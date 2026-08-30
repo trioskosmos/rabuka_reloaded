@@ -851,6 +851,13 @@ def transpile_body(body: str, consts: dict, func_name: str) -> str:
         if m:
             out.append("    while (test_has_pending_choice(&tg)) rb_resume_with_choice(&tg.state, 0);")
             mark_real(); continue
+        # while !game.has_pending_choice() { game.pass(); ... } — advance phases
+        # until a pending choice surfaces (e.g. a ライブ開始時 trigger). Bounded so a
+        # test that never produces a choice cannot hang the harness.
+        m = re.match(r'\s*while\s+!\s*game\.has_pending_choice\(\)(\s*&&\s*[^}]*)?\s*\{?\s*$', stripped)
+        if m:
+            out.append("    for (int _pg=0; _pg<64 && !test_has_pending_choice(&tg); _pg++) rb_advance_phase(&tg.state);")
+            mark_real(); continue
         if 'has_pending_choice' in line:
             mm = re.search(r'has_pending_choice\(\)', line)
             if mm:
@@ -869,6 +876,16 @@ def transpile_body(body: str, consts: dict, func_name: str) -> str:
                 out.append(f"    rb_resume_with_choice(&tg.state, {ix});")
             mark_real(); continue
         m = re.search(r'game\.select_option\s*\(\s*(\d+)\s*\)', line)
+        if m:
+            out.append(f"    rb_resume_with_choice(&tg.state, {m.group(1)});"); mark_real(); continue
+        # select_generated(N) — answer a pending generated choice with index N.
+        # Mirror the select_option handling: resume the pending choice so the
+        # ability's remaining effects (sibling grants) execute. (Rust's
+        # game.select_generated(N) selects the Nth generated option.) Only literal
+        # integer indices are handled here; variable-arg forms (e.g. a computed
+        # position index) still degrade to TODO because the binding expression is
+        # not translatable line-by-line.
+        m = re.search(r'select_generated\s*\(\s*(-?\d+)\s*\)', line)
         if m:
             out.append(f"    rb_resume_with_choice(&tg.state, {m.group(1)});"); mark_real(); continue
         m = re.search(r'game\.pending_choice_count\s*\(\s*\)', line)

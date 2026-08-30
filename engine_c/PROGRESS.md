@@ -178,8 +178,21 @@ the stale `⚠️` markers denoted fidelity edge-cases, not empty stubs. Correct
   baton `last_vacated_stage_area` / delayed-modifier ticking are minor edge-cases).
 
 **Net:** all three hand-written gating suites (`test`/`replay`/`ported`) compile and pass. The ~1000
-`generated` suite failures are now driven by deep live-pipeline fidelity nuances (per-card ability
-edge-cases, prohibition tie routing), not by missing placeholder functions — each is a multi-line
-fidelity port, not a single stub fill.
+`generated` suite failures are driven by **transpiler gaps**, not by missing engine functions:
+  - `game.select_generated(N)` was unhandled → degraded to `// TODO`, so those tests never answered
+    the pending choice. Now translated to `rb_resume_with_choice(&tg.state, N)` in `tools/gen_tests.py`
+    (mirrors `select_option`). This answers the choice, but those tests STILL fail because their
+    upstream setup helpers (`setup_kosuzu_test`, `advance_to_live_start_from_main`, `(kosuzu,_)`
+    destructuring) are themselves degraded TODOs in the generated file — the test environment is never
+    built, so no engine change can satisfy the assertions.
+  - The remaining generated failures cluster on: untranslated Rust setup/destructuring helpers, and
+    live-pipeline fidelity nuances (per-card ability edge-cases, prohibition tie routing). Each is a
+    multi-line fidelity port, not a single stub fill.
+
+**Conclusion:** the engine's placeholder functions are essentially all ported (gating suites green).
+The generated-suite red is a *transpiler* coverage problem (setup helpers + destructuring), plus deep
+live-pipeline fidelity. Next highest-value work: teach `gen_tests.py` to inline/translate the common
+setup helpers (`setup_kosuzu_test`, `advance_to_live_start_from_main`, tuple destructuring) so the
+transpiled tests actually build their game state.
 
 Hand-written suites green after every change (`rb_engine_test` / `rb_engine_replay` / `rb_engine_ported` 13/13).

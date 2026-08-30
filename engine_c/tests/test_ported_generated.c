@@ -244,10 +244,10 @@ static void gen_q255_dancing_stars_live_success_after_position_change(void){
     // TODO: );
     // // ab#0 asks for the destination; answer with the first generated option.
     test_has_pending_choice(&tg);
-    // TODO: game.select_generated(0);
+    rb_resume_with_choice(&tg.state, 0);
     while (test_has_pending_choice(&tg)) rb_resume_with_choice(&tg.state, 0);
     // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectTarget"), "expected only position|destination prompts in the chain" );
-    // TODO: game.select_generated(0);
+    rb_resume_with_choice(&tg.state, 0);
     // TODO: }
     // 
     int center_card = tg.state.p[0].stage[1];
@@ -1991,7 +1991,7 @@ static void gen_umi_bp3_live_start_select_heart_and_scale_with_success(void){
     // // Advance until live start triggers the pending choice.
     // // Stop passing as soon as pending_choice is set (next pass would auto-resolve it).
     int passes = 0;
-    test_has_pending_choice(&tg);
+    for (int _pg=0; _pg<64 && !test_has_pending_choice(&tg); _pg++) rb_advance_phase(&tg.state);
     // TODO: passes += 1;
     rb_advance_phase(&tg.state);
     // TODO: }
@@ -12662,7 +12662,7 @@ static void gen_q139_under_energy_moves_with_member(void){
     test_activate_ability(&tg, mover);
     test_has_pending_choice(&tg);
     // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectTarget"), "expected SelectTarget (position|destination)" );
-    // TODO: game.select_generated(0);
+    rb_resume_with_choice(&tg.state, 0);
     // TODO: scan_autos_both(&mut game);
     // 
     CHECK_EQ(tg.state.p[0].stage[0], mover, "q139_under_energy_moves_with_member");
@@ -25124,7 +25124,7 @@ static void gen_mute_kibiriver_normal_flow(void){
     while (test_has_pending_choice(&tg)) rb_resume_with_choice(&tg.state, 0);
     int acts = 0;
     // TODO: if !acts.is_empty() {
-    // TODO: game.select_generated(0);
+    rb_resume_with_choice(&tg.state, 0);
     test_drain_auto_choices(&tg);
     // TODO: } else {
     rb_resume_with_choice(&tg.state, -1);
@@ -31594,7 +31594,7 @@ static void gen_konata_bp4_deploy_blade_heart_member_waits(void){
     // 
     // // Choose a position for the deployed member.
     test_has_pending_choice(&tg);
-    // TODO: game.select_generated(0);
+    rb_resume_with_choice(&tg.state, 0);
     int konata_waited = 0;
     // TODO: .state
     // TODO: .mods
@@ -31697,7 +31697,7 @@ static void gen_konata_bp4_deploy_non_blade_heart_member_stays_active(void){
     // 
     test_has_pending_choice(&tg);
     // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectPosition"), "expected SelectPosition prompt" );
-    // TODO: game.select_generated(0);
+    rb_resume_with_choice(&tg.state, 0);
     test_has_pending_choice(&tg);
     // 
     // // The deployed member must actually be on stage for this negative to
@@ -50660,7 +50660,7 @@ static void gen_edelnote_two_members_different_names(void){
     // // inlined helper advance_to_live_start
     // 
     int passes = 0;
-    test_has_pending_choice(&tg);
+    for (int _pg=0; _pg<64 && !test_has_pending_choice(&tg); _pg++) rb_advance_phase(&tg.state);
     // TODO: passes += 1;
     rb_advance_phase(&tg.state);
     // TODO: }
@@ -50765,7 +50765,7 @@ static void gen_edelnote_single_member(void){
     // // inlined helper advance_to_live_start
     // 
     int passes = 0;
-    test_has_pending_choice(&tg);
+    for (int _pg=0; _pg<64 && !test_has_pending_choice(&tg); _pg++) rb_advance_phase(&tg.state);
     // TODO: passes += 1;
     rb_advance_phase(&tg.state);
     // TODO: }
@@ -50856,7 +50856,7 @@ static void gen_edelnote_no_members(void){
     // // inlined helper advance_to_live_start
     // 
     int passes = 0;
-    test_has_pending_choice(&tg);
+    for (int _pg=0; _pg<64 && !test_has_pending_choice(&tg); _pg++) rb_advance_phase(&tg.state);
     // TODO: passes += 1;
     rb_advance_phase(&tg.state);
     // TODO: }
@@ -50944,7 +50944,7 @@ static void gen_edelnote_three_members_two_same_name(void){
     // // inlined helper advance_to_live_start
     // 
     int passes = 0;
-    test_has_pending_choice(&tg);
+    for (int _pg=0; _pg<64 && !test_has_pending_choice(&tg); _pg++) rb_advance_phase(&tg.state);
     // TODO: passes += 1;
     rb_advance_phase(&tg.state);
     // TODO: }
@@ -51052,7 +51052,7 @@ static void gen_edelnote_two_same_name(void){
     // // inlined helper advance_to_live_start
     // 
     int passes = 0;
-    test_has_pending_choice(&tg);
+    for (int _pg=0; _pg<64 && !test_has_pending_choice(&tg); _pg++) rb_advance_phase(&tg.state);
     // TODO: passes += 1;
     rb_advance_phase(&tg.state);
     // TODO: }
@@ -51154,7 +51154,7 @@ static void gen_edelnote_name_based_exclusion(void){
     // // inlined helper advance_to_live_start
     // 
     int passes = 0;
-    test_has_pending_choice(&tg);
+    for (int _pg=0; _pg<64 && !test_has_pending_choice(&tg); _pg++) rb_advance_phase(&tg.state);
     // TODO: passes += 1;
     rb_advance_phase(&tg.state);
     // TODO: }
@@ -53052,7 +53052,7 @@ static void gen_s3_bp5_111_own_move_fires(void){
     test_activate_ability(&tg, watcher);
     test_has_pending_choice(&tg);
     // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectTarget"), "expected SelectTarget (position|destination)" );
-    // TODO: game.select_generated(0);
+    rb_resume_with_choice(&tg.state, 0);
     // TODO: scan_autos_both(&mut game);
     // 
     // TODO assert: assert!( game.state.mods.get_orientation_modifier(opp_member) == Some("wait"), "own-effect move fires the no-parenthetical auto" );
@@ -60841,7 +60841,7 @@ static void gen_bp5_111_activation_chain_waits_low_blade_opponent(void){
     // // (SelectTarget target=position|destination, allow_skip=false).
     test_has_pending_choice(&tg);
     // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectTarget"), "expected SelectTarget position|destination" );
-    // TODO: game.select_generated(0); // destination area choice
+    rb_resume_with_choice(&tg.state, 0);
     // TODO: scan_autos_both(&mut game);
     // 
     CHECK_EQ(tg.state.p[0].stage[0], saint_snow, "bp5_111_activation_chain_waits_low_blade_opponent");
@@ -60871,7 +60871,7 @@ static void gen_bp5_111_chain_neg_empty_opponent_stage(void){
     // // opponent stage (SelectTarget target=position|destination).
     test_has_pending_choice(&tg);
     // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectTarget"), "expected SelectTarget position|destination" );
-    // TODO: game.select_generated(0); // destination area choice
+    rb_resume_with_choice(&tg.state, 0);
     // TODO: scan_autos_both(&mut game);
     // 
     CHECK_EQ(tg.state.p[0].stage[0], saint_snow, "bp5_111_chain_neg_empty_opponent_stage");
@@ -70374,7 +70374,7 @@ static void gen_q238_reposition_opponent_member(void){
     CHECK_EQ(actions, 1, "q238_reposition_opponent_member");
     // 
     // // Select the opponent member
-    // TODO: game.select_generated(0);
+    rb_resume_with_choice(&tg.state, 0);
     // 
     // // Should now ask for destination
     test_has_pending_choice(&tg);
@@ -70382,7 +70382,7 @@ static void gen_q238_reposition_opponent_member(void){
     // TODO assert: assert!(dest_actions > 0, "Should have destination options");
     // 
     // // Move opponent member to left
-    // TODO: game.select_generated(0);
+    rb_resume_with_choice(&tg.state, 0);
     // 
     test_has_pending_choice(&tg);
     CHECK_EQ(tg.state.p[1].stage[0], opp_member, "q238_reposition_opponent_member");
@@ -70419,10 +70419,10 @@ static void gen_q238_reposition_own_member(void){
     int actions = 0;
     CHECK_EQ(actions, 1, "q238_reposition_own_member");
     // 
-    // TODO: game.select_generated(0);
+    rb_resume_with_choice(&tg.state, 0);
     // 
     test_has_pending_choice(&tg);
-    // TODO: game.select_generated(0); // move to whatever destination
+    rb_resume_with_choice(&tg.state, 0);
     // 
     test_has_pending_choice(&tg);
     // 
@@ -70525,10 +70525,10 @@ static void gen_q238_select_opponent_center(void){
     CHECK_EQ(actions, 2, "q238_select_opponent_center");
     // 
     // // Select opponent:center (index 1)
-    // TODO: game.select_generated(1);
+    rb_resume_with_choice(&tg.state, 1);
     // 
     test_has_pending_choice(&tg);
-    // TODO: game.select_generated(0); // move to left
+    rb_resume_with_choice(&tg.state, 0);
     // 
     test_has_pending_choice(&tg);
     CHECK_EQ(tg.state.p[1].stage[0], opp_center, "q238_select_opponent_center");
@@ -72090,7 +72090,7 @@ static void gen_non_optional_pc_with_all_positions_excluded_fizzles(void){
     // TODO assert_eq (unresolved): assert_eq!( actions.len(), 2, "Should offer 2 position options (left, right), got {}", actions.len() );
     // 
     // // Selecting any position should work without error
-    // TODO: game.select_generated(0);
+    rb_resume_with_choice(&tg.state, 0);
     test_drain_auto_choices(&tg);
     test_has_pending_choice(&tg);
     // 
@@ -73660,7 +73660,7 @@ static void gen_dia_position_change_saintsnow_source_any_destination(void){
     // TODO assert_eq (unresolved): assert_eq!( src_area, Some("left"), "Only left (理亞/SaintSnow) should be selectable" );
     // 
     // // Select left (理亞) as source
-    // TODO: game.select_generated(0);
+    rb_resume_with_choice(&tg.state, 0);
     // 
     // // Destination selection: must include center (non-SaintSnow filler)
     test_has_pending_choice(&tg);
@@ -73879,7 +73879,7 @@ static void gen_dia_position_change_two_saintsnow_both_selectable(void){
     // TODO assert: assert!(src_areas.contains(&"center"), "Center should be selectable");
     // 
     // // Select left (理亞1) as source
-    // TODO: game.select_generated(0);
+    rb_resume_with_choice(&tg.state, 0);
     // 
     // // Destination selection: must include center (理亞2), right (Dia)
     test_has_pending_choice(&tg);
@@ -89961,17 +89961,17 @@ static void gen_position_change_three_members_all_move(void){
     test_has_pending_choice(&tg);
     int actions = 0;
     // TODO assert_eq (unresolved): assert_eq!(actions.len(), 3, "First: all 3 zones available");
-    // TODO: game.select_generated(1); // a → Center
+    rb_resume_with_choice(&tg.state, 1);
     // 
     test_has_pending_choice(&tg);
     actions = 0;
     // TODO assert_eq (unresolved): assert_eq!(actions.len(), 2, "Second: 2 zones remain after first pick");
-    // TODO: game.select_generated(1); // → Right
+    rb_resume_with_choice(&tg.state, 1);
     // 
     test_has_pending_choice(&tg);
     actions = 0;
     // TODO assert_eq (unresolved): assert_eq!(actions.len(), 1, "Third: last remaining zone");
-    // TODO: game.select_generated(0); // → Left
+    rb_resume_with_choice(&tg.state, 0);
     // 
     test_has_pending_choice(&tg);
     // TODO: assert_ne!(game.state.player1.stage.stage[0], -1);
@@ -90071,7 +90071,7 @@ static void gen_position_change_no_other_members(void){
     // action result consumed: assert_eq!( actions[0] .parameters .as_ref() .unwrap() .stage_area .as_deref(), Some("left") );
     // action result consumed: assert_eq!( actions[1] .parameters .as_ref() .unwrap() .stage_area .as_deref(), Some("center") );
     // action result consumed: assert_eq!( actions[2] .parameters .as_ref() .unwrap() .stage_area .as_deref(), Some("right") );
-    // TODO: game.select_generated(0); // move to Left
+    rb_resume_with_choice(&tg.state, 0);
     // 
     test_has_pending_choice(&tg);
     CHECK_EQ(tg.state.p[0].stage[0], chii, "position_change_no_other_members");
@@ -90099,17 +90099,17 @@ static void gen_position_change_with_swap(void){
     test_has_pending_choice(&tg);
     int actions = 0;
     // TODO assert_eq (unresolved): assert_eq!(actions.len(), 3, "First: all 3 zones available");
-    // TODO: game.select_generated(2); // Move to Right
+    rb_resume_with_choice(&tg.state, 2);
     // 
     test_has_pending_choice(&tg);
     actions = 0;
     // TODO assert_eq (unresolved): assert_eq!(actions.len(), 2, "Second: 2 zones remain after first pick");
-    // TODO: game.select_generated(0); // Move to Left
+    rb_resume_with_choice(&tg.state, 0);
     // 
     test_has_pending_choice(&tg);
     actions = 0;
     // TODO assert_eq (unresolved): assert_eq!(actions.len(), 1, "Third: last remaining zone");
-    // TODO: game.select_generated(0); // Move to Center
+    rb_resume_with_choice(&tg.state, 0);
     // 
     test_has_pending_choice(&tg);
     // TODO: assert_ne!(game.state.player1.stage.stage[0], -1);
@@ -90339,17 +90339,17 @@ static void gen_position_change_tracks_card_movement(void){
     test_has_pending_choice(&tg);
     int actions = 0;
     // TODO assert_eq (unresolved): assert_eq!(actions.len(), 3, "First: all 3 zones available");
-    // TODO: game.select_generated(1); // a → Center
+    rb_resume_with_choice(&tg.state, 1);
     // 
     test_has_pending_choice(&tg);
     actions = 0;
     // TODO assert_eq (unresolved): assert_eq!(actions.len(), 2, "Second: 2 zones remain");
-    // TODO: game.select_generated(0); // → Left
+    rb_resume_with_choice(&tg.state, 0);
     // 
     test_has_pending_choice(&tg);
     actions = 0;
     // TODO assert_eq (unresolved): assert_eq!(actions.len(), 1, "Third: last remaining zone");
-    // TODO: game.select_generated(0); // → Right
+    rb_resume_with_choice(&tg.state, 0);
     // 
     int moved = 0;
     // TODO assert: assert!(!moved.is_empty(), "At least one card should have moved");
@@ -124800,7 +124800,7 @@ static void gen_riko_bp6_auto_single_card_deck_top_exact_identity(void){
     // 
     // 
     test_has_pending_choice(&tg);
-    // TODO: game.select_generated(0);
+    rb_resume_with_choice(&tg.state, 0);
     // 
     // // live removed from waitroom entirely
     CHECK((!test_zone_has_id(&tg, 0, "discard", live)), "riko_bp6_auto_single_card_deck_top_exact_identity");
@@ -124909,7 +124909,7 @@ static void gen_riko_bp6_auto_single_card_deck_bottom_exact_identity(void){
     // 
     // 
     test_has_pending_choice(&tg);
-    // TODO: game.select_generated(1); // deck_bottom
+    rb_resume_with_choice(&tg.state, 1);
     // 
     CHECK((!test_zone_has_id(&tg, 0, "discard", live)), "riko_bp6_auto_single_card_deck_bottom_exact_identity");
     // TODO assert_eq (unresolved): assert_eq!( game.state.player1.main_deck.cards.len(), deck_snapshot.len() + 1, "deck gained exactly 1 card" );
@@ -125017,7 +125017,7 @@ static void gen_riko_bp6_auto_batch_of_3_first_only_taken_others_untouched(void)
     // 
     // // Then position|destination choice for deck top or bottom
     test_has_pending_choice(&tg);
-    // TODO: game.select_generated(0); // deck_top
+    rb_resume_with_choice(&tg.state, 0);
     // 
     // TODO assert_eq (unresolved): assert_eq!( game.state.player1.main_deck.cards.len(), deck_before + 1, "exactly 1 card added to deck" );
     // // The player picked index 1 (batch[1]), which is the second card
@@ -125130,7 +125130,7 @@ static void gen_riko_bp6_auto_mixed_batch_filters_correctly(void){
     // 
     // 
     test_has_pending_choice(&tg);
-    // TODO: game.select_generated(0);
+    rb_resume_with_choice(&tg.state, 0);
     // 
     // // Only aq_live was removed; others untouched
     CHECK((!test_zone_has_id(&tg, 0, "discard", aq_live)), "riko_bp6_auto_mixed_batch_filters_correctly");
@@ -125324,7 +125324,7 @@ static void gen_riko_bp6_auto_turn_limit_blocks_second_trigger_exact(void){
     // TODO: .process_pending_auto_abilities(&game.state.player1.id.clone());
     // 
     test_has_pending_choice(&tg);
-    // TODO: game.select_generated(0);
+    rb_resume_with_choice(&tg.state, 0);
     CHECK((!test_zone_has_id(&tg, 0, "discard", live_a)), "riko_bp6_auto_turn_limit_blocks_second_trigger_exact");
     // TODO assert_eq (unresolved): assert_eq!( game.state.player1.main_deck.cards.first(), Some(&live_a), "first trigger: live_a on deck top" );
     // 
@@ -125719,7 +125719,7 @@ static void gen_riko_bp6_auto_optional_skip_does_not_consume_turn_limit(void){
     // TODO: .process_pending_auto_abilities(&game.state.player1.id.clone());
     // 
     test_has_pending_choice(&tg);
-    // TODO: game.select_generated(0); // deck_top
+    rb_resume_with_choice(&tg.state, 0);
     CHECK((!test_zone_has_id(&tg, 0, "discard", live_b)), "riko_bp6_auto_optional_skip_does_not_consume_turn_limit");
     CHECK(test_zone_has_id(&tg, 0, "deck", live_b), "riko_bp6_auto_optional_skip_does_not_consume_turn_limit");
     // // live_a still in waitroom (from the skip)
@@ -132098,7 +132098,7 @@ static void gen_kosuzu_choose_number_adds_to_hand(void){
     rb_advance_phase(&tg.state);
     // 
     test_has_pending_choice(&tg);
-    // TODO: game.select_generated(0);
+    rb_resume_with_choice(&tg.state, 0);
     test_has_pending_choice(&tg);
     CHECK(test_zone_has_id(&tg, 0, "hand", top_card), "kosuzu_choose_number_adds_to_hand");
     CHECK_EQ(rb_mods_get_blade(&tg.state.mods, kosuzu), 0, "kosuzu_choose_number_adds_to_hand");
@@ -132124,7 +132124,7 @@ static void gen_kosuzu_choose_number_gains_blade(void){
     rb_advance_phase(&tg.state);
     // 
     test_has_pending_choice(&tg);
-    // TODO: game.select_generated(9);
+    rb_resume_with_choice(&tg.state, 9);
     test_has_pending_choice(&tg);
     CHECK((!test_zone_has_id(&tg, 0, "hand", top_card)), "kosuzu_choose_number_gains_blade");
     // TODO assert_eq (unresolved): assert_eq!( game.state.player1.main_deck.cards[0], top_card, "card returned to top of deck" );
@@ -132151,7 +132151,7 @@ static void gen_kosuzu_equal_choice_both_effects(void){
     rb_advance_phase(&tg.state);
     // 
     test_has_pending_choice(&tg);
-    // TODO: game.select_generated(3);
+    rb_resume_with_choice(&tg.state, 3);
     test_has_pending_choice(&tg);
     CHECK(test_zone_has_id(&tg, 0, "hand", top_card), "kosuzu_equal_choice_both_effects");
     CHECK(rb_mods_get_blade(&tg.state.mods, kosuzu), "kosuzu_equal_choice_both_effects");
