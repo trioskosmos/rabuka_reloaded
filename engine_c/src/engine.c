@@ -637,10 +637,13 @@ int rb_card_arrived_this_turn(const GameState *g, int pl, int card_id) {
     return 0;
 }
 int rb_card_has_restriction(const GameState *g, int card_id, const char *restriction) {
-    /* restriction support not yet in the C engine (see PROGRESS §14); returns 0
-       (no restriction) so baton replacement is allowed. TODO: wire to
-       CardRestriction data once decoded. */
-    (void)g; (void)card_id; (void)restriction;
+    /* Card-data restrictions (e.g. cannot_baton_touch) require a CardRestriction
+        field the C decoder does not yet expose — see PROGRESS §12.3 / §14. Until
+        that decoder gap is closed, honor the RUNTIME cannot-activate ban
+        (set_card_active / restriction effect), which also bars a locked member
+        from being baton-replaced. */
+    (void)restriction;
+    if (rb_card_is_cannot_active(g, card_id)) return 1;
     return 0;
 }
 void rb_send_to_waitroom(GameState *g, int pl, int card_id) {
