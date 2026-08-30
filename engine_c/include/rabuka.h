@@ -338,6 +338,11 @@ typedef struct {
     char target[64];      /* for SELECT_TARGET: "pay_optional_cost:skip..." etc. */
     char description[128];
     RbChoiceRoute route;  /* which gate produced this choice (ChoiceRoute) */
+    /* selection filter — mirrors engine/src/ability/choice.rs SelectionContext
+        (card_type is already above; group_names + heart_colors narrow the pool
+        further so a host UI / test picks a valid card). Empty/negative = no filter. */
+    char filter_group[32];
+    int  filter_heart;     /* heart color idx, -1 = none */
 } RbChoice;
 
 typedef struct {
@@ -376,6 +381,11 @@ typedef struct {
     int      resume_is_select; /* 1 if the select_card choice is a select_cards/select/look_and_select
                                    (kept card recorded into g->selected_cards). Set by the emitter, not
                                    derived from resume_eff (which may dangle after the source Card is freed). */
+    /* selection filter snapshot (mirrors SelectionContext group/heart filter) —
+        copied from the pending choice before it is cleared so rb_look_resume can
+        validate the kept card. Empty/negative = no filter. */
+    char     resume_filter_group[32];
+    int      resume_filter_heart;
     /* optional-cost continuation: when an optional pay_energy/cost gate emits a
        choice, the executing effect's parent + the index of that gate are stashed
        here so the resume can run the ability's remaining sibling effects. */

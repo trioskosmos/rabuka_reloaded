@@ -84,6 +84,27 @@ void rb_effect_select_cards(GameState *g, int actor, AbilityEffect *e){
     for(int i=0;i<e->n_extra;i++) if(e->extra_k[i] && !strcmp(e->extra_k[i],"card_type")) ctype=e->extra_v[i];
     int cnt=e->count>=0?e->count:1;
     rb_emit_choice(g, actor, RB_CHOICE_SELECT_CARD, zone, ctype, cnt, e->is_optional?1:0, NULL);
+    /* SelectionContext filter (ability/choice.rs): narrow the valid pool to a
+        group and/or heart color so a host UI / test picks a legal card. */
+    g->queue.pending.filter_group[0] = 0;
+    g->queue.pending.filter_heart = -1;
+    for(int i=0;i<e->n_extra;i++){
+        if(e->extra_k[i] && !strcmp(e->extra_k[i],"group_names") && e->extra_v[i])
+            strncpy(g->queue.pending.filter_group, e->extra_v[i], sizeof(g->queue.pending.filter_group)-1);
+        else if(e->extra_k[i] && !strcmp(e->extra_k[i],"heart_colors") && e->extra_v[i]){
+            const char *hc=e->extra_v[i];
+            int col=-1;
+            if(!strcmp(hc,"pink")||!strcmp(hc,"heart00")) col=0;
+            else if(!strcmp(hc,"red")) col=1; else if(!strcmp(hc,"yellow")) col=2;
+            else if(!strcmp(hc,"green")) col=3; else if(!strcmp(hc,"blue")) col=4;
+            else if(!strcmp(hc,"purple")) col=5; else if(!strcmp(hc,"orange")) col=6;
+            else if(!strcmp(hc,"all")) col=7;
+            g->queue.pending.filter_heart = col;
+        }
+    }
+    /* snapshot the filter so rb_look_resume can validate after the pending choice is cleared */
+    strncpy(g->queue.resume_filter_group, g->queue.pending.filter_group, sizeof(g->queue.resume_filter_group)-1);
+    g->queue.resume_filter_heart = g->queue.pending.filter_heart;
     g->queue.resume_mode = 2; g->queue.resume_eff = e; g->queue.resume_is_select = 1;
     g->queue.resume_actor = actor; g->queue.resume_host = actor;
 }
@@ -109,6 +130,32 @@ void rb_look_resume(GameState *g, int actor, int selected_idx, const char *desti
         lp->n=0; return;
     }
     int chosen=lp->cards[selected_idx];
+    /* SelectionContext filter (ability/choice.rs): if a group/heart filter was
+        specified, the kept card must satisfy it; otherwise treat as a skip so a
+        mismatched pick never silently enters selected_cards. */
+    if(is_select && (g->queue.resume_filter_group[0] || g->queue.resume_filter_heart >= 0)) {
+        int ok = 1;
+        if (g->queue.resume_filter_group[0] &&
+            !rb_card_matches_group_str(chosen, g->queue.resume_filter_group)) ok = 0;
+        if (ok && g->queue.resume_filter_heart >= 0) {
+            Card fc; if (rb_decode_card_by_index((uint32_t)chosen, &fc)) {
+                int has = 0;
+                for (int h = 0; h < fc.n_hearts; h++)
+                    if (fc.heart_color[h] == g->queue.resume_filter_heart) has = 1;
+                rb_free_card(&fc);
+                if (!has) ok = 0;
+            }
+        }
+        if (!ok) {
+            if (lp->from_deck) {
+                for (int i = 0; i < lp->n; i++) if (P->deck.n < RB_MAX_ZONE) P->deck.cards[P->deck.n++] = lp->cards[i];
+                rb_shuffle(P->deck.cards, P->deck.n);
+            } else {
+                for (int i = 0; i < lp->n; i++) if (P->hand.n < RB_MAX_ZONE) P->hand.cards[P->hand.n++] = lp->cards[i];
+            }
+            lp->n = 0; return;
+        }
+    }
     if(is_select){
         if(g->n_selected_cards < RB_MAX_RECENTLY_MOVED) g->selected_cards[g->n_selected_cards++]=chosen;
     }
