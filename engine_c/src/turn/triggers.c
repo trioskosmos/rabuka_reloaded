@@ -335,6 +335,38 @@ static void apply_constant_effect(GameState *g, int pl, int host_cid, AbilityEff
             if(acc) acc->heart[7]+=1;
         }
     }
+    else if (!strcmp(e->action,"draw") || !strcmp(e->action,"draw_card") ||
+               !strcmp(e->action,"draw_until_count")) {
+        rb_effect_draw_card(g, pl, e, host_cid);
+    } else if (!strcmp(e->action,"discard_card") || !strcmp(e->action,"discard_until_count")) {
+        rb_effect_move_cards(g, pl, e);
+    } else if (!strcmp(e->action,"move_cards") || !strcmp(e->action,"return_to_hand") ||
+               !strcmp(e->action,"bounce") || !strcmp(e->action,"back_to_hand") ||
+               !strcmp(e->action,"deck_bottom") || !strcmp(e->action,"put_on_bottom")) {
+        rb_effect_move_cards(g, pl, e);
+    } else if (!strcmp(e->action,"look_at") || !strcmp(e->action,"reveal") ||
+               !strcmp(e->action,"reveal_per_group")) {
+        rb_effect_look_at(g, pl, e);
+    } else if (!strcmp(e->action,"reveal_until_live_card")) {
+        rb_effect_reveal_until_live_card(g, pl, e);
+    } else if (!strcmp(e->action,"reveal_until_chosen_card")) {
+        rb_effect_reveal_until_chosen_card(g, pl, e);
+    } else if (!strcmp(e->action,"select_cards") || !strcmp(e->action,"select") ||
+               !strcmp(e->action,"select_number") || !strcmp(e->action,"look_and_select")) {
+        rb_effect_select_cards(g, pl, e);
+    } else if (!strcmp(e->action,"change_state")) {
+        rb_effect_change_state(g, pl, e);
+    } else if (!strcmp(e->action,"position_change")) {
+        rb_effect_position_change(g, pl, e, host_cid);
+    } else if (!strcmp(e->action,"rotation")) {
+        rb_effect_rotation(g, pl, e);
+    } else if (!strcmp(e->action,"restriction")) {
+        int resolved=0; rb_execute_misc_effect(g, pl, &g->p[pl], e, &resolved);
+    } else if (!strcmp(e->action,"energy_placement")) {
+        rb_effect_energy_placement(g, pl, e);
+    } else if (!strcmp(e->action,"energy_state_change")) {
+        rb_effect_energy_state_change(g, pl, e);
+    }
     /* sequential children: walk them (q127_wien leaves_stage_modifier_removed etc.) */
     for(int i=0;i<e->n_child;i++) apply_constant_effect(g, pl, host_cid, e->child[i], acc);
 }
