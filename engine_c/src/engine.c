@@ -827,6 +827,10 @@ int rb_game_init(GameState *g, const uint32_t *deck0, int n0,
     memset(g, 0, sizeof(*g));
     rb_mods_init(&g->mods);
     g->winner = -1; g->turn = 1; g->phase = RB_PHASE_RPS;
+    g->cheer_check_base = -1;
+    g->baton_touch_replaced_member_cost = -1;
+    g->baton_touch_replaced_member_id = -1;
+    g->baton_touch_arriving_card_id = -1;
     for (int pl = 0; pl < 2; pl++) {
         const uint32_t *d = (pl == 0) ? deck0 : deck1;
         int n = (pl == 0) ? n0 : n1;

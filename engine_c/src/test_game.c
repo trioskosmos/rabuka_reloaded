@@ -9,6 +9,10 @@ void test_game_new(TestGame *tg){
     tg->state.phase=RB_PHASE_MAIN;
     tg->state.active=0; tg->state.first_attacker=0; tg->state.second_attacker=1;
     for(int p=0;p<2;p++) for(int i=0;i<RB_STAGE_SIZE;i++) tg->state.p[p].stage[i]=RB_EMPTY_SLOT;
+    tg->state.cheer_check_base = -1;
+    tg->state.baton_touch_replaced_member_cost = -1;
+    tg->state.baton_touch_replaced_member_id = -1;
+    tg->state.baton_touch_arriving_card_id = -1;
 }
 
 int test_id(TestGame *tg, const char *card_no){

@@ -192,6 +192,8 @@ int  rb_mods_is_delayed_cannot_active(RbMods *m, int card_id);
 void rb_mods_add_delayed_cannot_active(RbMods *m, int card_id, uint8_t turns);
 void rb_mods_tick_delayed_for(RbMods *m, const int *owned, int n_owned);
 
+typedef struct { uint8_t slot; int32_t delta; } RbYellMod;
+
 /* ── Card (decoded from cards.bin) ── */
 #define RB_MAX_HEARTS 64
 typedef struct {
@@ -444,7 +446,42 @@ typedef struct GameState {
     int      n_cannot_active_cards;
     char     prohibition[64][48];            /* restriction: "type:destination" prohibition notes */
     int      n_prohibition;
+    /* ── tracking.rs (ported) ── */
+    int      turn1_abilities_played[64]; int n_turn1_abilities_played;
+    int      turn2_abilities_played[64]; int n_turn2_abilities_played;
+    int      player1_cheer_blade_heart_count;
+    int      player2_cheer_blade_heart_count;
+    RbBag    last_resolution_cards_p1;
+    RbBag    last_resolution_cards_p2;
+    int      cheer_check_base; /* -1 = None */
+    int      cheer_checks_required;
+    int      cheer_checks_done;
+    int      cheer_check_completed;
+    RbYellMod yell_count_modifiers[32]; int n_yell_count_modifiers;
+    int      baton_touch_count_p1;
+    int      baton_touch_count_p2;
+    int      baton_touch_arriving_card_ids[16]; int n_baton_touch_arriving_card_ids;
+    int      baton_touch_zero_cost;
+    int      baton_touch_replaced_member_cost; /* -1 = None */
+    int      baton_touch_replaced_member_id;  /* -1 = None */
+    int      baton_touch_arriving_card_id; /* -1 = None */
+    int      areas_placed_this_turn[16]; int n_areas_placed_this_turn;
+    int      cards_appeared_this_turn[64]; int n_cards_appeared_this_turn;
+    int      auto_ability_trigger_counts[32]; int n_auto_ability_trigger_counts;
+    int      position_change_occurred_this_turn;
+    int      formation_change_occurred_this_turn;
+    int      opponent_live_success_this_turn;
+    int      game_state_history[64]; int n_game_state_history;
+    int      loop_detected;
 } GameState;
+
+/* ── Tracking (engine/src/core/game_state/tracking.rs) ── */
+void rb_reset_keyword_tracking(GameState *g);
+void rb_add_yell_count_modifier(GameState *g, uint8_t player_slot, int32_t delta);
+uint8_t rb_effective_cheer_checks_required(const GameState *g, const char *player_id, uint8_t base);
+int rb_perform_cheer_check(GameState *g, const char *player_id, uint8_t blade_count);
+int rb_check_required_hearts(const GameState *g);
+int rb_is_action_prohibited(const GameState *g, const char *action);
 
 /* ── Ability queue drain + owner lookup (engine/src/ability_queue.rs) ── */
 int rb_owner_of_card(const GameState *g, int cid);
