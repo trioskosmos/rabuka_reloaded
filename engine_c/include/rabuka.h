@@ -502,6 +502,9 @@ void rb_print_state(const GameState *g);
 /* ── Zone helpers (operate on a player's bags) ── */
 int  rb_draw(GameState *g, int pl);                 /* draw 1 to hand */
 int  rb_draw_energy(GameState *g, int pl);          /* draw 1 to energy zone */
+int  rb_draw_cards_for_player(RbPlayer *player, uint8_t count, const char *source,
+                             const char *destination, const char *card_type_filter,
+                             int is_any_number, void *distinct, void *card_db, int self_target_id);
 void rb_shuffle(int *a, int n);
 int  rb_zone_of_str(const char *s, RbZone *out);    /* map zone wire name */
 
