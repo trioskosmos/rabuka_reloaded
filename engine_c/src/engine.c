@@ -202,7 +202,9 @@ void rb_execute_effect_ex(GameState *g, int actor, AbilityEffect *e, int host_ci
     for (int i = 0; i < e->n_child; i++) {
         /* repeat_procedure's children are executed cnt times by handle_action,
            so skip the single pre-order pass here to avoid a double execution. */
-        if (!(e->action && !strcmp(e->action, "repeat_procedure")))
+        if (!(e->action && (!strcmp(e->action, "repeat_procedure") ||
+                            !strcmp(e->action, "conditional_alternative") ||
+                            !strcmp(e->action, "sequential"))))
             rb_execute_effect_ex(g, actor, e->child[i], host_cid);
         if (rb_has_pending_choice(g)) {
             /* An optional cost gate (pay_energy/pay_cost) that emitted its
@@ -212,7 +214,9 @@ void rb_execute_effect_ex(GameState *g, int actor, AbilityEffect *e, int host_ci
             AbilityEffect *ch = e->child[i];
             if (ch && ch->is_optional && ch->action &&
                 (!strcmp(ch->action, "pay_energy") || !strcmp(ch->action, "pay_cost") ||
-                 !strcmp(ch->action, "activation_cost") || !strcmp(ch->action, "pay_optional_cost"))) {
+                  !strcmp(ch->action, "activation_cost") || !strcmp(ch->action, "pay_optional_cost") ||
+                  !strcmp(ch->action, "draw") || !strcmp(ch->action, "draw_card") ||
+                  !strcmp(ch->action, "draw_until_count"))) {
                 g->queue.resume_parent = e;
                 g->queue.resume_child = i;
             }
@@ -249,10 +253,10 @@ static void handle_action(GameState *g, int actor, AbilityEffect *e, int host_ci
     RbPlayer *W = &g->p[who];
     RbPlayer *O = &g->p[actor ^ 1];
 
-    if (!strcmp(act, "draw") || !strcmp(act, "draw_card")) {
-        for (int i = 0; i < cnt; i++) rb_draw(g, who);
-    } else if (!strcmp(act, "draw_until_count")) {
-        while (W->hand.n < cnt) { if (!rb_draw(g, who)) break; }
+    if (!strcmp(act, "draw") || !strcmp(act, "draw_card") ||
+        !strcmp(act, "draw_until_count")) {
+        /* Faithful draw — mirror draw.rs:execute_draw_wrapper/execute_draw. */
+        rb_effect_draw_card(g, actor, e, host_cid);
     } else if (!strcmp(act, "discard_card")) {
         RbZone src = RB_ZONE_HAND;
         if (e->source) rb_zone_of_str(e->source, &src);
@@ -288,8 +292,15 @@ static void handle_action(GameState *g, int actor, AbilityEffect *e, int host_ci
             if (e->extra_k[i] && !strcmp(e->extra_k[i], "group_names")) gn = e->extra_v[i];
         }
         if (!res || !strcmp(res, "energy")) {
-            W->energy_active += cnt;
-            if (W->energy_active > RB_MAX_ENERGY_CARDS) W->energy_active = RB_MAX_ENERGY_CARDS;
+            /* target=="both" grants energy to BOTH players (mirrors gain_resource). */
+            int eng_players[2]; int nep = 0;
+            if (e->target && !strcmp(e->target, "both")) { eng_players[nep++] = actor; eng_players[nep++] = actor ^ 1; }
+            else eng_players[nep++] = who;
+            for (int ep = 0; ep < nep; ep++) {
+                RbPlayer *EP = &g->p[eng_players[ep]];
+                EP->energy_active += cnt;
+                if (EP->energy_active > RB_MAX_ENERGY_CARDS) EP->energy_active = RB_MAX_ENERGY_CARDS;
+            }
         } else {
             int recips[RB_STAGE_SIZE + 1]; int nr = 0;
             if (self_target && !gn) {
@@ -297,15 +308,19 @@ static void handle_action(GameState *g, int actor, AbilityEffect *e, int host_ci
                 if (host_cid >= 0) recips[nr++] = host_cid;
             } else {
                 /* mirror Rust resolve_gain_resource_targets: when a group/card_type
-                   filter is present, targets are the matching stage members of
-                   the (target) player regardless of self_target. */
-                int tgt = target_player(e, actor);
-                RbPlayer *TP = &g->p[tgt];
-                for (int q = 0; q < RB_STAGE_SIZE; q++) {
-                    int cid = TP->stage[q];
-                    if (cid == RB_EMPTY_SLOT) continue;
-                    if (gn && !rb_card_matches_group_str(cid, gn)) continue;
-                    if (nr < (int)(sizeof(recips)/sizeof(recips[0]))) recips[nr++] = cid;
+                    filter is present, targets are the matching stage members of
+                    the indicated player(s). target=="both" grants to BOTH players. */
+                int tgt_players[2]; int ntp = 0;
+                if (e->target && !strcmp(e->target, "both")) { tgt_players[ntp++] = actor; tgt_players[ntp++] = actor ^ 1; }
+                else tgt_players[ntp++] = target_player(e, actor);
+                for (int tp = 0; tp < ntp; tp++) {
+                    RbPlayer *TP = &g->p[tgt_players[tp]];
+                    for (int q = 0; q < RB_STAGE_SIZE; q++) {
+                        int cid = TP->stage[q];
+                        if (cid == RB_EMPTY_SLOT) continue;
+                        if (gn && !rb_card_matches_group_str(cid, gn)) continue;
+                        if (nr < (int)(sizeof(recips)/sizeof(recips[0]))) recips[nr++] = cid;
+                    }
                 }
             }
             if (nr == 0 && host_cid >= 0) recips[nr++] = host_cid;
@@ -360,12 +375,29 @@ static void handle_action(GameState *g, int actor, AbilityEffect *e, int host_ci
         if (W->energy_active < 0) W->energy_active = 0;
         rb_recalc_constants(g);
     } else if (!strcmp(act, "modify_score") || !strcmp(act, "gain_score")) {
-        W->score += cnt;
+        /* target=="both" adjusts BOTH players' scores (mirrors gain_resource). */
+        if (e->target && !strcmp(e->target, "both")) { g->p[actor].score += cnt; g->p[actor ^ 1].score += cnt; }
+        else W->score += cnt;
     } else if (!strcmp(act, "gain_heart") ||
-               !strcmp(act, "place_heart") || !strcmp(act, "specify_heart_color")) {
+                !strcmp(act, "place_heart")) {
         int col = heart_color_of(e, RB_HEART_PINK);
         if (host_cid >= 0) rb_mods_add_heart(&g->mods, host_cid, col, cnt);
         else W->hearts[col] += cnt;
+    } else if (!strcmp(act, "specify_heart_color")) {
+        /* Mirror state.rs:execute_specify_heart_color — set a persistent per-card
+            heart-color override: the targeted member's base hearts are thereafter
+            counted as `col` (not granted as an extra heart). Applied in
+            rb_calc_stage_hearts. */
+        int col = heart_color_of(e, RB_HEART_PINK);
+        if (col < 0 || col > 7) col = RB_HEART_PINK;
+        if (host_cid >= 0) {
+            g->mods.heart_color_override[host_cid] = (int8_t)col;
+        } else {
+            for (int q = 0; q < RB_STAGE_SIZE; q++)
+                if (W->stage[q] != RB_EMPTY_SLOT)
+                    g->mods.heart_color_override[W->stage[q]] = (int8_t)col;
+        }
+        rb_recalc_constants(g);
     } else if (!strcmp(act, "lose_heart") || !strcmp(act, "damage")) {
         int col = heart_color_of(e, RB_HEART_PINK);
         O->hearts[col] -= cnt;
@@ -471,6 +503,7 @@ static void handle_action(GameState *g, int actor, AbilityEffect *e, int host_ci
                         else if (!strcmp(hc,"all")) hcol=7;
                     }
                     g->mods.heart_multiplier[cid] = (int8_t)hcol;
+                    g->mods.heart_multiplier_amt[cid] = (int8_t)(cnt >= 1 ? cnt : 2);
                 }
             } else if (!strcmp(act, "choose_required_hearts")) {
                 /* Headless can't let the player pick a color, so apply the chosen
@@ -601,11 +634,28 @@ static void handle_action(GameState *g, int actor, AbilityEffect *e, int host_ci
             for (int i = 0; i < e->n_child; i++)
                 rb_execute_effect_ex(g, actor, e->child[i], host_cid);
     } else if (!strcmp(act, "custom") ||
-                !strcmp(act, "do_nothing") || !strcmp(act, "sequential") ||
-                !strcmp(act, "conditional_alternative")) {
-        /* Compound/control: children already executed pre-order in rb_execute_effect. */
-    } else if (!strcmp(act, "choice") || !strcmp(act, "conditional_on_result") ||
-                !strcmp(act, "conditional_on_optional")) {
+                !strcmp(act, "do_nothing")) {
+        /* Compound/control no-ops. */
+    } else if (!strcmp(act, "sequential")) {
+        /* Mirror compound.rs::execute_sequential_effect — run the action list
+            (children) in order with per-step condition gating + otherwise-condition
+            skip + trailing repeat_procedure loop. */
+        rb_compound_sequential(g, actor, e, host_cid);
+    } else if (!strcmp(act, "conditional_alternative")) {
+        /* Mirror compound.rs::execute_conditional_alternative — tiered conditions
+            then legacy single-condition routing. branch=-1 routes via the effect's
+            own condition (post-negation). */
+        rb_compound_conditional_alternative(g, actor, e, -1, host_cid);
+    } else if (!strcmp(act, "conditional_on_result")) {
+        /* Mirror compound.rs::execute_conditional_on_result — run primary_effect,
+            then the followup_action if result_condition is met. */
+        rb_compound_conditional_on_result(g, actor, e, host_cid);
+    } else if (!strcmp(act, "conditional_on_optional")) {
+        /* Mirror compound.rs::execute_conditional_on_optional — taken=-1 preserves
+            the legacy emit-choice (headless auto-skips); resume routes via the
+            (chose_yes, negation) matrix. */
+        rb_compound_conditional_on_optional(g, actor, e, -1, host_cid);
+    } else if (!strcmp(act, "choice")) {
         int allow = e->is_optional ? 1 : 0;
         rb_emit_choice(g, actor, RB_CHOICE_SELECT_TARGET, NULL, NULL, cnt, allow, act);
     } else if (!strcmp(act, "select_number")) {
@@ -717,6 +767,9 @@ int rb_play_member(GameState *g, int pl, int hand_idx, int stage_pos) {
     P->stage[stage_pos] = card;
     P->stage_wait[stage_pos] = 0;
     g->stage_arrived[pl][stage_pos] = 1;
+    /* Mirror GameState::debut_count_this_turn — a member debuted (登場) on this
+        turn; bump the per-player counter so temporal conditions gate on it. */
+    g->debut_count_this_turn[pl]++;
     /* Mirror Rust set_recently_moved_batch: the played (or baton-replaced) member
         is now "recently moved" so movement-condition gates and auto-abilities-for-
         movement (trigger_auto_abilities_for_movement) see it during this resolution. */
@@ -841,6 +894,7 @@ int rb_perform_live(GameState *g, int pl);
 static void live_phase(GameState *g) {
     /* Live card set: auto-place up to MAX_LIVE_CARDS - reduction from each player's hand. */
     g->live_success[0] = 0; g->live_success[1] = 0; /* fresh per-turn live result */
+    g->live_score[0] = 0;   g->live_score[1] = 0;   /* fresh per-turn live scores */
     for (int pl = 0; pl < 2; pl++) {
         RbPlayer *P = &g->p[pl];
         int limit = RB_MAX_LIVE_CARDS - g->live_set_limit_reduction[pl];
@@ -890,6 +944,11 @@ static void rollover(GameState *g) {
     /* The turn that just completed is a real turn — count it before deciding
         the match (mirrors Rust: the winning turn increments turn_number). */
     g->turn++;
+    /* Clear per-turn temporal-condition tracking (mirrors GameState reset of
+        moved_this_turn / debut_count_this_turn / position_change_occurred_this_turn). */
+    for(int i=0;i<RB_MAX_CARD_IDS;i++) g->moved_this_turn[i]=0;
+    g->debut_count_this_turn[0]=g->debut_count_this_turn[1]=0;
+    g->position_change_occurred_this_turn=0;
     check_victory(g);
     if (g->winner != -1) { g->phase = RB_PHASE_DONE; return; }
     g->active = g->active ^ 1;

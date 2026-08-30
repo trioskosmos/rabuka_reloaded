@@ -43,6 +43,32 @@ int rb_resume_with_choice(GameState *g, int selected_idx) {
         }
     } else if (mode == 3) {          /* auto-ability → execute deferred body */
         if (!was_skip && def) rb_execute_effect_ex(g, actor, def, host);
+    } else if (mode == 4) {         /* optional draw gate (draw.rs execute_draw_wrapper) */
+        if (!was_skip) {
+            int n = 0;
+            int t = g->queue.resume_draw_target;
+            int self_id = g->queue.resume_draw_self_id;
+            if (t == 2) { /* both */
+                n += rb_draw_cards_for_player(&g->p[0], (uint8_t)g->queue.resume_draw_count,
+                        g->queue.resume_draw_source, g->queue.resume_draw_dest,
+                        g->queue.resume_draw_ctype, 0, NULL, NULL, -1);
+                n += rb_draw_cards_for_player(&g->p[1], (uint8_t)g->queue.resume_draw_count,
+                        g->queue.resume_draw_source, g->queue.resume_draw_dest,
+                        g->queue.resume_draw_ctype, 0, NULL, NULL, -1);
+            } else {
+                n += rb_draw_cards_for_player(&g->p[t], (uint8_t)g->queue.resume_draw_count,
+                        g->queue.resume_draw_source, g->queue.resume_draw_dest,
+                        g->queue.resume_draw_ctype, 0, NULL, NULL, self_id);
+            }
+            g->last_draw_count = n;
+        }
+        /* continue any remaining sibling effects of the parent ability */
+        if (cont) {
+            for (int j = cont_from; j < cont->n_child; j++) {
+                if (rb_has_pending_choice(g)) break;
+                rb_execute_effect_ex(g, actor, cont->child[j], host);
+            }
+        }
     } else {                         /* default: optional-cost / generic deferred */
         if (!was_skip && def) {
             if (def->action && (!strcmp(def->action, "pay_energy") ||

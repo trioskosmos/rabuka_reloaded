@@ -74,27 +74,74 @@ int rb_trigger_live_start(GameState *g, int pl) {
     return queued;
 }
 
-/* Mirror rb_trigger_live_start for the ライブ成功時 (LiveSuccess) trigger.
-   Queues abilities whose trigger matches on the given player's staged members. */
-int rb_trigger_live_success(GameState *g, int pl) {
+/* Gate: only fire LiveSuccess when the live actually satisfied its heart
+   requirements this turn (mirrors engine/src/core/game_state/abilities.rs:
+   should_trigger_live_success — the live must have passed the heart check).
+   In the C pipeline `passed` is recorded into g->live_success[pl] before the
+   trigger block runs, so gating on it is equivalent to Rust's need_heart scan. */
+int rb_should_trigger_live_success(const GameState *g, int pl) {
+    if (!g) return 0;
+    if (pl < 0 || pl > 1) return 0;
+    if (g->p[pl].live.n == 0) return 0;
+    return g->live_success[pl] ? 1 : 0;
+}
+
+/* Queue every ライブ成功時 (LiveSuccess) ability on a single card, deduplicated
+   by (card_id, ability_idx). Mirrors the per-card scan in
+   turn/triggers.rs::trigger_live_success_abilities. */
+static int queue_live_success_for_card(GameState *g, int pl, int cid) {
     int queued = 0;
+    int n = rb_card_num_abilities((uint32_t)cid);
+    for (int i = 0; i < n; i++) {
+        Ability ab; if (!rb_decode_card_ability((uint32_t)cid, i, &ab)) continue;
+        if (ab.triggers && rb_trigger_is(ab.triggers, "ライブ成功時")) {
+            int key = (cid << 16) | (i & 0xFFFF);
+            if (key != g->just_completed_ability_key &&
+                !rb_use_limit_reached(&g->queue, cid, i, ab.use_limit < 0 ? 99 : ab.use_limit, g->turn)) {
+                rb_queue_push(&g->queue, cid, i);
+                rb_record_use(&g->queue, cid, i, g->turn);
+                queued++;
+            }
+        }
+        rb_free_ability(&ab);
+    }
+    return queued;
+}
+
+/* Mirror rb_trigger_live_start for the ライブ成功時 (LiveSuccess) trigger.
+   Queues abilities whose trigger matches, scanning BOTH the live-card zone
+   (live cards carry their own LiveSuccess autos, e.g. live-card effects) and
+   the staged members (mirrors turn/triggers.rs::trigger_live_success_abilities
+   which iterates player.live_card_zone then player.stage). Gated by
+   rb_should_trigger_live_success so it only fires on a successful live. */
+int rb_trigger_live_success(GameState *g, int pl) {
+    if (!rb_should_trigger_live_success(g, pl)) return 0;
+    int queued = 0;
+    for (int i = 0; i < g->p[pl].live.n; i++) {
+        int cid = g->p[pl].live.cards[i];
+        if (cid == RB_EMPTY_SLOT) continue;
+        queued += queue_live_success_for_card(g, pl, cid);
+    }
     for (int s = 0; s < RB_STAGE_SIZE; s++) {
         int cid = g->p[pl].stage[s];
         if (cid == RB_EMPTY_SLOT) continue;
-        int n = rb_card_num_abilities((uint32_t)cid);
-        for (int i = 0; i < n; i++) {
-            Ability ab; if (!rb_decode_card_ability((uint32_t)cid, i, &ab)) continue;
-            if (ab.triggers && rb_trigger_is(ab.triggers, "ライブ成功時")) {
-                if (!rb_use_limit_reached(&g->queue, cid, i, ab.use_limit < 0 ? 99 : ab.use_limit, g->turn)) {
-                    rb_queue_push(&g->queue, cid, i);
-                    rb_record_use(&g->queue, cid, i, g->turn);
-                    queued++;
-                }
-            }
-            rb_free_ability(&ab);
-        }
+        queued += queue_live_success_for_card(g, pl, cid);
     }
     return queued;
+}
+
+/* Mirror live.rs::drain_pending_live_success_choices. Re-entrantly drain the
+   ability queue until it empties or a pending choice surfaces (the host
+   resolver resumes and re-drains). Returns 1 if a pending choice was left
+   unresolved (caller should yield to the host), 0 otherwise. */
+int rb_drain_live_success_choices(GameState *g) {
+    if (!g) return 0;
+    int guard = 0;
+    while (g->queue.n_entries > 0 && guard++ < 64) {
+        rb_drain_ability_queue(g);
+        if (rb_has_pending_choice(g)) return 1;
+    }
+    return 0;
 }
 
 /* Helper: apply a single effect as a constant modifier (no condition gate here
@@ -222,6 +269,63 @@ static void apply_constant_effect(GameState *g, int pl, int host_cid, AbilityEff
         rb_mods_add_need_heart(&g->mods, tgt_cid, col, cnt);
         if(!acc) g->mods.constant_need_heart[tgt_cid][col]+=cnt;
         if(acc) acc->need_heart[col]+=cnt;
+    } else if (!strcmp(e->action,"set_cost") || !strcmp(e->action,"set_cost_to_use")) {
+        int cnt=e->count>=0?e->count:1;
+        for(int i=0;i<e->n_extra;i++) if(e->extra_k[i] && !strcmp(e->extra_k[i],"value")) cnt=atoi(e->extra_v[i]);
+        rb_mods_add_cost(&g->mods, tgt_cid, cnt);
+        if(!acc) g->mods.constant_cost[tgt_cid]+=cnt;
+        if(acc) acc->cost+=cnt;
+    } else if (!strcmp(e->action,"set_score")) {
+        int cnt=e->count>=0?e->count:1;
+        for(int i=0;i<e->n_extra;i++) if(e->extra_k[i] && !strcmp(e->extra_k[i],"value")) cnt=atoi(e->extra_v[i]);
+        rb_mods_add_score(&g->mods, tgt_cid, cnt);
+        if(!acc) g->mods.constant_score[tgt_cid]+=cnt;
+        if(acc) acc->score+=cnt;
+    } else if (!strcmp(e->action,"set_blade_count")) {
+        int cnt=e->count>=0?e->count:1;
+        for(int i=0;i<e->n_extra;i++) if(e->extra_k[i] && !strcmp(e->extra_k[i],"value")) cnt=atoi(e->extra_v[i]);
+        rb_mods_add_blade(&g->mods, tgt_cid, cnt);
+        if(!acc) g->mods.constant_blade[tgt_cid]+=cnt;
+        if(acc) acc->blade+=cnt;
+    } else if (!strcmp(e->action,"set_blade_type")) {
+        /* Constant blade-color recolor — mirrors engine.c:set_blade_type field write.
+            Re-applied idempotently each recalc (no additive tracking needed). */
+        const char *bc=NULL;
+        for(int i=0;i<e->n_extra;i++) if(e->extra_k[i] && (!strcmp(e->extra_k[i],"blade_color")||!strcmp(e->extra_k[i],"blade_type"))) bc=e->extra_v[i];
+        int col=-1;
+        if(bc){
+            if(!strcmp(bc,"pink")||!strcmp(bc,"heart00")) col=0;
+            else if(!strcmp(bc,"red")) col=1;
+            else if(!strcmp(bc,"yellow")) col=2;
+            else if(!strcmp(bc,"green")) col=3;
+            else if(!strcmp(bc,"blue")) col=4;
+            else if(!strcmp(bc,"purple")) col=5;
+            else if(!strcmp(bc,"orange")) col=6;
+            else if(!strcmp(bc,"all")) col=7;
+        }
+        g->mods.blade_type[tgt_cid]=(int8_t)col;
+    } else if (!strcmp(e->action,"set_heart_type")) {
+        /* Constant heart recolor — mirrors engine.c:set_heart_type field write. */
+        const char *ref=NULL;
+        for(int i=0;i<e->n_extra;i++) if(e->extra_k[i] && !strcmp(e->extra_k[i],"ref_value")) ref=e->extra_v[i];
+        if(ref && !strcmp(ref,"placed_under")){
+            for(int s=0;s<RB_STAGE_SIZE;s++){ if(g->p[tgt_pl].stage[s]==tgt_cid && g->p[tgt_pl].under_cards[s].n>0){ g->mods.heart_copy[tgt_cid]=g->p[tgt_pl].under_cards[s].cards[0]; break; } }
+        } else {
+            int hcol=7;
+            for(int i=0;i<e->n_extra;i++) if(e->extra_k[i] && !strcmp(e->extra_k[i],"heart_color")){
+                const char *hc=e->extra_v[i];
+                if(!hc) continue;
+                else if(!strcmp(hc,"pink")||!strcmp(hc,"heart00")) hcol=0;
+                else if(!strcmp(hc,"red")) hcol=1;
+                else if(!strcmp(hc,"yellow")) hcol=2;
+                else if(!strcmp(hc,"green")) hcol=3;
+                else if(!strcmp(hc,"blue")) hcol=4;
+                else if(!strcmp(hc,"purple")) hcol=5;
+                else if(!strcmp(hc,"orange")) hcol=6;
+                else if(!strcmp(hc,"all")) hcol=7;
+            }
+            g->mods.heart_multiplier[tgt_cid]=(int8_t)hcol;
+        }
     } else if (!strcmp(e->action,"gain_ability")) {
         const char *ag=NULL;
         for(int i=0;i<e->n_extra;i++) if(e->extra_k[i] && !strcmp(e->extra_k[i],"ability_gain")) ag=e->extra_v[i];

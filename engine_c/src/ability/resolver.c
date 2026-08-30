@@ -18,14 +18,23 @@ int rb_resolver_pending_choice(const GameState *g) {
 }
 
 /* Mirror resolver.rs:can_activate_effect — is this effect activatable now?
-   Default: yes (no timing/energy gating yet). */
+   Rust evaluates the effect's `condition` (the on-activation gate) and skips
+   it when it fails; ConditionalAlternative's condition is a branch selector,
+   not a gate, so it is exempt. The activation-position/activation_condition
+   merge and cost-paid fast-path are not yet ported (cost is paid by the
+   caller via rb_validate_cost); the Main-phase gate mirrors the headless
+   auto-activation timing. */
 int rb_can_activate_effect(const GameState *g, int actor, const AbilityEffect *eff) {
-    (void)actor; (void)eff;
-    /* Mirror resolver.rs:can_activate_effect — abilities may be activated
-       during the Main phase (the engine fires debut/on_live automatically
-       elsewhere). TODO: consult the ability's cost via rb_validate_cost
-       once the Ability (not just its effect) is passed in. */
-    return g->phase == RB_PHASE_MAIN ? 1 : 0;
+    if (g->phase != RB_PHASE_MAIN) return 0;
+    if (!eff) return 1;
+    if (eff->condition) {
+        /* ConditionalAlternative's condition picks the branch, it is not a
+           gate (mirrors resolver.rs: skip gate for that action type). */
+        if (eff->action && !strcmp(eff->action, "conditional_alternative"))
+            return 1;
+        return rb_eval_condition(g, actor, eff->condition);
+    }
+    return 1;
 }
 
 /* Mirror resolver.rs:get_trigger_ability_infos — collect abilities whose
@@ -64,7 +73,7 @@ int rb_resolver_trigger_infos(const GameState *g, int actor, const char *trigger
 
 /* Mirror resolver.rs:resolve_ability — run a single ability's effects. */
 int rb_resolve_ability(GameState *g, int actor, const AbilityEffect *eff, int *resolved) {
-    return rb_compound_sequential(g, actor, &g->p[actor], eff, 1, resolved, -1);
+    return rb_compound_sequential(g, actor, eff, -1);
 }
 
 /* Mirror resolver.rs:card_matches_type — selector card-type filter.

@@ -99,6 +99,27 @@ typedef struct AbilityEffect {
     char *extra_k[RB_MAX_EXTRA];
     char *extra_v[RB_MAX_EXTRA];
     int   n_extra;
+    /* compound sub-effects — mirror AbilityEffect::compound (ability/types.rs).
+       These are decoded from their own wire keys (primary_effect / alternative_effect
+       / followup_action / optional_action / conditional_action / result_condition /
+       alternative_condition) instead of child[] so branch ordering is unambiguous and
+       the generic pre-order walk in rb_execute_effect_ex never double-executes them. */
+    struct AbilityEffect *primary_effect;
+    struct AbilityEffect *alternative_effect;
+    struct AbilityEffect *followup_action;
+    struct AbilityEffect *optional_action;
+    struct AbilityEffect *conditional_action;
+    Condition *result_condition;       /* a Condition, not an effect */
+    Condition *alternative_condition;   /* a Condition, not an effect */
+    int   repeat_limit;                /* repeat_procedure: max ADDITIONAL iterations */
+    int   conditional_flag;            /* effect.compound.conditional */
+    int   conditional_negation;        /* effect.compound.conditional_negation (on_optional) */
+    int   per_unit;                    /* per_unit count (0 = none) */
+    int   per_unit_count;
+    int   distinct_flag;               /* per-unit distinct filter */
+    char  id_field[32];                /* effect id (step output ref key) */
+    char  self_target_field[8];        /* "true"/"false" */
+    char  card_type_field[24];         /* member_card / live_card / energy_card */
 } AbilityEffect;
 
 typedef struct Ability {
@@ -167,7 +188,9 @@ typedef struct {
     int16_t         constant_need_heart[RB_MAX_CARD_IDS][8];
     int16_t         heart_copy[RB_MAX_CARD_IDS];   /* target→source */
     int8_t          heart_multiplier[RB_MAX_CARD_IDS]; /* -1 none, else colour 0..7 */
+    int8_t          heart_multiplier_amt[RB_MAX_CARD_IDS]; /* multiplier applied to that colour (default 2) */
     int8_t          blade_type[RB_MAX_CARD_IDS];   /* -1 none, else BladeColor idx */
+    int8_t          heart_color_override[RB_MAX_CARD_IDS]; /* -1 none (specify_heart_color); else all base hearts counted as this colour */
 } RbMods;
 
 void rb_mods_init(RbMods *m);
@@ -285,6 +308,7 @@ typedef struct {
     int       life;                   /* life points (HP)  Etracked for parity with Rust engine */
     int       hearts[RB_MAX_HEARTS]; /* hearts-by-color on this player */
     int       yell_note_icons;        /* hearts produced during performance */
+    int       yell_from_bottom;       /* G8: yell reveal from deck bottom (tracking.rs) */
 } RbPlayer;
 
 typedef enum {
@@ -378,7 +402,7 @@ typedef struct {
     int      resume_active;    /* 1 while re-running a resumed effect node */
     int      auto_ability;     /* 1 if pending choice is an auto-ability (drainable) */
     int      choice_result;    /* selected index stored for the resumed node */
-    int      resume_mode;      /* 0=deferred, 1=position_change, 2=select_card, 3=auto_ability */
+    int      resume_mode;      /* 0=deferred, 1=position_change, 2=select_card, 3=auto_ability, 4=draw gate */
     int      resume_is_select; /* 1 if the select_card choice is a select_cards/select/look_and_select
                                    (kept card recorded into g->selected_cards). Set by the emitter, not
                                    derived from resume_eff (which may dangle after the source Card is freed). */
@@ -392,6 +416,15 @@ typedef struct {
        here so the resume can run the ability's remaining sibling effects. */
     const AbilityEffect *resume_parent;
     int      resume_child;
+    /* optional-draw gate resume (mirror draw.rs:execute_draw_wrapper +
+        emit_pay_skip_gate). On resume we perform the draw directly instead of
+        re-executing the effect (which would re-emit the gate → infinite loop). */
+    int      resume_draw_count;     /* resolved count to draw on accept */
+    int      resume_draw_target;    /* 0/1 single player, 2 = both */
+    char     resume_draw_source[32];
+    char     resume_draw_dest[32];
+    char     resume_draw_ctype[32];
+    int      resume_draw_self_id;   /* self_target_id, or -1 */
 } RbAbilityQueue;
 
 int  rb_queue_push(RbAbilityQueue *q, int card_id, int ability_idx);
@@ -413,6 +446,7 @@ typedef struct {
     int success; /* 1 if all_pass */
     int surplus_hearts; /* total_pool - total_required, -1 on fail */
     int note_icons;
+    int live_passed[RB_MAX_LIVE_CARDS]; /* per-live verdict (populate_live_verdicts) */
 } RbLiveSnapshot;
 
 /* A modifier granted by a trigger with a Duration that must be reverted when
@@ -441,6 +475,7 @@ typedef struct GameState {
     RbAbilityQueue queue;
     int      live_set_limit_reduction[2];
     int      yell_count_mod[2];   /* per-player modify_yell_count delta (live.c do_yell) */
+    char     yell_source[2][16];   /* per-player modify_yell_source override (live.c do_yell) */
     RbLiveSnapshot snapshots[RB_MAX_SNAPSHOTS];
     int      n_snapshots;
     int      recently_moved[RB_MAX_RECENTLY_MOVED];
@@ -450,6 +485,9 @@ typedef struct GameState {
     int      selected_cards[RB_MAX_RECENTLY_MOVED]; /* cards chosen by a select_cards/select/look_and_select choice */
     int      n_selected_cards;
     int      live_success[2];   /* per player: did this player pass their live this turn */
+    int      live_score[2];      /* per player: total score from the most recent live performance */
+    int      p1_live_won;       /* Rule 8.4.13: P1 won the live (placed to success) this turn */
+    int      p2_live_won;       /* Rule 8.4.13: P2 won the live (placed to success) this turn */
     /* state_change_condition tracking (mirrors Rust recently_state_changed /
        turn_state_changes). Set when a member's orientation actually flips during
        rb_effect_change_state; cleared at turn rollover. from/to are orientation
@@ -459,6 +497,7 @@ typedef struct GameState {
     int      last_wait_to_active_count; /* count of wait→active flips this turn */
     int      revealed_cards[RB_MAX_RECENTLY_MOVED]; /* cards revealed by yell/re_yell */
     int      n_revealed;
+    int      last_draw_count;   /* mirror AbilityResolver.step_state.last_draw_count */
     int      re_yell_occurred;  /* a re_yell effect fired this live */
     int      re_yell_blade_hearts[8]; /* hearts harvested by perform_yell, applied to live */
     int      re_yell_note_icons;
@@ -510,10 +549,14 @@ typedef struct GameState {
     int      game_state_history[64]; int n_game_state_history;
     int      loop_detected;
     /* just_completed_ability_key — mirrors Rust's GameState.just_completed_ability_key.
-       Set by rb_drain_ability_queue after each ability resolves so the auto-trigger
-       scan can skip re-enqueueing the very ability that just fired (prevents an
-       auto ability from recursively re-triggering itself). Key = (card_id<<16)|ability_idx. */
+        Set by rb_drain_ability_queue after each ability resolves so the auto-trigger
+        scan can skip re-enqueueing the very ability that just fired (prevents an
+        auto ability from recursively re-triggering itself). Key = (card_id<<16)|ability_idx. */
     int      just_completed_ability_key;
+    /* ── temporal-condition tracking (mirrors GameState.has_card_moved_this_turn /
+        debut_count_this_turn; position_change_occurred_this_turn already declared above) ── */
+    int      moved_this_turn[RB_MAX_CARD_IDS]; /* per-card: moved during current turn */
+    int      debut_count_this_turn[2];         /* members debuted this turn per player */
 } GameState;
 
 /* ── Tracking (engine/src/core/game_state/tracking.rs) ── */
@@ -546,6 +589,11 @@ int  rb_draw_energy(GameState *g, int pl);          /* draw 1 to energy zone */
 int  rb_draw_cards_for_player(RbPlayer *player, uint8_t count, const char *source,
                              const char *destination, const char *card_type_filter,
                              int is_any_number, void *distinct, void *card_db, int self_target_id);
+/* Faithful port of draw.rs:execute_draw_wrapper + execute_draw. Mirrors the
+    resolver's draw effect (count resolution: static / dynamic / zero-special;
+    target both/self/opponent; optional pay-skip gate; any_number; per_unit;
+    card_type filter; source/destination routing). */
+int  rb_effect_draw_card(GameState *g, int actor, AbilityEffect *e, int host_cid);
 void rb_shuffle(int *a, int n);
 int  rb_zone_of_str(const char *s, RbZone *out);    /* map zone wire name */
 
@@ -566,6 +614,8 @@ int  rb_trigger_debut(GameState *g, int pl, int card_id);
 void rb_fire_debut(GameState *g, int pl, int card_id);
 int  rb_trigger_live_start(GameState *g, int pl);
 int  rb_trigger_live_success(GameState *g, int pl);
+int  rb_should_trigger_live_success(const GameState *g, int pl);
+int  rb_drain_live_success_choices(GameState *g);
 int  rb_queue_trigger_abilities(GameState *g, int pl, const char *trigger);
 int  rb_fire_auto(GameState *g, int pl);
 int  rb_process_pending_auto_abilities(GameState *g);
@@ -632,7 +682,11 @@ int rb_effect_count(const GameState *g, int actor, const AbilityEffect *e,
 
 /* ── Shared card/zone/comparison helpers (engine/src/ability/util.rs) ── */
 int  rb_compare_counts(const char *operator, int actual, int expected);
-int  rb_card_matches_type(int card_id, const char *filter);
+int rb_card_matches_type(int card_id, const char *filter);
+/* card_property predicates (card.rs::has_blade_heart/has_score_icon/has_all_blade) */
+int rb_card_has_blade_heart(const Card *c);
+int rb_card_has_score_icon(const Card *c);
+int rb_card_has_all_blade(const Card *c);
 int  rb_orientation_matches_state(const char *orientation, const char *state);
 int  rb_card_matches_group_str(int card_id, const char *group_name);
 void rb_set_card_identity(int cid, const char *name);
@@ -671,22 +725,27 @@ int rb_get_change_state_candidates(const GameState *g, int actor,
                                    int *out_positions, int max);
 
 /* ── Compound / sequential / conditional execution (engine/src/ability/compound.rs) ── */
-int rb_compound_sequential(GameState *g, int actor, const RbPlayer *self,
-                            const AbilityEffect *effects, int n, int *resolved, int host_cid);
+/* Mirror compound.rs::execute_sequential_effect. `eff` is the sequential effect; its
+   children are the action list (the Rust `compound.actions`). A trailing
+   repeat_procedure child is treated as the repeat marker (repeat_max = repeat_limit+1). */
+int rb_compound_sequential(GameState *g, int actor, const AbilityEffect *eff, int host_cid);
+/* Mirror compound.rs::route_conditional_branch — pick the branch index (0/1) for a
+   conditional_alternative whose condition has been evaluated. */
 int rb_compound_route_branch(const GameState *g, int actor, const AbilityEffect *eff);
-int rb_compound_conditional_alternative(GameState *g, int actor, const RbPlayer *self,
-                                         const AbilityEffect *eff, int branch, int *resolved,
-                                         int host_cid);
-int rb_compound_conditional_on_result(GameState *g, int actor, const RbPlayer *self,
-                                       const AbilityEffect *eff, int last_result, int *resolved,
-                                       int host_cid);
-int rb_compound_conditional_on_optional(GameState *g, int actor, const RbPlayer *self,
-                                         const AbilityEffect *eff, int taken, int *resolved,
-                                         int host_cid);
+/* Mirror compound.rs::execute_conditional_alternative. branch<0 → route via the
+   effect's own condition; branch 0 = consequent (alternative_effect), 1 = alternate. */
+int rb_compound_conditional_alternative(GameState *g, int actor,
+                                          const AbilityEffect *eff, int branch, int host_cid);
+/* Mirror compound.rs::execute_conditional_on_result. */
+int rb_compound_conditional_on_result(GameState *g, int actor,
+                                        const AbilityEffect *eff, int host_cid);
+/* Mirror compound.rs::execute_conditional_on_optional. `taken`: -1 = no result yet
+   (emit choice, headless auto-skips), 0 = not paid, 1 = paid. */
+int rb_compound_conditional_on_optional(GameState *g, int actor,
+                                          const AbilityEffect *eff, int taken, int host_cid);
 int rb_compound_choice_string(const AbilityEffect *eff, const char *choice);
-int rb_compound_choice_action(GameState *g, int actor, const RbPlayer *self,
-                               const AbilityEffect *eff, int choice_idx, int *resolved,
-                               int host_cid);
+int rb_compound_choice_action(GameState *g, int actor, const AbilityEffect *eff,
+                                int choice_idx, int host_cid);
 
 /* ── Ability resolver frontend (engine/src/ability/resolver.rs) ── */
 typedef struct AbilityInfo {
@@ -707,6 +766,8 @@ void rb_record_ability_use(GameState *g, int cid, int idx);
 int  rb_collect_constant_hand(const GameState *g, int actor, AbilityEffect *out, int max);
 int  rb_collect_live_modifiers(const GameState *g, int actor, AbilityEffect *out, int max);
 int  rb_trigger_auto_abilities(GameState *g, int actor, const char *trigger);
+/* Mirror live.rs::determine_winners — who placed a live this turn (score-tie → both). */
+void rb_determine_live_winners(const GameState *g, int *p1_won, int *p2_won);
 int  rb_process_pending_auto_abilities(GameState *g);
 void rb_check_expired_effects(GameState *g, int which);
 int  rb_apply_ability_effects(GameState *g, int actor, const Ability *ab, int host_cid);

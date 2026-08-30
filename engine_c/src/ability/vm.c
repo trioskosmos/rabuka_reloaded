@@ -205,6 +205,13 @@ static void effect_free(AbilityEffect *e) {
     rb_free_condition(e->condition);
     for (int i = 0; i < e->n_child; i++) effect_free(e->child[i]);
     for (int i = 0; i < e->n_extra; i++) { free(e->extra_k[i]); free(e->extra_v[i]); }
+    effect_free(e->primary_effect);
+    effect_free(e->alternative_effect);
+    effect_free(e->followup_action);
+    effect_free(e->optional_action);
+    effect_free(e->conditional_action);
+    rb_free_condition(e->result_condition);
+    rb_free_condition(e->alternative_condition);
     free(e);
 }
 static int effect_add_child(AbilityEffect *e, AbilityEffect *c) {
@@ -263,8 +270,22 @@ static AbilityEffect *decode_effect_body(Rdr *r) {
                     strcmp(key, "conditional") == 0 || strcmp(key, "is_further") == 0 ||
                     strcmp(key, "max") == 0)) {
             if (strcmp(key, "optional") == 0 && tag == RB_TAG_TRUE) e->is_optional = 1;
+            if (strcmp(key, "conditional") == 0 && tag == RB_TAG_TRUE) e->conditional_flag = 1;
+            if (strcmp(key, "conditional_negation") == 0 && tag == RB_TAG_TRUE) e->conditional_negation = 1;
             if (strcmp(key, "is_further") == 0 && tag == RB_TAG_TRUE) e->is_further = 1;
             skip_value(r, tag);
+            continue;
+        }
+        /* compound sub-conditions (mirror AbilityEffect::compound.result_condition /
+            alternative_condition — Conditions decoded into dedicated fields so the
+            generic pre-order walk in rb_execute_effect_ex never double-evaluates them). */
+        if (key && (strcmp(key, "result_condition") == 0 ||
+                    strcmp(key, "alternative_condition") == 0)) {
+            if (tag == RB_TAG_OBJVAR) {
+                Condition *c = read_condition(r);
+                if (strcmp(key, "result_condition") == 0) e->result_condition = c;
+                else e->alternative_condition = c;
+            } else skip_value(r, tag);
             continue;
         }
         /* nested effect(s) */
@@ -282,15 +303,60 @@ static AbilityEffect *decode_effect_body(Rdr *r) {
             } else skip_value(r, tag);
             continue;
         }
-        if (key && (strcmp(key, "look_action") == 0 || strcmp(key, "select_action") == 0 ||
-                    strcmp(key, "primary_effect") == 0 || strcmp(key, "followup_action") == 0 ||
-                    strcmp(key, "optional_action") == 0 || strcmp(key, "conditional_action") == 0)) {
+        if (key && (strcmp(key, "look_action") == 0 || strcmp(key, "select_action") == 0)) {
             if (tag == RB_TAG_OBJVAR) {
                 AbilityEffect *c = decode_effect_body(r);
                 if (c) effect_add_child(e, c);
             } else skip_value(r, tag);
             continue;
         }
+        /* compound sub-effects (mirror AbilityEffect::compound primary/alternative/
+            followup/optional/conditional). Decoded into dedicated fields (NOT child[])
+            so branch ordering is unambiguous and the pre-order walk in rb_execute_effect_ex
+            does not double-execute them. */
+        if (key && (strcmp(key, "primary_effect") == 0 ||
+                    strcmp(key, "alternative_effect") == 0 ||
+                    strcmp(key, "followup_action") == 0 ||
+                    strcmp(key, "optional_action") == 0 ||
+                    strcmp(key, "conditional_action") == 0)) {
+            if (tag == RB_TAG_OBJVAR) {
+                AbilityEffect *c = decode_effect_body(r);
+                if (c) {
+                    if (!strcmp(key, "primary_effect")) { effect_free(e->primary_effect); e->primary_effect = c; }
+                    else if (!strcmp(key, "alternative_effect")) { effect_free(e->alternative_effect); e->alternative_effect = c; }
+                    else if (!strcmp(key, "followup_action")) { effect_free(e->followup_action); e->followup_action = c; }
+                    else if (!strcmp(key, "optional_action")) { effect_free(e->optional_action); e->optional_action = c; }
+                    else { effect_free(e->conditional_action); e->conditional_action = c; }
+                }
+            } else skip_value(r, tag);
+            continue;
+        }
+        /* compound scalar fields mirrored from AbilityEffect::compound / root. These
+           are also retained as extras (below) for callers that read them as strings. */
+        if (key && !strcmp(key, "repeat_limit") && tag == RB_TAG_I64) {
+            int64_t v; if (rd_int(r, &v)) e->repeat_limit = (int)v;
+            continue;
+        }
+        if (key && !strcmp(key, "per_unit_count") && tag == RB_TAG_I64) {
+            int64_t v; if (rd_int(r, &v)) e->per_unit_count = (int)v;
+            continue;
+        }
+        if (key && !strcmp(key, "id") && tag == RB_TAG_STR) {
+            uint32_t idx; if (rd_idx(r, &idx)) { const char *s = rb_get_string(idx); if (s) { strncpy(e->id_field, s, 31); e->id_field[31]=0; } }
+            continue;
+        }
+        if (key && (!strcmp(key, "self_target") || !strcmp(key, "card_type")) && tag == RB_TAG_STR) {
+            uint32_t idx; if (rd_idx(r, &idx)) { const char *s = rb_get_string(idx); if (s) {
+                if (!strcmp(key,"self_target")) { strncpy(e->self_target_field, s, 7); e->self_target_field[7]=0; }
+                else { strncpy(e->card_type_field, s, 23); e->card_type_field[23]=0; }
+            } }
+            continue;
+        }
+        if (key && (!strcmp(key, "per_unit") || !strcmp(key, "distinct")) && tag == RB_TAG_I64) {
+            int64_t v; if (rd_int(r, &v)) { if (!strcmp(key,"per_unit")) e->per_unit = (int)v; else e->distinct_flag = (int)v; }
+            continue;
+        }
+        if (key && !strcmp(key, "distinct") && tag == RB_TAG_TRUE) { e->distinct_flag = 1; continue; }
         /* scalar extras (stringify) — also handle heart_colors array */
         if (tag == RB_TAG_STR) {
             uint32_t idx; if (rd_idx(r, &idx)) effect_set_extra(e, key, rb_get_string(idx));

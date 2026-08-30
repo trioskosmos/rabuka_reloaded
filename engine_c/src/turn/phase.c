@@ -87,6 +87,16 @@ void rb_advance_phase(GameState *g) {
     }
     if(g->phase==RB_PHASE_VICTORY){
         /* victory check + rollover */
+        /* Rule 8.4.13: determine who placed a live this turn; if only one player
+            did, they become first attacker next round (mirrors live.rs::
+            move_live_to_success_and_handle_wins first-attacker promotion). A score
+            tie means both placed, so first attacker is left unchanged. */
+        int p1_won=0, p2_won=0;
+        rb_determine_live_winners(g, &p1_won, &p2_won);
+        g->p1_live_won = p1_won; g->p2_live_won = p2_won;
+        if (p1_won && !p2_won)      { g->first_attacker = 0; g->second_attacker = 1; }
+        else if (p2_won && !p1_won) { g->first_attacker = 1; g->second_attacker = 0; }
+
         for(int pl=0;pl<2;pl++){
             if(g->p[pl].success.n >= RB_VICTORY_CARD_COUNT) g->winner=pl;
             else if(g->p[pl].score >= RB_SCORE_WIN) g->winner=pl;
@@ -94,6 +104,11 @@ void rb_advance_phase(GameState *g) {
         if(g->p[0].success.n>=RB_VICTORY_CARD_COUNT && g->p[1].success.n>=RB_VICTORY_CARD_COUNT) g->winner=2;
         if(g->winner!=-1){ g->phase=RB_PHASE_DONE; return; }
         g->turn++;
+        /* Clear per-turn temporal-condition tracking (mirrors GameState reset of
+            moved_this_turn / debut_count_this_turn / position_change_occurred_this_turn). */
+        for(int i=0;i<RB_MAX_CARD_IDS;i++) g->moved_this_turn[i]=0;
+        g->debut_count_this_turn[0]=g->debut_count_this_turn[1]=0;
+        g->position_change_occurred_this_turn=0;
         g->active=g->active^1;
         rb_tick_gained(g); /* expire gained abilities whose duration elapsed (mirrors TemporaryEffect turn-end) */
         g->phase=RB_PHASE_ACTIVE;

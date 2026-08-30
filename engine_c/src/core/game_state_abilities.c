@@ -21,16 +21,13 @@ int rb_ability_matches_trigger(const Ability *ab, const char *trigger) {
 }
 
 /* Mirror abilities.rs:record_ability_use — mark `cid`'s `idx`-th ability as
-   already used this turn (for once-per-turn gating). STUB: no per-turn
-   use-tracking table yet; recorded into a module-local log only. */
-static struct { int cid; int idx; } s_used[RB_MAX_USED];
-static int s_n_used;
+   used this turn (for once-per-turn gating). The authoritative per-turn tracker
+   is the ability queue's use table (mirrors Rust's turn_limited_abilities_used
+   HashMap keyed by (card_id, ability_idx, turn)); delegate there so the saturating
+   count is the same one consulted by rb_use_limit_reached. */
 void rb_record_ability_use(GameState *g, int cid, int idx) {
-    (void)g;
-    if (s_n_used >= RB_MAX_USED) return;
-    s_used[s_n_used].cid = cid;
-    s_used[s_n_used].idx = idx;
-    s_n_used++;
+    if (!g) return;
+    rb_record_use(&g->queue, cid, idx, g->turn);
 }
 
 /* Apply one constant-modifier effect node to the per-card constant tables.
@@ -166,6 +163,6 @@ int rb_process_pending_auto_abilities(GameState *g) {
    sequential runner. */
 int rb_apply_ability_effects(GameState *g, int actor, const Ability *ab, int host_cid) {
     if (!g || !ab || !ab->effect) return 0;
-    rb_compound_sequential(g, actor, &g->p[actor], ab->effect, 1, NULL, host_cid);
+    rb_compound_sequential(g, actor, ab->effect, host_cid);
     return 1;
 }

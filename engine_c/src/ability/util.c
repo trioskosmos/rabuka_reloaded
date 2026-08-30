@@ -47,6 +47,27 @@ int rb_compare_counts(const char *operator, int actual, int expected) {
     return 1;
 }
 
+/* card_property predicates — mirror card.rs::has_blade_heart /
+   has_score_icon / has_all_blade. The C Card flattens base+blade+need hearts
+   into heart_color[]/heart_count[] in that order, so blade hearts live at
+   indices [num_base, num_base+num_blade). */
+int rb_card_has_blade_heart(const Card *c) {
+    if (c->num_blade > 0) return 1;                       /* blade_heart.is_some() */
+    if (c->has_special && c->special_count > 0) return 1; /* special_heart non-empty */
+    return 0;
+}
+int rb_card_has_score_icon(const Card *c) {
+    return c->has_special && c->special_color == (uint8_t)RB_HEART_SCORE;
+}
+int rb_card_has_all_blade(const Card *c) {
+    int base = c->num_base;
+    int end = base + c->num_blade;
+    if (end > c->n_hearts) end = c->n_hearts;
+    for (int h = base; h < end; h++)
+        if (c->heart_color[h] == (uint8_t)RB_HEART_ALL) return 1;
+    return 0;
+}
+
 /* Mirror util::card_matches_type. card_id is a card_no index. Uses the faithful
     type_flags low-2-bit encoding (0=Member, 1=Live, 2=Energy) exactly like
     rb_card_is_live/rb_card_is_energy in core/card.c. */

@@ -22,7 +22,13 @@ void rb_calc_stage_hearts(const GameState *g, int pl, int out[8]){
         int cid=P->stage[s];
         if(cid==RB_EMPTY_SLOT) continue;
         Card c; if(!rb_decode_card_by_index((uint32_t)cid,&c)) continue;
-        for(int h=0;h<c.n_hearts;h++) out[c.heart_color[h]%8]+=c.heart_count[h];
+        int hco = g->mods.heart_color_override[cid];
+        for(int h=0;h<c.n_hearts;h++){
+            int col = (hco>=0 && hco<=7) ? hco : c.heart_color[h]%8;
+            out[col]+=c.heart_count[h];
+        }
+        /* specify_heart_color: recolor all of this member's base hearts to the
+            overridden colour (state.rs::execute_specify_heart_color). */
         int blade=(int)c.blade + rb_mods_get_blade((RbMods*)&g->mods, cid);
         if(blade>0){
             /* set_blade_type recolor (state.rs::execute_set_blade_type): a colored
@@ -50,8 +56,22 @@ static int do_yell(GameState *g, int pl, int yell_cards[RB_MAX_LIVE_CARDS*3], in
     memset(blade_hearts,0,8*sizeof(int));
     *note_icons=0;
     *n_yell=0;
-    for(int i=0;i<total_needed && P->deck.n>0;i++){
-        int cid=P->deck.cards[--P->deck.n]; /* top */
+    const char *src = (pl>=0 && pl<2 && g->yell_source[pl][0]) ? g->yell_source[pl] : "deck_top";
+    int from_bottom = (!strcmp(src,"deck_bottom") || !strcmp(src,"bottom"));
+    int from_discard = (!strcmp(src,"discard") || !strcmp(src,"waitroom"));
+    int from_hand    = !strcmp(src,"hand");
+    for(int i=0;i<total_needed;i++){
+        int cid=-1;
+        if(from_bottom){
+            if(P->deck.n>0){ cid=P->deck.cards[0]; for(int k=1;k<P->deck.n;k++) P->deck.cards[k-1]=P->deck.cards[k]; P->deck.n--; }
+        } else if(from_discard){
+            if(P->discard.n>0) cid=P->discard.cards[--P->discard.n];
+        } else if(from_hand){
+            if(P->hand.n>0) cid=P->hand.cards[--P->hand.n];
+        } else { /* deck_top (default) */
+            if(P->deck.n>0) cid=P->deck.cards[--P->deck.n];
+        }
+        if(cid<0) break; /* source exhausted */
         yell_cards[(*n_yell)++]=cid;
         Card c; if(!rb_decode_card_by_index((uint32_t)cid,&c)){ continue; }
         /* blade_heart handling: blade contributes pink; special hearts could be draw/score */
@@ -87,7 +107,7 @@ static int do_yell(GameState *g, int pl, int yell_cards[RB_MAX_LIVE_CARDS*3], in
     Returns 1 if all lives pass. Also computes surplus (total - required) for
     no_excess checks — mirrors engine/src/turn/live.rs compute_surplus_and_flags
     which snapshots use for NoExcessHeart condition gating. */
-static int allocate_and_verdict(const GameState *g, int pl, const int total_hearts[8], int *out_passed, int *out_score, int *out_surplus){
+static int allocate_and_verdict(const GameState *g, int pl, const int total_hearts[8], int *out_passed, int *out_score, int *out_surplus, int *out_per_live){
     RbPlayer *P=(RbPlayer*)&g->p[pl];
     int total_score=0;
     int all_pass=1;
@@ -144,6 +164,7 @@ static int allocate_and_verdict(const GameState *g, int pl, const int total_hear
             if(score<0) score=0;
             total_score+=score;
         } else all_pass=0;
+        if(out_per_live && li < RB_MAX_LIVE_CARDS) out_per_live[li] = ok ? 1 : 0;
     }
     if(out_passed) *out_passed=all_pass;
     if(out_score) *out_score=total_score;
@@ -176,7 +197,9 @@ int rb_perform_live(GameState *g, int pl){
     for(int col=0;col<8 && col<RB_MAX_HEARTS;col++) total_hearts[col]+=P->hearts[col];
 
     int passed=0, live_score=0, surplus=-1;
-    allocate_and_verdict(g, pl, total_hearts, &passed, &live_score, &surplus);
+    int live_passed[RB_MAX_LIVE_CARDS]={0};
+    allocate_and_verdict(g, pl, total_hearts, &passed, &live_score, &surplus, live_passed);
+    g->live_success[pl] = passed; /* record this turn's live result for opponent_live_success */
     /* push snapshot for parity diff (trace_game oracle) — surplus feeds
        NoExcessHeart condition (engine/src/turn/live.rs compute_surplus_and_flags) */
     if(g->n_snapshots < RB_MAX_SNAPSHOTS){
@@ -187,8 +210,18 @@ int rb_perform_live(GameState *g, int pl){
         s->total_score=live_score; s->success=passed;
         s->surplus_hearts = surplus;
         s->note_icons = note_icons;
+        for(int i=0;i<P->live.n && i<RB_MAX_LIVE_CARDS;i++) s->live_passed[i]=live_passed[i];
     }
-    g->live_success[pl] = passed; /* record this turn's live result for opponent_live_success */
+    /* Mirror engine/src/turn/live.rs revert_live_success_score_modifiers — snapshot
+        each live card's pre-trigger score modifier so any score granted by
+        LiveSuccess/Auto abilities during this live can be reverted afterwards
+        (the grant is temporary, applied only to this live's result, not a
+        permanent modifier). The granted value is already credited into live_score
+        above, so reverting after the recompute is safe and prevents leaks. */
+    int pre_score_mod[RB_MAX_LIVE_CARDS];
+    for(int i=0;i<P->live.n && i<RB_MAX_LIVE_CARDS;i++)
+        pre_score_mod[i] = rb_mods_get_score(&g->mods, P->live.cards[i]);
+
     /* Mirror engine/src/turn/live.rs: after a successful live, fire that
        player's ライブ成功時 (LiveSuccess) auto-abilities and drain them so
        their score/blade/heart grants apply before the live is finalized. */
@@ -197,27 +230,50 @@ int rb_perform_live(GameState *g, int pl){
             (mirrors engine/src/turn/live.rs:434/435 + :528/529). */
         rb_trigger_auto_abilities(g, pl, "自動");
         rb_trigger_live_success(g, pl);
-        rb_drain_ability_queue(g);
+        /* drain_pending_live_success_choices — re-entrant drain of both queues
+            while no pending choice surfaces (host resumes + re-drains). */
+        rb_drain_live_success_choices(g);
     }
-    /* Two-pass re_yell rebuild: LiveSuccess triggers may have stashed re-yell
-       hearts (perform_yell). Re-apply them to the success check, mirroring
-       engine/src/turn/live.rs pending_reyell_rebuild. */
-    if (g->re_yell_occurred) {
-        for (int i = 0; i < 8; i++) total_hearts[i] += g->re_yell_blade_hearts[i];
-        int passed2 = 0, score2 = 0, surplus2 = -1;
-        allocate_and_verdict(g, pl, total_hearts, &passed2, &score2, &surplus2);
+    /* Post-trigger re-evaluation: LiveSuccess / re_yell / Auto abilities grant
+        score/blade/heart that must be credited to the live result (mirrors
+        Rust's post-trigger recompute of surplus + score via pX_extra).
+        Re-run allocation against the now-current modifier state, folding in
+        any re_yell blade hearts harvested by perform_yell. */
+    {
+        int stage_hearts2[8]={0};
+        rb_stage_hearts_pipeline(g, pl, stage_hearts2);
+        int total2[8]={0};
+        for(int i=0;i<8;i++) total2[i]=stage_hearts2[i]+blade_hearts[i];
+        for(int col=0;col<8 && col<RB_MAX_HEARTS;col++) total2[col]+=P->hearts[col];
+        for(int i=0;i<8;i++) total2[i]+=g->re_yell_blade_hearts[i];
+        int passed2=0, score2=0, surplus2=-1;
+        int live_passed2[RB_MAX_LIVE_CARDS]={0};
+        allocate_and_verdict(g, pl, total2, &passed2, &score2, &surplus2, live_passed2);
         passed = passed2; live_score = score2; surplus = surplus2;
         g->live_success[pl] = passed;
+        g->live_score[pl] = live_score;
         note_icons += g->re_yell_note_icons;
         if (g->n_snapshots > 0) {
             RbLiveSnapshot *s = &g->snapshots[g->n_snapshots - 1];
             s->success = passed; s->surplus_hearts = surplus;
             s->total_score = live_score; s->note_icons = note_icons;
+            for(int i=0;i<8;i++) s->total_hearts[i]=total2[i];
+            for(int i=0;i<P->live.n && i<RB_MAX_LIVE_CARDS;i++) s->live_passed[i]=live_passed2[i];
         }
-        g->re_yell_occurred = 0;
-        g->re_yell_note_icons = 0;
-        memset(g->re_yell_blade_hearts, 0, sizeof(g->re_yell_blade_hearts));
     }
+    /* revert_live_success_score_modifiers (live.rs): the score grants from the
+        LiveSuccess/Auto abilities fired above are event-scoped and must not leak
+        into future turns/lives. The delta on each live card is reverted now that it
+        has already been credited into live_score → P->score. Constant modifiers
+        applied by rb_recalc_constants are re-applied each turn, so this is safe. */
+    for(int i=0;i<P->live.n && i<RB_MAX_LIVE_CARDS;i++){
+        int cid=P->live.cards[i];
+        int post = rb_mods_get_score(&g->mods, cid);
+        if(post != pre_score_mod[i]) rb_mods_add_score(&g->mods, cid, pre_score_mod[i]-post);
+    }
+    g->re_yell_occurred = 0;
+    g->re_yell_note_icons = 0;
+    memset(g->re_yell_blade_hearts, 0, sizeof(g->re_yell_blade_hearts));
 
     /* Move lives: if all passed, to success (score added); else to discard */
     int lives_to_move=P->live.n;
@@ -244,4 +300,23 @@ int rb_perform_live(GameState *g, int pl){
         if(P->discard.n < RB_MAX_ZONE) P->discard.cards[P->discard.n++]=yell_cards[i];
     }
     return passed;
+}
+
+/* Mirror live.rs::determine_winners — decide which player(s) placed a live this
+   turn. A player "won" iff they passed ALL their live cards' heart checks
+   (g->live_success[pl]). If both passed, the higher live score wins; on a
+   score tie BOTH win (both place to success). Mirrors the Rust tie rule that
+   feeds move_live_to_success_and_handle_wins / first-attacker rollover. */
+void rb_determine_live_winners(const GameState *g, int *p1_won, int *p2_won) {
+    int p1_all = g->live_success[0];
+    int p2_all = g->live_success[1];
+    int r0 = 0, r1 = 0;
+    if (!p1_all && !p2_all)        { r0 = 0; r1 = 0; }
+    else if (p1_all && !p2_all)    { r0 = 1; r1 = 0; }
+    else if (!p1_all && p2_all)    { r0 = 0; r1 = 1; }
+    else if (g->live_score[0] > g->live_score[1]) { r0 = 1; r1 = 0; }
+    else if (g->live_score[1] > g->live_score[0]) { r0 = 0; r1 = 1; }
+    else                                     { r0 = 1; r1 = 1; } /* tie → both place */
+    if (p1_won) *p1_won = r0;
+    if (p2_won) *p2_won = r1;
 }

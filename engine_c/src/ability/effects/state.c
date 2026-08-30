@@ -6,9 +6,6 @@
    engine/src/ability/effects/state.rs + misc.rs + compound.rs */
 
 void rb_effect_change_state(GameState *g, int actor, AbilityEffect *e){
-    int who=actor;
-    if(e->target && !strcmp(e->target,"opponent")) who=actor^1;
-    RbPlayer *P=&g->p[who];
     const char *st=NULL;
     for(int i=0;i<e->n_extra;i++) if(e->extra_k[i] && !strcmp(e->extra_k[i],"state")) st=e->extra_v[i];
     if(!st) for(int i=0;i<e->n_extra;i++) if(e->extra_k[i] && !strcmp(e->extra_k[i],"to_state")) st=e->extra_v[i];
@@ -22,26 +19,34 @@ void rb_effect_change_state(GameState *g, int actor, AbilityEffect *e){
     }
     if(e->target && !pos && !strcmp(e->target,"all")) all=1;
     int apply_pos = pos ? rb_pos_to_area(pos) : -1;
-    for(int q=0;q<RB_STAGE_SIZE;q++){
-        if(P->stage[q]==RB_EMPTY_SLOT) continue;
-        if(!all && apply_pos>=0 && apply_pos!=q) continue;
-        if(!all && apply_pos<0 && q!=(RB_STAGE_SIZE==3?1:0)) {
-            /* no explicit target: act on the first member only (break after) */
+
+    /* Mirror misc.rs::execute_change_state — "both" flips orientation on BOTH
+        players' stages; otherwise self (or opponent when target=="opponent"). */
+    int players[2]; int np=0;
+    if(e->target && !strcmp(e->target,"both")){ players[np++]=actor; players[np++]=actor^1; }
+    else if(e->target && !strcmp(e->target,"opponent")){ players[np++]=actor^1; }
+    else { players[np++]=actor; }
+
+    for(int pk=0; pk<np; pk++){
+        RbPlayer *P=&g->p[players[pk]];
+        for(int q=0;q<RB_STAGE_SIZE;q++){
+            if(P->stage[q]==RB_EMPTY_SLOT) continue;
+            if(!all && apply_pos>=0 && apply_pos!=q) continue;
+            int ocid = P->stage[q];
+            const char *old_ori = rb_mods_get_orientation((RbMods*)&g->mods, ocid);
+            int was_wait = old_ori && !strcmp(old_ori, "wait");
+            int will_wait = (!strcmp(st, "wait")) ? 1 : 0;
+            if (was_wait != will_wait) {
+                /* record the transition for state_change_condition */
+                g->state_change_from[ocid] = (int8_t)(was_wait ? 1 : 0);
+                g->state_change_to[ocid]   = (int8_t)(will_wait ? 1 : 0);
+                if (was_wait && !will_wait) g->last_wait_to_active_count++;
+            }
+            P->stage_wait[q] = will_wait;
+            /* "rest" sets the rest orientation; orientation mod stores the string verbatim */
+            rb_mods_set_orientation(&g->mods, ocid, st);
+            if(!all && apply_pos<0) break; /* first-member-only default */
         }
-        int ocid = P->stage[q];
-        const char *old_ori = rb_mods_get_orientation((RbMods*)&g->mods, ocid);
-        int was_wait = old_ori && !strcmp(old_ori, "wait");
-        int will_wait = (!strcmp(st, "wait")) ? 1 : 0;
-        if (was_wait != will_wait) {
-            /* record the transition for state_change_condition */
-            g->state_change_from[ocid] = (int8_t)(was_wait ? 1 : 0);
-            g->state_change_to[ocid]   = (int8_t)(will_wait ? 1 : 0);
-            if (was_wait && !will_wait) g->last_wait_to_active_count++;
-        }
-        P->stage_wait[q] = will_wait;
-        /* "rest" sets the rest orientation; orientation mod stores the string verbatim */
-        rb_mods_set_orientation(&g->mods, ocid, st);
-        if(!all && apply_pos<0) break; /* first-member-only default */
     }
 }
 
@@ -114,6 +119,9 @@ static void rb_pos_change_for_player(GameState *g, int who, AbilityEffect *e, in
 
 void rb_effect_position_change(GameState *g, int actor, AbilityEffect *e, int host_cid){
     const char *t = (e->target && *e->target) ? e->target : "self";
+    /* Mirror GameState::position_change_occurred_this_turn — set the per-player flag
+        so temporal conditions ("このターンに配置が変化している") can gate on it. */
+    g->position_change_occurred_this_turn = 1; /* scalar per-game flag (mirrors GameState) */
     if(!strcmp(t,"both") || !strcmp(t,"self"))  rb_pos_change_for_player(g, actor, e, host_cid);
     if(!strcmp(t,"both") || !strcmp(t,"opponent")) rb_pos_change_for_player(g, actor^1, e, host_cid);
 }
@@ -205,9 +213,19 @@ void rb_effect_modify_cost(GameState *g, int actor, AbilityEffect *e){
            card count; live.c do_yell reads g->yell_count_mod[pl]. */
         g->yell_count_mod[who] += cnt;
     } else if(e->action && !strcmp(e->action,"modify_yell_source")){
-        /* modify_yell_source changes which cards are yelled; headless yell uses
-           the deck top regardless of source, so this is a documented no-op. */
-        (void)cnt;
+        /* Mirror misc.rs:execute_modify_yell_source — record the per-player yell
+            source override (e.g. deck_bottom / discard / hand). live.c do_yell
+            consults g->yell_source[pl] when drawing the revealed yell cards. */
+        const char *src = NULL;
+        for(int i=0;i<e->n_extra;i++) if(e->extra_k[i] && !strcmp(e->extra_k[i],"source")) { src=e->extra_v[i]; break; }
+        if(!src) src = e->source;
+        if(!src) src = "deck_top";
+        strncpy(g->yell_source[who], src, sizeof(g->yell_source[who])-1);
+        g->yell_source[who][sizeof(g->yell_source[who])-1] = '\0';
+        /* Mirror modifiers.rs::refresh_yell_sources: a deck_bottom source sets
+           yell_from_bottom so the cheer check (tracking.rs) draws from the deck
+           bottom (G8 — 恋になりたいAQUARIUM). */
+        g->p[who].yell_from_bottom = (strcmp(src, "deck_bottom") == 0);
     }
 }
 

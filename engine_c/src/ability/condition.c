@@ -28,6 +28,17 @@ static int get_bool(const Condition *c, const char *key, int *out) {
     if (v->tag == RB_TAG_STR && v->s) { *out = (!strcmp(v->s,"true")); return 1; }
     return 0;
 }
+/* Return a nested Condition stored under `key` (Rust condition.get_condition()). */
+static const Condition *get_cond(const Condition *c, const char *key) {
+    const CondValue *v = find_val(c, key);
+    if (!v || v->tag != RB_TAG_OBJVAR) return NULL;
+    return v->cond;
+}
+/* Per-card "moved this turn" gate — mirrors GameState::has_card_moved_this_turn. */
+static int card_moved_this_turn(const GameState *g, int cid) {
+    if (cid < 0 || cid >= RB_MAX_CARD_IDS) return 0;
+    return g->moved_this_turn[cid] != 0;
+}
 static int eval_operator(int actual, const char *op, int threshold) {
     if (!op) op = ">=";
     if (!strcmp(op, ">=")) return actual >= threshold;
@@ -468,7 +479,57 @@ static int eval_temporal(const struct GameState *g, int actor, const Condition *
         if (!strcmp(temp,"first_turn")) return g->turn==1;
         /* this_turn with a count defaults to debut_count_this_turn which the
            C port does not track; fall back to true per Rust's no-nested default. */
-        if (!strcmp(temp,"this_turn")) return 1;
+        if (!strcmp(temp,"this_turn")) {
+            /* Mirror state.rs::evaluate_temporal_condition "this_turn" branch. */
+            int count = -1; int has_count = get_i(c, "count", &count);
+            const char *loc = get_str(c, "location");
+            const char *ctype = get_str(c, "card_type");
+            const char *tgt = get_str(c, "target");
+            int who = (tgt && !strcmp(tgt,"opponent")) ? (actor^1) : actor;
+            if (has_count && (!loc || !strcmp(loc,"stage")) &&
+                (!ctype || !strcmp(ctype,"member_card"))) {
+                const char *group = get_str(c, "group_names");
+                if (group && *group) {
+                    /* count stage members matching the group that moved this turn. */
+                    int matching = 0;
+                    for (int q=0; q<RB_STAGE_SIZE; q++) {
+                        int cid = g->p[who].stage[q];
+                        if (cid < 0) continue;
+                        if (!rb_card_matches_group_str(cid, group)) continue;
+                        if (card_moved_this_turn(g, cid)) matching++;
+                    }
+                    return matching >= count;
+                }
+                return g->debut_count_this_turn[who] >= count;
+            }
+            /* no explicit count: fall back to temporal_scope year or a nested condition. */
+            const char *scope = get_str(c, "temporal_scope");
+            if (scope) return atoi(scope) == g->turn;
+            const Condition *nested = get_cond(c, "condition");
+            if (nested) {
+                /* NotMoved/HasMoved nested conditions gate on this-turn movement. */
+                const char *mv = get_str(nested, "movement");
+                if (mv && (!strcmp(mv,"not_moved")||!strcmp(mv,"notMoved")))
+                    /* activating_card unavailable here; Rust returns true when no
+                        activating card is set — preserve that default. */
+                    return 1;
+                if (mv && (!strcmp(mv,"has_moved")||!strcmp(mv,"hasMoved"))) {
+                    if (g->position_change_occurred_this_turn) {
+                        const char *grp = get_str(nested, "group_names");
+                        for (int q=0; q<RB_STAGE_SIZE; q++) {
+                            int cid = g->p[who].stage[q];
+                            if (cid < 0) continue;
+                            if (grp && !rb_card_matches_group_str(cid, grp)) continue;
+                            if (card_moved_this_turn(g, cid)) return 1;
+                        }
+                        return 0;
+                    }
+                    return 0;
+                }
+                return eval_condition_inner(g, actor, nested);
+            }
+            return 1; /* Rust default when nothing gates */
+        }
     }
     return 1;
 }

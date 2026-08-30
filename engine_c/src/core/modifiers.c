@@ -3,7 +3,7 @@
 
 void rb_mods_init(RbMods *m) {
     memset(m, 0, sizeof(*m));
-    for(int i=0;i<RB_MAX_CARD_IDS;i++){ m->heart_copy[i]=-1; m->heart_multiplier[i]=-1; m->blade_type[i]=-1; }
+    for(int i=0;i<RB_MAX_CARD_IDS;i++){ m->heart_copy[i]=-1; m->heart_multiplier[i]=-1; m->heart_multiplier_amt[i]=2; m->blade_type[i]=-1; m->heart_color_override[i]=-1; }
 }
 
 void rb_mods_clear_card(RbMods *m, int cid) {
@@ -23,7 +23,9 @@ void rb_mods_clear_card(RbMods *m, int cid) {
     for (int c = 0; c < 8; c++) { m->constant_heart[cid][c] = 0; m->constant_need_heart[cid][c] = 0; }
     m->heart_copy[cid] = -1;
     m->heart_multiplier[cid] = -1;
+    m->heart_multiplier_amt[cid] = 2;
     m->blade_type[cid] = -1;
+    m->heart_color_override[cid] = -1;
 }
 
 /* ── blade ── */

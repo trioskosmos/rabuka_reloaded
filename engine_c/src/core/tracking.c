@@ -79,7 +79,7 @@ int rb_perform_cheer_check(GameState *g, const char *player_id, uint8_t blade_co
     if(player_id && !strcmp(player_id, "p2")) pl = 1;
     /* mirror Rust: pick player by id; we use p1/p2 string. */
     RbPlayer *player = &g->p[pl];
-    int from_bottom = 0; /* TODO: player.yell_from_bottom not ported; assume top */
+    int from_bottom = player->yell_from_bottom; /* mirror tracking.rs: player.yell_from_bottom */
 
     for(int i=0;i<blade_count;i++){
         if(player->deck.n==0 && player->discard.n>0){
@@ -88,8 +88,14 @@ int rb_perform_cheer_check(GameState *g, const char *player_id, uint8_t blade_co
         }
         int card_id = -1;
         if(from_bottom){
-            /* draw_bottom not yet ported; fallback to top */
-            if(player->deck.n>0) card_id = player->deck.cards[--player->deck.n];
+            /* draw_bottom: take the bottom of the deck (front of the C array)
+               and shift the rest down — mirror player.main_deck.draw_bottom(). */
+            if(player->deck.n>0){
+                card_id = player->deck.cards[0];
+                memmove(&player->deck.cards[0], &player->deck.cards[1],
+                        (size_t)(player->deck.n - 1) * sizeof(int));
+                player->deck.n--;
+            }
         } else {
             if(player->deck.n>0) card_id = player->deck.cards[--player->deck.n];
         }

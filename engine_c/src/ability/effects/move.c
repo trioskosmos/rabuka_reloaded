@@ -43,11 +43,12 @@ static int card_matches_filter(int card_idx, AbilityEffect *e){
         Card c; if(!rb_decode_card_by_index((uint32_t)card_idx,&c)) return 0;
         int has=0;
         if(!strcmp(cp,"has_blade_heart")){
-            for(int h=0;h<c.n_hearts;h++) if(c.heart_color[h]>=RB_HEART_PINK && c.heart_color[h]<=RB_HEART_ALL) { has=1; break; }
+            has = rb_card_has_blade_heart(&c);
         } else if(!strcmp(cp,"has_score_icon")){
-            for(int h=0;h<c.n_hearts;h++) if(c.heart_color[h]==RB_HEART_SCORE) { has=1; break; }
+            has = rb_card_has_score_icon(&c);
+        } else if(!strcmp(cp,"has_all_blade")){
+            has = rb_card_has_all_blade(&c);
         }
-        /* has_all_blade requires a card flag the C decoder does not expose yet. */
         if(neg) has=!has;
         rb_free_card(&c);
         if(!has) return 0;
@@ -200,6 +201,9 @@ void rb_effect_move_cards(GameState *g, int actor, AbilityEffect *e){
     for(int i=0;i<g->n_recently_moved;i++) g->recently_moved[i]=moved_ids[i];
     g->n_those_cards = nm < RB_MAX_RECENTLY_MOVED ? nm : RB_MAX_RECENTLY_MOVED;
     for(int i=0;i<g->n_those_cards;i++) g->those_cards[i]=moved_ids[i];
+    /* Mirror GameState::has_card_moved_this_turn — mark every card this move just
+        moved so temporal/movement conditions ("このターンに移動している") can gate on it. */
+    for(int i=0;i<nm;i++) g->moved_this_turn[moved_ids[i]] = 1;
 }
 
 /* needed by engine.c wrapper */

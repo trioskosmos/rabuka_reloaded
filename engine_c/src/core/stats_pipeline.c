@@ -41,13 +41,14 @@ void rb_stage_hearts_pipeline(const GameState *g, int pl, int out[8]){
             rb_free_card(&sc);
         }
     }
-    /* heart_color_multiplier: one colour multiplied */
+    /* heart_color_multiplier: one colour multiplied by the stored amount */
     for(int s=0;s<RB_STAGE_SIZE;s++){
         int cid=g->p[pl].stage[s];
         if(cid==RB_EMPTY_SLOT) continue;
         int mult_col=g->mods.heart_multiplier[cid];
         if(mult_col<0) continue;
-        /* stub: double that colour */
-        out[mult_col%8]*=2;
+        int amt=g->mods.heart_multiplier_amt[cid];
+        if(amt<1) amt=2;
+        out[mult_col%8]*=amt;
     }
 }
