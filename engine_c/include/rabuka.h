@@ -416,6 +416,10 @@ typedef struct {
        here so the resume can run the ability's remaining sibling effects. */
     const AbilityEffect *resume_parent;
     int      resume_child;
+    /* heart-color choice result (mirrors Rust execute_choice → conditional_choice =
+        Str(color) consumed by execute_gain_resource). Set when a select/choice with a
+        heart_color extra is answered; the following gain_resource reads it. -1 = none. */
+    int      selected_heart_color;
     /* optional-draw gate resume (mirror draw.rs:execute_draw_wrapper +
         emit_pay_skip_gate). On resume we perform the draw directly instead of
         re-executing the effect (which would re-emit the gate → infinite loop). */
@@ -687,6 +691,8 @@ int rb_effect_count(const GameState *g, int actor, int host_cid, const AbilityEf
 
 /* ── Shared card/zone/comparison helpers (engine/src/ability/util.rs) ── */
 int  rb_compare_counts(const char *operator, int actual, int expected);
+/* Decode a heart_color from an effect's extra fields (engine.c). */
+int heart_color_of(AbilityEffect *e, int dflt);
 int rb_card_matches_type(int card_id, const char *filter);
 /* card_property predicates (card.rs::has_blade_heart/has_score_icon/has_all_blade) */
 int rb_card_has_blade_heart(const Card *c);

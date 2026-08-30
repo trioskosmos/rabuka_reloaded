@@ -103,7 +103,7 @@ static const char *extra(AbilityEffect *e, const char *k) {
         if (e->extra_k[i] && !strcmp(e->extra_k[i], k)) return e->extra_v[i];
     return NULL;
 }
-static int heart_color_of(AbilityEffect *e, int dflt) {
+int heart_color_of(AbilityEffect *e, int dflt) {
     const char *h = extra(e, "heart_color");
     if (!h) h = extra(e, "target");
     if (!h) return dflt;
@@ -206,22 +206,42 @@ void rb_execute_effect_ex(GameState *g, int actor, AbilityEffect *e, int host_ci
                             !strcmp(e->action, "conditional_alternative") ||
                             !strcmp(e->action, "sequential"))))
             rb_execute_effect_ex(g, actor, e->child[i], host_cid);
-        if (rb_has_pending_choice(g)) {
-            /* An optional cost gate (pay_energy/pay_cost) that emitted its
-               pay/skip choice stalled this effect chain. Stash the parent +
-               gate index so the resume can run the remaining sibling effects
-               (e.g. the gain_resource that follows the paid cost). */
-            AbilityEffect *ch = e->child[i];
-            if (ch && ch->is_optional && ch->action &&
-                (!strcmp(ch->action, "pay_energy") || !strcmp(ch->action, "pay_cost") ||
-                  !strcmp(ch->action, "activation_cost") || !strcmp(ch->action, "pay_optional_cost") ||
-                  !strcmp(ch->action, "draw") || !strcmp(ch->action, "draw_card") ||
-                  !strcmp(ch->action, "draw_until_count"))) {
-                g->queue.resume_parent = e;
-                g->queue.resume_child = i;
+            if (rb_has_pending_choice(g)) {
+                /* A child emitted a pending choice and stalled this effect chain.
+                   Stash the parent + child index + host so the resume can run the
+                   remaining sibling effects (e.g. the gain_resource that follows a
+                   paid optional cost, or the heart grant that follows a
+                   choice/select_number/select_cards prompt). Mirrors Rust's
+                   pending_actions park + resume_pending_actions. */
+                AbilityEffect *ch = e->child[i];
+                if (ch && ch->action) {
+                    int is_gate = ch->is_optional &&
+                        (!strcmp(ch->action, "pay_energy") || !strcmp(ch->action, "pay_cost") ||
+                         !strcmp(ch->action, "activation_cost") || !strcmp(ch->action, "pay_optional_cost") ||
+                         !strcmp(ch->action, "draw") || !strcmp(ch->action, "draw_card") ||
+                         !strcmp(ch->action, "draw_until_count"));
+                    int is_choice = (!strcmp(ch->action, "choice") ||
+                                      !strcmp(ch->action, "select_number") ||
+                                      !strcmp(ch->action, "select_cards") ||
+                                      !strcmp(ch->action, "select") ||
+                                      !strcmp(ch->action, "look_and_select"));
+                    if (is_choice) {
+                        /* Mirror Rust pending_actions: the choice's remaining body
+                            (the sibling effects that follow it in the parent, e.g. the
+                            gain_resource that follows a heart-color select) runs AFTER
+                            the player answers. Park the parent + the choice's child
+                            index so resume executes the later siblings. */
+                        g->queue.resume_parent = e;
+                        g->queue.resume_child = i;
+                        g->queue.resume_host = host_cid;
+                    } else if (is_gate) {
+                        g->queue.resume_parent = e;
+                        g->queue.resume_child = i;
+                        g->queue.resume_host = host_cid;
+                    }
+                }
+                return;
             }
-            return;
-        }
     }
     if (!e->action) return;
     handle_action(g, actor, e, host_cid);
@@ -338,7 +358,10 @@ static void handle_action(GameState *g, int actor, AbilityEffect *e, int host_ci
                         if (g->n_temp_effects < RB_MAX_TEMP_EFFECTS) g->temp_effects[g->n_temp_effects++] = te;
                     }
                 } else if (!strcmp(res, "heart")) {
-                    int col = heart_color_of(e, RB_HEART_PINK);
+                    int col = (g->queue.selected_heart_color >= 0)
+                                  ? g->queue.selected_heart_color
+                                  : heart_color_of(e, RB_HEART_PINK);
+                    g->queue.selected_heart_color = -1; /* consumed by this grant */
                     rb_mods_add_heart(&g->mods, cid, col, amt * sign);
                     if (dur != RB_TEMP_PERM) {
                         RbTempEffect te; memset(&te, 0, sizeof(te));
@@ -384,7 +407,10 @@ static void handle_action(GameState *g, int actor, AbilityEffect *e, int host_ci
         else W->score += cnt;
     } else if (!strcmp(act, "gain_heart") ||
                 !strcmp(act, "place_heart")) {
-        int col = heart_color_of(e, RB_HEART_PINK);
+        int col = (g->queue.selected_heart_color >= 0)
+                      ? g->queue.selected_heart_color
+                      : heart_color_of(e, RB_HEART_PINK);
+        g->queue.selected_heart_color = -1;
         if (host_cid >= 0) rb_mods_add_heart(&g->mods, host_cid, col, cnt);
         else W->hearts[col] += cnt;
     } else if (!strcmp(act, "specify_heart_color")) {
@@ -671,6 +697,9 @@ static void handle_action(GameState *g, int actor, AbilityEffect *e, int host_ci
     } else if (!strcmp(act, "choice")) {
         int allow = e->is_optional ? 1 : 0;
         rb_emit_choice(g, actor, RB_CHOICE_SELECT_TARGET, NULL, NULL, cnt, allow, act);
+        /* Heart-color choice: stash the chosen color for the following gain (mirrors
+            Rust execute_choice → conditional_choice). */
+        g->queue.selected_heart_color = heart_color_of(e, -1);
     } else if (!strcmp(act, "select_number")) {
         /* Mirror ability/choice.rs select_number — emit a count-choice the host
             answers; the chosen number is recorded in queue.choice_result on resume
@@ -678,6 +707,7 @@ static void handle_action(GameState *g, int actor, AbilityEffect *e, int host_ci
             semantics as the other choice verbs. */
         int allow = e->is_optional ? 1 : 0;
         rb_emit_choice(g, actor, RB_CHOICE_SELECT_NUMBER, NULL, NULL, cnt, allow, act);
+        g->queue.selected_heart_color = heart_color_of(e, -1);
     }
     /* sequential / conditional_* / choice / re_yell / perform_yell / custom /
        do_nothing: children already executed (or nothing to do). */

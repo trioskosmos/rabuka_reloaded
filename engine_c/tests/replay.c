@@ -101,10 +101,12 @@ static void scenario_cost_modifier(void){
 static void scenario_heart_modifier(void){
     GameState g; uint32_t d0[10]={0,1,2,3,4,5,6,7,8,9}; uint32_t d1[10]={10,11,12,13,14,15,16,17,18,19};
     rb_seed(5); rb_game_init(&g,d0,10,d1,10);
-    if(g.p[0].stage[0]==-1 && g.p[0].hand.n>0){ int c=g.p[0].hand.cards[0]; g.p[0].stage[0]=c; g.p[0].hand.cards[0]=g.p[0].hand.cards[g.p[0].hand.n-1]; g.p[0].hand.n--; }
-    int cid=g.p[0].stage[0]; if(cid==-1) return;
+    /* required-hearts modifiers in Rust target the LIVE cards (live_card_zone);
+       place the card there so the need_heart modifier actually attaches. */
+    if(g.p[0].live.n==0 && g.p[0].hand.n>0){ int c=g.p[0].hand.cards[0]; g.p[0].hand.cards[0]=g.p[0].hand.cards[g.p[0].hand.n-1]; g.p[0].hand.n--; g.p[0].live.cards[g.p[0].live.n++]=c; }
+    int cid=g.p[0].live.cards[0]; if(g.p[0].live.n==0) return;
     int before=rb_mods_get_need_heart(&g.mods,cid,0);
-    AbilityEffect e={0}; e.action="modify_required_hearts"; e.count=2; e.extra_k[0]="heart_color"; e.extra_v[0]="pink"; e.n_extra=1;
+    AbilityEffect e={0}; e.action="modify_required_hearts"; e.count=2; e.extra_k[0]="heart_color"; e.extra_v[0]="pink"; e.extra_k[1]="operation"; e.extra_v[1]="increase"; e.n_extra=2;
     rb_execute_effect(&g,0,&e);
     CHECK(rb_mods_get_need_heart(&g.mods,cid,0)==before+2,"modify_required_hearts via need_heart mods");
 }
