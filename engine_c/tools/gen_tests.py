@@ -798,6 +798,11 @@ def transpile_body(body: str, consts: dict, func_name: str) -> str:
             if mm:
                 if mm.group(1) not in declared: unresolved = True; continue
                 out.append(f"    test_add_to_deck(&tg, {mm.group(1)});"); continue
+        m = re.search(r'game\.state\.process_pending_auto_abilities\s*\(', line)
+        if m:
+            out.append("    rb_drain_ability_queue(&tg.state);"); mark_real(); continue
+        if 'activating_card = Some' in line:
+            out.append("    // skipped: activating_card (C uses queued card id as host)"); continue
         m = re.search(r'game\.give_energy\((\d+)\)', line)
         if m:
             out.append(f"    test_give_energy(&tg, {m.group(1)});"); continue
@@ -1216,6 +1221,14 @@ static int failures=0;
                 elif text[i] == '}': depth -= 1
                 i += 1
             body = text[start:i-1]
+            # fire_live_start(&mut game, cid) → queue live-start autos then drain.
+            # The Rust helper finds the ライブ開始時 ability and calls
+            # trigger_auto_ability(LiveStart,...) + process_pending_auto_abilities;
+            # the C engine does the same via rb_trigger_live_start + drain.
+            body = re.sub(
+                r'fire_live_start\s*\(\s*&?mut\s+game\s*,\s*\w+\s*\)\s*;',
+                'rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);',
+                body)
             body = expand_helpers(body, helpers, consts)
             # skip functions whose structure the line-based transpiler cannot
             # emit without breaking the C compile: multi-line match/if-let/

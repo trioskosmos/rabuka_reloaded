@@ -799,5 +799,19 @@ const uint16_t RBKA_CARD_ABILITY_PAIRS[4022] = {
   5695,909,5696,910,5697,911,5698,912,5699,913,5700,914,5701,915,5702,916,
   5702,917,5703,918,5703,919,5704,920,5704,921,5704,922,5705,923,5706,924,
   5707,925,5708,926,5709,927,5710,928,5710,929,5711,930,5712,931,5713,932,
-  5714,933,5714,934,5715,935,
+   5714,933,5714,934,5715,935,
 };
+
+/* Host/PC build: the offset-table pointers alias the embedded arrays. */
+uint16_t *g_offset_deltas = (uint16_t *)RBKA_OFFSET_DELTAS;
+uint32_t *g_strings_offsets = (uint32_t *)RBKA_STRINGS_OFFSETS;
+uint16_t *g_card_ability_pairs = (uint16_t *)RBKA_CARD_ABILITY_PAIRS;
+
+/* Host/PC (non-CD-i) build: the tables are embedded, so the streaming loader
+   used by the embedded ROM variant is a no-op here. Provided so data.c's call
+   to rb_load_gen_data resolves without pulling in gen_data_cdi.c (which would
+   duplicate the embedded table symbols). */
+int rb_load_gen_data(const unsigned char *buf, long len) {
+    (void)buf; (void)len;
+    return 0;
+}

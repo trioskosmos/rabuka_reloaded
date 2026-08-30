@@ -368,8 +368,8 @@ static void gen_dia_keeps_one_on_bottom_rest_to_waitroom(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(dia);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    // skipped: activating_card (C uses queued card id as host)
+    rb_drain_ability_queue(&tg.state);
     test_drain_auto_choices(&tg);
     // 
     // 
@@ -428,8 +428,8 @@ static void gen_mari_keeps_one_on_top_rest_to_deck_bottom(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(mari);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    // skipped: activating_card (C uses queued card id as host)
+    rb_drain_ability_queue(&tg.state);
     test_drain_auto_choices(&tg);
     // 
     // 
@@ -2031,7 +2031,7 @@ static void gen_resolution_watcher_dormant_without_actual_ls_lss_resolution(void
     int deck_before = tg.state.p[0].deck.n;
     int pid = 0;
     // TODO: TurnEngine::trigger_auto_abilities_for_player(&mut game.state, &pid);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    rb_drain_ability_queue(&tg.state);
     test_drain_auto_choices(&tg);
     // 
     test_has_pending_choice(&tg);
@@ -2054,18 +2054,18 @@ static void gen_ren_005_turn2_blocks_third_energy_placed(void){
     // TODO: game.state.push_movement_event(-1, "energy_deck", "energy_zone", Some(ren), "p1", true);
     int pid = 0;
     // TODO: rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(&mut game.state, &pid);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    rb_drain_ability_queue(&tg.state);
     CHECK_EQ(rb_mods_get_blade(&tg.state.mods, ren), 1, "ren_005_turn2_blocks_third_energy_placed");
     // // Second same turn (turn2 allows 2)
     // TODO: game.state.push_movement_event(-1, "energy_deck", "energy_zone", Some(ren), "p1", true);
     // TODO: rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(&mut game.state, &pid);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    rb_drain_ability_queue(&tg.state);
     int second = rb_mods_get_blade(&tg.state.mods, ren);
     // TODO assert: assert!(second == 1 || second == 2, "second placement should be 1 or 2, got {}", second);
     // // Third same turn should be blocked (ターン2回)
     // TODO: game.state.push_movement_event(-1, "energy_deck", "energy_zone", Some(ren), "p1", true);
     // TODO: rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(&mut game.state, &pid);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    rb_drain_ability_queue(&tg.state);
     int third = rb_mods_get_blade(&tg.state.mods, ren);
     // TODO assert: assert!(third <= 2, "ターン2回 should block third, got {}", third);
     // 
@@ -2413,7 +2413,7 @@ static void gen_chisato_q126_area_move_triggers_energy_placement(void){
     // // TAS scan finds position_change auto abilities via position_change_events
     int player_id = 0;
     // TODO: rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(&mut game.state, &player_id);
-    // TODO: game.state.process_pending_auto_abilities(&player_id);
+    rb_drain_ability_queue(&tg.state);
     // 
     // // Q126: area move should trigger the auto ability,
     // // placing 1 energy card from energy deck → energy zone
@@ -2726,30 +2726,7 @@ static void gen_bp7024_lone_aqours_member_hearts_become_heart04(void){
     int other = test_id(&tg, "PL!-sd1-010-SD");
     tg.state.p[0].stage[1] = other;
     // 
-    // // inlined helper fire_live_start
-    // 
-    int ability_id = 0;
-    // action result consumed: let card = game.db.get_card(live).unwrap();
-    int ab = 0;
-    // TODO: .resolved_abilities()
-    // TODO: .find(|a| a.triggers.as_deref() == Some("ライブ開始時"))
-    // TODO: .unwrap_or_else(|| panic!("card {} lacks a ライブ開始時 ability", card.card_no));
-    // TODO: format!("{}_{}", card.card_no, ab.full_text)
-    // TODO: };
-    // action result consumed: let card_no = game.db.get_card(live).unwrap().card_no.to_string();
-    int pid = 0;
-    // TODO: game.state.trigger_auto_ability(
-    // TODO: ability_id,
-    // TODO: AbilityTrigger::LiveStart,
-    // TODO: pid.clone(),
-    // TODO: Some(card_no),
-    // TODO: Some(live),
-    // TODO: None,
-    // TODO: None,
-    // TODO: );
-    // TODO: game.state.activating_card = Some(live);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
-    // 
+    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     while (test_has_pending_choice(&tg)) rb_resume_with_choice(&tg.state, 0);
     rb_resume_with_choice(&tg.state, 0);
     // TODO: }
@@ -2770,30 +2747,7 @@ static void gen_bp7024_no_aqours_member_no_transform(void){
     int other = test_id(&tg, "PL!-sd1-010-SD");
     tg.state.p[0].stage[0] = other;
     // 
-    // // inlined helper fire_live_start
-    // 
-    int ability_id = 0;
-    // action result consumed: let card = game.db.get_card(live).unwrap();
-    int ab = 0;
-    // TODO: .resolved_abilities()
-    // TODO: .find(|a| a.triggers.as_deref() == Some("ライブ開始時"))
-    // TODO: .unwrap_or_else(|| panic!("card {} lacks a ライブ開始時 ability", card.card_no));
-    // TODO: format!("{}_{}", card.card_no, ab.full_text)
-    // TODO: };
-    // action result consumed: let card_no = game.db.get_card(live).unwrap().card_no.to_string();
-    int pid = 0;
-    // TODO: game.state.trigger_auto_ability(
-    // TODO: ability_id,
-    // TODO: AbilityTrigger::LiveStart,
-    // TODO: pid.clone(),
-    // TODO: Some(card_no),
-    // TODO: Some(live),
-    // TODO: None,
-    // TODO: None,
-    // TODO: );
-    // TODO: game.state.activating_card = Some(live);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
-    // 
+    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     while (test_has_pending_choice(&tg)) rb_resume_with_choice(&tg.state, 0);
     rb_resume_with_choice(&tg.state, 0);
     // TODO: }
@@ -2880,7 +2834,7 @@ static void gen_sd2_002_natural_move_no_heart(void){
     // TODO: game.state.push_movement_event(keke, "stage", "stage", None, "p1", false);
     int pid = 0;
     // TODO: rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(&mut game.state, &pid);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    rb_drain_ability_queue(&tg.state);
     int heart_mod = rb_mods_get_heart(&tg.state.mods, keke, 6);
     CHECK_EQ(heart_mod, 0, "sd2_002_natural_move_no_heart");
     // 
@@ -6528,7 +6482,7 @@ static void gen_check_self_comparison_container_hand_presence(void){
     // TODO: };
     // 
     test_add_to_hand(&tg, self_card);
-    // TODO: game.state.activating_card = Some(self_card);
+    // skipped: activating_card (C uses queued card id as host)
     int ctx = 0;
     // TODO assert: assert!( ctx.evaluate_condition(&cond), "comparison_condition with check_self should pass while this card is in hand" );
     // 
@@ -7261,7 +7215,7 @@ static void gen_live_success_per_wait_member_adds_score(void){
     // TODO: None,
     // TODO: );
     // // Also ensure live_start path for Daisuki is not confused — this is LiveSuccess for N-bp3-031-L, correct.
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    rb_drain_ability_queue(&tg.state);
     test_drain_auto_choices(&tg);
     int score_after = rb_mods_get_score(&tg.state.mods, live);
     // TODO assert_eq (unresolved): assert_eq!( score_after, score_before + 1, "LiveSuccess per wait member should add score+1 (wait=1, before={}, after={})", score_before, score_after );
@@ -8174,7 +8128,7 @@ static void gen_ren_ab0_energy_return_places_energy_wait(void){
     test_add_to_deck(&tg, eid);
     int pid = 0;
     // TODO: rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(&mut game.state, &pid);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    rb_drain_ability_queue(&tg.state);
     test_drain_auto_choices(&tg);
     // // Should have triggered without crash
     // TODO assert: assert!(game.state.player1.stage.stage.contains(&ren));
@@ -9394,7 +9348,7 @@ static void gen_sd2_002_opponent_effect_area_move_triggers_heart(void){
     // 
     int pid = 0;
     // TODO: TurnEngine::trigger_auto_abilities_for_player(&mut game.state, &pid);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    rb_drain_ability_queue(&tg.state);
     test_drain_auto_choices(&tg);
     // 
     int heart_mod = 0;
@@ -9416,7 +9370,7 @@ static void gen_keke_jidou_effect_only_false_no_trigger(void){
     // TODO: game.state.push_movement_event(keke, "stage", "stage", None, "p1", false);
     int pid = 0;
     // TODO: rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(&mut game.state, &pid);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    rb_drain_ability_queue(&tg.state);
     CHECK_EQ(rb_mods_get_heart(&tg.state.mods, keke, 6), 0, "keke_jidou_effect_only_false_no_trigger");
     // 
 }
@@ -9431,7 +9385,7 @@ static void gen_keke_jidou_self_effect_move_triggers(void){
     // TODO: game.state.push_movement_event(keke, "stage", "stage", Some(keke), "p1", true);
     int pid = 0;
     // TODO: rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(&mut game.state, &pid);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    rb_drain_ability_queue(&tg.state);
     CHECK_EQ(rb_mods_get_heart(&tg.state.mods, keke, 6), 1, "keke_jidou_self_effect_move_triggers");
     // 
 }
@@ -10134,30 +10088,7 @@ static void gen_bp7025_staged_chisato_gains_blade(void){
     int other = test_id(&tg, "PL!-sd1-010-SD");
     tg.state.p[0].stage[0] = other;
     // 
-    // // inlined helper fire_live_start
-    // 
-    int ability_id = 0;
-    // action result consumed: let card = game.db.get_card(holder).unwrap();
-    int ab = 0;
-    // TODO: .resolved_abilities()
-    // TODO: .find(|a| a.triggers.as_deref() == Some("ライブ開始時"))
-    // TODO: .unwrap_or_else(|| panic!("card {} lacks a ライブ開始時 ability", card.card_no));
-    // TODO: format!("{}_{}", card.card_no, ab.full_text)
-    // TODO: };
-    // action result consumed: let card_no = game.db.get_card(holder).unwrap().card_no.to_string();
-    int pid = 0;
-    // TODO: game.state.trigger_auto_ability(
-    // TODO: ability_id,
-    // TODO: AbilityTrigger::LiveStart,
-    // TODO: pid.clone(),
-    // TODO: Some(card_no),
-    // TODO: Some(holder),
-    // TODO: None,
-    // TODO: None,
-    // TODO: );
-    // TODO: game.state.activating_card = Some(holder);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
-    // 
+    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     // 
     CHECK_EQ(rb_mods_get_blade(&tg.state.mods, chisato_card), 1, "bp7025_staged_chisato_gains_blade");
     CHECK_EQ(rb_mods_get_blade(&tg.state.mods, other), 0, "bp7025_staged_chisato_gains_blade");
@@ -10267,8 +10198,8 @@ static void gen_pb1016_look_two_reveals_karin_to_hand(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(me);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    // skipped: activating_card (C uses queued card id as host)
+    rb_drain_ability_queue(&tg.state);
     // 
     int guard = 0;
     test_has_pending_choice(&tg);
@@ -10345,17 +10276,7 @@ static void gen_rin_is_null_live_counts_as_no_ability(void){
     // TODO: fill_decks(&mut game, filler);
     int null_live = test_id(&tg, "PL!HS-bp1-019-L");
     test_add_to_live(&tg, null_live);
-    // // inlined helper fire_live_start
-    // 
-    // action result consumed: let card = game.db.get_card(rin).unwrap();
-    // action result consumed: let ab = card.resolved_abilities().find(|a| a.triggers.as_deref() == Some("ライブ開始時")).unwrap();
-    int ability_id = 0;
-    int card_no = 0;
-    int pid = 0;
-    // TODO: game.state.trigger_auto_ability(ability_id, AbilityTrigger::LiveStart, pid.clone(), Some(card_no), Some(rin), None, None);
-    // TODO: game.state.activating_card = Some(rin);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
-    // 
+    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     int blade = rb_mods_get_blade(&tg.state.mods, mate);
     // TODO assert_eq (unresolved): assert_eq!(blade, 2, "is_null live should count as no LS/LSS -> should grant blade, got {}", blade);
     // 
@@ -10375,17 +10296,7 @@ static void gen_rin_both_triggers_live_no_blade(void){
     // TODO: fill_decks(&mut game, filler);
     int both = test_id(&tg, "PL!N-sd2-007-P");
     test_add_to_live(&tg, both);
-    // // inlined helper fire_live_start
-    // 
-    // action result consumed: let card = game.db.get_card(rin).unwrap();
-    // action result consumed: let ab = card.resolved_abilities().find(|a| a.triggers.as_deref() == Some("ライブ開始時")).unwrap();
-    int ability_id = 0;
-    int card_no = 0;
-    int pid = 0;
-    // TODO: game.state.trigger_auto_ability(ability_id, AbilityTrigger::LiveStart, pid.clone(), Some(card_no), Some(rin), None, None);
-    // TODO: game.state.activating_card = Some(rin);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
-    // 
+    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     int blade = rb_mods_get_blade(&tg.state.mods, mate);
     // TODO assert_eq (unresolved): assert_eq!(blade, 0, "live with both LS/LSS should not count, got {}", blade);
     // 
@@ -10406,17 +10317,7 @@ static void gen_rin_only_ls_live_no_blade(void){
     // // Find a live with only LS (e.g., PL!N-bp1-027-L has LS)
     int only_ls = test_id(&tg, "PL!N-bp1-027-L");
     test_add_to_live(&tg, only_ls);
-    // // inlined helper fire_live_start
-    // 
-    // action result consumed: let card = game.db.get_card(rin).unwrap();
-    // action result consumed: let ab = card.resolved_abilities().find(|a| a.triggers.as_deref() == Some("ライブ開始時")).unwrap();
-    int ability_id = 0;
-    int card_no = 0;
-    int pid = 0;
-    // TODO: game.state.trigger_auto_ability(ability_id, AbilityTrigger::LiveStart, pid.clone(), Some(card_no), Some(rin), None, None);
-    // TODO: game.state.activating_card = Some(rin);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
-    // 
+    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     int blade = rb_mods_get_blade(&tg.state.mods, mate);
     CHECK_EQ(blade, 0, "rin_only_ls_live_no_blade");
     // 
@@ -14518,10 +14419,10 @@ static void gen_target_count_1_gain_resource_chooses_one_of_many(void){
     // 
     int player_id = 0;
     // TODO: rabuka_engine::turn::TurnEngine::trigger_live_start_abilities(&mut game.state, &player_id);
-    // TODO: game.state.process_pending_auto_abilities(&player_id);
+    rb_drain_ability_queue(&tg.state);
     test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, 0);
-    // TODO: game.state.process_pending_auto_abilities(&player_id);
+    rb_drain_ability_queue(&tg.state);
     // TODO: }
     // 
     int a_heart06 = 0;
@@ -14556,10 +14457,10 @@ static void gen_distinct_card_name_prevents_same_card_twice(void){
     // 
     int player_id = 0;
     // TODO: rabuka_engine::turn::TurnEngine::trigger_live_start_abilities(&mut game.state, &player_id);
-    // TODO: game.state.process_pending_auto_abilities(&player_id);
+    rb_drain_ability_queue(&tg.state);
     test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, 0);
-    // TODO: game.state.process_pending_auto_abilities(&player_id);
+    rb_drain_ability_queue(&tg.state);
     // TODO: }
     // 
     // // No members on stage/waitroom → the 5-distinct-Liella condition is unmet,
@@ -14937,8 +14838,8 @@ static void gen_q280_live_success_flags_placed_energy_not_member(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(mei);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    // skipped: activating_card (C uses queued card id as host)
+    rb_drain_ability_queue(&tg.state);
     while (test_has_pending_choice(&tg)) rb_resume_with_choice(&tg.state, 0);
     rb_resume_with_choice(&tg.state, -1);
     // TODO: }
@@ -15494,8 +15395,8 @@ static void gen_bp3_031_per_waited_member_score_plus1(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(live);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    // skipped: activating_card (C uses queued card id as host)
+    rb_drain_ability_queue(&tg.state);
     while (test_has_pending_choice(&tg)) rb_resume_with_choice(&tg.state, 0);
     rb_resume_with_choice(&tg.state, -1);
     // TODO: }
@@ -19789,8 +19690,8 @@ static void gen_mia_real_dia_mill_triggers_ab0(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(dia);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    // skipped: activating_card (C uses queued card id as host)
+    rb_drain_ability_queue(&tg.state);
     // // Do NOT drain here: the pending ミア choice must be observed by the caller.
     // 
     // 
@@ -19858,8 +19759,8 @@ static void gen_mia_real_dia_mill_decline_no_recover(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(dia);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    // skipped: activating_card (C uses queued card id as host)
+    rb_drain_ability_queue(&tg.state);
     // // Do NOT drain here: the pending ミア choice must be observed by the caller.
     // 
     // 
@@ -20694,7 +20595,7 @@ static void gen_multi_color_heart_condition_not_met_does_not_queue(void){
     int ability_card = 0;
     // 
     // TODO: game.state.trigger_auto_abilities_for_player("p1");
-    // TODO: game.state.process_pending_auto_abilities("p1");
+    rb_drain_ability_queue(&tg.state);
     // 
     // TODO assert_eq (unresolved): assert_eq!( get_heart_modifier(&game, ability_card, HeartColor::Heart01), 0, "Should have no heart01 modifier with only 2 same-group members" );
     // TODO assert_eq (unresolved): assert_eq!( get_heart_modifier(&game, ability_card, HeartColor::Heart04), 0, "Should have no heart04 modifier with only 2 same-group members" );
@@ -20722,7 +20623,7 @@ static void gen_multi_color_heart_wrong_group_does_not_trigger(void){
     // TODO: }
     // 
     // TODO: game.state.trigger_auto_abilities_for_player("p1");
-    // TODO: game.state.process_pending_auto_abilities("p1");
+    rb_drain_ability_queue(&tg.state);
     // 
     // TODO assert_eq (unresolved): assert_eq!( get_heart_modifier(&game, ability_card, HeartColor::Heart01), 0, "Wrong-group cards must NOT trigger" );
     // TODO assert_eq (unresolved): assert_eq!( get_heart_modifier(&game, ability_card, HeartColor::Heart04), 0, "Wrong-group cards must NOT trigger" );
@@ -20740,7 +20641,7 @@ static void gen_multi_color_heart_condition_met_grants_both_colors(void){
     int ability_card = 0;
     // 
     // TODO: game.state.trigger_auto_abilities_for_player("p1");
-    // TODO: game.state.process_pending_auto_abilities("p1");
+    rb_drain_ability_queue(&tg.state);
     // 
     test_has_pending_choice(&tg);
     // 
@@ -20822,7 +20723,7 @@ static void gen_tomari_jidou_self_move_triggers(void){
     // TODO: game.state.push_movement_event(tomari, "stage", "stage", Some(tomari), "p1", true);
     int pid = 0;
     // TODO: rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(&mut game.state, &pid);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    rb_drain_ability_queue(&tg.state);
     CHECK_EQ(rb_mods_get_blade(&tg.state.mods, tomari), 1, "tomari_jidou_self_move_triggers");
     // 
 }
@@ -20837,7 +20738,7 @@ static void gen_tomari_jidou_opponent_move_triggers(void){
     // TODO: game.state.push_movement_event(tomari, "stage", "stage", Some(tomari), "p2", true);
     int pid = 0;
     // TODO: rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(&mut game.state, &pid);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    rb_drain_ability_queue(&tg.state);
     CHECK_EQ(rb_mods_get_blade(&tg.state.mods, tomari), 1, "tomari_jidou_opponent_move_triggers");
     // 
 }
@@ -20852,7 +20753,7 @@ static void gen_tomari_jidou_natural_move_no_trigger(void){
     // TODO: game.state.push_movement_event(tomari, "stage", "stage", None, "p1", false);
     int pid = 0;
     // TODO: rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(&mut game.state, &pid);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    rb_drain_ability_queue(&tg.state);
     CHECK_EQ(rb_mods_get_blade(&tg.state.mods, tomari), 0, "tomari_jidou_natural_move_no_trigger");
     // 
 }
@@ -21792,8 +21693,8 @@ static void gen_pb2_029_debut_rests_low_cost_member(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(me);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    // skipped: activating_card (C uses queued card id as host)
+    rb_drain_ability_queue(&tg.state);
     // 
     // TODO assert_eq (unresolved): assert_eq!( game.state.mods.orientation_modifiers.get(&cheap).copied(), Some(rabuka_engine::core::game_modifiers::CardOrientation::Wait), "the opponent's cost-2 member should be rested" );
     // 
@@ -22065,30 +21966,7 @@ static void gen_pb1034_choose_first_color_heart03(void){
     TestGame tg; test_game_new(&tg);
     int me = 0;
     // 
-    // // inlined helper fire_live_start
-    // 
-    int ability_id = 0;
-    // action result consumed: let card = game.db.get_card(me).unwrap();
-    int ab = 0;
-    // TODO: .resolved_abilities()
-    // TODO: .find(|a| a.triggers.as_deref() == Some("ライブ開始時"))
-    // TODO: .unwrap_or_else(|| panic!("card {} lacks a ライブ開始時 ability", card.card_no));
-    // TODO: format!("{}_{}", card.card_no, ab.full_text)
-    // TODO: };
-    // action result consumed: let card_no = game.db.get_card(me).unwrap().card_no.to_string();
-    int pid = 0;
-    // TODO: game.state.trigger_auto_ability(
-    // TODO: ability_id,
-    // TODO: AbilityTrigger::LiveStart,
-    // TODO: pid.clone(),
-    // TODO: Some(card_no),
-    // TODO: Some(me),
-    // TODO: None,
-    // TODO: None,
-    // TODO: );
-    // TODO: game.state.activating_card = Some(me);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
-    // 
+    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, 0);
     // 
@@ -22105,30 +21983,7 @@ static void gen_pb1034_choose_last_color_heart05(void){
     TestGame tg; test_game_new(&tg);
     int me = 0;
     // 
-    // // inlined helper fire_live_start
-    // 
-    int ability_id = 0;
-    // action result consumed: let card = game.db.get_card(me).unwrap();
-    int ab = 0;
-    // TODO: .resolved_abilities()
-    // TODO: .find(|a| a.triggers.as_deref() == Some("ライブ開始時"))
-    // TODO: .unwrap_or_else(|| panic!("card {} lacks a ライブ開始時 ability", card.card_no));
-    // TODO: format!("{}_{}", card.card_no, ab.full_text)
-    // TODO: };
-    // action result consumed: let card_no = game.db.get_card(me).unwrap().card_no.to_string();
-    int pid = 0;
-    // TODO: game.state.trigger_auto_ability(
-    // TODO: ability_id,
-    // TODO: AbilityTrigger::LiveStart,
-    // TODO: pid.clone(),
-    // TODO: Some(card_no),
-    // TODO: Some(me),
-    // TODO: None,
-    // TODO: None,
-    // TODO: );
-    // TODO: game.state.activating_card = Some(me);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
-    // 
+    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     rb_resume_with_choice(&tg.state, 2);
     // 
     // TODO assert_eq (unresolved): assert_eq!( multiplier(&game, me), Some(HeartColor::Heart05), "chose heart05 -> original hearts become heart05" );
@@ -22142,30 +21997,7 @@ static void gen_pb1034_choose_mid_color_heart04(void){
     TestGame tg; test_game_new(&tg);
     int me = 0;
     // 
-    // // inlined helper fire_live_start
-    // 
-    int ability_id = 0;
-    // action result consumed: let card = game.db.get_card(me).unwrap();
-    int ab = 0;
-    // TODO: .resolved_abilities()
-    // TODO: .find(|a| a.triggers.as_deref() == Some("ライブ開始時"))
-    // TODO: .unwrap_or_else(|| panic!("card {} lacks a ライブ開始時 ability", card.card_no));
-    // TODO: format!("{}_{}", card.card_no, ab.full_text)
-    // TODO: };
-    // action result consumed: let card_no = game.db.get_card(me).unwrap().card_no.to_string();
-    int pid = 0;
-    // TODO: game.state.trigger_auto_ability(
-    // TODO: ability_id,
-    // TODO: AbilityTrigger::LiveStart,
-    // TODO: pid.clone(),
-    // TODO: Some(card_no),
-    // TODO: Some(me),
-    // TODO: None,
-    // TODO: None,
-    // TODO: );
-    // TODO: game.state.activating_card = Some(me);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
-    // 
+    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     rb_resume_with_choice(&tg.state, 1);
     // 
     // TODO assert_eq (unresolved): assert_eq!(multiplier(&game, me), Some(HeartColor::Heart04));
@@ -22179,30 +22011,7 @@ static void gen_pb1036_twin_chooses_heart06(void){
     TestGame tg; test_game_new(&tg);
     int me = 0;
     // 
-    // // inlined helper fire_live_start
-    // 
-    int ability_id = 0;
-    // action result consumed: let card = game.db.get_card(me).unwrap();
-    int ab = 0;
-    // TODO: .resolved_abilities()
-    // TODO: .find(|a| a.triggers.as_deref() == Some("ライブ開始時"))
-    // TODO: .unwrap_or_else(|| panic!("card {} lacks a ライブ開始時 ability", card.card_no));
-    // TODO: format!("{}_{}", card.card_no, ab.full_text)
-    // TODO: };
-    // action result consumed: let card_no = game.db.get_card(me).unwrap().card_no.to_string();
-    int pid = 0;
-    // TODO: game.state.trigger_auto_ability(
-    // TODO: ability_id,
-    // TODO: AbilityTrigger::LiveStart,
-    // TODO: pid.clone(),
-    // TODO: Some(card_no),
-    // TODO: Some(me),
-    // TODO: None,
-    // TODO: None,
-    // TODO: );
-    // TODO: game.state.activating_card = Some(me);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
-    // 
+    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, 2);
     // 
@@ -22226,30 +22035,7 @@ static void gen_bp4011_wait_self_center_mus_member_two_blades(void){
     int left_mu = test_id(&tg, "PL!-sd1-007-SD");
     tg.state.p[0].stage[2] = left_mu;
     // 
-    // // inlined helper fire_live_start
-    // 
-    int ability_id = 0;
-    // action result consumed: let card = game.db.get_card(me).unwrap();
-    int ab = 0;
-    // TODO: .resolved_abilities()
-    // TODO: .find(|a| a.triggers.as_deref() == Some("ライブ開始時"))
-    // TODO: .unwrap_or_else(|| panic!("card {} lacks a ライブ開始時 ability", card.card_no));
-    // TODO: format!("{}_{}", card.card_no, ab.full_text)
-    // TODO: };
-    // action result consumed: let card_no = game.db.get_card(me).unwrap().card_no.to_string();
-    int pid = 0;
-    // TODO: game.state.trigger_auto_ability(
-    // TODO: ability_id,
-    // TODO: AbilityTrigger::LiveStart,
-    // TODO: pid.clone(),
-    // TODO: Some(card_no),
-    // TODO: Some(me),
-    // TODO: None,
-    // TODO: None,
-    // TODO: );
-    // TODO: game.state.activating_card = Some(me);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
-    // 
+    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     // 
     // // Optional self-wait cost gate is always presented; answer "Yes: wait self".
     test_has_pending_choice(&tg);
@@ -22275,30 +22061,7 @@ static void gen_bp4017_twin_center_mus_member_one_blade(void){
     int center = test_id(&tg, "PL!-sd1-001-SD");
     tg.state.p[0].stage[1] = center;
     // 
-    // // inlined helper fire_live_start
-    // 
-    int ability_id = 0;
-    // action result consumed: let card = game.db.get_card(me).unwrap();
-    int ab = 0;
-    // TODO: .resolved_abilities()
-    // TODO: .find(|a| a.triggers.as_deref() == Some("ライブ開始時"))
-    // TODO: .unwrap_or_else(|| panic!("card {} lacks a ライブ開始時 ability", card.card_no));
-    // TODO: format!("{}_{}", card.card_no, ab.full_text)
-    // TODO: };
-    // action result consumed: let card_no = game.db.get_card(me).unwrap().card_no.to_string();
-    int pid = 0;
-    // TODO: game.state.trigger_auto_ability(
-    // TODO: ability_id,
-    // TODO: AbilityTrigger::LiveStart,
-    // TODO: pid.clone(),
-    // TODO: Some(card_no),
-    // TODO: Some(me),
-    // TODO: None,
-    // TODO: None,
-    // TODO: );
-    // TODO: game.state.activating_card = Some(me);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
-    // 
+    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     test_has_pending_choice(&tg);
     // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectTarget"), "expected SelectTarget pay_optional_cost gate" );
     rb_resume_with_choice(&tg.state, 1);
@@ -22341,8 +22104,8 @@ static void gen_bp6013_success_score_six_retrieves_mus_live(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(me);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    // skipped: activating_card (C uses queued card id as host)
+    rb_drain_ability_queue(&tg.state);
     // 
     int guard = 0;
     test_has_pending_choice(&tg);
@@ -22384,8 +22147,8 @@ static void gen_bp6013_empty_success_zone_no_retrieval(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(me);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    // skipped: activating_card (C uses queued card id as host)
+    rb_drain_ability_queue(&tg.state);
     // 
     int guard = 0;
     test_has_pending_choice(&tg);
@@ -22413,17 +22176,7 @@ static void gen_rin_multiple_plain_lives_still_grants(void){
     int plain2 = test_id(&tg, "PL!-sd1-020-SD");
     test_add_to_live(&tg, plain1);
     test_add_to_live(&tg, plain2);
-    // // inlined helper fire_live_start
-    // 
-    // action result consumed: let card = game.db.get_card(rin).unwrap();
-    // action result consumed: let ab = card.resolved_abilities().find(|a| a.triggers.as_deref() == Some("ライブ開始時")).unwrap();
-    int ability_id = 0;
-    int card_no = 0;
-    int pid = 0;
-    // TODO: game.state.trigger_auto_ability(ability_id, AbilityTrigger::LiveStart, pid.clone(), Some(card_no), Some(rin), None, None);
-    // TODO: game.state.activating_card = Some(rin);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
-    // 
+    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     CHECK_EQ(rb_mods_get_blade(&tg.state.mods, mate), 2, "rin_multiple_plain_lives_still_grants");
     // 
 }
@@ -22444,17 +22197,7 @@ static void gen_rin_mixed_lives_plain_present_grants(void){
     int with_ability = test_id(&tg, "PL!N-sd2-007-P");
     test_add_to_live(&tg, plain);
     test_add_to_live(&tg, with_ability);
-    // // inlined helper fire_live_start
-    // 
-    // action result consumed: let card = game.db.get_card(rin).unwrap();
-    // action result consumed: let ab = card.resolved_abilities().find(|a| a.triggers.as_deref() == Some("ライブ開始時")).unwrap();
-    int ability_id = 0;
-    int card_no = 0;
-    int pid = 0;
-    // TODO: game.state.trigger_auto_ability(ability_id, AbilityTrigger::LiveStart, pid.clone(), Some(card_no), Some(rin), None, None);
-    // TODO: game.state.activating_card = Some(rin);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
-    // 
+    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     CHECK_EQ(rb_mods_get_blade(&tg.state.mods, mate), 2, "rin_mixed_lives_plain_present_grants");
     // 
 }
@@ -22474,17 +22217,7 @@ static void gen_rin_exclude_self_with_only_rin_and_mate(void){
     // TODO: fill_decks(&mut game, filler);
     int plain = test_id(&tg, "PL!-sd1-020-SD");
     test_add_to_live(&tg, plain);
-    // // inlined helper fire_live_start
-    // 
-    // action result consumed: let card = game.db.get_card(rin).unwrap();
-    // action result consumed: let ab = card.resolved_abilities().find(|a| a.triggers.as_deref() == Some("ライブ開始時")).unwrap();
-    int ability_id = 0;
-    int card_no = 0;
-    int pid = 0;
-    // TODO: game.state.trigger_auto_ability(ability_id, AbilityTrigger::LiveStart, pid.clone(), Some(card_no), Some(rin), None, None);
-    // TODO: game.state.activating_card = Some(rin);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
-    // 
+    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     CHECK_EQ(rb_mods_get_blade(&tg.state.mods, mate), 2, "rin_exclude_self_with_only_rin_and_mate");
     CHECK_EQ(rb_mods_get_blade(&tg.state.mods, rin), 0, "rin_exclude_self_with_only_rin_and_mate");
     // 
@@ -22505,17 +22238,7 @@ static void gen_rin_choice_among_two_mates(void){
     // TODO: fill_decks(&mut game, filler);
     int plain = test_id(&tg, "PL!-sd1-020-SD");
     test_add_to_live(&tg, plain);
-    // // inlined helper fire_live_start
-    // 
-    // action result consumed: let card = game.db.get_card(rin).unwrap();
-    // action result consumed: let ab = card.resolved_abilities().find(|a| a.triggers.as_deref() == Some("ライブ開始時")).unwrap();
-    int ability_id = 0;
-    int card_no = 0;
-    int pid = 0;
-    // TODO: game.state.trigger_auto_ability(ability_id, AbilityTrigger::LiveStart, pid.clone(), Some(card_no), Some(rin), None, None);
-    // TODO: game.state.activating_card = Some(rin);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
-    // 
+    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     // // Should have a choice to pick which other member gets blade
     // // If the engine auto-picks, at least one of the two mates gets blade
     test_drain_auto_choices(&tg);
@@ -23324,7 +23047,7 @@ static void gen_q250_self_appearance_triggers(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.process_pending_auto_abilities("player1");
+    rb_drain_ability_queue(&tg.state);
     // 
     test_has_pending_choice(&tg);
     // TODO assert: assert!(is_wait(&game, p2_member), "Opponent member put into wait");
@@ -23353,7 +23076,7 @@ static void gen_q250_no_appearance_no_trigger(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.process_pending_auto_abilities("player1");
+    rb_drain_ability_queue(&tg.state);
     // 
     // 
     test_has_pending_choice(&tg);
@@ -23385,7 +23108,7 @@ static void gen_q250_opponent_selects_which_member(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.process_pending_auto_abilities("player1");
+    rb_drain_ability_queue(&tg.state);
     // 
     // 
     test_has_pending_choice(&tg);
@@ -23418,7 +23141,7 @@ static void gen_q250_use_limit(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.process_pending_auto_abilities("player1");
+    rb_drain_ability_queue(&tg.state);
     // 
     test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, 0);
@@ -23438,7 +23161,7 @@ static void gen_q250_use_limit(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.process_pending_auto_abilities("player1");
+    rb_drain_ability_queue(&tg.state);
     // 
     test_has_pending_choice(&tg);
     // 
@@ -24049,8 +23772,8 @@ static void gen_hasunosora_pb1_condition_met_gains_heart04(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(hanasaka);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    // skipped: activating_card (C uses queued card id as host)
+    rb_drain_ability_queue(&tg.state);
     // 
     // 
     // // When only 1 valid target, effect auto-applies without prompt
@@ -24170,8 +23893,8 @@ static void gen_hasunosora_pb1_condition_not_met_no_effect(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(hanasaka);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    // skipped: activating_card (C uses queued card id as host)
+    rb_drain_ability_queue(&tg.state);
     // 
     // 
     test_has_pending_choice(&tg);
@@ -24292,8 +24015,8 @@ static void gen_hasunosora_pb1_non_hasu_not_targeted(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(hanasaka);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    // skipped: activating_card (C uses queued card id as host)
+    rb_drain_ability_queue(&tg.state);
     // 
     // 
     // // No valid target → no pending choice
@@ -24416,8 +24139,8 @@ static void gen_hasunosora_pb1_only_one_gets_heart04(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(hanasaka);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    // skipped: activating_card (C uses queued card id as host)
+    rb_drain_ability_queue(&tg.state);
     // 
     // 
     test_has_pending_choice(&tg);
@@ -25395,7 +25118,7 @@ static void gen_mute_kibiriver_normal_flow(void){
     // 
     int pid = 0;
     // TODO: rabuka_engine::turn::TurnEngine::trigger_live_start_abilities(&mut game.state, &pid);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    rb_drain_ability_queue(&tg.state);
     // 
     // // Handle pending choice — select a card
     while (test_has_pending_choice(&tg)) rb_resume_with_choice(&tg.state, 0);
@@ -25452,7 +25175,7 @@ static void gen_mute_kibiriver_no_kasumi_on_stage(void){
     // 
     int pid = 0;
     // TODO: rabuka_engine::turn::TurnEngine::trigger_live_start_abilities(&mut game.state, &pid);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    rb_drain_ability_queue(&tg.state);
     // 
     test_has_pending_choice(&tg);
     // 
@@ -25476,7 +25199,7 @@ static void gen_mute_kibiriver_no_kasumi_in_revealed_no_selection(void){
     // TODO loop (degraded): for _ in 0..10 { game.state.player1.main_deck.cards.push(filler); }
     int pid = 0;
     // TODO: rabuka_engine::turn::TurnEngine::trigger_live_start_abilities(&mut game.state, &pid);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    rb_drain_ability_queue(&tg.state);
     // // Reveal 4 filler, no Kasumi to select → should have no SelectCard or auto-skip
     // // The ability should still discard the 4 revealed
     while (test_has_pending_choice(&tg)) rb_resume_with_choice(&tg.state, 0);
@@ -25509,7 +25232,7 @@ static void gen_mute_kibiriver_multiple_kasumi_in_revealed_select_one(void){
     // TODO loop (degraded): for _ in 0..10 { let f=test_id(&tg, "PL!-sd1-010-SD"); game.state.player1.main_deck.cards.push(f); }
     int pid = 0;
     // TODO: rabuka_engine::turn::TurnEngine::trigger_live_start_abilities(&mut game.state, &pid);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    rb_drain_ability_queue(&tg.state);
     test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, 0);
     test_has_pending_choice(&tg);
@@ -27809,8 +27532,8 @@ static void gen_q267_deck_exhausts_mid_mill_refreshes_and_completes(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(rina);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    // skipped: activating_card (C uses queued card id as host)
+    rb_drain_ability_queue(&tg.state);
     test_drain_auto_choices(&tg);
     // 
     // 
@@ -27907,8 +27630,8 @@ static void gen_q267_deck_exactly_seven_no_refresh(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(rina);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    // skipped: activating_card (C uses queued card id as host)
+    rb_drain_ability_queue(&tg.state);
     test_drain_auto_choices(&tg);
     // 
     // 
@@ -27994,8 +27717,8 @@ static void gen_q267_deck_five_refresh_completes_to_seven(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(rina);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    // skipped: activating_card (C uses queued card id as host)
+    rb_drain_ability_queue(&tg.state);
     test_drain_auto_choices(&tg);
     // 
     // 
@@ -28061,8 +27784,8 @@ static void gen_q267_both_players_refresh_their_own_deck(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(rina);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    // skipped: activating_card (C uses queued card id as host)
+    rb_drain_ability_queue(&tg.state);
     test_drain_auto_choices(&tg);
     // 
     // 
@@ -28520,8 +28243,8 @@ static void gen_emma_pb1008_debut_choice_picks_member(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(emma);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    // skipped: activating_card (C uses queued card id as host)
+    rb_drain_ability_queue(&tg.state);
     // 
     // 
     test_has_pending_choice(&tg);
@@ -31610,7 +31333,7 @@ static void gen_pb2006_jidou_placement_feeds_constant_cost_up(void){
     // 
     int pid = 0;
     // TODO: TurnEngine::trigger_auto_abilities_for_player(&mut game.state, &pid);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    rb_drain_ability_queue(&tg.state);
     test_drain_auto_choices(&tg);
     // 
     // // The jidou placed the Liella! member under kinako.
@@ -31660,7 +31383,7 @@ static void gen_pb2006_jidou_once_per_turn_no_second_placement(void){
     // 
     int pid = 0;
     // TODO: TurnEngine::trigger_auto_abilities_for_player(&mut game.state, &pid);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    rb_drain_ability_queue(&tg.state);
     test_drain_auto_choices(&tg);
     // 
     // // Second move same turn.
@@ -31682,7 +31405,7 @@ static void gen_pb2006_jidou_once_per_turn_no_second_placement(void){
     // TODO: game.state.position_change_occurred_this_turn = true;
     // 
     // TODO: TurnEngine::trigger_auto_abilities_for_player(&mut game.state, &pid);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    rb_drain_ability_queue(&tg.state);
     test_drain_auto_choices(&tg);
     // 
     // TODO assert_eq (unresolved): assert_eq!( game.state.player1.stage.under_cards[2].len(), 0, "ターン1回: second area move same turn must NOT place a second card" );
@@ -32519,7 +32242,7 @@ static void gen_toubatsu_q263_center_to_area_move_triggers_auto(void){
     int pid = 0;
     // // TAS scan: finds non-self_target position_change abilities
     // TODO: rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(&mut game.state, &pid);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    rb_drain_ability_queue(&tg.state);
     // 
     // // Auto should fire with a 3-option choice (blades / wait / draw)
     test_has_pending_choice(&tg);
@@ -32610,7 +32333,7 @@ static void gen_kanon_no_baton_touch_stays_in_waitroom(void){
     test_add_to_discard(&tg, kanon);
     int pid = 0;
     // TODO: rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(&mut game.state, &pid);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    rb_drain_ability_queue(&tg.state);
     test_drain_auto_choices(&tg);
     // 
     CHECK(test_zone_has_id(&tg, 0, "discard", kanon), "kanon_no_baton_touch_stays_in_waitroom");
@@ -34260,8 +33983,8 @@ static void gen_pr032_mills_shortfall_and_recovers_live_to_deck_top(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(cid);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    // skipped: activating_card (C uses queued card id as host)
+    rb_drain_ability_queue(&tg.state);
     // 
     // 
     // TODO assert_eq (unresolved): assert_eq!( game.state.player1.waitroom.cards.len(), wait_before + 3, "waitroom 5 of 8 -> mill exactly 3" );
@@ -34324,8 +34047,8 @@ static void gen_pr032_declining_keeps_milled_cards_in_waitroom(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(cid);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    // skipped: activating_card (C uses queued card id as host)
+    rb_drain_ability_queue(&tg.state);
     // 
     // 
     test_has_pending_choice(&tg);
@@ -34373,8 +34096,8 @@ static void gen_pr032_no_live_among_milled_no_prompt(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(cid);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    // skipped: activating_card (C uses queued card id as host)
+    rb_drain_ability_queue(&tg.state);
     // 
     // 
     // TODO assert_eq (unresolved): assert_eq!( game.state.player1.waitroom.cards.len(), wait_before + 6, "waitroom 2 of 8 -> mill exactly 6" );
@@ -34434,8 +34157,8 @@ static void gen_pr032_waitroom_at_threshold_mills_nothing(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(cid);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    // skipped: activating_card (C uses queued card id as host)
+    rb_drain_ability_queue(&tg.state);
     // 
     // 
     CHECK_EQ(tg.state.p[0].deck.n, deck_before, "pr032_waitroom_at_threshold_mills_nothing");
@@ -34494,8 +34217,8 @@ static void gen_pr032_waitroom_seven_mills_one_and_recovers_live(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(cid);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    // skipped: activating_card (C uses queued card id as host)
+    rb_drain_ability_queue(&tg.state);
     // 
     // 
     // TODO assert_eq (unresolved): assert_eq!( game.state.player1.waitroom.cards.len(), wait_before + 1, "waitroom 7 of 8 -> mill exactly 1" );
@@ -34547,30 +34270,7 @@ static void gen_mirage_two_baton_arrivals_reduce_heart05(void){
     // TODO: }
     // 
     // 
-    // // inlined helper fire_live_start
-    // 
-    int ability_id = 0;
-    // action result consumed: let card = game.db.get_card(live).unwrap();
-    int ab = 0;
-    // TODO: .resolved_abilities()
-    // TODO: .find(|a| a.triggers.as_deref() == Some("ライブ開始時"))
-    // TODO: .unwrap_or_else(|| panic!("card {} lacks a ライブ開始時 ability", card.card_no));
-    // TODO: format!("{}_{}", card.card_no, ab.full_text)
-    // TODO: };
-    // action result consumed: let card_no = game.db.get_card(live).unwrap().card_no.to_string();
-    int pid = 0;
-    // TODO: game.state.trigger_auto_ability(
-    // TODO: ability_id,
-    // TODO: rabuka_engine::core::types::AbilityTrigger::LiveStart,
-    // TODO: pid.clone(),
-    // TODO: Some(card_no),
-    // TODO: Some(live),
-    // TODO: None,
-    // TODO: None,
-    // TODO: );
-    // TODO: game.state.activating_card = Some(live);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
-    // 
+    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     // 
     // TODO assert_eq (unresolved): assert_eq!( game.state .mods .get_need_heart_modifier(live, HeartColor::Heart05), -1, "two baton-touch 蓮ノ空 arrivals -> heart05 requirement -1" );
     // TODO assert_eq (unresolved): assert_eq!( game.state .mods .get_need_heart_modifier(live, HeartColor::Heart01), 0, "Mirage Voyage touches heart05 only" );
@@ -34604,30 +34304,7 @@ static void gen_mirage_one_baton_arrival_no_reduction(void){
     // TODO: }
     // 
     // 
-    // // inlined helper fire_live_start
-    // 
-    int ability_id = 0;
-    // action result consumed: let card = game.db.get_card(live).unwrap();
-    int ab = 0;
-    // TODO: .resolved_abilities()
-    // TODO: .find(|a| a.triggers.as_deref() == Some("ライブ開始時"))
-    // TODO: .unwrap_or_else(|| panic!("card {} lacks a ライブ開始時 ability", card.card_no));
-    // TODO: format!("{}_{}", card.card_no, ab.full_text)
-    // TODO: };
-    // action result consumed: let card_no = game.db.get_card(live).unwrap().card_no.to_string();
-    int pid = 0;
-    // TODO: game.state.trigger_auto_ability(
-    // TODO: ability_id,
-    // TODO: rabuka_engine::core::types::AbilityTrigger::LiveStart,
-    // TODO: pid.clone(),
-    // TODO: Some(card_no),
-    // TODO: Some(live),
-    // TODO: None,
-    // TODO: None,
-    // TODO: );
-    // TODO: game.state.activating_card = Some(live);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
-    // 
+    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     // 
     // TODO assert_eq (unresolved): assert_eq!( game.state .mods .get_need_heart_modifier(live, HeartColor::Heart05), 0, "only one baton arrival -> gate needs 2" );
     // 
@@ -34671,30 +34348,7 @@ static void gen_mirage_batons_of_wrong_group_no_reduction(void){
     // TODO: }
     // 
     // 
-    // // inlined helper fire_live_start
-    // 
-    int ability_id = 0;
-    // action result consumed: let card = game.db.get_card(live).unwrap();
-    int ab = 0;
-    // TODO: .resolved_abilities()
-    // TODO: .find(|a| a.triggers.as_deref() == Some("ライブ開始時"))
-    // TODO: .unwrap_or_else(|| panic!("card {} lacks a ライブ開始時 ability", card.card_no));
-    // TODO: format!("{}_{}", card.card_no, ab.full_text)
-    // TODO: };
-    // action result consumed: let card_no = game.db.get_card(live).unwrap().card_no.to_string();
-    int pid = 0;
-    // TODO: game.state.trigger_auto_ability(
-    // TODO: ability_id,
-    // TODO: rabuka_engine::core::types::AbilityTrigger::LiveStart,
-    // TODO: pid.clone(),
-    // TODO: Some(card_no),
-    // TODO: Some(live),
-    // TODO: None,
-    // TODO: None,
-    // TODO: );
-    // TODO: game.state.activating_card = Some(live);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
-    // 
+    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     // 
     // TODO assert_eq (unresolved): assert_eq!( game.state .mods .get_need_heart_modifier(live, HeartColor::Heart05), 0, "baton arrivals without 蓮ノ空 membership don't qualify" );
     // 
@@ -34713,30 +34367,7 @@ static void gen_mirage_seated_without_baton_no_reduction(void){
     tg.state.p[0].stage[0] = a;
     tg.state.p[0].stage[1] = b;
     // 
-    // // inlined helper fire_live_start
-    // 
-    int ability_id = 0;
-    // action result consumed: let card = game.db.get_card(live).unwrap();
-    int ab = 0;
-    // TODO: .resolved_abilities()
-    // TODO: .find(|a| a.triggers.as_deref() == Some("ライブ開始時"))
-    // TODO: .unwrap_or_else(|| panic!("card {} lacks a ライブ開始時 ability", card.card_no));
-    // TODO: format!("{}_{}", card.card_no, ab.full_text)
-    // TODO: };
-    // action result consumed: let card_no = game.db.get_card(live).unwrap().card_no.to_string();
-    int pid = 0;
-    // TODO: game.state.trigger_auto_ability(
-    // TODO: ability_id,
-    // TODO: rabuka_engine::core::types::AbilityTrigger::LiveStart,
-    // TODO: pid.clone(),
-    // TODO: Some(card_no),
-    // TODO: Some(live),
-    // TODO: None,
-    // TODO: None,
-    // TODO: );
-    // TODO: game.state.activating_card = Some(live);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
-    // 
+    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     // 
     // TODO assert_eq (unresolved): assert_eq!( game.state .mods .get_need_heart_modifier(live, HeartColor::Heart05), 0, "蓮ノ空 members without baton-touch arrival don't qualify" );
     // 
@@ -34779,30 +34410,7 @@ static void gen_kokon_two_baton_arrivals_reduce_heart01(void){
     // TODO: }
     // 
     // 
-    // // inlined helper fire_live_start
-    // 
-    int ability_id = 0;
-    // action result consumed: let card = game.db.get_card(live).unwrap();
-    int ab = 0;
-    // TODO: .resolved_abilities()
-    // TODO: .find(|a| a.triggers.as_deref() == Some("ライブ開始時"))
-    // TODO: .unwrap_or_else(|| panic!("card {} lacks a ライブ開始時 ability", card.card_no));
-    // TODO: format!("{}_{}", card.card_no, ab.full_text)
-    // TODO: };
-    // action result consumed: let card_no = game.db.get_card(live).unwrap().card_no.to_string();
-    int pid = 0;
-    // TODO: game.state.trigger_auto_ability(
-    // TODO: ability_id,
-    // TODO: rabuka_engine::core::types::AbilityTrigger::LiveStart,
-    // TODO: pid.clone(),
-    // TODO: Some(card_no),
-    // TODO: Some(live),
-    // TODO: None,
-    // TODO: None,
-    // TODO: );
-    // TODO: game.state.activating_card = Some(live);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
-    // 
+    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     // 
     // TODO assert_eq (unresolved): assert_eq!( game.state .mods .get_need_heart_modifier(live, HeartColor::Heart01), -1, "ココン東西 reduces heart01 requirement" );
     // TODO assert_eq (unresolved): assert_eq!( game.state .mods .get_need_heart_modifier(live, HeartColor::Heart05), 0, "ココン東西 touches heart01 only" );
@@ -34828,30 +34436,7 @@ static void gen_omoi_accept_member_to_deck_top_grants_blade(void){
     int wr_member = test_id(&tg, "PL!N-bp3-006-R");
     test_add_to_discard(&tg, wr_member);
     // 
-    // // inlined helper fire_live_start
-    // 
-    int ability_id = 0;
-    // action result consumed: let card = game.db.get_card(live).unwrap();
-    int ab = 0;
-    // TODO: .resolved_abilities()
-    // TODO: .find(|a| a.triggers.as_deref() == Some("ライブ開始時"))
-    // TODO: .unwrap_or_else(|| panic!("card {} lacks a ライブ開始時 ability", card.card_no));
-    // TODO: format!("{}_{}", card.card_no, ab.full_text)
-    // TODO: };
-    // action result consumed: let card_no = game.db.get_card(live).unwrap().card_no.to_string();
-    int pid = 0;
-    // TODO: game.state.trigger_auto_ability(
-    // TODO: ability_id,
-    // TODO: AbilityTrigger::LiveStart,
-    // TODO: pid.clone(),
-    // TODO: Some(card_no),
-    // TODO: Some(live),
-    // TODO: None,
-    // TODO: None,
-    // TODO: );
-    // TODO: game.state.activating_card = Some(live);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
-    // 
+    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, 0);
     // 
@@ -34875,30 +34460,7 @@ static void gen_omoi_decline_no_blade_no_move(void){
     int wr_member = test_id(&tg, "PL!N-bp3-006-R");
     test_add_to_discard(&tg, wr_member);
     // 
-    // // inlined helper fire_live_start
-    // 
-    int ability_id = 0;
-    // action result consumed: let card = game.db.get_card(live).unwrap();
-    int ab = 0;
-    // TODO: .resolved_abilities()
-    // TODO: .find(|a| a.triggers.as_deref() == Some("ライブ開始時"))
-    // TODO: .unwrap_or_else(|| panic!("card {} lacks a ライブ開始時 ability", card.card_no));
-    // TODO: format!("{}_{}", card.card_no, ab.full_text)
-    // TODO: };
-    // action result consumed: let card_no = game.db.get_card(live).unwrap().card_no.to_string();
-    int pid = 0;
-    // TODO: game.state.trigger_auto_ability(
-    // TODO: ability_id,
-    // TODO: AbilityTrigger::LiveStart,
-    // TODO: pid.clone(),
-    // TODO: Some(card_no),
-    // TODO: Some(live),
-    // TODO: None,
-    // TODO: None,
-    // TODO: );
-    // TODO: game.state.activating_card = Some(live);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
-    // 
+    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     test_has_pending_choice(&tg);
     // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard (discard-zone recovery, allow_skip)" );
     rb_resume_with_choice(&tg.state, -1);
@@ -34927,30 +34489,7 @@ static void gen_omoi_empty_waitroom_no_prompt(void){
     tg.state.p[0].stage[1] = mate;
     // // Waitroom EMPTY.
     // 
-    // // inlined helper fire_live_start
-    // 
-    int ability_id = 0;
-    // action result consumed: let card = game.db.get_card(live).unwrap();
-    int ab = 0;
-    // TODO: .resolved_abilities()
-    // TODO: .find(|a| a.triggers.as_deref() == Some("ライブ開始時"))
-    // TODO: .unwrap_or_else(|| panic!("card {} lacks a ライブ開始時 ability", card.card_no));
-    // TODO: format!("{}_{}", card.card_no, ab.full_text)
-    // TODO: };
-    // action result consumed: let card_no = game.db.get_card(live).unwrap().card_no.to_string();
-    int pid = 0;
-    // TODO: game.state.trigger_auto_ability(
-    // TODO: ability_id,
-    // TODO: AbilityTrigger::LiveStart,
-    // TODO: pid.clone(),
-    // TODO: Some(card_no),
-    // TODO: Some(live),
-    // TODO: None,
-    // TODO: None,
-    // TODO: );
-    // TODO: game.state.activating_card = Some(live);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
-    // 
+    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     // 
     test_has_pending_choice(&tg);
     CHECK_EQ(rb_mods_get_blade(&tg.state.mods, mate), 0, "omoi_empty_waitroom_no_prompt");
@@ -34973,30 +34512,7 @@ static void gen_ruby_reveal_aqours_place_and_gain_blade(void){
     test_add_to_hand(&tg, aqours_card);
     test_add_to_hand(&tg, non_aq);
     // 
-    // // inlined helper fire_live_start
-    // 
-    int ability_id = 0;
-    // action result consumed: let card = game.db.get_card(ruby).unwrap();
-    int ab = 0;
-    // TODO: .resolved_abilities()
-    // TODO: .find(|a| a.triggers.as_deref() == Some("ライブ開始時"))
-    // TODO: .unwrap_or_else(|| panic!("card {} lacks a ライブ開始時 ability", card.card_no));
-    // TODO: format!("{}_{}", card.card_no, ab.full_text)
-    // TODO: };
-    // action result consumed: let card_no = game.db.get_card(ruby).unwrap().card_no.to_string();
-    int pid = 0;
-    // TODO: game.state.trigger_auto_ability(
-    // TODO: ability_id,
-    // TODO: AbilityTrigger::LiveStart,
-    // TODO: pid.clone(),
-    // TODO: Some(card_no),
-    // TODO: Some(ruby),
-    // TODO: None,
-    // TODO: None,
-    // TODO: );
-    // TODO: game.state.activating_card = Some(ruby);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
-    // 
+    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     // 
     // // First prompt: optional reveal cost gate -> accept.
     test_has_pending_choice(&tg);
@@ -35030,30 +34546,7 @@ static void gen_ruby_no_aqours_in_hand_blade_still_optional(void){
     test_add_to_hand(&tg, only_mu);
     // 
     int deck_before = tg.state.p[0].deck.n;
-    // // inlined helper fire_live_start
-    // 
-    int ability_id = 0;
-    // action result consumed: let card = game.db.get_card(ruby).unwrap();
-    int ab = 0;
-    // TODO: .resolved_abilities()
-    // TODO: .find(|a| a.triggers.as_deref() == Some("ライブ開始時"))
-    // TODO: .unwrap_or_else(|| panic!("card {} lacks a ライブ開始時 ability", card.card_no));
-    // TODO: format!("{}_{}", card.card_no, ab.full_text)
-    // TODO: };
-    // action result consumed: let card_no = game.db.get_card(ruby).unwrap().card_no.to_string();
-    int pid = 0;
-    // TODO: game.state.trigger_auto_ability(
-    // TODO: ability_id,
-    // TODO: AbilityTrigger::LiveStart,
-    // TODO: pid.clone(),
-    // TODO: Some(card_no),
-    // TODO: Some(ruby),
-    // TODO: None,
-    // TODO: None,
-    // TODO: );
-    // TODO: game.state.activating_card = Some(ruby);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
-    // 
+    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     // 
     test_has_pending_choice(&tg);
     // // Nothing eligible to reveal -> gate skipped entirely.
@@ -35288,30 +34781,7 @@ static void gen_bp5026_total_eleven_scores_plus_one(void){
     tg.state.p[0].stage[1] = big2;
     tg.state.p[0].stage[2] = small;
     // 
-    // // inlined helper fire_live_start
-    // 
-    int ability_id = 0;
-    // action result consumed: let card = game.db.get_card(live).unwrap();
-    int ab = 0;
-    // TODO: .resolved_abilities()
-    // TODO: .find(|a| a.triggers.as_deref() == Some("ライブ開始時"))
-    // TODO: .unwrap_or_else(|| panic!("card {} lacks a ライブ開始時 ability", card.card_no));
-    // TODO: format!("{}_{}", card.card_no, ab.full_text)
-    // TODO: };
-    // action result consumed: let card_no = game.db.get_card(live).unwrap().card_no.to_string();
-    int pid = 0;
-    // TODO: game.state.trigger_auto_ability(
-    // TODO: ability_id,
-    // TODO: AbilityTrigger::LiveStart,
-    // TODO: pid.clone(),
-    // TODO: Some(card_no),
-    // TODO: Some(live),
-    // TODO: None,
-    // TODO: None,
-    // TODO: );
-    // TODO: game.state.activating_card = Some(live);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
-    // 
+    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     // 
     CHECK_EQ(rb_mods_get_score(&tg.state.mods, live), 1, "bp5026_total_eleven_scores_plus_one");
     // 
@@ -35332,30 +34802,7 @@ static void gen_bp5026_total_below_threshold_no_bonus(void){
     tg.state.p[0].stage[1] = l2;
     tg.state.p[0].stage[2] = outsider;
     // 
-    // // inlined helper fire_live_start
-    // 
-    int ability_id = 0;
-    // action result consumed: let card = game.db.get_card(live).unwrap();
-    int ab = 0;
-    // TODO: .resolved_abilities()
-    // TODO: .find(|a| a.triggers.as_deref() == Some("ライブ開始時"))
-    // TODO: .unwrap_or_else(|| panic!("card {} lacks a ライブ開始時 ability", card.card_no));
-    // TODO: format!("{}_{}", card.card_no, ab.full_text)
-    // TODO: };
-    // action result consumed: let card_no = game.db.get_card(live).unwrap().card_no.to_string();
-    int pid = 0;
-    // TODO: game.state.trigger_auto_ability(
-    // TODO: ability_id,
-    // TODO: AbilityTrigger::LiveStart,
-    // TODO: pid.clone(),
-    // TODO: Some(card_no),
-    // TODO: Some(live),
-    // TODO: None,
-    // TODO: None,
-    // TODO: );
-    // TODO: game.state.activating_card = Some(live);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
-    // 
+    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     // 
     CHECK_EQ(rb_mods_get_score(&tg.state.mods, live), 0, "bp5026_total_below_threshold_no_bonus");
     // 
@@ -35375,30 +34822,7 @@ static void gen_cl1010_expensive_member_two_blades(void){
     int big = test_id(&tg, "PL!HS-bp5-004-R");
     tg.state.p[0].stage[1] = big;
     // 
-    // // inlined helper fire_live_start
-    // 
-    int ability_id = 0;
-    // action result consumed: let card = game.db.get_card(live).unwrap();
-    int ab = 0;
-    // TODO: .resolved_abilities()
-    // TODO: .find(|a| a.triggers.as_deref() == Some("ライブ開始時"))
-    // TODO: .unwrap_or_else(|| panic!("card {} lacks a ライブ開始時 ability", card.card_no));
-    // TODO: format!("{}_{}", card.card_no, ab.full_text)
-    // TODO: };
-    // action result consumed: let card_no = game.db.get_card(live).unwrap().card_no.to_string();
-    int pid = 0;
-    // TODO: game.state.trigger_auto_ability(
-    // TODO: ability_id,
-    // TODO: AbilityTrigger::LiveStart,
-    // TODO: pid.clone(),
-    // TODO: Some(card_no),
-    // TODO: Some(live),
-    // TODO: None,
-    // TODO: None,
-    // TODO: );
-    // TODO: game.state.activating_card = Some(live);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
-    // 
+    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     // 
     CHECK_EQ(rb_mods_get_blade(&tg.state.mods, big), 2, "cl1010_expensive_member_two_blades");
     // 
@@ -35418,30 +34842,7 @@ static void gen_cl1010_cheap_member_no_blades(void){
     int low = test_id(&tg, "PL!HS-cl1-002-CL");
     tg.state.p[0].stage[1] = low;
     // 
-    // // inlined helper fire_live_start
-    // 
-    int ability_id = 0;
-    // action result consumed: let card = game.db.get_card(live).unwrap();
-    int ab = 0;
-    // TODO: .resolved_abilities()
-    // TODO: .find(|a| a.triggers.as_deref() == Some("ライブ開始時"))
-    // TODO: .unwrap_or_else(|| panic!("card {} lacks a ライブ開始時 ability", card.card_no));
-    // TODO: format!("{}_{}", card.card_no, ab.full_text)
-    // TODO: };
-    // action result consumed: let card_no = game.db.get_card(live).unwrap().card_no.to_string();
-    int pid = 0;
-    // TODO: game.state.trigger_auto_ability(
-    // TODO: ability_id,
-    // TODO: AbilityTrigger::LiveStart,
-    // TODO: pid.clone(),
-    // TODO: Some(card_no),
-    // TODO: Some(live),
-    // TODO: None,
-    // TODO: None,
-    // TODO: );
-    // TODO: game.state.activating_card = Some(live);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
-    // 
+    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     // 
     CHECK_EQ(rb_mods_get_blade(&tg.state.mods, low), 0, "cl1010_cheap_member_no_blades");
     // 
@@ -35495,30 +34896,7 @@ static void gen_bp6030_draw_one_discard_one(void){
     // // Hand starts EMPTY: the drawn card is then the only discard candidate,
     // // making the end state fully deterministic.
     // 
-    // // inlined helper fire_live_start
-    // 
-    int ability_id = 0;
-    // action result consumed: let card = game.db.get_card(live).unwrap();
-    int ab = 0;
-    // TODO: .resolved_abilities()
-    // TODO: .find(|a| a.triggers.as_deref() == Some("ライブ開始時"))
-    // TODO: .unwrap_or_else(|| panic!("card {} lacks a ライブ開始時 ability", card.card_no));
-    // TODO: format!("{}_{}", card.card_no, ab.full_text)
-    // TODO: };
-    // action result consumed: let card_no = game.db.get_card(live).unwrap().card_no.to_string();
-    int pid = 0;
-    // TODO: game.state.trigger_auto_ability(
-    // TODO: ability_id,
-    // TODO: AbilityTrigger::LiveStart,
-    // TODO: pid.clone(),
-    // TODO: Some(card_no),
-    // TODO: Some(live),
-    // TODO: None,
-    // TODO: None,
-    // TODO: );
-    // TODO: game.state.activating_card = Some(live);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
-    // 
+    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     int guard = 0;
     test_has_pending_choice(&tg);
     // TODO: guard += 1;
@@ -35801,8 +35179,8 @@ static void gen_honoka_bp4001_draws_only_when_stage_total_is_cheaper(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(honoka);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    // skipped: activating_card (C uses queued card id as host)
+    rb_drain_ability_queue(&tg.state);
     // 
     while (test_has_pending_choice(&tg)) rb_resume_with_choice(&tg.state, 0);
     rb_resume_with_choice(&tg.state, -1);
@@ -35829,8 +35207,8 @@ static void gen_honoka_bp4001_draws_only_when_stage_total_is_cheaper(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(honoka);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    // skipped: activating_card (C uses queued card id as host)
+    rb_drain_ability_queue(&tg.state);
     // 
     while (test_has_pending_choice(&tg)) rb_resume_with_choice(&tg.state, 0);
     rb_resume_with_choice(&tg.state, -1);
@@ -35890,8 +35268,8 @@ static void gen_kasumu_bp3002_grants_chosen_heart_to_other_nijigasaki_only(void)
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(kasumu);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    // skipped: activating_card (C uses queued card id as host)
+    rb_drain_ability_queue(&tg.state);
     // 
     // 
     // // Optional cost 「手札を1枚控え室に置いてもよい」 is presented directly as
@@ -35955,8 +35333,8 @@ static void gen_sayaka_hsbp2011_mills_top_five(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(sayaka);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    // skipped: activating_card (C uses queued card id as host)
+    rb_drain_ability_queue(&tg.state);
     // 
     // 
     // TODO assert_eq (unresolved): assert_eq!( game.state.player1.waitroom.cards.len(), waitroom_before + 5, "five cards milled to the waitroom" );
@@ -36074,13 +35452,13 @@ static void gen_jidou_effect_cause_both_sides(void){
     // // Simulate area move caused by own effect (should trigger turn1 jidou)
     // TODO: game.state.push_movement_event(jidou, "stage", "stage", Some(jidou), "p1", true);
     // TODO: game.state.trigger_auto_abilities_for_player("p1");
-    // TODO: game.state.process_pending_auto_abilities("p1");
+    rb_drain_ability_queue(&tg.state);
     int after_blades = 0;
     // TODO assert: assert!(after_blades >= before_blades, "jidou effect-cause trigger should not reduce blades");
     // // Second jidou: energy placed by own effect → blade until live end
     // TODO: game.state.push_movement_event(-1, "energy_deck", "energy", Some(jidou), "p1", true);
     // TODO: game.state.trigger_auto_abilities_for_player("p1");
-    // TODO: game.state.process_pending_auto_abilities("p1");
+    rb_drain_ability_queue(&tg.state);
     // TODO assert: assert!(game.state.player1.stage.stage.contains(&jidou));
     // 
 }
@@ -36102,11 +35480,11 @@ static void gen_jidou_paired_with_other_ability_both_fire(void){
     // TODO: game.state.push_movement_event(card, "hand", "stage", Some(card), "p1", true);
     // TODO: game.state.record_card_appearance(card, "hand");
     // TODO: game.state.trigger_auto_abilities_for_player("p1");
-    // TODO: game.state.process_pending_auto_abilities("p1");
+    rb_drain_ability_queue(&tg.state);
     // // Trigger second jidou via energy placed
     // TODO: game.state.push_movement_event(-1, "energy_deck", "energy", Some(card), "p1", true);
     // TODO: game.state.trigger_auto_abilities_for_player("p1");
-    // TODO: game.state.process_pending_auto_abilities("p1");
+    rb_drain_ability_queue(&tg.state);
     // // At least one of the two should have added state; we pin no panic and distinct paths
     // TODO assert: assert!(game.state.player1.stage.stage.contains(&card));
     // TODO assert: assert!(game.state.mods.blade_modifiers.len() >= before);
@@ -36132,7 +35510,7 @@ static void gen_jidou_distinct_from_constant_and_activation(void){
     // TODO assert_eq (unresolved): assert_eq!(before.len(), after_const.len(), "constant recalc should be idempotent for jidou");
     // TODO: game.state.push_movement_event(m, "stage", "stage", Some(m), "p1", true);
     // TODO: game.state.trigger_auto_abilities_for_player("p1");
-    // TODO: game.state.process_pending_auto_abilities("p1");
+    rb_drain_ability_queue(&tg.state);
     int after_jidou = 0;
     // // Jidou trigger path is separate — may or may not add blade depending on trigger, but must not crash
     // TODO assert: assert!(after_jidou.len() >= after_const.len() || after_jidou.len() == after_const.len());
@@ -36157,12 +35535,12 @@ static void gen_jidou_both_on_same_card_coexist_and_fire_separately(void){
     // TODO: game.state.push_movement_event(card, "hand", "stage", Some(card), "p1", true);
     // TODO: game.state.record_card_appearance(card, "hand");
     // TODO: game.state.trigger_auto_abilities_for_player("p1");
-    // TODO: game.state.process_pending_auto_abilities("p1");
+    rb_drain_ability_queue(&tg.state);
     int after_first = tg.state.p[0].energy.n;
     // // Fire second jidou via energy placed by own effect
     // TODO: game.state.push_movement_event(-1, "energy_deck", "energy", Some(card), "p1", true);
     // TODO: game.state.trigger_auto_abilities_for_player("p1");
-    // TODO: game.state.process_pending_auto_abilities("p1");
+    rb_drain_ability_queue(&tg.state);
     // // Both should have been considered; at worst second adds blade, at least no crash and card still there
     // TODO assert: assert!(game.state.player1.stage.stage.contains(&card));
     CHECK(tg.state.p[0].energy.n, "jidou_both_on_same_card_coexist_and_fire_separately");
@@ -36318,7 +35696,7 @@ static void gen_yell_all_blade_blocks_sumire_and_wien(void){
     // TODO: }
     // TODO: }
     // TODO: game.state.trigger_auto_abilities_for_player("p1");
-    // TODO: game.state.process_pending_auto_abilities("p1");
+    rb_drain_ability_queue(&tg.state);
     // 
     CHECK_EQ(rb_mods_get_heart(&tg.state.mods, sumire, 6), 0, "yell_all_blade_blocks_sumire_and_wien");
     CHECK_EQ(rb_mods_get_heart(&tg.state.mods, wien, 3), 0, "yell_all_blade_blocks_sumire_and_wien");
@@ -36355,7 +35733,7 @@ static void gen_yell_only_one_present_triggers_self_only(void){
     // TODO: }
     // TODO: }
     // TODO: game.state.trigger_auto_abilities_for_player("p1");
-    // TODO: game.state.process_pending_auto_abilities("p1");
+    rb_drain_ability_queue(&tg.state);
     // 
     CHECK_EQ(rb_mods_get_heart(&tg.state.mods, sumire, 6), 1, "yell_only_one_present_triggers_self_only");
     // // Ensure Wien absent doesn't somehow get heart on filler
@@ -38201,8 +37579,8 @@ static void gen_ai_two_distinct_diverdiva_offers_choice(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(ai);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    // skipped: activating_card (C uses queued card id as host)
+    rb_drain_ability_queue(&tg.state);
     test_drain_auto_choices(&tg);
     // 
     // 
@@ -38247,8 +37625,8 @@ static void gen_ai_option_0_activates_two_energy(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(ai);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    // skipped: activating_card (C uses queued card id as host)
+    rb_drain_ability_queue(&tg.state);
     test_drain_auto_choices(&tg);
     // 
     test_has_pending_choice(&tg);
@@ -38297,8 +37675,8 @@ static void gen_ai_option_1_places_energy_under_nijigasaki_member(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(ai);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    // skipped: activating_card (C uses queued card id as host)
+    rb_drain_ability_queue(&tg.state);
     test_drain_auto_choices(&tg);
     // 
     test_has_pending_choice(&tg);
@@ -38345,8 +37723,8 @@ static void gen_ai_condition_fails_with_one_diverdiva(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(ai);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    // skipped: activating_card (C uses queued card id as host)
+    rb_drain_ability_queue(&tg.state);
     test_drain_auto_choices(&tg);
     // 
     // 
@@ -38383,8 +37761,8 @@ static void gen_ai_condition_fails_with_duplicate_name(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(ai1);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    // skipped: activating_card (C uses queued card id as host)
+    rb_drain_ability_queue(&tg.state);
     test_drain_auto_choices(&tg);
     // 
     // 
@@ -38528,8 +37906,8 @@ static void gen_emma_two_distinct_colors_gains_heart04(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(emma);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    // skipped: activating_card (C uses queued card id as host)
+    rb_drain_ability_queue(&tg.state);
     test_drain_auto_choices(&tg);
     // 
     // TODO assert_eq (unresolved): assert_eq!( heart04(&game, emma), 1, "2 distinct blade-heart colors among milled members → heart04, got {}", heart04(&game, emma) );
@@ -38565,8 +37943,8 @@ static void gen_emma_three_distinct_colors_gains_heart04(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(emma);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    // skipped: activating_card (C uses queued card id as host)
+    rb_drain_ability_queue(&tg.state);
     test_drain_auto_choices(&tg);
     // 
     // 
@@ -38600,8 +37978,8 @@ static void gen_emma_all_one_color_no_heart04(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(emma);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    // skipped: activating_card (C uses queued card id as host)
+    rb_drain_ability_queue(&tg.state);
     test_drain_auto_choices(&tg);
     // 
     // 
@@ -38636,8 +38014,8 @@ static void gen_emma_only_one_member_milled_no_heart04(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(emma);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    // skipped: activating_card (C uses queued card id as host)
+    rb_drain_ability_queue(&tg.state);
     test_drain_auto_choices(&tg);
     // 
     // 
@@ -38671,8 +38049,8 @@ static void gen_emma_members_without_blade_heart_no_heart04(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(emma);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    // skipped: activating_card (C uses queued card id as host)
+    rb_drain_ability_queue(&tg.state);
     test_drain_auto_choices(&tg);
     // 
     // 
@@ -40542,8 +39920,8 @@ static void gen_mirai_skip_leaves_discard_and_no_blade(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(mirai);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    // skipped: activating_card (C uses queued card id as host)
+    rb_drain_ability_queue(&tg.state);
     test_drain_auto_choices(&tg);
     // 
     test_has_pending_choice(&tg);
@@ -44279,7 +43657,7 @@ static void gen_kanon_ab1_live_success_pay_optional_cost(void){
     // // Set phase and trigger LiveSuccess abilities
     // TODO: game.state.current_phase = Phase::LiveVictoryDetermination;
     // TODO: TurnEngine::trigger_live_success_abilities(&mut game.state, "p1");
-    // TODO: game.state.process_pending_auto_abilities("p1");
+    rb_drain_ability_queue(&tg.state);
     // 
     // // LiveSuccess should have fired → pending choice (optional cost)
     test_has_pending_choice(&tg);
@@ -44344,7 +43722,7 @@ static void gen_kanon_ab1_live_success_skip_optional_cost(void){
     // 
     // TODO: game.state.current_phase = Phase::LiveVictoryDetermination;
     // TODO: TurnEngine::trigger_live_success_abilities(&mut game.state, "p1");
-    // TODO: game.state.process_pending_auto_abilities("p1");
+    rb_drain_ability_queue(&tg.state);
     // 
     test_has_pending_choice(&tg);
     // 
@@ -46421,30 +45799,7 @@ static void gen_mari_heart05_total_exactly_four_grants(void){
     int l = test_id(&tg, "PL!HS-PR-011-PR");
     test_add_to_live(&tg, l);
     // 
-    // // inlined helper fire_live_start
-    // 
-    int ability_id = 0;
-    // action result consumed: let card = game.db.get_card(mari).unwrap();
-    int ab = 0;
-    // TODO: .resolved_abilities()
-    // TODO: .find(|a| a.triggers.as_deref() == Some("ライブ開始時"))
-    // TODO: .unwrap_or_else(|| panic!("card {} lacks a ライブ開始時 ability", card.card_no));
-    // TODO: format!("{}_{}", card.card_no, ab.full_text)
-    // TODO: };
-    // action result consumed: let card_no = game.db.get_card(mari).unwrap().card_no.to_string();
-    int pid = 0;
-    // TODO: game.state.trigger_auto_ability(
-    // TODO: ability_id,
-    // TODO: AbilityTrigger::LiveStart,
-    // TODO: pid.clone(),
-    // TODO: Some(card_no),
-    // TODO: Some(mari),
-    // TODO: None,
-    // TODO: None,
-    // TODO: );
-    // TODO: game.state.activating_card = Some(mari);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
-    // 
+    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     // 
     CHECK_EQ(rb_mods_get_heart(&tg.state.mods, mari, 5), 1, "mari_heart05_total_exactly_four_grants");
     // 
@@ -46459,30 +45814,7 @@ static void gen_mari_heart05_total_two_no_grant(void){
     int l = test_id(&tg, "PL!S-PR-023-PR");
     test_add_to_live(&tg, l);
     // 
-    // // inlined helper fire_live_start
-    // 
-    int ability_id = 0;
-    // action result consumed: let card = game.db.get_card(mari).unwrap();
-    int ab = 0;
-    // TODO: .resolved_abilities()
-    // TODO: .find(|a| a.triggers.as_deref() == Some("ライブ開始時"))
-    // TODO: .unwrap_or_else(|| panic!("card {} lacks a ライブ開始時 ability", card.card_no));
-    // TODO: format!("{}_{}", card.card_no, ab.full_text)
-    // TODO: };
-    // action result consumed: let card_no = game.db.get_card(mari).unwrap().card_no.to_string();
-    int pid = 0;
-    // TODO: game.state.trigger_auto_ability(
-    // TODO: ability_id,
-    // TODO: AbilityTrigger::LiveStart,
-    // TODO: pid.clone(),
-    // TODO: Some(card_no),
-    // TODO: Some(mari),
-    // TODO: None,
-    // TODO: None,
-    // TODO: );
-    // TODO: game.state.activating_card = Some(mari);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
-    // 
+    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     // 
     CHECK_EQ(rb_mods_get_heart(&tg.state.mods, mari, 5), 0, "mari_heart05_total_two_no_grant");
     // 
@@ -46495,30 +45827,7 @@ static void gen_mari_empty_live_zone_no_grant(void){
     TestGame tg; test_game_new(&tg);
     int mari = 0;
     // 
-    // // inlined helper fire_live_start
-    // 
-    int ability_id = 0;
-    // action result consumed: let card = game.db.get_card(mari).unwrap();
-    int ab = 0;
-    // TODO: .resolved_abilities()
-    // TODO: .find(|a| a.triggers.as_deref() == Some("ライブ開始時"))
-    // TODO: .unwrap_or_else(|| panic!("card {} lacks a ライブ開始時 ability", card.card_no));
-    // TODO: format!("{}_{}", card.card_no, ab.full_text)
-    // TODO: };
-    // action result consumed: let card_no = game.db.get_card(mari).unwrap().card_no.to_string();
-    int pid = 0;
-    // TODO: game.state.trigger_auto_ability(
-    // TODO: ability_id,
-    // TODO: AbilityTrigger::LiveStart,
-    // TODO: pid.clone(),
-    // TODO: Some(card_no),
-    // TODO: Some(mari),
-    // TODO: None,
-    // TODO: None,
-    // TODO: );
-    // TODO: game.state.activating_card = Some(mari);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
-    // 
+    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     // 
     CHECK_EQ(rb_mods_get_heart(&tg.state.mods, mari, 5), 0, "mari_empty_live_zone_no_grant");
     // 
@@ -46536,30 +45845,7 @@ static void gen_rin_live_without_triggers_grants_other_member_two_blades(void){
     int plain_live = test_id(&tg, "PL!-sd1-020-SD");
     test_add_to_live(&tg, plain_live);
     // 
-    // // inlined helper fire_live_start
-    // 
-    int ability_id = 0;
-    // action result consumed: let card = game.db.get_card(rin).unwrap();
-    int ab = 0;
-    // TODO: .resolved_abilities()
-    // TODO: .find(|a| a.triggers.as_deref() == Some("ライブ開始時"))
-    // TODO: .unwrap_or_else(|| panic!("card {} lacks a ライブ開始時 ability", card.card_no));
-    // TODO: format!("{}_{}", card.card_no, ab.full_text)
-    // TODO: };
-    // action result consumed: let card_no = game.db.get_card(rin).unwrap().card_no.to_string();
-    int pid = 0;
-    // TODO: game.state.trigger_auto_ability(
-    // TODO: ability_id,
-    // TODO: AbilityTrigger::LiveStart,
-    // TODO: pid.clone(),
-    // TODO: Some(card_no),
-    // TODO: Some(rin),
-    // TODO: None,
-    // TODO: None,
-    // TODO: );
-    // TODO: game.state.activating_card = Some(rin);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
-    // 
+    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     // 
     CHECK_EQ(rb_mods_get_blade(&tg.state.mods, mate), 2, "rin_live_without_triggers_grants_other_member_two_blades");
     CHECK_EQ(rb_mods_get_blade(&tg.state.mods, rin), 0, "rin_live_without_triggers_grants_other_member_two_blades");
@@ -46578,30 +45864,7 @@ static void gen_rin_all_lives_have_triggers_no_blades(void){
     int triggered = test_id(&tg, "PL!N-sd2-007-P");
     test_add_to_live(&tg, triggered);
     // 
-    // // inlined helper fire_live_start
-    // 
-    int ability_id = 0;
-    // action result consumed: let card = game.db.get_card(rin).unwrap();
-    int ab = 0;
-    // TODO: .resolved_abilities()
-    // TODO: .find(|a| a.triggers.as_deref() == Some("ライブ開始時"))
-    // TODO: .unwrap_or_else(|| panic!("card {} lacks a ライブ開始時 ability", card.card_no));
-    // TODO: format!("{}_{}", card.card_no, ab.full_text)
-    // TODO: };
-    // action result consumed: let card_no = game.db.get_card(rin).unwrap().card_no.to_string();
-    int pid = 0;
-    // TODO: game.state.trigger_auto_ability(
-    // TODO: ability_id,
-    // TODO: AbilityTrigger::LiveStart,
-    // TODO: pid.clone(),
-    // TODO: Some(card_no),
-    // TODO: Some(rin),
-    // TODO: None,
-    // TODO: None,
-    // TODO: );
-    // TODO: game.state.activating_card = Some(rin);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
-    // 
+    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     // 
     CHECK_EQ(rb_mods_get_blade(&tg.state.mods, mate), 0, "rin_all_lives_have_triggers_no_blades");
     // 
@@ -46616,30 +45879,7 @@ static void gen_rin_empty_live_zone_no_blades(void){
     int mate = 0;
     // TODO destructuring: let (rin, mate) = rin_setup(&mut game);
     // 
-    // // inlined helper fire_live_start
-    // 
-    int ability_id = 0;
-    // action result consumed: let card = game.db.get_card(rin).unwrap();
-    int ab = 0;
-    // TODO: .resolved_abilities()
-    // TODO: .find(|a| a.triggers.as_deref() == Some("ライブ開始時"))
-    // TODO: .unwrap_or_else(|| panic!("card {} lacks a ライブ開始時 ability", card.card_no));
-    // TODO: format!("{}_{}", card.card_no, ab.full_text)
-    // TODO: };
-    // action result consumed: let card_no = game.db.get_card(rin).unwrap().card_no.to_string();
-    int pid = 0;
-    // TODO: game.state.trigger_auto_ability(
-    // TODO: ability_id,
-    // TODO: AbilityTrigger::LiveStart,
-    // TODO: pid.clone(),
-    // TODO: Some(card_no),
-    // TODO: Some(rin),
-    // TODO: None,
-    // TODO: None,
-    // TODO: );
-    // TODO: game.state.activating_card = Some(rin);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
-    // 
+    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     // 
     CHECK_EQ(rb_mods_get_blade(&tg.state.mods, mate), 0, "rin_empty_live_zone_no_blades");
     // 
@@ -46661,30 +45901,7 @@ static void gen_bp5015_all_six_colors_present_two_blades(void){
     tg.state.p[0].stage[1] = honoka;
     tg.state.p[0].stage[2] = kanan;
     // 
-    // // inlined helper fire_live_start
-    // 
-    int ability_id = 0;
-    // action result consumed: let card = game.db.get_card(shizuku).unwrap();
-    int ab = 0;
-    // TODO: .resolved_abilities()
-    // TODO: .find(|a| a.triggers.as_deref() == Some("ライブ開始時"))
-    // TODO: .unwrap_or_else(|| panic!("card {} lacks a ライブ開始時 ability", card.card_no));
-    // TODO: format!("{}_{}", card.card_no, ab.full_text)
-    // TODO: };
-    // action result consumed: let card_no = game.db.get_card(shizuku).unwrap().card_no.to_string();
-    int pid = 0;
-    // TODO: game.state.trigger_auto_ability(
-    // TODO: ability_id,
-    // TODO: AbilityTrigger::LiveStart,
-    // TODO: pid.clone(),
-    // TODO: Some(card_no),
-    // TODO: Some(shizuku),
-    // TODO: None,
-    // TODO: None,
-    // TODO: );
-    // TODO: game.state.activating_card = Some(shizuku);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
-    // 
+    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     // 
     CHECK_EQ(rb_mods_get_blade(&tg.state.mods, shizuku), 2, "bp5015_all_six_colors_present_two_blades");
     // 
@@ -46704,30 +45921,7 @@ static void gen_bp5015_missing_colors_no_blades(void){
     int honoka = test_id(&tg, "PL!-sd1-001-SD");
     tg.state.p[0].stage[1] = honoka;
     // 
-    // // inlined helper fire_live_start
-    // 
-    int ability_id = 0;
-    // action result consumed: let card = game.db.get_card(shizuku).unwrap();
-    int ab = 0;
-    // TODO: .resolved_abilities()
-    // TODO: .find(|a| a.triggers.as_deref() == Some("ライブ開始時"))
-    // TODO: .unwrap_or_else(|| panic!("card {} lacks a ライブ開始時 ability", card.card_no));
-    // TODO: format!("{}_{}", card.card_no, ab.full_text)
-    // TODO: };
-    // action result consumed: let card_no = game.db.get_card(shizuku).unwrap().card_no.to_string();
-    int pid = 0;
-    // TODO: game.state.trigger_auto_ability(
-    // TODO: ability_id,
-    // TODO: AbilityTrigger::LiveStart,
-    // TODO: pid.clone(),
-    // TODO: Some(card_no),
-    // TODO: Some(shizuku),
-    // TODO: None,
-    // TODO: None,
-    // TODO: );
-    // TODO: game.state.activating_card = Some(shizuku);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
-    // 
+    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     // 
     CHECK_EQ(rb_mods_get_blade(&tg.state.mods, shizuku), 0, "bp5015_missing_colors_no_blades");
     // 
@@ -46750,30 +45944,7 @@ static void gen_sumire_three_catchu_draws(void){
     // 
     int deck_before = tg.state.p[0].deck.n;
     test_give_energy(&tg, 5);
-    // // inlined helper fire_live_start
-    // 
-    int ability_id = 0;
-    // action result consumed: let card = game.db.get_card(sumire).unwrap();
-    int ab = 0;
-    // TODO: .resolved_abilities()
-    // TODO: .find(|a| a.triggers.as_deref() == Some("ライブ開始時"))
-    // TODO: .unwrap_or_else(|| panic!("card {} lacks a ライブ開始時 ability", card.card_no));
-    // TODO: format!("{}_{}", card.card_no, ab.full_text)
-    // TODO: };
-    // action result consumed: let card_no = game.db.get_card(sumire).unwrap().card_no.to_string();
-    int pid = 0;
-    // TODO: game.state.trigger_auto_ability(
-    // TODO: ability_id,
-    // TODO: AbilityTrigger::LiveStart,
-    // TODO: pid.clone(),
-    // TODO: Some(card_no),
-    // TODO: Some(sumire),
-    // TODO: None,
-    // TODO: None,
-    // TODO: );
-    // TODO: game.state.activating_card = Some(sumire);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
-    // 
+    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, 1);
     // 
@@ -46797,30 +45968,7 @@ static void gen_sumire_only_two_catchu_no_draw(void){
     tg.state.p[0].stage[2] = mu_member;
     // 
     int deck_before = tg.state.p[0].deck.n;
-    // // inlined helper fire_live_start
-    // 
-    int ability_id = 0;
-    // action result consumed: let card = game.db.get_card(sumire).unwrap();
-    int ab = 0;
-    // TODO: .resolved_abilities()
-    // TODO: .find(|a| a.triggers.as_deref() == Some("ライブ開始時"))
-    // TODO: .unwrap_or_else(|| panic!("card {} lacks a ライブ開始時 ability", card.card_no));
-    // TODO: format!("{}_{}", card.card_no, ab.full_text)
-    // TODO: };
-    // action result consumed: let card_no = game.db.get_card(sumire).unwrap().card_no.to_string();
-    int pid = 0;
-    // TODO: game.state.trigger_auto_ability(
-    // TODO: ability_id,
-    // TODO: AbilityTrigger::LiveStart,
-    // TODO: pid.clone(),
-    // TODO: Some(card_no),
-    // TODO: Some(sumire),
-    // TODO: None,
-    // TODO: None,
-    // TODO: );
-    // TODO: game.state.activating_card = Some(sumire);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
-    // 
+    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     // 
     // TODO assert_eq (unresolved): assert_eq!( deck_before, game.state.player1.main_deck.cards.len(), "only 2 CatChu! members -> no draw" );
     // 
@@ -46895,30 +46043,7 @@ static void gen_pr0029_pay_energy_grants_heart01(void){
     // TODO: game.state.player1.energy_zone.active_count()
     // TODO: };
     // 
-    // // inlined helper fire_live_start
-    // 
-    int ability_id = 0;
-    // action result consumed: let card = game.db.get_card(me).unwrap();
-    int ab = 0;
-    // TODO: .resolved_abilities()
-    // TODO: .find(|a| a.triggers.as_deref() == Some("ライブ開始時"))
-    // TODO: .unwrap_or_else(|| panic!("card {} lacks a ライブ開始時 ability", card.card_no));
-    // TODO: format!("{}_{}", card.card_no, ab.full_text)
-    // TODO: };
-    // action result consumed: let card_no = game.db.get_card(me).unwrap().card_no.to_string();
-    int pid = 0;
-    // TODO: game.state.trigger_auto_ability(
-    // TODO: ability_id,
-    // TODO: AbilityTrigger::LiveStart,
-    // TODO: pid.clone(),
-    // TODO: Some(card_no),
-    // TODO: Some(me),
-    // TODO: None,
-    // TODO: None,
-    // TODO: );
-    // TODO: game.state.activating_card = Some(me);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
-    // 
+    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, 1);
     // 
@@ -46935,30 +46060,7 @@ static void gen_pr0029_decline_no_heart(void){
     int me = 0;
     test_give_energy(&tg, 3);
     // 
-    // // inlined helper fire_live_start
-    // 
-    int ability_id = 0;
-    // action result consumed: let card = game.db.get_card(me).unwrap();
-    int ab = 0;
-    // TODO: .resolved_abilities()
-    // TODO: .find(|a| a.triggers.as_deref() == Some("ライブ開始時"))
-    // TODO: .unwrap_or_else(|| panic!("card {} lacks a ライブ開始時 ability", card.card_no));
-    // TODO: format!("{}_{}", card.card_no, ab.full_text)
-    // TODO: };
-    // action result consumed: let card_no = game.db.get_card(me).unwrap().card_no.to_string();
-    int pid = 0;
-    // TODO: game.state.trigger_auto_ability(
-    // TODO: ability_id,
-    // TODO: AbilityTrigger::LiveStart,
-    // TODO: pid.clone(),
-    // TODO: Some(card_no),
-    // TODO: Some(me),
-    // TODO: None,
-    // TODO: None,
-    // TODO: );
-    // TODO: game.state.activating_card = Some(me);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
-    // 
+    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     rb_resume_with_choice(&tg.state, -1);
     // 
     CHECK_EQ(rb_mods_get_heart(&tg.state.mods, me, 1), 0, "pr0029_decline_no_heart");
@@ -46980,30 +46082,7 @@ static void gen_bp4024_mus_member_gains_blade(void){
     int mus_member = test_id(&tg, "PL!-sd1-010-SD");
     tg.state.p[0].stage[0] = mus_member;
     // 
-    // // inlined helper fire_live_start
-    // 
-    int ability_id = 0;
-    // action result consumed: let card = game.db.get_card(live).unwrap();
-    int ab = 0;
-    // TODO: .resolved_abilities()
-    // TODO: .find(|a| a.triggers.as_deref() == Some("ライブ開始時"))
-    // TODO: .unwrap_or_else(|| panic!("card {} lacks a ライブ開始時 ability", card.card_no));
-    // TODO: format!("{}_{}", card.card_no, ab.full_text)
-    // TODO: };
-    // action result consumed: let card_no = game.db.get_card(live).unwrap().card_no.to_string();
-    int pid = 0;
-    // TODO: game.state.trigger_auto_ability(
-    // TODO: ability_id,
-    // TODO: AbilityTrigger::LiveStart,
-    // TODO: pid.clone(),
-    // TODO: Some(card_no),
-    // TODO: Some(live),
-    // TODO: None,
-    // TODO: None,
-    // TODO: );
-    // TODO: game.state.activating_card = Some(live);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
-    // 
+    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     // 
     CHECK_EQ(rb_mods_get_blade(&tg.state.mods, mus_member), 1, "bp4024_mus_member_gains_blade");
     // 
@@ -47023,30 +46102,7 @@ static void gen_bp4024_no_mus_member_on_stage_no_blades(void){
     int aq = test_id(&tg, "PL!S-sd1-001-SD");
     tg.state.p[0].stage[0] = aq;
     // 
-    // // inlined helper fire_live_start
-    // 
-    int ability_id = 0;
-    // action result consumed: let card = game.db.get_card(live).unwrap();
-    int ab = 0;
-    // TODO: .resolved_abilities()
-    // TODO: .find(|a| a.triggers.as_deref() == Some("ライブ開始時"))
-    // TODO: .unwrap_or_else(|| panic!("card {} lacks a ライブ開始時 ability", card.card_no));
-    // TODO: format!("{}_{}", card.card_no, ab.full_text)
-    // TODO: };
-    // action result consumed: let card_no = game.db.get_card(live).unwrap().card_no.to_string();
-    int pid = 0;
-    // TODO: game.state.trigger_auto_ability(
-    // TODO: ability_id,
-    // TODO: AbilityTrigger::LiveStart,
-    // TODO: pid.clone(),
-    // TODO: Some(card_no),
-    // TODO: Some(live),
-    // TODO: None,
-    // TODO: None,
-    // TODO: );
-    // TODO: game.state.activating_card = Some(live);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
-    // 
+    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     // 
     CHECK_EQ(rb_mods_get_blade(&tg.state.mods, aq), 0, "bp4024_no_mus_member_on_stage_no_blades");
     // 
@@ -47072,30 +46128,7 @@ static void gen_bp5013_mill_three_all_members_two_blades(void){
     // TODO: }
     int deck_before = tg.state.p[0].deck.n;
     // 
-    // // inlined helper fire_live_start
-    // 
-    int ability_id = 0;
-    // action result consumed: let card = game.db.get_card(me).unwrap();
-    int ab = 0;
-    // TODO: .resolved_abilities()
-    // TODO: .find(|a| a.triggers.as_deref() == Some("ライブ開始時"))
-    // TODO: .unwrap_or_else(|| panic!("card {} lacks a ライブ開始時 ability", card.card_no));
-    // TODO: format!("{}_{}", card.card_no, ab.full_text)
-    // TODO: };
-    // action result consumed: let card_no = game.db.get_card(me).unwrap().card_no.to_string();
-    int pid = 0;
-    // TODO: game.state.trigger_auto_ability(
-    // TODO: ability_id,
-    // TODO: AbilityTrigger::LiveStart,
-    // TODO: pid.clone(),
-    // TODO: Some(card_no),
-    // TODO: Some(me),
-    // TODO: None,
-    // TODO: None,
-    // TODO: );
-    // TODO: game.state.activating_card = Some(me);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
-    // 
+    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     // 
     CHECK_EQ(rb_mods_get_blade(&tg.state.mods, me), 2, "bp5013_mill_three_all_members_two_blades");
     // TODO assert_eq (unresolved): assert_eq!( game.state.player1.main_deck.cards.len(), deck_before - 3, "sanity: deck shrank only by the mill" );
@@ -47121,30 +46154,7 @@ static void gen_bp5013_live_card_among_milled_no_blades(void){
     // TODO: game.state.player1.main_deck.cards.insert(0, m);
     // TODO: }
     // 
-    // // inlined helper fire_live_start
-    // 
-    int ability_id = 0;
-    // action result consumed: let card = game.db.get_card(me).unwrap();
-    int ab = 0;
-    // TODO: .resolved_abilities()
-    // TODO: .find(|a| a.triggers.as_deref() == Some("ライブ開始時"))
-    // TODO: .unwrap_or_else(|| panic!("card {} lacks a ライブ開始時 ability", card.card_no));
-    // TODO: format!("{}_{}", card.card_no, ab.full_text)
-    // TODO: };
-    // action result consumed: let card_no = game.db.get_card(me).unwrap().card_no.to_string();
-    int pid = 0;
-    // TODO: game.state.trigger_auto_ability(
-    // TODO: ability_id,
-    // TODO: AbilityTrigger::LiveStart,
-    // TODO: pid.clone(),
-    // TODO: Some(card_no),
-    // TODO: Some(me),
-    // TODO: None,
-    // TODO: None,
-    // TODO: );
-    // TODO: game.state.activating_card = Some(me);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
-    // 
+    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     // 
     CHECK_EQ(rb_mods_get_blade(&tg.state.mods, me), 0, "bp5013_live_card_among_milled_no_blades");
     // 
@@ -47237,30 +46247,7 @@ static void gen_pb2047_non_liella_on_stage_no_enemy_wait(void){
     int enemy = test_id(&tg, "PL!SP-PR-010-PR");
     // TODO: game.state.player2.stage.stage[0] = enemy;
     // 
-    // // inlined helper fire_live_start
-    // 
-    int ability_id = 0;
-    // action result consumed: let card = game.db.get_card(live).unwrap();
-    int ab = 0;
-    // TODO: .resolved_abilities()
-    // TODO: .find(|a| a.triggers.as_deref() == Some("ライブ開始時"))
-    // TODO: .unwrap_or_else(|| panic!("card {} lacks a ライブ開始時 ability", card.card_no));
-    // TODO: format!("{}_{}", card.card_no, ab.full_text)
-    // TODO: };
-    // action result consumed: let card_no = game.db.get_card(live).unwrap().card_no.to_string();
-    int pid = 0;
-    // TODO: game.state.trigger_auto_ability(
-    // TODO: ability_id,
-    // TODO: AbilityTrigger::LiveStart,
-    // TODO: pid.clone(),
-    // TODO: Some(card_no),
-    // TODO: Some(live),
-    // TODO: None,
-    // TODO: None,
-    // TODO: );
-    // TODO: game.state.activating_card = Some(live);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
-    // 
+    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     test_has_pending_choice(&tg);
     // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard for the discard cost" );
     rb_resume_with_choice(&tg.state, 0);
@@ -47299,30 +46286,7 @@ static void gen_bp5010_mills_three_retrieves_arise_member(void){
     test_add_to_hand(&tg, fodder);
     // 
     int deck_before = tg.state.p[0].deck.n;
-    // // inlined helper fire_live_start
-    // 
-    int ability_id = 0;
-    // action result consumed: let card = game.db.get_card(me).unwrap();
-    int ab = 0;
-    // TODO: .resolved_abilities()
-    // TODO: .find(|a| a.triggers.as_deref() == Some("ライブ開始時"))
-    // TODO: .unwrap_or_else(|| panic!("card {} lacks a ライブ開始時 ability", card.card_no));
-    // TODO: format!("{}_{}", card.card_no, ab.full_text)
-    // TODO: };
-    // action result consumed: let card_no = game.db.get_card(me).unwrap().card_no.to_string();
-    int pid = 0;
-    // TODO: game.state.trigger_auto_ability(
-    // TODO: ability_id,
-    // TODO: AbilityTrigger::LiveStart,
-    // TODO: pid.clone(),
-    // TODO: Some(card_no),
-    // TODO: Some(me),
-    // TODO: None,
-    // TODO: None,
-    // TODO: );
-    // TODO: game.state.activating_card = Some(me);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
-    // 
+    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     // // Accept the optional hand-discard cost by choosing which card to
     // // discard (allow_skip=true SelectCard), then drain.
     rb_resume_with_choice(&tg.state, 0);
@@ -47352,30 +46316,7 @@ static void gen_bp5010_mill_happens_even_without_arise(void){
     test_add_to_hand(&tg, fodder);
     // 
     int deck_before = tg.state.p[0].deck.n;
-    // // inlined helper fire_live_start
-    // 
-    int ability_id = 0;
-    // action result consumed: let card = game.db.get_card(me).unwrap();
-    int ab = 0;
-    // TODO: .resolved_abilities()
-    // TODO: .find(|a| a.triggers.as_deref() == Some("ライブ開始時"))
-    // TODO: .unwrap_or_else(|| panic!("card {} lacks a ライブ開始時 ability", card.card_no));
-    // TODO: format!("{}_{}", card.card_no, ab.full_text)
-    // TODO: };
-    // action result consumed: let card_no = game.db.get_card(me).unwrap().card_no.to_string();
-    int pid = 0;
-    // TODO: game.state.trigger_auto_ability(
-    // TODO: ability_id,
-    // TODO: AbilityTrigger::LiveStart,
-    // TODO: pid.clone(),
-    // TODO: Some(card_no),
-    // TODO: Some(me),
-    // TODO: None,
-    // TODO: None,
-    // TODO: );
-    // TODO: game.state.activating_card = Some(me);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
-    // 
+    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     rb_resume_with_choice(&tg.state, 0);
     int guard = 0;
     test_has_pending_choice(&tg);
@@ -47421,8 +46362,8 @@ static void gen_kotori_pb1003_decline_self_wait_resolves_nothing(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(kotori);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    // skipped: activating_card (C uses queued card id as host)
+    rb_drain_ability_queue(&tg.state);
     // 
     // 
     // // Optional cost prompts; declining skips the whole effect.
@@ -47466,8 +46407,8 @@ static void gen_kotori_pb1003_accept_waits_self_and_activates_per_printemps(void
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(kotori);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    // skipped: activating_card (C uses queued card id as host)
+    rb_drain_ability_queue(&tg.state);
     // 
     rb_resume_with_choice(&tg.state, 1);
     // 
@@ -47513,8 +46454,8 @@ static void gen_sayaka_hsbp2002_fetch_is_cost_and_count_filtered(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(sayaka);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    // skipped: activating_card (C uses queued card id as host)
+    rb_drain_ability_queue(&tg.state);
     // 
     // 
     // // Selection offers ONLY the two cost≤2 members.
@@ -47644,7 +46585,7 @@ static void gen_dia_bp2_yell_with_live_card_and_hand_under_7_draws_one(void){
     // 
     int hand_before = tg.state.p[0].hand.n;
     // TODO: game.state.trigger_auto_abilities_for_player("p1");
-    // TODO: game.state.process_pending_auto_abilities("p1");
+    rb_drain_ability_queue(&tg.state);
     int hand_after = tg.state.p[0].hand.n;
     // 
     // TODO assert_eq (unresolved): assert_eq!( hand_after, hand_before + 1, "Dia draws 1 with live card in yell + hand ≤7" );
@@ -47725,7 +46666,7 @@ static void gen_dia_bp2_hand_over_7_no_draw(void){
     // 
     int hand_before = tg.state.p[0].hand.n;
     // TODO: game.state.trigger_auto_abilities_for_player("p1");
-    // TODO: game.state.process_pending_auto_abilities("p1");
+    rb_drain_ability_queue(&tg.state);
     int hand_after = tg.state.p[0].hand.n;
     // 
     CHECK_EQ(hand_after, hand_before, "dia_bp2_hand_over_7_no_draw");
@@ -47795,7 +46736,7 @@ static void gen_dia_bp2_no_live_card_no_draw(void){
     // 
     int hand_before = tg.state.p[0].hand.n;
     // TODO: game.state.trigger_auto_abilities_for_player("p1");
-    // TODO: game.state.process_pending_auto_abilities("p1");
+    rb_drain_ability_queue(&tg.state);
     int hand_after = tg.state.p[0].hand.n;
     // 
     CHECK_EQ(hand_after, hand_before, "dia_bp2_no_live_card_no_draw");
@@ -47825,7 +46766,7 @@ static void gen_umi_bp5_three_members_without_blade_heart_gains_all_hearts(void)
     // 
     // TODO assert: assert!( !has_all_heart_modifier(&game), "HeartColor::All must not be present before" );
     // TODO: game.state.trigger_auto_abilities_for_player("p1");
-    // TODO: game.state.process_pending_auto_abilities("p1");
+    rb_drain_ability_queue(&tg.state);
     // 
     // TODO assert: assert!( has_all_heart_modifier(&game), "Umi must set HeartColor::All with 3+ qualifying members in yell" );
     // 
@@ -47855,7 +46796,7 @@ static void gen_umi_bp5_three_members_with_blade_heart_no_gain(void){
     // 
     int before = 0;
     // TODO: game.state.trigger_auto_abilities_for_player("p1");
-    // TODO: game.state.process_pending_auto_abilities("p1");
+    rb_drain_ability_queue(&tg.state);
     int after = 0;
     // 
     CHECK_EQ(before, after, "umi_bp5_three_members_with_blade_heart_no_gain");
@@ -47884,7 +46825,7 @@ static void gen_umi_bp5_two_members_no_heart_gain(void){
     // 
     int before = 0;
     // TODO: game.state.trigger_auto_abilities_for_player("p1");
-    // TODO: game.state.process_pending_auto_abilities("p1");
+    rb_drain_ability_queue(&tg.state);
     int after = 0;
     // 
     CHECK_EQ(before, after, "umi_bp5_two_members_no_heart_gain");
@@ -48515,12 +47456,12 @@ static void gen_q251_member_no_blade_can_move(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.process_pending_auto_abilities("player1");
+    rb_drain_ability_queue(&tg.state);
     // 
     // 
     test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, 0);
-    // TODO: game.state.process_pending_auto_abilities("player1");
+    rb_drain_ability_queue(&tg.state);
     CHECK(test_zone_has_id(&tg, 0, "discard", member), "q251_member_no_blade_can_move");
     // 
 }
@@ -48581,7 +47522,7 @@ static void gen_q251_live_special_heart_cannot_move(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.process_pending_auto_abilities("player1");
+    rb_drain_ability_queue(&tg.state);
     // 
     // 
     test_has_pending_choice(&tg);
@@ -48645,7 +47586,7 @@ static void gen_q251_has_blade_heart_filtered(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.process_pending_auto_abilities("player1");
+    rb_drain_ability_queue(&tg.state);
     // 
     // 
     test_has_pending_choice(&tg);
@@ -48702,7 +47643,7 @@ static void gen_q251_wrong_group_filtered(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.process_pending_auto_abilities("player1");
+    rb_drain_ability_queue(&tg.state);
     // 
     // 
     test_has_pending_choice(&tg);
@@ -48761,12 +47702,12 @@ static void gen_q251_mixed_pool_only_member_can_move(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.process_pending_auto_abilities("player1");
+    rb_drain_ability_queue(&tg.state);
     // 
     // 
     test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, 0);
-    // TODO: game.state.process_pending_auto_abilities("player1");
+    rb_drain_ability_queue(&tg.state);
     CHECK(test_zone_has_id(&tg, 0, "discard", member), "q251_mixed_pool_only_member_can_move");
     // TODO assert: assert!( !game.state.revealed_cards.contains(&member), "Member removed from revealed" );
     // TODO assert: assert!( game.state.revealed_cards.contains(&live), "Live card stays in revealed (excluded by has_blade_heart)" );
@@ -48826,7 +47767,7 @@ static void gen_q251_skip_optional(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.process_pending_auto_abilities("player1");
+    rb_drain_ability_queue(&tg.state);
     // 
     // 
     test_has_pending_choice(&tg);
@@ -49308,7 +48249,7 @@ static void gen_burn_no_under_no_move_no_score(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: g.state.activating_card = Some(burn);
+    // skipped: activating_card (C uses queued card id as host)
     // TODO: g.state.process_pending_auto_abilities(&pid);
     test_drain_auto_choices(&tg);
     // 
@@ -49346,7 +48287,7 @@ static void gen_burn_skip_optional_no_score_even_with_10_total(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: g.state.activating_card = Some(burn);
+    // skipped: activating_card (C uses queued card id as host)
     // TODO: g.state.process_pending_auto_abilities(&pid);
     test_drain_auto_choices(&tg);
     // 
@@ -49709,9 +48650,9 @@ static void gen_joint_live_start_skip_optional_no_effect(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(joint);
+    // skipped: activating_card (C uses queued card id as host)
     int pid = 0;
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    rb_drain_ability_queue(&tg.state);
     // 
     // TODO: handle_optional_cost(&mut game, &[]); // skip with empty indices
     // 
@@ -49818,14 +48759,14 @@ static void gen_joint_live_start_no_named_skips_gracefully(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(joint);
+    // skipped: activating_card (C uses queued card id as host)
     int pid = 0;
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    rb_drain_ability_queue(&tg.state);
     // 
     // 
     // // No matching cards in hand → cost auto-skips, effect should not fire
     pid = 0;
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    rb_drain_ability_queue(&tg.state);
     // 
     CHECK_EQ(tg.state.p[0].hand.n, 1, "joint_live_start_no_named_skips_gracefully");
     CHECK_EQ(rb_mods_get_score(&tg.state.mods, joint), 0, "joint_live_start_no_named_skips_gracefully");
@@ -53820,7 +52761,7 @@ static void gen_sumire_yell_no_blade_gains_heart06(void){
     test_add_to_discard(&tg, m_no_blade);
     CHECK_EQ(rb_mods_get_heart(&tg.state.mods, sumire, 6), 0, "sumire_yell_no_blade_gains_heart06");
     // TODO: game.state.trigger_auto_abilities_for_player("p1");
-    // TODO: game.state.process_pending_auto_abilities("p1");
+    rb_drain_ability_queue(&tg.state);
     CHECK_EQ(rb_mods_get_heart(&tg.state.mods, sumire, 6), 1, "sumire_yell_no_blade_gains_heart06");
     // 
 }
@@ -53852,7 +52793,7 @@ static void gen_sumire_yell_with_blade_no_gain(void){
     // TODO: }
     // 
     // TODO: game.state.trigger_auto_abilities_for_player("p1");
-    // TODO: game.state.process_pending_auto_abilities("p1");
+    rb_drain_ability_queue(&tg.state);
     CHECK_EQ(rb_mods_get_heart(&tg.state.mods, sumire, 6), 0, "sumire_yell_with_blade_no_gain");
     CHECK_EQ(rb_mods_get_heart(&tg.state.mods, wien, 3), 0, "sumire_yell_with_blade_no_gain");
     // 
@@ -53886,7 +52827,7 @@ static void gen_yell_mixed_blade_and_no_blade_no_gain(void){
     // TODO: }
     // 
     // TODO: game.state.trigger_auto_abilities_for_player("p1");
-    // TODO: game.state.process_pending_auto_abilities("p1");
+    rb_drain_ability_queue(&tg.state);
     CHECK_EQ(rb_mods_get_heart(&tg.state.mods, sumire, 6), 0, "yell_mixed_blade_and_no_blade_no_gain");
     // 
 }
@@ -53905,7 +52846,7 @@ static void gen_yell_empty_revealed_no_gain(void){
     // TODO: game.state.revealed_cards.clear();
     // TODO: game.state.yell_occurred = false;
     // TODO: game.state.trigger_auto_abilities_for_player("p1");
-    // TODO: game.state.process_pending_auto_abilities("p1");
+    rb_drain_ability_queue(&tg.state);
     CHECK_EQ(rb_mods_get_heart(&tg.state.mods, sumire, 6), 0, "yell_empty_revealed_no_gain");
     // 
 }
@@ -53926,14 +52867,14 @@ static void gen_yell_turn1_blocks_second_trigger(void){
     // TODO: game.state.yell_occurred = true;
     test_add_to_discard(&tg, m_no_blade);
     // TODO: game.state.trigger_auto_abilities_for_player("p1");
-    // TODO: game.state.process_pending_auto_abilities("p1");
+    rb_drain_ability_queue(&tg.state);
     CHECK_EQ(rb_mods_get_heart(&tg.state.mods, sumire, 6), 1, "yell_turn1_blocks_second_trigger");
     // // Second trigger same turn should be blocked by ターン1回 — clear revealed and retrigger, modifier must stay 1
     // TODO: game.state.revealed_cards.clear();
     // TODO: game.state.revealed_cards.push(m_no_blade);
     // TODO: game.state.yell_occurred = true;
     // TODO: game.state.trigger_auto_abilities_for_player("p1");
-    // TODO: game.state.process_pending_auto_abilities("p1");
+    rb_drain_ability_queue(&tg.state);
     CHECK_EQ(rb_mods_get_heart(&tg.state.mods, sumire, 6), 1, "yell_turn1_blocks_second_trigger");
     // 
 }
@@ -53954,7 +52895,7 @@ static void gen_wien_yell_no_blade_gains_heart03_independent(void){
     // TODO: game.state.revealed_cards.push(m_no_blade);
     // TODO: game.state.yell_occurred = true;
     // TODO: game.state.trigger_auto_abilities_for_player("p1");
-    // TODO: game.state.process_pending_auto_abilities("p1");
+    rb_drain_ability_queue(&tg.state);
     CHECK_EQ(rb_mods_get_heart(&tg.state.mods, wien, 3), 1, "wien_yell_no_blade_gains_heart03_independent");
     // // Sumire not on stage → no heart06 anywhere
     CHECK_EQ(rb_mods_get_heart(&tg.state.mods, filler, 6), 0, "wien_yell_no_blade_gains_heart03_independent");
@@ -54225,7 +53166,7 @@ static void gen_q269_control_deck_to_discard_triggers(void){
     // TODO: .push_movement_event(mia, "deck", "discard", Some(mia), "p1", true);
     int pid = 0;
     // TODO: game.state.trigger_auto_abilities_for_player(&pid);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    rb_drain_ability_queue(&tg.state);
     // 
     // // Accept the optional recover, then the hand-discard that enables そうしたとき.
     // TODO assert: assert!( accept_mia_recover(&mut game), "control: a deck→discard movement must offer the conditional_optional recover" );
@@ -54248,7 +53189,7 @@ static void gen_q277_control_no_refresh_recovers_mia(void){
     // TODO: .push_movement_event(mia, "deck", "discard", Some(mia), "p1", true);
     int pid = 0;
     // TODO: game.state.trigger_auto_abilities_for_player(&pid);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    rb_drain_ability_queue(&tg.state);
     // 
     // TODO assert: assert!( accept_mia_recover(&mut game), "control: without a refresh ミア's recover must be offered" );
     CHECK(test_zone_has_id(&tg, 0, "hand", mia), "q277_control_no_refresh_recovers_mia");
@@ -54277,7 +53218,7 @@ static void gen_q277_refresh_before_auto_resolve_prevents_recover(void){
     // 
     int pid = 0;
     // TODO: game.state.trigger_auto_abilities_for_player(&pid);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    rb_drain_ability_queue(&tg.state);
     // TODO: accept_mia_recover(&mut game);
     // 
     CHECK((!test_zone_has_id(&tg, 0, "hand", mia)), "q277_refresh_before_auto_resolve_prevents_recover");
@@ -54413,30 +53354,7 @@ static void gen_dia_heart04_total_exactly_four_grants_heart04(void){
     l = test_id(&tg, "PL!S-bp2-020-L");
     test_add_to_live(&tg, l);
     // 
-    // // inlined helper fire_live_start
-    // 
-    int ability_id = 0;
-    // action result consumed: let card = game.db.get_card(dia).unwrap();
-    int ab = 0;
-    // TODO: .resolved_abilities()
-    // TODO: .find(|a| a.triggers.as_deref() == Some("ライブ開始時"))
-    // TODO: .unwrap_or_else(|| panic!("card {} lacks a ライブ開始時 ability", card.card_no));
-    // TODO: format!("{}_{}", card.card_no, ab.full_text)
-    // TODO: };
-    // action result consumed: let card_no = game.db.get_card(dia).unwrap().card_no.to_string();
-    int pid = 0;
-    // TODO: game.state.trigger_auto_ability(
-    // TODO: ability_id,
-    // TODO: AbilityTrigger::LiveStart,
-    // TODO: pid.clone(),
-    // TODO: Some(card_no),
-    // TODO: Some(dia),
-    // TODO: None,
-    // TODO: None,
-    // TODO: );
-    // TODO: game.state.activating_card = Some(dia);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
-    // 
+    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     // 
     CHECK_EQ(rb_mods_get_heart(&tg.state.mods, dia, 4), 1, "dia_heart04_total_exactly_four_grants_heart04");
     // 
@@ -54455,30 +53373,7 @@ static void gen_dia_heart04_total_three_no_grant(void){
     test_add_to_live(&tg, l1);
     test_add_to_live(&tg, l2);
     // 
-    // // inlined helper fire_live_start
-    // 
-    int ability_id = 0;
-    // action result consumed: let card = game.db.get_card(dia).unwrap();
-    int ab = 0;
-    // TODO: .resolved_abilities()
-    // TODO: .find(|a| a.triggers.as_deref() == Some("ライブ開始時"))
-    // TODO: .unwrap_or_else(|| panic!("card {} lacks a ライブ開始時 ability", card.card_no));
-    // TODO: format!("{}_{}", card.card_no, ab.full_text)
-    // TODO: };
-    // action result consumed: let card_no = game.db.get_card(dia).unwrap().card_no.to_string();
-    int pid = 0;
-    // TODO: game.state.trigger_auto_ability(
-    // TODO: ability_id,
-    // TODO: AbilityTrigger::LiveStart,
-    // TODO: pid.clone(),
-    // TODO: Some(card_no),
-    // TODO: Some(dia),
-    // TODO: None,
-    // TODO: None,
-    // TODO: );
-    // TODO: game.state.activating_card = Some(dia);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
-    // 
+    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     // 
     CHECK_EQ(rb_mods_get_heart(&tg.state.mods, dia, 4), 0, "dia_heart04_total_three_no_grant");
     // 
@@ -54491,30 +53386,7 @@ static void gen_dia_empty_live_zone_no_grant(void){
     TestGame tg; test_game_new(&tg);
     int dia = 0;
     // 
-    // // inlined helper fire_live_start
-    // 
-    int ability_id = 0;
-    // action result consumed: let card = game.db.get_card(dia).unwrap();
-    int ab = 0;
-    // TODO: .resolved_abilities()
-    // TODO: .find(|a| a.triggers.as_deref() == Some("ライブ開始時"))
-    // TODO: .unwrap_or_else(|| panic!("card {} lacks a ライブ開始時 ability", card.card_no));
-    // TODO: format!("{}_{}", card.card_no, ab.full_text)
-    // TODO: };
-    // action result consumed: let card_no = game.db.get_card(dia).unwrap().card_no.to_string();
-    int pid = 0;
-    // TODO: game.state.trigger_auto_ability(
-    // TODO: ability_id,
-    // TODO: AbilityTrigger::LiveStart,
-    // TODO: pid.clone(),
-    // TODO: Some(card_no),
-    // TODO: Some(dia),
-    // TODO: None,
-    // TODO: None,
-    // TODO: );
-    // TODO: game.state.activating_card = Some(dia);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
-    // 
+    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     // 
     CHECK_EQ(rb_mods_get_heart(&tg.state.mods, dia, 4), 0, "dia_empty_live_zone_no_grant");
     // 
@@ -54537,30 +53409,7 @@ static void gen_wwd_accept_cost_energy_ahead_scores_plus_one(void){
     // 
     int deck_before = 0;
     int zone_before = tg.state.p[0].energy.n;
-    // // inlined helper fire_live_start
-    // 
-    int ability_id = 0;
-    // action result consumed: let card = game.db.get_card(live).unwrap();
-    int ab = 0;
-    // TODO: .resolved_abilities()
-    // TODO: .find(|a| a.triggers.as_deref() == Some("ライブ開始時"))
-    // TODO: .unwrap_or_else(|| panic!("card {} lacks a ライブ開始時 ability", card.card_no));
-    // TODO: format!("{}_{}", card.card_no, ab.full_text)
-    // TODO: };
-    // action result consumed: let card_no = game.db.get_card(live).unwrap().card_no.to_string();
-    int pid = 0;
-    // TODO: game.state.trigger_auto_ability(
-    // TODO: ability_id,
-    // TODO: AbilityTrigger::LiveStart,
-    // TODO: pid.clone(),
-    // TODO: Some(card_no),
-    // TODO: Some(live),
-    // TODO: None,
-    // TODO: None,
-    // TODO: );
-    // TODO: game.state.activating_card = Some(live);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
-    // 
+    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, 1);
     // // Remaining prompts: which energy card leaves the zone, then the
@@ -54592,30 +53441,7 @@ static void gen_wwd_decline_no_score_change(void){
     test_add_to_discard(&tg, e);
     // TODO: game.state.player2.energy_zone.add_active(1);
     // 
-    // // inlined helper fire_live_start
-    // 
-    int ability_id = 0;
-    // action result consumed: let card = game.db.get_card(live).unwrap();
-    int ab = 0;
-    // TODO: .resolved_abilities()
-    // TODO: .find(|a| a.triggers.as_deref() == Some("ライブ開始時"))
-    // TODO: .unwrap_or_else(|| panic!("card {} lacks a ライブ開始時 ability", card.card_no));
-    // TODO: format!("{}_{}", card.card_no, ab.full_text)
-    // TODO: };
-    // action result consumed: let card_no = game.db.get_card(live).unwrap().card_no.to_string();
-    int pid = 0;
-    // TODO: game.state.trigger_auto_ability(
-    // TODO: ability_id,
-    // TODO: AbilityTrigger::LiveStart,
-    // TODO: pid.clone(),
-    // TODO: Some(card_no),
-    // TODO: Some(live),
-    // TODO: None,
-    // TODO: None,
-    // TODO: );
-    // TODO: game.state.activating_card = Some(live);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
-    // 
+    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, -1);
     // 
@@ -54652,30 +53478,7 @@ static void gen_wwd_energy_not_ahead_after_cost_no_bonus(void){
     // TODO: game.state.player2.energy_zone.add_active(1);
     // TODO: } // opponent ahead either way
     // 
-    // // inlined helper fire_live_start
-    // 
-    int ability_id = 0;
-    // action result consumed: let card = game.db.get_card(live).unwrap();
-    int ab = 0;
-    // TODO: .resolved_abilities()
-    // TODO: .find(|a| a.triggers.as_deref() == Some("ライブ開始時"))
-    // TODO: .unwrap_or_else(|| panic!("card {} lacks a ライブ開始時 ability", card.card_no));
-    // TODO: format!("{}_{}", card.card_no, ab.full_text)
-    // TODO: };
-    // action result consumed: let card_no = game.db.get_card(live).unwrap().card_no.to_string();
-    int pid = 0;
-    // TODO: game.state.trigger_auto_ability(
-    // TODO: ability_id,
-    // TODO: AbilityTrigger::LiveStart,
-    // TODO: pid.clone(),
-    // TODO: Some(card_no),
-    // TODO: Some(live),
-    // TODO: None,
-    // TODO: None,
-    // TODO: );
-    // TODO: game.state.activating_card = Some(live);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
-    // 
+    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     test_has_pending_choice(&tg);
     // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectTarget"), "expected SelectTarget (pay_optional_cost:skip)" );
     rb_resume_with_choice(&tg.state, 1);
@@ -54714,8 +53517,8 @@ static void gen_wwd_live_success_places_waited_energy_with_delayed_lock(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(live);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    // skipped: activating_card (C uses queued card id as host)
+    rb_drain_ability_queue(&tg.state);
     // 
     CHECK_EQ(tg.state.p[0].energy.n, 1, "wwd_live_success_places_waited_energy_with_delayed_lock");
     CHECK_EQ(tg.state.p[0].energy_active, 0, "wwd_live_success_places_waited_energy_with_delayed_lock");
@@ -57924,8 +56727,8 @@ static void gen_emma_live_start_activates_wait_both_gain_heart04(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(emma);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    // skipped: activating_card (C uses queued card id as host)
+    rb_drain_ability_queue(&tg.state);
     // 
     // 
     // // Optional cost: discard 2 cards. Say yes.
@@ -58058,8 +56861,8 @@ static void gen_emma_live_start_three_members_only_activated_gets_heart(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(emma);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    // skipped: activating_card (C uses queued card id as host)
+    rb_drain_ability_queue(&tg.state);
     // 
     // 
     // // Optional cost: discard 2 cards
@@ -58192,8 +56995,8 @@ static void gen_emma_live_start_no_wait_members_no_heart(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(emma);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    // skipped: activating_card (C uses queued card id as host)
+    rb_drain_ability_queue(&tg.state);
     // 
     // 
     while (test_has_pending_choice(&tg)) rb_resume_with_choice(&tg.state, 0);
@@ -58314,8 +57117,8 @@ static void gen_emma_live_start_alone_no_other_members_no_heart(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(emma);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    // skipped: activating_card (C uses queued card id as host)
+    rb_drain_ability_queue(&tg.state);
     // 
     // 
     while (test_has_pending_choice(&tg)) rb_resume_with_choice(&tg.state, 0);
@@ -58435,8 +57238,8 @@ static void gen_emma_live_start_active_member_not_affected(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(emma);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    // skipped: activating_card (C uses queued card id as host)
+    rb_drain_ability_queue(&tg.state);
     // 
     // 
     while (test_has_pending_choice(&tg)) rb_resume_with_choice(&tg.state, 0);
@@ -58677,8 +57480,8 @@ static void gen_niko_pb1009_suppresses_effect_activations_for_the_turn(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(nico);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    // skipped: activating_card (C uses queued card id as host)
+    rb_drain_ability_queue(&tg.state);
     while (test_has_pending_choice(&tg)) rb_resume_with_choice(&tg.state, 0);
     rb_resume_with_choice(&tg.state, -1);
     // TODO: }
@@ -58798,10 +57601,10 @@ static void gen_both_in_live_zone_both_trigger(void){
     // 
     int player_id = 0;
     // TODO: rabuka_engine::turn::TurnEngine::trigger_live_start_abilities(&mut game.state, &player_id);
-    // TODO: game.state.process_pending_auto_abilities(&player_id);
+    rb_drain_ability_queue(&tg.state);
     test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, 0);
-    // TODO: game.state.process_pending_auto_abilities(&player_id);
+    rb_drain_ability_queue(&tg.state);
     // TODO: }
     // 
     int phoenix_score = rb_mods_get_score(&tg.state.mods, phoenix);
@@ -58848,10 +57651,10 @@ static void gen_subject_in_live_target_in_success(void){
     // 
     int player_id = 0;
     // TODO: rabuka_engine::turn::TurnEngine::trigger_live_start_abilities(&mut game.state, &player_id);
-    // TODO: game.state.process_pending_auto_abilities(&player_id);
+    rb_drain_ability_queue(&tg.state);
     test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, 0);
-    // TODO: game.state.process_pending_auto_abilities(&player_id);
+    rb_drain_ability_queue(&tg.state);
     // TODO: }
     // 
     // // PHOENIX condition: find heart01>=4 Niji card in success/live zone
@@ -58903,10 +57706,10 @@ static void gen_both_in_success_does_not_trigger(void){
     // 
     int player_id = 0;
     // TODO: rabuka_engine::turn::TurnEngine::trigger_live_start_abilities(&mut game.state, &player_id);
-    // TODO: game.state.process_pending_auto_abilities(&player_id);
+    rb_drain_ability_queue(&tg.state);
     test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, 0);
-    // TODO: game.state.process_pending_auto_abilities(&player_id);
+    rb_drain_ability_queue(&tg.state);
     // TODO: }
     // 
     CHECK_EQ(rb_mods_get_score(&tg.state.mods, phoenix), 0, "both_in_success_does_not_trigger");
@@ -58950,10 +57753,10 @@ static void gen_both_in_live_zone_check_success_zone_condition(void){
     // 
     int player_id = 0;
     // TODO: rabuka_engine::turn::TurnEngine::trigger_live_start_abilities(&mut game.state, &player_id);
-    // TODO: game.state.process_pending_auto_abilities(&player_id);
+    rb_drain_ability_queue(&tg.state);
     test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, 0);
-    // TODO: game.state.process_pending_auto_abilities(&player_id);
+    rb_drain_ability_queue(&tg.state);
     // TODO: }
     // 
     // // PHOENIX: heart01>=4 needed → finds Stellar Stream (heart01=4) in live zone → +1 score
@@ -58997,10 +57800,10 @@ static void gen_non_niji_live_card_does_not_trigger(void){
     // 
     int player_id = 0;
     // TODO: rabuka_engine::turn::TurnEngine::trigger_live_start_abilities(&mut game.state, &player_id);
-    // TODO: game.state.process_pending_auto_abilities(&player_id);
+    rb_drain_ability_queue(&tg.state);
     test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, 0);
-    // TODO: game.state.process_pending_auto_abilities(&player_id);
+    rb_drain_ability_queue(&tg.state);
     // TODO: }
     // 
     // // Neither condition should trigger: filler is not Nijigasaki
@@ -59047,10 +57850,10 @@ static void gen_stellar_stream_chooses_one_of_multiple_members(void){
     // 
     int player_id = 0;
     // TODO: rabuka_engine::turn::TurnEngine::trigger_live_start_abilities(&mut game.state, &player_id);
-    // TODO: game.state.process_pending_auto_abilities(&player_id);
+    rb_drain_ability_queue(&tg.state);
     test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, 0);
-    // TODO: game.state.process_pending_auto_abilities(&player_id);
+    rb_drain_ability_queue(&tg.state);
     // TODO: }
     // 
     // // Stellar Stream's effect has target_count=1, so only ONE member gets +4 heart06
@@ -60043,7 +58846,7 @@ static void gen_daisuki_score_plus_one_when_active_energy_exists(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: g.state.activating_card = Some(live);
+    // skipped: activating_card (C uses queued card id as host)
     // TODO: g.state.process_pending_auto_abilities(&pid);
     test_drain_auto_choices(&tg);
     // 
@@ -60079,7 +58882,7 @@ static void gen_daisuki_score_not_added_when_no_active_energy(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: g.state.activating_card = Some(live);
+    // skipped: activating_card (C uses queued card id as host)
     // TODO: g.state.process_pending_auto_abilities(&pid);
     test_drain_auto_choices(&tg);
     // 
@@ -60117,7 +58920,7 @@ static void gen_daisuki_opponent_active_does_not_satisfy_self(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: g.state.activating_card = Some(live);
+    // skipped: activating_card (C uses queued card id as host)
     // TODO: g.state.process_pending_auto_abilities(&pid);
     test_drain_auto_choices(&tg);
     // 
@@ -61329,9 +60132,9 @@ static void gen_hanamaru_single_matching_auto_adds_to_hand(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(hanamaru);
+    // skipped: activating_card (C uses queued card id as host)
     int pid = 0;
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    rb_drain_ability_queue(&tg.state);
     // 
     // 
     // // Engine auto-resolves: 1 valid card → moved to hand, condition passes, followup auto-deploys.
@@ -61399,9 +60202,9 @@ static void gen_hanamaru_multiple_valid_forces_selection(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(hanamaru);
+    // skipped: activating_card (C uses queued card id as host)
     int pid = 0;
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    rb_drain_ability_queue(&tg.state);
     // 
     // 
     // // Multiple valid cards → must prompt for selection
@@ -61464,9 +60267,9 @@ static void gen_hanamaru_non_matching_no_deploy(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(hanamaru);
+    // skipped: activating_card (C uses queued card id as host)
     int pid = 0;
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    rb_drain_ability_queue(&tg.state);
     // 
     // 
     // // Auto-resolves: card goes to hand, condition fails (not 津島善子/黒澤ルビィ)
@@ -61532,9 +60335,9 @@ static void gen_hanamaru_no_empty_slot_card_in_hand(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(hanamaru);
+    // skipped: activating_card (C uses queued card id as host)
     int pid = 0;
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    rb_drain_ability_queue(&tg.state);
     // 
     // 
     // // Card added to hand, condition passes, but no empty slot → stays in hand
@@ -61598,9 +60401,9 @@ static void gen_hanamaru_no_valid_discard_no_action(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(hanamaru);
+    // skipped: activating_card (C uses queued card id as host)
     int pid = 0;
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    rb_drain_ability_queue(&tg.state);
     // 
     // 
     // // No valid target → nothing happens
@@ -61666,9 +60469,9 @@ static void gen_hanamaru_both_matching_one_deploys(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(hanamaru);
+    // skipped: activating_card (C uses queued card id as host)
     int pid = 0;
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    rb_drain_ability_queue(&tg.state);
     // 
     // 
     // // Multiple valid → forces selection prompt
@@ -61739,9 +60542,9 @@ static void gen_hanamaru_deploy_to_left_when_right_full(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(hanamaru);
+    // skipped: activating_card (C uses queued card id as host)
     int pid = 0;
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    rb_drain_ability_queue(&tg.state);
     // 
     // 
     // // Left (index 0) is the only empty slot → deployment there is exact.
@@ -64420,7 +63223,7 @@ static void gen_landing_action_yeah_surplus_heart_applies_score_bonus(void){
     tg.state.p[0].stage[1] = provider;
     tg.state.p[0].stage[2] = provider;
     test_add_to_live(&tg, live);
-    // TODO: game.state.activating_card = Some(live);
+    // skipped: activating_card (C uses queued card id as host)
     // 
     // TODO: let mut resolver =
     // TODO: AbilityResolver::new(game.state.card_database.clone(), game.state.activating_card);
@@ -65269,8 +64072,8 @@ static void gen_pr028_boosted_member_draws(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(live_id);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    // skipped: activating_card (C uses queued card id as host)
+    rb_drain_ability_queue(&tg.state);
     // 
     // 
     // TODO assert_eq (unresolved): assert_eq!( deck_before - game.state.player1.main_deck.cards.len(), 1, "current > original -> draw 1" );
@@ -65307,8 +64110,8 @@ static void gen_pr028_unboosted_member_no_draw(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(live_id);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    // skipped: activating_card (C uses queued card id as host)
+    rb_drain_ability_queue(&tg.state);
     // 
     // 
     // TODO assert_eq (unresolved): assert_eq!( deck_before, game.state.player1.main_deck.cards.len(), "current == original is not 'more than' -> no draw" );
@@ -65348,8 +64151,8 @@ static void gen_pr028_empty_stage_no_draw(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(live);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    // skipped: activating_card (C uses queued card id as host)
+    rb_drain_ability_queue(&tg.state);
     // 
     // 
     // TODO assert_eq (unresolved): assert_eq!(deck_before, game.state.player1.main_deck.cards.len());
@@ -65394,8 +64197,8 @@ static void gen_pr028_boost_on_non_member_does_not_count(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(live);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    // skipped: activating_card (C uses queued card id as host)
+    rb_drain_ability_queue(&tg.state);
     // 
     // 
     // TODO assert_eq (unresolved): assert_eq!( deck_before, game.state.player1.main_deck.cards.len(), "boosted non-member must not satisfy the gate" );
@@ -65435,8 +64238,8 @@ static void gen_pb1029_one_boosted_miraku_draws_only(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(live);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    // skipped: activating_card (C uses queued card id as host)
+    rb_drain_ability_queue(&tg.state);
     // 
     // 
     // TODO assert_eq (unresolved): assert_eq!( deck_before - game.state.player1.main_deck.cards.len(), 1, "one boosted みらくらぱーく！ member -> draw 1" );
@@ -65480,8 +64283,8 @@ static void gen_pb1029_two_boosted_miraku_draw_and_reduce_hearts(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(live);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    // skipped: activating_card (C uses queued card id as host)
+    rb_drain_ability_queue(&tg.state);
     // 
     // 
     // TODO assert_eq (unresolved): assert_eq!( deck_before - game.state.player1.main_deck.cards.len(), 1, "two boosted members -> draw 1 (not 2)" );
@@ -65521,8 +64324,8 @@ static void gen_pb1029_unboosted_miraku_nothing(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(live);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    // skipped: activating_card (C uses queued card id as host)
+    rb_drain_ability_queue(&tg.state);
     // 
     // 
     // TODO assert_eq (unresolved): assert_eq!( deck_before, game.state.player1.main_deck.cards.len(), "みらくらぱーく！ without extra hearts doesn't qualify" );
@@ -65564,8 +64367,8 @@ static void gen_pb1029_boosted_non_miraku_nothing(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(live);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    // skipped: activating_card (C uses queued card id as host)
+    rb_drain_ability_queue(&tg.state);
     // 
     // 
     // TODO assert_eq (unresolved): assert_eq!(deck_before, game.state.player1.main_deck.cards.len());
@@ -65593,30 +64396,7 @@ static void gen_maki_accept_cost_three_success_cards_six_blades(void){
     int hand_fodder = test_id(&tg, "PL!-sd1-010-SD");
     test_add_to_hand(&tg, hand_fodder);
     // 
-    // // inlined helper fire_live_start
-    // 
-    int ability_id = 0;
-    // action result consumed: let card = game.db.get_card(maki).unwrap();
-    int ab = 0;
-    // TODO: .resolved_abilities()
-    // TODO: .find(|a| a.triggers.as_deref() == Some("ライブ開始時"))
-    // TODO: .unwrap_or_else(|| panic!("card {} lacks a ライブ開始時 ability", card.card_no));
-    // TODO: format!("{}_{}", card.card_no, ab.full_text)
-    // TODO: };
-    // action result consumed: let card_no = game.db.get_card(maki).unwrap().card_no.to_string();
-    int pid = 0;
-    // TODO: game.state.trigger_auto_ability(
-    // TODO: ability_id,
-    // TODO: AbilityTrigger::LiveStart,
-    // TODO: pid.clone(),
-    // TODO: Some(card_no),
-    // TODO: Some(maki),
-    // TODO: None,
-    // TODO: None,
-    // TODO: );
-    // TODO: game.state.activating_card = Some(maki);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
-    // 
+    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, 0);
     // 
@@ -65642,30 +64422,7 @@ static void gen_maki_decline_no_blades(void){
     s = test_id(&tg, "PL!-sd1-019-SD");
     test_add_to_live(&tg, s);
     // 
-    // // inlined helper fire_live_start
-    // 
-    int ability_id = 0;
-    // action result consumed: let card = game.db.get_card(maki).unwrap();
-    int ab = 0;
-    // TODO: .resolved_abilities()
-    // TODO: .find(|a| a.triggers.as_deref() == Some("ライブ開始時"))
-    // TODO: .unwrap_or_else(|| panic!("card {} lacks a ライブ開始時 ability", card.card_no));
-    // TODO: format!("{}_{}", card.card_no, ab.full_text)
-    // TODO: };
-    // action result consumed: let card_no = game.db.get_card(maki).unwrap().card_no.to_string();
-    int pid = 0;
-    // TODO: game.state.trigger_auto_ability(
-    // TODO: ability_id,
-    // TODO: AbilityTrigger::LiveStart,
-    // TODO: pid.clone(),
-    // TODO: Some(card_no),
-    // TODO: Some(maki),
-    // TODO: None,
-    // TODO: None,
-    // TODO: );
-    // TODO: game.state.activating_card = Some(maki);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
-    // 
+    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     // // No hand fodder exists -> the optional discard cost is unpayable and
     // // auto-skips (Q92): no prompt at all.
     test_has_pending_choice(&tg);
@@ -65687,30 +64444,7 @@ static void gen_maki_empty_success_zone_zero_blades(void){
     int hand_fodder = test_id(&tg, "PL!-sd1-010-SD");
     test_add_to_hand(&tg, hand_fodder);
     // 
-    // // inlined helper fire_live_start
-    // 
-    int ability_id = 0;
-    // action result consumed: let card = game.db.get_card(maki).unwrap();
-    int ab = 0;
-    // TODO: .resolved_abilities()
-    // TODO: .find(|a| a.triggers.as_deref() == Some("ライブ開始時"))
-    // TODO: .unwrap_or_else(|| panic!("card {} lacks a ライブ開始時 ability", card.card_no));
-    // TODO: format!("{}_{}", card.card_no, ab.full_text)
-    // TODO: };
-    // action result consumed: let card_no = game.db.get_card(maki).unwrap().card_no.to_string();
-    int pid = 0;
-    // TODO: game.state.trigger_auto_ability(
-    // TODO: ability_id,
-    // TODO: AbilityTrigger::LiveStart,
-    // TODO: pid.clone(),
-    // TODO: Some(card_no),
-    // TODO: Some(maki),
-    // TODO: None,
-    // TODO: None,
-    // TODO: );
-    // TODO: game.state.activating_card = Some(maki);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
-    // 
+    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     test_has_pending_choice(&tg);
     // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard skippable discard-cost prompt" );
     rb_resume_with_choice(&tg.state, 0);
@@ -65739,30 +64473,7 @@ static void gen_honoka_accept_other_members_gain_one_blade_each(void){
     int hand_fodder = test_id(&tg, "PL!-sd1-010-SD");
     test_add_to_hand(&tg, hand_fodder);
     // 
-    // // inlined helper fire_live_start
-    // 
-    int ability_id = 0;
-    // action result consumed: let card = game.db.get_card(honoka).unwrap();
-    int ab = 0;
-    // TODO: .resolved_abilities()
-    // TODO: .find(|a| a.triggers.as_deref() == Some("ライブ開始時"))
-    // TODO: .unwrap_or_else(|| panic!("card {} lacks a ライブ開始時 ability", card.card_no));
-    // TODO: format!("{}_{}", card.card_no, ab.full_text)
-    // TODO: };
-    // action result consumed: let card_no = game.db.get_card(honoka).unwrap().card_no.to_string();
-    int pid = 0;
-    // TODO: game.state.trigger_auto_ability(
-    // TODO: ability_id,
-    // TODO: AbilityTrigger::LiveStart,
-    // TODO: pid.clone(),
-    // TODO: Some(card_no),
-    // TODO: Some(honoka),
-    // TODO: None,
-    // TODO: None,
-    // TODO: );
-    // TODO: game.state.activating_card = Some(honoka);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
-    // 
+    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, 0);
     // 
@@ -65785,30 +64496,7 @@ static void gen_honoka_decline_no_blades_anywhere(void){
     int mate_a = test_id(&tg, "PL!S-sd1-001-SD");
     tg.state.p[0].stage[0] = mate_a;
     // 
-    // // inlined helper fire_live_start
-    // 
-    int ability_id = 0;
-    // action result consumed: let card = game.db.get_card(honoka).unwrap();
-    int ab = 0;
-    // TODO: .resolved_abilities()
-    // TODO: .find(|a| a.triggers.as_deref() == Some("ライブ開始時"))
-    // TODO: .unwrap_or_else(|| panic!("card {} lacks a ライブ開始時 ability", card.card_no));
-    // TODO: format!("{}_{}", card.card_no, ab.full_text)
-    // TODO: };
-    // action result consumed: let card_no = game.db.get_card(honoka).unwrap().card_no.to_string();
-    int pid = 0;
-    // TODO: game.state.trigger_auto_ability(
-    // TODO: ability_id,
-    // TODO: AbilityTrigger::LiveStart,
-    // TODO: pid.clone(),
-    // TODO: Some(card_no),
-    // TODO: Some(honoka),
-    // TODO: None,
-    // TODO: None,
-    // TODO: );
-    // TODO: game.state.activating_card = Some(honoka);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
-    // 
+    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     // // No hand fodder exists -> the optional discard cost auto-skips (Q92).
     test_has_pending_choice(&tg);
     // 
@@ -65831,30 +64519,7 @@ static void gen_honoka_lone_member_nothing_to_boost(void){
     int hand_fodder = test_id(&tg, "PL!-sd1-010-SD");
     test_add_to_hand(&tg, hand_fodder);
     // 
-    // // inlined helper fire_live_start
-    // 
-    int ability_id = 0;
-    // action result consumed: let card = game.db.get_card(honoka).unwrap();
-    int ab = 0;
-    // TODO: .resolved_abilities()
-    // TODO: .find(|a| a.triggers.as_deref() == Some("ライブ開始時"))
-    // TODO: .unwrap_or_else(|| panic!("card {} lacks a ライブ開始時 ability", card.card_no));
-    // TODO: format!("{}_{}", card.card_no, ab.full_text)
-    // TODO: };
-    // action result consumed: let card_no = game.db.get_card(honoka).unwrap().card_no.to_string();
-    int pid = 0;
-    // TODO: game.state.trigger_auto_ability(
-    // TODO: ability_id,
-    // TODO: AbilityTrigger::LiveStart,
-    // TODO: pid.clone(),
-    // TODO: Some(card_no),
-    // TODO: Some(honoka),
-    // TODO: None,
-    // TODO: None,
-    // TODO: );
-    // TODO: game.state.activating_card = Some(honoka);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
-    // 
+    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     // // The optional cost is still offered; accepting discards the fodder but
     // // yields nothing (no other members exist).
     rb_resume_with_choice(&tg.state, 0);
@@ -66227,7 +64892,7 @@ static void gen_shiori_live_total_minus_one_clamped_at_zero(void){
     tg.state.p[0].live.n=0;
     tg.state.p[0].live.n=0;
     int shiori = test_id(&tg, "PL!N-bp5-010-R");
-    // TODO: game.state.activating_card = Some(shiori);
+    // skipped: activating_card (C uses queued card id as host)
     // TODO: game.state.ability_queue.push_constant_context("p1".to_string());
     // // Load the real second action (-1) from abilities.json
     // TODO: let abilities: serde_json::Value =
@@ -66398,7 +65063,7 @@ static void gen_shiori_p2_live_total_floor(void){
     // TODO: game.state.mods.p2_constant_total_score_bonus = 0;
     tg.state.p[0].live.n=0;
     tg.state.p[0].live.n=0;
-    // TODO: game.state.activating_card = Some(shiori);
+    // skipped: activating_card (C uses queued card id as host)
     // TODO: game.state.ability_queue.push_constant_context("p2".to_string());
     // TODO: let abilities: serde_json::Value =
     // action result consumed: serde_json::from_str(&std::fs::read_to_string("../cards/abilities.json").unwrap()).unwrap();
@@ -67738,7 +66403,7 @@ static void gen_kanon_invalidate_liella_live_start(void){
     while (test_has_pending_choice(&tg)) rb_resume_with_choice(&tg.state, 0);
     rb_resume_with_choice(&tg.state, 0);
     // TODO: }
-    // TODO: game.state.process_pending_auto_abilities("p1");
+    rb_drain_ability_queue(&tg.state);
     // 
     // // Kanon played to Center via baton touch
     CHECK_EQ(tg.state.p[0].stage[1], kanon, "kanon_invalidate_liella_live_start");
@@ -67778,7 +66443,7 @@ static void gen_vivid_world_all_heart_colors_present(void){
     // 
     // TODO: game.state.current_phase = Phase::LiveVictoryDetermination;
     // TODO: TurnEngine::trigger_live_success_abilities(&mut game.state, "p1");
-    // TODO: game.state.process_pending_auto_abilities("p1");
+    rb_drain_ability_queue(&tg.state);
     // 
     CHECK_EQ(rb_mods_get_score(&tg.state.mods, live_card), 1, "vivid_world_all_heart_colors_present");
     // 
@@ -67808,7 +66473,7 @@ static void gen_vivid_world_missing_heart_color(void){
     // 
     // TODO: game.state.current_phase = Phase::LiveVictoryDetermination;
     // TODO: TurnEngine::trigger_live_success_abilities(&mut game.state, "p1");
-    // TODO: game.state.process_pending_auto_abilities("p1");
+    rb_drain_ability_queue(&tg.state);
     // 
     CHECK_EQ(rb_mods_get_score(&tg.state.mods, live_card), 0, "vivid_world_missing_heart_color");
     // 
@@ -67842,7 +66507,7 @@ static void gen_vivid_world_half_nijigasaki_half_other(void){
     // 
     // TODO: game.state.current_phase = Phase::LiveVictoryDetermination;
     // TODO: TurnEngine::trigger_live_success_abilities(&mut game.state, "p1");
-    // TODO: game.state.process_pending_auto_abilities("p1");
+    rb_drain_ability_queue(&tg.state);
     // 
     CHECK_EQ(rb_mods_get_score(&tg.state.mods, live_card), 0, "vivid_world_half_nijigasaki_half_other");
     // 
@@ -68791,7 +67456,7 @@ static void gen_two_copies_on_stage_both_gain_blades(void){
     rb_resume_with_choice(&tg.state, -1);
     // 
     int p1_id = 0;
-    // TODO: game.state.process_pending_auto_abilities(&p1_id);
+    rb_drain_ability_queue(&tg.state);
     // 
     // // Second ability: discard 1 card → 1 blade
     test_has_pending_choice(&tg);
@@ -71698,7 +70363,7 @@ static void gen_q238_reposition_opponent_member(void){
     // TODO: game.state.recently_moved_from_zone = Some("stage".to_string());
     int pid = 0;
     // TODO: rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(&mut game.state, &pid);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    rb_drain_ability_queue(&tg.state);
     // 
     // 
     // // Should have a pending choice (optional position_change)
@@ -71745,7 +70410,7 @@ static void gen_q238_reposition_own_member(void){
     // TODO: game.state.recently_moved_from_zone = Some("stage".to_string());
     int pid = 0;
     // TODO: rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(&mut game.state, &pid);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    rb_drain_ability_queue(&tg.state);
     // 
     // 
     test_has_pending_choice(&tg);
@@ -71783,7 +70448,7 @@ static void gen_q238_no_other_members_skips(void){
     // TODO: game.state.recently_moved_from_zone = Some("stage".to_string());
     int pid = 0;
     // TODO: rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(&mut game.state, &pid);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    rb_drain_ability_queue(&tg.state);
     // 
     // 
     // // After moving to discard, no other members on either stage
@@ -71817,7 +70482,7 @@ static void gen_q238_both_players_members_all_selectable(void){
     // TODO: game.state.recently_moved_from_zone = Some("stage".to_string());
     int pid = 0;
     // TODO: rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(&mut game.state, &pid);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    rb_drain_ability_queue(&tg.state);
     // 
     // 
     test_has_pending_choice(&tg);
@@ -71852,7 +70517,7 @@ static void gen_q238_select_opponent_center(void){
     // TODO: game.state.recently_moved_from_zone = Some("stage".to_string());
     int pid = 0;
     // TODO: rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(&mut game.state, &pid);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    rb_drain_ability_queue(&tg.state);
     // 
     // 
     test_has_pending_choice(&tg);
@@ -72066,7 +70731,7 @@ static void gen_q238_optional_skip(void){
     // TODO: game.state.recently_moved_from_zone = Some("stage".to_string());
     int pid = 0;
     // TODO: rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(&mut game.state, &pid);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    rb_drain_ability_queue(&tg.state);
     // 
     // 
     test_has_pending_choice(&tg);
@@ -74575,8 +73240,8 @@ static void gen_bp6020_ab0_opponent_member_resolution_does_not_arm_own_watcher(v
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(p2_honoka);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    // skipped: activating_card (C uses queued card id as host)
+    rb_drain_ability_queue(&tg.state);
     // 
     test_has_pending_choice(&tg);
     CHECK_EQ(tg.state.p[1].stage[1], p2_honoka, "bp6020_ab0_opponent_member_resolution_does_not_arm_own_watcher");
@@ -76107,7 +74772,7 @@ static void gen_zero_blade_heart_types_no_effect(void){
     int ability_card = 0;
     // 
     // TODO: game.state.trigger_auto_abilities_for_player("p1");
-    // TODO: game.state.process_pending_auto_abilities("p1");
+    rb_drain_ability_queue(&tg.state);
     // 
     // TODO assert_eq (unresolved): assert_eq!( get_heart_modifier(&game, ability_card, HeartColor::Heart01), 0, "No heart01 granted with 0 blade heart types" );
     // TODO assert_eq (unresolved): assert_eq!( get_score_modifier(&game, ability_card), 0, "No score modifier with 0 blade heart types" );
@@ -76125,7 +74790,7 @@ static void gen_two_blade_heart_types_no_effect(void){
     int ability_card = 0;
     // 
     // TODO: game.state.trigger_auto_abilities_for_player("p1");
-    // TODO: game.state.process_pending_auto_abilities("p1");
+    rb_drain_ability_queue(&tg.state);
     // 
     // TODO assert_eq (unresolved): assert_eq!( get_heart_modifier(&game, ability_card, HeartColor::Heart01), 0, "No heart01 granted with only 2 blade heart types" );
     // TODO assert_eq (unresolved): assert_eq!( get_score_modifier(&game, ability_card), 0, "No score modifier with only 2 blade heart types" );
@@ -76144,7 +74809,7 @@ static void gen_three_blade_heart_types_grants_heart01(void){
     int ability_card = 0;
     // 
     // TODO: game.state.trigger_auto_abilities_for_player("p1");
-    // TODO: game.state.process_pending_auto_abilities("p1");
+    rb_drain_ability_queue(&tg.state);
     // 
     // TODO assert_eq (unresolved): assert_eq!( get_heart_modifier(&game, ability_card, HeartColor::Heart01), 1, "Should have heart01 ×1 with 3 blade heart types" );
     // TODO assert_eq (unresolved): assert_eq!( get_score_modifier(&game, ability_card), 0, "No score modifier with only 3 blade heart types (need 6)" );
@@ -76165,7 +74830,7 @@ static void gen_five_blade_heart_types_grants_heart01_only(void){
     int ability_card = 0;
     // 
     // TODO: game.state.trigger_auto_abilities_for_player("p1");
-    // TODO: game.state.process_pending_auto_abilities("p1");
+    rb_drain_ability_queue(&tg.state);
     // 
     // TODO assert_eq (unresolved): assert_eq!( get_heart_modifier(&game, ability_card, HeartColor::Heart01), 1, "Should have heart01 ×1 with 5 blade heart types" );
     // TODO assert_eq (unresolved): assert_eq!( get_score_modifier(&game, ability_card), 0, "No score modifier with 5 blade heart types (need 6)" );
@@ -76187,7 +74852,7 @@ static void gen_six_blade_heart_types_grants_both(void){
     int ability_card = 0;
     // 
     // TODO: game.state.trigger_auto_abilities_for_player("p1");
-    // TODO: game.state.process_pending_auto_abilities("p1");
+    rb_drain_ability_queue(&tg.state);
     // 
     // TODO assert_eq (unresolved): assert_eq!( get_heart_modifier(&game, ability_card, HeartColor::Heart01), 1, "Should have heart01 ×1 with 6 blade heart types" );
     // // The gain_ability grants 「常時：ライブの合計スコア＋１する」 — live-total.
@@ -76212,7 +74877,7 @@ static void gen_all_blade_heart_types_with_b_all_grants_both(void){
     int ability_card = 0;
     // 
     // TODO: game.state.trigger_auto_abilities_for_player("p1");
-    // TODO: game.state.process_pending_auto_abilities("p1");
+    rb_drain_ability_queue(&tg.state);
     // 
     // TODO assert_eq (unresolved): assert_eq!( get_heart_modifier(&game, ability_card, HeartColor::Heart01), 1, "Should have heart01 ×1 with all blade heart types + b_all" );
     // // The gain_ability grants 「常時：ライブの合計スコア＋１する」 — live-total.
@@ -76234,7 +74899,7 @@ static void gen_base_heart_only_does_not_count(void){
     int ability_card = 0;
     // 
     // TODO: game.state.trigger_auto_abilities_for_player("p1");
-    // TODO: game.state.process_pending_auto_abilities("p1");
+    rb_drain_ability_queue(&tg.state);
     // 
     // TODO assert_eq (unresolved): assert_eq!( get_heart_modifier(&game, ability_card, HeartColor::Heart01), 0, "Cards with only base_heart should NOT trigger blade heart condition" );
     // 
@@ -76254,7 +74919,7 @@ static void gen_blade_hearts_count_base_hearts_ignored(void){
     int ability_card = 0;
     // 
     // TODO: game.state.trigger_auto_abilities_for_player("p1");
-    // TODO: game.state.process_pending_auto_abilities("p1");
+    rb_drain_ability_queue(&tg.state);
     // 
     // TODO assert_eq (unresolved): assert_eq!( get_heart_modifier(&game, ability_card, HeartColor::Heart01), 1, "3 blade heart types should grant heart01 even with base-heart-only cards present" );
     // 
@@ -76272,7 +74937,7 @@ static void gen_duplicate_blade_heart_colors_do_not_stack(void){
     int ability_card = 0;
     // 
     // TODO: game.state.trigger_auto_abilities_for_player("p1");
-    // TODO: game.state.process_pending_auto_abilities("p1");
+    rb_drain_ability_queue(&tg.state);
     // 
     // TODO assert_eq (unresolved): assert_eq!( get_heart_modifier(&game, ability_card, HeartColor::Heart01), 0, "Only 2 distinct blade heart types — condition needs 3" );
     // 
@@ -78667,8 +77332,8 @@ static void gen_cooking_both_in_discard_offers_optional(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(c);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    // skipped: activating_card (C uses queued card id as host)
+    rb_drain_ability_queue(&tg.state);
     // // Drain any SelectAutoAbility confirmation before inspecting the result.
     test_drain_auto_choices(&tg);
     // 
@@ -78708,8 +77373,8 @@ static void gen_cooking_only_live_card_no_offer(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(c);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    // skipped: activating_card (C uses queued card id as host)
+    rb_drain_ability_queue(&tg.state);
     // // Drain any SelectAutoAbility confirmation before inspecting the result.
     test_drain_auto_choices(&tg);
     // 
@@ -78748,8 +77413,8 @@ static void gen_cooking_only_member_without_blade_no_offer(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(c);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    // skipped: activating_card (C uses queued card id as host)
+    rb_drain_ability_queue(&tg.state);
     // // Drain any SelectAutoAbility confirmation before inspecting the result.
     test_drain_auto_choices(&tg);
     // 
@@ -78789,8 +77454,8 @@ static void gen_cooking_live_plus_member_with_blade_no_offer(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(c);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    // skipped: activating_card (C uses queued card id as host)
+    rb_drain_ability_queue(&tg.state);
     // // Drain any SelectAutoAbility confirmation before inspecting the result.
     test_drain_auto_choices(&tg);
     // 
@@ -78829,8 +77494,8 @@ static void gen_cooking_only_member_with_blade_no_offer(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(c);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    // skipped: activating_card (C uses queued card id as host)
+    rb_drain_ability_queue(&tg.state);
     // // Drain any SelectAutoAbility confirmation before inspecting the result.
     test_drain_auto_choices(&tg);
     // 
@@ -78870,8 +77535,8 @@ static void gen_cooking_non_niji_in_discard_no_offer(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(c);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    // skipped: activating_card (C uses queued card id as host)
+    rb_drain_ability_queue(&tg.state);
     // // Drain any SelectAutoAbility confirmation before inspecting the result.
     test_drain_auto_choices(&tg);
     // 
@@ -78915,8 +77580,8 @@ static void gen_cooking_condition_checks_discard_not_stage(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(c);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    // skipped: activating_card (C uses queued card id as host)
+    rb_drain_ability_queue(&tg.state);
     // // Drain any SelectAutoAbility confirmation before inspecting the result.
     test_drain_auto_choices(&tg);
     // 
@@ -78958,8 +77623,8 @@ static void gen_cooking_accept_shuffles_discard_to_deck_bottom(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(c);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    // skipped: activating_card (C uses queued card id as host)
+    rb_drain_ability_queue(&tg.state);
     // // Drain any SelectAutoAbility confirmation before inspecting the result.
     test_drain_auto_choices(&tg);
     // 
@@ -79011,8 +77676,8 @@ static void gen_cooking_decline_does_nothing(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(c);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    // skipped: activating_card (C uses queued card id as host)
+    rb_drain_ability_queue(&tg.state);
     // // Drain any SelectAutoAbility confirmation before inspecting the result.
     test_drain_auto_choices(&tg);
     // 
@@ -79060,8 +77725,8 @@ static void gen_cooking_accept_gives_heart01_to_all_niji_members(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(c);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    // skipped: activating_card (C uses queued card id as host)
+    rb_drain_ability_queue(&tg.state);
     // // Drain any SelectAutoAbility confirmation before inspecting the result.
     test_drain_auto_choices(&tg);
     // 
@@ -80067,8 +78732,8 @@ static void gen_ab2_live_success_places_energy_under_member(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(s);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    // skipped: activating_card (C uses queued card id as host)
+    rb_drain_ability_queue(&tg.state);
     // 
     // TODO assert_eq (unresolved): assert_eq!( under_count(&game, MemberArea::Center), 1, "exactly 1 energy card placed under せつ菜" );
     // TODO assert_eq (unresolved): assert_eq!( game.state.player1.energy_deck.cards.len(), 1, "1 energy card drawn from the energy deck" );
@@ -80106,8 +78771,8 @@ static void gen_ab2_live_success_no_energy_deck_places_nothing(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(s);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    // skipped: activating_card (C uses queued card id as host)
+    rb_drain_ability_queue(&tg.state);
     // 
     // TODO assert_eq (unresolved): assert_eq!( under_count(&game, MemberArea::Center), 0, "empty energy deck → nothing placed under" );
     // 
@@ -86194,9 +84859,9 @@ static void gen_issue8_honoka_live_score_dynamic(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(honoka);
+    // skipped: activating_card (C uses queued card id as host)
     int pid = 0;
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    rb_drain_ability_queue(&tg.state);
     // 
     // 
     // // Process choices: cost (select 1 card from hand), then look_and_select (select 1 from looked_at)
@@ -86267,9 +84932,9 @@ static void gen_issue8_honoka_live_score_2(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(honoka);
+    // skipped: activating_card (C uses queued card id as host)
     int pid = 0;
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    rb_drain_ability_queue(&tg.state);
     // 
     // 
     while (test_has_pending_choice(&tg)) rb_resume_with_choice(&tg.state, 0);
@@ -86340,9 +85005,9 @@ static void gen_issue8_honoka_live_score_1_plus_2(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(honoka);
+    // skipped: activating_card (C uses queued card id as host)
     int pid = 0;
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    rb_drain_ability_queue(&tg.state);
     // 
     // 
     while (test_has_pending_choice(&tg)) rb_resume_with_choice(&tg.state, 0);
@@ -87392,7 +86057,7 @@ static void gen_ren_energy_to_deck_triggers_energy_place(void){
     // 
     int pid = 0;
     // TODO: rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(&mut game.state, &pid);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    rb_drain_ability_queue(&tg.state);
     test_drain_auto_choices(&tg);
     // 
     // 
@@ -87435,7 +86100,7 @@ static void gen_ren_placed_energy_is_wait_not_active(void){
     // 
     int pid = 0;
     // TODO: rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(&mut game.state, &pid);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    rb_drain_ability_queue(&tg.state);
     test_drain_auto_choices(&tg);
     // 
     // 
@@ -87477,7 +86142,7 @@ static void gen_ren_once_per_turn_when_both_triggers(void){
     // 
     int pid = 0;
     // TODO: rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(&mut game.state, &pid);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    rb_drain_ability_queue(&tg.state);
     test_drain_auto_choices(&tg);
     // 
     // 
@@ -87492,14 +86157,14 @@ static void gen_ren_once_per_turn_when_both_triggers(void){
     // 
     pid = 0;
     // TODO: rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(&mut game.state, &pid);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    rb_drain_ability_queue(&tg.state);
     test_drain_auto_choices(&tg);
     // 
     // // inlined helper trigger_auto
     // 
     pid = 0;
     // TODO: rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(&mut game.state, &pid);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    rb_drain_ability_queue(&tg.state);
     test_drain_auto_choices(&tg);
     // 
     // 
@@ -87526,7 +86191,7 @@ static void gen_ren_empty_energy_deck_places_nothing(void){
     // 
     int pid = 0;
     // TODO: rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(&mut game.state, &pid);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    rb_drain_ability_queue(&tg.state);
     test_drain_auto_choices(&tg);
     // 
     // 
@@ -87564,7 +86229,7 @@ static void gen_ren_no_trigger_no_energy(void){
     // 
     int pid = 0;
     // TODO: rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(&mut game.state, &pid);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    rb_drain_ability_queue(&tg.state);
     test_drain_auto_choices(&tg);
     // 
     // 
@@ -87604,7 +86269,7 @@ static void gen_ren_opponent_energy_move_does_not_trigger(void){
     // 
     int pid = 0;
     // TODO: rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(&mut game.state, &pid);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    rb_drain_ability_queue(&tg.state);
     test_drain_auto_choices(&tg);
     // 
     // 
@@ -87645,7 +86310,7 @@ static void gen_ren_other_member_appearance_does_not_trigger(void){
     // 
     int pid = 0;
     // TODO: rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(&mut game.state, &pid);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    rb_drain_ability_queue(&tg.state);
     test_drain_auto_choices(&tg);
     // 
     // 
@@ -87687,7 +86352,7 @@ static void gen_ren_multiple_energy_moves_single_fire(void){
     // 
     int pid = 0;
     // TODO: rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(&mut game.state, &pid);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    rb_drain_ability_queue(&tg.state);
     test_drain_auto_choices(&tg);
     // 
     // 
@@ -87730,7 +86395,7 @@ static void gen_ren_wrong_source_energy_move_does_not_trigger(void){
     // 
     int pid = 0;
     // TODO: rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(&mut game.state, &pid);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    rb_drain_ability_queue(&tg.state);
     test_drain_auto_choices(&tg);
     // 
     // 
@@ -88109,7 +86774,7 @@ static void gen_mirai_ticket_empty_revealed_triggers_and_auto_skips(void){
     // // inlined helper fire
     // 
     // TODO: game.state.trigger_auto_abilities_for_player("p1");
-    // TODO: game.state.process_pending_auto_abilities("p1");
+    rb_drain_ability_queue(&tg.state);
     // 
     // 
     test_has_pending_choice(&tg);
@@ -89457,7 +88122,7 @@ static void gen_test_q252_basic_trigger(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.process_pending_auto_abilities("player1");
+    rb_drain_ability_queue(&tg.state);
     // 
     // 
     // // Choice 1: select the card (or skip)
@@ -89493,7 +88158,7 @@ static void gen_test_q252_non_aqours_no_trigger(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.process_pending_auto_abilities("player1");
+    rb_drain_ability_queue(&tg.state);
     // 
     // 
     test_has_pending_choice(&tg);
@@ -89520,7 +88185,7 @@ static void gen_test_q252_two_cards_choose_one(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.process_pending_auto_abilities("player1");
+    rb_drain_ability_queue(&tg.state);
     // 
     // 
     // // Choice 1: choose 1 of 2 recently moved cards
@@ -89559,7 +88224,7 @@ static void gen_test_q252_three_cards_choose_one(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.process_pending_auto_abilities("player1");
+    rb_drain_ability_queue(&tg.state);
     // 
     // 
     // // Choice 1: choose 1 of 3
@@ -89600,7 +88265,7 @@ static void gen_test_q252_use_limit(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.process_pending_auto_abilities("player1");
+    rb_drain_ability_queue(&tg.state);
     // 
     test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, 0);
@@ -89622,7 +88287,7 @@ static void gen_test_q252_use_limit(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.process_pending_auto_abilities("player1");
+    rb_drain_ability_queue(&tg.state);
     // 
     test_has_pending_choice(&tg);
     // 
@@ -89648,7 +88313,7 @@ static void gen_test_q252_pick_second_card(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.process_pending_auto_abilities("player1");
+    rb_drain_ability_queue(&tg.state);
     // 
     // 
     // // Pick live2 (index 1), top
@@ -89804,7 +88469,7 @@ static void gen_test_q252_mixed_aqours_and_non_aqours(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.process_pending_auto_abilities("player1");
+    rb_drain_ability_queue(&tg.state);
     // 
     // 
     // // Even with 1 matching card, if the source zone has non-matching cards,
@@ -89843,7 +88508,7 @@ static void gen_test_q252_non_live_in_recently_moved(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.process_pending_auto_abilities("player1");
+    rb_drain_ability_queue(&tg.state);
     // 
     // 
     // // Even with 1 matching card, the engine prompts to select it (or skip)
@@ -89880,7 +88545,7 @@ static void gen_test_q252_skip_optional_move(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.process_pending_auto_abilities("player1");
+    rb_drain_ability_queue(&tg.state);
     // 
     // 
     // // Choice: pick card or skip. Empty indices → skip.
@@ -89913,7 +88578,7 @@ static void gen_test_q252_skip_optional_two_cards(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.process_pending_auto_abilities("player1");
+    rb_drain_ability_queue(&tg.state);
     // 
     // 
     // // Choice: pick 1 of 2 or skip. Empty indices → skip.
@@ -91752,7 +90417,7 @@ static void gen_formation_change_with_group_names_and_empty_slots(void){
     // // effect fires with multiple_targets=true and group_names=["Liella!"].
     // TODO: game.state.live_success_triggered_this_turn = false;
     // TODO: TurnEngine::trigger_live_success_abilities(&mut game.state, &player_id);
-    // TODO: game.state.process_pending_auto_abilities(&player_id);
+    rb_drain_ability_queue(&tg.state);
     // 
     // // Should have a position change choice now
     test_has_pending_choice(&tg);
@@ -91832,7 +90497,7 @@ static void gen_formation_change_destination_excludes_already_claimed_area(void)
     // TODO: rabuka_engine::game_state::Phase::LiveVictoryDetermination;
     // TODO: game.state.live_success_triggered_this_turn = false;
     // TODO: TurnEngine::trigger_live_success_abilities(&mut game_state_ref(&mut game), &player_id);
-    // TODO: game.state.process_pending_auto_abilities(&player_id);
+    rb_drain_ability_queue(&tg.state);
     // 
     // // First member's destination choice.
     test_has_pending_choice(&tg);
@@ -93313,8 +91978,8 @@ static void gen_sumire_double_baton_choice_path_records_two_touches(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(sumire);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    // skipped: activating_card (C uses queued card id as host)
+    rb_drain_ability_queue(&tg.state);
     // 
     test_has_pending_choice(&tg);
     // 
@@ -95703,8 +94368,8 @@ static void gen_yuna_sp222_live_start_optional_energy_places_wait_energy(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(yuna);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    // skipped: activating_card (C uses queued card id as host)
+    rb_drain_ability_queue(&tg.state);
     // 
     // 
     // // Optional payment is offered (rules 9.6.2.3: optional ⇒ still legal at 3).
@@ -95730,8 +94395,8 @@ static void gen_yuna_sp222_live_start_optional_energy_places_wait_energy(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(yuna);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    // skipped: activating_card (C uses queued card id as host)
+    rb_drain_ability_queue(&tg.state);
     // 
     test_has_pending_choice(&tg);
     // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectTarget"), "expected SelectTarget (pay_optional_cost:skip)" );
@@ -95773,8 +94438,8 @@ static void gen_kanata_bp3006_debut_enters_wait_state(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(kanata);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    // skipped: activating_card (C uses queued card id as host)
+    rb_drain_ability_queue(&tg.state);
     // 
     // TODO assert_eq (unresolved): assert_eq!( game.state.mods.get_orientation_modifier(kanata), Some("wait"), "debut resolves with self-wait" );
     // 
@@ -95813,8 +94478,8 @@ static void gen_suzuki_hsbp1008_mill_three_all_members_draws_one(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(suzuki);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    // skipped: activating_card (C uses queued card id as host)
+    rb_drain_ability_queue(&tg.state);
     // 
     // 
     // TODO assert_eq (unresolved): assert_eq!( game.state.player1.hand.cards.len(), hand_before + 1, "all 3 milled cards are members → draw 1" );
@@ -95856,8 +94521,8 @@ static void gen_suzuki_hsbp1008_mill_with_live_card_no_draw(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(suzuki);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    // skipped: activating_card (C uses queued card id as host)
+    rb_drain_ability_queue(&tg.state);
     // 
     // 
     CHECK_EQ(tg.state.p[0].hand.n, hand_before, "suzuki_hsbp1008_mill_with_live_card_no_draw");
@@ -95890,8 +94555,8 @@ static void gen_wakashi_spbp1008_debut_draws_one_without_mei(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(wakashi);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    // skipped: activating_card (C uses queued card id as host)
+    rb_drain_ability_queue(&tg.state);
     // 
     // 
     // TODO assert_eq (unresolved): assert_eq!( game.state.player1.hand.cards.len(), hand_before + 1, "no 米女メイ on stage → single draw" );
@@ -95925,8 +94590,8 @@ static void gen_wakashi_spbp1008_debut_draws_two_with_mei(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(wakashi);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    // skipped: activating_card (C uses queued card id as host)
+    rb_drain_ability_queue(&tg.state);
     // 
     // 
     // TODO assert_eq (unresolved): assert_eq!( game.state.player1.hand.cards.len(), hand_before + 2, "米女メイ on stage → additional draw" );
@@ -95963,8 +94628,8 @@ static void gen_niko_bp3009_cost13_condition_draw(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(niko);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    // skipped: activating_card (C uses queued card id as host)
+    rb_drain_ability_queue(&tg.state);
     // 
     // TODO assert_eq (unresolved): assert_eq!( game.state.player1.hand.cards.len(), hand_before + 1, "cost-13 member present → draw 1" );
     // 
@@ -95998,8 +94663,8 @@ static void gen_niko_bp3009_no_cost13_no_draw(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(niko);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    // skipped: activating_card (C uses queued card id as host)
+    rb_drain_ability_queue(&tg.state);
     // 
     CHECK_EQ(tg.state.p[0].hand.n, hand_before, "niko_bp3009_no_cost13_no_draw");
     // 
@@ -96056,8 +94721,8 @@ static void gen_ruby_bp5009_decline_optional_payment_fetches_nothing(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(ruby);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    // skipped: activating_card (C uses queued card id as host)
+    rb_drain_ability_queue(&tg.state);
     // 
     test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, 0);
@@ -96097,8 +94762,8 @@ static void gen_ruby_bp5009_accept_optional_payment_fetches_and_grants_blades(vo
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(ruby);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    // skipped: activating_card (C uses queued card id as host)
+    rb_drain_ability_queue(&tg.state);
     // 
     rb_resume_with_choice(&tg.state, 1);
     // 
@@ -96759,8 +95424,8 @@ static void gen_mirror_copies_each_evaluate_against_own_opponent(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(p1_live);
-    // TODO: game.state.process_pending_auto_abilities(&"p1".to_string());
+    // skipped: activating_card (C uses queued card id as host)
+    rb_drain_ability_queue(&tg.state);
     // 
     // // inlined helper fire_live_success_as
     // 
@@ -96779,8 +95444,8 @@ static void gen_mirror_copies_each_evaluate_against_own_opponent(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(p2_live);
-    // TODO: game.state.process_pending_auto_abilities(&"p2".to_string());
+    // skipped: activating_card (C uses queued card id as host)
+    rb_drain_ability_queue(&tg.state);
     // 
     // 
     // TODO assert_eq (unresolved): assert_eq!( score_mod(&game, p1_live), 1, "P1's copy: opp(P2)=3 > self(P1)=2 → +1" );
@@ -96947,8 +95612,8 @@ static void gen_p2_owned_rina_mills_both_decks_from_p2_seat(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(rina_p2);
-    // TODO: game.state.process_pending_auto_abilities(&"p2".to_string());
+    // skipped: activating_card (C uses queued card id as host)
+    rb_drain_ability_queue(&tg.state);
     test_drain_auto_choices(&tg);
     // 
     // 
@@ -97035,8 +95700,8 @@ static void gen_mutual_mill_identity_no_cross_pollination(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(rina_p1);
-    // TODO: game.state.process_pending_auto_abilities(&"p1".to_string());
+    // skipped: activating_card (C uses queued card id as host)
+    rb_drain_ability_queue(&tg.state);
     test_drain_auto_choices(&tg);
     // 
     // 
@@ -97084,8 +95749,8 @@ static void gen_hot_passion_empty_energy_deck_no_prompt_no_draw(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(hot);
-    // TODO: game.state.process_pending_auto_abilities(&"p1".to_string());
+    // skipped: activating_card (C uses queued card id as host)
+    rb_drain_ability_queue(&tg.state);
     // 
     test_drain_auto_choices(&tg);
     // 
@@ -97130,8 +95795,8 @@ static void gen_hot_passion_waited_energy_flips_opponent_score_comparison(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(happy_p2);
-    // TODO: game.state.process_pending_auto_abilities(&"p2".to_string());
+    // skipped: activating_card (C uses queued card id as host)
+    rb_drain_ability_queue(&tg.state);
     // 
     // TODO assert_eq (unresolved): assert_eq!( score_mod(&game, happy_p2), 0, "baseline 2 vs 2: P2's copy scores nothing" );
     // 
@@ -97155,8 +95820,8 @@ static void gen_hot_passion_waited_energy_flips_opponent_score_comparison(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(hot_p1);
-    // TODO: game.state.process_pending_auto_abilities(&"p1".to_string());
+    // skipped: activating_card (C uses queued card id as host)
+    rb_drain_ability_queue(&tg.state);
     // 
     test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, 1);
@@ -97186,8 +95851,8 @@ static void gen_hot_passion_waited_energy_flips_opponent_score_comparison(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(happy_p2);
-    // TODO: game.state.process_pending_auto_abilities(&"p2".to_string());
+    // skipped: activating_card (C uses queued card id as host)
+    rb_drain_ability_queue(&tg.state);
     // 
     // TODO assert_eq (unresolved): assert_eq!( score_mod(&game, happy_p2), 1, "HOT PASSION's waited energy counts as エネルギー (4.7.4): opp 3 > self 2 -> +1" );
     // 
@@ -100105,7 +98770,7 @@ static void gen_like_a_treasure_opponent_live_success_does_not_fire(void){
     // TODO: game.state.push_movement_event(filler, "deck", "discard", None, "p2", true);
     int pid = 0;
     // TODO: game.state.trigger_auto_abilities_for_player(&pid);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    rb_drain_ability_queue(&tg.state);
     // 
     int offered = 0;
     CHECK((!offered), "like_a_treasure_opponent_live_success_does_not_fire");
@@ -101553,9 +100218,9 @@ static void gen_kotori_live_start_skip_does_not_gain_heart(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(kotori);
+    // skipped: activating_card (C uses queued card id as host)
     int pid = 0;
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    rb_drain_ability_queue(&tg.state);
     // 
     // 
     // // Should prompt to select card (optional, can skip)
@@ -101628,9 +100293,9 @@ static void gen_kotori_live_start_no_valid_target_in_hand(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(kotori);
+    // skipped: activating_card (C uses queued card id as host)
     int pid = 0;
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    rb_drain_ability_queue(&tg.state);
     // 
     // 
     // // No matching μ's member card in hand → should not prompt
@@ -101704,9 +100369,9 @@ static void gen_kotori_q247_preexisting_under_does_not_double_heart(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(kotori);
+    // skipped: activating_card (C uses queued card id as host)
     int pid = 0;
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    rb_drain_ability_queue(&tg.state);
     // 
     // 
     // // Step 1: Select card to place under
@@ -101794,9 +100459,9 @@ static void gen_kotori_q247_preexisting_under_skip_live_start_no_heart(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(kotori);
+    // skipped: activating_card (C uses queued card id as host)
     int pid = 0;
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    rb_drain_ability_queue(&tg.state);
     // 
     // 
     // // Should prompt to select card (optional, can skip)
@@ -101847,9 +100512,9 @@ static void gen_kotori_deploy_to_empty_right(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(kotori);
+    // skipped: activating_card (C uses queued card id as host)
     int pid = 0;
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    rb_drain_ability_queue(&tg.state);
     // 
     // 
     test_has_pending_choice(&tg);
@@ -101896,9 +100561,9 @@ static void gen_kotori_deploy_to_left_when_right_full(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(kotori);
+    // skipped: activating_card (C uses queued card id as host)
     int pid = 0;
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    rb_drain_ability_queue(&tg.state);
     // 
     // 
     test_has_pending_choice(&tg);
@@ -101940,9 +100605,9 @@ static void gen_kotori_no_member_under_no_choice(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(kotori);
+    // skipped: activating_card (C uses queued card id as host)
     int pid = 0;
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    rb_drain_ability_queue(&tg.state);
     // 
     // 
     test_has_pending_choice(&tg);
@@ -101986,9 +100651,9 @@ static void gen_kotori_no_empty_slot_keeps_under(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(kotori);
+    // skipped: activating_card (C uses queued card id as host)
     int pid = 0;
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    rb_drain_ability_queue(&tg.state);
     // 
     // 
     // // No empty slot → no choice, member stays under
@@ -102033,9 +100698,9 @@ static void gen_kotori_skip_optional_does_nothing(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(kotori);
+    // skipped: activating_card (C uses queued card id as host)
     int pid = 0;
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    rb_drain_ability_queue(&tg.state);
     // 
     // 
     test_has_pending_choice(&tg);
@@ -105259,8 +103924,8 @@ static void gen_mijuku_dreamer_no_refresh_no_bonus(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(mijuku);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    // skipped: activating_card (C uses queued card id as host)
+    rb_drain_ability_queue(&tg.state);
     // 
     CHECK_EQ(rb_mods_get_score(&tg.state.mods, mijuku), 0, "mijuku_dreamer_no_refresh_no_bonus");
     // 
@@ -105304,8 +103969,8 @@ static void gen_mijuku_dreamer_refresh_via_mill_gets_bonus(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(mijuku);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    // skipped: activating_card (C uses queued card id as host)
+    rb_drain_ability_queue(&tg.state);
     // 
     CHECK_EQ(rb_mods_get_score(&tg.state.mods, mijuku), 2, "mijuku_dreamer_refresh_via_mill_gets_bonus");
     // 
@@ -105408,8 +104073,8 @@ static void gen_tiny_stars_basic(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(tiny_stars);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    // skipped: activating_card (C uses queued card id as host)
+    rb_drain_ability_queue(&tg.state);
     // 
     // 
     test_has_pending_choice(&tg);
@@ -105519,8 +104184,8 @@ static void gen_tiny_stars_duplicate_kanon(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(tiny_stars);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    // skipped: activating_card (C uses queued card id as host)
+    rb_drain_ability_queue(&tg.state);
     // 
     // 
     test_has_pending_choice(&tg);
@@ -105651,8 +104316,8 @@ static void gen_tiny_stars_duplicate_keke(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(tiny_stars);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    // skipped: activating_card (C uses queued card id as host)
+    rb_drain_ability_queue(&tg.state);
     // 
     // 
     // // Kanon has only 1 candidate, should be handled automatically.
@@ -105783,8 +104448,8 @@ static void gen_tiny_stars_kanon_only(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(tiny_stars);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    // skipped: activating_card (C uses queued card id as host)
+    rb_drain_ability_queue(&tg.state);
     // 
     // 
     test_has_pending_choice(&tg);
@@ -105889,8 +104554,8 @@ static void gen_tiny_stars_keke_only(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(tiny_stars);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    // skipped: activating_card (C uses queued card id as host)
+    rb_drain_ability_queue(&tg.state);
     // 
     // 
     test_has_pending_choice(&tg);
@@ -105994,8 +104659,8 @@ static void gen_tiny_stars_none(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(tiny_stars);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    // skipped: activating_card (C uses queued card id as host)
+    rb_drain_ability_queue(&tg.state);
     // 
     // 
     test_has_pending_choice(&tg);
@@ -108343,7 +107008,7 @@ static void gen_test_sumire_other_card_move_triggers(void){
     // TODO: &mut game.state,
     // TODO: &player_id,
     // TODO: );
-    // TODO: game.state.process_pending_auto_abilities(&player_id);
+    rb_drain_ability_queue(&tg.state);
     // 
     // // Since a different card moved, Sumire's "this member" check should NOT trigger.
     // TODO assert_eq (unresolved): assert_eq!( heart02_mod(&game, sumire), 0, "different-card move should NOT trigger Sumire (card identity check)" );
@@ -108381,7 +107046,7 @@ static void gen_test_sumire_use_limit_blocks_second(void){
     // TODO: .push_movement_event(sumire, "stage", "stage", Some(sumire), "p1", true);
     // TODO: game.state.batch_movements.clear();
     // TODO: rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(&mut game.state, &player_id);
-    // TODO: game.state.process_pending_auto_abilities(&player_id);
+    rb_drain_ability_queue(&tg.state);
     // // First trigger consumed use_limit and granted heart02.
     // TODO assert_eq (unresolved): assert_eq!( heart02_mod(&game, sumire), 1, "heart02 from area move trigger" );
     // 
@@ -108811,7 +107476,7 @@ static void gen_sumire_position_change_then_energy_use_limit_blocks_second(void)
     // 
     int player_id = 0;
     // TODO: rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(&mut game.state, &player_id);
-    // TODO: game.state.process_pending_auto_abilities(&player_id);
+    rb_drain_ability_queue(&tg.state);
     // 
     // // Use_limit=1 should prevent a second trigger
     // TODO assert_eq (unresolved): assert_eq!( heart02_mod(&game, sumire), 1, "heart02 unchanged — second trigger blocked by use_limit" );
@@ -109016,7 +107681,7 @@ static void gen_sumire_opponent_effect_move_no_trigger(void){
     // TODO: &mut game.state,
     // TODO: &player_id,
     // TODO: );
-    // TODO: game.state.process_pending_auto_abilities(&player_id);
+    rb_drain_ability_queue(&tg.state);
     // 
     // TODO assert_eq (unresolved): assert_eq!( heart02_mod(&game, sumire), 0, "opponent effect moving Sumire should NOT trigger (self_effect_only)" );
     // 
@@ -110617,7 +109282,7 @@ static void gen_ab1_different_group_moved_to_hand(void){
     // 
     // // Fire LiveSuccess and process
     // TODO: TurnEngine::trigger_live_success_abilities(&mut game.state, "p1");
-    // TODO: game.state.process_pending_auto_abilities("p1");
+    rb_drain_ability_queue(&tg.state);
     // 
     // 
     CHECK(test_zone_has_id(&tg, 0, "hand", aqours_discard), "ab1_different_group_moved_to_hand");
@@ -110654,7 +109319,7 @@ static void gen_ab1_same_group_not_moved(void){
     // 
     // // Fire LiveSuccess and process
     // TODO: TurnEngine::trigger_live_success_abilities(&mut game.state, "p1");
-    // TODO: game.state.process_pending_auto_abilities("p1");
+    rb_drain_ability_queue(&tg.state);
     // 
     // 
     CHECK((!test_zone_has_id(&tg, 0, "hand", muse_discard)), "ab1_same_group_not_moved");
@@ -110690,7 +109355,7 @@ static void gen_ab1_empty_discard_nothing_happens(void){
     // 
     // // Fire LiveSuccess and process
     // TODO: TurnEngine::trigger_live_success_abilities(&mut game.state, "p1");
-    // TODO: game.state.process_pending_auto_abilities("p1");
+    rb_drain_ability_queue(&tg.state);
     // 
     // 
     CHECK_EQ(tg.state.p[0].hand.n, hand_before, "ab1_empty_discard_nothing_happens");
@@ -110729,7 +109394,7 @@ static void gen_ab1_mixed_discard_only_different_group_moved(void){
     // 
     // // Fire LiveSuccess and process
     // TODO: TurnEngine::trigger_live_success_abilities(&mut game.state, "p1");
-    // TODO: game.state.process_pending_auto_abilities("p1");
+    rb_drain_ability_queue(&tg.state);
     // 
     // 
     CHECK(test_zone_has_id(&tg, 0, "hand", aqours_discard), "ab1_mixed_discard_only_different_group_moved");
@@ -110768,7 +109433,7 @@ static void gen_ab1_empty_stage_all_discard_moved(void){
     // 
     // // Fire LiveSuccess and process
     // TODO: TurnEngine::trigger_live_success_abilities(&mut game.state, "p1");
-    // TODO: game.state.process_pending_auto_abilities("p1");
+    rb_drain_ability_queue(&tg.state);
     // 
     // 
     CHECK(test_zone_has_id(&tg, 0, "hand", aqours_card), "ab1_empty_stage_all_discard_moved");
@@ -110807,7 +109472,7 @@ static void gen_ab1_multiname_stage_blocks_all_its_groups(void){
     // 
     // // Fire LiveSuccess and process
     // TODO: TurnEngine::trigger_live_success_abilities(&mut game.state, "p1");
-    // TODO: game.state.process_pending_auto_abilities("p1");
+    rb_drain_ability_queue(&tg.state);
     // 
     // 
     // // Aqours card blocked (multi matches Aqours)
@@ -110853,7 +109518,7 @@ static void gen_ab1_two_multiname_stage_blocks_more_groups(void){
     // 
     // // Fire LiveSuccess and process
     // TODO: TurnEngine::trigger_live_success_abilities(&mut game.state, "p1");
-    // TODO: game.state.process_pending_auto_abilities("p1");
+    rb_drain_ability_queue(&tg.state);
     // 
     // 
     CHECK(test_zone_has_id(&tg, 0, "hand", muse), "ab1_two_multiname_stage_blocks_more_groups");
@@ -110892,7 +109557,7 @@ static void gen_ab1_multiname_discard_selectable_when_groups_differ(void){
     // 
     // // Fire LiveSuccess and process
     // TODO: TurnEngine::trigger_live_success_abilities(&mut game.state, "p1");
-    // TODO: game.state.process_pending_auto_abilities("p1");
+    rb_drain_ability_queue(&tg.state);
     // 
     // 
     CHECK(test_zone_has_id(&tg, 0, "hand", multi_discard), "ab1_multiname_discard_selectable_when_groups_differ");
@@ -110930,7 +109595,7 @@ static void gen_ab1_multiname_discard_blocked_when_group_matches_stage(void){
     // 
     // // Fire LiveSuccess and process
     // TODO: TurnEngine::trigger_live_success_abilities(&mut game.state, "p1");
-    // TODO: game.state.process_pending_auto_abilities("p1");
+    rb_drain_ability_queue(&tg.state);
     // 
     // 
     CHECK((!test_zone_has_id(&tg, 0, "hand", multi_discard)), "ab1_multiname_discard_blocked_when_group_matches_stage");
@@ -110968,7 +109633,7 @@ static void gen_ab1_multiname_discard_blocked_by_one_matching_group(void){
     // 
     // // Fire LiveSuccess and process
     // TODO: TurnEngine::trigger_live_success_abilities(&mut game.state, "p1");
-    // TODO: game.state.process_pending_auto_abilities("p1");
+    rb_drain_ability_queue(&tg.state);
     // 
     // 
     CHECK((!test_zone_has_id(&tg, 0, "hand", multi_discard)), "ab1_multiname_discard_blocked_by_one_matching_group");
@@ -111007,7 +109672,7 @@ static void gen_ab1_two_multiname_discards_both_pass(void){
     // 
     // // Fire LiveSuccess and process
     // TODO: TurnEngine::trigger_live_success_abilities(&mut game.state, "p1");
-    // TODO: game.state.process_pending_auto_abilities("p1");
+    rb_drain_ability_queue(&tg.state);
     // 
     // 
     int count_in_hand = 0;
@@ -111345,7 +110010,7 @@ static void gen_chisato_no_trigger_without_position_change_flag(void){
     // 
     int player_id = 0;
     // TODO: TurnEngine::trigger_auto_abilities_for_player(&mut game.state, &player_id);
-    // TODO: game.state.process_pending_auto_abilities(&player_id);
+    rb_drain_ability_queue(&tg.state);
     // 
     CHECK_EQ(tg.state.p[0].energy.n, energy_before, "chisato_no_trigger_without_position_change_flag");
     // 
@@ -111410,7 +110075,7 @@ static void gen_fuyumari_appear_triggers_opponent_wait(void){
     // 
     int pid = 0;
     // TODO: TurnEngine::trigger_auto_abilities_for_player(&mut game.state, &pid);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    rb_drain_ability_queue(&tg.state);
     // 
     // // With only 1 valid candidate and count=1, the effect auto-applies (no prompt).
     // // Verify target is now in wait state.
@@ -111481,7 +110146,7 @@ static void gen_fuyumari_area_move_triggers_opponent_wait(void){
     // 
     int pid = 0;
     // TODO: TurnEngine::trigger_auto_abilities_for_player(&mut game.state, &pid);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    rb_drain_ability_queue(&tg.state);
     // 
     // // With only 1 valid candidate and count=1, the effect auto-applies (no prompt).
     int ori = 0;
@@ -111507,7 +110172,7 @@ static void gen_fuyumari_blade_limit_excludes_high_blade(void){
     // 
     int pid = 0;
     // TODO: TurnEngine::trigger_auto_abilities_for_player(&mut game.state, &pid);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    rb_drain_ability_queue(&tg.state);
     // 
     // // No valid candidates → no choice prompt
     test_has_pending_choice(&tg);
@@ -111539,7 +110204,7 @@ static void gen_fuyumari_already_wait_excluded_from_candidates(void){
     // 
     int pid = 0;
     // TODO: TurnEngine::trigger_auto_abilities_for_player(&mut game.state, &pid);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    rb_drain_ability_queue(&tg.state);
     // 
     // // Only 1 valid (non-wait) candidate and count=1 → auto-applies without prompt.
     // 
@@ -111571,7 +110236,7 @@ static void gen_fuyumari_waits_only_one_member(void){
     // 
     int pid = 0;
     // TODO: TurnEngine::trigger_auto_abilities_for_player(&mut game.state, &pid);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    rb_drain_ability_queue(&tg.state);
     // 
     test_has_pending_choice(&tg);
     // TODO: game.assert_select_card("stage", 1, false);
@@ -112441,8 +111106,8 @@ static void gen_umi_bp4004_success_score_six_activates_two(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(umi);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    // skipped: activating_card (C uses queued card id as host)
+    rb_drain_ability_queue(&tg.state);
     // 
     // 
     CHECK_EQ(tg.state.p[0].energy_active, 4, "umi_bp4004_success_score_six_activates_two");
@@ -112493,8 +111158,8 @@ static void gen_umi_bp4004_below_threshold_activates_nothing(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(umi);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    // skipped: activating_card (C uses queued card id as host)
+    rb_drain_ability_queue(&tg.state);
     // 
     // 
     CHECK_EQ(tg.state.p[0].energy_active, 1, "umi_bp4004_below_threshold_activates_nothing");
@@ -112539,8 +111204,8 @@ static void gen_riko_bp7002_cost_nine_aqours_on_stage_draws(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(riko);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    // skipped: activating_card (C uses queued card id as host)
+    rb_drain_ability_queue(&tg.state);
     // 
     // 
     // TODO assert_eq (unresolved): assert_eq!( game.state.player1.hand.cards.len(), hand_before + 1, "cost 9 (boundary >=) Aqours member present → draw 1" );
@@ -112585,8 +111250,8 @@ static void gen_riko_bp7002_group_and_cost_filters(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(riko);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    // skipped: activating_card (C uses queued card id as host)
+    rb_drain_ability_queue(&tg.state);
     // 
     // 
     CHECK_EQ(tg.state.p[0].hand.n, hand_before, "riko_bp7002_group_and_cost_filters");
@@ -112617,8 +111282,8 @@ static void gen_riko_bp7002_group_and_cost_filters(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(riko);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    // skipped: activating_card (C uses queued card id as host)
+    rb_drain_ability_queue(&tg.state);
     // 
     // 
     CHECK_EQ(tg.state.p[0].hand.n, hand_before, "riko_bp7002_group_and_cost_filters");
@@ -112663,8 +111328,8 @@ static void gen_happy_party_train_all_active_reduces_need_heart(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(hpt);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    // skipped: activating_card (C uses queued card id as host)
+    rb_drain_ability_queue(&tg.state);
     // 
     // 
     // 
@@ -112707,8 +111372,8 @@ static void gen_happy_party_train_waited_or_empty_stage_no_reduction(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(hpt);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    // skipped: activating_card (C uses queued card id as host)
+    rb_drain_ability_queue(&tg.state);
     // 
     // 
     // TODO assert_eq (unresolved): assert_eq!( game.state .mods .get_need_heart_modifier(hpt, HeartColor::Heart00), 0, "a waited member breaks すべて…アクティブ" );
@@ -112739,8 +111404,8 @@ static void gen_happy_party_train_waited_or_empty_stage_no_reduction(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(hpt);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    // skipped: activating_card (C uses queued card id as host)
+    rb_drain_ability_queue(&tg.state);
     // 
     // 
     // TODO assert_eq (unresolved): assert_eq!( game.state .mods .get_need_heart_modifier(hpt, HeartColor::Heart00), 0, "empty stage → すべてのメンバーがアクティブ is not met" );
@@ -112783,8 +111448,8 @@ static void gen_happy_party_train_mill_aqours_member_reduces_need_heart(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(hpt);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    // skipped: activating_card (C uses queued card id as host)
+    rb_drain_ability_queue(&tg.state);
     // 
     // 
     CHECK(test_zone_has_id(&tg, 0, "discard", aqours_member), "happy_party_train_mill_aqours_member_reduces_need_heart");
@@ -112824,8 +111489,8 @@ static void gen_happy_party_train_mill_non_aqours_no_reduction(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(hpt);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    // skipped: activating_card (C uses queued card id as host)
+    rb_drain_ability_queue(&tg.state);
     // 
     // 
     CHECK(test_zone_has_id(&tg, 0, "discard", mus_member), "happy_party_train_mill_non_aqours_no_reduction");
@@ -112869,8 +111534,8 @@ static void gen_stars_we_chase_four_distinct_lives_plus_one(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(swc);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    // skipped: activating_card (C uses queued card id as host)
+    rb_drain_ability_queue(&tg.state);
     // 
     // 
     CHECK_EQ(rb_mods_get_score(&tg.state.mods, swc), 1, "stars_we_chase_four_distinct_lives_plus_one");
@@ -112913,8 +111578,8 @@ static void gen_stars_we_chase_six_distinct_lives_instead_plus_two(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(swc);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    // skipped: activating_card (C uses queued card id as host)
+    rb_drain_ability_queue(&tg.state);
     // 
     // 
     CHECK_EQ(rb_mods_get_score(&tg.state.mods, swc), 2, "stars_we_chase_six_distinct_lives_instead_plus_two");
@@ -112970,8 +111635,8 @@ static void gen_stars_we_chase_duplicates_and_three_distinct_do_not_qualify(void
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(swc);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    // skipped: activating_card (C uses queued card id as host)
+    rb_drain_ability_queue(&tg.state);
     // 
     // 
     CHECK_EQ(rb_mods_get_score(&tg.state.mods, swc), 0, "stars_we_chase_duplicates_and_three_distinct_do_not_qualify");
@@ -113006,8 +111671,8 @@ static void gen_stars_we_chase_duplicates_and_three_distinct_do_not_qualify(void
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(swc);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    // skipped: activating_card (C uses queued card id as host)
+    rb_drain_ability_queue(&tg.state);
     // 
     // 
     CHECK_EQ(rb_mods_get_score(&tg.state.mods, swc), 0, "stars_we_chase_duplicates_and_three_distinct_do_not_qualify");
@@ -113076,8 +111741,8 @@ static void gen_rurino_bp5011_debut_draws_one(void){
     // TODO: None,
     // TODO: None,
     // TODO: );
-    // TODO: game.state.activating_card = Some(rurino);
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    // skipped: activating_card (C uses queued card id as host)
+    rb_drain_ability_queue(&tg.state);
     // 
     // 
     // TODO assert_eq (unresolved): assert_eq!( game.state.player1.hand.cards.len(), hand_before + 1, "登場 → draw 1" );
@@ -118639,7 +117304,7 @@ static void gen_test_one_live_start_each_time_drains_no_choice(void){
     int p1_id = 0;
     // TODO: rabuka_engine::turn::TurnEngine::trigger_live_start_abilities(&mut game.state, &p1_id);
     // TODO: rabuka_engine::turn::TurnEngine::trigger_live_start_abilities(&mut game.state, &"player2");
-    // TODO: game.state.process_pending_auto_abilities(&p1_id);
+    rb_drain_ability_queue(&tg.state);
     // 
     // // After the fix, everything auto-resolves except the resolved LS member's
     // // own effect: observed exactly one SelectHeartColor prompt ("Choose a
@@ -123793,7 +122458,7 @@ static void gen_sayaka_q243_max_three_per_activation_recounts(void){
     // TODO: None,
     // TODO: );
     int pid = 0;
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    rb_drain_ability_queue(&tg.state);
     // 
     while (test_has_pending_choice(&tg)) rb_resume_with_choice(&tg.state, 0);
     rb_resume_with_choice(&tg.state, -1);
@@ -123842,7 +122507,7 @@ static void gen_sayaka_q243_max_three_per_activation_recounts(void){
     // TODO: None,
     // TODO: );
     pid = 0;
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    rb_drain_ability_queue(&tg.state);
     // 
     while (test_has_pending_choice(&tg)) rb_resume_with_choice(&tg.state, 0);
     rb_resume_with_choice(&tg.state, -1);
@@ -123874,7 +122539,7 @@ static void gen_sayaka_q243_max_three_per_activation_recounts(void){
     // TODO: None,
     // TODO: );
     pid = 0;
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    rb_drain_ability_queue(&tg.state);
     // 
     while (test_has_pending_choice(&tg)) rb_resume_with_choice(&tg.state, 0);
     rb_resume_with_choice(&tg.state, -1);
@@ -123924,7 +122589,7 @@ static void gen_sayaka_q243_zero_under_no_heart(void){
     // TODO: None,
     // TODO: );
     int pid = 0;
-    // TODO: game.state.process_pending_auto_abilities(&pid);
+    rb_drain_ability_queue(&tg.state);
     // 
     while (test_has_pending_choice(&tg)) rb_resume_with_choice(&tg.state, 0);
     rb_resume_with_choice(&tg.state, -1);
@@ -132484,7 +131149,7 @@ static void gen_lovepeace_q150_self_hearts_greater_than_opponent_score_plus_1(vo
     // // P1 has 20 hearts > P2 has 2 hearts → should grant +1 score
     // TODO: game.state.current_phase = rabuka_engine::game_state::Phase::LiveVictoryDetermination;
     // TODO: rabuka_engine::turn::TurnEngine::trigger_live_success_abilities(&mut game.state, "p1");
-    // TODO: game.state.process_pending_auto_abilities("p1");
+    rb_drain_ability_queue(&tg.state);
     // 
     // // If the ability fired, P1's live card now has +1 score modifier
     int p1_score_mod = rb_mods_get_score(&tg.state.mods, lovepeace);
