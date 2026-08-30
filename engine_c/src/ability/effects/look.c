@@ -1,5 +1,6 @@
 #include "rabuka.h"
 #include <string.h>
+#include <stdio.h>
 
 /* Look/select pools — mirrors engine/src/ability/look.rs
    For portable core we keep two pools per player:

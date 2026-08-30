@@ -21,6 +21,7 @@ static unsigned char *g_cards_blob = NULL;
 static long          g_cards_len = 0;
 static uint32_t      g_num_cards = 0;
 static char        **g_card_strings = NULL;   /* null-terminated copies */
+static uint32_t      g_num_card_strings = 0;  /* entries in g_card_strings */
 static uint32_t     *g_card_off = NULL;       /* (num_cards+1) offsets */
 static unsigned char *g_card_data = NULL;     /* base of card records */
 
@@ -84,6 +85,7 @@ static int parse_cards(const unsigned char *blob, long len) {
         p += slen;
     }
     g_card_strings = realloc(g_card_strings, (n ? n : 1) * sizeof(char *));
+    g_num_card_strings = (uint32_t)n;
 
     const unsigned char *lentab = strtab + strtab_len;
     const unsigned char *cardbase = lentab + g_num_cards;
@@ -212,7 +214,11 @@ uint16_t rb_card_ability_idx(uint32_t i) {
     return le16(rb_card_record(i) + 16); /* ability_idx at offset 16 */
 }
 const char *rb_card_string(uint16_t idx) {
-    if (g_card_strings && idx < (uint32_t)-1) return g_card_strings[idx];
+    /* Group/unit/series indices come from the same cards.bin string table, but
+        a malformed or foreign record could carry an index past the end of the
+        table. Clamp to the real size so callers (card_matches_group_str,
+        condition evaluators, etc.) never dereference an out-of-bounds slot. */
+    if (g_card_strings && idx < g_num_card_strings) return g_card_strings[idx];
     return "";
 }
 

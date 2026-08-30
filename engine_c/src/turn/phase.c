@@ -118,12 +118,15 @@ void rb_player_refresh(GameState *g, int pl) {
     /* Rust Player::refresh() recomputes cached derived zone state AND, when the
        deck is empty, shuffles the waitroom (discard) back in. */
     RbPlayer *P = &g->p[pl];
-    if (P->energy_active < P->energy.n) P->energy_active = P->energy.n;
     if (P->deck.n == 0 && P->discard.n > 0) {
         for (int i = 0; i < P->discard.n; i++) P->deck.cards[P->deck.n++] = P->discard.cards[i];
         P->discard.n = 0;
         rb_shuffle(P->deck.cards, P->deck.n);
         P->deck_refreshed_this_turn = 1;
+        /* After a deck-out refresh, all energy is active again (Rust
+            Player::refresh re-activates the energy zone). Only re-sync here —
+            NOT on every draw — otherwise paying energy is silently undone. */
+        P->energy_active = P->energy.n;
     }
 }
 
