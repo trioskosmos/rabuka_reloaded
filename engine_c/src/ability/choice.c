@@ -25,6 +25,7 @@ int rb_resume_with_choice(GameState *g, int selected_idx) {
     const AbilityEffect *cont = g->queue.resume_parent;
     int cont_from = g->queue.resume_child + 1;
     int was_skip = (selected_idx < 0);
+    g->queue.choice_result = selected_idx;   /* record the player's pick (select_number etc.) */
     rb_clear_pending_choice(g);
     g->queue.resume_mode = 0;
     g->queue.resume_eff = NULL;

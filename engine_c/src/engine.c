@@ -608,6 +608,13 @@ static void handle_action(GameState *g, int actor, AbilityEffect *e, int host_ci
                 !strcmp(act, "conditional_on_optional")) {
         int allow = e->is_optional ? 1 : 0;
         rb_emit_choice(g, actor, RB_CHOICE_SELECT_TARGET, NULL, NULL, cnt, allow, act);
+    } else if (!strcmp(act, "select_number")) {
+        /* Mirror ability/choice.rs select_number — emit a count-choice the host
+            answers; the chosen number is recorded in queue.choice_result on resume
+            (downstream effects do not yet consume it headless). Same pause/resume
+            semantics as the other choice verbs. */
+        int allow = e->is_optional ? 1 : 0;
+        rb_emit_choice(g, actor, RB_CHOICE_SELECT_NUMBER, NULL, NULL, cnt, allow, act);
     }
     /* sequential / conditional_* / choice / re_yell / perform_yell / custom /
        do_nothing: children already executed (or nothing to do). */

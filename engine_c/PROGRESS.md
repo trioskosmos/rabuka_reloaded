@@ -1,5 +1,7 @@
 # engine_c — C Port of the Rabuka Engine
 
+**Status update (select_number + §12.3 matrix reconciliation):** `select_number` (`choice.c`/`engine.c`) now emits a `RB_CHOICE_SELECT_NUMBER` pending choice (mirrors `ability/choice.rs::select_number`); the host's pick is recorded in `queue.choice_result` on resume and downstream headless skips. Reconciled the §12.3 verb matrix: `position_change`, `choice`, `reveal`, `re_yell`, `reduce_live_card_set_limit`, `repeat_procedure`, `reveal_until_live_card`, `set_blade_count`, `suppress_ability_trigger` were already implemented (not 🔴 no-ops); `set_blade_type` recolor + BAll doubling done; `modify_yell_source` is a documented headless no-op. **Genuinely remaining verb-level gaps: only `modify_yell_source` (headless deck-top yell) and `dynamic_count` (generator-side — `abilities_gen.rs` bakes dynamic counts into literals, not a `DynamicCount` reference, so it cannot be resolved from the current bytecode without a generator change).** Gating suites green.
+
 **Status: v0.5 — choice/resume framework built.** This session built the missing choice-resolution plumbing and surfaced the *real* engine parity failures. `rb_resume_with_choice` now dispatches by `queue.resume_mode` (0=deferred gate, 1=position_change, 2=select_cards, 3=auto_ability) instead of only running a `deferred` effect that was always NULL. `rb_look_resume` (previously dead code) is now reached for `SELECT_CARD` choices; `position_change` emits a `SELECT_TARGET` destination choice (mode 1) and `rb_resume_position_change` swaps on resume; `test_drain_auto_choices` answers `SelectAutoAbility` prompts. Transpiler (`tools/gen_tests.py`) now emits `test_play_to_stage`/`test_activate_ability` for `execute_main_phase_action`, `try_play_to_stage_for`, `activate_ability`, `try_activate_ability`, `play_to_stage` (fixed fully-qualified `rabuka_engine::zones::MemberArea` parsing), `try_play_to_stage`, and maps `select_position_option`/`accept_position_swap`→`rb_resume_with_choice`, `drain_auto_ability_choices`→`test_drain_auto_choices`; the legacy `// TODO` action-commenting is gone. Also fixed the test-helper energy cap (`test_give_energy` was clamping at `RB_MAX_ENERGY_CARDS=12`, breaking costly-member plays in tests that hand out 20 energy). **Net: generated suite went from ~666 (mostly artifact) failures to 613 genuine engine-mechanic failures; hand-written suites stay green (test/replay/ported all pass, 13 ported).** Remaining failures cluster in: position_change→energy grant (choice-ordering when an auto-ability prompt precedes the position target), deck refresh/mill (`q267`, `kinako deck2`, `p2 rina`, mutual mill), nico appear-from-discard, energy-zone capacity, blade expiry.
 
 **Status update (look/select/restriction + build fix):** Wired the orphaned real `restriction`/`activation_restriction`/`modify_limit` handler (`misc.c:h_restriction`) into `handle_action` — previously the verb routed to a no-op while the faithful impl sat unused. Implemented `reveal_until_live_card` and `reveal_until_chosen_card` (`look.c`) mirroring `engine/src/ability/look.rs:reveal_until` (reveal from deck top until a live/card_type match, populate the looked_at pool). Made the `selected_cards` relay pool real: `rb_look_resume` now records the kept card into `g->selected_cards` on a `select_cards`/`select`/`look_and_select` resume, and `move_cards` source `"selected_cards"` reads it (was reading `recently_moved` — wrong pool). **Critical infra fix:** the choice-resume path dereferenced `g->queue.resume_eff`, a dangling pointer (the `AbilityEffect` lives inside a transiently-`rb_free_card`'d `Card`); replaced with an explicit `queue.resume_is_select` flag set by the emitter. Also fixed the `Makefile` to list `include/*.h` as prerequisites so header edits force a full rebuild (without this, adding a `GameState` field left stale `.o` files with the old layout → silent memory corruption). All hand-written suites green after a clean rebuild; generated suite unchanged (1231, transpiler artifacts).
@@ -95,16 +97,16 @@ Derived from `cards/abilities.json` (`abilities.json:936 unique`), cross-checked
 | 77 | `select_cards` | `ability/effects/misc.rs` | ⚠️ `SELECT_CARD` emitted; `selected_cards` relay pool real (`rb_look_resume`) | P0 |
 | 74 | `look_and_select` | `ability/look.rs` + `choice.rs` | ⚠️ emits `SELECT_CARD`; `rb_look_resume` wired (`look.c`) | P0 |
 | 35 | `select` | `choice.rs` | ⚠️ emits `SELECT_TARGET`; `selected_cards` relay pool real | P0 |
-| 27 | `position_change` | `ability/effects/misc.rs` | 🔴 no-op (stage reordering) | P1 |
+| 27 | `position_change` | `ability/effects/misc.rs` | ✅ real (`rb_effect_position_change` + `rb_pos_change_for_player`; single src→dst swap + formation rotation map; interactive per-member pick via `rb_resume_position_change` SELECT_TARGET) | P1 |
 | 26 | `modify_required_hearts` | `core/game_modifiers.rs` | ⚠️ adds to `p->hearts[]` flat, not per-card modifier | P1 |
-| 25 | `choice` | `ability/choice.rs` (3447 LOC) | 🔴 no-op (should spawn pending_choice) | P0 |
+| 25 | `choice` | `ability/choice.rs` (3447 LOC) | ✅ emits `SELECT_TARGET` pending choice (resume continues; headless skips) | P0 |
 | 22 | `conditional_on_result` | `ability/compound.rs` | ⚠️ emits pending choice (headless can't auto-resolve) | P1 |
 | 22 | `modify_cost` | `ability/effects/misc.rs` | ✅ handled (`rb_effect_modify_cost`) | P1 |
 | 16 | `gain_ability` | `ability/effects/ability_effects.rs` | ✅ real (`rb_gain_ability` — staged target gets score bonus, ticks out) | P2 |
 | 14 | `restriction` / `activation_restriction` | `ability/effects/misc.rs` | ✅ real (`h_restriction`: prohibition[] + cannot_activate per-player/per-card gate in `rb_activate_ability`) | P1 |
 | 11 | `conditional_on_optional` | `ability/compound.rs` | ⚠️ emits pending choice (headless can't auto-resolve) | P1 |
 | 10 | `place_energy_under_member` | `ability/effects/state.rs` | ✅ handled (`h_place_energy_under_member`) | P1 |
-| 9 | `reveal` | `ability/look.rs` | ⚠️ headless reveal partially done | P1 |
+| 9 | `reveal` | `ability/look.rs` | ✅ faithful (`rb_effect_look_at`: deck/hand reveal, group reveal-until-match from both sources, revealed_cards pool) | P1 |
 | 9 | `set_heart_type` | `ability/effects/misc.rs` | ✅ handled (`placed_under`→`heart_copy` added; color→`heart_color_multiplier`) | P2 |
 | 8 | `specify_heart_color` | `ability/effects/state.rs` | ⚠️ treated as heart add | P1 |
 | 7 | `conditional_alternative` | `ability/compound.rs` | ⚠️ emits pending choice (headless can't auto-resolve) | P1 |
@@ -117,19 +119,19 @@ Derived from `cards/abilities.json` (`abilities.json:936 unique`), cross-checked
 | 2 | `invalidate_ability` | `ability/effects/ability_effects.rs` | ✅ real (`rb_invalidate_ability`) | P2 |
 | 2 | `modify_yell_count` | `turn/live.rs` | ✅ handled | P2 |
 | 2 | `draw_until_count` | `ability/effects/draw.rs` | ✅ handled | P0 |
-| 2 | `re_yell` | `turn/live.rs` | 🔴 no-op | P2 |
+| 2 | `re_yell` | `turn/live.rs` | ✅ real (`h_re_yell` sets `re_yell_occurred`; two-pass rebuild in `rb_perform_live`) | P2 |
 | 2 | `do_nothing` | `ability/effects/misc.rs` | ✅ no-op correct | — |
-| 2 | `set_blade_type` | `ability/effects/misc.rs` | ⚠️ recolor wired in stage hearts + yell (BAll doubling still needs decoder) | P1 |
+| 2 | `set_blade_type` | `ability/effects/misc.rs` | ✅ recolor wired in stage hearts + yell; BAll (`b_heart07`) doubling now implemented in `do_yell` | P1 |
 | 2 | `gain_ability_from_source` | `ability/effects/ability_effects.rs` | ✅ real (`rb_gain_ability_from_source`, `ability.c:110`) | P2 |
-| 2 | `reduce_live_card_set_limit` | `ability/effects/misc.rs` | 🔴 no-op | P1 |
+| 2 | `reduce_live_card_set_limit` | `ability/effects/misc.rs` | ✅ handled (engine.c `rb_effect_reduce_live_card_set_limit`) | P1 |
 | 1 | `set_card_identity` | `ability/effects/misc.rs` | ✅ real (`rb_set_card_identity`/`rb_card_matches_identity_str`, `util.c:113`) | P2 |
 | 1 | `discard_until_count` | `ability/effects/draw.rs` | ✅ handled | P0 |
-| 1 | `repeat_procedure` | `ability/compound.rs` | 🔴 no-op | P2 |
-| 1 | `reveal_until_live_card` | `ability/look.rs` | 🔴 no-op | P1 |
-| 1 | `set_blade_count` | `ability/effects/misc.rs` | 🔴 no-op | P2 |
-| 1 | `select_number` | `choice.rs` | 🔴 no-op | P2 |
-| 1 | `modify_yell_source` | `turn/live.rs` | 🔴 no-op | P2 |
-| 1 | `suppress_ability_trigger` | `ability/effects/ability_effects.rs` | 🔴 no-op | P2 |
+| 1 | `repeat_procedure` | `ability/compound.rs` | ✅ loops child `count` times (engine.c `repeat_procedure`) | P2 |
+| 1 | `reveal_until_live_card` | `ability/look.rs` | ✅ real (`reveal_until` predicate live-card match; `rb_effect_reveal_until_live_card`) | P1 |
+| 1 | `set_blade_count` | `ability/effects/misc.rs` | ✅ handled (engine.c `rb_effect_set_blade_count` sets `mods.blade_count[cid]`) | P2 |
+| 1 | `select_number` | `choice.rs` | ✅ emits `SELECT_NUMBER` pending choice (resume records pick in `queue.choice_result`; headless skips) | P2 |
+| 1 | `modify_yell_source` | `turn/live.rs` | ⚠️ documented no-op (headless yell uses deck top regardless of source) | P2 |
+| 1 | `suppress_ability_trigger` | `ability/effects/ability_effects.rs` | ✅ handled (`rb_invalidate_ability` / `suppress_ability_trigger` sets `mods.invalid_abilities[cid]`) | P2 |
 
 *460+ effect nodes carry `has_condition`; 936 abilities all have `triggers` + optional `use_limit`.*
 

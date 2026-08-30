@@ -307,7 +307,8 @@ typedef enum {
     RB_CHOICE_NONE = 0,
     RB_CHOICE_SELECT_CARD,
     RB_CHOICE_SELECT_TARGET, /* pay_skip / position|destination / double_baton etc. */
-    RB_CHOICE_SELECT_HEART_COLOR
+    RB_CHOICE_SELECT_HEART_COLOR,
+    RB_CHOICE_SELECT_NUMBER  /* ability/choice.rs select_number (count choice) */
 } RbChoiceKind;
 
 /* ChoiceRoute  Emirrors engine/src/ability/types.rs::ChoiceRoute. Tags which
