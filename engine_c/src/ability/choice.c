@@ -29,6 +29,7 @@ int rb_resume_with_choice(GameState *g, int selected_idx) {
     g->queue.resume_mode = 0;
     g->queue.resume_eff = NULL;
     g->queue.auto_ability = 0;
+    g->queue.state = RB_QUEUE_RESOLVING;   /* resuming / draining an ability */
     if (mode == 2) {                 /* select_cards → look.ts keep/drop */
         const char *dest = eff ? eff->destination : NULL;
         rb_look_resume(g, actor, selected_idx, dest, is_select);
@@ -78,4 +79,5 @@ void rb_emit_choice(GameState *g, int actor, RbChoiceKind kind,
     g->queue.has_pending = 1;
     g->queue.actor = actor;
     g->queue.deferred = NULL;
+    g->queue.state = RB_QUEUE_AWAITING_CHOICE;   /* QueueState FSM (ability_queue.rs) */
 }
