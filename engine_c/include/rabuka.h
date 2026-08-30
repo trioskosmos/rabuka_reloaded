@@ -564,6 +564,7 @@ void rb_effect_position_change(GameState *g, int actor, AbilityEffect *e, int ho
 void rb_effect_rotation(GameState *g, int actor, AbilityEffect *e);
 void rb_effect_modify_cost(GameState *g, int actor, AbilityEffect *e);
 void rb_effect_modify_hearts(GameState *g, int actor, AbilityEffect *e);
+int  rb_execute_modify_score(GameState *g, int actor, AbilityEffect *e);
 
 /* ── Dynamic count resolution (engine/src/ability/dynamic_count.rs) ── */
 int  rb_resolve_dynamic_count(const struct GameState *g, int owner,
