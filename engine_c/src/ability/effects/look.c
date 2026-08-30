@@ -46,9 +46,17 @@ void rb_effect_look_at(GameState *g, int actor, AbilityEffect *e){
         populating the looked_at pool — instead of revealing a fixed count. */
     const char *group=NULL;
     for(int i=0;i<e->n_extra;i++) if(e->extra_k[i] && !strcmp(e->extra_k[i],"group_names")) group=e->extra_v[i];
-    if(group && from_deck){
-        while(P->deck.n>0 && lp->n<MAX_LOOKED){
-            int cid=P->deck.cards[--P->deck.n];
+    if(group){
+        /* reveal_per_group (look.rs::execute_reveal_per_group): reveal from the
+            source (deck top OR hand top) until a card of that group is found,
+            populating the looked_at pool — instead of revealing a fixed count.
+            Mirrors Rust for both deck and hand sources. */
+        while(lp->n<MAX_LOOKED){
+            int cid=-1;
+            if(from_deck && P->deck.n>0) cid=P->deck.cards[--P->deck.n];
+            else if(!from_deck && P->hand.n>0) cid=P->hand.cards[--P->hand.n];
+            else break;
+            if(cid<0) break;
             lp->cards[lp->n++]=cid;
             if(rb_card_matches_group_str(cid, group)) break;
         }
