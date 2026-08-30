@@ -83,12 +83,18 @@ int rb_draw_energy(GameState *g, int pl) {
 }
 
 /* ───────────────────────────── card classification ───────────────────────────── */
+/* Faithful classification mirrors Card::is_live/is_energy (core/card.c): the low
+   2 bits of type_flags encode 0=Member, 1=Live, 2=Energy. The old heuristic
+   (n_hearts==0 && cost==0 && blade==0) mis-classified real live/energy cards as
+   members and had no energy branch at all. */
 static int card_is_live(Card *c) {
-    /* A live/song card carries no member hearts and no play cost. */
-    return (c->n_hearts == 0) && (c->cost == 0) && (c->blade == 0);
+    return (c->type_flags & 0x03) == 1;
+}
+static int card_is_energy(Card *c) {
+    return (c->type_flags & 0x03) == 2;
 }
 static int card_is_member(Card *c) {
-    return !card_is_live(c);
+    return (c->type_flags & 0x03) == 0;
 }
 
 /* ───────────────────────────── extra-field lookup ───────────────────────────── */
@@ -871,9 +877,11 @@ static void check_victory(GameState *g) {
 static void rollover(GameState *g) {
     /* Revert until_end_of_turn / first_turn temporary effects at turn end. */
     rb_check_expired_effects(g, RB_TEMP_TURN_END);
+    /* The turn that just completed is a real turn — count it before deciding
+        the match (mirrors Rust: the winning turn increments turn_number). */
+    g->turn++;
     check_victory(g);
     if (g->winner != -1) { g->phase = RB_PHASE_DONE; return; }
-    g->turn++;
     g->active = g->active ^ 1;
     g->phase = RB_PHASE_ACTIVE;
     /* Clear turn-scoped state_change_condition tracking. */

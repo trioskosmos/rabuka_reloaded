@@ -47,18 +47,19 @@ int rb_compare_counts(const char *operator, int actual, int expected) {
     return 1;
 }
 
-/* Mirror util::card_matches_type. card_id is a card_no index. */
+/* Mirror util::card_matches_type. card_id is a card_no index. Uses the faithful
+    type_flags low-2-bit encoding (0=Member, 1=Live, 2=Energy) exactly like
+    rb_card_is_live/rb_card_is_energy in core/card.c. */
 int rb_card_matches_type(int card_id, const char *filter) {
     if (!filter) return 1;
-    Card c; if (!rb_decode_card_by_index((uint32_t)card_id, &c)) return 0;
     int is_live  = rb_card_is_live(card_id);
-    int is_member = !is_live;
+    int is_energy = rb_card_is_energy(card_id);
+    int is_member = !is_live && !is_energy;
     int r;
     if (!strcmp(filter, "live_card"))        r = is_live;
     else if (!strcmp(filter, "member_card")) r = is_member;
-    else if (!strcmp(filter, "energy_card")) r = 0; /* no energy cards in C db */
+    else if (!strcmp(filter, "energy_card")) r = is_energy;
     else r = 1;
-    rb_free_card(&c);
     return r;
 }
 
