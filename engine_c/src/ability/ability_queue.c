@@ -10,7 +10,7 @@ int rb_queue_push(RbAbilityQueue *q, int card_id, int ability_idx) {
     q->n_entries++;
     return 1;
 }
-void rb_queue_clear(RbAbilityQueue *q) { if (q) { memset(q, 0, sizeof(*q)); } }
+void rb_queue_clear(RbAbilityQueue *q) { if (q) { memset(q, 0, sizeof(*q)); q->selected_heart_color = -1; } }
 int rb_queue_has_pending(const RbAbilityQueue *q) { return q && q->n_entries > 0; }
 RbQueueState rb_queue_state(const RbAbilityQueue *q) {
     return q ? q->state : RB_QUEUE_IDLE;

@@ -71,8 +71,8 @@ static int count_in_zone(const struct GameState *g, int pl, const char *loc) {
     if (!strcmp(loc, "energy")||!strcmp(loc,"energy_zone")) return P->energy.n;
     if (!strcmp(loc, "live_card_zone")||!strcmp(loc,"live")) return P->live.n;
     if (!strcmp(loc, "success")||!strcmp(loc,"success_zone")||!strcmp(loc,"success_live_zone")||!strcmp(loc,"success_live_card_zone")) return P->success.n;
-    if (!strcmp(loc, "resolution")||!strcmp(loc,"resolution_zone")) return 0; /* not tracked */
-    if (!strcmp(loc, "revealed_cards")) return 0;
+    if (!strcmp(loc, "resolution")||!strcmp(loc,"resolution_zone")) return g->resolution.n;
+    if (!strcmp(loc, "revealed_cards")) return g->n_revealed;
     if (!strcmp(loc, "empty_area")) {
         int e=0; for(int i=0;i<RB_STAGE_SIZE;i++) if(P->stage[i]==RB_EMPTY_SLOT) e++;
         return e;

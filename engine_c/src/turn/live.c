@@ -3,13 +3,16 @@
 #include <stdio.h>
 
 /* Faithful Live performance — mirrors engine/src/turn/live.rs
-   Simplified but structurally faithful:
-   - yell reveals (top N per live, blade → heart pool)
+   - yell reveals (top N per live, blade -> heart pool)
    - stage hearts via RbMods (blade/heart modifiers + base hearts)
-   - greedy allocation H00Wild→Wildcard→AllWild handling
+   - greedy allocation mirroring compute_allocations / check_live_success
+     (Phase 1a colored, 3a demand-aware surplus, 3b h00->heart0 only,
+      4 icon_all last) + allocations_pass verdict
    - per-live verdict and score with modifiers
    - surplus tracking for no_excess checks
    Host still auto-resolves pending choices via skip in engine.c. */
+
+
 
 
 
@@ -34,7 +37,7 @@ void rb_calc_stage_hearts(const GameState *g, int pl, int out[8]){
             /* set_blade_type recolor (state.rs::execute_set_blade_type): a colored
                 blade_type routes the member's blade into that heart color instead of
                 pink; blade_type<0 (none) or pink(0) stays pink. Mirrors Rust's
-                blade_color→HeartColor mapping (draw/score never produced by blade). */
+                blade_color->HeartColor mapping (draw/score never produced by blade). */
             int bt = g->mods.blade_type[cid];
             if(bt>=1 && bt<=6) out[bt]+=blade; else out[RB_HEART_PINK]+=blade;
         }
@@ -91,7 +94,7 @@ static int do_yell(GameState *g, int pl, int yell_cards[RB_MAX_LIVE_CARDS*3], in
         int mult = has_ball ? 2 : 1;
         for(int h=0;h<c.n_hearts;h++){
             int col=c.heart_color[h];
-            if(col==RB_HEART_DRAW) { /* draw icon → immediate draw handled by caller */ }
+            if(col==RB_HEART_DRAW) { /* draw icon -> immediate draw handled by caller */ }
             else if(col==7) blade_hearts[7]+=c.heart_count[h];           /* BAll source, not doubled */
             else if(col==RB_HEART_SCORE) (*note_icons)+=c.heart_count[h]*mult;
             else blade_hearts[col%8]+=c.heart_count[h]*mult;
@@ -103,73 +106,156 @@ static int do_yell(GameState *g, int pl, int yell_cards[RB_MAX_LIVE_CARDS*3], in
     return revealed;
 }
 
-/* Greedy allocation: assign total_hearts[8] to each live's required[8] (need_heart).
-    Returns 1 if all lives pass. Also computes surplus (total - required) for
-    no_excess checks — mirrors engine/src/turn/live.rs compute_surplus_and_flags
-    which snapshots use for NoExcessHeart condition gating. */
+/* ───────────────────────────── allocation (mirror live.rs compute_allocations) ───────────────────────────── */
+
+static void rb_build_card_needs(const GameState *g, int pl, int *needs /*[n][8]*/, int *n_out){
+    RbPlayer *P=(RbPlayer*)&g->p[pl];
+    int n=0;
+    for(int li=0; li<P->live.n && n<RB_MAX_LIVE_CARDS; li++){
+        int need[8]={0};
+        rb_effective_need_heart(g, P->live.cards[li], need);
+        memcpy(needs+n*8, need, 8*sizeof(int));
+        n++;
+    }
+    *n_out=n;
+}
+
+/* future_demand[i][c] = sum of need[j][c] for j>i, c in 1..6 (mirror compute_future_demand). */
+static void rb_compute_future_demand(const int *needs /*[n][8]*/, int n, int *future /*[n][8]*/){
+    int running[8]={0};
+    for(int i=n-1;i>=0;i--){
+        if(i+1<n) for(int c=1;c<7;c++) future[i*8+c]=running[c];
+        for(int c=1;c<7;c++) running[c]+=needs[i*8+c];
+    }
+}
+
+/* Smart greedy allocation (mirror greedy_allocate). Mutates pool[8] (shared across
+   cards) and fills per-card filled[i][8]. Strategy:
+     1a  colored hearts -> specific color req
+     3a  surplus colors (demand-aware) -> heart0/any deficit (colorless h00 -> heart0 only)
+     4   icon_all (pool[7]) -> color deficits first, then heart0. */
+static void rb_greedy_allocate(int *pool /*[8]*/, const int *needs /*[n][8]*/, int n, const int *future /*[n][8]*/, int *filled /*[n][8]*/){
+    for(int i=0;i<n;i++){
+        int need[8]; memcpy(need, needs+i*8, 8*sizeof(int));
+        int filledc[8]={0};
+        /* Phase 1a: matching colored hearts -> specific color req */
+        for(int c=1;c<7;c++){
+            if(need[c]>0 && pool[c]>0){
+                int take = pool[c]<need[c] ? pool[c] : need[c];
+                pool[c]-=take; filledc[c]+=take;
+            }
+        }
+        /* Phase 3a: remaining deficit filled by surplus colored hearts (h00 bucket) */
+        int total_filled=0; for(int c=0;c<8;c++) total_filled+=filledc[c];
+        int total_required=0; for(int c=0;c<8;c++) total_required+=need[c];
+        int h00_deficit = total_required - total_filled; if(h00_deficit<0) h00_deficit=0;
+        if(h00_deficit>0){
+            int surplus_colors[6]; int ns=0;
+            for(int c=1;c<7;c++) if(pool[c]>0) surplus_colors[ns++]=c;
+            /* demand-aware: sort by (pool[c]-future[i][c]) descending */
+            for(int a=0;a<ns;a++) for(int b=a+1;b<ns;b++){
+                int sa = pool[surplus_colors[a]] - future[i*8+surplus_colors[a]];
+                int sb = pool[surplus_colors[b]] - future[i*8+surplus_colors[b]];
+                if(sb>sa){ int t=surplus_colors[a]; surplus_colors[a]=surplus_colors[b]; surplus_colors[b]=t; }
+            }
+            int filled_h00=0;
+            for(int k=0;k<ns;k++){
+                int c=surplus_colors[k];
+                if(filled_h00>=h00_deficit) break;
+                if(pool[c]>0){
+                    int take = pool[c] < (h00_deficit-filled_h00) ? pool[c] : (h00_deficit-filled_h00);
+                    pool[c]-=take; filled_h00+=take; filledc[c]+=take;
+                }
+            }
+            /* Phase 3b: colorless h00 (pool[0]) -> heart0 deficit ONLY (never a color) */
+            if(filled_h00<h00_deficit && pool[0]>0){
+                int take = pool[0] < (h00_deficit-filled_h00) ? pool[0] : (h00_deficit-filled_h00);
+                pool[0]-=take; filled_h00+=take; filledc[0]+=take;
+            }
+        }
+        /* Phase 4: icon_all (pool[7]) -> color deficits first, then heart0 */
+        if(pool[7]>0){
+            for(int c=1;c<7;c++){
+                if(need[c]>filledc[c] && pool[7]>0){
+                    int deficit=need[c]-filledc[c];
+                    int take = pool[7]<deficit ? pool[7] : deficit;
+                    pool[7]-=take; filledc[c]+=take;
+                }
+            }
+            int total_colored=0; for(int c=1;c<7;c++) total_colored+=filledc[c];
+            int h00_remaining = need[0]-total_colored; if(h00_remaining<0) h00_remaining=0;
+            if(h00_remaining>0 && pool[7]>0){
+                int take = pool[7]<h00_remaining ? pool[7] : h00_remaining;
+                pool[7]-=take; filledc[0]+=take;
+            }
+        }
+        memcpy(filled+i*8, filledc, 8*sizeof(int));
+    }
+}
+
+/* allocations_pass (mirror live.rs): each card's filled must meet its need; colorless
+   (filled[0]) counts toward heart0/total only, and only icon_all (filled[7]) may cover
+   a specific color deficit. */
+static int rb_allocations_pass(const int *filled /*[n][8]*/, const int *needs /*[n][8]*/, int n){
+    for(int i=0;i<n;i++){
+        int filledc[8]; memcpy(filledc, filled+i*8, 8*sizeof(int));
+        int need[8];   memcpy(need,   needs+i*8, 8*sizeof(int));
+        int total_filled=0; for(int c=0;c<8;c++) total_filled+=filledc[c];
+        int total_required=0; for(int c=0;c<8;c++) total_required+=need[c];
+        if(total_filled < total_required) return 0;
+        int icon_all = filledc[7];
+        if(need[0]>0){
+            int any=0; for(int c=0;c<7;c++) any+=filledc[c];
+            if(any + icon_all < need[0]) return 0;
+            int u = need[0]-any; if(u<0) u=0;
+            if(u>icon_all) u=icon_all;
+            icon_all-=u; if(icon_all<0) icon_all=0;
+        }
+        for(int c=1;c<7;c++){
+            if(filledc[c]<need[c]){
+                int deficit=need[c]-filledc[c];
+                if(icon_all>=deficit) icon_all-=deficit; else return 0;
+            }
+        }
+    }
+    return 1;
+}
+
+/* Greedy allocation + verdict (mirror compute_allocations / check_live_success).
+   Returns 1 if all lives pass. Computes surplus (total - required) for no_excess
+   checks. */
 static int allocate_and_verdict(const GameState *g, int pl, const int total_hearts[8], int *out_passed, int *out_score, int *out_surplus, int *out_per_live){
     RbPlayer *P=(RbPlayer*)&g->p[pl];
     int total_score=0;
-    int all_pass=1;
     int pool[8]; memcpy(pool,total_hearts,8*sizeof(int));
+    int needs[RB_MAX_LIVE_CARDS*8]; int filled[RB_MAX_LIVE_CARDS*8]; int future[RB_MAX_LIVE_CARDS*8];
+    int n=0;
+    rb_build_card_needs(g, pl, needs, &n);
+    rb_compute_future_demand(needs, n, future);
+    rb_greedy_allocate(pool, needs, n, future, filled);
+    int all_pass = rb_allocations_pass(filled, needs, n) ? 1 : 0;
+
     int total_required_all=0;
+    int total_pool=0; for(int k=0;k<8;k++) total_pool+=total_hearts[k];
+    for(int i=0;i<n;i++) for(int k=0;k<8;k++) total_required_all+=needs[i*8+k];
+
     for(int li=0; li<P->live.n; li++){
-        int required[8]={0};
-        rb_effective_need_heart(g, P->live.cards[li], required);
-        for(int k=0;k<8;k++) total_required_all+=required[k];
-        /* allocation: total coverage check */
-        int total_req=0,total_pool=0; for(int k=0;k<8;k++){ total_req+=required[k]; total_pool+=pool[k]; }
-        if(total_pool < total_req){ all_pass=0; continue; }
-        /* heart0 bucket (col 0) can be filled by any 1..6 + icon_all */
-        /* For faithful, we use greedy: first fill with exact color, then icon_all (col 7) covers deficits */
-        int icon_all=pool[7];
-        int ok=1;
-        /* heart0 check */
-        if(required[0]>0){
-            int any = pool[1]+pool[2]+pool[3]+pool[4]+pool[5]+pool[6]+pool[0];
-            if(any + icon_all < required[0]) ok=0;
-            else {
-                int need0=required[0];
-                int use0 = need0 - (pool[0]+pool[1]+pool[2]+pool[3]+pool[4]+pool[5]+pool[6]);
-                if(use0<0) use0=0;
-                if(use0>icon_all) use0=icon_all;
-                icon_all-=use0;
-            }
-        }
+        int need[8]; memcpy(need, needs+li*8, 8*sizeof(int));
+        int got=0; for(int c=0;c<8;c++) got+=filled[li*8+c];
+        int reqt=0; for(int c=0;c<8;c++) reqt+=need[c];
+        int ok = (reqt==0) || (got>=reqt);
+        if(out_per_live && li<RB_MAX_LIVE_CARDS) out_per_live[li]=ok?1:0;
         if(ok){
-            for(int col=1;col<7;col++){
-                if(pool[col] < required[col]){
-                    int deficit=required[col]-pool[col];
-                    if(icon_all >= deficit) icon_all-=deficit;
-                    else { ok=0; break; }
-                }
-            }
-        }
-        if(ok){
-            /* consume */
-            for(int col=0;col<7;col++){
-                int need=required[col];
-                int take = need < pool[col] ? need : pool[col];
-                pool[col]-=take;
-                need-=take;
-                if(need>0){
-                    int from_all = need < icon_all ? need : icon_all;
-                    icon_all-=from_all;
-                    pool[7]=icon_all;
-                }
-            }
             Card sc; int base=0;
             if(rb_decode_card_by_index((uint32_t)P->live.cards[li],&sc)){ base=(int)sc.score; rb_free_card(&sc); }
             int score=base + rb_mods_get_score((RbMods*)&g->mods, P->live.cards[li]);
             if(score<0) score=0;
             total_score+=score;
         } else all_pass=0;
-        if(out_per_live && li < RB_MAX_LIVE_CARDS) out_per_live[li] = ok ? 1 : 0;
     }
     if(out_passed) *out_passed=all_pass;
     if(out_score) *out_score=total_score;
     if(out_surplus){
-        int total_pool=0; for(int k=0;k<8;k++) total_pool+=total_hearts[k];
         *out_surplus = all_pass ? (total_pool - total_required_all) : -1;
         if(*out_surplus < 0 && all_pass) *out_surplus = 0;
     }
@@ -223,8 +309,8 @@ int rb_perform_live(GameState *g, int pl){
         pre_score_mod[i] = rb_mods_get_score(&g->mods, P->live.cards[i]);
 
     /* Mirror engine/src/turn/live.rs: after a successful live, fire that
-       player's ライブ成功時 (LiveSuccess) auto-abilities and drain them so
-       their score/blade/heart grants apply before the live is finalized. */
+        player's ライブ成功時 (LiveSuccess) auto-abilities and drain them so
+        their score/blade/heart grants apply before the live is finalized. */
     if (passed) {
         /* The performer's 自動 (Auto) abilities also fire around the live
             (mirrors engine/src/turn/live.rs:434/435 + :528/529). */
@@ -264,7 +350,7 @@ int rb_perform_live(GameState *g, int pl){
     /* revert_live_success_score_modifiers (live.rs): the score grants from the
         LiveSuccess/Auto abilities fired above are event-scoped and must not leak
         into future turns/lives. The delta on each live card is reverted now that it
-        has already been credited into live_score → P->score. Constant modifiers
+        has already been credited into live_score -> P->score. Constant modifiers
         applied by rb_recalc_constants are re-applied each turn, so this is safe. */
     for(int i=0;i<P->live.n && i<RB_MAX_LIVE_CARDS;i++){
         int cid=P->live.cards[i];
@@ -316,7 +402,7 @@ void rb_determine_live_winners(const GameState *g, int *p1_won, int *p2_won) {
     else if (!p1_all && p2_all)    { r0 = 0; r1 = 1; }
     else if (g->live_score[0] > g->live_score[1]) { r0 = 1; r1 = 0; }
     else if (g->live_score[1] > g->live_score[0]) { r0 = 0; r1 = 1; }
-    else                                     { r0 = 1; r1 = 1; } /* tie → both place */
+    else                                     { r0 = 1; r1 = 1; } /* tie -> both place */
     if (p1_won) *p1_won = r0;
     if (p2_won) *p2_won = r1;
 }

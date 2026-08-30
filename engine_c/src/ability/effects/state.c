@@ -230,34 +230,58 @@ void rb_effect_modify_cost(GameState *g, int actor, AbilityEffect *e){
 }
 
 void rb_effect_modify_hearts(GameState *g, int actor, AbilityEffect *e){
-    int cnt=e->count>=0?e->count:1;
-    int who=actor;
-    if(e->target && !strcmp(e->target,"opponent")) who=actor^1;
-    RbPlayer *P=&g->p[who];
-    int col=0;
-    for(int i=0;i<e->n_extra;i++) if(e->extra_k[i] && !strcmp(e->extra_k[i],"heart_color")){
-        const char *hc=e->extra_v[i];
-        if(!strcmp(hc,"pink")||!strcmp(hc,"heart00")) col=0;
-        else if(!strcmp(hc,"red")) col=1;
-        else if(!strcmp(hc,"yellow")) col=2;
-        else if(!strcmp(hc,"green")) col=3;
-        else if(!strcmp(hc,"blue")) col=4;
-        else if(!strcmp(hc,"purple")) col=5;
-        else if(!strcmp(hc,"orange")) col=6;
-        else if(!strcmp(hc,"all")) col=7;
+    /* Faithful mirror of engine/src/ability/effects/score.rs::execute_modify_required_hearts:
+       apply add/set need_heart modifiers (operation: decrease/increase/set) to the
+       target player's live cards, for each listed heart color, scaled by per_unit. */
+    int value = e->count >= 0 ? e->count : 1;
+    const char *op = "decrease"; int is_set = 0; int sign = -1;
+    const char *grp = NULL; const char *loc = NULL; int per_unit = 0; int per_unit_count = 1;
+    for (int i = 0; i < e->n_extra; i++) {
+        if (!e->extra_k[i]) continue;
+        if (!strcmp(e->extra_k[i], "operation") && e->extra_v[i]) {
+            op = e->extra_v[i];
+            if (!strcmp(op, "increase")) { sign = 1; is_set = 0; }
+            else if (!strcmp(op, "set")) { sign = 1; is_set = 1; }
+            else { sign = -1; is_set = 0; }
+        } else if (!strcmp(e->extra_k[i], "group_names") || !strcmp(e->extra_k[i], "group_name")) {
+            if (e->extra_v[i]) grp = e->extra_v[i];
+        } else if (!strcmp(e->extra_k[i], "per_unit") && e->extra_v[i] && !strcmp(e->extra_v[i], "true")) {
+            per_unit = 1;
+        } else if (!strcmp(e->extra_k[i], "location")) {
+            loc = e->extra_v[i];
+        } else if (!strcmp(e->extra_k[i], "per_unit_count") && e->extra_v[i]) {
+            per_unit_count = atoi(e->extra_v[i]);
+        }
     }
-    /* Mirror score.rs::execute_modify_required_hearts — required hearts attach to
-        the player's LIVE cards (the cards actually performed); fall back to all
-        stage members when no live cards are set yet. Previously only the first
-        staged/hand card was modified (under-counted multi-live effects). */
-    int applied = 0;
-    for(int i=0;i<P->live.n;i++){ rb_mods_add_need_heart(&g->mods, P->live.cards[i], col%8, cnt); applied=1; }
-    if(!applied){
-        for(int q=0;q<RB_STAGE_SIZE;q++) if(P->stage[q]!=RB_EMPTY_SLOT){
-            rb_mods_add_need_heart(&g->mods, P->stage[q], col%8, cnt);
+    /* colors (default heart00) from heart_colors / heart_color (comma list) */
+    int cols[8]; int nc = 0;
+    for (int i = 0; i < e->n_extra && nc < 8; i++) {
+        if (e->extra_k[i] && (!strcmp(e->extra_k[i], "heart_colors") || !strcmp(e->extra_k[i], "heart_color")) && e->extra_v[i]) {
+            cols[nc++] = heart_color_of((AbilityEffect*)e, 0);
+            break;
+        }
+    }
+    if (nc == 0) cols[nc++] = 0;
+    RbPlayer *Pp = (e->target && !strcmp(e->target, "opponent")) ? &g->p[actor ^ 1] : &g->p[actor];
+    if (per_unit) {
+        int units = Pp->live.n;
+        if (loc && (!strcmp(loc, "success_live_zone") || !strcmp(loc, "live_zone") || !strcmp(loc, "success_live_card_zone")))
+            units = Pp->success.n;
+        if (per_unit_count < 1) per_unit_count = 1;
+        value = value * (units / per_unit_count);
+    }
+    int who = (e->target && !strcmp(e->target, "opponent")) ? actor ^ 1 : actor;
+    RbPlayer *P = &g->p[who];
+    for (int i = 0; i < P->live.n; i++) {
+        int cid = P->live.cards[i];
+        if (grp && !rb_card_matches_group_str(cid, grp)) continue;
+        for (int c = 0; c < nc; c++) {
+            if (is_set) rb_mods_set_need_heart(&g->mods, cid, cols[c], value);
+            else       rb_mods_add_need_heart(&g->mods, cid, cols[c], value * sign);
         }
     }
 }
+
 
 /* Mirror state.rs::execute_energy_placement — draw `count` energy from the
    energy deck into the energy zone, activating them when state_change=="active".

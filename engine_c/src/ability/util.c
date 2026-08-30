@@ -90,7 +90,42 @@ int rb_orientation_matches_state(const char *orientation, const char *state) {
     return !strcmp(orientation, state);
 }
 
-/* Mirror util::card_matches_group_str (simplified: group/unit/name substring). */
+/* Mirror util::card_series_matches_group — does `series` belong to `group`?
+   Matches the canonical KNOWN_GROUPS taxonomy (μ's/Aqours/虹ヶ咲/Liella!/蓮ノ空).
+   For μ's, each series line is checked individually to handle multi-series joint
+   cards (e.g. a "ラブライブ！" line among other group lines). */
+static int rb_card_series_matches_group(const char *series, const char *group) {
+    if (!series || !group) return 0;
+    if (!strcmp(group, "μ's")) {
+        /* split on '\n' and test each line */
+        const char *p = series;
+        while (*p) {
+            const char *nl = strchr(p, '\n');
+            size_t len = nl ? (size_t)(nl - p) : strlen(p);
+            char line[1024];
+            if (len >= sizeof(line)) len = sizeof(line) - 1;
+            memcpy(line, p, len);
+            line[len] = '\0';
+            if (strstr(line, "ラブライブ！") &&
+                !strstr(line, "サンシャイン") &&
+                !strstr(line, "虹ヶ咲") &&
+                !strstr(line, "スーパースター") &&
+                !strstr(line, "蓮ノ空"))
+                return 1;
+            if (!nl) break;
+            p = nl + 1;
+        }
+        return 0;
+    }
+    if (!strcmp(group, "Aqours"))  return strstr(series, "サンシャイン") != NULL;
+    if (!strcmp(group, "虹ヶ咲")) return strstr(series, "虹ヶ咲") != NULL;
+    if (!strcmp(group, "Liella!")) return strstr(series, "スーパースター") != NULL;
+    if (!strcmp(group, "蓮ノ空"))  return strstr(series, "蓮ノ空") != NULL;
+    return 0;
+}
+
+/* Mirror util::card_matches_group_str (group/unit/name/series substring + exact
+    unit/group equality, plus set_card_identity overrides). */
 int rb_card_matches_group_str(int card_id, const char *group_name) {
     if (!group_name) return 1;
     Card c; if (!rb_decode_card_by_index((uint32_t)card_id, &c)) return 0;
@@ -98,6 +133,7 @@ int rb_card_matches_group_str(int card_id, const char *group_name) {
     char *gn = norm_str(group_name);
     const char *g  = rb_card_string(c.group_idx);
     const char *u  = rb_card_string(c.unit_idx);
+    const char *s  = rb_card_string(c.series_idx);
     char *gnorm = g  ? norm_str(g)  : NULL;
     char *unorm = u  ? norm_str(u)  : NULL;
     char *nnorm = c.name ? norm_str(c.name) : NULL;
@@ -112,6 +148,9 @@ int rb_card_matches_group_str(int card_id, const char *group_name) {
         if (!match && (strstr(gnorm, gn) || strstr(gn, gnorm) ||
                        (unorm && (strstr(unorm, gn) || strstr(gn, unorm))) ||
                        (nnorm && (strstr(nnorm, gn) || strstr(gn, nnorm)))))
+            match = 1;
+        /* series membership (multi-series joint cards match via any line) */
+        if (!match && s && rb_card_series_matches_group(s, group_name))
             match = 1;
     }
     /* set_card_identity overrides: a rewritten member counts as its new identity */

@@ -168,13 +168,16 @@ static int h_play_baton_touch(GameState *g, int actor, const AbilityEffect *e) {
     if (bt_count > 0) return 1;            /* already done this play action */
 
     if (count > 1) {
-        /* Double baton: choose 2 occupied stage areas (Rust filters out members
-            deployed_this_turn — that flag is not tracked in C, so all occupied
-            areas are offered). The resume path decodes the selected pair index. */
+        /* Double baton: choose 2 occupied stage areas, excluding members deployed
+            this turn (baton arrival-ban, Rule 9.6.2.1.2.1; stage_arrived set on
+            deploy in engine.c:812). The resume path decodes the selected pair index. */
         if (g->queue.resume_active) return 1;   /* already resolving */
         RbPlayer *P = &g->p[who];
         int occupied[RB_STAGE_SIZE]; int no = 0;
-        for (int i = 0; i < RB_STAGE_SIZE; i++) if (P->stage[i] != RB_EMPTY_SLOT) occupied[no++] = i;
+        /* Rust filters out members deployed this turn (baton arrival-ban, Rule
+            9.6.2.1.2.1); stage_arrived is set on deploy in engine.c:812. */
+        for (int i = 0; i < RB_STAGE_SIZE; i++)
+            if (P->stage[i] != RB_EMPTY_SLOT && !g->stage_arrived[who][i]) occupied[no++] = i;
         if (no < 2) return 1;          /* not enough occupied positions */
         int pairs = no * (no - 1) / 2;
         rb_emit_choice(g, who, RB_CHOICE_SELECT_TARGET, NULL, NULL, pairs, 1, "double_baton_touch");

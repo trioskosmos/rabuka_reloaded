@@ -21,6 +21,7 @@ int  test_id(TestGame *tg, const char *card_no); /* card index or -1, like Rust 
 void test_add_to_hand(TestGame *tg, int card_id);
 void test_add_to_discard(TestGame *tg, int card_id);
 void test_add_to_stage(TestGame *tg, int area, int card_id); /* area 0=left 1=center 2=right */
+void test_place_under(TestGame *tg, int pl, int area, int card_id); /* tuck card under member at area */
 void test_add_to_success(TestGame *tg, int card_id);
 void test_add_to_live(TestGame *tg, int card_id);
 void test_add_to_deck(TestGame *tg, int card_id);

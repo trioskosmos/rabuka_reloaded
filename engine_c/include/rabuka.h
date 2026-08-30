@@ -608,6 +608,7 @@ int  rb_zone_of_str(const char *s, RbZone *out);    /* map zone wire name */
 int  rb_play_card(GameState *g, int pl, int hand_idx);
 int  rb_play_member(GameState *g, int pl, int hand_idx, int stage_pos); /* to stage */
 int  rb_activate_ability(GameState *g, int pl, int hand_idx);
+int  rb_activate_card(GameState *g, int pl, int card_id); /* run the card's 起動 (Activate) ability: cost + effect */
 /* Baton-touch support (replace an occupied stage member). */
 int  rb_card_arrived_this_turn(const GameState *g, int pl, int card_id);
 int  rb_card_has_restriction(const GameState *g, int card_id, const char *restriction);

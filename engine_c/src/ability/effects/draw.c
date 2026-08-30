@@ -146,8 +146,10 @@ int rb_effect_draw_card(GameState *g, int actor, AbilityEffect *e, int host_cid)
         final_count = rb_effect_count(g, actor, host_cid, e, g->last_draw_count);
     } else if (e->count == 0) {
         /* Rust: when count is 0, draw = moved_cards (then recently_moved, then
-            last_cost_discard_count  Enot tracked). Use recently_moved. */
-        final_count = g->n_recently_moved > 0 ? g->n_recently_moved : 0;
+            last_cost_discard_count). C tracks both recently_moved and
+            mods.last_cost_discard_count. */
+        final_count = g->n_recently_moved > 0 ? g->n_recently_moved
+                     : g->mods.last_cost_discard_count;
     } else {
         final_count = e->count;
     }

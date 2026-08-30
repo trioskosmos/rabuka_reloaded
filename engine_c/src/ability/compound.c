@@ -57,7 +57,25 @@ int rb_compound_sequential(GameState *g, int actor, const AbilityEffect *eff, in
 
             (void)has_repeat;
             rb_execute_effect_ex(g, actor, a, host_cid);
-            if (rb_has_pending_choice(g)) return 1;   /* interactive: stop */
+            if (rb_has_pending_choice(g)) {
+                /* Park the parent + the index of the child that emitted the choice
+                    (mirrors rb_execute_effect_ex) so the resume runs the remaining
+                    sibling effects (e.g. the gain_resource after a heart-color select). */
+                const char *ca = a->action;
+                int is_choice = ca && (!strcmp(ca, "choice") || !strcmp(ca, "select_number") ||
+                                       !strcmp(ca, "select_cards") || !strcmp(ca, "select") ||
+                                       !strcmp(ca, "look_and_select"));
+                int is_gate = a->is_optional && ca &&
+                    (!strcmp(ca, "pay_energy") || !strcmp(ca, "pay_cost") ||
+                     !strcmp(ca, "activation_cost") || !strcmp(ca, "pay_optional_cost") ||
+                     !strcmp(ca, "draw") || !strcmp(ca, "draw_card") || !strcmp(ca, "draw_until_count"));
+                if (is_choice || is_gate) {
+                    g->queue.resume_parent = eff;
+                    g->queue.resume_child = i;
+                    g->queue.resume_host = host_cid;
+                }
+                return 1;   /* interactive: stop */
+            }
         }
     }
     return 1;

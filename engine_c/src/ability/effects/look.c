@@ -96,6 +96,7 @@ void rb_effect_select_cards(GameState *g, int actor, AbilityEffect *e){
         group and/or heart color so a host UI / test picks a legal card. */
     g->queue.pending.filter_group[0] = 0;
     g->queue.pending.filter_heart = -1;
+    int has_heart_color = 0;
     for(int i=0;i<e->n_extra;i++){
         if(e->extra_k[i] && !strcmp(e->extra_k[i],"group_names") && e->extra_v[i])
             strncpy(g->queue.pending.filter_group, e->extra_v[i], sizeof(g->queue.pending.filter_group)-1);
@@ -109,12 +110,42 @@ void rb_effect_select_cards(GameState *g, int actor, AbilityEffect *e){
             else if(!strcmp(hc,"all")) col=7;
             g->queue.pending.filter_heart = col;
         }
+        if (e->extra_k[i] && (!strcmp(e->extra_k[i], "heart_color") ||
+                              !strcmp(e->extra_k[i], "heart_colors")))
+            has_heart_color = 1;
     }
     /* snapshot the filter so rb_look_resume can validate after the pending choice is cleared */
     strncpy(g->queue.resume_filter_group, g->queue.pending.filter_group, sizeof(g->queue.resume_filter_group)-1);
     g->queue.resume_filter_heart = g->queue.pending.filter_heart;
-    g->queue.resume_mode = 2; g->queue.resume_eff = e; g->queue.resume_is_select = 1;
-    g->queue.resume_actor = actor; g->queue.resume_host = actor;
+    /* Heart-color selection (mirrors Rust execute_choice → conditional_choice =
+        Str(color)). A select with a heart_color extra is a "pick a heart color"
+        prompt; stash the chosen color so the following gain_resource applies it.
+        Route it through the default resume branch (mode 0) so the parent's later
+        siblings (the gain) run after the choice resolves — NOT the card-select
+        look/keep path (mode 2). */
+    if (has_heart_color) {
+        g->queue.selected_heart_color = -1;
+        for (int i = 0; i < e->n_extra; i++) {
+            if (e->extra_k[i] && (!strcmp(e->extra_k[i], "heart_color") ||
+                                  !strcmp(e->extra_k[i], "heart_colors")) && e->extra_v[i]) {
+                int col = -1;
+                if (!strcmp(e->extra_v[i], "pink") || !strcmp(e->extra_v[i], "heart00")) col = 0;
+                else if (!strcmp(e->extra_v[i], "red") || !strcmp(e->extra_v[i], "heart01")) col = 1;
+                else if (!strcmp(e->extra_v[i], "yellow") || !strcmp(e->extra_v[i], "heart02")) col = 2;
+                else if (!strcmp(e->extra_v[i], "green") || !strcmp(e->extra_v[i], "heart03")) col = 3;
+                else if (!strcmp(e->extra_v[i], "blue") || !strcmp(e->extra_v[i], "heart04")) col = 4;
+                else if (!strcmp(e->extra_v[i], "purple") || !strcmp(e->extra_v[i], "heart05")) col = 5;
+                else if (!strcmp(e->extra_v[i], "orange") || !strcmp(e->extra_v[i], "heart06")) col = 6;
+                else if (!strcmp(e->extra_v[i], "all") || !strcmp(e->extra_v[i], "heart07") || !strcmp(e->extra_v[i], "b_all")) col = 7;
+                if (col >= 0) g->queue.selected_heart_color = col;
+            }
+        }
+        g->queue.resume_mode = 0; g->queue.resume_is_select = 0;
+        g->queue.resume_eff = e; g->queue.resume_actor = actor; g->queue.resume_host = actor;
+    } else {
+        g->queue.resume_mode = 2; g->queue.resume_eff = e; g->queue.resume_is_select = 1;
+        g->queue.resume_actor = actor; g->queue.resume_host = actor;
+    }
 }
 
 /* Called when host resumes SELECT_CARD — move chosen card to destination.

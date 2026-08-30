@@ -844,6 +844,41 @@ int rb_play_member(GameState *g, int pl, int hand_idx, int stage_pos) {
     return 1;
 }
 
+/* Activate a card's ability by card id. Mirrors Rust's `GameState::activate_ability`:
+    the card may expose several abilities (RAKA_CARD_ABILITY_PAIRS); the manual
+    "activate" action runs the one(s) whose trigger is 起動 (Activate). Apply each
+    matched ability's cost BEFORE its effect. Falls back to the card's single
+    default `ability_idx` when no 起動 ability exists (e.g. debut-only members). */
+int rb_activate_card(GameState *g, int pl, int card_id) {
+    int any = 0, matched = 0;
+    int n = rb_card_num_abilities((uint32_t)card_id);
+    for (int a = 0; a < n; a++) {
+        uint32_t aidx;
+        if (!rb_card_get_ability_idx((uint32_t)card_id, a, &aidx)) continue;
+        Ability ab;
+        if (!rb_decode_card_ability((uint32_t)card_id, a, &ab)) continue;
+        int is_activate = ab.triggers && strstr(ab.triggers, "起動");
+        if (is_activate) {
+            if (ab.cost)   { g->n_recently_moved = 0; rb_execute_effect_ex(g, pl, ab.cost, card_id); any = 1; }
+            if (ab.effect)  { g->n_recently_moved = 0; rb_execute_effect_ex(g, pl, ab.effect, card_id); any = 1; }
+            matched++;
+        }
+        rb_free_ability(&ab);
+    }
+    if (matched == 0) {
+        /* Fallback: single default ability (debut/auto-only members). */
+        Card c;
+        if (rb_decode_card_by_index((uint32_t)card_id, &c)) {
+            if (c.ability) {
+                if (c.ability->cost)   { g->n_recently_moved = 0; rb_execute_effect_ex(g, pl, c.ability->cost, card_id); any = 1; }
+                if (c.ability->effect)  { g->n_recently_moved = 0; rb_execute_effect_ex(g, pl, c.ability->effect, card_id); any = 1; }
+            }
+            rb_free_card(&c);
+        }
+    }
+    return any;
+}
+
 int rb_activate_ability(GameState *g, int pl, int hand_idx) {
     RbPlayer *P = &g->p[pl];
     /* Restriction gate: a player (or specific card) under a cannot-activate
@@ -852,16 +887,7 @@ int rb_activate_ability(GameState *g, int pl, int hand_idx) {
     if (hand_idx >= 0 && hand_idx < P->hand.n &&
         rb_card_is_cannot_active(g, P->hand.cards[hand_idx])) return 0;
     if (hand_idx < 0 || hand_idx >= P->hand.n) return 0;
-    Card c;
-    if (!rb_decode_card_by_index((uint32_t)P->hand.cards[hand_idx], &c)) return 0;
-    int ok = 0;
-    if (c.ability && c.ability->effect) {
-        g->n_recently_moved = 0; /* batch-scope for this activation */
-        rb_execute_effect_ex(g, pl, c.ability->effect, (int)P->hand.cards[hand_idx]);
-        ok = 1;
-    }
-    rb_free_card(&c);
-    return ok;
+    return rb_activate_card(g, pl, (int)P->hand.cards[hand_idx]);
 }
 
 int rb_play_card(GameState *g, int pl, int hand_idx) {

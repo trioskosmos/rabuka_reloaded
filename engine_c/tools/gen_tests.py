@@ -280,11 +280,17 @@ def map_board_expr(expr: str, func_name: str):
     # game.state.playerN.<zone>.cards.len() -> tg.state.p[N-1].<bag>.n
     m = re.match(r'game\.state\.player(\d+)\.(\w+)\.cards\.len\(\)', e)
     if m:
-        if m.group(2) not in KNOWN_PLAYER_FIELD:
+        zone = ZONE_NORM.get(m.group(2), m.group(2))
+        if zone not in ("hand", "deck", "discard", "energy", "live", "success", "stage"):
             return None
         pl = int(m.group(1)) - 1
-        bag = KNOWN_PLAYER_FIELD.get(m.group(2))
-        return f"tg.state.p[{pl}].{bag}.n"
+        return f"tg.state.p[{pl}].{zone}.n"
+    # game.state.playerN.stage.get_under_cards(MemberArea::X).len() -> under_cards[area].n
+    m = re.match(r'game\.state\.player(\d+)\.stage\.get_under_cards\(MemberArea::(\w+)\)\.len\(\)', e)
+    if m:
+        pl = int(m.group(1)) - 1
+        area = AREA_MAP.get(m.group(2), "1")
+        return f"tg.state.p[{pl}].under_cards[{area}].n"
     # game.state.playerN.<known field>  (score, energy, ...)
     m = re.match(r'game\.state\.player(\d+)\.(\w+)', e)
     if m:
@@ -892,6 +898,20 @@ def transpile_body(body: str, consts: dict, func_name: str) -> str:
         if m:
             out.append("    test_pending_choice_count(&tg);"); mark_real(); continue
         # ---- live bucket ----
+        # 1-arg form: set_live_card(card) → active player (index 0).
+        m = re.search(r'game\.set_live_card\s*\(\s*(\w+)\s*\)', line)
+        if m:
+            var = m.group(1)
+            if var not in declared:
+                unresolved = True; continue
+            out.append(f"    test_set_live_card(&tg, 0, {var});"); mark_real(); continue
+        # variable player form: set_live_card(player, card).
+        m = re.search(r'game\.set_live_card\s*\(\s*(\w+)\s*,\s*(\w+)\s*\)', line)
+        if m:
+            var = m.group(2)
+            if var not in declared:
+                unresolved = True; continue
+            out.append(f"    test_set_live_card(&tg, {m.group(1)}, {var});"); mark_real(); continue
         m = re.search(r'game\.set_live_card\s*\(\s*(\d+)\s*,\s*(\w+)\s*\)', line)
         if m:
             var = m.group(2)
@@ -901,6 +921,30 @@ def transpile_body(body: str, consts: dict, func_name: str) -> str:
         m = re.search(r'game\.player_perform_live\s*\(\s*\)', line)
         if m:
             out.append("    rb_perform_live(&tg.state, 0);"); mark_real(); continue
+        # place_under_card(area, card): tuck a card under a stage member.
+        # Full form with a literal card id.
+        m = re.search(r'game\.state\.player(\d+)\.stage\.place_under_card\(\s*MemberArea::(\w+)\s*,\s*test_id\(&tg,\s*"([^"]+)"\)\s*\)', line)
+        if m:
+            pl = int(m.group(1)) - 1
+            area = AREA_MAP.get(m.group(2), "1")
+            out.append(f"    test_place_under(&tg, {pl}, {area}, test_id(&tg, \"{m.group(3)}\"));"); mark_real(); continue
+        m = re.search(r'game\.state\.player(\d+)\.stage\.place_under_card\(\s*MemberArea::(\w+)\s*,\s*(\w+)\s*\)', line)
+        if m:
+            pl = int(m.group(1)) - 1
+            area = AREA_MAP.get(m.group(2), "1")
+            var = m.group(3)
+            if var not in declared:
+                unresolved = True; continue
+            out.append(f"    test_place_under(&tg, {pl}, {area}, {var});"); mark_real(); continue
+        # Degraded form (LHS accessor already stripped to a leading '.'): default
+        # player to 0 (player1), which is the overwhelmingly common case.
+        m = re.search(r'\.place_under_card\(\s*MemberArea::(\w+)\s*,\s*(\w+)\s*\)', line)
+        if m:
+            area = AREA_MAP.get(m.group(1), "1")
+            var = m.group(2)
+            if var not in declared:
+                unresolved = True; continue
+            out.append(f"    test_place_under(&tg, 0, {area}, {var});"); mark_real(); continue
         m = re.search(r'game\.set_active_side\s*\(\s*([^)]*)\)', line)
         if m:
             out.append(f"    // TODO set_active_side: {stripped}"); continue
@@ -1032,11 +1076,19 @@ def transpile_body(body: str, consts: dict, func_name: str) -> str:
             mm = re.search(r'give_energy\((\d+)\)', line)
             if mm:
                 out.append(f"    test_give_energy(&tg, {mm.group(1)});"); continue
-        m = re.match(r'\s*game\.fire_trigger\((\w+)\s*,', line)
+        # fire_trigger(&mut game, cid, AbilityTrigger::X, "label") — the canonical
+        # helper that fires a card's auto ability by JA trigger label, then drains.
+        # Map to: queue every ability of the owner matching `label`, then drain
+        # (mirrors fire_trigger: trigger_auto_ability + process_pending_auto_abilities).
+        m = re.search(r'fire_trigger\s*\(\s*&?\s*mut\s+game\s*,\s*(\w+)\s*,\s*[A-Za-z_:]*\s*,\s*"([^"]*)"\s*\)', line)
+        if not m:
+            m = re.search(r'fire_trigger\s*\(\s*game\s*,\s*(\w+)\s*,\s*[A-Za-z_:]*\s*,\s*"([^"]*)"\s*\)', line)
         if m:
-            var = m.group(1)
-            if var not in declared: unresolved = True; continue
-            out.append(f"    rb_fire_debut(&tg.state, 0, {var});"); continue
+            var = m.group(1); trig = m.group(2)
+            if var not in declared:
+                unresolved = True; continue
+            out.append(f"    {{ int ftpl = rb_owner_of_card(&tg.state, {var}); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, \"{trig}\"); rb_drain_ability_queue(&tg.state); }}")
+            mark_real(); continue
         if 'game.select_option(' in line:
             mm = re.search(r'select_option\((\d+)\)', line)
             if mm:

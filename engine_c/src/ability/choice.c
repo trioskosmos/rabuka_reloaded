@@ -1,5 +1,6 @@
 #include "rabuka.h"
 #include <string.h>
+#include <stdio.h>
 
 int rb_has_pending_choice(const GameState *g) { return g ? g->queue.has_pending : 0; }
 const RbChoice *rb_get_pending_choice(const GameState *g) {
@@ -79,7 +80,7 @@ int rb_resume_with_choice(GameState *g, int selected_idx) {
                 rb_execute_effect_ex(g, actor, def, host);
         }
         /* After paying an optional cost, continue the ability's remaining
-           sibling effects (e.g. the gain_resource that follows the cost). */
+            sibling effects (e.g. the gain_resource that follows the cost). */
         if (!was_skip && cont) {
             for (int j = cont_from; j < cont->n_child; j++) {
                 if (rb_has_pending_choice(g)) break;

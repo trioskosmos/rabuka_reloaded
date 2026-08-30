@@ -65,6 +65,7 @@ int rb_resolve_dynamic_count(const struct GameState *g, int owner, int host_cid,
             if (!in) for (int k = 0; k < P->deck.n; k++) if (P->deck.cards[k] == cid) { in = 1; break; }
             if (!in) for (int k = 0; k < P->live.n; k++) if (P->live.cards[k] == cid) { in = 1; break; }
             if (!in) for (int k = 0; k < P->success.n; k++) if (P->success.cards[k] == cid) { in = 1; break; }
+            if (!in) for (int k = 0; k < g->resolution.n; k++) if (g->resolution.cards[k] == cid) { in = 1; break; }
             if (in) count++;
         }
     } else if (!strcmp(reference_text, "unit_count")) {

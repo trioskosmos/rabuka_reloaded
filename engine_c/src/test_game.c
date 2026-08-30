@@ -32,6 +32,14 @@ void test_add_to_stage(TestGame *tg, int area, int card_id){
     tg->state.p[0].stage[area]=card_id;
     tg->state.p[0].stage_wait[area]=0;
 }
+void test_place_under(TestGame *tg, int pl, int area, int card_id){
+    /* Mirror stage.place_under_card(area, card): tuck `card_id` under the
+        member occupying `area` of player `pl` (0=p1, 1=p2). */
+    if(pl<0||pl>1||area<0||area>=RB_STAGE_SIZE) return;
+    RbPlayer *P=&tg->state.p[pl];
+    RbBag *u=&P->under_cards[area];
+    if(u->n < RB_MAX_ZONE) u->cards[u->n++]=card_id;
+}
 void test_add_to_success(TestGame *tg, int card_id){
     RbPlayer *P=&tg->state.p[0];
     if(P->success.n < RB_MAX_ZONE) P->success.cards[P->success.n++]=card_id;
@@ -94,23 +102,9 @@ int test_activate_ability(TestGame *tg, int card_id){
     RbPlayer *P = &tg->state.p[0];
     for (int i = 0; i < P->hand.n; i++)
         if (P->hand.cards[i] == card_id) return rb_activate_ability(&tg->state, 0, i);
-    /* Rust activate_ability also fires a member already on stage. */
-    for (int q = 0; q < RB_STAGE_SIZE; q++) {
-        if (P->stage[q] == card_id) {
-            Card c;
-            if (rb_decode_card_by_index((uint32_t)card_id, &c)) {
-                int ok = 0;
-                if (c.ability && c.ability->effect) {
-                    rb_execute_effect_ex(&tg->state, 0, c.ability->effect, card_id);
-                    ok = 1;
-                }
-                rb_free_card(&c);
-                return ok;
-            }
-            return 0;
-        }
-    }
-    return 0;
+    /* Rust activate_ability also fires a member already on stage — run the real
+        multi-ability activate path (cost + 起動-triggered effect). */
+    return rb_activate_card(&tg->state, 0, card_id);
 }
 void test_spend_energy(TestGame *tg, int n){
     RbPlayer *P=&tg->state.p[0];

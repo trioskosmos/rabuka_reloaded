@@ -41,8 +41,12 @@ $(TARGET)_replay: $(OBJ_LIB) $(REPLAY)
 $(TARGET)_ported: $(OBJ_LIB) $(PORTED)
 	$(CC) $(CFLAGS) -o $@ $(OBJ_LIB) $(PORTED)
 
-$(TARGET)_generated: $(OBJ_LIB) $(GENERATED)
+ $(TARGET)_generated: $(OBJ_LIB) $(GENERATED)
 	$(CC) $(CFLAGS) -o $@ $(OBJ_LIB) $(GENERATED)
+
+ $(TARGET)_debug: $(OBJ_LIB) src/debug_umi.o
+	$(CC) $(CFLAGS) -o $@ $(OBJ_LIB) src/debug_umi.o
+
 
 audit: $(TARGET)_audit
 	./$(TARGET)_audit

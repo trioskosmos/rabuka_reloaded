@@ -163,6 +163,21 @@ pub const DECKS: &[DeckInfo] = &[
         ],
     },
     DeckInfo {
+        name: "_mini_focus",
+        cards: &[
+            "﻿PL!S-bp6-002-R+",
+            "PL!S-bp6-002-R+",
+            "PL!-sd1-007-SD",
+            "PL!-sd1-007-SD",
+            "PL!-sd1-007-SD",
+            "PL!-sd1-013-SD",
+            "PL!-bp3-019-L",
+            "PL!-bp3-019-L",
+            "PL!S-bp3-019-L",
+            "PL!N-sd1-001-SD",
+        ],
+    },
+    DeckInfo {
         name: "aiscream 37PMZ",
         cards: &[
             "LL-BP2-001-R+",

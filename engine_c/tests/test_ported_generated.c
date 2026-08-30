@@ -66,7 +66,7 @@ static void gen_sumire_wien_both_yell_same_turn_both_get_heart(void){
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "sumire_wien_both_yell_same_turn_both_get_heart");
     // TODO loop (degraded): for _ in 0..5 { game.pass(); }
     // 
-    // TODO: game.set_live_card(filler);
+    test_set_live_card(&tg, 0, filler);
     // TODO loop (degraded): for _ in 0..5 { game.pass(); }
     // // Both should have triggered (each has its own heart color)
     // // At least one should have heart
@@ -620,7 +620,7 @@ static void gen_mifune_q231_excess_heart_2_score_cancels_to_0(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(mifune);
+    test_set_live_card(&tg, 0, mifune);
     // // Pass through to LiveVictoryDetermination where LiveSuccess triggers fire
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
@@ -921,7 +921,7 @@ static void gen_start_true_dreams_q66_opponent_no_card_score_higher(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "start_true_dreams_q66_opponent_no_card_score_higher");
     // 
-    // TODO: game.set_live_card(start);
+    test_set_live_card(&tg, 0, start);
     // // inlined helper advance_to_live_success
     // 
     rb_advance_phase(&tg.state);
@@ -1165,7 +1165,7 @@ static void gen_love_u_q192_live_success_all_blade_score_up(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "love_u_q192_live_success_all_blade_score_up");
     // 
-    // TODO: game.set_live_card(love_u);
+    test_set_live_card(&tg, 0, love_u);
     // // inlined helper advance_to_live_success
     // 
     rb_advance_phase(&tg.state);
@@ -1257,7 +1257,7 @@ static void gen_smile_q224_live_success_score_plus_1(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(smile);
+    test_set_live_card(&tg, 0, smile);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -1394,7 +1394,7 @@ static void gen_dazzling_q187_exclude_selected_liella_other_pickable(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(dazzling);
+    test_set_live_card(&tg, 0, dazzling);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     test_drain_auto_choices(&tg);
@@ -1603,9 +1603,9 @@ static void gen_live_cards_stuck_in_live_zone_instead_of_discard(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "live_cards_stuck_in_live_zone_instead_of_discard");
     // 
-    // TODO: game.set_live_card(live1);
-    // TODO: game.set_live_card(live2);
-    // TODO: game.set_live_card(live3);
+    test_set_live_card(&tg, 0, live1);
+    test_set_live_card(&tg, 0, live2);
+    test_set_live_card(&tg, 0, live3);
     // 
     int total_after_set = 0;
     // TODO: eprintln!(
@@ -2135,7 +2135,7 @@ static void gen_miracle_wave_q182_excess_heart_score_4(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "miracle_wave_q182_excess_heart_score_4");
     // 
-    // TODO: game.set_live_card(wave);
+    test_set_live_card(&tg, 0, wave);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -2536,9 +2536,9 @@ static void gen_hanamusubi_q213_member_card_moved_before_live_start(void){
     rb_advance_phase(&tg.state);
     // 
     // // Try to set the 蓮ノ空 member as a live card
-    // TODO: game.set_live_card(hasetsu);
+    test_set_live_card(&tg, 0, hasetsu);
     // // Also set a real live card
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // 
     // // The member card should be in waitroom (or should it?)
     // // Actually set_live_card would fail for member cards because
@@ -3317,7 +3317,7 @@ static void gen_sumire_turn_limit_blocks_second_yell(void){
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "sumire_turn_limit_blocks_second_yell");
     // 
     test_add_to_hand(&tg, filler);
-    // TODO: game.set_live_card(filler);
+    test_set_live_card(&tg, 0, filler);
     // // inlined helper advance_to_live_success
     // 
     rb_advance_phase(&tg.state);
@@ -3422,7 +3422,7 @@ static void gen_wien_turn_limit_blocks_second_yell(void){
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "wien_turn_limit_blocks_second_yell");
     // 
     test_add_to_hand(&tg, filler);
-    // TODO: game.set_live_card(filler);
+    test_set_live_card(&tg, 0, filler);
     // // inlined helper advance_to_live_success
     // 
     rb_advance_phase(&tg.state);
@@ -3681,7 +3681,7 @@ static void gen_daydream_mermaid_choice_appears_and_selects_energy(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "daydream_mermaid_choice_appears_and_selects_energy");
     // 
-    // TODO: game.set_live_card(mermaid);
+    test_set_live_card(&tg, 0, mermaid);
     // // inlined helper advance_to_live_success
     // 
     rb_advance_phase(&tg.state);
@@ -3754,7 +3754,7 @@ static void gen_daydream_mermaid_choice_selects_recover(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "daydream_mermaid_choice_selects_recover");
     // 
-    // TODO: game.set_live_card(mermaid);
+    test_set_live_card(&tg, 0, mermaid);
     // // inlined helper advance_to_live_success
     // 
     rb_advance_phase(&tg.state);
@@ -3885,7 +3885,7 @@ static void gen_dream_believers_one_hasetsu_plus_other_pass(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(dream);
+    test_set_live_card(&tg, 0, dream);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
@@ -4013,7 +4013,7 @@ static void gen_dream_believers_q212_multiname_no_match(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(dream);
+    test_set_live_card(&tg, 0, dream);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
@@ -4144,7 +4144,7 @@ static void gen_dream_with_you_q116_blade_10_score_plus_1(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(dream);
+    test_set_live_card(&tg, 0, dream);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
@@ -4266,7 +4266,7 @@ static void gen_dream_with_you_q116_blade_6_no_score(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(dream);
+    test_set_live_card(&tg, 0, dream);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
@@ -4370,7 +4370,7 @@ static void gen_genki_zenkai_invalidates_own_live_success(void){
     rb_advance_phase(&tg.state);
     // 
     test_add_to_hand(&tg, genki);
-    // TODO: game.set_live_card(genki);
+    test_set_live_card(&tg, 0, genki);
     // 
     // // Advance to live_start (ab#0 fires: condition check → invalidate live_success)
     // // inlined helper advance_to_live_start
@@ -4507,7 +4507,7 @@ static void gen_genki_zenkai_live_success_fires_when_condition_not_met(void){
     rb_advance_phase(&tg.state);
     // 
     test_add_to_hand(&tg, genki);
-    // TODO: game.set_live_card(genki);
+    test_set_live_card(&tg, 0, genki);
     // 
     // // inlined helper advance_to_live_start
     // 
@@ -4975,11 +4975,11 @@ static void gen_mebius_blocks_both_success_zones_on_tied_live(void){
     rb_advance_phase(&tg.state);
     // 
     // // P1 sets mebius (first attacker).
-    // TODO: game.set_live_card(mebius_p1);
+    test_set_live_card(&tg, 0, mebius_p1);
     // // Transition phase to LiveCardSetSecondAttacker.
     rb_advance_phase(&tg.state);
     // // P2 sets mebius (second attacker).
-    // TODO: game.set_live_card(mebius_p2);
+    test_set_live_card(&tg, 0, mebius_p2);
     // 
     // // inlined helper advance_to_live_victory
     // 
@@ -5180,9 +5180,9 @@ static void gen_mebius_does_not_fire_on_untied_scores(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(mebius_p1);
+    test_set_live_card(&tg, 0, mebius_p1);
     rb_advance_phase(&tg.state);
-    // TODO: game.set_live_card(normal_live_p2);
+    test_set_live_card(&tg, 0, normal_live_p2);
     // 
     // // Transition through both performance phases.
     rb_advance_phase(&tg.state);
@@ -5276,7 +5276,7 @@ static void gen_heart_override_additive_stacks_in_both_stage_heart_calcs(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
-    // TODO: game.set_live_card(filler);
+    test_set_live_card(&tg, 0, filler);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
@@ -5388,7 +5388,7 @@ static void gen_first_attacker_window_facts_survive_second_active_phase_and_live
     // 
     // // And still be readable when ライブ開始時 conditions evaluate.
     test_add_to_hand(&tg, live);
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     int guard = 0;
@@ -5434,7 +5434,7 @@ static void gen_round_scoped_trackers_clear_at_turn_rollover(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // // LiveCardSetFAN → SAN → performances → victory determination → next FAN.
     rb_advance_phase(&tg.state);
     int guard = 0;
@@ -5775,7 +5775,7 @@ static void gen_eternalize_love_full_live_flow_heart00_reduction(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -6301,7 +6301,7 @@ static void gen_takaramono_no_excess_heart_score_plus_1(void){
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "takaramono_no_excess_heart_score_plus_1");
     // 
     // TODO: game.state.self_no_excess_heart_this_turn = true;
-    // TODO: game.set_live_card(takaramono);
+    test_set_live_card(&tg, 0, takaramono);
     // // inlined helper advance_to_live_success
     // 
     rb_advance_phase(&tg.state);
@@ -6365,7 +6365,7 @@ static void gen_takaramono_excess_heart_no_score(void){
     // 
     // // Confirm flag is false
     // TODO assert: assert!( !game.state.self_no_excess_heart_this_turn, "Flag should be false after reset" );
-    // TODO: game.set_live_card(takaramono);
+    test_set_live_card(&tg, 0, takaramono);
     // // inlined helper advance_to_live_success
     // 
     rb_advance_phase(&tg.state);
@@ -6591,7 +6591,7 @@ static void gen_cheer_pipeline_draw_and_score_icons(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "cheer_pipeline_draw_and_score_icons");
     // 
-    // TODO: game.set_live_card(live_card);
+    test_set_live_card(&tg, 0, live_card);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -6704,7 +6704,7 @@ static void gen_cheer_pipeline_score_icon(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "cheer_pipeline_score_icon");
     // 
-    // TODO: game.set_live_card(live_card);
+    test_set_live_card(&tg, 0, live_card);
     // // Deck layout applied AFTER set_live_card (index 0 = top): position 0 is
     // // consumed by the LiveCardSet refill draw, so the yell then reveals
     // // [DASH copy, filler, filler].
@@ -7297,7 +7297,7 @@ static void gen_kagayaiteru_live_success_draw_then_discard(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "kagayaiteru_live_success_draw_then_discard");
     // 
-    // TODO: game.set_live_card(card);
+    test_set_live_card(&tg, 0, card);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -7394,7 +7394,7 @@ static void gen_kagayaiteru_q125_cannot_place_in_success_zone(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "kagayaiteru_q125_cannot_place_in_success_zone");
     // 
-    // TODO: game.set_live_card(card);
+    test_set_live_card(&tg, 0, card);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -7532,7 +7532,7 @@ static void gen_pl_hs_sd1_008_live_start_pay_cost_select_heart01_target_ally(voi
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // // inlined helper finish_live_setup
     // 
     rb_advance_phase(&tg.state);
@@ -7613,7 +7613,7 @@ static void gen_pl_hs_sd1_008_live_start_skip_cost_no_effect(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // // inlined helper finish_live_setup
     // 
     rb_advance_phase(&tg.state);
@@ -7766,7 +7766,7 @@ static void gen_sayaka_bp6_live_start_modify_cost_only_applies_to_dollchestra(vo
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // // inlined helper finish_live_setup
     // 
     rb_advance_phase(&tg.state);
@@ -7835,7 +7835,7 @@ static void gen_sayaka_bp6_skip_cost_no_draw_no_cost_mod(void){
     test_add_to_hand(&tg, filler);
     test_give_energy(&tg, 10);
     // TODO loop (degraded): for _ in 0..5 { game.pass(); }
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // TODO loop (degraded): for _ in 0..2 { game.pass(); }
     test_has_pending_choice(&tg);
     // // Skip the cost (empty selection)
@@ -7957,7 +7957,7 @@ static void gen_solitude_q67_hasetsu_member_with_heart01_score_plus_1(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(solitude);
+    test_set_live_card(&tg, 0, solitude);
     // 
     // // Pass through to trigger LiveStart
     rb_advance_phase(&tg.state);
@@ -8081,7 +8081,7 @@ static void gen_solitude_q67_non_hasetsu_member_no_score(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(solitude);
+    test_set_live_card(&tg, 0, solitude);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
@@ -8298,7 +8298,7 @@ static void gen_hanamaru_q120_hand7_auto_condition_checked_after_blade_draws(voi
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
@@ -8352,7 +8352,7 @@ static void gen_hanamaru_q120_no_live_in_revealed_no_draw(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
@@ -8504,7 +8504,7 @@ static void gen_kosuzu_bp6_condition_met_gains_heart05_and_blade(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // // inlined helper finish_live_setup
     // 
     rb_advance_phase(&tg.state);
@@ -8706,7 +8706,7 @@ static void gen_kosuzu_bp6_condition_not_met_no_heart05_no_blade(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // // inlined helper finish_live_setup
     // 
     rb_advance_phase(&tg.state);
@@ -8856,7 +8856,7 @@ static void gen_kinako_auto_triggers_on_live_success(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -9118,7 +9118,7 @@ static void gen_q107_dia_skip_discard_no_followup(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
@@ -9591,7 +9591,7 @@ static void gen_position_change_triggered_grant_blade_to_moved_members(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
-    // TODO: game.set_live_card(self_control);
+    test_set_live_card(&tg, 0, self_control);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     while (test_has_pending_choice(&tg)) rb_resume_with_choice(&tg.state, 0);
@@ -9682,7 +9682,7 @@ static void gen_you_s3_q153_live_success_draw_if_fewer_revealed(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
-    // TODO: game.set_live_card(live_card);
+    test_set_live_card(&tg, 0, live_card);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
@@ -9812,7 +9812,7 @@ static void gen_wish_song_five_distinct_liella_revealed_scores(void){
     // TODO: game.state.revealed_cards.push(id);
     // TODO: }
     // 
-    // TODO: fire_trigger(&mut game, live, AbilityTrigger::LiveSuccess, "ライブ成功時");
+    { int ftpl = rb_owner_of_card(&tg.state, live); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ成功時"); rb_drain_ability_queue(&tg.state); }
     // 
     CHECK_EQ(rb_mods_get_score(&tg.state.mods, live), 1, "wish_song_five_distinct_liella_revealed_scores");
     // 
@@ -9831,7 +9831,7 @@ static void gen_wish_song_four_distinct_liella_revealed_no_score(void){
     // TODO: game.state.revealed_cards.push(id);
     // TODO: }
     // 
-    // TODO: fire_trigger(&mut game, live, AbilityTrigger::LiveSuccess, "ライブ成功時");
+    { int ftpl = rb_owner_of_card(&tg.state, live); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ成功時"); rb_drain_ability_queue(&tg.state); }
     // 
     CHECK_EQ(rb_mods_get_score(&tg.state.mods, live), 0, "wish_song_four_distinct_liella_revealed_no_score");
     // 
@@ -9853,7 +9853,7 @@ static void gen_bp4006_three_distinct_members_retrieves_liella_live_from_reveale
     // TODO: game.state.revealed_cards.push(liella_live);
     int hand_before = tg.state.p[0].hand.n;
     // 
-    // TODO: fire_trigger(&mut game, me, AbilityTrigger::LiveSuccess, "ライブ成功時");
+    { int ftpl = rb_owner_of_card(&tg.state, me); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ成功時"); rb_drain_ability_queue(&tg.state); }
     // 
     // TODO assert_eq (unresolved): assert_eq!( game.state.player1.hand.cards.len(), hand_before + 1, "Liella! live card retrieved from revealed cards to hand" );
     CHECK(test_zone_has_id(&tg, 0, "hand", liella_live), "bp4006_three_distinct_members_retrieves_liella_live_from_revealed");
@@ -9905,7 +9905,7 @@ static void gen_pb1024_live_success_draws_two_discards_two_empty_hand(void){
     // 
     int waitroom_before = tg.state.p[0].discard.n;
     // 
-    // TODO: fire_trigger(&mut game, live, AbilityTrigger::LiveSuccess, "ライブ成功時");
+    { int ftpl = rb_owner_of_card(&tg.state, live); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ成功時"); rb_drain_ability_queue(&tg.state); }
     while (test_has_pending_choice(&tg)) rb_resume_with_choice(&tg.state, 0);
     rb_resume_with_choice(&tg.state, 0);
     // TODO: }
@@ -9930,7 +9930,7 @@ static void gen_pb1024_live_success_keeps_non_selected_cards(void){
     test_add_to_deck(&tg, d1);
     test_add_to_deck(&tg, d2);
     // 
-    // TODO: fire_trigger(&mut game, live, AbilityTrigger::LiveSuccess, "ライブ成功時");
+    { int ftpl = rb_owner_of_card(&tg.state, live); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ成功時"); rb_drain_ability_queue(&tg.state); }
     // // Discard selection exists — discard the two drawn cards (last two indices).
     test_has_pending_choice(&tg);
     // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard for the 2-card discard" );
@@ -10753,8 +10753,8 @@ static void gen_live_end_grant_expires_through_real_phase_rollover(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live);
-    // TODO: fire_trigger(&mut game, me, AbilityTrigger::Debut, "登場");
+    test_set_live_card(&tg, 0, live);
+    { int ftpl = rb_owner_of_card(&tg.state, me); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "登場"); rb_drain_ability_queue(&tg.state); }
     CHECK_EQ(rb_mods_get_blade(&tg.state.mods, me), 3, "live_end_grant_expires_through_real_phase_rollover");
     // 
     // // Real rollover: LiveCardSet → performances → victory determination → Active.
@@ -10843,7 +10843,7 @@ static void gen_yell_proper_no_blade_gains_via_live(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "yell_proper_no_blade_gains_via_live");
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // // FirstAttacker pass (p2 sets live), SecondAttacker pass → first performance entry
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
@@ -10901,7 +10901,7 @@ static void gen_yell_proper_with_blade_blocks_via_live(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "yell_proper_with_blade_blocks_via_live");
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // // FirstAttacker pass (p2 sets live), SecondAttacker pass → first performance entry
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
@@ -10935,7 +10935,7 @@ static void gen_yell_proper_all_blade_blocks_via_live(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "yell_proper_all_blade_blocks_via_live");
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // // FirstAttacker pass (p2 sets live), SecondAttacker pass → first performance entry
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
@@ -11174,7 +11174,7 @@ static void gen_q148_blade_total_active_members(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -11421,7 +11421,7 @@ static void gen_q148_blade_total_includes_waited_member(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -11665,7 +11665,7 @@ static void gen_q148_blade_total_below_threshold(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -11795,7 +11795,7 @@ static void gen_eutopia_q38_score_condition_checks_live_card_count(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(eutopia);
+    test_set_live_card(&tg, 0, eutopia);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
@@ -11955,9 +11955,9 @@ static void gen_eutopia_q38_three_live_cards_score_plus_2(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(eutopia);
-    // TODO: game.set_live_card(live2);
-    // TODO: game.set_live_card(live3);
+    test_set_live_card(&tg, 0, eutopia);
+    test_set_live_card(&tg, 0, live2);
+    test_set_live_card(&tg, 0, live3);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
@@ -12079,7 +12079,7 @@ static void gen_rainbow_q38_member_on_stage_per_live_card_blade(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live1);
+    test_set_live_card(&tg, 0, live1);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
@@ -12144,7 +12144,7 @@ static void gen_test_q246_partial_overlap_dedup(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // // inlined helper finish_live_setup
     // 
     rb_advance_phase(&tg.state);
@@ -12221,7 +12221,7 @@ static void gen_test_q246_subset_selection(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // // inlined helper finish_live_setup
     // 
     rb_advance_phase(&tg.state);
@@ -12296,7 +12296,7 @@ static void gen_test_q246_single_card(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // // inlined helper finish_live_setup
     // 
     rb_advance_phase(&tg.state);
@@ -12380,7 +12380,7 @@ static void gen_q253_galaxy_gets_plus_one(void){
     rb_advance_phase(&tg.state);
     // 
     test_add_to_hand(&tg, galaxy);
-    // TODO: game.set_live_card(galaxy);
+    test_set_live_card(&tg, 0, galaxy);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -12459,7 +12459,7 @@ static void gen_q253_kanan_first_galaxy_gets_nothing(void){
     rb_advance_phase(&tg.state);
     // 
     test_add_to_hand(&tg, galaxy);
-    // TODO: game.set_live_card(galaxy);
+    test_set_live_card(&tg, 0, galaxy);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -12558,7 +12558,7 @@ static void gen_q253_both_succeed_two_live_cards(void){
     rb_advance_phase(&tg.state);
     // 
     test_add_to_hand(&tg, galaxy);
-    // TODO: game.set_live_card(galaxy);
+    test_set_live_card(&tg, 0, galaxy);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -12652,12 +12652,12 @@ static void gen_q139_under_energy_moves_with_member(void){
     // TODO: game.state
     // TODO: .player1
     // TODO: .stage
-    // TODO: .place_under_card(MemberArea::Center, e);
+    test_place_under(&tg, 0, 1, e);
     e = test_id(&tg, "LL-E-001-SD");
     // TODO: game.state
     // TODO: .player1
     // TODO: .stage
-    // TODO: .place_under_card(MemberArea::Center, e);
+    test_place_under(&tg, 0, 1, e);
     // 
     test_activate_ability(&tg, mover);
     test_has_pending_choice(&tg);
@@ -12666,8 +12666,8 @@ static void gen_q139_under_energy_moves_with_member(void){
     // TODO: scan_autos_both(&mut game);
     // 
     CHECK_EQ(tg.state.p[0].stage[0], mover, "q139_under_energy_moves_with_member");
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.stage.get_under_cards(MemberArea::LeftSide).len(), 2, "Q139: under-energy moved together with its member" );
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.stage.get_under_cards(MemberArea::Center).len(), 0, "old area no longer holds the under-energy" );
+    CHECK_EQ(tg.state.p[0].under_cards[0].n, 2, "q139_under_energy_moves_with_member");
+    CHECK_EQ(tg.state.p[0].under_cards[1].n, 0, "q139_under_energy_moves_with_member");
     // 
 }
 
@@ -12689,12 +12689,12 @@ static void gen_q138_under_energy_cannot_pay_costs(void){
     // TODO: game.state
     // TODO: .player1
     // TODO: .stage
-    // TODO: .place_under_card(MemberArea::Center, e);
+    test_place_under(&tg, 0, 1, e);
     e = test_id(&tg, "LL-E-001-SD");
     // TODO: game.state
     // TODO: .player1
     // TODO: .stage
-    // TODO: .place_under_card(MemberArea::Center, e);
+    test_place_under(&tg, 0, 1, e);
     test_add_to_hand(&tg, pricey);
     test_give_energy(&tg, 1);
     // 
@@ -12740,7 +12740,7 @@ static void gen_q37_live_start_grant_does_not_stack_on_refire(void){
     // // cannot reach that — LiveStart dispatch is phase-driven and single-shot,
     // // protected by the just_completed/this_batch guards. Hardening ticket:
     // // make gained-ability registration idempotent per (card, full_text).
-    // TODO: fire_trigger(&mut game, member, AbilityTrigger::LiveStart, "ライブ開始時");
+    { int ftpl = rb_owner_of_card(&tg.state, member); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ開始時"); rb_drain_ability_queue(&tg.state); }
     test_recalc(&tg);
     // 
     // TODO assert_eq (unresolved): assert_eq!( game.state.mods.p1_constant_total_score_bonus, 1, "Q37: one LiveStart timing -> exactly one 常時 score+1 grant" );
@@ -14108,7 +14108,7 @@ static void gen_setsuna_q205_all_heart_granted(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -14250,7 +14250,7 @@ static void gen_setsuna_q205_condition_not_met_no_bonus(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -14727,7 +14727,7 @@ static void gen_q276_control_normal_live_does_go_to_success_zone(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -15480,7 +15480,7 @@ static void gen_bp3_031_fires_from_real_live_victory_flow(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -15560,7 +15560,7 @@ static void gen_temporary_live_end_effect_expires_when_live_phase_ends(void){
     int me = test_id(&tg, "PL!HS-cl1-006-CL");
     tg.state.p[0].stage[0] = me;
     // 
-    // TODO: fire_trigger(&mut game, me, AbilityTrigger::Debut, "登場");
+    { int ftpl = rb_owner_of_card(&tg.state, me); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "登場"); rb_drain_ability_queue(&tg.state); }
     CHECK_EQ(rb_mods_get_blade(&tg.state.mods, me), 3, "temporary_live_end_effect_expires_when_live_phase_ends");
     // TODO assert: assert!( !game.state.temporary_effects.is_empty(), "the grant must be registered as a tracked temporary effect" );
     // 
@@ -15830,7 +15830,7 @@ static void gen_shizuku_bp1_live_start_gains_chosen_heart(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live_card);
+    test_set_live_card(&tg, 0, live_card);
     // 
     int before = 0;
     // TODO: eprintln!(
@@ -16047,7 +16047,7 @@ static void gen_vitamin_q128_hand_greater_triggers_score(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "vitamin_q128_hand_greater_triggers_score");
     // 
-    // TODO: game.set_live_card(vitamin);
+    test_set_live_card(&tg, 0, vitamin);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -16123,7 +16123,7 @@ static void gen_vitamin_q119_score_locked_after_resolution(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "vitamin_q119_score_locked_after_resolution");
     // 
-    // TODO: game.set_live_card(vitamin);
+    test_set_live_card(&tg, 0, vitamin);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -16196,7 +16196,7 @@ static void gen_vitamin_hand_less_or_equal_no_score(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "vitamin_hand_less_or_equal_no_score");
     // 
-    // TODO: game.set_live_card(vitamin);
+    test_set_live_card(&tg, 0, vitamin);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -16264,7 +16264,7 @@ static void gen_wao_wao_q178_activate_3_printemps_score_plus_1(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "wao_wao_q178_activate_3_printemps_score_plus_1");
     // 
-    // TODO: game.set_live_card(wao_wao);
+    test_set_live_card(&tg, 0, wao_wao);
     // 
     // // Now set wait states (active phase has already passed)
     // TODO: game.state
@@ -16343,7 +16343,7 @@ static void gen_wao_wao_q178_already_active_no_change(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "wao_wao_q178_already_active_no_change");
     // 
-    // TODO: game.set_live_card(wao_wao);
+    test_set_live_card(&tg, 0, wao_wao);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
@@ -16407,7 +16407,7 @@ static void gen_wao_wao_q179_only_2_wait_to_active_no_score(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "wao_wao_q179_only_2_wait_to_active_no_score");
     // 
-    // TODO: game.set_live_card(wao_wao);
+    test_set_live_card(&tg, 0, wao_wao);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
@@ -17011,7 +17011,7 @@ static void gen_q175_hanano_cross_unit_discard_same_unit_as_each_other(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -17260,7 +17260,7 @@ static void gen_q175_multiple_qualifying_units_player_chooses_pair(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -17348,7 +17348,7 @@ static void gen_hanano_no_qualifying_unit_skips_cost(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -18181,7 +18181,7 @@ static void gen_tote_mari_q68_can_still_set_live_card(void){
     // 
     // // Live card set phase: try to set a live card
     // // According to Q68, this should be allowed despite cannot_live
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // 
     // // Setting succeeded — that's the expected behavior per Q68
     CHECK(test_zone_has_id(&tg, 0, "live", live), "tote_mari_q68_can_still_set_live_card");
@@ -18285,14 +18285,14 @@ static void gen_tote_mari_q68_live_performance_discards_live_card(void){
     rb_advance_phase(&tg.state);
     // 
     // // P1 live card set: set the live card (cannot_live should NOT block this)
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     CHECK(test_zone_has_id(&tg, 0, "live", live), "tote_mari_q68_live_performance_discards_live_card");
     // 
     // // Pass to LiveCardSetSecondAttacker (P2's turn)
     rb_advance_phase(&tg.state);
     // 
     // // P2 can also set a live card
-    // TODO: game.set_live_card(opp_live);
+    test_set_live_card(&tg, 0, opp_live);
     CHECK(test_zone_has_id(&tg, 1, "live", opp_live), "tote_mari_q68_live_performance_discards_live_card");
     // 
     // // Pass to performance phase and execute P1's performance
@@ -18365,7 +18365,7 @@ static void gen_zettai_lover_heart4_member_gets_score_one_heart3_does_not(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(lover);
+    test_set_live_card(&tg, 0, lover);
     // // inlined helper finish_live_setup
     // 
     rb_advance_phase(&tg.state);
@@ -18426,7 +18426,7 @@ static void gen_zettai_lover_no_member_meets_heart_threshold(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(lover);
+    test_set_live_card(&tg, 0, lover);
     // // inlined helper finish_live_setup
     // 
     rb_advance_phase(&tg.state);
@@ -18484,7 +18484,7 @@ static void gen_zettai_lover_non_liella_high_heart_not_counted(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(lover);
+    test_set_live_card(&tg, 0, lover);
     // // inlined helper finish_live_setup
     // 
     rb_advance_phase(&tg.state);
@@ -19013,7 +19013,7 @@ static void gen_strawberry_trapper_q132_conditions_met_score_plus_2(void){
     // // Set after phase advancement (which resets tracking at Active phase)
     // TODO: game.state.p2_live_success_this_turn = true;
     // TODO: game.state.p2_live_success_no_excess = true;
-    // TODO: game.set_live_card(strawberry);
+    test_set_live_card(&tg, 0, strawberry);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -19133,7 +19133,7 @@ static void gen_strawberry_trapper_insufficient_heart05_no_score(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "strawberry_trapper_insufficient_heart05_no_score");
     // 
-    // TODO: game.set_live_card(strawberry);
+    test_set_live_card(&tg, 0, strawberry);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -19222,7 +19222,7 @@ static void gen_strawberry_trapper_no_opponent_success_no_score(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "strawberry_trapper_no_opponent_success_no_score");
     // 
-    // TODO: game.set_live_card(strawberry);
+    test_set_live_card(&tg, 0, strawberry);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -19427,7 +19427,7 @@ static void gen_awake_q36_10_plus_hasetsu_cheers_score_plus_1(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(awake);
+    test_set_live_card(&tg, 0, awake);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -19528,7 +19528,7 @@ static void gen_awake_q36_low_cheers_no_score(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(awake);
+    test_set_live_card(&tg, 0, awake);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -19627,7 +19627,7 @@ static void gen_awake_q36_non_hasetsu_cheered_no_score(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(awake);
+    test_set_live_card(&tg, 0, awake);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -20237,7 +20237,7 @@ static void gen_link_to_future_three_distinct_members_plus_6(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "link_to_future_three_distinct_members_plus_6");
     // 
-    // TODO: game.set_live_card(link);
+    test_set_live_card(&tg, 0, link);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -20344,7 +20344,7 @@ static void gen_link_to_future_one_member_plus_2(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "link_to_future_one_member_plus_2");
     // 
-    // TODO: game.set_live_card(link);
+    test_set_live_card(&tg, 0, link);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -20446,7 +20446,7 @@ static void gen_link_to_future_zero_members_score_0(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "link_to_future_zero_members_score_0");
     // 
-    // TODO: game.set_live_card(link);
+    test_set_live_card(&tg, 0, link);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -20807,7 +20807,7 @@ static void gen_sumire_q113_no_cheer_no_trigger(void){
     // 
     // // Set a live card so the performance starts
     test_add_to_hand(&tg, filler);
-    // TODO: game.set_live_card(filler);
+    test_set_live_card(&tg, 0, filler);
     // // inlined helper advance_to_live_success
     // 
     rb_advance_phase(&tg.state);
@@ -20872,7 +20872,7 @@ static void gen_sumire_q112_cheer_with_blade_heart_no_gain(void){
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "sumire_q112_cheer_with_blade_heart_no_gain");
     // 
     test_add_to_hand(&tg, filler);
-    // TODO: game.set_live_card(filler);
+    test_set_live_card(&tg, 0, filler);
     // // inlined helper advance_to_live_success
     // 
     rb_advance_phase(&tg.state);
@@ -20978,7 +20978,7 @@ static void gen_sumire_q112_positive_no_blade_heart_triggers_heart06(void){
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "sumire_q112_positive_no_blade_heart_triggers_heart06");
     // 
     test_add_to_hand(&tg, filler);
-    // TODO: game.set_live_card(filler);
+    test_set_live_card(&tg, 0, filler);
     // // inlined helper advance_to_live_success
     // 
     rb_advance_phase(&tg.state);
@@ -21066,7 +21066,7 @@ static void gen_tokimeki_q216_missing_hearts_no_score(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "tokimeki_q216_missing_hearts_no_score");
     // 
-    // TODO: game.set_live_card(tokimeki);
+    test_set_live_card(&tg, 0, tokimeki);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
@@ -21145,7 +21145,7 @@ static void gen_tokimeki_all_6_colors_collectively_score_plus_1(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "tokimeki_all_6_colors_collectively_score_plus_1");
     // 
-    // TODO: game.set_live_card(tokimeki);
+    test_set_live_card(&tg, 0, tokimeki);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
@@ -21223,7 +21223,7 @@ static void gen_tokimeki_q232_modifier_separate_from_base_score(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "tokimeki_q232_modifier_separate_from_base_score");
     // 
-    // TODO: game.set_live_card(tokimeki);
+    test_set_live_card(&tg, 0, tokimeki);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
@@ -21277,7 +21277,7 @@ static void gen_wien_q113_no_cheer_no_trigger(void){
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "wien_q113_no_cheer_no_trigger");
     // 
     test_add_to_hand(&tg, filler);
-    // TODO: game.set_live_card(filler);
+    test_set_live_card(&tg, 0, filler);
     // // inlined helper advance_to_live_success
     // 
     rb_advance_phase(&tg.state);
@@ -21341,7 +21341,7 @@ static void gen_wien_q112_cheer_with_blade_heart_no_gain(void){
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "wien_q112_cheer_with_blade_heart_no_gain");
     // 
     test_add_to_hand(&tg, filler);
-    // TODO: game.set_live_card(filler);
+    test_set_live_card(&tg, 0, filler);
     // // inlined helper advance_to_live_success
     // 
     rb_advance_phase(&tg.state);
@@ -21447,7 +21447,7 @@ static void gen_wien_q112_positive_no_blade_heart_triggers_heart03(void){
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "wien_q112_positive_no_blade_heart_triggers_heart03");
     // 
     test_add_to_hand(&tg, filler);
-    // TODO: game.set_live_card(filler);
+    test_set_live_card(&tg, 0, filler);
     // // inlined helper advance_to_live_success
     // 
     rb_advance_phase(&tg.state);
@@ -21600,7 +21600,7 @@ static void gen_start_dash_q36_live_success_draw_3(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "start_dash_q36_live_success_draw_3");
-    // TODO: game.set_live_card(start_dash);
+    test_set_live_card(&tg, 0, start_dash);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
@@ -21621,7 +21621,7 @@ static void gen_cl1_006_debut_gains_three_blades(void){
     int me = test_id(&tg, "PL!HS-cl1-006-CL");
     tg.state.p[0].stage[1] = me;
     // 
-    // TODO: fire_trigger(&mut game, me, AbilityTrigger::Debut, "登場");
+    { int ftpl = rb_owner_of_card(&tg.state, me); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "登場"); rb_drain_ability_queue(&tg.state); }
     // 
     CHECK_EQ(rb_mods_get_blade(&tg.state.mods, me), 3, "cl1_006_debut_gains_three_blades");
     // 
@@ -21711,7 +21711,7 @@ static void gen_sd1026_energy_nine_or_more_scores(void){
     test_add_to_live(&tg, live);
     test_give_energy(&tg, 9);
     // 
-    // TODO: fire_trigger(&mut game, live, AbilityTrigger::LiveStart, "ライブ開始時");
+    { int ftpl = rb_owner_of_card(&tg.state, live); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ開始時"); rb_drain_ability_queue(&tg.state); }
     // 
     // TODO assert_eq (unresolved): assert_eq!( game.state.mods.get_score_modifier(live), 1, "{}: 9 energy -> score +1", variant );
     // TODO: }
@@ -21727,7 +21727,7 @@ static void gen_sd1026_energy_below_nine_no_score(void){
     test_add_to_live(&tg, live);
     test_give_energy(&tg, 8);
     // 
-    // TODO: fire_trigger(&mut game, live, AbilityTrigger::LiveStart, "ライブ開始時");
+    { int ftpl = rb_owner_of_card(&tg.state, live); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ開始時"); rb_drain_ability_queue(&tg.state); }
     // 
     CHECK_EQ(rb_mods_get_score(&tg.state.mods, live), 0, "sd1026_energy_below_nine_no_score");
     // 
@@ -21747,7 +21747,7 @@ static void gen_treco_please_aqours_h04_total_ten_scores_two(void){
     tg.state.p[0].stage[0] = a1;
     tg.state.p[0].stage[1] = a2;
     // 
-    // TODO: fire_trigger(&mut game, live, AbilityTrigger::LiveStart, "ライブ開始時");
+    { int ftpl = rb_owner_of_card(&tg.state, live); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ開始時"); rb_drain_ability_queue(&tg.state); }
     // 
     CHECK_EQ(rb_mods_get_score(&tg.state.mods, live), 2, "treco_please_aqours_h04_total_ten_scores_two");
     // 
@@ -21765,7 +21765,7 @@ static void gen_treco_please_aqours_h04_below_ten_no_score(void){
     int a1 = test_id(&tg, "PL!S-bp5-007-R");
     tg.state.p[0].stage[0] = a1;
     // 
-    // TODO: fire_trigger(&mut game, live, AbilityTrigger::LiveStart, "ライブ開始時");
+    { int ftpl = rb_owner_of_card(&tg.state, live); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ開始時"); rb_drain_ability_queue(&tg.state); }
     // 
     CHECK_EQ(rb_mods_get_score(&tg.state.mods, live), 0, "treco_please_aqours_h04_below_ten_no_score");
     // 
@@ -21785,7 +21785,7 @@ static void gen_bp7024_debut_heart01_with_three_r3birth(void){
     tg.state.p[0].stage[2] = r2;
     // TODO: game.state.player2.stage.stage[0] = r3;
     // 
-    // TODO: fire_trigger(&mut game, me, AbilityTrigger::Debut, "登場");
+    { int ftpl = rb_owner_of_card(&tg.state, me); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "登場"); rb_drain_ability_queue(&tg.state); }
     // 
     // TODO: const H01: rabuka_engine::card::HeartColor = rabuka_engine::card::HeartColor::Heart01;
     // TODO assert: assert!( game.state.mods.get_heart_modifier(me, H01) > 0, "3 R3BIRTH members on stage -> heart01 until live end" );
@@ -21804,7 +21804,7 @@ static void gen_bp7024_debut_no_heart01_with_two_r3birth(void){
     tg.state.p[0].stage[1] = r1;
     tg.state.p[0].stage[2] = other;
     // 
-    // TODO: fire_trigger(&mut game, me, AbilityTrigger::Debut, "登場");
+    { int ftpl = rb_owner_of_card(&tg.state, me); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "登場"); rb_drain_ability_queue(&tg.state); }
     // 
     // TODO: const H01: rabuka_engine::card::HeartColor = rabuka_engine::card::HeartColor::Heart01;
     // TODO assert_eq (unresolved): assert_eq!( game.state.mods.get_heart_modifier(me, H01), 0, "only 2 R3BIRTH members -> no heart01" );
@@ -22488,9 +22488,9 @@ static void gen_mebius_single_copy_blocks_both_when_tied(void){
     // 
     // TODO loop (degraded): for _ in 0..5 { game.pass(); }
     // 
-    // TODO: game.set_live_card(mebius_p1);
+    test_set_live_card(&tg, 0, mebius_p1);
     rb_advance_phase(&tg.state);
-    // TODO: game.set_live_card(other_live_p2);
+    test_set_live_card(&tg, 0, other_live_p2);
     // // inlined helper advance_victory
     // 
     // TODO loop (degraded): for _ in 0..3 { game.pass(); }
@@ -22652,9 +22652,9 @@ static void gen_mebius_no_block_when_scores_untied_both_succeed(void){
     // 
     // TODO loop (degraded): for _ in 0..5 { game.pass(); }
     // 
-    // TODO: game.set_live_card(mebius_p1);
+    test_set_live_card(&tg, 0, mebius_p1);
     rb_advance_phase(&tg.state);
-    // TODO: game.set_live_card(fail_live_p2);
+    test_set_live_card(&tg, 0, fail_live_p2);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     test_has_pending_choice(&tg);
@@ -22820,9 +22820,9 @@ static void gen_mebius_restriction_expires_next_live(void){
     // 
     // TODO loop (degraded): for _ in 0..5 { game.pass(); }
     // 
-    // TODO: game.set_live_card(mebius_p1);
+    test_set_live_card(&tg, 0, mebius_p1);
     rb_advance_phase(&tg.state);
-    // TODO: game.set_live_card(mebius_p2);
+    test_set_live_card(&tg, 0, mebius_p2);
     // // inlined helper advance_victory
     // 
     // TODO loop (degraded): for _ in 0..3 { game.pass(); }
@@ -22845,7 +22845,7 @@ static void gen_mebius_restriction_expires_next_live(void){
     // TODO loop (degraded): for _ in 0..5 { game.pass(); }
     // // May be in Main phase again; set next live if possible
     // TODO: if game.state.current_phase.to_string().contains("LiveCardSet") {
-    // TODO: game.set_live_card(next_live);
+    test_set_live_card(&tg, 0, next_live);
     // TODO loop (degraded): for _ in 0..3 { game.pass(); }
     test_has_pending_choice(&tg);
     rb_advance_phase(&tg.state);
@@ -23005,9 +23005,9 @@ static void gen_mebius_tie_when_both_fail_still_restricts(void){
     // 
     // TODO loop (degraded): for _ in 0..5 { game.pass(); }
     // 
-    // TODO: game.set_live_card(mebius_p1);
+    test_set_live_card(&tg, 0, mebius_p1);
     rb_advance_phase(&tg.state);
-    // TODO: game.set_live_card(fail_live_p2);
+    test_set_live_card(&tg, 0, fail_live_p2);
     // TODO loop (degraded): for _ in 0..3 { game.pass(); }
     test_has_pending_choice(&tg);
     // // inlined helper advance_victory
@@ -23214,7 +23214,7 @@ static void gen_aurora_flower_all_distinct_names_and_costs_grants_score(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(aurora);
+    test_set_live_card(&tg, 0, aurora);
     // // inlined helper finish_live_setup
     // 
     rb_advance_phase(&tg.state);
@@ -23277,7 +23277,7 @@ static void gen_aurora_flower_same_cost_no_score(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(aurora);
+    test_set_live_card(&tg, 0, aurora);
     // // inlined helper finish_live_setup
     // 
     rb_advance_phase(&tg.state);
@@ -23340,7 +23340,7 @@ static void gen_aurora_flower_same_name_no_score(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(aurora);
+    test_set_live_card(&tg, 0, aurora);
     // // inlined helper finish_live_setup
     // 
     rb_advance_phase(&tg.state);
@@ -23402,7 +23402,7 @@ static void gen_aurora_flower_two_members_no_score(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(aurora);
+    test_set_live_card(&tg, 0, aurora);
     // // inlined helper finish_live_setup
     // 
     rb_advance_phase(&tg.state);
@@ -23445,7 +23445,7 @@ static void gen_yoshiko_live_start_mills_deck_bottom_three(void){
     int top_marker = 0;
     int bottoms = 0;
     // TODO destructuring: let (top_marker, bottoms) = seed_deck_with_bottom(&mut game);
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -23492,7 +23492,7 @@ static void gen_yoshiko_n_live_start_mills_deck_bottom_one(void){
     int bottoms = 0;
     // TODO destructuring: let (_top, bottoms) = seed_deck_with_bottom(&mut game);
     int bottom_most = 0;
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -23536,7 +23536,7 @@ static void gen_mari_live_start_mills_deck_bottom_one(void){
     int bottoms = 0;
     // TODO destructuring: let (_top, bottoms) = seed_deck_with_bottom(&mut game);
     int bottom_most = 0;
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -23603,7 +23603,7 @@ static void gen_yoshiko_live_start_all_aqours_gives_heart04(void){
     test_add_to_deck(&tg, aqours2);
     test_add_to_deck(&tg, aqours3);
     // 
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -24795,7 +24795,7 @@ static void gen_miracle_stay_tune_both_conditions_met_score_plus_1(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(card);
+    test_set_live_card(&tg, 0, card);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -24880,7 +24880,7 @@ static void gen_miracle_stay_tune_fewer_than_3_distinct_members_no_score(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(card);
+    test_set_live_card(&tg, 0, card);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -24965,7 +24965,7 @@ static void gen_miracle_stay_tune_empty_success_zone_no_score(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(card);
+    test_set_live_card(&tg, 0, card);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -25048,7 +25048,7 @@ static void gen_miracle_stay_tune_neither_condition_no_score(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(card);
+    test_set_live_card(&tg, 0, card);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -26190,7 +26190,7 @@ static void gen_live_card_set_refill_draws_placed_count(void){
     // TODO: }
     // TODO: }
     // 
-    // TODO: game.set_live_card(live1);
+    test_set_live_card(&tg, 0, live1);
     // // A second live arrives by effect (established direct-placement idiom).
     test_add_to_live(&tg, live2);
     // 
@@ -26270,7 +26270,7 @@ static void gen_ginako_discard_non_ginako_gains_one_blade(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(filler_live);
+    test_set_live_card(&tg, 0, filler_live);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -26347,7 +26347,7 @@ static void gen_ginako_skip_cost_gains_zero_blades(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(filler_live);
+    test_set_live_card(&tg, 0, filler_live);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -26515,9 +26515,9 @@ static void gen_rin_activate_across_turns(void){
     // TODO: } // P2 Active→Energy→Draw→Main, then LiveCardSet
     rb_advance_phase(&tg.state);
     // TODO: } // P2 Active→Energy→Draw→Main, then LiveCardSet
-    // TODO: game.set_live_card(live_card);
+    test_set_live_card(&tg, 0, live_card);
     rb_advance_phase(&tg.state);
-    // TODO: game.set_live_card(live_card);
+    test_set_live_card(&tg, 0, live_card);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
@@ -26631,7 +26631,7 @@ static void gen_rin_live_success_ability_triggers(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
-    // TODO: game.set_live_card(live_card);
+    test_set_live_card(&tg, 0, live_card);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
@@ -26742,7 +26742,7 @@ static void gen_center_mus_with_2_heart03_reduces_1(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(wonder);
+    test_set_live_card(&tg, 0, wonder);
     // // inlined helper finish_live_setup
     // 
     rb_advance_phase(&tg.state);
@@ -26818,7 +26818,7 @@ static void gen_center_mus_zero_heart03_no_reduction(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(wonder);
+    test_set_live_card(&tg, 0, wonder);
     // // inlined helper finish_live_setup
     // 
     rb_advance_phase(&tg.state);
@@ -26893,7 +26893,7 @@ static void gen_no_center_member_no_reduction(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(wonder);
+    test_set_live_card(&tg, 0, wonder);
     // // inlined helper finish_live_setup
     // 
     rb_advance_phase(&tg.state);
@@ -26969,7 +26969,7 @@ static void gen_center_non_mus_no_reduction(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(wonder);
+    test_set_live_card(&tg, 0, wonder);
     // // inlined helper finish_live_setup
     // 
     rb_advance_phase(&tg.state);
@@ -27853,7 +27853,7 @@ static void gen_butterfly_wing_q260_suppressed_not_resolved(void){
     rb_advance_phase(&tg.state);
     // 
     test_add_to_hand(&tg, butterfly);
-    // TODO: game.set_live_card(butterfly);
+    test_set_live_card(&tg, 0, butterfly);
     // 
     // // Advance to live_start phase
     // // inlined helper advance_to_live_start
@@ -27942,7 +27942,7 @@ static void gen_butterfly_wing_q260_control_live_start_resolves(void){
     rb_advance_phase(&tg.state);
     // 
     test_add_to_hand(&tg, live);
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // 
     // // Advance to live_start — LiveStart abilities should trigger
     // // inlined helper advance_to_live_start
@@ -28061,7 +28061,7 @@ static void gen_butterfly_wing_live_success_scores_with_live_start_members(void)
     rb_advance_phase(&tg.state);
     // 
     test_add_to_hand(&tg, butterfly);
-    // TODO: game.set_live_card(butterfly);
+    test_set_live_card(&tg, 0, butterfly);
     // 
     // // Advance to live_start (suppressed), then performance
     // // inlined helper advance_to_live_start
@@ -28183,7 +28183,7 @@ static void gen_butterfly_wing_no_live_start_member_no_score(void){
     rb_advance_phase(&tg.state);
     // 
     test_add_to_hand(&tg, butterfly);
-    // TODO: game.set_live_card(butterfly);
+    test_set_live_card(&tg, 0, butterfly);
     // 
     // // inlined helper advance_to_live_start
     // 
@@ -28676,9 +28676,9 @@ static void gen_bp5_020_skip_no_draw(void){
     test_add_to_hand(&tg, live);
     test_give_energy(&tg, 20);
     // TODO loop (degraded): for _ in 0..5 { game.pass(); }
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // // Directly fire LiveSuccess via trigger to test pay vs skip without full live flow
-    // TODO: crate::helpers::fire_trigger(&mut game, live, rabuka_engine::core::types::AbilityTrigger::LiveSuccess, "ライブ成功時");
+    { int ftpl = rb_owner_of_card(&tg.state, live); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ成功時"); rb_drain_ability_queue(&tg.state); }
     test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, 0);
     test_has_pending_choice(&tg);
@@ -28702,8 +28702,8 @@ static void gen_bp5_020_insufficient_energy_no_draw(void){
     test_add_to_hand(&tg, live);
     test_give_energy(&tg, 0);
     // TODO loop (degraded): for _ in 0..5 { game.pass(); }
-    // TODO: game.set_live_card(live);
-    // TODO: crate::helpers::fire_trigger(&mut game, live, rabuka_engine::core::types::AbilityTrigger::LiveSuccess, "ライブ成功時");
+    test_set_live_card(&tg, 0, live);
+    { int ftpl = rb_owner_of_card(&tg.state, live); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ成功時"); rb_drain_ability_queue(&tg.state); }
     test_has_pending_choice(&tg);
     // // Try to pay with 0 energy — should either not offer pay or fail
     int before = tg.state.p[0].energy_active;
@@ -29516,7 +29516,7 @@ static void gen_wien_q262_empty_hand_triggers_energy_move(void){
     // 
     // // Hand should now have only the live card at this point
     // // Set it as the live card — after this hand is empty
-    // TODO: game.set_live_card(live_card);
+    test_set_live_card(&tg, 0, live_card);
     // 
     int energy_zone_before = tg.state.p[0].energy_active;
     int energy_deck_before = 0;
@@ -29583,7 +29583,7 @@ static void gen_wien_q262_discard_prevents_energy_move(void){
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "wien_q262_discard_prevents_energy_move");
     // 
     // // Set live card — hand still has filler
-    // TODO: game.set_live_card(live_card);
+    test_set_live_card(&tg, 0, live_card);
     CHECK_EQ(tg.state.p[0].hand.n, 1, "wien_q262_discard_prevents_energy_move");
     int energy_zone_before = tg.state.p[0].energy_active;
     int energy_deck_before = 0;
@@ -29751,7 +29751,7 @@ static void gen_wien_with_partner_reduces_cheer_checks_by_8(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live_card);
+    test_set_live_card(&tg, 0, live_card);
     // // inlined helper advance_past_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -29818,7 +29818,7 @@ static void gen_wien_alone_no_reduction(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live_card);
+    test_set_live_card(&tg, 0, live_card);
     // // inlined helper advance_past_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -29885,7 +29885,7 @@ static void gen_opponent_cheer_checks_unaffected(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live_card);
+    test_set_live_card(&tg, 0, live_card);
     // // inlined helper advance_past_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -29952,7 +29952,7 @@ static void gen_q117_second_wien_copy_counts_as_other_member(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live_card);
+    test_set_live_card(&tg, 0, live_card);
     // // inlined helper advance_past_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -30084,7 +30084,7 @@ static void gen_emotion_zero_in_success_zone(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(emo);
+    test_set_live_card(&tg, 0, emo);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     while (test_has_pending_choice(&tg)) rb_resume_with_choice(&tg.state, 0);
@@ -30131,7 +30131,7 @@ static void gen_emotion_one_in_success_zone(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(emo);
+    test_set_live_card(&tg, 0, emo);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     while (test_has_pending_choice(&tg)) rb_resume_with_choice(&tg.state, 0);
@@ -30183,7 +30183,7 @@ static void gen_emotion_two_in_success_zone(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(emo);
+    test_set_live_card(&tg, 0, emo);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     while (test_has_pending_choice(&tg)) rb_resume_with_choice(&tg.state, 0);
@@ -30236,7 +30236,7 @@ static void gen_emotion_live_zone_fires_success_zone_does_not(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(emo);
+    test_set_live_card(&tg, 0, emo);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     while (test_has_pending_choice(&tg)) rb_resume_with_choice(&tg.state, 0);
@@ -31454,7 +31454,7 @@ static void gen_special_color_set_blades_and_score_twin_in_one_live(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
-    // TODO: game.set_live_card(special);
+    test_set_live_card(&tg, 0, special);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     while (test_has_pending_choice(&tg)) rb_resume_with_choice(&tg.state, 0);
@@ -31968,7 +31968,7 @@ static void gen_s_pb1_019_live_start_enough_heart02_invalidates(void){
     test_add_to_hand(&tg, live);
     // TODO loop (degraded): for _ in 0..10 { let f=test_id(&tg, "PL!-sd1-010-SD"); game.state.player1.main_deck.cards.push(f); game.state.player2.main_deck.cards.push(f); }
     // TODO loop (degraded): for _ in 0..5 { game.pass(); }
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // TODO loop (degraded): for _ in 0..2 { game.pass(); }
     // // LiveStart should have invalidated LiveSuccess, but we check that the invalidate flag is set
     CHECK(test_zone_has_id(&tg, 0, "live", live), "s_pb1_019_live_start_enough_heart02_invalidates");
@@ -31990,7 +31990,7 @@ static void gen_s_pb1_019_live_start_insufficient_heart02_not_invalidate(void){
     test_add_to_hand(&tg, live);
     // TODO loop (degraded): for _ in 0..10 { let f=test_id(&tg, "PL!-sd1-010-SD"); game.state.player1.main_deck.cards.push(f); game.state.player2.main_deck.cards.push(f); }
     // TODO loop (degraded): for _ in 0..5 { game.pass(); }
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // TODO loop (degraded): for _ in 0..2 { game.pass(); }
     // // With low heart02, invalidate should NOT happen, LiveSuccess should still be valid
     CHECK(test_zone_has_id(&tg, 0, "live", live), "s_pb1_019_live_start_insufficient_heart02_not_invalidate");
@@ -32008,7 +32008,7 @@ static void gen_s_pb1_019_live_success_places_opponent_energy_wait(void){
     tg.state.p[0].stage[1] = test_id(&tg, "PL!S-sd1-001-SD");
     test_add_to_hand(&tg, live);
     // TODO loop (degraded): for _ in 0..5 { game.pass(); }
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // TODO loop (degraded): for _ in 0..2 { game.pass(); }
     // // Need to go to LiveSuccess: advance through live phases
     // TODO loop (degraded): for _ in 0..7 { game.pass(); }
@@ -32919,7 +32919,7 @@ static void gen_all_members_excluded_no_reduction(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(card);
+    test_set_live_card(&tg, 0, card);
     // // inlined helper finish_live_setup
     // 
     rb_advance_phase(&tg.state);
@@ -33001,7 +33001,7 @@ static void gen_one_non_excluded_member_reduces_1(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(card);
+    test_set_live_card(&tg, 0, card);
     // // inlined helper finish_live_setup
     // 
     rb_advance_phase(&tg.state);
@@ -33083,7 +33083,7 @@ static void gen_mixed_excluded_and_counted_members(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(card);
+    test_set_live_card(&tg, 0, card);
     // // inlined helper finish_live_setup
     // 
     rb_advance_phase(&tg.state);
@@ -33165,7 +33165,7 @@ static void gen_member_with_both_excluded_and_non_excluded_colors_counts(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(card);
+    test_set_live_card(&tg, 0, card);
     // // inlined helper finish_live_setup
     // 
     rb_advance_phase(&tg.state);
@@ -33475,7 +33475,7 @@ static void gen_s_bp2_021_live_success_with_live_in_yell_moves_to_deck_bottom(vo
     // TODO: game.state.yell_occurred = true;
     test_add_to_deck(&tg, filler);
     int deck_len_before = tg.state.p[0].deck.n;
-    // TODO: crate::helpers::fire_trigger(&mut game, live, rabuka_engine::core::types::AbilityTrigger::LiveSuccess, "ライブ成功時");
+    { int ftpl = rb_owner_of_card(&tg.state, live); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ成功時"); rb_drain_ability_queue(&tg.state); }
     // // The move should be pending as SelectCard over revealed_cards (max 1, allow_skip)
     test_has_pending_choice(&tg);
     // // Should offer the live_in_yell as selectable
@@ -33505,7 +33505,7 @@ static void gen_s_bp2_021_live_success_no_live_in_yell_no_move(void){
     // TODO: game.state.revealed_cards.push(filler); // only filler, no live
     // TODO: game.state.yell_occurred = true;
     int deck_before = 0;
-    // TODO: crate::helpers::fire_trigger(&mut game, live, rabuka_engine::core::types::AbilityTrigger::LiveSuccess, "ライブ成功時");
+    { int ftpl = rb_owner_of_card(&tg.state, live); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ成功時"); rb_drain_ability_queue(&tg.state); }
     test_has_pending_choice(&tg);
     // // No live eligible, should be skippable or auto-skip
     rb_resume_with_choice(&tg.state, -1);
@@ -33530,7 +33530,7 @@ static void gen_s_bp2_021_live_success_empty_yell_no_move(void){
     // TODO: game.state.revealed_cards.clear();
     // TODO: game.state.yell_occurred = false;
     int deck_before = 0;
-    // TODO: crate::helpers::fire_trigger(&mut game, live, rabuka_engine::core::types::AbilityTrigger::LiveSuccess, "ライブ成功時");
+    { int ftpl = rb_owner_of_card(&tg.state, live); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ成功時"); rb_drain_ability_queue(&tg.state); }
     test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, -1);
     // TODO: }
@@ -33555,7 +33555,7 @@ static void gen_s_bp2_021_live_success_skip_optional(void){
     // TODO: game.state.revealed_cards.push(live_in_yell);
     // TODO: game.state.yell_occurred = true;
     int deck_before = 0;
-    // TODO: crate::helpers::fire_trigger(&mut game, live, rabuka_engine::core::types::AbilityTrigger::LiveSuccess, "ライブ成功時");
+    { int ftpl = rb_owner_of_card(&tg.state, live); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ成功時"); rb_drain_ability_queue(&tg.state); }
     test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, -1);
     // TODO: }
@@ -33579,7 +33579,7 @@ static void gen_pb1021_dollchestra_in_live_zone_draws(void){
     test_add_to_deck(&tg, drawn);
     int hand_before = tg.state.p[0].hand.n;
     // 
-    // TODO: fire_trigger(&mut game, me, AbilityTrigger::LiveSuccess, "ライブ成功時");
+    { int ftpl = rb_owner_of_card(&tg.state, me); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ成功時"); rb_drain_ability_queue(&tg.state); }
     // 
     // TODO assert_eq (unresolved): assert_eq!( game.state.player1.hand.cards.len(), hand_before + 1, "DOLLCHESTRA in live zone -> draw 1" );
     // 
@@ -33600,7 +33600,7 @@ static void gen_pb1021_no_dollchestra_no_draw(void){
     test_add_to_deck(&tg, drawn);
     int hand_before = tg.state.p[0].hand.n;
     // 
-    // TODO: fire_trigger(&mut game, me, AbilityTrigger::LiveSuccess, "ライブ成功時");
+    { int ftpl = rb_owner_of_card(&tg.state, me); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ成功時"); rb_drain_ability_queue(&tg.state); }
     // 
     CHECK_EQ(tg.state.p[0].hand.n, hand_before, "pb1021_no_dollchestra_no_draw");
     // discard: let _ = drawn;
@@ -33625,7 +33625,7 @@ static void gen_bp6022_more_opp_energy_scores(void){
     test_add_to_discard(&tg, e2);
     // TODO: game.state.player2.energy_zone.add_active(3);
     // 
-    // TODO: fire_trigger(&mut game, live, AbilityTrigger::LiveSuccess, "ライブ成功時");
+    { int ftpl = rb_owner_of_card(&tg.state, live); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ成功時"); rb_drain_ability_queue(&tg.state); }
     // 
     CHECK_EQ(rb_mods_get_score(&tg.state.mods, live), 1, "bp6022_more_opp_energy_scores");
     // 
@@ -33646,7 +33646,7 @@ static void gen_bp6022_equal_or_fewer_opp_energy_no_score(void){
     test_add_to_discard(&tg, e2);
     // TODO: game.state.player2.energy_zone.add_active(2);
     // 
-    // TODO: fire_trigger(&mut game, live, AbilityTrigger::LiveSuccess, "ライブ成功時");
+    { int ftpl = rb_owner_of_card(&tg.state, live); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ成功時"); rb_drain_ability_queue(&tg.state); }
     // 
     CHECK_EQ(rb_mods_get_score(&tg.state.mods, live), 0, "bp6022_equal_or_fewer_opp_energy_no_score");
     // 
@@ -33667,7 +33667,7 @@ static void gen_bp6012_debut_activates_energy_with_sbuuke_teammate(void){
     test_add_to_discard(&tg, energy);
     CHECK_EQ(tg.state.p[0].energy_active, 0, "bp6012_debut_activates_energy_with_sbuuke_teammate");
     // 
-    // TODO: fire_trigger(&mut game, me, AbilityTrigger::Debut, "登場");
+    { int ftpl = rb_owner_of_card(&tg.state, me); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "登場"); rb_drain_ability_queue(&tg.state); }
     // 
     CHECK_EQ(tg.state.p[0].energy_active, 1, "bp6012_debut_activates_energy_with_sbuuke_teammate");
     // 
@@ -33704,7 +33704,7 @@ static void gen_bp2017_debut_draws_with_10_card_waitroom(void){
     test_add_to_deck(&tg, drawn);
     int hand_before = tg.state.p[0].hand.n;
     // 
-    // TODO: fire_trigger(&mut game, me, AbilityTrigger::Debut, "登場");
+    { int ftpl = rb_owner_of_card(&tg.state, me); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "登場"); rb_drain_ability_queue(&tg.state); }
     // 
     // TODO assert_eq (unresolved): assert_eq!( game.state.player1.hand.cards.len(), hand_before + 1, "waitroom has 10+ cards -> draw 1" );
     // 
@@ -33739,7 +33739,7 @@ static void gen_bp2017_debut_no_draw_with_9_card_waitroom(void){
     test_add_to_deck(&tg, drawn);
     int hand_before = tg.state.p[0].hand.n;
     // 
-    // TODO: fire_trigger(&mut game, me, AbilityTrigger::Debut, "登場");
+    { int ftpl = rb_owner_of_card(&tg.state, me); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "登場"); rb_drain_ability_queue(&tg.state); }
     // 
     CHECK_EQ(tg.state.p[0].hand.n, hand_before, "bp2017_debut_no_draw_with_9_card_waitroom");
     // 
@@ -33939,7 +33939,7 @@ static void gen_sd1022_live_start_grants_blade_to_all_aqours_members(void){
     tg.state.p[0].stage[1] = a2;
     tg.state.p[0].stage[2] = non_aqours;
     // 
-    // TODO: fire_trigger(&mut game, live, AbilityTrigger::LiveStart, "ライブ開始時");
+    { int ftpl = rb_owner_of_card(&tg.state, live); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ開始時"); rb_drain_ability_queue(&tg.state); }
     // 
     CHECK(rb_mods_get_blade(&tg.state.mods, a1), "sd1022_live_start_grants_blade_to_all_aqours_members");
     CHECK(rb_mods_get_blade(&tg.state.mods, a2), "sd1022_live_start_grants_blade_to_all_aqours_members");
@@ -34923,7 +34923,7 @@ static void gen_sd2005_specify_color_grants_exactly_two_of_one_color(void){
     // TODO: game.add_to_hand(test_id(&tg, "PL!-sd1-010-SD"));
     // TODO: game.add_to_hand(test_id(&tg, "PL!S-sd1-001-SD"));
     // 
-    // TODO: fire_trigger(&mut game, me, AbilityTrigger::LiveStart, "ライブ開始時");
+    { int ftpl = rb_owner_of_card(&tg.state, me); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ開始時"); rb_drain_ability_queue(&tg.state); }
     // // First prompt: the optional discard-2-hand cost selection.
     test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, 0);
@@ -34958,7 +34958,7 @@ static void gen_pb2030_choose_first_option_transforms(void){
     TestGame tg; test_game_new(&tg);
     int me = 0;
     // 
-    // TODO: fire_trigger(&mut game, me, AbilityTrigger::LiveStart, "ライブ開始時");
+    { int ftpl = rb_owner_of_card(&tg.state, me); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ開始時"); rb_drain_ability_queue(&tg.state); }
     rb_resume_with_choice(&tg.state, 0);
     // 
     // TODO assert_eq (unresolved): assert_eq!( game.state.mods.heart_color_multiplier.get(&me).copied(), Some(HeartColor::Heart02), "chose heart02 -> original hearts become heart02" );
@@ -34972,7 +34972,7 @@ static void gen_pb2030_choose_third_option_transforms(void){
     TestGame tg; test_game_new(&tg);
     int me = 0;
     // 
-    // TODO: fire_trigger(&mut game, me, AbilityTrigger::LiveStart, "ライブ開始時");
+    { int ftpl = rb_owner_of_card(&tg.state, me); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ開始時"); rb_drain_ability_queue(&tg.state); }
     rb_resume_with_choice(&tg.state, 2);
     // 
     // TODO assert_eq (unresolved): assert_eq!( game.state.mods.heart_color_multiplier.get(&me).copied(), Some(HeartColor::Heart06), "chose heart06 -> original hearts become heart06" );
@@ -35050,7 +35050,7 @@ static void gen_cl1012_tie_score_retrieves_cost_nine_member(void){
     // TODO: game.state.revealed_cards.push(cheap);
     // 
     int live_id = 0;
-    // TODO: fire_trigger(&mut game, live_id, AbilityTrigger::LiveSuccess, "ライブ成功時");
+    { int ftpl = rb_owner_of_card(&tg.state, live_id); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ成功時"); rb_drain_ability_queue(&tg.state); }
     int guard = 0;
     test_has_pending_choice(&tg);
     // TODO: guard += 1;
@@ -35106,7 +35106,7 @@ static void gen_cl1012_unequal_scores_no_retrieval(void){
     // TODO: game.state.revealed_cards.push(expensive);
     // 
     int live_id = 0;
-    // TODO: fire_trigger(&mut game, live_id, AbilityTrigger::LiveSuccess, "ライブ成功時");
+    { int ftpl = rb_owner_of_card(&tg.state, live_id); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ成功時"); rb_drain_ability_queue(&tg.state); }
     // 
     CHECK((!test_zone_has_id(&tg, 0, "hand", expensive)), "cl1012_unequal_scores_no_retrieval");
     // 
@@ -35425,7 +35425,7 @@ static void gen_jidou_watching_live_start_resolve_triggers(void){
     // TODO: fill_decks(&mut game, filler);
     test_add_to_live(&tg, watcher);
     tg.state.p[0].stage[1] = muse;
-    // TODO: fire_trigger(&mut game, muse, AbilityTrigger::LiveStart, "ライブ開始時");
+    { int ftpl = rb_owner_of_card(&tg.state, muse); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ開始時"); rb_drain_ability_queue(&tg.state); }
     test_has_pending_choice(&tg);
     // // Use same helper as existing test: pick generated action with stage_area == "left"
     int actions = 0;
@@ -36820,7 +36820,7 @@ static void gen_aoku_haruka_live_start_scores_with_aurora_in_discard(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "aoku_haruka_live_start_scores_with_aurora_in_discard");
-    // TODO: game.set_live_card(aoku);
+    test_set_live_card(&tg, 0, aoku);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     while (test_has_pending_choice(&tg)) rb_resume_with_choice(&tg.state, 0);
@@ -36940,7 +36940,7 @@ static void gen_aoku_haruka_live_start_no_score_when_aurora_missing(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "aoku_haruka_live_start_no_score_when_aurora_missing");
-    // TODO: game.set_live_card(aoku);
+    test_set_live_card(&tg, 0, aoku);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     while (test_has_pending_choice(&tg)) rb_resume_with_choice(&tg.state, 0);
@@ -37062,7 +37062,7 @@ static void gen_aoku_haruka_live_start_fails_with_only_non_suzu_live_cards(void)
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "aoku_haruka_live_start_fails_with_only_non_suzu_live_cards");
-    // TODO: game.set_live_card(aoku);
+    test_set_live_card(&tg, 0, aoku);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     while (test_has_pending_choice(&tg)) rb_resume_with_choice(&tg.state, 0);
@@ -37156,7 +37156,7 @@ static void gen_bloom_live_start_heart_choice_changes_requirements(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "bloom_live_start_heart_choice_changes_requirements");
     // 
-    // TODO: game.set_live_card(bloom);
+    test_set_live_card(&tg, 0, bloom);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -37265,7 +37265,7 @@ static void gen_bloom_no_hasunosuka_member_no_choice(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "bloom_no_hasunosuka_member_no_choice");
     // 
-    // TODO: game.set_live_card(bloom);
+    test_set_live_card(&tg, 0, bloom);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -37370,7 +37370,7 @@ static void gen_bloom_live_start_choice_second_option_heart04(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "bloom_live_start_choice_second_option_heart04");
     // 
-    // TODO: game.set_live_card(bloom);
+    test_set_live_card(&tg, 0, bloom);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -37478,7 +37478,7 @@ static void gen_bloom_live_start_choice_third_option_heart05(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "bloom_live_start_choice_third_option_heart05");
     // 
-    // TODO: game.set_live_card(bloom);
+    test_set_live_card(&tg, 0, bloom);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -37535,7 +37535,7 @@ static void gen_bloom_choice_is_exclusive_other_hearts_zero(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "bloom_choice_is_exclusive_other_hearts_zero");
     // 
-    // TODO: game.set_live_card(bloom);
+    test_set_live_card(&tg, 0, bloom);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -38968,7 +38968,7 @@ static void gen_ladybug_q114_both_members_on_stage_reduces_hearts(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "ladybug_q114_both_members_on_stage_reduces_hearts");
     // 
-    // TODO: game.set_live_card(ladybug);
+    test_set_live_card(&tg, 0, ladybug);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -39036,7 +39036,7 @@ static void gen_ladybug_q114_missing_sayaka_no_reduction(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "ladybug_q114_missing_sayaka_no_reduction");
     // 
-    // TODO: game.set_live_card(ladybug);
+    test_set_live_card(&tg, 0, ladybug);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -39093,7 +39093,7 @@ static void gen_ladybug_q114_missing_kosuzu_no_reduction(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "ladybug_q114_missing_kosuzu_no_reduction");
     // 
-    // TODO: game.set_live_card(ladybug);
+    test_set_live_card(&tg, 0, ladybug);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -39125,7 +39125,7 @@ static void gen_ladybug_q114_wrong_character_no_reduction(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "ladybug_q114_wrong_character_no_reduction");
     // 
-    // TODO: game.set_live_card(ladybug);
+    test_set_live_card(&tg, 0, ladybug);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -39154,7 +39154,7 @@ static void gen_ladybug_q114_no_members_no_reduction(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "ladybug_q114_no_members_no_reduction");
     // 
-    // TODO: game.set_live_card(ladybug);
+    test_set_live_card(&tg, 0, ladybug);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -40183,7 +40183,7 @@ static void gen_kanata_live_success_with_others_waits_self(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -40296,7 +40296,7 @@ static void gen_kanata_live_success_no_others_does_not_wait(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -40356,7 +40356,7 @@ static void gen_mari_q131_zero_deck_blocks_live_start(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
@@ -40408,7 +40408,7 @@ static void gen_mari_q131_one_card_deck_blocked(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
@@ -40489,7 +40489,7 @@ static void gen_mari_live_start_sufficient_deck_fires(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
@@ -40577,7 +40577,7 @@ static void gen_mari_choose_opponent_look_at_opponent_deck(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
@@ -40667,7 +40667,7 @@ static void gen_mari_choose_opponent_empty_deck_blocked(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
@@ -40811,13 +40811,13 @@ static void gen_performance_pipeline_blade_yell_heart_score(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "performance_pipeline_blade_yell_heart_score");
     // 
-    // TODO: game.set_live_card(live_card);
+    test_set_live_card(&tg, 0, live_card);
     // 
     // // P2 sets the same live card
     test_has_pending_choice(&tg);
     test_add_to_hand(&tg, live_card);
     rb_advance_phase(&tg.state);
-    // TODO: game.set_live_card(live_card);
+    test_set_live_card(&tg, 0, live_card);
     rb_advance_phase(&tg.state);
     // 
     // // Handle any pending choices (live-start triggers etc.)
@@ -41025,7 +41025,7 @@ static void gen_performance_pipeline_fail_when_hearts_insufficient(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "performance_pipeline_fail_when_hearts_insufficient");
     // 
-    // TODO: game.set_live_card(live_card);
+    test_set_live_card(&tg, 0, live_card);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
@@ -41176,8 +41176,8 @@ static void gen_heart00_passes_check_fails_when_insufficient(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "heart00_passes_check_fails_when_insufficient");
     // 
-    // TODO: game.set_live_card(live_a);
-    // TODO: game.set_live_card(live_b);
+    test_set_live_card(&tg, 0, live_a);
+    test_set_live_card(&tg, 0, live_b);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
@@ -41327,7 +41327,7 @@ static void gen_heart00_passes_check_succeeds_when_sufficient(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "heart00_passes_check_succeeds_when_sufficient");
     // 
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
@@ -41469,7 +41469,7 @@ static void gen_live_card_base_score_stored_correctly(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "live_card_base_score_stored_correctly");
     // 
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
@@ -42329,7 +42329,7 @@ static void gen_azuna_q158_blade_all_members(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "azuna_q158_blade_all_members");
     // 
-    // TODO: game.set_live_card(filler_live);
+    test_set_live_card(&tg, 0, filler_live);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -42410,7 +42410,7 @@ static void gen_azuna_q158_blade_single_member(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "azuna_q158_blade_single_member");
     // 
-    // TODO: game.set_live_card(filler_live);
+    test_set_live_card(&tg, 0, filler_live);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -42494,7 +42494,7 @@ static void gen_azuna_q157_energy_under_member_uses_any_energy(void){
     // // Add wait energy (doesn't increment active_energy_count)
     test_add_to_discard(&tg, energy_id);
     // 
-    // TODO: game.set_live_card(filler_live);
+    test_set_live_card(&tg, 0, filler_live);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -42575,7 +42575,7 @@ static void gen_azuna_q184_energy_under_member_not_counted(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "azuna_q184_energy_under_member_not_counted");
     // 
-    // TODO: game.set_live_card(filler_live);
+    test_set_live_card(&tg, 0, filler_live);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -42694,7 +42694,7 @@ static void gen_b_heart07_yell_contributes_two_colorless_hearts_each(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "b_heart07_yell_contributes_two_colorless_hearts_each");
     // 
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // // inlined helper advance_to_live_success
     // 
     rb_advance_phase(&tg.state);
@@ -42813,7 +42813,7 @@ static void gen_colorless_hearts_cannot_fill_colored_requirement(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "colorless_hearts_cannot_fill_colored_requirement");
     // 
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // // inlined helper advance_to_live_success
     // 
     rb_advance_phase(&tg.state);
@@ -42928,7 +42928,7 @@ static void gen_colorless_hearts_fill_heart0_when_colored_hearts_present(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "colorless_hearts_fill_heart0_when_colored_hearts_present");
     // 
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // // inlined helper advance_to_live_success
     // 
     rb_advance_phase(&tg.state);
@@ -43035,7 +43035,7 @@ static void gen_insufficient_colorless_hearts_fail_heart0_only_live(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "insufficient_colorless_hearts_fail_heart0_only_live");
     // 
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // // inlined helper advance_to_live_success
     // 
     rb_advance_phase(&tg.state);
@@ -43413,7 +43413,7 @@ static void gen_kanon_ab1_live_success_fires_but_live_fails_no_hearts(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "kanon_ab1_live_success_fires_but_live_fails_no_hearts");
     // 
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -43526,7 +43526,7 @@ static void gen_kanon_q93_partial_resolution_one_card(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "kanon_q93_partial_resolution_one_card");
     // 
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -43592,7 +43592,7 @@ static void gen_kanon_q93_partial_resolution_zero_cards(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "kanon_q93_partial_resolution_zero_cards");
     // 
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -44358,7 +44358,7 @@ static void gen_natsumi_live_start_blade_per_2_hand(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "natsumi_live_start_blade_per_2_hand");
     // 
-    // TODO: game.set_live_card(live_card);
+    test_set_live_card(&tg, 0, live_card);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
@@ -44414,7 +44414,7 @@ static void gen_q109_natsumi_blade_snapshot_hand_change_no_effect(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
-    // TODO: game.set_live_card(live_card);
+    test_set_live_card(&tg, 0, live_card);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
@@ -44476,7 +44476,7 @@ static void gen_q109_natsumi_blade_unchanged_after_discard(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
-    // TODO: game.set_live_card(live_card);
+    test_set_live_card(&tg, 0, live_card);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
@@ -44533,7 +44533,7 @@ static void gen_q109_natsumi_zero_hand_zero_blade(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
-    // TODO: game.set_live_card(live_card);
+    test_set_live_card(&tg, 0, live_card);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
@@ -44588,7 +44588,7 @@ static void gen_q109_natsumi_odd_hand_floor_division(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
-    // TODO: game.set_live_card(live_card);
+    test_set_live_card(&tg, 0, live_card);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
@@ -44609,7 +44609,7 @@ static void gen_sp_pb1_004_live_start_pay_2e_places_wait(void){
     test_give_energy(&tg, 5);
     int deck_before = 0;
     int active_before = tg.state.p[0].energy_active;
-    // TODO: crate::helpers::fire_trigger(&mut game, sumire, rabuka_engine::core::types::AbilityTrigger::LiveStart, "ライブ開始時");
+    { int ftpl = rb_owner_of_card(&tg.state, sumire); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ開始時"); rb_drain_ability_queue(&tg.state); }
     test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, 1);
     test_has_pending_choice(&tg);
@@ -44631,7 +44631,7 @@ static void gen_sp_pb1_004_live_start_skip_no_effect(void){
     test_give_energy(&tg, 5);
     int deck_before = 0;
     int active_before = tg.state.p[0].energy_active;
-    // TODO: crate::helpers::fire_trigger(&mut game, sumire, rabuka_engine::core::types::AbilityTrigger::LiveStart, "ライブ開始時");
+    { int ftpl = rb_owner_of_card(&tg.state, sumire); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ開始時"); rb_drain_ability_queue(&tg.state); }
     test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, 0);
     test_has_pending_choice(&tg);
@@ -44651,7 +44651,7 @@ static void gen_sp_pb1_004_live_start_insufficient_energy_no_pay(void){
     tg.state.p[0].stage[1] = sumire;
     test_give_energy(&tg, 1);
     int active_before = tg.state.p[0].energy_active;
-    // TODO: crate::helpers::fire_trigger(&mut game, sumire, rabuka_engine::core::types::AbilityTrigger::LiveStart, "ライブ開始時");
+    { int ftpl = rb_owner_of_card(&tg.state, sumire); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ開始時"); rb_drain_ability_queue(&tg.state); }
     // // With insufficient energy, the pay option should be disabled or not present; engine should still present choice but pay may be unavailable
     test_has_pending_choice(&tg);
     // // Try to pay (if available) — but with 1 energy, pay 2 should be blocked
@@ -44678,7 +44678,7 @@ static void gen_sp_pb1_004_live_success_pay_3e_draws(void){
     tg.state.p[0].stage[1] = sumire;
     test_give_energy(&tg, 5);
     int hand_before = tg.state.p[0].hand.n;
-    // TODO: crate::helpers::fire_trigger(&mut game, sumire, rabuka_engine::core::types::AbilityTrigger::LiveSuccess, "ライブ成功時");
+    { int ftpl = rb_owner_of_card(&tg.state, sumire); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ成功時"); rb_drain_ability_queue(&tg.state); }
     test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, 1);
     test_has_pending_choice(&tg);
@@ -44698,7 +44698,7 @@ static void gen_sp_pb1_004_live_success_skip_no_draw(void){
     tg.state.p[0].stage[1] = sumire;
     test_give_energy(&tg, 5);
     int hand_before = tg.state.p[0].hand.n;
-    // TODO: crate::helpers::fire_trigger(&mut game, sumire, rabuka_engine::core::types::AbilityTrigger::LiveSuccess, "ライブ成功時");
+    { int ftpl = rb_owner_of_card(&tg.state, sumire); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ成功時"); rb_drain_ability_queue(&tg.state); }
     test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, 0);
     test_has_pending_choice(&tg);
@@ -45093,7 +45093,7 @@ static void gen_strawberry_q36_only_fires_in_live_victory_determination(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "strawberry_q36_only_fires_in_live_victory_determination");
     // 
-    // TODO: game.set_live_card(strawberry);
+    test_set_live_card(&tg, 0, strawberry);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -45151,7 +45151,7 @@ static void gen_strawberry_q132_first_attacker_evaluated(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "strawberry_q132_first_attacker_evaluated");
     // 
-    // TODO: game.set_live_card(strawberry);
+    test_set_live_card(&tg, 0, strawberry);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -45221,7 +45221,7 @@ static void gen_strawberry_q142_excess_heart_prevents_score(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "strawberry_q142_excess_heart_prevents_score");
     // 
-    // TODO: game.set_live_card(strawberry);
+    test_set_live_card(&tg, 0, strawberry);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -45287,7 +45287,7 @@ static void gen_strawberry_q142_wrong_group_prevents_score(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "strawberry_q142_wrong_group_prevents_score");
     // 
-    // TODO: game.set_live_card(strawberry);
+    test_set_live_card(&tg, 0, strawberry);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -45349,7 +45349,7 @@ static void gen_strawberry_opponent_didnt_win_no_score(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "strawberry_opponent_didnt_win_no_score");
     // 
-    // TODO: game.set_live_card(strawberry);
+    test_set_live_card(&tg, 0, strawberry);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -45685,7 +45685,7 @@ static void gen_pb1013_higher_cost_member_on_stage_draws(void){
     test_add_to_deck(&tg, drawn);
     int hand_before = tg.state.p[0].hand.n;
     // 
-    // TODO: fire_trigger(&mut game, me, AbilityTrigger::LiveSuccess, "ライブ成功時");
+    { int ftpl = rb_owner_of_card(&tg.state, me); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ成功時"); rb_drain_ability_queue(&tg.state); }
     // 
     // TODO assert_eq (unresolved): assert_eq!( game.state.player1.hand.cards.len(), hand_before + 1, "a member costing more than 9 is on stage -> draw 1" );
     CHECK(test_zone_has_id(&tg, 0, "hand", drawn), "pb1013_higher_cost_member_on_stage_draws");
@@ -45703,7 +45703,7 @@ static void gen_pb1013_only_lower_cost_members_no_draw(void){
     tg.state.p[0].stage[1] = small;
     int hand_before = tg.state.p[0].hand.n;
     // 
-    // TODO: fire_trigger(&mut game, me, AbilityTrigger::LiveSuccess, "ライブ成功時");
+    { int ftpl = rb_owner_of_card(&tg.state, me); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ成功時"); rb_drain_ability_queue(&tg.state); }
     // 
     CHECK_EQ(tg.state.p[0].hand.n, hand_before, "pb1013_only_lower_cost_members_no_draw");
     // 
@@ -45724,7 +45724,7 @@ static void gen_go_master_start_fewer_success_cards_scores(void){
     test_add_to_live(&tg, o1);
     test_add_to_live(&tg, o2);
     // 
-    // TODO: fire_trigger(&mut game, live, AbilityTrigger::LiveStart, "ライブ開始時");
+    { int ftpl = rb_owner_of_card(&tg.state, live); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ開始時"); rb_drain_ability_queue(&tg.state); }
     // 
     CHECK_EQ(rb_mods_get_score(&tg.state.mods, live), 1, "go_master_start_fewer_success_cards_scores");
     // 
@@ -45743,7 +45743,7 @@ static void gen_go_master_start_equal_success_cards_no_score(void){
     int o1 = test_id(&tg, "PL!-sd1-010-SD");
     test_add_to_live(&tg, o1);
     // 
-    // TODO: fire_trigger(&mut game, live, AbilityTrigger::LiveStart, "ライブ開始時");
+    { int ftpl = rb_owner_of_card(&tg.state, live); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ開始時"); rb_drain_ability_queue(&tg.state); }
     // 
     CHECK_EQ(rb_mods_get_score(&tg.state.mods, live), 0, "go_master_start_equal_success_cards_no_score");
     // 
@@ -45763,7 +45763,7 @@ static void gen_note_mermaid_two_distinct_kaleidoscope_members_score(void){
     tg.state.p[0].stage[0] = ren;
     tg.state.p[0].stage[1] = wien;
     // 
-    // TODO: fire_trigger(&mut game, live, AbilityTrigger::LiveStart, "ライブ開始時");
+    { int ftpl = rb_owner_of_card(&tg.state, live); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ開始時"); rb_drain_ability_queue(&tg.state); }
     // 
     CHECK_EQ(rb_mods_get_score(&tg.state.mods, live), 1, "note_mermaid_two_distinct_kaleidoscope_members_score");
     // 
@@ -45783,7 +45783,7 @@ static void gen_note_mermaid_duplicate_kaleidoscope_names_no_score(void){
     tg.state.p[0].stage[0] = ren1;
     tg.state.p[0].stage[1] = ren2;
     // 
-    // TODO: fire_trigger(&mut game, live, AbilityTrigger::LiveStart, "ライブ開始時");
+    { int ftpl = rb_owner_of_card(&tg.state, live); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ開始時"); rb_drain_ability_queue(&tg.state); }
     // 
     CHECK_EQ(rb_mods_get_score(&tg.state.mods, live), 0, "note_mermaid_duplicate_kaleidoscope_names_no_score");
     // 
@@ -48791,7 +48791,7 @@ static void gen_mia_q190_choose_heart05_grants_heart05(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live_for_zone);
+    test_set_live_card(&tg, 0, live_for_zone);
     rb_advance_phase(&tg.state);
     test_has_pending_choice(&tg);
     // action result consumed: let live_pos = game.state.player1.hand.cards.iter().position(|&c| c == live_for_cost).unwrap();
@@ -48825,7 +48825,7 @@ static void gen_mia_live_success_distinct_3_recovers(void){
     int live = test_id(&tg, "PL!-sd1-019-SD");
     test_add_to_hand(&tg, live);
     // TODO loop (degraded): for _ in 0..5 { game.pass(); }
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // TODO loop (degraded): for _ in 0..7 { game.pass(); if game.has_pending_choice() { game.select_indices(&[]); } }
     test_has_pending_choice(&tg);
     // 
@@ -48849,7 +48849,7 @@ static void gen_mia_live_success_distinct_2_no_recover(void){
     int live = test_id(&tg, "PL!-sd1-019-SD");
     test_add_to_hand(&tg, live);
     // TODO loop (degraded): for _ in 0..5 { game.pass(); }
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // TODO loop (degraded): for _ in 0..7 { game.pass(); if game.has_pending_choice() { game.select_indices(&[]); } }
     test_has_pending_choice(&tg);
     // 
@@ -48910,7 +48910,6 @@ static void gen_setsuna_pb1_live_card_setup_works(void){
     // 
     // TODO assert: assert!( game.state.player1.live_card_zone.cards.is_empty(), "Live zone should be empty before set" );
     // 
-    // TODO: game.set_live_card(live_card);
     // 
     // TODO assert: assert!( !game.state.player1.live_card_zone.cards.is_empty(), "Live card should be in zone after set" );
     // TODO assert_eq (unresolved): assert_eq!( game.state.player1.live_card_zone.cards[0], live_card, "Set card should match" );
@@ -48939,7 +48938,6 @@ static void gen_setsuna_pb1_constant_missing_heart_types_no_gain(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live_card);
     // 
     // TODO: eprintln!(
     // TODO: "Before advance_to_live_start: phase={}, snapshots={}",
@@ -49000,7 +48998,6 @@ static void gen_setsuna_pb1_constant_heart_persists_during_live(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live_card_a);
     // TODO: game.state
     // TODO: .player1
     // TODO: .success_live_card_zone
@@ -49053,7 +49050,6 @@ static void gen_setsuna_pb1_constant_partial_heart_types_various_combos(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live_card);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -50130,7 +50126,7 @@ static void gen_mogyu_no_surplus_heart01_no_draw(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // TODO loop (degraded): for _ in 0..7 { game.pass(); drain_skippables(&mut game); }
     // // With no surplus heart01, should not draw
     test_has_pending_choice(&tg);
@@ -50159,7 +50155,7 @@ static void gen_mogyu_empty_deck_no_panic(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // TODO loop (degraded): for _ in 0..7 { game.pass(); drain_skippables(&mut game); }
     test_has_pending_choice(&tg);
     // 
@@ -50232,7 +50228,7 @@ static void gen_sentimental_steps_no_mus_in_success_zone_no_draw(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // TODO loop (degraded): for _ in 0..7 { game.pass(); drain_skippables(&mut game); }
     // // With Hasunosora in success zone (not μ's), the μ's condition should fail → no draw
     test_has_pending_choice(&tg);
@@ -50304,7 +50300,7 @@ static void gen_sentimental_steps_empty_success_zone_no_draw(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // TODO loop (degraded): for _ in 0..7 { game.pass(); drain_skippables(&mut game); }
     test_has_pending_choice(&tg);
     // 
@@ -50457,7 +50453,7 @@ static void gen_q261_live_fails_no_trigger(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(neutral);
+    test_set_live_card(&tg, 0, neutral);
     // // inlined helper advance_to_live_victory
     // 
     rb_advance_phase(&tg.state);
@@ -52215,7 +52211,7 @@ static void gen_riko_equal_cost_both_occupied_triggers(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -52291,7 +52287,7 @@ static void gen_riko_different_costs_no_trigger(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -52367,7 +52363,7 @@ static void gen_riko_left_empty_no_trigger(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -52443,7 +52439,7 @@ static void gen_riko_right_empty_no_trigger(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -52516,7 +52512,7 @@ static void gen_riko_both_empty_no_trigger(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -52592,7 +52588,7 @@ static void gen_riko_same_cost_different_cards_triggers(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -52662,7 +52658,7 @@ static void gen_himeno_bp5_same_group_cost_auto_skips_when_no_match(void){
     test_add_to_hand(&tg, a);
     test_add_to_hand(&tg, b);
     test_add_to_hand(&tg, live);
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // clear
     // // inlined helper finish_live_setup
     // 
@@ -52730,7 +52726,7 @@ static void gen_himeno_bp5_same_group_cost_auto_skips_when_only_no_group_cards(v
     test_add_to_hand(&tg, nogroup1);
     test_add_to_hand(&tg, nogroup2);
     test_add_to_hand(&tg, live);
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // // inlined helper finish_live_setup
     // 
     rb_advance_phase(&tg.state);
@@ -53671,7 +53667,7 @@ static void gen_sp_pr_021_hearts_lt5_no_weight(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(filler_live);
+    test_set_live_card(&tg, 0, filler_live);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -53768,7 +53764,7 @@ static void gen_azuna_target_self_puts_members_on_deck_bottom(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(filler_live);
+    test_set_live_card(&tg, 0, filler_live);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -53861,7 +53857,7 @@ static void gen_aiko_target_self_looks_at_top_card(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(filler_live);
+    test_set_live_card(&tg, 0, filler_live);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -54809,7 +54805,7 @@ static void gen_q254_mandatory_no_skip_when_condition_met(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live_card);
+    test_set_live_card(&tg, 0, live_card);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -54897,7 +54893,7 @@ static void gen_q254_one_card_no_effect(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live_card);
+    test_set_live_card(&tg, 0, live_card);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -54977,7 +54973,7 @@ static void gen_q254_zero_cards_no_effect(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live_card);
+    test_set_live_card(&tg, 0, live_card);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -55063,7 +55059,7 @@ static void gen_q254_three_cards_triggers(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live_card);
+    test_set_live_card(&tg, 0, live_card);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -55155,7 +55151,7 @@ static void gen_q254_modified_requirement_overrides_base_with_stage(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live_card);
+    test_set_live_card(&tg, 0, live_card);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -55270,7 +55266,7 @@ static void gen_q254_modified_requirement_met_with_high_heart_stage(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live_card);
+    test_set_live_card(&tg, 0, live_card);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -55357,7 +55353,7 @@ static void gen_q254_no_condition_uses_base_requirement(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live_card);
+    test_set_live_card(&tg, 0, live_card);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -57934,7 +57930,7 @@ static void gen_chika_constant_blade_counts_only_under(void){
     // TODO: game.state
     // TODO: .player1
     // TODO: .stage
-    // TODO: .place_under_card(MemberArea::Center, kanon);
+    test_place_under(&tg, 0, 1, kanon);
     // 
     test_recalc(&tg);
     // 
@@ -57993,7 +57989,7 @@ static void gen_shizuku_live_start_blade_per_distinct_under(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -58055,7 +58051,7 @@ static void gen_shizuku_live_start_blade_dedups_same_name(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -58113,7 +58109,7 @@ static void gen_shizuku_live_start_blade_zero_under(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -58148,7 +58144,7 @@ static void gen_shizuku_live_start_blade_counts_only_under(void){
     // TODO: game.state
     // TODO: .player1
     // TODO: .stage
-    // TODO: .place_under_card(MemberArea::Center, kanon);
+    test_place_under(&tg, 0, 1, kanon);
     // 
     test_give_energy(&tg, 3);
     // // inlined helper seed_deck
@@ -58185,7 +58181,7 @@ static void gen_shizuku_live_start_blade_counts_only_under(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -60061,7 +60057,7 @@ static void gen_chisato_promo_ab1_live_start(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
-    // TODO: game.set_live_card(live_card);
+    test_set_live_card(&tg, 0, live_card);
     // 
     // // Pass to run LiveStart phase and trigger abilities
     rb_advance_phase(&tg.state);
@@ -61172,7 +61168,7 @@ static void gen_n_bp3_005_constant_grant_and_counting_auto_combo(void){
     CHECK_EQ(tg.state.p[0].hand.n, 5, "n_bp3_005_constant_grant_and_counting_auto_combo");
     // 
     // // Live start with 2+ own debuts this turn: 常時 score+1 until live end.
-    // TODO: fire_trigger(&mut game, member, AbilityTrigger::LiveStart, "ライブ開始時");
+    { int ftpl = rb_owner_of_card(&tg.state, member); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ開始時"); rb_drain_ability_queue(&tg.state); }
     test_recalc(&tg);
     // TODO assert_eq (unresolved): assert_eq!( game.state.mods.p1_constant_total_score_bonus, 1, "conditional constant granted (3 own debuts >= 2)" );
     // 
@@ -61253,7 +61249,7 @@ static void gen_n_bp3_005_two_debuts_auto_silent_but_constant_grants(void){
     // 
     CHECK_EQ(tg.state.p[0].hand.n, 0, "n_bp3_005_two_debuts_auto_silent_but_constant_grants");
     // 
-    // TODO: fire_trigger(&mut game, member, AbilityTrigger::LiveStart, "ライブ開始時");
+    { int ftpl = rb_owner_of_card(&tg.state, member); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ開始時"); rb_drain_ability_queue(&tg.state); }
     test_recalc(&tg);
     // TODO assert_eq (unresolved): assert_eq!( game.state.mods.p1_constant_total_score_bonus, 1, "LiveStart constant still grants at 2 own debuts" );
     // 
@@ -62086,7 +62082,7 @@ static void gen_poppin_q66_has_cards_beats_no_cards(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "poppin_q66_has_cards_beats_no_cards");
     // 
-    // TODO: game.set_live_card(poppin);
+    test_set_live_card(&tg, 0, poppin);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -62175,7 +62171,7 @@ static void gen_poppin_equal_score_fails(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "poppin_equal_score_fails");
     // 
-    // TODO: game.set_live_card(poppin);
+    test_set_live_card(&tg, 0, poppin);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -62261,7 +62257,7 @@ static void gen_poppin_lower_score_fails(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "poppin_lower_score_fails");
     // 
-    // TODO: game.set_live_card(poppin);
+    test_set_live_card(&tg, 0, poppin);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -62356,7 +62352,7 @@ static void gen_poppin_multiple_cards_lower_total_fails(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "poppin_multiple_cards_lower_total_fails");
     // 
-    // TODO: game.set_live_card(poppin);
+    test_set_live_card(&tg, 0, poppin);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -62441,7 +62437,7 @@ static void gen_poppin_multiple_niji_revealed_picks_one(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "poppin_multiple_niji_revealed_picks_one");
     // 
-    // TODO: game.set_live_card(poppin);
+    test_set_live_card(&tg, 0, poppin);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -62526,7 +62522,7 @@ static void gen_poppin_no_niji_revealed_effect_fails(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "poppin_no_niji_revealed_effect_fails");
     // 
-    // TODO: game.set_live_card(poppin);
+    test_set_live_card(&tg, 0, poppin);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -62609,7 +62605,7 @@ static void gen_poppin_mixed_revealed_picks_niji_only(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "poppin_mixed_revealed_picks_niji_only");
     // 
-    // TODO: game.set_live_card(poppin);
+    test_set_live_card(&tg, 0, poppin);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -62732,7 +62728,7 @@ static void gen_setsuna_q230_both_zero_heart02_gained(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
@@ -62858,7 +62854,7 @@ static void gen_setsuna_unequal_success_cards_no_heart(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
@@ -62984,7 +62980,7 @@ static void gen_setsuna_surplus_heart_draw_2_discard_1_net_plus_1(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
@@ -63155,7 +63151,7 @@ static void gen_setsuna_surplus_heart_draw_and_discard_net_plus_1(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
@@ -63640,7 +63636,7 @@ static void gen_natsumi_rain_draws_and_discards_with_hasunosora_on_stage(void){
     test_add_to_hand(&tg, hand_filler);
     // 
     int deck_before = tg.state.p[0].deck.n;
-    // TODO: fire_trigger(&mut game, live, AbilityTrigger::LiveSuccess, "ライブ成功時");
+    { int ftpl = rb_owner_of_card(&tg.state, live); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ成功時"); rb_drain_ability_queue(&tg.state); }
     test_has_pending_choice(&tg);
     // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard for the discard" );
     rb_resume_with_choice(&tg.state, 0);
@@ -63665,7 +63661,7 @@ static void gen_natsumi_rain_no_hasunosora_no_draw(void){
     tg.state.p[0].stage[0] = test_id(&tg, "PL!-sd1-010-SD");
     // 
     int deck_before = tg.state.p[0].deck.n;
-    // TODO: fire_trigger(&mut game, live, AbilityTrigger::LiveSuccess, "ライブ成功時");
+    { int ftpl = rb_owner_of_card(&tg.state, live); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ成功時"); rb_drain_ability_queue(&tg.state); }
     // 
     // TODO assert_eq (unresolved): assert_eq!( deck_before - game.state.player1.main_deck.cards.len(), 0, "no 蓮ノ空 member on stage -> nothing happens" );
     // 
@@ -63690,7 +63686,7 @@ static void gen_sd2_007_extra_draw_when_opponent_also_succeeded(void){
     // TODO: game.state.p2_live_success_no_excess = true;
     // 
     int deck_before = tg.state.p[0].deck.n;
-    // TODO: fire_trigger(&mut game, setsuna, AbilityTrigger::LiveSuccess, "ライブ成功時");
+    { int ftpl = rb_owner_of_card(&tg.state, setsuna); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ成功時"); rb_drain_ability_queue(&tg.state); }
     test_has_pending_choice(&tg);
     // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard for the discard" );
     rb_resume_with_choice(&tg.state, 0);
@@ -63711,7 +63707,7 @@ static void gen_sd2_007_single_draw_without_opponent_success(void){
     test_add_to_hand(&tg, setsuna);
     // 
     int deck_before = tg.state.p[0].deck.n;
-    // TODO: fire_trigger(&mut game, setsuna, AbilityTrigger::LiveSuccess, "ライブ成功時");
+    { int ftpl = rb_owner_of_card(&tg.state, setsuna); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ成功時"); rb_drain_ability_queue(&tg.state); }
     // 
     // TODO assert_eq (unresolved): assert_eq!( deck_before - game.state.player1.main_deck.cards.len(), 1, "opponent did not succeed -> only the base draw" );
     // 
@@ -63771,7 +63767,7 @@ static void gen_bp7_019_places_two_aqours_cards_under_deck(void){
     test_add_to_discard(&tg, aq1);
     test_add_to_discard(&tg, aq2);
     // 
-    // TODO: fire_trigger(&mut game, live, AbilityTrigger::LiveSuccess, "ライブ成功時");
+    { int ftpl = rb_owner_of_card(&tg.state, live); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ成功時"); rb_drain_ability_queue(&tg.state); }
     test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, 0);
     rb_resume_with_choice(&tg.state, 1);
@@ -63792,7 +63788,7 @@ static void gen_hot_passion_accept_energy_opponent_draws(void){
     int live = 0;
     // 
     int p2_hand_before = tg.state.p[1].hand.n;
-    // TODO: fire_trigger(&mut game, live, AbilityTrigger::LiveSuccess, "ライブ成功時");
+    { int ftpl = rb_owner_of_card(&tg.state, live); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ成功時"); rb_drain_ability_queue(&tg.state); }
     test_has_pending_choice(&tg);
     // // Pay/skip gate: options ["No", "Yes"] — pick "Yes".
     rb_resume_with_choice(&tg.state, 1);
@@ -63811,7 +63807,7 @@ static void gen_hot_passion_decline_no_opponent_draw(void){
     int live = 0;
     // 
     int p2_hand_before = tg.state.p[1].hand.n;
-    // TODO: fire_trigger(&mut game, live, AbilityTrigger::LiveSuccess, "ライブ成功時");
+    { int ftpl = rb_owner_of_card(&tg.state, live); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ成功時"); rb_drain_ability_queue(&tg.state); }
     test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, -1);
     // 
@@ -63840,7 +63836,7 @@ static void gen_bp6_016n_waitroom_debut_looks_three_takes_one(void){
     // // Simulate a waitroom debut, then fire 登場.
     tg.state.p[0].stage[0] = me;
     // TODO: game.state.record_card_appearance(me, "discard");
-    // TODO: fire_trigger(&mut game, me, AbilityTrigger::Debut, "登場");
+    { int ftpl = rb_owner_of_card(&tg.state, me); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "登場"); rb_drain_ability_queue(&tg.state); }
     // 
     test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, 0);
@@ -63878,7 +63874,7 @@ static void gen_bp6_016n_hand_debut_no_look(void){
     // // Normal hand debut — wrong appearance source.
     tg.state.p[0].stage[0] = me;
     // TODO: game.state.record_card_appearance(me, "hand");
-    // TODO: fire_trigger(&mut game, me, AbilityTrigger::Debut, "登場");
+    { int ftpl = rb_owner_of_card(&tg.state, me); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "登場"); rb_drain_ability_queue(&tg.state); }
     // 
     test_has_pending_choice(&tg);
     // 
@@ -63897,7 +63893,7 @@ static void gen_bp6_016n_no_appearance_record_no_look(void){
     // // Direct placement with no recorded debut at all (e.g. engine-internal
     // // setup) — gate must fail closed.
     tg.state.p[0].stage[0] = me;
-    // TODO: fire_trigger(&mut game, me, AbilityTrigger::Debut, "登場");
+    { int ftpl = rb_owner_of_card(&tg.state, me); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "登場"); rb_drain_ability_queue(&tg.state); }
     // 
     test_has_pending_choice(&tg);
     // 
@@ -63921,7 +63917,7 @@ static void gen_bp6_016n_deck_shorter_than_three_looks_whats_there(void){
     // 
     tg.state.p[0].stage[0] = me;
     // TODO: game.state.record_card_appearance(me, "discard");
-    // TODO: fire_trigger(&mut game, me, AbilityTrigger::Debut, "登場");
+    { int ftpl = rb_owner_of_card(&tg.state, me); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "登場"); rb_drain_ability_queue(&tg.state); }
     // 
     test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, 0);
@@ -63956,7 +63952,7 @@ static void gen_bp6_011n_waitroom_debut_draws_two_discards_one(void){
     // TODO: game.state.record_card_appearance(me, "discard");
     // 
     int deck_before = tg.state.p[0].deck.n;
-    // TODO: fire_trigger(&mut game, me, AbilityTrigger::Debut, "登場");
+    { int ftpl = rb_owner_of_card(&tg.state, me); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "登場"); rb_drain_ability_queue(&tg.state); }
     test_has_pending_choice(&tg);
     // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard for the discard" );
     rb_resume_with_choice(&tg.state, 0);
@@ -63983,7 +63979,7 @@ static void gen_bp6_011n_hand_debut_no_draw(void){
     // TODO: game.state.record_card_appearance(me, "hand"); // wrong source
     // 
     int deck_before = tg.state.p[0].deck.n;
-    // TODO: fire_trigger(&mut game, me, AbilityTrigger::Debut, "登場");
+    { int ftpl = rb_owner_of_card(&tg.state, me); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "登場"); rb_drain_ability_queue(&tg.state); }
     // 
     // TODO assert_eq (unresolved): assert_eq!( deck_before, game.state.player1.main_deck.cards.len(), "hand debut -> no draw" );
     CHECK(test_zone_has_id(&tg, 0, "hand", hand_card), "bp6_011n_hand_debut_no_draw");
@@ -64010,7 +64006,7 @@ static void gen_bp6_011n_deck_with_one_card_still_discards(void){
     int discard_me = test_id(&tg, "PL!-sd1-010-SD");
     test_add_to_hand(&tg, discard_me);
     // 
-    // TODO: fire_trigger(&mut game, me, AbilityTrigger::Debut, "登場");
+    { int ftpl = rb_owner_of_card(&tg.state, me); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "登場"); rb_drain_ability_queue(&tg.state); }
     test_has_pending_choice(&tg);
     // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard for the discard" );
     rb_resume_with_choice(&tg.state, 0);
@@ -64035,7 +64031,7 @@ static void gen_bp6_011n_empty_deck_and_empty_hand_is_a_clean_noop(void){
     // TODO: game.state.record_card_appearance(me, "discard");
     // 
     // // Must not panic: draw 0 from an empty deck, discard from an empty hand.
-    // TODO: fire_trigger(&mut game, me, AbilityTrigger::Debut, "登場");
+    { int ftpl = rb_owner_of_card(&tg.state, me); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "登場"); rb_drain_ability_queue(&tg.state); }
     // 
 }
 
@@ -65713,7 +65709,7 @@ static void gen_s9_check_timing_cascade_smoke(void){
     // // Advance roughly to live card set
     // TODO loop (degraded): for _ in 0..5 { game.pass(); }
     // TODO: if game.state.player1.hand.cards.contains(&live) {
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     rb_advance_phase(&tg.state);
     test_has_pending_choice(&tg);
     // // Even if we don't go through full phases, the pipeline helpers should be callable
@@ -66605,7 +66601,7 @@ static void gen_vitamin_summer_live_success_hand_condition(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "vitamin_summer_live_success_hand_condition");
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     while (test_has_pending_choice(&tg)) rb_resume_with_choice(&tg.state, 0);
@@ -67091,7 +67087,7 @@ static void gen_triple_discard_gives_blade(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -67158,7 +67154,7 @@ static void gen_triple_no_matching_zero_blades(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -67225,7 +67221,7 @@ static void gen_triple_discard_two_cards(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -67317,7 +67313,7 @@ static void gen_triple_discard_re_prompt_shows_correct_actions(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -67440,7 +67436,7 @@ static void gen_two_copies_on_stage_both_gain_blades(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -67528,7 +67524,7 @@ static void gen_any_number_discard_sequential_works(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -67600,7 +67596,7 @@ static void gen_any_number_partial_discard_grants_partial_blades(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -67669,7 +67665,7 @@ static void gen_non_contiguous_matches_via_action_pipeline(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -68575,7 +68571,7 @@ static void gen_live_victory_p1_wins_with_global_bonus_p2_without(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -69309,7 +69305,7 @@ static void gen_score_bonus_applied_with_revealed_live_cards(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live_card);
+    test_set_live_card(&tg, 0, live_card);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     while (test_has_pending_choice(&tg)) rb_resume_with_choice(&tg.state, 0);
@@ -71026,8 +71022,8 @@ static void gen_watanabe_two_hosts_with_members_under_both_gain(void){
     tg.state.p[0].stage[0] = watanabe;
     tg.state.p[0].stage[1] = a;
     tg.state.p[0].stage[2] = b;
-    // TODO: game.state.player1.stage.place_under_card(MemberArea::Center, test_id(&tg, "PL!-sd1-001-SD"));
-    // TODO: game.state.player1.stage.place_under_card(MemberArea::RightSide, test_id(&tg, "PL!-sd1-001-SD"));
+    test_place_under(&tg, 0, 1, test_id(&tg, "PL!-sd1-001-SD"));
+    test_place_under(&tg, 0, 2, test_id(&tg, "PL!-sd1-001-SD"));
     // 
     test_recalc(&tg);
     // 
@@ -71134,7 +71130,7 @@ static void gen_mifune_same_name_in_success_zone_gains_heart04(void){
     test_add_to_live(&tg, niji_live_a);
     test_add_to_live(&tg, niji_live_b);
     // 
-    // TODO: fire_trigger(&mut game, mifune, AbilityTrigger::LiveStart, "ライブ開始時");
+    { int ftpl = rb_owner_of_card(&tg.state, mifune); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ開始時"); rb_drain_ability_queue(&tg.state); }
     // 
     // // 「ライブカードを1枚選ぶ」 — observed: a SelectCard live_card_zone
     // // prompt appears even with exactly one candidate.
@@ -71160,7 +71156,7 @@ static void gen_mifune_different_name_in_success_zone_no_heart04(void){
     test_add_to_live(&tg, niji_live);
     test_add_to_live(&tg, other_live);
     // 
-    // TODO: fire_trigger(&mut game, mifune, AbilityTrigger::LiveStart, "ライブ開始時");
+    { int ftpl = rb_owner_of_card(&tg.state, mifune); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ開始時"); rb_drain_ability_queue(&tg.state); }
     // // Observed: SelectCard live_card_zone prompt appears even when the
     // // selection would be discarded by the name gate.
     test_has_pending_choice(&tg);
@@ -71183,7 +71179,7 @@ static void gen_mifune_empty_success_zone_no_heart04(void){
     tg.state.p[0].stage[1] = mifune;
     test_add_to_live(&tg, niji_live);
     // 
-    // TODO: fire_trigger(&mut game, mifune, AbilityTrigger::LiveStart, "ライブ開始時");
+    { int ftpl = rb_owner_of_card(&tg.state, mifune); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ開始時"); rb_drain_ability_queue(&tg.state); }
     // // Observed: SelectCard live_card_zone prompt appears even with a single
     // // candidate and an empty success zone.
     test_has_pending_choice(&tg);
@@ -71209,7 +71205,7 @@ static void gen_dream_believers_members_and_name_match_score_plus_one(void){
     // // substring (「カード名に「DreamBelievers」を含む」), not an exact match.
     // TODO: game.add_to_discard(test_id(&tg, "PL!HS-bp1-019-L"));
     // 
-    // TODO: fire_trigger(&mut game, live, AbilityTrigger::LiveStart, "ライブ開始時");
+    { int ftpl = rb_owner_of_card(&tg.state, live); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ開始時"); rb_drain_ability_queue(&tg.state); }
     // 
     CHECK_EQ(rb_mods_get_score(&tg.state.mods, live), 1, "dream_believers_members_and_name_match_score_plus_one");
     // 
@@ -71229,7 +71225,7 @@ static void gen_dream_believers_wrong_name_no_bonus(void){
     // // A live card whose name does not contain the substring.
     // TODO: game.add_to_discard(test_id(&tg, "PL!-sd1-020-SD"));
     // 
-    // TODO: fire_trigger(&mut game, live, AbilityTrigger::LiveStart, "ライブ開始時");
+    { int ftpl = rb_owner_of_card(&tg.state, live); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ開始時"); rb_drain_ability_queue(&tg.state); }
     // 
     CHECK_EQ(rb_mods_get_score(&tg.state.mods, live), 0, "dream_believers_wrong_name_no_bonus");
     // 
@@ -71247,7 +71243,7 @@ static void gen_dream_believers_two_members_no_bonus(void){
     // TODO stage assign (unresolved rhs): game.state.player1.stage.stage[1] = hs_member(&mut game);
     // TODO: game.add_to_discard(test_id(&tg, "PL!HS-bp1-019-L"));
     // 
-    // TODO: fire_trigger(&mut game, live, AbilityTrigger::LiveStart, "ライブ開始時");
+    { int ftpl = rb_owner_of_card(&tg.state, live); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ開始時"); rb_drain_ability_queue(&tg.state); }
     // 
     CHECK_EQ(rb_mods_get_score(&tg.state.mods, live), 0, "dream_believers_two_members_no_bonus");
     // 
@@ -71267,7 +71263,7 @@ static void gen_dream_believers_empty_waitroom_no_bonus(void){
     int filler = test_id(&tg, "PL!-sd1-010-SD");
     // TODO: fill_decks(&mut game, filler); // keep refresh mechanics away from the assertion
     // 
-    // TODO: fire_trigger(&mut game, live, AbilityTrigger::LiveStart, "ライブ開始時");
+    { int ftpl = rb_owner_of_card(&tg.state, live); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ開始時"); rb_drain_ability_queue(&tg.state); }
     // 
     CHECK_EQ(rb_mods_get_score(&tg.state.mods, live), 0, "dream_believers_empty_waitroom_no_bonus");
     // 
@@ -71286,7 +71282,7 @@ static void gen_dream_believers_variant_name_still_matches(void){
     // TODO: game.state.player1.stage.stage[slot] = hs_member(&mut game);
     // TODO: game.add_to_discard(test_id(&tg, "PL!HS-bp5-017-L")); // 104期Ver.
     // 
-    // TODO: fire_trigger(&mut game, live, AbilityTrigger::LiveStart, "ライブ開始時");
+    { int ftpl = rb_owner_of_card(&tg.state, live); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ開始時"); rb_drain_ability_queue(&tg.state); }
     // 
     CHECK_EQ(rb_mods_get_score(&tg.state.mods, live), 1, "dream_believers_variant_name_still_matches");
     // 
@@ -71910,7 +71906,7 @@ static void gen_exclude_position_center_not_offered(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // // Now at LiveCardSetFirstAttacker — set a live card
-    // TODO: game.set_live_card(rin);
+    test_set_live_card(&tg, 0, rin);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
@@ -71997,7 +71993,7 @@ static void gen_exclude_position_and_exclude_self_combine_correctly(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
-    // TODO: game.set_live_card(rin);
+    test_set_live_card(&tg, 0, rin);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
@@ -72167,7 +72163,7 @@ static void gen_sunny_branch1_1_member_triggers_draw(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "sunny_branch1_1_member_triggers_draw");
     // 
-    // TODO: game.set_live_card(sunny);
+    test_set_live_card(&tg, 0, sunny);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -72225,7 +72221,7 @@ static void gen_sunny_branch1_no_members_does_nothing(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "sunny_branch1_no_members_does_nothing");
     // 
-    // TODO: game.set_live_card(sunny);
+    test_set_live_card(&tg, 0, sunny);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -72281,7 +72277,7 @@ static void gen_sunny_branch3_3_members_score_plus_1(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "sunny_branch3_3_members_score_plus_1");
     // 
-    // TODO: game.set_live_card(sunny);
+    test_set_live_card(&tg, 0, sunny);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -72341,7 +72337,7 @@ static void gen_sunny_branch3_3_members_duplicate_name_no_score(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "sunny_branch3_3_members_duplicate_name_no_score");
     // 
-    // TODO: game.set_live_card(sunny);
+    test_set_live_card(&tg, 0, sunny);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -72398,7 +72394,7 @@ static void gen_sunny_branch2_two_mus_grants_heart(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "sunny_branch2_two_mus_grants_heart");
     // 
-    // TODO: game.set_live_card(sunny);
+    test_set_live_card(&tg, 0, sunny);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -72463,7 +72459,7 @@ static void gen_sunny_branch2_two_non_mus_no_heart(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "sunny_branch2_two_non_mus_no_heart");
     // 
-    // TODO: game.set_live_card(sunny);
+    test_set_live_card(&tg, 0, sunny);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -72532,7 +72528,7 @@ static void gen_sunny_branch2_one_member_skips_b2(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "sunny_branch2_one_member_skips_b2");
     // 
-    // TODO: game.set_live_card(sunny);
+    test_set_live_card(&tg, 0, sunny);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -72595,7 +72591,7 @@ static void gen_sunny_q210_joint_card_counts_as_one_member(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "sunny_q210_joint_card_counts_as_one_member");
     // 
-    // TODO: game.set_live_card(sunny);
+    test_set_live_card(&tg, 0, sunny);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -72657,7 +72653,7 @@ static void gen_sunny_q211_joint_card_targetable_for_mus_heart(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "sunny_q211_joint_card_targetable_for_mus_heart");
     // 
-    // TODO: game.set_live_card(sunny);
+    test_set_live_card(&tg, 0, sunny);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -74372,7 +74368,7 @@ static void gen_mymai_tonight_with_aqours_live_gains_blade(void){
     int member_a = 0;
     // TODO destructuring: let (_, member_a) = setup_mymai_only(&mut game);
     test_add_to_hand(&tg, aqours_live);
-    // TODO: game.set_live_card(aqours_live);
+    test_set_live_card(&tg, 0, aqours_live);
     // // inlined helper advance_to_performance
     // 
     rb_advance_phase(&tg.state);
@@ -74413,7 +74409,7 @@ static void gen_mymai_tonight_with_aqours_member_no_blade(void){
     int member_a = 0;
     // TODO destructuring: let (_, member_a) = setup_mymai_only(&mut game);
     test_add_to_hand(&tg, aqours_member);
-    // TODO: game.set_live_card(aqours_member);
+    test_set_live_card(&tg, 0, aqours_member);
     // // inlined helper advance_to_performance
     // 
     rb_advance_phase(&tg.state);
@@ -74435,7 +74431,7 @@ static void gen_mymai_tonight_with_non_aqours_live_no_blade(void){
     int member_a = 0;
     // TODO destructuring: let (_, member_a) = setup_mymai_only(&mut game);
     test_add_to_hand(&tg, non_aqours);
-    // TODO: game.set_live_card(non_aqours);
+    test_set_live_card(&tg, 0, non_aqours);
     // // inlined helper advance_to_performance
     // 
     rb_advance_phase(&tg.state);
@@ -74459,7 +74455,7 @@ static void gen_mymai_tonight_blade_disappears_after_live_end(void){
     int member_a = 0;
     // TODO destructuring: let (_, member_a) = setup_mymai_only(&mut game);
     test_add_to_hand(&tg, aqours_live);
-    // TODO: game.set_live_card(aqours_live);
+    test_set_live_card(&tg, 0, aqours_live);
     // 
     // // inlined helper advance_to_performance
     // 
@@ -74549,9 +74545,9 @@ static void gen_mymai_two_copies_plus_aqours_live_both_fire(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(mymai);
-    // TODO: game.set_live_card(mymai2);
-    // TODO: game.set_live_card(aqours_live);
+    test_set_live_card(&tg, 0, mymai);
+    test_set_live_card(&tg, 0, mymai2);
+    test_set_live_card(&tg, 0, aqours_live);
     // 
     // // inlined helper advance_to_performance
     // 
@@ -74635,9 +74631,9 @@ static void gen_mymai_with_aqours_and_non_aqours_live_gains_blade(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(mymai);
-    // TODO: game.set_live_card(aqours_live);
-    // TODO: game.set_live_card(non_aqours);
+    test_set_live_card(&tg, 0, mymai);
+    test_set_live_card(&tg, 0, aqours_live);
+    test_set_live_card(&tg, 0, non_aqours);
     // // inlined helper advance_to_performance
     // 
     rb_advance_phase(&tg.state);
@@ -74662,7 +74658,7 @@ static void gen_mymai_q121_all_stage_members_gain_blade(void){
     // TODO destructuring: let (_, member_a) = setup_mymai_only(&mut game);
     int member_b = tg.state.p[0].stage[1];
     test_add_to_hand(&tg, aqours_live);
-    // TODO: game.set_live_card(aqours_live);
+    test_set_live_card(&tg, 0, aqours_live);
     // // inlined helper advance_to_performance
     // 
     rb_advance_phase(&tg.state);
@@ -74744,9 +74740,9 @@ static void gen_mymai_two_aqours_live_gains_blade_once(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(mymai);
-    // TODO: game.set_live_card(aq1);
-    // TODO: game.set_live_card(aq2);
+    test_set_live_card(&tg, 0, mymai);
+    test_set_live_card(&tg, 0, aq1);
+    test_set_live_card(&tg, 0, aq2);
     // // inlined helper advance_to_performance
     // 
     rb_advance_phase(&tg.state);
@@ -75905,7 +75901,7 @@ static void gen_q127_wien_plus1_stacks_on_bloom_set(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "q127_wien_plus1_stacks_on_bloom_set");
     // 
-    // TODO: game.set_live_card(bloom);
+    test_set_live_card(&tg, 0, bloom);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -76092,7 +76088,7 @@ static void gen_q127_wien_plus1_stacks_on_hareruya_set(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "q127_wien_plus1_stacks_on_hareruya_set");
     // 
-    // TODO: game.set_live_card(hareruya);
+    test_set_live_card(&tg, 0, hareruya);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -76264,7 +76260,7 @@ static void gen_q127_two_wien_stack_plus2_heart00(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "q127_two_wien_stack_plus2_heart00");
     // 
-    // TODO: game.set_live_card(bloom);
+    test_set_live_card(&tg, 0, bloom);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -76421,7 +76417,7 @@ static void gen_q127_wien_leaves_stage_modifier_removed(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "q127_wien_leaves_stage_modifier_removed");
     // 
-    // TODO: game.set_live_card(bloom);
+    test_set_live_card(&tg, 0, bloom);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -76614,7 +76610,7 @@ static void gen_q127_wien_adds_heart00_not_in_set(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "q127_wien_adds_heart00_not_in_set");
     // 
-    // TODO: game.set_live_card(hareruya);
+    test_set_live_card(&tg, 0, hareruya);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -76781,7 +76777,7 @@ static void gen_q127_wien_only_affects_heart00(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "q127_wien_only_affects_heart00");
     // 
-    // TODO: game.set_live_card(bloom);
+    test_set_live_card(&tg, 0, bloom);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -76955,7 +76951,7 @@ static void gen_q127_wien_plus_bloom_heart04_pattern(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "q127_wien_plus_bloom_heart04_pattern");
     // 
-    // TODO: game.set_live_card(bloom);
+    test_set_live_card(&tg, 0, bloom);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -77117,7 +77113,7 @@ static void gen_q127_wien_plus_bloom_heart05_pattern(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "q127_wien_plus_bloom_heart05_pattern");
     // 
-    // TODO: game.set_live_card(bloom);
+    test_set_live_card(&tg, 0, bloom);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -77278,7 +77274,7 @@ static void gen_q127_no_wien_bloom_set_standalone(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "q127_no_wien_bloom_set_standalone");
     // 
-    // TODO: game.set_live_card(bloom);
+    test_set_live_card(&tg, 0, bloom);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -77943,7 +77939,7 @@ static void gen_hanamusubi_alone_no_reduction(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(hanamusubi);
+    test_set_live_card(&tg, 0, hanamusubi);
     // // inlined helper finish_live_setup
     // 
     rb_advance_phase(&tg.state);
@@ -78029,8 +78025,8 @@ static void gen_hanamusubi_with_one_other_renosora_reduces_2(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(hanamusubi);
-    // TODO: game.set_live_card(other_renosora);
+    test_set_live_card(&tg, 0, hanamusubi);
+    test_set_live_card(&tg, 0, other_renosora);
     // // inlined helper finish_live_setup
     // 
     rb_advance_phase(&tg.state);
@@ -78125,9 +78121,9 @@ static void gen_hanamusubi_with_two_other_renosora_reduces_4(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(hanamusubi);
-    // TODO: game.set_live_card(other_a);
-    // TODO: game.set_live_card(other_b);
+    test_set_live_card(&tg, 0, hanamusubi);
+    test_set_live_card(&tg, 0, other_a);
+    test_set_live_card(&tg, 0, other_b);
     // // inlined helper finish_live_setup
     // 
     rb_advance_phase(&tg.state);
@@ -78212,8 +78208,8 @@ static void gen_hanamusubi_reduces_only_heart04_not_heart0(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(hanamusubi);
-    // TODO: game.set_live_card(other_renosora);
+    test_set_live_card(&tg, 0, hanamusubi);
+    test_set_live_card(&tg, 0, other_renosora);
     // // inlined helper finish_live_setup
     // 
     rb_advance_phase(&tg.state);
@@ -78304,8 +78300,8 @@ static void gen_two_hanamusubi_each_reduces_2(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(a);
-    // TODO: game.set_live_card(b);
+    test_set_live_card(&tg, 0, a);
+    test_set_live_card(&tg, 0, b);
     // // inlined helper finish_live_setup
     // 
     rb_advance_phase(&tg.state);
@@ -78399,9 +78395,9 @@ static void gen_three_hanamusubi_each_reduces_4(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(a);
-    // TODO: game.set_live_card(b);
-    // TODO: game.set_live_card(c);
+    test_set_live_card(&tg, 0, a);
+    test_set_live_card(&tg, 0, b);
+    test_set_live_card(&tg, 0, c);
     // // inlined helper finish_live_setup
     // 
     rb_advance_phase(&tg.state);
@@ -78490,8 +78486,8 @@ static void gen_one_hanamusubi_one_filler_no_reduction(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(hanamusubi);
-    // TODO: game.set_live_card(filler_live);
+    test_set_live_card(&tg, 0, hanamusubi);
+    test_set_live_card(&tg, 0, filler_live);
     // // inlined helper finish_live_setup
     // 
     rb_advance_phase(&tg.state);
@@ -78578,9 +78574,9 @@ static void gen_one_hanamusubi_two_fillers_no_reduction(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(hanamusubi);
-    // TODO: game.set_live_card(f1);
-    // TODO: game.set_live_card(f2);
+    test_set_live_card(&tg, 0, hanamusubi);
+    test_set_live_card(&tg, 0, f1);
+    test_set_live_card(&tg, 0, f2);
     // // inlined helper finish_live_setup
     // 
     rb_advance_phase(&tg.state);
@@ -78863,7 +78859,7 @@ static void gen_jellyfish_two_members_appeared_reduce_by_2(void){
     test_play_to_stage(&tg, chisato, 0);
     test_play_to_stage(&tg, natsumi, 1);
     // 
-    // TODO: game.set_live_card(jellyfish);
+    test_set_live_card(&tg, 0, jellyfish);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -78955,7 +78951,7 @@ static void gen_jellyfish_q99_one_member_both_flags_counts_once(void){
     // 
     test_play_to_stage(&tg, chisato, 1);
     // 
-    // TODO: game.set_live_card(jellyfish);
+    test_set_live_card(&tg, 0, jellyfish);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -79053,7 +79049,7 @@ static void gen_jellyfish_mixed_qualifying_and_non_qualifying(void){
     test_play_to_stage(&tg, natsumi, 1);
     test_play_to_stage(&tg, honoka, 2);
     // 
-    // TODO: game.set_live_card(jellyfish);
+    test_set_live_card(&tg, 0, jellyfish);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -79145,7 +79141,7 @@ static void gen_jellyfish_no_qualifying_members_no_reduction(void){
     // 
     test_play_to_stage(&tg, honoka, 1);
     // 
-    // TODO: game.set_live_card(jellyfish);
+    test_set_live_card(&tg, 0, jellyfish);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -79243,7 +79239,7 @@ static void gen_jellyfish_three_members_all_qualify_reduce_by_3(void){
     test_play_to_stage(&tg, natsumi, 1);
     test_play_to_stage(&tg, wakana_pr, 2);
     // 
-    // TODO: game.set_live_card(jellyfish);
+    test_set_live_card(&tg, 0, jellyfish);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -79343,7 +79339,7 @@ static void gen_jellyfish_member_moved_by_position_change_without_appearing_this
     // 
     rb_resume_with_choice(&tg.state, 0);
     // 
-    // TODO: game.set_live_card(jellyfish);
+    test_set_live_card(&tg, 0, jellyfish);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -79434,7 +79430,7 @@ static void gen_jellyfish_member_neither_appeared_nor_moved_does_not_count(void)
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "jellyfish_member_neither_appeared_nor_moved_does_not_count");
     // 
     // 
-    // TODO: game.set_live_card(jellyfish);
+    test_set_live_card(&tg, 0, jellyfish);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -79534,7 +79530,7 @@ static void gen_jellyfish_q98_member_appeared_then_left_not_counted(void){
     // // Mark Chisato as appeared this turn AFTER phase advance (tracking may be cleared during passes)
     // TODO: game.state.cards_appeared_this_turn.push(chisato);
     // 
-    // TODO: game.set_live_card(jellyfish);
+    test_set_live_card(&tg, 0, jellyfish);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -79636,7 +79632,7 @@ static void gen_jellyfish_q98_one_left_one_stays(void){
     // // Re-insert appeared tracking AFTER phase advance (it may be cleared during passes)
     // TODO: game.state.cards_appeared_this_turn.push(natsumi);
     // 
-    // TODO: game.set_live_card(jellyfish);
+    test_set_live_card(&tg, 0, jellyfish);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -81045,7 +81041,7 @@ static void gen_nonfiction_cost_p1_high_vs_p2_low_scores(void){
     CHECK_EQ_STR(rb_phase_name(tg.state.phase), "Main", "nonfiction_cost_p1_high_vs_p2_low_scores");
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(nonfiction);
+    test_set_live_card(&tg, 0, nonfiction);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // // inlined helper drain_auto_choices
@@ -81152,7 +81148,7 @@ static void gen_nonfiction_cost_p1_high_vs_p2_empty_scores(void){
     CHECK_EQ_STR(rb_phase_name(tg.state.phase), "Main", "nonfiction_cost_p1_high_vs_p2_empty_scores");
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(nonfiction);
+    test_set_live_card(&tg, 0, nonfiction);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // // inlined helper drain_auto_choices
@@ -81259,7 +81255,7 @@ static void gen_nonfiction_cost_p1_low_vs_p2_high_no_score(void){
     CHECK_EQ_STR(rb_phase_name(tg.state.phase), "Main", "nonfiction_cost_p1_low_vs_p2_high_no_score");
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(nonfiction);
+    test_set_live_card(&tg, 0, nonfiction);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // // inlined helper drain_auto_choices
@@ -81365,7 +81361,7 @@ static void gen_nonfiction_cost_p1_non_liella_center_no_score(void){
     CHECK_EQ_STR(rb_phase_name(tg.state.phase), "Main", "nonfiction_cost_p1_non_liella_center_no_score");
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(nonfiction);
+    test_set_live_card(&tg, 0, nonfiction);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // // inlined helper drain_auto_choices
@@ -81472,7 +81468,7 @@ static void gen_nonfiction_cost_equal_costs_no_score(void){
     CHECK_EQ_STR(rb_phase_name(tg.state.phase), "Main", "nonfiction_cost_equal_costs_no_score");
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(nonfiction);
+    test_set_live_card(&tg, 0, nonfiction);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // // inlined helper drain_auto_choices
@@ -81586,10 +81582,10 @@ static void gen_nonfiction_cost_p2_high_vs_p1_low_scores(void){
     rb_advance_phase(&tg.state);
     // 
     // // P1 sets a live card
-    // TODO: game.set_live_card(p1_live_card);
+    test_set_live_card(&tg, 0, p1_live_card);
     rb_advance_phase(&tg.state);
     // // P2 sets the nonfiction live card
-    // TODO: game.set_live_card(nonfiction);
+    test_set_live_card(&tg, 0, nonfiction);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // // inlined helper drain_auto_choices
@@ -81698,9 +81694,9 @@ static void gen_nonfiction_cost_p2_high_vs_p1_empty_scores(void){
     CHECK_EQ_STR(rb_phase_name(tg.state.phase), "Main", "nonfiction_cost_p2_high_vs_p1_empty_scores");
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(p1_live_card);
+    test_set_live_card(&tg, 0, p1_live_card);
     rb_advance_phase(&tg.state);
-    // TODO: game.set_live_card(nonfiction);
+    test_set_live_card(&tg, 0, nonfiction);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // // inlined helper drain_auto_choices
@@ -81809,9 +81805,9 @@ static void gen_nonfiction_cost_p2_low_vs_p1_high_no_score(void){
     CHECK_EQ_STR(rb_phase_name(tg.state.phase), "Main", "nonfiction_cost_p2_low_vs_p1_high_no_score");
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(p1_live_card);
+    test_set_live_card(&tg, 0, p1_live_card);
     rb_advance_phase(&tg.state);
-    // TODO: game.set_live_card(nonfiction);
+    test_set_live_card(&tg, 0, nonfiction);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // // inlined helper drain_auto_choices
@@ -81920,9 +81916,9 @@ static void gen_nonfiction_cost_p2_equal_costs_no_score(void){
     CHECK_EQ_STR(rb_phase_name(tg.state.phase), "Main", "nonfiction_cost_p2_equal_costs_no_score");
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(p1_live_card);
+    test_set_live_card(&tg, 0, p1_live_card);
     rb_advance_phase(&tg.state);
-    // TODO: game.set_live_card(nonfiction);
+    test_set_live_card(&tg, 0, nonfiction);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // // inlined helper drain_auto_choices
@@ -82030,7 +82026,7 @@ static void gen_nonfiction_cost_p1_lower_than_p2_liella_no_score(void){
     CHECK_EQ_STR(rb_phase_name(tg.state.phase), "Main", "nonfiction_cost_p1_lower_than_p2_liella_no_score");
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(nonfiction);
+    test_set_live_card(&tg, 0, nonfiction);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // // inlined helper drain_auto_choices
@@ -82459,7 +82455,7 @@ static void gen_no_saint_snow_does_not_fire(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(awaken);
+    test_set_live_card(&tg, 0, awaken);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -82555,7 +82551,7 @@ static void gen_no_aqours_does_not_fire(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(awaken);
+    test_set_live_card(&tg, 0, awaken);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -82655,7 +82651,7 @@ static void gen_cost_below_20_does_not_fire(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(awaken);
+    test_set_live_card(&tg, 0, awaken);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -82757,7 +82753,7 @@ static void gen_cost_at_least_20_fires(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(awaken);
+    test_set_live_card(&tg, 0, awaken);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -82858,7 +82854,7 @@ static void gen_optional_can_skip(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(awaken);
+    test_set_live_card(&tg, 0, awaken);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -82966,7 +82962,7 @@ static void gen_no_matching_live_in_discard_skips(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(awaken);
+    test_set_live_card(&tg, 0, awaken);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -83075,7 +83071,7 @@ static void gen_can_select_2_of_4_available(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(awaken);
+    test_set_live_card(&tg, 0, awaken);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -83722,7 +83718,7 @@ static void gen_bp6_021_accept_cost_scores_and_retrieves(void){
     tg.state.p[0].stage[0] = mus_member;
     // TODO: game.add_to_discard(mus_live);
     // 
-    // TODO: fire_trigger(&mut game, live, AbilityTrigger::LiveSuccess, "ライブ成功時");
+    { int ftpl = rb_owner_of_card(&tg.state, live); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ成功時"); rb_drain_ability_queue(&tg.state); }
     // // Even with a single cost candidate the optional gate IS offered
     // // (observed: SelectTarget pay_optional_cost:skip_optional_cost).
     test_has_pending_choice(&tg);
@@ -83754,7 +83750,7 @@ static void gen_bp6_021_skip_cost_no_score_no_retrieval(void){
     tg.state.p[0].stage[2] = m2;
     // TODO: game.add_to_discard(mus_live);
     // 
-    // TODO: fire_trigger(&mut game, live, AbilityTrigger::LiveSuccess, "ライブ成功時");
+    { int ftpl = rb_owner_of_card(&tg.state, live); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ成功時"); rb_drain_ability_queue(&tg.state); }
     test_has_pending_choice(&tg);
     // TODO assert: assert!(answer_optional(&mut game, false), "expected an optional-gate prompt");
     // 
@@ -83775,7 +83771,7 @@ static void gen_cl1_009_retrieves_cost_four_boundary(void){
     test_add_to_live(&tg, live);
     // TODO: game.state.revealed_cards.push(target);
     // 
-    // TODO: fire_trigger(&mut game, live, AbilityTrigger::LiveSuccess, "ライブ成功時");
+    { int ftpl = rb_owner_of_card(&tg.state, live); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ成功時"); rb_drain_ability_queue(&tg.state); }
     // // Single valid candidate auto-resolves — no selection prompt.
     test_has_pending_choice(&tg);
     // 
@@ -83794,7 +83790,7 @@ static void gen_cl1_009_retrieves_cost_nine_boundary(void){
     test_add_to_live(&tg, live);
     // TODO: game.state.revealed_cards.push(target);
     // 
-    // TODO: fire_trigger(&mut game, live, AbilityTrigger::LiveSuccess, "ライブ成功時");
+    { int ftpl = rb_owner_of_card(&tg.state, live); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ成功時"); rb_drain_ability_queue(&tg.state); }
     // // Single valid candidate auto-resolves — no selection prompt.
     test_has_pending_choice(&tg);
     // 
@@ -83813,7 +83809,7 @@ static void gen_cl1_009_cost_ten_outside_range_not_selectable(void){
     test_add_to_live(&tg, live);
     // TODO: game.state.revealed_cards.push(outside);
     // 
-    // TODO: fire_trigger(&mut game, live, AbilityTrigger::LiveSuccess, "ライブ成功時");
+    { int ftpl = rb_owner_of_card(&tg.state, live); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ成功時"); rb_drain_ability_queue(&tg.state); }
     test_has_pending_choice(&tg);
     CHECK((!test_zone_has_id(&tg, 0, "hand", outside)), "cl1_009_cost_ten_outside_range_not_selectable");
     // 
@@ -83831,7 +83827,7 @@ static void gen_cl1_009_wrong_group_excluded_even_in_range(void){
     test_add_to_live(&tg, live);
     // TODO: game.state.revealed_cards.push(mus);
     // 
-    // TODO: fire_trigger(&mut game, live, AbilityTrigger::LiveSuccess, "ライブ成功時");
+    { int ftpl = rb_owner_of_card(&tg.state, live); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ成功時"); rb_drain_ability_queue(&tg.state); }
     test_has_pending_choice(&tg);
     // 
 }
@@ -83847,7 +83843,7 @@ static void gen_hs_bp6_032_retrieves_low_cost_member(void){
     test_add_to_live(&tg, live);
     // TODO: game.state.revealed_cards.push(target);
     // 
-    // TODO: fire_trigger(&mut game, live, AbilityTrigger::LiveSuccess, "ライブ成功時");
+    { int ftpl = rb_owner_of_card(&tg.state, live); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ成功時"); rb_drain_ability_queue(&tg.state); }
     // // Single valid candidate auto-resolves — no selection prompt.
     test_has_pending_choice(&tg);
     // 
@@ -83866,7 +83862,7 @@ static void gen_hs_bp6_032_expensive_members_not_selectable(void){
     test_add_to_live(&tg, live);
     // TODO: game.state.revealed_cards.push(expensive);
     // 
-    // TODO: fire_trigger(&mut game, live, AbilityTrigger::LiveSuccess, "ライブ成功時");
+    { int ftpl = rb_owner_of_card(&tg.state, live); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ成功時"); rb_drain_ability_queue(&tg.state); }
     test_has_pending_choice(&tg);
     // 
 }
@@ -84779,7 +84775,7 @@ static void gen_issue5_kanon_invalidate_other_liella(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -86927,7 +86923,7 @@ static void gen_kowareyasuki_opponent_loses_surplus_hearts_score_up(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "kowareyasuki_opponent_loses_surplus_hearts_score_up");
     // 
-    // TODO: game.set_live_card(koware);
+    test_set_live_card(&tg, 0, koware);
     // 
     // // Advance through live phases
     rb_advance_phase(&tg.state);
@@ -87005,7 +87001,7 @@ static void gen_kowareyasuki_opponent_loses_2plus_hearts_gets_score_bonus(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
-    // TODO: game.set_live_card(koware);
+    test_set_live_card(&tg, 0, koware);
     // 
     // // Advance through all live phases up to SecondAttackerPerformance
     rb_advance_phase(&tg.state);
@@ -87095,7 +87091,7 @@ static void gen_kowareyasuki_opponent_loses_exactly_2_gets_bonus(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
-    // TODO: game.set_live_card(koware);
+    test_set_live_card(&tg, 0, koware);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
@@ -87179,7 +87175,7 @@ static void gen_kowareyasuki_opponent_loses_1_no_bonus(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
-    // TODO: game.set_live_card(koware);
+    test_set_live_card(&tg, 0, koware);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
@@ -87297,8 +87293,8 @@ static void gen_two_kanon_copies_under_one_liella_host(void){
     // 
     int k1 = test_id(&tg, "PL!SP-bp7-001-R");
     int k2 = test_id(&tg, "PL!SP-bp7-001-R");
-    // TODO: game.state.player1.stage.place_under_card(MemberArea::Center, k1);
-    // TODO: game.state.player1.stage.place_under_card(MemberArea::Center, k2);
+    test_place_under(&tg, 0, 1, k1);
+    test_place_under(&tg, 0, 1, k2);
     // 
     test_recalc(&tg);
     // 
@@ -87365,8 +87361,8 @@ static void gen_kanon_copies_under_two_liella_hosts(void){
     // 
     int ka = test_id(&tg, "PL!SP-bp7-001-R");
     int kb = test_id(&tg, "PL!SP-bp7-001-R");
-    // TODO: game.state.player1.stage.place_under_card(MemberArea::Center, ka);
-    // TODO: game.state.player1.stage.place_under_card(MemberArea::RightSide, kb);
+    test_place_under(&tg, 0, 1, ka);
+    test_place_under(&tg, 0, 2, kb);
     // 
     test_recalc(&tg);
     // 
@@ -87389,7 +87385,7 @@ static void gen_kanon_under_opponent_liella_host_gains_blade(void){
     tg.state.p[1].stage[2] = -1;
     // 
     int kanon = test_id(&tg, "PL!SP-bp7-001-R");
-    // TODO: game.state.player2.stage.place_under_card(MemberArea::Center, kanon);
+    test_place_under(&tg, 1, 1, kanon);
     // 
     test_recalc(&tg);
     // 
@@ -87410,7 +87406,7 @@ static void gen_kanon_leaving_removes_blade(void){
     tg.state.p[0].stage[2] = -1;
     // 
     int kanon = test_id(&tg, "PL!SP-bp7-001-R");
-    // TODO: game.state.player1.stage.place_under_card(MemberArea::Center, kanon);
+    test_place_under(&tg, 0, 1, kanon);
     // 
     test_recalc(&tg);
     CHECK_EQ(rb_mods_get_blade(&tg.state.mods, host), 1, "kanon_leaving_removes_blade");
@@ -87690,7 +87686,7 @@ static void gen_bp6_023_draws_extra_with_mus_live_in_success_zone(void){
     int deck_before = tg.state.p[0].deck.n;
     // // inlined helper fire_trigger
     // 
-    // TODO: crate::helpers::fire_trigger(game, live, AbilityTrigger::LiveSuccess, "ライブ成功時");
+    { int ftpl = rb_owner_of_card(&tg.state, live); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ成功時"); rb_drain_ability_queue(&tg.state); }
     test_drain_auto_choices(&tg);
     // 
     // 
@@ -87712,7 +87708,7 @@ static void gen_bp6_023_single_draw_without_success_zone_card(void){
     int deck_before = tg.state.p[0].deck.n;
     // // inlined helper fire_trigger
     // 
-    // TODO: crate::helpers::fire_trigger(game, live, AbilityTrigger::LiveSuccess, "ライブ成功時");
+    { int ftpl = rb_owner_of_card(&tg.state, live); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ成功時"); rb_drain_ability_queue(&tg.state); }
     test_drain_auto_choices(&tg);
     // 
     // 
@@ -87736,7 +87732,7 @@ static void gen_bp6_023_non_mus_live_in_success_zone_single_draw(void){
     int deck_before = tg.state.p[0].deck.n;
     // // inlined helper fire_trigger
     // 
-    // TODO: crate::helpers::fire_trigger(game, live, AbilityTrigger::LiveSuccess, "ライブ成功時");
+    { int ftpl = rb_owner_of_card(&tg.state, live); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ成功時"); rb_drain_ability_queue(&tg.state); }
     test_drain_auto_choices(&tg);
     // 
     // 
@@ -87754,7 +87750,7 @@ static void gen_sd2_003_draws_extra_after_area_move(void){
     int deck_before = tg.state.p[0].deck.n;
     // // inlined helper fire_trigger
     // 
-    // TODO: crate::helpers::fire_trigger(game, chisato, AbilityTrigger::LiveSuccess, "ライブ成功時");
+    { int ftpl = rb_owner_of_card(&tg.state, chisato); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ成功時"); rb_drain_ability_queue(&tg.state); }
     test_drain_auto_choices(&tg);
     // 
     // 
@@ -87772,7 +87768,7 @@ static void gen_sd2_003_single_draw_without_area_move(void){
     int deck_before = tg.state.p[0].deck.n;
     // // inlined helper fire_trigger
     // 
-    // TODO: crate::helpers::fire_trigger(game, chisato, AbilityTrigger::LiveSuccess, "ライブ成功時");
+    { int ftpl = rb_owner_of_card(&tg.state, chisato); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ成功時"); rb_drain_ability_queue(&tg.state); }
     test_drain_auto_choices(&tg);
     // 
     // TODO assert_eq (unresolved): assert_eq!( deck_before - game.state.player1.main_deck.cards.len(), 1, "no area move this turn -> only the base draw" );
@@ -87789,7 +87785,7 @@ static void gen_bps2025_distinct_trio_retrieves_revealed_to_hand(void){
     // 
     int live = test_id(&tg, "PL!SP-bp2-025-L");
     test_add_to_hand(&tg, live);
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // // Two DIFFERENT names among the trio satisfy 「2人以上」.
     int kanon = test_id(&tg, "PL!SP-sd1-002-SD");
     int wien = test_id(&tg, "PL!SP-sd2-010-SD2");
@@ -87800,7 +87796,7 @@ static void gen_bps2025_distinct_trio_retrieves_revealed_to_hand(void){
     // TODO: game.state.revealed_cards.clear();
     // TODO: game.state.revealed_cards.push(prize);
     // 
-    // TODO: fire_trigger(&mut game, live, AbilityTrigger::LiveSuccess, "ライブ成功時");
+    { int ftpl = rb_owner_of_card(&tg.state, live); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ成功時"); rb_drain_ability_queue(&tg.state); }
     int guard = 0;
     test_has_pending_choice(&tg);
     // TODO: guard += 1;
@@ -87821,7 +87817,7 @@ static void gen_bps2025_single_name_no_retrieval(void){
     // 
     int live = test_id(&tg, "PL!SP-bp2-025-L");
     test_add_to_hand(&tg, live);
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // // Only ONE of the named trio on stage.
     int kanon = test_id(&tg, "PL!SP-sd1-002-SD");
     tg.state.p[0].stage[0] = kanon;
@@ -87829,7 +87825,7 @@ static void gen_bps2025_single_name_no_retrieval(void){
     // TODO: game.state.revealed_cards.clear();
     // TODO: game.state.revealed_cards.push(prize);
     // 
-    // TODO: fire_trigger(&mut game, live, AbilityTrigger::LiveSuccess, "ライブ成功時");
+    { int ftpl = rb_owner_of_card(&tg.state, live); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ成功時"); rb_drain_ability_queue(&tg.state); }
     // 
     CHECK((!test_zone_has_id(&tg, 0, "hand", prize)), "bps2025_single_name_no_retrieval");
     // 
@@ -87845,13 +87841,13 @@ static void gen_bps7023_optional_liella_reveal_to_deck_top(void){
     // 
     int live = test_id(&tg, "PL!SP-bp7-023-L");
     test_add_to_hand(&tg, live);
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     int liella_card = test_id(&tg, "PL!SP-bp1-026-L");
     // TODO: game.state.revealed_cards.clear();
     // TODO: game.state.revealed_cards.push(liella_card);
     int deck_before = tg.state.p[0].deck.n;
     // 
-    // TODO: fire_trigger(&mut game, live, AbilityTrigger::LiveSuccess, "ライブ成功時");
+    { int ftpl = rb_owner_of_card(&tg.state, live); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ成功時"); rb_drain_ability_queue(&tg.state); }
     // // Optional move is folded into the allow_skip selection prompt.
     int guard = 0;
     test_has_pending_choice(&tg);
@@ -87873,7 +87869,7 @@ static void gen_bs5019_success_zone_two_retrieves_two_members(void){
     // 
     int live = test_id(&tg, "PL!S-bp5-019-L");
     test_add_to_hand(&tg, live);
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // // Own success zone has 2 cards -> gate met.
     int no = 0;
     // TODO loop (degraded): for no in ["PL!-sd1-019-SD", "PL!HS-bp2-020-L"] {
@@ -87886,7 +87882,7 @@ static void gen_bs5019_success_zone_two_retrieves_two_members(void){
     // TODO: game.state.revealed_cards.push(m1);
     // TODO: game.state.revealed_cards.push(m2);
     // 
-    // TODO: fire_trigger(&mut game, live, AbilityTrigger::LiveSuccess, "ライブ成功時");
+    { int ftpl = rb_owner_of_card(&tg.state, live); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ成功時"); rb_drain_ability_queue(&tg.state); }
     // // 「2枚まで」 max selection: answer with both candidate indices at once.
     test_has_pending_choice(&tg);
     // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard (revealed_cards, count=2)" );
@@ -87927,7 +87923,7 @@ static void gen_pr0018_seven_liella_reveals_place_wait_energy(void){
     // TODO: game.state.revealed_cards.push(test_id(&tg, "PL!SP-bp1-026-L"));
     // TODO: game.state.revealed_cards.push(filler);
     // 
-    // TODO: fire_trigger(&mut game, me, AbilityTrigger::LiveSuccess, "ライブ成功時");
+    { int ftpl = rb_owner_of_card(&tg.state, me); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ成功時"); rb_drain_ability_queue(&tg.state); }
     int guard = 0;
     test_has_pending_choice(&tg);
     // TODO: guard += 1;
@@ -87960,7 +87956,7 @@ static void gen_pr0018_under_seven_liella_no_energy(void){
     // TODO: game.state.revealed_cards.push(test_id(&tg, "PL!SP-bp1-026-L"));
     // TODO: game.state.revealed_cards.push(test_id(&tg, "PL!SP-bp1-026-L"));
     // 
-    // TODO: fire_trigger(&mut game, me, AbilityTrigger::LiveSuccess, "ライブ成功時");
+    { int ftpl = rb_owner_of_card(&tg.state, me); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ成功時"); rb_drain_ability_queue(&tg.state); }
     int guard = 0;
     test_has_pending_choice(&tg);
     // TODO: guard += 1;
@@ -88045,7 +88041,7 @@ static void gen_bp4020_rightside_moved_gains_two_blades(void){
     // TODO: game.state.cards_moved_this_turn.push(me);
     // TODO: game.state.position_change_occurred_this_turn = true;
     // 
-    // TODO: fire_trigger(&mut game, me, AbilityTrigger::LiveStart, "ライブ開始時");
+    { int ftpl = rb_owner_of_card(&tg.state, me); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ開始時"); rb_drain_ability_queue(&tg.state); }
     test_recalc(&tg);
     // 
     CHECK_EQ(rb_mods_get_blade(&tg.state.mods, me), 2, "bp4020_rightside_moved_gains_two_blades");
@@ -88065,7 +88061,7 @@ static void gen_bp4020_center_moved_no_blades(void){
     // TODO: game.state.cards_moved_this_turn.push(me);
     // TODO: game.state.position_change_occurred_this_turn = true;
     // 
-    // TODO: fire_trigger(&mut game, me, AbilityTrigger::LiveStart, "ライブ開始時");
+    { int ftpl = rb_owner_of_card(&tg.state, me); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ開始時"); rb_drain_ability_queue(&tg.state); }
     test_recalc(&tg);
     // 
     CHECK_EQ(rb_mods_get_blade(&tg.state.mods, me), 0, "bp4020_center_moved_no_blades");
@@ -88084,7 +88080,7 @@ static void gen_nbp7012_pay_specifies_color_and_gains_one(void){
     tg.state.p[0].stage[1] = me;
     test_give_energy(&tg, 3);
     // 
-    // TODO: fire_trigger(&mut game, me, AbilityTrigger::LiveStart, "ライブ開始時");
+    { int ftpl = rb_owner_of_card(&tg.state, me); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ開始時"); rb_drain_ability_queue(&tg.state); }
     test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, 1);
     // // Answer the color specification choice(s).
@@ -88925,7 +88921,7 @@ static void gen_karin_reveal_condition_met_cheap_member_goes_to_hand(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live_card);
+    test_set_live_card(&tg, 0, live_card);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -89013,7 +89009,7 @@ static void gen_karin_reveal_condition_met_cheap_member_not_in_discard(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live_card);
+    test_set_live_card(&tg, 0, live_card);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -89103,7 +89099,7 @@ static void gen_karin_reveal_condition_met_card_removed_from_deck_top(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live_card);
+    test_set_live_card(&tg, 0, live_card);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -89194,7 +89190,7 @@ static void gen_karin_reveal_condition_met_hand_count_increases(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live_card);
+    test_set_live_card(&tg, 0, live_card);
     // // After setting live card: hand decreased by 1
     // // inlined helper advance_to_live_start
     // 
@@ -89286,7 +89282,7 @@ static void gen_karin_reveal_non_member_live_card_goes_to_discard(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live_card);
+    test_set_live_card(&tg, 0, live_card);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -89374,7 +89370,7 @@ static void gen_karin_reveal_non_member_not_added_to_hand(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live_card);
+    test_set_live_card(&tg, 0, live_card);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -89462,7 +89458,7 @@ static void gen_karin_reveal_expensive_member_goes_to_discard(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live_card);
+    test_set_live_card(&tg, 0, live_card);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -89553,7 +89549,7 @@ static void gen_karin_reveal_condition_met_position_changes(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live_card);
+    test_set_live_card(&tg, 0, live_card);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -89646,7 +89642,7 @@ static void gen_karin_reveal_condition_not_met_position_unchanged(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live_card);
+    test_set_live_card(&tg, 0, live_card);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -89734,7 +89730,7 @@ static void gen_karin_reveal_card_in_exactly_one_zone(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live_card);
+    test_set_live_card(&tg, 0, live_card);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -89829,7 +89825,7 @@ static void gen_karin_reveal_condition_met_deck_top_becomes_filler(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live_card);
+    test_set_live_card(&tg, 0, live_card);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -89921,7 +89917,7 @@ static void gen_karin_reveal_condition_failed_deck_top_becomes_filler(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live_card);
+    test_set_live_card(&tg, 0, live_card);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -92991,7 +92987,7 @@ static void gen_condition_0_revealed_no_trigger(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
-    // TODO: game.set_live_card(daisuki);
+    test_set_live_card(&tg, 0, daisuki);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
@@ -93140,7 +93136,7 @@ static void gen_condition_1_revealed_triggers(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
-    // TODO: game.set_live_card(daisuki);
+    test_set_live_card(&tg, 0, daisuki);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
@@ -93294,7 +93290,7 @@ static void gen_condition_5_revealed_all_blade_heart_no_trigger(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
-    // TODO: game.set_live_card(daisuki);
+    test_set_live_card(&tg, 0, daisuki);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
@@ -93443,7 +93439,7 @@ static void gen_blade_heart_0_triggers_discard(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
-    // TODO: game.set_live_card(daisuki);
+    test_set_live_card(&tg, 0, daisuki);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
@@ -93593,7 +93589,7 @@ static void gen_blade_heart_2_triggers_discard(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
-    // TODO: game.set_live_card(daisuki);
+    test_set_live_card(&tg, 0, daisuki);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
@@ -93745,7 +93741,7 @@ static void gen_blade_heart_3_blocks_entire_ability(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
-    // TODO: game.set_live_card(daisuki);
+    test_set_live_card(&tg, 0, daisuki);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
@@ -93897,7 +93893,7 @@ static void gen_discard_skip_no_re_yell(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
-    // TODO: game.set_live_card(daisuki);
+    test_set_live_card(&tg, 0, daisuki);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
@@ -94793,7 +94789,7 @@ static void gen_hs2003_skip_reorder_rest_goes_to_waitroom(void){
     // TODO: game.state.player1.main_deck.cards.insert(0, c);
     // TODO: }
     // 
-    // TODO: fire_trigger(&mut game, me, AbilityTrigger::LiveStart, "ライブ開始時");
+    { int ftpl = rb_owner_of_card(&tg.state, me); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ開始時"); rb_drain_ability_queue(&tg.state); }
     rb_resume_with_choice(&tg.state, 0);
     // // Skip every reorder pick -> all three looked cards go to the waitroom.
     int guard = 0;
@@ -94893,7 +94889,7 @@ static void gen_s1013_look4_takes_live_requiring_two_heart04(void){
     // 
     // // inlined helper fire_debut_accept
     // 
-    // TODO: fire_trigger(game, me, AbilityTrigger::Debut, "登場");
+    { int ftpl = rb_owner_of_card(&tg.state, me); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "登場"); rb_drain_ability_queue(&tg.state); }
     test_has_pending_choice(&tg);
     // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard (hand cost gate)" );
     rb_resume_with_choice(&tg.state, 0);
@@ -94924,7 +94920,7 @@ static void gen_s1013_look4_plain_member_stays_out(void){
     // 
     // // inlined helper fire_debut_accept
     // 
-    // TODO: fire_trigger(game, me, AbilityTrigger::Debut, "登場");
+    { int ftpl = rb_owner_of_card(&tg.state, me); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "登場"); rb_drain_ability_queue(&tg.state); }
     test_has_pending_choice(&tg);
     // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard (hand cost gate)" );
     rb_resume_with_choice(&tg.state, 0);
@@ -94955,7 +94951,7 @@ static void gen_s1014_look4_takes_live_requiring_two_heart02(void){
     // 
     // // inlined helper fire_debut_accept
     // 
-    // TODO: fire_trigger(game, me, AbilityTrigger::Debut, "登場");
+    { int ftpl = rb_owner_of_card(&tg.state, me); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "登場"); rb_drain_ability_queue(&tg.state); }
     test_has_pending_choice(&tg);
     // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard (hand cost gate)" );
     rb_resume_with_choice(&tg.state, 0);
@@ -94986,7 +94982,7 @@ static void gen_b5014_takes_member_with_heart06(void){
     // 
     // // inlined helper fire_debut_accept
     // 
-    // TODO: fire_trigger(game, me, AbilityTrigger::Debut, "登場");
+    { int ftpl = rb_owner_of_card(&tg.state, me); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "登場"); rb_drain_ability_queue(&tg.state); }
     test_has_pending_choice(&tg);
     // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard (hand cost gate)" );
     rb_resume_with_choice(&tg.state, 0);
@@ -95011,13 +95007,13 @@ static void gen_nb5028_sets_score_and_required_hearts(void){
     // 
     int live = test_id(&tg, "PL!N-bp5-028-L");
     test_add_to_hand(&tg, live);
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // TODO: game.state.current_phase = rabuka_engine::game_state::Phase::FirstAttackerPerformance;
     // // Stage member holding heart02 x4.
     int chika = test_id(&tg, "PL!S-bp5-001-R＋");
     tg.state.p[0].stage[0] = chika;
     // 
-    // TODO: fire_trigger(&mut game, live, AbilityTrigger::LiveStart, "ライブ開始時");
+    { int ftpl = rb_owner_of_card(&tg.state, live); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ開始時"); rb_drain_ability_queue(&tg.state); }
     test_recalc(&tg);
     // 
     CHECK_EQ(rb_mods_get_score(&tg.state.mods, live), 2, "nb5028_sets_score_and_required_hearts");
@@ -95110,7 +95106,7 @@ static void gen_spb5023_compound_gate_grants_plus_two(void){
     // 
     int live = test_id(&tg, "PL!SP-bp5-023-L");
     test_add_to_hand(&tg, live);
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // // Either-zone >=2: two cards in OWN success zone.
     int no = 0;
     // TODO loop (degraded): for no in ["PL!-sd1-019-SD", "PL!HS-bp2-020-L"] {
@@ -95121,7 +95117,7 @@ static void gen_spb5023_compound_gate_grants_plus_two(void){
     // TODO: game.state.revealed_cards.clear();
     // TODO: game.state.revealed_cards.push(test_id(&tg, "PL!SP-bp1-023-L"));
     // 
-    // TODO: fire_trigger(&mut game, live, AbilityTrigger::LiveSuccess, "ライブ成功時");
+    { int ftpl = rb_owner_of_card(&tg.state, live); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ成功時"); rb_drain_ability_queue(&tg.state); }
     // 
     CHECK_EQ(rb_mods_get_score(&tg.state.mods, live), 2, "spb5023_compound_gate_grants_plus_two");
     // 
@@ -95137,13 +95133,13 @@ static void gen_spb5023_single_success_card_no_bonus(void){
     // 
     int live = test_id(&tg, "PL!SP-bp5-023-L");
     test_add_to_hand(&tg, live);
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     int s = test_id(&tg, "PL!-sd1-019-SD");
     test_add_to_live(&tg, s);
     // TODO: game.state.revealed_cards.clear();
     // TODO: game.state.revealed_cards.push(test_id(&tg, "PL!SP-bp1-023-L"));
     // 
-    // TODO: fire_trigger(&mut game, live, AbilityTrigger::LiveSuccess, "ライブ成功時");
+    { int ftpl = rb_owner_of_card(&tg.state, live); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ成功時"); rb_drain_ability_queue(&tg.state); }
     // 
     CHECK_EQ(rb_mods_get_score(&tg.state.mods, live), 0, "spb5023_single_success_card_no_bonus");
     // 
@@ -95159,7 +95155,7 @@ static void gen_spb5024_color_choice_gains_area_moved_members(void){
     // 
     int live = test_id(&tg, "PL!SP-bp5-024-L");
     test_add_to_hand(&tg, live);
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // 
     // // Two members on stage; only one has changed areas this turn.
     int mover = test_id(&tg, "PL!S-bp5-001-R＋");
@@ -95168,7 +95164,7 @@ static void gen_spb5024_color_choice_gains_area_moved_members(void){
     tg.state.p[0].stage[2] = stationary;
     // TODO: game.state.push_movement_event(mover, "stage", "stage", None, "p1", true);
     // 
-    // TODO: fire_trigger(&mut game, live, AbilityTrigger::LiveStart, "ライブ開始時");
+    { int ftpl = rb_owner_of_card(&tg.state, live); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ開始時"); rb_drain_ability_queue(&tg.state); }
     // TODO: answer_all(&mut game, 0); // choose first offered color
     test_recalc(&tg);
     // 
@@ -95203,7 +95199,7 @@ static void gen_tabi_bp7021_mill_tiers_two_members_no_bonus(void){
     test_add_to_deck(&tg, l);
     // discard: let _ = l1;
     // 
-    // TODO: fire_trigger(&mut game, live, AbilityTrigger::LiveStart, "ライブ開始時");
+    { int ftpl = rb_owner_of_card(&tg.state, live); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ開始時"); rb_drain_ability_queue(&tg.state); }
     // 
     CHECK_EQ(tg.state.p[0].discard.n, 5, "tabi_bp7021_mill_tiers_two_members_no_bonus");
     CHECK_EQ(tg.state.p[0].hand.n, 0, "tabi_bp7021_mill_tiers_two_members_no_bonus");
@@ -95230,7 +95226,7 @@ static void gen_tabi_bp7021_mill_tiers_three_members_draw_only(void){
     l = test_id(&tg, "PL!-sd1-019-SD");
     test_add_to_deck(&tg, l);
     // 
-    // TODO: fire_trigger(&mut game, live, AbilityTrigger::LiveStart, "ライブ開始時");
+    { int ftpl = rb_owner_of_card(&tg.state, live); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ開始時"); rb_drain_ability_queue(&tg.state); }
     // 
     CHECK_EQ(tg.state.p[0].hand.n, 1, "tabi_bp7021_mill_tiers_three_members_draw_only");
     CHECK_EQ(rb_mods_get_score(&tg.state.mods, live), 0, "tabi_bp7021_mill_tiers_three_members_draw_only");
@@ -95255,7 +95251,7 @@ static void gen_tabi_bp7021_all_five_members_draw_and_score(void){
     m = test_id(&tg, "PL!S-sd1-001-SD");
     test_add_to_deck(&tg, m);
     // 
-    // TODO: fire_trigger(&mut game, live, AbilityTrigger::LiveStart, "ライブ開始時");
+    { int ftpl = rb_owner_of_card(&tg.state, live); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ開始時"); rb_drain_ability_queue(&tg.state); }
     // 
     CHECK_EQ(tg.state.p[0].hand.n, 1, "tabi_bp7021_all_five_members_draw_and_score");
     CHECK_EQ(rb_mods_get_score(&tg.state.mods, live), 1, "tabi_bp7021_all_five_members_draw_and_score");
@@ -95281,7 +95277,7 @@ static void gen_tabi_bp7021_fewer_than_three_members_on_stage_noop(void){
     m = test_id(&tg, "PL!S-sd1-001-SD");
     test_add_to_deck(&tg, m);
     // 
-    // TODO: fire_trigger(&mut game, live, AbilityTrigger::LiveStart, "ライブ開始時");
+    { int ftpl = rb_owner_of_card(&tg.state, live); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ開始時"); rb_drain_ability_queue(&tg.state); }
     // 
     CHECK_EQ(tg.state.p[0].discard.n, 0, "tabi_bp7021_fewer_than_three_members_on_stage_noop");
     // 
@@ -95297,7 +95293,7 @@ static void gen_kinako_spbp7017_placed_energy_wont_activate_next_turn(void){
     test_add_to_stage(&tg, 1, kinako);
     // TODO: fill_energy_deck(&mut game, 0, 2);
     // 
-    // TODO: fire_trigger(&mut game, kinako, AbilityTrigger::Debut, "登場");
+    { int ftpl = rb_owner_of_card(&tg.state, kinako); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "登場"); rb_drain_ability_queue(&tg.state); }
     // 
     CHECK_EQ(tg.state.p[0].energy.n, 1, "kinako_spbp7017_placed_energy_wont_activate_next_turn");
     // action result consumed: let placed = *game.state.player1.energy_zone.cards.last().unwrap();
@@ -95316,7 +95312,7 @@ static void gen_guilty_night_option_b_draws_instead(void){
     int live = 0;
     // 
     int o1 = tg.state.p[1].stage[0];
-    // TODO: fire_trigger(&mut game, live, AbilityTrigger::LiveSuccess, "ライブ成功時");
+    { int ftpl = rb_owner_of_card(&tg.state, live); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ成功時"); rb_drain_ability_queue(&tg.state); }
     test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, 1);
     // 
@@ -95339,18 +95335,18 @@ static void gen_sumire_pbp2004_original_score_beaten_or_revealed_live_draws(void
     test_add_to_live(&tg, live6);
     // 
     // // Neither condition: score NOT raised, nothing revealed.
-    // TODO: fire_trigger(&mut game, sumire, AbilityTrigger::LiveSuccess, "ライブ成功時");
+    { int ftpl = rb_owner_of_card(&tg.state, sumire); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ成功時"); rb_drain_ability_queue(&tg.state); }
     CHECK_EQ(tg.state.p[0].hand.n, 0, "sumire_pbp2004_original_score_beaten_or_revealed_live_draws");
     // 
     // // Condition ①: current score pushed ABOVE its original 6.
     // TODO: game.state.mods.add_score_modifier(live6, 2);
-    // TODO: fire_trigger(&mut game, sumire, AbilityTrigger::LiveSuccess, "ライブ成功時");
+    { int ftpl = rb_owner_of_card(&tg.state, sumire); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ成功時"); rb_drain_ability_queue(&tg.state); }
     CHECK_EQ(tg.state.p[0].hand.n, 1, "sumire_pbp2004_original_score_beaten_or_revealed_live_draws");
     // 
     // // Condition ②: a revealed live card with a score icon.
     // TODO: game.state.mods.add_score_modifier(live6, -2); // undo ①
     // TODO: game.state.revealed_cards.push(test_id(&tg, "PL!-sd1-019-SD")); // score-1 live
-    // TODO: fire_trigger(&mut game, sumire, AbilityTrigger::LiveSuccess, "ライブ成功時");
+    { int ftpl = rb_owner_of_card(&tg.state, sumire); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ成功時"); rb_drain_ability_queue(&tg.state); }
     CHECK_EQ(tg.state.p[0].hand.n, 2, "sumire_pbp2004_original_score_beaten_or_revealed_live_draws");
     // 
 }
@@ -95387,7 +95383,7 @@ static void gen_honoka_pr0020_gains_constant_live_total_at_eight(void){
     // TODO: heart_map.insert(HeartColor::Heart00, 20);
     // TODO: game.state.player1.stage_hearts = Some(BaseHeart { hearts: heart_map });
     // 
-    // TODO: fire_trigger(&mut game, honoka, AbilityTrigger::LiveStart, "ライブ開始時");
+    { int ftpl = rb_owner_of_card(&tg.state, honoka); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ開始時"); rb_drain_ability_queue(&tg.state); }
     test_recalc(&tg);
     // TODO assert_eq (unresolved): assert_eq!( game.state.mods.p1_constant_total_score_bonus, 1, "score total ≥ 8 → gained 【常時】ライブの合計スコア+1" );
     // 
@@ -96002,7 +95998,7 @@ static void gen_eternalize_q204_zero_niko_hearts_unchanged(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     while (test_has_pending_choice(&tg)) rb_resume_with_choice(&tg.state, 0);
@@ -96038,7 +96034,7 @@ static void gen_eternalize_different_names_no_reduction(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     while (test_has_pending_choice(&tg)) rb_resume_with_choice(&tg.state, 0);
@@ -96073,7 +96069,7 @@ static void gen_eternalize_one_niji_one_other_triggers_zero(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     while (test_has_pending_choice(&tg)) rb_resume_with_choice(&tg.state, 0);
@@ -96109,7 +96105,7 @@ static void gen_eternalize_three_all_different_no_trigger(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     while (test_has_pending_choice(&tg)) rb_resume_with_choice(&tg.state, 0);
@@ -96605,7 +96601,7 @@ static void gen_live_fails_with_insufficient_hearts(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -96755,7 +96751,7 @@ static void gen_both_players_live_score_compared(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(p1_live);
+    test_set_live_card(&tg, 0, p1_live);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -96869,7 +96865,7 @@ static void gen_q147_empty_need_heart_live_succeeds(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -97015,11 +97011,11 @@ static void gen_both_players_have_live_cards(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(p1_live);
+    test_set_live_card(&tg, 0, p1_live);
     // // Transition to SecondAttacker so P2 can set theirs too — without this,
     // // P2 never performs and the scenario is a walkover, not a tie.
     rb_advance_phase(&tg.state);
-    // TODO: game.set_live_card(p2_live);
+    test_set_live_card(&tg, 0, p2_live);
     // // inlined helper advance_to_live_victory
     // 
     rb_advance_phase(&tg.state);
@@ -97133,7 +97129,7 @@ static void gen_one_player_live_auto_higher_score(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -97635,7 +97631,7 @@ static void gen_any_card_fails_hearts_all_fail(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live_a);
+    test_set_live_card(&tg, 0, live_a);
     // // Second live card joins the zone (same as having set 2 cards).
     test_add_to_live(&tg, live_b);
     // // inlined helper advance_to_live_start
@@ -97751,7 +97747,7 @@ static void gen_winner_takes_one_to_success_zone(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live_a);
+    test_set_live_card(&tg, 0, live_a);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -98147,7 +98143,7 @@ static void gen_shared_pool_depletion_all_fail(void){
     rb_advance_phase(&tg.state);
     // 
     // // Set the first live card during LiveCardSet phase
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // // Add second live card directly (simulating having set 2 cards)
     test_add_to_live(&tg, live2);
     CHECK_EQ(tg.state.p[0].live.n, 2, "shared_pool_depletion_all_fail");
@@ -98269,7 +98265,7 @@ static void gen_three_live_cards_any_fails_all_fail(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     test_add_to_live(&tg, live2);
     test_add_to_live(&tg, live3);
     CHECK_EQ(tg.state.p[0].live.n, 3, "three_live_cards_any_fails_all_fail");
@@ -98807,7 +98803,7 @@ static void gen_pb1016_m_decline_leaves_deck_intact(void){
     // 
     // // inlined helper fire_debut
     // 
-    // TODO: fire_trigger(game, me, AbilityTrigger::Debut, "登場");
+    { int ftpl = rb_owner_of_card(&tg.state, me); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "登場"); rb_drain_ability_queue(&tg.state); }
     // 
     rb_resume_with_choice(&tg.state, 1);
     // 
@@ -98913,7 +98909,7 @@ static void gen_bpsp2005_accept_pay_looks_seven_fetches_liella(void){
     // 
     // // inlined helper fire_debut
     // 
-    // TODO: fire_trigger(game, me, AbilityTrigger::Debut, "登場");
+    { int ftpl = rb_owner_of_card(&tg.state, me); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "登場"); rb_drain_ability_queue(&tg.state); }
     // 
     test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, 1);
@@ -98943,7 +98939,7 @@ static void gen_bpsp2005_decline_pay_skips_the_look(void){
     // 
     // // inlined helper fire_debut
     // 
-    // TODO: fire_trigger(game, me, AbilityTrigger::Debut, "登場");
+    { int ftpl = rb_owner_of_card(&tg.state, me); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "登場"); rb_drain_ability_queue(&tg.state); }
     // 
     // // No energy given -> an unpayable optional gate is auto-skipped (Q92).
     test_has_pending_choice(&tg);
@@ -98967,7 +98963,7 @@ static void gen_pbs2007_pay_three_retrieves_liella_live_from_waitroom(void){
     int live = test_id(&tg, "PL!SP-bp1-026-L");
     test_add_to_discard(&tg, live);
     // 
-    // TODO: fire_trigger(&mut game, me, AbilityTrigger::LiveSuccess, "ライブ成功時");
+    { int ftpl = rb_owner_of_card(&tg.state, me); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ成功時"); rb_drain_ability_queue(&tg.state); }
     rb_resume_with_choice(&tg.state, 1);
     int guard = 0;
     test_has_pending_choice(&tg);
@@ -98992,7 +98988,7 @@ static void gen_pbs2007_decline_keeps_waitroom_untouched(void){
     int live = test_id(&tg, "PL!SP-bp1-026-L");
     test_add_to_discard(&tg, live);
     // 
-    // TODO: fire_trigger(&mut game, me, AbilityTrigger::LiveSuccess, "ライブ成功時");
+    { int ftpl = rb_owner_of_card(&tg.state, me); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ成功時"); rb_drain_ability_queue(&tg.state); }
     // // No energy given -> an unpayable optional gate is auto-skipped (Q92).
     test_has_pending_choice(&tg);
     // 
@@ -99275,7 +99271,7 @@ static void gen_special_color_q195_set_blade_liella_at_center(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "special_color_q195_set_blade_liella_at_center");
     // 
-    // TODO: game.set_live_card(special);
+    test_set_live_card(&tg, 0, special);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -99336,7 +99332,7 @@ static void gen_liella_at_left_side_excluded_by_position(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "liella_at_left_side_excluded_by_position");
     // 
-    // TODO: game.set_live_card(special);
+    test_set_live_card(&tg, 0, special);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -99396,7 +99392,7 @@ static void gen_liella_at_right_side_excluded_by_position(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "liella_at_right_side_excluded_by_position");
     // 
-    // TODO: game.set_live_card(special);
+    test_set_live_card(&tg, 0, special);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -99455,7 +99451,7 @@ static void gen_non_liella_at_center_excluded_by_group(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "non_liella_at_center_excluded_by_group");
     // 
-    // TODO: game.set_live_card(special);
+    test_set_live_card(&tg, 0, special);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -99516,7 +99512,7 @@ static void gen_multiple_liella_only_center_gets_modifier(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "multiple_liella_only_center_gets_modifier");
     // 
-    // TODO: game.set_live_card(special);
+    test_set_live_card(&tg, 0, special);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -99578,7 +99574,7 @@ static void gen_center_empty_no_one_gets_modifier(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "center_empty_no_one_gets_modifier");
     // 
-    // TODO: game.set_live_card(special);
+    test_set_live_card(&tg, 0, special);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -99641,7 +99637,7 @@ static void gen_all_three_liella_only_center_gets_modifier(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "all_three_liella_only_center_gets_modifier");
     // 
-    // TODO: game.set_live_card(special);
+    test_set_live_card(&tg, 0, special);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -99707,7 +99703,7 @@ static void gen_opponent_liella_not_affected_by_self_target(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "opponent_liella_not_affected_by_self_target");
     // 
-    // TODO: game.set_live_card(special);
+    test_set_live_card(&tg, 0, special);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -99768,7 +99764,7 @@ static void gen_liella_blade_2_gets_correct_modifier(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "liella_blade_2_gets_correct_modifier");
     // 
-    // TODO: game.set_live_card(special);
+    test_set_live_card(&tg, 0, special);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -99837,7 +99833,7 @@ static void gen_liella_blade_1_gets_correct_modifier(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "liella_blade_1_gets_correct_modifier");
     // 
-    // TODO: game.set_live_card(special);
+    test_set_live_card(&tg, 0, special);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -99900,7 +99896,7 @@ static void gen_q195_existing_modifier_stacks_on_set_value(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "q195_existing_modifier_stacks_on_set_value");
     // 
-    // TODO: game.set_live_card(special);
+    test_set_live_card(&tg, 0, special);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -99961,7 +99957,7 @@ static void gen_liella_blade_4_gets_set_to_3_not_plus_3(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "liella_blade_4_gets_set_to_3_not_plus_3");
     // 
-    // TODO: game.set_live_card(special);
+    test_set_live_card(&tg, 0, special);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -100023,7 +100019,7 @@ static void gen_liella_blade_1_also_gets_set_to_3(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "liella_blade_1_also_gets_set_to_3");
     // 
-    // TODO: game.set_live_card(special);
+    test_set_live_card(&tg, 0, special);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -100088,7 +100084,7 @@ static void gen_liella_blade_4_with_existing_modifier(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "liella_blade_4_with_existing_modifier");
     // 
-    // TODO: game.set_live_card(special);
+    test_set_live_card(&tg, 0, special);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -100319,7 +100315,7 @@ static void gen_kotori_q247_preexisting_under_does_not_double_heart(void){
     // // Pre-place a card under Kotori (simulating prior baton touch)
     // // inlined helper place_under
     // 
-    // TODO: game.state.player1.stage.place_under_card(MemberArea::Center, under_card);
+    test_place_under(&tg, 0, 1, under_card);
     // 
     // TODO assert_eq (unresolved): assert_eq!( game.state .player1 .stage .get_under_cards(MemberArea::Center) .len(), 1, "1 card placed under before LiveStart" );
     // 
@@ -100411,7 +100407,7 @@ static void gen_kotori_q247_preexisting_under_skip_live_start_no_heart(void){
     tg.state.p[0].stage[2] = -1;
     // // inlined helper place_under
     // 
-    // TODO: game.state.player1.stage.place_under_card(MemberArea::Center, under_card);
+    test_place_under(&tg, 0, 1, under_card);
     // 
     test_add_to_hand(&tg, muse);
     test_add_to_hand(&tg, filler_live);
@@ -100490,7 +100486,7 @@ static void gen_kotori_deploy_to_empty_right(void){
     tg.state.p[0].stage[2] = -1;
     // // inlined helper place_under
     // 
-    // TODO: game.state.player1.stage.place_under_card(MemberArea::Center, muse);
+    test_place_under(&tg, 0, 1, muse);
     // 
     test_give_energy(&tg, 3);
     // 
@@ -100539,7 +100535,7 @@ static void gen_kotori_deploy_to_left_when_right_full(void){
     tg.state.p[0].stage[2] = filler;
     // // inlined helper place_under
     // 
-    // TODO: game.state.player1.stage.place_under_card(MemberArea::Center, muse);
+    test_place_under(&tg, 0, 1, muse);
     // 
     test_give_energy(&tg, 3);
     // 
@@ -100629,7 +100625,7 @@ static void gen_kotori_no_empty_slot_keeps_under(void){
     tg.state.p[0].stage[2] = filler;
     // // inlined helper place_under
     // 
-    // TODO: game.state.player1.stage.place_under_card(MemberArea::Center, muse);
+    test_place_under(&tg, 0, 1, muse);
     // 
     test_give_energy(&tg, 3);
     // 
@@ -100676,7 +100672,7 @@ static void gen_kotori_skip_optional_does_nothing(void){
     tg.state.p[0].stage[2] = -1;
     // // inlined helper place_under
     // 
-    // TODO: game.state.player1.stage.place_under_card(MemberArea::Center, muse);
+    test_place_under(&tg, 0, 1, muse);
     // 
     test_give_energy(&tg, 3);
     // 
@@ -100753,7 +100749,7 @@ static void gen_natsumi_bp5_decline_first_mill(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "natsumi_bp5_decline_first_mill");
     // 
-    // TODO: game.set_live_card(filler_live);
+    test_set_live_card(&tg, 0, filler_live);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -100816,7 +100812,7 @@ static void gen_natsumi_bp5_mill_one_live_stop(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "natsumi_bp5_mill_one_live_stop");
     // 
-    // TODO: game.set_live_card(filler_live);
+    test_set_live_card(&tg, 0, filler_live);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -100880,7 +100876,7 @@ static void gen_natsumi_bp5_mill_one_non_live_stop(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "natsumi_bp5_mill_one_non_live_stop");
     // 
-    // TODO: game.set_live_card(filler_live);
+    test_set_live_card(&tg, 0, filler_live);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -100939,7 +100935,7 @@ static void gen_natsumi_bp5_mill_non_live_then_live_stop(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "natsumi_bp5_mill_non_live_then_live_stop");
     // 
-    // TODO: game.set_live_card(filler_live);
+    test_set_live_card(&tg, 0, filler_live);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -101007,7 +101003,7 @@ static void gen_natsumi_bp5_all_four_iterations_live(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "natsumi_bp5_all_four_iterations_live");
     // 
-    // TODO: game.set_live_card(filler_live);
+    test_set_live_card(&tg, 0, filler_live);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -101103,7 +101099,7 @@ static void gen_natsumi_bp5_change_state_only_self_with_fillers(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "natsumi_bp5_change_state_only_self_with_fillers");
     // 
-    // TODO: game.set_live_card(filler_live);
+    test_set_live_card(&tg, 0, filler_live);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -101165,7 +101161,7 @@ static void gen_natsumi_bp5_change_state_at_left_position(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "natsumi_bp5_change_state_at_left_position");
     // 
-    // TODO: game.set_live_card(filler_live);
+    test_set_live_card(&tg, 0, filler_live);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -101225,7 +101221,7 @@ static void gen_natsumi_bp5_change_state_at_right_position(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "natsumi_bp5_change_state_at_right_position");
     // 
-    // TODO: game.set_live_card(filler_live);
+    test_set_live_card(&tg, 0, filler_live);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -101286,7 +101282,7 @@ static void gen_natsumi_bp5_all_four_iterations_non_live(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "natsumi_bp5_all_four_iterations_non_live");
     // 
-    // TODO: game.set_live_card(filler_live);
+    test_set_live_card(&tg, 0, filler_live);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -101352,7 +101348,7 @@ static void gen_natsumi_bp5_stop_after_two_iterations(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "natsumi_bp5_stop_after_two_iterations");
     // 
-    // TODO: game.set_live_card(filler_live);
+    test_set_live_card(&tg, 0, filler_live);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -101428,7 +101424,7 @@ static void gen_natsumi_bp5_repeat_does_not_wait_fillers_when_self_is_wait(void)
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "natsumi_bp5_repeat_does_not_wait_fillers_when_self_is_wait");
     // 
-    // TODO: game.set_live_card(filler_live);
+    test_set_live_card(&tg, 0, filler_live);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -101512,7 +101508,7 @@ static void gen_natsumi_bp5_all_iterations_live_never_waits_fillers(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "natsumi_bp5_all_iterations_live_never_waits_fillers");
     // 
-    // TODO: game.set_live_card(filler_live);
+    test_set_live_card(&tg, 0, filler_live);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -101601,7 +101597,7 @@ static void gen_natsumi_bp5_q222_repeat_continues_after_wait(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "natsumi_bp5_q222_repeat_continues_after_wait");
     // 
-    // TODO: game.set_live_card(filler_live);
+    test_set_live_card(&tg, 0, filler_live);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -101751,7 +101747,7 @@ static void gen_natsumi_pb2_020_q264_no_trigger_when_zero_cards_revealed(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "natsumi_pb2_020_q264_no_trigger_when_zero_cards_revealed");
-    // TODO: game.set_live_card(liella_live);
+    test_set_live_card(&tg, 0, liella_live);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
@@ -102285,7 +102281,7 @@ static void gen_bp3_001_live_start_can_skip_activation(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live_card);
+    test_set_live_card(&tg, 0, live_card);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
@@ -102965,7 +102961,7 @@ static void gen_kokoro_high_member_sets_cost_and_grants_heart05(void){
     // // PR-017-PR 大沢さやか original cost 17.
     int me = 0;
     // 
-    // TODO: fire_trigger(&mut game, me, AbilityTrigger::LiveStart, "ライブ開始時");
+    { int ftpl = rb_owner_of_card(&tg.state, me); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ開始時"); rb_drain_ability_queue(&tg.state); }
     test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, 0);
     int guard = 0;
@@ -102987,7 +102983,7 @@ static void gen_kokoro_boundary_eleven_exactly_reaches_ten(void){
     // // bp1-002-R 瑠璃乃 original cost 11.
     int me = 0;
     // 
-    // TODO: fire_trigger(&mut game, me, AbilityTrigger::LiveStart, "ライブ開始時");
+    { int ftpl = rb_owner_of_card(&tg.state, me); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ開始時"); rb_drain_ability_queue(&tg.state); }
     rb_resume_with_choice(&tg.state, 0);
     int guard = 0;
     test_has_pending_choice(&tg);
@@ -103008,7 +103004,7 @@ static void gen_kokoro_below_threshold_sets_cost_without_heart(void){
     // // bp6-005-R+ 小鈴 original cost 10.
     int me = 0;
     // 
-    // TODO: fire_trigger(&mut game, me, AbilityTrigger::LiveStart, "ライブ開始時");
+    { int ftpl = rb_owner_of_card(&tg.state, me); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ開始時"); rb_drain_ability_queue(&tg.state); }
     rb_resume_with_choice(&tg.state, 0);
     int guard = 0;
     test_has_pending_choice(&tg);
@@ -103028,7 +103024,7 @@ static void gen_kokoro_decline_leaves_everything_untouched(void){
     TestGame tg; test_game_new(&tg);
     int me = 0;
     // 
-    // TODO: fire_trigger(&mut game, me, AbilityTrigger::LiveStart, "ライブ開始時");
+    { int ftpl = rb_owner_of_card(&tg.state, me); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ開始時"); rb_drain_ability_queue(&tg.state); }
     test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, 1);
     // 
@@ -103045,7 +103041,7 @@ static void gen_kokoro_no_dollchestra_in_hand_no_gate(void){
     TestGame tg; test_game_new(&tg);
     int me = 0;
     // 
-    // TODO: fire_trigger(&mut game, me, AbilityTrigger::LiveStart, "ライブ開始時");
+    { int ftpl = rb_owner_of_card(&tg.state, me); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ開始時"); rb_drain_ability_queue(&tg.state); }
     test_has_pending_choice(&tg);
     // TODO assert_eq (unresolved): assert_eq!(effective_cost(&game, me), 4);
     // 
@@ -103181,7 +103177,7 @@ static void gen_ddd_decline_pay_does_nothing(void){
     int mate = test_id(&tg, "PL!N-sd1-010-SD");
     test_add_to_discard(&tg, mate);
     // 
-    // TODO: fire_trigger(&mut game, live, AbilityTrigger::LiveSuccess, "ライブ成功時");
+    { int ftpl = rb_owner_of_card(&tg.state, live); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ成功時"); rb_drain_ability_queue(&tg.state); }
     test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, 0);
     // 
@@ -103198,7 +103194,7 @@ static void gen_ddd_option_a_retrieves_any_member_from_waitroom(void){
     int mate = test_id(&tg, "PL!N-sd1-010-SD");
     test_add_to_discard(&tg, mate);
     // 
-    // TODO: fire_trigger(&mut game, live, AbilityTrigger::LiveSuccess, "ライブ成功時");
+    { int ftpl = rb_owner_of_card(&tg.state, live); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ成功時"); rb_drain_ability_queue(&tg.state); }
     rb_resume_with_choice(&tg.state, 1);
     rb_resume_with_choice(&tg.state, 0);
     int guard = 0;
@@ -103219,11 +103215,11 @@ static void gen_ddd_option_b_requires_two_cards_in_live_zone(void){
     int live = 0;
     // // Exactly ONE card in the live zone -> option B's gate fails.
     test_add_to_hand(&tg, live);
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     int hs_live = test_id(&tg, "PL!HS-bp1-020-L");
     test_add_to_discard(&tg, hs_live);
     // 
-    // TODO: fire_trigger(&mut game, live, AbilityTrigger::LiveSuccess, "ライブ成功時");
+    { int ftpl = rb_owner_of_card(&tg.state, live); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ成功時"); rb_drain_ability_queue(&tg.state); }
     rb_resume_with_choice(&tg.state, 1);
     rb_resume_with_choice(&tg.state, 1);
     int guard = 0;
@@ -103243,14 +103239,14 @@ static void gen_ddd_option_b_with_two_live_cards_fetches_hasunosora_live(void){
     TestGame tg; test_game_new(&tg);
     int live = 0;
     test_add_to_hand(&tg, live);
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // // Second card in the live zone satisfies 「2枚以上」.
     int second = test_id(&tg, "PL!HS-bp1-021-L");
     test_add_to_live(&tg, second);
     int hs_live = test_id(&tg, "PL!HS-bp1-020-L");
     test_add_to_discard(&tg, hs_live);
     // 
-    // TODO: fire_trigger(&mut game, live, AbilityTrigger::LiveSuccess, "ライブ成功時");
+    { int ftpl = rb_owner_of_card(&tg.state, live); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ成功時"); rb_drain_ability_queue(&tg.state); }
     rb_resume_with_choice(&tg.state, 1);
     rb_resume_with_choice(&tg.state, 1);
     int guard = 0;
@@ -103741,7 +103737,7 @@ static void gen_cutie_panther_live_start_reduce_hearts(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
-    // TODO: game.set_live_card(cutie);
+    test_set_live_card(&tg, 0, cutie);
     // // Set wait AFTER the active phase, which would otherwise stand the member.
     // TODO: game.state
     // TODO: .mods
@@ -103876,7 +103872,7 @@ static void gen_kaguya_live_success_cheer_recover(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
-    // TODO: game.set_live_card(kaguya);
+    test_set_live_card(&tg, 0, kaguya);
     // 
     // // Advance through remaining phases to live performance
     rb_advance_phase(&tg.state);
@@ -104734,7 +104730,7 @@ static void gen_himeno_bp5_same_group_____gains_heart(void){
     test_add_to_hand(&tg, same1);
     test_add_to_hand(&tg, same2);
     test_add_to_hand(&tg, live);
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // clear
     // // inlined helper finish_live_setup
     // 
@@ -104802,7 +104798,7 @@ static void gen_himeno_bp5_different_group_pair_still_works(void){
     test_add_to_hand(&tg, p1);
     test_add_to_hand(&tg, p2);
     test_add_to_hand(&tg, live);
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // clear
     // // inlined helper finish_live_setup
     // 
@@ -104870,7 +104866,7 @@ static void gen_himeno_bp5_mixed_groups_auto_skips(void){
     test_add_to_hand(&tg, a);
     test_add_to_hand(&tg, b);
     test_add_to_hand(&tg, live);
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // clear
     // // inlined helper finish_live_setup
     // 
@@ -104935,7 +104931,7 @@ static void gen_himeno_bp5_only_one_same_group_auto_skips(void){
     test_add_to_hand(&tg, same1);
     test_add_to_hand(&tg, wrong);
     test_add_to_hand(&tg, live);
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // clear
     // // inlined helper finish_live_setup
     // 
@@ -104996,7 +104992,7 @@ static void gen_himeno_bp5_empty_hand_skips(void){
     int live = test_id(&tg, "PL!-sd1-020-SD");
     // clear
     test_add_to_hand(&tg, live);
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // clear
     // // inlined helper finish_live_setup
     // 
@@ -105061,7 +105057,7 @@ static void gen_himeno_bp5_no_group_cards_auto_skip(void){
     test_add_to_hand(&tg, n1);
     test_add_to_hand(&tg, n2);
     test_add_to_hand(&tg, live);
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // clear
     // // inlined helper finish_live_setup
     // 
@@ -105128,7 +105124,7 @@ static void gen_himeno_bp5_three_same_group_picks_two(void){
     test_add_to_hand(&tg, s2);
     test_add_to_hand(&tg, s3);
     test_add_to_hand(&tg, live);
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // clear
     // // inlined helper finish_live_setup
     // 
@@ -105206,7 +105202,7 @@ static void gen_himeno_bp5_p_variant(void){
     test_add_to_hand(&tg, s1);
     test_add_to_hand(&tg, s2);
     test_add_to_hand(&tg, live);
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // clear
     // // inlined helper finish_live_setup
     // 
@@ -105274,7 +105270,7 @@ static void gen_himeno_bp5_ar_variant(void){
     test_add_to_hand(&tg, s1);
     test_add_to_hand(&tg, s2);
     test_add_to_hand(&tg, live);
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // clear
     // // inlined helper finish_live_setup
     // 
@@ -105342,7 +105338,7 @@ static void gen_himeno_bp5_skip_cost_via_choice(void){
     test_add_to_hand(&tg, s1);
     test_add_to_hand(&tg, s2);
     test_add_to_hand(&tg, live);
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // clear
     // // inlined helper finish_live_setup
     // 
@@ -105410,7 +105406,7 @@ static void gen_himeno_bp5_left_position(void){
     test_add_to_hand(&tg, s1);
     test_add_to_hand(&tg, s2);
     test_add_to_hand(&tg, live);
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // clear
     // // inlined helper finish_live_setup
     // 
@@ -105478,7 +105474,7 @@ static void gen_himeno_bp5_right_position(void){
     test_add_to_hand(&tg, s1);
     test_add_to_hand(&tg, s2);
     test_add_to_hand(&tg, live);
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // clear
     // // inlined helper finish_live_setup
     // 
@@ -105546,7 +105542,7 @@ static void gen_himeno_bp5_cross_unit_same_group(void){
     test_add_to_hand(&tg, s1);
     test_add_to_hand(&tg, s2);
     test_add_to_hand(&tg, live);
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // clear
     // // inlined helper finish_live_setup
     // 
@@ -105614,7 +105610,7 @@ static void gen_himeno_bp5_discarded_go_to_waitroom(void){
     test_add_to_hand(&tg, s1);
     test_add_to_hand(&tg, s2);
     test_add_to_hand(&tg, live);
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // clear
     // // inlined helper finish_live_setup
     // 
@@ -105683,7 +105679,7 @@ static void gen_himeno_bp5_p_variant_mixed_groups_skips(void){
     test_add_to_hand(&tg, a);
     test_add_to_hand(&tg, b);
     test_add_to_hand(&tg, live);
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // clear
     // // inlined helper finish_live_setup
     // 
@@ -105748,7 +105744,7 @@ static void gen_test_bp1_live_start_pay_cost_gains_score_three(void){
     rb_advance_phase(&tg.state);
     // // Then P1 sets live card via set_live_card() externally
     // 
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // // inlined helper finish_live_setup
     // 
     rb_advance_phase(&tg.state);
@@ -105820,7 +105816,7 @@ static void gen_test_bp1_live_start_no_matching_hand_cards_skips(void){
     rb_advance_phase(&tg.state);
     // // Then P1 sets live card via set_live_card() externally
     // 
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // // inlined helper finish_live_setup
     // 
     rb_advance_phase(&tg.state);
@@ -105882,7 +105878,7 @@ static void gen_test_bp2_live_start_discard_any_number_gains_blade_per_card(void
     rb_advance_phase(&tg.state);
     // // Then P1 sets live card via set_live_card() externally
     // 
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // // inlined helper finish_live_setup
     // 
     rb_advance_phase(&tg.state);
@@ -105951,7 +105947,7 @@ static void gen_test_bp2_live_start_skip_cost_gains_no_blade(void){
     rb_advance_phase(&tg.state);
     // // Then P1 sets live card via set_live_card() externally
     // 
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // // inlined helper finish_live_setup
     // 
     rb_advance_phase(&tg.state);
@@ -106015,7 +106011,7 @@ static void gen_test_bp3_live_start_pay_6e_gains_3_blade(void){
     rb_advance_phase(&tg.state);
     // // Then P1 sets live card via set_live_card() externally
     // 
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // // inlined helper finish_live_setup
     // 
     rb_advance_phase(&tg.state);
@@ -106082,7 +106078,7 @@ static void gen_test_bp3_live_start_skip_gains_no_blade(void){
     rb_advance_phase(&tg.state);
     // // Then P1 sets live card via set_live_card() externally
     // 
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // // inlined helper finish_live_setup
     // 
     rb_advance_phase(&tg.state);
@@ -106148,7 +106144,7 @@ static void gen_test_bp4_live_start_dual_trigger_fires(void){
     rb_advance_phase(&tg.state);
     // // Then P1 sets live card via set_live_card() externally
     // 
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // // inlined helper finish_live_setup
     // 
     rb_advance_phase(&tg.state);
@@ -106644,7 +106640,7 @@ static void gen_test_bp6_live_start_two_distinct_colors_gain_two_hearts(void){
     rb_advance_phase(&tg.state);
     // // Then P1 sets live card via set_live_card() externally
     // 
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // // inlined helper finish_live_setup
     // 
     rb_advance_phase(&tg.state);
@@ -106718,7 +106714,7 @@ static void gen_test_bp6_live_start_skip_gains_no_heart(void){
     rb_advance_phase(&tg.state);
     // // Then P1 sets live card via set_live_card() externally
     // 
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // // inlined helper finish_live_setup
     // 
     rb_advance_phase(&tg.state);
@@ -107969,7 +107965,7 @@ static void gen_chika_q171_live_end_persistence(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "chika_q171_live_end_persistence");
     // 
-    // TODO: game.set_live_card(filler_live);
+    test_set_live_card(&tg, 0, filler_live);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -108434,7 +108430,7 @@ static void gen_pb1018_look_two_reveals_kanata_to_hand(void){
     tg.state.p[0].stage[1] = me;
     // // inlined helper fire_debut
     // 
-    // TODO: fire_trigger(game, me, AbilityTrigger::Debut, "登場");
+    { int ftpl = rb_owner_of_card(&tg.state, me); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "登場"); rb_drain_ability_queue(&tg.state); }
     // 
     int guard = 0;
     test_has_pending_choice(&tg);
@@ -108464,7 +108460,7 @@ static void gen_pb1018_no_kanata_in_look_stays_in_waitroom_flow(void){
     tg.state.p[0].stage[1] = me;
     // // inlined helper fire_debut
     // 
-    // TODO: fire_trigger(game, me, AbilityTrigger::Debut, "登場");
+    { int ftpl = rb_owner_of_card(&tg.state, me); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "登場"); rb_drain_ability_queue(&tg.state); }
     // 
     int guard = 0;
     test_has_pending_choice(&tg);
@@ -108487,7 +108483,7 @@ static void gen_sd1007_accept_pay_fetches_liella_member_from_waitroom(void){
     // 
     // // inlined helper fire_debut
     // 
-    // TODO: fire_trigger(game, me, AbilityTrigger::Debut, "登場");
+    { int ftpl = rb_owner_of_card(&tg.state, me); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "登場"); rb_drain_ability_queue(&tg.state); }
     // 
     test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, 1);
@@ -108507,7 +108503,7 @@ static void gen_sd1007_decline_pay_no_fetch(void){
     // 
     // // inlined helper fire_debut
     // 
-    // TODO: fire_trigger(game, me, AbilityTrigger::Debut, "登場");
+    { int ftpl = rb_owner_of_card(&tg.state, me); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "登場"); rb_drain_ability_queue(&tg.state); }
     // 
     test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, 0);
@@ -108717,7 +108713,7 @@ static void gen_bp6010_heart02_total_four_or_more_gains_heart02(void){
     // // Live card requiring heart02 x4 -> aggregate total 4 >= 4.
     int live = test_id(&tg, "PL!SP-pb1-023-L");
     test_add_to_hand(&tg, live);
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // // The during_live temporal gate requires an active live phase.
     // TODO: game.state.current_phase = rabuka_engine::game_state::Phase::FirstAttackerPerformance;
     // 
@@ -108741,7 +108737,7 @@ static void gen_bp6010_under_threshold_no_gain(void){
     // // Live card with NO heart02 requirement (heart01/04/05 only).
     int live = test_id(&tg, "PL!HS-bp2-020-L");
     test_add_to_hand(&tg, live);
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // TODO: game.state.current_phase = rabuka_engine::game_state::Phase::FirstAttackerPerformance;
     // 
     // TODO: fire_trigger(&mut game, me, AbilityTrigger::LiveStart, LIVE_START);
@@ -108898,7 +108894,7 @@ static void gen_two_distinct_groups_no_effect(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -109002,7 +108998,7 @@ static void gen_all_same_group_no_effect(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -109106,7 +109102,7 @@ static void gen_center_empty_no_effect(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -109208,7 +109204,7 @@ static void gen_multi_name_card_single_slot_one_group_not_three(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -109711,7 +109707,7 @@ static void gen_aspire_moved_liella_gains_blade_unmoved_and_non_liella_do_not(vo
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
-    // TODO: game.set_live_card(aspire);
+    test_set_live_card(&tg, 0, aspire);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     while (test_has_pending_choice(&tg)) rb_resume_with_choice(&tg.state, 0);
@@ -109744,7 +109740,7 @@ static void gen_aspire_only_non_liella_moved_no_blade(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
-    // TODO: game.set_live_card(aspire);
+    test_set_live_card(&tg, 0, aspire);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     while (test_has_pending_choice(&tg)) rb_resume_with_choice(&tg.state, 0);
@@ -109779,7 +109775,7 @@ static void gen_aspire_liella_and_non_liella_moved_only_liella_gains_blade(void)
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
-    // TODO: game.set_live_card(aspire);
+    test_set_live_card(&tg, 0, aspire);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     while (test_has_pending_choice(&tg)) rb_resume_with_choice(&tg.state, 0);
@@ -109811,7 +109807,7 @@ static void gen_aspire_no_liella_on_stage_no_blade(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
-    // TODO: game.set_live_card(aspire);
+    test_set_live_card(&tg, 0, aspire);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     while (test_has_pending_choice(&tg)) rb_resume_with_choice(&tg.state, 0);
@@ -109840,7 +109836,7 @@ static void gen_aspire_no_movement_no_blade(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
-    // TODO: game.set_live_card(aspire);
+    test_set_live_card(&tg, 0, aspire);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     while (test_has_pending_choice(&tg)) rb_resume_with_choice(&tg.state, 0);
@@ -109875,7 +109871,7 @@ static void gen_aspire_two_moved_liella_both_gain_blade(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
-    // TODO: game.set_live_card(aspire);
+    test_set_live_card(&tg, 0, aspire);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     while (test_has_pending_choice(&tg)) rb_resume_with_choice(&tg.state, 0);
@@ -110421,7 +110417,7 @@ static void gen_fuyumari_p2_play_to_stage_triggers_appearance(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
-    // TODO: game.set_live_card(p1_live);
+    test_set_live_card(&tg, 0, p1_live);
     // // Pass through everything until P2 Main
     rb_advance_phase(&tg.state);
     while (test_has_pending_choice(&tg)) rb_resume_with_choice(&tg.state, 0);
@@ -112352,7 +112348,7 @@ static void gen_sp_bp5_016_constant_evaluated_during_live_phase(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live_card);
+    test_set_live_card(&tg, 0, live_card);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
@@ -112978,7 +112974,7 @@ static void gen_hs_bp5_021_single_hasunosora_member_heart_conversion(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live_card);
+    test_set_live_card(&tg, 0, live_card);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
@@ -113109,7 +113105,7 @@ static void gen_hs_bp5_021_multiple_hasunosora_members_choice_one_converted(void
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live_card);
+    test_set_live_card(&tg, 0, live_card);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
@@ -113224,7 +113220,7 @@ static void gen_hs_bp5_021_no_hasunosora_members_noop(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live_card);
+    test_set_live_card(&tg, 0, live_card);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
@@ -113344,7 +113340,7 @@ static void gen_hs_bp5_021_score_bonus_with_three_mirakura_members(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live_card);
+    test_set_live_card(&tg, 0, live_card);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
@@ -113458,7 +113454,7 @@ static void gen_hs_bp5_021_no_score_bonus_with_one_mirakura_member(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live_card);
+    test_set_live_card(&tg, 0, live_card);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
@@ -113564,7 +113560,7 @@ static void gen_hs_bp5_021_precise_heart_count_after_transform(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live_card);
+    test_set_live_card(&tg, 0, live_card);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
@@ -114571,7 +114567,7 @@ static void gen_issue7_mifune_live_start_select_and_check(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -114660,7 +114656,7 @@ static void gen_issue9_karin_select_from_discard_place_on_deck(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -114749,7 +114745,7 @@ static void gen_karin_edge_0_waited_members(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -114849,7 +114845,7 @@ static void gen_karin_edge_1_waited_1_niji_in_discard(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -114953,7 +114949,7 @@ static void gen_karin_edge_3_waited_1_niji_available(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -115056,7 +115052,7 @@ static void gen_karin_edge_2_waited_2_niji_select_both(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -115152,7 +115148,7 @@ static void gen_karin_edge_non_niji_not_selectable(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -115250,7 +115246,7 @@ static void gen_karin_edge_not_opponent_waitroom(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -115346,7 +115342,7 @@ static void gen_karin_edge_hand_unchanged(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -115433,7 +115429,7 @@ static void gen_issue11_shizuku_score_floor_at_zero(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -115518,7 +115514,7 @@ static void gen_issue12_compass_activate_dollchestra_live_start(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(compass);
+    test_set_live_card(&tg, 0, compass);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -115670,7 +115666,7 @@ static void gen_saikou_edge_no_cards(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(saikou);
+    test_set_live_card(&tg, 0, saikou);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -115752,7 +115748,7 @@ static void gen_saikou_edge_score1_only(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(saikou);
+    test_set_live_card(&tg, 0, saikou);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -115834,7 +115830,7 @@ static void gen_saikou_edge_score5_only(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(saikou);
+    test_set_live_card(&tg, 0, saikou);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -115918,7 +115914,7 @@ static void gen_saikou_edge_both_scores(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(saikou);
+    test_set_live_card(&tg, 0, saikou);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -116000,7 +115996,7 @@ static void gen_saikou_edge_score2_only(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(saikou);
+    test_set_live_card(&tg, 0, saikou);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -116107,7 +116103,7 @@ static void gen_live_start_grants_all_heart(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(victory);
+    test_set_live_card(&tg, 0, victory);
     // // inlined helper finish_live_setup
     // 
     rb_advance_phase(&tg.state);
@@ -116212,7 +116208,7 @@ static void gen_two_members_both_get_all_heart(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(victory);
+    test_set_live_card(&tg, 0, victory);
     // // inlined helper finish_live_setup
     // 
     rb_advance_phase(&tg.state);
@@ -116329,7 +116325,7 @@ static void gen_already_has_all_heart_no_double_grant(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(victory);
+    test_set_live_card(&tg, 0, victory);
     // // inlined helper finish_live_setup
     // 
     rb_advance_phase(&tg.state);
@@ -116433,7 +116429,7 @@ static void gen_live_start_another_member(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(victory);
+    test_set_live_card(&tg, 0, victory);
     // // inlined helper finish_live_setup
     // 
     rb_advance_phase(&tg.state);
@@ -116537,7 +116533,7 @@ static void gen_live_start_cost_free_still_triggers(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(victory);
+    test_set_live_card(&tg, 0, victory);
     // // inlined helper finish_live_setup
     // 
     rb_advance_phase(&tg.state);
@@ -116642,7 +116638,7 @@ static void gen_non_member_on_stage_no_trigger(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(victory);
+    test_set_live_card(&tg, 0, victory);
     // // inlined helper finish_live_setup
     // 
     rb_advance_phase(&tg.state);
@@ -116747,7 +116743,7 @@ static void gen_member_without_live_start_no_trigger(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(victory);
+    test_set_live_card(&tg, 0, victory);
     // // inlined helper finish_live_setup
     // 
     rb_advance_phase(&tg.state);
@@ -116852,7 +116848,7 @@ static void gen_all_heart_expires_at_live_end(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(victory);
+    test_set_live_card(&tg, 0, victory);
     // // inlined helper finish_live_setup
     // 
     rb_advance_phase(&tg.state);
@@ -116999,7 +116995,7 @@ static void gen_live_success_each_time_draws_card(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(victory);
+    test_set_live_card(&tg, 0, victory);
     // // inlined helper finish_live_setup
     // 
     rb_advance_phase(&tg.state);
@@ -117142,7 +117138,7 @@ static void gen_no_live_success_no_trigger(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(victory);
+    test_set_live_card(&tg, 0, victory);
     // // inlined helper finish_live_setup
     // 
     rb_advance_phase(&tg.state);
@@ -117289,7 +117285,7 @@ static void gen_test_one_live_start_each_time_drains_no_choice(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(victory);
+    test_set_live_card(&tg, 0, victory);
     // // inlined helper finish_live_setup
     // 
     rb_advance_phase(&tg.state);
@@ -117412,7 +117408,7 @@ static void gen_test_live_success_each_time_drains_after_success(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(victory);
+    test_set_live_card(&tg, 0, victory);
     // // inlined helper finish_live_setup
     // 
     rb_advance_phase(&tg.state);
@@ -117560,7 +117556,7 @@ static void gen_live_card_own_live_success_no_trigger(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(victory);
+    test_set_live_card(&tg, 0, victory);
     // // Manually add the second live card (君のこころは輝いてるかい？) to the zone
     test_add_to_live(&tg, live_card);
     // // inlined helper finish_live_setup
@@ -117710,7 +117706,7 @@ static void gen_baad_cage_cost_limit_two_hasunosora_members_grants_score(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(baad_cage);
+    test_set_live_card(&tg, 0, baad_cage);
     // // inlined helper finish_live_setup
     // 
     rb_advance_phase(&tg.state);
@@ -117815,7 +117811,7 @@ static void gen_baad_cage_cost_limit_one_member_no_score(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(baad_cage);
+    test_set_live_card(&tg, 0, baad_cage);
     // // inlined helper finish_live_setup
     // 
     rb_advance_phase(&tg.state);
@@ -117921,7 +117917,7 @@ static void gen_baad_cage_cost_limit_one_below_threshold_no_score(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(baad_cage);
+    test_set_live_card(&tg, 0, baad_cage);
     // // inlined helper finish_live_setup
     // 
     rb_advance_phase(&tg.state);
@@ -118028,7 +118024,7 @@ static void gen_baad_cage_three_members_score_still_one(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(baad_cage);
+    test_set_live_card(&tg, 0, baad_cage);
     // // inlined helper finish_live_setup
     // 
     rb_advance_phase(&tg.state);
@@ -118096,7 +118092,7 @@ static void gen_discard_member_gives_heart04_and_blade_to_same_name(void){
     // clear
     test_add_to_hand(&tg, nahone_hand);
     test_add_to_hand(&tg, live);
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // clear
     // // inlined helper finish_live_setup
     // 
@@ -118168,7 +118164,7 @@ static void gen_skip_cost_no_effect(void){
     // clear
     test_add_to_hand(&tg, nahone_hand);
     test_add_to_hand(&tg, live);
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // clear
     // // inlined helper finish_live_setup
     // 
@@ -118236,7 +118232,7 @@ static void gen_discard_non_member_no_buff(void){
     // clear
     test_add_to_hand(&tg, live_discard);
     test_add_to_hand(&tg, live);
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // clear
     // // inlined helper finish_live_setup
     // 
@@ -118306,7 +118302,7 @@ static void gen_empty_hand_skips(void){
     // 
     // clear
     test_add_to_hand(&tg, live);
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // clear
     // // inlined helper finish_live_setup
     // 
@@ -118371,7 +118367,7 @@ static void gen_discard_member_different_name_than_activating(void){
     // clear
     test_add_to_hand(&tg, other_member);
     test_add_to_hand(&tg, live);
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // clear
     // // inlined helper finish_live_setup
     // 
@@ -118443,7 +118439,7 @@ static void gen_discard_same_name_as_activating_card(void){
     // clear
     test_add_to_hand(&tg, nahone_hand);
     test_add_to_hand(&tg, live);
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // clear
     // // inlined helper finish_live_setup
     // 
@@ -118515,7 +118511,7 @@ static void gen_q30_multiple_same_name_only_one_buffed(void){
     // clear
     test_add_to_hand(&tg, nahone_hand);
     test_add_to_hand(&tg, live);
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // clear
     // // inlined helper finish_live_setup
     // 
@@ -118591,7 +118587,7 @@ static void gen_discarded_card_goes_to_waitroom(void){
     // clear
     test_add_to_hand(&tg, nahone_hand);
     test_add_to_hand(&tg, live);
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // clear
     // // inlined helper finish_live_setup
     // 
@@ -118662,7 +118658,7 @@ static void gen_heart04_only_no_other_colors(void){
     // clear
     test_add_to_hand(&tg, nahone_hand);
     test_add_to_hand(&tg, live);
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // clear
     // // inlined helper finish_live_setup
     // 
@@ -118738,7 +118734,7 @@ static void gen_p_variant_works(void){
     // clear
     test_add_to_hand(&tg, nahone_hand);
     test_add_to_hand(&tg, live);
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // clear
     // // inlined helper finish_live_setup
     // 
@@ -118809,7 +118805,7 @@ static void gen_p_plus_variant_works(void){
     // clear
     test_add_to_hand(&tg, nahone_hand);
     test_add_to_hand(&tg, live);
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // clear
     // // inlined helper finish_live_setup
     // 
@@ -118880,7 +118876,7 @@ static void gen_sec_variant_works(void){
     // clear
     test_add_to_hand(&tg, nahone_hand);
     test_add_to_hand(&tg, live);
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // clear
     // // inlined helper finish_live_setup
     // 
@@ -118952,7 +118948,7 @@ static void gen_discard_from_non_contiguous_hand(void){
     test_add_to_hand(&tg, filler);
     test_add_to_hand(&tg, live);
     test_add_to_hand(&tg, nahone_hand);
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // clear
     // // inlined helper finish_live_setup
     // 
@@ -119022,7 +119018,7 @@ static void gen_only_live_card_in_hand_skips(void){
     // 
     // clear
     test_add_to_hand(&tg, live);
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // clear
     // // inlined helper finish_live_setup
     // 
@@ -119087,7 +119083,7 @@ static void gen_nahone_at_left_position(void){
     // clear
     test_add_to_hand(&tg, nahone_hand);
     test_add_to_hand(&tg, live);
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // clear
     // // inlined helper finish_live_setup
     // 
@@ -119158,7 +119154,7 @@ static void gen_nahone_at_right_position(void){
     // clear
     test_add_to_hand(&tg, nahone_hand);
     test_add_to_hand(&tg, live);
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // clear
     // // inlined helper finish_live_setup
     // 
@@ -119230,7 +119226,7 @@ static void gen_hand_mixed_cards_discard_member_only(void){
     test_add_to_hand(&tg, filler);
     test_add_to_hand(&tg, nahone_hand);
     test_add_to_hand(&tg, live);
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // clear
     // // inlined helper finish_live_setup
     // 
@@ -119303,7 +119299,7 @@ static void gen_discard_different_name_member_no_target(void){
     // clear
     test_add_to_hand(&tg, other_member);
     test_add_to_hand(&tg, live);
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // clear
     // // inlined helper finish_live_setup
     // 
@@ -119376,7 +119372,7 @@ static void gen_other_same_name_not_buffed(void){
     // clear
     test_add_to_hand(&tg, nahone_hand);
     test_add_to_hand(&tg, live);
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // clear
     // // inlined helper finish_live_setup
     // 
@@ -119460,7 +119456,7 @@ static void gen_effect_tracked_as_temporary_live_end(void){
     // clear
     test_add_to_hand(&tg, nahone_hand);
     test_add_to_hand(&tg, live);
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // clear
     // // inlined helper finish_live_setup
     // 
@@ -121830,8 +121826,8 @@ static void gen_kasumi_rule_1054_under_energy_recycles_to_energy_deck(void){
     // // inlined helper place_energy_under
     // 
     int energy_id = test_id(&tg, "LL-E-001-SD");
-    // TODO: game.state.player1.stage.place_under_card(MemberArea::Center, energy_id);
-    // TODO: game.state.player1.stage.place_under_card(MemberArea::Center, energy_id);
+    test_place_under(&tg, 0, 1, energy_id);
+    test_place_under(&tg, 0, 1, energy_id);
     // 
     int energy_deck_before = 0;
     // TODO: game.state
@@ -121855,8 +121851,8 @@ static void gen_kasumi_rule_4553_under_cards_follow_position_change(void){
     // // inlined helper place_energy_under
     // 
     int energy_id = test_id(&tg, "LL-E-001-SD");
-    // TODO: game.state.player1.stage.place_under_card(MemberArea::Center, energy_id);
-    // TODO: game.state.player1.stage.place_under_card(MemberArea::Center, energy_id);
+    test_place_under(&tg, 0, 1, energy_id);
+    test_place_under(&tg, 0, 1, energy_id);
     // 
     // TODO: game.state
     // TODO: .player1
@@ -122109,7 +122105,7 @@ static void gen_ayumu_bp5n_heart01_condition_passes_but_modifier_not_found(void)
     // // inlined helper place_energy_under
     // 
     int energy_id = test_id(&tg, "LL-E-001-SD");
-    // TODO: game.state.player1.stage.place_under_card(MemberArea::Center, energy_id);
+    test_place_under(&tg, 0, 1, energy_id);
     // 
     // // inlined helper advance_to_live_card_set_p1
     // 
@@ -122119,7 +122115,7 @@ static void gen_ayumu_bp5n_heart01_condition_passes_but_modifier_not_found(void)
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(filler_live);
+    test_set_live_card(&tg, 0, filler_live);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -122170,7 +122166,7 @@ static void gen_rina_rule_1053_under_member_goes_to_waitroom(void){
     // TODO: game.state
     // TODO: .player1
     // TODO: .stage
-    // TODO: .place_under_card(MemberArea::Center, target);
+    test_place_under(&tg, 0, 1, target);
     // TODO: game.state
     // TODO: .player1
     // TODO: .remove_member_from_stage_with_recycling(1, &game.db);
@@ -122193,7 +122189,7 @@ static void gen_rina_rule_4553_under_member_follows_position_change(void){
     // TODO: game.state
     // TODO: .player1
     // TODO: .stage
-    // TODO: .place_under_card(MemberArea::Center, target);
+    test_place_under(&tg, 0, 1, target);
     // TODO: game.state
     // TODO: .player1
     // TODO: .stage
@@ -122294,17 +122290,17 @@ static void gen_sayaka_live_start_per_unit_counts_hand_not_under(void){
     // TODO: game.state
     // TODO: .player1
     // TODO: .stage
-    // TODO: .place_under_card(MemberArea::Center, s);
+    test_place_under(&tg, 0, 1, s);
     s = test_id(&tg, "PL!HS-pb1-002-R");
     // TODO: game.state
     // TODO: .player1
     // TODO: .stage
-    // TODO: .place_under_card(MemberArea::Center, s);
+    test_place_under(&tg, 0, 1, s);
     s = test_id(&tg, "PL!HS-pb1-002-R");
     // TODO: game.state
     // TODO: .player1
     // TODO: .stage
-    // TODO: .place_under_card(MemberArea::Center, s);
+    test_place_under(&tg, 0, 1, s);
     // // inlined helper seed_deck
     // 
     int filler = test_id(&tg, "PL!-sd1-010-SD");
@@ -122337,7 +122333,7 @@ static void gen_sayaka_live_start_per_unit_counts_hand_not_under(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(filler_live);
+    test_set_live_card(&tg, 0, filler_live);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -122400,7 +122396,7 @@ static void gen_sayaka_live_start_zero_under_still_gets_hand_count(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(filler_live);
+    test_set_live_card(&tg, 0, filler_live);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -122431,12 +122427,12 @@ static void gen_sayaka_q243_max_three_per_activation_recounts(void){
     // TODO: game.state
     // TODO: .player1
     // TODO: .stage
-    // TODO: .place_under_card(MemberArea::Center, s);
+    test_place_under(&tg, 0, 1, s);
     s = test_id(&tg, "PL!HS-pb1-002-R");
     // TODO: game.state
     // TODO: .player1
     // TODO: .stage
-    // TODO: .place_under_card(MemberArea::Center, s);
+    test_place_under(&tg, 0, 1, s);
     // TODO assert_eq (unresolved): assert_eq!( game.state .player1 .stage .get_under_cards(MemberArea::Center) .len(), 2, "2 under-cards before first LiveStart" );
     // 
     // // First activation: 2 under → max=3 → heart05+2
@@ -122475,17 +122471,17 @@ static void gen_sayaka_q243_max_three_per_activation_recounts(void){
     // TODO: game.state
     // TODO: .player1
     // TODO: .stage
-    // TODO: .place_under_card(MemberArea::Center, s);
+    test_place_under(&tg, 0, 1, s);
     s = test_id(&tg, "PL!HS-pb1-002-R");
     // TODO: game.state
     // TODO: .player1
     // TODO: .stage
-    // TODO: .place_under_card(MemberArea::Center, s);
+    test_place_under(&tg, 0, 1, s);
     s = test_id(&tg, "PL!HS-pb1-002-R");
     // TODO: game.state
     // TODO: .player1
     // TODO: .stage
-    // TODO: .place_under_card(MemberArea::Center, s);
+    test_place_under(&tg, 0, 1, s);
     // TODO assert_eq (unresolved): assert_eq!( game.state .player1 .stage .get_under_cards(MemberArea::Center) .len(), 5, "5 under-cards before second LiveStart" );
     // 
     // // Second activation: 5 under → max=3 → heart05+3 (new cards counted)
@@ -122567,7 +122563,7 @@ static void gen_sayaka_q243_zero_under_no_heart(void){
     // TODO: game.state
     // TODO: .player1
     // TODO: .stage
-    // TODO: .place_under_card(MemberArea::Center, filler);
+    test_place_under(&tg, 0, 1, filler);
     test_give_energy(&tg, 15);
     // 
     // // 1 under → LiveStart counts 1 (under max=3)
@@ -122617,11 +122613,11 @@ static void gen_sayaka_rule_4553_under_members_follow_position_change(void){
     // TODO: game.state
     // TODO: .player1
     // TODO: .stage
-    // TODO: .place_under_card(MemberArea::Center, s1);
+    test_place_under(&tg, 0, 1, s1);
     // TODO: game.state
     // TODO: .player1
     // TODO: .stage
-    // TODO: .place_under_card(MemberArea::Center, s2);
+    test_place_under(&tg, 0, 1, s2);
     // TODO: game.state
     // TODO: .player1
     // TODO: .stage
@@ -122645,7 +122641,7 @@ static void gen_sayaka_rule_1053_under_members_go_to_waitroom(void){
     // TODO: game.state
     // TODO: .player1
     // TODO: .stage
-    // TODO: .place_under_card(MemberArea::Center, s1);
+    test_place_under(&tg, 0, 1, s1);
     // TODO: game.state
     // TODO: .player1
     // TODO: .remove_member_from_stage_with_recycling(1, &game.db);
@@ -122665,8 +122661,8 @@ static void gen_awakening_move_1_of_2(void){
     // // inlined helper place_energy_under
     // 
     int energy_id = 0;
-    // TODO: g.state.player1.stage.place_under_card(MemberArea::Center, energy_id);
-    // TODO: g.state.player1.stage.place_under_card(MemberArea::Center, energy_id);
+    test_place_under(&tg, 0, 1, energy_id);
+    test_place_under(&tg, 0, 1, energy_id);
     // 
     test_add_to_hand(&tg, a);
     int energy_before = 0;
@@ -122713,8 +122709,8 @@ static void gen_awakening_skip_all(void){
     // // inlined helper place_energy_under
     // 
     int energy_id = 0;
-    // TODO: g.state.player1.stage.place_under_card(MemberArea::Center, energy_id);
-    // TODO: g.state.player1.stage.place_under_card(MemberArea::Center, energy_id);
+    test_place_under(&tg, 0, 1, energy_id);
+    test_place_under(&tg, 0, 1, energy_id);
     // 
     test_add_to_hand(&tg, a);
     int energy_before = 0;
@@ -122787,14 +122783,14 @@ static void gen_awakening_targets_energy_owner_member_only(void){
     // // inlined helper place_energy_under
     // 
     int energy_id = 0;
-    // TODO: g.state.player1.stage.place_under_card(MemberArea::Center, energy_id);
-    // TODO: g.state.player1.stage.place_under_card(MemberArea::Center, energy_id);
+    test_place_under(&tg, 0, 1, energy_id);
+    test_place_under(&tg, 0, 1, energy_id);
     // 
     // // inlined helper place_energy_under
     // 
     energy_id = 0;
-    // TODO: g.state.player1.stage.place_under_card(MemberArea::RightSide, energy_id);
-    // TODO: g.state.player1.stage.place_under_card(MemberArea::RightSide, energy_id);
+    test_place_under(&tg, 0, 2, energy_id);
+    test_place_under(&tg, 0, 2, energy_id);
     // 
     test_add_to_hand(&tg, a);
     int energy_before = 0;
@@ -122839,8 +122835,8 @@ static void gen_awakening_move_all_energy(void){
     // // inlined helper place_energy_under
     // 
     int energy_id = 0;
-    // TODO: g.state.player1.stage.place_under_card(MemberArea::Center, energy_id);
-    // TODO: g.state.player1.stage.place_under_card(MemberArea::Center, energy_id);
+    test_place_under(&tg, 0, 1, energy_id);
+    test_place_under(&tg, 0, 1, energy_id);
     // 
     test_add_to_hand(&tg, a);
     int energy_before = 0;
@@ -123000,7 +122996,7 @@ static void gen_issue2_rina_cost_total_6_draws_card(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -123101,7 +123097,7 @@ static void gen_issue2_rina_cost_total_10_no_bonus(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -123195,7 +123191,7 @@ static void gen_issue3_karin_live_start_draw_card(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -123285,7 +123281,7 @@ static void gen_issue5_solitude_rain_heart_color_scoring(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(solitude);
+    test_set_live_card(&tg, 0, solitude);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -123369,7 +123365,7 @@ static void gen_issue6_natsumi_self_and_other_blade(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -123455,7 +123451,7 @@ static void gen_issue6_natsumi_self_only_blade(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -123537,7 +123533,7 @@ static void gen_issue6_natsumi_low_energy_no_blade(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -123621,7 +123617,7 @@ static void gen_issue6_natsumi_blade_expires_after_live_victory_determination(vo
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -123729,7 +123725,7 @@ static void gen_issue7_hajimari_set_required_hearts(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live_card);
+    test_set_live_card(&tg, 0, live_card);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -123827,7 +123823,7 @@ static void gen_issue7_hajimari_no_success_live_no_effect(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live_card);
+    test_set_live_card(&tg, 0, live_card);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -124062,7 +124058,7 @@ static void gen_issue10_dream_with_you_no_blade_no_score(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(dream);
+    test_set_live_card(&tg, 0, dream);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -124148,7 +124144,7 @@ static void gen_issue10_dream_with_you_high_blade_plus_1_score(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(dream);
+    test_set_live_card(&tg, 0, dream);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -124220,7 +124216,7 @@ static void gen_proof_cost_20plus_draws_card(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(proof);
+    test_set_live_card(&tg, 0, proof);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -124355,7 +124351,7 @@ static void gen_issue16_hanamaru_all_cost_higher_than_opponent_gains_blade(void)
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -124449,7 +124445,7 @@ static void gen_issue16_hanamaru_opponent_higher_cost_no_blade(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -124555,7 +124551,7 @@ static void gen_riko_bp6_auto_e2e_heart_failure_triggers(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(mw);
+    test_set_live_card(&tg, 0, mw);
     // 
     // // Drive the FULL round: P1 fails MIRACLE WAVE's 12-heart requirement →
     // // lives go to waitroom → Riko's auto fires and offers the optional
@@ -124689,7 +124685,7 @@ static void gen_riko_bp6_auto_e2e_heart_success_no_trigger(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(hpt);
+    test_set_live_card(&tg, 0, hpt);
     // 
     while (test_has_pending_choice(&tg)) rb_resume_with_choice(&tg.state, 0);
     rb_resume_with_choice(&tg.state, -1);
@@ -125808,7 +125804,7 @@ static void gen_riko_bp6_live_end_clears_all_heart(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(mw);
+    test_set_live_card(&tg, 0, mw);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -126320,7 +126316,7 @@ static void gen_rin_bp4_009_lower_total_draws_two_puts_one_on_top(void){
     test_add_to_hand(&tg, keep);
     test_add_to_hand(&tg, sacrifice);
     // 
-    // TODO: fire_trigger(&mut game, rin, AbilityTrigger::LiveStart, "ライブ開始時");
+    { int ftpl = rb_owner_of_card(&tg.state, rin); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ開始時"); rb_drain_ability_queue(&tg.state); }
     // 
     // // Edge 7: put-back is MANDATORY — no ようない in the text.
     test_has_pending_choice(&tg);
@@ -126358,7 +126354,7 @@ static void gen_rin_bp4_009_equal_totals_do_not_fire(void){
     // TODO: game.add_to_hand(test_id(&tg, "PL!N-PR-019-PR"));
     int hand_before = tg.state.p[0].hand.n;
     // 
-    // TODO: fire_trigger(&mut game, rin, AbilityTrigger::LiveStart, "ライブ開始時");
+    { int ftpl = rb_owner_of_card(&tg.state, rin); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ開始時"); rb_drain_ability_queue(&tg.state); }
     test_has_pending_choice(&tg);
     CHECK_EQ(tg.state.p[0].hand.n, hand_before, "rin_bp4_009_equal_totals_do_not_fire");
     // 
@@ -126376,7 +126372,7 @@ static void gen_rin_bp4_009_both_stages_empty_does_not_fire(void){
     // // Neither side has any member staged — totals 0 vs 0. Rin herself is
     // // deliberately held out so her own cost does not tip the comparison.
     // 
-    // TODO: fire_trigger(&mut game, rin, AbilityTrigger::LiveStart, "ライブ開始時");
+    { int ftpl = rb_owner_of_card(&tg.state, rin); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ開始時"); rb_drain_ability_queue(&tg.state); }
     test_has_pending_choice(&tg);
     // 
 }
@@ -126397,7 +126393,7 @@ static void gen_rin_bp4_009_higher_own_total_does_not_fire(void){
     // TODO: game.add_to_hand(test_id(&tg, "PL!N-PR-019-PR"));
     int hand_before = tg.state.p[0].hand.n;
     // 
-    // TODO: fire_trigger(&mut game, rin, AbilityTrigger::LiveStart, "ライブ開始時");
+    { int ftpl = rb_owner_of_card(&tg.state, rin); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ開始時"); rb_drain_ability_queue(&tg.state); }
     test_has_pending_choice(&tg);
     CHECK_EQ(tg.state.p[0].hand.n, hand_before, "rin_bp4_009_higher_own_total_does_not_fire");
     // 
@@ -126416,7 +126412,7 @@ static void gen_rin_bp4_009_own_empty_stage_counts_as_zero_and_fires(void){
     // TODO: game.state.player2.stage.stage[1] = test_id(&tg, "PL!S-sd1-001-SD"); // cost 17
     test_add_to_hand(&tg, filler);
     // 
-    // TODO: fire_trigger(&mut game, rin, AbilityTrigger::LiveStart, "ライブ開始時");
+    { int ftpl = rb_owner_of_card(&tg.state, rin); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ開始時"); rb_drain_ability_queue(&tg.state); }
     // 
     test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, 0);
@@ -126438,7 +126434,7 @@ static void gen_kanon_spbp4_001_places_wait_energy_when_liella_only(void){
     int zone_before = tg.state.p[0].energy.n;
     int active_before = tg.state.p[0].energy_active;
     // 
-    // TODO: fire_trigger(&mut game, kanon, AbilityTrigger::Debut, "登場");
+    { int ftpl = rb_owner_of_card(&tg.state, kanon); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "登場"); rb_drain_ability_queue(&tg.state); }
     // 
     // TODO assert_eq (unresolved): assert_eq!( game.state.player1.energy_zone.cards.len(), zone_before + 1, "one energy card placed from the energy deck" );
     CHECK_EQ(tg.state.p[0].energy_active, active_before, "kanon_spbp4_001_places_wait_energy_when_liella_only");
@@ -126459,7 +126455,7 @@ static void gen_kanon_spbp4_001_non_liella_blocks_placement(void){
     // TODO: fill_energy_deck(&mut game, 0, 3);
     // 
     int zone_before = tg.state.p[0].energy.n;
-    // TODO: fire_trigger(&mut game, kanon, AbilityTrigger::Debut, "登場");
+    { int ftpl = rb_owner_of_card(&tg.state, kanon); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "登場"); rb_drain_ability_queue(&tg.state); }
     CHECK_EQ(tg.state.p[0].energy.n, zone_before, "kanon_spbp4_001_non_liella_blocks_placement");
     // 
 }
@@ -126507,7 +126503,7 @@ static void gen_kanon_spbp4_001_energy_count_includes_wait_state(void){
     // TODO: game.state.player1.energy_zone.set_active_count(5);
     // TODO: fill_energy_deck(&mut game, 0, 2);
     int zone_before = tg.state.p[0].energy.n;
-    // TODO: fire_trigger(&mut game, kanon, AbilityTrigger::Debut, "登場");
+    { int ftpl = rb_owner_of_card(&tg.state, kanon); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "登場"); rb_drain_ability_queue(&tg.state); }
     CHECK_EQ(tg.state.p[0].energy.n, zone_before, "kanon_spbp4_001_energy_count_includes_wait_state");
     // 
     // // Add one more (waiting) card: 5 active + 2 wait = 7 total → passes.
@@ -126518,7 +126514,7 @@ static void gen_kanon_spbp4_001_energy_count_includes_wait_state(void){
     // TODO: .push(test_id(&tg, "LL-E-001-SD"));
     int zone_after_push = tg.state.p[0].energy.n;
     CHECK_EQ(zone_after_push, 7, "kanon_spbp4_001_energy_count_includes_wait_state");
-    // TODO: fire_trigger(&mut game, kanon, AbilityTrigger::Debut, "登場");
+    { int ftpl = rb_owner_of_card(&tg.state, kanon); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "登場"); rb_drain_ability_queue(&tg.state); }
     // TODO assert_eq (unresolved): assert_eq!( game.state.player1.energy_zone.cards.len(), zone_after_push + 1, "mixed 5 active + 2 wait = 7 ≥ 7 → placement happens" );
     // 
 }
@@ -126535,7 +126531,7 @@ static void gen_kanon_spbp4_001_empty_energy_deck_degrades_gracefully(void){
     // // Energy deck deliberately left EMPTY.
     // 
     int zone_before = tg.state.p[0].energy.n;
-    // TODO: fire_trigger(&mut game, kanon, AbilityTrigger::Debut, "登場");
+    { int ftpl = rb_owner_of_card(&tg.state, kanon); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "登場"); rb_drain_ability_queue(&tg.state); }
     CHECK_EQ(tg.state.p[0].energy.n, zone_before, "kanon_spbp4_001_empty_energy_deck_degrades_gracefully");
     // 
 }
@@ -127577,7 +127573,7 @@ static void gen_kanon_unless_pay_pay_avoids_discard(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "kanon_unless_pay_pay_avoids_discard");
     // 
-    // TODO: game.set_live_card(live_card);
+    test_set_live_card(&tg, 0, live_card);
     // // Record hand AFTER live card is set (removed from hand)
     int hand_before = tg.state.p[0].hand.n;
     // // Passing from LiveCardSetFirstAttacker draws 1 card per live card placed
@@ -127657,7 +127653,7 @@ static void gen_kanon_unless_pay_skip_triggers_discard(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "kanon_unless_pay_skip_triggers_discard");
     // 
-    // TODO: game.set_live_card(live_card);
+    test_set_live_card(&tg, 0, live_card);
     // // Record hand AFTER live card is set (removed from hand)
     int hand_before = tg.state.p[0].hand.n;
     // // Passing from LiveCardSetFirstAttacker draws 1 card per live card placed
@@ -127780,7 +127776,7 @@ static void gen_karin_position_change_removes_not_moved_blade(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
-    // TODO: game.set_live_card(live_card);
+    test_set_live_card(&tg, 0, live_card);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     int safety = 0;
@@ -128875,7 +128871,7 @@ static void gen_ai_screeam_answer_both_discard(void){
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "ai_screeam_answer_both_discard");
     // 
     // // Set the live card — triggers ライブ開始時 abilities
-    // TODO: game.set_live_card(screeam);
+    test_set_live_card(&tg, 0, screeam);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -128962,7 +128958,7 @@ static void gen_ai_screeam_answer_both_draw(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "ai_screeam_answer_both_draw");
     // 
-    // TODO: game.set_live_card(screeam);
+    test_set_live_card(&tg, 0, screeam);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -129041,7 +129037,7 @@ static void gen_ai_screeam_answer_both_gain_blade(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "ai_screeam_answer_both_gain_blade");
     // 
-    // TODO: game.set_live_card(screeam);
+    test_set_live_card(&tg, 0, screeam);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -129118,7 +129114,7 @@ static void gen_distortion_q97_all_active_no_catchu_score_plus_1(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "distortion_q97_all_active_no_catchu_score_plus_1");
     // 
-    // TODO: game.set_live_card(distortion);
+    test_set_live_card(&tg, 0, distortion);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -129185,7 +129181,7 @@ static void gen_distortion_q96_score_permanent_after_energy_used(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "distortion_q96_score_permanent_after_energy_used");
     // 
-    // TODO: game.set_live_card(distortion);
+    test_set_live_card(&tg, 0, distortion);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -129269,7 +129265,7 @@ static void gen_distortion_basic_energy_refresh_with_catchu(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "distortion_basic_energy_refresh_with_catchu");
     // 
-    // TODO: game.set_live_card(distortion);
+    test_set_live_card(&tg, 0, distortion);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -129344,7 +129340,7 @@ static void gen_distortion_no_refresh_when_no_wait_energy(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "distortion_no_refresh_when_no_wait_energy");
     // 
-    // TODO: game.set_live_card(distortion);
+    test_set_live_card(&tg, 0, distortion);
     // 
     // // CatChu condition met, but no wait energy → nothing to refresh
     // // All energy already active → score +1 should fire
@@ -129421,7 +129417,7 @@ static void gen_distortion_max_cap_8_wait_refresh_6_only(void){
     // TODO assert_eq (unresolved): assert_eq!(&game.state.player1.energy_zone.active_count(), 0);
     // TODO assert_eq (unresolved): assert_eq!(&game.state.player1.energy_zone.cards.len(), 8);
     // 
-    // TODO: game.set_live_card(distortion);
+    test_set_live_card(&tg, 0, distortion);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -129493,7 +129489,7 @@ static void gen_distortion_exact_max_boundary_6_wait_all_refreshed(void){
     // TODO assert_eq (unresolved): assert_eq!(&game.state.player1.energy_zone.active_count(), 0);
     // TODO assert_eq (unresolved): assert_eq!(&game.state.player1.energy_zone.cards.len(), 6);
     // 
-    // TODO: game.set_live_card(distortion);
+    test_set_live_card(&tg, 0, distortion);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -129566,7 +129562,7 @@ static void gen_distortion_same_name_catchu_condition_not_met(void){
     // TODO assert_eq (unresolved): assert_eq!(&game.state.player1.energy_zone.active_count(), 3);
     // TODO assert_eq (unresolved): assert_eq!(&game.state.player1.energy_zone.cards.len(), 7);
     // 
-    // TODO: game.set_live_card(distortion);
+    test_set_live_card(&tg, 0, distortion);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -129644,8 +129640,8 @@ static void gen_distortion_q103_two_triggers_only_one_plus_1(void){
     // TODO assert_eq (unresolved): assert_eq!(&game.state.player1.energy_zone.active_count(), 0);
     // TODO assert_eq (unresolved): assert_eq!(&game.state.player1.energy_zone.cards.len(), 7);
     // 
-    // TODO: game.set_live_card(distortion1);
-    // TODO: game.set_live_card(distortion2);
+    test_set_live_card(&tg, 0, distortion1);
+    test_set_live_card(&tg, 0, distortion2);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -129727,7 +129723,7 @@ static void gen_distortion_two_same_one_diff_catchu_condition_met(void){
     // TODO assert_eq (unresolved): assert_eq!(&game.state.player1.energy_zone.active_count(), 0);
     // TODO assert_eq (unresolved): assert_eq!(&game.state.player1.energy_zone.cards.len(), 4);
     // 
-    // TODO: game.set_live_card(distortion);
+    test_set_live_card(&tg, 0, distortion);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -129790,7 +129786,7 @@ static void gen_distortion_same_name_catchu_all_active_score_plus_1(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "distortion_same_name_catchu_all_active_score_plus_1");
     // 
-    // TODO: game.set_live_card(distortion);
+    test_set_live_card(&tg, 0, distortion);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -129922,7 +129918,7 @@ static void gen_ayumu_live_start_triggers(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "ayumu_live_start_triggers");
     // 
-    // TODO: game.set_live_card(filler_live);
+    test_set_live_card(&tg, 0, filler_live);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -130671,7 +130667,7 @@ static void gen_you_live_start_optional_cost_triggers(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "you_live_start_optional_cost_triggers");
     // 
-    // TODO: game.set_live_card(filler_live);
+    test_set_live_card(&tg, 0, filler_live);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -130741,7 +130737,7 @@ static void gen_you_abilityless_card_not_in_choice(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "you_abilityless_card_not_in_choice");
     // 
-    // TODO: game.set_live_card(filler_live);
+    test_set_live_card(&tg, 0, filler_live);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -130812,7 +130808,7 @@ static void gen_bella_q174_no_member_on_stage_ability_does_not_fire(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "bella_q174_no_member_on_stage_ability_does_not_fire");
     // 
-    // TODO: game.set_live_card(bella);
+    test_set_live_card(&tg, 0, bella);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -130890,7 +130886,7 @@ static void gen_bella_q174_no_heart04_surplus_ability_does_not_fire(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "bella_q174_no_heart04_surplus_ability_does_not_fire");
     // 
-    // TODO: game.set_live_card(bella);
+    test_set_live_card(&tg, 0, bella);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -130968,7 +130964,7 @@ static void gen_bella_positive_surplus_heart04_ability_fires(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "bella_positive_surplus_heart04_ability_fires");
     // 
-    // TODO: game.set_live_card(bella);
+    test_set_live_card(&tg, 0, bella);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -131237,7 +131233,7 @@ static void gen_lovepeace_q172_ability_gained_hearts_count_but_not_blade(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "lovepeace_q172_ability_gained_hearts_count_but_not_blade");
     // 
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -131375,7 +131371,7 @@ static void gen_hareruya_q74_multiname_distinct_counting(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "hareruya_q74_multiname_distinct_counting");
     // 
-    // TODO: game.set_live_card(hareruya);
+    test_set_live_card(&tg, 0, hareruya);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -131441,7 +131437,7 @@ static void gen_wien_q117_another_member_triggers_yell_reduction(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "wien_q117_another_member_triggers_yell_reduction");
     // 
-    // TODO: game.set_live_card(live_card);
+    test_set_live_card(&tg, 0, live_card);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -131650,7 +131646,7 @@ static void gen_dia_sd1_optional_draw_skip_skips_movement(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO: game.set_live_card(filler); // removes 1 filler from hand → hand=3
+    test_set_live_card(&tg, 0, filler);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
@@ -131710,7 +131706,7 @@ static void gen_dia_sd1_optional_draw_pay_then_deck_top(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // // Draw phase draws 1 → Deck=9, Hand=4
-    // TODO: game.set_live_card(filler); // Hand=3
+    test_set_live_card(&tg, 0, filler);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
@@ -131983,7 +131979,7 @@ static void gen_ai_screeam_soreigai_all_members_on_both_sides_gain_blade(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "ai_screeam_soreigai_all_members_on_both_sides_gain_blade");
     // 
-    // TODO: game.set_live_card(screeam);
+    test_set_live_card(&tg, 0, screeam);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
@@ -132062,7 +132058,7 @@ static void gen_rise_up_high_turn1_score_and_blade(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "rise_up_high_turn1_score_and_blade");
     // 
-    // TODO: game.set_live_card(live);
+    test_set_live_card(&tg, 0, live);
     // // inlined helper advance_to_live_start
     // 
     rb_advance_phase(&tg.state);
