@@ -13,6 +13,10 @@
 #include <string.h>
 #include <stdlib.h>
 
+/* Mirror misc.rs:execute_gain_surplus_heart — capture this player's live surplus
+   (total_hearts − total_required) so it can be granted/lost as a resource. */
+void rb_effect_gain_surplus_heart(GameState *g, int actor, const AbilityEffect *e);
+
 static int h_gain_resource(GameState *g, int actor, const AbilityEffect *e) {
     /* Mirror misc.rs:execute_gain_resource — add `count` energy to the
        actor's energy zone AND activate it (capped at RB_ENERGY_CAP). The
@@ -92,8 +96,17 @@ static int h_restriction(GameState *g, int actor, const AbilityEffect *e) {
     return 1;
 }
 static int h_choice(GameState *g, int actor, const AbilityEffect *e) {
-    (void)g; (void)actor; (void)e;
-    return 1; /* TODO: open interactive choice */
+    /* Mirror misc.rs / ability/choice.rs `execute_choice` — present a choice to
+       the host (headless auto-skips via the resolver). Emit a SELECT_TARGET
+       pending choice with the effect's count as the option count and its
+       is_optional flag as the allow-skip bit, so the resume path mirrors the
+       dedicated "choice" verb in engine.c. */
+    if (g->queue.resume_active) return 1;   /* already resolving; don't re-emit */
+    int cnt = e->count >= 0 ? e->count : 1;
+    int allow = e->is_optional ? 1 : 0;
+    rb_emit_choice(g, actor, RB_CHOICE_SELECT_TARGET, NULL, NULL, cnt, allow, "choice");
+    g->queue.resume_mode = 0;
+    return 1;
 }
 static int h_position_change(GameState *g, int actor, const AbilityEffect *e) {
     /* Mirror misc.rs position_change — move a member from a source area to a
@@ -175,6 +188,30 @@ static int h_perform_yell(GameState *g, int actor, const AbilityEffect *e) {
     g->re_yell_occurred = 1;
     return 1;
 }
+/* Mirror misc.rs:execute_gain_surplus_heart — capture this player's live surplus
+   (total_hearts − total_required) so it can be granted/lost as a resource. The
+   Rust path computes it from the latest performance snapshot; the C snapshot's
+   `surplus_hearts` already holds total_pool − total_required. */
+void rb_effect_gain_surplus_heart(GameState *g, int actor, const AbilityEffect *e) {
+    if (!g || !e) return;
+    int pl = actor;
+    if (e->target && (!strcmp(e->target, "opponent") || !strcmp(e->target, "p2"))) pl = actor ^ 1;
+
+    /* Most recent snapshot for this player (mirrors performance_snapshots.find). */
+    int surplus = 0;
+    for (int i = g->n_snapshots - 1; i >= 0; i--) {
+        if (g->snapshots[i].player == pl) {
+            int s = g->snapshots[i].surplus_hearts;
+            surplus = (s >= 0) ? s : 0;
+            break;
+        }
+    }
+    g->last_surplus_loss_count[pl] = surplus;
+    /* Rust resets self/opponent_live_surplus_count when sign==negative && is_all;
+       the C engine has no separate per-player live surplus counter, so the value
+       is captured above and reused by subsequent gain_resource/score effects. */
+}
+
 static int h_shuffle(GameState *g, int actor, const AbilityEffect *e) {
     /* Mirror misc.rs shuffle — Fisher-Yates shuffle of the named zone
        (default: deck). */

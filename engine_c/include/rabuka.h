@@ -498,6 +498,7 @@ typedef struct GameState {
     int      revealed_cards[RB_MAX_RECENTLY_MOVED]; /* cards revealed by yell/re_yell */
     int      n_revealed;
     int      last_draw_count;   /* mirror AbilityResolver.step_state.last_draw_count */
+    int      last_surplus_loss_count[2]; /* gain_surplus_heart: surplus hearts gained/lost this live (misc.rs) */
     int      re_yell_occurred;  /* a re_yell effect fired this live */
     int      re_yell_blade_hearts[8]; /* hearts harvested by perform_yell, applied to live */
     int      re_yell_note_icons;
@@ -642,6 +643,7 @@ void rb_effective_need_heart(const GameState *g, int live_cid, int out[8]);
 int  rb_perform_live(GameState *g, int pl);
 /* Effects  Everb handlers */
 void rb_effect_move_cards(GameState *g, int actor, AbilityEffect *e);
+void rb_effect_gain_surplus_heart(GameState *g, int actor, const AbilityEffect *e);
 void rb_effect_look_at(GameState *g, int actor, AbilityEffect *e);
 void rb_effect_reveal_until_live_card(GameState *g, int actor, AbilityEffect *e);
 void rb_effect_reveal_until_chosen_card(GameState *g, int actor, AbilityEffect *e);

@@ -1,5 +1,12 @@
 # engine_c — C port of the Rabuka engine
 
+**STOP OVERTHINKING. JUST PORT.** Pick a `.c` file, open its Rust twin in `engine/src/...`,
+find the functions it still fakes (grep `TODO`/`STUB`/`not yet`/`no-op`/`return 0;`/`placeholder`),
+copy them verbatim into C, build, run `rb_engine_test`/`rb_engine_replay`/`rb_engine_ported`
+(until those 3 stay green — the generated suite is allowed to stay red). Do not write essays
+about whether something is "approximate"; port it and move to the next function. The md is only
+a worklist to know which file maps to which Rust file and what's left.
+
 **Rule:** copy `engine/src/...` into `engine_c/src/...` file-by-file. Rust is the finished
 source of truth. Each placeholder/stub in a `.c` file gets translated from its matching Rust
 function — no "best-effort returns 0" shortcuts. When you work a file, grep its Rust twin for
@@ -32,7 +39,7 @@ is a *worklist*, expected red until everything is ported. Only the hand-written 
 | `src/ability/effects/look.c` | `ability/look.rs` | ✅ done | — |
 | `src/ability/effects/state.c` | `ability/effects/state.rs` + `misc.rs` | ⚠️ partial | `choose_required_hearts`; `set_heart_type placed_under` (still need-heart add) |
 | `src/ability/effects/ability.c` | `ability/effects/ability_effects.rs` | ⚠️ partial | `gain_ability` expiry faithful (score-only approx); `activate_ability` source filter |
-| `src/ability/effects/misc.c` | `ability/effects/misc.rs` | ⚠️ partial | `h_choice` → real `SelectCard`/`SelectTarget` emit; `h_play_baton_touch` redirect gate |
+| `src/ability/effects/misc.c` | `ability/effects/misc.rs` | ⚠️ partial | `gain_surplus_heart` verb ported this session; `h_play_baton_touch` redirect gate |
 | `src/ability/effects/draw.c` | `ability/effects/draw.rs` | ✅ done | — |
 | `src/ability/effects/score.c` | `ability/effects/score.rs` | ✅ done (faithful this session) | remaining 5 fns wired from `state.c`/`engine.c` — retire "simplified" comments |
 | `src/core/card.c` | `core/card.rs` | ✅ done | `blade_heart`/`need_heart` split when Live needs it |
@@ -64,5 +71,7 @@ is a *worklist*, expected red until everything is ported. Only the hand-written 
 - `effects/score.c` `rb_execute_modify_score` — faithful (card_type/group/heart_colors/self_target/per_unit/floor).
 - `tracking.c` `rb_perform_cheer_check` + `state.c` `modify_yell_source` — `yell_from_bottom` (G8) ported.
 - `util.c` + `move.c` `card_property` filters — `has_blade_heart`/`has_score_icon` now faithful via `rb_card_has_blade_heart`/`rb_card_has_score_icon`; `has_all_blade` (BAll) implemented via `rb_card_has_all_blade` (was previously a silent `false`).
+- `misc.c` `h_choice` — now emits a `SELECT_TARGET` pending choice (mirrors `choice.rs`/`engine.c` `choice` verb) instead of a silent `return 1`.
+- `misc.c` + `engine.c` + `rabuka.h` — `gain_surplus_heart` verb ported from `misc.rs:execute_gain_surplus_heart` (captures live surplus into `last_surplus_loss_count[pl]` from the latest snapshot).
 
 Hand-written suites green after every change (`rb_engine_test` / `rb_engine_replay` / `rb_engine_ported` 13/13).

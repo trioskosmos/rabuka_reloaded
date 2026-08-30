@@ -571,6 +571,11 @@ static void handle_action(GameState *g, int actor, AbilityEffect *e, int host_ci
         int resolved = 0;
         rb_execute_misc_effect(g, actor, W, e, &resolved);
         (void)resolved;
+    } else if (!strcmp(act, "gain_surplus_heart")) {
+        /* Mirror misc.rs:execute_gain_surplus_heart — capture this player's live
+           surplus (total_hearts − total_required) into last_surplus_loss_count
+           so it can be granted/lost as a resource by a later effect. */
+        rb_effect_gain_surplus_heart(g, actor, e);
     } else if (!strcmp(act, "re_yell")) {
         /* Mirror misc.rs:execute_re_yell. Optionally clear blade/heart modifiers
            of the target's staged members, clear the revealed pool, and mark that
