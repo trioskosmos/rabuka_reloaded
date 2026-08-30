@@ -10,7 +10,6 @@
 static void activate_wait_members(GameState *g, int pl) {
     RbPlayer *P=&g->p[pl];
     int owned[RB_MAX_CARD_IDS]; int n_owned=0;
-    for(int i=0;i<RB_MAX_CARD_IDS;i++) if(g->mods.delayed_cannot_active[i]) {}
     /* collect owned card ids for delayed tick */
     for(int s=0;s<RB_STAGE_SIZE;s++) if(P->stage[s]!=RB_EMPTY_SLOT) owned[n_owned++]=P->stage[s];
     for(int i=0;i<P->energy.n;i++) owned[n_owned++]=P->energy.cards[i];
@@ -77,6 +76,11 @@ void rb_advance_phase(GameState *g) {
         rb_trigger_auto_abilities(g, 0, "自動");
         rb_trigger_auto_abilities(g, 1, "自動");
         rb_process_pending_auto_abilities(g);
+        /* Mirror engine/src/turn/phases.rs: the LiveStart/LiveCardSet triggers are
+           queued above and then RESOLVED here (the Rust TurnEngine both enqueues and
+           executes within trigger_auto_abilities_for_player). Drain so any pending
+           choice surfaces before the test/host resolves it. */
+        rb_drain_ability_queue(g);
         g->phase=RB_PHASE_PERFORMANCE;
         return;
     }

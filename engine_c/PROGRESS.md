@@ -27,9 +27,9 @@ is a *worklist*, expected red until everything is ported. Only the hand-written 
 | C file | Rust source | Status | Next copy |
 |---|---|---|---|
 | `src/ability/vm.c` | `ability/vm.rs` + `*_decoder_gen.rs` | ✅ done | — |
-| `src/ability/condition.c` | `ability/condition/{card,compound,state}.rs` | ✅ done (all 20 variants) | `eval_both_condition` dispatch (no wire discriminator yet); `eval_temporal` nested sub-checks |
-| `src/ability/choice.c` | `ability/choice.rs` | ⚠️ partial | `select_number`/`pay-skip` resume routing |
-| `src/ability/compound.c` | `ability/compound.rs` | ⚠️ partial | `conditional_on_*` / `repeat_procedure` feeding `pending_repeat_actions` |
+| `src/ability/condition.c` | `ability/condition/{card,compound,state}.rs` | ✅ done | `eval_both_condition` dispatched via `eval_comparison_inner` values-branch; `eval_temporal` nested/sub-checks implemented |
+| `src/ability/choice.c` | `ability/choice.rs` | ✅ done | `rb_resume_with_choice` modes 0-4 + default deferred/optional-cost routing implemented |
+| `src/ability/compound.c` | `ability/compound.rs` | ✅ done | sequential/conditional/conditional_on_result/conditional_on_optional/choice_action all ported; `repeat_procedure` loops synchronously (headless); `pending_repeat_actions` FSM feeding not tracked |
 | `src/ability/ability_queue.c` | `ability_queue.rs` + `triggers.rs` | ⚠️ partial | `QueueState` FSM + `ConditionalChoice`/`resolver` |
 | `src/ability/dynamic_count.c` | `ability/dynamic_count.rs` | ⚠️ partial | `cheer_revealed_cards` arm (revealed_count already ported; `last_cost_discard_count` now wired) |
 | `src/ability/util.c` | `ability/util.rs` | ⚠️ partial | group/series/set_card_identity membership (series not exposed) |
@@ -51,8 +51,8 @@ is a *worklist*, expected red until everything is ported. Only the hand-written 
 | `src/core/tracking.c` | `core/game_state/tracking.rs` | ✅ done | `rb_refresh_yell_sources` ported from `modifiers.rs:972` (per-player `yell_from_bottom` from constant `modify_yell_source("deck_bottom")` on live/success zones); called from `rb_recalc_constants` |
 | `src/core/zones.c` | `core/zones.rs` + `player.rs` | ⚠️ partial | strict `stage[3]` + typed zones + cap enforcement |
 | `src/turn/live.c` | `turn/live.rs` (2846 LOC) | ⚠️ partial | `BAll` doubling; `finalize_snapshot_fields`; `prohibition_effects` tie |
-| `src/turn/phase.c` | `turn/phases.rs` (1685 LOC) | ⚠️ partial | mulligan choice; baton `last_vacated_stage_area`; delayed-modifier ticking |
-| `src/turn/triggers.c` | `turn/triggers.rs` | ⚠️ partial | victory `prohibition_effects` tie-break; `check_expired_effects` full |
+| `src/turn/phase.c` | `turn/phases.rs` (1685 LOC) | ⚠️ partial | mulligan choice (headless no-op OK); baton `last_vacated_stage_area`; delayed-modifier ticking (dead stub loop removed; ticking via `rb_mods_tick_delayed_for`) |
+| `src/turn/triggers.c` | `turn/triggers.rs` | ✅ done | `check_expired_effects` (live_end/turn_end) implemented; victory `prohibition_effects` tie-break pending |
 | `src/engine.c` | engine main loop + `turn/*` | ✅ done | `set_heart_type`/`choose_required_hearts`/`set_blade_type`/`set_card_identity` property rewrites all dispatched faithfully (verified); unknown-verb no-ops retained by design |
 | `tools/gen_tests.py` | (transpiler) | ✅ done | `fire_live_start` → `rb_trigger_live_start`+`rb_drain_ability_queue` now emitted (was degraded to `// TODO:` at the per-line fallback); passthrough added for substituted engine calls |
 
