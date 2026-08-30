@@ -565,6 +565,10 @@ void rb_effect_rotation(GameState *g, int actor, AbilityEffect *e);
 void rb_effect_modify_cost(GameState *g, int actor, AbilityEffect *e);
 void rb_effect_modify_hearts(GameState *g, int actor, AbilityEffect *e);
 int  rb_execute_modify_score(GameState *g, int actor, AbilityEffect *e);
+void rb_log_set_enabled(int enabled);
+void rb_log_push_verdict(const char *text, const char *kind, int passed);
+int  rb_log_buffer_len(void);
+void rb_log_clear_verdicts(void);
 
 /* ── Dynamic count resolution (engine/src/ability/dynamic_count.rs) ── */
 int  rb_resolve_dynamic_count(const struct GameState *g, int owner,
