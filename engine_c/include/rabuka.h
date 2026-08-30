@@ -277,7 +277,9 @@ typedef struct {
     RbBag     live;                   /* live card zone */
     RbBag     success;                /* success live card zone */
     RbBag     discard;                /* waitroom */
+    int       deck_refreshed_this_turn; /* Rule 10.2.2.1 mid-effect refresh flag */
     int       score;
+    int       life;                   /* life points (HP) — tracked for parity with Rust engine */
     int       hearts[RB_MAX_HEARTS]; /* hearts-by-color on this player */
     int       yell_note_icons;        /* hearts produced during performance */
 } RbPlayer;
@@ -294,6 +296,8 @@ typedef enum {
     RB_PHASE_VICTORY,     /* success determination + turn rollover */
     RB_PHASE_DONE
 } RbPhase;
+
+const char *rb_phase_name(int phase);
 
 /* ── Choice / ability queue (engine/src/ability/choice.rs + ability_queue.rs) ── */
 typedef enum {
@@ -356,6 +360,16 @@ typedef struct {
     int      n_uses;
     int      use_turn;         /* turn number for which use_keys are valid */
     RbQueueState state;        /* QueueState FSM (Idle/Resolving/AwaitingChoice/Draining) */
+    /* choice-resume continuation: when an effect node emits a choice it stores
+       itself here so rb_resume_with_choice can re-enter handle_action for that
+       node (applying the selection) instead of re-traversing its children. */
+    AbilityEffect *resume_eff;
+    int      resume_actor;
+    int      resume_host;
+    int      resume_active;    /* 1 while re-running a resumed effect node */
+    int      auto_ability;     /* 1 if pending choice is an auto-ability (drainable) */
+    int      choice_result;    /* selected index stored for the resumed node */
+    int      resume_mode;      /* 0=deferred, 1=position_change, 2=select_card, 3=auto_ability */
 } RbAbilityQueue;
 
 int  rb_queue_push(RbAbilityQueue *q, int card_id, int ability_idx);
@@ -422,11 +436,21 @@ typedef struct GameState {
     RbBag    resolution;             /* resolution zone (temp holding) */
     RbTempEffect temp_effects[RB_MAX_TEMP_EFFECTS];
     int      n_temp_effects;
+    int      stage_arrived[2][RB_STAGE_SIZE]; /* set when a member was deployed this turn (baton arrival-ban, Rule 9.6.2.1.2.1) */
+    int      baton_touch_used[2];             /* baton used this play-action (once-per-action limit) */
+    int      current_is_baton;                /* context flag threaded to effect/trigger evaluation */
+    int      player_cannot_activate[2];      /* restriction: that player may not activate abilities */
+    int      cannot_active_cards[RB_MAX_ZONE]; /* restriction: per-card cannot-activate (delayed/next-turn) */
+    int      n_cannot_active_cards;
+    char     prohibition[64][48];            /* restriction: "type:destination" prohibition notes */
+    int      n_prohibition;
 } GameState;
 
 /* ── Ability queue drain + owner lookup (engine/src/ability_queue.rs) ── */
 int rb_owner_of_card(const GameState *g, int cid);
 int rb_drain_ability_queue(GameState *g);
+void rb_look_resume(GameState *g, int actor, int selected_idx, const char *destination);
+void rb_resume_position_change(GameState *g, int actor, const AbilityEffect *e, int host_cid, int selected_idx);
 
 /* ── RNG (xorshift; deterministic given seed) ── */
 void rb_seed(uint32_t s);
@@ -448,6 +472,12 @@ int  rb_zone_of_str(const char *s, RbZone *out);    /* map zone wire name */
 int  rb_play_card(GameState *g, int pl, int hand_idx);
 int  rb_play_member(GameState *g, int pl, int hand_idx, int stage_pos); /* to stage */
 int  rb_activate_ability(GameState *g, int pl, int hand_idx);
+/* Baton-touch support (replace an occupied stage member). */
+int  rb_card_arrived_this_turn(const GameState *g, int pl, int card_id);
+int  rb_card_has_restriction(const GameState *g, int card_id, const char *restriction);
+void rb_send_to_waitroom(GameState *g, int pl, int card_id);
+/* Restriction (prohibition / cannot-activate) support. */
+int  rb_card_is_cannot_active(const GameState *g, int card_id);
 
 /* ── Triggers / phase / live / stats_pipeline ── */
 int  rb_trigger_is(const char *triggers, const char *needle);
@@ -490,7 +520,8 @@ void rb_emit_choice(GameState *g, int actor, RbChoiceKind kind,
                     const char *zone, const char *card_type,
                     int count, int allow_skip, const char *target);
 void rb_effect_change_state(GameState *g, int actor, AbilityEffect *e);
-void rb_effect_position_change(GameState *g, int actor, AbilityEffect *e);
+void rb_effect_position_change(GameState *g, int actor, AbilityEffect *e, int host_cid);
+void rb_effect_rotation(GameState *g, int actor, AbilityEffect *e);
 void rb_effect_modify_cost(GameState *g, int actor, AbilityEffect *e);
 void rb_effect_modify_hearts(GameState *g, int actor, AbilityEffect *e);
 
@@ -516,6 +547,13 @@ int  rb_card_at_position(const struct GameState *g, int pl, const char *pos);
 int  rb_pos_to_area(const char *pos);
 int  rb_zone_cards(const struct GameState *g, int pl, const char *zone,
                    int *out_ids, int max);
+
+/* ── HeartColor parsing (engine/src/core/card.rs parse_heart_color / index) ── */
+/* Faithful port of `s.parse::<HeartColor>()` / `HeartColor::index()`. String
+   → RbHeartColor; "b_"-prefixed blade hearts strip the prefix and recurse;
+   "heart07"/"b_heart07" → colorless (RB_HEART_PINK / index 0); unknown → pink. */
+RbHeartColor rb_parse_heart_color(const char *s);
+int          rb_heart_index(RbHeartColor c);
 
 /* ── Effect execution (public for testing / harness) ── */
 void rb_execute_effect(GameState *g, int actor, AbilityEffect *e);

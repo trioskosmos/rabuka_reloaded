@@ -35,52 +35,119 @@ void rb_effect_change_state(GameState *g, int actor, AbilityEffect *e){
     }
 }
 
-void rb_effect_position_change(GameState *g, int actor, AbilityEffect *e){
-    int who=actor;
-    if(e->target && !strcmp(e->target,"opponent")) who=actor^1;
-    RbPlayer *P=&g->p[who];
-    (void)e;
-    /* Resolve source/destination areas. Rust mirrors position_change(source, dest)
-       where each may be a position ("left"/"center"/"right") or unspecified
-       (any occupied / first empty). Interactive area-select is folded to the
-       headless no-op-skip path; we honor the parsed positions here. */
-    const char *src_pos=NULL, *dst_pos=NULL;
+static void rb_record_movement(GameState *g, int cid){
+    if(cid<0) return;
+    if(g->n_recently_moved < RB_MAX_RECENTLY_MOVED){
+        g->recently_moved[g->n_recently_moved++]=cid;
+    } else {
+        for(int i=1;i<RB_MAX_RECENTLY_MOVED;i++) g->recently_moved[i-1]=g->recently_moved[i];
+        g->recently_moved[RB_MAX_RECENTLY_MOVED-1]=cid;
+    }
+}
+
+/* Resolve one player's stage swap. Rust's position_change(from,to) SWAPS the two
+   stage slots (the member at the destination moves to the source). Mirrors
+   misc.rs::execute_position_change_with_destination core. */
+static void rb_pos_change_for_player(GameState *g, int who, AbilityEffect *e, int host_cid){
+    const char *src_pos=NULL, *dst_pos=NULL, *target_member=NULL;
     for(int i=0;i<e->n_extra;i++){
-        if(e->extra_k[i] && !strcmp(e->extra_k[i],"source_position")) src_pos=e->extra_v[i];
-        else if(e->extra_k[i] && (!strcmp(e->extra_k[i],"destination")||!strcmp(e->extra_k[i],"dest_position"))) dst_pos=e->extra_v[i];
+        if(!e->extra_k[i]) continue;
+        if(!strcmp(e->extra_k[i],"source_position")) src_pos=e->extra_v[i];
+        else if(!strcmp(e->extra_k[i],"destination")||!strcmp(e->extra_k[i],"dest_position")) dst_pos=e->extra_v[i];
+        else if(!strcmp(e->extra_k[i],"target_member")) target_member=e->extra_v[i];
     }
     if(!dst_pos && e->destination && *e->destination) dst_pos=e->destination;
-    int src = src_pos ? rb_pos_to_area(src_pos) : -1;
-    int dst = dst_pos ? rb_pos_to_area(dst_pos) : -1;
-
-    if(src>=0 && dst>=0){
-        if(src!=dst && P->stage[src]>=0 && P->stage[dst]<0){
-            int c=P->stage[src]; P->stage[src]=RB_EMPTY_SLOT; P->stage_wait[src]=0;
-            P->stage[dst]=c; P->stage_wait[dst]=0;
-        }
-    } else if(src>=0 && dst<0){
-        /* move src member to first empty slot */
-        if(P->stage[src]>=0){
-            for(int d=0;d<RB_STAGE_SIZE;d++) if(P->stage[d]<0){
-                int c=P->stage[src]; P->stage[src]=RB_EMPTY_SLOT; P->stage_wait[src]=0;
-                P->stage[d]=c; P->stage_wait[d]=0; break;
-            }
-        }
-    } else if(src<0 && dst>=0){
-        /* move first occupied member to dst if free */
-        if(P->stage[dst]<0){
-            for(int s=0;s<RB_STAGE_SIZE;s++) if(P->stage[s]>=0){
-                int c=P->stage[s]; P->stage[s]=RB_EMPTY_SLOT; P->stage_wait[s]=0;
-                P->stage[dst]=c; P->stage_wait[dst]=0; break;
-            }
-        }
-    } else {
-        /* No positions given: portable fallback — left<->right swap. */
-        if(P->stage[0]!=RB_EMPTY_SLOT && P->stage[2]!=RB_EMPTY_SLOT){
-            int tmp=P->stage[0]; P->stage[0]=P->stage[2]; P->stage[2]=tmp;
-            int tmpw=P->stage_wait[0]; P->stage_wait[0]=P->stage_wait[2]; P->stage_wait[2]=tmpw;
-        }
+    if(!dst_pos){
+        /* No predetermined destination → interactive: ask the host to pick a
+           stage area to swap with (candidates listed left→center→right so the
+           transpiler's "left"→index 0 mapping holds). */
+        if(g->queue.resume_active) return;   /* already resolving; don't re-emit */
+        int cands[RB_STAGE_SIZE]; int nc=0;
+        for(int i=0;i<RB_STAGE_SIZE;i++) cands[nc++]=i;
+        rb_emit_choice(g, who, RB_CHOICE_SELECT_TARGET, NULL, NULL, nc, 0, "position_change");
+        g->queue.resume_mode = 1; g->queue.resume_eff = e;
+        g->queue.resume_actor = who; g->queue.resume_host = host_cid;
+        return;
     }
+    if(!strcmp(dst_pos,"same_area")) return;
+    int dst=rb_pos_to_area(dst_pos);
+    if(dst<0) return;
+    RbPlayer *P=&g->p[who];
+
+    if(src_pos){
+        int src=rb_pos_to_area(src_pos);
+        if(src<0||src==dst) return;
+        if(P->stage[src]<0) return;      /* no member at source → nothing to move */
+        int a=P->stage[src], b=P->stage[dst];
+        P->stage[src]=b; P->stage_wait[src]=P->stage_wait[dst];
+        P->stage[dst]=a; P->stage_wait[dst]=P->stage_wait[src];
+        rb_record_movement(g,a);
+        if(b>=0) rb_record_movement(g,b);
+        rb_recalc_constants(g);
+        return;
+    }
+    if(target_member && strcmp(target_member,"this_member")){
+        int cid=rb_find_card_by_no(target_member);
+        int cur=-1;
+        for(int i=0;i<RB_STAGE_SIZE;i++) if(P->stage[i]==cid){cur=i;break;}
+        if(cur<0||cur==dst) return;
+        int a=P->stage[cur], b=P->stage[dst];
+        P->stage[cur]=b; P->stage_wait[cur]=P->stage_wait[dst];
+        P->stage[dst]=a; P->stage_wait[dst]=P->stage_wait[cur];
+        rb_record_movement(g,a);
+        if(b>=0) rb_record_movement(g,b);
+        rb_recalc_constants(g);
+        return;
+    }
+    /* No source/target_member: interactive (per-member choice) — emitted above. */
+}
+
+void rb_effect_position_change(GameState *g, int actor, AbilityEffect *e, int host_cid){
+    const char *t = (e->target && *e->target) ? e->target : "self";
+    if(!strcmp(t,"both") || !strcmp(t,"self"))  rb_pos_change_for_player(g, actor, e, host_cid);
+    if(!strcmp(t,"both") || !strcmp(t,"opponent")) rb_pos_change_for_player(g, actor^1, e, host_cid);
+}
+
+void rb_resume_position_change(GameState *g, int actor, const AbilityEffect *e, int host_cid, int selected_idx){
+    (void)e;
+    RbPlayer *P=&g->p[actor];
+    int dst = selected_idx;             /* candidate index → stage area (0/1/2) */
+    if(dst<0 || dst>=RB_STAGE_SIZE) return;
+    int src=-1;
+    for(int i=0;i<RB_STAGE_SIZE;i++) if(P->stage[i]==host_cid){src=i;break;}
+    if(src<0 || src==dst) return;
+    int a=P->stage[src], b=P->stage[dst];
+    P->stage[src]=b; P->stage_wait[src]=P->stage_wait[dst];
+    P->stage[dst]=a; P->stage_wait[dst]=P->stage_wait[src];
+    rb_record_movement(g,a);
+    if(b>=0) rb_record_movement(g,b);
+    rb_recalc_constants(g);
+}
+
+/* Cyclic stage rotation — mirrors misc.rs::execute_rotation (rotation_map=[2,0,1]:
+   left(0)->right(2), center(1)->left(0), right(2)->center(1)). Deterministic. */
+void rb_effect_rotation(GameState *g, int actor, AbilityEffect *e){
+    const char *t = (e->target && *e->target) ? e->target : "self";
+    if(!strcmp(t,"both")) t = "self";       /* Rust: "both" resolves to self only */
+    int who = (!strcmp(t,"opponent")) ? (actor^1) : actor;
+    RbPlayer *P=&g->p[who];
+    int snap[RB_STAGE_SIZE], wait[RB_STAGE_SIZE];
+    RbBag under[RB_STAGE_SIZE];
+    for(int i=0;i<RB_STAGE_SIZE;i++){
+        snap[i]=P->stage[i]; wait[i]=P->stage_wait[i];
+        under[i]=P->under_cards[i];
+        P->stage[i]=RB_EMPTY_SLOT; P->stage_wait[i]=0;
+    }
+    static const int map[RB_STAGE_SIZE] = {2,0,1};
+    for(int src=0;src<RB_STAGE_SIZE;src++){
+        if(snap[src]<0) continue;
+        int dst=map[src];
+        P->stage[dst]=snap[src];
+        P->stage_wait[dst]=wait[src];
+        P->under_cards[dst]=under[src];
+        rb_record_movement(g, snap[src]);
+    }
+    rb_recalc_constants(g);
 }
 
 void rb_effect_modify_cost(GameState *g, int actor, AbilityEffect *e){

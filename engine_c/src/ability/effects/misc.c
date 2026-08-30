@@ -45,9 +45,51 @@ static int h_discard_until_count(GameState *g, int actor, const AbilityEffect *e
     }
     return 1;
 }
+static const char *eff_extra(const AbilityEffect *e, const char *k){
+    for(int i=0;i<e->n_extra;i++) if(e->extra_k[i] && !strcmp(e->extra_k[i],k)) return e->extra_v[i];
+    return NULL;
+}
 static int h_restriction(GameState *g, int actor, const AbilityEffect *e) {
-    (void)g; (void)actor; (void)e;
-    return 1; /* TODO: set play restriction flag */
+    const char *rtype = eff_extra(e, "restriction_type");
+    const char *rdest = eff_extra(e, "restricted_destination");
+    if(!rtype) rtype = eff_extra(e, "type");
+    if(!rdest && e->destination) rdest = e->destination;
+    int delayed = 0;
+    const char *dstr = eff_extra(e, "delayed");
+    if(dstr && (!strcmp(dstr,"true")||!strcmp(dstr,"1"))) delayed = 1;
+
+    /* Record the prohibition note (mirrors gs.prohibition_effects). */
+    if(g->n_prohibition < 64){
+        char *b = g->prohibition[g->n_prohibition];
+        int bi = 0;
+        const char *a = rtype?rtype:"unknown";
+        const char *d = rdest?rdest:"";
+        for(const char *p=a; *p && bi<46; ) b[bi++]=*p++;
+        if(bi<47) b[bi++]=':';
+        for(const char *p=d; *p && bi<47; ) b[bi++]=*p++;
+        b[bi]=0;
+        g->n_prohibition++;
+    }
+
+    /* cannot_activate / cannot_active → block ability activation. */
+    int is_cannot = rtype && (!strcmp(rtype,"cannot_activate_by_effect") ||
+                             !strcmp(rtype,"cannot_active") || !strcmp(rtype,"cannot_activate"));
+    if(is_cannot){
+        int tgt = actor;
+        if(e->target && !strcmp(e->target,"opponent")) tgt = actor^1;
+        if(delayed){
+            /* Key the ban on the cards this ability just moved, else the target
+               player's staged members (next-turn-only activation lockout). */
+            for(int i=0;i<g->n_recently_moved && g->n_cannot_active_cards<RB_MAX_ZONE;i++)
+                g->cannot_active_cards[g->n_cannot_active_cards++]=g->recently_moved[i];
+            for(int q=0;q<RB_STAGE_SIZE;q++)
+                if(g->p[tgt].stage[q]>=0 && g->n_cannot_active_cards<RB_MAX_ZONE)
+                    g->cannot_active_cards[g->n_cannot_active_cards++]=g->p[tgt].stage[q];
+        } else {
+            g->player_cannot_activate[tgt] = 1;
+        }
+    }
+    return 1;
 }
 static int h_choice(GameState *g, int actor, const AbilityEffect *e) {
     (void)g; (void)actor; (void)e;

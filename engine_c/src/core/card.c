@@ -107,18 +107,15 @@ int rb_decode_card_ability(uint32_t card_idx, int n, Ability *out){
    no blade; it is "energy" when it has a cost but no hearts and no blade. The
    database record carries these directly (num_base+num_blade+num_need = heart
    count, cost, blade), so we read them without a full decode. */
-static int rb_card_total_hearts(uint32_t card_id) {
-    const unsigned char *r = rb_card_record(card_id);
-    if (!r) return 0;
-    return (int)r[22] + (int)r[23] + (int)r[24];
-}
 int rb_card_is_live(int card_id) {
     const unsigned char *r = rb_card_record(card_id);
     if (!r) return 0;
-    return rb_card_total_hearts(card_id) == 0 && r[19] == 0 && r[20] == 0;
+    /* compile_cards.py: type_flags = ctype | has_special<<2 | has_cost<<3 |
+       has_score<<4; ctype low 2 bits: 0=Member, 1=Live, 2=Energy. */
+    return (r[18] & 0x03) == 1;
 }
 int rb_card_is_energy(int card_id) {
     const unsigned char *r = rb_card_record(card_id);
     if (!r) return 0;
-    return r[19] > 0 && r[20] == 0 && rb_card_total_hearts(card_id) == 0;
+    return (r[18] & 0x03) == 2;
 }

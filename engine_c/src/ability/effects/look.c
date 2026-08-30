@@ -49,6 +49,8 @@ void rb_effect_look_at(GameState *g, int actor, AbilityEffect *e){
     }
     /* Surface as SELECT_CARD choice on looked_at zone */
     rb_emit_choice(g, actor, RB_CHOICE_SELECT_CARD, "looked_at", NULL, 1, e->is_optional?1:0, NULL);
+    g->queue.resume_mode = 2; g->queue.resume_eff = e;
+    g->queue.resume_actor = actor; g->queue.resume_host = actor;
 }
 
 void rb_effect_select_cards(GameState *g, int actor, AbilityEffect *e){
@@ -61,6 +63,8 @@ void rb_effect_select_cards(GameState *g, int actor, AbilityEffect *e){
     for(int i=0;i<e->n_extra;i++) if(e->extra_k[i] && !strcmp(e->extra_k[i],"card_type")) ctype=e->extra_v[i];
     int cnt=e->count>=0?e->count:1;
     rb_emit_choice(g, actor, RB_CHOICE_SELECT_CARD, zone, ctype, cnt, e->is_optional?1:0, NULL);
+    g->queue.resume_mode = 2; g->queue.resume_eff = e;
+    g->queue.resume_actor = actor; g->queue.resume_host = actor;
 }
 
 /* Called when host resumes SELECT_CARD — move chosen card to destination.

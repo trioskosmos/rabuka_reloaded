@@ -39,6 +39,10 @@ static int card_matches_filter(int card_idx, AbilityEffect *e){
    action is recorded in g->recently_moved so subsequent `preceding_moved` /
    `selected_cards` / `those_cards` references (conditions, chained effects)
    resolve against the actual moved cards. */
+static int stage_area_of(RbPlayer *P, int cid){
+    for(int q=0;q<RB_STAGE_SIZE;q++) if(P->stage[q]==cid) return q;
+    return -1;
+}
 static int find_and_remove_card(RbPlayer *P, int cid){
     for(int q=0;q<RB_STAGE_SIZE;q++) if(P->stage[q]==cid){ P->stage[q]=-1; P->stage_wait[q]=0; return 1; }
     for(int i=0;i<P->hand.n;i++) if(P->hand.cards[i]==cid){ for(int k=i;k<P->hand.n-1;k++) P->hand.cards[k]=P->hand.cards[k+1]; P->hand.n--; return 1; }
@@ -49,48 +53,115 @@ static int find_and_remove_card(RbPlayer *P, int cid){
     for(int i=0;i<P->energy.n;i++) if(P->energy.cards[i]==cid){ for(int k=i;k<P->energy.n-1;k++) P->energy.cards[k]=P->energy.cards[k+1]; P->energy.n--; return 1; }
     return 0;
 }
-static void place_in_dst(RbPlayer *A, RbZone dst, int cid, int to_top){
-    if(dst==RB_ZONE_STAGE){ for(int q=0;q<RB_STAGE_SIZE;q++) if(A->stage[q]<0){ A->stage[q]=cid; A->stage_wait[q]=0; break; } return; }
+/* Place a card into a zone, or onto/under a stage area. dst_area: -1 = first
+   empty stage slot, 0..2 = specific area. under=1 places beneath the member.
+   dst_stage=1 routes to stage placement even when dst RbZone isn't RB_ZONE_STAGE. */
+static void place_in_dst(RbPlayer *A, RbZone dst, int cid, int to_top, int to_bottom,
+                         int dst_area, int under, int dst_stage){
+    if(dst_stage || dst==RB_ZONE_STAGE){
+        int area = dst_area;
+        if(area<0){ for(int q=0;q<RB_STAGE_SIZE;q++) if(A->stage[q]<0){ area=q; break; } }
+        if(area<0 || area>=RB_STAGE_SIZE) return;
+        if(under){ if(A->under_cards[area].n < RB_MAX_ZONE) A->under_cards[area].cards[A->under_cards[area].n++]=cid; }
+        else { A->stage[area]=cid; A->stage_wait[area]=0; }
+        return;
+    }
     RbBag *db=NULL;
     if(dst==RB_ZONE_HAND) db=&A->hand; else if(dst==RB_ZONE_DECK) db=&A->deck;
     else if(dst==RB_ZONE_DISCARD) db=&A->discard; else if(dst==RB_ZONE_ENERGY) db=&A->energy;
     else if(dst==RB_ZONE_LIVE) db=&A->live; else if(dst==RB_ZONE_SUCCESS) db=&A->success;
     if(!db) return;
     if(db->n < RB_MAX_ZONE){
-        if(to_top && dst==RB_ZONE_DECK){ for(int k=db->n;k>0;k--) db->cards[k]=db->cards[k-1]; db->cards[0]=cid; db->n++; }
+        if(to_bottom && dst==RB_ZONE_DECK){ db->cards[db->n++]=cid; }
+        else if(to_top && dst==RB_ZONE_DECK){ for(int k=db->n;k>0;k--) db->cards[k]=db->cards[k-1]; db->cards[0]=cid; db->n++; }
         else db->cards[db->n++]=cid;
     }
 }
 void rb_effect_move_cards(GameState *g, int actor, AbilityEffect *e){
-    int cnt = e->count>=0? e->count : 1;
+    int drain_all = (e->count < 0);   /* count=-1 mirrors drain-all semantics */
+    int cnt = drain_all ? 0x7fffffff : (e->count>=0? e->count : 1);
     const char *src_s = e->source ? e->source : "hand";
     const char *dst_s = e->destination ? e->destination : "discard";
     int relay = (!strcmp(src_s,"those_cards")||!strcmp(src_s,"recently_moved")||!strcmp(src_s,"looked_at")||!strcmp(src_s,"selected_cards"));
-    if (!strcmp(dst_s,"those_cards")||!strcmp(dst_s,"recently_moved")||!strcmp(dst_s,"looked_at")) dst_s="discard";
-    if (!strcmp(dst_s,"under_member")||!strcmp(dst_s,"same_area")||!strcmp(dst_s,"empty_area")) dst_s="discard";
+
+    /* ── Destination resolution (computed once; shared by both players) ── */
     RbZone dst=RB_ZONE_DISCARD;
-    rb_zone_of_str(dst_s,&dst);
+    int dst_stage=0, dst_area=-1, dst_under=0;
     int to_top = e->destination && (!strcmp(e->destination,"deck_top")||!strcmp(e->destination,"deck_top_or_bottom"));
-    RbPlayer *A=&g->p[actor^ (e->target && !strcmp(e->target,"opponent")?1:0)];
-    (void)actor;
-    int src_ids[RB_MAX_ZONE]; int ns=0;
-    if(!strcmp(src_s,"looked_at")||!strcmp(src_s,"looked_at_remaining")){
-        ns = rb_looked_at_pool(actor, src_ids, RB_MAX_ZONE);
-    } else if(relay){
-        for(int i=0;i<g->n_recently_moved;i++) src_ids[ns++]=g->recently_moved[i];
-    } else {
-        RbZone src=RB_ZONE_HAND; rb_zone_of_str(src_s,&src);
-        RbBag *sb=NULL;
-        if(src==RB_ZONE_STAGE){ for(int pos=0;pos<RB_STAGE_SIZE && ns<cnt;pos++) if(A->stage[pos]>=0 && card_matches_filter(A->stage[pos],e)) src_ids[ns++]=A->stage[pos]; }
-        else if(src==RB_ZONE_HAND) sb=&A->hand; else if(src==RB_ZONE_DECK) sb=&A->deck;
-        else if(src==RB_ZONE_DISCARD) sb=&A->discard; else if(src==RB_ZONE_ENERGY) sb=&A->energy;
-        else if(src==RB_ZONE_LIVE) sb=&A->live; else if(src==RB_ZONE_SUCCESS) sb=&A->success;
-        if(sb){ for(int i=sb->n-1;i>=0 && ns<cnt;i--) if(card_matches_filter(sb->cards[i],e)) src_ids[ns++]=sb->cards[i]; }
-    }
+    int to_bottom = e->destination && !strcmp(e->destination,"deck_bottom");
+    if(!strcmp(dst_s,"stage")||!strcmp(dst_s,"empty_area")){ dst_stage=1; dst_area=-1; }
+    else if(!strcmp(dst_s,"same_area")){ dst_stage=1; dst_area=-2; } /* -2 = same area the card came from */
+    else if(!strcmp(dst_s,"under_member")){ dst_stage=1; dst_area=-3; dst_under=1; } /* -3 = under source area / first staged */
+    else if(!strcmp(dst_s,"those_cards")||!strcmp(dst_s,"recently_moved")||!strcmp(dst_s,"looked_at")){ dst=RB_ZONE_DISCARD; }
+    else rb_zone_of_str(dst_s,&dst);
+
+    /* ── Target players (Rule: "both" applies to self AND opponent) ── */
+    int players[2]; int np=0;
+    if (e->target && !strcmp(e->target,"both")) { players[np++]=actor; players[np++]=actor^1; }
+    else if (e->target && !strcmp(e->target,"opponent")) { players[np++]=actor^1; }
+    else { players[np++]=actor; }
+
     int moved_ids[RB_MAX_ZONE]; int nm=0;
-    for(int i=0;i<ns;i++){
-        int cid=src_ids[i];
-        if(find_and_remove_card(A,cid)){ place_in_dst(A,dst,cid,to_top); moved_ids[nm++]=cid; }
+    for(int pk=0; pk<np; pk++){
+        RbPlayer *A=&g->p[players[pk]];
+        int is_deck = (!relay && !strcmp(src_s,"deck"));
+
+        /* ── Source collection (deck source may be refilled by refresh) ── */
+        int src_ids[RB_MAX_ZONE]; int src_area[RB_MAX_ZONE]; int ns=0;
+        if(!strcmp(src_s,"looked_at")||!strcmp(src_s,"looked_at_remaining")){
+            ns = rb_looked_at_pool(actor, src_ids, RB_MAX_ZONE);
+            for(int i=0;i<ns;i++) src_area[i]=-1;
+        } else if(relay){
+            for(int i=0;i<g->n_recently_moved && ns<cnt;i++){ src_ids[ns]=g->recently_moved[i]; src_area[ns]=-1; ns++; }
+        } else {
+            RbZone src=RB_ZONE_HAND; rb_zone_of_str(src_s,&src);
+            if(src==RB_ZONE_STAGE){ for(int pos=0;pos<RB_STAGE_SIZE && ns<cnt;pos++) if(A->stage[pos]>=0 && card_matches_filter(A->stage[pos],e)){ src_ids[ns]=A->stage[pos]; src_area[ns]=pos; ns++; } }
+            else { RbBag *sb=NULL;
+                if(src==RB_ZONE_HAND) sb=&A->hand; else if(src==RB_ZONE_DECK) sb=&A->deck;
+                else if(src==RB_ZONE_DISCARD) sb=&A->discard; else if(src==RB_ZONE_ENERGY) sb=&A->energy;
+                else if(src==RB_ZONE_LIVE) sb=&A->live; else if(src==RB_ZONE_SUCCESS) sb=&A->success;
+                if(sb){ for(int i=sb->n-1;i>=0 && ns<cnt;i--) if(card_matches_filter(sb->cards[i],e)){ src_ids[ns]=sb->cards[i]; src_area[ns]=-1; ns++; } }
+            }
+        }
+
+        /* ── Move (deck source refreshes mid-mill per Rule 10.2.2.1) ── */
+        int moved=0;
+        for(int i=0;i<ns;i++){
+            int cid=src_ids[i];
+            if(!find_and_remove_card(A,cid)) continue;
+            if(dst_stage){
+                int area=dst_area;
+                if(area==-2) area=src_area[i];
+                if(area==-3){ area=src_area[i]; dst_under=1; }
+                if(area<0){ for(int q=0;q<RB_STAGE_SIZE;q++) if(A->stage[q]<0){ area=q; break; } }
+                place_in_dst(A,dst,cid,to_top,to_bottom,area,dst_under,1);
+            } else {
+                place_in_dst(A,dst,cid,to_top,to_bottom,-1,0,0);
+            }
+            moved_ids[nm++]=cid; moved++;
+        }
+        /* Deck refill via refresh when the mill ran the deck dry mid-effect. */
+        if(is_deck && moved < cnt){
+            while(moved < cnt){
+                if(A->deck.n==0){
+                    if(A->discard.n>0){ /* Rule 10.2.2.1: shuffle waitroom under deck */
+                        rb_shuffle(A->discard.cards, A->discard.n);
+                        for(int k=0;k<A->discard.n;k++) A->deck.cards[A->deck.n++]=A->discard.cards[k];
+                        A->discard.n=0;
+                        A->deck_refreshed_this_turn=1;
+                    } else break;
+                }
+                int cid=A->deck.cards[--A->deck.n];
+                if(dst_stage){
+                    int area=dst_area;
+                    if(area<0){ for(int q=0;q<RB_STAGE_SIZE;q++) if(A->stage[q]<0){ area=q; break; } }
+                    place_in_dst(A,dst,cid,to_top,to_bottom,area,dst_under,1);
+                } else {
+                    place_in_dst(A,dst,cid,to_top,to_bottom,-1,0,0);
+                }
+                moved_ids[nm++]=cid; moved++;
+            }
+        }
     }
     /* Record the moved set for `preceding_moved`/`those_cards` relay references. */
     g->n_recently_moved = nm < RB_MAX_RECENTLY_MOVED ? nm : RB_MAX_RECENTLY_MOVED;

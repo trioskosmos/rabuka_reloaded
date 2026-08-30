@@ -75,7 +75,10 @@ int rb_drain_ability_queue(GameState *g) {
         if (!rb_decode_card_ability((uint32_t)e->card_id, e->ability_idx, &ab)) continue;
         int actor = rb_owner_of_card(g, e->card_id);
         if (actor < 0) actor = g->active;
-        if (ab.effect) rb_execute_effect_ex(g, actor, ab.effect, e->card_id);
+        if (ab.effect) {
+            g->n_recently_moved = 0; /* batch-scope per queue entry (clear_recently_moved_batch) */
+            rb_execute_effect_ex(g, actor, ab.effect, e->card_id);
+        }
         rb_free_ability(&ab);
         ran++;
         if (rb_has_pending_choice(g)) {

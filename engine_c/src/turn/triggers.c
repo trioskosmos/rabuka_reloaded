@@ -227,28 +227,14 @@ static void apply_constant_effect(GameState *g, int pl, int host_cid, AbilityEff
     for(int i=0;i<e->n_child;i++) apply_constant_effect(g, pl, host_cid, e->child[i], acc);
 }
 
-/* Fire a card's 登場 (Debut) abilities immediately, applying their modifiers and
-   registering any Duration::LiveEnd grants as temporary effects so they can be
-   reverted later. Mirrors engine/src/turn/triggers.rs:trigger_debut_abilities. */
+/* Fire a card's 登場 (Debut) abilities by queuing them and draining the queue,
+   exactly mirroring Rust's trigger_debut → process_pending_auto_abilities path.
+   This executes the ability's full effect tree (move_cards / gain_resource /
+   modify_cost / etc.) instead of only the constant modifiers. */
 void rb_fire_debut(GameState *g, int pl, int card_id) {
-    int n = rb_card_num_abilities((uint32_t)card_id);
-    for(int i=0;i<n;i++){
-        Ability ab; if(!rb_decode_card_ability((uint32_t)card_id,i,&ab)) continue;
-        if(ab.triggers && rb_trigger_is(ab.triggers,"登場") && ab.effect){
-            int cond_ok=1;
-            if(ab.effect->has_condition && ab.effect->condition)
-                cond_ok=rb_eval_condition_for_host(g, pl, card_id, ab.effect->condition);
-            if(cond_ok){
-                RbTempEffect te; memset(&te,0,sizeof(te)); te.card_id=card_id;
-                int live_end = effect_is_live_end(ab.effect);
-                te.live_end = live_end;
-                apply_constant_effect(g, pl, card_id, ab.effect, live_end?&te:NULL);
-                if(live_end && g->n_temp_effects < RB_MAX_TEMP_EFFECTS)
-                    g->temp_effects[g->n_temp_effects++]=te;
-            }
-        }
-        rb_free_ability(&ab);
-    }
+    rb_trigger_debut(g, pl, card_id);
+    if (g->queue.n_entries > 0)
+        rb_drain_ability_queue(g);
 }
 
 /* Revert all Duration::LiveEnd temporary effects (called at live-phase end). */

@@ -51,7 +51,7 @@ int rb_compare_counts(const char *operator, int actual, int expected) {
 int rb_card_matches_type(int card_id, const char *filter) {
     if (!filter) return 1;
     Card c; if (!rb_decode_card_by_index((uint32_t)card_id, &c)) return 0;
-    int is_live  = (c.n_hearts == 0 && c.cost == 0 && c.blade == 0);
+    int is_live  = rb_card_is_live(card_id);
     int is_member = !is_live;
     int r;
     if (!strcmp(filter, "live_card"))        r = is_live;
@@ -147,4 +147,41 @@ int rb_zone_cards(const struct GameState *g, int pl, const char *zone, int *out_
     }
     #undef PUSH
     return n;
+}
+
+/* Mirror card.rs parse_heart_color — string → RbHeartColor. */
+RbHeartColor rb_parse_heart_color(const char *s) {
+    if (!s) return RB_HEART_PINK;
+    if (!strcmp(s, "heart00") || !strcmp(s, "h00")) return RB_HEART_PINK;
+    if (!strcmp(s, "heart01") || !strcmp(s, "h01")) return RB_HEART_RED;
+    if (!strcmp(s, "heart02") || !strcmp(s, "h02")) return RB_HEART_YELLOW;
+    if (!strcmp(s, "heart03") || !strcmp(s, "h03")) return RB_HEART_GREEN;
+    if (!strcmp(s, "heart04") || !strcmp(s, "h04")) return RB_HEART_BLUE;
+    if (!strcmp(s, "heart05") || !strcmp(s, "h05")) return RB_HEART_PURPLE;
+    if (!strcmp(s, "heart06") || !strcmp(s, "h06")) return RB_HEART_ORANGE;
+    if (!strcmp(s, "b_all")) return RB_HEART_ALL;
+    if (!strcmp(s, "draw"))  return RB_HEART_DRAW;
+    if (!strcmp(s, "score")) return RB_HEART_SCORE;
+    if (!strcmp(s, "all"))   return RB_HEART_ALL;
+    /* b_heart07 / heart07 → colorless (heart00 / pool index 0). */
+    if (!strcmp(s, "heart07") || !strcmp(s, "b_heart07")) return RB_HEART_PINK;
+    /* Blade hearts: strip the "b_" prefix and re-parse (e.g. b_heart03 → heart03). */
+    if (s[0] == 'b' && s[1] == '_') return rb_parse_heart_color(s + 2);
+    return RB_HEART_PINK; /* unknown → colorless, mirrors Rust default */
+}
+
+/* Mirror HeartColor::index() — colored hearts 0..6, All = 7, the colorless
+   (Draw/Score/Any/BAll) buckets collapse to 0 to match Rust's index(). */
+int rb_heart_index(RbHeartColor c) {
+    switch (c) {
+        case RB_HEART_PINK:
+        case RB_HEART_RED:
+        case RB_HEART_YELLOW:
+        case RB_HEART_GREEN:
+        case RB_HEART_BLUE:
+        case RB_HEART_PURPLE:
+        case RB_HEART_ORANGE:   return (int)c;          /* 0..6 */
+        case RB_HEART_ALL:      return 7;
+        default:                return 0;               /* DRAW/SCORE/ANY */
+    }
 }

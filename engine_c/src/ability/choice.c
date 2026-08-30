@@ -14,24 +14,41 @@ void rb_clear_pending_choice(GameState *g) {
 }
 int rb_resume_with_choice(GameState *g, int selected_idx) {
     if (!g || !g->queue.has_pending) return 0;
-    /* selected_idx==-1 means skip (may-pay gate declined). For the portable stub,
-       the deferred effect (stashed at emit time) is dropped on skip, executed on
-       pick. Optional costs (pay_optional_cost:skip) are paid on pick rather than
-       executed as effects (mirrors cost.rs handle_optional_cost_payment). */
-    AbilityEffect *def = g->queue.deferred;
-    int was_skip = (selected_idx < 0);
     int actor = g->queue.actor;
+    int mode = g->queue.resume_mode;
+    AbilityEffect *eff = g->queue.resume_eff;
+    int host = g->queue.resume_host;
+    int was_skip = (selected_idx < 0);
     rb_clear_pending_choice(g);
-    if (!was_skip && def) {
-        /* An optional energy/cost gate defers the cost effect; paying it deducts
-           the energy. Any other deferred effect is resumed as an effect tree. */
-        if (def->action && (!strcmp(def->action, "pay_energy") ||
-                            !strcmp(def->action, "pay_cost") ||
-                            !strcmp(def->action, "activation_cost")))
-            rb_pay_cost(g, actor, def);
-        else
-            rb_execute_effect(g, actor, def);
+    g->queue.resume_mode = 0;
+    g->queue.resume_eff = NULL;
+    g->queue.auto_ability = 0;
+    if (mode == 2) {                 /* select_cards → look.ts keep/drop */
+        const char *dest = eff ? eff->destination : NULL;
+        rb_look_resume(g, actor, selected_idx, dest);
+    } else if (mode == 1) {          /* position_change destination selection */
+        if (!was_skip && eff) {
+            g->queue.resume_active = 1;
+            g->queue.choice_result = selected_idx;
+            rb_resume_position_change(g, actor, eff, host, selected_idx);
+            g->queue.resume_active = 0;
+        }
+    } else if (mode == 3) {          /* auto-ability → execute deferred body */
+        AbilityEffect *def = g->queue.deferred;
+        if (!was_skip && def) rb_execute_effect_ex(g, actor, def, host);
+    } else {                         /* default: optional-cost / generic deferred */
+        AbilityEffect *def = g->queue.deferred;
+        if (!was_skip && def) {
+            if (def->action && (!strcmp(def->action, "pay_energy") ||
+                                !strcmp(def->action, "pay_cost") ||
+                                !strcmp(def->action, "activation_cost")))
+                rb_pay_cost(g, actor, def);
+            else
+                rb_execute_effect_ex(g, actor, def, host);
+        }
     }
+    /* continue resolving any queued trigger/auto abilities */
+    rb_drain_ability_queue(g);
     return 1;
 }
 

@@ -37,6 +37,20 @@ void test_add_to_opp_success(TestGame *tg, int card_id);
 /* trigger / temporary-effect helpers */
 void test_fire_debut(TestGame *tg, int card_id);
 void test_expire_effects(TestGame *tg);
+/* activate an ability by card id (finds it in hand) — mirrors
+   ActionType::ActivateAbility via TurnEngine::execute_main_phase_action. */
+int  test_activate_ability(TestGame *tg, int card_id);
+/* Drain auto-ability (SelectAutoAbility) pending choices — mirrors
+   TestGame::drain_auto_ability_choices (answers with proceed / empty). */
+void test_drain_auto_choices(TestGame *tg);
+/* Spend N active energy (energy_zone.sub_active) — saturating at 0. */
+void test_spend_energy(TestGame *tg, int n);
+/* choice / pending-choice shims (mirror helpers/mod.rs has_pending_choice /
+   select_indices / select_option / pending_choice_count) */
+int  test_has_pending_choice(TestGame *tg);
+int  test_pending_choice_count(TestGame *tg);
+/* live shim (mirror helpers/mod.rs set_live_card) */
+void test_set_live_card(TestGame *tg, int zone, int card_id);
 const char *test_card_name(int card_id);
 
 /* board helpers for assertions */
@@ -44,5 +58,14 @@ int  test_stage_has(TestGame *tg, int area, int card_id);
 int  test_hand_has(TestGame *tg, int card_id);
 int  test_success_count(TestGame *tg);
 void test_print_board(TestGame *tg);
+
+/* phase / choice introspection + modifier getters (mirror TestGame helpers) */
+void test_pass(TestGame *tg);
+const char *test_pending_choice_type(TestGame *tg);
+int  test_get_blade_modifier(TestGame *tg, int cid);
+int  test_get_score_modifier(TestGame *tg, int cid);
+int  test_get_cost_modifier(TestGame *tg, int cid);
+int  test_get_heart_modifier(TestGame *tg, int cid, int color);
+int  test_filler_hand(TestGame *tg);
 
 #endif

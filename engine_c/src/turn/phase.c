@@ -110,11 +110,16 @@ static int  bag_remove_at_local(RbBag *b, int i) {
 }
 
 void rb_player_refresh(GameState *g, int pl) {
-    /* Rust Player::refresh() recomputes cached derived zone state. The C model
-       keeps zones authoritative (no separate cached view), so the only derived
-       quantity is energy_active, which activates all non-delayed energy. */
+    /* Rust Player::refresh() recomputes cached derived zone state AND, when the
+       deck is empty, shuffles the waitroom (discard) back in. */
     RbPlayer *P = &g->p[pl];
     if (P->energy_active < P->energy.n) P->energy_active = P->energy.n;
+    if (P->deck.n == 0 && P->discard.n > 0) {
+        for (int i = 0; i < P->discard.n; i++) P->deck.cards[P->deck.n++] = P->discard.cards[i];
+        P->discard.n = 0;
+        rb_shuffle(P->deck.cards, P->deck.n);
+        P->deck_refreshed_this_turn = 1;
+    }
 }
 
 void rb_check_victory_condition(GameState *g) {
@@ -201,4 +206,20 @@ void rb_check_timing(GameState *g) {
     int active = g->active;
     rb_process_pending_auto_abilities(g);
     (void)active;
+}
+
+const char *rb_phase_name(int phase) {
+    switch (phase) {
+        case RB_PHASE_RPS:            return "RPS";
+        case RB_PHASE_OPENING:        return "Opening";
+        case RB_PHASE_ACTIVE:         return "Active";
+        case RB_PHASE_ENERGY:         return "Energy";
+        case RB_PHASE_DRAW:           return "Draw";
+        case RB_PHASE_MAIN:           return "Main";
+        case RB_PHASE_LIVE_SET:       return "LiveCardSet";
+        case RB_PHASE_PERFORMANCE:    return "Performance";
+        case RB_PHASE_VICTORY:        return "Victory";
+        case RB_PHASE_DONE:           return "Done";
+        default:                      return "Unknown";
+    }
 }

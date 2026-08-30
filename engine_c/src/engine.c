@@ -66,6 +66,7 @@ static RbBag *zone_bag(RbPlayer *pl, RbZone z) {
 /* ───────────────────────────── draw helpers ───────────────────────────── */
 int rb_draw(GameState *g, int pl) {
     RbPlayer *P = &g->p[pl];
+    if (P->deck.n == 0) rb_player_refresh(g, pl);   /* refresh shuffles waitroom in */
     if (P->deck.n == 0) return 0;
     if (P->hand.n >= RB_MAX_HAND) return 0;
     bag_push(&P->hand, bag_take_first(&P->deck));
@@ -73,6 +74,7 @@ int rb_draw(GameState *g, int pl) {
 }
 int rb_draw_energy(GameState *g, int pl) {
     RbPlayer *P = &g->p[pl];
+    if (P->deck.n == 0) rb_player_refresh(g, pl);
     if (P->deck.n == 0) return 0;
     if (P->energy.n >= RB_MAX_ENERGY_CARDS) return 0;
     bag_push(&P->energy, bag_take_first(&P->deck));
@@ -197,6 +199,13 @@ void rb_execute_effect_ex(GameState *g, int actor, AbilityEffect *e, int host_ci
 }
 
 void rb_execute_effect(GameState *g, int actor, AbilityEffect *e) {
+    /* Batch-scope recently_moved at the start of each ability resolution
+       (mirrors Rust GameState::clear_recently_moved_batch between batches so
+       `has_moved`/`preceding_moved` refer to THIS ability's moves, not the
+       whole game). selected_cards is NOT cleared here — it is set
+       asynchronously by a look/select choice resume and must survive across
+       ability boundaries until consumed. */
+    g->n_recently_moved = 0;
     rb_execute_effect_ex(g, actor, e, -1);
 }
 
@@ -436,8 +445,10 @@ static void handle_action(GameState *g, int actor, AbilityEffect *e, int host_ci
         int lim = cnt>0?cnt:1;
         g->live_set_limit_reduction[who] += lim;
         if(g->live_set_limit_reduction[who] > RB_MAX_LIVE_CARDS) g->live_set_limit_reduction[who]=RB_MAX_LIVE_CARDS;
-    } else if (!strcmp(act, "position_change") || !strcmp(act, "rotation")) {
-        rb_effect_position_change(g, actor, e);
+    } else if (!strcmp(act, "position_change")) {
+        rb_effect_position_change(g, actor, e, host_cid);
+    } else if (!strcmp(act, "rotation")) {
+        rb_effect_rotation(g, actor, e);
     } else if (!strcmp(act, "choose_target_player")) {
         rb_emit_choice(g, actor, RB_CHOICE_SELECT_TARGET, NULL, NULL, 1, 0, "self_or_opponent");
     } else if (!strcmp(act, "play_baton_touch") || !strcmp(act, "double_baton_touch")) {
@@ -535,44 +546,106 @@ static void handle_action(GameState *g, int actor, AbilityEffect *e, int host_ci
 }
 
 /* ───────────────────────────── play / activate ───────────────────────────── */
+int rb_card_arrived_this_turn(const GameState *g, int pl, int card_id) {
+    if (pl < 0 || pl > 1) return 0;
+    for (int i = 0; i < RB_STAGE_SIZE; i++)
+        if (g->p[pl].stage[i] == card_id && g->stage_arrived[pl][i]) return 1;
+    return 0;
+}
+int rb_card_has_restriction(const GameState *g, int card_id, const char *restriction) {
+    /* restriction support not yet in the C engine (see PROGRESS §14); returns 0
+       (no restriction) so baton replacement is allowed. TODO: wire to
+       CardRestriction data once decoded. */
+    (void)g; (void)card_id; (void)restriction;
+    return 0;
+}
+void rb_send_to_waitroom(GameState *g, int pl, int card_id) {
+    RbPlayer *P = &g->p[pl];
+    if (P->discard.n < RB_MAX_ZONE) P->discard.cards[P->discard.n++] = card_id;
+}
+
+int rb_card_is_cannot_active(const GameState *g, int card_id) {
+    if (g->player_cannot_activate[0] || g->player_cannot_activate[1]) {
+        /* Per-player lockout: a staged member of a locked player cannot act.
+           We can't cheaply know ownership here, so rb_activate_ability checks
+           the actor's player flag directly. This helper covers the per-card set. */
+    }
+    for (int i = 0; i < g->n_cannot_active_cards; i++)
+        if (g->cannot_active_cards[i] == card_id) return 1;
+    return 0;
+}
+
 int rb_play_member(GameState *g, int pl, int hand_idx, int stage_pos) {
     RbPlayer *P = &g->p[pl];
     if (hand_idx < 0 || hand_idx >= P->hand.n) return 0;
     if (stage_pos < 0 || stage_pos >= RB_STAGE_SIZE) return 0;
-    if (P->stage[stage_pos] >= 0) return 0; /* occupied */
     Card c;
     if (!rb_decode_card_by_index((uint32_t)P->hand.cards[hand_idx], &c)) return 0;
     int cid = P->hand.cards[hand_idx];
+    int is_baton = (P->stage[stage_pos] >= 0); /* playing onto an occupied area */
+
+    /* Baton-touch legality gates (Rule 9.6.2.1.2.1): cannot replace a member that
+       arrived THIS turn, and a member with cannot_baton_touch restriction is
+       immovable. Also enforce one baton per play-action. */
+    if (is_baton) {
+        int old = P->stage[stage_pos];
+        if (g->baton_touch_used[pl] || rb_card_arrived_this_turn(g, pl, old) ||
+            rb_card_has_restriction(g, old, "cannot_baton_touch")) {
+            rb_free_card(&c); return 0;
+        }
+    }
+
     int base_cost = c.cost;
     int cost_mod = rb_mods_get_cost(&g->mods, cid);
     int cost = base_cost + cost_mod;
     if (cost < 0) cost = 0;
-    /* Cost gate: sequential_cost validation (mirrors ability/cost.rs:validate_cost)
-       For member play, only pay_energy is relevant; check active energy. */
+    if (is_baton) {
+        /* Baton: pay only the difference vs the replaced member's cost. */
+        Card oldc; rb_decode_card_by_index((uint32_t)P->stage[stage_pos], &oldc);
+        int old_cost = (int)oldc.cost + rb_mods_get_cost(&g->mods, P->stage[stage_pos]);
+        if (old_cost < 0) old_cost = 0;
+        cost = cost - old_cost;
+        if (cost < 0) cost = 0;
+        rb_free_card(&oldc);
+    }
+    /* Cost gate: member play cost is never optional, so reject if insufficient. */
     if (P->energy_active < cost) {
-        /* optional cost skip: if paid card is optional and insufficient, allow skip
-           via pay-or-skip gate (engine/src/ability/cost.rs: has_skip_prompt). For
-           member play the cost is never optional, so we must reject. */
         rb_free_card(&c); return 0;
     }
     P->energy_active -= cost;
-    /* Recalculate constants after cost payment (energy count changed may affect
-       conditional cost modifiers — see Rust cost.rs pay_energy path). */
+    g->n_recently_moved = 0;
     rb_recalc_constants(g);
+
     int card = bag_remove_at(&P->hand, hand_idx);
-    P->stage[stage_pos] = card; P->stage_wait[stage_pos] = 0;
-    /* Deput: queue debut trigger instead of immediate execute, mirroring
-       engine/src/turn/triggers.rs:trigger_debut_abilities . For now execute
-       immediate if queue is idle, but also queue for later auto-drain. */
+    if (is_baton) {
+        /* Replace: old member (and its under-cards) → waitroom. */
+        int old = P->stage[stage_pos];
+        for (int u = 0; u < P->under_cards[stage_pos].n; u++)
+            rb_send_to_waitroom(g, pl, P->under_cards[stage_pos].cards[u]);
+        P->under_cards[stage_pos].n = 0;
+        rb_send_to_waitroom(g, pl, old);
+        P->stage[stage_pos] = -1;
+        g->baton_touch_used[pl] = 1;
+    }
+    P->stage[stage_pos] = card;
+    P->stage_wait[stage_pos] = 0;
+    g->stage_arrived[pl][stage_pos] = 1;
+
+    /* Fire triggers. A normal "登場" ability fires on both debut and baton;
+       a baton-specific trigger ("バトンタッチ…") fires only on baton-touch. */
     if (c.ability && c.ability->effect) {
-        if (c.ability->triggers && rb_trigger_is(c.ability->triggers,"登場")) {
+        g->current_is_baton = is_baton;
+        if (c.ability->triggers && rb_trigger_is(c.ability->triggers, "登場")) {
             rb_trigger_debut(g, pl, card);
-            /* If no pending choice was queued, execute now (host auto-drains) */
             if (!rb_has_pending_choice(g))
                 rb_execute_effect_ex(g, pl, c.ability->effect, card);
-        } else {
-            rb_execute_effect_ex(g, pl, c.ability->effect, card);
         }
+        if (is_baton && c.ability->triggers &&
+            strstr(c.ability->triggers, "バトンタッチ")) {
+            if (!rb_has_pending_choice(g))
+                rb_execute_effect_ex(g, pl, c.ability->effect, card);
+        }
+        g->current_is_baton = 0;
     }
     rb_free_card(&c);
     return 1;
@@ -580,11 +653,17 @@ int rb_play_member(GameState *g, int pl, int hand_idx, int stage_pos) {
 
 int rb_activate_ability(GameState *g, int pl, int hand_idx) {
     RbPlayer *P = &g->p[pl];
+    /* Restriction gate: a player (or specific card) under a cannot-activate
+       lockout may not activate abilities. */
+    if (g->player_cannot_activate[pl]) return 0;
+    if (hand_idx >= 0 && hand_idx < P->hand.n &&
+        rb_card_is_cannot_active(g, P->hand.cards[hand_idx])) return 0;
     if (hand_idx < 0 || hand_idx >= P->hand.n) return 0;
     Card c;
     if (!rb_decode_card_by_index((uint32_t)P->hand.cards[hand_idx], &c)) return 0;
     int ok = 0;
     if (c.ability && c.ability->effect) {
+        g->n_recently_moved = 0; /* batch-scope for this activation */
         rb_execute_effect_ex(g, pl, c.ability->effect, (int)P->hand.cards[hand_idx]);
         ok = 1;
     }
@@ -649,8 +728,10 @@ static void main_phase(GameState *g, int pl) {
         if (cid < 0) continue;
         Card c;
         if (!rb_decode_card_by_index((uint32_t)cid, &c)) continue;
-        if (c.ability && c.ability->effect)
+        if (c.ability && c.ability->effect) {
+            g->n_recently_moved = 0; /* batch-scope for this staged member */
             rb_execute_effect_ex(g, pl, c.ability->effect, cid);
+        }
         rb_free_card(&c);
     }
 }
@@ -718,6 +799,14 @@ static void rollover(GameState *g) {
 void rb_turn(GameState *g) {
     if (g->winner != -1) return;
     int pl = g->active;
+    /* Reset per-turn baton state: deployment-arrival ban and one-baton-per-action. */
+    for (int p = 0; p < 2; p++) {
+        for (int i = 0; i < RB_STAGE_SIZE; i++) g->stage_arrived[p][i] = 0;
+        g->baton_touch_used[p] = 0;
+        g->player_cannot_activate[p] = 0;
+    }
+    g->n_cannot_active_cards = 0;
+    g->n_prohibition = 0;
     g->phase = RB_PHASE_ACTIVE;
     activate_wait_members(g, pl);
     g->phase = RB_PHASE_ENERGY;
