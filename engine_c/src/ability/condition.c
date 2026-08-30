@@ -93,10 +93,10 @@ static int count_distinct_in_zone(const struct GameState *g, int pl, const char 
     }
     return distinct;
 }
-static int zone_count_filtered(const struct GameState *g, int pl, const char *loc, const char *card_type){
+static int zone_count_filtered(const struct GameState *g, int pl, const char *loc, const char *card_type, const char *group){
     int base = count_in_zone(g,pl,loc);
-    if(!card_type) return base;
-    /* filter: live_card vs member_card vs energy_card */
+    if(!card_type && !group) return base;
+    /* filter: live_card vs member_card vs energy_card (+ optional group_names) */
     const RbPlayer *P=&g->p[pl];
     int ids[RB_MAX_ZONE]; int n=0;
     if (!strcmp(loc, "hand")){ for(int i=0;i<P->hand.n;i++) ids[n++]=P->hand.cards[i]; }
@@ -104,16 +104,22 @@ static int zone_count_filtered(const struct GameState *g, int pl, const char *lo
     else return base; /* other zones: no filter for now */
     int filtered=0;
     for(int i=0;i<n;i++){
-        Card c; if(!rb_decode_card_by_index((uint32_t)ids[i],&c)) continue;
-        int is_live = (c.n_hearts==0 && c.cost==0 && c.blade==0);
-        int is_member = !is_live;
+        /* Use the faithful type_flags encoding (rb_card_is_live/rb_card_is_energy),
+            NOT the broken n_hearts==0&&cost==0&&blade==0 heuristic — real live/energy
+            cards DO have hearts/cost, so that heuristic mis-classified everything
+            (mirrors the fix in rb_card_is_live/rb_card_is_energy elsewhere). */
+        int is_live = rb_card_is_live(ids[i]);
+        int is_energy = rb_card_is_energy(ids[i]);
+        int is_member = !is_live && !is_energy;
         int match=0;
-        if(!strcmp(card_type,"live_card") && is_live) match=1;
-        else if(!strcmp(card_type,"member_card") && is_member) match=1;
-        else if(!strcmp(card_type,"energy_card")) match=0; /* no energy cards in hand/stage */
-        else if(!strcmp(card_type,"card")) match=1;
+        if(card_type){
+            if(!strcmp(card_type,"live_card") && is_live) match=1;
+            else if(!strcmp(card_type,"member_card") && is_member) match=1;
+            else if(!strcmp(card_type,"energy_card") && is_energy) match=1;
+            else if(!strcmp(card_type,"card")) match=1;
+        } else match=1; /* group filter only */
+        if(match && group && !rb_card_matches_group_str(ids[i], group)) match=0;
         if(match) filtered++;
-        rb_free_card(&c);
     }
     return filtered;
 }
@@ -159,8 +165,12 @@ static int eval_location(const struct GameState *g, int actor, const Condition *
     if (!loc) loc = "stage";
     int pl = target_player_idx(actor, c);
     const char *ctype = get_str(c, "card_type");
+    /* group_names / group filter (mirrors Rust CardFilter.group_names substring match) */
+    const char *group = get_str(c, "group");
+    const CondValue *gv = find_val(c, "group_names");
+    if (gv && gv->tag == RB_TAG_ARRAY && gv->arr_n>0 && gv->arr[0].tag==RB_TAG_STR) group = gv->arr[0].s;
     int actual = 0;
-    if (ctype) actual = zone_count_filtered(g, pl, loc, ctype);
+    if (ctype || group) actual = zone_count_filtered(g, pl, loc, ctype, group);
     else if (distinct) actual = count_distinct_in_zone(g, pl, loc);
     else actual = count_in_zone(g, pl, loc);
 
@@ -272,6 +282,14 @@ static int eval_comparison_inner(const struct GameState *g, int actor, int host_
     const char *loc = get_str(c, "location");
     const char *agg = get_str(c, "aggregate");
     const char *ctype = get_str(c, "comparison_type");
+    /* both_condition: values = required scores that must ALL be present among the
+       player's success/live cards. It shares variant 2 with comparison_condition
+       but carries NO comparison_type=="score", so route it here. Mirrors
+       card.rs:evaluate_both_condition. */
+    const CondValue *bvals = find_val(c, "values");
+    if (bvals && bvals->tag == RB_TAG_ARRAY && bvals->arr_n > 0 &&
+        !(ctype && !strcmp(ctype, "score")))
+        return eval_both_condition(g, actor, c);
     /* hanayo: location=success_live_card_zone, card_type=live_card, count=6, operator=>=, comparison_type=score, aggregate=total
        → sum of card scores in zone, not count. Mirrors engine/src/ability/condition/card.rs evaluate_comparison. */
     if (loc && agg && !strcmp(agg,"total") && ctype && !strcmp(ctype,"score")) {
@@ -462,11 +480,40 @@ static int eval_temporal(const struct GameState *g, int actor, const Condition *
    the State variant discriminant). resource_type=="energy" or the
    `energy_state` field gate on active/wait energy counts; otherwise the
    member orientation (stage_wait flag + orientation modifier) is matched. */
+static int state_idx(const char *s){
+    if(!s) return 0;
+    if(!strcmp(s,"wait")||!strcmp(s,"ウェイト")) return 1;
+    return 0; /* active / none */
+}
+/* state_change_condition: a member transitioned from_state -> to_state this turn.
+   Mirrors state.rs:evaluate_state_change_condition (primary recently_state_changed
+   path; turn-scoped fallbacks approximated by the per-turn tracking set in
+   rb_effect_change_state). */
+static int eval_state_change(const struct GameState *g, int actor, const Condition *c, const char *from, const char *to) {
+    int fi = state_idx(from), ti = state_idx(to);
+    int pl = target_player_idx(actor, c);
+    const RbPlayer *P = &g->p[pl];
+    if (fi==1 && ti==0) {
+        int cnt=1; get_i(c,"count",&cnt);
+        const char *op=get_str(c,"operator");
+        if(op && !strcmp(op,">=")) return g->last_wait_to_active_count >= cnt;
+        if(op && !strcmp(op,">"))  return g->last_wait_to_active_count >  cnt;
+        if(op && !strcmp(op,"=") ) return g->last_wait_to_active_count == cnt;
+    }
+    for(int i=0;i<RB_STAGE_SIZE;i++){
+        int cid=P->stage[i];
+        if(cid==RB_EMPTY_SLOT) continue;
+        if(g->state_change_from[cid]==fi && g->state_change_to[cid]==ti) return 1;
+    }
+    return 0;
+}
 static int eval_state(const struct GameState *g, int actor, const Condition *c) {
+    const char *from = get_str(c, "from_state");
+    const char *to   = get_str(c, "to_state");
+    if (from && to) return eval_state_change(g, actor, c, from, to);
     const char *res = get_str(c, "resource_type");
     const char *es  = get_str(c, "energy_state");
     const char *st  = get_str(c, "state");
-    if (!st) st = get_str(c, "from_state");
     int pl = target_player_idx(actor, c);
     const RbPlayer *P = &g->p[pl];
 
@@ -872,12 +919,34 @@ static int eval_condition_inner_host(const struct GameState *g, int actor, int h
         case RB_COND_NO_EXCESS_HEART:     r = eval_no_excess(g, actor, c); break;
         case RB_COND_ALWAYS_TRUE:         r = 1; break;
         case RB_COND_ANY_OF:              r = eval_any_of(g, actor, c); break;
-        case RB_COND_ALL_REVEALED:
-            /* Mirror condition.rs:evaluate_all_revealed_match_heart_color — true if
-               >= count revealed cards match the heart color. Headless has no
-               revealed_cards list, so matching == 0 => false for any threshold. */
-            r = 0;
+        case RB_COND_ALL_REVEALED: {
+            /* Mirror condition.rs:evaluate_all_revealed_match_heart_color — at
+               least `count` revealed cards carry the required heart color. The
+               headless engine tracks the revealed pool in g->revealed_cards[]. */
+            const CondValue *hv = find_val(c, "heart_colors");
+            int thr=1; get_i(c,"count",&thr);
+            if (g->n_revealed==0) { r = 0; break; }
+            int matched=0;
+            for(int i=0;i<g->n_revealed;i++){
+                int cid=g->revealed_cards[i];
+                Card cc; if(!rb_decode_card_by_index((uint32_t)cid,&cc)) continue;
+                int has=0;
+                if(hv && hv->tag==RB_TAG_ARRAY && hv->arr_n>0){
+                    for(int h=0;h<cc.n_hearts && !has;h++){
+                        int col=cc.heart_color[h]%8;
+                        for(uint32_t k=0;k<hv->arr_n;k++){
+                            int want = hv->arr[k].tag==RB_TAG_I64?(int)hv->arr[k].i:
+                                      (hv->arr[k].tag==RB_TAG_STR&&hv->arr[k].s)?atoi(hv->arr[k].s):0;
+                            if(want>=0 && want<=7 && col==want){ has=1; break; }
+                        }
+                    }
+                } else has = cc.n_hearts>0 ? 1 : 0;
+                if(has) matched++;
+                rb_free_card(&cc);
+            }
+            r = (matched >= thr) ? 1 : 0;
             break;
+        }
         default: r = 1; break;
     }
     return negation ? !r : r;

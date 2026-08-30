@@ -39,25 +39,28 @@ void rb_gain_ability(GameState *g, int actor, AbilityEffect *e){
 }
 
 void rb_invalidate_ability(GameState *g, int actor, AbilityEffect *e){
-    (void)actor; (void)e;
-    /* Drop all gained on target */
+    (void)e;
+    /* Mirror ability_effects.rs::execute_invalidate_ability — revoke every gained
+        ability owned by the targeted player (revert its score bonus, then drop). */
     int who=actor;
     if(e->target && !strcmp(e->target,"opponent")) who=actor^1;
-    RbPlayer *P=&g->p[who];
-    for(int i=0;i<g_n;i++){
+    for(int i=g_n-1;i>=0;i--){
         int t=g_gained[i].target;
-        /* if target is on stage, clear its score bonus */
-        for(int q=0;q<RB_STAGE_SIZE;q++) if(P->stage[q]==t){
+        if(rb_owner_of_card(g, t) == who){
             rb_mods_add_score(&g->mods, t, -g_gained[i].score);
+            for(int j=i;j<g_n-1;j++) g_gained[j]=g_gained[j+1];
+            g_n--;
         }
     }
-    g_n=0;
 }
 
-void rb_tick_gained(void){
+void rb_tick_gained(GameState *g){
+    if(!g) return;
     for(int i=0;i<g_n;i++){
         if(--g_gained[i].turns<=0){
-            /* would clear via rb_mods but need GameState — handled in recalc */
+            /* Mirror TemporaryEffect expiry: revert the granted score modifier
+                on the target card so the bonus does not leak past its duration. */
+            rb_mods_add_score(&g->mods, g_gained[i].target, -g_gained[i].score);
             for(int j=i;j<g_n-1;j++) g_gained[j]=g_gained[j+1];
             g_n--; i--;
         }

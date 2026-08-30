@@ -80,6 +80,10 @@ int rb_drain_ability_queue(GameState *g) {
             rb_execute_effect_ex(g, actor, ab.effect, e->card_id);
         }
         rb_free_ability(&ab);
+        /* Mirror Rust's just_completed_ability_key: record which ability just
+            resolved so an auto-trigger scan can skip re-enqueueing it (prevents
+            an auto ability from recursively re-triggering itself). */
+        g->just_completed_ability_key = (e->card_id << 16) | (e->ability_idx & 0xFFFF);
         ran++;
         if (rb_has_pending_choice(g)) {
             /* yield to host; resume re-enters the loop (FSM stays AwaitingChoice

@@ -28,9 +28,19 @@ void rb_effect_change_state(GameState *g, int actor, AbilityEffect *e){
         if(!all && apply_pos<0 && q!=(RB_STAGE_SIZE==3?1:0)) {
             /* no explicit target: act on the first member only (break after) */
         }
-        P->stage_wait[q]=(!strcmp(st,"wait"))?1:0;
+        int ocid = P->stage[q];
+        const char *old_ori = rb_mods_get_orientation((RbMods*)&g->mods, ocid);
+        int was_wait = old_ori && !strcmp(old_ori, "wait");
+        int will_wait = (!strcmp(st, "wait")) ? 1 : 0;
+        if (was_wait != will_wait) {
+            /* record the transition for state_change_condition */
+            g->state_change_from[ocid] = (int8_t)(was_wait ? 1 : 0);
+            g->state_change_to[ocid]   = (int8_t)(will_wait ? 1 : 0);
+            if (was_wait && !will_wait) g->last_wait_to_active_count++;
+        }
+        P->stage_wait[q] = will_wait;
         /* "rest" sets the rest orientation; orientation mod stores the string verbatim */
-        rb_mods_set_orientation(&g->mods, P->stage[q], st);
+        rb_mods_set_orientation(&g->mods, ocid, st);
         if(!all && apply_pos<0) break; /* first-member-only default */
     }
 }
@@ -218,8 +228,15 @@ void rb_effect_modify_hearts(GameState *g, int actor, AbilityEffect *e){
         else if(!strcmp(hc,"orange")) col=6;
         else if(!strcmp(hc,"all")) col=7;
     }
-    int target=-1;
-    for(int q=0;q<RB_STAGE_SIZE;q++) if(P->stage[q]!=RB_EMPTY_SLOT){ target=P->stage[q]; break; }
-    if(target==-1 && P->hand.n>0) target=P->hand.cards[0];
-    if(target!=-1) rb_mods_add_need_heart(&g->mods, target, col%8, cnt);
+    /* Mirror score.rs::execute_modify_required_hearts — required hearts attach to
+        the player's LIVE cards (the cards actually performed); fall back to all
+        stage members when no live cards are set yet. Previously only the first
+        staged/hand card was modified (under-counted multi-live effects). */
+    int applied = 0;
+    for(int i=0;i<P->live.n;i++){ rb_mods_add_need_heart(&g->mods, P->live.cards[i], col%8, cnt); applied=1; }
+    if(!applied){
+        for(int q=0;q<RB_STAGE_SIZE;q++) if(P->stage[q]!=RB_EMPTY_SLOT){
+            rb_mods_add_need_heart(&g->mods, P->stage[q], col%8, cnt);
+        }
+    }
 }

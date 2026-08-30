@@ -434,22 +434,38 @@ static void handle_action(GameState *g, int actor, AbilityEffect *e, int host_ci
                    blade-timing condition (mirrors ability blade_type = all). */
                 g->mods.blade_type[cid] = 7;
             } else if (!strcmp(act, "set_heart_type")) {
-                /* Recolor the member's required heart: add `cnt` need-hearts of
-                   the chosen color (default all=7). */
-                int hcol = 7;
-                for (int i = 0; i < e->n_extra; i++) if (e->extra_k[i] && !strcmp(e->extra_k[i], "heart_color")) {
-                    const char *hc = e->extra_v[i];
-                    if (!hc) continue;
-                    else if (!strcmp(hc,"pink")||!strcmp(hc,"heart00")) hcol=0;
-                    else if (!strcmp(hc,"red")) hcol=1;
-                    else if (!strcmp(hc,"yellow")) hcol=2;
-                    else if (!strcmp(hc,"green")) hcol=3;
-                    else if (!strcmp(hc,"blue")) hcol=4;
-                    else if (!strcmp(hc,"purple")) hcol=5;
-                    else if (!strcmp(hc,"orange")) hcol=6;
-                    else if (!strcmp(hc,"all")) hcol=7;
+                /* Mirror state.rs:execute_set_heart_type — ref_value="placed_under"
+                    copies the hearts of the card placed under this member
+                    (set_heart_copy → heart_copy[cid]); otherwise transform this
+                    member's hearts to the chosen color via heart_color_multiplier
+                    (consumed by rb_stage_hearts_pipeline). */
+                const char *ref = NULL;
+                for (int i = 0; i < e->n_extra; i++) if (e->extra_k[i] && !strcmp(e->extra_k[i], "ref_value")) ref = e->extra_v[i];
+                if (ref && !strcmp(ref, "placed_under")) {
+                    /* Find the card under this member (stats_pipeline heart_copy
+                        REPLACES the target's base hearts with the source's). */
+                    for (int s = 0; s < RB_STAGE_SIZE; s++) {
+                        if (W->stage[s] == cid && W->under_cards[s].n > 0) {
+                            g->mods.heart_copy[cid] = W->under_cards[s].cards[0];
+                            break;
+                        }
+                    }
+                } else {
+                    int hcol = 7;
+                    for (int i = 0; i < e->n_extra; i++) if (e->extra_k[i] && !strcmp(e->extra_k[i], "heart_color")) {
+                        const char *hc = e->extra_v[i];
+                        if (!hc) continue;
+                        else if (!strcmp(hc,"pink")||!strcmp(hc,"heart00")) hcol=0;
+                        else if (!strcmp(hc,"red")) hcol=1;
+                        else if (!strcmp(hc,"yellow")) hcol=2;
+                        else if (!strcmp(hc,"green")) hcol=3;
+                        else if (!strcmp(hc,"blue")) hcol=4;
+                        else if (!strcmp(hc,"purple")) hcol=5;
+                        else if (!strcmp(hc,"orange")) hcol=6;
+                        else if (!strcmp(hc,"all")) hcol=7;
+                    }
+                    g->mods.heart_multiplier[cid] = (int8_t)hcol;
                 }
-                rb_mods_add_need_heart(&g->mods, cid, hcol, cnt > 0 ? cnt : 1);
             } else if (!strcmp(act, "choose_required_hearts")) {
                 /* Headless can't let the player pick a color, so apply the chosen
                    required-heart count to the "all" color (satisfies any color check). */
@@ -587,9 +603,17 @@ static void handle_action(GameState *g, int actor, AbilityEffect *e, int host_ci
         int allow = e->is_optional ? 1 : 0;
         rb_emit_choice(g, actor, RB_CHOICE_SELECT_TARGET, NULL, NULL, cnt, allow, act);
     }
-    /* sequential / conditional_* / choice / repeat_procedure / re_yell /
-       perform_yell / custom / do_nothing: children already executed (or nothing
-       to do). Kept here as explicit no-ops so unknown verbs are visible. */
+    /* sequential / conditional_* / choice / re_yell / perform_yell / custom /
+       do_nothing: children already executed (or nothing to do). */
+    else if (!strcmp(act, "repeat_procedure")) {
+        /* Mirror ability/compound.rs:execute_repeat_procedure — run the child
+           effect `count` times (default 1). Children are NOT auto-run here. */
+        int reps = (e->count > 0) ? e->count : 1;
+        for (int r = 0; r < reps; r++)
+            for (int ci = 0; ci < e->n_child; ci++)
+                if (e->child[ci]) rb_execute_effect_ex(g, actor, e->child[ci], host_cid);
+    }
+    /* Unknown verbs: explicit no-op so they remain visible. */
 }
 
 /* ───────────────────────────── play / activate ───────────────────────────── */
@@ -677,6 +701,12 @@ int rb_play_member(GameState *g, int pl, int hand_idx, int stage_pos) {
     P->stage[stage_pos] = card;
     P->stage_wait[stage_pos] = 0;
     g->stage_arrived[pl][stage_pos] = 1;
+    /* Mirror Rust set_recently_moved_batch: the played (or baton-replaced) member
+        is now "recently moved" so movement-condition gates and auto-abilities-for-
+        movement (trigger_auto_abilities_for_movement) see it during this resolution. */
+    g->recently_moved[0] = card;
+    g->n_recently_moved = 1;
+    if (is_baton) g->baton_last_vacated_area[pl] = stage_pos;
 
     /* Fire triggers. A normal "登場" ability fires on both debut and baton;
        a baton-specific trigger ("バトンタッチ…") fires only on baton-touch. */
@@ -694,6 +724,10 @@ int rb_play_member(GameState *g, int pl, int hand_idx, int stage_pos) {
         }
         g->current_is_baton = 0;
     }
+    /* A member placed on stage is an event that triggers that player's 自動
+        (Auto) abilities — mirrors engine/src/turn/actions.rs
+        handle_play_member_to_stage → trigger_auto_abilities_for_player. */
+    rb_fire_auto(g, pl);
     rb_free_card(&c);
     return 1;
 }
@@ -701,7 +735,7 @@ int rb_play_member(GameState *g, int pl, int hand_idx, int stage_pos) {
 int rb_activate_ability(GameState *g, int pl, int hand_idx) {
     RbPlayer *P = &g->p[pl];
     /* Restriction gate: a player (or specific card) under a cannot-activate
-       lockout may not activate abilities. */
+        lockout may not activate abilities. */
     if (g->player_cannot_activate[pl]) return 0;
     if (hand_idx >= 0 && hand_idx < P->hand.n &&
         rb_card_is_cannot_active(g, P->hand.cards[hand_idx])) return 0;
@@ -842,6 +876,10 @@ static void rollover(GameState *g) {
     g->turn++;
     g->active = g->active ^ 1;
     g->phase = RB_PHASE_ACTIVE;
+    /* Clear turn-scoped state_change_condition tracking. */
+    memset(g->state_change_from, 0, sizeof(g->state_change_from));
+    memset(g->state_change_to, 0, sizeof(g->state_change_to));
+    g->last_wait_to_active_count = 0;
 }
 
 /* One full turn: active player's normal phase + shared live phase + rollover. */

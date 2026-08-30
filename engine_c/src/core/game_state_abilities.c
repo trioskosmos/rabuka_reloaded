@@ -85,10 +85,14 @@ int rb_collect_live_modifiers(const GameState *g, int actor, AbilityEffect *out,
     return 0;
 }
 
-/* Fire every ability on the cards `ids[0..n]` whose trigger matches. */
-static int fire_zone_abilities(GameState *g, int actor, const int *ids, int n,
-                                const char *trigger) {
-    int fired = 0;
+/* Queue every ability on the cards `ids[0..n]` whose trigger matches `trigger`.
+    Mirrors abilities.rs:trigger_auto_abilities_for_player_with_event's TAS scan:
+    each stage (and live/success/hand/energy) card's auto abilities are enqueued
+    once per turn (use_limit gating) and the just-resolved ability is skipped so
+    an auto ability does not recursively re-trigger itself. Returns count queued. */
+static int queue_zone_abilities(GameState *g, int actor, const int *ids, int n,
+                                 const char *trigger) {
+    int queued = 0;
     for (int i = 0; i < n; i++) {
         int cid = ids[i];
         if (cid < 0) continue;
@@ -97,41 +101,64 @@ static int fire_zone_abilities(GameState *g, int actor, const int *ids, int n,
             Ability ab;
             if (!rb_decode_card_ability((uint32_t)cid, a, &ab)) continue;
             if (rb_ability_matches_trigger(&ab, trigger)) {
-                if (ab.effect)
-                    rb_compound_sequential(g, actor, &g->p[actor], ab.effect, 1, NULL, cid);
-                fired++;
+                int key = (cid << 16) | (a & 0xFFFF);
+                int limit = ab.use_limit < 0 ? 99 : ab.use_limit;
+                if (key != g->just_completed_ability_key &&
+                    !rb_use_limit_reached(&g->queue, cid, a, limit, g->turn)) {
+                    rb_queue_push(&g->queue, cid, a);
+                    rb_record_use(&g->queue, cid, a, g->turn);
+                    queued++;
+                }
             }
             rb_free_ability(&ab);
         }
     }
-    return fired;
+    return queued;
 }
 
-/* Mirror abilities.rs:trigger_auto_abilities_for_player — fire all
-   auto-trigger abilities of `actor` matching `trigger` across the actor's
-   stage, success-live, live, hand and energy zones. Returns count fired. */
-int rb_trigger_auto_abilities(GameState *g, int actor, const char *trigger) {
+/* Mirror abilities.rs:trigger_auto_abilities_for_player — enqueue all
+    auto-trigger abilities of `actor` matching `trigger` across the actor's
+    stage, success-live, live, hand and energy zones (plus the batch of cards
+    recently moved this resolution). Returns count queued. */
+int rb_queue_trigger_abilities(GameState *g, int pl, const char *trigger) {
     if (!g || !trigger) return 0;
     int total = 0;
-    const RbPlayer *P = &g->p[actor];
-    total += fire_zone_abilities(g, actor, P->stage, RB_STAGE_SIZE, trigger);
-    total += fire_zone_abilities(g, actor, P->success.cards, P->success.n, trigger);
-    total += fire_zone_abilities(g, actor, P->live.cards, P->live.n, trigger);
-    total += fire_zone_abilities(g, actor, P->hand.cards, P->hand.n, trigger);
-    total += fire_zone_abilities(g, actor, P->energy.cards, P->energy.n, trigger);
+    const RbPlayer *P = &g->p[pl];
+    total += queue_zone_abilities(g, pl, P->stage, RB_STAGE_SIZE, trigger);
+    total += queue_zone_abilities(g, pl, P->success.cards, P->success.n, trigger);
+    total += queue_zone_abilities(g, pl, P->live.cards, P->live.n, trigger);
+    total += queue_zone_abilities(g, pl, P->hand.cards, P->hand.n, trigger);
+    total += queue_zone_abilities(g, pl, P->energy.cards, P->energy.n, trigger);
+    total += queue_zone_abilities(g, pl, g->recently_moved, g->n_recently_moved, trigger);
     return total;
 }
 
+/* Mirror abilities.rs:trigger_auto_abilities_for_player + process_pending — queue
+    then drain. Returns count fired. */
+int rb_trigger_auto_abilities(GameState *g, int actor, const char *trigger) {
+    int queued = rb_queue_trigger_abilities(g, actor, trigger);
+    if (queued > 0) rb_drain_ability_queue(g);
+    /* Mirror Rust: just_completed_ability_key is cleared after the TAS scan so a
+        later scan in the same resolution does not keep skipping this ability. */
+    g->just_completed_ability_key = -1;
+    return queued;
+}
+
+/* Convenience: fire a player's 自動 (Auto) trigger abilities. */
+int rb_fire_auto(GameState *g, int pl) {
+    return rb_trigger_auto_abilities(g, pl, "自動");
+}
+
 /* Mirror abilities.rs:process_pending_auto_abilities — drain the queue of
-   deferred auto-triggers. Returns count processed. */
+    deferred auto-triggers. Returns count processed. */
 int rb_process_pending_auto_abilities(GameState *g) {
     if (!g) return 0;
     return rb_drain_ability_queue(g);
 }
 
 /* Mirror abilities.rs:check_expired_effects — expire temporary effects whose
-   duration has elapsed (end of turn / end of live). Definition lives in
-   turn/triggers.c (shared with the live/turn pipeline); declared in rabuka.h. */
+    duration has elapsed (end of turn / end of live). Definition lives in
+    turn/triggers.c (shared with the live/turn pipeline); declared in rabuka.h. */
 
 /* Mirror abilities.rs:apply_ability_effects — run the persistent / on-trigger
    effects of an ability. The engine's rb_execute_effect already handles the

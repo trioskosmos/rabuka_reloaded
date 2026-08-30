@@ -135,6 +135,10 @@ void rb_effect_move_cards(GameState *g, int actor, AbilityEffect *e){
         } else if(relay){
             if(!strcmp(src_s,"selected_cards")){
                 for(int i=0;i<g->n_selected_cards && ns<cnt;i++){ src_ids[ns]=g->selected_cards[i]; src_area[ns]=-1; ns++; }
+            } else if(!strcmp(src_s,"those_cards")){
+                /* Rust `those_cards` relay: the cards moved by the immediately
+                    preceding move_cards action (recorded below). */
+                for(int i=0;i<g->n_those_cards && ns<cnt;i++){ src_ids[ns]=g->those_cards[i]; src_area[ns]=-1; ns++; }
             } else {
                 for(int i=0;i<g->n_recently_moved && ns<cnt;i++){ src_ids[ns]=g->recently_moved[i]; src_area[ns]=-1; ns++; }
             }
@@ -188,9 +192,14 @@ void rb_effect_move_cards(GameState *g, int actor, AbilityEffect *e){
             }
         }
     }
-    /* Record the moved set for `preceding_moved`/`those_cards` relay references. */
+    /* Record the moved set for `preceding_moved`/`those_cards` relay references.
+        `those_cards` holds exactly the cards this move_cards just moved, so the
+        next move_cards with source="those_cards" resolves against them (Rust
+        `those_cards` relay). `recently_moved` is the broader batch pool. */
     g->n_recently_moved = nm < RB_MAX_RECENTLY_MOVED ? nm : RB_MAX_RECENTLY_MOVED;
     for(int i=0;i<g->n_recently_moved;i++) g->recently_moved[i]=moved_ids[i];
+    g->n_those_cards = nm < RB_MAX_RECENTLY_MOVED ? nm : RB_MAX_RECENTLY_MOVED;
+    for(int i=0;i<g->n_those_cards;i++) g->those_cards[i]=moved_ids[i];
 }
 
 /* needed by engine.c wrapper */

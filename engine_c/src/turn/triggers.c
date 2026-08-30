@@ -169,6 +169,14 @@ static void apply_constant_effect(GameState *g, int pl, int host_cid, AbilityEff
         rb_mods_add_score(&g->mods, tgt_cid, cnt);
         if(!acc) g->mods.constant_score[tgt_cid]+=cnt;
         if(acc) acc->score+=cnt;
+    } else if (!strcmp(e->action,"gain_blade") || !strcmp(e->action,"add_blade") ||
+               !strcmp(e->action,"gain_blade_heart") || !strcmp(e->action,"set_blade_count") ||
+               !strcmp(e->action,"modify_blade")) {
+        int cnt=e->count>=0?e->count:1;
+        for(int i=0;i<e->n_extra;i++) if(e->extra_k[i] && !strcmp(e->extra_k[i],"sign") && e->extra_v[i] && !strcmp(e->extra_v[i],"negative")) cnt = -cnt;
+        rb_mods_add_blade(&g->mods, tgt_cid, cnt);
+        if(!acc) g->mods.constant_blade[tgt_cid]+=cnt;
+        if(acc) acc->blade+=cnt;
     } else if (!strcmp(e->action,"gain_resource")) {
         const char *res=NULL;
         for(int i=0;i<e->n_extra;i++) if(e->extra_k[i] && !strcmp(e->extra_k[i],"resource")) res=e->extra_v[i];

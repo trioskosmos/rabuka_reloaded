@@ -72,6 +72,10 @@ void rb_advance_phase(GameState *g) {
         rb_check_timing(g);
         rb_trigger_live_start(g, 0);
         rb_trigger_live_start(g, 1);
+        /* LiveCardSet is also an auto-trigger event for both players — mirrors
+            engine/src/turn/phases.rs:644/648 trigger_auto_abilities_for_player. */
+        rb_trigger_auto_abilities(g, 0, "自動");
+        rb_trigger_auto_abilities(g, 1, "自動");
         rb_process_pending_auto_abilities(g);
         g->phase=RB_PHASE_PERFORMANCE;
         return;
@@ -91,6 +95,7 @@ void rb_advance_phase(GameState *g) {
         if(g->winner!=-1){ g->phase=RB_PHASE_DONE; return; }
         g->turn++;
         g->active=g->active^1;
+        rb_tick_gained(g); /* expire gained abilities whose duration elapsed (mirrors TemporaryEffect turn-end) */
         g->phase=RB_PHASE_ACTIVE;
     }
 }

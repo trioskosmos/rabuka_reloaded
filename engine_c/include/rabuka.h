@@ -434,9 +434,18 @@ typedef struct GameState {
     int      n_snapshots;
     int      recently_moved[RB_MAX_RECENTLY_MOVED];
     int      n_recently_moved;
+    int      those_cards[RB_MAX_RECENTLY_MOVED]; /* cards moved by the immediately preceding move_cards action (Rust `those_cards` relay) */
+    int      n_those_cards;
     int      selected_cards[RB_MAX_RECENTLY_MOVED]; /* cards chosen by a select_cards/select/look_and_select choice */
     int      n_selected_cards;
     int      live_success[2];   /* per player: did this player pass their live this turn */
+    /* state_change_condition tracking (mirrors Rust recently_state_changed /
+       turn_state_changes). Set when a member's orientation actually flips during
+       rb_effect_change_state; cleared at turn rollover. from/to are orientation
+       indices (0=active/none,1=wait) keyed by card id. */
+    int8_t   state_change_from[RB_MAX_CARD_IDS];
+    int8_t   state_change_to[RB_MAX_CARD_IDS];
+    int      last_wait_to_active_count; /* count of wait→active flips this turn */
     int      revealed_cards[RB_MAX_RECENTLY_MOVED]; /* cards revealed by yell/re_yell */
     int      n_revealed;
     int      re_yell_occurred;  /* a re_yell effect fired this live */
@@ -455,6 +464,7 @@ typedef struct GameState {
     int      n_temp_effects;
     int      stage_arrived[2][RB_STAGE_SIZE]; /* set when a member was deployed this turn (baton arrival-ban, Rule 9.6.2.1.2.1) */
     int      baton_touch_used[2];             /* baton used this play-action (once-per-action limit) */
+    int      baton_last_vacated_area[2];      /* stage area vacated by the most recent baton (mirrors Rust last_vacated_stage_area) */
     int      current_is_baton;                /* context flag threaded to effect/trigger evaluation */
     int      player_cannot_activate[2];      /* restriction: that player may not activate abilities */
     int      cannot_active_cards[RB_MAX_ZONE]; /* restriction: per-card cannot-activate (delayed/next-turn) */
@@ -488,6 +498,11 @@ typedef struct GameState {
     int      opponent_live_success_this_turn;
     int      game_state_history[64]; int n_game_state_history;
     int      loop_detected;
+    /* just_completed_ability_key — mirrors Rust's GameState.just_completed_ability_key.
+       Set by rb_drain_ability_queue after each ability resolves so the auto-trigger
+       scan can skip re-enqueueing the very ability that just fired (prevents an
+       auto ability from recursively re-triggering itself). Key = (card_id<<16)|ability_idx. */
+    int      just_completed_ability_key;
 } GameState;
 
 /* ── Tracking (engine/src/core/game_state/tracking.rs) ── */
@@ -540,6 +555,9 @@ int  rb_trigger_debut(GameState *g, int pl, int card_id);
 void rb_fire_debut(GameState *g, int pl, int card_id);
 int  rb_trigger_live_start(GameState *g, int pl);
 int  rb_trigger_live_success(GameState *g, int pl);
+int  rb_queue_trigger_abilities(GameState *g, int pl, const char *trigger);
+int  rb_fire_auto(GameState *g, int pl);
+int  rb_process_pending_auto_abilities(GameState *g);
 void rb_recalc_constants(GameState *g);
 void rb_check_expired_effects(GameState *g, int which);
 void rb_advance_phase(GameState *g);
@@ -572,7 +590,7 @@ void rb_gain_ability(GameState *g, int actor, AbilityEffect *e);
 void rb_gain_ability_from_source(GameState *g, int actor, AbilityEffect *e, int host_cid);
 void rb_invalidate_ability(GameState *g, int actor, AbilityEffect *e);
 void rb_activate_ability_effect(GameState *g, int actor, AbilityEffect *e, int host_cid);
-void rb_tick_gained(void);
+void rb_tick_gained(GameState *g);
 int  card_matches_card_type_filter(int card_idx, const char *filter);
 void rb_emit_choice(GameState *g, int actor, RbChoiceKind kind,
                     const char *zone, const char *card_type,

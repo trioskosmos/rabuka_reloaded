@@ -24,7 +24,14 @@ void rb_calc_stage_hearts(const GameState *g, int pl, int out[8]){
         Card c; if(!rb_decode_card_by_index((uint32_t)cid,&c)) continue;
         for(int h=0;h<c.n_hearts;h++) out[c.heart_color[h]%8]+=c.heart_count[h];
         int blade=(int)c.blade + rb_mods_get_blade((RbMods*)&g->mods, cid);
-        if(blade>0) out[RB_HEART_PINK]+=blade;
+        if(blade>0){
+            /* set_blade_type recolor (state.rs::execute_set_blade_type): a colored
+                blade_type routes the member's blade into that heart color instead of
+                pink; blade_type<0 (none) or pink(0) stays pink. Mirrors Rust's
+                blade_color→HeartColor mapping (draw/score never produced by blade). */
+            int bt = g->mods.blade_type[cid];
+            if(bt>=1 && bt<=6) out[bt]+=blade; else out[RB_HEART_PINK]+=blade;
+        }
         for(int col=0;col<8;col++){ int mod=rb_mods_get_heart((RbMods*)&g->mods, cid, col); if(mod) out[col]+=mod; }
         rb_free_card(&c);
     }
@@ -48,7 +55,13 @@ static int do_yell(GameState *g, int pl, int yell_cards[RB_MAX_LIVE_CARDS*3], in
         yell_cards[(*n_yell)++]=cid;
         Card c; if(!rb_decode_card_by_index((uint32_t)cid,&c)){ continue; }
         /* blade_heart handling: blade contributes pink; special hearts could be draw/score */
-        if(c.blade>0) blade_hearts[RB_HEART_PINK]+=c.blade;
+        if(c.blade>0){
+            /* set_blade_type recolor also applies to a yelled card's own blade
+                (state.rs::execute_set_blade_type sets the modifier on the card in
+                any zone; process_yell_revealed_card_icons takes override_color). */
+            int bt = g->mods.blade_type[cid];
+            if(bt>=1 && bt<=6) blade_hearts[bt]+=c.blade; else blade_hearts[RB_HEART_PINK]+=c.blade;
+        }
         for(int h=0;h<c.n_hearts;h++){
             int col=c.heart_color[h];
             if(col==RB_HEART_DRAW) { /* draw icon → immediate draw handled by caller */ }
@@ -172,6 +185,9 @@ int rb_perform_live(GameState *g, int pl){
        player's ライブ成功時 (LiveSuccess) auto-abilities and drain them so
        their score/blade/heart grants apply before the live is finalized. */
     if (passed) {
+        /* The performer's 自動 (Auto) abilities also fire around the live
+            (mirrors engine/src/turn/live.rs:434/435 + :528/529). */
+        rb_trigger_auto_abilities(g, pl, "自動");
         rb_trigger_live_success(g, pl);
         rb_drain_ability_queue(g);
     }

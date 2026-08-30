@@ -27,11 +27,19 @@ void rb_stage_hearts_pipeline(const GameState *g, int pl, int out[8]){
         if(target==RB_EMPTY_SLOT) continue;
         int src=g->mods.heart_copy[target];
         if(src<=0 || src>=RB_MAX_CARD_IDS) continue;
-        Card sc; if(!rb_decode_card_by_index((uint32_t)src,&sc)) continue;
-        /* zero current and replace with source's */
-        /* Simplified: add source's hearts on top (faithful would replace) */
-        for(int h=0;h<sc.n_hearts;h++) out[sc.heart_color[h]%8]+=sc.heart_count[h];
-        rb_free_card(&sc);
+        /* heart_copy REPLACES the target's own base hearts with the source's. */
+        Card tc; if(rb_decode_card_by_index((uint32_t)target,&tc)){
+            for(int h=0;h<tc.n_hearts;h++){
+                int col=tc.heart_color[h]%8;
+                out[col]-=tc.heart_count[h];
+                if(out[col]<0) out[col]=0;
+            }
+            rb_free_card(&tc);
+        }
+        Card sc; if(rb_decode_card_by_index((uint32_t)src,&sc)){
+            for(int h=0;h<sc.n_hearts;h++) out[sc.heart_color[h]%8]+=sc.heart_count[h];
+            rb_free_card(&sc);
+        }
     }
     /* heart_color_multiplier: one colour multiplied */
     for(int s=0;s<RB_STAGE_SIZE;s++){

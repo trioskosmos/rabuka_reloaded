@@ -170,3 +170,4 @@ engine_c/src/*.bin
 engine_c/src/core/generated/*.o
 engine_c/src/**/*.o
 
+engine_c/debug_eli.exe

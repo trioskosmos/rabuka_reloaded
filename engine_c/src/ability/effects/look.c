@@ -40,12 +40,32 @@ void rb_effect_look_at(GameState *g, int actor, AbilityEffect *e){
     const char *src = e->source ? e->source : "deck";
     int from_deck = !strcmp(src,"deck")||!strcmp(src,"deck_top");
     lp->from_deck = from_deck;
-    for(int i=0;i<cnt && lp->n < MAX_LOOKED;i++){
-        int cid=-1;
-        if(from_deck && P->deck.n>0) cid=P->deck.cards[--P->deck.n];
-        else if(P->hand.n>0) cid=P->hand.cards[--P->hand.n];
-        else break;
-        lp->cards[lp->n++]=cid;
+    /* reveal_per_group (look.rs::execute_reveal_per_group): when a group filter is
+        present, reveal from the deck top until a card of that group is found,
+        populating the looked_at pool — instead of revealing a fixed count. */
+    const char *group=NULL;
+    for(int i=0;i<e->n_extra;i++) if(e->extra_k[i] && !strcmp(e->extra_k[i],"group_names")) group=e->extra_v[i];
+    if(group && from_deck){
+        while(P->deck.n>0 && lp->n<MAX_LOOKED){
+            int cid=P->deck.cards[--P->deck.n];
+            lp->cards[lp->n++]=cid;
+            if(rb_card_matches_group_str(cid, group)) break;
+        }
+    } else {
+        for(int i=0;i<cnt && lp->n < MAX_LOOKED;i++){
+            int cid=-1;
+            if(from_deck && P->deck.n>0) cid=P->deck.cards[--P->deck.n];
+            else if(P->hand.n>0) cid=P->hand.cards[--P->hand.n];
+            else break;
+            lp->cards[lp->n++]=cid;
+        }
+    }
+    /* Mirror Rust reveal → gs.revealed_cards: every looked/revealed card also lands
+        in the shared revealed_cards pool consumed by the all_revealed_match_heart_color
+        condition (ability/condition.c eval_all_revealed). */
+    for(int i=0;i<lp->n;i++){
+        if(g->n_revealed < RB_MAX_RECENTLY_MOVED)
+            g->revealed_cards[g->n_revealed++]=lp->cards[i];
     }
     /* Surface as SELECT_CARD choice on looked_at zone */
     rb_emit_choice(g, actor, RB_CHOICE_SELECT_CARD, "looked_at", NULL, 1, e->is_optional?1:0, NULL);
@@ -124,6 +144,8 @@ static int reveal_until(GameState *g, int who, int (*pred)(const GameState*, int
     while(P->deck.n>0 && lp->n<MAX_LOOKED){
         int cid=P->deck.cards[--P->deck.n];
         lp->cards[lp->n++]=cid;
+        if(g->n_revealed < RB_MAX_RECENTLY_MOVED)
+            g->revealed_cards[g->n_revealed++]=cid;
         if(pred(g,cid)) return 1; /* matched */
     }
     return 0; /* deck exhausted without a match */
