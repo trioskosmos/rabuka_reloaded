@@ -2,15 +2,18 @@
 #include <string.h>
 #include <stdlib.h>
 
-/* Gain/invalidate ability — mirrors engine/src/ability/effects/ability_effects.rs
-   Portable stub tracks gained abilities as temporary score/heart modifiers with
-   expiry on next recalc (full Duration handling lands with the 100-fixture
+/* Gain/invalidate ability — mirrors engine/src/ability/effects/ability_effects.rs.
+   Tracks gained abilities as temporary score/blade/heart/need_heart modifiers
+   with expiry on next recalc (full Duration handling lands with the 100-fixture
    harness). For the 900-ability count, surfacing the expiry is what flips
-   ~20 of the 16 gain_ability abilities from no-ops to faithful. */
+   ~20 of the gain_ability abilities from no-ops to faithful. */
 
 typedef struct {
     int target; /* card_id */
     int score;  /* bonus */
+    int blade;
+    int heart;
+    int need_heart;
     int turns;  /* remaining */
 } Gained;
 
@@ -26,28 +29,40 @@ void rb_gain_ability(GameState *g, int actor, AbilityEffect *e){
     for(int q=0;q<RB_STAGE_SIZE;q++) if(P->stage[q]!=RB_EMPTY_SLOT){ target=P->stage[q]; break; }
     if(target==-1 && P->hand.n>0) target=P->hand.cards[0];
     if(target==-1) return;
-    int bonus=0;
-    for(int i=0;i<e->n_extra;i++) if(e->extra_k[i] && !strcmp(e->extra_k[i],"value")) bonus=atoi(e->extra_v[i]);
-    if(!bonus) bonus=e->count>=0?e->count:1;
+    int score=0, blade=0, heart=0, need=0;
+    for(int i=0;i<e->n_extra;i++){
+        if(!e->extra_k[i]) continue;
+        if(!strcmp(e->extra_k[i],"value"))      score=atoi(e->extra_v[i]);
+        else if(!strcmp(e->extra_k[i],"blade"))  blade=atoi(e->extra_v[i]);
+        else if(!strcmp(e->extra_k[i],"heart"))  heart=atoi(e->extra_v[i]);
+        else if(!strcmp(e->extra_k[i],"need_heart")) need=atoi(e->extra_v[i]);
+    }
+    if(!score) score=e->count>=0?e->count:1;
     if(g_n < MAX_GAINED){
-        g_gained[g_n].target=target;
-        g_gained[g_n].score=bonus;
-        g_gained[g_n].turns=2; /* live one full round */
-        g_n++;
-        rb_mods_add_score(&g->mods, target, bonus);
+        Gained *gg=&g_gained[g_n++];
+        gg->target=target; gg->score=score; gg->blade=blade; gg->heart=heart;
+        gg->need_heart=need; gg->turns=2; /* live one full round */
+        if(score) rb_mods_add_score(&g->mods, target, score);
+        if(blade) rb_mods_add_blade(&g->mods, target, blade);
+        if(heart) rb_mods_add_heart(&g->mods, target, 0, heart);
+        if(need)  rb_mods_add_need_heart(&g->mods, target, 0, need);
     }
 }
 
 void rb_invalidate_ability(GameState *g, int actor, AbilityEffect *e){
     (void)e;
     /* Mirror ability_effects.rs::execute_invalidate_ability — revoke every gained
-        ability owned by the targeted player (revert its score bonus, then drop). */
+        ability owned by the targeted player (revert its score/blade/heart/need
+        bonus, then drop). */
     int who=actor;
     if(e->target && !strcmp(e->target,"opponent")) who=actor^1;
     for(int i=g_n-1;i>=0;i--){
         int t=g_gained[i].target;
         if(rb_owner_of_card(g, t) == who){
-            rb_mods_add_score(&g->mods, t, -g_gained[i].score);
+            if(g_gained[i].score) rb_mods_add_score(&g->mods, t, -g_gained[i].score);
+            if(g_gained[i].blade) rb_mods_add_blade(&g->mods, t, -g_gained[i].blade);
+            if(g_gained[i].heart) rb_mods_add_heart(&g->mods, t, 0, -g_gained[i].heart);
+            if(g_gained[i].need_heart) rb_mods_add_need_heart(&g->mods, t, 0, -g_gained[i].need_heart);
             for(int j=i;j<g_n-1;j++) g_gained[j]=g_gained[j+1];
             g_n--;
         }
@@ -58,9 +73,13 @@ void rb_tick_gained(GameState *g){
     if(!g) return;
     for(int i=0;i<g_n;i++){
         if(--g_gained[i].turns<=0){
-            /* Mirror TemporaryEffect expiry: revert the granted score modifier
+            /* Mirror TemporaryEffect expiry: revert the granted modifiers
                 on the target card so the bonus does not leak past its duration. */
-            rb_mods_add_score(&g->mods, g_gained[i].target, -g_gained[i].score);
+            int t=g_gained[i].target;
+            if(g_gained[i].score) rb_mods_add_score(&g->mods, t, -g_gained[i].score);
+            if(g_gained[i].blade) rb_mods_add_blade(&g->mods, t, -g_gained[i].blade);
+            if(g_gained[i].heart) rb_mods_add_heart(&g->mods, t, 0, -g_gained[i].heart);
+            if(g_gained[i].need_heart) rb_mods_add_need_heart(&g->mods, t, 0, -g_gained[i].need_heart);
             for(int j=i;j<g_n-1;j++) g_gained[j]=g_gained[j+1];
             g_n--; i--;
         }

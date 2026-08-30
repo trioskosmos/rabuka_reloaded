@@ -38,7 +38,7 @@ is a *worklist*, expected red until everything is ported. Only the hand-written 
 | `src/ability/effects/move.c` | `ability/move_cards.rs` (3780 LOC) | ⚠️ partial | `under_member`/`same_area`/`empty_area` edges; `LookedAtRemaining` (`has_blade_heart`/`has_score_icon`/`has_all_blade` done this session) |
 | `src/ability/effects/look.c` | `ability/look.rs` | ✅ done | — |
 | `src/ability/effects/state.c` | `ability/effects/state.rs` + `misc.rs` | ⚠️ partial | `choose_required_hearts`; `set_heart_type placed_under` (still need-heart add) |
-| `src/ability/effects/ability.c` | `ability/effects/ability_effects.rs` | ⚠️ partial | `gain_ability` expiry faithful (score-only approx); `activate_ability` source filter |
+| `src/ability/effects/ability.c` | `ability/effects/ability_effects.rs` | ⚠️ partial | `gain_ability` now grants score/blade/heart/need_heart (was score-only); `activate_ability` source filter |
 | `src/ability/effects/misc.c` | `ability/effects/misc.rs` | ⚠️ partial | `gain_surplus_heart` verb ported this session; `h_play_baton_touch` redirect gate |
 | `src/ability/effects/draw.c` | `ability/effects/draw.rs` | ✅ done | — |
 | `src/ability/effects/score.c` | `ability/effects/score.rs` | ✅ done (faithful this session) | remaining 5 fns wired from `state.c`/`engine.c` — retire "simplified" comments |
@@ -73,5 +73,6 @@ is a *worklist*, expected red until everything is ported. Only the hand-written 
 - `util.c` + `move.c` `card_property` filters — `has_blade_heart`/`has_score_icon` now faithful via `rb_card_has_blade_heart`/`rb_card_has_score_icon`; `has_all_blade` (BAll) implemented via `rb_card_has_all_blade` (was previously a silent `false`).
 - `misc.c` `h_choice` — now emits a `SELECT_TARGET` pending choice (mirrors `choice.rs`/`engine.c` `choice` verb) instead of a silent `return 1`.
 - `misc.c` + `engine.c` + `rabuka.h` — `gain_surplus_heart` verb ported from `misc.rs:execute_gain_surplus_heart` (captures live surplus into `last_surplus_loss_count[pl]` from the latest snapshot).
+- `effects/ability.c` `rb_gain_ability` — now grants blade/heart/need_heart modifiers (not just score); `rb_invalidate_ability`/`rb_tick_gained` revert all four kinds.
 
 Hand-written suites green after every change (`rb_engine_test` / `rb_engine_replay` / `rb_engine_ported` 13/13).
