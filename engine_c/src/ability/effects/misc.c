@@ -157,10 +157,43 @@ static int h_place_energy_under_member(GameState *g, int actor, const AbilityEff
     return 1;
 }
 static int h_play_baton_touch(GameState *g, int actor, const AbilityEffect *e) {
-    (void)g; (void)actor; (void)e;
-    /* Mirror misc.rs play_baton_touch — interactive baton-redirect gate.
-       Headless auto-play has no opponent to redirect to, so this is a
-       permissive no-op (the redirected play is simply allowed). */
+    /* Mirror misc.rs::execute_play_baton_touch — baton-touch redirect gate.
+        Faithful: once a baton touch has been performed during the current
+        play action it is a no-op; otherwise (single) record the allowance as
+        a prohibition note, or (double, count>1) emit a pair-selection choice. */
+    int count = e->count >= 1 ? e->count : 1;
+    int who = actor;
+    if (e->target && (!strcmp(e->target, "opponent") || !strcmp(e->target, "p2"))) who = actor ^ 1;
+    int bt_count = (who == 0) ? g->baton_touch_count_p1 : g->baton_touch_count_p2;
+    if (bt_count > 0) return 1;            /* already done this play action */
+
+    if (count > 1) {
+        /* Double baton: choose 2 occupied stage areas (Rust filters out members
+            deployed_this_turn — that flag is not tracked in C, so all occupied
+            areas are offered). The resume path decodes the selected pair index. */
+        if (g->queue.resume_active) return 1;   /* already resolving */
+        RbPlayer *P = &g->p[who];
+        int occupied[RB_STAGE_SIZE]; int no = 0;
+        for (int i = 0; i < RB_STAGE_SIZE; i++) if (P->stage[i] != RB_EMPTY_SLOT) occupied[no++] = i;
+        if (no < 2) return 1;          /* not enough occupied positions */
+        int pairs = no * (no - 1) / 2;
+        rb_emit_choice(g, who, RB_CHOICE_SELECT_TARGET, NULL, NULL, pairs, 1, "double_baton_touch");
+        g->queue.resume_mode = 1;
+        g->queue.resume_eff = (AbilityEffect *)e;
+        g->queue.resume_actor = who;
+        g->queue.resume_host = -1;
+        return 1;
+    }
+    /* Single baton: record "baton_touch_allowed:<count>" (mirrors
+        gs.prohibition_effects.push) so downstream play is permitted. */
+    if (g->n_prohibition < 64) {
+        char *b = g->prohibition[g->n_prohibition]; int bi = 0;
+        const char *s = "baton_touch_allowed:";
+        for (const char *p = s; *p && bi < 46; ) b[bi++] = *p++;
+        if (count >= 10) b[bi++] = (char)('0' + (count / 10));
+        b[bi++] = (char)('0' + (count % 10));
+        b[bi] = 0; g->n_prohibition++;
+    }
     return 1;
 }
 static int h_re_yell(GameState *g, int actor, const AbilityEffect *e) {

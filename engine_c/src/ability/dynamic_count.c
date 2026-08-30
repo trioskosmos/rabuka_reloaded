@@ -19,16 +19,16 @@
 #include <string.h>
 #include <stdlib.h>
 
-int rb_resolve_dynamic_count(const struct GameState *g, int owner,
+int rb_resolve_dynamic_count(const struct GameState *g, int owner, int host_cid,
                               const char *reference,
-                             const char *base_reference,
-                             const char *count_type,
-                             const char *calculation,
-                             int calculation_value,
-                             int owner_on_p1,
-                             const int *moved, int n_moved,
-                             const int *selected, int n_selected,
-                             int last_draw_count)
+                              const char *base_reference,
+                              const char *count_type,
+                              const char *calculation,
+                              int calculation_value,
+                              int owner_on_p1,
+                              const int *moved, int n_moved,
+                              const int *selected, int n_selected,
+                              int last_draw_count)
 {
     const char *reference_text = reference ? reference : base_reference;
 
@@ -50,8 +50,23 @@ int rb_resolve_dynamic_count(const struct GameState *g, int owner,
         else if (g->n_recently_moved > 0) count = g->n_recently_moved;
         else count = 0;
     } else if (!strcmp(reference_text, "revealed_cards") ||
-                !strcmp(reference_text, "previous_reveal")) {
-        count = g->n_revealed; /* revealed pool tracked via g->revealed_cards[] */
+                 !strcmp(reference_text, "previous_reveal")) {
+        /* Mirror revealed_count: no separate cheer pool in the C port, so count the
+            revealed (yell) cards that currently belong to the owner's zones. */
+        const RbPlayer *P = &g->p[owner];
+        for (int i = 0; i < g->n_revealed; i++) {
+            int cid = g->revealed_cards[i];
+            int in = 0;
+            for (int k = 0; k < P->hand.n; k++) if (P->hand.cards[k] == cid) { in = 1; break; }
+            if (!in) for (int k = 0; k < P->discard.n; k++) if (P->discard.cards[k] == cid) { in = 1; break; }
+            if (!in) for (int k = 0; k < RB_STAGE_SIZE; k++) if (P->stage[k] == cid) { in = 1; break; }
+            if (!in) for (int k = 0; k < RB_STAGE_SIZE; k++) if (P->under_cards[k].n) { in = 1; break; }
+            if (!in) for (int k = 0; k < P->energy.n; k++) if (P->energy.cards[k] == cid) { in = 1; break; }
+            if (!in) for (int k = 0; k < P->deck.n; k++) if (P->deck.cards[k] == cid) { in = 1; break; }
+            if (!in) for (int k = 0; k < P->live.n; k++) if (P->live.cards[k] == cid) { in = 1; break; }
+            if (!in) for (int k = 0; k < P->success.n; k++) if (P->success.cards[k] == cid) { in = 1; break; }
+            if (in) count++;
+        }
     } else if (!strcmp(reference_text, "unit_count")) {
         const RbPlayer *P = &g->p[owner];
         for (int i = 0; i < RB_STAGE_SIZE; i++) if (P->stage[i] != RB_EMPTY_SLOT) count++;
@@ -90,8 +105,15 @@ int rb_resolve_dynamic_count(const struct GameState *g, int owner,
         int diff = threshold - P->discard.n;
         count = diff < 0 ? 0 : diff;
     } else if (!strcmp(reference_text, "energy_cards_under_this_member")) {
+        /* Mirror Rust: count only the under-cards of the MEMBER whose ability is
+            resolving (self.activating_card's stage slot), not every stage member. */
         const RbPlayer *P = &g->p[owner];
-        for (int a = 0; a < RB_STAGE_SIZE; a++) count += P->under_cards[a].n;
+        if (host_cid >= 0) {
+            for (int a = 0; a < RB_STAGE_SIZE; a++)
+                if (P->stage[a] == host_cid) { count += P->under_cards[a].n; break; }
+        } else {
+            for (int a = 0; a < RB_STAGE_SIZE; a++) count += P->under_cards[a].n;
+        }
     } else {
         if (count_type && !strcmp(count_type, "revealed_cards")) count = 0;
         else count = 0;
@@ -118,8 +140,8 @@ static int dc_extra_int(const AbilityEffect *e, const char *key) {
    otherwise pull the DynamicCount parameters the decoder stored as extra_kv
    and feed them to rb_resolve_dynamic_count. Falls back to 1 when no dynamic
    parameters are present (preserves prior default). */
-int rb_effect_count(const struct GameState *g, int actor, const AbilityEffect *e,
-                    int last_draw_count) {
+int rb_effect_count(const struct GameState *g, int actor, int host_cid, const AbilityEffect *e,
+                     int last_draw_count) {
     if (!e) return 0;
     if (e->count >= 0) return e->count;
     const char *reference = dc_extra(e, "reference");
@@ -132,7 +154,7 @@ int rb_effect_count(const struct GameState *g, int actor, const AbilityEffect *e
     int owner_on_p1 = (on_p1 && !strcmp(on_p1, "true")) ? 1 : 0;
     int moved = dc_extra_int(e, "moved");
     int selected = dc_extra_int(e, "selected");
-    return rb_resolve_dynamic_count(g, actor, reference, base_reference, count_type, calculation,
+    return rb_resolve_dynamic_count(g, actor, host_cid, reference, base_reference, count_type, calculation,
                                     calc_value, owner_on_p1,
                                     &moved, moved > 0 ? 1 : 0,
                                     &selected, selected > 0 ? 1 : 0,

@@ -248,7 +248,7 @@ static int target_player(AbilityEffect *e, int actor) {
 
 static void handle_action(GameState *g, int actor, AbilityEffect *e, int host_cid) {
     const char *act = e->action;
-    int cnt = rb_effect_count(g, actor, e, 0);
+    int cnt = rb_effect_count(g, actor, host_cid, e, 0);
     int who = target_player(e, actor);
     RbPlayer *W = &g->p[who];
     RbPlayer *O = &g->p[actor ^ 1];
@@ -323,7 +323,11 @@ static void handle_action(GameState *g, int actor, AbilityEffect *e, int host_ci
                     }
                 }
             }
-            if (nr == 0 && host_cid >= 0) recips[nr++] = host_cid;
+            /* Filtered grants (group/card_type) must NOT fall back to the host
+                when no member matches — Rust grants to the matching set only, so
+                a "boost other μ's members" ability yields 0 when none are present.
+                Only the unfiltered self-target case falls back to the host. */
+            if (nr == 0 && host_cid >= 0 && !gn) recips[nr++] = host_cid;
             for (int r = 0; r < nr; r++) {
                 int cid = recips[r];
                 if (!strcmp(res, "blade")) {
@@ -440,6 +444,10 @@ static void handle_action(GameState *g, int actor, AbilityEffect *e, int host_ci
                !strcmp(act, "set_cost_to_use") || !strcmp(act,"modify_yell_count") ||
                !strcmp(act,"modify_yell_source")) {
         rb_effect_modify_cost(g, actor, e);
+    } else if (!strcmp(act, "energy_placement")) {
+        rb_effect_energy_placement(g, actor, e);
+    } else if (!strcmp(act, "energy_state_change")) {
+        rb_effect_energy_state_change(g, actor, e);
     } else if (!strcmp(act, "set_card_identity") || !strcmp(act, "set_blade_type") ||
                 !strcmp(act, "set_blade_count") || !strcmp(act, "set_heart_type") ||
                 !strcmp(act, "choose_required_hearts") || !strcmp(act, "all_blade_timing")) {

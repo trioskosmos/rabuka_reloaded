@@ -260,11 +260,10 @@ static int eval_position(const struct GameState *g, int actor, const Condition *
 
 /* ── both_condition (variant 2 alias) ──
    Mirror engine/src/ability/condition/card.rs:evaluate_both_condition.
-   `values` is a list of card scores; route to success/live cards and
-   require that EVERY listed score is present. Not yet dispatched from
-   eval_comparison_inner because the C bytecode merges both_condition into
-   the same variant 2 as comparison_condition (no wire-type discriminator);
-   kept for future routing once the envelope carries the condition type. */
+    `values` is a list of card scores; route to success/live cards and
+    require that EVERY listed score is present. Dispatched from
+    eval_comparison_inner when no comparison_type=="score" is present
+    (variant 2 shared with comparison_condition). */
 static int __attribute__((unused)) eval_both_condition(const struct GameState *g, int actor, const Condition *c) {
     const CondValue *vv = find_val(c, "values");
     if (!vv || vv->tag != RB_TAG_ARRAY || vv->arr_n == 0) return 0;
@@ -406,13 +405,13 @@ static int eval_group(const struct GameState *g, int actor, const Condition *c) 
                 fprintf(stderr,"[grp] card=%s gname=%s uname=%s target=%s\n",
                         card.name?card.name:"?", gname, uname?uname:"-", gv->arr[gi].s);
         }
-        for(uint32_t gi=0;gi<gv->arr_n;gi++){
-            const char *t = (gv->arr[gi].tag==RB_TAG_STR)?gv->arr[gi].s:NULL;
-            if(!t) continue;
-            if(gname && (!strcmp(gname,t)||strstr(gname,t)||strstr(t,gname))) { rb_free_card(&card); return 1; }
-            if(uname && (!strcmp(uname,t)||strstr(uname,t)||strstr(t,uname))) { rb_free_card(&card); return 1; }
-        }
-        rb_free_card(&card);
+         for(uint32_t gi=0;gi<gv->arr_n;gi++){
+             const char *t = (gv->arr[gi].tag==RB_TAG_STR)?gv->arr[gi].s:NULL;
+             if(!t) continue;
+             /* Mirror card_matches_any_group: group/unit/name/series/identity. */
+             if(rb_card_matches_group_str(ids[i], t)) { rb_free_card(&card); return 1; }
+         }
+         rb_free_card(&card);
     }
     return 0;
 }
@@ -430,12 +429,10 @@ static int eval_appearance(const struct GameState *g, int actor, const Condition
     if(n==0) return 0;
     for(int i=0;i<n;i++){
         Card card; if(!rb_decode_card_by_index((uint32_t)ids[i],&card)) continue;
-        const char *gname = rb_card_string(card.group_idx);
-        const char *uname = rb_card_string(card.unit_idx);
         int matched=0;
         for(uint32_t gi=0;gi<chars->arr_n;gi++) if(chars->arr[gi].tag==RB_TAG_STR && chars->arr[gi].s){
-            if(gname && (!strcmp(gname,chars->arr[gi].s)||strstr(gname,chars->arr[gi].s))) matched=1;
-            if(uname && (!strcmp(uname,chars->arr[gi].s)||strstr(uname,chars->arr[gi].s))) matched=1;
+            /* characters are group/unit/name filters; reuse shared matcher. */
+            if(rb_card_matches_group_str(ids[i], chars->arr[gi].s)) matched=1;
         }
         rb_free_card(&card);
         if(matched) return 1;

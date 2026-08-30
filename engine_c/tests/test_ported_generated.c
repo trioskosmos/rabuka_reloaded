@@ -2726,7 +2726,7 @@ static void gen_bp7024_lone_aqours_member_hearts_become_heart04(void){
     int other = test_id(&tg, "PL!-sd1-010-SD");
     tg.state.p[0].stage[1] = other;
     // 
-    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
+    rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     while (test_has_pending_choice(&tg)) rb_resume_with_choice(&tg.state, 0);
     rb_resume_with_choice(&tg.state, 0);
     // TODO: }
@@ -2747,7 +2747,7 @@ static void gen_bp7024_no_aqours_member_no_transform(void){
     int other = test_id(&tg, "PL!-sd1-010-SD");
     tg.state.p[0].stage[0] = other;
     // 
-    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
+    rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     while (test_has_pending_choice(&tg)) rb_resume_with_choice(&tg.state, 0);
     rb_resume_with_choice(&tg.state, 0);
     // TODO: }
@@ -10088,7 +10088,7 @@ static void gen_bp7025_staged_chisato_gains_blade(void){
     int other = test_id(&tg, "PL!-sd1-010-SD");
     tg.state.p[0].stage[0] = other;
     // 
-    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
+    rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     // 
     CHECK_EQ(rb_mods_get_blade(&tg.state.mods, chisato_card), 1, "bp7025_staged_chisato_gains_blade");
     CHECK_EQ(rb_mods_get_blade(&tg.state.mods, other), 0, "bp7025_staged_chisato_gains_blade");
@@ -10276,7 +10276,7 @@ static void gen_rin_is_null_live_counts_as_no_ability(void){
     // TODO: fill_decks(&mut game, filler);
     int null_live = test_id(&tg, "PL!HS-bp1-019-L");
     test_add_to_live(&tg, null_live);
-    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
+    rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     int blade = rb_mods_get_blade(&tg.state.mods, mate);
     // TODO assert_eq (unresolved): assert_eq!(blade, 2, "is_null live should count as no LS/LSS -> should grant blade, got {}", blade);
     // 
@@ -10296,7 +10296,7 @@ static void gen_rin_both_triggers_live_no_blade(void){
     // TODO: fill_decks(&mut game, filler);
     int both = test_id(&tg, "PL!N-sd2-007-P");
     test_add_to_live(&tg, both);
-    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
+    rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     int blade = rb_mods_get_blade(&tg.state.mods, mate);
     // TODO assert_eq (unresolved): assert_eq!(blade, 0, "live with both LS/LSS should not count, got {}", blade);
     // 
@@ -10317,7 +10317,7 @@ static void gen_rin_only_ls_live_no_blade(void){
     // // Find a live with only LS (e.g., PL!N-bp1-027-L has LS)
     int only_ls = test_id(&tg, "PL!N-bp1-027-L");
     test_add_to_live(&tg, only_ls);
-    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
+    rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     int blade = rb_mods_get_blade(&tg.state.mods, mate);
     CHECK_EQ(blade, 0, "rin_only_ls_live_no_blade");
     // 
@@ -21966,7 +21966,7 @@ static void gen_pb1034_choose_first_color_heart03(void){
     TestGame tg; test_game_new(&tg);
     int me = 0;
     // 
-    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
+    rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, 0);
     // 
@@ -21983,7 +21983,7 @@ static void gen_pb1034_choose_last_color_heart05(void){
     TestGame tg; test_game_new(&tg);
     int me = 0;
     // 
-    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
+    rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     rb_resume_with_choice(&tg.state, 2);
     // 
     // TODO assert_eq (unresolved): assert_eq!( multiplier(&game, me), Some(HeartColor::Heart05), "chose heart05 -> original hearts become heart05" );
@@ -21997,7 +21997,7 @@ static void gen_pb1034_choose_mid_color_heart04(void){
     TestGame tg; test_game_new(&tg);
     int me = 0;
     // 
-    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
+    rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     rb_resume_with_choice(&tg.state, 1);
     // 
     // TODO assert_eq (unresolved): assert_eq!(multiplier(&game, me), Some(HeartColor::Heart04));
@@ -22011,7 +22011,7 @@ static void gen_pb1036_twin_chooses_heart06(void){
     TestGame tg; test_game_new(&tg);
     int me = 0;
     // 
-    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
+    rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, 2);
     // 
@@ -22035,7 +22035,7 @@ static void gen_bp4011_wait_self_center_mus_member_two_blades(void){
     int left_mu = test_id(&tg, "PL!-sd1-007-SD");
     tg.state.p[0].stage[2] = left_mu;
     // 
-    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
+    rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     // 
     // // Optional self-wait cost gate is always presented; answer "Yes: wait self".
     test_has_pending_choice(&tg);
@@ -22061,7 +22061,7 @@ static void gen_bp4017_twin_center_mus_member_one_blade(void){
     int center = test_id(&tg, "PL!-sd1-001-SD");
     tg.state.p[0].stage[1] = center;
     // 
-    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
+    rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     test_has_pending_choice(&tg);
     // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectTarget"), "expected SelectTarget pay_optional_cost gate" );
     rb_resume_with_choice(&tg.state, 1);
@@ -22176,7 +22176,7 @@ static void gen_rin_multiple_plain_lives_still_grants(void){
     int plain2 = test_id(&tg, "PL!-sd1-020-SD");
     test_add_to_live(&tg, plain1);
     test_add_to_live(&tg, plain2);
-    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
+    rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     CHECK_EQ(rb_mods_get_blade(&tg.state.mods, mate), 2, "rin_multiple_plain_lives_still_grants");
     // 
 }
@@ -22197,7 +22197,7 @@ static void gen_rin_mixed_lives_plain_present_grants(void){
     int with_ability = test_id(&tg, "PL!N-sd2-007-P");
     test_add_to_live(&tg, plain);
     test_add_to_live(&tg, with_ability);
-    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
+    rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     CHECK_EQ(rb_mods_get_blade(&tg.state.mods, mate), 2, "rin_mixed_lives_plain_present_grants");
     // 
 }
@@ -22217,7 +22217,7 @@ static void gen_rin_exclude_self_with_only_rin_and_mate(void){
     // TODO: fill_decks(&mut game, filler);
     int plain = test_id(&tg, "PL!-sd1-020-SD");
     test_add_to_live(&tg, plain);
-    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
+    rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     CHECK_EQ(rb_mods_get_blade(&tg.state.mods, mate), 2, "rin_exclude_self_with_only_rin_and_mate");
     CHECK_EQ(rb_mods_get_blade(&tg.state.mods, rin), 0, "rin_exclude_self_with_only_rin_and_mate");
     // 
@@ -22238,7 +22238,7 @@ static void gen_rin_choice_among_two_mates(void){
     // TODO: fill_decks(&mut game, filler);
     int plain = test_id(&tg, "PL!-sd1-020-SD");
     test_add_to_live(&tg, plain);
-    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
+    rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     // // Should have a choice to pick which other member gets blade
     // // If the engine auto-picks, at least one of the two mates gets blade
     test_drain_auto_choices(&tg);
@@ -34270,7 +34270,7 @@ static void gen_mirage_two_baton_arrivals_reduce_heart05(void){
     // TODO: }
     // 
     // 
-    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
+    rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     // 
     // TODO assert_eq (unresolved): assert_eq!( game.state .mods .get_need_heart_modifier(live, HeartColor::Heart05), -1, "two baton-touch 蓮ノ空 arrivals -> heart05 requirement -1" );
     // TODO assert_eq (unresolved): assert_eq!( game.state .mods .get_need_heart_modifier(live, HeartColor::Heart01), 0, "Mirage Voyage touches heart05 only" );
@@ -34304,7 +34304,7 @@ static void gen_mirage_one_baton_arrival_no_reduction(void){
     // TODO: }
     // 
     // 
-    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
+    rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     // 
     // TODO assert_eq (unresolved): assert_eq!( game.state .mods .get_need_heart_modifier(live, HeartColor::Heart05), 0, "only one baton arrival -> gate needs 2" );
     // 
@@ -34348,7 +34348,7 @@ static void gen_mirage_batons_of_wrong_group_no_reduction(void){
     // TODO: }
     // 
     // 
-    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
+    rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     // 
     // TODO assert_eq (unresolved): assert_eq!( game.state .mods .get_need_heart_modifier(live, HeartColor::Heart05), 0, "baton arrivals without 蓮ノ空 membership don't qualify" );
     // 
@@ -34367,7 +34367,7 @@ static void gen_mirage_seated_without_baton_no_reduction(void){
     tg.state.p[0].stage[0] = a;
     tg.state.p[0].stage[1] = b;
     // 
-    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
+    rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     // 
     // TODO assert_eq (unresolved): assert_eq!( game.state .mods .get_need_heart_modifier(live, HeartColor::Heart05), 0, "蓮ノ空 members without baton-touch arrival don't qualify" );
     // 
@@ -34410,7 +34410,7 @@ static void gen_kokon_two_baton_arrivals_reduce_heart01(void){
     // TODO: }
     // 
     // 
-    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
+    rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     // 
     // TODO assert_eq (unresolved): assert_eq!( game.state .mods .get_need_heart_modifier(live, HeartColor::Heart01), -1, "ココン東西 reduces heart01 requirement" );
     // TODO assert_eq (unresolved): assert_eq!( game.state .mods .get_need_heart_modifier(live, HeartColor::Heart05), 0, "ココン東西 touches heart01 only" );
@@ -34436,7 +34436,7 @@ static void gen_omoi_accept_member_to_deck_top_grants_blade(void){
     int wr_member = test_id(&tg, "PL!N-bp3-006-R");
     test_add_to_discard(&tg, wr_member);
     // 
-    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
+    rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, 0);
     // 
@@ -34460,7 +34460,7 @@ static void gen_omoi_decline_no_blade_no_move(void){
     int wr_member = test_id(&tg, "PL!N-bp3-006-R");
     test_add_to_discard(&tg, wr_member);
     // 
-    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
+    rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     test_has_pending_choice(&tg);
     // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard (discard-zone recovery, allow_skip)" );
     rb_resume_with_choice(&tg.state, -1);
@@ -34489,7 +34489,7 @@ static void gen_omoi_empty_waitroom_no_prompt(void){
     tg.state.p[0].stage[1] = mate;
     // // Waitroom EMPTY.
     // 
-    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
+    rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     // 
     test_has_pending_choice(&tg);
     CHECK_EQ(rb_mods_get_blade(&tg.state.mods, mate), 0, "omoi_empty_waitroom_no_prompt");
@@ -34512,7 +34512,7 @@ static void gen_ruby_reveal_aqours_place_and_gain_blade(void){
     test_add_to_hand(&tg, aqours_card);
     test_add_to_hand(&tg, non_aq);
     // 
-    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
+    rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     // 
     // // First prompt: optional reveal cost gate -> accept.
     test_has_pending_choice(&tg);
@@ -34546,7 +34546,7 @@ static void gen_ruby_no_aqours_in_hand_blade_still_optional(void){
     test_add_to_hand(&tg, only_mu);
     // 
     int deck_before = tg.state.p[0].deck.n;
-    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
+    rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     // 
     test_has_pending_choice(&tg);
     // // Nothing eligible to reveal -> gate skipped entirely.
@@ -34781,7 +34781,7 @@ static void gen_bp5026_total_eleven_scores_plus_one(void){
     tg.state.p[0].stage[1] = big2;
     tg.state.p[0].stage[2] = small;
     // 
-    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
+    rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     // 
     CHECK_EQ(rb_mods_get_score(&tg.state.mods, live), 1, "bp5026_total_eleven_scores_plus_one");
     // 
@@ -34802,7 +34802,7 @@ static void gen_bp5026_total_below_threshold_no_bonus(void){
     tg.state.p[0].stage[1] = l2;
     tg.state.p[0].stage[2] = outsider;
     // 
-    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
+    rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     // 
     CHECK_EQ(rb_mods_get_score(&tg.state.mods, live), 0, "bp5026_total_below_threshold_no_bonus");
     // 
@@ -34822,7 +34822,7 @@ static void gen_cl1010_expensive_member_two_blades(void){
     int big = test_id(&tg, "PL!HS-bp5-004-R");
     tg.state.p[0].stage[1] = big;
     // 
-    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
+    rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     // 
     CHECK_EQ(rb_mods_get_blade(&tg.state.mods, big), 2, "cl1010_expensive_member_two_blades");
     // 
@@ -34842,7 +34842,7 @@ static void gen_cl1010_cheap_member_no_blades(void){
     int low = test_id(&tg, "PL!HS-cl1-002-CL");
     tg.state.p[0].stage[1] = low;
     // 
-    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
+    rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     // 
     CHECK_EQ(rb_mods_get_blade(&tg.state.mods, low), 0, "cl1010_cheap_member_no_blades");
     // 
@@ -34896,7 +34896,7 @@ static void gen_bp6030_draw_one_discard_one(void){
     // // Hand starts EMPTY: the drawn card is then the only discard candidate,
     // // making the end state fully deterministic.
     // 
-    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
+    rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     int guard = 0;
     test_has_pending_choice(&tg);
     // TODO: guard += 1;
@@ -45799,7 +45799,7 @@ static void gen_mari_heart05_total_exactly_four_grants(void){
     int l = test_id(&tg, "PL!HS-PR-011-PR");
     test_add_to_live(&tg, l);
     // 
-    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
+    rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     // 
     CHECK_EQ(rb_mods_get_heart(&tg.state.mods, mari, 5), 1, "mari_heart05_total_exactly_four_grants");
     // 
@@ -45814,7 +45814,7 @@ static void gen_mari_heart05_total_two_no_grant(void){
     int l = test_id(&tg, "PL!S-PR-023-PR");
     test_add_to_live(&tg, l);
     // 
-    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
+    rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     // 
     CHECK_EQ(rb_mods_get_heart(&tg.state.mods, mari, 5), 0, "mari_heart05_total_two_no_grant");
     // 
@@ -45827,7 +45827,7 @@ static void gen_mari_empty_live_zone_no_grant(void){
     TestGame tg; test_game_new(&tg);
     int mari = 0;
     // 
-    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
+    rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     // 
     CHECK_EQ(rb_mods_get_heart(&tg.state.mods, mari, 5), 0, "mari_empty_live_zone_no_grant");
     // 
@@ -45845,7 +45845,7 @@ static void gen_rin_live_without_triggers_grants_other_member_two_blades(void){
     int plain_live = test_id(&tg, "PL!-sd1-020-SD");
     test_add_to_live(&tg, plain_live);
     // 
-    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
+    rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     // 
     CHECK_EQ(rb_mods_get_blade(&tg.state.mods, mate), 2, "rin_live_without_triggers_grants_other_member_two_blades");
     CHECK_EQ(rb_mods_get_blade(&tg.state.mods, rin), 0, "rin_live_without_triggers_grants_other_member_two_blades");
@@ -45864,7 +45864,7 @@ static void gen_rin_all_lives_have_triggers_no_blades(void){
     int triggered = test_id(&tg, "PL!N-sd2-007-P");
     test_add_to_live(&tg, triggered);
     // 
-    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
+    rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     // 
     CHECK_EQ(rb_mods_get_blade(&tg.state.mods, mate), 0, "rin_all_lives_have_triggers_no_blades");
     // 
@@ -45879,7 +45879,7 @@ static void gen_rin_empty_live_zone_no_blades(void){
     int mate = 0;
     // TODO destructuring: let (rin, mate) = rin_setup(&mut game);
     // 
-    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
+    rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     // 
     CHECK_EQ(rb_mods_get_blade(&tg.state.mods, mate), 0, "rin_empty_live_zone_no_blades");
     // 
@@ -45901,7 +45901,7 @@ static void gen_bp5015_all_six_colors_present_two_blades(void){
     tg.state.p[0].stage[1] = honoka;
     tg.state.p[0].stage[2] = kanan;
     // 
-    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
+    rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     // 
     CHECK_EQ(rb_mods_get_blade(&tg.state.mods, shizuku), 2, "bp5015_all_six_colors_present_two_blades");
     // 
@@ -45921,7 +45921,7 @@ static void gen_bp5015_missing_colors_no_blades(void){
     int honoka = test_id(&tg, "PL!-sd1-001-SD");
     tg.state.p[0].stage[1] = honoka;
     // 
-    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
+    rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     // 
     CHECK_EQ(rb_mods_get_blade(&tg.state.mods, shizuku), 0, "bp5015_missing_colors_no_blades");
     // 
@@ -45944,7 +45944,7 @@ static void gen_sumire_three_catchu_draws(void){
     // 
     int deck_before = tg.state.p[0].deck.n;
     test_give_energy(&tg, 5);
-    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
+    rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, 1);
     // 
@@ -45968,7 +45968,7 @@ static void gen_sumire_only_two_catchu_no_draw(void){
     tg.state.p[0].stage[2] = mu_member;
     // 
     int deck_before = tg.state.p[0].deck.n;
-    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
+    rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     // 
     // TODO assert_eq (unresolved): assert_eq!( deck_before, game.state.player1.main_deck.cards.len(), "only 2 CatChu! members -> no draw" );
     // 
@@ -46043,7 +46043,7 @@ static void gen_pr0029_pay_energy_grants_heart01(void){
     // TODO: game.state.player1.energy_zone.active_count()
     // TODO: };
     // 
-    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
+    rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, 1);
     // 
@@ -46060,7 +46060,7 @@ static void gen_pr0029_decline_no_heart(void){
     int me = 0;
     test_give_energy(&tg, 3);
     // 
-    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
+    rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     rb_resume_with_choice(&tg.state, -1);
     // 
     CHECK_EQ(rb_mods_get_heart(&tg.state.mods, me, 1), 0, "pr0029_decline_no_heart");
@@ -46082,7 +46082,7 @@ static void gen_bp4024_mus_member_gains_blade(void){
     int mus_member = test_id(&tg, "PL!-sd1-010-SD");
     tg.state.p[0].stage[0] = mus_member;
     // 
-    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
+    rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     // 
     CHECK_EQ(rb_mods_get_blade(&tg.state.mods, mus_member), 1, "bp4024_mus_member_gains_blade");
     // 
@@ -46102,7 +46102,7 @@ static void gen_bp4024_no_mus_member_on_stage_no_blades(void){
     int aq = test_id(&tg, "PL!S-sd1-001-SD");
     tg.state.p[0].stage[0] = aq;
     // 
-    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
+    rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     // 
     CHECK_EQ(rb_mods_get_blade(&tg.state.mods, aq), 0, "bp4024_no_mus_member_on_stage_no_blades");
     // 
@@ -46128,7 +46128,7 @@ static void gen_bp5013_mill_three_all_members_two_blades(void){
     // TODO: }
     int deck_before = tg.state.p[0].deck.n;
     // 
-    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
+    rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     // 
     CHECK_EQ(rb_mods_get_blade(&tg.state.mods, me), 2, "bp5013_mill_three_all_members_two_blades");
     // TODO assert_eq (unresolved): assert_eq!( game.state.player1.main_deck.cards.len(), deck_before - 3, "sanity: deck shrank only by the mill" );
@@ -46154,7 +46154,7 @@ static void gen_bp5013_live_card_among_milled_no_blades(void){
     // TODO: game.state.player1.main_deck.cards.insert(0, m);
     // TODO: }
     // 
-    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
+    rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     // 
     CHECK_EQ(rb_mods_get_blade(&tg.state.mods, me), 0, "bp5013_live_card_among_milled_no_blades");
     // 
@@ -46247,7 +46247,7 @@ static void gen_pb2047_non_liella_on_stage_no_enemy_wait(void){
     int enemy = test_id(&tg, "PL!SP-PR-010-PR");
     // TODO: game.state.player2.stage.stage[0] = enemy;
     // 
-    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
+    rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     test_has_pending_choice(&tg);
     // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard for the discard cost" );
     rb_resume_with_choice(&tg.state, 0);
@@ -46286,7 +46286,7 @@ static void gen_bp5010_mills_three_retrieves_arise_member(void){
     test_add_to_hand(&tg, fodder);
     // 
     int deck_before = tg.state.p[0].deck.n;
-    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
+    rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     // // Accept the optional hand-discard cost by choosing which card to
     // // discard (allow_skip=true SelectCard), then drain.
     rb_resume_with_choice(&tg.state, 0);
@@ -46316,7 +46316,7 @@ static void gen_bp5010_mill_happens_even_without_arise(void){
     test_add_to_hand(&tg, fodder);
     // 
     int deck_before = tg.state.p[0].deck.n;
-    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
+    rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     rb_resume_with_choice(&tg.state, 0);
     int guard = 0;
     test_has_pending_choice(&tg);
@@ -53354,7 +53354,7 @@ static void gen_dia_heart04_total_exactly_four_grants_heart04(void){
     l = test_id(&tg, "PL!S-bp2-020-L");
     test_add_to_live(&tg, l);
     // 
-    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
+    rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     // 
     CHECK_EQ(rb_mods_get_heart(&tg.state.mods, dia, 4), 1, "dia_heart04_total_exactly_four_grants_heart04");
     // 
@@ -53373,7 +53373,7 @@ static void gen_dia_heart04_total_three_no_grant(void){
     test_add_to_live(&tg, l1);
     test_add_to_live(&tg, l2);
     // 
-    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
+    rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     // 
     CHECK_EQ(rb_mods_get_heart(&tg.state.mods, dia, 4), 0, "dia_heart04_total_three_no_grant");
     // 
@@ -53386,7 +53386,7 @@ static void gen_dia_empty_live_zone_no_grant(void){
     TestGame tg; test_game_new(&tg);
     int dia = 0;
     // 
-    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
+    rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     // 
     CHECK_EQ(rb_mods_get_heart(&tg.state.mods, dia, 4), 0, "dia_empty_live_zone_no_grant");
     // 
@@ -53409,7 +53409,7 @@ static void gen_wwd_accept_cost_energy_ahead_scores_plus_one(void){
     // 
     int deck_before = 0;
     int zone_before = tg.state.p[0].energy.n;
-    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
+    rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, 1);
     // // Remaining prompts: which energy card leaves the zone, then the
@@ -53441,7 +53441,7 @@ static void gen_wwd_decline_no_score_change(void){
     test_add_to_discard(&tg, e);
     // TODO: game.state.player2.energy_zone.add_active(1);
     // 
-    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
+    rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, -1);
     // 
@@ -53478,7 +53478,7 @@ static void gen_wwd_energy_not_ahead_after_cost_no_bonus(void){
     // TODO: game.state.player2.energy_zone.add_active(1);
     // TODO: } // opponent ahead either way
     // 
-    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
+    rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     test_has_pending_choice(&tg);
     // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectTarget"), "expected SelectTarget (pay_optional_cost:skip)" );
     rb_resume_with_choice(&tg.state, 1);
@@ -64396,7 +64396,7 @@ static void gen_maki_accept_cost_three_success_cards_six_blades(void){
     int hand_fodder = test_id(&tg, "PL!-sd1-010-SD");
     test_add_to_hand(&tg, hand_fodder);
     // 
-    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
+    rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, 0);
     // 
@@ -64422,7 +64422,7 @@ static void gen_maki_decline_no_blades(void){
     s = test_id(&tg, "PL!-sd1-019-SD");
     test_add_to_live(&tg, s);
     // 
-    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
+    rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     // // No hand fodder exists -> the optional discard cost is unpayable and
     // // auto-skips (Q92): no prompt at all.
     test_has_pending_choice(&tg);
@@ -64444,7 +64444,7 @@ static void gen_maki_empty_success_zone_zero_blades(void){
     int hand_fodder = test_id(&tg, "PL!-sd1-010-SD");
     test_add_to_hand(&tg, hand_fodder);
     // 
-    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
+    rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     test_has_pending_choice(&tg);
     // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard skippable discard-cost prompt" );
     rb_resume_with_choice(&tg.state, 0);
@@ -64473,7 +64473,7 @@ static void gen_honoka_accept_other_members_gain_one_blade_each(void){
     int hand_fodder = test_id(&tg, "PL!-sd1-010-SD");
     test_add_to_hand(&tg, hand_fodder);
     // 
-    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
+    rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, 0);
     // 
@@ -64496,7 +64496,7 @@ static void gen_honoka_decline_no_blades_anywhere(void){
     int mate_a = test_id(&tg, "PL!S-sd1-001-SD");
     tg.state.p[0].stage[0] = mate_a;
     // 
-    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
+    rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     // // No hand fodder exists -> the optional discard cost auto-skips (Q92).
     test_has_pending_choice(&tg);
     // 
@@ -64519,7 +64519,7 @@ static void gen_honoka_lone_member_nothing_to_boost(void){
     int hand_fodder = test_id(&tg, "PL!-sd1-010-SD");
     test_add_to_hand(&tg, hand_fodder);
     // 
-    // TODO: rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
+    rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     // // The optional cost is still offered; accepting discards the fodder but
     // // yields nothing (no other members exist).
     rb_resume_with_choice(&tg.state, 0);

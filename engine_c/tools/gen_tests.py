@@ -527,6 +527,14 @@ def transpile_body(body: str, consts: dict, func_name: str) -> str:
         if not stripped or stripped.startswith("//"):
             out.append(f"    // {stripped}")
             continue
+        # Passthrough for engine calls already substituted into the body by the
+        # pre-pass (fire_live_start -> rb_trigger_live_start + rb_drain_ability_queue).
+        # These only ever appear as the result of a substitution, so emit them
+        # verbatim instead of degrading to a `// TODO:` comment at the fallback.
+        if 'rb_trigger_live_start(' in stripped or 'rb_drain_ability_queue(' in stripped \
+           or 'rb_trigger_live_start(' in line:
+            out.append(f"    {stripped}")
+            continue
         # for/while/loop: declare the loop variable so the (degraded) body still
         # compiles and runs once; the loop control itself degrades to a TODO.
         fm = re.match(r'\s*(?:for|while)\s+(?:mut\s+)?(?:\(\s*([^)]*?)\s*\)|&?(\w+|_))\s+in\b', stripped)

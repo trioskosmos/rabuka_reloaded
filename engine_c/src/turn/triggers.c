@@ -427,4 +427,5 @@ void rb_recalc_constants(GameState *g) {
             }
         }
     }
+    rb_refresh_yell_sources(g);
 }

@@ -124,3 +124,37 @@ int rb_is_action_prohibited(const GameState *g, const char *action){
     }
     return 0;
 }
+
+/* Mirror modifiers.rs::refresh_yell_sources — recompute each player's
+    yell_from_bottom flag from the constant (常時) ModifyYellSource("deck_bottom")
+    abilities on their live-card and success-live-card zones. */
+void rb_refresh_yell_sources(GameState *g){
+    for (int pl = 0; pl < 2; pl++) {
+        g->p[pl].yell_from_bottom = 0;
+        int cids[RB_MAX_LIVE_CARDS + RB_MAX_ZONE];
+        int nc = 0;
+        for (int i = 0; i < g->p[pl].live.n; i++) cids[nc++] = g->p[pl].live.cards[i];
+        for (int i = 0; i < g->p[pl].success.n; i++) cids[nc++] = g->p[pl].success.cards[i];
+        for (int k = 0; k < nc; k++) {
+            int cid = cids[k];
+            int n = rb_card_num_abilities((uint32_t)cid);
+            int found = 0;
+            for (int ai = 0; ai < n && !found; ai++) {
+                Ability ab; if (!rb_decode_card_ability((uint32_t)cid, ai, &ab)) continue;
+                if (ab.triggers && rb_trigger_is(ab.triggers, "常時") && ab.effect) {
+                    AbilityEffect *e = ab.effect;
+                    if (!strcmp(e->action, "modify_yell_source")) {
+                        const char *src = NULL;
+                        for (int i = 0; i < e->n_extra; i++)
+                            if (e->extra_k[i] && (!strcmp(e->extra_k[i], "source") ||
+                                                  !strcmp(e->extra_k[i], "yell_source"))) { src = e->extra_v[i]; break; }
+                        if (!src) src = e->source;
+                        if (src && !strcmp(src, "deck_bottom")) found = 1;
+                    }
+                }
+                rb_free_ability(&ab);
+            }
+            if (found) { g->p[pl].yell_from_bottom = 1; break; }
+        }
+    }
+}

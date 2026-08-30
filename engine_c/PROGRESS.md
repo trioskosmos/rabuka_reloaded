@@ -37,9 +37,9 @@ is a *worklist*, expected red until everything is ported. Only the hand-written 
 | `src/ability/resolver.c` | `ability/resolver.rs` | ⚠️ partial | `get_trigger_ability_infos`/`resolve_ability`/`pending_choice` → real decode+queue |
 | `src/ability/effects/move.c` | `ability/move_cards.rs` (3780 LOC) | ⚠️ partial | `under_member`/`same_area`/`empty_area` edges; `LookedAtRemaining` (`has_blade_heart`/`has_score_icon`/`has_all_blade` done this session) |
 | `src/ability/effects/look.c` | `ability/look.rs` | ✅ done | — |
-| `src/ability/effects/state.c` | `ability/effects/state.rs` + `misc.rs` | ⚠️ partial | `choose_required_hearts`; `set_heart_type placed_under` (still need-heart add) |
+| `src/ability/effects/state.c` | `ability/effects/state.rs` + `misc.rs` | ✅ done | `choose_required_hearts` + `set_heart_type placed_under` are dispatched in `engine.c:447` (verified faithful) |
 | `src/ability/effects/ability.c` | `ability/effects/ability_effects.rs` | ⚠️ partial | `gain_ability` now grants score/blade/heart/need_heart (was score-only); `activate_ability` source filter |
-| `src/ability/effects/misc.c` | `ability/effects/misc.rs` | ⚠️ partial | `gain_surplus_heart` verb ported this session; `h_play_baton_touch` redirect gate |
+| `src/ability/effects/misc.c` | `ability/effects/misc.rs` | ✅ done | `h_play_baton_touch` now faithful (baton_touch_count gate + double-baton choice + `baton_touch_allowed` prohibition note); `gain_surplus_heart` verb ported |
 | `src/ability/effects/draw.c` | `ability/effects/draw.rs` | ✅ done | — |
 | `src/ability/effects/score.c` | `ability/effects/score.rs` | ✅ done (faithful this session) | remaining 5 fns wired from `state.c`/`engine.c` — retire "simplified" comments |
 | `src/core/card.c` | `core/card.rs` | ✅ done | `blade_heart`/`need_heart` split when Live needs it |
@@ -48,22 +48,36 @@ is a *worklist*, expected red until everything is ported. Only the hand-written 
 | `src/core/modifiers.c` | `core/game_modifiers.rs` + `modifiers.rs` | ✅ done | `recalculate_constants` per-card `heart_copy`/`multiplier` |
 | `src/core/stats_pipeline.c` | `core/stats_pipeline.rs` | ✅ done | exact `Allocation` plan (greedy is approximate) |
 | `src/core/game_state_abilities.c` | `core/game_state/abilities.rs` | ⚠️ partial | `rb_collect_live_modifiers` — phantom mapping (no such fn in this Rust rev); reconcile/remove |
-| `src/core/tracking.c` | `core/game_state/tracking.rs` | ✅ done (yell_from_bottom ported this session) | — |
+| `src/core/tracking.c` | `core/game_state/tracking.rs` | ✅ done | `rb_refresh_yell_sources` ported from `modifiers.rs:972` (per-player `yell_from_bottom` from constant `modify_yell_source("deck_bottom")` on live/success zones); called from `rb_recalc_constants` |
 | `src/core/zones.c` | `core/zones.rs` + `player.rs` | ⚠️ partial | strict `stage[3]` + typed zones + cap enforcement |
 | `src/turn/live.c` | `turn/live.rs` (2846 LOC) | ⚠️ partial | `BAll` doubling; `finalize_snapshot_fields`; `prohibition_effects` tie |
 | `src/turn/phase.c` | `turn/phases.rs` (1685 LOC) | ⚠️ partial | mulligan choice; baton `last_vacated_stage_area`; delayed-modifier ticking |
 | `src/turn/triggers.c` | `turn/triggers.rs` | ⚠️ partial | victory `prohibition_effects` tie-break; `check_expired_effects` full |
-| `src/engine.c` | engine main loop + `turn/*` | ⚠️ partial | `set_heart_type`/`choose_required_hearts` property rewrites; unknown-verb no-ops |
+| `src/engine.c` | engine main loop + `turn/*` | ✅ done | `set_heart_type`/`choose_required_hearts`/`set_blade_type`/`set_card_identity` property rewrites all dispatched faithfully (verified); unknown-verb no-ops retained by design |
+| `tools/gen_tests.py` | (transpiler) | ✅ done | `fire_live_start` → `rb_trigger_live_start`+`rb_drain_ability_queue` now emitted (was degraded to `// TODO:` at the per-line fallback); passthrough added for substituted engine calls |
 
 ## Sub-task queue (open placeholders, ready to copy)
-1. `misc.rs` `execute_choice` / `play_baton_touch` → `effects/misc.c`
+1. `misc.rs` `execute_choice` / `play_baton_touch` → `effects/misc.c` (DONE: baton_touch faithful this session)
 2. `score.rs` remaining 5 fns → `effects/score.c` (retire "simplified")
-3. `state.rs` `choose_required_hearts` + `set_heart_type placed_under` → `effects/state.c`
-4. `modifiers.rs` `refresh_yell_sources` (per-player scan) → `state.c`/`tracking.c`
-5. `compound.rs` `conditional_on_*` / `repeat_procedure` feeding → `compound.c`
-6. `move_cards.rs` `card_property` `has_all_blade` + placement edges → `effects/move.c`
+3. `state.rs` `choose_required_hearts` + `set_heart_type placed_under` → DONE in `engine.c:447`
+4. `modifiers.rs` `refresh_yell_sources` (per-player scan) → DONE: `tracking.c` this session, called from `rb_recalc_constants`
+5. `compound.rs` `conditional_on_*` / `repeat_procedure` feeding → `compound.c` (blocked on `ability_queue.c` FSM)
+6. `move_cards.rs` `card_property` `has_all_blade` + placement edges → `effects/move.c` (`has_all_blade` done; placement edges remain)
 7. `phases.rs` mulligan flow → `phase.c`
 8. `live.rs` exact `Allocation` + `BAll` + `prohibition_effects` tie → `live.c`
+9. **ENGINE GAP surfaced by transpiler fix:** `rb_trigger_live_start` over-grants on ~16
+   tests (`got 1/2 expected 0`) once `fire_live_start` stopped being a TODO. Root-caused:
+   `rb_execute_effect_ex` already gates on `e->has_condition` and `eval_group` is faithful,
+   so unconditional conditions are honored. The residual over-grant is the **target
+   SELECTION** path — live-start abilities that *choose* members by group/name and should
+   grant 0 when none match (and the decline/optional-choice path that should skip the
+   grant). The C `handle_action` gain_resource now skips the host fallback when a group
+   filter (`gn`) is present (faithful), but the selection/decline path in
+   `turn/triggers.rs::trigger_live_start` + choice-resume (`ability_queue.c`) still needs
+   porting for the remaining cases.
+10. `gen_tests.py`: also emit `recalculate_constants`/`test_recalc` after stage setup in
+    constant tests that currently rely on an implicit Rust recalc (already mapped; verify
+    any remaining `// TODO recalc` sites).
 
 ## Translated this session
 - `resolver.c` `rb_can_activate_effect` — now evaluates `eff->condition` (was Main-phase stub).
@@ -74,5 +88,20 @@ is a *worklist*, expected red until everything is ported. Only the hand-written 
 - `misc.c` `h_choice` — now emits a `SELECT_TARGET` pending choice (mirrors `choice.rs`/`engine.c` `choice` verb) instead of a silent `return 1`.
 - `misc.c` + `engine.c` + `rabuka.h` — `gain_surplus_heart` verb ported from `misc.rs:execute_gain_surplus_heart` (captures live surplus into `last_surplus_loss_count[pl]` from the latest snapshot).
 - `effects/ability.c` `rb_gain_ability` — now grants blade/heart/need_heart modifiers (not just score); `rb_invalidate_ability`/`rb_tick_gained` revert all four kinds.
+- `tools/gen_tests.py` — `fire_live_start(&mut game, cid)` now emits the real
+  `rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);`
+  instead of degrading to a `// TODO:` comment (a per-line fallback was re-commenting the
+  pre-substituted engine calls). Result: 13 generated tests now pass; 16 revealed a real
+  engine gap (live-start over-grant, subtask 9).
+- `src/turn/triggers.c` + `src/core/tracking.c` — `rb_refresh_yell_sources` ported
+  (`modifiers.rs:972`) and called from `rb_recalc_constants`.
+- `src/ability/effects/misc.c` — `h_play_baton_touch` faithful (baton_touch_count gate +
+  double-baton pair choice + `baton_touch_allowed` prohibition note).
+- `src/engine.c` `handle_action` — `gain_resource` no longer falls back to granting the host
+  when a group filter (`gn`) matches no member (faithful: filtered grants yield 0 when no
+  target). This is the live-start over-grant subtask (#9) partial fix.
+- `src/ability/dynamic_count.c` — build-blocking signature mismatch (`host_cid` was dropped
+  from `rb_resolve_dynamic_count`/`rb_effect_count`) fixed by threading `host_cid` through
+  `engine.c`/`effects/draw.c` (the generated suite could not even compile before this).
 
 Hand-written suites green after every change (`rb_engine_test` / `rb_engine_replay` / `rb_engine_ported` 13/13).

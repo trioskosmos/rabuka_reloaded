@@ -13,15 +13,12 @@ static int card_matches_filter(int card_idx, AbilityEffect *e){
     const char *ctype = NULL;
     for(int i=0;i<e->n_extra;i++) if(e->extra_k[i] && !strcmp(e->extra_k[i],"card_type")) ctype=e->extra_v[i];
     if(ctype && !card_matches_card_type_filter(card_idx, ctype)) return 0;
-    /* group filter via extra "group_names" — stub: check Card.group_idx string contains fragment */
+    /* group filter via extra "group_names" — mirror move_cards.rs which uses
+        card_matches_any_group (group/unit/name/series/identity substring). */
     const char *gn=NULL;
     for(int i=0;i<e->n_extra;i++) if(e->extra_k[i] && !strcmp(e->extra_k[i],"group_names")) gn=e->extra_v[i];
     if(gn){
-        Card c; if(!rb_decode_card_by_index((uint32_t)card_idx,&c)) return 0;
-        const char *gname = rb_card_string(c.group_idx);
-        int match = gname && strstr(gname, gn);
-        rb_free_card(&c);
-        if(!match) return 0;
+        if(!rb_card_matches_group_str(card_idx, gn)) return 0;
     }
     const char *cnames=NULL;
     for(int i=0;i<e->n_extra;i++) if(e->extra_k[i] && !strcmp(e->extra_k[i],"card_names")) cnames=e->extra_v[i];

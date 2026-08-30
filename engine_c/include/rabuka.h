@@ -563,6 +563,7 @@ typedef struct GameState {
 /* ── Tracking (engine/src/core/game_state/tracking.rs) ── */
 void rb_reset_keyword_tracking(GameState *g);
 void rb_add_yell_count_modifier(GameState *g, uint8_t player_slot, int32_t delta);
+void rb_refresh_yell_sources(GameState *g);
 uint8_t rb_effective_cheer_checks_required(const GameState *g, const char *player_id, uint8_t base);
 int rb_perform_cheer_check(GameState *g, const char *player_id, uint8_t blade_count);
 int rb_check_required_hearts(const GameState *g);
@@ -663,6 +664,8 @@ void rb_effect_position_change(GameState *g, int actor, AbilityEffect *e, int ho
 void rb_effect_rotation(GameState *g, int actor, AbilityEffect *e);
 void rb_effect_modify_cost(GameState *g, int actor, AbilityEffect *e);
 void rb_effect_modify_hearts(GameState *g, int actor, AbilityEffect *e);
+void rb_effect_energy_placement(GameState *g, int actor, AbilityEffect *e);
+void rb_effect_energy_state_change(GameState *g, int actor, AbilityEffect *e);
 int  rb_execute_modify_score(GameState *g, int actor, AbilityEffect *e);
 void rb_log_set_enabled(int enabled);
 void rb_log_push_verdict(const char *text, const char *kind, int passed);
@@ -670,17 +673,17 @@ int  rb_log_buffer_len(void);
 void rb_log_clear_verdicts(void);
 
 /* ── Dynamic count resolution (engine/src/ability/dynamic_count.rs) ── */
-int  rb_resolve_dynamic_count(const struct GameState *g, int owner,
-                             const char *reference, const char *base_reference,
-                             const char *count_type, const char *calculation,
-                             int calculation_value, int owner_on_p1,
-                             const int *moved, int n_moved,
-                              const int *selected, int n_selected,
-                              int last_draw_count);
+int  rb_resolve_dynamic_count(const struct GameState *g, int owner, int host_cid,
+                               const char *reference, const char *base_reference,
+                               const char *count_type, const char *calculation,
+                               int calculation_value, int owner_on_p1,
+                               const int *moved, int n_moved,
+                                const int *selected, int n_selected,
+                                int last_draw_count);
 /* Resolve an effect's count: static `count`, or (if -1) decode the DynamicCount
    params stored as extra_kv and call rb_resolve_dynamic_count. */
-int rb_effect_count(const GameState *g, int actor, const AbilityEffect *e,
-                    int last_draw_count);
+int rb_effect_count(const GameState *g, int actor, int host_cid, const AbilityEffect *e,
+                     int last_draw_count);
 
 /* ── Shared card/zone/comparison helpers (engine/src/ability/util.rs) ── */
 int  rb_compare_counts(const char *operator, int actual, int expected);

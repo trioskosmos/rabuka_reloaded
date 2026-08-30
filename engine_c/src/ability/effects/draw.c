@@ -143,7 +143,7 @@ int rb_effect_draw_card(GameState *g, int actor, AbilityEffect *e, int host_cid)
     /* count resolution (mirror execute_draw_wrapper) */
     int final_count;
     if (e->count < 0) {
-        final_count = rb_effect_count(g, actor, e, g->last_draw_count);
+        final_count = rb_effect_count(g, actor, host_cid, e, g->last_draw_count);
     } else if (e->count == 0) {
         /* Rust: when count is 0, draw = moved_cards (then recently_moved, then
             last_cost_discard_count  Enot tracked). Use recently_moved. */

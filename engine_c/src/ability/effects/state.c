@@ -258,3 +258,61 @@ void rb_effect_modify_hearts(GameState *g, int actor, AbilityEffect *e){
         }
     }
 }
+
+/* Mirror state.rs::execute_energy_placement — draw `count` energy from the
+   energy deck into the energy zone, activating them when state_change=="active".
+   The C energy model tracks energy as a single count (zone size + active count),
+   so this simply grows the zone and (optionally) the active count. */
+void rb_effect_energy_placement(GameState *g, int actor, AbilityEffect *e){
+    const char *st = NULL;
+    for(int i=0;i<e->n_extra;i++) if(e->extra_k[i] && !strcmp(e->extra_k[i],"state")) st=e->extra_v[i];
+    int who = actor;
+    if(e->target && (!strcmp(e->target,"opponent")||!strcmp(e->target,"p2"))) who = actor^1;
+    RbPlayer *P = &g->p[who];
+    int n = e->count >= 0 ? e->count : 1;
+    int active = st && (!strcmp(st,"active")||!strcmp(st,"アクティブ"));
+    for(int k=0;k<n;k++){
+        if(P->energy.n < RB_ENERGY_CAP) P->energy.n++;
+        if(active && P->energy_active < RB_ENERGY_CAP) P->energy_active++;
+    }
+}
+
+/* Mirror state.rs::execute_energy_state_change — change active/wait state of
+   `count` energy cards. "active" activates (energy_active += effective);
+   "wait" deactivates (energy_active -= effective). effective follows the Rust
+   max/count==0 logic against the C active/total counts. */
+void rb_effect_energy_state_change(GameState *g, int actor, AbilityEffect *e){
+    const char *st = NULL;
+    int max = 0;
+    for(int i=0;i<e->n_extra;i++){
+        if(e->extra_k[i] && !strcmp(e->extra_k[i],"state")) st=e->extra_v[i];
+        else if(e->extra_k[i] && !strcmp(e->extra_k[i],"max") && e->extra_v[i] && !strcmp(e->extra_v[i],"true")) max=1;
+    }
+    if(!st) st = "active";
+    int who = actor;
+    if(e->target && (!strcmp(e->target,"opponent")||!strcmp(e->target,"p2"))) who = actor^1;
+    RbPlayer *P = &g->p[who];
+    int total = P->energy.n, active = P->energy_active;
+    int is_active = (!strcmp(st,"active")||!strcmp(st,"アクティブ"));
+    int eff;
+    if(max){
+        int available = is_active ? (total - active) : active;
+        if(available < 0) available = 0;
+        int req = e->count > 0 ? e->count : 1;
+        eff = req < available ? req : available;
+    } else if(e->count == 0){
+        eff = is_active ? (total - active) : active;   /* all of the opposite state */
+    } else {
+        eff = e->count;
+    }
+    if(is_active){
+        active += eff;
+        if(active > total) active = total;
+        if(active > RB_ENERGY_CAP) active = RB_ENERGY_CAP;
+        P->energy_active = active;
+    } else {
+        active -= eff;
+        if(active < 0) active = 0;
+        P->energy_active = active;
+    }
+}
