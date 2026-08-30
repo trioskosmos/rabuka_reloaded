@@ -17,14 +17,15 @@ int rb_draw_cards_for_player(RbPlayer *player, uint8_t count, const char *source
     int drawn = 0;
     while(drawn < count){
         int card = -1;
-        /* source is deck-related; only deck supported for now */
-        if(source && (!strcmp(source,"deck")||!strcmp(source,"main_deck")||!strcmp(source,"deck_top"))){
+        int from_deck = source && (!strcmp(source,"deck")||!strcmp(source,"main_deck")||!strcmp(source,"deck_top")||!strcmp(source,"deck_bottom"));
+        int deck_bottom = source && !strcmp(source,"deck_bottom");
+        if(from_deck){
             if(player->deck.n>0){
-                card = player->deck.cards[--player->deck.n];
+                if(deck_bottom){ card = player->deck.cards[0]; for(int i=1;i<player->deck.n;i++) player->deck.cards[i-1]=player->deck.cards[i]; player->deck.n--; }
+                else card = player->deck.cards[--player->deck.n];
             } else {
                 /* Q104 / Rule 10.2.1: deck empty mid-draw -> refresh from waitroom */
-                if(player->deck.n==0 && player->discard.n>0){
-                    /* refresh: shuffle waitroom into deck */
+                if(player->discard.n>0){
                     for(int i=0;i<player->discard.n;i++) player->deck.cards[player->deck.n++] = player->discard.cards[i];
                     player->discard.n = 0;
                     rb_shuffle(player->deck.cards, player->deck.n);
@@ -33,8 +34,24 @@ int rb_draw_cards_for_player(RbPlayer *player, uint8_t count, const char *source
                 }
                 break;
             }
+        } else if(source && (!strcmp(source,"discard")||!strcmp(source,"waitroom"))){
+            if(player->discard.n>0) card = player->discard.cards[--player->discard.n];
+            else break;
+        } else if(source && !strcmp(source,"hand")){
+            if(player->hand.n>0) card = player->hand.cards[--player->hand.n];
+            else break;
+        } else if(source && !strcmp(source,"energy")){
+            if(player->energy.n>0) card = player->energy.cards[--player->energy.n];
+            else break;
+        } else if(source && (!strcmp(source,"success")||!strcmp(source,"success_zone")||!strcmp(source,"success_live_zone")||!strcmp(source,"success_live_card_zone"))){
+            if(player->success.n>0) card = player->success.cards[--player->success.n];
+            else break;
+        } else if(source && (!strcmp(source,"staged")||!strcmp(source,"stage"))){
+            for(int i=0;i<RB_STAGE_SIZE;i++) if(player->stage[i]!=RB_EMPTY_SLOT){ card=player->stage[i]; player->stage[i]=RB_EMPTY_SLOT; break; }
+            if(card==-1) break;
         } else {
-            /* non-deck sources not yet ported */
+            /* resolution_zone / revealed_cards / unknown: not ported (revealed pool
+                lives in GameState, not RbPlayer; resolution not tracked) */
             break;
         }
         if(card==-1) break;
@@ -65,16 +82,23 @@ int rb_draw_cards_for_player(RbPlayer *player, uint8_t count, const char *source
             }
             drawn++;
         } else {
-            /* not matching -> put back on deck bottom? original pushes back */
-            if(player->deck.n < RB_MAX_ZONE){
-                /* push to bottom: shift */
+            /* not matching -> put back on the source pile bottom */
+            if(from_deck){
                 for(int i=player->deck.n;i>0;i--) player->deck.cards[i]=player->deck.cards[i-1];
-                player->deck.cards[0]=card;
-                player->deck.n++;
+                player->deck.cards[0]=card; player->deck.n++;
+            } else if(source && (!strcmp(source,"discard")||!strcmp(source,"waitroom"))){
+                if(player->discard.n<RB_MAX_ZONE) player->discard.cards[player->discard.n++]=card;
+            } else if(source && !strcmp(source,"hand")){
+                if(player->hand.n<RB_MAX_ZONE) player->hand.cards[player->hand.n++]=card;
+            } else if(source && !strcmp(source,"energy")){
+                if(player->energy.n<RB_MAX_ZONE) player->energy.cards[player->energy.n++]=card;
+            } else if(source && (!strcmp(source,"success")||!strcmp(source,"success_zone")||!strcmp(source,"success_live_zone")||!strcmp(source,"success_live_card_zone"))){
+                if(player->success.n<RB_MAX_ZONE) player->success.cards[player->success.n++]=card;
             }
+            /* stage source: a non-matching staged draw simply returns to its slot */
         }
     }
-    return 0;
+    return drawn;
 }
 
 /* Stubs for the AbilityResolver methods that use draw — full port lands with
