@@ -101,7 +101,39 @@ is a *worklist*, expected red until everything is ported. Only the hand-written 
   when a group filter (`gn`) matches no member (faithful: filtered grants yield 0 when no
   target). This is the live-start over-grant subtask (#9) partial fix.
 - `src/ability/dynamic_count.c` — build-blocking signature mismatch (`host_cid` was dropped
-  from `rb_resolve_dynamic_count`/`rb_effect_count`) fixed by threading `host_cid` through
-  `engine.c`/`effects/draw.c` (the generated suite could not even compile before this).
+   from `rb_resolve_dynamic_count`/`rb_effect_count`) fixed by threading `host_cid` through
+   `engine.c`/`effects/draw.c` (the generated suite could not even compile before this).
+- `src/turn/triggers.c` `apply_constant_effect` — constant abilities using `draw`/`move_cards`/
+   `look_at`/`reveal`/`select_cards`/`change_state`/`position_change`/`rotation`/`restriction`/
+   `energy_placement`/`energy_state_change` now delegate to the runtime effect executors instead
+   of being silently dropped (idempotent; no hand-written-suite regression).
+
+## Blockers for the ~1000 generated-suite failures (root-cause taxonomy)
+The generated suite is a *worklist* (allowed red); the 3 hand-written suites gate. After this
+session's fixes the remaining failures cluster by **trigger/flow**, not by missing constant math:
+
+1. **Live-start selection/decline (subtask #9, ~16 tests):** live-start abilities that *choose*
+   members by group/name and grant 0 when none match (or are declined) are over-granted because
+   the C target-selection/choice-resume path in `turn/triggers.rs::trigger_live_start` +
+   `ability_queue.c` FSM is only partial. Conditions themselves evaluate faithfully
+   (`eval_group`/`eval_appearance`/`eval_position`/`eval_complex` all implemented), so this is
+   purely the selection/decline wiring. **Fix:** port the `select_cards`→resume→grant chain and
+   the optional-choice skip so a no-match/decline yields 0.
+2. **Debut (`trigger_debut`) fidelity:** debut abilities fire via `rb_fire_debut`+drain, but
+   per-ability effect subtrees (nested move/gain/condition) are not all faithful yet.
+3. **Full live-phase pipeline (`live.c`, 2846 LOC):** heart harvest → allocation → verdict →
+   score, yell/cheer, BAll doubling, `prohibition_effects` tie — only partially wired. This is
+   the bulk of the live-* buckets. **Fix:** continue `live.c` port (subtask #8).
+4. **Hand-ability triggers:** some cards grant from hand (e.g. `ai_screeam` in hand buffs both
+   stages). `rb_recalc_constants` scans stage/success/live only (matches Rust), so these fire via
+   a *different* trigger that the C engine must execute on the right entry point. **Fix:** ensure
+   the relevant trigger (debut/live-start/hand-reveal) is queued, not by scanning hand in recalc.
+5. **Interactive choice/select resume:** `select_number`/`pay-skip`/multi-select routing in
+   `choice.c` + queue FSM is partial (subtask in `choice.c`/`ability_queue.c`).
+
+Net effect of this session: gating suites stayed green; 13 generated tests newly pass via the
+transpiler fix; root-caused the live-start over-grant; broadened `apply_constant_effect`.
+(NOTE: a `test_add_to_stage`→`rb_recalc_constants` auto-recall was tried and **reverted** — it
+prematurely applied constants and regressed `rb_engine_ported`.)
 
 Hand-written suites green after every change (`rb_engine_test` / `rb_engine_replay` / `rb_engine_ported` 13/13).
