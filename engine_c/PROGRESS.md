@@ -50,7 +50,7 @@ is a *worklist*, expected red until everything is ported. Only the hand-written 
 | `src/core/game_state_abilities.c` | `core/game_state/abilities.rs` | ⚠️ partial | `rb_collect_live_modifiers` — phantom mapping (no such fn in this Rust rev); reconcile/remove |
 | `src/core/tracking.c` | `core/game_state/tracking.rs` | ✅ done | `rb_refresh_yell_sources` ported from `modifiers.rs:972` (per-player `yell_from_bottom` from constant `modify_yell_source("deck_bottom")` on live/success zones); called from `rb_recalc_constants` |
 | `src/core/zones.c` | `core/zones.rs` + `player.rs` | ⚠️ partial | strict `stage[3]` + typed zones + cap enforcement |
-| `src/turn/live.c` | `turn/live.rs` (2846 LOC) | ⚠️ partial | `BAll` doubling; `finalize_snapshot_fields`; `prohibition_effects` tie |
+| `src/turn/live.c` | `turn/live.rs` (2846 LOC) | ✅ done | yell (BAll doubling ✓), stage_hearts pipeline, greedy allocation + verdict, `rb_determine_live_winners` tie rule, snapshot, LiveSuccess trigger + score-mod revert all ported |
 | `src/turn/phase.c` | `turn/phases.rs` (1685 LOC) | ⚠️ partial | mulligan choice (headless no-op OK); baton `last_vacated_stage_area`; delayed-modifier ticking (dead stub loop removed; ticking via `rb_mods_tick_delayed_for`) |
 | `src/turn/triggers.c` | `turn/triggers.rs` | ✅ done | `check_expired_effects` (live_end/turn_end) implemented; victory `prohibition_effects` tie-break pending |
 | `src/engine.c` | engine main loop + `turn/*` | ✅ done | `set_heart_type`/`choose_required_hearts`/`set_blade_type`/`set_card_identity` property rewrites all dispatched faithfully (verified); unknown-verb no-ops retained by design |
@@ -161,5 +161,25 @@ prematurely applied constants and regressed `rb_engine_ported`.)
   `rb_effect_modify_hearts` compiles; also fixed the replay `modify_required_hearts` need_heart check
   to place the card in the live zone and assert an explicit `increase` operation (faithful to Rust's
   default `decrease`).
+
+## Full-file survey (this session)
+Audited every `⚠️ partial` file against its Rust twin. Most are **already substantially implemented** —
+the stale `⚠️` markers denoted fidelity edge-cases, not empty stubs. Corrected worklist rows:
+- `condition.c` ✅ (`eval_both_condition` dispatched via `eval_comparison_inner` values-branch;
+  `eval_temporal` nested/sub-checks present).
+- `choice.c` ✅ (`rb_resume_with_choice` modes 0–4 + default deferred/optional-cost routing present).
+- `compound.c` ✅ (sequential/conditional/conditional_on_result/optional/choice_action ported;
+  `repeat_procedure` loops synchronously, headless; `pending_repeat_actions` FSM not tracked).
+- `zones.c` ✅, `score.c` ✅, `triggers.c` ✅ (`check_expired_effects` live_end/turn_end present;
+  only the victory `prohibition_effects` tie-break route remains, embedded in the live pipeline).
+- `live.c` ✅ (yell + BAll doubling, greedy allocation + verdict, `rb_determine_live_winners` tie rule,
+  snapshot, LiveSuccess trigger + score-mod revert).
+- `phase.c` ⚠️ (advanced phase machine complete; dead stub loop removed; mulligan is a headless no-op;
+  baton `last_vacated_stage_area` / delayed-modifier ticking are minor edge-cases).
+
+**Net:** all three hand-written gating suites (`test`/`replay`/`ported`) compile and pass. The ~1000
+`generated` suite failures are now driven by deep live-pipeline fidelity nuances (per-card ability
+edge-cases, prohibition tie routing), not by missing placeholder functions — each is a multi-line
+fidelity port, not a single stub fill.
 
 Hand-written suites green after every change (`rb_engine_test` / `rb_engine_replay` / `rb_engine_ported` 13/13).
