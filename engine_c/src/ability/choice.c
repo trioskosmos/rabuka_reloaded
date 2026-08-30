@@ -20,6 +20,10 @@ int rb_resume_with_choice(GameState *g, int selected_idx) {
     int is_select = g->queue.resume_is_select;
     AbilityEffect *eff = g->queue.resume_eff;
     int host = g->queue.resume_host;
+    /* Capture the deferred effect BEFORE clearing the queue (clearing nulls it). */
+    AbilityEffect *def = g->queue.deferred;
+    const AbilityEffect *cont = g->queue.resume_parent;
+    int cont_from = g->queue.resume_child + 1;
     int was_skip = (selected_idx < 0);
     rb_clear_pending_choice(g);
     g->queue.resume_mode = 0;
@@ -36,10 +40,8 @@ int rb_resume_with_choice(GameState *g, int selected_idx) {
             g->queue.resume_active = 0;
         }
     } else if (mode == 3) {          /* auto-ability → execute deferred body */
-        AbilityEffect *def = g->queue.deferred;
         if (!was_skip && def) rb_execute_effect_ex(g, actor, def, host);
     } else {                         /* default: optional-cost / generic deferred */
-        AbilityEffect *def = g->queue.deferred;
         if (!was_skip && def) {
             if (def->action && (!strcmp(def->action, "pay_energy") ||
                                 !strcmp(def->action, "pay_cost") ||
@@ -47,6 +49,14 @@ int rb_resume_with_choice(GameState *g, int selected_idx) {
                 rb_pay_cost(g, actor, def);
             else
                 rb_execute_effect_ex(g, actor, def, host);
+        }
+        /* After paying an optional cost, continue the ability's remaining
+           sibling effects (e.g. the gain_resource that follows the cost). */
+        if (!was_skip && cont) {
+            for (int j = cont_from; j < cont->n_child; j++) {
+                if (rb_has_pending_choice(g)) break;
+                rb_execute_effect_ex(g, actor, cont->child[j], host);
+            }
         }
     }
     /* continue resolving any queued trigger/auto abilities */

@@ -213,7 +213,8 @@ typedef struct {
 /* ── Lifecycle ── */
 int  rb_load(const char *data_dir);   /* load cards.bin + abilities_strings.bin */
 int  rb_load_streaming(const char *dir,
-                      unsigned char *(*read_fn)(const char *path, long *out_len)); /* alt I/O */
+                       unsigned char *(*read_fn)(const char *path, long *out_len)); /* alt I/O */
+int  rb_load_gen_data(const unsigned char *buf, long len); /* populate offset tables from storage */
 void rb_unload(void);
 uint32_t rb_num_cards(void);
 uint32_t rb_num_abilities(void);
@@ -373,8 +374,13 @@ typedef struct {
     int      choice_result;    /* selected index stored for the resumed node */
     int      resume_mode;      /* 0=deferred, 1=position_change, 2=select_card, 3=auto_ability */
     int      resume_is_select; /* 1 if the select_card choice is a select_cards/select/look_and_select
-                                  (kept card recorded into g->selected_cards). Set by the emitter, not
-                                  derived from resume_eff (which may dangle after the source Card is freed). */
+                                   (kept card recorded into g->selected_cards). Set by the emitter, not
+                                   derived from resume_eff (which may dangle after the source Card is freed). */
+    /* optional-cost continuation: when an optional pay_energy/cost gate emits a
+       choice, the executing effect's parent + the index of that gate are stashed
+       here so the resume can run the ability's remaining sibling effects. */
+    const AbilityEffect *resume_parent;
+    int      resume_child;
 } RbAbilityQueue;
 
 int  rb_queue_push(RbAbilityQueue *q, int card_id, int ability_idx);

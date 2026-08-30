@@ -152,3 +152,21 @@ ll_dbg.txt
 
 # DeepSeek training harness (local experiments)
 /deepseek-harness/
+
+# engine_c build outputs and transpiler scratch logs
+engine_c/rb_engine.exe
+engine_c/rb_engine_*.exe
+engine_c/*.txt
+engine_c/err*.txt
+engine_c/out*.txt
+engine_c/p_*.txt
+engine_c/r_*.txt
+engine_c/t_*.txt
+engine_c/q*_out.txt
+engine_c/platforms/
+
+
+engine_c/src/*.bin
+engine_c/src/core/generated/*.o
+engine_c/src/**/*.o
+

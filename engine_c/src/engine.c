@@ -102,14 +102,20 @@ static int heart_color_of(AbilityEffect *e, int dflt) {
     if (!h) h = extra(e, "target");
     if (!h) return dflt;
     if (!strcmp(h, "pink") || !strcmp(h, "heart00")) return RB_HEART_PINK;
-    if (!strcmp(h, "red")) return RB_HEART_RED;
-    if (!strcmp(h, "yellow")) return RB_HEART_YELLOW;
-    if (!strcmp(h, "green")) return RB_HEART_GREEN;
-    if (!strcmp(h, "blue")) return RB_HEART_BLUE;
-    if (!strcmp(h, "purple")) return RB_HEART_PURPLE;
-    if (!strcmp(h, "orange")) return RB_HEART_ORANGE;
+    if (!strcmp(h, "red") || !strcmp(h, "heart01")) return RB_HEART_RED;
+    if (!strcmp(h, "yellow") || !strcmp(h, "heart02")) return RB_HEART_YELLOW;
+    if (!strcmp(h, "green") || !strcmp(h, "heart03")) return RB_HEART_GREEN;
+    if (!strcmp(h, "blue") || !strcmp(h, "heart04")) return RB_HEART_BLUE;
+    if (!strcmp(h, "purple") || !strcmp(h, "heart05")) return RB_HEART_PURPLE;
+    if (!strcmp(h, "orange") || !strcmp(h, "heart06")) return RB_HEART_ORANGE;
+    if (!strcmp(h, "all") || !strcmp(h, "heart07") || !strcmp(h, "b_all")) return RB_HEART_ALL;
     if (!strcmp(h, "draw")) return RB_HEART_DRAW;
     if (!strcmp(h, "score")) return RB_HEART_SCORE;
+    /* generic "heartNN" (NN = 00..07) → numeric color index */
+    if (!strncmp(h, "heart", 5) && h[5] >= '0' && h[5] <= '9') {
+        int idx = atoi(h + 5);
+        if (idx >= 0 && idx <= 7) return idx;
+    }
     return dflt;
 }
 
@@ -192,7 +198,20 @@ void rb_execute_effect_ex(GameState *g, int actor, AbilityEffect *e, int host_ci
            so skip the single pre-order pass here to avoid a double execution. */
         if (!(e->action && !strcmp(e->action, "repeat_procedure")))
             rb_execute_effect_ex(g, actor, e->child[i], host_cid);
-        if (rb_has_pending_choice(g)) return;
+        if (rb_has_pending_choice(g)) {
+            /* An optional cost gate (pay_energy/pay_cost) that emitted its
+               pay/skip choice stalled this effect chain. Stash the parent +
+               gate index so the resume can run the remaining sibling effects
+               (e.g. the gain_resource that follows the paid cost). */
+            AbilityEffect *ch = e->child[i];
+            if (ch && ch->is_optional && ch->action &&
+                (!strcmp(ch->action, "pay_energy") || !strcmp(ch->action, "pay_cost") ||
+                 !strcmp(ch->action, "activation_cost") || !strcmp(ch->action, "pay_optional_cost"))) {
+                g->queue.resume_parent = e;
+                g->queue.resume_child = i;
+            }
+            return;
+        }
     }
     if (!e->action) return;
     handle_action(g, actor, e, host_cid);

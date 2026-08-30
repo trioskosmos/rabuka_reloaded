@@ -10,8 +10,11 @@ extern const uint32_t RBKA_BYTECODE_LEN;
 
 /* generated tables */
 extern const uint32_t RBKA_NUM_ABILITIES;
-extern const uint16_t RBKA_OFFSET_DELTAS[];
-extern const uint32_t RBKA_STRINGS_OFFSETS[];
+/* These point at the offset tables. For the PC/host build they alias the
+   embedded arrays (see gen_data.c); for bare-metal builds they are populated
+   from gen_data.bin streamed off storage (see gen_data_cdi.c). */
+extern uint16_t *g_offset_deltas;
+extern uint32_t *g_strings_offsets;
 
 /* ── globals ── */
 static unsigned char *g_cards_blob = NULL;
@@ -102,8 +105,8 @@ static int parse_strings(const unsigned char *blob, long len) {
     uint32_t n = RBKA_NUM_STRING_OFFSETS ? (RBKA_NUM_STRING_OFFSETS - 1) : 0;
     g_strings = malloc((n ? n : 1) * sizeof(char *));
     for (uint32_t i = 0; i < n; i++) {
-        uint32_t a = RBKA_STRINGS_OFFSETS[i];
-        uint32_t b = RBKA_STRINGS_OFFSETS[i + 1];
+        uint32_t a = g_strings_offsets[i];
+        uint32_t b = g_strings_offsets[i + 1];
         uint32_t sl = b - a;
         char *s = malloc(sl + 1);
         memcpy(s, g_abstr_blob + a, sl); s[sl] = 0;
@@ -171,6 +174,12 @@ int rb_load_streaming(const char *dir,
         if (!buf) return -4;
         g_bc = buf;        /* owned, live for the match */
         g_bc_len = (uint32_t)n;
+        /* Offset tables: stream from storage too (don't embed ~24 KB). */
+        snprintf(path, sizeof(path), "%s/gen_data.bin", dir);
+        buf = read_fn(path, &n);
+        if (!buf) return -5;
+        if (rb_load_gen_data(buf, n) != 0) { free(buf); return -6; }
+        free(buf);
         return 0;
     }
     /* No read_fn supplied: bare-metal ports must provide one. The hosted
@@ -211,8 +220,8 @@ const char *rb_card_string(uint16_t idx) {
 const unsigned char *rb_bc_slice(uint32_t idx, uint32_t *out_len) {
     if (idx >= RBKA_NUM_ABILITIES) return NULL;
     uint32_t start = 0;
-    for (uint32_t i = 0; i < idx; i++) start += RBKA_OFFSET_DELTAS[i];
-    uint32_t len = RBKA_OFFSET_DELTAS[idx];
+    for (uint32_t i = 0; i < idx; i++) start += g_offset_deltas[i];
+    uint32_t len = g_offset_deltas[idx];
     *out_len = len;
     if (start + len > g_bc_len) return NULL;
     return g_bc + start;

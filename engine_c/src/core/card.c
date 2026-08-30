@@ -2,7 +2,7 @@
 #include "gen_data.h"
 #include <stdlib.h>
 #include <string.h>
-extern const uint16_t RBKA_CARD_ABILITY_PAIRS[];
+extern uint16_t *g_card_ability_pairs;
 
 static uint16_t le16p(const unsigned char *p) {
     return (uint16_t)p[0] | ((uint16_t)p[1] << 8);
@@ -75,7 +75,7 @@ int rb_card_num_abilities(uint32_t card_idx){
     if(!card_no) return 0;
     int cnt=0;
     for(uint32_t i=0;i<RBKA_NUM_CARD_ABILITY_PAIRS*2; i+=2){
-        const char *pair_no = rb_get_string(RBKA_CARD_ABILITY_PAIRS[i]);
+        const char *pair_no = rb_get_string(g_card_ability_pairs[i]);
         if(pair_no && !strcmp(pair_no, card_no)) cnt++;
     }
     return cnt;
@@ -88,9 +88,9 @@ int rb_card_get_ability_idx(uint32_t card_idx, int n, uint32_t *out){
     if(!card_no) return 0;
     int cur=0;
     for(uint32_t i=0;i<RBKA_NUM_CARD_ABILITY_PAIRS*2; i+=2){
-        const char *pair_no = rb_get_string(RBKA_CARD_ABILITY_PAIRS[i]);
+        const char *pair_no = rb_get_string(g_card_ability_pairs[i]);
         if(pair_no && !strcmp(pair_no, card_no)){
-            if(cur==n){ *out = RBKA_CARD_ABILITY_PAIRS[i+1]; return 1; }
+            if(cur==n){ *out = g_card_ability_pairs[i+1]; return 1; }
             cur++;
         }
     }
