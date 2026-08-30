@@ -89,6 +89,7 @@ static int cost_move_from_source(GameState *g, int actor, const char *src, int c
                 bag_push(&P->discard, cid); moved++;
             }
         }
+        g->mods.last_cost_discard_count = moved;
         return moved;
     }
     RbBag *b = cost_source_bag(P, src);
@@ -98,6 +99,7 @@ static int cost_move_from_source(GameState *g, int actor, const char *src, int c
         bag_push(&P->discard, cid);
         moved++;
     }
+    g->mods.last_cost_discard_count = moved;
     return moved;
 }
 

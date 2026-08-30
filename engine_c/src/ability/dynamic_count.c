@@ -41,10 +41,10 @@ int rb_resolve_dynamic_count(const struct GameState *g, int owner, int host_cid,
             Card c; if (rb_decode_card_by_index((uint32_t)cid, &c)) { count = c.score; rb_free_card(&c); }
         }
     } else if (!strcmp(reference_text, "previous_moved_cards") ||
-               !strcmp(reference_text, "previous_move")) {
+                !strcmp(reference_text, "previous_move")) {
         if (n_moved > 0) count = n_moved;
         else if (g->n_recently_moved > 0) count = g->n_recently_moved;
-        else count = 0; /* Rust: mods.last_cost_discard_count (not tracked) */
+        else count = g->mods.last_cost_discard_count; /* Rust: mods.last_cost_discard_count */
     } else if (!strcmp(reference_text, "previous_draw")) {
         if (last_draw_count > 0) count = last_draw_count;
         else if (g->n_recently_moved > 0) count = g->n_recently_moved;
@@ -141,8 +141,40 @@ static int dc_extra_int(const AbilityEffect *e, const char *key) {
    and feed them to rb_resolve_dynamic_count. Falls back to 1 when no dynamic
    parameters are present (preserves prior default). */
 int rb_effect_count(const struct GameState *g, int actor, int host_cid, const AbilityEffect *e,
-                     int last_draw_count) {
+                      int last_draw_count) {
     if (!e) return 0;
+    /* per_unit scaling (mirrors misc.rs calculate_gain_multiplier /
+        resolve_per_unit_count): the base count is multiplied by the number of
+        units at `location` (e.g. one heart per success-live-zone card). Checked
+        BEFORE the e->count early-return because the base count is 1-per-unit. */
+    const char *per_unit = dc_extra(e, "per_unit");
+    if (per_unit && !strcmp(per_unit, "true")) {
+        const char *loc = dc_extra(e, "location");
+        int units = 1;
+        if (loc) {
+            if (!strcmp(loc, "success_live_zone") || !strcmp(loc, "success") ||
+                !strcmp(loc, "live")) {
+                /* the player's live-card zone (the live being performed) */
+                int pl = (host_cid >= 0) ? rb_owner_of_card((GameState*)g, host_cid) : actor;
+                if (pl < 0) pl = actor;
+                units = g->p[pl].live.n;
+            } else if (!strcmp(loc, "hand")) {
+                units = g->p[actor].hand.n;
+            } else if (!strcmp(loc, "stage")) {
+                int c = 0; for (int s = 0; s < RB_STAGE_SIZE; s++)
+                    if (g->p[actor].stage[s] != RB_EMPTY_SLOT) c++;
+                units = c;
+            } else if (!strcmp(loc, "deck")) {
+                units = g->p[actor].deck.n;
+            } else if (!strcmp(loc, "success_zone")) {
+                units = g->p[actor].success.n;
+            }
+        }
+        if (units < 0) units = 0;
+        int base = (e->count >= 0) ? e->count : 1;
+        if (base < 0) base = 1;
+        return base * units;
+    }
     if (e->count >= 0) return e->count;
     const char *reference = dc_extra(e, "reference");
     const char *base_reference = dc_extra(e, "base_reference");

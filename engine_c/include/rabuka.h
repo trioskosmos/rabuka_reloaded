@@ -191,6 +191,7 @@ typedef struct {
     int8_t          heart_multiplier_amt[RB_MAX_CARD_IDS]; /* multiplier applied to that colour (default 2) */
     int8_t          blade_type[RB_MAX_CARD_IDS];   /* -1 none, else BladeColor idx */
     int8_t          heart_color_override[RB_MAX_CARD_IDS]; /* -1 none (specify_heart_color); else all base hearts counted as this colour */
+    int             last_cost_discard_count;       /* cards discarded as part of the last cost payment */
 } RbMods;
 
 void rb_mods_init(RbMods *m);

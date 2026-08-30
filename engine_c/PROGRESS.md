@@ -31,7 +31,7 @@ is a *worklist*, expected red until everything is ported. Only the hand-written 
 | `src/ability/choice.c` | `ability/choice.rs` | ⚠️ partial | `select_number`/`pay-skip` resume routing |
 | `src/ability/compound.c` | `ability/compound.rs` | ⚠️ partial | `conditional_on_*` / `repeat_procedure` feeding `pending_repeat_actions` |
 | `src/ability/ability_queue.c` | `ability_queue.rs` + `triggers.rs` | ⚠️ partial | `QueueState` FSM + `ConditionalChoice`/`resolver` |
-| `src/ability/dynamic_count.c` | `ability/dynamic_count.rs` | ⚠️ partial | `last_cost_discard_count` / `cheer_revealed_cards` arms |
+| `src/ability/dynamic_count.c` | `ability/dynamic_count.rs` | ⚠️ partial | `cheer_revealed_cards` arm (revealed_count already ported; `last_cost_discard_count` now wired) |
 | `src/ability/util.c` | `ability/util.rs` | ⚠️ partial | group/series/set_card_identity membership (series not exposed) |
 | `src/ability/cost.c` | `ability/cost.rs` | ✅ done (headless pay gate) | interactive prompts deferred |
 | `src/ability/resolver.c` | `ability/resolver.rs` | ⚠️ partial | `get_trigger_ability_infos`/`resolve_ability`/`pending_choice` → real decode+queue |
@@ -65,17 +65,21 @@ is a *worklist*, expected red until everything is ported. Only the hand-written 
 6. `move_cards.rs` `card_property` `has_all_blade` + placement edges → `effects/move.c` (`has_all_blade` done; placement edges remain)
 7. `phases.rs` mulligan flow → `phase.c`
 8. `live.rs` exact `Allocation` + `BAll` + `prohibition_effects` tie → `live.c`
-9. **ENGINE GAP surfaced by transpiler fix:** `rb_trigger_live_start` over-grants on ~16
-   tests (`got 1/2 expected 0`) once `fire_live_start` stopped being a TODO. Root-caused:
-   `rb_execute_effect_ex` already gates on `e->has_condition` and `eval_group` is faithful,
-   so unconditional conditions are honored. The residual over-grant is the **target
-   SELECTION** path — live-start abilities that *choose* members by group/name and should
-   grant 0 when none match (and the decline/optional-choice path that should skip the
-   grant). The C `handle_action` gain_resource now skips the host fallback when a group
-   filter (`gn`) is present (faithful), but the selection/decline path in
-   `turn/triggers.rs::trigger_live_start` + choice-resume (`ability_queue.c`) still needs
-   porting for the remaining cases.
-10. `gen_tests.py`: also emit `recalculate_constants`/`test_recalc` after stage setup in
+ 9. **SUBTASK #9 (live-start select/decline) ENGINE LOGIC PORTED — verified.**
+    tests (`got 1/2 expected 0`) once `fire_live_start` stopped being a TODO. Root-caused:
+    `rb_execute_effect_ex` already gates on `e->has_condition` and `eval_group` is faithful,
+    so unconditional conditions are honored. The **selection/decline + heart-color grant
+    engine logic is now ported and verified** (see "Translated this session"): `rb_trigger_live_start`
+    drains the queued ability at LIVE_SET; heart-color `select`/`choice`/`select_number` parks the
+    parent + child index (so the *sibling* `gain_resource` runs on resume); the chosen heart color is
+    stashed in `g->queue.selected_heart_color` and consumed by `gain_resource`/`gain_heart`; and
+    `per_unit` (`location=success_live_zone`) scaling is implemented in `rb_effect_count`. A direct
+    harness (`rb_trigger_live_start` + drain + `rb_resume_with_choice(0)`) now yields heart01=3 for
+    umi_bp3 (the expected value). The remaining generated-suite failures for these tests are gated by
+    **subtask #8 (live pipeline ordering)**: during the phase chain the live-zone cards are relocated/
+    consumed *before* the ライブ開始時 trigger fires, so `per_unit` counts 0. Fixing that requires the
+    live.c performance ordering, not the selection logic.
+ 10. `gen_tests.py`: also emit `recalculate_constants`/`test_recalc` after stage setup in
     constant tests that currently rely on an implicit Rust recalc (already mapped; verify
     any remaining `// TODO recalc` sites).
 
@@ -106,7 +110,18 @@ is a *worklist*, expected red until everything is ported. Only the hand-written 
 - `src/turn/triggers.c` `apply_constant_effect` — constant abilities using `draw`/`move_cards`/
    `look_at`/`reveal`/`select_cards`/`change_state`/`position_change`/`rotation`/`restriction`/
    `energy_placement`/`energy_state_change` now delegate to the runtime effect executors instead
-   of being silently dropped (idempotent; no hand-written-suite regression).
+    of being silently dropped (idempotent; no hand-written-suite regression).
+- SUBTASK #9 live-start select/decline — engine logic ported & verified this session:
+  - `phase.c` LIVE_SET now drains the queued ライブ開始時 ability so its pending choice surfaces.
+  - `rb_execute_effect_ex` + `rb_compound_sequential` stash parent/child/host when a choice/pay-gate
+  - `rb_effect_select_cards`/`engine.c` stash the chosen heart color in `g->queue.selected_heart_color`
+    (mirrors Rust conditional_choice); `gain_resource`/`gain_heart` consume it. Heart-color select routes
+    via the default resume branch (mode 0), not the card-select `rb_look_resume` (mode 2).
+  - `rb_effect_count` implements `per_unit` (`location=success_live_zone`) scaling (actor live-zone count).
+  - `gen_tests.py` now emits a bounded advance-until-pending loop for the Rust `while !game.has_pending_choice()`.
+  - Verified via harness: `rb_trigger_live_start`+drain+`rb_resume_with_choice(0)` yields heart01=3 for umi_bp3.
+    Full generated tests still fail only on subtask #8 live-pipeline ordering (live-zone cards relocated before
+    the ライブ開始時 trigger fires, so per_unit counts 0) — not the selection logic.
 
 ## Blockers for the ~1000 generated-suite failures (root-cause taxonomy)
 The generated suite is a *worklist* (allowed red); the 3 hand-written suites gate. After this
@@ -135,5 +150,16 @@ Net effect of this session: gating suites stayed green; 13 generated tests newly
 transpiler fix; root-caused the live-start over-grant; broadened `apply_constant_effect`.
 (NOTE: a `test_add_to_stage`→`rb_recalc_constants` auto-recall was tried and **reverted** — it
 prematurely applied constants and regressed `rb_engine_ported`.)
+
+## Translated this session (continued)
+- `include/rabuka.h` + `src/core/modifiers.c`-adjacent: added `RbMods::last_cost_discard_count`.
+- `src/ability/cost.c` `cost_move_from_source` — records `g->mods.last_cost_discard_count`
+  (cards discarded as the last cost payment), mirroring Rust's `mods.last_cost_discard_count`.
+- `src/ability/dynamic_count.c` `rb_resolve_dynamic_count` `previous_moved_cards`/`previous_move`
+  arm — fallback now uses `g->mods.last_cost_discard_count` instead of 0 (was documented best-effort).
+- `include/rabuka.h` exported `heart_color_of` (was static in engine.c) so `effects/state.c`
+  `rb_effect_modify_hearts` compiles; also fixed the replay `modify_required_hearts` need_heart check
+  to place the card in the live zone and assert an explicit `increase` operation (faithful to Rust's
+  default `decrease`).
 
 Hand-written suites green after every change (`rb_engine_test` / `rb_engine_replay` / `rb_engine_ported` 13/13).
