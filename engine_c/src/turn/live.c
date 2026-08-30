@@ -62,11 +62,19 @@ static int do_yell(GameState *g, int pl, int yell_cards[RB_MAX_LIVE_CARDS*3], in
             int bt = g->mods.blade_type[cid];
             if(bt>=1 && bt<=6) blade_hearts[bt]+=c.blade; else blade_hearts[RB_HEART_PINK]+=c.blade;
         }
+        /* BAll (b_heart07, color 7) doubling — mirrors engine/src/turn/live.rs
+            process_yell_revealed_card_icons: a card carrying an All-color heart
+            doubles every other heart icon on that same card (the All heart itself
+            is the doubling source and is NOT doubled). */
+        int has_ball = 0;
+        for(int h=0;h<c.n_hearts;h++) if(c.heart_color[h]==7 && c.heart_count[h]>0) has_ball=1;
+        int mult = has_ball ? 2 : 1;
         for(int h=0;h<c.n_hearts;h++){
             int col=c.heart_color[h];
             if(col==RB_HEART_DRAW) { /* draw icon → immediate draw handled by caller */ }
-            else if(col==RB_HEART_SCORE) (*note_icons)+=c.heart_count[h];
-            else blade_hearts[col%8]+=c.heart_count[h];
+            else if(col==7) blade_hearts[7]+=c.heart_count[h];           /* BAll source, not doubled */
+            else if(col==RB_HEART_SCORE) (*note_icons)+=c.heart_count[h]*mult;
+            else blade_hearts[col%8]+=c.heart_count[h]*mult;
         }
         /* special_heart for draw/score already handled */
         rb_free_card(&c);
