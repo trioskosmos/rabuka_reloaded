@@ -155,3 +155,44 @@ int test_get_heart_modifier(TestGame *tg, int cid, int color){ return rb_mods_ge
 /* Default filler card id (mirrors per-module `fn filler_hand(game)` helpers that
    return a common SD filler). Used only where the helper call appears inline. */
 int test_filler_hand(TestGame *tg){ return rb_find_card_by_no("PL!-sd1-010-SD"); }
+
+/* Collection-predicate helpers mirroring the Rust tests' ubiquitous
+   `zone.cards.iter().any(|c| c.card_no == "X")` / `.contains(&id)` patterns,
+   which a line-based transpiler cannot emit directly. */
+static int zone_bag(TestGame *tg, int pl, const char *zone, RbBag **out){
+    if(!strcmp(zone,"hand")) *out=&tg->state.p[pl].hand;
+    else if(!strcmp(zone,"deck")||!strcmp(zone,"main_deck")) *out=&tg->state.p[pl].deck;
+    else if(!strcmp(zone,"discard")||!strcmp(zone,"waitroom")) *out=&tg->state.p[pl].discard;
+    else if(!strcmp(zone,"live")) *out=&tg->state.p[pl].live;
+    else if(!strcmp(zone,"success")) *out=&tg->state.p[pl].success;
+    else if(!strcmp(zone,"energy")||!strcmp(zone,"energy_zone")) *out=&tg->state.p[pl].energy;
+    else *out=NULL;
+    return *out!=NULL;
+}
+int rb_card_no_eq(int card_id, const char *no){
+    Card c; if(!rb_decode_card_by_index((uint32_t)card_id,&c)) return 0;
+    const char *cn = rb_card_string(c.card_no_idx);
+    return cn && strcmp(cn, no)==0;
+}
+int test_zone_has_card_no(TestGame *tg, int pl, const char *zone, const char *no){
+    RbBag *b=NULL;
+    if(!strcmp(zone,"stage")){
+        for(int i=0;i<RB_STAGE_SIZE;i++)
+            if(tg->state.p[pl].stage[i]!=RB_EMPTY_SLOT && rb_card_no_eq(tg->state.p[pl].stage[i],no)) return 1;
+        return 0;
+    }
+    if(!zone_bag(tg,pl,zone,&b)) return 0;
+    for(int i=0;i<b->n;i++) if(rb_card_no_eq(b->cards[i],no)) return 1;
+    return 0;
+}
+int test_zone_has_id(TestGame *tg, int pl, const char *zone, int id){
+    RbBag *b=NULL;
+    if(!strcmp(zone,"stage")){
+        for(int i=0;i<RB_STAGE_SIZE;i++)
+            if(tg->state.p[pl].stage[i]!=RB_EMPTY_SLOT && tg->state.p[pl].stage[i]==id) return 1;
+        return 0;
+    }
+    if(!zone_bag(tg,pl,zone,&b)) return 0;
+    for(int i=0;i<b->n;i++) if(b->cards[i]==id) return 1;
+    return 0;
+}

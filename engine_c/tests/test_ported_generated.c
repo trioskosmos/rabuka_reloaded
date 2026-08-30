@@ -34,14 +34,13 @@ static void gen_bp1009_debut_mill2_then_retrieve_member_from_waitroom(void){
     test_play_to_stage(&tg, me, 1);
     // // The retrieval step prompts "select member from waitroom" only AFTER
     // // the mill resolves — drain every pending choice in order.
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&niji), "虹ヶ咲 member retrieved to hand" );
-    // TODO assert: assert!( !game.state.player1.waitroom.cards.contains(&niji), "retrieved member left the waitroom" );
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&m1) && game.state.player1.waitroom.cards.contains(&m2), "both deck-top cards were milled to the waitroom" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", niji), "bp1009_debut_mill2_then_retrieve_member_from_waitroom");
+    CHECK((!test_zone_has_id(&tg, 0, "discard", niji)), "bp1009_debut_mill2_then_retrieve_member_from_waitroom");
+    CHECK(test_zone_has_id(&tg, 0, "discard", m1), "bp1009_debut_mill2_then_retrieve_member_from_waitroom");
     // TODO assert_eq (unresolved): assert_eq!( game.state.player1.waitroom.cards.len(), waitroom_before + 2, "+2 milled-in, -1 retrieved-out; waitroom={:?}", game.state.player1.waitroom.cards );
     // 
 }
@@ -171,7 +170,7 @@ static void gen_q29_baton_touch_blocked_on_arrival_turn_allowed_next_turn(void){
     // TODO: log::debug!("[Q29_TEST] rejection reason: {}", err);
     // 
     CHECK_EQ(tg.state.p[0].stage[0], first, "q29_baton_touch_blocked_on_arrival_turn_allowed_next_turn");
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&second), "the incoming member stays in hand" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", second), "q29_baton_touch_blocked_on_arrival_turn_allowed_next_turn");
     // 
     // // Turn 2: rollover clears deployed_this_turn — the SAME play now works.
     // // Drive back into P1's own Main phase.
@@ -183,8 +182,7 @@ static void gen_q29_baton_touch_blocked_on_arrival_turn_allowed_next_turn(void){
     // TODO: {
     // TODO: guard += 1;
     rb_advance_phase(&tg.state);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // TODO: }
@@ -193,7 +191,7 @@ static void gen_q29_baton_touch_blocked_on_arrival_turn_allowed_next_turn(void){
     // action result consumed: .expect("next turn: the identical baton touch is legal");
     // 
     CHECK_EQ(tg.state.p[0].stage[0], second, "q29_baton_touch_blocked_on_arrival_turn_allowed_next_turn");
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&first), "Q24/Q141: the departing member goes to the waitroom" );
+    CHECK(test_zone_has_id(&tg, 0, "discard", first), "q29_baton_touch_blocked_on_arrival_turn_allowed_next_turn");
     // 
 }
 
@@ -214,7 +212,7 @@ static void gen_test_q258_himege_activate_no_target(void){
     // 
     // // Verification:
     // // 1. Himege is now in discard
-    // TODO assert: assert!(game.state.player1.waitroom.cards.contains(&himege));
+    CHECK(test_zone_has_id(&tg, 0, "discard", himege), "test_q258_himege_activate_no_target");
     // 
     // // 2. No members on stage gained a blade (stage is empty anyway)
     // TODO assert_eq (unresolved): assert_eq!(game.state.mods.blade_modifiers.len(), 0);
@@ -247,8 +245,7 @@ static void gen_q255_dancing_stars_live_success_after_position_change(void){
     // // ab#0 asks for the destination; answer with the first generated option.
     test_has_pending_choice(&tg);
     // TODO: game.select_generated(0);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectTarget"), "expected only position|destination prompts in the chain" );
     // TODO: game.select_generated(0);
     // TODO: }
@@ -329,13 +326,13 @@ static void gen_q256_maki_reveal_crossroads_replacement(void){
     // 
     // // Verifications:
     // // 1. 錯覚CROSSROADS should be in waitroom (replaced from success zone placement)
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&crossroads), "錯覚CROSSROADS should be in waitroom (replacement triggered)" );
+    CHECK(test_zone_has_id(&tg, 0, "discard", crossroads), "q256_maki_reveal_crossroads_replacement");
     // 
     // // 2. The μ's live card should be in success zone
     // TODO assert: assert!( game.state .player1 .success_live_card_zone .cards .contains(&muse_live), "μ's live card should be in success zone (replacement target)" );
     // 
     // // 3. The filler live card that was in success zone should now be in hand
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&filler_live), "Original success zone card should be in hand" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", filler_live), "q256_maki_reveal_crossroads_replacement");
     // 
     // // 4. Maki should be on stage in Center
     CHECK_EQ(tg.state.p[0].stage[1], maki, "q256_maki_reveal_crossroads_replacement");
@@ -380,8 +377,7 @@ static void gen_dia_keeps_one_on_bottom_rest_to_waitroom(void){
     // // the re-prompt to finalize (selected → deck bottom, rest → waitroom).
     int guard = 0;
     int selected = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && guard < 10 {
+    test_has_pending_choice(&tg);
     // TODO: guard += 1;
     // TODO: if !selected {
     // TODO: game.select_indices(&[0]);
@@ -441,8 +437,7 @@ static void gen_mari_keeps_one_on_top_rest_to_deck_bottom(void){
     // // the re-prompt to finalize.
     int guard = 0;
     int selected = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && guard < 10 {
+    test_has_pending_choice(&tg);
     // TODO: guard += 1;
     // TODO: if !selected {
     // TODO: game.select_indices(&[0]);
@@ -489,7 +484,7 @@ static void gen_kanon_q106_debut_recover_from_discard(void){
     tg.state.p[0].stage[0] = other_liella;
     test_play_to_stage(&tg, kanon, 1);
     // 
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&liella), "Liella card recovered from waitroom to hand" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", liella), "kanon_q106_debut_recover_from_discard");
     CHECK_EQ(tg.state.p[0].stage[1], kanon, "kanon_q106_debut_recover_from_discard");
     // // Verify other_liella is still on stage (was not replaced)
     CHECK_EQ(tg.state.p[0].stage[0], other_liella, "kanon_q106_debut_recover_from_discard");
@@ -558,8 +553,7 @@ static void gen_mifune_q231_excess_heart_2_score_cancels_to_0(void){
     rb_advance_phase(&tg.state);
     // 
     // // Consume any residual choices from the live phase / ability triggers
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -610,8 +604,7 @@ static void gen_p2_owned_trapper_scores_from_p1_success_in_real_round(void){
     // // Drive the real round: P1 Main → … → LiveCardSetP1.
     // TODO loop (degraded): for _ in 0..5 {
     // TODO: g.pass();
-    int g = 0;
-    // TODO loop (degraded): while g.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: g.select_indices(&[]);
     // TODO: }
     // TODO: }
@@ -619,8 +612,7 @@ static void gen_p2_owned_trapper_scores_from_p1_success_in_real_round(void){
     // 
     // // Next: LiveCardSetSecondAttacker → P2 performs the TRAPPER.
     // TODO: g.pass();
-    g = 0;
-    // TODO loop (degraded): while g.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: g.select_indices(&[]);
     // TODO: }
     // TODO: g.set_live_card(trapper);
@@ -630,8 +622,7 @@ static void gen_p2_owned_trapper_scores_from_p1_success_in_real_round(void){
     // // Stop advancing the MOMENT determination records per-seat results:
     // // crossing into the next turn resets them (Active-phase entry).
     // TODO loop (degraded): for _ in 0..8 {
-    g = 0;
-    // TODO loop (degraded): while g.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: g.select_indices(&[]);
     // TODO: }
     // TODO: if g.state.p1_live_success_this_turn || g.state.p2_live_success_this_turn {
@@ -639,8 +630,7 @@ static void gen_p2_owned_trapper_scores_from_p1_success_in_real_round(void){
     // TODO: }
     // TODO: g.pass();
     // TODO: }
-    g = 0;
-    // TODO loop (degraded): while g.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: g.select_indices(&[]);
     // TODO: }
     // 
@@ -658,8 +648,7 @@ static void gen_p2_owned_trapper_scores_from_p1_success_in_real_round(void){
     test_has_pending_choice(&tg);
     // TODO: g.pass();
     // TODO: }
-    g = 0;
-    // TODO loop (degraded): while g.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: g.select_indices(&[]);
     // TODO: }
     // TODO: }
@@ -804,8 +793,7 @@ static void gen_nijigasaki_bp1_006r_pay_two_draw_one(void){
     // 
     test_activate_ability(&tg, member);
     // action result consumed: .expect("activation should succeed with 2 energy");
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -1114,8 +1102,7 @@ static void gen_kidou_card_play_to_stage_not_softlocked(void){
     test_play_to_stage(&tg, kidou_card, 1);
     // 
     // // Resolve any pending choices from debut/auto triggers
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -1132,7 +1119,9 @@ static void gen_kidou_card_play_to_stage_not_softlocked(void){
     // TODO: .any(|a| a.action_type == game_setup::ActionType::PlayMemberToStage);
     // 
     // TODO: eprintln!("Actions after playing kidou card to stage:");
-    // TODO: for (i, a) in actions.iter().enumerate() {
+    int i = 0;
+    int a = 0;
+    // TODO loop (degraded): for (i, a) in actions.iter().enumerate() {
     // TODO: eprintln!(
     // TODO: "  [{}] {:?} {}",
     // TODO: i,
@@ -1212,8 +1201,7 @@ static void gen_live_cards_stuck_in_live_zone_instead_of_discard(void){
     // TODO: eprintln!("phase: {:?}", game.state.current_phase);
     // 
     int safety = 20;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && safety > 0 {
+    test_has_pending_choice(&tg);
     int ct = 0;
     // TODO: eprintln!("choice: {}", ct);
     // TODO: if ct == "SelectAutoAbility" {
@@ -1236,8 +1224,7 @@ static void gen_live_cards_stuck_in_live_zone_instead_of_discard(void){
     test_has_pending_choice(&tg);
     rb_advance_phase(&tg.state);
     // TODO: }
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && safety > 0 {
+    test_has_pending_choice(&tg);
     ct = 0;
     // TODO: if ct == "SelectAutoAbility" {
     // TODO: game.select_indices(&[]);
@@ -1807,8 +1794,7 @@ static void gen_bp7024_lone_aqours_member_hearts_become_heart04(void){
     // TODO: game.state.activating_card = Some(live);
     // TODO: game.state.process_pending_auto_abilities(&pid);
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -1852,8 +1838,7 @@ static void gen_bp7024_no_aqours_member_no_transform(void){
     // TODO: game.state.activating_card = Some(live);
     // TODO: game.state.process_pending_auto_abilities(&pid);
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -1889,7 +1874,7 @@ static void gen_pb1007_with_lilywhite_member_retrieves_mus_live(void){
     // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard for the 3-card hand cost" );
     // TODO: game.select_indices(&[0, 1, 2]);
     // 
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&mus_live), "lilywhite member on stage -> retrieve μ's live card to hand" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", mus_live), "pb1007_with_lilywhite_member_retrieves_mus_live");
     // 
 }
 
@@ -1920,7 +1905,7 @@ static void gen_pb1007_without_lilywhite_member_no_retrieval(void){
     // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard for the 3-card hand cost" );
     // TODO: game.select_indices(&[0, 1, 2]);
     // 
-    // TODO assert: assert!( !game.state.player1.hand.cards.contains(&mus_live), "no lilywhite member -> no retrieval" );
+    CHECK((!test_zone_has_id(&tg, 0, "hand", mus_live)), "pb1007_without_lilywhite_member_no_retrieval");
     // 
 }
 
@@ -2490,8 +2475,7 @@ static void gen_himeko_debut_repositions_opponent_member_and_koko_responds(void)
     // TODO: g.assert_pending_choice_type("SelectTarget", "reposition target choice");
     // TODO: g.select_indices(&[0]); // options[0] = "right" = 可可's slot
     // 
-    int g = 0;
-    // TODO loop (degraded): while g.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: g.select_indices(&[]);
     // TODO: }
     // 
@@ -2529,8 +2513,7 @@ static void gen_himeko_gate_blocked_no_reposition_no_koko_response(void){
     // TODO: g.give_energy(15);
     // 
     // TODO: g.play_to_stage(himeko, MemberArea::Center);
-    int g = 0;
-    // TODO loop (degraded): while g.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: g.select_indices(&[]);
     // TODO: }
     // 
@@ -2558,8 +2541,7 @@ static void gen_no_live_cards_at_all_no_winner_clean_rollover(void){
     // TODO: {
     // TODO: guard += 1;
     rb_advance_phase(&tg.state);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // TODO: }
@@ -2593,8 +2575,7 @@ static void gen_q159_positive_select_prompt_appears(void){
     test_has_pending_choice(&tg);
     int saw_select = 0;
     int safety = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && safety < 30 {
+    test_has_pending_choice(&tg);
     // TODO: safety += 1;
     int ct = 0;
     // TODO: if ct.as_deref() == Some("SelectCard") { saw_select = true; }
@@ -2650,7 +2631,7 @@ static void gen_daydream_mermaid_choice_appears_and_selects_energy(void){
     // 
     int energy_before = tg.state.p[0].energy.n;
     rb_resume_with_choice(&tg.state, 0);
-    // TODO assert: assert!( game.state.player1.energy_zone.cards.len() > energy_before, "Energy should be placed from energy deck" );
+    CHECK(tg.state.p[0].energy.n, "daydream_mermaid_choice_appears_and_selects_energy");
     // 
 }
 
@@ -2700,7 +2681,7 @@ static void gen_daydream_mermaid_choice_selects_recover(void){
     test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // 
-    // TODO assert: assert!( game.state.player1.hand.cards.len() > hand_before, "Member should be recovered to hand" );
+    CHECK(tg.state.p[0].hand.n, "daydream_mermaid_choice_selects_recover");
     // 
 }
 
@@ -2847,8 +2828,7 @@ static void gen_dream_with_you_q116_blade_10_score_plus_1(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -2894,8 +2874,7 @@ static void gen_dream_with_you_q116_blade_6_no_score(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -2947,8 +2926,7 @@ static void gen_genki_zenkai_invalidates_own_live_success(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -2957,18 +2935,15 @@ static void gen_genki_zenkai_invalidates_own_live_success(void){
     // 
     // // Advance through performance → live_success should NOT fire
     rb_advance_phase(&tg.state);
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     rb_advance_phase(&tg.state);
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     rb_advance_phase(&tg.state);
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -3024,8 +2999,7 @@ static void gen_genki_zenkai_live_success_fires_when_condition_not_met(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -3034,18 +3008,15 @@ static void gen_genki_zenkai_live_success_fires_when_condition_not_met(void){
     // 
     // // Advance through performance → live_success SHOULD fire
     rb_advance_phase(&tg.state);
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     rb_advance_phase(&tg.state);
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     rb_advance_phase(&tg.state);
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -3377,8 +3348,7 @@ static void gen_mebius_blocks_both_success_zones_on_tied_live(void){
     rb_advance_phase(&tg.state);
     // TODO: }
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -3388,8 +3358,7 @@ static void gen_mebius_blocks_both_success_zones_on_tied_live(void){
     rb_advance_phase(&tg.state);
     // TODO: }
     // 
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // // One more pass finalizes victory determination (winner placement).
@@ -3481,8 +3450,7 @@ static void gen_mebius_does_not_fire_on_untied_scores(void){
     // // Transition through both performance phases.
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -3492,8 +3460,7 @@ static void gen_mebius_does_not_fire_on_untied_scores(void){
     rb_advance_phase(&tg.state);
     // TODO: }
     // 
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // // One more pass finalizes victory determination (winner placement),
@@ -3507,7 +3474,7 @@ static void gen_mebius_does_not_fire_on_untied_scores(void){
     int p2_success = 0;
     // TODO assert_eq (unresolved): assert_eq!( p1_success.as_slice(), &[mebius_p1][..], "untied 2-vs-0: P1's winning mebius reaches its own success zone" );
     // TODO assert: assert!( !p2_success.contains(&normal_live_p2), "untied: P2's failed live places nothing" );
-    // TODO assert: assert!( game.state.player2.waitroom.cards.contains(&normal_live_p2), "P2's failed live card ends in the waitroom" );
+    CHECK(test_zone_has_id(&tg, 1, "discard", normal_live_p2), "mebius_does_not_fire_on_untied_scores");
     // 
 }
 
@@ -3684,8 +3651,7 @@ static void gen_first_attacker_window_facts_survive_second_active_phase_and_live
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     int guard = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && guard < 20 {
+    test_has_pending_choice(&tg);
     // TODO: guard += 1;
     // TODO: if game.pending_choice_type().as_deref() == Some("SelectAutoAbility") {
     // TODO: game.select_indices(&[]);
@@ -3730,8 +3696,7 @@ static void gen_round_scoped_trackers_clear_at_turn_rollover(void){
     // TODO loop (degraded): for _ in 0..8 {
     rb_advance_phase(&tg.state);
     int guard = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && guard < 20 {
+    test_has_pending_choice(&tg);
     // TODO: guard += 1;
     // TODO: if game.pending_choice_type().as_deref() == Some("SelectAutoAbility") {
     // TODO: game.select_indices(&[]);
@@ -3816,7 +3781,7 @@ static void gen_q273_fired_debut_ability_cost_is_paid(void){
     // 
     CHECK(saw_hana_cost, "q273_fired_debut_ability_cost_is_paid");
     // // 花丸's 登場 effect resolved: a top-3 card was added to hand (deck shrank).
-    // TODO assert: assert!( game.state.player1.main_deck.cards.len() < deck_before, "Q273: after paying the cost, the 登場 effect resolved (a card was added to hand)" );
+    CHECK(tg.state.p[0].deck.n, "q273_fired_debut_ability_cost_is_paid");
     // 
 }
 
@@ -3892,7 +3857,7 @@ static void gen_test_baton_touch_succeeds_without_restriction(void){
     test_play_to_stage(&tg, filler_member, 0);
     // action result consumed: assert!( result.is_ok(), "identical baton touch must succeed without the restriction: {:?}", result.err() );
     CHECK_EQ(tg.state.p[0].stage[0], filler_member, "test_baton_touch_succeeds_without_restriction");
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&unprotected), "replaced member went to the waitroom (baton touch happened)" );
+    CHECK(test_zone_has_id(&tg, 0, "discard", unprotected), "test_baton_touch_succeeds_without_restriction");
     // 
 }
 
@@ -3947,8 +3912,7 @@ static void gen_eternalize_love_full_live_flow_heart00_reduction(void){
     // 
     // 
     // // Handle any pending choices from LiveStart
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -3965,14 +3929,12 @@ static void gen_eternalize_love_full_live_flow_heart00_reduction(void){
     rb_advance_phase(&tg.state);
     // // LiveVictoryDetermination
     rb_advance_phase(&tg.state);
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // // LVD → Active (check_expired_effects runs)
     rb_advance_phase(&tg.state);
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -4022,8 +3984,7 @@ static void gen_izumi_grants_heart06_to_member_with_heart06_only(void){
     test_play_to_stage(&tg, izumi, 1);
     // 
     // // Resolve any pending choices (e.g. SelectTarget)
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -4076,8 +4037,7 @@ static void gen_izumi_no_valid_target_no_effect(void){
     test_play_to_stage(&tg, izumi, 1);
     // 
     // // Resolve any pending choices
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -4689,7 +4649,7 @@ static void gen_cheer_pipeline_score_icon(void){
     // TODO assert_eq (unresolved): assert_eq!(snap.total_score, 2, "card score 1 + one revealed score icon");
     // 
     // // The revealed copy went to the waitroom with the rest of the yell.
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&dash_on_deck), "yell-revealed START:DASH!! should end up in the waitroom" );
+    CHECK(test_zone_has_id(&tg, 0, "discard", dash_on_deck), "cheer_pipeline_score_icon");
     // 
 }
 
@@ -4723,8 +4683,8 @@ static void gen_duplicate_cards_on_stage_have_unique_ids(void){
     // TODO: "Center and right must have different card IDs"
     // TODO: );
     // 
-    // TODO assert: assert!( !game.state.player1.waitroom.cards.contains(&card1), "Center card should not be in waitroom" );
-    // TODO assert: assert!( !game.state.player1.waitroom.cards.contains(&card2), "Right card should not be in waitroom" );
+    CHECK((!test_zone_has_id(&tg, 0, "discard", card1)), "duplicate_cards_on_stage_have_unique_ids");
+    CHECK((!test_zone_has_id(&tg, 0, "discard", card2)), "duplicate_cards_on_stage_have_unique_ids");
     // 
 }
 
@@ -5038,7 +4998,7 @@ static void gen_kagayaiteru_q125_cannot_place_in_success_zone(void){
     // 
     // // P1 had the only live card → auto-won, but the constant restriction
     // // prevents placement in success zone → goes to waitroom instead
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&card), "Q125: Card should be in waitroom (cannot be placed in success zone)" );
+    CHECK(test_zone_has_id(&tg, 0, "discard", card), "kagayaiteru_q125_cannot_place_in_success_zone");
     // 
 }
 
@@ -5073,7 +5033,7 @@ static void gen_konata_q77_debuted_this_turn_activates_energy(void){
     // // Net active change: -2E (ab#1 cost) = -2.
     int active_after = tg.state.p[0].energy_active;
     // TODO assert_eq (unresolved): assert_eq!( active_after, active_before - 2, "ab#1 cost 2E fired (first matching ability)" );
-    // TODO assert: assert!( !game.state.player1.waitroom.cards.contains(&niji_member), "ab#0 cost (discard niji_member) was NOT paid (not the fired ability)" );
+    CHECK((!test_zone_has_id(&tg, 0, "discard", niji_member)), "konata_q77_debuted_this_turn_activates_energy");
     // 
 }
 
@@ -5100,7 +5060,7 @@ static void gen_konata_no_debut_condition_fails(void){
     // // Cost: 2E paid (active drops by 2). Draw 1 card.
     int active_after = tg.state.p[0].energy_active;
     // TODO assert_eq (unresolved): assert_eq!( active_before - active_after, 2, "ab#1 cost: 2E paid, net -2" );
-    // TODO assert: assert!( !game.state.player1.waitroom.cards.contains(&niji_member), "niji_member should NOT be in waitroom (ab#0 did not fire)" );
+    CHECK((!test_zone_has_id(&tg, 0, "discard", niji_member)), "konata_no_debut_condition_fails");
     // 
 }
 
@@ -5211,8 +5171,7 @@ static void gen_pl_hs_sd1_008_live_start_skip_cost_no_effect(void){
     // 
     // 
     int safety = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && safety < 10 {
+    test_has_pending_choice(&tg);
     // TODO: safety += 1;
     // TODO: if game.pending_choice_type().as_deref() == Some("SelectAutoAbility") {
     // TODO: game.select_indices(&[]);
@@ -5266,7 +5225,7 @@ static void gen_rin_q123_activate_empty_waitroom(void){
     CHECK_EQ(tg.state.p[0].stage[1], -1, "rin_q123_activate_empty_waitroom");
     // 
     // // Rin should be in waitroom
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&rin), "Rin should be in waitroom after self_cost" );
+    CHECK(test_zone_has_id(&tg, 0, "discard", rin), "rin_q123_activate_empty_waitroom");
     // 
     // // No live card was recovered (waitroom had none), but ability succeeded
     // // The effect gracefully did nothing
@@ -5299,8 +5258,8 @@ static void gen_rin_q79_vacated_area_can_receive_new_member(void){
     CHECK_EQ(tg.state.p[0].stage[1], -1, "rin_q79_vacated_area_can_receive_new_member");
     // 
     // // Waitroom should have Rin (from self_cost) — live card was recovered
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&rin), "Rin should be in waitroom" );
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&live_card), "Live card should be recovered to hand" );
+    CHECK(test_zone_has_id(&tg, 0, "discard", rin), "rin_q79_vacated_area_can_receive_new_member");
+    CHECK(test_zone_has_id(&tg, 0, "hand", live_card), "rin_q79_vacated_area_can_receive_new_member");
     // 
     // // The vacated center area can receive a new card (empty slot exists)
     // 
@@ -5351,8 +5310,7 @@ static void gen_sayaka_bp6_live_start_modify_cost_only_applies_to_dollchestra(vo
     // TODO: game.select_indices(&[0]);
     // 
     // // Draw happens automatically. No more choices expected.
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -5398,8 +5356,7 @@ static void gen_sayaka_bp6_skip_cost_no_draw_no_cost_mod(void){
     test_has_pending_choice(&tg);
     // // Skip the cost (empty selection)
     // TODO: game.select_indices(&[]);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() { game.select_indices(&[]); }
+    test_has_pending_choice(&tg);
     // // No draw, no cost mod when cost skipped
     CHECK_EQ(rb_mods_get_cost(&tg.state.mods, doll), 0, "sayaka_bp6_skip_cost_no_draw_no_cost_mod");
     CHECK_EQ(rb_mods_get_cost(&tg.state.mods, sayaka), 0, "sayaka_bp6_skip_cost_no_draw_no_cost_mod");
@@ -5446,8 +5403,7 @@ static void gen_solitude_q67_hasetsu_member_with_heart01_score_plus_1(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -5493,8 +5449,7 @@ static void gen_solitude_q67_non_hasetsu_member_no_score(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -5571,8 +5526,7 @@ static void gen_determination_cascade_p1_failure_relocation_p2_success(void){
     // // Drive exactly like opponent_live_success_flow_test: fixed pass counts
     // // reach each LiveCardSet phase, then determination.
     int seen = 0;
-    int g = 0;
-    // TODO loop (degraded): while g.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: g.select_indices(&[0]);
     // TODO: }
     // TODO: };
@@ -5594,8 +5548,7 @@ static void gen_determination_cascade_p1_failure_relocation_p2_success(void){
     // TODO: }
     // TODO: g.pass();
     // TODO: }
-    g = 0;
-    // TODO loop (degraded): while g.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: g.select_indices(&[0]);
     // TODO: }
     // 
@@ -5649,8 +5602,7 @@ static void gen_hanamaru_q120_hand7_auto_condition_checked_after_blade_draws(voi
     rb_advance_phase(&tg.state);
     // 
     // // After LiveStart choice (if any)
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -5772,8 +5724,7 @@ static void gen_kosuzu_bp6_condition_met_gains_heart05_and_blade(void){
     // TODO: game.select_indices(&[0]);
     // 
     // // Resolve any remaining choices
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -5788,10 +5739,14 @@ static void gen_kosuzu_bp6_condition_met_gains_heart05_and_blade(void){
     // TODO: game.state.mods.heart_modifiers
     // TODO: );
     // TODO: eprintln!("[DEBUG] kosuzu={}", kosuzu);
-    // TODO: for (k, v) in &game.state.mods.blade_modifiers {
+    int k = 0;
+    int v = 0;
+    // TODO loop (degraded): for (k, v) in &game.state.mods.blade_modifiers {
     // TODO: eprintln!("  blade mod: card={} val={}", k, v);
     // TODO: }
-    // TODO: for (k, v) in &game.state.mods.heart_modifiers {
+    k = 0;
+    v = 0;
+    // TODO loop (degraded): for (k, v) in &game.state.mods.heart_modifiers {
     // TODO: eprintln!("  heart mod: card={} val={:?}", k, v);
     // TODO: }
     // 
@@ -5881,8 +5836,7 @@ static void gen_kosuzu_bp6_condition_not_met_no_heart05_no_blade(void){
     // // Pay the cost
     // TODO: game.select_indices(&[0]);
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -5929,8 +5883,7 @@ static void gen_kinako_auto_triggers_on_live_success(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // // inlined helper advance_to_live_victory
@@ -5939,8 +5892,7 @@ static void gen_kinako_auto_triggers_on_live_success(void){
     rb_advance_phase(&tg.state);
     // TODO: }
     // 
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     rb_advance_phase(&tg.state);
@@ -5993,7 +5945,7 @@ static void gen_kinako_auto_triggers_on_position_change(void){
     // TODO: game.select_generated(left_idx);
     test_drain_auto_choices(&tg);
     // 
-    // TODO assert: assert!( !game.state.player1.waitroom.cards.contains(&liella), "Liella card should have been removed from waitroom by Kinako's auto ability" );
+    CHECK((!test_zone_has_id(&tg, 0, "discard", liella)), "kinako_auto_triggers_on_position_change");
     int kinako_idx = 0;
     // TODO: .state
     // TODO: .player1
@@ -6041,8 +5993,7 @@ static void gen_q107_dia_skip_discard_no_followup(void){
     // 
     test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -6094,8 +6045,7 @@ static void gen_miyashita_ai_cost10_appears_elsewhere_triggers_draw(void){
     test_give_energy(&tg, 12);
     // 
     test_play_to_stage(&tg, cost10, 2);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -6131,8 +6081,7 @@ static void gen_miyashita_ai_q197_baton_touch_replaced_does_not_trigger(void){
     test_give_energy(&tg, 12);
     // 
     test_play_to_stage(&tg, cost10, 0);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -6344,8 +6293,7 @@ static void gen_position_change_triggered_grant_blade_to_moved_members(void){
     // TODO: game.set_live_card(self_control);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     test_drain_auto_choices(&tg);
     // TODO: }
     // 
@@ -6399,8 +6347,7 @@ static void gen_you_s3_q153_live_success_draw_if_fewer_revealed(void){
     // TODO loop (degraded): for _ in 0..5 {
     rb_advance_phase(&tg.state);
     // TODO: }
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // // The LiveSuccess ability must be routed and resolved with an explicit
@@ -6459,8 +6406,8 @@ static void gen_proteinbar_discard2_retrieves_niji_member(void){
     // // Discard-cost selection: choose both hand cards.
     // TODO: game.select_indices(&[0, 1]);
     // 
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&niji), "虹ヶ咲 member retrieved from waitroom to hand" );
-    // TODO assert: assert!( !game.state.player1.waitroom.cards.contains(&niji), "retrieved member left the waitroom" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", niji), "proteinbar_discard2_retrieves_niji_member");
+    CHECK((!test_zone_has_id(&tg, 0, "discard", niji)), "proteinbar_discard2_retrieves_niji_member");
     // 
 }
 
@@ -6484,7 +6431,7 @@ static void gen_bp3004_rest_self_and_discard_retrieves_niji_live(void){
     // TODO: game.select_indices(&[0]);
     // 
     // TODO assert_eq (unresolved): assert_eq!( game.state.mods.orientation_modifiers.get(&me).copied(), Some(rabuka_engine::core::game_modifiers::CardOrientation::Wait), "this member was rested as part of the cost" );
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&live), "虹ヶ咲 live card retrieved to hand" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", live), "bp3004_rest_self_and_discard_retrieves_niji_live");
     // 
 }
 
@@ -6505,8 +6452,8 @@ static void gen_bp4018_rests_self_to_waitroom_retrieves_liella(void){
     // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard retrieval prompt" );
     // TODO: game.select_indices(&[0]);
     // 
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&me), "this member moved to the waitroom" );
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&liella), "Liella! card retrieved to hand" );
+    CHECK(test_zone_has_id(&tg, 0, "discard", me), "bp4018_rests_self_to_waitroom_retrieves_liella");
+    CHECK(test_zone_has_id(&tg, 0, "hand", liella), "bp4018_rests_self_to_waitroom_retrieves_liella");
     // 
 }
 
@@ -6567,7 +6514,7 @@ static void gen_bp4006_three_distinct_members_retrieves_liella_live_from_reveale
     // TODO: fire_trigger(&mut game, me, AbilityTrigger::LiveSuccess, "ライブ成功時");
     // 
     // TODO assert_eq (unresolved): assert_eq!( game.state.player1.hand.cards.len(), hand_before + 1, "Liella! live card retrieved from revealed cards to hand" );
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&liella_live), "the retrieved card is the revealed Liella! live card" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", liella_live), "bp4006_three_distinct_members_retrieves_liella_live_from_revealed");
     // 
 }
 
@@ -6596,7 +6543,7 @@ static void gen_bp1009_activation_draws_one_discards_one(void){
     // 
     CHECK_EQ(tg.state.p[0].hand.n, 1, "bp1009_activation_draws_one_discards_one");
     // TODO assert_eq (unresolved): assert_eq!( game.state.player1.waitroom.cards.len(), waitroom_before + 1, "exactly one card was discarded to the waitroom" );
-    // TODO assert: assert!( !game.state.player1.main_deck.cards.contains(&drawn), "the stocked deck card was drawn" );
+    CHECK((!test_zone_has_id(&tg, 0, "deck", drawn)), "bp1009_activation_draws_one_discards_one");
     // 
 }
 
@@ -6617,8 +6564,7 @@ static void gen_pb1024_live_success_draws_two_discards_two_empty_hand(void){
     int waitroom_before = tg.state.p[0].discard.n;
     // 
     // TODO: fire_trigger(&mut game, live, AbilityTrigger::LiveSuccess, "ライブ成功時");
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -6650,7 +6596,7 @@ static void gen_pb1024_live_success_keeps_non_selected_cards(void){
     // TODO assert: assert!(n >= 2, "need at least the 2 drawn cards in hand");
     // TODO: game.select_indices(&[n - 2, n - 1]);
     // 
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&kept), "the pre-existing hand card can be kept" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", kept), "pb1024_live_success_keeps_non_selected_cards");
     // 
 }
 
@@ -6671,8 +6617,7 @@ static void gen_bp3012_look4_reveals_niji_card_to_hand(void){
     // TODO loop (degraded): for &cid in &[niji] {
     test_add_to_deck(&tg, cid);
     // TODO: }
-    int game = 0;
-    // TODO loop (degraded): while game.state.player1.main_deck.cards.len() < 40 {
+    // TODO: while game.state.player1.main_deck.cards.len() < 40 {
     int f = test_id(&tg, "PL!-sd1-010-SD");
     test_add_to_deck(&tg, f);
     // TODO: }
@@ -6686,7 +6631,7 @@ static void gen_bp3012_look4_reveals_niji_card_to_hand(void){
     // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard (zone=looked_at count=1 allow_skip=true group=虹ヶ咲)" );
     // TODO: game.select_indices(&[0]); // select the 虹ヶ咲 card (top of the looked four)
     // 
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&niji), "虹ヶ咲 card revealed from the looked four to hand" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", niji), "bp3012_look4_reveals_niji_card_to_hand");
     // 
 }
 
@@ -6707,8 +6652,7 @@ static void gen_pb1028_look2_adds_one_to_hand(void){
     // TODO loop (degraded): for &cid in &[prize] {
     test_add_to_deck(&tg, cid);
     // TODO: }
-    int game = 0;
-    // TODO loop (degraded): while game.state.player1.main_deck.cards.len() < 40 {
+    // TODO: while game.state.player1.main_deck.cards.len() < 40 {
     int f = test_id(&tg, "PL!-sd1-010-SD");
     test_add_to_deck(&tg, f);
     // TODO: }
@@ -6723,7 +6667,7 @@ static void gen_pb1028_look2_adds_one_to_hand(void){
     // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard (zone=looked_at count=1 allow_skip=false)" );
     // TODO: game.select_indices(&[0]); // add first looked card to hand
     // 
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&prize), "the top deck card was added to hand via look" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", prize), "pb1028_look2_adds_one_to_hand");
     // 
 }
 
@@ -6744,8 +6688,7 @@ static void gen_bp1011_look5_reveals_live_card_to_hand(void){
     // TODO loop (degraded): for &cid in &[live_card] {
     test_add_to_deck(&tg, cid);
     // TODO: }
-    int game = 0;
-    // TODO loop (degraded): while game.state.player1.main_deck.cards.len() < 40 {
+    // TODO: while game.state.player1.main_deck.cards.len() < 40 {
     int f = test_id(&tg, "PL!-sd1-010-SD");
     test_add_to_deck(&tg, f);
     // TODO: }
@@ -6760,7 +6703,7 @@ static void gen_bp1011_look5_reveals_live_card_to_hand(void){
     // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard (zone=looked_at count=1 allow_skip=true live_card)" );
     // TODO: game.select_indices(&[0]); // select the live card
     // 
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&live_card), "live card revealed from the looked five to hand" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", live_card), "bp1011_look5_reveals_live_card_to_hand");
     // 
 }
 
@@ -6855,13 +6798,12 @@ static void gen_bp7019_three_5ync_retrieves_live_from_waitroom(void){
     // 
     test_play_to_stage(&tg, me, 2);
     int guard = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && guard < 10 {
+    test_has_pending_choice(&tg);
     // TODO: guard += 1;
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&mus_live), "3x 5yncri5e! staged -> live card retrieved to hand" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", mus_live), "bp7019_three_5ync_retrieves_live_from_waitroom");
     // 
 }
 
@@ -6886,13 +6828,12 @@ static void gen_bp7019_only_two_5ync_no_retrieval(void){
     // 
     test_play_to_stage(&tg, me, 2);
     int guard = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && guard < 10 {
+    test_has_pending_choice(&tg);
     // TODO: guard += 1;
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
-    // TODO assert: assert!( !game.state.player1.hand.cards.contains(&mus_live), "only 2x 5yncri5e! -> no retrieval" );
+    CHECK((!test_zone_has_id(&tg, 0, "hand", mus_live)), "bp7019_only_two_5ync_no_retrieval");
     // 
 }
 
@@ -6941,13 +6882,12 @@ static void gen_pb1016_look_two_reveals_karin_to_hand(void){
     // TODO: game.state.process_pending_auto_abilities(&pid);
     // 
     int guard = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && guard < 10 {
+    test_has_pending_choice(&tg);
     // TODO: guard += 1;
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
-    // TODO assert: assert!( !game.state.player1.main_deck.cards.contains(&karin), "Karin left the deck" );
+    CHECK((!test_zone_has_id(&tg, 0, "deck", karin)), "pb1016_look_two_reveals_karin_to_hand");
     // 
 }
 
@@ -6969,13 +6909,12 @@ static void gen_bp4006_score_three_or_more_looks_five_mus_fetch(void){
     // 
     test_play_to_stage(&tg, me, 1);
     int guard = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && guard < 10 {
+    test_has_pending_choice(&tg);
     // TODO: guard += 1;
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&mus_member), "score gate met -> μ's member fetched to hand" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", mus_member), "bp4006_score_three_or_more_looks_five_mus_fetch");
     // 
 }
 
@@ -6994,13 +6933,12 @@ static void gen_bp4006_low_score_no_fetch(void){
     // 
     test_play_to_stage(&tg, me, 1);
     int guard = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && guard < 10 {
+    test_has_pending_choice(&tg);
     // TODO: guard += 1;
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
-    // TODO assert: assert!( !game.state.player1.hand.cards.contains(&mus_member), "score total < 3 -> no look, no fetch" );
+    CHECK((!test_zone_has_id(&tg, 0, "hand", mus_member)), "bp4006_low_score_no_fetch");
     // 
 }
 
@@ -7141,7 +7079,7 @@ static void gen_shizuku_turn_limit_blocks_second_activation(void){
     // TODO: game.select_indices(&[0]);
     // TODO: game.select_indices(&[0]);
     rb_resume_with_choice(&tg.state, 1);
-    // TODO assert: assert!(game.state.player1.hand.cards.contains(&live));
+    CHECK(test_zone_has_id(&tg, 0, "hand", live), "shizuku_turn_limit_blocks_second_activation");
     // // Second activation same turn should be blocked (turn1)
     int before_hand = tg.state.p[0].hand.n;
     // TODO action: let res = TurnEngine::execute_main_phase_action( &mut game.state, &ActionType::UseAbility, Some(shizuku), None, None, None, );
@@ -7174,7 +7112,7 @@ static void gen_shizuku_p_and_ar_variants_work(void){
     // TODO: game.select_indices(&[0]);
     // TODO: game.select_indices(&[0]);
     rb_resume_with_choice(&tg.state, 1);
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&live), "{} should also recover live", variant );
+    CHECK(test_zone_has_id(&tg, 0, "hand", live), "shizuku_p_and_ar_variants_work");
     // TODO: }
     // 
 }
@@ -7203,11 +7141,11 @@ static void gen_kanon_select_three_any_order_and_draw(void){
     // TODO: game.select_indices(&[0, 1, 2]);
     test_drain_auto_choices(&tg);
     // TODO: }
-    // TODO assert: assert!(game.state.player1.hand.cards.len() >= hand_before - 1, "should have at least hand_before-1 after debut (hand_before {} hand now {:?})", hand_before, game.state.player1.hand.cards);
+    CHECK(tg.state.p[0].hand.n, "kanon_select_three_any_order_and_draw");
     // // The draw is conditional, but at least the 3 cards should be under deck
     // // Check that discard no longer has the 3 group cards
     int cat = test_id(&tg, "PL!SP-bp1-004-PR");
-    // TODO assert: assert!(!game.state.player1.waitroom.cards.contains(&cat), "CatChu! should be under deck");
+    CHECK((!test_zone_has_id(&tg, 0, "discard", cat)), "kanon_select_three_any_order_and_draw");
     // 
 }
 
@@ -7257,7 +7195,7 @@ static void gen_kanon_only_one_group_present_can_still_select_one(void){
     // // Hand after: played kanon (-1) + maybe draw (+1) = >= hand_before -1
     // // We just verify the selected CatChu! is now under deck
     cat = test_id(&tg, "PL!SP-bp1-004-PR");
-    // TODO assert: assert!(!game.state.player1.waitroom.cards.contains(&cat), "CatChu! should be under deck after selection");
+    CHECK((!test_zone_has_id(&tg, 0, "discard", cat)), "kanon_only_one_group_present_can_still_select_one");
     // 
 }
 
@@ -7530,13 +7468,11 @@ static void gen_live_end_grant_expires_through_real_phase_rollover(void){
     rb_advance_phase(&tg.state);
     // 
     int guard = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.state.current_turn_phase == rabuka_engine::game_state::TurnPhase::Live && guard < 12 {
+    // TODO: while game.state.current_turn_phase == rabuka_engine::game_state::TurnPhase::Live && guard < 12 {
     // TODO: guard += 1;
     rb_advance_phase(&tg.state);
     test_drain_auto_choices(&tg);
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // TODO: }
@@ -7619,8 +7555,7 @@ static void gen_yell_proper_no_blade_gains_via_live(void){
     // 
     // // After performance, yell occurred and autos resolved.
     // // Drain any remaining choices (e.g., live success look)
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // // Debug verdicts on failure
@@ -7673,8 +7608,7 @@ static void gen_yell_proper_with_blade_blocks_via_live(void){
     // // One more pass lets first performance resolve (yell) and move to second performance
     rb_advance_phase(&tg.state);
     // 
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // TODO assert_eq (unresolved): assert_eq!( heart06(&game, sumire), 0, "Sumire must NOT gain when yell contained a blade heart" );
@@ -7706,8 +7640,7 @@ static void gen_yell_proper_all_blade_blocks_via_live(void){
     // // One more pass lets first performance resolve (yell) and move to second performance
     rb_advance_phase(&tg.state);
     // 
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // TODO assert_eq (unresolved): assert_eq!(heart06(&game, sumire), 0, "ALL blade must block Sumire");
@@ -7759,8 +7692,7 @@ static void gen_q148_blade_total_active_members(void){
     // 
     // 
     int safety = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && safety < 30 {
+    test_has_pending_choice(&tg);
     // TODO: safety += 1;
     // TODO: game.try_select_indices(&[0]).unwrap_or_default();
     // TODO: }
@@ -7819,8 +7751,7 @@ static void gen_q148_blade_total_includes_waited_member(void){
     // 
     // 
     int safety = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && safety < 30 {
+    test_has_pending_choice(&tg);
     // TODO: safety += 1;
     // TODO: game.try_select_indices(&[0]).unwrap_or_default();
     // TODO: }
@@ -7876,8 +7807,7 @@ static void gen_q148_blade_total_below_threshold(void){
     // 
     // 
     int safety = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && safety < 30 {
+    test_has_pending_choice(&tg);
     // TODO: safety += 1;
     // TODO: game.try_select_indices(&[0]).unwrap_or_default();
     // TODO: }
@@ -7973,8 +7903,7 @@ static void gen_eutopia_q38_three_live_cards_score_plus_2(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -8021,12 +7950,10 @@ static void gen_rainbow_q38_member_on_stage_per_live_card_blade(void){
     rb_advance_phase(&tg.state);
     // 
     // // Pay optional energy (1) for Rainbow's LiveStart ability
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, 1);
     // TODO: }
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -8238,7 +8165,9 @@ static void gen_q253_galaxy_gets_plus_one(void){
     // TODO loop (degraded): for _ in 0..20 {
     test_add_to_deck(&tg, filler);
     // TODO: }
-    // TODO: for (i, &id) in &[yell_live].iter().enumerate() {
+    int i = 0;
+    int id = 0;
+    // TODO loop (degraded): for (i, &id) in &[yell_live].iter().enumerate() {
     // TODO: game.state.player1.main_deck.cards.insert(1 + i, id);
     // TODO: }
     // 
@@ -8256,24 +8185,20 @@ static void gen_q253_galaxy_gets_plus_one(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
     rb_advance_phase(&tg.state);
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     rb_advance_phase(&tg.state);
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     rb_advance_phase(&tg.state);
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -8300,7 +8225,9 @@ static void gen_q253_kanan_first_galaxy_gets_nothing(void){
     // TODO loop (degraded): for _ in 0..20 {
     test_add_to_deck(&tg, filler);
     // TODO: }
-    // TODO: for (i, &id) in &[yell_live].iter().enumerate() {
+    int i = 0;
+    int id = 0;
+    // TODO loop (degraded): for (i, &id) in &[yell_live].iter().enumerate() {
     // TODO: game.state.player1.main_deck.cards.insert(1 + i, id);
     // TODO: }
     // 
@@ -8318,8 +8245,7 @@ static void gen_q253_kanan_first_galaxy_gets_nothing(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -8327,8 +8253,7 @@ static void gen_q253_kanan_first_galaxy_gets_nothing(void){
     rb_advance_phase(&tg.state);
     // // Process all pending choices: auto-skip yell-triggered abilities,
     // // but explicitly select a card for Kanan's non-optional move.
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     int actions = 0;
     int has_skip = 0;
     // TODO: .iter()
@@ -8344,20 +8269,17 @@ static void gen_q253_kanan_first_galaxy_gets_nothing(void){
     // TODO: game.select_indices(&[]);
     // TODO: }
     // // Consume any remaining choices from performance phase
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // // Second performance phase
     rb_advance_phase(&tg.state);
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // // Victory determination
     rb_advance_phase(&tg.state);
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -8383,7 +8305,9 @@ static void gen_q253_both_succeed_two_live_cards(void){
     // TODO loop (degraded): for _ in 0..20 {
     test_add_to_deck(&tg, filler);
     // TODO: }
-    // TODO: for (i, &id) in &[yell_live_1.iter().enumerate() {
+    int i = 0;
+    int id = 0;
+    // TODO loop (degraded): for (i, &id) in &[yell_live_1.iter().enumerate() {
     // TODO: game.state.player1.main_deck.cards.insert(1 + i, id);
     // TODO: }
     // 
@@ -8403,8 +8327,7 @@ static void gen_q253_both_succeed_two_live_cards(void){
     // 
     // // inlined helper answer_prompts
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     int actions = 0;
     // TODO: if actions
     // TODO: .iter()
@@ -8421,8 +8344,7 @@ static void gen_q253_both_succeed_two_live_cards(void){
     rb_advance_phase(&tg.state);
     // // inlined helper answer_prompts
     // 
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     actions = 0;
     // TODO: if actions
     // TODO: .iter()
@@ -8438,8 +8360,7 @@ static void gen_q253_both_succeed_two_live_cards(void){
     rb_advance_phase(&tg.state);
     // // inlined helper answer_prompts
     // 
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     actions = 0;
     // TODO: if actions
     // TODO: .iter()
@@ -8455,8 +8376,7 @@ static void gen_q253_both_succeed_two_live_cards(void){
     rb_advance_phase(&tg.state);
     // // inlined helper answer_prompts
     // 
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     actions = 0;
     // TODO: if actions
     // TODO: .iter()
@@ -8673,7 +8593,7 @@ static void gen_chika_adds_riko_gets_2_blades(void){
     test_drain_auto_choices(&tg);
     // 
     // 
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&riko), "Riko should be added to hand" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", riko), "chika_adds_riko_gets_2_blades");
     CHECK_EQ(rb_mods_get_blade(&tg.state.mods, chika), 2, "chika_adds_riko_gets_2_blades");
     // 
 }
@@ -8723,7 +8643,7 @@ static void gen_chika_adds_yo_gets_2_blades(void){
     test_drain_auto_choices(&tg);
     // 
     // 
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&yo), "Yo should be added to hand" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", yo), "chika_adds_yo_gets_2_blades");
     CHECK_EQ(rb_mods_get_blade(&tg.state.mods, chika), 2, "chika_adds_yo_gets_2_blades");
     // 
 }
@@ -8773,7 +8693,7 @@ static void gen_chika_adds_non_matching_member_gets_no_blades(void){
     test_drain_auto_choices(&tg);
     // 
     // 
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&honoka), "Honoka should be added to hand" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", honoka), "chika_adds_non_matching_member_gets_no_blades");
     CHECK_EQ(rb_mods_get_blade(&tg.state.mods, chika), 0, "chika_adds_non_matching_member_gets_no_blades");
     // 
 }
@@ -8864,8 +8784,7 @@ static void gen_location_condition_negative_too_few_cards(void){
     // // a buggy implementation could grab it from there.
     test_activate_ability(&tg, emma);
     int guard = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && guard < 10 {
+    test_has_pending_choice(&tg);
     // TODO: guard += 1;
     // TODO: game.select_indices(&[]);
     // TODO: }
@@ -9206,7 +9125,7 @@ static void gen_looked_at_discard_player_discards(void){
     // TODO: game.select_indices(&[0]);
     test_drain_auto_choices(&tg);
     // 
-    // TODO assert: assert!(game.state.player1.waitroom.cards.contains(&looked_at_id));
+    CHECK(test_zone_has_id(&tg, 0, "discard", looked_at_id), "looked_at_discard_player_discards");
     // TODO assert: assert!(game.state.player1.main_deck.cards.first().copied() != Some(looked_at_id));
     // 
 }
@@ -9248,7 +9167,7 @@ static void gen_looked_at_discard_player_skips(void){
     test_drain_auto_choices(&tg);
     // 
     // TODO assert: assert!(game.state.player1.main_deck.cards.first().copied() == Some(looked_at_id));
-    // TODO assert: assert!(!game.state.player1.waitroom.cards.contains(&looked_at_id));
+    CHECK((!test_zone_has_id(&tg, 0, "discard", looked_at_id)), "looked_at_discard_player_skips");
     // 
 }
 
@@ -9293,13 +9212,12 @@ static void gen_ren_baton_touch_from_liella_places_energy(void){
     test_play_to_stage(&tg, ren, 0);
     // action result consumed: .expect("play with baton touch");
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
     // // ab#0: 2 energy cards placed in wait state from energy deck
-    // TODO assert: assert!( game.state.player1.energy_zone.cards.len() >= energy_before + 2, "2 energy cards added when baton-touched from Liella! with ≥7 energy" );
+    CHECK(tg.state.p[0].energy.n, "ren_baton_touch_from_liella_places_energy");
     // TODO assert: assert!( game.state.player1.stage.stage.contains(&ren), "Ren placed on stage" );
     // 
 }
@@ -9342,8 +9260,7 @@ static void gen_ren_baton_touch_from_non_liella_no_energy(void){
     test_play_to_stage(&tg, ren, 0);
     // action result consumed: .expect("play with baton touch");
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -9393,8 +9310,7 @@ static void gen_ren_baton_touch_liella_insufficient_energy_no_effect(void){
     test_play_to_stage(&tg, ren, 0);
     // action result consumed: .expect("play with baton touch");
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -9428,7 +9344,7 @@ static void gen_sayaka_q63_ability_debut_no_cost_payment(void){
     // TODO: game.select_indices(&[0]);
     // 
     CHECK_EQ(tg.state.p[0].energy_active, 0, "sayaka_q63_ability_debut_no_cost_payment");
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&sayaka), "sayaka should be in waitroom after activation cost" );
+    CHECK(test_zone_has_id(&tg, 0, "discard", sayaka), "sayaka_q63_ability_debut_no_cost_payment");
     CHECK_EQ(tg.state.p[0].stage[1], hasuno_member, "sayaka_q63_ability_debut_no_cost_payment");
     // 
 }
@@ -9690,8 +9606,7 @@ static void gen_target_count_1_gain_resource_chooses_one_of_many(void){
     int player_id = 0;
     // TODO: rabuka_engine::turn::TurnEngine::trigger_live_start_abilities(&mut game.state, &player_id);
     // TODO: game.state.process_pending_auto_abilities(&player_id);
-    int game = 0;
-    // TODO loop (degraded): while game.state.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: game.state.process_pending_auto_abilities(&player_id);
     // TODO: }
@@ -9729,8 +9644,7 @@ static void gen_distinct_card_name_prevents_same_card_twice(void){
     int player_id = 0;
     // TODO: rabuka_engine::turn::TurnEngine::trigger_live_start_abilities(&mut game.state, &player_id);
     // TODO: game.state.process_pending_auto_abilities(&player_id);
-    int game = 0;
-    // TODO loop (degraded): while game.state.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: game.state.process_pending_auto_abilities(&player_id);
     // TODO: }
@@ -9766,8 +9680,7 @@ static void gen_target_count_on_draw_until_count(void){
     test_has_pending_choice(&tg);
     // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard (hand, count=2, allow_skip)" );
     // TODO: game.select_indices(&[0, 1]);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     CHECK_EQ(tg.state.p[0].hand.n, 5, "target_count_on_draw_until_count");
@@ -9932,8 +9845,7 @@ static void gen_q276_control_normal_live_does_go_to_success_zone(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // // inlined helper advance_to_live_victory
@@ -9942,14 +9854,13 @@ static void gen_q276_control_normal_live_does_go_to_success_zone(void){
     rb_advance_phase(&tg.state);
     // TODO: }
     // 
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // // One more pass finalizes the winner's success-zone placement.
     rb_advance_phase(&tg.state);
     // 
-    // TODO assert: assert!( game.state.player1.success_live_card_zone.cards.contains(&live), "control: a normal live card IS placed in the success zone; got {:?}", game.state.player1.success_live_card_zone.cards );
+    CHECK(test_zone_has_id(&tg, 0, "success", live), "q276_control_normal_live_does_go_to_success_zone");
     // 
 }
 
@@ -9999,8 +9910,7 @@ static void gen_q280_live_success_flags_placed_energy_not_member(void){
     // TODO: );
     // TODO: game.state.activating_card = Some(mei);
     // TODO: game.state.process_pending_auto_abilities(&pid);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -10094,8 +10004,7 @@ static void gen_chika_low_cost_hand_not_selectable(void){
     // 
     test_activate_ability(&tg, chika);
     int guard = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && guard < 20 {
+    test_has_pending_choice(&tg);
     // TODO: guard += 1;
     // TODO: game.select_indices(&[0]);
     // TODO: }
@@ -10138,7 +10047,7 @@ static void gen_eli_bp4_sequential_discard_two(void){
     // TODO: game.select_indices(&[1]);
     test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
-    // TODO assert: assert!(game.state.player1.hand.cards.contains(&live_a));
+    CHECK(test_zone_has_id(&tg, 0, "hand", live_a), "eli_bp4_sequential_discard_two");
     // 
 }
 
@@ -10161,7 +10070,7 @@ static void gen_eli_bp4_all_at_once_discard(void){
     // TODO: game.select_indices(&[0]);
     test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
-    // TODO assert: assert!(game.state.player1.hand.cards.contains(&live_a));
+    CHECK(test_zone_has_id(&tg, 0, "hand", live_a), "eli_bp4_all_at_once_discard");
     // 
 }
 
@@ -10239,8 +10148,7 @@ static void gen_stay_in_place_no_new_move(void){
     // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectTarget"), "expected SelectTarget (position|destination)" );
     // TODO: game.select_indices(&[2]); // right → right (stay)
     // 
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -10263,8 +10171,7 @@ static void gen_one_moves_two_stay(void){
     test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, 1);
     // // Third choice may/may not exist
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -10397,8 +10304,7 @@ static void gen_konata_q77_self_appearance_activates_energy(void){
     // 
     // TODO: game.activate_ability_index(konata, ENERGY_ABILITY_IDX);
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -10423,8 +10329,7 @@ static void gen_konata_no_appearance_condition_fails(void){
     // 
     // TODO: game.activate_ability_index(konata, ENERGY_ABILITY_IDX);
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -10447,8 +10352,7 @@ static void gen_konata_use_limit_blocks_second_activation(void){
     // // First activation
     int active_before = tg.state.p[0].energy_active;
     // TODO: game.activate_ability_index(konata, ENERGY_ABILITY_IDX);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -10471,7 +10375,7 @@ static void gen_sp_bp4_003_center_blade(void){
     tg.state.p[0].stage[1] = m;
     tg.state.p[0].stage[2] = -1;
     test_recalc(&tg);
-    // TODO assert: assert!( game.state.mods.get_blade_modifier(m) >= 2, "center constant should grant +2 blade" );
+    CHECK(rb_mods_get_blade(&tg.state.mods, m), "sp_bp4_003_center_blade");
     // 
 }
 
@@ -10562,8 +10466,7 @@ static void gen_bp3_031_per_waited_member_score_plus1(void){
     // TODO: );
     // TODO: game.state.activating_card = Some(live);
     // TODO: game.state.process_pending_auto_abilities(&pid);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -10614,8 +10517,7 @@ static void gen_bp3_031_fires_from_real_live_victory_flow(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -10625,8 +10527,7 @@ static void gen_bp3_031_fires_from_real_live_victory_flow(void){
     // // One more pass executes victory determination, which evaluates
     // // ライブ成功時 for succeeded lives.
     rb_advance_phase(&tg.state);
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -10656,7 +10557,7 @@ static void gen_sp_bp4_003_center_blade_2(void){
     tg.state.p[0].stage[1] = m;
     tg.state.p[0].stage[2] = -1;
     test_recalc(&tg);
-    // TODO assert: assert!( game.state.mods.get_blade_modifier(m) >= 2, "center constant grants blade" );
+    CHECK(rb_mods_get_blade(&tg.state.mods, m), "sp_bp4_003_center_blade");
     // 
 }
 
@@ -10771,8 +10672,7 @@ static void gen_rin_bp6_no_heart03_cards_skips_cleanly(void){
     // // no SelectCard prompt is created at all (FINALIZE_MOVE cards=[] with pending=false).
     test_has_pending_choice(&tg);
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -10806,8 +10706,7 @@ static void gen_shizuku_q196_draw_after_discard_cost(void){
     // TODO action: TurnEngine::execute_main_phase_action( &mut game.state, &ActionType::UseAbility, Some(shizuku), None, None, None, )
     // action result consumed: .expect("activate ability");
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -10922,8 +10821,7 @@ static void gen_sp_bp5_choice_energy_pay_and_draw(void){
     // action result consumed: .expect("play to stage");
     // 
     // // Optional cost choice: select_option(1) = PAY (0 = skip)
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, 1);
     // TODO: }
     // 
@@ -10969,8 +10867,7 @@ static void gen_sp_bp5_choice_energy_pay_and_wait_opponent(void){
     // // Optional cost choice: select_option(1) = PAY
     // // Effect auto-resolves: finds opponent member → selects wait opponent
     int choice_count = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     int hand_len = 0;
     int ct = 0;
     // TODO: eprintln!(
@@ -11018,8 +10915,7 @@ static void gen_sp_bp5_choice_energy_decline_cost_no_effect(void){
     // action result consumed: .expect("play to stage");
     // 
     // // No energy for cost → no optional cost choice → ability fires without effect
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -11394,10 +11290,10 @@ static void gen_tomari_discards_entire_hand_then_draws_6(void){
     // // After accepting: hand should be empty except the 6 drawn.
     CHECK_EQ(tg.state.p[0].hand.n, 6, "tomari_discards_entire_hand_then_draws_6");
     // // The discarded cards are in waitroom
-    // TODO assert: assert!( game.state.player1.waitroom.cards.len() >= expected_discard, "Discarded cards should be in waitroom" );
+    CHECK(tg.state.p[0].discard.n, "tomari_discards_entire_hand_then_draws_6");
     c = 0;
     // TODO loop (degraded): for c in &extra {
-    // TODO assert: assert!( !game.state.player1.hand.cards.contains(c), "Hand should not contain discarded card" );
+    CHECK((!test_zone_has_id(&tg, 0, "hand", c)), "tomari_discards_entire_hand_then_draws_6");
     // TODO: }
     // 
 }
@@ -11432,7 +11328,7 @@ static void gen_tomari_skips_discard_effect_does_not_fire(void){
     // // Skipping the optional discard gates the effect — no draw occurs.
     // // The hand keeps its cards (no discard happened).
     // TODO assert_eq (unresolved): assert_eq!( game.state.player1.hand.cards.len(), hand_before.len(), "Skipping discard should keep hand unchanged (effect does not fire)" );
-    // TODO assert: assert!( !game.state.player1.waitroom.cards.contains(&extra[0]) && !game.state.player1.waitroom.cards.contains(&extra[1]), "No cards should be discarded when skipping" );
+    CHECK((!test_zone_has_id(&tg, 0, "discard", extra)), "tomari_skips_discard_effect_does_not_fire");
     // 
 }
 
@@ -11570,8 +11466,7 @@ static void gen_emma_bp5_q215_only_wait_energy_available(void){
     // // (activation tries 2 placements with only 1 energy available). Answer
     // // each; the engine saturates when the zone runs dry.
     int guard = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: guard += 1;
     // TODO assert: assert!(guard <= 5, "runaway energy-selection prompts");
     // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard energy-zone prompt" );
@@ -11664,7 +11559,7 @@ static void gen_q175_hanano_cross_unit_discard_same_unit_as_each_other(void){
     // // Re-prompt: pick 1 more card, filtered to same unit
     // action result consumed: game.try_select_indices(&[0]).unwrap();
     // TODO assert_eq (unresolved): assert_eq!( game.state.player1.hand.cards.len(), before - 2, "2 cards were discarded" );
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&lily), "lilywhite (different unit) should remain" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", lily), "q175_hanano_cross_unit_discard_same_unit_as_each_other");
     // 
 }
 
@@ -11724,10 +11619,10 @@ static void gen_q175_multiple_qualifying_units_player_chooses_pair(void){
     // action result consumed: game.try_select_indices(&[2]).unwrap(); // pick lily_a
     // action result consumed: game.try_select_indices(&[0]).unwrap(); // pick lily_b (only remaining lilywhite)
     // 
-    // TODO assert: assert!( !game.state.player1.hand.cards.contains(&lily_a), "lily_a discarded" );
-    // TODO assert: assert!( !game.state.player1.hand.cards.contains(&lily_b), "lily_b discarded" );
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&print_a), "Printemps untouched" );
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&print_b), "Printemps untouched" );
+    CHECK((!test_zone_has_id(&tg, 0, "hand", lily_a)), "q175_multiple_qualifying_units_player_chooses_pair");
+    CHECK((!test_zone_has_id(&tg, 0, "hand", lily_b)), "q175_multiple_qualifying_units_player_chooses_pair");
+    CHECK(test_zone_has_id(&tg, 0, "hand", print_a), "q175_multiple_qualifying_units_player_chooses_pair");
+    CHECK(test_zone_has_id(&tg, 0, "hand", print_b), "q175_multiple_qualifying_units_player_chooses_pair");
     // 
 }
 
@@ -11772,8 +11667,8 @@ static void gen_hanano_no_qualifying_unit_skips_cost(void){
     // // No unit has ≥2 → optional cost skipped
     int hand_count = tg.state.p[0].hand.n;
     test_has_pending_choice(&tg);
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&print), "Printemps still in hand" );
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&lily), "lilywhite still in hand" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", print), "hanano_no_qualifying_unit_skips_cost");
+    CHECK(test_zone_has_id(&tg, 0, "hand", lily), "hanano_no_qualifying_unit_skips_cost");
     CHECK_EQ(tg.state.p[0].hand.n, hand_count, "hanano_no_qualifying_unit_skips_cost");
     // 
 }
@@ -12146,8 +12041,7 @@ static void gen_pr_energy_place_pay_cost_energy_in_wait(void){
     // 
     // // 登場 ability fires: first an auto-ability choice, then cost choice
     // // Handle all pending choices
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -12186,8 +12080,7 @@ static void gen_pr_energy_place_source_from_energy_deck(void){
     // action result consumed: .expect("play to stage");
     // 
     // // Handle auto-ability + cost choices
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -12263,7 +12156,7 @@ static void gen_rina_q226_skip_optional_placement(void){
     // // Deck should have 2 cards (4 -2 discarded, no placement)
     CHECK_EQ(tg.state.p[0].deck.n, 2, "rina_q226_skip_optional_placement");
     // // Live should remain in discard
-    // TODO assert: assert!(game.state.player1.waitroom.cards.contains(&live), "live stays in discard when skipped");
+    CHECK(test_zone_has_id(&tg, 0, "discard", live), "rina_q226_skip_optional_placement");
     // 
 }
 
@@ -12284,8 +12177,7 @@ static void gen_rina_q226_no_live_in_discard_no_prompt(void){
     // // With no live in discard, the optional SelectCard should either not appear or be skippable with 0 options
     // // Drain any pending (if appears, skip)
     int safety = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && safety < 5 {
+    test_has_pending_choice(&tg);
     // TODO: safety += 1;
     // TODO: game.select_indices(&[]);
     // TODO: }
@@ -12375,8 +12267,7 @@ static void gen_tote_mari_q68_debut_draws_and_sets_cannot_live(void){
     test_play_to_stage(&tg, totemari, 0);
     // 
     // // Debut ability auto-triggers: draw 1, set cannot_live
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -12412,8 +12303,7 @@ static void gen_tote_mari_q68_can_still_set_live_card(void){
     test_give_energy(&tg, 4);
     test_play_to_stage(&tg, totemari, 0);
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -12427,7 +12317,7 @@ static void gen_tote_mari_q68_can_still_set_live_card(void){
     // TODO: game.set_live_card(live);
     // 
     // // Setting succeeded — that's the expected behavior per Q68
-    // TODO assert: assert!( game.state.player1.live_card_zone.cards.contains(&live), "Live card can be set despite cannot_live" );
+    CHECK(test_zone_has_id(&tg, 0, "live", live), "tote_mari_q68_can_still_set_live_card");
     // 
 }
 
@@ -12461,8 +12351,7 @@ static void gen_tote_mari_q68_live_performance_discards_live_card(void){
     test_give_energy(&tg, 4);
     // 
     test_play_to_stage(&tg, totemari, 1);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -12476,14 +12365,14 @@ static void gen_tote_mari_q68_live_performance_discards_live_card(void){
     // 
     // // P1 live card set: set the live card (cannot_live should NOT block this)
     // TODO: game.set_live_card(live);
-    // TODO assert: assert!(game.state.player1.live_card_zone.cards.contains(&live));
+    CHECK(test_zone_has_id(&tg, 0, "live", live), "tote_mari_q68_live_performance_discards_live_card");
     // 
     // // Pass to LiveCardSetSecondAttacker (P2's turn)
     rb_advance_phase(&tg.state);
     // 
     // // P2 can also set a live card
     // TODO: game.set_live_card(opp_live);
-    // TODO assert: assert!(game.state.player2.live_card_zone.cards.contains(&opp_live));
+    CHECK(test_zone_has_id(&tg, 1, "live", opp_live), "tote_mari_q68_live_performance_discards_live_card");
     // 
     // // Pass to performance phase and execute P1's performance
     // // First pass: LiveCardSetSecondAttacker → FirstAttackerPerformance (sets phase)
@@ -12496,12 +12385,12 @@ static void gen_tote_mari_q68_live_performance_discards_live_card(void){
     // // After P1's performance, live card should go to waitroom
     // 
     // // P1's live card should have been discarded during performance due to cannot_live
-    // TODO assert: assert!( !game.state.player1.live_card_zone.cards.contains(&live), "P1 live card discarded during performance (cannot_live)" );
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&live), "P1 live card moved to waitroom" );
+    CHECK((!test_zone_has_id(&tg, 0, "live", live)), "tote_mari_q68_live_performance_discards_live_card");
+    CHECK(test_zone_has_id(&tg, 0, "discard", live), "tote_mari_q68_live_performance_discards_live_card");
     // 
     // // P2's live card should still be present (opponent unaffected by cannot_live)
     // // P2 performs second
-    // TODO assert: assert!( game.state.player2.live_card_zone.cards.contains(&opp_live), "P2 live card remains (opponent cannot_live does not affect P2)" );
+    CHECK(test_zone_has_id(&tg, 1, "live", opp_live), "tote_mari_q68_live_performance_discards_live_card");
     // 
     // // Cheer count should be 0 for P1 (no yell occurs with cannot_live)
     // TODO assert_eq (unresolved): assert_eq!( game.state.player1_cheer_blade_heart_count, 0, "P1 cheer count is 0 (cannot_live)" );
@@ -12765,8 +12654,7 @@ static void gen_kanan_debut_non_group_member_no_formation(void){
     // 
     // // Drain anything that appears.
     int guard = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && guard < 20 {
+    test_has_pending_choice(&tg);
     // TODO: guard += 1;
     // TODO: game.select_indices(&[]);
     // TODO: }
@@ -12790,8 +12678,7 @@ static void gen_dive_live_zone_only_ab1_triggers(void){
     int pid = 0;
     // TODO: rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(&mut g.state, &pid);
     // TODO: g.state.process_pending_auto_abilities(&pid);
-    int g = 0;
-    // TODO loop (degraded): while g.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: g.select_indices(&[0]);
     // TODO: }
     // 
@@ -12813,8 +12700,7 @@ static void gen_dive_not_in_live_zone_no_trigger(void){
     int pid = 0;
     // TODO: rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(&mut g.state, &pid);
     // TODO: g.state.process_pending_auto_abilities(&pid);
-    int g = 0;
-    // TODO loop (degraded): while g.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: g.select_indices(&[0]);
     // TODO: }
     // 
@@ -12835,8 +12721,7 @@ static void gen_dive_no_niji_no_target(void){
     int pid = 0;
     // TODO: rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(&mut g.state, &pid);
     // TODO: g.state.process_pending_auto_abilities(&pid);
-    int g = 0;
-    // TODO loop (degraded): while g.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: g.select_indices(&[0]);
     // TODO: }
     // 
@@ -13081,14 +12966,12 @@ static void gen_strawberry_trapper_q132_conditions_met_score_plus_2(void){
     // // Let the test proceed without getting stuck in AUTO_TRIGGER loops
     // // Handle infinite Riko auto-trigger loop: just let choices pile up
     // TODO loop (degraded): for _ in 0..5 {
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     rb_advance_phase(&tg.state);
     // TODO: }
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -13227,8 +13110,7 @@ static void gen_umi_q228_four_unique_groups_cost_zero(void){
     // 
     test_activate_ability(&tg, umi);
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -13301,8 +13183,7 @@ static void gen_umi_q228_reduction_charges_effective_cost(void){
     // TODO assert_eq (unresolved): assert_eq!( offer.parameters.as_ref().and_then(|p| p.base_cost), Some(4), "printed base cost stays 4 for display" );
     // 
     test_activate_ability(&tg, umi);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -13507,7 +13388,7 @@ static void gen_mia_real_dia_mill_triggers_ab0(void){
     // 
     int saw = 0;
     CHECK(saw, "mia_real_dia_mill_triggers_ab0");
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&mia), "ミア should be recovered to hand after accepting the optional" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", mia), "mia_real_dia_mill_triggers_ab0");
     // 
 }
 
@@ -13558,8 +13439,8 @@ static void gen_mia_real_dia_mill_decline_no_recover(void){
     int saw = 0;
     // 
     CHECK(saw, "mia_real_dia_mill_decline_no_recover");
-    // TODO assert: assert!( !game.state.player1.hand.cards.contains(&mia), "declining must leave ミア in the discard, not recovered" );
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&mia), "ミア stays in the discard after decline" );
+    CHECK((!test_zone_has_id(&tg, 0, "hand", mia)), "mia_real_dia_mill_decline_no_recover");
+    CHECK(test_zone_has_id(&tg, 0, "discard", mia), "mia_real_dia_mill_decline_no_recover");
     // 
 }
 
@@ -14630,8 +14511,7 @@ static void gen_nico_bp4_debut_wait_blocked_by_wait_immunity(void){
     test_add_to_hand(&tg, nico);
     test_give_energy(&tg, 10);
     test_play_to_stage(&tg, nico, 1);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -14656,8 +14536,7 @@ static void gen_nico_bp4_q189_debut_opponent_waits_own_member(void){
     // 
     // // Debut fires: opponent waits 1 of their own active members
     // // (with only 1 eligible target, the effect auto-resolves)
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -15001,8 +14880,7 @@ static void gen_pb1014_baton_over_own_name_draws_two_discards_one(void){
     int d2 = test_id(&tg, "PL!-sd1-010-SD");
     test_add_to_deck(&tg, d1);
     test_add_to_deck(&tg, d2);
-    int game = 0;
-    // TODO loop (degraded): while game.state.player1.main_deck.cards.len() < 40 {
+    // TODO: while game.state.player1.main_deck.cards.len() < 40 {
     int f = test_id(&tg, "PL!-sd1-010-SD");
     test_add_to_deck(&tg, f);
     // TODO: }
@@ -15010,13 +14888,13 @@ static void gen_pb1014_baton_over_own_name_draws_two_discards_one(void){
     test_play_to_stage(&tg, me, 0);
     // 
     // // Draw 2 landed...
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&d1) && game.state.player1.hand.cards.contains(&d2), "both drawn cards are in hand" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", d1), "pb1014_baton_over_own_name_draws_two_discards_one");
     // // ...then the hand-discard cost/effect step asks which card to bin.
     test_has_pending_choice(&tg);
     // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard (hand, count=1)" );
     // TODO: game.select_indices(&[0]);
     // 
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&old_me), "the replaced 中須かすみ sits in the waitroom" );
+    CHECK(test_zone_has_id(&tg, 0, "discard", old_me), "pb1014_baton_over_own_name_draws_two_discards_one");
     CHECK_EQ(tg.state.p[0].hand.n, 1, "pb1014_baton_over_own_name_draws_two_discards_one");
     // TODO assert: assert!( !game.state.player1.waitroom.cards.is_empty(), "a discard happened" );
     // 
@@ -15371,13 +15249,12 @@ static void gen_bp6013_success_score_six_retrieves_mus_live(void){
     // TODO: game.state.process_pending_auto_abilities(&pid);
     // 
     int guard = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && guard < 10 {
+    test_has_pending_choice(&tg);
     // TODO: guard += 1;
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&mus_live), "score total >= 6 -> μ's live retrieved to hand" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", mus_live), "bp6013_success_score_six_retrieves_mus_live");
     // 
 }
 
@@ -15415,13 +15292,12 @@ static void gen_bp6013_empty_success_zone_no_retrieval(void){
     // TODO: game.state.process_pending_auto_abilities(&pid);
     // 
     int guard = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && guard < 10 {
+    test_has_pending_choice(&tg);
     // TODO: guard += 1;
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
-    // TODO assert: assert!( !game.state.player1.hand.cards.contains(&mus_live), "empty success zone -> no retrieval" );
+    CHECK((!test_zone_has_id(&tg, 0, "hand", mus_live)), "bp6013_empty_success_zone_no_retrieval");
     // 
 }
 
@@ -15704,18 +15580,16 @@ static void gen_mebius_single_copy_blocks_both_when_tied(void){
     // 
     // TODO loop (degraded): for _ in 0..3 { game.pass(); }
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() { game.select_indices(&[0]); }
+    test_has_pending_choice(&tg);
     // // inlined helper advance_victory
     // 
     // TODO loop (degraded): for _ in 0..3 { game.pass(); }
     // 
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() { game.select_indices(&[0]); }
+    test_has_pending_choice(&tg);
     rb_advance_phase(&tg.state);
     // // Both should be blocked (neither in success)
-    // TODO assert: assert!(!game.state.player1.success_live_card_zone.cards.contains(&mebius_p1));
-    // TODO assert: assert!(!game.state.player2.success_live_card_zone.cards.contains(&other_live_p2));
+    CHECK((!test_zone_has_id(&tg, 0, "success", mebius_p1)), "mebius_single_copy_blocks_both_when_tied");
+    CHECK((!test_zone_has_id(&tg, 1, "success", other_live_p2)), "mebius_single_copy_blocks_both_when_tied");
     // 
 }
 
@@ -15772,14 +15646,12 @@ static void gen_mebius_no_block_when_scores_untied_both_succeed(void){
     // TODO: game.set_live_card(fail_live_p2);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() { game.select_indices(&[]); }
+    test_has_pending_choice(&tg);
     // // inlined helper advance_victory
     // 
     // TODO loop (degraded): for _ in 0..3 { game.pass(); }
     // 
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() { game.select_indices(&[0]); }
+    test_has_pending_choice(&tg);
     rb_advance_phase(&tg.state);
     int p1_total = 0;
     int p2_total = 0;
@@ -15789,7 +15661,7 @@ static void gen_mebius_no_block_when_scores_untied_both_succeed(void){
     // TODO: if snap.player_id == game.state.player2.id { p2_total = Some(snap.total_score); }
     // TODO: }
     // TODO: assert_ne!(p1_total, p2_total, "should be untied 2 vs 0, got {:?} vs {:?}", p1_total, p2_total);
-    // TODO assert: assert!(game.state.player1.success_live_card_zone.cards.contains(&mebius_p1), "untied: P1 mebius should reach success zone");
+    CHECK(test_zone_has_id(&tg, 0, "success", mebius_p1), "mebius_no_block_when_scores_untied_both_succeed");
     // 
 }
 
@@ -15848,17 +15720,15 @@ static void gen_mebius_restriction_expires_next_live(void){
     // 
     // TODO loop (degraded): for _ in 0..3 { game.pass(); }
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() { game.select_indices(&[0]); }
+    test_has_pending_choice(&tg);
     // // inlined helper advance_victory
     // 
     // TODO loop (degraded): for _ in 0..3 { game.pass(); }
     // 
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() { game.select_indices(&[0]); }
+    test_has_pending_choice(&tg);
     rb_advance_phase(&tg.state);
     // // First tied live blocked
-    // TODO assert: assert!(!game.state.player1.success_live_card_zone.cards.contains(&mebius_p1));
+    CHECK((!test_zone_has_id(&tg, 0, "success", mebius_p1)), "mebius_restriction_expires_next_live");
     // // Now start a second live in next turn: give new lives that should not be blocked
     // // Advance to next turn's live phase
     // // Simplest: directly give a new live to p1 and set it, expecting it to reach success zone since restriction cleared at live_end
@@ -15870,8 +15740,7 @@ static void gen_mebius_restriction_expires_next_live(void){
     // TODO: if game.state.current_phase.to_string().contains("LiveCardSet") {
     // TODO: game.set_live_card(next_live);
     // TODO loop (degraded): for _ in 0..3 { game.pass(); }
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() { game.select_indices(&[0]); }
+    test_has_pending_choice(&tg);
     rb_advance_phase(&tg.state);
     // // The next live should be able to place (not blocked by previous tie)
     // // We check that success zone is not universally blocked: at least next_live OR mebius could be there
@@ -15880,7 +15749,7 @@ static void gen_mebius_restriction_expires_next_live(void){
     CHECK_EQ(tg.state.p[0].success.n, 0, "mebius_restriction_expires_next_live");
     // TODO: } else {
     // // If not in live phase, at least verify waitrooms still contain first mebius and success zones are still empty for first
-    // TODO assert: assert!(game.state.player1.waitroom.cards.contains(&mebius_p1));
+    CHECK(test_zone_has_id(&tg, 0, "discard", mebius_p1), "mebius_restriction_expires_next_live");
     // TODO: }
     // 
 }
@@ -15937,14 +15806,12 @@ static void gen_mebius_tie_when_both_fail_still_restricts(void){
     rb_advance_phase(&tg.state);
     // TODO: game.set_live_card(fail_live_p2);
     // TODO loop (degraded): for _ in 0..3 { game.pass(); }
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() { game.select_indices(&[]); }
+    test_has_pending_choice(&tg);
     // // inlined helper advance_victory
     // 
     // TODO loop (degraded): for _ in 0..3 { game.pass(); }
     // 
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() { game.select_indices(&[0]); }
+    test_has_pending_choice(&tg);
     rb_advance_phase(&tg.state);
     // // P1's mebius succeeded, P2 failed -> totals 2 vs 0 untied, so not blocked; P1 should be in success
     // // This is actually untied case, not tie-both-fail. For tie-both-fail we need both lives fail with 0-0.
@@ -16133,8 +16000,7 @@ static void gen_aurora_flower_all_distinct_names_and_costs_grants_score(void){
     rb_advance_phase(&tg.state);
     // 
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -16179,8 +16045,7 @@ static void gen_aurora_flower_same_cost_no_score(void){
     rb_advance_phase(&tg.state);
     // 
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -16225,8 +16090,7 @@ static void gen_aurora_flower_same_name_no_score(void){
     rb_advance_phase(&tg.state);
     // 
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -16270,8 +16134,7 @@ static void gen_aurora_flower_two_members_no_score(void){
     rb_advance_phase(&tg.state);
     // 
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -16366,7 +16229,7 @@ static void gen_yoshiko_n_live_start_mills_deck_bottom_one(void){
     // TODO assert_eq (unresolved): assert_eq!( p1_waitroom.len(), 1, "exactly 1 card discarded, got {}", p1_waitroom.len() );
     // TODO assert_eq (unresolved): assert_eq!( p1_waitroom.first(), Some(&bottom_most), "the bottom-most card (last in deck) must be discarded, discard={:?}", p1_waitroom );
     // // Hand card untouched.
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&hand_card), "the hand card must NOT be discarded" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", hand_card), "yoshiko_n_live_start_mills_deck_bottom_one");
     // 
 }
 
@@ -16408,8 +16271,7 @@ static void gen_mari_live_start_mills_deck_bottom_one(void){
     // // Mari ab#1: デッキの一番下のカードを控え室に置いてもよい → optional discard.
     // // The optional-cost choice is ["No", "Yes"] — accept with option 1.
     int guard = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && guard < 4 {
+    test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, 1);
     // TODO: guard += 1;
     // TODO: }
@@ -16504,7 +16366,7 @@ static void gen_kanata_skip_optional_cost_effect_does_not_fire(void){
     // 
     // TODO assert: assert!( !in_hand(&game, eligible), "declining the optional cost means the effect must NOT resolve" );
     // TODO assert: assert!( !in_waitroom(&game, eligible), "the eligible card must stay in the deck, not be discarded" );
-    // TODO assert: assert!( game.state.player1.main_deck.cards.contains(&eligible), "the eligible card should remain on the deck" );
+    CHECK(test_zone_has_id(&tg, 0, "deck", eligible), "kanata_skip_optional_cost_effect_does_not_fire");
     // 
 }
 
@@ -16994,13 +16856,12 @@ static void gen_maki_baton_touch_places_cheap_member_on_stage(void){
     // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard (cheap member from hand)" );
     // TODO: game.select_indices(&[0]); // select cheap from hand
     // // Resolve any remaining choices (positioning sub-choice, etc.)
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, 0);
     // TODO: }
     // 
     // TODO assert: assert!( game.state.player1.stage.stage.contains(&cheap), "cheap member appeared on stage" );
-    // TODO assert: assert!( !game.state.player1.hand.cards.contains(&cheap), "cheap member removed from hand" );
+    CHECK((!test_zone_has_id(&tg, 0, "hand", cheap)), "maki_baton_touch_places_cheap_member_on_stage");
     // 
 }
 
@@ -17045,7 +16906,7 @@ static void gen_maki_no_baton_touch_no_appear(void){
     // 
     test_play_to_stage(&tg, maki, 1);
     // 
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&cheap), "cheap member stays in hand (no baton touch)" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", cheap), "maki_no_baton_touch_no_appear");
     // 
 }
 
@@ -17069,7 +16930,7 @@ static void gen_maki_no_eligible_hand_skips(void){
     test_play_to_stage(&tg, maki, 1);
     // action result consumed: .expect("baton touch");
     // 
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&too_expensive), "cost-9 card stays in hand" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", too_expensive), "maki_no_eligible_hand_skips");
     // 
 }
 
@@ -17123,8 +16984,7 @@ static void gen_all_5_match_selects_muse_card_and_blade(void){
     // // inlined helper activate_and_resolve
     // 
     test_activate_ability(&tg, maki);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -17141,7 +17001,7 @@ static void gen_all_5_match_selects_muse_card_and_blade(void){
     CHECK_EQ(blade, 3, "all_5_match_selects_muse_card_and_blade");
     // 
     // // Remaining 4 revealed cards + 1 cost discard = 5 in discard
-    // TODO assert: assert!(game.state.player1.waitroom.cards.len() >= 5, "At least 5 cards in discard (4 remaining revealed + 1 cost), got {}", game.state.player1.waitroom.cards.len());
+    CHECK(tg.state.p[0].discard.n, "all_5_match_selects_muse_card_and_blade");
     // 
 }
 
@@ -17193,8 +17053,7 @@ static void gen_gain_resource_blade_applied_to_activating_card(void){
     // // inlined helper activate_and_resolve
     // 
     test_activate_ability(&tg, maki);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -17255,8 +17114,7 @@ static void gen_use_limit_once(void){
     // // inlined helper activate_and_resolve
     // 
     test_activate_ability(&tg, maki);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -17265,8 +17123,7 @@ static void gen_use_limit_once(void){
     // // Second activation — should fail (use_limit: 1)
     test_activate_ability(&tg, maki);
     // action result consumed: if result.is_ok() {
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // TODO: }
@@ -17331,8 +17188,7 @@ static void gen_miracle_stay_tune_both_conditions_met_score_plus_1(void){
     rb_advance_phase(&tg.state);
     // 
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -17381,8 +17237,7 @@ static void gen_miracle_stay_tune_fewer_than_3_distinct_members_no_score(void){
     rb_advance_phase(&tg.state);
     // 
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -17431,8 +17286,7 @@ static void gen_miracle_stay_tune_empty_success_zone_no_score(void){
     rb_advance_phase(&tg.state);
     // 
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -17479,8 +17333,7 @@ static void gen_miracle_stay_tune_neither_condition_no_score(void){
     rb_advance_phase(&tg.state);
     // 
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -17521,8 +17374,7 @@ static void gen_mute_kibiriver_normal_flow(void){
     // TODO: game.state.process_pending_auto_abilities(&pid);
     // 
     // // Handle pending choice — select a card
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     int acts = 0;
     // TODO: if !acts.is_empty() {
     // TODO: game.select_generated(0);
@@ -17557,7 +17409,7 @@ static void gen_mute_kibiriver_normal_flow(void){
     // TODO assert_eq (unresolved): assert_eq!( game.state .mods .get_heart_modifier(kasumi, rabuka_engine::card::HeartColor::Heart06), 1, "heart06 in selected card → +1" );
     // 
     // // All revealed cards discarded
-    // TODO assert: assert!( game.state.player1.waitroom.cards.len() >= 4, "Revealed cards should be discarded (got {})", game.state.player1.waitroom.cards.len() );
+    CHECK(tg.state.p[0].discard.n, "mute_kibiriver_normal_flow");
     // 
 }
 
@@ -17603,14 +17455,13 @@ static void gen_mute_kibiriver_no_kasumi_in_revealed_no_selection(void){
     // TODO: game.state.process_pending_auto_abilities(&pid);
     // // Reveal 4 filler, no Kasumi to select → should have no SelectCard or auto-skip
     // // The ability should still discard the 4 revealed
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     int acts = 0;
     // TODO: if !acts.is_empty() { game.select_generated(0); } else { game.select_indices(&[]); }
     test_drain_auto_choices(&tg);
     // TODO: }
     test_has_pending_choice(&tg);
-    // TODO assert: assert!(game.state.player1.waitroom.cards.len() >= 4, "revealed filler should be discarded");
+    CHECK(tg.state.p[0].discard.n, "mute_kibiriver_no_kasumi_in_revealed_no_selection");
     // // No heart should be gained because no Kasumi selected
     // TODO assert_eq (unresolved): assert_eq!(game.state.mods.get_heart_modifier(kasumi, rabuka_engine::card::HeartColor::Heart03), 0);
     // 
@@ -17637,10 +17488,9 @@ static void gen_mute_kibiriver_multiple_kasumi_in_revealed_select_one(void){
     // TODO: game.state.process_pending_auto_abilities(&pid);
     test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() { game.select_indices(&[]); game.drain_auto_ability_choices(); }
     test_has_pending_choice(&tg);
-    // TODO assert: assert!(game.state.player1.waitroom.cards.len() >= 4);
+    test_has_pending_choice(&tg);
+    CHECK(tg.state.p[0].discard.n, "mute_kibiriver_multiple_kasumi_in_revealed_select_one");
     // 
 }
 
@@ -18190,8 +18040,7 @@ static void gen_energy_phase_draws_one_and_empty_deck_skips(void){
     // TODO: guard += 1;
     // TODO assert: assert!(guard <= 24, "RB_PHASE_ENERGY {:?} (0 {}) not reached", RB_PHASE_ENERGY, 0);
     rb_advance_phase(&tg.state);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // TODO: }
@@ -18201,7 +18050,7 @@ static void gen_energy_phase_draws_one_and_empty_deck_skips(void){
     rb_advance_phase(&tg.state);
     // 
     CHECK_EQ(tg.state.p[0].energy.n, 1, "energy_phase_draws_one_and_empty_deck_skips");
-    // TODO assert: assert!( game.state.player1.energy_zone.cards.contains(&seeded), "the SEEDED card was moved (top-of-deck order respected)" );
+    CHECK(test_zone_has_id(&tg, 0, "energy", seeded), "energy_phase_draws_one_and_empty_deck_skips");
     // 
 }
 
@@ -18234,8 +18083,7 @@ static void gen_draw_phase_on_empty_main_deck_refreshes_then_draws(void){
     // TODO: guard += 1;
     // TODO assert: assert!(guard <= 24, "RB_PHASE_ENERGY {:?} (0 {}) not reached", RB_PHASE_ENERGY, 0);
     rb_advance_phase(&tg.state);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // TODO: }
@@ -18249,8 +18097,7 @@ static void gen_draw_phase_on_empty_main_deck_refreshes_then_draws(void){
     // TODO: guard += 1;
     // TODO assert: assert!(guard <= 24, "RB_PHASE_MAIN {:?} (0 {}) not reached", RB_PHASE_MAIN, 0);
     rb_advance_phase(&tg.state);
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // TODO: }
@@ -18283,8 +18130,7 @@ static void gen_live_card_set_refill_draws_placed_count(void){
     // TODO: {
     // TODO: guard += 1;
     rb_advance_phase(&tg.state);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // TODO: }
@@ -18367,8 +18213,7 @@ static void gen_ginako_discard_non_ginako_gains_one_blade(void){
     test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -18427,8 +18272,7 @@ static void gen_ginako_skip_cost_gains_zero_blades(void){
     test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -18552,15 +18396,13 @@ static void gen_rin_activate_across_turns(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // // Handle LiveSuccess under_member selection (select any available cards)
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     rb_advance_phase(&tg.state);
@@ -18624,8 +18466,7 @@ static void gen_rin_live_success_ability_triggers(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -18986,7 +18827,7 @@ static void gen_shizuku_heart_copy_matches_placed_card(void){
     // 
     // // 1. The discard card was moved under shizuku.
     // TODO assert: assert!( game.state.player1.stage.under_cards[1].contains(&ayumu), "上原歩夢 should be placed under shizuku" );
-    // TODO assert: assert!( !game.state.player1.waitroom.cards.contains(&ayumu), "上原歩夢 should leave the waitroom" );
+    CHECK((!test_zone_has_id(&tg, 0, "discard", ayumu)), "shizuku_heart_copy_matches_placed_card");
     // 
     // // 2. The heart_copy modifier maps shizuku → the placed card.
     // TODO assert_eq (unresolved): assert_eq!( game.state.mods.get_heart_copy(shizuku), Some(ayumu), "heart_copy should map shizuku → placed card" );
@@ -19377,7 +19218,9 @@ static void gen_butterfly_wing_q260_suppressed_not_resolved(void){
     // TODO loop (degraded): for _ in 0..20 {
     test_add_to_deck(&tg, filler);
     // TODO: }
-    // TODO: for (i, &id) in &[].iter().enumerate() {
+    int i = 0;
+    int id = 0;
+    // TODO loop (degraded): for (i, &id) in &[].iter().enumerate() {
     // TODO: game.state.player1.main_deck.cards.insert(1 + i, id);
     // TODO: }
     // 
@@ -19401,14 +19244,12 @@ static void gen_butterfly_wing_q260_suppressed_not_resolved(void){
     // TODO assert_eq (unresolved): assert_eq!( game.state.ability_queue.len(), 0, "Q260: Suppressed LiveStart abilities should NOT be in the queue (length 0)" );
     // 
     // // Drain any pending choices (should be none — LiveStart fully suppressed)
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
     rb_advance_phase(&tg.state);
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -19447,7 +19288,9 @@ static void gen_butterfly_wing_q260_control_live_start_resolves(void){
     // TODO loop (degraded): for _ in 0..20 {
     test_add_to_deck(&tg, filler);
     // TODO: }
-    // TODO: for (i, &id) in &[].iter().enumerate() {
+    int i = 0;
+    int id = 0;
+    // TODO loop (degraded): for (i, &id) in &[].iter().enumerate() {
     // TODO: game.state.player1.main_deck.cards.insert(1 + i, id);
     // TODO: }
     // 
@@ -19472,19 +19315,17 @@ static void gen_butterfly_wing_q260_control_live_start_resolves(void){
     // 
     // // Process all pending choices (LiveStart abilities resolve)
     // // Mei's live_start gives "エネルギーを2枚アクティブにする" — 2 Meis = 4 energy activated
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
     rb_advance_phase(&tg.state);
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
     // // Energy should have increased since LiveStart abilities resolved
-    // TODO assert: assert!( game.state.player1.energy_zone.active_count() >= 2, "Control: LiveStart abilities resolved → energy should have been activated (got {})", game.state.player1.energy_zone.active_count() );
+    CHECK(tg.state.p[0].energy_active, "butterfly_wing_q260_control_live_start_resolves");
     // 
 }
 
@@ -19531,24 +19372,20 @@ static void gen_butterfly_wing_live_success_scores_with_live_start_members(void)
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
     rb_advance_phase(&tg.state);
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     rb_advance_phase(&tg.state);
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     rb_advance_phase(&tg.state);
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -19600,24 +19437,20 @@ static void gen_butterfly_wing_no_live_start_member_no_score(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
     rb_advance_phase(&tg.state);
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     rb_advance_phase(&tg.state);
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     rb_advance_phase(&tg.state);
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -19832,9 +19665,9 @@ static void gen_izumi_bp6_q257_single_match_moves_to_hand(void){
     // 
     // TODO assert_eq (unresolved): assert_eq!( game.state.mods.get_orientation_modifier(izumi), Some("wait"), "Q257 Case B: Izumi must become wait before step 2" );
     // 
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&matching_live), "Q257 Case B: matching 蓮ノ空 live (score≤4) should be in hand" );
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&filler), "Q257 Case B: non-matching discard card should remain in waitroom" );
-    // TODO assert: assert!( !game.state.player1.waitroom.cards.contains(&matching_live), "Q257 Case B: matching live should no longer be in waitroom" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", matching_live), "izumi_bp6_q257_single_match_moves_to_hand");
+    CHECK(test_zone_has_id(&tg, 0, "discard", filler), "izumi_bp6_q257_single_match_moves_to_hand");
+    CHECK((!test_zone_has_id(&tg, 0, "discard", matching_live)), "izumi_bp6_q257_single_match_moves_to_hand");
     // 
 }
 
@@ -19881,8 +19714,8 @@ static void gen_izumi_bp6_q257_multiple_matches_prompts_choice(void){
     // 
     // TODO: game.select_indices(&[0]);
     // // Index 0 = match1 (waitroom insertion order): exact outcome pinned.
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&match1), "Q257 Case D: selected (first) matching live should be in hand" );
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&match2) && !game.state.player1.waitroom.cards.contains(&match1), "Q257 Case D: unchosen live stays in waitroom, chosen one left it" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", match1), "izumi_bp6_q257_multiple_matches_prompts_choice");
+    CHECK(test_zone_has_id(&tg, 0, "discard", match2), "izumi_bp6_q257_multiple_matches_prompts_choice");
     // 
 }
 
@@ -19924,13 +19757,13 @@ static void gen_kinako_activate_discards_matching_card(void){
     // TODO: game.select_indices(&[0]);
     // 
     // // Verify cost_card was discarded from hand
-    // TODO assert: assert!( !game.state.player1.hand.cards.contains(&cost_card), "Cost card should have been removed from hand" );
+    CHECK((!test_zone_has_id(&tg, 0, "hand", cost_card)), "kinako_activate_discards_matching_card");
     // 
     // // Verify cost_card is now in discard
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&cost_card), "Cost card should be in discard" );
+    CHECK(test_zone_has_id(&tg, 0, "discard", cost_card), "kinako_activate_discards_matching_card");
     // 
     // // Verify high_cost_card is still in hand (not eligible by cost)
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&high_cost_card), "High cost card should still be in hand (filtered by cost_limit)" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", high_cost_card), "kinako_activate_discards_matching_card");
     // 
 }
 
@@ -19964,15 +19797,14 @@ static void gen_kinako_q108_sumire_discard_no_blade(void){
     // TODO: game.select_indices(&[0]);
     // 
     // // Drain any remaining choices (debut ability activation followup, etc.)
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     int t = 0;
     // TODO: eprintln!("[DRAIN] choice={:?}", t);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
     // // Sumire should be in discard (cost paid)
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&sumire), "Q240: Sumire should be discarded as cost" );
+    CHECK(test_zone_has_id(&tg, 0, "discard", sumire), "kinako_q108_sumire_discard_no_blade");
     // 
     // // Q240: Sumire's debut fires from waitroom → center check FAILS → no blade
     int blade_after = rb_mods_get_blade(&tg.state.mods, kinako);
@@ -20012,13 +19844,12 @@ static void gen_kinako_q240_non_center_debut_activates(void){
     // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard cost prompt" );
     // TODO: game.select_indices(&[0]);
     // // Drain followup: if the debut ability triggers additional choices
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: eprintln!("[CTRL DRAIN] choice={:?}", game.pending_choice_type());
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&debut_card), "Q240 control: Debut card should be discarded as cost" );
+    CHECK(test_zone_has_id(&tg, 0, "discard", debut_card), "kinako_q240_non_center_debut_activates");
     // 
 }
 
@@ -20040,7 +19871,7 @@ static void gen_kinako_activate_high_cost_card_stays_in_hand(void){
     // TODO action: let _ = TurnEngine::execute_main_phase_action( &mut game.state, &ActionType::UseAbility, Some(kinako), None, None, None, );
     // 
     // // Regardless of result, the high-cost card should still be in hand
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&high_cost), "High cost card should remain in hand (not eligible for cost_limit=4)" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", high_cost), "kinako_activate_high_cost_card_stays_in_hand");
     // 
 }
 
@@ -20063,8 +19894,7 @@ static void gen_bp5_020_skip_no_draw(void){
     // TODO: crate::helpers::fire_trigger(&mut game, live, rabuka_engine::core::types::AbilityTrigger::LiveSuccess, "ライブ成功時");
     test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, 0);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() { game.select_indices(&[]); }
+    test_has_pending_choice(&tg);
     // TODO: }
     // // Skip should not draw, hand should not have grown beyond the live itself
     test_has_pending_choice(&tg);
@@ -20091,9 +19921,8 @@ static void gen_bp5_020_insufficient_energy_no_draw(void){
     // // Try to pay with 0 energy — should either not offer pay or fail
     int before = tg.state.p[0].energy_active;
     rb_resume_with_choice(&tg.state, 1);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() { game.select_indices(&[]); }
-    // TODO assert: assert!(game.state.player1.energy_zone.active_count() <= before);
+    test_has_pending_choice(&tg);
+    CHECK(tg.state.p[0].energy_active, "bp5_020_insufficient_energy_no_draw");
     // TODO: }
     CHECK(true, "bp5_020_insufficient_energy_no_draw");
     // 
@@ -20677,7 +20506,7 @@ static void gen_wien_q262_empty_hand_triggers_energy_move(void){
     // // no per-card selection needed after the optional discard skip).
     // 
     // // Q262: Energy card should have moved from energy zone to energy deck
-    // TODO assert: assert!( game.state.player1.energy_zone.active_count() < energy_zone_before, "Q262: An energy card should have left the energy zone" );
+    CHECK(tg.state.p[0].energy_active, "wien_q262_empty_hand_triggers_energy_move");
     // TODO assert: assert!( game.state.player1.energy_deck.cards.len() > energy_deck_before, "Q262: Energy deck should have gained a card" );
     // 
 }
@@ -20721,8 +20550,7 @@ static void gen_wien_q262_discard_prevents_energy_move(void){
     rb_resume_with_choice(&tg.state, 1);
     // // If engine presents a follow-up SelectCard for which card to discard, handle it
     int safety = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && safety < 5 {
+    test_has_pending_choice(&tg);
     // TODO: safety += 1;
     int ct = 0;
     // TODO: if ct == "SelectCard" {
@@ -20760,8 +20588,7 @@ static void gen_wien_live_success_choice_draw_via_trigger(void){
     // // Option 0 = draw 2
     rb_resume_with_choice(&tg.state, 0);
     // // Drain any follow-up (draw is immediate)
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // TODO assert_eq (unresolved): assert_eq!( game.state.player1.hand.cards.len(), hand_before + 2, "draw 2 should increase hand by 2" );
@@ -20791,8 +20618,7 @@ static void gen_wien_live_success_choice_energy_via_trigger(void){
     test_has_pending_choice(&tg);
     // // Option 1 = place energy wait (second option) — should NOT draw
     rb_resume_with_choice(&tg.state, 1);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     CHECK_EQ(tg.state.p[0].hand.n, hand_before, "wien_live_success_choice_energy_via_trigger");
@@ -20834,8 +20660,7 @@ static void gen_wien_with_partner_reduces_cheer_checks_by_8(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     int guard = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && guard < 10 {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: guard += 1;
     // TODO: }
@@ -20884,8 +20709,7 @@ static void gen_wien_alone_no_reduction(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     int guard = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && guard < 10 {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: guard += 1;
     // TODO: }
@@ -20934,8 +20758,7 @@ static void gen_opponent_cheer_checks_unaffected(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     int guard = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && guard < 10 {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: guard += 1;
     // TODO: }
@@ -20984,8 +20807,7 @@ static void gen_q117_second_wien_copy_counts_as_other_member(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     int guard = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && guard < 10 {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: guard += 1;
     // TODO: }
@@ -21022,13 +20844,12 @@ static void gen_eli_bp5_skip_both_costs_still_looks(void){
     // TODO: game.select_indices(&[]);
     // // Drain any remaining choices: the look phase is optional (count 1 optional true), so skipping it should just discard
     int safety = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && safety < 5 {
+    test_has_pending_choice(&tg);
     // TODO: safety += 1;
     // TODO: game.select_indices(&[]);
     // TODO: }
     // // After playing, hand should be 0 or 1; just verify no panic and look completed
-    // TODO assert: assert!(game.state.player1.hand.cards.len() <= 1, "hand should be 0 or 1 after skipping");
+    CHECK(tg.state.p[0].hand.n, "eli_bp5_skip_both_costs_still_looks");
     // // Look phase completed (no pending choice remains)
     test_has_pending_choice(&tg);
     // 
@@ -21054,13 +20875,12 @@ static void gen_eli_bp5_no_eligible_look_discards_all(void){
     // TODO: game.select_indices(&[0]); // discard filler
     // // Drain look choices (with no eligible, engine may auto-discard)
     int safety = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && safety < 5 {
+    test_has_pending_choice(&tg);
     // TODO: safety += 1;
     // TODO: game.select_indices(&[]);
     // TODO: }
-    // TODO assert: assert!(game.state.player1.hand.cards.len() <= 1, "hand should be 0 or 1");
-    // TODO assert: assert!(game.state.player1.waitroom.cards.len() >= wait_before + 5, "at least 5 looked discarded");
+    CHECK(tg.state.p[0].hand.n, "eli_bp5_no_eligible_look_discards_all");
+    CHECK(tg.state.p[0].discard.n, "eli_bp5_no_eligible_look_discards_all");
     // 
 }
 
@@ -21087,12 +20907,11 @@ static void gen_eli_bp5_look_select_optional_skip_keeps_hand(void){
     // TODO: game.select_indices(&[0]);
     // // Drain look choices, skip optional select even though eligible exists
     int safety = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && safety < 5 {
+    test_has_pending_choice(&tg);
     // TODO: safety += 1;
     // TODO: game.select_indices(&[]);
     // TODO: }
-    // TODO assert: assert!(game.state.player1.hand.cards.len() <= 1, "skip must not add beyond 1");
+    CHECK(tg.state.p[0].hand.n, "eli_bp5_look_select_optional_skip_keeps_hand");
     // 
 }
 
@@ -21115,19 +20934,16 @@ static void gen_emotion_zero_in_success_zone(void){
     // TODO: game.set_live_card(emo);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     rb_advance_phase(&tg.state);
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -21163,19 +20979,16 @@ static void gen_emotion_one_in_success_zone(void){
     // TODO: game.set_live_card(emo);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     rb_advance_phase(&tg.state);
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -21216,19 +21029,16 @@ static void gen_emotion_two_in_success_zone(void){
     // TODO: game.set_live_card(emo);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     rb_advance_phase(&tg.state);
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -21270,19 +21080,16 @@ static void gen_emotion_live_zone_fires_success_zone_does_not(void){
     // TODO: game.set_live_card(emo);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     rb_advance_phase(&tg.state);
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -21458,7 +21265,7 @@ static void gen_mia_q73_deck_has_live_card_after_refresh(void){
     // 
     // // Now reveal_until_live_card runs. Deck has 3 fillers, then refreshes from waitroom.
     // // The live card from waitroom gets revealed and goes to hand.
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&live_card), "Live card should be obtained via reveal" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", live_card), "mia_q73_deck_has_live_card_after_refresh");
     // 
 }
 
@@ -21515,7 +21322,7 @@ static void gen_mia_q102_live_immediately_on_top(void){
     test_play_to_stage(&tg, mia, 1);
     test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
-    // TODO assert: assert!(game.state.player1.hand.cards.contains(&live), "live on top should be obtained");
+    CHECK(test_zone_has_id(&tg, 0, "hand", live), "mia_q102_live_immediately_on_top");
     CHECK_EQ(tg.state.p[0].deck.n, 3, "mia_q102_live_immediately_on_top");
     // 
 }
@@ -21538,7 +21345,7 @@ static void gen_mia_q102_skip_cost_still_reveals(void){
     // TODO: game.select_indices(&[]); // skip discard cost
     // TODO: }
     // // Even when skipping cost, the reveal should still happen (or at least no panic)
-    // TODO assert: assert!(game.state.player1.hand.cards.contains(&live) || game.state.player1.waitroom.cards.contains(&live) || game.state.player1.main_deck.cards.contains(&live), "no panic, live somewhere");
+    CHECK(test_zone_has_id(&tg, 0, "hand", live), "mia_q102_skip_cost_still_reveals");
     // 
 }
 
@@ -21577,8 +21384,7 @@ static void gen_third_appearance_draws_to_five(void){
     // // inlined helper drain
     // 
     int guard = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && guard < 10 {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: guard += 1;
     // TODO: }
@@ -21587,8 +21393,7 @@ static void gen_third_appearance_draws_to_five(void){
     // // inlined helper drain
     // 
     guard = 0;
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && guard < 10 {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: guard += 1;
     // TODO: }
@@ -21597,8 +21402,7 @@ static void gen_third_appearance_draws_to_five(void){
     // // inlined helper drain
     // 
     guard = 0;
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && guard < 10 {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: guard += 1;
     // TODO: }
@@ -21646,8 +21450,7 @@ static void gen_hand_at_five_or_more_draws_nothing(void){
     // // inlined helper drain
     // 
     int guard = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && guard < 10 {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: guard += 1;
     // TODO: }
@@ -21656,8 +21459,7 @@ static void gen_hand_at_five_or_more_draws_nothing(void){
     // // inlined helper drain
     // 
     guard = 0;
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && guard < 10 {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: guard += 1;
     // TODO: }
@@ -21666,8 +21468,7 @@ static void gen_hand_at_five_or_more_draws_nothing(void){
     // // inlined helper drain
     // 
     guard = 0;
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && guard < 10 {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: guard += 1;
     // TODO: }
@@ -21707,8 +21508,7 @@ static void gen_two_appearances_no_draw(void){
     // // inlined helper drain
     // 
     int guard = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && guard < 10 {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: guard += 1;
     // TODO: }
@@ -21717,8 +21517,7 @@ static void gen_two_appearances_no_draw(void){
     // // inlined helper drain
     // 
     guard = 0;
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && guard < 10 {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: guard += 1;
     // TODO: }
@@ -21749,8 +21548,7 @@ static void gen_small_deck_draws_out_and_resolves(void){
     // // inlined helper drain
     // 
     int guard = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && guard < 10 {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: guard += 1;
     // TODO: }
@@ -21759,8 +21557,7 @@ static void gen_small_deck_draws_out_and_resolves(void){
     // // inlined helper drain
     // 
     guard = 0;
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && guard < 10 {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: guard += 1;
     // TODO: }
@@ -21769,8 +21566,7 @@ static void gen_small_deck_draws_out_and_resolves(void){
     // // inlined helper drain
     // 
     guard = 0;
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && guard < 10 {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: guard += 1;
     // TODO: }
@@ -21802,8 +21598,7 @@ static void gen_shizuku_pay_2e_deploys_shizuku(void){
     rb_resume_with_choice(&tg.state, 1);
     // // After pay, may have SelectCard for which Shizuku to deploy
     int safety = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && safety<5 { safety+=1; game.select_indices(&[0]); }
+    test_has_pending_choice(&tg);
     // // Deployed shizuku should be on stage (either left/right)
     int has_shizuku_hand = 0;
     // TODO assert: assert!(has_shizuku_hand || game.state.player1.hand.cards.contains(&shizuku_hand)==false, "Shizuku should have left hand");
@@ -21829,9 +21624,8 @@ static void gen_shizuku_skip_pay_no_deploy(void){
     test_play_to_stage(&tg, shizuku, 1);
     test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, 0);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() { game.select_indices(&[]); }
-    // TODO assert: assert!(game.state.player1.hand.cards.contains(&shizuku_hand), "skip should keep Shizuku in hand");
+    test_has_pending_choice(&tg);
+    CHECK(test_zone_has_id(&tg, 0, "hand", shizuku_hand), "shizuku_skip_pay_no_deploy");
     // 
 }
 
@@ -21853,10 +21647,9 @@ static void gen_shizuku_no_eligible_shizuku_no_deploy(void){
     test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, 1);
     int safety = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && safety<5 { safety+=1; let _ = game.try_select_indices(&[]); let _ = game.try_select_indices(&[0]); }
+    test_has_pending_choice(&tg);
     // // Hand should still have filler, no Shizuku deployed
-    // TODO assert: assert!(game.state.player1.hand.cards.contains(&filler));
+    CHECK(test_zone_has_id(&tg, 0, "hand", filler), "shizuku_no_eligible_shizuku_no_deploy");
     // 
 }
 
@@ -21899,7 +21692,7 @@ static void gen_miyashita_pay_2e_deploys(void){
     test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, 1);
     test_has_pending_choice(&tg);
-    // TODO assert: assert!(game.state.player1.stage.stage.iter().any(|&id| id==miya_hand));
+    CHECK(test_zone_has_id(&tg, 0, "stage", miya_hand), "miyashita_pay_2e_deploys");
     // 
 }
 
@@ -21921,9 +21714,8 @@ static void gen_miyashita_skip_no_deploy(void){
     test_play_to_stage(&tg, miya, 1);
     test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, 0);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() { game.select_indices(&[]); }
-    // TODO assert: assert!(game.state.player1.hand.cards.contains(&miya_hand));
+    test_has_pending_choice(&tg);
+    CHECK(test_zone_has_id(&tg, 0, "hand", miya_hand), "miyashita_skip_no_deploy");
     // 
 }
 
@@ -21945,7 +21737,7 @@ static void gen_miyashita_no_eligible_no_deploy(void){
     test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, 1);
     test_has_pending_choice(&tg);
-    // TODO assert: assert!(game.state.player1.hand.cards.contains(&filler));
+    CHECK(test_zone_has_id(&tg, 0, "hand", filler), "miyashita_no_eligible_no_deploy");
     // 
 }
 
@@ -22147,7 +21939,7 @@ static void gen_setsuna_debuts_to_vacated_area_not_stage_first_empty(void){
     // // same_area should place the new card at stage[2], NOT at stage[1] (Center).
     CHECK_EQ(tg.state.p[0].stage[2], target, "setsuna_debuts_to_vacated_area_not_stage_first_empty");
     // TODO assert: assert!( !game.state.player1.stage.stage.contains(&setsuna), "Original setsuna is in waitroom, not on stage" );
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&setsuna), "Original setsuna should be in waitroom" );
+    CHECK(test_zone_has_id(&tg, 0, "discard", setsuna), "setsuna_debuts_to_vacated_area_not_stage_first_empty");
     // 
 }
 
@@ -22310,7 +22102,7 @@ static void gen_pb2006_jidou_placement_feeds_constant_cost_up(void){
     // // The jidou placed the Liella! member under kinako.
     // TODO assert_eq (unresolved): assert_eq!( game.state.player1.stage.under_cards[0].len(), 1, "jidou places 1 Liella! member from discard under kinako on area move" );
     // TODO assert: assert!( game.state.player1.stage.under_cards[0].contains(&liella_member), "the Liella! member from discard is the card placed under" );
-    // TODO assert: assert!( !game.state.player1.waitroom.cards.contains(&liella_member), "placed card left the discard" );
+    CHECK((!test_zone_has_id(&tg, 0, "discard", liella_member)), "pb2006_jidou_placement_feeds_constant_cost_up");
     // 
     // // The chain payoff: her 常時 now counts 1 Liella! under → cost +1.
     // // Constant cost bonuses land in constant_cost_bonuses (recalc output).
@@ -22410,8 +22202,7 @@ static void gen_special_color_set_blades_and_score_twin_in_one_live(void){
     // TODO: game.set_live_card(special);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.drain_choices_strict(&["SelectCard", "SelectAutoAbility"], &[0]);
     // TODO: }
     CHECK_EQ(rb_mods_get_blade(&tg.state.mods, liella), 3, "special_color_set_blades_and_score_twin_in_one_live");
@@ -22442,8 +22233,7 @@ static void gen_special_color_set_blades_and_score_twin_in_one_live(void){
     // TODO: AbilityTrigger::LiveSuccess,
     // TODO: "ライブ成功時",
     // TODO: );
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.drain_choices_strict(&["SelectCard", "SelectAutoAbility"], &[0]);
     // TODO: }
     // 
@@ -22619,8 +22409,7 @@ static void gen_konata_bp4_q188_placed_in_wait_no_trigger(void){
     rb_mods_set_orientation(&tg.state.mods, konata, "wait");
     // 
     // TODO: rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(&mut game.state, "p1");
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -22645,8 +22434,7 @@ static void gen_s_bp5_010_with_5_heart02_triggers_global(void){
     test_give_energy(&tg, 15);
     // TODO loop (degraded): for _ in 0..5 { let f=test_id(&tg, "PL!-sd1-010-SD"); game.state.player1.main_deck.cards.push(f); }
     test_play_to_stage(&tg, chika, 1);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() { game.select_indices(&[]); }
+    test_has_pending_choice(&tg);
     // TODO assert: assert!(game.state.player1.stage.stage.contains(&chika));
     // 
 }
@@ -22733,7 +22521,7 @@ static void gen_s_pb1_019_live_start_enough_heart02_invalidates(void){
     // TODO: game.set_live_card(live);
     // TODO loop (degraded): for _ in 0..2 { game.pass(); }
     // // LiveStart should have invalidated LiveSuccess, but we check that the invalidate flag is set
-    // TODO assert: assert!(game.state.player1.live_card_zone.cards.contains(&live), "live should be in live zone after set");
+    CHECK(test_zone_has_id(&tg, 0, "live", live), "s_pb1_019_live_start_enough_heart02_invalidates");
     // TODO assert: assert!(game.state.mods.get_heart_modifier(aqours1, rabuka_engine::card::HeartColor::Heart02) >= 3);
     // 
 }
@@ -22755,7 +22543,7 @@ static void gen_s_pb1_019_live_start_insufficient_heart02_not_invalidate(void){
     // TODO: game.set_live_card(live);
     // TODO loop (degraded): for _ in 0..2 { game.pass(); }
     // // With low heart02, invalidate should NOT happen, LiveSuccess should still be valid
-    // TODO assert: assert!(game.state.player1.live_card_zone.cards.contains(&live), "live should remain in live zone when not invalidated");
+    CHECK(test_zone_has_id(&tg, 0, "live", live), "s_pb1_019_live_start_insufficient_heart02_not_invalidate");
     // 
 }
 
@@ -22775,7 +22563,7 @@ static void gen_s_pb1_019_live_success_places_opponent_energy_wait(void){
     // // Need to go to LiveSuccess: advance through live phases
     // TODO loop (degraded): for _ in 0..7 { game.pass(); }
     // // After live, opponent should have energy wait placed if live succeeded - at least verify the live resolved
-    // TODO assert: assert!(!game.state.player1.live_card_zone.cards.contains(&live) || game.state.player1.success_live_card_zone.cards.contains(&live), "live should have resolved");
+    CHECK((!test_zone_has_id(&tg, 0, "live", live)), "s_pb1_019_live_success_places_opponent_energy_wait");
     // 
 }
 
@@ -22833,10 +22621,10 @@ static void gen_toubatsu_q118_2_distinct_live_cards_works(void){
     int in_hand = 0;
     // TODO: || game.state.player1.hand.cards.contains(&live_b);
     CHECK(in_hand, "toubatsu_q118_2_distinct_live_cards_works");
-    // TODO assert: assert!( !game.state.player1.waitroom.cards.contains(&live_a) || !game.state.player1.waitroom.cards.contains(&live_b), "At least one live card should have moved out of discard" );
+    CHECK((!test_zone_has_id(&tg, 0, "discard", live_a)), "toubatsu_q118_2_distinct_live_cards_works");
     // // Player2 should NOT have the card in hand
-    // TODO assert: assert!( !game.state.player2.hand.cards.contains(&live_a), "Card should not go to opponent's hand" );
-    // TODO assert: assert!( !game.state.player2.hand.cards.contains(&live_b), "Card should not go to opponent's hand" );
+    CHECK((!test_zone_has_id(&tg, 1, "hand", live_a)), "toubatsu_q118_2_distinct_live_cards_works");
+    CHECK((!test_zone_has_id(&tg, 1, "hand", live_b)), "toubatsu_q118_2_distinct_live_cards_works");
     // 
 }
 
@@ -22864,7 +22652,7 @@ static void gen_toubatsu_q118_1_live_card_fails(void){
     test_has_pending_choice(&tg);
     // 
     // // Q118: Live card should NOT be in hand (effect required 2 distinct)
-    // TODO assert: assert!( !game.state.player1.hand.cards.contains(&live_a), "Live card should not be added: effect needs 2 distinct cards" );
+    CHECK((!test_zone_has_id(&tg, 0, "hand", live_a)), "toubatsu_q118_1_live_card_fails");
     // 
 }
 
@@ -22922,10 +22710,10 @@ static void gen_toubatsu_duplicate_names_in_discard_opponent_only_sees_correct_c
     // TODO: };
     // 
     // // live_a2 (the duplicate) must never have left discard
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&live_a2), "Duplicate live_a2 must remain in discard — opponent should not select it" );
+    CHECK(test_zone_has_id(&tg, 0, "discard", live_a2), "toubatsu_duplicate_names_in_discard_opponent_only_sees_correct_cards");
     // 
     // // The first of the two distinct picks must have moved (either to hand or left discard)
-    // TODO assert: assert!( !game.state.player1.waitroom.cards.contains(&got), "Selected card should have moved out of discard" );
+    CHECK((!test_zone_has_id(&tg, 0, "discard", got)), "toubatsu_duplicate_names_in_discard_opponent_only_sees_correct_cards");
     // 
 }
 
@@ -22997,8 +22785,7 @@ static void gen_kanon_baton_touch_places_under_arriver(void){
     // 
     test_add_to_hand(&tg, arriver);
     test_play_to_stage(&tg, arriver, 1);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     int required = 0;
     // TODO: matches!(
     // TODO: c,
@@ -23019,7 +22806,7 @@ static void gen_kanon_baton_touch_places_under_arriver(void){
     // 
     CHECK_EQ(tg.state.p[0].stage[1], arriver, "kanon_baton_touch_places_under_arriver");
     // TODO assert: assert!( under_center(&game).contains(&kanon), "ab#1 should place 澁谷かのん under the arriving member; under={:?}", under_center(&game) );
-    // TODO assert: assert!( !game.state.player1.waitroom.cards.contains(&kanon), "baton-touched 澁谷かのん must be under the arriver, not in the waitroom" );
+    CHECK((!test_zone_has_id(&tg, 0, "discard", kanon)), "kanon_baton_touch_places_under_arriver");
     // 
 }
 
@@ -23049,7 +22836,7 @@ static void gen_kanon_no_baton_touch_stays_in_waitroom(void){
     // TODO: game.state.process_pending_auto_abilities(&pid);
     test_drain_auto_choices(&tg);
     // 
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&kanon), "non-baton-touch removal must leave 澁谷かのん in the waitroom" );
+    CHECK(test_zone_has_id(&tg, 0, "discard", kanon), "kanon_no_baton_touch_stays_in_waitroom");
     // TODO assert: assert!( under_center(&game).is_empty(), "no member under center — ab#1 must not fire without baton touch" );
     // 
 }
@@ -23075,8 +22862,7 @@ static void gen_kanon_as_arriver_not_displaced(void){
     int kanon = test_id(&tg, "PL!SP-bp7-001-R");
     test_add_to_hand(&tg, kanon);
     test_play_to_stage(&tg, kanon, 1);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -23273,8 +23059,7 @@ static void gen_maki_ab0_opponent_wait_blocked_by_wait_immunity(void){
     test_play_to_stage(&tg, maki, 1);
     // 
     int guard = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && guard < 20 {
+    test_has_pending_choice(&tg);
     // TODO: guard += 1;
     // // Pay the optional cost (wait a BiBi member), then the opponent's own-wait.
     // TODO: if game.pending_choice_type().as_deref() == Some("SelectCard") {
@@ -23328,8 +23113,7 @@ static void gen_maki_q177_debut_triggers_draw_via_ab0(void){
     // TODO assert_eq (unresolved): assert_eq!( entry.as_ref().and_then(|e| e.choice_player_id.as_deref()), Some("p2"), "Wait-member choice should be routed to opponent" );
     // TODO: game.select_indices(&[0]);
     // // Consume any remaining choices
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -23371,8 +23155,7 @@ static void gen_maki_edge_cost5_opponent_draws_nothing(void){
     // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectTarget"), "expected SelectTarget optional-cost gate" );
     rb_resume_with_choice(&tg.state, 0);
     // // Cost was skipped → opponent action doesn't fire → no choice
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -23416,8 +23199,7 @@ static void gen_maki_edge_no_opponent_member_no_draw(void){
     // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectTarget"), "expected SelectTarget optional-cost gate" );
     rb_resume_with_choice(&tg.state, 0);
     // // Opponent has no members → no pending choice after skip
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -23771,7 +23553,7 @@ static void gen_stage_to_discard_ability_triggers_only_on_baton_touch(void){
     test_has_pending_choice(&tg);
     // 
     // // Verify Honoka is in waitroom
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&honoka), "Honoka should be in waitroom after baton touch" );
+    CHECK(test_zone_has_id(&tg, 0, "discard", honoka), "stage_to_discard_ability_triggers_only_on_baton_touch");
     // 
 }
 
@@ -23911,8 +23693,7 @@ static void gen_s_bp2_021_live_success_with_live_in_yell_moves_to_deck_bottom(vo
     test_has_pending_choice(&tg);
     // // Should offer the live_in_yell as selectable
     // TODO: game.select_indices(&[0]);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() { game.select_indices(&[]); }
+    test_has_pending_choice(&tg);
     // TODO: }
     // // Live should now be at deck bottom
     int deck = 0;
@@ -23941,8 +23722,7 @@ static void gen_s_bp2_021_live_success_no_live_in_yell_no_move(void){
     test_has_pending_choice(&tg);
     // // No live eligible, should be skippable or auto-skip
     // TODO: game.select_indices(&[]);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() { game.select_indices(&[]); }
+    test_has_pending_choice(&tg);
     // TODO: }
     // TODO assert_eq (unresolved): assert_eq!(game.state.player1.main_deck.cards, deck_before, "no live in yell should not change deck");
     // 
@@ -24338,8 +24118,8 @@ static void gen_sd1022_live_start_grants_blade_to_all_aqours_members(void){
     // 
     // TODO: fire_trigger(&mut game, live, AbilityTrigger::LiveStart, "ライブ開始時");
     // 
-    // TODO assert: assert!( game.state.mods.get_blade_modifier(a1) >= 1, "Aqours member 1 gains a blade" );
-    // TODO assert: assert!( game.state.mods.get_blade_modifier(a2) >= 1, "Aqours member 2 gains a blade" );
+    CHECK(rb_mods_get_blade(&tg.state.mods, a1), "sd1022_live_start_grants_blade_to_all_aqours_members");
+    CHECK(rb_mods_get_blade(&tg.state.mods, a2), "sd1022_live_start_grants_blade_to_all_aqours_members");
     CHECK_EQ(rb_mods_get_blade(&tg.state.mods, non_aqours), 0, "sd1022_live_start_grants_blade_to_all_aqours_members");
     // 
 }
@@ -24391,7 +24171,7 @@ static void gen_pr032_mills_shortfall_and_recovers_live_to_deck_top(void){
     // TODO: game.select_indices(&[0]); // accept: put the live card on deck top
     // 
     // TODO assert_eq (unresolved): assert_eq!( game.state.player1.main_deck.cards.first(), Some(&live), "live card recovered to deck TOP" );
-    // TODO assert: assert!( !game.state.player1.waitroom.cards.contains(&live), "recovered live card left the waitroom" );
+    CHECK((!test_zone_has_id(&tg, 0, "discard", live)), "pr032_mills_shortfall_and_recovers_live_to_deck_top");
     // 
 }
 
@@ -24454,8 +24234,8 @@ static void gen_pr032_declining_keeps_milled_cards_in_waitroom(void){
     // 
     // // Declined: the live card stays in the waitroom and never reaches the deck
     // // (the test name promises "keeps milled cards in waitroom").
-    // TODO assert: assert!( !game.state.player1.main_deck.cards.contains(&live), "declined: live card must not enter the deck at all" );
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&live), "declined: live card stays in the waitroom" );
+    CHECK((!test_zone_has_id(&tg, 0, "deck", live)), "pr032_declining_keeps_milled_cards_in_waitroom");
+    CHECK(test_zone_has_id(&tg, 0, "discard", live), "pr032_declining_keeps_milled_cards_in_waitroom");
     // 
 }
 
@@ -24652,8 +24432,7 @@ static void gen_mirage_two_baton_arrivals_reduce_heart05(void){
     // // inlined helper drain
     // 
     int guard = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && guard < 10 {
+    test_has_pending_choice(&tg);
     // TODO: guard += 1;
     // TODO: game.select_indices(&[0]);
     // TODO: }
@@ -24662,8 +24441,7 @@ static void gen_mirage_two_baton_arrivals_reduce_heart05(void){
     // // inlined helper drain
     // 
     guard = 0;
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && guard < 10 {
+    test_has_pending_choice(&tg);
     // TODO: guard += 1;
     // TODO: game.select_indices(&[0]);
     // TODO: }
@@ -24720,8 +24498,7 @@ static void gen_mirage_one_baton_arrival_no_reduction(void){
     // // inlined helper drain
     // 
     int guard = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && guard < 10 {
+    test_has_pending_choice(&tg);
     // TODO: guard += 1;
     // TODO: game.select_indices(&[0]);
     // TODO: }
@@ -24779,8 +24556,7 @@ static void gen_mirage_batons_of_wrong_group_no_reduction(void){
     // // inlined helper drain
     // 
     int guard = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && guard < 10 {
+    test_has_pending_choice(&tg);
     // TODO: guard += 1;
     // TODO: game.select_indices(&[0]);
     // TODO: }
@@ -24789,8 +24565,7 @@ static void gen_mirage_batons_of_wrong_group_no_reduction(void){
     // // inlined helper drain
     // 
     guard = 0;
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && guard < 10 {
+    test_has_pending_choice(&tg);
     // TODO: guard += 1;
     // TODO: game.select_indices(&[0]);
     // TODO: }
@@ -24889,8 +24664,7 @@ static void gen_kokon_two_baton_arrivals_reduce_heart01(void){
     // // inlined helper drain
     // 
     int guard = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && guard < 10 {
+    test_has_pending_choice(&tg);
     // TODO: guard += 1;
     // TODO: game.select_indices(&[0]);
     // TODO: }
@@ -24899,8 +24673,7 @@ static void gen_kokon_two_baton_arrivals_reduce_heart01(void){
     // // inlined helper drain
     // 
     guard = 0;
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && guard < 10 {
+    test_has_pending_choice(&tg);
     // TODO: guard += 1;
     // TODO: game.select_indices(&[0]);
     // TODO: }
@@ -25030,7 +24803,7 @@ static void gen_omoi_decline_no_blade_no_move(void){
     // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard (discard-zone recovery, allow_skip)" );
     // TODO: game.select_indices(&[]); // decline
     // 
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&wr_member), "declined: member stays in waitroom" );
+    CHECK(test_zone_has_id(&tg, 0, "discard", wr_member), "omoi_decline_no_blade_no_move");
     // TODO: assert_ne!(
     // TODO: game.state.player1.main_deck.cards.first(),
     // TODO: Some(&wr_member),
@@ -25130,14 +24903,13 @@ static void gen_ruby_reveal_aqours_place_and_gain_blade(void){
     rb_resume_with_choice(&tg.state, 1);
     // // Then answer the deck top-vs-bottom placement choice.
     int guard = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && guard < 10 {
+    test_has_pending_choice(&tg);
     // TODO: guard += 1;
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
     // // The revealed Aqours card left the hand onto the deck.
-    // TODO assert: assert!( !game.state.player1.hand.cards.contains(&aqours_card), "revealed Aqours card moved onto the deck" );
+    CHECK((!test_zone_has_id(&tg, 0, "hand", aqours_card)), "ruby_reveal_aqours_place_and_gain_blade");
     int in_deck = 0;
     CHECK(in_deck, "ruby_reveal_aqours_place_and_gain_blade");
     // 
@@ -25185,12 +24957,12 @@ static void gen_ruby_no_aqours_in_hand_blade_still_optional(void){
     // 
     test_has_pending_choice(&tg);
     // // Nothing eligible to reveal -> gate skipped entirely.
-    // TODO assert: assert!(game.state.player1.hand.cards.contains(&only_mu));
+    CHECK(test_zone_has_id(&tg, 0, "hand", only_mu), "ruby_no_aqours_in_hand_blade_still_optional");
     // TODO: return;
     // TODO: }
     // // If a gate was still offered, declining must leave everything alone.
     // TODO: game.select_indices(&[]);
-    // TODO assert: assert!(game.state.player1.hand.cards.contains(&only_mu));
+    CHECK(test_zone_has_id(&tg, 0, "hand", only_mu), "ruby_no_aqours_in_hand_blade_still_optional");
     CHECK_EQ(tg.state.p[0].deck.n, deck_before, "ruby_no_aqours_in_hand_blade_still_optional");
     // 
 }
@@ -25220,14 +24992,13 @@ static void gen_chisato_right_side_debut_draws_two_discards_two(void){
     // 
     // // Answer hand-discard selection(s).
     int guard = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && guard < 10 {
+    test_has_pending_choice(&tg);
     // TODO: guard += 1;
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
     CHECK_EQ(rb_mods_get_blade(&tg.state.mods, me), 0, "chisato_right_side_debut_draws_two_discards_two");
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&d1) && game.state.player1.hand.cards.contains(&d2), "both drawn cards reached the hand" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", d1), "chisato_right_side_debut_draws_two_discards_two");
     // 
 }
 
@@ -25253,8 +25024,7 @@ static void gen_sumire_left_side_debut_draws_two_discards_two(void){
     test_play_to_stage(&tg, me, 0);
     // 
     int guard = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && guard < 10 {
+    test_has_pending_choice(&tg);
     // TODO: guard += 1;
     // TODO: game.select_indices(&[0]);
     // TODO: }
@@ -25294,14 +25064,13 @@ static void gen_mia_activation_self_wait_draws_two_discards_two(void){
     // TODO assert_eq (unresolved): assert_eq!( game.state.mods.get_orientation_modifier(mia), Some("wait"), "activation cost waits this member" );
     // 
     int guard = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && guard < 10 {
+    test_has_pending_choice(&tg);
     // TODO: guard += 1;
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&d1) && game.state.player1.hand.cards.contains(&d2), "drawn cards reached the hand" );
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&h1) && game.state.player1.waitroom.cards.contains(&h2), "two hand cards discarded to the waitroom" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", d1), "mia_activation_self_wait_draws_two_discards_two");
+    CHECK(test_zone_has_id(&tg, 0, "discard", h1), "mia_activation_self_wait_draws_two_discards_two");
     // 
 }
 
@@ -25354,7 +25123,7 @@ static void gen_cl1002_accept_energy_retrieves_dollchestra(void){
     test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, 1);
     // 
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&doll), "DOLLCHESTRA card retrieved to hand" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", doll), "cl1002_accept_energy_retrieves_dollchestra");
     // 
 }
 
@@ -25372,7 +25141,7 @@ static void gen_cl1002_decline_stays_in_waitroom(void){
     // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectTarget"), "expected SelectTarget (pay_optional_cost:skip)" );
     // TODO: game.select_indices(&[]); // decline
     // 
-    // TODO assert: assert!( !game.state.player1.hand.cards.contains(&doll), "declined -> card stays in the waitroom" );
+    CHECK((!test_zone_has_id(&tg, 0, "hand", doll)), "cl1002_decline_stays_in_waitroom");
     // 
 }
 
@@ -25394,14 +25163,13 @@ static void gen_cl1008_self_to_waitroom_retrieves_hasunosora(void){
     // 
     // // Drain the retrieval selection prompt.
     int guard = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && guard < 10 {
+    test_has_pending_choice(&tg);
     // TODO: guard += 1;
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
-    // TODO assert: assert!( !game.state.player1.stage.stage.iter().any(|&c| c == me), "activation cost moved this member off stage" );
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&hns_card), "Hasunosora card retrieved to hand" );
+    CHECK((!test_zone_has_id(&tg, 0, "stage", me)), "cl1008_self_to_waitroom_retrieves_hasunosora");
+    CHECK(test_zone_has_id(&tg, 0, "hand", hns_card), "cl1008_self_to_waitroom_retrieves_hasunosora");
     // 
 }
 
@@ -25652,15 +25420,14 @@ static void gen_bp6030_draw_one_discard_one(void){
     // TODO: game.state.process_pending_auto_abilities(&pid);
     // 
     int guard = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && guard < 10 {
+    test_has_pending_choice(&tg);
     // TODO: guard += 1;
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
-    // TODO assert: assert!( !game.state.player1.hand.cards.contains(&drawn), "the drawn card was immediately paid back to the waitroom" );
+    CHECK((!test_zone_has_id(&tg, 0, "hand", drawn)), "bp6030_draw_one_discard_one");
     CHECK_EQ(tg.state.p[0].hand.n, 0, "bp6030_draw_one_discard_one");
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&drawn), "discarded card lands in the waitroom" );
+    CHECK(test_zone_has_id(&tg, 0, "discard", drawn), "bp6030_draw_one_discard_one");
     // 
 }
 
@@ -25806,14 +25573,13 @@ static void gen_cl1012_tie_score_retrieves_cost_nine_member(void){
     int live_id = 0;
     // TODO: fire_trigger(&mut game, live_id, AbilityTrigger::LiveSuccess, "ライブ成功時");
     int guard = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && guard < 10 {
+    test_has_pending_choice(&tg);
     // TODO: guard += 1;
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&expensive), "tie -> cost>=9 member retrieved to hand" );
-    // TODO assert: assert!( !game.state.player1.hand.cards.contains(&cheap), "cost-2 member not eligible" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", expensive), "cl1012_tie_score_retrieves_cost_nine_member");
+    CHECK((!test_zone_has_id(&tg, 0, "hand", cheap)), "cl1012_tie_score_retrieves_cost_nine_member");
     // 
 }
 
@@ -25863,7 +25629,7 @@ static void gen_cl1012_unequal_scores_no_retrieval(void){
     int live_id = 0;
     // TODO: fire_trigger(&mut game, live_id, AbilityTrigger::LiveSuccess, "ライブ成功時");
     // 
-    // TODO assert: assert!( !game.state.player1.hand.cards.contains(&expensive), "scores not tied -> no retrieval" );
+    CHECK((!test_zone_has_id(&tg, 0, "hand", expensive)), "cl1012_unequal_scores_no_retrieval");
     // 
 }
 
@@ -25891,8 +25657,7 @@ static void gen_wondermates_activates_waited_nijigasaki_enabling_activation(void
     // TODO: AbilityTrigger::LiveStart,
     // TODO: "ライブ開始時",
     // TODO: );
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -25938,8 +25703,7 @@ static void gen_honoka_bp4001_draws_only_when_stage_total_is_cheaper(void){
     // TODO: game.state.activating_card = Some(honoka);
     // TODO: game.state.process_pending_auto_abilities(&pid);
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // TODO assert_eq (unresolved): assert_eq!( game.state.player1.hand.cards.len(), before + 1, "stage total 9 < opponent 15 → draw 1" );
@@ -25967,8 +25731,7 @@ static void gen_honoka_bp4001_draws_only_when_stage_total_is_cheaper(void){
     // TODO: game.state.activating_card = Some(honoka);
     // TODO: game.state.process_pending_auto_abilities(&pid);
     // 
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     CHECK_EQ(tg.state.p[0].hand.n, before2, "honoka_bp4001_draws_only_when_stage_total_is_cheaper");
@@ -26301,7 +26064,7 @@ static void gen_jidou_both_on_same_card_coexist_and_fire_separately(void){
     // TODO: game.state.process_pending_auto_abilities("p1");
     // // Both should have been considered; at worst second adds blade, at least no crash and card still there
     // TODO assert: assert!(game.state.player1.stage.stage.contains(&card));
-    // TODO assert: assert!(game.state.player1.energy_zone.cards.len() >= after_first || true);
+    CHECK(tg.state.p[0].energy.n, "jidou_both_on_same_card_coexist_and_fire_separately");
     // 
 }
 
@@ -26531,8 +26294,7 @@ static void gen_q146_activating_member_alone_draws_1(void){
     test_play_to_stage(&tg, kumi, 1);
     // 
     int safety = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && safety < 30 {
+    test_has_pending_choice(&tg);
     // TODO: safety += 1;
     // TODO: game.try_select_indices(&[0]).unwrap_or_default();
     // TODO: }
@@ -26581,8 +26343,7 @@ static void gen_q146_three_members_draws_3(void){
     test_play_to_stage(&tg, kumi, 2);
     // 
     int safety = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && safety < 30 {
+    test_has_pending_choice(&tg);
     // TODO: safety += 1;
     // TODO: game.try_select_indices(&[0]).unwrap_or_default();
     // TODO: }
@@ -26629,8 +26390,7 @@ static void gen_q146_two_members_draws_2(void){
     test_play_to_stage(&tg, kumi, 1);
     // 
     int safety = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && safety < 30 {
+    test_has_pending_choice(&tg);
     // TODO: safety += 1;
     // TODO: game.try_select_indices(&[0]).unwrap_or_default();
     // TODO: }
@@ -26693,8 +26453,7 @@ static void gen_q146_opponent_members_not_counted(void){
     test_play_to_stage(&tg, kumi, 1);
     // 
     int safety = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && safety < 30 {
+    test_has_pending_choice(&tg);
     // TODO: safety += 1;
     // TODO: game.try_select_indices(&[0]).unwrap_or_default();
     // TODO: }
@@ -26765,8 +26524,7 @@ static void gen_aoku_haruka_live_start_scores_with_aurora_in_discard(void){
     // TODO: game.set_live_card(aoku);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, 0);
     // TODO: }
     // 
@@ -26810,8 +26568,7 @@ static void gen_aoku_haruka_live_start_no_score_when_aurora_missing(void){
     // TODO: game.set_live_card(aoku);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, 0);
     // TODO: }
     // 
@@ -26857,8 +26614,7 @@ static void gen_aoku_haruka_live_start_fails_with_only_non_suzu_live_cards(void)
     // TODO: game.set_live_card(aoku);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, 0);
     // TODO: }
     // 
@@ -27396,8 +27152,7 @@ static void gen_mari_bottom_kanan_added_to_hand(void){
     // // inlined helper accept_optional_discard
     // 
     int guard = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && guard < 6 {
+    test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, 1);
     // TODO: guard += 1;
     // TODO: }
@@ -27407,9 +27162,9 @@ static void gen_mari_bottom_kanan_added_to_hand(void){
     // TODO: let deck: Vec<i16> = game.state.player1.main_deck.cards.iter().copied().collect();
     // TODO assert: assert!(!deck.contains(&bottom), "果南 should leave the deck");
     // // Since it's 松浦果南, it must now be in hand.
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&bottom), "果南 should be added to hand" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", bottom), "mari_bottom_kanan_added_to_hand");
     // // Not left in the waitroom.
-    // TODO assert: assert!( !game.state.player1.waitroom.cards.contains(&bottom), "果南 should not remain in waitroom" );
+    CHECK((!test_zone_has_id(&tg, 0, "discard", bottom)), "mari_bottom_kanan_added_to_hand");
     // 
 }
 
@@ -27424,8 +27179,7 @@ static void gen_mari_bottom_dia_added_to_hand(void){
     // // inlined helper accept_optional_discard
     // 
     int guard = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && guard < 6 {
+    test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, 1);
     // TODO: guard += 1;
     // TODO: }
@@ -27433,8 +27187,8 @@ static void gen_mari_bottom_dia_added_to_hand(void){
     // 
     // TODO: let deck: Vec<i16> = game.state.player1.main_deck.cards.iter().copied().collect();
     // TODO assert: assert!(!deck.contains(&bottom), "ダイヤ should leave the deck");
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&bottom), "ダイヤ should be added to hand" );
-    // TODO assert: assert!( !game.state.player1.waitroom.cards.contains(&bottom), "ダイヤ should not remain in waitroom" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", bottom), "mari_bottom_dia_added_to_hand");
+    CHECK((!test_zone_has_id(&tg, 0, "discard", bottom)), "mari_bottom_dia_added_to_hand");
     // 
 }
 
@@ -27449,8 +27203,7 @@ static void gen_mari_bottom_suimire_stays_in_waitroom(void){
     // // inlined helper accept_optional_discard
     // 
     int guard = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && guard < 6 {
+    test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, 1);
     // TODO: guard += 1;
     // TODO: }
@@ -27460,9 +27213,9 @@ static void gen_mari_bottom_suimire_stays_in_waitroom(void){
     // TODO: let deck: Vec<i16> = game.state.player1.main_deck.cards.iter().copied().collect();
     // TODO assert: assert!(!deck.contains(&bottom), "すみれ should leave the deck");
     // // NOT one of the named characters → stays in the waitroom.
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&bottom), "すみれ should remain in the waitroom (condition must be false)" );
+    CHECK(test_zone_has_id(&tg, 0, "discard", bottom), "mari_bottom_suimire_stays_in_waitroom");
     // // NOT added to hand.
-    // TODO assert: assert!( !game.state.player1.hand.cards.contains(&bottom), "すみれ must NOT be added to hand" );
+    CHECK((!test_zone_has_id(&tg, 0, "hand", bottom)), "mari_bottom_suimire_stays_in_waitroom");
     // 
 }
 
@@ -27479,21 +27232,20 @@ static void gen_mari_does_not_grab_other_discard_match(void){
     // // inlined helper accept_optional_discard
     // 
     int guard = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && guard < 6 {
+    test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, 1);
     // TODO: guard += 1;
     // TODO: }
     // 
     // 
     // // The placed すみれ stays in the waitroom.
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&bottom), "すみれ should stay in the waitroom" );
+    CHECK(test_zone_has_id(&tg, 0, "discard", bottom), "mari_does_not_grab_other_discard_match");
     // // The OTHER 果南 in the discard must NOT be grabbed (preceding_moved targets
     // // only the just-placed card).
-    // TODO assert: assert!( !game.state.player1.hand.cards.contains(&other_kanan), "the pre-existing discard 果南 must NOT be grabbed" );
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&other_kanan), "the pre-existing discard 果南 stays in the waitroom" );
+    CHECK((!test_zone_has_id(&tg, 0, "hand", other_kanan)), "mari_does_not_grab_other_discard_match");
+    CHECK(test_zone_has_id(&tg, 0, "discard", other_kanan), "mari_does_not_grab_other_discard_match");
     // // Neither reached the hand.
-    // TODO assert: assert!( !game.state.player1.hand.cards.contains(&bottom), "すみれ must not reach the hand" );
+    CHECK((!test_zone_has_id(&tg, 0, "hand", bottom)), "mari_does_not_grab_other_discard_match");
     // 
 }
 
@@ -27789,7 +27541,7 @@ static void gen_chisato_q129_cost_reduction_affects_threshold(void){
     // TODO: game.select_indices(&[0]);
     // 
     // // Verify the card is still in hand (revealed, not discarded)
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&ll_card), "Revealed card should stay in hand" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", ll_card), "chisato_q129_cost_reduction_affects_threshold");
     // 
 }
 
@@ -28107,8 +27859,7 @@ static void gen_distortion_three_distinct_catchu_reduces_and_scores(void){
     rb_advance_phase(&tg.state);
     // 
     // 
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -28139,8 +27890,7 @@ static void gen_distortion_one_catchu_no_score_gate_not_met(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     int after_h00 = 0;
@@ -28173,8 +27923,7 @@ static void gen_distortion_duplicate_names_dedupe(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     int after_h00 = 0;
@@ -28204,8 +27953,7 @@ static void gen_distortion_no_catchu_no_change(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // TODO assert_eq (unresolved): assert_eq!(need_heart(&game, live, HeartColor::Heart00), 9, "unchanged");
@@ -28848,8 +28596,8 @@ static void gen_tang_keke_discard_member_with_blade_heart_choose_one(void){
     // 
     int energy_before = 0;
     // 
-    // TODO assert: assert!( game.state.player1.energy_zone.cards.len() > energy_before, "Energy should be placed from energy deck" );
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&liella_with_bh), "Discarded card should be in waitroom" );
+    CHECK(tg.state.p[0].energy.n, "tang_keke_discard_member_with_blade_heart_choose_one");
+    CHECK(test_zone_has_id(&tg, 0, "discard", liella_with_bh), "tang_keke_discard_member_with_blade_heart_choose_one");
     // 
 }
 
@@ -28886,8 +28634,8 @@ static void gen_tang_keke_discard_member_without_blade_heart_choose_any_number(v
     // // Select the heart06 option — verify heart06 was gained on the target member
     rb_resume_with_choice(&tg.state, 0);
     // 
-    // TODO assert: assert!( game.state.player1.energy_zone.cards.len() > energy_before, "Energy should be placed from energy deck (selected first)" );
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&liella_no_bh), "Discarded card should be in waitroom" );
+    CHECK(tg.state.p[0].energy.n, "tang_keke_discard_member_without_blade_heart_choose_any_number");
+    CHECK(test_zone_has_id(&tg, 0, "discard", liella_no_bh), "tang_keke_discard_member_without_blade_heart_choose_any_number");
     // // Heart06 gain is a modifier — just verify no crash / no infinite loop
     test_has_pending_choice(&tg);
     // 
@@ -28914,8 +28662,8 @@ static void gen_tang_keke_discard_non_member_liella_card_choose_one(void){
     // 
     int energy_before = 0;
     // 
-    // TODO assert: assert!( game.state.player1.energy_zone.cards.len() > energy_before, "Energy should be placed from energy deck" );
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&liella_live), "Discarded live card should be in waitroom" );
+    CHECK(tg.state.p[0].energy.n, "tang_keke_discard_non_member_liella_card_choose_one");
+    CHECK(test_zone_has_id(&tg, 0, "discard", liella_live), "tang_keke_discard_non_member_liella_card_choose_one");
     // 
 }
 
@@ -29028,8 +28776,7 @@ static void gen_mirai_skip_leaves_discard_and_no_blade(void){
     // 
     test_has_pending_choice(&tg);
     // TODO: game.select_choice_option(0); // Skip
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -29058,8 +28805,7 @@ static void gen_kanata_does_not_block_manual_ability_activation(void){
     test_recalc(&tg);
     // TODO assert: assert!( game.state .constant_cannot_activate_members .iter() .any(|x| x == &kanata.to_string()), "Kanata should be in constant_cannot_activate_members" );
     test_activate_ability(&tg, other);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -29146,8 +28892,7 @@ static void gen_kanata_live_success_with_others_waits_self(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // // inlined helper advance_to_live_victory
@@ -29156,8 +28901,7 @@ static void gen_kanata_live_success_with_others_waits_self(void){
     rb_advance_phase(&tg.state);
     // TODO: }
     // 
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     rb_advance_phase(&tg.state);
@@ -29195,8 +28939,7 @@ static void gen_kanata_live_success_no_others_does_not_wait(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // // inlined helper advance_to_live_victory
@@ -29205,8 +28948,7 @@ static void gen_kanata_live_success_no_others_does_not_wait(void){
     rb_advance_phase(&tg.state);
     // TODO: }
     // 
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     rb_advance_phase(&tg.state);
@@ -29350,8 +29092,7 @@ static void gen_mari_live_start_sufficient_deck_fires(void){
     // TODO: game.select_indices(&[0]);
     // 
     // // Resolve any remaining prompts (finish selection, order, etc.)
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -29409,8 +29150,7 @@ static void gen_mari_choose_opponent_look_at_opponent_deck(void){
     // // Keep card 0, discard the rest
     // TODO: game.select_indices(&[0]);
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -29530,8 +29270,7 @@ static void gen_performance_pipeline_blade_yell_heart_score(void){
     rb_advance_phase(&tg.state);
     // 
     // // Handle any pending choices (live-start triggers etc.)
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -29663,8 +29402,7 @@ static void gen_performance_pipeline_fail_when_hearts_insufficient(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     rb_advance_phase(&tg.state);
@@ -29740,8 +29478,7 @@ static void gen_heart00_passes_check_fails_when_insufficient(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     rb_advance_phase(&tg.state);
@@ -29815,8 +29552,7 @@ static void gen_heart00_passes_check_succeeds_when_sufficient(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     rb_advance_phase(&tg.state);
@@ -29882,8 +29618,7 @@ static void gen_live_card_base_score_stored_correctly(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     rb_advance_phase(&tg.state);
@@ -29897,7 +29632,9 @@ static void gen_live_card_base_score_stored_correctly(void){
     // TODO: .find(|s| s.player_id == "p1")
     // action result consumed: .expect("P1 should have a performance snapshot");
     // 
-    // TODO: for (i, l) in perf.lives.iter().enumerate() {
+    int i = 0;
+    int l = 0;
+    // TODO loop (degraded): for (i, l) in perf.lives.iter().enumerate() {
     // TODO assert_eq (unresolved): assert_eq!( l.base_score, 1, "live[{}] base_score should be 1 (card's raw score)", i );
     // TODO assert: assert!( l.score >= l.base_score, "live[{}] score ({}) should be >= base_score ({})", i, l.score, l.base_score );
     // TODO: }
@@ -29928,14 +29665,13 @@ static void gen_hazuki_baton_touch_places_liella_under(void){
     // 
     test_play_to_stage(&tg, hazuki, 1);
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
     int under = 0;
     // TODO assert: assert!( under.contains(&liella_member), "Liella! member should be under hazuki" );
-    // TODO assert: assert!( !game.state.player1.waitroom.cards.contains(&liella_member), "Liella! member should NOT be in waitroom" );
+    CHECK((!test_zone_has_id(&tg, 0, "discard", liella_member)), "hazuki_baton_touch_places_liella_under");
     // 
 }
 
@@ -29963,8 +29699,7 @@ static void gen_hazuki_baton_touch_non_liella_places_nothing(void){
     // 
     test_play_to_stage(&tg, hazuki, 1);
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -30012,13 +29747,12 @@ static void gen_hazuki_activates_kidou_copied_from_under(void){
     // // The 起動 ability (from 若菜四季): self-stage→waitroom cost (auto via self_cost) +
     // // return 1 live from discard (auto-selects when exactly 1 live in discard)
     // // No pending choices expected since both steps auto-resolve.
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&hazuki), "Hazuki should be in waitroom after 起動 cost" );
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&live), "Live card should be returned to hand by 起動 effect" );
+    CHECK(test_zone_has_id(&tg, 0, "discard", hazuki), "hazuki_activates_kidou_copied_from_under");
+    CHECK(test_zone_has_id(&tg, 0, "hand", live), "hazuki_activates_kidou_copied_from_under");
     // 
 }
 
@@ -30842,7 +30576,7 @@ static void gen_fuyumari_q95_player_chooses_card_from_discard(void){
     // 
     CHECK_EQ(tg.state.p[0].stage[0], other_member, "fuyumari_q95_player_chooses_card_from_discard");
     CHECK_EQ(tg.state.p[0].stage[1], fuyumari, "fuyumari_q95_player_chooses_card_from_discard");
-    // TODO assert: assert!( game.state.player1.waitroom.cards.len() <= discard_before, "Cost adds 1, effect removes 1 → net ≤ discard_before" );
+    CHECK(tg.state.p[0].discard.n, "fuyumari_q95_player_chooses_card_from_discard");
     // 
 }
 
@@ -30869,7 +30603,7 @@ static void gen_fuyumari_edge_no_valid_cost_target(void){
     test_has_pending_choice(&tg);
     // 
     CHECK_EQ(tg.state.p[0].stage[0], filler, "fuyumari_edge_no_valid_cost_target");
-    // TODO assert: assert!( !game.state.player1.waitroom.cards.contains(&filler), "non-Liella! member must not be sacrificed as cost" );
+    CHECK((!test_zone_has_id(&tg, 0, "discard", filler)), "fuyumari_edge_no_valid_cost_target");
     CHECK_EQ(tg.state.p[0].stage[1], fuyumari, "fuyumari_edge_no_valid_cost_target");
     // 
 }
@@ -30893,16 +30627,14 @@ static void gen_q77_self_appearance_activates_energy(void){
     // // inlined helper activate_and_drain
     // 
     test_activate_ability(&tg, konata);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
     // // inlined helper activate_and_drain
     // 
     test_activate_ability(&tg, konata);
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -30946,16 +30678,14 @@ static void gen_different_niji_member_on_turn2_activates(void){
     // // inlined helper activate_and_drain
     // 
     test_activate_ability(&tg, konata);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
     // // inlined helper activate_and_drain
     // 
     test_activate_ability(&tg, konata);
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -30983,8 +30713,7 @@ static void gen_no_appearance_condition_fails(void){
     // // inlined helper activate_and_drain
     // 
     test_activate_ability(&tg, konata);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -30993,8 +30722,7 @@ static void gen_no_appearance_condition_fails(void){
     // // inlined helper activate_and_drain
     // 
     test_activate_ability(&tg, konata);
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -31025,8 +30753,7 @@ static void gen_non_niji_member_does_not_activate(void){
     // // inlined helper activate_and_drain
     // 
     test_activate_ability(&tg, konata);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -31035,8 +30762,7 @@ static void gen_non_niji_member_does_not_activate(void){
     // // inlined helper activate_and_drain
     // 
     test_activate_ability(&tg, konata);
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -31531,8 +31257,7 @@ static void gen_mei_bp5_select_two_from_different_series(void){
     // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard looked_at prompt" );
     // TODO: game.select_indices(&[0]);
     // TODO: }
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -31563,8 +31288,7 @@ static void gen_mei_bp5_select_zero_cards(void){
     // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard looked_at prompt" );
     // TODO: game.select_indices(&[0]);
     // TODO: }
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -31595,8 +31319,7 @@ static void gen_mei_bp5_select_one_card(void){
     // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard looked_at prompt" );
     // TODO: game.select_indices(&[0]);
     // TODO: }
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -31670,15 +31393,14 @@ static void gen_mei_bp5_q235_debut_look_and_select_with_multiname(void){
     // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard looked_at prompt" );
     // TODO: game.select_indices(&[0]);
     // TODO: }
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
     // 
     int multiname_in_hand = 0;
     CHECK(multiname_in_hand, "mei_bp5_q235_debut_look_and_select_with_multiname");
-    // TODO assert: assert!( !game.state.player1.main_deck.cards.contains(&multiname), "Multi-name card should no longer be in the deck" );
+    CHECK((!test_zone_has_id(&tg, 0, "deck", multiname)), "mei_bp5_q235_debut_look_and_select_with_multiname");
     // 
 }
 
@@ -31892,8 +31614,7 @@ static void gen_sp_pb1_004_live_start_pay_2e_places_wait(void){
     // TODO: crate::helpers::fire_trigger(&mut game, sumire, rabuka_engine::core::types::AbilityTrigger::LiveStart, "ライブ開始時");
     test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, 1);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() { game.select_indices(&[]); }
+    test_has_pending_choice(&tg);
     // TODO assert_eq (unresolved): assert_eq!(game.state.player1.energy_zone.active_count(), active_before.saturating_sub(2), "should pay 2 active energy");
     // // Energy deck may be empty in TestGame new, so don't strictly assert deck length; just ensure no panic and active decreased
     // TODO assert: assert!(game.state.player1.energy_deck.cards.len() <= deck_before, "energy deck should not increase");
@@ -31915,8 +31636,7 @@ static void gen_sp_pb1_004_live_start_skip_no_effect(void){
     // TODO: crate::helpers::fire_trigger(&mut game, sumire, rabuka_engine::core::types::AbilityTrigger::LiveStart, "ライブ開始時");
     test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, 0);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() { game.select_indices(&[]); }
+    test_has_pending_choice(&tg);
     CHECK_EQ(tg.state.p[0].energy_active, active_before, "sp_pb1_004_live_start_skip_no_effect");
     // TODO assert_eq (unresolved): assert_eq!(game.state.player1.energy_deck.cards.len(), deck_before, "skip should not move energy");
     // 
@@ -31940,13 +31660,12 @@ static void gen_sp_pb1_004_live_start_insufficient_energy_no_pay(void){
     // // The engine should either not offer pay or fail to pay and keep energy
     int before = tg.state.p[0].energy_active;
     rb_resume_with_choice(&tg.state, 0);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() { game.select_indices(&[]); }
+    test_has_pending_choice(&tg);
     // // Active should not go negative; should stay at 1 or be 0 if pay was incorrectly allowed
-    // TODO assert: assert!(game.state.player1.energy_zone.active_count() <= before, "should not overpay");
+    CHECK(tg.state.p[0].energy_active, "sp_pb1_004_live_start_insufficient_energy_no_pay");
     // TODO: }
     // // At least verify no panic and active unchanged if skip
-    // TODO assert: assert!(game.state.player1.energy_zone.active_count() <= active_before);
+    CHECK(tg.state.p[0].energy_active, "sp_pb1_004_live_start_insufficient_energy_no_pay");
     // 
 }
 
@@ -31964,8 +31683,7 @@ static void gen_sp_pb1_004_live_success_pay_3e_draws(void){
     // TODO: crate::helpers::fire_trigger(&mut game, sumire, rabuka_engine::core::types::AbilityTrigger::LiveSuccess, "ライブ成功時");
     test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, 1);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() { game.select_indices(&[]); }
+    test_has_pending_choice(&tg);
     // TODO assert_eq (unresolved): assert_eq!(game.state.player1.hand.cards.len(), hand_before + 1, "should draw 1 on pay");
     CHECK_EQ(tg.state.p[0].energy_active, 2, "sp_pb1_004_live_success_pay_3e_draws");
     // 
@@ -31985,8 +31703,7 @@ static void gen_sp_pb1_004_live_success_skip_no_draw(void){
     // TODO: crate::helpers::fire_trigger(&mut game, sumire, rabuka_engine::core::types::AbilityTrigger::LiveSuccess, "ライブ成功時");
     test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, 0);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() { game.select_indices(&[]); }
+    test_has_pending_choice(&tg);
     CHECK_EQ(tg.state.p[0].hand.n, hand_before, "sp_pb1_004_live_success_skip_no_draw");
     CHECK_EQ(tg.state.p[0].energy_active, 5, "sp_pb1_004_live_success_skip_no_draw");
     // 
@@ -32068,7 +31785,9 @@ static void gen_wien_constant_applies_to_all_opponent_live_cards(void){
     // 
     test_recalc(&tg);
     // 
-    // TODO: for (i, &card) in [live1, live2, live3].iter().enumerate() {
+    int i = 0;
+    int card = 0;
+    // TODO loop (degraded): for (i, &card) in [live1, live2, live3].iter().enumerate() {
     int mod_val = 0;
     // TODO: .state
     // TODO: .mods
@@ -32101,8 +31820,7 @@ static void gen_riko_bp5_condition_met_increases_opponent_hearts(void){
     // 
     test_play_to_stage(&tg, riko_bp5, 2);
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -32135,8 +31853,7 @@ static void gen_riko_bp5_condition_not_met_does_nothing(void){
     // 
     test_play_to_stage(&tg, riko_bp5, 2);
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -32161,7 +31878,7 @@ static void gen_rurino_activates_wait_member_and_adds_live(void){
     // 
     // // Verify preconditions
     // TODO assert_eq (unresolved): assert_eq!( game.state.mods.get_orientation_modifier(mirakura_member), Some("wait"), "Member should start in wait" );
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&live_card), "Live card should be in discard" );
+    CHECK(test_zone_has_id(&tg, 0, "discard", live_card), "rurino_activates_wait_member_and_adds_live");
     // 
     // // Deploy Rurino
     test_play_to_stage(&tg, rurino, 1);
@@ -32176,8 +31893,8 @@ static void gen_rurino_activates_wait_member_and_adds_live(void){
     // 
     // // The "そうした場合" (conditional) action should have fired:
     // // live card moved from discard to hand.
-    // TODO assert: assert!( !game.state.player1.waitroom.cards.contains(&live_card), "Live card should be removed from discard" );
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&live_card), "Live card should be in hand" );
+    CHECK((!test_zone_has_id(&tg, 0, "discard", live_card)), "rurino_activates_wait_member_and_adds_live");
+    CHECK(test_zone_has_id(&tg, 0, "hand", live_card), "rurino_activates_wait_member_and_adds_live");
     // 
 }
 
@@ -32205,7 +31922,7 @@ static void gen_rurino_no_wait_member_skips_entire_sequence(void){
     test_has_pending_choice(&tg);
     // 
     // // Live card should still be in discard — second action didn't fire.
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&live_card), "Live card should remain in discard (sequence was skipped)" );
+    CHECK(test_zone_has_id(&tg, 0, "discard", live_card), "rurino_no_wait_member_skips_entire_sequence");
     // 
 }
 
@@ -32226,7 +31943,7 @@ static void gen_rurino_skip_optional_leaves_live_in_discard(void){
     rb_resume_with_choice(&tg.state, 0);
     // 
     // // Live card should still be in discard — second action didn't fire.
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&live_card), "Live card should remain in discard (skipped)" );
+    CHECK(test_zone_has_id(&tg, 0, "discard", live_card), "rurino_skip_optional_leaves_live_in_discard");
     // 
 }
 
@@ -32390,8 +32107,7 @@ static void gen_strawberry_q36_only_fires_in_live_victory_determination(void){
     rb_advance_phase(&tg.state);
     CHECK(strstr(rb_phase_name(tg.state.phase), "Live Result") != NULL, "strawberry_q36_only_fires_in_live_victory_determination");
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -32681,8 +32397,7 @@ static void gen_yoshi_center_cost4_to_cost6_succeeds(void){
     // // Third: choose from discard cost X+2
     // TODO: game.select_indices(&[0]);
     // TODO: }
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() { game.select_indices(&[]); }
+    test_has_pending_choice(&tg);
     // // After success, candidate should be on stage at same area where target was (index 0)
     CHECK(tg.state.p[0].stage[0], "yoshi_center_cost4_to_cost6_succeeds");
     // 
@@ -32708,10 +32423,9 @@ static void gen_yoshi_cost4_with_no_cost6_in_discard_no_place(void){
     test_has_pending_choice(&tg);
     test_has_pending_choice(&tg);
     test_has_pending_choice(&tg);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() { game.select_indices(&[]); }
+    test_has_pending_choice(&tg);
     // // Target should have been moved to discard, but no candidate placed because no cost6
-    // TODO assert: assert!(game.state.player1.waitroom.cards.contains(&target), "target should be in discard");
+    CHECK(test_zone_has_id(&tg, 0, "discard", target), "yoshi_cost4_with_no_cost6_in_discard_no_place");
     // TODO assert: assert!(!game.state.player1.stage.stage.contains(&wrong_cost), "wrong cost should not be placed");
     // 
 }
@@ -32730,8 +32444,7 @@ static void gen_yoshi_no_other_aqours_no_target(void){
     test_activate_ability(&tg, yoshi);
     test_has_pending_choice(&tg);
     // // With no other Aqours, the second step should have no selectable target, so ability ends after cost
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() { game.select_indices(&[]); }
+    test_has_pending_choice(&tg);
     // TODO assert: assert!(game.state.player1.stage.stage.contains(&yoshi) || game.state.player1.waitroom.cards.contains(&yoshi), "yoshi should be wait or stage");
     // 
 }
@@ -32773,8 +32486,7 @@ static void gen_yoshi_turn1_blocks_second(void){
     test_has_pending_choice(&tg);
     test_has_pending_choice(&tg);
     test_has_pending_choice(&tg);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() { game.select_indices(&[]); }
+    test_has_pending_choice(&tg);
     test_activate_ability(&tg, yoshi);
     // action result consumed: assert!(res2.is_err(), "turn1 should block second");
     // 
@@ -32878,7 +32590,7 @@ static void gen_izumi_bp5_look_with_eligible_hasu_selects(void){
     // TODO assert_eq (unresolved): assert_eq!(game.pending_choice_type().as_deref(), Some("SelectCard"));
     // // Select the eligible Hasunosora
     // TODO: game.select_indices(&[0]);
-    // TODO assert: assert!(game.state.player1.hand.cards.contains(&hasu9), "Hasunosora cost9 should be in hand");
+    CHECK(test_zone_has_id(&tg, 0, "hand", hasu9), "izumi_bp5_look_with_eligible_hasu_selects");
     test_has_pending_choice(&tg);
     // 
 }
@@ -32906,7 +32618,7 @@ static void gen_izumi_bp5_look_with_eligible_skip_keeps_hand(void){
     test_has_pending_choice(&tg);
     // // Skip optional select even though eligible exists
     // TODO: game.select_indices(&[]);
-    // TODO assert: assert!(!game.state.player1.hand.cards.contains(&hasu9), "skipped select should not add Hasunosora");
+    CHECK((!test_zone_has_id(&tg, 0, "hand", hasu9)), "izumi_bp5_look_with_eligible_skip_keeps_hand");
     test_has_pending_choice(&tg);
     // 
 }
@@ -32931,13 +32643,12 @@ static void gen_izumi_bp5_look_no_eligible_auto_discards(void){
     // TODO: game.select_indices(&[0]);
     // // No eligible in top 5 (all filler), should auto-discard 5 to waitroom and end
     int safety = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && safety < 5 {
+    test_has_pending_choice(&tg);
     // TODO: safety += 1;
     // TODO: game.select_indices(&[]);
     // TODO: }
     test_has_pending_choice(&tg);
-    // TODO assert: assert!(game.state.player1.waitroom.cards.len() >= wait_before + 6, "5 looked + 1 discard to waitroom");
+    CHECK(tg.state.p[0].discard.n, "izumi_bp5_look_no_eligible_auto_discards");
     // 
 }
 
@@ -32957,7 +32668,7 @@ static void gen_pb1013_higher_cost_member_on_stage_draws(void){
     // TODO: fire_trigger(&mut game, me, AbilityTrigger::LiveSuccess, "ライブ成功時");
     // 
     // TODO assert_eq (unresolved): assert_eq!( game.state.player1.hand.cards.len(), hand_before + 1, "a member costing more than 9 is on stage -> draw 1" );
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&drawn), "the drawn card is the one stocked on the deck" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", drawn), "pb1013_higher_cost_member_on_stage_draws");
     // 
 }
 
@@ -33497,16 +33208,15 @@ static void gen_mei_accept_live_cost_look_five_take_one(void){
     // 
     // // Prompt chain: optional live-discard gate -> which-card selection.
     int guard = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && guard < 10 {
+    test_has_pending_choice(&tg);
     // TODO: guard += 1;
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
     // // The live card paid as cost sits in the waitroom.
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&live_cost), "cost live card was discarded to the waitroom" );
+    CHECK(test_zone_has_id(&tg, 0, "discard", live_cost), "mei_accept_live_cost_look_five_take_one");
     // // The first looked card was taken into the hand.
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&a), "one looked card added to hand" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", a), "mei_accept_live_cost_look_five_take_one");
     // 
 }
 
@@ -33528,7 +33238,7 @@ static void gen_mei_decline_cost_no_look(void){
     // // Decline the optional live-card discard.
     // TODO: game.select_indices(&[]);
     // 
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&live_cost), "declined: live card stays in hand" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", live_cost), "mei_decline_cost_no_look");
     // 
 }
 
@@ -33571,7 +33281,7 @@ static void gen_pr0029_pay_energy_grants_heart01(void){
     rb_resume_with_choice(&tg.state, 1);
     // 
     CHECK_EQ(rb_mods_get_heart(&tg.state.mods, me, 1), 1, "pr0029_pay_energy_grants_heart01");
-    // TODO assert: assert!( game.state.player1.energy_zone.active_count() < active_before, "energy was consumed" );
+    CHECK(tg.state.p[0].energy_active, "pr0029_pay_energy_grants_heart01");
     // 
 }
 
@@ -33815,8 +33525,7 @@ static void gen_bp7022_activation_moves_member_to_another_area(void){
     int zone_before = tg.state.p[0].energy.n;
     test_activate_ability(&tg, me);
     int guard = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && guard < 10 {
+    test_has_pending_choice(&tg);
     // TODO: guard += 1;
     // TODO: game.select_indices(&[0]);
     // TODO: }
@@ -33844,11 +33553,10 @@ static void gen_bp7022_empty_energy_deck_still_changes_position_or_noops_cleanly
     // // NO energy at all -> the {E} cost cannot be paid; activation no-ops
     // // without panicking.
     test_activate_ability(&tg, me);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
-    // TODO assert: assert!( game.state.player1.stage.stage.iter().any(|&c| c == me), "member stays on stage" );
+    CHECK(test_zone_has_id(&tg, 0, "stage", me), "bp7022_empty_energy_deck_still_changes_position_or_noops_cleanly");
     // 
 }
 
@@ -33977,14 +33685,13 @@ static void gen_bp5010_mills_three_retrieves_arise_member(void){
     // // discard (allow_skip=true SelectCard), then drain.
     // TODO: game.select_indices(&[0]);
     int guard = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && guard < 10 {
+    test_has_pending_choice(&tg);
     // TODO: guard += 1;
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
     // TODO assert_eq (unresolved): assert_eq!( game.state.player1.main_deck.cards.len(), deck_before - 3, "milled exactly 3" );
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&arise), "A-RISE member retrieved to hand" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", arise), "bp5010_mills_three_retrieves_arise_member");
     // 
 }
 
@@ -34029,8 +33736,7 @@ static void gen_bp5010_mill_happens_even_without_arise(void){
     // 
     // TODO: game.select_indices(&[0]); // accept the optional discard
     int guard = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && guard < 10 {
+    test_has_pending_choice(&tg);
     // TODO: guard += 1;
     // TODO: game.select_indices(&[0]);
     // TODO: }
@@ -34558,8 +34264,7 @@ static void gen_q137_keke_active_cost_pay_applies_wait(void){
     // TODO assert_eq (unresolved): assert_eq!(ori, Some("wait"), "Keke should be waited after paying cost");
     // 
     // // Effect resolves (look_at_4) — no valid Liella! live cards → skip selection
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -34588,8 +34293,7 @@ static void gen_q137_keke_skip_cost_no_wait(void){
     rb_resume_with_choice(&tg.state, 0);
     // 
     // // Resolve any remaining effect
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -34617,8 +34321,7 @@ static void gen_q137_keke_already_waited_cannot_pay_again(void){
     // // Pay the cost — Keke becomes waited
     test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, 1);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -34752,8 +34455,7 @@ static void gen_q198_baton_touch_cost11_no_trigger(void){
     // 
     // // Auto should NOT fire — Ranju was replaced before cost11 appeared.
     // // Ranju is now in waitroom, so the condition "location: stage" fails.
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -34762,7 +34464,7 @@ static void gen_q198_baton_touch_cost11_no_trigger(void){
     // // When Ranju was played, 11 energy was used (cost 11).
     // // When cost11 was played via baton touch, no extra energy used.
     // // So active_energy = 20 - 11 = 9, no energy from energy deck was added.
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&ranju), "Ranju should be in waitroom after baton touch" );
+    CHECK(test_zone_has_id(&tg, 0, "discard", ranju), "q198_baton_touch_cost11_no_trigger");
     // 
 }
 
@@ -34791,13 +34493,12 @@ static void gen_q198_normal_appearance_cost11_triggers(void){
     test_play_to_stage(&tg, cost11, 1);
     // 
     // // Auto should fire: energy deck → place 1 energy in wait state
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
     // // Verify energy was placed (total zone count increased)
-    // TODO assert: assert!( game.state.player1.energy_zone.cards.len() > 0, "Energy should be placed from energy deck" );
+    CHECK(tg.state.p[0].energy.n, "q198_normal_appearance_cost11_triggers");
     // 
 }
 
@@ -34829,13 +34530,12 @@ static void gen_q197_baton_touch_cost10_no_trigger(void){
     test_play_to_stage(&tg, cost10, 1);
     // 
     // // Auto should NOT fire
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
     // // Hand should decrease (cost10 played, no draw from auto)
-    // TODO assert: assert!( game.state.player1.hand.cards.len() < hand_before, "Hand should decrease — auto should NOT fire on baton touch" );
+    CHECK(tg.state.p[0].hand.n, "q197_baton_touch_cost10_no_trigger");
     // 
 }
 
@@ -34867,14 +34567,13 @@ static void gen_q197_normal_appearance_cost10_triggers(void){
     test_play_to_stage(&tg, cost10, 1);
     // 
     // // Auto should fire: draw 1 card
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
     // // Hand: [cost10] → play cost10 → [] → draw → [drawn]. hand_before=1, final=1.
     // // The draw compensates the play. Auto fires = hand stays same.
-    // TODO assert: assert!( game.state.player1.hand.cards.len() >= hand_before.saturating_sub(0), "Hand should not decrease — auto should fire (draw compensates play)" );
+    CHECK(tg.state.p[0].hand.n, "q197_normal_appearance_cost10_triggers");
     // // Check that at least the auto fired (energy or draw effect)
     // // If auto fired, draw happened: hand = [drawn] = hand_before
     CHECK_EQ(tg.state.p[0].hand.n, hand_before, "q197_normal_appearance_cost10_triggers");
@@ -34914,8 +34613,7 @@ static void gen_q196_activate_zero_members_on_stage(void){
     // TODO: game.select_indices(&[0]);
     // 
     // // Effect resolves: draw 1, then blade grant (no targets → skip)
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -34962,8 +34660,7 @@ static void gen_q196_activate_with_niji_member_grants_blade(void){
     // // stage the single candidate auto-resolves — no prompt (observed).
     test_has_pending_choice(&tg);
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -35015,7 +34712,7 @@ static void gen_q251_member_no_blade_can_move(void){
     test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: game.state.process_pending_auto_abilities("player1");
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&member), "蓮ノ空 member without blade heart moved to waitroom" );
+    CHECK(test_zone_has_id(&tg, 0, "discard", member), "q251_member_no_blade_can_move");
     // 
 }
 
@@ -35063,7 +34760,7 @@ static void gen_q251_live_special_heart_cannot_move(void){
     // 
     test_has_pending_choice(&tg);
     // TODO assert: assert!( game.state.revealed_cards.contains(&live), "Live card remains in revealed_cards (not moved to waitroom)" );
-    // TODO assert: assert!( !game.state.player1.waitroom.cards.contains(&live), "Live card NOT in waitroom" );
+    CHECK((!test_zone_has_id(&tg, 0, "discard", live)), "q251_live_special_heart_cannot_move");
     // 
 }
 
@@ -35193,7 +34890,7 @@ static void gen_q251_mixed_pool_only_member_can_move(void){
     test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: game.state.process_pending_auto_abilities("player1");
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&member), "蓮ノ空 member moved to waitroom" );
+    CHECK(test_zone_has_id(&tg, 0, "discard", member), "q251_mixed_pool_only_member_can_move");
     // TODO assert: assert!( !game.state.revealed_cards.contains(&member), "Member removed from revealed" );
     // TODO assert: assert!( game.state.revealed_cards.contains(&live), "Live card stays in revealed (excluded by has_blade_heart)" );
     // 
@@ -35242,12 +34939,11 @@ static void gen_q251_skip_optional(void){
     // TODO: game.select_indices(&[]); // skip
     // 
     // // After skipping, drain any remaining auto-resolve choices (e.g. second action)
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // TODO assert: assert!( game.state.revealed_cards.contains(&m1), "Card stays in revealed_cards after skip" );
-    // TODO assert: assert!( !game.state.player1.waitroom.cards.contains(&m1), "Card NOT moved to waitroom" );
+    CHECK((!test_zone_has_id(&tg, 0, "discard", m1)), "q251_skip_optional");
     // 
 }
 
@@ -35514,10 +35210,10 @@ static void gen_fuyumari_q118_opponent_picks_first_card(void){
     rb_resume_with_choice(&tg.state, 0);
     // 
     // // Step 3: Opponent's chosen card (live_a, index 0 of selected_cards) goes to hand
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&live_a), "Opponent-chosen card (live_a) should be in hand" );
-    // TODO assert: assert!( !game.state.player1.waitroom.cards.contains(&live_a), "live_a should be removed from discard" );
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&live_b), "live_b stays in discard (not chosen by opponent)" );
-    // TODO assert: assert!( !game.state.player2.hand.cards.contains(&live_a), "live_a should go to player1's hand, not opponent" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", live_a), "fuyumari_q118_opponent_picks_first_card");
+    CHECK((!test_zone_has_id(&tg, 0, "discard", live_a)), "fuyumari_q118_opponent_picks_first_card");
+    CHECK(test_zone_has_id(&tg, 0, "discard", live_b), "fuyumari_q118_opponent_picks_first_card");
+    CHECK((!test_zone_has_id(&tg, 1, "hand", live_a)), "fuyumari_q118_opponent_picks_first_card");
     // 
 }
 
@@ -35558,9 +35254,9 @@ static void gen_fuyumari_q118_opponent_picks_second_card(void){
     rb_resume_with_choice(&tg.state, 1);
     // 
     // // Step 3: Opponent's chosen card (live_b, index 1 of selected_cards) goes to hand
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&live_b), "Opponent-chosen card (live_b) should be in hand" );
-    // TODO assert: assert!( !game.state.player1.waitroom.cards.contains(&live_b), "live_b should be removed from discard" );
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&live_a), "live_a stays in discard (not chosen by opponent)" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", live_b), "fuyumari_q118_opponent_picks_second_card");
+    CHECK((!test_zone_has_id(&tg, 0, "discard", live_b)), "fuyumari_q118_opponent_picks_second_card");
+    CHECK(test_zone_has_id(&tg, 0, "discard", live_a), "fuyumari_q118_opponent_picks_second_card");
     // 
 }
 
@@ -35585,11 +35281,10 @@ static void gen_fuyumari_q118_only_one_live_card_no_effect(void){
     // 
     // // Fewer than 2 distinct live cards → select creates no choice → effect ends
     // // Consume any remaining choice
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
-    // TODO assert: assert!( !game.state.player1.hand.cards.contains(&live), "No live card should be added when <2 available" );
+    CHECK((!test_zone_has_id(&tg, 0, "hand", live)), "fuyumari_q118_only_one_live_card_no_effect");
     // 
 }
 
@@ -35621,8 +35316,7 @@ static void gen_fuyumari_q118_card_count_integrity(void){
     test_has_pending_choice(&tg);
     // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard for the opponent's pick from selected_cards" );
     // TODO: game.select_indices(&[0]); // opponent selects first of the two
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -35668,10 +35362,10 @@ static void gen_fuyumari_q118_three_distinct_cards_opponent_picks_middle(void){
     rb_resume_with_choice(&tg.state, 1);
     // 
     // // Step 3: Opponent-chosen card (live_c) goes to hand
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&live_c), "Opponent-chosen card (live_c) should be in hand" );
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&live_a), "Unchosen live_a stays in discard" );
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&live_b), "Unchosen live_b stays in discard" );
-    // TODO assert: assert!( !game.state.player1.waitroom.cards.contains(&live_c), "live_c should be removed from discard" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", live_c), "fuyumari_q118_three_distinct_cards_opponent_picks_middle");
+    CHECK(test_zone_has_id(&tg, 0, "discard", live_a), "fuyumari_q118_three_distinct_cards_opponent_picks_middle");
+    CHECK(test_zone_has_id(&tg, 0, "discard", live_b), "fuyumari_q118_three_distinct_cards_opponent_picks_middle");
+    CHECK((!test_zone_has_id(&tg, 0, "discard", live_c)), "fuyumari_q118_three_distinct_cards_opponent_picks_middle");
     // 
 }
 
@@ -35717,10 +35411,10 @@ static void gen_fuyumari_q118_duplicate_names_distinct_filter_works(void){
     rb_resume_with_choice(&tg.state, 0);
     // 
     // // Step 3: Opponent-chosen card (live_a) goes to hand
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&live_a), "Opponent-chosen card (live_a) should be in hand" );
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&live_c), "Unchosen live_c stays in discard" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", live_a), "fuyumari_q118_duplicate_names_distinct_filter_works");
+    CHECK(test_zone_has_id(&tg, 0, "discard", live_c), "fuyumari_q118_duplicate_names_distinct_filter_works");
     // // live_a2 should be unaffected
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&live_a2), "live_a2 (duplicate name, unchosen) stays in discard" );
+    CHECK(test_zone_has_id(&tg, 0, "discard", live_a2), "fuyumari_q118_duplicate_names_distinct_filter_works");
     // 
 }
 
@@ -36849,8 +36543,7 @@ static void gen_coco_left_side_draws(void){
     // 
     int hand_before = 0;
     test_play_to_stage(&tg, coco, 0);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, 1);
     // TODO: }
     // 
@@ -36871,8 +36564,7 @@ static void gen_coco_center_does_not_draw(void){
     // 
     int hand_before = 0;
     test_play_to_stage(&tg, coco, 1);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, 1);
     // TODO: }
     // 
@@ -36893,8 +36585,7 @@ static void gen_coco_right_side_does_not_draw(void){
     // 
     int hand_before = 0;
     test_play_to_stage(&tg, coco, 2);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, 1);
     // TODO: }
     // 
@@ -36920,8 +36611,7 @@ static void gen_chisato_left_side_draws_and_discards(void){
     // 
     test_has_pending_choice(&tg);
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -36947,8 +36637,7 @@ static void gen_chisato_right_side_draws_and_discards(void){
     // 
     test_has_pending_choice(&tg);
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -36991,8 +36680,7 @@ static void gen_edelnote_two_members_different_names(void){
     rb_advance_phase(&tg.state);
     // TODO: }
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -37053,8 +36741,7 @@ static void gen_edelnote_single_member(void){
     rb_advance_phase(&tg.state);
     // TODO: }
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -37101,8 +36788,7 @@ static void gen_edelnote_no_members(void){
     rb_advance_phase(&tg.state);
     // TODO: }
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // // No EdelNote members → no modifiers should be applied
@@ -37146,8 +36832,7 @@ static void gen_edelnote_three_members_two_same_name(void){
     rb_advance_phase(&tg.state);
     // TODO: }
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -37211,8 +36896,7 @@ static void gen_edelnote_two_same_name(void){
     rb_advance_phase(&tg.state);
     // TODO: }
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -37275,8 +36959,7 @@ static void gen_edelnote_name_based_exclusion(void){
     // // Heart should only offer edel2 (桂城 泉, only different name).
     test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -37358,16 +37041,18 @@ static void gen_pr_ai_pays_cost_discards_2_draws_4(void){
     // TODO assert_eq (unresolved): assert_eq!( game.state.player1.main_deck.cards.len(), deck_before - 5, "Deck should lose 5 cards (the 5 drawn)" );
     // 
     // // The discarded filler IDs from the original hand should be in the waitroom.
-    // TODO: for (i, &orig) in hand_before_play.iter().enumerate() {
+    int i = 0;
+    int orig = 0;
+    // TODO loop (degraded): for (i, &orig) in hand_before_play.iter().enumerate() {
     // TODO: if i == 0 {
     // TODO: continue;
     // TODO: } // skip Ai
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&orig), "Filler card at hand index {} (id={}, {}) should be in waitroom", i, orig, game.name(orig) );
+    CHECK(test_zone_has_id(&tg, 0, "discard", orig), "pr_ai_pays_cost_discards_2_draws_4");
     // TODO: }
     // 
     // // Sanity: Ai not in waitroom (it's on stage, not in hand or discard).
-    // TODO assert: assert!(!game.state.player1.waitroom.cards.contains(&ai));
-    // TODO assert: assert!(!game.state.player1.hand.cards.contains(&ai));
+    CHECK((!test_zone_has_id(&tg, 0, "discard", ai)), "pr_ai_pays_cost_discards_2_draws_4");
+    CHECK((!test_zone_has_id(&tg, 0, "hand", ai)), "pr_ai_pays_cost_discards_2_draws_4");
     // discard: let _ = filler; // suppress unused warning
     // 
 }
@@ -37705,8 +37390,7 @@ static void gen_ab1_no_blade_when_statically_in_live_zone(void){
     int pid = 0;
     // TODO: rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(&mut g.state, &pid);
     // TODO: g.state.process_pending_auto_abilities(&pid);
-    int g = 0;
-    // TODO loop (degraded): while g.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: g.select_indices(&[]);
     // TODO: }
     // 
@@ -37733,8 +37417,7 @@ static void gen_ab1_rescan_after_flags_cleared_does_not_double_grant(void){
     int pid = 0;
     // TODO: rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(&mut g.state, &pid);
     // TODO: g.state.process_pending_auto_abilities(&pid);
-    int g = 0;
-    // TODO loop (degraded): while g.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: g.select_indices(&[0]);
     // TODO: }
     // TODO assert_eq (unresolved): assert_eq!(blade_mod(&g, niji), 2, "first grant gives exactly blade+2");
@@ -37743,8 +37426,7 @@ static void gen_ab1_rescan_after_flags_cleared_does_not_double_grant(void){
     // TODO: g.state.clear_recently_moved_batch();
     // TODO: rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(&mut g.state, &pid);
     // TODO: g.state.process_pending_auto_abilities(&pid);
-    g = 0;
-    // TODO loop (degraded): while g.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: g.select_indices(&[0]);
     // TODO: }
     // TODO assert_eq (unresolved): assert_eq!( blade_mod(&g, niji), 2, "rescan after flags cleared must NOT double the blade grant" );
@@ -37776,8 +37458,7 @@ static void gen_two_dive_copies_only_the_moved_one_places(void){
     // // Accept the (single) placement offer.
     int placements = 0;
     int guard = 0;
-    int g = 0;
-    // TODO loop (degraded): while g.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: guard += 1;
     // TODO assert: assert!(guard <= 10, "runaway prompts:\n{}", g.pending_choice_summary());
     int ty = 0;
@@ -37911,8 +37592,7 @@ static void gen_maki_debut_pay_cost_opponent_waits_one(void){
     // TODO: game.select_indices(&[0]);
     // 
     // // 3. ab#1 triggers (state change detected) and auto-resolves
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -37950,8 +37630,7 @@ static void gen_maki_debut_skip_cost_no_effect(void){
     // // Skip the optional cost (card_id != Some(1) → "skip_optional_cost")
     rb_resume_with_choice(&tg.state, 0);
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -37985,13 +37664,12 @@ static void gen_maki_ab1_draws_on_cost4_or_less_opponent_waited(void){
     // // ab#1 is pre-filtered out (no state change yet). ab#0 auto-resolves.
     rb_resume_with_choice(&tg.state, 1);
     // // hand = [filler, extra] = 2. deck = [].
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
     CHECK_EQ(tg.state.p[0].hand.n, 2, "maki_ab1_draws_on_cost4_or_less_opponent_waited");
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&extra), "Drawn card should be in hand" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", extra), "maki_ab1_draws_on_cost4_or_less_opponent_waited");
     // 
 }
 
@@ -38016,8 +37694,7 @@ static void gen_maki_ab1_no_draw_on_cost_over4_opponent_waited(void){
     // 
     rb_resume_with_choice(&tg.state, 1);
     // // Opponent wait happens, but ab#1 condition fails for cost 13 > 4 → no draw.
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -38056,8 +37733,7 @@ static void gen_maki_ab1_use_limit_once_per_turn(void){
     int entry = 0;
     // TODO assert_eq (unresolved): assert_eq!( entry.as_ref().and_then(|e| e.choice_player_id.as_deref()), Some("p2"), "Wait-member choice must be routed to opponent (p2)" );
     // TODO: game.select_indices(&[0]); // Opponent waits p2_a (cost 4 ≤ 4 → ab#1 draws)
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // // hand = [filler, drawn] = 2 (play -1, draw +1 = net 0)
@@ -38100,8 +37776,7 @@ static void gen_maki_ab0_plus_ab1_end_to_end(void){
     // 
     // // ab#1 pre-filtered out (no state change yet). ab#0 auto-resolves.
     rb_resume_with_choice(&tg.state, 1);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -38271,8 +37946,7 @@ static void gen_riko_equal_cost_both_occupied_triggers(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -38322,8 +37996,7 @@ static void gen_riko_different_costs_no_trigger(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -38373,8 +38046,7 @@ static void gen_riko_left_empty_no_trigger(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -38424,8 +38096,7 @@ static void gen_riko_right_empty_no_trigger(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -38472,8 +38143,7 @@ static void gen_riko_both_empty_no_trigger(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -38523,8 +38193,7 @@ static void gen_riko_same_cost_different_cards_triggers(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -38843,8 +38512,7 @@ static void gen_s2_pb1_006_opponent_drag_arms_per_move(void){
     // // pulled right -> center. Distinct movement_event_counter => arms again.
     test_play_to_stage(&tg, mover1, 1);
     // action result consumed: .expect("p2 debut of mover1");
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: answer_choice(&mut game, 0);
     // TODO: }
     // TODO: scan_autos_both(&mut game);
@@ -38999,9 +38667,9 @@ static void gen_q269_yell_reveal_does_not_trigger_mia_auto(void){
     // TODO assert: assert!(revealed.contains(&mia), "yell must reveal ミア");
     // 
     test_has_pending_choice(&tg);
-    // TODO assert: assert!( !game.state.player1.hand.cards.contains(&mia), "Q269: ミア must not be recovered to hand by a yell reveal" );
+    CHECK((!test_zone_has_id(&tg, 0, "hand", mia)), "q269_yell_reveal_does_not_trigger_mia_auto");
     CHECK_EQ(tg.state.p[0].hand.n, hand_before, "q269_yell_reveal_does_not_trigger_mia_auto");
-    // TODO assert: assert!( !game.state.player1.waitroom.cards.contains(&mia), "Q269: ミア must not move to the waitroom from a yell reveal" );
+    CHECK((!test_zone_has_id(&tg, 0, "discard", mia)), "q269_yell_reveal_does_not_trigger_mia_auto");
     // 
 }
 
@@ -39018,7 +38686,7 @@ static void gen_q269_yell_reveal_mid_pool_does_not_trigger(void){
     // TODO assert: assert!(revealed.contains(&mia), "yell must reveal ミア among the 3");
     // 
     test_has_pending_choice(&tg);
-    // TODO assert: assert!( !game.state.player1.hand.cards.contains(&mia) && game.state.player1.hand.cards.len() == hand_before, "Q269: ミア not recovered, hand not discarded" );
+    CHECK((!test_zone_has_id(&tg, 0, "hand", mia)), "q269_yell_reveal_mid_pool_does_not_trigger");
     // 
 }
 
@@ -39037,7 +38705,7 @@ static void gen_q269_yell_reveal_does_not_recover_existing_waitroom_copy(void){
     // TODO assert: assert!(revealed.contains(&mia_revealed), "yell reveals a ミア");
     // 
     test_has_pending_choice(&tg);
-    // TODO assert: assert!( !game.state.player1.hand.cards.contains(&mia_revealed) && !game.state.player1.hand.cards.contains(&mia_waitroom), "Q269: neither ミア copy is recovered to hand" );
+    CHECK((!test_zone_has_id(&tg, 0, "hand", mia_revealed)), "q269_yell_reveal_does_not_recover_existing_waitroom_copy");
     CHECK_EQ(tg.state.p[0].hand.n, hand_before, "q269_yell_reveal_does_not_recover_existing_waitroom_copy");
     // 
 }
@@ -39061,7 +38729,7 @@ static void gen_q269_control_deck_to_discard_triggers(void){
     // 
     // // Accept the optional recover, then the hand-discard that enables そうしたとき.
     // TODO assert: assert!( accept_mia_recover(&mut game), "control: a deck→discard movement must offer the conditional_optional recover" );
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&mia), "control: deck→discard movement must recover ミア to hand (scan is live)" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", mia), "q269_control_deck_to_discard_triggers");
     // 
 }
 
@@ -39083,7 +38751,7 @@ static void gen_q277_control_no_refresh_recovers_mia(void){
     // TODO: game.state.process_pending_auto_abilities(&pid);
     // 
     // TODO assert: assert!( accept_mia_recover(&mut game), "control: without a refresh ミア's recover must be offered" );
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&mia), "control: ミア is still in the waitroom → recovered to hand" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", mia), "q277_control_no_refresh_recovers_mia");
     // 
 }
 
@@ -39105,15 +38773,15 @@ static void gen_q277_refresh_before_auto_resolve_prevents_recover(void){
     // // 自動 resolves (Q277): the waitroom (incl. ミア) is shuffled into the deck.
     // clear
     // TODO: game.state.player1.refresh();
-    // TODO assert: assert!( !game.state.player1.waitroom.cards.contains(&mia) && game.state.player1.main_deck.cards.contains(&mia), "setup: refresh must move ミア out of the waitroom into the deck" );
+    CHECK((!test_zone_has_id(&tg, 0, "discard", mia)), "q277_refresh_before_auto_resolve_prevents_recover");
     // 
     int pid = 0;
     // TODO: game.state.trigger_auto_abilities_for_player(&pid);
     // TODO: game.state.process_pending_auto_abilities(&pid);
     // TODO: accept_mia_recover(&mut game);
     // 
-    // TODO assert: assert!( !game.state.player1.hand.cards.contains(&mia), "Q277: refresh before the auto resolves removes ミア from the waitroom, so it cannot be recovered" );
-    // TODO assert: assert!( game.state.player1.main_deck.cards.contains(&mia), "Q277: after refresh ミア is in the deck, not the waitroom" );
+    CHECK((!test_zone_has_id(&tg, 0, "hand", mia)), "q277_refresh_before_auto_resolve_prevents_recover");
+    CHECK(test_zone_has_id(&tg, 0, "deck", mia), "q277_refresh_before_auto_resolve_prevents_recover");
     // 
 }
 
@@ -39397,15 +39065,14 @@ static void gen_wwd_accept_cost_energy_ahead_scores_plus_one(void){
     // // Remaining prompts: which energy card leaves the zone, then the
     // // ability's own {E} activation-cost payment.
     int guard = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && guard < 10 {
+    test_has_pending_choice(&tg);
     // TODO: guard += 1;
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
     // TODO assert_eq (unresolved): assert_eq!( game.state.player1.energy_deck.cards.len(), deck_before + 1, "accepted: one energy moved from zone back to the energy deck" );
     // TODO assert_eq (unresolved): assert_eq!( game.state.player1.energy_zone.cards.len(), zone_before - 1, "zone lost exactly the moved card" );
-    // TODO assert: assert!( game.state.mods.get_score_modifier(live) >= 1, "energy still ahead after paying -> score +1" );
+    CHECK(rb_mods_get_score(&tg.state.mods, live), "wwd_accept_cost_energy_ahead_scores_plus_one");
     // 
 }
 
@@ -39567,8 +39234,7 @@ static void gen_niji_choice_activate_energy(void){
     test_play_to_stage(&tg, member, 1);
     // 
     // // Debut triggers during play_to_stage; handle any pending choices
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_choice_option(0);
     // TODO: }
     // 
@@ -39610,8 +39276,7 @@ static void gen_niji_choice_put_live_on_deck_top(void){
     test_add_to_hand(&tg, member);
     test_play_to_stage(&tg, member, 1);
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_choice_option(1);
     // TODO: }
     // 
@@ -39685,8 +39350,7 @@ static void gen_sp_pr_021_hearts_lt5_no_weight(void){
     // // inlined helper drain_auto
     // 
     int safety = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && safety < 30 {
+    test_has_pending_choice(&tg);
     // TODO: safety += 1;
     // TODO: if game.pending_choice_type().as_deref() == Some("SelectAutoAbility") {
     // TODO: game.select_indices(&[]);
@@ -39698,8 +39362,7 @@ static void gen_sp_pr_021_hearts_lt5_no_weight(void){
     // 
     // 
     // 
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -39775,8 +39438,7 @@ static void gen_azuna_target_self_puts_members_on_deck_bottom(void){
     // // inlined helper drain_auto
     // 
     int safety = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && safety < 30 {
+    test_has_pending_choice(&tg);
     // TODO: safety += 1;
     // TODO: if game.pending_choice_type().as_deref() == Some("SelectAutoAbility") {
     // TODO: game.select_indices(&[]);
@@ -39789,8 +39451,7 @@ static void gen_azuna_target_self_puts_members_on_deck_bottom(void){
     // 
     // 
     // // Handle the target player choice
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     int choice = 0;
     // TODO: let is_target =
     // TODO: matches!(choice, rabuka_engine::ability::types::Choice::SelectTarget { .. });
@@ -39859,8 +39520,7 @@ static void gen_aiko_target_self_looks_at_top_card(void){
     // // inlined helper drain_auto
     // 
     int safety = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && safety < 30 {
+    test_has_pending_choice(&tg);
     // TODO: safety += 1;
     // TODO: if game.pending_choice_type().as_deref() == Some("SelectAutoAbility") {
     // TODO: game.select_indices(&[]);
@@ -39879,8 +39539,7 @@ static void gen_aiko_target_self_looks_at_top_card(void){
     // // Handle choices:
     // //  - SelectTarget "self_or_opponent": option 0 = self
     // //  - SelectCard zone=looked_at (destination=discard): index 0 = the looked card
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     int choice = 0;
     // TODO: let is_target =
     // TODO: matches!(choice, rabuka_engine::ability::types::Choice::SelectTarget { .. });
@@ -39891,8 +39550,8 @@ static void gen_aiko_target_self_looks_at_top_card(void){
     // TODO: }
     // TODO: }
     // 
-    // TODO assert: assert!( !game.state.player1.main_deck.cards.contains(&looked), "the discarded card is no longer on the deck" );
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&looked), "choosing the discard option moves the looked-at top card to the waitroom" );
+    CHECK((!test_zone_has_id(&tg, 0, "deck", looked)), "aiko_target_self_looks_at_top_card");
+    CHECK(test_zone_has_id(&tg, 0, "discard", looked), "aiko_target_self_looks_at_top_card");
     // 
 }
 
@@ -40769,8 +40428,7 @@ static void gen_q254_mandatory_no_skip_when_condition_met(void){
     rb_advance_phase(&tg.state);
     // 
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -40820,8 +40478,7 @@ static void gen_q254_one_card_no_effect(void){
     rb_advance_phase(&tg.state);
     // 
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -40863,8 +40520,7 @@ static void gen_q254_zero_cards_no_effect(void){
     rb_advance_phase(&tg.state);
     // 
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -40912,8 +40568,7 @@ static void gen_q254_three_cards_triggers(void){
     rb_advance_phase(&tg.state);
     // 
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -40967,8 +40622,7 @@ static void gen_q254_modified_requirement_overrides_base_with_stage(void){
     rb_advance_phase(&tg.state);
     // 
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -41045,8 +40699,7 @@ static void gen_q254_modified_requirement_met_with_high_heart_stage(void){
     rb_advance_phase(&tg.state);
     // 
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -41095,8 +40748,7 @@ static void gen_q254_no_condition_uses_base_requirement(void){
     rb_advance_phase(&tg.state);
     // 
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -41147,7 +40799,7 @@ static void gen_live_phase_crossroads_replacement_p1(void){
     // TODO: game.select_indices(&[0]);
     // 
     // // Verify: Crossroads moved to waitroom, μ's live in success zone
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&crossroads), "Crossroads should be in waitroom (replacement triggered)" );
+    CHECK(test_zone_has_id(&tg, 0, "discard", crossroads), "live_phase_crossroads_replacement_p1");
     // TODO assert: assert!( game.state .player1 .success_live_card_zone .cards .contains(&muse_live), "μ's live card should be in success zone" );
     // TODO assert: assert!( game.state.player1.live_card_zone.cards.is_empty(), "live_card_zone should be empty after processing" );
     // 
@@ -41174,7 +40826,7 @@ static void gen_live_phase_crossroads_replacement_skip_p1(void){
     // 
     // // Verify: Crossroads placed in success zone directly, μ's live stays in discard
     // TODO assert: assert!( game.state .player1 .success_live_card_zone .cards .contains(&crossroads), "Crossroads should be in success zone (no replacement)" );
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&muse_live), "μ's live card should remain in waitroom" );
+    CHECK(test_zone_has_id(&tg, 0, "discard", muse_live), "live_phase_crossroads_replacement_skip_p1");
     // TODO assert: assert!( game.state.player1.live_card_zone.cards.is_empty(), "live_card_zone should be empty" );
     // 
 }
@@ -41209,7 +40861,7 @@ static void gen_live_phase_crossroads_replacement_p2(void){
     // // Accept the replacement
     // TODO: game.select_indices(&[0]);
     // 
-    // TODO assert: assert!( game.state.player2.waitroom.cards.contains(&crossroads), "P2 Crossroads should be in waitroom" );
+    CHECK(test_zone_has_id(&tg, 1, "discard", crossroads), "live_phase_crossroads_replacement_p2");
     // TODO assert: assert!( game.state .player2 .success_live_card_zone .cards .contains(&muse_live), "P2 μ's live should be in success zone" );
     // 
 }
@@ -41239,7 +40891,7 @@ static void gen_live_phase_crossroads_replacement_with_dreamin(void){
     // // Accept it
     // TODO: game.select_indices(&[0]);
     // 
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&crossroads), "Crossroads should be in waitroom" );
+    CHECK(test_zone_has_id(&tg, 0, "discard", crossroads), "live_phase_crossroads_replacement_with_dreamin");
     // TODO assert: assert!( game.state .player1 .success_live_card_zone .cards .contains(&dreamin), "Dreamin' Go! Go!! should be in success zone" );
     // 
 }
@@ -41276,7 +40928,7 @@ static void gen_live_phase_crossroads_replacement_multiple_targets(void){
     // // Select the first one (Dreamin' Go! Go!!)
     // TODO: game.select_indices(&[0]);
     // 
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&crossroads), "Crossroads should be in waitroom" );
+    CHECK(test_zone_has_id(&tg, 0, "discard", crossroads), "live_phase_crossroads_replacement_multiple_targets");
     // TODO assert: assert!( game.state .player1 .success_live_card_zone .cards .contains(&dreamin), "Dreamin' Go! Go!! should be in success zone" );
     // TODO assert: assert!( game.state.player1.live_card_zone.cards.is_empty(), "live_card_zone should be empty" );
     // 
@@ -41318,8 +40970,7 @@ static void gen_maki_debut_crossroads_replacement_with_dreamin(void){
     // // Cost choice first, then the replacement choice.
     int cost_handled = 0;
     int replacement_handled = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     int _before = 0;
     // TODO: if !cost_handled {
     // // First choice: reveal cost
@@ -41339,11 +40990,11 @@ static void gen_maki_debut_crossroads_replacement_with_dreamin(void){
     CHECK(replacement_handled, "maki_debut_crossroads_replacement_with_dreamin");
     // 
     // // Crossroads should be in waitroom (replaced)
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&crossroads), "Crossroads should be in waitroom" );
+    CHECK(test_zone_has_id(&tg, 0, "discard", crossroads), "maki_debut_crossroads_replacement_with_dreamin");
     // // Dreamin' Go! Go!! should be in success zone
     // TODO assert: assert!( game.state .player1 .success_live_card_zone .cards .contains(&dreamin), "Dreamin' should be in success zone" );
     // // Original filler should be returned to hand
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&filler_live), "Original success zone card should be in hand" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", filler_live), "maki_debut_crossroads_replacement_with_dreamin");
     // 
 }
 
@@ -41749,8 +41400,7 @@ static void gen_c6_non_aqours_baton_touch_does_not_fire(void){
     int dia = test_id(&tg, "PL!S-bp7-004-P");
     test_add_to_hand(&tg, dia);
     test_play_to_stage(&tg, dia, 1);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -41790,8 +41440,7 @@ static void gen_c6_keep_3_shuffle_rest_under_then_draw_3(void){
     // 
     // // Drain: P1 selects up to 3 (keep 3), P2 selects up to 3 (keep 3).
     int guard = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && guard < 20 {
+    test_has_pending_choice(&tg);
     // TODO: guard += 1;
     // TODO: if game.pending_choice_type().as_deref() == Some("SelectCard") {
     // TODO: game.select_indices(&[0, 1, 2]);
@@ -41834,8 +41483,7 @@ static void gen_c6_hand_below_max_nothing_shuffled_under(void){
     // TODO: baton_touch_dia(&mut game);
     // 
     int guard = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && guard < 20 {
+    test_has_pending_choice(&tg);
     // TODO: guard += 1;
     // TODO: if game.pending_choice_type().as_deref() == Some("SelectCard") {
     // TODO: game.select_indices(&[0, 1]);
@@ -41877,8 +41525,7 @@ static void gen_c6_hands_processed_independently(void){
     // TODO: baton_touch_dia(&mut game);
     // 
     int guard = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && guard < 20 {
+    test_has_pending_choice(&tg);
     // TODO: guard += 1;
     // TODO: if game.pending_choice_type().as_deref() == Some("SelectCard") {
     // TODO: game.select_indices(&[0, 1, 2]);
@@ -42107,8 +41754,7 @@ static void gen_emma_q163_self_excluded_no_other_niko_cost_fails(void){
     // // (the ability should not proceed to draw)
     // 
     // // Drain any pending choices
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -42222,8 +41868,7 @@ static void gen_emma_live_start_activates_wait_both_gain_heart04(void){
     // 
     // 
     // // Optional cost: discard 2 cards. Say yes.
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0, 1]);
     // TODO: }
     // 
@@ -42376,8 +42021,7 @@ static void gen_emma_live_start_no_wait_members_no_heart(void){
     // TODO: game.state.process_pending_auto_abilities(&pid);
     // 
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0, 1]);
     // TODO: }
     // 
@@ -42442,8 +42086,7 @@ static void gen_emma_live_start_alone_no_other_members_no_heart(void){
     // TODO: game.state.process_pending_auto_abilities(&pid);
     // 
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0, 1]);
     // TODO: }
     // 
@@ -42507,8 +42150,7 @@ static void gen_emma_live_start_active_member_not_affected(void){
     // TODO: game.state.process_pending_auto_abilities(&pid);
     // 
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0, 1]);
     // TODO: }
     // // Observed: only one wait member is eligible → the change_state leg
@@ -42747,8 +42389,7 @@ static void gen_niko_pb1009_suppresses_effect_activations_for_the_turn(void){
     // TODO: );
     // TODO: game.state.activating_card = Some(nico);
     // TODO: game.state.process_pending_auto_abilities(&pid);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // TODO: }
@@ -42759,8 +42400,7 @@ static void gen_niko_pb1009_suppresses_effect_activations_for_the_turn(void){
     // TODO: AbilityTrigger::Debut,
     // TODO: "登場",
     // TODO: );
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -42814,8 +42454,7 @@ static void gen_mijuku_dreamer_refresh_condition_scores(void){
     // TODO: AbilityTrigger::LiveSuccess,
     // TODO: "ライブ成功時",
     // TODO: );
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     CHECK_EQ(rb_mods_get_score(&tg.state.mods, live), 0, "mijuku_dreamer_refresh_condition_scores");
@@ -42828,8 +42467,7 @@ static void gen_mijuku_dreamer_refresh_condition_scores(void){
     // TODO: AbilityTrigger::LiveSuccess,
     // TODO: "ライブ成功時",
     // TODO: );
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     CHECK_EQ(rb_mods_get_score(&tg.state.mods, live), 2, "mijuku_dreamer_refresh_condition_scores");
@@ -42852,7 +42490,7 @@ static void gen_himena_bp6006_murasakipark_partner_baton_succeeds(void){
     test_play_to_stage(&tg, partner, 0);
     // action result consumed: assert!(res.is_ok(), "allowed partner group must pass the restriction");
     // TODO assert: assert!( !game.state.player1.stage.stage.contains(&himena), "protected member replaced by allowed partner" );
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&himena), "baton-touched member goes to the waitroom" );
+    CHECK(test_zone_has_id(&tg, 0, "discard", himena), "himena_bp6006_murasakipark_partner_baton_succeeds");
     // TODO assert: assert!( game.state.player1.stage.stage.contains(&partner), "partner now occupies the area" );
     // 
 }
@@ -42871,8 +42509,7 @@ static void gen_both_in_live_zone_both_trigger(void){
     int player_id = 0;
     // TODO: rabuka_engine::turn::TurnEngine::trigger_live_start_abilities(&mut game.state, &player_id);
     // TODO: game.state.process_pending_auto_abilities(&player_id);
-    int game = 0;
-    // TODO loop (degraded): while game.state.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: game.state.process_pending_auto_abilities(&player_id);
     // TODO: }
@@ -42922,8 +42559,7 @@ static void gen_subject_in_live_target_in_success(void){
     int player_id = 0;
     // TODO: rabuka_engine::turn::TurnEngine::trigger_live_start_abilities(&mut game.state, &player_id);
     // TODO: game.state.process_pending_auto_abilities(&player_id);
-    int game = 0;
-    // TODO loop (degraded): while game.state.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: game.state.process_pending_auto_abilities(&player_id);
     // TODO: }
@@ -42978,8 +42614,7 @@ static void gen_both_in_success_does_not_trigger(void){
     int player_id = 0;
     // TODO: rabuka_engine::turn::TurnEngine::trigger_live_start_abilities(&mut game.state, &player_id);
     // TODO: game.state.process_pending_auto_abilities(&player_id);
-    int game = 0;
-    // TODO loop (degraded): while game.state.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: game.state.process_pending_auto_abilities(&player_id);
     // TODO: }
@@ -43026,8 +42661,7 @@ static void gen_both_in_live_zone_check_success_zone_condition(void){
     int player_id = 0;
     // TODO: rabuka_engine::turn::TurnEngine::trigger_live_start_abilities(&mut game.state, &player_id);
     // TODO: game.state.process_pending_auto_abilities(&player_id);
-    int game = 0;
-    // TODO loop (degraded): while game.state.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: game.state.process_pending_auto_abilities(&player_id);
     // TODO: }
@@ -43074,8 +42708,7 @@ static void gen_non_niji_live_card_does_not_trigger(void){
     int player_id = 0;
     // TODO: rabuka_engine::turn::TurnEngine::trigger_live_start_abilities(&mut game.state, &player_id);
     // TODO: game.state.process_pending_auto_abilities(&player_id);
-    int game = 0;
-    // TODO loop (degraded): while game.state.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: game.state.process_pending_auto_abilities(&player_id);
     // TODO: }
@@ -43125,8 +42758,7 @@ static void gen_stellar_stream_chooses_one_of_multiple_members(void){
     int player_id = 0;
     // TODO: rabuka_engine::turn::TurnEngine::trigger_live_start_abilities(&mut game.state, &player_id);
     // TODO: game.state.process_pending_auto_abilities(&player_id);
-    int game = 0;
-    // TODO loop (degraded): while game.state.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: game.state.process_pending_auto_abilities(&player_id);
     // TODO: }
@@ -43514,8 +43146,7 @@ static void gen_ayase_group_filter_rejects_non_mus(void){
     test_play_to_stage(&tg, ayase, 1);
     // 
     // // Drain — no selectable cards remain after group filter
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -43551,14 +43182,13 @@ static void gen_ayase_rejects_debut_trigger_mus(void){
     tg.state.p[0].stage[2] = -1;
     // 
     test_play_to_stage(&tg, ayase, 1);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
     // // Both debut cards should be rejected (has abilities, not 常時)
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&debut_mus), "Debut μ's card must be filtered out" );
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&second_debut), "Second debut μ's card must be filtered out" );
+    CHECK(test_zone_has_id(&tg, 0, "discard", debut_mus), "ayase_rejects_debut_trigger_mus");
+    CHECK(test_zone_has_id(&tg, 0, "discard", second_debut), "ayase_rejects_debut_trigger_mus");
     // 
 }
 
@@ -43598,14 +43228,13 @@ static void gen_ayase_accepts_jyouji_rejects_debut(void){
     // 
     // // Select it
     // TODO: game.select_indices(&[0]);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
     // // 常時 card goes to hand, debut card goes to waitroom
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&jyouji_mus), "常時 card should be added to hand" );
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&debut_mus), "Debut card should be discarded" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", jyouji_mus), "ayase_accepts_jyouji_rejects_debut");
+    CHECK(test_zone_has_id(&tg, 0, "discard", debut_mus), "ayase_accepts_jyouji_rejects_debut");
     // 
 }
 
@@ -43640,13 +43269,12 @@ static void gen_ayase_accepts_no_ability_mus(void){
     // action result consumed: assert_eq!( filtered.unwrap().len(), 1, "Only 1 card should be selectable (the no-ability one)" );
     // 
     // TODO: game.select_indices(&[0]);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&no_ability_mus), "No-ability μ's card should be added to hand" );
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&non_mus), "Non-μ's card should be discarded" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", no_ability_mus), "ayase_accepts_no_ability_mus");
+    CHECK(test_zone_has_id(&tg, 0, "discard", non_mus), "ayase_accepts_no_ability_mus");
     // 
 }
 
@@ -43681,8 +43309,7 @@ static void gen_ayase_both_match_only_one_selectable(void){
     // action result consumed: assert_eq!( filtered.unwrap().len(), 2, "Both cards should be selectable" );
     // 
     // TODO: game.select_indices(&[1]);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -43712,8 +43339,8 @@ static void gen_ayase_neither_matches_auto_discard(void){
     test_play_to_stage(&tg, ayase, 1);
     // 
     test_has_pending_choice(&tg);
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&debut_a), "Debut card A should be discarded" );
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&debut_b), "Debut card B should be discarded" );
+    CHECK(test_zone_has_id(&tg, 0, "discard", debut_a), "ayase_neither_matches_auto_discard");
+    CHECK(test_zone_has_id(&tg, 0, "discard", debut_b), "ayase_neither_matches_auto_discard");
     // 
 }
 
@@ -44184,7 +43811,7 @@ static void gen_yoshiko_debit_stage_full_graceful(void){
     // // Stage full → cards stay in discard, NOT moved to hand
     // TODO assert: assert!( waitroom_contains(&game, cost_2a), "cost_2a should stay in discard when stage is full" );
     // TODO assert: assert!( waitroom_contains(&game, cost_2b), "cost_2b should stay in discard when stage is full" );
-    // TODO assert: assert!( !game.state.player1.hand.cards.contains(&cost_2a), "Should NOT route to hand" );
+    CHECK((!test_zone_has_id(&tg, 0, "hand", cost_2a)), "yoshiko_debit_stage_full_graceful");
     // // Stage unchanged (yoshiko replaced center filler at play_to_stage)
     CHECK_EQ(tg.state.p[0].stage[1], yoshiko, "yoshiko_debit_stage_full_graceful");
     // // Only yoshiko's debut fired; placed cards couldn't appear
@@ -45006,7 +44633,7 @@ static void gen_hanamaru_both_matching_one_deploys(void){
     // // deterministic: tsushima lands on stage[2] (same path as
     // // hanamaru_single_matching_auto_adds_to_hand).
     // TODO assert_eq (unresolved): assert_eq!( game.state.player1.stage.stage[2], tsushima, "selected card must deploy to the empty slot, stage={:?} hand={:?}", game.state.player1.stage.stage, game.state.player1.hand.cards );
-    // TODO assert: assert!( !game.state.player1.hand.cards.contains(&kurosawa), "the unchosen card stays out of hand" );
+    CHECK((!test_zone_has_id(&tg, 0, "hand", kurosawa)), "hanamaru_both_matching_one_deploys");
     // 
 }
 
@@ -45109,8 +44736,7 @@ static void gen_cost_skipped_does_not_apply_wait_state(void){
     test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, 0);
     // // Effect still runs for skip (original engine behavior). Resolve any sub-choices.
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -45132,8 +44758,7 @@ static void gen_select_zero_cards_both_discarded(void){
     int filler = test_id(&tg, "PL!-sd1-010-SD");
     test_add_to_deck(&tg, card_a);
     test_add_to_deck(&tg, card_b);
-    int game = 0;
-    // TODO loop (degraded): while game.state.player1.main_deck.cards.len() < 40 {
+    // TODO: while game.state.player1.main_deck.cards.len() < 40 {
     test_add_to_deck(&tg, filler);
     // TODO: }
     test_give_energy(&tg, 5);
@@ -45149,14 +44774,13 @@ static void gen_select_zero_cards_both_discarded(void){
     // // look_and_select: select 0 cards
     test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
     // // Both looked-at cards go to discard
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&card_a), "card_a should be in discard" );
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&card_b), "card_b should be in discard" );
+    CHECK(test_zone_has_id(&tg, 0, "discard", card_a), "select_zero_cards_both_discarded");
+    CHECK(test_zone_has_id(&tg, 0, "discard", card_b), "select_zero_cards_both_discarded");
     // 
 }
 
@@ -45172,8 +44796,7 @@ static void gen_select_one_card_other_discarded(void){
     int filler = test_id(&tg, "PL!-sd1-010-SD");
     test_add_to_deck(&tg, card_a);
     test_add_to_deck(&tg, card_b);
-    int game = 0;
-    // TODO loop (degraded): while game.state.player1.main_deck.cards.len() < 40 {
+    // TODO: while game.state.player1.main_deck.cards.len() < 40 {
     test_add_to_deck(&tg, filler);
     // TODO: }
     int discard_before = tg.state.p[0].discard.n;
@@ -45190,14 +44813,13 @@ static void gen_select_one_card_other_discarded(void){
     // // look_and_select: select card_a (index 0)
     test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
     // TODO assert_eq (unresolved): assert_eq!( game.state.player1.main_deck.cards[0], card_a, "card_a should be on top of deck" );
-    // TODO assert: assert!( game.state.player1.main_deck.cards.contains(&card_a), "card_a should be in deck" );
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&card_b), "card_b should be in discard" );
+    CHECK(test_zone_has_id(&tg, 0, "deck", card_a), "select_one_card_other_discarded");
+    CHECK(test_zone_has_id(&tg, 0, "discard", card_b), "select_one_card_other_discarded");
     // TODO assert_eq (unresolved): assert_eq!( game.state.player1.waitroom.cards.len(), discard_before + 1, "1 card should have been discarded" );
     // 
 }
@@ -45214,8 +44836,7 @@ static void gen_select_both_cards_stay_on_deck(void){
     int filler = test_id(&tg, "PL!-sd1-010-SD");
     test_add_to_deck(&tg, card_a);
     test_add_to_deck(&tg, card_b);
-    int game = 0;
-    // TODO loop (degraded): while game.state.player1.main_deck.cards.len() < 40 {
+    // TODO: while game.state.player1.main_deck.cards.len() < 40 {
     test_add_to_deck(&tg, filler);
     // TODO: }
     int discard_before = tg.state.p[0].discard.n;
@@ -45238,13 +44859,12 @@ static void gen_select_both_cards_stay_on_deck(void){
     test_has_pending_choice(&tg);
     // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectTarget"), "expected SelectTarget order prompt" );
     rb_resume_with_choice(&tg.state, 0);
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
-    // TODO assert: assert!(game.state.player1.main_deck.cards.contains(&card_a));
-    // TODO assert: assert!(game.state.player1.main_deck.cards.contains(&card_b));
+    CHECK(test_zone_has_id(&tg, 0, "deck", card_a), "select_both_cards_stay_on_deck");
+    CHECK(test_zone_has_id(&tg, 0, "deck", card_b), "select_both_cards_stay_on_deck");
     CHECK_EQ(tg.state.p[0].discard.n, discard_before, "select_both_cards_stay_on_deck");
     // TODO assert_eq (unresolved): assert_eq!( game.state.player1.main_deck.cards[0], card_a, "card_a should be top of deck" );
     // TODO assert_eq (unresolved): assert_eq!( game.state.player1.main_deck.cards[1], card_b, "card_b should be second from top" );
@@ -45263,8 +44883,7 @@ static void gen_select_both_cards_any_order_card_b_on_top(void){
     int filler = test_id(&tg, "PL!-sd1-010-SD");
     test_add_to_deck(&tg, card_a);
     test_add_to_deck(&tg, card_b);
-    int game = 0;
-    // TODO loop (degraded): while game.state.player1.main_deck.cards.len() < 40 {
+    // TODO: while game.state.player1.main_deck.cards.len() < 40 {
     test_add_to_deck(&tg, filler);
     // TODO: }
     test_give_energy(&tg, 5);
@@ -45286,8 +44905,7 @@ static void gen_select_both_cards_any_order_card_b_on_top(void){
     test_has_pending_choice(&tg);
     // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectTarget"), "expected SelectTarget order prompt" );
     rb_resume_with_choice(&tg.state, 1);
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -45308,8 +44926,7 @@ static void gen_card_count_integrity(void){
     int filler = test_id(&tg, "PL!-sd1-010-SD");
     test_add_to_deck(&tg, card_a);
     test_add_to_deck(&tg, card_b);
-    int game = 0;
-    // TODO loop (degraded): while game.state.player1.main_deck.cards.len() < 40 {
+    // TODO: while game.state.player1.main_deck.cards.len() < 40 {
     test_add_to_deck(&tg, filler);
     // TODO: }
     test_give_energy(&tg, 5);
@@ -45326,8 +44943,7 @@ static void gen_card_count_integrity(void){
     // // look_and_select: select 1 card
     test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -45434,8 +45050,8 @@ static void gen_hs_pb1_003_debut_discards_feed_auto_gain(void){
     // 
     // 
     // // 自動 half: the discard was >=1 card hand->waitroom this turn.
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&mirakura), "みらくらぱーく！ member went to the waitroom" );
-    // TODO assert: assert!( game.state.mods.get_blade_modifier(card) >= 1, "chain: debut discard arms the per-discard auto -> +1 blade" );
+    CHECK(test_zone_has_id(&tg, 0, "discard", mirakura), "hs_pb1_003_debut_discards_feed_auto_gain");
+    CHECK(rb_mods_get_blade(&tg.state.mods, card), "hs_pb1_003_debut_discards_feed_auto_gain");
     CHECK(rb_mods_get_heart(&tg.state.mods, card, 1), "hs_pb1_003_debut_discards_feed_auto_gain");
     // 
 }
@@ -45509,7 +45125,7 @@ static void gen_sp_bp7_005_double_auto_cascade(void){
     // TODO assert_eq (unresolved): assert_eq!( game.state.player1.energy_deck.cards.len(), deck_len_setup - 1, "ab#0 placed exactly one energy from the deck" );
     // TODO assert_eq (unresolved): assert_eq!( game.state.player1.energy_zone.cards.len(), zone_before + 1, "the placed energy landed in the energy zone" );
     // TODO assert_eq (unresolved): assert_eq!( game.state.player1.energy_zone.active_count(), active_before - 9, "placed energy is WAITED (active count only dropped by the play cost)" );
-    // TODO assert: assert!( game.state.mods.get_blade_modifier(member) >= 1, "cascade: ab#0's own-effect zone placement arms ab#1 -> +1 blade" );
+    CHECK(rb_mods_get_blade(&tg.state.mods, member), "sp_bp7_005_double_auto_cascade");
     // 
 }
 
@@ -45619,8 +45235,7 @@ static void gen_baton_touch_moves_replaced_member_to_waitroom(void){
     test_add_to_hand(&tg, filler);
     test_play_to_stage(&tg, arriver, 1);
     // // Handle debut "draw 2, discard 1" choice (required, can't skip)
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     int is_required_discard = 0;
     // TODO: matches!(
     // TODO: c,
@@ -45638,7 +45253,7 @@ static void gen_baton_touch_moves_replaced_member_to_waitroom(void){
     // TODO: }
     // TODO: }
     // 
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&target), "Replaced member should be in waitroom after baton touch" );
+    CHECK(test_zone_has_id(&tg, 0, "discard", target), "baton_touch_moves_replaced_member_to_waitroom");
     CHECK_EQ(tg.state.p[0].stage[1], arriver, "baton_touch_moves_replaced_member_to_waitroom");
     // 
 }
@@ -45664,8 +45279,7 @@ static void gen_baton_touch_does_not_lock_all_full_lanes(void){
     test_add_to_hand(&tg, second_arriver);
     // 
     test_play_to_stage(&tg, first_arriver, 1);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -45707,12 +45321,11 @@ static void gen_baton_touch_hanaho_auto_ability_triggers(void){
     test_add_to_hand(&tg, arriver);
     test_add_to_hand(&tg, filler);
     test_play_to_stage(&tg, arriver, 1);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&hanaho), "花帆 should be in waitroom after baton touch" );
+    CHECK(test_zone_has_id(&tg, 0, "discard", hanaho), "baton_touch_hanaho_auto_ability_triggers");
     // 
     int after = tg.state.p[0].energy_active;
     // // Baton touch cost = arriver.cost - hanaho.cost = 15 - 9 = 6
@@ -45740,8 +45353,7 @@ static void gen_baton_touch_count_per_player(void){
     // TODO assert_eq (unresolved): assert_eq!( game.state.get_baton_touch_count("p2"), 0, "p2 count starts at 0" );
     // 
     test_play_to_stage(&tg, arriver, 1);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -45768,8 +45380,7 @@ static void gen_baton_touch_arriving_card_ids_tracked(void){
     // TODO assert: assert!( game.state.baton_touch_arriving_card_ids.is_empty(), "starts empty" );
     // 
     test_play_to_stage(&tg, arriver, 1);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -45805,8 +45416,7 @@ static void gen_opponent_baton_touch_discard_does_not_trigger(void){
     // 
     // // Perform baton touch from P1's hand
     test_play_to_stage(&tg, arriver, 1);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -46146,8 +45756,7 @@ static void gen_ab0_triggers_for_p2_during_p2_main_phase(void){
     // TODO: g.state.process_pending_auto_abilities(&pid);
     // 
     // // ab#0 presents optional placement choice; ab#1 then asks for stage target
-    int g = 0;
-    // TODO loop (degraded): while g.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: g.select_indices(&[0]);
     // TODO: }
     // 
@@ -46180,8 +45789,7 @@ static void gen_ab0_no_trigger_for_p2_during_p1_main_phase(void){
     int pid = 0;
     // TODO: rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(&mut g.state, &pid);
     // TODO: g.state.process_pending_auto_abilities(&pid);
-    int g = 0;
-    // TODO loop (degraded): while g.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: g.select_indices(&[]);
     // TODO: }
     // 
@@ -46209,8 +45817,7 @@ static void gen_ab0_no_trigger_outside_main_phase(void){
     int pid = 0;
     // TODO: rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(&mut g.state, &pid);
     // TODO: g.state.process_pending_auto_abilities(&pid);
-    int g = 0;
-    // TODO loop (degraded): while g.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: g.select_indices(&[]);
     // TODO: }
     // 
@@ -46235,8 +45842,7 @@ static void gen_ab0_no_trigger_from_static_hand(void){
     int pid = 0;
     // TODO: rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(&mut g.state, &pid);
     // TODO: g.state.process_pending_auto_abilities(&pid);
-    int g = 0;
-    // TODO loop (degraded): while g.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: g.select_indices(&[]);
     // TODO: }
     // 
@@ -46268,8 +45874,7 @@ static void gen_ab1_two_niji_members_only_one_gets_blade(void){
     int pid = 0;
     // TODO: rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(&mut g.state, &pid);
     // TODO: g.state.process_pending_auto_abilities(&pid);
-    int g = 0;
-    // TODO loop (degraded): while g.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: g.select_indices(&[0]);
     // TODO: }
     // 
@@ -46303,8 +45908,7 @@ static void gen_ab1_fires_on_direct_placement(void){
     int pid = 0;
     // TODO: rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(&mut g.state, &pid);
     // TODO: g.state.process_pending_auto_abilities(&pid);
-    int g = 0;
-    // TODO loop (degraded): while g.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: g.select_indices(&[0]);
     // TODO: }
     // 
@@ -46367,7 +45971,7 @@ static void gen_poppin_q66_has_cards_beats_no_cards(void){
     rb_advance_phase(&tg.state);
     // 
     // TODO assert: assert!(game .state .player1 .success_live_card_zone .cards .contains(&poppin));
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&niji), "虹ヶ咲 should be moved from revealed → hand" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", niji), "poppin_q66_has_cards_beats_no_cards");
     // 
 }
 
@@ -46431,7 +46035,7 @@ static void gen_poppin_equal_score_fails(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO assert: assert!( !game.state.player1.hand.cards.contains(&niji), "Equal score → condition should fail" );
+    CHECK((!test_zone_has_id(&tg, 0, "hand", niji)), "poppin_equal_score_fails");
     // 
 }
 
@@ -46493,7 +46097,7 @@ static void gen_poppin_lower_score_fails(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO assert: assert!( !game.state.player1.hand.cards.contains(&niji), "P1 1 < P2 2 → condition should fail" );
+    CHECK((!test_zone_has_id(&tg, 0, "hand", niji)), "poppin_lower_score_fails");
     // 
 }
 
@@ -46564,7 +46168,7 @@ static void gen_poppin_multiple_cards_lower_total_fails(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO assert: assert!( !game.state.player1.hand.cards.contains(&niji), "P1 2 < P2 3 → condition should fail" );
+    CHECK((!test_zone_has_id(&tg, 0, "hand", niji)), "poppin_multiple_cards_lower_total_fails");
     // 
 }
 
@@ -46628,8 +46232,8 @@ static void gen_poppin_multiple_niji_revealed_picks_one(void){
     // TODO: game.select_indices(&[0]);
     // 
     CHECK_EQ(tg.state.p[0].hand.n, 1, "poppin_multiple_niji_revealed_picks_one");
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&niji_a), "niji_a should be in hand" );
-    // TODO assert: assert!( !game.state.player1.waitroom.cards.contains(&niji_a), "niji_a should be removed from waitroom (no duplication)" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", niji_a), "poppin_multiple_niji_revealed_picks_one");
+    CHECK((!test_zone_has_id(&tg, 0, "discard", niji_a)), "poppin_multiple_niji_revealed_picks_one");
     // 
 }
 
@@ -46686,7 +46290,7 @@ static void gen_poppin_no_niji_revealed_effect_fails(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO assert: assert!( game.state.player1.hand.cards.len() <= hand_before, "No 虹ヶ咲 → hand should not grow" );
+    CHECK(tg.state.p[0].hand.n, "poppin_no_niji_revealed_effect_fails");
     // 
 }
 
@@ -46745,8 +46349,8 @@ static void gen_poppin_mixed_revealed_picks_niji_only(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&niji), "虹ヶ咲 should be added to hand" );
-    // TODO assert: assert!( !game.state.player1.hand.cards.contains(&non_niji), "Non-虹ヶ咲 should NOT be added" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", niji), "poppin_mixed_revealed_picks_niji_only");
+    CHECK((!test_zone_has_id(&tg, 0, "hand", non_niji)), "poppin_mixed_revealed_picks_niji_only");
     // 
 }
 
@@ -46837,8 +46441,7 @@ static void gen_setsuna_unequal_success_cards_no_heart(void){
     rb_advance_phase(&tg.state);
     // 
     // // Condition should fail: P1 has 2 success cards, P2 has 1 (not equal)
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     int mod_val = 0;
@@ -46891,8 +46494,7 @@ static void gen_setsuna_surplus_heart_draw_2_discard_1_net_plus_1(void){
     rb_advance_phase(&tg.state);
     // 
     // // Resolve choices (discard 1 from hand after drawing 2)
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -46946,8 +46548,7 @@ static void gen_setsuna_surplus_heart_draw_and_discard_net_plus_1(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     rb_advance_phase(&tg.state);
@@ -47338,8 +46939,8 @@ static void gen_natsumi_rain_draws_and_discards_with_hasunosora_on_stage(void){
     // TODO: game.select_indices(&[0]); // choose which hand card to discard
     // 
     // TODO assert_eq (unresolved): assert_eq!( deck_before - game.state.player1.main_deck.cards.len(), 1, "gate met -> draw 1" );
-    // TODO assert: assert!( !game.state.player1.hand.cards.contains(&hand_filler), "second step discards 1 hand card" );
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&hand_filler), "discarded card lands in the waitroom" );
+    CHECK((!test_zone_has_id(&tg, 0, "hand", hand_filler)), "natsumi_rain_draws_and_discards_with_hasunosora_on_stage");
+    CHECK(test_zone_has_id(&tg, 0, "discard", hand_filler), "natsumi_rain_draws_and_discards_with_hasunosora_on_stage");
     // 
 }
 
@@ -47432,8 +47033,7 @@ static void gen_bp6_016_look_three_reorder_back_on_top(void){
     // 
     // // Answer every look/placement prompt by taking the first offered card.
     int guard = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && guard < 10 {
+    test_has_pending_choice(&tg);
     // TODO: guard += 1;
     // TODO: game.select_indices(&[0]);
     // TODO: }
@@ -47468,8 +47068,8 @@ static void gen_bp7_019_places_two_aqours_cards_under_deck(void){
     test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0, 1]);
     // 
-    // TODO assert: assert!( !game.state.player1.waitroom.cards.contains(&aq1) && !game.state.player1.waitroom.cards.contains(&aq2), "both Aqours cards left the waitroom" );
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&non_aq), "non-Aqours card stays in the waitroom" );
+    CHECK((!test_zone_has_id(&tg, 0, "discard", aq1)), "bp7_019_places_two_aqours_cards_under_deck");
+    CHECK(test_zone_has_id(&tg, 0, "discard", non_aq), "bp7_019_places_two_aqours_cards_under_deck");
     int deck = 0;
     // TODO assert_eq (unresolved): assert_eq!(deck.len(), 32, "30 fillers + 2 returned cards");
     // TODO assert: assert!( deck.ends_with(&vec![aq1, aq2]) || deck.ends_with(&vec![aq2, aq1]), "the two Aqours cards sit at the deck BOTTOM (either order)" );
@@ -47654,8 +47254,8 @@ static void gen_bp6_011n_waitroom_debut_draws_two_discards_one(void){
     // TODO: game.select_indices(&[0]); // choose which hand card to discard
     // 
     // TODO assert_eq (unresolved): assert_eq!( deck_before - game.state.player1.main_deck.cards.len(), 2, "waitroom debut -> draw exactly 2" );
-    // TODO assert: assert!( !game.state.player1.hand.cards.contains(&hand_card), "second step discards 1 hand card" );
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&hand_card), "discarded card lands in the waitroom" );
+    CHECK((!test_zone_has_id(&tg, 0, "hand", hand_card)), "bp6_011n_waitroom_debut_draws_two_discards_one");
+    CHECK(test_zone_has_id(&tg, 0, "discard", hand_card), "bp6_011n_waitroom_debut_draws_two_discards_one");
     // 
 }
 
@@ -47678,7 +47278,7 @@ static void gen_bp6_011n_hand_debut_no_draw(void){
     // TODO: fire_trigger(&mut game, me, AbilityTrigger::Debut, "登場");
     // 
     // TODO assert_eq (unresolved): assert_eq!( deck_before, game.state.player1.main_deck.cards.len(), "hand debut -> no draw" );
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&hand_card), "no discard either" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", hand_card), "bp6_011n_hand_debut_no_draw");
     // 
 }
 
@@ -47708,8 +47308,8 @@ static void gen_bp6_011n_deck_with_one_card_still_discards(void){
     // TODO: game.select_indices(&[0]);
     // 
     // TODO assert: assert!( game.state.player1.main_deck.cards.is_empty(), "drew the single available card" );
-    // TODO assert: assert!( !game.state.player1.hand.cards.contains(&discard_me), "discard step still ran despite short draw" );
-    // TODO assert: assert!(game.state.player1.waitroom.cards.contains(&discard_me));
+    CHECK((!test_zone_has_id(&tg, 0, "hand", discard_me)), "bp6_011n_deck_with_one_card_still_discards");
+    CHECK(test_zone_has_id(&tg, 0, "discard", discard_me), "bp6_011n_deck_with_one_card_still_discards");
     // 
 }
 
@@ -48114,7 +47714,7 @@ static void gen_maki_accept_cost_three_success_cards_six_blades(void){
     // TODO: game.select_indices(&[0]); // accept: discard 1 hand card
     // 
     CHECK_EQ(rb_mods_get_blade(&tg.state.mods, maki), 6, "maki_accept_cost_three_success_cards_six_blades");
-    // TODO assert: assert!( !game.state.player1.hand.cards.contains(&hand_fodder), "cost fodder was discarded" );
+    CHECK((!test_zone_has_id(&tg, 0, "hand", hand_fodder)), "maki_accept_cost_three_success_cards_six_blades");
     // 
 }
 
@@ -48207,7 +47807,7 @@ static void gen_maki_empty_success_zone_zero_blades(void){
     // TODO: game.select_indices(&[0]); // accept anyway
     // 
     CHECK_EQ(rb_mods_get_blade(&tg.state.mods, maki), 0, "maki_empty_success_zone_zero_blades");
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&hand_fodder), "cost was still paid even though it yielded nothing" );
+    CHECK(test_zone_has_id(&tg, 0, "discard", hand_fodder), "maki_empty_success_zone_zero_blades");
     // 
 }
 
@@ -48351,7 +47951,7 @@ static void gen_honoka_lone_member_nothing_to_boost(void){
     // TODO: game.select_indices(&[0]);
     // 
     CHECK_EQ(rb_mods_get_blade(&tg.state.mods, honoka), 0, "honoka_lone_member_nothing_to_boost");
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&hand_fodder), "cost fodder was discarded" );
+    CHECK(test_zone_has_id(&tg, 0, "discard", hand_fodder), "honoka_lone_member_nothing_to_boost");
     // 
 }
 
@@ -48446,8 +48046,7 @@ static void gen_natsumi_bpb7009_center_waits_low_blade_opponent_only(void){
     // TODO: AbilityTrigger::LiveStart,
     // TODO: "ライブ開始時",
     // TODO: );
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -48464,8 +48063,7 @@ static void gen_natsumi_bpb7009_center_waits_low_blade_opponent_only(void){
     // TODO: AbilityTrigger::LiveStart,
     // TODO: "ライブ開始時",
     // TODO: );
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // TODO assert: assert!( !is_waited(&game, low), "（センター限定）: not in center → no effect even with eligible targets" );
@@ -48492,8 +48090,7 @@ static void gen_nozomi_bp3007_skipped_cost_means_no_look(void){
     // TODO: "ライブ開始時",
     // TODO: );
     test_has_pending_choice(&tg);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -48520,7 +48117,7 @@ static void gen_pb1_007_cost_3_with_0_success(void){
     test_pending_choice_count(&tg);
     // TODO assert_eq (unresolved): assert_eq!(count, 3, "0 success -> cost 3, got {}", count);
     // TODO: game.select_indices(&[0,1,2]);
-    // TODO assert: assert!(game.state.player1.hand.cards.contains(&mus_live));
+    CHECK(test_zone_has_id(&tg, 0, "hand", mus_live), "pb1_007_cost_3_with_0_success");
     // 
 }
 
@@ -48540,7 +48137,7 @@ static void gen_pb1_007_cost_2_with_1_success(void){
     test_pending_choice_count(&tg);
     // TODO assert_eq (unresolved): assert_eq!(count, 2, "1 success -> cost 2, got {}", count);
     // TODO: game.select_indices(&[0,1]);
-    // TODO assert: assert!(game.state.player1.hand.cards.contains(&mus_live));
+    CHECK(test_zone_has_id(&tg, 0, "hand", mus_live), "pb1_007_cost_2_with_1_success");
     // 
 }
 
@@ -48560,7 +48157,7 @@ static void gen_pb1_007_cost_1_with_2_success(void){
     test_pending_choice_count(&tg);
     // TODO assert_eq (unresolved): assert_eq!(count, 1, "2 success -> cost 1, got {}", count);
     // TODO: game.select_indices(&[0]);
-    // TODO assert: assert!(game.state.player1.hand.cards.contains(&mus_live));
+    CHECK(test_zone_has_id(&tg, 0, "hand", mus_live), "pb1_007_cost_1_with_2_success");
     // 
 }
 
@@ -48583,7 +48180,7 @@ static void gen_pb1_007_cost_0_with_3_success(void){
     // TODO assert_eq (unresolved): assert_eq!(count, 1, "2 success -> cost 1 (max before win), got {}", count);
     // TODO: game.select_indices(&[0]);
     // TODO: }
-    // TODO assert: assert!(game.state.player1.hand.cards.contains(&mus_live));
+    CHECK(test_zone_has_id(&tg, 0, "hand", mus_live), "pb1_007_cost_0_with_3_success");
     // 
 }
 
@@ -48605,7 +48202,7 @@ static void gen_pb1_007_cost_clamped_0_with_4_success(void){
     // TODO assert_eq (unresolved): assert_eq!(count, 1, "2 success (max) -> cost 1, got {}", count);
     // TODO: game.select_indices(&[0]);
     // TODO: }
-    // TODO assert: assert!(game.state.player1.hand.cards.contains(&mus_live));
+    CHECK(test_zone_has_id(&tg, 0, "hand", mus_live), "pb1_007_cost_clamped_0_with_4_success");
     // 
 }
 
@@ -48629,7 +48226,7 @@ static void gen_pb1_007_insufficient_hand_blocked(void){
     // // We just verify it doesn't retrieve
     int mus_live = test_id(&tg, "PL!-sd1-020-SD");
     test_add_to_discard(&tg, mus_live);
-    // TODO assert: assert!(!game.state.player1.hand.cards.contains(&mus_live));
+    CHECK((!test_zone_has_id(&tg, 0, "hand", mus_live)), "pb1_007_insufficient_hand_blocked");
     // TODO: }
     // 
 }
@@ -48650,7 +48247,7 @@ static void gen_pb1_007_non_muse_live_not_retrieved(void){
     test_pending_choice_count(&tg);
     // TODO assert_eq (unresolved): assert_eq!(count, 2, "1 success -> cost 2, got {}", count);
     // TODO: game.select_indices(&[0,1]);
-    // TODO assert: assert!(!game.state.player1.hand.cards.contains(&liella_live), "liella live should not be retrieved as μ's filter");
+    CHECK((!test_zone_has_id(&tg, 0, "hand", liella_live)), "pb1_007_non_muse_live_not_retrieved");
     // 
 }
 
@@ -48674,7 +48271,7 @@ static void gen_pb1_007_turn1_blocks_second(void){
     test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
-    // TODO assert: assert!(game.state.player1.hand.cards.contains(&mus1) || game.state.player1.hand.cards.contains(&mus2));
+    CHECK(test_zone_has_id(&tg, 0, "hand", mus1), "pb1_007_turn1_blocks_second");
     // // Second activation same turn should be blocked
     test_activate_ability(&tg, me);
     // action result consumed: assert!(res.is_err(), "turn1 should block second activation, got {:?}", res);
@@ -48932,16 +48529,15 @@ static void gen_baton_touch_search_adds_hasu_live_to_hand(void){
     test_add_to_hand(&tg, filler);
     test_play_to_stage(&tg, ginko, 1);
     int guard = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && guard < 10 {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: guard += 1;
     // TODO: }
     // 
     // 
     // TODO assert: assert!( game.state.player1.stage.stage.contains(&ginko), "Ginko must be on stage after baton touch" );
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&hasu), "蓮ノ空 live card must be added to hand" );
-    // TODO assert: assert!( !game.state.player1.waitroom.cards.contains(&hasu), "蓮ノ空 live card must leave the waitroom" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", hasu), "baton_touch_search_adds_hasu_live_to_hand");
+    CHECK((!test_zone_has_id(&tg, 0, "discard", hasu)), "baton_touch_search_adds_hasu_live_to_hand");
     // 
 }
 
@@ -48963,15 +48559,14 @@ static void gen_non_hasu_live_not_added(void){
     test_add_to_hand(&tg, filler);
     test_play_to_stage(&tg, ginko, 1);
     int guard = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && guard < 10 {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: guard += 1;
     // TODO: }
     // 
     // 
-    // TODO assert: assert!( !game.state.player1.hand.cards.contains(&mus_live), "Non-蓮ノ空 live card must NOT be added to hand (group_names filter)" );
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&mus_live), "Non-蓮ノ空 live card must stay in the waitroom" );
+    CHECK((!test_zone_has_id(&tg, 0, "hand", mus_live)), "non_hasu_live_not_added");
+    CHECK(test_zone_has_id(&tg, 0, "discard", mus_live), "non_hasu_live_not_added");
     // 
 }
 
@@ -48995,16 +48590,15 @@ static void gen_mixed_waitroom_only_hasu_selectable(void){
     test_add_to_hand(&tg, filler);
     test_play_to_stage(&tg, ginko, 1);
     int guard = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && guard < 10 {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: guard += 1;
     // TODO: }
     // 
     // 
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&hasu), "蓮ノ空 live must be selectable and added to hand" );
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&mus_live), "μ's live must remain in the waitroom" );
-    // TODO assert: assert!( !game.state.player1.hand.cards.contains(&mus_live), "μ's live must never be selected" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", hasu), "mixed_waitroom_only_hasu_selectable");
+    CHECK(test_zone_has_id(&tg, 0, "discard", mus_live), "mixed_waitroom_only_hasu_selectable");
+    CHECK((!test_zone_has_id(&tg, 0, "hand", mus_live)), "mixed_waitroom_only_hasu_selectable");
     // 
 }
 
@@ -49026,15 +48620,14 @@ static void gen_wrong_group_replaced_no_trigger(void){
     test_add_to_hand(&tg, filler);
     test_play_to_stage(&tg, ginko, 1);
     int guard = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && guard < 10 {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: guard += 1;
     // TODO: }
     // 
     // 
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&hasu), "No trigger over a non-スリーズブーケ member: waitroom untouched" );
-    // TODO assert: assert!( !game.state.player1.hand.cards.contains(&hasu), "No trigger over a non-スリーズブーケ member: nothing added to hand" );
+    CHECK(test_zone_has_id(&tg, 0, "discard", hasu), "wrong_group_replaced_no_trigger");
+    CHECK((!test_zone_has_id(&tg, 0, "hand", hasu)), "wrong_group_replaced_no_trigger");
     // 
 }
 
@@ -49056,15 +48649,14 @@ static void gen_equal_cost_replaced_no_trigger(void){
     test_add_to_hand(&tg, filler);
     test_play_to_stage(&tg, ginko, 1);
     int guard = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && guard < 10 {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: guard += 1;
     // TODO: }
     // 
     // 
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&hasu), "Equal-cost replacement is not 'よりコストが低い': waitroom untouched" );
-    // TODO assert: assert!( !game.state.player1.hand.cards.contains(&hasu), "Equal-cost replacement must not add cards to hand" );
+    CHECK(test_zone_has_id(&tg, 0, "discard", hasu), "equal_cost_replaced_no_trigger");
+    CHECK((!test_zone_has_id(&tg, 0, "hand", hasu)), "equal_cost_replaced_no_trigger");
     // 
 }
 
@@ -49085,8 +48677,7 @@ static void gen_empty_waitroom_resolves_cleanly(void){
     test_add_to_hand(&tg, filler);
     test_play_to_stage(&tg, ginko, 1);
     int guard = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && guard < 10 {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: guard += 1;
     // TODO: }
@@ -49115,15 +48706,14 @@ static void gen_member_in_waitroom_ignored(void){
     test_add_to_hand(&tg, filler);
     test_play_to_stage(&tg, ginko, 1);
     int guard = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && guard < 10 {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: guard += 1;
     // TODO: }
     // 
     // 
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&member), "Member card must stay in the waitroom (card_type=live_card filter)" );
-    // TODO assert: assert!( !game.state.player1.hand.cards.contains(&member), "Member card must not be added to hand" );
+    CHECK(test_zone_has_id(&tg, 0, "discard", member), "member_in_waitroom_ignored");
+    CHECK((!test_zone_has_id(&tg, 0, "hand", member)), "member_in_waitroom_ignored");
     // 
 }
 
@@ -49147,8 +48737,7 @@ static void gen_two_hasu_lives_exactly_one_taken(void){
     test_add_to_hand(&tg, filler);
     test_play_to_stage(&tg, ginko, 1);
     int guard = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && guard < 10 {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: guard += 1;
     // TODO: }
@@ -49193,11 +48782,10 @@ static void gen_kanon_select_liella_cost4_keep_in_hand(void){
     // 
     // TODO: game.select_indices(&[0]); // select liella from looked_at
     // // skip stage debut followup → card stays in hand
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&liella), "Liella! in hand" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", liella), "kanon_select_liella_cost4_keep_in_hand");
     // 
 }
 
@@ -49230,7 +48818,7 @@ static void gen_kanon_select_liella_debut_to_stage(void){
     rb_resume_with_choice(&tg.state, 0);
     // 
     // TODO assert: assert!( game.state .player1 .stage .stage .iter() .any(|&id| id == liella), "on stage" );
-    // TODO assert: assert!( !game.state.player1.hand.cards.contains(&liella), "not in hand" );
+    CHECK((!test_zone_has_id(&tg, 0, "hand", liella)), "kanon_select_liella_debut_to_stage");
     // 
 }
 
@@ -49245,11 +48833,10 @@ static void gen_kanon_skip_cost_effect_not_executed(void){
     // 
     test_play_to_stage(&tg, kanon, 1);
     // // Skip optional cost
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
-    // TODO assert: assert!( !game.state.player1.hand.cards.contains(&liella), "not in hand" );
+    CHECK((!test_zone_has_id(&tg, 0, "hand", liella)), "kanon_skip_cost_effect_not_executed");
     // 
 }
 
@@ -49268,12 +48855,11 @@ static void gen_kanon_no_matching_cards_discard_all(void){
     // TODO: TurnEngine::resume_with_choice(&mut game.state, None, Some(vec![0])).ok();
     // 
     // // Drain followup choice
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&filler), "discarded" );
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&non_mus), "discarded" );
+    CHECK(test_zone_has_id(&tg, 0, "discard", filler), "kanon_no_matching_cards_discard_all");
+    CHECK(test_zone_has_id(&tg, 0, "discard", non_mus), "kanon_no_matching_cards_discard_all");
     // 
 }
 
@@ -49291,14 +48877,13 @@ static void gen_kanon_cost_above_4_rejected(void){
     // 
     // TODO: TurnEngine::resume_with_choice(&mut game.state, None, Some(vec![0])).ok();
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // // Cost-11 Kanon copy is Liella! but above the cost≤4 filter → rejected,
     // // so nothing was selected and both looked_at cards end up discarded.
-    // TODO assert: assert!( !game.state.player1.hand.cards.contains(&kanon_self), "Cost > 4 card must not be selectable/kept" );
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&kanon_self), "Rejected card goes to the waitroom with the rest" );
+    CHECK((!test_zone_has_id(&tg, 0, "hand", kanon_self)), "kanon_cost_above_4_rejected");
+    CHECK(test_zone_has_id(&tg, 0, "discard", kanon_self), "kanon_cost_above_4_rejected");
     // 
 }
 
@@ -49316,13 +48901,12 @@ static void gen_kanon_non_liella_cost4_rejected(void){
     // 
     // TODO: TurnEngine::resume_with_choice(&mut game.state, None, Some(vec![0])).ok();
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // // μ's member fails the 『Liella!』 group filter → rejected and discarded.
-    // TODO assert: assert!( !game.state.player1.hand.cards.contains(&non_liella), "Non-Liella! card must not be selectable/kept" );
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&non_liella), "Rejected card goes to the waitroom with the rest" );
+    CHECK((!test_zone_has_id(&tg, 0, "hand", non_liella)), "kanon_non_liella_cost4_rejected");
+    CHECK(test_zone_has_id(&tg, 0, "discard", non_liella), "kanon_non_liella_cost4_rejected");
     // 
 }
 
@@ -49342,8 +48926,7 @@ static void gen_kanon_max_1_enforced(void){
     // 
     // TODO: game.select_indices(&[0]); // select first matching from looked_at
     // // skip followup
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // // Only 1 of the 2 Liella! cards should be in hand (max=1)
@@ -49554,8 +49137,7 @@ static void gen_s9_check_timing_cascade_smoke(void){
     // TODO: if game.state.player1.hand.cards.contains(&live) {
     // TODO: game.set_live_card(live);
     rb_advance_phase(&tg.state);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() { game.select_indices(&[]); }
+    test_has_pending_choice(&tg);
     // // Even if we don't go through full phases, the pipeline helpers should be callable
     int hearts = 0;
     // TODO assert: assert!(hearts.hearts.values_sum() >= 2);
@@ -49597,7 +49179,7 @@ static void gen_shioriko_bp4_basic_swap_one_niji_one_niji(void){
     // 
     // TODO assert: assert!( game.state .player1 .success_live_card_zone .cards .contains(&niji_b), "niji_b should be in success zone after swap" );
     // TODO assert: assert!( !game .state .player1 .success_live_card_zone .cards .contains(&niji_a), "niji_a should not be in success zone after swap" );
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&niji_a), "niji_a should be in waitroom after swap" );
+    CHECK(test_zone_has_id(&tg, 0, "discard", niji_a), "shioriko_bp4_basic_swap_one_niji_one_niji");
     // 
 }
 
@@ -49629,7 +49211,7 @@ static void gen_shioriko_bp4_skip_optional_nothing_moves(void){
     // TODO: game.select_indices(&[]);
     // 
     // TODO assert: assert!( game.state .player1 .success_live_card_zone .cards .contains(&niji), "Niji card should remain in success zone after skip" );
-    // TODO assert: assert!( !game.state.player1.waitroom.cards.contains(&niji), "Niji card should not be in waitroom after skip" );
+    CHECK((!test_zone_has_id(&tg, 0, "discard", niji)), "shioriko_bp4_skip_optional_nothing_moves");
     // 
 }
 
@@ -49667,7 +49249,7 @@ static void gen_shioriko_bp4_two_niji_in_success_choose_one(void){
     // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard (zone=discard, live_card, allow_skip=false)" );
     // TODO: game.select_indices(&[0]);
     // 
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&niji_a), "niji_a (chosen to move) should be in waitroom" );
+    CHECK(test_zone_has_id(&tg, 0, "discard", niji_a), "shioriko_bp4_two_niji_in_success_choose_one");
     // TODO assert: assert!( !game .state .player1 .success_live_card_zone .cards .contains(&niji_a), "niji_a should not be in success zone" );
     // TODO assert: assert!( game.state .player1 .success_live_card_zone .cards .contains(&niji_b), "niji_b (the second Niji) should remain in success zone" );
     // TODO assert: assert!( game.state .player1 .success_live_card_zone .cards .contains(&niji_c), "niji_c should be in success zone (retrieved from waitroom)" );
@@ -49755,8 +49337,8 @@ static void gen_shioriko_bp4_non_niji_in_discard_not_offered(void){
     // 
     // TODO assert: assert!( game.state .player1 .success_live_card_zone .cards .contains(&niji_b), "Niji_b should be in success zone (retrieved from waitroom)" );
     // TODO assert: assert!( !game .state .player1 .success_live_card_zone .cards .contains(&niji), "Original niji should have moved out of success zone" );
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&non_niji), "Non-Niji card should remain untouched in waitroom" );
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&niji), "Original niji should be in waitroom after swap" );
+    CHECK(test_zone_has_id(&tg, 0, "discard", non_niji), "shioriko_bp4_non_niji_in_discard_not_offered");
+    CHECK(test_zone_has_id(&tg, 0, "discard", niji), "shioriko_bp4_non_niji_in_discard_not_offered");
     // 
 }
 
@@ -49794,7 +49376,7 @@ static void gen_shioriko_bp4_no_niji_in_success_skips_entirely(void){
     test_has_pending_choice(&tg);
     // 
     // TODO assert: assert!( game.state .player1 .success_live_card_zone .cards .contains(&non_niji), "Non-Niji card should remain in success zone" );
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&niji), "Niji card should remain in waitroom (conditional never satisfied)" );
+    CHECK(test_zone_has_id(&tg, 0, "discard", niji), "shioriko_bp4_no_niji_in_success_skips_entirely");
     // 
 }
 
@@ -49892,8 +49474,7 @@ static void gen_kanon_invalidate_liella_live_start(void){
     // action result consumed: .expect("Play Kanon with baton touch");
     // 
     // // Process pending auto abilities (debut trigger)
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, 0);
     // TODO: }
     // TODO: game.state.process_pending_auto_abilities("p1");
@@ -49903,7 +49484,7 @@ static void gen_kanon_invalidate_liella_live_start(void){
     // // The invalidate follow-up recovered the replaced target from waitroom to hand
     // // Baton touch moved target→waitroom, then followup moved target→hand
     CHECK_EQ(tg.state.p[0].hand.n, 1, "kanon_invalidate_liella_live_start");
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&target), "Target card recovered from waitroom to hand by invalidate followup" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", target), "kanon_invalidate_liella_live_start");
     // // No blade/heart modifiers should remain on the invalidated target
     CHECK_EQ(rb_mods_get_blade(&tg.state.mods, target), 0, "kanon_invalidate_liella_live_start");
     // 
@@ -50043,15 +49624,13 @@ static void gen_vitamin_summer_live_success_hand_condition(void){
     // TODO: game.set_live_card(live);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -50112,8 +49691,7 @@ static void gen_riko_aqours_live_leaving_live_zone_offers_deck_placement(void){
     // // Optional deck-top/bottom offer must appear.
     test_has_pending_choice(&tg);
     // TODO: crate::helpers::answer_choice(&mut g, 0);
-    int g = 0;
-    // TODO loop (degraded): while g.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: g.select_indices(&[0]);
     // TODO: }
     // 
@@ -50233,8 +49811,7 @@ static void gen_riko_responds_only_to_own_side_live_zone(void){
     // TODO: g.state.process_pending_auto_abilities(&pid2);
     test_has_pending_choice(&tg);
     // TODO: crate::helpers::answer_choice(&mut g, 0);
-    int g = 0;
-    // TODO loop (degraded): while g.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: g.select_indices(&[0]);
     // TODO: }
     // TODO assert: assert!(g.state.player2.main_deck.cards.contains(&live_p2));
@@ -50291,8 +49868,7 @@ static void gen_reina_fires_after_non_blade_member_left_live_zone(void){
     // TODO: AbilityTrigger::LiveStart,
     // TODO: "ライブ開始時",
     // TODO: );
-    int g = 0;
-    // TODO loop (degraded): while g.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: g.select_indices(&[0]);
     // TODO: }
     // 
@@ -50354,8 +49930,7 @@ static void gen_reina_silent_when_blade_heart_member_left_live_zone(void){
     // TODO: AbilityTrigger::LiveStart,
     // TODO: "ライブ開始時",
     // TODO: );
-    int g = 0;
-    // TODO loop (degraded): while g.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: g.select_indices(&[0]);
     // TODO: }
     // 
@@ -50388,8 +49963,7 @@ static void gen_miyamiya_baton_touch_cost15_newcomer_full_payoff(void){
     // // (rules 9.6.2.3.2): Ai -> waitroom, newcomer arrives; net payment =
     // // newcomer cost - Ai's printed cost.
     // TODO: g.play_to_stage(newcomer, rabuka_engine::zones::MemberArea::Center);
-    int g = 0;
-    // TODO loop (degraded): while g.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: g.select_indices(&[]);
     // TODO: }
     // 
@@ -50429,8 +50003,7 @@ static void gen_miyamiya_baton_touch_cost13_newcomer_energy_only(void){
     int hand_before = 0;
     // 
     // TODO: g.play_to_stage(newcomer, rabuka_engine::zones::MemberArea::Center);
-    int g = 0;
-    // TODO loop (degraded): while g.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: g.select_indices(&[]);
     // TODO: }
     // 
@@ -50470,8 +50043,7 @@ static void gen_miyamiya_baton_touch_blade_heart_newcomer_nothing(void){
     int hand_before = 0;
     // 
     // TODO: g.play_to_stage(newcomer, rabuka_engine::zones::MemberArea::Center);
-    int g = 0;
-    // TODO loop (degraded): while g.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: g.select_indices(&[]);
     // TODO: }
     // 
@@ -50577,8 +50149,7 @@ static void gen_triple_no_matching_zero_blades(void){
     rb_advance_phase(&tg.state);
     // 
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -50994,8 +50565,7 @@ static void gen_himeno_front_3_opponents_select_left_moves_to_center(void){
     test_give_energy(&tg, 9);
     test_play_to_stage(&tg, himeno, 1);
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, 0);
     // TODO: }
     // 
@@ -51023,8 +50593,7 @@ static void gen_himeno_front_1_opponent_at_left_moves_to_center(void){
     test_give_energy(&tg, 9);
     test_play_to_stage(&tg, himeno, 1);
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, 0);
     // TODO: }
     // 
@@ -51054,8 +50623,7 @@ static void gen_himeno_front_on_left_opponent_moves_to_right(void){
     test_give_energy(&tg, 9);
     test_play_to_stage(&tg, himeno, 0);
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, 0);
     // TODO: }
     // 
@@ -51085,8 +50653,7 @@ static void gen_himeno_front_on_right_opponent_moves_to_left(void){
     test_give_energy(&tg, 9);
     test_play_to_stage(&tg, himeno, 2);
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // // First option is "left" (index 0), which IS the front of right.
     // // Select "center" (index 1) as the source instead.
     rb_resume_with_choice(&tg.state, 1);
@@ -51266,7 +50833,7 @@ static void gen_kasumi_q63_ability_appearance_no_cost_paid(void){
     // TODO assert_eq (unresolved): assert_eq!( game.state.player1.hand.cards.len(), hand_before - 1, "Q63: one card discarded from hand for cost" );
     // 
     // // Verify: Kasumi no longer in discard
-    // TODO assert: assert!( !game.state.player1.waitroom.cards.contains(&kasumi), "Kasumi moved from discard to stage" );
+    CHECK((!test_zone_has_id(&tg, 0, "discard", kasumi)), "kasumi_q63_ability_appearance_no_cost_paid");
     // 
 }
 
@@ -51360,7 +50927,7 @@ static void gen_kasumi_q76_appear_on_occupied_area(void){
     // TODO: kasumi,
     // TODO: "Q76: Kasumi replaced filler on center",
     // TODO: );
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&filler), "Q76: filler was moved to waitroom" );
+    CHECK(test_zone_has_id(&tg, 0, "discard", filler), "kasumi_q76_appear_on_occupied_area");
     // 
     // // Kasumi should be tracked as deployed this turn
     // TODO assert: assert!( game.state.player1.deployed_this_turn.contains(&kasumi), "Q76: Kasumi tracked as deployed this turn" );
@@ -51409,7 +50976,7 @@ static void gen_kasumi_q76_cannot_target_locked_area(void){
     test_has_pending_choice(&tg);
     // 
     // // Kasumi should still be in discard
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&kasumi), "Kasumi stays in discard when all areas locked" );
+    CHECK(test_zone_has_id(&tg, 0, "discard", kasumi), "kasumi_q76_cannot_target_locked_area");
     // 
 }
 
@@ -51457,7 +51024,7 @@ static void gen_kasumi_q76_appear_when_stage_full_all_occupied(void){
     // TODO: );
     // 
     // // filler1 moved to waitroom
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&filler1), "filler1 was moved to waitroom" );
+    CHECK(test_zone_has_id(&tg, 0, "discard", filler1), "kasumi_q76_appear_when_stage_full_all_occupied");
     // 
     // // LeftSide card (kasumi) should be tracked as deployed this turn
     // TODO assert: assert!( game.state.player1.deployed_this_turn.contains(&kasumi), "Kasumi at LeftSide deployed this turn" );
@@ -51471,7 +51038,7 @@ static void gen_kasumi_q76_appear_when_stage_full_all_occupied(void){
     CHECK_EQ(tg.state.p[0].stage[2], filler3, "kasumi_q76_appear_when_stage_full_all_occupied");
     // 
     // // Kasumi no longer in discard
-    // TODO assert: assert!( !game.state.player1.waitroom.cards.contains(&kasumi), "Kasumi moved from discard" );
+    CHECK((!test_zone_has_id(&tg, 0, "discard", kasumi)), "kasumi_q76_appear_when_stage_full_all_occupied");
     // 
 }
 
@@ -51722,8 +51289,7 @@ static void gen_live_victory_p1_wins_with_global_bonus_p2_without(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // // inlined helper advance_to_live_victory
@@ -51732,8 +51298,7 @@ static void gen_live_victory_p1_wins_with_global_bonus_p2_without(void){
     rb_advance_phase(&tg.state);
     // TODO: }
     // 
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     rb_advance_phase(&tg.state);
@@ -51950,7 +51515,7 @@ static void gen_yell_draw_refreshes_deck_when_empty(void){
     // // Dream Believers is sent there too). The refreshed fillers were partially
     // // drawn back out.
     CHECK_EQ(tg.state.p[0].discard.n, 2, "yell_draw_refreshes_deck_when_empty");
-    // TODO assert: assert!(game.state.player1.waitroom.cards.contains(&sr));
+    CHECK(test_zone_has_id(&tg, 0, "discard", sr), "yell_draw_refreshes_deck_when_empty");
     // 
 }
 
@@ -52025,8 +51590,7 @@ static void gen_discarded_first_yell_hearts_are_lost(void){
     // TODO: layout.push(test_id(&tg, "PL!-sd1-020-SD"));
     // TODO: layout.push(test_id(&tg, "PL!-sd1-010-SD"));
     // TODO: layout.push(test_id(&tg, "PL!-sd1-010-SD"));
-    int layout = 0;
-    // TODO loop (degraded): while layout.len() < 20 {
+    // TODO: while layout.len() < 20 {
     // TODO: layout.push(test_id(&tg, "PL!-sd1-010-SD"));
     // TODO: }
     // TODO: perform_live(&mut game, live, Some(layout), skip_choices);
@@ -52216,19 +51780,16 @@ static void gen_score_bonus_applied_with_revealed_live_cards(void){
     // TODO: game.set_live_card(live_card);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     rb_advance_phase(&tg.state);
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -52321,8 +51882,7 @@ static void gen_you_q124_blade_heart_excluded_base_heart_included(void){
     // TODO: game.state.player1.main_deck.cards.extend(vec![
     // TODO: qualifying, blade_only, filler, filler, filler, filler, filler,
     // TODO: ]);
-    int game = 0;
-    // TODO loop (degraded): while game.state.player1.main_deck.cards.len() < 40 {
+    // TODO: while game.state.player1.main_deck.cards.len() < 40 {
     test_add_to_deck(&tg, filler);
     // TODO: }
     test_give_energy(&tg, 13);
@@ -52341,7 +51901,7 @@ static void gen_you_q124_blade_heart_excluded_base_heart_included(void){
     // TODO: panic!("resolve_all_up_to: exceeded {} iters", 30);
     // 
     test_has_pending_choice(&tg);
-    // TODO assert: assert!( !game.state.player1.hand.cards.contains(&blade_only), "Blade-only NOT in hand" );
+    CHECK((!test_zone_has_id(&tg, 0, "hand", blade_only)), "you_q124_blade_heart_excluded_base_heart_included");
     // 
 }
 
@@ -52357,8 +51917,7 @@ static void gen_you_ability_ends_and_discard_only_grows_at_end(void){
     // TODO: game.state.player1.main_deck.cards.extend(vec![
     // TODO: filler, filler, filler, filler, filler, filler, filler, filler,
     // TODO: ]);
-    int game = 0;
-    // TODO loop (degraded): while game.state.player1.main_deck.cards.len() < 40 {
+    // TODO: while game.state.player1.main_deck.cards.len() < 40 {
     test_add_to_deck(&tg, filler);
     // TODO: }
     int initial_discard = tg.state.p[0].discard.n;
@@ -52394,8 +51953,7 @@ static void gen_you_ability_select_1_card(void){
     // TODO: game.state.player1.main_deck.cards.extend(vec![
     // TODO: qualifying, filler, filler, filler, filler, filler, filler, filler,
     // TODO: ]);
-    int game = 0;
-    // TODO loop (degraded): while game.state.player1.main_deck.cards.len() < 40 {
+    // TODO: while game.state.player1.main_deck.cards.len() < 40 {
     test_add_to_deck(&tg, filler);
     // TODO: }
     test_give_energy(&tg, 13);
@@ -52415,7 +51973,7 @@ static void gen_you_ability_select_1_card(void){
     // TODO: }
     // TODO: panic!("resolve_all_up_to: exceeded {} iters", 30);
     // 
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&qualifying), "Qualifying card in hand" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", qualifying), "you_ability_select_1_card");
     // 
 }
 
@@ -52436,8 +51994,7 @@ static void gen_you_ability_select_multiple_cards(void){
     // TODO: .main_deck
     // TODO: .cards
     // TODO: .extend(vec![q1, q2, q3, filler, filler, filler, filler, filler]);
-    int game = 0;
-    // TODO loop (degraded): while game.state.player1.main_deck.cards.len() < 40 {
+    // TODO: while game.state.player1.main_deck.cards.len() < 40 {
     test_add_to_deck(&tg, filler);
     // TODO: }
     test_give_energy(&tg, 13);
@@ -52464,9 +52021,9 @@ static void gen_you_ability_select_multiple_cards(void){
     // TODO: }
     // TODO: panic!("resolve_all_up_to: exceeded {} iters", 30);
     // 
-    // TODO assert: assert!(game.state.player1.hand.cards.contains(&q1), "Q1 in hand");
-    // TODO assert: assert!(game.state.player1.hand.cards.contains(&q2), "Q2 in hand");
-    // TODO assert: assert!(game.state.player1.hand.cards.contains(&q3), "Q3 in hand");
+    CHECK(test_zone_has_id(&tg, 0, "hand", q1), "you_ability_select_multiple_cards");
+    CHECK(test_zone_has_id(&tg, 0, "hand", q2), "you_ability_select_multiple_cards");
+    CHECK(test_zone_has_id(&tg, 0, "hand", q3), "you_ability_select_multiple_cards");
     // 
 }
 
@@ -52487,8 +52044,7 @@ static void gen_you_ability_user_scenario_select_one_card(void){
     // TODO: .main_deck
     // TODO: .cards
     // TODO: .extend(vec![q1, q2, q3, filler, filler, filler, filler, filler]);
-    int game = 0;
-    // TODO loop (degraded): while game.state.player1.main_deck.cards.len() < 40 {
+    // TODO: while game.state.player1.main_deck.cards.len() < 40 {
     test_add_to_deck(&tg, filler);
     // TODO: }
     test_give_energy(&tg, 13);
@@ -52508,9 +52064,9 @@ static void gen_you_ability_user_scenario_select_one_card(void){
     // TODO: }
     // TODO: panic!("resolve_all_up_to: exceeded {} iters", 30);
     // 
-    // TODO assert: assert!(game.state.player1.hand.cards.contains(&q1), "Q1 in hand");
-    // TODO assert: assert!( !game.state.player1.hand.cards.contains(&q2), "Q2 NOT in hand" );
-    // TODO assert: assert!( !game.state.player1.hand.cards.contains(&q3), "Q3 NOT in hand" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", q1), "you_ability_user_scenario_select_one_card");
+    CHECK((!test_zone_has_id(&tg, 0, "hand", q2)), "you_ability_user_scenario_select_one_card");
+    CHECK((!test_zone_has_id(&tg, 0, "hand", q3)), "you_ability_user_scenario_select_one_card");
     // 
 }
 
@@ -52529,8 +52085,7 @@ static void gen_you_q124_two_plays_both_reject_blade_hearts(void){
     // TODO: .main_deck
     // TODO: .cards
     // TODO: .extend(vec![filler, filler, filler, filler, filler, filler, filler]);
-    int game = 0;
-    // TODO loop (degraded): while game.state.player1.main_deck.cards.len() < 40 {
+    // TODO: while game.state.player1.main_deck.cards.len() < 40 {
     test_add_to_deck(&tg, filler);
     // TODO: }
     test_give_energy(&tg, 13);
@@ -52548,7 +52103,7 @@ static void gen_you_q124_two_plays_both_reject_blade_hearts(void){
     // TODO: }
     // TODO: panic!("resolve_all_up_to: exceeded {} iters", 30);
     // 
-    // TODO assert: assert!( !game.state.player1.hand.cards.contains(&blade_only), "Blade-only NOT in hand" );
+    CHECK((!test_zone_has_id(&tg, 0, "hand", blade_only)), "you_q124_two_plays_both_reject_blade_hearts");
     // 
 }
 
@@ -52568,8 +52123,7 @@ static void gen_you_select_2_then_ends(void){
     // TODO: .main_deck
     // TODO: .cards
     // TODO: .extend(vec![q1, q2, filler, filler, filler, filler, filler]);
-    int game = 0;
-    // TODO loop (degraded): while game.state.player1.main_deck.cards.len() < 40 {
+    // TODO: while game.state.player1.main_deck.cards.len() < 40 {
     test_add_to_deck(&tg, filler);
     // TODO: }
     test_give_energy(&tg, 13);
@@ -52594,8 +52148,8 @@ static void gen_you_select_2_then_ends(void){
     // TODO: }
     // TODO: panic!("resolve_all_up_to: exceeded {} iters", 30);
     // 
-    // TODO assert: assert!(game.state.player1.hand.cards.contains(&q1), "Q1 in hand");
-    // TODO assert: assert!(game.state.player1.hand.cards.contains(&q2), "Q2 in hand");
+    CHECK(test_zone_has_id(&tg, 0, "hand", q1), "you_select_2_then_ends");
+    CHECK(test_zone_has_id(&tg, 0, "hand", q2), "you_select_2_then_ends");
     // 
 }
 
@@ -52616,8 +52170,7 @@ static void gen_you_select_3_then_ends(void){
     // TODO: .main_deck
     // TODO: .cards
     // TODO: .extend(vec![q1, q2, q3, filler, filler, filler, filler]);
-    int game = 0;
-    // TODO loop (degraded): while game.state.player1.main_deck.cards.len() < 40 {
+    // TODO: while game.state.player1.main_deck.cards.len() < 40 {
     test_add_to_deck(&tg, filler);
     // TODO: }
     test_give_energy(&tg, 13);
@@ -52644,9 +52197,9 @@ static void gen_you_select_3_then_ends(void){
     // TODO: }
     // TODO: panic!("resolve_all_up_to: exceeded {} iters", 30);
     // 
-    // TODO assert: assert!(game.state.player1.hand.cards.contains(&q1), "Q1 in hand");
-    // TODO assert: assert!(game.state.player1.hand.cards.contains(&q2), "Q2 in hand");
-    // TODO assert: assert!(game.state.player1.hand.cards.contains(&q3), "Q3 in hand");
+    CHECK(test_zone_has_id(&tg, 0, "hand", q1), "you_select_3_then_ends");
+    CHECK(test_zone_has_id(&tg, 0, "hand", q2), "you_select_3_then_ends");
+    CHECK(test_zone_has_id(&tg, 0, "hand", q3), "you_select_3_then_ends");
     // 
 }
 
@@ -52684,8 +52237,7 @@ static void gen_yoshiko_no_other_member_on_stage(void){
     test_give_energy(&tg, 15);
     // 
     test_activate_ability(&tg, yoshiko);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -52709,8 +52261,7 @@ static void gen_yoshiko_only_non_aqours_on_stage(void){
     test_give_energy(&tg, 15);
     // 
     test_activate_ability(&tg, yoshiko);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -52735,8 +52286,7 @@ static void gen_yoshiko_multiple_aqours_choice(void){
     test_give_energy(&tg, 15);
     // 
     test_activate_ability(&tg, yoshiko);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -52766,8 +52316,7 @@ static void gen_yoshiko_sacrifice_and_summon_cost_plus_two_to_vacated_area(void)
     test_give_energy(&tg, 15);
     // 
     test_activate_ability(&tg, yoshiko);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -52800,8 +52349,7 @@ static void gen_yoshiko_sacrifice_from_full_stage_other_members_undisturbed(void
     test_give_energy(&tg, 15);
     // 
     test_activate_ability(&tg, yoshiko);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -52833,8 +52381,7 @@ static void gen_yoshiko_once_per_turn_second_activation_fails(void){
     // // First activation should succeed
     test_activate_ability(&tg, yoshiko);
     // action result consumed: assert!(r1.is_ok(), "first activation should succeed");
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -52860,8 +52407,7 @@ static void gen_yoshiko_empty_hand_cost_fails(void){
     // 
     test_activate_ability(&tg, yoshiko);
     // // Cost resolution should fail silently (not crash)
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -52888,8 +52434,7 @@ static void gen_yoshiko_no_matching_cost_in_discard(void){
     test_give_energy(&tg, 15);
     // 
     test_activate_ability(&tg, yoshiko);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -52931,12 +52476,11 @@ static void gen_q209_ceras_discard_edelnote_live_recover_same(void){
     // // Effect: single candidate (the just-discarded edel_live) AUTO-RESOLVES
     // // — no retrieval prompt; outcome pinned by the hand assertion below.
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&edel_live), "Q209: EdelNote live card discarded as cost should be retrievable" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", edel_live), "q209_ceras_discard_edelnote_live_recover_same");
     // 
 }
 
@@ -52970,12 +52514,11 @@ static void gen_q209_ceras_discard_filler_retrieve_preexisting_edelnote(void){
     // 
     // // Effect: move_cards with count=1 from a waitroom with exactly 1 EdelNote live
     // // → engine auto-resolves (single candidate), no prompt. Verify outcome strictly.
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&edel_live), "Pre-existing EdelNote live card should be retrievable" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", edel_live), "q209_ceras_discard_filler_retrieve_preexisting_edelnote");
     // 
 }
 
@@ -53007,8 +52550,7 @@ static void gen_q209_ceras_no_edelnote_in_discard_skips(void){
     // // After play_to_stage: ceras removed from hand, [filler, filler]
     // // After cost discard 2: hand empty
     // // After effect (no match): hand still empty
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -53042,8 +52584,7 @@ static void gen_q209_ceras_decline_cost_no_effect(void){
     // TODO: TurnEngine::resume_with_choice(&mut game.state, Some(-1), None).expect("skip");
     // 
     // // No cost paid → no effect → hand unchanged (minus ceras which is on stage)
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -53083,13 +52624,12 @@ static void gen_q209_ceras_multiple_edelnote_choose_one(void){
     test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[1]); // pick the second one
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&edel_b), "Should have retrieved the selected EdelNote live card" );
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&edel_a), "Unselected EdelNote live should remain in waitroom" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", edel_b), "q209_ceras_multiple_edelnote_choose_one");
+    CHECK(test_zone_has_id(&tg, 0, "discard", edel_a), "q209_ceras_multiple_edelnote_choose_one");
     // 
 }
 
@@ -53130,13 +52670,12 @@ static void gen_q209_kasumi_discard_niji_live_recover_same(void){
     // TODO: game.select_indices(&[0]); // discard first card (niji_live)
     // 
     // // Drain any residual prompts (defensive; retrieval auto-resolves).
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
     // // Strict outcome:
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&niji_live), "Q209: 虹ヶ咲 live card discarded as cost should be retrievable" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", niji_live), "q209_kasumi_discard_niji_live_recover_same");
     CHECK_EQ(tg.state.p[0].hand.n, hand_before, "q209_kasumi_discard_niji_live_recover_same");
     CHECK_EQ(tg.state.p[0].discard.n, waitroom_before, "q209_kasumi_discard_niji_live_recover_same");
     // TODO assert_eq (unresolved): assert_eq!( game.state.player1.energy_zone.active_count(), energy_before - 2, "Q209: fixed 2-energy cost step should be auto-paid during activation" );
@@ -53168,8 +52707,7 @@ static void gen_q209_kasumi_no_niji_in_discard_skips(void){
     // TODO: game.select_indices(&[0]); // discard filler
     // 
     // // No 虹ヶ咲 live in waitroom → no retrieval choice
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -53208,8 +52746,7 @@ static void gen_q209_kasumi_use_limit_blocks_second(void){
     // // (the just-discarded niji_live) auto-resolves.
     test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]); // discard
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -53253,13 +52790,12 @@ static void gen_q209_kasumi_retrieve_different_niji_live(void){
     test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]); // retrieve niji_a
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&niji_a), "Pre-existing niji_live (niji_a) should be retrievable" );
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&niji_b), "Discarded niji_b should stay in waitroom" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", niji_a), "q209_kasumi_retrieve_different_niji_live");
+    CHECK(test_zone_has_id(&tg, 0, "discard", niji_b), "q209_kasumi_retrieve_different_niji_live");
     // 
 }
 
@@ -54156,8 +53692,8 @@ static void gen_kanon_alone_on_stage_no_recovery(void){
     // // No other member on stage: kanon debuts into an empty Center.
     test_play_to_stage(&tg, kanon, 1);
     // 
-    // TODO assert: assert!( !game.state.player1.hand.cards.contains(&liella_card), "no invalidatable Liella! member -> 「これにより無効にした場合」 cannot fire -> no recovery" );
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&liella_card), "the Liella! card stays in the waitroom" );
+    CHECK((!test_zone_has_id(&tg, 0, "hand", liella_card)), "kanon_alone_on_stage_no_recovery");
+    CHECK(test_zone_has_id(&tg, 0, "discard", liella_card), "kanon_alone_on_stage_no_recovery");
     // 
 }
 
@@ -54194,13 +53730,12 @@ static void gen_himeno_q82_dodo_live_card_selectable(void){
     // TODO: game.select_indices(&[0]);
     // 
     // // Resolve any remaining sub-choices (reveal, move to hand, discard rest)
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
     test_has_pending_choice(&tg);
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&dodo), "Q82: ド！ド！ド！ (みらくらぱーく！) is selectable" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", dodo), "himeno_q82_dodo_live_card_selectable");
     // 
 }
 
@@ -54232,13 +53767,12 @@ static void gen_himeno_q82_identity_live_card_selectable(void){
     // TODO: game.select_indices(&[0]); // pay cost
     test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]); // select identity
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: } // resolve remaining
     // 
     test_has_pending_choice(&tg);
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&identity), "Q82: アイデンティティ (みらくらぱーく！) is selectable" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", identity), "himeno_q82_identity_live_card_selectable");
     // 
 }
 
@@ -54882,7 +54416,7 @@ static void gen_sunny_branch1_no_members_does_nothing(void){
     // // Verify that none of the ability's effects triggered.
     // // P1 started with 1 card (sunny), after set_live_card it may be gone.
     // // If no draw happened, hand should be ≤ 1.
-    // TODO assert: assert!( game.state.player1.hand.cards.len() <= 1, "P1 hand should not have increased (no draw triggered)" );
+    CHECK(tg.state.p[0].hand.n, "sunny_branch1_no_members_does_nothing");
     // 
 }
 
@@ -54931,8 +54465,7 @@ static void gen_sunny_branch3_3_members_score_plus_1(void){
     // 
     // 
     // // Handle pending choices: discard choice from branch 1, then heart target from branch 2
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -54988,8 +54521,7 @@ static void gen_sunny_branch3_3_members_duplicate_name_no_score(void){
     // 
     // 
     // // Handle pending choices: discard choice from branch 1, then heart target from branch 2
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -55042,8 +54574,7 @@ static void gen_sunny_branch2_two_mus_grants_heart(void){
     // 
     // 
     // // Handle all pending choices: Branch 1 discard, then Branch 2 heart target
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -55229,8 +54760,7 @@ static void gen_sunny_q210_joint_card_counts_as_one_member(void){
     // 
     // // Branch 1 fires (1 member = joint card counts as 1).
     // // Drain all pending choices using the while-loop pattern from existing tests.
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -55362,14 +54892,13 @@ static void gen_honoka_q166_member_skips_live_fillers(void){
     // TODO assert: assert!( desc.contains("Live card"), "Choice should mention Live card, got: {}", desc );
     // TODO assert: assert!( desc.contains("Member card"), "Choice should mention Member card, got: {}", desc );
     rb_resume_with_choice(&tg.state, 1);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&target_member), "Target member should be in hand" );
-    // TODO assert: assert!( !game.state.player1.hand.cards.contains(&live_filler), "Live fillers should NOT be in hand" );
-    // TODO assert: assert!( !game.state.player1.main_deck.cards.contains(&target_member), "Target member should not remain in deck" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", target_member), "honoka_q166_member_skips_live_fillers");
+    CHECK((!test_zone_has_id(&tg, 0, "hand", live_filler)), "honoka_q166_member_skips_live_fillers");
+    CHECK((!test_zone_has_id(&tg, 0, "deck", target_member)), "honoka_q166_member_skips_live_fillers");
     CHECK_EQ(tg.state.p[0].deck.n, 0, "honoka_q166_member_skips_live_fillers");
     // 
 }
@@ -55405,13 +54934,12 @@ static void gen_honoka_q166_target_first_card(void){
     // TODO assert: assert!( desc.contains("Live card"), "Choice should mention Live card, got: {}", desc );
     // TODO assert: assert!( desc.contains("Member card"), "Choice should mention Member card, got: {}", desc );
     rb_resume_with_choice(&tg.state, 1);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&target), "Target should be in hand" );
-    // TODO assert: assert!( !game.state.player1.main_deck.cards.contains(&target), "Target should not remain in deck" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", target), "honoka_q166_target_first_card");
+    CHECK((!test_zone_has_id(&tg, 0, "deck", target)), "honoka_q166_target_first_card");
     // 
 }
 
@@ -55455,12 +54983,11 @@ static void gen_honoka_q166_target_last_card(void){
     // TODO assert: assert!( desc.contains("Live card"), "Choice should mention Live card, got: {}", desc );
     // TODO assert: assert!( desc.contains("Member card"), "Choice should mention Member card, got: {}", desc );
     rb_resume_with_choice(&tg.state, 1);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&target), "Target should be in hand" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", target), "honoka_q166_target_last_card");
     CHECK_EQ(tg.state.p[0].deck.n, 0, "honoka_q166_target_last_card");
     // 
 }
@@ -55500,12 +55027,11 @@ static void gen_honoka_q166_live_card_skips_members(void){
     // TODO assert: assert!( desc.contains("Live card"), "Choice should mention Live card, got: {}", desc );
     // TODO assert: assert!( desc.contains("Member card"), "Choice should mention Member card, got: {}", desc );
     rb_resume_with_choice(&tg.state, 0);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&target_live), "Live card should be in hand" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", target_live), "honoka_q166_live_card_skips_members");
     int hand_member = 0;
     // TODO: .state
     // TODO: .player1
@@ -55554,8 +55080,7 @@ static void gen_honoka_q166_two_matches_only_one_added(void){
     // TODO assert: assert!( desc.contains("Live card"), "Choice should mention Live card, got: {}", desc );
     // TODO assert: assert!( desc.contains("Member card"), "Choice should mention Member card, got: {}", desc );
     rb_resume_with_choice(&tg.state, 1);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -55605,8 +55130,7 @@ static void gen_honoka_q166_no_member_in_deck_refresh(void){
     // TODO assert: assert!( desc.contains("Live card"), "Choice should mention Live card, got: {}", desc );
     // TODO assert: assert!( desc.contains("Member card"), "Choice should mention Member card, got: {}", desc );
     rb_resume_with_choice(&tg.state, 1);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -55657,12 +55181,11 @@ static void gen_honoka_q167_deck_exhausted_during_reveal(void){
     // TODO assert: assert!( desc.contains("Live card"), "Choice should mention Live card, got: {}", desc );
     // TODO assert: assert!( desc.contains("Member card"), "Choice should mention Member card, got: {}", desc );
     rb_resume_with_choice(&tg.state, 1);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&target), "Target should be in hand after refresh" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", target), "honoka_q167_deck_exhausted_during_reveal");
     // 
 }
 
@@ -55717,12 +55240,11 @@ static void gen_honoka_use_limit_blocks_second_activation(void){
     // TODO assert: assert!( desc.contains("Live card"), "Choice should mention Live card, got: {}", desc );
     // TODO assert: assert!( desc.contains("Member card"), "Choice should mention Member card, got: {}", desc );
     rb_resume_with_choice(&tg.state, 1);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&target), "Target in hand after first activation" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", target), "honoka_use_limit_blocks_second_activation");
     // TODO action: let result = TurnEngine::execute_main_phase_action( &mut game.state, &ActionType::UseAbility, Some(honoka), None, None, None, );
     // action result consumed: assert!(result.is_err(), "Second activation should fail (use_limit)");
     // 
@@ -56053,16 +55575,14 @@ static void gen_dia_choose_blade(void){
     // TODO: game.state.turn_number = 1;
     test_play_to_stage(&tg, dia, 1);
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.state.has_pending_choice() {
+    test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, 0);
     // TODO: }
-    game = 0;
-    // TODO loop (degraded): while game.state.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
-    // TODO assert: assert!( game.state.mods.get_blade_modifier(aqours) > 0, "Chika should have blade" );
+    CHECK(rb_mods_get_blade(&tg.state.mods, aqours), "dia_choose_blade");
     // 
 }
 
@@ -56100,8 +55620,8 @@ static void gen_kotori_discard_non_muse_retrieve_live(void){
     // // Alternative effect: retrieve live from discard (no further prompts)
     test_has_pending_choice(&tg);
     // 
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&live), "Live card should be retrieved from discard" );
-    // TODO assert: assert!( !game.state.player1.waitroom.cards.contains(&live), "Retrieved card no longer in waitroom" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", live), "kotori_discard_non_muse_retrieve_live");
+    CHECK((!test_zone_has_id(&tg, 0, "discard", live)), "kotori_discard_non_muse_retrieve_live");
     // 
 }
 
@@ -56381,8 +55901,7 @@ static void gen_hanabiko_static_discard_no_trigger(void){
     // TODO: rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(&mut g.state, &pid);
     // TODO: g.state.process_pending_auto_abilities(&pid);
     // 
-    int g = 0;
-    // TODO loop (degraded): while g.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: g.select_indices(&[]);
     // TODO: }
     // 
@@ -56414,8 +55933,7 @@ static void gen_hanabiko_static_stage_no_trigger(void){
     // TODO: rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(&mut g.state, &pid);
     // TODO: g.state.process_pending_auto_abilities(&pid);
     // 
-    int g = 0;
-    // TODO loop (degraded): while g.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: g.select_indices(&[]);
     // TODO: }
     // 
@@ -56536,11 +56054,9 @@ static void gen_hanabiko_two_copies_one_moved_one_static(void){
     // // ab#0 should fire exactly once (for the moved copy only)
     test_has_pending_choice(&tg);
     // 
-    int g = 0;
-    // TODO loop (degraded): while g.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: g.select_indices(&[0]);
-    g = 0;
-    // TODO loop (degraded): while g.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: g.select_indices(&[0]); // drain sub-choices
     // TODO: }
     // TODO: }
@@ -56609,8 +56125,7 @@ static void gen_hanabiko_replaced_by_new_card_on_same_position_triggers(void){
     // 
     // // Play replacement to center (baton-touch: Hanabiko goes to waitroom)
     // TODO: g.play_to_stage(replacement, rabuka_engine::zones::MemberArea::Center);
-    int g = 0;
-    // TODO loop (degraded): while g.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: g.select_indices(&[]);
     // TODO: }
     // 
@@ -56667,8 +56182,7 @@ static void gen_hanabiko_baton_touch_replaced_triggers(void){
     // 
     // // Now Hanabiko's auto-ability should fire.
     // // Accept the optional discard, then retrieve live + member.
-    int g = 0;
-    // TODO loop (degraded): while g.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: g.select_indices(&[0]);
     // TODO: }
     // 
@@ -56690,8 +56204,7 @@ static void gen_mymai_tonight_with_aqours_live_gains_blade(void){
     // 
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -56710,8 +56223,7 @@ static void gen_mymai_tonight_alone_no_blade(void){
     // 
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -56733,8 +56245,7 @@ static void gen_mymai_tonight_with_aqours_member_no_blade(void){
     // 
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -56756,8 +56267,7 @@ static void gen_mymai_tonight_with_non_aqours_live_no_blade(void){
     // 
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -56782,8 +56292,7 @@ static void gen_mymai_tonight_blade_disappears_after_live_end(void){
     // 
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -56839,8 +56348,7 @@ static void gen_mymai_two_copies_plus_aqours_live_both_fire(void){
     // 
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -56889,14 +56397,13 @@ static void gen_mymai_with_aqours_and_non_aqours_live_gains_blade(void){
     // 
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
     // 
     // // PL!S-bp3-018-N (Kurosawa Ruby) should have blade
-    // TODO assert: assert!( game.state.mods.get_blade_modifier(member_a) > 0, "Member_a (PL!S-bp3-018-N) should have blade" );
+    CHECK(rb_mods_get_blade(&tg.state.mods, member_a), "mymai_with_aqours_and_non_aqours_live_gains_blade");
     // 
 }
 
@@ -56915,14 +56422,13 @@ static void gen_mymai_q121_all_stage_members_gain_blade(void){
     // 
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
     // 
-    // TODO assert: assert!( game.state.mods.get_blade_modifier(member_a) > 0, "Member_a should have blade" );
-    // TODO assert: assert!( game.state.mods.get_blade_modifier(member_b) > 0, "Member_b should also have blade (effect applies to ALL stage members)" );
+    CHECK(rb_mods_get_blade(&tg.state.mods, member_a), "mymai_q121_all_stage_members_gain_blade");
+    CHECK(rb_mods_get_blade(&tg.state.mods, member_b), "mymai_q121_all_stage_members_gain_blade");
     // 
 }
 
@@ -56964,8 +56470,7 @@ static void gen_mymai_two_aqours_live_gains_blade_once(void){
     // 
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -57290,8 +56795,7 @@ static void gen_condition_passes_with_sd_osawa(void){
     // TODO: g.give_energy(15);
     // 
     // TODO: g.play_to_stage(himeno, MemberArea::LeftSide);
-    int g = 0;
-    // TODO loop (degraded): while g.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: g.select_indices(&[]);
     // TODO: }
     // 
@@ -57319,8 +56823,7 @@ static void gen_condition_passes_with_bp1_osawa(void){
     // TODO: g.give_energy(15);
     // 
     // TODO: g.play_to_stage(himeno, MemberArea::LeftSide);
-    int g = 0;
-    // TODO loop (degraded): while g.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: g.select_indices(&[]);
     // TODO: }
     // 
@@ -57348,8 +56851,7 @@ static void gen_condition_passes_with_bp5_osawa(void){
     // TODO: g.give_energy(15);
     // 
     // TODO: g.play_to_stage(himeno, MemberArea::LeftSide);
-    int g = 0;
-    // TODO loop (degraded): while g.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: g.select_indices(&[]);
     // TODO: }
     // 
@@ -57377,8 +56879,7 @@ static void gen_condition_passes_with_momoo(void){
     // TODO: g.give_energy(15);
     // 
     // TODO: g.play_to_stage(himeno, MemberArea::LeftSide);
-    int g = 0;
-    // TODO loop (degraded): while g.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: g.select_indices(&[]);
     // TODO: }
     // 
@@ -57406,8 +56907,7 @@ static void gen_condition_passes_with_kodomo(void){
     // TODO: g.give_energy(15);
     // 
     // TODO: g.play_to_stage(himeno, MemberArea::LeftSide);
-    int g = 0;
-    // TODO loop (degraded): while g.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: g.select_indices(&[]);
     // TODO: }
     // 
@@ -57435,8 +56935,7 @@ static void gen_condition_passes_with_two_bp_osawa(void){
     // TODO: g.give_energy(15);
     // 
     // TODO: g.play_to_stage(himeno, MemberArea::LeftSide);
-    int g = 0;
-    // TODO loop (degraded): while g.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: g.select_indices(&[]);
     // TODO: }
     // 
@@ -57464,8 +56963,7 @@ static void gen_condition_fails_with_no_match(void){
     // TODO: g.give_energy(15);
     // 
     // TODO: g.play_to_stage(himeno, MemberArea::LeftSide);
-    int g = 0;
-    // TODO loop (degraded): while g.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: g.select_indices(&[]);
     // TODO: }
     // 
@@ -57493,8 +56991,7 @@ static void gen_both_effects_execute(void){
     // TODO: g.give_energy(15);
     // 
     // TODO: g.play_to_stage(himeno, MemberArea::LeftSide);
-    int g = 0;
-    // TODO loop (degraded): while g.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: g.select_indices(&[]);
     // TODO: }
     // 
@@ -57525,8 +57022,7 @@ static void gen_no_effects_without_match(void){
     // TODO: g.give_energy(15);
     // 
     // TODO: g.play_to_stage(himeno, MemberArea::LeftSide);
-    int g = 0;
-    // TODO loop (degraded): while g.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: g.select_indices(&[]);
     // TODO: }
     // 
@@ -57553,8 +57049,7 @@ static void gen_honoka_cost_limit_wait_blocked_by_wait_immunity(void){
     // TODO: g.give_energy(10);
     // TODO: g.play_to_stage(honoka, MemberArea::RightSide);
     test_activate_ability(&tg, honoka);
-    int g = 0;
-    // TODO loop (degraded): while g.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: g.select_indices(&[0]);
     // TODO: }
     // 
@@ -58041,8 +57536,7 @@ static void gen_q127_wien_plus1_stacks_on_bloom_set(void){
     test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, 0);
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -58128,8 +57622,7 @@ static void gen_q127_wien_plus1_stacks_on_hareruya_set(void){
     rb_advance_phase(&tg.state);
     // 
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -58206,8 +57699,7 @@ static void gen_q127_two_wien_stack_plus2_heart00(void){
     test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, 0);
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -58266,8 +57758,7 @@ static void gen_q127_wien_leaves_stage_modifier_removed(void){
     test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, 0);
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -58359,8 +57850,7 @@ static void gen_q127_wien_adds_heart00_not_in_set(void){
     rb_advance_phase(&tg.state);
     // 
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -58432,8 +57922,7 @@ static void gen_q127_wien_only_affects_heart00(void){
     test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, 0);
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -58509,8 +57998,7 @@ static void gen_q127_wien_plus_bloom_heart04_pattern(void){
     test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, 1);
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -58574,8 +58062,7 @@ static void gen_q127_wien_plus_bloom_heart05_pattern(void){
     test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, 2);
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -58638,8 +58125,7 @@ static void gen_q127_no_wien_bloom_set_standalone(void){
     test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, 0);
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -59039,7 +58525,7 @@ static void gen_cooking_decline_does_nothing(void){
     CHECK_EQ(tg.state.p[0].discard.n, discard_before, "cooking_decline_does_nothing");
     CHECK_EQ(tg.state.p[0].deck.n, deck_before, "cooking_decline_does_nothing");
     CHECK_EQ(rb_mods_get_heart(&tg.state.mods, stage_a, 1), 0, "cooking_decline_does_nothing");
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&member), "discarded member should remain in discard after declining" );
+    CHECK(test_zone_has_id(&tg, 0, "discard", member), "cooking_decline_does_nothing");
     // 
 }
 
@@ -59548,7 +59034,9 @@ static void gen_three_hanamusubi_each_reduces_4(void){
     // 
     // 
     // // Each sees 2 others → -4
-    // TODO: for (card, label) in [(&a, "A"), (&b, "B"), (&c, "C")] {
+    int card = 0;
+    int label = 0;
+    // TODO loop (degraded): for (card, label) in [(&a, "A"), (&b, "B"), (&c, "C")] {
     int mod_val = 0;
     // TODO: .state
     // TODO: .mods
@@ -60434,13 +59922,13 @@ static void gen_invalid_live_card_discard_records_turn_movements(void){
     // TODO: }
     // 
     // 
-    // TODO assert: assert!(game.state.player1.live_card_zone.cards.contains(&member));
+    CHECK(test_zone_has_id(&tg, 0, "live", member), "invalid_live_card_discard_records_turn_movements");
     CHECK(tg.state.turn, "invalid_live_card_discard_records_turn_movements");
     // 
     // TODO: rabuka_engine::turn::TurnEngine::check_timing(&mut game.state);
     // 
-    // TODO assert: assert!(!game.state.player1.live_card_zone.cards.contains(&member));
-    // TODO assert: assert!(game.state.player1.waitroom.cards.contains(&member));
+    CHECK((!test_zone_has_id(&tg, 0, "live", member)), "invalid_live_card_discard_records_turn_movements");
+    CHECK(test_zone_has_id(&tg, 0, "discard", member), "invalid_live_card_discard_records_turn_movements");
     // 
     int movement = tg.state.turn;
     // TODO assert: assert!(movement.is_some());
@@ -60630,8 +60118,8 @@ static void gen_invalid_energy_card_in_live_zone_goes_to_energy_deck(void){
     // 
     // TODO: rabuka_engine::turn::TurnEngine::check_timing(&mut game.state);
     // 
-    // TODO assert: assert!(!game.state.player1.live_card_zone.cards.contains(&energy));
-    // TODO assert: assert!(game.state.player1.energy_deck.cards.contains(&energy));
+    CHECK((!test_zone_has_id(&tg, 0, "live", energy)), "invalid_energy_card_in_live_zone_goes_to_energy_deck");
+    CHECK(test_zone_has_id(&tg, 0, "energy_deck", energy), "invalid_energy_card_in_live_zone_goes_to_energy_deck");
     // 
 }
 
@@ -60734,8 +60222,8 @@ static void gen_check_invalid_live_cards_distinguishes_players(void){
     // TODO: rabuka_engine::turn::TurnEngine::check_timing(&mut game.state);
     // 
     // // Both cards should be in their respective waitrooms
-    // TODO assert: assert!(game.state.player1.waitroom.cards.contains(&member1));
-    // TODO assert: assert!(game.state.player2.waitroom.cards.contains(&member2));
+    CHECK(test_zone_has_id(&tg, 0, "discard", member1), "check_invalid_live_cards_distinguishes_players");
+    CHECK(test_zone_has_id(&tg, 1, "discard", member2), "check_invalid_live_cards_distinguishes_players");
     // 
     // // Two movement events recorded
     // TODO assert_eq (unresolved): assert_eq!(game.state.turn_movements.len(), 2);
@@ -60780,8 +60268,7 @@ static void gen_maki_pb1_place_mus_live_on_deck_top(void){
     // 
     test_play_to_stage(&tg, maki, 1);
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -60813,8 +60300,7 @@ static void gen_maki_pb1_no_mus_live_in_discard(void){
     // 
     test_play_to_stage(&tg, maki, 1);
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -60848,8 +60334,7 @@ static void gen_maki_pb1_no_opponent_wait_no_draw(void){
     int deck_before_len = tg.state.p[0].deck.n;
     test_play_to_stage(&tg, maki, 1);
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -60890,8 +60375,7 @@ static void gen_maki_pb1_opponent_wait_draws(void){
     // 
     test_play_to_stage(&tg, maki, 1);
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -60901,8 +60385,8 @@ static void gen_maki_pb1_opponent_wait_draws(void){
     // TODO assert_eq (unresolved): assert_eq!( deck_after, deck_before, "Move (+1) + Draw (-1) net deck unchanged: before={}, after={}", deck_before, deck_after );
     // TODO assert_eq (unresolved): assert_eq!( hand_after, hand_before, "Net hand unchanged (play -1, draw +1): before={}, after={}", hand_before, hand_after );
     // // Waitroom card was moved to deck then drawn to hand
-    // TODO assert: assert!( !game.state.player1.waitroom.cards.contains(&mus_live), "μ's live should leave waitroom" );
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&mus_live), "Draw should bring the just-placed μ's live (or top deck card) to hand; hand={:?}", game.state.player1.hand.cards );
+    CHECK((!test_zone_has_id(&tg, 0, "discard", mus_live)), "maki_pb1_opponent_wait_draws");
+    CHECK(test_zone_has_id(&tg, 0, "hand", mus_live), "maki_pb1_opponent_wait_draws");
     // 
 }
 
@@ -60928,8 +60412,7 @@ static void gen_maki_pb1_wait_in_all_positions_triggers(void){
     test_give_energy(&tg, 20);
     int hand_before = tg.state.p[0].hand.n;
     test_play_to_stage(&tg, maki, 1);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // TODO assert_eq (unresolved): assert_eq!( game.state.player1.hand.cards.len(), hand_before, "Wait at pos {} should trigger draw", pos );
@@ -60961,8 +60444,7 @@ static void gen_maki_pb1_multiple_waits_still_draw_one(void){
     test_give_energy(&tg, 20);
     int deck_before = tg.state.p[0].deck.n;
     test_play_to_stage(&tg, maki, 1);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     CHECK_EQ(tg.state.p[0].deck.n, deck_before, "maki_pb1_multiple_waits_still_draw_one");
@@ -60989,8 +60471,7 @@ static void gen_maki_pb1_active_opponent_no_draw(void){
     // TODO: }
     test_give_energy(&tg, 20);
     test_play_to_stage(&tg, maki, 1);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     CHECK_EQ(tg.state.p[0].hand.n, 1, "maki_pb1_active_opponent_no_draw");
@@ -61018,8 +60499,7 @@ static void gen_maki_pb1_no_mus_but_wait_still_draws(void){
     int deck_before = tg.state.p[0].deck.n;
     int hand_before = tg.state.p[0].hand.n;
     test_play_to_stage(&tg, maki, 1);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // // No card to move (skip choice?), then draw → deck -1, hand net 0
@@ -61046,13 +60526,12 @@ static void gen_maki_pb1_empty_deck_still_works(void){
     // // No cards in deck
     test_give_energy(&tg, 20);
     test_play_to_stage(&tg, maki, 1);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // // After move, deck has 1 (mus_live), then draw consumes it → deck 0, hand has mus_live
     CHECK_EQ(tg.state.p[0].deck.n, 0, "maki_pb1_empty_deck_still_works");
-    // TODO assert: assert!(game.state.player1.hand.cards.contains(&mus_live));
+    CHECK(test_zone_has_id(&tg, 0, "hand", mus_live), "maki_pb1_empty_deck_still_works");
     // 
 }
 
@@ -61082,8 +60561,7 @@ static void gen_maki_pb1_self_wait_not_enough(void){
     // TODO: }
     test_give_energy(&tg, 20);
     test_play_to_stage(&tg, maki, 1);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     CHECK_EQ(tg.state.p[0].hand.n, 1, "maki_pb1_self_wait_not_enough");
@@ -61131,8 +60609,7 @@ static void gen_nonfiction_cost_p1_high_vs_p2_low_scores(void){
     rb_advance_phase(&tg.state);
     // // inlined helper drain_auto_choices
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.state.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -61183,8 +60660,7 @@ static void gen_nonfiction_cost_p1_high_vs_p2_empty_scores(void){
     rb_advance_phase(&tg.state);
     // // inlined helper drain_auto_choices
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.state.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -61235,8 +60711,7 @@ static void gen_nonfiction_cost_p1_low_vs_p2_high_no_score(void){
     rb_advance_phase(&tg.state);
     // // inlined helper drain_auto_choices
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.state.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -61286,8 +60761,7 @@ static void gen_nonfiction_cost_p1_non_liella_center_no_score(void){
     rb_advance_phase(&tg.state);
     // // inlined helper drain_auto_choices
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.state.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -61338,8 +60812,7 @@ static void gen_nonfiction_cost_equal_costs_no_score(void){
     rb_advance_phase(&tg.state);
     // // inlined helper drain_auto_choices
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.state.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -61400,8 +60873,7 @@ static void gen_nonfiction_cost_p2_high_vs_p1_low_scores(void){
     rb_advance_phase(&tg.state);
     // // inlined helper drain_auto_choices
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.state.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -61456,8 +60928,7 @@ static void gen_nonfiction_cost_p2_high_vs_p1_empty_scores(void){
     rb_advance_phase(&tg.state);
     // // inlined helper drain_auto_choices
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.state.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -61512,8 +60983,7 @@ static void gen_nonfiction_cost_p2_low_vs_p1_high_no_score(void){
     rb_advance_phase(&tg.state);
     // // inlined helper drain_auto_choices
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.state.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -61568,8 +61038,7 @@ static void gen_nonfiction_cost_p2_equal_costs_no_score(void){
     rb_advance_phase(&tg.state);
     // // inlined helper drain_auto_choices
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.state.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -61621,8 +61090,7 @@ static void gen_nonfiction_cost_p1_lower_than_p2_liella_no_score(void){
     rb_advance_phase(&tg.state);
     // // inlined helper drain_auto_choices
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.state.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -62018,8 +61486,7 @@ static void gen_no_saint_snow_does_not_fire(void){
     // // inlined helper drain_auto
     // 
     int safety = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && safety < 30 {
+    test_has_pending_choice(&tg);
     // TODO: safety += 1;
     // TODO: if game.pending_choice_type().as_deref() == Some("SelectAutoAbility") {
     // TODO: game.select_indices(&[]);
@@ -62079,8 +61546,7 @@ static void gen_no_aqours_does_not_fire(void){
     // // inlined helper drain_auto
     // 
     int safety = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && safety < 30 {
+    test_has_pending_choice(&tg);
     // TODO: safety += 1;
     // TODO: if game.pending_choice_type().as_deref() == Some("SelectAutoAbility") {
     // TODO: game.select_indices(&[]);
@@ -62144,8 +61610,7 @@ static void gen_cost_below_20_does_not_fire(void){
     // // inlined helper drain_auto
     // 
     int safety = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && safety < 30 {
+    test_has_pending_choice(&tg);
     // TODO: safety += 1;
     // TODO: if game.pending_choice_type().as_deref() == Some("SelectAutoAbility") {
     // TODO: game.select_indices(&[]);
@@ -62211,8 +61676,7 @@ static void gen_cost_at_least_20_fires(void){
     // // inlined helper drain_auto
     // 
     int safety = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && safety < 30 {
+    test_has_pending_choice(&tg);
     // TODO: safety += 1;
     // TODO: if game.pending_choice_type().as_deref() == Some("SelectAutoAbility") {
     // TODO: game.select_indices(&[]);
@@ -62277,8 +61741,7 @@ static void gen_optional_can_skip(void){
     // // inlined helper drain_auto
     // 
     int safety = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && safety < 30 {
+    test_has_pending_choice(&tg);
     // TODO: safety += 1;
     // TODO: if game.pending_choice_type().as_deref() == Some("SelectAutoAbility") {
     // TODO: game.select_indices(&[]);
@@ -62295,7 +61758,7 @@ static void gen_optional_can_skip(void){
     // TODO: game.select_indices(&[]);
     // 
     // // Card should remain in discard
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&aq_l), "Card should remain in discard after skip" );
+    CHECK(test_zone_has_id(&tg, 0, "discard", aq_l), "optional_can_skip");
     // 
 }
 
@@ -62350,8 +61813,7 @@ static void gen_no_matching_live_in_discard_skips(void){
     // // inlined helper drain_auto
     // 
     int safety = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && safety < 30 {
+    test_has_pending_choice(&tg);
     // TODO: safety += 1;
     // TODO: if game.pending_choice_type().as_deref() == Some("SelectAutoAbility") {
     // TODO: game.select_indices(&[]);
@@ -62424,8 +61886,7 @@ static void gen_can_select_2_of_4_available(void){
     // // inlined helper drain_auto
     // 
     int safety = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && safety < 30 {
+    test_has_pending_choice(&tg);
     // TODO: safety += 1;
     // TODO: if game.pending_choice_type().as_deref() == Some("SelectAutoAbility") {
     // TODO: game.select_indices(&[]);
@@ -62490,8 +61951,7 @@ static void gen_test_yoshiko_center_ability_basic_success(void){
     test_activate_ability(&tg, yoshiko);
     // 
     // // Handle all pending choices: cost (hand discard) + effect (stage member selection)
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -62590,8 +62050,7 @@ static void gen_test_yoshiko_center_ability_no_other_aqours_on_stage(void){
     test_activate_ability(&tg, yoshiko);
     // 
     // // Handle cost choice (hand discard)
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -62627,8 +62086,7 @@ static void gen_test_yoshiko_center_ability_no_valid_discard_targets(void){
     test_activate_ability(&tg, yoshiko);
     // 
     // // Handle all pending choices: cost + effect (stage member selection)
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]); // Select Chika (only Aqours on stage)
     // TODO: }
     // 
@@ -62670,8 +62128,7 @@ static void gen_test_yoshiko_center_ability_cost_calculation(void){
     test_activate_ability(&tg, yoshiko);
     // 
     // // Handle all pending choices: cost + effect (stage→Chika selected) + conditional summon
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]); // Select Chika (only Aqours on stage besides self)
     // TODO: }
     // 
@@ -62714,8 +62171,7 @@ static void gen_test_yoshiko_center_ability_use_limit(void){
     test_activate_ability(&tg, yoshiko);
     // 
     // // Handle all choices for the first ability (cost discard + stage selection + possible discard selection)
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -62754,8 +62210,7 @@ static void gen_test_yoshiko_center_ability_exclude_self(void){
     test_activate_ability(&tg, yoshiko);
     // 
     // // Handle all pending choices: cost + effect (stage member selection) + conditional summon
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // // Stage choice: only Chika (Aqours, not self) is available
     // // Discard choice: Dia (cost 11 = Chika cost 9 + 2) auto-resolves (1 candidate)
     // TODO: game.select_indices(&[0]);
@@ -62795,8 +62250,7 @@ static void gen_test_yoshiko_cost_reference_uses_sacrificed_not_self(void){
     test_give_energy(&tg, 15);
     // 
     test_activate_ability(&tg, yoshiko);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -62830,8 +62284,7 @@ static void gen_test_yoshiko_no_valid_target_after_sacrifice(void){
     test_give_energy(&tg, 15);
     // 
     test_activate_ability(&tg, yoshiko);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -62897,8 +62350,7 @@ static void gen_c5_cost_moves_one_energy_from_zone_under_member(void){
     int energy_zone_before = tg.state.p[0].energy.n;
     test_activate_ability(&tg, karin);
     int guard = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && guard < 20 {
+    test_has_pending_choice(&tg);
     // TODO: guard += 1;
     // TODO: game.select_indices(&[0]);
     // TODO: }
@@ -63038,8 +62490,7 @@ static void gen_c5_single_candidate_auto_waited(void){
     // 
     // // Only 1 eligible candidate → the effect resolves without a prompt.
     int guard = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && guard < 20 {
+    test_has_pending_choice(&tg);
     // TODO: guard += 1;
     // TODO: game.select_indices(&[0]);
     // TODO: }
@@ -63086,9 +62537,9 @@ static void gen_bp6_021_accept_cost_scores_and_retrieves(void){
     // TODO assert: assert!(answer_optional(&mut game, true), "unexpected prompt shape");
     // 
     CHECK_EQ(rb_mods_get_score(&tg.state.mods, live), 1, "bp6_021_accept_cost_scores_and_retrieves");
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&mus_live), "cost accepted -> μ's live card retrieved to hand" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", mus_live), "bp6_021_accept_cost_scores_and_retrieves");
     // TODO assert: assert!( !game.state.player1.stage.stage.contains(&mus_member), "cost accepted -> the μ's member left the stage" );
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&mus_member), "cost accepted -> the μ's member went to the waitroom" );
+    CHECK(test_zone_has_id(&tg, 0, "discard", mus_member), "bp6_021_accept_cost_scores_and_retrieves");
     // 
 }
 
@@ -63115,7 +62566,7 @@ static void gen_bp6_021_skip_cost_no_score_no_retrieval(void){
     // TODO assert: assert!(answer_optional(&mut game, false), "expected an optional-gate prompt");
     // 
     CHECK_EQ(rb_mods_get_score(&tg.state.mods, live), 0, "bp6_021_skip_cost_no_score_no_retrieval");
-    // TODO assert: assert!( !game.state.player1.hand.cards.contains(&mus_live), "cost declined -> no retrieval" );
+    CHECK((!test_zone_has_id(&tg, 0, "hand", mus_live)), "bp6_021_skip_cost_no_score_no_retrieval");
     // TODO assert: assert!( game.state.player1.stage.stage.contains(&m1) && game.state.player1.stage.stage.contains(&m2), "cost declined -> both members stay on stage" );
     // 
 }
@@ -63135,7 +62586,7 @@ static void gen_cl1_009_retrieves_cost_four_boundary(void){
     // // Single valid candidate auto-resolves — no selection prompt.
     test_has_pending_choice(&tg);
     // 
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&target), "cost-4 蓮ノ空 member (lower boundary) retrieved" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", target), "cl1_009_retrieves_cost_four_boundary");
     // 
 }
 
@@ -63154,7 +62605,7 @@ static void gen_cl1_009_retrieves_cost_nine_boundary(void){
     // // Single valid candidate auto-resolves — no selection prompt.
     test_has_pending_choice(&tg);
     // 
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&target), "cost-9 蓮ノ空 member (upper boundary) retrieved" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", target), "cl1_009_retrieves_cost_nine_boundary");
     // 
 }
 
@@ -63171,7 +62622,7 @@ static void gen_cl1_009_cost_ten_outside_range_not_selectable(void){
     // 
     // TODO: fire_trigger(&mut game, live, AbilityTrigger::LiveSuccess, "ライブ成功時");
     test_has_pending_choice(&tg);
-    // TODO assert: assert!( !game.state.player1.hand.cards.contains(&outside), "cost-10 member stays in revealed pool" );
+    CHECK((!test_zone_has_id(&tg, 0, "hand", outside)), "cl1_009_cost_ten_outside_range_not_selectable");
     // 
 }
 
@@ -63207,7 +62658,7 @@ static void gen_hs_bp6_032_retrieves_low_cost_member(void){
     // // Single valid candidate auto-resolves — no selection prompt.
     test_has_pending_choice(&tg);
     // 
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&target), "cost-4 member retrieved to hand" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", target), "hs_bp6_032_retrieves_low_cost_member");
     // 
 }
 
@@ -63272,7 +62723,7 @@ static void gen_bp4_021_accept_puts_waitroom_card_on_deck_top(void){
     // TODO: game.select_indices(&[0]);
     // 
     // TODO assert_eq (unresolved): assert_eq!( game.state.player1.main_deck.cards.first(), Some(&recycled), "accepted -> waitroom card sits on deck top" );
-    // TODO assert: assert!( !game.state.player1.waitroom.cards.contains(&recycled), "accepted -> card left the waitroom" );
+    CHECK((!test_zone_has_id(&tg, 0, "discard", recycled)), "bp4_021_accept_puts_waitroom_card_on_deck_top");
     // 
 }
 
@@ -63298,7 +62749,7 @@ static void gen_bp4_021_skip_leaves_waitroom_intact(void){
     test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]); // decline / select nothing
     // 
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&recycled), "declined -> card stays in the waitroom" );
+    CHECK(test_zone_has_id(&tg, 0, "discard", recycled), "bp4_021_skip_leaves_waitroom_intact");
     // 
 }
 
@@ -63337,8 +62788,7 @@ static void gen_two_dive_retrieved_chain_still_works(void){
     // TODO: g.state.process_pending_auto_abilities(&pid);
     // 
     // // Drain all choices (ab#0 placement, ab#1 target selection, etc.)
-    int g = 0;
-    // TODO loop (degraded): while g.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: g.select_indices(&[0]);
     // TODO: }
     // 
@@ -63386,12 +62836,10 @@ static void gen_only_moved_copy_triggers_static_copy_does_not(void){
     // TODO: g.state.process_pending_auto_abilities(&pid);
     // 
     int choice_count = 0;
-    int g = 0;
-    // TODO loop (degraded): while g.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: choice_count += 1;
     // TODO: g.select_indices(&[0]);
-    g = 0;
-    // TODO loop (degraded): while g.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: g.select_indices(&[0]);
     // TODO: }
     // TODO: }
@@ -63431,8 +62879,7 @@ static void gen_ab0_places_dive_ab1_grants_blade_verify_modifier(void){
     test_has_pending_choice(&tg);
     // TODO: g.select_indices(&[0]);
     // // ab#1 may auto-select or create a choice — drain all
-    int g = 0;
-    // TODO loop (degraded): while g.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: g.select_indices(&[0]);
     // TODO: }
     // 
@@ -63509,8 +62956,7 @@ static void gen_full_chain_setsuna_debut_retrieval(void){
     // TODO: g.select_indices(&[0]);
     // 
     // // ab#1 may auto-select blade target or prompt — drain all
-    int g = 0;
-    // TODO loop (degraded): while g.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: g.select_indices(&[0]);
     // TODO: }
     // 
@@ -63546,8 +62992,7 @@ static void gen_two_dive_live_zone_two_blade_grants(void){
     // TODO: rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(&mut g.state, &pid);
     // TODO: g.state.process_pending_auto_abilities(&pid);
     // 
-    int g = 0;
-    // TODO loop (degraded): while g.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: g.select_indices(&[0]);
     // TODO: }
     // 
@@ -63608,8 +63053,7 @@ static void gen_ab0_does_not_fire_outside_main_phase(void){
     // TODO: rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(&mut g.state, &pid);
     // TODO: g.state.process_pending_auto_abilities(&pid);
     // 
-    int g = 0;
-    // TODO loop (degraded): while g.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: g.select_indices(&[0]);
     // TODO: }
     // 
@@ -63652,12 +63096,10 @@ static void gen_two_static_one_moved_only_one_trigger(void){
     // TODO: g.state.process_pending_auto_abilities(&pid);
     // 
     int choice_count = 0;
-    int g = 0;
-    // TODO loop (degraded): while g.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: choice_count += 1;
     // TODO: g.select_indices(&[0]);
-    g = 0;
-    // TODO loop (degraded): while g.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: g.select_indices(&[0]);
     // TODO: }
     // TODO: }
@@ -63703,8 +63145,7 @@ static void gen_ab0_placement_reduces_live_card_set_limit(void){
     // TODO: g.select_indices(&[0]); // accept placement
     // 
     // // ab#1 may fire — drain all
-    int g = 0;
-    // TODO loop (degraded): while g.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: g.select_indices(&[0]);
     // TODO: }
     // 
@@ -63774,8 +63215,7 @@ static void gen_skip_placement_then_new_retrieval_still_triggers(void){
     // TODO: g.select_indices(&[1]);
     // 
     // // ab#1 should fire (or auto-select blade)
-    int g = 0;
-    // TODO loop (degraded): while g.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: g.select_indices(&[0]);
     // TODO: }
     // 
@@ -63803,8 +63243,7 @@ static void gen_issue2_kanan_discard_1_gain_1(void){
     test_play_to_stage(&tg, kanan, 1);
     // 
     int iter = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     int ct = 0;
     // TODO: eprintln!("[TEST_DEBUG] iter={} pending_choice_type={:?}", iter, ct);
     // TODO: if game.pending_choice_type().as_deref() == Some("SelectAutoAbility") {
@@ -63844,8 +63283,7 @@ static void gen_issue2_kanan_skip_cost_empty_live_gain(void){
     // 
     test_play_to_stage(&tg, kanan, 1);
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: if game.pending_choice_type().as_deref() == Some("SelectAutoAbility") {
     // TODO: game.select_indices(&[]);
     // TODO: } else {
@@ -63886,8 +63324,7 @@ static void gen_issue3_ayumu_compound_both_conditions_met(void){
     // // Activate 起動 ability (activation)
     test_activate_ability(&tg, ayumu);
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: if game.pending_choice_type().as_deref() == Some("SelectAutoAbility") {
     // TODO: game.select_indices(&[]);
     // TODO: } else {
@@ -63896,7 +63333,7 @@ static void gen_issue3_ayumu_compound_both_conditions_met(void){
     // TODO: }
     // 
     // // Ability should have looked at cards from deck → deck changed
-    // TODO assert: assert!( game.state.player1.main_deck.cards.len() < deck_before || !game.state.rule_log.is_empty(), "3a: ability executed (deck changed or log emitted)" );
+    CHECK(tg.state.p[0].deck.n, "issue3_ayumu_compound_both_conditions_met");
     // 
 }
 
@@ -63921,8 +63358,7 @@ static void gen_issue3_ayumu_live_card_in_hand_blocks_effect(void){
     // 
     test_activate_ability(&tg, ayumu);
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: if game.pending_choice_type().as_deref() == Some("SelectAutoAbility") {
     // TODO: game.select_indices(&[]);
     // TODO: } else {
@@ -63970,8 +63406,7 @@ static void gen_issue5_kanon_invalidate_other_liella(void){
     rb_advance_phase(&tg.state);
     // 
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: if game.pending_choice_type().as_deref() == Some("SelectAutoAbility") {
     // TODO: game.select_indices(&[]);
     // TODO: } else {
@@ -64033,8 +63468,7 @@ static void gen_issue8_honoka_live_score_dynamic(void){
     // 
     // 
     // // Process choices: cost (select 1 card from hand), then look_and_select (select 1 from looked_at)
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -64089,8 +63523,7 @@ static void gen_issue8_honoka_live_score_2(void){
     // TODO: game.state.process_pending_auto_abilities(&pid);
     // 
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -64146,8 +63579,7 @@ static void gen_issue8_honoka_live_score_1_plus_2(void){
     // TODO: game.state.process_pending_auto_abilities(&pid);
     // 
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -64408,8 +63840,7 @@ static void gen_q176_reveal_live_card_gains_plus1_score(void){
     // 
     test_activate_ability(&tg, umi);
     // // 1 card in hand, count=1 → engine auto-selects, no pending choice
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -64431,8 +63862,7 @@ static void gen_q176_reveal_non_live_card_no_score_modifier(void){
     test_give_energy(&tg, 3);
     // 
     test_activate_ability(&tg, umi);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -64455,8 +63885,7 @@ static void gen_q176_use_limit_blocks_second_activation_same_turn(void){
     test_give_energy(&tg, 6);
     // 
     test_activate_ability(&tg, umi);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -64478,8 +63907,7 @@ static void gen_q176_revealed_card_stays_in_hand(void){
     test_give_energy(&tg, 3);
     // 
     test_activate_ability(&tg, umi);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -64501,8 +63929,7 @@ static void gen_q176_score_modifier_persists_through_phase_changes(void){
     test_give_energy(&tg, 3);
     // 
     test_activate_ability(&tg, umi);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -64527,8 +63954,7 @@ static void gen_q176_score_modifier_cleared_when_member_leaves_stage(void){
     test_give_energy(&tg, 3);
     // 
     test_activate_ability(&tg, umi);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     test_recalc(&tg);
@@ -64560,8 +63986,7 @@ static void gen_q176_choice_path_pick_live_from_mixed_hand(void){
     test_activate_ability(&tg, umi);
     test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[1]);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -64589,8 +64014,7 @@ static void gen_q176_choice_path_pick_non_live_from_mixed_hand(void){
     // 
     test_activate_ability(&tg, umi);
     // TODO: game.select_indices(&[0]);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -64616,8 +64040,7 @@ static void gen_q176_picked_card_tracked_in_revealed_cards(void){
     // 
     test_activate_ability(&tg, umi);
     // TODO: game.select_indices(&[1]);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -65582,8 +65005,7 @@ static void gen_serasu_edelnote_appear_triggers_opponent_wait(void){
     test_has_pending_choice(&tg);
     int entry = 0;
     // TODO assert_eq (unresolved): assert_eq!( entry.as_ref().and_then(|e| e.choice_player_id.as_deref()), Some("p2"), "Wait-member choice should be routed to opponent" );
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -65612,8 +65034,7 @@ static void gen_serasu_edelnote_appear_no_opponent_member(void){
     test_play_to_stage(&tg, edelnote_member, 0);
     // 
     // // Auto fires but opponent has no members → skips cleanly
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // // No crash is the main assertion
@@ -65657,8 +65078,7 @@ static void gen_kowareyasuki_opponent_loses_surplus_hearts_score_up(void){
     rb_advance_phase(&tg.state);
     // 
     // // LiveSuccess phase — ability fires
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -65718,8 +65138,7 @@ static void gen_kowareyasuki_opponent_loses_2plus_hearts_gets_score_bonus(void){
     // 
     rb_advance_phase(&tg.state);
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -65776,8 +65195,7 @@ static void gen_kowareyasuki_opponent_loses_exactly_2_gets_bonus(void){
     // 
     rb_advance_phase(&tg.state);
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -65833,8 +65251,7 @@ static void gen_kowareyasuki_opponent_loses_1_no_bonus(void){
     // 
     rb_advance_phase(&tg.state);
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -66091,8 +65508,7 @@ static void gen_kanon_full_flow_baton_touch_places_under_and_grants_blade(void){
     // discard: let _ = kanon;
     test_add_to_hand(&tg, arriver);
     test_play_to_stage(&tg, arriver, 1);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // // Default: skip any optional choice; required discards pick the first card.
     int required = 0;
     // TODO: matches!(
@@ -66117,7 +65533,7 @@ static void gen_kanon_full_flow_baton_touch_places_under_and_grants_blade(void){
     // // ab#1: 澁谷かのん should now be UNDER the arriver, not sitting in the waitroom.
     int under = 0;
     // TODO assert: assert!( under.contains(&kanon), "ab#1 should place 澁谷かのん under the arriving member; under={:?}", under );
-    // TODO assert: assert!( !game.state.player1.waitroom.cards.contains(&kanon), "澁谷かのん must be under the arriver (ab#1), not in the waitroom" );
+    CHECK((!test_zone_has_id(&tg, 0, "discard", kanon)), "kanon_full_flow_baton_touch_places_under_and_grants_blade");
     // 
     // // ab#0: the Liella! arriver host now gains a blade.
     test_recalc(&tg);
@@ -66399,13 +65815,12 @@ static void gen_bps2025_distinct_trio_retrieves_revealed_to_hand(void){
     // 
     // TODO: fire_trigger(&mut game, live, AbilityTrigger::LiveSuccess, "ライブ成功時");
     int guard = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && guard < 10 {
+    test_has_pending_choice(&tg);
     // TODO: guard += 1;
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&prize), "gate met -> revealed card retrieved to hand" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", prize), "bps2025_distinct_trio_retrieves_revealed_to_hand");
     // 
 }
 
@@ -66429,7 +65844,7 @@ static void gen_bps2025_single_name_no_retrieval(void){
     // 
     // TODO: fire_trigger(&mut game, live, AbilityTrigger::LiveSuccess, "ライブ成功時");
     // 
-    // TODO assert: assert!( !game.state.player1.hand.cards.contains(&prize), "<2 distinct names -> nothing retrieved" );
+    CHECK((!test_zone_has_id(&tg, 0, "hand", prize)), "bps2025_single_name_no_retrieval");
     // 
 }
 
@@ -66452,8 +65867,7 @@ static void gen_bps7023_optional_liella_reveal_to_deck_top(void){
     // TODO: fire_trigger(&mut game, live, AbilityTrigger::LiveSuccess, "ライブ成功時");
     // // Optional move is folded into the allow_skip selection prompt.
     int guard = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && guard < 10 {
+    test_has_pending_choice(&tg);
     // TODO: guard += 1;
     // TODO: game.select_indices(&[0]);
     // TODO: }
@@ -66491,13 +65905,12 @@ static void gen_bs5019_success_zone_two_retrieves_two_members(void){
     // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard (revealed_cards, count=2)" );
     // TODO: game.select_indices(&[0, 1]);
     int guard = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && guard < 10 {
+    test_has_pending_choice(&tg);
     // TODO: guard += 1;
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&m1) && game.state.player1.hand.cards.contains(&m2), "gate met -> up to 2 members retrieved to hand" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", m1), "bs5019_success_zone_two_retrieves_two_members");
     // 
 }
 
@@ -66524,8 +65937,7 @@ static void gen_pr0018_seven_liella_reveals_place_wait_energy(void){
     // 
     // TODO: fire_trigger(&mut game, me, AbilityTrigger::LiveSuccess, "ライブ成功時");
     int guard = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && guard < 10 {
+    test_has_pending_choice(&tg);
     // TODO: guard += 1;
     // TODO: game.select_indices(&[0]); // accept optional discard if offered
     // TODO: }
@@ -66555,8 +65967,7 @@ static void gen_pr0018_under_seven_liella_no_energy(void){
     // 
     // TODO: fire_trigger(&mut game, me, AbilityTrigger::LiveSuccess, "ライブ成功時");
     int guard = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && guard < 10 {
+    test_has_pending_choice(&tg);
     // TODO: guard += 1;
     // TODO: game.select_indices(&[0]);
     // TODO: }
@@ -66590,8 +66001,7 @@ static void gen_hs6015_hand_debut_draws_nothing(void){
     // 
     test_play_to_stage(&tg, me, 1);
     int guard = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && guard < 10 {
+    test_has_pending_choice(&tg);
     // TODO: guard += 1;
     // TODO: game.select_indices(&[0]);
     // TODO: }
@@ -66617,14 +66027,13 @@ static void gen_hs6016_activation_deploys_low_cost_member_to_empty_area(void){
     // 
     test_activate_ability(&tg, me);
     int guard = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && guard < 10 {
+    test_has_pending_choice(&tg);
     // TODO: guard += 1;
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
     // TODO assert: assert!( game.state.player1.stage.stage.contains(&kamaru), "cost<=4 『蓮ノ空』 member debuted into an empty area" );
-    // TODO assert: assert!( !game.state.player1.waitroom.cards.contains(&kamaru), "deployed member left the waitroom" );
+    CHECK((!test_zone_has_id(&tg, 0, "discard", kamaru)), "hs6016_activation_deploys_low_cost_member_to_empty_area");
     // 
 }
 
@@ -66685,8 +66094,7 @@ static void gen_nbp7012_pay_specifies_color_and_gains_one(void){
     rb_resume_with_choice(&tg.state, 1);
     // // Answer the color specification choice(s).
     int guard = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && guard < 10 {
+    test_has_pending_choice(&tg);
     // TODO: guard += 1;
     // TODO: if game.pending_choice_type().as_deref() == Some("SelectHeartColor") {
     // TODO: game.select_choice_option(0);
@@ -66732,7 +66140,7 @@ static void gen_test_q252_basic_trigger(void){
     // 
     test_has_pending_choice(&tg);
     // TODO assert_eq (unresolved): assert_eq!( game.state.player1.main_deck.cards.first(), Some(&live), "Live card on top of deck" );
-    // TODO assert: assert!( !game.state.player1.waitroom.cards.contains(&live), "Live card removed from waitroom" );
+    CHECK((!test_zone_has_id(&tg, 0, "discard", live)), "test_q252_basic_trigger");
     // 
 }
 
@@ -66795,8 +66203,8 @@ static void gen_test_q252_two_cards_choose_one(void){
     // 
     test_has_pending_choice(&tg);
     // TODO assert_eq (unresolved): assert_eq!( game.state.player1.main_deck.cards.first(), Some(&live1), "live1 on top of deck" );
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&live2), "live2 stays in waitroom" );
-    // TODO assert: assert!( !game.state.player1.waitroom.cards.contains(&live1), "live1 removed from waitroom" );
+    CHECK(test_zone_has_id(&tg, 0, "discard", live2), "test_q252_two_cards_choose_one");
+    CHECK((!test_zone_has_id(&tg, 0, "discard", live1)), "test_q252_two_cards_choose_one");
     // 
 }
 
@@ -66834,9 +66242,9 @@ static void gen_test_q252_three_cards_choose_one(void){
     // 
     test_has_pending_choice(&tg);
     // TODO assert_eq (unresolved): assert_eq!( game.state.player1.main_deck.cards.last(), Some(&live2), "live2 on bottom of deck" );
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&live1), "live1 stays in waitroom" );
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&live3), "live3 stays in waitroom" );
-    // TODO assert: assert!( !game.state.player1.waitroom.cards.contains(&live2), "live2 removed from waitroom" );
+    CHECK(test_zone_has_id(&tg, 0, "discard", live1), "test_q252_three_cards_choose_one");
+    CHECK(test_zone_has_id(&tg, 0, "discard", live3), "test_q252_three_cards_choose_one");
+    CHECK((!test_zone_has_id(&tg, 0, "discard", live2)), "test_q252_three_cards_choose_one");
     // 
 }
 
@@ -66920,7 +66328,7 @@ static void gen_test_q252_pick_second_card(void){
     // 
     test_has_pending_choice(&tg);
     // TODO assert_eq (unresolved): assert_eq!( game.state.player1.main_deck.cards.last(), Some(&live2), "live2 on bottom" );
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&live1), "live1 stays in waitroom" );
+    CHECK(test_zone_has_id(&tg, 0, "discard", live1), "test_q252_pick_second_card");
     // 
 }
 
@@ -67007,8 +66415,8 @@ static void gen_test_q252_stage_two_cards_simulation(void){
     // 
     test_has_pending_choice(&tg);
     // TODO assert_eq (unresolved): assert_eq!( game.state.player1.main_deck.cards.first(), Some(&live1), "live1 on top of deck" );
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&live2), "live2 stays in waitroom (only 1 can be placed)" );
-    // TODO assert: assert!( !game.state.player1.waitroom.cards.contains(&live1), "live1 removed from waitroom" );
+    CHECK(test_zone_has_id(&tg, 0, "discard", live2), "test_q252_stage_two_cards_simulation");
+    CHECK((!test_zone_has_id(&tg, 0, "discard", live1)), "test_q252_stage_two_cards_simulation");
     // 
 }
 
@@ -67046,7 +66454,7 @@ static void gen_test_q252_mixed_aqours_and_non_aqours(void){
     // 
     test_has_pending_choice(&tg);
     // TODO assert_eq (unresolved): assert_eq!( game.state.player1.main_deck.cards.first(), Some(&aqours_live), "Aqours live card on top of deck" );
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&non_aqours_live), "Non-Aqours live card stays in waitroom" );
+    CHECK(test_zone_has_id(&tg, 0, "discard", non_aqours_live), "test_q252_mixed_aqours_and_non_aqours");
     // 
 }
 
@@ -67085,7 +66493,7 @@ static void gen_test_q252_non_live_in_recently_moved(void){
     // 
     test_has_pending_choice(&tg);
     // TODO assert_eq (unresolved): assert_eq!( game.state.player1.main_deck.cards.last(), Some(&aqours_live), "Aqours live card on bottom of deck" );
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&aqours_member), "Aqours member stays in waitroom (not a live card)" );
+    CHECK(test_zone_has_id(&tg, 0, "discard", aqours_member), "test_q252_non_live_in_recently_moved");
     // 
 }
 
@@ -67116,8 +66524,8 @@ static void gen_test_q252_skip_optional_move(void){
     // TODO: game.select_indices(&[]);
     // 
     test_has_pending_choice(&tg);
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&live), "Live card remains in waitroom after skip" );
-    // TODO assert: assert!( !game.state.player1.main_deck.cards.contains(&live), "Live card NOT moved to deck after skip" );
+    CHECK(test_zone_has_id(&tg, 0, "discard", live), "test_q252_skip_optional_move");
+    CHECK((!test_zone_has_id(&tg, 0, "deck", live)), "test_q252_skip_optional_move");
     // 
 }
 
@@ -67149,8 +66557,8 @@ static void gen_test_q252_skip_optional_two_cards(void){
     // TODO: game.select_indices(&[]);
     // 
     test_has_pending_choice(&tg);
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&live1), "live1 remains in waitroom after skip" );
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&live2), "live2 remains in waitroom after skip" );
+    CHECK(test_zone_has_id(&tg, 0, "discard", live1), "test_q252_skip_optional_two_cards");
+    CHECK(test_zone_has_id(&tg, 0, "discard", live2), "test_q252_skip_optional_two_cards");
     // 
 }
 
@@ -67382,8 +66790,7 @@ static void gen_hanayo_bp4_baton_touch_uses_modified_cost(void){
     // 
     test_add_to_hand(&tg, arriver);
     test_play_to_stage(&tg, arriver, 1);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -67460,14 +66867,13 @@ static void gen_karin_reveal_condition_met_cheap_member_goes_to_hand(void){
     rb_advance_phase(&tg.state);
     // 
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // // Karin's conditional effect prompts mandatorily when the reveal
     // // matches — answer first option; no-op when nothing was asked.
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&cheap), "Revealed card should be in hand when condition is met" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", cheap), "karin_reveal_condition_met_cheap_member_goes_to_hand");
     // 
 }
 
@@ -67513,14 +66919,13 @@ static void gen_karin_reveal_condition_met_cheap_member_not_in_discard(void){
     rb_advance_phase(&tg.state);
     // 
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // // Karin's conditional effect prompts mandatorily when the reveal
     // // matches — answer first option; no-op when nothing was asked.
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
-    // TODO assert: assert!( !game.state.player1.waitroom.cards.contains(&cheap), "Revealed card should NOT be discarded when condition is met" );
+    CHECK((!test_zone_has_id(&tg, 0, "discard", cheap)), "karin_reveal_condition_met_cheap_member_not_in_discard");
     // 
 }
 
@@ -67568,14 +66973,13 @@ static void gen_karin_reveal_condition_met_card_removed_from_deck_top(void){
     rb_advance_phase(&tg.state);
     // 
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // // Karin's conditional effect prompts mandatorily when the reveal
     // // matches — answer first option; no-op when nothing was asked.
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
-    // TODO assert: assert!( !game.state.player1.main_deck.cards.contains(&cheap), "Revealed card should be removed from deck (revealed then moved)" );
+    CHECK((!test_zone_has_id(&tg, 0, "deck", cheap)), "karin_reveal_condition_met_card_removed_from_deck_top");
     // 
 }
 
@@ -67625,8 +67029,7 @@ static void gen_karin_reveal_condition_met_hand_count_increases(void){
     rb_advance_phase(&tg.state);
     // 
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // // Karin's conditional effect prompts mandatorily when the reveal
     // // matches — answer first option; no-op when nothing was asked.
     // TODO: game.select_indices(&[0]);
@@ -67681,14 +67084,13 @@ static void gen_karin_reveal_non_member_live_card_goes_to_discard(void){
     rb_advance_phase(&tg.state);
     // 
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // // Karin's conditional effect prompts mandatorily when the reveal
     // // matches — answer first option; no-op when nothing was asked.
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&deck_top), "Non-member card should be discarded when condition fails" );
+    CHECK(test_zone_has_id(&tg, 0, "discard", deck_top), "karin_reveal_non_member_live_card_goes_to_discard");
     // 
 }
 
@@ -67734,14 +67136,13 @@ static void gen_karin_reveal_non_member_not_added_to_hand(void){
     rb_advance_phase(&tg.state);
     // 
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // // Karin's conditional effect prompts mandatorily when the reveal
     // // matches — answer first option; no-op when nothing was asked.
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
-    // TODO assert: assert!( !game.state.player1.hand.cards.contains(&deck_top), "Non-member card should NOT be added to hand" );
+    CHECK((!test_zone_has_id(&tg, 0, "hand", deck_top)), "karin_reveal_non_member_not_added_to_hand");
     // 
 }
 
@@ -67787,15 +67188,14 @@ static void gen_karin_reveal_expensive_member_goes_to_discard(void){
     rb_advance_phase(&tg.state);
     // 
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // // Karin's conditional effect prompts mandatorily when the reveal
     // // matches — answer first option; no-op when nothing was asked.
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&expensive), "Card with cost >9 should be discarded when condition fails" );
-    // TODO assert: assert!( !game.state.player1.hand.cards.contains(&expensive), "Expensive card should NOT be added to hand" );
+    CHECK(test_zone_has_id(&tg, 0, "discard", expensive), "karin_reveal_expensive_member_goes_to_discard");
+    CHECK((!test_zone_has_id(&tg, 0, "hand", expensive)), "karin_reveal_expensive_member_goes_to_discard");
     // 
 }
 
@@ -67843,8 +67243,7 @@ static void gen_karin_reveal_condition_met_position_changes(void){
     rb_advance_phase(&tg.state);
     // 
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // // Karin's conditional effect prompts mandatorily when the reveal
     // // matches — answer first option; no-op when nothing was asked.
     // TODO: game.select_indices(&[0]);
@@ -67901,8 +67300,7 @@ static void gen_karin_reveal_condition_not_met_position_unchanged(void){
     rb_advance_phase(&tg.state);
     // 
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // // Karin's conditional effect prompts mandatorily when the reveal
     // // matches — answer first option; no-op when nothing was asked.
     // TODO: game.select_indices(&[0]);
@@ -67954,8 +67352,7 @@ static void gen_karin_reveal_card_in_exactly_one_zone(void){
     rb_advance_phase(&tg.state);
     // 
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // // Karin's conditional effect prompts mandatorily when the reveal
     // // matches — answer first option; no-op when nothing was asked.
     // TODO: game.select_indices(&[0]);
@@ -68014,8 +67411,7 @@ static void gen_karin_reveal_condition_met_deck_top_becomes_filler(void){
     rb_advance_phase(&tg.state);
     // 
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // // Karin's conditional effect prompts mandatorily when the reveal
     // // matches — answer first option; no-op when nothing was asked.
     // TODO: game.select_indices(&[0]);
@@ -68071,8 +67467,7 @@ static void gen_karin_reveal_condition_failed_deck_top_becomes_filler(void){
     rb_advance_phase(&tg.state);
     // 
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // // Karin's conditional effect prompts mandatorily when the reveal
     // // matches — answer first option; no-op when nothing was asked.
     // TODO: game.select_indices(&[0]);
@@ -68604,8 +67999,7 @@ static void gen_formation_change_destination_excludes_already_claimed_area(void)
     // // collisions and matches the plan.
     // action result consumed: let left_idx = second_opts.iter().position(|o| o == "left").unwrap();
     // TODO: game.select_option(left_idx as i16);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -69082,8 +68476,7 @@ static void gen_sumire_no_baton_touch_no_draw(void){
     test_play_to_stage(&tg, sumire, 1);
     // action result consumed: .expect("play without baton touch");
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -69133,8 +68526,7 @@ static void gen_sumire_q194_locked_member_excluded_from_double_baton(void){
     test_play_to_stage(&tg, sumire, 1);
     // action result consumed: .expect("play with baton touch");
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -69188,8 +68580,7 @@ static void gen_sumire_only_one_occupied_area_triggers_single_baton_touch(void){
     test_play_to_stage(&tg, sumire, 0);
     // action result consumed: .expect("play with baton touch");
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -69234,8 +68625,7 @@ static void gen_sumire_double_baton_to_left_does_not_activate_debut(void){
     test_play_to_stage(&tg, sumire, 0);
     // action result consumed: .expect("play with double baton via card_indices");
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -69326,8 +68716,7 @@ static void gen_sumire_single_baton_stays_single_no_auto_promote(void){
     test_play_to_stage(&tg, sumire, 1);
     // action result consumed: .expect("play with single baton");
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -69415,8 +68804,7 @@ static void gen_sumire_double_baton_integration_via_string_path(void){
     // TODO: )
     // action result consumed: .expect("double baton via string-parsed action_type should succeed");
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -69467,8 +68855,7 @@ static void gen_sumire_explicit_double_baton_via_card_indices(void){
     test_play_to_stage(&tg, sumire, 1);
     // action result consumed: .expect("explicit double baton via card_indices");
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -69480,8 +68867,8 @@ static void gen_sumire_explicit_double_baton_via_card_indices(void){
     // TODO assert_eq (unresolved): assert_eq!(on_stage[1], sumire, "Center has Sumire");
     // TODO assert_eq (unresolved): assert_eq!(on_stage[2], -1, "Right empty");
     // 
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&liella1), "liella1 in waitroom (cost 15 > 4)" );
-    // TODO assert: assert!( !game.state.player1.waitroom.cards.contains(&liella2), "liella2 deployed back to stage" );
+    CHECK(test_zone_has_id(&tg, 0, "discard", liella1), "sumire_explicit_double_baton_via_card_indices");
+    CHECK((!test_zone_has_id(&tg, 0, "discard", liella2)), "sumire_explicit_double_baton_via_card_indices");
     // 
     CHECK_EQ(tg.state.p[0].hand.n, 3, "sumire_explicit_double_baton_via_card_indices");
     // 
@@ -69532,8 +68919,7 @@ static void gen_sumire_explicit_double_baton_to_left_no_debut(void){
     test_play_to_stage(&tg, sumire, 0);
     // action result consumed: .expect("explicit double baton to Left");
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -69634,8 +69020,7 @@ static void gen_look_and_select_any_number_partial_selection(void){
     // // Select 1 card only (index 0).
     // TODO: game.select_indices(&[0]);
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -69677,14 +69062,13 @@ static void gen_look_and_select_any_number_full_selection(void){
     // TODO: game.select_indices(&[0]);
     // 
     // // Resolve order prompt (any_order)
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, 0);
     // TODO: }
     // 
     test_has_pending_choice(&tg);
-    // TODO assert: assert!( game.state.player1.main_deck.cards.contains(&card_a), "card_a should be on deck" );
-    // TODO assert: assert!( game.state.player1.main_deck.cards.contains(&card_b), "card_b should be on deck" );
+    CHECK(test_zone_has_id(&tg, 0, "deck", card_a), "look_and_select_any_number_full_selection");
+    CHECK(test_zone_has_id(&tg, 0, "deck", card_b), "look_and_select_any_number_full_selection");
     // 
 }
 
@@ -69717,14 +69101,13 @@ static void gen_look_and_select_any_number_skip_all(void){
     // // Select 0 cards (skip)
     // TODO: game.select_indices(&[]);
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
     test_has_pending_choice(&tg);
     // // Docstring: select 0 → BOTH looked-at cards go to discard.
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&card_a) && game.state.player1.waitroom.cards.contains(&card_b), "both looked-at cards should be in discard after skipping selection" );
+    CHECK(test_zone_has_id(&tg, 0, "discard", card_a), "look_and_select_any_number_skip_all");
     // 
 }
 
@@ -69814,12 +69197,11 @@ static void gen_yoshiko_look_select_member_heart05_2(void){
     rb_resume_with_choice(&tg.state, 1);
     // TODO: game.select_indices(&[0]);
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&member_heart05_2), "Member card with heart05=2 should be in hand" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", member_heart05_2), "yoshiko_look_select_member_heart05_2");
     // TODO assert: assert!( !game .state .player1 .waitroom .cards .contains(&member_heart05_2), "Selected card should NOT be in waitroom" );
     // 
 }
@@ -69853,12 +69235,11 @@ static void gen_yoshiko_look_select_live_heart05_2(void){
     rb_resume_with_choice(&tg.state, 0);
     // TODO: game.select_indices(&[0]);
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&live_heart05_2), "Live card with need_heart05=2 should be in hand" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", live_heart05_2), "yoshiko_look_select_live_heart05_2");
     // 
 }
 
@@ -69958,12 +69339,11 @@ static void gen_yoshiko_look_select_both_types_eligible(void){
     rb_resume_with_choice(&tg.state, 1);
     // TODO: game.select_indices(&[0]);
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&member_heart05_2), "Selected member card should be in hand" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", member_heart05_2), "yoshiko_look_select_both_types_eligible");
     // 
 }
 
@@ -70022,12 +69402,11 @@ static void gen_yoshiko_look_select_discard_remaining(void){
     rb_resume_with_choice(&tg.state, 1);
     // TODO: game.select_indices(&[0]);
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&filler), "Non-selected looked-at cards go to waitroom" );
+    CHECK(test_zone_has_id(&tg, 0, "discard", filler), "yoshiko_look_select_discard_remaining");
     // 
 }
 
@@ -70129,8 +69508,7 @@ static void gen_serasu_edelnote_appears_fires_once(void){
     // 
     // // Drain the choice
     // TODO: game.select_indices(&[0]);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -70170,8 +69548,7 @@ static void gen_serasu_edelnote_appears_with_non_edelnote_on_stage(void){
     // 
     test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -70199,8 +69576,7 @@ static void gen_hanaho_played_to_stage_no_baton_touch_does_not_trigger(void){
     // 
     test_play_to_stage(&tg, hanaho, 1);
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -70252,12 +69628,11 @@ static void gen_hanaho_baton_touch_triggers_activates_energy(void){
     test_add_to_hand(&tg, arriver);
     test_add_to_hand(&tg, filler);
     test_play_to_stage(&tg, arriver, 1);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&hanaho), "Hanaho must be in waitroom after baton touch" );
+    CHECK(test_zone_has_id(&tg, 0, "discard", hanaho), "hanaho_baton_touch_triggers_activates_energy");
     CHECK_EQ(tg.state.p[0].stage[1], arriver, "hanaho_baton_touch_triggers_activates_energy");
     // 
     int energy_after = tg.state.p[0].energy_active;
@@ -70282,8 +69657,7 @@ static void gen_hanaho_baton_touch_low_cost_no_trigger(void){
     test_add_to_hand(&tg, low_cost);
     test_add_to_hand(&tg, filler);
     test_play_to_stage(&tg, low_cost, 1);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -70313,8 +69687,7 @@ static void gen_hanaho_baton_touch_wrong_group_no_trigger(void){
     test_add_to_hand(&tg, filler);
     // // Play to an occupied area triggers auto baton touch
     test_play_to_stage(&tg, wrong_group, 1);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -70342,8 +69715,7 @@ static void gen_hanaho_baton_touch_triggers_exactly_once(void){
     test_add_to_hand(&tg, arriver);
     test_add_to_hand(&tg, filler);
     test_play_to_stage(&tg, arriver, 1);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -70385,8 +69757,7 @@ static void gen_baton_touch_cleared_between_actions(void){
     test_add_to_hand(&tg, arriver);
     test_add_to_hand(&tg, filler);
     test_play_to_stage(&tg, arriver, 1);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -70394,8 +69765,7 @@ static void gen_baton_touch_cleared_between_actions(void){
     test_add_to_hand(&tg, fresh_card);
     int energy_before = tg.state.p[0].energy_active;
     test_play_to_stage(&tg, fresh_card, 0);
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -70436,8 +69806,7 @@ static void gen_serasu_double_trigger_regression(void){
     test_play_to_stage(&tg, edelnote_member, 0);
     // 
     // // Drain any pending choices (single opponent = auto-resolve)
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -71283,7 +70652,7 @@ static void gen_ruby_bp5009_decline_optional_payment_fetches_nothing(void){
     // 
     CHECK_EQ(tg.state.p[0].hand.n, hand_before, "ruby_bp5009_decline_optional_payment_fetches_nothing");
     CHECK_EQ(rb_mods_get_blade(&tg.state.mods, ruby), 0, "ruby_bp5009_decline_optional_payment_fetches_nothing");
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&saint), "SaintSnow stays in the waitroom" );
+    CHECK(test_zone_has_id(&tg, 0, "discard", saint), "ruby_bp5009_decline_optional_payment_fetches_nothing");
     // 
 }
 
@@ -71322,7 +70691,7 @@ static void gen_ruby_bp5009_accept_optional_payment_fetches_and_grants_blades(vo
     rb_resume_with_choice(&tg.state, 1);
     // 
     // TODO assert_eq (unresolved): assert_eq!( game.state.player1.hand.cards.len(), hand_before + 1, "SaintSnow moves from waitroom to hand" );
-    // TODO assert: assert!( !game.state.player1.waitroom.cards.contains(&saint), "fetched card left the waitroom" );
+    CHECK((!test_zone_has_id(&tg, 0, "discard", saint)), "ruby_bp5009_accept_optional_payment_fetches_and_grants_blades");
     CHECK_EQ(rb_mods_get_blade(&tg.state.mods, ruby), 2, "ruby_bp5009_accept_optional_payment_fetches_and_grants_blades");
     CHECK_EQ(tg.state.p[0].energy_active, 1, "ruby_bp5009_accept_optional_payment_fetches_and_grants_blades");
     // 
@@ -71351,8 +70720,7 @@ static void gen_hs2003_skip_reorder_rest_goes_to_waitroom(void){
     rb_resume_with_choice(&tg.state, 0);
     // // Skip every reorder pick -> all three looked cards go to the waitroom.
     int guard = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && guard < 12 {
+    test_has_pending_choice(&tg);
     // TODO: guard += 1;
     // TODO: game.select_indices(&[]);
     // TODO: }
@@ -71383,8 +70751,7 @@ static void gen_pr0017_exile_recovers_mus_live_and_activates_two_energy(void){
     // // inlined helper answer_all
     // 
     int guard = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && guard < 12 {
+    test_has_pending_choice(&tg);
     // TODO: guard += 1;
     // TODO: if game.pending_choice_type().as_deref() == Some("SelectHeartColor") {
     // TODO: game.select_choice_option(0);
@@ -71394,7 +70761,7 @@ static void gen_pr0017_exile_recovers_mus_live_and_activates_two_energy(void){
     // TODO: }
     // 
     // 
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&mus_live), "μ's live recovered to hand" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", mus_live), "pr0017_exile_recovers_mus_live_and_activates_two_energy");
     CHECK_EQ(tg.state.p[0].energy_active, 4, "pr0017_exile_recovers_mus_live_and_activates_two_energy");
     // 
 }
@@ -71417,8 +70784,7 @@ static void gen_pr0017_under_nine_score_recovers_without_activation(void){
     // // inlined helper answer_all
     // 
     int guard = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && guard < 12 {
+    test_has_pending_choice(&tg);
     // TODO: guard += 1;
     // TODO: if game.pending_choice_type().as_deref() == Some("SelectHeartColor") {
     // TODO: game.select_choice_option(0);
@@ -71428,7 +70794,7 @@ static void gen_pr0017_under_nine_score_recovers_without_activation(void){
     // TODO: }
     // 
     // 
-    // TODO assert: assert!(game.state.player1.hand.cards.contains(&mus_live));
+    CHECK(test_zone_has_id(&tg, 0, "hand", mus_live), "pr0017_under_nine_score_recovers_without_activation");
     CHECK_EQ(tg.state.p[0].energy_active, 2, "pr0017_under_nine_score_recovers_without_activation");
     // 
 }
@@ -71455,14 +70821,13 @@ static void gen_s1013_look4_takes_live_requiring_two_heart04(void){
     // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard (hand cost gate)" );
     rb_resume_with_choice(&tg.state, 0);
     int guard = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && guard < 10 {
+    test_has_pending_choice(&tg);
     // TODO: guard += 1;
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
     // 
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&seed), "live requiring heart04x2 matches the OR filter" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", seed), "s1013_look4_takes_live_requiring_two_heart04");
     // 
 }
 
@@ -71487,14 +70852,13 @@ static void gen_s1013_look4_plain_member_stays_out(void){
     // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard (hand cost gate)" );
     rb_resume_with_choice(&tg.state, 0);
     int guard = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && guard < 10 {
+    test_has_pending_choice(&tg);
     // TODO: guard += 1;
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
     // 
-    // TODO assert: assert!( !game.state.player1.hand.cards.contains(&plain), "member without heart04 tie must NOT be taken" );
+    CHECK((!test_zone_has_id(&tg, 0, "hand", plain)), "s1013_look4_plain_member_stays_out");
     // 
 }
 
@@ -71519,14 +70883,13 @@ static void gen_s1014_look4_takes_live_requiring_two_heart02(void){
     // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard (hand cost gate)" );
     rb_resume_with_choice(&tg.state, 0);
     int guard = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && guard < 10 {
+    test_has_pending_choice(&tg);
     // TODO: guard += 1;
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
     // 
-    // TODO assert: assert!(game.state.player1.hand.cards.contains(&seed));
+    CHECK(test_zone_has_id(&tg, 0, "hand", seed), "s1014_look4_takes_live_requiring_two_heart02");
     // 
 }
 
@@ -71551,14 +70914,13 @@ static void gen_b5014_takes_member_with_heart06(void){
     // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard (hand cost gate)" );
     rb_resume_with_choice(&tg.state, 0);
     int guard = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && guard < 10 {
+    test_has_pending_choice(&tg);
     // TODO: guard += 1;
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
     // 
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&eli), "member holding heart06 matches the OR-color filter" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", eli), "b5014_takes_member_with_heart06");
     // 
 }
 
@@ -71612,8 +70974,7 @@ static void gen_spb5021_six_energy_exile_places_wait_energy(void){
     // // inlined helper answer_all
     // 
     int guard = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && guard < 12 {
+    test_has_pending_choice(&tg);
     // TODO: guard += 1;
     // TODO: if game.pending_choice_type().as_deref() == Some("SelectHeartColor") {
     // TODO: game.select_choice_option(0);
@@ -71647,8 +71008,7 @@ static void gen_spb5021_five_energy_exiles_but_places_nothing(void){
     // // inlined helper answer_all
     // 
     int guard = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && guard < 12 {
+    test_has_pending_choice(&tg);
     // TODO: guard += 1;
     // TODO: if game.pending_choice_type().as_deref() == Some("SelectHeartColor") {
     // TODO: game.select_choice_option(0);
@@ -71657,7 +71017,7 @@ static void gen_spb5021_five_energy_exiles_but_places_nothing(void){
     // TODO: }
     // TODO: }
     // 
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&me), "self-exile cost is paid even below the >=6 energy gate" );
+    CHECK(test_zone_has_id(&tg, 0, "discard", me), "spb5021_five_energy_exiles_but_places_nothing");
     // // ...but the gated effect places no energy.
     CHECK_EQ(tg.state.p[0].energy.n, zone_before, "spb5021_five_energy_exiles_but_places_nothing");
     // 
@@ -72205,11 +71565,11 @@ static void gen_mutual_mill_identity_no_cross_pollination(void){
     // 
     c = 0;
     // TODO loop (degraded): for &c in &p1_top7 {
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&c) && !game.state.player2.waitroom.cards.contains(&c), "P1 milled card {} must sit in P1's waitroom only", c );
+    CHECK(test_zone_has_id(&tg, 0, "discard", c), "mutual_mill_identity_no_cross_pollination");
     // TODO: }
     c = 0;
     // TODO loop (degraded): for &c in &p2_top7 {
-    // TODO assert: assert!( game.state.player2.waitroom.cards.contains(&c) && !game.state.player1.waitroom.cards.contains(&c), "P2 milled card {} must sit in P2's waitroom only", c );
+    CHECK(test_zone_has_id(&tg, 1, "discard", c), "mutual_mill_identity_no_cross_pollination");
     // TODO: }
     CHECK_EQ(tg.state.p[0].discard.n, 7, "mutual_mill_identity_no_cross_pollination");
     CHECK_EQ(tg.state.p[1].discard.n, 7, "mutual_mill_identity_no_cross_pollination");
@@ -72387,8 +71747,7 @@ static void gen_eternalize_q204_zero_niko_hearts_unchanged(void){
     // TODO: game.set_live_card(live);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -72422,8 +71781,7 @@ static void gen_eternalize_different_names_no_reduction(void){
     // TODO: game.set_live_card(live);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -72456,8 +71814,7 @@ static void gen_eternalize_one_niji_one_other_triggers_zero(void){
     // TODO: game.set_live_card(live);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -72491,8 +71848,7 @@ static void gen_eternalize_three_all_different_no_trigger(void){
     // TODO: game.set_live_card(live);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -72524,8 +71880,7 @@ static void gen_chika_q218_no_ability_cost_reduced(void){
     test_play_to_stage(&tg, chika, 1);
     // 
     // // Drain any debut choices
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -72568,8 +71923,7 @@ static void gen_himeno_no_matching_character_does_not_trigger(void){
     // 
     test_play_to_stage(&tg, himeno, 0);
     // // Drain all pending choices (auto abilities, optional costs, etc.)
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -72605,8 +71959,7 @@ static void gen_himeno_osawa_on_stage_triggers(void){
     // 
     test_play_to_stage(&tg, himeno, 0);
     // // Drain all pending choices (auto abilities, optional costs, etc.)
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -72641,8 +71994,7 @@ static void gen_himeno_momoo_on_stage_triggers(void){
     // 
     test_play_to_stage(&tg, himeno, 0);
     // // Drain all pending choices (auto abilities, optional costs, etc.)
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -72675,8 +72027,7 @@ static void gen_himeno_kodomo_on_stage_triggers(void){
     // 
     test_play_to_stage(&tg, himeno, 0);
     // // Drain all pending choices (auto abilities, optional costs, etc.)
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -72709,8 +72060,7 @@ static void gen_himeno_all_three_on_stage_triggers(void){
     // 
     test_play_to_stage(&tg, himeno, 0);
     // // Drain all pending choices (auto abilities, optional costs, etc.)
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -72743,8 +72093,7 @@ static void gen_himeno_mixed_characters_triggers(void){
     // 
     test_play_to_stage(&tg, himeno, 0);
     // // Drain all pending choices (auto abilities, optional costs, etc.)
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -72774,8 +72123,7 @@ static void gen_himeno_empty_stage_does_not_trigger(void){
     // 
     test_play_to_stage(&tg, himeno, 0);
     // // Drain all pending choices (auto abilities, optional costs, etc.)
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -72947,7 +72295,7 @@ static void gen_live_fails_with_insufficient_hearts(void){
     // // Q35: the failed live card must end in the WAITROOM — never the
     // // success zone. A bare "!has_pending_choice()" cannot distinguish this
     // // from any other terminal state.
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&live), "Q35: failed live card goes to the waitroom" );
+    CHECK(test_zone_has_id(&tg, 0, "discard", live), "live_fails_with_insufficient_hearts");
     // TODO assert: assert!( game.state.player1.success_live_card_zone.cards.is_empty(), "Q35: insufficient hearts → nothing enters the success zone" );
     // 
 }
@@ -73194,7 +72542,7 @@ static void gen_no_live_card_no_yell_no_success(void){
     rb_advance_phase(&tg.state);
     // TODO: }
     // 
-    // TODO assert: assert!( game.state.player1.main_deck.cards.len() >= 45, "Q32: Deck should not lose >5 cards from yell (no live card set)" );
+    CHECK(tg.state.p[0].deck.n, "no_live_card_no_yell_no_success");
     // TODO assert: assert!( game.state.player1.success_live_card_zone.cards.is_empty() && game.state.player2.success_live_card_zone.cards.is_empty(), "Q32: no live performed → nobody places" );
     // 
 }
@@ -73245,7 +72593,7 @@ static void gen_any_card_fails_hearts_all_fail(void){
     // 
     // // 8.3.16: one failure fails ALL — nothing places, both cards to waitroom.
     // TODO assert: assert!( game.state.player1.success_live_card_zone.cards.is_empty(), "Q35: no placement when any live card failed" );
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&live_a) && game.state.player1.waitroom.cards.contains(&live_b), "Q35: ALL live cards go to the waitroom" );
+    CHECK(test_zone_has_id(&tg, 0, "discard", live_a), "any_card_fails_hearts_all_fail");
     // 
 }
 
@@ -73296,7 +72644,7 @@ static void gen_winner_takes_one_to_success_zone(void){
     int placed = 0;
     // TODO assert: assert!( placed == live_a || placed == live_b, "placed card is one of the performed lives" );
     int other = 0;
-    // TODO assert: assert!( !game.state.player1.success_live_card_zone.cards.contains(&other), "Q83: only ONE of the successful lives places" );
+    CHECK((!test_zone_has_id(&tg, 0, "success", other)), "winner_takes_one_to_success_zone");
     // 
 }
 
@@ -73347,8 +72695,7 @@ static void gen_daydream_mermaid_no_niji_in_success_pick_one(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     int t = 0;
     // TODO: if t.as_deref() == Some("SelectTarget") {
     // TODO: break;
@@ -73366,7 +72713,7 @@ static void gen_daydream_mermaid_no_niji_in_success_pick_one(void){
     // TODO: game.select_indices(&[0]);
     // 
     test_has_pending_choice(&tg);
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&recover_target), "Recovered member in hand" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", recover_target), "daydream_mermaid_no_niji_in_success_pick_one");
     // 
 }
 
@@ -73420,8 +72767,7 @@ static void gen_daydream_mermaid_q191_niji_in_success_pick_both(void){
     rb_advance_phase(&tg.state);
     // 
     // // Niji in success zone → choice should use any_number re-prompt
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     int t = 0;
     // TODO: if t.as_deref() == Some("SelectTarget") {
     // TODO: break;
@@ -73446,8 +72792,8 @@ static void gen_daydream_mermaid_q191_niji_in_success_pick_both(void){
     // // zone directly — no card-selection prompt follows the second option pick.
     test_has_pending_choice(&tg);
     // 
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&recover_target), "Recovered member is in hand" );
-    // TODO assert: assert!( game.state.player1.energy_zone.active_count() > 0 || !game.state.player1.energy_zone.cards.is_empty(), "Energy card was placed" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", recover_target), "daydream_mermaid_q191_niji_in_success_pick_both");
+    CHECK(tg.state.p[0].energy_active, "daydream_mermaid_q191_niji_in_success_pick_both");
     // 
 }
 
@@ -73893,7 +73239,7 @@ static void gen_like_a_treasure_real_mill_accept_adds_niji_and_scores(void){
     // 
     int offered = 0;
     CHECK(offered, "like_a_treasure_real_mill_accept_adds_niji_and_scores");
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&niji), "accepting adds the milled 虹ヶ咲 live card to hand" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", niji), "like_a_treasure_real_mill_accept_adds_niji_and_scores");
     // TODO assert_eq (unresolved): assert_eq!(score(&game, lat), score_before + 1, "accepting grants +1 score");
     // 
 }
@@ -73982,8 +73328,8 @@ static void gen_pb1016_m_looks_four_fetches_lilywhite(void){
     TestGame tg; test_game_new(&tg);
     int seed = 0;
     // TODO destructuring: let (_, seed) = look_fetch_flow(&mut game, "PL!-pb1-016-R", "PL!-PR-007-PR"); // 東條希 lilywhite
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&seed), "lilywhite card revealed to hand" );
-    // TODO assert: assert!( !game.state.player1.main_deck.cards.contains(&seed), "fetched card left the deck" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", seed), "pb1016_m_looks_four_fetches_lilywhite");
+    CHECK((!test_zone_has_id(&tg, 0, "deck", seed)), "pb1016_m_looks_four_fetches_lilywhite");
     // 
 }
 
@@ -74008,7 +73354,7 @@ static void gen_pb1016_m_decline_leaves_deck_intact(void){
     rb_resume_with_choice(&tg.state, 1);
     // 
     CHECK_EQ(tg.state.p[0].deck.n, deck_before, "pb1016_m_decline_leaves_deck_intact");
-    // TODO assert: assert!(!game.state.player1.hand.cards.contains(&seed));
+    CHECK((!test_zone_has_id(&tg, 0, "hand", seed)), "pb1016_m_decline_leaves_deck_intact");
     // 
 }
 
@@ -74019,7 +73365,7 @@ static void gen_spb1017_looks_five_fetches_5yncri5e(void){
     TestGame tg; test_game_new(&tg);
     int seed = 0;
     // TODO destructuring: let (_, seed) = look_fetch_flow(&mut game, "PL!SP-pb1-017-N", "PL!SP-PR-005-PR"); // 嵐千砂都
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&seed), "『5yncri5e!』 card revealed to hand" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", seed), "spb1017_looks_five_fetches_5yncri5e");
     // 
 }
 
@@ -74030,7 +73376,7 @@ static void gen_hspb1018_looks_five_fetches_dollchestra(void){
     TestGame tg; test_game_new(&tg);
     int seed = 0;
     // TODO destructuring: let (_, seed) = look_fetch_flow(&mut game, "PL!HS-pb1-018-N", "PL!HS-bp2-008-R");
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&seed), "『DOLLCHESTRA』 card revealed to hand" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", seed), "hspb1018_looks_five_fetches_dollchestra");
     // 
 }
 
@@ -74041,7 +73387,7 @@ static void gen_pb1021_looks_two_reveals_rinana_to_hand(void){
     TestGame tg; test_game_new(&tg);
     // // Deck top is another copy of the holder herself — same character name.
     int seed = 0;
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&seed), "「天王寺璃奈」 member revealed to hand" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", seed), "pb1021_looks_two_reveals_rinana_to_hand");
     // 
 }
 
@@ -74051,7 +73397,7 @@ static void gen_pb1021_wrong_character_stays_out_of_hand(void){
     // db loaded via rb_load
     TestGame tg; test_game_new(&tg);
     int seed = 0;
-    // TODO assert: assert!( !game.state.player1.hand.cards.contains(&seed), "non-璃奈 member on top must NOT be revealed to hand" );
+    CHECK((!test_zone_has_id(&tg, 0, "hand", seed)), "pb1021_wrong_character_stays_out_of_hand");
     // 
 }
 
@@ -74061,7 +73407,7 @@ static void gen_pb1024_looks_two_reveals_tomari_to_hand(void){
     // db loaded via rb_load
     TestGame tg; test_game_new(&tg);
     int seed = 0;
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&seed), "「鐘嵐珠」 member revealed to hand" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", seed), "pb1024_looks_two_reveals_tomari_to_hand");
     // 
 }
 
@@ -74083,13 +73429,12 @@ static void gen_bpsp1010_activation_cost_then_liella_look_five(void){
     // 
     test_activate_ability(&tg, me);
     int guard = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && guard < 10 {
+    test_has_pending_choice(&tg);
     // TODO: guard += 1;
     // TODO: game.select_indices(&[0]); // pay hand cost, then take the Liella card
     // TODO: }
     // 
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&kanon), "『Liella!』 card revealed to hand after paying 2E + discard" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", kanon), "bpsp1010_activation_cost_then_liella_look_five");
     // 
 }
 
@@ -74115,13 +73460,12 @@ static void gen_bpsp2005_accept_pay_looks_seven_fetches_liella(void){
     test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, 1);
     int guard = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && guard < 10 {
+    test_has_pending_choice(&tg);
     // TODO: guard += 1;
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&kanon), "paid -> 『Liella!』 card revealed to hand" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", kanon), "bpsp2005_accept_pay_looks_seven_fetches_liella");
     // 
 }
 
@@ -74147,7 +73491,7 @@ static void gen_bpsp2005_decline_pay_skips_the_look(void){
     test_has_pending_choice(&tg);
     // 
     CHECK_EQ(tg.state.p[0].deck.n, deck_before, "bpsp2005_decline_pay_skips_the_look");
-    // TODO assert: assert!(!game.state.player1.hand.cards.contains(&kanon));
+    CHECK((!test_zone_has_id(&tg, 0, "hand", kanon)), "bpsp2005_decline_pay_skips_the_look");
     // 
 }
 
@@ -74168,13 +73512,12 @@ static void gen_pbs2007_pay_three_retrieves_liella_live_from_waitroom(void){
     // TODO: fire_trigger(&mut game, me, AbilityTrigger::LiveSuccess, "ライブ成功時");
     rb_resume_with_choice(&tg.state, 1);
     int guard = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && guard < 10 {
+    test_has_pending_choice(&tg);
     // TODO: guard += 1;
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&live), "paid 3 -> 『Liella!』 live retrieved to hand" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", live), "pbs2007_pay_three_retrieves_liella_live_from_waitroom");
     // 
 }
 
@@ -74195,7 +73538,7 @@ static void gen_pbs2007_decline_keeps_waitroom_untouched(void){
     // // No energy given -> an unpayable optional gate is auto-skipped (Q92).
     test_has_pending_choice(&tg);
     // 
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&live), "declined -> live stays in the waitroom" );
+    CHECK(test_zone_has_id(&tg, 0, "discard", live), "pbs2007_decline_keeps_waitroom_untouched");
     // 
 }
 
@@ -74217,14 +73560,13 @@ static void gen_hspb1004_discard_mills_three_recovers_slieszbuque_live(void){
     // 
     test_play_to_stage(&tg, me, 1);
     int guard = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && guard < 10 {
+    test_has_pending_choice(&tg);
     // TODO: guard += 1;
     // TODO: game.select_indices(&[0]); // accept hand cost, then pick the live
     // TODO: }
     // 
     // TODO assert_eq (unresolved): assert_eq!( game.state.player1.main_deck.cards.len(), deck_before - 3, "top 3 cards milled to the waitroom" );
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&sblive), "『スリーズブーケ』 live recovered to hand" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", sblive), "hspb1004_discard_mills_three_recovers_slieszbuque_live");
     // 
 }
 
@@ -74251,14 +73593,13 @@ static void gen_hspb1004_decline_hand_cost_no_mill_no_recover(void){
     // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected skippable SelectCard cost prompt" );
     rb_resume_with_choice(&tg.state, 1);
     int guard = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && guard < 10 {
+    test_has_pending_choice(&tg);
     // TODO: guard += 1;
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
     CHECK_EQ(tg.state.p[0].deck.n, deck_before, "hspb1004_decline_hand_cost_no_mill_no_recover");
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&sblive), "declined -> live stays in the waitroom" );
+    CHECK(test_zone_has_id(&tg, 0, "discard", sblive), "hspb1004_decline_hand_cost_no_mill_no_recover");
     // 
 }
 
@@ -75093,7 +74434,7 @@ static void gen_you_insufficient_energy_cannot_play(void){
     test_play_to_stage(&tg, you, 1);
     // TODO: .expect_err("cost 4 with only 3 energy must fail");
     // TODO assert: assert!( err.contains("energy") || err.contains("cost"), "error should mention energy/cost, got: {err}" );
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&you), "card stays in hand after failed play" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", you), "you_insufficient_energy_cannot_play");
     // 
 }
 
@@ -76458,8 +75799,8 @@ static void gen_natsumi_pb2_020_q264_no_trigger_when_zero_cards_revealed(void){
     // // Q264: 0 cards revealed → condition not met → ability should NOT trigger.
     // // Strong form: the live card must NOT be in the discard; it stays where
     // // the flow left it (hand or live zone).
-    // TODO assert: assert!( !game.state.player1.waitroom.cards.contains(&liella_live), "Q264: Liella! live card must NOT have been discarded" );
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&liella_live) || game .state .player1 .live_card_zone .cards .contains(&liella_live), "Q264: Liella! live card should still be in hand or live zone" );
+    CHECK((!test_zone_has_id(&tg, 0, "discard", liella_live)), "natsumi_pb2_020_q264_no_trigger_when_zero_cards_revealed");
+    CHECK(test_zone_has_id(&tg, 0, "hand", liella_live), "natsumi_pb2_020_q264_no_trigger_when_zero_cards_revealed");
     // 
 }
 
@@ -76673,8 +76014,7 @@ static void gen_bp3_005_debut_activates_all_waited_members(void){
     // 
     test_add_to_hand(&tg, card);
     test_play_to_stage(&tg, card, 2);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -76708,16 +76048,14 @@ static void gen_combo_bp3_005_mass_activate_readies_self_waited_ability_member(v
     // 
     test_add_to_hand(&tg, kanata);
     test_play_to_stage(&tg, kanata, 0);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
     // // Kanata's 起動: waits herself, activates 1 energy.
     int energy_before = tg.state.p[0].energy_active;
     test_activate_ability(&tg, kanata);
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // TODO assert_eq (unresolved): assert_eq!( game.state.mods.get_orientation_modifier(kanata), Some("wait"), "cost: kanata should be waited" );
@@ -76726,8 +76064,7 @@ static void gen_combo_bp3_005_mass_activate_readies_self_waited_ability_member(v
     // // Play bp3-005 — its debut activates ALL members incl. kanata.
     test_add_to_hand(&tg, mass);
     test_play_to_stage(&tg, mass, 1);
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -76735,8 +76072,7 @@ static void gen_combo_bp3_005_mass_activate_readies_self_waited_ability_member(v
     // // Kanata can immediately be used again (no turn limit on her ability).
     int e2 = tg.state.p[0].energy_active;
     test_activate_ability(&tg, kanata);
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // TODO assert_eq (unresolved): assert_eq!( game.state.player1.energy_zone.active_count(), e2 + 1, "reactivated kanata should be able to activate again" );
@@ -76772,8 +76108,7 @@ static void gen_bp3_001_live_start_can_skip_activation(void){
     // 
     test_add_to_hand(&tg, card);
     test_play_to_stage(&tg, card, 1);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -76790,8 +76125,7 @@ static void gen_bp3_001_live_start_can_skip_activation(void){
     // 
     // // Decline every optional prompt ("1人まで" = may choose zero).
     int safety = 0;
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && safety < 30 {
+    test_has_pending_choice(&tg);
     // TODO: safety += 1;
     // TODO: if game.pending_choice_type().as_deref() == Some("SelectAutoAbility") {
     // TODO: game.select_indices(&[0]);
@@ -76835,14 +76169,13 @@ static void gen_pb1_005_debut_draws_with_cards_in_success_zone(void){
     test_add_to_hand(&tg, card);
     int hand_before = tg.state.p[0].hand.n;
     test_play_to_stage(&tg, card, 1);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
     // // Debut: card left hand (-1), condition met → drew 1 (+1).
     CHECK_EQ(tg.state.p[0].hand.n, hand_before, "pb1_005_debut_draws_with_cards_in_success_zone");
-    // TODO assert: assert!( !game.state.player1.hand.cards.contains(&card), "card itself must be on stage, not back in hand" );
+    CHECK((!test_zone_has_id(&tg, 0, "hand", card)), "pb1_005_debut_draws_with_cards_in_success_zone");
     // 
 }
 
@@ -76871,8 +76204,7 @@ static void gen_pb1_005_debut_no_draw_without_success_zone_cards(void){
     // 
     test_add_to_hand(&tg, card);
     test_play_to_stage(&tg, card, 1);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -76907,15 +76239,14 @@ static void gen_sp_bp1_007_debut_counts_total_energy_not_active(void){
     // 
     test_add_to_hand(&tg, card);
     test_play_to_stage(&tg, card, 1);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
     // // Full-price play: 13 of 15 flipped to wait → only 2 ACTIVE left.
     CHECK_EQ(tg.state.p[0].energy_active, 2, "sp_bp1_007_debut_counts_total_energy_not_active");
     CHECK_EQ(tg.state.p[0].energy.n, 15, "sp_bp1_007_debut_counts_total_energy_not_active");
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&dead_live), "condition counts TOTAL energy (15 ≥ 11) → live card retrieved" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", dead_live), "sp_bp1_007_debut_counts_total_energy_not_active");
     // 
 }
 
@@ -76955,15 +76286,14 @@ static void gen_sp_bp1_007_debut_no_retrieve_when_total_below_11_via_baton_touch
     // // use_baton_touch).
     test_play_to_stage(&tg, card, 1);
     // action result consumed: .expect("baton touch play should succeed at zero cost");
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
     // TODO assert: assert!( game.state.player1.stage.stage.contains(&card), "mei should be on stage" );
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&victim), "baton touch sends the replaced member to the waitroom" );
+    CHECK(test_zone_has_id(&tg, 0, "discard", victim), "sp_bp1_007_debut_no_retrieve_when_total_below_11_via_baton_touch");
     CHECK_EQ(tg.state.p[0].energy.n, 10, "sp_bp1_007_debut_no_retrieve_when_total_below_11_via_baton_touch");
-    // TODO assert: assert!( !game.state.player1.hand.cards.contains(&dead_live), "total energy 10 < 11 → no retrieval" );
+    CHECK((!test_zone_has_id(&tg, 0, "hand", dead_live)), "sp_bp1_007_debut_no_retrieve_when_total_below_11_via_baton_touch");
     // 
 }
 
@@ -76995,8 +76325,7 @@ static void gen_sp_bp1_007_debut_noop_when_waitroom_has_no_live_card(void){
     test_play_to_stage(&tg, card, 1);
     // 
     int safety = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && safety < 30 {
+    test_has_pending_choice(&tg);
     // TODO: safety += 1;
     // TODO: game.dbg_events(5);
     // TODO: game.select_indices(&[]);
@@ -77036,13 +76365,12 @@ static void gen_sp_bp2_013_debut_places_waitroom_card_on_deck_top(void){
     // // Choose the waitroom card ("1枚まで" → SelectCard with skip allowed).
     // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard to pick a waitroom card" );
     // TODO: game.select_indices(&[0]);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
     // TODO assert_eq (unresolved): assert_eq!( game.state.player1.main_deck.cards.first(), Some(&marker), "chosen card must sit on top of the deck (index 0)" );
-    // TODO assert: assert!( !game.state.player1.waitroom.cards.contains(&marker), "chosen card must have left the waitroom" );
+    CHECK((!test_zone_has_id(&tg, 0, "discard", marker)), "sp_bp2_013_debut_places_waitroom_card_on_deck_top");
     // 
 }
 
@@ -77076,13 +76404,12 @@ static void gen_sp_bp2_013_debut_can_place_zero_cards(void){
     test_play_to_stage(&tg, card, 1);
     // // Decline: take nothing from the waitroom.
     // TODO: game.select_indices(&[]);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
     CHECK_EQ(tg.state.p[0].deck.n, deck_before, "sp_bp2_013_debut_can_place_zero_cards");
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&bystander), "bystander must remain in the waitroom" );
+    CHECK(test_zone_has_id(&tg, 0, "discard", bystander), "sp_bp2_013_debut_can_place_zero_cards");
     // 
 }
 
@@ -77098,8 +76425,7 @@ static void gen_kokoro_high_member_sets_cost_and_grants_heart05(void){
     test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, 0);
     int guard = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && guard < 10 {
+    test_has_pending_choice(&tg);
     // TODO: guard += 1;
     // TODO: game.select_indices(&[0]); // pick the staged DOLLCHESTRA member
     // TODO: }
@@ -77120,8 +76446,7 @@ static void gen_kokoro_boundary_eleven_exactly_reaches_ten(void){
     // TODO: fire_trigger(&mut game, me, AbilityTrigger::LiveStart, "ライブ開始時");
     rb_resume_with_choice(&tg.state, 0);
     int guard = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && guard < 10 {
+    test_has_pending_choice(&tg);
     // TODO: guard += 1;
     // TODO: game.select_indices(&[0]);
     // TODO: }
@@ -77142,8 +76467,7 @@ static void gen_kokoro_below_threshold_sets_cost_without_heart(void){
     // TODO: fire_trigger(&mut game, me, AbilityTrigger::LiveStart, "ライブ開始時");
     rb_resume_with_choice(&tg.state, 0);
     int guard = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && guard < 10 {
+    test_has_pending_choice(&tg);
     // TODO: guard += 1;
     // TODO: game.select_indices(&[0]);
     // TODO: }
@@ -77247,15 +76571,14 @@ static void gen_kanan_mill_then_debut_exact_cost_plus_two_same_area(void){
     // 
     test_activate_ability(&tg, me);
     int guard = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && guard < 10 {
+    test_has_pending_choice(&tg);
     // TODO: guard += 1;
     // TODO: game.select_indices(&[0]); // pay cost, pick sacrifice, pick rebirth
     // TODO: }
     // 
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&chika), "sacrificed Aqours member went to the waitroom" );
+    CHECK(test_zone_has_id(&tg, 0, "discard", chika), "kanan_mill_then_debut_exact_cost_plus_two_same_area");
     CHECK_EQ(tg.state.p[0].stage[0], dia, "kanan_mill_then_debut_exact_cost_plus_two_same_area");
-    // TODO assert: assert!( !game.state.player1.waitroom.cards.contains(&dia), "reborn member left the waitroom" );
+    CHECK((!test_zone_has_id(&tg, 0, "discard", dia)), "kanan_mill_then_debut_exact_cost_plus_two_same_area");
     // 
 }
 
@@ -77273,13 +76596,12 @@ static void gen_kanan_no_matching_cost_only_the_mill_happens(void){
     // 
     test_activate_ability(&tg, me);
     int guard = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && guard < 10 {
+    test_has_pending_choice(&tg);
     // TODO: guard += 1;
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&chika), "the sacrifice still happened" );
+    CHECK(test_zone_has_id(&tg, 0, "discard", chika), "kanan_no_matching_cost_only_the_mill_happens");
     CHECK_EQ(tg.state.p[0].stage[0], -1, "kanan_no_matching_cost_only_the_mill_happens");
     // 
 }
@@ -77296,8 +76618,7 @@ static void gen_kanan_cannot_mill_itself(void){
     // 
     test_activate_ability(&tg, me);
     int guard = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && guard < 10 {
+    test_has_pending_choice(&tg);
     // TODO: guard += 1;
     // TODO: game.select_indices(&[0]);
     // TODO: }
@@ -77320,7 +76641,7 @@ static void gen_ddd_decline_pay_does_nothing(void){
     test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, 0);
     // 
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&mate), "declined -> waitroom untouched" );
+    CHECK(test_zone_has_id(&tg, 0, "discard", mate), "ddd_decline_pay_does_nothing");
     // 
 }
 
@@ -77337,13 +76658,12 @@ static void gen_ddd_option_a_retrieves_any_member_from_waitroom(void){
     rb_resume_with_choice(&tg.state, 1);
     rb_resume_with_choice(&tg.state, 0);
     int guard = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && guard < 10 {
+    test_has_pending_choice(&tg);
     // TODO: guard += 1;
     // TODO: game.select_indices(&[0]); // pick the member
     // TODO: }
     // 
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&mate), "option A retrieved the member to hand" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", mate), "ddd_option_a_retrieves_any_member_from_waitroom");
     // 
 }
 
@@ -77363,13 +76683,12 @@ static void gen_ddd_option_b_requires_two_cards_in_live_zone(void){
     rb_resume_with_choice(&tg.state, 1);
     rb_resume_with_choice(&tg.state, 1);
     int guard = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && guard < 10 {
+    test_has_pending_choice(&tg);
     // TODO: guard += 1;
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
-    // TODO assert: assert!( !game.state.player1.hand.cards.contains(&hs_live), "live zone has <2 cards -> option B must not retrieve anything" );
+    CHECK((!test_zone_has_id(&tg, 0, "hand", hs_live)), "ddd_option_b_requires_two_cards_in_live_zone");
     // 
 }
 
@@ -77391,13 +76710,12 @@ static void gen_ddd_option_b_with_two_live_cards_fetches_hasunosora_live(void){
     rb_resume_with_choice(&tg.state, 1);
     rb_resume_with_choice(&tg.state, 1);
     int guard = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && guard < 10 {
+    test_has_pending_choice(&tg);
     // TODO: guard += 1;
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&hs_live), "gate met -> 『蓮ノ空』 live card retrieved to hand" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", hs_live), "ddd_option_b_with_two_live_cards_fetches_hasunosora_live");
     // 
 }
 
@@ -77429,16 +76747,15 @@ static void gen_hinoshita_q236_name_contains_all_matches(void){
     // // Exactly 1 live card in hand → auto-select (no choice for reveal).
     // // Exactly 1 matching card in waitroom → auto-select (no choice for recovery).
     // // So has_pending_choice() should be false.
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
     // // Q236: Target should be in hand
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&target_live), "Q236: Should recover Dream Believers (104th Ver.) — fragments 'Dream Believers' match" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", target_live), "hinoshita_q236_name_contains_all_matches");
     // 
     // // Revealed card must stay in hand (公開する = reveal, NOT discard)
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&reveal_live), "Q236: Revealed card must stay in hand — '公開する' reveals without discarding" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", reveal_live), "hinoshita_q236_name_contains_all_matches");
     // 
     // // 2 energy consumed
     // TODO assert_eq (unresolved): assert_eq!( game.state.player1.energy_zone.active_count(), energy_before - 2, "Q236: 2 energy should be consumed" );
@@ -77463,19 +76780,18 @@ static void gen_hinoshita_q237_name_contains_all_no_match(void){
     // 
     test_activate_ability(&tg, hino);
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
     // // Q237: Target should NOT be recoverable
-    // TODO assert: assert!( !game.state.player1.hand.cards.contains(&target_live), "Q237: Should NOT recover Dream Believers — extra fragment '(104th Ver.)' not contained in target name" );
+    CHECK((!test_zone_has_id(&tg, 0, "hand", target_live)), "hinoshita_q237_name_contains_all_no_match");
     // 
     // // Target stays in waitroom
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&target_live), "Q237: Target card should remain in waitroom" );
+    CHECK(test_zone_has_id(&tg, 0, "discard", target_live), "hinoshita_q237_name_contains_all_no_match");
     // 
     // // Revealed card must stay in hand
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&reveal_live), "Q237: Revealed card must stay in hand — '公開する' reveals without discarding" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", reveal_live), "hinoshita_q237_name_contains_all_no_match");
     // 
     // // 2 energy consumed
     // TODO assert_eq (unresolved): assert_eq!( game.state.player1.energy_zone.active_count(), energy_before - 2, "Q237: 2 energy should be consumed" );
@@ -77500,19 +76816,18 @@ static void gen_hinoshita_no_matching_live_in_discard_fails(void){
     // 
     test_activate_ability(&tg, hino);
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
     // // wrong_live should NOT be in hand
-    // TODO assert: assert!( !game.state.player1.hand.cards.contains(&wrong_live), "Mismatched live card should not be recovered" );
+    CHECK((!test_zone_has_id(&tg, 0, "hand", wrong_live)), "hinoshita_no_matching_live_in_discard_fails");
     // 
     // // wrong_live stays in waitroom
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&wrong_live), "Mismatched live card should remain in waitroom" );
+    CHECK(test_zone_has_id(&tg, 0, "discard", wrong_live), "hinoshita_no_matching_live_in_discard_fails");
     // 
     // // Revealed card must stay in hand
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&reveal_live), "Revealed card must stay in hand — '公開する' reveals without discarding" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", reveal_live), "hinoshita_no_matching_live_in_discard_fails");
     // 
     // // 2 energy consumed
     // TODO assert_eq (unresolved): assert_eq!( game.state.player1.energy_zone.active_count(), energy_before - 2, "2 energy should be consumed" );
@@ -77545,17 +76860,16 @@ static void gen_hinoshita_reveal_choice_keeps_card_in_hand(void){
     // 
     // // Second choice: select which card to recover from waitroom
     // // (Only 1 match, so this auto-selects — no choice)
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
     // // Target recovered
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&target_live), "Should recover Dream Believers (104th Ver.)" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", target_live), "hinoshita_reveal_choice_keeps_card_in_hand");
     // 
     // // BOTH revealed cards must still be in hand (only revealed, not discarded)
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&reveal_a), "Chosen reveal card must stay in hand" );
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&reveal_b), "Unchosen reveal card must stay in hand" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", reveal_a), "hinoshita_reveal_choice_keeps_card_in_hand");
+    CHECK(test_zone_has_id(&tg, 0, "hand", reveal_b), "hinoshita_reveal_choice_keeps_card_in_hand");
     // 
 }
 
@@ -77591,8 +76905,7 @@ static void gen_hinoshita_use_limit_once_per_turn(void){
     test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -77623,13 +76936,12 @@ static void gen_hinoshita_no_live_card_in_hand_fails(void){
     // 
     // // The ability processes asynchronously — cost fails (no card to reveal).
     // // No choices should appear (cost never paid, effect never starts).
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
     // // Target should stay in waitroom (no card moved)
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&target_live), "Target should remain in waitroom — cost was not paid" );
+    CHECK(test_zone_has_id(&tg, 0, "discard", target_live), "hinoshita_no_live_card_in_hand_fails");
     // 
     // // No card was added to hand
     CHECK_EQ(tg.state.p[0].hand.n, 0, "hinoshita_no_live_card_in_hand_fails");
@@ -77652,13 +76964,12 @@ static void gen_butterfly_to_butterfly_wing_matches(void){
     test_give_energy(&tg, 2);
     // 
     test_activate_ability(&tg, hino);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&target), "Butterfly Wing should be recoverable — 'Butterfly Wing' contains 'Butterfly'" );
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&reveal), "Revealed 'Butterfly' must stay in hand" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", target), "butterfly_to_butterfly_wing_matches");
+    CHECK(test_zone_has_id(&tg, 0, "hand", reveal), "butterfly_to_butterfly_wing_matches");
     // 
 }
 
@@ -77678,14 +76989,13 @@ static void gen_butterfly_wing_to_butterfly_no_match(void){
     test_give_energy(&tg, 2);
     // 
     test_activate_ability(&tg, hino);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
-    // TODO assert: assert!( !game.state.player1.hand.cards.contains(&target), "'Butterfly' should NOT be recoverable — 'Butterfly' does not contain 'Butterfly Wing'" );
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&target), "'Butterfly' should remain in waitroom" );
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&reveal), "Revealed 'Butterfly Wing' must stay in hand" );
+    CHECK((!test_zone_has_id(&tg, 0, "hand", target)), "butterfly_wing_to_butterfly_no_match");
+    CHECK(test_zone_has_id(&tg, 0, "discard", target), "butterfly_wing_to_butterfly_no_match");
+    CHECK(test_zone_has_id(&tg, 0, "hand", reveal), "butterfly_wing_to_butterfly_no_match");
     // 
 }
 
@@ -77705,13 +77015,12 @@ static void gen_dream_believers_to_105_matches(void){
     test_give_energy(&tg, 2);
     // 
     test_activate_ability(&tg, hino);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&target), "'Dream Believers（105期Ver.）' should be recoverable — contains 'Dream Believers'" );
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&reveal), "Revealed 'Dream Believers' must stay in hand" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", target), "dream_believers_to_105_matches");
+    CHECK(test_zone_has_id(&tg, 0, "hand", reveal), "dream_believers_to_105_matches");
     // 
 }
 
@@ -77731,14 +77040,13 @@ static void gen_dream_believers_105_to_base_no_match(void){
     test_give_energy(&tg, 2);
     // 
     test_activate_ability(&tg, hino);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
-    // TODO assert: assert!( !game.state.player1.hand.cards.contains(&target), "'Dream Believers' should NOT be recoverable — does not contain suffix" );
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&target), "'Dream Believers' should remain in waitroom" );
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&reveal), "Revealed 'Dream Believers（105期Ver.）' must stay in hand" );
+    CHECK((!test_zone_has_id(&tg, 0, "hand", target)), "dream_believers_105_to_base_no_match");
+    CHECK(test_zone_has_id(&tg, 0, "discard", target), "dream_believers_105_to_base_no_match");
+    CHECK(test_zone_has_id(&tg, 0, "hand", reveal), "dream_believers_105_to_base_no_match");
     // 
 }
 
@@ -77758,14 +77066,13 @@ static void gen_dream_believers_104_to_105_no_match(void){
     test_give_energy(&tg, 2);
     // 
     test_activate_ability(&tg, hino);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
-    // TODO assert: assert!( !game.state.player1.hand.cards.contains(&target), "'Dream Believers（105期Ver.）' should NOT be recoverable from '104期Ver.' reveal" );
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&target), "'Dream Believers（105期Ver.）' should remain in waitroom" );
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&reveal), "Revealed 'Dream Believers（104期Ver.）' must stay in hand" );
+    CHECK((!test_zone_has_id(&tg, 0, "hand", target)), "dream_believers_104_to_105_no_match");
+    CHECK(test_zone_has_id(&tg, 0, "discard", target), "dream_believers_104_to_105_no_match");
+    CHECK(test_zone_has_id(&tg, 0, "hand", reveal), "dream_believers_104_to_105_no_match");
     // 
 }
 
@@ -77785,14 +77092,13 @@ static void gen_dream_believers_105_to_104_no_match(void){
     test_give_energy(&tg, 2);
     // 
     test_activate_ability(&tg, hino);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
-    // TODO assert: assert!( !game.state.player1.hand.cards.contains(&target), "'Dream Believers（104期Ver.）' should NOT be recoverable from '105期Ver.' reveal" );
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&target), "'Dream Believers（104期Ver.）' should remain in waitroom" );
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&reveal), "Revealed 'Dream Believers（105期Ver.）' must stay in hand" );
+    CHECK((!test_zone_has_id(&tg, 0, "hand", target)), "dream_believers_105_to_104_no_match");
+    CHECK(test_zone_has_id(&tg, 0, "discard", target), "dream_believers_105_to_104_no_match");
+    CHECK(test_zone_has_id(&tg, 0, "hand", reveal), "dream_believers_105_to_104_no_match");
     // 
 }
 
@@ -77812,13 +77118,12 @@ static void gen_link_to_the_future_to_104_matches(void){
     test_give_energy(&tg, 2);
     // 
     test_activate_ability(&tg, hino);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&target), "'Link to the FUTURE（104期Ver.）' should be recoverable — contains 'Link to the FUTURE'" );
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&reveal), "Revealed 'Link to the FUTURE' must stay in hand" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", target), "link_to_the_future_to_104_matches");
+    CHECK(test_zone_has_id(&tg, 0, "hand", reveal), "link_to_the_future_to_104_matches");
     // 
 }
 
@@ -77838,14 +77143,13 @@ static void gen_link_to_the_future_104_to_base_no_match(void){
     test_give_energy(&tg, 2);
     // 
     test_activate_ability(&tg, hino);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
-    // TODO assert: assert!( !game.state.player1.hand.cards.contains(&target), "'Link to the FUTURE' should NOT be recoverable — does not contain suffix" );
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&target), "'Link to the FUTURE' should remain in waitroom" );
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&reveal), "Revealed 'Link to the FUTURE（104期Ver.）' must stay in hand" );
+    CHECK((!test_zone_has_id(&tg, 0, "hand", target)), "link_to_the_future_104_to_base_no_match");
+    CHECK(test_zone_has_id(&tg, 0, "discard", target), "link_to_the_future_104_to_base_no_match");
+    CHECK(test_zone_has_id(&tg, 0, "hand", reveal), "link_to_the_future_104_to_base_no_match");
     // 
 }
 
@@ -77882,8 +77186,7 @@ static void gen_cutie_panther_live_start_reduce_hearts(void){
     rb_mods_set_orientation(&tg.state.mods, opp, "wait");
     // TODO loop (degraded): for _ in 0..5 {
     rb_advance_phase(&tg.state);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // TODO: }
@@ -77953,14 +77256,13 @@ static void gen_kaguya_live_success_cheer_recover(void){
     // // After live performance, cheer-revealed cards should be in revealed_cards
     // // If the member was cheer-revealed, the ability should add it to hand
     // // Handle all pending choices (cost + revealed_cards selection)
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // // Select the first option whenever prompted
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
     // // Verify: the μ's member card was recovered to hand by the LiveSuccess ability
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&member), "μ's member should be recovered to hand by kaguya LiveSuccess ability" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", member), "kaguya_live_success_cheer_recover");
     // 
 }
 
@@ -78014,8 +77316,7 @@ static void gen_mijuku_dreamer_refresh_via_mill_gets_bonus(void){
     // TODO: game.state.player1.deck_refreshed_this_turn = false;
     // 
     test_activate_ability(&tg, hanayo);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -78904,8 +78205,8 @@ static void gen_himeno_bp5_skip_cost_via_choice(void){
     test_has_pending_choice(&tg);
     // discard: let _ = game.try_select_indices(&[]);
     // TODO assert_eq (unresolved): assert_eq!(get_heart01(&game, himeno), 0);
-    // TODO assert: assert!(game.state.player1.hand.cards.contains(&s1));
-    // TODO assert: assert!(game.state.player1.hand.cards.contains(&s2));
+    CHECK(test_zone_has_id(&tg, 0, "hand", s1), "himeno_bp5_skip_cost_via_choice");
+    CHECK(test_zone_has_id(&tg, 0, "hand", s2), "himeno_bp5_skip_cost_via_choice");
     // 
 }
 
@@ -79105,8 +78406,8 @@ static void gen_himeno_bp5_discarded_go_to_waitroom(void){
     // TODO: game.select_indices(&[0]);
     test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
-    // TODO assert: assert!(game.state.player1.waitroom.cards.contains(&s1));
-    // TODO assert: assert!(game.state.player1.waitroom.cards.contains(&s2));
+    CHECK(test_zone_has_id(&tg, 0, "discard", s1), "himeno_bp5_discarded_go_to_waitroom");
+    CHECK(test_zone_has_id(&tg, 0, "discard", s2), "himeno_bp5_discarded_go_to_waitroom");
     // 
 }
 
@@ -79203,8 +78504,7 @@ static void gen_test_bp1_live_start_pay_cost_gains_score_three(void){
     test_has_pending_choice(&tg);
     // 
     // // Select all 3 matching cards (indices in the choice list)
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // action result consumed: game.try_select_indices(&[0, 1, 2]).unwrap();
     // TODO: }
     // 
@@ -79589,14 +78889,13 @@ static void gen_test_bp4_debut_look_select_puts_card_in_hand(void){
     // // After selection: ayumu should be in hand
     int hand_after = tg.state.p[0].hand.n;
     // TODO assert_eq (unresolved): assert_eq!( hand_after, hand_after_play + 1, "Selected card should go to hand ({} -> {})", hand_after_play, hand_after );
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&ayumu), "Ayumu should be in hand after selection" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", ayumu), "test_bp4_debut_look_select_puts_card_in_hand");
     // 
     int waitroom_count = tg.state.p[0].discard.n;
     // TODO assert: assert!( waitroom_count >= 4, "Remaining looked-at cards should go to waitroom (got {})", waitroom_count );
     // 
     // // No pending choices should remain
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     test_has_pending_choice(&tg);
@@ -79652,7 +78951,7 @@ static void gen_test_bp4_debut_skip_select_discards_all(void){
     // 
     int hand_after = tg.state.p[0].hand.n;
     CHECK_EQ(hand_after, hand_after_play, "test_bp4_debut_skip_select_discards_all");
-    // TODO assert: assert!( game.state.player1.waitroom.cards.len() >= 5, "All looked-at cards should go to waitroom when skipped (got {})", game.state.player1.waitroom.cards.len() );
+    CHECK(tg.state.p[0].discard.n, "test_bp4_debut_skip_select_discards_all");
     // 
 }
 
@@ -79704,8 +79003,7 @@ static void gen_test_bp4_debut_wait_opponent_members_after_selection(void){
     // 
     // TODO: game.select_indices(&[0]);
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -80622,8 +79920,7 @@ static void gen_chika_q171_live_end_persistence(void){
     // 
     // // LiveStart triggers may queue choices (e.g. other auto abilities) — drain
     // // but the score modifier must persist regardless.
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -80705,8 +80002,7 @@ static void gen_chika_wait_target_stays_on_stage(void){
     // 
     // // Activate → cost prompts for which member to wait (2 candidates)
     test_activate_ability(&tg, chika);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]); // select other (stage[0])
     // TODO: }
     // 
@@ -80735,8 +80031,7 @@ static void gen_chika_waited_member_gets_score_boost(void){
     test_give_energy(&tg, 5);
     // 
     test_activate_ability(&tg, chika);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]); // wait other
     // TODO: }
     // 
@@ -80763,8 +80058,7 @@ static void gen_chika_wait_can_select_any_member(void){
     test_give_energy(&tg, 5);
     // 
     test_activate_ability(&tg, chika);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[2]); // select b (stage[2], the 3rd option)
     // TODO: }
     // 
@@ -80792,8 +80086,7 @@ static void gen_chika_bp5_cost_reduction_applies_to_no_ability_member(void){
     test_add_to_hand(&tg, chika);
     // TODO: game.give_energy(chika_cost + filler_cost + 5);
     test_play_to_stage(&tg, chika, 1);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -80820,8 +80113,7 @@ static void gen_chika_bp5_no_reduction_for_member_with_ability(void){
     test_add_to_hand(&tg, chika);
     // TODO: game.give_energy(chika_cost + target_cost + 5);
     test_play_to_stage(&tg, chika, 1);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -80847,8 +80139,7 @@ static void gen_chika_bp5_cost_reduction_applies_floor_check(void){
     test_add_to_hand(&tg, chika);
     // TODO: game.give_energy(chika_cost + 4 + 5);
     test_play_to_stage(&tg, chika, 1);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -80876,13 +80167,11 @@ static void gen_chika_bp5_cost_reduction_stacks(void){
     test_add_to_hand(&tg, chika2);
     // TODO: game.give_energy(chika_cost * 2 + 4 + 5);
     test_play_to_stage(&tg, chika, 1);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     test_play_to_stage(&tg, chika2, 0);
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -80917,8 +80206,7 @@ static void gen_chika_bp5_baton_touch_from_no_ability_draw(void){
     int hand_before = tg.state.p[0].hand.n;
     test_play_to_stage(&tg, chika, 1);
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     int is_required = 0;
     // TODO: matches!(
     // TODO: c,
@@ -80937,7 +80225,7 @@ static void gen_chika_bp5_baton_touch_from_no_ability_draw(void){
     // TODO: }
     // 
     CHECK_EQ(tg.state.p[0].stage[1], chika, "chika_bp5_baton_touch_from_no_ability_draw");
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&no_ability), "No-ability member replaced" );
+    CHECK(test_zone_has_id(&tg, 0, "discard", no_ability), "chika_bp5_baton_touch_from_no_ability_draw");
     CHECK_EQ(tg.state.p[0].hand.n, hand_before, "chika_bp5_baton_touch_from_no_ability_draw");
     // 
 }
@@ -80964,8 +80252,7 @@ static void gen_chika_bp5_baton_touch_from_ability_member_no_draw(void){
     int hand_before = tg.state.p[0].hand.n;
     test_play_to_stage(&tg, chika, 1);
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -80995,8 +80282,7 @@ static void gen_chika_bp5_normal_debut_no_draw(void){
     int hand_before = tg.state.p[0].hand.n;
     test_play_to_stage(&tg, chika, 1);
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -81028,8 +80314,7 @@ static void gen_chika_bp5_baton_touch_draw_triggers_refresh(void){
     int hand_before = tg.state.p[0].hand.n;
     test_play_to_stage(&tg, chika, 1);
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     int is_required = 0;
     // TODO: matches!(
     // TODO: c,
@@ -81049,7 +80334,7 @@ static void gen_chika_bp5_baton_touch_draw_triggers_refresh(void){
     // 
     CHECK_EQ(tg.state.p[0].stage[1], chika, "chika_bp5_baton_touch_draw_triggers_refresh");
     CHECK_EQ(tg.state.p[0].hand.n, hand_before, "chika_bp5_baton_touch_draw_triggers_refresh");
-    // TODO assert: assert!( game.state.player1.main_deck.cards.len() > 0 || game.state.player1.waitroom.cards.len() > 0, "Refresh should have occurred (cards exist somewhere)" );
+    CHECK(tg.state.p[0].deck.n, "chika_bp5_baton_touch_draw_triggers_refresh");
     // 
 }
 
@@ -81073,14 +80358,13 @@ static void gen_pb1018_look_two_reveals_kanata_to_hand(void){
     // TODO: fire_trigger(game, me, AbilityTrigger::Debut, "登場");
     // 
     int guard = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && guard < 10 {
+    test_has_pending_choice(&tg);
     // TODO: guard += 1;
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
-    // TODO assert: assert!( !game.state.player1.main_deck.cards.contains(&kanata), "Kanata left the deck" );
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&kanata), "Kanata revealed to hand" );
+    CHECK((!test_zone_has_id(&tg, 0, "deck", kanata)), "pb1018_look_two_reveals_kanata_to_hand");
+    CHECK(test_zone_has_id(&tg, 0, "hand", kanata), "pb1018_look_two_reveals_kanata_to_hand");
     // 
 }
 
@@ -81104,8 +80388,7 @@ static void gen_pb1018_no_kanata_in_look_stays_in_waitroom_flow(void){
     // TODO: fire_trigger(game, me, AbilityTrigger::Debut, "登場");
     // 
     int guard = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && guard < 10 {
+    test_has_pending_choice(&tg);
     // TODO: guard += 1;
     // TODO: game.select_indices(&[]);
     // TODO: }
@@ -81130,7 +80413,7 @@ static void gen_sd1007_accept_pay_fetches_liella_member_from_waitroom(void){
     test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, 1);
     // 
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&kanon), "Liella! member retrieved from the waitroom to hand" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", kanon), "sd1007_accept_pay_fetches_liella_member_from_waitroom");
     // 
 }
 
@@ -81150,7 +80433,7 @@ static void gen_sd1007_decline_pay_no_fetch(void){
     test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, 0);
     // 
-    // TODO assert: assert!( !game.state.player1.hand.cards.contains(&kanon), "declined -> Kanata stays in the waitroom" );
+    CHECK((!test_zone_has_id(&tg, 0, "hand", kanon)), "sd1007_decline_pay_no_fetch");
     // 
 }
 
@@ -81173,14 +80456,13 @@ static void gen_sd2006_activation_cost_retrieves_liella_live(void){
     // 
     test_activate_ability(&tg, me);
     int guard = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && guard < 10 {
+    test_has_pending_choice(&tg);
     // TODO: guard += 1;
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&live), "Liella! live card retrieved from the waitroom" );
-    // TODO assert: assert!( !game.state.player1.waitroom.cards.contains(&live), "live left the waitroom" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", live), "sd2006_activation_cost_retrieves_liella_live");
+    CHECK((!test_zone_has_id(&tg, 0, "discard", live)), "sd2006_activation_cost_retrieves_liella_live");
     // 
 }
 
@@ -81197,13 +80479,12 @@ static void gen_pr0004_heart01_three_plus_live_fetched(void){
     // 
     test_activate_ability(&tg, me);
     int guard = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && guard < 10 {
+    test_has_pending_choice(&tg);
     // TODO: guard += 1;
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&live), "live with heart01>=3 requirement retrieved" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", live), "pr0004_heart01_three_plus_live_fetched");
     // 
 }
 
@@ -81220,13 +80501,12 @@ static void gen_pr0004_low_heart01_live_not_fetched(void){
     // 
     test_activate_ability(&tg, me);
     int guard = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && guard < 10 {
+    test_has_pending_choice(&tg);
     // TODO: guard += 1;
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
-    // TODO assert: assert!( !game.state.player1.hand.cards.contains(&live), "live with heart01<3 must NOT be retrievable" );
+    CHECK((!test_zone_has_id(&tg, 0, "hand", live)), "pr0004_low_heart01_live_not_fetched");
     // 
 }
 
@@ -81245,8 +80525,7 @@ static void gen_bp4017_leftside_moved_gains_two_blades(void){
     // 
     // TODO: fire_trigger(&mut game, me, AbilityTrigger::LiveStart, LIVE_START);
     int guard = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && guard < 10 {
+    test_has_pending_choice(&tg);
     // TODO: guard += 1;
     // TODO: game.select_indices(&[0]);
     // TODO: }
@@ -81313,8 +80592,7 @@ static void gen_bp4013_accept_grants_other_stage_member_heart01(void){
     test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, 0);
     int guard = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && guard < 10 {
+    test_has_pending_choice(&tg);
     // TODO: guard += 1;
     // TODO: game.select_indices(&[0]); // pick the first eligible member (mate)
     // TODO: }
@@ -81404,8 +80682,7 @@ static void gen_bp7023_opponent_one_energy_ahead_scores_plus_one(void){
     // 
     // TODO: fire_trigger(&mut game, live, AbilityTrigger::LiveStart, LIVE_START);
     int guard = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && guard < 10 {
+    test_has_pending_choice(&tg);
     // TODO: guard += 1;
     rb_resume_with_choice(&tg.state, 1);
     // TODO: }
@@ -81425,8 +80702,7 @@ static void gen_bp7023_opponent_two_energy_ahead_scores_plus_two(void){
     // 
     // TODO: fire_trigger(&mut game, live, AbilityTrigger::LiveStart, LIVE_START);
     int guard = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && guard < 10 {
+    test_has_pending_choice(&tg);
     // TODO: guard += 1;
     rb_resume_with_choice(&tg.state, 1);
     // TODO: }
@@ -81445,8 +80721,7 @@ static void gen_bp7023_tied_after_return_no_score(void){
     // 
     // TODO: fire_trigger(&mut game, live, AbilityTrigger::LiveStart, LIVE_START);
     int guard = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && guard < 10 {
+    test_has_pending_choice(&tg);
     // TODO: guard += 1;
     rb_resume_with_choice(&tg.state, 1);
     // TODO: }
@@ -81494,8 +80769,7 @@ static void gen_two_distinct_groups_no_effect(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -81543,8 +80817,7 @@ static void gen_all_same_group_no_effect(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -81592,8 +80865,7 @@ static void gen_center_empty_no_effect(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -81639,8 +80911,7 @@ static void gen_multi_name_card_single_slot_one_group_not_three(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -81711,8 +80982,8 @@ static void gen_ab1_different_group_moved_to_hand(void){
     // TODO: game.state.process_pending_auto_abilities("p1");
     // 
     // 
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&aqours_discard), "Aqours card should move to hand (differs from stage μ's)" );
-    // TODO assert: assert!( !game.state.player1.waitroom.cards.contains(&aqours_discard), "Aqours card should no longer be in discard" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", aqours_discard), "ab1_different_group_moved_to_hand");
+    CHECK((!test_zone_has_id(&tg, 0, "discard", aqours_discard)), "ab1_different_group_moved_to_hand");
     // 
 }
 
@@ -81748,8 +81019,8 @@ static void gen_ab1_same_group_not_moved(void){
     // TODO: game.state.process_pending_auto_abilities("p1");
     // 
     // 
-    // TODO assert: assert!( !game.state.player1.hand.cards.contains(&muse_discard), "μ's card should NOT move to hand (same group as stage)" );
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&muse_discard), "μ's card should remain in discard" );
+    CHECK((!test_zone_has_id(&tg, 0, "hand", muse_discard)), "ab1_same_group_not_moved");
+    CHECK(test_zone_has_id(&tg, 0, "discard", muse_discard), "ab1_same_group_not_moved");
     // 
 }
 
@@ -81823,9 +81094,9 @@ static void gen_ab1_mixed_discard_only_different_group_moved(void){
     // TODO: game.state.process_pending_auto_abilities("p1");
     // 
     // 
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&aqours_discard), "Aqours card should move (differs from stage)" );
-    // TODO assert: assert!( !game.state.player1.hand.cards.contains(&muse_discard), "μ's card should NOT move (same group as stage)" );
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&muse_discard), "μ's card should remain in discard" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", aqours_discard), "ab1_mixed_discard_only_different_group_moved");
+    CHECK((!test_zone_has_id(&tg, 0, "hand", muse_discard)), "ab1_mixed_discard_only_different_group_moved");
+    CHECK(test_zone_has_id(&tg, 0, "discard", muse_discard), "ab1_mixed_discard_only_different_group_moved");
     // 
 }
 
@@ -81862,8 +81133,8 @@ static void gen_ab1_empty_stage_all_discard_moved(void){
     // TODO: game.state.process_pending_auto_abilities("p1");
     // 
     // 
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&aqours_card), "Aqours should move (empty stage = no groups blocked)" );
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&muse_card), "μ's should also move (empty stage)" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", aqours_card), "ab1_empty_stage_all_discard_moved");
+    CHECK(test_zone_has_id(&tg, 0, "hand", muse_card), "ab1_empty_stage_all_discard_moved");
     // 
 }
 
@@ -81902,11 +81173,11 @@ static void gen_ab1_multiname_stage_blocks_all_its_groups(void){
     // 
     // 
     // // Aqours card blocked (multi matches Aqours)
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&aqours_discard), "Aqours should stay in discard (blocked by multi-name's Aqours group)" );
-    // TODO assert: assert!( !game.state.player1.hand.cards.contains(&aqours_discard), "Aqours should NOT be in hand" );
+    CHECK(test_zone_has_id(&tg, 0, "discard", aqours_discard), "ab1_multiname_stage_blocks_all_its_groups");
+    CHECK((!test_zone_has_id(&tg, 0, "hand", aqours_discard)), "ab1_multiname_stage_blocks_all_its_groups");
     // 
     // // μ's card should move (μ's is not in multi's groups)
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&muse_discard), "μ's should move to hand (not blocked by multi)" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", muse_discard), "ab1_multiname_stage_blocks_all_its_groups");
     // 
 }
 
@@ -81947,9 +81218,9 @@ static void gen_ab1_two_multiname_stage_blocks_more_groups(void){
     // TODO: game.state.process_pending_auto_abilities("p1");
     // 
     // 
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&muse), "μ's should move (not blocked)" );
-    // TODO assert: assert!( !game.state.player1.hand.cards.contains(&aqours), "Aqours should NOT move (blocked by multi1)" );
-    // TODO assert: assert!( !game.state.player1.hand.cards.contains(&nijigasaki), "虹ヶ咲 should NOT move (blocked by multi2)" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", muse), "ab1_two_multiname_stage_blocks_more_groups");
+    CHECK((!test_zone_has_id(&tg, 0, "hand", aqours)), "ab1_two_multiname_stage_blocks_more_groups");
+    CHECK((!test_zone_has_id(&tg, 0, "hand", nijigasaki)), "ab1_two_multiname_stage_blocks_more_groups");
     // 
 }
 
@@ -81986,8 +81257,8 @@ static void gen_ab1_multiname_discard_selectable_when_groups_differ(void){
     // TODO: game.state.process_pending_auto_abilities("p1");
     // 
     // 
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&multi_discard), "Multi-name card should move (all its groups differ from μ's)" );
-    // TODO assert: assert!( !game.state.player1.waitroom.cards.contains(&multi_discard), "Multi-name card should no longer be in discard" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", multi_discard), "ab1_multiname_discard_selectable_when_groups_differ");
+    CHECK((!test_zone_has_id(&tg, 0, "discard", multi_discard)), "ab1_multiname_discard_selectable_when_groups_differ");
     // 
 }
 
@@ -82024,8 +81295,8 @@ static void gen_ab1_multiname_discard_blocked_when_group_matches_stage(void){
     // TODO: game.state.process_pending_auto_abilities("p1");
     // 
     // 
-    // TODO assert: assert!( !game.state.player1.hand.cards.contains(&multi_discard), "Multi-name card should NOT move (its Aqours group matches stage)" );
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&multi_discard), "Multi-name card should remain in discard" );
+    CHECK((!test_zone_has_id(&tg, 0, "hand", multi_discard)), "ab1_multiname_discard_blocked_when_group_matches_stage");
+    CHECK(test_zone_has_id(&tg, 0, "discard", multi_discard), "ab1_multiname_discard_blocked_when_group_matches_stage");
     // 
 }
 
@@ -82062,8 +81333,8 @@ static void gen_ab1_multiname_discard_blocked_by_one_matching_group(void){
     // TODO: game.state.process_pending_auto_abilities("p1");
     // 
     // 
-    // TODO assert: assert!( !game.state.player1.hand.cards.contains(&multi_discard), "Multi-name card should NOT move (its 虹ヶ咲 group matches stage)" );
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&multi_discard), "Multi-name card should remain in discard" );
+    CHECK((!test_zone_has_id(&tg, 0, "hand", multi_discard)), "ab1_multiname_discard_blocked_by_one_matching_group");
+    CHECK(test_zone_has_id(&tg, 0, "discard", multi_discard), "ab1_multiname_discard_blocked_by_one_matching_group");
     // 
 }
 
@@ -82138,8 +81409,7 @@ static void gen_aspire_moved_liella_gains_blade_unmoved_and_non_liella_do_not(vo
     // TODO: game.set_live_card(aspire);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     test_drain_auto_choices(&tg);
     // TODO: }
     // 
@@ -82170,8 +81440,7 @@ static void gen_aspire_only_non_liella_moved_no_blade(void){
     // TODO: game.set_live_card(aspire);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     test_drain_auto_choices(&tg);
     // TODO: }
     // 
@@ -82204,8 +81473,7 @@ static void gen_aspire_liella_and_non_liella_moved_only_liella_gains_blade(void)
     // TODO: game.set_live_card(aspire);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     test_drain_auto_choices(&tg);
     // TODO: }
     // 
@@ -82235,8 +81503,7 @@ static void gen_aspire_no_liella_on_stage_no_blade(void){
     // TODO: game.set_live_card(aspire);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     test_drain_auto_choices(&tg);
     // TODO: }
     // 
@@ -82263,8 +81530,7 @@ static void gen_aspire_no_movement_no_blade(void){
     // TODO: game.set_live_card(aspire);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     test_drain_auto_choices(&tg);
     // TODO: }
     // 
@@ -82297,8 +81563,7 @@ static void gen_aspire_two_moved_liella_both_gain_blade(void){
     // TODO: game.set_live_card(aspire);
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     test_drain_auto_choices(&tg);
     // TODO: }
     // 
@@ -82589,8 +81854,7 @@ static void gen_fuyumari_real_play_to_stage_triggers_appearance(void){
     test_play_to_stage(&tg, fuyumari, 0);
     // 
     // // Drain all pending choices (auto abilities, etc.)
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -82638,8 +81902,7 @@ static void gen_fuyumari_p2_play_to_stage_triggers_appearance(void){
     // // Pass through everything until P2 Main
     // TODO loop (degraded): for _ in 0..40 {
     rb_advance_phase(&tg.state);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     int phase = tg.state.phase;
@@ -82651,8 +81914,7 @@ static void gen_fuyumari_p2_play_to_stage_triggers_appearance(void){
     // TODO: }
     // 
     test_play_to_stage(&tg, fuyumari, 0);
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -82688,15 +81950,14 @@ static void gen_fuyumari_baton_touch_triggers_area_move(void){
     // 
     // // Baton touch: play Fuyumari to occupied Center → existing goes to waitroom
     test_play_to_stage(&tg, fuyumari, 1);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
     // // Fuyumari should be on stage at Center
     CHECK_EQ(tg.state.p[0].stage[1], fuyumari, "fuyumari_baton_touch_triggers_area_move");
     // // Existing should be in waitroom
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&existing), "Existing member should be in waitroom after baton touch" );
+    CHECK(test_zone_has_id(&tg, 0, "discard", existing), "fuyumari_baton_touch_triggers_area_move");
     // 
     // // Target on P2 stage should be in wait state
     int ori = 0;
@@ -82739,8 +82000,7 @@ static void gen_fuyumari_baton_touch_left_to_center_triggers(void){
     // // Actually to trigger baton touch, we need to play to an OCCUPIED area.
     // // Let's baton touch to Center: existing goes to waitroom
     test_play_to_stage(&tg, fuyumari, 1);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -83199,7 +82459,7 @@ static void gen_happy_party_train_mill_aqours_member_reduces_need_heart(void){
     // TODO: game.state.process_pending_auto_abilities(&pid);
     // 
     // 
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&aqours_member), "bottom card was milled to the waitroom" );
+    CHECK(test_zone_has_id(&tg, 0, "discard", aqours_member), "happy_party_train_mill_aqours_member_reduces_need_heart");
     // TODO assert_eq (unresolved): assert_eq!( game.state .mods .get_need_heart_modifier(hpt, HeartColor::Heart00), -1, "milled card WAS 『Aqours』 member → need heart0 −1" );
     // 
 }
@@ -83240,7 +82500,7 @@ static void gen_happy_party_train_mill_non_aqours_no_reduction(void){
     // TODO: game.state.process_pending_auto_abilities(&pid);
     // 
     // 
-    // TODO assert: assert!(game.state.player1.waitroom.cards.contains(&mus_member));
+    CHECK(test_zone_has_id(&tg, 0, "discard", mus_member), "happy_party_train_mill_non_aqours_no_reduction");
     // TODO assert_eq (unresolved): assert_eq!( game.state .mods .get_need_heart_modifier(hpt, HeartColor::Heart00), 0, "μ's member milled → NO reduction" );
     // 
 }
@@ -83517,8 +82777,7 @@ static void gen_n_pb1_006_wait_self_activates_one_energy(void){
     // 
     // // 4. Play card from hand to stage (real TurnEngine action)
     test_play_to_stage(&tg, card, 1);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -83557,8 +82816,7 @@ static void gen_n_pb1_006_activates_wait_energy_to_active(void){
     // 
     test_add_to_hand(&tg, card);
     test_play_to_stage(&tg, card, 1);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -83604,8 +82862,7 @@ static void gen_n_pb1_006_can_activate_multiple_times(void){
     // 
     test_add_to_hand(&tg, card);
     test_play_to_stage(&tg, card, 1);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -83652,15 +82909,14 @@ static void gen_sp_bp5_016_energy_ge_10_grants_heart06_x2(void){
     // 
     test_add_to_hand(&tg, card);
     test_play_to_stage(&tg, card, 1);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
     // // After playing, we still have 15 - 9 = 6 energy.
     // // Give 4 more to reach 10.
     test_give_energy(&tg, 4);
-    // TODO assert: assert!( game.state.player1.energy_zone.active_count() >= 10, "Precondition: energy >= 10" );
+    CHECK(tg.state.p[0].energy_active, "sp_bp5_016_energy_ge_10_grants_heart06_x2");
     // 
     // // Trigger constant ability evaluation
     test_recalc(&tg);
@@ -83697,8 +82953,7 @@ static void gen_sp_bp5_016_energy_lt_10_grants_no_heart06(void){
     // 
     test_add_to_hand(&tg, card);
     test_play_to_stage(&tg, card, 1);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -83707,7 +82962,7 @@ static void gen_sp_bp5_016_energy_lt_10_grants_no_heart06(void){
     // // Remove enough cards to drop below 10
     // TODO: game.state.player1.energy_zone.cards.truncate(5);
     // TODO: game.state.player1.energy_zone.set_active_count(5);
-    // TODO assert: assert!( game.state.player1.energy_zone.cards.len() < 10, "Precondition: total energy cards < 10 (got {})", game.state.player1.energy_zone.cards.len() );
+    CHECK(tg.state.p[0].energy.n, "sp_bp5_016_energy_lt_10_grants_no_heart06");
     // 
     test_recalc(&tg);
     // 
@@ -83745,8 +83000,7 @@ static void gen_sp_bp5_016_constant_evaluated_during_live_phase(void){
     // 
     test_add_to_hand(&tg, card);
     test_play_to_stage(&tg, card, 1);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -83815,8 +83069,7 @@ static void gen_hs_bp5_016_wait_opponent_members_triggers_constant_heart06(void)
     test_play_to_stage(&tg, card, 1);
     // 
     // // Should prompt: may discard 1 card to activate optional cost
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // // Pay optional cost: discard 1 from hand
     // TODO: game.select_indices(&[0]);
     // TODO: }
@@ -83825,7 +83078,7 @@ static void gen_hs_bp5_016_wait_opponent_members_triggers_constant_heart06(void)
     // TODO assert_eq (unresolved): assert_eq!( game.state.mods.get_orientation_modifier(opp_member), Some("wait"), "Appear: opponent member should be waited" );
     // 
     // // Assert: discard target was removed from hand
-    // TODO assert: assert!( !game.state.player1.hand.cards.contains(&discard_target), "Appear: discard target should be removed from hand" );
+    CHECK((!test_zone_has_id(&tg, 0, "hand", discard_target)), "hs_bp5_016_wait_opponent_members_triggers_constant_heart06");
     // 
     // // Now assert constant ability: 2+ opponent wait → heart06
     test_recalc(&tg);
@@ -83861,8 +83114,7 @@ static void gen_hs_bp5_016_no_heart06_without_opponent_wait(void){
     test_add_to_hand(&tg, card);
     test_play_to_stage(&tg, card, 1);
     // // Skip the optional discard (decline the ability)
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -83902,8 +83154,7 @@ static void gen_bp4_018_own_success_score_greater_grants_blade_x2(void){
     // 
     test_add_to_hand(&tg, card);
     test_play_to_stage(&tg, card, 1);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -83946,8 +83197,7 @@ static void gen_bp4_018_opponent_score_higher_grants_zero_blade(void){
     // 
     test_add_to_hand(&tg, card);
     test_play_to_stage(&tg, card, 1);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -83995,8 +83245,7 @@ static void gen_bp4_018_blade_updates_when_score_changes(void){
     // 
     test_add_to_hand(&tg, card);
     test_play_to_stage(&tg, card, 1);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -84011,7 +83260,7 @@ static void gen_bp4_018_blade_updates_when_score_changes(void){
     // TODO: .cards
     // TODO: .push(own_live_a);
     test_recalc(&tg);
-    // TODO assert: assert!( game.state.mods.get_blade_modifier(card) >= 2, "Own score 1 > opp score 0 should give blade ×2" );
+    CHECK(rb_mods_get_blade(&tg.state.mods, card), "bp4_018_blade_updates_when_score_changes");
     // 
     // // Add opponent card: own 1 < opp 2 → lose blade
     // TODO: game.state
@@ -84057,8 +83306,7 @@ static void gen_hs_bp5_021_single_hasunosora_member_heart_conversion(void){
     // 
     test_add_to_hand(&tg, member);
     test_play_to_stage(&tg, member, 1);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -84074,8 +83322,7 @@ static void gen_hs_bp5_021_single_hasunosora_member_heart_conversion(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -84130,13 +83377,11 @@ static void gen_hs_bp5_021_multiple_hasunosora_members_choice_one_converted(void
     test_add_to_hand(&tg, member_a);
     test_add_to_hand(&tg, member_b);
     test_play_to_stage(&tg, member_a, 0);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     test_play_to_stage(&tg, member_b, 1);
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -84154,8 +83399,7 @@ static void gen_hs_bp5_021_multiple_hasunosora_members_choice_one_converted(void
     // 
     // // Should get a choice prompt to select which member to convert
     // // Select the first eligible member (LeftSide = member_a)
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -84196,8 +83440,7 @@ static void gen_hs_bp5_021_no_hasunosora_members_noop(void){
     // 
     test_add_to_hand(&tg, filler_member);
     test_play_to_stage(&tg, filler_member, 1);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -84213,8 +83456,7 @@ static void gen_hs_bp5_021_no_hasunosora_members_noop(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -84254,18 +83496,15 @@ static void gen_hs_bp5_021_score_bonus_with_three_mirakura_members(void){
     test_add_to_hand(&tg, mirakura_b);
     test_add_to_hand(&tg, mirakura_c);
     test_play_to_stage(&tg, mirakura, 0);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     test_play_to_stage(&tg, mirakura_b, 1);
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     test_play_to_stage(&tg, mirakura_c, 2);
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -84281,8 +83520,7 @@ static void gen_hs_bp5_021_score_bonus_with_three_mirakura_members(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -84320,13 +83558,11 @@ static void gen_hs_bp5_021_no_score_bonus_with_one_mirakura_member(void){
     test_add_to_hand(&tg, mirakura);
     test_add_to_hand(&tg, other);
     test_play_to_stage(&tg, mirakura, 1);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     test_play_to_stage(&tg, other, 0);
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -84342,8 +83578,7 @@ static void gen_hs_bp5_021_no_score_bonus_with_one_mirakura_member(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -84378,8 +83613,7 @@ static void gen_hs_bp5_021_precise_heart_count_after_transform(void){
     // 
     test_add_to_hand(&tg, member);
     test_play_to_stage(&tg, member, 1);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -84394,8 +83628,7 @@ static void gen_hs_bp5_021_precise_heart_count_after_transform(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -84893,7 +84126,7 @@ static void gen_hanamaru_constant_cost_per_success_card(void){
     // // Verify energy was consumed: active_energy_count decreased
     // // Base + 1 should be consumed
     int expected_cost = 0;
-    // TODO assert: assert!( game.state.player1.energy_zone.active_count() <= ((base_cost as u8) + 5) - expected_cost as u8, "Should consume base + 1 energy (success_live_zone card increases cost)" );
+    CHECK(tg.state.p[0].energy_active, "hanamaru_constant_cost_per_success_card");
     // 
 }
 
@@ -85330,8 +84563,7 @@ static void gen_issue7_mifune_live_start_select_and_check(void){
     rb_advance_phase(&tg.state);
     // 
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: if game.pending_choice_type().as_deref() == Some("SelectAutoAbility") {
     // TODO: game.select_indices(&[]);
     // TODO: } else {
@@ -85382,8 +84614,7 @@ static void gen_issue9_karin_select_from_discard_place_on_deck(void){
     rb_advance_phase(&tg.state);
     // 
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: if game.pending_choice_type().as_deref() == Some("SelectAutoAbility") {
     // TODO: game.select_indices(&[]);
     // TODO: } else {
@@ -85436,8 +84667,7 @@ static void gen_karin_edge_0_waited_members(void){
     // // inlined helper drain_choices
     // 
     int safety = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && safety < 30 {
+    test_has_pending_choice(&tg);
     // TODO: safety += 1;
     // TODO: if game.pending_choice_type().as_deref() == Some("SelectAutoAbility") {
     // TODO: game.select_indices(&[]);
@@ -85450,7 +84680,7 @@ static void gen_karin_edge_0_waited_members(void){
     // // 0 waited → select 0 → nothing moved from waitroom
     // // Deck: 20 - 1 (ab#0 draw) = 19
     CHECK_EQ(tg.state.p[0].discard.n, waitroom_before, "karin_edge_0_waited_members");
-    // TODO assert: assert!( game.state.player1.main_deck.cards.len() < deck_after_fill, "0 wait: deck decreased by draws (no placement)" );
+    CHECK(tg.state.p[0].deck.n, "karin_edge_0_waited_members");
     // 
 }
 
@@ -85499,8 +84729,7 @@ static void gen_karin_edge_1_waited_1_niji_in_discard(void){
     // // inlined helper drain_with_select_first
     // 
     int safety = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && safety < 30 {
+    test_has_pending_choice(&tg);
     // TODO: safety += 1;
     // TODO: if game.pending_choice_type().as_deref() == Some("SelectAutoAbility") {
     // TODO: game.select_indices(&[]);
@@ -85563,8 +84792,7 @@ static void gen_karin_edge_3_waited_1_niji_available(void){
     // // inlined helper drain_with_select_first
     // 
     int safety = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && safety < 30 {
+    test_has_pending_choice(&tg);
     // TODO: safety += 1;
     // TODO: if game.pending_choice_type().as_deref() == Some("SelectAutoAbility") {
     // TODO: game.select_indices(&[]);
@@ -85628,8 +84856,7 @@ static void gen_karin_edge_2_waited_2_niji_select_both(void){
     // 
     // 
     int safety = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && safety < 30 {
+    test_has_pending_choice(&tg);
     // TODO: safety += 1;
     // TODO: if game.pending_choice_type().as_deref() == Some("SelectAutoAbility") {
     // TODO: game.select_indices(&[]);
@@ -85687,8 +84914,7 @@ static void gen_karin_edge_non_niji_not_selectable(void){
     // // inlined helper drain_choices
     // 
     int safety = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && safety < 30 {
+    test_has_pending_choice(&tg);
     // TODO: safety += 1;
     // TODO: if game.pending_choice_type().as_deref() == Some("SelectAutoAbility") {
     // TODO: game.select_indices(&[]);
@@ -85748,8 +84974,7 @@ static void gen_karin_edge_not_opponent_waitroom(void){
     // // inlined helper drain_with_select_first
     // 
     int safety = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && safety < 30 {
+    test_has_pending_choice(&tg);
     // TODO: safety += 1;
     // TODO: if game.pending_choice_type().as_deref() == Some("SelectAutoAbility") {
     // TODO: game.select_indices(&[]);
@@ -85807,8 +85032,7 @@ static void gen_karin_edge_hand_unchanged(void){
     // // inlined helper drain_with_select_first
     // 
     int safety = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && safety < 30 {
+    test_has_pending_choice(&tg);
     // TODO: safety += 1;
     // TODO: if game.pending_choice_type().as_deref() == Some("SelectAutoAbility") {
     // TODO: game.select_indices(&[]);
@@ -85855,8 +85079,7 @@ static void gen_issue11_shizuku_score_floor_at_zero(void){
     rb_advance_phase(&tg.state);
     // 
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: if game.pending_choice_type().as_deref() == Some("SelectAutoAbility") {
     // TODO: game.select_indices(&[]);
     // TODO: } else {
@@ -85903,8 +85126,7 @@ static void gen_issue12_compass_activate_dollchestra_live_start(void){
     rb_advance_phase(&tg.state);
     // 
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: if game.pending_choice_type().as_deref() == Some("SelectAutoAbility") {
     // TODO: game.select_indices(&[]);
     // TODO: } else {
@@ -85940,8 +85162,7 @@ static void gen_issue13_mia_three_conditional_blade_checks(void){
     // 
     test_play_to_stage(&tg, mia, 1);
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: if game.pending_choice_type().as_deref() == Some("SelectAutoAbility") {
     // TODO: game.select_indices(&[]);
     // TODO: } else {
@@ -85985,8 +85206,7 @@ static void gen_saikou_edge_no_cards(void){
     // // inlined helper saikou_drain
     // 
     int safety = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && safety < 20 {
+    test_has_pending_choice(&tg);
     // TODO: safety += 1;
     // TODO: game.select_indices(&[]);
     // TODO: }
@@ -86030,8 +85250,7 @@ static void gen_saikou_edge_score1_only(void){
     // // inlined helper saikou_drain
     // 
     int safety = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && safety < 20 {
+    test_has_pending_choice(&tg);
     // TODO: safety += 1;
     // TODO: game.select_indices(&[]);
     // TODO: }
@@ -86075,8 +85294,7 @@ static void gen_saikou_edge_score5_only(void){
     // // inlined helper saikou_drain
     // 
     int safety = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && safety < 20 {
+    test_has_pending_choice(&tg);
     // TODO: safety += 1;
     // TODO: game.select_indices(&[]);
     // TODO: }
@@ -86122,8 +85340,7 @@ static void gen_saikou_edge_both_scores(void){
     // // inlined helper saikou_drain
     // 
     int safety = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && safety < 20 {
+    test_has_pending_choice(&tg);
     // TODO: safety += 1;
     // TODO: game.select_indices(&[]);
     // TODO: }
@@ -86167,8 +85384,7 @@ static void gen_saikou_edge_score2_only(void){
     // // inlined helper saikou_drain
     // 
     int safety = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && safety < 20 {
+    test_has_pending_choice(&tg);
     // TODO: safety += 1;
     // TODO: game.select_indices(&[]);
     // TODO: }
@@ -86216,8 +85432,7 @@ static void gen_live_start_grants_all_heart(void){
     // 
     // // inlined helper drain_choices
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -86264,8 +85479,7 @@ static void gen_two_members_both_get_all_heart(void){
     // 
     // // inlined helper drain_choices
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -86324,8 +85538,7 @@ static void gen_already_has_all_heart_no_double_grant(void){
     // 
     // // inlined helper drain_choices
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -86371,8 +85584,7 @@ static void gen_live_start_another_member(void){
     // 
     // // inlined helper drain_choices
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -86418,8 +85630,7 @@ static void gen_live_start_cost_free_still_triggers(void){
     // 
     // // inlined helper drain_choices
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -86466,8 +85677,7 @@ static void gen_non_member_on_stage_no_trigger(void){
     // 
     // // inlined helper drain_choices
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -86514,8 +85724,7 @@ static void gen_member_without_live_start_no_trigger(void){
     // 
     // // inlined helper drain_choices
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -86562,8 +85771,7 @@ static void gen_all_heart_expires_at_live_end(void){
     // 
     // // inlined helper drain_choices
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -86588,24 +85796,21 @@ static void gen_all_heart_expires_at_live_end(void){
     rb_advance_phase(&tg.state);
     // // inlined helper drain_choices
     // 
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
     rb_advance_phase(&tg.state);
     // // inlined helper drain_choices
     // 
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
     rb_advance_phase(&tg.state);
     // // inlined helper drain_choices
     // 
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -86655,8 +85860,7 @@ static void gen_live_success_each_time_draws_card(void){
     // 
     // // inlined helper drain_choices
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -86681,29 +85885,26 @@ static void gen_live_success_each_time_draws_card(void){
     rb_advance_phase(&tg.state);
     // // inlined helper drain_choices
     // 
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
     rb_advance_phase(&tg.state);
     // // inlined helper drain_choices
     // 
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
     rb_advance_phase(&tg.state);
     // // inlined helper drain_choices
     // 
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
     // 
-    // TODO assert: assert!( game.state.player1.main_deck.cards.len() < deck_before, "LiveSuccess + Victory Road each_time should draw cards" );
+    CHECK(tg.state.p[0].deck.n, "live_success_each_time_draws_card");
     // 
 }
 
@@ -86744,8 +85945,7 @@ static void gen_no_live_success_no_trigger(void){
     // 
     // // inlined helper drain_choices
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -86769,24 +85969,21 @@ static void gen_no_live_success_no_trigger(void){
     rb_advance_phase(&tg.state);
     // // inlined helper drain_choices
     // 
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
     rb_advance_phase(&tg.state);
     // // inlined helper drain_choices
     // 
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
     rb_advance_phase(&tg.state);
     // // inlined helper drain_choices
     // 
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -86853,8 +86050,7 @@ static void gen_test_one_live_start_each_time_drains_no_choice(void){
     test_has_pending_choice(&tg);
     // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectHeartColor"), "expected SelectHeartColor; a SelectAutoAbility means ET leaked into \ the choice pool (available should have been 1 → auto-promote)" );
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -86903,8 +86099,7 @@ static void gen_test_live_success_each_time_drains_after_success(void){
     // 
     // // inlined helper drain_choices
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -86929,29 +86124,26 @@ static void gen_test_live_success_each_time_drains_after_success(void){
     rb_advance_phase(&tg.state);
     // // inlined helper drain_choices
     // 
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
     rb_advance_phase(&tg.state);
     // // inlined helper drain_choices
     // 
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
     rb_advance_phase(&tg.state);
     // // inlined helper drain_choices
     // 
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
     // 
-    // TODO assert: assert!( game.state.player1.main_deck.cards.len() < deck_before, "LiveSuccess + each_time draw should decrease deck" );
+    CHECK(tg.state.p[0].deck.n, "test_live_success_each_time_drains_after_success");
     // 
 }
 
@@ -86999,8 +86191,7 @@ static void gen_live_card_own_live_success_no_trigger(void){
     // 
     // // inlined helper drain_choices
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -87024,24 +86215,21 @@ static void gen_live_card_own_live_success_no_trigger(void){
     rb_advance_phase(&tg.state);
     // // inlined helper drain_choices
     // 
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
     rb_advance_phase(&tg.state);
     // // inlined helper drain_choices
     // 
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
     rb_advance_phase(&tg.state);
     // // inlined helper drain_choices
     // 
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -87050,7 +86238,7 @@ static void gen_live_card_own_live_success_no_trigger(void){
     // // The member (PL!-bp3-012-N) has NO LiveSuccess.
     // // Victory Road should NOT fire live card's LiveSuccess is from a non-member.
     // // Only the live card's own LiveSuccess draw happens.
-    // TODO assert: assert!( game.state.player1.main_deck.cards.len() < deck_before, "Live card's own LiveSuccess draws; Victory Road does NOT fire for non-member" );
+    CHECK(tg.state.p[0].deck.n, "live_card_own_live_success_no_trigger");
     // 
 }
 
@@ -87093,8 +86281,7 @@ static void gen_baad_cage_cost_limit_two_hasunosora_members_grants_score(void){
     // 
     // // inlined helper drain_choices
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -87141,8 +86328,7 @@ static void gen_baad_cage_cost_limit_one_member_no_score(void){
     // 
     // // inlined helper drain_choices
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -87190,8 +86376,7 @@ static void gen_baad_cage_cost_limit_one_below_threshold_no_score(void){
     // 
     // // inlined helper drain_choices
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -87240,8 +86425,7 @@ static void gen_baad_cage_three_members_score_still_one(void){
     // 
     // // inlined helper drain_choices
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -87294,12 +86478,11 @@ static void gen_discard_member_gives_heart04_and_blade_to_same_name(void){
     test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
-    // TODO assert: assert!(game.state.player1.waitroom.cards.contains(&nahone_hand));
+    CHECK(test_zone_has_id(&tg, 0, "discard", nahone_hand), "discard_member_gives_heart04_and_blade_to_same_name");
     // TODO assert_eq (unresolved): assert_eq!(get_heart04(&game, nahone_stage), 1);
     // TODO assert: assert!(get_blade(&game, nahone_stage) >= 1);
     // 
@@ -87349,7 +86532,7 @@ static void gen_skip_cost_no_effect(void){
     test_has_pending_choice(&tg);
     // discard: let _ = game.try_select_indices(&[]);
     // 
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&nahone_hand), "Card should remain in hand when cost is skipped" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", nahone_hand), "skip_cost_no_effect");
     // TODO assert_eq (unresolved): assert_eq!(get_heart04(&game, nahone_stage), 0);
     // TODO assert_eq (unresolved): assert_eq!(get_blade(&game, nahone_stage), 0);
     // 
@@ -87399,12 +86582,11 @@ static void gen_discard_non_member_no_buff(void){
     test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
-    // TODO assert: assert!(game.state.player1.waitroom.cards.contains(&live_discard));
+    CHECK(test_zone_has_id(&tg, 0, "discard", live_discard), "discard_non_member_no_buff");
     // TODO assert_eq (unresolved): assert_eq!(get_heart04(&game, nahone_stage), 0);
     // TODO assert_eq (unresolved): assert_eq!(get_blade(&game, nahone_stage), 0);
     // 
@@ -87499,12 +86681,11 @@ static void gen_discard_member_different_name_than_activating(void){
     test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
-    // TODO assert: assert!(game.state.player1.waitroom.cards.contains(&other_member));
+    CHECK(test_zone_has_id(&tg, 0, "discard", other_member), "discard_member_different_name_than_activating");
     // TODO assert_eq (unresolved): assert_eq!(get_heart04(&game, nahone_stage), 1);
     // TODO assert: assert!(get_blade(&game, nahone_stage) >= 1);
     // 
@@ -87554,8 +86735,7 @@ static void gen_discard_same_name_as_activating_card(void){
     test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -87609,8 +86789,7 @@ static void gen_q30_multiple_same_name_only_one_buffed(void){
     test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -87668,13 +86847,12 @@ static void gen_discarded_card_goes_to_waitroom(void){
     test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
-    // TODO assert: assert!(!game.state.player1.hand.cards.contains(&nahone_hand));
-    // TODO assert: assert!(game.state.player1.waitroom.cards.contains(&nahone_hand));
+    CHECK((!test_zone_has_id(&tg, 0, "hand", nahone_hand)), "discarded_card_goes_to_waitroom");
+    CHECK(test_zone_has_id(&tg, 0, "discard", nahone_hand), "discarded_card_goes_to_waitroom");
     // 
 }
 
@@ -87722,8 +86900,7 @@ static void gen_heart04_only_no_other_colors(void){
     test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -87781,8 +86958,7 @@ static void gen_p_variant_works(void){
     test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -87835,8 +87011,7 @@ static void gen_p_plus_variant_works(void){
     test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -87889,8 +87064,7 @@ static void gen_sec_variant_works(void){
     test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -87944,12 +87118,11 @@ static void gen_discard_from_non_contiguous_hand(void){
     test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[1]);
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
-    // TODO assert: assert!(game.state.player1.waitroom.cards.contains(&nahone_hand));
+    CHECK(test_zone_has_id(&tg, 0, "discard", nahone_hand), "discard_from_non_contiguous_hand");
     // TODO assert_eq (unresolved): assert_eq!(get_heart04(&game, nahone_stage), 1);
     // TODO assert: assert!(get_blade(&game, nahone_stage) >= 1);
     // 
@@ -88044,8 +87217,7 @@ static void gen_nahone_at_left_position(void){
     test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -88098,8 +87270,7 @@ static void gen_nahone_at_right_position(void){
     test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -88153,15 +87324,14 @@ static void gen_hand_mixed_cards_discard_member_only(void){
     test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[1]);
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
-    // TODO assert: assert!(game.state.player1.waitroom.cards.contains(&nahone_hand));
+    CHECK(test_zone_has_id(&tg, 0, "discard", nahone_hand), "hand_mixed_cards_discard_member_only");
     // TODO assert_eq (unresolved): assert_eq!(get_heart04(&game, nahone_stage), 1);
     // TODO assert: assert!(get_blade(&game, nahone_stage) >= 1);
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&filler), "Non-discarded card should remain in hand" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", filler), "hand_mixed_cards_discard_member_only");
     // 
 }
 
@@ -88209,12 +87379,11 @@ static void gen_discard_different_name_member_no_target(void){
     test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
-    // TODO assert: assert!(game.state.player1.waitroom.cards.contains(&other_member));
+    CHECK(test_zone_has_id(&tg, 0, "discard", other_member), "discard_different_name_member_no_target");
     // TODO assert_eq (unresolved): assert_eq!( get_heart04(&game, nahone_stage), 0, "No heart04 when discarded card has different name" );
     // TODO assert_eq (unresolved): assert_eq!( get_blade(&game, nahone_stage), 0, "No blade when discarded card has different name" );
     // 
@@ -88265,8 +87434,7 @@ static void gen_other_same_name_not_buffed(void){
     test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -88332,8 +87500,7 @@ static void gen_effect_tracked_as_temporary_live_end(void){
     test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -88536,8 +87703,7 @@ static void gen_katsuraki_debut_all_wait_blocked_by_immunity(void){
     // TODO: g.give_energy(20);
     // TODO: g.play_to_stage(katsuraki, MemberArea::Center);
     // 
-    int g = 0;
-    // TODO loop (degraded): while g.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: g.select_indices(&[0]);
     // TODO: }
     // 
@@ -88694,10 +87860,10 @@ static void gen_c8_q242_both_shuffle_and_retrieve_and_blade(void){
     // TODO: trigger_momoo_debut(&mut game, c);
     // 
     // // Live card was retrieved from discard to hand
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&live), "Q242: Live card should be retrieved to hand" );
-    // TODO assert: assert!( !game.state.player1.waitroom.cards.contains(&live), "Q242: Live card should no longer be in discard" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", live), "c8_q242_both_shuffle_and_retrieve_and_blade");
+    CHECK((!test_zone_has_id(&tg, 0, "discard", live)), "c8_q242_both_shuffle_and_retrieve_and_blade");
     // // P1's waitroom shrank (member cards shuffled under + live card retrieved)
-    // TODO assert: assert!( game.state.player1.waitroom.cards.len() < w1_before, "Q242: P1 waitroom should shrink" );
+    CHECK(tg.state.p[0].discard.n, "c8_q242_both_shuffle_and_retrieve_and_blade");
     // 
     // // Blade+2 gained
     int blade_after = rb_mods_get_blade(&tg.state.mods, c);
@@ -88782,7 +87948,7 @@ static void gen_c8_q242_exactly_20_threshold_met(void){
     // 
     int blade = rb_mods_get_blade(&tg.state.mods, c);
     // TODO assert: assert!( blade >= 2, "Q242: Exactly 20 cards moved → threshold met, blade+2 should apply" );
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&live), "Q242: Live card retrieved at exactly 20 threshold" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", live), "c8_q242_exactly_20_threshold_met");
     // 
 }
 
@@ -88824,7 +87990,7 @@ static void gen_c8_q242_19_below_threshold(void){
     int blade = rb_mods_get_blade(&tg.state.mods, c);
     CHECK_EQ(blade, 0, "c8_q242_19_below_threshold");
     // // Live card should NOT be retrieved
-    // TODO assert: assert!( !game.state.player1.hand.cards.contains(&live), "Q242: Live card not retrieved below threshold" );
+    CHECK((!test_zone_has_id(&tg, 0, "hand", live)), "c8_q242_19_below_threshold");
     // 
 }
 
@@ -88915,8 +88081,7 @@ static void gen_c11_peek_per_niji_selects_keep1(void){
     // 
     // TODO: g.give_energy(5);
     // TODO: trigger(&mut g, l, "ライブ開始時");
-    int g = 0;
-    // TODO loop (degraded): while g.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: g.select_indices(&[0]);
     // TODO: }
     // // Deck was all fillers (no live card): the reveal cannot grant score.
@@ -89201,11 +88366,11 @@ static void gen_triple_gameplay_accept_cost10_discards_hand(void){
     int remaining = tg.state.p[0].energy_active;
     CHECK_EQ(remaining, 0, "triple_gameplay_accept_cost10_discards_hand");
     // // triple is on stage, 3 hand cards moved to waitroom
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&hanamaru), "hanamaru discarded" );
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&setsuna), "setsuna discarded" );
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&chisato), "chisato discarded" );
+    CHECK(test_zone_has_id(&tg, 0, "discard", hanamaru), "triple_gameplay_accept_cost10_discards_hand");
+    CHECK(test_zone_has_id(&tg, 0, "discard", setsuna), "triple_gameplay_accept_cost10_discards_hand");
+    CHECK(test_zone_has_id(&tg, 0, "discard", chisato), "triple_gameplay_accept_cost10_discards_hand");
     // TODO assert: assert!( game.state.player1.stage.stage.contains(&triple), "triple is on stage" );
-    // TODO assert: assert!( !game.state.player1.hand.cards.contains(&hanamaru), "hand no longer contains hanamaru" );
+    CHECK((!test_zone_has_id(&tg, 0, "hand", hanamaru)), "triple_gameplay_accept_cost10_discards_hand");
     // 
 }
 
@@ -89230,9 +88395,9 @@ static void gen_triple_gameplay_decline_pays15_keeps_hand(void){
     int remaining = tg.state.p[0].energy_active;
     CHECK_EQ(remaining, 0, "triple_gameplay_decline_pays15_keeps_hand");
     // // hand cards stay
-    // TODO assert: assert!(game.state.player1.hand.cards.contains(&hanamaru));
-    // TODO assert: assert!(game.state.player1.hand.cards.contains(&setsuna));
-    // TODO assert: assert!(game.state.player1.hand.cards.contains(&chisato));
+    CHECK(test_zone_has_id(&tg, 0, "hand", hanamaru), "triple_gameplay_decline_pays15_keeps_hand");
+    CHECK(test_zone_has_id(&tg, 0, "hand", setsuna), "triple_gameplay_decline_pays15_keeps_hand");
+    CHECK(test_zone_has_id(&tg, 0, "hand", chisato), "triple_gameplay_decline_pays15_keeps_hand");
     // TODO assert: assert!(game.state.player1.waitroom.cards.is_empty());
     // 
 }
@@ -89322,8 +88487,8 @@ static void gen_triple_debut_adds_live_card_from_waitroom(void){
     test_add_to_hand(&tg, triple);
     test_give_energy(&tg, 15);
     test_play_to_stage(&tg, triple, 1);
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&live), "debut should add a live card from waitroom to hand" );
-    // TODO assert: assert!( !game.state.player1.waitroom.cards.contains(&live), "the live card should leave the waitroom" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", live), "triple_debut_adds_live_card_from_waitroom");
+    CHECK((!test_zone_has_id(&tg, 0, "discard", live)), "triple_debut_adds_live_card_from_waitroom");
     // 
 }
 
@@ -89338,7 +88503,7 @@ static void gen_triple_debut_no_live_card_in_waitroom(void){
     test_add_to_discard(&tg, member);
     test_give_energy(&tg, 15);
     test_play_to_stage(&tg, triple, 1);
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&member), "non-live cards in waitroom are not touched by ab#1" );
+    CHECK(test_zone_has_id(&tg, 0, "discard", member), "triple_debut_no_live_card_in_waitroom");
     // 
 }
 
@@ -89363,8 +88528,8 @@ static void gen_triple_live_success_adds_member_from_waitroom(void){
     // TODO: );
     test_drain_auto_choices(&tg);
     // 
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&member), "live success should add a member card from waitroom to hand" );
-    // TODO assert: assert!( !game.state.player1.waitroom.cards.contains(&member), "the member card should leave the waitroom" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", member), "triple_live_success_adds_member_from_waitroom");
+    CHECK((!test_zone_has_id(&tg, 0, "discard", member)), "triple_live_success_adds_member_from_waitroom");
     // 
 }
 
@@ -89390,7 +88555,7 @@ static void gen_triple_live_success_ignores_live_cards_in_waitroom(void){
     test_drain_auto_choices(&tg);
     // 
     // TODO assert: assert!( game.state .player1 .waitroom .cards .contains(&live_in_waitroom), "live cards in waitroom are not touched by ab#2" );
-    // TODO assert: assert!( !game.state.player1.hand.cards.contains(&live_in_waitroom), "live card must not be added to hand by ab#2" );
+    CHECK((!test_zone_has_id(&tg, 0, "hand", live_in_waitroom)), "triple_live_success_ignores_live_cards_in_waitroom");
     // 
 }
 
@@ -89411,7 +88576,7 @@ static void gen_triple_second_copy_can_be_used_as_one_fodder(void){
     test_play_to_stage(&tg, triple_play, 1);
     // TODO assert: assert!( answer_play_choice(&mut game, true), "second triple copy should satisfy one required character" );
     // TODO assert: assert!(game.state.player1.stage.stage.contains(&triple_play));
-    // TODO assert: assert!(game.state.player1.waitroom.cards.contains(&triple_fodder));
+    CHECK(test_zone_has_id(&tg, 0, "discard", triple_fodder), "triple_second_copy_can_be_used_as_one_fodder");
     CHECK_EQ(tg.state.p[0].energy_active, 0, "triple_second_copy_can_be_used_as_one_fodder");
     // 
 }
@@ -89536,8 +88701,8 @@ static void gen_triple_with_extra_unrelated_cards_still_offers_choice(void){
     // TODO assert: assert!(answer_play_choice(&mut game, true));
     // TODO assert: assert!(game.state.player1.stage.stage.contains(&triple));
     // // extra cards must remain in hand
-    // TODO assert: assert!(game.state.player1.hand.cards.contains(&extra1));
-    // TODO assert: assert!(game.state.player1.hand.cards.contains(&extra2));
+    CHECK(test_zone_has_id(&tg, 0, "hand", extra1), "triple_with_extra_unrelated_cards_still_offers_choice");
+    CHECK(test_zone_has_id(&tg, 0, "hand", extra2), "triple_with_extra_unrelated_cards_still_offers_choice");
     // // exactly 3 discarded
     CHECK_EQ(tg.state.p[0].discard.n, 3, "triple_with_extra_unrelated_cards_still_offers_choice");
     // 
@@ -89823,7 +88988,7 @@ static void gen_mia_activate_retrieves_live_even_without_energy_placement(void){
     // // Cost choice must be offered even when skipping energy placement is intended
     test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&niji_live), "Effect still works (retrieves live) despite cost not placing energy" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", niji_live), "mia_activate_retrieves_live_even_without_energy_placement");
     // 
 }
 
@@ -89851,7 +89016,7 @@ static void gen_mia_use_limit_not_enforced(void){
     // // Must offer live retrieval selection
     test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]); // select which niji live to retrieve
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&niji1), "First activation works" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", niji1), "mia_use_limit_not_enforced");
     // // use_limit=1: second activation is blocked by use_limit check
     int hand_before = tg.state.p[0].hand.n;
     int energy_before = 0;
@@ -89872,7 +89037,7 @@ static void gen_mia_use_limit_not_enforced(void){
     // TODO: .get_under_cards(MemberArea::Center)
     // TODO: .len();
     CHECK_EQ(energy_after, energy_before, "mia_use_limit_not_enforced");
-    // TODO assert: assert!( !game.state.player1.hand.cards.contains(&niji2), "use_limit=1 prevented second activation from retrieving another live" );
+    CHECK((!test_zone_has_id(&tg, 0, "hand", niji2)), "mia_use_limit_not_enforced");
     // 
 }
 
@@ -90044,7 +89209,7 @@ static void gen_rina_rule_1053_under_member_goes_to_waitroom(void){
     // TODO: game.state
     // TODO: .player1
     // TODO: .remove_member_from_stage_with_recycling(1, &game.db);
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&target), "Rule 10.5.3: under member goes to waitroom" );
+    CHECK(test_zone_has_id(&tg, 0, "discard", target), "rina_rule_1053_under_member_goes_to_waitroom");
     // TODO assert_eq (unresolved): assert_eq!( game.state .player1 .stage .get_under_cards(MemberArea::Center) .len(), 0 );
     // 
 }
@@ -90101,7 +89266,7 @@ static void gen_sayaka_activate_effect_does_not_place_under(void){
     // TODO assert_eq (unresolved): assert_eq!( under.len(), 1, "1 card should be under sayaka after reveal→under_member" );
     // TODO assert_eq (unresolved): assert_eq!( under[0], sayaka_hand, "The revealed sayaka should be under sayaka" );
     // // Card must NOT remain in hand (duplication bug fix)
-    // TODO assert: assert!( !game.state.player1.hand.cards.contains(&sayaka_hand), "revealed card should be removed from hand, not duplicated" );
+    CHECK((!test_zone_has_id(&tg, 0, "hand", sayaka_hand)), "sayaka_activate_effect_does_not_place_under");
     // 
 }
 
@@ -90287,8 +89452,7 @@ static void gen_sayaka_q243_max_three_per_activation_recounts(void){
     int pid = 0;
     // TODO: game.state.process_pending_auto_abilities(&pid);
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -90329,8 +89493,7 @@ static void gen_sayaka_q243_max_three_per_activation_recounts(void){
     pid = 0;
     // TODO: game.state.process_pending_auto_abilities(&pid);
     // 
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -90362,8 +89525,7 @@ static void gen_sayaka_q243_max_three_per_activation_recounts(void){
     pid = 0;
     // TODO: game.state.process_pending_auto_abilities(&pid);
     // 
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -90413,8 +89575,7 @@ static void gen_sayaka_q243_zero_under_no_heart(void){
     int pid = 0;
     // TODO: game.state.process_pending_auto_abilities(&pid);
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     int heart = 0;
@@ -90472,7 +89633,7 @@ static void gen_sayaka_rule_1053_under_members_go_to_waitroom(void){
     // TODO: game.state
     // TODO: .player1
     // TODO: .remove_member_from_stage_with_recycling(1, &game.db);
-    // TODO assert: assert!(game.state.player1.waitroom.cards.contains(&s1));
+    CHECK(test_zone_has_id(&tg, 0, "discard", s1), "sayaka_rule_1053_under_members_go_to_waitroom");
     // TODO assert_eq (unresolved): assert_eq!( game.state .player1 .stage .get_under_cards(MemberArea::Center) .len(), 0 );
     // 
 }
@@ -90727,8 +89888,8 @@ static void gen_issue1_kanon_invalidate_and_recover(void){
     test_give_energy(&tg, 13);
     test_play_to_stage(&tg, kanon, 1);
     // 
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&liella_discard), "1a: must recover Liella! from discard after invalidate" );
-    // TODO assert: assert!( !game.state.player1.waitroom.cards.contains(&liella_discard), "1a: recovered card removed from discard" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", liella_discard), "issue1_kanon_invalidate_and_recover");
+    CHECK((!test_zone_has_id(&tg, 0, "discard", liella_discard)), "issue1_kanon_invalidate_and_recover");
     // 
 }
 
@@ -90751,7 +89912,7 @@ static void gen_issue1_kanon_no_liella_on_stage_no_recovery(void){
     test_give_energy(&tg, 13);
     test_play_to_stage(&tg, kanon, 1);
     // 
-    // TODO assert: assert!( !game.state.player1.hand.cards.contains(&liella_discard), "1b: no Liella! on stage -> must NOT recover" );
+    CHECK((!test_zone_has_id(&tg, 0, "hand", liella_discard)), "issue1_kanon_no_liella_on_stage_no_recovery");
     CHECK_EQ(tg.state.p[0].discard.n, 1, "issue1_kanon_no_liella_on_stage_no_recovery");
     // 
 }
@@ -90798,8 +89959,7 @@ static void gen_issue2_rina_cost_total_6_draws_card(void){
     // 
     // 
     // // Optional cost: select 2 member cards from discard
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     int t = 0;
     // TODO: if t.as_deref() == Some("SelectAutoAbility") {
     // TODO: game.select_indices(&[]);
@@ -90861,8 +90021,7 @@ static void gen_issue2_rina_cost_total_10_no_bonus(void){
     rb_advance_phase(&tg.state);
     // 
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     int t = 0;
     // TODO: if t.as_deref() == Some("SelectAutoAbility") {
     // TODO: game.select_indices(&[]);
@@ -90919,8 +90078,7 @@ static void gen_issue3_karin_live_start_draw_card(void){
     // 
     // 
     int safety = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && safety < 20 {
+    test_has_pending_choice(&tg);
     // TODO: if game.pending_choice_type().as_deref() == Some("SelectAutoAbility") {
     // TODO: game.select_indices(&[]);
     // TODO: } else {
@@ -90971,8 +90129,7 @@ static void gen_issue5_solitude_rain_heart_color_scoring(void){
     rb_advance_phase(&tg.state);
     // 
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -91018,8 +90175,7 @@ static void gen_issue6_natsumi_self_and_other_blade(void){
     rb_advance_phase(&tg.state);
     // 
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -91067,8 +90223,7 @@ static void gen_issue6_natsumi_self_only_blade(void){
     rb_advance_phase(&tg.state);
     // 
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -91112,8 +90267,7 @@ static void gen_issue6_natsumi_low_energy_no_blade(void){
     rb_advance_phase(&tg.state);
     // 
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -91159,8 +90313,7 @@ static void gen_issue6_natsumi_blade_expires_after_live_victory_determination(vo
     rb_advance_phase(&tg.state);
     // 
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // // Blade granted at LiveStart with duration=live_end
@@ -91179,8 +90332,7 @@ static void gen_issue6_natsumi_blade_expires_after_live_victory_determination(vo
     rb_advance_phase(&tg.state);
     // 
     // // Handle the LookAndSelect pending choice from LiveSuccess
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -91231,8 +90383,7 @@ static void gen_issue7_hajimari_set_required_hearts(void){
     rb_advance_phase(&tg.state);
     // 
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -91292,8 +90443,7 @@ static void gen_issue7_hajimari_no_success_live_no_effect(void){
     rb_advance_phase(&tg.state);
     // 
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -91329,8 +90479,7 @@ static void gen_issue9_izumi_debut_draw_2_discard_1(void){
     test_play_to_stage(&tg, izumi, 1);
     // 
     // // Debut: draw 2 → then discard 1 ("Select 1 card from hand", allow_skip=false)
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: if game.pending_choice_type().as_deref() == Some("SelectAutoAbility") {
     // TODO: game.select_indices(&[]);
     // TODO: } else {
@@ -91340,8 +90489,7 @@ static void gen_issue9_izumi_debut_draw_2_discard_1(void){
     test_has_pending_choice(&tg);
     // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard" );
     // TODO: game.select_indices(&[0]);
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -91370,8 +90518,7 @@ static void gen_issue9_izumi_debut_empty_hand(void){
     // 
     test_play_to_stage(&tg, izumi, 1);
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: if game.pending_choice_type().as_deref() == Some("SelectAutoAbility") {
     // TODO: game.select_indices(&[]);
     // TODO: } else {
@@ -91381,8 +90528,7 @@ static void gen_issue9_izumi_debut_empty_hand(void){
     test_has_pending_choice(&tg);
     // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard" );
     // TODO: game.select_indices(&[0]);
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -91422,8 +90568,7 @@ static void gen_issue10_dream_with_you_no_blade_no_score(void){
     rb_advance_phase(&tg.state);
     // 
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -91471,8 +90616,7 @@ static void gen_issue10_dream_with_you_high_blade_plus_1_score(void){
     rb_advance_phase(&tg.state);
     // 
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -91529,8 +90673,7 @@ static void gen_proof_cost_20plus_draws_card(void){
     // // Only Proof's LiveStart fires (abilityless members have none).
     // // Proof's look-and-select creates a SelectCard choice → pick index 0.
     int hand_after_setup = tg.state.p[0].hand.n;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -91624,8 +90767,7 @@ static void gen_issue16_hanamaru_all_cost_higher_than_opponent_gains_blade(void)
     rb_advance_phase(&tg.state);
     // 
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: if game.pending_choice_type().as_deref() == Some("SelectAutoAbility") {
     // TODO: game.select_indices(&[]);
     // TODO: } else {
@@ -91681,8 +90823,7 @@ static void gen_issue16_hanamaru_opponent_higher_cost_no_blade(void){
     rb_advance_phase(&tg.state);
     // 
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: if game.pending_choice_type().as_deref() == Some("SelectAutoAbility") {
     // TODO: game.select_indices(&[]);
     // TODO: } else {
@@ -91729,22 +90870,20 @@ static void gen_riko_bp6_auto_e2e_heart_failure_triggers(void){
     // // lives go to waitroom → Riko's auto fires and offers the optional
     // // deck-top/bottom placement → ACCEPT it ([0]) so she relocates the live.
     // TODO loop (degraded): for _ in 0..8 {
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     rb_advance_phase(&tg.state);
     // TODO: }
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
     // // Riko's effect moved the failed live onto her deck (top); later natural
     // // draws in the loop may pull it into hand — either way it must NOT be
     // // back in the waitroom.
-    // TODO assert: assert!( !game.state.player1.waitroom.cards.contains(&mw), "failed live must leave the waitroom via Riko BP6 auto" );
-    // TODO assert: assert!( game.state.player1.main_deck.cards.contains(&mw) || game.state.player1.hand.cards.contains(&mw), "relocated live ends up in deck or (after draws) hand" );
+    CHECK((!test_zone_has_id(&tg, 0, "discard", mw)), "riko_bp6_auto_e2e_heart_failure_triggers");
+    CHECK(test_zone_has_id(&tg, 0, "deck", mw), "riko_bp6_auto_e2e_heart_failure_triggers");
     // 
 }
 
@@ -91777,8 +90916,7 @@ static void gen_riko_bp6_auto_e2e_heart_success_no_trigger(void){
     // 
     // TODO: game.set_live_card(hpt);
     // 
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -91834,7 +90972,7 @@ static void gen_riko_bp6_auto_single_card_deck_top_exact_identity(void){
     // TODO: game.select_generated(0);
     // 
     // // live removed from waitroom entirely
-    // TODO assert: assert!( !game.state.player1.waitroom.cards.contains(&live), "target live card removed from waitroom" );
+    CHECK((!test_zone_has_id(&tg, 0, "discard", live)), "riko_bp6_auto_single_card_deck_top_exact_identity");
     CHECK_EQ(tg.state.p[0].discard.n, 0, "riko_bp6_auto_single_card_deck_top_exact_identity");
     // // deck: original + live on top
     // TODO assert_eq (unresolved): assert_eq!( game.state.player1.main_deck.cards.len(), deck_snapshot.len() + 1, "deck gained exactly 1 card" );
@@ -91886,7 +91024,7 @@ static void gen_riko_bp6_auto_single_card_deck_bottom_exact_identity(void){
     test_has_pending_choice(&tg);
     // TODO: game.select_generated(1); // deck_bottom
     // 
-    // TODO assert: assert!( !game.state.player1.waitroom.cards.contains(&live), "target live card removed from waitroom" );
+    CHECK((!test_zone_has_id(&tg, 0, "discard", live)), "riko_bp6_auto_single_card_deck_bottom_exact_identity");
     // TODO assert_eq (unresolved): assert_eq!( game.state.player1.main_deck.cards.len(), deck_snapshot.len() + 1, "deck gained exactly 1 card" );
     // TODO assert_eq (unresolved): assert_eq!( game.state.player1.main_deck.cards.last(), Some(&live), "live card is at deck bottom" );
     // TODO: let snapshot_vec: Vec<i16> = deck_snapshot.iter().copied().collect();
@@ -91996,10 +91134,10 @@ static void gen_riko_bp6_auto_mixed_batch_filters_correctly(void){
     // TODO: game.select_generated(0);
     // 
     // // Only aq_live was removed; others untouched
-    // TODO assert: assert!( !game.state.player1.waitroom.cards.contains(&aq_live), "aq_live removed" );
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&non_aq_live), "non-Aqours live remains" );
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&filler_member), "member card remains" );
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&energy), "energy card remains" );
+    CHECK((!test_zone_has_id(&tg, 0, "discard", aq_live)), "riko_bp6_auto_mixed_batch_filters_correctly");
+    CHECK(test_zone_has_id(&tg, 0, "discard", non_aq_live), "riko_bp6_auto_mixed_batch_filters_correctly");
+    CHECK(test_zone_has_id(&tg, 0, "discard", filler_member), "riko_bp6_auto_mixed_batch_filters_correctly");
+    CHECK(test_zone_has_id(&tg, 0, "discard", energy), "riko_bp6_auto_mixed_batch_filters_correctly");
     // TODO assert_eq (unresolved): assert_eq!( game.state.player1.main_deck.cards.first(), Some(&aq_live), "aq_live on deck top" );
     // 
 }
@@ -92037,7 +91175,7 @@ static void gen_riko_bp6_auto_non_aq_live_alone_no_trigger(void){
     // 
     // 
     test_has_pending_choice(&tg);
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&non_aq), "non-Aqours live stays in waitroom" );
+    CHECK(test_zone_has_id(&tg, 0, "discard", non_aq), "riko_bp6_auto_non_aq_live_alone_no_trigger");
     // 
 }
 
@@ -92076,7 +91214,7 @@ static void gen_riko_bp6_auto_turn_limit_blocks_second_trigger_exact(void){
     // 
     test_has_pending_choice(&tg);
     // TODO: game.select_generated(0);
-    // TODO assert: assert!( !game.state.player1.waitroom.cards.contains(&live_a), "first trigger: live_a moved to deck" );
+    CHECK((!test_zone_has_id(&tg, 0, "discard", live_a)), "riko_bp6_auto_turn_limit_blocks_second_trigger_exact");
     // TODO assert_eq (unresolved): assert_eq!( game.state.player1.main_deck.cards.first(), Some(&live_a), "first trigger: live_a on deck top" );
     // 
     // // --- Second trigger (same turn) ---
@@ -92088,7 +91226,7 @@ static void gen_riko_bp6_auto_turn_limit_blocks_second_trigger_exact(void){
     // TODO: .process_pending_auto_abilities(&game.state.player1.id.clone());
     // 
     test_has_pending_choice(&tg);
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&live_b), "second trigger: live_b remains in waitroom" );
+    CHECK(test_zone_has_id(&tg, 0, "discard", live_b), "riko_bp6_auto_turn_limit_blocks_second_trigger_exact");
     // // live_a still on deck top (untouched by second trigger)
     // TODO assert_eq (unresolved): assert_eq!( game.state.player1.main_deck.cards.first(), Some(&live_a), "second trigger: live_a still on deck top" );
     // 
@@ -92193,7 +91331,7 @@ static void gen_riko_bp6_auto_riko_not_on_stage_no_trigger(void){
     // 
     // 
     test_has_pending_choice(&tg);
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&live), "live card stays in waitroom" );
+    CHECK(test_zone_has_id(&tg, 0, "discard", live), "riko_bp6_auto_riko_not_on_stage_no_trigger");
     // 
 }
 
@@ -92232,8 +91370,8 @@ static void gen_riko_bp6_auto_optional_skip_does_not_consume_turn_limit(void){
     // 
     test_has_pending_choice(&tg);
     // TODO: game.select_option(-1); // skip
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&live_a), "skip: live_a stays in waitroom" );
-    // TODO assert: assert!( !game.state.player1.main_deck.cards.contains(&live_a), "skip: live_a not on deck" );
+    CHECK(test_zone_has_id(&tg, 0, "discard", live_a), "riko_bp6_auto_optional_skip_does_not_consume_turn_limit");
+    CHECK((!test_zone_has_id(&tg, 0, "deck", live_a)), "riko_bp6_auto_optional_skip_does_not_consume_turn_limit");
     // 
     // // --- Second trigger (same turn): skip did NOT consume turn limit ---
     test_add_to_discard(&tg, live_b);
@@ -92247,10 +91385,10 @@ static void gen_riko_bp6_auto_optional_skip_does_not_consume_turn_limit(void){
     // 
     test_has_pending_choice(&tg);
     // TODO: game.select_generated(0); // deck_top
-    // TODO assert: assert!( !game.state.player1.waitroom.cards.contains(&live_b), "live_b moved to deck from second trigger" );
-    // TODO assert: assert!( game.state.player1.main_deck.cards.contains(&live_b), "live_b on deck" );
+    CHECK((!test_zone_has_id(&tg, 0, "discard", live_b)), "riko_bp6_auto_optional_skip_does_not_consume_turn_limit");
+    CHECK(test_zone_has_id(&tg, 0, "deck", live_b), "riko_bp6_auto_optional_skip_does_not_consume_turn_limit");
     // // live_a still in waitroom (from the skip)
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&live_a), "live_a still in waitroom (was skipped)" );
+    CHECK(test_zone_has_id(&tg, 0, "discard", live_a), "riko_bp6_auto_optional_skip_does_not_consume_turn_limit");
     // 
     // // --- Third trigger: now the turn limit IS consumed (live_b placed on deck) ---
     int live_c = test_id(&tg, "PL!S-PR-022-PR");
@@ -92264,7 +91402,7 @@ static void gen_riko_bp6_auto_optional_skip_does_not_consume_turn_limit(void){
     // TODO: .process_pending_auto_abilities(&game.state.player1.id.clone());
     // 
     test_has_pending_choice(&tg);
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&live_c), "live_c stays in waitroom (turn limit used)" );
+    CHECK(test_zone_has_id(&tg, 0, "discard", live_c), "riko_bp6_auto_optional_skip_does_not_consume_turn_limit");
     // 
 }
 
@@ -92305,8 +91443,7 @@ static void gen_riko_bp6_live_end_clears_all_heart(void){
     // 
     // 
     // // Handle any pending choices from LiveStart triggers
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -92322,8 +91459,7 @@ static void gen_riko_bp6_live_end_clears_all_heart(void){
     rb_advance_phase(&tg.state);
     // 
     // // Handle any pending choices (e.g. LiveSuccess triggers)
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -92757,7 +91893,7 @@ static void gen_rin_bp4_009_lower_total_draws_two_puts_one_on_top(void){
     // 
     // TODO assert_eq (unresolved): assert_eq!( game.state.player1.main_deck.cards.first().copied(), Some(sacrifice), "chosen card sits at deck index 0 (TOP)" );
     // TODO assert_eq (unresolved): assert_eq!( game.state.player1.hand.cards.len(), 2 + 2 - 1, "drew 2, returned exactly 1 to the deck" );
-    // TODO assert: assert!(game.state.player1.hand.cards.contains(&keep));
+    CHECK(test_zone_has_id(&tg, 0, "hand", keep), "rin_bp4_009_lower_total_draws_two_puts_one_on_top");
     // 
 }
 
@@ -93055,7 +92191,7 @@ static void gen_mari_bp3_008_aqours_high_fetch_activates_four(void){
     // 
     test_activate_ability(&tg, mari);
     // 
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&mari), "activation cost sends Mari herself to the waitroom" );
+    CHECK(test_zone_has_id(&tg, 0, "discard", mari), "mari_bp3_008_aqours_high_fetch_activates_four");
     CHECK_EQ(tg.state.p[0].stage[1], -1, "mari_bp3_008_aqours_high_fetch_activates_four");
     // 
     test_has_pending_choice(&tg);
@@ -93069,7 +92205,7 @@ static void gen_mari_bp3_008_aqours_high_fetch_activates_four(void){
     // action result consumed: .expect("Aqours high live offered");
     // TODO: game.select_indices(&[idx]);
     // 
-    // TODO assert: assert!(game.state.player1.hand.cards.contains(&aqours_high));
+    CHECK(test_zone_has_id(&tg, 0, "hand", aqours_high), "mari_bp3_008_aqours_high_fetch_activates_four");
     CHECK_EQ(tg.state.p[0].energy_active, 6, "mari_bp3_008_aqours_high_fetch_activates_four");
     // 
 }
@@ -93094,7 +92230,7 @@ static void gen_mari_bp3_008_wrong_group_fetch_skips_activation(void){
     // action result consumed: .expect("non-Aqours live also selectable");
     // TODO: game.select_indices(&[idx]);
     // 
-    // TODO assert: assert!(game.state.player1.hand.cards.contains(&niji_low));
+    CHECK(test_zone_has_id(&tg, 0, "hand", niji_low), "mari_bp3_008_wrong_group_fetch_skips_activation");
     CHECK_EQ(tg.state.p[0].energy_active, 2, "mari_bp3_008_wrong_group_fetch_skips_activation");
     // 
 }
@@ -93128,7 +92264,7 @@ static void gen_mari_bp3_008_aqours_below_six_skips_activation(void){
     // action result consumed: .expect("low Aqours live selectable");
     // TODO: game.select_indices(&[idx]);
     // 
-    // TODO assert: assert!(game.state.player1.hand.cards.contains(&aqours_low));
+    CHECK(test_zone_has_id(&tg, 0, "hand", aqours_low), "mari_bp3_008_aqours_below_six_skips_activation");
     CHECK_EQ(tg.state.p[0].energy_active, 2, "mari_bp3_008_aqours_below_six_skips_activation");
     // 
 }
@@ -93144,11 +92280,10 @@ static void gen_mari_bp3_008_usable_with_no_live_in_waitroom(void){
     // TODO: game.add_to_discard(test_id(&tg, "PL!-sd1-010-SD")); // only a MEMBER in the waitroom
     // 
     test_activate_ability(&tg, mari);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&mari), "Q123: usable — cost was paid" );
+    CHECK(test_zone_has_id(&tg, 0, "discard", mari), "mari_bp3_008_usable_with_no_live_in_waitroom");
     // TODO assert: assert!( game.state.player1.hand.cards.is_empty(), "nothing added when no live exists" );
     CHECK_EQ(tg.state.p[0].energy_active, 0, "mari_bp3_008_usable_with_no_live_in_waitroom");
     // 
@@ -93164,8 +92299,7 @@ static void gen_mari_bp3_008_activates_only_available_waiting_energies(void){
     int aqours_high = 0;
     // TODO destructuring: let (mari, aqours_high, _) = mari_bp3_008_board(&mut game, 1);
     // // Trim the shared board from 6 cards down to 3.
-    int game = 0;
-    // TODO loop (degraded): while game.state.player1.energy_zone.cards.len() > 3 {
+    // TODO: while game.state.player1.energy_zone.cards.len() > 3 {
     // pop
     // TODO: }
     test_activate_ability(&tg, mari);
@@ -93274,7 +92408,7 @@ static void gen_wakana_bp2_008_use_limit_blocks_second_activation(void){
     // // Pay cost, select Center
     test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, 0);
-    // TODO assert: assert!( game.state.player1.energy_zone.active_count() == 2, "1 energy spent, 2 remaining" );
+    CHECK(tg.state.p[0].energy_active, "wakana_bp2_008_use_limit_blocks_second_activation");
     // 
     // // Second activation: should fail due to use limit
     test_activate_ability(&tg, wakana);
@@ -93576,8 +92710,7 @@ static void gen_keke_look_select_sunny_passion_member(void){
     // TODO loop (degraded): for _ in 0..4 {
     test_add_to_deck(&tg, filler);
     // TODO: }
-    int game = 0;
-    // TODO loop (degraded): while game.state.player1.main_deck.cards.len() < 40 {
+    // TODO: while game.state.player1.main_deck.cards.len() < 40 {
     test_add_to_deck(&tg, filler);
     // TODO: }
     test_give_energy(&tg, 4);
@@ -93595,7 +92728,7 @@ static void gen_keke_look_select_sunny_passion_member(void){
     // TODO: game.select_indices(&[0]);
     // 
     // // Sunny should now be in hand
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&sunny), "SunnyPassion member should be added to hand" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", sunny), "keke_look_select_sunny_passion_member");
     // 
 }
 
@@ -93617,8 +92750,7 @@ static void gen_keke_look_select_liella_no_blade_heart_excluded(void){
     // TODO loop (degraded): for _ in 0..4 {
     test_add_to_deck(&tg, filler);
     // TODO: }
-    int game = 0;
-    // TODO loop (degraded): while game.state.player1.main_deck.cards.len() < 40 {
+    // TODO: while game.state.player1.main_deck.cards.len() < 40 {
     test_add_to_deck(&tg, filler);
     // TODO: }
     test_give_energy(&tg, 4);
@@ -93628,16 +92760,15 @@ static void gen_keke_look_select_liella_no_blade_heart_excluded(void){
     test_play_to_stage(&tg, keke, 1);
     // 
     // // Drain all choices
-    game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
     // // After all choices resolved, liella_no_bh should have been discarded
     // // since it's Liella! but lacks blade_heart.
     test_has_pending_choice(&tg);
-    // TODO assert: assert!( !game.state.player1.hand.cards.contains(&liella_no_bh), "Liella member without blade heart should NOT be in hand" );
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&liella_no_bh), "Liella member without blade heart should be in waitroom" );
+    CHECK((!test_zone_has_id(&tg, 0, "hand", liella_no_bh)), "keke_look_select_liella_no_blade_heart_excluded");
+    CHECK(test_zone_has_id(&tg, 0, "discard", liella_no_bh), "keke_look_select_liella_no_blade_heart_excluded");
     // 
 }
 
@@ -93659,8 +92790,7 @@ static void gen_keke_look_select_liella_with_blade_heart(void){
     // TODO loop (degraded): for _ in 0..4 {
     test_add_to_deck(&tg, filler);
     // TODO: }
-    int game = 0;
-    // TODO loop (degraded): while game.state.player1.main_deck.cards.len() < 40 {
+    // TODO: while game.state.player1.main_deck.cards.len() < 40 {
     test_add_to_deck(&tg, filler);
     // TODO: }
     test_give_energy(&tg, 4);
@@ -93675,7 +92805,7 @@ static void gen_keke_look_select_liella_with_blade_heart(void){
     test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // 
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&liella_bh), "Liella member with blade heart should be added to hand" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", liella_bh), "keke_look_select_liella_with_blade_heart");
     // 
 }
 
@@ -93830,7 +92960,7 @@ static void gen_natsumi_009_draw_with_other_5yncri5e(void){
     // 
     test_play_to_stage(&tg, natsumi, 1);
     // 
-    // TODO assert: assert!( !game.state.player1.hand.cards.contains(&natsumi), "Natsumi should not be in hand (played to stage)" );
+    CHECK((!test_zone_has_id(&tg, 0, "hand", natsumi)), "natsumi_009_draw_with_other_5yncri5e");
     // TODO assert_eq (unresolved): assert_eq!( game.state.player1.main_deck.cards.len(), deck_before - 1, "Deck should have 1 fewer card after draw" );
     // TODO assert_eq (unresolved): assert_eq!( game.state.player1.hand.cards.len(), hand_before + 1, "Should draw 1 card when other 5yncri5e! on stage" );
     // 
@@ -93859,7 +92989,7 @@ static void gen_natsumi_009_no_draw_when_alone(void){
     // 
     test_play_to_stage(&tg, natsumi, 1);
     // 
-    // TODO assert: assert!( !game.state.player1.hand.cards.contains(&natsumi), "Natsumi should not be in hand (played to stage)" );
+    CHECK((!test_zone_has_id(&tg, 0, "hand", natsumi)), "natsumi_009_no_draw_when_alone");
     CHECK_EQ(tg.state.p[0].hand.n, hand_before, "natsumi_009_no_draw_when_alone");
     // 
 }
@@ -93887,7 +93017,7 @@ static void gen_natsumi_009_no_draw_with_non_5yncri5e(void){
     // 
     test_play_to_stage(&tg, natsumi, 1);
     // 
-    // TODO assert: assert!( !game.state.player1.hand.cards.contains(&natsumi), "Natsumi should not be in hand (played to stage)" );
+    CHECK((!test_zone_has_id(&tg, 0, "hand", natsumi)), "natsumi_009_no_draw_with_non_5yncri5e");
     CHECK_EQ(tg.state.p[0].hand.n, hand_before, "natsumi_009_no_draw_with_non_5yncri5e");
     // 
 }
@@ -93916,8 +93046,8 @@ static void gen_natsumi_009_no_draw_with_duplicate_in_hand(void){
     int hand_before = 0;
     test_play_to_stage(&tg, natsumi1, 1);
     // 
-    // TODO assert: assert!( !game.state.player1.hand.cards.contains(&natsumi1), "natsumi1 should not be in hand (played to stage)" );
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&natsumi2), "natsumi2 should still be in hand" );
+    CHECK((!test_zone_has_id(&tg, 0, "hand", natsumi1)), "natsumi_009_no_draw_with_duplicate_in_hand");
+    CHECK(test_zone_has_id(&tg, 0, "hand", natsumi2), "natsumi_009_no_draw_with_duplicate_in_hand");
     // // After play: natsumi1 removed from hand → hand = [natsumi2] → len = 1
     // // If draw occurred: hand = [natsumi2, drawn_card] → len = 2
     int hand_after = tg.state.p[0].hand.n;
@@ -93978,8 +93108,7 @@ static void gen_kanon_unless_pay_pay_avoids_discard(void){
     int energy_after = tg.state.p[0].energy_active;
     // TODO assert: assert!( energy_after < 11, "2 energy should be consumed (had 11 after playing kanon, now {})", energy_after );
     // // Consume any remaining choices
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // 
@@ -94045,8 +93174,7 @@ static void gen_kanon_unless_pay_skip_triggers_discard(void){
     int energy_after = tg.state.p[0].energy_active;
     // TODO assert_eq (unresolved): assert_eq!( energy_after, 2, "Energy should remain 2 when skipping payment (was 2, now {})", energy_after );
     // // Consume any remaining choices
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     energy_after = tg.state.p[0].energy_active;
@@ -94111,8 +93239,7 @@ static void gen_karin_position_change_removes_not_moved_blade(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     int safety = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && safety < 30 {
+    test_has_pending_choice(&tg);
     // TODO: safety += 1;
     // TODO: if game.pending_choice_type().as_deref() == Some("SelectAutoAbility") {
     // TODO: game.select_indices(&[]);
@@ -94123,7 +93250,7 @@ static void gen_karin_position_change_removes_not_moved_blade(void){
     // 
     // 
     // // Verify: cheap_member was added to hand (not discarded).
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&cheap_member), "cheap member card should be in hand after LiveStart" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", cheap_member), "karin_position_change_removes_not_moved_blade");
     // 
     // // Verify: Karin moved.
     int pos_after = 0;
@@ -94182,7 +93309,7 @@ static void gen_rurino_ozora_no_trigger_when_alone_on_stage(void){
     // 
     // // Verify ability did NOT trigger - condition not met
     // // The みらくらぱーく！ card should still be in discard
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&mirakura_card), "みらくらぱーく！ card should remain in discard when Rurino is alone on stage" );
+    CHECK(test_zone_has_id(&tg, 0, "discard", mirakura_card), "rurino_ozora_no_trigger_when_alone_on_stage");
     // 
     // // Verify stage setup is correct
     CHECK_EQ(tg.state.p[0].stage[1], rurino, "rurino_ozora_no_trigger_when_alone_on_stage");
@@ -94257,20 +93384,19 @@ static void gen_rurino_ozora_only_selects_mirakura_cards(void){
     // 
     // // Resolve any pending choices (select first eligible card each time)
     int safety = 0;
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() && safety < 10 {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: safety += 1;
     // TODO: }
     // 
     // // Non-mirakura cards remain in discard (filtered out by ability)
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&non_mirakura), "Non-mirakura card should remain in discard" );
+    CHECK(test_zone_has_id(&tg, 0, "discard", non_mirakura), "rurino_ozora_only_selects_mirakura_cards");
     // 
     // // Deterministic selection ([0] each prompt): mirakura_card1 (first in
     // // discard order) is the recovered one, card2 stays behind.
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&mirakura_card1), "first mirakura card should be recovered to hand, hand={:?}", game.state.player1.hand.cards );
-    // TODO assert: assert!( !game.state.player1.hand.cards.contains(&mirakura_card2), "second mirakura card should NOT be recovered" );
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&mirakura_card2), "unrecovered mirakura card remains in discard" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", mirakura_card1), "rurino_ozora_only_selects_mirakura_cards");
+    CHECK((!test_zone_has_id(&tg, 0, "hand", mirakura_card2)), "rurino_ozora_only_selects_mirakura_cards");
+    CHECK(test_zone_has_id(&tg, 0, "discard", mirakura_card2), "rurino_ozora_only_selects_mirakura_cards");
     // 
 }
 
@@ -94470,7 +93596,7 @@ static void gen_mirakura_discard_then_draws_count_plus_one(void){
     // TODO: game.select_indices(&[]);
     // 
     // // Effect: draw 2 (1 discarded + 1 bonus)
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&discard_card), "Discard pile should contain the discarded card" );
+    CHECK(test_zone_has_id(&tg, 0, "discard", discard_card), "mirakura_discard_then_draws_count_plus_one");
     CHECK_EQ(tg.state.p[0].hand.n, 2, "mirakura_discard_then_draws_count_plus_one");
     CHECK_EQ(tg.state.p[0].deck.n, 18, "mirakura_discard_then_draws_count_plus_one");
     // 
@@ -95186,12 +94312,12 @@ static void gen_ai_screeam_answer_both_draw(void){
     // // P1: 2 initial - 1 live card + 1 (replacement draw from pass) + 1 (ability draw) = 3
     // TODO assert_eq (unresolved): assert_eq!( game.state.player1.hand.cards.len(), p1_hand_before + 1, "P1: net +1 (-1 live, +2 draws)" );
     // // P2 draws 1 naturally during phases + 1 from ability
-    // TODO assert: assert!( game.state.player2.hand.cards.len() > p2_hand_before, "P2 should have drawn" );
+    CHECK(tg.state.p[1].hand.n, "ai_screeam_answer_both_draw");
     // // P1 draws 1, P2 draws 1 (plus P2's natural phase draw)
-    // TODO assert: assert!( game.state.player1.main_deck.cards.len() < p1_deck, "P1 deck should have decreased" );
-    // TODO assert: assert!( game.state.player2.main_deck.cards.len() < p2_deck, "P2 deck should have decreased" );
-    // TODO assert: assert!( game.state.player1.hand.cards.len() >= p1_hand_before - 1, "P1 should have at least as many cards as before (-1 live card)" );
-    // TODO assert: assert!( game.state.player2.hand.cards.len() > p2_hand_before, "P2 should have drawn at least 1" );
+    CHECK(tg.state.p[0].deck.n, "ai_screeam_answer_both_draw");
+    CHECK(tg.state.p[1].deck.n, "ai_screeam_answer_both_draw");
+    CHECK(tg.state.p[0].hand.n, "ai_screeam_answer_both_draw");
+    CHECK(tg.state.p[1].hand.n, "ai_screeam_answer_both_draw");
     // 
 }
 
@@ -95251,8 +94377,8 @@ static void gen_ai_screeam_answer_both_gain_blade(void){
     // 
     // // Verify blade modifiers were applied
     test_has_pending_choice(&tg);
-    // TODO assert: assert!( game.state.mods.get_blade_modifier(p1_member) > 0, "P1 member should have gained blade modifier" );
-    // TODO assert: assert!( game.state.mods.get_blade_modifier(p2_member) > 0, "P2 member should have gained blade modifier" );
+    CHECK(rb_mods_get_blade(&tg.state.mods, p1_member), "ai_screeam_answer_both_gain_blade");
+    CHECK(rb_mods_get_blade(&tg.state.mods, p2_member), "ai_screeam_answer_both_gain_blade");
     // 
 }
 
@@ -95865,8 +94991,8 @@ static void gen_ayumu_kanon_koko_debut_recover_from_discard(void){
     test_has_pending_choice(&tg);
     // 
     // // Verify the member card was recovered from discard to hand
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&member), "Member should be recovered from discard to hand" );
-    // TODO assert: assert!( !game.state.player1.waitroom.cards.contains(&member), "Member should no longer be in discard" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", member), "ayumu_kanon_koko_debut_recover_from_discard");
+    CHECK((!test_zone_has_id(&tg, 0, "discard", member)), "ayumu_kanon_koko_debut_recover_from_discard");
     // 
 }
 
@@ -95955,8 +95081,7 @@ static void gen_ayumu_live_start_triggers(void){
     test_has_pending_choice(&tg);
     // 
     // // Pay the cost: discard the named copy (handling sequential prompts)
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[0]);
     // TODO: }
     // 
@@ -96016,10 +95141,10 @@ static void gen_nico_q168_both_appear_from_discard(void){
     // TODO assert_eq (unresolved): assert_eq!( game.state.mods.get_orientation_modifier(cheap_p2), Some("wait"), "P2's member wait state" );
     // 
     // // Cards removed from discard, NOT in hand
-    // TODO assert: assert!( !game.state.player1.waitroom.cards.contains(&cheap_p1), "P1's card removed from discard" );
-    // TODO assert: assert!( !game.state.player2.waitroom.cards.contains(&cheap_p2), "P2's card removed from discard" );
-    // TODO assert: assert!( !game.state.player1.hand.cards.contains(&cheap_p1), "P1's card NOT in hand" );
-    // TODO assert: assert!( !game.state.player2.hand.cards.contains(&cheap_p2), "P2's card NOT in hand" );
+    CHECK((!test_zone_has_id(&tg, 0, "discard", cheap_p1)), "nico_q168_both_appear_from_discard");
+    CHECK((!test_zone_has_id(&tg, 1, "discard", cheap_p2)), "nico_q168_both_appear_from_discard");
+    CHECK((!test_zone_has_id(&tg, 0, "hand", cheap_p1)), "nico_q168_both_appear_from_discard");
+    CHECK((!test_zone_has_id(&tg, 1, "hand", cheap_p2)), "nico_q168_both_appear_from_discard");
     // 
 }
 
@@ -96104,7 +95229,7 @@ static void gen_nico_sync_path_opponent_gets_choice_when_self_has_none(void){
     // TODO assert_eq (unresolved): assert_eq!( game.state.mods.get_orientation_modifier(cheap_a), Some("wait") );
     // 
     // // cheap_b still in P2 discard (was not selected)
-    // TODO assert: assert!(game.state.player2.waitroom.cards.contains(&cheap_b));
+    CHECK(test_zone_has_id(&tg, 1, "discard", cheap_b), "nico_sync_path_opponent_gets_choice_when_self_has_none");
     // 
 }
 
@@ -96189,7 +95314,7 @@ static void gen_nico_q181_area_freed_after_card_leaves(void){
     // 
     // // Q181: The area is now free
     CHECK_EQ(tg.state.p[0].stage[1], -1, "nico_q181_area_freed_after_card_leaves");
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&cheap), "Removed card back in waitroom" );
+    CHECK(test_zone_has_id(&tg, 0, "discard", cheap), "nico_q181_area_freed_after_card_leaves");
     // 
 }
 
@@ -96223,7 +95348,7 @@ static void gen_nico_requires_empty_area(void){
     // // P1 stage unchanged [filler, nico, filler]
     // TODO assert_eq (unresolved): assert_eq!( game.state.player1.stage.stage, [filler, nico, filler], "P1 stage full, no extra card appeared" );
     // // P1's card returned to discard
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&cheap), "P1's card back in discard (no room on stage)" );
+    CHECK(test_zone_has_id(&tg, 0, "discard", cheap), "nico_requires_empty_area");
     // // P2's card appeared on stage
     CHECK_EQ(tg.state.p[1].stage[2], cheap, "nico_requires_empty_area");
     // 
@@ -96270,7 +95395,7 @@ static void gen_nico_cost_filter_only_shows_eligible(void){
     // action result consumed: assert_eq!( game.state.mods.get_orientation_modifier( *game .state .player2 .stage .stage .iter() .find(|&&id| id != -1) .unwrap() ), Some("wait"), "P2's card wait state" );
     // 
     // // Expensive card still in discard
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&expensive), "Cost-9 card should remain in discard (was never selectable)" );
+    CHECK(test_zone_has_id(&tg, 0, "discard", expensive), "nico_cost_filter_only_shows_eligible");
     // 
 }
 
@@ -96351,14 +95476,14 @@ static void gen_nico_prompt_path_two_eligible_in_discard(void){
     CHECK_EQ(tg.state.p[0].stage[1], cheap_a, "nico_prompt_path_two_eligible_in_discard");
     // TODO assert_eq (unresolved): assert_eq!( game.state.mods.get_orientation_modifier(cheap_a), Some("wait") );
     // // cheap_b still in discard (was not selected)
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&cheap_b), "cheap_b remains in discard" );
+    CHECK(test_zone_has_id(&tg, 0, "discard", cheap_b), "nico_prompt_path_two_eligible_in_discard");
     // 
     // // P2: their card appeared
     // TODO assert: assert!( game.state.player2.stage.stage.contains(&cheap_a), "P2's card on stage" );
     // 
     // // No cards in hand
-    // TODO assert: assert!( !game.state.player1.hand.cards.contains(&cheap_a), "P1's selected card NOT in hand" );
-    // TODO assert: assert!( !game.state.player2.hand.cards.contains(&cheap_a), "P2's card NOT in hand" );
+    CHECK((!test_zone_has_id(&tg, 0, "hand", cheap_a)), "nico_prompt_path_two_eligible_in_discard");
+    CHECK((!test_zone_has_id(&tg, 1, "hand", cheap_a)), "nico_prompt_path_two_eligible_in_discard");
     // 
     // // Both cards placed are in wait state
     // TODO assert_eq (unresolved): assert_eq!( game.state.mods.get_orientation_modifier(cheap_a), Some("wait"), "P1's card wait state" );
@@ -96458,8 +95583,8 @@ static void gen_nico_full_stage_then_prompt_path(void){
     test_has_pending_choice(&tg);
     // TODO assert_eq (unresolved): assert_eq!(game.state.player1.stage.stage, [filler, nico, filler]);
     // // P1's discard untouched (no selection was shown)
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&cheap_a), "P1 cheap_a stays in discard" );
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&cheap_b), "P1 cheap_b stays in discard" );
+    CHECK(test_zone_has_id(&tg, 0, "discard", cheap_a), "nico_full_stage_then_prompt_path");
+    CHECK(test_zone_has_id(&tg, 0, "discard", cheap_b), "nico_full_stage_then_prompt_path");
     // TODO assert: assert!( game.state.player2.stage.stage.contains(&cheap_a), "P2's card appeared" );
     // 
 }
@@ -96674,7 +95799,7 @@ static void gen_you_abilityless_card_not_in_choice(void){
     // TODO: game.select_indices(&[]);
     // 
     // // Filler should still be in hand (it was not eligible for selection)
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&filler), "Filler card should remain in hand (not selectable for named-char cost)" );
+    CHECK(test_zone_has_id(&tg, 0, "hand", filler), "you_abilityless_card_not_in_choice");
     // 
     // // Blade modifier should be applied from discarding the named copy
     int blade_mod = rb_mods_get_blade(&tg.state.mods, keke);
@@ -96853,8 +95978,7 @@ static void gen_bella_positive_surplus_heart04_ability_fires(void){
     // // Advance through phases, handling any pending choices
     // TODO loop (degraded): for _ in 0..8 {
     rb_advance_phase(&tg.state);
-    int game = 0;
-    // TODO loop (degraded): while game.has_pending_choice() {
+    test_has_pending_choice(&tg);
     // TODO: game.select_indices(&[]);
     // TODO: }
     // TODO: }
@@ -97474,7 +96598,7 @@ static void gen_kanon_activation_choice_condition_discard_flow(void){
     test_has_pending_choice(&tg);
     CHECK_EQ(tg.state.p[0].energy_active, 11, "kanon_activation_choice_condition_discard_flow");
     // // The selected card should be in discard (waitroom)
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&cheap), "Discarded card should be in waitroom" );
+    CHECK(test_zone_has_id(&tg, 0, "discard", cheap), "kanon_activation_choice_condition_discard_flow");
     // 
 }
 
@@ -97561,12 +96685,12 @@ static void gen_hanamaru_score_icon_filter(void){
     test_has_pending_choice(&tg);
     // 
     // // Verify: score_live moved from waitroom to hand
-    // TODO assert: assert!( !game.state.player1.waitroom.cards.contains(&score_live), "score icon live card should have been moved out of discard" );
-    // TODO assert: assert!( game.state.player1.hand.cards.contains(&score_live), "score icon live card should be in hand" );
+    CHECK((!test_zone_has_id(&tg, 0, "discard", score_live)), "hanamaru_score_icon_filter");
+    CHECK(test_zone_has_id(&tg, 0, "hand", score_live), "hanamaru_score_icon_filter");
     // 
     // // Verify: non-score live and member remain in discard
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&no_score_live), "non-score live card should remain in discard" );
-    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&member), "member card should remain in discard" );
+    CHECK(test_zone_has_id(&tg, 0, "discard", no_score_live), "hanamaru_score_icon_filter");
+    CHECK(test_zone_has_id(&tg, 0, "discard", member), "hanamaru_score_icon_filter");
     // 
 }
 
@@ -97630,14 +96754,14 @@ static void gen_ai_screeam_soreigai_all_members_on_both_sides_gain_blade(void){
     test_has_pending_choice(&tg);
     // 
     // // All 3 P1 members should have blade
-    // TODO assert: assert!( game.state.mods.get_blade_modifier(p1_a) > 0, "P1 left member should have blade" );
-    // TODO assert: assert!( game.state.mods.get_blade_modifier(p1_b) > 0, "P1 center member should have blade" );
-    // TODO assert: assert!( game.state.mods.get_blade_modifier(p1_c) > 0, "P1 right member should have blade" );
+    CHECK(rb_mods_get_blade(&tg.state.mods, p1_a), "ai_screeam_soreigai_all_members_on_both_sides_gain_blade");
+    CHECK(rb_mods_get_blade(&tg.state.mods, p1_b), "ai_screeam_soreigai_all_members_on_both_sides_gain_blade");
+    CHECK(rb_mods_get_blade(&tg.state.mods, p1_c), "ai_screeam_soreigai_all_members_on_both_sides_gain_blade");
     // 
     // // All 3 P2 members should have blade
-    // TODO assert: assert!( game.state.mods.get_blade_modifier(p2_a) > 0, "P2 left member should have blade" );
-    // TODO assert: assert!( game.state.mods.get_blade_modifier(p2_b) > 0, "P2 center member should have blade" );
-    // TODO assert: assert!( game.state.mods.get_blade_modifier(p2_c) > 0, "P2 right member should have blade" );
+    CHECK(rb_mods_get_blade(&tg.state.mods, p2_a), "ai_screeam_soreigai_all_members_on_both_sides_gain_blade");
+    CHECK(rb_mods_get_blade(&tg.state.mods, p2_b), "ai_screeam_soreigai_all_members_on_both_sides_gain_blade");
+    CHECK(rb_mods_get_blade(&tg.state.mods, p2_c), "ai_screeam_soreigai_all_members_on_both_sides_gain_blade");
     // 
 }
 
@@ -97691,10 +96815,10 @@ static void gen_rise_up_high_turn1_score_and_blade(void){
     // // Ability should fire: condition checks turn_number == 1
     // // Score +1
     int live_id = 0;
-    // TODO assert: assert!( game.state.mods.get_score_modifier(live_id) > 0, "Live card should have score +1 on turn 1" );
+    CHECK(rb_mods_get_score(&tg.state.mods, live_id), "rise_up_high_turn1_score_and_blade");
     // 
     // // Blade gain on the 虹ヶ咲 member
-    // TODO assert: assert!( game.state.mods.get_blade_modifier(niji_member) > 0, "虹ヶ咲 member should have gained blade" );
+    CHECK(rb_mods_get_blade(&tg.state.mods, niji_member), "rise_up_high_turn1_score_and_blade");
     // 
 }
 
@@ -97719,7 +96843,7 @@ static void gen_kosuzu_choose_number_adds_to_hand(void){
     test_has_pending_choice(&tg);
     // TODO: game.select_generated(0);
     test_has_pending_choice(&tg);
-    // TODO assert: assert!(game.state.player1.hand.cards.contains(&top_card));
+    CHECK(test_zone_has_id(&tg, 0, "hand", top_card), "kosuzu_choose_number_adds_to_hand");
     CHECK_EQ(rb_mods_get_blade(&tg.state.mods, kosuzu), 0, "kosuzu_choose_number_adds_to_hand");
     // 
 }
@@ -97745,9 +96869,9 @@ static void gen_kosuzu_choose_number_gains_blade(void){
     test_has_pending_choice(&tg);
     // TODO: game.select_generated(9);
     test_has_pending_choice(&tg);
-    // TODO assert: assert!(!game.state.player1.hand.cards.contains(&top_card));
+    CHECK((!test_zone_has_id(&tg, 0, "hand", top_card)), "kosuzu_choose_number_gains_blade");
     // TODO assert_eq (unresolved): assert_eq!( game.state.player1.main_deck.cards[0], top_card, "card returned to top of deck" );
-    // TODO assert: assert!(game.state.mods.get_blade_modifier(kosuzu) > 0);
+    CHECK(rb_mods_get_blade(&tg.state.mods, kosuzu), "kosuzu_choose_number_gains_blade");
     // 
 }
 
@@ -97772,8 +96896,8 @@ static void gen_kosuzu_equal_choice_both_effects(void){
     test_has_pending_choice(&tg);
     // TODO: game.select_generated(3);
     test_has_pending_choice(&tg);
-    // TODO assert: assert!(game.state.player1.hand.cards.contains(&top_card));
-    // TODO assert: assert!(game.state.mods.get_blade_modifier(kosuzu) > 0);
+    CHECK(test_zone_has_id(&tg, 0, "hand", top_card), "kosuzu_equal_choice_both_effects");
+    CHECK(rb_mods_get_blade(&tg.state.mods, kosuzu), "kosuzu_equal_choice_both_effects");
     // 
 }
 

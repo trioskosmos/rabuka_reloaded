@@ -215,6 +215,35 @@ def map_card_field(expr: str, card_vars):
         return f'{m.group(1)}.{CARD_FIELD[m.group(2)]}'
     return None
 
+ZONE_NORM = {"main_deck":"deck","deck":"deck","hand":"hand","waitroom":"discard","discard":"discard",
+             "live_card_zone":"live","live":"live","success_live_card_zone":"success","success":"success",
+             "energy_zone":"energy","energy":"energy","stage":"stage"}
+
+def map_collection_pred(expr: str):
+    """Map Rust collection-closure predicates (.stage.stage.iter().any(|&id| id == X),
+    .cards.iter().any(|c| c.card_no == "Y") / .cards.contains(&id)) to C bools."""
+    e = expr.strip().rstrip(')')
+    # game.state.playerN.stage.stage.iter().any(|&?v| v == VAR)
+    m = re.match(r'game\.state\.player(\d+)\.stage\.stage\.iter\(\)\.any\(\s*\|\&?\w+\|\s*\w+\s*==\s*([\w-]+)', e)
+    if m:
+        return f'test_zone_has_id(&tg, {int(m.group(1))-1}, "stage", {m.group(2)})'
+    # game.state.playerN.ZONE.cards.iter().any(|&?v| v == VAR)
+    m = re.match(r'game\.state\.player(\d+)\.(\w+)\.cards\.iter\(\)\.any\(\s*\|\&?\w+\|\s*\w+\s*==\s*([\w-]+)', e)
+    if m:
+        zone = ZONE_NORM.get(m.group(2), m.group(2))
+        return f'test_zone_has_id(&tg, {int(m.group(1))-1}, "{zone}", {m.group(3)})'
+    # game.state.playerN.ZONE.cards.iter().any(|&?v| v.card_no == "X" | !=)
+    m = re.match(r'game\.state\.player(\d+)\.(\w+)\.cards\.iter\(\)\.any\(\s*\|\&?\w+\|\s*\w+\.card_no\s*(==|!=)\s*"([^"]+)"', e)
+    if m:
+        zone = ZONE_NORM.get(m.group(2), m.group(2)); base = f'test_zone_has_card_no(&tg, {int(m.group(1))-1}, "{zone}", "{m.group(3)}")'
+        return base if m.group(4) == '==' else f'(!{base})'
+    # game.state.playerN.ZONE.cards.contains(&VAR)
+    m = re.match(r'game\.state\.player(\d+)\.(\w+)\.cards\.contains\(\s*&?([\w-]+)', e)
+    if m:
+        zone = ZONE_NORM.get(m.group(2), m.group(2))
+        return f'test_zone_has_id(&tg, {int(m.group(1))-1}, "{zone}", {m.group(3)})'
+    return None
+
 def strip_rust_wrappers(expr: str):
     """Drop Rust `Option` noise so the inner value matches C: .unwrap(),
     .unwrap_or(N) and Some(X)."""
@@ -459,14 +488,22 @@ def transpile_body(body: str, consts: dict, func_name: str) -> str:
             continue
         # for/while/loop: declare the loop variable so the (degraded) body still
         # compiles and runs once; the loop control itself degrades to a TODO.
-        fm = re.match(r'\s*(?:for|while)\s+(?:mut\s+)?&?(\w+|_)\b', stripped)
+        fm = re.match(r'\s*(?:for|while)\s+(?:mut\s+)?(?:\(\s*([^)]*?)\s*\)|&?(\w+|_))\s+in\b', stripped)
         if fm:
-            var = fm.group(1)
-            if var != '_':
-                if var not in declared:
-                    out.append(f'    int {var} = 0;'); declared.add(var)
+            vartuple, var = fm.group(1), fm.group(2)
+            names = []
+            if vartuple is not None:
+                for part in re.split(r',', vartuple):
+                    part = re.sub(r'[&*]', '', part).strip()
+                    if part and part != '_':
+                        names.append(part)
+            if var and var != '_':
+                names.append(var)
+            for nm in names:
+                if nm not in declared:
+                    out.append(f'    int {nm} = 0;'); declared.add(nm)
                 else:
-                    out.append(f'    {var} = 0;')
+                    out.append(f'    {nm} = 0;')
             out.append(f"    // TODO loop (degraded): {stripped}")
             continue
         if re.match(r'\s*loop\s*\{', stripped):
@@ -1013,10 +1050,12 @@ def transpile_body(body: str, consts: dict, func_name: str) -> str:
                     if r is not None: return r
                     r = map_board_expr(e, func_name)
                     if r is not None: return r
-                    return map_modifier_expr(e, func_name)
+                    r = map_modifier_expr(e, func_name)
+                    if r is not None: return r
+                    return map_collection_pred(e)
                 clhs, crhs = resolve(lhs), resolve(rhs)
-                lhs_ok = (map_heart_expr(lhs) is not None) or (map_card_field(lhs, card_vars) is not None) or assert_resolvable(lhs)
-                rhs_ok = (map_heart_expr(rhs) is not None) or (map_card_field(rhs, card_vars) is not None) or assert_resolvable(rhs)
+                lhs_ok = (map_heart_expr(lhs) is not None) or (map_card_field(lhs, card_vars) is not None) or (map_collection_pred(lhs) is not None) or assert_resolvable(lhs)
+                rhs_ok = (map_heart_expr(rhs) is not None) or (map_card_field(rhs, card_vars) is not None) or (map_collection_pred(rhs) is not None) or assert_resolvable(rhs)
                 if clhs is not None and crhs is not None and lhs_ok and rhs_ok:
                     out.append(f'    CHECK_EQ({clhs}, {crhs}, "{func_name}");')
                     continue
@@ -1027,10 +1066,12 @@ def transpile_body(body: str, consts: dict, func_name: str) -> str:
             out.append(f"    // TODO assert_eq: {stripped}")
             continue
         if 'assert!' in line:
-            mm = re.search(r'assert!\s*\(\s*(.+?)\s*(?:,\s*"[^"]*"\s*)?\)', line, re.DOTALL)
+            mm = re.search(r'assert!\s*\((.*)\)\s*;?\s*$', line, re.DOTALL)
             ccond = None
             if mm:
-                cond = strip_rust_wrappers(mm.group(1)).strip()
+                cond = mm.group(1)
+                cond = re.sub(r',\s*"[^"]*"\s*$', '', cond).strip()
+                cond = strip_rust_wrappers(cond).strip()
                 neg = cond.startswith('!')
                 core = cond[1:].strip() if neg else cond
                 if core == 'game.has_pending_choice()':
@@ -1039,6 +1080,8 @@ def transpile_body(body: str, consts: dict, func_name: str) -> str:
                     c = map_board_expr(core, func_name)
                 if c is None:
                     c = map_modifier_expr(core, func_name)
+                if c is None:
+                    c = map_collection_pred(core)
                 if c is not None:
                     ccond = ('(!' if neg else '') + c + (')' if neg else '')
             if ccond is not None:

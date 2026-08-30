@@ -67,5 +67,8 @@ int  test_get_score_modifier(TestGame *tg, int cid);
 int  test_get_cost_modifier(TestGame *tg, int cid);
 int  test_get_heart_modifier(TestGame *tg, int cid, int color);
 int  test_filler_hand(TestGame *tg);
+int  rb_card_no_eq(int card_id, const char *no);
+int  test_zone_has_card_no(TestGame *tg, int pl, const char *zone, const char *no);
+int  test_zone_has_id(TestGame *tg, int pl, const char *zone, int id);
 
 #endif
