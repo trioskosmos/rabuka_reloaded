@@ -327,15 +327,6 @@ impl<'a> Display<'a> {
         }
         Self::blit_line(&mut ui_bg, &font_ts, &icon_ts, e0, &frame.header, 0, 0);
         Self::blit_line(&mut ui_bg, &font_ts, &icon_ts, e0, &frame.action_count, COLS - 6, 0);
-        // Header second row: P1/P2 H/E + hearts/blade (icons) like 3DS top screen, using space better
-        {
-            let p1c = alloc::format!("P1 {} {}", frame.p1_info[0], frame.p1_info[1]);
-            let p2c = alloc::format!("P2 {} {}", frame.p2_info[0], frame.p2_info[1]);
-            let p1t = rabuka_engine::game::platform_ui::one_line(&p1c, 15);
-            let p2t = rabuka_engine::game::platform_ui::one_line(&p2c, 15);
-            Self::blit_line(&mut ui_bg, &font_ts, &icon_ts, e0, &p1t, 0, 1);
-            Self::blit_line(&mut ui_bg, &font_ts, &icon_ts, e0, &p2t, 15, 1);
-        }
 
         // Stage rows: opponent (flipped 180°) then player, with live success + live set stacked on right
         for (row, y) in STAGE_YS.iter().enumerate() {
