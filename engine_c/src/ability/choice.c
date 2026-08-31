@@ -167,18 +167,112 @@ int rb_resolver_build_reprompt(RbAbilityResolver *self, GameState *g) {
     return 0;
 }
 
+/* Mirror Rust GameState::entry_cost() — the cost AbilityEffect of the ability
+    currently being resolved (queue.entries[cur]). Copies the cost action into
+    out_act (e.g. "discard"/"reveal"/"pay_energy") and returns 1 if a cost exists. */
+static int rb_queue_current_cost_action(GameState *g, char *out_act, int outlen) {
+    if (out_act && outlen > 0) out_act[0] = '\0';
+    if (!g) return 0;
+    int cur = g->queue.cur;
+    if (cur < 0 || cur >= RB_QUEUE_DEPTH) return 0;
+    RbQueueEntry *e = &g->queue.entries[cur];
+    if (e->card_id < 0) return 0;
+    Ability ab;
+    if (!rb_decode_card_ability((uint32_t)e->card_id, e->ability_idx, &ab)) return 0;
+    int has = (ab.cost != NULL);
+    if (has && out_act && outlen > 0) {
+        const char *a = ab.cost->action ? ab.cost->action : "";
+        strncpy(out_act, a, outlen - 1); out_act[outlen - 1] = '\0';
+    }
+    rb_free_ability(&ab);
+    return has;
+}
+
 int rb_resolver_handle_select_card(RbAbilityResolver *self, GameState *g, const char *selected) {
     if (!g || !g->queue.has_pending) return -1;
-    int pl = g->queue.actor;
+    int actor = g->queue.actor;
     int idx = selected ? atoi(selected) : -1;
-    int ids[RB_MAX_ZONE];
-    int n = rb_zone_cards(g, pl, g->queue.pending.zone, ids, RB_MAX_ZONE);
-    if (idx >= 0 && idx < n) {
-        int cid = ids[idx];
-        if (self->n_selected_cards < RB_MAX_RECENTLY_MOVED)
-            self->selected_cards[self->n_selected_cards++] = cid;
-        if (g->queue.resume_eff) rb_set_chosen_target(g->queue.resume_eff, g->queue.pending.zone);
+    int was_skip = (idx < 0);
+    const char *zone = g->queue.pending.zone[0] ? g->queue.pending.zone : "hand";
+    const char *target = g->queue.pending.target[0] ? g->queue.pending.target : NULL;
+    int allow_skip = g->queue.pending.allow_skip;
+
+    int cur = g->queue.cur;
+    int effect_started = (cur >= 0 && cur < RB_QUEUE_DEPTH) ? g->queue.entries[cur].effect_started : 0;
+    char cost_act[48]; cost_act[0] = '\0';
+    int has_cost = rb_queue_current_cost_action(g, cost_act, sizeof(cost_act));
+    int is_reveal = (target && strstr(target, "reveal")) || (zone && strstr(zone, "reveal"));
+    int is_cost_reveal = (!effect_started && has_cost && !strcmp(cost_act, "reveal"));
+
+    /* Consume the deferred そうした場合 gate (mirrors Rust): a skipped answer drops
+        the remaining actions of the current entry. */
+    if (self->deferred_conditional_gate) {
+        self->deferred_conditional_gate = 0;
+        if (was_skip && cur >= 0) {
+            /* C has no per-entry pending_actions list; the gate is consumed and the
+                ability proceeds (Rust clears entry.pending_actions on skip). */
+        }
     }
+
+    /* Reveal selection: push the chosen cards to the revealed set; do not move. */
+    if (is_reveal || is_cost_reveal) {
+        if (!was_skip) {
+            int ids[RB_MAX_ZONE];
+            int n = rb_zone_cards(g, actor, zone, ids, RB_MAX_ZONE);
+            if (idx >= 0 && idx < n) {
+                int cid = ids[idx];
+                if (g->n_revealed < RB_MAX_RECENTLY_MOVED)
+                    g->revealed_cards[g->n_revealed++] = cid;
+                if (self->n_selected_cards < RB_MAX_RECENTLY_MOVED)
+                    self->selected_cards[self->n_selected_cards++] = cid;
+                if (g->queue.resume_eff) rb_set_chosen_target(g->queue.resume_eff, target ? target : "reveal");
+            }
+        }
+        return rb_resolver_clear_choice_state_and_resume(self);
+    }
+
+    /* Hand-cost payment (Rust Rule 9.4.2.3): the chosen hand cards are the cost;
+        move them to the waitroom (discard) and record the cost result + movement
+        so downstream cost-condition gates and auto-triggers see it. */
+    if (!effect_started && has_cost && !strcmp(zone, "hand")) {
+        if (!was_skip) {
+            int ids[RB_MAX_ZONE];
+            int n = rb_zone_cards(g, actor, "hand", ids, RB_MAX_ZONE);
+            if (idx >= 0 && idx < n) {
+                int cid = ids[idx];
+                rb_choice_send_to_dst(g, actor, cid, "waitroom");
+                if (self->n_moved_cards < RB_MAX_RECENTLY_MOVED)
+                    self->moved_cards[self->n_moved_cards++] = cid;
+                if (self->n_selected_cards < RB_MAX_RECENTLY_MOVED)
+                    self->selected_cards[self->n_selected_cards++] = cid;
+                if (g->n_recently_moved < RB_MAX_RECENTLY_MOVED)
+                    g->recently_moved[g->n_recently_moved++] = cid;
+            }
+            if (cur >= 0) g->queue.entries[cur].optional_cost_result = 1;
+            g->mods.last_cost_discard_count = self->n_moved_cards;
+            g->mods.n_last_cost_moved_card_ids = self->n_moved_cards;
+            for (int i = 0; i < self->n_moved_cards && i < RB_MAX_RECENTLY_MOVED; i++)
+                g->mods.last_cost_moved_card_ids[i] = self->moved_cards[i];
+        } else {
+            if (cur >= 0) g->queue.entries[cur].optional_cost_result = 0;
+        }
+        /* C emits one card per choice; a single pick satisfies the gate. */
+        return rb_resolver_clear_choice_state_and_resume(self);
+    }
+
+    /* Plain select: record the chosen card as the target. The deferred effect
+        (re-executed by the resume path) applies the actual zone move. */
+    if (!was_skip) {
+        int ids[RB_MAX_ZONE];
+        int n = rb_zone_cards(g, actor, zone, ids, RB_MAX_ZONE);
+        if (idx >= 0 && idx < n) {
+            int cid = ids[idx];
+            if (self->n_selected_cards < RB_MAX_RECENTLY_MOVED)
+                self->selected_cards[self->n_selected_cards++] = cid;
+            if (g->queue.resume_eff) rb_set_chosen_target(g->queue.resume_eff, zone);
+        }
+    }
+    (void)allow_skip;
     return rb_resolver_clear_choice_state_and_resume(self);
 }
 
@@ -542,31 +636,37 @@ int rb_resume_with_choice(GameState *g, int selected_idx) {
                         !strcmp(def->action, "pay_cost") ||
                         !strcmp(def->action, "activation_cost") ||
                         !strcmp(def->action, "pay_any_cost")));
+        /* "discard your entire hand" optional cost (mirrors Rust
+            handle_pay_cost_all_discard routing). */
+        if (g->queue.pending.target && strstr(g->queue.pending.target, "pay_cost_all_discard")) {
+            rb_handle_pay_cost_all_discard(g, actor, selected);
+            rb_resolver_continue_siblings(g, actor, host, cont, cont_from);
+            return 1;
+        }
         switch (kind) {
-        case RB_CHOICE_SELECT_CARD:
-            /* Optional-cost deferral: the deferred effect is the cost itself, so
-                pay it (mode-0 behavior). Otherwise record the selection through
-                the handler (mirrors Rust handle_select_card's chosen-target /
-                selected_cards bookkeeping) AND apply the deferred effect, which
-                performs the actual zone move based on the chosen index — the C
-                engine models the selection via deferred re-execution. */
-            if (is_cost && !was_skip) {
-                rb_pay_cost(g, actor, def);
-                rb_resolver_continue_siblings(g, actor, host, cont, cont_from);
-                break;
-            }
+        case RB_CHOICE_SELECT_CARD: {
+            /* Faithful handle_select_card dispatch: reveal and hand-cost selections
+                are applied directly by the handler (which moves cards / records the
+                cost result). Plain selects still re-run the deferred effect, because
+                in the C engine the deferred effect performs the actual zone move
+                based on the chosen index — the engine models selection via
+                deferred re-execution rather than the handler doing the move. */
+            const char *pzone = g->queue.pending.zone[0] ? g->queue.pending.zone : "hand";
+            const char *ptarget = g->queue.pending.target[0] ? g->queue.pending.target : NULL;
+            int cur = g->queue.cur;
+            int eff_started = (cur >= 0 && cur < RB_QUEUE_DEPTH) ? g->queue.entries[cur].effect_started : 0;
+            char ca[48]; ca[0] = '\0';
+            int hc = rb_queue_current_cost_action(g, ca, sizeof(ca));
+            int rev = (ptarget && strstr(ptarget, "reveal")) || (pzone && strstr(pzone, "reveal"));
+            int cost_hand = (!eff_started && hc && !strcmp(pzone, "hand"));
             rb_resolver_handle_select_card(&self, g, selected);
-            if (!was_skip && def) {
-                if (def->action && (!strcmp(def->action, "pay_energy") ||
-                                    !strcmp(def->action, "pay_cost") ||
-                                    !strcmp(def->action, "activation_cost") ||
-                                    !strcmp(def->action, "pay_any_cost")))
-                    rb_pay_cost(g, actor, def);
-                else
-                    rb_execute_effect_ex(g, actor, def, host);
+            if (!was_skip && def && !rev && !cost_hand) {
+                if (is_cost) rb_pay_cost(g, actor, def);
+                else         rb_execute_effect_ex(g, actor, def, host);
             }
             rb_resolver_continue_siblings(g, actor, host, cont, cont_from);
             break;
+        }
         case RB_CHOICE_SELECT_TARGET:
             /* record the chosen target via the handler, then run the deferred
                 effect that consumes it (C models target selection via deferral). */

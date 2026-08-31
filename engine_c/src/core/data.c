@@ -136,6 +136,49 @@ static int parse_strings(const unsigned char *blob, long len) {
     return 0;
 }
 
+#ifdef RB_ROM_STRINGS
+/* Genesis/ROM build: the card & ability string blobs are embedded in ROM. We
+   build two RAM pointer arrays (g_card_strings_rom, g_strings_rom) that index
+   directly into those blobs — no per-string copy, so the whole game fits in the
+   64 KB work RAM. The engine's parse_cards/parse_strings treat these as the live
+   string tables (see the #ifdef RB_ROM_STRINGS branches above). */
+int rb_load_rom(const unsigned char *cards_blob, long cards_len,
+                const unsigned char *abstr_blob, long abstr_len) {
+    /* ── card-name pointer table ── */
+    if (cards_len < 10 || memcmp(cards_blob, "CARD", 4) != 0) return -2;
+    g_num_cards = le16(cards_blob + 4);
+    uint32_t strtab_len = le32(cards_blob + 6);
+    const unsigned char *strtab = cards_blob + 10;
+    const unsigned char *p = strtab;
+    size_t n = 0;
+    while ((long)(p - strtab) < (long)strtab_len) {
+        uint16_t slen = le16(p); p += 2 + slen; n++;
+    }
+    g_card_strings_rom = (char **)malloc((n ? n : 1) * sizeof(char *));
+    if (!g_card_strings_rom) return -7;
+    p = strtab; n = 0;
+    while ((long)(p - strtab) < (long)strtab_len) {
+        uint16_t slen = le16(p); p += 2;
+        g_card_strings_rom[n++] = (char *)p;
+        p += slen;
+    }
+    if (parse_cards(cards_blob, cards_len) != 0) return -2;
+
+    /* ── ability-string pointer table ── */
+    g_abstr_blob = (unsigned char *)abstr_blob;
+    g_abstr_len = abstr_len;
+    uint32_t sn = RBKA_NUM_STRING_OFFSETS ? (RBKA_NUM_STRING_OFFSETS - 1) : 0;
+    g_strings_rom = (char **)malloc((sn ? sn : 1) * sizeof(char *));
+    if (!g_strings_rom) return -8;
+    for (uint32_t i = 0; i < sn; i++)
+        g_strings_rom[i] = (char *)(abstr_blob + g_strings_offsets[i]);
+    if (parse_strings(abstr_blob, abstr_len) != 0) return -3;
+
+    load_bytecode();
+    return 0;
+}
+#endif
+
 /* ── load cards.bin ── */
 static int load_cards(const char *dir) {
     char path[1024];

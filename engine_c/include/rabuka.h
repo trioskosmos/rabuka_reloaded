@@ -210,6 +210,8 @@ typedef struct {
     int8_t          blade_type[RB_MAX_CARD_IDS];   /* -1 none, else BladeColor idx */
     int8_t          heart_color_override[RB_MAX_CARD_IDS]; /* -1 none (specify_heart_color); else all base hearts counted as this colour */
     int             last_cost_discard_count;       /* cards discarded as part of the last cost payment */
+    int             last_cost_moved_card_ids[8]; /* ids moved for the last cost (mirrors Rust mods.last_cost_moved_card_ids) */
+    int             n_last_cost_moved_card_ids;
     /* last_under_move_host_ids — mirrors game_modifiers.rs last_under_move_host_ids
         (SmallVec<[i16;4]>). Stage member ids that hosted the cards pulled by the
         most recent move_from_under_member, so a following 「そうした場合、そのメンバーは…」
@@ -299,6 +301,13 @@ int  rb_load(const char *data_dir);   /* load cards.bin + abilities_strings.bin 
 int  rb_load_streaming(const char *dir,
                        unsigned char *(*read_fn)(const char *path, long *out_len)); /* alt I/O */
 int  rb_load_gen_data(const unsigned char *buf, long len); /* populate offset tables from storage */
+#ifdef RB_ROM_STRINGS
+/* ROM-embedded build: cards.bin / abilities_strings.bin live in ROM; the
+   caller passes their addresses and rb_load_rom() builds pointer tables that
+   index directly into the blobs (no per-string copy). */
+int  rb_load_rom(const unsigned char *cards_blob, long cards_len,
+                 const unsigned char *abstr_blob, long abstr_len);
+#endif
 void rb_unload(void);
 uint32_t rb_num_cards(void);
 uint32_t rb_num_abilities(void);
@@ -518,6 +527,7 @@ typedef struct {
     int ability_idx;  /* 0..n */
     int cost_paid;    /* 1 after cost emitted */
     int effect_started;
+    int optional_cost_result; /* -1 none, 0 declined, 1 paid (mirrors Rust entry.optional_cost_result) */
 } RbQueueEntry;
 
 #define RB_QUEUE_DEPTH 16
@@ -1160,6 +1170,7 @@ int rb_pay_cost(GameState *g, int actor, const AbilityEffect *cost);
 int rb_validate_cost(const GameState *g, int actor, const AbilityEffect *cost);
 int rb_pay_deferred_costs(GameState *g, int actor, const AbilityEffect *cost);
 int rb_handle_optional_cost_payment(GameState *g, int actor, const AbilityEffect *cost, int pay);
+int rb_handle_pay_cost_all_discard(GameState *g, int actor, const char *selected);
 int rb_cost_has_skip_prompt(const AbilityEffect *cost);
 int rb_compute_play_cost(const GameState *g, int actor, int card_id, int set_override);
 int rb_get_change_state_candidates(const GameState *g, int actor,

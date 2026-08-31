@@ -1,2 +1,7 @@
 *.o
 *.obj
+toolchains/
+platforms/*/output/
+*.bin
+*.elf
+*.map

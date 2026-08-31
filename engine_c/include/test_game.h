@@ -26,6 +26,8 @@ void test_add_to_success(TestGame *tg, int card_id);
 void test_add_to_live(TestGame *tg, int card_id);
 void test_add_to_deck(TestGame *tg, int card_id);
 void test_add_to_deck_pl(TestGame *tg, int pl, int card_id);
+/* Prepend card to the top of player pl's deck (Rust main_deck.cards.insert(0, x)). */
+void test_insert_deck_top(TestGame *tg, int pl, int card_id);
 void test_add_to_energy(TestGame *tg, int pl, int card_id);
 void test_set_energy_active(TestGame *tg, int pl, int n);
 void test_add_to_revealed(TestGame *tg, int card_id);

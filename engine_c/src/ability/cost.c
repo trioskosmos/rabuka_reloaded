@@ -434,3 +434,57 @@ int rb_compute_play_cost(const GameState *g, int actor, int card_id,
     rb_free_card(&card);
     return cost;
 }
+
+/* Mirror cost.rs::handle_pay_cost_all_discard — settle an "optional: discard your
+    entire hand" cost. `accepted` is true unless the player skipped (selected ==
+    "skip_optional_cost" or "0"). On accept, every hand card is moved to the
+    waitroom (discard) as a real zone change, the movement is recorded, and — only
+    if the cost was paid — the ability's effect is executed (mirrors the
+    colon-gated "may discard X: draw Y" pattern: skip ⇒ no effect). */
+int rb_handle_pay_cost_all_discard(GameState *g, int actor, const char *selected) {
+    if (!g) return 0;
+    int accepted = (selected && strcmp(selected, "skip_optional_cost") &&
+                    strcmp(selected, "0"));
+    int cur = g->queue.cur;
+    if (cur >= 0 && cur < RB_QUEUE_DEPTH) {
+        g->queue.entries[cur].cost_paid = 1;
+        g->queue.entries[cur].optional_cost_result = accepted ? 1 : 0;
+    }
+    if (accepted) {
+        const char *target_str = "self";
+        const char *source = "hand";
+        if (cur >= 0 && cur < RB_QUEUE_DEPTH) {
+            RbQueueEntry *e = &g->queue.entries[cur];
+            if (e->card_id >= 0) {
+                Ability ab;
+                if (rb_decode_card_ability((uint32_t)e->card_id, e->ability_idx, &ab) && ab.cost) {
+                    if (ab.cost->target && *ab.cost->target) target_str = ab.cost->target;
+                    if (ab.cost->source && *ab.cost->source) source = ab.cost->source;
+                    rb_free_ability(&ab);
+                }
+            }
+        }
+        int tp = rb_resolve_target_player(g, target_str);
+        int tpl = (tp >= 0) ? tp : actor;
+        RbPlayer *P = &g->p[tpl];
+        (void)source;
+        int moved = P->hand.n;
+        for (int i = 0; i < moved; i++) {
+            int cid = P->hand.cards[i];
+            if (P->discard.n < RB_MAX_ZONE) P->discard.cards[P->discard.n++] = cid;
+            if (g->n_recently_moved < RB_MAX_RECENTLY_MOVED)
+                g->recently_moved[g->n_recently_moved++] = cid;
+        }
+        g->mods.last_cost_discard_count = moved;
+        P->hand.n = 0;
+        rb_recalc_constants(g);
+    }
+    /* Only run the effect if the optional cost was paid. */
+    if (accepted && g->queue.resume_eff) {
+        int eff_started = (cur >= 0 && cur < RB_QUEUE_DEPTH) ? g->queue.entries[cur].effect_started : 0;
+        (void)eff_started;
+        rb_execute_effect_ex(g, actor, g->queue.resume_eff, g->queue.resume_host);
+        if (cur >= 0 && cur < RB_QUEUE_DEPTH) g->queue.entries[cur].effect_started = 1;
+    }
+    return 1;
+}

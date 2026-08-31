@@ -130,6 +130,16 @@ def _map_game_id(expr: str, consts: dict):
         return f'test_id(&tg, "{m.group(1)}")'
     return e
 
+def _map_game_id_safe(expr: str, consts: dict):
+    """Like _map_game_id but returns None when the id cannot be resolved to a
+    C call (e.g. game.id(NIJI_LIVES[0]) indexing a const array, or any expr
+    still mentioning `game.`). Callers should emit a TODO instead of broken C
+    so the generated file keeps compiling."""
+    c = _map_game_id(expr, consts)
+    if c is None or re.search(r'\bgame\.', c):
+        return None
+    return c
+
 def expand_helpers(body: str, helpers: dict, consts: dict, depth=0):
     """Recursively inline helper calls (setup_and_trigger, trigger_debut, …)
     with parameter substitution so the call site's body becomes translatable."""
@@ -530,13 +540,21 @@ def join_method_continuations(lines):
             .push(x);
     into a single line so the single-line transpiler regexes fire. A line that
     begins with optional whitespace then '.' + identifier is treated as a
-    continuation of the previous non-empty line. Method chains are the only
+    continuation of the previous non-empty line. Concatenate with NO separator
+    (Rust chains are dot-joined, e.g. `game.state.player1`), not a space, or the
+    resulting `game.state .player1` matches no rule. Strip a trailing line
+    comment so it can't swallow the rest of the chain. Method chains are the only
     common case of a statement starting with '.', so the false-positive risk is
     low; verify by regenerating and re-running the suite."""
     out = []
     for ln in lines:
-        if out and re.match(r'^\s*\.[A-Za-z_]\w*', ln):
-            out[-1] = out[-1].rstrip() + ' ' + ln.strip()
+        s = ln.rstrip()
+        prev = out[-1].rstrip() if out else ''
+        # Only join when the previous line is an unfinished expression (a Rust
+        # chain never ends a continuation line with ; } { or an open paren).
+        if out and not prev.endswith((';', '}', '{', '(')) and re.match(r'^\s*\.[A-Za-z_]\w*', s):
+            cont = re.sub(r'//.*$', '', s).strip()
+            out[-1] = out[-1].rstrip() + cont
         else:
             out.append(ln)
     return out
@@ -1186,7 +1204,9 @@ def transpile_body(body: str, consts: dict, func_name: str) -> str:
         m = re.search(r'game\.state\.player(\d+)\.(main_deck|deck|waitroom|discard)\.cards\.push\((.*)\)', line)
         if m:
             pl = int(m.group(1)) - 1; zone = m.group(2); inner = m.group(3).strip()
-            card = _map_game_id(inner, consts)
+            card = _map_game_id_safe(inner, consts)
+            if card is None:
+                out.append(f"    // TODO push (unresolved id): {inner}"); continue
             bag = 'deck' if zone in ('main_deck', 'deck') else 'discard'
             if bag == 'deck':
                 out.append(f"    test_add_to_deck(&tg, {card});")
@@ -1197,14 +1217,51 @@ def transpile_body(body: str, consts: dict, func_name: str) -> str:
         m = re.search(r'game\.state\.player(\d+)\.energy_zone\.cards\.push\((.*)\)', line)
         if m:
             pl = int(m.group(1)) - 1
-            card = _map_game_id(m.group(2).strip(), consts)
+            card = _map_game_id_safe(m.group(2).strip(), consts)
+            if card is None:
+                out.append(f"    // TODO push (unresolved id): {m.group(2).strip()}"); continue
             out.append(f"    test_add_to_energy(&tg, {pl}, {card});"); mark_real(); continue
         # energy_deck.cards.push(card) -> deck (player-aware)
         m = re.search(r'game\.state\.player(\d+)\.energy_deck\.cards\.push\((.*)\)', line)
         if m:
             pl = int(m.group(1)) - 1
-            card = _map_game_id(m.group(2).strip(), consts)
+            card = _map_game_id_safe(m.group(2).strip(), consts)
+            if card is None:
+                out.append(f"    // TODO push (unresolved id): {m.group(2).strip()}"); continue
             out.append(f"    test_add_to_deck_pl(&tg, {pl}, {card});"); continue
+        # main_deck.cards = vec![a, b, c].into()  (deck replacement, top=a)
+        # or vec![x; N].into() (repeat-constructor) -> clear deck then push
+        # each card in order (top first). Repeat-constructors are unrolled.
+        m = re.search(r'game\.state\.player(\d+)\.main_deck\.cards\s*=\s*vec!\[(.*)\]\.into\(\)', line)
+        if m:
+            pl = int(m.group(1)) - 1
+            inner = m.group(2).strip()
+            parts = [f"    tg.state.p[{pl}].deck.n = 0;"]
+            rm = re.match(r'^(.*?)\s*;\s*(\d+)\s*$', inner)
+            if rm and rm.group(2).isdigit():
+                card = _map_game_id_safe(rm.group(1).strip(), consts)
+                if card is None:
+                    out.append(f"    // TODO push (unresolved id): {rm.group(1).strip()}"); continue
+                for _ in range(min(int(rm.group(2)), 256)):
+                    parts.append(f"    test_add_to_deck(&tg, {card});")
+            else:
+                for e in split_top_commas(inner):
+                    e = e.strip()
+                    if not e:
+                        continue
+                    card = _map_game_id_safe(e, consts)
+                    if card is None:
+                        out.append(f"    // TODO push (unresolved id): {e}"); continue
+                    parts.append(f"    test_add_to_deck(&tg, {card});")
+            out.extend(parts); mark_real(); continue
+        # main_deck.cards.insert(0, card)  (prepend to deck top)
+        m = re.search(r'game\.state\.player(\d+)\.main_deck\.cards\.insert\(\s*0\s*,\s*(.*)\)', line)
+        if m:
+            pl = int(m.group(1)) - 1
+            card = _map_game_id_safe(m.group(2).strip(), consts)
+            if card is None:
+                out.append(f"    // TODO push (unresolved id): {m.group(2).strip()}"); continue
+            out.append(f"    test_insert_deck_top(&tg, {pl}, {card});"); mark_real(); continue
         # energy_zone.set_active_count(N)
         m = re.search(r'game\.state\.player(\d+)\.energy_zone\.set_active_count\((\d+)\)', line)
         if m:
@@ -1213,7 +1270,9 @@ def transpile_body(body: str, consts: dict, func_name: str) -> str:
         # revealed_cards.push(card) / revealed_cards.len()
         m = re.search(r'game\.state\.revealed_cards\.push\((.*)\)', line)
         if m:
-            card = _map_game_id(m.group(1).strip(), consts)
+            card = _map_game_id_safe(m.group(1).strip(), consts)
+            if card is None:
+                out.append(f"    // TODO push (unresolved id): {m.group(1).strip()}"); continue
             out.append(f"    test_add_to_revealed(&tg, {card});"); mark_real(); continue
         # game.state.push_movement_event(who, from_zone, to_zone, Some(card), side, flag)
         # -> record the auto-trigger implied by the move so a later
@@ -1255,10 +1314,10 @@ def transpile_body(body: str, consts: dict, func_name: str) -> str:
         # let VAR = EXPR;  — declare so downstream references always compile
         # (resolving to C when possible, else stub with 0). Reuse already-declared
         # names via assignment to avoid "redefinition" when a loop body is flattened.
-        lm = re.match(r'\s*let\s+(?:mut\s+)?(\w+)\s*=\s*(.+?);\s*$', line)
+        lm = re.match(r'\s*let\s+(?:mut\s+)?(\w+)\s*(?::\s*[A-Za-z_][\w<>,\s]*?)?\s*=\s*(.+?);\s*$', line)
         if not lm:
             # multi-line `let X = a.b().c()...` chains: the `let` line has no `;`.
-            lm = re.match(r'\s*let\s+(?:mut\s+)?(\w+)\s*=\s*(.+)$', line)
+            lm = re.match(r'\s*let\s+(?:mut\s+)?(\w+)\s*(?::\s*[A-Za-z_][\w<>,\s]*?)?\s*=\s*(.+)$', line)
             if lm:
                 var = lm.group(1)
                 if var == "_":
