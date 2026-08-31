@@ -10,6 +10,11 @@
 #include "rabuka.h"
 #include <string.h>
 #include <stdio.h>
+#include <stdlib.h>
+
+/* Forward declarations */
+void rb_resolver_store_pending_choice(GameState *g);
+#include <stdio.h>
 
 /* ── resolver.rs::get_pending_choice ──
    Return the pending choice, or NULL when none is awaiting input. */
@@ -166,22 +171,32 @@ int rb_resolve_ability(GameState *g, int actor, const Ability *ab,
     if (resolved) *resolved = 0;
     if (!g || !ab) return 0;
 
+    /* Check use limit */
     if (ab->use_limit > 0) {
         if (rb_resolver_use_limit_reached(g, host_cid, ability_idx, ab->use_limit))
             return 0;
     }
 
+    /* Pay cost if not already paid */
     if (ab->cost) {
         if (!rb_pay_cost(g, actor, ab->cost))
             return 0;
     }
 
+    /* Execute effect - this may emit a pending choice */
     if (ab->effect) {
         if (!rb_can_activate_effect(g, actor, ab->effect, host_cid))
             return 0;
         rb_execute_effect_ex(g, actor, ab->effect, host_cid);
+        /* If a pending choice was created, store it and return */
+        if (g->queue.has_pending) {
+            rb_resolver_store_pending_choice(g);
+            if (resolved) *resolved = 1;
+            return 1;
+        }
     }
 
+    /* Record use limit */
     if (ab->use_limit > 0)
         rb_record_ability_use(g, host_cid, ability_idx);
 

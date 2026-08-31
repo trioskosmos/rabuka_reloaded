@@ -77,10 +77,10 @@ fraction of the Rust twin) and `audit_placeholders.py` (no TODO/STUB markers lef
 - C lines / Rust lines: ~19,038 / 48,265 (~40%). [UPDATED 2026-09-01]
 - C functions: 1,272 / Rust port functions: 857 (C has MORE due to helpers). [UPDATED 2026-09-01]
 - Worst file gaps: `src/ability/resolver.c` (1 missing). [UPDATED 2026-09-01]
-- DEPENDENCY_AUDITY.md: 995 REAL, 246 DONE_SMALL, 31 STUBS (2%). [UPDATED 2026-09-01]
-- Test status: 7 failing tests (down from initial failures). [UPDATED 2026-09-01]
+- DEPENDENCY_AUDIT.md: 995 REAL, 246 DONE_SMALL, 31 STUBS (2%). [UPDATED 2026-09-01]
+- Test status: 7 failing tests (requires faithful port of complex game logic). [UPDATED 2026-09-01]
 - Orphaned fragment files (`choice_frag_*.c`): DELETED 2026-09-01.
-- Build status: CLEAN (rb_engine.exe, 675KB). [UPDATED 2026-09-01]
+- Build status: CLEAN (rb_engine.exe, 677KB). [UPDATED 2026-09-01]
 - Ported this session (2026-09-01, 29 commits):
   - **move.rs (30+ functions):** prompt_card_selection, place_card_with_stage_choice, resolve_from_recently_moved, take_cards_from_standard_zone, resolve_cards_from_source, resolve_from_zone, resolve_from_energy_deck, resolve_from_stage, resolve_from_under_member, move_from_revealed, finalize_card_movement, fire_debut_side_effects, handle_select_position, execute_stage_placement_choices, place_energy_under_member_selected, execute_move_cards_both, execute_selected_cards_from_zone, handle_select_cards_looked_at, handle_energy_zone_selection, resolve_from_revealed_cards, resolve_from_those_cards
   - **state.rs (16+ functions):** execute_change_state, execute_energy_placement, execute_energy_state_change, execute_set_card_identity, execute_set_heart_type_applied, execute_set_cost, execute_set_blade_type, execute_specify_heart_color, execute_set_card_identity_all_regions, execute_set_cost_to_use, execute_all_blade_timing, execute_modify_cost, execute_activation_cost, execute_set_heart_copy_from_under, execute_set_heart_type, reduce_live_card_set_limit
