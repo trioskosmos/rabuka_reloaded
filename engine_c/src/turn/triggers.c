@@ -71,6 +71,10 @@ int rb_trigger_live_start(GameState *g, int pl) {
             rb_free_ability(&ab);
         }
     }
+    /* Process the queued abilities so their effects resolve (e.g., position change) */
+    if (queued > 0) {
+        rb_drain_ability_queue(g);
+    }
     return queued;
 }
 
