@@ -86,6 +86,9 @@ void rb_advance_phase(GameState *g) {
     }
     if(g->phase==RB_PHASE_PERFORMANCE){
         rb_recalc_constants(g);
+        /* Perform the live calculation for both players */
+        rb_perform_live(g, 0);
+        rb_perform_live(g, 1);
         /* Trigger LiveSuccess abilities for both players */
         rb_trigger_live_success(g, 0);
         rb_trigger_live_success(g, 1);

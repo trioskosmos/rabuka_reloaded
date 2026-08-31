@@ -325,8 +325,16 @@ void rb_effect_energy_placement(GameState *g, int actor, AbilityEffect *e){
     int n = e->count >= 0 ? e->count : 1;
     int active = st && (!strcmp(st,"active")||!strcmp(st,"アクティブ"));
     for(int k=0;k<n;k++){
-        if(P->energy.n < RB_ENERGY_CAP) P->energy.n++;
-        if(active && P->energy_active < RB_ENERGY_CAP) P->energy_active++;
+        /* Draw from energy_deck and place in energy_zone */
+        if(P->energy_deck.n > 0){
+            int cid = P->energy_deck.cards[0];
+            for(int i=0;i<P->energy_deck.n-1;i++) P->energy_deck.cards[i] = P->energy_deck.cards[i+1];
+            P->energy_deck.n--;
+            if(P->energy.n < RB_MAX_ZONE){
+                P->energy.cards[P->energy.n++] = cid;
+                if(active && P->energy_active < RB_ENERGY_CAP) P->energy_active++;
+            }
+        }
     }
 }
 
