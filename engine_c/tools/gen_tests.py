@@ -7,9 +7,38 @@ and emits a C test file that mirrors them via test_game.h.
 Handles the constant-recalc pattern (cost/score/heart) which is ~30%
 of the suite and is already green after the variant-byte + modify_cost fixes.
 """
-import re, pathlib
+import re, pathlib, os
 
-ROOT = pathlib.Path(__file__).resolve().parents[2]
+def _find_repo_root():
+    """Locate the repo root robustly regardless of how the script is invoked
+    (relative __file__, msys/Windows path mangling, or a cwd inside a subdir).
+    The root is the nearest ancestor that contains BOTH engine/tests and
+    engine_c/ (so we never guess wrong under symlinked/OneDrive mounts)."""
+    seeds = []
+    try:
+        seeds.append(pathlib.Path(__file__).resolve())
+    except Exception:
+        pass
+    try:
+        seeds.append(pathlib.Path(os.getcwd()).resolve())
+    except Exception:
+        pass
+    for seed in seeds:
+        cur = seed
+        for _ in range(8):
+            if (cur / "engine" / "tests").is_dir() and (cur / "engine_c").is_dir():
+                return cur
+            parent = cur.parent
+            if parent == cur:
+                break
+            cur = parent
+    # Fallback: original assumption (script lives in <root>/engine_c/tools).
+    try:
+        return pathlib.Path(__file__).resolve().parents[2]
+    except Exception:
+        return pathlib.Path(os.getcwd()).resolve()
+
+ROOT = _find_repo_root()
 SRC = ROOT / "engine" / "tests"
 OUT = ROOT / "engine_c" / "tests" / "test_ported_generated.c"
 
@@ -254,6 +283,27 @@ def strip_rust_wrappers(expr: str):
     if m:
         e = m.group(1)
     return e
+
+def resolve_expected_expr(expr: str, declared: set):
+    """Resolve an assert_eq! expected-side expression to a C r-value, or None.
+    Handles: int literal, declared local, and `local ± int` / `int ± local`
+    (the overwhelmingly common `len() == before + 2` patterns)."""
+    e = strip_rust_wrappers(expr).strip()
+    # int literal
+    m = re.match(r'^(-?\d+)$', e)
+    if m:
+        return m.group(1)
+    # IDENT +/- int  or  int +/- IDENT
+    m = re.match(r'^(\w+)\s*([+-])\s*(\d+)$', e)
+    if m and m.group(1) in declared:
+        return f"{m.group(1)} {m.group(2)} {m.group(3)}"
+    m = re.match(r'^(\d+)\s*([+-])\s*(\w+)$', e)
+    if m and m.group(3) in declared:
+        return f"{m.group(1)} {m.group(2)} {m.group(3)}"
+    # bare declared local
+    if re.match(r'^\w+$', e) and e in declared:
+        return e
+    return None
 
 # Player struct fields the C RbPlayer actually has (zone/field aliases resolved).
 KNOWN_PLAYER_FIELD = {
@@ -1288,6 +1338,14 @@ def transpile_body(body: str, consts: dict, func_name: str) -> str:
         m = re.search(r'assert_eq!\s*\(\s*test_pending_choice_type\(&tg\)\s*,\s*"([^"]+)"', line)
         if m:
             out.append(f'    CHECK_EQ_STR(test_pending_choice_type(&tg), "{m.group(1)}", "{func_name}");'); continue
+        # game.pending_choice_type().as_deref() == Some("X")  (string-Option form,
+        # the canonical SelectCard/SelectTarget prompt assertion).
+        m = re.search(r'assert_eq!\s*\(\s*test_pending_choice_type\(&tg\)\s*\.as_(?:deref|ref)\(\)\s*,\s*Some\(\s*"([^"]+)"\s*\)', line)
+        if m:
+            out.append(f'    CHECK_EQ_STR(test_pending_choice_type(&tg), "{m.group(1)}", "{func_name}");'); continue
+        m = re.search(r'assert_eq!\s*\(\s*Some\(\s*"([^"]+)"\s*\)\s*,\s*test_pending_choice_type\(&tg\)\s*\.as_(?:deref|ref)\(\)', line)
+        if m:
+            out.append(f'    CHECK_EQ_STR(test_pending_choice_type(&tg), "{m.group(1)}", "{func_name}");'); continue
         m = re.search(r'assert_eq!\s*\(\s*(.+?)\s*,\s*Some\((-?\d+)\)\s*(?:,\s*"[^"]*"\s*)?\)', line, re.DOTALL)
         if m:
             expr = strip_rust_wrappers(m.group(1))
@@ -1307,7 +1365,7 @@ def transpile_body(body: str, consts: dict, func_name: str) -> str:
             if cexpr is not None and (map_heart_expr(expr) is not None or map_card_field(expr, card_vars) is not None or assert_resolvable(expr)):
                 out.append(f'    CHECK_EQ({cexpr}, {m.group(1)}, "{func_name}");'); continue
         if 'assert_eq!' in line:
-            mm = re.search(r'assert_eq!\s*\(\s*(.+?)\s*,\s*(-?\d+)\s*(?:,\s*"[^"]*"\s*)?\)', line, re.DOTALL)
+            mm = re.search(r'assert_eq!\s*\(\s*(.+?)\s*,\s*(.+?)\s*(?:,\s*"[^"]*"\s*)?\)', line, re.DOTALL)
             if mm:
                 expr, expected = strip_rust_wrappers(mm.group(1)), strip_rust_wrappers(mm.group(2))
                 cexpr = map_board_expr(expr, func_name)
@@ -1317,9 +1375,12 @@ def transpile_body(body: str, consts: dict, func_name: str) -> str:
                     cexpr = map_heart_expr(expr)
                 if cexpr is None:
                     cexpr = map_card_field(expr, card_vars)
-                if cexpr is not None and (map_heart_expr(expr) is not None or map_card_field(expr, card_vars) is not None or assert_resolvable(expr)):
-                    out.append(f'    CHECK_EQ({cexpr}, {expected}, "{func_name}");')
-                    continue
+                if cexpr is not None:
+                    # expected side: int literal, declared local, or local±int / int±local
+                    exp_c = resolve_expected_expr(expected, declared)
+                    if exp_c is not None and (map_heart_expr(expr) is not None or map_card_field(expr, card_vars) is not None or assert_resolvable(expr)):
+                        out.append(f'    CHECK_EQ({cexpr}, {exp_c}, "{func_name}");')
+                        continue
                 unresolved = True
                 out.append(f"    // TODO assert_eq (unresolved): {stripped}")
                 continue

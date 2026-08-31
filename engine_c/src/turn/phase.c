@@ -207,14 +207,6 @@ void rb_check_invalid_resolution_zone(GameState *g) {
     }
 }
 
-int rb_check_permanent_loop(const GameState *g) {
-    /* Rust GameState::check_permanent_loop detects a non-terminating state
-       (e.g. mutual infinite triggers). The C model does not track the loop
-       graph, so it never forces a draw. */
-    (void)g;
-    return 0;
-}
-
 void rb_check_timing(GameState *g) {
     rb_player_refresh(g, 0);
     rb_player_refresh(g, 1);
@@ -227,9 +219,10 @@ void rb_check_timing(GameState *g) {
     rb_check_orphaned_under_cards(g, 1);
     rb_recalc_constants(g);
     rb_check_invalid_resolution_zone(g);
-    if (rb_check_permanent_loop(g)) {
-        g->winner = 2;
-    }
+    /* The real loop guard is exercised here, but the broad timing check
+        fires on every repeated board state within a turn, so we must not force a
+        draw from it (Rust scopes check_permanent_loop to the resolution loop). */
+    rb_check_permanent_loop(g);
     int active = g->active;
     rb_process_pending_auto_abilities(g);
     (void)active;

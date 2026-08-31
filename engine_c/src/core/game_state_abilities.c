@@ -12,6 +12,7 @@
 
 #include "rabuka.h"
 #include <string.h>
+#include <stdint.h>
 
 /* Mirror abilities.rs:ability_matches_trigger — does ability `ab` fire on
    `trigger`? Uses the decoded ability text trigger set. */
@@ -75,11 +76,114 @@ int rb_collect_constant_hand(const GameState *g, int actor, AbilityEffect *out, 
     return found;
 }
 
-/* Mirror abilities.rs:collect_live_ability_modifiers — gather temporary
-   modifiers applied during a live. Returns 0 (not tracked yet). */
+/* Mirror abilities.rs:collect_live_ability_modifiers — gather the constant /
+    triggerless modifiers contributed by the actor's live-card-zone and
+    success-live-zone members (cards sitting in the live contribute their
+    continuous effects exactly like stage members do during recalculate_constants).
+    Returns the number of constant abilities applied. */
 int rb_collect_live_modifiers(const GameState *g, int actor, AbilityEffect *out, int max) {
-    (void)g; (void)actor; (void)out; (void)max;
+    (void)out; (void)max;
+    if (!g || actor < 0 || actor > 1) return 0;
+    int found = 0;
+    const RbPlayer *P = &g->p[actor];
+    /* live-card zone then success-live zone */
+    int ids[RB_MAX_ZONE * 2];
+    int n = 0;
+    for (int i = 0; i < P->live.n && n < (int)(sizeof(ids)/sizeof(ids[0])); i++)
+        ids[n++] = P->live.cards[i];
+    for (int i = 0; i < P->success.n && n < (int)(sizeof(ids)/sizeof(ids[0])); i++)
+        ids[n++] = P->success.cards[i];
+    for (int i = 0; i < n; i++) {
+        int cid = ids[i];
+        if (cid < 0) continue;
+        int nab = rb_card_num_abilities((uint32_t)cid);
+        for (int a = 0; a < nab; a++) {
+            Ability ab;
+            if (!rb_decode_card_ability((uint32_t)cid, a, &ab)) continue;
+            int is_constant = (ab.triggers == NULL || ab.triggers[0] == '\0' ||
+                               strstr(ab.triggers, "constant") != NULL ||
+                               strstr(ab.triggers, "continuous") != NULL);
+            if (is_constant && ab.effect) {
+                apply_constant_node((RbMods *)&g->mods, cid, ab.effect);
+                found++;
+            }
+            rb_free_ability(&ab);
+        }
+    }
+    return found;
+}
+
+/* ── Trigger-scan helpers (mirror abilities.rs private fns) ── */
+
+/* Local key/value reader (mirrors condition.c::get_str). */
+static const char *rb_cond_get_str(const Condition *c, const char *key) {
+    if (!c) return NULL;
+    for (uint32_t i = 0; i < c->n_fields; i++)
+        if (c->fields[i].key && !strcmp(c->fields[i].key, key)
+            && c->fields[i].v.tag == RB_TAG_STR)
+            return c->fields[i].v.s;
+    return NULL;
+}
+
+/* Recursive condition-text search (mirrors Rust's `tree_has`). */
+static int rb_condition_tree_has_text(const Condition *c, const char *needle) {
+    if (!c || !needle) return 0;
+    const char *t = rb_cond_get_str(c, "text");
+    if (t && strstr(t, needle)) return 1;
+    for (uint32_t i = 0; i < c->n_fields; i++) {
+        const CondValue *dv = &c->fields[i].v;
+        if (dv->tag == RB_TAG_OBJVAR && dv->cond && rb_condition_tree_has_text(dv->cond, needle))
+            return 1;
+        if (dv->tag == RB_TAG_ARRAY)
+            for (uint32_t j = 0; j < dv->arr_n; j++)
+                if (dv->arr[j].tag == RB_TAG_OBJVAR && dv->arr[j].cond
+                    && rb_condition_tree_has_text(dv->arr[j].cond, needle))
+                    return 1;
+    }
     return 0;
+}
+
+/* Mirror abilities.rs::condition_is_event_based — event-driven conditions
+    (movement, state change, and non-revealed-card location) can be evaluated at
+    TAS scan time; other types are deferred to resolution time. */
+static int rb_condition_is_event_based(const Condition *c) {
+    if (!c) return 0;
+    switch (c->variant) {
+        case RB_COND_MOVEMENT: return 1;   /* moved/moves/position_change/baton_touch/live_success */
+        case RB_COND_STATE:    return 1;   /* active<->wait transitions */
+        case RB_COND_LOCATION: {
+            const char *loc = rb_cond_get_str(c, "location");
+            return !(loc && !strcmp(loc, "revealed_cards"));
+        }
+        case RB_COND_COMPOUND:
+            for (uint32_t i = 0; i < c->n_fields; i++) {
+                const CondValue *dv = &c->fields[i].v;
+                if (dv->tag == RB_TAG_OBJVAR && dv->cond && rb_condition_is_event_based(dv->cond))
+                    return 1;
+            }
+            return 0;
+        default: return 0;
+    }
+}
+
+/* Mirror abilities.rs::effect_is_ability_resolution_watcher — 自動 abilities
+    whose trigger clause watches an ability RESOLUTION arm ONLY via the
+    post-resolution hook; the TAS must never fire them on a board scan. */
+static int rb_effect_is_ability_resolution_watcher(const AbilityEffect *e) {
+    if (!e) return 0;
+    const char *tt = NULL;
+    for (int i = 0; i < e->n_extra; i++)
+        if (e->extra_k[i] && !strcmp(e->extra_k[i], "trigger_type")) { tt = e->extra_v[i]; break; }
+    if (!tt || strcmp(tt, "each_time") != 0) return 0;
+    return rb_condition_tree_has_text(e->condition, "能力が解決");
+}
+
+/* Mirror abilities.rs::opp_cause_key — fold (num_key, moved_card_id, seq) into a
+    single u64 identity so an opponent-caused watcher arms once per move. */
+uint64_t rb_opp_cause_key(uint32_t num_key, int moved_card_id, uint16_t seq) {
+    uint64_t m = (uint64_t)(uint32_t)moved_card_id;
+    uint64_t s = (uint64_t)seq;
+    return (uint64_t)num_key ^ (m << 20) ^ (s << 44);
 }
 
 /* Queue every ability on the cards `ids[0..n]` whose trigger matches `trigger`.
@@ -98,13 +202,32 @@ static int queue_zone_abilities(GameState *g, int actor, const int *ids, int n,
             Ability ab;
             if (!rb_decode_card_ability((uint32_t)cid, a, &ab)) continue;
             if (rb_ability_matches_trigger(&ab, trigger)) {
+                /* Resolution-watchers (「…能力が解決したとき」) arm ONLY via the
+                    post-resolution hook; a board scan would fire them every pass. */
+                if (ab.effect && rb_effect_is_ability_resolution_watcher(ab.effect))
+                    { rb_free_ability(&ab); continue; }
+                /* Pre-filter event-based conditions so an auto ability whose
+                    trigger event has not occurred is not queued. */
+                if (ab.effect && ab.effect->has_condition && ab.effect->condition
+                    && rb_condition_is_event_based(ab.effect->condition)
+                    && !rb_eval_condition(g, actor, ab.effect->condition)) {
+                    rb_free_ability(&ab); continue;
+                }
                 int key = (cid << 16) | (a & 0xFFFF);
                 int limit = ab.use_limit < 0 ? 99 : ab.use_limit;
                 if (key != g->just_completed_ability_key &&
                     !rb_use_limit_reached(&g->queue, cid, a, limit, g->turn)) {
-                    rb_queue_push(&g->queue, cid, a);
-                    rb_record_use(&g->queue, cid, a, g->turn);
-                    queued++;
+                    int dup = 0;
+                    for (int b = 0; b < g->n_batch_triggered_keys; b++)
+                        if (g->batch_triggered_keys[b] == key) { dup = 1; break; }
+                    if (!dup) {
+                        int cap = (int)(sizeof(g->batch_triggered_keys)/sizeof(g->batch_triggered_keys[0]));
+                        if (g->n_batch_triggered_keys < cap)
+                            g->batch_triggered_keys[g->n_batch_triggered_keys++] = key;
+                        rb_queue_push(&g->queue, cid, a);
+                        rb_record_use(&g->queue, cid, a, g->turn);
+                        queued++;
+                    }
                 }
             }
             rb_free_ability(&ab);
@@ -119,6 +242,7 @@ static int queue_zone_abilities(GameState *g, int actor, const int *ids, int n,
     recently moved this resolution). Returns count queued. */
 int rb_queue_trigger_abilities(GameState *g, int pl, const char *trigger) {
     if (!g || !trigger) return 0;
+    g->n_batch_triggered_keys = 0;
     int total = 0;
     const RbPlayer *P = &g->p[pl];
     total += queue_zone_abilities(g, pl, P->stage, RB_STAGE_SIZE, trigger);
@@ -315,6 +439,45 @@ int rb_ability_has_remaining_uses(const GameState *g, int cid, int idx) {
 /* Mirror abilities.rs::trigger_auto_abilities_for_movement — fire 移動時 autos. */
 int rb_trigger_auto_abilities_for_movement(GameState *g, int pl) {
     return rb_trigger_auto_abilities(g, pl, "移動時");
+}
+
+/* Mirror abilities.rs::generate_state_hash — a cheap fold over the board's
+    observable shape (turn, active player, zone occupancy and the stage contents
+    of both players, plus the prohibition / temporary-effect tallies). Used by
+    rb_check_permanent_loop to detect a repeated board state. */
+static uint64_t rb_generate_state_hash(const GameState *g) {
+    uint64_t h = 1469598103934665603ULL; /* FNV-1a offset basis */
+    int vals[80]; int n = 0;
+    #define RB_PUSH(x) do { if (n < (int)(sizeof(vals)/sizeof(vals[0]))) vals[n++] = (int)(x); } while (0)
+    RB_PUSH(g->turn); RB_PUSH(g->active); RB_PUSH(g->winner);
+    RB_PUSH(g->live_set_player); RB_PUSH(g->rps[0]); RB_PUSH(g->rps[1]);
+    for (int pl = 0; pl < 2; pl++) {
+        const RbPlayer *P = &g->p[pl];
+        RB_PUSH(P->hand.n); RB_PUSH(P->energy.n); RB_PUSH(P->discard.n);
+        RB_PUSH(P->live.n); RB_PUSH(P->success.n);
+        for (int s = 0; s < RB_STAGE_SIZE; s++) RB_PUSH(P->stage[s]);
+    }
+    RB_PUSH(g->n_prohibition); RB_PUSH(g->n_temp_effects);
+    #undef RB_PUSH
+    for (int i = 0; i < n; i++) {
+        h ^= (uint64_t)(vals[i] & 0xFFFFFFFFu);
+        h *= 1099511628211ULL;
+    }
+    return h;
+}
+
+/* Mirror abilities.rs::check_permanent_loop — record the board hash in
+    game_state_history; if we have seen this exact state before, a non-terminating
+    trigger loop is in progress, so flag it (the caller forces a draw). */
+int rb_check_permanent_loop(GameState *g) {
+    if (!g) return 0;
+    uint64_t h = rb_generate_state_hash(g);
+    for (int i = 0; i < g->n_game_state_history; i++)
+        if ((uint64_t)g->game_state_history[i] == h) { g->loop_detected = 1; return 1; }
+    int cap = (int)(sizeof(g->game_state_history)/sizeof(g->game_state_history[0]));
+    if (g->n_game_state_history < cap)
+        g->game_state_history[g->n_game_state_history++] = (int)h;
+    return 0;
 }
 
 /* Mirror abilities.rs::resolve_target_player — map a target string to a player

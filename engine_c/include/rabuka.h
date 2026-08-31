@@ -715,6 +715,10 @@ typedef struct GameState {
         scan can skip re-enqueueing the very ability that just fired (prevents an
         auto ability from recursively re-triggering itself). Key = (card_id<<16)|ability_idx. */
     int      just_completed_ability_key;
+    /* batch_triggered_keys — per auto-trigger scan, the numeric (card_id<<16)|ability_idx
+        keys already enqueued this batch. Mirrors Rust's this_batch_triggered_ability_ids
+        so a single trigger event never enqueues the same watcher more than once. */
+    int      batch_triggered_keys[64]; int n_batch_triggered_keys;
     /* ── temporal-condition tracking (mirrors GameState.has_card_moved_this_turn /
         debut_count_this_turn; position_change_occurred_this_turn already declared above) ── */
     int      moved_this_turn[RB_MAX_CARD_IDS]; /* per-card: moved during current turn */
@@ -837,7 +841,7 @@ void rb_check_invalid_live_cards(GameState *g, int is_p1);
 void rb_check_invalid_energy_cards(GameState *g, int pl);
 void rb_check_orphaned_under_cards(GameState *g, int pl);
 void rb_check_invalid_resolution_zone(GameState *g);
-int  rb_check_permanent_loop(const GameState *g);
+int  rb_check_permanent_loop(GameState *g);
 void rb_player_refresh(GameState *g, int pl);
 
 /* ── Card classification (mirrors Rust Card::is_live / is_energy) ── */
@@ -934,7 +938,7 @@ void rb_effect_selected_energy_zone_cards(GameState *g, int actor, const int *in
 int  rb_drain_under_cards_to_energy_zone(GameState *g, const char *target, int stage_idx);
 void rb_effect_gain_surplus_heart(GameState *g, int actor, const AbilityEffect *e);
 /* Mirror cost.rs::handle_pay_cost_all_discard — "may discard your whole hand" cost. */
-void rb_effect_pay_cost_all_discard(GameState *g, int actor, const AbilityEffect *e);
+int  rb_effect_pay_cost_all_discard(GameState *g, int actor, const AbilityEffect *e);
 void rb_effect_look_at(GameState *g, int actor, AbilityEffect *e);
 void rb_effect_reveal_until_live_card(GameState *g, int actor, AbilityEffect *e);
 void rb_effect_reveal_until_chosen_card(GameState *g, int actor, AbilityEffect *e);
@@ -1203,6 +1207,7 @@ void rb_check_expired_effects(GameState *g, int which);
 int  rb_apply_ability_effects(GameState *g, int actor, const Ability *ab, int host_cid);
 int  rb_opponent_id(int pl);
 int  rb_distinct_stage_groups(const GameState *g, int pl);
+uint64_t rb_opp_cause_key(uint32_t num_key, int moved_card_id, uint16_t seq);
 int  rb_can_place_card_in_zone(const GameState *g, int cid, const char *zone);
 void rb_clear_movement_tracking(GameState *g);
 void rb_process_with_completed_key(GameState *g, int key);

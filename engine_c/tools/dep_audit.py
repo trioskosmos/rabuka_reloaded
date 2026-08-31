@@ -253,6 +253,16 @@ def main():
         recs[:]=uniq
     defined_set=set(best)
 
+    # Header `static inline` helpers (e.g. rb_saturate_u8) live in rabuka.h, not a
+    # .c file — register them so they aren't falsely reported as "missing".
+    hdr_defs=set()
+    for h in [os.path.join(ROOT,"include","rabuka.h")]:
+        if os.path.exists(h):
+            with open(h,encoding="utf-8",errors="replace") as f:
+                for nm,_ in find_functions(strip_c(f.read())):
+                    hdr_defs.add(nm)
+    defined_set |= hdr_defs
+
     # Fixpoint: a stub that only *delegates* to an already-real/DONE helper is
     # itself real (e.g. rb_eval_condition_for_host -> eval_condition_inner_host).
     # Propagate so chains of delegators all become REAL.

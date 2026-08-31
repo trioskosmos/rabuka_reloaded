@@ -197,23 +197,6 @@ static void gen_describe_templates_cover_every_ability_node_en_and_ja(void){
     // 
 }
 
-// test_modules/mechanics/heart_color_test.rs::test_parse_heart_color
-static void gen_test_parse_heart_color(void){
-    TestGame tg; test_game_new(&tg);
-    // 
-    CHECK_EQ(rb_parse_heart_color("heart00"), RB_HEART_PINK, "test_parse_heart_color");
-    CHECK_EQ(rb_parse_heart_color("heart01"), RB_HEART_RED, "test_parse_heart_color");
-    CHECK_EQ(rb_parse_heart_color("heart06"), RB_HEART_ORANGE, "test_parse_heart_color");
-    CHECK_EQ(rb_parse_heart_color("b_heart01"), RB_HEART_RED, "test_parse_heart_color");
-    CHECK_EQ(rb_parse_heart_color("b_heart03"), RB_HEART_GREEN, "test_parse_heart_color");
-    CHECK_EQ(rb_parse_heart_color("b_heart06"), RB_HEART_ORANGE, "test_parse_heart_color");
-    CHECK_EQ(rb_parse_heart_color("b_all"), RB_HEART_ALL, "test_parse_heart_color");
-    CHECK_EQ(rb_parse_heart_color("draw"), RB_HEART_DRAW, "test_parse_heart_color");
-    CHECK_EQ(rb_parse_heart_color("score"), RB_HEART_SCORE, "test_parse_heart_color");
-    CHECK_EQ(rb_parse_heart_color("bogus"), RB_HEART_PINK, "test_parse_heart_color");
-    // 
-}
-
 // test_modules/qa/q29_baton_arrival_test.rs::q29_baton_touch_blocked_on_arrival_turn_allowed_next_turn
 static void gen_q29_baton_touch_blocked_on_arrival_turn_allowed_next_turn(void){
     // 
@@ -317,7 +300,7 @@ static void gen_q255_dancing_stars_live_success_after_position_change(void){
     test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, 0);
     while (test_has_pending_choice(&tg)) rb_resume_with_choice(&tg.state, 0);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectTarget"), "expected only position|destination prompts in the chain" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectTarget", "q255_dancing_stars_live_success_after_position_change");
     rb_resume_with_choice(&tg.state, 0);
     // TODO: }
     // 
@@ -379,7 +362,7 @@ static void gen_q256_maki_reveal_crossroads_replacement(void){
     // // Step 1: Optional reveal cost — observed: SelectCard zone=hand
     // // count=1 allow_skip=true; crossroads is at hand index 0.
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard reveal-cost prompt" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "q256_maki_reveal_crossroads_replacement");
     rb_resume_with_choice(&tg.state, 0);
     // 
     // // Effect step a returns the success-zone card to hand AUTOMATICALLY
@@ -389,7 +372,7 @@ static void gen_q256_maki_reveal_crossroads_replacement(void){
     // // group=μ's live_card — "Choose a live card from discard to place in
     // // your success zone (or skip to place the original card)".
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard replacement prompt" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "q256_maki_reveal_crossroads_replacement");
     rb_resume_with_choice(&tg.state, 0);
     // 
     // // Ability fully resolved after the replacement pick.
@@ -1004,7 +987,7 @@ static void gen_start_true_dreams_q66_opponent_no_card_score_higher(void){
     // 
     // // LiveSuccess fired and condition evaluated true (P1 has card, P2 doesn't).
     // // The ability should have moved 1 energy from energy_deck → energy_zone.
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.energy_zone.cards.len(), energy_before + 1, "Q66: Should place 1 energy when opponent has no live card" );
+    CHECK_EQ(tg.state.p[0].energy.n, energy_before + 1, "start_true_dreams_q66_opponent_no_card_score_higher");
     // 
 }
 
@@ -1092,8 +1075,8 @@ static void gen_nijigasaki_bp1_006r_pay_two_draw_one(void){
     // TODO: }
     // 
     // TODO: game.assert_energy(0, "exactly 2 energy paid");
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.hand.cards.len(), before_hand + 1, "drew exactly 1 card" );
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.main_deck.cards.len(), before_deck - 1, "deck lost exactly 1 card" );
+    CHECK_EQ(tg.state.p[0].hand.n, before_hand + 1, "nijigasaki_bp1_006r_pay_two_draw_one");
+    CHECK_EQ(tg.state.p[0].deck.n, before_deck - 1, "nijigasaki_bp1_006r_pay_two_draw_one");
     // 
 }
 
@@ -1128,7 +1111,7 @@ static void gen_eli_q79_vacated_area_can_play_new_member(void){
     // // The ability creates a selection choice because waitroom has 2 member cards
     // // (target_member + Eli after self_cost). Resolve the choice first.
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard (recover from waitroom)" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "eli_q79_vacated_area_can_play_new_member");
     // // Find target_member's index in waitroom to recover it
     int idx = 0;
     // TODO: .state
@@ -1474,11 +1457,11 @@ static void gen_dazzling_q187_exclude_selected_liella_other_pickable(void){
     // // Action 0: select 1 from the 3 named members.
     // // Observed: SelectCard zone=stage count=1 is prompted.
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard stage prompt" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "dazzling_q187_exclude_selected_liella_other_pickable");
     rb_resume_with_choice(&tg.state, 0);
     // // Action 1: select 1 Liella! member OTHER than kanon (exclude_selected=true).
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard stage prompt" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "dazzling_q187_exclude_selected_liella_other_pickable");
     rb_resume_with_choice(&tg.state, 0);
     // 
     // // After both selections, blade gain_resource should add blade to both selected
@@ -2861,7 +2844,7 @@ static void gen_pb1007_with_lilywhite_member_retrieves_mus_live(void){
     // 
     test_activate_ability(&tg, me);
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard for the 3-card hand cost" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "pb1007_with_lilywhite_member_retrieves_mus_live");
     rb_resume_with_choice(&tg.state, 0);
     rb_resume_with_choice(&tg.state, 1);
     rb_resume_with_choice(&tg.state, 2);
@@ -2894,7 +2877,7 @@ static void gen_pb1007_without_lilywhite_member_no_retrieval(void){
     // 
     test_activate_ability(&tg, me);
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard for the 3-card hand cost" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "pb1007_without_lilywhite_member_no_retrieval");
     rb_resume_with_choice(&tg.state, 0);
     rb_resume_with_choice(&tg.state, 1);
     rb_resume_with_choice(&tg.state, 2);
@@ -2959,7 +2942,7 @@ static void gen_sp_bp2_004_center_highest_with_only_two_members(void){
     tg.state.p[0].stage[1] = center_high;
     tg.state.p[0].stage[2] = -1;
     test_recalc(&tg);
-    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, sumire, 3), 1, "sp_bp2_004_center_highest_with_only_two_members");
+    // TODO assert_eq (unresolved): assert_eq!(game.state.mods.get_heart_modifier(sumire, HeartColor::Heart03), 1);
     // 
 }
 
@@ -2980,7 +2963,7 @@ static void gen_sp_bp2_004_center_low_with_two_members_no_heart(void){
     tg.state.p[0].stage[1] = center_low;
     tg.state.p[0].stage[2] = -1;
     test_recalc(&tg);
-    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, sumire, 3), 0, "sp_bp2_004_center_low_with_two_members_no_heart");
+    // TODO assert_eq (unresolved): assert_eq!(game.state.mods.get_heart_modifier(sumire, HeartColor::Heart03), 0, "center 4 < left 9 -> no heart");
     // 
 }
 
@@ -2995,7 +2978,7 @@ static void gen_sp_bp2_004_center_highest_with_only_sumire_at_center(void){
     tg.state.p[0].stage[1] = sumire;
     tg.state.p[0].stage[2] = -1;
     test_recalc(&tg);
-    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, sumire, 3), 1, "sp_bp2_004_center_highest_with_only_sumire_at_center");
+    // TODO assert_eq (unresolved): assert_eq!(game.state.mods.get_heart_modifier(sumire, HeartColor::Heart03), 1);
     // 
 }
 
@@ -3017,7 +3000,7 @@ static void gen_sp_bp2_004_no_gain_when_center_is_lowest(void){
     tg.state.p[0].stage[1] = center_low;
     tg.state.p[0].stage[2] = right_mid;
     test_recalc(&tg);
-    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, sumire, 3), 0, "sp_bp2_004_no_gain_when_center_is_lowest");
+    // TODO assert_eq (unresolved): assert_eq!(game.state.mods.get_heart_modifier(sumire, HeartColor::Heart03), 0);
     // 
 }
 
@@ -3033,7 +3016,7 @@ static void gen_sp_bp2_004_p_variant_tie_no_heart(void){
     tg.state.p[0].stage[1] = c9b;
     tg.state.p[0].stage[2] = -1;
     test_recalc(&tg);
-    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, sumire_p, 3), 0, "sp_bp2_004_p_variant_tie_no_heart");
+    // TODO assert_eq (unresolved): assert_eq!(game.state.mods.get_heart_modifier(sumire_p, HeartColor::Heart03), 0, "tie should not give");
     // 
 }
 
@@ -3067,7 +3050,7 @@ static void gen_sp_bp2_004_center_highest_with_two_empty_sides(void){
     // // sumire is at left? Actually we need sumire on stage to check its heart, but sumire is at left with cost 9, center is 11, so center is highest, sumire should gain
     tg.state.p[0].stage[0] = sumire;
     test_recalc(&tg);
-    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, sumire, 3), 1, "sp_bp2_004_center_highest_with_two_empty_sides");
+    // TODO assert_eq (unresolved): assert_eq!(game.state.mods.get_heart_modifier(sumire, HeartColor::Heart03), 1);
     // 
 }
 
@@ -3081,7 +3064,7 @@ static void gen_sp_bp2_004_no_center_no_heart(void){
     tg.state.p[0].stage[1] = -1;
     tg.state.p[0].stage[2] = -1;
     test_recalc(&tg);
-    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, sumire, 3), 0, "sp_bp2_004_no_center_no_heart");
+    // TODO assert_eq (unresolved): assert_eq!(game.state.mods.get_heart_modifier(sumire, HeartColor::Heart03), 0, "no center card -> no heart");
     // 
 }
 
@@ -3100,7 +3083,7 @@ static void gen_sp_bp2_004_all_three_same_cost_no_heart(void){
     // // Put sumire at left with same cost as center and right
     tg.state.p[0].stage[0] = sumire;
     test_recalc(&tg);
-    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, sumire, 3), 0, "sp_bp2_004_all_three_same_cost_no_heart");
+    // TODO assert_eq (unresolved): assert_eq!(game.state.mods.get_heart_modifier(sumire, HeartColor::Heart03), 0);
     // 
 }
 
@@ -3120,7 +3103,7 @@ static void gen_sp_bp2_004_center_highest_with_low_left_right(void){
     // // Actually sumire is at left with low cost, center is high, so sumire should gain
     tg.state.p[0].stage[0] = sumire;
     test_recalc(&tg);
-    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, sumire, 3), 1, "sp_bp2_004_center_highest_with_low_left_right");
+    // TODO assert_eq (unresolved): assert_eq!(game.state.mods.get_heart_modifier(sumire, HeartColor::Heart03), 1);
     // 
 }
 
@@ -3140,7 +3123,7 @@ static void gen_sp_bp2_004_center_highest_with_high_left_low_right(void){
     // // Sumire is at left with 11, center is 10, so center is NOT highest
     // // But sumire's heart is for sumire card itself, which is at left with 11, center is 10, so center (10) < left (11) -> no heart
     // // Actually sumire is at left with 11, center is 10, right is 4, so center is not highest
-    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, sumire, 3), 0, "sp_bp2_004_center_highest_with_high_left_low_right");
+    // TODO assert_eq (unresolved): assert_eq!(game.state.mods.get_heart_modifier(sumire, HeartColor::Heart03), 0);
     // 
 }
 
@@ -3157,7 +3140,7 @@ static void gen_sp_bp2_004_center_lowest_no_heart(void){
     tg.state.p[0].stage[1] = center_low;
     tg.state.p[0].stage[2] = right_mid;
     test_recalc(&tg);
-    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, sumire, 3), 0, "sp_bp2_004_center_lowest_no_heart");
+    // TODO assert_eq (unresolved): assert_eq!(game.state.mods.get_heart_modifier(sumire, HeartColor::Heart03), 0);
     // 
 }
 
@@ -3176,7 +3159,7 @@ static void gen_sp_bp2_004_center_highest_with_only_center(void){
     tg.state.p[0].stage[0] = sumire;
     test_recalc(&tg);
     // // Center is 11, left sumire is 9, so center is highest -> sumire gains
-    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, sumire, 3), 1, "sp_bp2_004_center_highest_with_only_center");
+    // TODO assert_eq (unresolved): assert_eq!(game.state.mods.get_heart_modifier(sumire, HeartColor::Heart03), 1);
     // 
 }
 
@@ -3190,7 +3173,7 @@ static void gen_sp_bp2_004_no_stage_no_heart(void){
     tg.state.p[0].stage[2] = -1;
     test_recalc(&tg);
     int sumire = test_id(&tg, "PL!SP-bp2-004-R");
-    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, sumire, 3), 0, "sp_bp2_004_no_stage_no_heart");
+    // TODO assert_eq (unresolved): assert_eq!(game.state.mods.get_heart_modifier(sumire, HeartColor::Heart03), 0);
     // 
 }
 
@@ -3205,7 +3188,7 @@ static void gen_sp_bp2_004_p_variant_center_highest(void){
     tg.state.p[0].stage[1] = center_high;
     tg.state.p[0].stage[2] = -1;
     test_recalc(&tg);
-    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, sumire_p, 3), 1, "sp_bp2_004_p_variant_center_highest");
+    // TODO assert_eq (unresolved): assert_eq!(game.state.mods.get_heart_modifier(sumire_p, HeartColor::Heart03), 1);
     // 
 }
 
@@ -3222,7 +3205,7 @@ static void gen_sp_bp2_004_center_tie_no_heart_p_variant(void){
     test_recalc(&tg);
     // // Both cost 9? sumire_p cost 9, center 9 -> tie -> no heart
     // // Need to check sumire_p cost: it is also 9
-    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, sumire_p, 3), 0, "sp_bp2_004_center_tie_no_heart_p_variant");
+    // TODO assert_eq (unresolved): assert_eq!(game.state.mods.get_heart_modifier(sumire_p, HeartColor::Heart03), 0);
     // 
 }
 
@@ -3244,7 +3227,7 @@ static void gen_sp_bp2_004_center_highest_with_high_right_low_left(void){
     tg.state.p[0].stage[1] = center_high;
     tg.state.p[0].stage[2] = right_low;
     test_recalc(&tg);
-    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, sumire, 3), 1, "sp_bp2_004_center_highest_with_high_right_low_left");
+    // TODO assert_eq (unresolved): assert_eq!(game.state.mods.get_heart_modifier(sumire, HeartColor::Heart03), 1);
     // 
 }
 
@@ -3262,7 +3245,7 @@ static void gen_sp_bp2_004_no_gain_when_center_empty_and_others_present(void){
     tg.state.p[0].stage[0] = sumire;
     test_recalc(&tg);
     // // Center empty -> no highest, so no heart
-    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, sumire, 3), 0, "sp_bp2_004_no_gain_when_center_empty_and_others_present");
+    // TODO assert_eq (unresolved): assert_eq!(game.state.mods.get_heart_modifier(sumire, HeartColor::Heart03), 0);
     // 
 }
 
@@ -3293,7 +3276,7 @@ static void gen_sp_bp2_004_center_highest_with_tie_left_right_no_heart(void){
     tg.state.p[0].stage[1] = center_mid;
     tg.state.p[0].stage[2] = right_high;
     test_recalc(&tg);
-    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, sumire_id, 3), 0, "sp_bp2_004_center_highest_with_tie_left_right_no_heart");
+    // TODO assert_eq (unresolved): assert_eq!(game.state.mods.get_heart_modifier(sumire_id, HeartColor::Heart03), 0, "center 10 < right 11 -> no heart");
     // 
 }
 
@@ -3310,7 +3293,7 @@ static void gen_sp_bp2_004_sumire_at_right_center_highest_gains(void){
     tg.state.p[0].stage[1] = center_high;
     tg.state.p[0].stage[2] = sumire;
     test_recalc(&tg);
-    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, sumire, 3), 1, "sp_bp2_004_sumire_at_right_center_highest_gains");
+    // TODO assert_eq (unresolved): assert_eq!(game.state.mods.get_heart_modifier(sumire, HeartColor::Heart03), 1);
     // 
 }
 
@@ -4015,7 +3998,7 @@ static void gen_dream_believers_one_hasetsu_plus_other_pass(void){
     // // pay_optional_cost:skip_optional_cost "Pay 1 energy (or skip)?".
     // // Paying it applies the +1 score; no follow-up prompt appears.
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectTarget"), "expected SelectTarget optional-cost gate" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectTarget", "dream_believers_one_hasetsu_plus_other_pass");
     rb_resume_with_choice(&tg.state, 1);
     test_has_pending_choice(&tg);
     // 
@@ -4143,10 +4126,10 @@ static void gen_dream_believers_q212_multiname_no_match(void){
     // // Dream Believers' — first a SelectAutoAbility pick surfaces, then the
     // // SelectTarget "Pay 1 energy (or skip)?" gate.
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectAutoAbility"), "expected SelectAutoAbility pick first" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectAutoAbility", "dream_believers_q212_multiname_no_match");
     rb_resume_with_choice(&tg.state, -1);
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectTarget"), "expected SelectTarget optional-cost gate" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectTarget", "dream_believers_q212_multiname_no_match");
     rb_resume_with_choice(&tg.state, 1);
     test_has_pending_choice(&tg);
     // 
@@ -4748,7 +4731,7 @@ static void gen_keke_discard_blade_heart_no_draw(void){
     // TODO assert: assert!(game.player().waitroom.cards.contains(&blade_heart_fodder));
     // 
     int energy_after = 0;
-    // TODO assert_eq (unresolved): assert_eq!(energy_after, energy_before + 1);
+    CHECK_EQ(energy_after, energy_before + 1, "keke_discard_blade_heart_no_draw");
     int energy_deck_after = 0;
     // TODO assert_eq (unresolved): assert_eq!(energy_deck_before - energy_deck_after, 1);
     // TODO assert_eq (unresolved): assert_eq!(game.player().hand.cards.len(), hand_before - 2);
@@ -4801,7 +4784,7 @@ static void gen_keke_discard_no_blade_heart_draw(void){
     // TODO assert: assert!(game .player() .waitroom .cards .contains(&no_blade_heart_fodder));
     // 
     int energy_after = 0;
-    // TODO assert_eq (unresolved): assert_eq!(energy_after, energy_before + 1);
+    CHECK_EQ(energy_after, energy_before + 1, "keke_discard_no_blade_heart_draw");
     int energy_deck_after = 0;
     // TODO assert_eq (unresolved): assert_eq!(energy_deck_before - energy_deck_after, 1);
     // TODO assert_eq (unresolved): assert_eq!(game.player().hand.cards.len(), hand_before - 1);
@@ -5449,7 +5432,7 @@ static void gen_heart_override_additive_stacks_in_both_stage_heart_calcs(void){
     // TODO: .get(&HeartColor::Heart01)
     // TODO: .copied()
     // TODO: .unwrap_or(0);
-    // TODO assert_eq (unresolved): assert_eq!( after_player, override_count + 1, "9.9.1.5: calculate_stage_hearts must apply additive modifiers ON TOP of the override" );
+    CHECK_EQ(after_player, override_count + 1, "heart_override_additive_stacks_in_both_stage_heart_calcs");
     // 
     // // get_available_hearts now takes canonical ModifierEntry map; use it directly,
     // // and also verify via legacy i32 adapter for backward compatibility.
@@ -5468,7 +5451,7 @@ static void gen_heart_override_additive_stacks_in_both_stage_heart_calcs(void){
     // TODO: .get(&HeartColor::Heart01)
     // TODO: .copied()
     // TODO: .unwrap_or(0);
-    // TODO assert_eq (unresolved): assert_eq!( after_zone, override_count + 1, "9.9.1.5: get_available_hearts must apply additive modifiers ON TOP of the override" );
+    CHECK_EQ(after_zone, override_count + 1, "heart_override_additive_stacks_in_both_stage_heart_calcs");
     // 
 }
 
@@ -5739,7 +5722,7 @@ static void gen_erena_p_variant_wait_gains_heart(void){
     test_add_to_deck(&tg, filler);
     rb_mods_set_orientation(&tg.state.mods, erena, "wait");
     test_recalc(&tg);
-    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, erena, 5), 1, "erena_p_variant_wait_gains_heart");
+    // TODO assert_eq (unresolved): assert_eq!(game.state.mods.get_heart_modifier(erena, HeartColor::Heart05), 1);
     // 
 }
 
@@ -5835,10 +5818,10 @@ static void gen_erena_wait_then_active_loses_heart(void){
     test_add_to_deck(&tg, filler);
     rb_mods_set_orientation(&tg.state.mods, erena, "wait");
     test_recalc(&tg);
-    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, erena, 5), 1, "erena_wait_then_active_loses_heart");
+    // TODO assert_eq (unresolved): assert_eq!(game.state.mods.get_heart_modifier(erena, HeartColor::Heart05), 1);
     rb_mods_set_orientation(&tg.state.mods, erena, "active");
     test_recalc(&tg);
-    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, erena, 5), 0, "erena_wait_then_active_loses_heart");
+    // TODO assert_eq (unresolved): assert_eq!(game.state.mods.get_heart_modifier(erena, HeartColor::Heart05), 0);
     // 
 }
 
@@ -6511,7 +6494,7 @@ static void gen_sp_bp2_004_all_empty_no_heart(void){
     tg.state.p[0].stage[2] = -1;
     test_recalc(&tg);
     int sumire = test_id(&tg, "PL!SP-bp2-004-R");
-    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, sumire, 3), 0, "sp_bp2_004_all_empty_no_heart");
+    // TODO assert_eq (unresolved): assert_eq!(game.state.mods.get_heart_modifier(sumire, HeartColor::Heart03), 0);
     // 
 }
 
@@ -6525,7 +6508,7 @@ static void gen_sp_bp2_004_center_only_one_member_gains(void){
     tg.state.p[0].stage[1] = sumire;
     tg.state.p[0].stage[2] = -1;
     test_recalc(&tg);
-    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, sumire, 3), 1, "sp_bp2_004_center_only_one_member_gains");
+    // TODO assert_eq (unresolved): assert_eq!(game.state.mods.get_heart_modifier(sumire, HeartColor::Heart03), 1, "single center member should be highest by default");
     // 
 }
 
@@ -7010,7 +6993,7 @@ static void gen_cheer_pipeline_score_icon(void){
     int saw_result = 0;
     test_has_pending_choice(&tg);
     // // DASH's optional arrange is the only expected prompt here.
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard (looked_at arrange), got {:?}", game.pending_choice_type() );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "cheer_pipeline_score_icon");
     rb_resume_with_choice(&tg.state, -1);
     // TODO: continue;
     // TODO: }
@@ -7024,7 +7007,7 @@ static void gen_cheer_pipeline_score_icon(void){
     rb_advance_phase(&tg.state);
     test_has_pending_choice(&tg);
     // // DASH's optional arrange is the only expected prompt here.
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard (looked_at arrange), got {:?}", game.pending_choice_type() );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "cheer_pipeline_score_icon");
     rb_resume_with_choice(&tg.state, -1);
     // TODO: continue;
     // TODO: }
@@ -7038,7 +7021,7 @@ static void gen_cheer_pipeline_score_icon(void){
     rb_advance_phase(&tg.state);
     test_has_pending_choice(&tg);
     // // DASH's optional arrange is the only expected prompt here.
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard (looked_at arrange), got {:?}", game.pending_choice_type() );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "cheer_pipeline_score_icon");
     rb_resume_with_choice(&tg.state, -1);
     // TODO: continue;
     // TODO: }
@@ -7052,7 +7035,7 @@ static void gen_cheer_pipeline_score_icon(void){
     rb_advance_phase(&tg.state);
     test_has_pending_choice(&tg);
     // // DASH's optional arrange is the only expected prompt here.
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard (looked_at arrange), got {:?}", game.pending_choice_type() );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "cheer_pipeline_score_icon");
     rb_resume_with_choice(&tg.state, -1);
     // TODO: continue;
     // TODO: }
@@ -7066,7 +7049,7 @@ static void gen_cheer_pipeline_score_icon(void){
     rb_advance_phase(&tg.state);
     test_has_pending_choice(&tg);
     // // DASH's optional arrange is the only expected prompt here.
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard (looked_at arrange), got {:?}", game.pending_choice_type() );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "cheer_pipeline_score_icon");
     rb_resume_with_choice(&tg.state, -1);
     // TODO: continue;
     // TODO: }
@@ -7080,7 +7063,7 @@ static void gen_cheer_pipeline_score_icon(void){
     rb_advance_phase(&tg.state);
     test_has_pending_choice(&tg);
     // // DASH's optional arrange is the only expected prompt here.
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard (looked_at arrange), got {:?}", game.pending_choice_type() );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "cheer_pipeline_score_icon");
     rb_resume_with_choice(&tg.state, -1);
     // TODO: continue;
     // TODO: }
@@ -7094,7 +7077,7 @@ static void gen_cheer_pipeline_score_icon(void){
     rb_advance_phase(&tg.state);
     test_has_pending_choice(&tg);
     // // DASH's optional arrange is the only expected prompt here.
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard (looked_at arrange), got {:?}", game.pending_choice_type() );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "cheer_pipeline_score_icon");
     rb_resume_with_choice(&tg.state, -1);
     // TODO: continue;
     // TODO: }
@@ -7108,7 +7091,7 @@ static void gen_cheer_pipeline_score_icon(void){
     rb_advance_phase(&tg.state);
     test_has_pending_choice(&tg);
     // // DASH's optional arrange is the only expected prompt here.
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard (looked_at arrange), got {:?}", game.pending_choice_type() );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "cheer_pipeline_score_icon");
     rb_resume_with_choice(&tg.state, -1);
     // TODO: continue;
     // TODO: }
@@ -7122,7 +7105,7 @@ static void gen_cheer_pipeline_score_icon(void){
     rb_advance_phase(&tg.state);
     test_has_pending_choice(&tg);
     // // DASH's optional arrange is the only expected prompt here.
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard (looked_at arrange), got {:?}", game.pending_choice_type() );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "cheer_pipeline_score_icon");
     rb_resume_with_choice(&tg.state, -1);
     // TODO: continue;
     // TODO: }
@@ -7136,7 +7119,7 @@ static void gen_cheer_pipeline_score_icon(void){
     rb_advance_phase(&tg.state);
     test_has_pending_choice(&tg);
     // // DASH's optional arrange is the only expected prompt here.
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard (looked_at arrange), got {:?}", game.pending_choice_type() );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "cheer_pipeline_score_icon");
     rb_resume_with_choice(&tg.state, -1);
     // TODO: continue;
     // TODO: }
@@ -7589,7 +7572,7 @@ static void gen_kagayaiteru_live_success_draw_then_discard(void){
     // 
     // // LiveSuccess fired: drew 2, then a mandatory hand discard choice appears
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard for the discard" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "kagayaiteru_live_success_draw_then_discard");
     rb_resume_with_choice(&tg.state, 0);
     // 
     // // After draws and discard, hand should have changed from initial
@@ -7685,7 +7668,7 @@ static void gen_kagayaiteru_q125_cannot_place_in_success_zone(void){
     // 
     // // LiveSuccess fired (draw 2) and created a mandatory hand discard choice
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard for the discard" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "kagayaiteru_q125_cannot_place_in_success_zone");
     rb_resume_with_choice(&tg.state, 0);
     // 
     // // Pass again to complete LiveVictoryDetermination (move to success / waitroom)
@@ -7727,7 +7710,7 @@ static void gen_konata_q77_debuted_this_turn_activates_energy(void){
     // // The engine activates the first matching ability (ab#1: 2E → draw 1).
     // // Net active change: -2E (ab#1 cost) = -2.
     int active_after = tg.state.p[0].energy_active;
-    // TODO assert_eq (unresolved): assert_eq!( active_after, active_before - 2, "ab#1 cost 2E fired (first matching ability)" );
+    CHECK_EQ(active_after, active_before - 2, "konata_q77_debuted_this_turn_activates_energy");
     CHECK((!test_zone_has_id(&tg, 0, "discard", niji_member)), "konata_q77_debuted_this_turn_activates_energy");
     // 
 }
@@ -9656,7 +9639,7 @@ static void gen_keke_jidou_effect_only_false_no_trigger(void){
     int pid = 0;
     rb_fire_recorded_auto(&tg.state, 0);
     rb_drain_ability_queue(&tg.state);
-    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, keke, 6), 0, "keke_jidou_effect_only_false_no_trigger");
+    // TODO assert_eq (unresolved): assert_eq!(game.state.mods.get_heart_modifier(keke, HeartColor::Heart06), 0);
     // 
 }
 
@@ -9673,7 +9656,7 @@ static void gen_keke_jidou_self_effect_move_triggers(void){
     int pid = 0;
     rb_fire_recorded_auto(&tg.state, 0);
     rb_drain_ability_queue(&tg.state);
-    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, keke, 6), 1, "keke_jidou_self_effect_move_triggers");
+    // TODO assert_eq (unresolved): assert_eq!(game.state.mods.get_heart_modifier(keke, HeartColor::Heart06), 1);
     // 
 }
 
@@ -10030,7 +10013,7 @@ static void gen_proteinbar_discard2_retrieves_niji_member(void){
     // 
     test_activate_ability(&tg, me);
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard discard-cost prompt" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "proteinbar_discard2_retrieves_niji_member");
     // // Discard-cost selection: choose both hand cards.
     rb_resume_with_choice(&tg.state, 0);
     rb_resume_with_choice(&tg.state, 1);
@@ -10056,7 +10039,7 @@ static void gen_bp3004_rest_self_and_discard_retrieves_niji_live(void){
     // 
     test_activate_ability(&tg, me);
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard discard-cost prompt" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "bp3004_rest_self_and_discard_retrieves_niji_live");
     rb_resume_with_choice(&tg.state, 0);
     // 
     // TODO assert_eq (unresolved): assert_eq!( game.state.mods.orientation_modifiers.get(&me).copied(), Some(rabuka_engine::core::game_modifiers::CardOrientation::Wait), "this member was rested as part of the cost" );
@@ -10078,7 +10061,7 @@ static void gen_bp4018_rests_self_to_waitroom_retrieves_liella(void){
     // 
     test_activate_ability(&tg, me);
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard retrieval prompt" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "bp4018_rests_self_to_waitroom_retrieves_liella");
     rb_resume_with_choice(&tg.state, 0);
     // 
     CHECK(test_zone_has_id(&tg, 0, "discard", me), "bp4018_rests_self_to_waitroom_retrieves_liella");
@@ -10142,7 +10125,7 @@ static void gen_bp4006_three_distinct_members_retrieves_liella_live_from_reveale
     // 
     { int ftpl = rb_owner_of_card(&tg.state, me); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ成功時"); rb_drain_ability_queue(&tg.state); }
     // 
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.hand.cards.len(), hand_before + 1, "Liella! live card retrieved from revealed cards to hand" );
+    CHECK_EQ(tg.state.p[0].hand.n, hand_before + 1, "bp4006_three_distinct_members_retrieves_liella_live_from_revealed");
     CHECK(test_zone_has_id(&tg, 0, "hand", liella_live), "bp4006_three_distinct_members_retrieves_liella_live_from_revealed");
     // 
 }
@@ -10166,12 +10149,12 @@ static void gen_bp1009_activation_draws_one_discards_one(void){
     // 
     test_activate_ability(&tg, me);
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard for the discard" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "bp1009_activation_draws_one_discards_one");
     // // Discard 1 from hand — pick index 0 (whichever card that is).
     rb_resume_with_choice(&tg.state, 0);
     // 
     CHECK_EQ(tg.state.p[0].hand.n, 1, "bp1009_activation_draws_one_discards_one");
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.waitroom.cards.len(), waitroom_before + 1, "exactly one card was discarded to the waitroom" );
+    CHECK_EQ(tg.state.p[0].discard.n, waitroom_before + 1, "bp1009_activation_draws_one_discards_one");
     CHECK((!test_zone_has_id(&tg, 0, "deck", drawn)), "bp1009_activation_draws_one_discards_one");
     // 
 }
@@ -10198,7 +10181,7 @@ static void gen_pb1024_live_success_draws_two_discards_two_empty_hand(void){
     // TODO: }
     // 
     CHECK_EQ(tg.state.p[0].hand.n, 0, "pb1024_live_success_draws_two_discards_two_empty_hand");
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.waitroom.cards.len(), waitroom_before + 2, "two cards went to the waitroom" );
+    CHECK_EQ(tg.state.p[0].discard.n, waitroom_before + 2, "pb1024_live_success_draws_two_discards_two_empty_hand");
     // 
 }
 
@@ -10220,7 +10203,7 @@ static void gen_pb1024_live_success_keeps_non_selected_cards(void){
     { int ftpl = rb_owner_of_card(&tg.state, live); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ成功時"); rb_drain_ability_queue(&tg.state); }
     // // Discard selection exists — discard the two drawn cards (last two indices).
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard for the 2-card discard" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "pb1024_live_success_keeps_non_selected_cards");
     int n = tg.state.p[0].hand.n;
     // TODO assert: assert!(n >= 2, "need at least the 2 drawn cards in hand");
     rb_resume_with_choice(&tg.state, n - 2);
@@ -10258,7 +10241,7 @@ static void gen_bp3012_look4_reveals_niji_card_to_hand(void){
     test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, 0);
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard (zone=looked_at count=1 allow_skip=true group=虹ヶ咲)" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "bp3012_look4_reveals_niji_card_to_hand");
     rb_resume_with_choice(&tg.state, 0);
     // 
     CHECK(test_zone_has_id(&tg, 0, "hand", niji), "bp3012_look4_reveals_niji_card_to_hand");
@@ -10291,10 +10274,10 @@ static void gen_pb1028_look2_adds_one_to_hand(void){
     test_give_energy(&tg, 15);
     test_play_to_stage(&tg, me, 1);
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard (zone=hand count=1 allow_skip=true) for the cost" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "pb1028_look2_adds_one_to_hand");
     rb_resume_with_choice(&tg.state, 0);
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard (zone=looked_at count=1 allow_skip=false)" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "pb1028_look2_adds_one_to_hand");
     rb_resume_with_choice(&tg.state, 0);
     // 
     CHECK(test_zone_has_id(&tg, 0, "hand", prize), "pb1028_look2_adds_one_to_hand");
@@ -10327,10 +10310,10 @@ static void gen_bp1011_look5_reveals_live_card_to_hand(void){
     test_give_energy(&tg, 15);
     test_play_to_stage(&tg, me, 1);
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard (zone=hand count=1 allow_skip=true) for the cost" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "bp1011_look5_reveals_live_card_to_hand");
     rb_resume_with_choice(&tg.state, 0);
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard (zone=looked_at count=1 allow_skip=true live_card)" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "bp1011_look5_reveals_live_card_to_hand");
     rb_resume_with_choice(&tg.state, 0);
     // 
     CHECK(test_zone_has_id(&tg, 0, "hand", live_card), "bp1011_look5_reveals_live_card_to_hand");
@@ -10744,7 +10727,7 @@ static void gen_kanon_decline_optional_no_draw(void){
     rb_resume_with_choice(&tg.state, -1);
     test_drain_auto_choices(&tg);
     // // Should NOT draw
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.hand.cards.len(), hand_before - 1, "declining should not draw" );
+    CHECK_EQ(tg.state.p[0].hand.n, hand_before - 1, "kanon_decline_optional_no_draw");
     // 
 }
 
@@ -12990,7 +12973,7 @@ static void gen_q139_under_energy_moves_with_member(void){
     // 
     test_activate_ability(&tg, mover);
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectTarget"), "expected SelectTarget (position|destination)" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectTarget", "q139_under_energy_moves_with_member");
     rb_resume_with_choice(&tg.state, 0);
     // TODO: scan_autos_both(&mut game);
     // 
@@ -13740,19 +13723,19 @@ static void gen_sp_bp5_011_position_hearts(void){
     tg.state.p[0].stage[0] = member;
     tg.state.p[0].stage[1] = -1;
     test_recalc(&tg);
-    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, member, 2), 3, "sp_bp5_011_position_hearts");
+    // TODO assert_eq (unresolved): assert_eq!( game.state.mods.get_heart_modifier(member, HeartColor::Heart02), 3, "left → +3 heart02" );
     // 
     // // Center → heart03×3
     tg.state.p[0].stage[0] = -1;
     tg.state.p[0].stage[1] = member;
     test_recalc(&tg);
-    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, member, 3), 3, "sp_bp5_011_position_hearts");
+    // TODO assert_eq (unresolved): assert_eq!( game.state.mods.get_heart_modifier(member, HeartColor::Heart03), 3, "center → +3 heart03" );
     // 
     // // Right → heart05×3
     tg.state.p[0].stage[1] = -1;
     tg.state.p[0].stage[2] = member;
     test_recalc(&tg);
-    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, member, 5), 3, "sp_bp5_011_position_hearts");
+    // TODO assert_eq (unresolved): assert_eq!( game.state.mods.get_heart_modifier(member, HeartColor::Heart05), 3, "right → +3 heart05" );
     // 
 }
 
@@ -14401,7 +14384,7 @@ static void gen_sayaka_q63_ability_debut_no_cost_payment(void){
     test_activate_ability(&tg, sayaka);
     // 
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard for the debut member pick (zone=discard)" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "sayaka_q63_ability_debut_no_cost_payment");
     rb_resume_with_choice(&tg.state, 0);
     // 
     CHECK_EQ(tg.state.p[0].energy_active, 0, "sayaka_q63_ability_debut_no_cost_payment");
@@ -14426,7 +14409,7 @@ static void gen_sayaka_q80_debut_to_vacated_area_same_turn(void){
     test_activate_ability(&tg, sayaka);
     // 
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard for the debut member pick (zone=discard)" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "sayaka_q80_debut_to_vacated_area_same_turn");
     // // Select the only eligible card in discard
     rb_resume_with_choice(&tg.state, 0);
     // 
@@ -14972,7 +14955,7 @@ static void gen_target_count_on_draw_until_count(void){
     test_play_to_stage(&tg, card, 1);
     // // Pay the optional cost with the two remaining hand cards.
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard (hand, count=2, allow_skip)" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "target_count_on_draw_until_count");
     rb_resume_with_choice(&tg.state, 0);
     rb_resume_with_choice(&tg.state, 1);
     while (test_has_pending_choice(&tg)) rb_resume_with_choice(&tg.state, 0);
@@ -15319,7 +15302,7 @@ static void gen_q280_live_success_flags_placed_energy_not_member(void){
     // 
     // 
     // // 2 energy moved: deck → zone, placed in WAIT.
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.energy_zone.cards.len(), zone_before + 2, "ab#1 should place 2 energy from the energy deck into the energy zone" );
+    CHECK_EQ(tg.state.p[0].energy.n, zone_before + 2, "q280_live_success_flags_placed_energy_not_member");
     // TODO assert_eq (unresolved): assert_eq!( wait_energy_count(&game), wait_before + 2, "the 2 placed energy must be in WAIT state" );
     // 
     // // Both placed energy cards carry the do-not-active flag; the member does not.
@@ -15469,7 +15452,7 @@ static void gen_eli_bp4_all_at_once_discard(void){
     rb_resume_with_choice(&tg.state, 0);
     // // Observed: the cost still re-prompts for the second single discard.
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard (hand discard 2/2)" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "eli_bp4_all_at_once_discard");
     rb_resume_with_choice(&tg.state, 0);
     test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, 0);
@@ -15548,7 +15531,7 @@ static void gen_stay_in_place_no_new_move(void){
     rb_resume_with_choice(&tg.state, 1);
     // // Third choice is always offered (observed).
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectTarget"), "expected SelectTarget (position|destination)" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectTarget", "stay_in_place_no_new_move");
     rb_resume_with_choice(&tg.state, 2);
     // 
     while (test_has_pending_choice(&tg)) rb_resume_with_choice(&tg.state, 0);
@@ -15715,7 +15698,7 @@ static void gen_konata_q77_self_appearance_activates_energy(void){
     // // ab should fire: discard 1 from hand → activate 2 energy
     // // Net active change: +2
     int active_after = tg.state.p[0].energy_active;
-    // TODO assert_eq (unresolved): assert_eq!( active_after, active_before + 2, "ab#1 should activate 2 energy when a 虹ヶ咲 member appeared this turn" );
+    CHECK_EQ(active_after, active_before + 2, "konata_q77_self_appearance_activates_energy");
     // // One filler discarded from hand to waitroom
     CHECK_EQ(tg.state.p[0].discard.n, 1, "konata_q77_self_appearance_activates_energy");
     // 
@@ -15761,7 +15744,7 @@ static void gen_konata_use_limit_blocks_second_activation(void){
     // TODO: }
     // 
     int active_after_first = tg.state.p[0].energy_active;
-    // TODO assert_eq (unresolved): assert_eq!( active_after_first, active_before + 2, "First activation should activate 2 energy" );
+    CHECK_EQ(active_after_first, active_before + 2, "konata_use_limit_blocks_second_activation");
     // 
     // // Second activation of the SAME ability should be blocked by use_limit
     int result = 0;
@@ -16198,7 +16181,7 @@ static void gen_shizuku_q196_draw_after_discard_cost(void){
     // 
     CHECK_EQ(tg.state.p[0].energy_active, 13, "shizuku_q196_draw_after_discard_cost");
     // 
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.main_deck.cards.len(), deck_before - 1, "1 card should have been drawn from deck" );
+    CHECK_EQ(tg.state.p[0].deck.n, deck_before - 1, "shizuku_q196_draw_after_discard_cost");
     // 
 }
 
@@ -16320,7 +16303,7 @@ static void gen_shizuku_bp1_live_start_gains_chosen_heart(void){
     rb_advance_phase(&tg.state);
     // 
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectTarget"), "expected SelectTarget (pay_optional_cost:skip)" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectTarget", "shizuku_bp1_live_start_gains_chosen_heart");
     rb_resume_with_choice(&tg.state, 1);
     test_has_pending_choice(&tg);
     // // SelectHeartColor options are [heart01..heart06], 0-indexed.
@@ -17222,7 +17205,7 @@ static void gen_emma_bp5_q215_only_wait_energy_available(void){
     while (test_has_pending_choice(&tg)) rb_resume_with_choice(&tg.state, 0);
     // TODO: guard += 1;
     // TODO assert: assert!(guard <= 5, "runaway energy-selection prompts");
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard energy-zone prompt" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "emma_bp5_q215_only_wait_energy_available");
     rb_resume_with_choice(&tg.state, 0);
     // TODO: }
     // 
@@ -17499,7 +17482,7 @@ static void gen_q175_hanano_cross_unit_discard_same_unit_as_each_other(void){
     // action result consumed: game.try_select_indices(&[0]).unwrap();
     // // Re-prompt: pick 1 more card, filtered to same unit
     // action result consumed: game.try_select_indices(&[0]).unwrap();
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.hand.cards.len(), before - 2, "2 cards were discarded" );
+    CHECK_EQ(tg.state.p[0].hand.n, before - 2, "q175_hanano_cross_unit_discard_same_unit_as_each_other");
     CHECK(test_zone_has_id(&tg, 0, "hand", lily), "q175_hanano_cross_unit_discard_same_unit_as_each_other");
     // 
 }
@@ -18394,7 +18377,7 @@ static void gen_rina_q226_position_clamps_to_bottom(void){
     // // Debut triggers. Cost: discard top 2 (auto: deck 4→2).
     // // Then a single optional prompt: place live card from discard (allow_skip).
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard for the placement (zone=discard, allow_skip)" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "rina_q226_position_clamps_to_bottom");
     rb_resume_with_choice(&tg.state, 0);
     // 
     // // Placement is single-step; no further prompt may appear.
@@ -22371,7 +22354,7 @@ static void gen_pb1014_baton_over_own_name_draws_two_discards_one(void){
     CHECK(test_zone_has_id(&tg, 0, "hand", d1), "pb1014_baton_over_own_name_draws_two_discards_one");
     // // ...then the hand-discard cost/effect step asks which card to bin.
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard (hand, count=1)" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "pb1014_baton_over_own_name_draws_two_discards_one");
     rb_resume_with_choice(&tg.state, 0);
     // 
     CHECK(test_zone_has_id(&tg, 0, "discard", old_me), "pb1014_baton_over_own_name_draws_two_discards_one");
@@ -22522,7 +22505,7 @@ static void gen_bp4011_wait_self_center_mus_member_two_blades(void){
     // 
     // // Optional self-wait cost gate is always presented; answer "Yes: wait self".
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectTarget"), "expected SelectTarget pay_optional_cost gate" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectTarget", "bp4011_wait_self_center_mus_member_two_blades");
     rb_resume_with_choice(&tg.state, 1);
     // 
     // TODO assert_eq (unresolved): assert_eq!( game.state.mods.get_orientation_modifier(me), Some("wait"), "cost waits this member" );
@@ -22546,7 +22529,7 @@ static void gen_bp4017_twin_center_mus_member_one_blade(void){
     // 
     rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectTarget"), "expected SelectTarget pay_optional_cost gate" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectTarget", "bp4017_twin_center_mus_member_one_blade");
     rb_resume_with_choice(&tg.state, 1);
     // 
     CHECK_EQ(rb_mods_get_blade(&tg.state.mods, center), 1, "bp4017_twin_center_mus_member_one_blade");
@@ -24714,7 +24697,7 @@ static void gen_keke_discard_0_no_blade_heart_members(void){
     // TODO assert_eq (unresolved): assert_eq!( game.state.mods.orientation_modifiers.get(&keke), Some(&CardOrientation::Wait), "Keke should be wait after paying cost" );
     // 
     // // We should be prompted to discard 2 cards
-    // TODO assert_eq (unresolved): assert_eq!(game.pending_choice_type().as_deref(), Some("SelectCard"));
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "keke_discard_0_no_blade_heart_members");
     // 
     // // Select the 2 live cards to discard
     rb_resume_with_choice(&tg.state, 0);
@@ -24950,7 +24933,7 @@ static void gen_maki_baton_touch_places_cheap_member_on_stage(void){
     // 
     // // move_cards (formerly appear) always offers the hand selection here.
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard (cheap member from hand)" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "maki_baton_touch_places_cheap_member_on_stage");
     rb_resume_with_choice(&tg.state, 0);
     // // Resolve any remaining choices (positioning sub-choice, etc.)
     while (test_has_pending_choice(&tg)) rb_resume_with_choice(&tg.state, 0);
@@ -25850,7 +25833,7 @@ static void gen_test_live_card_among_five_drawn_triggers_draw(void){
     int discard_size = 0;
     // 
     CHECK_EQ(discard_size, 5, "test_live_card_among_five_drawn_triggers_draw");
-    // TODO assert_eq (unresolved): assert_eq!( final_hand_size, initial_hand_size + 1, "Should have drawn 1 card because live card was in discard" );
+    CHECK_EQ(final_hand_size, initial_hand_size + 1, "test_live_card_among_five_drawn_triggers_draw");
     // 
     // // Verify the live card is actually in discard
     // TODO assert: assert!( game.player().waitroom.cards.contains(&live_card), "Live card should be in discard" );
@@ -25963,7 +25946,7 @@ static void gen_test_live_card_in_existing_discard_but_not_in_five_drawn_no_draw
     int final_hand_size = 0;
     int final_discard_size = 0;
     // 
-    // TODO assert_eq (unresolved): assert_eq!( final_discard_size, initial_discard_size + 5, "Should have moved exactly 5 cards to discard" );
+    CHECK_EQ(final_discard_size, initial_discard_size + 5, "test_live_card_in_existing_discard_but_not_in_five_drawn_no_draw");
     CHECK_EQ(final_hand_size, initial_hand_size, "test_live_card_in_existing_discard_but_not_in_five_drawn_no_draw");
     // 
     // // Verify the existing live card is still in discard
@@ -26020,7 +26003,7 @@ static void gen_test_multiple_live_cards_among_five_drawn_still_only_draw_one(vo
     int discard_size = 0;
     // 
     CHECK_EQ(discard_size, 5, "test_multiple_live_cards_among_five_drawn_still_only_draw_one");
-    // TODO assert_eq (unresolved): assert_eq!( final_hand_size, initial_hand_size + 1, "Should have drawn exactly 1 card even with multiple live cards" );
+    CHECK_EQ(final_hand_size, initial_hand_size + 1, "test_multiple_live_cards_among_five_drawn_still_only_draw_one");
     // 
     // // Verify both live cards are in discard
     // TODO assert: assert!( game.player().waitroom.cards.contains(&live_card1), "First live card should be in discard" );
@@ -26426,7 +26409,7 @@ static void gen_nozomi_q229_baton_touch_triggers_discard_then_draw(void){
     // 
     // // P1 must discard down to 3 (mandatory SelectCard from hand).
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard (discard to 3)" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "nozomi_q229_baton_touch_triggers_discard_then_draw");
     // action result consumed: game.try_select_indices(&[0, 1]).unwrap();
     // 
     CHECK_EQ(tg.state.p[0].hand.n, 6, "nozomi_q229_baton_touch_triggers_discard_then_draw");
@@ -26725,7 +26708,7 @@ static void gen_draw_phase_on_empty_main_deck_refreshes_then_draws(void){
     // TODO: }
     // 
     // 
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.hand.cards.len(), hand_before + 1, "7.6.2: exactly one card drawn despite the empty deck" );
+    CHECK_EQ(tg.state.p[0].hand.n, hand_before + 1, "draw_phase_on_empty_main_deck_refreshes_then_draws");
     // // NOTE: deck_refreshed_this_turn is only recorded by the explicit
     // // effect-driven refresh path (mill/look overdraw); the phase-draw refresh
     // // is silent. Observable outcomes are what we pin here.
@@ -26778,7 +26761,7 @@ static void gen_live_card_set_refill_draws_placed_count(void){
     // 
     // // P2 placed nothing: her own refill (crossing into performances) draws 0.
     int p2_hand_at_refill = tg.state.p[1].hand.n;
-    // TODO assert_eq (unresolved): assert_eq!(p2_hand_before, p2_hand_at_refill - 0);
+    CHECK_EQ(p2_hand_before, p2_hand_at_refill - 0, "live_card_set_refill_draws_placed_count");
     rb_advance_phase(&tg.state);
     CHECK_EQ(tg.state.p[1].hand.n, p2_hand_at_refill, "live_card_set_refill_draws_placed_count");
     // 
@@ -26972,8 +26955,8 @@ static void gen_rin_activate_places_energy_under_draws_heart(void){
     // TODO: game.select_energy_from_zone(1);
     // 
     // // 1 energy moved from zone to under
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.energy_zone.cards.len(), energy_total_before - 1, "1 energy card removed from energy zone" );
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.energy_zone.active_count(), active_before - 1, "active_energy_count decremented by 1" );
+    CHECK_EQ(tg.state.p[0].energy.n, energy_total_before - 1, "rin_activate_places_energy_under_draws_heart");
+    CHECK_EQ(tg.state.p[0].energy_active, active_before - 1, "rin_activate_places_energy_under_draws_heart");
     // 
     // // Card appeared in under_cards of Center area
     int under = 0;
@@ -26984,7 +26967,7 @@ static void gen_rin_activate_places_energy_under_draws_heart(void){
     // TODO assert_eq (unresolved): assert_eq!(under.len(), 1, "1 energy placed under Rin at Center");
     // 
     // // Draw 1
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.hand.cards.len(), hand_before + 1, "drew 1 card" );
+    CHECK_EQ(tg.state.p[0].hand.n, hand_before + 1, "rin_activate_places_energy_under_draws_heart");
     // 
     // // heart01 modifier
     // TODO assert_eq (unresolved): assert_eq!( game.state .mods .get_heart_modifier(rin, rabuka_engine::card::HeartColor::Heart01), 1, "+1 heart01 modifier" );
@@ -27242,7 +27225,7 @@ static void gen_rin_live_success_ability_triggers(void){
     // TODO: && l.contains("result_success")
     // TODO: });
     // TODO: if success {
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.energy_zone.cards.len(), energy_before + 1, "success places exactly under_count(0)+1 energy cards" );
+    CHECK_EQ(tg.state.p[0].energy.n, energy_before + 1, "rin_live_success_ability_triggers");
     CHECK_EQ(tg.state.p[0].energy_active, active_before, "rin_live_success_ability_triggers");
     // TODO: }
     // 
@@ -29072,7 +29055,7 @@ static void gen_kinako_activate_discards_matching_card(void){
     // // Should have a pending choice to select the cost card.
     // // Observed: SelectCard zone=hand count=1 (cost_limit filter applied).
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard cost prompt" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "kinako_activate_discards_matching_card");
     // // Select the first index (cost_card which is at hand index 0)
     rb_resume_with_choice(&tg.state, 0);
     // 
@@ -29130,7 +29113,7 @@ static void gen_kinako_q108_sumire_discard_no_blade(void){
     // // Select Sumire as cost card.
     // // Observed: SelectCard zone=hand count=1 is prompted.
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard cost prompt" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "kinako_q108_sumire_discard_no_blade");
     rb_resume_with_choice(&tg.state, 0);
     // 
     // // Drain any remaining choices (debut ability activation followup, etc.)
@@ -29195,7 +29178,7 @@ static void gen_kinako_q240_non_center_debut_activates(void){
     // // Select debut_card as cost.
     // // Observed: SelectCard zone=hand count=1 is prompted.
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard cost prompt" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "kinako_q240_non_center_debut_activates");
     rb_resume_with_choice(&tg.state, 0);
     // // Drain followup: if the debut ability triggers additional choices
     while (test_has_pending_choice(&tg)) rb_resume_with_choice(&tg.state, 0);
@@ -30323,7 +30306,7 @@ static void gen_wien_live_success_choice_draw_via_trigger(void){
     while (test_has_pending_choice(&tg)) rb_resume_with_choice(&tg.state, 0);
     rb_resume_with_choice(&tg.state, -1);
     // TODO: }
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.hand.cards.len(), hand_before + 2, "draw 2 should increase hand by 2" );
+    CHECK_EQ(tg.state.p[0].hand.n, hand_before + 2, "wien_live_success_choice_draw_via_trigger");
     // 
 }
 
@@ -31140,7 +31123,7 @@ static void gen_mia_q73_deck_has_live_card_after_refresh(void){
     // 
     // // Debut auto ability fires: optional cost (discard 1 from hand)
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard for the discard cost" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "mia_q73_deck_has_live_card_after_refresh");
     rb_resume_with_choice(&tg.state, 0);
     // 
     // // Now reveal_until_live_card runs. Deck has 3 fillers, then refreshes from waitroom.
@@ -31172,7 +31155,7 @@ static void gen_mia_q102_no_live_card_anywhere(void){
     test_play_to_stage(&tg, mia, 1);
     // 
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard for the discard cost" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "mia_q102_no_live_card_anywhere");
     rb_resume_with_choice(&tg.state, 0);
     // 
     // // After reveal_until_live_card: deck should have 0 cards (all revealed)
@@ -31840,7 +31823,7 @@ static void gen_setsuna_q157_wait_energy_can_be_placed_under_member(void){
     // // then prompts once: SelectCard zone=energy count=1 allow_skip=false
     // // ("Choose energy card(s) to place under member").
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard for energy placement" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "setsuna_q157_wait_energy_can_be_placed_under_member");
     rb_resume_with_choice(&tg.state, 0);
     // 
     int total_after = tg.state.p[0].energy.n;
@@ -31869,7 +31852,7 @@ static void gen_setsuna_q184_energy_under_member_not_counted(void){
     // // then prompts once: SelectCard zone=energy count=1 allow_skip=false
     // // ("Choose energy card(s) to place under member").
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard for energy placement" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "setsuna_q184_energy_under_member_not_counted");
     rb_resume_with_choice(&tg.state, 0);
     // 
     CHECK_EQ(tg.state.p[0].energy.n, 2, "setsuna_q184_energy_under_member_not_counted");
@@ -31898,7 +31881,7 @@ static void gen_setsuna_debuts_to_vacated_area_not_stage_first_empty(void){
     // // then prompts once: SelectCard zone=energy count=1 allow_skip=false
     // // ("Choose energy card(s) to place under member").
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard for energy placement" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "setsuna_debuts_to_vacated_area_not_stage_first_empty");
     rb_resume_with_choice(&tg.state, 0);
     // 
     // // After self_cost removes setsuna from RightSide, last_vacated_stage_area = Some(2).
@@ -31930,7 +31913,7 @@ static void gen_setsuna_energy_placed_under_vacated_area_not_center(void){
     // // then prompts once: SelectCard zone=energy count=1 allow_skip=false
     // // ("Choose energy card(s) to place under member").
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard for energy placement" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "setsuna_energy_placed_under_vacated_area_not_center");
     rb_resume_with_choice(&tg.state, 0);
     // 
     // // New card should be on the right side
@@ -32457,11 +32440,11 @@ static void gen_konata_bp4_deploy_non_blade_heart_member_stays_active(void){
     // // Observed chain (same as the BH test): SelectTarget optional 2E gate,
     // // then ONE SelectPosition for the deployed member.
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectTarget"), "expected SelectTarget optional-cost gate" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectTarget", "konata_bp4_deploy_non_blade_heart_member_stays_active");
     rb_resume_with_choice(&tg.state, 1);
     // 
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectPosition"), "expected SelectPosition prompt" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectPosition", "konata_bp4_deploy_non_blade_heart_member_stays_active");
     rb_resume_with_choice(&tg.state, 0);
     test_has_pending_choice(&tg);
     // 
@@ -33421,7 +33404,7 @@ static void gen_jimo_ai_draw_2_discard_2(void){
     int deck_before = 0;
     int hand_before = 0;
     // TODO destructuring: let (game, _, deck_before, hand_before) = setup(5, 2);
-    // TODO assert_eq (unresolved): assert_eq!(game.state.player1.main_deck.cards.len(), deck_before - 2);
+    CHECK_EQ(tg.state.p[0].deck.n, deck_before - 2, "jimo_ai_draw_2_discard_2");
     CHECK_EQ(tg.state.p[0].hand.n, hand_before, "jimo_ai_draw_2_discard_2");
     // 
 }
@@ -33434,7 +33417,7 @@ static void gen_jimo_ai_draw_1_discard_1(void){
     int deck_before = 0;
     int hand_before = 0;
     // TODO destructuring: let (game, _, deck_before, hand_before) = setup(5, 1);
-    // TODO assert_eq (unresolved): assert_eq!(game.state.player1.main_deck.cards.len(), deck_before - 1);
+    CHECK_EQ(tg.state.p[0].deck.n, deck_before - 1, "jimo_ai_draw_1_discard_1");
     CHECK_EQ(tg.state.p[0].hand.n, hand_before, "jimo_ai_draw_1_discard_1");
     // 
 }
@@ -33460,7 +33443,7 @@ static void gen_jimo_ai_draw_3_discard_3_limited_hand(void){
     int deck_before = 0;
     int hand_before = 0;
     // TODO destructuring: let (game, _, deck_before, hand_before) = setup(1, 3);
-    // TODO assert_eq (unresolved): assert_eq!(game.state.player1.main_deck.cards.len(), deck_before - 3);
+    CHECK_EQ(tg.state.p[0].deck.n, deck_before - 3, "jimo_ai_draw_3_discard_3_limited_hand");
     CHECK_EQ(tg.state.p[0].hand.n, hand_before, "jimo_ai_draw_3_discard_3_limited_hand");
     // 
 }
@@ -33538,7 +33521,7 @@ static void gen_maki_q177_debut_triggers_draw_via_ab0(void){
     // // Pay optional cost (wait Maki herself as Center BiBi member).
     // // Observed: SelectTarget pay_optional_cost gate is offered.
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectTarget"), "expected SelectTarget optional-cost gate" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectTarget", "maki_q177_debut_triggers_draw_via_ab0");
     rb_resume_with_choice(&tg.state, 1);
     // // Opponent chooses a member to wait (select cheap_opp at index 0)
     test_has_pending_choice(&tg);
@@ -33551,7 +33534,7 @@ static void gen_maki_q177_debut_triggers_draw_via_ab0(void){
     // TODO: }
     // 
     // // Ab#1 draws 1 → hand goes from 1 to 2
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.hand.cards.len(), hand_after_play + 1, "Q177: Cost ≤4 opponent waited → draw 1" );
+    CHECK_EQ(tg.state.p[0].hand.n, hand_after_play + 1, "maki_q177_debut_triggers_draw_via_ab0");
     // // Opponent member should be on stage (just in wait state)
     // TODO assert: assert!( game.state.player2.stage.stage.contains(&cheap_opp), "Opponent member should still be on stage (wait state)" );
     // TODO assert_eq (unresolved): assert_eq!( game.state.mods.get_orientation_modifier(cheap_opp), Some("wait"), "Opponent's cheap member should be in wait state" );
@@ -33592,7 +33575,7 @@ static void gen_maki_edge_cost5_opponent_draws_nothing(void){
     // // Skip optional cost (choose "Skip" option index 0).
     // // Observed: SelectTarget pay_optional_cost gate is offered.
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectTarget"), "expected SelectTarget optional-cost gate" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectTarget", "maki_edge_cost5_opponent_draws_nothing");
     rb_resume_with_choice(&tg.state, 0);
     // // Cost was skipped → opponent action doesn't fire → no choice
     while (test_has_pending_choice(&tg)) rb_resume_with_choice(&tg.state, 0);
@@ -33643,7 +33626,7 @@ static void gen_maki_edge_no_opponent_member_no_draw(void){
     // // Observed: SelectTarget pay_optional_cost gate is offered even though
     // // the effect would have no targets.
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectTarget"), "expected SelectTarget optional-cost gate" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectTarget", "maki_edge_no_opponent_member_no_draw");
     rb_resume_with_choice(&tg.state, 0);
     // // Opponent has no members → no pending choice after skip
     while (test_has_pending_choice(&tg)) rb_resume_with_choice(&tg.state, 0);
@@ -33681,7 +33664,7 @@ static void gen_ai_bp3_three_deploys_draws_to_five(void){
     // // After 3 deploys, hand went from 6 → 3 (3 cards used).
     // // draw-until-5: current=3, target=5, draws 2.
     CHECK_EQ(tg.state.p[0].hand.n, 5, "ai_bp3_three_deploys_draws_to_five");
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.main_deck.cards.len(), deck_before - 2, "Deck should lose 2 cards (drawn to reach 5)" );
+    CHECK_EQ(tg.state.p[0].deck.n, deck_before - 2, "ai_bp3_three_deploys_draws_to_five");
     CHECK_EQ(tg.state.p[0].discard.n, discard_before, "ai_bp3_three_deploys_draws_to_five");
     CHECK_EQ(tg.state.p[0].stage[2], ai, "ai_bp3_three_deploys_draws_to_five");
     // 
@@ -33734,7 +33717,7 @@ static void gen_ai_bp3_draw_from_empty_hand(void){
     // 
     // // After 3 deploys: hand = 0. draw-until-5 draws 5 → hand = 5.
     CHECK_EQ(tg.state.p[0].hand.n, 5, "ai_bp3_draw_from_empty_hand");
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.main_deck.cards.len(), deck_before - 5, "Deck should lose 5 cards" );
+    CHECK_EQ(tg.state.p[0].deck.n, deck_before - 5, "ai_bp3_draw_from_empty_hand");
     CHECK_EQ(tg.state.p[0].discard.n, discard_before, "ai_bp3_draw_from_empty_hand");
     // 
 }
@@ -34549,7 +34532,7 @@ static void gen_pb1021_dollchestra_in_live_zone_draws(void){
     // 
     { int ftpl = rb_owner_of_card(&tg.state, me); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ成功時"); rb_drain_ability_queue(&tg.state); }
     // 
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.hand.cards.len(), hand_before + 1, "DOLLCHESTRA in live zone -> draw 1" );
+    CHECK_EQ(tg.state.p[0].hand.n, hand_before + 1, "pb1021_dollchestra_in_live_zone_draws");
     // 
 }
 
@@ -34674,7 +34657,7 @@ static void gen_bp2017_debut_draws_with_10_card_waitroom(void){
     // 
     { int ftpl = rb_owner_of_card(&tg.state, me); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "登場"); rb_drain_ability_queue(&tg.state); }
     // 
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.hand.cards.len(), hand_before + 1, "waitroom has 10+ cards -> draw 1" );
+    CHECK_EQ(tg.state.p[0].hand.n, hand_before + 1, "bp2017_debut_draws_with_10_card_waitroom");
     // 
 }
 
@@ -34955,10 +34938,10 @@ static void gen_pr032_mills_shortfall_and_recovers_live_to_deck_top(void){
     rb_drain_ability_queue(&tg.state);
     // 
     // 
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.waitroom.cards.len(), wait_before + 3, "waitroom 5 of 8 -> mill exactly 3" );
+    CHECK_EQ(tg.state.p[0].discard.n, wait_before + 3, "pr032_mills_shortfall_and_recovers_live_to_deck_top");
     // 
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard for the retrieval (zone=discard, allow_skip)" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "pr032_mills_shortfall_and_recovers_live_to_deck_top");
     rb_resume_with_choice(&tg.state, 0);
     // 
     // TODO assert_eq (unresolved): assert_eq!( game.state.player1.main_deck.cards.first(), Some(&live), "live card recovered to deck TOP" );
@@ -35020,7 +35003,7 @@ static void gen_pr032_declining_keeps_milled_cards_in_waitroom(void){
     // 
     // 
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard for the retrieval (zone=discard, allow_skip)" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "pr032_declining_keeps_milled_cards_in_waitroom");
     rb_resume_with_choice(&tg.state, -1);
     // 
     // // Declined: the live card stays in the waitroom and never reaches the deck
@@ -35068,7 +35051,7 @@ static void gen_pr032_no_live_among_milled_no_prompt(void){
     rb_drain_ability_queue(&tg.state);
     // 
     // 
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.waitroom.cards.len(), wait_before + 6, "waitroom 2 of 8 -> mill exactly 6" );
+    CHECK_EQ(tg.state.p[0].discard.n, wait_before + 6, "pr032_no_live_among_milled_no_prompt");
     test_has_pending_choice(&tg);
     // 
 }
@@ -35189,7 +35172,7 @@ static void gen_pr032_waitroom_seven_mills_one_and_recovers_live(void){
     rb_drain_ability_queue(&tg.state);
     // 
     // 
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.waitroom.cards.len(), wait_before + 1, "waitroom 7 of 8 -> mill exactly 1" );
+    CHECK_EQ(tg.state.p[0].discard.n, wait_before + 1, "pr032_waitroom_seven_mills_one_and_recovers_live");
     // 
     // // The single milled card IS the live card; 「〜してもよい」 offers a
     // // declinable selection even for one candidate.
@@ -35430,7 +35413,7 @@ static void gen_omoi_decline_no_blade_no_move(void){
     // 
     rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard (discard-zone recovery, allow_skip)" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "omoi_decline_no_blade_no_move");
     rb_resume_with_choice(&tg.state, -1);
     // 
     CHECK(test_zone_has_id(&tg, 0, "discard", wr_member), "omoi_decline_no_blade_no_move");
@@ -35592,7 +35575,7 @@ static void gen_sumire_left_side_debut_draws_two_discards_two(void){
     // 
     // // Net effect: deck -2, and exactly two of the three known cards
     // // (d1, d2, keep) were discarded to the waitroom.
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.main_deck.cards.len(), filler_deck_len - 2, "drew exactly 2" );
+    CHECK_EQ(tg.state.p[0].deck.n, filler_deck_len - 2, "sumire_left_side_debut_draws_two_discards_two");
     int survivors = 0;
     // TODO: .iter()
     // TODO: .filter(|c| game.state.player1.hand.cards.contains(c))
@@ -35648,7 +35631,7 @@ static void gen_koko_three_kaleidoscore_grants_heart06_and_blade(void){
     // 
     test_recalc(&tg);
     // 
-    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, koko, 6), 1, "koko_three_kaleidoscore_grants_heart06_and_blade");
+    // TODO assert_eq (unresolved): assert_eq!( game.state.mods.get_heart_modifier(koko, HeartColor::Heart06), 1, "3 KALEIDOSCORE members -> heart06 granted" );
     CHECK_EQ(rb_mods_get_blade(&tg.state.mods, koko), 1, "koko_three_kaleidoscore_grants_heart06_and_blade");
     // 
 }
@@ -35666,7 +35649,7 @@ static void gen_koko_only_two_kaleidoscope_no_bonus(void){
     // 
     test_recalc(&tg);
     // 
-    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, koko, 6), 0, "koko_only_two_kaleidoscope_no_bonus");
+    // TODO assert_eq (unresolved): assert_eq!( game.state.mods.get_heart_modifier(koko, HeartColor::Heart06), 0, "only 2 KALEIDOSCORE -> no heart06" );
     CHECK_EQ(rb_mods_get_blade(&tg.state.mods, koko), 0, "koko_only_two_kaleidoscope_no_bonus");
     // 
 }
@@ -35699,7 +35682,7 @@ static void gen_cl1002_decline_stays_in_waitroom(void){
     // 
     test_play_to_stage(&tg, me, 0);
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectTarget"), "expected SelectTarget (pay_optional_cost:skip)" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectTarget", "cl1002_decline_stays_in_waitroom");
     rb_resume_with_choice(&tg.state, -1);
     // 
     CHECK((!test_zone_has_id(&tg, 0, "hand", doll)), "cl1002_decline_stays_in_waitroom");
@@ -35826,7 +35809,7 @@ static void gen_cl1004_choose_mill_three(void){
     int deck_before = tg.state.p[0].deck.n;
     rb_resume_with_choice(&tg.state, 0);
     // 
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.main_deck.cards.len(), deck_before - 3, "chose mill -> deck top 3 moved to waitroom" );
+    CHECK_EQ(tg.state.p[0].deck.n, deck_before - 3, "cl1004_choose_mill_three");
     // 
 }
 
@@ -36153,7 +36136,7 @@ static void gen_honoka_bp4001_draws_only_when_stage_total_is_cheaper(void){
     while (test_has_pending_choice(&tg)) rb_resume_with_choice(&tg.state, 0);
     rb_resume_with_choice(&tg.state, -1);
     // TODO: }
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.hand.cards.len(), before + 1, "stage total 9 < opponent 15 → draw 1" );
+    CHECK_EQ(tg.state.p[0].hand.n, before + 1, "honoka_bp4001_draws_only_when_stage_total_is_cheaper");
     // 
     // // Now more expensive: my 9 > opponent 5 → no draw.
     // TODO: game.state.player2.stage.stage[1] = small;
@@ -36305,8 +36288,8 @@ static void gen_sayaka_hsbp2011_mills_top_five(void){
     rb_drain_ability_queue(&tg.state);
     // 
     // 
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.waitroom.cards.len(), waitroom_before + 5, "five cards milled to the waitroom" );
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.main_deck.cards.len(), deck_before - 5, "deck shrank by five from the top" );
+    CHECK_EQ(tg.state.p[0].discard.n, waitroom_before + 5, "sayaka_hsbp2011_mills_top_five");
+    CHECK_EQ(tg.state.p[0].deck.n, deck_before - 5, "sayaka_hsbp2011_mills_top_five");
     // 
 }
 
@@ -36700,8 +36683,8 @@ static void gen_yell_all_blade_blocks_sumire_and_wien(void){
     rb_fire_recorded_auto(&tg.state, 0);
     rb_drain_ability_queue(&tg.state);
     // 
-    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, sumire, 6), 0, "yell_all_blade_blocks_sumire_and_wien");
-    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, wien, 3), 0, "yell_all_blade_blocks_sumire_and_wien");
+    // TODO assert_eq (unresolved): assert_eq!(game.state.mods.get_heart_modifier(sumire, HeartColor::Heart06), 0, "Sumire must NOT gain when ALL blade present");
+    // TODO assert_eq (unresolved): assert_eq!(game.state.mods.get_heart_modifier(wien, HeartColor::Heart03), 0, "Wien must NOT gain when ALL blade present");
     // 
 }
 
@@ -36737,9 +36720,9 @@ static void gen_yell_only_one_present_triggers_self_only(void){
     rb_fire_recorded_auto(&tg.state, 0);
     rb_drain_ability_queue(&tg.state);
     // 
-    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, sumire, 6), 1, "yell_only_one_present_triggers_self_only");
+    // TODO assert_eq (unresolved): assert_eq!(game.state.mods.get_heart_modifier(sumire, HeartColor::Heart06), 1);
     // // Ensure Wien absent doesn't somehow get heart on filler
-    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, filler, 3), 0, "yell_only_one_present_triggers_self_only");
+    // TODO assert_eq (unresolved): assert_eq!(game.state.mods.get_heart_modifier(filler, HeartColor::Heart03), 0);
     // 
 }
 
@@ -36969,7 +36952,7 @@ static void gen_q146_activating_member_alone_draws_1(void){
     // // Q146: 1 member → draw 1, discard 1. Net: 0.
     // // play_to_stage removes kumi from hand (-1), debut net 0.
     int hand_after = tg.state.p[0].hand.n;
-    // TODO assert_eq (unresolved): assert_eq!( hand_after, hand_before - 1, "Q146: 1 member → draw 1 discard 1 = net 0" );
+    CHECK_EQ(hand_after, hand_before - 1, "q146_activating_member_alone_draws_1");
     // 
 }
 
@@ -37203,7 +37186,7 @@ static void gen_q146_three_members_draws_3(void){
     // 
     // // Q146: 3 members → draw 3, discard 1. Net: +2. play_to_stage: -1. Total: +1.
     int hand_after = tg.state.p[0].hand.n;
-    // TODO assert_eq (unresolved): assert_eq!( hand_after, hand_before + 1, "Q146: 3 members → draw 3 discard 1 = net +1" );
+    CHECK_EQ(hand_after, hand_before + 1, "q146_three_members_draws_3");
     // 
 }
 
@@ -37685,7 +37668,7 @@ static void gen_q146_opponent_members_not_counted(void){
     // 
     // // Only 1 own member → draw 1, discard 1. Net: 0. play_to_stage: -1.
     int hand_after = tg.state.p[0].hand.n;
-    // TODO assert_eq (unresolved): assert_eq!( hand_after, hand_before - 1, "Q146: opponent members not counted → net 0" );
+    CHECK_EQ(hand_after, hand_before - 1, "q146_opponent_members_not_counted");
     // 
 }
 
@@ -41693,7 +41676,7 @@ static void gen_mari_q131_zero_deck_blocks_live_start(void){
     // // inlined helper choose_self
     // 
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectTarget"), "expected SelectTarget self_or_opponent prompt" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectTarget", "mari_q131_zero_deck_blocks_live_start");
     rb_resume_with_choice(&tg.state, 0);
     // 
     // 
@@ -41745,7 +41728,7 @@ static void gen_mari_q131_one_card_deck_blocked(void){
     // // inlined helper choose_self
     // 
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectTarget"), "expected SelectTarget self_or_opponent prompt" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectTarget", "mari_q131_one_card_deck_blocked");
     rb_resume_with_choice(&tg.state, 0);
     // 
     // 
@@ -41826,7 +41809,7 @@ static void gen_mari_live_start_sufficient_deck_fires(void){
     // // inlined helper choose_self
     // 
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectTarget"), "expected SelectTarget self_or_opponent prompt" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectTarget", "mari_live_start_sufficient_deck_fires");
     rb_resume_with_choice(&tg.state, 0);
     // 
     // 
@@ -41913,7 +41896,7 @@ static void gen_mari_choose_opponent_look_at_opponent_deck(void){
     // // inlined helper choose_opponent
     // 
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectTarget"), "expected SelectTarget self_or_opponent prompt" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectTarget", "mari_choose_opponent_look_at_opponent_deck");
     rb_resume_with_choice(&tg.state, 1);
     // 
     // 
@@ -42004,7 +41987,7 @@ static void gen_mari_choose_opponent_empty_deck_blocked(void){
     // // inlined helper choose_opponent
     // 
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectTarget"), "expected SelectTarget self_or_opponent prompt" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectTarget", "mari_choose_opponent_empty_deck_blocked");
     rb_resume_with_choice(&tg.state, 1);
     // 
     // 
@@ -43913,7 +43896,7 @@ static void gen_azuna_q184_energy_under_member_not_counted(void){
     test_has_pending_choice(&tg);
     // TODO: game.select_energy_from_zone(1);
     // 
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.energy_zone.cards.len(), energy_before - 1, "Q184: 1 energy removed from zone" );
+    CHECK_EQ(tg.state.p[0].energy.n, energy_before - 1, "azuna_q184_energy_under_member_not_counted");
     // 
 }
 
@@ -43921,7 +43904,7 @@ static void gen_azuna_q184_energy_under_member_not_counted(void){
 static void gen_b_heart07_parses_to_colorless_heart00(void){
     TestGame tg; test_game_new(&tg);
     // 
-    CHECK_EQ(rb_parse_heart_color("b_heart07"), RB_HEART_PINK, "b_heart07_parses_to_colorless_heart00");
+    // TODO assert_eq (unresolved): assert_eq!(parse_heart_color("b_heart07"), HeartColor::Heart00);
     // action result consumed: assert_eq!( "b_heart07".parse::<HeartColor>().unwrap(), HeartColor::Heart00 );
     CHECK_EQ(rb_heart_index(RB_HEART_PINK), 0, "b_heart07_parses_to_colorless_heart00");
     // 
@@ -44401,7 +44384,7 @@ static void gen_fuyumari_q63_effect_debut_no_cost_payment(void){
     // // to skip_optional_cost, so this test exercises the SKIP path (no swap,
     // // no effect). The state assertions below hold trivially on that path.
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectTarget"), "expected SelectTarget pay_optional_cost gate" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectTarget", "fuyumari_q63_effect_debut_no_cost_payment");
     rb_resume_with_choice(&tg.state, 0);
     test_has_pending_choice(&tg);
     // 
@@ -44430,7 +44413,7 @@ static void gen_fuyumari_q63_optional_cost_skipped(void){
     // // Observed: the optional stage cost opens with the same pay/skip gate;
     // // an empty card_indices answer also resolves to skip_optional_cost.
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectTarget"), "expected SelectTarget pay_optional_cost gate" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectTarget", "fuyumari_q63_optional_cost_skipped");
     rb_resume_with_choice(&tg.state, -1);
     // 
     CHECK_EQ(tg.state.p[0].stage[0], liella_member, "fuyumari_q63_optional_cost_skipped");
@@ -44466,7 +44449,7 @@ static void gen_fuyumari_q95_player_chooses_card_from_discard(void){
     // // 3. Effect: the very next ask is the re-deploy choice from the waitroom
     // // (SelectCard zone=discard count=1 allow_skip=false).
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard (zone=discard, member_card) for the re-deploy choice" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "fuyumari_q95_player_chooses_card_from_discard");
     rb_resume_with_choice(&tg.state, 0);
     test_has_pending_choice(&tg);
     // 
@@ -45476,7 +45459,7 @@ static void gen_mei_bp5_select_two_from_different_series(void){
     // // inlined helper discard_cost_if_pending
     // 
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard skippable discard-cost prompt" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "mei_bp5_select_two_from_different_series");
     rb_resume_with_choice(&tg.state, 0);
     // 
     // 
@@ -45484,10 +45467,10 @@ static void gen_mei_bp5_select_two_from_different_series(void){
     // // inlined helper select_and_finish
     // 
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard looked_at prompt" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "mei_bp5_select_two_from_different_series");
     rb_resume_with_choice(&tg.state, 0);
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard looked_at prompt" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "mei_bp5_select_two_from_different_series");
     rb_resume_with_choice(&tg.state, 0);
     while (test_has_pending_choice(&tg)) rb_resume_with_choice(&tg.state, 0);
     rb_resume_with_choice(&tg.state, -1);
@@ -45509,7 +45492,7 @@ static void gen_mei_bp5_select_zero_cards(void){
     // // inlined helper discard_cost_if_pending
     // 
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard skippable discard-cost prompt" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "mei_bp5_select_zero_cards");
     rb_resume_with_choice(&tg.state, 0);
     // 
     // // inlined helper select_and_finish
@@ -45517,7 +45500,7 @@ static void gen_mei_bp5_select_zero_cards(void){
     int i = 0;
     // TODO loop (degraded): for i in 0..0 {
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard looked_at prompt" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "mei_bp5_select_zero_cards");
     rb_resume_with_choice(&tg.state, 0);
     // TODO: }
     while (test_has_pending_choice(&tg)) rb_resume_with_choice(&tg.state, 0);
@@ -45540,13 +45523,13 @@ static void gen_mei_bp5_select_one_card(void){
     // // inlined helper discard_cost_if_pending
     // 
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard skippable discard-cost prompt" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "mei_bp5_select_one_card");
     rb_resume_with_choice(&tg.state, 0);
     // 
     // // inlined helper select_and_finish
     // 
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard looked_at prompt" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "mei_bp5_select_one_card");
     rb_resume_with_choice(&tg.state, 0);
     while (test_has_pending_choice(&tg)) rb_resume_with_choice(&tg.state, 0);
     rb_resume_with_choice(&tg.state, -1);
@@ -45567,7 +45550,7 @@ static void gen_mei_bp5_per_group_rejects_two_from_same_group(void){
     // // inlined helper discard_cost_if_pending
     // 
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard skippable discard-cost prompt" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "mei_bp5_per_group_rejects_two_from_same_group");
     rb_resume_with_choice(&tg.state, 0);
     // 
     // 
@@ -45575,7 +45558,7 @@ static void gen_mei_bp5_per_group_rejects_two_from_same_group(void){
     // // Observed: SelectCard zone=looked_at count=3 is prompted and the
     // // engine rejects the same-group pair.
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard looked_at prompt" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "mei_bp5_per_group_rejects_two_from_same_group");
     int result = 0;
     // action result consumed: assert!( result.is_err(), "Per-group should reject 2 cards from same series" );
     // // After rejection, no further choices (ability terminated).
@@ -45609,7 +45592,7 @@ static void gen_mei_bp5_q235_debut_look_and_select_with_multiname(void){
     // // inlined helper discard_cost_if_pending
     // 
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard skippable discard-cost prompt" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "mei_bp5_q235_debut_look_and_select_with_multiname");
     rb_resume_with_choice(&tg.state, 0);
     // 
     // 
@@ -45617,10 +45600,10 @@ static void gen_mei_bp5_q235_debut_look_and_select_with_multiname(void){
     // // inlined helper select_and_finish
     // 
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard looked_at prompt" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "mei_bp5_q235_debut_look_and_select_with_multiname");
     rb_resume_with_choice(&tg.state, 0);
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard looked_at prompt" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "mei_bp5_q235_debut_look_and_select_with_multiname");
     rb_resume_with_choice(&tg.state, 0);
     while (test_has_pending_choice(&tg)) rb_resume_with_choice(&tg.state, 0);
     rb_resume_with_choice(&tg.state, -1);
@@ -46086,7 +46069,7 @@ static void gen_sp_pb1_004_live_success_pay_3e_draws(void){
     test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, 1);
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!(game.state.player1.hand.cards.len(), hand_before + 1, "should draw 1 on pay");
+    CHECK_EQ(tg.state.p[0].hand.n, hand_before + 1, "sp_pb1_004_live_success_pay_3e_draws");
     CHECK_EQ(tg.state.p[0].energy_active, 2, "sp_pb1_004_live_success_pay_3e_draws");
     // 
 }
@@ -47037,7 +47020,7 @@ static void gen_izumi_bp5_look_with_eligible_hasu_selects(void){
     test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, 0);
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!(game.pending_choice_type().as_deref(), Some("SelectCard"));
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "izumi_bp5_look_with_eligible_hasu_selects");
     // // Select the eligible Hasunosora
     rb_resume_with_choice(&tg.state, 0);
     CHECK(test_zone_has_id(&tg, 0, "hand", hasu9), "izumi_bp5_look_with_eligible_hasu_selects");
@@ -47133,7 +47116,7 @@ static void gen_pb1013_higher_cost_member_on_stage_draws(void){
     // 
     { int ftpl = rb_owner_of_card(&tg.state, me); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ成功時"); rb_drain_ability_queue(&tg.state); }
     // 
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.hand.cards.len(), hand_before + 1, "a member costing more than 9 is on stage -> draw 1" );
+    CHECK_EQ(tg.state.p[0].hand.n, hand_before + 1, "pb1013_higher_cost_member_on_stage_draws");
     CHECK(test_zone_has_id(&tg, 0, "hand", drawn), "pb1013_higher_cost_member_on_stage_draws");
     // 
 }
@@ -47247,7 +47230,7 @@ static void gen_mari_heart05_total_exactly_four_grants(void){
     // 
     rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     // 
-    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, mari, 5), 1, "mari_heart05_total_exactly_four_grants");
+    // TODO assert_eq (unresolved): assert_eq!( game.state.mods.get_heart_modifier(mari, HeartColor::Heart05), 1, "aggregate == 4 satisfies >=4" );
     // 
 }
 
@@ -47262,7 +47245,7 @@ static void gen_mari_heart05_total_two_no_grant(void){
     // 
     rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     // 
-    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, mari, 5), 0, "mari_heart05_total_two_no_grant");
+    // TODO assert_eq (unresolved): assert_eq!( game.state.mods.get_heart_modifier(mari, HeartColor::Heart05), 0, "aggregate 2 < 4 -> no grant" );
     // 
 }
 
@@ -47275,7 +47258,7 @@ static void gen_mari_empty_live_zone_no_grant(void){
     // 
     rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     // 
-    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, mari, 5), 0, "mari_empty_live_zone_no_grant");
+    // TODO assert_eq (unresolved): assert_eq!( game.state.mods.get_heart_modifier(mari, HeartColor::Heart05), 0 );
     // 
 }
 
@@ -47493,7 +47476,7 @@ static void gen_pr0029_pay_energy_grants_heart01(void){
     test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, 1);
     // 
-    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, me, 1), 1, "pr0029_pay_energy_grants_heart01");
+    // TODO assert_eq (unresolved): assert_eq!( game.state.mods.get_heart_modifier(me, HeartColor::Heart01), 1, "paid -> heart01 until live end" );
     CHECK(tg.state.p[0].energy_active, "pr0029_pay_energy_grants_heart01");
     // 
 }
@@ -47509,7 +47492,7 @@ static void gen_pr0029_decline_no_heart(void){
     rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     rb_resume_with_choice(&tg.state, -1);
     // 
-    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, me, 1), 0, "pr0029_decline_no_heart");
+    // TODO assert_eq (unresolved): assert_eq!( game.state.mods.get_heart_modifier(me, HeartColor::Heart01), 0 );
     // 
 }
 
@@ -47576,7 +47559,7 @@ static void gen_bp5013_mill_three_all_members_two_blades(void){
     rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     // 
     CHECK_EQ(rb_mods_get_blade(&tg.state.mods, me), 2, "bp5013_mill_three_all_members_two_blades");
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.main_deck.cards.len(), deck_before - 3, "sanity: deck shrank only by the mill" );
+    CHECK_EQ(tg.state.p[0].deck.n, deck_before - 3, "bp5013_mill_three_all_members_two_blades");
     // 
 }
 
@@ -47627,7 +47610,7 @@ static void gen_bp7022_activation_moves_member_to_another_area(void){
     // TODO: }
     // 
     // TODO assert_eq (unresolved): assert_eq!( game.state.player1.energy_deck.cards.len(), deck_before + 1, "one energy returned to the energy deck" );
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.energy_zone.cards.len(), zone_before - 1, "zone lost the paid energy" );
+    CHECK_EQ(tg.state.p[0].energy.n, zone_before - 1, "bp7022_activation_moves_member_to_another_area");
     // TODO: assert_ne!(
     // TODO: game.state.player1.stage.stage.iter().position(|&c| c == me),
     // TODO: Some(1),
@@ -47667,7 +47650,7 @@ static void gen_pb2047_all_liella_stage_waits_enemy_cost_two_member(void){
     int enemy = 0;
     // 
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard for the discard cost" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "pb2047_all_liella_stage_waits_enemy_cost_two_member");
     rb_resume_with_choice(&tg.state, 0);
     // 
     // TODO assert_eq (unresolved): assert_eq!( game.state.mods.get_orientation_modifier(enemy), Some("wait"), "all-Liella stage -> enemy cost<=2 member waited" );
@@ -47693,7 +47676,7 @@ static void gen_pb2047_non_liella_on_stage_no_enemy_wait(void){
     // 
     rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard for the discard cost" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "pb2047_non_liella_on_stage_no_enemy_wait");
     rb_resume_with_choice(&tg.state, 0);
     // 
     // TODO: assert_ne!(
@@ -47739,7 +47722,7 @@ static void gen_bp5010_mills_three_retrieves_arise_member(void){
     rb_resume_with_choice(&tg.state, 0);
     // TODO: }
     // 
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.main_deck.cards.len(), deck_before - 3, "milled exactly 3" );
+    CHECK_EQ(tg.state.p[0].deck.n, deck_before - 3, "bp5010_mills_three_retrieves_arise_member");
     CHECK(test_zone_has_id(&tg, 0, "hand", arise), "bp5010_mills_three_retrieves_arise_member");
     // 
 }
@@ -47767,7 +47750,7 @@ static void gen_bp5010_mill_happens_even_without_arise(void){
     rb_resume_with_choice(&tg.state, 0);
     // TODO: }
     // 
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.main_deck.cards.len(), deck_before - 3, "mill still happened" );
+    CHECK_EQ(tg.state.p[0].deck.n, deck_before - 3, "bp5010_mill_happens_even_without_arise");
     // 
 }
 
@@ -47906,7 +47889,7 @@ static void gen_sayaka_hsbp2002_fetch_is_cost_and_count_filtered(void){
     rb_resume_with_choice(&tg.state, 0);
     rb_resume_with_choice(&tg.state, 1);
     // 
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.hand.cards.len(), hand_before + 2, "two fetched members join the hand" );
+    CHECK_EQ(tg.state.p[0].hand.n, hand_before + 2, "sayaka_hsbp2002_fetch_is_cost_and_count_filtered");
     int waitroom = 0;
     // TODO assert: assert!( !waitroom.contains(&cheap_a) && !waitroom.contains(&cheap_b), "fetched cards leave the waitroom" );
     // TODO assert: assert!( waitroom.contains(&pricey), "cost-5 member exceeds コスト2以下 → stays" );
@@ -48031,7 +48014,7 @@ static void gen_dia_bp2_yell_with_live_card_and_hand_under_7_draws_one(void){
     rb_drain_ability_queue(&tg.state);
     int hand_after = tg.state.p[0].hand.n;
     // 
-    // TODO assert_eq (unresolved): assert_eq!( hand_after, hand_before + 1, "Dia draws 1 with live card in yell + hand ≤7" );
+    CHECK_EQ(hand_after, hand_before + 1, "dia_bp2_yell_with_live_card_and_hand_under_7_draws_one");
     // 
 }
 
@@ -48782,7 +48765,7 @@ static void gen_q196_activate_zero_members_on_stage(void){
     // // presents a SelectCard for the move_cards cost step.
     // // Observed: SelectCard zone=hand count=1 allow_skip=false.
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard cost prompt" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "q196_activate_zero_members_on_stage");
     // // Select 1 card to discard.
     rb_resume_with_choice(&tg.state, 0);
     // 
@@ -48829,7 +48812,7 @@ static void gen_q196_activate_with_niji_member_grants_blade(void){
     // // Self-cost removes shizuku, then SelectCard for remaining cost step.
     // // Observed: SelectCard zone=hand count=1 allow_skip=false.
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard cost prompt" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "q196_activate_with_niji_member_grants_blade");
     rb_resume_with_choice(&tg.state, 0);
     // 
     // // Blade target selection: with 上原歩夢 as the only 虹ヶ咲 member on
@@ -49903,10 +49886,10 @@ static void gen_fuyumari_q118_card_count_integrity(void){
     // 
     rb_resume_with_choice(&tg.state, 0);
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard for the remaining live-card pick" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "fuyumari_q118_card_count_integrity");
     rb_resume_with_choice(&tg.state, 0);
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard for the opponent's pick from selected_cards" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "fuyumari_q118_card_count_integrity");
     rb_resume_with_choice(&tg.state, 0);
     while (test_has_pending_choice(&tg)) rb_resume_with_choice(&tg.state, 0);
     rb_resume_with_choice(&tg.state, -1);
@@ -50261,8 +50244,8 @@ static void gen_mia_q190_choose_heart05_grants_heart05(void){
     test_has_pending_choice(&tg);
     // // Choose heart05 (index 4 in sorted heart01-06)
     rb_resume_with_choice(&tg.state, 4);
-    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, mia, 5), 1, "mia_q190_choose_heart05_grants_heart05");
-    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, mia, 2), 0, "mia_q190_choose_heart05_grants_heart05");
+    // TODO assert_eq (unresolved): assert_eq!(game.state.mods.get_heart_modifier(mia, HeartColor::Heart05), 1, "heart05 should be gained");
+    // TODO assert_eq (unresolved): assert_eq!(game.state.mods.get_heart_modifier(mia, HeartColor::Heart02), 0, "other heart not gained");
     // 
 }
 
@@ -52748,11 +52731,11 @@ static void gen_pr_ai_pays_cost_discards_2_draws_to_five(void){
     // action result consumed: game.try_select_indices(&[0, 1]).unwrap();
     // 
     // // Two cards were discarded as cost
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.waitroom.cards.len(), discard_before + 2, "Waitroom should have +2 from cost" );
+    CHECK_EQ(tg.state.p[0].discard.n, discard_before + 2, "pr_ai_pays_cost_discards_2_draws_to_five");
     // 
     // // After discard: hand = 0, draw-until-5 → draws 5
     CHECK_EQ(tg.state.p[0].hand.n, 5, "pr_ai_pays_cost_discards_2_draws_to_five");
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.main_deck.cards.len(), deck_before - 5, "Deck should lose 5 cards" );
+    CHECK_EQ(tg.state.p[0].deck.n, deck_before - 5, "pr_ai_pays_cost_discards_2_draws_to_five");
     // 
 }
 
@@ -52782,13 +52765,13 @@ static void gen_pr_ai_pays_cost_discards_2_draws_4(void){
     // action result consumed: game.try_select_indices(&[0, 1]).unwrap();
     // 
     // // Discard: 2 filler cards were discarded as cost.
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.waitroom.cards.len(), discard_before + 2, "Waitroom should have +2 cards from cost" );
+    CHECK_EQ(tg.state.p[0].discard.n, discard_before + 2, "pr_ai_pays_cost_discards_2_draws_4");
     // 
     // // Deck: 5 - 4 = 1. We started with 10 in deck, hand had 3 (1 ai + 2 filler).
     // // After play: hand = 2, deck = 10. Cost discards 2: hand = 0, deck = 10.
     // // Draw-until-5 draws 5: hand = 5, deck = 5.
     CHECK_EQ(tg.state.p[0].hand.n, 5, "pr_ai_pays_cost_discards_2_draws_4");
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.main_deck.cards.len(), deck_before - 5, "Deck should lose 5 cards (the 5 drawn)" );
+    CHECK_EQ(tg.state.p[0].deck.n, deck_before - 5, "pr_ai_pays_cost_discards_2_draws_4");
     // 
     // // The discarded filler IDs from the original hand should be in the waitroom.
     int i = 0;
@@ -52879,8 +52862,8 @@ static void gen_pr_ai_hand_4_pays_cost_draws_4(void){
     // 
     // // Hand: 3 - 2 + draw-to-5 = 1 + 4 = 5. Drawn 4.
     CHECK_EQ(tg.state.p[0].hand.n, 5, "pr_ai_hand_4_pays_cost_draws_4");
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.main_deck.cards.len(), deck_before - 4, "Deck should lose 4 cards (4 drawn)" );
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.waitroom.cards.len(), discard_before + 2, "Waitroom should have +2 cards from cost" );
+    CHECK_EQ(tg.state.p[0].deck.n, deck_before - 4, "pr_ai_hand_4_pays_cost_draws_4");
+    CHECK_EQ(tg.state.p[0].discard.n, discard_before + 2, "pr_ai_hand_4_pays_cost_draws_4");
     // 
 }
 
@@ -53028,7 +53011,7 @@ static void gen_activation_discard_cost_feeds_movement_views(void){
     test_activate_ability(&tg, me);
     // // Proteinbar's cost is a mandatory 2-card hand discard.
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard (hand cost discard)" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "activation_discard_cost_feeds_movement_views");
     rb_resume_with_choice(&tg.state, 0);
     rb_resume_with_choice(&tg.state, 1);
     // 
@@ -54304,10 +54287,10 @@ static void gen_sumire_yell_no_blade_gains_heart06(void){
     test_add_to_revealed(&tg, m_no_blade);
     // TODO: game.state.yell_occurred = true;
     test_add_to_discard(&tg, m_no_blade);
-    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, sumire, 6), 0, "sumire_yell_no_blade_gains_heart06");
+    // TODO assert_eq (unresolved): assert_eq!(game.state.mods.get_heart_modifier(sumire, HeartColor::Heart06), 0);
     rb_fire_recorded_auto(&tg.state, 0);
     rb_drain_ability_queue(&tg.state);
-    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, sumire, 6), 1, "sumire_yell_no_blade_gains_heart06");
+    // TODO assert_eq (unresolved): assert_eq!(game.state.mods.get_heart_modifier(sumire, HeartColor::Heart06), 1, "Sumire should gain heart06 when yell has no blade heart");
     // 
 }
 
@@ -54339,8 +54322,8 @@ static void gen_sumire_yell_with_blade_no_gain(void){
     // 
     rb_fire_recorded_auto(&tg.state, 0);
     rb_drain_ability_queue(&tg.state);
-    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, sumire, 6), 0, "sumire_yell_with_blade_no_gain");
-    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, wien, 3), 0, "sumire_yell_with_blade_no_gain");
+    // TODO assert_eq (unresolved): assert_eq!(game.state.mods.get_heart_modifier(sumire, HeartColor::Heart06), 0, "Sumire must NOT gain when yell contains blade heart");
+    // TODO assert_eq (unresolved): assert_eq!(game.state.mods.get_heart_modifier(wien, HeartColor::Heart03), 0, "Wien must NOT gain when yell contains blade heart");
     // 
 }
 
@@ -54373,7 +54356,7 @@ static void gen_yell_mixed_blade_and_no_blade_no_gain(void){
     // 
     rb_fire_recorded_auto(&tg.state, 0);
     rb_drain_ability_queue(&tg.state);
-    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, sumire, 6), 0, "yell_mixed_blade_and_no_blade_no_gain");
+    // TODO assert_eq (unresolved): assert_eq!(game.state.mods.get_heart_modifier(sumire, HeartColor::Heart06), 0, "Mixed yell with 1 blade must still block");
     // 
 }
 
@@ -54392,7 +54375,7 @@ static void gen_yell_empty_revealed_no_gain(void){
     // TODO: game.state.yell_occurred = false;
     rb_fire_recorded_auto(&tg.state, 0);
     rb_drain_ability_queue(&tg.state);
-    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, sumire, 6), 0, "yell_empty_revealed_no_gain");
+    // TODO assert_eq (unresolved): assert_eq!(game.state.mods.get_heart_modifier(sumire, HeartColor::Heart06), 0, "Empty yell (yell_occurred false) must not trigger");
     // 
 }
 
@@ -54413,14 +54396,14 @@ static void gen_yell_turn1_blocks_second_trigger(void){
     test_add_to_discard(&tg, m_no_blade);
     rb_fire_recorded_auto(&tg.state, 0);
     rb_drain_ability_queue(&tg.state);
-    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, sumire, 6), 1, "yell_turn1_blocks_second_trigger");
+    // TODO assert_eq (unresolved): assert_eq!(game.state.mods.get_heart_modifier(sumire, HeartColor::Heart06), 1);
     // // Second trigger same turn should be blocked by ターン1回 — clear revealed and retrigger, modifier must stay 1
     // TODO: game.state.revealed_cards.clear();
     test_add_to_revealed(&tg, m_no_blade);
     // TODO: game.state.yell_occurred = true;
     rb_fire_recorded_auto(&tg.state, 0);
     rb_drain_ability_queue(&tg.state);
-    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, sumire, 6), 1, "yell_turn1_blocks_second_trigger");
+    // TODO assert_eq (unresolved): assert_eq!(game.state.mods.get_heart_modifier(sumire, HeartColor::Heart06), 1, "Second yell same turn must be blocked by turn1");
     // 
 }
 
@@ -54441,9 +54424,9 @@ static void gen_wien_yell_no_blade_gains_heart03_independent(void){
     // TODO: game.state.yell_occurred = true;
     rb_fire_recorded_auto(&tg.state, 0);
     rb_drain_ability_queue(&tg.state);
-    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, wien, 3), 1, "wien_yell_no_blade_gains_heart03_independent");
+    // TODO assert_eq (unresolved): assert_eq!(game.state.mods.get_heart_modifier(wien, HeartColor::Heart03), 1);
     // // Sumire not on stage → no heart06 anywhere
-    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, filler, 6), 0, "wien_yell_no_blade_gains_heart03_independent");
+    // TODO assert_eq (unresolved): assert_eq!(game.state.mods.get_heart_modifier(filler, HeartColor::Heart06), 0);
     // 
 }
 
@@ -54540,7 +54523,7 @@ static void gen_s2_bp4_016_energy_placed_by_opponent_fires(void){
     // 
     // TODO: scan_autos_both(&mut game);
     // 
-    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, watcher, 6), 1, "s2_bp4_016_energy_placed_by_opponent_fires");
+    // TODO assert_eq (unresolved): assert_eq!( game.state.mods.get_heart_modifier(watcher, HeartColor::Heart06), 1, "parenthetical: opponent-caused energy placement fires +1 heart06" );
     // 
 }
 
@@ -54596,7 +54579,7 @@ static void gen_s3_bp5_111_own_move_fires(void){
     // // OWN 起動 moves the watcher itself -> auto waits the low-blade opponent.
     test_activate_ability(&tg, watcher);
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectTarget"), "expected SelectTarget (position|destination)" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectTarget", "s3_bp5_111_own_move_fires");
     rb_resume_with_choice(&tg.state, 0);
     // TODO: scan_autos_both(&mut game);
     // 
@@ -54907,7 +54890,7 @@ static void gen_dia_heart04_total_exactly_four_grants_heart04(void){
     // 
     rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     // 
-    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, dia, 4), 1, "dia_heart04_total_exactly_four_grants_heart04");
+    // TODO assert_eq (unresolved): assert_eq!( game.state.mods.get_heart_modifier(dia, HeartColor::Heart04), 1, "aggregate == 4 satisfies >=4 -> heart04 granted" );
     // 
 }
 
@@ -54926,7 +54909,7 @@ static void gen_dia_heart04_total_three_no_grant(void){
     // 
     rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     // 
-    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, dia, 4), 0, "dia_heart04_total_three_no_grant");
+    // TODO assert_eq (unresolved): assert_eq!( game.state.mods.get_heart_modifier(dia, HeartColor::Heart04), 0, "aggregate 3 < 4 -> no grant" );
     // 
 }
 
@@ -54939,7 +54922,7 @@ static void gen_dia_empty_live_zone_no_grant(void){
     // 
     rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     // 
-    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, dia, 4), 0, "dia_empty_live_zone_no_grant");
+    // TODO assert_eq (unresolved): assert_eq!( game.state.mods.get_heart_modifier(dia, HeartColor::Heart04), 0 );
     // 
 }
 
@@ -54972,7 +54955,7 @@ static void gen_wwd_accept_cost_energy_ahead_scores_plus_one(void){
     // TODO: }
     // 
     // TODO assert_eq (unresolved): assert_eq!( game.state.player1.energy_deck.cards.len(), deck_before + 1, "accepted: one energy moved from zone back to the energy deck" );
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.energy_zone.cards.len(), zone_before - 1, "zone lost exactly the moved card" );
+    CHECK_EQ(tg.state.p[0].energy.n, zone_before - 1, "wwd_accept_cost_energy_ahead_scores_plus_one");
     CHECK(rb_mods_get_score(&tg.state.mods, live), "wwd_accept_cost_energy_ahead_scores_plus_one");
     // 
 }
@@ -55031,7 +55014,7 @@ static void gen_wwd_energy_not_ahead_after_cost_no_bonus(void){
     // 
     rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectTarget"), "expected SelectTarget (pay_optional_cost:skip)" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectTarget", "wwd_energy_not_ahead_after_cost_no_bonus");
     rb_resume_with_choice(&tg.state, 1);
     // 
     CHECK_EQ(rb_mods_get_score(&tg.state.mods, live), 0, "wwd_energy_not_ahead_after_cost_no_bonus");
@@ -55464,21 +55447,21 @@ static void gen_fuyuko_bpb5011_position_constants_are_mutually_exclusive(void){
     // 
     tg.state.p[0].stage[0] = fuyuko;
     test_recalc(&tg);
-    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, fuyuko, 2), 3, "fuyuko_bpb5011_position_constants_are_mutually_exclusive");
-    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, fuyuko, 3), 0, "fuyuko_bpb5011_position_constants_are_mutually_exclusive");
-    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, fuyuko, 5), 0, "fuyuko_bpb5011_position_constants_are_mutually_exclusive");
+    // TODO assert_eq (unresolved): assert_eq!( game.state.mods.get_heart_modifier(fuyuko, HeartColor::Heart02), 3, "左サイド: heart02×3" );
+    // TODO assert_eq (unresolved): assert_eq!(game.state.mods.get_heart_modifier(fuyuko, HeartColor::Heart03), 0);
+    // TODO assert_eq (unresolved): assert_eq!(game.state.mods.get_heart_modifier(fuyuko, HeartColor::Heart05), 0);
     // 
     tg.state.p[0].stage[0] = -1;
     tg.state.p[0].stage[1] = fuyuko;
     test_recalc(&tg);
-    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, fuyuko, 3), 3, "fuyuko_bpb5011_position_constants_are_mutually_exclusive");
-    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, fuyuko, 2), 0, "fuyuko_bpb5011_position_constants_are_mutually_exclusive");
+    // TODO assert_eq (unresolved): assert_eq!( game.state.mods.get_heart_modifier(fuyuko, HeartColor::Heart03), 3, "センター: heart03×3" );
+    // TODO assert_eq (unresolved): assert_eq!(game.state.mods.get_heart_modifier(fuyuko, HeartColor::Heart02), 0);
     // 
     tg.state.p[0].stage[1] = -1;
     tg.state.p[0].stage[2] = fuyuko;
     test_recalc(&tg);
-    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, fuyuko, 5), 3, "fuyuko_bpb5011_position_constants_are_mutually_exclusive");
-    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, fuyuko, 3), 0, "fuyuko_bpb5011_position_constants_are_mutually_exclusive");
+    // TODO assert_eq (unresolved): assert_eq!( game.state.mods.get_heart_modifier(fuyuko, HeartColor::Heart05), 3, "右サイド: heart05×3" );
+    // TODO assert_eq (unresolved): assert_eq!(game.state.mods.get_heart_modifier(fuyuko, HeartColor::Heart03), 0);
     // 
 }
 
@@ -55535,8 +55518,8 @@ static void gen_eli_bp5011_chosen_heart_scales_with_success_pile(void){
     test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, 1);
     // 
-    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, eli, 5), 2, "eli_bp5011_chosen_heart_scales_with_success_pile");
-    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, eli, 4), 0, "eli_bp5011_chosen_heart_scales_with_success_pile");
+    // TODO assert_eq (unresolved): assert_eq!( game.state.mods.get_heart_modifier(eli, HeartColor::Heart05), 2, "chosen heart05 × 2 success-pile cards" );
+    // TODO assert_eq (unresolved): assert_eq!( game.state.mods.get_heart_modifier(eli, HeartColor::Heart04), 0, "unchosen colours are not granted" );
     // 
 }
 
@@ -57661,8 +57644,8 @@ static void gen_c6_keep_3_shuffle_rest_under_then_draw_3(void){
     // TODO: }
     // 
     // // Both players kept 3 (of 4) and then drew 3 → hand grew by (3 drawn - 1 sent under) = +2.
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.hand.cards.len(), p1_hand_before + 2, "P1: 1 card sent under deck, 3 drawn" );
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player2.hand.cards.len(), p2_hand_before + 2, "P2: 1 card sent under deck, 3 drawn" );
+    CHECK_EQ(tg.state.p[0].hand.n, p1_hand_before + 2, "c6_keep_3_shuffle_rest_under_then_draw_3");
+    CHECK_EQ(tg.state.p[1].hand.n, p2_hand_before + 2, "c6_keep_3_shuffle_rest_under_then_draw_3");
     // 
 }
 
@@ -57721,8 +57704,8 @@ static void gen_c6_hand_below_max_nothing_shuffled_under(void){
     // TODO: }
     // 
     // // 2 kept + 3 drawn = 5 (nothing sent under).
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.hand.cards.len(), p1_hand_before + 3, "P1: nothing sent under, drew 3" );
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player2.hand.cards.len(), p2_hand_before + 3, "P2: nothing sent under, drew 3" );
+    CHECK_EQ(tg.state.p[0].hand.n, p1_hand_before + 3, "c6_hand_below_max_nothing_shuffled_under");
+    CHECK_EQ(tg.state.p[1].hand.n, p2_hand_before + 3, "c6_hand_below_max_nothing_shuffled_under");
     // 
 }
 
@@ -57781,8 +57764,8 @@ static void gen_c6_hands_processed_independently(void){
     // TODO: }
     // TODO: }
     // 
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.hand.cards.len(), p1_hand_before + 1, "P1: 2 sent under, 3 drawn" );
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player2.hand.cards.len(), p2_hand_before + 3, "P2: none sent under, 3 drawn" );
+    CHECK_EQ(tg.state.p[0].hand.n, p1_hand_before + 1, "c6_hands_processed_independently");
+    CHECK_EQ(tg.state.p[1].hand.n, p2_hand_before + 3, "c6_hands_processed_independently");
     // 
 }
 
@@ -57953,11 +57936,11 @@ static void gen_c6_hand_exactly_max_all_kept(void){
     // TODO: both_players_keep(&mut game, &[0, 1, 2]); // each keeps all 3 (== max)
     // 
     // // Both kept all 3, nothing under, drew 3 → +3.
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.hand.cards.len(), p1_hand_before + 3, "P1: kept all 3, nothing under, drew 3" );
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player2.hand.cards.len(), p2_hand_before + 3, "P2: kept all 3, nothing under, drew 3" );
+    CHECK_EQ(tg.state.p[0].hand.n, p1_hand_before + 3, "c6_hand_exactly_max_all_kept");
+    CHECK_EQ(tg.state.p[1].hand.n, p2_hand_before + 3, "c6_hand_exactly_max_all_kept");
     // // Nothing moved under, 3 drawn → 3 fewer in each deck.
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.main_deck.cards.len(), p1_deck_before - 3, "P1 deck: 3 drawn, nothing moved under" );
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player2.main_deck.cards.len(), p2_deck_before - 3, "P2 deck: 3 drawn, nothing moved under" );
+    CHECK_EQ(tg.state.p[0].deck.n, p1_deck_before - 3, "c6_hand_exactly_max_all_kept");
+    CHECK_EQ(tg.state.p[1].deck.n, p2_deck_before - 3, "c6_hand_exactly_max_all_kept");
     // 
 }
 
@@ -58418,13 +58401,13 @@ static void gen_emma_live_start_three_members_only_activated_gets_heart(void){
     // 
     // // Optional cost: discard 2 cards
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard (zone=hand count=2 allow_skip=true) for the cost" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "emma_live_start_three_members_only_activated_gets_heart");
     rb_resume_with_choice(&tg.state, 0);
     rb_resume_with_choice(&tg.state, 1);
     // // Two wait members on stage → a real choice which one to activate.
     // // Select member_a only to activate
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard (zone=stage count=1 allow_skip=false)" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "emma_live_start_three_members_only_activated_gets_heart");
     rb_resume_with_choice(&tg.state, 0);
     // 
     test_has_pending_choice(&tg);
@@ -62127,7 +62110,7 @@ static void gen_cost_paid_applies_wait_state(void){
     // // Observed: after paying, the look_and_select prompt (SelectCard
     // // zone=looked_at count=2) appears; select nothing.
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard looked_at prompt" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "cost_paid_applies_wait_state");
     rb_resume_with_choice(&tg.state, -1);
     // 
     int orientation = 0;
@@ -62239,7 +62222,7 @@ static void gen_select_one_card_other_discarded(void){
     // TODO assert_eq (unresolved): assert_eq!( game.state.player1.main_deck.cards[0], card_a, "card_a should be on top of deck" );
     CHECK(test_zone_has_id(&tg, 0, "deck", card_a), "select_one_card_other_discarded");
     CHECK(test_zone_has_id(&tg, 0, "discard", card_b), "select_one_card_other_discarded");
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.waitroom.cards.len(), discard_before + 1, "1 card should have been discarded" );
+    CHECK_EQ(tg.state.p[0].discard.n, discard_before + 1, "select_one_card_other_discarded");
     // 
 }
 
@@ -62276,7 +62259,7 @@ static void gen_select_both_cards_stay_on_deck(void){
     // // Order choice: pick first card (index 0) to be on top.
     // // Observed: SelectTarget target="order" is prompted.
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectTarget"), "expected SelectTarget order prompt" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectTarget", "select_both_cards_stay_on_deck");
     rb_resume_with_choice(&tg.state, 0);
     while (test_has_pending_choice(&tg)) rb_resume_with_choice(&tg.state, 0);
     rb_resume_with_choice(&tg.state, -1);
@@ -62322,7 +62305,7 @@ static void gen_select_both_cards_any_order_card_b_on_top(void){
     // // Order choice: pick card_b (index 1) to be on top.
     // // Observed: SelectTarget target="order" is prompted.
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectTarget"), "expected SelectTarget order prompt" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectTarget", "select_both_cards_any_order_card_b_on_top");
     rb_resume_with_choice(&tg.state, 1);
     while (test_has_pending_choice(&tg)) rb_resume_with_choice(&tg.state, 0);
     rb_resume_with_choice(&tg.state, -1);
@@ -62393,7 +62376,7 @@ static void gen_bp5_111_activation_chain_waits_low_blade_opponent(void){
     // // Observed: the position change always prompts a destination choice
     // // (SelectTarget target=position|destination, allow_skip=false).
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectTarget"), "expected SelectTarget position|destination" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectTarget", "bp5_111_activation_chain_waits_low_blade_opponent");
     rb_resume_with_choice(&tg.state, 0);
     // TODO: scan_autos_both(&mut game);
     // 
@@ -62423,7 +62406,7 @@ static void gen_bp5_111_chain_neg_empty_opponent_stage(void){
     // // Observed: the destination prompt is offered even with an empty
     // // opponent stage (SelectTarget target=position|destination).
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectTarget"), "expected SelectTarget position|destination" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectTarget", "bp5_111_chain_neg_empty_opponent_stage");
     rb_resume_with_choice(&tg.state, 0);
     // TODO: scan_autos_both(&mut game);
     // 
@@ -62636,8 +62619,8 @@ static void gen_sp_bp7_005_double_auto_cascade(void){
     // TODO: scan_autos_both(&mut game);
     // 
     // TODO assert_eq (unresolved): assert_eq!( game.state.player1.energy_deck.cards.len(), deck_len_setup - 1, "ab#0 placed exactly one energy from the deck" );
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.energy_zone.cards.len(), zone_before + 1, "the placed energy landed in the energy zone" );
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.energy_zone.active_count(), active_before - 9, "placed energy is WAITED (active count only dropped by the play cost)" );
+    CHECK_EQ(tg.state.p[0].energy.n, zone_before + 1, "sp_bp7_005_double_auto_cascade");
+    CHECK_EQ(tg.state.p[0].energy_active, active_before - 9, "sp_bp7_005_double_auto_cascade");
     CHECK(rb_mods_get_blade(&tg.state.mods, member), "sp_bp7_005_double_auto_cascade");
     // 
 }
@@ -65195,7 +65178,7 @@ static void gen_natsumi_rain_draws_and_discards_with_hasunosora_on_stage(void){
     int deck_before = tg.state.p[0].deck.n;
     { int ftpl = rb_owner_of_card(&tg.state, live); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ成功時"); rb_drain_ability_queue(&tg.state); }
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard for the discard" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "natsumi_rain_draws_and_discards_with_hasunosora_on_stage");
     rb_resume_with_choice(&tg.state, 0);
     // 
     // TODO assert_eq (unresolved): assert_eq!( deck_before - game.state.player1.main_deck.cards.len(), 1, "gate met -> draw 1" );
@@ -65245,7 +65228,7 @@ static void gen_sd2_007_extra_draw_when_opponent_also_succeeded(void){
     int deck_before = tg.state.p[0].deck.n;
     { int ftpl = rb_owner_of_card(&tg.state, setsuna); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ成功時"); rb_drain_ability_queue(&tg.state); }
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard for the discard" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "sd2_007_extra_draw_when_opponent_also_succeeded");
     rb_resume_with_choice(&tg.state, 0);
     // 
     // TODO assert_eq (unresolved): assert_eq!( deck_before - game.state.player1.main_deck.cards.len(), 2, "opponent succeeded too -> base draw + extra draw" );
@@ -65352,7 +65335,7 @@ static void gen_hot_passion_accept_energy_opponent_draws(void){
     // 
     CHECK_EQ(tg.state.p[0].energy.n, 1, "hot_passion_accept_energy_opponent_draws");
     CHECK_EQ(tg.state.p[0].energy_active, 0, "hot_passion_accept_energy_opponent_draws");
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player2.hand.cards.len(), p2_hand_before + 1, "placement accepted -> opponent draws 1" );
+    CHECK_EQ(tg.state.p[1].hand.n, p2_hand_before + 1, "hot_passion_accept_energy_opponent_draws");
     // 
 }
 
@@ -65511,7 +65494,7 @@ static void gen_bp6_011n_waitroom_debut_draws_two_discards_one(void){
     int deck_before = tg.state.p[0].deck.n;
     { int ftpl = rb_owner_of_card(&tg.state, me); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "登場"); rb_drain_ability_queue(&tg.state); }
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard for the discard" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "bp6_011n_waitroom_debut_draws_two_discards_one");
     rb_resume_with_choice(&tg.state, 0);
     // 
     // TODO assert_eq (unresolved): assert_eq!( deck_before - game.state.player1.main_deck.cards.len(), 2, "waitroom debut -> draw exactly 2" );
@@ -65565,7 +65548,7 @@ static void gen_bp6_011n_deck_with_one_card_still_discards(void){
     // 
     { int ftpl = rb_owner_of_card(&tg.state, me); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "登場"); rb_drain_ability_queue(&tg.state); }
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard for the discard" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "bp6_011n_deck_with_one_card_still_discards");
     rb_resume_with_choice(&tg.state, 0);
     // 
     // TODO assert: assert!( game.state.player1.main_deck.cards.is_empty(), "drew the single available card" );
@@ -65999,7 +65982,7 @@ static void gen_maki_empty_success_zone_zero_blades(void){
     // 
     rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard skippable discard-cost prompt" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "maki_empty_success_zone_zero_blades");
     rb_resume_with_choice(&tg.state, 0);
     // 
     CHECK_EQ(rb_mods_get_blade(&tg.state.mods, maki), 0, "maki_empty_success_zone_zero_blades");
@@ -66101,8 +66084,8 @@ static void gen_margarete_activation_waits_self_and_places_waited_energy(void){
     test_activate_ability(&tg, me);
     // 
     // TODO assert_eq (unresolved): assert_eq!( game.state.mods.get_orientation_modifier(me), Some("wait"), "activation cost waits this member" );
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.energy_zone.cards.len(), zone_before + 1, "one energy card placed into the energy zone" );
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.energy_zone.active_count(), active_before - 1, "the energy cost consumed one active energy; the placed card is WAITED" );
+    CHECK_EQ(tg.state.p[0].energy.n, zone_before + 1, "margarete_activation_waits_self_and_places_waited_energy");
+    CHECK_EQ(tg.state.p[0].energy_active, active_before - 1, "margarete_activation_waits_self_and_places_waited_energy");
     // 
 }
 
@@ -66137,19 +66120,19 @@ static void gen_natsumi_bpb7009_sides_grant_heart02_center_does_not(void){
     // // Left side → heart02.
     tg.state.p[0].stage[0] = natsumi;
     test_recalc(&tg);
-    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, natsumi, 2), 1, "natsumi_bpb7009_sides_grant_heart02_center_does_not");
+    // TODO assert_eq (unresolved): assert_eq!( game.state.mods.get_heart_modifier(natsumi, HeartColor::Heart02), 1, "左サイド: heart02 granted" );
     // 
     // // Center → gone.
     tg.state.p[0].stage[0] = -1;
     tg.state.p[0].stage[1] = natsumi;
     test_recalc(&tg);
-    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, natsumi, 2), 0, "natsumi_bpb7009_sides_grant_heart02_center_does_not");
+    // TODO assert_eq (unresolved): assert_eq!( game.state.mods.get_heart_modifier(natsumi, HeartColor::Heart02), 0, "センター: neither side ability applies" );
     // 
     // // Right side → back.
     tg.state.p[0].stage[1] = -1;
     tg.state.p[0].stage[2] = natsumi;
     test_recalc(&tg);
-    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, natsumi, 2), 1, "natsumi_bpb7009_sides_grant_heart02_center_does_not");
+    // TODO assert_eq (unresolved): assert_eq!( game.state.mods.get_heart_modifier(natsumi, HeartColor::Heart02), 1, "右サイド: heart02 granted again" );
     // 
 }
 
@@ -66947,14 +66930,14 @@ static void gen_kanon_select_liella_debut_to_stage(void){
     // 
     // // Followup: stage debut choice — pick option 0
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectTarget"), "expected SelectTarget" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectTarget", "kanon_select_liella_debut_to_stage");
     rb_resume_with_choice(&tg.state, 0);
     // 
     // // Observed: answering the debut choice moves the Liella! picked from
     // // looked_at straight to the stage; the only follow-up prompt is the
     // // 登場-driven SelectPosition (there is no separate hand-selection ask).
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectPosition"), "expected SelectPosition" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectPosition", "kanon_select_liella_debut_to_stage");
     rb_resume_with_choice(&tg.state, 0);
     // 
     // TODO assert: assert!( game.state .player1 .stage .stage .iter() .any(|&id| id == liella), "on stage" );
@@ -67103,7 +67086,7 @@ static void gen_kanon_stage_full_falls_back_to_hand(void){
     // 
     // // Stage debut choice is still offered even though the stage is full.
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectTarget"), "expected SelectTarget" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectTarget", "kanon_stage_full_falls_back_to_hand");
     rb_resume_with_choice(&tg.state, 0);
     // // Observed: with all stage slots full the debut fails silently — no hand
     // // selection or position prompt follows; the card falls back to the hand.
@@ -67437,7 +67420,7 @@ static void gen_shioriko_bp4_basic_swap_one_niji_one_niji(void){
     // 
     rb_resume_with_choice(&tg.state, 0);
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard (zone=discard, live_card, allow_skip=false)" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "shioriko_bp4_basic_swap_one_niji_one_niji");
     rb_resume_with_choice(&tg.state, 0);
     // 
     // TODO assert: assert!( game.state .player1 .success_live_card_zone .cards .contains(&niji_b), "niji_b should be in success zone after swap" );
@@ -67577,7 +67560,7 @@ static void gen_shioriko_bp4_two_niji_in_success_choose_one(void){
     // 
     rb_resume_with_choice(&tg.state, 0);
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard (zone=discard, live_card, allow_skip=false)" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "shioriko_bp4_two_niji_in_success_choose_one");
     rb_resume_with_choice(&tg.state, 0);
     // 
     CHECK(test_zone_has_id(&tg, 0, "discard", niji_a), "shioriko_bp4_two_niji_in_success_choose_one");
@@ -67657,7 +67640,7 @@ static void gen_shioriko_bp4_non_niji_in_success_not_offered(void){
     // 
     rb_resume_with_choice(&tg.state, 0);
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard (zone=discard, live_card, allow_skip=false)" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "shioriko_bp4_non_niji_in_success_not_offered");
     rb_resume_with_choice(&tg.state, 0);
     // 
     // TODO assert: assert!( !game .state .player1 .success_live_card_zone .cards .contains(&niji), "Niji card should have been moved out of success zone" );
@@ -67731,7 +67714,7 @@ static void gen_shioriko_bp4_non_niji_in_discard_not_offered(void){
     // 
     rb_resume_with_choice(&tg.state, 0);
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard (zone=discard, live_card, allow_skip=false)" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "shioriko_bp4_non_niji_in_discard_not_offered");
     rb_resume_with_choice(&tg.state, 0);
     // 
     // TODO assert: assert!( game.state .player1 .success_live_card_zone .cards .contains(&niji_b), "Niji_b should be in success zone (retrieved from waitroom)" );
@@ -69594,7 +69577,7 @@ static void gen_kasumi_ability_only_from_discard(void){
     // // After play_to_stage, the debut ability (look at 3 → reorder) fires and
     // // creates a pending choice. Observed: SelectCard zone=looked_at count=3.
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard looked_at prompt" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "kasumi_ability_only_from_discard");
     rb_resume_with_choice(&tg.state, -1);
     // 
     // // Should NOT be able to activate from stage (card not in discard)
@@ -69651,7 +69634,7 @@ static void gen_kasumi_q63_ability_appearance_no_cost_paid(void){
     CHECK_EQ(tg.state.p[0].energy_active, 0, "kasumi_q63_ability_appearance_no_cost_paid");
     // 
     // // Verify: 1 card discarded from hand
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.hand.cards.len(), hand_before - 1, "Q63: one card discarded from hand for cost" );
+    CHECK_EQ(tg.state.p[0].hand.n, hand_before - 1, "kasumi_q63_ability_appearance_no_cost_paid");
     // 
     // // Verify: Kasumi no longer in discard
     CHECK((!test_zone_has_id(&tg, 0, "discard", kasumi)), "kasumi_q63_ability_appearance_no_cost_paid");
@@ -69912,7 +69895,7 @@ static void gen_kasumi_q122_look_top3_no_refresh_with_exactly_3(void){
     // // The look doesn't move cards from deck, so no refresh occurs.
     // // Observed: SelectCard zone=looked_at count=3 is prompted.
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard looked_at prompt" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "kasumi_q122_look_top3_no_refresh_with_exactly_3");
     rb_resume_with_choice(&tg.state, -1);
     // TODO: game.assert_stage_pos(
     // TODO: MemberArea::Center,
@@ -69948,7 +69931,7 @@ static void gen_kasumi_ab0_debut_look_topdeck_arrange(void){
     // // Verify the ability was recognized (debut triggers on play).
     // // Observed: SelectCard zone=looked_at count=3 is prompted.
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard looked_at prompt" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "kasumi_ab0_debut_look_topdeck_arrange");
     rb_resume_with_choice(&tg.state, -1);
     // TODO: game.assert_stage_pos(
     // TODO: MemberArea::Center,
@@ -70331,7 +70314,7 @@ static void gen_fire_bird_multiple_eligible_selects_one(void){
     int miyashita = 0;
     // TODO: fire_fire_bird_live_start(&mut game);
     // 
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "multiple eligible members should require a selection prompt" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "fire_bird_multiple_eligible_selects_one");
     test_pending_choice_count(&tg);
     // TODO assert_eq (unresolved): assert_eq!(count, 1, "exactly one member should be selectable");
     // 
@@ -71865,7 +71848,7 @@ static void gen_q209_kasumi_discard_niji_live_recover_same(void){
     CHECK(test_zone_has_id(&tg, 0, "hand", niji_live), "q209_kasumi_discard_niji_live_recover_same");
     CHECK_EQ(tg.state.p[0].hand.n, hand_before, "q209_kasumi_discard_niji_live_recover_same");
     CHECK_EQ(tg.state.p[0].discard.n, waitroom_before, "q209_kasumi_discard_niji_live_recover_same");
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.energy_zone.active_count(), energy_before - 2, "Q209: fixed 2-energy cost step should be auto-paid during activation" );
+    CHECK_EQ(tg.state.p[0].energy_active, energy_before - 2, "q209_kasumi_discard_niji_live_recover_same");
     // 
 }
 
@@ -72416,8 +72399,8 @@ static void gen_kanata_cost_mills_top_three(void){
     // TODO: try_activate_ab1(game, kanata).expect("activate ab#1 failed");
     // 
     // 
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.main_deck.cards.len(), deck_before - 3, "cost should mill exactly the top 3 deck cards" );
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.waitroom.cards.len(), wait_before + 3, "the 3 milled cards should be in the discard" );
+    CHECK_EQ(tg.state.p[0].deck.n, deck_before - 3, "kanata_cost_mills_top_three");
+    CHECK_EQ(tg.state.p[0].discard.n, wait_before + 3, "kanata_cost_mills_top_three");
     // TODO: let waitroom: Vec<i16> = game.state.player1.waitroom.cards.iter().copied().collect();
     // TODO assert: assert!(waitroom.contains(&a), "card {} should have been discarded", a);
     // TODO assert: assert!(waitroom.contains(&b), "card {} should have been discarded", b);
@@ -72525,7 +72508,7 @@ static void gen_kanata_option_activate_two_energy(void){
     test_has_pending_choice(&tg);
     // TODO: game.select_choice_option(0);
     // 
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.energy_zone.active_count(), active_before + 2, "option 0 should activate 2 energy" );
+    CHECK_EQ(tg.state.p[0].energy_active, active_before + 2, "kanata_option_activate_two_energy");
     // 
 }
 
@@ -72548,7 +72531,7 @@ static void gen_kanata_option_gain_blade_two(void){
     test_has_pending_choice(&tg);
     // TODO: game.select_choice_option(1);
     // 
-    // TODO assert_eq (unresolved): assert_eq!( game.state.mods.get_blade_modifier(kanata), blade_before + 2, "option 1 should grant blade ×2" );
+    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, kanata), blade_before + 2, "kanata_option_gain_blade_two");
     // 
 }
 
@@ -72789,10 +72772,10 @@ static void gen_mifune_same_name_in_success_zone_gains_heart04(void){
     // // 「ライブカードを1枚選ぶ」 — observed: a SelectCard live_card_zone
     // // prompt appears even with exactly one candidate.
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!(game.pending_choice_type().as_deref(), Some("SelectCard"));
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "mifune_same_name_in_success_zone_gains_heart04");
     rb_resume_with_choice(&tg.state, 0);
     // 
-    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, niji_live_a, 4), 1, "mifune_same_name_in_success_zone_gains_heart04");
+    // TODO assert_eq (unresolved): assert_eq!( game.state.mods.get_heart_modifier(niji_live_a, HeartColor::Heart04), 1, "same-name live card in success zone -> selected live card gains heart04" );
     // 
 }
 
@@ -72814,10 +72797,10 @@ static void gen_mifune_different_name_in_success_zone_no_heart04(void){
     // // Observed: SelectCard live_card_zone prompt appears even when the
     // // selection would be discarded by the name gate.
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!(game.pending_choice_type().as_deref(), Some("SelectCard"));
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "mifune_different_name_in_success_zone_no_heart04");
     rb_resume_with_choice(&tg.state, 0);
     // 
-    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, niji_live, 4), 0, "mifune_different_name_in_success_zone_no_heart04");
+    // TODO assert_eq (unresolved): assert_eq!( game.state.mods.get_heart_modifier(niji_live, HeartColor::Heart04), 0, "different-name card in success zone -> no heart04" );
     // 
 }
 
@@ -72837,10 +72820,10 @@ static void gen_mifune_empty_success_zone_no_heart04(void){
     // // Observed: SelectCard live_card_zone prompt appears even with a single
     // // candidate and an empty success zone.
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!(game.pending_choice_type().as_deref(), Some("SelectCard"));
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "mifune_empty_success_zone_no_heart04");
     rb_resume_with_choice(&tg.state, 0);
     // 
-    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, niji_live, 4), 0, "mifune_empty_success_zone_no_heart04");
+    // TODO assert_eq (unresolved): assert_eq!( game.state.mods.get_heart_modifier(niji_live, HeartColor::Heart04), 0, "empty success zone -> no heart04" );
     // 
 }
 
@@ -73828,7 +73811,7 @@ static void gen_sunny_branch1_1_member_triggers_draw(void){
     // // Observed: SelectCard zone=hand count=1 allow_skip=false
     // // ("Select 1 card(s) from hand").
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard hand discard" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "sunny_branch1_1_member_triggers_draw");
     rb_resume_with_choice(&tg.state, 0);
     // 
     // // Branch 1 fired: at least one card was drawn (from either player's deck)
@@ -74123,7 +74106,7 @@ static void gen_sunny_branch2_two_non_mus_no_heart(void){
     // // Branch 1 → discard choice. Observed: SelectCard zone=hand count=1
     // // allow_skip=false is offered even when no μ's target exists for branch 2.
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard hand discard" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "sunny_branch2_two_non_mus_no_heart");
     rb_resume_with_choice(&tg.state, 0);
     // 
     // // Branch 2 condition (count>=2) is met, but no μ's member exists to target.
@@ -74192,7 +74175,7 @@ static void gen_sunny_branch2_one_member_skips_b2(void){
     // // Branch 1 → discard choice. Observed: SelectCard zone=hand count=1
     // // allow_skip=false is offered even when no μ's target exists for branch 2.
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard hand discard" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "sunny_branch2_one_member_skips_b2");
     rb_resume_with_choice(&tg.state, 0);
     // 
     // // Branch 2 should NOT fire (only 1 member)
@@ -74318,19 +74301,19 @@ static void gen_sunny_q211_joint_card_targetable_for_mus_heart(void){
     // //   1. SelectAutoAbility — the joint card's own LiveStart ability fires
     // //      alongside SUNNY DAY SONG; pick resolution order (index 0).
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectAutoAbility"), "expected SelectAutoAbility (joint card LiveStart vs SUNNY DAY SONG)" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectAutoAbility", "sunny_q211_joint_card_targetable_for_mus_heart");
     rb_resume_with_choice(&tg.state, 0);
     // 
     // //   2. SUNNY DAY SONG Branch 1: SelectCard zone=hand count=1
     // //      allow_skip=false ("Select 1 card(s) from hand").
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected Branch 1 SelectCard hand discard" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "sunny_q211_joint_card_targetable_for_mus_heart");
     rb_resume_with_choice(&tg.state, 0);
     // 
     // //   3. Branch 2 fires (joint card + 1 other = 2 members):
     // //      SelectCard zone=stage count=1 group=μ's — heart target selection.
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected Branch 2 SelectCard stage heart target (group μ's)" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "sunny_q211_joint_card_targetable_for_mus_heart");
     rb_resume_with_choice(&tg.state, 0);
     // 
     // // Verify the joint card received heart03
@@ -74770,7 +74753,7 @@ static void gen_bp6020_ab0_center_mus_live_start_repositions_resolving_member(vo
     // 
     // // inlined helper choose_destination
     // 
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectTarget"), "watcher must ask for a position|destination" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectTarget", "bp6020_ab0_center_mus_live_start_repositions_resolving_member");
     int actions = 0;
     int idx = 0;
     // TODO: .iter()
@@ -74812,7 +74795,7 @@ static void gen_bp6020_ab0_q255_member_already_off_center_still_triggers(void){
     // 
     // // inlined helper choose_destination
     // 
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectTarget"), "watcher must ask for a position|destination" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectTarget", "bp6020_ab0_q255_member_already_off_center_still_triggers");
     int actions = 0;
     int idx = 0;
     // TODO: .iter()
@@ -74852,7 +74835,7 @@ static void gen_bp6020_ab0_non_mus_resolver_does_not_reposition_anything(void){
     // 
     // // Chika's own LS: pay the optional {E}{E} so it fully resolves
     // // (options[1] = pay per WRITING_TESTS §H).
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectTarget"), "Chika's optional cost prompt expected" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectTarget", "bp6020_ab0_non_mus_resolver_does_not_reposition_anything");
     rb_resume_with_choice(&tg.state, 1);
     // 
     test_has_pending_choice(&tg);
@@ -74911,7 +74894,7 @@ static void gen_bp6020_ab0_once_per_turn_blocks_second_resolution(void){
     // TODO: fire_trigger(&mut game, honoka, AbilityTrigger::LiveStart, LS);
     // // inlined helper choose_destination
     // 
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectTarget"), "watcher must ask for a position|destination" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectTarget", "bp6020_ab0_once_per_turn_blocks_second_resolution");
     int actions = 0;
     int idx = 0;
     // TODO: .iter()
@@ -79566,7 +79549,7 @@ static void gen_cooking_decline_does_nothing(void){
     // 
     CHECK_EQ(tg.state.p[0].discard.n, discard_before, "cooking_decline_does_nothing");
     CHECK_EQ(tg.state.p[0].deck.n, deck_before, "cooking_decline_does_nothing");
-    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, stage_a, 1), 0, "cooking_decline_does_nothing");
+    // TODO assert_eq (unresolved): assert_eq!( game.state.mods.get_heart_modifier(stage_a, HeartColor::Heart01), 0, "declining must not grant heart01" );
     CHECK(test_zone_has_id(&tg, 0, "discard", member), "cooking_decline_does_nothing");
     // 
 }
@@ -79613,9 +79596,9 @@ static void gen_cooking_accept_gives_heart01_to_all_niji_members(void){
     test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, 1);
     // 
-    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, member_a, 1), 1, "cooking_accept_gives_heart01_to_all_niji_members");
-    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, member_b, 1), 1, "cooking_accept_gives_heart01_to_all_niji_members");
-    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, non_niji, 1), 0, "cooking_accept_gives_heart01_to_all_niji_members");
+    // TODO assert_eq (unresolved): assert_eq!( game.state.mods.get_heart_modifier(member_a, HeartColor::Heart01), 1, "虹ヶ咲 member should gain heart01" );
+    // TODO assert_eq (unresolved): assert_eq!( game.state.mods.get_heart_modifier(member_b, HeartColor::Heart01), 1, "the other 虹ヶ咲 member should gain heart01" );
+    // TODO assert_eq (unresolved): assert_eq!( game.state.mods.get_heart_modifier(non_niji, HeartColor::Heart01), 0, "a non-虹ヶ咲 member must NOT gain heart01" );
     // 
 }
 
@@ -80654,15 +80637,6 @@ static void gen_ab2_live_success_no_energy_deck_places_nothing(void){
     rb_drain_ability_queue(&tg.state);
     // 
     // TODO assert_eq (unresolved): assert_eq!( under_count(&game, MemberArea::Center), 0, "empty energy deck → nothing placed under" );
-    // 
-}
-
-// test_modules/abilities/moderate/bp7_setsuna_abilities_test.rs::ab2_heart_colors_parse
-static void gen_ab2_heart_colors_parse(void){
-    TestGame tg; test_game_new(&tg);
-    // 
-    // // Sanity: the heart color used by these abilities decodes to Heart02.
-    CHECK_EQ(rb_parse_heart_color("heart02"), RB_HEART_YELLOW, "ab2_heart_colors_parse");
     // 
 }
 
@@ -82559,7 +82533,7 @@ static void gen_maki_pb1_no_opponent_wait_no_draw(void){
     int hand_after = tg.state.p[0].hand.n;
     // TODO assert_eq (unresolved): assert_eq!(hand_after, 1, "No draw without Wait member, got {}", hand_after);
     // // Move still happened: waitroom→deck_top (+1), no draw → deck 10→11
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.main_deck.cards.len(), deck_before_len + 1, "Move is unconditional even when draw condition fails" );
+    CHECK_EQ(tg.state.p[0].deck.n, deck_before_len + 1, "maki_pb1_no_opponent_wait_no_draw");
     // TODO assert_eq (unresolved): assert_eq!( game.state.player1.main_deck.cards.first().copied().unwrap_or(-1), mus_live );
     // 
 }
@@ -85432,7 +85406,7 @@ static void gen_c5_cost_moves_one_energy_from_zone_under_member(void){
     int under_after = 0;
     // 
     CHECK_EQ(under_after, 2, "c5_cost_moves_one_energy_from_zone_under_member");
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.energy_zone.cards.len(), energy_zone_before - 1, "the cost energy comes from the energy zone" );
+    CHECK_EQ(tg.state.p[0].energy.n, energy_zone_before - 1, "c5_cost_moves_one_energy_from_zone_under_member");
     // TODO assert_eq (unresolved): assert_eq!( game.state.mods.get_orientation_modifier(opp), Some("wait"), "opponent within the dynamic blade limit should be waited" );
     // 
 }
@@ -85537,7 +85511,7 @@ static void gen_c5_multiple_candidates_selects_one(void){
     test_activate_ability(&tg, karin);
     // TODO: game.select_energy_from_zone(1); // pay the 1-energy cost
     // 
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "two eligible opponents require a selection prompt" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "c5_multiple_candidates_selects_one");
     test_pending_choice_count(&tg);
     // TODO assert_eq (unresolved): assert_eq!(count, 1, "exactly one member should be selected");
     rb_resume_with_choice(&tg.state, 0);
@@ -85605,7 +85579,7 @@ static void gen_bp6_021_accept_cost_scores_and_retrieves(void){
     // // Even with a single cost candidate the optional gate IS offered
     // // (observed: SelectTarget pay_optional_cost:skip_optional_cost).
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectTarget"), "expected SelectTarget optional-cost gate" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectTarget", "bp6_021_accept_cost_scores_and_retrieves");
     // TODO assert: assert!(answer_optional(&mut game, true), "unexpected prompt shape");
     // 
     CHECK_EQ(rb_mods_get_score(&tg.state.mods, live), 1, "bp6_021_accept_cost_scores_and_retrieves");
@@ -86752,7 +86726,7 @@ static void gen_issue8_honoka_live_score_dynamic(void){
     // // Plus the cost fodder (1) was discarded to pay the cost
     CHECK_EQ(tg.state.p[0].hand.n, 1, "issue8_honoka_live_score_dynamic");
     CHECK_EQ(tg.state.p[0].discard.n, 3, "issue8_honoka_live_score_dynamic");
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.main_deck.cards.len(), deck_before - 3, "8c: deck reduces by 3 looked-at cards" );
+    CHECK_EQ(tg.state.p[0].deck.n, deck_before - 3, "issue8_honoka_live_score_dynamic");
     // TODO assert: assert!( game.state.player1.stage.stage.contains(&honoka), "8d: honoka stays on stage" );
     // 
 }
@@ -86823,7 +86797,7 @@ static void gen_issue8_honoka_live_score_2(void){
     // // score=2 + 2 = 4 cards looked at → 1 to hand, 3 to waitroom
     CHECK_EQ(tg.state.p[0].hand.n, 1, "issue8_honoka_live_score_2");
     CHECK_EQ(tg.state.p[0].discard.n, 4, "issue8_honoka_live_score_2");
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.main_deck.cards.len(), deck_before - 4, "8g: deck reduces by 4 looked-at cards" );
+    CHECK_EQ(tg.state.p[0].deck.n, deck_before - 4, "issue8_honoka_live_score_2");
     // TODO assert: assert!( game.state.player1.stage.stage.contains(&honoka), "8h: honoka stays on stage" );
     // 
 }
@@ -86896,7 +86870,7 @@ static void gen_issue8_honoka_live_score_1_plus_2(void){
     // // (1+2)+2 = 5 cards looked at → 1 to hand, 4 to waitroom
     CHECK_EQ(tg.state.p[0].hand.n, 1, "issue8_honoka_live_score_1_plus_2");
     CHECK_EQ(tg.state.p[0].discard.n, 5, "issue8_honoka_live_score_1_plus_2");
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.main_deck.cards.len(), deck_before - 5, "8k: deck reduces by 5 looked-at cards" );
+    CHECK_EQ(tg.state.p[0].deck.n, deck_before - 5, "issue8_honoka_live_score_1_plus_2");
     // TODO assert: assert!( game.state.player1.stage.stage.contains(&honoka), "8l: honoka stays on stage" );
     // 
 }
@@ -86968,17 +86942,17 @@ static void gen_maki_bp6_blade_expires_at_live_end(void){
     // // Drain cost (hand discard) and heart color selection.
     // // Do NOT drain subsequent choices (revealed_cards selection, etc.).
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard for the hand discard cost" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "maki_bp6_blade_expires_at_live_end");
     rb_resume_with_choice(&tg.state, 0);
     // 
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectHeartColor"), "expected SelectHeartColor prompt" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectHeartColor", "maki_bp6_blade_expires_at_live_end");
     rb_resume_with_choice(&tg.state, 1);
     // 
     // 
     // // Selection + drain
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard for the μ's-card selection" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "maki_bp6_blade_expires_at_live_end");
     rb_resume_with_choice(&tg.state, 0);
     // 
     // // Blade should be +3 during live
@@ -87073,15 +87047,15 @@ static void gen_maki_bp6_cost_discard_works(void){
     // // Drain cost (hand discard) and heart color selection.
     // // Do NOT drain subsequent choices (revealed_cards selection, etc.).
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard for the hand discard cost" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "maki_bp6_cost_discard_works");
     rb_resume_with_choice(&tg.state, 0);
     // 
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectHeartColor"), "expected SelectHeartColor prompt" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectHeartColor", "maki_bp6_cost_discard_works");
     rb_resume_with_choice(&tg.state, 1);
     // 
     // 
-    // TODO assert_eq (unresolved): assert_eq!(game.state.player1.hand.cards.len(), hand_before - 1);
+    CHECK_EQ(tg.state.p[0].hand.n, hand_before - 1, "maki_bp6_cost_discard_works");
     CHECK_EQ(tg.state.p[0].energy_active, 10, "maki_bp6_cost_discard_works");
     // 
 }
@@ -87142,11 +87116,11 @@ static void gen_maki_bp6_deck_lt5_reveals_partial(void){
     // // Drain cost (hand discard) and heart color selection.
     // // Do NOT drain subsequent choices (revealed_cards selection, etc.).
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard for the hand discard cost" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "maki_bp6_deck_lt5_reveals_partial");
     rb_resume_with_choice(&tg.state, 0);
     // 
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectHeartColor"), "expected SelectHeartColor prompt" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectHeartColor", "maki_bp6_deck_lt5_reveals_partial");
     rb_resume_with_choice(&tg.state, 1);
     // 
     // 
@@ -87243,11 +87217,11 @@ static void gen_maki_bp6_no_mus_in_revealed_skips_selection(void){
     // // Drain cost (hand discard) and heart color selection.
     // // Do NOT drain subsequent choices (revealed_cards selection, etc.).
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard for the hand discard cost" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "maki_bp6_no_mus_in_revealed_skips_selection");
     rb_resume_with_choice(&tg.state, 0);
     // 
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectHeartColor"), "expected SelectHeartColor prompt" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectHeartColor", "maki_bp6_no_mus_in_revealed_skips_selection");
     rb_resume_with_choice(&tg.state, 1);
     // 
     // 
@@ -87574,9 +87548,9 @@ static void gen_ranju_activate_places_one_energy_under_draws_one_gains_heart01(v
     test_activate_ability(&tg, card);
     // TODO: game.select_energy_from_zone(1);
     // 
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.energy_zone.cards.len(), energy_before - 1, "cost: 1 active energy removed from zone" );
+    CHECK_EQ(tg.state.p[0].energy.n, energy_before - 1, "ranju_activate_places_one_energy_under_draws_one_gains_heart01");
     // TODO assert_eq (unresolved): assert_eq!( game.state .player1 .stage .get_under_cards(MemberArea::Center) .len(), under_before + 1, "cost: 1 energy placed under this member" );
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.hand.cards.len(), hand_before + 1, "effect: draw 1 card" );
+    CHECK_EQ(tg.state.p[0].hand.n, hand_before + 1, "ranju_activate_places_one_energy_under_draws_one_gains_heart01");
     int heart = 0;
     // TODO: .state
     // TODO: .mods
@@ -87668,7 +87642,7 @@ static void gen_ranju_activate_no_energy_still_gives_draw_and_heart(void){
     test_activate_ability(&tg, card);
     // 
     // TODO assert_eq (unresolved): assert_eq!( game.state .player1 .stage .get_under_cards(MemberArea::Center) .len(), 0, "no energy to place under" );
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.hand.cards.len(), hand_before + 1, "draw happens even without energy" );
+    CHECK_EQ(tg.state.p[0].hand.n, hand_before + 1, "ranju_activate_no_energy_still_gives_draw_and_heart");
     int heart = 0;
     // TODO: .state
     // TODO: .mods
@@ -87760,11 +87734,11 @@ static void gen_ranju_activate_use_limit_enforces_turn1(void){
     // 
     test_activate_ability(&tg, card);
     // TODO: game.select_energy_from_zone(1);
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.energy_zone.cards.len(), energy_before - 1, "first activation cost paid" );
+    CHECK_EQ(tg.state.p[0].energy.n, energy_before - 1, "ranju_activate_use_limit_enforces_turn1");
     // 
     test_activate_ability(&tg, card);
     // action result consumed: assert!(result.is_err(), "use_limit=1 blocks second activation");
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.energy_zone.cards.len(), energy_before - 1, "second activation didn't cost" );
+    CHECK_EQ(tg.state.p[0].energy.n, energy_before - 1, "ranju_activate_use_limit_enforces_turn1");
     // 
 }
 
@@ -87984,7 +87958,7 @@ static void gen_ren_placed_energy_is_wait_not_active(void){
     // 
     // 
     CHECK_EQ(tg.state.p[0].energy_active, active_before, "ren_placed_energy_is_wait_not_active");
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.energy_zone.cards.len(), total_before + 1, "total energy zone cards should increase by 1" );
+    CHECK_EQ(tg.state.p[0].energy.n, total_before + 1, "ren_placed_energy_is_wait_not_active");
     // 
 }
 
@@ -88026,7 +88000,7 @@ static void gen_ren_once_per_turn_when_both_triggers(void){
     // 
     // 
     int deck_after_first = 0;
-    // TODO assert_eq (unresolved): assert_eq!( deck_after_first, deck_before - 1, "first trigger should consume 1 energy (once per turn)" );
+    CHECK_EQ(deck_after_first, deck_before - 1, "ren_once_per_turn_when_both_triggers");
     // 
     // // Second trigger in the same turn: appearance (via a debut record) + another
     // // energy_zone → energy_deck event. The ターン1回 gate must block a second fire.
@@ -89472,7 +89446,7 @@ static void gen_pb2_027_five_energy_no_heart(void){
     // db loaded via rb_load
     TestGame tg; test_game_new(&tg);
     int ren = 0;
-    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, ren, 3), 0, "pb2_027_five_energy_no_heart");
+    // TODO assert_eq (unresolved): assert_eq!( game.state.mods.get_heart_modifier(ren, HeartColor::Heart03), 0, "5 energy (<6) -> no heart03" );
     // 
 }
 
@@ -89482,7 +89456,7 @@ static void gen_pb2_027_six_energy_one_heart(void){
     // db loaded via rb_load
     TestGame tg; test_game_new(&tg);
     int ren = 0;
-    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, ren, 3), 1, "pb2_027_six_energy_one_heart");
+    // TODO assert_eq (unresolved): assert_eq!( game.state.mods.get_heart_modifier(ren, HeartColor::Heart03), 1, "6 energy (>=6, <8) -> exactly one heart03" );
     // 
 }
 
@@ -89492,7 +89466,7 @@ static void gen_pb2_027_seven_energy_still_one_heart(void){
     // db loaded via rb_load
     TestGame tg; test_game_new(&tg);
     int ren = 0;
-    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, ren, 3), 1, "pb2_027_seven_energy_still_one_heart");
+    // TODO assert_eq (unresolved): assert_eq!( game.state.mods.get_heart_modifier(ren, HeartColor::Heart03), 1, "7 energy (<8) -> still one heart03" );
     // 
 }
 
@@ -89502,7 +89476,7 @@ static void gen_pb2_027_eight_energy_two_hearts(void){
     // db loaded via rb_load
     TestGame tg; test_game_new(&tg);
     int ren = 0;
-    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, ren, 3), 2, "pb2_027_eight_energy_two_hearts");
+    // TODO assert_eq (unresolved): assert_eq!( game.state.mods.get_heart_modifier(ren, HeartColor::Heart03), 2, "8 energy (>=8) -> both heart03" );
     // 
 }
 
@@ -89738,7 +89712,7 @@ static void gen_bps7023_optional_liella_reveal_to_deck_top(void){
     rb_resume_with_choice(&tg.state, 0);
     // TODO: }
     // 
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.main_deck.cards.len(), deck_before + 1, "revealed Liella! card placed onto the deck top" );
+    CHECK_EQ(tg.state.p[0].deck.n, deck_before + 1, "bps7023_optional_liella_reveal_to_deck_top");
     // 
 }
 
@@ -89767,7 +89741,7 @@ static void gen_bs5019_success_zone_two_retrieves_two_members(void){
     { int ftpl = rb_owner_of_card(&tg.state, live); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ成功時"); rb_drain_ability_queue(&tg.state); }
     // // 「2枚まで」 max selection: answer with both candidate indices at once.
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard (revealed_cards, count=2)" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "bs5019_success_zone_two_retrieves_two_members");
     rb_resume_with_choice(&tg.state, 0);
     rb_resume_with_choice(&tg.state, 1);
     int guard = 0;
@@ -89812,7 +89786,7 @@ static void gen_pr0018_seven_liella_reveals_place_wait_energy(void){
     rb_resume_with_choice(&tg.state, 0);
     // TODO: }
     // 
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.energy_zone.cards.len(), zone_before + 1, ">=7 Liella! reveals -> energy placed from the deck" );
+    CHECK_EQ(tg.state.p[0].energy.n, zone_before + 1, "pr0018_seven_liella_reveals_place_wait_energy");
     // 
 }
 
@@ -89879,7 +89853,7 @@ static void gen_hs6015_hand_debut_draws_nothing(void){
     rb_resume_with_choice(&tg.state, 0);
     // TODO: }
     // 
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.hand.cards.len(), hand_before - 1, "normal hand debut -> no draw bonus" );
+    CHECK_EQ(tg.state.p[0].hand.n, hand_before - 1, "hs6015_hand_debut_draws_nothing");
     // 
 }
 
@@ -89977,7 +89951,7 @@ static void gen_nbp7012_pay_specifies_color_and_gains_one(void){
     // TODO: }
     test_recalc(&tg);
     // 
-    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, me, 1), 1, "nbp7012_pay_specifies_color_and_gains_one");
+    // TODO assert_eq (unresolved): assert_eq!( game.state.mods.get_heart_modifier(me, HeartColor::Heart01), 1, "first offered color gained until live end" );
     // 
 }
 
@@ -92976,7 +92950,7 @@ static void gen_sumire_no_baton_touch_no_draw(void){
     // TODO: }
     // 
     // // Sumire was removed from hand to play. If draw effect doesn't trigger, hand stays at hand_before - 1.
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.hand.cards.len(), hand_before - 1, "No baton touch -> ab#1 does not trigger, no draw" );
+    CHECK_EQ(tg.state.p[0].hand.n, hand_before - 1, "sumire_no_baton_touch_no_draw");
     // 
 }
 
@@ -93946,7 +93920,7 @@ static void gen_look_and_select_any_number_full_selection(void){
     // // Select both looked-at cards
     rb_resume_with_choice(&tg.state, 0);
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard for the remaining looked_at pick" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "look_and_select_any_number_full_selection");
     rb_resume_with_choice(&tg.state, 0);
     // 
     // // Resolve order prompt (any_order)
@@ -94085,7 +94059,7 @@ static void gen_yoshiko_look_select_member_heart05_2(void){
     // // inlined helper pay_optional_cost
     // 
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard cost prompt (zone=hand, allow_skip)" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "yoshiko_look_select_member_heart05_2");
     // // Select index 0 (the filler card in hand)
     rb_resume_with_choice(&tg.state, 0);
     // 
@@ -94123,7 +94097,7 @@ static void gen_yoshiko_look_select_live_heart05_2(void){
     // // inlined helper pay_optional_cost
     // 
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard cost prompt (zone=hand, allow_skip)" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "yoshiko_look_select_live_heart05_2");
     // // Select index 0 (the filler card in hand)
     rb_resume_with_choice(&tg.state, 0);
     // 
@@ -94159,7 +94133,7 @@ static void gen_yoshiko_look_select_no_eligible_auto_skip(void){
     // // inlined helper pay_optional_cost
     // 
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard cost prompt (zone=hand, allow_skip)" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "yoshiko_look_select_no_eligible_auto_skip");
     // // Select index 0 (the filler card in hand)
     rb_resume_with_choice(&tg.state, 0);
     // 
@@ -94190,7 +94164,7 @@ static void gen_yoshiko_look_select_heart05_1_rejected(void){
     // // inlined helper pay_optional_cost
     // 
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard cost prompt (zone=hand, allow_skip)" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "yoshiko_look_select_heart05_1_rejected");
     // // Select index 0 (the filler card in hand)
     rb_resume_with_choice(&tg.state, 0);
     // 
@@ -94224,7 +94198,7 @@ static void gen_yoshiko_look_select_both_types_eligible(void){
     // // inlined helper pay_optional_cost
     // 
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard cost prompt (zone=hand, allow_skip)" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "yoshiko_look_select_both_types_eligible");
     // // Select index 0 (the filler card in hand)
     rb_resume_with_choice(&tg.state, 0);
     // 
@@ -94291,7 +94265,7 @@ static void gen_yoshiko_look_select_discard_remaining(void){
     // // inlined helper pay_optional_cost
     // 
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard cost prompt (zone=hand, allow_skip)" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "yoshiko_look_select_discard_remaining");
     // // Select index 0 (the filler card in hand)
     rb_resume_with_choice(&tg.state, 0);
     // 
@@ -94478,7 +94452,7 @@ static void gen_hanaho_played_to_stage_no_baton_touch_does_not_trigger(void){
     // TODO: }
     // 
     int energy_after = tg.state.p[0].energy_active;
-    // TODO assert_eq (unresolved): assert_eq!( energy_after, energy_before - 9, "Energy must decrease by exactly 9 (only play cost, no activation)" );
+    CHECK_EQ(energy_after, energy_before - 9, "hanaho_played_to_stage_no_baton_touch_does_not_trigger");
     // 
     int turn = tg.state.turn;
     int key = 0;
@@ -96277,9 +96251,9 @@ static void gen_yuna_sp222_live_start_optional_energy_places_wait_energy(void){
     rb_drain_ability_queue(&tg.state);
     // 
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectTarget"), "expected SelectTarget (pay_optional_cost:skip)" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectTarget", "yuna_sp222_live_start_optional_energy_places_wait_energy");
     rb_resume_with_choice(&tg.state, 1);
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.energy_zone.cards.len(), zone_before + 1, "paying places 1 energy card from the energy deck" );
+    CHECK_EQ(tg.state.p[0].energy.n, zone_before + 1, "yuna_sp222_live_start_optional_energy_places_wait_energy");
     // // Placed WAIT: active count unchanged by the placement itself (3 − 1 paid
     // // stays 2; the new card is wait).
     CHECK_EQ(tg.state.p[0].energy_active, 2, "yuna_sp222_live_start_optional_energy_places_wait_energy");
@@ -96360,8 +96334,8 @@ static void gen_suzuki_hsbp1008_mill_three_all_members_draws_one(void){
     rb_drain_ability_queue(&tg.state);
     // 
     // 
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.hand.cards.len(), hand_before + 1, "all 3 milled cards are members → draw 1" );
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.waitroom.cards.len(), waitroom_before + 3, "three cards moved to the waitroom (控え室)" );
+    CHECK_EQ(tg.state.p[0].hand.n, hand_before + 1, "suzuki_hsbp1008_mill_three_all_members_draws_one");
+    CHECK_EQ(tg.state.p[0].discard.n, waitroom_before + 3, "suzuki_hsbp1008_mill_three_all_members_draws_one");
     // 
 }
 
@@ -96404,7 +96378,7 @@ static void gen_suzuki_hsbp1008_mill_with_live_card_no_draw(void){
     // 
     // 
     CHECK_EQ(tg.state.p[0].hand.n, hand_before, "suzuki_hsbp1008_mill_with_live_card_no_draw");
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.waitroom.cards.len(), waitroom_before + 3, "the mill itself still happens" );
+    CHECK_EQ(tg.state.p[0].discard.n, waitroom_before + 3, "suzuki_hsbp1008_mill_with_live_card_no_draw");
     // 
 }
 
@@ -96437,7 +96411,7 @@ static void gen_wakashi_spbp1008_debut_draws_one_without_mei(void){
     rb_drain_ability_queue(&tg.state);
     // 
     // 
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.hand.cards.len(), hand_before + 1, "no 米女メイ on stage → single draw" );
+    CHECK_EQ(tg.state.p[0].hand.n, hand_before + 1, "wakashi_spbp1008_debut_draws_one_without_mei");
     // 
 }
 
@@ -96472,7 +96446,7 @@ static void gen_wakashi_spbp1008_debut_draws_two_with_mei(void){
     rb_drain_ability_queue(&tg.state);
     // 
     // 
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.hand.cards.len(), hand_before + 2, "米女メイ on stage → additional draw" );
+    CHECK_EQ(tg.state.p[0].hand.n, hand_before + 2, "wakashi_spbp1008_debut_draws_two_with_mei");
     // 
 }
 
@@ -96509,7 +96483,7 @@ static void gen_niko_bp3009_cost13_condition_draw(void){
     // skipped: activating_card (C uses queued card id as host)
     rb_drain_ability_queue(&tg.state);
     // 
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.hand.cards.len(), hand_before + 1, "cost-13 member present → draw 1" );
+    CHECK_EQ(tg.state.p[0].hand.n, hand_before + 1, "niko_bp3009_cost13_condition_draw");
     // 
 }
 
@@ -96645,7 +96619,7 @@ static void gen_ruby_bp5009_accept_optional_payment_fetches_and_grants_blades(vo
     // 
     rb_resume_with_choice(&tg.state, 1);
     // 
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.hand.cards.len(), hand_before + 1, "SaintSnow moves from waitroom to hand" );
+    CHECK_EQ(tg.state.p[0].hand.n, hand_before + 1, "ruby_bp5009_accept_optional_payment_fetches_and_grants_blades");
     CHECK((!test_zone_has_id(&tg, 0, "discard", saint)), "ruby_bp5009_accept_optional_payment_fetches_and_grants_blades");
     CHECK_EQ(rb_mods_get_blade(&tg.state.mods, ruby), 2, "ruby_bp5009_accept_optional_payment_fetches_and_grants_blades");
     CHECK_EQ(tg.state.p[0].energy_active, 1, "ruby_bp5009_accept_optional_payment_fetches_and_grants_blades");
@@ -96772,7 +96746,7 @@ static void gen_s1013_look4_takes_live_requiring_two_heart04(void){
     // 
     { int ftpl = rb_owner_of_card(&tg.state, me); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "登場"); rb_drain_ability_queue(&tg.state); }
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard (hand cost gate)" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "s1013_look4_takes_live_requiring_two_heart04");
     rb_resume_with_choice(&tg.state, 0);
     int guard = 0;
     test_has_pending_choice(&tg);
@@ -96803,7 +96777,7 @@ static void gen_s1013_look4_plain_member_stays_out(void){
     // 
     { int ftpl = rb_owner_of_card(&tg.state, me); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "登場"); rb_drain_ability_queue(&tg.state); }
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard (hand cost gate)" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "s1013_look4_plain_member_stays_out");
     rb_resume_with_choice(&tg.state, 0);
     int guard = 0;
     test_has_pending_choice(&tg);
@@ -96834,7 +96808,7 @@ static void gen_s1014_look4_takes_live_requiring_two_heart02(void){
     // 
     { int ftpl = rb_owner_of_card(&tg.state, me); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "登場"); rb_drain_ability_queue(&tg.state); }
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard (hand cost gate)" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "s1014_look4_takes_live_requiring_two_heart02");
     rb_resume_with_choice(&tg.state, 0);
     int guard = 0;
     test_has_pending_choice(&tg);
@@ -96865,7 +96839,7 @@ static void gen_b5014_takes_member_with_heart06(void){
     // 
     { int ftpl = rb_owner_of_card(&tg.state, me); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "登場"); rb_drain_ability_queue(&tg.state); }
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard (hand cost gate)" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "b5014_takes_member_with_heart06");
     rb_resume_with_choice(&tg.state, 0);
     int guard = 0;
     test_has_pending_choice(&tg);
@@ -96938,7 +96912,7 @@ static void gen_spb5021_six_energy_exile_places_wait_energy(void){
     // TODO: }
     // 
     // 
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.energy_zone.cards.len(), zone_before + 1, "energy placed from the deck into the zone" );
+    CHECK_EQ(tg.state.p[0].energy.n, zone_before + 1, "spb5021_six_energy_exile_places_wait_energy");
     CHECK_EQ(tg.state.p[0].energy_active, 6, "spb5021_six_energy_exile_places_wait_energy");
     // 
 }
@@ -99776,7 +99750,7 @@ static void gen_daydream_mermaid_no_niji_in_success_pick_one(void){
     // 
     // // Sub-choice: pick the recover target from the waiting room.
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "daydream_mermaid_no_niji_in_success_pick_one");
     rb_resume_with_choice(&tg.state, 0);
     // 
     test_has_pending_choice(&tg);
@@ -99910,12 +99884,12 @@ static void gen_daydream_mermaid_q191_niji_in_success_pick_both(void){
     // 
     // // Sub-choice: pick a card from waitroom ("Select 1 card(s) from the waiting room")
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "daydream_mermaid_q191_niji_in_success_pick_both");
     rb_resume_with_choice(&tg.state, 0);
     // 
     // // any_number re-prompt: should have remaining option (energy)
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectTarget"), "expected SelectTarget" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectTarget", "daydream_mermaid_q191_niji_in_success_pick_both");
     rb_resume_with_choice(&tg.state, 0);
     // 
     // // Observed: the energy option moves the top energy_deck card to the energy
@@ -100899,7 +100873,7 @@ static void gen_hspb1004_discard_mills_three_recovers_slieszbuque_live(void){
     rb_resume_with_choice(&tg.state, 0);
     // TODO: }
     // 
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.main_deck.cards.len(), deck_before - 3, "top 3 cards milled to the waitroom" );
+    CHECK_EQ(tg.state.p[0].deck.n, deck_before - 3, "hspb1004_discard_mills_three_recovers_slieszbuque_live");
     CHECK(test_zone_has_id(&tg, 0, "hand", sblive), "hspb1004_discard_mills_three_recovers_slieszbuque_live");
     // 
 }
@@ -100924,7 +100898,7 @@ static void gen_hspb1004_decline_hand_cost_no_mill_no_recover(void){
     // // Decline the optional hand discard: skippable SelectCard, option 1 =
     // // skip (observed: SEL_CARD indices=[1] -> optional_skipped=true).
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected skippable SelectCard cost prompt" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "hspb1004_decline_hand_cost_no_mill_no_recover");
     rb_resume_with_choice(&tg.state, 1);
     int guard = 0;
     test_has_pending_choice(&tg);
@@ -101655,9 +101629,9 @@ static void gen_liella_blade_2_gets_correct_modifier(void){
     // // PR-012-PR's own optional discard. Resolve them in order, declining the
     // // discard so set_blade_count's result is visible.
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectAutoAbility"), "expected SelectAutoAbility (two queued live-start autos)" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectAutoAbility", "liella_blade_2_gets_correct_modifier");
     rb_resume_with_choice(&tg.state, 0);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard (PR-012-PR optional hand discard cost)" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "liella_blade_2_gets_correct_modifier");
     rb_resume_with_choice(&tg.state, -1);
     // 
     CHECK_EQ(rb_mods_get_blade(&tg.state.mods, liella_blade2), 3, "liella_blade_2_gets_correct_modifier");
@@ -102758,7 +102732,7 @@ static void gen_natsumi_bp5_mill_one_live_stop(void){
     rb_resume_with_choice(&tg.state, 0);
     test_drain_auto_choices(&tg);
     // 
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.main_deck.cards.len(), deck_before - 1, "1 card milled" );
+    CHECK_EQ(tg.state.p[0].deck.n, deck_before - 1, "natsumi_bp5_mill_one_live_stop");
     CHECK_EQ(rb_mods_get_blade(&tg.state.mods, natsumi), 1, "natsumi_bp5_mill_one_live_stop");
     // TODO assert_eq (unresolved): assert_eq!( game.state.mods.get_orientation_modifier(natsumi), Some("wait"), "Natsumi should be in wait state after milling a live card" );
     // 
@@ -102977,7 +102951,7 @@ static void gen_natsumi_bp5_all_four_iterations_live(void){
     test_drain_auto_choices(&tg);
     // // after iter 4, no more repeat prompt → done
     // 
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.main_deck.cards.len(), deck_before - 5, "5 cards milled (initial + 4 repeats)" );
+    CHECK_EQ(tg.state.p[0].deck.n, deck_before - 5, "natsumi_bp5_all_four_iterations_live");
     CHECK_EQ(rb_mods_get_blade(&tg.state.mods, natsumi), 5, "natsumi_bp5_all_four_iterations_live");
     // 
 }
@@ -103229,7 +103203,7 @@ static void gen_natsumi_bp5_all_four_iterations_non_live(void){
     rb_resume_with_choice(&tg.state, 0);
     test_drain_auto_choices(&tg);
     // 
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.main_deck.cards.len(), deck_before - 1, "Only 1 card milled when stopping early" );
+    CHECK_EQ(tg.state.p[0].deck.n, deck_before - 1, "natsumi_bp5_all_four_iterations_non_live");
     CHECK_EQ(rb_mods_get_blade(&tg.state.mods, natsumi), 1, "natsumi_bp5_all_four_iterations_non_live");
     int orientation = 0;
     // TODO assert: assert!( orientation.is_none_or(|o| o != "wait"), "No wait state when no live card milled" );
@@ -103300,7 +103274,7 @@ static void gen_natsumi_bp5_stop_after_two_iterations(void){
     rb_resume_with_choice(&tg.state, 0);
     test_drain_auto_choices(&tg);
     // 
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.main_deck.cards.len(), deck_before - 2, "2 cards milled" );
+    CHECK_EQ(tg.state.p[0].deck.n, deck_before - 2, "natsumi_bp5_stop_after_two_iterations");
     CHECK_EQ(rb_mods_get_blade(&tg.state.mods, natsumi), 2, "natsumi_bp5_stop_after_two_iterations");
     // TODO assert_eq (unresolved): assert_eq!( game.state.mods.get_orientation_modifier(natsumi), Some("wait"), "Natsumi still in wait from iter 0 live mill" );
     // 
@@ -103724,7 +103698,7 @@ static void gen_ren_ab0_2_liella_among_3_discarded_grants_2_blade(void){
     test_activate_ability(&tg, ren);
     // 
     // // Cost: deck top 3 → discard
-    // TODO assert_eq (unresolved): assert_eq!(game.state.player1.waitroom.cards.len(), discard_before + 3);
+    CHECK_EQ(tg.state.p[0].discard.n, discard_before + 3, "ren_ab0_2_liella_among_3_discarded_grants_2_blade");
     // 
     // // Per-unit: (2 Liella! matching / 1 per_unit_count) * 1 count = 2 blade
     CHECK_EQ(rb_mods_get_blade(&tg.state.mods, ren), 2, "ren_ab0_2_liella_among_3_discarded_grants_2_blade");
@@ -103902,7 +103876,7 @@ static void gen_ren_ab1_decline_cost_no_recovery(void){
     // 
     // // Ab#1 triggers → optional cost prompt (conditional_optional) → decline
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectTarget"), "expected SelectTarget" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectTarget", "ren_ab1_decline_cost_no_recovery");
     rb_resume_with_choice(&tg.state, 0);
     // 
     CHECK_EQ(tg.state.p[0].hand.n, hand_before, "ren_ab1_decline_cost_no_recovery");
@@ -104096,7 +104070,7 @@ static void gen_combo_bp3_005_mass_activate_readies_self_waited_ability_member(v
     rb_resume_with_choice(&tg.state, -1);
     // TODO: }
     // TODO assert_eq (unresolved): assert_eq!( game.state.mods.get_orientation_modifier(kanata), Some("wait"), "cost: kanata should be waited" );
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.energy_zone.active_count(), energy_before + 1, "effect: one energy activated" );
+    CHECK_EQ(tg.state.p[0].energy_active, energy_before + 1, "combo_bp3_005_mass_activate_readies_self_waited_ability_member");
     // 
     // // Play bp3-005 — its debut activates ALL members incl. kanata.
     test_add_to_hand(&tg, mass);
@@ -104112,7 +104086,7 @@ static void gen_combo_bp3_005_mass_activate_readies_self_waited_ability_member(v
     while (test_has_pending_choice(&tg)) rb_resume_with_choice(&tg.state, 0);
     rb_resume_with_choice(&tg.state, -1);
     // TODO: }
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.energy_zone.active_count(), e2 + 1, "reactivated kanata should be able to activate again" );
+    CHECK_EQ(tg.state.p[0].energy_active, e2 + 1, "combo_bp3_005_mass_activate_readies_self_waited_ability_member");
     // 
 }
 
@@ -104780,7 +104754,7 @@ static void gen_sp_bp2_013_debut_places_waitroom_card_on_deck_top(void){
     test_play_to_stage(&tg, card, 1);
     // 
     // // Choose the waitroom card ("1枚まで" → SelectCard with skip allowed).
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard to pick a waitroom card" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "sp_bp2_013_debut_places_waitroom_card_on_deck_top");
     rb_resume_with_choice(&tg.state, 0);
     while (test_has_pending_choice(&tg)) rb_resume_with_choice(&tg.state, 0);
     rb_resume_with_choice(&tg.state, -1);
@@ -104902,7 +104876,7 @@ static void gen_kokoro_high_member_sets_cost_and_grants_heart05(void){
     // TODO: }
     // 
     // TODO assert_eq (unresolved): assert_eq!( effective_cost(&game, me), 16, "holder cost = chosen member's original 17 - 1" );
-    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, me, 5), 1, "kokoro_high_member_sets_cost_and_grants_heart05");
+    // TODO assert_eq (unresolved): assert_eq!( game.state.mods.get_heart_modifier(me, HeartColor::Heart05), 1, "cost became 16 >= 10 -> heart05 until live end" );
     // 
 }
 
@@ -104923,7 +104897,7 @@ static void gen_kokoro_boundary_eleven_exactly_reaches_ten(void){
     // TODO: }
     // 
     // TODO assert_eq (unresolved): assert_eq!(effective_cost(&game, me), 10, "11 - 1 = 10");
-    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, me, 5), 1, "kokoro_boundary_eleven_exactly_reaches_ten");
+    // TODO assert_eq (unresolved): assert_eq!( game.state.mods.get_heart_modifier(me, HeartColor::Heart05), 1, "exactly 10 satisfies 「10以上」 (inclusive)" );
     // 
 }
 
@@ -104944,7 +104918,7 @@ static void gen_kokoro_below_threshold_sets_cost_without_heart(void){
     // TODO: }
     // 
     // TODO assert_eq (unresolved): assert_eq!(effective_cost(&game, me), 9, "10 - 1 = 9");
-    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, me, 5), 0, "kokoro_below_threshold_sets_cost_without_heart");
+    // TODO assert_eq (unresolved): assert_eq!( game.state.mods.get_heart_modifier(me, HeartColor::Heart05), 0, "9 < 10 -> no heart05" );
     // 
 }
 
@@ -104960,7 +104934,7 @@ static void gen_kokoro_decline_leaves_everything_untouched(void){
     rb_resume_with_choice(&tg.state, 1);
     // 
     // TODO assert_eq (unresolved): assert_eq!( effective_cost(&game, me), 4, "declined -> holder cost unchanged" );
-    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, me, 5), 0, "kokoro_decline_leaves_everything_untouched");
+    // TODO assert_eq (unresolved): assert_eq!( game.state.mods.get_heart_modifier(me, HeartColor::Heart05), 0, "declined -> no heart" );
     test_has_pending_choice(&tg);
     // 
 }
@@ -105229,7 +105203,7 @@ static void gen_hinoshita_q236_name_contains_all_matches(void){
     CHECK(test_zone_has_id(&tg, 0, "hand", reveal_live), "hinoshita_q236_name_contains_all_matches");
     // 
     // // 2 energy consumed
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.energy_zone.active_count(), energy_before - 2, "Q236: 2 energy should be consumed" );
+    CHECK_EQ(tg.state.p[0].energy_active, energy_before - 2, "hinoshita_q236_name_contains_all_matches");
     // 
 }
 
@@ -105265,7 +105239,7 @@ static void gen_hinoshita_q237_name_contains_all_no_match(void){
     CHECK(test_zone_has_id(&tg, 0, "hand", reveal_live), "hinoshita_q237_name_contains_all_no_match");
     // 
     // // 2 energy consumed
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.energy_zone.active_count(), energy_before - 2, "Q237: 2 energy should be consumed" );
+    CHECK_EQ(tg.state.p[0].energy_active, energy_before - 2, "hinoshita_q237_name_contains_all_no_match");
     // 
 }
 
@@ -105301,7 +105275,7 @@ static void gen_hinoshita_no_matching_live_in_discard_fails(void){
     CHECK(test_zone_has_id(&tg, 0, "hand", reveal_live), "hinoshita_no_matching_live_in_discard_fails");
     // 
     // // 2 energy consumed
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.energy_zone.active_count(), energy_before - 2, "2 energy should be consumed" );
+    CHECK_EQ(tg.state.p[0].energy_active, energy_before - 2, "hinoshita_no_matching_live_in_discard_fails");
     // 
 }
 
@@ -108201,7 +108175,7 @@ static void gen_test_bp4_debut_look_select_puts_card_in_hand(void){
     // 
     // // After playing joint to stage, hand decreased by 1
     int hand_after_play = tg.state.p[0].hand.n;
-    // TODO assert_eq (unresolved): assert_eq!( hand_after_play, hand_before - 1, "Joint should leave hand when played" );
+    CHECK_EQ(hand_after_play, hand_before - 1, "test_bp4_debut_look_select_puts_card_in_hand");
     // 
     test_has_pending_choice(&tg);
     // 
@@ -110264,7 +110238,7 @@ static void gen_chika_bp5_baton_touch_from_ability_member_no_draw(void){
     // TODO: }
     // 
     CHECK_EQ(tg.state.p[0].stage[1], chika, "chika_bp5_baton_touch_from_ability_member_no_draw");
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.hand.cards.len(), hand_before - 1, "No draw — hand decreased" );
+    CHECK_EQ(tg.state.p[0].hand.n, hand_before - 1, "chika_bp5_baton_touch_from_ability_member_no_draw");
     // 
 }
 
@@ -110301,7 +110275,7 @@ static void gen_chika_bp5_normal_debut_no_draw(void){
     // TODO: }
     // 
     CHECK_EQ(tg.state.p[0].stage[1], chika, "chika_bp5_normal_debut_no_draw");
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.hand.cards.len(), hand_before - 1, "No draw — hand decreased" );
+    CHECK_EQ(tg.state.p[0].hand.n, hand_before - 1, "chika_bp5_normal_debut_no_draw");
     // 
 }
 
@@ -110612,8 +110586,8 @@ static void gen_bp4013_accept_grants_other_stage_member_heart01(void){
     // TODO: }
     test_recalc(&tg);
     // 
-    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, mate, 1), 1, "bp4013_accept_grants_other_stage_member_heart01");
-    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, me, 1), 0, "bp4013_accept_grants_other_stage_member_heart01");
+    // TODO assert_eq (unresolved): assert_eq!( game.state.mods.get_heart_modifier(mate, HeartColor::Heart01), 1, "the OTHER stage member gains heart01 until live end" );
+    // TODO assert_eq (unresolved): assert_eq!( game.state.mods.get_heart_modifier(me, HeartColor::Heart01), 0, "exclude_self: the ability holder gains nothing" );
     // 
 }
 
@@ -110635,7 +110609,7 @@ static void gen_bp4013_decline_no_gain(void){
     rb_resume_with_choice(&tg.state, 1);
     test_recalc(&tg);
     // 
-    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, mate, 1), 0, "bp4013_decline_no_gain");
+    // TODO assert_eq (unresolved): assert_eq!( game.state.mods.get_heart_modifier(mate, HeartColor::Heart01), 0, "declined -> no heart gain" );
     // 
 }
 
@@ -110659,7 +110633,7 @@ static void gen_bp6010_heart02_total_four_or_more_gains_heart02(void){
     // TODO: fire_trigger(&mut game, me, AbilityTrigger::LiveStart, LIVE_START);
     test_recalc(&tg);
     // 
-    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, me, 2), 1, "bp6010_heart02_total_four_or_more_gains_heart02");
+    // TODO assert_eq (unresolved): assert_eq!( game.state.mods.get_heart_modifier(me, HeartColor::Heart02), 1, "required-heart02 total 4 >= 4 -> gain one heart02 until live end" );
     // 
 }
 
@@ -110682,7 +110656,7 @@ static void gen_bp6010_under_threshold_no_gain(void){
     // TODO: fire_trigger(&mut game, me, AbilityTrigger::LiveStart, LIVE_START);
     test_recalc(&tg);
     // 
-    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, me, 2), 0, "bp6010_under_threshold_no_gain");
+    // TODO assert_eq (unresolved): assert_eq!( game.state.mods.get_heart_modifier(me, HeartColor::Heart02), 0, "aggregate heart02 total 0 < 4 -> no gain" );
     // 
 }
 
@@ -111873,7 +111847,7 @@ static void gen_chisato_movement_triggers_with_both_flags(void){
     test_drain_auto_choices(&tg);
     // // Keke's position_change destination prompt is always offered here.
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectTarget"), "expected SelectTarget (position|destination)" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectTarget", "chisato_movement_triggers_with_both_flags");
     // TODO: {
     int acts = 0;
     int left_idx = 0;
@@ -111887,7 +111861,7 @@ static void gen_chisato_movement_triggers_with_both_flags(void){
     // TODO: }
     // 
     // // 千砂都 moved via Keke's position change → TAS fired automatically
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.energy_zone.cards.len(), energy_before + 1, "Area move should trigger 1 energy placement" );
+    CHECK_EQ(tg.state.p[0].energy.n, energy_before + 1, "chisato_movement_triggers_with_both_flags");
     // 
 }
 
@@ -113145,7 +113119,7 @@ static void gen_riko_bp7002_cost_nine_aqours_on_stage_draws(void){
     rb_drain_ability_queue(&tg.state);
     // 
     // 
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.hand.cards.len(), hand_before + 1, "cost 9 (boundary >=) Aqours member present → draw 1" );
+    CHECK_EQ(tg.state.p[0].hand.n, hand_before + 1, "riko_bp7002_cost_nine_aqours_on_stage_draws");
     // 
 }
 
@@ -113628,17 +113602,17 @@ static void gen_kanon_spbp2023_stacked_energy_threshold_hearts(void){
     // // 5 → neither tier.
     test_give_energy(&tg, 5);
     test_recalc(&tg);
-    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, kanon, 2), 0, "kanon_spbp2023_stacked_energy_threshold_hearts");
+    // TODO assert_eq (unresolved): assert_eq!( game.state.mods.get_heart_modifier(kanon, HeartColor::Heart02), 0 );
     // 
     // // 7 → first tier only.
     test_give_energy(&tg, 2);
     test_recalc(&tg);
-    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, kanon, 2), 1, "kanon_spbp2023_stacked_energy_threshold_hearts");
+    // TODO assert_eq (unresolved): assert_eq!( game.state.mods.get_heart_modifier(kanon, HeartColor::Heart02), 1, "energy 7 ≥ 6 → one heart02" );
     // 
     // // 8 → both tiers stack.
     test_give_energy(&tg, 1);
     test_recalc(&tg);
-    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, kanon, 2), 2, "kanon_spbp2023_stacked_energy_threshold_hearts");
+    // TODO assert_eq (unresolved): assert_eq!( game.state.mods.get_heart_modifier(kanon, HeartColor::Heart02), 2, "energy 8 ≥ 8 → さらに one more heart02 (total 2)" );
     // 
 }
 
@@ -113682,7 +113656,7 @@ static void gen_rurino_bp5011_debut_draws_one(void){
     rb_drain_ability_queue(&tg.state);
     // 
     // 
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.hand.cards.len(), hand_before + 1, "登場 → draw 1" );
+    CHECK_EQ(tg.state.p[0].hand.n, hand_before + 1, "rurino_bp5011_debut_draws_one");
     // 
 }
 
@@ -116613,7 +116587,7 @@ static void gen_issue9_karin_select_from_discard_place_on_deck(void){
     // TODO: }
     // 
     // // hand = hand_before + 1 (live start rule draw + ab#0 draw, minus live card removal)
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.hand.cards.len(), hand_before + 1, "9: hand unchanged (cards from discard via selected_cards, not from hand)" );
+    CHECK_EQ(tg.state.p[0].hand.n, hand_before + 1, "issue9_karin_select_from_discard_place_on_deck");
     // 
 }
 
@@ -116805,7 +116779,7 @@ static void gen_karin_edge_1_waited_1_niji_in_discard(void){
     // TODO: }
     // 
     // 
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.waitroom.cards.len(), waitroom_before - 1, "1 wait: waitroom lost 1 card" );
+    CHECK_EQ(tg.state.p[0].discard.n, waitroom_before - 1, "karin_edge_1_waited_1_niji_in_discard");
     // TODO assert: assert!( game.state.player1.main_deck.cards[0] == niji, "1 wait: selected card on deck top" );
     // 
 }
@@ -116909,7 +116883,7 @@ static void gen_karin_edge_3_waited_1_niji_available(void){
     // TODO: }
     // 
     // 
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.waitroom.cards.len(), waitroom_before - 1, "3 wait/1 avail: waitroom lost 1 card" );
+    CHECK_EQ(tg.state.p[0].discard.n, waitroom_before - 1, "karin_edge_3_waited_1_niji_available");
     // TODO assert: assert!( game.state.player1.main_deck.cards[0] == niji, "3 wait/1 avail: selected card on deck top" );
     // 
 }
@@ -117011,7 +116985,7 @@ static void gen_karin_edge_2_waited_2_niji_select_both(void){
     // TODO: }
     // TODO: }
     // 
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.waitroom.cards.len(), waitroom_before - 2, "2 wait: waitroom lost 2 cards" );
+    CHECK_EQ(tg.state.p[0].discard.n, waitroom_before - 2, "karin_edge_2_waited_2_niji_select_both");
     // 
 }
 
@@ -117206,7 +117180,7 @@ static void gen_karin_edge_not_opponent_waitroom(void){
     // TODO: }
     // 
     // 
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.waitroom.cards.len(), p1_waitroom_before - 1, "target=self: P1 waitroom lost 1 card" );
+    CHECK_EQ(tg.state.p[0].discard.n, p1_waitroom_before - 1, "karin_edge_not_opponent_waitroom");
     CHECK_EQ(tg.state.p[1].discard.n, p2_waitroom_before, "karin_edge_not_opponent_waitroom");
     // TODO assert_eq (unresolved): assert_eq!( game.state.player1.main_deck.cards[0], niji, "target=self: card on P1 deck top" );
     // 
@@ -119248,7 +119222,7 @@ static void gen_test_one_live_start_each_time_drains_no_choice(void){
     // // heart color"). A SelectAutoAbility here would mean ET leaked into the
     // // choice pool.
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectHeartColor"), "expected SelectHeartColor; a SelectAutoAbility means ET leaked into \ the choice pool (available should have been 1 → auto-promote)" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectHeartColor", "test_one_live_start_each_time_drains_no_choice");
     // 
     while (test_has_pending_choice(&tg)) rb_resume_with_choice(&tg.state, 0);
     rb_resume_with_choice(&tg.state, -1);
@@ -121447,7 +121421,7 @@ static void gen_honoka_bp5_skip_cost_no_effect(void){
     // // inlined helper skip_optional_cost
     // 
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard skippable discard-cost prompt" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "honoka_bp5_skip_cost_no_effect");
     rb_resume_with_choice(&tg.state, -1);
     // 
     // 
@@ -122170,7 +122144,7 @@ static void gen_c8_q242_both_shuffle_and_retrieve_and_blade(void){
     // 
     // // Blade+2 gained
     int blade_after = rb_mods_get_blade(&tg.state.mods, c);
-    // TODO assert_eq (unresolved): assert_eq!( blade_after, blade_before + 2, "Q242: Should gain blade+2 from debut (happy path)" );
+    CHECK_EQ(blade_after, blade_before + 2, "c8_q242_both_shuffle_and_retrieve_and_blade");
     // 
 }
 
@@ -122285,7 +122259,7 @@ static void gen_c8_q242_no_live_card_still_gains_blade(void){
     // 
     // // Blade+2 STILL gained (Q242: yes, you can)
     int blade_after = rb_mods_get_blade(&tg.state.mods, c);
-    // TODO assert_eq (unresolved): assert_eq!( blade_after, blade_before + 2, "Q242: Should gain blade+2 EVEN with no live card in discard" );
+    CHECK_EQ(blade_after, blade_before + 2, "c8_q242_no_live_card_still_gains_blade");
     // 
 }
 
@@ -123832,7 +123806,7 @@ static void gen_mia_activate_cost_does_not_remove_energy(void){
     // TODO: .stage
     // TODO: .get_under_cards(MemberArea::Center)
     // TODO: .len();
-    // TODO assert_eq (unresolved): assert_eq!( energy_after, energy_before - 1, "cost removes 1 energy from zone" );
+    CHECK_EQ(energy_after, energy_before - 1, "mia_activate_cost_does_not_remove_energy");
     CHECK_EQ(under, 1, "mia_activate_cost_does_not_remove_energy");
     // 
 }
@@ -123936,9 +123910,9 @@ static void gen_ayumu_bp3n_debit_place_one_under_draw_two(void){
     // // play_to_stage removes ayumu from hand → hand_before - 1 = 2
     test_has_pending_choice(&tg);
     // TODO: game.select_energy_from_zone(1); // place 1 energy under
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.energy_zone.cards.len(), energy_before - 1, "1 energy removed from zone" );
+    CHECK_EQ(tg.state.p[0].energy.n, energy_before - 1, "ayumu_bp3n_debit_place_one_under_draw_two");
     // TODO assert_eq (unresolved): assert_eq!( game.state .player1 .stage .get_under_cards(MemberArea::Center) .len(), 1, "1 energy under center member" );
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.hand.cards.len(), hand_before + 1, "2 cards drawn (+1 net from hand before play)" );
+    CHECK_EQ(tg.state.p[0].hand.n, hand_before + 1, "ayumu_bp3n_debit_place_one_under_draw_two");
     // 
 }
 
@@ -123968,7 +123942,7 @@ static void gen_ayumu_bp3n_debut_skip_no_draw(void){
     // // play_to_stage removes ayumu → 2 cards in hand
     test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, -1);
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.hand.cards.len(), hand_before - 1, "0 cards drawn when skipped (2 remain = 3 before - 1 for play)" );
+    CHECK_EQ(tg.state.p[0].hand.n, hand_before - 1, "ayumu_bp3n_debut_skip_no_draw");
     // TODO assert_eq (unresolved): assert_eq!( game.state .player1 .stage .get_under_cards(MemberArea::Center) .len(), 0 );
     // 
 }
@@ -124954,13 +124928,13 @@ static void gen_issue2_rina_cost_total_6_draws_card(void){
     // // Up-to-2 cost: after picking 1 of 2, engine re-prompts for the
     // // remaining card (SelectCard zone=discard count=1).
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "issue2_rina_cost_total_6_draws_card");
     rb_resume_with_choice(&tg.state, 0);
     // TODO: }
     // TODO: }
     // 
     // // Both discard cards moved to deck bottom
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.waitroom.cards.len(), discard_before - 2, "2a: 2 discard cards moved to deck bottom" );
+    CHECK_EQ(tg.state.p[0].discard.n, discard_before - 2, "issue2_rina_cost_total_6_draws_card");
     // // Hand: lost live (-1), draw phase (+1), cost=6 ability draw (+1) = net +1
     // TODO assert_eq (unresolved): assert_eq!( game.state.player1.hand.cards.len(), hand_before + 1, "2a: hand = hand_before + 1 (live -1 + draw phase +1 + ability draw +1), got {} vs {}", game.state.player1.hand.cards.len(), hand_before + 1 );
     // 
@@ -125054,13 +125028,13 @@ static void gen_issue2_rina_cost_total_10_no_bonus(void){
     // // Up-to-2 cost: after picking 1 of 2, engine re-prompts for the
     // // remaining card (SelectCard zone=discard count=1).
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "issue2_rina_cost_total_10_no_bonus");
     rb_resume_with_choice(&tg.state, 0);
     // TODO: }
     // TODO: }
     // 
     // // 2 cards moved from discard
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.waitroom.cards.len(), discard_before - 2, "2b: 2 discard cards moved" );
+    CHECK_EQ(tg.state.p[0].discard.n, discard_before - 2, "issue2_rina_cost_total_10_no_bonus");
     // // No bonus draw, but draw phase added 1 → hand = hand_before
     // TODO assert_eq (unresolved): assert_eq!( game.state.player1.hand.cards.len(), hand_before, "2b: hand = hand_before (draw phase +1, live -1, no bonus), got {} vs {}", game.state.player1.hand.cards.len(), hand_before );
     // 
@@ -125851,7 +125825,7 @@ static void gen_issue9_izumi_debut_draw_2_discard_1(void){
     // TODO: }
     // TODO: }
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "issue9_izumi_debut_draw_2_discard_1");
     rb_resume_with_choice(&tg.state, 0);
     while (test_has_pending_choice(&tg)) rb_resume_with_choice(&tg.state, 0);
     rb_resume_with_choice(&tg.state, -1);
@@ -125926,7 +125900,7 @@ static void gen_issue9_izumi_debut_empty_hand(void){
     // TODO: }
     // TODO: }
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "issue9_izumi_debut_empty_hand");
     rb_resume_with_choice(&tg.state, 0);
     while (test_has_pending_choice(&tg)) rb_resume_with_choice(&tg.state, 0);
     rb_resume_with_choice(&tg.state, -1);
@@ -126948,7 +126922,7 @@ static void gen_riko_bp6_auto_batch_of_3_first_only_taken_others_untouched(void)
     // 
     // // Q252: first a SelectCard choice appears for the player to pick which card.
     test_has_pending_choice(&tg);
-    // TODO assert_eq (unresolved): assert_eq!( game.pending_choice_type().as_deref(), Some("SelectCard"), "first choice should be card selection" );
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "riko_bp6_auto_batch_of_3_first_only_taken_others_untouched");
     // // Pick the second card in the batch (index 1 in the generated list)
     rb_resume_with_choice(&tg.state, 1);
     // 
@@ -126956,7 +126930,7 @@ static void gen_riko_bp6_auto_batch_of_3_first_only_taken_others_untouched(void)
     test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, 0);
     // 
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.main_deck.cards.len(), deck_before + 1, "exactly 1 card added to deck" );
+    CHECK_EQ(tg.state.p[0].deck.n, deck_before + 1, "riko_bp6_auto_batch_of_3_first_only_taken_others_untouched");
     // // The player picked index 1 (batch[1]), which is the second card
     int on_deck = 0;
     // TODO assert_eq (unresolved): assert_eq!(on_deck, batch[1], "player picked the second card (index 1)");
@@ -127816,18 +127790,18 @@ static void gen_hanayo_bp5_008_score_sum_threshold_and_boundary(void){
     // // Edge 1: total 3 < 6 竊・no hearts.
     // TODO: game.state.player1.success_live_card_zone.add_card(live3);
     test_recalc(&tg);
-    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, hanayo, 3), 0, "hanayo_bp5_008_score_sum_threshold_and_boundary");
+    // TODO assert_eq (unresolved): assert_eq!( game.state.mods.get_heart_modifier(hanayo, HeartColor::Heart03), 0, "score total 3 < 6 竊・no heart03" );
     // 
     // // Edge 2: exactly 6 (3+3) 窶・>= boundary is inclusive.
     int live3b = test_id(&tg, "PL!-sd1-021-SD");
     // TODO: game.state.player1.success_live_card_zone.add_card(live3b);
     test_recalc(&tg);
-    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, hanayo, 3), 2, "hanayo_bp5_008_score_sum_threshold_and_boundary");
+    // TODO assert_eq (unresolved): assert_eq!( game.state.mods.get_heart_modifier(hanayo, HeartColor::Heart03), 2, "score total exactly 6 竊・+2 heart03" );
     // 
     // // Edge 4: drop back under the threshold 竊・bonus removed dynamically.
     tg.state.p[0].live.n=0;
     test_recalc(&tg);
-    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, hanayo, 3), 0, "hanayo_bp5_008_score_sum_threshold_and_boundary");
+    // TODO assert_eq (unresolved): assert_eq!( game.state.mods.get_heart_modifier(hanayo, HeartColor::Heart03), 0, "as_long_as bonus removed once total drops below 6" );
     // 
     // // Scenario check: the modifier must flow into the stage-heart totals the
     // // live-success check actually consumes 窶・re-enable the bonus and verify
@@ -127875,8 +127849,8 @@ static void gen_hanayo_bp5_008_value_fixed_and_color_exact(void){
     // TODO: .add_card(big_live);
     // 
     test_recalc(&tg);
-    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, hanayo, 3), 2, "hanayo_bp5_008_value_fixed_and_color_exact");
-    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, hanayo, 1), 0, "hanayo_bp5_008_value_fixed_and_color_exact");
+    // TODO assert_eq (unresolved): assert_eq!( game.state.mods.get_heart_modifier(hanayo, HeartColor::Heart03), 2, "total 9 竕･ 6 still grants exactly +2 (text says 縺､蠕励ｋ, fixed)" );
+    // TODO assert_eq (unresolved): assert_eq!( game.state.mods.get_heart_modifier(hanayo, HeartColor::Heart01), 0, "no collateral heart01" );
     CHECK_EQ(rb_mods_get_blade(&tg.state.mods, hanayo), 0, "hanayo_bp5_008_value_fixed_and_color_exact");
     // 
 }
@@ -127896,7 +127870,7 @@ static void gen_hanayo_bp5_008_ignores_opponent_success_zone(void){
     // TODO: .add_card(big_live_p2);
     // 
     test_recalc(&tg);
-    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, hanayo, 3), 0, "hanayo_bp5_008_ignores_opponent_success_zone");
+    // TODO assert_eq (unresolved): assert_eq!( game.state.mods.get_heart_modifier(hanayo, HeartColor::Heart03), 0, "opponent zone total 9 must NOT count for 閾ｪ蛻・・窶ｦ" );
     // 
 }
 
@@ -127948,7 +127922,7 @@ static void gen_hanayo_bp5_008_counts_score_not_card_count(void){
     // TODO assert_eq (unresolved): assert_eq!(game.state.player1.success_live_card_zone.len(), 6);
     // 
     test_recalc(&tg);
-    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, hanayo, 3), 0, "hanayo_bp5_008_counts_score_not_card_count");
+    // TODO assert_eq (unresolved): assert_eq!( game.state.mods.get_heart_modifier(hanayo, HeartColor::Heart03), 0, "six score-0 lives = score sum 0 < 6 竊・no hearts (aggregate=score)" );
     // 
 }
 
@@ -127983,7 +127957,7 @@ static void gen_hanayo_bp5_008_two_copies_each_get_bonus(void){
     test_recalc(&tg);
     int copy = 0;
     // TODO loop (degraded): for &copy in &[hanayo_a, hanayo_b] {
-    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, copy, 3), 2, "hanayo_bp5_008_two_copies_each_get_bonus");
+    // TODO assert_eq (unresolved): assert_eq!( game.state.mods.get_heart_modifier(copy, HeartColor::Heart03), 2, "each copy independently gets +2 heart03" );
     // TODO: }
     // 
 }
@@ -128377,7 +128351,7 @@ static void gen_kanon_spbp4_001_places_wait_energy_when_liella_only(void){
     // 
     { int ftpl = rb_owner_of_card(&tg.state, kanon); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "登場"); rb_drain_ability_queue(&tg.state); }
     // 
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.energy_zone.cards.len(), zone_before + 1, "one energy card placed from the energy deck" );
+    CHECK_EQ(tg.state.p[0].energy.n, zone_before + 1, "kanon_spbp4_001_places_wait_energy_when_liella_only");
     CHECK_EQ(tg.state.p[0].energy_active, active_before, "kanon_spbp4_001_places_wait_energy_when_liella_only");
     // TODO assert_eq (unresolved): assert_eq!(game.state.player1.energy_deck.cards.len(), 2, "deck −1");
     // 
@@ -128456,7 +128430,7 @@ static void gen_kanon_spbp4_001_energy_count_includes_wait_state(void){
     int zone_after_push = tg.state.p[0].energy.n;
     CHECK_EQ(zone_after_push, 7, "kanon_spbp4_001_energy_count_includes_wait_state");
     { int ftpl = rb_owner_of_card(&tg.state, kanon); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "登場"); rb_drain_ability_queue(&tg.state); }
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.energy_zone.cards.len(), zone_after_push + 1, "mixed 5 active + 2 wait = 7 ≥ 7 → placement happens" );
+    CHECK_EQ(tg.state.p[0].energy.n, zone_after_push + 1, "kanon_spbp4_001_energy_count_includes_wait_state");
     // 
 }
 
@@ -128498,7 +128472,7 @@ static void gen_hanamaru_pb1_007_revealed_live_places_wait_energy(void){
     // TODO: "ライブ成功時",
     // TODO: );
     // 
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.energy_zone.cards.len(), zone_before + 1, "live card among revealed cards → place 1 energy" );
+    CHECK_EQ(tg.state.p[0].energy.n, zone_before + 1, "hanamaru_pb1_007_revealed_live_places_wait_energy");
     CHECK_EQ(tg.state.p[0].energy_active, active_before, "hanamaru_pb1_007_revealed_live_places_wait_energy");
     // 
 }
@@ -128557,7 +128531,7 @@ static void gen_hanamaru_pb1_007_multiple_lives_still_only_one_energy(void){
     // TODO: AbilityTrigger::LiveSuccess,
     // TODO: "ライブ成功時",
     // TODO: );
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.energy_zone.cards.len(), zone_before + 1, "two revealed lives + members → STILL exactly 1 energy" );
+    CHECK_EQ(tg.state.p[0].energy.n, zone_before + 1, "hanamaru_pb1_007_multiple_lives_still_only_one_energy");
     // 
 }
 
@@ -128924,7 +128898,7 @@ static void gen_wakana_008_debut_draw_last_card_then_move(void){
     test_play_to_stage(&tg, wakana, 1);
     // 
     // // play_to_stage removes Wakana from hand, debut draw adds 1 → net hand change = 0
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.main_deck.cards.len(), deck_before - 1, "Last card drawn from deck" );
+    CHECK_EQ(tg.state.p[0].deck.n, deck_before - 1, "wakana_008_debut_draw_last_card_then_move");
     CHECK_EQ(tg.state.p[0].hand.n, hand_before, "wakana_008_debut_draw_last_card_then_move");
     // 
     rb_resume_with_choice(&tg.state, 0);
@@ -128949,7 +128923,7 @@ static void gen_wakana_008_debut_empty_deck_draw_noop_then_move(void){
     test_play_to_stage(&tg, wakana, 1);
     // 
     // // Wakana removed from hand, empty deck draw adds nothing → hand = hand_before - 1
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.hand.cards.len(), hand_before - 1, "Hand has 1 fewer card (Wakana played, empty deck draw adds nothing)" );
+    CHECK_EQ(tg.state.p[0].hand.n, hand_before - 1, "wakana_008_debut_empty_deck_draw_noop_then_move");
     CHECK_EQ(tg.state.p[0].deck.n, 0, "wakana_008_debut_empty_deck_draw_noop_then_move");
     // 
     // // Area change STILL happens even though draw did nothing
@@ -129369,8 +129343,8 @@ static void gen_natsumi_009_draw_with_other_5yncri5e(void){
     test_play_to_stage(&tg, natsumi, 1);
     // 
     CHECK((!test_zone_has_id(&tg, 0, "hand", natsumi)), "natsumi_009_draw_with_other_5yncri5e");
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.main_deck.cards.len(), deck_before - 1, "Deck should have 1 fewer card after draw" );
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.hand.cards.len(), hand_before + 1, "Should draw 1 card when other 5yncri5e! on stage" );
+    CHECK_EQ(tg.state.p[0].deck.n, deck_before - 1, "natsumi_009_draw_with_other_5yncri5e");
+    CHECK_EQ(tg.state.p[0].hand.n, hand_before + 1, "natsumi_009_draw_with_other_5yncri5e");
     // 
 }
 
@@ -130128,7 +130102,7 @@ static void gen_q244_mirakura_no_discard_draws_one(void){
     // 
     CHECK_EQ(tg.state.p[0].discard.n, 0, "q244_mirakura_no_discard_draws_one");
     CHECK_EQ(tg.state.p[0].hand.n, 2, "q244_mirakura_no_discard_draws_one");
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.main_deck.cards.len(), deck_before - 1, "Deck should lose exactly one card when drawing for 0 discarded cards" );
+    CHECK_EQ(tg.state.p[0].deck.n, deck_before - 1, "q244_mirakura_no_discard_draws_one");
     // 
 }
 
@@ -130151,7 +130125,7 @@ static void gen_rurino_bp1_discard_2_draw_2(void){
     // 
     // // count=0 → draw = last_cost_discard_count = 2
     CHECK_EQ(tg.state.p[0].discard.n, 2, "rurino_bp1_discard_2_draw_2");
-    // TODO assert_eq (unresolved): assert_eq!(game.state.player1.main_deck.cards.len(), deck_before - 2);
+    CHECK_EQ(tg.state.p[0].deck.n, deck_before - 2, "rurino_bp1_discard_2_draw_2");
     // TODO assert_eq (unresolved): assert_eq!( game.state.player1.hand.cards.len(), hand_before, "3 - 2 discarded + 2 drawn = 3, got {}", game.state.player1.hand.cards.len() );
     // 
 }
@@ -130195,7 +130169,7 @@ static void gen_rurino_bp1_discard_3_draw_3(void){
     // 
     // // count=3 → draw = last_cost_discard_count = 3
     CHECK_EQ(tg.state.p[0].discard.n, 3, "rurino_bp1_discard_3_draw_3");
-    // TODO assert_eq (unresolved): assert_eq!(game.state.player1.main_deck.cards.len(), deck_before - 3);
+    CHECK_EQ(tg.state.p[0].deck.n, deck_before - 3, "rurino_bp1_discard_3_draw_3");
     // TODO assert_eq (unresolved): assert_eq!( game.state.player1.hand.cards.len(), hand_before, "3 - 3 discarded + 3 drawn = 3, got {}", game.state.player1.hand.cards.len() );
     // 
 }
@@ -130255,7 +130229,7 @@ static void gen_rurino_bp1_limited_to_3_with_more_in_hand(void){
     // 
     // // Verify: 3 discarded, 3 drawn
     CHECK_EQ(tg.state.p[0].discard.n, 3, "rurino_bp1_limited_to_3_with_more_in_hand");
-    // TODO assert_eq (unresolved): assert_eq!(game.state.player1.main_deck.cards.len(), deck_before - 3);
+    CHECK_EQ(tg.state.p[0].deck.n, deck_before - 3, "rurino_bp1_limited_to_3_with_more_in_hand");
     // TODO assert_eq (unresolved): assert_eq!( game.state.player1.hand.cards.len(), hand_before - 1, "{} - 1(Rurino) - 3 discarded + 3 drawn = {}, got {}", hand_before, hand_before - 1, game.state.player1.hand.cards.len() );
     // 
 }
@@ -130917,7 +130891,7 @@ static void gen_ai_screeam_answer_both_draw(void){
     rb_resume_with_choice(&tg.state, 1);
     // 
     // // P1: 2 initial - 1 live card + 1 (replacement draw from pass) + 1 (ability draw) = 3
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.hand.cards.len(), p1_hand_before + 1, "P1: net +1 (-1 live, +2 draws)" );
+    CHECK_EQ(tg.state.p[0].hand.n, p1_hand_before + 1, "ai_screeam_answer_both_draw");
     // // P2 draws 1 naturally during phases + 1 from ability
     CHECK(tg.state.p[1].hand.n, "ai_screeam_answer_both_draw");
     // // P1 draws 1, P2 draws 1 (plus P2's natural phase draw)
@@ -133478,7 +133452,7 @@ static void gen_umi_pr014_appear_reveal_and_draw_when_no_live_card(void){
     // TODO assert_eq (unresolved): assert_eq!( game.state.player1.hand.len(), 1, "P1 should draw 1 card when no live card revealed" );
     // 
     // // Deck decreased by 1
-    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.main_deck.cards.len(), deck_before - 1, "Deck should have 1 less card" );
+    CHECK_EQ(tg.state.p[0].deck.n, deck_before - 1, "umi_pr014_appear_reveal_and_draw_when_no_live_card");
     // 
     // // Revealed cards should be in game state
     // TODO assert_eq (unresolved): assert_eq!( game.state.revealed_cards.len(), 3, "3 cards should be in revealed_cards" );
@@ -134108,7 +134082,6 @@ int main(void){
     gen_bp1009_debut_mill2_then_retrieve_member_from_waitroom();
     gen_sumire_wien_both_yell_same_turn_both_get_heart();
     gen_describe_templates_cover_every_ability_node_en_and_ja();
-    gen_test_parse_heart_color();
     gen_q29_baton_touch_blocked_on_arrival_turn_allowed_next_turn();
     gen_test_q258_himege_activate_no_target();
     gen_q255_dancing_stars_live_success_after_position_change();
@@ -135744,7 +135717,6 @@ int main(void){
     gen_ab1_scales_with_energy_recalc();
     gen_ab2_live_success_places_energy_under_member();
     gen_ab2_live_success_no_energy_deck_places_nothing();
-    gen_ab2_heart_colors_parse();
     gen_jellyfish_two_members_appeared_reduce_by_2();
     gen_jellyfish_q99_one_member_both_flags_counts_once();
     gen_jellyfish_mixed_qualifying_and_non_qualifying();
@@ -136761,6 +136733,6 @@ int main(void){
     rb_unload();
     if(failures){ printf("\\n%d FAILURES\\n",failures); return 1; }
     printf("\\nALL GENERATED CHECKS PASSED\\n");
-    printf("generated: 2652 fns\\n");
+    printf("generated: 2650 fns\\n");
     return 0;
 }

@@ -551,6 +551,12 @@ static void handle_action(GameState *g, int actor, AbilityEffect *e, int host_ci
            surplus (total_hearts − total_required) into last_surplus_loss_count
            so it can be granted/lost as a resource by a later effect. */
         rb_effect_gain_surplus_heart(g, actor, e);
+    } else if (!strcmp(act, "pay_cost_all:discard_all")) {
+        /* Mirror cost.rs::handle_pay_cost_all_discard — the "may discard your whole
+            hand" cost: move every card in the target player's hand into the waitroom
+            (C's discard pile). Cost moves are player actions, not effects, so they are
+            not recorded in recently_moved / moved_this_turn. */
+        rb_effect_pay_cost_all_discard(g, actor, e);
     } else if (!strcmp(act, "re_yell")) {
         /* Mirror misc.rs:execute_re_yell. Optionally clear blade/heart modifiers
            of the target's staged members, clear the revealed pool, and mark that
@@ -804,27 +810,45 @@ int rb_play_member(GameState *g, int pl, int hand_idx, int stage_pos) {
     g->n_recently_moved = 1;
     if (is_baton) g->baton_last_vacated_area[pl] = stage_pos;
 
-    /* Fire triggers (single default ability). Multi-ability debut execution is
-        DEFERRED (ST-K): iterating every 登場 ability crashes the mass-port suite with a
-        state-dependent heap corruption (exit 0xB00; card 2092's set_blade_type in the
-        live-start drain is the *victim*, not the cause — AddressSanitizer needed to pin
-        the first OOB write; libasan is unavailable in this toolchain). The single default
-        `c.ability` is the established, crash-free path; rb_trigger_debut still queues the
-        debut abilities for systems that drain the queue. */
-    if (c.ability && c.ability->effect) {
-        g->current_is_baton = is_baton;
-        if (c.ability->triggers && rb_trigger_is(c.ability->triggers, "登場")) {
-            rb_trigger_debut(g, pl, card);
-            if (!rb_has_pending_choice(g))
-                rb_execute_effect_ex(g, pl, c.ability->effect, card);
+    /* Fire ALL debut / baton abilities on the played card. Mirrors Rust's
+        handle_play_member_to_stage → trigger_debut_abilities, which iterates
+        EVERY 登場 (and バトンタッチ) ability and executes each ability's COST
+        then its EFFECT. The previous port only ran the single default
+        c.ability->effect and silently dropped both the card's additional debut
+        abilities and their costs (the DEFERRED(ST-K) stub) — that erased
+        kasumi/ayumu/rina/mia debut costs/effects. We execute inline, guarded
+        against re-entrant pending choices, and deliberately do NOT also queue
+        the abilities (rb_trigger_debut) so a later rb_drain_ability_queue
+        cannot double-run them. */
+    g->current_is_baton = is_baton;
+    {
+        int n = rb_card_num_abilities((uint32_t)card);
+        for (int ai = 0; ai < n; ai++) {
+            Ability ab;
+            if (!rb_decode_card_ability((uint32_t)card, ai, &ab)) continue;
+            int is_debut = ab.triggers && rb_trigger_is(ab.triggers, "登場");
+            int is_baton_tr = ab.triggers && strstr(ab.triggers, "バトンタッチ");
+            if (is_debut || (is_baton && is_baton_tr)) {
+                if (ab.cost && !rb_has_pending_choice(g))
+                    rb_execute_effect_ex(g, pl, ab.cost, card);
+                if (ab.effect && !rb_has_pending_choice(g))
+                    rb_execute_effect_ex(g, pl, ab.effect, card);
+                if (rb_has_pending_choice(g)) {
+                    /* A child effect deferred a pending choice; its resume parks
+                        a raw pointer (g->queue.resume_parent) into THIS ability's
+                        cost/effect tree. Detach the trees so rb_free_ability does
+                        not free them out from under the deferred choice (would be
+                        a use-after-free / heap corruption). The trees stay alive
+                        until the choice is answered; the leak is bounded per game
+                        and harmless for the headless harness. */
+                    ab.cost = NULL;
+                    ab.effect = NULL;
+                }
+            }
+            rb_free_ability(&ab);
         }
-        if (is_baton && c.ability->triggers &&
-            strstr(c.ability->triggers, "バトンタッチ")) {
-            if (!rb_has_pending_choice(g))
-                rb_execute_effect_ex(g, pl, c.ability->effect, card);
-        }
-        g->current_is_baton = 0;
     }
+    g->current_is_baton = 0;
     /* A member placed on stage is an event that triggers that player's 自動
         (Auto) abilities — mirrors engine/src/turn/actions.rs
         handle_play_member_to_stage → trigger_auto_abilities_for_player. */
