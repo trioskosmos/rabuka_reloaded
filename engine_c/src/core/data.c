@@ -79,9 +79,15 @@ static int parse_cards(const unsigned char *blob, long len) {
     while ((long)(p - strtab) < (long)strtab_len) {
         uint16_t slen = le16(p); p += 2;
         if (n + 1 > cap) { cap *= 2; g_card_strings = realloc(g_card_strings, cap * sizeof(char *)); }
+#ifdef RB_ROM_STRINGS
+        /* Bare-metal: the strtab blob is NUL-terminated in ROM; keep a ROM
+           pointer instead of duplicating the string into the 64 KB arena. */
+        g_card_strings[n++] = (char *)p;
+#else
         char *s = malloc(slen + 1);
         memcpy(s, p, slen); s[slen] = 0;
         g_card_strings[n++] = s;
+#endif
         p += slen;
     }
     g_card_strings = realloc(g_card_strings, (n ? n : 1) * sizeof(char *));
@@ -110,9 +116,15 @@ static int parse_strings(const unsigned char *blob, long len) {
         uint32_t a = g_strings_offsets[i];
         uint32_t b = g_strings_offsets[i + 1];
         uint32_t sl = b - a;
+#ifdef RB_ROM_STRINGS
+        /* Bare-metal: abilities_strings.bin is NUL-terminated in ROM; keep the
+           ROM pointer (g_strings_offsets already indexes the original starts). */
+        g_strings[i] = (char *)(g_abstr_blob + a);
+#else
         char *s = malloc(sl + 1);
         memcpy(s, g_abstr_blob + a, sl); s[sl] = 0;
         g_strings[i] = s;
+#endif
     }
     return 0;
 }
