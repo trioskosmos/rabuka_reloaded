@@ -767,9 +767,47 @@ static int h_choice(GameState *g, int actor, const AbilityEffect *e) {
 }
 static int h_position_change(GameState *g, int actor, const AbilityEffect *e) {
     /* Mirror misc.rs position_change — move a member from a source area to a
-       destination area on the actor's stage. Source defaults to center,
-       destination from e->destination (else e->target). */
+       destination area on the actor's stage. When the destination is not
+       specified or the effect is each_time, emit a SelectTarget choice. */
     RbPlayer *P = &g->p[actor];
+
+    /* Check if this is an each_time effect that needs a choice */
+    const char *trigger_type = NULL;
+    for (int i = 0; i < e->n_extra; i++) {
+        if (e->extra_k[i] && !strcmp(e->extra_k[i], "trigger_type") && e->extra_v[i]) {
+            trigger_type = e->extra_v[i]; break;
+        }
+    }
+
+    /* For each_time effects, find the triggering member and emit a choice */
+    if (trigger_type && !strcmp(trigger_type, "each_time")) {
+        /* Find the triggering member on stage */
+        int triggering_member = g->queue.resume_host;
+        int cur_idx = -1;
+        for (int i = 0; i < RB_STAGE_SIZE; i++) {
+            if (P->stage[i] == triggering_member) { cur_idx = i; break; }
+        }
+        if (cur_idx >= 0) {
+            /* Emit a SelectTarget choice for destination */
+            char options[128];
+            options[0] = '\0';
+            int n_opts = 0;
+            const char *areas[] = {"left", "center", "right"};
+            for (int i = 0; i < 3; i++) {
+                if (i != cur_idx) {
+                    if (n_opts > 0) strcat(options, ",");
+                    strcat(options, areas[i]);
+                    n_opts++;
+                }
+            }
+            rb_emit_choice(g, actor, RB_CHOICE_SELECT_TARGET, NULL, NULL, 1, e->is_optional, "position|destination");
+            rb_choice_set_description(&g->queue.pending, "Choose destination for member");
+            rb_choice_set_route(&g->queue.pending, RB_ROUTE_SELECT_TARGET);
+            return 1;
+        }
+    }
+
+    /* Direct position change (source → destination) */
     int src = 1, dst = 1;
     if (e->source && *e->source) src = rb_pos_to_area(e->source);
     const char *dest = e->destination && *e->destination ? e->destination : e->target;
@@ -777,8 +815,8 @@ static int h_position_change(GameState *g, int actor, const AbilityEffect *e) {
     if (src < 0 || src >= RB_STAGE_SIZE) src = 1;
     if (dst < 0 || dst >= RB_STAGE_SIZE) dst = 1;
     if (src == dst) return 1;
-    if (P->stage[src] < 0) return 0;        /* nothing to move */
-    if (P->stage[dst] >= 0) return 0;        /* destination occupied */
+    if (P->stage[src] < 0) return 0;
+    if (P->stage[dst] >= 0) return 0;
     int card = P->stage[src];
     P->stage[src] = -1; P->stage_wait[src] = 0;
     P->stage[dst] = card; P->stage_wait[dst] = 0;

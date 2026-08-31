@@ -127,6 +127,10 @@ int rb_trigger_live_success(GameState *g, int pl) {
         if (cid == RB_EMPTY_SLOT) continue;
         queued += queue_live_success_for_card(g, pl, cid);
     }
+    /* Process the queued abilities so their effects resolve (e.g., move energy) */
+    if (queued > 0) {
+        rb_drain_ability_queue(g);
+    }
     return queued;
 }
 
