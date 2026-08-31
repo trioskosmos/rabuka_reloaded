@@ -225,16 +225,18 @@ def _quantize_method():
 _QUANT_METHOD = _quantize_method()
 
 def bake_front_sized_with_master(img, w, h, master_q):
-    """Fit one card image into wxh preserving aspect via black letterbox (not
-    edge-stretch) so every zone respects the card's 0.708 aspect like 3DS.
-    Bars are solid black (palette index 0) so the card never looks stretched."""
+    """Cover-fit like web `object-fit: cover` and 3DS `scale=min` centered.
+    No black bars — crop to fill while preserving 0.708 aspect, matching web
+    and 3DS which never show letterbox. Bars would be board background, not black."""
     iw, ih = img.size
-    scale = min(w / iw, h / ih)
+    scale = max(w / iw, h / ih)
     nw, nh = int(iw * scale), int(ih * scale)
     small = preprocess(img).resize((nw, nh), Image.LANCZOS)
-    canvas = Image.new("RGB", (w, h), (0, 0, 0))
-    canvas.paste(small, ((w - nw) // 2, (h - nh) // 2))
-    q = canvas.quantize(
+    # Center-crop to target
+    left = (nw - w) // 2
+    top = (nh - h) // 2
+    small = small.crop((left, top, left + w, top + h))
+    q = small.quantize(
         palette=master_q,
         dither=Image.Dither.FLOYDSTEINBERG,
     )
@@ -244,21 +246,20 @@ def bake_front_sized_with_master(img, w, h, master_q):
 
 
 def bake_live_sized_with_master(img, w, h, master_q):
-    """Live mini (16x24) - preserve aspect with black letterbox, not edge-stretch.
-    Like 3DS, live cards are centered with correct 0.708 aspect; bars are solid
-    black so the card never looks stretched. Uses same master palette."""
+    """Live mini (16x24) - cover like web, no black bars. Crop to fill 0.708
+    aspect, sharpen for tiny thumbs."""
     iw, ih = img.size
-    scale = min(w / iw, h / ih)
+    scale = max(w / iw, h / ih)
     nw, nh = int(iw * scale), int(ih * scale)
     small = preprocess(img).resize((nw, nh), Image.LANCZOS)
-    # Optional light sharpen for tiny live thumbs (helps at 16x22)
     try:
         small = small.filter(ImageFilter.UnsharpMask(radius=0.8, percent=80, threshold=1))
     except Exception:
         pass
-    canvas = Image.new("RGB", (w, h), (0, 0, 0))
-    canvas.paste(small, ((w - nw) // 2, (h - nh) // 2))
-    q = canvas.quantize(
+    left = (nw - w) // 2
+    top = (nh - h) // 2
+    small = small.crop((left, top, left + w, top + h))
+    q = small.quantize(
         palette=master_q,
         dither=Image.Dither.FLOYDSTEINBERG,
     )
