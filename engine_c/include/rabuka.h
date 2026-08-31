@@ -399,6 +399,12 @@ typedef struct {
         further so a host UI / test picks a valid card). Empty/negative = no filter. */
     char filter_group[32];
     int  filter_heart;     /* heart color idx, -1 = none */
+    /* heart-color choice option list (mirrors Choice::SelectHeartColor.options).
+        Populated by rb_effect_select_heart_color so the host can present the
+        exact palette; rb_resume_with_choice maps the picked index back to a
+        color and stores it in queue.selected_heart_color. */
+    char heart_options[8][24];
+    int  n_heart_options;
 } RbChoice;
 
 typedef struct {
@@ -603,6 +609,18 @@ typedef struct GameState {
     /* play recursion depth — guards rb_play_member against unbounded re-entrancy
         when a debut/baton effect itself places a member (which re-enters this fn). */
     int      play_depth;
+    /* ── C6 keep-N-shuffle-rest (draw.rs::execute_both_hand_keep_shuffle_under) ──
+        Resolver-persistent phase state. Phase 0 snapshots self's hand and prompts;
+        phase 1 (after self's choice) moves self's non-selected under deck and
+        prompts opponent; phase 2 moves opponent's non-selected under deck and
+        resets. Snapshots are the hand at selection time; selected holds the kept
+        positions chosen in each SELECT_CARD choice. */
+    int      keep_shuffle_under_phase;
+    int      keep_shuffle_under_count;
+    int      keep_shuffle_under_snapshot[2][RB_MAX_HAND];
+    int      keep_shuffle_under_snapshot_n[2];
+    int      keep_shuffle_under_selected[RB_MAX_HAND];
+    int      keep_shuffle_under_selected_n;
 } GameState;
 
 /* ── Tracking (engine/src/core/game_state/tracking.rs) ── */
@@ -641,6 +659,25 @@ int  rb_draw_cards_for_player(RbPlayer *player, uint8_t count, const char *sourc
     target both/self/opponent; optional pay-skip gate; any_number; per_unit;
     card_type filter; source/destination routing). */
 int  rb_effect_draw_card(GameState *g, int actor, AbilityEffect *e, int host_cid);
+/* Ported from draw.rs:execute_select_effect — routes a `select` verb to the
+    area / heart-color / C6 keep-shuffle / generic card-selection path. */
+void rb_effect_select_effect(GameState *g, int actor, AbilityEffect *e, int host_cid);
+/* draw.rs:execute_select_heart_color — emit a heart-color choice (or fix the
+    color when only one candidate remains). */
+void rb_effect_select_heart_color(GameState *g, int actor, int count,
+                                  const char **heart_colors, int n_colors, const char *target);
+/* draw.rs:execute_select_number — emit a numeric choice 1..max_cost (+67). */
+void rb_effect_select_number(GameState *g, int actor, AbilityEffect *e);
+/* draw.rs:execute_area_select — emit an area (left/center/right) choice. */
+void rb_effect_area_select(GameState *g, int actor, AbilityEffect *e, int host_cid);
+/* draw.rs:execute_both_hand_keep_shuffle_under + make_hand_selection_choice +
+    move_non_selected_hand_to_deck_bottom — C6 keep-N-shuffle-rest. */
+void rb_effect_both_hand_keep_shuffle_under(GameState *g, int actor, AbilityEffect *e, int host_cid);
+/* draw.rs:resolve_gain_heart_color — returns a fixed heart color idx, or -1 if a
+    choice was emitted / not a heart resource. */
+int  rb_resolve_gain_heart_color(GameState *g, int actor, AbilityEffect *e,
+                                 const char *resource, int count,
+                                 const char **heart_colors, int n_colors, int heart_selection);
 void rb_shuffle(int *a, int n);
 int  rb_zone_of_str(const char *s, RbZone *out);    /* map zone wire name */
 
@@ -700,6 +737,10 @@ void rb_effect_move_cards(GameState *g, int actor, AbilityEffect *e);
     missing/invalid index. */
 int  rb_move_from_under_member(GameState *g, int actor, const int *indices, int n_indices,
                                 int (*validate)(int), const char *dst, const char *target);
+/* Mirror move_cards.rs::drain_under_cards_to_energy_zone — route every card
+    tucked under the given stage member to the energy zone (if it is an energy
+    card, marked wait) or the waitroom. Returns the number of cards moved. */
+int  rb_drain_under_cards_to_energy_zone(GameState *g, const char *target, int stage_idx);
 void rb_effect_gain_surplus_heart(GameState *g, int actor, const AbilityEffect *e);
 void rb_effect_look_at(GameState *g, int actor, AbilityEffect *e);
 void rb_effect_reveal_until_live_card(GameState *g, int actor, AbilityEffect *e);
@@ -718,11 +759,30 @@ void rb_emit_choice(GameState *g, int actor, RbChoiceKind kind,
 void rb_effect_change_state(GameState *g, int actor, AbilityEffect *e);
 void rb_effect_position_change(GameState *g, int actor, AbilityEffect *e, int host_cid);
 void rb_effect_rotation(GameState *g, int actor, AbilityEffect *e);
-void rb_effect_modify_cost(GameState *g, int actor, AbilityEffect *e);
+void rb_effect_modify_cost(GameState *g, int actor, AbilityEffect *e, int host_cid);
+void rb_effect_set_cost(GameState *g, int actor, AbilityEffect *e, int host_cid);
+void rb_effect_set_blade_type(GameState *g, int actor, AbilityEffect *e, int host_cid);
+void rb_effect_set_blade_count(GameState *g, int actor, AbilityEffect *e, int host_cid);
+void rb_effect_set_heart_type(GameState *g, int actor, AbilityEffect *e, int host_cid);
+void rb_effect_set_heart_copy_from_under(GameState *g, int actor, AbilityEffect *e, int host_cid);
+void rb_effect_set_card_identity(GameState *g, int actor, AbilityEffect *e, int host_cid);
+void rb_effect_set_card_identity_all_regions(GameState *g, int actor, AbilityEffect *e, int host_cid);
+void rb_effect_reduce_live_card_set_limit(GameState *g, int actor, AbilityEffect *e, int host_cid);
+void rb_effect_specify_heart_color(GameState *g, int actor, AbilityEffect *e, int host_cid);
+void rb_effect_set_cost_to_use(GameState *g, int actor, AbilityEffect *e, int host_cid);
+void rb_effect_all_blade_timing(GameState *g, int actor, AbilityEffect *e, int host_cid);
+void rb_effect_activation_cost(GameState *g, int actor, AbilityEffect *e, int host_cid);
 void rb_effect_modify_hearts(GameState *g, int actor, AbilityEffect *e);
 void rb_effect_energy_placement(GameState *g, int actor, AbilityEffect *e);
 void rb_effect_energy_state_change(GameState *g, int actor, AbilityEffect *e);
 int  rb_execute_modify_score(GameState *g, int actor, AbilityEffect *e);
+int  rb_execute_modify_required_hearts(GameState *g, int actor, AbilityEffect *e);
+void rb_execute_modify_required_hearts_standard(GameState *g, int actor,
+        const char *operation, int value, const char **heart_colors, int n_colors,
+        const char *target, const char *effect_text);
+int  rb_execute_modify_yell_count(GameState *g, int actor, AbilityEffect *e);
+int  rb_execute_modify_limit(GameState *g, int actor, AbilityEffect *e);
+int  rb_execute_modify_required_hearts_success(GameState *g, int actor, AbilityEffect *e);
 void rb_log_set_enabled(int enabled);
 void rb_log_push_verdict(const char *text, const char *kind, int passed);
 int  rb_log_buffer_len(void);
@@ -876,5 +936,30 @@ int  rb_resolve_target_player(const GameState *g, const char *target);
 /* ── Misc effect handlers (engine/src/ability/effects/misc.rs) ── */
 int rb_execute_misc_effect(GameState *g, int actor, const RbPlayer *self,
                            const AbilityEffect *e, int *resolved);
+/* Same dispatch, but carrying the resolving card id (Rust `activating_card`) so
+   handlers that grant per-card resources / read "this member" attribute correctly. */
+int rb_execute_misc_effect_ex(GameState *g, int actor, const RbPlayer *self,
+                              const AbilityEffect *e, int host_cid, int *resolved);
+/* Mirror misc.rs::handle_both_targets — run a target="both" effect for self then
+   opponent. Returns 1 when the effect was fully handled ("both" target), else 0. */
+int rb_misc_handle_both_targets(GameState *g, int actor, const AbilityEffect *e);
+/* Formation-change plan entry — mirrors AbilityResolver.formation_plan
+   ((member_id, destination) pairs collected while the player assigns areas).
+   dest_area < 0 means "not assigned yet". */
+typedef struct { int member_id; int dest_area; } RbFormationSlot;
+/* Mirror misc.rs::compute_valid_position_destinations — writes the valid stage
+   area indices (0 left / 1 center / 2 right) into out_areas; returns the count. */
+int rb_misc_position_destinations(const GameState *g, int actor, const AbilityEffect *e,
+                                  int host_cid, const RbFormationSlot *plan, int n_plan,
+                                  int *out_areas, int max);
+/* Mirror misc.rs::finalize_formation_change — apply every planned move as one
+   atomic stage permutation. Returns the number of members that changed area. */
+int rb_misc_finalize_formation_change(GameState *g, int actor,
+                                      const RbFormationSlot *plan, int n_plan);
+/* Mirror misc.rs::execute_position_change_with_destination — move the effect's
+   member (source_position / target_member card_no / this_member) to `destination`
+   ("same_area" = no-op, "front" = mirrored area per Rule 4.5.7). */
+int rb_position_change_with_destination(GameState *g, int actor, const AbilityEffect *e,
+                                        const char *destination, int host_cid);
 
 #endif /* RABUKA_H */

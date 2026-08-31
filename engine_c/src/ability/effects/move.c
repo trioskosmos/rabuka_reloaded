@@ -322,5 +322,59 @@ int rb_move_from_under_member(GameState *g, int actor, const int *indices, int n
     return n_indices;
 }
 
+/* Mirror move_cards.rs::drain_under_cards_to_energy_zone — pull every card
+    tucked under the given stage member and route it to the energy zone (if it
+    is an energy card, marked wait) or the waitroom otherwise. Returns the
+    number of cards moved. */
+int rb_drain_under_cards_to_energy_zone(GameState *g, const char *target, int stage_idx) {
+    if (!g || stage_idx < 0 || stage_idx >= RB_STAGE_SIZE) return 0;
+    int pl = 0;
+    if (target && *target) { int t = rb_resolve_target_player(g, target); if (t >= 0) pl = t; }
+    RbPlayer *P = &g->p[pl];
+    int n = P->under_cards[stage_idx].n;
+    int moved = 0;
+    for (int i = 0; i < n; i++) {
+        int cid = P->under_cards[stage_idx].cards[i];
+        if (rb_card_is_energy(cid)) {
+            if (P->energy.n < RB_MAX_ZONE) P->energy.cards[P->energy.n++] = cid;
+            rb_mods_set_orientation(&g->mods, cid, "wait");
+        } else {
+            if (P->discard.n < RB_MAX_ZONE) P->discard.cards[P->discard.n++] = cid;
+        }
+        moved++;
+    }
+    P->under_cards[stage_idx].n = 0;
+    rb_recalc_constants(g);
+    return moved;
+}
+
+/* Mirror move_cards.rs::remove_card_from_any_zone — remove a single card from
+    whichever zone currently holds it. When it leaves the stage the vacated area
+    index is written back to *last_vacated (mirrors rule 9.6.2.1.2.1 tracking). */
+static void remove_card_from_any_zone(RbPlayer *P, int *last_vacated, int cid) {
+    int i;
+    for (i = 0; i < P->hand.n; i++) if (P->hand.cards[i] == cid) {
+        for (int k = i; k < P->hand.n - 1; k++) P->hand.cards[k] = P->hand.cards[k + 1];
+        P->hand.n--; return;
+    }
+    for (i = 0; i < P->discard.n; i++) if (P->discard.cards[i] == cid) {
+        for (int k = i; k < P->discard.n - 1; k++) P->discard.cards[k] = P->discard.cards[k + 1];
+        P->discard.n--; return;
+    }
+    for (i = 0; i < RB_STAGE_SIZE; i++) if (P->stage[i] == cid) {
+        P->stage[i] = -1; P->stage_wait[i] = 0;
+        if (last_vacated) *last_vacated = i;
+        return;
+    }
+    for (i = 0; i < P->energy.n; i++) if (P->energy.cards[i] == cid) {
+        for (int k = i; k < P->energy.n - 1; k++) P->energy.cards[k] = P->energy.cards[k + 1];
+        P->energy.n--; return;
+    }
+    for (i = 0; i < P->live.n; i++) if (P->live.cards[i] == cid) {
+        for (int k = i; k < P->live.n - 1; k++) P->live.cards[k] = P->live.cards[k + 1];
+        P->live.n--; return;
+    }
+}
+
 /* needed by engine.c wrapper */
 int card_matches_card_type_filter(int card_idx, const char *filter);

@@ -27,6 +27,13 @@ int rb_resume_with_choice(GameState *g, int selected_idx) {
     int cont_from = g->queue.resume_child + 1;
     int was_skip = (selected_idx < 0);
     g->queue.choice_result = selected_idx;   /* record the player's pick (select_number etc.) */
+    /* Heart-color choice (draw.rs::execute_select_heart_color): map the picked
+        option index back to a color so the following gain_resource consumes it. */
+    if (g->queue.pending.kind == RB_CHOICE_SELECT_HEART_COLOR && !was_skip) {
+        if (selected_idx >= 0 && selected_idx < g->queue.pending.n_heart_options)
+            g->queue.selected_heart_color =
+                (int)rb_parse_heart_color(g->queue.pending.heart_options[selected_idx]);
+    }
     rb_clear_pending_choice(g);
     g->queue.resume_mode = 0;
     g->queue.resume_eff = NULL;
@@ -69,6 +76,19 @@ int rb_resume_with_choice(GameState *g, int selected_idx) {
                 if (rb_has_pending_choice(g)) break;
                 rb_execute_effect_ex(g, actor, cont->child[j], host);
             }
+        }
+    } else if (mode == 5) {         /* C6 keep-shuffle-under re-entry */
+        if (!was_skip && eff) {
+            /* capture the chosen card id (index into the answerer's hand) so the
+                re-entered keep-shuffle phase can tell kept from moved. */
+            int pl = g->queue.actor;
+            RbPlayer *P = &g->p[pl];
+            if (selected_idx >= 0 && selected_idx < P->hand.n) {
+                if (g->n_selected_cards < RB_MAX_RECENTLY_MOVED) {
+                    g->selected_cards[g->n_selected_cards++] = P->hand.cards[selected_idx];
+                }
+            }
+            rb_effect_both_hand_keep_shuffle_under(g, host, eff, host);
         }
     } else {                         /* default: optional-cost / generic deferred */
         if (!was_skip && def) {

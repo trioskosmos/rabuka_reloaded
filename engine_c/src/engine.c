@@ -432,20 +432,7 @@ static void handle_action(GameState *g, int actor, AbilityEffect *e, int host_ci
         if (host_cid >= 0) rb_mods_add_heart(&g->mods, host_cid, col, cnt);
         else W->hearts[col] += cnt;
     } else if (!strcmp(act, "specify_heart_color")) {
-        /* Mirror state.rs:execute_specify_heart_color — set a persistent per-card
-            heart-color override: the targeted member's base hearts are thereafter
-            counted as `col` (not granted as an extra heart). Applied in
-            rb_calc_stage_hearts. */
-        int col = heart_color_of(e, RB_HEART_PINK);
-        if (col < 0 || col > 7) col = RB_HEART_PINK;
-        if (host_cid >= 0) {
-            g->mods.heart_color_override[host_cid] = (int8_t)col;
-        } else {
-            for (int q = 0; q < RB_STAGE_SIZE; q++)
-                if (W->stage[q] != RB_EMPTY_SLOT)
-                    g->mods.heart_color_override[W->stage[q]] = (int8_t)col;
-        }
-        rb_recalc_constants(g);
+        rb_effect_specify_heart_color(g, actor, e, host_cid);
     } else if (!strcmp(act, "lose_heart") || !strcmp(act, "damage")) {
         int col = heart_color_of(e, RB_HEART_PINK);
         O->hearts[col] -= cnt;
@@ -484,102 +471,37 @@ static void handle_action(GameState *g, int actor, AbilityEffect *e, int host_ci
     } else if (!strcmp(act, "select_cards") || !strcmp(act, "select") ||
                !strcmp(act, "select_number") || !strcmp(act, "look_and_select")) {
         rb_effect_select_cards(g, actor, e);
-    } else if (!strcmp(act, "set_cost") || !strcmp(act, "modify_cost") ||
-               !strcmp(act, "set_cost_to_use") || !strcmp(act,"modify_yell_count") ||
-               !strcmp(act,"modify_yell_source")) {
-        rb_effect_modify_cost(g, actor, e);
+    } else if (!strcmp(act, "set_cost")) {
+        rb_effect_set_cost(g, actor, e, host_cid);
+    } else if (!strcmp(act, "modify_cost") || !strcmp(act, "set_cost_to_use") ||
+                !strcmp(act,"modify_yell_count") || !strcmp(act,"modify_yell_source")) {
+        rb_effect_modify_cost(g, actor, e, host_cid);
     } else if (!strcmp(act, "energy_placement")) {
         rb_effect_energy_placement(g, actor, e);
     } else if (!strcmp(act, "energy_state_change")) {
         rb_effect_energy_state_change(g, actor, e);
-    } else if (!strcmp(act, "set_card_identity") || !strcmp(act, "set_blade_type") ||
-                !strcmp(act, "set_blade_count") || !strcmp(act, "set_heart_type") ||
-                !strcmp(act, "choose_required_hearts") || !strcmp(act, "all_blade_timing")) {
-        /* card-property rewrites — set_blade_type recolors the target member's
-           blade; set_blade_count sets its blade modifier. Others (identity/
-           heart_type/required_hearts) need per-card fields the C model does not
-           track yet; they are documented no-ops. */
+    } else if (!strcmp(act, "set_card_identity")) {
+        rb_effect_set_card_identity(g, actor, e, host_cid);
+    } else if (!strcmp(act, "set_blade_type")) {
+        rb_effect_set_blade_type(g, actor, e, host_cid);
+    } else if (!strcmp(act, "set_blade_count")) {
+        rb_effect_set_blade_count(g, actor, e, host_cid);
+    } else if (!strcmp(act, "set_heart_type")) {
+        rb_effect_set_heart_type(g, actor, e, host_cid);
+    } else if (!strcmp(act, "all_blade_timing")) {
+        rb_effect_all_blade_timing(g, actor, e, host_cid);
+    } else if (!strcmp(act, "choose_required_hearts")) {
+        /* Headless can't let the player pick a color, so apply the chosen
+           required-heart count to the "all" color (satisfies any color check). */
         int cid = host_cid >= 0 ? host_cid : -1;
-        if (cid >= RB_MAX_CARD_IDS) cid = -1;   /* bounds-guard direct mods[.] writes below */
         if (cid < 0) for (int q = 0; q < RB_STAGE_SIZE; q++) if (W->stage[q] != RB_EMPTY_SLOT) { cid = W->stage[q]; break; }
         if (cid >= 0) {
-            if (!strcmp(act, "set_blade_type")) {
-                const char *bc = NULL;
-                for (int i = 0; i < e->n_extra; i++) if (e->extra_k[i] && (!strcmp(e->extra_k[i], "blade_color") || !strcmp(e->extra_k[i], "blade_type"))) bc = e->extra_v[i];
-                int col = -1;
-                if (bc) {
-                    if (!strcmp(bc, "pink")||!strcmp(bc,"heart00")) col = 0;
-                    else if (!strcmp(bc, "red")) col = 1;
-                    else if (!strcmp(bc, "yellow")) col = 2;
-                    else if (!strcmp(bc, "green")) col = 3;
-                    else if (!strcmp(bc, "blue")) col = 4;
-                    else if (!strcmp(bc, "purple")) col = 5;
-                    else if (!strcmp(bc, "orange")) col = 6;
-                    else if (!strcmp(bc, "all")) col = 7;
-                }
-                g->mods.blade_type[cid] = (int8_t)col;
-            } else if (!strcmp(act, "set_blade_count")) {
-                rb_mods_set_blade(&g->mods, cid, cnt);
-            } else if (!strcmp(act, "all_blade_timing")) {
-                /* "all" blade color so the member's blade satisfies any
-                   blade-timing condition (mirrors ability blade_type = all). */
-                g->mods.blade_type[cid] = 7;
-            } else if (!strcmp(act, "set_heart_type")) {
-                /* Mirror state.rs:execute_set_heart_type — ref_value="placed_under"
-                    copies the hearts of the card placed under this member
-                    (set_heart_copy → heart_copy[cid]); otherwise transform this
-                    member's hearts to the chosen color via heart_color_multiplier
-                    (consumed by rb_stage_hearts_pipeline). */
-                const char *ref = NULL;
-                for (int i = 0; i < e->n_extra; i++) if (e->extra_k[i] && !strcmp(e->extra_k[i], "ref_value")) ref = e->extra_v[i];
-                if (ref && !strcmp(ref, "placed_under")) {
-                    /* Find the card under this member (stats_pipeline heart_copy
-                        REPLACES the target's base hearts with the source's). */
-                    for (int s = 0; s < RB_STAGE_SIZE; s++) {
-                        if (W->stage[s] == cid && W->under_cards[s].n > 0) {
-                            g->mods.heart_copy[cid] = W->under_cards[s].cards[0];
-                            break;
-                        }
-                    }
-                } else {
-                    int hcol = 7;
-                    for (int i = 0; i < e->n_extra; i++) if (e->extra_k[i] && !strcmp(e->extra_k[i], "heart_color")) {
-                        const char *hc = e->extra_v[i];
-                        if (!hc) continue;
-                        else if (!strcmp(hc,"pink")||!strcmp(hc,"heart00")) hcol=0;
-                        else if (!strcmp(hc,"red")) hcol=1;
-                        else if (!strcmp(hc,"yellow")) hcol=2;
-                        else if (!strcmp(hc,"green")) hcol=3;
-                        else if (!strcmp(hc,"blue")) hcol=4;
-                        else if (!strcmp(hc,"purple")) hcol=5;
-                        else if (!strcmp(hc,"orange")) hcol=6;
-                        else if (!strcmp(hc,"all")) hcol=7;
-                    }
-                    g->mods.heart_multiplier[cid] = (int8_t)hcol;
-                    g->mods.heart_multiplier_amt[cid] = (int8_t)(cnt >= 1 ? cnt : 2);
-                }
-            } else if (!strcmp(act, "choose_required_hearts")) {
-                /* Headless can't let the player pick a color, so apply the chosen
-                   required-heart count to the "all" color (satisfies any color check). */
-                rb_mods_add_need_heart(&g->mods, cid, 7, cnt > 0 ? cnt : 1);
-            } else if (!strcmp(act, "set_card_identity")) {
-                /* Rewrite this member's identity to the listed group/unit names so
-                   it counts as them in group/name matching (mirrors
-                   ability_effects.rs::execute_set_card_identity). identities may be a
-                   comma/、/space separated list. */
-                for (int i = 0; i < e->n_extra; i++) {
-                    if (e->extra_k[i] && (!strcmp(e->extra_k[i], "identities") ||
-                        !strcmp(e->extra_k[i], "identity")) && e->extra_v[i]) {
-                        char buf[256]; strncpy(buf, e->extra_v[i], 255); buf[255] = 0;
-                        char *tok = strtok(buf, ",、 ");
-                        while (tok) { rb_set_card_identity(cid, tok); tok = strtok(NULL, ",、 "); }
-                    }
-                }
-            }
+            int lim = cnt > 0 ? cnt : 1;
+            rb_mods_add_need_heart(&g->mods, cid, 7, lim);
             rb_recalc_constants(g);
         }
     } else if (!strcmp(act, "modify_required_hearts") || !strcmp(act, "modify_required_hearts_global") ||
-               !strcmp(act, "modify_required_hearts_success")) {
+                !strcmp(act, "modify_required_hearts_success")) {
         rb_effect_modify_hearts(g, actor, e);
     } else if (!strcmp(act, "gain_ability")) {
         rb_gain_ability(g, actor, e);
@@ -592,9 +514,7 @@ static void handle_action(GameState *g, int actor, AbilityEffect *e, int host_ci
            ability of each selected card (or the activating card's own ability). */
         rb_activate_ability_effect(g, actor, e, host_cid);
     } else if (!strcmp(act, "reduce_live_card_set_limit")) {
-        int lim = cnt>0?cnt:1;
-        g->live_set_limit_reduction[who] += lim;
-        if(g->live_set_limit_reduction[who] > RB_MAX_LIVE_CARDS) g->live_set_limit_reduction[who]=RB_MAX_LIVE_CARDS;
+        rb_effect_reduce_live_card_set_limit(g, actor, e, host_cid);
     } else if (!strcmp(act, "position_change")) {
         rb_effect_position_change(g, actor, e, host_cid);
     } else if (!strcmp(act, "rotation")) {

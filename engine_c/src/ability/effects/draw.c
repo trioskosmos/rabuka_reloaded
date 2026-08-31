@@ -245,3 +245,261 @@ int rb_effect_draw_card(GameState *g, int actor, AbilityEffect *e, int host_cid)
 int rb_execute_draw_wrapper(GameState *g, int actor, AbilityEffect *e, int host_cid) {
     return rb_effect_draw_card(g, actor, e, host_cid);
 }
+
+/* ── Helpers (mirror effect-field readers used by draw.rs::execute_select_effect) ── */
+static const char *draw_extra(const AbilityEffect *e, const char *k) {
+    if (!e) return NULL;
+    for (int i = 0; i < e->n_extra; i++)
+        if (e->extra_k[i] && !strcmp(e->extra_k[i], k)) return e->extra_v[i];
+    return NULL;
+}
+static int draw_heart_colors(const AbilityEffect *e, const char **out, int max) {
+    int n = 0;
+    if (!e) return 0;
+    for (int i = 0; i < e->n_extra && n < max; i++)
+        if (e->extra_k[i] && !strcmp(e->extra_k[i], "heart_colors") && e->extra_v[i])
+            out[n++] = e->extra_v[i];
+    return n;
+}
+
+/* Mirror draw.rs:execute_select_heart_color — dedupe colors; if exactly one color
+    remains (and not a heart_selection), fix it directly into queue.selected_heart_color;
+    otherwise emit a SelectHeartColor choice. */
+void rb_effect_select_heart_color(GameState *g, int actor, int count,
+                                  const char **heart_colors, int n_colors, const char *target) {
+    (void)target;
+    if (!g) return;
+    const char *unique[8]; int nu = 0;
+    for (int i = 0; i < n_colors; i++) {
+        int found = 0;
+        for (int j = 0; j < nu; j++) if (!strcmp(unique[j], heart_colors[i])) { found = 1; break; }
+        if (!found && nu < 8) unique[nu++] = heart_colors[i];
+    }
+    if (nu == 1) {
+        g->queue.selected_heart_color = (int)rb_parse_heart_color(unique[0]);
+        return;
+    }
+    rb_emit_choice(g, actor, RB_CHOICE_SELECT_HEART_COLOR, NULL, NULL, count > 0 ? count : 1, 0, "select_heart_color");
+    g->queue.pending.n_heart_options = 0;
+    for (int i = 0; i < nu && i < 8; i++) {
+        strncpy(g->queue.pending.heart_options[i], unique[i], sizeof(g->queue.pending.heart_options[i]) - 1);
+        g->queue.pending.n_heart_options++;
+    }
+    g->queue.resume_mode = 0;
+    g->queue.resume_eff = NULL;
+}
+
+/* Mirror draw.rs:execute_select_number — offer 1..max_cost plus the sentinel "67". */
+void rb_effect_select_number(GameState *g, int actor, AbilityEffect *e) {
+    if (!g || !e) return;
+    int max_cost = 10;
+    uint32_t n = rb_num_cards();
+    for (uint32_t i = 0; i < n; i++) {
+        Card c;
+        if (rb_decode_card_by_index(i, &c)) {
+            if (c.cost > max_cost) max_cost = c.cost;
+            rb_free_card(&c);
+        }
+    }
+    int allow = e->is_optional ? 1 : 0;
+    rb_emit_choice(g, actor, RB_CHOICE_SELECT_NUMBER, NULL, NULL, max_cost, allow, "choice_number");
+    const char *hc = draw_extra(e, "heart_color");
+    if (!hc) hc = draw_extra(e, "heart_colors");
+    g->queue.selected_heart_color = (int)rb_parse_heart_color(hc ? hc : "pink");
+    char desc[160];
+    snprintf(desc, sizeof(desc), "Choose a number: 1..%d, 67", max_cost);
+    strncpy(g->queue.pending.description, desc, sizeof(g->queue.pending.description) - 1);
+}
+
+/* Mirror draw.rs:execute_area_select — offer left/center/right, excluding the
+    activating card's current stage position. */
+void rb_effect_area_select(GameState *g, int actor, AbilityEffect *e, int host_cid) {
+    if (!g || !e) return;
+    const char *pos_names[3] = { "left", "center", "right" };
+    char valid[3][8]; int nv = 0;
+    for (int i = 0; i < 3; i++) {
+        if (host_cid >= 0 && g->p[actor].stage[i] == host_cid) continue;
+        strncpy(valid[nv], pos_names[i], sizeof(valid[nv]) - 1);
+        nv++;
+    }
+    if (nv == 0) return;
+    char opts[64]; opts[0] = 0;
+    for (int i = 0; i < nv; i++) {
+        if (i) strncat(opts, ",", sizeof(opts) - strlen(opts) - 1);
+        strncat(opts, valid[i], sizeof(opts) - strlen(opts) - 1);
+    }
+    int allow = e->is_optional ? 1 : 0;
+    rb_emit_choice(g, actor, RB_CHOICE_SELECT_TARGET, NULL, NULL, nv, allow, "area_select");
+    snprintf(g->queue.pending.description, sizeof(g->queue.pending.description),
+             "Choose an area: %s", opts);
+}
+
+/* Mirror draw.rs:resolve_gain_heart_color — return a fixed heart color idx, or -1
+    if a choice was emitted (or this is not a heart resource). */
+int rb_resolve_gain_heart_color(GameState *g, int actor, AbilityEffect *e,
+                                const char *resource, int count,
+                                const char **heart_colors, int n_colors, int heart_selection) {
+    if (strcmp(resource, "heart") != 0 && strcmp(resource, "ハート") != 0) return -1;
+    if (n_colors == 0 && !heart_selection && draw_extra(e, "heart_type") == NULL) return -1;
+    const char *colors[8]; int nc = 0;
+    const char *ht = draw_extra(e, "heart_type");
+    if (ht) colors[nc++] = ht;
+    else for (int i = 0; i < n_colors && nc < 8; i++) colors[nc++] = heart_colors[i];
+    if (nc == 0) {
+        const char *def[6] = { "heart01","heart02","heart03","heart04","heart05","heart06" };
+        for (int i = 0; i < 6; i++) colors[nc++] = def[i];
+    }
+    const char *unique[8]; int nu = 0;
+    for (int i = 0; i < nc; i++) {
+        int f = 0;
+        for (int j = 0; j < nu; j++) if (!strcmp(unique[j], colors[i])) { f = 1; break; }
+        if (!f && nu < 8) unique[nu++] = colors[i];
+    }
+    if (nu == 1 && !heart_selection) return (int)rb_parse_heart_color(unique[0]);
+    if (!heart_selection && nu > 1 && count >= nu) return -1; /* caller distributes */
+    rb_emit_choice(g, actor, RB_CHOICE_SELECT_HEART_COLOR, NULL, NULL, count > 0 ? count : 1, 0, "select_heart_color");
+    g->queue.pending.n_heart_options = 0;
+    for (int i = 0; i < nu && i < 8; i++) {
+        strncpy(g->queue.pending.heart_options[i], unique[i], sizeof(g->queue.pending.heart_options[i]) - 1);
+        g->queue.pending.n_heart_options++;
+    }
+    g->queue.resume_mode = 0;
+    g->queue.resume_eff = NULL;
+    return -1;
+}
+
+/* Mirror draw.rs:execute_select_effect — route a `select` verb to the area /
+    heart-color / C6 keep-shuffle / generic card-selection path. */
+void rb_effect_select_effect(GameState *g, int actor, AbilityEffect *e, int host_cid) {
+    if (!g || !e) return;
+    const char *heart_colors[8]; int n_hc = draw_heart_colors(e, heart_colors, 8);
+    int has_heart_colors = n_hc > 0;
+    const char *src   = draw_extra(e, "source");
+    const char *or_ct = draw_extra(e, "or_card_types");
+    const char *chars = draw_extra(e, "characters");
+    const char *group = draw_extra(e, "group_names");
+    const char *ctype = draw_extra(e, "card_type");
+
+    if (!src && n_hc == 0 && !or_ct && !chars && !group) {
+        rb_effect_area_select(g, actor, e, host_cid);
+        return;
+    }
+    if (!src && !ctype && has_heart_colors) {
+        int count = e->count >= 0 ? e->count : 1;
+        rb_effect_select_heart_color(g, actor, count, heart_colors, n_hc, e->target);
+        return;
+    }
+    if (draw_extra(e, "keep_shuffle_under")) {
+        rb_effect_both_hand_keep_shuffle_under(g, actor, e, host_cid);
+        return;
+    }
+    /* generic execute_select: choose `count` cards from the resolved source zone */
+    const char *source = (!ctype || strcmp(ctype, "member_card") != 0)
+                         ? (src ? src : "hand")
+                         : (src ? src : "stage");
+    int cnt = e->count >= 0 ? e->count : 1;
+    rb_emit_choice(g, actor, RB_CHOICE_SELECT_CARD, source, ctype, cnt, e->is_optional ? 1 : 0, NULL);
+    g->queue.pending.filter_group[0] = 0;
+    if (group) strncpy(g->queue.pending.filter_group, group, sizeof(g->queue.pending.filter_group) - 1);
+    g->queue.pending.filter_heart = -1;
+    if (n_hc) g->queue.pending.filter_heart = (int)rb_parse_heart_color(heart_colors[0]);
+    strncpy(g->queue.resume_filter_group, g->queue.pending.filter_group, sizeof(g->queue.resume_filter_group) - 1);
+    g->queue.resume_filter_heart = g->queue.pending.filter_heart;
+    if (n_hc) {
+        g->queue.resume_mode = 0; g->queue.resume_is_select = 0;
+    } else {
+        g->queue.resume_mode = 2; g->queue.resume_is_select = 1;
+    }
+    g->queue.resume_eff = e; g->queue.resume_actor = actor; g->queue.resume_host = actor;
+}
+
+/* ── C6 keep-N-shuffle-rest (draw.rs::execute_both_hand_keep_shuffle_under) ── */
+void rb_effect_both_hand_keep_shuffle_under(GameState *g, int actor, AbilityEffect *e, int host_cid) {
+    (void)host_cid;
+    if (!g || !e) return;
+    int count = e->count >= 0 ? e->count : 1;
+    int phase = g->keep_shuffle_under_phase;
+
+    if (phase == 0) {
+        int pl = actor;
+        RbPlayer *P = &g->p[pl];
+        int ns = 0;
+        for (int i = 0; i < P->hand.n && ns < RB_MAX_HAND; i++)
+            g->keep_shuffle_under_snapshot[0][ns++] = P->hand.cards[i];
+        g->keep_shuffle_under_snapshot_n[0] = ns;
+        int pick = count < P->hand.n ? count : P->hand.n;
+        rb_emit_choice(g, pl, RB_CHOICE_SELECT_CARD, "hand", NULL, pick > 0 ? pick : 1, 1, "keep_shuffle_under");
+        g->queue.resume_mode = 5; g->queue.resume_eff = e;
+        g->queue.resume_actor = actor; g->queue.resume_host = actor;
+        g->keep_shuffle_under_phase = 1;
+        return;
+    }
+    if (phase == 1) {
+        RbPlayer *Ps = &g->p[actor];
+        int *snap = g->keep_shuffle_under_snapshot[0]; int ns = g->keep_shuffle_under_snapshot_n[0];
+        int kept[RB_MAX_HAND]; int nk = 0;
+        for (int i = 0; i < g->n_selected_cards && nk < RB_MAX_HAND; i++) kept[nk++] = g->selected_cards[i];
+        for (int i = 0; i < ns; i++) {
+            int is_kept = 0;
+            for (int k = 0; k < nk; k++) if (kept[k] == snap[i]) { is_kept = 1; break; }
+            if (!is_kept) {
+                for (int p = 0; p < Ps->hand.n; p++) if (Ps->hand.cards[p] == snap[i]) {
+                    for (int q = p; q < Ps->hand.n - 1; q++) Ps->hand.cards[q] = Ps->hand.cards[q + 1];
+                    Ps->hand.n--; break;
+                }
+            }
+        }
+        int to_move[RB_MAX_HAND]; int nm = 0;
+        for (int i = 0; i < ns; i++) {
+            int is_kept = 0;
+            for (int k = 0; k < nk; k++) if (kept[k] == snap[i]) { is_kept = 1; break; }
+            if (!is_kept && nm < RB_MAX_HAND) to_move[nm++] = snap[i];
+        }
+        rb_shuffle(to_move, nm);
+        for (int i = 0; i < nm; i++) if (Ps->deck.n < RB_MAX_ZONE) Ps->deck.cards[Ps->deck.n++] = to_move[i];
+        /* snapshot opponent and prompt */
+        int opp = actor ^ 1; RbPlayer *Po = &g->p[opp];
+        int ns2 = 0;
+        for (int i = 0; i < Po->hand.n && ns2 < RB_MAX_HAND; i++)
+            g->keep_shuffle_under_snapshot[1][ns2++] = Po->hand.cards[i];
+        g->keep_shuffle_under_snapshot_n[1] = ns2;
+        int pick2 = count < Po->hand.n ? count : Po->hand.n;
+        rb_emit_choice(g, opp, RB_CHOICE_SELECT_CARD, "hand", NULL, pick2 > 0 ? pick2 : 1, 1, "keep_shuffle_under");
+        g->queue.resume_mode = 5; g->queue.resume_eff = e;
+        g->queue.resume_actor = actor; g->queue.resume_host = actor;
+        g->keep_shuffle_under_phase = 2;
+        g->n_selected_cards = 0; /* fresh selection for opponent */
+        return;
+    }
+    /* phase == 2: opponent's selection resolved */
+    {
+        int opp = actor ^ 1; RbPlayer *Po = &g->p[opp];
+        int *snap = g->keep_shuffle_under_snapshot[1]; int ns = g->keep_shuffle_under_snapshot_n[1];
+        int kept[RB_MAX_HAND]; int nk = 0;
+        for (int i = 0; i < g->n_selected_cards && nk < RB_MAX_HAND; i++) kept[nk++] = g->selected_cards[i];
+        for (int i = 0; i < ns; i++) {
+            int is_kept = 0;
+            for (int k = 0; k < nk; k++) if (kept[k] == snap[i]) { is_kept = 1; break; }
+            if (!is_kept) {
+                for (int p = 0; p < Po->hand.n; p++) if (Po->hand.cards[p] == snap[i]) {
+                    for (int q = p; q < Po->hand.n - 1; q++) Po->hand.cards[q] = Po->hand.cards[q + 1];
+                    Po->hand.n--; break;
+                }
+            }
+        }
+        int to_move[RB_MAX_HAND]; int nm = 0;
+        for (int i = 0; i < ns; i++) {
+            int is_kept = 0;
+            for (int k = 0; k < nk; k++) if (kept[k] == snap[i]) { is_kept = 1; break; }
+            if (!is_kept && nm < RB_MAX_HAND) to_move[nm++] = snap[i];
+        }
+        rb_shuffle(to_move, nm);
+        for (int i = 0; i < nm; i++) if (Po->deck.n < RB_MAX_ZONE) Po->deck.cards[Po->deck.n++] = to_move[i];
+    }
+    g->keep_shuffle_under_phase = 0;
+    g->keep_shuffle_under_count = 0;
+    g->keep_shuffle_under_snapshot_n[0] = 0;
+    g->keep_shuffle_under_snapshot_n[1] = 0;
+    g->keep_shuffle_under_selected_n = 0;
+    g->n_selected_cards = 0;
+}

@@ -1,6 +1,7 @@
 #include "rabuka.h"
 #include <string.h>
 #include <stdlib.h>
+#include <stdio.h>
 
 /* State / cost / compound handlers — mirrors
    engine/src/ability/effects/state.rs + misc.rs + compound.rs */
@@ -168,67 +169,9 @@ void rb_effect_rotation(GameState *g, int actor, AbilityEffect *e){
     rb_recalc_constants(g);
 }
 
-void rb_effect_modify_cost(GameState *g, int actor, AbilityEffect *e){
-    int cnt=e->count>=0?e->count:1;
-    int who=actor;
-    if(e->target && !strcmp(e->target,"opponent")) who=actor^1;
-    RbPlayer *P=&g->p[who];
-    /* set_cost/set_cost_to_use carry the amount in a "value" extra when the
-       wire encodes it that way; prefer it over the bare count. */
-    int val=cnt;
-    for(int i=0;i<e->n_extra;i++) if(e->extra_k[i] && !strcmp(e->extra_k[i],"value")){
-        int v=atoi(e->extra_v[i]); if(v) val=v;
-    }
-    int is_set = e->action && (!strcmp(e->action,"set_cost")||!strcmp(e->action,"set_cost_to_use"));
-    /* Faithful target: apply to every staged member + hand-visible costs.
-        Rust's cost_modifiers are per-card and constant abilities recalc via
-        recalc_constants; here we mirror by applying to all owned members so
-        later draws also see the modifier via the card_id entry. The old
-        first-staged-only path was a P0/P1 coverage hole (modify_cost appeared
-        to work but only for one member). */
-    int any=0;
-    for(int q=0;q<RB_STAGE_SIZE;q++) if(P->stage[q]!=RB_EMPTY_SLOT){
-        int cid=P->stage[q];
-        if(is_set) rb_mods_set_cost(&g->mods, cid, val);
-        else       rb_mods_add_cost(&g->mods, cid, cnt);
-        any=1;
-    }
-    if(!any){
-        for(int i=0;i<P->hand.n;i++){
-            int cid=P->hand.cards[i];
-            if(is_set) rb_mods_set_cost(&g->mods, cid, val);
-            else       rb_mods_add_cost(&g->mods, cid, cnt);
-        }
-        for(int i=0;i<P->deck.n;i++){
-            int cid=P->deck.cards[i];
-            if(is_set) rb_mods_set_cost(&g->mods, cid, val);
-            else       rb_mods_add_cost(&g->mods, cid, cnt);
-        }
-    }
-    /* modify_yell_count / modify_yell_source are per-player yell modifiers.
-       Store as a cost-like entry on a synthetic id (0) and let live.c's
-       do_yell read them — minimal portable wire until a full yell mods table lands. */
-    if(e->action && !strcmp(e->action,"modify_yell_count")){
-        /* Mirror misc.rs modify_yell_count — add `count` to the per-live yell
-           card count; live.c do_yell reads g->yell_count_mod[pl]. */
-        g->yell_count_mod[who] += cnt;
-    } else if(e->action && !strcmp(e->action,"modify_yell_source")){
-        /* Mirror misc.rs:execute_modify_yell_source — record the per-player yell
-            source override (e.g. deck_bottom / discard / hand). live.c do_yell
-            consults g->yell_source[pl] when drawing the revealed yell cards. */
-        const char *src = NULL;
-        for(int i=0;i<e->n_extra;i++) if(e->extra_k[i] && !strcmp(e->extra_k[i],"source")) { src=e->extra_v[i]; break; }
-        if(!src) src = e->source;
-        if(!src) src = "deck_top";
-        strncpy(g->yell_source[who], src, sizeof(g->yell_source[who])-1);
-        g->yell_source[who][sizeof(g->yell_source[who])-1] = '\0';
         /* Mirror modifiers.rs::refresh_yell_sources: a deck_bottom source sets
            yell_from_bottom so the cheer check (tracking.rs) draws from the deck
            bottom (G8 — 恋になりたいAQUARIUM). */
-        g->p[who].yell_from_bottom = (strcmp(src, "deck_bottom") == 0);
-    }
-}
-
 void rb_effect_modify_hearts(GameState *g, int actor, AbilityEffect *e){
     /* Faithful mirror of engine/src/ability/effects/score.rs::execute_modify_required_hearts:
        apply add/set need_heart modifiers (operation: decrease/increase/set) to the
@@ -338,5 +281,355 @@ void rb_effect_energy_state_change(GameState *g, int actor, AbilityEffect *e){
         active -= eff;
         if(active < 0) active = 0;
         P->energy_active = active;
+    }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Faithful mirrors of engine/src/ability/effects/state.rs execute_* functions.
+   Each mirrors the Rust body as closely as the C model allows. Helpers first.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+static int s_who(const char *target, int actor){
+    if(target && (!strcmp(target,"opponent")||!strcmp(target,"p2"))) return actor^1;
+    return actor;
+}
+static int s_value(const AbilityEffect *e, int dflt){
+    for(int i=0;i<e->n_extra;i++) if(e->extra_k[i] && !strcmp(e->extra_k[i],"value")){
+        int v=atoi(e->extra_v[i]); return v;
+    }
+    return dflt;
+}
+static int s_has_group(const AbilityEffect *e, const char **out){
+    for(int i=0;i<e->n_extra;i++) if(e->extra_k[i] && (!strcmp(e->extra_k[i],"group_names")||!strcmp(e->extra_k[i],"group_name")) && e->extra_v[i]){ *out=e->extra_v[i]; return 1; }
+    return 0;
+}
+static int s_has_chars(const AbilityEffect *e, const char **out){
+    for(int i=0;i<e->n_extra;i++) if(e->extra_k[i] && !strcmp(e->extra_k[i],"characters") && e->extra_v[i]){ *out=e->extra_v[i]; return 1; }
+    return 0;
+}
+static int s_match_chars(int cid, const char *chars){
+    if(!chars) return 1;
+    char buf[256]; strncpy(buf, chars, 255); buf[255]=0;
+    char *tok=strtok(buf, ",、 ");
+    const char *arr[8]; int n=0;
+    while(tok && n<8){ arr[n++]=tok; tok=strtok(NULL, ",、 "); }
+    if(n==0) return 1;
+    return rb_card_matches_characters(cid, arr, n);
+}
+/* Keep a candidate only if it passes the optional group/character filter. */
+static int s_pass_filter(int cid, const char *grp, const char *chars){
+    if(grp && !rb_card_matches_group_str(cid, grp)) return 0;
+    if(!s_match_chars(cid, chars)) return 0;
+    return 1;
+}
+static int s_blade_color_idx(const char *bt){
+    if(!bt) return -1;
+    if(!strcmp(bt,"pink")||!strcmp(bt,"heart00")) return 0;
+    if(!strcmp(bt,"red")) return 1;
+    if(!strcmp(bt,"yellow")) return 2;
+    if(!strcmp(bt,"green")) return 3;
+    if(!strcmp(bt,"blue")) return 4;
+    if(!strcmp(bt,"purple")) return 5;
+    if(!strcmp(bt,"orange")) return 6;
+    if(!strcmp(bt,"all")) return 7;
+    return -1;
+}
+static int s_heart_idx(const char *h){
+    if(!h) return RB_HEART_ALL;
+    if(!strcmp(h,"pink")||!strcmp(h,"heart00")) return RB_HEART_PINK;
+    if(!strcmp(h,"red")||!strcmp(h,"heart01")) return RB_HEART_RED;
+    if(!strcmp(h,"yellow")||!strcmp(h,"heart02")) return RB_HEART_YELLOW;
+    if(!strcmp(h,"green")||!strcmp(h,"heart03")) return RB_HEART_GREEN;
+    if(!strcmp(h,"blue")||!strcmp(h,"heart04")) return RB_HEART_BLUE;
+    if(!strcmp(h,"purple")||!strcmp(h,"heart05")) return RB_HEART_PURPLE;
+    if(!strcmp(h,"orange")||!strcmp(h,"heart06")) return RB_HEART_ORANGE;
+    if(!strcmp(h,"all")||!strcmp(h,"heart07")) return RB_HEART_ALL;
+    if(!strncmp(h,"heart",5)){ int idx=atoi(h+5); if(idx>=0&&idx<=7) return idx; }
+    return RB_HEART_ALL;
+}
+
+/* Mirror state.rs::execute_set_cost — value from "value" extra; zone chosen by
+   card_type (live_card / member_card / energy_card / default hand); optional
+   group / character filter. */
+void rb_effect_set_cost(GameState *g, int actor, AbilityEffect *e, int host_cid){
+    (void)host_cid;
+    int value = s_value(e, 0);
+    int who = s_who(e->target, actor);
+    RbPlayer *P = &g->p[who];
+    int ids[RB_MAX_ZONE]; int n=0;
+    const char *ct = e->card_type_field;
+    if(ct && !strcmp(ct,"live_card")) { for(int i=0;i<P->live.n;i++) ids[n++]=P->live.cards[i]; }
+    else if(ct && !strcmp(ct,"member_card")) { for(int q=0;q<RB_STAGE_SIZE;q++) if(P->stage[q]!=RB_EMPTY_SLOT) ids[n++]=P->stage[q]; }
+    else if(ct && !strcmp(ct,"energy_card")) { for(int i=0;i<P->energy.n;i++) ids[n++]=P->energy.cards[i]; }
+    else { for(int i=0;i<P->hand.n;i++) ids[n++]=P->hand.cards[i]; }
+    const char *grp=NULL,*chars=NULL;
+    if(s_has_group(e,&grp)||s_has_chars(e,&chars)){
+        int fids[RB_MAX_ZONE]; int fn=0;
+        for(int i=0;i<n;i++) if(s_pass_filter(ids[i], grp, chars)) fids[fn++]=ids[i];
+        n=fn; for(int i=0;i<n;i++) ids[i]=fids[i];
+    }
+    for(int i=0;i<n;i++) rb_mods_set_cost(&g->mods, ids[i], value);
+}
+
+/* Mirror state.rs::execute_modify_cost — operation add/subtract/set (default add),
+   zone by card_type / source=hand, optional group/character filter, self_target
+   restriction to the activating card (host_cid), and the "set_from_reference"
+   family (resolve a previously selected/moved card's printed cost ± offset as an
+   additive delta). */
+void rb_effect_modify_cost(GameState *g, int actor, AbilityEffect *e, int host_cid){
+    const char *op="add";
+    for(int i=0;i<e->n_extra;i++) if(e->extra_k[i] && !strcmp(e->extra_k[i],"operation") && e->extra_v[i]) op=e->extra_v[i];
+    int value = s_value(e, 0);
+    int who = s_who(e->target, actor);
+    /* modify_yell_count / modify_yell_source are per-player yell modifiers. */
+    if(e->action && !strcmp(e->action,"modify_yell_count")){
+        g->yell_count_mod[who] += (e->count>=0?e->count:1);
+        return;
+    } else if(e->action && !strcmp(e->action,"modify_yell_source")){
+        const char *src = NULL;
+        for(int i=0;i<e->n_extra;i++) if(e->extra_k[i] && !strcmp(e->extra_k[i],"source")) { src=e->extra_v[i]; break; }
+        if(!src) src = e->source;
+        if(!src) src = "deck_top";
+        strncpy(g->yell_source[who], src, sizeof(g->yell_source[who])-1);
+        g->yell_source[who][sizeof(g->yell_source[who])-1] = '\0';
+        g->p[who].yell_from_bottom = (strcmp(src, "deck_bottom") == 0);
+        return;
+    }
+    RbPlayer *P = &g->p[who];
+    int is_hand = 0;
+    for(int i=0;i<e->n_extra;i++){
+        if(e->extra_k[i] && (!strcmp(e->extra_k[i],"source")||!strcmp(e->extra_k[i],"location")) && e->extra_v[i] && !strcmp(e->extra_v[i],"hand")) is_hand=1;
+    }
+    int ids[RB_MAX_ZONE]; int n=0;
+    const char *ct = e->card_type_field;
+    if(is_hand) { for(int i=0;i<P->hand.n;i++) ids[n++]=P->hand.cards[i]; }
+    else if(ct && !strcmp(ct,"live_card")) { for(int i=0;i<P->live.n;i++) ids[n++]=P->live.cards[i]; }
+    else if(ct && !strcmp(ct,"member_card")) { for(int q=0;q<RB_STAGE_SIZE;q++) if(P->stage[q]!=RB_EMPTY_SLOT) ids[n++]=P->stage[q]; }
+    else if(ct && !strcmp(ct,"energy_card")) { for(int i=0;i<P->energy.n;i++) ids[n++]=P->energy.cards[i]; }
+    else { for(int i=0;i<P->hand.n;i++) ids[n++]=P->hand.cards[i]; }
+    const char *grp=NULL,*chars=NULL;
+    if(s_has_group(e,&grp)||s_has_chars(e,&chars)){
+        int fids[RB_MAX_ZONE]; int fn=0;
+        for(int i=0;i<n;i++) if(s_pass_filter(ids[i], grp, chars)) fids[fn++]=ids[i];
+        n=fn; for(int i=0;i<n;i++) ids[i]=fids[i];
+    }
+    if(e->self_target_field[0]=='t' && host_cid>=0){
+        int fids[RB_MAX_ZONE]; int fn=0;
+        for(int i=0;i<n;i++) if(ids[i]==host_cid) fids[fn++]=ids[i];
+        n=fn; for(int i=0;i<n;i++) ids[i]=fids[i];
+    }
+    if(!strcmp(op,"set_from_reference")){
+        int ref=-1;
+        if(g->n_selected_cards>0) ref=g->selected_cards[g->n_selected_cards-1];
+        else if(g->n_those_cards>0) ref=g->those_cards[g->n_those_cards-1];
+        else if(g->n_recently_moved>0) ref=g->recently_moved[g->n_recently_moved-1];
+        if(ref<0) return;
+        Card rc; int refcost=0;
+        if(rb_decode_card_by_index((uint32_t)ref,&rc)){ refcost = rc.cost; rb_free_card(&rc); }
+        const char *off=NULL;
+        for(int i=0;i<e->n_extra;i++) if(e->extra_k[i]&&!strcmp(e->extra_k[i],"cost_offset")&&e->extra_v[i]) off=e->extra_v[i];
+        int offset = off?atoi(off):0;
+        int resolved = refcost + offset;
+        for(int i=0;i<n;i++){
+            int printed=0; Card c;
+            if(rb_decode_card_by_index((uint32_t)ids[i],&c)){ printed=c.cost; rb_free_card(&c); }
+            int d = resolved - printed;
+            rb_mods_add_cost(&g->mods, ids[i], d);
+        }
+        return;
+    }
+    int delta;
+    if(!strcmp(op,"set")) delta=value;
+    else if(!strcmp(op,"subtract")) delta=-value;
+    else if(!strcmp(op,"add")) delta=value;
+    else return;
+    for(int i=0;i<n;i++){
+        if(!strcmp(op,"set")) rb_mods_set_cost(&g->mods, ids[i], delta);
+        else rb_mods_add_cost(&g->mods, ids[i], delta);
+    }
+}
+
+/* Mirror state.rs::execute_set_blade_type — recolor the blade of every staged
+   member matching the optional group/character filter to the given BladeColor. */
+void rb_effect_set_blade_type(GameState *g, int actor, AbilityEffect *e, int host_cid){
+    (void)host_cid;
+    const char *bt=NULL;
+    for(int i=0;i<e->n_extra;i++) if(e->extra_k[i] && (!strcmp(e->extra_k[i],"blade_type")||!strcmp(e->extra_k[i],"blade_color")) && e->extra_v[i]) bt=e->extra_v[i];
+    int col = s_blade_color_idx(bt);
+    if(col<0) return;
+    int who = s_who(e->target, actor);
+    RbPlayer *P=&g->p[who];
+    const char *grp=NULL,*chars=NULL; s_has_group(e,&grp); s_has_chars(e,&chars);
+    for(int q=0;q<RB_STAGE_SIZE;q++){
+        int cid=P->stage[q];
+        if(cid==RB_EMPTY_SLOT) continue;
+        if(!s_pass_filter(cid, grp, chars)) continue;
+        g->mods.blade_type[cid]=(int8_t)col;
+    }
+    rb_recalc_constants(g);
+}
+
+/* Mirror state.rs::execute_set_blade_count — set the blade modifier of every
+   staged member (filtered by group/character/position) to `value`. */
+void rb_effect_set_blade_count(GameState *g, int actor, AbilityEffect *e, int host_cid){
+    (void)host_cid;
+    int value = s_value(e, 0);
+    if(value==0) value = (e->count>=0?e->count:0);
+    int who = s_who(e->target, actor);
+    RbPlayer *P=&g->p[who];
+    int ids[RB_STAGE_SIZE]; int n=0;
+    for(int q=0;q<RB_STAGE_SIZE;q++) if(P->stage[q]!=RB_EMPTY_SLOT) ids[n++]=P->stage[q];
+    const char *grp=NULL,*chars=NULL;
+    if(s_has_group(e,&grp)||s_has_chars(e,&chars)){
+        int f[RB_STAGE_SIZE]; int fn=0;
+        for(int i=0;i<n;i++) if(s_pass_filter(ids[i],grp,chars)) f[fn++]=ids[i];
+        n=fn; for(int i=0;i<n;i++) ids[i]=f[i];
+    }
+    const char *pos=NULL;
+    for(int i=0;i<e->n_extra;i++) if(e->extra_k[i]&&!strcmp(e->extra_k[i],"position")&&e->extra_v[i]) pos=e->extra_v[i];
+    if(pos){ int area=rb_pos_to_area(pos); if(area>=0){ int exp=P->stage[area]; int f[RB_STAGE_SIZE]; int fn=0; for(int i=0;i<n;i++) if(ids[i]==exp) f[fn++]=ids[i]; n=fn; for(int i=0;i<n;i++) ids[i]=f[i]; } }
+    for(int i=0;i<n;i++) rb_mods_set_blade(&g->mods, ids[i], value);
+    rb_recalc_constants(g);
+}
+
+/* Mirror state.rs::execute_set_heart_copy_from_under — copy the hearts of the
+   card just placed under this member onto the member. */
+void rb_effect_set_heart_copy_from_under(GameState *g, int actor, AbilityEffect *e, int host_cid){
+    (void)e;
+    int member=-1;
+    if(g->n_selected_cards>0) member=g->selected_cards[0];
+    else if(host_cid>=0) member=host_cid;
+    if(member<0) return;
+    RbPlayer *P=&g->p[actor];
+    int src=-1;
+    for(int s=0;s<RB_STAGE_SIZE;s++) if(P->stage[s]==member){
+        RbBag *uc=&P->under_cards[s];
+        if(uc->n>0){
+            for(int k=uc->n-1;k>=0;k--){
+                int c=uc->cards[k]; int is_moved=0;
+                for(int m=0;m<g->n_those_cards;m++) if(g->those_cards[m]==c){is_moved=1;break;}
+                if(is_moved){ src=c; break; }
+            }
+            if(src<0) src=uc->cards[uc->n-1];
+        }
+        break;
+    }
+    if(src<0) return;
+    rb_mods_set_heart_copy(&g->mods, member, src);
+}
+
+/* Mirror state.rs::execute_set_heart_type (+ set_heart_type_applied). ref_value
+   "placed_under" copies the under-card's hearts; otherwise the member's hearts
+   are recolored (transform) to the chosen heart color via heart_multiplier. */
+void rb_effect_set_heart_type(GameState *g, int actor, AbilityEffect *e, int host_cid){
+    const char *ref=NULL;
+    for(int i=0;i<e->n_extra;i++) if(e->extra_k[i]&&!strcmp(e->extra_k[i],"ref_value")&&e->extra_v[i]) ref=e->extra_v[i];
+    if(ref && !strcmp(ref,"placed_under")){ rb_effect_set_heart_copy_from_under(g, actor, e, host_cid); return; }
+    const char *ht=NULL;
+    for(int i=0;i<e->n_extra;i++) if(e->extra_k[i] && (!strcmp(e->extra_k[i],"heart_type")||!strcmp(e->extra_k[i],"heart_color")) && e->extra_v[i]) ht=e->extra_v[i];
+    if(!ht) for(int i=0;i<e->n_extra;i++) if(e->extra_k[i] && !strcmp(e->extra_k[i],"heart_colors") && e->extra_v[i]) ht=e->extra_v[i];
+    if(!ht || !strcmp(ht,"selected")) ht="heart00";
+    int col = s_heart_idx(ht);
+    int who = s_who(e->target, actor);
+    int cid=-1;
+    if(g->n_selected_cards>0) cid=g->selected_cards[0];
+    else if(host_cid>=0) cid=host_cid;
+    else for(int q=0;q<RB_STAGE_SIZE;q++) if(g->p[who].stage[q]!=RB_EMPTY_SLOT){ cid=g->p[who].stage[q]; break; }
+    if(cid<0) return;
+    g->mods.heart_multiplier[cid]=(int8_t)col;
+    g->mods.heart_multiplier_amt[cid]=(int8_t)(e->count>=1?e->count:2);
+}
+
+/* Mirror state.rs::execute_set_card_identity — rewrite this member's identity to
+   the listed group/unit names so it counts as them in group/name matching. */
+void rb_effect_set_card_identity(GameState *g, int actor, AbilityEffect *e, int host_cid){
+    int cid=-1;
+    if(host_cid>=0) cid=host_cid;
+    else for(int q=0;q<RB_STAGE_SIZE;q++) if(g->p[actor].stage[q]!=RB_EMPTY_SLOT){ cid=g->p[actor].stage[q]; break; }
+    if(cid<0) return;
+    const char *id=NULL;
+    for(int i=0;i<e->n_extra;i++) if(e->extra_k[i]&&(!strcmp(e->extra_k[i],"identities")||!strcmp(e->extra_k[i],"identity"))&&e->extra_v[i]) id=e->extra_v[i];
+    if(!id) return;
+    char buf[256]; strncpy(buf,id,255); buf[255]=0;
+    char *tok=strtok(buf, ",、 ");
+    while(tok){ rb_set_card_identity(cid, tok); tok=strtok(NULL, ",、 "); }
+}
+
+/* Mirror state.rs::execute_set_card_identity_all_regions — identity rewrite that
+   also records a per-card prohibition note "card_identity:{cid}:{identity}". */
+void rb_effect_set_card_identity_all_regions(GameState *g, int actor, AbilityEffect *e, int host_cid){
+    int cid=-1;
+    if(host_cid>=0) cid=host_cid;
+    else for(int q=0;q<RB_STAGE_SIZE;q++) if(g->p[actor].stage[q]!=RB_EMPTY_SLOT){ cid=g->p[actor].stage[q]; break; }
+    if(cid<0) return;
+    const char *id=NULL;
+    for(int i=0;i<e->n_extra;i++) if(e->extra_k[i]&&(!strcmp(e->extra_k[i],"identities")||!strcmp(e->extra_k[i],"identity"))&&e->extra_v[i]) id=e->extra_v[i];
+    if(!id) return;
+    char buf[256]; strncpy(buf,id,255); buf[255]=0;
+    char *tok=strtok(buf, ",、 ");
+    while(tok){
+        rb_set_card_identity(cid, tok);
+        if(g->n_prohibition < 64){
+            snprintf(g->prohibition[g->n_prohibition], sizeof(g->prohibition[g->n_prohibition]), "card_identity:%d:%s", cid, tok);
+            g->n_prohibition++;
+        }
+        tok=strtok(NULL, ",、 ");
+    }
+}
+
+/* Mirror state.rs::execute_reduce_live_card_set_limit — reduce the player's live
+   card set limit by `count`. */
+void rb_effect_reduce_live_card_set_limit(GameState *g, int actor, AbilityEffect *e, int host_cid){
+    (void)host_cid;
+    int lim = e->count>=0?e->count:1;
+    int who = s_who(e->target, actor);
+    g->live_set_limit_reduction[who]+=lim;
+    if(g->live_set_limit_reduction[who]>RB_MAX_LIVE_CARDS) g->live_set_limit_reduction[who]=RB_MAX_LIVE_CARDS;
+}
+
+/* Mirror state.rs::execute_specify_heart_color — set a persistent per-card heart
+   color override (target member's base hearts counted as `col`). */
+void rb_effect_specify_heart_color(GameState *g, int actor, AbilityEffect *e, int host_cid){
+    int col = heart_color_of(e, RB_HEART_PINK);
+    if(col<0||col>7) col=RB_HEART_PINK;
+    int who = s_who(e->target, actor);
+    RbPlayer *P=&g->p[who];
+    if(host_cid>=0) g->mods.heart_color_override[host_cid]=(int8_t)col;
+    else for(int q=0;q<RB_STAGE_SIZE;q++) if(P->stage[q]!=RB_EMPTY_SLOT) g->mods.heart_color_override[P->stage[q]]=(int8_t)col;
+    rb_recalc_constants(g);
+}
+
+/* Mirror state.rs::execute_set_cost_to_use — set this member's cost-to-use to
+   `value` (applies to the activating/selected card). */
+void rb_effect_set_cost_to_use(GameState *g, int actor, AbilityEffect *e, int host_cid){
+    int value=s_value(e,0);
+    int cid = host_cid>=0?host_cid:-1;
+    if(cid<0 && g->n_selected_cards>0) cid=g->selected_cards[0];
+    if(cid<0) return;
+    rb_mods_set_cost(&g->mods, cid, value);
+}
+
+/* Mirror state.rs::execute_all_blade_timing — set the member's blade type to
+   "all" so its blade satisfies any blade-timing condition. */
+void rb_effect_all_blade_timing(GameState *g, int actor, AbilityEffect *e, int host_cid){
+    (void)e;
+    int cid = host_cid>=0?host_cid:-1;
+    if(cid<0 && g->n_selected_cards>0) cid=g->selected_cards[0];
+    if(cid<0) for(int q=0;q<RB_STAGE_SIZE;q++) if(g->p[actor].stage[q]!=RB_EMPTY_SLOT){cid=g->p[actor].stage[q];break;}
+    if(cid<0) return;
+    g->mods.blade_type[cid]=7;
+}
+
+/* Mirror state.rs::execute_activation_cost — record a prohibition note
+   "activation_cost_{op}_{value}" for self/opponent targets. */
+void rb_effect_activation_cost(GameState *g, int actor, AbilityEffect *e, int host_cid){
+    (void)host_cid;
+    const char *op="increase";
+    for(int i=0;i<e->n_extra;i++) if(e->extra_k[i]&&!strcmp(e->extra_k[i],"operation")&&e->extra_v[i]) op=e->extra_v[i];
+    int value=s_value(e,0);
+    const char *target = e->target?e->target:"self";
+    if(!strcmp(target,"self")||!strcmp(target,"opponent")){
+        char note[64]; snprintf(note,sizeof(note),"activation_cost_%s_%d",op,value);
+        if(g->n_prohibition < 64){ snprintf(g->prohibition[g->n_prohibition], sizeof(g->prohibition[g->n_prohibition]), "%s", note); g->n_prohibition++; }
     }
 }

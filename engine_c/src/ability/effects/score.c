@@ -146,3 +146,281 @@ int rb_execute_modify_score(GameState *gs, int actor, AbilityEffect *e) {
     }
     return 0;
 }
+
+/* ── Shared helpers for the remaining score.rs ports ── */
+
+/* Count of a single heart color on a card (mirrors base_heart.hearts.get(hc)). */
+static int sc_card_heart_count(int cid, int col) {
+    Card c; if (!rb_decode_card_by_index((uint32_t)cid, &c)) return 0;
+    int r = 0;
+    for (int i = 0; i < c.n_hearts; i++)
+        if ((int)c.heart_color[i] == col) r += c.heart_count[i];
+    rb_free_card(&c);
+    return r;
+}
+
+/* Parse a comma/space/、 separated heart-color string into color indices (0..7). */
+static int sc_parse_colors(const char *s, int *out, int max) {
+    if (!s || !*s) return 0;
+    char buf[256]; strncpy(buf, s, sizeof(buf) - 1); buf[sizeof(buf) - 1] = 0;
+    char *tok = strtok(buf, ",、 ");
+    int n = 0;
+    while (tok && n < max) {
+        out[n++] = rb_heart_index(rb_parse_heart_color(tok));
+        tok = strtok(NULL, ",、 ");
+    }
+    return n;
+}
+
+/* True when every heart color present on the card is listed in exc (mirrors
+   Rust base_heart.hearts.keys().all(|hc| exclude_heart_colors.contains(hc)). */
+static int sc_card_all_hearts_excluded(const Card *c, const int *exc, int nexc) {
+    if (c->n_hearts == 0) return 0;
+    for (int i = 0; i < c->n_hearts; i++) {
+        int col = (int)c->heart_color[i];
+        int found = 0;
+        for (int k = 0; k < nexc; k++) if (exc[k] == col) { found = 1; break; }
+        if (!found) return 0;
+    }
+    return 1;
+}
+
+static int sc_card_moved_this_turn(const GameState *g, int cid) {
+    return (cid >= 0 && cid < RB_MAX_CARD_IDS) ? (g->moved_this_turn[cid] != 0) : 0;
+}
+static int sc_card_appeared_this_turn(const GameState *g, int cid) {
+    for (int i = 0; i < g->n_cards_appeared_this_turn; i++)
+        if (g->cards_appeared_this_turn[i] == cid) return 1;
+    return 0;
+}
+
+/* Faithful port of execute_modify_required_hearts. Handles per_unit (both the
+   per_unit_heart_colors total-icon mode and the default per-card location
+   count, with distinct-name and timing-condition filters), the success-zone
+   live+success card pool, group/original-value filters, and per-color
+   set/add of need_heart modifiers. */
+int rb_execute_modify_required_hearts(GameState *gs, int actor, AbilityEffect *e) {
+    if (!gs || !e) return -1;
+    const char *operation = sc_extra(e, "operation"); if (!operation) operation = "decrease";
+    int value = e->count >= 0 ? e->count : sc_extra_int(e, "value");
+    const char *target = e->target ? e->target : "self";
+    int per_unit = sc_extra(e, "per_unit") && (!strcmp(sc_extra(e, "per_unit"), "true") || !strcmp(sc_extra(e, "per_unit"), "1"));
+    int per_unit_count = sc_extra_int(e, "per_unit_count"); if (per_unit_count <= 0) per_unit_count = 1;
+    const char *group = sc_extra(e, "group"); if (!group) group = sc_extra(e, "group_names");
+    const char *location = sc_extra(e, "location");
+    const char *timing_condition = sc_extra(e, "timing_condition");
+    int original_value = sc_extra(e, "original_value") && (!strcmp(sc_extra(e, "original_value"), "true") || !strcmp(sc_extra(e, "original_value"), "1"));
+    int original_count = sc_extra_int(e, "original_count");
+    const char *original_operator = sc_extra(e, "original_operator");
+    int exclude_self = sc_extra(e, "exclude_self") && (!strcmp(sc_extra(e, "exclude_self"), "true") || !strcmp(sc_extra(e, "exclude_self"), "1"));
+    int self_target = (!strcmp(e->self_target_field, "true") || (sc_extra(e, "self_target") && !strcmp(sc_extra(e, "self_target"), "true"))) ? 1 : 0;
+    int exc_colors[8]; int n_exc = sc_parse_colors(sc_extra(e, "exclude_heart_colors"), exc_colors, 8);
+    int max_flag = sc_extra(e, "max") && (!strcmp(sc_extra(e, "max"), "true") || !strcmp(sc_extra(e, "max"), "1"));
+    int repeat_limit = e->repeat_limit;
+    int pu_colors[8]; int n_pu = sc_parse_colors(sc_extra(e, "per_unit_heart_colors"), pu_colors, 8);
+    int is_distinct = (e->distinct_flag != 0);
+    int act = gs->queue.resume_host >= 0 ? gs->queue.resume_host : -1;
+
+    int pl = rb_target_player_index(target, actor == 0 ? "p1" : "p2");
+    if (pl < 0) pl = actor;
+    const RbPlayer *P = &gs->p[pl];
+
+    /* ── per_unit: recompute value from matching units ── */
+    if (per_unit) {
+        if (n_pu > 0) {
+            /* Count total heart icons of the given colors across matching stage members. */
+            int total = 0;
+            for (int i = 0; i < RB_STAGE_SIZE; i++) {
+                int cid = P->stage[i];
+                if (cid == RB_EMPTY_SLOT) continue;
+                if (exclude_self && cid == act) continue;
+                if (group && !rb_card_matches_group_str(cid, group)) continue;
+                for (int j = 0; j < n_pu; j++) total += sc_card_heart_count(cid, pu_colors[j]);
+            }
+            int per_unit_base = max_flag ? 1 : value;
+            int units = total / (per_unit_count > 0 ? per_unit_count : 1);
+            if (repeat_limit > 0 && units > repeat_limit) units = repeat_limit;
+            value = per_unit_base * units;
+        } else {
+            /* Default per-unit: count cards in the specified location. */
+            int zone_cards[RB_MAX_ZONE]; int nz = 0;
+            if (location && (!strcmp(location, "success_live_zone") || !strcmp(location, "success_live_card_zone"))) {
+                for (int i = 0; i < P->success.n; i++) zone_cards[nz++] = P->success.cards[i];
+            } else if (location && (!strcmp(location, "live_card_zone") || !strcmp(location, "live_zone"))) {
+                for (int i = 0; i < P->live.n; i++) zone_cards[nz++] = P->live.cards[i];
+            } else {
+                for (int i = 0; i < RB_STAGE_SIZE; i++)
+                    if (P->stage[i] != RB_EMPTY_SLOT) zone_cards[nz++] = P->stage[i];
+            }
+            const char *seen[32]; int nseen = 0;
+            int count = 0;
+            for (int i = 0; i < nz; i++) {
+                int cid = zone_cards[i];
+                if (exclude_self && cid == act) continue;
+                if (group && !rb_card_matches_group_str(cid, group)) continue;
+                Card c; int have = rb_decode_card_by_index((uint32_t)cid, &c);
+                if (have) {
+                    if (is_distinct) {
+                        int dup = 0;
+                        for (int k = 0; k < nseen; k++) if (seen[k] && c.name && !strcmp(seen[k], c.name)) { dup = 1; break; }
+                        if (dup) { rb_free_card(&c); continue; }
+                        if (nseen < 32) seen[nseen++] = rb_strdup2(c.name);
+                    }
+                    if (n_exc > 0 && sc_card_all_hearts_excluded(&c, exc_colors, n_exc)) { rb_free_card(&c); continue; }
+                    rb_free_card(&c);
+                }
+                if (timing_condition && !strcmp(timing_condition, "appeared_or_moved_this_turn")) {
+                    if (!sc_card_moved_this_turn(gs, cid) && !sc_card_appeared_this_turn(gs, cid)) continue;
+                }
+                count++;
+            }
+            for (int k = 0; k < nseen; k++) rb_free((void *)seen[k]);
+            int per_unit_base = max_flag ? 1 : value;
+            int units = count / (per_unit_count > 0 ? per_unit_count : 1);
+            if (repeat_limit > 0 && units > repeat_limit) units = repeat_limit;
+            value = per_unit_base * units;
+        }
+    }
+
+    /* ── Build candidate card ids (live, or live+success when self-target
+       activating card sits in success_live_card_zone). ── */
+    int in_success = 0;
+    if (act >= 0) for (int i = 0; i < P->success.n; i++) if (P->success.cards[i] == act) { in_success = 1; break; }
+    int card_ids[RB_MAX_ZONE]; int nids = 0;
+    if (self_target && in_success) {
+        for (int i = 0; i < P->live.n && nids < RB_MAX_ZONE; i++) card_ids[nids++] = P->live.cards[i];
+        for (int i = 0; i < P->success.n && nids < RB_MAX_ZONE; i++) card_ids[nids++] = P->success.cards[i];
+    } else {
+        for (int i = 0; i < P->live.n && nids < RB_MAX_ZONE; i++) card_ids[nids++] = P->live.cards[i];
+    }
+
+    /* Filter by self_target / group / original score. */
+    int recv[RB_MAX_ZONE]; int nr = 0;
+    for (int i = 0; i < nids && nr < RB_MAX_ZONE; i++) {
+        int cid = card_ids[i];
+        if (self_target) { if (act < 0 || cid != act) continue; }
+        if (group && !rb_card_matches_group_str(cid, group)) continue;
+        if (original_value) {
+            Card c; if (!rb_decode_card_by_index((uint32_t)cid, &c)) continue;
+            int score = (int)c.score; rb_free_card(&c);
+            if (original_operator) {
+                int met = 1;
+                if      (!strcmp(original_operator, ">=")) met = score >= original_count;
+                else if (!strcmp(original_operator, "<=")) met = score <= original_count;
+                else if (!strcmp(original_operator, ">"))  met = score >  original_count;
+                else if (!strcmp(original_operator, "<"))  met = score <  original_count;
+                else if (!strcmp(original_operator, "==")) met = score == original_count;
+                else if (!strcmp(original_operator, "!=")) met = score != original_count;
+                if (!met) continue;
+            } else if (score != original_count) continue;
+        }
+        recv[nr++] = cid;
+    }
+
+    /* Resolve colors (default heart00) and apply per-color modifiers. */
+    int colors[8]; int ncol = sc_parse_colors(sc_extra(e, "heart_colors"), colors, 8);
+    if (ncol == 0) { colors[0] = 0; ncol = 1; }
+    int per_color_value = value;
+    for (int ci = 0; ci < ncol; ci++) {
+        int color = colors[ci];
+        for (int i = 0; i < nr; i++) {
+            int cid = recv[i];
+            int delta;
+            if (!strcmp(operation, "decrease")) delta = -value;
+            else if (!strcmp(operation, "increase")) delta = value;
+            else if (!strcmp(operation, "set")) delta = per_color_value;
+            else continue;
+            if (!strcmp(operation, "set"))
+                rb_mods_set_need_heart(&gs->mods, cid, color, (int16_t)per_color_value);
+            else
+                rb_mods_add_need_heart(&gs->mods, cid, color, delta);
+        }
+    }
+    return 0;
+}
+
+/* Faithful port of execute_modify_required_hearts_standard. */
+void rb_execute_modify_required_hearts_standard(GameState *gs, int actor,
+        const char *operation, int value, const char **heart_colors, int n_colors,
+        const char *target, const char *effect_text) {
+    if (!gs) return;
+    int colors[8]; int ncol = 0;
+    if (!heart_colors || n_colors <= 0) { colors[0] = 0; ncol = 1; }
+    else { for (int i = 0; i < n_colors && ncol < 8; i++) colors[ncol++] = rb_heart_index(rb_parse_heart_color(heart_colors[i])); }
+
+    int pl = rb_target_player_index(target, actor == 0 ? "p1" : "p2");
+    if (pl < 0) pl = actor;
+    const RbPlayer *P = &gs->p[pl];
+
+    for (int ci = 0; ci < ncol; ci++) {
+        int color = colors[ci];
+        for (int i = 0; i < P->live.n; i++) {
+            int cid = P->live.cards[i];
+            int modifier = !strcmp(operation, "increase") ? value
+                         : !strcmp(operation, "decrease") ? -value : 0;
+            rb_mods_add_need_heart(&gs->mods, cid, color, (int16_t)modifier);
+        }
+    }
+    (void)effect_text;
+}
+
+/* Faithful port of execute_modify_yell_count. */
+int rb_execute_modify_yell_count(GameState *gs, int actor, AbilityEffect *e) {
+    if (!gs || !e) return -1;
+    const char *operation = sc_extra(e, "operation"); if (!operation) operation = "subtract";
+    int count = e->count >= 0 ? e->count : sc_extra_int(e, "count");
+    int slot = (actor == 1) ? 2 : 1;
+    if (!strcmp(operation, "add")) rb_add_yell_count_modifier(gs, (uint8_t)slot, (int32_t)count);
+    else if (!strcmp(operation, "subtract")) rb_add_yell_count_modifier(gs, (uint8_t)slot, -(int32_t)count);
+    return 0;
+}
+
+/* Faithful port of execute_modify_limit. */
+int rb_execute_modify_limit(GameState *gs, int actor, AbilityEffect *e) {
+    if (!gs || !e) return -1;
+    const char *operation = sc_extra(e, "operation"); if (!operation) operation = "decrease";
+    int count = e->count >= 0 ? e->count : sc_extra_int(e, "count");
+    if (gs->n_prohibition < 64) {
+        char *b = gs->prohibition[gs->n_prohibition];
+        if (!strcmp(operation, "decrease")) snprintf(b, 48, "limit_decrease:%d", count);
+        else if (!strcmp(operation, "increase")) snprintf(b, 48, "limit_increase:%d", count);
+        else b[0] = 0;
+        gs->n_prohibition++;
+    }
+    (void)actor;
+    return 0;
+}
+
+/* Faithful port of execute_modify_required_hearts_success. */
+int rb_execute_modify_required_hearts_success(GameState *gs, int actor, AbilityEffect *e) {
+    if (!gs || !e) return -1;
+    const char *operation = sc_extra(e, "operation"); if (!operation) operation = "increase";
+    int value = e->count >= 0 ? e->count : sc_extra_int(e, "value");
+    const char *target = e->target ? e->target : "self";
+    const char *card_type = sc_extra(e, "card_type");
+    const char *heart_colors = sc_extra(e, "heart_colors");
+
+    int pl = rb_target_player_index(target, actor == 0 ? "p1" : "p2");
+    if (pl < 0) pl = actor;
+    RbPlayer *P = &gs->p[pl];
+
+    int card_ids[RB_MAX_ZONE]; int nids = 0;
+    if (card_type && !strcmp(card_type, "live_card")) {
+        for (int i = 0; i < P->success.n && nids < RB_MAX_ZONE; i++) card_ids[nids++] = P->success.cards[i];
+    }
+
+    int delta = !strcmp(operation, "increase") ? value
+              : !strcmp(operation, "decrease") ? -value : 0;
+    if (delta == 0) return 0;
+
+    int colors[8]; int ncol = sc_parse_colors(heart_colors, colors, 8);
+    if (ncol == 0) { for (int i = 0; i < 7; i++) colors[i] = i; ncol = 7; }
+
+    for (int i = 0; i < nids; i++) {
+        int cid = card_ids[i];
+        for (int ci = 0; ci < ncol; ci++) {
+            rb_mods_add_need_heart(&gs->mods, cid, colors[ci], (int16_t)delta);
+        }
+    }
+    return 0;
+}
