@@ -31,13 +31,54 @@ python scan_tmp.py        # lists functions whose body is empty / returns 0 / ca
                           # stub|not tracked|not yet|no-op|TODO marker (incl. preceding comment)
 ```
 
-**Audit result (2026-08-31):** the engine is already ported — every flagged function is
-substantially implemented (best-effort arms only). The lone `return 0` stub
-`rb_collect_live_modifiers` is intentional (verified phantom, no Rust twin — see worklist
-row for `game_state_abilities.c`). **Conclusion: there are no missing placeholder functions
-blocking tests.** The ~1001 remaining `rb_engine_generated` failures are ability-*logic* bugs
-inside already-ported functions (per-card behavior), not unported stubs. Sub-tasks below are
-therefore logic-bug clusters, not stub ports.
+**Size audit (2026-08-31): the port is INCOMPLETE, not done.** Per-file line
+comparison of each C file against its Rust twin shows the C side is a small fraction
+of the Rust:
+
+```
+ability/vm.c                  C=  423  Rust=  1589  (27%)
+ability/condition.c           C= 1167  Rust=  6074  (19%)
+ability/choice.c              C=  109  Rust=  3375  ( 3%)   <-- huge gap
+ability/compound.c            C=  197  Rust=   981  (20%)
+ability/ability_queue.c       C=  109  Rust=   695  (16%)
+ability/dynamic_count.c       C=  186  Rust=   177  (105%)
+ability/util.c               C=  267  Rust=  2496  (11%)   <-- huge gap
+ability/cost.c               C=  193  Rust=  1345  (14%)
+ability/resolver.c           C=   76  Rust=  1195  ( 6%)   <-- huge gap
+ability/effects/move.c        C=  260  Rust=  3664  ( 7%)   <-- huge gap
+ability/effects/look.c        C=  261  Rust=  1159  (23%)
+ability/effects/draw.c        C=  232  Rust=   713  (33%)
+ability/effects/misc.c        C=  283  Rust=  4120  ( 7%)   <-- huge gap
+ability/effects/ability.c     C=  142  Rust= ~ (effect.rs)
+ability/effects/state.c       C=  327  Rust=  1744  (19%)
+core/card.c                  C=  112  Rust=  3713  ( 3%)   <-- huge gap
+core/data.c                  C=  224  Rust= ~ (data.rs)
+core/alloc.c                 C=   29  Rust= ~ (alloc.rs)
+core/modifiers.c             C=  126  Rust=  1881  ( 7%)   <-- huge gap
+core/stats_pipeline.c        C=   51  Rust=   269  (19%)
+core/game_state_abilities.c  C=  177  Rust=  2820  ( 6%)   <-- huge gap
+core/tracking.c              C=  146  Rust=   110  (133%)
+core/zones.c                 C=   76  Rust=   842  ( 9%)
+turn/phase.c                 C=  236  Rust=  1612  (15%)
+turn/live.c                  C=  386  Rust=  2717  (14%)
+turn/triggers.c              C=  450  Rust=   146  (308%)
+engine.c                     C= 1140  Rust= ~ (engine.rs / game/*)
+
+TOTAL (mapped)  C=7385  Rust=39117  (19%)
+```
+
+The earlier in-file stub scan was misleading: it only flags functions that *already
+exist* in C with a stub/no-op comment. It cannot see the hundreds of Rust functions that
+have **no C equivalent at all** — that is the real gap. `rb_collect_live_modifiers`
+(return 0) is still an intentional no-op, but most of the ~1001 generated-suite failures
+come from unported logic, not from a few missing stubs.
+
+**Conclusion:** the remaining work is porting the missing functions file-by-file, starting
+with the largest gaps (by absolute missing Rust lines): `misc.c` (~3837), `util.c` (~2229),
+`card.c` (~3601), `move.c` (~3404), `game_state_abilities.c` (~2643), `condition.c` (~4907),
+`choice.c` (~3266), `live.c`, `phase.c`, `resolver.c`, `cost.c`. Each `Rust fn → C fn`
+port is a sub-task. One real gap (`card_matches_filter` cost/heart/character arms) was
+already ported (commit e2dbd1c1).
 
 ---
 
