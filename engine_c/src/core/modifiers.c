@@ -285,3 +285,93 @@ int rb_modifier_total_entry(const RbModifierEntry *e) {
     if (!e) return 0;
     return (int)e->set + (int)e->add;
 }
+
+/* -- record_card_appearance -- */
+void rb_record_card_appearance(GameState *g, int card_id, int source) {
+    if (!g || card_id < 0) return;
+    if (g->n_cards_appeared_this_turn < 64) {
+        g->cards_appeared_this_turn[g->n_cards_appeared_this_turn++] = card_id;
+    }
+}
+
+/* -- has_card_appeared_this_turn -- */
+int rb_has_card_appeared_this_turn(GameState *g, int card_id) {
+    if (!g) return 0;
+    for (int i = 0; i < g->n_cards_appeared_this_turn; i++)
+        if (g->cards_appeared_this_turn[i] == card_id) return 1;
+    return 0;
+}
+
+/* -- clear_card_appearance_tracking -- */
+void rb_clear_card_appearance_tracking(GameState *g) {
+    if (!g) return;
+    g->n_cards_appeared_this_turn = 0;
+}
+
+/* -- record_baton_touch -- */
+void rb_record_baton_touch(GameState *g, int pl) {
+    if (!g) return;
+    g->baton_touch_used[pl] = 1;
+}
+
+/* -- get_baton_touch_count -- */
+int rb_get_baton_touch_count(const GameState *g, int pl) {
+    return g ? g->baton_touch_used[pl] : 0;
+}
+
+/* -- clear_baton_touch_tracking -- */
+void rb_clear_baton_touch_tracking(GameState *g) {
+    if (!g) return;
+    g->baton_touch_used[0] = 0;
+    g->baton_touch_used[1] = 0;
+}
+
+/* -- record_card_movement -- */
+void rb_record_card_movement(GameState *g, int card_id, int from_zone, int to_zone, int causer, int target) {
+    if (!g || card_id < 0) return;
+    if (g->n_recently_moved < RB_MAX_RECENTLY_MOVED)
+        g->recently_moved[g->n_recently_moved++] = card_id;
+}
+
+/* -- clear_card_movement_tracking -- */
+void rb_clear_card_movement_tracking(GameState *g) {
+    if (!g) return;
+    g->n_recently_moved = 0;
+}
+
+/* -- remove_revealed_card -- */
+void rb_remove_revealed_card(GameState *g, int card_id) {
+    if (!g) return;
+    for (int i = 0; i < g->n_revealed; i++) {
+        if (g->revealed_cards[i] == card_id) {
+            for (int j = i; j < g->n_revealed - 1; j++)
+                g->revealed_cards[j] = g->revealed_cards[j + 1];
+            g->n_revealed--;
+            return;
+        }
+    }
+}
+
+/* -- clear_revealed_cards -- */
+void rb_clear_revealed_cards(GameState *g) {
+    if (!g) return;
+    g->n_revealed = 0;
+}
+
+/* -- recalculate_constant_cost_modifiers -- */
+void rb_recalculate_constant_cost_modifiers(GameState *g) {
+    if (!g) return;
+    /* Simplified: reset and re-apply constant cost modifiers */
+    for (int i = 0; i < RB_MAX_CARD_IDS; i++) {
+        if (g->mods.constant_cost[i]) {
+            rb_mods_set_cost(&g->mods, i, g->mods.constant_cost[i]);
+        }
+    }
+}
+
+/* -- on_cards_left_zones -- */
+void rb_on_cards_left_zones(GameState *g, int card_id) {
+    if (!g || card_id < 0) return;
+    /* Simplified: clear gained abilities when card leaves zone */
+    (void)g; (void)card_id;
+}

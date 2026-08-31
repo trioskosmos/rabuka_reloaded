@@ -343,3 +343,174 @@ void rb_effect_reveal_until_target(GameState *g, int actor, AbilityEffect *e){
     g->queue.resume_mode = 2; g->queue.resume_eff = e; g->queue.resume_is_select = 0;
     g->queue.resume_actor = actor; g->queue.resume_host = actor;
 }
+
+/* -- look_at_with_refresh -- */
+static int look_at_with_refresh(GameState *g, int who, int count, const char *source) {
+    RbPlayer *P = &g->p[who];
+    LookPool *lp = &g_look[who];
+    lp->n = 0; lp->from_deck = 1; lp->owner = who;
+    int take = P->deck.n < count ? P->deck.n : count;
+    for (int i = 0; i < take && lp->n < MAX_LOOKED; i++) {
+        int cid = P->deck.cards[--P->deck.n];
+        lp->cards[lp->n++] = cid;
+        if (g->n_revealed < RB_MAX_RECENTLY_MOVED)
+            g->revealed_cards[g->n_revealed++] = cid;
+    }
+    if (lp->n < count) {
+        if (P->deck.n == 0 && P->discard.n > 0) {
+            rb_player_refresh(g, who);
+        }
+        int remaining = count - lp->n;
+        for (int i = 0; i < remaining && P->deck.n > 0 && lp->n < MAX_LOOKED; i++) {
+            int cid = P->deck.cards[--P->deck.n];
+            lp->cards[lp->n++] = cid;
+            if (g->n_revealed < RB_MAX_RECENTLY_MOVED)
+                g->revealed_cards[g->n_revealed++] = cid;
+        }
+    }
+    return lp->n;
+}
+
+/* -- execute_reveal_per_group -- */
+void rb_effect_reveal_per_group(GameState *g, int actor, AbilityEffect *e) {
+    int count = e->count >= 0 ? e->count : 1;
+    int who = actor;
+    if (e->target && !strcmp(e->target, "opponent")) who = actor ^ 1;
+    RbPlayer *P = &g->p[who];
+    const char *source = e->source ? e->source : "hand";
+    int card_ids[RB_MAX_ZONE];
+    int n_cards = 0;
+    if (!strcmp(source, "hand")) {
+        for (int i = 0; i < P->hand.n && n_cards < RB_MAX_ZONE; i++)
+            card_ids[n_cards++] = P->hand.cards[i];
+    } else if (!strcmp(source, "deck") || !strcmp(source, "deck_top")) {
+        int take = count < P->deck.n ? count : P->deck.n;
+        for (int i = 0; i < take && n_cards < RB_MAX_ZONE; i++)
+            card_ids[n_cards++] = P->deck.cards[P->deck.n - 1 - i];
+    } else if (!strcmp(source, "discard") || !strcmp(source, "waitroom")) {
+        for (int i = 0; i < P->discard.n && n_cards < RB_MAX_ZONE; i++)
+            card_ids[n_cards++] = P->discard.cards[i];
+    } else if (!strcmp(source, "looked_at")) {
+        LookPool *lp = &g_look[who];
+        for (int i = 0; i < lp->n && n_cards < RB_MAX_ZONE; i++)
+            card_ids[n_cards++] = lp->cards[i];
+    }
+    for (int i = 0; i < n_cards; i++) {
+        if (g->n_revealed < RB_MAX_RECENTLY_MOVED)
+            g->revealed_cards[g->n_revealed++] = card_ids[i];
+    }
+}
+
+/* -- execute_reveal -- */
+void rb_effect_reveal(GameState *g, int actor, AbilityEffect *e) {
+    int count = e->count >= 0 ? e->count : 1;
+    int who = actor;
+    if (e->target && !strcmp(e->target, "opponent")) who = actor ^ 1;
+    RbPlayer *P = &g->p[who];
+    const char *source = e->source ? e->source : "hand";
+    int card_type = 0, cost_limit = -1, any_number = 0, is_max = 0, is_optional = e->is_optional ? 1 : 0;
+    for (int i = 0; i < e->n_extra; i++) {
+        if (!e->extra_k[i]) continue;
+        if (!strcmp(e->extra_k[i], "any_number") && e->extra_v[i] && !strcmp(e->extra_v[i], "true")) any_number = 1;
+        else if (!strcmp(e->extra_k[i], "max") && e->extra_v[i] && !strcmp(e->extra_v[i], "true")) is_max = 1;
+    }
+    int available = 0;
+    if (!strcmp(source, "hand")) available = P->hand.n;
+    else if (!strcmp(source, "looked_at")) available = g_look[who].n;
+    else if (!strcmp(source, "deck") || !strcmp(source, "deck_top")) available = P->deck.n;
+    if ((!strcmp(source, "hand") || !strcmp(source, "looked_at")) && available > 0) {
+        if (is_max || is_optional || count == 0 || count < available) {
+            rb_emit_choice(g, actor, RB_CHOICE_SELECT_CARD, source, NULL, any_number ? available : count, any_number || is_optional || is_max, NULL);
+            g->queue.resume_mode = 0; g->queue.resume_eff = e;
+            g->queue.resume_is_select = 0;
+            g->queue.resume_actor = actor; g->queue.resume_host = actor;
+            return;
+        }
+    }
+    int card_ids[RB_MAX_ZONE];
+    int n_cards = 0;
+    if (!strcmp(source, "hand")) {
+        for (int i = 0; i < P->hand.n && n_cards < RB_MAX_ZONE; i++)
+            card_ids[n_cards++] = P->hand.cards[i];
+    } else if (!strcmp(source, "deck") || !strcmp(source, "deck_top")) {
+        int take = count < P->deck.n ? count : P->deck.n;
+        for (int i = 0; i < take && n_cards < RB_MAX_ZONE; i++)
+            card_ids[n_cards++] = P->deck.cards[P->deck.n - 1 - i];
+    } else if (!strcmp(source, "looked_at")) {
+        LookPool *lp = &g_look[who];
+        for (int i = 0; i < lp->n && n_cards < RB_MAX_ZONE; i++)
+            card_ids[n_cards++] = lp->cards[i];
+    }
+    for (int i = 0; i < n_cards; i++) {
+        if (g->n_revealed < RB_MAX_RECENTLY_MOVED)
+            g->revealed_cards[g->n_revealed++] = card_ids[i];
+    }
+}
+
+/* -- execute_select -- */
+void rb_effect_select(GameState *g, int actor, AbilityEffect *e) {
+    int who = actor;
+    if (e->target && !strcmp(e->target, "opponent")) who = actor ^ 1;
+    RbPlayer *P = &g->p[who];
+    const char *source = e->source ? e->source : "hand";
+    int count = e->count >= 0 ? e->count : 1;
+    int is_optional = e->is_optional ? 1 : 0;
+    int card_ids[RB_MAX_ZONE];
+    int n_cards = 0;
+    if (!strcmp(source, "hand")) {
+        for (int i = 0; i < P->hand.n && n_cards < RB_MAX_ZONE; i++)
+            card_ids[n_cards++] = P->hand.cards[i];
+    } else if (!strcmp(source, "deck")) {
+        int take = count < P->deck.n ? count : P->deck.n;
+        for (int i = 0; i < take && n_cards < RB_MAX_ZONE; i++)
+            card_ids[n_cards++] = P->deck.cards[P->deck.n - 1 - i];
+    } else if (!strcmp(source, "discard") || !strcmp(source, "waitroom")) {
+        for (int i = 0; i < P->discard.n && n_cards < RB_MAX_ZONE; i++)
+            card_ids[n_cards++] = P->discard.cards[i];
+    } else if (!strcmp(source, "stage")) {
+        for (int i = 0; i < RB_STAGE_SIZE; i++)
+            if (P->stage[i] != RB_EMPTY_SLOT && n_cards < RB_MAX_ZONE)
+                card_ids[n_cards++] = P->stage[i];
+    } else if (!strcmp(source, "looked_at")) {
+        LookPool *lp = &g_look[who];
+        for (int i = 0; i < lp->n && n_cards < RB_MAX_ZONE; i++)
+            card_ids[n_cards++] = lp->cards[i];
+    } else if (!strcmp(source, "selected_cards")) {
+        for (int i = 0; i < g->n_selected_cards && n_cards < RB_MAX_ZONE; i++)
+            card_ids[n_cards++] = g->selected_cards[i];
+    }
+    LookPool *lp = &g_look[who];
+    lp->n = 0; lp->from_deck = 0; lp->owner = who;
+    for (int i = 0; i < n_cards && lp->n < MAX_LOOKED; i++)
+        lp->cards[lp->n++] = card_ids[i];
+    if (count == 0 || lp->n == 0) return;
+    if (count > lp->n) count = lp->n;
+    rb_emit_choice(g, actor, RB_CHOICE_SELECT_CARD, source, NULL, count, is_optional, NULL);
+    g->queue.resume_mode = 2; g->queue.resume_eff = e;
+    g->queue.resume_is_select = 1;
+    g->queue.resume_actor = actor; g->queue.resume_host = actor;
+}
+
+/* -- execute_look_and_select -- */
+void rb_effect_look_and_select(GameState *g, int actor, AbilityEffect *e) {
+    if (e->primary_effect) {
+        rb_execute_effect_ex(g, actor, e->primary_effect, actor);
+        if (rb_has_pending_choice(g)) return;
+    }
+    int count = 1, any_number = 0, is_max = 0, is_optional = 0;
+    for (int i = 0; i < e->n_extra; i++) {
+        if (!e->extra_k[i]) continue;
+        if (!strcmp(e->extra_k[i], "count") && e->extra_v[i]) count = atoi(e->extra_v[i]);
+        else if (!strcmp(e->extra_k[i], "any_number") && e->extra_v[i] && !strcmp(e->extra_v[i], "true")) any_number = 1;
+        else if (!strcmp(e->extra_k[i], "max") && e->extra_v[i] && !strcmp(e->extra_v[i], "true")) is_max = 1;
+        else if (!strcmp(e->extra_k[i], "optional") && e->extra_v[i] && !strcmp(e->extra_v[i], "true")) is_optional = 1;
+    }
+    int who = actor;
+    if (e->target && !strcmp(e->target, "opponent")) who = actor ^ 1;
+    LookPool *lp = &g_look[who];
+    int max_select = any_number ? lp->n : (count < lp->n ? count : lp->n);
+    rb_emit_choice(g, actor, RB_CHOICE_SELECT_CARD, "looked_at", NULL, max_select, is_optional || is_max || any_number, NULL);
+    g->queue.resume_mode = 2; g->queue.resume_eff = e;
+    g->queue.resume_is_select = 1;
+    g->queue.resume_actor = actor; g->queue.resume_host = actor;
+}
