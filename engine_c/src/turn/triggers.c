@@ -511,3 +511,45 @@ int rb_is_trigger_suppressed(GameState *g, int pl, const char *trigger_name) {
     }
     return 0;
 }
+
+/* Faithful port of trigger_live_success_abilities */
+void rb_trigger_live_success_faithful(GameState *g, int pl) {
+    if (!g) return;
+    RbPlayer *P = &g->p[pl];
+
+    /* Check if live success should trigger */
+    if (!g->live_surplus_ready_this_turn) return;
+
+    /* Collect abilities to trigger from stage cards */
+    for (int s = 0; s < RB_STAGE_SIZE; s++) {
+        int cid = P->stage[s];
+        if (cid < 0) continue;
+        int nab = rb_card_num_abilities((uint32_t)cid);
+        for (int a = 0; a < nab; a++) {
+            Ability ab;
+            if (!rb_decode_card_ability((uint32_t)cid, a, &ab)) continue;
+            if (ab.effect && ab.triggers && strstr(ab.triggers, "ライブ成功時")) {
+                /* Enqueue the ability */
+                rb_queue_push(&g->queue, cid, a);
+                rb_record_use(&g->queue, cid, a, g->turn);
+            }
+            rb_free_ability(&ab);
+        }
+    }
+
+    /* Collect abilities from live card zone */
+    for (int i = 0; i < P->live.n; i++) {
+        int cid = P->live.cards[i];
+        if (cid < 0) continue;
+        int nab = rb_card_num_abilities((uint32_t)cid);
+        for (int a = 0; a < nab; a++) {
+            Ability ab;
+            if (!rb_decode_card_ability((uint32_t)cid, a, &ab)) continue;
+            if (ab.effect && ab.triggers && strstr(ab.triggers, "ライブ成功時")) {
+                rb_queue_push(&g->queue, cid, a);
+                rb_record_use(&g->queue, cid, a, g->turn);
+            }
+            rb_free_ability(&ab);
+        }
+    }
+}

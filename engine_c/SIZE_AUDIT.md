@@ -8,43 +8,43 @@ actually present in C.
 ## Summary
 
 - C files audited (mapped to a Rust twin): 28
-- Total C lines (non-blank/comment): 16534   Total Rust lines: 48265
-- Total C functions: 1097   Total Rust functions (all): 1069
+- Total C lines (non-blank/comment): 19038   Total Rust lines: 48265
+- Total C functions: 1245   Total Rust functions (all): 1069
 - Total Rust **port-target** functions (excl. constructors/trait glue): 857
-- **Function-count gap (Rust port-targets − C, summed): -240** (approx. unported functions)
+- **Function-count gap (Rust port-targets − C, summed): -388** (approx. unported functions)
 - Best-effort unmatched Rust function names: 5 (heuristic)
 
 ## Per-file gap (sorted by missing-function count, worst first)
 
 | C file | C lines | Rust lines | C/Rust % | C fns | Rust port fns | missing ≈ | Rust twin(s) |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
-| `src/ability/effects/move.c` | 489 | 3322 | 14% | 21 | 41 | 20 | move_cards.rs |
-| `src/turn/live.c` | 532 | 2467 | 21% | 24 | 37 | 13 | live.rs |
-| `src/ability/effects/state.c` | 1078 | 5359 | 20% | 48 | 56 | 8 | state.rs, misc.rs |
-| `src/core/game_state_abilities.c` | 693 | 2403 | 28% | 61 | 67 | 6 | abilities.rs |
-| `src/ability/ability_queue.c` | 183 | 669 | 27% | 25 | 29 | 4 | ability_queue.rs, triggers.rs |
-| `src/ability/resolver.c` | 189 | 1019 | 18% | 20 | 24 | 4 | resolver.rs |
-| `src/ability/vm.c` | 2209 | 3522 | 62% | 78 | 81 | 3 | vm.rs, effect_decoder_gen.rs, condition_decoder_gen.rs |
-| `src/ability/util.c` | 1321 | 2199 | 60% | 87 | 88 | 1 | util.rs |
-| `src/ability/condition.c` | 1893 | 6571 | 28% | 91 | 81 | -10 | condition.rs, card.rs, compound.rs, state.rs |
+| `src/ability/resolver.c` | 210 | 1019 | 20% | 23 | 24 | 1 | resolver.rs |
+| `src/ability/vm.c` | 2231 | 3522 | 63% | 81 | 81 | 0 | vm.rs, effect_decoder_gen.rs, condition_decoder_gen.rs |
+| `src/ability/condition.c` | 2215 | 6571 | 33% | 100 | 81 | -19 | condition.rs, card.rs, compound.rs, state.rs |
 | `src/ability/choice.c` | 681 | 3165 | 21% | 49 | 33 | -16 | choice.rs |
+| `src/ability/ability_queue.c` | 306 | 669 | 45% | 42 | 29 | -13 | ability_queue.rs, triggers.rs |
 | `src/ability/dynamic_count.c` | 167 | 158 | 105% | 5 | 2 | -3 | dynamic_count.rs |
-| `src/ability/cost.c` | 406 | 1195 | 33% | 27 | 9 | -18 | cost.rs |
-| `src/ability/compound.c` | 159 | 753 | 21% | 9 | 8 | -1 | compound.rs |
-| `src/ability/effects/look.c` | 262 | 1119 | 23% | 13 | 10 | -3 | look.rs |
-| `src/ability/effects/ability.c` | 141 | 493 | 28% | 7 | 7 | 0 | ability_effects.rs |
-| `src/ability/effects/misc.c` | 870 | 3766 | 23% | 53 | 39 | -14 | misc.rs |
-| `src/ability/effects/draw.c` | 459 | 663 | 69% | 14 | 14 | 0 | draw.rs |
+| `src/ability/util.c` | 1346 | 2199 | 61% | 88 | 88 | 0 | util.rs |
+| `src/ability/cost.c` | 456 | 1195 | 38% | 29 | 9 | -20 | cost.rs |
+| `src/ability/compound.c` | 193 | 753 | 25% | 11 | 8 | -3 | compound.rs |
+| `src/ability/effects/move.c` | 1210 | 3322 | 36% | 41 | 41 | 0 | move_cards.rs |
+| `src/ability/effects/look.c` | 428 | 1119 | 38% | 19 | 10 | -9 | look.rs |
+| `src/ability/effects/state.c` | 1358 | 5359 | 25% | 63 | 56 | -7 | state.rs, misc.rs |
+| `src/ability/effects/ability.c` | 200 | 493 | 40% | 13 | 7 | -6 | ability_effects.rs |
+| `src/ability/effects/misc.c` | 928 | 3766 | 24% | 55 | 39 | -16 | misc.rs |
+| `src/ability/effects/draw.c` | 463 | 663 | 69% | 15 | 14 | -1 | draw.rs |
 | `src/ability/effects/score.c` | 352 | 748 | 47% | 16 | 6 | -10 | score.rs |
 | `src/core/card.c` | 1260 | 3448 | 36% | 186 | 91 | -95 | card.rs |
 | `src/core/data.c` | 404 | 966 | 41% | 36 | 12 | -24 | mod.rs, types.rs |
 | `src/core/alloc.c` | 63 | 140 | 45% | 10 | 5 | -5 | pool.rs |
-| `src/core/modifiers.c` | 238 | 416 | 57% | 46 | 22 | -24 | game_modifiers.rs, modifiers.rs |
+| `src/core/modifiers.c` | 302 | 416 | 72% | 58 | 22 | -36 | game_modifiers.rs, modifiers.rs |
 | `src/core/stats_pipeline.c` | 146 | 226 | 64% | 8 | 8 | 0 | stats_pipeline.rs |
+| `src/core/game_state_abilities.c` | 934 | 2403 | 38% | 83 | 67 | -16 | abilities.rs |
 | `src/core/tracking.c` | 132 | 90 | 146% | 10 | 6 | -4 | tracking.rs |
 | `src/core/zones.c` | 430 | 1052 | 40% | 58 | 37 | -21 | zones.rs, player.rs |
-| `src/turn/phase.c` | 405 | 1429 | 28% | 33 | 31 | -2 | phases.rs |
-| `src/turn/triggers.c` | 387 | 573 | 67% | 14 | 5 | -9 | triggers.rs |
+| `src/turn/phase.c` | 488 | 1429 | 34% | 43 | 31 | -12 | phases.rs |
+| `src/turn/live.c` | 720 | 2467 | 29% | 40 | 37 | -3 | live.rs |
+| `src/turn/triggers.c` | 430 | 573 | 75% | 15 | 5 | -10 | triggers.rs |
 | `src/engine.c` | 985 | 334 | 294% | 48 | 8 | -40 | main.rs, lib.rs, mod.rs, game.rs |
 
 ## Best-effort unmatched Rust function names (heuristic — verify manually)

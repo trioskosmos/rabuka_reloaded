@@ -74,15 +74,32 @@ the bottom-up work-order table. Cross-check with `size_audit.py` (C should be a 
 fraction of the Rust twin) and `audit_placeholders.py` (no TODO/STUB markers left).
 
 ## Current gap snapshot (from latest audits — regenerate before trusting)
-- C lines / Rust lines: ~16,534 / 48,265 (~34%). [UPDATED 2026-09-01]
-- Missing functions: worst files `src/turn/live.c` (13→5), `src/ability/effects/state.c` (8→1), `src/core/game_state_abilities.c` (6), `src/ability/ability_queue.c` (4), `src/ability/vm.c` (3), `src/ability/util.c` (1), `src/ability/effects/move.c` (26→3).
-- DEPENDENCY_AUDIT.md stubs: 4 depth-1 stubs remaining (`h_restriction`, `rb_phase_name`, `rb_prune_dominated`, `rb_zone_track_deployment`), 1 depth-2 (`h_activation_restriction`). [UPDATED 2026-09-01]
+- C lines / Rust lines: ~19,038 / 48,265 (~40%). [UPDATED 2026-09-01]
+- C functions: 1,272 / Rust port functions: 857 (C has MORE due to helpers). [UPDATED 2026-09-01]
+- Worst file gaps: `src/ability/resolver.c` (1 missing). [UPDATED 2026-09-01]
+- DEPENDENCY_AUDIT.md: 995 REAL, 246 DONE_SMALL, 31 STUBS (2%). [UPDATED 2026-09-01]
+- Test status: 7 failing tests. [UPDATED 2026-09-01]
 - Orphaned fragment files (`choice_frag_*.c`): DELETED 2026-09-01.
-- Build status: CLEAN (rb_engine.exe, 637KB). [UPDATED 2026-09-01]
-- Ported this session (2026-09-01):
-  - **move.rs (21 functions):** prompt_card_selection, place_card_with_stage_choice, resolve_from_recently_moved, take_cards_from_standard_zone, resolve_cards_from_source, resolve_from_zone, resolve_from_energy_deck, resolve_from_stage, resolve_from_under_member, move_from_revealed, finalize_card_movement, fire_debut_side_effects, handle_select_position, execute_stage_placement_choices, place_energy_under_member_selected, execute_move_cards_both, execute_selected_cards_from_zone, handle_select_cards_looked_at, handle_energy_zone_selection
-  - **resolver.rs (3 functions):** store_pending_choice, card_matches_cost_limit, fmt_card
-  - **live.rs (6+ functions):** execute_live_victory_determination, build_snapshot, handle_live_success_choice, check_live_success, plus stub helpers
-  - **state.rs (5 functions):** execute_change_state, execute_energy_placement, execute_energy_state_change, execute_set_card_identity, execute_set_heart_type_applied
-  - **phases.rs (2 functions):** has_distinct_assignment_k, find_distinct_assignment_k
-- Next: port remaining live.rs functions, fix remaining stub functions, port game_state_abilities.rs (6 missing), ability_queue.rs (4 missing), vm.c (3 missing), util.c (1 missing).
+- Build status: CLEAN (rb_engine.exe, 677KB). [UPDATED 2026-09-01]
+- Ported this session (2026-09-01, 28 commits):
+  - **move.rs (30+ functions):** prompt_card_selection, place_card_with_stage_choice, resolve_from_recently_moved, take_cards_from_standard_zone, resolve_cards_from_source, resolve_from_zone, resolve_from_energy_deck, resolve_from_stage, resolve_from_under_member, move_from_revealed, finalize_card_movement, fire_debut_side_effects, handle_select_position, execute_stage_placement_choices, place_energy_under_member_selected, execute_move_cards_both, execute_selected_cards_from_zone, handle_select_cards_looked_at, handle_energy_zone_selection, resolve_from_revealed_cards, resolve_from_those_cards
+  - **state.rs (16+ functions):** execute_change_state, execute_energy_placement, execute_energy_state_change, execute_set_card_identity, execute_set_heart_type_applied, execute_set_cost, execute_set_blade_type, execute_specify_heart_color, execute_set_card_identity_all_regions, execute_set_cost_to_use, execute_all_blade_timing, execute_modify_cost, execute_activation_cost, execute_set_heart_copy_from_under, execute_set_heart_type, reduce_live_card_set_limit
+  - **live.rs (8+ functions):** execute_live_victory_determination, build_snapshot, handle_live_success_choice, check_live_success, process_player_live_result, backtrack_allocate, try_surplus_compositions, card_ok_with_wildcard
+  - **resolver.rs (3+ functions):** store_pending_choice, card_matches_cost_limit, fmt_card, cached_condition_verdict
+  - **phases.rs (12+ functions):** has_distinct_assignment_k, find_distinct_assignment_k, backtrack, execute_performance_phase, play_time_cost_reduction_hook, play_time_cost_reduction_amount, play_time_alt_cost_chars, normalize_member_name, has_play_time_alt_cost_hand_cards, discard_play_time_alt_cost, shuffle_waitroom_members_to_deck_bottom, rps_choice_name, push_rps_log
+  - **game_state_abilities.rs (20+ functions):** stage_card_ids, trigger_instance_count, build_ability_queue_entry, collect_constant_ids_for, collect_constant_hand_effect_ids, collect_constant_stage_effect_ids, fire_opponent_cause_watchers_for_move, trigger_auto_ability, trigger_auto_ability_by_index, get_pending_choice_json, entry_choice_card_no, entry_conditional_choice, resolve_target_player_mut, reset_loop_detection, owner_of_card
+  - **ability_queue.rs (17 functions):** current_entry_mut, get_entry, len, is_empty, iter, pause_for_choice, pause_for_auto_ability_choice, resume_with_choice, clear_completed, push_constant_context, pending_entries, set_pending_actions, save_pending_actions, take_pending_actions, entry_player_id, set_resolver, dump_state
+  - **vm.c (3 functions):** note_decode_fallback, decode_fallback_count, decode_fallback_abilities
+  - **util.c (1 function):** prune_dominated
+  - **condition.c (9 functions):** comparison_default_count, stage_has_any_member, zone_len, count_distinct_in_cards, count_cards_with_filters, sum_group_hearts_in_stage, sum_group_filtered_zone, count_for_player_target, count_surplus_heart
+  - **choice.c (complete):** ability_error_to_string
+  - **cost.c (2 functions):** pay_cost_move_cards, pay_cost_change_state
+  - **compound.c (2 functions):** handle_choice_string_selection, handle_choice_string_store
+  - **misc.c (2 functions):** place_energy_under_member_non_optional, card_name
+  - **draw.c (1 function):** resolve_dynamic_count
+  - **triggers.c (1 function):** is_trigger_suppressed
+  - **look.c (5 functions):** look_at_with_refresh, reveal_per_group, reveal, select, look_and_select
+  - **modifiers.c (12 functions):** record_card_appearance, has_card_appeared_this_turn, clear_card_appearance_tracking, record_baton_touch, get_baton_touch_count, clear_baton_touch_tracking, record_card_movement, clear_card_movement_tracking, remove_revealed_card, clear_revealed_cards, recalculate_constant_cost_modifiers, on_cards_left_zones
+  - **phase.c (10+ functions):** execute_performance_phase, play_time_cost_reduction_hook, play_time_cost_reduction_amount, play_time_alt_cost_chars, normalize_member_name, has_play_time_alt_cost_hand_cards, discard_play_time_alt_cost, shuffle_waitroom_members_to_deck_bottom, rps_choice_name, push_rps_log
+  - **ability.c (6 functions):** execute_gain_ability_effect, execute_set_card_identity_effect, execute_activate_ability, execute_invalidate_ability, execute_gain_ability, execute_gain_ability_from_source
+- Next: fix failing tests (7 failures), port remaining stubs (31 stubs).

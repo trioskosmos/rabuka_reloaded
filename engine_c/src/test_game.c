@@ -188,6 +188,9 @@ const char *test_pending_choice_type(TestGame *tg){
         case RB_CHOICE_SELECT_CARD:        return "SelectCard";
         case RB_CHOICE_SELECT_TARGET:      return "SelectTarget";
         case RB_CHOICE_SELECT_HEART_COLOR: return "SelectHeartColor";
+        case RB_CHOICE_SELECT_NUMBER:      return "SelectNumber";
+        case RB_CHOICE_SELECT_POSITION:    return "SelectPosition";
+        case RB_CHOICE_SELECT_AUTO_ABILITY: return "SelectAutoAbility";
         default:                           return "Unknown";
     }
 }
