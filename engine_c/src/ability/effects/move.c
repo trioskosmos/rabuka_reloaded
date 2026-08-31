@@ -378,3 +378,24 @@ static void remove_card_from_any_zone(RbPlayer *P, int *last_vacated, int cid) {
 
 /* needed by engine.c wrapper */
 int card_matches_card_type_filter(int card_idx, const char *filter);
+
+/* Mirror move_cards.rs::execute_selected_energy_zone_cards — for each energy-zone
+    card at the given indices, clear its modifiers and flip it to "wait" orientation,
+    and decrement the player's active energy count by the number of marked cards. */
+void rb_effect_selected_energy_zone_cards(GameState *g, int actor, const int *indices, int n_indices) {
+    if (!g || n_indices <= 0) return;
+    int pl = actor;
+    RbPlayer *P = &g->p[pl];
+    int to_mark[RB_MAX_ZONE]; int nm = 0;
+    for (int i = 0; i < n_indices && nm < RB_MAX_ZONE; i++) {
+        int idx = indices[i];
+        if (idx >= 0 && idx < P->energy.n) to_mark[nm++] = P->energy.cards[idx];
+    }
+    /* active_energy_count -= marked count (saturating at 0). */
+    int sub = nm < 32768 ? nm : 32767;
+    P->energy_active = P->energy_active > sub ? P->energy_active - sub : 0;
+    for (int i = 0; i < nm; i++) {
+        rb_mods_clear_card(&g->mods, to_mark[i]);
+        rb_mods_set_orientation(&g->mods, to_mark[i], "wait");
+    }
+}

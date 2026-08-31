@@ -924,14 +924,21 @@ void rb_effect_move_cards(GameState *g, int actor, AbilityEffect *e);
     missing/invalid index. */
 int  rb_move_from_under_member(GameState *g, int actor, const int *indices, int n_indices,
                                 int (*validate)(int), const char *dst, const char *target);
+/* Mirror move_cards.rs::execute_selected_energy_zone_cards — mark the energy-zone
+    cards at the given indices as "wait" (clearing their modifiers) and decrement the
+    player's active energy count by the marked count. */
+void rb_effect_selected_energy_zone_cards(GameState *g, int actor, const int *indices, int n_indices);
 /* Mirror move_cards.rs::drain_under_cards_to_energy_zone — route every card
     tucked under the given stage member to the energy zone (if it is an energy
     card, marked wait) or the waitroom. Returns the number of cards moved. */
 int  rb_drain_under_cards_to_energy_zone(GameState *g, const char *target, int stage_idx);
 void rb_effect_gain_surplus_heart(GameState *g, int actor, const AbilityEffect *e);
+/* Mirror cost.rs::handle_pay_cost_all_discard — "may discard your whole hand" cost. */
+void rb_effect_pay_cost_all_discard(GameState *g, int actor, const AbilityEffect *e);
 void rb_effect_look_at(GameState *g, int actor, AbilityEffect *e);
 void rb_effect_reveal_until_live_card(GameState *g, int actor, AbilityEffect *e);
 void rb_effect_reveal_until_chosen_card(GameState *g, int actor, AbilityEffect *e);
+void rb_effect_reveal_until_target(GameState *g, int actor, AbilityEffect *e);
 void rb_effect_select_cards(GameState *g, int actor, AbilityEffect *e);
 int  rb_looked_at_pool(int pl, int *out_ids, int max);
 void rb_gain_ability(GameState *g, int actor, AbilityEffect *e);

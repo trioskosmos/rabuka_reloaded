@@ -468,6 +468,8 @@ static void handle_action(GameState *g, int actor, AbilityEffect *e, int host_ci
         rb_effect_reveal_until_live_card(g, actor, e);
     } else if (!strcmp(act, "reveal_until_chosen_card")) {
         rb_effect_reveal_until_chosen_card(g, actor, e);
+    } else if (!strcmp(act, "reveal_until_target")) {
+        rb_effect_reveal_until_target(g, actor, e);
     } else if (!strcmp(act, "select_cards") || !strcmp(act, "select") ||
                !strcmp(act, "select_number") || !strcmp(act, "look_and_select")) {
         rb_effect_select_cards(g, actor, e);

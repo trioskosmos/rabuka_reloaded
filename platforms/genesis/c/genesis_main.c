@@ -7,6 +7,7 @@
 #include "rabuka.h"
 #include "romdata.h"
 #include "console.h"
+#include <string.h>
 
 static unsigned char *my_read(const char *path, long *out_len) {
     if (strstr(path, "cards.bin"))            { *out_len = (long)cards_bin_len;   return (unsigned char *)cards_bin; }

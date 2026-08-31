@@ -1,6 +1,7 @@
 #include "rabuka.h"
 #include <string.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 /* Look/select pools — mirrors engine/src/ability/look.rs
    For portable core we keep two pools per player:
@@ -246,9 +247,24 @@ static int card_is_live_pred(const GameState *g, int cid){
 /* Adapter so card_matches_card_type_filter (int,int) can be used as a
    reveal_until predicate (const GameState*,int). */
 static const char *g_reveal_ctype;
+static int g_reveal_cost_limit = -1;
+static const char *g_reveal_cost_op;
 static int card_type_pred(const GameState *g, int cid){
     (void)g;
     return card_matches_card_type_filter(cid, g_reveal_ctype);
+}
+
+/* Mirror look.rs::execute_reveal_until_target — reveal from the deck until a card
+    matching card_type (and, for member_card, cost_limit op) is found. The predicate
+    layers the optional cost gate on top of the card_type gate. */
+static int card_type_cost_pred(const GameState *g, int cid){
+    (void)g;
+    if (!g_reveal_ctype) return 0;
+    if (!card_matches_card_type_filter(cid, g_reveal_ctype)) return 0;
+    /* cost_limit only applies when the selected card_type is member_card. */
+    if (g_reveal_cost_limit >= 0 && !strcmp(g_reveal_ctype, "member_card"))
+        if (!rb_card_matches_cost_limit(cid, g_reveal_cost_limit, g_reveal_cost_op)) return 0;
+    return 1;
 }
 
 void rb_effect_reveal_until_live_card(GameState *g, int actor, AbilityEffect *e){
@@ -268,6 +284,38 @@ void rb_effect_reveal_until_chosen_card(GameState *g, int actor, AbilityEffect *
     for(int i=0;i<e->n_extra;i++) if(e->extra_k[i] && !strcmp(e->extra_k[i],"card_type")) ctype=e->extra_v[i];
     g_reveal_ctype = ctype ? ctype : "live_card";
     reveal_until(g, who, ctype ? card_type_pred : card_is_live_pred);
+    rb_emit_choice(g, actor, RB_CHOICE_SELECT_CARD, "looked_at", ctype, 1, e->is_optional?1:0, NULL);
+    g->queue.resume_mode = 2; g->queue.resume_eff = e; g->queue.resume_is_select = 0;
+    g->queue.resume_actor = actor; g->queue.resume_host = actor;
+}
+
+/* Mirror look.rs::execute_reveal_until_target — reveal from the deck until a card
+    matching card_type (and the member_card cost_limit gate) is found. On a match
+    the matched card is moved to the FRONT of the looked_at pool; on no match the
+    pool is cleared, mirroring Rust's matched_idx reordering. */
+void rb_effect_reveal_until_target(GameState *g, int actor, AbilityEffect *e){
+    int who = actor;
+    if(e->target && !strcmp(e->target,"opponent")) who=actor^1;
+    const char *ctype=NULL, *clim=NULL, *cop=NULL;
+    for(int i=0;i<e->n_extra;i++){
+        if(!e->extra_k[i]) continue;
+        if(!strcmp(e->extra_k[i],"card_type")) ctype=e->extra_v[i];
+        else if(!strcmp(e->extra_k[i],"cost_limit")) clim=e->extra_v[i];
+        else if(!strcmp(e->extra_k[i],"cost_limit_operator")) cop=e->extra_v[i];
+    }
+    g_reveal_ctype = ctype ? ctype : "live_card";
+    g_reveal_cost_limit = clim ? atoi(clim) : -1;
+    g_reveal_cost_op = cop ? cop : NULL;
+    LookPool *lp=&g_look[who];
+    int matched = reveal_until(g, who, card_type_cost_pred);
+    if(matched && lp->n>1){
+        /* reveal_until pushes the matched card last; move it to the pool front. */
+        int m = lp->cards[lp->n-1];
+        for(int i=lp->n-1;i>0;i--) lp->cards[i]=lp->cards[i-1];
+        lp->cards[0]=m;
+    } else if(!matched){
+        lp->n=0; /* no match → clear pool (mirrors Rust looked_at_cards.clear()) */
+    }
     rb_emit_choice(g, actor, RB_CHOICE_SELECT_CARD, "looked_at", ctype, 1, e->is_optional?1:0, NULL);
     g->queue.resume_mode = 2; g->queue.resume_eff = e; g->queue.resume_is_select = 0;
     g->queue.resume_actor = actor; g->queue.resume_host = actor;

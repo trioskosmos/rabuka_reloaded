@@ -16,3 +16,7 @@ abstr_bin_end:
 
 .set cards_bin_len, cards_bin_end - cards_bin
 .set abstr_bin_len, abstr_bin_end - abstr_bin
+
+/* ROM-resident pointer tables for the string databases (RB_ROM_STRINGS). */
+.include "card_ptrs.inc"
+.include "abstr_ptrs.inc"

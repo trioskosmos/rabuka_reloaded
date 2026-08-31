@@ -351,6 +351,8 @@ static void apply_constant_effect(GameState *g, int pl, int host_cid, AbilityEff
         rb_effect_reveal_until_live_card(g, pl, e);
     } else if (!strcmp(e->action,"reveal_until_chosen_card")) {
         rb_effect_reveal_until_chosen_card(g, pl, e);
+    } else if (!strcmp(e->action,"reveal_until_target")) {
+        rb_effect_reveal_until_target(g, pl, e);
     } else if (!strcmp(e->action,"select_cards") || !strcmp(e->action,"select") ||
                !strcmp(e->action,"select_number") || !strcmp(e->action,"look_and_select")) {
         rb_effect_select_cards(g, pl, e);

@@ -16,6 +16,12 @@ extern const uint32_t RBKA_NUM_ABILITIES;
 extern uint16_t *g_offset_deltas;
 extern uint32_t *g_strings_offsets;
 
+#ifdef RB_ROM_STRINGS
+/* Pointer tables emitted by pack.py into ROM (see romdata.s / *.inc). */
+extern char **g_card_strings_rom;
+extern char **g_strings_rom;
+#endif
+
 /* ── globals ── */
 static unsigned char *g_cards_blob = NULL;
 static long          g_cards_len = 0;
@@ -74,24 +80,25 @@ static int parse_cards(const unsigned char *blob, long len) {
     const unsigned char *strtab = g_cards_blob + 10;
     const unsigned char *p = strtab;
 
+#ifdef RB_ROM_STRINGS
+    /* Pointer array lives in ROM (card_ptrs.inc); no arena used. */
+    g_card_strings = g_card_strings_rom;
+    g_num_card_strings = g_num_cards;
+    (void)p; (void)strtab_len;
+#else
     size_t cap = 256, n = 0;
     g_card_strings = malloc(cap * sizeof(char *));
     while ((long)(p - strtab) < (long)strtab_len) {
         uint16_t slen = le16(p); p += 2;
         if (n + 1 > cap) { cap *= 2; g_card_strings = realloc(g_card_strings, cap * sizeof(char *)); }
-#ifdef RB_ROM_STRINGS
-        /* Bare-metal: the strtab blob is NUL-terminated in ROM; keep a ROM
-           pointer instead of duplicating the string into the 64 KB arena. */
-        g_card_strings[n++] = (char *)p;
-#else
         char *s = malloc(slen + 1);
         memcpy(s, p, slen); s[slen] = 0;
         g_card_strings[n++] = s;
-#endif
         p += slen;
     }
     g_card_strings = realloc(g_card_strings, (n ? n : 1) * sizeof(char *));
     g_num_card_strings = (uint32_t)n;
+#endif
 
     const unsigned char *lentab = strtab + strtab_len;
     const unsigned char *cardbase = lentab + g_num_cards;
@@ -111,21 +118,21 @@ static int parse_strings(const unsigned char *blob, long len) {
     g_abstr_blob = (unsigned char *)blob;
     g_abstr_len = len;
     uint32_t n = RBKA_NUM_STRING_OFFSETS ? (RBKA_NUM_STRING_OFFSETS - 1) : 0;
+#ifdef RB_ROM_STRINGS
+    /* Pointer array lives in ROM (abstr_ptrs.inc); no arena used. */
+    g_strings = g_strings_rom;
+#else
     g_strings = malloc((n ? n : 1) * sizeof(char *));
     for (uint32_t i = 0; i < n; i++) {
         uint32_t a = g_strings_offsets[i];
         uint32_t b = g_strings_offsets[i + 1];
         uint32_t sl = b - a;
-#ifdef RB_ROM_STRINGS
-        /* Bare-metal: abilities_strings.bin is NUL-terminated in ROM; keep the
-           ROM pointer (g_strings_offsets already indexes the original starts). */
-        g_strings[i] = (char *)(g_abstr_blob + a);
-#else
         char *s = malloc(sl + 1);
         memcpy(s, g_abstr_blob + a, sl); s[sl] = 0;
         g_strings[i] = s;
-#endif
     }
+#endif
+    (void)n;
     return 0;
 }
 

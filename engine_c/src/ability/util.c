@@ -168,16 +168,21 @@ int rb_card_matches_group_str(int card_id, const char *group_name) {
    unit/group name), group/name matching must also accept those identities.
    Stored as raw group/unit name strings keyed by card_id. */
 #define RB_MAX_IDENT 8
-static char g_ident[RB_MAX_CARD_IDS][RB_MAX_IDENT][28];
+/* Per-card identity override slots, allocated on demand from the arena so the
+   table doesn't consume 896 KB of BSS (Genesis only has 64 KB RAM). */
+static char *g_ident[RB_MAX_CARD_IDS];
 static int  g_ident_n[RB_MAX_CARD_IDS];
 
 void rb_set_card_identity(int cid, const char *name) {
     if (cid < 0 || cid >= RB_MAX_CARD_IDS || !name || !*name) return;
+    if (!g_ident[cid]) g_ident[cid] = (char *)malloc((size_t)RB_MAX_IDENT * 28);
+    char *base = g_ident[cid];
+    if (!base) return;
     for (int i = 0; i < g_ident_n[cid]; i++)
-        if (!strcmp(g_ident[cid][i], name)) return;
+        if (!strcmp(base + (size_t)i * 28, name)) return;
     if (g_ident_n[cid] < RB_MAX_IDENT) {
-        strncpy(g_ident[cid][g_ident_n[cid]], name, 27);
-        g_ident[cid][g_ident_n[cid]][27] = 0;
+        strncpy(base + (size_t)g_ident_n[cid] * 28, name, 27);
+        base[(size_t)g_ident_n[cid] * 28 + 27] = 0;
         g_ident_n[cid]++;
     }
 }
@@ -186,11 +191,12 @@ int rb_card_matches_identity_str(int card_id, const char *group_name) {
     if (card_id < 0 || card_id >= RB_MAX_CARD_IDS || !group_name) return 0;
     char *gn = norm_str(group_name);
     int match = 0;
+    char *base = g_ident[card_id];
     for (int i = 0; i < g_ident_n[card_id]; i++) {
-        char *io = norm_str(g_ident[card_id][i]);
+        char *slot = base ? base + (size_t)i * 28 : NULL;
+        char *io = slot ? norm_str(slot) : NULL;
         if ((io && (strstr(io, gn) || strstr(gn, io))) ||
-            (strstr(g_ident[card_id][i], group_name) ||
-             strstr(group_name, g_ident[card_id][i])))
+            (slot && (strstr(slot, group_name) || strstr(group_name, slot))))
             match = 1;
         if (io) rb_free(io);
         if (match) break;

@@ -521,6 +521,43 @@ static int h_gain_heart_all_type(GameState *g, int actor, const AbilityEffect *e
     return 1;
 }
 
+/* Mirror misc.rs:handle_bp6_pattern — "gain 1 heart of each distinct color among
+    discarded cards". Detected by: resource=heart + per_unit + per_unit_type=discard
+    + multiple_targets. For every distinct base_heart color present in the recently
+    moved (discarded) cards, grant 1 heart of that color to the activating card. */
+static int h_bp6_pattern(GameState *g, int actor, const AbilityEffect *e) {
+    (void)actor;
+    const char *res = eff_extra(e, "resource");
+    int per_unit = (e->per_unit > 0) || extra_true(e, "per_unit");
+    const char *put = eff_extra(e, "per_unit_type");
+    int multi = extra_true(e, "multiple_targets");
+    if (!(res && !strcmp(res, "heart") && per_unit && put && !strcmp(put, "discard") && multi))
+        return 0;
+    int activating = s_activating_card;
+    if (activating < 0) return 1;
+    /* Collect the distinct base_heart colors among the recently moved cards. */
+    int distinct[8]; int nd = 0;
+    for (int i = 0; i < g->n_recently_moved; i++) {
+        int cid = g->recently_moved[i];
+        Card c;
+        if (!rb_decode_card_by_index((uint32_t)cid, &c)) continue;
+        for (int h = 0; h < c.n_hearts && h < c.num_base; h++) {
+            int col = c.heart_color[h];
+            if (col < 0 || col > 7) continue;
+            int seen = 0;
+            for (int j = 0; j < nd; j++) if (distinct[j] == col) { seen = 1; break; }
+            if (!seen && nd < 8) distinct[nd++] = col;
+        }
+        rb_free_card(&c);
+    }
+    int dur = duration_is_temporary(e) ? effect_duration(e) : RB_TEMP_PERM;
+    for (int i = 0; i < nd; i++) {
+        int amt = 1;
+        apply_heart_to_card(g, activating, &distinct[i], &amt, 1, 0, dur);
+    }
+    return 1;
+}
+
 static int h_gain_resource(GameState *g, int actor, const AbilityEffect *e) {
     /* Mirror misc.rs:execute_gain_resource — special heart shapes first, then the
        normalized resource kind drives target resolution + blade/heart application.
@@ -531,6 +568,7 @@ static int h_gain_resource(GameState *g, int actor, const AbilityEffect *e) {
         return h_gain_heart_colors_from_selected_card(g, actor, e);
     if (res && !strcmp(res, "heart") && rb_is_all_heart_type(e))
         return h_gain_heart_all_type(g, actor, e);
+    if (h_bp6_pattern(g, actor, e)) return 1;
     if (res && !strcmp(res, "surplus_heart")) { rb_effect_gain_surplus_heart(g, actor, e); return 1; }
 
     int kind = resource_kind(res);
@@ -607,7 +645,30 @@ static int h_gain_resource(GameState *g, int actor, const AbilityEffect *e) {
     }
 
     apply_blade_resource(g, e, kind, who, t.blade, t.n_blade, activating, is_all, dur,
-                         final_count, blades_to_add);
+                          final_count, blades_to_add);
+
+    /* group_reference="same_group_name": restrict heart targets to members whose
+        group matches the cost-discarded card's group (mirrors misc.rs:1199). */
+    if (extra_true(e, "group_reference")) {
+        const char *gref = eff_extra(e, "group_reference");
+        if (gref && !strcmp(gref, "same_group_name") && g->n_recently_moved > 0) {
+            char ref_group[64]; ref_group[0] = 0;
+            Card rc;
+            if (rb_decode_card_by_index((uint32_t)g->recently_moved[0], &rc)) {
+                const char *gs = rc.group_idx ? rb_card_string(rc.group_idx) : NULL;
+                if (gs) strncpy(ref_group, gs, sizeof ref_group - 1);
+                rb_free_card(&rc);
+            }
+            if (ref_group[0]) {
+                int keep = 0;
+                for (int i = 0; i < t.n_heart; i++)
+                    if (rb_card_matches_group_str(t.heart[i], ref_group))
+                        t.heart[keep++] = t.heart[i];
+                t.n_heart = keep;
+            }
+        }
+    }
+
     apply_heart_resource(g, e, kind, who, t.heart, t.n_heart, activating, is_self_target,
                          is_all, dur, is_negative, colors, counts, 1, final_count);
     g->queue.selected_heart_color = -1;       /* consumed by this grant */
@@ -621,6 +682,21 @@ static int h_pay_energy(GameState *g, int actor, const AbilityEffect *e) {
     RbPlayer *P = &g->p[actor];
     P->energy_active -= n;
     if (P->energy_active < 0) P->energy_active = 0;
+    return 1;
+}
+/* Mirror cost.rs::handle_pay_cost_all_discard — the "may discard your whole hand"
+    cost: move every card in the target player's hand into the waitroom (C's discard
+    pile). Cost moves are player actions, not effects, so we do NOT mark them in
+    recently_moved / moved_this_turn (mirrors Rust push_movement_event(...false)). */
+int rb_effect_pay_cost_all_discard(GameState *g, int actor, const AbilityEffect *e) {
+    int who = actor;
+    if (e->target && (!strcmp(e->target, "opponent") || !strcmp(e->target, "p2")))
+        who = actor ^ 1;
+    RbPlayer *P = &g->p[who];
+    while (P->hand.n > 0) {
+        int cid = P->hand.cards[--P->hand.n];
+        rb_waitroom_add(P, cid);
+    }
     return 1;
 }
 static int h_discard_until_count(GameState *g, int actor, const AbilityEffect *e) {
@@ -1028,6 +1104,7 @@ int rb_execute_misc_effect(GameState *g, int actor, const RbPlayer *self,
         else if (!strcmp(name, "choose_required_hearts")) r = h_choose_required_hearts(g, actor, e);
         else if (!strcmp(name, "choose_target_player"))   r = h_choose_target_player(g, actor, e);
         else if (!strcmp(name, "custom"))                 r = h_custom(g, actor, e);
+        else if (!strcmp(name, "pay_cost_all:discard_all")) r = rb_effect_pay_cost_all_discard(g, actor, e);
         else r = 0; /* unknown misc effect */
     }
     (void)self;

@@ -9,6 +9,8 @@
 #include <stdarg.h>
 #include <stdint.h>
 #include <ctype.h>
+#include <stdio.h>
+#include <string.h>
 
 /* ---- console output hook (implemented in console.c) ---- */
 void __console_out(int c);
