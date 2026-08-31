@@ -1,5 +1,12 @@
 # engine_c — C port of the Rabuka engine
 
+> ## ⛔ YOU ARE TO PORT THE RUST TO C. STOP BULLSHITTING. STOP COMPLAINING. JUST DO IT. ⛔
+> No essays. No "this is hard / architecture mismatch / I need to explain myself". Open the
+> Rust file, translate its functions into the matching `.c` file faithfully (every branch,
+> every state mutation), build, keep `rb_engine_test`/`rb_engine_replay`/`rb_engine_ported`
+> green, commit. A function that compiles but only clears state and returns is NOT DONE.
+> Parity means the real logic is reproduced. Now go port.
+
 **STOP OVERTHINKING. JUST PORT.** Pick a `.c` file, open its Rust twin in `engine/src/...`,
 find the functions it still fakes (grep `TODO`/`STUB`/`not yet`/`no-op`/`return 0;`/`placeholder`),
 copy them verbatim into C, build, run `rb_engine_test`/`rb_engine_replay`/`rb_engine_ported`
@@ -19,6 +26,44 @@ engine decodes that bytecode (mirrors `ability/vm.rs`) and executes the effect t
 **Priority:** translate the whole engine first; the generated test suite (`rb_engine_generated`)
 is a *worklist*, expected red until everything is ported. Only the hand-written suites
 (`rb_engine_test` / `rb_engine_replay` / `rb_engine_ported`) are gating and must stay green.
+
+---
+
+## ANTI-PATTERNS (do NOT do these — they look like progress, are not)
+
+1. **A function that exists by name is NOT parity.** A handler whose body only does
+   "clear the choice state + resume the queue" (or `return 0;`/`return 1;` with no real
+   work) is a **stub**, not a port. Porting `choice.rs` by writing 30 `handle_*` functions
+   that all just `rb_resolver_clear_choice_state_and_resume(self)` produces a ~400-line
+   `choice.c` that *compiles* but is nowhere near the ~3000 lines of real logic in
+   `choice.rs`. That is the bullshit this project keeps repeating. **Parity = the actual
+   branches/state mutations from the Rust function are reproduced**, not the skeleton.
+   Verify by line/branch count against the Rust twin, not by grepping for `rb_*_handle_*`.
+
+2. **Never delete intermediate artifacts before the merged result is committed.** If you
+   translate via per-function fragment files (`choice_frag_*.c`), you MUST assemble them
+   into the real `.c`, **build + commit**, and only THEN (optionally) remove the fragments.
+   Deleting fragments before committing the merge = throwing away the work. This happened;
+   it lost a full translation.
+
+3. **One writer per file.** Subagents writing to the same `.c` concurrently corrupt it.
+   If you fan out per-function work, each subagent writes to its OWN uniquely-named fragment
+   file; a single orchestrator concatenates/merges them into the one `.c` (dedupe by
+   function name, strip duplicate struct/typedef defs) and commits. Do not have multiple
+   agents edit `choice.c` directly at once.
+
+4. **Do not invent a parallel architecture.** The C engine already has its data model
+   (`GameState`, `RbChoice`, `queue.pending/deferred/resume_*`, `rb_*`). Translate the Rust
+   methods onto THAT model using the existing `rb_*` helpers. Inventing a brand-new
+   `RbAbilityResolver` with fields/helpers that don't exist, then calling hundreds of
+   not-yet-written `rb_resolver_*` helpers, produces un-mergeable fragments.
+
+5. **Assemble/merge must read the ORIGINAL `.c` from `git show HEAD:...`, not the current
+   working file** — otherwise you duplicate the header and the file balloons.
+
+Check parity with: `python size_audit.py` (C vs Rust line %), and by diffing the function
+list (name presence ≠ implementation). A "done" file still showing a few-% C/Rust ratio is
+a stub file, not a port.
 
 ---
 
