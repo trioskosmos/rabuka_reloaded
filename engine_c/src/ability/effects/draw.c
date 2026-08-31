@@ -542,3 +542,10 @@ RbEffectDataSingleCard rb_make_card_effect_data(int card_id, int amount, const c
     }
     return d;
 }
+
+/* Mirror draw.rs:AbilityResolver::resolve_dynamic_count -- resolve a dynamic
+   count reference using the resolver's transient context. */
+int rb_draw_resolve_dynamic_count(GameState *g, int actor, const AbilityEffect *e, int host_cid) {
+    if (!g || !e) return 0;
+    return rb_effect_count(g, actor, host_cid, e, g->last_draw_count);
+}

@@ -1114,3 +1114,66 @@ int rb_execute_misc_effect(GameState *g, int actor, const RbPlayer *self,
     if (resolved) *resolved = r;
     return r;
 }
+
+/* Mirror misc.rs:execute_place_energy_under_member_non_optional -- cost-path
+   variant that forces optional=false to avoid re-prompting. */
+int rb_effect_place_energy_under_member_non_optional(GameState *g, int actor, const AbilityEffect *e) {
+    if (!g || !e) return 0;
+    RbPlayer *P = &g->p[actor];
+    int area = 1;
+    const char *dest = e->destination && *e->destination ? e->destination : e->target;
+    if (dest && *dest) area = rb_pos_to_area(dest);
+    if (area < 0 || area >= RB_STAGE_SIZE) area = 1;
+    if (P->stage[area] < 0) return 0;
+    const char *source = e->source;
+    int n = e->count > 0 ? e->count : 1;
+    if (source && !strcmp(source, "energy_deck")) {
+        int moved = 0;
+        while (moved < n && P->energy_deck.n > 0) {
+            int cid = P->energy_deck.cards[--P->energy_deck.n];
+            if (P->under_cards[area].n < RB_MAX_ZONE)
+                P->under_cards[area].cards[P->under_cards[area].n++] = cid;
+            moved++;
+        }
+        rb_recalc_constants(g);
+        return 1;
+    }
+    if (source && (!strcmp(source, "under_member") || !strcmp(source, "energy_deck")) &&
+        e->destination && !strcmp(e->destination, "energy_zone")) {
+        int moved = 0;
+        while (moved < n && P->energy_deck.n > 0) {
+            int cid = P->energy_deck.cards[--P->energy_deck.n];
+            if (P->energy.n < RB_MAX_ZONE)
+                P->energy.cards[P->energy.n++] = cid;
+            moved++;
+        }
+        return 1;
+    }
+    int moved = 0;
+    while (moved < n && P->energy.n > 0) {
+        int cid = P->energy.cards[--P->energy.n];
+        if (P->under_cards[area].n < RB_MAX_ZONE)
+            P->under_cards[area].cards[P->under_cards[area].n++] = cid;
+        moved++;
+    }
+    rb_recalc_constants(g);
+    return 1;
+}
+
+/* Mirror misc.rs:card_name -- get a card's display name. */
+static const char *card_name(int card_id, char *buf, size_t cap) {
+    if (card_id >= 0) {
+        Card c;
+        if (rb_decode_card_by_index((uint32_t)card_id, &c)) {
+            if (c.name && c.name[0]) {
+                strncpy(buf, c.name, cap - 1);
+                buf[cap - 1] = 0;
+                rb_free_card(&c);
+                return buf;
+            }
+            rb_free_card(&c);
+        }
+    }
+    snprintf(buf, cap, "Card#%d", card_id);
+    return buf;
+}

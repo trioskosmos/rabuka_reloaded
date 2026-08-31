@@ -2418,3 +2418,30 @@ const char *rb_effect_state_as_str(int es) {
         default: return NULL;
     }
 }
+
+/* -- Decode-fallback audit (mirrors vm.rs DECODE_FALLBACKS) -- */
+#define RB_DECODE_AUDIT_MAX 4096
+static uint32_t g_decode_fallback_count = 0;
+static uint32_t g_decode_fallback_abilities[RB_DECODE_AUDIT_MAX] = {0};
+
+void rb_note_decode_fallback(int ability, const char *field, const char *value) {
+    (void)field; (void)value;
+    g_decode_fallback_count++;
+    if (ability >= 0 && ability < RB_DECODE_AUDIT_MAX) {
+        g_decode_fallback_abilities[ability]++;
+    }
+}
+
+uint32_t rb_decode_fallback_count(void) {
+    return g_decode_fallback_count;
+}
+
+int rb_decode_fallback_abilities(uint32_t *out, int max) {
+    int n = 0;
+    for (uint32_t i = 0; i < RB_DECODE_AUDIT_MAX && n < max; i++) {
+        if (g_decode_fallback_abilities[i] > 0) {
+            out[n++] = i;
+        }
+    }
+    return n;
+}

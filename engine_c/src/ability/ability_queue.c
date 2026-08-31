@@ -233,3 +233,145 @@ int rb_queue_has_resolver(const GameState *g) {
     (void)g;
     return 0;
 }
+
+/* -- Ported from engine/src/ability_queue.rs -- */
+
+RbQueueEntry *rb_queue_current_entry_mut(GameState *g) {
+    if (!g) return NULL;
+    if (g->queue.state == RB_QUEUE_IDLE) return NULL;
+    if (g->queue.state == RB_QUEUE_AWAITING_CHOICE && g->queue.auto_ability) return NULL;
+    if (g->queue.cur < 0 || g->queue.cur >= g->queue.n_entries) return NULL;
+    return &g->queue.entries[g->queue.cur];
+}
+
+const RbQueueEntry *rb_queue_get_entry(const GameState *g, int index) {
+    if (!g || index < 0 || index >= g->queue.n_entries) return NULL;
+    return &g->queue.entries[index];
+}
+
+int rb_queue_len(const GameState *g) {
+    return g ? g->queue.n_entries : 0;
+}
+
+int rb_queue_is_empty(const GameState *g) {
+    return !g || g->queue.n_entries == 0;
+}
+
+void rb_queue_iter(const GameState *g, void (*fn)(const RbQueueEntry *, void *), void *ctx) {
+    if (!g || !fn) return;
+    for (int i = 0; i < g->queue.n_entries; i++) {
+        fn(&g->queue.entries[i], ctx);
+    }
+}
+
+void rb_queue_pause_for_choice(GameState *g, const RbChoice *choice) {
+    if (!g || !choice) return;
+    if (g->queue.state == RB_QUEUE_AWAITING_CHOICE) return;
+    g->queue.pending = *choice;
+    g->queue.has_pending = 1;
+    g->queue.actor = g->active;
+    g->queue.state = RB_QUEUE_AWAITING_CHOICE;
+}
+
+void rb_queue_pause_for_auto_ability_choice(GameState *g, const RbChoice *choice) {
+    if (!g || !choice) return;
+    g->queue.pending = *choice;
+    g->queue.has_pending = 1;
+    g->queue.auto_ability = 1;
+    g->queue.actor = g->active;
+    g->queue.state = RB_QUEUE_AWAITING_CHOICE;
+}
+
+void rb_queue_resume_with_choice(GameState *g) {
+    if (!g) return;
+    if (g->queue.auto_ability) {
+        g->queue.auto_ability = 0;
+        g->queue.has_pending = 0;
+        g->queue.state = RB_QUEUE_IDLE;
+    } else {
+        g->queue.has_pending = 0;
+        g->queue.state = RB_QUEUE_RESOLVING;
+    }
+}
+
+void rb_queue_clear_completed(GameState *g) {
+    if (!g) return;
+    int write = 0;
+    for (int i = 0; i < g->queue.n_entries; i++) {
+        if (!g->queue.entries[i].completed) {
+            if (write != i) g->queue.entries[write] = g->queue.entries[i];
+            write++;
+        }
+    }
+    g->queue.n_entries = write;
+    if ((int)g->queue.cur > g->queue.n_entries) g->queue.cur = 0;
+}
+
+void rb_queue_push_constant_context(GameState *g) {
+    if (!g || g->queue.n_entries >= RB_QUEUE_DEPTH) return;
+    int idx = g->queue.n_entries;
+    memset(&g->queue.entries[idx], 0, sizeof(RbQueueEntry));
+    g->queue.entries[idx].card_id = -1;
+    g->queue.entries[idx].ability_idx = -1;
+    g->queue.n_entries++;
+    g->queue.cur = idx;
+    g->queue.state = RB_QUEUE_RESOLVING;
+}
+
+int rb_queue_pending_entries(const GameState *g, int *indices, int max_indices) {
+    if (!g || !indices) return 0;
+    int count = 0;
+    for (int i = 0; i < g->queue.n_entries && count < max_indices; i++) {
+        if (!g->queue.entries[i].completed) {
+            indices[count++] = i;
+        }
+    }
+    return count;
+}
+
+void rb_queue_set_pending_actions(GameState *g, int count) {
+    if (!g) return;
+    int cur = g->queue.cur;
+    if (cur < 0 || cur >= g->queue.n_entries) return;
+    g->queue.entries[cur].pending_actions_n = count > 0 ? count : 0;
+}
+
+void rb_queue_save_pending_actions(GameState *g, int count) {
+    if (!g || count <= 0) return;
+    int cur = g->queue.cur;
+    if (cur < 0 || cur >= g->queue.n_entries) return;
+    g->queue.entries[cur].pending_actions_n += count;
+}
+
+int rb_queue_take_pending_actions(GameState *g) {
+    if (!g) return 0;
+    int cur = g->queue.cur;
+    if (cur < 0 || cur >= g->queue.n_entries) return 0;
+    int n = g->queue.entries[cur].pending_actions_n;
+    g->queue.entries[cur].pending_actions_n = 0;
+    return n;
+}
+
+int rb_queue_entry_player_id(const GameState *g, int index) {
+    if (!g || index < 0 || index >= g->queue.n_entries) return -1;
+    return rb_owner_of_card(g, g->queue.entries[index].card_id);
+}
+
+void rb_queue_set_resolver(GameState *g) {
+    (void)g;
+}
+
+void rb_queue_dump_state(const GameState *g, char *buf, size_t buf_sz) {
+    if (!g || !buf || buf_sz == 0) return;
+    int pos = 0;
+    pos += snprintf(buf + pos, buf_sz - pos, "state=%d\n", g->queue.state);
+    pos += snprintf(buf + pos, buf_sz - pos, "cur=%d\n", g->queue.cur);
+    pos += snprintf(buf + pos, buf_sz - pos, "n_entries=%d\n", g->queue.n_entries);
+    for (int i = 0; i < g->queue.n_entries && pos < (int)buf_sz; i++) {
+        RbQueueEntry *e = &g->queue.entries[i];
+        pos += snprintf(buf + pos, buf_sz - pos,
+            "  [%d] card=%d ab#%d completed=%d cost_paid=%d effect_started=%d optional_cost_result=%d pending_actions=%d\n",
+            e->ability_idx, e->card_id, e->ability_idx, e->completed,
+            e->cost_paid, e->effect_started, e->optional_cost_result, e->pending_actions_n);
+    }
+}

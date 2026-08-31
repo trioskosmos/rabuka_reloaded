@@ -815,14 +815,40 @@ int rb_has_cannot_baton_touch_protection_util(int incoming, int existing) {
     return rb_has_cannot_baton_touch_protection(incoming, existing);
 }
 
-/* Mirror util.rs::prune_dominated — remove masks dominated by another in the
-   set (mask m is dominated if some kept k has (k & m) == m).
-   C port using bitmasks: sorts, dedupes, then removes m ⊆ k. Returns count kept. */
-int rb_prune_dominated(const int *cands, int n) {
-    (void)cands; (void)n;
-    /* Full bitmask dominated-set pruning is used by the energy solver.
-       C port delegates to the existing rb_energy_activate_all pipeline. */
-    return 0;
+/* Mirror util.rs::prune_dominated — remove masks that are strict subsets of
+   another mask in the list. A mask m is dominated if some kept k has (k & m) == m.
+   Operates in-place on the array; *n is updated to the new count. */
+static int cmp_u64(const void *a, const void *b) {
+    uint64_t va = *(const uint64_t *)a, vb = *(const uint64_t *)b;
+    return (va > vb) - (va < vb);
+}
+
+void rb_prune_dominated(uint64_t *masks, int *n) {
+    if (*n <= 1) return;
+    qsort(masks, *n, sizeof(uint64_t), cmp_u64);
+    /* dedup */
+    int m = 1;
+    for (int i = 1; i < *n; i++)
+        if (masks[i] != masks[m - 1]) masks[m++] = masks[i];
+    *n = m;
+    /* remove dominated */
+    uint64_t kept[RB_MAX_ZONE];
+    int nk = 0;
+    for (int i = 0; i < *n; i++) {
+        uint64_t mi = masks[i];
+        int dominated = 0;
+        for (int j = 0; j < nk; j++) {
+            if ((kept[j] & mi) == mi) { dominated = 1; break; }
+        }
+        if (dominated) continue;
+        int w = 0;
+        for (int j = 0; j < nk; j++)
+            if ((mi & kept[j]) != kept[j]) kept[w++] = kept[j];
+        nk = w;
+        kept[nk++] = mi;
+    }
+    memcpy(masks, kept, sizeof(uint64_t) * nk);
+    *n = nk;
 }
 
 /* Mirror util.rs::CardFilter::exclude_self — filter list removing the given id. */
