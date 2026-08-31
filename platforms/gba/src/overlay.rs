@@ -11,6 +11,7 @@ use alloc::format;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
+use rabuka_engine::card::HeartColor;
 use rabuka_engine::game::platform_ui::{one_line, wrap_text};
 use rabuka_engine::game_state::GameState;
 
@@ -182,6 +183,10 @@ fn run_cards_menu<I: InputSource>(
         } else {
             &gs.player1
         };
+        use rabuka_engine::core::constants::EMPTY_SLOT;
+        let stage_cards = |p: &rabuka_engine::player::Player| {
+            p.stage.stage.iter().filter(|&&c| c != EMPTY_SLOT).copied().collect::<Vec<i16>>()
+        };
         let zones: Vec<(String, Vec<i16>)> = alloc::vec![
             (
                 format!("Hand ({})", me.hand.cards.len()),
@@ -210,6 +215,22 @@ fn run_cards_menu<I: InputSource>(
             (
                 format!("Exclusion ({})", me.exclusion_zone.cards.len()),
                 me.exclusion_zone.cards.to_vec()
+            ),
+            (
+                format!("Stage ({})", stage_cards(me).len()),
+                stage_cards(me)
+            ),
+            (
+                format!("Opp Stage ({})", stage_cards(you).len()),
+                stage_cards(you)
+            ),
+            (
+                format!("Live ({})", me.live_card_zone.cards.len()),
+                me.live_card_zone.cards.to_vec()
+            ),
+            (
+                format!("Opp Live ({})", you.live_card_zone.cards.len()),
+                you.live_card_zone.cards.to_vec()
             ),
             (
                 format!("Opp Waitroom ({})", you.waitroom.cards.len()),
@@ -242,23 +263,148 @@ fn run_cards_menu<I: InputSource>(
     }
 }
 
-/// Blocking Start-menu overlay. Called from the board/actions frame when
-/// Start is pressed; returns once the player closes the menu (the caller
-/// treats the frame as consumed).
+fn hearts_icon_for(player: &rabuka_engine::player::Player, gs: &GameState) -> String {
+    use rabuka_engine::card::HeartColor;
+    let heart_idx = |c: &HeartColor| match c {
+        HeartColor::BAll | HeartColor::Draw | HeartColor::Score => None,
+        _ => Some(c.index()),
+    };
+    let mut counts = [0u32; 8];
+    for &cid in &player.stage.stage {
+        if cid == rabuka_engine::core::constants::EMPTY_SLOT { continue; }
+        if let Some(card) = gs.card_database.get_card(cid) {
+            if let Some(ref bh) = card.base_heart {
+                let mult = gs.mods.heart_color_multiplier.get(&cid).copied();
+                for (col, cnt) in &bh.hearts {
+                    if let Some(idx) = heart_idx(col) {
+                        if let Some(hc) = mult { if hc != *col { continue; } }
+                        counts[idx] += *cnt as u32;
+                    }
+                }
+            }
+        }
+    }
+    for (cid, mp) in &gs.mods.heart_modifiers {
+        if !player.stage.stage.contains(cid) { continue; }
+        for (col, val) in mp {
+            if let Some(idx) = heart_idx(col) {
+                counts[idx] = (counts[idx] as i32 + val.total()).max(0) as u32;
+            }
+        }
+    }
+    let mut parts: Vec<String> = Vec::new();
+    for (i, &cnt) in counts.iter().enumerate() {
+        if cnt > 0 {
+            let name = match i {
+                0 => "heart_00", 1 => "heart_01", 2 => "heart_02",
+                3 => "heart_03", 4 => "heart_04", 5 => "heart_05",
+                6 => "heart_06", _ => "icon_all",
+            };
+            parts.push(format!("{{{{{}.png|{}}}}}{}", name, name, cnt));
+        }
+    }
+    if parts.is_empty() { String::new() } else { parts.join(" ") }
+}
+
+fn blade_total_for(player: &rabuka_engine::player::Player, gs: &GameState) -> i32 {
+    let mut total: i32 = 0;
+    for &cid in &player.stage.stage {
+        if cid == rabuka_engine::core::constants::EMPTY_SLOT { continue; }
+        if let Some(card) = gs.card_database.get_card(cid) {
+            let is_wait = gs.mods.orientation_modifiers.get(&cid).map(|o| o.as_str()=="wait").unwrap_or(false);
+            if is_wait { continue; }
+            let bm = gs.mods.blade_modifiers.get(&cid).map(|m| m.total()).unwrap_or(0);
+            total += (card.blade as i32 + bm).max(0);
+        }
+    }
+    total
+}
+
+fn build_stats_lines(gs: &GameState) -> Vec<String> {
+    let me = gs.active_player();
+    let you = if me.id == gs.player1.id { &gs.player2 } else { &gs.player1 };
+    let mut out: Vec<String> = Vec::new();
+    out.push(format!("T{} {:?} {}>", gs.turn_number, gs.current_phase, if me.id==gs.player1.id {"P1"} else {"P2"}));
+    // P1 stats
+    let p1 = &gs.player1; let p2 = &gs.player2;
+    for (label, p) in [("P1", p1), ("P2", p2)] {
+        let hearts = hearts_icon_for(p, gs);
+        let blade = blade_total_for(p, gs);
+        let hb = if hearts.is_empty() && blade==0 { String::new() } else if hearts.is_empty() { format!("{{{{icon_blade.png|BLADE}}}}{}", blade) } else if blade==0 { hearts.clone() } else { format!("{} {{{{icon_blade.png|BLADE}}}}{}", hearts, blade) };
+        out.push(format!("{} H{} {{{{icon_energy.png|E}}}}{} D{} W{} S{}", label, p.hand.cards.len(), p.energy_zone.active_count(), p.main_deck.cards.len(), p.waitroom.cards.len(), p.success_live_card_zone.cards.len()));
+        if !hb.is_empty() {
+            // wrap hearts/blade to fit 30 cols
+            for l in wrap_text(&hb, COLS as usize) { out.push(l); }
+        } else {
+            out.push(String::from("  Hearts/Blade --"));
+        }
+        // live need if in live phase
+        if matches!(gs.current_phase, rabuka_engine::game_state::Phase::LiveCardSetFirstAttacker | rabuka_engine::game_state::Phase::LiveCardSetSecondAttacker | rabuka_engine::game_state::Phase::FirstAttackerPerformance | rabuka_engine::game_state::Phase::SecondAttackerPerformance) {
+            let mut need_counts = [0u32; 8];
+            for &cid in &p.live_card_zone.cards {
+                if cid == rabuka_engine::core::constants::EMPTY_SLOT { continue; }
+                if let Some(card) = gs.card_database.get_card(cid) {
+                    if let Some(ref need) = card.need_heart {
+                        for (col, cnt) in &need.hearts {
+                            let idx = match *col { HeartColor::Heart00=>0, HeartColor::Heart01=>1, HeartColor::Heart02=>2, HeartColor::Heart03=>3, HeartColor::Heart04=>4, HeartColor::Heart05=>5, HeartColor::Heart06=>6, HeartColor::All=>7, _=> 99 };
+                            if idx < 8 { need_counts[idx] += *cnt as u32; }
+                        }
+                    }
+                }
+            }
+            let mut need_parts: Vec<String> = Vec::new();
+            for (i, &c) in need_counts.iter().enumerate() { if c>0 { let n = match i {0=>"heart_00",1=>"heart_01",2=>"heart_02",3=>"heart_03",4=>"heart_04",5=>"heart_05",6=>"heart_06",_=>"icon_all"}; need_parts.push(format!("{{{{{}.png|{}}}}}{}", n,n,c)); } }
+            if !need_parts.is_empty() {
+                out.push(format!("Need {}", need_parts.join(" ")));
+            }
+        }
+    }
+    out.push(String::from("-- A:Menu B:Close --"));
+    out
+}
+
+fn show_stats<I: InputSource>(display: &mut Display, input: &mut I, gs: &GameState) -> Option<bool> {
+    let lines = build_stats_lines(gs);
+    let mut off = 0usize;
+    loop {
+        display.clear();
+        display.println("STATS  A:Menu B:Close  Up/Down:Scroll");
+        let end = (off + VISIBLE).min(lines.len());
+        for l in off..end { display.println(&lines[l]); }
+        if lines.len() > end { display.println(&format!("  .. {} more", lines.len()-end)); }
+        display.swap_buffers();
+        input.poll();
+        if input.just_pressed(Button::Up) { off = off.saturating_sub(1); }
+        else if input.just_pressed(Button::Down) && off + VISIBLE < lines.len() { off += 1; }
+        else if input.just_pressed(Button::A) { return Some(true); }
+        else if input.just_pressed(Button::B) { return Some(false); }
+        display.wait();
+    }
+}
+
+/// Blocking Start-menu overlay. 3DS shows stats on the top screen; GBA has
+/// one screen so Start first shows the stats (hearts/blade) then offers the
+/// menu. A/B on stats goes to menu/close.
 pub fn run_start_menu<I: InputSource>(
     display: &mut Display,
     input: &mut I,
     gs: &GameState,
 ) {
     loop {
+        match show_stats(display, input, gs) {
+            Some(true) => {}, // continue to menu below
+            _ => return,
+        }
         let items = alloc::vec![
             String::from("Game Log"),
             String::from("Cards"),
-            String::from("Back"),
+            String::from("Back to Stats"),
+            String::from("Close"),
         ];
         match select(display, input, &items, "MENU") {
             Some(0) => show_game_log(display, input, gs),
             Some(1) => run_cards_menu(display, input, gs),
+            Some(2) => continue, // back to stats
             _ => return,
         }
     }

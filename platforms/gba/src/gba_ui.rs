@@ -79,19 +79,31 @@ impl<'u, 'd, I: InputSource> GbaUi<'u, 'd, I> {
             return false;
         }
 
+        // L cycles board focus: Hand -> Own Stage -> Opp Stage
+        if self.input.just_pressed(Button::L) {
+            self.board.cycle_focus();
+            let frame = self.board.build(
+                gs,
+                &self.actionable,
+                &self.action_line,
+                self.action_index,
+                self.action_total,
+            );
+            self.display.render_board_frame(&frame);
+            return true;
+        }
+
         let left = self.input.just_pressed(Button::Left);
         let right = self.input.just_pressed(Button::Right);
-        let hand_len = gs.active_player().hand.cards.len();
-        let scrolled = if left {
-            self.board.scroll_hand(-1, hand_len)
-        } else if right {
-            self.board.scroll_hand(1, hand_len)
+        let scrolled = if left || right {
+            let delta = if left { -1 } else { 1 };
+            let hand_len = gs.active_player().hand.cards.len();
+            self.board.move_focused(delta, hand_len)
         } else {
             false
         };
 
-        // R pops the art detail of the cursored hand card; otherwise R falls
-        // through to the engine's action-stats viewer.
+        // R pops detail of focused card (hand or stage); L already handled.
         if self.input.just_pressed(Button::R) && !scrolled {
             let frame = self.board.build(
                 gs,

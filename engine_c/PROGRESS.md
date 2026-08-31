@@ -33,7 +33,13 @@ python scan_tmp.py        # lists functions whose body is empty / returns 0 / ca
 
 **Size audit (2026-08-31): the port is INCOMPLETE, not done.** Per-file line
 comparison of each C file against its Rust twin shows the C side is a small fraction
-of the Rust:
+of the Rust. Run it:
+
+```powershell
+python size_audit.py        # engine_c/ — prints C vs Rust line counts per mapped file
+```
+
+Abrieviated result (full table printed by the script):
 
 ```
 ability/vm.c                  C=  423  Rust=  1589  (27%)

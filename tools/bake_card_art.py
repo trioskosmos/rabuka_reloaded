@@ -263,6 +263,30 @@ def bake_front_sized_with_master(img, w, h, master_q):
     return pack_8bpp_tiles(px, w, h, tiles_w, tiles_h)
 
 
+def bake_live_sized_with_master(img, w, h, master_q):
+    """Live mini (16x24) - preserve aspect with black letterbox, not edge-stretch.
+    Like 3DS, live cards are centered with correct 0.708 aspect; bars are solid
+    black so the card never looks stretched. Uses same master palette."""
+    iw, ih = img.size
+    scale = min(w / iw, h / ih)
+    nw, nh = int(iw * scale), int(ih * scale)
+    small = preprocess(img).resize((nw, nh), Image.LANCZOS)
+    # Optional light sharpen for tiny live thumbs (helps at 16x22)
+    try:
+        small = small.filter(ImageFilter.UnsharpMask(radius=0.8, percent=80, threshold=1))
+    except Exception:
+        pass
+    canvas = Image.new("RGB", (w, h), (0, 0, 0))
+    canvas.paste(small, ((w - nw) // 2, (h - nh) // 2))
+    q = canvas.quantize(
+        palette=master_q,
+        dither=Image.Dither.FLOYDSTEINBERG,
+    )
+    px = q.load()
+    tiles_w, tiles_h = w // TILE, h // TILE
+    return pack_8bpp_tiles(px, w, h, tiles_w, tiles_h)
+
+
 def bake_front_sized(img, w, h):
     """Cover-crop + resize one card image to a wxh portrait 4bpp front."""
     target = w / h
@@ -455,7 +479,7 @@ def main():
             + (
                 bake_front_sized_with_master(img, FRONT_W, FRONT_H, master_q),
                 bake_front_sized_with_master(img, STAGE_W, STAGE_H, master_q),
-                bake_front_sized_with_master(img, LIVE_W, LIVE_H, master_q),
+                bake_live_sized_with_master(img, LIVE_W, LIVE_H, master_q),
             )
         )
 

@@ -169,7 +169,38 @@ pub fn one_line(text: &str, cols: usize) -> String {
     s
 }
 
-/// Format a heart map as "R2 B3"-style codes (like the 3DS stat line).
+fn heart_icon_for(c: &crate::card::HeartColor) -> Option<&'static str> {
+    use crate::card::HeartColor;
+    match c {
+        HeartColor::Heart00 => Some("heart_00"),
+        HeartColor::Heart01 => Some("heart_01"),
+        HeartColor::Heart02 => Some("heart_02"),
+        HeartColor::Heart03 => Some("heart_03"),
+        HeartColor::Heart04 => Some("heart_04"),
+        HeartColor::Heart05 => Some("heart_05"),
+        HeartColor::Heart06 => Some("heart_06"),
+        HeartColor::BAll => Some("icon_b_all"),
+        HeartColor::Draw => Some("icon_draw"),
+        HeartColor::Score => Some("icon_score"),
+        HeartColor::All => Some("icon_all"),
+    }
+}
+
+/// Format a heart map — GBA/3DS emit `{{icon}}` markers, other ports keep "R2 B3" plain.
+#[cfg(feature = "gba")]
+pub fn heart_str(hm: &crate::card::HeartMap) -> String {
+    hm.iter()
+        .map(|(c, v)| {
+            if let Some(name) = heart_icon_for(c) {
+                format!("{{{{{}.png|{}}}}}{}", name, name, v)
+            } else {
+                format!("{}{}", c.short_label(), v)
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+#[cfg(not(feature = "gba"))]
 pub fn heart_str(hm: &crate::card::HeartMap) -> String {
     hm.iter()
         .map(|(c, v)| format!("{}{}", c.short_label(), v))
@@ -177,7 +208,53 @@ pub fn heart_str(hm: &crate::card::HeartMap) -> String {
         .join(" ")
 }
 
-/// Single-line stat summary, mirroring the 3DS card-detail stat line.
+/// Single-line stat summary — GBA uses baked texticons, others keep plain codes.
+#[cfg(feature = "gba")]
+pub fn card_stat_text(card: &Card) -> String {
+    use crate::card::CardType;
+    match card.card_type {
+        CardType::Member => {
+            let mut s = String::new();
+            if let Some(cost) = card.cost {
+                if cost > 0 {
+                    s.push_str(&format!("{{{{icon_energy.png|E}}}}{}  ", cost));
+                }
+            }
+            let hs = card
+                .base_heart
+                .as_ref()
+                .map(|bh| heart_str(&bh.hearts))
+                .unwrap_or_default();
+            if !hs.is_empty() {
+                s.push_str(&hs);
+                s.push_str("  ");
+            }
+            if card.blade > 0 {
+                s.push_str(&format!("{{{{icon_blade.png|BLADE}}}}{}", card.blade));
+            }
+            s
+        }
+        CardType::Live => {
+            let mut s = String::new();
+            if let Some(score) = card.score {
+                if score > 0 {
+                    s.push_str(&format!("{{{{icon_score.png|SCORE}}}}{}  ", score));
+                }
+            }
+            let ns = card
+                .need_heart
+                .as_ref()
+                .map(|nh| heart_str(&nh.hearts))
+                .unwrap_or_default();
+            if !ns.is_empty() {
+                s.push_str(&ns);
+            }
+            s
+        }
+        CardType::Energy => String::new(),
+    }
+}
+#[cfg(not(feature = "gba"))]
 pub fn card_stat_text(card: &Card) -> String {
     use crate::card::CardType;
     match card.card_type {

@@ -662,6 +662,12 @@ void rb_effective_need_heart(const GameState *g, int live_cid, int out[8]);
 int  rb_perform_live(GameState *g, int pl);
 /* Effects  Everb handlers */
 void rb_effect_move_cards(GameState *g, int actor, AbilityEffect *e);
+/* Mirror move_cards.rs::move_from_under_member — pull cards out of a member's
+    under_cards and place them into dst. validate(card_id) must return nonzero for
+    the card to be moved (NULL = accept all). Returns count moved, or -1 on a
+    missing/invalid index. */
+int  rb_move_from_under_member(GameState *g, int actor, const int *indices, int n_indices,
+                                int (*validate)(int), const char *dst, const char *target);
 void rb_effect_gain_surplus_heart(GameState *g, int actor, const AbilityEffect *e);
 void rb_effect_look_at(GameState *g, int actor, AbilityEffect *e);
 void rb_effect_reveal_until_live_card(GameState *g, int actor, AbilityEffect *e);
