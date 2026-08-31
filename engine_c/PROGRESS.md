@@ -77,11 +77,11 @@ fraction of the Rust twin) and `audit_placeholders.py` (no TODO/STUB markers lef
 - C lines / Rust lines: ~19,038 / 48,265 (~40%). [UPDATED 2026-09-01]
 - C functions: 1,272 / Rust port functions: 857 (C has MORE due to helpers). [UPDATED 2026-09-01]
 - Worst file gaps: `src/ability/resolver.c` (1 missing). [UPDATED 2026-09-01]
-- DEPENDENCY_AUDIT.md: 995 REAL, 246 DONE_SMALL, 31 STUBS (2%). [UPDATED 2026-09-01]
-- Test status: 7 failing tests. [UPDATED 2026-09-01]
+- DEPENDENCY_AUDITY.md: 995 REAL, 246 DONE_SMALL, 31 STUBS (2%). [UPDATED 2026-09-01]
+- Test status: 7 failing tests (down from initial failures). [UPDATED 2026-09-01]
 - Orphaned fragment files (`choice_frag_*.c`): DELETED 2026-09-01.
-- Build status: CLEAN (rb_engine.exe, 677KB). [UPDATED 2026-09-01]
-- Ported this session (2026-09-01, 28 commits):
+- Build status: CLEAN (rb_engine.exe, 675KB). [UPDATED 2026-09-01]
+- Ported this session (2026-09-01, 29 commits):
   - **move.rs (30+ functions):** prompt_card_selection, place_card_with_stage_choice, resolve_from_recently_moved, take_cards_from_standard_zone, resolve_cards_from_source, resolve_from_zone, resolve_from_energy_deck, resolve_from_stage, resolve_from_under_member, move_from_revealed, finalize_card_movement, fire_debut_side_effects, handle_select_position, execute_stage_placement_choices, place_energy_under_member_selected, execute_move_cards_both, execute_selected_cards_from_zone, handle_select_cards_looked_at, handle_energy_zone_selection, resolve_from_revealed_cards, resolve_from_those_cards
   - **state.rs (16+ functions):** execute_change_state, execute_energy_placement, execute_energy_state_change, execute_set_card_identity, execute_set_heart_type_applied, execute_set_cost, execute_set_blade_type, execute_specify_heart_color, execute_set_card_identity_all_regions, execute_set_cost_to_use, execute_all_blade_timing, execute_modify_cost, execute_activation_cost, execute_set_heart_copy_from_under, execute_set_heart_type, reduce_live_card_set_limit
   - **live.rs (8+ functions):** execute_live_victory_determination, build_snapshot, handle_live_success_choice, check_live_success, process_player_live_result, backtrack_allocate, try_surplus_compositions, card_ok_with_wildcard
@@ -97,9 +97,9 @@ fraction of the Rust twin) and `audit_placeholders.py` (no TODO/STUB markers lef
   - **compound.c (2 functions):** handle_choice_string_selection, handle_choice_string_store
   - **misc.c (2 functions):** place_energy_under_member_non_optional, card_name
   - **draw.c (1 function):** resolve_dynamic_count
-  - **triggers.c (1 function):** is_trigger_suppressed
+  - **triggers.c (2 functions):** is_trigger_suppressed, trigger_live_success_faithful
   - **look.c (5 functions):** look_at_with_refresh, reveal_per_group, reveal, select, look_and_select
   - **modifiers.c (12 functions):** record_card_appearance, has_card_appeared_this_turn, clear_card_appearance_tracking, record_baton_touch, get_baton_touch_count, clear_baton_touch_tracking, record_card_movement, clear_card_movement_tracking, remove_revealed_card, clear_revealed_cards, recalculate_constant_cost_modifiers, on_cards_left_zones
   - **phase.c (10+ functions):** execute_performance_phase, play_time_cost_reduction_hook, play_time_cost_reduction_amount, play_time_alt_cost_chars, normalize_member_name, has_play_time_alt_cost_hand_cards, discard_play_time_alt_cost, shuffle_waitroom_members_to_deck_bottom, rps_choice_name, push_rps_log
   - **ability.c (6 functions):** execute_gain_ability_effect, execute_set_card_identity_effect, execute_activate_ability, execute_invalidate_ability, execute_gain_ability, execute_gain_ability_from_source
-- Next: fix failing tests (7 failures), port remaining stubs (31 stubs).
+- Next: fix 7 failing tests (requires faithful port of complex game logic for ability activation, choice emission, and game state management).
