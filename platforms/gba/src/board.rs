@@ -15,11 +15,10 @@ use rabuka_engine::card::HeartColor;
 use rabuka_engine::core::constants::{EMPTY_SLOT, STAGE_SIZE};
 use rabuka_engine::game_state::GameState;
 
-/// Cards shown per hand window — derived from screen/pitch, not a guess.
-/// 240px wide = 30 tiles; hand pitch = card width (3) + gap (1) = 4 tiles.
+/// Cards shown per hand window — badge on card saves gap, so pitch = width.
 const SCREEN_COLS: i32 = 30;
-const HAND_PITCH_TILES: i32 = 4;
-pub const HAND_VISIBLE: usize = (SCREEN_COLS / HAND_PITCH_TILES) as usize; // 7
+const HAND_PITCH_TILES: i32 = 3;
+pub const HAND_VISIBLE: usize = (SCREEN_COLS / HAND_PITCH_TILES) as usize; // 10
 
 /// One drawable card slot on the board.
 #[derive(Clone)]

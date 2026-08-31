@@ -26,20 +26,20 @@ const STAGE_H: i32 = STAGE_CARD.1; // 6
 const HAND_H: i32 = HAND_CARD.1; // 4
 const BAR_H: i32 = FONT_ROWS; // single-line action bar
 
-const STAGE_PITCH: i32 = STAGE_CARD.0 + 1; // 1 col gap for badge
-const HAND_PITCH: i32 = HAND_CARD.0 + 1; // 1 col gap
+const STAGE_PITCH: i32 = STAGE_CARD.0; // badge on card saves 1 col
+const HAND_PITCH: i32 = HAND_CARD.0;
 const STAGE_START_X: i32 = 1;
 const LIVE_CARD: (i32, i32) = (2, 3); // 16x24 mini live
-const LIVE_PITCH: i32 = LIVE_CARD.0 + 1; // 3
+const LIVE_PITCH: i32 = LIVE_CARD.0; // badge on card
 const HAND_START_X: i32 = 0;
 
 const STAGE_YS: [i32; 2] = [HEADER_H, HEADER_H + STAGE_H]; // [2, 8]
 const HAND_Y: i32 = STAGE_YS[1] + STAGE_H; // 14
 const BAR_Y: i32 = ROWS - BAR_H; // 18
-const INFO_X: i32 = STAGE_START_X + STAGE_PITCH * 2 + STAGE_CARD.0 + 1; // 19
+const INFO_X: i32 = STAGE_START_X + STAGE_PITCH * 3 + 1; // 17 with no-gap pitch
 
-/// Hand capacity derived from screen width, not hardcoded (30 cols / 4 pitch = 7).
-pub const HAND_FITS: usize = (COLS / HAND_PITCH) as usize; // 7
+/// Hand capacity derived from screen width, not hardcoded (30 cols / 3 pitch = 10).
+pub const HAND_FITS: usize = (COLS / HAND_PITCH) as usize; // 10
 
 /// Board UI tile indices inside [`BOARD_UI`] (4bpp text BG, bank 15).
 /// Single solid gray tile repeated for all empty zones (VRAM-cheap).
@@ -331,9 +331,10 @@ impl<'a> Display<'a> {
         {
             let p1c = alloc::format!("P1 {} {}", frame.p1_info[0], frame.p1_info[1]);
             let p2c = alloc::format!("P2 {} {}", frame.p2_info[0], frame.p2_info[1]);
-            // truncate each half to 15 cols to fit 30
-            Self::blit_line(&mut ui_bg, &font_ts, &icon_ts, e0, &p1c, 0, 1);
-            Self::blit_line(&mut ui_bg, &font_ts, &icon_ts, e0, &p2c, 15, 1);
+            let p1t = rabuka_engine::game::platform_ui::one_line(&p1c, 15);
+            let p2t = rabuka_engine::game::platform_ui::one_line(&p2c, 15);
+            Self::blit_line(&mut ui_bg, &font_ts, &icon_ts, e0, &p1t, 0, 1);
+            Self::blit_line(&mut ui_bg, &font_ts, &icon_ts, e0, &p2t, 15, 1);
         }
 
         // Stage rows: opponent (flipped 180°) then player, with live success + live set stacked on right
@@ -644,14 +645,8 @@ fn draw_slot(
         None => empty(ui_bg),
     }
     if slot.actionable {
-        // Badge in gap column — mirrored for flipped opponent (left gap)
-        let bx = if flipped {
-            if x > 0 { x - 1 } else { x }
-        } else if x + cols < COLS {
-            x + cols
-        } else {
-            x + cols - 1
-        };
-        ui_bg.set_tile((bx, y), ui_ts, TileSetting::new(UI_BADGE, e0));
+        // Gold badge on the card itself (top-right corner, or bottom-left when flipped 180°)
+        let (bx, by) = if flipped { (x, y + rows - 1) } else { (x + cols - 1, y) };
+        ui_bg.set_tile((bx, by), ui_ts, TileSetting::new(UI_BADGE, e0));
     }
 }

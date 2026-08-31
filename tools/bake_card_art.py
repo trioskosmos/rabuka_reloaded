@@ -225,34 +225,14 @@ def _quantize_method():
 _QUANT_METHOD = _quantize_method()
 
 def bake_front_sized_with_master(img, w, h, master_q):
-    """Fit one card image into wxh preserving full border / aspect via
-    letterbox with edge-clamped bars (not black) so every zone respects the
-    card's 0.708 aspect. Bars are filled by replicating the edge pixels."""
+    """Fit one card image into wxh preserving aspect via black letterbox (not
+    edge-stretch) so every zone respects the card's 0.708 aspect like 3DS.
+    Bars are solid black (palette index 0) so the card never looks stretched."""
     iw, ih = img.size
     scale = min(w / iw, h / ih)
     nw, nh = int(iw * scale), int(ih * scale)
     small = preprocess(img).resize((nw, nh), Image.LANCZOS)
-    # Canvas filled by edge extension, then paste centered
-    canvas = Image.new("RGB", (w, h))
-    # Fill with edge-extended background
-    # Horizontal bars (top/bottom) or vertical bars (left/right)
-    canvas.paste(small, ((w - nw) // 2, (h - nh) // 2))
-    if nw < w:
-        # vertical bars on sides — replicate left/right edge columns
-        left_col = small.crop((0, 0, 1, nh))
-        right_col = small.crop((nw - 1, 0, nw, nh))
-        left_strip = left_col.resize(((w - nw) // 2 + 1, nh), Image.NEAREST)
-        right_strip = right_col.resize(((w - nw + 1) // 2, nh), Image.NEAREST)
-        canvas.paste(left_strip, (0, (h - nh) // 2))
-        canvas.paste(right_strip, ((w + nw) // 2, (h - nh) // 2))
-    if nh < h:
-        top_row = small.crop((0, 0, nw, 1))
-        bottom_row = small.crop((0, nh - 1, nw, nh))
-        top_strip = top_row.resize((nw, (h - nh) // 2 + 1), Image.NEAREST)
-        bottom_strip = bottom_row.resize((nw, (h - nh + 1) // 2), Image.NEAREST)
-        canvas.paste(top_strip, ((w - nw) // 2, 0))
-        canvas.paste(bottom_strip, ((w - nw) // 2, (h + nh) // 2))
-    # Ensure centre is still the correctly scaled image (paste again over bars)
+    canvas = Image.new("RGB", (w, h), (0, 0, 0))
     canvas.paste(small, ((w - nw) // 2, (h - nh) // 2))
     q = canvas.quantize(
         palette=master_q,
