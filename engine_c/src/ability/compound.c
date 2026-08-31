@@ -211,3 +211,16 @@ int rb_compound_choice_action(GameState *g, int actor, const AbilityEffect *eff,
     rb_execute_effect_ex(g, actor, eff->child[choice_idx], host_cid);
     return 1;
 }
+
+/* ───────────────────────────── save_remaining (compound.rs) ─────────────────────────────
+    Store deferred sequential commands on the current entry. Mirrors the inner
+    save_remaining function in execute_sequential_effect: extends the queue's
+    pending_actions with the remaining AbilityEffects so the sequential loop
+    resumes after the pending choice round-trips. The C port approximates the
+    Rust Vec<Box<AbilityEffect>> by storing the count of remaining actions. */
+void rb_compound_save_remaining(GameState *g, int remaining_count) {
+    if (!g) return;
+    int cur = g->queue.cur;
+    if (cur < 0 || cur >= g->queue.n_entries) return;
+    g->queue.entries[cur].pending_actions_n = remaining_count;
+}

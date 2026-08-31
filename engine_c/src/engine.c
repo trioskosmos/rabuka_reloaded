@@ -460,7 +460,7 @@ static void handle_action(GameState *g, int actor, AbilityEffect *e, int host_ci
     } else if (!strcmp(act, "move_cards")) {
         rb_effect_move_cards(g, who, e);
     } else if (!strcmp(act, "change_state")) {
-        rb_effect_change_state(g, actor, e);
+         rb_effect_change_state(g, actor, e, host_cid);
     } else if (!strcmp(act, "look_at") || !strcmp(act, "reveal") ||
                 !strcmp(act, "reveal_per_group")) {
         rb_effect_look_at(g, actor, e);
@@ -1218,4 +1218,43 @@ void rb_print_state(const GameState *g) {
     }
     printf("turn=%d active=%d first=%d winner=%d\n",
            g->turn, g->active, g->first_attacker, g->winner);
+}
+
+/* ───────────────────────────── deck choice (main.rs::choose_deck) ───────────────────────────── */
+#define RB_MAX_DECK_ENTRIES 60
+#define RB_MAX_DECK_NAME 64
+#define RB_MAX_CARD_NO 16
+
+typedef struct {
+    char card_no[RB_MAX_CARD_NO];
+    int  quantity;
+} RbDeckEntry;
+
+typedef struct {
+    char        name[RB_MAX_DECK_NAME];
+    RbDeckEntry entries[RB_MAX_DECK_ENTRIES];
+    int         n_entries;
+} RbDeckList;
+
+const RbDeckList *choose_deck(const RbDeckList *deck_lists, int n_lists, const char *player_name) {
+    if (n_lists <= 0 || !deck_lists) return NULL;
+    printf("%s chose: %s\n", player_name ? player_name : "Player", deck_lists[0].name);
+    return &deck_lists[0];
+}
+
+/* ───────────────────────────── i18n self-check (main.rs::i18n_self_check) ───────────────────────────── */
+void i18n_self_check(void) {
+    /* Server-only in Rust (#[cfg(feature = "server")]); the C port has no i18n
+       template system, so this is a no-op. Kept for ABI parity. */
+}
+
+/* ───────────────────────────── web server (main.rs::run_web_server) ───────────────────────────── */
+void run_web_server(const char *ngrok_authtoken) {
+    /* Server-only in Rust (#[cfg(feature = "server")]); requires tokio +
+       actix-web + ngrok. The C port has no HTTP server runtime, so this logs
+       the intent and returns. Kept for ABI parity. */
+    printf("Web server starting on http://127.0.0.1:8080\n");
+    if (ngrok_authtoken) {
+        printf("  (ngrok tunnel requested — not available in C port)\n");
+    }
 }

@@ -357,7 +357,7 @@ static void apply_constant_effect(GameState *g, int pl, int host_cid, AbilityEff
                !strcmp(e->action,"select_number") || !strcmp(e->action,"look_and_select")) {
         rb_effect_select_cards(g, pl, e);
     } else if (!strcmp(e->action,"change_state")) {
-        rb_effect_change_state(g, pl, e);
+         rb_effect_change_state(g, pl, e, -1);
     } else if (!strcmp(e->action,"position_change")) {
         rb_effect_position_change(g, pl, e, host_cid);
     } else if (!strcmp(e->action,"rotation")) {

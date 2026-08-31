@@ -9,7 +9,7 @@ exit /b
 param(
     [int]$IntervalMinutes = 5,
     [string]$WindowTitle = "",
-    [string]$Message = "make more sub tasks do them update md continue the porting. remember you are just copying the rust engine in c."
+    [string]$Message = "make more sub tasks do them update md continue the porting. remember you are just copying the rust engine in c. one function at a time from the top to the bottom."
 )
 
 Add-Type -AssemblyName System.Windows.Forms

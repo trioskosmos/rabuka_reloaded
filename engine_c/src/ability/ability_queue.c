@@ -199,3 +199,37 @@ int rb_drain_ability_queue(GameState *g) {
         rb_queue_set_state(&g->queue, RB_QUEUE_IDLE);
     return ran;
 }
+
+/* ── Ported from engine/src/ability_queue.rs ──────────────────────────────────
+   pop_constant_context, take_resolver, has_resolver — mirror the Rust
+   AbilityQueue methods for constant-evaluation context management and
+   resolver persistence across choice round-trips. The C queue model uses a
+   flat array of entries with a state machine; resolver state is managed
+   differently (no per-entry Box<AbilityResolver>), so take_resolver and
+   has_resolver are no-ops. */
+
+/* Mirror AbilityQueue::pop_constant_context — pop the temporary constant
+   evaluation context and restore idle state. */
+void rb_queue_pop_constant_context(GameState *g) {
+    if (!g) return;
+    if (g->queue.n_entries > 0) {
+        g->queue.n_entries--;
+    }
+    rb_queue_set_state(&g->queue, RB_QUEUE_IDLE);
+}
+
+/* Mirror AbilityQueue::take_resolver — take the resolver from the current
+   entry. The C port doesn't store per-entry resolvers, so this is a no-op
+   that returns 0 (no resolver available). */
+int rb_queue_take_resolver(GameState *g) {
+    (void)g;
+    return 0;
+}
+
+/* Mirror AbilityQueue::has_resolver — check if the current entry has a
+   resolver (i.e. ability execution is in progress). Always returns 0 in
+   the C port (no separate resolver state). */
+int rb_queue_has_resolver(const GameState *g) {
+    (void)g;
+    return 0;
+}

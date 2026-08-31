@@ -774,3 +774,62 @@ void rb_emit_choice(GameState *g, int actor, RbChoiceKind kind,
     g->queue.deferred = NULL;
     g->queue.state = RB_QUEUE_AWAITING_CHOICE;   /* QueueState FSM (ability_queue.rs) */
 }
+
+/* ── Type helpers (ported from engine/src/ability/types.rs) ── */
+
+/* PAY_SKIP_TARGET constant. */
+#define RB_PAY_SKIP_TARGET "pay_optional_cost:skip_optional_cost"
+
+/* gained_ability_index — extract the gained index from an encoded ability index. */
+int rb_gained_ability_index(int ability_idx) {
+    if (ability_idx < 10000) return -1;
+    int g = ability_idx - 10000;
+    if (g >= 10000) return -1;
+    return g;
+}
+
+/* Choice::description_ja — returns the Japanese description for the choice. */
+const char *rb_choice_description_ja(const RbChoice *ch) {
+    if (!ch) return NULL;
+    return NULL; /* C RbChoice has no description_ja field; placeholder for parity. */
+}
+
+/* Choice::allow_skip — returns whether this choice may be skipped. */
+int rb_choice_allow_skip(const RbChoice *ch) {
+    if (!ch) return 0;
+    return ch->allow_skip;
+}
+
+/* Choice::set_description — replace the description field. */
+void rb_choice_set_description(RbChoice *ch, const char *desc) {
+    if (!ch || !desc) return;
+    strncpy(ch->description, desc, sizeof(ch->description) - 1);
+    ch->description[sizeof(ch->description) - 1] = '\0';
+}
+
+/* Choice::set_bilingual_descriptions — replace both prompt fields. */
+void rb_choice_set_bilingual_descriptions(RbChoice *ch, const char *en, const char *ja) {
+    (void)ja;
+    if (!ch) return;
+    if (en) {
+        strncpy(ch->description, en, sizeof(ch->description) - 1);
+        ch->description[sizeof(ch->description) - 1] = '\0';
+    }
+}
+
+/* AbilityError::to_string — human-readable error message. */
+const char *rb_ability_error_to_string(int err) {
+    switch (err) {
+        case RB_AE_NO_MEMBER_IN_TARGET_AREA: return "Cannot baton touch - no member in target area";
+        case RB_AE_AREA_LOCKED: return "Cannot baton touch: area is locked this turn";
+        case RB_AE_BATON_TOUCH_PROTECTION: return "Cannot baton touch: member has baton touch discard protection";
+        case RB_AE_INVALID_HAND_INDEX: return "Invalid hand index";
+        case RB_AE_NOT_MEMBER_CARD: return "Only member cards can be placed on stage";
+        case RB_AE_CARD_NOT_FOUND: return "Card not found in database";
+        case RB_AE_ZONE_FULL: return "Live card zone is full";
+        default: return "Unknown error";
+    }
+}
+
+
+

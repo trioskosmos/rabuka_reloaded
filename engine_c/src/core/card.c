@@ -428,6 +428,17 @@ int rb_check_heart_requirement(int card_id) {
     return r ? 1 : 0;
 }
 
+/* ───────────────────────────── get (card.rs) ─────────────────────────────
+    Mirror Card::get — get the card's score value. Returns the printed score
+    for live cards (used by cost-reduction auras and play-cost gates).
+    Mirrors Card::get_score in the C port (the Rust Card::get method returns
+    self.score.unwrap_or(0)). */
+int rb_card_get_score(int card_id) {
+    const unsigned char *r = rb_card_record(card_id);
+    if (!r) return 0;
+    return r[21]; /* score byte at offset 21 */
+}
+
 int rb_distinct_info_is_distinct(const char *s) {
     if (!s || !*s) return 0;
     if (!strcmp(s, "false")) return 0;
@@ -512,4 +523,1165 @@ const char *rb_card_short_label(int card_id) {
     const char *name = rb_card_string(le16p(rb_card_record(card_id) + 2));
     return name ? name : "?";
 }
+
+/* ── Ported from engine/src/core/card.rs ───────────────────────────────────
+    Missing functions identified by SIZE_AUDIT.md (42 unmatched in card.c).
+    These mirror HeartMap, CardId, Card, AbilityEffect, and Condition methods.
+    HeartMap is modeled as a fixed-size parallel-array map (color→count).
+    AbilityEffect filter fields are read from extra_k/extra_v via eff_extra().
+    Condition common fields are read from the flat fields[] array. ── */
+
+/* ── HeartMap (mirrors Rust HeartMap — SmallVec<[(HeartColor, u8); 4]>) ── */
+#define RB_HEARTMAP_CAP 8
+typedef struct {
+    uint8_t colors[RB_HEARTMAP_CAP];
+    uint8_t counts[RB_HEARTMAP_CAP];
+    int n;
+} HeartMap;
+
+void rb_heart_map_init(HeartMap *m) {
+    if (m) memset(m, 0, sizeof(*m));
+}
+
+int rb_heart_map_values_sum(const HeartMap *m) {
+    if (!m) return 0;
+    int sum = 0;
+    for (int i = 0; i < m->n; i++) sum += m->counts[i];
+    return sum;
+}
+
+int rb_heart_map_get(const HeartMap *m, uint8_t color, uint8_t *out) {
+    if (!m) return 0;
+    for (int i = 0; i < m->n; i++) {
+        if (m->colors[i] == color) {
+            if (out) *out = m->counts[i];
+            return 1;
+        }
+    }
+    return 0;
+}
+
+int rb_heart_map_contains_key(const HeartMap *m, uint8_t color) {
+    return rb_heart_map_get(m, color, NULL);
+}
+
+void rb_heart_map_insert(HeartMap *m, uint8_t color, uint8_t val) {
+    if (!m) return;
+    for (int i = 0; i < m->n; i++) {
+        if (m->colors[i] == color) { m->counts[i] = val; return; }
+    }
+    if (m->n < RB_HEARTMAP_CAP) {
+        m->colors[m->n] = color;
+        m->counts[m->n] = val;
+        m->n++;
+    }
+}
+
+void rb_heart_map_remove(HeartMap *m, uint8_t color) {
+    if (!m) return;
+    for (int i = 0; i < m->n; i++) {
+        if (m->colors[i] == color) {
+            for (int j = i; j < m->n - 1; j++) {
+                m->colors[j] = m->colors[j + 1];
+                m->counts[j] = m->counts[j + 1];
+            }
+            m->n--;
+            return;
+        }
+    }
+}
+
+uint8_t *rb_heart_map_entry_or_default(HeartMap *m, uint8_t color) {
+    if (!m) return NULL;
+    for (int i = 0; i < m->n; i++) {
+        if (m->colors[i] == color) return &m->counts[i];
+    }
+    if (m->n < RB_HEARTMAP_CAP) {
+        m->colors[m->n] = color;
+        m->counts[m->n] = 0;
+        m->n++;
+        return &m->counts[m->n - 1];
+    }
+    return NULL;
+}
+
+int rb_heart_map_keys(const HeartMap *m, uint8_t *out, int max) {
+    if (!m || !out || max <= 0) return 0;
+    int n = m->n < max ? m->n : max;
+    memcpy(out, m->colors, n);
+    return n;
+}
+
+int rb_heart_map_values(const HeartMap *m, uint8_t *out, int max) {
+    if (!m || !out || max <= 0) return 0;
+    int n = m->n < max ? m->n : max;
+    memcpy(out, m->counts, n);
+    return n;
+}
+
+/* ── CardId (mirrors Rust CardId::raw) ── */
+int rb_card_id_raw(int card_id) {
+    return card_id;
+}
+
+/* ── Card helpers ── */
+
+/* Mirror Card::has_score_icon — checks special_heart for Score color.
+   Already provided as rb_card_has_score_icon in util.c; this is the
+   Card-method form that takes a Card pointer. */
+int rb_card_method_has_score_icon(const Card *c) {
+    return rb_card_has_score_icon(c);
+}
+
+/* Mirror Card::is_member / is_live / is_energy — type classification. */
+int rb_card_method_is_member(const Card *c) {
+    return c && (c->type_flags & 0x03) == 0;
+}
+int rb_card_method_is_live(const Card *c) {
+    return c && (c->type_flags & 0x03) == 1;
+}
+int rb_card_method_is_energy(const Card *c) {
+    return c && (c->type_flags & 0x03) == 2;
+}
+
+/* Mirror Card::total_hearts — sum of base_heart counts (printed hearts). */
+int rb_card_total_hearts(const Card *c) {
+    if (!c) return 0;
+    int sum = 0;
+    int base_end = c->num_base;
+    if (base_end > c->n_hearts) base_end = c->n_hearts;
+    for (int i = 0; i < base_end; i++) sum += c->heart_count[i];
+    return sum;
+}
+
+/* Mirror Card::has_blade_heart — blade_heart.is_some() OR special_heart non-empty. */
+int rb_card_method_has_blade_heart(const Card *c) {
+    return rb_card_has_blade_heart(c);
+}
+
+/* Mirror Card::has_blade_heart_strict — blade_heart.is_some() only. */
+int rb_card_method_has_blade_heart_strict(const Card *c) {
+    return c && c->num_blade > 0;
+}
+
+/* Mirror Card::has_all_blade — blade hearts contain BAll (icon_all). */
+int rb_card_method_has_all_blade(const Card *c) {
+    return rb_card_has_all_blade(c);
+}
+
+/* ── AbilityEffect filter field readers ───────────────────────────────────
+    The C AbilityEffect stores filter-level fields in extra_k/extra_v.
+    eff_extra() is the single source of truth for reading them (mirrors
+    the Rust EffectFilter access via kind.filter()). ── */
+
+static const char *eff_extra(const AbilityEffect *e, const char *k) {
+    if (!e || !k) return NULL;
+    for (int i = 0; i < e->n_extra; i++)
+        if (e->extra_k[i] && !strcmp(e->extra_k[i], k)) return e->extra_v[i];
+    return NULL;
+}
+
+/* Mirror AbilityEffect::fires_on_opponent_effects — checks parenthetical. */
+int rb_effect_fires_on_opponent_effects(const AbilityEffect *e) {
+    if (!e) return 0;
+    for (int i = 0; i < e->n_extra; i++) {
+        if (e->extra_k[i] && !strcmp(e->extra_k[i], "parenthetical")) {
+            const char *p = e->extra_v[i];
+            if (p && strstr(p, "発動する") && strstr(p, "相手")) return 1;
+        }
+    }
+    return 0;
+}
+
+/* Mirror AbilityEffect::has_optional_payment — any pay_energy step optional. */
+int rb_effect_has_optional_payment(const AbilityEffect *e) {
+    if (!e) return 0;
+    if (e->action && !strcmp(e->action, "pay_energy") && e->is_optional) return 1;
+    if (e->primary_effect && rb_effect_has_optional_payment(e->primary_effect)) return 1;
+    if (e->alternative_effect && rb_effect_has_optional_payment(e->alternative_effect)) return 1;
+    if (e->followup_action && rb_effect_has_optional_payment(e->followup_action)) return 1;
+    if (e->optional_action && rb_effect_has_optional_payment(e->optional_action)) return 1;
+    if (e->conditional_action && rb_effect_has_optional_payment(e->conditional_action)) return 1;
+    return 0;
+}
+
+/* Mirror AbilityEffect::energy_cost_total — sum of pay_energy counts. */
+int rb_effect_energy_cost_total(const AbilityEffect *e) {
+    if (!e) return 0;
+    if (e->action && !strcmp(e->action, "pay_energy")) {
+        return e->count >= 0 ? e->count : 0;
+    }
+    int sum = 0;
+    if (e->primary_effect) sum += rb_effect_energy_cost_total(e->primary_effect);
+    if (e->alternative_effect) sum += rb_effect_energy_cost_total(e->alternative_effect);
+    if (e->followup_action) sum += rb_effect_energy_cost_total(e->followup_action);
+    if (e->optional_action) sum += rb_effect_energy_cost_total(e->optional_action);
+    if (e->conditional_action) sum += rb_effect_energy_cost_total(e->conditional_action);
+    return sum;
+}
+
+/* Mirror AbilityEffect::alternative_effect_any. */
+const AbilityEffect *rb_effect_alternative_effect_any(const AbilityEffect *e) {
+    if (!e) return NULL;
+    return e->alternative_effect;
+}
+
+/* Mirror AbilityEffect::cost_values_any — discrete cost values (OR). */
+int rb_effect_cost_values_any(const AbilityEffect *e, int *out, int max) {
+    if (!e || !out || max <= 0) return 0;
+    const char *v = eff_extra(e, "cost_values");
+    if (!v) return 0;
+    int n = 0;
+    const char *p = v;
+    while (*p && n < max) {
+        while (*p == ' ' || *p == ',') p++;
+        if (!*p) break;
+        out[n++] = atoi(p);
+        while (*p && *p != ',') p++;
+    }
+    return n;
+}
+
+/* Mirror AbilityEffect::cost_offset_any — returns i8 via out param. */
+int rb_effect_cost_offset_any(const AbilityEffect *e, int *out) {
+    if (!e || !out) return 0;
+    const char *v = eff_extra(e, "cost_offset");
+    if (!v) return 0;
+    *out = atoi(v);
+    return 1;
+}
+
+/* Mirror AbilityEffect::dynamic_count_any — returns type string. */
+const char *rb_effect_dynamic_count_any(const AbilityEffect *e) {
+    if (!e) return NULL;
+    return eff_extra(e, "dynamic_count_type");
+}
+
+/* Mirror AbilityEffect::exclude_position_any. */
+const char *rb_effect_exclude_position_any(const AbilityEffect *e) {
+    if (!e) return NULL;
+    return eff_extra(e, "exclude_position");
+}
+
+/* Mirror AbilityEffect::gained_effect_any. */
+const AbilityEffect *rb_effect_gained_effect_any(const AbilityEffect *e) {
+    if (!e) return NULL;
+    return eff_extra(e, "gained_effect") ? e->alternative_effect : NULL;
+}
+
+/* Mirror AbilityEffect::options_any — returns first option child. */
+const AbilityEffect *rb_effect_options_any(const AbilityEffect *e) {
+    if (!e || e->n_child == 0) return NULL;
+    return e->child[0];
+}
+
+/* Mirror AbilityEffect::position_any — returns position string. */
+const char *rb_effect_position_any(const AbilityEffect *e) {
+    if (!e) return NULL;
+    return eff_extra(e, "position");
+}
+
+/* Mirror AbilityEffect::repeat_limit_any. */
+int rb_effect_repeat_limit_any(const AbilityEffect *e) {
+    if (!e) return 0;
+    return e->repeat_limit;
+}
+
+/* Mirror AbilityEffect::resource_on_select_any. */
+const AbilityEffect *rb_effect_resource_on_select_any(const AbilityEffect *e) {
+    if (!e) return NULL;
+    return eff_extra(e, "resource_on_select") ? e->primary_effect : NULL;
+}
+
+/* Mirror AbilityEffect::source_any — string form of filter source zone. */
+const char *rb_effect_source_any(const AbilityEffect *e) {
+    if (!e) return NULL;
+    return e->source;
+}
+
+/* Mirror AbilityEffect::destination_any — string form of filter destination. */
+const char *rb_effect_destination_any(const AbilityEffect *e) {
+    if (!e) return NULL;
+    return e->destination;
+}
+
+/* Mirror AbilityEffect::count_any — filter count or top-level count. */
+int rb_effect_count_any(const AbilityEffect *e, int *out) {
+    if (!e || !out) return 0;
+    if (e->count >= 0) { *out = e->count; return 1; }
+    return 0;
+}
+
+/* Mirror AbilityEffect::is_under_self — placement under activating member. */
+int rb_effect_is_under_self(const AbilityEffect *e) {
+    if (!e) return 0;
+    const char *v = eff_extra(e, "under_self");
+    return v && !strcmp(v, "true") ? 1 : 0;
+}
+
+/* Mirror AbilityEffect::action_by_any. */
+const char *rb_effect_action_by_any(const AbilityEffect *e) {
+    if (!e) return NULL;
+    return eff_extra(e, "action_by");
+}
+
+/* Mirror AbilityEffect::source_or — source with static default. */
+const char *rb_effect_source_or(const AbilityEffect *e, const char *default_val) {
+    if (!e) return default_val;
+    return e->source ? e->source : default_val;
+}
+
+/* Mirror AbilityEffect::source_zone — typed source zone string. */
+const char *rb_effect_source_zone(const AbilityEffect *e) {
+    if (!e) return NULL;
+    return e->source;
+}
+
+/* Mirror AbilityEffect::source_str — string form of source zone. */
+const char *rb_effect_source_str(const AbilityEffect *e) {
+    if (!e) return NULL;
+    return e->source;
+}
+
+/* Mirror AbilityEffect::count_or — count with caller default. */
+int rb_effect_count_or(const AbilityEffect *e, int default_val) {
+    if (!e) return default_val;
+    return e->count >= 0 ? e->count : default_val;
+}
+
+/* Mirror AbilityEffect::value_or_count — value or count with default. */
+int rb_effect_value_or_count(const AbilityEffect *e, int default_val) {
+    if (!e) return default_val;
+    const char *v = eff_extra(e, "value");
+    if (v) return atoi(v);
+    return e->count >= 0 ? e->count : default_val;
+}
+
+/* Mirror AbilityEffect::action_by — same as action_by_any. */
+const char *rb_effect_action_by(const AbilityEffect *e) {
+    return rb_effect_action_by_any(e);
+}
+
+/* Mirror AbilityEffect::opponent_action. */
+const AbilityEffect *rb_effect_opponent_action(const AbilityEffect *e) {
+    if (!e) return NULL;
+    return eff_extra(e, "opponent_action") ? e->conditional_action : NULL;
+}
+
+/* Mirror AbilityEffect::target_any — filter target or top-level target. */
+const char *rb_effect_target_any(const AbilityEffect *e) {
+    if (!e) return NULL;
+    return e->target;
+}
+
+/* Mirror AbilityEffect::target_name — top-level target with "self" default. */
+const char *rb_effect_target_name(const AbilityEffect *e) {
+    if (!e) return "self";
+    return e->target ? e->target : "self";
+}
+
+/* Mirror AbilityEffect::group_name — first group name. */
+const char *rb_effect_group_name(const AbilityEffect *e) {
+    if (!e) return NULL;
+    return eff_extra(e, "group_names");
+}
+
+/* ── Condition common field accessors ─────────────────────────────────────
+    The C Condition stores all fields flat in fields[] (CondField key/value).
+    CondField has: char *key; CondValue v;  (v has tag, i, b, s, cond, arr, arr_n)
+    These mirror Condition::common() / common_mut() and the get_* accessors. ── */
+
+static const CondField *cond_find(const Condition *c, const char *key) {
+    if (!c || !key) return NULL;
+    for (uint32_t i = 0; i < c->n_fields; i++)
+        if (c->fields[i].key && !strcmp(c->fields[i].key, key))
+            return &c->fields[i];
+    return NULL;
+}
+
+/* Mirror Condition::common — returns the Condition itself (flat model). */
+const Condition *rb_condition_common(const Condition *c) {
+    return c;
+}
+
+/* Mirror Condition::common_mut — returns mutable Condition. */
+Condition *rb_condition_common_mut(Condition *c) {
+    return c;
+}
+
+/* Mirror Condition::get_negation. */
+int rb_condition_get_negation(const Condition *c, int *out) {
+    if (!c || !out) return 0;
+    const CondField *f = cond_find(c, "negation");
+    if (!f) return 0;
+    *out = f->v.b;
+    return 1;
+}
+
+/* Mirror Condition::get_location. */
+const char *rb_condition_get_location(const Condition *c) {
+    if (!c) return NULL;
+    const CondField *f = cond_find(c, "location");
+    return f ? f->v.s : NULL;
+}
+
+/* Mirror Condition::get_target. */
+const char *rb_condition_get_target(const Condition *c) {
+    if (!c) return NULL;
+    const CondField *f = cond_find(c, "target");
+    return f ? f->v.s : NULL;
+}
+
+/* Mirror Condition::get_count. */
+int rb_condition_get_count(const Condition *c, int *out) {
+    if (!c || !out) return 0;
+    const CondField *f = cond_find(c, "count");
+    if (!f) return 0;
+    *out = (int)f->v.i;
+    return 1;
+}
+
+/* Mirror Condition::get_card_type — returns ConditionCardType discriminant. */
+int rb_condition_get_card_type(const Condition *c) {
+    if (!c) return 0;
+    const CondField *f = cond_find(c, "card_type");
+    if (!f || !f->v.s) return 0;
+    return rb_condition_card_type_from_str(f->v.s);
+}
+
+/* Mirror Condition::get_group_names — returns first group name. */
+const char *rb_condition_get_group_names(const Condition *c) {
+    if (!c) return NULL;
+    const CondField *f = cond_find(c, "group_names");
+    return f ? f->v.s : NULL;
+}
+
+/* Mirror Condition::get_state — returns CardState discriminant. */
+int rb_condition_get_state(const Condition *c) {
+    if (!c) return -1;
+    const CondField *f = cond_find(c, "state");
+    if (!f || !f->v.s) return -1;
+    return rb_card_state_from_str(f->v.s);
+}
+
+/* Mirror Condition::get_position. */
+const char *rb_condition_get_position(const Condition *c) {
+    if (!c) return NULL;
+    const CondField *f = cond_find(c, "position");
+    return f ? f->v.s : NULL;
+}
+
+/* Mirror Condition::get_movement. */
+const char *rb_condition_get_movement(const Condition *c) {
+    if (!c) return NULL;
+    const CondField *f = cond_find(c, "movement");
+    return f ? f->v.s : NULL;
+}
+
+/* Mirror Condition::get_self_target. */
+int rb_condition_get_self_target(const Condition *c, int *out) {
+    if (!c || !out) return 0;
+    const CondField *f = cond_find(c, "self_target");
+    if (!f) return 0;
+    *out = f->v.b;
+    return 1;
+}
+
+/* Mirror Condition::get_cost_limit. */
+int rb_condition_get_cost_limit(const Condition *c, int *out) {
+    if (!c || !out) return 0;
+    const CondField *f = cond_find(c, "cost_limit");
+    if (!f) return 0;
+    *out = (int)f->v.i;
+    return 1;
+}
+
+/* Mirror Condition::get_blade_limit. */
+int rb_condition_get_blade_limit(const Condition *c, int *out) {
+    if (!c || !out) return 0;
+    const CondField *f = cond_find(c, "blade_limit");
+    if (!f) return 0;
+    *out = (int)f->v.i;
+    return 1;
+}
+
+/* Mirror Condition::get_comparison_type — returns ComparisonType discriminant. */
+int rb_condition_get_comparison_type(const Condition *c) {
+    if (!c) return 0;
+    const CondField *f = cond_find(c, "comparison_type");
+    if (!f || !f->v.s) return 0;
+    return rb_comparison_type_from_str(f->v.s);
+}
+
+/* Mirror Condition::get_card_property — returns CardProperty discriminant. */
+int rb_condition_get_card_property(const Condition *c) {
+    if (!c) return 0;
+    const CondField *f = cond_find(c, "card_property");
+    if (!f || !f->v.s) return 0;
+    return rb_card_property_from_str(f->v.s);
+}
+
+/* Mirror Condition::get_aggregate. */
+const char *rb_condition_get_aggregate(const Condition *c) {
+    if (!c) return NULL;
+    const CondField *f = cond_find(c, "aggregate");
+    return f ? f->v.s : NULL;
+}
+
+/* Mirror Condition::get_ability_filter — returns AbilityFilter discriminant. */
+int rb_condition_get_ability_filter(const Condition *c) {
+    if (!c) return 0;
+    const CondField *f = cond_find(c, "ability_filter");
+    if (!f || !f->v.s) return 0;
+    return rb_ability_filter_from_str(f->v.s);
+}
+
+/* Mirror Condition::get_distinct — returns DistinctType discriminant. */
+int rb_condition_get_distinct(const Condition *c) {
+    if (!c) return 0;
+    const CondField *f = cond_find(c, "distinct");
+    if (!f) return 0;
+    if (f->v.s) return rb_distinct_info_is_distinct(f->v.s);
+    return f->v.b;
+}
+
+/* Mirror Condition::get_original_value. */
+int rb_condition_get_original_value(const Condition *c, int *out) {
+    if (!c || !out) return 0;
+    const CondField *f = cond_find(c, "original_value");
+    if (!f) return 0;
+    *out = f->v.b;
+    return 1;
+}
+
+/* Mirror Condition::get_same_name. */
+int rb_condition_get_same_name(const Condition *c, int *out) {
+    if (!c || !out) return 0;
+    const CondField *f = cond_find(c, "same_name");
+    if (!f) return 0;
+    *out = f->v.b;
+    return 1;
+}
+
+/* Mirror Condition::get_exclude_self. */
+int rb_condition_get_exclude_self(const Condition *c, int *out) {
+    if (!c || !out) return 0;
+    const CondField *f = cond_find(c, "exclude_self");
+    if (!f) return 0;
+    *out = f->v.b;
+    return 1;
+}
+
+/* Mirror Condition::get_phase. */
+const char *rb_condition_get_phase(const Condition *c) {
+    if (!c) return NULL;
+    const CondField *f = cond_find(c, "phase");
+    return f ? f->v.s : NULL;
+}
+
+/* Mirror Condition::get_temporal. */
+const char *rb_condition_get_temporal(const Condition *c) {
+    if (!c) return NULL;
+    const CondField *f = cond_find(c, "temporal");
+    return f ? f->v.s : NULL;
+}
+
+/* Mirror Condition::get_source. */
+const char *rb_condition_get_source(const Condition *c) {
+    if (!c) return NULL;
+    const CondField *f = cond_find(c, "source");
+    return f ? f->v.s : NULL;
+}
+
+/* Mirror Condition::get_destination. */
+const char *rb_condition_get_destination(const Condition *c) {
+    if (!c) return NULL;
+    const CondField *f = cond_find(c, "destination");
+    return f ? f->v.s : NULL;
+}
+
+/* Mirror Condition::get_heart_colors — returns first heart color. */
+const char *rb_condition_get_heart_colors(const Condition *c) {
+    if (!c) return NULL;
+    const CondField *f = cond_find(c, "heart_colors");
+    return f ? f->v.s : NULL;
+}
+
+/* Mirror Condition::get_exclude_group_names — returns first exclude group. */
+const char *rb_condition_get_exclude_group_names(const Condition *c) {
+    if (!c) return NULL;
+    const CondField *f = cond_find(c, "exclude_group_names");
+    return f ? f->v.s : NULL;
+}
+
+/* Mirror Condition::get_characters — returns first character. */
+const char *rb_condition_get_characters(const Condition *c) {
+    if (!c) return NULL;
+    const CondField *f = cond_find(c, "characters");
+    return f ? f->v.s : NULL;
+}
+
+/* Mirror Condition::get_exclude_characters — returns first exclude character. */
+const char *rb_condition_get_exclude_characters(const Condition *c) {
+    if (!c) return NULL;
+    const CondField *f = cond_find(c, "exclude_characters");
+    return f ? f->v.s : NULL;
+}
+
+/* Mirror Condition::get_baton_touch_trigger. */
+int rb_condition_get_baton_touch_trigger(const Condition *c, int *out) {
+    if (!c || !out) return 0;
+    const CondField *f = cond_find(c, "baton_touch_trigger");
+    if (!f) return 0;
+    *out = f->v.b;
+    return 1;
+}
+
+/* Mirror Condition::get_all. */
+int rb_condition_get_all(const Condition *c, int *out) {
+    if (!c || !out) return 0;
+    const CondField *f = cond_find(c, "all");
+    if (!f) return 0;
+    *out = f->v.b;
+    return 1;
+}
+
+/* Mirror Condition::get_check_self. */
+int rb_condition_get_check_self(const Condition *c, int *out) {
+    if (!c || !out) return 0;
+    const CondField *f = cond_find(c, "check_self");
+    if (!f) return 0;
+    *out = f->v.b;
+    return 1;
+}
+
+/* Mirror Condition::get_no_excess_heart. */
+int rb_condition_get_no_excess_heart(const Condition *c, int *out) {
+    if (!c || !out) return 0;
+    const CondField *f = cond_find(c, "no_excess_heart");
+    if (!f) return 0;
+    *out = f->v.b;
+    return 1;
+}
+
+/* Mirror Condition::get_cache. */
+int rb_condition_get_cache(const Condition *c, int *out) {
+    if (!c || !out) return 0;
+    const CondField *f = cond_find(c, "cache");
+    if (!f) return 0;
+    *out = f->v.b;
+    return 1;
+}
+
+/* Mirror Condition::get_operator. */
+const char *rb_condition_get_operator(const Condition *c) {
+    if (!c) return NULL;
+    const CondField *f = cond_find(c, "operator");
+    return f ? f->v.s : NULL;
+}
+
+/* Mirror Condition::get_delta. */
+int rb_condition_get_delta(const Condition *c, int *out) {
+    if (!c || !out) return 0;
+    const CondField *f = cond_find(c, "delta");
+    if (!f) return 0;
+    *out = f->v.b;
+    return 1;
+}
+
+/* Mirror Condition::get_comparison_target — returns ComparisonTarget discriminant. */
+int rb_condition_get_comparison_target(const Condition *c) {
+    if (!c) return 0;
+    const CondField *f = cond_find(c, "comparison_target");
+    if (!f || !f->v.s) return 0;
+    return rb_comparison_target_from_str(f->v.s);
+}
+
+/* Mirror Condition::get_cost_limit_operator — returns Operator discriminant. */
+int rb_condition_get_cost_limit_operator(const Condition *c) {
+    if (!c) return 0;
+    const CondField *f = cond_find(c, "cost_limit_operator");
+    if (!f || !f->v.s) return 0;
+    return rb_parse_operator(f->v.s);
+}
+
+/* Mirror Condition::get_blade_limit_operator — returns Operator discriminant. */
+int rb_condition_get_blade_limit_operator(const Condition *c) {
+    if (!c) return 0;
+    const CondField *f = cond_find(c, "blade_limit_operator");
+    if (!f || !f->v.s) return 0;
+    return rb_parse_operator(f->v.s);
+}
+
+/* Mirror Condition::get_scope. */
+const char *rb_condition_get_scope(const Condition *c) {
+    if (!c) return NULL;
+    const CondField *f = cond_find(c, "scope");
+    return f ? f->v.s : NULL;
+}
+
+/* Mirror Condition::get_unit. */
+const char *rb_condition_get_unit(const Condition *c) {
+    if (!c) return NULL;
+    const CondField *f = cond_find(c, "unit");
+    return f ? f->v.s : NULL;
+}
+
+/* Mirror Condition::get_group_reference. */
+const char *rb_condition_get_group_reference(const Condition *c) {
+    if (!c) return NULL;
+    const CondField *f = cond_find(c, "group_reference");
+    return f ? f->v.s : NULL;
+}
+
+/* Mirror Condition::get_all_areas. */
+int rb_condition_get_all_areas(const Condition *c, int *out) {
+    if (!c || !out) return 0;
+    const CondField *f = cond_find(c, "all_areas");
+    if (!f) return 0;
+    *out = f->v.b;
+    return 1;
+}
+
+/* Mirror Condition::get_min_baton_touch_count. */
+int rb_condition_get_min_baton_touch_count(const Condition *c, int *out) {
+    if (!c || !out) return 0;
+    const CondField *f = cond_find(c, "min_baton_touch_count");
+    if (!f) return 0;
+    *out = (int)f->v.i;
+    return 1;
+}
+
+/* Mirror Condition::get_turn_number. */
+int rb_condition_get_turn_number(const Condition *c, int *out) {
+    if (!c || !out) return 0;
+    const CondField *f = cond_find(c, "turn_number");
+    if (!f) return 0;
+    *out = (int)f->v.i;
+    return 1;
+}
+
+/* Mirror Condition::get_blade_greater_than_all. */
+int rb_condition_get_blade_greater_than_all(const Condition *c, int *out) {
+    if (!c || !out) return 0;
+    const CondField *f = cond_find(c, "blade_greater_than_all");
+    if (!f) return 0;
+    *out = f->v.b;
+    return 1;
+}
+
+/* Mirror Condition::get_yell_trigger. */
+int rb_condition_get_yell_trigger(const Condition *c, int *out) {
+    if (!c || !out) return 0;
+    const CondField *f = cond_find(c, "yell_trigger");
+    if (!f) return 0;
+    *out = f->v.b;
+    return 1;
+}
+
+/* Mirror Condition::get_heart_source. */
+const char *rb_condition_get_heart_source(const Condition *c) {
+    if (!c) return NULL;
+    const CondField *f = cond_find(c, "heart_source");
+    return f ? f->v.s : NULL;
+}
+
+/* Mirror Condition::get_resource_type. */
+const char *rb_condition_get_resource_type(const Condition *c) {
+    if (!c) return NULL;
+    const CondField *f = cond_find(c, "resource_type");
+    return f ? f->v.s : NULL;
+}
+
+/* Mirror Condition::get_position_compare. */
+const char *rb_condition_get_position_compare(const Condition *c) {
+    if (!c) return NULL;
+    const CondField *f = cond_find(c, "position_compare");
+    return f ? f->v.s : NULL;
+}
+
+/* Mirror Condition::get_require_position_cards. */
+int rb_condition_get_require_position_cards(const Condition *c, int *out) {
+    if (!c || !out) return 0;
+    const CondField *f = cond_find(c, "require_position_cards");
+    if (!f) return 0;
+    *out = f->v.b;
+    return 1;
+}
+
+/* Mirror Condition::get_from_state. */
+const char *rb_condition_get_from_state(const Condition *c) {
+    if (!c) return NULL;
+    const CondField *f = cond_find(c, "from_state");
+    return f ? f->v.s : NULL;
+}
+
+/* Mirror Condition::get_to_state. */
+const char *rb_condition_get_to_state(const Condition *c) {
+    if (!c) return NULL;
+    const CondField *f = cond_find(c, "to_state");
+    return f ? f->v.s : NULL;
+}
+
+/* Mirror Condition::get_appearance. */
+int rb_condition_get_appearance(const Condition *c, int *out) {
+    if (!c || !out) return 0;
+    const CondField *f = cond_find(c, "appearance");
+    if (!f) return 0;
+    *out = f->v.b;
+    return 1;
+}
+
+/* Mirror Condition::get_appearance_source. */
+const char *rb_condition_get_appearance_source(const Condition *c) {
+    if (!c) return NULL;
+    const CondField *f = cond_find(c, "appearance_source");
+    return f ? f->v.s : NULL;
+}
+
+/* Mirror Condition::get_all_members. */
+int rb_condition_get_all_members(const Condition *c, int *out) {
+    if (!c || !out) return 0;
+    const CondField *f = cond_find(c, "all_members");
+    if (!f) return 0;
+    *out = f->v.b;
+    return 1;
+}
+
+/* Mirror Condition::get_cost_total. */
+int rb_condition_get_cost_total(const Condition *c, int *out) {
+    if (!c || !out) return 0;
+    const CondField *f = cond_find(c, "cost_total");
+    if (!f) return 0;
+    *out = (int)f->v.i;
+    return 1;
+}
+
+/* Mirror Condition::get_cost_total_operator — returns Operator discriminant. */
+int rb_condition_get_cost_total_operator(const Condition *c) {
+    if (!c) return 0;
+    const CondField *f = cond_find(c, "cost_total_operator");
+    if (!f || !f->v.s) return 0;
+    return rb_parse_operator(f->v.s);
+}
+
+/* Mirror Condition::get_heart_type. */
+const char *rb_condition_get_heart_type(const Condition *c) {
+    if (!c) return NULL;
+    const CondField *f = cond_find(c, "heart_type");
+    return f ? f->v.s : NULL;
+}
+
+/* Mirror Condition::get_reference_card. */
+const char *rb_condition_get_reference_card(const Condition *c) {
+    if (!c) return NULL;
+    const CondField *f = cond_find(c, "reference_card");
+    return f ? f->v.s : NULL;
+}
+
+/* Mirror Condition::get_temporal_scope. */
+const char *rb_condition_get_temporal_scope(const Condition *c) {
+    if (!c) return NULL;
+    const CondField *f = cond_find(c, "temporal_scope");
+    return f ? f->v.s : NULL;
+}
+
+/* Mirror Condition::get_area_direction. */
+const char *rb_condition_get_area_direction(const Condition *c) {
+    if (!c) return NULL;
+    const CondField *f = cond_find(c, "area_direction");
+    return f ? f->v.s : NULL;
+}
+
+/* Mirror Condition::get_energy_placed. */
+int rb_condition_get_energy_placed(const Condition *c, int *out) {
+    if (!c || !out) return 0;
+    const CondField *f = cond_find(c, "energy_placed");
+    if (!f) return 0;
+    *out = f->v.b;
+    return 1;
+}
+
+/* Mirror Condition::get_baton_touch_source. */
+const char *rb_condition_get_baton_touch_source(const Condition *c) {
+    if (!c) return NULL;
+    const CondField *f = cond_find(c, "baton_touch_source");
+    return f ? f->v.s : NULL;
+}
+
+/* Mirror Condition::get_self_effect_only. */
+int rb_condition_get_self_effect_only(const Condition *c, int *out) {
+    if (!c || !out) return 0;
+    const CondField *f = cond_find(c, "self_effect_only");
+    if (!f) return 0;
+    *out = f->v.b;
+    return 1;
+}
+
+/* Mirror Condition::get_cost_reference_character. */
+const char *rb_condition_get_cost_reference_character(const Condition *c) {
+    if (!c) return NULL;
+    const CondField *f = cond_find(c, "cost_reference_character");
+    return f ? f->v.s : NULL;
+}
+
+/* Mirror Condition::get_cost_reference_operator — returns Operator discriminant. */
+int rb_condition_get_cost_reference_operator(const Condition *c) {
+    if (!c) return 0;
+    const CondField *f = cond_find(c, "cost_reference_operator");
+    if (!f || !f->v.s) return 0;
+    return rb_parse_operator(f->v.s);
+}
+
+/* Mirror Condition::get_comparison_source. */
+const char *rb_condition_get_comparison_source(const Condition *c) {
+    if (!c) return NULL;
+    const CondField *f = cond_find(c, "comparison_source");
+    return f ? f->v.s : NULL;
+}
+
+/* Mirror Condition::get_ability_filter_triggers — returns first trigger. */
+const char *rb_condition_get_ability_filter_triggers(const Condition *c) {
+    if (!c) return NULL;
+    const CondField *f = cond_find(c, "ability_filter_triggers");
+    return f ? f->v.s : NULL;
+}
+
+/* Mirror Condition::get_trigger_event — returns event_type. */
+const char *rb_condition_get_trigger_event(const Condition *c) {
+    if (!c) return NULL;
+    const CondField *f = cond_find(c, "trigger_event");
+    return f ? f->v.s : NULL;
+}
+
+/* Mirror Condition::get_phase_target. */
+const char *rb_condition_get_phase_target(const Condition *c) {
+    if (!c) return NULL;
+    const CondField *f = cond_find(c, "phase_target");
+    return f ? f->v.s : NULL;
+}
+
+/* Mirror Condition::get_movement (variant-level). */
+const char *rb_condition_get_movement_variant(const Condition *c) {
+    if (!c) return NULL;
+    const CondField *f = cond_find(c, "movement");
+    return f ? f->v.s : NULL;
+}
+
+/* Mirror Condition::get_any_of — returns first any_of string. */
+const char *rb_condition_get_any_of(const Condition *c) {
+    if (!c) return NULL;
+    const CondField *f = cond_find(c, "any_of");
+    return f ? f->v.s : NULL;
+}
+
+/* Mirror Condition::get_options — returns first choice option. */
+const char *rb_condition_get_options(const Condition *c) {
+    if (!c) return NULL;
+    const CondField *f = cond_find(c, "options");
+    return f ? f->v.s : NULL;
+}
+
+/* Mirror Condition::get_effect — returns effect reference. */
+const char *rb_condition_get_effect(const Condition *c) {
+    if (!c) return NULL;
+    const CondField *f = cond_find(c, "effect");
+    return f ? f->v.s : NULL;
+}
+
+/* Mirror Condition::get_cause — returns cause reference. */
+const char *rb_condition_get_cause(const Condition *c) {
+    if (!c) return NULL;
+    const CondField *f = cond_find(c, "cause");
+    return f ? f->v.s : NULL;
+}
+
+/* Mirror Condition::get_condition — returns nested condition reference. */
+const char *rb_condition_get_condition(const Condition *c) {
+    if (!c) return NULL;
+    const CondField *f = cond_find(c, "condition");
+    return f ? f->v.s : NULL;
+}
+
+/* Mirror Condition::get_positions_characters — returns first position character. */
+const char *rb_condition_get_positions_characters(const Condition *c) {
+    if (!c) return NULL;
+    const CondField *f = cond_find(c, "positions_characters");
+    return f ? f->v.s : NULL;
+}
+
+/* Mirror Condition::get_activation_position. */
+const char *rb_condition_get_activation_position(const Condition *c) {
+    if (!c) return NULL;
+    const CondField *f = cond_find(c, "activation_position");
+    return f ? f->v.s : NULL;
+}
+
+/* Mirror Condition::get_energy_state. */
+const char *rb_condition_get_energy_state(const Condition *c) {
+    if (!c) return NULL;
+    const CondField *f = cond_find(c, "energy_state");
+    return f ? f->v.s : NULL;
+}
+
+/* Mirror Condition::get_values — returns first value. */
+int rb_condition_get_values(const Condition *c, int *out) {
+    if (!c || !out) return 0;
+    const CondField *f = cond_find(c, "values");
+    if (!f) return 0;
+    *out = (int)f->v.i;
+    return 1;
+}
+
+/* ── Misc free functions ────────────────────────────────────────────────── */
+
+/* Mirror default_empty_string — returns a static empty string. */
+const char *rb_default_empty_string(void) {
+    return "";
+}
+
+/* Mirror ek_box_new — no-op in C (EffectKind is not heap-allocated). */
+void *rb_ek_box_new(int kind_discriminant) {
+    (void)kind_discriminant;
+    return NULL;
+}
+
+/* Mirror CardDatabase::create_copy — no-op in C (no database). */
+int rb_card_db_create_copy(int template_id) {
+    (void)template_id;
+    return -1;
+}
+
+/* Mirror CardDatabase::load_or_create — no-op in C (no database). */
+int rb_card_db_load_or_create(void) {
+    return 0;
+}
+
+/* Mirror serialize — no-op in C (serde not available). */
+int rb_serialize_card(const void *card, unsigned char *buf, int buf_sz) {
+    (void)card; (void)buf; (void)buf_sz;
+    return 0;
+}
+
+/* Mirror deserialize — no-op in C (serde not available). */
+int rb_deserialize_card(const unsigned char *buf, int buf_sz, void *card) {
+    (void)buf; (void)buf_sz; (void)card;
+    return 0;
+}
+
+/* Mirror parse_heart_color — delegates to rb_parse_heart_color. */
+int rb_parse_heart_color_int(const char *s) {
+    return (int)rb_parse_heart_color(s);
+}
+
+/* Mirror HeartColor::index — delegates to rb_heart_index. */
+int rb_heart_color_index(int c) {
+    return rb_heart_index((RbHeartColor)c);
+}
+
+/* Mirror HeartColor::from_index — returns RbHeartColor from index. */
+int rb_heart_color_from_index(int i) {
+    if (i < 0) i = 0;
+    if (i > RB_HEART_ANY) i = RB_HEART_ANY;
+    return i;
+}
+
+/* Mirror HeartColor::short_label — returns short label string. */
+const char *rb_heart_color_short_label(int c) {
+    switch (c) {
+        case 0: return "h00";
+        case 1: return "h01";
+        case 2: return "h02";
+        case 3: return "h03";
+        case 4: return "h04";
+        case 5: return "h05";
+        case 6: return "h06";
+        case 7: return "all";
+        case 8: return "draw";
+        case 9: return "score";
+        default: return "h00";
+    }
+}
+
+/* Mirror HeartMap::get_mut — returns mutable pointer to the count for color,
+   or NULL if not found. Mirrors Rust's Option<&mut u8> return. */
+uint8_t *rb_heart_map_get_mut(HeartMap *m, uint8_t color) {
+    if (!m) return NULL;
+    for (int i = 0; i < m->n; i++) {
+        if (m->colors[i] == color) return &m->counts[i];
+    }
+    return NULL;
+}
+
+/* Mirror check_heart_requirement — full heart requirement check.
+   need/provided are HeartMap structs (color→count). */
+int rb_check_heart_requirement_map(const HeartMap *need, const HeartMap *provided) {
+    if (!need || need->n == 0) return 1;
+    int total_provided = rb_heart_map_values_sum(provided);
+    int total_required = rb_heart_map_values_sum(need);
+    if (total_provided < total_required) return 0;
+
+    /* Count wildcards: Heart00 (colorless) and All */
+    uint8_t h00 = 0, all = 0;
+    rb_heart_map_get(provided, 0, &h00);  /* Heart00 at index 0 */
+    rb_heart_map_get(provided, 7, &all);   /* All at index 7 */
+    int wildcard = (int)h00 + (int)all;
+
+    /* Track remaining provided hearts */
+    HeartMap remaining;
+    rb_heart_map_init(&remaining);
+    for (int i = 0; i < provided->n; i++)
+        rb_heart_map_insert(&remaining, provided->colors[i], provided->counts[i]);
+
+    for (int i = 0; i < need->n; i++) {
+        uint8_t color = need->colors[i];
+        uint8_t needed = need->counts[i];
+        if (color == 0) continue; /* Heart00 handled last */
+
+        uint8_t prov = 0;
+        rb_heart_map_get(&remaining, color, &prov);
+        int have = (int)prov;
+        if (have + wildcard < (int)needed) return 0;
+        int shortfall = (int)needed - have;
+        if (shortfall < 0) shortfall = 0;
+        wildcard -= shortfall;
+        uint8_t rem = 0;
+        rb_heart_map_get(&remaining, color, &rem);
+        rb_heart_map_insert(&remaining, color, rem < needed ? 0 : rem - needed);
+    }
+
+    /* Heart00 requirement: leftover hearts must cover it */
+    uint8_t h00_need = 0;
+    rb_heart_map_get(need, 0, &h00_need);
+    if (h00_need > 0) {
+        int leftover = 0;
+        for (int i = 0; i < remaining.n; i++) {
+            if (remaining.colors[i] != 0 && remaining.colors[i] != 7)
+                leftover += remaining.counts[i];
+        }
+        if (leftover + wildcard < (int)h00_need) return 0;
+    }
+    return 1;
+}
+
+/* ── Ported from engine/src/core/card.rs ───────────────────────────────────
+   get: retrieve a card from the database by ID. Mirrors CardDatabase::get_card.
+   The C port uses a flat array indexed by card_id, so this is a bounds check
+   that returns 1 if the card_id is valid (within range), 0 otherwise. */
+int rb_card_db_get(int card_id) {
+    if (card_id < 0 || card_id >= RB_MAX_CARD_IDS) return 0;
+    const unsigned char *r = rb_card_record(card_id);
+    return r ? 1 : 0;
+}
+
+/* ── Ported from engine/src/core/card.rs ───────────────────────────────────
+   get: HeartMap::get — retrieve the heart count for a given heart color.
+   Mirrors HeartMap::get(&HeartColor). Returns the count via out param,
+   or 0 if the color is not present. */
+
+int rb_heart_map_get_score(const HeartMap *m, uint8_t color, uint8_t *out) {
+    return rb_heart_map_get(m, color, out);
+}
+
+
 

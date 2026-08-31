@@ -46,3 +46,20 @@ int rb_log_drain_verdicts(RbLogItem *out, int max){
     g_log_n = 0;
     return n;
 }
+
+/* ── Ported from engine/src/ability/log.rs ───────────────────────────────────
+    drain_verdicts_since: drain verdicts from a given start index.
+    Mirrors Rust's drain_verdicts_since(start_index) function. */
+int rb_log_drain_verdicts_since(int start_index, RbLogItem *out, int max){
+    if(!g_log_enabled) return 0;
+    if(start_index < 0) start_index = 0;
+    if(start_index >= g_log_n) return 0;
+    int avail = g_log_n - start_index;
+    int n = avail < max ? avail : max;
+    for(int i=0;i<n;i++) out[i]=g_log_buf[start_index + i];
+    /* Shift remaining entries down */
+    int remaining = g_log_n - (start_index + n);
+    for(int i=0;i<remaining;i++) g_log_buf[i] = g_log_buf[start_index + n + i];
+    g_log_n = remaining;
+    return n;
+}

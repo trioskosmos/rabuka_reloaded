@@ -22,9 +22,32 @@ static LookPool g_look[2]; /* per-player */
 
 void rb_look_clear(int pl){ g_look[pl].n=0; g_look[pl].from_deck=0; g_look[pl].owner=pl; }
 
+/* Remove a single card id from the looked_at pool for player `pl` (mirrors
+   gs.looked_at_cards.remove). Returns 1 if found and removed, 0 otherwise. */
+int rb_look_remove(int pl, int cid){
+    if(pl<0||pl>=2) return 0;
+    LookPool *lp=&g_look[pl];
+    for(int i=0;i<lp->n;i++){
+        if(lp->cards[i]==cid){
+            for(int k=i;k<lp->n-1;k++) lp->cards[k]=lp->cards[k+1];
+            lp->n--;
+            return 1;
+        }
+    }
+    return 0;
+}
+
+/* Add a card id to the looked_at pool for player `pl`. Mirrors
+    gs.looked_at_cards.push. Silently ignored when the pool is full. */
+void rb_look_add(int pl, int cid){
+    if(pl<0||pl>=2) return;
+    LookPool *lp=&g_look[pl];
+    if(lp->n < MAX_LOOKED) lp->cards[lp->n++]=cid;
+}
+
 /* Expose the looked_at pool for relay references (move_cards source
-   "looked_at" / "looked_at_remaining", mirroring engine/src/ability/look.rs
-   looked_at relay pool). Returns the count, fills out_ids (cap max). */
+    "looked_at" / "looked_at_remaining", mirroring engine/src/ability/look.rs
+    looked_at relay pool). Returns the count, fills out_ids (cap max). */
 int rb_looked_at_pool(int pl, int *out_ids, int max){
     LookPool *lp=&g_look[pl];
     int n = lp->n < max ? lp->n : max;

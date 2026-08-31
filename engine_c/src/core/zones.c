@@ -428,3 +428,99 @@ int rb_resolution_clear(GameState *g, int *out, int max){
 int rb_resolution_len(const GameState *g){
     return g ? g->resolution.n : 0;
 }
+
+/* Mirror MemberArea::from_index — inverse of rb_member_area_to_index. */
+int rb_member_area_from_index(int idx){
+    if(idx==0) return 0;
+    if(idx==1) return 1;
+    if(idx==2) return 2;
+    return -1;
+}
+
+/* Mirror MainDeck::shuffle (Rule: index 0 = top). */
+void rb_deck_shuffle(GameState *g, int pl){
+    if(!g || pl<0 || pl>1) return;
+    rb_shuffle(g->p[pl].deck.cards, g->p[pl].deck.n);
+}
+
+/* Mirror MainDeck::is_empty. */
+int rb_deck_is_empty(const GameState *g, int pl){
+    if(!g || pl<0 || pl>1) return 1;
+    return g->p[pl].deck.n == 0;
+}
+
+/* Mirror MainDeck::len. */
+int rb_deck_len(const GameState *g, int pl){
+    if(!g || pl<0 || pl>1) return 0;
+    return g->p[pl].deck.n;
+}
+
+/* Mirror EnergyDeck::draw — draw the top energy card. */
+int rb_energy_deck_draw(GameState *g, int pl){
+    if(!g || pl<0 || pl>1) return -1;
+    RbBag *d = &g->p[pl].energy_deck;
+    if(d->n == 0) return -1;
+    int cid = d->cards[0];
+    for(int i=0;i<d->n-1;i++) d->cards[i] = d->cards[i+1];
+    d->n--;
+    return cid;
+}
+
+/* Mirror EnergyDeck::is_empty. */
+int rb_energy_deck_is_empty(const GameState *g, int pl){
+    if(!g || pl<0 || pl>1) return 1;
+    return g->p[pl].energy_deck.n == 0;
+}
+
+/* Check whether `need` (8-element color counts) is satisfied by `provided`.
+ * Mirrors the relevant part of check_heart_requirement for flat arrays. */
+static int local_check_heart_req(const int *need, const int *provided){
+    int total_need = 0, total_prov = 0;
+    for(int c=0;c<8;c++){
+        if(need[c] > 0) total_need += need[c];
+        if(provided && provided[c] > 0) total_prov += provided[c];
+    }
+    if(total_need == 0) return 1;
+    if(total_prov < total_need) return 0;
+    int wildcard = (provided ? provided[0] : 0) + (provided ? provided[7] : 0);
+    for(int c=1;c<7;c++){
+        if(!provided) continue;
+        int deficit = need[c] - provided[c];
+        if(deficit > 0){
+            if(wildcard < deficit) return 0;
+            wildcard -= deficit;
+        }
+    }
+    return 1;
+}
+
+/* Mirror LiveCardZone::calculate_live_score (Rule 5.2/8.2). Iterates the live
+ * card zone, sums each card's (base_score + score_modifier) when its need_heart
+ * is satisfied by stage_hearts, then adds cheer_blade_heart_count and the
+ * constant_total_score_bonus — all saturated to u8. */
+int rb_live_calculate_score(const GameState *g, int pl, int cheer_blade_heart_count,
+                            const int *stage_hearts, int constant_total_score_bonus){
+    if(!g || pl<0 || pl>1) return 0;
+    const RbPlayer *P = &g->p[pl];
+    int total_score = 0;
+    for(int i=0;i<P->live.n;i++){
+        int cid = P->live.cards[i];
+        Card c;
+        if(!rb_decode_card_by_index((uint32_t)cid, &c)) continue;
+        int base_score = (int)c.score;
+        int modifier = rb_mods_get_score((RbMods *)&g->mods, cid);
+        int card_score = base_score + modifier;
+        if(card_score < 0) card_score = 0;
+        if(card_score > 255) card_score = 255;
+        int need[8] = {0};
+        rb_effective_need_heart(g, cid, need);
+        int satisfied = local_check_heart_req(need, stage_hearts);
+        rb_free_card(&c);
+        if(satisfied) total_score += card_score;
+    }
+    total_score += cheer_blade_heart_count;
+    total_score += constant_total_score_bonus;
+    if(total_score < 0) total_score = 0;
+    if(total_score > 255) total_score = 255;
+    return total_score;
+}

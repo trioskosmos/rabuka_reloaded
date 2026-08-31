@@ -647,6 +647,16 @@ def transpile_body(body: str, consts: dict, func_name: str) -> str:
         action = m.group(1)
         tail = re.split(r'\.(expect|expect_err|unwrap|unwrap_or|is_ok|is_err)\b', text)[0]
         tail = re.split(r'\?', tail)[0]
+        # Detect expect/expect_err for return value checking
+        has_expect = re.search(r'\.expect\s*\(', text)
+        has_expect_err = re.search(r'\.expect_err\s*\(', text)
+        expect_msg = ''
+        if has_expect:
+            mmsg = re.search(r'\.expect\s*\(\s*"([^"]*)"', text)
+            expect_msg = mmsg.group(1) if mmsg else 'expected success'
+        if has_expect_err:
+            mmsg = re.search(r'\.expect_err\s*\(\s*"([^"]*)"', text)
+            expect_msg = mmsg.group(1) if mmsg else 'expected failure'
         if action == 'PlayMemberToStage':
             cm = re.search(r'Some\(\s*(\w+)\s*\)', tail)
             if not cm:
@@ -660,7 +670,12 @@ def transpile_body(body: str, consts: dict, func_name: str) -> str:
                     unresolved = True
                     return False
                 emit_game_id(card, cardlit)
-            out.append(f"    test_play_to_stage(&tg, {card}, {area});")
+            if has_expect_err:
+                out.append(f"    CHECK_EQ(test_play_to_stage(&tg, {card}, {area}), 0, \"{expect_msg}\");")
+            elif has_expect:
+                out.append(f"    CHECK_EQ(test_play_to_stage(&tg, {card}, {area}), 1, \"{expect_msg}\");")
+            else:
+                out.append(f"    test_play_to_stage(&tg, {card}, {area});")
             mark_real()
             return True
         if action in ('ActivateAbility',):

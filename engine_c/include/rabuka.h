@@ -423,6 +423,7 @@ typedef struct {
     int       stage_wait[RB_STAGE_SIZE]; /* 1 if member is in "wait" state */
     RbBag     under_cards[RB_STAGE_SIZE]; /* cards placed under each stage member */
     RbBag     energy;                 /* energy cards in energy zone */
+    RbBag     energy_deck;            /* energy deck (draw pile for energy) */
     int       energy_active;          /* count of active energy */
     RbBag     live;                   /* live card zone */
     RbBag     success;                /* success live card zone */
@@ -511,6 +512,17 @@ typedef enum {
     RB_ROUTE_SELECT_TARGET,   /* select_target (position/destination) */
     RB_ROUTE_CONDITIONAL_CHOICE
 } RbChoiceRoute;
+
+/* AbilityError codes — mirrors engine/src/ability/types.rs::AbilityError */
+typedef enum {
+    RB_AE_NO_MEMBER_IN_TARGET_AREA = 0,
+    RB_AE_AREA_LOCKED,
+    RB_AE_BATON_TOUCH_PROTECTION,
+    RB_AE_INVALID_HAND_INDEX,
+    RB_AE_NOT_MEMBER_CARD,
+    RB_AE_CARD_NOT_FOUND,
+    RB_AE_ZONE_FULL
+} RbAbilityError;
 
 /* QueueState  Emirrors engine/src/ability_queue.rs::QueueState FSM. */
 typedef enum {
@@ -617,6 +629,7 @@ int rb_use_limit_reached(RbAbilityQueue *q, int card_id, int ability_idx, int li
 void rb_record_use(RbAbilityQueue *q, int card_id, int ability_idx, int cur_turn);
 int rb_use_count(RbAbilityQueue *q, int card_id, int ability_idx, int cur_turn);
 void rb_choice_set_route(RbChoice *ch, RbChoiceRoute r);
+void rb_choice_set_description(RbChoice *ch, const char *desc);
 
 typedef struct {
     int player; /* 0/1 */
@@ -680,6 +693,8 @@ typedef struct GameState {
     int      n_those_cards;
     int      selected_cards[RB_MAX_RECENTLY_MOVED]; /* cards chosen by a select_cards/select/look_and_select choice */
     int      n_selected_cards;
+    int      assignment[RB_MAX_RECENTLY_MOVED]; /* distinct-name assignment for alt-cost (phases.rs) */
+    int      n_assignment;
     int      live_success[2];   /* per player: did this player pass their live this turn */
     int      live_score[2];      /* per player: total score from the most recent live performance */
     int      p1_live_won;       /* Rule 8.4.13: P1 won the live (placed to success) this turn */
@@ -822,6 +837,9 @@ int rb_is_action_prohibited(const GameState *g, const char *action);
 int rb_owner_of_card(const GameState *g, int cid);
 int rb_drain_ability_queue(GameState *g);
 void rb_look_resume(GameState *g, int actor, int selected_idx, const char *destination, int is_select);
+int rb_look_remove(int pl, int cid);
+void rb_look_add(int pl, int cid);
+void rb_look_clear(int pl);
 /* Queue introspection / control (mirrors AbilityQueue methods) */
 int rb_queue_is_idle(const GameState *g);
 int rb_queue_has_entry_with_id(const GameState *g, int card_id, int ability_idx);
@@ -835,6 +853,14 @@ void rb_queue_promote_entry_by_abs(GameState *g, int absolute);
 void rb_queue_set_current_entry(GameState *g, int absolute);
 int rb_queue_has_pending_actions(const GameState *g);
 void rb_resume_position_change(GameState *g, int actor, const AbilityEffect *e, int host_cid, int selected_idx);
+
+/* ── Ability queue: pop_constant_context / take_resolver / has_resolver ──
+   Mirrors AbilityQueue methods for constant-evaluation context and resolver
+   persistence. The C queue model uses a flat array with no per-entry resolver,
+   so take_resolver and has_resolver are no-ops. */
+void rb_queue_pop_constant_context(GameState *g);
+int  rb_queue_take_resolver(GameState *g);
+int  rb_queue_has_resolver(const GameState *g);
 
 /* ── RNG (xorshift; deterministic given seed) ── */
 void rb_seed(uint32_t s);
@@ -1036,7 +1062,7 @@ int  card_matches_card_type_filter(int card_idx, const char *filter);
 void rb_emit_choice(GameState *g, int actor, RbChoiceKind kind,
                     const char *zone, const char *card_type,
                     int count, int allow_skip, const char *target);
-void rb_effect_change_state(GameState *g, int actor, AbilityEffect *e);
+void rb_effect_change_state(GameState *g, int actor, AbilityEffect *e, int host_cid);
 void rb_effect_position_change(GameState *g, int actor, AbilityEffect *e, int host_cid);
 void rb_effect_rotation(GameState *g, int actor, AbilityEffect *e);
 void rb_effect_modify_cost(GameState *g, int actor, AbilityEffect *e, int host_cid);
@@ -1127,6 +1153,15 @@ int  rb_card_at_position(const struct GameState *g, int pl, const char *pos);
 int  rb_pos_to_area(const char *pos);
 int  rb_zone_cards(const struct GameState *g, int pl, const char *zone,
                    int *out_ids, int max);
+int  rb_get_selection_indices(const int *cards, int n, const char *card_type,
+                              const char *group, int self_target_only,
+                              int activating_card, int *out_idxs, int max);
+int  rb_classify_selection(const int *indices, int n, int count, int is_all);
+int  rb_resolve_selection(const int *cards, int n, const char *card_type,
+                          const char *group, int count, int is_all,
+                          int self_target_only, int activating_card);
+int  rb_zone_remove_at_indices(GameState *g, int pl, const char *zone,
+                                const int *indices, int n_indices);
 int  rb_stage_first_empty(const int stage[RB_STAGE_SIZE]);
 
 /* ── MemberArea wire helpers (engine/src/core/zones.rs:MemberArea) ── */
@@ -1165,6 +1200,12 @@ int  rb_check_card_property(const char *prop, int negation, const Card *c);
 int  rb_filter_current_blade(const int *cands, int n, const GameState *g,
                              int blade_limit, const char *op, int *out, int max);
 
+/* ── phases.rs: _3ds_tdbg / log_turn_start ──
+    Mirrors TurnEngine debug-trace and turn-start logging helpers. No-op in
+    the C port (logging infrastructure not available). */
+void rb_3ds_tdbg(const char *msg);
+void rb_log_turn_start(GameState *g);
+
 /* ── Stage under-card / placement helpers (engine/src/core/zones.rs:Stage) ── */
 void rb_stage_place_under_card(RbPlayer *player, int area, int card_id);
 int  rb_stage_get_under_cards(const RbPlayer *player, int area, int *out, int max);
@@ -1184,6 +1225,8 @@ int  rb_energy_add_card(RbPlayer *player, int card_id);
 int  rb_energy_pay(RbPlayer *player, int amount);
 void rb_energy_activate_all(RbPlayer *player);
 int  rb_energy_active_count(const RbPlayer *player);
+int  rb_energy_deck_draw(GameState *g, int pl);
+int  rb_energy_deck_is_empty(const GameState *g, int pl);
 void rb_energy_set_active_count(RbPlayer *player, int count); /* EnergyZone::set_active_count */
 void rb_energy_add_active(RbPlayer *player, int delta);       /* EnergyZone::add_active (saturating) */
 void rb_energy_sub_active(RbPlayer *player, int delta);       /* EnergyZone::sub_active (saturating) */
@@ -1258,6 +1301,7 @@ int rb_compound_conditional_on_optional(GameState *g, int actor,
 int rb_compound_choice_string(const AbilityEffect *eff, const char *choice);
 int rb_compound_choice_action(GameState *g, int actor, const AbilityEffect *eff,
                                 int choice_idx, int host_cid);
+void rb_compound_save_remaining(GameState *g, int remaining_count);
 
 /* ── Ability resolver frontend (engine/src/ability/resolver.rs) ── */
 typedef struct AbilityInfo {
@@ -1371,6 +1415,38 @@ int rb_misc_finalize_formation_change(GameState *g, int actor,
    member (source_position / target_member card_no / this_member) to `destination`
    ("same_area" = no-op, "front" = mirrored area per Rule 4.5.7). */
 int rb_position_change_with_destination(GameState *g, int actor, const AbilityEffect *e,
-                                        const char *destination, int host_cid);
+                                         const char *destination, int host_cid);
+
+/* ── types.rs: ArcStr serialize/deserialize ──
+     Mirrors ArcStr serde impl (C strings are already owned heap values). */
+char *rb_arcstr_serialize(const char *s);
+void rb_arcstr_deserialize(char *s);
+
+/* ── types.rs: Phase::label_jp ──
+     Japanese phase labels for bilingual frontend rendering. */
+const char *rb_phase_label_jp(int phase);
+
+/* ── types.rs: EffectData accessors ──
+     Mirrors EffectData enum methods (C EffectData is flattened to single-card). */
+int rb_effect_data_items(const RbEffectDataSingleCard *d, int card_id,
+                         int *out_amount, char *out_color, size_t color_sz);
+int rb_effect_data_is_p1(const RbEffectDataSingleCard *d);
+int rb_effect_data_old_value(const RbEffectDataSingleCard *d);
+int rb_effect_data_count(const RbEffectDataSingleCard *d);
+const char *rb_effect_data_color(const RbEffectDataSingleCard *d);
+int rb_effect_data_amount(const RbEffectDataSingleCard *d);
+
+/* ── types.rs: ZoneId::equivalent / matches_source ──
+     Zone aliasing for rule-purpose equivalence and zone-change condition matching. */
+int rb_zone_equivalent(RbZoneId a, RbZoneId b);
+int rb_zone_matches_source(RbZoneId zone, const char *source);
+
+/* ── card.rs: Card::get (score accessor) ──
+     Mirrors Card::get_score — returns the printed score for a card. */
+int rb_card_get_score(int card_id);
+
+/* ── game_modifiers.rs: ModifierEntry::total ──
+     Mirrors ModifierEntry::total — returns set + additive combined. */
+int rb_modifier_total_entry(const RbModifierEntry *e);
 
 #endif /* RABUKA_H */

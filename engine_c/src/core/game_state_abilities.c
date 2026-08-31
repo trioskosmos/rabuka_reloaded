@@ -681,6 +681,24 @@ int rb_is_loop_detected(const GameState *g) {
     return g ? g->loop_detected : 0;
 }
 
+/* Mirror abilities.rs::SimpleHasher (Hasher trait) — hasher state for
+   generate_state_hash. The Rust Hasher trait methods write(&mut self, bytes)
+   and finish(&self) become C functions operating on a RbHasher*. */
+typedef struct {
+    uint64_t state;
+} RbHasher;
+
+static void rb_hasher_write(RbHasher *h, const uint8_t *bytes, size_t len) {
+    if (!h) return;
+    for (size_t i = 0; i < len; i++) {
+        h->state = h->state * 31 + bytes[i];
+    }
+}
+
+static uint64_t rb_hasher_finish(const RbHasher *h) {
+    return h ? h->state : 0;
+}
+
 /* Mirror abilities.rs::add_replacement_effect / reset_replacement_effect_flags / mark_replacement_effect_applied
    Stub: replacement effects not yet implemented in C port. */
 void rb_add_replacement_effect(GameState *g, int card_id, int player_id, const char *original_event, const AbilityEffect *replacement_effects, int n_replacement, int is_choice_based) {

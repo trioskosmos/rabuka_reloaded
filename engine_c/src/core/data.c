@@ -307,3 +307,226 @@ int rb_find_card_by_no(const char *card_no) {
     }
     return -1;
 }
+
+/* ════════════════════════════════════════════════════════════════════
+     Ported from engine/src/core/types.rs (the 11 unmatched functions).
+     ════════════════════════════════════════════════════════════════════ */
+
+/* ── deserialize (ArcStr::deserialize) ──
+    Reads a null-terminated string from `buf` (max `buf_len` bytes) into
+    `out` (capacity `out_len`). Returns 0 on success, -1 on error. */
+int rb_deserialize(const char *buf, int buf_len, char *out, int out_len) {
+    if (!buf || !out || buf_len <= 0 || out_len <= 0) return -1;
+    int i = 0;
+    int max_copy = (buf_len < out_len - 1) ? buf_len : out_len - 1;
+    while (i < max_copy && buf[i] != '\0') {
+        out[i] = buf[i];
+        i++;
+    }
+    out[i] = '\0';
+    return 0;
+}
+
+/* ── label_jp (Phase::label_jp) ──
+    Returns the Japanese label for a phase. The C RbPhase enum is a
+    condensed version of the Rust Phase enum (Rust splits mulligan /
+    live-card-set / performance into first-attacker / second-attacker
+    variants); we map each C phase to the most appropriate label. */
+const char *rb_label_jp(RbPhase phase) {
+    switch (phase) {
+        case RB_PHASE_RPS:          return "ジャンケン";
+        case RB_PHASE_OPENING:      return "先攻選択";
+        case RB_PHASE_ACTIVE:       return "アクティブ";
+        case RB_PHASE_ENERGY:       return "エネルギー";
+        case RB_PHASE_DRAW:         return "ドロー";
+        case RB_PHASE_MAIN:         return "メイン";
+        case RB_PHASE_LIVE_SET:     return "ライブセット";
+        case RB_PHASE_PERFORMANCE:  return "パフォーマンス";
+        case RB_PHASE_VICTORY:      return "ライブ勝敗判定";
+        default:                    return "";
+    }
+}
+
+/* ── equivalent (ZoneId::equivalent) ──
+    Returns 1 if two zone IDs are semantically equivalent (discard/waitroom
+    and energy/energy_zone are treated as the same zone). */
+int rb_equivalent(RbZoneId a, RbZoneId b) {
+    if (a == b) return 1;
+    if ((a == RB_ZONEID_DISCARD  && b == RB_ZONEID_WAITROOM) ||
+        (a == RB_ZONEID_WAITROOM && b == RB_ZONEID_DISCARD))  return 1;
+    if ((a == RB_ZONEID_ENERGY     && b == RB_ZONEID_ENERGY_ZONE) ||
+        (a == RB_ZONEID_ENERGY_ZONE && b == RB_ZONEID_ENERGY))    return 1;
+    return 0;
+}
+
+/* ── matches_source (ZoneId::matches_source) ──
+    Returns 1 if `zone` satisfies a zone-change condition whose requested
+    source string is `source`. Mirrors the Rust logic:
+      - generic "deck" matches Deck | DeckTop | DeckBottom
+      - specific "deck_top" / "deck_bottom" match only that subzone
+      - "discard" / "waitroom" match each other */
+int rb_matches_source(RbZoneId zone, const char *source) {
+    /* Resolve the source string to a ZoneId (mirrors ZoneId::from_str) */
+    RbZoneId src = RB_ZONEID_UNKNOWN;
+    if (strcmp(source, "stage") == 0)                src = RB_ZONEID_STAGE;
+    else if (strcmp(source, "hand") == 0)           src = RB_ZONEID_HAND;
+    else if (strcmp(source, "deck") == 0)           src = RB_ZONEID_DECK;
+    else if (strcmp(source, "deck_top") == 0)       src = RB_ZONEID_DECK_TOP;
+    else if (strcmp(source, "deck_bottom") == 0)    src = RB_ZONEID_DECK_BOTTOM;
+    else if (strcmp(source, "discard") == 0)        src = RB_ZONEID_DISCARD;
+    else if (strcmp(source, "waitroom") == 0)       src = RB_ZONEID_WAITROOM;
+    else if (strcmp(source, "energy") == 0)         src = RB_ZONEID_ENERGY;
+    else if (strcmp(source, "energy_zone") == 0)    src = RB_ZONEID_ENERGY_ZONE;
+    else if (strcmp(source, "energy_deck") == 0)    src = RB_ZONEID_ENERGY_DECK;
+    else if (strcmp(source, "success_zone") == 0)   src = RB_ZONEID_SUCCESS_ZONE;
+    else if (strcmp(source, "live_card_zone") == 0) src = RB_ZONEID_LIVE_CARD_ZONE;
+    else if (strcmp(source, "success_live_zone") == 0 ||
+             strcmp(source, "success_live_card_zone") == 0) src = RB_ZONEID_SUCCESS_LIVE_ZONE;
+    else if (strcmp(source, "empty_area") == 0)     src = RB_ZONEID_EMPTY_AREA;
+    else if (strcmp(source, "same_area") == 0)      src = RB_ZONEID_SAME_AREA;
+    else if (strcmp(source, "under_member") == 0 ||
+             strcmp(source, "under") == 0)          src = RB_ZONEID_UNDER_MEMBER;
+    else if (strcmp(source, "looked_at") == 0)      src = RB_ZONEID_LOOKED_AT;
+    else if (strcmp(source, "revealed_cards") == 0) src = RB_ZONEID_REVEALED_CARDS;
+    else if (strcmp(source, "selected_cards") == 0) src = RB_ZONEID_SELECTED_CARDS;
+    else if (strcmp(source, "resolution") == 0 ||
+             strcmp(source, "resolution_zone") == 0) src = RB_ZONEID_RESOLUTION;
+    else if (strcmp(source, "exclusion_zone") == 0) src = RB_ZONEID_EXCLUSION_ZONE;
+
+    switch (src) {
+        case RB_ZONEID_DECK:
+            return zone == RB_ZONEID_DECK ||
+                   zone == RB_ZONEID_DECK_TOP ||
+                   zone == RB_ZONEID_DECK_BOTTOM;
+        case RB_ZONEID_DECK_TOP:
+            return zone == RB_ZONEID_DECK_TOP;
+        case RB_ZONEID_DECK_BOTTOM:
+            return zone == RB_ZONEID_DECK_BOTTOM;
+        case RB_ZONEID_DISCARD:
+            return zone == RB_ZONEID_DISCARD || zone == RB_ZONEID_WAITROOM;
+        case RB_ZONEID_WAITROOM:
+            return zone == RB_ZONEID_DISCARD || zone == RB_ZONEID_WAITROOM;
+        default:
+            return zone == src;
+    }
+}
+
+/* ── Ported from engine/src/core/types.rs ───────────────────────────────────
+    ArcStr serialize/deserialize (serde feature only in Rust; in C these are
+    plain strdup/free since C strings are already owned heap values). ── */
+
+/* Mirror ArcStr::serialize — copy the string for ownership transfer. Caller
+   must rb_free the result. Returns NULL on alloc failure. */
+char *rb_arcstr_serialize(const char *s) {
+    if (!s) return NULL;
+    return rb_strdup2(s);
+}
+
+/* Mirror ArcStr::deserialize — free an ArcStr-owned string. */
+void rb_arcstr_deserialize(char *s) {
+    rb_free(s);
+}
+
+/* ── Ported from engine/src/core/types.rs::Phase::label_jp ───────────────────
+    Japanese phase labels for bilingual frontend rendering. Returns a static
+   string; never NULL. */
+const char *rb_phase_label_jp(int phase) {
+    switch (phase) {
+        case RB_PHASE_RPS:            return "ジャンケン";
+        case RB_PHASE_OPENING:        return "先攻選択";
+        case RB_PHASE_ACTIVE:         return "アクティブ";
+        case RB_PHASE_ENERGY:         return "エネルギー";
+        case RB_PHASE_DRAW:           return "ドロー";
+        case RB_PHASE_MAIN:           return "メイン";
+        case RB_PHASE_LIVE_SET:       return "ライブセット（先攻）";
+        case RB_PHASE_PERFORMANCE:    return "パフォーマンス（先攻）";
+        case RB_PHASE_VICTORY:        return "ライブ勝敗判定";
+        case RB_PHASE_DONE:           return "終了";
+        default:                      return "不明";
+    }
+}
+
+/* ── Ported from engine/src/core/types.rs::EffectData accessors ───────────────
+    The C EffectData is flattened into RbEffectDataSingleCard (the single-card
+   variant). These accessors mirror the Rust EffectData enum methods. ── */
+
+/* Mirror EffectData::items — returns the single card item if card_id matches. */
+int rb_effect_data_items(const RbEffectDataSingleCard *d, int card_id,
+                         int *out_amount, char *out_color, size_t color_sz) {
+    if (!d || d->card_id != card_id) return 0;
+    if (out_amount) *out_amount = d->amount;
+    if (out_color && color_sz > 0) {
+        if (d->color[0]) {
+            strncpy(out_color, d->color, color_sz - 1);
+            out_color[color_sz - 1] = '\0';
+        } else {
+            out_color[0] = '\0';
+        }
+    }
+    return 1;
+}
+
+/* Mirror EffectData::is_p1 — always returns 0 (no SurplusHeart variant in C). */
+int rb_effect_data_is_p1(const RbEffectDataSingleCard *d) {
+    (void)d;
+    return 0;
+}
+
+/* Mirror EffectData::old_value — always returns 0 (no SurplusHeart variant). */
+int rb_effect_data_old_value(const RbEffectDataSingleCard *d) {
+    (void)d;
+    return 0;
+}
+
+/* Mirror EffectData::count — returns the amount as a count surrogate. */
+int rb_effect_data_count(const RbEffectDataSingleCard *d) {
+    if (!d) return 0;
+    return d->amount >= 0 ? (int)(uint8_t)d->amount : 0;
+}
+
+/* Mirror EffectData::color — returns the color string or NULL. */
+const char *rb_effect_data_color(const RbEffectDataSingleCard *d) {
+    if (!d || !d->color[0]) return NULL;
+    return d->color;
+}
+
+/* Mirror EffectData::amount — returns the amount. */
+int rb_effect_data_amount(const RbEffectDataSingleCard *d) {
+    if (!d) return 0;
+    return d->amount;
+}
+
+/* ── Ported from engine/src/core/types.rs::ZoneId::equivalent ────────────────
+    Zone aliasing: discard↔waitroom and energy↔energy_zone are the same zone
+   for rule purposes. */
+int rb_zone_equivalent(RbZoneId a, RbZoneId b) {
+    if (a == b) return 1;
+    if ((a == RB_ZONEID_DISCARD  && b == RB_ZONEID_WAITROOM) ||
+        (a == RB_ZONEID_WAITROOM && b == RB_ZONEID_DISCARD))
+        return 1;
+    if ((a == RB_ZONEID_ENERGY      && b == RB_ZONEID_ENERGY_ZONE) ||
+        (a == RB_ZONEID_ENERGY_ZONE && b == RB_ZONEID_ENERGY))
+        return 1;
+    return 0;
+}
+
+/* ── Ported from engine/src/core/types.rs::ZoneId::matches_source ────────────
+    Semantic aliasing for zone-change condition matching: a generic "deck"
+   source matches Deck/DeckTop/DeckBottom; specific subzones match only
+   themselves; discard/waitroom are interchangeable. */
+int rb_zone_matches_source(RbZoneId zone, const char *source) {
+    if (!source) return 0;
+    RbZoneId src = rb_zone_of_str(source, NULL);
+    if (src == RB_ZONEID_UNKNOWN) return 0;
+    switch (src) {
+        case RB_ZONEID_DECK:
+            return zone == RB_ZONEID_DECK ||
+                   zone == RB_ZONEID_DECK_TOP ||
+                   zone == RB_ZONEID_DECK_BOTTOM;
+        case RB_ZONEID_DECK_TOP:    return zone == RB_ZONEID_DECK_TOP;
+        case RB_ZONEID_DECK_BOTTOM: return zone == RB_ZONEID_DECK_BOTTOM;
+        case RB_ZONEID_DISCARD:     return zone == RB_ZONEID_DISCARD || zone == RB_ZONEID_WAITROOM;
+        case RB_ZONEID_WAITROOM:    return zone == RB_ZONEID_DISCARD || zone == RB_ZONEID_WAITROOM;
+        default:                    return zone == src;
+    }
+}

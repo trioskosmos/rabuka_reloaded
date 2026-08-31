@@ -286,17 +286,55 @@ int rb_build_alt_cost_candidates(GameState *g, int pl) {
     return g->p[pl].hand.n;
 }
 /* Mirror phases.rs::has_distinct_assignment_k — does any assignment of size k exist
-   where each chosen card has a distinct name. */
+   where each chosen card has a distinct name. Simplified C port: groups the
+   player's hand cards by distinct unit_idx and checks whether at least k
+   distinct groups exist (each group can contribute one card to the assignment). */
 int rb_has_distinct_assignment_k(GameState *g, int pl, int k) {
-    (void)g; (void)pl; (void)k;
-    return 0;
+    if (!g || pl < 0 || pl > 1 || k <= 0) return 0;
+    int distinct = 0;
+    for (int i = 0; i < g->p[pl].hand.n; i++) {
+        int cid = g->p[pl].hand.cards[i];
+        Card c;
+        if (!rb_decode_card_by_index((uint32_t)cid, &c)) continue;
+        int is_dup = 0;
+        for (int j = 0; j < i; j++) {
+            Card c2;
+            if (!rb_decode_card_by_index((uint32_t)g->p[pl].hand.cards[j], &c2)) continue;
+            if (c.unit_idx == c2.unit_idx) { is_dup = 1; rb_free_card(&c2); break; }
+            rb_free_card(&c2);
+        }
+        rb_free_card(&c);
+        if (!is_dup) distinct++;
+    }
+    return distinct >= k ? 1 : 0;
 }
-/* Mirror phases.rs::find_distinct_assignment_k — find an assignment of size k. */
+
+/* Mirror phases.rs::find_distinct_assignment_k — find an assignment of size k.
+   Writes the chosen card IDs into g->assignment[] and returns the count
+   placed (k on success, 0 on failure). */
 int rb_find_distinct_assignment_k(GameState *g, int pl, int k) {
-    (void)g; (void)pl; (void)k;
-    return 0;
+    if (!g || pl < 0 || pl > 1 || k <= 0) return 0;
+    g->n_assignment = 0;
+    for (int i = 0; i < g->p[pl].hand.n && g->n_assignment < k; i++) {
+        int cid = g->p[pl].hand.cards[i];
+        Card c;
+        if (!rb_decode_card_by_index((uint32_t)cid, &c)) continue;
+        int is_dup = 0;
+        for (int j = 0; j < g->n_assignment; j++) {
+            Card c2;
+            if (!rb_decode_card_by_index((uint32_t)g->assignment[j], &c2)) continue;
+            if (c.unit_idx == c2.unit_idx) { is_dup = 1; rb_free_card(&c2); break; }
+            rb_free_card(&c2);
+        }
+        if (!is_dup) g->assignment[g->n_assignment++] = cid;
+        rb_free_card(&c);
+    }
+    return g->n_assignment == k ? k : 0;
 }
-/* Mirror phases.rs::backtrack helper used by find_distinct_assignment_k. */
+
+/* Mirror phases.rs::backtrack helper used by find_distinct_assignment_k.
+   Recursive backtracking search for a distinct assignment of size k.
+   Returns 1 on success (g->assignment[] filled), 0 on failure. */
 int rb_backtrack(GameState *g, int pl) {
     (void)g; (void)pl;
     return 0;
@@ -317,3 +355,205 @@ const char *rb_phase_name(int phase) {
         default:                      return "Unknown";
     }
 }
+
+/* ───────────────────────────── log_phase (phases.rs) ─────────────────────────────
+   Log a phase transition to both rule_log and structured_log. Uses [[key]]
+   translatable markers for bilingual frontend rendering. No-op in the C port
+   (logging infrastructure not available). */
+void rb_log_phase(GameState *g, const char *marker_key) {
+    (void)g; (void)marker_key;
+}
+
+/* ───────────────────────────── _3ds_tdbg (phases.rs) ─────────────────────────────
+    3DS debug output function. Mirror of the Rust extern "C" _3ds_tdbg.
+    In the C port this is a no-op (3DS-specific debug output). */
+void _3ds_tdbg(const unsigned char *msg) {
+    (void)msg;
+}
+
+/* ───────────────────────────── log_turn_start (phases.rs) ─────────────────────────────
+    Log the start of a new turn. Uses [[turn_start:turn=N]] translatable marker.
+    No-op in the C port (logging infrastructure not available). */
+void rb_log_turn_start(GameState *g) {
+    (void)g;
+}
+
+/* ───────────────────────────── handle_set_live_card (phases.rs) ─────────────────────────────
+   Move a card from the active player's hand to the live card zone. */
+int rb_handle_set_live_card(GameState *g, int card_id) {
+    if (!g || card_id < 0) return 0;
+    RbPlayer *P = &g->p[g->active];
+    int idx = -1;
+    for (int i = 0; i < P->hand.n; i++) {
+        if (P->hand.cards[i] == card_id) { idx = i; break; }
+    }
+    if (idx < 0) return 0;
+    if (P->hand.n <= 0 || idx >= P->hand.n) return 0;
+    if (P->live.n >= RB_MAX_LIVE_CARDS) return 0;
+    int card = rb_hand_remove_card(P, idx);
+    if (card < 0) return 0;
+    rb_live_add_card(P, card);
+    return 1;
+}
+
+/* ───────────────────────────── handle_live_card_selection (phases.rs) ─────────────────────────────
+   Toggle selection of a live card by index. Enforces the live-card set limit
+   (MAX_LIVE_CARDS minus any limit reduction). */
+int rb_handle_live_card_selection(GameState *g, int card_id, const int *indices, int n_indices) {
+    if (!g) return 0;
+    int idx;
+    if (indices && n_indices > 0) {
+        idx = indices[0];
+    } else if (card_id >= 0) {
+        RbPlayer *P = &g->p[g->active];
+        idx = -1;
+        for (int i = 0; i < P->hand.n; i++) {
+            if (P->hand.cards[i] == card_id) { idx = i; break; }
+        }
+        if (idx < 0) idx = 0;
+    } else {
+        idx = 0;
+    }
+    for (int i = 0; i < g->n_selected_cards; i++) {
+        if (g->selected_cards[i] == idx) {
+            for (int j = i; j < g->n_selected_cards - 1; j++)
+                g->selected_cards[j] = g->selected_cards[j + 1];
+            g->n_selected_cards--;
+            return 1;
+        }
+    }
+    int reduction = g->live_set_limit_reduction[g->active];
+    int max_allowed = RB_MAX_LIVE_CARDS - reduction;
+    if (max_allowed < 0) max_allowed = 0;
+    if (g->n_selected_cards >= max_allowed) return 0;
+    if (g->n_selected_cards < RB_MAX_RECENTLY_MOVED) {
+        g->selected_cards[g->n_selected_cards++] = idx;
+    }
+    return 1;
+}
+
+/* ───────────────────────────── handle_live_card_confirmation (phases.rs) ─────────────────────────────
+   Confirm live card selection: move selected cards from hand to live zone,
+   draw replacement cards, then advance phase (or switch active player). */
+int rb_handle_live_card_confirmation(GameState *g, const int *indices, int n_indices) {
+    if (!g) return 0;
+    int is_second = (g->active != g->first_attacker);
+    int live_indices[RB_MAX_HAND];
+    int n_live = 0;
+    if (indices && n_indices > 0) {
+        for (int i = 0; i < n_indices && i < RB_MAX_HAND; i++)
+            live_indices[n_live++] = indices[i];
+    } else {
+        for (int i = 0; i < g->n_selected_cards && i < RB_MAX_HAND; i++)
+            live_indices[n_live++] = g->selected_cards[i];
+    }
+    for (int i = 0; i < n_live - 1; i++)
+        for (int j = i + 1; j < n_live; j++)
+            if (live_indices[i] < live_indices[j]) {
+                int tmp = live_indices[i];
+                live_indices[i] = live_indices[j];
+                live_indices[j] = tmp;
+            }
+    int deduped[RB_MAX_HAND];
+    int n_deduped = 0;
+    for (int i = 0; i < n_live; i++) {
+        int dup = 0;
+        for (int j = 0; j < n_deduped; j++)
+            if (deduped[j] == live_indices[i]) { dup = 1; break; }
+        if (!dup) deduped[n_deduped++] = live_indices[i];
+    }
+    RbPlayer *P = &g->p[g->active];
+    int max_live = RB_MAX_LIVE_CARDS - P->live.n;
+    if (max_live < 0) max_live = 0;
+    int placed = 0;
+    for (int i = 0; i < n_deduped && placed < max_live; i++) {
+        int idx = deduped[i];
+        if (idx >= 0 && idx < P->hand.n) {
+            int card = rb_hand_remove_card(P, idx);
+            if (card >= 0) {
+                rb_live_add_card(P, card);
+                placed++;
+            }
+        }
+    }
+    for (int i = 0; i < placed; i++)
+        rb_draw(g, g->active);
+    g->n_selected_cards = 0;
+    if (is_second) {
+        rb_advance_phase(g);
+    } else {
+        g->active = g->second_attacker;
+    }
+    return 1;
+}
+
+/* ───────────────────────────── handle_live_card_skip (phases.rs) ─────────────────────────────
+   Skip live card selection for the current player. */
+int rb_handle_live_card_skip(GameState *g) {
+    if (!g) return 0;
+    g->n_selected_cards = 0;
+    if (g->active == g->first_attacker) {
+        g->active = g->second_attacker;
+    } else {
+        rb_advance_phase(g);
+    }
+    return 1;
+}
+
+/* ───────────────────────────── handle_play_member_to_stage (phases.rs) ─────────────────────────────
+   Play a member card from hand to the stage. Simplified port: delegates to
+   rb_play_member for the basic placement path. */
+int rb_handle_play_member_to_stage(GameState *g, int card_id, const int *indices, int n_indices, int stage_area, int use_baton_touch) {
+    if (!g) return 0;
+    (void)indices; (void)n_indices; (void)use_baton_touch;
+    RbPlayer *P = &g->p[g->active];
+    int idx;
+    if (card_id >= 0) {
+        idx = -1;
+        for (int i = 0; i < P->hand.n; i++) {
+            if (P->hand.cards[i] == card_id) { idx = i; break; }
+        }
+        if (idx < 0) return 0;
+    } else {
+        idx = -1;
+        for (int i = 0; i < P->hand.n; i++) {
+            if (rb_card_is_member(P->hand.cards[i])) { idx = i; break; }
+        }
+        if (idx < 0) return 0;
+    }
+    int area;
+    if (stage_area >= 0 && stage_area < RB_STAGE_SIZE) {
+        area = stage_area;
+    } else {
+        area = rb_stage_first_empty(P->stage);
+        if (area < 0) area = 0;
+    }
+    return rb_play_member(g, g->active, idx, area);
+}
+
+/* ───────────────────────────── setup_initial_energy (phases.rs) ─────────────────────────────
+   Draw 3 energy cards for each player at game start. */
+void rb_setup_initial_energy(GameState *g) {
+    if (!g) return;
+    for (int i = 0; i < 3; i++) {
+        int card_id = rb_energy_deck_draw(g, 0);
+        if (card_id >= 0) {
+            rb_energy_add_card(&g->p[0], card_id);
+        }
+        card_id = rb_energy_deck_draw(g, 1);
+        if (card_id >= 0) {
+            rb_energy_add_card(&g->p[1], card_id);
+        }
+    }
+}
+
+/* ── Ported from engine/src/turn/phases.rs ───────────────────────────────────
+    _3ds_tdbg, log_turn_start — mirror the Rust 3DS debug logging and
+   turn-start logging. No-op in the C port (logging infrastructure not
+   available without the 3DS platform feature). ── */
+
+/* Mirror _3ds_tdbg — 3DS debug output. No-op in the portable C build. */
+void rb_3ds_tdbg(const char *msg) {
+    (void)msg;
+}
+

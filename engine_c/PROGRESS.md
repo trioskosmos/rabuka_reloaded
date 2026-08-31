@@ -74,8 +74,15 @@ the bottom-up work-order table. Cross-check with `size_audit.py` (C should be a 
 fraction of the Rust twin) and `audit_placeholders.py` (no TODO/STUB markers left).
 
 ## Current gap snapshot (from latest audits — regenerate before trusting)
-- C lines / Rust lines: ~10,551 / 48,265 (~22%).
-- Missing functions (SIZE_AUDIT.md gap ≈ 178): worst files `vm.c` (58), `card.c` (58), `util.c` (40), `condition.c` (29), `effects/move.c` (29), `turn/live.c` (21), `turn/phase.c` (19).
-- DEPENDENCY_AUDIT.md stubs: 4 remaining (`h_restriction`, `rb_phase_name`, `rb_resolver_finalize_choice`, `h_activation_restriction`). Fix bottom-up (depth 1 first), then bulk-fill the worst line-ratio gaps above.
-- Missing declarations (`DEPENDENCY_AUDIT.md` MISSING): `rb_complete_play_with_cost`, `rb_fire_all_auto`. Both exist in C source (`engine.c`, `game_state_abilities.c`) — audit path issue; verify with build.
-- Next maintainer action: regenerate both audits (`python tools/dep_audit.py ...` and `python tools/size_audit.py --rust ../engine/src ...`), pick the deepest stub or worst gap file, port file-by-file without inventing new architecture, rebuild, re-audit.
+- C lines / Rust lines: ~16,534 / 48,265 (~34%). [UPDATED 2026-09-01]
+- Missing functions: worst files `src/turn/live.c` (13→5), `src/ability/effects/state.c` (8→1), `src/core/game_state_abilities.c` (6), `src/ability/ability_queue.c` (4), `src/ability/vm.c` (3), `src/ability/util.c` (1), `src/ability/effects/move.c` (26→3).
+- DEPENDENCY_AUDIT.md stubs: 4 depth-1 stubs remaining (`h_restriction`, `rb_phase_name`, `rb_prune_dominated`, `rb_zone_track_deployment`), 1 depth-2 (`h_activation_restriction`). [UPDATED 2026-09-01]
+- Orphaned fragment files (`choice_frag_*.c`): DELETED 2026-09-01.
+- Build status: CLEAN (rb_engine.exe, 637KB). [UPDATED 2026-09-01]
+- Ported this session (2026-09-01):
+  - **move.rs (21 functions):** prompt_card_selection, place_card_with_stage_choice, resolve_from_recently_moved, take_cards_from_standard_zone, resolve_cards_from_source, resolve_from_zone, resolve_from_energy_deck, resolve_from_stage, resolve_from_under_member, move_from_revealed, finalize_card_movement, fire_debut_side_effects, handle_select_position, execute_stage_placement_choices, place_energy_under_member_selected, execute_move_cards_both, execute_selected_cards_from_zone, handle_select_cards_looked_at, handle_energy_zone_selection
+  - **resolver.rs (3 functions):** store_pending_choice, card_matches_cost_limit, fmt_card
+  - **live.rs (6+ functions):** execute_live_victory_determination, build_snapshot, handle_live_success_choice, check_live_success, plus stub helpers
+  - **state.rs (5 functions):** execute_change_state, execute_energy_placement, execute_energy_state_change, execute_set_card_identity, execute_set_heart_type_applied
+  - **phases.rs (2 functions):** has_distinct_assignment_k, find_distinct_assignment_k
+- Next: port remaining live.rs functions, fix remaining stub functions, port game_state_abilities.rs (6 missing), ability_queue.rs (4 missing), vm.c (3 missing), util.c (1 missing).

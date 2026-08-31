@@ -9,6 +9,7 @@
 
 #include "rabuka.h"
 #include <string.h>
+#include <stdio.h>
 
 /* ── resolver.rs::get_pending_choice ──
    Return the pending choice, or NULL when none is awaiting input. */
@@ -192,4 +193,110 @@ int rb_resolve_ability(GameState *g, int actor, const Ability *ab,
    Selector card-type filter. Delegates to util.c. */
 int rb_resolver_card_matches_type(int cid, const char *filter) {
     return rb_card_matches_type(cid, filter);
+}
+
+/* ── resolver.rs::drain_verdicts / push_verdict / drain_verdicts_since ──
+   Logging stubs — the C engine logs to g->rule_log, not a separate verdict queue.
+   These are no-ops in C (verdicts are appended directly to rule_log in
+   execute_* functions). ── */
+void rb_resolver_drain_verdicts(GameState *g) {
+    (void)g;
+}
+void rb_resolver_push_verdict(GameState *g, const char *text, const char *kind, int passed) {
+    (void)g; (void)text; (void)kind; (void)passed;
+}
+void rb_resolver_drain_verdicts_since(GameState *g, int snapshot) {
+    (void)g; (void)snapshot;
+}
+
+/* ── resolver.rs::emit_pay_skip_gate ──
+   Emit a pay/skip choice for optional cost payment. The C engine uses
+   rb_emit_choice with route=ROUTE_PAY_SKIP. ── */
+void rb_resolver_emit_pay_skip_gate(GameState *g, int actor, const AbilityEffect *e,
+                                      const char *description, int optional, const char *route) {
+    (void)e;
+    if (!g || !description) return;
+    rb_emit_choice(g, actor, RB_CHOICE_SELECT_TARGET, NULL, NULL, 1, optional, route ? route : "pay_skip");
+}
+
+/* ── resolver.rs::cached_condition_verdict / store_condition_verdict ──
+   Condition result caching. The C engine evaluates conditions on demand,
+   so these are no-ops (always re-evaluate). ── */
+int rb_resolver_cached_condition_verdict(const GameState *g, int actor, const char *cond_text, int *result) {
+    (void)g; (void)actor; (void)cond_text; (void)result;
+    return 0; /* no cache hit */
+}
+void rb_resolver_store_condition_verdict(GameState *g, int actor, const char *cond_text, int result) {
+    (void)g; (void)actor; (void)cond_text; (void)result;
+}
+
+/* ── resolver.rs::merge_group_names ──
+   Merge group_names from multiple effects into a single comma-separated string.
+   Returns a static buffer (not thread-safe, but the C engine is single-threaded). ── */
+const char *rb_resolver_merge_group_names(const char **groups, int n) {
+    static char buf[1024];
+    buf[0] = '\0';
+    int pos = 0;
+    for (int i = 0; i < n && pos < 1000; i++) {
+        if (groups[i]) {
+            int len = strlen(groups[i]);
+            if (pos > 0 && pos < 1000) buf[pos++] = ',';
+            if (pos + len < 1000) { memcpy(buf + pos, groups[i], len); pos += len; }
+        }
+    }
+    buf[pos] = '\0';
+    return buf;
+}
+
+/* ── resolver.rs::check_keywords ──
+   Check if an ability has any of the specified keywords. Returns 1 if any match. ── */
+int rb_resolver_check_keywords(const Ability *ab, const char **keywords, int n) {
+    if (!ab || !keywords || n <= 0) return 0;
+    for (int i = 0; i < n; i++) {
+        if (keywords[i] && ab->triggers && strstr(ab->triggers, keywords[i])) return 1;
+    }
+    return 0;
+}
+
+/* ── resolver.rs::fmt_ids ──
+   Format an array of card IDs into a comma-separated string. Static buffer. ── */
+const char *rb_resolver_fmt_ids(const int *ids, int n) {
+    static char buf[1024];
+    buf[0] = '\0';
+    int pos = 0;
+    for (int i = 0; i < n && pos < 1000; i++) {
+        if (i > 0 && pos < 1000) buf[pos++] = ',';
+        int written = snprintf(buf + pos, 1000 - pos, "%d", ids[i]);
+        if (written > 0) pos += written;
+    }
+    buf[pos] = '\0';
+    return buf;
+}
+
+/* Mirror resolver.rs::store_pending_choice — snapshot the pending choice into
+   the ability queue. The C queue model uses a global pending choice. */
+void rb_resolver_store_pending_choice(GameState *g) {
+    if (!g) return;
+    g->queue.has_pending = 1;
+    g->queue.state = RB_QUEUE_AWAITING_CHOICE;
+}
+
+/* Mirror resolver.rs::card_matches_cost_limit — delegate to util.c. */
+int rb_resolver_card_matches_cost_limit(int card_id, int cost_limit, const char *operator) {
+    if (cost_limit < 0) return 1;
+    return rb_card_matches_cost_limit(card_id, cost_limit, operator);
+}
+
+/* Mirror resolver.rs::fmt_card — format a card ID into its display name. */
+void rb_resolver_fmt_card(int cid, char *out, size_t out_sz) {
+    if (!out || out_sz == 0) return;
+    out[0] = '\0';
+    Card c;
+    if (rb_decode_card_by_index((uint32_t)cid, &c)) {
+        if (c.name) {
+            strncpy(out, c.name, out_sz - 1);
+            out[out_sz - 1] = '\0';
+        }
+        rb_free_card(&c);
+    }
 }

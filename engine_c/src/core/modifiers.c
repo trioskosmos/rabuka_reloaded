@@ -276,3 +276,12 @@ void rb_mods_add_heart_with_trace(RbMods *m, int cid, int color, int delta,
     rb_mods_add_heart(m, cid, color, delta);
     rb_mods_trace_push(m, source_card_id, ability_text, RB_EFFECT_HEART_BONUS, cid, color, delta);
 }
+
+/* ───────────────────────────── total (game_modifiers.rs) ─────────────────────────────
+    Mirror ModifierEntry::total — returns the combined set + additive value.
+    set (absolute override) is the base; additive deltas stack on top.
+    Mirrors ModifierEntry::total(self) -> i32 in game_modifiers.rs. */
+int rb_modifier_total_entry(const RbModifierEntry *e) {
+    if (!e) return 0;
+    return (int)e->set + (int)e->add;
+}

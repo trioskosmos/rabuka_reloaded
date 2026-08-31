@@ -19,6 +19,9 @@
 #include <string.h>
 #include <stdlib.h>
 
+/* Forward declaration */
+int rb_revealed_count(const struct GameState *g, int owner);
+
 int rb_resolve_dynamic_count(const struct GameState *g, int owner, int host_cid,
                               const char *reference,
                               const char *base_reference,
@@ -51,23 +54,7 @@ int rb_resolve_dynamic_count(const struct GameState *g, int owner, int host_cid,
         else count = 0;
     } else if (!strcmp(reference_text, "revealed_cards") ||
                  !strcmp(reference_text, "previous_reveal")) {
-        /* Mirror revealed_count: no separate cheer pool in the C port, so count the
-            revealed (yell) cards that currently belong to the owner's zones. */
-        const RbPlayer *P = &g->p[owner];
-        for (int i = 0; i < g->n_revealed; i++) {
-            int cid = g->revealed_cards[i];
-            int in = 0;
-            for (int k = 0; k < P->hand.n; k++) if (P->hand.cards[k] == cid) { in = 1; break; }
-            if (!in) for (int k = 0; k < P->discard.n; k++) if (P->discard.cards[k] == cid) { in = 1; break; }
-            if (!in) for (int k = 0; k < RB_STAGE_SIZE; k++) if (P->stage[k] == cid) { in = 1; break; }
-            if (!in) for (int k = 0; k < RB_STAGE_SIZE; k++) if (P->under_cards[k].n) { in = 1; break; }
-            if (!in) for (int k = 0; k < P->energy.n; k++) if (P->energy.cards[k] == cid) { in = 1; break; }
-            if (!in) for (int k = 0; k < P->deck.n; k++) if (P->deck.cards[k] == cid) { in = 1; break; }
-            if (!in) for (int k = 0; k < P->live.n; k++) if (P->live.cards[k] == cid) { in = 1; break; }
-            if (!in) for (int k = 0; k < P->success.n; k++) if (P->success.cards[k] == cid) { in = 1; break; }
-            if (!in) for (int k = 0; k < g->resolution.n; k++) if (g->resolution.cards[k] == cid) { in = 1; break; }
-            if (in) count++;
-        }
+        count = rb_revealed_count(g, owner);
     } else if (!strcmp(reference_text, "unit_count")) {
         const RbPlayer *P = &g->p[owner];
         for (int i = 0; i < RB_STAGE_SIZE; i++) if (P->stage[i] != RB_EMPTY_SLOT) count++;
@@ -192,4 +179,32 @@ int rb_effect_count(const struct GameState *g, int actor, int host_cid, const Ab
                                     &moved, moved > 0 ? 1 : 0,
                                     &selected, selected > 0 ? 1 : 0,
                                     last_draw_count);
+}
+
+/* ── revealed_count: mirror GameState::revealed_count ──
+   Number of cards in the revealed (yell) pool belonging to `owner`.
+   No separate cheer pool in the C port, so count the revealed (yell) cards
+   that currently belong to the owner's zones. */
+int rb_revealed_count(const struct GameState *g, int owner) {
+    const RbPlayer *P = &g->p[owner];
+    int count = 0;
+    for (int i = 0; i < g->n_revealed; i++) {
+        int cid = g->revealed_cards[i];
+        int in = 0;
+        for (int k = 0; k < P->hand.n; k++) if (P->hand.cards[k] == cid) { in = 1; break; }
+        if (!in) for (int k = 0; k < P->discard.n; k++) if (P->discard.cards[k] == cid) { in = 1; break; }
+        if (!in) for (int k = 0; k < RB_STAGE_SIZE; k++) if (P->stage[k] == cid) { in = 1; break; }
+        if (!in) for (int k = 0; k < RB_STAGE_SIZE; k++) if (P->under_cards[k].n > 0) {
+            for (int j = 0; j < P->under_cards[k].n; j++)
+                if (P->under_cards[k].cards[j] == cid) { in = 1; break; }
+            if (in) break;
+        }
+        if (!in) for (int k = 0; k < P->energy.n; k++) if (P->energy.cards[k] == cid) { in = 1; break; }
+        if (!in) for (int k = 0; k < P->deck.n; k++) if (P->deck.cards[k] == cid) { in = 1; break; }
+        if (!in) for (int k = 0; k < P->live.n; k++) if (P->live.cards[k] == cid) { in = 1; break; }
+        if (!in) for (int k = 0; k < P->success.n; k++) if (P->success.cards[k] == cid) { in = 1; break; }
+        if (!in) for (int k = 0; k < g->resolution.n; k++) if (g->resolution.cards[k] == cid) { in = 1; break; }
+        if (in) count++;
+    }
+    return count;
 }

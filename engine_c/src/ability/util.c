@@ -13,6 +13,7 @@
 #include "rabuka.h"
 #include <string.h>
 #include <stdlib.h>
+#include <stdio.h>
 
 /* Normalize a UTF-8 copy: '！'(EF BC 81)→'!', 'µ'(C2 B5)→'μ'(CE BC).
    Caller must rb_free the result. Returns NULL on alloc failure. */
@@ -873,5 +874,757 @@ int rb_classify_selection(const int *idxs, int n, int count, int is_all) {
     if (is_all) return 1;
     if (n < count) return 0;
     if (n > count) return 2;
+    return 1;
+}
+
+/* ── Ported from engine/src/ability/util.rs ───────────────────────────────────
+    push_temporary_effect — register a temporary (duration-limited) effect
+   on GameState.temporary_effects so it can be reverted when its duration
+   expires. Mirrors the Rust util::push_temporary_effect. ── */
+
+/* Check whether a given effect_type has a revert handler in
+   rb_check_expired_effects. Mirrors is_revertable_effect_type. */
+static int rb_is_revertable_effect_type(const char *effect_type) {
+    if (!effect_type) return 0;
+    if (!strcmp(effect_type, "blade_bonus")) return 1;
+    if (!strcmp(effect_type, "heart_bonus")) return 1;
+    if (!strcmp(effect_type, "score_bonus")) return 1;
+    if (!strcmp(effect_type, "score_set")) return 1;
+    if (!strcmp(effect_type, "cost_bonus")) return 1;
+    if (!strcmp(effect_type, "cost_set")) return 1;
+    if (!strcmp(effect_type, "heart_override")) return 1;
+    if (!strcmp(effect_type, "modify_cost")) return 1;
+    if (!strcmp(effect_type, "set_heart_type")) return 1;
+    return 0;
+}
+
+/* Mirror util::push_temporary_effect — push a temporary effect onto
+   GameState.temp_effects if duration is non-permanent. The C port
+   stores a simplified RbTempEffect (no EffectData). */
+void rb_util_push_temporary_effect(
+    GameState *g,
+    const char *effect_type,
+    const char *duration,
+    const char *target_player_id,
+    const char *description)
+{
+    if (!g || !effect_type) return;
+    if (!duration || !strcmp(duration, "permanent")) return;
+    if (!rb_is_revertable_effect_type(effect_type)) {
+        /* warn: no revert handler — mirrors Rust log::warn */
+        fprintf(stderr, "[warn] temporary effect type '%s' has no expiry revert handler\n", effect_type);
+    }
+    if (g->n_temp_effects >= RB_MAX_TEMP_EFFECTS) {
+        fprintf(stderr, "[warn] temporary effects buffer full, dropping '%s'\n", effect_type);
+        return;
+    }
+    RbTempEffect *te = &g->temp_effects[g->n_temp_effects++];
+    te->card_id = -1;
+    te->dur = rb_parse_duration(duration);
+    te->blade = 0;
+    te->score = 0;
+    te->cost = 0;
+    for (int c = 0; c < 8; c++) { te->heart[c] = 0; te->need_heart[c] = 0; }
+    (void)target_player_id;
+    (void)description;
+}
+
+/* Mirror util.rs::card_matches_cost_limit_op — cost-limit check with explicit
+    comparison operator. The existing rb_card_matches_cost_limit hard-codes
+    the live/member dispatch; this is the faithful Rust signature. */
+int rb_card_matches_cost_limit_op(int card_id, int cost_limit, const char *comparison) {
+    return rb_card_matches_cost_limit(card_id, cost_limit, comparison);
+}
+
+/* Mirror util.rs::zone_card_ids — return owned card IDs from a named zone.
+    Fills out_ids (capacity max) with card_no indices; returns count written. */
+int rb_zone_card_ids(const GameState *g, int pl, const char *zone, int *out_ids, int max) {
+    return rb_zone_cards(g, pl, zone, out_ids, max);
+}
+
+/* Mirror util.rs::count_in_zone (with filter) — count cards in a zone that
+    match the given card-type / group filter. The C port mirrors the Rust
+    count_in_zone pipeline: stage counts non-empty slots; under_member sums
+    all under-card bags; other zones delegate to rb_count_in_zone. */
+int rb_count_in_zone_filtered(const GameState *g, int pl, const char *zone,
+                              const char *card_type, const char *group) {
+    if (!zone) return 0;
+    const RbPlayer *P = &g->p[pl];
+    if (!strcmp(zone, "stage")) {
+        int n = 0;
+        for (int i = 0; i < RB_STAGE_SIZE; i++) {
+            int cid = P->stage[i];
+            if (cid == RB_EMPTY_SLOT) continue;
+            if (card_type && !rb_card_matches_type(cid, card_type)) continue;
+            if (group && !rb_card_matches_group_str(cid, group)) continue;
+            n++;
+        }
+        return n;
+    }
+    if (!strcmp(zone, "under_member") || !strcmp(zone, "under")) {
+        int n = 0;
+        for (int s = 0; s < RB_STAGE_SIZE; s++) {
+            const RbBag *u = &P->under_cards[s];
+            for (int i = 0; i < u->n; i++) {
+                int cid = u->cards[i];
+                if (card_type && !rb_card_matches_type(cid, card_type)) continue;
+                if (group && !rb_card_matches_group_str(cid, group)) continue;
+                n++;
+            }
+        }
+        return n;
+    }
+    /* For bag zones, gather then filter */
+    int ids[RB_MAX_ZONE];
+    int n = rb_zone_cards(g, pl, zone, ids, RB_MAX_ZONE);
+    int count = 0;
+    for (int i = 0; i < n; i++) {
+        if (card_type && !rb_card_matches_type(ids[i], card_type)) continue;
+        if (group && !rb_card_matches_group_str(ids[i], group)) continue;
+        count++;
+    }
+    return count;
+}
+
+/* Mirror util.rs::get_zone_card_count — count cards in a named zone. */
+int rb_get_zone_card_count(const GameState *g, int pl, const char *zone) {
+    if (!zone) return 0;
+    const RbPlayer *P = &g->p[pl];
+    if (!strcmp(zone, "stage")) {
+        int n = 0;
+        for (int i = 0; i < RB_STAGE_SIZE; i++) if (P->stage[i] != RB_EMPTY_SLOT) n++;
+        return n;
+    }
+    if (!strcmp(zone, "under_member") || !strcmp(zone, "under")) {
+        int n = 0;
+        for (int s = 0; s < RB_STAGE_SIZE; s++) n += P->under_cards[s].n;
+        return n;
+    }
+    return rb_count_in_zone(g, pl, zone);
+}
+
+/* Mirror util.rs::matching_indices — return indices into `cards` where cards
+    match the filter (card_type + group). Writes matching indices into out_idx
+    (capacity max); returns the count written. */
+int rb_matching_indices(const int *cards, int n, const char *card_type,
+                        const char *group, int *out_idx, int max) {
+    if (!cards || !out_idx) return 0;
+    int m = 0;
+    for (int i = 0; i < n; i++) {
+        int cid = cards[i];
+        if (card_type && !rb_card_matches_type(cid, card_type)) continue;
+        if (group && !rb_card_matches_group_str(cid, group)) continue;
+        if (m < max) out_idx[m++] = i;
+    }
+    return m;
+}
+
+/* Mirror util.rs::count_matching — count cards matching the filter. */
+int rb_count_matching(const int *cards, int n, const char *card_type, const char *group) {
+    if (!cards) return 0;
+    int count = 0;
+    for (int i = 0; i < n; i++) {
+        if (card_type && !rb_card_matches_type(cards[i], card_type)) continue;
+        if (group && !rb_card_matches_group_str(cards[i], group)) continue;
+        count++;
+    }
+    return count;
+}
+
+/* Mirror util.rs::count_matching_distinct — count matching cards with
+    distinct-name dedup. */
+int rb_count_matching_distinct(const int *cards, int n, const char *card_type,
+                               const char *group, RbDistinctType distinct) {
+    if (!rb_distinct_should_dedupe(distinct))
+        return rb_count_matching(cards, n, card_type, group);
+    int filtered[RB_MAX_ZONE];
+    int fn = rb_matching_indices(cards, n, card_type, group, filtered, RB_MAX_ZONE);
+    int ids[RB_MAX_ZONE];
+    for (int i = 0; i < fn; i++) ids[i] = cards[filtered[i]];
+    int deduped[RB_MAX_ZONE];
+    return rb_apply_distinct_filter(ids, fn, distinct, deduped, RB_MAX_ZONE);
+}
+
+/* Mirror util.rs::matching_ids_filtered — matching ids with distinct filter,
+    target count truncation, and exclusion by id. */
+int rb_matching_ids_filtered(const int *cards, int n, const char *card_type,
+                             const char *group, RbDistinctType distinct,
+                             const int *exclude_ids, int n_exclude,
+                             int target_count, int *out, int max) {
+    if (!cards || !out) return 0;
+    int m = 0;
+    for (int i = 0; i < n && m < max; i++) {
+        int cid = cards[i];
+        if (card_type && !rb_card_matches_type(cid, card_type)) continue;
+        if (group && !rb_card_matches_group_str(cid, group)) continue;
+        int excluded = 0;
+        for (int e = 0; e < n_exclude; e++) {
+            if (exclude_ids[e] == cid) { excluded = 1; break; }
+        }
+        if (excluded) continue;
+        out[m++] = cid;
+    }
+    if (rb_distinct_should_dedupe(distinct)) {
+        int deduped[RB_MAX_ZONE];
+        int dn = rb_apply_distinct_filter(out, m, distinct, deduped, RB_MAX_ZONE);
+        for (int i = 0; i < dn && i < max; i++) out[i] = deduped[i];
+        m = dn;
+    }
+    if (target_count > 0 && m > target_count) m = target_count;
+    return m;
+}
+
+/* Mirror util.rs::dedupe_by_normalized_name — deduplicate items by their
+    card's normalized name, keeping first occurrences. Items missing from the
+    database are kept. The C port operates on card-id arrays. */
+int rb_dedupe_by_normalized_name(const int *items, int n, int *out, int max) {
+    if (!items || !out) return 0;
+    char seen[RB_MAX_ZONE][256];
+    int  nseen = 0;
+    int  m = 0;
+    for (int i = 0; i < n; i++) {
+        int cid = items[i];
+        Card c;
+        int found = 0;
+        if (rb_decode_card_by_index((uint32_t)cid, &c)) {
+            if (c.name) {
+                char nm[256];
+                rb_norm_ws(c.name, nm, sizeof nm);
+                int dup = 0;
+                for (int s = 0; s < nseen; s++) {
+                    if (!strcmp(seen[s], nm)) { dup = 1; break; }
+                }
+                if (!dup) {
+                    if (nseen < RB_MAX_ZONE) {
+                        strncpy(seen[nseen], nm, 255); seen[nseen][255] = 0; nseen++;
+                    }
+                    found = 1;
+                }
+            } else {
+                found = 1;
+            }
+            rb_free_card(&c);
+        } else {
+            found = 1;
+        }
+        if (found && m < max) out[m++] = items[i];
+    }
+    return m;
+}
+
+/* Mirror util.rs::filter_distinct — return indices into `cards` matching the
+    filter, deduplicated by card name when distinct is set. */
+int rb_filter_distinct(const int *cards, int n, const char *card_type,
+                       const char *group, RbDistinctType distinct,
+                       int *out_idx, int max) {
+    if (!rb_distinct_should_dedupe(distinct))
+        return rb_matching_indices(cards, n, card_type, group, out_idx, max);
+    int matching[RB_MAX_ZONE];
+    int mn = rb_matching_indices(cards, n, card_type, group, matching, RB_MAX_ZONE);
+    int ids[RB_MAX_ZONE];
+    for (int i = 0; i < mn; i++) ids[i] = cards[matching[i]];
+    int deduped_ids[RB_MAX_ZONE];
+    int dn = rb_dedupe_by_normalized_name(ids, mn, deduped_ids, RB_MAX_ZONE);
+    /* Map deduped ids back to indices */
+    int m = 0;
+    for (int i = 0; i < mn && m < max; i++) {
+        for (int d = 0; d < dn; d++) {
+            if (cards[matching[i]] == deduped_ids[d]) {
+                out_idx[m++] = matching[i];
+                break;
+            }
+        }
+    }
+    return m;
+}
+
+/* Mirror util.rs::norm_group_name — normalize fullwidth '！'→'!' and 'µ'→'μ'.
+    Caller must rb_free the result. Returns NULL on alloc failure. */
+static char *rb_norm_group_name(const char *s) {
+    return norm_str(s);
+}
+
+/* Mirror util.rs::debug_group_match — no-op in the C port (debug logging
+    is handled by rb_log_*). */
+static void rb_debug_group_match(int card_id, const char *group_name, int result) {
+    (void)card_id; (void)group_name; (void)result;
+}
+
+/* Mirror util.rs::find_modify_cost — search the effect tree for a
+    ModifyCost effect matching the given operation and location. Returns the
+    found effect or NULL. */
+const AbilityEffect *rb_find_modify_cost(const AbilityEffect *effect,
+                                         const char *op, const char *loc) {
+    if (!effect) return NULL;
+    if (!strcmp(effect->action ? effect->action : "", "modify_cost")) {
+        if (op) {
+            const char *eff_op = eff_extra(effect, "operation");
+            if (!eff_op || strcmp(eff_op, op)) return NULL;
+        }
+        if (loc) {
+            const char *eff_loc = eff_extra(effect, "location");
+            if (!eff_loc || strcmp(eff_loc, loc)) return NULL;
+        }
+        return effect;
+    }
+    /* Search children */
+    for (int i = 0; i < effect->n_child; i++) {
+        const AbilityEffect *found = rb_find_modify_cost(effect->child[i], op, loc);
+        if (found) return found;
+    }
+    /* Search compound sub-effects */
+    if (effect->primary_effect) {
+        const AbilityEffect *found = rb_find_modify_cost(effect->primary_effect, op, loc);
+        if (found) return found;
+    }
+    if (effect->alternative_effect) {
+        const AbilityEffect *found = rb_find_modify_cost(effect->alternative_effect, op, loc);
+        if (found) return found;
+    }
+    if (effect->followup_action) {
+        const AbilityEffect *found = rb_find_modify_cost(effect->followup_action, op, loc);
+        if (found) return found;
+    }
+    return NULL;
+}
+
+/* Mirror util.rs::play_cost_reduction_matches — check if a card matches
+    the cost-reduction criteria. */
+static int rb_play_cost_reduction_matches(const AbilityEffect *effect, int card_id,
+                                          const Card *card) {
+    const char *gn = eff_extra(effect, "group");
+    if (gn && !rb_card_matches_group_str(card_id, gn)) return 0;
+    const char *cost_limit = eff_extra(effect, "cost_limit");
+    if (cost_limit) {
+        int limit = atoi(cost_limit);
+        if (card->cost != limit) return 0;
+    }
+    if (!rb_cost_threshold_met(card, effect)) return 0;
+    const char *ct = eff_extra(effect, "card_type");
+    if (ct && strcmp(ct, "member_card")) return 0;
+    const char *af = eff_extra(effect, "ability_filter");
+    if (af && !strcmp(af, "no_ability")) {
+        if (card->ability) return 0;
+    }
+    return 1;
+}
+
+/* Mirror util.rs::per_unit_cost_reduction — calculate per-unit cost reduction. */
+static int rb_per_unit_cost_reduction(const AbilityEffect *effect, int hand_count) {
+    const char *pul = eff_extra(effect, "per_unit_location");
+    const char *loc = eff_extra(effect, "location");
+    const char *count_zone = pul ? pul : loc;
+    if (!count_zone) count_zone = "hand";
+    int raw_count;
+    if (!strcmp(count_zone, "stage")) {
+        /* Stage count with group filter — simplified: use hand_count */
+        raw_count = hand_count;
+    } else {
+        raw_count = hand_count;
+    }
+    const char *puc = eff_extra(effect, "per_unit_count");
+    int per_unit_count = puc ? atoi(puc) : 1;
+    if (per_unit_count < 1) per_unit_count = 1;
+    int exclude_self = 0;
+    const char *es = eff_extra(effect, "exclude_self");
+    if (es && !strcmp(es, "true")) exclude_self = 1;
+    int effective = exclude_self ? (raw_count > 0 ? raw_count - 1 : 0) : raw_count;
+    const char *val = eff_extra(effect, "value");
+    int value = val ? atoi(val) : 1;
+    return (effective / per_unit_count) * value;
+}
+
+/* Mirror util.rs::scan_abilities_for_cost_reduction — scan a card's abilities
+    for a qualifying ModifyCost-subtract-hand effect. Returns reduction or 0. */
+static int rb_scan_abilities_for_cost_reduction(uint32_t card_idx,
+                                                int target_id, const Card *target_card,
+                                                int hand_count) {
+    int n_abilities = rb_card_num_abilities(card_idx);
+    for (int i = 0; i < n_abilities; i++) {
+        Ability ab;
+        if (!rb_decode_card_ability(card_idx, i, &ab)) continue;
+        if (ab.effect) {
+            const AbilityEffect *mc = rb_find_modify_cost(ab.effect, "subtract", "hand");
+            if (mc && rb_play_cost_reduction_matches(mc, target_id, target_card)) {
+                if (mc->per_unit) {
+                    int r = rb_per_unit_cost_reduction(mc, hand_count);
+                    rb_free_ability(&ab);
+                    return r;
+                } else {
+                    const char *val = eff_extra(mc, "value");
+                    int r = val ? atoi(val) : 1;
+                    rb_free_ability(&ab);
+                    return r;
+                }
+            }
+        }
+        rb_free_ability(&ab);
+    }
+    return 0;
+}
+
+/* Mirror util.rs::calculate_play_cost_reduction — calculate the total play
+    cost reduction for a card from its own abilities and stage/live auras. */
+int rb_calculate_play_cost_reduction(const GameState *g, int pl, int hand_count,
+                                     int card_id) {
+    Card card;
+    if (!rb_decode_card_by_index((uint32_t)card_id, &card)) return 0;
+    int reduction = 0;
+    /* 1. Self-reduction from own abilities */
+    {
+        int n_abilities = rb_card_num_abilities((uint32_t)card_id);
+        for (int i = 0; i < n_abilities; i++) {
+            Ability ab;
+            if (!rb_decode_card_ability((uint32_t)card_id, i, &ab)) continue;
+            if (ab.effect) {
+                const AbilityEffect *mc = rb_find_modify_cost(ab.effect, "subtract", "hand");
+                if (mc && rb_play_cost_reduction_matches(mc, card_id, &card)) {
+                    if (mc->per_unit) {
+                        reduction = rb_per_unit_cost_reduction(mc, hand_count);
+                    } else {
+                        const char *val = eff_extra(mc, "value");
+                        reduction = val ? atoi(val) : 1;
+                    }
+                }
+            }
+            rb_free_ability(&ab);
+        }
+    }
+    /* 2. Stage card auras */
+    const RbPlayer *P = &g->p[pl];
+    for (int s = 0; s < RB_STAGE_SIZE; s++) {
+        int stage_id = P->stage[s];
+        if (stage_id == RB_EMPTY_SLOT) continue;
+        int r = rb_scan_abilities_for_cost_reduction((uint32_t)stage_id,
+                                                      card_id, &card, hand_count);
+        if (r > 0) reduction += r;
+    }
+    /* 3. Success live card auras */
+    if (reduction == 0) {
+        for (int i = 0; i < P->success.n; i++) {
+            int live_id = P->success.cards[i];
+            int r = rb_scan_abilities_for_cost_reduction((uint32_t)live_id,
+                                                          card_id, &card, hand_count);
+            if (r > 0) { reduction = r; break; }
+        }
+    }
+    rb_free_card(&card);
+    return reduction;
+}
+
+/* Mirror util.rs::constant_per_unit_units — compute the units part of a
+    constant per_unit gain (before base). */
+int rb_constant_per_unit_units(const AbilityEffect *effect, const GameState *g, int pl,
+                               int host_card_id) {
+    const char *zone = rb_constant_per_unit_zone(effect);
+    int per_count = rb_count_in_zone_filtered(g, pl, zone, NULL, NULL);
+    const char *puc = eff_extra(effect, "per_unit_count");
+    int per_unit_count = puc ? atoi(puc) : 1;
+    if (per_unit_count < 1) per_unit_count = 1;
+    int units = per_count / per_unit_count;
+    const char *max_str = eff_extra(effect, "max");
+    if (max_str && !strcmp(max_str, "true")) {
+        const char *cap_str = eff_extra(effect, "count");
+        if (cap_str) {
+            int cap = atoi(cap_str);
+            if (units > cap) units = cap;
+        }
+    }
+    return units;
+}
+
+/* Mirror util.rs::resolve_discard_per_unit_count — for per_unit_type="discard":
+    count recently-moved cards matching a filter, falling back to
+    last_discard_count when no recent moves are tracked. */
+int rb_resolve_discard_per_unit_count(const GameState *g, int last_discard_count,
+                                      const char *card_type, const char *group) {
+    if (g->n_recently_moved > 0) {
+        return rb_count_matching(g->recently_moved, g->n_recently_moved, card_type, group);
+    }
+    return last_discard_count;
+}
+
+/* Mirror util.rs::calculate_per_unit_multiplier — calculate the per-unit
+    multiplier for a per_unit effect. */
+int rb_calculate_per_unit_multiplier(const GameState *g, int pl, const char *per_unit_type,
+                                     const char *state_filter) {
+    if (!per_unit_type) return 1;
+    const RbPlayer *P = &g->p[pl];
+    if (!strcmp(per_unit_type, "member") || !strcmp(per_unit_type, "人") ||
+        !strcmp(per_unit_type, "members")) {
+        int count = 0;
+        for (int i = 0; i < RB_STAGE_SIZE; i++) {
+            int cid = P->stage[i];
+            if (cid == RB_EMPTY_SLOT) continue;
+            if (state_filter) {
+                const char *ori = rb_mods_get_orientation((RbMods *)&g->mods, cid);
+                if (!rb_orientation_matches_state(ori, state_filter)) continue;
+            }
+            count++;
+        }
+        return count;
+    }
+    if (!strcmp(per_unit_type, "hand") || !strcmp(per_unit_type, "card") ||
+        !strcmp(per_unit_type, "枚")) {
+        return P->hand.n;
+    }
+    if (!strcmp(per_unit_type, "energy")) return P->energy.n;
+    if (!strcmp(per_unit_type, "live_card_zone")) return P->live.n;
+    if (!strcmp(per_unit_type, "discard")) return P->discard.n;
+    if (!strcmp(per_unit_type, "under_member") || !strcmp(per_unit_type, "下")) {
+        int n = 0;
+        for (int s = 0; s < RB_STAGE_SIZE; s++) n += P->under_cards[s].n;
+        return n;
+    }
+    return 1;
+}
+
+/* Mirror util.rs::resolve_per_unit_count — resolve per-unit count with optional
+    card type / group / heart color filtering. */
+int rb_resolve_per_unit_count(const GameState *g, int pl, const char *per_unit_type,
+                              const char *card_type, const char *group,
+                              const char *state_filter, int host_card_id) {
+    if (!per_unit_type) return 1;
+    const RbPlayer *P = &g->p[pl];
+    if (!strcmp(per_unit_type, "stage") || !strcmp(per_unit_type, "member") ||
+        !strcmp(per_unit_type, "人") || !strcmp(per_unit_type, "members")) {
+        int count = 0;
+        for (int i = 0; i < RB_STAGE_SIZE; i++) {
+            int cid = P->stage[i];
+            if (cid == RB_EMPTY_SLOT) continue;
+            if (card_type && !rb_card_matches_type(cid, card_type)) continue;
+            if (group && !rb_card_matches_group_str(cid, group)) continue;
+            if (state_filter) {
+                const char *ori = rb_mods_get_orientation((RbMods *)&g->mods, cid);
+                if (!rb_orientation_matches_state(ori, state_filter)) continue;
+            }
+            count++;
+        }
+        return count;
+    }
+    if (!strcmp(per_unit_type, "hand") || !strcmp(per_unit_type, "card")) {
+        return rb_count_matching(P->hand.cards, P->hand.n, card_type, group);
+    }
+    if (!strcmp(per_unit_type, "under_member") || !strcmp(per_unit_type, "枚")) {
+        int n = 0;
+        for (int s = 0; s < RB_STAGE_SIZE; s++) {
+            const RbBag *u = &P->under_cards[s];
+            n += rb_count_matching(u->cards, u->n, card_type, group);
+        }
+        return n;
+    }
+    if (!strcmp(per_unit_type, "discard")) {
+        return rb_count_matching(P->discard.cards, P->discard.n, card_type, group);
+    }
+    if (!strcmp(per_unit_type, "live_card_zone")) {
+        return rb_count_matching(P->live.cards, P->live.n, card_type, group);
+    }
+    if (!strcmp(per_unit_type, "success_live_zone") || !strcmp(per_unit_type, "success_live_card_zone")) {
+        return rb_count_matching(P->success.cards, P->success.n, card_type, group);
+    }
+    return rb_calculate_per_unit_multiplier(g, pl, per_unit_type, state_filter);
+}
+
+/* Mirror util.rs::max_distinct_names — optimal search for the best name
+    assignment across cards. C port uses a simplified greedy approach. */
+int rb_max_distinct_names(const int *cards, int n) {
+    if (n <= 0) return 0;
+    /* Greedy: count distinct normalized names */
+    char seen[RB_MAX_ZONE][256];
+    int  nseen = 0;
+    for (int i = 0; i < n; i++) {
+        Card c;
+        if (!rb_decode_card_by_index((uint32_t)cards[i], &c)) continue;
+        if (c.name) {
+            char nm[256];
+            rb_norm_ws(c.name, nm, sizeof nm);
+            int dup = 0;
+            for (int s = 0; s < nseen; s++) {
+                if (!strcmp(seen[s], nm)) { dup = 1; break; }
+            }
+            if (!dup && nseen < RB_MAX_ZONE) {
+                strncpy(seen[nseen], nm, 255); seen[nseen][255] = 0; nseen++;
+            }
+        }
+        rb_free_card(&c);
+    }
+    return nseen;
+}
+
+/* Mirror util.rs::max_distinct_names_greedy — first-fit greedy fallback. */
+static int rb_max_distinct_names_greedy(const int *cards, int n) {
+    return rb_max_distinct_names(cards, n);
+}
+
+/* Mirror util.rs::filter_from_parts — build a filter from common fields.
+    C port returns a filter struct. */
+typedef struct {
+    char card_type[32];
+    char group[64];
+    int  cost_limit;
+    char cost_op[8];
+    int  has_filter;
+} RbCardFilter;
+
+int rb_filter_from_parts(const char *card_type, const char *group, int cost_limit,
+                         const char *cost_op, RbCardFilter *out) {
+    if (!out) return 0;
+    memset(out, 0, sizeof(RbCardFilter));
+    if (card_type) strncpy(out->card_type, card_type, 31);
+    if (group) strncpy(out->group, group, 63);
+    out->cost_limit = cost_limit;
+    if (cost_op) strncpy(out->cost_op, cost_op, 7);
+    out->has_filter = (card_type || group || cost_limit >= 0);
+    return 1;
+}
+
+/* Mirror util.rs::filter_from_parts_full — build a full filter from parts. */
+int rb_filter_from_parts_full(const char *card_type, const char *group, int cost_limit,
+                              const char *cost_op, int cost_total, const char *cost_total_op,
+                              RbCardFilter *out) {
+    if (!out) return 0;
+    memset(out, 0, sizeof(RbCardFilter));
+    if (card_type) strncpy(out->card_type, card_type, 31);
+    if (group) strncpy(out->group, group, 63);
+    out->cost_limit = cost_limit;
+    if (cost_op) strncpy(out->cost_op, cost_op, 7);
+    out->has_filter = (card_type || group || cost_limit >= 0);
+    return 1;
+}
+
+/* Mirror util.rs::get_selection_indices — return indices into `cards` matching
+    the filter, with optional self-target pinning. */
+int rb_get_selection_indices(const int *cards, int n, const char *card_type,
+                             const char *group, int self_target_only,
+                             int activating_card, int *out_idx, int max) {
+    if (!cards || !out_idx) return 0;
+    int m = rb_matching_indices(cards, n, card_type, group, out_idx, max);
+    if (self_target_only && activating_card >= 0) {
+        int filtered[RB_MAX_ZONE];
+        int fn = 0;
+        for (int i = 0; i < m; i++) {
+            if (cards[out_idx[i]] == activating_card) {
+                filtered[fn++] = out_idx[i];
+            }
+        }
+        for (int i = 0; i < fn && i < max; i++) out_idx[i] = filtered[i];
+        m = fn;
+    }
+    return m;
+}
+
+/* Mirror util.rs::resolve_selection — full selection resolution: filter →
+    classify → SelectionOutcome. Returns 0=Skip, 1=Exact, 2=Prompt. */
+int rb_resolve_selection(const int *cards, int n, const char *card_type,
+                         const char *group, int count, int is_all,
+                         int self_target_only, int activating_card) {
+    int idxs[RB_MAX_ZONE];
+    int mn = rb_get_selection_indices(cards, n, card_type, group,
+                                       self_target_only, activating_card,
+                                       idxs, RB_MAX_ZONE);
+    return rb_classify_selection(idxs, mn, count, is_all);
+}
+
+/* Mirror util.rs::zone_remove_at_indices — remove cards from a named zone by
+    indices (processed in descending order). Returns count removed. */
+int rb_zone_remove_at_indices(GameState *g, int pl, const char *zone,
+                              const int *indices, int n_indices) {
+    if (!g || !zone || !indices || n_indices <= 0) return 0;
+    /* Sort indices descending */
+    int sorted[RB_MAX_ZONE];
+    int sn = 0;
+    for (int i = 0; i < n_indices && sn < RB_MAX_ZONE; i++) sorted[sn++] = indices[i];
+    /* Simple bubble sort descending */
+    for (int i = 0; i < sn - 1; i++) {
+        for (int j = i + 1; j < sn; j++) {
+            if (sorted[j] > sorted[i]) {
+                int tmp = sorted[i]; sorted[i] = sorted[j]; sorted[j] = tmp;
+            }
+        }
+    }
+    int removed = 0;
+    RbPlayer *P = &g->p[pl];
+    for (int i = 0; i < sn; i++) {
+        int idx = sorted[i];
+        if (!strcmp(zone, "hand")) {
+            if (idx >= 0 && idx < P->hand.n) {
+                for (int k = idx; k < P->hand.n - 1; k++) P->hand.cards[k] = P->hand.cards[k + 1];
+                P->hand.n--; removed++;
+            }
+        } else if (!strcmp(zone, "discard") || !strcmp(zone, "waitroom")) {
+            if (idx >= 0 && idx < P->discard.n) {
+                for (int k = idx; k < P->discard.n - 1; k++) P->discard.cards[k] = P->discard.cards[k + 1];
+                P->discard.n--; removed++;
+            }
+        } else if (!strcmp(zone, "energy")) {
+            if (idx >= 0 && idx < P->energy.n) {
+                for (int k = idx; k < P->energy.n - 1; k++) P->energy.cards[k] = P->energy.cards[k + 1];
+                P->energy.n--; removed++;
+            }
+        } else if (!strcmp(zone, "live") || !strcmp(zone, "live_card_zone")) {
+            if (idx >= 0 && idx < P->live.n) {
+                for (int k = idx; k < P->live.n - 1; k++) P->live.cards[k] = P->live.cards[k + 1];
+                P->live.n--; removed++;
+            }
+        } else if (!strcmp(zone, "success") || !strcmp(zone, "success_live_zone") ||
+                   !strcmp(zone, "success_live_card_zone")) {
+            if (idx >= 0 && idx < P->success.n) {
+                for (int k = idx; k < P->success.n - 1; k++) P->success.cards[k] = P->success.cards[k + 1];
+                P->success.n--; removed++;
+            }
+        }
+    }
+    return removed;
+}
+
+/* Mirror util.rs::CardFilter::matches — check whether a single card matches
+    ALL present filter fields. C port combines card_type, group, cost_limit,
+    characters, heart_colors, name_fragments, original_blade_limit, ability_filter. */
+int rb_card_filter_matches(int card_id, const char *card_type, const char *group,
+                           int cost_limit, const char *cost_op,
+                           int original_blade_limit, const char *blade_op,
+                           int exclude_self_id) {
+    if (exclude_self_id >= 0 && card_id == exclude_self_id) return 0;
+    if (card_type && !rb_card_matches_type(card_id, card_type)) return 0;
+    if (group && !rb_card_matches_group_str(card_id, group)) return 0;
+    if (cost_limit >= 0 && !rb_card_matches_cost_limit(card_id, cost_limit, cost_op)) return 0;
+    if (original_blade_limit >= 0) {
+        Card c;
+        if (!rb_decode_card_by_index((uint32_t)card_id, &c)) return 0;
+        int blade = c.blade;
+        rb_free_card(&c);
+        if (!rb_compare_counts(blade_op, blade, original_blade_limit)) return 0;
+    }
+    return 1;
+}
+
+/* Mirror util.rs::CardFilter::matches_card — convenience wrapper. */
+int rb_card_filter_matches_card(int card_id, const char *card_type, const char *group,
+                                int cost_limit, const char *cost_op) {
+    return rb_card_filter_matches(card_id, card_type, group, cost_limit, cost_op, -1, NULL, -1);
+}
+
+/* ── Ported from engine/src/ability/util.rs ───────────────────────────────────
+    push_temporary_effect — register a temporary (duration-limited) effect
+   on GameState.temp_effects so it can be reverted when its duration expires.
+   This is the low-level variant that takes pre-parsed modifier values. ── */
+
+/* Mirror GameState::push_temporary_effect — add a temporary effect to the
+   game state's temp_effects array. Returns 1 on success, 0 if full. */
+int rb_push_temporary_effect(GameState *g, int card_id, int dur, int blade,
+                             int score, int cost, const int *heart,
+                             const int *need_heart) {
+    if (!g || g->n_temp_effects >= RB_MAX_TEMP_EFFECTS) return 0;
+    RbTempEffect *e = &g->temp_effects[g->n_temp_effects];
+    e->card_id = card_id;
+    e->dur = dur;
+    e->blade = blade;
+    e->score = score;
+    e->cost = cost;
+    for (int i = 0; i < 8; i++) {
+        e->heart[i] = heart ? heart[i] : 0;
+        e->need_heart[i] = need_heart ? need_heart[i] : 0;
+    }
+    g->n_temp_effects++;
     return 1;
 }

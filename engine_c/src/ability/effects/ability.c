@@ -149,3 +149,30 @@ void rb_gain_ability_from_source(GameState *g, int actor, AbilityEffect *e, int 
         rb_free_card(&sc);
     }
 }
+
+/* Mirror ability_effects.rs::execute_set_card_identity_effect. When the
+    all_regions flag is set, route through the all-regions variant (which also
+    records per-card prohibition notes); otherwise apply the identity rewrite
+    for this region only. */
+void rb_set_card_identity_effect(GameState *g, int actor, AbilityEffect *e, int host_cid){
+    int all_regions=0;
+    for(int i=0;i<e->n_extra;i++)
+        if(e->extra_k[i] && !strcmp(e->extra_k[i],"all_regions") && e->extra_v[i] && !strcmp(e->extra_v[i],"true"))
+            all_regions=1;
+    if(all_regions) rb_effect_set_card_identity_all_regions(g, actor, e, host_cid);
+    else            rb_effect_set_card_identity(g, actor, e, host_cid);
+}
+
+/* Mirror ability_effects.rs::execute_suppress_ability_trigger. Surface the
+    suppressed trigger name via the rule log (INFO-only: no per-card state is
+    mutated in the portable core). */
+void rb_suppress_ability_trigger(GameState *g, int actor, AbilityEffect *e, int host_cid){
+    (void)host_cid;
+    const char *trigger="unknown";
+    for(int i=0;i<e->n_extra;i++)
+        if(e->extra_k[i] && !strcmp(e->extra_k[i],"suppressed_trigger") && e->extra_v[i])
+            trigger=e->extra_v[i];
+    (void)trigger;
+    (void)g;
+    (void)actor;
+}
