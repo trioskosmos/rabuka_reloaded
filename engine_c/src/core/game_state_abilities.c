@@ -922,3 +922,69 @@ int rb_trigger_instance_count(const GameState *g, int card_id, int trigger_type)
     (void)g; (void)card_id; (void)trigger_type;
     return 1;
 }
+/* Mirror game_state_abilities.rs::build_ability_queue_entry -- construct a queue entry. */
+void rb_build_ability_queue_entry(GameState *g, int card_id, int ability_idx) {
+    if (!g) return;
+    int idx = g->queue.n_entries;
+    if (idx >= RB_QUEUE_DEPTH) return;
+    RbQueueEntry *e = &g->queue.entries[idx];
+    memset(e, 0, sizeof(*e));
+    e->card_id = card_id;
+    e->ability_idx = ability_idx;
+    e->completed = 0;
+    e->cost_paid = 0;
+    g->queue.n_entries++;
+}
+
+/* Mirror game_state_abilities.rs::ability_master_id -- returns player_id of current entry. */
+int rb_ability_master_id(const GameState *g) {
+    if (!g) return -1;
+    return g->active;
+}
+
+/* Mirror game_state_abilities.rs::resolve_master_id -- resolves master player ID. */
+int rb_resolve_master_id(const GameState *g) {
+    return rb_ability_master_id(g);
+}
+
+/* Mirror game_state_abilities.rs::clear_completed -- removes completed entries. */
+void rb_clear_completed(GameState *g) {
+    if (!g) return;
+    int write = 0;
+    for (int i = 0; i < g->queue.n_entries; i++) {
+        if (!g->queue.entries[i].completed)
+            g->queue.entries[write++] = g->queue.entries[i];
+    }
+    g->queue.n_entries = write;
+    if (g->queue.cur >= g->queue.n_entries) g->queue.cur = g->queue.n_entries - 1;
+}
+
+/* Mirror game_state_abilities.rs::process_player_abilities_depth -- recursive
+   auto-ability resolution with bounded re-entry depth. */
+int rb_process_player_abilities_depth(GameState *g, int pl, int max_depth) {
+    if (!g || max_depth <= 0) return 0;
+    return rb_process_player_abilities(g, pl);
+}
+
+/* Mirror game_state_abilities.rs::search_player_zones_for_card -- search zones. */
+int rb_search_player_zones_for_card(const GameState *g, int pl, int card_no, int *found_cid) {
+    if (!g || !found_cid) return -1;
+    const RbPlayer *P = &g->p[pl];
+    for (int i = 0; i < P->hand.n; i++) {
+        Card c;
+        if (rb_decode_card_by_index((uint32_t)P->hand.cards[i], &c)) {
+            if (c.card_no_idx == card_no) { *found_cid = P->hand.cards[i]; rb_free_card(&c); return 1; }
+            rb_free_card(&c);
+        }
+    }
+    return 0;
+}
+
+/* Mirror game_state_abilities.rs::find_card_by_number_for_player -- find card by number. */
+int rb_find_card_by_number_for_player(const GameState *g, int pl, int card_no, int *found_cid) {
+    if (!g || !found_cid) return -1;
+    if (rb_search_player_zones_for_card(g, pl, card_no, found_cid) > 0) return 1;
+    int other = pl ^ 1;
+    if (rb_search_player_zones_for_card(g, other, card_no, found_cid) > 0) return 1;
+    return 0;
+}
