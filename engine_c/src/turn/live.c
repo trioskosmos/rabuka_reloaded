@@ -46,8 +46,56 @@ void rb_calc_stage_hearts(const GameState *g, int pl, int out[8]){
     }
 }
 
+/* Per-card yell icon tally (mirror live.rs::process_yell_revealed_card_icons).
+    The C card model merges a card's printed blade-hearts into heart_color[] /
+    heart_count[] (so "blade_heart" entries live there) and its special hearts
+    (draw/score) into special_color / special_count. The per-card BAll×2 doubling
+    below matches the established C port (the decode stores the All-color heart as
+    index 7), diverging from Rust's Heart00×2 only in which index carries the ×2;
+    set_blade_type recolor applies to colored blades (Draw/Score pass through). */
+typedef struct {
+    int blade_hearts[8];
+    int note_icons;
+    int draw_icons;
+} RbYellIconOutcome;
+
+static RbYellIconOutcome rb_process_yell_revealed_card_icons(const GameState *g,
+        int cid, int override_color, int total_hearts[8], int *cheer_count){
+    RbYellIconOutcome out; memset(&out,0,sizeof(out));
+    Card c; if(!rb_decode_card_by_index((uint32_t)cid,&c)) return out;
+    /* printed blade -> pink (recolored by set_blade_type) */
+    if(c.blade>0){
+        int bt=g->mods.blade_type[cid];
+        if(bt>=1 && bt<=6) out.blade_hearts[bt]+=c.blade; else out.blade_hearts[RB_HEART_PINK]+=c.blade;
+    }
+    /* BAll (b_heart07, color 7) doubling — a card carrying an All-color heart
+        doubles every other heart icon on that same card (the All heart itself is
+        the doubling source and is NOT doubled). */
+    int has_ball=0;
+    for(int h=0;h<c.n_hearts;h++) if(c.heart_color[h]==7 && c.heart_count[h]>0) has_ball=1;
+    int mult = has_ball ? 2 : 1;
+    for(int h=0;h<c.n_hearts;h++){
+        int col=c.heart_color[h];
+        /* override_color (live.rs::player_perform_live) recolors every yell card's
+            heart icons to a stage member's set_blade_type heart color; Draw/Score
+            special icons pass through unchanged. */
+        int eff = (override_color>=0 && col!=RB_HEART_DRAW && col!=RB_HEART_SCORE) ? override_color : col;
+        if(eff==RB_HEART_DRAW){ out.draw_icons += c.heart_count[h]; }
+        else if(eff==7){ out.blade_hearts[7]+=c.heart_count[h]; }                 /* BAll source, not doubled */
+        else if(eff==RB_HEART_SCORE){ int n=c.heart_count[h]*mult; out.note_icons+=n; *cheer_count+=n; }
+        else { out.blade_hearts[eff%8]+=c.heart_count[h]*mult; }
+    }
+    if(c.has_special){
+        if(c.special_color==RB_HEART_DRAW) out.draw_icons+=c.special_count;
+        else if(c.special_color==RB_HEART_SCORE){ int n=c.special_count; out.note_icons+=n; *cheer_count+=n; }
+    }
+    for(int i=0;i<8;i++) total_hearts[i]+=out.blade_hearts[i];
+    rb_free_card(&c);
+    return out;
+}
+
 /* Yell: reveal top yell_count cards per live (default 1) and harvest blade hearts.
-   Returns number of yell cards revealed, fills blade_hearts[8] + note_icons. */
+    Returns number of yell cards revealed, fills blade_hearts[8] + note_icons. */
 static int do_yell(GameState *g, int pl, int yell_cards[RB_MAX_LIVE_CARDS*3], int *n_yell, int blade_hearts[8], int *note_icons){
     RbPlayer *P=&g->p[pl];
     int lives=P->live.n;
@@ -63,6 +111,16 @@ static int do_yell(GameState *g, int pl, int yell_cards[RB_MAX_LIVE_CARDS*3], in
     int from_bottom = (!strcmp(src,"deck_bottom") || !strcmp(src,"bottom"));
     int from_discard = (!strcmp(src,"discard") || !strcmp(src,"waitroom"));
     int from_hand    = !strcmp(src,"hand");
+    /* override_color (mirror live.rs::player_perform_live): the first stage
+        member's set_blade_type, mapped to a heart color, recolors every yell
+        card's heart icons. -1 = no override. */
+    int override_color=-1;
+    for(int i=0;i<RB_STAGE_SIZE;i++){
+        int cid=P->stage[i];
+        if(cid==RB_EMPTY_SLOT) continue;
+        int bt=g->mods.blade_type[cid];
+        if(bt>=0){ override_color=rb_blade_color_to_heart(bt); break; }
+    }
     for(int i=0;i<total_needed;i++){
         int cid=-1;
         if(from_bottom){
@@ -76,31 +134,10 @@ static int do_yell(GameState *g, int pl, int yell_cards[RB_MAX_LIVE_CARDS*3], in
         }
         if(cid<0) break; /* source exhausted */
         yell_cards[(*n_yell)++]=cid;
-        Card c; if(!rb_decode_card_by_index((uint32_t)cid,&c)){ continue; }
-        /* blade_heart handling: blade contributes pink; special hearts could be draw/score */
-        if(c.blade>0){
-            /* set_blade_type recolor also applies to a yelled card's own blade
-                (state.rs::execute_set_blade_type sets the modifier on the card in
-                any zone; process_yell_revealed_card_icons takes override_color). */
-            int bt = g->mods.blade_type[cid];
-            if(bt>=1 && bt<=6) blade_hearts[bt]+=c.blade; else blade_hearts[RB_HEART_PINK]+=c.blade;
-        }
-        /* BAll (b_heart07, color 7) doubling — mirrors engine/src/turn/live.rs
-            process_yell_revealed_card_icons: a card carrying an All-color heart
-            doubles every other heart icon on that same card (the All heart itself
-            is the doubling source and is NOT doubled). */
-        int has_ball = 0;
-        for(int h=0;h<c.n_hearts;h++) if(c.heart_color[h]==7 && c.heart_count[h]>0) has_ball=1;
-        int mult = has_ball ? 2 : 1;
-        for(int h=0;h<c.n_hearts;h++){
-            int col=c.heart_color[h];
-            if(col==RB_HEART_DRAW) { /* draw icon -> immediate draw handled by caller */ }
-            else if(col==7) blade_hearts[7]+=c.heart_count[h];           /* BAll source, not doubled */
-            else if(col==RB_HEART_SCORE) (*note_icons)+=c.heart_count[h]*mult;
-            else blade_hearts[col%8]+=c.heart_count[h]*mult;
-        }
-        /* special_heart for draw/score already handled */
-        rb_free_card(&c);
+        /* all blade/heart/draw/score icons of this card flow through the shared
+            helper (mirror live.rs::player_perform_live's yell loop). */
+        RbYellIconOutcome o = rb_process_yell_revealed_card_icons(g, cid, override_color, blade_hearts, note_icons);
+        (void)o; /* draw_icons deferred (engine draws after all yell cards revealed) */
         revealed++;
     }
     return revealed;
@@ -239,19 +276,28 @@ static int allocate_and_verdict(const GameState *g, int pl, const int total_hear
     int total_pool=0; for(int k=0;k<8;k++) total_pool+=total_hearts[k];
     for(int i=0;i<n;i++) for(int k=0;k<8;k++) total_required_all+=needs[i*8+k];
 
+    /* snapshot detail consumed by rb_populate_live_verdicts / rb_compute_surplus_and_flags */
+    RbLiveSnapshot *sn = (g->n_snapshots>0) ? (RbLiveSnapshot*)&g->snapshots[g->n_snapshots-1] : NULL;
+
     for(int li=0; li<P->live.n; li++){
         int need[8]; memcpy(need, needs+li*8, 8*sizeof(int));
         int got=0; for(int c=0;c<8;c++) got+=filled[li*8+c];
         int reqt=0; for(int c=0;c<8;c++) reqt+=need[c];
         int ok = (reqt==0) || (got>=reqt);
+        int score=0;
         if(out_per_live && li<RB_MAX_LIVE_CARDS) out_per_live[li]=ok?1:0;
         if(ok){
             Card sc; int base=0;
             if(rb_decode_card_by_index((uint32_t)P->live.cards[li],&sc)){ base=(int)sc.score; rb_free_card(&sc); }
-            int score=base + rb_mods_get_score((RbMods*)&g->mods, P->live.cards[li]);
+            score=base + rb_mods_get_score((RbMods*)&g->mods, P->live.cards[li]);
             if(score<0) score=0;
             total_score+=score;
         } else all_pass=0;
+        if(sn && li<RB_MAX_LIVE_CARDS){
+            sn->live_score_detail[li]=ok?score:0;
+            memcpy(sn->live_required[li], need, 8*sizeof(int));
+            memcpy(sn->live_filled[li], filled+li*8, 8*sizeof(int));
+        }
     }
     if(out_passed) *out_passed=all_pass;
     if(out_score) *out_score=total_score;
@@ -346,6 +392,9 @@ int rb_perform_live(GameState *g, int pl){
             for(int i=0;i<8;i++) s->total_hearts[i]=total2[i];
             for(int i=0;i<P->live.n && i<RB_MAX_LIVE_CARDS;i++) s->live_passed[i]=live_passed2[i];
         }
+        /* Mirror live.rs::populate_live_verdicts — finalize per-live pass/fail on
+            the now-current allocation (post LiveSuccess/Auto/re_yell modifiers). */
+        rb_populate_live_verdicts(g);
     }
     /* revert_live_success_score_modifiers (live.rs): the score grants from the
         LiveSuccess/Auto abilities fired above are event-scoped and must not leak
@@ -405,4 +454,126 @@ void rb_determine_live_winners(const GameState *g, int *p1_won, int *p2_won) {
     else                                     { r0 = 1; r1 = 1; } /* tie -> both place */
     if (p1_won) *p1_won = r0;
     if (p2_won) *p2_won = r1;
+}
+
+/* Mirror live.rs::populate_live_verdicts — for every snapshot, recompute each
+    live's pass/fail from the allocation already stored in live_filled /
+    live_required (rb_allocations_pass acceptance rules), writing live_passed.
+    Operates per-snapshot independently of the victory determination, so it is
+    safe to run from rb_perform_live after each allocation. */
+void rb_populate_live_verdicts(GameState *g){
+    for(int si=0; si<g->n_snapshots; si++){
+        RbLiveSnapshot *s=&g->snapshots[si];
+        for(int i=0;i<s->n_lives && i<RB_MAX_LIVE_CARDS;i++){
+            int *filled=s->live_filled[i];
+            int *req=s->live_required[i];
+            int icon_all=filled[7];
+            int total_filled=0, total_req=0;
+            for(int c=0;c<8;c++){ total_filled+=filled[c]; total_req+=req[c]; }
+            int ok = total_filled>=total_req;
+            if(ok && req[0]>0){
+                int any=0; for(int c=0;c<7;c++) any+=filled[c];
+                if(any+icon_all < req[0]) ok=0;
+                else { int used=req[0]-any; if(used<0) used=0; icon_all-=used; if(icon_all<0) icon_all=0; }
+            }
+            if(ok){
+                for(int c=1;c<7;c++){
+                    if(filled[c]<req[c]){
+                        int deficit=req[c]-filled[c];
+                        if(icon_all>=deficit) icon_all-=deficit; else { ok=0; break; }
+                    }
+                }
+            }
+            s->live_passed[i]=ok?1:0;
+        }
+    }
+}
+
+/* Mirror live.rs::finalize_snapshot_fields — fill each snapshot's total_score and
+    success flag from the victory determination result. The player that performed
+    a given snapshot is recorded in s->player (0/1), keyed to p1_won/p2_won. */
+void rb_finalize_snapshot_fields(GameState *g, int p1_won, int p2_won,
+                                 int p1_score, int p2_score){
+    for(int si=0;si<g->n_snapshots;si++){
+        RbLiveSnapshot *s=&g->snapshots[si];
+        int sc    = (s->player==0) ? p1_score : p2_score;
+        s->total_score = sc;
+        int all_passed=1;
+        for(int i=0;i<s->n_lives && i<RB_MAX_LIVE_CARDS;i++) if(!s->live_passed[i]) all_passed=0;
+        s->success = all_passed && sc>0;
+    }
+}
+
+/* Mirror live.rs::compute_surplus_and_flags — per-color surplus into each
+    snapshot (surplus_per_color), and the GameState surplus-count / no-excess
+    flags used by NoExcessHeart conditions. */
+void rb_compute_surplus_and_flags(GameState *g, int p1_won, int p2_won){
+    int p1_surplus=0, p2_surplus=0;
+    for(int si=0;si<g->n_snapshots;si++){
+        RbLiveSnapshot *s=&g->snapshots[si];
+        int total_avail=0;
+        for(int c=0;c<8;c++) total_avail+=s->total_hearts[c];
+        int total_filled=0;
+        for(int i=0;i<s->n_lives && i<RB_MAX_LIVE_CARDS;i++)
+            for(int c=0;c<8;c++) total_filled+=s->live_filled[i][c];
+        int surplus=total_avail-total_filled; if(surplus<0) surplus=0;
+        for(int c=0;c<8;c++){
+            int filled_color=0;
+            for(int i=0;i<s->n_lives && i<RB_MAX_LIVE_CARDS;i++) filled_color+=s->live_filled[i][c];
+            int pc=s->total_hearts[c]-filled_color; if(pc<0) pc=0;
+            s->surplus_per_color[c]=pc;
+        }
+        if(s->player==0){ p1_surplus=surplus; g->self_live_surplus_count=surplus; }
+        else            { p2_surplus=surplus; g->opponent_live_surplus_count=surplus; }
+    }
+    g->live_surplus_ready_this_turn=1;
+    if(p2_won) g->p2_live_success_no_excess = (p2_surplus==0);
+    if(p1_won) g->p1_live_success_no_excess = (p1_surplus==0);
+}
+
+/* ── live.rs standalone helpers (ported) ── */
+
+/* Mirror live.rs::blade_color_to_heart (rule 8.3.11). A colored blade type maps
+   1:1 to the heart color of the same index (Peach→heart01 … Purple→heart06); the
+    ALL blade maps to HeartColor::All (icon_all, index 7) per rule 2.1.1.3. */
+int rb_blade_color_to_heart(int bc){
+    if (bc >= 1 && bc <= 6) return bc;
+    if (bc == 7) return RB_HEART_ALL;
+    return RB_HEART_PINK; /* fallback (should not happen for a real blade color) */
+}
+
+/* Mirror live.rs::TurnEngine::score_delta_since: total (current - prev) across the
+    given zone cards. Both arrays are cid-indexed (size RB_MAX_CARD_IDS); a missing
+    prev entry defaults to 0, mirroring Rust's HashMap::get().copied().unwrap_or(0). */
+int rb_score_delta_since(const int *current, const int *prev, const int *zone_cards, int n){
+    int total = 0;
+    for (int i = 0; i < n; i++){
+        int cid = zone_cards[i];
+        if (cid < 0 || cid >= RB_MAX_CARD_IDS) continue;
+        int cur = current ? current[cid] : 0;
+        int prv = prev ? prev[cid] : 0;
+        total += cur - prv;
+    }
+    return total;
+}
+
+/* Mirror live.rs::TurnEngine::compute_pregame_scores: each player's live score from
+    current stage hearts + granted hearts, plus the per-player extra (LiveSuccess
+    delta). Reuses the shared allocation/verdict path so the score formula stays a
+    single source of truth with rb_perform_live. */
+void rb_compute_pregame_scores(const GameState *g, int p1_extra, int p2_extra,
+                               int *p1_score, int *p2_score){
+    for (int pl = 0; pl < 2; pl++){
+        int stage[8] = {0};
+        rb_stage_hearts_pipeline(g, pl, stage);
+        int total[8];
+        for (int i = 0; i < 8; i++) total[i] = stage[i] + g->p[pl].hearts[i];
+        int passed = 0, score = 0, surplus = -1;
+        allocate_and_verdict(g, pl, total, &passed, &score, &surplus, NULL);
+        int extra = (pl == 0) ? p1_extra : p2_extra;
+        int s = score + extra;
+        if (s < 0) s = 0;
+        if (pl == 0) { if (p1_score) *p1_score = s; }
+        else         { if (p2_score) *p2_score = s; }
+    }
 }

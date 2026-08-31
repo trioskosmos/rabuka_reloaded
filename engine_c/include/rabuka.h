@@ -172,6 +172,24 @@ int  rb_eval_condition_for_host(const struct GameState *g, int actor, int host_c
 typedef struct { int16_t set; int16_t add; } RbModifierEntry;
 static inline int rb_modifier_total(RbModifierEntry e) { return (int)e.set + (int)e.add; }
 
+/* Trace record — mirrors Rust AbilityApplication pushed by the *_with_trace
+   modifier helpers (engine/src/core/game_modifiers.rs). Used for snapshot
+   attribution; the portable core keeps a bounded ring (no consumer yet). */
+#define RB_MODS_TRACE_CAP 64
+#define RB_MODS_TRACE_TEXT 48
+typedef enum {
+    RB_EFFECT_BLADE_BONUS = 0,
+    RB_EFFECT_HEART_BONUS = 1
+} RbEffectType;
+typedef struct {
+    int16_t source_card_id;
+    int16_t target_card_id;
+    int16_t amount;
+    int8_t  effect_type;   /* RbEffectType */
+    int8_t  heart_color;   /* -1 = none */
+    char    ability_text[RB_MODS_TRACE_TEXT];
+} RbAbilityTraceEntry;
+
 typedef struct {
     RbModifierEntry blade[RB_MAX_CARD_IDS];
     RbModifierEntry heart[RB_MAX_CARD_IDS][8];      /* per-color (0..7) */
@@ -198,6 +216,9 @@ typedef struct {
         gain step can target them specifically (resolve_gain_resource_targets). */
     int16_t         last_under_move_host_ids[4];
     int             n_last_under_move_host_ids;
+    /* snapshot-trace ring (mirrors AbilityApplication buffer of *_with_trace) */
+    RbAbilityTraceEntry trace[RB_MODS_TRACE_CAP];
+    int             n_trace;
 } RbMods;
 
 void rb_mods_init(RbMods *m);
@@ -245,6 +266,15 @@ void rb_mods_clear_blade_type(RbMods *m, int card_id);
 int  rb_mods_get_blade_type(RbMods *m, int card_id);
 void rb_mods_set_heart_color_multiplier(RbMods *m, int card_id, int color);
 int  rb_mods_get_heart_color_multiplier(RbMods *m, int card_id);
+/* *_with_trace — mirror add_*_modifier_with_trace (push an AbilityApplication
+   onto the bounded snapshot-trace ring in addition to applying the modifier). */
+void rb_mods_add_blade_with_trace(RbMods *m, int card_id, int delta,
+                                  int source_card_id, const char *ability_text);
+void rb_mods_add_heart_with_trace(RbMods *m, int card_id, int color, int delta,
+                                  int source_card_id, const char *ability_text);
+int  rb_mods_trace_len(const RbMods *m);
+void rb_mods_trace_push(RbMods *m, int source_card_id, const char *ability_text,
+                        int effect_type, int target_card_id, int heart_color, int amount);
 
 typedef struct { uint8_t slot; int32_t delta; } RbYellMod;
 
@@ -317,11 +347,45 @@ typedef enum {
     RB_ZONE_RESOLUTION
 } RbZone;
 
+/* Compact zone identifier (mirrors engine/src/core/types.rs::ZoneId).
+    Replaces free-form zone strings in movement/position events so the engine
+    can compare, alias, and serialize zones without heap-allocated strings.
+    The wire names match the Rust as_str() mapping (stage/hand/deck/...). */
+typedef enum {
+    RB_ZONEID_STAGE = 0,
+    RB_ZONEID_HAND,
+    RB_ZONEID_DECK,
+    RB_ZONEID_DECK_TOP,
+    RB_ZONEID_DECK_BOTTOM,
+    RB_ZONEID_DISCARD,
+    RB_ZONEID_WAITROOM,
+    RB_ZONEID_ENERGY,
+    RB_ZONEID_ENERGY_ZONE,
+    RB_ZONEID_ENERGY_DECK,
+    RB_ZONEID_SUCCESS_ZONE,
+    RB_ZONEID_LIVE_CARD_ZONE,
+    RB_ZONEID_SUCCESS_LIVE_ZONE,
+    RB_ZONEID_EMPTY_AREA,
+    RB_ZONEID_SAME_AREA,
+    RB_ZONEID_UNDER_MEMBER,
+    RB_ZONEID_LOOKED_AT,
+    RB_ZONEID_REVEALED_CARDS,
+    RB_ZONEID_SELECTED_CARDS,
+    RB_ZONEID_RESOLUTION,
+    RB_ZONEID_EXCLUSION_ZONE,
+    RB_ZONEID_UNKNOWN
+} RbZoneId;
+
 /* A zone is just a bag of card indices (card_no index into the database). */
 typedef struct {
     int cards[RB_MAX_ZONE];
     int n;
 } RbBag;
+
+/* A hand is just a bag of card indices (mirrors engine/src/core/player.rs
+    Player::hand: Hand — the C engine models every card collection as an RbBag,
+    so RbHand is a named alias for readability at call sites). */
+typedef RbBag RbHand;
 
 typedef struct {
     RbBag     hand;
@@ -356,6 +420,48 @@ typedef enum {
 } RbPhase;
 
 const char *rb_phase_name(int phase);
+
+/* ── Turn-phase grouping (mirrors engine/src/core/types.rs::TurnPhase) ──
+    Used to classify the broad phase of a turn: first-attacker normal play,
+    second-attacker normal play, or the Live/performance phase. */
+typedef enum {
+    RB_TURNP_NORMAL_FIRST = 0,
+    RB_TURNP_NORMAL_SECOND,
+    RB_TURNP_LIVE
+} RbTurnPhase;
+
+/* ── Game result (mirrors engine/src/core/types.rs::GameResult) ── */
+typedef enum {
+    RB_RESULT_FIRST_ATTACKER_WINS = 0,
+    RB_RESULT_SECOND_ATTACKER_WINS,
+    RB_RESULT_DRAW,
+    RB_RESULT_ONGOING
+} RbGameResult;
+
+/* ── Ability trigger kinds (mirrors engine/src/core/types.rs::AbilityTrigger) ──
+    The trigger verb is still carried as a string on Ability::triggers, but this
+    enumeration gives the canonical set of trigger categories the engine knows. */
+typedef enum {
+    RB_TRIGGER_ACTIVATION = 0,
+    RB_TRIGGER_DEBUT,
+    RB_TRIGGER_LIVE_START,
+    RB_TRIGGER_LIVE_SUCCESS,
+    RB_TRIGGER_CONSTANT,
+    RB_TRIGGER_AUTO
+} RbAbilityTrigger;
+
+/* ── Modifier/ability duration (mirrors engine/src/core/types.rs::Duration) ──
+    Note: the resolver's temporary-effect expiry uses the RB_TEMP_* integer
+    constants (see RbTempEffect::dur) which correspond to the first three
+    variants; AsLongAs/Unless are conditions, not expiry kinds. */
+typedef enum {
+    RB_DURATION_LIVE_END = 0,
+    RB_DURATION_THIS_TURN,
+    RB_DURATION_THIS_LIVE,
+    RB_DURATION_PERMANENT,
+    RB_DURATION_AS_LONG_AS,
+    RB_DURATION_UNLESS
+} RbDuration;
 
 /* ── Choice / ability queue (engine/src/ability/choice.rs + ability_queue.rs) ── */
 typedef enum {
@@ -489,6 +595,12 @@ typedef struct {
     int surplus_hearts; /* total_pool - total_required, -1 on fail */
     int note_icons;
     int live_passed[RB_MAX_LIVE_CARDS]; /* per-live verdict (populate_live_verdicts) */
+    /* per-live allocation detail (mirror live.rs::populate_live_verdicts:
+        lives[i].required / filled / score). Filled by allocate_and_verdict. */
+    int live_required[RB_MAX_LIVE_CARDS][8];
+    int live_filled[RB_MAX_LIVE_CARDS][8];
+    int live_score_detail[RB_MAX_LIVE_CARDS];
+    int surplus_per_color[8];          /* per-color surplus (compute_surplus_and_flags) */
 } RbLiveSnapshot;
 
 /* A modifier granted by a trigger with a Duration that must be reverted when
@@ -530,6 +642,13 @@ typedef struct GameState {
     int      live_score[2];      /* per player: total score from the most recent live performance */
     int      p1_live_won;       /* Rule 8.4.13: P1 won the live (placed to success) this turn */
     int      p2_live_won;       /* Rule 8.4.13: P2 won the live (placed to success) this turn */
+    /* live-surplus / no-excess flags (mirror live.rs::compute_surplus_and_flags +
+        record_pretrigger_live_results). Zeroed by rb_game_init. */
+    int      self_live_surplus_count;
+    int      opponent_live_surplus_count;
+    int      live_surplus_ready_this_turn;
+    int      p1_live_success_no_excess;
+    int      p2_live_success_no_excess;
     /* state_change_condition tracking (mirrors Rust recently_state_changed /
        turn_state_changes). Set when a member's orientation actually flips during
        rb_effect_change_state; cleared at turn rollover. from/to are orientation
@@ -725,10 +844,78 @@ void rb_player_refresh(GameState *g, int pl);
 int rb_card_is_live(int card_id);
 int rb_card_is_energy(int card_id);
 int rb_card_is_member(int card_id);
+
+/* ── Card string/classification helpers (mirror engine/src/core/card.rs) ── */
+int  rb_card_type_from_str(const char *s);   /* "member_card"→0, "live_card"→1,
+                                                 "energy_card"→2, else -1 */
+const char *rb_card_type_str(int t);         /* inverse of rb_card_type_from_str */
+void rb_card_normalize_no(const char *src, char *out, size_t out_sz);   /* CardDatabase::normalize_card_no */
+void rb_card_normalize_name(const char *src, char *out, size_t out_sz); /* CardDatabase::normalize_name */
+void rb_map_series_to_group(const char *series, char *out, size_t out_sz); /* map_series_to_group */
+
+/* ── card.rs enum string classification helpers ──
+   Mirror the Rust `as_str` / `from_str` impls on the enums defined in
+   engine/src/core/card.rs. The int encodings follow the Rust enum discriminant
+   order (Active=0/Wait=1; Self=0/Opponent=1; HasBladeHeart=0/HasScoreIcon=1/
+   HasAllBlade=2; Score=0/Cost=1/Count=2/Equality=3/EnergyRelative=4;
+   NoAbility=0/HasAbility=1/HasAbilityType=2/NoAbilityType=3; Self=0/Opponent=1/
+   Both=2/Either=3; MemberCard=0/LiveCard=1/EnergyCard=2; Stage=0/Hand=1/…
+   DeckTop=3/Discard=4/EnergyZone=5/LiveCardZone=6/SuccessLiveZone=7/
+   UnderMember=8/RevealedCards=9). */
+const char *rb_card_state_str(int s);          /* CardState */
+int         rb_card_state_from_str(const char *s);
+const char *rb_comparison_target_str(int s);   /* ComparisonTarget */
+int         rb_comparison_target_from_str(const char *s);
+const char *rb_card_property_str(int s);       /* CardProperty */
+int         rb_card_property_from_str(const char *s);
+const char *rb_placement_order_str(int s);     /* PlacementOrder (any_order) */
+const char *rb_distinct_type_str(int s);       /* DistinctType */
+const char *rb_comparison_type_str(int s);     /* ComparisonType */
+int         rb_comparison_type_from_str(const char *s);
+const char *rb_ability_filter_str(int s);      /* AbilityFilter */
+int         rb_ability_filter_from_str(const char *s);
+const char *rb_condition_target_str(int s);    /* ConditionTarget */
+const char *rb_condition_card_type_str(int s); /* ConditionCardType */
+int         rb_condition_card_type_from_str(const char *s);
+const char *rb_location_str(int s);            /* Location */
+/* Free functions mirroring card.rs parse_operator / parse_operation.
+   Return the Rust enum discriminant, or -1 for an unknown string. */
+int rb_parse_operator(const char *s);
+int rb_parse_operation(const char *s);
+/* Mirror DistinctInfo::is_distinct — string-form branch (the flat C decode
+   stores `distinct` as a string; the Boolean branch is not represented). */
+int rb_distinct_info_is_distinct(const char *s);
+
 void rb_calc_stage_hearts(const GameState *g, int pl, int out[8]);
 void rb_stage_hearts_pipeline(const GameState *g, int pl, int out[8]);
 void rb_effective_need_heart(const GameState *g, int live_cid, int out[8]);
 int  rb_perform_live(GameState *g, int pl);
+/* ── live.rs standalone helpers (ported) ── */
+/* Mirror live.rs::blade_color_to_heart: map a set_blade_type blade color to the
+    heart color its icons become (colored 1..6 → same index; All → icon_all idx 7).
+    NB: pink (blade_type -1/none) is never passed here — it stays pink at the call site. */
+int  rb_blade_color_to_heart(int bc);
+/* Mirror live.rs::TurnEngine::score_delta_since: total of (current - prev) score
+    modifiers across the given zone cards (cid-indexed parallel arrays of size
+    RB_MAX_CARD_IDS; missing entries default to 0, mirroring HashMap get-or-default). */
+int  rb_score_delta_since(const int *current, const int *prev, const int *zone_cards, int n);
+/* Mirror live.rs::TurnEngine::compute_pregame_scores: compute each player's live
+    score from current stage hearts + granted hearts, folding in p1/p2 extra deltas
+    (e.g. LiveSuccess-triggered score grants). Uses the shared allocation/verdict path. */
+void rb_compute_pregame_scores(const GameState *g, int p1_extra, int p2_extra,
+                               int *p1_score, int *p2_score);
+/* ── live.rs verdict/surplus helpers (ported) ── */
+/* Mirror live.rs::populate_live_verdicts (operates on the snapshot filled by
+    allocate_and_verdict — recomputes each live's pass/fail with the same
+    acceptance rules as rb_allocations_pass). */
+void rb_populate_live_verdicts(GameState *g);
+/* Mirror live.rs::finalize_snapshot_fields — fill each snapshot's total_score /
+    success flag from the victory determination result. */
+void rb_finalize_snapshot_fields(GameState *g, int p1_won, int p2_won,
+                                 int p1_score, int p2_score);
+/* Mirror live.rs::compute_surplus_and_flags — per-color surplus into each
+    snapshot and the GameState no-excess / surplus-count flags. */
+void rb_compute_surplus_and_flags(GameState *g, int p1_won, int p2_won);
 /* Effects  Everb handlers */
 void rb_effect_move_cards(GameState *g, int actor, AbilityEffect *e);
 /* Mirror move_cards.rs::move_from_under_member — pull cards out of a member's
@@ -839,6 +1026,8 @@ int rb_card_has_score_icon(const Card *c);
 int rb_card_has_all_blade(const Card *c);
 int  rb_orientation_matches_state(const char *orientation, const char *state);
 int  rb_card_matches_group_str(int card_id, const char *group_name);
+int  rb_card_matches_any_group(int card_id, const char **groups, int n);
+int  rb_card_matches_name_constraint(int card_id, const char *name_constraint);
 void rb_set_card_identity(int cid, const char *name);
 int  rb_card_matches_identity_str(int card_id, const char *group_name);
 int  rb_card_at_position(const struct GameState *g, int pl, const char *pos);
@@ -846,6 +1035,81 @@ int  rb_pos_to_area(const char *pos);
 int  rb_zone_cards(const struct GameState *g, int pl, const char *zone,
                    int *out_ids, int max);
 int  rb_stage_first_empty(const int stage[RB_STAGE_SIZE]);
+
+/* ── MemberArea wire helpers (engine/src/core/zones.rs:MemberArea) ── */
+uint8_t rb_member_area_to_tag(int idx);    /* 0→1,1→2,2→3; 0 if invalid */
+int     rb_member_area_from_tag(uint8_t tag); /* 1→0,2→1,3→2; -1 if invalid */
+
+/* ── Duration / distinct-name helpers (engine/src/ability/util.rs) ── */
+/* Mirror util.rs::DistinctType (CardName/True/Distinct are all "dedupe" variants). */
+typedef enum {
+    RB_DISTINCT_NONE = 0,
+    RB_DISTINCT_CARDNAME,
+    RB_DISTINCT_TRUE,
+    RB_DISTINCT_DISTINCT
+} RbDistinctType;
+
+/* Mirror util.rs::parse_duration — maps a duration string to an RB_TEMP_* kind. */
+int  rb_parse_duration(const char *s);
+/* Canonical group taxonomy — exactly the entries recognized by
+    rb_card_series_matches_group / card_matches_group_str. */
+extern const char *RB_KNOWN_GROUPS[5];
+/* Mirror util.rs::distinct_should_dedupe. */
+int  rb_distinct_should_dedupe(RbDistinctType d);
+/* Mirror util.rs::count_distinct_member_name_units — Q278/Q279 joint-aware
+    distinct-name count (single-name cards dedup; a joint card adds one unit
+    only when it introduces a name not already present as a single name). */
+int  rb_count_distinct_member_name_units(const int *cards, int n);
+/* Mirror util.rs::apply_distinct_filter — dedupes `cards` by normalized name
+    when `d` is a dedupe variant, otherwise copies through. Returns out count. */
+int  rb_apply_distinct_filter(const int *cards, int n, RbDistinctType d,
+                              int *out, int max);
+/* Mirror util.rs::CardFilter::check_card_property — single-property predicate
+    (has_blade_heart / has_score_icon / has_all_blade), negation-aware. */
+int  rb_check_card_property(const char *prop, int negation, const Card *c);
+/* Mirror util.rs::filter_current_blade — post-filter candidate ids by their
+    CURRENT blade total (base, or set + additive modifiers from GameState.mods). */
+int  rb_filter_current_blade(const int *cands, int n, const GameState *g,
+                             int blade_limit, const char *op, int *out, int max);
+
+/* ── Stage under-card / placement helpers (engine/src/core/zones.rs:Stage) ── */
+void rb_stage_place_under_card(RbPlayer *player, int area, int card_id);
+int  rb_stage_get_under_cards(const RbPlayer *player, int area, int *out, int max);
+int  rb_stage_under_cards_with_hosts(const RbPlayer *player, int *out_under, int *out_host, int max);
+int  rb_stage_recycle_under_cards(GameState *g, int pl, int area,
+                                  int *out_wait, int *n_wait,
+                                  int *out_energy, int *n_energy, int max);
+int  rb_stage_can_place_card(const GameState *g, int pl, int card_id);
+int  rb_stage_formation_change(GameState *g, int pl,
+                               const int *from_areas, const int *to_areas, int n);
+
+/* ── Zone bag helpers (engine/src/core/zones.rs: Energy/Live/Hand/Waitroom/...) ── */
+int  rb_energy_can_place_card(const RbPlayer *player, int card_id);
+int  rb_energy_add_card(RbPlayer *player, int card_id);
+int  rb_energy_pay(RbPlayer *player, int amount);
+void rb_energy_activate_all(RbPlayer *player);
+int  rb_energy_active_count(const RbPlayer *player);
+void rb_energy_set_active_count(RbPlayer *player, int count); /* EnergyZone::set_active_count */
+void rb_energy_add_active(RbPlayer *player, int delta);       /* EnergyZone::add_active (saturating) */
+void rb_energy_sub_active(RbPlayer *player, int delta);       /* EnergyZone::sub_active (saturating) */
+int  rb_live_can_place_card(const RbPlayer *player, int card_id);
+int  rb_live_add_card(RbPlayer *player, int card_id);
+int  rb_live_clear(RbPlayer *player, int *out, int max);
+int  rb_live_len(const RbPlayer *player);
+void rb_hand_add(RbPlayer *player, int card_id);
+int  rb_hand_remove_card(RbPlayer *player, int index);
+int  rb_hand_len(const RbPlayer *player);
+int  rb_hand_is_empty(const RbPlayer *player);
+void rb_waitroom_add(RbPlayer *player, int card_id);
+int  rb_waitroom_take_all(RbPlayer *player, int *out, int max);
+void rb_waitroom_shuffle(GameState *g, int pl);
+int  rb_waitroom_len(const RbPlayer *player);
+void rb_waitroom_remove_card(RbPlayer *player, int card_id);
+void rb_success_add(RbPlayer *player, int card_id);
+int  rb_success_len(const RbPlayer *player);
+void rb_resolution_add(GameState *g, int card_id);
+int  rb_resolution_clear(GameState *g, int *out, int max);
+int  rb_resolution_len(const GameState *g);
 
 /* ── HeartColor parsing (engine/src/core/card.rs parse_heart_color / index) ── */
 /* Faithful port of `s.parse::<HeartColor>()` / `HeartColor::index()`. String

@@ -2,6 +2,7 @@
 #include "gen_data.h"
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
 extern uint16_t *g_card_ability_pairs;
 
 static uint16_t le16p(const unsigned char *p) {
@@ -124,3 +125,278 @@ int rb_card_is_member(int card_id) {
     if (!r) return 0;
     return (r[18] & 0x03) == 0;
 }
+
+/* ── Ported from engine/src/core/card.rs ───────────────────────────────────
+   These are pure string/classification helpers that mirror the Rust
+   `CardType` / `CardDatabase::normalize_*` / `map_series_to_group` functions.
+   They own no state and use only the standard library + rabuka.h types. ── */
+
+/* Mirror CardType::from_card_str / as_card_str. Card-type encoding matches the
+   on-disk convention in card.c: 0 = Member, 1 = Live, 2 = Energy (-1 unknown). */
+int rb_card_type_from_str(const char *s) {
+    if (!s) return -1;
+    if (!strcmp(s, "member_card")) return 0;
+    if (!strcmp(s, "live_card"))   return 1;
+    if (!strcmp(s, "energy_card")) return 2;
+    return -1;
+}
+const char *rb_card_type_str(int t) {
+    switch (t) {
+        case 1:  return "live_card";
+        case 2:  return "energy_card";
+        case 0:  return "member_card";
+        default: return "member_card";
+    }
+}
+
+/* Mirror CardDatabase::normalize_card_no — uppercase ASCII, fullwidth
+   a-z → ASCII uppercase, and fullwidth ＋！－＊＃ → +!-*. Multibyte sequences
+   that are not one of those symbols are copied through unchanged. */
+void rb_card_normalize_no(const char *src, char *out, size_t out_sz) {
+    size_t j = 0;
+    const unsigned char *s = (const unsigned char *)src;
+    for (size_t i = 0; s[i]; ) {
+        unsigned char c = s[i];
+        if (c >= 'a' && c <= 'z') {
+            if (j + 1 < out_sz) out[j++] = (char)(c - 0x20);
+            i++;
+            continue;
+        }
+        if (c == 0xEF && s[i + 1] == 0xBD && s[i + 2] >= 0x81 && s[i + 2] <= 0x9A) {
+            /* fullwidth lowercase ａ..ｚ → ASCII uppercase A..Z */
+            if (j + 1 < out_sz) out[j++] = (char)('A' + (s[i + 2] - 0x81));
+            i += 3;
+            continue;
+        }
+        if (c == 0xEF && s[i + 1] == 0xBC) {
+            /* fullwidth symbols under EF BC XX */
+            char m = 0;
+            switch (s[i + 2]) {
+                case 0xAB: m = '+'; break;
+                case 0x81: m = '!'; break;
+                case 0x8D: m = '-'; break;
+                case 0x8A: m = '*'; break;
+                case 0x83: m = '#'; break;
+                default:   break;
+            }
+            if (m) {
+                if (j + 1 < out_sz) out[j++] = m;
+                i += 3;
+                continue;
+            }
+        }
+        /* ordinary byte (incl. continuation bytes of an unhandled multibyte seq) */
+        if (j + 1 < out_sz) out[j++] = (char)c;
+        i++;
+    }
+    if (out_sz > 0) out[j] = '\0';
+}
+
+/* Mirror CardDatabase::normalize_name — strip ASCII whitespace plus the common
+   Unicode whitespace (U+3000 ideographic space, U+00A0 no-break space) so
+   inconsistent spacing in card names doesn't break ability conditions. */
+void rb_card_normalize_name(const char *src, char *out, size_t out_sz) {
+    size_t j = 0;
+    const unsigned char *s = (const unsigned char *)src;
+    for (size_t i = 0; s[i]; ) {
+        if (s[i] <= 0x20 && isspace((int)s[i])) { i++; continue; }
+        if (s[i] == 0xE3 && s[i + 1] == 0x80 && s[i + 2] == 0x80) { i += 3; continue; }
+        if (s[i] == 0xC2 && s[i + 1] == 0xA0) { i += 2; continue; }
+        if (j + 1 < out_sz) out[j++] = (char)s[i];
+        i++;
+    }
+    if (out_sz > 0) out[j] = '\0';
+}
+
+/* Mirror map_series_to_group (serde_support build). Maps a known series string
+   to its group label; unknown series maps to the empty string. */
+void rb_map_series_to_group(const char *series, char *out, size_t out_sz) {
+    static const struct { const char *s; const char *g; } tbl[] = {
+        { "ラブライブ！", "μ's" },
+        { "ラブライブ！サンシャイン!!", "Aqours" },
+        { "ラブライブ！虹ヶ咲学園スクールアイドル同好会", "虹ヶ咲" },
+        { "ラブライブ！スーパースター!!", "Liella!" },
+        { "蓮ノ空女学院スクールアイドルクラブ", "蓮ノ空" },
+        { "ラブライブ！蓮ノ空女学院スクールアイドルクラブ", "蓮ノ空" },
+    };
+    if (out_sz > 0) out[0] = '\0';
+    if (!series) return;
+    for (size_t i = 0; i < sizeof(tbl) / sizeof(tbl[0]); i++) {
+        if (!strcmp(series, tbl[i].s)) {
+            if (out_sz > 0) {
+                strncpy(out, tbl[i].g, out_sz - 1);
+                out[out_sz - 1] = '\0';
+            }
+            return;
+        }
+    }
+}
+
+/* ── Ported from engine/src/core/card.rs ───────────────────────────────────
+   Enum string classification helpers + free functions (parse_operator /
+   parse_operation / DistinctInfo::is_distinct). These mirror the Rust
+   `as_str` / `from_str` / free-function impls on the same enums. Int encodings
+   follow the Rust enum variant order (see rabuka.h block above). ── */
+
+/* CardState: Active ⇄ "active", otherwise Wait ⇄ "wait". */
+const char *rb_card_state_str(int s) {
+    return s == 0 ? "active" : "wait";
+}
+int rb_card_state_from_str(const char *s) {
+    if (s && !strcmp(s, "active")) return 0; /* CardState::Active */
+    return 1;                                /* Rust: _ => Wait */
+}
+
+/* ComparisonTarget: Self_ ⇄ "self", Opponent ⇄ "opponent". */
+const char *rb_comparison_target_str(int s) {
+    return s == 1 ? "opponent" : "self";
+}
+int rb_comparison_target_from_str(const char *s) {
+    if (s && !strcmp(s, "opponent")) return 1; /* ComparisonTarget::Opponent */
+    return 0;                                  /* Rust: _ => Self_ */
+}
+
+/* CardProperty: has_blade_heart / has_score_icon / has_all_blade. */
+const char *rb_card_property_str(int s) {
+    switch (s) {
+        case 1:  return "has_score_icon";
+        case 2:  return "has_all_blade";
+        default: return "has_blade_heart";     /* Rust: _ => HasBladeHeart */
+    }
+}
+int rb_card_property_from_str(const char *s) {
+    if (!s) return 0;
+    if (!strcmp(s, "has_score_icon")) return 1;
+    if (!strcmp(s, "has_all_blade"))  return 2;
+    return 0;                                  /* Rust: _ => HasBladeHeart */
+}
+
+/* PlacementOrder: only AnyOrder ("any_order"). */
+const char *rb_placement_order_str(int s) {
+    (void)s;
+    return "any_order";
+}
+
+/* DistinctType: CardName / True / Distinct. */
+const char *rb_distinct_type_str(int s) {
+    switch (s) {
+        case 1: return "true";
+        case 2: return "distinct";
+        default: return "card_name";
+    }
+}
+
+/* ComparisonType: Score / Cost / Count / Equality / EnergyRelative. */
+const char *rb_comparison_type_str(int s) {
+    switch (s) {
+        case 1: return "cost";
+        case 2: return "count";
+        case 3: return "equality";
+        case 4: return "energy_relative";
+        default: return "score";               /* Rust: _ => Score */
+    }
+}
+int rb_comparison_type_from_str(const char *s) {
+    if (!s) return 0;
+    if (!strcmp(s, "cost"))           return 1;
+    if (!strcmp(s, "count"))          return 2;
+    if (!strcmp(s, "equality"))       return 3;
+    if (!strcmp(s, "energy_relative")) return 4;
+    return 0;                                  /* Rust: _ => Score */
+}
+
+/* AbilityFilter: NoAbility / HasAbility / HasAbilityType / NoAbilityType. */
+const char *rb_ability_filter_str(int s) {
+    switch (s) {
+        case 1: return "has_ability";
+        case 2: return "has_ability_type";
+        case 3: return "no_ability_type";
+        default: return "no_ability";          /* Rust: _ => NoAbility */
+    }
+}
+int rb_ability_filter_from_str(const char *s) {
+    if (!s) return 0;
+    if (!strcmp(s, "has_ability"))      return 1;
+    if (!strcmp(s, "has_ability_type")) return 2;
+    if (!strcmp(s, "no_ability_type"))  return 3;
+    return 0;                                  /* Rust: _ => NoAbility */
+}
+
+/* ConditionTarget: Self / Opponent / Both / Either. */
+const char *rb_condition_target_str(int s) {
+    switch (s) {
+        case 1: return "opponent";
+        case 2: return "both";
+        case 3: return "either";
+        default: return "self";
+    }
+}
+
+/* ConditionCardType: MemberCard / LiveCard / EnergyCard. */
+const char *rb_condition_card_type_str(int s) {
+    switch (s) {
+        case 1: return "live_card";
+        case 2: return "energy_card";
+        default: return "member_card";         /* Rust: _ => MemberCard */
+    }
+}
+int rb_condition_card_type_from_str(const char *s) {
+    if (!s) return 0;
+    if (!strcmp(s, "live_card"))   return 1;
+    if (!strcmp(s, "energy_card")) return 2;
+    return 0;                                  /* Rust: _ => MemberCard */
+}
+
+/* Location: stage / hand / deck / deck_top / discard / energy_zone /
+   live_card_zone / success_live_card_zone / under_member / revealed_cards. */
+const char *rb_location_str(int s) {
+    switch (s) {
+        case 1: return "hand";
+        case 2: return "deck";
+        case 3: return "deck_top";
+        case 4: return "discard";
+        case 5: return "energy_zone";
+        case 6: return "live_card_zone";
+        case 7: return "success_live_card_zone";
+        case 8: return "under_member";
+        case 9: return "revealed_cards";
+        default: return "stage";
+    }
+}
+
+/* Mirror card.rs parse_operator — string → Operator discriminant
+   (Gte=0, Lte=1, Gt=2, Lt=3, Eq=4); -1 if unknown. */
+int rb_parse_operator(const char *s) {
+    if (!s) return -1;
+    if (!strcmp(s, ">=")) return 0;
+    if (!strcmp(s, "<=")) return 1;
+    if (!strcmp(s, ">"))  return 2;
+    if (!strcmp(s, "<"))  return 3;
+    if (!strcmp(s, "=") || !strcmp(s, "==")) return 4;
+    return -1;
+}
+
+/* Mirror card.rs parse_operation — string → Operation discriminant
+   (Add=0, Decrease=1, Increase=2, Remove=3, Set=4, Subtract=5,
+   SetFromReference=6); -1 if unknown. */
+int rb_parse_operation(const char *s) {
+    if (!s) return -1;
+    if (!strcmp(s, "add"))               return 0;
+    if (!strcmp(s, "decrease"))          return 1;
+    if (!strcmp(s, "increase"))          return 2;
+    if (!strcmp(s, "remove"))            return 3;
+    if (!strcmp(s, "set"))               return 4;
+    if (!strcmp(s, "subtract"))          return 5;
+    if (!strcmp(s, "set_from_reference")) return 6;
+    return -1;
+}
+
+/* Mirror DistinctInfo::is_distinct — string form only. A non-"false",
+   non-empty string is distinct (the flat C decode stores `distinct` as a
+   string; the Boolean-tagged branch is not represented). */
+int rb_distinct_info_is_distinct(const char *s) {
+    if (!s || !*s) return 0;
+    if (!strcmp(s, "false")) return 0;
+    return 1;
+}
+

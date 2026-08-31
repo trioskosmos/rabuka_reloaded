@@ -575,13 +575,230 @@ int rb_move_cards(GameState *g, int pl, const int *card_ids, int n,
 }
 
 int rb_resolve_indices_to_ids(const GameState *g, int pl, const char *zone,
-                              const int *indices, int n_idx, int *out) {
+                               const int *indices, int n_idx, int *out) {
     int ids[RB_MAX_ZONE];
     int n = rb_zone_cards(g, pl, zone, ids, RB_MAX_ZONE);
     int m = 0;
     for (int i = 0; i < n_idx; i++) {
         int idx = indices[i];
         if (idx >= 0 && idx < n) out[m++] = ids[idx];
+    }
+    return m;
+}
+
+/* Mirror util.rs::card_matches_any_group — pass if `groups` is empty (no
+    filter) or the card matches ANY entry. Replaces the repeated
+    `group_names.first().map(|g| card_matches_group_str(...))` pattern. */
+int rb_card_matches_any_group(int card_id, const char **groups, int n) {
+    if (!groups || n <= 0) return 1;
+    for (int i = 0; i < n; i++)
+        if (groups[i] && rb_card_matches_group_str(card_id, groups[i])) return 1;
+    return 0;
+}
+
+/* Strip ASCII whitespace, mirroring CardDatabase::normalize_name (used by
+    util.rs::card_matches_name_constraint). Caller provides a big-enough buf. */
+static void rb_norm_ws(const char *s, char *out, size_t outsz) {
+    size_t j = 0;
+    if (!s) { if (outsz) out[0] = '\0'; return; }
+    for (size_t i = 0; s[i]; i++) {
+        char c = s[i];
+        if (c == ' ' || c == '\t' || c == '\n' || c == '\r') continue;
+        if (j + 1 < outsz) out[j++] = c;
+    }
+    out[j] = '\0';
+}
+
+/* Mirror util.rs::card_matches_name_constraint — exact normalized match of the
+    card name (or any '&' / '＆'-separated constituent) against the constraint.
+    C cards carry a single name string, so multi-name cards are split here. */
+int rb_card_matches_name_constraint(int card_id, const char *name_constraint) {
+    if (!name_constraint) return 1;
+    Card c;
+    if (!rb_decode_card_by_index((uint32_t)card_id, &c)) return 0;
+    char cons[256];
+    rb_norm_ws(name_constraint, cons, sizeof cons);
+    int r = 0;
+    if (c.name) {
+        char nm[256];
+        rb_norm_ws(c.name, nm, sizeof nm);
+        const char *p = nm;
+        while (*p) {
+            const char *sep = NULL;
+            for (const char *q = p; *q; q++) {
+                if (*q == '&') { sep = q; break; }
+                if ((unsigned char)q[0] == 0xEF && (unsigned char)q[1] == 0xBC &&
+                    (unsigned char)q[2] == 0x86) { sep = q; break; }
+            }
+            size_t len = sep ? (size_t)(sep - p) : strlen(p);
+            char tok[256];
+            if (len >= sizeof tok) len = sizeof tok - 1;
+            memcpy(tok, p, len);
+            tok[len] = '\0';
+            if (!strcmp(tok, cons)) { r = 1; break; }
+            p = sep ? sep + (sep[0] == '&' ? 1 : 3) : p + strlen(p);
+        }
+    }
+    rb_free_card(&c);
+    return r;
+}
+
+/* ── Duration / distinct-name helpers (mirror engine/src/ability/util.rs) ── */
+
+/* Mirror util.rs::parse_duration — "this_turn" reverts at turn rollover
+    (RB_TEMP_TURN_END); "live_end"/"this_live" at live phase end
+    (RB_TEMP_LIVE_END); "permanent"/"as_long_as" never expire (RB_TEMP_PERM).
+    Unknown ⇒ live-end (matches Rust's ThisLive default). */
+int rb_parse_duration(const char *s) {
+    if (!s) return RB_TEMP_LIVE_END;
+    if (!strcmp(s, "this_turn"))    return RB_TEMP_TURN_END;
+    if (!strcmp(s, "live_end") || !strcmp(s, "this_live")) return RB_TEMP_LIVE_END;
+    if (!strcmp(s, "as_long_as") || !strcmp(s, "permanent")) return RB_TEMP_PERM;
+    return RB_TEMP_LIVE_END;
+}
+
+/* Canonical group taxonomy — exactly the groups recognized by
+    rb_card_series_matches_group. ONE definition, mirrored from util.rs KNOWN_GROUPS. */
+const char *RB_KNOWN_GROUPS[5] = { "μ's", "Aqours", "虹ヶ咲", "Liella!", "蓮ノ空" };
+
+/* Mirror util.rs::distinct_should_dedupe — CardName/True/Distinct all dedupe. */
+int rb_distinct_should_dedupe(RbDistinctType d) {
+    return d == RB_DISTINCT_CARDNAME || d == RB_DISTINCT_TRUE || d == RB_DISTINCT_DISTINCT;
+}
+
+/* Mirror util.rs::count_distinct_member_name_units — joint-aware distinct-name
+    count for "名前の異なるメンバーカード1枚につき" (Q278/Q279). Single-name cards
+    dedup by name; a joint ("A&B&C") card adds one unit only when it introduces
+    at least one name not already present as a single-name card. */
+int rb_count_distinct_member_name_units(const int *cards, int n) {
+    char seen[RB_MAX_ZONE][256];
+    int  nseen = 0;
+    int  joints[RB_MAX_ZONE];
+    int  njoints = 0;
+    for (int i = 0; i < n && i < RB_MAX_ZONE; i++) {
+        Card c;
+        if (!rb_decode_card_by_index((uint32_t)cards[i], &c)) continue;
+        if (c.name) {
+            char nm[256];
+            rb_norm_ws(c.name, nm, sizeof nm);
+            if (strchr(nm, '&')) {
+                if (njoints < RB_MAX_ZONE) joints[njoints++] = cards[i];
+            } else {
+                int dup = 0;
+                for (int s = 0; s < nseen; s++)
+                    if (!strcmp(seen[s], nm)) { dup = 1; break; }
+                if (!dup && nseen < RB_MAX_ZONE) {
+                    strncpy(seen[nseen], nm, 255); seen[nseen][255] = 0; nseen++;
+                }
+            }
+        }
+        rb_free_card(&c);
+    }
+    int count = nseen;
+    for (int j = 0; j < njoints; j++) {
+        Card c;
+        if (!rb_decode_card_by_index((uint32_t)joints[j], &c)) continue;
+        if (c.name) {
+            char nm[256];
+            rb_norm_ws(c.name, nm, sizeof nm);
+            int has_new = 0;
+            const char *p = nm;
+            while (*p) {
+                const char *sep = strchr(p, '&');
+                size_t len = sep ? (size_t)(sep - p) : strlen(p);
+                char tok[256];
+                if (len >= sizeof tok) len = sizeof tok - 1;
+                memcpy(tok, p, len); tok[len] = '\0';
+                int in_set = 0;
+                for (int s = 0; s < nseen; s++)
+                    if (!strcmp(seen[s], tok)) { in_set = 1; break; }
+                if (!in_set) {
+                    if (nseen < RB_MAX_ZONE) {
+                        strncpy(seen[nseen], tok, 255); seen[nseen][255] = 0; nseen++;
+                    }
+                    has_new = 1;
+                }
+                p = sep ? sep + 1 : p + strlen(p);
+            }
+            if (has_new) count++;
+        }
+        rb_free_card(&c);
+    }
+    return count;
+}
+
+/* Mirror util.rs::apply_distinct_filter — when `d` is a dedupe variant, drop
+    cards whose normalized name was already seen (mirrors dedupe_by_normalized_name,
+    which keeps the full "&"-joined name for joint cards). Otherwise copy through. */
+int rb_apply_distinct_filter(const int *cards, int n, RbDistinctType d,
+                             int *out, int max) {
+    if (!rb_distinct_should_dedupe(d)) {
+        int m = 0;
+        for (int i = 0; i < n && m < max; i++) out[m++] = cards[i];
+        return m;
+    }
+    char seen[RB_MAX_ZONE][256];
+    int  nseen = 0;
+    int  m = 0;
+    for (int i = 0; i < n; i++) {
+        Card c;
+        if (!rb_decode_card_by_index((uint32_t)cards[i], &c)) {
+            if (m < max) out[m++] = cards[i];
+            continue;
+        }
+        if (c.name) {
+            char nm[256];
+            rb_norm_ws(c.name, nm, sizeof nm);
+            int dup = 0;
+            for (int s = 0; s < nseen; s++)
+                if (!strcmp(seen[s], nm)) { dup = 1; break; }
+            if (!dup) {
+                if (nseen < RB_MAX_ZONE) {
+                    strncpy(seen[nseen], nm, 255); seen[nseen][255] = 0; nseen++;
+                }
+                if (m < max) out[m++] = cards[i];
+            }
+        } else {
+            if (m < max) out[m++] = cards[i];
+        }
+        rb_free_card(&c);
+    }
+    return m;
+}
+
+/* Mirror util.rs::CardFilter::check_card_property — single card-property
+    predicate with optional negation ("does NOT have blade heart"). */
+int rb_check_card_property(const char *prop, int negation, const Card *c) {
+    int has = 0;
+    if (!prop) has = 1;
+    else if (!strcmp(prop, "has_blade_heart")) has = rb_card_has_blade_heart(c);
+    else if (!strcmp(prop, "has_score_icon"))  has = rb_card_has_score_icon(c);
+    else if (!strcmp(prop, "has_all_blade"))   has = rb_card_has_all_blade(c);
+    return negation ? !has : has;
+}
+
+/* Mirror util.rs::filter_current_blade — post-filter `cands` by CURRENT blade
+    total (printed base, or set + additive modifiers). Matches "ブレードをNつ以上
+    持つ" (no 元々) semantics; returns the surviving ids written into `out`. */
+int rb_filter_current_blade(const int *cands, int n, const GameState *g,
+                            int blade_limit, const char *op, int *out, int max) {
+    if (blade_limit < 0) {
+        int m = 0;
+        for (int i = 0; i < n && m < max; i++) out[m++] = cands[i];
+        return m;
+    }
+    const char *o = op ? op : ">=";
+    int m = 0;
+    for (int i = 0; i < n; i++) {
+        int cid = cands[i];
+        int base = 0;
+        Card c;
+        if (rb_decode_card_by_index((uint32_t)cid, &c)) { base = c.blade; rb_free_card(&c); }
+        int set       = rb_mods_get_blade_set((RbMods *)&g->mods, cid);
+        int effective = set != 0 ? set : base;
+        int additive  = rb_mods_get_blade((RbMods *)&g->mods, cid) - set;
+        int total     = rb_saturate_u8(effective + additive);
+        if (rb_compare_counts(o, total, blade_limit) && m < max) out[m++] = cid;
     }
     return m;
 }

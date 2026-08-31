@@ -4,6 +4,7 @@
 void rb_mods_init(RbMods *m) {
     memset(m, 0, sizeof(*m));
     for(int i=0;i<RB_MAX_CARD_IDS;i++){ m->heart_copy[i]=-1; m->heart_multiplier[i]=-1; m->heart_multiplier_amt[i]=2; m->blade_type[i]=-1; m->heart_color_override[i]=-1; }
+    m->n_trace = 0;
 }
 
 void rb_mods_clear_card(RbMods *m, int cid) {
@@ -237,4 +238,41 @@ void rb_mods_set_heart_color_multiplier(RbMods *m, int cid, int color) {
 int rb_mods_get_heart_color_multiplier(RbMods *m, int cid) {
     if (cid < 0 || cid >= RB_MAX_CARD_IDS) return -1;
     return m->heart_multiplier[cid];
+}
+
+/* ── snapshot trace ring (mirror add_*_modifier_with_trace) ── */
+int rb_mods_trace_len(const RbMods *m) { return m->n_trace; }
+
+void rb_mods_trace_push(RbMods *m, int source_card_id, const char *ability_text,
+                        int effect_type, int target_card_id, int heart_color, int amount) {
+    if (m->n_trace >= RB_MODS_TRACE_CAP) {
+        /* compact_state behaviour: drop the oldest entry when full. */
+        memmove(&m->trace[0], &m->trace[1], (size_t)(RB_MODS_TRACE_CAP - 1) * sizeof(RbAbilityTraceEntry));
+        m->n_trace = RB_MODS_TRACE_CAP - 1;
+    }
+    RbAbilityTraceEntry *e = &m->trace[m->n_trace++];
+    e->source_card_id = (int16_t)source_card_id;
+    e->target_card_id = (int16_t)target_card_id;
+    e->amount = (int16_t)amount;
+    e->effect_type = (int8_t)effect_type;
+    e->heart_color = (int8_t)(heart_color < 0 ? -1 : heart_color);
+    memset(e->ability_text, 0, RB_MODS_TRACE_TEXT);
+    if (ability_text) {
+        int n = 0;
+        while (ability_text[n] && n < RB_MODS_TRACE_TEXT - 1) { e->ability_text[n] = ability_text[n]; n++; }
+    }
+}
+
+void rb_mods_add_blade_with_trace(RbMods *m, int cid, int delta,
+                                  int source_card_id, const char *ability_text) {
+    if (cid < 0 || cid >= RB_MAX_CARD_IDS) return;
+    rb_mods_add_blade(m, cid, delta);
+    rb_mods_trace_push(m, source_card_id, ability_text, RB_EFFECT_BLADE_BONUS, cid, -1, delta);
+}
+
+void rb_mods_add_heart_with_trace(RbMods *m, int cid, int color, int delta,
+                                  int source_card_id, const char *ability_text) {
+    if (cid < 0 || cid >= RB_MAX_CARD_IDS || color < 0 || color >= 8) return;
+    rb_mods_add_heart(m, cid, color, delta);
+    rb_mods_trace_push(m, source_card_id, ability_text, RB_EFFECT_HEART_BONUS, cid, color, delta);
 }
