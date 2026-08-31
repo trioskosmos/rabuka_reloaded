@@ -1427,3 +1427,202 @@ void rb_effect_execute_set_heart_type_applied(GameState *g, int actor,
     rb_mods_set_heart_color_multiplier(&g->mods, card_id, color);
     rb_rule_log_activated(g, card_id, "[[log_set_heart_type]]");
 }
+
+/* Mirror AbilityResolver::execute_set_cost — set cost modifier for cards. */
+void rb_effect_execute_set_cost(GameState *g, int actor, AbilityEffect *e) {
+    if (!g) return;
+    int value = 0;
+    const char *val_str = s_eff_extra(e, "value");
+    if (val_str && *val_str) value = atoi(val_str);
+    const char *target = e->target ? e->target : "self";
+    int pl = actor;
+    if (!strcmp(target, "opponent")) pl = actor ^ 1;
+    RbPlayer *P = &g->p[pl];
+    const char *ctype = s_eff_extra(e, "card_type");
+    int card_ids[RB_MAX_ZONE];
+    int n = 0;
+    if (ctype && !strcmp(ctype, "live")) {
+        for (int i = 0; i < P->live.n; i++) card_ids[n++] = P->live.cards[i];
+    } else if (ctype && !strcmp(ctype, "member")) {
+        for (int i = 0; i < RB_STAGE_SIZE; i++)
+            if (P->stage[i] >= 0) card_ids[n++] = P->stage[i];
+    } else {
+        for (int i = 0; i < P->hand.n; i++) card_ids[n++] = P->hand.cards[i];
+    }
+    for (int i = 0; i < n; i++)
+        rb_mods_set_cost(&g->mods, card_ids[i], value);
+}
+
+/* Mirror AbilityResolver::execute_set_blade_type — set blade type for stage members. */
+void rb_effect_execute_set_blade_type(GameState *g, int actor, AbilityEffect *e) {
+    if (!g) return;
+    const char *blade_type = s_eff_extra(e, "blade_type");
+    if (!blade_type || !*blade_type) return;
+    const char *target = e->target ? e->target : "self";
+    int pl = actor;
+    if (!strcmp(target, "opponent")) pl = actor ^ 1;
+    RbPlayer *P = &g->p[pl];
+    int color = 0;
+    if (!strcmp(blade_type, "red") || strcmp(blade_type, "赤ブレード") == 0) color = 1;
+    else if (!strcmp(blade_type, "blue") || strcmp(blade_type, "青ブレード") == 0) color = 2;
+    else if (!strcmp(blade_type, "green") || strcmp(blade_type, "緑ブレード") == 0) color = 3;
+    else if (!strcmp(blade_type, "yellow") || strcmp(blade_type, "黄ブレード") == 0) color = 4;
+    else if (!strcmp(blade_type, "purple") || strcmp(blade_type, "紫ブレード") == 0) color = 5;
+    for (int i = 0; i < RB_STAGE_SIZE; i++) {
+        if (P->stage[i] < 0) continue;
+        rb_mods_set_blade_type(&g->mods, P->stage[i], color);
+    }
+}
+
+/* Mirror AbilityResolver::execute_set_heart_type — set heart type for cards.
+   Handles self-target (activating_card) and member-target with selection. */
+void rb_effect_execute_set_heart_type(GameState *g, int actor, AbilityEffect *e) {
+    if (!g) return;
+    const char *heart_type = s_eff_extra(e, "heart_type");
+    const char *target = e->target ? e->target : "self";
+    int pl = actor;
+    if (!strcmp(target, "opponent")) pl = actor ^ 1;
+    RbPlayer *P = &g->p[pl];
+    int is_self = (e->self_target_field[0] && !strcmp(e->self_target_field, "true"));
+    int color = 0;
+    if (heart_type) {
+        if (strcmp(heart_type, "heart01") == 0) color = 1;
+        else if (strcmp(heart_type, "heart02") == 0) color = 2;
+        else if (strcmp(heart_type, "heart03") == 0) color = 3;
+        else if (strcmp(heart_type, "heart04") == 0) color = 4;
+        else if (strcmp(heart_type, "heart05") == 0) color = 5;
+        else if (strcmp(heart_type, "heart06") == 0) color = 6;
+        else if (strcmp(heart_type, "heart07") == 0) color = 7;
+    }
+    if (is_self) {
+        int card_id = g->queue.resume_host;
+        if (card_id >= 0)
+            rb_mods_set_heart_color_multiplier(&g->mods, card_id, color);
+    } else {
+        for (int i = 0; i < RB_STAGE_SIZE; i++) {
+            if (P->stage[i] < 0) continue;
+            rb_mods_set_heart_color_multiplier(&g->mods, P->stage[i], color);
+        }
+    }
+}
+
+/* Mirror AbilityResolver::execute_set_heart_copy_from_under — copy hearts from
+   the card placed under a member onto the member itself. */
+void rb_effect_execute_set_heart_copy_from_under(GameState *g, int actor, AbilityEffect *e) {
+    if (!g) return;
+    int member_card = (g->n_selected_cards > 0) ? g->selected_cards[0] : g->queue.resume_host;
+    if (member_card < 0) return;
+    rb_mods_set_heart_copy(&g->mods, member_card, g->queue.resume_host);
+    rb_recalc_constants(g);
+}
+
+/* Mirror AbilityResolver::execute_activation_cost — modify activation cost. */
+void rb_effect_execute_activation_cost(GameState *g, int actor, AbilityEffect *e) {
+    if (!g) return;
+    const char *operation = s_eff_extra(e, "operation");
+    if (!operation || !*operation) operation = "increase";
+    int value = 0;
+    const char *val_str = s_eff_extra(e, "value");
+    if (val_str && *val_str) value = atoi(val_str);
+    const char *target = e->target ? e->target : "self";
+    if (!strcmp(target, "self") || !strcmp(target, "opponent")) {
+        if (g->n_prohibition < 64) {
+            snprintf(g->prohibition[g->n_prohibition], sizeof(g->prohibition[g->n_prohibition]),
+                     "activation_cost_%s_%d", operation, value);
+            g->n_prohibition++;
+        }
+    }
+}
+
+/* Mirror AbilityResolver::execute_set_blade_count — set blade count for stage members. */
+void rb_effect_execute_set_blade_count(GameState *g, int actor, AbilityEffect *e) {
+    if (!g) return;
+    int value = e->count > 0 ? e->count : 0;
+    const char *val_str = s_eff_extra(e, "value");
+    if (val_str && *val_str) value = atoi(val_str);
+    const char *target = e->target ? e->target : "self";
+    int pl = actor;
+    if (!strcmp(target, "opponent")) pl = actor ^ 1;
+    RbPlayer *P = &g->p[pl];
+    for (int i = 0; i < RB_STAGE_SIZE; i++) {
+        if (P->stage[i] < 0) continue;
+        rb_mods_set_blade(&g->mods, P->stage[i], value);
+    }
+}
+
+/* Mirror AbilityResolver::execute_specify_heart_color — present heart color
+   selection choice to the player (Q190). */
+void rb_effect_execute_specify_heart_color(GameState *g, int actor, AbilityEffect *e) {
+    if (!g) return;
+    const char *opts = "heart01,heart02,heart03,heart04,heart05,heart06";
+    rb_emit_choice(g, actor, RB_CHOICE_SELECT_TARGET, NULL, NULL, 1, 0, opts);
+    rb_choice_set_description(&g->queue.pending, "Choose a heart color");
+    rb_choice_set_route(&g->queue.pending, RB_ROUTE_SELECT_TARGET);
+}
+
+/* Mirror AbilityResolver::execute_set_card_identity_all_regions — set card
+   identity across all regions. */
+void rb_effect_execute_set_card_identity_all_regions(GameState *g, int actor, AbilityEffect *e) {
+    if (!g) return;
+    const char *identities = s_eff_extra(e, "identities");
+    if (identities && *identities && g->n_prohibition < 64) {
+        snprintf(g->prohibition[g->n_prohibition], sizeof(g->prohibition[g->n_prohibition]),
+                 "card_identity_all:%s", identities);
+        g->n_prohibition++;
+    }
+}
+
+/* Mirror AbilityResolver::execute_set_cost_to_use — set cost to use for abilities. */
+void rb_effect_execute_set_cost_to_use(GameState *g, int actor, AbilityEffect *e) {
+    if (!g) return;
+    int value = 0;
+    const char *val_str = s_eff_extra(e, "value");
+    if (val_str && *val_str) value = atoi(val_str);
+    const char *target = e->target ? e->target : "self";
+    int pl = actor;
+    if (!strcmp(target, "opponent")) pl = actor ^ 1;
+    int card_id = (g->n_selected_cards > 0) ? g->selected_cards[0] : g->queue.resume_host;
+    if (card_id >= 0)
+        rb_mods_set_cost(&g->mods, card_id, value);
+}
+
+/* Mirror AbilityResolver::execute_all_blade_timing — handle all-blade timing. */
+void rb_effect_execute_all_blade_timing(GameState *g, int actor, AbilityEffect *e) {
+    if (!g) return;
+    const char *target = e->target ? e->target : "self";
+    int pl = actor;
+    if (!strcmp(target, "opponent")) pl = actor ^ 1;
+    RbPlayer *P = &g->p[pl];
+    for (int i = 0; i < RB_STAGE_SIZE; i++) {
+        if (P->stage[i] < 0) continue;
+        rb_mods_set_blade(&g->mods, P->stage[i], 1);
+    }
+}
+
+/* Mirror AbilityResolver::execute_modify_cost — modify cost of cards. */
+void rb_effect_execute_modify_cost(GameState *g, int actor, AbilityEffect *e) {
+    if (!g) return;
+    const char *operation = s_eff_extra(e, "operation");
+    if (!operation || !*operation) operation = "increase";
+    int value = 0;
+    const char *val_str = s_eff_extra(e, "value");
+    if (val_str && *val_str) value = atoi(val_str);
+    const char *target = e->target ? e->target : "self";
+    int pl = actor;
+    if (!strcmp(target, "opponent")) pl = actor ^ 1;
+    RbPlayer *P = &g->p[pl];
+    int sign = !strcmp(operation, "decrease") ? -1 : 1;
+    int card_ids[RB_MAX_ZONE];
+    int n = 0;
+    const char *ctype = s_eff_extra(e, "card_type");
+    if (ctype && !strcmp(ctype, "live")) {
+        for (int i = 0; i < P->live.n; i++) card_ids[n++] = P->live.cards[i];
+    } else if (ctype && !strcmp(ctype, "member")) {
+        for (int i = 0; i < RB_STAGE_SIZE; i++)
+            if (P->stage[i] >= 0) card_ids[n++] = P->stage[i];
+    } else {
+        for (int i = 0; i < P->hand.n; i++) card_ids[n++] = P->hand.cards[i];
+    }
+    for (int i = 0; i < n; i++)
+        rb_mods_set_cost(&g->mods, card_ids[i], sign * value);
+}

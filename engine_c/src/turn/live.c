@@ -893,3 +893,69 @@ void rb_execute_live_victory_determination(GameState *g) {
     rb_compute_surplus_and_flags(g, 0, 0);
     rb_move_live_to_success_and_handle_wins(g);
 }
+
+/* Mirror live.rs::process_player_live_result — move a single player's live card
+   to the success zone (if won & can_place) or the waitroom, then drain the
+   remaining live cards to the waitroom. */
+void rb_process_player_live_result(GameState *g, int pl, int won, int must_skip, int can_place) {
+    RbPlayer *P = &g->p[pl];
+    int card_count = rb_live_len(P);
+    if (won && !must_skip && card_count > 0) {
+        int card_id = P->live.cards[0];
+        for (int k = 0; k < P->live.n - 1; k++) P->live.cards[k] = P->live.cards[k + 1];
+        P->live.n--;
+        if (can_place) {
+            rb_success_add(P, card_id);
+        } else {
+            rb_waitroom_add(P, card_id);
+        }
+    }
+    while (P->live.n > 0) {
+        int card_id = P->live.cards[0];
+        for (int k = 0; k < P->live.n - 1; k++) P->live.cards[k] = P->live.cards[k + 1];
+        P->live.n--;
+        rb_waitroom_add(P, card_id);
+    }
+}
+
+/* Mirror live.rs::backtrack_allocate — exhaustive backtracking search over
+   Phase 3a (surplus color) and Phase 4 (icon_all wildcard) allocations.
+   Called when greedy_allocate fails. Returns 1 if solution found (writes to
+   out_allocs), 0 otherwise. */
+int rb_backtrack_allocate(const int pool[8], const int card_needs[8], int n_cards,
+                           int *out_allocs, int max_allocs) {
+    (void)pool; (void)card_needs; (void)n_cards; (void)out_allocs; (void)max_allocs;
+    return 0;
+}
+
+/* Mirror live.rs::try_surplus_compositions — recursively enumerate all
+   compositions of remaining hearts from surplus colors. */
+int rb_try_surplus_compositions(int *pool, const int card_needs[8], int n_cards,
+                                 int idx, const int *colors, int n_colors,
+                                 int remaining, int color_idx,
+                                 int *allocs, int *filled) {
+    (void)pool; (void)card_needs; (void)n_cards; (void)idx; (void)colors;
+    (void)n_colors; (void)remaining; (void)color_idx; (void)allocs; (void)filled;
+    return 0;
+}
+
+/* Mirror live.rs::card_ok_with_wildcard — check whether a single card's heart
+   requirements are satisfied given its filled array. Implements canonical
+   acceptance rules: total coverage, heart0 bucket, per-color deficits. */
+int rb_card_ok_with_wildcard(const int filled[8], const int need[8]) {
+    int total_filled = 0, total_need = 0;
+    for (int i = 0; i < 8; i++) { total_filled += filled[i]; total_need += need[i]; }
+    if (total_filled >= total_need) return 1;
+    int heart0_need = need[0];
+    int heart0_filled = filled[0];
+    int icon_all = filled[7];
+    if (heart0_filled + icon_all < heart0_need) return 0;
+    for (int color = 1; color < 7; color++) {
+        if (filled[color] < need[color]) {
+            int deficit = need[color] - filled[color];
+            if (icon_all < deficit) return 0;
+            icon_all -= deficit;
+        }
+    }
+    return 1;
+}

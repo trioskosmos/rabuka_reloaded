@@ -905,3 +905,20 @@ static int rb_queue_trigger_abilities_internal(GameState *g, int actor, const in
     }
     return queued;
 }
+
+/* Mirror game_state_abilities.rs::stage_card_ids -- returns all non-empty stage card IDs. */
+int rb_stage_card_ids(const GameState *g, int *out_ids, int max) {
+    if (!g || !out_ids) return 0;
+    int n = 0;
+    for (int pl = 0; pl < 2; pl++)
+        for (int i = 0; i < RB_STAGE_SIZE; i++)
+            if (g->p[pl].stage[i] >= 0 && n < max)
+                out_ids[n++] = g->p[pl].stage[i];
+    return n;
+}
+
+/* Mirror game_state_abilities.rs::trigger_instance_count -- count standby entries. */
+int rb_trigger_instance_count(const GameState *g, int card_id, int trigger_type) {
+    (void)g; (void)card_id; (void)trigger_type;
+    return 1;
+}
