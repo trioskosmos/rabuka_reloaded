@@ -265,5 +265,62 @@ void rb_effect_move_cards(GameState *g, int actor, AbilityEffect *e){
     for(int i=0;i<nm;i++) g->moved_this_turn[moved_ids[i]] = 1;
 }
 
+/* Mirror move_cards.rs::move_from_under_member — pull the cards at the given
+    global under_member indices out from beneath stage members and place them
+    into dst. validate(card_id) must return nonzero for the card to be moved
+    (NULL = accept all). Returns the count moved, or -1 on a missing/invalid
+    index. Host stage member ids are recorded in g->mods.last_under_move_host_ids
+    so a following gain step can target them specifically. */
+int rb_move_from_under_member(GameState *g, int actor, const int *indices, int n_indices,
+                              int (*validate)(int), const char *dst, const char *target) {
+    if (!g) return -1;
+    int pl = actor;
+    if (target && *target) { int t = rb_resolve_target_player(g, target); if (t >= 0) pl = t; }
+    RbPlayer *P = &g->p[pl];
+
+    /* Stage the (area, card_id) pairs to move (mirrors cards_to_move: Vec<(usize,i16)>). */
+    int host_ids[4]; int nh = 0;
+    for (int k = 0; k < n_indices; k++) {
+        int idx = indices ? indices[k] : -1;
+        if (idx < 0) return -1;
+        int global = 0, found = 0, si = -1, cid = -1;
+        for (si = 0; si < RB_STAGE_SIZE; si++) {
+            int len = P->under_cards[si].n;
+            if (idx < global + len) {
+                cid = P->under_cards[si].cards[idx - global];
+                if (validate && !validate(cid)) return -1; /* type filter mismatch */
+                found = 1;
+                break;
+            }
+            global += len;
+        }
+        if (!found) return -1; /* index not found in under_member */
+        /* Remove the card from under_cards[si]. */
+        for (int j = idx - global; j < P->under_cards[si].n - 1; j++)
+            P->under_cards[si].cards[j] = P->under_cards[si].cards[j + 1];
+        P->under_cards[si].n--;
+        rb_place_card_in_zone(g, pl, cid, dst ? dst : "discard", -1);
+        /* Record the hosting stage member (mirrors last_under_move_host_ids). */
+        int host = P->stage[si];
+        if (host >= 0) {
+            int dup = 0;
+            for (int h = 0; h < nh; h++) if (host_ids[h] == host) { dup = 1; break; }
+            if (!dup && nh < 4) host_ids[nh++] = host;
+        }
+    }
+
+    /* Persist host ids into the mods record (mirrors gs.mods.last_under_move_host_ids). */
+    g->mods.n_last_under_move_host_ids = 0;
+    for (int h = 0; h < nh; h++) {
+        int dup = 0;
+        for (int i = 0; i < g->mods.n_last_under_move_host_ids; i++)
+            if (g->mods.last_under_move_host_ids[i] == host_ids[h]) { dup = 1; break; }
+        if (!dup && g->mods.n_last_under_move_host_ids < 4)
+            g->mods.last_under_move_host_ids[g->mods.n_last_under_move_host_ids++] = (int16_t)host_ids[h];
+    }
+    rb_recalc_constants(g);
+    return n_indices;
+}
+
 /* needed by engine.c wrapper */
 int card_matches_card_type_filter(int card_idx, const char *filter);

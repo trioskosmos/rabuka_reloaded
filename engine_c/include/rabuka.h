@@ -192,6 +192,12 @@ typedef struct {
     int8_t          blade_type[RB_MAX_CARD_IDS];   /* -1 none, else BladeColor idx */
     int8_t          heart_color_override[RB_MAX_CARD_IDS]; /* -1 none (specify_heart_color); else all base hearts counted as this colour */
     int             last_cost_discard_count;       /* cards discarded as part of the last cost payment */
+    /* last_under_move_host_ids — mirrors game_modifiers.rs last_under_move_host_ids
+        (SmallVec<[i16;4]>). Stage member ids that hosted the cards pulled by the
+        most recent move_from_under_member, so a following 「そうした場合、そのメンバーは…」
+        gain step can target them specifically (resolve_gain_resource_targets). */
+    int16_t         last_under_move_host_ids[4];
+    int             n_last_under_move_host_ids;
 } RbMods;
 
 void rb_mods_init(RbMods *m);
