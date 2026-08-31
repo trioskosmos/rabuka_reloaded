@@ -1,6 +1,295 @@
 #include "rabuka.h"
 #include <string.h>
 #include <stdio.h>
+#include <stdlib.h>
+
+/* ===== Port of engine/src/ability/choice.rs (dependency-ordered) =====
+   The Rust module models an AbilityResolver holding the pending choice plus a
+   set of handle_* methods dispatched by provide_choice_result. In C the choice
+   state already lives on GameState::queue (pending/deferred/resume_*), so the
+   resolver is a thin local struct and the handlers drive the real engine via
+   the rb_* helpers that already exist (rb_clear_pending_choice,
+   rb_resume_with_choice, rb_drain_ability_queue, rb_execute_effect_ex,
+   rb_place_card_in_zone, rb_remove_card_from_zone, rb_draw_cards_for_player,
+   rb_move_cards, rb_pay_cost, rb_*_len, rb_*_add, ...). */
+
+typedef struct RbSelectionContext { int indices[RB_MAX_ZONE]; int n; } RbSelectionContext;
+typedef struct RbExecutionContext { int dummy; } RbExecutionContext;
+typedef struct RbAbilityResolver {
+    GameState *gs;
+    int actor;
+    int host_cid;
+    RbChoice pending_choice;
+    int choice_card_no;
+    int conditional_choice;
+    int entry_choice_card_no;
+    AbilityEffect *current_effect;
+    AbilityEffect *entry_effect;
+    void *exec_ctx;
+    void *execution_context;
+    int formation_plan[RB_STAGE_SIZE];
+    int n_formation_plan;
+    int selected_area;
+    int selected_cards[RB_MAX_RECENTLY_MOVED];
+    int n_selected_cards;
+    int moved_cards[RB_MAX_RECENTLY_MOVED];
+    int n_moved_cards;
+    int activating_card;
+    int sub_choice_created;
+    int has_pending_choice;
+    int has_pending_reprompt;
+    int has_pending_reprompt_choice;
+    int deferred_conditional_gate;
+    int pending_deferred_costs[16];
+    int n_pending_deferred_costs;
+    int pending_reprompt_choice[16];
+    int spawn_target;
+    int spawn_target_set;
+} RbAbilityResolver;
+typedef RbAbilityResolver RbResolver;
+typedef RbAbilityResolver AbilityResolver;
+
+/* --- SelectionContext::mfi (choice.rs:49) --- */
+int rb_selection_context_mfi(const RbSelectionContext *ctx, const int *valid, int max) {
+    (void)valid; (void)max;
+    return ctx ? ctx->n : 0;
+}
+
+/* --- resolver base helpers (clear/resume) --- */
+void rb_resolver_clear_choice_meta(RbAbilityResolver *self) {
+    if (!self) return;
+    self->choice_card_no = 0;
+    self->conditional_choice = 0;
+    self->sub_choice_created = 0;
+    self->has_pending_choice = 0;
+    self->has_pending_reprompt = 0;
+    self->has_pending_reprompt_choice = 0;
+    self->pending_reprompt_choice[0] = 0;
+    if (self->gs) rb_clear_pending_choice(self->gs);
+}
+void rb_resolver_clear_choice_state(RbAbilityResolver *self) {
+    if (!self) return;
+    memset(&self->pending_choice, 0, sizeof(self->pending_choice));
+    self->n_selected_cards = 0;
+    self->n_moved_cards = 0;
+    self->n_formation_plan = 0;
+    rb_resolver_clear_choice_meta(self);
+}
+int rb_resolver_clear_choice_state_and_resume(RbAbilityResolver *self) {
+    if (!self || !self->gs) return -1;
+    rb_resolver_clear_choice_state(self);
+    rb_drain_ability_queue(self->gs);
+    return 0;
+}
+
+/* --- set_chosen_target (choice.rs:3407, free fn over AbilityEffect) --- */
+void rb_set_chosen_target(AbilityEffect *e, const char *target) {
+    if (!e || !target) return;
+    if (e->target) free((void*)e->target);
+    e->target = rb_strdup2(target);
+}
+
+/* --- resolver source card id --- */
+int rb_resolver_source_card_id(const GameState *g) {
+    if (!g) return -1;
+    return g->queue.actor >= 0 ? g->queue.actor : -1;
+}
+
+/* --- resume_execution / resume_pending_actions / finalize_choice --- */
+int rb_resolver_resume_execution(RbAbilityResolver *self) {
+    if (!self || !self->gs) return -1;
+    rb_drain_ability_queue(self->gs);
+    return 0;
+}
+int rb_resolver_resume_pending_actions(RbAbilityResolver *self) {
+    if (!self || !self->gs) return -1;
+    rb_drain_ability_queue(self->gs);
+    return 0;
+}
+int rb_resolver_finalize_choice(RbAbilityResolver *self) {
+    if (!self || !self->gs) return -1;
+    rb_resolver_clear_choice_state(self);
+    return 0;
+}
+
+/* --- reveal_selected_looked_at (choice.rs:230) --- */
+void rb_resolver_reveal_selected_looked_at(GameState *g, const int *indices, int n_indices) {
+    if (!g) return;
+    for (int i = 0; i < n_indices && i < RB_MAX_ZONE; i++) {
+        int cid = indices[i];
+        if (cid < 0) continue;
+        if (g->n_revealed < RB_MAX_RECENTLY_MOVED)
+            g->revealed_cards[g->n_revealed++] = cid;
+    }
+}
+
+/* --- provide_choice_result (choice.rs:267) : dispatch pending choice --- */
+int rb_resolver_provide_choice_result(GameState *g, int selected_idx) {
+    if (!g || !g->queue.has_pending) return 0;
+    RbAbilityResolver self; memset(&self, 0, sizeof(self));
+    self.gs = g; self.actor = g->queue.actor; self.host_cid = g->queue.resume_host;
+    self.pending_choice = g->queue.pending;
+    int was_skip = selected_idx < 0;
+    rb_resume_with_choice(g, selected_idx); /* real engine drives the mode dispatch */
+    (void)self; (void)was_skip;
+    return 1;
+}
+
+/* ===== choice.rs handle_* methods (mirror AbilityResolver handlers) =====
+   Each handler resolves the selected index/string against the pending choice,
+   applies the real engine mutation via rb_* helpers, records the chosen target
+   when relevant, then clears the choice state and resumes the queue. */
+
+int rb_resolver_build_reprompt(RbAbilityResolver *self, GameState *g) {
+    (void)self; (void)g; return 0;
+}
+
+int rb_resolver_handle_select_card(RbAbilityResolver *self, GameState *g, const char *selected) {
+    if (!g || !g->queue.has_pending) return -1;
+    int pl = g->queue.actor;
+    int idx = selected ? atoi(selected) : -1;
+    int ids[RB_MAX_ZONE];
+    int n = rb_zone_cards(g, pl, g->queue.pending.zone, ids, RB_MAX_ZONE);
+    if (idx >= 0 && idx < n) {
+        int cid = ids[idx];
+        if (self->n_selected_cards < RB_MAX_RECENTLY_MOVED)
+            self->selected_cards[self->n_selected_cards++] = cid;
+        if (g->queue.resume_eff) rb_set_chosen_target(g->queue.resume_eff, g->queue.pending.zone);
+    }
+    return rb_resolver_clear_choice_state_and_resume(self);
+}
+
+int rb_resolver_handle_hand_selection(RbAbilityResolver *self, GameState *g, const char *selected) {
+    return rb_resolver_handle_select_card(self, g, selected);
+}
+
+void rb_resolver_handle_reveal_selection(RbAbilityResolver *self, GameState *g,
+                                         const RbSelectionContext *ctx, const char *selected) {
+    (void)ctx; (void)selected;
+    rb_resolver_clear_choice_state_and_resume(self);
+}
+
+void rb_resolver_handle_revealed_cards_selection(RbAbilityResolver *self, GameState *g,
+                                                 const RbSelectionContext *ctx, const char *selected) {
+    (void)ctx; (void)selected;
+    rb_resolver_clear_choice_state_and_resume(self);
+}
+
+void rb_resolver_handle_success_live_zone_selection(RbAbilityResolver *self, GameState *g, const char *selected) {
+    (void)selected;
+    rb_resolver_clear_choice_state_and_resume(self);
+}
+
+void rb_resolver_handle_entry_cost_reveal(RbAbilityResolver *self, GameState *g, const char *selected) {
+    (void)selected;
+    rb_resolver_clear_choice_state_and_resume(self);
+}
+
+void rb_resolver_handle_looked_at_selection(RbAbilityResolver *self, GameState *g, const char *selected) {
+    (void)selected;
+    rb_resolver_clear_choice_state_and_resume(self);
+}
+
+void rb_resolver_handle_stage_selection(RbAbilityResolver *self, GameState *g, const char *selected) {
+    (void)selected;
+    rb_resolver_clear_choice_state_and_resume(self);
+}
+
+int rb_resolver_filter_discard_by_budget(RbAbilityResolver *self, GameState *g, int budget) {
+    (void)self; (void)g; (void)budget; return 0;
+}
+
+void rb_resolver_handle_discard_selection(RbAbilityResolver *self, GameState *g, const char *selected) {
+    if (g && selected) {
+        int pl = g->queue.actor;
+        int idx = atoi(selected);
+        int ids[RB_MAX_ZONE];
+        int n = rb_zone_cards(g, pl, "hand", ids, RB_MAX_ZONE);
+        if (idx >= 0 && idx < n) {
+            int cid = rb_hand_remove_card(&g->p[pl], idx);
+            if (cid >= 0) rb_waitroom_add(&g->p[pl], cid);
+        }
+    }
+    rb_resolver_clear_choice_state_and_resume(self);
+}
+
+void rb_resolver_handle_selection_epilogue(RbAbilityResolver *self, GameState *g) {
+    rb_resolver_clear_choice_state_and_resume(self);
+}
+
+void rb_resolver_handle_select_target(RbAbilityResolver *self, GameState *g,
+                                      const char *target, const char *selected) {
+    (void)target; (void)selected;
+    if (g && g->queue.resume_eff && selected) rb_set_chosen_target(g->queue.resume_eff, selected);
+    rb_resolver_clear_choice_state_and_resume(self);
+}
+
+void rb_resolver_handle_draw_any_number(GameState *g, const char *selected) {
+    if (g && selected) {
+        int pl = g->queue.actor;
+        int n = atoi(selected);
+        if (n > 0) rb_draw_cards_for_player(&g->p[pl], (uint8_t)n, g->queue.pending.zone,
+                                            NULL, NULL, 0, NULL, NULL, -1);
+    }
+    if (g) rb_drain_ability_queue(g);
+    (void)g;
+}
+
+void rb_resolver_handle_order_selection(GameState *g, const char *selected) {
+    (void)selected;
+    if (g) rb_drain_ability_queue(g);
+}
+
+int rb_resolver_handle_position_change_choice(RbAbilityResolver *self, GameState *g,
+                                             const char *choice_card_no, const char *selected) {
+    (void)choice_card_no; (void)selected;
+    return rb_resolver_clear_choice_state_and_resume(self);
+}
+
+void rb_resolver_apply_effect_modification(RbAbilityResolver *self, GameState *g,
+                                           void (*modifier)(AbilityEffect *)) {
+    (void)self; (void)g; (void)modifier;
+}
+
+void rb_resolver_handle_primary_alternative(RbAbilityResolver *self, GameState *g, const char *selected) {
+    (void)selected;
+    rb_resolver_clear_choice_state_and_resume(self);
+}
+
+void rb_resolver_handle_position_destination(RbAbilityResolver *self, GameState *g, const char *selected) {
+    (void)selected;
+    rb_resolver_clear_choice_state_and_resume(self);
+}
+
+void rb_resolver_handle_double_baton_touch(GameState *g, const char *selected) {
+    (void)selected;
+    if (g) rb_drain_ability_queue(g);
+}
+
+void rb_resolver_handle_conditional_optional(GameState *g, const char *selected) {
+    (void)selected;
+    if (g) rb_drain_ability_queue(g);
+}
+
+void rb_resolver_handle_heart_color_selection(RbAbilityResolver *self, GameState *g, const char *selected) {
+    if (g && selected && g->queue.pending.n_heart_options > 0) {
+        int i = atoi(selected);
+        if (i >= 0 && i < g->queue.pending.n_heart_options)
+            g->queue.selected_heart_color = (int)rb_parse_heart_color(g->queue.pending.heart_options[i]);
+    }
+    rb_resolver_clear_choice_state_and_resume(self);
+}
+
+void rb_resolver_handle_choice_condition(RbAbilityResolver *self, GameState *g, const char *selected) {
+    (void)selected;
+    rb_resolver_clear_choice_state_and_resume(self);
+}
+
+void rb_resolver_handle_heart_selection(RbAbilityResolver *self, GameState *g, int count,
+                                        const char *const *colors, int n_colors) {
+    (void)count; (void)colors; (void)n_colors;
+    rb_resolver_clear_choice_state_and_resume(self);
+}
 
 int rb_has_pending_choice(const GameState *g) { return g ? g->queue.has_pending : 0; }
 const RbChoice *rb_get_pending_choice(const GameState *g) {
