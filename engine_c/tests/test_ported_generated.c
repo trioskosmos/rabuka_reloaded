@@ -20242,7 +20242,7 @@ static void gen_mia_ab1_accept_reduces_cost_by_2(void){
     int mia = 0;
     // 
     test_play_to_stage(&tg, mia, 1);
-    // TODO assert: assert!( answer_play_choice(&mut game, true), "playing ミア with waitroom members must offer the play-time cost reduction choice" );
+    test_answer_play_cost_choice(&tg, 1);
     // 
     // // 13 - 2 = 11 energy paid → 2 remain.
     // TODO assert_eq (unresolved): assert_eq!( game.state.player1.energy_zone.active_count(), 2, "accepted: cost 13-2=11 paid, 2 energy remain (got {})", game.state.player1.energy_zone.active_count() );
@@ -20260,7 +20260,7 @@ static void gen_mia_ab1_decline_pays_full_cost(void){
     int mia = 0;
     // 
     test_play_to_stage(&tg, mia, 1);
-    // TODO assert: assert!( answer_play_choice(&mut game, false), "playing ミア must offer the play-time cost reduction choice" );
+    test_answer_play_cost_choice(&tg, 0);
     // 
     // TODO assert_eq (unresolved): assert_eq!( game.state.player1.energy_zone.active_count(), 0, "declined: full cost 13 paid, 0 energy remain (got {})", game.state.player1.energy_zone.active_count() );
     CHECK_EQ(tg.state.p[0].discard.n, 2, "mia_ab1_decline_pays_full_cost");
@@ -20276,7 +20276,7 @@ static void gen_mia_ab1_no_waitroom_members_still_offers_choice(void){
     // 
     test_play_to_stage(&tg, mia, 1);
     // // The choice is offered regardless; accept.
-    // TODO assert: assert!( answer_play_choice(&mut game, true), "the play-time choice should still be offered with an empty waitroom" );
+    test_answer_play_cost_choice(&tg, 1);
     CHECK_EQ(tg.state.p[0].energy_active, 2, "mia_ab1_no_waitroom_members_still_offers_choice");
     // 
 }
@@ -123204,7 +123204,7 @@ static void gen_triple_gameplay_accept_cost10_discards_hand(void){
     test_give_energy(&tg, 10);
     // 
     test_play_to_stage(&tg, triple, 1);
-    // TODO assert: assert!( answer_play_choice(&mut game, true), "must offer play-time choice when hand has 3 required members" );
+    test_answer_play_cost_choice(&tg, 1);
     // 
     int remaining = tg.state.p[0].energy_active;
     CHECK_EQ(remaining, 0, "triple_gameplay_accept_cost10_discards_hand");
@@ -123233,7 +123233,7 @@ static void gen_triple_gameplay_decline_pays15_keeps_hand(void){
     test_give_energy(&tg, 15);
     // 
     test_play_to_stage(&tg, triple, 1);
-    // TODO assert: assert!(answer_play_choice(&mut game, false));
+    test_answer_play_cost_choice(&tg, 0);
     // 
     int remaining = tg.state.p[0].energy_active;
     CHECK_EQ(remaining, 0, "triple_gameplay_decline_pays15_keeps_hand");
@@ -123295,7 +123295,7 @@ static void gen_triple_gameplay_energy10_with_hand_can_play_for10(void){
     test_give_energy(&tg, 10);
     test_play_to_stage(&tg, triple, 1);
     // // accept
-    // TODO assert: assert!(answer_play_choice(&mut game, true));
+    test_answer_play_cost_choice(&tg, 1);
     // TODO assert: assert!(game.state.player1.stage.stage.contains(&triple));
     // 
 }
@@ -123417,7 +123417,7 @@ static void gen_triple_second_copy_can_be_used_as_one_fodder(void){
     test_add_to_hand(&tg, chisato);
     test_give_energy(&tg, 10);
     test_play_to_stage(&tg, triple_play, 1);
-    // TODO assert: assert!( answer_play_choice(&mut game, true), "second triple copy should satisfy one required character" );
+    test_answer_play_cost_choice(&tg, 1);
     // TODO assert: assert!(game.state.player1.stage.stage.contains(&triple_play));
     CHECK(test_zone_has_id(&tg, 0, "discard", triple_fodder), "triple_second_copy_can_be_used_as_one_fodder");
     CHECK_EQ(tg.state.p[0].energy_active, 0, "triple_second_copy_can_be_used_as_one_fodder");
@@ -123459,7 +123459,7 @@ static void gen_triple_optimal_assignment_with_multi_name(void){
     test_add_to_hand(&tg, chisato);
     test_give_energy(&tg, 10);
     test_play_to_stage(&tg, triple_play, 1);
-    // TODO assert: assert!( answer_play_choice(&mut game, true), "optimal assignment should find hanamaru->hanamaru, chisato->chisato, triple->setsuna" );
+    test_answer_play_cost_choice(&tg, 1);
     // TODO assert: assert!(game.state.player1.stage.stage.contains(&triple_play));
     // 
 }
@@ -123495,7 +123495,7 @@ static void gen_triple_10_energy_minimum_cost_is_10(void){
     test_play_to_stage(&tg, triple, 1);
     test_has_pending_choice(&tg);
     // // Minimum cost path: accept 10
-    // TODO assert: assert!(answer_play_choice(&mut game, true));
+    test_answer_play_cost_choice(&tg, 1);
     // TODO assert: assert!(game.state.player1.stage.stage.contains(&triple));
     CHECK_EQ(tg.state.p[0].energy_active, 0, "triple_10_energy_minimum_cost_is_10");
     // 
@@ -123541,7 +123541,7 @@ static void gen_triple_with_extra_unrelated_cards_still_offers_choice(void){
     test_add_to_hand(&tg, extra2);
     test_give_energy(&tg, 10);
     test_play_to_stage(&tg, triple, 1);
-    // TODO assert: assert!(answer_play_choice(&mut game, true));
+    test_answer_play_cost_choice(&tg, 1);
     // TODO assert: assert!(game.state.player1.stage.stage.contains(&triple));
     // // extra cards must remain in hand
     CHECK(test_zone_has_id(&tg, 0, "hand", extra1), "triple_with_extra_unrelated_cards_still_offers_choice");
@@ -123572,7 +123572,7 @@ static void gen_triple_many_duplicates_still_finds_assignment(void){
     test_add_to_hand(&tg, chisato);
     test_give_energy(&tg, 10);
     test_play_to_stage(&tg, triple_play, 1);
-    // TODO assert: assert!(answer_play_choice(&mut game, true));
+    test_answer_play_cost_choice(&tg, 1);
     // TODO assert: assert!(game.state.player1.stage.stage.contains(&triple_play));
     CHECK_EQ(tg.state.p[0].discard.n, 3, "triple_many_duplicates_still_finds_assignment");
     // // triple_fodder should stay (not needed) OR be one of the three – either is valid, but distinctness holds
@@ -123621,7 +123621,7 @@ static void gen_triple_combinatorial_variant_fuzz(void){
     test_give_energy(&tg, 10);
     test_play_to_stage(&tg, triple, 1);
     test_has_pending_choice(&tg);
-    // TODO assert: assert!(answer_play_choice(&mut game, true));
+    test_answer_play_cost_choice(&tg, 1);
     // TODO assert: assert!( game.state.player1.stage.stage.contains(&triple), "variant combo {h} {s} {c} should succeed with 10" );
     // TODO: }
     // TODO: }
@@ -123645,7 +123645,7 @@ static void gen_triple_cost_cleared_after_play_and_second_play_costs_15(void){
     test_add_to_hand(&tg, chisato);
     test_give_energy(&tg, 10);
     test_play_to_stage(&tg, triple1, 1);
-    // TODO assert: assert!(answer_play_choice(&mut game, true));
+    test_answer_play_cost_choice(&tg, 1);
     CHECK_EQ(tg.state.p[0].energy_active, 0, "triple_cost_cleared_after_play_and_second_play_costs_15");
     // // Second play: need a fresh triple in hand with no fodder left -> should cost 15, no alternative
     int triple2 = test_id(&tg, "LL-bp7-001-R＋");

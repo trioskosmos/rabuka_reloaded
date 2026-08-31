@@ -812,6 +812,9 @@ uint16_t *g_card_ability_pairs = (uint16_t *)RBKA_CARD_ABILITY_PAIRS;
    to rb_load_gen_data resolves without pulling in gen_data_cdi.c (which would
    duplicate the embedded table symbols). */
 int rb_load_gen_data(const unsigned char *buf, long len) {
-    (void)buf; (void)len;
+    /* Host/PC build: the offset tables are embedded (the RBKA_* symbols alias the
+        embedded arrays), so there is nothing to stream in. We still validate the
+        supplied blob so a mismatched/nNull buffer fails loudly instead of silently. */
+    if (!buf || len <= 0) return -1;
     return 0;
 }

@@ -254,8 +254,12 @@ void rb_energy_sub_active(RbPlayer *player, int delta){
 /* ── LiveCardZone helpers (mirror LiveCardZone; backed by RbPlayer::live) ── */
 
 int rb_live_can_place_card(const RbPlayer *player, int card_id){
-    (void)player; (void)card_id;
-    return 1; /* Rule 8.2: any card from hand may enter the live card zone */
+    if (!player) return 0;
+    if (card_id < 0) return 0;
+    /* Rule 8.2: any card from hand may enter the live card zone, subject to the
+        live-zone capacity (RB_MAX_LIVE_CARDS). */
+    if (player->live.n >= RB_MAX_LIVE_CARDS) return 0;
+    return 1;
 }
 
 int rb_live_add_card(RbPlayer *player, int card_id){

@@ -76,4 +76,9 @@ int  rb_card_no_eq(int card_id, const char *no);
 int  test_zone_has_card_no(TestGame *tg, int pl, const char *zone, const char *no);
 int  test_zone_has_id(TestGame *tg, int pl, const char *zone, int id);
 
+/* Answer a play paused by the play-time alternative-cost hook (Rust answer_play_choice
+    for target "play_time_cost_reduction"). Completes the play at the chosen cost. If no
+    such play is pending, falls back to the generic choice resume. */
+void test_answer_play_cost_choice(TestGame *tg, int accept);
+
 #endif

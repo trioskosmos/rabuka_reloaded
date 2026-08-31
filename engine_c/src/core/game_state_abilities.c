@@ -441,6 +441,29 @@ int rb_trigger_auto_abilities_for_movement(GameState *g, int pl) {
     return rb_trigger_auto_abilities(g, pl, "移動時");
 }
 
+/* Mirror abilities.rs "fire all auto" entry — trigger every auto ability for the
+    player (and any queued by opponents) then drain the resolution queue so they
+    all resolve. The trigger string is 自動 (AUTO), matching Rust's
+    crate::triggers::AUTO and the rest of the C port (rb_fire_auto). */
+int rb_fire_all_auto(GameState *g, int pl) {
+    if (!g) return 0;
+    rb_trigger_auto_abilities(g, pl, "自動");
+    rb_drain_ability_queue(g);
+    return 0;
+}
+
+/* Mirror abilities.rs: trigger_auto_abilities_for_player + process_pending_auto_abilities
+    (the canonical post-event auto-orchestration pair used at phase/live/movement
+    boundaries). trigger_auto_abilities queues + drains the immediately-resolvable
+    autos; process_pending_auto_abilities drains any deferred autos that armed
+    during the first pass. */
+int rb_fire_auto_and_pending(GameState *g, int pl) {
+    if (!g) return 0;
+    rb_fire_auto(g, pl);
+    rb_process_pending_auto_abilities(g);
+    return 0;
+}
+
 /* Mirror abilities.rs::generate_state_hash — a cheap fold over the board's
     observable shape (turn, active player, zone occupancy and the stage contents
     of both players, plus the prohibition / temporary-effect tallies). Used by

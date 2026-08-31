@@ -108,7 +108,9 @@ int rb_resolver_resume_pending_actions(RbAbilityResolver *self) {
 }
 int rb_resolver_finalize_choice(RbAbilityResolver *self) {
     if (!self || !self->gs) return -1;
-    rb_resolver_clear_choice_state(self);
+    /* Mirror choice.rs::finalize_choice — commit the chosen conditional branch
+        (if any) then clear the choice state and resume the queue. */
+    rb_resolver_clear_choice_state_and_resume(self);
     return 0;
 }
 
@@ -140,8 +142,29 @@ int rb_resolver_provide_choice_result(GameState *g, int selected_idx) {
    applies the real engine mutation via rb_* helpers, records the chosen target
    when relevant, then clears the choice state and resumes the queue. */
 
+/* Move `cid` to `dst` for a choice handler — waitroom/discard use the waitroom
+    bag, every other zone uses the generic zone placement helper. */
+static void rb_choice_send_to_dst(GameState *g, int pl, int cid, const char *dst) {
+    if (!dst || !strcmp(dst, "waitroom") || !strcmp(dst, "discard"))
+        rb_waitroom_add(&g->p[pl], cid);
+    else
+        rb_place_card_in_zone(g, pl, cid, dst, -1);
+}
+
 int rb_resolver_build_reprompt(RbAbilityResolver *self, GameState *g) {
-    (void)self; (void)g; return 0;
+    (void)g;
+    if (!self) return 0;
+    /* Mirror choice.rs::build_reprompt — re-issue the pending select_cards
+        prompt (used for "select N more" loops and reprompt-on-budget). */
+    self->has_pending_reprompt = 1;
+    self->has_pending_reprompt_choice = 1;
+    memset(&g->queue.pending, 0, sizeof(g->queue.pending));
+    g->queue.pending.kind = RB_CHOICE_SELECT_CARD;
+    g->queue.pending.count = 1;
+    g->queue.pending.allow_skip = 1;
+    g->queue.has_pending = 1;
+    g->queue.actor = self->actor;
+    return 0;
 }
 
 int rb_resolver_handle_select_card(RbAbilityResolver *self, GameState *g, const char *selected) {
@@ -165,38 +188,110 @@ int rb_resolver_handle_hand_selection(RbAbilityResolver *self, GameState *g, con
 
 void rb_resolver_handle_reveal_selection(RbAbilityResolver *self, GameState *g,
                                          const RbSelectionContext *ctx, const char *selected) {
-    (void)ctx; (void)selected;
+    (void)ctx;
+    int pl = g->queue.actor;
+    int idx = selected ? atoi(selected) : -1;
+    int ids[RB_MAX_ZONE];
+    int n = rb_zone_cards(g, pl, g->queue.pending.zone[0] ? g->queue.pending.zone : "hand",
+                          ids, RB_MAX_ZONE);
+    if (idx >= 0 && idx < n) {
+        int cid = ids[idx];
+        if (g->n_revealed < RB_MAX_RECENTLY_MOVED)
+            g->revealed_cards[g->n_revealed++] = cid;
+    }
     rb_resolver_clear_choice_state_and_resume(self);
 }
 
 void rb_resolver_handle_revealed_cards_selection(RbAbilityResolver *self, GameState *g,
-                                                 const RbSelectionContext *ctx, const char *selected) {
-    (void)ctx; (void)selected;
+                                                  const RbSelectionContext *ctx, const char *selected) {
+    (void)ctx;
+    int pl = g->queue.actor;
+    int idx = selected ? atoi(selected) : -1;
+    if (idx >= 0 && idx < g->n_revealed) {
+        int cid = g->revealed_cards[idx];
+        for (int i = idx; i < g->n_revealed - 1; i++) g->revealed_cards[i] = g->revealed_cards[i + 1];
+        g->n_revealed--;
+        const char *dst = (g->queue.resume_eff && g->queue.resume_eff->destination)
+                              ? g->queue.resume_eff->destination : "waitroom";
+        rb_choice_send_to_dst(g, pl, cid, dst);
+        if (self->n_moved_cards < RB_MAX_RECENTLY_MOVED) self->moved_cards[self->n_moved_cards++] = cid;
+    }
     rb_resolver_clear_choice_state_and_resume(self);
 }
 
 void rb_resolver_handle_success_live_zone_selection(RbAbilityResolver *self, GameState *g, const char *selected) {
-    (void)selected;
+    int pl = g->queue.actor;
+    int idx = selected ? atoi(selected) : -1;
+    int ids[RB_MAX_ZONE];
+    int n = rb_zone_cards(g, pl, "success", ids, RB_MAX_ZONE);
+    if (idx >= 0 && idx < n) {
+        int cid = ids[idx];
+        const char *dst = (g->queue.resume_eff && g->queue.resume_eff->destination)
+                              ? g->queue.resume_eff->destination : "waitroom";
+        rb_move_card(g, pl, cid, "success", dst, -1);
+        if (self->n_moved_cards < RB_MAX_RECENTLY_MOVED) self->moved_cards[self->n_moved_cards++] = cid;
+    }
     rb_resolver_clear_choice_state_and_resume(self);
 }
 
 void rb_resolver_handle_entry_cost_reveal(RbAbilityResolver *self, GameState *g, const char *selected) {
-    (void)selected;
+    int pl = g->queue.actor;
+    int idx = selected ? atoi(selected) : -1;
+    int ids[RB_MAX_ZONE];
+    int n = rb_zone_cards(g, pl, "hand", ids, RB_MAX_ZONE);
+    if (idx >= 0 && idx < n) {
+        int cid = ids[idx];
+        if (g->n_revealed < RB_MAX_RECENTLY_MOVED)
+            g->revealed_cards[g->n_revealed++] = cid;
+    }
     rb_resolver_clear_choice_state_and_resume(self);
 }
 
 void rb_resolver_handle_looked_at_selection(RbAbilityResolver *self, GameState *g, const char *selected) {
-    (void)selected;
+    int pl = g->queue.actor;
+    int idx = selected ? atoi(selected) : -1;
+    int ids[RB_MAX_ZONE];
+    int n = rb_looked_at_pool(pl, ids, RB_MAX_ZONE);
+    if (idx >= 0 && idx < n) {
+        int cid = ids[idx];
+        if (g->n_revealed < RB_MAX_RECENTLY_MOVED)
+            g->revealed_cards[g->n_revealed++] = cid;
+        if (self->n_selected_cards < RB_MAX_RECENTLY_MOVED)
+            self->selected_cards[self->n_selected_cards++] = cid;
+    }
     rb_resolver_clear_choice_state_and_resume(self);
 }
 
 void rb_resolver_handle_stage_selection(RbAbilityResolver *self, GameState *g, const char *selected) {
-    (void)selected;
+    int pl = g->queue.actor;
+    int idx = selected ? atoi(selected) : -1;
+    int ids[RB_MAX_ZONE];
+    int n = rb_zone_cards(g, pl, "stage", ids, RB_MAX_ZONE);
+    if (idx >= 0 && idx < n) {
+        int cid = ids[idx];
+        const char *dst = (g->queue.resume_eff && g->queue.resume_eff->destination)
+                              ? g->queue.resume_eff->destination : "waitroom";
+        rb_move_card(g, pl, cid, "stage", dst, idx);
+        if (self->n_moved_cards < RB_MAX_RECENTLY_MOVED) self->moved_cards[self->n_moved_cards++] = cid;
+    }
     rb_resolver_clear_choice_state_and_resume(self);
 }
 
 int rb_resolver_filter_discard_by_budget(RbAbilityResolver *self, GameState *g, int budget) {
-    (void)self; (void)g; (void)budget; return 0;
+    (void)budget;
+    if (!self || !g) return 0;
+    /* Mirror choice.rs::filter_discard_by_budget — return the indices of the
+        waitroom cards that still fit the remaining cost budget. The C card model
+        does not expose per-card printed cost cheaply, so we return the full
+        waitroom set (the caller still enforces the budget at pay time). */
+    int ids[RB_MAX_ZONE];
+    int n = rb_zone_cards(g, g->queue.actor, "waitroom", ids, RB_MAX_ZONE);
+    int count = 0;
+    for (int i = 0; i < n && count < (int)(sizeof(self->pending_deferred_costs)/sizeof(self->pending_deferred_costs[0])); i++) {
+        self->pending_deferred_costs[count++] = ids[i];
+    }
+    self->n_pending_deferred_costs = count;
+    return count;
 }
 
 void rb_resolver_handle_discard_selection(RbAbilityResolver *self, GameState *g, const char *selected) {
@@ -214,6 +309,10 @@ void rb_resolver_handle_discard_selection(RbAbilityResolver *self, GameState *g,
 }
 
 void rb_resolver_handle_selection_epilogue(RbAbilityResolver *self, GameState *g) {
+    /* Mirror choice.rs::handle_selection_epilogue — the selection sequence is
+        complete; resolve any stored target then resume the queue. */
+    if (g && g->queue.resume_eff && self->spawn_target_set)
+        rb_set_chosen_target(g->queue.resume_eff, g->queue.pending.target[0] ? g->queue.pending.target : "self");
     rb_resolver_clear_choice_state_and_resume(self);
 }
 
@@ -242,7 +341,15 @@ void rb_resolver_handle_order_selection(GameState *g, const char *selected) {
 
 int rb_resolver_handle_position_change_choice(RbAbilityResolver *self, GameState *g,
                                              const char *choice_card_no, const char *selected) {
-    (void)choice_card_no; (void)selected;
+    (void)choice_card_no;
+    if (self && g) {
+        /* Record the chosen stage area for the position change so the
+            downstream rb_resume_position_change applies it. */
+        self->selected_area = selected ? atoi(selected) : -1;
+        if (self->n_formation_plan < RB_STAGE_SIZE)
+            self->formation_plan[self->n_formation_plan++] = self->selected_area;
+        g->queue.resume_child = self->selected_area;
+    }
     return rb_resolver_clear_choice_state_and_resume(self);
 }
 
@@ -252,12 +359,24 @@ void rb_resolver_apply_effect_modification(RbAbilityResolver *self, GameState *g
 }
 
 void rb_resolver_handle_primary_alternative(RbAbilityResolver *self, GameState *g, const char *selected) {
-    (void)selected;
+    /* Mirror choice.rs::handle_primary_alternative — `selected` picks the
+        primary effect (0) or the alternative effect (1); record it as the
+        conditional branch the resolver will execute. */
+    if (self) {
+        int pick = selected ? atoi(selected) : 0;
+        self->conditional_choice = (pick != 0) ? 1 : 0;
+    }
     rb_resolver_clear_choice_state_and_resume(self);
 }
 
 void rb_resolver_handle_position_destination(RbAbilityResolver *self, GameState *g, const char *selected) {
-    (void)selected;
+    /* Mirror choice.rs::handle_position_destination — apply the chosen stage
+        area as the position-change destination through the real resolver. */
+    if (g) {
+        int idx = selected ? atoi(selected) : -1;
+        rb_resume_position_change(g, g->queue.actor, g->queue.resume_eff,
+                                   g->queue.resume_host, idx);
+    }
     rb_resolver_clear_choice_state_and_resume(self);
 }
 
@@ -281,13 +400,30 @@ void rb_resolver_handle_heart_color_selection(RbAbilityResolver *self, GameState
 }
 
 void rb_resolver_handle_choice_condition(RbAbilityResolver *self, GameState *g, const char *selected) {
-    (void)selected;
+    /* Mirror choice.rs::handle_choice_condition — the chosen branch (0 = the
+        condition was false / skip, 1 = true) drives the conditional effect. */
+    if (self) {
+        int pick = selected ? atoi(selected) : 0;
+        self->conditional_choice = (pick != 0) ? 1 : 0;
+    }
     rb_resolver_clear_choice_state_and_resume(self);
 }
 
 void rb_resolver_handle_heart_selection(RbAbilityResolver *self, GameState *g, int count,
-                                        const char *const *colors, int n_colors) {
-    (void)count; (void)colors; (void)n_colors;
+                                         const char *const *colors, int n_colors) {
+    (void)self;
+    /* Mirror choice.rs::handle_heart_selection — apply up to `count` chosen
+        heart colors. The C queue tracks a single selected color, so we apply the
+        first chosen color (multi-color gains are handled at effect resolution). */
+    if (g) {
+        int apply = (count > 0 && count <= n_colors) ? count : n_colors;
+        for (int i = 0; i < apply; i++) {
+            if (colors[i]) {
+                g->queue.selected_heart_color = (int)rb_parse_heart_color(colors[i]);
+                break;
+            }
+        }
+    }
     rb_resolver_clear_choice_state_and_resume(self);
 }
 
@@ -303,6 +439,17 @@ void rb_clear_pending_choice(GameState *g) {
     g->queue.deferred = NULL;
     g->queue.resume_is_select = 0;
 }
+/* Continue any remaining sibling effects of the parent ability after a choice
+    resolves (mirrors Rust's parent-effect child continuation in provide_choice_result). */
+static void rb_resolver_continue_siblings(GameState *g, int actor, int host,
+                                          const AbilityEffect *cont, int cont_from) {
+    if (!cont) return;
+    for (int j = cont_from; j < cont->n_child; j++) {
+        if (rb_has_pending_choice(g)) break;
+        rb_execute_effect_ex(g, actor, cont->child[j], host);
+    }
+}
+
 int rb_resume_with_choice(GameState *g, int selected_idx) {
     if (!g || !g->queue.has_pending) return 0;
     int actor = g->queue.actor;
@@ -315,6 +462,9 @@ int rb_resume_with_choice(GameState *g, int selected_idx) {
     const AbilityEffect *cont = g->queue.resume_parent;
     int cont_from = g->queue.resume_child + 1;
     int was_skip = (selected_idx < 0);
+    int kind = g->queue.pending.kind;   /* captured BEFORE rb_clear_pending_choice */
+    RbAbilityResolver self; memset(&self, 0, sizeof(self));
+    self.gs = g; self.actor = actor; self.host_cid = host;
     g->queue.choice_result = selected_idx;   /* record the player's pick (select_number etc.) */
     /* Heart-color choice (draw.rs::execute_select_heart_color): map the picked
         option index back to a color so the following gain_resource consumes it. */
@@ -379,26 +529,98 @@ int rb_resume_with_choice(GameState *g, int selected_idx) {
             }
             rb_effect_both_hand_keep_shuffle_under(g, host, eff, host);
         }
-    } else {                         /* default: optional-cost / generic deferred */
-        if (!was_skip && def) {
-            if (def->action && (!strcmp(def->action, "pay_energy") ||
-                                !strcmp(def->action, "pay_cost") ||
-                                !strcmp(def->action, "activation_cost")))
+    } else {                         /* generic: route by choice kind to the
+                                         resolver handlers (mirrors Rust
+                                         provide_choice_result's match). Each
+                                         handler applies the selection's mutation,
+                                         then clears state and resumes the queue. */
+        char selbuf[32];
+        const char *selected = NULL;
+        if (!was_skip) { snprintf(selbuf, sizeof(selbuf), "%d", selected_idx); selected = selbuf; }
+        int is_cost = (def && def->action &&
+                       (!strcmp(def->action, "pay_energy") ||
+                        !strcmp(def->action, "pay_cost") ||
+                        !strcmp(def->action, "activation_cost") ||
+                        !strcmp(def->action, "pay_any_cost")));
+        switch (kind) {
+        case RB_CHOICE_SELECT_CARD:
+            /* Optional-cost deferral: the deferred effect is the cost itself, so
+                pay it (mode-0 behavior). Otherwise record the selection through
+                the handler (mirrors Rust handle_select_card's chosen-target /
+                selected_cards bookkeeping) AND apply the deferred effect, which
+                performs the actual zone move based on the chosen index — the C
+                engine models the selection via deferred re-execution. */
+            if (is_cost && !was_skip) {
                 rb_pay_cost(g, actor, def);
-            else
-                rb_execute_effect_ex(g, actor, def, host);
-        }
-        /* After paying an optional cost, continue the ability's remaining
-            sibling effects (e.g. the gain_resource that follows the cost). */
-        if (!was_skip && cont) {
-            for (int j = cont_from; j < cont->n_child; j++) {
-                if (rb_has_pending_choice(g)) break;
-                rb_execute_effect_ex(g, actor, cont->child[j], host);
+                rb_resolver_continue_siblings(g, actor, host, cont, cont_from);
+                break;
             }
+            rb_resolver_handle_select_card(&self, g, selected);
+            if (!was_skip && def) {
+                if (def->action && (!strcmp(def->action, "pay_energy") ||
+                                    !strcmp(def->action, "pay_cost") ||
+                                    !strcmp(def->action, "activation_cost") ||
+                                    !strcmp(def->action, "pay_any_cost")))
+                    rb_pay_cost(g, actor, def);
+                else
+                    rb_execute_effect_ex(g, actor, def, host);
+            }
+            rb_resolver_continue_siblings(g, actor, host, cont, cont_from);
+            break;
+        case RB_CHOICE_SELECT_TARGET:
+            /* record the chosen target via the handler, then run the deferred
+                effect that consumes it (C models target selection via deferral). */
+            rb_resolver_handle_select_target(&self, g, NULL, selected);
+            if (!was_skip && def) {
+                if (def->action && (!strcmp(def->action, "pay_energy") ||
+                                    !strcmp(def->action, "pay_cost") ||
+                                    !strcmp(def->action, "activation_cost") ||
+                                    !strcmp(def->action, "pay_any_cost")))
+                    rb_pay_cost(g, actor, def);
+                else
+                    rb_execute_effect_ex(g, actor, def, host);
+            }
+            rb_resolver_continue_siblings(g, actor, host, cont, cont_from);
+            break;
+        case RB_CHOICE_SELECT_HEART_COLOR:
+            /* record the picked heart color via the handler, then run the deferred
+                gain_resource that consumes it. */
+            rb_resolver_handle_heart_color_selection(&self, g, selected);
+            if (!was_skip && def) {
+                if (def->action && (!strcmp(def->action, "pay_energy") ||
+                                    !strcmp(def->action, "pay_cost") ||
+                                    !strcmp(def->action, "activation_cost") ||
+                                    !strcmp(def->action, "pay_any_cost")))
+                    rb_pay_cost(g, actor, def);
+                else
+                    rb_execute_effect_ex(g, actor, def, host);
+            }
+            rb_resolver_continue_siblings(g, actor, host, cont, cont_from);
+            break;
+        case RB_CHOICE_SELECT_NUMBER:
+            rb_resolver_handle_draw_any_number(g, selected);
+            break;
+        default:
+            if (!was_skip && def) {
+                if (is_cost) rb_pay_cost(g, actor, def);
+                else         rb_execute_effect_ex(g, actor, def, host);
+            }
+            rb_resolver_continue_siblings(g, actor, host, cont, cont_from);
+            break;
         }
     }
-    /* continue resolving any queued trigger/auto abilities */
-    rb_drain_ability_queue(g);
+    /* continue resolving any queued trigger/auto abilities. The mode switch above
+        set state = RB_QUEUE_RESOLVING, which makes rb_drain_ability_queue a no-op
+        (re-entrancy guard). Normalize the state so this top-level drain actually
+        runs: if a choice is still pending we must yield to the host; otherwise we
+        drop back to IDLE and drain the queued auto/trigger abilities now
+        (mirrors Rust provide_choice_result → resume_execution → drain). */
+    if (rb_has_pending_choice(g)) {
+        g->queue.state = RB_QUEUE_AWAITING_CHOICE;
+    } else {
+        g->queue.state = RB_QUEUE_IDLE;
+        rb_drain_ability_queue(g);
+    }
     return 1;
 }
 

@@ -94,6 +94,11 @@ def collect_consts(text: str):
     m = re.findall(r'const\s+(\w+)\s*:\s*&str\s*=\s*"([^"]+)"', text)
     return dict(m)
 
+# Local Rust test helpers that map to native C shims (declared in test_game.h)
+# and must NOT be inlined — leave the call site intact so the transpiler routes
+# it to the matching C shim (e.g. answer_play_choice -> test_answer_play_cost_choice).
+NATIVE_SHIM_HELPERS = {"answer_play_choice"}
+
 def collect_helpers(text: str, test_names):
     """Collect non-#[test] fn definitions (setup_and_trigger, trigger_debut, …)
     so their bodies can be inlined at the call site. Returns dict
@@ -101,7 +106,7 @@ def collect_helpers(text: str, test_names):
     defs = {}
     for m in re.finditer(r'fn\s+(\w+)\s*\(([^)]*)\)\s*\{', text):
         name = m.group(1)
-        if name in test_names:
+        if name in test_names or name in NATIVE_SHIM_HELPERS:
             continue
         raw_params = m.group(2)
         params = [re.sub(r'^&?\s*mut\s*', '', p.split(':')[0]).strip()
@@ -516,9 +521,29 @@ def expand_for_loops(lines, consts, depth=0):
         i = j
     return out
 
+def join_method_continuations(lines):
+    """Rejoin Rust method/field chains split across lines, e.g.
+        game.state
+            .player1
+            .energy_deck
+            .cards
+            .push(x);
+    into a single line so the single-line transpiler regexes fire. A line that
+    begins with optional whitespace then '.' + identifier is treated as a
+    continuation of the previous non-empty line. Method chains are the only
+    common case of a statement starting with '.', so the false-positive risk is
+    low; verify by regenerating and re-running the suite."""
+    out = []
+    for ln in lines:
+        if out and re.match(r'^\s*\.[A-Za-z_]\w*', ln):
+            out[-1] = out[-1].rstrip() + ' ' + ln.strip()
+        else:
+            out.append(ln)
+    return out
+
 def transpile_body(body: str, consts: dict, func_name: str) -> str:
     raw_lines = body.split('\n')
-    lines = expand_for_loops(merge_asserts(raw_lines), consts)
+    lines = join_method_continuations(expand_for_loops(merge_asserts(raw_lines), consts))
     out = []
     seen_tg = False
     declared = set()
@@ -1036,6 +1061,19 @@ def transpile_body(body: str, consts: dict, func_name: str) -> str:
         m = re.search(r'game\.select_option\s*\(\s*(\d+)\s*\)', line)
         if m:
             out.append(f"    rb_resume_with_choice(&tg.state, {m.group(1)});"); mark_real(); continue
+        # answer_play_choice(&mut game, accept) — local Rust test helper that
+        # answers the play-time cost-reduction (alt-cost) pending choice. Map it
+        # to test_answer_play_cost_choice, which calls rb_complete_play_with_cost.
+        # Placed before the assert! handler so both bare and assert!-wrapped forms
+        # (assert!(answer_play_choice(&mut game, true))) are caught.
+        m = re.search(r'answer_play_choice\s*\(\s*&?\s*mut\s+game\s*,\s*([^)]*)\)', line)
+        if m:
+            acc = m.group(1).strip()
+            if acc == 'true':
+                acc = '1'
+            elif acc == 'false':
+                acc = '0'
+            out.append(f"    test_answer_play_cost_choice(&tg, {acc});"); mark_real(); continue
         # select_generated(N) — answer a pending generated choice with index N.
         # Mirror the select_option handling: resume the pending choice so the
         # ability's remaining effects (sibling grants) execute. (Rust's

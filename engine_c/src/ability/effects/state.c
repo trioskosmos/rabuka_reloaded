@@ -100,6 +100,11 @@ static void rb_pos_change_for_player(GameState *g, int who, AbilityEffect *e, in
         rb_record_movement(g,a);
         if(b>=0) rb_record_movement(g,b);
         rb_recalc_constants(g);
+        /* A position change is an event that can trigger the player's 自動 (Auto)
+            abilities (mirrors Rust choice.rs position handling →
+            trigger_auto_abilities_for_movement_current). Queue them; the queue is
+            drained once rb_resume_with_choice normalizes its state below. */
+        rb_fire_auto_and_pending(g, who);
         return;
     }
     if(target_member && strcmp(target_member,"this_member")){
@@ -113,6 +118,7 @@ static void rb_pos_change_for_player(GameState *g, int who, AbilityEffect *e, in
         rb_record_movement(g,a);
         if(b>=0) rb_record_movement(g,b);
         rb_recalc_constants(g);
+        rb_fire_auto_and_pending(g, who);
         return;
     }
     /* No source/target_member: interactive (per-member choice) — emitted above. */
@@ -141,6 +147,11 @@ void rb_resume_position_change(GameState *g, int actor, const AbilityEffect *e, 
     rb_record_movement(g,a);
     if(b>=0) rb_record_movement(g,b);
     rb_recalc_constants(g);
+    /* Interactive swap just resolved — fire the player's 自動 (Auto) abilities
+        (mirrors Rust choice.rs position handler →
+        trigger_auto_abilities_for_movement_current). Queued; drained by
+        rb_resume_with_choice once it normalizes its queue state. */
+    rb_fire_auto_and_pending(g, actor);
 }
 
 /* Cyclic stage rotation — mirrors misc.rs::execute_rotation (rotation_map=[2,0,1]:

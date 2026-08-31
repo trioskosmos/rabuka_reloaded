@@ -744,6 +744,18 @@ typedef struct GameState {
     int      keep_shuffle_under_snapshot_n[2];
     int      keep_shuffle_under_selected[RB_MAX_HAND];
     int      keep_shuffle_under_selected_n;
+    /* Play-time alternative cost (Rust play_time_cost_reduction_hook): when a
+        card with a 常時/プレイ時 modify_cost(set) alt-cost is played, rb_play_member
+        pauses here and stores the pending play; rb_complete_play_with_cost then
+        finishes it at the chosen cost. Not used by cards without such an ability,
+        so the synchronous play path is unaffected. */
+    int      ptc_active;     /* a play is paused awaiting the alt-cost answer */
+    int      ptc_resuming;   /* rb_play_member is completing a paused play */
+    int      ptc_card;       /* card id being played */
+    int      ptc_hand;       /* hand index of the card */
+    int      ptc_area;       /* target stage area */
+    int      ptc_set;        /* alternative cost value (accept) */
+    int      ptc_base;       /* base cost (decline) */
 } GameState;
 
 /* ── Tracking (engine/src/core/game_state/tracking.rs) ── */
@@ -807,6 +819,7 @@ int  rb_zone_of_str(const char *s, RbZone *out);    /* map zone wire name */
 /* ── Play a card from hand ── */
 int  rb_play_card(GameState *g, int pl, int hand_idx);
 int  rb_play_member(GameState *g, int pl, int hand_idx, int stage_pos); /* to stage */
+int  rb_complete_play_with_cost(GameState *g, int pl, int accept); /* answer a paused play-time alt-cost */
 int  rb_activate_ability(GameState *g, int pl, int hand_idx);
 int  rb_activate_card(GameState *g, int pl, int card_id); /* run the card's 起動 (Activate) ability: cost + effect */
 /* Baton-touch support (replace an occupied stage member). */
@@ -827,6 +840,7 @@ int  rb_drain_live_success_choices(GameState *g);
 int  rb_queue_trigger_abilities(GameState *g, int pl, const char *trigger);
 int  rb_fire_auto(GameState *g, int pl);
 int  rb_fire_all_auto(GameState *g, int pl);
+int  rb_fire_auto_and_pending(GameState *g, int pl);
 void rb_record_event(GameState *g, int pl, const char *trig);
 int  rb_fire_recorded_auto(GameState *g, int pl);
 int  rb_process_pending_auto_abilities(GameState *g);

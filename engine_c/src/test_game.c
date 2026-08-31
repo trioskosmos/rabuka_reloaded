@@ -185,6 +185,14 @@ int test_get_blade_modifier(TestGame *tg, int cid){ return rb_mods_get_blade(&tg
 int test_get_score_modifier(TestGame *tg, int cid){ return rb_mods_get_score(&tg->state.mods, cid); }
 int test_get_cost_modifier(TestGame *tg, int cid){ return rb_mods_get_cost(&tg->state.mods, cid); }
 int test_get_heart_modifier(TestGame *tg, int cid, int color){ return rb_mods_get_heart(&tg->state.mods, cid, color); }
+void test_answer_play_cost_choice(TestGame *tg, int accept){
+    if (tg->state.ptc_active) {
+        rb_complete_play_with_cost(&tg->state, 0, accept);
+        return;
+    }
+    /* No paused alt-cost play: fall back to the generic choice resume. */
+    rb_resume_with_choice(&tg->state, accept ? 1 : 0);
+}
 /* Default filler card id (mirrors per-module `fn filler_hand(game)` helpers that
    return a common SD filler). Used only where the helper call appears inline. */
 int test_filler_hand(TestGame *tg){ return rb_find_card_by_no("PL!-sd1-010-SD"); }

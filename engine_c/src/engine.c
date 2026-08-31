@@ -740,6 +740,48 @@ int rb_card_is_cannot_active(const GameState *g, int card_id) {
     return 0;
 }
 
+/* Search an effect tree for a modify_cost action with op "set"; return its value.
+    Mirrors state.rs execute_modify_cost's "set" branch (absolute cost). */
+static int rb_find_set_cost_value(const AbilityEffect *e, int *out) {
+    if (!e) return 0;
+    if (e->action && !strcmp(e->action, "modify_cost")) {
+        const char *op = "add"; int value = 0;
+        for (int i = 0; i < e->n_extra; i++) {
+            if (e->extra_k[i] && !strcmp(e->extra_k[i], "operation") && e->extra_v[i]) op = e->extra_v[i];
+            if (e->extra_k[i] && (strcmp(e->extra_k[i], "value") == 0 || strcmp(e->extra_k[i], "set_value") == 0) && e->extra_v[i])
+                value = atoi(e->extra_v[i]);
+        }
+        if (value == 0 && e->count) value = e->count;
+        if (!strcmp(op, "set")) { *out = value; return 1; }
+        return 0;
+    }
+    for (int i = 0; i < e->n_child; i++)
+        if (rb_find_set_cost_value(e->child[i], out)) return 1;
+    return 0;
+}
+
+/* Detect a play-time alternative cost: a 常時/プレイ時 ability whose effect sets the
+    card's cost to a fixed value (Rust play_time_cost_reduction_hook's alt-cost).
+    Returns the alternative value, or 0 if none. */
+static int rb_detect_alt_cost(GameState *g, int card, int *set_out) {
+    (void)g;
+    int n = rb_card_num_abilities((uint32_t)card);
+    for (int ai = 0; ai < n; ai++) {
+        Ability ab;
+        if (!rb_decode_card_ability((uint32_t)card, ai, &ab)) continue;
+        int is_pt = 0;
+        if (ab.triggers && (strstr(ab.triggers, "常時") || strstr(ab.triggers, "プレイ時"))) is_pt = 1;
+        int val = 0;
+        if (is_pt && ab.effect && rb_find_set_cost_value(ab.effect, &val)) {
+            rb_free_ability(&ab);
+            *set_out = val;
+            return 1;
+        }
+        rb_free_ability(&ab);
+    }
+    return 0;
+}
+
 int rb_play_member(GameState *g, int pl, int hand_idx, int stage_pos) {
     RbPlayer *P = &g->p[pl];
     if (hand_idx < 0 || hand_idx >= P->hand.n) return 0;
@@ -777,6 +819,21 @@ int rb_play_member(GameState *g, int pl, int hand_idx, int stage_pos) {
         cost = cost - old_cost;
         if (cost < 0) cost = 0;
         rb_free_card(&oldc);
+    }
+    /* Play-time alternative cost (Rust play_time_cost_reduction_hook): if the card
+        has a 常時/プレイ時 modify_cost(set) alt-cost, pause here and remember the play
+        so the caller answers via rb_complete_play_with_cost (mapped from the
+        transpiled answer_play_choice). Only on the first pass (ptc_resuming==0);
+        the resume re-enters this fn below and simply pays the chosen cost. Cards
+        without such an ability take the unchanged synchronous path. */
+    if (!g->ptc_resuming) {
+        int setv = 0;
+        if (rb_detect_alt_cost(g, cid, &setv)) {
+            g->ptc_active = 1;
+            g->ptc_card = cid; g->ptc_hand = hand_idx; g->ptc_area = stage_pos;
+            g->ptc_set = setv; g->ptc_base = base_cost;
+            rb_free_card(&c); g->play_depth--; return 0;
+        }
     }
     /* Cost gate: member play cost is never optional, so reject if insufficient. */
     if (P->energy_active < cost) {
@@ -891,6 +948,24 @@ int rb_activate_card(GameState *g, int pl, int card_id) {
         }
     }
     return any;
+}
+
+/* Answer a play paused by rb_detect_alt_cost. On accept, set the cost modifier so
+    the total cost equals the alternative value (Rust set_cost_modifier(card, base-set)),
+    then re-enter rb_play_member (ptc_resuming=1 so detection is skipped) to pay the
+    chosen cost and place the card. On decline, place at the base cost. Returns the
+    placement result (0 if nothing was pending / placement failed). */
+int rb_complete_play_with_cost(GameState *g, int pl, int accept) {
+    if (!g->ptc_active) return 0;
+    int card = g->ptc_card, hand = g->ptc_hand, area = g->ptc_area;
+    int set = g->ptc_set, base = g->ptc_base;
+    if (accept && set != base)
+        rb_mods_set_cost(&g->mods, card, set - base);
+    g->ptc_resuming = 1;
+    int placed = rb_play_member(g, pl, hand, area);
+    g->ptc_resuming = 0;
+    g->ptc_active = 0;
+    return placed;
 }
 
 int rb_activate_ability(GameState *g, int pl, int hand_idx) {

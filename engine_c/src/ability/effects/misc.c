@@ -990,10 +990,13 @@ static int h_choose_target_player(GameState *g, int actor, const AbilityEffect *
     return 1;
 }
 
-/* Mirror misc.rs:execute_custom — engine-specific hook; no C-side behaviour, so
-   it is a permissive no-op. */
+/* Mirror misc.rs:execute_custom — engine-specific hook. Unrecognized custom
+    types are permissive no-ops (matching Rust's behaviour); we still record the
+    custom type for traceability instead of discarding the parameters. */
 static int h_custom(GameState *g, int actor, const AbilityEffect *e) {
-    (void)g; (void)actor; (void)e;
+    (void)g; (void)actor;
+    const char *ct = eff_extra(e, "custom_type");
+    if (ct) rb_log_push_verdict(ct, "custom", 1);
     return 1;
 }
 
