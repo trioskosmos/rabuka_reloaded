@@ -37,6 +37,12 @@ void rb_record_use(RbAbilityQueue *q, int card_id, int ability_idx, int cur_turn
     for (int i = 0; i < q->n_uses; i++) if (q->use_keys[i] == key) { q->use_counts[i]++; return; }
     if (q->n_uses < RB_USE_TRACK) { q->use_keys[q->n_uses] = key; q->use_counts[q->n_uses] = 1; q->n_uses++; }
 }
+int rb_use_count(RbAbilityQueue *q, int card_id, int ability_idx, int cur_turn) {
+    if (!q || q->use_turn != cur_turn) return 0;
+    int key = (card_id << 4) | (ability_idx & 0xF);
+    for (int i = 0; i < q->n_uses; i++) if (q->use_keys[i] == key) return q->use_counts[i];
+    return 0;
+}
 
 /* Return the player index that currently owns `cid` (searches stage/hand/
    energy/live/success/discard/deck), or -1. Mirrors Rust's player.contains_card. */

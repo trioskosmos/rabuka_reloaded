@@ -78,3 +78,8 @@ int rb_stage_position_change(int stage[RB_STAGE_SIZE], int from_area, int to_are
     }
     return card_id;
 }
+
+int rb_stage_first_empty(const int stage[RB_STAGE_SIZE]){
+    for(int i=0;i<RB_STAGE_SIZE;i++) if(stage[i]==RB_EMPTY_SLOT) return i;
+    return -1;
+}

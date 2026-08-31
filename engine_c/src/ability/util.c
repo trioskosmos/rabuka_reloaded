@@ -284,3 +284,304 @@ int rb_heart_index(RbHeartColor c) {
         default:                return 0;               /* DRAW/SCORE/ANY */
     }
 }
+
+/* ── Decoded-effect field reader (mirrors util.rs `*_any()` accessors) ──
+   The VM decodes every effect field verbatim into extra_k/extra_v, so the
+   Rust typed getters (operation_any, location_any, heart_type_any,
+   original_count_any, original_operator_any, …) map directly to these keys. */
+static const char *eff_extra(const AbilityEffect *e, const char *k) {
+    if (!e) return NULL;
+    for (int i = 0; i < e->n_extra; i++)
+        if (e->extra_k[i] && !strcmp(e->extra_k[i], k)) return e->extra_v[i];
+    return NULL;
+}
+/* case-insensitive equality (strcasecmp is not portable here) */
+static int str_ieq(const char *a, const char *b) {
+    if (!a || !b) return 0;
+    while (*a && *b) {
+        char ca = *a, cb = *b;
+        if (ca >= 'A' && ca <= 'Z') ca += 32;
+        if (cb >= 'A' && cb <= 'Z') cb += 32;
+        if (ca != cb) return 0;
+        a++; b++;
+    }
+    return *a == *b;
+}
+
+/* Mirror util.rs::heart_gain_per_entry — split a total heart gain evenly across
+   the listed colors (min 1 to avoid div-by-zero). */
+int rb_heart_gain_per_entry(int total, int n_colors) {
+    int len = n_colors > 0 ? n_colors : 1;
+    return total / len;
+}
+
+/* Mirror util.rs::is_all_heart_type — "all" heart_type is the wildcard. */
+int rb_is_all_heart_type(const AbilityEffect *e) {
+    const char *ht = eff_extra(e, "heart_type");
+    return ht && !strcmp(ht, "all");
+}
+
+/* Mirror util.rs::constant_per_unit_zone — loc.or(per_unit_type).unwrap_or("hand"). */
+const char *rb_constant_per_unit_zone(const AbilityEffect *e) {
+    const char *loc = eff_extra(e, "location");
+    if (loc) return loc;
+    const char *per = eff_extra(e, "per_unit_type");
+    if (per) return per;
+    return "hand";
+}
+
+/* Mirror util.rs::target_player_index — returns -1 when unresolvable. */
+int rb_target_player_index(const char *target, const char *master) {
+    if (!target) return -1;
+    int master_p2 = master && (!strcmp(master, "player2") || !strcmp(master, "p2"));
+    if (!strcmp(target, "self"))     return master_p2 ? 1 : 0;
+    if (!strcmp(target, "opponent")) return master_p2 ? 0 : 1;
+    if (str_ieq(target, "player1") || !strcmp(target, "p1")) return 0;
+    if (str_ieq(target, "player2") || !strcmp(target, "p2")) return 1;
+    return -1;
+}
+
+/* Mirror util.rs::target_player_label. */
+const char *rb_target_player_label(const char *target, const char *master) {
+    if (target) {
+        int master_p2 = master && (!strcmp(master, "player2") || !strcmp(master, "p2"));
+        if (!strcmp(target, "self"))     return master_p2 ? "P2" : "P1";
+        if (!strcmp(target, "opponent")) return master_p2 ? "P1" : "P2";
+    }
+    return "P1";
+}
+
+/* Mirror util.rs::activation_position_index — stage position → area index. */
+int rb_activation_position_index(const char *p) {
+    if (!p) return -1;
+    /* trim leading/trailing whitespace */
+    while (*p == ' ' || *p == '\t') p++;
+    if (!strcmp(p, "left") || !strcmp(p, "left_side")) return 0;
+    if (!strcmp(p, "center")) return 1;
+    if (!strcmp(p, "right") || !strcmp(p, "right_side")) return 2;
+    return -1;
+}
+
+/* Mirror util.rs::cost_threshold_met — original_count/operator gate on the
+   card's cost (used by cost-reduction / play-cost auras). No threshold ⇒ pass. */
+int rb_cost_threshold_met(const Card *card, const AbilityEffect *e) {
+    const char *th = eff_extra(e, "original_count");
+    if (!th || !*th) return 1;
+    int threshold = atoi(th);
+    int cost = card ? card->cost : 0;
+    const char *op = eff_extra(e, "original_operator");
+    int met = 1;
+    if (op) {
+        if      (!strcmp(op, ">=")) met = cost >= threshold;
+        else if (!strcmp(op, "<=")) met = cost <= threshold;
+        else if (!strcmp(op, ">"))  met = cost >  threshold;
+        else if (!strcmp(op, "<"))  met = cost <  threshold;
+        else if (!strcmp(op, "==")) met = cost == threshold;
+        else if (!strcmp(op, "!=")) met = cost != threshold;
+        else met = 1;
+    } else {
+        met = (cost == threshold);
+    }
+    return met;
+}
+
+/* ── Card predicate helpers (mirror util.rs card_matches_*) ── */
+
+/* Mirror util.rs::card_matches_cost_limit_op — live cards match on score,
+   members on cost; comparison defaults to "<=". */
+int rb_card_matches_cost_limit(int card_id, int cost_limit, const char *comparison) {
+    Card c;
+    if (!rb_decode_card_by_index((uint32_t)card_id, &c)) return 0;
+    int value = rb_card_is_live(card_id) ? (int)c.score : (int)c.cost;
+    int r;
+    if (!comparison || !*comparison)            r = value <= cost_limit;
+    else if (!strcmp(comparison, "min") || !strcmp(comparison, ">=")) r = value >= cost_limit;
+    else if (!strcmp(comparison, "exact") || !strcmp(comparison, "=")) r = value == cost_limit;
+    else if (!strcmp(comparison, ">"))  r = value >  cost_limit;
+    else if (!strcmp(comparison, "<"))  r = value <  cost_limit;
+    else                                 r = value <= cost_limit;
+    rb_free_card(&c);
+    return r;
+}
+
+static int card_has_heart_in_range(const Card *c, int hc, int start, int end) {
+    for (int i = start; i < end && i < c->n_hearts; i++)
+        if ((int)c->heart_color[i] == hc) return 1;
+    return 0;
+}
+
+/* Mirror util.rs::card_matches_heart_colors — OR logic over the listed colors. */
+int rb_card_matches_heart_colors(int card_id, const char **heart_colors, int n) {
+    if (n <= 0) return 1;
+    Card c;
+    if (!rb_decode_card_by_index((uint32_t)card_id, &c)) return 0;
+    int r = 0;
+    for (int k = 0; k < n; k++) {
+        int hc = (int)rb_parse_heart_color(heart_colors[k]);
+        int found = (c.num_base > 0)
+            ? card_has_heart_in_range(&c, hc, 0, c.num_base)
+            : card_has_heart_in_range(&c, hc, c.num_base + c.num_blade,
+                                      c.num_base + c.num_blade + c.num_need);
+        if (found) { r = 1; break; }
+    }
+    rb_free_card(&c);
+    return r;
+}
+
+/* Mirror util.rs::card_matches_all_heart_colors — AND logic over the listed colors. */
+int rb_card_matches_all_heart_colors(int card_id, const char **heart_colors, int n) {
+    if (n <= 0) return 1;
+    Card c;
+    if (!rb_decode_card_by_index((uint32_t)card_id, &c)) return 0;
+    int r = 1;
+    for (int k = 0; k < n; k++) {
+        int hc = (int)rb_parse_heart_color(heart_colors[k]);
+        int found = (c.num_base > 0)
+            ? card_has_heart_in_range(&c, hc, 0, c.num_base)
+            : card_has_heart_in_range(&c, hc, c.num_base + c.num_blade,
+                                      c.num_base + c.num_blade + c.num_need);
+        if (!found) { r = 0; break; }
+    }
+    rb_free_card(&c);
+    return r;
+}
+
+/* Mirror util.rs::card_matches_name_fragments — name must contain every fragment. */
+int rb_card_matches_name_fragments(int card_id, const char **fragments, int n) {
+    if (n <= 0) return 1;
+    Card c;
+    if (!rb_decode_card_by_index((uint32_t)card_id, &c)) return 0;
+    int r = 1;
+    for (int k = 0; k < n; k++) {
+        if (!c.name || !fragments[k] || !strstr(c.name, fragments[k])) { r = 0; break; }
+    }
+    rb_free_card(&c);
+    return r;
+}
+
+/* Mirror util.rs::card_matches_characters — card name contains any of the listed
+   character names (normalized). C tracks a single name, so the multi-name
+   `get_card_names` universe collapses to `c.name`. */
+int rb_card_matches_characters(int card_id, const char **names, int n) {
+    if (n <= 0) return 1;
+    Card c;
+    if (!rb_decode_card_by_index((uint32_t)card_id, &c)) return 0;
+    int r = 0;
+    if (c.name) {
+        for (int k = 0; k < n; k++) {
+            if (names[k] && strstr(c.name, names[k])) { r = 1; break; }
+        }
+    }
+    rb_free_card(&c);
+    return r;
+}
+
+/* Mirror util.rs::stage_position_index — stage-position string → area index. */
+int rb_stage_position_index(const char *pos) {
+    if (!pos) return -1;
+    if (!strcmp(pos, "center") || !strcmp(pos, "センターエリア")) return 1;
+    if (!strcmp(pos, "left_side") || !strcmp(pos, "左サイドエリア") || !strcmp(pos, "left")) return 0;
+    if (!strcmp(pos, "right_side") || !strcmp(pos, "右サイドエリア") || !strcmp(pos, "right")) return 2;
+    return -1;
+}
+
+/* ── Zone move/place helpers (mirror util.rs remove_card_from_zone /
+//    place_card_in_zone / move_card / move_cards / count_in_zone /
+//    resolve_indices_to_ids). Rust operates on Player with typed zones; C maps
+//    waitroom→discard and uses under_cards[] for under_member. ── */
+static RbBag *zone_bag(RbPlayer *P, const char *zone) {
+    if (!strcmp(zone, "hand")) return &P->hand;
+    if (!strcmp(zone, "deck") || !strcmp(zone, "main_deck")) return &P->deck;
+    if (!strcmp(zone, "waitroom") || !strcmp(zone, "discard")) return &P->discard;
+    if (!strcmp(zone, "energy") || !strcmp(zone, "energy_zone")) return &P->energy;
+    if (!strcmp(zone, "live") || !strcmp(zone, "live_card_zone")) return &P->live;
+    if (!strcmp(zone, "success") || !strcmp(zone, "success_live_zone") ||
+        !strcmp(zone, "success_live_card_zone")) return &P->success;
+    return NULL;
+}
+
+int rb_count_in_zone(const GameState *g, int pl, const char *zone) {
+    RbPlayer *P = (RbPlayer *)&g->p[pl];
+    if (!strcmp(zone, "stage")) {
+        int n = 0;
+        for (int i = 0; i < RB_STAGE_SIZE; i++) if (P->stage[i] != RB_EMPTY_SLOT) n++;
+        return n;
+    }
+    if (!strcmp(zone, "under_member") || !strcmp(zone, "under")) {
+        int n = 0;
+        for (int s = 0; s < RB_STAGE_SIZE; s++) n += P->under_cards[s].n;
+        return n;
+    }
+    RbBag *b = zone_bag(P, zone);
+    return b ? b->n : 0;
+}
+
+int rb_remove_card_from_zone(GameState *g, int pl, int card_id, const char *zone) {
+    RbPlayer *P = &g->p[pl];
+    if (!strcmp(zone, "stage")) {
+        for (int i = 0; i < RB_STAGE_SIZE; i++)
+            if (P->stage[i] == card_id) { P->stage[i] = RB_EMPTY_SLOT; P->stage_wait[i] = 0; return 1; }
+        return 0;
+    }
+    if (!strcmp(zone, "under_member") || !strcmp(zone, "under")) {
+        for (int s = 0; s < RB_STAGE_SIZE; s++) {
+            RbBag *u = &P->under_cards[s];
+            for (int i = 0; i < u->n; i++)
+                if (u->cards[i] == card_id) {
+                    for (int k = i; k < u->n - 1; k++) u->cards[k] = u->cards[k + 1];
+                    u->n--; return 1;
+                }
+        }
+        return 0;
+    }
+    RbBag *b = zone_bag(P, zone);
+    if (!b) return 0;
+    for (int i = 0; i < b->n; i++)
+        if (b->cards[i] == card_id) {
+            for (int k = i; k < b->n - 1; k++) b->cards[k] = b->cards[k + 1];
+            b->n--; return 1;
+        }
+    return 0;
+}
+
+int rb_place_card_in_zone(GameState *g, int pl, int card_id, const char *zone,
+                          int vacated_area) {
+    RbPlayer *P = &g->p[pl];
+    if (!strcmp(zone, "stage") || !strcmp(zone, "empty_area")) {
+        int area = vacated_area >= 0 ? vacated_area : rb_stage_first_empty(P->stage);
+        if (area < 0 || area >= RB_STAGE_SIZE) return 0;
+        P->stage[area] = card_id; P->stage_wait[area] = 0;
+        return 1;
+    }
+    RbBag *b = zone_bag(P, zone);
+    if (!b) return 0;
+    if (b->n < RB_MAX_ZONE) { b->cards[b->n++] = card_id; return 1; }
+    return 0;
+}
+
+int rb_move_card(GameState *g, int pl, int card_id, const char *src,
+                 const char *dst, int vacated_area) {
+    if (rb_remove_card_from_zone(g, pl, card_id, src))
+        return rb_place_card_in_zone(g, pl, card_id, dst, vacated_area);
+    return 0;
+}
+
+int rb_move_cards(GameState *g, int pl, const int *card_ids, int n,
+                  const char *src, const char *dst, int vacated_area) {
+    int c = 0;
+    for (int i = 0; i < n; i++)
+        if (rb_move_card(g, pl, card_ids[i], src, dst, vacated_area)) c++;
+    return c;
+}
+
+int rb_resolve_indices_to_ids(const GameState *g, int pl, const char *zone,
+                              const int *indices, int n_idx, int *out) {
+    int ids[RB_MAX_ZONE];
+    int n = rb_zone_cards(g, pl, zone, ids, RB_MAX_ZONE);
+    int m = 0;
+    for (int i = 0; i < n_idx; i++) {
+        int idx = indices[i];
+        if (idx >= 0 && idx < n) out[m++] = ids[idx];
+    }
+    return m;
+}

@@ -215,6 +215,30 @@ void rb_mods_set_orientation(RbMods *m, int card_id, const char *s);
 int  rb_mods_is_delayed_cannot_active(RbMods *m, int card_id);
 void rb_mods_add_delayed_cannot_active(RbMods *m, int card_id, uint8_t turns);
 void rb_mods_tick_delayed_for(RbMods *m, const int *owned, int n_owned);
+/* set-override accessors (mirror get_*_set_modifier / get_cost_modifier_set) */
+int  rb_mods_get_blade_set(RbMods *m, int card_id);
+void rb_mods_clear_blade_set(RbMods *m, int card_id);
+int  rb_mods_get_score_set(RbMods *m, int card_id);
+void rb_mods_clear_score_set(RbMods *m, int card_id);
+int  rb_mods_get_cost_set(RbMods *m, int card_id);
+void rb_mods_clear_cost_set(RbMods *m, int card_id);
+/* remove a previously-added delta (mirror remove_*_modifier) */
+void rb_mods_remove_blade(RbMods *m, int card_id, int delta);
+void rb_mods_remove_heart(RbMods *m, int card_id, int color, int delta);
+void rb_mods_remove_score(RbMods *m, int card_id, int delta);
+void rb_mods_remove_cost(RbMods *m, int card_id, int delta);
+/* heart_override / heart_copy / blade_type / heart_color_multiplier
+   (mirror GameModifiers set/get/clear accessors for those fields) */
+void rb_mods_set_heart_override(RbMods *m, int card_id, int color);
+void rb_mods_remove_heart_override(RbMods *m, int card_id);
+int  rb_mods_get_heart_override(RbMods *m, int card_id);
+void rb_mods_set_heart_copy(RbMods *m, int target_card_id, int source_card_id);
+int  rb_mods_get_heart_copy(RbMods *m, int target_card_id);
+void rb_mods_set_blade_type(RbMods *m, int card_id, int color);
+void rb_mods_clear_blade_type(RbMods *m, int card_id);
+int  rb_mods_get_blade_type(RbMods *m, int card_id);
+void rb_mods_set_heart_color_multiplier(RbMods *m, int card_id, int color);
+int  rb_mods_get_heart_color_multiplier(RbMods *m, int card_id);
 
 typedef struct { uint8_t slot; int32_t delta; } RbYellMod;
 
@@ -439,6 +463,7 @@ RbQueueState rb_queue_state(const RbAbilityQueue *q);
 void rb_queue_set_state(RbAbilityQueue *q, RbQueueState s);
 int rb_use_limit_reached(RbAbilityQueue *q, int card_id, int ability_idx, int limit, int cur_turn);
 void rb_record_use(RbAbilityQueue *q, int card_id, int ability_idx, int cur_turn);
+int rb_use_count(RbAbilityQueue *q, int card_id, int ability_idx, int cur_turn);
 void rb_choice_set_route(RbChoice *ch, RbChoiceRoute r);
 
 typedef struct {
@@ -656,6 +681,7 @@ void rb_player_refresh(GameState *g, int pl);
 /* ── Card classification (mirrors Rust Card::is_live / is_energy) ── */
 int rb_card_is_live(int card_id);
 int rb_card_is_energy(int card_id);
+int rb_card_is_member(int card_id);
 void rb_calc_stage_hearts(const GameState *g, int pl, int out[8]);
 void rb_stage_hearts_pipeline(const GameState *g, int pl, int out[8]);
 void rb_effective_need_heart(const GameState *g, int live_cid, int out[8]);
@@ -720,7 +746,27 @@ int rb_effect_count(const GameState *g, int actor, int host_cid, const AbilityEf
 int  rb_compare_counts(const char *operator, int actual, int expected);
 /* Decode a heart_color from an effect's extra fields (engine.c). */
 int heart_color_of(AbilityEffect *e, int dflt);
-int rb_card_matches_type(int card_id, const char *filter);
+int  rb_card_matches_type(int card_id, const char *filter);
+/* util.rs helpers (effect-field readers / target resolution / cost-threshold) */
+int  rb_heart_gain_per_entry(int total, int n_colors);
+int  rb_is_all_heart_type(const AbilityEffect *e);
+const char *rb_constant_per_unit_zone(const AbilityEffect *e);
+int  rb_target_player_index(const char *target, const char *master);
+const char *rb_target_player_label(const char *target, const char *master);
+int  rb_activation_position_index(const char *p);
+int  rb_cost_threshold_met(const Card *card, const AbilityEffect *e);
+int  rb_card_matches_cost_limit(int card_id, int cost_limit, const char *comparison);
+int  rb_card_matches_heart_colors(int card_id, const char **heart_colors, int n);
+int  rb_card_matches_all_heart_colors(int card_id, const char **heart_colors, int n);
+int  rb_card_matches_name_fragments(int card_id, const char **fragments, int n);
+int  rb_card_matches_characters(int card_id, const char **names, int n);
+int  rb_stage_position_index(const char *pos);
+int  rb_count_in_zone(const GameState *g, int pl, const char *zone);
+int  rb_remove_card_from_zone(GameState *g, int pl, int card_id, const char *zone);
+int  rb_place_card_in_zone(GameState *g, int pl, int card_id, const char *zone, int vacated_area);
+int  rb_move_card(GameState *g, int pl, int card_id, const char *src, const char *dst, int vacated_area);
+int  rb_move_cards(GameState *g, int pl, const int *card_ids, int n, const char *src, const char *dst, int vacated_area);
+int  rb_resolve_indices_to_ids(const GameState *g, int pl, const char *zone, const int *indices, int n_idx, int *out);
 /* card_property predicates (card.rs::has_blade_heart/has_score_icon/has_all_blade) */
 int rb_card_has_blade_heart(const Card *c);
 int rb_card_has_score_icon(const Card *c);
@@ -733,6 +779,7 @@ int  rb_card_at_position(const struct GameState *g, int pl, const char *pos);
 int  rb_pos_to_area(const char *pos);
 int  rb_zone_cards(const struct GameState *g, int pl, const char *zone,
                    int *out_ids, int max);
+int  rb_stage_first_empty(const int stage[RB_STAGE_SIZE]);
 
 /* ── HeartColor parsing (engine/src/core/card.rs parse_heart_color / index) ── */
 /* Faithful port of `s.parse::<HeartColor>()` / `HeartColor::index()`. String
@@ -759,6 +806,7 @@ int rb_validate_cost(const GameState *g, int actor, const AbilityEffect *cost);
 int rb_pay_deferred_costs(GameState *g, int actor, const AbilityEffect *cost);
 int rb_handle_optional_cost_payment(GameState *g, int actor, const AbilityEffect *cost, int pay);
 int rb_cost_has_skip_prompt(const AbilityEffect *cost);
+int rb_compute_play_cost(const GameState *g, int actor, int card_id, int set_override);
 int rb_get_change_state_candidates(const GameState *g, int actor,
                                    int *out_positions, int max);
 
@@ -809,6 +857,15 @@ void rb_determine_live_winners(const GameState *g, int *p1_won, int *p2_won);
 int  rb_process_pending_auto_abilities(GameState *g);
 void rb_check_expired_effects(GameState *g, int which);
 int  rb_apply_ability_effects(GameState *g, int actor, const Ability *ab, int host_cid);
+int  rb_opponent_id(int pl);
+int  rb_distinct_stage_groups(const GameState *g, int pl);
+int  rb_can_place_card_in_zone(const GameState *g, int cid, const char *zone);
+void rb_clear_movement_tracking(GameState *g);
+void rb_process_with_completed_key(GameState *g, int key);
+int  rb_ability_uses_used(const GameState *g, int cid, int idx);
+int  rb_ability_has_remaining_uses(const GameState *g, int cid, int idx);
+int  rb_trigger_auto_abilities_for_movement(GameState *g, int pl);
+int  rb_resolve_target_player(const GameState *g, const char *target);
 
 /* ── Misc effect handlers (engine/src/ability/effects/misc.rs) ── */
 int rb_execute_misc_effect(GameState *g, int actor, const RbPlayer *self,

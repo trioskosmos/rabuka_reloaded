@@ -303,6 +303,140 @@ per-cost waited, debut count) — each a multi-line fidelity port, not a single 
 
 Hand-written suites green after every change (`rb_engine_test` / `rb_engine_replay` / `rb_engine_ported` 13/13).
 
+## Translated this session (heart wildcard getter)
+- `src/core/modifiers.c` `rb_mods_get_heart` — now mirrors Rust `GameModifiers::get_heart_modifier`:
+  `Heart00` (index 0 / `RB_HEART_PINK`, the colorless wildcard) is added to **every** color query,
+  not just when `color == RB_HEART_PINK`. Previously the getter returned only the color-specific
+  entry, so a wildcard heart bonus was never attributed to non-pink colors. `need_heart` stays
+  color-exact (Rust `get_need_heart_modifier` has no wildcard). Gating suites green after the change
+  (`make rb_engine_test` → ALL TESTS PASSED).
+
+## Translated this session (`GameModifiers` accessor/lifecycle parity)
+Porting the remaining `engine/src/core/game_modifiers.rs` `GameModifiers` API that had **no C twin**
+into `src/core/modifiers.c` (declared in `include/rabuka.h`). All faithful 1:1 translations of the
+Rust `set_*` / `get_*` / `clear_*` / `remove_*` / `add_*` methods; existing C fields already existed
+(`constant_*`, `heart_color_override`, `heart_copy`, `blade_type`, `heart_multiplier`) — the engine
+was reaching them via direct struct access, so these wrap the same storage with the Rust-shaped API:
+- `rb_mods_get_blade_set` / `rb_mods_clear_blade_set` (mirror `get_blade_set_modifier` /
+  `clear_blade_set_modifier`).
+- `rb_mods_get_score_set` / `rb_mods_clear_score_set` (mirror `get_score_set_modifier` /
+  `clear_score_set_modifier`).
+- `rb_mods_get_cost_set` / `rb_mods_clear_cost_set` (mirror `get_cost_modifier_set`, which returns
+  `None` when `set == 0` so the caller falls back to base+additive cost).
+- `rb_mods_remove_blade` / `rb_mods_remove_heart` / `rb_mods_remove_score` /
+  `rb_mods_remove_cost` (mirror `remove_*_modifier`: saturating subtract of a previously-added delta;
+  cost clamps at 0 per Rust `remove_cost_modifier`).
+- `rb_mods_set_heart_override` / `rb_mods_remove_heart_override` / `rb_mods_get_heart_override`
+  (mirror `set_heart_override` / `remove_heart_override`; C stores the override color, the count is
+  unused by the portable core).
+- `rb_mods_set_heart_copy` / `rb_mods_get_heart_copy` (mirror `set_heart_copy` / `get_heart_copy`).
+- `rb_mods_set_blade_type` / `rb_mods_clear_blade_type` / `rb_mods_get_blade_type`
+  (mirror `set_blade_type_modifier` / `clear_blade_type_modifier`).
+- `rb_mods_set_heart_color_multiplier` / `rb_mods_get_heart_color_multiplier`
+  (mirror the `heart_color_multiplier` map).
+Gating suites green after every change (`make rb_engine_test` → ALL TESTS PASSED).
+
+## Translated this session (`util.rs` helper parity)
+Porting missing `engine/src/ability/util.rs` helpers into `src/ability/util.c`
+(declared in `include/rabuka.h`). Faithful copies of the Rust pure helpers:
+- `rb_heart_gain_per_entry` (mirror `heart_gain_per_entry`).
+- `rb_is_all_heart_type` (mirror `is_all_heart_type` — `heart_type == "all"` wildcard).
+- `rb_constant_per_unit_zone` (mirror `constant_per_unit_zone` — loc.or(per_unit_type).unwrap_or("hand")).
+- `rb_target_player_index` / `rb_target_player_label` (mirror `target_player_index` / `target_player_label`).
+- `rb_activation_position_index` (mirror `activation_position_index`).
+- `rb_cost_threshold_met` (mirror `cost_threshold_met` — original_count/operator gate on card cost).
+- `rb_card_is_member` added to `core/card.c` (mirror `Card::is_member`); `rb_card_matches_type`
+  already existed in util.c and was left intact.
+Effect field reads go through a local `eff_extra` reader (the VM decodes every effect
+field verbatim into `extra_k/extra_v`, so the Rust `*_any()` getters map to those keys).
+
+## Translated this session (play-cost reduction)
+Porting the deploy-cost reduction chain from `engine/src/ability/util.rs` into
+`src/ability/cost.c` (declared `rb_compute_play_cost` in `include/rabuka.h`):
+- `rb_compute_play_cost` (mirror `compute_play_cost`) — base − reduction + increase,
+  with constant set-override ("コストはNになる").
+- `cr_calc_reduction` (mirror `calculate_play_cost_reduction`) — self / stage-aura
+  (stacked) / success-live-zone (max) sources.
+- `cr_scan_one_effect_source` (mirror `scan_abilities_for_cost_reduction`) — iterates
+  a source card's abilities for a qualifying ModifyCost-subtract-hand effect.
+- `cr_scan_one_effect`, `cr_reduction_matches`, `cr_find_modify_cost`,
+  `cr_per_unit_reduction` — the inner predicates (operation/location/group/cost-limit/
+  threshold/card-type/ability_filter/condition-location guards; per-unit divisor).
+Note: `rb_compute_play_cost` is the Rust single source of truth but is not yet wired
+into `engine.c`'s deploy path (the harness plays cards directly), so it is a faithful
+port pending integration with the play-from-hand cost gate.
+
+## Translated this session (`util.rs` Card predicates)
+Continuing `engine/src/ability/util.rs` → `src/ability/util.c`:
+- `rb_card_matches_cost_limit` (mirror `card_matches_cost_limit_op` — live→score,
+  member→cost; comparison default `<=`).
+- `rb_card_matches_heart_colors` (mirror `card_matches_heart_colors` — OR over colors;
+  checks base hearts when present, else need_heart range).
+- `rb_card_matches_all_heart_colors` (mirror `card_matches_all_heart_colors` — AND over colors).
+- `rb_card_matches_name_fragments` (mirror `card_matches_name_fragments` — every fragment
+  is a substring of the card name).
+All declared in `include/rabuka.h`. Gating suites green (`make rb_engine_test` → ALL TESTS PASSED).
+
+## Translated this session (`util.rs` more predicates)
+- `rb_card_matches_characters` (mirror `card_matches_characters` — any listed name is a
+  substring of the card name; single-name universe in C).
+- `rb_stage_position_index` (mirror `stage_position_index` — stage-position string → area).
+- `rb_card_matches_any_group` already present as `rb_card_matches_group_str`; `card_at_position`
+  already present as `rb_card_at_position`. Gating suites green.
+
+## Translated this session (`zones.c`)
+- `rb_stage_first_empty` (mirror `util.rs::stage_first_empty`) added to `src/core/zones.c`;
+  declared in `include/rabuka.h`. Gating suites green.
+
+## Sub-task queue — remaining `util.rs` functions to copy (file: `src/ability/util.rs`)
+These remain unported (need `Player`/`CardDatabase` iteration; some depend on multi-name
+card support that C lacks today — tracked as ST-H):
+1. `zone_card_ids` / `zone_cards` (Player variant) — `rb_zone_cards` exists; a `rb_zone_card_ids`
+   returning a caller buffer is a thin wrapper.
+2. `count_in_zone` / `count_matching` / `matching_ids` / `matching_indices` / `build_candidate_pool`
+   — selection/candidate helpers over a zone.
+3. `dedupe_by_normalized_name` / `filter_distinct` / `max_distinct_names` — distinct-name DP
+   (needs multi-name `get_card_names`).
+4. `filter_from_parts` / `filter_from_parts_full` — `CardFilter` builder from an effect.
+5. `has_cannot_baton_touch_protection` — use existing `rb_card_has_restriction` (ST-D).
+
+## Sub-task queue — other files still behind the Rust twin (size-audit)
+- `condition.c` (C=1167 / Rust 6074): condition evaluators beyond the ones already ported.
+- `effects/misc.c` (C=283 / Rust 4120): remaining `misc.rs` effect handlers.
+- `effects/score.c` (C vs Rust ~?): remaining score-effect helpers.
+- `core/game_state/modifiers.rs` (`recalculate_constants` energy-threshold auras, ST-I).
+- `core/stats_pipeline.c` (`Allocation` exact plan).
+- `turn/live.c` (full live pipeline, ST-G) and `turn/phase.c` (mulligan / baton, sub-task queue).
+- `engine.c` deploy path: wire `rb_compute_play_cost` into the play-from-hand cost gate.
+
+## Translated this session (`game_state/abilities.rs` methods)
+Porting `engine/src/core/game_state/abilities.rs` methods into
+`src/core/game_state_abilities.c` (declared in `include/rabuka.h`):
+- `rb_opponent_id` (mirror `opponent_id`).
+- `rb_distinct_stage_groups` (mirror `distinct_stage_groups` — counts the 5 canonical
+  groups with a stage member, via `rb_card_matches_group_str`).
+- `rb_can_place_card_in_zone` (mirror `can_place_card_in_zone` — rejects on a constant
+  `cannot_place` restriction or a dynamic `prohibition_effects` entry; live↔success
+  zones are interchangeable via `zone_eq`).
+- `rb_clear_movement_tracking` (mirror `clear_movement_tracking`).
+- `rb_process_with_completed_key` (mirror `process_with_completed_key`).
+- `rb_ability_uses_used` / `rb_ability_has_remaining_uses` (mirror `ability_uses_used` /
+  `ability_has_remaining_uses`; read the queue's per-turn use table via new
+  `rb_use_count` in `ability_queue.c`).
+- `rb_trigger_auto_abilities_for_movement` (mirror `trigger_auto_abilities_for_movement`).
+Gating suites green (`make rb_engine_test` → ALL TESTS PASSED).
+
+## Translated this session (`util.rs` zone move/place helpers)
+Porting `engine/src/ability/util.rs` zone operations into `src/ability/util.c`
+(declared in `include/rabuka.h`); Rust `Player` zones map to `RbPlayer` bags
+(waitroom→discard, under_member→under_cards[]):
+- `rb_count_in_zone` (mirror `count_in_zone` without the `CardFilter` predicate).
+- `rb_remove_card_from_zone` (mirror `remove_card_from_zone`).
+- `rb_place_card_in_zone` (mirror `place_card_in_zone`).
+- `rb_move_card` / `rb_move_cards` (mirror `move_card` / `move_cards`).
+- `rb_resolve_indices_to_ids` (mirror `resolve_indices_to_ids`).
+Gating suites green (`make rb_engine_test` → ALL TESTS PASSED).
+
 ## Translated this session (generated-suite analysis + transpiler fix)
 Ran the generated suite (`rb_engine_generated`) as a concrete worklist: **1177 failures** out of 2652 fns
 (regenerated from `engine/tests/test_modules/*.rs` via `tools/gen_tests.py`). Audited the failure locus:

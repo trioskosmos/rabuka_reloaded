@@ -9,7 +9,7 @@ exit /b
 param(
     [int]$IntervalMinutes = 5,
     [string]$WindowTitle = "",
-    [string]$Message = "engine_c find placeholders make more sub tasks do them update md continue the porting. remember you are just copying the rust engine in c."
+    [string]$Message = "make more sub tasks do them update md continue the porting. remember you are just copying the rust engine in c."
 )
 
 Add-Type -AssemblyName System.Windows.Forms

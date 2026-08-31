@@ -191,3 +191,135 @@ int rb_apply_ability_effects(GameState *g, int actor, const Ability *ab, int hos
     rb_compound_sequential(g, actor, ab->effect, host_cid);
     return 1;
 }
+
+/* ── GameState ability helpers (mirror game_state/abilities.rs methods) ── */
+
+/* Mirror abilities.rs::opponent_id — the index of the other player. */
+int rb_opponent_id(int pl) { return pl ? 0 : 1; }
+
+/* Mirror abilities.rs::distinct_stage_groups — count of distinct canonical
+   groups among `pl`'s stage members (multi-name cards contribute every group). */
+int rb_distinct_stage_groups(const GameState *g, int pl) {
+    static const char *CANON[5] = {"μ's", "Aqours", "虹ヶ咲", "Liella!", "蓮ノ空"};
+    const RbPlayer *P = &g->p[pl];
+    int count = 0;
+    for (int gi = 0; gi < 5; gi++) {
+        int matched = 0;
+        for (int s = 0; s < RB_STAGE_SIZE; s++) {
+            int cid = P->stage[s];
+            if (cid != RB_EMPTY_SLOT && rb_card_matches_group_str(cid, CANON[gi])) {
+                matched = 1; break;
+            }
+        }
+        if (matched) count++;
+    }
+    return count;
+}
+
+/* Zone equivalence with live↔success interchange (mirrors Rust Zone comparisons). */
+static int zone_eq(const char *a, const char *b) {
+    if (!a || !b) return 0;
+    int a_live = (!strcmp(a, "live") || !strcmp(a, "live_card_zone"));
+    int b_live = (!strcmp(b, "live") || !strcmp(b, "live_card_zone"));
+    int a_succ = (!strcmp(a, "success") || !strcmp(a, "success_live_zone") ||
+                  !strcmp(a, "success_live_card_zone"));
+    int b_succ = (!strcmp(b, "success") || !strcmp(b, "success_live_zone") ||
+                  !strcmp(b, "success_live_card_zone"));
+    if (a_live && b_live) return 1;
+    if (a_succ && b_succ) return 1;
+    if (a_live && b_succ) return 1;
+    if (a_succ && b_live) return 1;
+    return !strcmp(a, b);
+}
+
+/* Mirror abilities.rs::_prohibition_destination_blocks — does a
+   "restriction:cannot_place:ZONE" prohibition block placement in `zone`? */
+static int prohibition_blocks_zone(const char *p, const char *zone) {
+    const char *prefix = "restriction:cannot_place:";
+    size_t plen = strlen(prefix);
+    if (strncmp(p, prefix, plen) != 0) return 0;
+    const char *block = p + plen;
+    return zone_eq(block, zone);
+}
+
+/* Mirror abilities.rs::can_place_card_in_zone — reject if a constant
+   "cannot_place" restriction or a dynamic prohibition_effects entry blocks it. */
+int rb_can_place_card_in_zone(const GameState *g, int cid, const char *zone) {
+    int nab = rb_card_num_abilities((uint32_t)cid);
+    for (int a = 0; a < nab; a++) {
+        Ability ab;
+        if (!rb_decode_card_ability((uint32_t)cid, a, &ab)) continue;
+        int is_constant = (ab.triggers == NULL || ab.triggers[0] == '\0' ||
+                           strstr(ab.triggers, "constant") != NULL ||
+                           strstr(ab.triggers, "continuous") != NULL);
+        if (is_constant && ab.effect) {
+            const AbilityEffect *e = ab.effect;
+            const char *act = e->action ? e->action : "";
+            const char *rtype = NULL;
+            for (int i = 0; i < e->n_extra; i++)
+                if (e->extra_k[i] && !strcmp(e->extra_k[i], "restriction_type"))
+                    rtype = e->extra_v[i];
+            const char *dest = NULL;
+            for (int i = 0; i < e->n_extra; i++)
+                if (e->extra_k[i] && (!strcmp(e->extra_k[i], "destination") ||
+                                      !strcmp(e->extra_k[i], "restricted_destination")))
+                    dest = e->extra_v[i];
+            if (!strcmp(act, "restriction") && rtype && !strcmp(rtype, "cannot_place") &&
+                dest && zone_eq(dest, zone)) {
+                rb_free_ability(&ab);
+                return 0;
+            }
+        }
+        rb_free_ability(&ab);
+    }
+    for (int i = 0; i < g->n_prohibition; i++)
+        if (prohibition_blocks_zone(g->prohibition[i], zone)) return 0;
+    return 1;
+}
+
+/* Mirror abilities.rs::clear_movement_tracking — drop the recently-moved batch. */
+void rb_clear_movement_tracking(GameState *g) {
+    if (!g) return;
+    g->n_recently_moved = 0;
+}
+
+/* Mirror abilities.rs::process_with_completed_key — set the completed key, drain
+   pending auto abilities, then clear the key. */
+void rb_process_with_completed_key(GameState *g, int key) {
+    if (!g) return;
+    g->just_completed_ability_key = key;
+    rb_drain_ability_queue(g);
+    g->just_completed_ability_key = -1;
+}
+
+/* Mirror abilities.rs::ability_uses_used — uses recorded this turn for an ability. */
+int rb_ability_uses_used(const GameState *g, int cid, int idx) {
+    if (!g) return 0;
+    return rb_use_count(&g->queue, cid, idx, g->turn);
+}
+
+/* Mirror abilities.rs::ability_has_remaining_uses — single source of truth for the
+   once-per-turn gate. Abilities without a limit are always allowed. */
+int rb_ability_has_remaining_uses(const GameState *g, int cid, int idx) {
+    if (!g) return 0;
+    int nab = rb_card_num_abilities((uint32_t)cid);
+    if (idx < 0 || idx >= nab) return 0;
+    Ability ab;
+    if (!rb_decode_card_ability((uint32_t)cid, idx, &ab)) return 1;
+    int limit = ab.use_limit < 0 ? 99 : ab.use_limit;
+    int used = rb_ability_uses_used(g, cid, idx);
+    rb_free_ability(&ab);
+    return used < limit;
+}
+
+/* Mirror abilities.rs::trigger_auto_abilities_for_movement — fire 移動時 autos. */
+int rb_trigger_auto_abilities_for_movement(GameState *g, int pl) {
+    return rb_trigger_auto_abilities(g, pl, "移動時");
+}
+
+/* Mirror abilities.rs::resolve_target_player — map a target string to a player
+   index (C has no per-player id strings; defaults master to player1). */
+int rb_resolve_target_player(const GameState *g, const char *target) {
+    (void)g;
+    return rb_target_player_index(target, NULL);
+}

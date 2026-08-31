@@ -46,7 +46,11 @@ void rb_mods_set_blade(RbMods *m, int cid, int v) {
 int rb_mods_get_heart(RbMods *m, int cid, int color) {
     if (cid < 0 || cid >= RB_MAX_CARD_IDS) return 0;
     if (color < 0 || color >= 8) return 0;
-    return rb_modifier_total(m->heart[cid][color]);
+    /* Mirrors Rust GameModifiers::get_heart_modifier: Heart00 (index 0, the
+       "colorless"/wildcard heart) is added to every color query. */
+    int v = rb_modifier_total(m->heart[cid][color]);
+    if (color != RB_HEART_PINK) v += rb_modifier_total(m->heart[cid][RB_HEART_PINK]);
+    return v;
 }
 void rb_mods_add_heart(RbMods *m, int cid, int color, int delta) {
     if (cid < 0 || cid >= RB_MAX_CARD_IDS || color < 0 || color >= 8) return;
@@ -132,4 +136,105 @@ void rb_mods_tick_delayed_for(RbMods *m, const int *owned, int n_owned) {
         if (v > 0) v--;
         m->delayed_cannot_active[cid] = v;
     }
+}
+
+/* ── set-override getters (mirror get_*_set_modifier / get_cost_modifier_set) ──
+   A "set" override is an absolute value that replaces the base value entirely
+   (Rust returns Some(set) only when set != 0). The C RbModifierEntry keeps the
+   set field separately so the engine can read it directly. */
+int rb_mods_get_blade_set(RbMods *m, int cid) {
+    if (cid < 0 || cid >= RB_MAX_CARD_IDS) return 0;
+    return m->blade[cid].set;
+}
+void rb_mods_clear_blade_set(RbMods *m, int cid) {
+    if (cid < 0 || cid >= RB_MAX_CARD_IDS) return;
+    m->blade[cid].set = 0;
+}
+int rb_mods_get_score_set(RbMods *m, int cid) {
+    if (cid < 0 || cid >= RB_MAX_CARD_IDS) return 0;
+    return m->score[cid].set;
+}
+void rb_mods_clear_score_set(RbMods *m, int cid) {
+    if (cid < 0 || cid >= RB_MAX_CARD_IDS) return;
+    m->score[cid].set = 0;
+}
+int rb_mods_get_cost_set(RbMods *m, int cid) {
+    if (cid < 0 || cid >= RB_MAX_CARD_IDS) return 0;
+    int v = m->cost[cid].set;
+    return v != 0 ? v : 0;   /* Rust get_cost_modifier_set filters set==0 → None */
+}
+void rb_mods_clear_cost_set(RbMods *m, int cid) {
+    if (cid < 0 || cid >= RB_MAX_CARD_IDS) return;
+    m->cost[cid].set = 0;
+}
+
+/* ── remove (mirror remove_*_modifier: saturating subtract of a previously added delta) ── */
+void rb_mods_remove_blade(RbMods *m, int cid, int delta) {
+    if (cid < 0 || cid >= RB_MAX_CARD_IDS) return;
+    m->blade[cid].add = rb_saturate_i16((int)m->blade[cid].add - delta);
+}
+void rb_mods_remove_heart(RbMods *m, int cid, int color, int delta) {
+    if (cid < 0 || cid >= RB_MAX_CARD_IDS || color < 0 || color >= 8) return;
+    m->heart[cid][color].add = rb_saturate_i16((int)m->heart[cid][color].add - delta);
+}
+void rb_mods_remove_score(RbMods *m, int cid, int delta) {
+    if (cid < 0 || cid >= RB_MAX_CARD_IDS) return;
+    m->score[cid].add = rb_saturate_i16((int)m->score[cid].add - delta);
+}
+void rb_mods_remove_cost(RbMods *m, int cid, int delta) {
+    if (cid < 0 || cid >= RB_MAX_CARD_IDS) return;
+    /* Rust remove_cost_modifier clamps the subtract at 0 (no negative cost). */
+    int v = (int)m->cost[cid].add - delta;
+    if (v < 0) v = 0;
+    m->cost[cid].add = rb_saturate_i16(v);
+}
+
+/* ── heart_override (mirror set_heart_override / remove_heart_override) ──
+   The C field stores only the override heart color (Rust keeps (color, count);
+   the count is not consumed by the portable core). -1 means "no override". */
+void rb_mods_set_heart_override(RbMods *m, int cid, int color) {
+    if (cid < 0 || cid >= RB_MAX_CARD_IDS) return;
+    m->heart_color_override[cid] = (int8_t)color;
+}
+void rb_mods_remove_heart_override(RbMods *m, int cid) {
+    if (cid < 0 || cid >= RB_MAX_CARD_IDS) return;
+    m->heart_color_override[cid] = -1;
+}
+int rb_mods_get_heart_override(RbMods *m, int cid) {
+    if (cid < 0 || cid >= RB_MAX_CARD_IDS) return -1;
+    return m->heart_color_override[cid];
+}
+
+/* ── heart_copy (mirror set_heart_copy / get_heart_copy) ── */
+void rb_mods_set_heart_copy(RbMods *m, int target_cid, int source_cid) {
+    if (target_cid < 0 || target_cid >= RB_MAX_CARD_IDS) return;
+    m->heart_copy[target_cid] = (int16_t)source_cid;
+}
+int rb_mods_get_heart_copy(RbMods *m, int target_cid) {
+    if (target_cid < 0 || target_cid >= RB_MAX_CARD_IDS) return -1;
+    return m->heart_copy[target_cid];
+}
+
+/* ── blade_type (mirror set_blade_type_modifier / clear_blade_type_modifier) ── */
+void rb_mods_set_blade_type(RbMods *m, int cid, int color) {
+    if (cid < 0 || cid >= RB_MAX_CARD_IDS) return;
+    m->blade_type[cid] = (int8_t)color;
+}
+void rb_mods_clear_blade_type(RbMods *m, int cid) {
+    if (cid < 0 || cid >= RB_MAX_CARD_IDS) return;
+    m->blade_type[cid] = -1;
+}
+int rb_mods_get_blade_type(RbMods *m, int cid) {
+    if (cid < 0 || cid >= RB_MAX_CARD_IDS) return -1;
+    return m->blade_type[cid];
+}
+
+/* ── heart_color_multiplier (mirror heart_color_multiplier map) ── */
+void rb_mods_set_heart_color_multiplier(RbMods *m, int cid, int color) {
+    if (cid < 0 || cid >= RB_MAX_CARD_IDS) return;
+    m->heart_multiplier[cid] = (int8_t)color;
+}
+int rb_mods_get_heart_color_multiplier(RbMods *m, int cid) {
+    if (cid < 0 || cid >= RB_MAX_CARD_IDS) return -1;
+    return m->heart_multiplier[cid];
 }

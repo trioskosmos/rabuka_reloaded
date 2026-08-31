@@ -12,6 +12,7 @@
 
 #include "rabuka.h"
 #include <string.h>
+#include <stdlib.h>
 
 /* local bag helpers (RbBag is a plain int array) */
 static void bag_push(RbBag *b, int c) { if (b->n < RB_MAX_ZONE) b->cards[b->n++] = c; }
@@ -206,4 +207,230 @@ int rb_handle_optional_cost_payment(GameState *g, int actor, const AbilityEffect
 int rb_cost_has_skip_prompt(const AbilityEffect *cost) {
     if (!cost) return 0;
     return cost_has_skip_prompt(cost);
+}
+
+/* ── Play-cost reduction (mirror engine/src/ability/util.rs
+//    compute_play_cost / calculate_play_cost_reduction / scan_abilities_for_
+//    cost_reduction / per_unit_cost_reduction / play_cost_reduction_matches).
+//    These compute the deploy cost of a member card from hand: base cost minus
+//    stage/live-zone reduction auras plus success-zone increases, with an
+//    optional constant set-override ("コストはNになる"). ── */
+
+/* decoded-effect field reader (mirrors util.rs `*_any()` getters) */
+static const char *cr_eff_extra(const AbilityEffect *e, const char *k) {
+    if (!e) return NULL;
+    for (int i = 0; i < e->n_extra; i++)
+        if (e->extra_k[i] && !strcmp(e->extra_k[i], k)) return e->extra_v[i];
+    return NULL;
+}
+static int cr_eff_int(const AbilityEffect *e, const char *k, int dflt) {
+    const char *v = cr_eff_extra(e, k);
+    if (!v || !*v) return dflt;
+    return atoi(v);
+}
+
+/* Mirror util.rs::find_modify_cost — find a ModifyCost sub-effect with matching
+   operation/location, recursing into sequential compounds. */
+static const AbilityEffect *cr_find_modify_cost(const AbilityEffect *e,
+                                                const char *op, const char *loc) {
+    if (!e) return NULL;
+    if (e->action && !strcmp(e->action, "modify_cost")) {
+        const char *eop = cr_eff_extra(e, "operation");
+        const char *eloc = cr_eff_extra(e, "location");
+        if ((!op || (eop && !strcmp(eop, op))) &&
+            (!loc || (eloc && !strcmp(eloc, loc))))
+            return e;
+    }
+    if (e->action && (!strcmp(e->action, "sequential") ||
+                     !strcmp(e->action, "sequential_cost"))) {
+        for (int i = 0; i < e->n_child; i++) {
+            const AbilityEffect *f = cr_find_modify_cost(e->child[i], op, loc);
+            if (f) return f;
+        }
+    }
+    return NULL;
+}
+
+/* Mirror util.rs::play_cost_reduction_matches */
+static int cr_reduction_matches(const AbilityEffect *e, int card_id, const Card *card) {
+    const char *gn = cr_eff_extra(e, "group_names");
+    if (gn && !rb_card_matches_group_str(card_id, gn)) return 0;
+    const char *limit = cr_eff_extra(e, "cost_limit");
+    if (limit && card->cost != atoi(limit)) return 0;
+    if (!rb_cost_threshold_met(card, e)) return 0;
+    const char *ct = cr_eff_extra(e, "card_type");
+    if (ct && strcmp(ct, "member_card") != 0) return 0;
+    const char *af = cr_eff_extra(e, "ability_filter");
+    if (af && !strcmp(af, "no_ability") && rb_card_num_abilities((uint32_t)card_id) > 0)
+        return 0;
+    return 1;
+}
+
+/* Mirror util.rs::per_unit_cost_reduction */
+static int cr_per_unit_reduction(const AbilityEffect *e, const GameState *g,
+                                 int actor, int hand_count) {
+    const char *pul  = cr_eff_extra(e, "per_unit_type");
+    const char *loc  = cr_eff_extra(e, "location");
+    const char *zone = pul ? pul : (loc ? loc : "hand");
+    int raw_count;
+    if (!strcmp(zone, "stage") && cr_eff_extra(e, "group_names")) {
+        const char *gn = cr_eff_extra(e, "group_names");
+        const RbPlayer *P = &g->p[actor];
+        int n = 0;
+        for (int s = 0; s < RB_STAGE_SIZE; s++) {
+            int id = P->stage[s];
+            if (id != RB_EMPTY_SLOT && rb_card_matches_group_str(id, gn)) n++;
+        }
+        raw_count = n;
+    } else {
+        raw_count = hand_count;
+    }
+    int per_unit_count = e->per_unit_count > 0 ? e->per_unit_count : 1;
+    const char *ex = cr_eff_extra(e, "exclude_self");
+    int exclude_self = ex && !strcmp(ex, "true");
+    int effective = exclude_self ? (raw_count > 0 ? raw_count - 1 : 0) : raw_count;
+    int value = cr_eff_int(e, "value", 1);
+    return (effective / per_unit_count) * value;
+}
+
+/* Mirror util.rs::scan_abilities_for_cost_reduction — scan one ModifyCost
+   (subtract, hand) effect on a source card. Returns reduction (>=0) or -1. */
+static int cr_scan_one_effect(const AbilityEffect *eff, int target_id,
+                              const Card *target_card, const GameState *g,
+                              int actor, int hand_count, int hand_guard) {
+    if (!eff || !eff->action || strcmp(eff->action, "modify_cost") != 0) return -1;
+    const char *op  = cr_eff_extra(eff, "operation");
+    const char *loc = cr_eff_extra(eff, "location");
+    if (!(op && !strcmp(op, "subtract"))) return -1;
+    if (!(loc && !strcmp(loc, "hand"))) return -1;
+    if (hand_guard && eff->condition) {
+        for (uint32_t i = 0; i < eff->condition->n_fields; i++) {
+            if (eff->condition->fields[i].key &&
+                !strcmp(eff->condition->fields[i].key, "location") &&
+                eff->condition->fields[i].v.tag == RB_TAG_STR &&
+                eff->condition->fields[i].v.s &&
+                !strcmp(eff->condition->fields[i].v.s, "hand"))
+                return -1;
+        }
+    }
+    const char *gn = cr_eff_extra(eff, "group_names");
+    if (gn && !rb_card_matches_group_str(target_id, gn)) return -1;
+    const char *limit = cr_eff_extra(eff, "cost_limit");
+    if (limit && target_card->cost != atoi(limit)) return -1;
+    if (!rb_cost_threshold_met(target_card, eff)) return -1;
+    const char *ct = cr_eff_extra(eff, "card_type");
+    if (ct && strcmp(ct, "member_card") != 0) return -1;
+    const char *af = cr_eff_extra(eff, "ability_filter");
+    if (af && !strcmp(af, "no_ability") &&
+        rb_card_num_abilities((uint32_t)target_id) > 0)
+        return -1;
+    if (eff->per_unit) return cr_per_unit_reduction(eff, g, actor, hand_count);
+    return cr_eff_int(eff, "value", 1);
+}
+
+/* forward decl */
+static int cr_scan_one_effect_source(int src_card_id, int target_id,
+                                     const Card *target_card, const GameState *g,
+                                     int actor, int hand_count, int hand_guard);
+
+/* Mirror util.rs::calculate_play_cost_reduction */
+static int cr_calc_reduction(const GameState *g, int actor, int card_id,
+                             const Card *card) {
+    int cost_reduction = 0;
+    int hand_count = g->p[actor].hand.n + 1;
+    int n = rb_card_num_abilities((uint32_t)card_id);
+    /* 1. self reduction */
+    for (int ai = 0; ai < n; ai++) {
+        Ability ab;
+        if (!rb_decode_card_ability((uint32_t)card_id, ai, &ab)) continue;
+        if (ab.effect) {
+            const AbilityEffect *mc = cr_find_modify_cost(ab.effect, "subtract", "hand");
+            if (mc && cr_reduction_matches(mc, card_id, card)) {
+                if (mc->per_unit)
+                    cost_reduction = cr_per_unit_reduction(mc, g, actor, hand_count);
+                else {
+                    int v = cr_eff_int(mc, "value", 1);
+                    if (v > cost_reduction) cost_reduction = v;
+                }
+            }
+        }
+        rb_free_ability(&ab);
+    }
+    /* 2. stage auras (stack) */
+    {
+        const RbPlayer *P = &g->p[actor];
+        for (int s = 0; s < RB_STAGE_SIZE; s++) {
+            int id = P->stage[s];
+            if (id == RB_EMPTY_SLOT) continue;
+            int r = cr_scan_one_effect_source(id, card_id, card, g, actor,
+                                             hand_count, 1);
+            if (r >= 0) cost_reduction += r;
+        }
+    }
+    /* 3. success live-zone auras (max, only if nothing yet) */
+    if (cost_reduction == 0) {
+        const RbPlayer *P = &g->p[actor];
+        for (int i = 0; i < P->success.n; i++) {
+            int id = P->success.cards[i];
+            int r = cr_scan_one_effect_source(id, card_id, card, g, actor,
+                                             hand_count, 0);
+            if (r >= 0) { if (r > cost_reduction) cost_reduction = r; break; }
+        }
+    }
+    return cost_reduction;
+}
+
+/* Scan all abilities of a source card for a qualifying cost-reduction effect. */
+static int cr_scan_one_effect_source(int src_card_id, int target_id,
+                                     const Card *target_card, const GameState *g,
+                                     int actor, int hand_count, int hand_guard) {
+    int n = rb_card_num_abilities((uint32_t)src_card_id);
+    for (int ai = 0; ai < n; ai++) {
+        Ability ab;
+        if (!rb_decode_card_ability((uint32_t)src_card_id, ai, &ab)) continue;
+        int r = -1;
+        if (ab.effect)
+            r = cr_scan_one_effect(ab.effect, target_id, target_card, g,
+                                   actor, hand_count, hand_guard);
+        rb_free_ability(&ab);
+        if (r >= 0) return r;
+    }
+    return -1;
+}
+
+/* Mirror util.rs::compute_play_cost — single source of truth for deploy cost. */
+int rb_compute_play_cost(const GameState *g, int actor, int card_id,
+                         int set_override) {
+    Card card;
+    if (!rb_decode_card_by_index((uint32_t)card_id, &card)) return 0;
+    int base_cost = card.cost;
+    int hand_count = g->p[actor].hand.n + 1;
+    int reduction = cr_calc_reduction(g, actor, card_id, &card);
+    int increase = 0;
+    int n = rb_card_num_abilities((uint32_t)card_id);
+    for (int ai = 0; ai < n; ai++) {
+        Ability ab;
+        if (!rb_decode_card_ability((uint32_t)card_id, ai, &ab)) continue;
+        if (ab.effect && ab.effect->action &&
+            !strcmp(ab.effect->action, "modify_cost")) {
+            const char *op  = cr_eff_extra(ab.effect, "operation");
+            const char *loc = cr_eff_extra(ab.effect, "location");
+            if (op && (!strcmp(op, "increase") || !strcmp(op, "add")) &&
+                loc && !strcmp(loc, "success_live_zone")) {
+                int per_unit_count = ab.effect->per_unit_count > 0
+                                     ? ab.effect->per_unit_count : 1;
+                int success_count = g->p[actor].success.n;
+                int multiplier = ab.effect->count > 0 ? ab.effect->count : 1;
+                increase = (success_count / per_unit_count) * multiplier;
+            }
+        }
+        rb_free_ability(&ab);
+    }
+    int cost = base_cost - reduction + increase;
+    if (cost < 0) cost = 0;
+    if (cost > 255) cost = 255;
+    if (set_override != 0 && set_override != base_cost)
+        cost = (int)rb_saturate_u8(set_override);
+    rb_free_card(&card);
+    return cost;
 }

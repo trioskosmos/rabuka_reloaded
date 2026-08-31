@@ -119,3 +119,8 @@ int rb_card_is_energy(int card_id) {
     if (!r) return 0;
     return (r[18] & 0x03) == 2;
 }
+int rb_card_is_member(int card_id) {
+    const unsigned char *r = rb_card_record(card_id);
+    if (!r) return 0;
+    return (r[18] & 0x03) == 0;
+}
