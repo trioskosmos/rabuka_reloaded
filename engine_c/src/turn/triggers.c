@@ -465,3 +465,49 @@ void rb_recalc_constants(GameState *g) {
     }
     rb_refresh_yell_sources(g);
 }
+
+/* Mirror triggers.rs::is_trigger_suppressed -- check if a trigger is suppressed
+   by any card on stage or live card zone. */
+int rb_is_trigger_suppressed(GameState *g, int pl, const char *trigger_name) {
+    if (!g || !trigger_name) return 0;
+    const RbPlayer *P = &g->p[pl];
+    for (int s = 0; s < RB_STAGE_SIZE; s++) {
+        int cid = P->stage[s];
+        if (cid < 0) continue;
+        int nab = rb_card_num_abilities((uint32_t)cid);
+        for (int a = 0; a < nab; a++) {
+            Ability ab;
+            if (!rb_decode_card_ability((uint32_t)cid, a, &ab)) continue;
+            if (ab.effect && ab.effect->action && !strcmp(ab.effect->action, "suppress_trigger")) {
+                for (int k = 0; k < ab.effect->n_extra; k++) {
+                    if (ab.effect->extra_k[k] && !strcmp(ab.effect->extra_k[k], "suppressed_trigger")
+                        && ab.effect->extra_v[k] && !strcmp(ab.effect->extra_v[k], trigger_name)) {
+                        rb_free_ability(&ab);
+                        return 1;
+                    }
+                }
+            }
+            rb_free_ability(&ab);
+        }
+    }
+    for (int i = 0; i < P->live.n; i++) {
+        int cid = P->live.cards[i];
+        if (cid < 0) continue;
+        int nab = rb_card_num_abilities((uint32_t)cid);
+        for (int a = 0; a < nab; a++) {
+            Ability ab;
+            if (!rb_decode_card_ability((uint32_t)cid, a, &ab)) continue;
+            if (ab.effect && ab.effect->action && !strcmp(ab.effect->action, "suppress_trigger")) {
+                for (int k = 0; k < ab.effect->n_extra; k++) {
+                    if (ab.effect->extra_k[k] && !strcmp(ab.effect->extra_k[k], "suppressed_trigger")
+                        && ab.effect->extra_v[k] && !strcmp(ab.effect->extra_v[k], trigger_name)) {
+                        rb_free_ability(&ab);
+                        return 1;
+                    }
+                }
+            }
+            rb_free_ability(&ab);
+        }
+    }
+    return 0;
+}
