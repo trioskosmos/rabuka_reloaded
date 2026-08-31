@@ -538,28 +538,183 @@ static int eval_group(const struct GameState *g, int actor, int host_cid, const 
     return 0;
 }
 
-/* ── appearance (variant 5) ── */
-static int eval_appearance(const struct GameState *g, int actor, const Condition *c) {
-    int ap=0; if (get_bool(c,"appearance",&ap) && !ap) return 0;
-    const CondValue *chars = find_val(c, "characters");
-    if (!chars || chars->tag!=RB_TAG_ARRAY || chars->arr_n==0) return 1;
-    int pl = target_player_idx(actor, c);
-    /* characters/group filter: check stage has at least one card matching any listed group/character */
-    const RbPlayer *P=&g->p[pl];
-    int ids[RB_MAX_ZONE]; int n=0;
-    for(int i=0;i<RB_STAGE_SIZE;i++) if(P->stage[i]!=RB_EMPTY_SLOT) ids[n++]=P->stage[i];
-    if(n==0) return 0;
-    for(int i=0;i<n;i++){
-        Card card; if(!rb_decode_card_by_index((uint32_t)ids[i],&card)) continue;
-        int matched=0;
-        for(uint32_t gi=0;gi<chars->arr_n;gi++) if(chars->arr[gi].tag==RB_TAG_STR && chars->arr[gi].s){
-            /* characters are group/unit/name filters; reuse shared matcher. */
-            if(rb_card_matches_group_str(ids[i], chars->arr[gi].s)) matched=1;
-        }
-        rb_free_card(&card);
-        if(matched) return 1;
-    }
+/* Mirror engine/src/ability/condition/card.rs::evaluate_appearance_condition_inner
+   + evaluate_appearance_stage. Handles:
+     • baton_touch_trigger (get_baton_touch_count + min_baton_touch_count)
+     • presence/absence (不在) routing by location (stage/hand/discard/other)
+     • self-trigger guard: when there are no card-targeting filters, the ability
+       only fires if the ACTIVATING card (host_cid) actually appeared this turn
+       and is on stage
+     • all_areas, cost_limit, card_type, group_names/characters (+verify an
+       appeared card matches), exclude_self, activation_position, position. */
+static int card_appeared_this_turn(const GameState *g, int cid) {
+    if (cid < 0) return 0;
+    for (int i = 0; i < g->n_cards_appeared_this_turn; i++)
+        if (g->cards_appeared_this_turn[i] == cid) return 1;
     return 0;
+}
+static int baton_touch_count_for(const GameState *g, int pl) {
+    return pl ? g->baton_touch_count_p2 : g->baton_touch_count_p1;
+}
+static int eval_appearance_stage(const struct GameState *g, int actor, int host_cid,
+                                  const Condition *c, int pl) {
+    const RbPlayer *P = &g->p[pl];
+    int ids[RB_STAGE_SIZE]; int n = 0;
+    for (int i = 0; i < RB_STAGE_SIZE; i++) if (P->stage[i] != RB_EMPTY_SLOT) ids[n++] = P->stage[i];
+    if (n == 0) return 0;
+
+    int has_group = 0; const CondValue *gv = find_val(c, "group_names");
+    if (gv && gv->tag == RB_TAG_ARRAY && gv->arr_n > 0) has_group = 1;
+    int has_chars = 0; const CondValue *chars = find_val(c, "characters");
+    if (chars && chars->tag == RB_TAG_ARRAY && chars->arr_n > 0) has_chars = 1;
+    int has_cost_limit = 0; get_i(c, "cost_limit", &has_cost_limit);
+    int has_card_type = 0; const char *ct = get_str(c, "card_type"); if (ct) has_card_type = 1;
+    int has_card_filters = has_group || has_chars || has_cost_limit || has_card_type;
+
+    int baton_trigger = 0; get_bool(c, "baton_touch_trigger", &baton_trigger);
+
+    /* Self-trigger guard: no card filters → only "this member appeared". */
+    if (!baton_trigger && !has_card_filters) {
+        if (g->n_cards_appeared_this_turn == 0) return 0;
+        if (host_cid < 0) return 0;
+        int on_stage = 0;
+        for (int i = 0; i < n; i++) if (ids[i] == host_cid) { on_stage = 1; break; }
+        if (!on_stage || !card_appeared_this_turn(g, host_cid)) return 0;
+    }
+
+    /* exclude_self with cost_limit/card_type: require ANOTHER appeared card matches. */
+    int excl = 0; get_bool(c, "exclude_self", &excl);
+    if (!baton_trigger && excl && (has_cost_limit || has_card_type) &&
+        g->n_cards_appeared_this_turn > 0) {
+        int other = 0;
+        for (int i = 0; i < n; i++) {
+            int cid = ids[i];
+            if (host_cid >= 0 && cid == host_cid) continue;
+            if (card_appeared_this_turn(g, cid)) { other = 1; break; }
+        }
+        if (!other) return 0;
+    }
+
+    int all_areas = 0; get_bool(c, "all_areas", &all_areas);
+    if (all_areas && n != RB_STAGE_SIZE) return 0;
+
+    /* cost_limit (e.g. コスト10のメンバー) */
+    if (has_cost_limit) {
+        const char *op = get_str(c, "operator"); if (!op) op = "=";
+        int cost_match = 0;
+        for (int i = 0; i < n; i++) {
+            Card cc; if (!rb_decode_card_by_index((uint32_t)ids[i], &cc)) continue;
+            int cost = (int)cc.cost;
+            rb_free_card(&cc);
+            if (eval_operator(cost, op, has_cost_limit)) { cost_match = 1; break; }
+        }
+        if (!cost_match) return 0;
+    }
+
+    /* card_type (member_card / live_card / energy_card) */
+    if (has_card_type) {
+        int type_match = 0;
+        for (int i = 0; i < n; i++) if (rb_card_matches_type(ids[i], ct)) { type_match = 1; break; }
+        if (!type_match) return 0;
+    }
+
+    /* group_names / characters — any (or all if all_areas) stage card matches. */
+    if (has_group || has_chars) {
+        int any_match = 0, all_match = 1;
+        for (int i = 0; i < n; i++) {
+            int matched = 0;
+            if (has_group)
+                for (uint32_t gi = 0; gi < gv->arr_n && !matched; gi++)
+                    if (gv->arr[gi].tag == RB_TAG_STR && gv->arr[gi].s &&
+                        rb_card_matches_group_str(ids[i], gv->arr[gi].s)) matched = 1;
+            if (has_chars && !matched)
+                for (uint32_t gi = 0; gi < chars->arr_n && !matched; gi++)
+                    if (chars->arr[gi].tag == RB_TAG_STR && chars->arr[gi].s &&
+                        rb_card_matches_group_str(ids[i], chars->arr[gi].s)) matched = 1;
+            if (matched) any_match = 1; else all_match = 0;
+        }
+        if (all_areas ? !all_match : !any_match) return 0;
+        /* Verify an APPEARED card matches the group (appearance trigger should only
+           fire when a card that actually appeared this turn matches). */
+        if (!baton_trigger && g->n_cards_appeared_this_turn > 0) {
+            int appeared_match = 0;
+            for (int i = 0; i < n; i++) {
+                int cid = ids[i];
+                if (!card_appeared_this_turn(g, cid)) continue;
+                int matched = 0;
+                if (has_group)
+                    for (uint32_t gi = 0; gi < gv->arr_n && !matched; gi++)
+                        if (gv->arr[gi].tag == RB_TAG_STR && gv->arr[gi].s &&
+                            rb_card_matches_group_str(cid, gv->arr[gi].s)) matched = 1;
+                if (has_chars && !matched)
+                    for (uint32_t gi = 0; gi < chars->arr_n && !matched; gi++)
+                        if (chars->arr[gi].tag == RB_TAG_STR && chars->arr[gi].s &&
+                            rb_card_matches_group_str(cid, chars->arr[gi].s)) matched = 1;
+                if (matched) { appeared_match = 1; break; }
+            }
+            if (!appeared_match) return 0;
+        }
+    }
+
+    /* activation_position: the activating card itself must be at the position. */
+    const char *actpos = get_str(c, "activation_position");
+    if (actpos && host_cid >= 0) {
+        int passes = 0;
+        char buf[64]; strncpy(buf, actpos, sizeof(buf) - 1); buf[sizeof(buf) - 1] = '\0';
+        char *t = strtok(buf, ",");
+        while (t) {
+            int idx = rb_activation_position_index(t);
+            if (idx >= 0 && idx < RB_STAGE_SIZE && idx < 3 && P->stage[idx] == host_cid) { passes = 1; break; }
+            t = strtok(NULL, ",");
+        }
+        if (!passes) return 0;
+    }
+
+    /* position (without position_compare): the activating card must be there. */
+    const char *pos = get_str(c, "position");
+    const char *poscmp = get_str(c, "position_compare");
+    if (pos && !poscmp && host_cid >= 0) {
+        int idx = stage_index_of_position(pos);
+        if (idx < 0) return 0;
+        if (idx >= RB_STAGE_SIZE || P->stage[idx] != host_cid) return 0;
+    }
+    return 1;
+}
+
+/* ── appearance (variant 5) ── */
+static int eval_appearance(const struct GameState *g, int actor, int host_cid, const Condition *c) {
+    int ap = 0; get_bool(c, "appearance", &ap);   /* unwrap_or(false) */
+    int baton_trigger = 0; get_bool(c, "baton_touch_trigger", &baton_trigger);
+    int pl = target_player_idx(actor, c);
+    const RbPlayer *P = &g->p[pl];
+
+    if (baton_trigger) {
+        int bt = baton_touch_count_for(g, pl);
+        if (bt == 0) return 0;
+        int minc = 0; if (get_i(c, "min_baton_touch_count", &minc) && minc > 0 && bt < minc) return 0;
+        /* baton appearances legitimately trigger on the activating card; presence is
+           checked by the stage/character filter below when present. */
+        if (!ap) return 1;
+    }
+
+    if (!baton_trigger && !ap) {
+        /* 不在 (absence) condition. */
+        const char *loc = get_str(c, "location");
+        if (!loc || !strcmp(loc, "stage")) {
+            for (int i = 0; i < RB_STAGE_SIZE; i++) if (P->stage[i] != RB_EMPTY_SLOT) return 0;
+            return 1;
+        }
+        if (!strcmp(loc, "hand"))    return P->hand.n == 0;
+        if (!strcmp(loc, "discard") || !strcmp(loc, "waitroom")) return P->discard.n == 0;
+        return 1;   /* other zones: absence is accepted */
+    }
+
+    /* appearance present condition. */
+    const char *loc = get_str(c, "location");
+    if (!loc || !strcmp(loc, "stage")) return eval_appearance_stage(g, actor, host_cid, c, pl);
+    if (!strcmp(loc, "hand"))    return P->hand.n > 0;
+    if (!strcmp(loc, "discard") || !strcmp(loc, "waitroom")) return P->discard.n > 0;
+    return 1;   /* other zones: presence accepted */
 }
 
 /* ── temporal (variant 6) ──
@@ -1138,7 +1293,7 @@ static int eval_condition_inner_host(const struct GameState *g, int actor, int h
         case RB_COND_COMPARISON:          r = eval_comparison_inner(g, actor, host_cid, c); break;
         case RB_COND_MOVEMENT:            r = eval_movement(g, actor, host_cid, c); break;
         case RB_COND_GROUP:               r = eval_group(g, actor, host_cid, c); break;
-        case RB_COND_APPEARANCE:          r = eval_appearance(g, actor, c); break;
+        case RB_COND_APPEARANCE:          r = eval_appearance(g, actor, host_cid, c); break;
         case RB_COND_TEMPORAL:            r = eval_temporal(g, actor, host_cid, c); break;
         case RB_COND_STATE:               r = eval_state(g, actor, host_cid, c); break;
         case RB_COND_RESOURCE:            r = eval_resource(g, actor, c); break;
