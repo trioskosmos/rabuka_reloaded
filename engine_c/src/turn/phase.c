@@ -557,3 +557,76 @@ void rb_3ds_tdbg(const char *msg) {
     (void)msg;
 }
 
+
+/* -- execute_performance_phase -- */
+void rb_execute_performance_phase(GameState *g, int is_first) {
+    if (!g) return;
+    rb_trigger_live_start(g, 0);
+    rb_trigger_live_start(g, 1);
+    rb_trigger_auto_abilities(g, 0, "ライブ開始時");
+    rb_trigger_auto_abilities(g, 1, "ライブ開始時");
+}
+
+/* -- play_time_cost_reduction_hook -- */
+int rb_play_time_cost_reduction_hook(GameState *g, int card_id) {
+    if (!g) return 0;
+    return 0; /* Simplified: no reduction */
+}
+
+/* -- play_time_cost_reduction_amount -- */
+int rb_play_time_cost_reduction_amount(const GameState *g, int card_id) {
+    if (!g) return 0;
+    return 0; /* Simplified: no reduction */
+}
+
+/* -- play_time_alt_cost_chars -- */
+int rb_play_time_alt_cost_chars(const GameState *g, int card_id, char *chars, int chars_len) {
+    if (!g || !chars) return 0;
+    chars[0] = '\0';
+    return 0;
+}
+
+/* -- normalize_member_name -- */
+void rb_normalize_member_name(const char *src, char *out, size_t out_sz) {
+    if (!src || !out) return;
+    strncpy(out, src, out_sz - 1);
+    out[out_sz - 1] = '\0';
+}
+
+/* -- has_play_time_alt_cost_hand_cards -- */
+int rb_has_play_time_alt_cost_hand_cards(const GameState *g, int card_id) {
+    if (!g) return 0;
+    return 0; /* Simplified */
+}
+
+/* -- discard_play_time_alt_cost -- */
+void rb_discard_play_time_alt_cost(GameState *g, int pl) {
+    if (!g) return;
+    (void)pl;
+}
+
+/* -- shuffle_waitroom_members_to_deck_bottom -- */
+void rb_shuffle_waitroom_members_to_deck_bottom(GameState *g, int pl) {
+    if (!g) return;
+    RbPlayer *P = &g->p[pl];
+    for (int i = 0; i < P->discard.n; i++)
+        P->deck.cards[P->deck.n++] = P->discard.cards[i];
+    P->discard.n = 0;
+    rb_shuffle(P->deck.cards, P->deck.n);
+}
+
+/* -- rps_choice_name -- */
+const char *rb_rps_choice_name(int choice) {
+    switch (choice) {
+        case 0: return "rock";
+        case 1: return "scissors";
+        case 2: return "paper";
+        default: return "unknown";
+    }
+}
+
+/* -- push_rps_log -- */
+void rb_push_rps_log(GameState *g, int p1, int p2, const char *winner_str) {
+    if (!g) return;
+    (void)p1; (void)p2; (void)winner_str;
+}
