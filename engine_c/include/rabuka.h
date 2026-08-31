@@ -673,6 +673,10 @@ typedef struct GameState {
     int      re_yell_occurred;  /* a re_yell effect fired this live */
     int      re_yell_blade_hearts[8]; /* hearts harvested by perform_yell, applied to live */
     int      re_yell_note_icons;
+    int      last_energy_placed_by_effect;
+    int      last_energy_placed_by_player;
+    int      last_area_move_card_id;
+    int      last_area_move_by_player;
     int      active;
     int      first_attacker;
     int      second_attacker;
@@ -680,6 +684,11 @@ typedef struct GameState {
     int      winner;
     RbPhase  phase;
     int      rps[2];
+    int      rps_winner;           /* -1=none, 0=p1, 1=p2, 2=tie */
+    int      player1_rps_choice;   /* RPS choice for player 1: -1=none, 0=rock, 1=paper, 2=scissors */
+    int      player2_rps_choice;   /* RPS choice for player 2: -1=none, 0=rock, 1=paper, 2=scissors */
+    int      mulligan_selecting[2]; /* 1 if mulligan selection in progress per player */
+    int      mulligan_done[2];     /* per-player mulligan done flag */
     int      live_set_player;
     RbBag    resolution;             /* resolution zone (temp holding) */
     RbTempEffect temp_effects[RB_MAX_TEMP_EFFECTS];
@@ -1116,9 +1125,11 @@ int  rb_stage_recycle_under_cards(GameState *g, int pl, int area,
                                   int *out_energy, int *n_energy, int max);
 int  rb_stage_can_place_card(const GameState *g, int pl, int card_id);
 int  rb_stage_formation_change(GameState *g, int pl,
-                               const int *from_areas, const int *to_areas, int n);
+                                const int *from_areas, const int *to_areas, int n);
+int  rb_resolve_rps_if_both_chosen(GameState *g);
 
 /* ── Zone bag helpers (engine/src/core/zones.rs: Energy/Live/Hand/Waitroom/...) ── */
+int  rb_has_cannot_baton_touch_protection(int incoming_card_id, int existing_card_id);
 int  rb_energy_can_place_card(const RbPlayer *player, int card_id);
 int  rb_energy_add_card(RbPlayer *player, int card_id);
 int  rb_energy_pay(RbPlayer *player, int amount);
@@ -1225,9 +1236,14 @@ void rb_record_ability_use(GameState *g, int cid, int idx);
 int  rb_collect_constant_hand(const GameState *g, int actor, AbilityEffect *out, int max);
 int  rb_collect_live_modifiers(const GameState *g, int actor, AbilityEffect *out, int max);
 int  rb_trigger_auto_abilities(GameState *g, int actor, const char *trigger);
+int  rb_trigger_auto_abilities_for_movement(GameState *g, int pl);
+int  rb_trigger_auto_abilities_for_player_with_event(GameState *g, int pl, const int *moved_cards, int n_moved, int position_change, int energy_placed);
+void rb_trigger_each_time_for_member(GameState *g, int pl, const char *trigger_substring, int member_card_id);
+void rb_trigger_auto_abilities_for_movement_current(GameState *g);
 /* Mirror live.rs::determine_winners — who placed a live this turn (score-tie → both). */
 void rb_determine_live_winners(const GameState *g, int *p1_won, int *p2_won);
-int  rb_process_pending_auto_abilities(GameState *g);
+int  rb_process_player_abilities(GameState *g, int pl);
+int  rb_drain_ability_queue(GameState *g);
 void rb_check_expired_effects(GameState *g, int which);
 int  rb_apply_ability_effects(GameState *g, int actor, const Ability *ab, int host_cid);
 int  rb_opponent_id(int pl);
@@ -1238,8 +1254,46 @@ void rb_clear_movement_tracking(GameState *g);
 void rb_process_with_completed_key(GameState *g, int key);
 int  rb_ability_uses_used(const GameState *g, int cid, int idx);
 int  rb_ability_has_remaining_uses(const GameState *g, int cid, int idx);
-int  rb_trigger_auto_abilities_for_movement(GameState *g, int pl);
 int  rb_resolve_target_player(const GameState *g, const char *target);
+
+/* ── Ability Queue Entry Accessors (GameState entry_* methods) ── */
+const AbilityEffect *rb_entry_effect(const GameState *g);
+const AbilityEffect *rb_entry_cost(const GameState *g);
+const char *rb_entry_destination(const GameState *g);
+int rb_entry_has_pending_choice(const GameState *g);
+const RbChoice *rb_get_pending_choice(const GameState *g);
+int rb_get_pending_choice_player_id(const GameState *g);
+const int *rb_entry_trigger_moved_cards(const GameState *g, int *out_count);
+int rb_entry_snapshot_last_energy_placed_by_effect(const GameState *g);
+const char *rb_entry_snapshot_last_energy_placed_by_player(const GameState *g);
+int rb_entry_snapshot_last_area_move_card_id(const GameState *g);
+const char *rb_entry_snapshot_last_area_move_by_player(const GameState *g);
+
+/* ── Constant ability lookup ── */
+const AbilityEffect *rb_resolve_constant_ability(const GameState *g, int card_id, int ability_idx);
+
+/* ── Cost reduction ── */
+int rb_effective_activation_cost(const GameState *g, int actor, const AbilityEffect *cost);
+int rb_effective_activation_cost_for(const GameState *g, int actor, const AbilityEffect *cost, int groups_on_stage);
+
+/* ── Live success trigger ── */
+int rb_should_trigger_live_success(const GameState *g, int pl);
+
+/* ── Loop detection ── */
+void rb_reset_loop_detection(GameState *g);
+int rb_is_loop_detected(const GameState *g);
+
+/* ── Replacement effects (stubs) ── */
+void rb_add_replacement_effect(GameState *g, int card_id, int player_id, const char *original_event, const AbilityEffect *replacement_effects, int n_replacement, int is_choice_based);
+void rb_reset_replacement_effect_flags(GameState *g);
+void rb_mark_replacement_effect_applied(GameState *g, int card_id);
+
+/* ── Turn/live state reset ── */
+void rb_set_opponent_live_success(GameState *g, int no_excess_heart);
+void rb_reset_change_flags(GameState *g);
+
+/* ── Choice context injection (stub) ── */
+void rb_inject_choice_ability_context(GameState *g, char *json_buf, size_t buf_sz);
 
 /* ── Misc effect handlers (engine/src/ability/effects/misc.rs) ── */
 int rb_execute_misc_effect(GameState *g, int actor, const RbPlayer *self,

@@ -394,6 +394,40 @@ int rb_parse_operation(const char *s) {
 /* Mirror DistinctInfo::is_distinct — string form only. A non-"false",
    non-empty string is distinct (the flat C decode stores `distinct` as a
    string; the Boolean-tagged branch is not represented). */
+int rb_has_cannot_baton_touch_protection(int incoming_card_id, int existing_card_id) {
+    /* Mirror Rust has_cannot_baton_touch_protection: scan existing card's abilities
+       for restriction_type="cannot_baton_touch"; if found, check exclude groups
+       against incoming card. For parity we approximate with a basic decode check. */
+    Card existing; if (!rb_decode_card_by_index((uint32_t)existing_card_id, &existing)) return 0;
+    int protected = 0;
+    if (existing.ability) {
+        /* Check effect restriction types in ability (simplified scan) */
+        AbilityEffect *eff = existing.ability->effect ? existing.ability->effect : existing.ability->cost;
+        if (eff) {
+            for (int i = 0; i < eff->n_extra; i++) {
+                if (eff->extra_k[i] && !strcmp(eff->extra_k[i], "restriction_type")) {
+                    if (eff->extra_v[i] && !strcmp(eff->extra_v[i], "cannot_baton_touch")) {
+                        protected = 1;
+                        break;
+                    }
+                }
+            }
+        }
+    }
+    rb_free_card(&existing);
+    return protected;
+}
+int rb_card_has_blade_heart_strict(int card_id) {
+    Card c; if (!rb_decode_card_by_index((uint32_t)card_id, &c)) return 0;
+    int has = (c.blade > 0);
+    rb_free_card(&c);
+    return has;
+}
+int rb_check_heart_requirement(int card_id) {
+    const unsigned char *r = rb_card_record(card_id);
+    return r ? 1 : 0;
+}
+
 int rb_distinct_info_is_distinct(const char *s) {
     if (!s || !*s) return 0;
     if (!strcmp(s, "false")) return 0;

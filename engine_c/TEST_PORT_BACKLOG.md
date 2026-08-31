@@ -5,14 +5,15 @@ checks across 966 fns). Failures are dominated by porting gaps, not engine crash
 
 ## Backlog
 
-- [ ] **1. Map `energy_deck.cards.push` to a C shim** (S)
-  - `energy_deck` is missing from `ZONE_TO_TESTADD` (`tools/gen_tests.py:195`) → falls through to `// TODO push to energy_deck`.
-  - Add a special-case in the `.cards.push` rule (`gen_tests.py:1317`) that emits `test_add_to_energy(&tg, pl, var)`.
-  - ~many `game.state.playerN.energy_deck.cards.push(...)` TODOs.
+- [x] **1. Map `energy_deck.cards.push` to a C shim** (S) — DONE
+  - Root cause was multi-line method chains, not a missing mapping: `energy_deck.cards.push` already mapped to `test_add_to_deck_pl` for single-line form.
+  - Added `join_method_continuations()` so chained calls (`.player1`/`.cards`/`.push` on separate lines) rejoin into one line → existing rules fire. (Must concatenate with no separator, not a space.)
+  - Guarded push rules with `_map_game_id_safe()` so unresolved `game.id(...)` degrades to `// TODO` instead of breaking the C compile.
 
-- [ ] **2. Add `main_deck` replace / `insert(0,…)` shims** (M)
-  - `game.state.playerN.main_deck.cards = vec![…].into()` (replace) and `.cards.insert(0, x)` (deck-top prepend) are TODOs.
-  - Need `test_set_deck(pl, cards[])` / `test_insert_deck_top(pl, card)` shims in `test_game.c` + transpiler rules.
+- [x] **2. Add `main_deck` replace / `insert(0,…)` shims** (M) — DONE
+  - `test_insert_deck_top(pl, card)` shim added to `test_game.c`/`test_game.h`.
+  - Transpiler rules for `main_deck.cards = vec![a,b,c].into()` (clear+push in order) and `vec![x; N].into()` (repeat-constructor, unrolled) and `main_deck.cards.insert(0, x)` (prepend).
+  - Also fixed type-annotated `let X: TYPE = …` so those bindings declare instead of TODO.
 
 - [ ] **3. Investigate `-1` card-not-found** (M)
   - 54 failures show `test_id` returning -1 (`rb_find_card_by_no` miss) for some card_no that exists in Rust.

@@ -174,7 +174,8 @@ int rb_load_rom(const unsigned char *cards_blob, long cards_len,
         g_strings_rom[i] = (char *)(abstr_blob + g_strings_offsets[i]);
     if (parse_strings(abstr_blob, abstr_len) != 0) return -3;
 
-    load_bytecode();
+    g_bc = (unsigned char *)RBKA_BYTECODE;   /* ROM-embedded bytecode blob */
+    g_bc_len = RBKA_BYTECODE_LEN;
     return 0;
 }
 #endif

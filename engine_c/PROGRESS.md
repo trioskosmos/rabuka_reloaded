@@ -72,3 +72,10 @@ Run `python tools/dep_audit.py --report DEPENDENCY_AUDIT.md` and confirm the fun
 just wrote is classified `REAL` (not `STUB_NOOP`/`STUB_MARKER`) and that it is no longer in
 the bottom-up work-order table. Cross-check with `size_audit.py` (C should be a meaningful
 fraction of the Rust twin) and `audit_placeholders.py` (no TODO/STUB markers left).
+
+## Current gap snapshot (from latest audits — regenerate before trusting)
+- C lines / Rust lines: ~10,551 / 48,265 (~22%).
+- Missing functions (SIZE_AUDIT.md gap ≈ 178): worst files `vm.c` (58), `card.c` (58), `util.c` (40), `condition.c` (29), `effects/move.c` (29), `turn/live.c` (21), `turn/phase.c` (19).
+- DEPENDENCY_AUDIT.md stubs: 4 remaining (`h_restriction`, `rb_phase_name`, `rb_resolver_finalize_choice`, `h_activation_restriction`). Fix bottom-up (depth 1 first), then bulk-fill the worst line-ratio gaps above.
+- Missing declarations (`DEPENDENCY_AUDIT.md` MISSING): `rb_complete_play_with_cost`, `rb_fire_all_auto`. Both exist in C source (`engine.c`, `game_state_abilities.c`) — audit path issue; verify with build.
+- Next maintainer action: regenerate both audits (`python tools/dep_audit.py ...` and `python tools/size_audit.py --rust ../engine/src ...`), pick the deepest stub or worst gap file, port file-by-file without inventing new architecture, rebuild, re-audit.

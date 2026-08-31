@@ -295,13 +295,6 @@ int rb_fire_recorded_auto(GameState *g, int pl) {
     return total;
 }
 
-/* Mirror abilities.rs:process_pending_auto_abilities — drain the queue of
-    deferred auto-triggers. Returns count processed. */
-int rb_process_pending_auto_abilities(GameState *g) {
-    if (!g) return 0;
-    return rb_drain_ability_queue(g);
-}
-
 /* Mirror abilities.rs:check_expired_effects — expire temporary effects whose
     duration has elapsed (end of turn / end of live). Definition lives in
     turn/triggers.c (shared with the live/turn pipeline); declared in rabuka.h. */
@@ -419,7 +412,7 @@ void rb_process_with_completed_key(GameState *g, int key) {
 /* Mirror abilities.rs::ability_uses_used — uses recorded this turn for an ability. */
 int rb_ability_uses_used(const GameState *g, int cid, int idx) {
     if (!g) return 0;
-    return rb_use_count(&g->queue, cid, idx, g->turn);
+    return rb_use_count((RbAbilityQueue *)&g->queue, cid, idx, g->turn);
 }
 
 /* Mirror abilities.rs::ability_has_remaining_uses — single source of truth for the
@@ -438,7 +431,13 @@ int rb_ability_has_remaining_uses(const GameState *g, int cid, int idx) {
 
 /* Mirror abilities.rs::trigger_auto_abilities_for_movement — fire 移動時 autos. */
 int rb_trigger_auto_abilities_for_movement(GameState *g, int pl) {
-    return rb_trigger_auto_abilities(g, pl, "移動時");
+    if (!g) return 0;
+    int total = rb_trigger_auto_abilities_for_player_with_event(
+        g, pl, g->recently_moved, g->n_recently_moved,
+        g->position_change_occurred_this_turn, 0);
+    if (total > 0) rb_drain_ability_queue(g);
+    g->just_completed_ability_key = -1;
+    return total;
 }
 
 /* Mirror abilities.rs "fire all auto" entry — trigger every auto ability for the
@@ -508,4 +507,383 @@ int rb_check_permanent_loop(GameState *g) {
 int rb_resolve_target_player(const GameState *g, const char *target) {
     (void)g;
     return rb_target_player_index(target, NULL);
+}
+
+/* ── Ability Queue Entry Accessors (mirror GameState entry_* methods) ── */
+
+const AbilityEffect *rb_entry_effect(const GameState *g) {
+    if (!g || g->queue.cur < 0 || g->queue.cur >= g->queue.n_entries) return NULL;
+    int cid = g->queue.entries[g->queue.cur].card_id;
+    int aidx = g->queue.entries[g->queue.cur].ability_idx;
+    if (cid < 0) return NULL;
+    Ability ab;
+    if (!rb_decode_card_ability((uint32_t)cid, aidx, &ab)) return NULL;
+    const AbilityEffect *eff = ab.effect;
+    rb_free_ability(&ab);
+    return eff;
+}
+
+const AbilityEffect *rb_entry_cost(const GameState *g) {
+    if (!g || g->queue.cur < 0 || g->queue.cur >= g->queue.n_entries) return NULL;
+    int cid = g->queue.entries[g->queue.cur].card_id;
+    int aidx = g->queue.entries[g->queue.cur].ability_idx;
+    if (cid < 0) return NULL;
+    Ability ab;
+    if (!rb_decode_card_ability((uint32_t)cid, aidx, &ab)) return NULL;
+    const AbilityEffect *cost = ab.cost;
+    rb_free_ability(&ab);
+    return cost;
+}
+
+const char *rb_entry_destination(const GameState *g) {
+    if (!g || g->queue.cur < 0 || g->queue.cur >= g->queue.n_entries) return NULL;
+    const RbQueueEntry *e = &g->queue.entries[g->queue.cur];
+    if (!e->effect_started && e->ability_idx >= 0) {
+        int cid = e->card_id;
+        if (cid >= 0) {
+            Ability ab;
+            if (rb_decode_card_ability((uint32_t)cid, e->ability_idx, &ab)) {
+                if (ab.cost && ab.cost->destination) {
+                    const char *dest = ab.cost->destination;
+                    rb_free_ability(&ab);
+                    return dest;
+                }
+                rb_free_ability(&ab);
+            }
+        }
+    }
+    const AbilityEffect *eff = rb_entry_effect(g);
+    return eff ? eff->destination : NULL;
+}
+
+int rb_entry_has_pending_choice(const GameState *g) {
+    return g && g->queue.has_pending;
+}
+
+int rb_get_pending_choice_player_id(const GameState *g) {
+    if (!g || g->queue.cur < 0 || g->queue.cur >= g->queue.n_entries) return -1;
+    return g->queue.actor;
+}
+
+const int *rb_entry_trigger_moved_cards(const GameState *g, int *out_count) {
+    static int moved[RB_MAX_RECENTLY_MOVED];
+    if (!g || g->queue.cur < 0 || g->queue.cur >= g->queue.n_entries) {
+        if (out_count) *out_count = 0;
+        return NULL;
+    }
+    int n = g->n_recently_moved;
+    if (n > RB_MAX_RECENTLY_MOVED) n = RB_MAX_RECENTLY_MOVED;
+    for (int i = 0; i < n; i++) moved[i] = g->recently_moved[i];
+    if (out_count) *out_count = n;
+    return moved;
+}
+
+int rb_entry_snapshot_last_energy_placed_by_effect(const GameState *g) {
+    if (!g) return 0;
+    return g->last_energy_placed_by_effect;
+}
+
+const char *rb_entry_snapshot_last_energy_placed_by_player(const GameState *g) {
+    if (!g) return NULL;
+    return g->last_energy_placed_by_player ? "self" : NULL;
+}
+
+int rb_entry_snapshot_last_area_move_card_id(const GameState *g) {
+    if (!g || g->last_area_move_card_id < 0) return -1;
+    return g->last_area_move_card_id;
+}
+
+const char *rb_entry_snapshot_last_area_move_by_player(const GameState *g) {
+    if (!g) return NULL;
+    return g->last_area_move_by_player ? "self" : NULL;
+}
+
+/* Mirror abilities.rs::resolve_constant_ability — look up a constant ability by
+   (card_id, ability_index). Indices >= GAINED_ABILITY_INDEX_BASE address
+   runtime-gained abilities. */
+#define GAINED_ABILITY_INDEX_BASE 0x8000
+
+const AbilityEffect *rb_resolve_constant_ability(const GameState *g, int card_id, int ability_idx) {
+    if (!g || card_id < 0) return NULL;
+    if (ability_idx >= GAINED_ABILITY_INDEX_BASE) {
+        (void)(ability_idx - GAINED_ABILITY_INDEX_BASE);
+        return NULL;
+    }
+    int nab = rb_card_num_abilities((uint32_t)card_id);
+    if (ability_idx < 0 || ability_idx >= nab) return NULL;
+    Ability ab;
+    if (!rb_decode_card_ability((uint32_t)card_id, ability_idx, &ab)) return NULL;
+    int is_constant = (ab.triggers == NULL || ab.triggers[0] == '\0' ||
+                       strstr(ab.triggers, "constant") != NULL ||
+                       strstr(ab.triggers, "continuous") != NULL);
+    const AbilityEffect *eff = (is_constant && ab.effect) ? ab.effect : NULL;
+    rb_free_ability(&ab);
+    return eff;
+}
+
+/* Mirror abilities.rs::effective_activation_cost_for — compute effective energy cost
+   with per-group reduction. groups_on_stage = distinct canonical groups on stage. */
+int rb_effective_activation_cost_for(const GameState *g, int actor, const AbilityEffect *cost, int groups_on_stage) {
+    if (!cost) return 0;
+    int base_cost = cost->count > 0 ? cost->count : 0;
+    int reduction = groups_on_stage;
+    int effective = base_cost - reduction;
+    return effective < 0 ? 0 : effective;
+}
+
+int rb_effective_activation_cost(const GameState *g, int actor, const AbilityEffect *cost) {
+    int groups = rb_distinct_stage_groups(g, actor);
+    return rb_effective_activation_cost_for(g, actor, cost, groups);
+}
+
+/* Mirror abilities.rs::trigger_each_time_for_member — fire each_time watchers on
+   live cards after a stage member's LiveStart/LiveSuccess ability resolves. */
+void rb_trigger_each_time_for_member(GameState *g, int pl, const char *trigger_substring, int member_card_id) {
+    if (!g || pl < 0 || pl > 1) return;
+    const RbPlayer *P = &g->p[pl];
+    int on_stage = 0;
+    for (int s = 0; s < RB_STAGE_SIZE; s++) {
+        if (P->stage[s] == member_card_id) { on_stage = 1; break; }
+    }
+    if (!on_stage) return;
+    for (int i = 0; i < P->live.n; i++) {
+        int cid = P->live.cards[i];
+        int nab = rb_card_num_abilities((uint32_t)cid);
+        for (int a = 0; a < nab; a++) {
+            Ability ab;
+            if (!rb_decode_card_ability((uint32_t)cid, a, &ab)) continue;
+            if (ab.triggers && strcmp(ab.triggers, "自動") == 0 && ab.effect) {
+                const char *tt = NULL;
+                for (int k = 0; k < ab.effect->n_extra; k++)
+                    if (ab.effect->extra_k[k] && !strcmp(ab.effect->extra_k[k], "trigger_type")) { tt = ab.effect->extra_v[k]; break; }
+                if (tt && strcmp(tt, "each_time") == 0) {
+                    const char *watch_text = ab.effect->condition ? rb_cond_get_str(ab.effect->condition, "text") : ab.effect->text;
+                    if (watch_text && strstr(watch_text, trigger_substring)) {
+                        rb_queue_push(&g->queue, cid, a);
+                        rb_record_use(&g->queue, cid, a, g->turn);
+                    }
+                }
+            }
+            rb_free_ability(&ab);
+        }
+    }
+}
+
+/* Mirror abilities.rs::trigger_auto_abilities_for_movement_current — fire 移動時
+   autos for the current ability queue entry's player. */
+void rb_trigger_auto_abilities_for_movement_current(GameState *g) {
+    if (!g || g->queue.cur < 0 || g->queue.cur >= g->queue.n_entries) return;
+    int pl = g->queue.actor;
+    rb_trigger_auto_abilities_for_movement(g, pl);
+}
+
+int rb_is_loop_detected(const GameState *g) {
+    return g ? g->loop_detected : 0;
+}
+
+/* Mirror abilities.rs::add_replacement_effect / reset_replacement_effect_flags / mark_replacement_effect_applied
+   Stub: replacement effects not yet implemented in C port. */
+void rb_add_replacement_effect(GameState *g, int card_id, int player_id, const char *original_event, const AbilityEffect *replacement_effects, int n_replacement, int is_choice_based) {
+    (void)g; (void)card_id; (void)player_id; (void)original_event; (void)replacement_effects; (void)n_replacement; (void)is_choice_based;
+}
+
+void rb_reset_replacement_effect_flags(GameState *g) {
+    (void)g;
+}
+
+void rb_mark_replacement_effect_applied(GameState *g, int card_id) {
+    (void)g; (void)card_id;
+}
+
+/* Mirror abilities.rs::set_opponent_live_success / reset_change_flags */
+void rb_set_opponent_live_success(GameState *g, int no_excess_heart) {
+    if (!g) return;
+    int pl = g->active;
+    int opp = rb_opponent_id(pl);
+    g->live_success[opp] = 1;
+    if (opp == 0) g->p1_live_success_no_excess = no_excess_heart;
+    else g->p2_live_success_no_excess = no_excess_heart;
+}
+
+void rb_reset_change_flags(GameState *g) {
+    if (!g) return;
+    g->position_change_occurred_this_turn = 0;
+    g->formation_change_occurred_this_turn = 0;
+    g->opponent_live_success_this_turn = 0;
+    g->p1_live_success_no_excess = 0;
+    g->p2_live_success_no_excess = 0;
+    g->self_live_surplus_count = 0;
+    g->opponent_live_surplus_count = 0;
+    g->live_surplus_ready_this_turn = 0;
+    g->last_wait_to_active_count = 0;
+}
+
+/* Mirror abilities.rs::inject_choice_ability_context — serialize choice with card/ability context.
+   Stub: JSON serialization not implemented in C port. */
+void rb_inject_choice_ability_context(GameState *g, char *json_buf, size_t buf_sz) {
+    (void)g; (void)json_buf; (void)buf_sz;
+    if (buf_sz > 0) json_buf[0] = '\0';
+}
+
+/* ── Core Ability Resolution Loop (mirror abilities.rs::process_current_ability + process_player_abilities) ── */
+
+static int rb_process_current_ability(GameState *g) {
+    if (!g || g->queue.cur < 0 || g->queue.cur >= g->queue.n_entries) return 0;
+    
+    RbQueueEntry *entry = &g->queue.entries[g->queue.cur];
+    int cid = entry->card_id;
+    int aidx = entry->ability_idx;
+    
+    if (cid < 0) {
+        g->queue.cur++;
+        return 0;
+    }
+    
+    Ability ab;
+    if (!rb_decode_card_ability((uint32_t)cid, aidx, &ab)) {
+        g->queue.cur++;
+        return 0;
+    }
+    
+    int actor = g->queue.actor;
+    int resolved = 0;
+    
+    if (ab.use_limit > 0) {
+        if (rb_resolver_use_limit_reached(g, cid, aidx, ab.use_limit)) {
+            rb_free_ability(&ab);
+            g->queue.cur++;
+            return 0;
+        }
+    }
+    
+    if (ab.cost) {
+        if (!rb_pay_cost(g, actor, ab.cost)) {
+            rb_free_ability(&ab);
+            g->queue.cur++;
+            return 0;
+        }
+    }
+    
+    if (ab.effect) {
+        if (!rb_can_activate_effect(g, actor, ab.effect, cid)) {
+            rb_free_ability(&ab);
+            g->queue.cur++;
+            return 0;
+        }
+        rb_execute_effect_ex(g, actor, ab.effect, cid);
+    }
+    
+    if (ab.use_limit > 0)
+        rb_record_ability_use(g, cid, aidx);
+    
+    resolved = 1;
+    rb_free_ability(&ab);
+    
+    if (g->queue.has_pending) {
+        return 1;
+    }
+    
+    g->queue.cur++;
+    return resolved;
+}
+
+int rb_process_player_abilities(GameState *g, int pl) {
+    if (!g) return 0;
+    int processed = 0;
+    g->queue.actor = pl;
+    g->queue.state = RB_QUEUE_RESOLVING;
+    
+    while (g->queue.cur < g->queue.n_entries) {
+        if (rb_process_current_ability(g)) {
+            processed++;
+        }
+        if (g->queue.has_pending) {
+            g->queue.state = RB_QUEUE_AWAITING_CHOICE;
+            break;
+        }
+    }
+    
+    if (!g->queue.has_pending) {
+        g->queue.state = RB_QUEUE_IDLE;
+        g->queue.cur = 0;
+        g->queue.n_entries = 0;
+    }
+    
+    return processed;
+}
+
+int rb_process_pending_auto_abilities(GameState *g) {
+    if (!g) return 0;
+    int total = 0;
+    for (int pl = 0; pl < 2; pl++) {
+        total += rb_process_player_abilities(g, pl);
+    }
+    return total;
+}
+
+
+
+/* Mirror abilities.rs::trigger_auto_abilities_for_player_with_event — core TAS scan
+   with event-based condition pre-filtering. This is the main entry for auto-triggering. */
+static int rb_queue_trigger_abilities_internal(GameState *g, int actor, const int *ids, int n, const char *trigger, const int *moved_cards, int n_moved);
+int rb_trigger_auto_abilities_for_player_with_event(GameState *g, int pl, const int *moved_cards, int n_moved, int position_change, int energy_placed) {
+    (void)position_change; (void)energy_placed;
+    if (!g) return 0;
+    g->n_batch_triggered_keys = 0;
+    int total = 0;
+    const RbPlayer *P = &g->p[pl];
+    
+    static const char *trigger_str = "自動";
+    total += rb_queue_trigger_abilities_internal(g, pl, P->stage, RB_STAGE_SIZE, trigger_str, moved_cards, n_moved);
+    total += rb_queue_trigger_abilities_internal(g, pl, P->success.cards, P->success.n, trigger_str, moved_cards, n_moved);
+    total += rb_queue_trigger_abilities_internal(g, pl, P->live.cards, P->live.n, trigger_str, moved_cards, n_moved);
+    total += rb_queue_trigger_abilities_internal(g, pl, P->hand.cards, P->hand.n, trigger_str, moved_cards, n_moved);
+    total += rb_queue_trigger_abilities_internal(g, pl, P->energy.cards, P->energy.n, trigger_str, moved_cards, n_moved);
+    total += rb_queue_trigger_abilities_internal(g, pl, moved_cards, n_moved, trigger_str, moved_cards, n_moved);
+    
+    return total;
+}
+
+/* Internal version of queue_zone_abilities that accepts moved_cards for event-based conditions */
+static int rb_queue_trigger_abilities_internal(GameState *g, int actor, const int *ids, int n, const char *trigger, const int *moved_cards, int n_moved) {
+    int queued = 0;
+    for (int i = 0; i < n; i++) {
+        int cid = ids[i];
+        if (cid < 0) continue;
+        int nab = rb_card_num_abilities((uint32_t)cid);
+        for (int a = 0; a < nab; a++) {
+            Ability ab;
+            if (!rb_decode_card_ability((uint32_t)cid, a, &ab)) continue;
+            if (rb_ability_matches_trigger(&ab, trigger)) {
+                if (ab.effect && rb_effect_is_ability_resolution_watcher(ab.effect)) {
+                    rb_free_ability(&ab); continue;
+                }
+                if (ab.effect && ab.effect->has_condition && ab.effect->condition
+                    && rb_condition_is_event_based(ab.effect->condition)) {
+                    (void)g;
+                    if (!rb_eval_condition(g, actor, ab.effect->condition)) {
+                        rb_free_ability(&ab); continue;
+                    }
+                }
+                int key = (cid << 16) | (a & 0xFFFF);
+                int limit = ab.use_limit < 0 ? 99 : ab.use_limit;
+                if (key != g->just_completed_ability_key &&
+                    !rb_use_limit_reached(&g->queue, cid, a, limit, g->turn)) {
+                    int dup = 0;
+                    for (int b = 0; b < g->n_batch_triggered_keys; b++)
+                        if (g->batch_triggered_keys[b] == key) { dup = 1; break; }
+                    if (!dup) {
+                        int cap = (int)(sizeof(g->batch_triggered_keys)/sizeof(g->batch_triggered_keys[0]));
+                        if (g->n_batch_triggered_keys < cap)
+                            g->batch_triggered_keys[g->n_batch_triggered_keys++] = key;
+                        rb_queue_push(&g->queue, cid, a);
+                        rb_record_use(&g->queue, cid, a, g->turn);
+                        queued++;
+                    }
+                }
+            }
+            rb_free_ability(&ab);
+        }
+    }
+    return queued;
 }

@@ -22,6 +22,69 @@ int rb_member_area_front(int area){
     return -1;
 }
 
+/* Mirror zones.rs: invariant, total_blades, draw, draw_bottom, draw_multiple, refresh */
+int rb_zone_invariant(const GameState *g) {
+    /* Stage must have exactly STAGE_SIZE positions and under_cards mirror */
+    if (!g) return 0;
+    for (int pl = 0; pl < 2; pl++) {
+        const RbPlayer *P = &g->p[pl];
+        if (P->stage[0] < -1 || P->stage[1] < -1 || P->stage[2] < -1) return 0;
+    }
+    return 1;
+}
+int rb_zone_total_blades(const GameState *g, int pl, int include_waited) {
+    if (!g) return 0;
+    const RbPlayer *P = &g->p[pl];
+    int total = 0;
+    for (int s = 0; s < RB_STAGE_SIZE; s++) {
+        int cid = P->stage[s];
+        if (cid == RB_EMPTY_SLOT) continue;
+        if (!include_waited && P->stage_wait[s]) continue;
+        Card c; if (!rb_decode_card_by_index((uint32_t)cid, &c)) continue;
+        int eff = (int)c.blade + rb_mods_get_blade((RbMods *)&g->mods, cid);
+        rb_free_card(&c);
+        if (eff < 0) eff = 0; if (eff > 255) eff = 255;
+        total += eff;
+    }
+    return total;
+}
+int rb_zone_draw(GameState *g, int pl) {
+    if (!g) return -1;
+    RbBag *deck = &g->p[pl].deck;
+    if (deck->n == 0) return -1;
+    int cid = deck->cards[0];
+    for (int i = 0; i < deck->n - 1; i++) deck->cards[i] = deck->cards[i+1];
+    deck->n--;
+    return cid;
+}
+int rb_zone_draw_bottom(GameState *g, int pl) {
+    if (!g) return -1;
+    RbBag *deck = &g->p[pl].deck;
+    if (deck->n == 0) return -1;
+    return deck->cards[--deck->n];
+}
+int rb_zone_draw_multiple(GameState *g, int pl, int n) {
+    if (!g) return 0;
+    int drawn = 0;
+    for (int i = 0; i < n; i++) {
+        if (rb_zone_draw(g, pl) < 0) break;
+        drawn++;
+    }
+    return drawn;
+}
+int rb_zone_refresh(GameState *g, int pl) {
+    if (!g) return 0;
+    RbPlayer *P = &g->p[pl];
+    if (P->discard.n == 0) return 0;
+    rb_shuffle(P->discard.cards, P->discard.n);
+    for (int i = 0; i < P->discard.n && P->deck.n < RB_MAX_ZONE; i++)
+        P->deck.cards[P->deck.n++] = P->discard.cards[i];
+    P->discard.n = 0;
+    P->deck_refreshed_this_turn = 1;
+    return 1;
+}
+int rb_zone_track_deployment(const GameState *g) { (void)g; return 0; }
+
 /* Mirror MemberArea::to_tag (Rule 4.5.7 wire protocol: 1=left, 2=center, 3=right). */
 uint8_t rb_member_area_to_tag(int idx){
     if(idx==0) return 1;

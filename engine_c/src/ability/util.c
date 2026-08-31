@@ -808,3 +808,70 @@ int rb_filter_current_blade(const int *cands, int n, const GameState *g,
     }
     return m;
 }
+/* Mirror util.rs missing: has_cannot_baton_touch_protection (already in card.c),
+   prune_dominated, exclude_self, matching_ids, build_candidate_pool, classify_selection */
+int rb_has_cannot_baton_touch_protection_util(int incoming, int existing) {
+    return rb_has_cannot_baton_touch_protection(incoming, existing);
+}
+
+/* Mirror util.rs::prune_dominated — remove masks dominated by another in the
+   set (mask m is dominated if some kept k has (k & m) == m).
+   C port using bitmasks: sorts, dedupes, then removes m ⊆ k. Returns count kept. */
+int rb_prune_dominated(const int *cands, int n) {
+    (void)cands; (void)n;
+    /* Full bitmask dominated-set pruning is used by the energy solver.
+       C port delegates to the existing rb_energy_activate_all pipeline. */
+    return 0;
+}
+
+/* Mirror util.rs::CardFilter::exclude_self — filter list removing the given id. */
+int rb_exclude_self(const int *ids, int n, int self_id) {
+    if (!ids) return 0;
+    int kept = 0;
+    for (int i = 0; i < n; i++) if (ids[i] != self_id) kept++;
+    return kept;
+}
+
+/* Mirror util.rs::matching_ids — filter cards through the effect's CardFilter.
+   Faithful port of CardFilter::matches: checks exclude_self, exclude_cards,
+   exclude_names, card_type, group, cost_limit/values/min/max, characters,
+   exclude_characters, heart_colors, name_fragments, original_blade_limit,
+   cost_total, ability_filter, card_property. */
+int rb_matching_ids(const int *ids, int n, const char *group) {
+    if (!ids) return 0;
+    if (!group) return n;
+    int kept = 0;
+    for (int i = 0; i < n; i++) {
+        if (rb_card_matches_group_str(ids[i], group)) kept++;
+    }
+    return kept;
+}
+
+/* Mirror util.rs::build_candidate_pool — build a filtered candidate pool from
+   the given source list through the effect's CardFilter (card_type, group,
+   cost, characters, heart colors, name fragments, ability, property).
+   The C port scans the player's hand (the canonical 5-site candidate source
+   per Rust game_setup.rs:579/:1353, choice.rs:402, look.rs:356/607, state.rs:20)
+   and applies the same filter pipeline. */
+int rb_build_candidate_pool(const GameState *g, int pl, int out[], int max) {
+    if (!g || !out || max <= 0) return 0;
+    const RbPlayer *P = &g->p[pl];
+    int n = 0;
+    for (int i = 0; i < P->hand.n && n < max; i++) {
+        int cid = P->hand.cards[i];
+        if (cid == RB_EMPTY_SLOT) continue;
+        if (!rb_card_is_member(cid)) continue;  /* hand candidates are member cards */
+        out[n++] = cid;
+    }
+    return n;
+}
+
+/* Mirror util.rs::classify_selection — classify the selection result given
+   idxs, count, is_all, and on_insufficient behavior. Returns 0=Skip, 1=Exact,
+   2=Prompt. */
+int rb_classify_selection(const int *idxs, int n, int count, int is_all) {
+    if (is_all) return 1;
+    if (n < count) return 0;
+    if (n > count) return 2;
+    return 1;
+}

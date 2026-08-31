@@ -350,6 +350,35 @@ def map_board_expr(expr: str, func_name: str):
             return None
         pl = int(m.group(1)) - 1
         return f"tg.state.p[{pl}].{zone}.n"
+    # game.state.playerN.<zone>.cards.contains(&id) -> test_zone_has_id
+    m = re.match(r'game\.state\.player(\d+)\.(\w+)\.cards\.contains\(&(\w+)\)', e)
+    if m:
+        pl = int(m.group(1)) - 1
+        zone = ZONE_NORM.get(m.group(2), m.group(2))
+        var = m.group(3)
+        return f"test_zone_has_id(&tg, {pl}, \"{zone}\", {var})"
+    # game.state.playerN.<zone>.cards.is_empty() -> zone.n == 0
+    m = re.match(r'game\.state\.player(\d+)\.(\w+)\.cards\.is_empty\(\)', e)
+    if m:
+        zone = ZONE_NORM.get(m.group(2), m.group(2))
+        pl = int(m.group(1)) - 1
+        return f"tg.state.p[{pl}].{zone}.n == 0"
+    # game.state.mods.blade_modifiers.get(&id) or .get_blade_modifier(id)
+    m = re.match(r'game\.state\.mods\.(?:blade_modifiers\.get|get_blade_modifier)\(&?(\w+)\)', e)
+    if m:
+        return f"test_get_blade_modifier(&tg, {m.group(1)})"
+    # game.state.mods.score_modifiers.get(&id) or .get_score_modifier(id)
+    m = re.match(r'game\.state\.mods\.(?:score_modifiers\.get|get_score_modifier)\(&?(\w+)\)', e)
+    if m:
+        return f"test_get_score_modifier(&tg, {m.group(1)})"
+    # game.state.mods.cost_modifiers.get(&id) or .get_cost_modifier(id)
+    m = re.match(r'game\.state\.mods\.(?:cost_modifiers\.get|get_cost_modifier)\(&?(\w+)\)', e)
+    if m:
+        return f"test_get_cost_modifier(&tg, {m.group(1)})"
+    # game.state.mods.heart_modifiers.get(&id, HeartColor::X) or .get_heart_modifier(id, HeartColor::X)
+    m = re.match(r'game\.state\.mods\.(?:heart_modifiers\.get|get_heart_modifier)\(&?(\w+)\s*,\s*HeartColor::Heart(\d+)\)', e)
+    if m:
+        return f"test_get_heart_modifier(&tg, {m.group(1)}, {m.group(2)})"
     # game.state.playerN.stage.get_under_cards(MemberArea::X).len() -> under_cards[area].n
     m = re.match(r'game\.state\.player(\d+)\.stage\.get_under_cards\(MemberArea::(\w+)\)\.len\(\)', e)
     if m:

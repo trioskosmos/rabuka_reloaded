@@ -10,13 +10,9 @@ static void rb_clear_auto_ability_trigger_tracking(GameState *g){
     g->n_auto_ability_trigger_counts = 0;
 }
 
-static void rb_reset_change_flags(GameState *g){
-    g->position_change_occurred_this_turn = 0;
-    g->formation_change_occurred_this_turn = 0;
-    g->opponent_live_success_this_turn = 0;
-}
 
-static void rb_reset_loop_detection(GameState *g){
+
+void rb_reset_loop_detection(GameState *g){
     g->n_game_state_history = 0;
     g->loop_detected = 0;
 }

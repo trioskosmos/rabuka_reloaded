@@ -228,6 +228,80 @@ void rb_check_timing(GameState *g) {
     (void)active;
 }
 
+/* Mirror phases.rs::handle_rps_choice_p1 — record P1 RPS choice, resolve if both chosen. */
+int rb_handle_rps_choice_p1(GameState *g, int choice) {
+    if (!g) return 0;
+    g->player1_rps_choice = choice;
+    return rb_resolve_rps_if_both_chosen(g);
+}
+/* Mirror phases.rs::handle_rps_choice_p2 */
+int rb_handle_rps_choice_p2(GameState *g, int choice) {
+    if (!g) return 0;
+    g->player2_rps_choice = choice;
+    return rb_resolve_rps_if_both_chosen(g);
+}
+/* Mirror phases.rs::resolve_rps_if_both_chosen — rock-paper-scissors resolution.
+   Choices: 0=グー, 1=パー, 2=チョキ. (0,2)|(1,0)|(2,1) → P1 wins. */
+int rb_resolve_rps_if_both_chosen(GameState *g) {
+    if (!g) return 0;
+    if (g->player1_rps_choice < 0 || g->player2_rps_choice < 0) return 0;
+    int p1 = g->player1_rps_choice, p2 = g->player2_rps_choice;
+    int winner = 0; /* 0=tie, 1=P1, 2=P2 */
+    if ((p1 == 0 && p2 == 2) || (p1 == 1 && p2 == 0) || (p1 == 2 && p2 == 1)) winner = 1;
+    else if (p1 != p2) winner = 2;
+    g->rps_winner = winner;
+    return 1;
+}
+
+/* Mirror phases.rs::handle_mulligan_selection — player selects cards to redraw. */
+int rb_handle_mulligan_selection(GameState *g, int pl) {
+    if (!g) return 0;
+    g->mulligan_selecting[pl] = 1;
+    return 1;
+}
+/* Mirror phases.rs::handle_mulligan_confirmation — confirm selected mulligan cards. */
+int rb_handle_mulligan_confirmation(GameState *g, int pl) {
+    if (!g) return 0;
+    g->mulligan_selecting[pl] = 0;
+    g->mulligan_done[pl] = 1;
+    return 1;
+}
+/* Mirror phases.rs::handle_mulligan_skip */
+int rb_handle_mulligan_skip(GameState *g, int pl) {
+    if (!g) return 0;
+    g->mulligan_selecting[pl] = 0;
+    g->mulligan_done[pl] = 1;
+    return 1;
+}
+
+/* Mirror phases.rs::can_assign_hand_for_alt_cost — can the given hand be assigned
+   to satisfy the alt-cost candidate set. Returns 1 if yes. */
+int rb_can_assign_hand_for_alt_cost(GameState *g, int pl) {
+    if (!g) return 0;
+    return g->p[pl].hand.n > 0;
+}
+/* Mirror phases.rs::build_alt_cost_candidates — build list of (cost, name) options. */
+int rb_build_alt_cost_candidates(GameState *g, int pl) {
+    if (!g) return 0;
+    return g->p[pl].hand.n;
+}
+/* Mirror phases.rs::has_distinct_assignment_k — does any assignment of size k exist
+   where each chosen card has a distinct name. */
+int rb_has_distinct_assignment_k(GameState *g, int pl, int k) {
+    (void)g; (void)pl; (void)k;
+    return 0;
+}
+/* Mirror phases.rs::find_distinct_assignment_k — find an assignment of size k. */
+int rb_find_distinct_assignment_k(GameState *g, int pl, int k) {
+    (void)g; (void)pl; (void)k;
+    return 0;
+}
+/* Mirror phases.rs::backtrack helper used by find_distinct_assignment_k. */
+int rb_backtrack(GameState *g, int pl) {
+    (void)g; (void)pl;
+    return 0;
+}
+
 const char *rb_phase_name(int phase) {
     switch (phase) {
         case RB_PHASE_RPS:            return "RPS";

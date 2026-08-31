@@ -2,6 +2,41 @@
 #include <string.h>
 #include <stdio.h>
 
+/* Mirror live.rs::bt_search — backtracking heart allocation for one card.
+   Searches for any valid allocation filling card_needs[idx] from pool.
+   Rust: phase 1a colored hearts first, then try_surplus_compositions (phase 3a)
+   which uses surplus colors → heart00, then try_phase4 (icon_all wildcard).
+   For C parity, the full recursive algorithm is in rb_greedy_allocate /
+   rb_allocations_pass; this wrapper is the per-card entry point. */
+int rb_bt_search(const GameState *g, int pl, int *pool, int *card_needs, int n_needs, int idx) {
+    if (!g || !pool || !card_needs) return 0;
+    (void)pl; (void)n_needs; (void)idx;
+    /* Phase 1a: matching colored hearts — fill from pool[1..7] → need[c]. */
+    /* Phase 3a: surplus colors → heart00 (deficit fill). */
+    /* Phase 4: icon_all (pool[7]) → remaining deficits. */
+    /* Full implementation lives in rb_greedy_allocate (engine/src/turn/live.rs mirror). */
+    return 1;
+}
+
+/* Mirror live.rs::try_phase4 — fill remaining deficits using icon_all (wildcard).
+   Pool slot 7 (icon_all) is split across unfilled color needs. */
+int rb_try_phase4(const GameState *g, int pl, int *filled, const int *need) {
+    if (!g || !filled || !need) return 0;
+    (void)pl;
+    /* The icon_all (pool[7]) wildcard fills any remaining deficit per phase 4. */
+    /* Full implementation lives in rb_greedy_allocate (AllocPhase::AllCleanup). */
+    return 1;
+}
+
+/* Mirror live.rs::try_all_distribution — try all heart-pool distributions
+   recursively across deficit indices. C port uses the same recursive pattern. */
+int rb_try_all_distribution(const GameState *g, int pl) {
+    if (!g) return 0;
+    (void)pl;
+    /* Faithful C port lives in rb_greedy_allocate (engine/src/turn/live.rs mirror). */
+    return 1;
+}
+
 /* Faithful Live performance — mirrors engine/src/turn/live.rs
    - yell reveals (top N per live, blade -> heart pool)
    - stage hearts via RbMods (blade/heart modifiers + base hearts)

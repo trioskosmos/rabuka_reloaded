@@ -317,7 +317,7 @@ static void gen_q255_dancing_stars_live_success_after_position_change(void){
     test_has_pending_choice(&tg);
     // 
     // // --- Verification ---
-    int score_mod = 0;
+    int score_mod = test_get_score_modifier(&tg, dancing_stars);
     // TODO assert: assert!( score_mod.is_some(), "Score modifier should exist on Dancing stars on me!" );
     // action result consumed: let total = score_mod.unwrap().total();
     // TODO assert_eq (unresolved): assert_eq!(total, 1, "Score modifier should be exactly +1, got {}", total);
@@ -1185,8 +1185,8 @@ static void gen_love_u_q192_live_success_all_blade_score_up(void){
     // 
     // // LiveSuccess fires — condition evaluated. A b_all card was among yell-revealed
     // // cards, so has_all_blade condition should pass and score should be +1.
-    // TODO assert: assert!( !game.state.player1.success_live_card_zone.cards.is_empty(), "Live card should have reached success_live_card_zone after LiveSuccess" );
-    CHECK_EQ(rb_mods_get_score(&tg.state.mods, love_u), 0, "love_u_q192_live_success_all_blade_score_up");
+    CHECK((!tg.state.p[0].success.n == 0), "love_u_q192_live_success_all_blade_score_up");
+    CHECK_EQ(test_get_score_modifier(&tg, love_u), 0, "love_u_q192_live_success_all_blade_score_up");
     int l = 0;
     // TODO assert_eq (unresolved): assert_eq!(l.score - l.base_score, 1, "bonus in final score");
     // 
@@ -1278,7 +1278,7 @@ static void gen_smile_q224_live_success_score_plus_1(void){
     // 
     int mod_id = 0;
     // 
-    CHECK_EQ(rb_mods_get_score(&tg.state.mods, mod_id), 0, "smile_q224_live_success_score_plus_1");
+    CHECK_EQ(test_get_score_modifier(&tg, mod_id), 0, "smile_q224_live_success_score_plus_1");
     int l = 0;
     // TODO assert_eq (unresolved): assert_eq!(l.score - l.base_score, 1, "bonus in final score");
     // 
@@ -1609,7 +1609,7 @@ static void gen_live_cards_stuck_in_live_zone_instead_of_discard(void){
     // TODO: );
     // 
     CHECK_EQ(tg.state.p[0].live.n, 3, "live_cards_stuck_in_live_zone_instead_of_discard");
-    // TODO assert: assert!(game.state.player1.waitroom.cards.is_empty());
+    CHECK(tg.state.p[0].discard.n == 0, "live_cards_stuck_in_live_zone_instead_of_discard");
     // 
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
@@ -1841,7 +1841,7 @@ static void gen_live_cards_stuck_in_live_zone_instead_of_discard(void){
     // // file was named after), so pin the exact correct outcome instead.
     CHECK_EQ(tg.state.p[0].live.n, 0, "live_cards_stuck_in_live_zone_instead_of_discard");
     CHECK_EQ(tg.state.p[0].discard.n, 3, "live_cards_stuck_in_live_zone_instead_of_discard");
-    // TODO assert: assert!( game.state.player1.success_live_card_zone.cards.is_empty(), "failed lives never reach the success zone" );
+    CHECK(tg.state.p[0].success.n == 0, "live_cards_stuck_in_live_zone_instead_of_discard");
     // TODO assert: assert!( game.state.revealed_cards.is_empty() && game.state.resolution_zone.cards.is_empty(), "yell/reveal scratch zones must be drained by victory determination" );
     // 
 }
@@ -2034,7 +2034,7 @@ static void gen_ren_005_turn2_blocks_third_energy_placed(void){
     int pid = 0;
     rb_fire_recorded_auto(&tg.state, 0);
     rb_drain_ability_queue(&tg.state);
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, ren), 1, "ren_005_turn2_blocks_third_energy_placed");
+    CHECK_EQ(test_get_blade_modifier(&tg, ren), 1, "ren_005_turn2_blocks_third_energy_placed");
     // // Second same turn (turn2 allows 2)
     tg.state.energy_placed_this_turn[0] = 1;
     if (ren >= 0 && ren < RB_MAX_CARD_IDS) { tg.state.moved_this_turn[ren] = 1; if (tg.state.n_recently_moved < RB_MAX_RECENTLY_MOVED) tg.state.recently_moved[tg.state.n_recently_moved++] = ren; }
@@ -2134,7 +2134,7 @@ static void gen_miracle_wave_q182_excess_heart_score_4(void){
     rb_advance_phase(&tg.state);
     test_drain_auto_choices(&tg);
     // 
-    CHECK_EQ(rb_mods_get_score(&tg.state.mods, wave), 0, "miracle_wave_q182_excess_heart_score_4");
+    CHECK_EQ(test_get_score_modifier(&tg, wave), 0, "miracle_wave_q182_excess_heart_score_4");
     // action result consumed: let l = game.state.performance_snapshots[0].lives.iter().find(|l| l.card_id == wave).unwrap();
     // TODO assert_eq (unresolved): assert_eq!(l.score, 4, "Live score should be 4");
     // 
@@ -3374,7 +3374,7 @@ static void gen_yohane_opponent_discards_no_blade(void){
     test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, 0);
     test_drain_auto_choices(&tg);
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, yohane), 0, "yohane_opponent_discards_no_blade");
+    CHECK_EQ(test_get_blade_modifier(&tg, yohane), 0, "yohane_opponent_discards_no_blade");
     // 
 }
 
@@ -3395,7 +3395,7 @@ static void gen_yohane_opponent_declines_gets_blade4(void){
     test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, -1);
     test_drain_auto_choices(&tg);
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, yohane), 4, "yohane_opponent_declines_gets_blade4");
+    CHECK_EQ(test_get_blade_modifier(&tg, yohane), 4, "yohane_opponent_declines_gets_blade4");
     // 
 }
 
@@ -3498,7 +3498,7 @@ static void gen_no_live_cards_at_all_no_winner_clean_rollover(void){
     // TODO: }
     // TODO: }
     // 
-    // TODO assert: assert!( game.state.player1.success_live_card_zone.cards.is_empty() && game.state.player2.success_live_card_zone.cards.is_empty(), "8.4.6.1: no live cards -> no winners -> no success-zone placements" );
+    CHECK(tg.state.p[0].success.n == 0, "no_live_cards_at_all_no_winner_clean_rollover");
     // // The rollover ran: turn counter advanced past the first round.
     CHECK(tg.state.turn, "no_live_cards_at_all_no_winner_clean_rollover");
     // 
@@ -6137,13 +6137,13 @@ static void gen_sumire_pr_center_position_grants_blade(void){
     test_give_energy(&tg, 20);
     test_recalc(&tg);
     // 
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, sumire), 5, "sumire_pr_center_position_grants_blade");
+    CHECK_EQ(test_get_blade_modifier(&tg, sumire), 5, "sumire_pr_center_position_grants_blade");
     // 
     // // Negative: move out of center → modifier drops.
     tg.state.p[0].stage[1] = -1;
     tg.state.p[0].stage[0] = sumire;
     test_recalc(&tg);
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, sumire), 0, "sumire_pr_center_position_grants_blade");
+    CHECK_EQ(test_get_blade_modifier(&tg, sumire), 0, "sumire_pr_center_position_grants_blade");
     // 
 }
 
@@ -6285,7 +6285,7 @@ static void gen_takaramono_no_excess_heart_score_plus_1(void){
     rb_advance_phase(&tg.state);
     // 
     // 
-    CHECK_EQ(rb_mods_get_score(&tg.state.mods, takaramono), 0, "takaramono_no_excess_heart_score_plus_1");
+    CHECK_EQ(test_get_score_modifier(&tg, takaramono), 0, "takaramono_no_excess_heart_score_plus_1");
     int l = 0;
     // TODO assert_eq (unresolved): assert_eq!(l.score - l.base_score, 1, "bonus in final score");
     // 
@@ -7794,8 +7794,8 @@ static void gen_sayaka_bp6_skip_cost_no_draw_no_cost_mod(void){
     rb_resume_with_choice(&tg.state, -1);
     test_has_pending_choice(&tg);
     // // No draw, no cost mod when cost skipped
-    CHECK_EQ(rb_mods_get_cost(&tg.state.mods, doll), 0, "sayaka_bp6_skip_cost_no_draw_no_cost_mod");
-    CHECK_EQ(rb_mods_get_cost(&tg.state.mods, sayaka), 0, "sayaka_bp6_skip_cost_no_draw_no_cost_mod");
+    CHECK_EQ(test_get_cost_modifier(&tg, doll), 0, "sayaka_bp6_skip_cost_no_draw_no_cost_mod");
+    CHECK_EQ(test_get_cost_modifier(&tg, sayaka), 0, "sayaka_bp6_skip_cost_no_draw_no_cost_mod");
     // 
 }
 
@@ -9263,9 +9263,9 @@ static void gen_position_change_triggered_grant_blade_to_moved_members(void){
     // 
     // 
     // // Verify: only seira_a and seira_b got blade; filler did not
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, seira_a), 1, "position_change_triggered_grant_blade_to_moved_members");
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, seira_b), 1, "position_change_triggered_grant_blade_to_moved_members");
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, filler), 0, "position_change_triggered_grant_blade_to_moved_members");
+    CHECK_EQ(test_get_blade_modifier(&tg, seira_a), 1, "position_change_triggered_grant_blade_to_moved_members");
+    CHECK_EQ(test_get_blade_modifier(&tg, seira_b), 1, "position_change_triggered_grant_blade_to_moved_members");
+    CHECK_EQ(test_get_blade_modifier(&tg, filler), 0, "position_change_triggered_grant_blade_to_moved_members");
     // 
 }
 
@@ -9470,7 +9470,7 @@ static void gen_wish_song_five_distinct_liella_revealed_scores(void){
     // 
     { int ftpl = rb_owner_of_card(&tg.state, live); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ成功時"); rb_drain_ability_queue(&tg.state); }
     // 
-    CHECK_EQ(rb_mods_get_score(&tg.state.mods, live), 1, "wish_song_five_distinct_liella_revealed_scores");
+    CHECK_EQ(test_get_score_modifier(&tg, live), 1, "wish_song_five_distinct_liella_revealed_scores");
     // 
 }
 
@@ -9489,7 +9489,7 @@ static void gen_wish_song_four_distinct_liella_revealed_no_score(void){
     // 
     { int ftpl = rb_owner_of_card(&tg.state, live); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ成功時"); rb_drain_ability_queue(&tg.state); }
     // 
-    CHECK_EQ(rb_mods_get_score(&tg.state.mods, live), 0, "wish_song_four_distinct_liella_revealed_no_score");
+    CHECK_EQ(test_get_score_modifier(&tg, live), 0, "wish_song_four_distinct_liella_revealed_no_score");
     // 
 }
 
@@ -9745,8 +9745,8 @@ static void gen_bp7025_staged_chisato_gains_blade(void){
     // 
     rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     // 
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, chisato_card), 1, "bp7025_staged_chisato_gains_blade");
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, other), 0, "bp7025_staged_chisato_gains_blade");
+    CHECK_EQ(test_get_blade_modifier(&tg, chisato_card), 1, "bp7025_staged_chisato_gains_blade");
+    CHECK_EQ(test_get_blade_modifier(&tg, other), 0, "bp7025_staged_chisato_gains_blade");
     // 
 }
 
@@ -10444,7 +10444,7 @@ static void gen_live_end_grant_expires_through_real_phase_rollover(void){
     // 
     test_set_live_card(&tg, 0, live);
     { int ftpl = rb_owner_of_card(&tg.state, me); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "登場"); rb_drain_ability_queue(&tg.state); }
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, me), 3, "live_end_grant_expires_through_real_phase_rollover");
+    CHECK_EQ(test_get_blade_modifier(&tg, me), 3, "live_end_grant_expires_through_real_phase_rollover");
     // 
     // // Real rollover: LiveCardSet → performances → victory determination → Active.
     // // inlined helper advance_to_live_start
@@ -10467,7 +10467,7 @@ static void gen_live_end_grant_expires_through_real_phase_rollover(void){
     // TODO: rabuka_engine::game_state::TurnPhase::Live,
     // TODO: "flow must have crossed the victory determination rollover"
     // TODO: );
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, me), 0, "live_end_grant_expires_through_real_phase_rollover");
+    CHECK_EQ(test_get_blade_modifier(&tg, me), 0, "live_end_grant_expires_through_real_phase_rollover");
     // TODO assert: assert!(game.state.temporary_effects.is_empty());
     // 
 }
@@ -11000,7 +11000,7 @@ static void gen_eutopia_q38_score_condition_checks_live_card_count(void){
     rb_advance_phase(&tg.state);
     // 
     // // Only 1 live card in zone, needs 3 → no bonus
-    CHECK_EQ(rb_mods_get_score(&tg.state.mods, eutopia), 0, "eutopia_q38_score_condition_checks_live_card_count");
+    CHECK_EQ(test_get_score_modifier(&tg, eutopia), 0, "eutopia_q38_score_condition_checks_live_card_count");
     // 
 }
 
@@ -11165,7 +11165,7 @@ static void gen_eutopia_q38_three_live_cards_score_plus_2(void){
     rb_resume_with_choice(&tg.state, 0);
     // TODO: }
     // 
-    CHECK_EQ(rb_mods_get_score(&tg.state.mods, eutopia), 2, "eutopia_q38_three_live_cards_score_plus_2");
+    CHECK_EQ(test_get_score_modifier(&tg, eutopia), 2, "eutopia_q38_three_live_cards_score_plus_2");
     // 
 }
 
@@ -11293,7 +11293,7 @@ static void gen_rainbow_q38_member_on_stage_per_live_card_blade(void){
     // 
     // // 1 live card in zone → per_unit → exactly +1 blade.
     // // A >= bound would mask double-application / stacking bugs.
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, rainbow), 1, "rainbow_q38_member_on_stage_per_live_card_blade");
+    CHECK_EQ(test_get_blade_modifier(&tg, rainbow), 1, "rainbow_q38_member_on_stage_per_live_card_blade");
     // 
 }
 
@@ -11600,7 +11600,7 @@ static void gen_q253_galaxy_gets_plus_one(void){
     rb_resume_with_choice(&tg.state, -1);
     // TODO: }
     // 
-    CHECK_EQ(rb_mods_get_score(&tg.state.mods, galaxy), 0, "q253_galaxy_gets_plus_one");
+    CHECK_EQ(test_get_score_modifier(&tg, galaxy), 0, "q253_galaxy_gets_plus_one");
     int l = 0;
     // TODO assert_eq (unresolved): assert_eq!(l.score - l.base_score, 1, "bonus in final score");
     // 
@@ -11696,7 +11696,7 @@ static void gen_q253_kanan_first_galaxy_gets_nothing(void){
     rb_resume_with_choice(&tg.state, -1);
     // TODO: }
     // 
-    CHECK_EQ(rb_mods_get_score(&tg.state.mods, galaxy), 0, "q253_kanan_first_galaxy_gets_nothing");
+    CHECK_EQ(test_get_score_modifier(&tg, galaxy), 0, "q253_kanan_first_galaxy_gets_nothing");
     // 
 }
 
@@ -11813,7 +11813,7 @@ static void gen_q253_both_succeed_two_live_cards(void){
     // TODO: }
     // 
     // 
-    CHECK_EQ(rb_mods_get_score(&tg.state.mods, galaxy), 1, "q253_both_succeed_two_live_cards");
+    CHECK_EQ(test_get_score_modifier(&tg, galaxy), 1, "q253_both_succeed_two_live_cards");
     // 
 }
 
@@ -12103,7 +12103,7 @@ static void gen_chika_adds_riko_gets_2_blades(void){
     // 
     // 
     CHECK(test_zone_has_id(&tg, 0, "hand", riko), "chika_adds_riko_gets_2_blades");
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, chika), 2, "chika_adds_riko_gets_2_blades");
+    CHECK_EQ(test_get_blade_modifier(&tg, chika), 2, "chika_adds_riko_gets_2_blades");
     // 
 }
 
@@ -12248,7 +12248,7 @@ static void gen_chika_adds_yo_gets_2_blades(void){
     // 
     // 
     CHECK(test_zone_has_id(&tg, 0, "hand", yo), "chika_adds_yo_gets_2_blades");
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, chika), 2, "chika_adds_yo_gets_2_blades");
+    CHECK_EQ(test_get_blade_modifier(&tg, chika), 2, "chika_adds_yo_gets_2_blades");
     // 
 }
 
@@ -12393,7 +12393,7 @@ static void gen_chika_adds_non_matching_member_gets_no_blades(void){
     // 
     // 
     CHECK(test_zone_has_id(&tg, 0, "hand", honoka), "chika_adds_non_matching_member_gets_no_blades");
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, chika), 0, "chika_adds_non_matching_member_gets_no_blades");
+    CHECK_EQ(test_get_blade_modifier(&tg, chika), 0, "chika_adds_non_matching_member_gets_no_blades");
     // 
 }
 
@@ -13264,7 +13264,7 @@ static void gen_sayaka_bp5_002_distinct_costs_condition(void){
     test_recalc(&tg);
     // 
     // // Costs [15, 2, 2] are NOT all distinct (cost 2 appears twice) → no blade.
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, sayaka_bp5), 0, "sayaka_bp5_002_distinct_costs_condition");
+    CHECK_EQ(test_get_blade_modifier(&tg, sayaka_bp5), 0, "sayaka_bp5_002_distinct_costs_condition");
     // 
     // // Add +2 cost modifier to member_cost2_b: cost goes from 2 → 4.
     // // Now costs are [15, 2, 4] → all distinct!
@@ -13274,7 +13274,7 @@ static void gen_sayaka_bp5_002_distinct_costs_condition(void){
     test_recalc(&tg);
     // 
     // // Should now gain blade modifier since [15, 2, 4] are all distinct.
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, sayaka_bp5), 1, "sayaka_bp5_002_distinct_costs_condition");
+    CHECK_EQ(test_get_blade_modifier(&tg, sayaka_bp5), 1, "sayaka_bp5_002_distinct_costs_condition");
     // 
 }
 
@@ -14540,7 +14540,7 @@ static void gen_sp_bp4_003_center_blade(void){
     tg.state.p[0].stage[1] = m;
     tg.state.p[0].stage[2] = -1;
     test_recalc(&tg);
-    CHECK(rb_mods_get_blade(&tg.state.mods, m), "sp_bp4_003_center_blade");
+    CHECK(test_get_blade_modifier(&tg, m), "sp_bp4_003_center_blade");
     // 
 }
 
@@ -14749,7 +14749,7 @@ static void gen_sp_bp4_003_center_blade_2(void){
     tg.state.p[0].stage[1] = m;
     tg.state.p[0].stage[2] = -1;
     test_recalc(&tg);
-    CHECK(rb_mods_get_blade(&tg.state.mods, m), "sp_bp4_003_center_blade");
+    CHECK(test_get_blade_modifier(&tg, m), "sp_bp4_003_center_blade");
     // 
 }
 
@@ -14784,18 +14784,18 @@ static void gen_temporary_live_end_effect_expires_when_live_phase_ends(void){
     tg.state.p[0].stage[0] = me;
     // 
     { int ftpl = rb_owner_of_card(&tg.state, me); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "登場"); rb_drain_ability_queue(&tg.state); }
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, me), 3, "temporary_live_end_effect_expires_when_live_phase_ends");
+    CHECK_EQ(test_get_blade_modifier(&tg, me), 3, "temporary_live_end_effect_expires_when_live_phase_ends");
     // TODO assert: assert!( !game.state.temporary_effects.is_empty(), "the grant must be registered as a tracked temporary effect" );
     // 
     // // Stay inside the live phase -> nothing expires.
     // TODO: game.state.current_turn_phase = TurnPhase::Live;
     // TODO: game.state.check_expired_effects();
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, me), 3, "temporary_live_end_effect_expires_when_live_phase_ends");
+    CHECK_EQ(test_get_blade_modifier(&tg, me), 3, "temporary_live_end_effect_expires_when_live_phase_ends");
     // 
     // // Live phase ends -> the effect expires and reverts exactly +3.
     // TODO: game.state.current_turn_phase = TurnPhase::FirstAttackerNormal;
     // TODO: game.state.check_expired_effects();
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, me), 0, "temporary_live_end_effect_expires_when_live_phase_ends");
+    CHECK_EQ(test_get_blade_modifier(&tg, me), 0, "temporary_live_end_effect_expires_when_live_phase_ends");
     // TODO assert: assert!(game.state.temporary_effects.is_empty());
     // 
 }
@@ -15282,7 +15282,7 @@ static void gen_vitamin_q128_hand_greater_triggers_score(void){
     int p2_hand = tg.state.p[1].hand.n;
     // TODO assert: assert!( p1_hand > p2_hand, "P1 hand ({}) must be > P2 hand ({}) for condition to pass", p1_hand, p2_hand );
     // 
-    CHECK_EQ(rb_mods_get_score(&tg.state.mods, vitamin), 0, "vitamin_q128_hand_greater_triggers_score");
+    CHECK_EQ(test_get_score_modifier(&tg, vitamin), 0, "vitamin_q128_hand_greater_triggers_score");
     int l = 0;
     // TODO assert_eq (unresolved): assert_eq!(l.score - l.base_score, 1, "bonus in final score");
     // 
@@ -15354,13 +15354,13 @@ static void gen_vitamin_q119_score_locked_after_resolution(void){
     rb_advance_phase(&tg.state);
     // 
     // // Score locked — verify in snapshot, cleared from mods
-    CHECK_EQ(rb_mods_get_score(&tg.state.mods, vitamin), 0, "vitamin_q119_score_locked_after_resolution");
+    CHECK_EQ(test_get_score_modifier(&tg, vitamin), 0, "vitamin_q119_score_locked_after_resolution");
     int l = 0;
     // TODO assert_eq (unresolved): assert_eq!(l.score - l.base_score, 1, "bonus in final score");
     // 
     // // Hand changes don't re-evaluate (still 0)
     // clear
-    CHECK_EQ(rb_mods_get_score(&tg.state.mods, vitamin), 0, "vitamin_q119_score_locked_after_resolution");
+    CHECK_EQ(test_get_score_modifier(&tg, vitamin), 0, "vitamin_q119_score_locked_after_resolution");
     // 
 }
 
@@ -16277,7 +16277,7 @@ static void gen_sd2_004_center_blade_plus4(void){
     tg.state.p[0].stage[2] = -1;
     test_recalc(&tg);
     // 
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, member), 4, "sd2_004_center_blade_plus4");
+    CHECK_EQ(test_get_blade_modifier(&tg, member), 4, "sd2_004_center_blade_plus4");
     // 
     // // Negative: move to left → no bonus
     tg.state.p[0].stage[1] = -1;
@@ -16303,7 +16303,7 @@ static void gen_pb2_035_left_blade_plus2(void){
     tg.state.p[0].stage[2] = -1;
     test_recalc(&tg);
     // 
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, member), 2, "pb2_035_left_blade_plus2");
+    CHECK_EQ(test_get_blade_modifier(&tg, member), 2, "pb2_035_left_blade_plus2");
     // 
 }
 
@@ -16319,7 +16319,7 @@ static void gen_pb2_041_right_blade_plus2(void){
     tg.state.p[0].stage[2] = member;
     test_recalc(&tg);
     // 
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, member), 2, "pb2_041_right_blade_plus2");
+    CHECK_EQ(test_get_blade_modifier(&tg, member), 2, "pb2_041_right_blade_plus2");
     // 
 }
 
@@ -17621,7 +17621,7 @@ static void gen_hazuki_activate_two_liella_discarded_gain_2_blade(void){
     // 
     // TODO action: TurnEngine::execute_main_phase_action( &mut game.state, &ActionType::UseAbility, Some(hazuki), None, None, None, ).expect("activate");
     // 
-    int blade_val = 0;
+    int blade_val = test_get_blade_modifier(&tg, hazuki);
     CHECK_EQ(blade_val, 2, "hazuki_activate_two_liella_discarded_gain_2_blade");
     // 
 }
@@ -17645,7 +17645,7 @@ static void gen_hazuki_activate_no_liella_discarded_gain_0_blade(void){
     // 
     // TODO action: TurnEngine::execute_main_phase_action( &mut game.state, &ActionType::UseAbility, Some(hazuki), None, None, None, ).expect("activate");
     // 
-    int blade_val = 0;
+    int blade_val = test_get_blade_modifier(&tg, hazuki);
     CHECK_EQ(blade_val, 0, "hazuki_activate_no_liella_discarded_gain_0_blade");
     // 
 }
@@ -17664,7 +17664,7 @@ static void gen_hazuki_activate_not_enough_deck_no_blade(void){
     // 
     // TODO action: let _ = TurnEngine::execute_main_phase_action( &mut game.state, &ActionType::UseAbility, Some(hazuki), None, None, None, );
     // 
-    int blade_val = 0;
+    int blade_val = test_get_blade_modifier(&tg, hazuki);
     CHECK_EQ(blade_val, 0, "hazuki_activate_not_enough_deck_no_blade");
     // 
 }
@@ -17685,7 +17685,7 @@ static void gen_kinako_q94_debut_grants_2_blade(void){
     tg.state.p[0].stage[0] = -1;
     test_play_to_stage(&tg, kinako, 0);
     // 
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, kinako), 2, "kinako_q94_debut_grants_2_blade");
+    CHECK_EQ(test_get_blade_modifier(&tg, kinako), 2, "kinako_q94_debut_grants_2_blade");
     // 
 }
 
@@ -17705,7 +17705,7 @@ static void gen_kinako_q171_blade_live_end_duration(void){
     tg.state.p[0].stage[0] = -1;
     test_play_to_stage(&tg, kinako, 0);
     // 
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, kinako), 2, "kinako_q171_blade_live_end_duration");
+    CHECK_EQ(test_get_blade_modifier(&tg, kinako), 2, "kinako_q171_blade_live_end_duration");
     // 
 }
 
@@ -17748,14 +17748,14 @@ static void gen_kinako_q94_debut_then_area_move_grants_4_blade(void){
     // TODO: kinako_q94,
     // TODO: rabuka_engine::zones::MemberArea::LeftSide,
     // TODO: );
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, kinako_q94), 2, "kinako_q94_debut_then_area_move_grants_4_blade");
+    CHECK_EQ(test_get_blade_modifier(&tg, kinako_q94), 2, "kinako_q94_debut_then_area_move_grants_4_blade");
     // 
     // // Play the swap-きな子 at RIGHT so the swap has a partner.
     // TODO: game.play_to_stage(
     // TODO: kinako_swap,
     // TODO: rabuka_engine::zones::MemberArea::RightSide,
     // TODO: );
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, kinako_q94), 2, "kinako_q94_debut_then_area_move_grants_4_blade");
+    CHECK_EQ(test_get_blade_modifier(&tg, kinako_q94), 2, "kinako_q94_debut_then_area_move_grants_4_blade");
     // 
     // // Swap: Q94-きな子 moves left → right.
     test_activate_ability(&tg, kinako_swap);
@@ -17772,7 +17772,7 @@ static void gen_kinako_q94_debut_then_area_move_grants_4_blade(void){
     CHECK_EQ(tg.state.p[0].stage[0], kinako_swap, "kinako_q94_debut_then_area_move_grants_4_blade");
     // 
     // // …and the move leg fired: 2 (debut) + 2 (move) = 4.
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, kinako_q94), 4, "kinako_q94_debut_then_area_move_grants_4_blade");
+    CHECK_EQ(test_get_blade_modifier(&tg, kinako_q94), 4, "kinako_q94_debut_then_area_move_grants_4_blade");
     // 
 }
 
@@ -17891,7 +17891,7 @@ static void gen_strawberry_trapper_q132_conditions_met_score_plus_2(void){
     rb_resume_with_choice(&tg.state, -1);
     // TODO: }
     // 
-    CHECK_EQ(rb_mods_get_score(&tg.state.mods, strawberry), 0, "strawberry_trapper_q132_conditions_met_score_plus_2");
+    CHECK_EQ(test_get_score_modifier(&tg, strawberry), 0, "strawberry_trapper_q132_conditions_met_score_plus_2");
     // action result consumed: let l = game.state.performance_snapshots[0].lives.iter().find(|l| l.card_id == strawberry).unwrap();
     // TODO assert_eq (unresolved): assert_eq!(l.score - l.base_score, 2, "bonus in final score");
     // 
@@ -17982,7 +17982,7 @@ static void gen_strawberry_trapper_insufficient_heart05_no_score(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    CHECK_EQ(rb_mods_get_score(&tg.state.mods, strawberry), 0, "strawberry_trapper_insufficient_heart05_no_score");
+    CHECK_EQ(test_get_score_modifier(&tg, strawberry), 0, "strawberry_trapper_insufficient_heart05_no_score");
     // 
 }
 
@@ -18071,7 +18071,7 @@ static void gen_strawberry_trapper_no_opponent_success_no_score(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    CHECK_EQ(rb_mods_get_score(&tg.state.mods, strawberry), 0, "strawberry_trapper_no_opponent_success_no_score");
+    CHECK_EQ(test_get_score_modifier(&tg, strawberry), 0, "strawberry_trapper_no_opponent_success_no_score");
     // 
 }
 
@@ -18269,7 +18269,7 @@ static void gen_awake_q36_10_plus_hasetsu_cheers_score_plus_1(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    CHECK_EQ(rb_mods_get_score(&tg.state.mods, awake), 0, "awake_q36_10_plus_hasetsu_cheers_score_plus_1");
+    CHECK_EQ(test_get_score_modifier(&tg, awake), 0, "awake_q36_10_plus_hasetsu_cheers_score_plus_1");
     int l = 0;
     // TODO assert_eq (unresolved): assert_eq!(l.score - l.base_score, 1, "bonus in final score");
     // 
@@ -18370,7 +18370,7 @@ static void gen_awake_q36_low_cheers_no_score(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    CHECK_EQ(rb_mods_get_score(&tg.state.mods, awake), 0, "awake_q36_low_cheers_no_score");
+    CHECK_EQ(test_get_score_modifier(&tg, awake), 0, "awake_q36_low_cheers_no_score");
     // 
 }
 
@@ -18469,7 +18469,7 @@ static void gen_awake_q36_non_hasetsu_cheered_no_score(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    CHECK_EQ(rb_mods_get_score(&tg.state.mods, awake), 0, "awake_q36_non_hasetsu_cheered_no_score");
+    CHECK_EQ(test_get_score_modifier(&tg, awake), 0, "awake_q36_non_hasetsu_cheered_no_score");
     // 
 }
 
@@ -18611,7 +18611,7 @@ static void gen_mia_ab1_accept_reduces_cost_by_2(void){
     // // 13 - 2 = 11 energy paid → 2 remain.
     // TODO assert_eq (unresolved): assert_eq!( game.state.player1.energy_zone.active_count(), 2, "accepted: cost 13-2=11 paid, 2 energy remain (got {})", game.state.player1.energy_zone.active_count() );
     // // The waitroom member cards were moved to the deck bottom.
-    // TODO assert: assert!( game.state.player1.waitroom.cards.is_empty(), "accepted: waitroom members are shuffled into the deck" );
+    CHECK(tg.state.p[0].discard.n == 0, "mia_ab1_accept_reduces_cost_by_2");
     CHECK_EQ(tg.state.p[0].deck.n, 2, "mia_ab1_accept_reduces_cost_by_2");
     // 
 }
@@ -19418,7 +19418,7 @@ static void gen_tomari_jidou_self_move_triggers(void){
     int pid = 0;
     rb_fire_recorded_auto(&tg.state, 0);
     rb_drain_ability_queue(&tg.state);
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, tomari), 1, "tomari_jidou_self_move_triggers");
+    CHECK_EQ(test_get_blade_modifier(&tg, tomari), 1, "tomari_jidou_self_move_triggers");
     // 
 }
 
@@ -19435,7 +19435,7 @@ static void gen_tomari_jidou_opponent_move_triggers(void){
     int pid = 0;
     rb_fire_recorded_auto(&tg.state, 0);
     rb_drain_ability_queue(&tg.state);
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, tomari), 1, "tomari_jidou_opponent_move_triggers");
+    CHECK_EQ(test_get_blade_modifier(&tg, tomari), 1, "tomari_jidou_opponent_move_triggers");
     // 
 }
 
@@ -19450,7 +19450,7 @@ static void gen_tomari_jidou_natural_move_no_trigger(void){
     int pid = 0;
     rb_fire_recorded_auto(&tg.state, 0);
     rb_drain_ability_queue(&tg.state);
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, tomari), 0, "tomari_jidou_natural_move_no_trigger");
+    CHECK_EQ(test_get_blade_modifier(&tg, tomari), 0, "tomari_jidou_natural_move_no_trigger");
     // 
 }
 
@@ -19836,7 +19836,7 @@ static void gen_tokimeki_all_6_colors_collectively_score_plus_1(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    CHECK_EQ(rb_mods_get_score(&tg.state.mods, tokimeki), 1, "tokimeki_all_6_colors_collectively_score_plus_1");
+    CHECK_EQ(test_get_score_modifier(&tg, tokimeki), 1, "tokimeki_all_6_colors_collectively_score_plus_1");
     // 
 }
 
@@ -19914,7 +19914,7 @@ static void gen_tokimeki_q232_modifier_separate_from_base_score(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    CHECK_EQ(rb_mods_get_score(&tg.state.mods, tokimeki), 1, "tokimeki_q232_modifier_separate_from_base_score");
+    CHECK_EQ(test_get_score_modifier(&tg, tokimeki), 1, "tokimeki_q232_modifier_separate_from_base_score");
     // 
 }
 
@@ -20301,7 +20301,7 @@ static void gen_cl1_006_debut_gains_three_blades(void){
     // 
     { int ftpl = rb_owner_of_card(&tg.state, me); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "登場"); rb_drain_ability_queue(&tg.state); }
     // 
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, me), 3, "cl1_006_debut_gains_three_blades");
+    CHECK_EQ(test_get_blade_modifier(&tg, me), 3, "cl1_006_debut_gains_three_blades");
     // 
 }
 
@@ -20404,7 +20404,7 @@ static void gen_sd1026_energy_below_nine_no_score(void){
     // 
     { int ftpl = rb_owner_of_card(&tg.state, live); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ開始時"); rb_drain_ability_queue(&tg.state); }
     // 
-    CHECK_EQ(rb_mods_get_score(&tg.state.mods, live), 0, "sd1026_energy_below_nine_no_score");
+    CHECK_EQ(test_get_score_modifier(&tg, live), 0, "sd1026_energy_below_nine_no_score");
     // 
 }
 
@@ -20424,7 +20424,7 @@ static void gen_treco_please_aqours_h04_total_ten_scores_two(void){
     // 
     { int ftpl = rb_owner_of_card(&tg.state, live); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ開始時"); rb_drain_ability_queue(&tg.state); }
     // 
-    CHECK_EQ(rb_mods_get_score(&tg.state.mods, live), 2, "treco_please_aqours_h04_total_ten_scores_two");
+    CHECK_EQ(test_get_score_modifier(&tg, live), 2, "treco_please_aqours_h04_total_ten_scores_two");
     // 
 }
 
@@ -20442,7 +20442,7 @@ static void gen_treco_please_aqours_h04_below_ten_no_score(void){
     // 
     { int ftpl = rb_owner_of_card(&tg.state, live); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ開始時"); rb_drain_ability_queue(&tg.state); }
     // 
-    CHECK_EQ(rb_mods_get_score(&tg.state.mods, live), 0, "treco_please_aqours_h04_below_ten_no_score");
+    CHECK_EQ(test_get_score_modifier(&tg, live), 0, "treco_please_aqours_h04_below_ten_no_score");
     // 
 }
 
@@ -20568,7 +20568,7 @@ static void gen_pb1014_baton_over_own_name_draws_two_discards_one(void){
     // 
     CHECK(test_zone_has_id(&tg, 0, "discard", old_me), "pb1014_baton_over_own_name_draws_two_discards_one");
     CHECK_EQ(tg.state.p[0].hand.n, 1, "pb1014_baton_over_own_name_draws_two_discards_one");
-    // TODO assert: assert!( !game.state.player1.waitroom.cards.is_empty(), "a discard happened" );
+    CHECK((!tg.state.p[0].discard.n == 0), "pb1014_baton_over_own_name_draws_two_discards_one");
     // 
 }
 
@@ -20610,7 +20610,7 @@ static void gen_bp2008_baton_over_cheaper_dollchestra_gains_two_blades(void){
     // 
     test_play_to_stage(&tg, me, 0);
     // 
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, me), 2, "bp2008_baton_over_cheaper_dollchestra_gains_two_blades");
+    CHECK_EQ(test_get_blade_modifier(&tg, me), 2, "bp2008_baton_over_cheaper_dollchestra_gains_two_blades");
     // 
 }
 
@@ -20630,7 +20630,7 @@ static void gen_bp2008_baton_over_expensive_dollchestra_no_blades(void){
     // 
     test_play_to_stage(&tg, me, 0);
     // 
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, me), 0, "bp2008_baton_over_expensive_dollchestra_no_blades");
+    CHECK_EQ(test_get_blade_modifier(&tg, me), 0, "bp2008_baton_over_expensive_dollchestra_no_blades");
     // 
 }
 
@@ -20718,8 +20718,8 @@ static void gen_bp4011_wait_self_center_mus_member_two_blades(void){
     rb_resume_with_choice(&tg.state, 1);
     // 
     // TODO assert_eq (unresolved): assert_eq!( game.state.mods.get_orientation_modifier(me), Some("wait"), "cost waits this member" );
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, center), 2, "bp4011_wait_self_center_mus_member_two_blades");
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, left_mu), 0, "bp4011_wait_self_center_mus_member_two_blades");
+    CHECK_EQ(test_get_blade_modifier(&tg, center), 2, "bp4011_wait_self_center_mus_member_two_blades");
+    CHECK_EQ(test_get_blade_modifier(&tg, left_mu), 0, "bp4011_wait_self_center_mus_member_two_blades");
     // 
 }
 
@@ -20741,7 +20741,7 @@ static void gen_bp4017_twin_center_mus_member_one_blade(void){
     CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectTarget", "bp4017_twin_center_mus_member_one_blade");
     rb_resume_with_choice(&tg.state, 1);
     // 
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, center), 1, "bp4017_twin_center_mus_member_one_blade");
+    CHECK_EQ(test_get_blade_modifier(&tg, center), 1, "bp4017_twin_center_mus_member_one_blade");
     // 
 }
 
@@ -20846,7 +20846,7 @@ static void gen_rin_multiple_plain_lives_still_grants(void){
     test_add_to_live(&tg, plain1);
     test_add_to_live(&tg, plain2);
     rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, mate), 2, "rin_multiple_plain_lives_still_grants");
+    CHECK_EQ(test_get_blade_modifier(&tg, mate), 2, "rin_multiple_plain_lives_still_grants");
     // 
 }
 
@@ -20867,7 +20867,7 @@ static void gen_rin_mixed_lives_plain_present_grants(void){
     test_add_to_live(&tg, plain);
     test_add_to_live(&tg, with_ability);
     rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, mate), 2, "rin_mixed_lives_plain_present_grants");
+    CHECK_EQ(test_get_blade_modifier(&tg, mate), 2, "rin_mixed_lives_plain_present_grants");
     // 
 }
 
@@ -20887,8 +20887,8 @@ static void gen_rin_exclude_self_with_only_rin_and_mate(void){
     int plain = test_id(&tg, "PL!-sd1-020-SD");
     test_add_to_live(&tg, plain);
     rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, mate), 2, "rin_exclude_self_with_only_rin_and_mate");
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, rin), 0, "rin_exclude_self_with_only_rin_and_mate");
+    CHECK_EQ(test_get_blade_modifier(&tg, mate), 2, "rin_exclude_self_with_only_rin_and_mate");
+    CHECK_EQ(test_get_blade_modifier(&tg, rin), 0, "rin_exclude_self_with_only_rin_and_mate");
     // 
 }
 
@@ -20919,7 +20919,7 @@ static void gen_rin_choice_among_two_mates(void){
     int b1 = rb_mods_get_blade(&tg.state.mods, mate1);
     int b2 = rb_mods_get_blade(&tg.state.mods, mate2);
     // TODO assert: assert!(b1 == 2 || b2 == 2, "one of the two mates should get blade, got {} and {}", b1, b2);
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, rin), 0, "rin_choice_among_two_mates");
+    CHECK_EQ(test_get_blade_modifier(&tg, rin), 0, "rin_choice_among_two_mates");
     // 
 }
 
@@ -21730,7 +21730,7 @@ static void gen_mebius_tie_when_both_fail_still_restricts(void){
     // // P1's mebius succeeded, P2 failed -> totals 2 vs 0 untied, so not blocked; P1 should be in success
     // // This is actually untied case, not tie-both-fail. For tie-both-fail we need both lives fail with 0-0.
     // // Use two failing lives with same 0 totals and give p1 mebius that would succeed, so not tie. Let's just check that engine doesn't panic and p1's success is placed when untied.
-    int p1_success = 0;
+    int p1_success = test_zone_has_id(&tg, 0, "success", mebius_p1);
     // // Untied 2 vs 0 -> p1 should be in success
     CHECK(p1_success, "mebius_tie_when_both_fail_still_restricts");
     // 
@@ -22894,7 +22894,7 @@ static void gen_keke_discard_0_no_blade_heart_members(void){
     // // Check resolution
     // TODO assert_eq (unresolved): assert_eq!( game.state.mods.orientation_modifiers.get(&keke), Some(&CardOrientation::Wait), "Keke should remain wait because 0 no-blade-heart members were discarded" );
     // 
-    int blades = 0;
+    int blades = test_get_blade_modifier(&tg, keke);
     CHECK_EQ(blades, 0, "keke_discard_0_no_blade_heart_members");
     // 
 }
@@ -22939,7 +22939,7 @@ static void gen_keke_discard_1_no_blade_heart_member(void){
     // TODO: "Keke should become active after discarding 1 no-blade-heart member"
     // TODO: );
     // 
-    int blades = 0;
+    int blades = test_get_blade_modifier(&tg, keke);
     CHECK_EQ(blades, 0, "keke_discard_1_no_blade_heart_member");
     // 
 }
@@ -22983,7 +22983,7 @@ static void gen_keke_discard_2_no_blade_heart_members(void){
     // TODO: "Keke should become active after discarding 2 no-blade-heart members"
     // TODO: );
     // 
-    int blades = 0;
+    int blades = test_get_blade_modifier(&tg, keke);
     CHECK_EQ(blades, 2, "keke_discard_2_no_blade_heart_members");
     // 
 }
@@ -23027,7 +23027,7 @@ static void gen_keke_discard_2_tomari_no_blade_heart(void){
     // TODO: "Keke should become active after discarding 2 no-blade-heart members"
     // TODO: );
     // 
-    int blades = 0;
+    int blades = test_get_blade_modifier(&tg, keke);
     // // PL!SP-sd1-011-P has blade=1 but blade_heart=None → has_blade_heart()=false
     // // So both count as "member cards without blade heart" → blade bonus should trigger
     CHECK_EQ(blades, 2, "keke_discard_2_tomari_no_blade_heart");
@@ -26726,7 +26726,7 @@ static void gen_butterfly_wing_live_success_scores_with_live_start_members(void)
     rb_resume_with_choice(&tg.state, -1);
     // TODO: }
     // 
-    CHECK_EQ(rb_mods_get_score(&tg.state.mods, butterfly), 0, "butterfly_wing_live_success_scores_with_live_start_members");
+    CHECK_EQ(test_get_score_modifier(&tg, butterfly), 0, "butterfly_wing_live_success_scores_with_live_start_members");
     // action result consumed: let l = game.state.performance_snapshots[0].lives.iter().find(|l| l.card_id == butterfly).unwrap();
     // TODO assert_eq (unresolved): assert_eq!(l.score - l.base_score, 1, "bonus in final score");
     // 
@@ -28098,7 +28098,7 @@ static void gen_wien_low_energy_no_cost_modifier(void){
     // 
     // // Recalc should NOT add cost mod (9 < 10)
     test_recalc(&tg);
-    CHECK_EQ(rb_mods_get_cost(&tg.state.mods, wien), 0, "wien_low_energy_no_cost_modifier");
+    CHECK_EQ(test_get_cost_modifier(&tg, wien), 0, "wien_low_energy_no_cost_modifier");
     // 
 }
 
@@ -28124,7 +28124,7 @@ static void gen_wien_high_energy_cost_modifier_applied(void){
     // 
     // // Recalc SHOULD add +4 cost mod (10 >= 10)
     test_recalc(&tg);
-    CHECK_EQ(rb_mods_get_cost(&tg.state.mods, wien), 4, "wien_high_energy_cost_modifier_applied");
+    CHECK_EQ(test_get_cost_modifier(&tg, wien), 4, "wien_high_energy_cost_modifier_applied");
     // 
 }
 
@@ -28144,19 +28144,19 @@ static void gen_wien_cost_modifier_dynamic(void){
     // 
     // // At 9 energy: no modifier
     test_recalc(&tg);
-    CHECK_EQ(rb_mods_get_cost(&tg.state.mods, wien), 0, "wien_cost_modifier_dynamic");
+    CHECK_EQ(test_get_cost_modifier(&tg, wien), 0, "wien_cost_modifier_dynamic");
     // 
     // // Add 1 more → 10 energy
     test_add_to_energy(&tg, 0, energy_id);
     // TODO: game.state.player1.energy_zone.add_active(1);
     test_recalc(&tg);
-    CHECK_EQ(rb_mods_get_cost(&tg.state.mods, wien), 4, "wien_cost_modifier_dynamic");
+    CHECK_EQ(test_get_cost_modifier(&tg, wien), 4, "wien_cost_modifier_dynamic");
     // 
     // // Remove 1 → back to 9
     // pop
     test_spend_energy(&tg, 1);
     test_recalc(&tg);
-    CHECK_EQ(rb_mods_get_cost(&tg.state.mods, wien), 0, "wien_cost_modifier_dynamic");
+    CHECK_EQ(test_get_cost_modifier(&tg, wien), 0, "wien_cost_modifier_dynamic");
     // 
 }
 
@@ -28173,7 +28173,7 @@ static void gen_wien_cost_modifier_cleared_on_leave(void){
     tg.state.p[0].stage[2] = -1;
     test_give_energy(&tg, 10);
     test_recalc(&tg);
-    CHECK_EQ(rb_mods_get_cost(&tg.state.mods, wien), 4, "wien_cost_modifier_cleared_on_leave");
+    CHECK_EQ(test_get_cost_modifier(&tg, wien), 4, "wien_cost_modifier_cleared_on_leave");
     // 
     // // Remove from stage
     tg.state.p[0].stage[1] = -1;
@@ -28181,7 +28181,7 @@ static void gen_wien_cost_modifier_cleared_on_leave(void){
     test_clear_mods_for_card(&tg, wien);
     test_recalc(&tg);
     // 
-    CHECK_EQ(rb_mods_get_cost(&tg.state.mods, wien), 0, "wien_cost_modifier_cleared_on_leave");
+    CHECK_EQ(test_get_cost_modifier(&tg, wien), 0, "wien_cost_modifier_cleared_on_leave");
     // 
 }
 
@@ -29543,7 +29543,7 @@ static void gen_small_deck_draws_out_and_resolves(void){
     // 
     // 
     CHECK_EQ(tg.state.p[0].hand.n, 2, "small_deck_draws_out_and_resolves");
-    // TODO assert: assert!( game.state.player1.main_deck.cards.is_empty(), "Deck should be empty after drawing out" );
+    CHECK(tg.state.p[0].deck.n == 0, "small_deck_draws_out_and_resolves");
     // 
 }
 
@@ -30253,7 +30253,7 @@ static void gen_special_color_set_blades_and_score_twin_in_one_live(void){
     while (test_has_pending_choice(&tg)) rb_resume_with_choice(&tg.state, 0);
     // TODO: game.drain_choices_strict(&["SelectCard", "SelectAutoAbility"], &[0]);
     // TODO: }
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, liella), 3, "special_color_set_blades_and_score_twin_in_one_live");
+    CHECK_EQ(test_get_blade_modifier(&tg, liella), 3, "special_color_set_blades_and_score_twin_in_one_live");
     // 
     // // She then moves out of center (an unrelated effect's reposition).
     // // inlined helper manually_move
@@ -30284,9 +30284,9 @@ static void gen_special_color_set_blades_and_score_twin_in_one_live(void){
     // TODO: game.drain_choices_strict(&["SelectCard", "SelectAutoAbility"], &[0]);
     // TODO: }
     // 
-    int total = 0;
+    int total = test_get_score_modifier(&tg, special);
     CHECK_EQ(total, 1, "special_color_set_blades_and_score_twin_in_one_live");
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, liella), 3, "special_color_set_blades_and_score_twin_in_one_live");
+    CHECK_EQ(test_get_blade_modifier(&tg, liella), 3, "special_color_set_blades_and_score_twin_in_one_live");
     // 
 }
 
@@ -32583,7 +32583,7 @@ static void gen_bp6022_more_opp_energy_scores(void){
     // 
     { int ftpl = rb_owner_of_card(&tg.state, live); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ成功時"); rb_drain_ability_queue(&tg.state); }
     // 
-    CHECK_EQ(rb_mods_get_score(&tg.state.mods, live), 1, "bp6022_more_opp_energy_scores");
+    CHECK_EQ(test_get_score_modifier(&tg, live), 1, "bp6022_more_opp_energy_scores");
     // 
 }
 
@@ -32604,7 +32604,7 @@ static void gen_bp6022_equal_or_fewer_opp_energy_no_score(void){
     // 
     { int ftpl = rb_owner_of_card(&tg.state, live); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ成功時"); rb_drain_ability_queue(&tg.state); }
     // 
-    CHECK_EQ(rb_mods_get_score(&tg.state.mods, live), 0, "bp6022_equal_or_fewer_opp_energy_no_score");
+    CHECK_EQ(test_get_score_modifier(&tg, live), 0, "bp6022_equal_or_fewer_opp_energy_no_score");
     // 
 }
 
@@ -32721,7 +32721,7 @@ static void gen_spr039_constant_blades_with_combined_success_cards(void){
     // 
     test_recalc(&tg);
     // 
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, me), 2, "spr039_constant_blades_with_combined_success_cards");
+    CHECK_EQ(test_get_blade_modifier(&tg, me), 2, "spr039_constant_blades_with_combined_success_cards");
     // 
 }
 
@@ -32741,7 +32741,7 @@ static void gen_spr039_constant_blades_off_below_four_combined(void){
     // 
     test_recalc(&tg);
     // 
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, me), 0, "spr039_constant_blades_off_below_four_combined");
+    CHECK_EQ(test_get_blade_modifier(&tg, me), 0, "spr039_constant_blades_off_below_four_combined");
     // 
 }
 
@@ -32851,7 +32851,7 @@ static void gen_bp7020_constant_blades_while_energy_ahead(void){
     // 
     test_recalc(&tg);
     // 
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, me), 2, "bp7020_constant_blades_while_energy_ahead");
+    CHECK_EQ(test_get_blade_modifier(&tg, me), 2, "bp7020_constant_blades_while_energy_ahead");
     // 
 }
 
@@ -32876,7 +32876,7 @@ static void gen_bp7020_constant_blades_off_when_behind(void){
     // 
     test_recalc(&tg);
     // 
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, me), 0, "bp7020_constant_blades_off_when_behind");
+    CHECK_EQ(test_get_blade_modifier(&tg, me), 0, "bp7020_constant_blades_off_when_behind");
     // 
 }
 
@@ -32897,9 +32897,9 @@ static void gen_sd1022_live_start_grants_blade_to_all_aqours_members(void){
     // 
     { int ftpl = rb_owner_of_card(&tg.state, live); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ開始時"); rb_drain_ability_queue(&tg.state); }
     // 
-    CHECK(rb_mods_get_blade(&tg.state.mods, a1), "sd1022_live_start_grants_blade_to_all_aqours_members");
-    CHECK(rb_mods_get_blade(&tg.state.mods, a2), "sd1022_live_start_grants_blade_to_all_aqours_members");
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, non_aqours), 0, "sd1022_live_start_grants_blade_to_all_aqours_members");
+    CHECK(test_get_blade_modifier(&tg, a1), "sd1022_live_start_grants_blade_to_all_aqours_members");
+    CHECK(test_get_blade_modifier(&tg, a2), "sd1022_live_start_grants_blade_to_all_aqours_members");
+    CHECK_EQ(test_get_blade_modifier(&tg, non_aqours), 0, "sd1022_live_start_grants_blade_to_all_aqours_members");
     // 
 }
 
@@ -33375,7 +33375,7 @@ static void gen_omoi_accept_member_to_deck_top_grants_blade(void){
     rb_resume_with_choice(&tg.state, 0);
     // 
     // TODO assert_eq (unresolved): assert_eq!( game.state.player1.main_deck.cards.first(), Some(&wr_member), "recovered member sits on deck TOP" );
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, mate), 1, "omoi_accept_member_to_deck_top_grants_blade");
+    CHECK_EQ(test_get_blade_modifier(&tg, mate), 1, "omoi_accept_member_to_deck_top_grants_blade");
     // 
 }
 
@@ -33405,7 +33405,7 @@ static void gen_omoi_decline_no_blade_no_move(void){
     // TODO: Some(&wr_member),
     // TODO: "declined: member not placed on deck"
     // TODO: );
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, mate), 0, "omoi_decline_no_blade_no_move");
+    CHECK_EQ(test_get_blade_modifier(&tg, mate), 0, "omoi_decline_no_blade_no_move");
     // 
 }
 
@@ -33426,7 +33426,7 @@ static void gen_omoi_empty_waitroom_no_prompt(void){
     rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     // 
     test_has_pending_choice(&tg);
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, mate), 0, "omoi_empty_waitroom_no_prompt");
+    CHECK_EQ(test_get_blade_modifier(&tg, mate), 0, "omoi_empty_waitroom_no_prompt");
     // 
 }
 
@@ -33460,7 +33460,7 @@ static void gen_ruby_reveal_aqours_place_and_gain_blade(void){
     // 
     // // The revealed Aqours card left the hand onto the deck.
     CHECK((!test_zone_has_id(&tg, 0, "hand", aqours_card)), "ruby_reveal_aqours_place_and_gain_blade");
-    int in_deck = 0;
+    int in_deck = test_zone_has_id(&tg, 0, "deck", aqours_card);
     CHECK(in_deck, "ruby_reveal_aqours_place_and_gain_blade");
     // 
 }
@@ -33524,7 +33524,7 @@ static void gen_chisato_right_side_debut_draws_two_discards_two(void){
     rb_resume_with_choice(&tg.state, 0);
     // TODO: }
     // 
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, me), 0, "chisato_right_side_debut_draws_two_discards_two");
+    CHECK_EQ(test_get_blade_modifier(&tg, me), 0, "chisato_right_side_debut_draws_two_discards_two");
     CHECK(test_zone_has_id(&tg, 0, "hand", d1), "chisato_right_side_debut_draws_two_discards_two");
     // 
 }
@@ -33612,7 +33612,7 @@ static void gen_koko_three_kaleidoscore_grants_heart06_and_blade(void){
     test_recalc(&tg);
     // 
     // TODO assert_eq (unresolved): assert_eq!( game.state.mods.get_heart_modifier(koko, HeartColor::Heart06), 1, "3 KALEIDOSCORE members -> heart06 granted" );
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, koko), 1, "koko_three_kaleidoscore_grants_heart06_and_blade");
+    CHECK_EQ(test_get_blade_modifier(&tg, koko), 1, "koko_three_kaleidoscore_grants_heart06_and_blade");
     // 
 }
 
@@ -33630,7 +33630,7 @@ static void gen_koko_only_two_kaleidoscope_no_bonus(void){
     test_recalc(&tg);
     // 
     // TODO assert_eq (unresolved): assert_eq!( game.state.mods.get_heart_modifier(koko, HeartColor::Heart06), 0, "only 2 KALEIDOSCORE -> no heart06" );
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, koko), 0, "koko_only_two_kaleidoscope_no_bonus");
+    CHECK_EQ(test_get_blade_modifier(&tg, koko), 0, "koko_only_two_kaleidoscope_no_bonus");
     // 
 }
 
@@ -33714,7 +33714,7 @@ static void gen_bp5026_total_eleven_scores_plus_one(void){
     // 
     rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     // 
-    CHECK_EQ(rb_mods_get_score(&tg.state.mods, live), 1, "bp5026_total_eleven_scores_plus_one");
+    CHECK_EQ(test_get_score_modifier(&tg, live), 1, "bp5026_total_eleven_scores_plus_one");
     // 
 }
 
@@ -33735,7 +33735,7 @@ static void gen_bp5026_total_below_threshold_no_bonus(void){
     // 
     rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     // 
-    CHECK_EQ(rb_mods_get_score(&tg.state.mods, live), 0, "bp5026_total_below_threshold_no_bonus");
+    CHECK_EQ(test_get_score_modifier(&tg, live), 0, "bp5026_total_below_threshold_no_bonus");
     // 
 }
 
@@ -33755,7 +33755,7 @@ static void gen_cl1010_expensive_member_two_blades(void){
     // 
     rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     // 
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, big), 2, "cl1010_expensive_member_two_blades");
+    CHECK_EQ(test_get_blade_modifier(&tg, big), 2, "cl1010_expensive_member_two_blades");
     // 
 }
 
@@ -33775,7 +33775,7 @@ static void gen_cl1010_cheap_member_no_blades(void){
     // 
     rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     // 
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, low), 0, "cl1010_cheap_member_no_blades");
+    CHECK_EQ(test_get_blade_modifier(&tg, low), 0, "cl1010_cheap_member_no_blades");
     // 
 }
 
@@ -34150,11 +34150,11 @@ static void gen_natsumi_bp4009_blade_constant_tracks_cost_total_race(void){
     tg.state.p[0].stage[1] = natsumi;
     // TODO: game.state.player2.stage.stage[1] = big;
     test_recalc(&tg);
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, natsumi), 3, "natsumi_bp4009_blade_constant_tracks_cost_total_race");
+    CHECK_EQ(test_get_blade_modifier(&tg, natsumi), 3, "natsumi_bp4009_blade_constant_tracks_cost_total_race");
     // 
     // TODO: game.state.player2.stage.stage[1] = small;
     test_recalc(&tg);
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, natsumi), 0, "natsumi_bp4009_blade_constant_tracks_cost_total_race");
+    CHECK_EQ(test_get_blade_modifier(&tg, natsumi), 0, "natsumi_bp4009_blade_constant_tracks_cost_total_race");
     // 
 }
 
@@ -36436,7 +36436,7 @@ static void gen_chisato_cost_misses_threshold_condition_fails(void){
     // // Cards should still be in hand (reveal doesn't discard)
     CHECK_EQ(tg.state.p[0].hand.n, 2, "chisato_cost_misses_threshold_condition_fails");
     // // Condition failed → no score modifier applied
-    CHECK_EQ(rb_mods_get_score(&tg.state.mods, chisato), 0, "chisato_cost_misses_threshold_condition_fails");
+    CHECK_EQ(test_get_score_modifier(&tg, chisato), 0, "chisato_cost_misses_threshold_condition_fails");
     // // use_limit IS consumed for 起動 abilities even when condition fails
     // // (the player paid the cost, the attempt counts toward the turn limit)
     int key = 0;
@@ -40820,9 +40820,9 @@ static void gen_azuna_q158_blade_all_members(void){
     test_has_pending_choice(&tg);
     // TODO: game.select_energy_from_zone(1);
     // 
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, member_left), 2, "azuna_q158_blade_all_members");
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, ayumu), 2, "azuna_q158_blade_all_members");
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, member_right), 2, "azuna_q158_blade_all_members");
+    CHECK_EQ(test_get_blade_modifier(&tg, member_left), 2, "azuna_q158_blade_all_members");
+    CHECK_EQ(test_get_blade_modifier(&tg, ayumu), 2, "azuna_q158_blade_all_members");
+    CHECK_EQ(test_get_blade_modifier(&tg, member_right), 2, "azuna_q158_blade_all_members");
     // 
 }
 
@@ -40901,7 +40901,7 @@ static void gen_azuna_q158_blade_single_member(void){
     test_has_pending_choice(&tg);
     // TODO: game.select_energy_from_zone(1);
     // 
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, ayumu), 2, "azuna_q158_blade_single_member");
+    CHECK_EQ(test_get_blade_modifier(&tg, ayumu), 2, "azuna_q158_blade_single_member");
     // 
 }
 
@@ -40985,7 +40985,7 @@ static void gen_azuna_q157_energy_under_member_uses_any_energy(void){
     test_has_pending_choice(&tg);
     // TODO: game.select_energy_from_zone(1);
     // 
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, ayumu), 2, "azuna_q157_energy_under_member_uses_any_energy");
+    CHECK_EQ(test_get_blade_modifier(&tg, ayumu), 2, "azuna_q157_energy_under_member_uses_any_energy");
     // 
 }
 
@@ -41900,7 +41900,7 @@ static void gen_kanon_ab1_live_success_pay_optional_cost(void){
     // 
     // // After paying, the ability should complete without freezing.
     // // Verify the score modifier was applied.
-    CHECK_EQ(rb_mods_get_score(&tg.state.mods, live), 1, "kanon_ab1_live_success_pay_optional_cost");
+    CHECK_EQ(test_get_score_modifier(&tg, live), 1, "kanon_ab1_live_success_pay_optional_cost");
     // 
     // // Verify 6 energy was deducted.
     int energy_spent = 0;
@@ -41963,7 +41963,7 @@ static void gen_kanon_ab1_live_success_skip_optional_cost(void){
     rb_resume_with_choice(&tg.state, 0);
     // 
     // // No score modifier should have been applied
-    CHECK_EQ(rb_mods_get_score(&tg.state.mods, live), 0, "kanon_ab1_live_success_skip_optional_cost");
+    CHECK_EQ(test_get_score_modifier(&tg, live), 0, "kanon_ab1_live_success_skip_optional_cost");
     // 
     // // No energy should have been deducted
     int energy_spent = 0;
@@ -42525,7 +42525,7 @@ static void gen_mei_bp5_q235_debut_look_and_select_with_multiname(void){
     // TODO: }
     // 
     // 
-    int multiname_in_hand = 0;
+    int multiname_in_hand = test_zone_has_id(&tg, 0, "hand", multiname);
     CHECK(multiname_in_hand, "mei_bp5_q235_debut_look_and_select_with_multiname");
     CHECK((!test_zone_has_id(&tg, 0, "deck", multiname)), "mei_bp5_q235_debut_look_and_select_with_multiname");
     // 
@@ -43472,9 +43472,9 @@ static void gen_strawberry_q132_first_attacker_evaluated(void){
     rb_advance_phase(&tg.state);
     // 
     // // Both conditions met 竊・live card should be in success_live_zone with score +2
-    // TODO assert: assert!( !game.state.player1.success_live_card_zone.cards.is_empty(), "Q132: Live card should be in success zone when both conditions pass" );
+    CHECK((!tg.state.p[0].success.n == 0), "strawberry_q132_first_attacker_evaluated");
     int target = 0;
-    CHECK_EQ(rb_mods_get_score(&tg.state.mods, target), 0, "strawberry_q132_first_attacker_evaluated");
+    CHECK_EQ(test_get_score_modifier(&tg, target), 0, "strawberry_q132_first_attacker_evaluated");
     // action result consumed: let l = game.state.performance_snapshots[0].lives.iter().find(|l| l.card_id == target).unwrap();
     // TODO assert_eq (unresolved): assert_eq!(l.score - l.base_score, 2, "bonus in final score");
     // 
@@ -43539,7 +43539,7 @@ static void gen_strawberry_q142_excess_heart_prevents_score(void){
     // // If live card succeeded (in success_zone), verify no +2
     // TODO: if !game.state.player1.success_live_card_zone.cards.is_empty() {
     int target = 0;
-    CHECK_EQ(rb_mods_get_score(&tg.state.mods, target), 0, "strawberry_q142_excess_heart_prevents_score");
+    CHECK_EQ(test_get_score_modifier(&tg, target), 0, "strawberry_q142_excess_heart_prevents_score");
     // TODO: }
     // 
 }
@@ -43601,8 +43601,8 @@ static void gen_strawberry_q142_wrong_group_prevents_score(void){
     // // Wrong group 竊・no score bonus
     // // Live card may have been discarded from live zones (heart requirements unmet)
     // // Verify both live zones are empty 窶・the card was properly removed
-    // TODO assert: assert!( game.state.player1.success_live_card_zone.cards.is_empty(), "Q142: No card in success zone (heart requirements unmet with filler)" );
-    // TODO assert: assert!( game.state.player1.live_card_zone.cards.is_empty(), "Q142: No card in live zone (heart requirements unmet with filler)" );
+    CHECK(tg.state.p[0].success.n == 0, "strawberry_q142_wrong_group_prevents_score");
+    CHECK(tg.state.p[0].live.n == 0, "strawberry_q142_wrong_group_prevents_score");
     // 
 }
 
@@ -43665,10 +43665,10 @@ static void gen_strawberry_opponent_didnt_win_no_score(void){
     // // If live card succeeded, verify no +2 score bonus
     // TODO: if !game.state.player1.success_live_card_zone.cards.is_empty() {
     int target = 0;
-    CHECK_EQ(rb_mods_get_score(&tg.state.mods, target), 0, "strawberry_opponent_didnt_win_no_score");
+    CHECK_EQ(test_get_score_modifier(&tg, target), 0, "strawberry_opponent_didnt_win_no_score");
     // TODO: } else if !game.state.player1.live_card_zone.cards.is_empty() {
     target = 0;
-    CHECK_EQ(rb_mods_get_score(&tg.state.mods, target), 0, "strawberry_opponent_didnt_win_no_score");
+    CHECK_EQ(test_get_score_modifier(&tg, target), 0, "strawberry_opponent_didnt_win_no_score");
     // TODO: }
     // 
 }
@@ -44040,7 +44040,7 @@ static void gen_go_master_start_fewer_success_cards_scores(void){
     // 
     { int ftpl = rb_owner_of_card(&tg.state, live); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ開始時"); rb_drain_ability_queue(&tg.state); }
     // 
-    CHECK_EQ(rb_mods_get_score(&tg.state.mods, live), 1, "go_master_start_fewer_success_cards_scores");
+    CHECK_EQ(test_get_score_modifier(&tg, live), 1, "go_master_start_fewer_success_cards_scores");
     // 
 }
 
@@ -44059,7 +44059,7 @@ static void gen_go_master_start_equal_success_cards_no_score(void){
     // 
     { int ftpl = rb_owner_of_card(&tg.state, live); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ開始時"); rb_drain_ability_queue(&tg.state); }
     // 
-    CHECK_EQ(rb_mods_get_score(&tg.state.mods, live), 0, "go_master_start_equal_success_cards_no_score");
+    CHECK_EQ(test_get_score_modifier(&tg, live), 0, "go_master_start_equal_success_cards_no_score");
     // 
 }
 
@@ -44079,7 +44079,7 @@ static void gen_note_mermaid_two_distinct_kaleidoscope_members_score(void){
     // 
     { int ftpl = rb_owner_of_card(&tg.state, live); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ開始時"); rb_drain_ability_queue(&tg.state); }
     // 
-    CHECK_EQ(rb_mods_get_score(&tg.state.mods, live), 1, "note_mermaid_two_distinct_kaleidoscope_members_score");
+    CHECK_EQ(test_get_score_modifier(&tg, live), 1, "note_mermaid_two_distinct_kaleidoscope_members_score");
     // 
 }
 
@@ -44099,7 +44099,7 @@ static void gen_note_mermaid_duplicate_kaleidoscope_names_no_score(void){
     // 
     { int ftpl = rb_owner_of_card(&tg.state, live); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ開始時"); rb_drain_ability_queue(&tg.state); }
     // 
-    CHECK_EQ(rb_mods_get_score(&tg.state.mods, live), 0, "note_mermaid_duplicate_kaleidoscope_names_no_score");
+    CHECK_EQ(test_get_score_modifier(&tg, live), 0, "note_mermaid_duplicate_kaleidoscope_names_no_score");
     // 
 }
 
@@ -44161,8 +44161,8 @@ static void gen_rin_live_without_triggers_grants_other_member_two_blades(void){
     // 
     rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     // 
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, mate), 2, "rin_live_without_triggers_grants_other_member_two_blades");
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, rin), 0, "rin_live_without_triggers_grants_other_member_two_blades");
+    CHECK_EQ(test_get_blade_modifier(&tg, mate), 2, "rin_live_without_triggers_grants_other_member_two_blades");
+    CHECK_EQ(test_get_blade_modifier(&tg, rin), 0, "rin_live_without_triggers_grants_other_member_two_blades");
     // 
 }
 
@@ -44180,7 +44180,7 @@ static void gen_rin_all_lives_have_triggers_no_blades(void){
     // 
     rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     // 
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, mate), 0, "rin_all_lives_have_triggers_no_blades");
+    CHECK_EQ(test_get_blade_modifier(&tg, mate), 0, "rin_all_lives_have_triggers_no_blades");
     // 
 }
 
@@ -44195,7 +44195,7 @@ static void gen_rin_empty_live_zone_no_blades(void){
     // 
     rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     // 
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, mate), 0, "rin_empty_live_zone_no_blades");
+    CHECK_EQ(test_get_blade_modifier(&tg, mate), 0, "rin_empty_live_zone_no_blades");
     // 
 }
 
@@ -44217,7 +44217,7 @@ static void gen_bp5015_all_six_colors_present_two_blades(void){
     // 
     rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     // 
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, shizuku), 2, "bp5015_all_six_colors_present_two_blades");
+    CHECK_EQ(test_get_blade_modifier(&tg, shizuku), 2, "bp5015_all_six_colors_present_two_blades");
     // 
 }
 
@@ -44237,7 +44237,7 @@ static void gen_bp5015_missing_colors_no_blades(void){
     // 
     rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     // 
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, shizuku), 0, "bp5015_missing_colors_no_blades");
+    CHECK_EQ(test_get_blade_modifier(&tg, shizuku), 0, "bp5015_missing_colors_no_blades");
     // 
 }
 
@@ -44398,7 +44398,7 @@ static void gen_bp4024_mus_member_gains_blade(void){
     // 
     rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     // 
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, mus_member), 1, "bp4024_mus_member_gains_blade");
+    CHECK_EQ(test_get_blade_modifier(&tg, mus_member), 1, "bp4024_mus_member_gains_blade");
     // 
 }
 
@@ -44418,7 +44418,7 @@ static void gen_bp4024_no_mus_member_on_stage_no_blades(void){
     // 
     rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     // 
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, aq), 0, "bp4024_no_mus_member_on_stage_no_blades");
+    CHECK_EQ(test_get_blade_modifier(&tg, aq), 0, "bp4024_no_mus_member_on_stage_no_blades");
     // 
 }
 
@@ -44443,7 +44443,7 @@ static void gen_bp5013_mill_three_all_members_two_blades(void){
     // 
     rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     // 
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, me), 2, "bp5013_mill_three_all_members_two_blades");
+    CHECK_EQ(test_get_blade_modifier(&tg, me), 2, "bp5013_mill_three_all_members_two_blades");
     CHECK_EQ(tg.state.p[0].deck.n, deck_before - 3, "bp5013_mill_three_all_members_two_blades");
     // 
 }
@@ -44468,7 +44468,7 @@ static void gen_bp5013_live_card_among_milled_no_blades(void){
     // 
     rb_trigger_live_start(&tg.state, 0); rb_trigger_live_start(&tg.state, 1); rb_drain_ability_queue(&tg.state);
     // 
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, me), 0, "bp5013_live_card_among_milled_no_blades");
+    CHECK_EQ(test_get_blade_modifier(&tg, me), 0, "bp5013_live_card_among_milled_no_blades");
     // 
 }
 
@@ -44783,15 +44783,15 @@ static void gen_sayaka_hsbp2002_blade_constant_tracks_higher_cost_member(void){
     // 
     tg.state.p[0].stage[1] = sayaka;
     test_recalc(&tg);
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, sayaka), 0, "sayaka_hsbp2002_blade_constant_tracks_higher_cost_member");
+    CHECK_EQ(test_get_blade_modifier(&tg, sayaka), 0, "sayaka_hsbp2002_blade_constant_tracks_higher_cost_member");
     // 
     tg.state.p[0].stage[0] = big;
     test_recalc(&tg);
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, sayaka), 3, "sayaka_hsbp2002_blade_constant_tracks_higher_cost_member");
+    CHECK_EQ(test_get_blade_modifier(&tg, sayaka), 3, "sayaka_hsbp2002_blade_constant_tracks_higher_cost_member");
     // 
     tg.state.p[0].stage[0] = -1;
     test_recalc(&tg);
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, sayaka), 0, "sayaka_hsbp2002_blade_constant_tracks_higher_cost_member");
+    CHECK_EQ(test_get_blade_modifier(&tg, sayaka), 0, "sayaka_hsbp2002_blade_constant_tracks_higher_cost_member");
     // 
 }
 
@@ -44809,7 +44809,7 @@ static void gen_niko_pr021_exact_energy_constant_refreshes_on_gain(void){
     test_give_energy(&tg, 6);
     // TODO: fill_energy_deck(&mut game, 0, 3);
     test_recalc(&tg);
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, niko), 0, "niko_pr021_exact_energy_constant_refreshes_on_gain");
+    CHECK_EQ(test_get_blade_modifier(&tg, niko), 0, "niko_pr021_exact_energy_constant_refreshes_on_gain");
     // 
     // TODO: trigger_auto(
     // TODO: &mut game,
@@ -44820,7 +44820,7 @@ static void gen_niko_pr021_exact_energy_constant_refreshes_on_gain(void){
     rb_resume_with_choice(&tg.state, 1);
     // 
     CHECK_EQ(tg.state.p[0].energy.n, 7, "niko_pr021_exact_energy_constant_refreshes_on_gain");
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, niko), 2, "niko_pr021_exact_energy_constant_refreshes_on_gain");
+    CHECK_EQ(test_get_blade_modifier(&tg, niko), 2, "niko_pr021_exact_energy_constant_refreshes_on_gain");
     // 
 }
 
@@ -46972,7 +46972,7 @@ static void gen_joint_live_start_skip_optional_no_effect(void){
     // TODO: handle_optional_cost(&mut game, &[]); // skip with empty indices
     // 
     CHECK_EQ(tg.state.p[0].hand.n, hand_before, "joint_live_start_skip_optional_no_effect");
-    CHECK_EQ(rb_mods_get_score(&tg.state.mods, joint), 0, "joint_live_start_skip_optional_no_effect");
+    CHECK_EQ(test_get_score_modifier(&tg, joint), 0, "joint_live_start_skip_optional_no_effect");
     // 
 }
 
@@ -47081,7 +47081,7 @@ static void gen_joint_live_start_no_named_skips_gracefully(void){
     rb_drain_ability_queue(&tg.state);
     // 
     CHECK_EQ(tg.state.p[0].hand.n, 1, "joint_live_start_no_named_skips_gracefully");
-    CHECK_EQ(rb_mods_get_score(&tg.state.mods, joint), 0, "joint_live_start_no_named_skips_gracefully");
+    CHECK_EQ(test_get_score_modifier(&tg, joint), 0, "joint_live_start_no_named_skips_gracefully");
     // 
 }
 
@@ -47274,11 +47274,11 @@ static void gen_setsuna_pb1_live_card_setup_works(void){
     rb_advance_phase(&tg.state);
     // 
     // 
-    // TODO assert: assert!( game.state.player1.live_card_zone.cards.is_empty(), "Live zone should be empty before set" );
+    CHECK(tg.state.p[0].live.n == 0, "setsuna_pb1_live_card_setup_works");
     // 
     test_set_live_card(&tg, 0, live_card);
     // 
-    // TODO assert: assert!( !game.state.player1.live_card_zone.cards.is_empty(), "Live card should be in zone after set" );
+    CHECK((!tg.state.p[0].live.n == 0), "setsuna_pb1_live_card_setup_works");
     // TODO assert_eq (unresolved): assert_eq!( game.state.player1.live_card_zone.cards[0], live_card, "Set card should match" );
     // 
 }
@@ -49587,9 +49587,9 @@ static void gen_edelnote_name_based_exclusion(void){
     // TODO: }
     // 
     // // edel1 got blades, edel2 got heart, edel3 (same name) gets nothing
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, edel1), 2, "edelnote_name_based_exclusion");
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, edel2), 0, "edelnote_name_based_exclusion");
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, edel3), 0, "edelnote_name_based_exclusion");
+    CHECK_EQ(test_get_blade_modifier(&tg, edel1), 2, "edelnote_name_based_exclusion");
+    CHECK_EQ(test_get_blade_modifier(&tg, edel2), 0, "edelnote_name_based_exclusion");
+    CHECK_EQ(test_get_blade_modifier(&tg, edel3), 0, "edelnote_name_based_exclusion");
     // TODO assert_eq (unresolved): assert_eq!( game.state .mods .get_heart_modifier(edel1, rabuka_engine::card::HeartColor::Heart06,), 0, "edel1 (same name as blade recipient) should have 0 heart06" );
     // TODO assert_eq (unresolved): assert_eq!( game.state .mods .get_heart_modifier(edel2, rabuka_engine::card::HeartColor::Heart06,), 2, "edel2 (only different name) should have +2 heart06" );
     // TODO assert_eq (unresolved): assert_eq!( game.state .mods .get_heart_modifier(edel3, rabuka_engine::card::HeartColor::Heart06,), 0, "edel3 (same name as edel1) should have 0 heart06" );
@@ -51317,7 +51317,7 @@ static void gen_s2_pb1_006_own_debut_fires(void){
     test_play_to_stage(&tg, member, 1);
     // TODO: scan_autos_both(&mut game);
     // 
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, member), 2, "s2_pb1_006_own_debut_fires");
+    CHECK_EQ(test_get_blade_modifier(&tg, member), 2, "s2_pb1_006_own_debut_fires");
     // 
 }
 
@@ -51337,7 +51337,7 @@ static void gen_s2_pb1_006_opponent_drag_arms_per_move(void){
     tg.state.p[0].stage[2] = member;
     test_play_to_stage(&tg, member, 2);
     // TODO: scan_autos_both(&mut game);
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, member), 2, "s2_pb1_006_opponent_drag_arms_per_move");
+    CHECK_EQ(test_get_blade_modifier(&tg, member), 2, "s2_pb1_006_opponent_drag_arms_per_move");
     // 
     // // P2 board: all-みらくらぱーく！ gate for the mover.
     int mirakura_a = test_id(&tg, "PL!HS-bp1-005-PR");
@@ -51357,7 +51357,7 @@ static void gen_s2_pb1_006_opponent_drag_arms_per_move(void){
     // TODO: scan_autos_both(&mut game);
     // 
     CHECK_EQ(tg.state.p[0].stage[1], member, "s2_pb1_006_opponent_drag_arms_per_move");
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, member), 4, "s2_pb1_006_opponent_drag_arms_per_move");
+    CHECK_EQ(test_get_blade_modifier(&tg, member), 4, "s2_pb1_006_opponent_drag_arms_per_move");
     // 
     // // NOTE: multi-drag sequences within one turn are deliberately NOT pinned
     // // here — blind index answers to the facing-area prompt can select
@@ -51414,7 +51414,7 @@ static void gen_s1_bp7_005_opponent_caused_placement_does_not_fire(void){
     // 
     // TODO: scan_autos_both(&mut game);
     // 
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, watcher), blade_before, "s1_bp7_005_opponent_caused_placement_does_not_fire");
+    CHECK_EQ(test_get_blade_modifier(&tg, watcher), blade_before, "s1_bp7_005_opponent_caused_placement_does_not_fire");
     // 
 }
 
@@ -51675,7 +51675,7 @@ static void gen_cost13_exact_boundary_triggers(void){
     tg.state.p[1].stage[1] = -1;
     tg.state.p[1].stage[2] = -1;
     test_recalc(&tg);
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, you), 2, "cost13_exact_boundary_triggers");
+    CHECK_EQ(test_get_blade_modifier(&tg, you), 2, "cost13_exact_boundary_triggers");
     // 
 }
 
@@ -51694,7 +51694,7 @@ static void gen_cost12_below_threshold_no_trigger(void){
     tg.state.p[1].stage[1] = -1;
     tg.state.p[1].stage[2] = -1;
     test_recalc(&tg);
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, you), 0, "cost12_below_threshold_no_trigger");
+    CHECK_EQ(test_get_blade_modifier(&tg, you), 0, "cost12_below_threshold_no_trigger");
     // 
 }
 
@@ -51709,7 +51709,7 @@ static void gen_cost13_on_self_triggers(void){
     tg.state.p[0].stage[1] = cost13;
     tg.state.p[0].stage[2] = -1;
     test_recalc(&tg);
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, you), 2, "cost13_on_self_triggers");
+    CHECK_EQ(test_get_blade_modifier(&tg, you), 2, "cost13_on_self_triggers");
     // 
 }
 
@@ -51728,7 +51728,7 @@ static void gen_both_sides_cost13_still_only_two_blades(void){
     tg.state.p[1].stage[1] = -1;
     tg.state.p[1].stage[2] = -1;
     test_recalc(&tg);
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, you), 2, "both_sides_cost13_still_only_two_blades");
+    CHECK_EQ(test_get_blade_modifier(&tg, you), 2, "both_sides_cost13_still_only_two_blades");
     // 
 }
 
@@ -51813,7 +51813,7 @@ static void gen_wwd_accept_cost_energy_ahead_scores_plus_one(void){
     // 
     // TODO assert_eq (unresolved): assert_eq!( game.state.player1.energy_deck.cards.len(), deck_before + 1, "accepted: one energy moved from zone back to the energy deck" );
     CHECK_EQ(tg.state.p[0].energy.n, zone_before - 1, "wwd_accept_cost_energy_ahead_scores_plus_one");
-    CHECK(rb_mods_get_score(&tg.state.mods, live), "wwd_accept_cost_energy_ahead_scores_plus_one");
+    CHECK(test_get_score_modifier(&tg, live), "wwd_accept_cost_energy_ahead_scores_plus_one");
     // 
 }
 
@@ -51836,7 +51836,7 @@ static void gen_wwd_decline_no_score_change(void){
     test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, -1);
     // 
-    CHECK_EQ(rb_mods_get_score(&tg.state.mods, live), 0, "wwd_decline_no_score_change");
+    CHECK_EQ(test_get_score_modifier(&tg, live), 0, "wwd_decline_no_score_change");
     // 
 }
 
@@ -51874,7 +51874,7 @@ static void gen_wwd_energy_not_ahead_after_cost_no_bonus(void){
     CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectTarget", "wwd_energy_not_ahead_after_cost_no_bonus");
     rb_resume_with_choice(&tg.state, 1);
     // 
-    CHECK_EQ(rb_mods_get_score(&tg.state.mods, live), 0, "wwd_energy_not_ahead_after_cost_no_bonus");
+    CHECK_EQ(test_get_score_modifier(&tg, live), 0, "wwd_energy_not_ahead_after_cost_no_bonus");
     // 
 }
 
@@ -52334,18 +52334,18 @@ static void gen_ruby_bp6009_blades_equal_success_pile_difference(void){
     test_add_to_live(&tg, live);
     test_add_to_live(&tg, live);
     test_recalc(&tg);
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, ruby), 3, "ruby_bp6009_blades_equal_success_pile_difference");
+    CHECK_EQ(test_get_blade_modifier(&tg, ruby), 3, "ruby_bp6009_blades_equal_success_pile_difference");
     // 
     // // I take two successes → diff shrinks to 1.
     test_add_to_live(&tg, live);
     test_add_to_live(&tg, live);
     test_recalc(&tg);
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, ruby), 1, "ruby_bp6009_blades_equal_success_pile_difference");
+    CHECK_EQ(test_get_blade_modifier(&tg, ruby), 1, "ruby_bp6009_blades_equal_success_pile_difference");
     // 
     // // Caught up → condition (strictly more) fails → zero.
     test_add_to_live(&tg, live);
     test_recalc(&tg);
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, ruby), 0, "ruby_bp6009_blades_equal_success_pile_difference");
+    CHECK_EQ(test_get_blade_modifier(&tg, ruby), 0, "ruby_bp6009_blades_equal_success_pile_difference");
     // 
 }
 
@@ -53035,7 +53035,7 @@ static void gen_q46_live_card_removed_condition_fails_blade_removed(void){
     // TODO: game.state.player1.live_card_zone.cards.push(test_id(&tg, "PL!-sd1-019-SD"));
     // 
     test_recalc(&tg);
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, kanako), 2, "q46_live_card_removed_condition_fails_blade_removed");
+    CHECK_EQ(test_get_blade_modifier(&tg, kanako), 2, "q46_live_card_removed_condition_fails_blade_removed");
     // 
     // // Remove 2 live cards → only 1 left → condition fails
     tg.state.p[0].live.n=0;
@@ -53154,7 +53154,7 @@ static void gen_q254_mandatory_no_skip_when_condition_met(void){
     // 
     test_has_pending_choice(&tg);
     // 
-    CHECK_EQ(rb_mods_get_score(&tg.state.mods, live_card), 5, "q254_mandatory_no_skip_when_condition_met");
+    CHECK_EQ(test_get_score_modifier(&tg, live_card), 5, "q254_mandatory_no_skip_when_condition_met");
     // TODO assert_eq (unresolved): assert_eq!( game.state .mods .get_need_heart_modifier(live_card, HeartColor::Heart02), 3 );
     // TODO assert_eq (unresolved): assert_eq!( game.state .mods .get_need_heart_modifier(live_card, HeartColor::Heart03), 3 );
     // TODO assert_eq (unresolved): assert_eq!( game.state .mods .get_need_heart_modifier(live_card, HeartColor::Heart06), 3 );
@@ -53236,7 +53236,7 @@ static void gen_q254_one_card_no_effect(void){
     rb_resume_with_choice(&tg.state, -1);
     // TODO: }
     // 
-    CHECK_EQ(rb_mods_get_score(&tg.state.mods, live_card), 0, "q254_one_card_no_effect");
+    CHECK_EQ(test_get_score_modifier(&tg, live_card), 0, "q254_one_card_no_effect");
     // TODO assert_eq (unresolved): assert_eq!( game.state .mods .get_need_heart_modifier(live_card, HeartColor::Heart02), 0, "No H02 mod with 1 card" );
     // TODO assert_eq (unresolved): assert_eq!( game.state .mods .get_need_heart_modifier(live_card, HeartColor::Heart03), 0, "No H03 mod with 1 card" );
     // TODO assert_eq (unresolved): assert_eq!( game.state .mods .get_need_heart_modifier(live_card, HeartColor::Heart06), 0, "No H06 mod with 1 card" );
@@ -53316,7 +53316,7 @@ static void gen_q254_zero_cards_no_effect(void){
     rb_resume_with_choice(&tg.state, -1);
     // TODO: }
     // 
-    CHECK_EQ(rb_mods_get_score(&tg.state.mods, live_card), 0, "q254_zero_cards_no_effect");
+    CHECK_EQ(test_get_score_modifier(&tg, live_card), 0, "q254_zero_cards_no_effect");
     // TODO assert_eq (unresolved): assert_eq!( game.state .mods .get_need_heart_modifier(live_card, HeartColor::Heart02), 0 );
     // TODO assert_eq (unresolved): assert_eq!( game.state .mods .get_need_heart_modifier(live_card, HeartColor::Heart03), 0 );
     // TODO assert_eq (unresolved): assert_eq!( game.state .mods .get_need_heart_modifier(live_card, HeartColor::Heart06), 0 );
@@ -53402,7 +53402,7 @@ static void gen_q254_three_cards_triggers(void){
     rb_resume_with_choice(&tg.state, -1);
     // TODO: }
     // 
-    CHECK_EQ(rb_mods_get_score(&tg.state.mods, live_card), 5, "q254_three_cards_triggers");
+    CHECK_EQ(test_get_score_modifier(&tg, live_card), 5, "q254_three_cards_triggers");
     // TODO assert_eq (unresolved): assert_eq!( game.state .mods .get_need_heart_modifier(live_card, HeartColor::Heart02), 3 );
     // TODO assert_eq (unresolved): assert_eq!( game.state .mods .get_need_heart_modifier(live_card, HeartColor::Heart03), 3 );
     // TODO assert_eq (unresolved): assert_eq!( game.state .mods .get_need_heart_modifier(live_card, HeartColor::Heart06), 3 );
@@ -53684,7 +53684,7 @@ static void gen_q254_no_condition_uses_base_requirement(void){
     rb_resume_with_choice(&tg.state, -1);
     // TODO: }
     // 
-    CHECK_EQ(rb_mods_get_score(&tg.state.mods, live_card), 0, "q254_no_condition_uses_base_requirement");
+    CHECK_EQ(test_get_score_modifier(&tg, live_card), 0, "q254_no_condition_uses_base_requirement");
     // TODO assert_eq (unresolved): assert_eq!( game.state .mods .get_need_heart_modifier(live_card, HeartColor::Heart02), 0 );
     // TODO assert_eq (unresolved): assert_eq!( game.state .mods .get_need_heart_modifier(live_card, HeartColor::Heart03), 0 );
     // TODO assert_eq (unresolved): assert_eq!( game.state .mods .get_need_heart_modifier(live_card, HeartColor::Heart06), 0 );
@@ -53733,7 +53733,7 @@ static void gen_live_phase_crossroads_replacement_p1(void){
     // // Verify: Crossroads moved to waitroom, μ's live in success zone
     CHECK(test_zone_has_id(&tg, 0, "discard", crossroads), "live_phase_crossroads_replacement_p1");
     // TODO assert: assert!( game.state .player1 .success_live_card_zone .cards .contains(&muse_live), "μ's live card should be in success zone" );
-    // TODO assert: assert!( game.state.player1.live_card_zone.cards.is_empty(), "live_card_zone should be empty after processing" );
+    CHECK(tg.state.p[0].live.n == 0, "live_phase_crossroads_replacement_p1");
     // 
 }
 
@@ -53759,7 +53759,7 @@ static void gen_live_phase_crossroads_replacement_skip_p1(void){
     // // Verify: Crossroads placed in success zone directly, μ's live stays in discard
     // TODO assert: assert!( game.state .player1 .success_live_card_zone .cards .contains(&crossroads), "Crossroads should be in success zone (no replacement)" );
     CHECK(test_zone_has_id(&tg, 0, "discard", muse_live), "live_phase_crossroads_replacement_skip_p1");
-    // TODO assert: assert!( game.state.player1.live_card_zone.cards.is_empty(), "live_card_zone should be empty" );
+    CHECK(tg.state.p[0].live.n == 0, "live_phase_crossroads_replacement_skip_p1");
     // 
 }
 
@@ -53862,7 +53862,7 @@ static void gen_live_phase_crossroads_replacement_multiple_targets(void){
     // 
     CHECK(test_zone_has_id(&tg, 0, "discard", crossroads), "live_phase_crossroads_replacement_multiple_targets");
     // TODO assert: assert!( game.state .player1 .success_live_card_zone .cards .contains(&dreamin), "Dreamin' Go! Go!! should be in success zone" );
-    // TODO assert: assert!( game.state.player1.live_card_zone.cards.is_empty(), "live_card_zone should be empty" );
+    CHECK(tg.state.p[0].live.n == 0, "live_phase_crossroads_replacement_multiple_targets");
     // 
 }
 
@@ -54034,12 +54034,12 @@ static void gen_angelic_angel_mus_leaves_stage_loses_mod(void){
     tg.state.p[0].stage[2] = -1;
     // 
     test_recalc(&tg);
-    CHECK_EQ(rb_mods_get_score(&tg.state.mods, angel), 5, "angelic_angel_mus_leaves_stage_loses_mod");
+    CHECK_EQ(test_get_score_modifier(&tg, angel), 5, "angelic_angel_mus_leaves_stage_loses_mod");
     // 
     // // Remove μ's from stage
     tg.state.p[0].stage[1] = -1;
     test_recalc(&tg);
-    CHECK_EQ(rb_mods_get_score(&tg.state.mods, angel), 0, "angelic_angel_mus_leaves_stage_loses_mod");
+    CHECK_EQ(test_get_score_modifier(&tg, angel), 0, "angelic_angel_mus_leaves_stage_loses_mod");
     // 
 }
 
@@ -54058,12 +54058,12 @@ static void gen_angelic_angel_removed_from_success_clears_mod(void){
     tg.state.p[0].stage[2] = -1;
     // 
     test_recalc(&tg);
-    CHECK_EQ(rb_mods_get_score(&tg.state.mods, angel), 5, "angelic_angel_removed_from_success_clears_mod");
+    CHECK_EQ(test_get_score_modifier(&tg, angel), 5, "angelic_angel_removed_from_success_clears_mod");
     // 
     // // Remove from success zone
     tg.state.p[0].live.n=0;
     test_recalc(&tg);
-    CHECK_EQ(rb_mods_get_score(&tg.state.mods, angel), 0, "angelic_angel_removed_from_success_clears_mod");
+    CHECK_EQ(test_get_score_modifier(&tg, angel), 0, "angelic_angel_removed_from_success_clears_mod");
     // 
 }
 
@@ -54089,10 +54089,10 @@ static void gen_angelic_angel_does_not_bleed_to_live_set_zone(void){
     test_recalc(&tg);
     // 
     // // Angelic Angel in success zone gets +5 (self-targeted)
-    CHECK_EQ(rb_mods_get_score(&tg.state.mods, angel), 5, "angelic_angel_does_not_bleed_to_live_set_zone");
+    CHECK_EQ(test_get_score_modifier(&tg, angel), 5, "angelic_angel_does_not_bleed_to_live_set_zone");
     // 
     // // Live set zone card should NOT get the +5
-    CHECK_EQ(rb_mods_get_score(&tg.state.mods, live_card), 0, "angelic_angel_does_not_bleed_to_live_set_zone");
+    CHECK_EQ(test_get_score_modifier(&tg, live_card), 0, "angelic_angel_does_not_bleed_to_live_set_zone");
     // 
 }
 
@@ -54112,7 +54112,7 @@ static void gen_angelic_angel_compound_and_both_required(void){
     tg.state.p[0].stage[2] = -1;
     // 
     test_recalc(&tg);
-    CHECK_EQ(rb_mods_get_score(&tg.state.mods, angel), 0, "angelic_angel_compound_and_both_required");
+    CHECK_EQ(test_get_score_modifier(&tg, angel), 0, "angelic_angel_compound_and_both_required");
     // 
 }
 
@@ -54286,7 +54286,7 @@ static void gen_ayumu_constant_bonus_removed_when_cards_leave_zone(void){
     // 
     // // Condition met → bonus active
     test_recalc(&tg);
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, ayumu), 2, "ayumu_constant_bonus_removed_when_cards_leave_zone");
+    CHECK_EQ(test_get_blade_modifier(&tg, ayumu), 2, "ayumu_constant_bonus_removed_when_cards_leave_zone");
     // 
     // // Remove live cards → condition fails → bonus removed
     tg.state.p[0].live.n=0;
@@ -55671,7 +55671,7 @@ static void gen_ll_bp2001_cannot_be_baton_touched_out(void){
     // // Baton touch onto her area must be rejected.
     test_play_to_stage(&tg, attacker, 1);
     // action result consumed: assert!( res.is_err(), "cannot_baton_touch protection must block the play" );
-    // TODO assert: assert!( game.state.player1.waitroom.cards.is_empty(), "protected member was not sent to the waitroom" );
+    CHECK(tg.state.p[0].discard.n == 0, "ll_bp2001_cannot_be_baton_touched_out");
     // 
 }
 
@@ -55764,15 +55764,15 @@ static void gen_ruby_bpb7009_front_blade_loss_respects_mirror_and_cost(void){
     // 
     test_recalc(&tg);
     // 
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, cheap), -1, "ruby_bpb7009_front_blade_loss_respects_mirror_and_cost");
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, ruby), 0, "ruby_bpb7009_front_blade_loss_respects_mirror_and_cost");
+    CHECK_EQ(test_get_blade_modifier(&tg, cheap), -1, "ruby_bpb7009_front_blade_loss_respects_mirror_and_cost");
+    CHECK_EQ(test_get_blade_modifier(&tg, ruby), 0, "ruby_bpb7009_front_blade_loss_respects_mirror_and_cost");
     // 
     // // Move ruby to LEFT → front becomes opponent's RIGHT (pricey, cost 15).
     tg.state.p[0].stage[2] = -1;
     tg.state.p[0].stage[0] = ruby;
     test_recalc(&tg);
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, pricey), 0, "ruby_bpb7009_front_blade_loss_respects_mirror_and_cost");
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, cheap), 0, "ruby_bpb7009_front_blade_loss_respects_mirror_and_cost");
+    CHECK_EQ(test_get_blade_modifier(&tg, pricey), 0, "ruby_bpb7009_front_blade_loss_respects_mirror_and_cost");
+    CHECK_EQ(test_get_blade_modifier(&tg, cheap), 0, "ruby_bpb7009_front_blade_loss_respects_mirror_and_cost");
     // 
 }
 
@@ -55795,7 +55795,7 @@ static void gen_mijuku_dreamer_refresh_condition_scores(void){
     while (test_has_pending_choice(&tg)) rb_resume_with_choice(&tg.state, 0);
     rb_resume_with_choice(&tg.state, -1);
     // TODO: }
-    CHECK_EQ(rb_mods_get_score(&tg.state.mods, live), 0, "mijuku_dreamer_refresh_condition_scores");
+    CHECK_EQ(test_get_score_modifier(&tg, live), 0, "mijuku_dreamer_refresh_condition_scores");
     // 
     // // Refresh happened this turn → +2.
     // TODO: game.state.player1.deck_refreshed_this_turn = true;
@@ -55808,7 +55808,7 @@ static void gen_mijuku_dreamer_refresh_condition_scores(void){
     while (test_has_pending_choice(&tg)) rb_resume_with_choice(&tg.state, 0);
     rb_resume_with_choice(&tg.state, -1);
     // TODO: }
-    CHECK_EQ(rb_mods_get_score(&tg.state.mods, live), 2, "mijuku_dreamer_refresh_condition_scores");
+    CHECK_EQ(test_get_score_modifier(&tg, live), 2, "mijuku_dreamer_refresh_condition_scores");
     // 
 }
 
@@ -55933,7 +55933,7 @@ static void gen_both_in_success_does_not_trigger(void){
     rb_drain_ability_queue(&tg.state);
     // TODO: }
     // 
-    CHECK_EQ(rb_mods_get_score(&tg.state.mods, phoenix), 0, "both_in_success_does_not_trigger");
+    CHECK_EQ(test_get_score_modifier(&tg, phoenix), 0, "both_in_success_does_not_trigger");
     // TODO assert_eq (unresolved): assert_eq!( game.state .mods .get_heart_modifier(member, HeartColor::Heart06), 0, "Stellar in success: no fire" );
     // 
 }
@@ -59061,8 +59061,8 @@ static void gen_hs_pb1_003_debut_discards_feed_auto_gain(void){
     // 
     // // 自動 half: the discard was >=1 card hand->waitroom this turn.
     CHECK(test_zone_has_id(&tg, 0, "discard", mirakura), "hs_pb1_003_debut_discards_feed_auto_gain");
-    CHECK(rb_mods_get_blade(&tg.state.mods, card), "hs_pb1_003_debut_discards_feed_auto_gain");
-    CHECK(rb_mods_get_heart(&tg.state.mods, card, 1), "hs_pb1_003_debut_discards_feed_auto_gain");
+    CHECK(test_get_blade_modifier(&tg, card), "hs_pb1_003_debut_discards_feed_auto_gain");
+    CHECK(test_get_heart_modifier(&tg, card, 01), "hs_pb1_003_debut_discards_feed_auto_gain");
     // 
 }
 
@@ -59101,7 +59101,7 @@ static void gen_hs_pb1_003_no_discard_no_auto_gain(void){
     test_has_pending_choice(&tg);
     // 
     CHECK_EQ(tg.state.p[0].hand.n, 2, "hs_pb1_003_no_discard_no_auto_gain");
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, card), 0, "hs_pb1_003_no_discard_no_auto_gain");
+    CHECK_EQ(test_get_blade_modifier(&tg, card), 0, "hs_pb1_003_no_discard_no_auto_gain");
     // 
 }
 
@@ -59134,7 +59134,7 @@ static void gen_sp_bp7_005_double_auto_cascade(void){
     // TODO assert_eq (unresolved): assert_eq!( game.state.player1.energy_deck.cards.len(), deck_len_setup - 1, "ab#0 placed exactly one energy from the deck" );
     CHECK_EQ(tg.state.p[0].energy.n, zone_before + 1, "sp_bp7_005_double_auto_cascade");
     CHECK_EQ(tg.state.p[0].energy_active, active_before - 9, "sp_bp7_005_double_auto_cascade");
-    CHECK(rb_mods_get_blade(&tg.state.mods, member), "sp_bp7_005_double_auto_cascade");
+    CHECK(test_get_blade_modifier(&tg, member), "sp_bp7_005_double_auto_cascade");
     // 
 }
 
@@ -61175,7 +61175,7 @@ static void gen_landing_action_yeah_surplus_heart_applies_score_bonus(void){
     // TODO: AbilityResolver::new(game.state.card_database.clone(), game.state.activating_card);
     // TODO: resolver.execute_effect(&mut game.state, &effect).expect("surplus-heart effect should execute cleanly");
     // 
-    CHECK_EQ(rb_mods_get_score(&tg.state.mods, live), 1, "landing_action_yeah_surplus_heart_applies_score_bonus");
+    CHECK_EQ(test_get_score_modifier(&tg, live), 1, "landing_action_yeah_surplus_heart_applies_score_bonus");
     // 
 }
 
@@ -61430,8 +61430,8 @@ static void gen_no_position_change_no_trigger(void){
     int cond_before = rb_mods_get_blade(&tg.state.mods, conditional);
     int self_before = rb_mods_get_blade(&tg.state.mods, self_target);
     // TODO assert: assert!( !game.state.position_change_occurred_this_turn, "No position change should have occurred" );
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, conditional), cond_before, "no_position_change_no_trigger");
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, self_target), self_before, "no_position_change_no_trigger");
+    CHECK_EQ(test_get_blade_modifier(&tg, conditional), cond_before, "no_position_change_no_trigger");
+    CHECK_EQ(test_get_blade_modifier(&tg, self_target), self_before, "no_position_change_no_trigger");
     // 
 }
 
@@ -61739,7 +61739,7 @@ static void gen_bp6_016n_deck_shorter_than_three_looks_whats_there(void){
     // TODO: game.state.player1.waitroom.cards.contains(&b)
     // TODO: };
     CHECK(other_in_wait, "bp6_016n_deck_shorter_than_three_looks_whats_there");
-    // TODO assert: assert!( game.state.player1.main_deck.cards.is_empty(), "deck fully consumed by the short look" );
+    CHECK(tg.state.p[0].deck.n == 0, "bp6_016n_deck_shorter_than_three_looks_whats_there");
     // 
 }
 
@@ -61819,7 +61819,7 @@ static void gen_bp6_011n_deck_with_one_card_still_discards(void){
     CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "bp6_011n_deck_with_one_card_still_discards");
     rb_resume_with_choice(&tg.state, 0);
     // 
-    // TODO assert: assert!( game.state.player1.main_deck.cards.is_empty(), "drew the single available card" );
+    CHECK(tg.state.p[0].deck.n == 0, "bp6_011n_deck_with_one_card_still_discards");
     CHECK((!test_zone_has_id(&tg, 0, "hand", discard_me)), "bp6_011n_deck_with_one_card_still_discards");
     CHECK(test_zone_has_id(&tg, 0, "discard", discard_me), "bp6_011n_deck_with_one_card_still_discards");
     // 
@@ -62180,7 +62180,7 @@ static void gen_maki_accept_cost_three_success_cards_six_blades(void){
     test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, 0);
     // 
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, maki), 6, "maki_accept_cost_three_success_cards_six_blades");
+    CHECK_EQ(test_get_blade_modifier(&tg, maki), 6, "maki_accept_cost_three_success_cards_six_blades");
     CHECK((!test_zone_has_id(&tg, 0, "hand", hand_fodder)), "maki_accept_cost_three_success_cards_six_blades");
     // 
 }
@@ -62207,7 +62207,7 @@ static void gen_maki_decline_no_blades(void){
     // // auto-skips (Q92): no prompt at all.
     test_has_pending_choice(&tg);
     // 
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, maki), 0, "maki_decline_no_blades");
+    CHECK_EQ(test_get_blade_modifier(&tg, maki), 0, "maki_decline_no_blades");
     // 
 }
 
@@ -62229,7 +62229,7 @@ static void gen_maki_empty_success_zone_zero_blades(void){
     CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "maki_empty_success_zone_zero_blades");
     rb_resume_with_choice(&tg.state, 0);
     // 
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, maki), 0, "maki_empty_success_zone_zero_blades");
+    CHECK_EQ(test_get_blade_modifier(&tg, maki), 0, "maki_empty_success_zone_zero_blades");
     CHECK(test_zone_has_id(&tg, 0, "discard", hand_fodder), "maki_empty_success_zone_zero_blades");
     // 
 }
@@ -62257,9 +62257,9 @@ static void gen_honoka_accept_other_members_gain_one_blade_each(void){
     test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, 0);
     // 
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, mate_a), 1, "honoka_accept_other_members_gain_one_blade_each");
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, mate_b), 1, "honoka_accept_other_members_gain_one_blade_each");
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, honoka), 0, "honoka_accept_other_members_gain_one_blade_each");
+    CHECK_EQ(test_get_blade_modifier(&tg, mate_a), 1, "honoka_accept_other_members_gain_one_blade_each");
+    CHECK_EQ(test_get_blade_modifier(&tg, mate_b), 1, "honoka_accept_other_members_gain_one_blade_each");
+    CHECK_EQ(test_get_blade_modifier(&tg, honoka), 0, "honoka_accept_other_members_gain_one_blade_each");
     // 
 }
 
@@ -62280,7 +62280,7 @@ static void gen_honoka_decline_no_blades_anywhere(void){
     // // No hand fodder exists -> the optional discard cost auto-skips (Q92).
     test_has_pending_choice(&tg);
     // 
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, mate_a), 0, "honoka_decline_no_blades_anywhere");
+    CHECK_EQ(test_get_blade_modifier(&tg, mate_a), 0, "honoka_decline_no_blades_anywhere");
     // 
 }
 
@@ -62304,7 +62304,7 @@ static void gen_honoka_lone_member_nothing_to_boost(void){
     // // yields nothing (no other members exist).
     rb_resume_with_choice(&tg.state, 0);
     // 
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, honoka), 0, "honoka_lone_member_nothing_to_boost");
+    CHECK_EQ(test_get_blade_modifier(&tg, honoka), 0, "honoka_lone_member_nothing_to_boost");
     CHECK(test_zone_has_id(&tg, 0, "discard", hand_fodder), "honoka_lone_member_nothing_to_boost");
     // 
 }
@@ -64211,7 +64211,7 @@ static void gen_kanon_invalidate_liella_live_start(void){
     CHECK_EQ(tg.state.p[0].hand.n, 1, "kanon_invalidate_liella_live_start");
     CHECK(test_zone_has_id(&tg, 0, "hand", target), "kanon_invalidate_liella_live_start");
     // // No blade/heart modifiers should remain on the invalidated target
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, target), 0, "kanon_invalidate_liella_live_start");
+    CHECK_EQ(test_get_blade_modifier(&tg, target), 0, "kanon_invalidate_liella_live_start");
     // 
 }
 
@@ -64244,7 +64244,7 @@ static void gen_vivid_world_all_heart_colors_present(void){
     // TODO: TurnEngine::trigger_live_success_abilities(&mut game.state, "p1");
     rb_drain_ability_queue(&tg.state);
     // 
-    CHECK_EQ(rb_mods_get_score(&tg.state.mods, live_card), 1, "vivid_world_all_heart_colors_present");
+    CHECK_EQ(test_get_score_modifier(&tg, live_card), 1, "vivid_world_all_heart_colors_present");
     // 
 }
 
@@ -64274,7 +64274,7 @@ static void gen_vivid_world_missing_heart_color(void){
     // TODO: TurnEngine::trigger_live_success_abilities(&mut game.state, "p1");
     rb_drain_ability_queue(&tg.state);
     // 
-    CHECK_EQ(rb_mods_get_score(&tg.state.mods, live_card), 0, "vivid_world_missing_heart_color");
+    CHECK_EQ(test_get_score_modifier(&tg, live_card), 0, "vivid_world_missing_heart_color");
     // 
 }
 
@@ -64308,7 +64308,7 @@ static void gen_vivid_world_half_nijigasaki_half_other(void){
     // TODO: TurnEngine::trigger_live_success_abilities(&mut game.state, "p1");
     rb_drain_ability_queue(&tg.state);
     // 
-    CHECK_EQ(rb_mods_get_score(&tg.state.mods, live_card), 0, "vivid_world_half_nijigasaki_half_other");
+    CHECK_EQ(test_get_score_modifier(&tg, live_card), 0, "vivid_world_half_nijigasaki_half_other");
     // 
 }
 
@@ -64417,7 +64417,7 @@ static void gen_vitamin_summer_live_success_hand_condition(void){
     rb_resume_with_choice(&tg.state, -1);
     // TODO: }
     // 
-    CHECK_EQ(rb_mods_get_score(&tg.state.mods, live), 0, "vitamin_summer_live_success_hand_condition");
+    CHECK_EQ(test_get_score_modifier(&tg, live), 0, "vitamin_summer_live_success_hand_condition");
     int l = 0;
     // TODO assert_eq (unresolved): assert_eq!(l.score - l.base_score, 1, "bonus in final score");
     // 
@@ -64844,7 +64844,7 @@ static void gen_triple_discard_gives_blade(void){
     test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, -1);
     // 
-    int blade = 0;
+    int blade = test_get_blade_modifier(&tg, stage);
     // TODO assert_eq (unresolved): assert_eq!(blade, 1, "1 card discarded → 1 blade, got {}", blade);
     // 
 }
@@ -64903,7 +64903,7 @@ static void gen_triple_no_matching_zero_blades(void){
     rb_resume_with_choice(&tg.state, -1);
     // TODO: }
     // 
-    int blade = 0;
+    int blade = test_get_blade_modifier(&tg, triple);
     // TODO assert_eq (unresolved): assert_eq!(blade, 0, "No matching → 0 blades, got {}", blade);
     // 
 }
@@ -64967,7 +64967,7 @@ static void gen_triple_discard_two_cards(void){
     rb_resume_with_choice(&tg.state, 1);
     rb_resume_with_choice(&tg.state, -1);
     // 
-    int blade = 0;
+    int blade = test_get_blade_modifier(&tg, stage);
     // TODO assert_eq (unresolved): assert_eq!(blade, 2, "2 cards discarded → 2 blades, got {}", blade);
     // 
 }
@@ -65063,7 +65063,7 @@ static void gen_triple_discard_re_prompt_shows_correct_actions(void){
     rb_resume_with_choice(&tg.state, 1);
     rb_resume_with_choice(&tg.state, -1);
     // 
-    int blade = 0;
+    int blade = test_get_blade_modifier(&tg, stage);
     // TODO assert_eq (unresolved): assert_eq!(blade, 2, "2 cards discarded → 2 blades, got {}", blade);
     // 
 }
@@ -65144,8 +65144,8 @@ static void gen_two_copies_on_stage_both_gain_blades(void){
     rb_resume_with_choice(&tg.state, 0);
     rb_resume_with_choice(&tg.state, -1);
     // 
-    int blade1 = 0;
-    int blade2 = 0;
+    int blade1 = test_get_blade_modifier(&tg, stage1);
+    int blade2 = test_get_blade_modifier(&tg, stage2);
     // TODO assert: assert!( blade1 > 0 && blade2 > 0, "Both copies should gain blades: copy1={} copy2={}", blade1, blade2 );
     // TODO assert: assert!( blade1 + blade2 >= 2, "Total blades should be at least 2: copy1={} copy2={}", blade1, blade2 );
     // 
@@ -65213,7 +65213,7 @@ static void gen_any_number_discard_sequential_works(void){
     rb_resume_with_choice(&tg.state, 2);
     rb_resume_with_choice(&tg.state, -1);
     // 
-    int blade = 0;
+    int blade = test_get_blade_modifier(&tg, stage);
     // TODO assert_eq (unresolved): assert_eq!(blade, 3, "3 cards discarded → 3 blades, got {}", blade);
     // 
 }
@@ -65278,7 +65278,7 @@ static void gen_any_number_partial_discard_grants_partial_blades(void){
     rb_resume_with_choice(&tg.state, 0);
     rb_resume_with_choice(&tg.state, -1);
     // 
-    int blade = 0;
+    int blade = test_get_blade_modifier(&tg, stage);
     // TODO assert_eq (unresolved): assert_eq!(blade, 1, "1 card discarded → 1 blade, got {}", blade);
     // 
 }
@@ -65351,7 +65351,7 @@ static void gen_non_contiguous_matches_via_action_pipeline(void){
     rb_resume_with_choice(&tg.state, 0);
     rb_resume_with_choice(&tg.state, -1);
     // 
-    int blade = 0;
+    int blade = test_get_blade_modifier(&tg, stage);
     // TODO assert_eq (unresolved): assert_eq!(blade, 2, "2 cards discarded → 2 blades, got {}", blade);
     // 
 }
@@ -66280,7 +66280,7 @@ static void gen_fire_bird_single_eligible_gains_2_heart02(void){
     // 
     // TODO assert_eq (unresolved): assert_eq!( game.state .mods .get_heart_modifier(miyashita, HeartColor::Heart02), 2, "eligible member should gain exactly +2 heart02" );
     // TODO assert_eq (unresolved): assert_eq!( game.state .mods .get_heart_modifier(miyashita, HeartColor::Heart01), 0, "no other heart color should be gained" );
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, miyashita), 0, "fire_bird_single_eligible_gains_2_heart02");
+    CHECK_EQ(test_get_blade_modifier(&tg, miyashita), 0, "fire_bird_single_eligible_gains_2_heart02");
     test_has_pending_choice(&tg);
     // 
 }
@@ -66295,7 +66295,7 @@ static void gen_fire_bird_exactly_4_blades_eligible(void){
     // TODO: fire_fire_bird_live_start(&mut game);
     // 
     // TODO assert_eq (unresolved): assert_eq!( game.state .mods .get_heart_modifier(ayumu, HeartColor::Heart02), 2, "exactly-4-blade member is eligible" );
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, ayumu), 0, "fire_bird_exactly_4_blades_eligible");
+    CHECK_EQ(test_get_blade_modifier(&tg, ayumu), 0, "fire_bird_exactly_4_blades_eligible");
     // 
 }
 
@@ -66319,7 +66319,7 @@ static void gen_fire_bird_multiple_eligible_selects_one(void){
     int miyashita_heart = rb_mods_get_heart(&tg.state.mods, miyashita, 2);
     // TODO assert: assert!( ayumu_heart == 2 || miyashita_heart == 2, "the chosen member should gain +2 heart02 (ayumu={}, miyashita={})", ayumu_heart, miyashita_heart );
     // TODO assert: assert!( ayumu_heart == 0 || miyashita_heart == 0, "the unchosen member should gain nothing (ayumu={}, miyashita={})", ayumu_heart, miyashita_heart );
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, ayumu), 0, "fire_bird_multiple_eligible_selects_one");
+    CHECK_EQ(test_get_blade_modifier(&tg, ayumu), 0, "fire_bird_multiple_eligible_selects_one");
     // 
 }
 
@@ -66347,7 +66347,7 @@ static void gen_fire_bird_below_4_blades_not_eligible(void){
     // TODO: fire_fire_bird_live_start(&mut game);
     // 
     // TODO assert_eq (unresolved): assert_eq!( game.state .mods .get_heart_modifier(shiori, HeartColor::Heart02), 0, "blade-3 member must NOT receive heart02" );
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, shiori), 0, "fire_bird_below_4_blades_not_eligible");
+    CHECK_EQ(test_get_blade_modifier(&tg, shiori), 0, "fire_bird_below_4_blades_not_eligible");
     test_has_pending_choice(&tg);
     // 
 }
@@ -68487,7 +68487,7 @@ static void gen_kanata_option_gain_blade_two(void){
     test_has_pending_choice(&tg);
     // TODO: game.select_choice_option(1);
     // 
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, kanata), blade_before + 2, "kanata_option_gain_blade_two");
+    CHECK_EQ(test_get_blade_modifier(&tg, kanata), blade_before + 2, "kanata_option_gain_blade_two");
     // 
 }
 
@@ -68800,7 +68800,7 @@ static void gen_dream_believers_members_and_name_match_score_plus_one(void){
     // 
     { int ftpl = rb_owner_of_card(&tg.state, live); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ開始時"); rb_drain_ability_queue(&tg.state); }
     // 
-    CHECK_EQ(rb_mods_get_score(&tg.state.mods, live), 1, "dream_believers_members_and_name_match_score_plus_one");
+    CHECK_EQ(test_get_score_modifier(&tg, live), 1, "dream_believers_members_and_name_match_score_plus_one");
     // 
 }
 
@@ -68820,7 +68820,7 @@ static void gen_dream_believers_wrong_name_no_bonus(void){
     // 
     { int ftpl = rb_owner_of_card(&tg.state, live); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ開始時"); rb_drain_ability_queue(&tg.state); }
     // 
-    CHECK_EQ(rb_mods_get_score(&tg.state.mods, live), 0, "dream_believers_wrong_name_no_bonus");
+    CHECK_EQ(test_get_score_modifier(&tg, live), 0, "dream_believers_wrong_name_no_bonus");
     // 
 }
 
@@ -68838,7 +68838,7 @@ static void gen_dream_believers_two_members_no_bonus(void){
     // 
     { int ftpl = rb_owner_of_card(&tg.state, live); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ開始時"); rb_drain_ability_queue(&tg.state); }
     // 
-    CHECK_EQ(rb_mods_get_score(&tg.state.mods, live), 0, "dream_believers_two_members_no_bonus");
+    CHECK_EQ(test_get_score_modifier(&tg, live), 0, "dream_believers_two_members_no_bonus");
     // 
 }
 
@@ -68858,7 +68858,7 @@ static void gen_dream_believers_empty_waitroom_no_bonus(void){
     // 
     { int ftpl = rb_owner_of_card(&tg.state, live); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ開始時"); rb_drain_ability_queue(&tg.state); }
     // 
-    CHECK_EQ(rb_mods_get_score(&tg.state.mods, live), 0, "dream_believers_empty_waitroom_no_bonus");
+    CHECK_EQ(test_get_score_modifier(&tg, live), 0, "dream_believers_empty_waitroom_no_bonus");
     // 
 }
 
@@ -68877,7 +68877,7 @@ static void gen_dream_believers_variant_name_still_matches(void){
     // 
     { int ftpl = rb_owner_of_card(&tg.state, live); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ開始時"); rb_drain_ability_queue(&tg.state); }
     // 
-    CHECK_EQ(rb_mods_get_score(&tg.state.mods, live), 1, "dream_believers_variant_name_still_matches");
+    CHECK_EQ(test_get_score_modifier(&tg, live), 1, "dream_believers_variant_name_still_matches");
     // 
 }
 
@@ -71006,7 +71006,7 @@ static void gen_dia_choose_blade(void){
     rb_resume_with_choice(&tg.state, 0);
     // TODO: }
     // 
-    CHECK(rb_mods_get_blade(&tg.state.mods, aqours), "dia_choose_blade");
+    CHECK(test_get_blade_modifier(&tg, aqours), "dia_choose_blade");
     // 
 }
 
@@ -72332,7 +72332,7 @@ static void gen_mymai_with_aqours_and_non_aqours_live_gains_blade(void){
     // 
     // 
     // // PL!S-bp3-018-N (Kurosawa Ruby) should have blade
-    CHECK(rb_mods_get_blade(&tg.state.mods, member_a), "mymai_with_aqours_and_non_aqours_live_gains_blade");
+    CHECK(test_get_blade_modifier(&tg, member_a), "mymai_with_aqours_and_non_aqours_live_gains_blade");
     // 
 }
 
@@ -72356,8 +72356,8 @@ static void gen_mymai_q121_all_stage_members_gain_blade(void){
     // TODO: }
     // 
     // 
-    CHECK(rb_mods_get_blade(&tg.state.mods, member_a), "mymai_q121_all_stage_members_gain_blade");
-    CHECK(rb_mods_get_blade(&tg.state.mods, member_b), "mymai_q121_all_stage_members_gain_blade");
+    CHECK(test_get_blade_modifier(&tg, member_a), "mymai_q121_all_stage_members_gain_blade");
+    CHECK(test_get_blade_modifier(&tg, member_b), "mymai_q121_all_stage_members_gain_blade");
     // 
 }
 
@@ -72724,7 +72724,7 @@ static void gen_q271_ab0_niji_member_gains_blade(void){
     int m = 0;
     // TODO destructuring: let (_cd, m) = trigger_start(&mut game, NIJI_MEMBER);
     // 
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, m), 1, "q271_ab0_niji_member_gains_blade");
+    CHECK_EQ(test_get_blade_modifier(&tg, m), 1, "q271_ab0_niji_member_gains_blade");
     // 
 }
 
@@ -72738,7 +72738,7 @@ static void gen_q271_ab0_non_niji_member_no_blade(void){
     int m = 0;
     // TODO destructuring: let (_cd, m) = trigger_start(&mut game, NON_NIJI_MEMBER);
     // 
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, m), 0, "q271_ab0_non_niji_member_no_blade");
+    CHECK_EQ(test_get_blade_modifier(&tg, m), 0, "q271_ab0_non_niji_member_no_blade");
     // 
 }
 
@@ -75168,7 +75168,7 @@ static void gen_cooking_accept_shuffles_discard_to_deck_bottom(void){
     test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, 1);
     // 
-    // TODO assert: assert!( game.state.player1.waitroom.cards.is_empty(), "all discard cards should be shuffled to the deck bottom" );
+    CHECK(tg.state.p[0].discard.n == 0, "cooking_accept_shuffles_discard_to_deck_bottom");
     int deck = 0;
     // TODO assert_eq (unresolved): assert_eq!(deck.len(), deck_before + 3, "3 discard cards go back to deck");
     // // All 3 landed on the bottom (last 3 positions).
@@ -79672,8 +79672,8 @@ static void gen_ruby_left_affects_p2_right_only(void){
     tg.state.p[1].stage[2] = opp_right;
     test_recalc(&tg);
     // 
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, opp_right), -1, "ruby_left_affects_p2_right_only");
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, opp_center), 0, "ruby_left_affects_p2_right_only");
+    CHECK_EQ(test_get_blade_modifier(&tg, opp_right), -1, "ruby_left_affects_p2_right_only");
+    CHECK_EQ(test_get_blade_modifier(&tg, opp_center), 0, "ruby_left_affects_p2_right_only");
     // 
 }
 
@@ -79706,8 +79706,8 @@ static void gen_ruby_facing_ruby_both_debuffed(void){
     tg.state.p[1].stage[2] = -1;
     test_recalc(&tg);
     // 
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, ruby_p1), -1, "ruby_facing_ruby_both_debuffed");
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, ruby_p2), -1, "ruby_facing_ruby_both_debuffed");
+    CHECK_EQ(test_get_blade_modifier(&tg, ruby_p1), -1, "ruby_facing_ruby_both_debuffed");
+    CHECK_EQ(test_get_blade_modifier(&tg, ruby_p2), -1, "ruby_facing_ruby_both_debuffed");
     // 
 }
 
@@ -79746,14 +79746,14 @@ static void gen_opponent_member_moves_out_of_front_recovers_blade(void){
     tg.state.p[1].stage[1] = opp;
     tg.state.p[1].stage[2] = -1;
     test_recalc(&tg);
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, opp), -1, "opponent_member_moves_out_of_front_recovers_blade");
+    CHECK_EQ(test_get_blade_modifier(&tg, opp), -1, "opponent_member_moves_out_of_front_recovers_blade");
     // 
     // // Opponent moves to P2 Left (slot 0)
     tg.state.p[1].stage[0] = opp;
     tg.state.p[1].stage[1] = -1;
     tg.state.p[1].stage[2] = -1;
     test_recalc(&tg);
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, opp), 0, "opponent_member_moves_out_of_front_recovers_blade");
+    CHECK_EQ(test_get_blade_modifier(&tg, opp), 0, "opponent_member_moves_out_of_front_recovers_blade");
     // 
 }
 
@@ -79772,11 +79772,11 @@ static void gen_ruby_leaves_stage_modifier_removed(void){
     tg.state.p[1].stage[1] = opp;
     tg.state.p[1].stage[2] = -1;
     test_recalc(&tg);
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, opp), -1, "ruby_leaves_stage_modifier_removed");
+    CHECK_EQ(test_get_blade_modifier(&tg, opp), -1, "ruby_leaves_stage_modifier_removed");
     // 
     tg.state.p[0].stage[1] = -1;
     test_recalc(&tg);
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, opp), 0, "ruby_leaves_stage_modifier_removed");
+    CHECK_EQ(test_get_blade_modifier(&tg, opp), 0, "ruby_leaves_stage_modifier_removed");
     // 
 }
 
@@ -79797,7 +79797,7 @@ static void gen_ruby_zero_blade_member_stays_zero(void){
     test_recalc(&tg);
     // 
     // // Internal modifier is -1 (the debuff is tracked on the target)
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, opp), -1, "ruby_zero_blade_member_stays_zero");
+    CHECK_EQ(test_get_blade_modifier(&tg, opp), -1, "ruby_zero_blade_member_stays_zero");
     // 
     // // Effective total blade across the stage is floored at 0, never negative.
     // // Ruby has base blade 0 and opp has base blade 0 + modifier -1.
@@ -81129,7 +81129,7 @@ static void gen_bp6_021_accept_cost_scores_and_retrieves(void){
     CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectTarget", "bp6_021_accept_cost_scores_and_retrieves");
     // TODO assert: assert!(answer_optional(&mut game, true), "unexpected prompt shape");
     // 
-    CHECK_EQ(rb_mods_get_score(&tg.state.mods, live), 1, "bp6_021_accept_cost_scores_and_retrieves");
+    CHECK_EQ(test_get_score_modifier(&tg, live), 1, "bp6_021_accept_cost_scores_and_retrieves");
     CHECK(test_zone_has_id(&tg, 0, "hand", mus_live), "bp6_021_accept_cost_scores_and_retrieves");
     // TODO assert: assert!( !game.state.player1.stage.stage.contains(&mus_member), "cost accepted -> the μ's member left the stage" );
     CHECK(test_zone_has_id(&tg, 0, "discard", mus_member), "bp6_021_accept_cost_scores_and_retrieves");
@@ -81158,7 +81158,7 @@ static void gen_bp6_021_skip_cost_no_score_no_retrieval(void){
     test_has_pending_choice(&tg);
     // TODO assert: assert!(answer_optional(&mut game, false), "expected an optional-gate prompt");
     // 
-    CHECK_EQ(rb_mods_get_score(&tg.state.mods, live), 0, "bp6_021_skip_cost_no_score_no_retrieval");
+    CHECK_EQ(test_get_score_modifier(&tg, live), 0, "bp6_021_skip_cost_no_score_no_retrieval");
     CHECK((!test_zone_has_id(&tg, 0, "hand", mus_live)), "bp6_021_skip_cost_no_score_no_retrieval");
     // TODO assert: assert!( game.state.player1.stage.stage.contains(&m1) && game.state.player1.stage.stage.contains(&m2), "cost declined -> both members stay on stage" );
     // 
@@ -82474,7 +82474,7 @@ static void gen_maki_bp6_blade_expires_at_live_end(void){
     rb_resume_with_choice(&tg.state, 0);
     // 
     // // Blade should be +3 during live
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, maki), 3, "maki_bp6_blade_expires_at_live_end");
+    CHECK_EQ(test_get_blade_modifier(&tg, maki), 3, "maki_bp6_blade_expires_at_live_end");
     // 
     // // Advance past live end so live_end effects expire
     // // Keep passing until we're past the Live turn phase
@@ -83950,7 +83950,7 @@ static void gen_love_wing_bell_removed_from_success_zone_loses_blade(void){
     // 
     // // Initially: blade should be granted
     test_recalc(&tg);
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, muse_center), 1, "love_wing_bell_removed_from_success_zone_loses_blade");
+    CHECK_EQ(test_get_blade_modifier(&tg, muse_center), 1, "love_wing_bell_removed_from_success_zone_loses_blade");
     // 
     // // Remove from success zone
     tg.state.p[0].live.n=0;
@@ -83978,7 +83978,7 @@ static void gen_love_wing_bell_member_leaves_center_loses_blade(void){
     // 
     // // Initially in center → blade
     test_recalc(&tg);
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, muse_center), 1, "love_wing_bell_member_leaves_center_loses_blade");
+    CHECK_EQ(test_get_blade_modifier(&tg, muse_center), 1, "love_wing_bell_member_leaves_center_loses_blade");
     // 
     // // Move to left side
     tg.state.p[0].stage[0] = muse_center;
@@ -84041,9 +84041,9 @@ static void gen_love_wing_bell_only_center_gets_blade_not_left_or_right(void){
     // 
     test_recalc(&tg);
     // 
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, left), 0, "love_wing_bell_only_center_gets_blade_not_left_or_right");
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, center), 1, "love_wing_bell_only_center_gets_blade_not_left_or_right");
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, right), 0, "love_wing_bell_only_center_gets_blade_not_left_or_right");
+    CHECK_EQ(test_get_blade_modifier(&tg, left), 0, "love_wing_bell_only_center_gets_blade_not_left_or_right");
+    CHECK_EQ(test_get_blade_modifier(&tg, center), 1, "love_wing_bell_only_center_gets_blade_not_left_or_right");
+    CHECK_EQ(test_get_blade_modifier(&tg, right), 0, "love_wing_bell_only_center_gets_blade_not_left_or_right");
     // 
 }
 
@@ -84067,7 +84067,7 @@ static void gen_love_wing_bell_empty_stage_no_crash(void){
     // // Now put a μ's member at center and re-evaluate.
     tg.state.p[0].stage[1] = muse;
     test_recalc(&tg);
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, muse), 1, "love_wing_bell_empty_stage_no_crash");
+    CHECK_EQ(test_get_blade_modifier(&tg, muse), 1, "love_wing_bell_empty_stage_no_crash");
     // 
 }
 
@@ -84109,7 +84109,7 @@ static void gen_yoshiko_pb1_opponent_empty_hand_auto_skips(void){
     test_has_pending_choice(&tg);
     // 
     test_has_pending_choice(&tg);
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, yoshiko), 4, "yoshiko_pb1_opponent_empty_hand_auto_skips");
+    CHECK_EQ(test_get_blade_modifier(&tg, yoshiko), 4, "yoshiko_pb1_opponent_empty_hand_auto_skips");
     // 
 }
 
@@ -84249,7 +84249,7 @@ static void gen_kowareyasuki_opponent_loses_surplus_hearts_score_up(void){
     // TODO: }
     // 
     // // Score should be unchanged since no surplus hearts were set
-    CHECK_EQ(rb_mods_get_score(&tg.state.mods, koware), 0, "kowareyasuki_opponent_loses_surplus_hearts_score_up");
+    CHECK_EQ(test_get_score_modifier(&tg, koware), 0, "kowareyasuki_opponent_loses_surplus_hearts_score_up");
     // 
 }
 
@@ -84493,7 +84493,7 @@ static void gen_kowareyasuki_opponent_loses_1_no_bonus(void){
     rb_resume_with_choice(&tg.state, -1);
     // TODO: }
     // 
-    CHECK_EQ(rb_mods_get_score(&tg.state.mods, koware), 0, "kowareyasuki_opponent_loses_1_no_bonus");
+    CHECK_EQ(test_get_score_modifier(&tg, koware), 0, "kowareyasuki_opponent_loses_1_no_bonus");
     // 
 }
 
@@ -84708,13 +84708,13 @@ static void gen_kanon_leaving_removes_blade(void){
     test_place_under(&tg, 0, 1, kanon);
     // 
     test_recalc(&tg);
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, host), 1, "kanon_leaving_removes_blade");
+    CHECK_EQ(test_get_blade_modifier(&tg, host), 1, "kanon_leaving_removes_blade");
     // 
     // // 澁谷かのん leaves the stage with her host (under-cards are recycled).
     // TODO destructuring: let (_, _) = game.state.player1.stage.recycle_under_cards(MemberArea::Center, &game.db);
     // 
     test_recalc(&tg);
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, host), 0, "kanon_leaving_removes_blade");
+    CHECK_EQ(test_get_blade_modifier(&tg, host), 0, "kanon_leaving_removes_blade");
     // 
 }
 
@@ -84930,7 +84930,7 @@ static void gen_sd2_003_hand_cost_reduced_with_nijigasaki_live_in_success_zone(v
     test_add_to_live(&tg, niji_live);
     test_recalc(&tg);
     // 
-    CHECK_EQ(rb_mods_get_cost(&tg.state.mods, shizuku), -2, "sd2_003_hand_cost_reduced_with_nijigasaki_live_in_success_zone");
+    CHECK_EQ(test_get_cost_modifier(&tg, shizuku), -2, "sd2_003_hand_cost_reduced_with_nijigasaki_live_in_success_zone");
     // 
 }
 
@@ -84944,7 +84944,7 @@ static void gen_sd2_003_hand_cost_full_without_success_zone_card(void){
     test_add_to_hand(&tg, shizuku);
     test_recalc(&tg);
     // 
-    CHECK_EQ(rb_mods_get_cost(&tg.state.mods, shizuku), 0, "sd2_003_hand_cost_full_without_success_zone_card");
+    CHECK_EQ(test_get_cost_modifier(&tg, shizuku), 0, "sd2_003_hand_cost_full_without_success_zone_card");
     // 
 }
 
@@ -84961,7 +84961,7 @@ static void gen_sd2_003_non_nijigasaki_live_does_not_reduce_cost(void){
     test_add_to_live(&tg, aqours_live);
     test_recalc(&tg);
     // 
-    CHECK_EQ(rb_mods_get_cost(&tg.state.mods, shizuku), 0, "sd2_003_non_nijigasaki_live_does_not_reduce_cost");
+    CHECK_EQ(test_get_cost_modifier(&tg, shizuku), 0, "sd2_003_non_nijigasaki_live_does_not_reduce_cost");
     // 
 }
 
@@ -85338,7 +85338,7 @@ static void gen_bp4020_rightside_moved_gains_two_blades(void){
     { int ftpl = rb_owner_of_card(&tg.state, me); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ開始時"); rb_drain_ability_queue(&tg.state); }
     test_recalc(&tg);
     // 
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, me), 2, "bp4020_rightside_moved_gains_two_blades");
+    CHECK_EQ(test_get_blade_modifier(&tg, me), 2, "bp4020_rightside_moved_gains_two_blades");
     // 
 }
 
@@ -85358,7 +85358,7 @@ static void gen_bp4020_center_moved_no_blades(void){
     { int ftpl = rb_owner_of_card(&tg.state, me); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ開始時"); rb_drain_ability_queue(&tg.state); }
     test_recalc(&tg);
     // 
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, me), 0, "bp4020_center_moved_no_blades");
+    CHECK_EQ(test_get_blade_modifier(&tg, me), 0, "bp4020_center_moved_no_blades");
     // 
 }
 
@@ -85894,7 +85894,7 @@ static void gen_hanayo_bp4_below_threshold_no_cost_mod(void){
     // TODO: add_score3_live(&mut game); // total = 3
     // 
     test_recalc(&tg);
-    CHECK_EQ(rb_mods_get_cost(&tg.state.mods, hanayo), 0, "hanayo_bp4_below_threshold_no_cost_mod");
+    CHECK_EQ(test_get_cost_modifier(&tg, hanayo), 0, "hanayo_bp4_below_threshold_no_cost_mod");
     // 
 }
 
@@ -85912,7 +85912,7 @@ static void gen_hanayo_bp4_at_threshold_has_cost_mod(void){
     // TODO: add_score3_live(&mut game); // total = 6
     // 
     test_recalc(&tg);
-    CHECK_EQ(rb_mods_get_cost(&tg.state.mods, hanayo), 3, "hanayo_bp4_at_threshold_has_cost_mod");
+    CHECK_EQ(test_get_cost_modifier(&tg, hanayo), 3, "hanayo_bp4_at_threshold_has_cost_mod");
     // 
 }
 
@@ -85931,7 +85931,7 @@ static void gen_hanayo_bp4_above_threshold_has_cost_mod(void){
     // TODO: add_score3_live(&mut game); // total = 9
     // 
     test_recalc(&tg);
-    CHECK_EQ(rb_mods_get_cost(&tg.state.mods, hanayo), 3, "hanayo_bp4_above_threshold_has_cost_mod");
+    CHECK_EQ(test_get_cost_modifier(&tg, hanayo), 3, "hanayo_bp4_above_threshold_has_cost_mod");
     // 
 }
 
@@ -85948,11 +85948,11 @@ static void gen_hanayo_bp4_dynamic_increase(void){
     // TODO: add_score3_live(&mut game); // total = 3
     // 
     test_recalc(&tg);
-    CHECK_EQ(rb_mods_get_cost(&tg.state.mods, hanayo), 0, "hanayo_bp4_dynamic_increase");
+    CHECK_EQ(test_get_cost_modifier(&tg, hanayo), 0, "hanayo_bp4_dynamic_increase");
     // 
     // TODO: add_score3_live(&mut game); // total = 6
     test_recalc(&tg);
-    CHECK_EQ(rb_mods_get_cost(&tg.state.mods, hanayo), 3, "hanayo_bp4_dynamic_increase");
+    CHECK_EQ(test_get_cost_modifier(&tg, hanayo), 3, "hanayo_bp4_dynamic_increase");
     // 
 }
 
@@ -85970,11 +85970,11 @@ static void gen_hanayo_bp4_dynamic_decrease(void){
     // TODO: add_score3_live(&mut game); // total = 6
     // 
     test_recalc(&tg);
-    CHECK_EQ(rb_mods_get_cost(&tg.state.mods, hanayo), 3, "hanayo_bp4_dynamic_decrease");
+    CHECK_EQ(test_get_cost_modifier(&tg, hanayo), 3, "hanayo_bp4_dynamic_decrease");
     // 
     if (tg.state.p[0].success.n>0) tg.state.p[0].success.n--;
     test_recalc(&tg);
-    CHECK_EQ(rb_mods_get_cost(&tg.state.mods, hanayo), 0, "hanayo_bp4_dynamic_decrease");
+    CHECK_EQ(test_get_cost_modifier(&tg, hanayo), 0, "hanayo_bp4_dynamic_decrease");
     // 
 }
 
@@ -85992,12 +85992,12 @@ static void gen_hanayo_bp4_removed_from_stage_clears_mod(void){
     // TODO: add_score3_live(&mut game); // total = 6
     // 
     test_recalc(&tg);
-    CHECK_EQ(rb_mods_get_cost(&tg.state.mods, hanayo), 3, "hanayo_bp4_removed_from_stage_clears_mod");
+    CHECK_EQ(test_get_cost_modifier(&tg, hanayo), 3, "hanayo_bp4_removed_from_stage_clears_mod");
     // 
     tg.state.p[0].stage[1] = -1;
     test_clear_mods_for_card(&tg, hanayo);
     test_recalc(&tg);
-    CHECK_EQ(rb_mods_get_cost(&tg.state.mods, hanayo), 0, "hanayo_bp4_removed_from_stage_clears_mod");
+    CHECK_EQ(test_get_cost_modifier(&tg, hanayo), 0, "hanayo_bp4_removed_from_stage_clears_mod");
     // 
 }
 
@@ -86012,7 +86012,7 @@ static void gen_hanayo_bp4_not_on_stage_no_mod(void){
     // TODO: add_score3_live(&mut game); // total = 6, but Hanayo not on stage
     // 
     test_recalc(&tg);
-    CHECK_EQ(rb_mods_get_cost(&tg.state.mods, hanayo), 0, "hanayo_bp4_not_on_stage_no_mod");
+    CHECK_EQ(test_get_cost_modifier(&tg, hanayo), 0, "hanayo_bp4_not_on_stage_no_mod");
     // 
 }
 
@@ -86036,7 +86036,7 @@ static void gen_hanayo_bp4_play_cost_unaffected(void){
     // 
     // // After playing, on-stage modifier should be active
     test_recalc(&tg);
-    CHECK_EQ(rb_mods_get_cost(&tg.state.mods, hanayo), 3, "hanayo_bp4_play_cost_unaffected");
+    CHECK_EQ(test_get_cost_modifier(&tg, hanayo), 3, "hanayo_bp4_play_cost_unaffected");
     // 
 }
 
@@ -86055,8 +86055,8 @@ static void gen_hanayo_bp4_two_copies_each_gets_mod(void){
     // TODO: add_score3_live(&mut game); // total = 6
     // 
     test_recalc(&tg);
-    CHECK_EQ(rb_mods_get_cost(&tg.state.mods, hanayo_a), 3, "hanayo_bp4_two_copies_each_gets_mod");
-    CHECK_EQ(rb_mods_get_cost(&tg.state.mods, hanayo_b), 3, "hanayo_bp4_two_copies_each_gets_mod");
+    CHECK_EQ(test_get_cost_modifier(&tg, hanayo_a), 3, "hanayo_bp4_two_copies_each_gets_mod");
+    CHECK_EQ(test_get_cost_modifier(&tg, hanayo_b), 3, "hanayo_bp4_two_copies_each_gets_mod");
     // 
 }
 
@@ -86075,8 +86075,8 @@ static void gen_hanayo_bp4_non_stackable_per_card_not_shared(void){
     // TODO: add_score3_live(&mut game); // total = 6
     // 
     test_recalc(&tg);
-    CHECK_EQ(rb_mods_get_cost(&tg.state.mods, filler), 0, "hanayo_bp4_non_stackable_per_card_not_shared");
-    CHECK_EQ(rb_mods_get_cost(&tg.state.mods, hanayo), 3, "hanayo_bp4_non_stackable_per_card_not_shared");
+    CHECK_EQ(test_get_cost_modifier(&tg, filler), 0, "hanayo_bp4_non_stackable_per_card_not_shared");
+    CHECK_EQ(test_get_cost_modifier(&tg, hanayo), 3, "hanayo_bp4_non_stackable_per_card_not_shared");
     // 
 }
 
@@ -86097,7 +86097,7 @@ static void gen_hanayo_bp4_baton_touch_uses_modified_cost(void){
     // TODO: add_score3_live(&mut game);
     // 
     test_recalc(&tg);
-    CHECK_EQ(rb_mods_get_cost(&tg.state.mods, hanayo), 3, "hanayo_bp4_baton_touch_uses_modified_cost");
+    CHECK_EQ(test_get_cost_modifier(&tg, hanayo), 3, "hanayo_bp4_baton_touch_uses_modified_cost");
     // 
     // // Give enough energy for either cost calculation
     // // Base-only: cost = 11 - 4 = 7 energy needed
@@ -86132,7 +86132,7 @@ static void gen_hanayo_bp4_baton_touch_base_cost_when_below_threshold(void){
     // TODO: add_score3_live(&mut game); // total = 3 (< 6), no +3 mod
     // 
     test_recalc(&tg);
-    CHECK_EQ(rb_mods_get_cost(&tg.state.mods, hanayo), 0, "hanayo_bp4_baton_touch_base_cost_when_below_threshold");
+    CHECK_EQ(test_get_cost_modifier(&tg, hanayo), 0, "hanayo_bp4_baton_touch_base_cost_when_below_threshold");
     // 
     // // 5 energy is enough for 11-4=7? No, 5 < 7. So this should fail.
     test_give_energy(&tg, 5);
@@ -87037,8 +87037,8 @@ static void gen_karin_reveal_card_in_exactly_one_zone(void){
     rb_resume_with_choice(&tg.state, 0);
     // TODO: }
     // 
-    int in_hand = 0;
-    int in_discard = 0;
+    int in_hand = test_zone_has_id(&tg, 0, "hand", deck_top);
+    int in_discard = test_zone_has_id(&tg, 0, "discard", deck_top);
     // TODO assert: assert!( in_hand != in_discard, "Revealed card must be in exactly one of hand or discard (in_hand={}, in_discard={})", in_hand, in_discard );
     // 
 }
@@ -91426,17 +91426,17 @@ static void gen_niko_pr021_exactly_seven_energy_grants_two_blades(void){
     // // 6 energy → condition fails.
     test_give_energy(&tg, 6);
     test_recalc(&tg);
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, nico), 0, "niko_pr021_exactly_seven_energy_grants_two_blades");
+    CHECK_EQ(test_get_blade_modifier(&tg, nico), 0, "niko_pr021_exactly_seven_energy_grants_two_blades");
     // 
     // // 7 energy → exactly → +2 blades.
     test_give_energy(&tg, 1);
     test_recalc(&tg);
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, nico), 2, "niko_pr021_exactly_seven_energy_grants_two_blades");
+    CHECK_EQ(test_get_blade_modifier(&tg, nico), 2, "niko_pr021_exactly_seven_energy_grants_two_blades");
     // 
     // // 8 energy → past the boundary → back to 0 ("〜あるかぎり" is live state).
     test_give_energy(&tg, 1);
     test_recalc(&tg);
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, nico), 0, "niko_pr021_exactly_seven_energy_grants_two_blades");
+    CHECK_EQ(test_get_blade_modifier(&tg, nico), 0, "niko_pr021_exactly_seven_energy_grants_two_blades");
     // 
 }
 
@@ -91820,7 +91820,7 @@ static void gen_ruby_bp5009_decline_optional_payment_fetches_nothing(void){
     rb_resume_with_choice(&tg.state, 0);
     // 
     CHECK_EQ(tg.state.p[0].hand.n, hand_before, "ruby_bp5009_decline_optional_payment_fetches_nothing");
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, ruby), 0, "ruby_bp5009_decline_optional_payment_fetches_nothing");
+    CHECK_EQ(test_get_blade_modifier(&tg, ruby), 0, "ruby_bp5009_decline_optional_payment_fetches_nothing");
     CHECK(test_zone_has_id(&tg, 0, "discard", saint), "ruby_bp5009_decline_optional_payment_fetches_nothing");
     // 
 }
@@ -91858,7 +91858,7 @@ static void gen_ruby_bp5009_accept_optional_payment_fetches_and_grants_blades(vo
     // 
     CHECK_EQ(tg.state.p[0].hand.n, hand_before + 1, "ruby_bp5009_accept_optional_payment_fetches_and_grants_blades");
     CHECK((!test_zone_has_id(&tg, 0, "discard", saint)), "ruby_bp5009_accept_optional_payment_fetches_and_grants_blades");
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, ruby), 2, "ruby_bp5009_accept_optional_payment_fetches_and_grants_blades");
+    CHECK_EQ(test_get_blade_modifier(&tg, ruby), 2, "ruby_bp5009_accept_optional_payment_fetches_and_grants_blades");
     CHECK_EQ(tg.state.p[0].energy_active, 1, "ruby_bp5009_accept_optional_payment_fetches_and_grants_blades");
     // 
 }
@@ -92108,7 +92108,7 @@ static void gen_nb5028_sets_score_and_required_hearts(void){
     { int ftpl = rb_owner_of_card(&tg.state, live); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ開始時"); rb_drain_ability_queue(&tg.state); }
     test_recalc(&tg);
     // 
-    CHECK_EQ(rb_mods_get_score(&tg.state.mods, live), 2, "nb5028_sets_score_and_required_hearts");
+    CHECK_EQ(test_get_score_modifier(&tg, live), 2, "nb5028_sets_score_and_required_hearts");
     int nh02 = 0;
     // TODO assert: assert!( nh02 >= 5, "required hearts must include heart02 totalling >=5 (got {nh02})" );
     // 
@@ -92203,7 +92203,7 @@ static void gen_spb5023_compound_gate_grants_plus_two(void){
     // 
     { int ftpl = rb_owner_of_card(&tg.state, live); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ成功時"); rb_drain_ability_queue(&tg.state); }
     // 
-    CHECK_EQ(rb_mods_get_score(&tg.state.mods, live), 2, "spb5023_compound_gate_grants_plus_two");
+    CHECK_EQ(test_get_score_modifier(&tg, live), 2, "spb5023_compound_gate_grants_plus_two");
     // 
 }
 
@@ -92225,7 +92225,7 @@ static void gen_spb5023_single_success_card_no_bonus(void){
     // 
     { int ftpl = rb_owner_of_card(&tg.state, live); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ成功時"); rb_drain_ability_queue(&tg.state); }
     // 
-    CHECK_EQ(rb_mods_get_score(&tg.state.mods, live), 0, "spb5023_single_success_card_no_bonus");
+    CHECK_EQ(test_get_score_modifier(&tg, live), 0, "spb5023_single_success_card_no_bonus");
     // 
 }
 
@@ -92287,7 +92287,7 @@ static void gen_tabi_bp7021_mill_tiers_two_members_no_bonus(void){
     // 
     CHECK_EQ(tg.state.p[0].discard.n, 5, "tabi_bp7021_mill_tiers_two_members_no_bonus");
     CHECK_EQ(tg.state.p[0].hand.n, 0, "tabi_bp7021_mill_tiers_two_members_no_bonus");
-    CHECK_EQ(rb_mods_get_score(&tg.state.mods, live), 0, "tabi_bp7021_mill_tiers_two_members_no_bonus");
+    CHECK_EQ(test_get_score_modifier(&tg, live), 0, "tabi_bp7021_mill_tiers_two_members_no_bonus");
     // 
 }
 
@@ -92313,7 +92313,7 @@ static void gen_tabi_bp7021_mill_tiers_three_members_draw_only(void){
     { int ftpl = rb_owner_of_card(&tg.state, live); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ開始時"); rb_drain_ability_queue(&tg.state); }
     // 
     CHECK_EQ(tg.state.p[0].hand.n, 1, "tabi_bp7021_mill_tiers_three_members_draw_only");
-    CHECK_EQ(rb_mods_get_score(&tg.state.mods, live), 0, "tabi_bp7021_mill_tiers_three_members_draw_only");
+    CHECK_EQ(test_get_score_modifier(&tg, live), 0, "tabi_bp7021_mill_tiers_three_members_draw_only");
     // 
 }
 
@@ -92338,7 +92338,7 @@ static void gen_tabi_bp7021_all_five_members_draw_and_score(void){
     { int ftpl = rb_owner_of_card(&tg.state, live); if (ftpl < 0) ftpl = 0; rb_queue_trigger_abilities(&tg.state, ftpl, "ライブ開始時"); rb_drain_ability_queue(&tg.state); }
     // 
     CHECK_EQ(tg.state.p[0].hand.n, 1, "tabi_bp7021_all_five_members_draw_and_score");
-    CHECK_EQ(rb_mods_get_score(&tg.state.mods, live), 1, "tabi_bp7021_all_five_members_draw_and_score");
+    CHECK_EQ(test_get_score_modifier(&tg, live), 1, "tabi_bp7021_all_five_members_draw_and_score");
     // 
 }
 
@@ -93668,7 +93668,7 @@ static void gen_live_fails_with_insufficient_hearts(void){
     // // success zone. A bare "!has_pending_choice()" cannot distinguish this
     // // from any other terminal state.
     CHECK(test_zone_has_id(&tg, 0, "discard", live), "live_fails_with_insufficient_hearts");
-    // TODO assert: assert!( game.state.player1.success_live_card_zone.cards.is_empty(), "Q35: insufficient hearts → nothing enters the success zone" );
+    CHECK(tg.state.p[0].success.n == 0, "live_fails_with_insufficient_hearts");
     // 
 }
 
@@ -94195,7 +94195,7 @@ static void gen_one_player_live_auto_higher_score(void){
     // 
     // // Q47 walkover: P2 never performed, so P1 places unopposed.
     // TODO assert_eq (unresolved): assert_eq!( game.state.player1.success_live_card_zone.cards.as_slice(), &[live][..], "Q47: P1's live reaches the success zone" );
-    // TODO assert: assert!( game.state.player2.success_live_card_zone.cards.is_empty() && game.state.player2.live_card_zone.cards.is_empty(), "Q47: P2 has nothing in play" );
+    CHECK(tg.state.p[1].success.n == 0, "one_player_live_auto_higher_score");
     // 
 }
 
@@ -94301,7 +94301,7 @@ static void gen_no_live_card_no_yell_no_success(void){
     rb_advance_phase(&tg.state);
     // 
     CHECK(tg.state.p[0].deck.n, "no_live_card_no_yell_no_success");
-    // TODO assert: assert!( game.state.player1.success_live_card_zone.cards.is_empty() && game.state.player2.success_live_card_zone.cards.is_empty(), "Q32: no live performed → nobody places" );
+    CHECK(tg.state.p[0].success.n == 0, "no_live_card_no_yell_no_success");
     // 
 }
 
@@ -94416,7 +94416,7 @@ static void gen_any_card_fails_hearts_all_fail(void){
     rb_advance_phase(&tg.state);
     // 
     // // 8.3.16: one failure fails ALL — nothing places, both cards to waitroom.
-    // TODO assert: assert!( game.state.player1.success_live_card_zone.cards.is_empty(), "Q35: no placement when any live card failed" );
+    CHECK(tg.state.p[0].success.n == 0, "any_card_fails_hearts_all_fail");
     CHECK(test_zone_has_id(&tg, 0, "discard", live_a), "any_card_fails_hearts_all_fail");
     // 
 }
@@ -94925,7 +94925,7 @@ static void gen_shared_pool_depletion_all_fail(void){
     // 
     // 
     // // Rule 8.3.16: all live cards should have been cleared (zone empty).
-    // TODO assert: assert!( game.state.player1.live_card_zone.cards.is_empty(), "8.3.16: Live card zone cleared when shared pool insufficient" );
+    CHECK(tg.state.p[0].live.n == 0, "shared_pool_depletion_all_fail");
     // // No victory choices because the zone was cleared.
     test_has_pending_choice(&tg);
     // 
@@ -95046,7 +95046,7 @@ static void gen_three_live_cards_any_fails_all_fail(void){
     rb_advance_phase(&tg.state);
     // 
     // 
-    // TODO assert: assert!( game.state.player1.live_card_zone.cards.is_empty(), "8.3.16: All 3 live cards cleared when hearts insufficient" );
+    CHECK(tg.state.p[0].live.n == 0, "three_live_cards_any_fails_all_fail");
     test_has_pending_choice(&tg);
     // 
 }
@@ -95456,7 +95456,7 @@ static void gen_like_a_treasure_real_mill_decline_nothing(void){
     // 
     int offered = 0;
     CHECK(offered, "like_a_treasure_real_mill_decline_nothing");
-    // TODO assert: assert!( game.state.player1.hand.cards.is_empty(), "declining adds nothing to hand" );
+    CHECK(tg.state.p[0].hand.n == 0, "like_a_treasure_real_mill_decline_nothing");
     // TODO assert_eq (unresolved): assert_eq!(score(&game, lat), 0, "declining grants no score");
     // 
 }
@@ -95475,7 +95475,7 @@ static void gen_like_a_treasure_real_mill_no_niji_does_not_fire(void){
     // // The conditional choice is presented, but with no 虹ヶ咲 live card among
     // // the moved cards it yields nothing (same as the injected-event variant).
     // discard: let _ = offered;
-    // TODO assert: assert!( game.state.player1.hand.cards.is_empty(), "no 虹ヶ咲 live card moved → nothing added to hand" );
+    CHECK(tg.state.p[0].hand.n == 0, "like_a_treasure_real_mill_no_niji_does_not_fire");
     // TODO assert_eq (unresolved): assert_eq!(score(&game, lat), 0, "no score without a 虹ヶ咲 live card");
     // 
 }
@@ -95492,7 +95492,7 @@ static void gen_like_a_treasure_no_movement_does_not_fire(void){
     // 
     // TODO: trigger_lat_ab1(&mut game, lat, Vec::new(), true);
     // 
-    // TODO assert: assert!( game.state.player1.hand.cards.is_empty(), "no movement → nothing added to hand" );
+    CHECK(tg.state.p[0].hand.n == 0, "like_a_treasure_no_movement_does_not_fire");
     // TODO assert_eq (unresolved): assert_eq!(score(&game, lat), 0, "no movement → no score");
     // 
 }
@@ -95516,7 +95516,7 @@ static void gen_like_a_treasure_opponent_live_success_does_not_fire(void){
     // 
     int offered = 0;
     CHECK((!offered), "like_a_treasure_opponent_live_success_does_not_fire");
-    // TODO assert: assert!( game.state.player1.hand.cards.is_empty(), "nothing added to hand from an opponent's mill" );
+    CHECK(tg.state.p[0].hand.n == 0, "like_a_treasure_opponent_live_success_does_not_fire");
     // TODO assert_eq (unresolved): assert_eq!(score(&game, lat), 0, "no score from an opponent's mill");
     // 
 }
@@ -96022,8 +96022,8 @@ static void gen_special_color_q195_set_blade_liella_at_center(void){
     rb_advance_phase(&tg.state);
     // 
     // 
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, liella), 3, "special_color_q195_set_blade_liella_at_center");
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, non_liella), 0, "special_color_q195_set_blade_liella_at_center");
+    CHECK_EQ(test_get_blade_modifier(&tg, liella), 3, "special_color_q195_set_blade_liella_at_center");
+    CHECK_EQ(test_get_blade_modifier(&tg, non_liella), 0, "special_color_q195_set_blade_liella_at_center");
     // 
 }
 
@@ -96083,7 +96083,7 @@ static void gen_liella_at_left_side_excluded_by_position(void){
     rb_advance_phase(&tg.state);
     // 
     // 
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, liella), 0, "liella_at_left_side_excluded_by_position");
+    CHECK_EQ(test_get_blade_modifier(&tg, liella), 0, "liella_at_left_side_excluded_by_position");
     // 
 }
 
@@ -96143,7 +96143,7 @@ static void gen_liella_at_right_side_excluded_by_position(void){
     rb_advance_phase(&tg.state);
     // 
     // 
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, liella), 0, "liella_at_right_side_excluded_by_position");
+    CHECK_EQ(test_get_blade_modifier(&tg, liella), 0, "liella_at_right_side_excluded_by_position");
     // 
 }
 
@@ -96202,7 +96202,7 @@ static void gen_non_liella_at_center_excluded_by_group(void){
     rb_advance_phase(&tg.state);
     // 
     // 
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, non_liella), 0, "non_liella_at_center_excluded_by_group");
+    CHECK_EQ(test_get_blade_modifier(&tg, non_liella), 0, "non_liella_at_center_excluded_by_group");
     // 
 }
 
@@ -96263,8 +96263,8 @@ static void gen_multiple_liella_only_center_gets_modifier(void){
     rb_advance_phase(&tg.state);
     // 
     // 
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, liella_center), 3, "multiple_liella_only_center_gets_modifier");
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, liella_left), 0, "multiple_liella_only_center_gets_modifier");
+    CHECK_EQ(test_get_blade_modifier(&tg, liella_center), 3, "multiple_liella_only_center_gets_modifier");
+    CHECK_EQ(test_get_blade_modifier(&tg, liella_left), 0, "multiple_liella_only_center_gets_modifier");
     // 
 }
 
@@ -96325,8 +96325,8 @@ static void gen_center_empty_no_one_gets_modifier(void){
     rb_advance_phase(&tg.state);
     // 
     // 
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, liella_left), 0, "center_empty_no_one_gets_modifier");
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, liella_right), 0, "center_empty_no_one_gets_modifier");
+    CHECK_EQ(test_get_blade_modifier(&tg, liella_left), 0, "center_empty_no_one_gets_modifier");
+    CHECK_EQ(test_get_blade_modifier(&tg, liella_right), 0, "center_empty_no_one_gets_modifier");
     // 
 }
 
@@ -96388,9 +96388,9 @@ static void gen_all_three_liella_only_center_gets_modifier(void){
     rb_advance_phase(&tg.state);
     // 
     // 
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, liella_center), 3, "all_three_liella_only_center_gets_modifier");
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, liella_left), 0, "all_three_liella_only_center_gets_modifier");
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, liella_right), 0, "all_three_liella_only_center_gets_modifier");
+    CHECK_EQ(test_get_blade_modifier(&tg, liella_center), 3, "all_three_liella_only_center_gets_modifier");
+    CHECK_EQ(test_get_blade_modifier(&tg, liella_left), 0, "all_three_liella_only_center_gets_modifier");
+    CHECK_EQ(test_get_blade_modifier(&tg, liella_right), 0, "all_three_liella_only_center_gets_modifier");
     // 
 }
 
@@ -96454,8 +96454,8 @@ static void gen_opponent_liella_not_affected_by_self_target(void){
     rb_advance_phase(&tg.state);
     // 
     // 
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, self_liella), 3, "opponent_liella_not_affected_by_self_target");
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, opp_liella), 0, "opponent_liella_not_affected_by_self_target");
+    CHECK_EQ(test_get_blade_modifier(&tg, self_liella), 3, "opponent_liella_not_affected_by_self_target");
+    CHECK_EQ(test_get_blade_modifier(&tg, opp_liella), 0, "opponent_liella_not_affected_by_self_target");
     // 
 }
 
@@ -96524,7 +96524,7 @@ static void gen_liella_blade_2_gets_correct_modifier(void){
     CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectCard", "liella_blade_2_gets_correct_modifier");
     rb_resume_with_choice(&tg.state, -1);
     // 
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, liella_blade2), 3, "liella_blade_2_gets_correct_modifier");
+    CHECK_EQ(test_get_blade_modifier(&tg, liella_blade2), 3, "liella_blade_2_gets_correct_modifier");
     // 
 }
 
@@ -96584,7 +96584,7 @@ static void gen_liella_blade_1_gets_correct_modifier(void){
     rb_advance_phase(&tg.state);
     // 
     // 
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, liella_blade1), 3, "liella_blade_1_gets_correct_modifier");
+    CHECK_EQ(test_get_blade_modifier(&tg, liella_blade1), 3, "liella_blade_1_gets_correct_modifier");
     // 
 }
 
@@ -96648,7 +96648,7 @@ static void gen_q195_existing_modifier_stacks_on_set_value(void){
     // 
     // 
     // // Q195: after set_blade(3), modifier = set(3) + additive(1) = 4, effective blade = 3 + 1 = 4
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, liella), 4, "q195_existing_modifier_stacks_on_set_value");
+    CHECK_EQ(test_get_blade_modifier(&tg, liella), 4, "q195_existing_modifier_stacks_on_set_value");
     // 
 }
 
@@ -96710,7 +96710,7 @@ static void gen_liella_blade_4_gets_set_to_3_not_plus_3(void){
     // 
     // // set_blade(3) on blade=4 member: set=3, additive=0 → total modifier = 3
     // // total_blades() uses set value (ignores base blade of 4) → effective blade = 3
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, kinako), 3, "liella_blade_4_gets_set_to_3_not_plus_3");
+    CHECK_EQ(test_get_blade_modifier(&tg, kinako), 3, "liella_blade_4_gets_set_to_3_not_plus_3");
     // 
 }
 
@@ -96772,7 +96772,7 @@ static void gen_liella_blade_1_also_gets_set_to_3(void){
     // 
     // // set_blade(3) on blade=1 member: set=3, additive=0 → total modifier = 3
     // // total_blades() uses set value (ignores base blade of 1) → effective blade = 3
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, liella_blade1), 3, "liella_blade_1_also_gets_set_to_3");
+    CHECK_EQ(test_get_blade_modifier(&tg, liella_blade1), 3, "liella_blade_1_also_gets_set_to_3");
     // 
 }
 
@@ -96837,7 +96837,7 @@ static void gen_liella_blade_4_with_existing_modifier(void){
     // 
     // // set_blade(3) + existing additive(1) → set=3, additive=1 → total modifier = 4
     // // total_blades() uses set value + additive → effective blade = 3+1=4
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, kinako), 4, "liella_blade_4_with_existing_modifier");
+    CHECK_EQ(test_get_blade_modifier(&tg, kinako), 4, "liella_blade_4_with_existing_modifier");
     // 
 }
 
@@ -97506,7 +97506,7 @@ static void gen_natsumi_bp5_decline_first_mill(void){
     test_drain_auto_choices(&tg);
     // 
     CHECK_EQ(tg.state.p[0].deck.n, deck_before, "natsumi_bp5_decline_first_mill");
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, natsumi), blade_before, "natsumi_bp5_decline_first_mill");
+    CHECK_EQ(test_get_blade_modifier(&tg, natsumi), blade_before, "natsumi_bp5_decline_first_mill");
     int orientation = 0;
     // TODO assert: assert!( orientation.is_none_or(|o| o != "wait"), "No wait state when mill declined" );
     // 
@@ -97570,7 +97570,7 @@ static void gen_natsumi_bp5_mill_one_live_stop(void){
     test_drain_auto_choices(&tg);
     // 
     CHECK_EQ(tg.state.p[0].deck.n, deck_before - 1, "natsumi_bp5_mill_one_live_stop");
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, natsumi), 1, "natsumi_bp5_mill_one_live_stop");
+    CHECK_EQ(test_get_blade_modifier(&tg, natsumi), 1, "natsumi_bp5_mill_one_live_stop");
     // TODO assert_eq (unresolved): assert_eq!( game.state.mods.get_orientation_modifier(natsumi), Some("wait"), "Natsumi should be in wait state after milling a live card" );
     // 
 }
@@ -97631,7 +97631,7 @@ static void gen_natsumi_bp5_mill_one_non_live_stop(void){
     rb_resume_with_choice(&tg.state, 0);
     test_drain_auto_choices(&tg);
     // 
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, natsumi), 1, "natsumi_bp5_mill_one_non_live_stop");
+    CHECK_EQ(test_get_blade_modifier(&tg, natsumi), 1, "natsumi_bp5_mill_one_non_live_stop");
     int orientation = 0;
     // TODO assert: assert!( orientation.is_none_or(|o| o != "wait"), "No wait state when milled card is not a live card" );
     // 
@@ -97698,7 +97698,7 @@ static void gen_natsumi_bp5_mill_non_live_then_live_stop(void){
     rb_resume_with_choice(&tg.state, 0);
     test_drain_auto_choices(&tg);
     // 
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, natsumi), 2, "natsumi_bp5_mill_non_live_then_live_stop");
+    CHECK_EQ(test_get_blade_modifier(&tg, natsumi), 2, "natsumi_bp5_mill_non_live_then_live_stop");
     // TODO assert_eq (unresolved): assert_eq!( game.state.mods.get_orientation_modifier(natsumi), Some("wait"), "Natsumi should be wait after milling a live card in iter 1" );
     // 
 }
@@ -97789,7 +97789,7 @@ static void gen_natsumi_bp5_all_four_iterations_live(void){
     // // after iter 4, no more repeat prompt → done
     // 
     CHECK_EQ(tg.state.p[0].deck.n, deck_before - 5, "natsumi_bp5_all_four_iterations_live");
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, natsumi), 5, "natsumi_bp5_all_four_iterations_live");
+    CHECK_EQ(test_get_blade_modifier(&tg, natsumi), 5, "natsumi_bp5_all_four_iterations_live");
     // 
 }
 
@@ -97854,7 +97854,7 @@ static void gen_natsumi_bp5_change_state_only_self_with_fillers(void){
     rb_resume_with_choice(&tg.state, 0);
     test_drain_auto_choices(&tg);
     // 
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, natsumi), 1, "natsumi_bp5_change_state_only_self_with_fillers");
+    CHECK_EQ(test_get_blade_modifier(&tg, natsumi), 1, "natsumi_bp5_change_state_only_self_with_fillers");
     // // Only natsumi should be in wait state
     // TODO assert_eq (unresolved): assert_eq!( game.state.mods.get_orientation_modifier(natsumi), Some("wait"), "Only Natsumi should be wait" );
     // TODO assert: assert!( game.state .mods .get_orientation_modifier(filler_member) .is_none_or(|o| o != "wait"), "Filler should not be wait" );
@@ -97916,7 +97916,7 @@ static void gen_natsumi_bp5_change_state_at_left_position(void){
     rb_resume_with_choice(&tg.state, 0);
     test_drain_auto_choices(&tg);
     // 
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, natsumi), 1, "natsumi_bp5_change_state_at_left_position");
+    CHECK_EQ(test_get_blade_modifier(&tg, natsumi), 1, "natsumi_bp5_change_state_at_left_position");
     // TODO assert_eq (unresolved): assert_eq!( game.state.mods.get_orientation_modifier(natsumi), Some("wait"), "Left position should be wait" );
     // 
 }
@@ -97976,7 +97976,7 @@ static void gen_natsumi_bp5_change_state_at_right_position(void){
     rb_resume_with_choice(&tg.state, 0);
     test_drain_auto_choices(&tg);
     // 
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, natsumi), 1, "natsumi_bp5_change_state_at_right_position");
+    CHECK_EQ(test_get_blade_modifier(&tg, natsumi), 1, "natsumi_bp5_change_state_at_right_position");
     // TODO assert_eq (unresolved): assert_eq!( game.state.mods.get_orientation_modifier(natsumi), Some("wait"), "Right position should be wait" );
     // 
 }
@@ -98041,7 +98041,7 @@ static void gen_natsumi_bp5_all_four_iterations_non_live(void){
     test_drain_auto_choices(&tg);
     // 
     CHECK_EQ(tg.state.p[0].deck.n, deck_before - 1, "natsumi_bp5_all_four_iterations_non_live");
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, natsumi), 1, "natsumi_bp5_all_four_iterations_non_live");
+    CHECK_EQ(test_get_blade_modifier(&tg, natsumi), 1, "natsumi_bp5_all_four_iterations_non_live");
     int orientation = 0;
     // TODO assert: assert!( orientation.is_none_or(|o| o != "wait"), "No wait state when no live card milled" );
     // 
@@ -98112,7 +98112,7 @@ static void gen_natsumi_bp5_stop_after_two_iterations(void){
     test_drain_auto_choices(&tg);
     // 
     CHECK_EQ(tg.state.p[0].deck.n, deck_before - 2, "natsumi_bp5_stop_after_two_iterations");
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, natsumi), 2, "natsumi_bp5_stop_after_two_iterations");
+    CHECK_EQ(test_get_blade_modifier(&tg, natsumi), 2, "natsumi_bp5_stop_after_two_iterations");
     // TODO assert_eq (unresolved): assert_eq!( game.state.mods.get_orientation_modifier(natsumi), Some("wait"), "Natsumi still in wait from iter 0 live mill" );
     // 
 }
@@ -98290,7 +98290,7 @@ static void gen_natsumi_bp5_all_iterations_live_never_waits_fillers(void){
     test_drain_auto_choices(&tg);
     // TODO: }
     // 
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, natsumi), 5, "natsumi_bp5_all_iterations_live_never_waits_fillers");
+    CHECK_EQ(test_get_blade_modifier(&tg, natsumi), 5, "natsumi_bp5_all_iterations_live_never_waits_fillers");
     // TODO assert_eq (unresolved): assert_eq!( game.state.mods.get_orientation_modifier(natsumi), Some("wait"), "Natsumi should be wait" );
     // TODO assert: assert!( game.state .mods .get_orientation_modifier(filler_member) .is_none_or(|o| o != "wait"), "Filler should NOT be wait at any point" );
     // TODO assert: assert!( game.state .mods .get_orientation_modifier(filler_2) .is_none_or(|o| o != "wait"), "Filler 2 should NOT be wait at any point" );
@@ -98538,7 +98538,7 @@ static void gen_ren_ab0_2_liella_among_3_discarded_grants_2_blade(void){
     CHECK_EQ(tg.state.p[0].discard.n, discard_before + 3, "ren_ab0_2_liella_among_3_discarded_grants_2_blade");
     // 
     // // Per-unit: (2 Liella! matching / 1 per_unit_count) * 1 count = 2 blade
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, ren), 2, "ren_ab0_2_liella_among_3_discarded_grants_2_blade");
+    CHECK_EQ(test_get_blade_modifier(&tg, ren), 2, "ren_ab0_2_liella_among_3_discarded_grants_2_blade");
     // 
 }
 
@@ -98570,7 +98570,7 @@ static void gen_ren_ab0_no_liella_no_blade(void){
     // 
     test_activate_ability(&tg, ren);
     // 
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, ren), 0, "ren_ab0_no_liella_no_blade");
+    CHECK_EQ(test_get_blade_modifier(&tg, ren), 0, "ren_ab0_no_liella_no_blade");
     // 
 }
 
@@ -98602,7 +98602,7 @@ static void gen_ren_ab0_all_3_liella_grants_3_blade(void){
     // 
     test_activate_ability(&tg, ren);
     // 
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, ren), 3, "ren_ab0_all_3_liella_grants_3_blade");
+    CHECK_EQ(test_get_blade_modifier(&tg, ren), 3, "ren_ab0_all_3_liella_grants_3_blade");
     // 
 }
 
@@ -98634,7 +98634,7 @@ static void gen_ren_ab0_blade_duration_live_end(void){
     // 
     test_activate_ability(&tg, ren);
     // 
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, ren), 3, "ren_ab0_blade_duration_live_end");
+    CHECK_EQ(test_get_blade_modifier(&tg, ren), 3, "ren_ab0_blade_duration_live_end");
     // 
 }
 
@@ -98675,7 +98675,7 @@ static void gen_ren_ab0_preexisting_liella_in_discard_inflates_count(void){
     // // Without the "those_cards" tracking, engine counts ALL Liella! in discard
     // // = 2 pre-existing + 1 just placed = 3
     // // Expected: 1 (only the 1 placed by cost). Limitation is now resolved!
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, ren), 1, "ren_ab0_preexisting_liella_in_discard_inflates_count");
+    CHECK_EQ(test_get_blade_modifier(&tg, ren), 1, "ren_ab0_preexisting_liella_in_discard_inflates_count");
     // 
 }
 
@@ -99207,7 +99207,7 @@ static void gen_pb1_005_debut_no_draw_without_success_zone_cards(void){
     test_add_to_deck(&tg, filler);
     test_add_to_deck(&tg, filler);
     // 
-    // TODO assert: assert!( game.state.player1.success_live_card_zone.cards.is_empty(), "precondition: empty success zone" );
+    CHECK(tg.state.p[0].success.n == 0, "pb1_005_debut_no_draw_without_success_zone_cards");
     // 
     test_add_to_hand(&tg, card);
     test_play_to_stage(&tg, card, 1);
@@ -99797,7 +99797,7 @@ static void gen_kinako_hand_cost_minus_two_while_liella_moved(void){
     // 
     test_recalc(&tg);
     // 
-    CHECK_EQ(rb_mods_get_cost(&tg.state.mods, k), -2, "kinako_hand_cost_minus_two_while_liella_moved");
+    CHECK_EQ(test_get_cost_modifier(&tg, k), -2, "kinako_hand_cost_minus_two_while_liella_moved");
     // 
 }
 
@@ -99812,7 +99812,7 @@ static void gen_kinako_hand_cost_normal_when_liella_did_not_move(void){
     // 
     test_recalc(&tg);
     // 
-    CHECK_EQ(rb_mods_get_cost(&tg.state.mods, k), 0, "kinako_hand_cost_normal_when_liella_did_not_move");
+    CHECK_EQ(test_get_cost_modifier(&tg, k), 0, "kinako_hand_cost_normal_when_liella_did_not_move");
     // 
 }
 
@@ -99829,7 +99829,7 @@ static void gen_kinako_non_liella_movement_gives_no_discount(void){
     // 
     test_recalc(&tg);
     // 
-    CHECK_EQ(rb_mods_get_cost(&tg.state.mods, k), 0, "kinako_non_liella_movement_gives_no_discount");
+    CHECK_EQ(test_get_cost_modifier(&tg, k), 0, "kinako_non_liella_movement_gives_no_discount");
     // 
 }
 
@@ -100664,7 +100664,7 @@ static void gen_mijuku_dreamer_no_refresh_no_bonus(void){
     // skipped: activating_card (C uses queued card id as host)
     rb_drain_ability_queue(&tg.state);
     // 
-    CHECK_EQ(rb_mods_get_score(&tg.state.mods, mijuku), 0, "mijuku_dreamer_no_refresh_no_bonus");
+    CHECK_EQ(test_get_score_modifier(&tg, mijuku), 0, "mijuku_dreamer_no_refresh_no_bonus");
     // 
 }
 
@@ -100709,7 +100709,7 @@ static void gen_mijuku_dreamer_refresh_via_mill_gets_bonus(void){
     // skipped: activating_card (C uses queued card id as host)
     rb_drain_ability_queue(&tg.state);
     // 
-    CHECK_EQ(rb_mods_get_score(&tg.state.mods, mijuku), 2, "mijuku_dreamer_refresh_via_mill_gets_bonus");
+    CHECK_EQ(test_get_score_modifier(&tg, mijuku), 2, "mijuku_dreamer_refresh_via_mill_gets_bonus");
     // 
 }
 
@@ -100813,9 +100813,9 @@ static void gen_tiny_stars_basic(void){
     // 
     test_has_pending_choice(&tg);
     // 
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, kanon), 1, "tiny_stars_basic");
+    CHECK_EQ(test_get_blade_modifier(&tg, kanon), 1, "tiny_stars_basic");
     // TODO assert_eq (unresolved): assert_eq!( game.state .mods .get_heart_modifier(kanon, HeartColor::Heart05), 1, "Kanon should have +1 heart05" );
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, keke), 1, "tiny_stars_basic");
+    CHECK_EQ(test_get_blade_modifier(&tg, keke), 1, "tiny_stars_basic");
     // TODO assert_eq (unresolved): assert_eq!( game.state .mods .get_heart_modifier(keke, HeartColor::Heart01), 1, "Keke should have +1 heart01" );
     // 
 }
@@ -100938,7 +100938,7 @@ static void gen_tiny_stars_duplicate_kanon(void){
     // TODO assert_eq (unresolved): assert_eq!( other_blade, 0, "Unselected kanon should have 0 blade, got {}", other_blade );
     // TODO assert_eq (unresolved): assert_eq!( other_heart, 0, "Unselected kanon should have 0 heart05, got {}", other_heart );
     // 
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, keke), 1, "tiny_stars_duplicate_kanon");
+    CHECK_EQ(test_get_blade_modifier(&tg, keke), 1, "tiny_stars_duplicate_kanon");
     // TODO assert_eq (unresolved): assert_eq!( game.state .mods .get_heart_modifier(keke, HeartColor::Heart01), 1, "Keke should have +1 heart01" );
     // 
 }
@@ -101053,7 +101053,7 @@ static void gen_tiny_stars_duplicate_keke(void){
     // // and single-candidate selections auto-resolve (no prompt offered).
     test_has_pending_choice(&tg);
     // 
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, kanon), 1, "tiny_stars_duplicate_keke");
+    CHECK_EQ(test_get_blade_modifier(&tg, kanon), 1, "tiny_stars_duplicate_keke");
     // TODO assert_eq (unresolved): assert_eq!( game.state .mods .get_heart_modifier(kanon, HeartColor::Heart05), 1, "Kanon should have +1 heart05" );
     // 
     int chosen_blade = rb_mods_get_blade(&tg.state.mods, keke1);
@@ -101166,7 +101166,7 @@ static void gen_tiny_stars_kanon_only(void){
     // 
     // 
     test_has_pending_choice(&tg);
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, kanon), 1, "tiny_stars_kanon_only");
+    CHECK_EQ(test_get_blade_modifier(&tg, kanon), 1, "tiny_stars_kanon_only");
     // TODO assert_eq (unresolved): assert_eq!( game.state .mods .get_heart_modifier(kanon, HeartColor::Heart05), 1, "Kanon should have +1 heart05" );
     // 
 }
@@ -101269,7 +101269,7 @@ static void gen_tiny_stars_keke_only(void){
     // 
     // 
     test_has_pending_choice(&tg);
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, keke), 1, "tiny_stars_keke_only");
+    CHECK_EQ(test_get_blade_modifier(&tg, keke), 1, "tiny_stars_keke_only");
     // TODO assert_eq (unresolved): assert_eq!( game.state .mods .get_heart_modifier(keke, HeartColor::Heart01), 1, "Keke should have +1 heart01" );
     // 
 }
@@ -101371,7 +101371,7 @@ static void gen_tiny_stars_none(void){
     // 
     // 
     test_has_pending_choice(&tg);
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, tiny_stars), 0, "tiny_stars_none");
+    CHECK_EQ(test_get_blade_modifier(&tg, tiny_stars), 0, "tiny_stars_none");
     // TODO assert_eq (unresolved): assert_eq!( game.state .mods .get_heart_modifier(tiny_stars, HeartColor::Heart05), 0, "No heart05 should be granted" );
     // TODO assert_eq (unresolved): assert_eq!( game.state .mods .get_heart_modifier(tiny_stars, HeartColor::Heart01), 0, "No heart01 should be granted" );
     // 
@@ -104502,7 +104502,7 @@ static void gen_chika_wait_target_stays_on_stage(void){
     // // Chika stays at center, unchanged
     // TODO assert_eq (unresolved): assert_eq!( game.player().stage.stage[1], chika, "Chika should remain at center" );
     // // No cards should be in waitroom (no movement happened)
-    // TODO assert: assert!( game.state.player1.waitroom.cards.is_empty(), "No cards should have been moved to waitroom" );
+    CHECK(tg.state.p[0].discard.n == 0, "chika_wait_target_stays_on_stage");
     // 
 }
 
@@ -105042,7 +105042,7 @@ static void gen_bp4017_leftside_moved_gains_two_blades(void){
     // TODO: }
     test_recalc(&tg);
     // 
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, me), 2, "bp4017_leftside_moved_gains_two_blades");
+    CHECK_EQ(test_get_blade_modifier(&tg, me), 2, "bp4017_leftside_moved_gains_two_blades");
     // 
 }
 
@@ -105060,7 +105060,7 @@ static void gen_bp4017_leftside_unmoved_no_blades(void){
     // TODO: fire_trigger(&mut game, me, AbilityTrigger::LiveStart, LIVE_START);
     test_recalc(&tg);
     // 
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, me), 0, "bp4017_leftside_unmoved_no_blades");
+    CHECK_EQ(test_get_blade_modifier(&tg, me), 0, "bp4017_leftside_unmoved_no_blades");
     // 
 }
 
@@ -105080,7 +105080,7 @@ static void gen_bp4017_center_moved_no_blades(void){
     // TODO: fire_trigger(&mut game, me, AbilityTrigger::LiveStart, LIVE_START);
     test_recalc(&tg);
     // 
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, me), 0, "bp4017_center_moved_no_blades");
+    CHECK_EQ(test_get_blade_modifier(&tg, me), 0, "bp4017_center_moved_no_blades");
     // 
 }
 
@@ -105198,7 +105198,7 @@ static void gen_bp7023_opponent_one_energy_ahead_scores_plus_one(void){
     rb_resume_with_choice(&tg.state, 1);
     // TODO: }
     // 
-    CHECK_EQ(rb_mods_get_score(&tg.state.mods, live), 1, "bp7023_opponent_one_energy_ahead_scores_plus_one");
+    CHECK_EQ(test_get_score_modifier(&tg, live), 1, "bp7023_opponent_one_energy_ahead_scores_plus_one");
     CHECK_EQ(tg.state.p[0].energy_active, 0, "bp7023_opponent_one_energy_ahead_scores_plus_one");
     // 
 }
@@ -105218,7 +105218,7 @@ static void gen_bp7023_opponent_two_energy_ahead_scores_plus_two(void){
     rb_resume_with_choice(&tg.state, 1);
     // TODO: }
     // 
-    CHECK_EQ(rb_mods_get_score(&tg.state.mods, live), 2, "bp7023_opponent_two_energy_ahead_scores_plus_two");
+    CHECK_EQ(test_get_score_modifier(&tg, live), 2, "bp7023_opponent_two_energy_ahead_scores_plus_two");
     // 
 }
 
@@ -105237,7 +105237,7 @@ static void gen_bp7023_tied_after_return_no_score(void){
     rb_resume_with_choice(&tg.state, 1);
     // TODO: }
     // 
-    CHECK_EQ(rb_mods_get_score(&tg.state.mods, live), 0, "bp7023_tied_after_return_no_score");
+    CHECK_EQ(test_get_score_modifier(&tg, live), 0, "bp7023_tied_after_return_no_score");
     // 
 }
 
@@ -106136,9 +106136,9 @@ static void gen_aspire_moved_liella_gains_blade_unmoved_and_non_liella_do_not(vo
     // TODO: }
     // 
     // 
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, moved_liella), 1, "aspire_moved_liella_gains_blade_unmoved_and_non_liella_do_not");
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, unmoved_liella), 0, "aspire_moved_liella_gains_blade_unmoved_and_non_liella_do_not");
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, moved_non_liella), 0, "aspire_moved_liella_gains_blade_unmoved_and_non_liella_do_not");
+    CHECK_EQ(test_get_blade_modifier(&tg, moved_liella), 1, "aspire_moved_liella_gains_blade_unmoved_and_non_liella_do_not");
+    CHECK_EQ(test_get_blade_modifier(&tg, unmoved_liella), 0, "aspire_moved_liella_gains_blade_unmoved_and_non_liella_do_not");
+    CHECK_EQ(test_get_blade_modifier(&tg, moved_non_liella), 0, "aspire_moved_liella_gains_blade_unmoved_and_non_liella_do_not");
     // 
 }
 
@@ -106169,7 +106169,7 @@ static void gen_aspire_only_non_liella_moved_no_blade(void){
     // TODO: }
     // 
     // 
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, non_liella), 0, "aspire_only_non_liella_moved_no_blade");
+    CHECK_EQ(test_get_blade_modifier(&tg, non_liella), 0, "aspire_only_non_liella_moved_no_blade");
     // 
 }
 
@@ -106204,8 +106204,8 @@ static void gen_aspire_liella_and_non_liella_moved_only_liella_gains_blade(void)
     // TODO: }
     // 
     // 
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, liella), 1, "aspire_liella_and_non_liella_moved_only_liella_gains_blade");
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, non_liella), 0, "aspire_liella_and_non_liella_moved_only_liella_gains_blade");
+    CHECK_EQ(test_get_blade_modifier(&tg, liella), 1, "aspire_liella_and_non_liella_moved_only_liella_gains_blade");
+    CHECK_EQ(test_get_blade_modifier(&tg, non_liella), 0, "aspire_liella_and_non_liella_moved_only_liella_gains_blade");
     // 
 }
 
@@ -106236,7 +106236,7 @@ static void gen_aspire_no_liella_on_stage_no_blade(void){
     // TODO: }
     // 
     // 
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, non_liella), 0, "aspire_no_liella_on_stage_no_blade");
+    CHECK_EQ(test_get_blade_modifier(&tg, non_liella), 0, "aspire_no_liella_on_stage_no_blade");
     // 
 }
 
@@ -106265,7 +106265,7 @@ static void gen_aspire_no_movement_no_blade(void){
     // TODO: }
     // 
     // 
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, liella), 0, "aspire_no_movement_no_blade");
+    CHECK_EQ(test_get_blade_modifier(&tg, liella), 0, "aspire_no_movement_no_blade");
     // 
 }
 
@@ -106300,8 +106300,8 @@ static void gen_aspire_two_moved_liella_both_gain_blade(void){
     // TODO: }
     // 
     // 
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, liella_a), 1, "aspire_two_moved_liella_both_gain_blade");
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, liella_b), 1, "aspire_two_moved_liella_both_gain_blade");
+    CHECK_EQ(test_get_blade_modifier(&tg, liella_a), 1, "aspire_two_moved_liella_both_gain_blade");
+    CHECK_EQ(test_get_blade_modifier(&tg, liella_b), 1, "aspire_two_moved_liella_both_gain_blade");
     // 
 }
 
@@ -107375,17 +107375,17 @@ static void gen_seras_pb1015_loses_three_blade_when_alone(void){
     // 
     // // Alone → −3 blade modifier.
     test_recalc(&tg);
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, seras), -3, "seras_pb1015_loses_three_blade_when_alone");
+    CHECK_EQ(test_get_blade_modifier(&tg, seras), -3, "seras_pb1015_loses_three_blade_when_alone");
     // 
     // // A friend arrives → loss stops.
     // TODO: game.add_to_stage(MemberArea::LeftSide, test_id(&tg, "PL!-sd1-010-SD"));
     test_recalc(&tg);
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, seras), 0, "seras_pb1015_loses_three_blade_when_alone");
+    CHECK_EQ(test_get_blade_modifier(&tg, seras), 0, "seras_pb1015_loses_three_blade_when_alone");
     // 
     // // Friend leaves → loss returns.
     tg.state.p[0].stage[0] = -1;
     test_recalc(&tg);
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, seras), -3, "seras_pb1015_loses_three_blade_when_alone");
+    CHECK_EQ(test_get_blade_modifier(&tg, seras), -3, "seras_pb1015_loses_three_blade_when_alone");
     // 
 }
 
@@ -107400,11 +107400,11 @@ static void gen_sayaka_bp6002_gains_two_blade_when_alone(void){
     test_add_to_stage(&tg, 1, sayaka);
     // 
     test_recalc(&tg);
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, sayaka), 2, "sayaka_bp6002_gains_two_blade_when_alone");
+    CHECK_EQ(test_get_blade_modifier(&tg, sayaka), 2, "sayaka_bp6002_gains_two_blade_when_alone");
     // 
     // TODO: game.add_to_stage(MemberArea::RightSide, test_id(&tg, "PL!-sd1-010-SD"));
     test_recalc(&tg);
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, sayaka), 0, "sayaka_bp6002_gains_two_blade_when_alone");
+    CHECK_EQ(test_get_blade_modifier(&tg, sayaka), 0, "sayaka_bp6002_gains_two_blade_when_alone");
     // 
 }
 
@@ -107876,7 +107876,7 @@ static void gen_stars_we_chase_four_distinct_lives_plus_one(void){
     rb_drain_ability_queue(&tg.state);
     // 
     // 
-    CHECK_EQ(rb_mods_get_score(&tg.state.mods, swc), 1, "stars_we_chase_four_distinct_lives_plus_one");
+    CHECK_EQ(test_get_score_modifier(&tg, swc), 1, "stars_we_chase_four_distinct_lives_plus_one");
     // 
 }
 
@@ -107917,7 +107917,7 @@ static void gen_stars_we_chase_six_distinct_lives_instead_plus_two(void){
     rb_drain_ability_queue(&tg.state);
     // 
     // 
-    CHECK_EQ(rb_mods_get_score(&tg.state.mods, swc), 2, "stars_we_chase_six_distinct_lives_instead_plus_two");
+    CHECK_EQ(test_get_score_modifier(&tg, swc), 2, "stars_we_chase_six_distinct_lives_instead_plus_two");
     // 
 }
 
@@ -107967,7 +107967,7 @@ static void gen_stars_we_chase_duplicates_and_three_distinct_do_not_qualify(void
     rb_drain_ability_queue(&tg.state);
     // 
     // 
-    CHECK_EQ(rb_mods_get_score(&tg.state.mods, swc), 0, "stars_we_chase_duplicates_and_three_distinct_do_not_qualify");
+    CHECK_EQ(test_get_score_modifier(&tg, swc), 0, "stars_we_chase_duplicates_and_three_distinct_do_not_qualify");
     // 
     // // Three distinct → still below threshold.
     // clear
@@ -108000,7 +108000,7 @@ static void gen_stars_we_chase_duplicates_and_three_distinct_do_not_qualify(void
     rb_drain_ability_queue(&tg.state);
     // 
     // 
-    CHECK_EQ(rb_mods_get_score(&tg.state.mods, swc), 0, "stars_we_chase_duplicates_and_three_distinct_do_not_qualify");
+    CHECK_EQ(test_get_score_modifier(&tg, swc), 0, "stars_we_chase_duplicates_and_three_distinct_do_not_qualify");
     // 
 }
 
@@ -109150,22 +109150,22 @@ static void gen_bp4_018_blade_updates_when_score_changes(void){
     // 
     // // Initially no cards in either success zone → scores equal → 0 blade
     test_recalc(&tg);
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, card), 0, "bp4_018_blade_updates_when_score_changes");
+    CHECK_EQ(test_get_blade_modifier(&tg, card), 0, "bp4_018_blade_updates_when_score_changes");
     // 
     // // Add own card: own 1 > opp 0 → gain blade ×2
     test_add_to_live(&tg, own_live_a);
     test_recalc(&tg);
-    CHECK(rb_mods_get_blade(&tg.state.mods, card), "bp4_018_blade_updates_when_score_changes");
+    CHECK(test_get_blade_modifier(&tg, card), "bp4_018_blade_updates_when_score_changes");
     // 
     // // Add opponent card: own 1 < opp 2 → lose blade
     test_add_to_live(&tg, opp_live);
     test_recalc(&tg);
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, card), 0, "bp4_018_blade_updates_when_score_changes");
+    CHECK_EQ(test_get_blade_modifier(&tg, card), 0, "bp4_018_blade_updates_when_score_changes");
     // 
     // // Add second own card: own 2 == opp 2 → still 0 (not strictly greater)
     test_add_to_live(&tg, own_live_b);
     test_recalc(&tg);
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, card), 0, "bp4_018_blade_updates_when_score_changes");
+    CHECK_EQ(test_get_blade_modifier(&tg, card), 0, "bp4_018_blade_updates_when_score_changes");
     // 
 }
 
@@ -109939,7 +109939,7 @@ static void gen_riko_compound_and_condition_removal(void){
     // 
     // // Condition met
     test_recalc(&tg);
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, riko), 3, "riko_compound_and_condition_removal");
+    CHECK_EQ(test_get_blade_modifier(&tg, riko), 3, "riko_compound_and_condition_removal");
     // 
     // // Remove opponent card → condition no longer met
     tg.state.p[0].live.n=0;
@@ -110215,7 +110215,7 @@ static void gen_you_pb1_opponent_more_energy_gains_blade(void){
     int you = 0;
     test_recalc(&tg);
     // TODO assert: assert!( you_pb1_has_blade(&game.state, you), "You: opponent 7 > self 3 → should gain blade" );
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, you), 3, "you_pb1_opponent_more_energy_gains_blade");
+    CHECK_EQ(test_get_blade_modifier(&tg, you), 3, "you_pb1_opponent_more_energy_gains_blade");
     // 
 }
 
@@ -110282,7 +110282,7 @@ static void gen_you_pb1_energy_changes_dynamically(void){
     test_set_energy_active(&tg, 1, 17);
     test_recalc(&tg);
     // TODO assert: assert!( you_pb1_has_blade(&game.state, you), "You: opponent 17 > self 13 → blade should return" );
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, you), 3, "you_pb1_energy_changes_dynamically");
+    CHECK_EQ(test_get_blade_modifier(&tg, you), 3, "you_pb1_energy_changes_dynamically");
     // 
 }
 
@@ -113943,7 +113943,7 @@ static void gen_baad_cage_cost_limit_two_hasunosora_members_grants_score(void){
     // TODO: }
     // 
     // 
-    CHECK_EQ(rb_mods_get_score(&tg.state.mods, baad_cage), 1, "baad_cage_cost_limit_two_hasunosora_members_grants_score");
+    CHECK_EQ(test_get_score_modifier(&tg, baad_cage), 1, "baad_cage_cost_limit_two_hasunosora_members_grants_score");
     // 
 }
 
@@ -114048,7 +114048,7 @@ static void gen_baad_cage_cost_limit_one_member_no_score(void){
     // TODO: }
     // 
     // 
-    CHECK_EQ(rb_mods_get_score(&tg.state.mods, baad_cage), 0, "baad_cage_cost_limit_one_member_no_score");
+    CHECK_EQ(test_get_score_modifier(&tg, baad_cage), 0, "baad_cage_cost_limit_one_member_no_score");
     // 
 }
 
@@ -114154,7 +114154,7 @@ static void gen_baad_cage_cost_limit_one_below_threshold_no_score(void){
     // TODO: }
     // 
     // 
-    CHECK_EQ(rb_mods_get_score(&tg.state.mods, baad_cage), 0, "baad_cage_cost_limit_one_below_threshold_no_score");
+    CHECK_EQ(test_get_score_modifier(&tg, baad_cage), 0, "baad_cage_cost_limit_one_below_threshold_no_score");
     // 
 }
 
@@ -114261,7 +114261,7 @@ static void gen_baad_cage_three_members_score_still_one(void){
     // TODO: }
     // 
     // 
-    CHECK_EQ(rb_mods_get_score(&tg.state.mods, baad_cage), 1, "baad_cage_three_members_score_still_one");
+    CHECK_EQ(test_get_score_modifier(&tg, baad_cage), 1, "baad_cage_three_members_score_still_one");
     // 
 }
 
@@ -117377,7 +117377,7 @@ static void gen_triple_passive_cost_not_set_by_discard(void){
     test_add_to_discard(&tg, chisato);
     test_recalc(&tg);
     // // must NOT be set — need hand discard at play time
-    CHECK_EQ(rb_mods_get_cost(&tg.state.mods, triple), 0, "triple_passive_cost_not_set_by_discard");
+    CHECK_EQ(test_get_cost_modifier(&tg, triple), 0, "triple_passive_cost_not_set_by_discard");
     // TODO assert_eq (unresolved): assert_eq!( game.state.mods.get_cost_modifier_set(triple), None, "no set-cost modifier without play-time choice" );
     // 
 }
@@ -117396,7 +117396,7 @@ static void gen_triple_passive_cost_not_set_with_hand_cards(void){
     test_add_to_hand(&tg, setsuna);
     test_add_to_hand(&tg, chisato);
     test_recalc(&tg);
-    CHECK_EQ(rb_mods_get_cost(&tg.state.mods, triple), 0, "triple_passive_cost_not_set_with_hand_cards");
+    CHECK_EQ(test_get_cost_modifier(&tg, triple), 0, "triple_passive_cost_not_set_with_hand_cards");
     // TODO assert_eq (unresolved): assert_eq!(game.state.mods.get_cost_modifier_set(triple), None);
     // 
 }
@@ -117454,7 +117454,7 @@ static void gen_triple_gameplay_decline_pays15_keeps_hand(void){
     CHECK(test_zone_has_id(&tg, 0, "hand", hanamaru), "triple_gameplay_decline_pays15_keeps_hand");
     CHECK(test_zone_has_id(&tg, 0, "hand", setsuna), "triple_gameplay_decline_pays15_keeps_hand");
     CHECK(test_zone_has_id(&tg, 0, "hand", chisato), "triple_gameplay_decline_pays15_keeps_hand");
-    // TODO assert: assert!(game.state.player1.waitroom.cards.is_empty());
+    CHECK(tg.state.p[0].discard.n == 0, "triple_gameplay_decline_pays15_keeps_hand");
     // 
 }
 
@@ -119437,7 +119437,7 @@ static void gen_issue6_natsumi_self_only_blade(void){
     rb_resume_with_choice(&tg.state, -1);
     // TODO: }
     // 
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, natsumi), 1, "issue6_natsumi_self_only_blade");
+    CHECK_EQ(test_get_blade_modifier(&tg, natsumi), 1, "issue6_natsumi_self_only_blade");
     // 
 }
 
@@ -119520,7 +119520,7 @@ static void gen_issue6_natsumi_low_energy_no_blade(void){
     // TODO: }
     // 
     // TODO assert_eq (unresolved): assert_eq!( game.state.mods.get_blade_modifier(natsumi), 0, "6c: energy 6 < 7 -> no blade for self, got {}", game.state.mods.get_blade_modifier(natsumi) );
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, other_liella), 0, "issue6_natsumi_low_energy_no_blade");
+    CHECK_EQ(test_get_blade_modifier(&tg, other_liella), 0, "issue6_natsumi_low_energy_no_blade");
     // 
 }
 
@@ -119603,14 +119603,14 @@ static void gen_issue6_natsumi_blade_expires_after_live_victory_determination(vo
     rb_resume_with_choice(&tg.state, -1);
     // TODO: }
     // // Blade granted at LiveStart with duration=live_end
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, natsumi), 1, "issue6_natsumi_blade_expires_after_live_victory_determination");
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, other_liella), 1, "issue6_natsumi_blade_expires_after_live_victory_determination");
+    CHECK_EQ(test_get_blade_modifier(&tg, natsumi), 1, "issue6_natsumi_blade_expires_after_live_victory_determination");
+    CHECK_EQ(test_get_blade_modifier(&tg, other_liella), 1, "issue6_natsumi_blade_expires_after_live_victory_determination");
     // 
     // // Advance through remaining live phases
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // // Blade should persist through LiveVictoryDetermination
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, natsumi), 1, "issue6_natsumi_blade_expires_after_live_victory_determination");
+    CHECK_EQ(test_get_blade_modifier(&tg, natsumi), 1, "issue6_natsumi_blade_expires_after_live_victory_determination");
     // 
     // // The phase is now LiveVictoryDetermination but execute_live_victory_determination
     // // runs only on the *next* advance_phase call. Pass to invoke it.
@@ -119626,8 +119626,8 @@ static void gen_issue6_natsumi_blade_expires_after_live_victory_determination(vo
     // // check_expired_effects and cleans up live_end-temporary effects.
     rb_advance_phase(&tg.state);
     // // duration=live_end effects cleared after LiveVictoryDetermination
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, natsumi), 0, "issue6_natsumi_blade_expires_after_live_victory_determination");
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, other_liella), 0, "issue6_natsumi_blade_expires_after_live_victory_determination");
+    CHECK_EQ(test_get_blade_modifier(&tg, natsumi), 0, "issue6_natsumi_blade_expires_after_live_victory_determination");
+    CHECK_EQ(test_get_blade_modifier(&tg, other_liella), 0, "issue6_natsumi_blade_expires_after_live_victory_determination");
     // 
 }
 
@@ -119707,7 +119707,7 @@ static void gen_issue7_hajimari_set_required_hearts(void){
     rb_resume_with_choice(&tg.state, -1);
     // TODO: }
     // 
-    CHECK_EQ(rb_mods_get_score(&tg.state.mods, live_card), 5, "issue7_hajimari_set_required_hearts");
+    CHECK_EQ(test_get_score_modifier(&tg, live_card), 5, "issue7_hajimari_set_required_hearts");
     int h02 = 0;
     int h03 = 0;
     int h06 = 0;
@@ -119793,7 +119793,7 @@ static void gen_issue7_hajimari_no_success_live_no_effect(void){
     rb_resume_with_choice(&tg.state, -1);
     // TODO: }
     // 
-    CHECK_EQ(rb_mods_get_score(&tg.state.mods, live_card), 0, "issue7_hajimari_no_success_live_no_effect");
+    CHECK_EQ(test_get_score_modifier(&tg, live_card), 0, "issue7_hajimari_no_success_live_no_effect");
     // 
 }
 
@@ -120029,7 +120029,7 @@ static void gen_issue10_dream_with_you_no_blade_no_score(void){
     // TODO: }
     // 
     // // No blade on stage → condition fails
-    CHECK_EQ(rb_mods_get_score(&tg.state.mods, dream), 0, "issue10_dream_with_you_no_blade_no_score");
+    CHECK_EQ(test_get_score_modifier(&tg, dream), 0, "issue10_dream_with_you_no_blade_no_score");
     // 
 }
 
@@ -120323,7 +120323,7 @@ static void gen_issue16_hanamaru_all_cost_higher_than_opponent_gains_blade(void)
     // TODO: }
     // 
     // // Condition: 9 > 4 → passes → +2 blade
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, hanamaru), 2, "issue16_hanamaru_all_cost_higher_than_opponent_gains_blade");
+    CHECK_EQ(test_get_blade_modifier(&tg, hanamaru), 2, "issue16_hanamaru_all_cost_higher_than_opponent_gains_blade");
     // 
 }
 
@@ -120417,7 +120417,7 @@ static void gen_issue16_hanamaru_opponent_higher_cost_no_blade(void){
     // TODO: }
     // 
     // // Condition: 9 vs opponent max 15 → fails → no blade
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, hanamaru), 0, "issue16_hanamaru_opponent_higher_cost_no_blade");
+    CHECK_EQ(test_get_blade_modifier(&tg, hanamaru), 0, "issue16_hanamaru_opponent_higher_cost_no_blade");
     // 
 }
 
@@ -121853,7 +121853,7 @@ static void gen_hanayo_bp5_008_value_fixed_and_color_exact(void){
     test_recalc(&tg);
     // TODO assert_eq (unresolved): assert_eq!( game.state.mods.get_heart_modifier(hanayo, HeartColor::Heart03), 2, "total 9 竕･ 6 still grants exactly +2 (text says 縺､蠕励ｋ, fixed)" );
     // TODO assert_eq (unresolved): assert_eq!( game.state.mods.get_heart_modifier(hanayo, HeartColor::Heart01), 0, "no collateral heart01" );
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, hanayo), 0, "hanayo_bp5_008_value_fixed_and_color_exact");
+    CHECK_EQ(test_get_blade_modifier(&tg, hanayo), 0, "hanayo_bp5_008_value_fixed_and_color_exact");
     // 
 }
 
@@ -121974,19 +121974,19 @@ static void gen_ruby_pb1_009_combined_count_threshold(void){
     // 
     // // Edge 1: both zones empty.
     test_recalc(&tg);
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, ruby), 0, "ruby_pb1_009_combined_count_threshold");
+    CHECK_EQ(test_get_blade_modifier(&tg, ruby), 0, "ruby_pb1_009_combined_count_threshold");
     // 
     // // Edge 2: own 1 + opponent 1 = 2 < 3.
     // TODO: game.state.player1.success_live_card_zone.add_card(live_a);
     // TODO: game.state.player2.success_live_card_zone.add_card(live_b);
     test_recalc(&tg);
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, ruby), 0, "ruby_pb1_009_combined_count_threshold");
+    CHECK_EQ(test_get_blade_modifier(&tg, ruby), 0, "ruby_pb1_009_combined_count_threshold");
     // 
     // // Edge 3: opponent's second card pushes the COMBINED count to 3.
     int live_c_opp = test_id(&tg, "PL!-sd1-021-SD");
     // TODO: game.state.player2.success_live_card_zone.add_card(live_c_opp);
     test_recalc(&tg);
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, ruby), 3, "ruby_pb1_009_combined_count_threshold");
+    CHECK_EQ(test_get_blade_modifier(&tg, ruby), 3, "ruby_pb1_009_combined_count_threshold");
     // 
 }
 
@@ -122022,7 +122022,7 @@ static void gen_ruby_pb1_009_own_zone_may_be_empty(void){
     // TODO assert_eq (unresolved): assert_eq!(game.state.player1.success_live_card_zone.len(), 0);
     // 
     test_recalc(&tg);
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, ruby), 3, "ruby_pb1_009_own_zone_may_be_empty");
+    CHECK_EQ(test_get_blade_modifier(&tg, ruby), 3, "ruby_pb1_009_own_zone_may_be_empty");
     // 
 }
 
@@ -122043,12 +122043,12 @@ static void gen_ruby_pb1_009_score_zero_lives_count_and_bonus_is_dynamic(void){
     // TODO assert_eq (unresolved): assert_eq!( game.state.player1.success_live_card_zone.len() + game.state.player2.success_live_card_zone.len(), 3 );
     // 
     test_recalc(&tg);
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, ruby), 3, "ruby_pb1_009_score_zero_lives_count_and_bonus_is_dynamic");
+    CHECK_EQ(test_get_blade_modifier(&tg, ruby), 3, "ruby_pb1_009_score_zero_lives_count_and_bonus_is_dynamic");
     // 
     // // Dynamic removal: one zone empties → back under threshold.
     tg.state.p[0].live.n=0;
     test_recalc(&tg);
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, ruby), 0, "ruby_pb1_009_score_zero_lives_count_and_bonus_is_dynamic");
+    CHECK_EQ(test_get_blade_modifier(&tg, ruby), 0, "ruby_pb1_009_score_zero_lives_count_and_bonus_is_dynamic");
     // 
 }
 
@@ -122087,7 +122087,7 @@ static void gen_ruby_pb1_009_two_copies_each_get_bonus(void){
     test_recalc(&tg);
     copy = 0;
     // TODO loop (degraded): for &copy in &[ruby_a, ruby_b] {
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, copy), 3, "ruby_pb1_009_two_copies_each_get_bonus");
+    CHECK_EQ(test_get_blade_modifier(&tg, copy), 3, "ruby_pb1_009_two_copies_each_get_bonus");
     // TODO: }
     // 
 }
@@ -122170,7 +122170,7 @@ static void gen_mari_bp5_008_bonus_is_live_total_not_per_card(void){
     // 
     test_recalc(&tg);
     // TODO assert_eq (unresolved): assert_eq!( game.state.mods.p1_constant_total_score_bonus, 1, "live-total accumulator holds the +1" );
-    CHECK_EQ(rb_mods_get_score(&tg.state.mods, mari), 0, "mari_bp5_008_bonus_is_live_total_not_per_card");
+    CHECK_EQ(test_get_score_modifier(&tg, mari), 0, "mari_bp5_008_bonus_is_live_total_not_per_card");
     // 
 }
 
@@ -122564,7 +122564,7 @@ static void gen_mari_bp3_008_usable_with_no_live_in_waitroom(void){
     rb_resume_with_choice(&tg.state, -1);
     // TODO: }
     CHECK(test_zone_has_id(&tg, 0, "discard", mari), "mari_bp3_008_usable_with_no_live_in_waitroom");
-    // TODO assert: assert!( game.state.player1.hand.cards.is_empty(), "nothing added when no live exists" );
+    CHECK(tg.state.p[0].hand.n == 0, "mari_bp3_008_usable_with_no_live_in_waitroom");
     CHECK_EQ(tg.state.p[0].energy_active, 0, "mari_bp3_008_usable_with_no_live_in_waitroom");
     // 
 }
@@ -124302,7 +124302,7 @@ static void gen_suki_low_blade_no_score(void){
     test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, 0);
     // 
-    int score = 0;
+    int score = test_get_score_modifier(&tg, suki_id);
     CHECK_EQ(score, 0, "suki_low_blade_no_score");
     // 
 }
@@ -124321,7 +124321,7 @@ static void gen_suki_high_blade_gains_score(void){
     test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, 0);
     // 
-    int score = 0;
+    int score = test_get_score_modifier(&tg, suki_id);
     // TODO assert_eq (unresolved): assert_eq!(score, 1, "Bonus given for blade 1+6=7 (got {})", score);
     // 
 }
@@ -124339,7 +124339,7 @@ static void gen_suki_choose_low_blade_no_bonus(void){
     test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, 0);
     // 
-    int score = 0;
+    int score = test_get_score_modifier(&tg, suki_id);
     CHECK_EQ(score, 0, "suki_choose_low_blade_no_bonus");
     // 
 }
@@ -124357,7 +124357,7 @@ static void gen_suki_choose_high_blade_gains_bonus(void){
     test_has_pending_choice(&tg);
     rb_resume_with_choice(&tg.state, 1);
     // 
-    int score = 0;
+    int score = test_get_score_modifier(&tg, suki_id);
     // TODO assert: assert!(score >= 1, "Bonus for high-blade choice (got {})", score);
     // 
 }
@@ -124772,8 +124772,8 @@ static void gen_ai_screeam_answer_both_gain_blade(void){
     // 
     // // Verify blade modifiers were applied
     test_has_pending_choice(&tg);
-    CHECK(rb_mods_get_blade(&tg.state.mods, p1_member), "ai_screeam_answer_both_gain_blade");
-    CHECK(rb_mods_get_blade(&tg.state.mods, p2_member), "ai_screeam_answer_both_gain_blade");
+    CHECK(test_get_blade_modifier(&tg, p1_member), "ai_screeam_answer_both_gain_blade");
+    CHECK(test_get_blade_modifier(&tg, p2_member), "ai_screeam_answer_both_gain_blade");
     // 
 }
 
@@ -124904,7 +124904,7 @@ static void gen_distortion_q96_score_permanent_after_energy_used(void){
     // 
     // 
     int live_card_id = 0;
-    CHECK_EQ(rb_mods_get_score(&tg.state.mods, live_card_id), 1, "distortion_q96_score_permanent_after_energy_used");
+    CHECK_EQ(test_get_score_modifier(&tg, live_card_id), 1, "distortion_q96_score_permanent_after_energy_used");
     // 
     // // Q96: Later making energy non-all-active doesn't undo score +1
     test_add_to_energy(&tg, 0, energy_id);
@@ -124912,7 +124912,7 @@ static void gen_distortion_q96_score_permanent_after_energy_used(void){
     // TODO assert: assert!( (game.state.player1.energy_zone.active_count() as usize) < game.state.player1.energy_zone.cards.len(), "Energy should not be all-active anymore" );
     // 
     // // Score modifier should still be +1
-    CHECK_EQ(rb_mods_get_score(&tg.state.mods, live_card_id), 1, "distortion_q96_score_permanent_after_energy_used");
+    CHECK_EQ(test_get_score_modifier(&tg, live_card_id), 1, "distortion_q96_score_permanent_after_energy_used");
     // 
 }
 
@@ -124995,7 +124995,7 @@ static void gen_distortion_basic_energy_refresh_with_catchu(void){
     // 
     // // Now all energy active → score +1 should fire
     int live_card_id = 0;
-    CHECK_EQ(rb_mods_get_score(&tg.state.mods, live_card_id), 1, "distortion_basic_energy_refresh_with_catchu");
+    CHECK_EQ(test_get_score_modifier(&tg, live_card_id), 1, "distortion_basic_energy_refresh_with_catchu");
     // 
 }
 
@@ -125067,7 +125067,7 @@ static void gen_distortion_no_refresh_when_no_wait_energy(void){
     test_has_pending_choice(&tg);
     // 
     int live_card_id = 0;
-    CHECK_EQ(rb_mods_get_score(&tg.state.mods, live_card_id), 1, "distortion_no_refresh_when_no_wait_energy");
+    CHECK_EQ(test_get_score_modifier(&tg, live_card_id), 1, "distortion_no_refresh_when_no_wait_energy");
     // 
 }
 
@@ -127275,7 +127275,7 @@ static void gen_dia_sd1_optional_draw_pay_then_deck_top(void){
     rb_resume_with_choice(&tg.state, 1);
     // 
     // TODO assert_eq (unresolved): assert_eq!(game.pending_choice_type(), Some("SelectCard".to_string()));
-    // TODO assert: assert!(!game.state.player1.hand.cards.is_empty());
+    CHECK((!tg.state.p[0].hand.n == 0), "dia_sd1_optional_draw_pay_then_deck_top");
     // 
     // action result consumed: game.try_select_indices(&[0, 1]).unwrap(); // place 2 on deck → Deck=10, Hand=2
     // 
@@ -127541,14 +127541,14 @@ static void gen_ai_screeam_soreigai_all_members_on_both_sides_gain_blade(void){
     test_has_pending_choice(&tg);
     // 
     // // All 3 P1 members should have blade
-    CHECK(rb_mods_get_blade(&tg.state.mods, p1_a), "ai_screeam_soreigai_all_members_on_both_sides_gain_blade");
-    CHECK(rb_mods_get_blade(&tg.state.mods, p1_b), "ai_screeam_soreigai_all_members_on_both_sides_gain_blade");
-    CHECK(rb_mods_get_blade(&tg.state.mods, p1_c), "ai_screeam_soreigai_all_members_on_both_sides_gain_blade");
+    CHECK(test_get_blade_modifier(&tg, p1_a), "ai_screeam_soreigai_all_members_on_both_sides_gain_blade");
+    CHECK(test_get_blade_modifier(&tg, p1_b), "ai_screeam_soreigai_all_members_on_both_sides_gain_blade");
+    CHECK(test_get_blade_modifier(&tg, p1_c), "ai_screeam_soreigai_all_members_on_both_sides_gain_blade");
     // 
     // // All 3 P2 members should have blade
-    CHECK(rb_mods_get_blade(&tg.state.mods, p2_a), "ai_screeam_soreigai_all_members_on_both_sides_gain_blade");
-    CHECK(rb_mods_get_blade(&tg.state.mods, p2_b), "ai_screeam_soreigai_all_members_on_both_sides_gain_blade");
-    CHECK(rb_mods_get_blade(&tg.state.mods, p2_c), "ai_screeam_soreigai_all_members_on_both_sides_gain_blade");
+    CHECK(test_get_blade_modifier(&tg, p2_a), "ai_screeam_soreigai_all_members_on_both_sides_gain_blade");
+    CHECK(test_get_blade_modifier(&tg, p2_b), "ai_screeam_soreigai_all_members_on_both_sides_gain_blade");
+    CHECK(test_get_blade_modifier(&tg, p2_c), "ai_screeam_soreigai_all_members_on_both_sides_gain_blade");
     // 
 }
 
@@ -127616,10 +127616,10 @@ static void gen_rise_up_high_turn1_score_and_blade(void){
     // // Ability should fire: condition checks turn_number == 1
     // // Score +1
     int live_id = 0;
-    CHECK(rb_mods_get_score(&tg.state.mods, live_id), "rise_up_high_turn1_score_and_blade");
+    CHECK(test_get_score_modifier(&tg, live_id), "rise_up_high_turn1_score_and_blade");
     // 
     // // Blade gain on the 虹ヶ咲 member
-    CHECK(rb_mods_get_blade(&tg.state.mods, niji_member), "rise_up_high_turn1_score_and_blade");
+    CHECK(test_get_blade_modifier(&tg, niji_member), "rise_up_high_turn1_score_and_blade");
     // 
 }
 
@@ -127645,7 +127645,7 @@ static void gen_kosuzu_choose_number_adds_to_hand(void){
     rb_resume_with_choice(&tg.state, 0);
     test_has_pending_choice(&tg);
     CHECK(test_zone_has_id(&tg, 0, "hand", top_card), "kosuzu_choose_number_adds_to_hand");
-    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, kosuzu), 0, "kosuzu_choose_number_adds_to_hand");
+    CHECK_EQ(test_get_blade_modifier(&tg, kosuzu), 0, "kosuzu_choose_number_adds_to_hand");
     // 
 }
 
@@ -127672,7 +127672,7 @@ static void gen_kosuzu_choose_number_gains_blade(void){
     test_has_pending_choice(&tg);
     CHECK((!test_zone_has_id(&tg, 0, "hand", top_card)), "kosuzu_choose_number_gains_blade");
     // TODO assert_eq (unresolved): assert_eq!( game.state.player1.main_deck.cards[0], top_card, "card returned to top of deck" );
-    CHECK(rb_mods_get_blade(&tg.state.mods, kosuzu), "kosuzu_choose_number_gains_blade");
+    CHECK(test_get_blade_modifier(&tg, kosuzu), "kosuzu_choose_number_gains_blade");
     // 
 }
 
@@ -127698,7 +127698,7 @@ static void gen_kosuzu_equal_choice_both_effects(void){
     rb_resume_with_choice(&tg.state, 3);
     test_has_pending_choice(&tg);
     CHECK(test_zone_has_id(&tg, 0, "hand", top_card), "kosuzu_equal_choice_both_effects");
-    CHECK(rb_mods_get_blade(&tg.state.mods, kosuzu), "kosuzu_equal_choice_both_effects");
+    CHECK(test_get_blade_modifier(&tg, kosuzu), "kosuzu_equal_choice_both_effects");
     // 
 }
 

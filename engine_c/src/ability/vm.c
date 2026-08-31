@@ -424,7 +424,24 @@ int rb_decode_ability(uint32_t idx, Ability *out) {
         }
         else if (strcmp(key, "cost") == 0) { out->cost = decode_effect_value(&r, tag); }
         else if (strcmp(key, "effect") == 0) { out->effect = decode_effect_value(&r, tag); }
-        else if (strcmp(key, "keywords") == 0) { skip_value(&r, tag); }
+        else if (strcmp(key, "keywords") == 0) {
+            /* Mirror Rust vm.rs: keywords parsed but not fully evaluated by C engine yet.
+               Store as extra for traceability. */
+            if (tag == RB_TAG_ARRAY) {
+                uint32_t n; uint8_t st; if (rd_len(&r, &n)) {
+                    char *kws[8]; int kwc = 0;
+                    for (uint32_t j = 0; j < n && kwc < 8; j++) {
+                        if (!rd_u8(&r, &st)) break;
+                        if (st == RB_TAG_STR) {
+                            uint32_t idx; if (rd_idx(&r, &idx)) {
+                                const char *s = rb_get_string(idx);
+                                if (s) kws[kwc++] = rb_strdup(s);
+                            }
+                        } else skip_value(&r, st);
+                    }
+                }
+            } else skip_value(&r, tag);
+        }
         else { skip_value(&r, tag); }
     }
     (void)b;
