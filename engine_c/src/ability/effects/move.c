@@ -9,43 +9,105 @@
    batch. This already makes ~200 of the 338 move_cards faithful where
    the filter was the only inaccuracy. */
 
+/* Mirrors engine/src/ability/util.rs CardFilter::matches — evaluate a card
+    against EVERY filter field present on the effect (card_type, group,
+    name fragments, cost limit/values, original blade, heart color, characters,
+    and ability property). Extra fields are decoded verbatim by vm.c so all of
+    these keys are available here. */
+static const char *cmf_extra(const AbilityEffect *e, const char *k){
+    for(int i=0;i<e->n_extra;i++) if(e->extra_k[i] && !strcmp(e->extra_k[i],k)) return e->extra_v[i];
+    return NULL;
+}
+static int cmf_cmp(const char *op, int a, int b){
+    if(!op||!*op) return a==b;
+    if(!strcmp(op,">=")) return a>=b;
+    if(!strcmp(op,"<=")) return a<=b;
+    if(!strcmp(op,">"))  return a>b;
+    if(!strcmp(op,"<"))  return a<b;
+    if(!strcmp(op,"==")||!strcmp(op,"=")) return a==b;
+    if(!strcmp(op,"!=")) return a!=b;
+    return a==b;
+}
+static int cmf_has_heart(const Card *c, int hc){
+    if(hc<0||hc>7) return 0;
+    for(int k=0;k<c->n_hearts;k++) if(c->heart_color[k]==(uint8_t)hc) return 1;
+    return 0;
+}
 static int card_matches_filter(int card_idx, AbilityEffect *e){
-    const char *ctype = NULL;
-    for(int i=0;i<e->n_extra;i++) if(e->extra_k[i] && !strcmp(e->extra_k[i],"card_type")) ctype=e->extra_v[i];
+    const char *ctype = cmf_extra(e,"card_type");
     if(ctype && !card_matches_card_type_filter(card_idx, ctype)) return 0;
-    /* group filter via extra "group_names" — mirror move_cards.rs which uses
-        card_matches_any_group (group/unit/name/series/identity substring). */
-    const char *gn=NULL;
-    for(int i=0;i<e->n_extra;i++) if(e->extra_k[i] && !strcmp(e->extra_k[i],"group_names")) gn=e->extra_v[i];
-    if(gn){
-        if(!rb_card_matches_group_str(card_idx, gn)) return 0;
-    }
-    const char *cnames=NULL;
-    for(int i=0;i<e->n_extra;i++) if(e->extra_k[i] && !strcmp(e->extra_k[i],"card_names")) cnames=e->extra_v[i];
+    const char *gn = cmf_extra(e,"group_names");
+    if(gn && !rb_card_matches_group_str(card_idx, gn)) return 0;
+    const char *cnames = cmf_extra(e,"card_names");
     if(cnames){
         Card c; if(!rb_decode_card_by_index((uint32_t)card_idx,&c)) return 0;
-        int match = c.name && strstr(c.name, cnames);
-        rb_free_card(&c);
-        if(!match) return 0;
+        int m = c.name && strstr(c.name, cnames); rb_free_card(&c);
+        if(!m) return 0;
     }
-    /* card_property filter (mirrors util.rs check_card_property): has_blade_heart /
-       has_score_icon match the card's heart icons; negation inverts. */
-    const char *cp=NULL; int neg=0;
-    for(int i=0;i<e->n_extra;i++){
-        if(e->extra_k[i] && !strcmp(e->extra_k[i],"card_property")) cp=e->extra_v[i];
-        else if(e->extra_k[i] && !strcmp(e->extra_k[i],"negation") &&
-                e->extra_v[i] && !strcmp(e->extra_v[i],"true")) neg=1;
+    const char *nf = cmf_extra(e,"name_fragments");
+    if(nf){
+        Card c; if(!rb_decode_card_by_index((uint32_t)card_idx,&c)) return 0;
+        int m = c.name && strstr(c.name, nf); rb_free_card(&c);
+        if(!m) return 0;
     }
+    /* cost: cost_limit(operator) / cost_values / cost_limit_min(>=) / cost_limit_max(<=) / cost_total(op) */
+    const char *cl = cmf_extra(e,"cost_limit");
+    if(cl){
+        int v=atoi(cl); const char *op=cmf_extra(e,"cost_operator");
+        Card c; if(!rb_decode_card_by_index((uint32_t)card_idx,&c)) return 0;
+        int ok=cmf_cmp(op,(int)c.cost,v); rb_free_card(&c); if(!ok) return 0;
+    }
+    const char *cv = cmf_extra(e,"cost_values");
+    if(cv){
+        int v=atoi(cv); Card c; if(!rb_decode_card_by_index((uint32_t)card_idx,&c)) return 0;
+        int ok=(c.cost==v)||(c.score==v); rb_free_card(&c); if(!ok) return 0;
+    }
+    const char *clmin = cmf_extra(e,"cost_limit_min");
+    if(clmin){
+        int v=atoi(clmin); Card c; if(!rb_decode_card_by_index((uint32_t)card_idx,&c)) return 0;
+        int ok=cmf_cmp(">=",(int)c.cost,v); rb_free_card(&c); if(!ok) return 0;
+    }
+    const char *clmax = cmf_extra(e,"cost_limit_max");
+    if(clmax){
+        int v=atoi(clmax); Card c; if(!rb_decode_card_by_index((uint32_t)card_idx,&c)) return 0;
+        int ok=cmf_cmp("<=",(int)c.cost,v); rb_free_card(&c); if(!ok) return 0;
+    }
+    const char *ct = cmf_extra(e,"cost_total");
+    if(ct){
+        int v=atoi(ct); const char *op=cmf_extra(e,"cost_total_operator");
+        Card c; if(!rb_decode_card_by_index((uint32_t)card_idx,&c)) return 0;
+        int ok=cmf_cmp(op,(int)c.cost,v); rb_free_card(&c); if(!ok) return 0;
+    }
+    /* original (printed) blade base — mirrors util.rs original_blade_limit */
+    const char *ob = cmf_extra(e,"original_blade_limit");
+    if(ob){
+        int v=atoi(ob); const char *op=cmf_extra(e,"original_blade_operator");
+        Card c; if(!rb_decode_card_by_index((uint32_t)card_idx,&c)) return 0;
+        int ok=cmf_cmp(op,(int)c.blade,v); rb_free_card(&c); if(!ok) return 0;
+    }
+    /* heart color — mirrors util.rs check_heart_colors */
+    const char *hc = cmf_extra(e,"heart_color");
+    if(hc){
+        int col = (int)rb_parse_heart_color(hc);
+        Card c; if(!rb_decode_card_by_index((uint32_t)card_idx,&c)) return 0;
+        int ok = (col==(int)RB_HEART_ANY && c.n_hearts>0) || cmf_has_heart(&c, col);
+        rb_free_card(&c); if(!ok) return 0;
+    }
+    /* characters / exclude_characters (group/unit/name fragments) */
+    const char *chars = cmf_extra(e,"characters");
+    if(chars && !rb_card_matches_group_str(card_idx, chars)) return 0;
+    const char *exch = cmf_extra(e,"exclude_characters");
+    if(exch && rb_card_matches_group_str(card_idx, exch)) return 0;
+    /* card_property filter (mirrors util.rs check_card_property) — negation inverts */
+    const char *cp = cmf_extra(e,"card_property");
     if(cp){
+        const char *ng = cmf_extra(e,"negation");
+        int neg = ng && !strcmp(ng,"true");
         Card c; if(!rb_decode_card_by_index((uint32_t)card_idx,&c)) return 0;
         int has=0;
-        if(!strcmp(cp,"has_blade_heart")){
-            has = rb_card_has_blade_heart(&c);
-        } else if(!strcmp(cp,"has_score_icon")){
-            has = rb_card_has_score_icon(&c);
-        } else if(!strcmp(cp,"has_all_blade")){
-            has = rb_card_has_all_blade(&c);
-        }
+        if(!strcmp(cp,"has_blade_heart"))      has = rb_card_has_blade_heart(&c);
+        else if(!strcmp(cp,"has_score_icon"))  has = rb_card_has_score_icon(&c);
+        else if(!strcmp(cp,"has_all_blade"))   has = rb_card_has_all_blade(&c);
         if(neg) has=!has;
         rb_free_card(&c);
         if(!has) return 0;
