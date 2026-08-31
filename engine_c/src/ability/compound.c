@@ -12,6 +12,8 @@
 
 #include "rabuka.h"
 #include <string.h>
+#include <stdlib.h>
+#include <stdio.h>
 
 /* Mirror compound.rs:execute_sequential_effect â€” run the effect's children
    (the Rust `compound.actions` list) in order, gating each step on its own
@@ -223,4 +225,40 @@ void rb_compound_save_remaining(GameState *g, int remaining_count) {
     int cur = g->queue.cur;
     if (cur < 0 || cur >= g->queue.n_entries) return;
     g->queue.entries[cur].pending_actions_n = remaining_count;
+}
+
+/* -- compound.c: handle_choice_string_selection -- */
+int rb_compound_handle_choice_string_selection(GameState *g, int actor, const char *selected,
+                                                const char **options, int n_options) {
+    if (!g || !selected) return 0;
+    int idx = atoi(selected);
+    if (idx > 0 && idx <= n_options && options) {
+        const char *val = options[idx - 1];
+        if (val && (strncmp(val, "heart", 5) == 0 ||
+                    !strcmp(val, "Ô") || !strcmp(val, "“") || !strcmp(val, "—Î") ||
+                    !strcmp(val, "Â") || !strcmp(val, "‰©") || !strcmp(val, "Ž‡"))) {
+            if (g->n_prohibition < 64) {
+                snprintf(g->prohibition[g->n_prohibition], 48, "selected_heart_color:%s", val);
+                g->n_prohibition++;
+            }
+        }
+    }
+    rb_clear_pending_choice(g);
+    return 1;
+}
+
+/* -- compound.c: handle_choice_string_store -- */
+int rb_compound_handle_choice_string_store(GameState *g, int actor, const char *selected,
+                                            const char **options, int n_options) {
+    if (!g || !selected) return 0;
+    int idx = atoi(selected);
+    if (idx > 0 && idx <= n_options && options) {
+        const char *val = options[idx - 1];
+        if (val) {
+            g->queue.choice_result = idx - 1;
+            strncpy(g->queue.resume_draw_ctype, val, sizeof(g->queue.resume_draw_ctype) - 1);
+        }
+    }
+    rb_clear_pending_choice(g);
+    return 1;
 }

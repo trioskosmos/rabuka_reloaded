@@ -488,3 +488,57 @@ int rb_handle_pay_cost_all_discard(GameState *g, int actor, const char *selected
     }
     return 1;
 }
+
+/* -- cost.c: pay_cost_move_cards -- */
+int rb_pay_cost_move_cards(GameState *g, int actor, const AbilityEffect *cost,
+                            int host_cid, int is_activation) {
+    if (!g || !cost) return 0;
+    const char *source = cost->source ? cost->source : "";
+    int count = cost->count > 0 ? cost->count : 1;
+    int is_optional = cost->is_optional;
+    const char *target = cost->target ? cost->target : "self";
+    int tp = rb_resolve_target_player(g, target);
+    int tpl = (tp >= 0) ? tp : actor;
+    RbPlayer *P = &g->p[tpl];
+    if (!strcmp(source, "hand")) {
+        int moved = 0;
+        while (moved < count && P->hand.n > 0) {
+            int cid = P->hand.cards[--P->hand.n];
+            if (P->discard.n < RB_MAX_ZONE) P->discard.cards[P->discard.n++] = cid;
+            moved++;
+        }
+        return 1;
+    }
+    if (!strcmp(source, "stage")) {
+        int moved = 0;
+        for (int i = 0; i < RB_STAGE_SIZE && moved < count; i++) {
+            if (P->stage[i] != RB_EMPTY_SLOT) {
+                int cid = P->stage[i];
+                P->stage[i] = RB_EMPTY_SLOT;
+                if (P->discard.n < RB_MAX_ZONE) P->discard.cards[P->discard.n++] = cid;
+                moved++;
+            }
+        }
+        return 1;
+    }
+    return 1;
+}
+
+/* -- cost.c: pay_cost_change_state -- */
+int rb_pay_cost_change_state(GameState *g, int actor, const AbilityEffect *cost,
+                              int host_cid, int is_activation) {
+    if (!g || !cost) return 0;
+    int count = cost->count > 0 ? cost->count : 1;
+    const char *target = cost->target ? cost->target : "self";
+    int tp = rb_resolve_target_player(g, target);
+    int tpl = (tp >= 0) ? tp : actor;
+    RbPlayer *P = &g->p[tpl];
+    int changed = 0;
+    for (int i = 0; i < RB_STAGE_SIZE && changed < count; i++) {
+        if (P->stage[i] != RB_EMPTY_SLOT) {
+            rb_mods_set_orientation(&g->mods, P->stage[i], "wait");
+            changed++;
+        }
+    }
+    return 1;
+}

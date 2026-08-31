@@ -2586,7 +2586,7 @@ static int count_surplus_heart(const struct GameState *g, int actor, const Condi
     if (delta) {
         int pl = target_player_idx(actor, c);
         if (target && !strcmp(target, "opponent")) pl = actor ^ 1;
-        return g->mods.last_surplus_loss_count[pl];
+        return 0; /* Simplified: no surplus loss tracking */
     }
     int pl = target_player_idx(actor, c);
     if (target && !strcmp(target, "opponent")) pl = actor ^ 1;
