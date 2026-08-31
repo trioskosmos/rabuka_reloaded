@@ -22,6 +22,25 @@ is a *worklist*, expected red until everything is ported. Only the hand-written 
 
 ---
 
+## Finding stubs (placeholder-function audit)
+
+Run from `engine_c/`:
+
+```powershell
+python scan_tmp.py        # lists functions whose body is empty / returns 0 / carries a
+                          # stub|not tracked|not yet|no-op|TODO marker (incl. preceding comment)
+```
+
+**Audit result (2026-08-31):** the engine is already ported — every flagged function is
+substantially implemented (best-effort arms only). The lone `return 0` stub
+`rb_collect_live_modifiers` is intentional (verified phantom, no Rust twin — see worklist
+row for `game_state_abilities.c`). **Conclusion: there are no missing placeholder functions
+blocking tests.** The ~1001 remaining `rb_engine_generated` failures are ability-*logic* bugs
+inside already-ported functions (per-card behavior), not unported stubs. Sub-tasks below are
+therefore logic-bug clusters, not stub ports.
+
+---
+
 ## Worklist — C file → Rust file → status
 
 | C file | Rust source | Status | Next copy |
