@@ -27,6 +27,42 @@ engine decodes that bytecode (mirrors `ability/vm.rs`) and executes the effect t
 is a *worklist*, expected red until everything is ported. Only the hand-written suites
 (`rb_engine_test` / `rb_engine_replay` / `rb_engine_ported`) are gating and must stay green.
 
+> ## ⚠️ STATUS CORRECTION — THIS IS STILL BULK TRANSLATION, NOT FIDELITY WORK
+> Despite later sections claiming "porting is functionally complete at the function level", that
+> claim is false and was based on a flawed signal. The exhaustive stub scanner only detects
+> **empty `{ return 0; }` / `{ return; }` bodies** — it CANNOT see the hundreds of Rust functions
+> that have **no C equivalent at all**. A file with no empty stubs can still be 10% of its Rust
+> twin because 90% of the Rust functions were never written in C. The file's own size-audit note
+> (line ~121) already admitted this: "It cannot see the hundreds of Rust functions that have no C
+> equivalent at all — that is the real gap."
+>
+> **Current `python size_audit.py` (2026-08-31) proves the port is far from done** — most mapped
+> files are at 7–35% of their Rust twin:
+> ```
+> ability/choice.c           C=  420  Rust=  3447  (12%)   <-- huge gap
+> ability/resolver.c         C=   83  Rust=  1242  ( 7%)   <-- huge gap
+> ability/effects/move.c     C=  380  Rust=  3780  (10%)   <-- huge gap
+> core/card.c                C=  402  Rust=  4138  (10%)   <-- huge gap
+> core/game_state_abilities.c C=325  Rust=  2924  (11%)   <-- huge gap
+> ability/ability_queue.c    C=  119  Rust=   914  (13%)
+> core/modifiers.c           C=  278  Rust=  1955  (14%)
+> turn/phase.c               C=  252  Rust=  1685  (15%)
+> ability/compound.c         C=  213  Rust=  1017  (21%)
+> ability/condition.c        C= 1207  Rust=  6254  (19%)
+> ability/vm.c               C=  439  Rust=  1684  (26%)
+> core/stats_pipeline.c      C=   54  Rust=   280  (19%)
+> ```
+> `scan_tmp.py` also still flags 16 functions carrying `stub`/`not yet`/`no-op`/`TODO` markers
+> (e.g. `rb_can_activate_effect`, `rb_collect_live_modifiers`, `h_play_baton_touch`, `handle_action`).
+>
+> **Therefore the work is, and remains, bulk translation:** open each `.c`, open its Rust twin,
+> find the Rust functions that have no C body (or only a stub/skeleton), and port them verbatim
+> — every branch, every state mutation. The "fidelity / transpiler gaps" framing only applies
+> AFTER a file reaches real parity (≥ ~90% of Rust lines with equivalent logic). Until then,
+> treat every low-% file as a translation backlog, not a completed port. The later "✅ done"
+> worklist rows are STALE and contradict this audit — re-audit each file against the live
+> `size_audit.py` numbers before marking it done.
+
 ---
 
 ## ANTI-PATTERNS (do NOT do these — they look like progress, are not)
@@ -565,7 +601,16 @@ Still, fixed a genuine transpiler **correctness bug** in `tools/gen_tests.py::ma
 Gating suites remain green after this turn (only `tools/gen_tests.py` + `src/test_game.c`/`test_game.h` +
 the regenerated test file changed; no engine core `.c` modified).
 
-## Engine porting status: COMPLETE at the function level (verified)
+## Engine porting status: NOT COMPLETE — still bulk translation (see STATUS CORRECTION at top)
+The earlier "COMPLETE at the function level" conclusion below was RETRACTED. The scanner cited here only
+detects **empty** stub bodies; it cannot see Rust functions with **no C equivalent**, which is the actual
+gap. The live `size_audit.py` numbers (at the top of this file) show most mapped `.c` files at 7–35% of
+their Rust twin — i.e. the majority of Rust functions were never ported. **This is still bulk translation,
+not fidelity work.** Re-audit each file against `size_audit.py` before claiming done.
+
+<details>
+<summary>RETRACTED — kept for history only</summary>
+
 Ran an exhaustive scanner over every `src/**/*.c` (excluding `test_game.c`/`main.c`/`debug_umi.c`) for
 empty/stub function bodies (`int f(...){ return 0; }`, `void f(...){ return; }`, etc.). **Result: none found.**
 Every engine function has a real body; the earlier `⚠️ partial` / `STUB` header comments were stale. The
@@ -577,6 +622,7 @@ generated-suite red is therefore **not** caused by missing engine functions but 
 **Conclusion:** "porting the Rust engine to C" is functionally done. To move the 1169 generated failures
 further, the work is per-ability fidelity ports (read the Rust ability handler, align the C handler) plus
 broadening `gen_tests.py`. Each remaining item is a multi-line fidelity port, not a stub fill.
+</details>
 
 ### Concrete remaining engine-fidelity sub-tasks (documented, deepest first)
 1. `live_cards_stuck_in_live_zone_instead_of_discard` — fine-grained live→discard relocation / per-unit

@@ -1169,11 +1169,18 @@ typedef struct AbilityInfo {
     int ability_idx;    /* index within card's abilities */
     const char *trigger;
 } AbilityInfo;
+const RbChoice *rb_resolver_get_pending_choice(const GameState *g);
 int  rb_resolver_pending_choice(const GameState *g);
-int  rb_can_activate_effect(const GameState *g, int actor, const AbilityEffect *eff);
+int  rb_resolver_current_ability_is_activation(const Ability *ab);
+const char *rb_resolver_zone_for_card(const GameState *g, int card_id);
+int  rb_resolver_use_limit_reached(const GameState *g, int card_id,
+                                    int ability_index, int use_limit);
+int  rb_can_activate_effect(const GameState *g, int actor,
+                             const AbilityEffect *eff, int host_cid);
 int  rb_resolver_trigger_infos(const GameState *g, int actor, const char *trigger,
                                AbilityInfo *out, int max);
-int  rb_resolve_ability(GameState *g, int actor, const AbilityEffect *eff, int *resolved);
+int  rb_resolve_ability(GameState *g, int actor, const Ability *ab,
+                        int ability_idx, int host_cid, int *resolved);
 int  rb_resolver_card_matches_type(int cid, const char *filter);
 
 /* ── Auto-trigger engine + ability use tracking (core/game_state/abilities.rs) ── */
