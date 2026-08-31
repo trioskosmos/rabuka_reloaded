@@ -745,6 +745,14 @@ int rb_resume_with_choice(GameState *g, int selected_idx) {
         g->queue.state = RB_QUEUE_AWAITING_CHOICE;
     } else {
         g->queue.state = RB_QUEUE_IDLE;
+        if (g->activation_keepalive_valid) {
+            fprintf(stderr, "MARK:free_keepalive pending=%d\n", g->queue.has_pending);
+            fflush(stderr);
+            rb_free_ability(&g->activation_keepalive);
+            g->activation_keepalive_valid = 0;
+            free(g->activation_act);
+            g->activation_act = NULL;
+        }
         rb_drain_ability_queue(g);
     }
     return 1;

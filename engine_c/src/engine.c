@@ -930,8 +930,33 @@ int rb_activate_card(GameState *g, int pl, int card_id) {
         if (!rb_decode_card_ability((uint32_t)card_id, a, &ab)) continue;
         int is_activate = ab.triggers && strstr(ab.triggers, "起動");
         if (is_activate) {
-            if (ab.cost)   { g->n_recently_moved = 0; rb_execute_effect_ex(g, pl, ab.cost, card_id); any = 1; }
-            if (ab.effect)  { g->n_recently_moved = 0; rb_execute_effect_ex(g, pl, ab.effect, card_id); any = 1; }
+            /* Mirror Rust resolver::resolve_ability: cost then effect are one
+                ability resolution. Wrap them in a single heap effect tree so an
+                optional cost that emits a pay/skip choice bridges to the effect via
+                the resume_parent/resume_child continuation. The decoded ability is
+                kept alive in g->activation_keepalive across the choice round-trip. */
+            AbilityEffect *act = (AbilityEffect *)malloc(sizeof(AbilityEffect));
+            memset(act, 0, sizeof(*act));
+            act->n_child = 0;
+            if (ab.cost)   act->child[act->n_child++] = ab.cost;
+            if (ab.effect) act->child[act->n_child++] = ab.effect;
+            g->activation_act = act;
+            g->activation_keepalive = ab;
+            g->activation_keepalive_valid = 1;
+            fprintf(stderr, "MARK:activate card=%d cost=%d eff=%d pending=%d\n",
+                    card_id, ab.cost ? 1 : 0, ab.effect ? 1 : 0, g->queue.has_pending);
+            fflush(stderr);
+            g->n_recently_moved = 0;
+            rb_execute_effect_ex(g, pl, act, card_id);
+            fprintf(stderr, "MARK:activated card=%d pending=%d\n", card_id, g->queue.has_pending);
+            fflush(stderr);
+            if (!g->queue.has_pending) {
+                rb_free_ability(&g->activation_keepalive);
+                g->activation_keepalive_valid = 0;
+                free(g->activation_act);
+                g->activation_act = NULL;
+            }
+            any = 1;
             matched++;
         }
         rb_free_ability(&ab);

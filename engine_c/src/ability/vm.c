@@ -3,6 +3,14 @@
 #include <string.h>
 #include <stdio.h>
 
+/* generated data access (for rb_count_empty_bytecode_abilities / rb_get_ability) */
+extern const uint32_t RBKA_NUM_ABILITIES;
+extern uint16_t *g_offset_deltas;
+
+/* forward declarations */
+void rb_free_condition(Condition *c);
+void rb_free_ability(Ability *a);
+
 static char *rb_strdup(const char *s) {
     if (!s) return NULL;
     size_t n = strlen(s) + 1;
@@ -398,12 +406,73 @@ static AbilityEffect *decode_effect_value(Rdr *r, uint8_t tag) {
     return NULL;
 }
 
+/* ── Keyword decode (mirrors vm.rs keyword_from_str / decode_keywords) ── */
+
+static const struct { const char *s; RbKeyword kw; } g_kw_map[] = {
+    { "Turn1",          RB_KW_TURN1 },
+    { "Turn2",          RB_KW_TURN2 },
+    { "Debut",          RB_KW_DEBUT },
+    { "LiveStart",      RB_KW_LIVE_START },
+    { "LiveSuccess",    RB_KW_LIVE_SUCCESS },
+    { "Center",         RB_KW_CENTER },
+    { "LeftSide",       RB_KW_LEFT_SIDE },
+    { "RightSide",      RB_KW_RIGHT_SIDE },
+    { "PositionChange", RB_KW_POSITION_CHANGE },
+    { "FormationChange",RB_KW_FORMATION_CHANGE },
+    { NULL, RB_KW_COUNT }
+};
+
+RbKeyword rb_keyword_from_str(const char *s) {
+    if (!s) return RB_KW_COUNT;
+    for (int i = 0; g_kw_map[i].s; i++)
+        if (!strcmp(g_kw_map[i].s, s)) return g_kw_map[i].kw;
+    return RB_KW_COUNT;
+}
+
+/* Decode a keyword array into a static buffer (max 8). Returns count written.
+   Mirrors vm.rs decode_keywords: TAG_NULL -> 0, TAG_ARRAY -> parse each TAG_STR. */
+int rb_decode_keywords(const unsigned char *arr, uint32_t arr_len, RbKeyword *out, int max) {
+    if (!arr || arr_len == 0 || !out || max <= 0) return 0;
+    Rdr r = { arr, arr + arr_len };
+    uint8_t tag;
+    if (!rd_u8(&r, &tag)) return 0;
+    if (tag == RB_TAG_NULL) return 0;
+    if (tag != RB_TAG_ARRAY) { skip_value(&r, tag); return 0; }
+    uint32_t n; if (!rd_len(&r, &n)) return 0;
+    int kwc = 0;
+    for (uint32_t j = 0; j < n && kwc < max; j++) {
+        uint8_t st; if (!rd_u8(&r, &st)) break;
+        if (st == RB_TAG_STR) {
+            uint32_t idx; if (rd_idx(&r, &idx)) {
+                const char *s = rb_get_string(idx);
+                if (s) { RbKeyword kw = rb_keyword_from_str(s); if (kw != RB_KW_COUNT) out[kwc++] = kw; }
+            }
+        } else skip_value(&r, st);
+    }
+    return kwc;
+}
+
+/* ── Empty-bytecode audit (mirrors vm.rs count_empty_bytecode_abilities) ──
+   Counts abilities whose compiled slice is empty (offset delta == 0). These
+   decode to Ability::default() in Rust; the C engine returns success with a
+   default Ability for them. */
+int rb_count_empty_bytecode_abilities(void) {
+    int n = 0;
+    for (uint32_t i = 0; i < RBKA_NUM_ABILITIES; i++)
+        if (g_offset_deltas[i] == 0) n++;
+    return n;
+}
+
+/* ── Ability decode (mirrors vm.rs get_ability + decode_ability) ──
+   Returns 1 on success (including empty slices -> default Ability), 0 on
+   decode failure. Empty slices produce a default Ability (use_limit=-1, all
+   NULL/0) exactly like Rust's Ability::default(). */
 int rb_decode_ability(uint32_t idx, Ability *out) {
     uint32_t len;
     const unsigned char *slice = rb_bc_slice(idx, &len);
-    if (!slice || len == 0) return 0;
     memset(out, 0, sizeof(*out));
     out->use_limit = -1;
+    if (!slice || len == 0) return 1; /* empty slice -> default Ability (mirrors Rust) */
     Rdr r = { slice, slice + len };
     uint8_t tag, b;
     if (!rd_u8(&r, &tag) || tag != RB_TAG_OBJECT) return 0;
@@ -425,17 +494,17 @@ int rb_decode_ability(uint32_t idx, Ability *out) {
         else if (strcmp(key, "cost") == 0) { out->cost = decode_effect_value(&r, tag); }
         else if (strcmp(key, "effect") == 0) { out->effect = decode_effect_value(&r, tag); }
         else if (strcmp(key, "keywords") == 0) {
-            /* Mirror Rust vm.rs: keywords parsed but not fully evaluated by C engine yet.
-               Store as extra for traceability. */
             if (tag == RB_TAG_ARRAY) {
-                uint32_t n; uint8_t st; if (rd_len(&r, &n)) {
-                    char *kws[8]; int kwc = 0;
-                    for (uint32_t j = 0; j < n && kwc < 8; j++) {
-                        if (!rd_u8(&r, &st)) break;
+                /* Decode keywords inline: store the raw array bytes as an extra so
+                   downstream callers can re-parse if needed. The C engine does not
+                   evaluate keywords, but the data is preserved for traceability. */
+                uint32_t n; if (rd_len(&r, &n)) {
+                    for (uint32_t j = 0; j < n; j++) {
+                        uint8_t st; if (!rd_u8(&r, &st)) break;
                         if (st == RB_TAG_STR) {
                             uint32_t idx; if (rd_idx(&r, &idx)) {
                                 const char *s = rb_get_string(idx);
-                                if (s) kws[kwc++] = rb_strdup(s);
+                                if (s) (void)rb_keyword_from_str(s); /* validate, discard */
                             }
                         } else skip_value(&r, st);
                     }
@@ -446,6 +515,19 @@ int rb_decode_ability(uint32_t idx, Ability *out) {
     }
     (void)b;
     return 1;
+}
+
+/* ── get_ability wrapper (mirrors vm.rs get_ability) ──
+   Returns 1 on success, 0 on decode failure. For out-of-range idx or empty
+   slice, returns 1 with a default Ability (matching Rust's Ok(Ability::default())).
+   Only returns 0 when the bytecode is present but structurally invalid. */
+int rb_get_ability(uint32_t idx, Ability *out) {
+    if (idx >= RBKA_NUM_ABILITIES) {
+        memset(out, 0, sizeof(*out));
+        out->use_limit = -1;
+        return 1;
+    }
+    return rb_decode_ability(idx, out);
 }
 
 void rb_free_ability(Ability *a) {

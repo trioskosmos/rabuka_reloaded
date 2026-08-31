@@ -434,3 +434,82 @@ int rb_distinct_info_is_distinct(const char *s) {
     return 1;
 }
 
+/* ── Trigger system (mirrors engine/src/triggers.rs + card.rs::Ability) ── */
+
+static const struct { const char *s; RbTriggerKind tk; } g_tk_map[] = {
+    { "起動",          RB_TK_ACTIVATION },
+    { "自動",          RB_TK_AUTO },
+    { "常時",          RB_TK_CONSTANT },
+    { "登場",          RB_TK_DEBUT },
+    { "Debut",         RB_TK_DEBUT },
+    { "ライブ開始時",  RB_TK_LIVE_START },
+    { "ライブ成功時",  RB_TK_LIVE_SUCCESS },
+    { "live_success",  RB_TK_LIVE_SUCCESS },
+    { "メイン",        RB_TK_MAIN },
+    { "baton touch",   RB_TK_BATON_TOUCH },
+    { NULL, RB_TK_COUNT }
+};
+
+RbTriggerKind rb_trigger_from_token(const char *s) {
+    if (!s) return RB_TK_COUNT;
+    for (int i = 0; g_tk_map[i].s; i++)
+        if (!strcmp(g_tk_map[i].s, s)) return g_tk_map[i].tk;
+    return RB_TK_COUNT;
+}
+
+/* Parse comma-separated trigger string into kinds. Returns count written (max 8). */
+int rb_parse_triggers(const char *triggers, RbTriggerKind *out, int max) {
+    if (!triggers || !out || max <= 0) return 0;
+    int n = 0;
+    const char *p = triggers;
+    while (*p && n < max) {
+        /* skip leading whitespace */
+        while (*p == ' ' || *p == '\t') p++;
+        const char *start = p;
+        /* find comma or end */
+        while (*p && *p != ',') p++;
+        /* extract token */
+        size_t len = (size_t)(p - start);
+        char buf[64];
+        if (len >= sizeof(buf)) len = sizeof(buf) - 1;
+        memcpy(buf, start, len);
+        buf[len] = '\0';
+        RbTriggerKind tk = rb_trigger_from_token(buf);
+        if (tk != RB_TK_COUNT) out[n++] = tk;
+        if (*p == ',') p++;
+    }
+    return n;
+}
+
+/* Check if an ability has a specific trigger kind (mirrors Ability::has_trigger). */
+int rb_ability_has_trigger(const Ability *a, RbTriggerKind kind) {
+    if (!a || !a->triggers) return 0;
+    RbTriggerKind kinds[8];
+    int n = rb_parse_triggers(a->triggers, kinds, 8);
+    for (int i = 0; i < n; i++)
+        if (kinds[i] == kind) return 1;
+    return 0;
+}
+
+/* Return triggerless text (mirrors Ability::triggerless_text). */
+const char *rb_ability_triggerless_text(const Ability *a) {
+    if (!a) return "";
+    if (a->triggerless_text && *a->triggerless_text) return a->triggerless_text;
+    /* Derive from full_text: strip leading 【...】 trigger clause */
+    if (!a->full_text) return "";
+    const char *ft = a->full_text;
+    while (*ft == ' ' || *ft == '\t') ft++;
+    if (*ft == '\xe3' && (unsigned char)ft[1] == 0x80 && (unsigned char)ft[2] == 91) {
+        /* 【 found — UTF-8 E3 80 91 */
+        const char *close = strstr(ft + 3, "\xe3\x80\x93"); /* 】 */
+        if (close) return close + 3;
+    }
+    return ft;
+}
+
+/* Short label for a card (mirrors Card::short_label). */
+const char *rb_card_short_label(int card_id) {
+    const char *name = rb_card_string(le16p(rb_card_record(card_id) + 2));
+    return name ? name : "?";
+}
+

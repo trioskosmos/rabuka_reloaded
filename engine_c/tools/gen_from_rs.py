@@ -5,7 +5,12 @@ Emits src/gen_data.c with:
   - RBKA_NUM_ABILITIES
   - RBKA_OFFSET_DELTAS[]   (u16, per-ability bytecode slice lengths)
   - RBKA_STRINGS_OFFSETS[] (u32, byte offsets into abilities_strings.bin)
-"""
+
+NOTE: src/core card.c uses functions defined in engine/src/core/card.rs
+(CardType, CardDatabase, HeartMap, Ability::has_trigger, Ability::triggerless_text,
+Card::short_label, etc.). When card.rs is updated, the corresponding C
+implementations in card.c must be updated manually — this script only handles
+the bytecode/string tables from abilities_gen.rs, not card.rs logic.
 import re, sys, pathlib
 
 SRC = pathlib.Path(sys.argv[1]) if len(sys.argv) > 1 else \

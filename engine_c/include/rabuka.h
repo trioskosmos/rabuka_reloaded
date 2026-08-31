@@ -317,8 +317,28 @@ const char *rb_get_string(uint32_t idx);
 
 /* ── Decode ── */
 int  rb_decode_ability(uint32_t idx, Ability *out);     /* returns 1 on success */
+int  rb_get_ability(uint32_t idx, Ability *out);         /* returns 1 even for empty/default */
+int  rb_count_empty_bytecode_abilities(void);            /* audit: empty slices */
 void rb_free_ability(Ability *a);
 void rb_free_condition(Condition *c);
+
+/* ── Trigger system (mirrors engine/src/triggers.rs) ── */
+typedef enum {
+    RB_TK_ACTIVATION = 0, RB_TK_AUTO, RB_TK_CONSTANT, RB_TK_DEBUT,
+    RB_TK_LIVE_START, RB_TK_LIVE_SUCCESS, RB_TK_MAIN, RB_TK_BATON_TOUCH, RB_TK_COUNT
+} RbTriggerKind;
+RbTriggerKind rb_trigger_from_token(const char *s);
+int rb_parse_triggers(const char *triggers, RbTriggerKind *out, int max);
+int rb_ability_has_trigger(const Ability *a, RbTriggerKind kind);
+const char *rb_ability_triggerless_text(const Ability *a);
+const char *rb_card_short_label(int card_id);
+typedef enum {
+    RB_KW_TURN1 = 0, RB_KW_TURN2, RB_KW_DEBUT, RB_KW_LIVE_START,
+    RB_KW_LIVE_SUCCESS, RB_KW_CENTER, RB_KW_LEFT_SIDE, RB_KW_RIGHT_SIDE,
+    RB_KW_POSITION_CHANGE, RB_KW_FORMATION_CHANGE, RB_KW_COUNT
+} RbKeyword;
+RbKeyword rb_keyword_from_str(const char *s);
+int rb_decode_keywords(const unsigned char *arr, uint32_t arr_len, RbKeyword *out, int max);
 int  rb_decode_card_by_index(uint32_t i, Card *out);    /* 0..num_cards-1 */
 void rb_free_card(Card *c);
 uint16_t rb_card_ability_idx(uint32_t i);   /* 0xFFFF if none  Efirst ability only (legacy) */
@@ -496,6 +516,7 @@ typedef enum {
 typedef enum {
     RB_QUEUE_IDLE = 0,
     RB_QUEUE_RESOLVING,
+    RB_QUEUE_PAYING_COST,
     RB_QUEUE_AWAITING_CHOICE,
     RB_QUEUE_DRAINING
 } RbQueueState;
@@ -527,7 +548,9 @@ typedef struct {
     int ability_idx;  /* 0..n */
     int cost_paid;    /* 1 after cost emitted */
     int effect_started;
+    int completed;    /* 1 after entry is done (mirrors Rust entry.completed) */
     int optional_cost_result; /* -1 none, 0 declined, 1 paid (mirrors Rust entry.optional_cost_result) */
+    int pending_actions_n;    /* count of pending sequential actions */
 } RbQueueEntry;
 
 #define RB_QUEUE_DEPTH 16
@@ -582,6 +605,7 @@ typedef struct {
     char     resume_draw_dest[32];
     char     resume_draw_ctype[32];
     int      resume_draw_self_id;   /* self_target_id, or -1 */
+    int      just_completed_ability_key; /* (card_id<<16)|ability_idx of last completed ability (prevents re-trigger) */
 } RbAbilityQueue;
 
 int  rb_queue_push(RbAbilityQueue *q, int card_id, int ability_idx);
@@ -637,6 +661,14 @@ typedef struct GameState {
     RbPlayer p[2];
     RbMods   mods;
     RbAbilityQueue queue;
+    /* Keep-alive for an in-flight activation that pends a choice mid-resolution.
+       rb_activate_card wraps cost+effect into a heap effect tree and stores the
+       decoded ability here so its cost/effect pointers stay valid across the
+       choice round-trip (mirrors Rust's persistent resolver). Freed when the
+       activation's pending choice fully resolves (rb_resume_with_choice). */
+    Ability  activation_keepalive;
+    int      activation_keepalive_valid;
+    AbilityEffect *activation_act;
     int      live_set_limit_reduction[2];
     int      yell_count_mod[2];   /* per-player modify_yell_count delta (live.c do_yell) */
     char     yell_source[2][16];   /* per-player modify_yell_source override (live.c do_yell) */
@@ -790,6 +822,18 @@ int rb_is_action_prohibited(const GameState *g, const char *action);
 int rb_owner_of_card(const GameState *g, int cid);
 int rb_drain_ability_queue(GameState *g);
 void rb_look_resume(GameState *g, int actor, int selected_idx, const char *destination, int is_select);
+/* Queue introspection / control (mirrors AbilityQueue methods) */
+int rb_queue_is_idle(const GameState *g);
+int rb_queue_has_entry_with_id(const GameState *g, int card_id, int ability_idx);
+int rb_queue_start_next(GameState *g);
+void rb_queue_complete_current(GameState *g);
+int rb_queue_make_entry(GameState *g, int card_id, int ability_idx);
+int rb_queue_is_entry_available(const GameState *g, int idx);
+int rb_queue_current_entry(const GameState *g);
+void rb_queue_promote_entry(GameState *g, int from_index);
+void rb_queue_promote_entry_by_abs(GameState *g, int absolute);
+void rb_queue_set_current_entry(GameState *g, int absolute);
+int rb_queue_has_pending_actions(const GameState *g);
 void rb_resume_position_change(GameState *g, int actor, const AbilityEffect *e, int host_cid, int selected_idx);
 
 /* ── RNG (xorshift; deterministic given seed) ── */
@@ -827,6 +871,11 @@ void rb_effect_area_select(GameState *g, int actor, AbilityEffect *e, int host_c
 /* draw.rs:execute_both_hand_keep_shuffle_under + make_hand_selection_choice +
     move_non_selected_hand_to_deck_bottom — C6 keep-N-shuffle-rest. */
 void rb_effect_both_hand_keep_shuffle_under(GameState *g, int actor, AbilityEffect *e, int host_cid);
+/* draw.rs:execute_draw_until_count — draw until hand reaches target_count */
+void rb_effect_draw_until_count(GameState *g, int actor, AbilityEffect *e);
+/* draw.rs:make_card_effect_data — build single-card effect data for resource grant */
+typedef struct { int card_id; int amount; char color[24]; } RbEffectDataSingleCard;
+RbEffectDataSingleCard rb_make_card_effect_data(int card_id, int amount, const char *color);
 /* draw.rs:resolve_gain_heart_color — returns a fixed heart color idx, or -1 if a
     choice was emitted / not a heart resource. */
 int  rb_resolve_gain_heart_color(GameState *g, int actor, AbilityEffect *e,

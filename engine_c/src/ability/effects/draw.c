@@ -503,3 +503,42 @@ void rb_effect_both_hand_keep_shuffle_under(GameState *g, int actor, AbilityEffe
     g->keep_shuffle_under_selected_n = 0;
     g->n_selected_cards = 0;
 }
+
+/* ── Draw until hand reaches target count (draw.rs::execute_draw_until_count) ──
+   If the target player's hand has fewer cards than target_count, draw the
+   difference from the deck. Mirrors the Rust logic:
+   to_draw = target_count.saturating_sub(current_hand_count) ── */
+void rb_effect_draw_until_count(GameState *g, int actor, AbilityEffect *e) {
+    if (!g || !e) return;
+    int target_count = 0;
+    for (int i = 0; i < e->n_extra; i++) {
+        if (e->extra_k[i] && !strcmp(e->extra_k[i], "target_count") && e->extra_v[i]) {
+            target_count = atoi(e->extra_v[i]);
+            break;
+        }
+    }
+    if (target_count <= 0) return;
+    const char *target = (e->target && *e->target) ? e->target : "self";
+    int who = (e->target && (!strcmp(e->target, "opponent") || !strcmp(e->target, "p2"))) ? actor ^ 1 : actor;
+    RbPlayer *P = &g->p[who];
+    int current = P->hand.n;
+    if (current >= target_count) return;
+    int to_draw = target_count - current;
+    rb_draw_cards_for_player(P, (uint8_t)to_draw, "deck", "hand", NULL, 0, NULL, NULL, -1);
+}
+
+/* ── Make single-card effect data (draw.rs::make_card_effect_data) ──
+   Builds an EffectData::SingleCard for a blade/heart resource grant.
+   The C engine stores this as a flat struct for downstream consumers. ── */
+RbEffectDataSingleCard rb_make_card_effect_data(int card_id, int amount, const char *color) {
+    RbEffectDataSingleCard d;
+    d.card_id = card_id;
+    d.amount = amount;
+    if (color) {
+        strncpy(d.color, color, sizeof(d.color) - 1);
+        d.color[sizeof(d.color) - 1] = '\0';
+    } else {
+        d.color[0] = '\0';
+    }
+    return d;
+}
