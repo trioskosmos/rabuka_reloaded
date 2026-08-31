@@ -178,9 +178,25 @@ int rb_resolve_ability(GameState *g, int actor, const Ability *ab,
     }
 
     /* Pay cost if not already paid */
-    if (ab->cost) {
+    int cost_already_paid = 0;
+    int cur = g->queue.cur;
+    if (cur >= 0 && cur < RB_QUEUE_DEPTH && g->queue.entries[cur].cost_paid)
+        cost_already_paid = 1;
+
+    if (ab->cost && !cost_already_paid) {
         if (!rb_pay_cost(g, actor, ab->cost))
             return 0;
+    }
+
+    /* Check effect condition before executing */
+    if (ab->effect && ab->effect->condition) {
+        if (!rb_can_activate_effect(g, actor, ab->effect, host_cid)) {
+            /* Condition not met - for activation abilities, record use */
+            if (ab->use_limit > 0) {
+                rb_record_ability_use(g, host_cid, ability_idx);
+            }
+            return 0;
+        }
     }
 
     /* Execute effect - this may emit a pending choice */

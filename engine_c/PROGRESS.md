@@ -81,14 +81,15 @@ fraction of the Rust twin) and `audit_placeholders.py` (no TODO/STUB markers lef
 - Test status: 12 failing assertions across 7 test functions. [UPDATED 2026-09-01]
 - Orphaned fragment files (`choice_frag_*.c`): DELETED 2026-09-01.
 - Build status: CLEAN (rb_engine.exe, 677KB). [UPDATED 2026-09-01]
-- Remaining work: Faithfully port complex game logic for ability activation, choice emission, and game state management. The failing tests check specific behaviors that require exact Rust logic replication. Key failing tests:
+- Remaining work: Faithfully port complex game logic for ability activation, choice emission, and game state management. The failing tests check specific behaviors that require exact Rust logic replication:
   - `start_true_dreams_q66_opponent_no_card_score_higher` - energy movement from LiveSuccess
   - `q255_dancing_stars_live_success_after_position_change` - SelectTarget choice emission
   - `q256_maki_reveal_crossroads_replacement` - SelectCard choice emission
   - `bp1009_debut_mill2_then_retrieve_member_from_waitroom` - milling and retrieval
   - `q29_baton_touch_blocked_on_arrival_turn_allowed_next_turn` - baton touch mechanics
-  - `test_q258_himege_activate_no_target` - ability activation
+  - `test_q258_himege_activate_no_target` - ability activation (handle_use_ability)
   - `p2_owned_trapper_scores_from_p1_success_in_real_round` - scoring from success zone
+- Note: The C engine has 1,272 functions vs Rust's 857 port-target functions because the C port includes many helper functions that don't have direct Rust equivalents. The SIZE_AUDIT gap of -388 means C has MORE functions than Rust.
 - Ported this session (2026-09-01, 29 commits):
   - **move.rs (30+ functions):** prompt_card_selection, place_card_with_stage_choice, resolve_from_recently_moved, take_cards_from_standard_zone, resolve_cards_from_source, resolve_from_zone, resolve_from_energy_deck, resolve_from_stage, resolve_from_under_member, move_from_revealed, finalize_card_movement, fire_debut_side_effects, handle_select_position, execute_stage_placement_choices, place_energy_under_member_selected, execute_move_cards_both, execute_selected_cards_from_zone, handle_select_cards_looked_at, handle_energy_zone_selection, resolve_from_revealed_cards, resolve_from_those_cards
   - **state.rs (16+ functions):** execute_change_state, execute_energy_placement, execute_energy_state_change, execute_set_card_identity, execute_set_heart_type_applied, execute_set_cost, execute_set_blade_type, execute_specify_heart_color, execute_set_card_identity_all_regions, execute_set_cost_to_use, execute_all_blade_timing, execute_modify_cost, execute_activation_cost, execute_set_heart_copy_from_under, execute_set_heart_type, reduce_live_card_set_limit
