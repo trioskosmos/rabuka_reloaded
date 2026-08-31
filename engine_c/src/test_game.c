@@ -52,6 +52,25 @@ void test_add_to_deck(TestGame *tg, int card_id){
     RbPlayer *P=&tg->state.p[0];
     if(P->deck.n < RB_MAX_ZONE) P->deck.cards[P->deck.n++]=card_id;
 }
+void test_add_to_deck_pl(TestGame *tg, int pl, int card_id){
+    if(pl<0||pl>1) return;
+    RbPlayer *P=&tg->state.p[pl];
+    if(P->deck.n < RB_MAX_ZONE) P->deck.cards[P->deck.n++]=card_id;
+}
+void test_add_to_energy(TestGame *tg, int pl, int card_id){
+    if(pl<0||pl>1) return;
+    RbPlayer *P=&tg->state.p[pl];
+    if(P->energy.n < RB_MAX_ZONE) P->energy.cards[P->energy.n++]=card_id;
+    if(P->energy_active < RB_MAX_ZONE) P->energy_active++;
+}
+void test_set_energy_active(TestGame *tg, int pl, int n){
+    if(pl<0||pl>1) return;
+    tg->state.p[pl].energy_active = n;
+}
+void test_add_to_revealed(TestGame *tg, int card_id){
+    if(tg->state.n_revealed < RB_MAX_RECENTLY_MOVED)
+        tg->state.revealed_cards[tg->state.n_revealed++]=card_id;
+}
 void test_give_energy(TestGame *tg, int count){
     int eid = rb_find_card_by_no("LL-E-001-SD");
     if(eid<0) eid=0;

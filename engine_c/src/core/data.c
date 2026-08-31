@@ -123,7 +123,7 @@ static int load_cards(const char *dir) {
     snprintf(path, sizeof(path), "%s/cards.bin", dir);
     g_cards_blob = read_file(path, &g_cards_len);
     if (!g_cards_blob) return -1;
-    fprintf(stderr, "[dbg] cards.bin loaded len=%ld\n", g_cards_len);
+    if (rb_ability_debug_enabled()) fprintf(stderr, "[dbg] cards.bin loaded len=%ld\n", g_cards_len);
     return parse_cards(g_cards_blob, g_cards_len);
 }
 

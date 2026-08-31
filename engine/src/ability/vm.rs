@@ -1,5 +1,9 @@
 #[cfg(not(feature = "snes"))]
-use super::abilities_gen::{COMPRESSED_BYTECODE, NUM_ABILITIES, OFFSET_DELTAS, STRINGS_OFFSETS, get_string};
+use super::abilities_gen::{NUM_ABILITIES, OFFSET_DELTAS, STRINGS_OFFSETS, get_string};
+#[cfg(all(not(feature = "snes"), not(feature = "gba")))]
+use super::abilities_gen::COMPRESSED_BYTECODE;
+#[cfg(feature = "gba")]
+use super::abilities_gen::BYTECODE;
 #[cfg(feature = "snes")]
 use super::abilities_gen::{ABILITY_LOCS, NUM_ABILITIES, STRINGS_OFFSETS, bytecode_slice, get_string};
 use super::enums::EffectState;
@@ -160,6 +164,7 @@ fn offset_of(idx: usize) -> usize {
 const BYTECODE_MAGIC: &[u8; 4] = b"RBKA";
 const BYTECODE_VERSION: u32 = 1;
 
+#[cfg(not(feature = "gba"))]
 fn strip_bytecode_header(data: Vec<u8>) -> Vec<u8> {
     if data.len() >= 8 && &data[0..4] == BYTECODE_MAGIC {
         let ver = u32::from_le_bytes([data[4], data[5], data[6], data[7]]);
@@ -171,7 +176,21 @@ fn strip_bytecode_header(data: Vec<u8>) -> Vec<u8> {
     data
 }
 
-#[cfg(all(not(feature = "snes"), not(feature = "no_std")))]
+#[cfg(feature = "gba")]
+fn get_decompressed_bytecode() -> &'static [u8] {
+    // GBA: 92KB decompressed bytecode lives in ROM via include_bytes!("abilities.bin"),
+    // zero heap allocation. Mirrors ps1 external_card_data pattern where large blobs
+    // are XIP. Avoids lazy Vec::with_capacity(92000) after mulligan fragments heap.
+    if BYTECODE.len() >= 8 && &BYTECODE[0..4] == BYTECODE_MAGIC {
+        let ver = u32::from_le_bytes([BYTECODE[4], BYTECODE[5], BYTECODE[6], BYTECODE[7]]);
+        assert!(ver == BYTECODE_VERSION, "bytecode version mismatch: got {ver}, expected {BYTECODE_VERSION} — stale blob paired with fresh code (C3). Regenerate via `python cards/compile_abilities.py`");
+        &BYTECODE[8..]
+    } else {
+        BYTECODE
+    }
+}
+
+#[cfg(all(not(feature = "snes"), not(feature = "gba"), not(feature = "no_std")))]
 fn get_decompressed_bytecode() -> &'static [u8] {
     use std::sync::OnceLock;
     static CACHE: OnceLock<Vec<u8>> = OnceLock::new();
@@ -181,7 +200,7 @@ fn get_decompressed_bytecode() -> &'static [u8] {
     })
 }
 
-#[cfg(all(not(feature = "snes"), feature = "no_std"))]
+#[cfg(all(not(feature = "snes"), feature = "no_std", not(feature = "gba")))]
 fn get_decompressed_bytecode() -> &'static [u8] {
     use core::cell::UnsafeCell;
     use crate::compat::atomic::AtomicU8;

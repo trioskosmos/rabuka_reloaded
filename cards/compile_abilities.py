@@ -667,10 +667,12 @@ def generate_abilities_gen(bytecode, offsets, strings, card_ability_pairs, build
 
 pub const NUM_ABILITIES: usize = {len(offsets) - 1};
 
-#[cfg(not(feature = "snes"))]
+#[cfg(all(not(feature = "snes"), not(feature = "gba")))]
 pub const COMPRESSED_BYTECODE: &[u8] = include_bytes!("../../../cards/build/abilities.bin.z");
-#[cfg(not(feature = "snes"))]
+#[cfg(all(not(feature = "snes"), not(feature = "gba")))]
 pub const DECOMPRESSED_LEN: usize = {len(bytecode)};
+#[cfg(feature = "gba")]
+pub const BYTECODE: &[u8] = include_bytes!("../../../cards/build/abilities.bin");
 
 /// Per-ability byte lengths (deltas between consecutive absolute offsets).
 /// `OFFSET_DELTAS[i]` is the size of the binary-JSON slice for

@@ -50,7 +50,7 @@ int rb_compound_sequential(GameState *g, int actor, const AbilityEffect *eff, in
                 /* a failed gate suppresses the rest of this conditional block */
                 continue;
             } else if (a->has_condition && !is_otherwise) {
-                int passed = rb_eval_condition(g, actor, a->condition);
+                int passed = rb_eval_condition_for_host(g, actor, host_cid, a->condition);
                 if (!a->is_optional) condition_failed = passed ? 0 : 1;
                 if (!passed) continue;
             }
@@ -100,12 +100,12 @@ int rb_compound_conditional_alternative(GameState *g, int actor,
     if (has_primary && has_alt) {
         /* Tiered: stricter alternative_condition first. */
         if (eff->alternative_condition && eff->condition) {
-            if (rb_eval_condition(g, actor, eff->alternative_condition)) {
+            if (rb_eval_condition_for_host(g, actor, host_cid, eff->alternative_condition)) {
                 if (eff->alternative_effect)
                     rb_execute_effect_ex(g, actor, eff->alternative_effect, host_cid);
                 return 1;
             }
-            if (rb_eval_condition(g, actor, eff->condition)) {
+            if (rb_eval_condition_for_host(g, actor, host_cid, eff->condition)) {
                 if (eff->primary_effect)
                     rb_execute_effect_ex(g, actor, eff->primary_effect, host_cid);
             }
@@ -115,7 +115,7 @@ int rb_compound_conditional_alternative(GameState *g, int actor,
         const Condition *cond = eff->alternative_condition ? eff->alternative_condition
                                                            : eff->condition;
         if (cond) {
-            if (rb_eval_condition(g, actor, cond)) {
+            if (rb_eval_condition_for_host(g, actor, host_cid, cond)) {
                 if (eff->alternative_effect)
                     rb_execute_effect_ex(g, actor, eff->alternative_effect, host_cid);
             } else if (eff->primary_effect) {
@@ -132,12 +132,12 @@ int rb_compound_conditional_alternative(GameState *g, int actor,
     }
 
     if (eff->alternative_condition) {
-        if (rb_eval_condition(g, actor, eff->alternative_condition) && eff->alternative_effect)
+        if (rb_eval_condition_for_host(g, actor, host_cid, eff->alternative_condition) && eff->alternative_effect)
             rb_execute_effect_ex(g, actor, eff->alternative_effect, host_cid);
         return 1;
     }
     if (has_alt && !has_primary && !eff->condition) {
-        if (eff->condition && rb_eval_condition(g, actor, eff->condition) && eff->alternative_effect)
+        if (eff->condition && rb_eval_condition_for_host(g, actor, host_cid, eff->condition) && eff->alternative_effect)
             rb_execute_effect_ex(g, actor, eff->alternative_effect, host_cid);
         return 1;
     }
@@ -157,7 +157,7 @@ int rb_compound_conditional_on_result(GameState *g, int actor,
 
     int cond_met = 1;
     if (eff->result_condition)
-        cond_met = rb_eval_condition(g, actor, eff->result_condition);
+        cond_met = rb_eval_condition_for_host(g, actor, host_cid, eff->result_condition);
     if (cond_met && eff->followup_action) {
         g->n_selected_cards = 0;
         rb_execute_effect_ex(g, actor, eff->followup_action, host_cid);

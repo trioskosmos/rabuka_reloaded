@@ -352,7 +352,100 @@ broadening `gen_tests.py`. Each remaining item is a multi-line fidelity port, no
    the real `cost`/`effect` — so the engine was running the wrong (cost-less) ability and `eli_q79` left Eli on
    stage. Added `rb_activate_card(g, pl, card_id)` which iterates `rb_card_num_abilities` /
    `rb_decode_card_ability`, runs every ability whose trigger contains **起動** (cost **then** effect), and
-   falls back to the default ability when none match. `rb_activate_ability` and `test_activate_ability` now use
-   it. **Result: `eli_q79` passes; generated failures 1169 → 1001 (−168).** Gating suites green.
+    falls back to the default ability when none match. `rb_activate_ability` and `test_activate_ability` now use
+    it. **Result: `eli_q79` passes; generated failures 1169 → 1001 (−168).** Gating suites green.
+
+Hand-written suites green after every change (`rb_engine_test` / `rb_engine_replay` / `rb_engine_ported` 13/13).
+
+## Translated this session (self/group_reference condition fidelity — ST-B / ST-C / ST-F)
+Root-caused the "two copies of a self-conditional ability both fire" boss-battle bug and the
+`group_reference=="same_group_name"` / `exclude_self` / `check_self` family of condition mismatches.
+In Rust every `ConditionEvaluator` carries `activating_card_id`; the C port never propagated it, so
+`evaluate_check_self_condition` / `group_reference` resolution / `exclude_self` silently degraded.
+
+- `src/ability/condition.c` **ST-B**: added `resolve_target_for_scope()` (mirrors
+  `condition/card.rs::resolve_target_for_scope` — `same`/`opponent`/`ally`/`self`/`trigger`/`active`/
+  `all`/area literals) and `eval_check_self()` (mirrors `evaluate_check_self_condition`: picks the
+  `same`→activating card / `ally`→own stage / `opponent`→enemy stage). `eval_comparison_inner` now
+  short-circuits `check_self` to `eval_check_self` (returns −1 to fall through to the generic branch
+  only when there is genuinely no target). `eval_compound` / `eval_location` / `eval_movement` /
+  `eval_group` / `eval_temporal` / `eval_state` / `eval_ability_filter` / `eval_choice` / `eval_complex`
+  all take an extra `host_cid` param and thread it into nested evaluations. `eval_both_condition`
+  rewritten (was `__attribute__((unused))` with a wrong `loc`-from-`position` selection); now selects
+  the correct success/live zone from the location literal. Added `stage_index_of_position()` forward decl
+  + the stale `debut_count_this_turn` fallback comment removed (`g->debut_count_this_turn` is tracked).
+- `src/ability/condition.c` **ST-C**: `eval_state` ported faithfully from `state.rs::evaluate_state_condition`.
+  Non-energy active/wait branch now mirrors `orientation_matches_state` (a card with NO orientation
+  modifier is "active" by default; `stage_wait` is the same fact). Crucially fixes the **self-state**
+  text bug: when the ability text contains 「このメンバーが」, the parser's default `card_type=member_card`
+  must NOT widen the query — the condition matches only the ACTIVATING card (Rust
+  `self.activating_card_id.is_some_and(...)`); otherwise every waited member on stage satisfies every
+  copy. Added `orientation_matches_state()` helper.
+- `src/ability/condition.c` **ST-A**: `zone_ids()` (mirrors `util::zone_cards`) resolves every zone —
+  stage/center/left/right/hand/deck/discard/energy/live/success/under_member/revealed_cards/resolution/
+  recently_moved; `count_distinct_in_zone` + `zone_count_filtered` use it; added `zone_count_filtered_ex`
+  with `exclude_self`.
+- `src/ability/compound.c` + `src/engine.c` **ST-F**: the runtime effect pipeline now evaluates
+  conditions with the activating card. `rb_compound_sequential` / `conditional_alternative` /
+  `conditional_on_result` and `rb_execute_effect_ex`'s gate now call `rb_eval_condition_for_host(g, actor,
+  host_cid, cond)` instead of `rb_eval_condition(g, actor, cond)`; `host_cid` already flows through
+  `rb_execute_effect_ex(..., host_cid)`. Added the `rb_eval_condition_for_host` declaration to `rabuka.h`
+  (already defined in condition.c). `rb_compound_route_branch` deliberately keeps the no-host call (pure
+  branch selector). This makes `check_self` / `group_reference=="same_group_name"` / `exclude_self`
+  evaluate correctly during real ability resolution, not just in the generated unit probes.
+
+**Build/verify:** `make rb_engine_test rb_engine_replay rb_engine_ported` all exit 0 (gating green).
+`make rb_engine_generated` compiles; failure count ≈ 999 (unchanged by this work). Confirmed by sampling
+a failing test (`jellyfish_two_members_appeared_reduce_by_2`): its assertion body is `int reduction = 0;`
+with `// TODO: .mods.get_need_heart_modifier(jellyfish, HeartColor::Heart00)` — the test harness never
+queries the engine, so the mismatch is a **transpiler/assert-body gap**, not an engine bug. The ST-B/C/F
+ports are correct engine fidelity; they surface (rather than hide) real mismatches and will pay off once
+`gen_tests.py` translates the `assert`/modifier-read bodies.
+
+## Remaining sub-task queue (refined, post ST-A..ST-F)
+1. **ST-D** `has_cannot_baton_touch_protection` → **DONE.** Ported `rb_card_has_restriction(g, incoming_cid, card_id, restriction)`
+   (engine.c) to walk the card's resolved-ability effect tree (`effect_has_restriction` recurses child /
+   primary / alternative / followup / optional / conditional sub-effects) checking `restriction_type == restriction`
+   and honoring `exclude_group_names` via `rb_card_matches_group_str` (mirrors util.rs). Signature gained the
+   incoming card id; call site `rb_play_member` (engine.c) now passes `cid`. The runtime cannot-active ban is
+   still honored as a fallback. Gating green; generated count unchanged (baton-touch tests use the direct
+   `test_play_to_stage` helper, not `rb_play_member`'s gate, and their assert bodies are harness TODOs).
+2. **ST-G** full live-phase pipeline (`live.c`) — live→discard relocation ordering + `prohibition_effects`
+   tie; bulk of live-* failures.
+3. **ST-H** `kotori_q207_multiname_matches_any_individual_name` — decode all `name_idx` in `Card` (binary
+   layout) + iterate in `rb_card_matches_group_str`.
+4. **ST-I** energy-threshold constants (`kasumi`/`karin`) — `rb_mods_get_constant_*` + `recalculate_constants`.
+5. **ST-J** `gen_tests.py` transpiler gaps (PARTIAL). Single-line `for _ in 0..N { ... }` range loops were
+   degrading to `// TODO` (only multi-line loops expanded). Added single-line range-loop expansion in
+   `expand_for_loops` (gen_tests.py:382) — splits the inline body on `;` so `game.pass()` phase-advance and
+   `main_deck.cards.push` deck-fill loops actually execute. Degraded loops dropped 292 → 176 after regen.
+   Assert-body translation (`.mods.get_need_heart_modifier`, `.state.mods` field reads) is STILL a TODO —
+   the 2972 `// TODO assert` lines are why most generated failures persist (the harness never queries the
+   engine for those checks). Translating those would convert silent harness gaps into real engine comparisons.
+6. **ST-F2** runtime `rb_can_activate_effect` (resolver.c) still calls bare `rb_eval_condition` (no host);
+   thread `host_cid` through it (minor — primary gate is `engine.c:201`, now fixed).
+ 7. **ST-K** multi-ability debut execution — DEFERRED (crash). `rb_play_member` only fires the card's single
+    default `c.ability`; multi-ability cards (e.g. `kanon_q106`, `PL!SP-bp2-001-R+`) never run their separate
+    `登場` ability, so debut effects (recover-from-discard etc.) don't fire. Mirroring `rb_activate_card`
+    (eli_q79) by iterating every ability and executing the `登場`/`バトンタッチ` effects directly was prototyped
+    and **crashes the mass-port suite** (exit `0xB00` = 2816; no `ok:` lines because stdout is buffered and
+    lost on abnormal termination — i.e. a genuine memory fault, not a logic mismatch).
+    - KEY FINDING: card 2092's `set_blade_type` is the *victim*, not the cause. A minimal harness that decodes
+      2092 (2 abilities, both `ライブ開始時`: ab0 sequential / ab1 set_blade_type) and (a) stages it + calls
+      `rb_fire_auto`, and (b) directly `rb_execute_effect_ex`'s the ab1 `set_blade_type` effect — **both return
+      OK**. The fault only appears inside the full mass-port board, so it is a **state-dependent heap corruption**
+      from an earlier out-of-bounds write elsewhere; 2092's drain entry is merely where it manifests.
+    - At the fault, the 2092 `set_blade_type` entry has `card_id=2092, blade_type[2092]=-1, nchild=0, n_extra=2`
+      (clean inputs) — so the write itself is in-range; the corruption is upstream.
+    - Defensive guards added (kept — harmless, gating green): `play_depth` cap (GameState field + `rb_play_member`
+      guard, depth>4 bails); `rb_drain_ability_queue` re-entrancy guard (returns 0 if already `RB_QUEUE_RESOLVING`);
+      `s_exec_depth` cap in `rb_execute_effect_ex` (depth>64 bails); `cid` bounds-guard in the `set_card_identity`/
+      `set_blade_type` block. None fix the root cause.
+    - Fix path: the first OOB write must be found with a memory debugger. **`libasan` is NOT installed in this
+      toolchain** (link fails: `cannot find -lasan`), so AddressSanitizer can't run here. Either install ASan /
+      build under a sanitizing toolchain, or manually audit fixed-size buffers touched by debut effects (RbBag
+      capacities, `g->revealed_cards[RB_MAX_RECENTLY_MOVED]`, mods arrays when a `card_id` can reach >=
+      `RB_MAX_CARD_IDS`, and any `strtok`/string buffers in handlers). Once the upstream corruption is fixed,
+      re-enable the multi-ability debut loop (the iterate version) and the kanon-style debut tests will pass.
 
 Hand-written suites green after every change (`rb_engine_test` / `rb_engine_replay` / `rb_engine_ported` 13/13).

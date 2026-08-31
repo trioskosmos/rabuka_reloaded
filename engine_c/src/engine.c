@@ -195,10 +195,17 @@ void rb_emit_choice(GameState *g, int actor, RbChoiceKind kind,
 
 /* Mirror Rust's `activating_card`: the card whose ability is resolving.
    Threaded through so per-card modifiers (blade/heart) attribute correctly. */
+static int s_exec_depth = 0;
 void rb_execute_effect_ex(GameState *g, int actor, AbilityEffect *e, int host_cid) {
     if (!e) return;
-    if (rb_has_pending_choice(g)) return;
-    if (e->has_condition && e->condition && !rb_eval_condition(g, actor, e->condition)) return;
+    /* Bound recursion: a deeply-nested effect tree (or a chain of ability effects
+        that move/activate members) can recurse through this fn and overflow the
+        stack. Headless caps the depth; effects past the cap are skipped (the same
+        ability would re-resolve on a later drain pass). */
+    if (s_exec_depth > 64) return;
+    s_exec_depth++;
+    if (rb_has_pending_choice(g)) { s_exec_depth--; return; }
+    if (e->has_condition && e->condition && !rb_eval_condition_for_host(g, actor, host_cid, e->condition)) { s_exec_depth--; return; }
     for (int i = 0; i < e->n_child; i++) {
         /* repeat_procedure's children are executed cnt times by handle_action,
            so skip the single pre-order pass here to avoid a double execution. */
@@ -240,11 +247,13 @@ void rb_execute_effect_ex(GameState *g, int actor, AbilityEffect *e, int host_ci
                         g->queue.resume_host = host_cid;
                     }
                 }
+                s_exec_depth--;
                 return;
             }
     }
-    if (!e->action) return;
+    if (!e->action) { s_exec_depth--; return; }
     handle_action(g, actor, e, host_cid);
+    s_exec_depth--;
 }
 
 void rb_execute_effect(GameState *g, int actor, AbilityEffect *e) {
@@ -360,7 +369,16 @@ static void handle_action(GameState *g, int actor, AbilityEffect *e, int host_ci
                 } else if (!strcmp(res, "heart")) {
                     int col = (g->queue.selected_heart_color >= 0)
                                   ? g->queue.selected_heart_color
-                                  : heart_color_of(e, RB_HEART_PINK);
+                                  : RB_HEART_PINK;
+                    /* honour an explicit heart_color extra (e.g. "heart06") — mirrors
+                        the per-color heart grants in misc.rs:execute_gain_resource. */
+                    for (int i = 0; i < e->n_extra; i++) {
+                        if (e->extra_k[i] && !strcmp(e->extra_k[i], "heart_color") && e->extra_v[i]) {
+                            int pc = rb_parse_heart_color(e->extra_v[i]);
+                            if (pc >= 0) col = pc;
+                            break;
+                        }
+                    }
                     g->queue.selected_heart_color = -1; /* consumed by this grant */
                     rb_mods_add_heart(&g->mods, cid, col, amt * sign);
                     if (dur != RB_TEMP_PERM) {
@@ -482,6 +500,7 @@ static void handle_action(GameState *g, int actor, AbilityEffect *e, int host_ci
            heart_type/required_hearts) need per-card fields the C model does not
            track yet; they are documented no-ops. */
         int cid = host_cid >= 0 ? host_cid : -1;
+        if (cid >= RB_MAX_CARD_IDS) cid = -1;   /* bounds-guard direct mods[.] writes below */
         if (cid < 0) for (int q = 0; q < RB_STAGE_SIZE; q++) if (W->stage[q] != RB_EMPTY_SLOT) { cid = W->stage[q]; break; }
         if (cid >= 0) {
             if (!strcmp(act, "set_blade_type")) {
@@ -729,14 +748,52 @@ int rb_card_arrived_this_turn(const GameState *g, int pl, int card_id) {
         if (g->p[pl].stage[i] == card_id && g->stage_arrived[pl][i]) return 1;
     return 0;
 }
-int rb_card_has_restriction(const GameState *g, int card_id, const char *restriction) {
-    /* Card-data restrictions (e.g. cannot_baton_touch) require a CardRestriction
-        field the C decoder does not yet expose — see PROGRESS §12.3 / §14. Until
-        that decoder gap is closed, honor the RUNTIME cannot-activate ban
-        (set_card_active / restriction effect), which also bars a locked member
-        from being baton-replaced. */
-    (void)restriction;
+/* Mirror engine/src/ability/util.rs::has_cannot_baton_touch_protection — walk a
+   card's resolved abilities; if any effect carries `restriction_type == restriction`
+   (e.g. "cannot_baton_touch") and the incoming card is NOT in that restriction's
+   `exclude_group_names`, the existing member blocks the baton touch. The effect tree
+   is walked recursively (child / primary / alternative / followup / optional /
+   conditional sub-effects) so nested restriction abilities are honored. */
+static int effect_has_restriction(const AbilityEffect *e, const char *restriction, int incoming_cid) {
+    if (!e) return 0;
+    /* Direct restriction effect on this node. */
+    const char *rt = NULL;
+    for (int i = 0; i < e->n_extra; i++)
+        if (e->extra_k[i] && !strcmp(e->extra_k[i], "restriction_type")) { rt = e->extra_v[i]; break; }
+    if (rt && !strcmp(rt, restriction)) {
+        /* exclude_group_names: a member of any excluded group is NOT protected. */
+        const char *ex = NULL;
+        for (int i = 0; i < e->n_extra; i++)
+            if (e->extra_k[i] && !strcmp(e->extra_k[i], "exclude_group_names")) { ex = e->extra_v[i]; break; }
+        if (ex && *ex) {
+            /* Rust passes the restriction string verbatim to card_matches_any_group,
+               which does substring matching against the card's series/unit/name/group. */
+            if (rb_card_matches_group_str(incoming_cid, ex)) return 0;
+        }
+        return 1;
+    }
+    /* Recurse into compound / nested effects. */
+    for (int i = 0; i < e->n_child; i++)
+        if (effect_has_restriction(e->child[i], restriction, incoming_cid)) return 1;
+    if (effect_has_restriction(e->primary_effect, restriction, incoming_cid)) return 1;
+    if (effect_has_restriction(e->alternative_effect, restriction, incoming_cid)) return 1;
+    if (effect_has_restriction(e->followup_action, restriction, incoming_cid)) return 1;
+    if (effect_has_restriction(e->optional_action, restriction, incoming_cid)) return 1;
+    if (effect_has_restriction(e->conditional_action, restriction, incoming_cid)) return 1;
+    return 0;
+}
+int rb_card_has_restriction(const GameState *g, int incoming_cid, int card_id, const char *restriction) {
+    /* Honor the runtime cannot-activate ban (set_card_active / restriction effect)
+        as well as the card-data restriction ability (has_cannot_baton_touch_protection). */
     if (rb_card_is_cannot_active(g, card_id)) return 1;
+    int n = rb_card_num_abilities((uint32_t)card_id);
+    for (int i = 0; i < n; i++) {
+        Ability ab;
+        if (!rb_decode_card_ability((uint32_t)card_id, i, &ab)) continue;
+        if (effect_has_restriction(ab.effect, restriction, incoming_cid)) { rb_free_ability(&ab); return 1; }
+        if (effect_has_restriction(ab.cost, restriction, incoming_cid))   { rb_free_ability(&ab); return 1; }
+        rb_free_ability(&ab);
+    }
     return 0;
 }
 void rb_send_to_waitroom(GameState *g, int pl, int card_id) {
@@ -759,8 +816,13 @@ int rb_play_member(GameState *g, int pl, int hand_idx, int stage_pos) {
     RbPlayer *P = &g->p[pl];
     if (hand_idx < 0 || hand_idx >= P->hand.n) return 0;
     if (stage_pos < 0 || stage_pos >= RB_STAGE_SIZE) return 0;
+    /* Bound re-entrancy: a debut/baton effect that places another member would
+        recurse into this fn. Cap the depth so a pathological chain cannot overflow
+        the stack (headless: the deepest legitimate chain is shallow). */
+    if (g->play_depth > 4) return 0;
+    g->play_depth++;
     Card c;
-    if (!rb_decode_card_by_index((uint32_t)P->hand.cards[hand_idx], &c)) return 0;
+    if (!rb_decode_card_by_index((uint32_t)P->hand.cards[hand_idx], &c)) { g->play_depth--; return 0; }
     int cid = P->hand.cards[hand_idx];
     int is_baton = (P->stage[stage_pos] >= 0); /* playing onto an occupied area */
 
@@ -770,8 +832,8 @@ int rb_play_member(GameState *g, int pl, int hand_idx, int stage_pos) {
     if (is_baton) {
         int old = P->stage[stage_pos];
         if (g->baton_touch_used[pl] || rb_card_arrived_this_turn(g, pl, old) ||
-            rb_card_has_restriction(g, old, "cannot_baton_touch")) {
-            rb_free_card(&c); return 0;
+            rb_card_has_restriction(g, cid, old, "cannot_baton_touch")) {
+            rb_free_card(&c); g->play_depth--; return 0;
         }
     }
 
@@ -790,7 +852,7 @@ int rb_play_member(GameState *g, int pl, int hand_idx, int stage_pos) {
     }
     /* Cost gate: member play cost is never optional, so reject if insufficient. */
     if (P->energy_active < cost) {
-        rb_free_card(&c); return 0;
+        rb_free_card(&c); g->play_depth--; return 0;
     }
     P->energy_active -= cost;
     g->n_recently_moved = 0;
@@ -820,8 +882,13 @@ int rb_play_member(GameState *g, int pl, int hand_idx, int stage_pos) {
     g->n_recently_moved = 1;
     if (is_baton) g->baton_last_vacated_area[pl] = stage_pos;
 
-    /* Fire triggers. A normal "登場" ability fires on both debut and baton;
-       a baton-specific trigger ("バトンタッチ…") fires only on baton-touch. */
+    /* Fire triggers (single default ability). Multi-ability debut execution is
+        DEFERRED (ST-K): iterating every 登場 ability crashes the mass-port suite with a
+        state-dependent heap corruption (exit 0xB00; card 2092's set_blade_type in the
+        live-start drain is the *victim*, not the cause — AddressSanitizer needed to pin
+        the first OOB write; libasan is unavailable in this toolchain). The single default
+        `c.ability` is the established, crash-free path; rb_trigger_debut still queues the
+        debut abilities for systems that drain the queue. */
     if (c.ability && c.ability->effect) {
         g->current_is_baton = is_baton;
         if (c.ability->triggers && rb_trigger_is(c.ability->triggers, "登場")) {
@@ -841,6 +908,7 @@ int rb_play_member(GameState *g, int pl, int hand_idx, int stage_pos) {
         handle_play_member_to_stage → trigger_auto_abilities_for_player. */
     rb_fire_auto(g, pl);
     rb_free_card(&c);
+    g->play_depth--;
     return 1;
 }
 

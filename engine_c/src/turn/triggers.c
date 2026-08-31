@@ -444,7 +444,9 @@ void rb_recalc_constants(GameState *g) {
                     AbilityEffect *e=ab.effect;
                     int cond_ok=1;
                     if(e->has_condition && e->condition) cond_ok=rb_eval_condition_for_host(g, pl, cid, e->condition);
-                    if(cid==1923||cid==2500||cid==2406||cid==2412) fprintf(stderr,"[recalc] cid=%d pl=%d cond_ok=%d act=%s\n",cid,pl,cond_ok,e->action?e->action:"-");
+                    /* Mirrors the constant-recalc log::debug! in modifiers.rs —
+                       gated so a full suite run is not flooded. */
+                    if (rb_ability_debug_enabled()) fprintf(stderr,"[recalc] cid=%d pl=%d cond_ok=%d act=%s\n",cid,pl,cond_ok,e->action?e->action:"-");
                     if(cond_ok) apply_constant_effect(g, pl, cid, e, NULL);
                     else {
                         for(int i=0;i<e->n_child;i++){

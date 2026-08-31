@@ -1,5 +1,6 @@
 #include "rabuka.h"
 #include <string.h>
+#include <stdio.h>
 
 int rb_queue_push(RbAbilityQueue *q, int card_id, int ability_idx) {
     if (!q || q->n_entries >= RB_QUEUE_DEPTH) return 0;
@@ -62,6 +63,12 @@ int rb_owner_of_card(const GameState *g, int cid) {
    Mirror ability_queue.rs drain + execute path. */
 int rb_drain_ability_queue(GameState *g) {
     if (!g) return 0;
+    /* Re-entrancy guard: an auto ability's effect can move a member, which re-enters
+        rb_fire_auto → rb_drain_ability_queue. Without this guard the chain recurses
+        unbounded and overflows the stack. The in-progress drain continues (and the
+        outer call resumes after the choice/child yields), so queued abilities still
+        run — just not simultaneously nested. */
+    if (g->queue.state == RB_QUEUE_RESOLVING) return 0;
     if (g->queue.n_entries == 0) { rb_queue_set_state(&g->queue, RB_QUEUE_IDLE); return 0; }
     rb_queue_set_state(&g->queue, RB_QUEUE_RESOLVING);
     int ran = 0;
@@ -76,8 +83,14 @@ int rb_drain_ability_queue(GameState *g) {
         int actor = rb_owner_of_card(g, e->card_id);
         if (actor < 0) actor = g->active;
         if (ab.effect) {
-            g->n_recently_moved = 0; /* batch-scope per queue entry (clear_recently_moved_batch) */
+            /* NOTE: clear_recently_moved_batch must happen AFTER the effect runs.
+               The ability's condition (eval_movement) is re-checked at execute time
+               and reads g->recently_moved; clearing it beforehand wipes the movement
+               event recorded by push_movement_event, so move-triggered abilities would
+               never satisfy their condition. Rust validates the condition at queue time
+               and clears the batch scope only after execution. */
             rb_execute_effect_ex(g, actor, ab.effect, e->card_id);
+            g->n_recently_moved = 0; /* batch-scope per queue entry */
         }
         rb_free_ability(&ab);
         /* Mirror Rust's just_completed_ability_key: record which ability just

@@ -25,6 +25,10 @@ void test_place_under(TestGame *tg, int pl, int area, int card_id); /* tuck card
 void test_add_to_success(TestGame *tg, int card_id);
 void test_add_to_live(TestGame *tg, int card_id);
 void test_add_to_deck(TestGame *tg, int card_id);
+void test_add_to_deck_pl(TestGame *tg, int pl, int card_id);
+void test_add_to_energy(TestGame *tg, int pl, int card_id);
+void test_set_energy_active(TestGame *tg, int pl, int n);
+void test_add_to_revealed(TestGame *tg, int card_id);
 void test_give_energy(TestGame *tg, int count);
 int  test_play_to_stage(TestGame *tg, int card_id, int area);
 int  test_try_play_to_stage(TestGame *tg, int card_id, int area); /* returns 1 on success */

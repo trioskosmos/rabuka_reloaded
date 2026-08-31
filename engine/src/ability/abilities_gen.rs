@@ -11,10 +11,12 @@
 
 pub const NUM_ABILITIES: usize = 936;
 
-#[cfg(not(feature = "snes"))]
+#[cfg(all(not(feature = "snes"), not(feature = "gba")))]
 pub const COMPRESSED_BYTECODE: &[u8] = include_bytes!("../../../cards/build/abilities.bin.z");
-#[cfg(not(feature = "snes"))]
+#[cfg(all(not(feature = "snes"), not(feature = "gba")))]
 pub const DECOMPRESSED_LEN: usize = 92901;
+#[cfg(feature = "gba")]
+pub const BYTECODE: &[u8] = include_bytes!("../../../cards/build/abilities.bin");
 
 /// Per-ability byte lengths (deltas between consecutive absolute offsets).
 /// `OFFSET_DELTAS[i]` is the size of the binary-JSON slice for

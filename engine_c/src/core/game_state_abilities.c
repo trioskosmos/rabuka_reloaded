@@ -146,6 +146,31 @@ int rb_fire_auto(GameState *g, int pl) {
     return rb_trigger_auto_abilities(g, pl, "自動");
 }
 
+/* Event→trigger recording (mirrors Rust's movement-event → auto-trigger queue).
+    The test harness records discrete events via push_movement_event(...) and then
+    calls trigger_auto_abilities_for_player, which should fire ONLY the abilities
+    whose trigger matches a recorded event — not every auto ability unconditionally
+    (that would break "should-not-trigger" tests). */
+static const struct { int bit; const char *trig; } RB_EV[] = {
+    { 1, "エネルギー置いた時" }, { 2, "移動時" }, { 4, "応援時" },
+    { 8, "公開時" }, { 16, "覚醒時" }, { 32, "レスト時" },
+    { 64, "バトンタッチ時" }, { 128, "除外時" }, { 256, "ターン開始時" },
+    { 512, "ドロー時" }, { 1024, "自動" }, { 0, NULL }
+};
+void rb_record_event(GameState *g, int pl, const char *trig) {
+    if (!g || pl < 0 || pl > 1) return;
+    for (int i = 0; RB_EV[i].trig; i++)
+        if (!strcmp(RB_EV[i].trig, trig)) { g->auto_event_mask[pl] |= RB_EV[i].bit; return; }
+}
+int rb_fire_recorded_auto(GameState *g, int pl) {
+    if (!g || pl < 0 || pl > 1) return 0;
+    int total = 0, mask = g->auto_event_mask[pl];
+    for (int i = 0; RB_EV[i].trig; i++)
+        if (mask & RB_EV[i].bit) total += rb_trigger_auto_abilities(g, pl, RB_EV[i].trig);
+    g->auto_event_mask[pl] = 0;
+    return total;
+}
+
 /* Mirror abilities.rs:process_pending_auto_abilities — drain the queue of
     deferred auto-triggers. Returns count processed. */
 int rb_process_pending_auto_abilities(GameState *g) {

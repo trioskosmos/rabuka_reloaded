@@ -79,15 +79,63 @@ static int count_in_zone(const struct GameState *g, int pl, const char *loc) {
     }
     return 0;
 }
+/* Mirror engine/src/ability/util.rs:zone_cards — resolve a named zone to its
+   card-id list. The zone-name table is the same one Rust's `Zone::from_str`
+   accepts (ability/enums.rs). Two documented extensions mirror special cases
+   Rust applies at the CALL sites rather than inside zone_cards:
+     • UnderMember is flattened over stage.under_cards (util::count_in_zone), and
+     • RevealedCards / Resolution resolve to the GameState-level pools
+       (card.rs:evaluate_location_condition reads game_state.revealed_cards
+       directly before falling through to zone_cards).
+   Empty stage slots (-1) are dropped here because EVERY Rust call site guards
+   with `id != -1`. Returns the number of ids written to `out`. */
+static int zone_ids(const struct GameState *g, int pl, const char *loc, int *out, int max) {
+    if (!loc || !out || max <= 0) return 0;
+    const RbPlayer *P = &g->p[pl];
+    int n = 0;
+#define RB_ZPUSH(id) do { int _z=(id); if (n < max && _z != RB_EMPTY_SLOT) out[n++] = _z; } while (0)
+    if (!strcmp(loc, "stage")) {
+        for (int i=0;i<RB_STAGE_SIZE;i++) RB_ZPUSH(P->stage[i]);
+    } else if (!strcmp(loc, "center")) {
+        RB_ZPUSH(P->stage[1]);
+    } else if (!strcmp(loc, "left") || !strcmp(loc, "left_side")) {
+        RB_ZPUSH(P->stage[0]);
+    } else if (!strcmp(loc, "right") || !strcmp(loc, "right_side")) {
+        RB_ZPUSH(P->stage[2]);
+    } else if (!strcmp(loc, "hand")) {
+        for (int i=0;i<P->hand.n;i++) RB_ZPUSH(P->hand.cards[i]);
+    } else if (!strcmp(loc, "deck") || !strcmp(loc, "deck_top") ||
+               !strcmp(loc, "deck_bottom") || !strcmp(loc, "energy_deck")) {
+        for (int i=0;i<P->deck.n;i++) RB_ZPUSH(P->deck.cards[i]);
+    } else if (!strcmp(loc, "discard") || !strcmp(loc, "waitroom")) {
+        for (int i=0;i<P->discard.n;i++) RB_ZPUSH(P->discard.cards[i]);
+    } else if (!strcmp(loc, "energy") || !strcmp(loc, "energy_zone")) {
+        for (int i=0;i<P->energy.n;i++) RB_ZPUSH(P->energy.cards[i]);
+    } else if (!strcmp(loc, "live_card_zone") || !strcmp(loc, "live")) {
+        for (int i=0;i<P->live.n;i++) RB_ZPUSH(P->live.cards[i]);
+    } else if (!strcmp(loc, "success_live_zone") || !strcmp(loc, "success_live_card_zone") ||
+               !strcmp(loc, "success_zone") || !strcmp(loc, "success")) {
+        for (int i=0;i<P->success.n;i++) RB_ZPUSH(P->success.cards[i]);
+    } else if (!strcmp(loc, "under_member") || !strcmp(loc, "under")) {
+        for (int s=0;s<RB_STAGE_SIZE;s++)
+            for (int i=0;i<P->under_cards[s].n;i++) RB_ZPUSH(P->under_cards[s].cards[i]);
+    } else if (!strcmp(loc, "revealed_cards")) {
+        for (int i=0;i<g->n_revealed;i++) RB_ZPUSH(g->revealed_cards[i]);
+    } else if (!strcmp(loc, "resolution") || !strcmp(loc, "resolution_zone")) {
+        for (int i=0;i<g->resolution.n;i++) RB_ZPUSH(g->resolution.cards[i]);
+    } else if (!strcmp(loc, "recently_moved") || !strcmp(loc, "preceding_moved") ||
+               !strcmp(loc, "those_cards") || !strcmp(loc, "selected_cards")) {
+        for (int i=0;i<g->n_recently_moved;i++) RB_ZPUSH(g->recently_moved[i]);
+    }
+    /* Unknown / non-zone marker strings resolve to the empty slice, exactly as
+       Rust's `None => &[]` / `_ => &[]` arms do. */
+#undef RB_ZPUSH
+    return n;
+}
 static int count_distinct_in_zone(const struct GameState *g, int pl, const char *loc) {
     if (!loc) return 0;
-    const RbPlayer *P = &g->p[pl];
-    int ids[RB_MAX_ZONE]; int n=0;
-    if (!strcmp(loc, "hand")){ for(int i=0;i<P->hand.n;i++) ids[n++]=P->hand.cards[i]; }
-    else if (!strcmp(loc, "stage")){ for(int i=0;i<RB_STAGE_SIZE;i++) if(P->stage[i]!=RB_EMPTY_SLOT) ids[n++]=P->stage[i]; }
-    else if (!strcmp(loc, "deck")){ for(int i=0;i<P->deck.n;i++) ids[n++]=P->deck.cards[i]; }
-    else if (!strcmp(loc, "discard")||!strcmp(loc,"waitroom")){ for(int i=0;i<P->discard.n;i++) ids[n++]=P->discard.cards[i]; }
-    else return count_in_zone(g,pl,loc);
+    int ids[RB_MAX_ZONE];
+    int n = zone_ids(g, pl, loc, ids, RB_MAX_ZONE);
     /* distinct by card name string */
     int distinct=0;
     for(int i=0;i<n;i++){
@@ -104,17 +152,18 @@ static int count_distinct_in_zone(const struct GameState *g, int pl, const char 
     }
     return distinct;
 }
-static int zone_count_filtered(const struct GameState *g, int pl, const char *loc, const char *card_type, const char *group){
-    int base = count_in_zone(g,pl,loc);
-    if(!card_type && !group) return base;
-    /* filter: live_card vs member_card vs energy_card (+ optional group_names) */
-    const RbPlayer *P=&g->p[pl];
-    int ids[RB_MAX_ZONE]; int n=0;
-    if (!strcmp(loc, "hand")){ for(int i=0;i<P->hand.n;i++) ids[n++]=P->hand.cards[i]; }
-    else if (!strcmp(loc, "stage")){ for(int i=0;i<RB_STAGE_SIZE;i++) if(P->stage[i]!=RB_EMPTY_SLOT) ids[n++]=P->stage[i]; }
-    else return base; /* other zones: no filter for now */
+static int zone_count_filtered_ex(const struct GameState *g, int pl, const char *loc, const char *card_type, const char *group, int exclude_cid){
+    if(!card_type && !group && exclude_cid < 0) return count_in_zone(g,pl,loc);
+    /* filter: live_card vs member_card vs energy_card (+ optional group_names,
+       + CardFilter.exclude_self). Mirror card.rs:evaluate_location_condition's
+       `count_side` closure — it filters util::zone_cards(player, location) for
+       EVERY zone, so the zone list comes from the shared zone_ids() resolver
+       (no per-zone opt-out). */
+    int ids[RB_MAX_ZONE];
+    int n = zone_ids(g, pl, loc, ids, RB_MAX_ZONE);
     int filtered=0;
     for(int i=0;i<n;i++){
+        if(exclude_cid >= 0 && ids[i] == exclude_cid) continue;
         /* Use the faithful type_flags encoding (rb_card_is_live/rb_card_is_energy),
             NOT the broken n_hearts==0&&cost==0&&blade==0 heuristic — real live/energy
             cards DO have hearts/cost, so that heuristic mis-classified everything
@@ -128,18 +177,63 @@ static int zone_count_filtered(const struct GameState *g, int pl, const char *lo
             else if(!strcmp(card_type,"member_card") && is_member) match=1;
             else if(!strcmp(card_type,"energy_card") && is_energy) match=1;
             else if(!strcmp(card_type,"card")) match=1;
-        } else match=1; /* group filter only */
+        } else match=1; /* group / exclude_self filter only */
         if(match && group && !rb_card_matches_group_str(ids[i], group)) match=0;
         if(match) filtered++;
     }
     return filtered;
 }
+static int zone_count_filtered(const struct GameState *g, int pl, const char *loc, const char *card_type, const char *group){
+    return zone_count_filtered_ex(g, pl, loc, card_type, group, -1);
+}
 
 /* Forward */
 static int eval_condition_inner(const struct GameState *g, int actor, const Condition *c);
+static int eval_condition_inner_host(const struct GameState *g, int actor, int host_cid, const Condition *c);
+static int stage_index_of_position(const char *pos);
+
+/* Mirror engine/src/ability/condition/card.rs:resolve_target_for_scope —
+   target=="self" with scope=="both" widens the scope to both players. */
+static const char *resolve_target_for_scope(const Condition *c) {
+    const char *target = get_str(c, "target");
+    if (!target) target = "self";
+    const char *scope = get_str(c, "scope");
+    if (!strcmp(target, "self") && scope && !strcmp(scope, "both")) return "both";
+    return target;
+}
+
+/* Mirror engine/src/ability/condition/card.rs:evaluate_check_self_condition.
+   `check_self` conditions (parser emits them for 「このカードが控え室にある」
+   style gates) test whether the ACTIVATING card itself sits in the location
+   instead of counting matching cards there.
+   Returns -1 (Rust `None`) when the condition is not a check_self condition or
+   lacks a resolvable location, so callers fall through to normal evaluation.
+   Negation is NOT applied here — callers own negation semantics. */
+static int eval_check_self(const struct GameState *g, int actor, int host_cid, const Condition *c) {
+    int cs = 0;
+    if (!get_bool(c, "check_self", &cs) || !cs) return -1;
+    if (host_cid < 0) return -1;                 /* Rust: `self.activating_card_id?` */
+    const char *loc = get_str(c, "location");
+    if (!loc || !*loc) return -1;
+    int ids[RB_MAX_ZONE];
+    int present = 0;
+    const char *scope = resolve_target_for_scope(c);
+    if (!strcmp(scope, "both")) {
+        for (int p = 0; p < 2 && !present; p++) {
+            int n = zone_ids(g, p, loc, ids, RB_MAX_ZONE);
+            for (int i = 0; i < n; i++) if (ids[i] == host_cid) { present = 1; break; }
+        }
+    } else {
+        int pl = (!strcmp(scope, "opponent")) ? (actor ^ 1) : actor;
+        int n = zone_ids(g, pl, loc, ids, RB_MAX_ZONE);
+        for (int i = 0; i < n; i++) if (ids[i] == host_cid) { present = 1; break; }
+    }
+    int thr = 1; get_i(c, "count", &thr);
+    return eval_operator(present ? 1 : 0, get_str(c, "operator"), thr);
+}
 
 /* ── compound (variant 0) / or ── */
-static int eval_compound(const struct GameState *g, int actor, const Condition *c) {
+static int eval_compound(const struct GameState *g, int actor, int host_cid, const Condition *c) {
     const char *op = get_str(c, "operator");
     const CondValue *v = find_val(c, "conditions");
     if (!v || v->tag != RB_TAG_ARRAY || !v->arr) return 1;
@@ -147,7 +241,10 @@ static int eval_compound(const struct GameState *g, int actor, const Condition *
     for (uint32_t i=0;i<v->arr_n;i++) {
         const CondValue *cv = &v->arr[i];
         if (cv->tag != RB_TAG_OBJVAR || !cv->cond) continue;
-        int r = eval_condition_inner(g, actor, cv->cond);
+        /* Rust keeps the same ConditionEvaluator (same activating_card_id) for
+           every nested condition — forward the host so check_self / not_moved /
+           exclude_self keep working inside compounds. */
+        int r = eval_condition_inner_host(g, actor, host_cid, cv->cond);
         if (is_or && r) return 1;
         if (!is_or && !r) return 0;
     }
@@ -155,7 +252,10 @@ static int eval_compound(const struct GameState *g, int actor, const Condition *
 }
 
 /* ── location / card_count (variant 1) ── */
-static int eval_location(const struct GameState *g, int actor, const Condition *c) {
+static int eval_location(const struct GameState *g, int actor, int host_cid, const Condition *c) {
+    /* Rust evaluates check_self FIRST and short-circuits on it. */
+    int cs = eval_check_self(g, actor, host_cid, c);
+    if (cs >= 0) return cs;
     int has_count = 0; int cnt_thr = 1;
     int tmp;
     has_count = get_i(c, "count", &tmp); if (has_count) cnt_thr = tmp;
@@ -180,10 +280,26 @@ static int eval_location(const struct GameState *g, int actor, const Condition *
     const char *group = get_str(c, "group");
     const CondValue *gv = find_val(c, "group_names");
     if (gv && gv->tag == RB_TAG_ARRAY && gv->arr_n>0 && gv->arr[0].tag==RB_TAG_STR) group = gv->arr[0].s;
+    /* group_reference=="same_group_name" overrides the filter group with the
+       ACTIVATING card's own group (card.rs: `group_override`). */
+    const char *gref = get_str(c, "group_reference");
+    Card hostc; int have_hostc = 0;
+    if (gref && !strcmp(gref, "same_group_name") && host_cid >= 0 &&
+        rb_decode_card_by_index((uint32_t)host_cid, &hostc)) {
+        const char *hg = rb_card_string(hostc.group_idx);
+        if (hg && *hg) group = hg;
+        have_hostc = 1;
+    }
+    /* exclude_self: drop the activating card from the match set
+       (card.rs: `filter.exclude_self = self.activating_card_id`). */
+    int excl = 0; get_bool(c, "exclude_self", &excl);
+    int exclude_cid = (excl && host_cid >= 0) ? host_cid : -1;
     int actual = 0;
-    if (ctype || group) actual = zone_count_filtered(g, pl, loc, ctype, group);
+    if (ctype || group) actual = zone_count_filtered_ex(g, pl, loc, ctype, group, exclude_cid);
     else if (distinct) actual = count_distinct_in_zone(g, pl, loc);
+    else if (exclude_cid >= 0) actual = zone_count_filtered_ex(g, pl, loc, NULL, NULL, exclude_cid);
     else actual = count_in_zone(g, pl, loc);
+    if (have_hostc) rb_free_card(&hostc);
 
     /* 'all' flag means require all slots filled etc. For now treat as count check */
     if (has_count) {
@@ -260,26 +376,28 @@ static int eval_position(const struct GameState *g, int actor, const Condition *
 
 /* ── both_condition (variant 2 alias) ──
    Mirror engine/src/ability/condition/card.rs:evaluate_both_condition.
-    `values` is a list of card scores; route to success/live cards and
-    require that EVERY listed score is present. Dispatched from
-    eval_comparison_inner when no comparison_type=="score" is present
+    `values` is a list of card scores; the candidate pool is selected BY
+    LOCATION (SuccessLiveZone → success only, LiveCardZone → live only, anything
+    else → success ⧺ live) and every listed score must be present. Dispatched
+    from eval_comparison_inner when no comparison_type=="score" is present
     (variant 2 shared with comparison_condition). */
-static int __attribute__((unused)) eval_both_condition(const struct GameState *g, int actor, const Condition *c) {
+static int eval_both_condition(const struct GameState *g, int actor, const Condition *c) {
     const CondValue *vv = find_val(c, "values");
     if (!vv || vv->tag != RB_TAG_ARRAY || vv->arr_n == 0) return 0;
     int pl = target_player_idx(actor, c);
     const RbPlayer *P = &g->p[pl];
+    const char *loc = get_str(c, "location");
+    int ids[RB_MAX_ZONE]; int n = 0;
+    int only_success = loc && (!strcmp(loc, "success_live_zone") || !strcmp(loc, "success_live_card_zone"));
+    int only_live    = loc && !strcmp(loc, "live_card_zone");
+    if (!only_live)    for (int j = 0; j < P->success.n && n < RB_MAX_ZONE; j++) ids[n++] = P->success.cards[j];
+    if (!only_success) for (int j = 0; j < P->live.n    && n < RB_MAX_ZONE; j++) ids[n++] = P->live.cards[j];
     for (uint32_t i = 0; i < vv->arr_n; i++) {
         int want = (vv->arr[i].tag == RB_TAG_I64) ? (int)vv->arr[i].i
                  : (vv->arr[i].tag == RB_TAG_STR && vv->arr[i].s) ? atoi(vv->arr[i].s) : 0;
         int found = 0;
-        for (int j = 0; j < P->success.n && !found; j++) {
-            Card cc; if (rb_decode_card_by_index((uint32_t)P->success.cards[j], &cc)) {
-                if (cc.score == want) found = 1; rb_free_card(&cc);
-            }
-        }
-        for (int j = 0; j < P->live.n && !found; j++) {
-            Card cc; if (rb_decode_card_by_index((uint32_t)P->live.cards[j], &cc)) {
+        for (int j = 0; j < n && !found; j++) {
+            Card cc; if (rb_decode_card_by_index((uint32_t)ids[j], &cc)) {
                 if (cc.score == want) found = 1; rb_free_card(&cc);
             }
         }
@@ -289,6 +407,9 @@ static int __attribute__((unused)) eval_both_condition(const struct GameState *g
 }
 
 static int eval_comparison_inner(const struct GameState *g, int actor, int host_cid, const Condition *c) {
+    /* Rust evaluates check_self FIRST and short-circuits on it
+       (card.rs:evaluate_comparison_condition line 1). */
+    { int cs = eval_check_self(g, actor, host_cid, c); if (cs >= 0) return cs; }
     const char *loc = get_str(c, "location");
     const char *agg = get_str(c, "aggregate");
     const char *ctype = get_str(c, "comparison_type");
@@ -333,7 +454,7 @@ static int eval_comparison_inner(const struct GameState *g, int actor, int host_
     if (pos && !strcmp(pos, "center") && loc && !strcmp(loc, "stage")) {
         return eval_highest_cost(g, actor, host_cid, c);
     }
-    if (loc) return eval_location(g, actor, c);
+    if (loc) return eval_location(g, actor, host_cid, c);
     int cnt=0, has_cnt=get_i(c, "count", &cnt);
     if (!has_cnt) {
         const CondValue *vv = find_val(c, "values");
@@ -351,7 +472,8 @@ static int eval_comparison_inner(const struct GameState *g, int actor, int host_
 }
 
 /* ── movement (variant 3) ── */
-static int eval_movement(const struct GameState *g, int actor, const Condition *c) {
+static int eval_movement(const struct GameState *g, int actor, int host_cid, const Condition *c) {
+    (void)host_cid;
     const char *mv = get_str(c, "movement");
     if (!mv) mv = get_str(c, "source"); /* some use source */
     int has_any = g->n_recently_moved > 0;
@@ -383,24 +505,24 @@ static int eval_movement(const struct GameState *g, int actor, const Condition *
 }
 
 /* ── group (variant 4) ── */
-static int eval_group(const struct GameState *g, int actor, const Condition *c) {
+static int eval_group(const struct GameState *g, int actor, int host_cid, const Condition *c) {
+    (void)host_cid;
     const char *loc = get_str(c, "location");
     if (!loc) loc = "stage";
     int pl = target_player_idx(actor, c);
     const CondValue *gv = find_val(c, "group_names");
     if (!gv || gv->tag != RB_TAG_ARRAY || gv->arr_n==0) return count_in_zone(g, pl, loc)>0;
-    /* Check if any card in zone has group matching any of group_names */
-    const RbPlayer *P=&g->p[pl];
-    int ids[RB_MAX_ZONE]; int n=0;
-    if (!strcmp(loc,"stage")){ for(int i=0;i<RB_STAGE_SIZE;i++) if(P->stage[i]!=RB_EMPTY_SLOT) ids[n++]=P->stage[i]; }
-    else if(!strcmp(loc,"hand")){ for(int i=0;i<P->hand.n;i++) ids[n++]=P->hand.cards[i]; }
-    else if(!strcmp(loc,"discard")||!strcmp(loc,"waitroom")){ for(int i=0;i<P->discard.n;i++) ids[n++]=P->discard.cards[i]; }
-    else return count_in_zone(g,pl,loc)>0;
+    /* Zone resolution mirrors card_matches_any_group's call site: Rust iterates
+       util::zone_cards(player, location), i.e. EVERY zone, not just
+       stage/hand/discard. */
+    int ids[RB_MAX_ZONE];
+    int n = zone_ids(g, pl, loc, ids, RB_MAX_ZONE);
+    if (n == 0) return 0;
     for(int i=0;i<n;i++){
         Card card; if(!rb_decode_card_by_index((uint32_t)ids[i],&card)) continue;
         const char *gname = rb_card_string(card.group_idx);
         const char *uname = rb_card_string(card.unit_idx);
-        if (gname && (strstr(gname,"μ")||strstr(gname,"ミ"))) {
+        if (rb_ability_debug_enabled() && gname && (strstr(gname,"μ")||strstr(gname,"ミ"))) {
             for(uint32_t gi=0;gi<gv->arr_n;gi++) if(gv->arr[gi].tag==RB_TAG_STR && gv->arr[gi].s)
                 fprintf(stderr,"[grp] card=%s gname=%s uname=%s target=%s\n",
                         card.name?card.name:"?", gname, uname?uname:"-", gv->arr[gi].s);
@@ -449,8 +571,7 @@ static int eval_appearance(const struct GameState *g, int actor, const Condition
 static int phase_in_live(const struct GameState *g) {
     return g->phase==RB_PHASE_LIVE_SET || g->phase==RB_PHASE_PERFORMANCE || g->phase==RB_PHASE_VICTORY;
 }
-static int eval_temporal(const struct GameState *g, int actor, const Condition *c) {
-    (void)actor;
+static int eval_temporal(const struct GameState *g, int actor, int host_cid, const Condition *c) {
     int tn=0;
     if (get_i(c,"turn_number",&tn)) {
         const char *op = get_str(c,"operator");
@@ -474,8 +595,6 @@ static int eval_temporal(const struct GameState *g, int actor, const Condition *
         if (!strcmp(temp,"before_live"))
             return !(g->phase==RB_PHASE_LIVE_SET || g->phase==RB_PHASE_PERFORMANCE || g->phase==RB_PHASE_VICTORY);
         if (!strcmp(temp,"first_turn")) return g->turn==1;
-        /* this_turn with a count defaults to debut_count_this_turn which the
-           C port does not track; fall back to true per Rust's no-nested default. */
         if (!strcmp(temp,"this_turn")) {
             /* Mirror state.rs::evaluate_temporal_condition "this_turn" branch. */
             int count = -1; int has_count = get_i(c, "count", &count);
@@ -504,15 +623,31 @@ static int eval_temporal(const struct GameState *g, int actor, const Condition *
             if (scope) return atoi(scope) == g->turn;
             const Condition *nested = get_cond(c, "condition");
             if (nested) {
-                /* NotMoved/HasMoved nested conditions gate on this-turn movement. */
+                /* NotMoved/HasMoved nested conditions gate on this-turn movement.
+                   Faithful to state.rs:evaluate_temporal_condition — the checks
+                   are keyed on the ACTIVATING card (host_cid), with the
+                   position / position-change / activating-card fallback chain. */
                 const char *mv = get_str(nested, "movement");
-                if (mv && (!strcmp(mv,"not_moved")||!strcmp(mv,"notMoved")))
-                    /* activating_card unavailable here; Rust returns true when no
-                        activating card is set — preserve that default. */
-                    return 1;
+                if (mv && (!strcmp(mv,"not_moved")||!strcmp(mv,"notMoved"))) {
+                    /* Rust: Some(cid) => !has_card_moved_this_turn(cid); None => true. */
+                    if (host_cid < 0) return 1;
+                    return !card_moved_this_turn(g, host_cid);
+                }
                 if (mv && (!strcmp(mv,"has_moved")||!strcmp(mv,"hasMoved"))) {
+                    /* 1) explicit `position` on the OUTER condition names the card. */
+                    const Condition *posc = get_cond(c, "position");
+                    const char *pos_str = posc ? get_str(posc, "position") : get_str(c, "position");
+                    if (pos_str) {
+                        int idx = stage_index_of_position(pos_str);
+                        if (idx >= 0 && g->p[who].stage[idx] != RB_EMPTY_SLOT)
+                            return card_moved_this_turn(g, g->p[who].stage[idx]);
+                    }
+                    /* 2) a position change happened this turn: any stage member
+                          (optionally group-filtered by the nested-then-outer
+                          group_names) that moved satisfies the gate. */
                     if (g->position_change_occurred_this_turn) {
                         const char *grp = get_str(nested, "group_names");
+                        if (!grp) grp = get_str(c, "group_names");
                         for (int q=0; q<RB_STAGE_SIZE; q++) {
                             int cid = g->p[who].stage[q];
                             if (cid < 0) continue;
@@ -521,9 +656,11 @@ static int eval_temporal(const struct GameState *g, int actor, const Condition *
                         }
                         return 0;
                     }
+                    /* 3) fall back to the activating card itself. */
+                    if (host_cid >= 0) return card_moved_this_turn(g, host_cid);
                     return 0;
                 }
-                return eval_condition_inner(g, actor, nested);
+                return eval_condition_inner_host(g, actor, host_cid, nested);
             }
             return 1; /* Rust default when nothing gates */
         }
@@ -565,7 +702,19 @@ static int eval_state_change(const struct GameState *g, int actor, const Conditi
     }
     return 0;
 }
-static int eval_state(const struct GameState *g, int actor, const Condition *c) {
+/* Mirror engine/src/ability/util.rs:orientation_matches_state — a card whose
+   current orientation modifier is `orientation` matches `state`; a card with NO
+   modifier is treated as active (the default orientation).
+   The C engine additionally keeps the per-slot `stage_wait` flag, so a member
+   with no explicit orientation modifier falls back to that flag (the two are
+   the same fact in Rust, where wait state IS the orientation modifier). */
+static int orientation_matches_state(const struct GameState *g, int pl, int slot, const char *state) {
+    if (!state) return 0;
+    const char *om = rb_mods_get_orientation((RbMods*)&g->mods, g->p[pl].stage[slot]);
+    if (om && *om) return !strcmp(om, state);
+    return !strcmp(state, g->p[pl].stage_wait[slot] ? "wait" : "active");
+}
+static int eval_state(const struct GameState *g, int actor, int host_cid, const Condition *c) {
     const char *from = get_str(c, "from_state");
     const char *to   = get_str(c, "to_state");
     if (from && to) return eval_state_change(g, actor, c, from, to);
@@ -586,25 +735,55 @@ static int eval_state(const struct GameState *g, int actor, const Condition *c) 
             return P->energy_active > 0;
         }
         if (!strcmp(st, "wait")) {
-            if (is_all) return P->energy.n > 0 && P->energy_active == 0;
+            if (is_all) return P->energy_active == 0;
             return P->energy_active < P->energy.n;
         }
         return 1;
     }
 
-    /* member active/wait state */
+    /* member active/wait state — faithful port of
+       state.rs:evaluate_state_condition's non-energy branch. */
     if (st && (!strcmp(st, "active") || !strcmp(st, "wait"))) {
-        int matching = 0;
-        for (int i = 0; i < RB_STAGE_SIZE; i++) if (P->stage[i] != RB_EMPTY_SLOT) {
-            int is_wait = P->stage_wait[i];
-            const char *cur = is_wait ? "wait" : "active";
-            if (!strcmp(st, cur)) matching++;
-            const char *om = rb_mods_get_orientation((RbMods*)&g->mods, P->stage[i]);
-            if (om && !strcmp(om, st)) matching++;
+        int occupied = 0;
+        for (int i = 0; i < RB_STAGE_SIZE; i++) if (P->stage[i] != RB_EMPTY_SLOT) occupied++;
+        if (occupied == 0) return 0;   /* Rust: stage_cards.is_empty() => false */
+        /* 「このメンバーが…」 self-state text must NOT be widened by the parser's
+           default card_type=member_card, otherwise every waited member on stage
+           would satisfy every copy of the card (the two-copy bug). */
+        const char *text = get_str(c, "text");
+        const char *cs   = get_str(c, "check_self");
+        int is_self_text = text && strstr(text, "このメンバーが") != NULL;
+        const char *ctype = get_str(c, "card_type");
+        const char *group = get_str(c, "group_names");
+        const CondValue *chars = find_val(c, "characters");
+        int has_filter;
+        if (is_self_text && !cs) has_filter = 0;
+        else has_filter = (group != NULL) || (ctype != NULL) ||
+                          (chars && chars->tag == RB_TAG_ARRAY && chars->arr_n > 0);
+        if (has_filter) {
+            for (int i = 0; i < RB_STAGE_SIZE; i++) {
+                int cid = P->stage[i];
+                if (cid == RB_EMPTY_SLOT) continue;
+                if (!orientation_matches_state(g, pl, i, st)) continue;
+                if (ctype && !card_matches_card_type_filter(cid, ctype)) continue;
+                if (group && !rb_card_matches_group_str(cid, group)) continue;
+                if (chars && chars->tag == RB_TAG_ARRAY && chars->arr_n > 0) {
+                    int ok = 0;
+                    for (uint32_t k = 0; k < chars->arr_n && !ok; k++)
+                        if (chars->arr[k].tag == RB_TAG_STR && chars->arr[k].s &&
+                            rb_card_matches_group_str(cid, chars->arr[k].s)) ok = 1;
+                    if (!ok) continue;
+                }
+                return 1;
+            }
+            return 0;
         }
-        const char *op = get_str(c, "operator");
-        int cnt = 1; get_i(c, "count", &cnt);
-        return eval_operator(matching, op, cnt);
+        /* Self branch: the ACTIVATING card must be on this stage AND match the
+           requested orientation (Rust `self.activating_card_id.is_some_and(...)`). */
+        if (host_cid < 0) return 0;
+        for (int i = 0; i < RB_STAGE_SIZE; i++)
+            if (P->stage[i] == host_cid) return orientation_matches_state(g, pl, i, st);
+        return 0;
     }
     return 1;
 }
@@ -798,29 +977,30 @@ static int card_ability_trigger_contains(int cid, const char *trig) {
    Mirror engine/src/ability/condition/card.rs:evaluate_ability_filter_condition.
    Scans the location's cards (stage/hand/discard/live) for has_ability /
    no_ability, optionally requiring a matching trigger prefix. */
-static int eval_ability_filter(const struct GameState *g, int actor, const Condition *c) {
+static int eval_ability_filter(const struct GameState *g, int actor, int host_cid, const Condition *c) {
     const char *filter = get_str(c, "ability_filter");
     if (!filter) filter = "no_ability";
     const char *loc = get_str(c, "location");
     if (!loc) loc = "stage";
     int pl = target_player_idx(actor, c);
 
-    int ids[RB_MAX_ZONE]; int n=0;
-    if (!strcmp(loc,"stage")) { for(int i=0;i<RB_STAGE_SIZE;i++) if(g->p[pl].stage[i]!=RB_EMPTY_SLOT) ids[n++]=g->p[pl].stage[i]; }
-    else if (!strcmp(loc,"hand")) { for(int i=0;i<g->p[pl].hand.n;i++) ids[n++]=g->p[pl].hand.cards[i]; }
-    else if (!strcmp(loc,"discard")||!strcmp(loc,"waitroom")) { for(int i=0;i<g->p[pl].discard.n;i++) ids[n++]=g->p[pl].discard.cards[i]; }
-    else if (!strcmp(loc,"energy")) { for(int i=0;i<g->p[pl].energy.n;i++) ids[n++]=g->p[pl].energy.cards[i]; }
-    else if (!strcmp(loc,"live")||!strcmp(loc,"live_card_zone")) { for(int i=0;i<g->p[pl].live.n;i++) ids[n++]=g->p[pl].live.cards[i]; }
-    else { /* fall back to activating card (host_cid) */ }
+    /* Rust scans util::zone_cards(player, location) — the shared resolver keeps
+       every zone reachable (the old per-zone if-chain silently dropped
+       deck/success/under_member to the activating-card fallback). */
+    int ids[RB_MAX_ZONE];
+    int n = zone_ids(g, pl, loc, ids, RB_MAX_ZONE);
 
     /* trigger prefixes */
     const CondValue *tv = get_arr(c, "ability_filter_triggers");
 
     int has_ability = 0;
     if (n == 0) {
-        /* no zone cards: ability_filter resolves to the activating card; if
-           none, mirror Rust (returns false for has_ability, true for no_ability). */
-    } else {
+        /* No cards in the zone: Rust falls back to the ACTIVATING card
+           (card.rs:evaluate_ability_filter_condition). With no activating card
+           either, has_ability stays false (so no_ability answers true). */
+        if (host_cid >= 0) { ids[0] = host_cid; n = 1; }
+    }
+    if (n > 0) {
         for (int i = 0; i < n; i++) {
             int cid = ids[i];
             int na = rb_card_num_abilities((uint32_t)cid);
@@ -899,13 +1079,13 @@ static int eval_score(const struct GameState *g, int actor, const Condition *c) 
     return eval_operator(g->p[pl].score, op, thr);
 }
 /* ── choice/position etc ── */
-static int eval_choice(const struct GameState *g, int actor, const Condition *c) {
+static int eval_choice(const struct GameState *g, int actor, int host_cid, const Condition *c) {
     /* Choice conditions are interactive; headless eval treats them as
        satisfiable. If a nested "condition" field is present, gate on it. */
     for (uint32_t i = 0; i < c->n_fields; i++) {
         const CondField *f = &c->fields[i];
         if (f->v.tag == RB_TAG_OBJVAR && f->v.cond && f->key && !strcmp(f->key, "condition"))
-            return rb_eval_condition(g, actor, f->v.cond);
+            return eval_condition_inner_host(g, actor, host_cid, f->v.cond);
     }
     return 1;
 }
@@ -913,12 +1093,14 @@ static int eval_choice(const struct GameState *g, int actor, const Condition *c)
 /* Complex condition (variant 12) — Rust ANDs a nested `cause` (and `effect`)
    condition. The decoder stores nested conditions as RB_TAG_OBJVAR CondValues,
    so we evaluate every nested sub-condition with AND (OR when the field is an
-   array keyed "or"/"any_of"). Mirrors state.rs:evaluate_complex_condition. */
-static int eval_complex(const struct GameState *g, int actor, const Condition *c) {
+   array keyed "or"/"any_of"). Mirrors state.rs:evaluate_complex_condition.
+   The activating card (host_cid) is forwarded because Rust reuses the same
+   ConditionEvaluator for every nested condition. */
+static int eval_complex(const struct GameState *g, int actor, int host_cid, const Condition *c) {
     for (uint32_t i = 0; i < c->n_fields; i++) {
         const CondField *f = &c->fields[i];
         if (f->v.tag == RB_TAG_OBJVAR && f->v.cond) {
-            if (!rb_eval_condition(g, actor, f->v.cond)) return 0;
+            if (!eval_condition_inner_host(g, actor, host_cid, f->v.cond)) return 0;
         } else if (f->v.tag == RB_TAG_ARRAY) {
             int combine_or = (f->key && (!strcmp(f->key, "or") ||
                                          !strcmp(f->key, "any_of") ||
@@ -927,7 +1109,7 @@ static int eval_complex(const struct GameState *g, int actor, const Condition *c
             for (uint32_t j = 0; j < f->v.arr_n; j++) {
                 CondValue *e = &f->v.arr[j];
                 if (e->tag == RB_TAG_OBJVAR && e->cond) {
-                    if (rb_eval_condition(g, actor, e->cond)) any = 1; else all = 0;
+                    if (eval_condition_inner_host(g, actor, host_cid, e->cond)) any = 1; else all = 0;
                 }
             }
             if (combine_or) { if (!any) return 0; }
@@ -941,25 +1123,29 @@ static int eval_complex(const struct GameState *g, int actor, const Condition *c
 static int eval_condition_inner_host(const struct GameState *g, int actor, int host_cid, const Condition *c) {
     if (!c) return 1;
     int negation=0; get_bool(c,"negation",&negation);
-    { const char *dp=get_str(c,"position"), *dl=get_str(c,"location"), *dc=get_str(c,"comparison_type"),
-        *dt=get_str(c,"target"), *dcs=get_str(c,"check_self");
-      if(dp&&!strcmp(dp,"center")) fprintf(stderr,"[cond] v=%d pos=center loc=%s cmptype=%s target=%s checkself=%s\n",
-          c->variant, dl?dl:"-", dc?dc:"-", dt?dt:"-", dcs?dcs:"-"); }
+    /* Mirrors the [cond] log::debug! in condition/card.rs — gated on the shared
+       ability-debug switch so a full suite run is not flooded. */
+    if (rb_ability_debug_enabled()) {
+        const char *dp=get_str(c,"position"), *dl=get_str(c,"location"), *dc=get_str(c,"comparison_type"),
+            *dt=get_str(c,"target"), *dcs=get_str(c,"check_self");
+        if(dp&&!strcmp(dp,"center")) fprintf(stderr,"[cond] v=%d pos=center loc=%s cmptype=%s target=%s checkself=%s\n",
+            c->variant, dl?dl:"-", dc?dc:"-", dt?dt:"-", dcs?dcs:"-");
+    }
     int r=1;
     switch ((RbConditionVariant)c->variant) {
-        case RB_COND_COMPOUND:            r = eval_compound(g, actor, c); break;
-        case RB_COND_LOCATION:            r = eval_location(g, actor, c); break;
+        case RB_COND_COMPOUND:            r = eval_compound(g, actor, host_cid, c); break;
+        case RB_COND_LOCATION:            r = eval_location(g, actor, host_cid, c); break;
         case RB_COND_COMPARISON:          r = eval_comparison_inner(g, actor, host_cid, c); break;
-        case RB_COND_MOVEMENT:            r = eval_movement(g, actor, c); break;
-        case RB_COND_GROUP:               r = eval_group(g, actor, c); break;
+        case RB_COND_MOVEMENT:            r = eval_movement(g, actor, host_cid, c); break;
+        case RB_COND_GROUP:               r = eval_group(g, actor, host_cid, c); break;
         case RB_COND_APPEARANCE:          r = eval_appearance(g, actor, c); break;
-        case RB_COND_TEMPORAL:            r = eval_temporal(g, actor, c); break;
-        case RB_COND_STATE:               r = eval_state(g, actor, c); break;
+        case RB_COND_TEMPORAL:            r = eval_temporal(g, actor, host_cid, c); break;
+        case RB_COND_STATE:               r = eval_state(g, actor, host_cid, c); break;
         case RB_COND_RESOURCE:            r = eval_resource(g, actor, c); break;
-        case RB_COND_ABILITY_FILTER:      r = eval_ability_filter(g, actor, c); break;
+        case RB_COND_ABILITY_FILTER:      r = eval_ability_filter(g, actor, host_cid, c); break;
         case RB_COND_SCORE_THRESHOLD:     r = eval_score(g, actor, c); break;
-        case RB_COND_CHOICE:              r = eval_choice(g, actor, c); break;
-        case RB_COND_COMPLEX:             r = eval_complex(g, actor, c); break;
+        case RB_COND_CHOICE:              r = eval_choice(g, actor, host_cid, c); break;
+        case RB_COND_COMPLEX:             r = eval_complex(g, actor, host_cid, c); break;
         case RB_COND_POSITION:            r = eval_position(g, actor, c); break;
         case RB_COND_OPPONENT_CHOICE:
             /* Mirror state.rs:evaluate_opponent_choice_condition — true unless the

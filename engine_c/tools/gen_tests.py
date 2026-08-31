@@ -291,6 +291,10 @@ def map_board_expr(expr: str, func_name: str):
         pl = int(m.group(1)) - 1
         area = AREA_MAP.get(m.group(2), "1")
         return f"tg.state.p[{pl}].under_cards[{area}].n"
+    # game.state.revealed_cards.len() -> n_revealed
+    m = re.match(r'game\.state\.revealed_cards\.len\(\)', e)
+    if m:
+        return "tg.state.n_revealed"
     # game.state.playerN.<known field>  (score, energy, ...)
     m = re.match(r'game\.state\.player(\d+)\.(\w+)', e)
     if m:
@@ -337,15 +341,95 @@ def merge_asserts(lines):
 
 KNOWN_PLAYER_FIELDS = {"energy_active", "score", "deck_refreshed_this_turn", "life"}
 
-def expand_for_loops(lines, consts):
+def expand_for_loops(lines, consts, depth=0):
     """Expand `for _ in START..END { body }` (range with a literal or const
     upper bound) into repeated body statements so setup such as deck-fill
-    pushes actually executes instead of degrading to a TODO comment."""
+    pushes actually executes instead of degrading to a TODO comment.
+
+    Recursive: a loop unrolled by an outer pass can itself contain loops
+    (e.g. `for _ in 0..50 { … }` nested inside `for p in [player1, player2]`),
+    so the copied body is re-expanded before being emitted."""
     out = []
     i = 0
     n = len(lines)
     while i < n:
         s = lines[i].strip()
+        # for VAR in [a, b, c] { ... }  (array literal unroll) — covers
+        # revealed_cards.push loops, deck-fill loops, select-from-array, etc.
+        m_arr = re.match(r'\s*for\s+(?:mut\s+)?(\w+|_)\s+in\s*\[(.*?)\](?:\s*\.\w+\([^)]*\))*\s*\{?\s*$', s)
+        if m_arr and 'filter(' not in s:
+            var = m_arr.group(1)
+            elems = split_top_commas(m_arr.group(2))
+            elems = [re.sub(r'\.iter\(\)\s*.*$', '', e).strip() for e in elems]
+            elems = [e for e in elems if e]
+            if not elems or len(elems) > 32:
+                out.append(lines[i]); i += 1; continue
+            depth = lines[i].count('{') - lines[i].count('}')
+            j = i + 1; body = []
+            while j < n and depth > 0:
+                body.append(lines[j])
+                depth += lines[j].count('{') - lines[j].count('}')
+                j += 1
+            if body and body[-1].strip() == '}':
+                body = body[:-1]
+            blob = "\n".join(body)
+            if "TestGame" in blob or "tg2" in blob or "return" in blob:
+                out.append(lines[i]); i += 1; continue
+            # Re-expand the body so loops nested inside an unrolled element
+            # (e.g. a range loop inside `for p in [player1, player2]`) are
+            # themselves expanded rather than copied through verbatim.
+            if depth < 8:
+                body = expand_for_loops(body, consts, depth + 1)
+            for e in elems:
+                if var == '_':
+                    out.extend(body)
+                else:
+                    for bl in body:
+                        out.append(re.sub(r'\b' + re.escape(var) + r'\b', e, bl))
+            i = j; continue
+        # Single-line range loop: `for _ in A..B { STMT; STMT; }` — the common
+        # `game.pass()` phase-advance and `main_deck.cards.push` deck-fill loops
+        # appear on one line and would otherwise degrade to a TODO. Expand the
+        # inline body (split on ';') so the per-statement rules below translate it.
+        m_sl = re.match(r'\s*for\s+(?:mut\s+)?(?:_|\(\s*[^)]*?\)|\w+)\s+in\s+(\d+)\.\.(\w+)\s*\{(.+)\}\s*$', s)
+        if m_sl:
+            start = int(m_sl.group(1)); endtok = m_sl.group(2)
+            if re.match(r'^\d+$', endtok):
+                end = int(endtok)
+            elif endtok in consts and re.match(r'^\d+$', consts[endtok]):
+                end = int(consts[endtok])
+            else:
+                out.append(lines[i]); i += 1; continue
+            count = end - start
+            if count <= 0 or count > 64:
+                out.append(lines[i]); i += 1; continue
+            inner = m_sl.group(3)
+            if '{' in inner or '}' in inner:   # nested braces: leave for the multi-line path
+                out.append(lines[i]); i += 1; continue
+            stmts = [st.strip() for st in inner.split(';') if st.strip()]
+            for _ in range(count):
+                for st in stmts:
+                    out.append("    " + st)
+            i += 1; continue
+        # Single-line array loop: `for VAR in [a, b, c] { STMT; STMT; }` — unroll the
+        # inline body (split on ';') once per element; substitute the named VAR if present.
+        m_sla = re.match(r'\s*for\s+(?:mut\s+)?(\w+|_)\s+in\s*\[(.*?)\]\s*\{(.+)\}\s*$', s)
+        if m_sla:
+            var = m_sla.group(1)
+            items = [e.strip() for e in split_top_commas(m_sla.group(2)) if e.strip()]
+            if not items or len(items) > 32:
+                out.append(lines[i]); i += 1; continue
+            inner = m_sla.group(3)
+            if '{' in inner or '}' in inner:
+                out.append(lines[i]); i += 1; continue
+            stmts = [st.strip() for st in inner.split(';') if st.strip()]
+            for it in items:
+                for st in stmts:
+                    if var == '_':
+                        out.append("    " + st)
+                    else:
+                        out.append("    " + re.sub(r'\b' + re.escape(var) + r'\b', it, st))
+            i += 1; continue
         m = re.match(r'\s*for\s+(?:mut\s+)?(?:_|\(\s*[^)]*?\)|\w+)\s+in\s+(\d+)\.\.(\w+)\s*\{?\s*$', s)
         if not m:
             out.append(lines[i]); i += 1; continue
@@ -373,6 +457,10 @@ def expand_for_loops(lines, consts):
         # game — repeating those would redeclare tg2 / break control flow.
         if "TestGame" in blob or "tg2" in blob or "return" in blob:
             out.append(lines[i]); i += 1; continue
+        # Re-expand the body so loops nested inside an unrolled range loop are
+        # themselves expanded rather than copied through verbatim.
+        if depth < 8:
+            body = expand_for_loops(body, consts, depth + 1)
         for _ in range(count):
             out.extend(body)
         i = j
@@ -785,6 +873,20 @@ def transpile_body(body: str, consts: dict, func_name: str) -> str:
             else:
                 out.append(f"    // TODO stage assign (unresolved rhs): {stripped}")
             continue
+        # game.state.<scalar> = value  (current_phase/turn/active/winner/.../life/score)
+        m = re.search(r'game\.state\.(current_phase|turn|active|winner|first_attacker|second_attacker|life|score|cheer_check_base)\s*=\s*([^;]+);', line)
+        if m:
+            f = 'phase' if m.group(1) == 'current_phase' else m.group(1)
+            rhs = m.group(2).strip()
+            if is_safe_rhs(rhs):
+                out.append(f"    tg.state.{f} = {rhs};"); continue
+        # game.state.playerN.<scalar field> = value  (energy_active/score/life/...)
+        m = re.search(r'game\.state\.player(\d+)\.(energy_active|score|life|deck_refreshed_this_turn)\s*=\s*([^;]+);', line)
+        if m:
+            pl = int(m.group(1)) - 1
+            rhs = m.group(3).strip()
+            if is_safe_rhs(rhs):
+                out.append(f"    tg.state.p[{pl}].{m.group(2)} = {rhs};"); continue
         m = re.search(r'game\.add_to_stage\(MemberArea::(\w+),\s*(\w+)\)', line)
         if m:
             area = {"Left":"0","Center":"1","Right":"2"}.get(m.group(1), "1")
@@ -1003,6 +1105,62 @@ def transpile_body(body: str, consts: dict, func_name: str) -> str:
             else:
                 out.append(f"    test_add_to_discard(&tg, {card});")
             continue
+        # energy placement: game.state.playerN.energy_zone.cards.push(card)
+        m = re.search(r'game\.state\.player(\d+)\.energy_zone\.cards\.push\((.*)\)', line)
+        if m:
+            pl = int(m.group(1)) - 1
+            card = _map_game_id(m.group(2).strip(), consts)
+            out.append(f"    test_add_to_energy(&tg, {pl}, {card});"); mark_real(); continue
+        # energy_deck.cards.push(card) -> deck (player-aware)
+        m = re.search(r'game\.state\.player(\d+)\.energy_deck\.cards\.push\((.*)\)', line)
+        if m:
+            pl = int(m.group(1)) - 1
+            card = _map_game_id(m.group(2).strip(), consts)
+            out.append(f"    test_add_to_deck_pl(&tg, {pl}, {card});"); continue
+        # energy_zone.set_active_count(N)
+        m = re.search(r'game\.state\.player(\d+)\.energy_zone\.set_active_count\((\d+)\)', line)
+        if m:
+            pl = int(m.group(1)) - 1
+            out.append(f"    test_set_energy_active(&tg, {pl}, {m.group(2)});"); continue
+        # revealed_cards.push(card) / revealed_cards.len()
+        m = re.search(r'game\.state\.revealed_cards\.push\((.*)\)', line)
+        if m:
+            card = _map_game_id(m.group(1).strip(), consts)
+            out.append(f"    test_add_to_revealed(&tg, {card});"); mark_real(); continue
+        # game.state.push_movement_event(who, from_zone, to_zone, Some(card), side, flag)
+        # -> record the auto-trigger implied by the move so a later
+        # trigger_auto_abilities_for_player fires only that trigger (faithful to
+        # Rust's movement-event -> auto-trigger queueing). Auto abilities
+        # (自動) gate on event-tracking flags, so we also set moved_this_turn /
+        # energy_placed_this_turn and record the 自動 trigger.
+        m = re.search(r'push_movement_event\s*\(\s*(-?\d+|\w+)\s*,\s*"([^"]+)"\s*,\s*"([^"]+)"\s*,\s*Some\(\s*(\w+)\s*\)\s*,\s*"([^"]+)"', line)
+        if m:
+            pl = 0 if m.group(5) == 'p1' else 1
+            frm, to, card = m.group(2), m.group(3), m.group(4)
+            if 'energy' in to:
+                trig = 'エネルギー置いた時'
+                out.append(f"    tg.state.energy_placed_this_turn[{pl}] = 1;")
+            elif 'stage' in frm or 'stage' in to:
+                trig = '移動時'
+            else:
+                trig = '移動時'
+            out.append(f"    if ({card} >= 0 && {card} < RB_MAX_CARD_IDS) {{ tg.state.moved_this_turn[{card}] = 1; if (tg.state.n_recently_moved < RB_MAX_RECENTLY_MOVED) tg.state.recently_moved[tg.state.n_recently_moved++] = {card}; }}")
+            out.append(f"    rb_record_event(&tg.state, {pl}, \"{trig}\");")
+            out.append(f"    rb_record_event(&tg.state, {pl}, \"自動\");")
+            mark_real(); continue
+        # trigger_auto_abilities_for_player(&mut game.state, &pid) -> fire only recorded events
+        m = re.search(r'TurnEngine::trigger_auto_abilities_for_player\s*\(\s*&?\s*mut\s+game\.state\s*,\s*&?\s*(\d+)\s*\)', line)
+        if m:
+            out.append(f"    rb_fire_recorded_auto(&tg.state, {m.group(1)});"); mark_real(); continue
+        m = re.search(r'TurnEngine::trigger_auto_abilities_for_player\s*\(', line)
+        if m:
+            out.append("    rb_fire_recorded_auto(&tg.state, 0);"); mark_real(); continue
+        m = re.search(r'trigger_auto_abilities_for_player\s*\(\s*&?\s*mut\s+game\.state\s*,\s*&?\s*(\d+)\s*\)', line)
+        if m:
+            out.append(f"    rb_fire_recorded_auto(&tg.state, {m.group(1)});"); mark_real(); continue
+        m = re.search(r'trigger_auto_abilities_for_player\s*\(', line)
+        if m:
+            out.append("    rb_fire_recorded_auto(&tg.state, 0);"); mark_real(); continue
         m = re.search(r'trigger_debut\(\s*game\s*,\s*(\w+)\s*\)', line)
         if m:
             out.append(f"    test_fire_debut(&tg, {m.group(1)});"); continue

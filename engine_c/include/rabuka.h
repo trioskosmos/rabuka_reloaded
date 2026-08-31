@@ -562,7 +562,16 @@ typedef struct GameState {
     /* ── temporal-condition tracking (mirrors GameState.has_card_moved_this_turn /
         debut_count_this_turn; position_change_occurred_this_turn already declared above) ── */
     int      moved_this_turn[RB_MAX_CARD_IDS]; /* per-card: moved during current turn */
+    int      energy_placed_this_turn[2];       /* energy placed by player this turn */
     int      debut_count_this_turn[2];         /* members debuted this turn per player */
+    /* auto_event_mask[pl] — bitmask of auto/event triggers that occurred since the
+        last trigger_auto_abilities_for_player scan (mirrors Rust's per-event
+        auto-trigger queueing). rb_record_event sets bits; rb_fire_recorded_auto
+        fires only the recorded triggers then clears the mask. */
+    int      auto_event_mask[2];
+    /* play recursion depth — guards rb_play_member against unbounded re-entrancy
+        when a debut/baton effect itself places a member (which re-enters this fn). */
+    int      play_depth;
 } GameState;
 
 /* ── Tracking (engine/src/core/game_state/tracking.rs) ── */
@@ -611,7 +620,7 @@ int  rb_activate_ability(GameState *g, int pl, int hand_idx);
 int  rb_activate_card(GameState *g, int pl, int card_id); /* run the card's 起動 (Activate) ability: cost + effect */
 /* Baton-touch support (replace an occupied stage member). */
 int  rb_card_arrived_this_turn(const GameState *g, int pl, int card_id);
-int  rb_card_has_restriction(const GameState *g, int card_id, const char *restriction);
+int  rb_card_has_restriction(const GameState *g, int incoming_cid, int card_id, const char *restriction);
 void rb_send_to_waitroom(GameState *g, int pl, int card_id);
 /* Restriction (prohibition / cannot-activate) support. */
 int  rb_card_is_cannot_active(const GameState *g, int card_id);
@@ -626,6 +635,9 @@ int  rb_should_trigger_live_success(const GameState *g, int pl);
 int  rb_drain_live_success_choices(GameState *g);
 int  rb_queue_trigger_abilities(GameState *g, int pl, const char *trigger);
 int  rb_fire_auto(GameState *g, int pl);
+int  rb_fire_all_auto(GameState *g, int pl);
+void rb_record_event(GameState *g, int pl, const char *trig);
+int  rb_fire_recorded_auto(GameState *g, int pl);
 int  rb_process_pending_auto_abilities(GameState *g);
 void rb_recalc_constants(GameState *g);
 void rb_check_expired_effects(GameState *g, int which);
@@ -677,6 +689,13 @@ void rb_log_set_enabled(int enabled);
 void rb_log_push_verdict(const char *text, const char *kind, int passed);
 int  rb_log_buffer_len(void);
 void rb_log_clear_verdicts(void);
+
+/* ── Ability tracing (engine/src/ability/debug.rs: ABILITY_DEBUG) ──
+   Mirrors the Rust `ABILITY_DEBUG` atomic gate: diagnostic traces are compiled
+   in permanently (they are part of the engine, per AGENTS.md) but only print
+   when tracing is switched on, so a full suite run stays quiet. */
+int  rb_ability_debug_enabled(void);
+void rb_ability_debug_set(int enabled);
 
 /* ── Dynamic count resolution (engine/src/ability/dynamic_count.rs) ── */
 int  rb_resolve_dynamic_count(const struct GameState *g, int owner, int host_cid,
