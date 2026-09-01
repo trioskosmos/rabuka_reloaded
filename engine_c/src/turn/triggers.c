@@ -568,3 +568,38 @@ int rb_trigger_auto_abilities_for_player(GameState *g, int pl) {
     if (!g) return 0;
     return rb_trigger_auto_abilities_for_player_with_event(g, pl, NULL, 0, 0, 0);
 }
+
+/* Map a raw trigger text to its canonical English key.
+   Mirrors engine/src/triggers.rs::canonical_trigger. Returns a static
+   string literal; do not free. */
+const char *rb_canonical_trigger(const char *raw) {
+    if (!raw) return "unknown";
+    if (strstr(raw, RB_TSTR_DEBUT) || strstr(raw, RB_TSTR_DEBUT_EN))
+        return "debut";
+    if (strstr(raw, RB_TSTR_LIVE_START))
+        return "live_start";
+    if (strstr(raw, RB_TSTR_LIVE_SUCCESS) || strstr(raw, RB_TSTR_LIVE_SUCCESS_EN))
+        return "live_success";
+    if (strstr(raw, RB_TSTR_ACTIVATION))
+        return "activation";
+    if (strstr(raw, RB_TSTR_CONSTANT))
+        return "constant";
+    if (strstr(raw, RB_TSTR_AUTO))
+        return "auto";
+    return "unknown";
+}
+
+/* Map a trigger string to its texticon filename for card badge display.
+   Mirrors engine/src/triggers.rs::trigger_to_texticon. Returns a static
+   string literal; do not free. */
+const char *rb_trigger_to_texticon(const char *trigger) {
+    if (!trigger) return "jyouji";
+    if (!strcmp(trigger, RB_TSTR_CONSTANT))      return "jyouji";
+    if (!strcmp(trigger, RB_TSTR_LIVE_SUCCESS))   return "live_success";
+    if (!strcmp(trigger, RB_TSTR_LIVE_START))     return "live_start";
+    if (!strcmp(trigger, RB_TSTR_DEBUT) || !strcmp(trigger, RB_TSTR_DEBUT_EN))
+        return "toujyou";
+    if (!strcmp(trigger, RB_TSTR_ACTIVATION))     return "kidou";
+    if (!strcmp(trigger, RB_TSTR_AUTO))           return "jidou";
+    return "jyouji";
+}
