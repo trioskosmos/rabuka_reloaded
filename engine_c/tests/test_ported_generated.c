@@ -2293,7 +2293,7 @@ static void gen_pb2_kinako_under_member_both_players(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    test_play_to_stage(&tg, p2_chisato, 1);
+    CHECK_EQ(test_play_to_stage(&tg, p2_chisato, 1), 1, "P2 play");
     // 
     test_has_pending_choice(&tg);
     acts = 0;
@@ -7172,6 +7172,95 @@ static void gen_live_success_per_wait_member_adds_score(void){
     // 
 }
 
+// test_modules/abilities/simple/heart_override_test.rs::kanan_livestart_converts_all_hearts_to_heart04
+static void gen_kanan_livestart_converts_all_hearts_to_heart04(void){
+    // 
+    // db loaded via rb_load
+    TestGame tg; test_game_new(&tg);
+    int kanan = test_id(&tg, "PL!S-pb1-003-R");
+    int filler = test_id(&tg, "PL!-sd1-010-SD");
+    int live_card = test_id(&tg, "PL!-sd1-019-SD");
+    // 
+    // // Kanan on stage center.
+    tg.state.p[0].stage[0] = -1;
+    tg.state.p[0].stage[1] = kanan;
+    tg.state.p[0].stage[2] = -1;
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_hand(&tg, live_card);
+    test_give_energy(&tg, 2);
+    // 
+    // // inlined helper advance_to_live
+    // 
+    rb_advance_phase(&tg.state);
+    rb_advance_phase(&tg.state);
+    rb_advance_phase(&tg.state);
+    rb_advance_phase(&tg.state);
+    rb_advance_phase(&tg.state);
+    // 
+    test_set_live_card(&tg, 0, live_card);
+    // 
+    // // Pass to advance from LiveCardSet -> FirstAttackerPerformance -> LiveStart
+    rb_advance_phase(&tg.state);
+    // // P2 turn draw → LiveStart triggers
+    rb_advance_phase(&tg.state);
+    // 
+    // // Kanan's LiveStart ability fires. Its cost is optional 2E — pay by selecting option 1.
+    test_has_pending_choice(&tg);
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectTarget", "kanan_livestart_converts_all_hearts_to_heart04");
+    rb_resume_with_choice(&tg.state, 1);
+    // 
+    // // Verify heart_color_multiplier only contains Kanan (not filler)
+    // TODO assert_eq (unresolved): assert_eq!( game.state.mods.heart_color_multiplier.len(), 1, "Only Kanan should have heart_color_multiplier" );
+    // TODO assert: assert!( game.state.mods.heart_color_multiplier.contains_key(&kanan), "Kanan should be in heart_color_multiplier" );
+    // 
+    // // Kanan's own hearts should be set to heart04 in the multiplier
+    // TODO: {
+    int mult = 0;
+    // TODO assert_eq (unresolved): assert_eq!( mult.get(&kanan), Some(&HeartColor::Heart04), "Kanan's multiplier should be heart04" );
+    // TODO: }
+    // 
+    // // Kanan's stage heart contribution now shows only heart04
+    int after = 0;
+    // TODO: &game.state.card_database,
+    // TODO: &game.state.mods.heart_color_multiplier,
+    // TODO: &Default::default(),
+    // TODO: &Default::default(),
+    // TODO: &Default::default(),
+    // TODO: );
+    // // The filler (PL!-sd1-010-SD) has its own hearts too, so after.hearts.len() > 1
+    // TODO assert_eq (unresolved): assert_eq!( after.hearts.get(&HeartColor::Heart04), Some(&6), "Kanan's 6 hearts become heart04" );
+    // TODO assert_eq (unresolved): assert_eq!( after.hearts.values().sum::<u8>(), game.state .player1 .calculate_stage_hearts( &game.state.card_database, &Default::default(), &Default::default(), &Default::default(), &Default::default(), ) .hearts .values() .sum::<u8>(), "Total unchanged (filler + Kanan)" );
+    // 
+    // // Advance through performance phase and verify that Kanan's member contribution
+    // // reflects the heart transformation during live.
+    rb_advance_phase(&tg.state);
+    // // Kanan's member contribution in the snapshot should have all hearts as heart04
+    int kanan_contribution = 0;
+    // TODO: snap.member_contributions.iter().find(|mc| mc.source_id == kanan)
+    // TODO: });
+    // TODO if let (untranspilable body): });
+    // 
+}
+
 // test_modules/abilities/simple/kagayaiteru_test.rs::kagayaiteru_live_success_draw_then_discard
 static void gen_kagayaiteru_live_success_draw_then_discard(void){
     // 
@@ -8733,6 +8822,172 @@ static void gen_kinako_auto_triggers_on_position_change(void){
     CHECK((!test_zone_has_id(&tg, 0, "discard", liella)), "kinako_auto_triggers_on_position_change");
     // action result consumed: let kinako_idx = game.state.player1.stage.stage.iter().position(|&id| id == kinako).unwrap();
     // TODO assert: assert!( game.state.player1.stage.under_cards[kinako_idx].contains(&liella), "Liella card should be under Kinako after position change" );
+    // 
+}
+
+// test_modules/jidou/complex/kurosawa_dia_re_yell_test.rs::q107_dia_re_yell_works
+static void gen_q107_dia_re_yell_works(void){
+    // 
+    // db loaded via rb_load
+    TestGame tg; test_game_new(&tg);
+    int dia = test_id(&tg, "PL!S-bp2-004-R");
+    // 
+    tg.state.p[0].stage[0] = test_id(&tg, "PL!-sd1-010-SD");
+    tg.state.p[0].stage[1] = test_id(&tg, "PL!-sd1-010-SD");
+    // // inlined helper fill_decks
+    // 
+    int filler = test_id(&tg, "PL!-sd1-010-SD");
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    // 
+    test_give_energy(&tg, 15);
+    // 
+    // // inlined helper advance_to_p1_performance
+    // 
+    tg.state.p[0].stage[2] = dia;
+    int live = test_id(&tg, "PL!-sd1-020-SD");
+    test_add_to_hand(&tg, live);
+    rb_advance_phase(&tg.state);
+    rb_advance_phase(&tg.state);
+    rb_advance_phase(&tg.state);
+    rb_advance_phase(&tg.state);
+    rb_advance_phase(&tg.state);
+    test_set_live_card(&tg, 0, live);
+    rb_advance_phase(&tg.state);
+    rb_advance_phase(&tg.state);
+    rb_advance_phase(&tg.state);
+    // 
+    // 
+    test_has_pending_choice(&tg);
+    int count = 0;
+    // TODO: game.get_pending_choice()
+    // TODO: {
+    // TODO: *count
+    // TODO: } else {
+    // TODO: 0
+    // TODO: };
+    // TODO: game.select_indices(&(0..count).collect::<Vec<_>>());
+    // 
+    // TODO assert: assert!(!game.state.initial_yell_revealed_cards.is_empty());
+    // TODO assert: assert!(!game.state.re_yell_revealed_cards.is_empty());
     // 
 }
 
@@ -12584,6 +12839,47 @@ static void gen_sp_bp5_011_position_hearts(void){
     // 
 }
 
+// test_modules/abilities/complex/l0_gap_constant4_test.rs::nico_bp7_007_per_under_energy_heart02
+static void gen_nico_bp7_007_per_under_energy_heart02(void){
+    // 
+    // db loaded via rb_load
+    TestGame tg; test_game_new(&tg);
+    // 
+    int member = test_id(&tg, "PL!N-bp7-007-R\u{ff0b}");
+    tg.state.p[0].stage[0] = -1;
+    tg.state.p[0].stage[1] = member;
+    tg.state.p[0].stage[2] = -1;
+    // // Place 2 energy cards under the member
+    int e1 = test_id(&tg, "LL-E-001-SD");
+    int e2 = test_id(&tg, "LL-E-001-SD");
+    // TODO if let (untranspilable body): let e2 = test_id(&tg, "LL-E-001-SD");
+    test_recalc(&tg);
+    // 
+    int h02 = rb_mods_get_heart(&tg.state.mods, member, 2);
+    CHECK_EQ(h02, 2, "nico_bp7_007_per_under_energy_heart02");
+    // 
+}
+
+// test_modules/abilities/complex/l0_gap_constant4_test.rs::sb7_005_aqours_under_card_blade
+static void gen_sb7_005_aqours_under_card_blade(void){
+    // 
+    // db loaded via rb_load
+    TestGame tg; test_game_new(&tg);
+    // 
+    int member = test_id(&tg, "PL!S-bp7-005-R\u{ff0b}");
+    tg.state.p[0].stage[0] = -1;
+    tg.state.p[0].stage[1] = member;
+    tg.state.p[0].stage[2] = -1;
+    // // Place an Aqours member card under this member
+    int under_card = test_id(&tg, "PL!S-bp2-001-R");
+    // TODO if let (untranspilable body): let under_card = test_id(&tg, "PL!S-bp2-001-R");
+    test_recalc(&tg);
+    // 
+    int blade = rb_mods_get_blade(&tg.state.mods, member);
+    CHECK_EQ(blade, 1, "sb7_005_aqours_under_card_blade");
+    // 
+}
+
 // test_modules/abilities/complex/l0_gap_constant5_test.rs::pb1_002_per_opponent_waited_heart06
 static void gen_pb1_002_per_opponent_waited_heart06(void){
     // 
@@ -12894,6 +13190,122 @@ static void gen_looked_at_discard_player_skips(void){
     // 
 }
 
+// test_modules/abilities/complex/looked_at_discard_test.rs::live_success_discard_4_from_deck_unconditionally
+static void gen_live_success_discard_4_from_deck_unconditionally(void){
+    // 
+    // db loaded via rb_load
+    TestGame tg; test_game_new(&tg);
+    // 
+    int yumewazurai = test_id(&tg, "PL!HS-pb1-027-L");
+    int member = test_id(&tg, "PL!HS-PR-007-PR");
+    int filler = test_id(&tg, "PL!-sd1-010-SD");
+    // 
+    tg.state.p[0].stage[1] = member;
+    tg.state.p[0].stage[2] = member;
+    tg.state.p[0].stage[0] = member;
+    test_add_to_hand(&tg, yumewazurai);
+    test_add_to_hand(&tg, filler);
+    // 
+    // clear
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    // clear
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    // 
+    // // Follow exactly the awake_test phase pattern
+    // // inlined helper advance_to_live_card_set_p1
+    // 
+    rb_advance_phase(&tg.state);
+    rb_advance_phase(&tg.state);
+    rb_advance_phase(&tg.state);
+    rb_advance_phase(&tg.state);
+    rb_advance_phase(&tg.state);
+    // 
+    test_set_live_card(&tg, 0, yumewazurai);
+    // // inlined helper advance_to_live_start
+    // 
+    rb_advance_phase(&tg.state);
+    rb_advance_phase(&tg.state);
+    // 
+    rb_advance_phase(&tg.state);
+    int deck_before = tg.state.p[0].deck.n;
+    int wr_before = tg.state.p[0].discard.n;
+    rb_advance_phase(&tg.state);
+    rb_advance_phase(&tg.state);
+    // 
+    // // Answer "Yes" to the optional discard before advancing further
+    // TODO: if let Some(rabuka_engine::ability::types::Choice::SelectTarget { ref target, .. }) =
+    // TODO: game.state.get_pending_choice()
+    // TODO: {
+    // TODO: if target == "pay_optional_cost:skip_optional_cost" {
+    // TODO: rabuka_engine::turn::TurnEngine::resume_with_choice(&mut game.state, Some(1), None).expect("accept optional discard");
+    // TODO: }
+    // TODO: }
+    rb_advance_phase(&tg.state);
+    // 
+    // // Exactly 4 cards discarded from deck top to waitroom
+    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.main_deck.cards.len(), deck_before - 4, "Deck lost exactly 4 cards (was {}, now {})", deck_before, game.state.player1.main_deck.cards.len() );
+    // TODO assert_eq (unresolved): assert_eq!( game.state.player1.waitroom.cards.len(), wr_before + 4, "Waitroom gained exactly 4 cards (was {}, now {})", wr_before, game.state.player1.waitroom.cards.len() );
+    // 
+}
+
 // test_modules/abilities/complex/ren_bp4_test.rs::ren_baton_touch_from_liella_places_energy
 static void gen_ren_baton_touch_from_liella_places_energy(void){
     // 
@@ -12982,7 +13394,7 @@ static void gen_ren_baton_touch_from_liella_places_energy(void){
     // 
     int energy_before = tg.state.p[0].energy.n;
     // 
-    test_play_to_stage(&tg, ren, 0);
+    CHECK_EQ(test_play_to_stage(&tg, ren, 0), 1, "play with baton touch");
     // 
     while (test_has_pending_choice(&tg)) rb_resume_with_choice(&tg.state, 0);
     rb_resume_with_choice(&tg.state, 0);
@@ -13077,7 +13489,7 @@ static void gen_ren_baton_touch_from_non_liella_no_energy(void){
     // 
     int energy_before = tg.state.p[0].energy.n;
     // 
-    test_play_to_stage(&tg, ren, 0);
+    CHECK_EQ(test_play_to_stage(&tg, ren, 0), 1, "play with baton touch");
     // 
     while (test_has_pending_choice(&tg)) rb_resume_with_choice(&tg.state, 0);
     rb_resume_with_choice(&tg.state, 0);
@@ -13174,7 +13586,7 @@ static void gen_ren_baton_touch_liella_insufficient_energy_no_effect(void){
     // 
     int energy_before = tg.state.p[0].energy.n;
     // 
-    test_play_to_stage(&tg, ren, 0);
+    CHECK_EQ(test_play_to_stage(&tg, ren, 0), 1, "play with baton touch");
     // 
     while (test_has_pending_choice(&tg)) rb_resume_with_choice(&tg.state, 0);
     rb_resume_with_choice(&tg.state, 0);
@@ -14239,6 +14651,99 @@ static void gen_eli_bp4_all_at_once_discard(void){
     // 
 }
 
+// test_modules/abilities/moderate/eri_bp3_test.rs::eri_q144_up_to_semantics_1_eligible_opponent_still_works
+static void gen_eri_q144_up_to_semantics_1_eligible_opponent_still_works(void){
+    // 
+    // db loaded via rb_load
+    TestGame tg; test_game_new(&tg);
+    // 
+    int eri = test_id(&tg, "PL!-bp3-002-R");
+    int eligible = test_id(&tg, "PL!-sd1-010-SD");
+    int filler = test_id(&tg, "PL!-sd1-019-SD");
+    // 
+    // // Opponent's stage: 1 eligible member (cost=4). Self stage: empty for eri.
+    tg.state.p[0].stage[0] = -1;
+    tg.state.p[0].stage[1] = -1;
+    tg.state.p[0].stage[2] = -1;
+    tg.state.p[1].stage[0] = eligible;
+    tg.state.p[1].stage[1] = -1;
+    tg.state.p[1].stage[2] = -1;
+    test_add_to_hand(&tg, eri);
+    test_add_to_hand(&tg, filler);
+    test_give_energy(&tg, 15);
+    // 
+    // TODO assert_eq (unresolved): assert_eq!( game.state.mods.get_orientation_modifier(eligible), None, "Before activation: eligible member is active on opponent's stage" );
+    // 
+    test_play_to_stage(&tg, eri, 1);
+    // 
+    // // Step 1: Optional cost (discard 1 from hand).
+    // // Hand has [filler] after playing eri. Choice is SelectCard (zone=hand, count=1, optional).
+    test_has_pending_choice(&tg);
+    // TODO: game.assert_select_card("hand", 1, true);
+    // 
+    // // Pay cost by discarding the filler (index 0)
+    rb_resume_with_choice(&tg.state, 0);
+    // 
+    // // Verify cost was recorded as paid (entry may be gone after resolution)
+    // TODO if let (untranspilable body): // Verify cost was recorded as paid (entry may be gone after resolution)
+    // 
+    CHECK_EQ(tg.state.p[0].discard.n, 1, "eri_q144_up_to_semantics_1_eligible_opponent_still_works");
+    CHECK_EQ(tg.state.p[0].hand.n, 0, "eri_q144_up_to_semantics_1_eligible_opponent_still_works");
+    // 
+    // // Step 2: Select opponent member(s) to put to wait (up to 2).
+    test_has_pending_choice(&tg);
+    // TODO: game.assert_select_card("stage", 2, true);
+    // 
+    // // Select the only eligible member (index 0)
+    rb_resume_with_choice(&tg.state, 0);
+    // 
+    // // Q144: Only 1 eligible member existed, but the ability activates
+    // // and puts that member to wait — "up to 2" is an upper bound
+    test_has_pending_choice(&tg);
+    int orientation = 0;
+    // TODO assert_eq (unresolved): assert_eq!( orientation, Some("wait"), "1 eligible opponent member was put to wait — 'up to 2' is an upper bound" );
+    // 
+}
+
+// test_modules/abilities/moderate/eri_bp3_test.rs::eri_q144_skip_cost_no_effect
+static void gen_eri_q144_skip_cost_no_effect(void){
+    // 
+    // db loaded via rb_load
+    TestGame tg; test_game_new(&tg);
+    // 
+    int eri = test_id(&tg, "PL!-bp3-002-R");
+    int eligible_1 = test_id(&tg, "PL!-sd1-010-SD");
+    int eligible_2 = test_id(&tg, "PL!-sd1-010-SD");
+    int too_expensive = test_id(&tg, "PL!-sd1-001-SD");
+    int filler = test_id(&tg, "PL!-sd1-019-SD");
+    // 
+    tg.state.p[0].stage[0] = -1;
+    tg.state.p[0].stage[1] = -1;
+    tg.state.p[0].stage[2] = -1;
+    tg.state.p[1].stage[0] = eligible_1;
+    tg.state.p[1].stage[1] = eligible_2;
+    tg.state.p[1].stage[2] = too_expensive;
+    test_add_to_hand(&tg, eri);
+    test_add_to_hand(&tg, filler);
+    test_give_energy(&tg, 15);
+    // 
+    test_play_to_stage(&tg, eri, 1);
+    // 
+    // // Step 1: Optional cost — skip it.
+    test_has_pending_choice(&tg);
+    // TODO: game.assert_select_card("hand", 1, true);
+    rb_resume_with_choice(&tg.state, -1);
+    // 
+    // // Verify cost was skipped (entry may be gone after resolution)
+    // TODO if let (untranspilable body): // Verify cost was skipped (entry may be gone after resolution)
+    // 
+    // // No effect — opponent members remain active
+    test_has_pending_choice(&tg);
+    // TODO assert_eq (unresolved): assert_eq!( game.state.mods.get_orientation_modifier(eligible_1), None, "Eligible member 1 should remain active (cost skipped)" );
+    // TODO assert_eq (unresolved): assert_eq!( game.state.mods.get_orientation_modifier(eligible_2), None, "Eligible member 2 should remain active (cost skipped)" );
+    // 
+}
+
 // test_modules/abilities/moderate/eri_bp3_test.rs::eri_q144_no_eligible_opponent_still_pays_cost
 static void gen_eri_q144_no_eligible_opponent_still_pays_cost(void){
     // 
@@ -15106,7 +15611,7 @@ static void gen_sp_bp5_choice_energy_pay_and_draw(void){
     int deck_card = test_id(&tg, "PL!-sd1-010-SD");
     test_add_to_deck(&tg, deck_card);
     // 
-    test_play_to_stage(&tg, card, 1);
+    CHECK_EQ(test_play_to_stage(&tg, card, 1), 1, "play to stage");
     // 
     // // Optional cost choice: select_option(1) = PAY (0 = skip)
     while (test_has_pending_choice(&tg)) rb_resume_with_choice(&tg.state, 0);
@@ -15144,7 +15649,7 @@ static void gen_sp_bp5_choice_energy_pay_and_wait_opponent(void){
     // TODO: game.state.player2.stage.stage, opponent
     // TODO: );
     // 
-    test_play_to_stage(&tg, card, 1);
+    CHECK_EQ(test_play_to_stage(&tg, card, 1), 1, "play to stage");
     // 
     // TODO: eprintln!(
     // TODO: "[W TEST] After play: p1 stage={:?}, p2 stage={:?}",
@@ -15198,7 +15703,7 @@ static void gen_sp_bp5_choice_energy_decline_cost_no_effect(void){
     // 
     int hand_before = 0;
     // 
-    test_play_to_stage(&tg, card, 1);
+    CHECK_EQ(test_play_to_stage(&tg, card, 1), 1, "play to stage");
     // 
     // // No energy for cost → no optional cost choice → ability fires without effect
     while (test_has_pending_choice(&tg)) rb_resume_with_choice(&tg.state, 0);
@@ -16656,7 +17161,7 @@ static void gen_keke_blocked_from_locked_area(void){
     // // After playing starter, hand should have [liella, keke]
     // // Let's find keke's position
     // action result consumed: let _keke_pos = v.state.player1.hand.cards.iter().position(|&c| c == keke).unwrap();
-    test_play_to_stage(&tg, keke, 0);
+    CHECK_EQ(test_play_to_stage(&tg, keke, 0), 1, "play Keke failed");
     // 
     // // Debut resolves straight into the hand-selection prompt.
     test_has_pending_choice(&tg);
@@ -16699,7 +17204,7 @@ static void gen_pr_energy_place_pay_cost_energy_in_wait(void){
     int energy_before = 0;
     // 
     // // Play card to stage → 登場 triggers
-    test_play_to_stage(&tg, card, 1);
+    CHECK_EQ(test_play_to_stage(&tg, card, 1), 1, "play to stage");
     // 
     // // 登場 ability fires: first an auto-ability choice, then cost choice
     // // Handle all pending choices
@@ -16738,7 +17243,7 @@ static void gen_pr_energy_place_source_from_energy_deck(void){
     int initial_energy_zone_size = 0;
     // 
     // // Play card
-    test_play_to_stage(&tg, card, 1);
+    CHECK_EQ(test_play_to_stage(&tg, card, 1), 1, "play to stage");
     // 
     // // Handle auto-ability + cost choices
     while (test_has_pending_choice(&tg)) rb_resume_with_choice(&tg.state, 0);
@@ -20213,7 +20718,7 @@ static void gen_nico_bp4_multi_opponent_choice(void){
     // 
     // // Debut fires: opponent must choose which member to wait
     test_has_pending_choice(&tg);
-    int entry = 0;
+    int entry = rb_queue_current_entry(&tg.state);
     // TODO assert_eq (unresolved): assert_eq!( entry.as_ref().and_then(|e| e.choice_player_id.as_deref()), Some("p2"), "Wait-member choice should be routed to opponent" );
     // 
     // // Opponent selects p2_member_b (index 1)
@@ -23094,7 +23599,7 @@ static void gen_maki_baton_touch_places_cheap_member_on_stage(void){
     test_add_to_hand(&tg, cheap);
     test_give_energy(&tg, 17);
     // 
-    test_play_to_stage(&tg, maki, 1);
+    CHECK_EQ(test_play_to_stage(&tg, maki, 1), 1, "baton touch");
     // 
     // TODO assert: assert!( game.state.player1.stage.stage.contains(&maki), "Maki on stage after baton touch" );
     // 
@@ -23127,7 +23632,7 @@ static void gen_maki_equal_cost_no_appear(void){
     test_add_to_hand(&tg, maki_hand);
     test_give_energy(&tg, 17);
     // 
-    test_play_to_stage(&tg, maki_hand, 1);
+    CHECK_EQ(test_play_to_stage(&tg, maki_hand, 1), 1, "baton touch");
     // 
     // TODO assert: assert!( game.state.player1.stage.stage.contains(&maki_hand), "new Maki on stage after baton touch" );
     // TODO assert_eq (unresolved): assert_eq!( game.state .player1 .stage .stage .iter() .filter(|&&c| c != -1) .count(), 1, "only 1 member on stage (old Maki replaced, no appear)" );
@@ -23173,7 +23678,7 @@ static void gen_maki_no_eligible_hand_skips(void){
     test_add_to_hand(&tg, too_expensive);
     test_give_energy(&tg, 17);
     // 
-    test_play_to_stage(&tg, maki, 1);
+    CHECK_EQ(test_play_to_stage(&tg, maki, 1), 1, "baton touch");
     // 
     CHECK(test_zone_has_id(&tg, 0, "hand", too_expensive), "maki_no_eligible_hand_skips");
     // 
@@ -27780,6 +28285,83 @@ static void gen_on_stage_card_ignores_hand_for_other_card_cost(void){
     // 
 }
 
+// test_modules/abilities/moderate/riko_test.rs::riko_q130_opponent_skips_triggers_conditional
+static void gen_riko_q130_opponent_skips_triggers_conditional(void){
+    // 
+    // db loaded via rb_load
+    TestGame tg; test_game_new(&tg);
+    // 
+    int riko = test_id(&tg, "PL!S-pb1-002-R");
+    int filler = test_id(&tg, "PL!-sd1-010-SD");
+    int live_card = test_id(&tg, "PL!-sd1-019-SD");
+    // 
+    test_add_to_hand(&tg, riko);
+    test_add_to_hand(&tg, filler);
+    test_add_to_hand(&tg, live_card);
+    test_give_energy(&tg, 13);
+    // 
+    tg.state.p[0].stage[0] = -1;
+    test_play_to_stage(&tg, riko, 0);
+    // 
+    // // Debut triggers opponent choice — assert exactly one SelectCard for hand
+    test_has_pending_choice(&tg);
+    // TODO: game.assert_select_card("hand", 1, true);
+    int entry = rb_queue_current_entry(&tg.state);
+    // TODO assert_eq (unresolved): assert_eq!( entry.as_ref().and_then(|e| e.choice_player_id.as_deref()), Some("p2"), "Discard choice should be routed to opponent" );
+    // 
+    // // Opponent skips (empty indices)
+    rb_resume_with_choice(&tg.state, -1);
+    // 
+    // // conditional_on_optional auto-resolves with chose_yes=false + negation=true
+    entry = rb_queue_current_entry(&tg.state);
+    // TODO if let (untranspilable body): let entry = game.state.ability_queue.current_entry();
+    test_has_pending_choice(&tg);
+    // TODO assert: assert!(game.state.player1.stage.stage.contains(&riko));
+    CHECK_EQ(tg.state.p[0].hand.n, 1, "riko_q130_opponent_skips_triggers_conditional");
+    // // Opponent's hand is untouched
+    CHECK_EQ(tg.state.p[1].hand.n, 1, "riko_q130_opponent_skips_triggers_conditional");
+    CHECK(test_zone_has_id(&tg, 1, "hand", live_card), "riko_q130_opponent_skips_triggers_conditional");
+    // 
+}
+
+// test_modules/abilities/moderate/riko_test.rs::riko_q130_opponent_discards_skips_conditional
+static void gen_riko_q130_opponent_discards_skips_conditional(void){
+    // 
+    // db loaded via rb_load
+    TestGame tg; test_game_new(&tg);
+    // 
+    int riko = test_id(&tg, "PL!S-pb1-002-R");
+    int filler = test_id(&tg, "PL!-sd1-010-SD");
+    int live_card = test_id(&tg, "PL!-sd1-019-SD");
+    // 
+    test_add_to_hand(&tg, riko);
+    test_add_to_hand(&tg, filler);
+    test_add_to_hand(&tg, live_card);
+    test_add_to_hand(&tg, filler);
+    test_give_energy(&tg, 13);
+    // 
+    tg.state.p[0].stage[0] = -1;
+    test_play_to_stage(&tg, riko, 0);
+    // 
+    // // Debut triggers opponent choice — opponent has 2 cards, must choose 1
+    test_has_pending_choice(&tg);
+    // TODO: game.assert_select_card("hand", 1, true);
+    int entry = rb_queue_current_entry(&tg.state);
+    // TODO assert_eq (unresolved): assert_eq!( entry.as_ref().and_then(|e| e.choice_player_id.as_deref()), Some("p2"), "Discard choice should be routed to opponent" );
+    // 
+    // // Opponent discards the live card (index 0)
+    rb_resume_with_choice(&tg.state, 0);
+    // 
+    // // conditional_on_optional auto-resolves with chose_yes=true + negation=true → do_nothing
+    entry = rb_queue_current_entry(&tg.state);
+    // TODO if let (untranspilable body): let entry = game.state.ability_queue.current_entry();
+    test_has_pending_choice(&tg);
+    CHECK_EQ(tg.state.p[1].hand.n, 1, "riko_q130_opponent_discards_skips_conditional");
+    CHECK((!test_zone_has_id(&tg, 1, "hand", live_card)), "riko_q130_opponent_discards_skips_conditional");
+    CHECK_EQ(tg.state.p[1].discard.n, 1, "riko_q130_opponent_discards_skips_conditional");
+    // 
+}
+
 // test_modules/abilities/moderate/riko_test.rs::riko_q130_opponent_multi_card_skips
 static void gen_riko_q130_opponent_multi_card_skips(void){
     // 
@@ -30983,7 +31565,7 @@ static void gen_toubatsu_q118_2_distinct_live_cards_works(void){
     // // Opponent chooses 1 of the 2 selected cards
     test_has_pending_choice(&tg);
     // TODO: {
-    int entry = 0;
+    int entry = rb_queue_current_entry(&tg.state);
     // TODO assert_eq (unresolved): assert_eq!( entry.as_ref().and_then(|e| e.choice_player_id.as_deref()), Some("p2"), "Opponent-select choice should be routed to opponent" );
     // TODO: }
     rb_resume_with_choice(&tg.state, 0);
@@ -31057,7 +31639,7 @@ static void gen_toubatsu_duplicate_names_in_discard_opponent_only_sees_correct_c
     // // Opponent selects 1 of the 2
     test_has_pending_choice(&tg);
     // TODO: {
-    int entry = 0;
+    int entry = rb_queue_current_entry(&tg.state);
     // TODO assert_eq (unresolved): assert_eq!( entry.as_ref().and_then(|e| e.choice_player_id.as_deref()), Some("p2"), "Opponent-select choice should be routed to opponent" );
     // TODO: }
     rb_resume_with_choice(&tg.state, 0);
@@ -31542,7 +32124,7 @@ static void gen_maki_q177_debut_triggers_draw_via_ab0(void){
     rb_resume_with_choice(&tg.state, 1);
     // // Opponent chooses a member to wait (select cheap_opp at index 0)
     test_has_pending_choice(&tg);
-    int entry = 0;
+    int entry = rb_queue_current_entry(&tg.state);
     // TODO assert_eq (unresolved): assert_eq!( entry.as_ref().and_then(|e| e.choice_player_id.as_deref()), Some("p2"), "Wait-member choice should be routed to opponent" );
     rb_resume_with_choice(&tg.state, 0);
     // // Consume any remaining choices
@@ -37575,7 +38157,7 @@ static void gen_ladybug_q114_missing_sayaka_no_reduction(void){
     rb_advance_phase(&tg.state);
     // 
     // 
-    int reduction = 0;
+    int reduction = rb_mods_get_blade(&tg.state.mods, ladybug);
     CHECK_EQ(reduction, 0, "ladybug_q114_missing_sayaka_no_reduction");
     // 
 }
@@ -37625,7 +38207,7 @@ static void gen_ladybug_q114_missing_kosuzu_no_reduction(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    int reduction = 0;
+    int reduction = rb_mods_get_blade(&tg.state.mods, ladybug);
     CHECK_EQ(reduction, 0, "ladybug_q114_missing_kosuzu_no_reduction");
     // 
 }
@@ -37676,7 +38258,7 @@ static void gen_ladybug_q114_wrong_character_no_reduction(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    int reduction = 0;
+    int reduction = rb_mods_get_blade(&tg.state.mods, ladybug);
     CHECK_EQ(reduction, 0, "ladybug_q114_wrong_character_no_reduction");
     // 
 }
@@ -37724,7 +38306,7 @@ static void gen_ladybug_q114_no_members_no_reduction(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    int reduction = 0;
+    int reduction = rb_mods_get_blade(&tg.state.mods, ladybug);
     CHECK_EQ(reduction, 0, "ladybug_q114_no_members_no_reduction");
     // 
 }
@@ -40094,6 +40676,69 @@ static void gen_hazuki_baton_touch_non_liella_places_nothing(void){
     // 
 }
 
+// test_modules/abilities/moderate/pl_sp_pb2_005_test.rs::hazuki_full_workflow_gains_abilities_from_under
+static void gen_hazuki_full_workflow_gains_abilities_from_under(void){
+    // 
+    // db loaded via rb_load
+    TestGame tg; test_game_new(&tg);
+    int hazuki = test_id(&tg, "PL!SP-pb2-005-R");
+    // // PL!SP-sd1-006-SD (若菜四季) has a 起動 ability and is Liella!
+    int liella_with_kidou = test_id(&tg, "PL!SP-sd1-006-SD");
+    int filler = test_id(&tg, "PL!-sd1-010-SD");
+    // 
+    tg.state.p[0].stage[1] = liella_with_kidou;
+    test_add_to_hand(&tg, hazuki);
+    test_add_to_hand(&tg, filler);
+    // // inlined helper fill_decks
+    // 
+    filler = test_id(&tg, "PL!-sd1-010-SD");
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    // 
+    test_give_energy(&tg, 25);
+    // 
+    test_play_to_stage(&tg, hazuki, 1);
+    // 
+    while (test_has_pending_choice(&tg)) rb_resume_with_choice(&tg.state, 0);
+    rb_resume_with_choice(&tg.state, -1);
+    // TODO: }
+    // 
+    int under = 0;
+    // TODO assert: assert!( under.contains(&liella_with_kidou), "Liella! member with 起動 should be under hazuki" );
+    // 
+    // // Trigger constant re-evaluation by passing through phases
+    rb_advance_phase(&tg.state);
+    rb_advance_phase(&tg.state);
+    // 
+    int gained = 0;
+    // TODO assert: assert!(gained.is_some(), "Hazuki should have gained abilities");
+    if (gained >= 0) {
+    TestGame tg; test_game_new(&tg);
+    int has_kidou = 0;
+    CHECK(has_kidou, "hazuki_full_workflow_gains_abilities_from_under");
+    // TODO: }
+    }
+    // 
+}
+
 // test_modules/abilities/moderate/pl_sp_pb2_005_test.rs::hazuki_activates_kidou_copied_from_under
 static void gen_hazuki_activates_kidou_copied_from_under(void){
     // 
@@ -40903,6 +41548,68 @@ static void gen_azuna_q158_blade_single_member(void){
     // 
     CHECK_EQ(test_get_blade_modifier(&tg, ayumu), 2, "azuna_q158_blade_single_member");
     // 
+}
+
+// test_modules/abilities/simple/ayumu_azuna_test.rs::azuna_q158_blade_not_gained_if_energy_not_placed
+static void gen_azuna_q158_blade_not_gained_if_energy_not_placed(void){
+    // 
+    // db loaded via rb_load
+    TestGame tg; test_game_new(&tg);
+    // 
+    int fill = test_id(&tg, "PL!-sd1-010-SD");
+    test_add_to_deck(&tg, fill);
+    test_add_to_deck(&tg, fill);
+    test_add_to_deck(&tg, fill);
+    test_add_to_deck(&tg, fill);
+    test_add_to_deck(&tg, fill);
+    test_add_to_deck(&tg, fill);
+    test_add_to_deck(&tg, fill);
+    test_add_to_deck(&tg, fill);
+    test_add_to_deck(&tg, fill);
+    test_add_to_deck(&tg, fill);
+    test_add_to_deck(&tg, fill);
+    test_add_to_deck(&tg, fill);
+    test_add_to_deck(&tg, fill);
+    test_add_to_deck(&tg, fill);
+    test_add_to_deck(&tg, fill);
+    test_add_to_deck(&tg, fill);
+    test_add_to_deck(&tg, fill);
+    test_add_to_deck(&tg, fill);
+    test_add_to_deck(&tg, fill);
+    test_add_to_deck(&tg, fill);
+    // 
+    int ayumu = test_id(&tg, "PL!N-bp3-001-R\u{ff0b}");
+    int filler_live = test_id(&tg, "PL!-sd1-019-SD");
+    // 
+    tg.state.p[0].stage[0] = -1;
+    tg.state.p[0].stage[1] = ayumu;
+    tg.state.p[0].stage[2] = -1;
+    test_add_to_hand(&tg, filler_live);
+    test_give_energy(&tg, 3);
+    // 
+    // // inlined helper advance_to_live_card_set_p1
+    // 
+    CHECK_EQ_STR(rb_phase_name(tg.state.phase), "Main", "azuna_q158_blade_not_gained_if_energy_not_placed");
+    rb_advance_phase(&tg.state);
+    CHECK_EQ_STR(rb_phase_name(tg.state.phase), "Active", "azuna_q158_blade_not_gained_if_energy_not_placed");
+    rb_advance_phase(&tg.state);
+    CHECK_EQ_STR(rb_phase_name(tg.state.phase), "Energy", "azuna_q158_blade_not_gained_if_energy_not_placed");
+    rb_advance_phase(&tg.state);
+    CHECK_EQ_STR(rb_phase_name(tg.state.phase), "Draw", "azuna_q158_blade_not_gained_if_energy_not_placed");
+    rb_advance_phase(&tg.state);
+    CHECK_EQ_STR(rb_phase_name(tg.state.phase), "Main", "azuna_q158_blade_not_gained_if_energy_not_placed");
+    rb_advance_phase(&tg.state);
+    CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "azuna_q158_blade_not_gained_if_energy_not_placed");
+    // 
+    test_set_live_card(&tg, 0, filler_live);
+    // // inlined helper advance_to_live_start
+    // 
+    rb_advance_phase(&tg.state);
+    rb_advance_phase(&tg.state);
+    // 
+    // 
+    test_has_pending_choice(&tg);
+    // action result consumed: let ch = game.state.get_pending_choice().cloned().unwrap();
 }
 
 // test_modules/abilities/simple/ayumu_azuna_test.rs::azuna_q157_energy_under_member_uses_any_energy
@@ -43272,6 +43979,120 @@ static void gen_rurino_empty_discard_no_crash(void){
     int ori = 0;
     // TODO assert: assert!(ori != Some("wait"), "Member should be activated");
     // 
+}
+
+// test_modules/jidou/complex/rurino_test.rs::rurino_bp5_live_start_gains_heart_from_discarded_group
+static void gen_rurino_bp5_live_start_gains_heart_from_discarded_group(void){
+    // 
+    // db loaded via rb_load
+    TestGame tg; test_game_new(&tg);
+    // 
+    int rurino = test_id(&tg, "PL!HS-bp5-003-R\u{ff0b}");
+    int mirakura_member = test_id(&tg, "PL!HS-bp6-011-R");
+    int cost_card = test_id(&tg, "PL!HS-bp6-011-R");
+    int filler = test_id(&tg, "PL!-sd1-010-SD");
+    // 
+    // // Set up stage: Rurino + one other みらくらぱーく member + filler
+    tg.state.p[0].stage[0] = rurino;
+    tg.state.p[0].stage[1] = mirakura_member;
+    tg.state.p[0].stage[2] = filler;
+    // // Live card in hand for set_live_card
+    int live_card = test_id(&tg, "PL!HS-PR-012-PR");
+    // // Fill deck
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    // // Energy for live card cost
+    test_give_energy(&tg, 10);
+    // 
+    rb_advance_phase(&tg.state);
+    rb_advance_phase(&tg.state);
+    rb_advance_phase(&tg.state);
+    rb_advance_phase(&tg.state);
+    rb_advance_phase(&tg.state);
+    // // Set hand explicitly to avoid draw-phase card index interference
+    // clear
+    test_add_to_hand(&tg, cost_card);
+    test_add_to_hand(&tg, live_card);
+    test_set_live_card(&tg, 0, live_card);
+    // // Advance to trigger LiveStart abilities
+    rb_advance_phase(&tg.state);
+    rb_advance_phase(&tg.state);
+    // 
+    // // LiveStart triggers — optional cost: select 1 card from hand to discard (or skip).
+    // // The cost handler directly creates SelectCard zone=hand (not SelectTarget).
+    test_has_pending_choice(&tg);
+    // // Select cost_card (index 0) to pay the cost
+    rb_resume_with_choice(&tg.state, 0);
+    // 
+    // // After cost is paid, prompts to select 1 member to receive heart01.
+    // // Verify the pending choice's filtered_indices only includes
+    // // matching group members (rurino@0, mirakura_member@1).
+    // // filler (Printemps, stage pos 2) is excluded from the candidate pool.
+    if (rb_mods_get_heart(&tg.state.mods, rurino, 0) >= 0) {
+    TestGame tg; test_game_new(&tg);
+    int h1 = 0;
+    // TODO assert: assert!(h1.is_some(), "Heart01 should be present on rurino");
+    // action result consumed: assert!(h1.unwrap().total() >= 1, "Heart01 should be >= 1 on rurino");
+    // TODO: }
+    }
 }
 
 // test_modules/jidou/complex/sp_bp1_003_cost_total_test.rs::chisato_cost_total_10_triggers
@@ -46082,6 +46903,118 @@ static void gen_q251_skip_optional(void){
     // 
 }
 
+// test_modules/abilities/complex/ability_from_source_test.rs::rina_gains_ability_from_under_member
+static void gen_rina_gains_ability_from_under_member(void){
+    // 
+    // db loaded via rb_load
+    TestGame tg; test_game_new(&tg);
+    // 
+    int rina = test_id(&tg, "PL!N-PR-026-PR");
+    // // Ayumu (PL!N-bp4-001-R): 虹ヶ咲 member, cost=2, has live_success ability
+    int ayumu = test_id(&tg, "PL!N-bp4-001-R");
+    int filler = test_id(&tg, "PL!-sd1-010-SD");
+    // 
+    tg.state.p[0].stage[0] = rina;
+    tg.state.p[0].stage[1] = filler;
+    tg.state.p[0].stage[2] = -1;
+    // TODO: game.state.player1.stage.under_cards[0].push(ayumu);
+    // 
+    // // inlined helper fill_decks
+    // 
+    // clear
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    // clear
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    // 
+    test_give_energy(&tg, 5);
+    // 
+    rb_advance_phase(&tg.state);
+    rb_advance_phase(&tg.state);
+    // 
+    int gained = 0;
+    // TODO assert: assert!(gained.is_some(), "Rina should have gained abilities");
+    // TODO if let (untranspilable body): assert!(gained.is_some(), "Rina should have gained abilities");
+    // 
+}
+
 // test_modules/abilities/complex/ability_from_source_test.rs::rina_only_copies_live_success_not_constant
 static void gen_rina_only_copies_live_success_not_constant(void){
     // 
@@ -46523,6 +47456,119 @@ static void gen_rina_not_on_stage(void){
     // 
 }
 
+// test_modules/abilities/complex/ability_from_source_test.rs::rina_copies_from_multiple_under_cards
+static void gen_rina_copies_from_multiple_under_cards(void){
+    // 
+    // db loaded via rb_load
+    TestGame tg; test_game_new(&tg);
+    // 
+    int rina = test_id(&tg, "PL!N-PR-026-PR");
+    int ayumu = test_id(&tg, "PL!N-bp4-001-R");
+    int shizuku = test_id(&tg, "PL!N-bp4-003-R");
+    int filler = test_id(&tg, "PL!-sd1-010-SD");
+    // 
+    tg.state.p[0].stage[0] = rina;
+    tg.state.p[0].stage[1] = filler;
+    tg.state.p[0].stage[2] = -1;
+    // TODO: game.state.player1.stage.under_cards[0].push(ayumu);
+    // TODO: game.state.player1.stage.under_cards[0].push(shizuku);
+    // 
+    // // inlined helper fill_decks
+    // 
+    // clear
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    // clear
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    // 
+    test_give_energy(&tg, 5);
+    // 
+    rb_advance_phase(&tg.state);
+    rb_advance_phase(&tg.state);
+    // 
+    int gained = 0;
+    // TODO assert: assert!(gained.is_some(), "Rina should have gained abilities");
+    // TODO if let (untranspilable body): assert!(gained.is_some(), "Rina should have gained abilities");
+    // 
+}
+
 // test_modules/abilities/complex/burn_energy_under_test.rs::burn_no_under_no_move_no_score
 static void gen_burn_no_under_no_move_no_score(void){
     TestGame tg; test_game_new(&tg);
@@ -46694,7 +47740,7 @@ static void gen_fuyumari_q118_opponent_picks_second_card(void){
     // // Step 2: Opponent picks the SECOND card (index 1 = live_b)
     test_has_pending_choice(&tg);
     // TODO: {
-    int entry = 0;
+    int entry = rb_queue_current_entry(&tg.state);
     // TODO assert_eq (unresolved): assert_eq!( entry.as_ref().and_then(|e| e.choice_player_id.as_deref()), Some("p2"), "Opponent-select choice should be routed to opponent" );
     // TODO: }
     // // Verify generated_actions returns non-empty for opponent
@@ -46803,7 +47849,7 @@ static void gen_fuyumari_q118_three_distinct_cards_opponent_picks_middle(void){
     // // Step 2: Opponent picks index 1 from selected_cards = live_c
     test_has_pending_choice(&tg);
     // TODO: {
-    int entry = 0;
+    int entry = rb_queue_current_entry(&tg.state);
     // TODO assert_eq (unresolved): assert_eq!( entry.as_ref().and_then(|e| e.choice_player_id.as_deref()), Some("p2"), "Opponent-select choice should be routed to opponent" );
     // TODO: }
     int actions = 0;
@@ -46852,7 +47898,7 @@ static void gen_fuyumari_q118_duplicate_names_distinct_filter_works(void){
     // // Step 2: Opponent picks from the 2 selected cards
     test_has_pending_choice(&tg);
     // TODO: {
-    int entry = 0;
+    int entry = rb_queue_current_entry(&tg.state);
     // TODO assert_eq (unresolved): assert_eq!( entry.as_ref().and_then(|e| e.choice_player_id.as_deref()), Some("p2"), "Opponent-select choice should be routed to opponent" );
     // TODO: }
     int actions = 0;
@@ -50105,6 +51151,104 @@ static void gen_two_dive_copies_only_the_moved_one_places(void){
     // 
 }
 
+// test_modules/jidou/complex/logging_test.rs::shared_log_never_leaks_private_zone_card_names
+static void gen_shared_log_never_leaks_private_zone_card_names(void){
+    TestGame tg; test_game_new(&tg);
+    // 
+    // // Per rules 4.1.2.2/4.1.2.3 & 4.8/4.9/4.11, hand, main-deck and
+    // // energy-deck are 非公開領域 (private) — their card *identities* must never
+    // // appear in the shared rule_log / structured_log. Only the activating
+    // // (stage) card may be named. Verify that a SelectCard choice over "hand"
+    // // and "deck" records neutral placeholder labels, not real card names.
+    // TODO: use rabuka_engine::ability::types::Choice;
+    // db loaded via rb_load
+    int secret = 0;
+    int secret_name = 0;
+    // 
+    // // Give P1 a hand & deck containing the secret card so resolution can find it.
+    test_add_to_hand(&tg, secret);
+    test_add_to_deck(&tg, secret);
+    // 
+    // // A private-zone SelectCard: offered labels must NOT contain secret_name.
+    int hand_choice = 0;
+    // TODO: zone: "hand".to_string(),
+    // TODO: card_type: None,
+    // TODO: count: 1,
+    // TODO: description: "choose from hand".to_string(),
+    // TODO: description_en: None,
+    // TODO: description_ja: None,
+    // TODO: allow_skip: true,
+    // TODO: cost_limit: None,
+    // TODO: cost_limit_operator: None,
+    // TODO: cost_total: None,
+    // TODO: cost_total_operator: None,
+    // TODO: cost_values: None,
+    // TODO: group: None,
+    // TODO: characters: None,
+    // TODO: filtered_indices: Some(vec![0]),
+    // TODO: is_select_action: false,
+    // TODO: heart_colors: Vec::new(),
+    // TODO: require_all_heart_colors: None,
+    // TODO: name_fragments: None,
+    // TODO: target_player_id: None,
+    // TODO: blind: false,
+    // TODO: is_reveal: false,
+    // TODO: picker: None,
+    // TODO: destination: None,
+    // TODO: discard_remaining: None,
+    // TODO: };
+    int deck_choice = 0;
+    // TODO: zone: "deck".to_string(),
+    // TODO: card_type: None,
+    // TODO: count: 1,
+    // TODO: description: "choose from deck".to_string(),
+    // TODO: description_en: None,
+    // TODO: description_ja: None,
+    // TODO: allow_skip: true,
+    // TODO: cost_limit: None,
+    // TODO: cost_limit_operator: None,
+    // TODO: cost_total: None,
+    // TODO: cost_total_operator: None,
+    // TODO: cost_values: None,
+    // TODO: group: None,
+    // TODO: characters: None,
+    // TODO: filtered_indices: Some(vec![0]),
+    // TODO: is_select_action: false,
+    // TODO: heart_colors: Vec::new(),
+    // TODO: require_all_heart_colors: None,
+    // TODO: name_fragments: None,
+    // TODO: target_player_id: None,
+    // TODO: blind: false,
+    // TODO: is_reveal: false,
+    // TODO: picker: None,
+    // TODO: destination: None,
+    // TODO: discard_remaining: None,
+    // TODO: };
+    // 
+    // TODO: g.state.push_choice_offered(&hand_choice);
+    // TODO: g.state.push_choice_resolved(&hand_choice, vec!["#0".to_string()], false);
+    // TODO: g.state.push_choice_offered(&deck_choice);
+    // TODO: g.state.push_choice_resolved(&deck_choice, vec!["#0".to_string()], false);
+    // 
+    int all_lines = 0;
+    int v = 0;
+    // TODO if let (untranspilable body): let mut v = vec![e.text.clone()];
+    // TODO: if let Some(LogMetadata::ChoiceOffered { offered, .. }) = &e.metadata {
+    // TODO: v.extend(offered.iter().cloned());
+    // TODO: }
+    // TODO: if let Some(LogMetadata::ChoiceResolved { chosen, .. }) = &e.metadata {
+    // TODO: v.extend(chosen.iter().cloned());
+    // TODO: }
+    // TODO: v
+    // TODO: }).collect();
+    // 
+    int line = 0;
+    // TODO loop (degraded): for line in &all_lines {
+    // TODO assert: assert!( !line.contains(&secret_name), "private-zone card name leaked into shared log: '{line}' (secret '{secret_name}')" );
+    // TODO: }
+    // 
+}
+
 // test_modules/jidou/complex/logging_test.rs::real_choice_flow_emits_offered_and_resolved
 static void gen_real_choice_flow_emits_offered_and_resolved(void){
     // 
@@ -50378,7 +51522,7 @@ static void gen_maki_ab1_use_limit_once_per_turn(void){
     // 
     // // ab#1 pre-filtered out (no state change yet). ab#0 auto-resolves.
     rb_resume_with_choice(&tg.state, 1);
-    int entry = 0;
+    int entry = rb_queue_current_entry(&tg.state);
     // TODO assert_eq (unresolved): assert_eq!( entry.as_ref().and_then(|e| e.choice_player_id.as_deref()), Some("p2"), "Wait-member choice must be routed to opponent (p2)" );
     rb_resume_with_choice(&tg.state, 0);
     while (test_has_pending_choice(&tg)) rb_resume_with_choice(&tg.state, 0);
@@ -51006,6 +52150,151 @@ static void gen_riko_same_cost_different_cards_triggers(void){
     // 
 }
 
+// test_modules/jidou/complex/rurino_bp5_test.rs::rurino_bp5_discard_only_matching_unit_gets_heart
+static void gen_rurino_bp5_discard_only_matching_unit_gets_heart(void){
+    // 
+    // db loaded via rb_load
+    TestGame tg; test_game_new(&tg);
+    // 
+    int rurino = test_id(&tg, "PL!HS-bp5-003-R＋");
+    int hs = test_id(&tg, "PL!HS-bp6-011-R");
+    int muse = test_id(&tg, "PL!-sd1-010-SD");
+    int filler = test_id(&tg, "PL!-sd1-010-SD");
+    // 
+    tg.state.p[0].stage[0] = hs;
+    tg.state.p[0].stage[1] = rurino;
+    tg.state.p[0].stage[2] = muse;
+    int cost_card = test_id(&tg, "PL!HS-bp6-011-R");
+    int live = test_id(&tg, "PL!-sd1-020-SD");
+    // 
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_hand(&tg, filler);
+    test_give_energy(&tg, 10);
+    // 
+    // // inlined helper advance_to_live_set
+    // 
+    rb_advance_phase(&tg.state);
+    rb_advance_phase(&tg.state);
+    rb_advance_phase(&tg.state);
+    rb_advance_phase(&tg.state);
+    rb_advance_phase(&tg.state);
+    // 
+    // // Set hand explicitly to avoid draw-phase card index interference
+    // clear
+    test_add_to_hand(&tg, cost_card);
+    test_add_to_hand(&tg, live);
+    test_set_live_card(&tg, 0, live);
+    // // inlined helper finish_live_setup
+    // 
+    rb_advance_phase(&tg.state);
+    rb_advance_phase(&tg.state);
+    // 
+    // 
+    // // Pay optional cost — select card from hand (index 0 = cost_card)
+    test_has_pending_choice(&tg);
+    // TODO assert_eq (unresolved): assert_eq!(game.pending_choice_type(), Some("SelectCard".to_string()));
+    rb_resume_with_choice(&tg.state, 0);
+    // 
+    // // Before selecting a target, verify the pending choice's filtered_indices
+    // // only includes matching group members (hs at stage pos 0, rurino at pos 1).
+    // // muse (Printemps, stage pos 2) is excluded from the candidate pool entirely.
+}
+
+// test_modules/jidou/complex/rurino_bp5_test.rs::himeno_bp5_same_group_cost_filters_hand_cards
+static void gen_himeno_bp5_same_group_cost_filters_hand_cards(void){
+    // 
+    // db loaded via rb_load
+    TestGame tg; test_game_new(&tg);
+    // 
+    // // Activating card: 安養寺 姫芽 (PL!HS-bp5-006-R, group=蓮ノ空)
+    int himeno = test_id(&tg, "PL!HS-bp5-006-R");
+    // // Same-group hand cards (蓮ノ空) — pair qualifies
+    int same1 = test_id(&tg, "PL!HS-bp6-011-R");
+    int same2 = test_id(&tg, "PL!HS-bp6-011-R");
+    // // Different-group hand card (Printemps, only 1 → excluded)
+    int wrong = test_id(&tg, "PL!-sd1-010-SD");
+    // // Live card
+    int live = test_id(&tg, "PL!-sd1-020-SD");
+    int filler = test_id(&tg, "PL!-sd1-010-SD");
+    // 
+    tg.state.p[0].stage[0] = -1;
+    tg.state.p[0].stage[1] = himeno;
+    tg.state.p[0].stage[2] = -1;
+    // 
+    // // inlined helper fill_decks
+    // 
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_hand(&tg, filler);
+    // 
+    test_give_energy(&tg, 10);
+    // 
+    // // inlined helper advance_to_live_set
+    // 
+    rb_advance_phase(&tg.state);
+    rb_advance_phase(&tg.state);
+    rb_advance_phase(&tg.state);
+    rb_advance_phase(&tg.state);
+    rb_advance_phase(&tg.state);
+    // 
+    // clear
+    test_add_to_hand(&tg, same1);
+    test_add_to_hand(&tg, same2);
+    test_add_to_hand(&tg, wrong);
+    test_add_to_hand(&tg, live);
+    test_set_live_card(&tg, 0, live);
+    // clear
+    // // inlined helper finish_live_setup
+    // 
+    rb_advance_phase(&tg.state);
+    rb_advance_phase(&tg.state);
+    // 
+    // 
+    // // Hand: [same1@0(蓮ノ空), same2@1(蓮ノ空), wrong@2(Printemps)]
+    test_has_pending_choice(&tg);
+    // TODO assert_eq (unresolved): assert_eq!(game.pending_choice_type(), Some("SelectCard".to_string()));
+    // 
+    // // filtered_indices must only include the 蓮ノ空 pair (0,1)
+    // // wrong (Printemps) has only 1 member → excluded
+}
+
 // test_modules/jidou/complex/rurino_bp5_test.rs::himeno_bp5_same_group_cost_auto_skips_when_no_match
 static void gen_himeno_bp5_same_group_cost_auto_skips_when_no_match(void){
     // 
@@ -51072,6 +52361,75 @@ static void gen_himeno_bp5_same_group_cost_auto_skips_when_no_match(void){
     test_has_pending_choice(&tg);
     // 
     // TODO assert_eq (unresolved): assert_eq!( game.state .mods .get_heart_modifier(himeno, rabuka_engine::card::HeartColor::Heart01), 0, "No heart01 should be granted when cost is skipped" );
+    // 
+}
+
+// test_modules/jidou/complex/rurino_bp5_test.rs::himeno_bp5_same_group_cost_excludes_no_group_cards
+static void gen_himeno_bp5_same_group_cost_excludes_no_group_cards(void){
+    // 
+    // db loaded via rb_load
+    TestGame tg; test_game_new(&tg);
+    // 
+    int himeno = test_id(&tg, "PL!HS-bp5-006-R");
+    int nogroup = test_id(&tg, "PL!-bp5-111-R");
+    int same1 = test_id(&tg, "PL!HS-bp6-011-R");
+    int same2 = test_id(&tg, "PL!HS-bp6-011-R");
+    int live = test_id(&tg, "PL!-sd1-020-SD");
+    int filler = test_id(&tg, "PL!-sd1-010-SD");
+    // 
+    tg.state.p[0].stage[0] = -1;
+    tg.state.p[0].stage[1] = himeno;
+    tg.state.p[0].stage[2] = -1;
+    // 
+    // // inlined helper fill_decks
+    // 
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_hand(&tg, filler);
+    // 
+    test_give_energy(&tg, 10);
+    // 
+    // // inlined helper advance_to_live_set
+    // 
+    rb_advance_phase(&tg.state);
+    rb_advance_phase(&tg.state);
+    rb_advance_phase(&tg.state);
+    rb_advance_phase(&tg.state);
+    rb_advance_phase(&tg.state);
+    // 
+    // clear
+    test_add_to_hand(&tg, nogroup);
+    test_add_to_hand(&tg, same1);
+    test_add_to_hand(&tg, same2);
+    test_add_to_hand(&tg, live);
+    test_set_live_card(&tg, 0, live);
+    // clear
+    // // inlined helper finish_live_setup
+    // 
+    rb_advance_phase(&tg.state);
+    rb_advance_phase(&tg.state);
+    // 
+    // 
+    // // Hand: [nogroup@0, same1@1(蓮ノ空), same2@2(蓮ノ空)]
+    test_has_pending_choice(&tg);
     // 
 }
 
@@ -57142,6 +58500,82 @@ static void gen_yoshiko_debit_two_cost2_ok(void){
     // TODO assert: assert!(!waitroom_contains(&game, cost_2a));
     // TODO assert: assert!(!waitroom_contains(&game, cost_2b));
     // 
+}
+
+// test_modules/abilities/moderate/yoshiko_debut_test.rs::yoshiko_debit_single_cost4_ok
+static void gen_yoshiko_debit_single_cost4_ok(void){
+    TestGame tg; test_game_new(&tg);
+    // 
+    int mut = 0;
+    int game = 0;
+    int yoshiko = 0;
+    int cards = 0;
+    int _filler = 0;
+    // TODO destructuring: let (mut game, yoshiko, cards, _filler) = setup_game();
+    int cost_4a = 0;
+    // TODO assert_eq (unresolved): assert_eq!(get_cost(&game, cost_4a), 4);
+    // 
+    test_play_to_stage(&tg, yoshiko, 1);
+    // TODO assert_eq (unresolved): assert_eq!(game.state.player1.debut_count_this_turn, 1);
+    // // inlined helper assert_stage
+    // 
+    // TODO assert_eq (unresolved): assert_eq!( &game.state.player1.stage.stage, [-1, "Stage mismatch: left={}, center={}, right={}", &game.state.player1.stage.stage[0], &game.state.player1.stage.stage[1], &game.state.player1.stage.stage[2], );
+    // 
+    // 
+    rb_resume_with_choice(&tg.state, 1);
+    // 
+    // // Select cost-4 from discard using filtered index
+    test_has_pending_choice(&tg);
+    // TODO: game.select_waitroom_card_filtered(cost_4a);
+    // 
+    // // Position choice for cost_4: empty=[0,2] → choose left
+    // TODO: select_stage_position(&mut game, 0); // left
+    // TODO assert_eq (unresolved): assert_eq!(game.state.player1.debut_count_this_turn, 2);
+    // // inlined helper assert_stage
+    // 
+    // TODO assert_eq (unresolved): assert_eq!( &game.state.player1.stage.stage, [cost_4a, "Stage mismatch: left={}, center={}, right={}", &game.state.player1.stage.stage[0], &game.state.player1.stage.stage[1], &game.state.player1.stage.stage[2], );
+    // 
+    // 
+    // // Re-prompt: remaining budget=0, skip
+    test_has_pending_choice(&tg);
+}
+
+// test_modules/abilities/moderate/yoshiko_debut_test.rs::yoshiko_debit_cost2_then_cost4_exceeds
+static void gen_yoshiko_debit_cost2_then_cost4_exceeds(void){
+    TestGame tg; test_game_new(&tg);
+    // 
+    int mut = 0;
+    int game = 0;
+    int yoshiko = 0;
+    int cards = 0;
+    int _filler = 0;
+    // TODO destructuring: let (mut game, yoshiko, cards, _filler) = setup_game();
+    // TODO assert_eq (unresolved): assert_eq!(get_cost(&game, cards[0]), 2);
+    // TODO assert_eq (unresolved): assert_eq!(get_cost(&game, cards[1]), 4);
+    // 
+    test_play_to_stage(&tg, yoshiko, 1);
+    // TODO assert_eq (unresolved): assert_eq!(game.state.player1.debut_count_this_turn, 1);
+    // // inlined helper assert_stage
+    // 
+    // TODO assert_eq (unresolved): assert_eq!( &game.state.player1.stage.stage, [-1, "Stage mismatch: left={}, center={}, right={}", &game.state.player1.stage.stage[0], &game.state.player1.stage.stage[1], &game.state.player1.stage.stage[2], );
+    // 
+    // 
+    rb_resume_with_choice(&tg.state, 1);
+    // 
+    // // Pick cost_2 → position choice → left
+    test_has_pending_choice(&tg);
+    // TODO: game.select_waitroom_card_filtered(cards[0]);
+    // TODO: select_stage_position(&mut game, 0); // left
+    // TODO assert: assert!(!waitroom_contains(&game, cards[0]), "cost_2 moved to stage");
+    // TODO assert_eq (unresolved): assert_eq!(game.state.player1.debut_count_this_turn, 2);
+    // // inlined helper assert_stage
+    // 
+    // TODO assert_eq (unresolved): assert_eq!( &game.state.player1.stage.stage, [cards[0], "Stage mismatch: left={}, center={}, right={}", &game.state.player1.stage.stage[0], &game.state.player1.stage.stage[1], &game.state.player1.stage.stage[2], );
+    // 
+    // 
+    // // Re-prompt: remaining budget=2, cost_4=4 > 2
+    test_has_pending_choice(&tg);
+    // // Inspect the re-prompt choice to verify cost_total and filtered_indices
 }
 
 // test_modules/abilities/moderate/yoshiko_debut_test.rs::yoshiko_debit_cost2_redirects_to_budget_card
@@ -63438,6 +64872,65 @@ static void gen_replacement_two_on_one_event_choose_order(void){
     // 
 }
 
+// test_modules/abilities/complex/pipeline_characterization_test.rs::timestamp_singleton_set_cards_pinned
+static void gen_timestamp_singleton_set_cards_pinned(void){
+    TestGame tg; test_game_new(&tg);
+    // 
+    // db loaded via rb_load
+    int c1_id = rb_find_card_by_no("PL!S-bp3-019-L");
+    Card c1; rb_decode_card_by_index(c1_id, &c1);
+    // // Actual DB value is 7, not 4 — pin the real value so drift is caught
+    CHECK_EQ(c1.score, 7, "timestamp_singleton_set_cards_pinned");
+    int c2 = 0;
+    // TODO: db.card_no_to_id.keys().find(|k| k.contains("bp7-001")).and_then(|k| db.get_card_by_no(k))
+    // TODO: });
+    // TODO assert: assert!(c2.is_some(), "LL-bp7-001 family must exist as timestamp candidate");
+    // // If cost expectation drifts, log it but don't hard-fail on absent family
+    // TODO if let (untranspilable body): // If cost expectation drifts, log it but don't hard-fail on absent family
+    // 
+}
+
+// test_modules/abilities/complex/pipeline_characterization_test.rs::cross_seat_mirror_sp_bp5_027_and_s_bp7_025
+static void gen_cross_seat_mirror_sp_bp5_027_and_s_bp7_025(void){
+    // 
+    // db loaded via rb_load
+    // // These are planned mirror rows per TEST_HARDENING_PLAN §5 ledger.
+    // // If the exact prints aren't in this build, pin the mechanism instead:
+    // // two distinct cards can occupy opposite seats and stage presence is seat-relative.
+    TestGame tg; test_game_new(&tg);
+    int try_a = 0;
+    int try_b = 0;
+    // TODO: if let (Some(a), Some(b)) = (try_a, try_b) {
+    // TODO: assert_ne!(a, b, "SP-bp5-027-L and S-bp7-025-L must be distinct cards");
+    // TODO stage assign (unresolved rhs): game.state.player1.stage.stage = [a, -1, -1];
+    tg.state.p[0].stage[1] = -1;
+    tg.state.p[0].stage[2] = -1;
+    // TODO stage assign (unresolved rhs): game.state.player2.stage.stage = [b, -1, -1];
+    tg.state.p[1].stage[1] = -1;
+    tg.state.p[1].stage[2] = -1;
+    // TODO assert: assert!(game.state.player1.stage.stage.contains(&a));
+    // TODO assert: assert!(game.state.player2.stage.stage.contains(&b));
+    // action result consumed: let ca = db.get_card(a).unwrap();
+    // action result consumed: let cb = db.get_card(b).unwrap();
+    // TODO assert: assert!(!ca.abilities.is_empty() || ca.ability.len()>0, "SP-bp5-027-L should have ability");
+    // TODO assert: assert!(!cb.abilities.is_empty() || cb.ability.len()>0, "S-bp7-025-L should have ability");
+    // TODO: } else {
+    // // Fallback pin: cross-seat mirror mechanism — stage presence is seat-relative
+    int a = test_id(&tg, "PL!-sd1-010-SD");
+    int b = test_id(&tg, "PL!-sd1-010-SD");
+    tg.state.p[0].stage[0] = a;
+    tg.state.p[0].stage[1] = -1;
+    tg.state.p[0].stage[2] = -1;
+    tg.state.p[1].stage[0] = b;
+    tg.state.p[1].stage[1] = -1;
+    tg.state.p[1].stage[2] = -1;
+    // TODO assert: assert!(game.state.player1.stage.stage.contains(&a));
+    // TODO assert: assert!(game.state.player2.stage.stage.contains(&b));
+    // TODO: assert_ne!(a, b);
+    // TODO: }
+    // 
+}
+
 // test_modules/abilities/complex/pipeline_characterization_test.rs::heart_pipeline_ordering_copy_multiplier_override_additive_agrees
 static void gen_heart_pipeline_ordering_copy_multiplier_override_additive_agrees(void){
     // 
@@ -64196,7 +65689,7 @@ static void gen_kanon_invalidate_liella_live_start(void){
     test_give_energy(&tg, 20);
     // 
     // // Play Kanon to Center with baton touch (replaces target)
-    test_play_to_stage(&tg, kanon, 1);
+    CHECK_EQ(test_play_to_stage(&tg, kanon, 1), 1, "Play Kanon with baton touch");
     // 
     // // Process pending auto abilities (debut trigger)
     while (test_has_pending_choice(&tg)) rb_resume_with_choice(&tg.state, 0);
@@ -66763,6 +68256,62 @@ static void gen_live_zone_special_icons_do_not_apply(void){
     int snap = 0;
     // TODO assert: assert!(snap.success, "stage covers heart01+03+06 without yell help");
     // TODO assert_eq (unresolved): assert_eq!( snap.total_score, 1, "live total is just the card score — the in-zone score icon adds nothing" );
+    // 
+}
+
+// test_modules/jidou/moderate/mari_bp2_test.rs::all_areas_aqours_diff_names_gains_ability
+static void gen_all_areas_aqours_diff_names_gains_ability(void){
+    // 
+    // db loaded via rb_load
+    TestGame tg; test_game_new(&tg);
+    // 
+    int filler = test_id(&tg, "PL!-sd1-010-SD");
+    int mari = 0;
+    int _stage_ids = 0;
+    // TODO destructuring: let (mari, _stage_ids) = setup_stage_with_3_aqours(&mut game);
+    // 
+    test_add_to_hand(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_recalc(&tg);
+    // 
+    int gained = 0;
+    // TODO assert: assert!(gained.is_some(), "Mari should have gained an ability");
+    if (gained >= 0) {
+    TestGame tg; test_game_new(&tg);
+    int has_live_success = 0;
+    CHECK(has_live_success, "all_areas_aqours_diff_names_gains_ability");
+    // TODO: }
+    }
+    // TODO assert: assert!( !game.state.delayed_gained_effects.is_empty(), "delayed_gained_effects should be populated" );
     // 
 }
 
@@ -69511,7 +71060,7 @@ static void gen_exclude_position_center_not_offered(void){
     // TODO: break;
     // TODO: }
     // // Check if the pending choice is a position destination choice
-    int is_position = 0;
+    int is_position = rb_has_pending_choice(&tg.state);
     // TODO: if is_position {
     // TODO: found_position_choice = true;
     // TODO: positions = game.generated_actions().iter().filter_map(|a| {
@@ -69587,7 +71136,7 @@ static void gen_exclude_position_and_exclude_self_combine_correctly(void){
     test_has_pending_choice(&tg);
     // TODO: break;
     // TODO: }
-    int is_position = 0;
+    int is_position = rb_has_pending_choice(&tg.state);
     // TODO: if is_position {
     // TODO: found_position_choice = true;
     // TODO: positions = game.generated_actions().iter().filter_map(|a| {
@@ -71007,6 +72556,146 @@ static void gen_dia_choose_blade(void){
     // TODO: }
     // 
     CHECK(test_get_blade_modifier(&tg, aqours), "dia_choose_blade");
+    // 
+}
+
+// test_modules/jidou/complex/choice_bullet_test.rs::bouken_three_options
+static void gen_bouken_three_options(void){
+    // 
+    // db loaded via rb_load
+    TestGame tg; test_game_new(&tg);
+    int bouken = test_id(&tg, "PL!S-bp6-020-L");
+    int aqours = test_id(&tg, "PL!S-bp2-001-R");
+    int filler = test_id(&tg, "PL!-sd1-010-SD");
+    // 
+    // // inlined helper fill_decks
+    // 
+    filler = test_id(&tg, "PL!-sd1-010-SD");
+    // clear
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    // clear
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    // 
+    test_add_to_live(&tg, bouken);
+    tg.state.p[0].stage[0] = aqours;
+    tg.state.p[0].stage[1] = filler;
+    tg.state.p[0].stage[2] = -1;
+    // // inlined helper advance_to_live_card_set_p1
+    // 
+    rb_advance_phase(&tg.state);
+    rb_advance_phase(&tg.state);
+    rb_advance_phase(&tg.state);
+    rb_advance_phase(&tg.state);
+    rb_advance_phase(&tg.state);
+    // 
+    // 
+    test_has_pending_choice(&tg);
+    // TODO: if let Some(ref pc) = game.state.get_pending_choice_json() {
+    // TODO: if let Some(opts) = pc.as_object().and_then(|j| j.get("options")).and_then(|o| o.as_array())
+    // TODO: {
+    // TODO assert_eq (unresolved): assert_eq!(opts.len(), 3, "Should have exactly 3 options");
+    // TODO: }
+    // TODO: }
+    rb_resume_with_choice(&tg.state, 0);
+    // TODO: }
     // 
 }
 
@@ -73107,7 +74796,7 @@ static void gen_test_opponent_choice_emma_punch(void){
     test_has_pending_choice(&tg);
     // 
     // // Verify choice_player_id is "p2" (opponent)
-    int entry = 0;
+    int entry = rb_queue_current_entry(&tg.state);
     // TODO assert_eq (unresolved): assert_eq!( entry.choice_player_id.as_deref(), Some("p2"), "Choice player should be p2 (opponent)" );
     // 
     // // Opponent chooses "Yes please" (index 0)
@@ -74859,6 +76548,193 @@ static void gen_q127_no_wien_bloom_set_standalone(void){
     // 
     int h00 = 0;
     CHECK_EQ(h00, 1, "q127_no_wien_bloom_set_standalone");
+    // 
+}
+
+// test_modules/qa/q127_heart_set_plus_global_test.rs::q127_build_card_needs_set_plus_additive
+static void gen_q127_build_card_needs_set_plus_additive(void){
+    // 
+    // db loaded via rb_load
+    TestGame tg; test_game_new(&tg);
+    // 
+    int wien = test_id(&tg, "PL!SP-bp2-010-P");
+    int bloom = test_id(&tg, "PL!HS-bp2-019-L");
+    int hasunosuka_member = test_id(&tg, "PL!HS-bp1-002-R");
+    int filler = test_id(&tg, "PL!-sd1-010-SD");
+    // 
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    // 
+    // // Wien on P2's stage
+    tg.state.p[1].stage[0] = -1;
+    tg.state.p[1].stage[1] = wien;
+    tg.state.p[1].stage[2] = -1;
+    // 
+    tg.state.p[0].stage[0] = -1;
+    tg.state.p[0].stage[1] = hasunosuka_member;
+    tg.state.p[0].stage[2] = -1;
+    test_add_to_hand(&tg, bloom);
+    test_add_to_hand(&tg, filler);
+    // 
+    // // inlined helper advance_to_live_card_set_p1
+    // 
+    rb_advance_phase(&tg.state);
+    rb_advance_phase(&tg.state);
+    rb_advance_phase(&tg.state);
+    rb_advance_phase(&tg.state);
+    rb_advance_phase(&tg.state);
+    CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "q127_build_card_needs_set_plus_additive");
+    // 
+    test_set_live_card(&tg, 0, bloom);
+    // // inlined helper advance_to_live_start
+    // 
+    rb_advance_phase(&tg.state);
+    rb_advance_phase(&tg.state);
+    // 
+    // 
+    test_has_pending_choice(&tg);
+    rb_resume_with_choice(&tg.state, 0);
+    // 
+    while (test_has_pending_choice(&tg)) rb_resume_with_choice(&tg.state, 0);
+    rb_resume_with_choice(&tg.state, -1);
+    // TODO: }
+    // 
+    int bloom_id = 0;
+    int card = 0;
+    // 
+    // // Get the current need_heart_modifiers
+    int mods = 0;
+    // 
+    // // Simulate build_card_needs logic
+    int need = 0;
+    int has_set = rb_mods_get_blade(&tg.state.mods, bloom_id);
+    CHECK(has_set, "q127_build_card_needs_set_plus_additive");
+    // 
+    // TODO: if let Some(ref _nh) = card.need_heart {
+    // TODO: if has_set {
+    // // Fixed Path 1: set first, then additive
+    if (rb_mods_get_blade(&tg.state.mods, bloom_id) >= 0) {
+    TestGame tg; test_game_new(&tg);
+    int color = 0;
+    int me = 0;
+    // TODO loop (degraded): for (color, me) in card_mods {
+    // TODO: if me.set != 0 {
+    // TODO: need[color.index()] = me.set as u32;
+    // TODO: }
+    // TODO: if me.additive != 0 {
+    int idx = 0;
+    int current = 0;
+    // TODO: need[idx] = (current + me.additive as i32).max(0) as u32;
+    // TODO: }
+    // TODO: }
+    // TODO: }
+    }
+    // TODO: }
+    // TODO: }
+    // 
+    // // Bloom set: heart01=2, heart00=1
+    // // Wien additive: +1 heart00
+    // // Effective: heart01=2, heart00=2
+    // TODO assert_eq (unresolved): assert_eq!( need[HeartColor::Heart01.index()], 2, "build_card_needs: heart01=2 (Bloom's set)" );
+    // TODO assert_eq (unresolved): assert_eq!( need[HeartColor::Heart00.index()], 2, "Q127 build_card_needs: heart00 = set(1) + additive(1) = 2" );
     // 
 }
 
@@ -80613,7 +82489,7 @@ static void gen_test_yoshiko_center_ability_fails_not_in_center(void){
     // 
     // // Verify no state changes occurred
     // TODO assert: assert!( game.player().stage.stage == stage_before, "Stage should be unchanged" );
-    // TODO assert: assert!( game.state.get_pending_choice().is_none(), "Should not have pending choice when not in center" );
+    CHECK(rb_has_pending_choice(&tg.state), "test_yoshiko_center_ability_fails_not_in_center");
     // 
 }
 
@@ -84088,6 +85964,76 @@ static void gen_mirai_ticket_empty_revealed_triggers_and_auto_skips(void){
     // 
 }
 
+// test_modules/jidou/complex/opponent_choice_tests.rs::yoshiko_pb1_opponent_discards_skips_blade
+static void gen_yoshiko_pb1_opponent_discards_skips_blade(void){
+    // 
+    // db loaded via rb_load
+    TestGame tg; test_game_new(&tg);
+    // 
+    int yoshiko = test_id(&tg, "PL!S-pb1-006-R");
+    int live_card = test_id(&tg, "PL!-sd1-019-SD");
+    int p2_card = test_id(&tg, "PL!-sd1-010-SD");
+    // 
+    tg.state.p[0].stage[1] = yoshiko;
+    test_add_to_hand(&tg, live_card);
+    test_add_to_hand(&tg, p2_card);
+    test_give_energy(&tg, 1);
+    // 
+    // // inlined helper setup_yoshiko
+    // 
+    test_activate_ability(&tg, yoshiko);
+    // TODO: game.assert_select_card("hand", 1, true);
+    // 
+    // 
+    // // Opponent discards their only card
+    rb_resume_with_choice(&tg.state, 0);
+    // 
+    // // conditional_on_optional auto-resolves: chose_yes=true + negation=true → do_nothing → no blade
+    // // inlined helper assert_optional_cost_state
+    // 
+    // TODO if let (untranspilable body): 
+    // 
+    test_has_pending_choice(&tg);
+    CHECK_EQ(test_get_blade_modifier(&tg, yoshiko), 0, "yoshiko_pb1_opponent_discards_skips_blade");
+    CHECK(test_zone_has_id(&tg, 1, "discard", p2_card), "yoshiko_pb1_opponent_discards_skips_blade");
+    // 
+}
+
+// test_modules/jidou/complex/opponent_choice_tests.rs::yoshiko_pb1_opponent_skips_gains_blade
+static void gen_yoshiko_pb1_opponent_skips_gains_blade(void){
+    // 
+    // db loaded via rb_load
+    TestGame tg; test_game_new(&tg);
+    // 
+    int yoshiko = test_id(&tg, "PL!S-pb1-006-R");
+    int live_card = test_id(&tg, "PL!-sd1-019-SD");
+    int p2_card = test_id(&tg, "PL!-sd1-010-SD");
+    // 
+    tg.state.p[0].stage[1] = yoshiko;
+    test_add_to_hand(&tg, live_card);
+    test_add_to_hand(&tg, p2_card);
+    test_give_energy(&tg, 1);
+    // 
+    // // inlined helper setup_yoshiko
+    // 
+    test_activate_ability(&tg, yoshiko);
+    // TODO: game.assert_select_card("hand", 1, true);
+    // 
+    // 
+    // // Opponent skips (empty indices)
+    rb_resume_with_choice(&tg.state, -1);
+    // 
+    // // conditional_on_optional auto-resolves: chose_yes=false + negation=true → gain blade 4
+    // // inlined helper assert_optional_cost_state
+    // 
+    // TODO if let (untranspilable body): 
+    // 
+    test_has_pending_choice(&tg);
+    CHECK_EQ(test_get_blade_modifier(&tg, yoshiko), 4, "yoshiko_pb1_opponent_skips_gains_blade");
+    CHECK((!test_zone_has_id(&tg, 1, "discard", p2_card)), "yoshiko_pb1_opponent_skips_gains_blade");
+    // 
+}
+
 // test_modules/jidou/complex/opponent_choice_tests.rs::yoshiko_pb1_opponent_empty_hand_auto_skips
 static void gen_yoshiko_pb1_opponent_empty_hand_auto_skips(void){
     // 
@@ -84110,6 +86056,89 @@ static void gen_yoshiko_pb1_opponent_empty_hand_auto_skips(void){
     // 
     test_has_pending_choice(&tg);
     CHECK_EQ(test_get_blade_modifier(&tg, yoshiko), 4, "yoshiko_pb1_opponent_empty_hand_auto_skips");
+    // 
+}
+
+// test_modules/jidou/complex/opponent_choice_tests.rs::yoshiko_pb1_opponent_multi_card_skips_gains_blade
+static void gen_yoshiko_pb1_opponent_multi_card_skips_gains_blade(void){
+    // 
+    // db loaded via rb_load
+    TestGame tg; test_game_new(&tg);
+    // 
+    int yoshiko = test_id(&tg, "PL!S-pb1-006-R");
+    int live_card = test_id(&tg, "PL!-sd1-019-SD");
+    // 
+    tg.state.p[0].stage[1] = yoshiko;
+    test_add_to_hand(&tg, live_card);
+    // // Opponent has 3 cards — classify_selection returns Prompt (len=3 > count=1)
+    // TODO: game.state.player2.hand.cards.push(test_id(&tg, "PL!-sd1-010-SD"));
+    // TODO: game.state.player2.hand.cards.push(test_id(&tg, "PL!-sd1-010-SD"));
+    // TODO: game.state.player2.hand.cards.push(test_id(&tg, "PL!-sd1-010-SD"));
+    test_give_energy(&tg, 1);
+    // 
+    // // inlined helper setup_yoshiko
+    // 
+    test_activate_ability(&tg, yoshiko);
+    // TODO: game.assert_select_card("hand", 1, true);
+    // 
+    // 
+    // // Opponent's discard choice should be routed to opponent
+    int entry = rb_queue_current_entry(&tg.state);
+    // TODO assert_eq (unresolved): assert_eq!( entry.choice_player_id.as_deref(), Some("p2"), "Discard choice should be routed to opponent" );
+    // 
+    // // Opponent skips despite having cards
+    rb_resume_with_choice(&tg.state, -1);
+    // 
+    // // inlined helper assert_optional_cost_state
+    // 
+    // TODO if let (untranspilable body): 
+    // 
+    test_has_pending_choice(&tg);
+    CHECK_EQ(test_get_blade_modifier(&tg, yoshiko), 4, "yoshiko_pb1_opponent_multi_card_skips_gains_blade");
+    CHECK_EQ(tg.state.p[1].hand.n, 3, "yoshiko_pb1_opponent_multi_card_skips_gains_blade");
+    CHECK_EQ(tg.state.p[1].discard.n, 0, "yoshiko_pb1_opponent_multi_card_skips_gains_blade");
+    // 
+}
+
+// test_modules/jidou/complex/opponent_choice_tests.rs::yoshiko_pb1_opponent_multi_card_discards_skips_blade
+static void gen_yoshiko_pb1_opponent_multi_card_discards_skips_blade(void){
+    // 
+    // db loaded via rb_load
+    TestGame tg; test_game_new(&tg);
+    // 
+    int yoshiko = test_id(&tg, "PL!S-pb1-006-R");
+    int live_card = test_id(&tg, "PL!-sd1-019-SD");
+    int p2_cards = 0;
+    // 
+    tg.state.p[0].stage[1] = yoshiko;
+    test_add_to_hand(&tg, live_card);
+    int c = 0;
+    // TODO loop (degraded): for &c in &p2_cards {
+    test_add_to_hand(&tg, c);
+    // TODO: }
+    test_give_energy(&tg, 1);
+    // 
+    // // inlined helper setup_yoshiko
+    // 
+    test_activate_ability(&tg, yoshiko);
+    // TODO: game.assert_select_card("hand", 1, true);
+    // 
+    // 
+    // // Opponent's discard choice should be routed to opponent
+    int entry = rb_queue_current_entry(&tg.state);
+    // TODO assert_eq (unresolved): assert_eq!( entry.choice_player_id.as_deref(), Some("p2"), "Discard choice should be routed to opponent" );
+    // 
+    // // Discard the first card
+    rb_resume_with_choice(&tg.state, 0);
+    // 
+    // // inlined helper assert_optional_cost_state
+    // 
+    // TODO if let (untranspilable body): 
+    // 
+    test_has_pending_choice(&tg);
+    CHECK_EQ(test_get_blade_modifier(&tg, yoshiko), 0, "yoshiko_pb1_opponent_multi_card_discards_skips_blade");
+    CHECK_EQ(tg.state.p[1].hand.n, 2, "yoshiko_pb1_opponent_multi_card_discards_skips_blade");
+    CHECK_EQ(tg.state.p[1].discard.n, 1, "yoshiko_pb1_opponent_multi_card_discards_skips_blade");
     // 
 }
 
@@ -84141,7 +86170,7 @@ static void gen_serasu_edelnote_appear_triggers_opponent_wait(void){
     // 
     // // Auto ability fires: opponent chooses which of their members to wait
     test_has_pending_choice(&tg);
-    int entry = 0;
+    int entry = rb_queue_current_entry(&tg.state);
     // TODO assert_eq (unresolved): assert_eq!( entry.as_ref().and_then(|e| e.choice_player_id.as_deref()), Some("p2"), "Wait-member choice should be routed to opponent" );
     while (test_has_pending_choice(&tg)) rb_resume_with_choice(&tg.state, 0);
     rb_resume_with_choice(&tg.state, 0);
@@ -87444,6 +89473,84 @@ static void gen_position_change_skip_optional(void){
     // 
 }
 
+// test_modules/abilities/complex/position_change_multi_test.rs::position_change_filters_by_group_names
+static void gen_position_change_filters_by_group_names(void){
+    // 
+    // db loaded via rb_load
+    TestGame tg; test_game_new(&tg);
+    // 
+    int himeno = test_id(&tg, "PL!HS-pb1-006-R");
+    int member_same = test_id(&tg, "PL!HS-sd1-014-SD");
+    int member_other = test_id(&tg, "PL!-sd1-010-SD");
+    // 
+    // // Place members on stage
+    tg.state.p[0].stage[0] = member_other;
+    tg.state.p[0].stage[1] = member_same;
+    tg.state.p[0].stage[2] = -1;
+    // 
+    // // Put himeno in hand and play to stage
+    test_add_to_hand(&tg, himeno);
+    test_give_energy(&tg, 11);
+    int filler = test_id(&tg, "PL!-sd1-010-SD");
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_play_to_stage(&tg, himeno, 2);
+    // 
+    // // Play himeno to RightSide — debut/live trigger will fire later.
+    // // Advance to live start to trigger the ability
+    rb_advance_phase(&tg.state);
+    rb_advance_phase(&tg.state);
+    rb_advance_phase(&tg.state);
+    rb_advance_phase(&tg.state);
+    rb_advance_phase(&tg.state);
+    // 
+    // // Set a live card so live starts
+    // TODO: game.state.player1.live_card_zone.cards.push(test_id(&tg, "PL!-sd1-010-SD"));
+    rb_advance_phase(&tg.state);
+    // TODO: game.state.player2.live_card_zone.cards.push(test_id(&tg, "PL!-sd1-010-SD"));
+    rb_advance_phase(&tg.state);
+    // 
+    // // The live start trigger fires and the sequential effect starts.
+    // // First sub-action: position_change with group_names=[みらくらぱーく！], exclude_self=true
+    // // Only Center (member_same) should be offered — Left (member_other) should NOT.
+    test_has_pending_choice(&tg);
+    CHECK_EQ_STR(test_pending_choice_type(&tg), "SelectTarget", "position_change_filters_by_group_names");
+    // 
+    // // The position change should only offer the Center area (みらくらぱーく！ member)
+    // // We'll check by looking at the generated actions
+    int actions = 0;
+    int position_actions = 0;
+    // 
+    // // Should have exactly 1 position option (Center, the only valid destination)
+    // // Left slot has member_other (non-group) → excluded. Right slot was where
+    // // himeno played but exclude_self excludes her own position. Center has
+    // // member_same (みらくらぱーく！) → valid. Empty slots are excluded here
+    // // because this is a single position change (not multiple_targets).
+    // TODO assert_eq (unresolved): assert_eq!( position_actions.len(), 1, "Only Center (みらくらぱーく！ member) should be offered as destination" );
+    // TODO: if let Some(ref params) = position_actions[0].parameters {
+    // TODO assert_eq (unresolved): assert_eq!( params.stage_area.as_deref(), Some("center"), "Only Center should be a valid position change destination" );
+    // TODO: }
+    // 
+}
+
 // test_modules/abilities/complex/position_change_multi_test.rs::position_change_group_names_excludes_self
 static void gen_position_change_group_names_excludes_self(void){
     // 
@@ -88125,7 +90232,7 @@ static void gen_sumire_q193_q194_baton_touch_draw_and_deploy(void){
     rb_advance_phase(&tg.state);
     // 
     // 
-    test_play_to_stage(&tg, sumire, 1);
+    CHECK_EQ(test_play_to_stage(&tg, sumire, 1), 1, "play with double baton via card_indices");
     // 
     // // After baton touch + debut: draw 2 cards (auto).
     // // Deploy target auto-resolves (single matching candidate) → no card selection prompt.
@@ -88249,7 +90356,7 @@ static void gen_sumire_no_baton_touch_no_draw(void){
     rb_advance_phase(&tg.state);
     // 
     // 
-    test_play_to_stage(&tg, sumire, 1);
+    CHECK_EQ(test_play_to_stage(&tg, sumire, 1), 1, "play without baton touch");
     // 
     while (test_has_pending_choice(&tg)) rb_resume_with_choice(&tg.state, 0);
     rb_resume_with_choice(&tg.state, 0);
@@ -88346,7 +90453,7 @@ static void gen_sumire_q194_locked_member_excluded_from_double_baton(void){
     // TODO: game.state.player1.deployed_this_turn.push(liella1);
     // TODO: }
     // 
-    test_play_to_stage(&tg, sumire, 1);
+    CHECK_EQ(test_play_to_stage(&tg, sumire, 1), 1, "play with baton touch");
     // 
     while (test_has_pending_choice(&tg)) rb_resume_with_choice(&tg.state, 0);
     rb_resume_with_choice(&tg.state, 0);
@@ -88444,7 +90551,7 @@ static void gen_sumire_only_one_occupied_area_triggers_single_baton_touch(void){
     rb_advance_phase(&tg.state);
     // 
     // 
-    test_play_to_stage(&tg, sumire, 0);
+    CHECK_EQ(test_play_to_stage(&tg, sumire, 0), 1, "play with baton touch");
     // 
     while (test_has_pending_choice(&tg)) rb_resume_with_choice(&tg.state, 0);
     rb_resume_with_choice(&tg.state, 0);
@@ -88536,7 +90643,7 @@ static void gen_sumire_double_baton_to_left_does_not_activate_debut(void){
     rb_advance_phase(&tg.state);
     // 
     // 
-    test_play_to_stage(&tg, sumire, 0);
+    CHECK_EQ(test_play_to_stage(&tg, sumire, 0), 1, "play with double baton via card_indices");
     // 
     while (test_has_pending_choice(&tg)) rb_resume_with_choice(&tg.state, 0);
     rb_resume_with_choice(&tg.state, 0);
@@ -88634,7 +90741,7 @@ static void gen_sumire_no_liella_on_stage_plays_normally(void){
     rb_advance_phase(&tg.state);
     rb_advance_phase(&tg.state);
     // 
-    test_play_to_stage(&tg, sumire, 1);
+    CHECK_EQ(test_play_to_stage(&tg, sumire, 1), 1, "play without baton touch");
     // 
     // TODO assert: assert!( game.state.player1.stage.stage.contains(&sumire), "Sumire placed on stage normally" );
     // 
@@ -88721,7 +90828,7 @@ static void gen_sumire_single_baton_stays_single_no_auto_promote(void){
     // 
     // 
     // // Use regular area button path (no card_indices) — single baton only
-    test_play_to_stage(&tg, sumire, 1);
+    CHECK_EQ(test_play_to_stage(&tg, sumire, 1), 1, "play with single baton");
     // 
     while (test_has_pending_choice(&tg)) rb_resume_with_choice(&tg.state, 0);
     rb_resume_with_choice(&tg.state, 0);
@@ -88949,7 +91056,7 @@ static void gen_sumire_explicit_double_baton_via_card_indices(void){
     rb_advance_phase(&tg.state);
     // 
     // 
-    test_play_to_stage(&tg, sumire, 1);
+    CHECK_EQ(test_play_to_stage(&tg, sumire, 1), 1, "explicit double baton via card_indices");
     // 
     while (test_has_pending_choice(&tg)) rb_resume_with_choice(&tg.state, 0);
     rb_resume_with_choice(&tg.state, 0);
@@ -89060,7 +91167,7 @@ static void gen_sumire_explicit_double_baton_to_left_no_debut(void){
     rb_advance_phase(&tg.state);
     // 
     // 
-    test_play_to_stage(&tg, sumire, 0);
+    CHECK_EQ(test_play_to_stage(&tg, sumire, 0), 1, "explicit double baton to Left");
     // 
     while (test_has_pending_choice(&tg)) rb_resume_with_choice(&tg.state, 0);
     rb_resume_with_choice(&tg.state, 0);
@@ -89660,7 +91767,7 @@ static void gen_serasu_edelnote_appears_fires_once(void){
     // 
     // // Opponent should get exactly one choice prompt
     test_has_pending_choice(&tg);
-    int entry = 0;
+    int entry = rb_queue_current_entry(&tg.state);
     // TODO assert_eq (unresolved): assert_eq!( entry.choice_player_id.as_deref(), Some("p2"), "Choice must be routed to opponent (p2)" );
     // 
     // // Drain the choice
@@ -92109,7 +94216,7 @@ static void gen_nb5028_sets_score_and_required_hearts(void){
     test_recalc(&tg);
     // 
     CHECK_EQ(test_get_score_modifier(&tg, live), 2, "nb5028_sets_score_and_required_hearts");
-    int nh02 = 0;
+    int nh02 = rb_mods_get_blade(&tg.state.mods, live);
     // TODO assert: assert!( nh02 >= 5, "required hearts must include heart02 totalling >=5 (got {nh02})" );
     // 
 }
@@ -92900,6 +95007,169 @@ static void gen_hot_passion_waited_energy_flips_opponent_score_comparison(void){
     // 
 }
 
+// test_modules/integration/remaining_quick_test.rs::eternalize_q204_two_niko_hearts_reduced
+static void gen_eternalize_q204_two_niko_hearts_reduced(void){
+    // 
+    // db loaded via rb_load
+    TestGame tg; test_game_new(&tg);
+    // 
+    int live = test_id(&tg, "PL!N-pb1-042-L");
+    int filler = test_id(&tg, "PL!-sd1-010-SD");
+    int niji = test_id(&tg, "PL!N-pb1-012-R");
+    // 
+    tg.state.p[0].stage[0] = niji;
+    tg.state.p[0].stage[1] = niji;
+    tg.state.p[0].stage[2] = -1;
+    test_add_to_hand(&tg, live);
+    test_add_to_hand(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_give_energy(&tg, 15);
+    // 
+    // // inlined helper advance_live
+    // 
+    rb_advance_phase(&tg.state);
+    rb_advance_phase(&tg.state);
+    rb_advance_phase(&tg.state);
+    rb_advance_phase(&tg.state);
+    rb_advance_phase(&tg.state);
+    // 
+    test_set_live_card(&tg, 0, live);
+    rb_advance_phase(&tg.state);
+    rb_advance_phase(&tg.state);
+    while (test_has_pending_choice(&tg)) rb_resume_with_choice(&tg.state, 0);
+    rb_resume_with_choice(&tg.state, 0);
+    // TODO: }
+    // 
+    int needs_mod = rb_mods_get_blade(&tg.state.mods, live);
+    // TODO assert: assert!( needs_mod.is_some(), "Q204: need_heart modifier applied for 2+ 虹ヶ咲 members" );
+    if (needs_mod >= 0) {
+    TestGame tg; test_game_new(&tg);
+    int h00_val = 0;
+    // TODO assert: assert!( h00_val == -3, "Q204: heart00 reduced by exactly 3 (got {})", h00_val );
+    // TODO: }
+    }
+    // 
+}
+
 // test_modules/integration/remaining_quick_test.rs::eternalize_q204_zero_niko_hearts_unchanged
 static void gen_eternalize_q204_zero_niko_hearts_unchanged(void){
     // 
@@ -93053,7 +95323,48 @@ static void gen_eternalize_q204_zero_niko_hearts_unchanged(void){
     // 
     // // card_count_condition counts ALL members without group filtering.
     // // With only 1 member (< threshold 2), the condition fails → no modifier.
-    // TODO assert: assert!( game.state.mods.need_heart_modifiers.get(&live).is_none(), "Q204: 1 member (<2) → condition fails → no modification" );
+    CHECK(rb_mods_get_blade(&tg.state.mods, live), "eternalize_q204_zero_niko_hearts_unchanged");
+    // 
+}
+
+// test_modules/integration/remaining_quick_test.rs::eternalize_same_name_two_niji_identical
+static void gen_eternalize_same_name_two_niji_identical(void){
+    TestGame tg; test_game_new(&tg);
+    // 
+    // db loaded via rb_load
+    int live = 0;
+    // TODO destructuring: let (live, _) = setup_eternalize_base(&mut game);
+    int ayumu = test_id(&tg, "PL!N-pb1-001-R");
+    // // Two of the same card → same name
+    tg.state.p[0].stage[0] = ayumu;
+    tg.state.p[0].stage[1] = ayumu;
+    tg.state.p[0].stage[2] = -1;
+    // // inlined helper run_live_with_eternalize
+    // 
+    // // inlined helper advance_live
+    // 
+    rb_advance_phase(&tg.state);
+    rb_advance_phase(&tg.state);
+    rb_advance_phase(&tg.state);
+    rb_advance_phase(&tg.state);
+    rb_advance_phase(&tg.state);
+    // 
+    test_set_live_card(&tg, 0, live);
+    rb_advance_phase(&tg.state);
+    rb_advance_phase(&tg.state);
+    while (test_has_pending_choice(&tg)) rb_resume_with_choice(&tg.state, 0);
+    rb_resume_with_choice(&tg.state, 0);
+    // TODO: }
+    // 
+    // 
+    int mods = rb_mods_get_blade(&tg.state.mods, live);
+    // TODO assert: assert!( mods.is_some(), "same-name identical members → should trigger" );
+    if (mods >= 0) {
+    TestGame tg; test_game_new(&tg);
+    int h00 = 0;
+    // TODO assert: assert!(h00 <= -3, "heart00 reduction >= 3 (got {})", h00);
+    // TODO: }
+    }
     // 
 }
 
@@ -93088,7 +95399,7 @@ static void gen_eternalize_different_names_no_reduction(void){
     // TODO: }
     // 
     // 
-    // TODO assert: assert!( game.state.mods.need_heart_modifiers.get(&live).is_none(), "different names → should NOT trigger" );
+    CHECK(rb_mods_get_blade(&tg.state.mods, live), "eternalize_different_names_no_reduction");
     // 
 }
 
@@ -93123,7 +95434,49 @@ static void gen_eternalize_one_niji_one_other_triggers_zero(void){
     // TODO: }
     // 
     // 
-    // TODO assert: assert!( game.state.mods.need_heart_modifiers.get(&live).is_none(), "1 虹ヶ咲 member → count < 2 → should NOT trigger" );
+    CHECK(rb_mods_get_blade(&tg.state.mods, live), "eternalize_one_niji_one_other_triggers_zero");
+    // 
+}
+
+// test_modules/integration/remaining_quick_test.rs::eternalize_two_same_one_different_triggers
+static void gen_eternalize_two_same_one_different_triggers(void){
+    TestGame tg; test_game_new(&tg);
+    // 
+    // db loaded via rb_load
+    int live = 0;
+    // TODO destructuring: let (live, _) = setup_eternalize_base(&mut game);
+    int kasumi = test_id(&tg, "PL!N-pb1-002-R");
+    int ayumu = test_id(&tg, "PL!N-pb1-001-R");
+    // // Two ayumu (same name) + one kasumi (different) → at least 2 share a name
+    tg.state.p[0].stage[0] = ayumu;
+    tg.state.p[0].stage[1] = ayumu;
+    tg.state.p[0].stage[2] = kasumi;
+    // // inlined helper run_live_with_eternalize
+    // 
+    // // inlined helper advance_live
+    // 
+    rb_advance_phase(&tg.state);
+    rb_advance_phase(&tg.state);
+    rb_advance_phase(&tg.state);
+    rb_advance_phase(&tg.state);
+    rb_advance_phase(&tg.state);
+    // 
+    test_set_live_card(&tg, 0, live);
+    rb_advance_phase(&tg.state);
+    rb_advance_phase(&tg.state);
+    while (test_has_pending_choice(&tg)) rb_resume_with_choice(&tg.state, 0);
+    rb_resume_with_choice(&tg.state, 0);
+    // TODO: }
+    // 
+    // 
+    int mods = rb_mods_get_blade(&tg.state.mods, live);
+    // TODO assert: assert!(mods.is_some(), "2/3 share a name → should trigger");
+    if (mods >= 0) {
+    TestGame tg; test_game_new(&tg);
+    int h00 = 0;
+    // TODO assert: assert!(h00 <= -3, "heart00 reduction >= 3 (got {})", h00);
+    // TODO: }
+    }
     // 
 }
 
@@ -93159,7 +95512,7 @@ static void gen_eternalize_three_all_different_no_trigger(void){
     // TODO: }
     // 
     // 
-    // TODO assert: assert!( game.state.mods.need_heart_modifiers.get(&live).is_none(), "3 different names → should NOT trigger" );
+    CHECK(rb_mods_get_blade(&tg.state.mods, live), "eternalize_three_all_different_no_trigger");
     // 
 }
 
@@ -95916,6 +98269,28 @@ static void gen_live_card_set_second_attacker(void){
     // TODO: gs.player2.is_first_attacker = true;
     // TODO assert: assert!( pvp_player_can_act(&gs, 0), "P1 (second attacker) should act" );
     // TODO assert: assert!( !pvp_player_can_act(&gs, 1), "P2 (first attacker) should wait" );
+    // 
+}
+
+// test_modules/integration/pvp_room_test.rs::opponent_choice_routed_via_choice_player_id_works_in_pvp
+static void gen_opponent_choice_routed_via_choice_player_id_works_in_pvp(void){
+    TestGame tg; test_game_new(&tg);
+    // 
+    // TODO: use rabuka_engine::ability::types::Choice;
+    // 
+    int gs = 0;
+    // TODO: gs.player1.is_first_attacker = true;
+    // TODO: gs.player2.is_first_attacker = false;
+    // 
+    // // Inject a SelectCard choice with choice_player_id set to opponent (P2)
+    int choice = 0;
+    // TODO: gs.ability_queue.pause_for_choice(choice);
+    // TODO if let (untranspilable body): gs.ability_queue.pause_for_choice(choice);
+    // 
+    // // P2 should be allowed to act (choice is routed to them)
+    // TODO assert: assert!(pvp_player_can_act(&gs, 1), "P2 can act on own choice");
+    // // P1 should be blocked (not their choice, even though they're active player)
+    // TODO assert: assert!(!pvp_player_can_act(&gs, 0), "P1 blocked from P2's choice");
     // 
 }
 
@@ -99399,7 +101774,7 @@ static void gen_sp_bp1_007_debut_no_retrieve_when_total_below_11_via_baton_touch
     test_add_to_hand(&tg, card);
     // // Real pipeline play with baton touch (the TestGame helper can't pass
     // // use_baton_touch).
-    test_play_to_stage(&tg, card, 1);
+    CHECK_EQ(test_play_to_stage(&tg, card, 1), 1, "baton touch play should succeed at zero cost");
     while (test_has_pending_choice(&tg)) rb_resume_with_choice(&tg.state, 0);
     rb_resume_with_choice(&tg.state, -1);
     // TODO: }
@@ -101854,6 +104229,71 @@ static void gen_himeno_bp5_three_same_group_picks_two(void){
     // 
 }
 
+// test_modules/abilities/complex/himeno_bp5_live_start_test.rs::himeno_bp5_three_cards_two_share_group
+static void gen_himeno_bp5_three_cards_two_share_group(void){
+    // 
+    // db loaded via rb_load
+    TestGame tg; test_game_new(&tg);
+    int himeno = test_id(&tg, "PL!HS-bp5-006-R");
+    int pa = test_id(&tg, "PL!HS-bp6-011-R");
+    int pb = test_id(&tg, "PL!HS-bp6-011-R");
+    int lone = test_id(&tg, "PL!-sd1-010-SD");
+    // 
+    tg.state.p[0].stage[0] = -1;
+    tg.state.p[0].stage[1] = himeno;
+    tg.state.p[0].stage[2] = -1;
+    int filler = test_id(&tg, "PL!-sd1-010-SD");
+    // // inlined helper fill_decks
+    // 
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_hand(&tg, filler);
+    // 
+    test_give_energy(&tg, 10);
+    // // inlined helper advance_to_live_set
+    // 
+    rb_advance_phase(&tg.state);
+    rb_advance_phase(&tg.state);
+    rb_advance_phase(&tg.state);
+    rb_advance_phase(&tg.state);
+    rb_advance_phase(&tg.state);
+    // 
+    // 
+    int live = test_id(&tg, "PL!-sd1-020-SD");
+    // clear
+    test_add_to_hand(&tg, pa);
+    test_add_to_hand(&tg, pb);
+    test_add_to_hand(&tg, lone);
+    test_add_to_hand(&tg, live);
+    test_set_live_card(&tg, 0, live);
+    // clear
+    // // inlined helper finish_live_setup
+    // 
+    rb_advance_phase(&tg.state);
+    rb_advance_phase(&tg.state);
+    // 
+    // 
+    test_has_pending_choice(&tg);
+}
+
 // test_modules/abilities/complex/himeno_bp5_live_start_test.rs::himeno_bp5_p_variant
 static void gen_himeno_bp5_p_variant(void){
     // 
@@ -103160,6 +105600,93 @@ static void gen_test_bp6_live_start_two_distinct_colors_gain_two_hearts(void){
     // TODO assert_eq (unresolved): assert_eq!( game.state .mods .get_heart_modifier(joint, HeartColor::Heart04), 1, "Heart04 from dia" );
     // TODO assert_eq (unresolved): assert_eq!( game.state .mods .get_heart_modifier(joint, HeartColor::Heart05), 1, "Heart05 from dia" );
     // TODO assert_eq (unresolved): assert_eq!( game.state .mods .get_heart_modifier(joint, HeartColor::Heart06), 1, "Heart06 from kotori" );
+    // 
+}
+
+// test_modules/abilities/complex/joint_card_live_start_test.rs::test_bp6_live_start_same_color_deduplicates
+static void gen_test_bp6_live_start_same_color_deduplicates(void){
+    // 
+    // db loaded via rb_load
+    TestGame tg; test_game_new(&tg);
+    // 
+    int joint = test_id(&tg, "LL-bp6-001-R\u{ff0b}");
+    int live = test_id(&tg, "PL!-sd1-010-SD");
+    int filler = test_id(&tg, "PL!-sd1-010-SD");
+    // 
+    // // Use two copies of the same card (same colors guaranteed)
+    int kotori1 = test_id(&tg, "PL!-bp3-003-R");
+    int kotori2 = test_id(&tg, "PL!-bp3-003-R");
+    // 
+    tg.state.p[0].stage[1] = joint;
+    test_add_to_hand(&tg, kotori1);
+    test_add_to_hand(&tg, kotori2);
+    test_add_to_hand(&tg, live);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_hand(&tg, filler);
+    test_give_energy(&tg, 10);
+    // 
+    // // inlined helper advance_to_live_start
+    // 
+    // // From initial phase: pass 5 times to reach LiveCardSetP1
+    rb_advance_phase(&tg.state);
+    rb_advance_phase(&tg.state);
+    rb_advance_phase(&tg.state);
+    rb_advance_phase(&tg.state);
+    rb_advance_phase(&tg.state);
+    // // Then P1 sets live card via set_live_card() externally
+    // 
+    test_set_live_card(&tg, 0, live);
+    // // inlined helper finish_live_setup
+    // 
+    rb_advance_phase(&tg.state);
+    rb_advance_phase(&tg.state);
+    // 
+    // 
+    test_has_pending_choice(&tg);
+    // 
+    // // Discard both copies
+    // action result consumed: game.try_select_indices(&[0, 1]).unwrap();
+    rb_resume_with_choice(&tg.state, -1);
+    // 
+    // // Determine the exact colors from the card.
+    // // Member cards store their heart colors in base_heart; need_heart is only on live cards.
+    int kotori_card = 0;
+    int distinct_colors = 0;
+    // TODO: bh.hearts.iter().filter(|&&(_, amt)| amt > 0).map(|&(c, _)| c).collect()
+    // TODO: } else {
+    // TODO: vec![]
+    // TODO: };
+    int expected = 0;
+    // 
+    int total = 0;
+    // TODO: HeartColor::Heart01,
+    // TODO: HeartColor::Heart02,
+    // TODO: HeartColor::Heart03,
+    // TODO: HeartColor::Heart04,
+    // TODO: HeartColor::Heart05,
+    // TODO: HeartColor::Heart06,
+    // TODO: ].iter().map(|&c| game.state.mods.get_heart_modifier(joint, c)).sum();
+    // 
+    // TODO assert_eq (unresolved): assert_eq!( total, expected, "bp6: 2 same-color cards → {} distinct color(s) → {} heart(s), got {}", expected, expected, total );
     // 
 }
 
@@ -105241,6 +107768,118 @@ static void gen_bp7023_tied_after_return_no_score(void){
     // 
 }
 
+// test_modules/abilities/complex/bring_love_test.rs::three_distinct_groups_center_gets_all_hearts
+static void gen_three_distinct_groups_center_gets_all_hearts(void){
+    // 
+    // db loaded via rb_load
+    TestGame tg; test_game_new(&tg);
+    int live = test_id(&tg, "LL-bp5-002-L");
+    int aqours = test_id(&tg, "PL!S-pb1-003-R");
+    int nijigasaki = test_id(&tg, "PL!N-pb1-001-R");
+    int muse = test_id(&tg, "PL!-bp3-003-R");
+    int filler = test_id(&tg, "PL!-sd1-010-SD");
+    // 
+    tg.state.p[0].stage[0] = muse;
+    tg.state.p[0].stage[1] = aqours;
+    tg.state.p[0].stage[2] = nijigasaki;
+    test_give_energy(&tg, 15);
+    test_add_to_hand(&tg, live);
+    // // inlined helper fill_deck
+    // 
+    // clear
+    // clear
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    // 
+    // 
+    // // inlined helper advance_to_live_card_set_p1
+    // 
+    rb_advance_phase(&tg.state);
+    rb_advance_phase(&tg.state);
+    rb_advance_phase(&tg.state);
+    rb_advance_phase(&tg.state);
+    rb_advance_phase(&tg.state);
+    // 
+    test_set_live_card(&tg, 0, live);
+    // // inlined helper advance_to_live_start
+    // 
+    rb_advance_phase(&tg.state);
+    rb_advance_phase(&tg.state);
+    // 
+    while (test_has_pending_choice(&tg)) rb_resume_with_choice(&tg.state, 0);
+    rb_resume_with_choice(&tg.state, -1);
+    // TODO: }
+    // 
+    int hm = rb_mods_get_heart(&tg.state.mods, aqours, 0);
+    // TODO assert: assert!(hm.is_some(), "Center (Aqours) should have heart modifier");
+    if (hm >= 0) {
+    TestGame tg; test_game_new(&tg);
+    int all_entry = 0;
+    // TODO assert: assert!(all_entry.is_some(), "Should have All heart modifier");
+    // action result consumed: assert_eq!(all_entry.unwrap().total(), 1, "Should have +1 All heart");
+    // TODO: }
+    }
+    // 
+}
+
 // test_modules/abilities/complex/bring_love_test.rs::two_distinct_groups_no_effect
 static void gen_two_distinct_groups_no_effect(void){
     // 
@@ -105340,7 +107979,7 @@ static void gen_two_distinct_groups_no_effect(void){
     rb_resume_with_choice(&tg.state, -1);
     // TODO: }
     // 
-    int hm = 0;
+    int hm = rb_mods_get_heart(&tg.state.mods, aqours, 0);
     // TODO assert: assert!( hm.is_none(), "Center should NOT get hearts with only 2 groups" );
     // 
 }
@@ -105444,7 +108083,7 @@ static void gen_all_same_group_no_effect(void){
     rb_resume_with_choice(&tg.state, -1);
     // TODO: }
     // 
-    int hm = 0;
+    int hm = rb_mods_get_heart(&tg.state.mods, muse1, 0);
     // TODO assert: assert!( hm.is_none(), "Center should NOT get hearts with all same group" );
     // 
 }
@@ -105651,7 +108290,7 @@ static void gen_multi_name_card_single_slot_one_group_not_three(void){
     // TODO: }
     // 
     // // Q105: one multi-name card = one group → 3-group condition fails
-    // TODO assert: assert!( game.state.mods.heart_modifiers.get(&multi).is_none(), "Single multi-name card (1 group) should NOT satisfy 3-group condition" );
+    CHECK(rb_mods_get_heart(&tg.state.mods, multi, 0), "multi_name_card_single_slot_one_group_not_three");
     // 
 }
 
@@ -113841,6 +116480,124 @@ static void gen_live_card_own_live_success_no_trigger(void){
     // 
 }
 
+// test_modules/integration/victory_road_test.rs::baad_cage_cost_limit_no_match
+static void gen_baad_cage_cost_limit_no_match(void){
+    // 
+    // db loaded via rb_load
+    TestGame tg; test_game_new(&tg);
+    // 
+    int baad_cage = test_id(&tg, "PL!HS-bp5-020-L");
+    int filler = test_id(&tg, "PL!-sd1-010-SD");
+    // 
+    // clear
+    // clear
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    test_add_to_deck(&tg, filler);
+    // 
+    // // Verify cost_limit is parsed correctly on the ability
+    int card_data = 0;
+    // TODO assert: assert!(card_data.is_some(), "Baad Cage card should load");
+    if (card_data >= 0) {
+    TestGame tg; test_game_new(&tg);
+    int has_cost_limit = 0;
+    // TODO: ab.effect.as_ref().is_some_and(|eff| {
+    // TODO: eff.condition.as_ref().is_some_and(|cond| {
+    // TODO: cond.get_cost_limit() == Some(10)
+    // TODO: && cond.get_cost_limit_operator()
+    // TODO: == Some(rabuka_engine::card::Operator::Gte)
+    // TODO: })
+    // TODO: })
+    // TODO: });
+    CHECK(has_cost_limit, "baad_cage_cost_limit_no_match");
+    // TODO: }
+    }
+    // 
+    test_add_to_hand(&tg, baad_cage);
+    test_add_to_hand(&tg, filler);
+    // 
+    // // inlined helper advance_to_live_start
+    // 
+    rb_advance_phase(&tg.state);
+    rb_advance_phase(&tg.state);
+    rb_advance_phase(&tg.state);
+    rb_advance_phase(&tg.state);
+    rb_advance_phase(&tg.state);
+    // 
+    test_set_live_card(&tg, 0, baad_cage);
+    // // inlined helper finish_live_setup
+    // 
+    rb_advance_phase(&tg.state);
+    rb_advance_phase(&tg.state);
+    // 
+    // // inlined helper drain_choices
+    // 
+    while (test_has_pending_choice(&tg)) rb_resume_with_choice(&tg.state, 0);
+    rb_resume_with_choice(&tg.state, -1);
+    // TODO: }
+    // 
+    // 
+    CHECK_EQ(test_get_score_modifier(&tg, baad_cage), 0, "baad_cage_cost_limit_no_match");
+    // 
+}
+
 // test_modules/integration/victory_road_test.rs::baad_cage_cost_limit_two_hasunosora_members_grants_score
 static void gen_baad_cage_cost_limit_two_hasunosora_members_grants_score(void){
     // 
@@ -119797,6 +122554,149 @@ static void gen_issue7_hajimari_no_success_live_no_effect(void){
     // 
 }
 
+// test_modules/integration/parser_issues_e2e_test.rs::issue7_hajimari_set_modifier_replaces_not_adds
+static void gen_issue7_hajimari_set_modifier_replaces_not_adds(void){
+    // 
+    // db loaded via rb_load
+    TestGame tg; test_game_new(&tg);
+    int live_card = test_id(&tg, "PL!SP-sd2-023-SD2");
+    int past_live = test_id(&tg, "PL!-sd1-019-SD");
+    int filler = test_id(&tg, "PL!-sd1-010-SD");
+    // 
+    test_add_to_live(&tg, past_live);
+    test_add_to_live(&tg, filler);
+    test_add_to_hand(&tg, live_card);
+    // // inlined helper fill_decks
+    // 
+    int f = 0;
+    test_add_to_deck(&tg, f);
+    test_add_to_deck(&tg, f);
+    test_add_to_deck(&tg, f);
+    test_add_to_deck(&tg, f);
+    test_add_to_deck(&tg, f);
+    test_add_to_deck(&tg, f);
+    test_add_to_deck(&tg, f);
+    test_add_to_deck(&tg, f);
+    test_add_to_deck(&tg, f);
+    test_add_to_deck(&tg, f);
+    test_add_to_deck(&tg, f);
+    test_add_to_deck(&tg, f);
+    test_add_to_deck(&tg, f);
+    test_add_to_deck(&tg, f);
+    test_add_to_deck(&tg, f);
+    test_add_to_deck(&tg, f);
+    test_add_to_deck(&tg, f);
+    test_add_to_deck(&tg, f);
+    test_add_to_deck(&tg, f);
+    test_add_to_deck(&tg, f);
+    test_add_to_deck(&tg, f);
+    test_add_to_deck(&tg, f);
+    test_add_to_deck(&tg, f);
+    test_add_to_deck(&tg, f);
+    test_add_to_deck(&tg, f);
+    test_add_to_deck(&tg, f);
+    test_add_to_deck(&tg, f);
+    test_add_to_deck(&tg, f);
+    test_add_to_deck(&tg, f);
+    test_add_to_deck(&tg, f);
+    test_add_to_deck(&tg, f);
+    test_add_to_deck(&tg, f);
+    test_add_to_deck(&tg, f);
+    test_add_to_deck(&tg, f);
+    test_add_to_deck(&tg, f);
+    test_add_to_deck(&tg, f);
+    test_add_to_deck(&tg, f);
+    test_add_to_deck(&tg, f);
+    test_add_to_deck(&tg, f);
+    test_add_to_deck(&tg, f);
+    // 
+    // 
+    // // inlined helper advance_to_live_card_set_p1
+    // 
+    rb_advance_phase(&tg.state);
+    rb_advance_phase(&tg.state);
+    rb_advance_phase(&tg.state);
+    rb_advance_phase(&tg.state);
+    rb_advance_phase(&tg.state);
+    // 
+    test_set_live_card(&tg, 0, live_card);
+    // // inlined helper advance_to_live_start
+    // 
+    rb_advance_phase(&tg.state);
+    rb_advance_phase(&tg.state);
+    // 
+    // 
+    while (test_has_pending_choice(&tg)) rb_resume_with_choice(&tg.state, 0);
+    rb_resume_with_choice(&tg.state, -1);
+    // TODO: }
+    // 
+    // // Verify set modifiers are correct type (set not additive)
+    if (rb_mods_get_blade(&tg.state.mods, live_card) >= 0) {
+    TestGame tg; test_game_new(&tg);
+    int hc = 0;
+    int expected = 0;
+    // TODO loop (degraded): for (hc, expected) in [
+    // TODO: (HeartColor::Heart02, 3),
+    // TODO: (HeartColor::Heart03, 3),
+    // TODO: (HeartColor::Heart06, 3),
+    // TODO: (HeartColor::Heart00, 3),
+    // TODO: ] {
+    int entry = 0;
+    // TODO assert_eq (unresolved): assert_eq!(entry.set, expected, "set modifier for {:?}", hc);
+    // TODO assert_eq (unresolved): assert_eq!(entry.additive, 0, "additive should be 0 for {:?}", hc);
+    // TODO: }
+    // TODO: } else {
+    // TODO: panic!("need_heart_modifiers missing for live_card");
+    // TODO: }
+    }
+    // 
+    // // Colors not in the set should be absent (0 when queried)
+    int hc = 0;
+    // TODO loop (degraded): for hc in &[
+    // TODO: HeartColor::Heart01,
+    // TODO: HeartColor::Heart04,
+    // TODO: HeartColor::Heart05,
+    // TODO: ] {
+    // TODO assert_eq (unresolved): assert_eq!( game.state.mods.get_need_heart_modifier(live_card, *hc), 0, "non-set color {:?} should be 0", hc );
+    // TODO: }
+    // 
+    // // Compute effective need_heart the same way should_trigger_live_success does
+    // action result consumed: let card = game.db.get_card(live_card).unwrap();
+    // action result consumed: let base = card.need_heart.as_ref().unwrap();
+    // // Base need_heart is {heart03:1, heart00:2}
+    // TODO assert_eq (unresolved): assert_eq!(*base.hearts.get(&HeartColor::Heart03).unwrap_or(&0), 1);
+    // TODO assert_eq (unresolved): assert_eq!(*base.hearts.get(&HeartColor::Heart00).unwrap_or(&0), 2);
+    // TODO assert_eq (unresolved): assert_eq!(*base.hearts.get(&HeartColor::Heart02).unwrap_or(&0), 0);
+    // TODO assert_eq (unresolved): assert_eq!(*base.hearts.get(&HeartColor::Heart06).unwrap_or(&0), 0);
+    // 
+    // // Effective need with set modifier should replace base entirely:
+    // // {heart02:3, heart03:3, heart06:3, heart00:3} — base {heart03:1, heart00:2} is dropped
+    int has_set = rb_mods_get_blade(&tg.state.mods, live_card);
+    CHECK(has_set, "issue7_hajimari_set_modifier_replaces_not_adds");
+    int effective = 0;
+    int hearts = 0;
+    if (rb_mods_get_blade(&tg.state.mods, live_card) >= 0) {
+    TestGame tg; test_game_new(&tg);
+    int color = 0;
+    int me = 0;
+    // TODO loop (degraded): for (color, me) in color_mods {
+    // TODO: if me.set != 0 {
+    // TODO: hearts.insert(*color, me.set as u8);
+    // TODO: }
+    // TODO: }
+    // TODO: }
+    }
+    // TODO: rabuka_engine::card::BaseHeart { hearts }
+    // TODO: };
+    // TODO assert_eq (unresolved): assert_eq!( effective.hearts.len(), 4, "effective need should have exactly 4 colors, got {:?}", effective.hearts );
+    // TODO assert_eq (unresolved): assert_eq!(effective.hearts[&HeartColor::Heart02], 3);
+    // TODO assert_eq (unresolved): assert_eq!(effective.hearts[&HeartColor::Heart03], 3);
+    // TODO assert_eq (unresolved): assert_eq!(effective.hearts[&HeartColor::Heart06], 3);
+    // TODO assert_eq (unresolved): assert_eq!(effective.hearts[&HeartColor::Heart00], 3);
+    // // heart00 overwritten to 3 (was 2 in base, but set replaces entirely)
+    // 
+}
+
 // test_modules/integration/parser_issues_e2e_test.rs::issue9_izumi_debut_draw_2_discard_1
 static void gen_issue9_izumi_debut_draw_2_discard_1(void){
     // 
@@ -122731,6 +125631,24 @@ static void gen_wakana_008_debut_center_swap_with_left_occupant(void){
     // 
 }
 
+// test_modules/abilities/complex/ability_engine_fixes_test.rs::wakana_008_debut_left_to_empty_center
+static void gen_wakana_008_debut_left_to_empty_center(void){
+    TestGame tg; test_game_new(&tg);
+    // 
+    int mut = 0;
+    int game = 0;
+    int wakana = 0;
+    // TODO destructuring: let (mut game, wakana, _) = setup_wakana_debut_game(3);
+    tg.state.p[0].stage[0] = -1;
+    tg.state.p[0].stage[1] = -1;
+    tg.state.p[0].stage[2] = -1;
+    test_play_to_stage(&tg, wakana, 0);
+    // 
+    // // Options should exclude Left, include Center and Right
+    int choice = 0;
+    // TODO if let (untranspilable body): let choice = game.get_pending_choice();
+}
+
 // test_modules/abilities/complex/ability_engine_fixes_test.rs::wakana_008_debut_left_swap_with_center_occupant
 static void gen_wakana_008_debut_left_swap_with_center_occupant(void){
     TestGame tg; test_game_new(&tg);
@@ -122752,6 +125670,23 @@ static void gen_wakana_008_debut_left_swap_with_center_occupant(void){
     // 
 }
 
+// test_modules/abilities/complex/ability_engine_fixes_test.rs::wakana_008_debut_right_to_empty_center
+static void gen_wakana_008_debut_right_to_empty_center(void){
+    TestGame tg; test_game_new(&tg);
+    // 
+    int mut = 0;
+    int game = 0;
+    int wakana = 0;
+    // TODO destructuring: let (mut game, wakana, _) = setup_wakana_debut_game(3);
+    tg.state.p[0].stage[0] = -1;
+    tg.state.p[0].stage[1] = -1;
+    tg.state.p[0].stage[2] = -1;
+    test_play_to_stage(&tg, wakana, 2);
+    // 
+    int choice = 0;
+    // TODO if let (untranspilable body): let choice = game.get_pending_choice();
+}
+
 // test_modules/abilities/complex/ability_engine_fixes_test.rs::wakana_008_debut_right_swap_with_center_occupant
 static void gen_wakana_008_debut_right_swap_with_center_occupant(void){
     TestGame tg; test_game_new(&tg);
@@ -122771,6 +125706,26 @@ static void gen_wakana_008_debut_right_swap_with_center_occupant(void){
     CHECK_EQ(tg.state.p[0].stage[1], wakana, "wakana_008_debut_right_swap_with_center_occupant");
     CHECK_EQ(tg.state.p[0].stage[2], filler, "wakana_008_debut_right_swap_with_center_occupant");
     // 
+}
+
+// test_modules/abilities/complex/ability_engine_fixes_test.rs::wakana_008_debut_both_occupied_swap_either
+static void gen_wakana_008_debut_both_occupied_swap_either(void){
+    TestGame tg; test_game_new(&tg);
+    // 
+    int mut = 0;
+    int game = 0;
+    int wakana = 0;
+    int filler = 0;
+    // TODO destructuring: let (mut game, wakana, filler) = setup_wakana_debut_game(3);
+    int occupant2 = test_id(&tg, "PL!-sd1-010-SD");
+    tg.state.p[0].stage[0] = filler;
+    tg.state.p[0].stage[1] = -1;
+    tg.state.p[0].stage[2] = occupant2;
+    test_play_to_stage(&tg, wakana, 1);
+    // 
+    // // Both Left and Right are options (Center excluded)
+    int choice = 0;
+    // TODO if let (untranspilable body): let choice = game.get_pending_choice();
 }
 
 // test_modules/abilities/complex/ability_engine_fixes_test.rs::wakana_008_debut_draw_last_card_then_move
@@ -124617,7 +127572,7 @@ static void gen_ai_screeam_answer_both_discard(void){
     test_has_pending_choice(&tg);
     // 
     // // Verify choice_player_id is set to opponent
-    int entry = 0;
+    int entry = rb_queue_current_entry(&tg.state);
     // TODO assert_eq (unresolved): assert_eq!( entry.choice_player_id.as_deref(), Some("p2"), "Choice player should be p2 (opponent decides flavor)" );
     // 
     // // Option 0: mint/flavor/cookie → both discard 1 from hand
@@ -124629,14 +127584,14 @@ static void gen_ai_screeam_answer_both_discard(void){
     // // "both" → effect targets P1 then P2; P2 also gets a discard choice
     test_has_pending_choice(&tg);
     // // Verify choice_player_id is "p1" — P1 chooses their own discard
-    entry = 0;
+    entry = rb_queue_current_entry(&tg.state);
     // TODO assert_eq (unresolved): assert_eq!( entry.choice_player_id.as_deref(), Some("p1"), "P1's discard choice should have choice_player_id=p1" );
     // // P1 discards card from hand
     rb_resume_with_choice(&tg.state, 0);
     // // Now P2 gets a discard choice
     test_has_pending_choice(&tg);
     // // Verify choice_player_id is "p2" — P2 chooses their own discard
-    entry = 0;
+    entry = rb_queue_current_entry(&tg.state);
     // TODO assert_eq (unresolved): assert_eq!( entry.choice_player_id.as_deref(), Some("p2"), "P2's discard choice should have choice_player_id=p2" );
     rb_resume_with_choice(&tg.state, 0);
     // 
@@ -124689,7 +127644,7 @@ static void gen_ai_screeam_answer_both_draw(void){
     // 
     test_has_pending_choice(&tg);
     // 
-    int entry = 0;
+    int entry = rb_queue_current_entry(&tg.state);
     // TODO assert_eq (unresolved): assert_eq!( entry.choice_player_id.as_deref(), Some("p2"), "Choice player should be p2 (opponent decides flavor)" );
     // 
     rb_resume_with_choice(&tg.state, 1);
@@ -124764,7 +127719,7 @@ static void gen_ai_screeam_answer_both_gain_blade(void){
     // 
     test_has_pending_choice(&tg);
     // 
-    int entry = 0;
+    int entry = rb_queue_current_entry(&tg.state);
     // TODO assert_eq (unresolved): assert_eq!( entry.choice_player_id.as_deref(), Some("p2"), "Choice player should be p2 (opponent decides flavor)" );
     // 
     // // Option 2: それ以外 → both members gain blade
@@ -126882,6 +129837,87 @@ static void gen_lovepeace_q172_ability_gained_hearts_count_but_not_blade(void){
     // 
 }
 
+// test_modules/integration/gameplay_test.rs::hareruya_q64_waitroom_only_five_distinct_liella_condition_met
+static void gen_hareruya_q64_waitroom_only_five_distinct_liella_condition_met(void){
+    // 
+    // db loaded via rb_load
+    TestGame tg; test_game_new(&tg);
+    int hareruya = test_id(&tg, "PL!SP-bp1-026-L");
+    int fill = test_id(&tg, "PL!-sd1-010-SD");
+    test_add_to_deck(&tg, fill);
+    test_add_to_deck(&tg, fill);
+    test_add_to_deck(&tg, fill);
+    test_add_to_deck(&tg, fill);
+    test_add_to_deck(&tg, fill);
+    test_add_to_deck(&tg, fill);
+    test_add_to_deck(&tg, fill);
+    test_add_to_deck(&tg, fill);
+    test_add_to_deck(&tg, fill);
+    test_add_to_deck(&tg, fill);
+    // 
+    // // Keep deck well-stocked to prevent refresh() from clearing the waitroom
+    test_add_to_deck(&tg, test_id(&tg, "PL!-sd1-010-SD"));
+    test_add_to_deck(&tg, test_id(&tg, "PL!-sd1-010-SD"));
+    test_add_to_deck(&tg, test_id(&tg, "PL!-sd1-010-SD"));
+    test_add_to_deck(&tg, test_id(&tg, "PL!-sd1-010-SD"));
+    test_add_to_deck(&tg, test_id(&tg, "PL!-sd1-010-SD"));
+    test_add_to_deck(&tg, test_id(&tg, "PL!-sd1-010-SD"));
+    test_add_to_deck(&tg, test_id(&tg, "PL!-sd1-010-SD"));
+    test_add_to_deck(&tg, test_id(&tg, "PL!-sd1-010-SD"));
+    test_add_to_deck(&tg, test_id(&tg, "PL!-sd1-010-SD"));
+    test_add_to_deck(&tg, test_id(&tg, "PL!-sd1-010-SD"));
+    // 
+    // // Put 5 distinct-name Liella! members in waitroom, none on stage
+    test_add_to_discard(&tg, test_id(&tg, "PL!SP-bp1-014-N"));
+    test_add_to_discard(&tg, test_id(&tg, "PL!SP-bp1-015-N"));
+    test_add_to_discard(&tg, test_id(&tg, "PL!SP-bp1-016-N"));
+    test_add_to_discard(&tg, test_id(&tg, "PL!SP-bp1-019-N"));
+    test_add_to_discard(&tg, test_id(&tg, "PL!SP-bp1-020-N"));
+    // 
+    test_add_to_hand(&tg, hareruya);
+    // // inlined helper advance_to_live_card_set_p1
+    // 
+    CHECK_EQ_STR(rb_phase_name(tg.state.phase), "Main", "hareruya_q64_waitroom_only_five_distinct_liella_condition_met");
+    rb_advance_phase(&tg.state);
+    CHECK_EQ_STR(rb_phase_name(tg.state.phase), "Active", "hareruya_q64_waitroom_only_five_distinct_liella_condition_met");
+    rb_advance_phase(&tg.state);
+    CHECK_EQ_STR(rb_phase_name(tg.state.phase), "Energy", "hareruya_q64_waitroom_only_five_distinct_liella_condition_met");
+    rb_advance_phase(&tg.state);
+    CHECK_EQ_STR(rb_phase_name(tg.state.phase), "Draw", "hareruya_q64_waitroom_only_five_distinct_liella_condition_met");
+    rb_advance_phase(&tg.state);
+    CHECK_EQ_STR(rb_phase_name(tg.state.phase), "Main", "hareruya_q64_waitroom_only_five_distinct_liella_condition_met");
+    rb_advance_phase(&tg.state);
+    CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL, "hareruya_q64_waitroom_only_five_distinct_liella_condition_met");
+    // 
+    test_set_live_card(&tg, 0, hareruya);
+    // 
+    // // inlined helper advance_to_live_start
+    // 
+    rb_advance_phase(&tg.state);
+    rb_advance_phase(&tg.state);
+    // 
+    // 
+    // // Debug: check the ability's condition locations field
+    int card = 0;
+    int ab = 0;
+    // TODO loop (degraded): for ab in card.resolved_abilities() {
+    // TODO: if let Some(ref ef) = ab.effect {
+    // TODO: if let Some(ref cond) = ef.condition {
+    // TODO: eprintln!("[DEBUG] condition: {:?}", cond);
+    // TODO: }
+    // TODO: }
+    // TODO: }
+    // 
+    int card_id = 0;
+    int h02_mod = 0;
+    int h03_mod = 0;
+    int h06_mod = 0;
+    // TODO assert_eq (unresolved): assert_eq!( h02_mod, 2, "heart02 should be exactly 2 by set_required_hearts (got {})", h02_mod );
+    // TODO assert_eq (unresolved): assert_eq!( h03_mod, 2, "heart03 should be exactly 2 by set_required_hearts (got {})", h03_mod );
+    // TODO assert_eq (unresolved): assert_eq!( h06_mod, 2, "heart06 should be exactly 2 by set_required_hearts (got {})", h06_mod );
+    // 
+}
+
 // test_modules/integration/gameplay_test.rs::hareruya_q74_multiname_distinct_counting
 static void gen_hareruya_q74_multiname_distinct_counting(void){
     // 
@@ -127285,6 +130321,45 @@ static void gen_dia_sd1_optional_draw_pay_then_deck_top(void){
     // TODO assert_eq (unresolved): assert_eq!(game.state.player1.main_deck.len(), 10);
     // // Hand: 3 + 1 - 1 + 1 - 2 = 2
     // TODO assert_eq (unresolved): assert_eq!(game.state.player1.hand.len(), 2);
+    // 
+}
+
+// test_modules/integration/gameplay_test.rs::revealed_cards_filtered_by_player_ownership
+static void gen_revealed_cards_filtered_by_player_ownership(void){
+    // 
+    // db loaded via rb_load
+    TestGame tg; test_game_new(&tg);
+    int p1_card = test_id(&tg, "PL!SP-sd1-019-SD");
+    int p2_card = test_id(&tg, "PL!SP-sd1-020-SD");
+    // 
+    // // Put both players' cards into their own discard so zone-ownership check passes
+    test_add_to_discard(&tg, p1_card);
+    test_add_to_discard(&tg, p2_card);
+    // 
+    // // Populate revealed_cards with both players' cards
+    // // Leave per-player cheer_bufs empty to force the fallback path
+    test_add_to_revealed(&tg, p1_card);
+    test_add_to_revealed(&tg, p2_card);
+    // 
+    // // Inject a SelectCard choice for the revealed_cards zone targeting self
+    int choice = 0;
+    // TODO: "revealed_cards",
+    // TODO: 1,
+    // TODO: "Select 1 card",
+    // TODO: false,
+    // TODO: ).target_player_id(Some("self".to_string())).build();
+    // TODO: game.state.ability_queue.pause_for_choice(choice);
+    // 
+    // // Set choice_player_id so generate_possible_actions resolves "self" to P1
+    // TODO if let (untranspilable body): // Set choice_player_id so generate_possible_actions resolves "self" to P1
+    // 
+    // // Generate possible actions and check which cards are selectable
+    int actions = 0;
+    int select_actions = 0;
+    // 
+    // // Only P1's card should be selectable (p2_card is not in P1's zones)
+    // TODO assert_eq (unresolved): assert_eq!( select_actions.len(), 1, "Only P1's card should be selectable" );
+    // TODO assert_eq (unresolved): assert_eq!( select_actions[0] .parameters .as_ref() .and_then(|p| p.card_id), Some(p1_card), "P1's card should be selectable" );
     // 
 }
 
@@ -127830,6 +130905,7 @@ int main(void){
     gen_empty_energy_deck_continues_game();
     gen_empty_energy_deck_player2_continues_game();
     gen_live_success_per_wait_member_adds_score();
+    gen_kanan_livestart_converts_all_hearts_to_heart04();
     gen_kagayaiteru_live_success_draw_then_discard();
     gen_kagayaiteru_q125_cannot_place_in_success_zone();
     gen_konata_q77_debuted_this_turn_activates_energy();
@@ -127851,6 +130927,7 @@ int main(void){
     gen_kosuzu_bp6_condition_not_met_no_heart05_no_blade();
     gen_kinako_auto_triggers_on_live_success();
     gen_kinako_auto_triggers_on_position_change();
+    gen_q107_dia_re_yell_works();
     gen_q107_dia_skip_discard_no_followup();
     gen_sayaka_unaffordable_not_offered_and_press_rejected();
     gen_miyashita_ai_cost10_appears_elsewhere_triggers_draw();
@@ -127935,6 +131012,8 @@ int main(void){
     gen_bp3_002_per_opponent_waited_member_blade();
     gen_pb1_009_opponent_3_success_cards_blade();
     gen_sp_bp5_011_position_hearts();
+    gen_nico_bp7_007_per_under_energy_heart02();
+    gen_sb7_005_aqours_under_card_blade();
     gen_pb1_002_per_opponent_waited_heart06();
     gen_sp_bp7_009_left_right_grants_heart02();
     gen_bp5_111_per_other_arise_member_heart05();
@@ -127943,6 +131022,7 @@ int main(void){
     gen_bp6_015_bibi_in_success_grants_heart06();
     gen_looked_at_discard_player_discards();
     gen_looked_at_discard_player_skips();
+    gen_live_success_discard_4_from_deck_unconditionally();
     gen_ren_baton_touch_from_liella_places_energy();
     gen_ren_baton_touch_from_non_liella_no_energy();
     gen_ren_baton_touch_liella_insufficient_energy_no_effect();
@@ -127968,6 +131048,8 @@ int main(void){
     gen_eli_bp4_condition_fails_score_too_low();
     gen_eli_bp4_sequential_discard_two();
     gen_eli_bp4_all_at_once_discard();
+    gen_eri_q144_up_to_semantics_1_eligible_opponent_still_works();
+    gen_eri_q144_skip_cost_no_effect();
     gen_eri_q144_no_eligible_opponent_still_pays_cost();
     gen_all_three_move_counts();
     gen_stay_in_place_no_new_move();
@@ -128229,6 +131311,8 @@ int main(void){
     gen_hand_card_alone_no_reduction();
     gen_on_stage_card_does_not_reduce_other_cards_cost();
     gen_on_stage_card_ignores_hand_for_other_card_cost();
+    gen_riko_q130_opponent_skips_triggers_conditional();
+    gen_riko_q130_opponent_discards_skips_conditional();
     gen_riko_q130_opponent_multi_card_skips();
     gen_riko_q130_opponent_empty_hand_auto_skip();
     gen_sp_bp4_008_leftside_draws();
@@ -128503,6 +131587,7 @@ int main(void){
     gen_live_card_base_score_stored_correctly();
     gen_hazuki_baton_touch_places_liella_under();
     gen_hazuki_baton_touch_non_liella_places_nothing();
+    gen_hazuki_full_workflow_gains_abilities_from_under();
     gen_hazuki_activates_kidou_copied_from_under();
     gen_hazuki_non_liella_under_no_abilities_gained();
     gen_erena_in_wait_gains_heart05();
@@ -128512,6 +131597,7 @@ int main(void){
     gen_erena_wait_not_on_stage();
     gen_azuna_q158_blade_all_members();
     gen_azuna_q158_blade_single_member();
+    gen_azuna_q158_blade_not_gained_if_energy_not_placed();
     gen_azuna_q157_energy_under_member_uses_any_energy();
     gen_azuna_q184_energy_under_member_not_counted();
     gen_b_heart07_parses_to_colorless_heart00();
@@ -128562,6 +131648,7 @@ int main(void){
     gen_rurino_no_wait_member_skips_entire_sequence();
     gen_rurino_skip_optional_leaves_live_in_discard();
     gen_rurino_empty_discard_no_crash();
+    gen_rurino_bp5_live_start_gains_heart_from_discarded_group();
     gen_chisato_cost_total_10_triggers();
     gen_chisato_cost_total_20_triggers();
     gen_chisato_cost_total_no_match_no_bonus();
@@ -128648,10 +131735,12 @@ int main(void){
     gen_q251_wrong_group_filtered();
     gen_q251_mixed_pool_only_member_can_move();
     gen_q251_skip_optional();
+    gen_rina_gains_ability_from_under_member();
     gen_rina_only_copies_live_success_not_constant();
     gen_rina_respects_cost_limit();
     gen_rina_no_under_cards();
     gen_rina_not_on_stage();
+    gen_rina_copies_from_multiple_under_cards();
     gen_burn_no_under_no_move_no_score();
     gen_burn_skip_optional_no_score_even_with_10_total();
     gen_fuyumari_q118_opponent_picks_first_card();
@@ -128719,6 +131808,7 @@ int main(void){
     gen_ab1_no_blade_when_statically_in_live_zone();
     gen_ab1_rescan_after_flags_cleared_does_not_double_grant();
     gen_two_dive_copies_only_the_moved_one_places();
+    gen_shared_log_never_leaks_private_zone_card_names();
     gen_real_choice_flow_emits_offered_and_resolved();
     gen_buffers_are_bounded();
     gen_maki_debut_pay_cost_opponent_waits_one();
@@ -128738,7 +131828,10 @@ int main(void){
     gen_riko_right_empty_no_trigger();
     gen_riko_both_empty_no_trigger();
     gen_riko_same_cost_different_cards_triggers();
+    gen_rurino_bp5_discard_only_matching_unit_gets_heart();
+    gen_himeno_bp5_same_group_cost_filters_hand_cards();
     gen_himeno_bp5_same_group_cost_auto_skips_when_no_match();
+    gen_himeno_bp5_same_group_cost_excludes_no_group_cards();
     gen_himeno_bp5_same_group_cost_auto_skips_when_only_no_group_cards();
     gen_sumire_yell_no_blade_gains_heart06();
     gen_sumire_yell_with_blade_no_gain();
@@ -128909,6 +132002,8 @@ int main(void){
     gen_daisuki_score_not_added_when_no_active_energy();
     gen_daisuki_opponent_active_does_not_satisfy_self();
     gen_yoshiko_debit_two_cost2_ok();
+    gen_yoshiko_debit_single_cost4_ok();
+    gen_yoshiko_debit_cost2_then_cost4_exceeds();
     gen_yoshiko_debit_cost2_redirects_to_budget_card();
     gen_yoshiko_debut_high_cost_not_selectable();
     gen_yoshiko_debit_stage_full_graceful();
@@ -129059,6 +132154,8 @@ int main(void){
     gen_heart_pipeline_three_entries_agree_with_copy_multiplier_override();
     gen_blade_pipeline_unified_set_plus_additive();
     gen_replacement_two_on_one_event_choose_order();
+    gen_timestamp_singleton_set_cards_pinned();
+    gen_cross_seat_mirror_sp_bp5_027_and_s_bp7_025();
     gen_heart_pipeline_ordering_copy_multiplier_override_additive_agrees();
     gen_s9_check_timing_cascade_smoke();
     gen_shioriko_bp4_basic_swap_one_niji_one_niji();
@@ -129127,6 +132224,7 @@ int main(void){
     gen_discarded_first_yell_hearts_are_lost();
     gen_score_icon_revealed_by_yell_adds_to_cheer_and_score();
     gen_live_zone_special_icons_do_not_apply();
+    gen_all_areas_aqours_diff_names_gains_ability();
     gen_empty_area_fails_condition();
     gen_duplicate_names_fails_condition();
     gen_non_aqours_member_fails_condition();
@@ -129239,6 +132337,7 @@ int main(void){
     gen_bp6020_ab1_non_mus_resolver_no_score_even_with_mus_staged_and_moved();
     gen_bp6020_ab1_once_per_turn_single_score_for_two_resolvers();
     gen_dia_choose_blade();
+    gen_bouken_three_options();
     gen_kotori_discard_non_muse_retrieve_live();
     gen_dia_position_change_saintsnow_source_any_destination();
     gen_dia_position_change_no_saintsnow_skips_gracefully();
@@ -129314,6 +132413,7 @@ int main(void){
     gen_q127_wien_plus_bloom_heart04_pattern();
     gen_q127_wien_plus_bloom_heart05_pattern();
     gen_q127_no_wien_bloom_set_standalone();
+    gen_q127_build_card_needs_set_plus_additive();
     gen_cooking_both_in_discard_offers_optional();
     gen_cooking_only_live_card_no_offer();
     gen_cooking_only_member_without_blade_no_offer();
@@ -129509,7 +132609,11 @@ int main(void){
     gen_love_wing_bell_only_center_gets_blade_not_left_or_right();
     gen_love_wing_bell_empty_stage_no_crash();
     gen_mirai_ticket_empty_revealed_triggers_and_auto_skips();
+    gen_yoshiko_pb1_opponent_discards_skips_blade();
+    gen_yoshiko_pb1_opponent_skips_gains_blade();
     gen_yoshiko_pb1_opponent_empty_hand_auto_skips();
+    gen_yoshiko_pb1_opponent_multi_card_skips_gains_blade();
+    gen_yoshiko_pb1_opponent_multi_card_discards_skips_blade();
     gen_serasu_edelnote_appear_triggers_opponent_wait();
     gen_serasu_edelnote_appear_no_opponent_member();
     gen_kowareyasuki_opponent_loses_surplus_hearts_score_up();
@@ -129595,6 +132699,7 @@ int main(void){
     gen_position_change_no_other_members();
     gen_position_change_with_swap();
     gen_position_change_skip_optional();
+    gen_position_change_filters_by_group_names();
     gen_position_change_group_names_excludes_self();
     gen_position_change_skip_when_no_valid_destinations();
     gen_position_change_tracks_card_movement();
@@ -129700,9 +132805,12 @@ int main(void){
     gen_mutual_mill_identity_no_cross_pollination();
     gen_hot_passion_empty_energy_deck_no_prompt_no_draw();
     gen_hot_passion_waited_energy_flips_opponent_score_comparison();
+    gen_eternalize_q204_two_niko_hearts_reduced();
     gen_eternalize_q204_zero_niko_hearts_unchanged();
+    gen_eternalize_same_name_two_niji_identical();
     gen_eternalize_different_names_no_reduction();
     gen_eternalize_one_niji_one_other_triggers_zero();
+    gen_eternalize_two_same_one_different_triggers();
     gen_eternalize_three_all_different_no_trigger();
     gen_chika_q218_no_ability_cost_reduced();
     gen_himeno_no_matching_character_does_not_trigger();
@@ -129772,6 +132880,7 @@ int main(void){
     gen_main_phase_second_attacker_only();
     gen_live_card_set_first_attacker();
     gen_live_card_set_second_attacker();
+    gen_opponent_choice_routed_via_choice_player_id_works_in_pvp();
     gen_opponent_choice_via_select_auto_ability_works_in_pvp();
     gen_normal_choice_stays_with_active_player_in_pvp();
     gen_special_color_q195_set_blade_liella_at_center();
@@ -129877,6 +132986,7 @@ int main(void){
     gen_himeno_bp5_empty_hand_skips();
     gen_himeno_bp5_no_group_cards_auto_skip();
     gen_himeno_bp5_three_same_group_picks_two();
+    gen_himeno_bp5_three_cards_two_share_group();
     gen_himeno_bp5_p_variant();
     gen_himeno_bp5_ar_variant();
     gen_himeno_bp5_skip_cost_via_choice();
@@ -129897,6 +133007,7 @@ int main(void){
     gen_test_bp4_debut_skip_select_discards_all();
     gen_test_bp4_debut_wait_opponent_members_after_selection();
     gen_test_bp6_live_start_two_distinct_colors_gain_two_hearts();
+    gen_test_bp6_live_start_same_color_deduplicates();
     gen_test_bp6_live_start_skip_gains_no_heart();
     gen_test_joint_card_has_all_three_name_identities();
     gen_test_sumire_area_move_triggers_draw_and_heart();
@@ -129949,6 +133060,7 @@ int main(void){
     gen_bp7023_opponent_one_energy_ahead_scores_plus_one();
     gen_bp7023_opponent_two_energy_ahead_scores_plus_two();
     gen_bp7023_tied_after_return_no_score();
+    gen_three_distinct_groups_center_gets_all_hearts();
     gen_two_distinct_groups_no_effect();
     gen_all_same_group_no_effect();
     gen_center_empty_no_effect();
@@ -130083,6 +133195,7 @@ int main(void){
     gen_test_one_live_start_each_time_drains_no_choice();
     gen_test_live_success_each_time_drains_after_success();
     gen_live_card_own_live_success_no_trigger();
+    gen_baad_cage_cost_limit_no_match();
     gen_baad_cage_cost_limit_two_hasunosora_members_grants_score();
     gen_baad_cage_cost_limit_one_member_no_score();
     gen_baad_cage_cost_limit_one_below_threshold_no_score();
@@ -130194,6 +133307,7 @@ int main(void){
     gen_issue6_natsumi_blade_expires_after_live_victory_determination();
     gen_issue7_hajimari_set_required_hearts();
     gen_issue7_hajimari_no_success_live_no_effect();
+    gen_issue7_hajimari_set_modifier_replaces_not_adds();
     gen_issue9_izumi_debut_draw_2_discard_1();
     gen_issue9_izumi_debut_empty_hand();
     gen_issue10_dream_with_you_no_blade_no_score();
@@ -130255,8 +133369,11 @@ int main(void){
     gen_wakana_bp2_008_use_limit_blocks_second_activation();
     gen_wakana_008_debut_center_to_empty_left();
     gen_wakana_008_debut_center_swap_with_left_occupant();
+    gen_wakana_008_debut_left_to_empty_center();
     gen_wakana_008_debut_left_swap_with_center_occupant();
+    gen_wakana_008_debut_right_to_empty_center();
     gen_wakana_008_debut_right_swap_with_center_occupant();
+    gen_wakana_008_debut_both_occupied_swap_either();
     gen_wakana_008_debut_draw_last_card_then_move();
     gen_wakana_008_debut_empty_deck_draw_noop_then_move();
     gen_wakana_008_debut_position_change_flag_empty();
@@ -130346,6 +133463,7 @@ int main(void){
     gen_lovepeace_q150_self_hearts_greater_than_opponent_score_plus_1();
     gen_lovepeace_q149_total_hearts_sum_of_base_hearts();
     gen_lovepeace_q172_ability_gained_hearts_count_but_not_blade();
+    gen_hareruya_q64_waitroom_only_five_distinct_liella_condition_met();
     gen_hareruya_q74_multiname_distinct_counting();
     gen_wien_q117_another_member_triggers_yell_reduction();
     gen_energy_zone_capacity_handled();
@@ -130353,6 +133471,7 @@ int main(void){
     gen_umi_pr014_appear_reveal_no_draw_when_live_card_present();
     gen_dia_sd1_optional_draw_skip_skips_movement();
     gen_dia_sd1_optional_draw_pay_then_deck_top();
+    gen_revealed_cards_filtered_by_player_ownership();
     gen_choice_condition_shows_proper_labels_in_actions();
     gen_kanon_activation_choice_condition_discard_flow();
     gen_kanon_activation_choice_condition_wait_option();
@@ -130366,6 +133485,6 @@ int main(void){
     rb_unload();
     if(failures){ printf("\\n%d FAILURES\\n",failures); return 1; }
     printf("\\nALL GENERATED CHECKS PASSED\\n");
-    printf("generated: 2650 fns\\n");
+    printf("generated: 2694 fns\\n");
     return 0;
 }

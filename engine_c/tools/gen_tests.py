@@ -189,6 +189,32 @@ def map_modifier_expr(expr: str, func_name: str):
     if m: return f'rb_mods_get_blade(&tg.state.mods, {m.group(1)})'
     m = re.match(r'game\.state\.mods\.get_heart_modifier\((\w+)\s*,\s*HeartColor::Heart(\d+)', e)
     if m: return f'rb_mods_get_heart(&tg.state.mods, {m.group(1)}, {int(m.group(2))})'
+    # HashMap get patterns: game.state.mods.X_modifiers.get(&id) -> rb_mods_get_X(...)
+    m = re.match(r'game\.state\.mods\.cost_modifiers\.get\s*\(\s*&?(\w+)\s*\)', e)
+    if m: return f'rb_mods_get_cost(&tg.state.mods, {m.group(1)})'
+    m = re.match(r'game\.state\.mods\.score_modifiers\.get\s*\(\s*&?(\w+)\s*\)', e)
+    if m: return f'rb_mods_get_score(&tg.state.mods, {m.group(1)})'
+    m = re.match(r'game\.state\.mods\.blade_modifiers\.get\s*\(\s*&?(\w+)\s*\)', e)
+    if m: return f'rb_mods_get_blade(&tg.state.mods, {m.group(1)})'
+    m = re.match(r'game\.state\.mods\.heart_modifiers\.get\s*\(\s*&?(\w+)\s*\)', e)
+    if m: return f'rb_mods_get_heart(&tg.state.mods, {m.group(1)}, 0)'
+    # HashMap contains_key patterns
+    m = re.match(r'game\.state\.mods\.cost_modifiers\.contains_key\s*\(\s*&?(\w+)\s*\)', e)
+    if m: return f'(rb_mods_get_cost(&tg.state.mods, {m.group(1)}) != 0)'
+    m = re.match(r'game\.state\.mods\.score_modifiers\.contains_key\s*\(\s*&?(\w+)\s*\)', e)
+    if m: return f'(rb_mods_get_score(&tg.state.mods, {m.group(1)}) != 0)'
+    m = re.match(r'game\.state\.mods\.blade_modifiers\.contains_key\s*\(\s*&?(\w+)\s*\)', e)
+    if m: return f'(rb_mods_get_blade(&tg.state.mods, {m.group(1)}) != 0)'
+    m = re.match(r'game\.state\.mods\.heart_modifiers\.contains_key\s*\(\s*&?(\w+)\s*\)', e)
+    if m: return f'(rb_mods_get_heart(&tg.state.mods, {m.group(1)}, 0) != 0)'
+    # Generic mods.get(&id) / mods.contains_key(&id) — used in complex body code
+    m = re.match(r'mods\.get\s*\(\s*&?(\w+)\s*\)', e)
+    if m: return f'rb_mods_get_blade(&tg.state.mods, {m.group(1)})'
+    m = re.match(r'mods\.contains_key\s*\(\s*&?(\w+)\s*\)', e)
+    if m: return f'(rb_mods_get_blade(&tg.state.mods, {m.group(1)}) != 0)'
+    # game.state.mods.need_heart_modifiers.get(&id) — special modifier map
+    m = re.match(r'game\.state\.mods\.need_heart_modifiers\.get\s*\(\s*&?(\w+)\s*\)', e)
+    if m: return f'rb_mods_get_blade(&tg.state.mods, {m.group(1)})'
     # player field access: game.state.playerN.field (only known C fields)
     m = re.match(r'game\.state\.player(\d+)\.(\w+)', e)
     if m:
@@ -334,6 +360,22 @@ KNOWN_PLAYER_FIELD = {
 def map_board_expr(expr: str, func_name: str):
     """Map a Rust board-access expression (game.state.playerN...) to C, else None."""
     e = expr.strip()
+    # game.state.ability_queue.current_entry() -> rb_queue_current_entry(&tg.state)
+    m = re.match(r'game\.state\.ability_queue\.current_entry\(\)', e)
+    if m:
+        return "rb_queue_current_entry(&tg.state)"
+    # game.state.ability_queue.resume_mode -> tg.state.queue.resume_mode
+    m = re.match(r'game\.state\.ability_queue\.resume_mode', e)
+    if m:
+        return "tg.state.queue.resume_mode"
+    # game.state.ability_queue.is_empty() -> rb_queue_is_empty(&tg.state)
+    m = re.match(r'game\.state\.ability_queue\.is_empty\(\)', e)
+    if m:
+        return "rb_queue_is_empty(&tg.state)"
+    # game.state.get_pending_choice() -> rb_has_pending_choice(&tg.state) (bool)
+    m = re.match(r'game\.state\.get_pending_choice\(\)', e)
+    if m:
+        return "rb_has_pending_choice(&tg.state)"
     # game.state.playerN.stage.stage[i]  -> tg.state.p[N-1].stage[i]
     m = re.match(r'game\.state\.player(\d+)\.stage\.stage\[(\d+)\]', e)
     if m:
@@ -697,6 +739,16 @@ def transpile_body(body: str, consts: dict, func_name: str) -> str:
     in_action = False
     action_buf = []
     action_depth = 0
+    in_iflet = False
+    iflet_buf = []
+    iflet_depth = 0
+    iflet_expr = ""
+    in_match = False
+    match_buf = []
+    match_depth = 0
+    match_expr = ""
+    in_iflet_complex = False
+    iflet_complex_depth = 0
 
     for line in lines:
         # Strip Rust integer suffixes (3usize, 0i32, …) that are invalid in C.
@@ -732,6 +784,76 @@ def transpile_body(body: str, consts: dict, func_name: str) -> str:
                     out.append(f"    // TODO action: {joined}")
                 in_action = False
                 action_buf = []
+            continue
+        # Buffer multi-line `if let Some(x) = expr { ... }` blocks into a unit.
+        if in_iflet:
+            iflet_buf.append(line)
+            iflet_depth += line.count('{') - line.count('}')
+            if iflet_depth <= 0:
+                body = "\n".join(iflet_buf)
+                c_body = transpile_body(body, consts, func_name)
+                if c_body:
+                    out.append(f"    if ({iflet_expr}) {{")
+                    out.append(c_body)
+                    out.append("    }")
+                else:
+                    out.append(f"    // TODO if let (untranspilable body): {stripped}")
+                in_iflet = False
+                iflet_buf = []
+            continue
+        m_iflet = re.match(r'\s*if\s+let\s+Some\((\w+)\)\s*=\s*(.+?)\s*\{', line)
+        if m_iflet:
+            var = m_iflet.group(1)
+            expr = m_iflet.group(2).strip()
+            # Map the inner expression to C — only handle cases where the
+            # expression has a valid C equivalent (board expr, modifier expr,
+            # heart expr, card field, or game.id()).
+            cexpr = map_board_expr(expr, func_name)
+            if cexpr is None: cexpr = map_modifier_expr(expr, func_name)
+            if cexpr is None: cexpr = map_heart_expr(expr)
+            if cexpr is None: cexpr = map_card_field(expr, card_vars)
+            if cexpr is None: cexpr = _map_game_id(expr, consts)
+            if cexpr is not None:
+                iflet_expr = f"{cexpr} >= 0"
+                iflet_buf = []
+                iflet_depth = 1
+                in_iflet = True
+                if var not in declared:
+                    declared.add(var)
+                continue
+            # Can't map the expression — degrade to TODO
+            out.append(f"    // TODO if let (unresolved expr): {stripped}")
+            continue
+        # Skip complex `if let` with enum variant destructuring (e.g. `if let Choice::SelectCard { field, .. } = x {`)
+        if in_iflet_complex:
+            iflet_complex_depth += line.count('{') - line.count('}')
+            if iflet_complex_depth <= 0:
+                in_iflet_complex = False
+                out.append(f"    // TODO if let (complex pattern): {stripped}")
+            continue
+        m_iflet_complex = re.match(r'\s*if\s+let\s+\w+(::\w+)*\s*\{', line)
+        if m_iflet_complex and not line.strip().startswith("//"):
+            # Multi-line if let patterns (e.g. `if let Enum::Variant { fields, .. } = x {`)
+            # have TWO opening braces: one for the pattern destructuring, one for
+            # the body. Set depth to 2 so we don't exit on the pattern's closing `}`.
+            iflet_complex_depth = 2
+            in_iflet_complex = True
+            continue
+        # Buffer simple `match expr { ... }` blocks and convert to if-else.
+        if in_match:
+            match_buf.append(line)
+            match_depth += line.count('{') - line.count('}')
+            if match_depth <= 0:
+                out.append(f"    // TODO match block: {stripped}")
+                in_match = False
+                match_buf = []
+            continue
+        m_match = re.match(r'\s*match\s+(.+?)\s*\{', line)
+        if m_match:
+            match_expr = m_match.group(1).strip()
+            match_buf = []
+            match_depth = 1
+            in_match = True
             continue
         # Consume Result-handling lines that follow action calls.
         if (re.search(r'^\s*\w*\.expect\(', line) or re.search(r'\.unwrap\(\)', line)
@@ -1668,12 +1790,13 @@ static int failures=0;
                 body)
             body = expand_helpers(body, helpers, consts)
             # skip functions whose structure the line-based transpiler cannot
-            # emit without breaking the C compile: multi-line match/if-let/
-            # while-let blocks span several lines and cannot degrade to a single
-            # TODO comment. Everything else (for/while loops, Some()/=> noise,
-            # tuple-let) is handled line-by-line and degrades to a TODO comment
-            # that still compiles and runs.
-            if re.search(r'\bmatch\s|if let |while let ', body):
+            # emit without breaking the C compile: multi-line match/while-let
+            # blocks span several lines and cannot degrade to a single TODO
+            # comment. `if let Some(x)` is now handled by the block collector
+            # above, so only match/while-let are skipped here. Everything else
+            # (for/while loops, Some()/=> noise, tuple-let) is handled
+            # line-by-line and degrades to a TODO comment that still compiles.
+            if re.search(r'\bmatch\s|while let ', body):
                 continue
             # skip if body has unsupported heavy patterns within the test itself
             if "place_tang" in body or "TANG" in body:

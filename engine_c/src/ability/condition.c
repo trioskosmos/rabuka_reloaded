@@ -523,11 +523,36 @@ static int eval_movement(const struct GameState *g, int actor, int host_cid, con
 }
 
 /* ── group (variant 4) ── */
+static int eval_group_aggregate(const GameState *g, int actor, const Condition *c);
+static int eval_group_multi(const GameState *g, int actor, const Condition *c);
+static int get_card_total_hearts(const struct GameState *g, int cid);
 static int eval_group(const struct GameState *g, int actor, int host_cid, const Condition *c) {
     (void)host_cid;
     const char *loc = get_str(c, "location");
     if (!loc) loc = "stage";
     int pl = target_player_idx(actor, c);
+    /* all_members branch: "…のみがいる" — every card in the zone must belong
+       to ONE of the listed groups (e.g. 『Aqours』か『SaintSnow』). */
+    int all_members_val = 0;
+    int all_members = get_i(c, "all_members", &all_members_val) ? all_members_val : 0;
+    if (all_members) {
+        const CondValue *gv = find_val(c, "group_names");
+        if (!gv || gv->tag != RB_TAG_ARRAY || gv->arr_n == 0) {
+            /* no group list with all_members: ambiguous → treat as no-match */
+            return 0;
+        }
+        int ids[RB_MAX_ZONE]; int n = zone_ids(g, pl, loc, ids, RB_MAX_ZONE);
+        if (n == 0) return 0;
+        for (int i = 0; i < n; i++) {
+            int matched = 0;
+            for (uint32_t gi = 0; gi < gv->arr_n; gi++) {
+                const char *t = (gv->arr[gi].tag == RB_TAG_STR) ? gv->arr[gi].s : NULL;
+                if (t && rb_card_matches_group_str(ids[i], t)) { matched = 1; break; }
+            }
+            if (!matched) return 0;
+        }
+        return 1;
+    }
     const CondValue *gv = find_val(c, "group_names");
     if (!gv || gv->tag != RB_TAG_ARRAY || gv->arr_n==0) return count_in_zone(g, pl, loc)>0;
     /* Zone resolution mirrors card_matches_any_group's call site: Rust iterates
@@ -553,7 +578,69 @@ static int eval_group(const struct GameState *g, int actor, int host_cid, const 
          }
          rb_free_card(&card);
     }
+    /* Aggregate total branch (e.g. heart02 >= 6) */
+    { int agg = eval_group_aggregate(g, actor, c); if (agg >= 0) return agg; }
+    /* Multiple group_names: each group must have >= count members */
+    { int multi = eval_group_multi(g, actor, c); if (multi >= 0) return multi; }
     return 0;
+}
+
+/* Mirror evaluate_group_condition: aggregate total check (e.g. heart02 >= 6).
+   Sums the hearts of matching cards in the zone and compares to aggregate_total. */
+static int eval_group_aggregate(const GameState *g, int actor, const Condition *c) {
+    int agg_total = 0;
+    if (!get_i(c, "aggregate_total", &agg_total) || agg_total <= 0) return -1;
+    int pl = target_player_idx(actor, c);
+    const char *loc = get_str(c, "location"); if (!loc) loc = "stage";
+    const char *op = get_str(c, "aggregate_total_operator");
+    if (!op) op = ">=";
+    /* Sum hearts for all cards in the zone matching the group filter */
+    int ids[RB_MAX_ZONE]; int n = zone_ids(g, pl, loc, ids, RB_MAX_ZONE);
+    int total = 0;
+    const CondValue *gv = find_val(c, "group_names");
+    for (int i = 0; i < n; i++) {
+        if (ids[i] < 0) continue;
+        if (gv && gv->tag == RB_TAG_ARRAY && gv->arr_n > 0) {
+            int matched = 0;
+            for (uint32_t gi = 0; gi < gv->arr_n; gi++) {
+                const char *t = (gv->arr[gi].tag == RB_TAG_STR) ? gv->arr[gi].s : NULL;
+                if (t && rb_card_matches_group_str(ids[i], t)) { matched = 1; break; }
+            }
+            if (!matched) continue;
+        }
+        total += get_card_total_hearts(g, ids[i]);
+    }
+    if (!strcmp(op, ">=")) return total >= agg_total;
+    if (!strcmp(op, ">"))  return total > agg_total;
+    if (!strcmp(op, "<=")) return total <= agg_total;
+    if (!strcmp(op, "<"))  return total < agg_total;
+    if (!strcmp(op, "==")) return total == agg_total;
+    return total >= agg_total;
+}
+
+/* Mirror evaluate_group_condition: multiple group_names branch.
+   Each listed group must have at least `count` members in the zone. */
+static int eval_group_multi(const GameState *g, int actor, const Condition *c) {
+    const CondValue *gv = find_val(c, "group_names");
+    if (!gv || gv->tag != RB_TAG_ARRAY || gv->arr_n <= 1) return -1;
+    const char *agg = get_str(c, "aggregate");
+    if (agg && !strcmp(agg, "total")) return -1; /* handled by aggregate branch */
+    int target_count = 0;
+    if (!get_i(c, "count", &target_count)) target_count = 1;
+    int pl = target_player_idx(actor, c);
+    const char *loc = get_str(c, "location"); if (!loc) loc = "stage";
+    int ids[RB_MAX_ZONE]; int n = zone_ids(g, pl, loc, ids, RB_MAX_ZONE);
+    for (uint32_t gi = 0; gi < gv->arr_n; gi++) {
+        const char *t = (gv->arr[gi].tag == RB_TAG_STR) ? gv->arr[gi].s : NULL;
+        if (!t) continue;
+        int count = 0;
+        for (int i = 0; i < n; i++) {
+            if (ids[i] < 0) continue;
+            if (rb_card_matches_group_str(ids[i], t)) count++;
+        }
+        if (count < target_count) return 0;
+    }
+    return 1;
 }
 
 /* Mirror engine/src/ability/condition/card.rs::evaluate_appearance_condition_inner
