@@ -399,11 +399,6 @@ candidates_ready:
             g->selected_cards[g->n_selected_cards++] = cid;
     }
 
-    /* Track changed_state_members for following delayed restriction steps */
-    for(int i=0;i<nchange;i++)
-        if(g->n_changed_state_members < RB_MAX_RECENTLY_MOVED)
-            g->changed_state_members[g->n_changed_state_members++] = cands[i];
-
     {
         const char *pp = s_player_prefix(g, g->activating_card >= 0 ? g->activating_card : host_cid);
         char act_name[64]; act_name[0] = 0;
