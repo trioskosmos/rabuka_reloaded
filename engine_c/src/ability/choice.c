@@ -9,20 +9,38 @@ typedef RbSelectionContext SelectionContext;
 
 int rb_get_card(int id, Card *out) { return rb_decode_card_by_index((uint32_t)id, out); }
 int rb_card_db_unit(int id) { (void)id; return 0; }
-int rb_ability_master_id(const GameState *g) { (void)g; return 0; }
-int rb_choice_destination(const GameState *g, int *out) { (void)g;(void)out; return 0; }
+int rb_ability_master_id(const GameState *g) { return g->activating_card >= 0 ? g->activating_card : 0; }
+int rb_choice_destination(const GameState *g, int *out) {
+    /* Return 1 if the pending choice has a destination zone, else 0 */
+    const RbChoice *c = rb_get_pending_choice(g);
+    if (c && c->target[0]) {
+        if (out) *out = 1;
+        return 1;
+    }
+    if (out) *out = 0;
+    return 0;
+}
 int rb_compound_route_conditional_branch(const AbilityEffect *e) { (void)e; return 0; }
 int rb_effect_answers_any(const AbilityEffect *e) { (void)e; return 0; }
 int rb_effect_resource_on_select(const AbilityEffect *e) { (void)e; return 0; }
 int rb_effect_alternative_count_type_any(const AbilityEffect *e) { (void)e; return 0; }
 int rb_entry_conditional_choice_effect(const GameState *g) { (void)g; return 0; }
-int rb_resolver_build_choice_select_cards(RbAbilityResolver *self, GameState *g) { (void)self;(void)g; return 0; }
+int rb_resolver_build_choice_select_cards(RbAbilityResolver *self, GameState *g) {
+    (void)self; (void)g;
+    return 0;
+}
 int rb_resolver_card_name(GameState *g, int id, char *out, int outsz) {
     Card c; if (rb_decode_card_by_index((uint32_t)id, &c)) { if(out&&outsz)snprintf(out,outsz,"%s",c.name?c.name:""); rb_free_card(&c); return 1;} return 0;
 }
 int rb_resolver_entry_effect(RbAbilityResolver *self) { (void)self; return 0; }
-int rb_resolver_look_select_finalize_dest(GameState *g, int idx) { (void)g;(void)idx; return 0; }
-int rb_resolver_spawn_target(RbAbilityResolver *self, GameState *g, int t) { (void)self;(void)g;(void)t; return 0; }
+int rb_resolver_look_select_finalize_dest(GameState *g, int idx) {
+    (void)g; (void)idx;
+    return 0;
+}
+int rb_resolver_spawn_target(RbAbilityResolver *self, GameState *g, int t) {
+    (void)self; (void)g; (void)t;
+    return 0;
+}
 
 /* ===== Port of engine/src/ability/choice.rs (dependency-ordered) =====
    The Rust module models an AbilityResolver holding the pending choice plus a
