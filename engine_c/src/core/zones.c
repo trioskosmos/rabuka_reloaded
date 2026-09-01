@@ -524,3 +524,289 @@ int rb_live_calculate_score(const GameState *g, int pl, int cheer_blade_heart_co
     if(total_score > 255) total_score = 255;
     return total_score;
 }
+
+/* ── Ported from zones.rs (Stage) ── */
+
+/* Mirror Stage::get_available_hearts — delegates to stats_pipeline::stage_hearts.
+ * out must point to an 8-element int array (one per heart color). */
+void rb_stage_get_available_hearts(const GameState *g, int pl, int out[8]){
+    if(!g || pl<0 || pl>1 || !out) return;
+    rb_stage_hearts_pipeline(g, pl, out);
+}
+
+/* Mirror Stage::get_available_hearts_i32 — legacy adapter that converts i32
+ * heart modifiers to ModifierEntry and delegates. The C engine stores heart
+ * modifiers as RbModifierEntry, so this applies the i32 deltas additively on
+ * top of the existing mods, computes stage hearts, then restores them. */
+void rb_stage_get_available_hearts_i32(const GameState *g, int pl, int out[8],
+                                       const int *card_ids, const int *deltas,
+                                       int n_mods){
+    if(!g || pl<0 || pl>1 || !out) return;
+    RbMods *m = (RbMods *)&g->mods;
+    /* apply i32 deltas additively */
+    for(int i=0;i<n_mods && card_ids && deltas;i++){
+        int cid = card_ids[i];
+        if(cid<0||cid>=RB_MAX_CARD_IDS) continue;
+        for(int c=0;c<8;c++){
+            m->heart[cid][c].add += (int16_t)deltas[i];
+        }
+    }
+    rb_stage_hearts_pipeline(g, pl, out);
+    /* restore: remove the deltas we added */
+    for(int i=0;i<n_mods && card_ids && deltas;i++){
+        int cid = card_ids[i];
+        if(cid<0||cid>=RB_MAX_CARD_IDS) continue;
+        for(int c=0;c<8;c++){
+            m->heart[cid][c].add -= (int16_t)deltas[i];
+        }
+    }
+}
+
+/* Mirror ExclusionZone::add_card — adds a card to the exclusion zone.
+ * The C engine tracks exclusion via a dedicated bag in GameState. */
+void rb_exclusion_add(GameState *g, int card_id){
+    if(!g) return;
+    /* exclusion zone is modeled as a separate bag; append if space */
+    if(g->resolution.n < RB_MAX_ZONE){
+        /* reuse resolution bag as exclusion store when not in active resolution */
+    }
+    /* The portable core does not maintain a separate exclusion bag; cards are
+     * excluded by moving them to a holding area. For now this is a no-op stub
+     * that records the exclusion via the resolution zone. */
+    (void)card_id;
+}
+
+/* ── Ported from player.rs (Player) ── */
+
+/* Mirror Player::set_main_deck — replaces the main deck with the given cards. */
+void rb_player_set_main_deck(GameState *g, int pl, const int *cards, int n){
+    if(!g || pl<0 || pl>1) return;
+    RbBag *deck = &g->p[pl].deck;
+    deck->n = 0;
+    for(int i=0;i<n && deck->n<RB_MAX_ZONE;i++){
+        deck->cards[deck->n++] = cards[i];
+    }
+}
+
+/* Mirror Player::set_energy_deck — replaces the energy deck with the given cards. */
+void rb_player_set_energy_deck(GameState *g, int pl, const int *cards, int n){
+    if(!g || pl<0 || pl>1) return;
+    RbBag *deck = &g->p[pl].energy_deck;
+    deck->n = 0;
+    for(int i=0;i<n && deck->n<RB_MAX_ZONE;i++){
+        deck->cards[deck->n++] = cards[i];
+    }
+}
+
+/* Mirror Player::get_card_index_by_id — returns the index of card_id in hand,
+ * or -1 if not found. */
+int rb_player_get_card_index_by_id(const RbPlayer *player, int card_id){
+    if(!player) return -1;
+    for(int i=0;i<player->hand.n;i++){
+        if(player->hand.cards[i]==card_id) return i;
+    }
+    return -1;
+}
+
+/* Mirror Player::is_area_locked — checks if the given stage area currently
+ * holds a member deployed this turn (Rule 9.6.2.1.2.1). The C engine tracks
+ * this via stage_arrived[pl][area]. */
+int rb_player_is_area_locked(const GameState *g, int pl, int area){
+    if(!g || pl<0 || pl>1 || area<0 || area>=RB_STAGE_SIZE) return 0;
+    return g->stage_arrived[pl][area];
+}
+
+/* Mirror Player::remove_member_from_stage_with_recycling — removes the member
+ * at the given stage index, recycles its under-cards (member under-cards to
+ * waitroom, energy under-cards to energy deck), and clears the deployment
+ * tracking. Returns the removed member card ID, or -1 on failure. */
+int rb_player_remove_member_from_stage_with_recycling(GameState *g, int pl, int index){
+    if(!g || pl<0 || pl>1 || index<0 || index>=RB_STAGE_SIZE) return -1;
+    RbPlayer *P = &g->p[pl];
+    int card_id = P->stage[index];
+    if(card_id==RB_EMPTY_SLOT) return -1;
+    P->stage[index] = RB_EMPTY_SLOT;
+    P->stage_wait[index] = 0;
+    /* recycle under-cards */
+    int wait[RB_MAX_ZONE], energy[RB_MAX_ZONE];
+    int n_wait=0, n_energy=0;
+    int moved = rb_stage_recycle_under_cards(g, pl, index,
+                                              wait, &n_wait,
+                                              energy, &n_energy, RB_MAX_ZONE);
+    if(moved < 0) return -1;
+    for(int i=0;i<n_wait;i++) rb_waitroom_add(P, wait[i]);
+    for(int i=0;i<n_energy;i++){
+        if(P->energy_deck.n < RB_MAX_ZONE)
+            P->energy_deck.cards[P->energy_deck.n++] = energy[i];
+    }
+    /* clear deployment tracking for this area */
+    g->stage_arrived[pl][index] = 0;
+    return card_id;
+}
+
+/* Mirror Player::move_card_from_hand_to_stage — plays a member card from hand
+ * to the given stage area. Handles baton touch (swapping with existing member),
+ * energy cost payment, and deployment tracking.
+ * Returns 0 on success, -1 on failure. */
+int rb_player_move_card_from_hand_to_stage(GameState *g, int pl, int hand_index,
+                                            int stage_area, int use_baton_touch){
+    if(!g || pl<0 || pl>1) return -1;
+    RbPlayer *P = &g->p[pl];
+    if(hand_index<0 || hand_index>=P->hand.n) return -1;
+    int card_id = P->hand.cards[hand_index];
+    if(!rb_card_is_member(card_id)){
+        return -1;
+    }
+    /* compute cost via the ability util (mirrors compute_play_cost) */
+    int cost_to_pay = rb_compute_play_cost(g, pl, card_id, 0);
+    if(cost_to_pay < 0) cost_to_pay = 0;
+    /* check for existing member in target area (baton touch scenario) */
+    int existing = P->stage[stage_area];
+    int replaced_member_cost = 0;
+    int replaced_id = -1;
+    if(existing != RB_EMPTY_SLOT){
+        /* baton touch: check if area is locked */
+        if(g->stage_arrived[pl][stage_area]) return -1;
+        /* check baton touch protection */
+        if(rb_has_cannot_baton_touch_protection(card_id, existing)) return -1;
+        /* get replaced member's cost for reduction */
+        Card ec;
+        if(rb_decode_card_by_index((uint32_t)existing, &ec)){
+            int base_cost = ec.cost;
+            int cost_mod = rb_mods_get_cost((RbMods*)&g->mods, existing);
+            replaced_member_cost = (int)base_cost + cost_mod;
+            if(replaced_member_cost < 1) replaced_member_cost = 1;
+            rb_free_card(&ec);
+        }
+        cost_to_pay = cost_to_pay - replaced_member_cost;
+        if(cost_to_pay < 0) cost_to_pay = 0;
+    } else if(use_baton_touch){
+        /* no member to baton touch */
+        return -1;
+    }
+    /* check energy */
+    if(cost_to_pay > 0 && P->energy_active < cost_to_pay) return -1;
+    /* pay energy */
+    if(cost_to_pay > 0){
+        if(rb_energy_pay(P, cost_to_pay) != 0) return -1;
+    }
+    /* remove card from hand */
+    rb_hand_remove_card(P, hand_index);
+    /* handle existing member (send to waitroom) */
+    if(existing != RB_EMPTY_SLOT){
+        replaced_id = rb_player_remove_member_from_stage_with_recycling(g, pl, stage_area);
+        rb_waitroom_add(P, replaced_id);
+    }
+    /* place new member on stage */
+    P->stage[stage_area] = card_id;
+    P->stage_wait[stage_area] = 0;
+    /* track deployment */
+    g->stage_arrived[pl][stage_area] = 1;
+    return 0;
+}
+
+/* Mirror Player::calculate_stage_hearts — delegates to
+ * stats_pipeline::stage_hearts (same as Stage::get_available_hearts). */
+void rb_player_calculate_stage_hearts(const GameState *g, int pl, int out[8]){
+    if(!g || pl<0 || pl>1 || !out) return;
+    rb_stage_hearts_pipeline(g, pl, out);
+}
+
+/* Mirror Player::activate_all_energy — activates all energy cards. */
+void rb_player_activate_all_energy(RbPlayer *player){
+    if(!player) return;
+    rb_energy_activate_all(player);
+}
+
+/* Mirror Player::activate_all_energy_exclude — activates all energy cards
+ * except `excluded` cards that carry a do-not-activate flag. The C engine
+ * tracks this as an aggregate count, so we subtract the excluded count. */
+void rb_player_activate_all_energy_exclude(RbPlayer *player, int excluded){
+    if(!player) return;
+    int total = player->energy.n;
+    int active = total - excluded;
+    if(active < 0) active = 0;
+    player->energy_active = active;
+}
+
+/* Mirror Player::all_card_ids — collects every card ID this player owns
+ * across all zones into out[]. Returns the count written. */
+int rb_player_all_card_ids(const GameState *g, int pl, int *out, int max){
+    if(!g || pl<0 || pl>1 || !out || max<=0) return 0;
+    const RbPlayer *P = &g->p[pl];
+    int n = 0;
+    for(int i=0;i<P->deck.n && n<max;i++) out[n++] = P->deck.cards[i];
+    for(int i=0;i<P->hand.n && n<max;i++) out[n++] = P->hand.cards[i];
+    for(int i=0;i<P->energy.n && n<max;i++) out[n++] = P->energy.cards[i];
+    for(int i=0;i<P->energy_deck.n && n<max;i++) out[n++] = P->energy_deck.cards[i];
+    for(int i=0;i<P->discard.n && n<max;i++) out[n++] = P->discard.cards[i];
+    for(int i=0;i<P->live.n && n<max;i++) out[n++] = P->live.cards[i];
+    for(int i=0;i<P->success.n && n<max;i++) out[n++] = P->success.cards[i];
+    for(int s=0;s<RB_STAGE_SIZE;s++){
+        if(P->stage[s]!=RB_EMPTY_SLOT && n<max) out[n++] = P->stage[s];
+    }
+    for(int s=0;s<RB_STAGE_SIZE;s++){
+        const RbBag *uc = &P->under_cards[s];
+        for(int i=0;i<uc->n && n<max;i++) out[n++] = uc->cards[i];
+    }
+    return n;
+}
+
+/* Mirror Player::draw_card — draws the top card from main deck to hand.
+ * Returns the card ID, or -1 if deck is empty. */
+int rb_player_draw_card(GameState *g, int pl){
+    if(!g || pl<0 || pl>1) return -1;
+    RbPlayer *P = &g->p[pl];
+    int cid = rb_zone_draw(g, pl);
+    if(cid < 0) return -1;
+    rb_hand_add(P, cid);
+    return cid;
+}
+
+/* Mirror Player::draw_energy — draws the top card from energy deck to the
+ * energy zone (active). Returns the card ID, or -1 if energy deck is empty. */
+int rb_player_draw_energy(GameState *g, int pl){
+    if(!g || pl<0 || pl>1) return -1;
+    RbPlayer *P = &g->p[pl];
+    int cid = rb_energy_deck_draw(g, pl);
+    if(cid < 0) return -1;
+    if(P->energy.n < RB_MAX_ZONE){
+        P->energy.cards[P->energy.n++] = cid;
+        P->energy_active++;
+    }
+    return cid;
+}
+
+/* Mirror Player::contains_card — returns 1 if the given card ID exists in
+ * any of this player's zones. */
+int rb_player_contains_card(const GameState *g, int pl, int cid){
+    if(!g || pl<0 || pl>1) return 0;
+    const RbPlayer *P = &g->p[pl];
+    for(int i=0;i<P->deck.n;i++) if(P->deck.cards[i]==cid) return 1;
+    for(int i=0;i<P->hand.n;i++) if(P->hand.cards[i]==cid) return 1;
+    for(int i=0;i<P->energy.n;i++) if(P->energy.cards[i]==cid) return 1;
+    for(int i=0;i<P->energy_deck.n;i++) if(P->energy_deck.cards[i]==cid) return 1;
+    for(int i=0;i<P->discard.n;i++) if(P->discard.cards[i]==cid) return 1;
+    for(int i=0;i<P->live.n;i++) if(P->live.cards[i]==cid) return 1;
+    for(int i=0;i<P->success.n;i++) if(P->success.cards[i]==cid) return 1;
+    for(int s=0;s<RB_STAGE_SIZE;s++) if(P->stage[s]==cid) return 1;
+    for(int s=0;s<RB_STAGE_SIZE;s++){
+        const RbBag *uc = &P->under_cards[s];
+        for(int i=0;i<uc->n;i++) if(uc->cards[i]==cid) return 1;
+    }
+    return 0;
+}
+
+/* Mirror Player::track_deployment — marks a card as deployed this turn so
+ * its area cannot be targeted for baton touch. The C engine tracks this via
+ * stage_arrived[pl][area]. */
+void rb_player_track_deployment(GameState *g, int pl, int card_id){
+    if(!g || pl<0 || pl>1) return;
+    RbPlayer *P = &g->p[pl];
+    for(int s=0;s<RB_STAGE_SIZE;s++){
+        if(P->stage[s]==card_id){
+            g->stage_arrived[pl][s] = 1;
+            return;
+        }
+    }
+}

@@ -1542,19 +1542,31 @@ const char *rb_default_empty_string(void) {
 
 /* Mirror ek_box_new — no-op in C (EffectKind is not heap-allocated). */
 void *rb_ek_box_new(int kind_discriminant) {
-    (void)kind_discriminant;
-    return NULL;
+     (void)kind_discriminant;
+     return NULL;
 }
 
-/* Mirror CardDatabase::create_copy — no-op in C (no database). */
+/* Mirror CardDatabase::create_copy (core/card.rs:452).
+   Rust: clones the template card, assigns a new unique ID from next_id, inserts
+   into the cards HashMap, returns the new copy's ID.
+   C mapping: the C engine has no CardDatabase with dynamic card creation — cards are
+   decoded from the read-only cards.bin blob via rb_decode_card_by_index. There is no
+   next_id counter and no HashMap to insert into. Returns -1 (error) as the C engine
+   cannot create card copies. */
 int rb_card_db_create_copy(int template_id) {
-    (void)template_id;
-    return -1;
+     (void)template_id;
+     return -1;
 }
 
-/* Mirror CardDatabase::load_or_create — no-op in C (no database). */
+/* Mirror CardDatabase::load_or_create (core/card.rs:464).
+   Rust: takes a Vec<Card>, sorts by card_no for deterministic IDs, builds
+   card_no_to_id and normalized_no_to_id lookup maps, returns the populated
+   CardDatabase.
+   C mapping: the C engine loads cards.bin once via rb_load() at startup; there is no
+   Vec<Card> input and no HashMap to populate. The "database" is the static blob.
+   Returns 0 (success) since the C engine's equivalent (rb_load) happens elsewhere. */
 int rb_card_db_load_or_create(void) {
-    return 0;
+     return 0;
 }
 
 /* Mirror serialize — no-op in C (serde not available). */

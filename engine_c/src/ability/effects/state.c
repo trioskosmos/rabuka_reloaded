@@ -325,20 +325,15 @@ void rb_effect_energy_placement(GameState *g, int actor, AbilityEffect *e){
     int n = e->count >= 0 ? e->count : 1;
     int active = st && (!strcmp(st,"active")||!strcmp(st,"アクティブ"));
     for(int k=0;k<n;k++){
-        /* Draw from energy_deck first, fall back to main deck */
-        int cid = -1;
+        /* Draw from energy_deck only (mirrors Rust energy_deck.draw()) */
         if(P->energy_deck.n > 0){
-            cid = P->energy_deck.cards[0];
+            int cid = P->energy_deck.cards[0];
             for(int i=0;i<P->energy_deck.n-1;i++) P->energy_deck.cards[i] = P->energy_deck.cards[i+1];
             P->energy_deck.n--;
-        } else if(P->deck.n > 0){
-            cid = P->deck.cards[0];
-            for(int i=0;i<P->deck.n-1;i++) P->deck.cards[i] = P->deck.cards[i+1];
-            P->deck.n--;
-        }
-        if(cid >= 0 && P->energy.n < RB_MAX_ZONE){
-            P->energy.cards[P->energy.n++] = cid;
-            if(active && P->energy_active < RB_ENERGY_CAP) P->energy_active++;
+            if(P->energy.n < RB_MAX_ZONE){
+                P->energy.cards[P->energy.n++] = cid;
+                if(active && P->energy_active < RB_ENERGY_CAP) P->energy_active++;
+            }
         }
     }
 }

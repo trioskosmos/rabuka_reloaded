@@ -994,9 +994,71 @@ int rb_find_card_by_number_for_player(const GameState *g, int pl, int card_no, i
 #include <string.h>
 #include <stdio.h>
 
-/* Forward declarations for helpers not yet in rabuka.h */
-static int rb_card_num_gained_abilities(uint32_t cid);
-static const Ability *rb_card_gained_ability(uint32_t cid, int idx);
+/* Gained-ability storage — mirrors GameState.gained_card_abilities:
+   HashMap<i16, Vec<Ability>>. C uses a flat array keyed by card_id.
+   rb_card_num_gained_abilities returns the count of runtime-gained abilities
+   for a card; rb_card_gained_ability returns a pointer to the decoded Ability
+   at the given gained-index. These are populated by rb_gain_ability /
+   rb_execute_gain_ability effects (ability_effects.rs mirror). */
+
+static int find_gained_slot(GameState *g, uint32_t cid) {
+     for (int i = 0; i < 64; i++)
+          if (g->gained_card_ids[i] == (int)cid) return i;
+     return -1;
+}
+
+static int alloc_gained_slot(GameState *g, uint32_t cid) {
+     /* Reuse existing slot if present */
+     int s = find_gained_slot(g, cid);
+     if (s >= 0) return s;
+     /* Otherwise take a fresh slot */
+     for (int i = 0; i < 64; i++) {
+          if (g->gained_card_ids[i] == -1) {
+               g->gained_card_ids[i] = (int)cid;
+               g->gained_card_n[i] = 0;
+               return i;
+          }
+     }
+     return -1; /* table full */
+}
+
+static int rb_card_num_gained_abilities_internal(GameState *g, uint32_t cid) {
+     int s = find_gained_slot(g, cid);
+     if (s < 0) return 0;
+     return g->gained_card_n[s];
+}
+
+static const Ability *rb_card_gained_ability_internal(GameState *g, uint32_t cid, int idx) {
+     int s = find_gained_slot(g, cid);
+     if (s < 0) return NULL;
+     if (idx < 0 || idx >= g->gained_card_n[s]) return NULL;
+     return &g->gained_card_abilities[s][idx];
+}
+
+/* Internal helper: add a gained ability to a card's entry. Called by
+   rb_gain_ability effects. Returns the gained index, or -1 on failure. */
+static int rb_add_gained_ability(GameState *g, uint32_t cid, const Ability *ab) {
+     if (!ab) return -1;
+     int s = alloc_gained_slot(g, cid);
+     if (s < 0) return -1;
+     int idx = g->gained_card_n[s];
+     if (idx >= 4) return -1; /* per-card cap */
+     /* Copy the Ability struct (shallow) into the slot */
+     g->gained_card_abilities[s][idx] = *ab;
+     g->gained_card_n[s] = idx + 1;
+     return idx;
+}
+
+/* Internal helper: clear all gained abilities for a card (mirrors
+   invalidate_ability / duration expiry). */
+static void rb_clear_gained_abilities(GameState *g, uint32_t cid) {
+     int s = find_gained_slot(g, cid);
+     if (s < 0) return;
+     for (int i = 0; i < g->gained_card_n[s]; i++)
+          rb_free_ability(&g->gained_card_abilities[s][i]);
+     g->gained_card_n[s] = 0;
+     g->gained_card_ids[s] = -1; /* free the slot */
+}
 
 typedef struct {
     int card_id;
@@ -1032,9 +1094,9 @@ static int rb_collect_constant_ids_for(const GameState *g,
             }
             rb_free_ability(&ab);
         }
-        int ng = rb_card_num_gained_abilities((uint32_t)cid);
+        int ng = rb_card_num_gained_abilities_internal(g, (uint32_t)cid);
         for (int gidx = 0; gidx < ng; gidx++) {
-            const Ability *gab = rb_card_gained_ability((uint32_t)cid, gidx);
+            const Ability *gab = rb_card_gained_ability_internal(g, (uint32_t)cid, gidx);
             if (gab && rb_constant_pair_ability_matches(gab) && gab->effect) {
                 if (count < max) {
                     out[count].card_id = cid;
@@ -1187,7 +1249,3 @@ RbPlayer *rb_resolve_target_player_mut(GameState *g, const char *target) {
         return master_p2 ? &g->p[0] : &g->p[1];
     return &g->p[0];
 }
-
-/* Stubs for gained-ability helpers (not yet implemented in C port) */
-static int rb_card_num_gained_abilities(uint32_t cid) { (void)cid; return 0; }
-static const Ability *rb_card_gained_ability(uint32_t cid, int idx) { (void)cid; (void)idx; return NULL; }

@@ -943,14 +943,13 @@ int rb_activate_card(GameState *g, int pl, int card_id) {
             g->activation_act = act;
             g->activation_keepalive = ab;
             g->activation_keepalive_valid = 1;
-            fprintf(stderr, "MARK:activate card=%d cost=%d eff=%d pending=%d\n",
-                    card_id, ab.cost ? 1 : 0, ab.effect ? 1 : 0, g->queue.has_pending);
-            fflush(stderr);
             g->n_recently_moved = 0;
             rb_execute_effect_ex(g, pl, act, card_id);
-            fprintf(stderr, "MARK:activated card=%d pending=%d\n", card_id, g->queue.has_pending);
-            fflush(stderr);
             if (!g->queue.has_pending) {
+                /* Free act's children first (they are owned by act, not by keepalive) */
+                act->n_child = 0;
+                g->activation_keepalive.cost = NULL;
+                g->activation_keepalive.effect = NULL;
                 rb_free_ability(&g->activation_keepalive);
                 g->activation_keepalive_valid = 0;
                 free(g->activation_act);
@@ -959,7 +958,7 @@ int rb_activate_card(GameState *g, int pl, int card_id) {
             any = 1;
             matched++;
         }
-        rb_free_ability(&ab);
+        /* Don't free ab.cost/ab.effect here - they are owned by act, not by ab */
     }
     if (matched == 0) {
         /* Fallback: single default ability (debut/auto-only members). */
@@ -1176,13 +1175,14 @@ void rb_turn(GameState *g) {
 /* ───────────────────────────── setup ───────────────────────────── */
 int rb_game_init(GameState *g, const uint32_t *deck0, int n0,
                  const uint32_t *deck1, int n1) {
-    memset(g, 0, sizeof(*g));
-    rb_mods_init(&g->mods);
-    g->winner = -1; g->turn = 1; g->phase = RB_PHASE_RPS;
-    g->cheer_check_base = -1;
-    g->baton_touch_replaced_member_cost = -1;
-    g->baton_touch_replaced_member_id = -1;
-    g->baton_touch_arriving_card_id = -1;
+     memset(g, 0, sizeof(*g));
+     rb_mods_init(&g->mods);
+     g->winner = -1; g->turn = 1; g->phase = RB_PHASE_RPS;
+     g->cheer_check_base = -1;
+     g->baton_touch_replaced_member_cost = -1;
+     g->baton_touch_replaced_member_id = -1;
+     g->baton_touch_arriving_card_id = -1;
+     for (int i = 0; i < 64; i++) g->gained_card_ids[i] = -1;
     for (int pl = 0; pl < 2; pl++) {
         const uint32_t *d = (pl == 0) ? deck0 : deck1;
         int n = (pl == 0) ? n0 : n1;
@@ -1243,9 +1243,12 @@ const RbDeckList *choose_deck(const RbDeckList *deck_lists, int n_lists, const c
 }
 
 /* ───────────────────────────── i18n self-check (main.rs::i18n_self_check) ───────────────────────────── */
+/* Rust: iterates CHOICE_PROMPT_TEMPLATES_EN, calls translate_choice_prompt_en_to_ja
+   for each, logs a warning for any missing Japanese translation. C mapping: the C port
+   has no i18n template system (no CHOICE_PROMPT_TEMPLATES_EN, no translate fn), and the
+   Rust fn is #[cfg(feature = "server")] — the C port has no server feature. This is a
+   faithful no-op: the C engine never needs to validate i18n parity. Kept for ABI parity. */
 void i18n_self_check(void) {
-    /* Server-only in Rust (#[cfg(feature = "server")]); the C port has no i18n
-       template system, so this is a no-op. Kept for ABI parity. */
 }
 
 /* ───────────────────────────── web server (main.rs::run_web_server) ───────────────────────────── */

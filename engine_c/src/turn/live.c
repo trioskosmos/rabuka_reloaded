@@ -918,25 +918,268 @@ void rb_process_player_live_result(GameState *g, int pl, int won, int must_skip,
     }
 }
 
-/* Mirror live.rs::backtrack_allocate — exhaustive backtracking search over
-   Phase 3a (surplus color) and Phase 4 (icon_all wildcard) allocations.
-   Called when greedy_allocate fails. Returns 1 if solution found (writes to
-   out_allocs), 0 otherwise. */
-int rb_backtrack_allocate(const int pool[8], const int card_needs[8], int n_cards,
-                           int *out_allocs, int max_allocs) {
-    (void)pool; (void)card_needs; (void)n_cards; (void)out_allocs; (void)max_allocs;
-    return 0;
+/* Faithful port of live.rs::backtrack_allocate + bt_search +
+   try_surplus_compositions + try_phase4 + try_all_distribution.
+   Exhaustive backtracking search over Phase 3a (surplus color) and Phase 4
+   (icon_all wildcard) allocations. Called when greedy_allocate fails.
+   Returns 1 if a valid allocation is found (writes flattened [card*8+color]
+   allocation counts to out_allocs, max_allocs entries), 0 otherwise. */
+
+/* Allocation descriptor written to out_allocs: encoded as card_idx*8 + color
+   (one entry per unit of heart allocated). The decoder uses card = entry/8,
+   color = entry%8. */
+#define BT_ALLOC_ENTRY(card, color) ((card)*8 + (color))
+
+/* card_ok_with_wildcard (ported from live.rs::card_ok_with_wildcard) — check
+   whether a single card's heart requirements are satisfied given its filled
+   array. COLORLESS hearts (filled[0]) count toward heart0/total bucket but
+   can NEVER be used as a specific color — only icon_all (filled[7]) can
+   cover a colored-note deficit. */
+static int bt_card_ok(const int filled[8], const int need[8]) {
+     int total_filled = 0, total_need = 0;
+     for (int i = 0; i < 8; i++) { total_filled += filled[i]; total_need += need[i]; }
+     if (total_filled < total_need) return 0;
+     int icon_all = filled[7];
+     if (need[0] > 0) {
+          int any_hearts = 0;
+          for (int c = 1; c < 7; c++) any_hearts += filled[c];
+          any_hearts += filled[0];
+          if (any_hearts + icon_all < need[0]) return 0;
+          int deficit = need[0] - any_hearts;
+          if (deficit > 0) { icon_all -= deficit; }
+     }
+     for (int c = 1; c < 7; c++) {
+          if (filled[c] < need[c]) {
+               int deficit = need[c] - filled[c];
+               if (icon_all < deficit) return 0;
+               icon_all -= deficit;
+          }
+     }
+     return 1;
 }
 
-/* Mirror live.rs::try_surplus_compositions — recursively enumerate all
-   compositions of remaining hearts from surplus colors. */
+/* Forward declarations */
+static int bt_search(int *pool, const int *card_needs, int n_cards, int idx,
+                      int *allocs, int *n_allocs, int max_allocs);
+static int bt_try_phase4(int *pool, const int *card_needs, int n_cards, int idx,
+                          int *allocs, int *n_allocs, int max_allocs,
+                          const int filled[8]);
+static int bt_try_all_distribution(int *pool, const int *card_needs, int n_cards,
+                                    int idx, int *allocs, int *n_allocs, int max_allocs,
+                                    const int filled[8],
+                                    const int *deficit_colors, int n_deficits,
+                                    const int *deficit_amts, int remaining, int di);
+
+/* try_surplus_compositions (ported from live.rs::try_surplus_compositions) —
+   recursively enumerate all compositions of `remaining` hearts from
+   colors[color_idx..]. For each composition, update pool/filled and recurse
+   into try_phase4. */
+static int bt_try_surplus(int *pool, const int *card_needs, int n_cards, int idx,
+                           int *allocs, int *n_allocs, int max_allocs,
+                           const int *colors, int n_colors,
+                           int remaining, int color_idx, int filled[8]) {
+     if (color_idx >= n_colors) {
+          if (remaining > 0) return 0;
+          return bt_try_phase4(pool, card_needs, n_cards, idx, allocs, n_allocs, max_allocs, filled);
+     }
+     int saved_pool[8]; memcpy(saved_pool, pool, sizeof(saved_pool));
+     int saved_n = *n_allocs;
+     int c = colors[color_idx];
+     int max_take = pool[c] < remaining ? pool[c] : remaining;
+     for (int take = 0; take <= max_take; take++) {
+          int new_filled[8]; memcpy(new_filled, filled, sizeof(new_filled));
+          if (take > 0) {
+               int entry = BT_ALLOC_ENTRY(idx, c);
+               if (*n_allocs < max_allocs) allocs[(*n_allocs)++] = entry;
+               pool[c] -= take;
+               new_filled[c] += take;
+          }
+          if (bt_try_surplus(pool, card_needs, n_cards, idx, allocs, n_allocs, max_allocs,
+                              colors, n_colors, remaining - take, color_idx + 1, new_filled))
+               return 1;
+          memcpy(pool, saved_pool, sizeof(saved_pool));
+          *n_allocs = saved_n;
+     }
+     return 0;
+}
+
+/* try_phase4 (ported from live.rs::try_phase4) — after Phase 3a choices are
+   made, try Phase 3b (heart00 -> heart00 deficit) and Phase 4 (icon_all ->
+   remaining deficits). */
+static int bt_try_phase4(int *pool, const int *card_needs, int n_cards, int idx,
+                          int *allocs, int *n_allocs, int max_allocs,
+                          const int filled[8]) {
+     int saved_pool[8]; memcpy(saved_pool, pool, sizeof(saved_pool));
+     int saved_n = *n_allocs;
+     int need[8]; memcpy(need, &card_needs[idx * 8], sizeof(need));
+
+     int total_filled_so_far = 0;
+     for (int i = 0; i < 8; i++) total_filled_so_far += filled[i];
+     int total_required = 0;
+     for (int i = 0; i < 8; i++) total_required += need[i];
+     int h00_deficit = total_required > total_filled_so_far ? total_required - total_filled_so_far : 0;
+
+     int new_filled[8]; memcpy(new_filled, filled, sizeof(new_filled));
+
+     /* Phase 3b: Heart00 (COLORLESS) -> remaining heart0/total deficit (forced) */
+     if (h00_deficit > 0 && pool[0] > 0) {
+          int take = pool[0] < h00_deficit ? pool[0] : h00_deficit;
+          int entry = BT_ALLOC_ENTRY(idx, 0);
+          for (int u = 0; u < take && *n_allocs < max_allocs; u++)
+               allocs[(*n_allocs)++] = entry;
+          pool[0] -= take;
+          new_filled[0] += take;
+     }
+
+     /* Recompute deficits */
+     int total_filled_now = 0;
+     for (int i = 0; i < 8; i++) total_filled_now += new_filled[i];
+     int h00_still_needed = total_required > total_filled_now ? total_required - total_filled_now : 0;
+
+     int deficit_colors[8], deficit_amts[8], n_deficits = 0;
+     for (int c = 1; c < 7; c++) {
+          if (new_filled[c] < need[c]) {
+               deficit_colors[n_deficits] = c;
+               deficit_amts[n_deficits] = need[c] - new_filled[c];
+               n_deficits++;
+          }
+     }
+     if (h00_still_needed > 0) {
+          deficit_colors[n_deficits] = 0;
+          deficit_amts[n_deficits] = h00_still_needed;
+          n_deficits++;
+     }
+
+     int all_count = pool[7];
+     if (all_count == 0 && n_deficits == 0) {
+          if (bt_card_ok(new_filled, need)) {
+               return bt_search(pool, card_needs, n_cards, idx + 1, allocs, n_allocs, max_allocs);
+          }
+     } else if (all_count == 0) {
+          /* No icon_all but deficits exist */
+     } else {
+          if (bt_try_all_distribution(pool, card_needs, n_cards, idx, allocs, n_allocs, max_allocs,
+                                       new_filled, deficit_colors, n_deficits, deficit_amts,
+                                       all_count, 0))
+               return 1;
+     }
+
+     memcpy(pool, saved_pool, sizeof(saved_pool));
+     *n_allocs = saved_n;
+     return 0;
+}
+
+/* try_all_distribution (ported from live.rs::try_all_distribution) — try all
+   distributions of `remaining` icon_all hearts to deficit types starting at di. */
+static int bt_try_all_distribution(int *pool, const int *card_needs, int n_cards,
+                                    int idx, int *allocs, int *n_allocs, int max_allocs,
+                                    const int filled[8],
+                                    const int *deficit_colors, int n_deficits,
+                                    const int *deficit_amts, int remaining, int di) {
+     if (di >= n_deficits) {
+          if (remaining > 0) return 0;
+          int need[8]; memcpy(need, &card_needs[idx * 8], sizeof(need));
+          if (bt_card_ok(filled, need)) {
+               return bt_search(pool, card_needs, n_cards, idx + 1, allocs, n_allocs, max_allocs);
+          }
+          return 0;
+     }
+     int saved_pool[8]; memcpy(saved_pool, pool, sizeof(saved_pool));
+     int saved_n = *n_allocs;
+     int target_color = deficit_colors[di];
+     int deficit_amt = deficit_amts[di];
+     int max_take = remaining < deficit_amt ? remaining : deficit_amt;
+     int need[8]; memcpy(need, &card_needs[idx * 8], sizeof(need));
+
+     for (int take = 0; take <= max_take; take++) {
+          int new_filled[8]; memcpy(new_filled, filled, sizeof(new_filled));
+          if (take > 0) {
+               int alloc_color = (target_color == 0) ? 7 : target_color;
+               int entry = BT_ALLOC_ENTRY(idx, alloc_color);
+               for (int u = 0; u < take && *n_allocs < max_allocs; u++)
+                    allocs[(*n_allocs)++] = entry;
+               pool[7] -= take;
+               if (target_color == 0) new_filled[0] += take;
+               else new_filled[target_color] += take;
+          }
+          if (bt_try_all_distribution(pool, card_needs, n_cards, idx, allocs, n_allocs, max_allocs,
+                                       new_filled, deficit_colors, n_deficits, deficit_amts,
+                                       remaining - take, di + 1))
+               return 1;
+          memcpy(pool, saved_pool, sizeof(saved_pool));
+          *n_allocs = saved_n;
+     }
+     return 0;
+}
+
+/* bt_search (ported from live.rs::bt_search) — recursive backtracking: try all
+   valid allocations for card `idx` then recurse. */
+static int bt_search(int *pool, const int *card_needs, int n_cards, int idx,
+                       int *allocs, int *n_allocs, int max_allocs) {
+     if (idx >= n_cards) return 1;
+     int saved_pool[8]; memcpy(saved_pool, pool, sizeof(saved_pool));
+     int saved_n = *n_allocs;
+     int need[8]; memcpy(need, &card_needs[idx * 8], sizeof(need));
+
+     /* Phase 1a: matching colored hearts -> color req (no choice) */
+     int filled[8] = {0};
+     for (int c = 1; c < 7; c++) {
+          if (need[c] > 0 && pool[c] > 0) {
+               int take = pool[c] < need[c] ? pool[c] : need[c];
+               int entry = BT_ALLOC_ENTRY(idx, c);
+               for (int u = 0; u < take && *n_allocs < max_allocs; u++)
+                    allocs[(*n_allocs)++] = entry;
+               pool[c] -= take;
+               filled[c] += take;
+          }
+     }
+
+     /* Compute h00 deficit */
+     int total_filled_so_far = 0;
+     for (int i = 0; i < 8; i++) total_filled_so_far += filled[i];
+     int total_required = 0;
+     for (int i = 0; i < 8; i++) total_required += need[i];
+     int h00_deficit = total_required > total_filled_so_far ? total_required - total_filled_so_far : 0;
+
+     /* Collect available surplus colors (pool[c] > 0 for c in 1..7) */
+     int surplus_colors[7], n_surplus = 0;
+     for (int c = 1; c < 7; c++) if (pool[c] > 0) surplus_colors[n_surplus++] = c;
+     int total_surplus = 0;
+     for (int i = 0; i < n_surplus; i++) total_surplus += pool[surplus_colors[i]];
+     int h00_from_surplus = h00_deficit < total_surplus ? h00_deficit : total_surplus;
+
+     int found = bt_try_surplus(pool, card_needs, n_cards, idx, allocs, n_allocs, max_allocs,
+                                  surplus_colors, n_surplus, h00_from_surplus, 0, filled);
+     if (found) return 1;
+
+     /* Undo */
+     memcpy(pool, saved_pool, sizeof(saved_pool));
+     *n_allocs = saved_n;
+     return 0;
+}
+
+/* backtrack_allocate (ported from live.rs::backtrack_allocate) — entry point. */
+int rb_backtrack_allocate(const int pool[8], const int card_needs[8], int n_cards,
+                           int *out_allocs, int max_allocs) {
+     if (!pool || !card_needs || n_cards <= 0 || !out_allocs || max_allocs <= 0)
+          return 0;
+     int work_pool[8]; memcpy(work_pool, pool, sizeof(work_pool));
+     int n_allocs = 0;
+     if (bt_search(work_pool, card_needs, n_cards, 0, out_allocs, &n_allocs, max_allocs))
+          return 1;
+     return 0;
+}
+
+/* try_surplus_compositions — public wrapper mirroring the Rust fn signature.
+   Delegates to bt_try_surplus for the actual enumeration. */
 int rb_try_surplus_compositions(int *pool, const int card_needs[8], int n_cards,
                                  int idx, const int *colors, int n_colors,
                                  int remaining, int color_idx,
                                  int *allocs, int *filled) {
-    (void)pool; (void)card_needs; (void)n_cards; (void)idx; (void)colors;
-    (void)n_colors; (void)remaining; (void)color_idx; (void)allocs; (void)filled;
-    return 0;
+     if (!pool || !card_needs || !colors || !allocs || !filled) return 0;
+     int n_allocs = 0;
+     return bt_try_surplus(pool, card_needs, n_cards, idx, allocs, &n_allocs,
+                            64, colors, n_colors, remaining, color_idx, filled);
 }
 
 /* Mirror live.rs::card_ok_with_wildcard — check whether a single card's heart

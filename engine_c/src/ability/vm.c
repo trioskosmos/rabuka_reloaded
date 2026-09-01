@@ -1755,14 +1755,17 @@ Condition *decode_condition_direct(Rdr *r, uint8_t variant) {
 }
 
 /* ── build_filter (ported from effect_decoder_gen.rs) ──
-   Builds an EffectFilter from flat EffectKindLocals. In the C engine the
-   AbilityEffect struct carries all filter fields directly (no separate
-   EffectFilter struct), so this is a no-op stub that returns NULL — the
-   filter fields are already decoded into AbilityEffect by decode_effect_body.
-   Mirrors Rust: returns None when every filter field is empty. */
+   Rust: builds an EffectFilter from EffectKindLocals, returns None when every
+   filter field is empty (lazy allocation). C mapping: the AbilityEffect struct
+   carries all filter fields directly (source, destination, target, card_type,
+   group_names, heart_colors, etc. decoded into extra_k/extra_v[] by
+   decode_effect_body), so there is no separate EffectFilter struct to build.
+   Returns NULL (= Rust None). The function is retained for ABI parity with the
+   Rust decoder; it is never called on the C execution path because the action
+   string (e->action) is used directly instead of EffectKind::from_action(). */
 void *build_filter(const void *ek) {
-    (void)ek;
-    return NULL;
+     (void)ek;
+     return NULL;
 }
 
 /* ── offset_of (stub) ──

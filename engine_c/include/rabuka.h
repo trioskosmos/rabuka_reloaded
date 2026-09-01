@@ -377,9 +377,9 @@ typedef enum {
 } RbZone;
 
 /* Compact zone identifier (mirrors engine/src/core/types.rs::ZoneId).
-    Replaces free-form zone strings in movement/position events so the engine
-    can compare, alias, and serialize zones without heap-allocated strings.
-    The wire names match the Rust as_str() mapping (stage/hand/deck/...). */
+     Replaces free-form zone strings in movement/position events so the engine
+     can compare, alias, and serialize zones without heap-allocated strings.
+     The wire names match the Rust as_str() mapping (stage/hand/deck/...). */
 typedef enum {
     RB_ZONEID_STAGE = 0,
     RB_ZONEID_HAND,
@@ -404,6 +404,43 @@ typedef enum {
     RB_ZONEID_EXCLUSION_ZONE,
     RB_ZONEID_UNKNOWN
 } RbZoneId;
+
+/* Ability zone identifier (mirrors engine/src/core/ability/enums.rs::Zone).
+   Used only for the from_ability_zone / to_ability_zone conversion functions.
+   Discriminant order matches the Rust enum exactly. */
+typedef enum {
+    RB_ABILITY_ZONE_HAND = 0,
+    RB_ABILITY_ZONE_STAGE,
+    RB_ABILITY_ZONE_STAGE_CENTER,
+    RB_ABILITY_ZONE_STAGE_LEFT,
+    RB_ABILITY_ZONE_STAGE_RIGHT,
+    RB_ABILITY_ZONE_DISCARD,
+    RB_ABILITY_ZONE_WAITROOM,
+    RB_ABILITY_ZONE_ENERGY,
+    RB_ABILITY_ZONE_ENERGY_ZONE,
+    RB_ABILITY_ZONE_DECK,
+    RB_ABILITY_ZONE_DECK_TOP,
+    RB_ABILITY_ZONE_DECK_BOTTOM,
+    RB_ABILITY_ZONE_SUCCESS_ZONE,
+    RB_ABILITY_ZONE_LIVE_CARD_ZONE,
+    RB_ABILITY_ZONE_SUCCESS_LIVE_ZONE,
+    RB_ABILITY_ZONE_ENERGY_DECK,
+    RB_ABILITY_ZONE_EMPTY_AREA,
+    RB_ABILITY_ZONE_SAME_AREA,
+    RB_ABILITY_ZONE_UNDER_MEMBER,
+    RB_ABILITY_ZONE_LOOKED_AT,
+    RB_ABILITY_ZONE_REVEALED_CARDS,
+    RB_ABILITY_ZONE_SELECTED_CARDS,
+    RB_ABILITY_ZONE_RESOLUTION,
+    RB_ABILITY_ZONE_EXCLUSION_ZONE,
+    RB_ABILITY_ZONE_PRECEDING_MOVED,
+    RB_ABILITY_ZONE_RECENTLY_MOVED,
+    RB_ABILITY_ZONE_THOSE_CARDS,
+    RB_ABILITY_ZONE_LOOKED_AT_REMAINING,
+    RB_ABILITY_ZONE_DECK_TOP_OR_BOTTOM,
+    RB_ABILITY_ZONE_FRONT,
+    RB_ABILITY_ZONE_UNKNOWN
+} RbAbilityZone;
 
 /* A zone is just a bag of card indices (card_no index into the database). */
 typedef struct {
@@ -824,6 +861,15 @@ typedef struct GameState {
     int      ptc_area;       /* target stage area */
     int      ptc_set;        /* alternative cost value (accept) */
     int      ptc_base;       /* base cost (decline) */
+    /* ── gained_card_abilities (mirrors GameState.gained_card_abilities:
+        HashMap<i16, Vec<Ability>>). Runtime-gained abilities (「…を得る」effects)
+        keyed by card_id. Stored as a flat array of (card_id, Ability) pairs with
+        a count per card, since C has no HashMap. rb_card_gained_ability and
+        rb_card_num_gained_abilities read/write this store. */
+    int      gained_card_ids[64];          /* card_id for each gained-ability slot */
+    Ability  gained_card_abilities[64][4]; /* up to 4 gained abilities per slot */
+    int      gained_card_n[64];            /* count of gained abilities per slot */
+    int      n_gained_cards;               /* number of distinct cards with gains */
 } GameState;
 
 /* ── Tracking (engine/src/core/game_state/tracking.rs) ── */
@@ -1333,6 +1379,7 @@ int  rb_collect_live_modifiers(const GameState *g, int actor, AbilityEffect *out
 int  rb_trigger_auto_abilities(GameState *g, int actor, const char *trigger);
 int  rb_trigger_auto_abilities_for_movement(GameState *g, int pl);
 int  rb_trigger_auto_abilities_for_player_with_event(GameState *g, int pl, const int *moved_cards, int n_moved, int position_change, int energy_placed);
+int  rb_trigger_auto_abilities_for_player(GameState *g, int pl);
 void rb_trigger_each_time_for_member(GameState *g, int pl, const char *trigger_substring, int member_card_id);
 void rb_trigger_auto_abilities_for_movement_current(GameState *g);
 /* Mirror live.rs::determine_winners — who placed a live this turn (score-tie → both). */
@@ -1442,6 +1489,20 @@ int rb_effect_data_amount(const RbEffectDataSingleCard *d);
      Zone aliasing for rule-purpose equivalence and zone-change condition matching. */
 int rb_zone_equivalent(RbZoneId a, RbZoneId b);
 int rb_zone_matches_source(RbZoneId zone, const char *source);
+
+/* ── types.rs: ZoneId::as_str ──
+     Converts a ZoneId enum to its wire string. Returns NULL for Unknown. */
+const char *rb_zone_id_as_str(RbZoneId z);
+
+/* ── types.rs: ZoneId::from_ability_zone / to_ability_zone ──
+     Convert between ability::enums::Zone and core::types::ZoneId.
+     to_ability_zone returns 0 on success, -1 if no mapping exists (Option::None). */
+RbZoneId rb_zone_id_from_ability_zone(RbAbilityZone ability_zone);
+int rb_zone_id_to_ability_zone(RbZoneId z, RbAbilityZone *out_ability_zone);
+
+/* ── types.rs: EffectType::as_str ──
+     Converts an RbEffectType enum to its wire string. */
+const char *rb_effect_type_as_str(RbEffectType t);
 
 /* ── card.rs: Card::get (score accessor) ──
      Mirrors Card::get_score — returns the printed score for a card. */

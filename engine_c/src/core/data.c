@@ -510,23 +510,79 @@ int rb_zone_equivalent(RbZoneId a, RbZoneId b) {
     return 0;
 }
 
-/* ── Ported from engine/src/core/types.rs::ZoneId::matches_source ────────────
-    Semantic aliasing for zone-change condition matching: a generic "deck"
-   source matches Deck/DeckTop/DeckBottom; specific subzones match only
-   themselves; discard/waitroom are interchangeable. */
-int rb_zone_matches_source(RbZoneId zone, const char *source) {
-    if (!source) return 0;
-    RbZoneId src = rb_zone_of_str(source, NULL);
-    if (src == RB_ZONEID_UNKNOWN) return 0;
-    switch (src) {
-        case RB_ZONEID_DECK:
-            return zone == RB_ZONEID_DECK ||
-                   zone == RB_ZONEID_DECK_TOP ||
-                   zone == RB_ZONEID_DECK_BOTTOM;
-        case RB_ZONEID_DECK_TOP:    return zone == RB_ZONEID_DECK_TOP;
-        case RB_ZONEID_DECK_BOTTOM: return zone == RB_ZONEID_DECK_BOTTOM;
-        case RB_ZONEID_DISCARD:     return zone == RB_ZONEID_DISCARD || zone == RB_ZONEID_WAITROOM;
-        case RB_ZONEID_WAITROOM:    return zone == RB_ZONEID_DISCARD || zone == RB_ZONEID_WAITROOM;
-        default:                    return zone == src;
+/* ── Ported from engine/src/core/types.rs::ZoneId::as_str ────────────────
+     Converts a ZoneId enum to its wire string. Returns NULL for Unknown. */
+const char *rb_zone_id_as_str(RbZoneId z) {
+    switch (z) {
+        case RB_ZONEID_STAGE:          return "stage";
+        case RB_ZONEID_HAND:           return "hand";
+        case RB_ZONEID_DECK:           return "deck";
+        case RB_ZONEID_DECK_TOP:       return "deck_top";
+        case RB_ZONEID_DECK_BOTTOM:    return "deck_bottom";
+        case RB_ZONEID_DISCARD:        return "discard";
+        case RB_ZONEID_WAITROOM:       return "waitroom";
+        case RB_ZONEID_ENERGY:         return "energy";
+        case RB_ZONEID_ENERGY_ZONE:    return "energy_zone";
+        case RB_ZONEID_ENERGY_DECK:    return "energy_deck";
+        case RB_ZONEID_SUCCESS_ZONE:   return "success_zone";
+        case RB_ZONEID_LIVE_CARD_ZONE: return "live_card_zone";
+        case RB_ZONEID_SUCCESS_LIVE_ZONE: return "success_live_zone";
+        case RB_ZONEID_EMPTY_AREA:     return "empty_area";
+        case RB_ZONEID_SAME_AREA:      return "same_area";
+        case RB_ZONEID_UNDER_MEMBER:   return "under_member";
+        case RB_ZONEID_LOOKED_AT:      return "looked_at";
+        case RB_ZONEID_REVEALED_CARDS: return "revealed_cards";
+        case RB_ZONEID_SELECTED_CARDS: return "selected_cards";
+        case RB_ZONEID_RESOLUTION:     return "resolution";
+        case RB_ZONEID_EXCLUSION_ZONE: return "exclusion_zone";
+        case RB_ZONEID_UNKNOWN:        return "unknown";
+        default:                       return NULL;
+    }
+}
+
+/* ── Ported from engine/src/core/types.rs::ZoneId::from_ability_zone ────
+     Convert an ability::enums::Zone discriminant to the core ZoneId. */
+RbZoneId rb_zone_id_from_ability_zone(RbAbilityZone ability_zone) {
+    switch (ability_zone) {
+        case RB_ABILITY_ZONE_STAGE:          return RB_ZONEID_STAGE;
+        case RB_ABILITY_ZONE_HAND:           return RB_ZONEID_HAND;
+        case RB_ABILITY_ZONE_DECK:           return RB_ZONEID_DECK;
+        case RB_ABILITY_ZONE_DISCARD:        return RB_ZONEID_DISCARD;
+        case RB_ABILITY_ZONE_ENERGY:         return RB_ZONEID_ENERGY;
+        case RB_ABILITY_ZONE_LIVE_CARD_ZONE: return RB_ZONEID_LIVE_CARD_ZONE;
+        case RB_ABILITY_ZONE_SUCCESS_LIVE_ZONE: return RB_ZONEID_SUCCESS_LIVE_ZONE;
+        case RB_ABILITY_ZONE_REVEALED_CARDS: return RB_ZONEID_REVEALED_CARDS;
+        default:                             return RB_ZONEID_UNKNOWN;
+    }
+}
+
+/* ── Ported from engine/src/core/types.rs::ZoneId::to_ability_zone ──────
+     Convert a core ZoneId to an ability::enums::Zone. Returns 0 on success,
+     -1 if no mapping exists (Option::None in Rust). */
+int rb_zone_id_to_ability_zone(RbZoneId z, RbAbilityZone *out_ability_zone) {
+    if (!out_ability_zone) return -1;
+    switch (z) {
+        case RB_ZONEID_STAGE:          *out_ability_zone = RB_ABILITY_ZONE_STAGE;          return 0;
+        case RB_ZONEID_HAND:           *out_ability_zone = RB_ABILITY_ZONE_HAND;           return 0;
+        case RB_ZONEID_DECK:           *out_ability_zone = RB_ABILITY_ZONE_DECK;           return 0;
+        case RB_ZONEID_DISCARD:
+        case RB_ZONEID_WAITROOM:       *out_ability_zone = RB_ABILITY_ZONE_DISCARD;        return 0;
+        case RB_ZONEID_ENERGY:
+        case RB_ZONEID_ENERGY_ZONE:    *out_ability_zone = RB_ABILITY_ZONE_ENERGY;         return 0;
+        case RB_ZONEID_LIVE_CARD_ZONE: *out_ability_zone = RB_ABILITY_ZONE_LIVE_CARD_ZONE; return 0;
+        case RB_ZONEID_SUCCESS_LIVE_ZONE:
+        case RB_ZONEID_SUCCESS_ZONE:   *out_ability_zone = RB_ABILITY_ZONE_SUCCESS_LIVE_ZONE; return 0;
+        case RB_ZONEID_REVEALED_CARDS: *out_ability_zone = RB_ABILITY_ZONE_REVEALED_CARDS; return 0;
+        default:                       return -1;
+    }
+}
+
+/* ── Ported from engine/src/core/types.rs::EffectType::as_str ────────────
+     Converts an RbEffectType enum to its wire string. */
+const char *rb_effect_type_as_str(RbEffectType t) {
+    switch (t) {
+        case RB_EFFECT_HEART_BONUS: return "heart_bonus";
+        case RB_EFFECT_BLADE_BONUS: return "blade_bonus";
+        default:                    return "";
     }
 }

@@ -967,7 +967,8 @@ int rb_move_resolve_from_recently_moved(GameState *g, int use_p2,
     return n;
 }
 
-/* Mirror describe::zone_label — English display label for a zone wire name. */
+/* Mirror describe::zone_label_inner(zone, false) — English display label for a
+   zone wire name. Faithful port of the Rust match table (describe.rs:47-68). */
 static const char *move_zone_label(const char *zone) {
     if (!zone) return "unknown";
     if (!strcmp(zone, "hand")) return "hand";

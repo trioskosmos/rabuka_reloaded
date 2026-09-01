@@ -561,3 +561,10 @@ void rb_trigger_live_success_faithful(GameState *g, int pl) {
         }
     }
 }
+
+/* Mirror turn/triggers.rs::trigger_auto_abilities_for_player — delegate to
+   GameState's method, which handles the scan + enqueue. */
+int rb_trigger_auto_abilities_for_player(GameState *g, int pl) {
+    if (!g) return 0;
+    return rb_trigger_auto_abilities_for_player_with_event(g, pl, NULL, 0, 0, 0);
+}

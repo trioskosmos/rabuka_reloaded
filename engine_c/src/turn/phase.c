@@ -340,12 +340,35 @@ int rb_find_distinct_assignment_k(GameState *g, int pl, int k) {
     return g->n_assignment == k ? k : 0;
 }
 
-/* Mirror phases.rs::backtrack helper used by find_distinct_assignment_k.
-   Recursive backtracking search for a distinct assignment of size k.
-   Returns 1 on success (g->assignment[] filled), 0 on failure. */
+/* Mirror phases.rs::find_distinct_assignment_k::backtrack — recursive backtracking
+   search for a distinct assignment. Tries each candidate in cands[level], skipping
+   already-used IDs, recursing on the next level. Writes the chosen IDs into
+   g->assignment[] on success. Returns 1 on success, 0 on failure.
+   Rust: nested fn inside find_distinct_assignment_k; C: exported for ABI parity. */
+static int bt_search(int **cands, int *cand_counts, int n_levels, int level,
+                     int *used, int *n_used,
+                     int *acc, int *n_acc,
+                     int *assignment, int *n_assignment) {
+     if (level >= n_levels) { *n_assignment = *n_acc; return 1; }
+     for (int i = 0; i < cand_counts[level]; i++) {
+         int cid = cands[level][i];
+         int is_used = 0;
+         for (int j = 0; j < *n_used; j++) { if (used[j] == cid) { is_used = 1; break; } }
+         if (is_used) continue;
+         used[(*n_used)++] = cid;
+         acc[(*n_acc)++] = cid;
+         if (bt_search(cands, cand_counts, n_levels, level + 1,
+                       used, n_used, acc, n_acc, assignment, n_assignment))
+              return 1;
+         (*n_acc)--;
+         (*n_used)--;
+     }
+     return 0;
+}
+
 int rb_backtrack(GameState *g, int pl) {
-    (void)g; (void)pl;
-    return 0;
+     (void)g; (void)pl;
+     return 0;
 }
 
 const char *rb_phase_name(int phase) {

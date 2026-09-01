@@ -57,6 +57,12 @@ void test_add_to_deck_pl(TestGame *tg, int pl, int card_id){
     RbPlayer *P=&tg->state.p[pl];
     if(P->deck.n < RB_MAX_ZONE) P->deck.cards[P->deck.n++]=card_id;
 }
+/* Add a card to the energy deck (mirrors Rust energy_deck.cards.push) */
+void test_add_to_energy_deck(TestGame *tg, int pl, int card_id){
+    if(pl<0||pl>1) return;
+    RbPlayer *P=&tg->state.p[pl];
+    if(P->energy_deck.n < RB_MAX_ZONE) P->energy_deck.cards[P->energy_deck.n++]=card_id;
+}
 /* Prepend a card to the top of player pl's deck (mirrors Rust
     main_deck.cards.insert(0, card)). Shifts existing cards down by one; if the
     deck is full the new card is dropped (matching a saturated RbBag). */
