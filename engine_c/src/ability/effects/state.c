@@ -388,6 +388,22 @@ candidates_ready:
     rb_trigger_auto_abilities_for_player(g, who);
     if(who != (actor ^ 1)) rb_trigger_auto_abilities_for_player(g, actor ^ 1);
 
+    /* Push changed cards to selected_cards so subsequent sequential actions
+       (e.g. gain_resource with target_from_selection: true) can target them. */
+    for(int i=0;i<nchange;i++){
+        int cid = cands[i];
+        int already = 0;
+        for(int s=0;s<g->n_selected_cards;s++)
+            if(g->selected_cards[s] == cid) already = 1;
+        if(!already && g->n_selected_cards < RB_MAX_RECENTLY_MOVED)
+            g->selected_cards[g->n_selected_cards++] = cid;
+    }
+
+    /* Track changed_state_members for following delayed restriction steps */
+    for(int i=0;i<nchange;i++)
+        if(g->n_changed_state_members < RB_MAX_RECENTLY_MOVED)
+            g->changed_state_members[g->n_changed_state_members++] = cands[i];
+
     {
         const char *pp = s_player_prefix(g, g->activating_card >= 0 ? g->activating_card : host_cid);
         char act_name[64]; act_name[0] = 0;
