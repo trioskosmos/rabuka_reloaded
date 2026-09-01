@@ -551,43 +551,64 @@ int rb_compound_choice_action(GameState *g, int actor, const AbilityEffect *eff,
     return 1;
 }
 
-/* ── handle_choice_string_selection: faithful (compound.rs:964-987) ── */
+/* ── handle_choice_string_selection: faithful (compound.rs:964-987) ──
+   Rust: if val starts with "heart" or is a Japanese heart-color name, push
+   "selected_heart_color:<val>" to gs.prohibition_effects. Then clear the
+   pending choice and resume pending actions (drains one pending slot). */
 int rb_compound_handle_choice_string_selection(GameState *g, int actor, const char *selected, const char **options, int n_options){
     (void)actor;
-    if(!g||!selected) return 0;
+    if(!g || !selected) return 0;
     int idx = atoi(selected);
-    if(idx>0 && idx<=n_options && options){
-        const char *val = options[idx-1];
-        if(val && (strncmp(val,"heart",5)==0 || !strcmp(val,"赤")||!strcmp(val,"桃")||!strcmp(val,"緑")||!strcmp(val,"青")||!strcmp(val,"黄")||!strcmp(val,"紫"))){
-            if(g->n_prohibition<64){ snprintf(g->prohibition[g->n_prohibition],48,"selected_heart_color:%s",val); g->n_prohibition++; }
-        }
-    }
-    rb_clear_pending_choice(g);
-    /* resume_pending_actions analogue */
-    if(g->queue.cur>=0&&g->queue.cur<g->queue.n_entries && g->queue.entries[g->queue.cur].pending_actions_n>0){
-        /* drain one pending */
-        g->queue.entries[g->queue.cur].pending_actions_n--;
-    }
-    return 1;
-}
-/* ── handle_choice_string_store: faithful (compound.rs:989-1016) ── */
-int rb_compound_handle_choice_string_store(GameState *g, int actor, const char *selected, const char **options, int n_options){
-    (void)actor;
-    if(!g||!selected) return 0;
-    int idx = atoi(selected);
-    if(idx>0 && idx<=n_options && options){
-        const char *val = options[idx-1];
+    if(idx > 0 && idx <= n_options && options){
+        const char *val = options[idx - 1];
         if(val){
-            g->queue.choice_result = idx-1;
-            strncpy(g->queue.resume_draw_ctype,val,sizeof(g->queue.resume_draw_ctype)-1);
-            /* also store conditional_choice Str analogue */
-            if(g->queue.cur>=0&&g->queue.cur<g->queue.n_entries){
-                /* store in choice_result already */
+            if(val[0] && !strncmp(val, "heart", 5)) {
+                if(g->n_prohibition < 64)
+                    snprintf(g->prohibition[g->n_prohibition++], 48,
+                             "selected_heart_color:%s", val);
+            } else if(!strcmp(val, "赤") || !strcmp(val, "桃") ||
+                      !strcmp(val, "緑") || !strcmp(val, "青") ||
+                      !strcmp(val, "黄") || !strcmp(val, "紫")) {
+                if(g->n_prohibition < 64)
+                    snprintf(g->prohibition[g->n_prohibition++], 48,
+                             "selected_heart_color:%s", val);
             }
         }
     }
     rb_clear_pending_choice(g);
-    if(g->queue.cur>=0&&g->queue.cur<g->queue.n_entries && g->queue.entries[g->queue.cur].pending_actions_n>0){
+    if(g->queue.cur >= 0 && g->queue.cur < g->queue.n_entries
+       && g->queue.entries[g->queue.cur].pending_actions_n > 0){
+        g->queue.entries[g->queue.cur].pending_actions_n--;
+    }
+    return 1;
+}
+/* ── handle_choice_string_store: faithful (compound.rs:989-1016) ──
+   Rust: parse selected index, look up options[idx-1], store it as
+   entry.conditional_choice = ConditionalChoice::Str(s). Then clear
+   pending choice and resume pending actions. In C we record the result
+   in entry.choice_result and resume_draw_ctype (the closest analogue
+   to ConditionalChoice::Str — the gain_resource handler reads it from
+   selected_heart_color or the effect's own field). */
+int rb_compound_handle_choice_string_store(GameState *g, int actor, const char *selected, const char **options, int n_options){
+    (void)actor;
+    if(!g || !selected) return 0;
+    int idx = atoi(selected);
+    if(idx > 0 && idx <= n_options && options){
+        const char *val = options[idx - 1];
+        if(val){
+            g->queue.choice_result = idx - 1;
+            strncpy(g->queue.resume_draw_ctype, val,
+                    sizeof(g->queue.resume_draw_ctype) - 1);
+            g->queue.resume_draw_ctype[sizeof(g->queue.resume_draw_ctype) - 1] = '\0';
+            if(g->queue.cur >= 0 && g->queue.cur < g->queue.n_entries){
+                /* choice_result already stores the index; the value string
+                   is in resume_draw_ctype for the resume handler to read. */
+            }
+        }
+    }
+    rb_clear_pending_choice(g);
+    if(g->queue.cur >= 0 && g->queue.cur < g->queue.n_entries
+       && g->queue.entries[g->queue.cur].pending_actions_n > 0){
         g->queue.entries[g->queue.cur].pending_actions_n--;
     }
     return 1;

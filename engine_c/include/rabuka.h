@@ -116,6 +116,7 @@ typedef struct AbilityEffect {
     int   conditional_negation;        /* effect.compound.conditional_negation (on_optional) */
     int   per_unit;                    /* per_unit count (0 = none) */
     int   per_unit_count;
+    int   cost_reduction_per_group;    /* cost_reduction_per_group (0 = none) */
     int   distinct_flag;               /* per-unit distinct filter */
     char  id_field[32];                /* effect id (step output ref key) */
     char  self_target_field[8];        /* "true"/"false" */
@@ -254,6 +255,7 @@ void rb_mods_clear_cost_set(RbMods *m, int card_id);
 /* remove a previously-added delta (mirror remove_*_modifier) */
 void rb_mods_remove_blade(RbMods *m, int card_id, int delta);
 void rb_mods_remove_heart(RbMods *m, int card_id, int color, int delta);
+void rb_mods_remove_need_heart(RbMods *m, int card_id, int color, int delta);
 void rb_mods_remove_score(RbMods *m, int card_id, int delta);
 void rb_mods_remove_cost(RbMods *m, int card_id, int delta);
 /* heart_override / heart_copy / blade_type / heart_color_multiplier
@@ -314,6 +316,25 @@ uint32_t rb_num_abilities(void);
 
 /* ── String table (abilities) ── */
 const char *rb_get_string(uint32_t idx);
+const char *get_string(uint32_t idx);
+const unsigned char *bytecode_slice(uint8_t ci, uint32_t start, uint32_t len);
+
+typedef struct { uint8_t chunk; uint16_t start; uint16_t len; } AbilityLoc;
+extern const AbilityLoc ABILITY_LOCS[];
+
+extern const uint32_t NUM_ABILITIES;
+extern const uint16_t *OFFSET_DELTAS;
+extern const uint32_t *STRINGS_OFFSETS;
+extern const uint16_t *CARD_ABILITY_PAIRS;
+extern const unsigned char *BYTECODE;
+extern const uint32_t BYTECODE_LEN;
+extern const uint32_t DECOMPRESSED_LEN;
+
+/* ── Decode-fallback audit (mirrors vm.rs DECODE_FALLBACKS) ── */
+#define RB_DECODE_AUDIT_MAX 4096
+void rb_note_decode_fallback(int ability, const char *field, const char *value);
+uint32_t rb_decode_fallback_count(void);
+int rb_decode_fallback_abilities(uint32_t *out, int max);
 
 /* ── Decode ── */
 int  rb_decode_ability(uint32_t idx, Ability *out);     /* returns 1 on success */
@@ -327,8 +348,23 @@ typedef enum {
     RB_TK_ACTIVATION = 0, RB_TK_AUTO, RB_TK_CONSTANT, RB_TK_DEBUT,
     RB_TK_LIVE_START, RB_TK_LIVE_SUCCESS, RB_TK_MAIN, RB_TK_BATON_TOUCH, RB_TK_COUNT
 } RbTriggerKind;
+
+/* Trigger string constants (engine/src/triggers.rs) */
+#define RB_TSTR_ACTIVATION    "起動"
+#define RB_TSTR_AUTO          "自動"
+#define RB_TSTR_CONSTANT      "常時"
+#define RB_TSTR_DEBUT         "登場"
+#define RB_TSTR_LIVE_START    "ライブ開始時"
+#define RB_TSTR_LIVE_SUCCESS  "ライブ成功時"
+#define RB_TSTR_MAIN          "メイン"
+#define RB_TSTR_BATON_TOUCH   "baton touch"
+#define RB_TSTR_DEBUT_EN      "Debut"
+#define RB_TSTR_LIVE_SUCCESS_EN "live_success"
+
 RbTriggerKind rb_trigger_from_token(const char *s);
 int rb_parse_triggers(const char *triggers, RbTriggerKind *out, int max);
+const char *rb_canonical_trigger(const char *raw);
+const char *rb_trigger_to_texticon(const char *trigger);
 int rb_ability_has_trigger(const Ability *a, RbTriggerKind kind);
 const char *rb_ability_triggerless_text(const Ability *a);
 const char *rb_card_short_label(int card_id);
@@ -442,6 +478,192 @@ typedef enum {
     RB_ABILITY_ZONE_UNKNOWN
 } RbAbilityZone;
 
+/* ── ability/enums.rs: typed ability enums ── */
+typedef enum {
+    RB_TARGET_SELF = 0,
+    RB_TARGET_OPPONENT,
+    RB_TARGET_BOTH,
+    RB_TARGET_EITHER
+} RbTargetPlayer;
+
+typedef enum {
+    RB_PLACEMENT_FILTER_SELF_AS_SOURCE = 0,
+    RB_PLACEMENT_UNDER_THIS_MEMBER,
+    RB_PLACEMENT_UNDER_CHOSEN_MEMBER
+} RbPlacementTarget;
+
+typedef enum {
+    RB_ACTION_DRAW_CARD = 0,
+    RB_ACTION_DRAW_UNTIL_COUNT,
+    RB_ACTION_MOVE_CARDS,
+    RB_ACTION_DISCARD_CARD,
+    RB_ACTION_SELECT,
+    RB_ACTION_SELECT_NUMBER,
+    RB_ACTION_SELECT_CARDS,
+    RB_ACTION_LOOK_AND_SELECT,
+    RB_ACTION_LOOK_AT,
+    RB_ACTION_REVEAL,
+    RB_ACTION_REVEAL_PER_GROUP,
+    RB_ACTION_REVEAL_UNTIL_LIVE_CARD,
+    RB_ACTION_REVEAL_UNTIL_CHOSEN_CARD,
+    RB_ACTION_CHANGE_STATE,
+    RB_ACTION_POSITION_CHANGE,
+    RB_ACTION_ROTATION,
+    RB_ACTION_PLACE_ENERGY_UNDER_MEMBER,
+    RB_ACTION_MODIFY_REQUIRED_HEARTS_SUCCESS,
+    RB_ACTION_GAIN_RESOURCE,
+    RB_ACTION_PAY_ENERGY,
+    RB_ACTION_GAIN_ABILITY,
+    RB_ACTION_GAIN_ABILITY_FROM_SOURCE,
+    RB_ACTION_INVALIDATE_ABILITY,
+    RB_ACTION_SUPPRESS_ABILITY_TRIGGER,
+    RB_ACTION_ACTIVATE_ABILITY,
+    RB_ACTION_MODIFY_COST,
+    RB_ACTION_MODIFY_YELL_SOURCE,
+    RB_ACTION_SET_COST,
+    RB_ACTION_SET_CARD_IDENTITY,
+    RB_ACTION_SET_COST_TO_USE,
+    RB_ACTION_MODIFY_SCORE,
+    RB_ACTION_MODIFY_REQUIRED_HEARTS,
+    RB_ACTION_SET_BLADE_TYPE,
+    RB_ACTION_SET_BLADE_COUNT,
+    RB_ACTION_SET_HEART_TYPE,
+    RB_ACTION_SPECIFY_HEART_COLOR,
+    RB_ACTION_CHOOSE_REQUIRED_HEARTS,
+    RB_ACTION_SEQUENTIAL,
+    RB_ACTION_CONDITIONAL_ALTERNATIVE,
+    RB_ACTION_CONDITIONAL_ON_RESULT,
+    RB_ACTION_CONDITIONAL_ON_OPTIONAL,
+    RB_ACTION_RESTRICTION,
+    RB_ACTION_ACTIVATION_RESTRICTION,
+    RB_ACTION_MODIFY_LIMIT,
+    RB_ACTION_SHUFFLE,
+    RB_ACTION_RE_YELL,
+    RB_ACTION_CUSTOM,
+    RB_ACTION_DO_NOTHING,
+    RB_ACTION_CHOICE,
+    RB_ACTION_REPEAT_PROCEDURE,
+    RB_ACTION_DISCARD_UNTIL_COUNT,
+    RB_ACTION_ALL_BLADE_TIMING,
+    RB_ACTION_REDUCE_LIVE_CARD_SET_LIMIT,
+    RB_ACTION_CHOOSE_TARGET_PLAYER,
+    RB_ACTION_PLAY_BATON_TOUCH,
+    RB_ACTION_MODIFY_REQUIRED_HEARTS_GLOBAL,
+    RB_ACTION_MODIFY_YELL_COUNT,
+    RB_ACTION_ACTIVATION_COST,
+    RB_ACTION_PERFORM_YELL,
+    RB_ACTION_CONDITIONAL_OPTIONAL,
+    RB_ACTION_COMPOUND_ACTION,
+    RB_ACTION_OPPONENT_ACTION,
+    RB_ACTION_ACTION_BY,
+    RB_ACTION_SEQUENTIAL_COST,
+    RB_ACTION_CHOICE_CONDITION,
+    RB_ACTION_ENERGY_CONDITION
+} RbActionType;
+
+typedef enum {
+    RB_CONDTYPE_COMPOUND = 0,
+    RB_CONDTYPE_COMPARISON,
+    RB_CONDTYPE_LOCATION,
+    RB_CONDTYPE_CARD_COUNT,
+    RB_CONDTYPE_CARD_BLADE,
+    RB_CONDTYPE_GROUP,
+    RB_CONDTYPE_POSITION,
+    RB_CONDTYPE_APPEARANCE,
+    RB_CONDTYPE_TEMPORAL,
+    RB_CONDTYPE_STATE,
+    RB_CONDTYPE_ENERGY_STATE,
+    RB_CONDTYPE_MOVEMENT,
+    RB_CONDTYPE_ABILITY_FILTER,
+    RB_CONDTYPE_OR,
+    RB_CONDTYPE_ANY_OF,
+    RB_CONDTYPE_SCORE_THRESHOLD,
+    RB_CONDTYPE_CHOICE,
+    RB_CONDTYPE_POSITION_CHANGE,
+    RB_CONDTYPE_STATE_CHANGE,
+    RB_CONDTYPE_OPPONENT_CHOICE,
+    RB_CONDTYPE_OPPONENT_LIVE_SUCCESS,
+    RB_CONDTYPE_COMPLEX,
+    RB_CONDTYPE_NO_EXCESS_HEART,
+    RB_CONDTYPE_OTHERWISE,
+    RB_CONDTYPE_NOT_MOVED,
+    RB_CONDTYPE_HAS_MOVED,
+    RB_CONDTYPE_RESOURCE,
+    RB_CONDTYPE_ACTION_SUCCESS,
+    RB_CONDTYPE_ALL_COST_COMPARISON,
+    RB_CONDTYPE_HIGHEST_COST_ON_STAGE,
+    RB_CONDTYPE_BOTH,
+    RB_CONDTYPE_ALL_REVEALED_MATCH_HEART_COLOR,
+    RB_CONDTYPE_CUSTOM
+} RbConditionType;
+
+typedef enum {
+    RB_STK_CHOICE = 0,
+    RB_STK_CHOICE_STRING,
+    RB_STK_PAY_OPTIONAL_COST_SKIP_OPTIONAL_COST,
+    RB_STK_DOUBLE_BATON_TOUCH,
+    RB_STK_PRIMARY_ALTERNATIVE,
+    RB_STK_APPLY_REPLACEMENT,
+    RB_STK_CHOOSE_REQUIRED_HEARTS,
+    RB_STK_POSITION_DESTINATION,
+    RB_STK_HEART_COLOR,
+    RB_STK_CHOICE_TYPE,
+    RB_STK_CHOICE_CONDITION,
+    RB_STK_CONDITIONAL_OPTIONAL,
+    RB_STK_DRAW_ANY_NUMBER,
+    RB_STK_ORDER,
+    RB_STK_SELF_OR_OPPONENT,
+    RB_STK_PAY_COST_ALL_DISCARD
+} RbSelectTargetKind;
+
+typedef enum {
+    RB_ECT_MEMBER_CARD = 0,
+    RB_ECT_LIVE_CARD,
+    RB_ECT_ENERGY_CARD,
+    RB_ECT_OTHER
+} RbEffectCardType;
+
+typedef enum {
+    RB_ES_ACTIVE = 0,
+    RB_ES_WAIT,
+    RB_ES_OTHER
+} RbEffectState;
+
+/* TargetPlayer helpers */
+int rb_target_player_from_str(const char *s);
+const char *rb_target_player_to_str(int tp);
+const char *rb_target_player_as_str(int tp);
+
+/* ActionType helpers */
+int rb_action_type_from_str(const char *s);
+const char *rb_action_type_to_str(int at);
+const char *rb_action_type_label(int at);
+int rb_action_type_default(void);
+
+/* ConditionType helpers */
+int rb_condition_type_from_str(const char *s);
+const char *rb_condition_type_to_str(int ct);
+
+/* SelectTargetKind helpers */
+int rb_select_target_kind_from_str(const char *s);
+const char *rb_select_target_kind_to_str(int stk);
+
+/* EffectCardType helpers */
+int rb_effect_card_type_from_str(const char *s);
+const char *rb_effect_card_type_as_str(int ect);
+RbEffectCardType rb_effect_card_type_default(void);
+
+/* EffectState helpers */
+int rb_effect_state_from_str(const char *s);
+const char *rb_effect_state_as_str(int es);
+RbEffectState rb_effect_state_default(void);
+
+/* AbilityZone helpers (RbAbilityZone enum declared above) */
+int rb_ability_zone_from_str(const char *s);
+const char *rb_ability_zone_to_str(int z);
+const char *rb_ability_zone_as_str(int z);
+int rb_ability_zone_from_source_str(const char *s);
+
 /* A zone is just a bag of card indices (card_no index into the database). */
 typedef struct {
     int cards[RB_MAX_ZONE];
@@ -552,15 +774,63 @@ typedef enum {
     RB_ROUTE_CONDITIONAL_CHOICE
 } RbChoiceRoute;
 
-/* AbilityError codes — mirrors engine/src/ability/types.rs::AbilityError */
+/* ── Full ChoiceRoute with all Rust variants (including Raw) ─────────── */
+typedef enum {
+    RB_ROUTEK_CHOICE      = 0,
+    RB_ROUTEK_CHOICE_STRING,
+    RB_ROUTEK_CHOICE_COST,
+    RB_ROUTEK_OPTIONAL_COST,
+    RB_ROUTEK_CHANGE_STATE,
+    RB_ROUTEK_RAW
+} RbChoiceRouteKind;
+
+/* ── StageSelectIntent (mirrors engine/src/ability/types.rs::StageSelectIntent) */
+typedef enum {
+    RB_SSI_CHANGE_STATE_WAIT = 0,
+    RB_SSI_UNDER_MEMBER_MOVE = 1,
+    RB_SSI_COLLECT_TARGETS   = 2
+} RbStageSelectIntent;
+
+/* ── RbChoiceResultKind (mirrors engine/src/ability/types.rs::ChoiceResult) */
+typedef enum {
+    RB_CR_CARD_SELECTED     = 0,
+    RB_CR_TARGET_SELECTED   = 1,
+    RB_CR_POSITION_SELECTED = 2,
+    RB_CR_HEART_COLOR       = 3,
+    RB_CR_HEART_TYPE        = 4,
+    RB_CR_AUTO_ABILITY      = 5,
+    RB_CR_LIVE_SUCCESS      = 6,
+    RB_CR_SKIP              = 7
+} RbChoiceResultKind;
+
+/* ── RbExecutionContextKind (mirrors engine/src/ability/types.rs::ExecutionContext) */
+typedef enum {
+    RB_EC_NONE                = 0,
+    RB_EC_SINGLE_EFFECT       = 1,
+    RB_EC_LOOK_AND_SELECT     = 2,
+    RB_EC_MOVE_CARDS_POSITION = 3
+} RbExecutionContextKind;
+
+/* ── RbLookAndSelectStepKind (mirrors engine/src/ability/types.rs::LookAndSelectStep) */
+typedef enum {
+    RB_LAS_LOOK     = 0,
+    RB_LAS_SELECT   = 1,
+    RB_LAS_FINALIZE = 2
+} RbLookAndSelectStepKind;
+
+/* ── AbilityError codes — mirrors engine/src/ability/types.rs::AbilityError */
 typedef enum {
     RB_AE_NO_MEMBER_IN_TARGET_AREA = 0,
     RB_AE_AREA_LOCKED,
     RB_AE_BATON_TOUCH_PROTECTION,
+    RB_AE_INSUFFICIENT_ENERGY,
     RB_AE_INVALID_HAND_INDEX,
     RB_AE_NOT_MEMBER_CARD,
     RB_AE_CARD_NOT_FOUND,
-    RB_AE_ZONE_FULL
+    RB_AE_CANNOT_PLACE,
+    RB_AE_GENERIC,
+    RB_AE_ZONE_FULL,
+    RB_AE_OTHER
 } RbAbilityError;
 
 /* QueueState  Emirrors engine/src/ability_queue.rs::QueueState FSM. */
@@ -572,47 +842,208 @@ typedef enum {
     RB_QUEUE_DRAINING
 } RbQueueState;
 
+/* Forward declarations for types defined in choice.c */
+typedef struct RbAbilityResolver RbAbilityResolver;
+typedef struct RbSelectionContext RbSelectionContext;
+
+/* ── Flat pending-choice struct (used by RbAbilityQueue.pending) ─────── */
 typedef struct {
     RbChoiceKind kind;
-    char zone[32];        /* e.g. "hand", "looked_at" */
-    char card_type[32];   /* member_card / live_card / energy_card */
-    int  count;           /* how many to pick */
-    int  allow_skip;      /* 1 = may skip */
-    char target[64];      /* for SELECT_TARGET: "pay_optional_cost:skip..." etc. */
+    char zone[32];
+    char card_type[32];
+    int  count;
+    int  allow_skip;
+    char target[64];
     char description[128];
-    RbChoiceRoute route;  /* which gate produced this choice (ChoiceRoute) */
-    /* selection filter — mirrors engine/src/ability/choice.rs SelectionContext
-        (card_type is already above; group_names + heart_colors narrow the pool
-        further so a host UI / test picks a valid card). Empty/negative = no filter. */
+    RbChoiceRoute route;
     char filter_group[32];
-    int  filter_heart;     /* heart color idx, -1 = none */
-    /* heart-color choice option list (mirrors Choice::SelectHeartColor.options).
-        Populated by rb_effect_select_heart_color so the host can present the
-        exact palette; rb_resume_with_choice maps the picked index back to a
-        color and stores it in queue.selected_heart_color. */
+    int  filter_heart;
     char heart_options[8][24];
     int  n_heart_options;
+    int  cost_limit;
+    char cost_limit_op[8];
+    int  cost_total;
+    char cost_total_op[8];
+    char characters[16][32];
+    int  n_characters;
+    char target_player_id[16];
+    int  blind;
+    int  is_reveal;
 } RbChoice;
 
+/* ── Queue entry (mirrors engine/src/ability/ability_queue.rs::AbilityQueueEntry) ── */
 typedef struct {
-    int card_id;      /* activating card's deck index (0..4095) */
-    int ability_idx;  /* 0..n */
-    int cost_paid;    /* 1 after cost emitted */
+    int card_id;
+    int ability_idx;
+    int cost_paid;
     int effect_started;
-    int completed;    /* 1 after entry is done (mirrors Rust entry.completed) */
-    int optional_cost_result; /* -1 none, 0 declined, 1 paid (mirrors Rust entry.optional_cost_result) */
-    int pending_actions_n;    /* count of pending sequential actions */
-    /* condition_cache — mirrors Rust AbilityQueueEntry.condition_cache: Vec<(String,bool)> for cache:true conditions.
-       The C port stores up to 8 stringified condition keys (hash of condition pointer + variant) + verdict. */
+    int completed;
+    int  optional_cost_result;
+    int  cost_paid_index;
+    int  choice_card_no;
+    int  pending_actions_n;
+    int  triggering_member_id;
+    int  use_limit_recorded;
+    int  optional_moves_all_moved; /* -1=None, 0=false, 1=true (mirrors Rust Option<bool>) */
 #define RB_COND_CACHE_CAP 8
-    int  cond_cache_keys[RB_COND_CACHE_CAP]; /* hash of condition pointer (or content hash) */
-    int  cond_cache_vals[RB_COND_CACHE_CAP]; /* 0/1 verdict */
+    int  cond_cache_keys[RB_COND_CACHE_CAP];
+    int  cond_cache_vals[RB_COND_CACHE_CAP];
     int  n_cond_cache;
-    char player_id[16]; /* mirrors Rust entry.player_id (e.g. "player1") for cost-reduction hooks */
+    char player_id[16];
+    char choice_player_id[16];
 } RbQueueEntry;
 
+/* ── TriggerEvent (engine/src/ability/types.rs::TriggerEvent) ────────── */
+#define RB_TE_MAX_MOVED        16
+#define RB_TE_MAX_APPEARED     16
+#define RB_TE_ZONE_SZ          32
+#define RB_TE_PLAYER_SZ        16
+typedef struct {
+    int   moved_cards[RB_TE_MAX_MOVED];
+    int   n_moved_cards;
+    char  moved_from_zone[RB_TE_ZONE_SZ];
+    int   has_moved_from_zone;
+    int   position_change_occurred;
+    struct { int card_id; char source_zone[RB_TE_ZONE_SZ]; } appeared_cards[RB_TE_MAX_APPEARED];
+    int   n_appeared_cards;
+    int   energy_placed_by_effect;
+    char  energy_placed_by_player[RB_TE_PLAYER_SZ];
+    int   has_energy_placed_by_player;
+} RbTriggerEvent;
+
+/* ── EffectSpawnContext (engine/src/ability/types.rs::EffectSpawnContext) */
+#define RB_ESC_SZ 64
+typedef struct {
+    char target[RB_ESC_SZ];
+    char destination[RB_ESC_SZ];
+    char source[RB_ESC_SZ];
+    int  position;
+} RbEffectSpawnContext;
+
+/* ── StepOutput (engine/src/ability/types.rs::StepOutput) ───────────── */
+#define RB_SO_MAX_CARDS 128
+typedef struct {
+    int  cards[RB_SO_MAX_CARDS];
+    int  n_cards;
+    int  has_value;
+    int  value;
+    int  has_accepted;
+    int  accepted;
+} RbStepOutput;
+
+/* ── ValueRef (engine/src/ability/types.rs::ValueRef) ───────────────── */
+typedef enum {
+    RB_VR_LITERAL       = 0,
+    RB_VR_STEP_VALUE    = 1,
+    RB_VR_STEP_ACCEPTED = 2,
+    RB_VR_STEP_OFFSET   = 3
+} RbValueRefKind;
+typedef struct {
+    RbValueRefKind kind;
+    int            literal_value;
+    char           step_id[64];
+    int            offset;
+} RbValueRef;
+
+/* ── ZoneSnapshot (engine/src/ability/types.rs::ZoneSnapshot) ────────── */
+typedef struct {
+    int hand_count;
+    int stage_count;
+    int waitroom_count;
+    int energy_count;
+    int active_energy_count;
+    int deck_count;
+} RbZoneSnapshot;
+
+/* ── AbilityTraceNode (engine/src/ability/types.rs::AbilityTraceNode) ── */
+#define RB_TRACE_MAX_CHILDREN 64
+typedef struct RbAbilityTraceNode RbAbilityTraceNode;
+struct RbAbilityTraceNode {
+    char label[128];
+    char card[64];
+    int  has_card;
+    RbZoneSnapshot before;
+    int  has_before;
+    RbZoneSnapshot after;
+    int  has_after;
+    RbAbilityTraceNode *children[RB_TRACE_MAX_CHILDREN];
+    int  n_children;
+};
+
+/* ── EffectPipeline (engine/src/ability/types.rs::EffectPipeline) ────── */
+typedef struct { RbAbilityTraceNode *trace; } RbEffectPipeline;
+
+/* ── StepState (engine/src/ability/types.rs::StepState) ──────────────── */
+#define RB_SS_MAX_RESULTS 256
+typedef struct {
+    char  step_id[64];
+    RbStepOutput output;
+    int  has_output;
+} RbStepResultEntry;
+typedef struct {
+    RbStepResultEntry entries[RB_SS_MAX_RESULTS];
+    int  n_entries;
+    int  last_draw_count;
+} RbStepState;
+
+/* ── Full Choice enum (RbFullChoice mirrors engine/src/ability/types.rs::Choice) ── */
+#define RB_MAX_CC_STRINGS   32
+#define RB_MAX_CC_U8S       64
+#define RB_MAX_CC_CARDS     64
+typedef enum {
+    RB_CC_SELECT_CARD        = 0,
+    RB_CC_SELECT_TARGET      = 1,
+    RB_CC_SELECT_POSITION    = 2,
+    RB_CC_SELECT_HEART_COLOR = 3,
+    RB_CC_SELECT_HEART_TYPE  = 4,
+    RB_CC_SELECT_AUTO_ABILITY= 5,
+    RB_CC_SELECT_LIVE_SUCCESS= 6
+} RbFullChoiceKind;
+typedef struct { uint8_t values[RB_MAX_CC_U8S]; int n_values; } RbFullChoiceU8Vec;
+typedef struct { char strings[RB_MAX_CC_STRINGS][64]; int n_strings; } RbFullChoiceStringVec;
+typedef struct RbFullChoice {
+    RbFullChoiceKind kind;
+    char zone[32]; char card_type[32]; int has_card_type; int count;
+    char description[128]; char description_en[128]; char description_ja[128];
+    int  allow_skip; int cost_limit; char cost_limit_op[8]; int has_cost_limit;
+    int  cost_total; char cost_total_op[8]; int has_cost_total;
+    RbFullChoiceU8Vec cost_values; char group[32];
+    RbFullChoiceStringVec characters; int has_characters;
+    RbFullChoiceStringVec heart_colors; int require_all_heart_colors;
+    RbFullChoiceStringVec name_fragments; char target_player_id[16];
+    int  blind; int is_reveal; char picker[32]; char destination[32];
+    int  discard_remaining; int is_select_action;
+    int  filtered_indices[RB_MAX_ZONE]; int n_filtered; int has_filtered;
+    char target[64]; RbFullChoiceStringVec options; char position[32];
+    RbFullChoiceStringVec hc_options;
+    RbFullChoiceStringVec aa_options; RbFullChoiceStringVec ls_options;
+} RbFullChoice;
+
+/* ── ChoiceResult (engine/src/ability/types.rs::ChoiceResult) ───────── */
+typedef struct {
+    RbChoiceResultKind kind;
+    int   card_indices[RB_MAX_CC_CARDS]; int n_card_indices;
+    char  target[64]; char position[32];
+    char  heart_colors[RB_MAX_CC_STRINGS][24]; int n_heart_colors;
+    char  heart_types[RB_MAX_CC_STRINGS][24];  int n_heart_types;
+    int   auto_ability_queue_index; int live_success_card_index;
+} RbChoiceResult;
+
+/* ── LookAndSelectStep (engine/src/ability/types.rs::LookAndSelectStep) ── */
+typedef struct {
+    RbLookAndSelectStepKind kind;
+    int  look_count; char look_source[32];
+    int  select_count; int select_max_per_group; int has_select_max_per_group;
+    char finalize_destination[32]; char finalize_source_zone[32];
+} RbLookAndSelectStep;
+
+/* ── ChoiceBuilder (engine/src/ability/types.rs::ChoiceBuilder) ──────── */
+typedef struct RbChoiceBuilder {
+    RbFullChoice ch;
+} RbChoiceBuilder;
+
 #define RB_QUEUE_DEPTH 16
-#define RB_USE_TRACK  256  /* (card_id<<4|ability_idx) slots per turn */
+#define RB_USE_TRACK  256
 
 typedef struct {
     RbChoice pending;
@@ -621,6 +1052,7 @@ typedef struct {
     AbilityEffect *deferred;   /* sequential remainder after pay_skip gate */
     RbQueueEntry entries[RB_QUEUE_DEPTH];
     int      n_entries;
+    int      pending_actions_n;    /* count of pending sequential actions */
     int      cur;              /* index of current entry being resolved */
     int      use_keys[RB_USE_TRACK];
     int      use_counts[RB_USE_TRACK];
@@ -714,8 +1146,31 @@ typedef struct {
     int need_heart[8];
 } RbTempEffect;
 
+/* Replacement effect (used by GameState at line 819). */
+typedef struct {
+    int card_id;
+    int player_id;
+    char original_event[64];
+    int is_choice_based;
+    int applied_this_event;
+} RbReplacementEffect;
+
 #define RB_MAX_SNAPSHOTS 64
 #define RB_MAX_RECENTLY_MOVED 8
+
+/* batch_movements / position_change_events entry types (must precede GameState) */
+typedef struct {
+    int moved_card_id;
+    int source_zone;
+    int dest_zone;
+    int cause_player_id;
+    int effect_only;
+} RbBatchMovement;
+typedef struct {
+    int card_id;
+    int position;
+} RbPositionChangeEvent;
+
 typedef struct GameState {
     RbPlayer p[2];
     RbMods   mods;
@@ -730,6 +1185,10 @@ typedef struct GameState {
     AbilityEffect *activation_act;
     int      live_set_limit_reduction[2];
     int      yell_count_mod[2];   /* per-player modify_yell_count delta (live.c do_yell) */
+    int      activating_card;     /* currently resolving card id (mirrors gs.activating_card) */
+    int      pending_energy_payment; /* optional energy payment count (resolver-local) */
+    int16_t  last_cost_waited_members[RB_STAGE_SIZE]; /* members put to wait by last cost */
+    int      n_last_cost_waited_members;
     char     yell_source[2][16];   /* per-player modify_yell_source override (live.c do_yell) */
     RbLiveSnapshot snapshots[RB_MAX_SNAPSHOTS];
     int      n_snapshots;
@@ -737,6 +1196,14 @@ typedef struct GameState {
     int      n_recently_moved;
     int      those_cards[RB_MAX_RECENTLY_MOVED]; /* cards moved by the immediately preceding move_cards action (Rust `those_cards` relay) */
     int      n_those_cards;
+    int      recently_appeared[RB_MAX_RECENTLY_MOVED]; /* cards that appeared this turn */
+    int      n_recently_appeared;
+    int      recently_state_changed[RB_MAX_RECENTLY_MOVED]; /* cards whose state changed this turn */
+    int      n_recently_state_changed;
+    RbBatchMovement batch_movements[16];
+    int n_batch_movements;
+    RbPositionChangeEvent position_change_events[16];
+    int      n_position_change_events;
     int      selected_cards[RB_MAX_RECENTLY_MOVED]; /* cards chosen by a select_cards/select/look_and_select choice */
     int      n_selected_cards;
     int      assignment[RB_MAX_RECENTLY_MOVED]; /* distinct-name assignment for alt-cost (phases.rs) */
@@ -755,7 +1222,9 @@ typedef struct GameState {
     /* state_change_condition tracking (mirrors Rust recently_state_changed /
        turn_state_changes). Set when a member's orientation actually flips during
        rb_effect_change_state; cleared at turn rollover. from/to are orientation
-       indices (0=active/none,1=wait) keyed by card id. */
+        indices (0=active/none,1=wait) keyed by card id. */
+    int      turn_state_changes[64][4]; /* [activating_card, target_card, from_state[0], to_state[0]] */
+    int      n_turn_state_changes;
     int8_t   state_change_from[RB_MAX_CARD_IDS];
     int8_t   state_change_to[RB_MAX_CARD_IDS];
     int      last_wait_to_active_count; /* count of wait→active flips this turn */
@@ -795,6 +1264,10 @@ typedef struct GameState {
     int      n_cannot_active_cards;
     char     prohibition[64][48];            /* restriction: "type:destination" prohibition notes */
     int      n_prohibition;
+    char     prohibition_effects[64][48];    /* dynamic prohibition effects (e.g. cannot_place) */
+    int      n_prohibition_effects;
+    RbReplacementEffect replacement_effects[32]; /* mirrors Rust replacement_effects */
+    int      n_replacement_effects;
     /* ── tracking.rs (ported) ── */
     int      turn1_abilities_played[64]; int n_turn1_abilities_played;
     int      turn2_abilities_played[64]; int n_turn2_abilities_played;
@@ -941,6 +1414,11 @@ int  rb_draw_cards_for_player(RbPlayer *player, uint8_t count, const char *sourc
     target both/self/opponent; optional pay-skip gate; any_number; per_unit;
     card_type filter; source/destination routing). */
 int  rb_effect_draw_card(GameState *g, int actor, AbilityEffect *e, int host_cid);
+/* Trampoline for draw.rs:execute_draw_wrapper. Calls rb_effect_draw_card. */
+int  rb_execute_draw_wrapper(GameState *g, int actor, AbilityEffect *e, int host_cid);
+/* draw.rs:AbilityResolver::resolve_dynamic_count — resolves a dynamic count
+   reference using the GameState transient context. */
+int  rb_draw_resolve_dynamic_count(GameState *g, int actor, const AbilityEffect *e, int host_cid);
 /* Ported from draw.rs:execute_select_effect — routes a `select` verb to the
     area / heart-color / C6 keep-shuffle / generic card-selection path. */
 void rb_effect_select_effect(GameState *g, int actor, AbilityEffect *e, int host_cid);
@@ -1139,6 +1617,9 @@ void rb_effect_activation_cost(GameState *g, int actor, AbilityEffect *e, int ho
 void rb_effect_modify_hearts(GameState *g, int actor, AbilityEffect *e);
 void rb_effect_energy_placement(GameState *g, int actor, AbilityEffect *e);
 void rb_effect_energy_state_change(GameState *g, int actor, AbilityEffect *e);
+void rb_util_push_temporary_effect(GameState *g, const char *effect_type,
+                                   const char *duration, const char *target_player_id,
+                                   const char *description);
 int  rb_execute_modify_score(GameState *g, int actor, AbilityEffect *e);
 int  rb_execute_modify_required_hearts(GameState *g, int actor, AbilityEffect *e);
 void rb_execute_modify_required_hearts_standard(GameState *g, int actor,
@@ -1152,12 +1633,85 @@ void rb_log_push_verdict(const char *text, const char *kind, int passed);
 int  rb_log_buffer_len(void);
 void rb_log_clear_verdicts(void);
 
+/* ── AbilityLogItem verdict buffer (engine/src/ability/log.rs) ──
+   Mirrors the Rust AbilityLogItem tagged enum. Each entry is a RbAbilityLogItem
+   with a kind discriminator and a union of the three variant payloads.
+   Condition children are a heap-allocated array (mirrors Vec<AbilityLogItem>);
+   use rb_log_free_item to release a drained item. */
+#define RB_LOG_MAX_CHILDREN 8
+
+typedef struct RbAbilityLogItem RbAbilityLogItem;
+
+#define RB_LOG_KIND_CONDITION 0
+#define RB_LOG_KIND_COST      1
+#define RB_LOG_KIND_EFFECT    2
+
+struct RbAbilityLogItem {
+    int kind;
+    union {
+        struct {
+            char text[256];
+            char condition_type[64];
+            char expectation[256];
+            char actual[256];
+            int passed;
+            int n_children;
+            RbAbilityLogItem *children;
+        } condition;
+        struct {
+            char text[256];
+            char expectation[256];
+            char actual[256];
+            int passed;
+            int optional;
+        } cost;
+        struct {
+            char text[256];
+            char action[64];
+            char details[256];
+        } effect;
+    } as;
+};
+
+typedef RbAbilityLogItem RbLogItem; /* backward-compatible alias */
+
+int  rb_log_drain_verdicts(RbAbilityLogItem *out, int max);
+
+/* Variant-specific push helpers (mirrors AbilityLogItem variants + children). */
+void rb_log_push_verdict_condition(const char *text, const char *condition_type,
+                                   const char *expectation, const char *actual,
+                                   int passed);
+void rb_log_push_verdict_cost(const char *text, const char *expectation,
+                              const char *actual, int passed, int optional);
+void rb_log_push_verdict_effect(const char *text, const char *action, const char *details);
+void rb_log_push_verdict_child(int parent_index, const RbAbilityLogItem *child);
+void rb_log_push_verdict_item(const RbAbilityLogItem *item);
+
+/* Deep-free a drained item (release children heap array). */
+void rb_log_free_item(RbAbilityLogItem *item);
+
 /* ── Ability tracing (engine/src/ability/debug.rs: ABILITY_DEBUG) ──
    Mirrors the Rust `ABILITY_DEBUG` atomic gate: diagnostic traces are compiled
    in permanently (they are part of the engine, per AGENTS.md) but only print
    when tracing is switched on, so a full suite run stays quiet. */
 int  rb_ability_debug_enabled(void);
 void rb_ability_debug_set(int enabled);
+
+/* ── AbDebug buffered tracer (engine/src/ability/debug.rs: AbDebug) ──
+   Per-resolution debug helper that buffers formatted trace lines and flushes
+   them to the rule log or structured log. Mirrors Rust AbDebug::p / ability /
+   condition / cost_pay / effect + flush helpers. */
+typedef struct RbAbDebug RbAbDebug;
+void rb_abdebug_init(RbAbDebug *d);
+void rb_abdebug_p(RbAbDebug *d, const char *tag, const char *msg);
+void rb_abdebug_flush_to_rule_log(RbAbDebug *d);
+void rb_abdebug_flush_to_structured_log(RbAbDebug *d);
+void rb_abdebug_ability(RbAbDebug *d, const char *card_name, const char *card_no,
+                        const char *card_id, const Ability *ability);
+void rb_abdebug_condition(RbAbDebug *d, const Condition *cond, int actual,
+                          int threshold, int passed);
+void rb_abdebug_cost_pay(RbAbDebug *d, const AbilityEffect *cost, int ok);
+void rb_abdebug_effect(RbAbDebug *d, const AbilityEffect *effect);
 
 /* ── Dynamic count resolution (engine/src/ability/dynamic_count.rs) ── */
 int  rb_resolve_dynamic_count(const struct GameState *g, int owner, int host_cid,
@@ -1225,6 +1779,65 @@ int  rb_stage_first_empty(const int stage[RB_STAGE_SIZE]);
 /* ── MemberArea wire helpers (engine/src/core/zones.rs:MemberArea) ── */
 uint8_t rb_member_area_to_tag(int idx);    /* 0→1,1→2,2→3; 0 if invalid */
 int     rb_member_area_from_tag(uint8_t tag); /* 1→0,2→1,3→2; -1 if invalid */
+
+#define RB_MAX_MATCH_OUT 512
+
+/* Filter struct for matching_ids / constant_per_unit_units (mirrors CardFilter).
+   Only the fields needed by the C port are represented; None/unspecified = match anything. */
+typedef struct {
+    char  card_type[32];
+    char  group[64];
+    int   has_group;
+    int   cost_limit;
+    char  cost_op[8];
+    int   has_cost_limit;
+    char  characters[256];
+    int   has_characters;
+    char  exclude_characters[256];
+    int   has_exclude_characters;
+    char  heart_colors[8][24];
+    int   n_heart_colors;
+    int   require_all_heart_colors;
+    int   heart_color_count;
+    int   need_heart_total;
+    char  need_heart_operator[8];
+    char  need_heart_color[24];
+    int   has_need_heart_total;
+    char  name_fragments[8][64];
+    int   n_name_fragments;
+    int   original_blade_limit;
+    char  original_blade_op[8];
+    int   has_original_blade;
+    char  ability_filter[32];
+    char  ability_filter_triggers[8][32];
+    int   n_ability_filter_triggers;
+    int   negation;
+    int   exclude_self_id;
+    int   has_exclude_self;
+    int   cost_total;
+    char  cost_total_op[8];
+    int   has_cost_total;
+    int   has_filter;
+} RbCardFilter;
+
+/* Heart-all wildcard key ("heart00"). */
+#define RB_HEART_ALL_KEY "heart00"
+
+/* Matching helpers using the RbCardFilter struct. */
+int rb_matching_ids(const RbCardFilter *f, const int *cards, int n, int *out, int max);
+int rb_count_matching_filter(const RbCardFilter *f, const int *cards, int n);
+int rb_matching_indices_filter(const RbCardFilter *f, const int *cards, int n, int *out_idx, int max);
+
+/* constant_per_unit_units — compute the units part of a constant per_unit gain. */
+int rb_constant_per_unit_units(const AbilityEffect *effect, const GameState *g, int pl,
+                               int host_card_id);
+/* resolve_per_unit_count — count matching cards in the per-unit zone for scaling. */
+int rb_resolve_per_unit_count(const GameState *g, int pl, const char *per_unit_type,
+                              const char *card_type, const char *group,
+                              const char *state_filter, int host_card_id);
+
+/* Stage-first-empty helper (center-priority: 1, 0, 2). */
+int rb_stage_first_empty(const int stage[RB_STAGE_SIZE]);
 
 /* ── Duration / distinct-name helpers (engine/src/ability/util.rs) ── */
 /* Mirror util.rs::DistinctType (CardName/True/Distinct are all "dedupe" variants). */
@@ -1306,6 +1919,7 @@ int  rb_success_len(const RbPlayer *player);
 void rb_resolution_add(GameState *g, int card_id);
 int  rb_resolution_clear(GameState *g, int *out, int max);
 int  rb_resolution_len(const GameState *g);
+void rb_record_card_movement(GameState *g, int card_id, int from_zone, int to_zone, int causer, int target);
 
 /* ── HeartColor parsing (engine/src/core/card.rs parse_heart_color / index) ── */
 /* Faithful port of `s.parse::<HeartColor>()` / `HeartColor::index()`. String
@@ -1324,7 +1938,8 @@ void rb_execute_effect_ex(GameState *g, int actor, AbilityEffect *e, int host_ci
 int       rb_has_pending_choice(const GameState *g);
 const RbChoice *rb_get_pending_choice(const GameState *g);
 int       rb_resume_with_choice(GameState *g, int selected_idx); /* 0..count-1, -1=skip */
-void      rb_clear_pending_choice(GameState *g);
+void rb_clear_pending_choice(GameState *g);
+void rb_queue_set_pending_choice(GameState *g, const RbChoice *choice);
 
 /* ── Ability cost payment (engine/src/ability/cost.rs) ── */
 int rb_pay_cost(GameState *g, int actor, const AbilityEffect *cost);
@@ -1336,6 +1951,12 @@ int rb_cost_has_skip_prompt(const AbilityEffect *cost);
 int rb_compute_play_cost(const GameState *g, int actor, int card_id, int set_override);
 int rb_get_change_state_candidates(const GameState *g, int actor,
                                    int *out_positions, int max);
+int rb_pay_cost_move_cards(GameState *g, int actor, const AbilityEffect *cost,
+                           int host_cid, int is_activation);
+int rb_pay_cost_change_state(GameState *g, int actor, const AbilityEffect *cost,
+                             int host_cid, int is_activation);
+int rb_effect_place_energy_under_member_non_optional(GameState *g, int actor, const AbilityEffect *e);
+void rb_move_execute_move_cards(GameState *g, int actor, AbilityEffect *e);
 
 /* ── Compound / sequential / conditional execution (engine/src/ability/compound.rs) ── */
 /* Mirror compound.rs::execute_sequential_effect. `eff` is the sequential effect; its
@@ -1358,8 +1979,19 @@ int rb_compound_conditional_on_optional(GameState *g, int actor,
                                           const AbilityEffect *eff, int taken, int host_cid);
 int rb_compound_choice_string(const AbilityEffect *eff, const char *choice);
 int rb_compound_choice_action(GameState *g, int actor, const AbilityEffect *eff,
-                                int choice_idx, int host_cid);
+                              int choice_idx, int host_cid);
 void rb_compound_save_remaining(GameState *g, int remaining_count);
+/* handle_choice_string_selection (compound.rs) — picks a string option;
+   if it names a heart color the choice is recorded as a prohibition. */
+int rb_compound_handle_choice_string_selection(GameState *g, int actor,
+                                               const char *selected,
+                                               const char **options, int n_options);
+/* handle_choice_string_store (compound.rs) — stores the chosen string value
+   in the queue entry (choice_result / resume_draw_ctype) for later use
+   (mirrors ConditionalChoice::Str in the Rust port). */
+int rb_compound_handle_choice_string_store(GameState *g, int actor,
+                                           const char *selected,
+                                           const char **options, int n_options);
 
 /* ── Ability resolver frontend (engine/src/ability/resolver.rs) ── */
 typedef struct AbilityInfo {
@@ -1376,13 +2008,101 @@ int  rb_resolver_use_limit_reached(const GameState *g, int card_id,
 int  rb_can_activate_effect(const GameState *g, int actor,
                              const AbilityEffect *eff, int host_cid);
 int  rb_resolver_trigger_infos(const GameState *g, int actor, const char *trigger,
-                               AbilityInfo *out, int max);
+                                AbilityInfo *out, int max);
 int  rb_resolve_ability(GameState *g, int actor, const Ability *ab,
                         int ability_idx, int host_cid, int *resolved);
 int  rb_resolver_card_matches_type(int cid, const char *filter);
+int  rb_resolver_card_matches_cost_limit(int card_id, int cost_limit, const char *op);
+void rb_resolver_store_pending_choice(GameState *g);
+void rb_resolver_emit_pay_skip_gate(GameState *g, int actor, const AbilityEffect *e,
+                                     const char *description, int optional, const char *route);
+void rb_resolver_fmt_card(int cid, char *out, size_t out_sz);
+const char *rb_resolver_fmt_ids(const int *ids, int n);
+
+/* ── choice.rs public API (complete translation, engine_c/src/ability/choice.c) ── */
+int  rb_resolver_resume_execution(RbAbilityResolver *self);
+int  rb_resolver_resume_execution_with_ctx(RbAbilityResolver *self, void *ctx);
+int  rb_resolver_resume_pending_actions(RbAbilityResolver *self);
+int  rb_resolver_finalize_choice(RbAbilityResolver *self);
+int  rb_resolver_finalize_choice_with_ctx(RbAbilityResolver *self, void *ctx);
+void rb_resolver_reveal_selected_looked_at(GameState *g, const int *indices, int n_indices);
+int  rb_resolver_provide_choice_result(GameState *g, int selected_idx);
+int  rb_resolver_handle_select_card(RbAbilityResolver *self, GameState *g, const char *selected);
+int  rb_resolver_handle_hand_selection(RbAbilityResolver *self, GameState *g, const char *selected);
+void rb_resolver_handle_reveal_selection(RbAbilityResolver *self, GameState *g,
+                                          const RbSelectionContext *ctx, const char *selected);
+void rb_resolver_handle_revealed_cards_selection(RbAbilityResolver *self, GameState *g,
+                                                  const RbSelectionContext *ctx, const char *selected);
+void rb_resolver_handle_success_live_zone_selection(RbAbilityResolver *self, GameState *g,
+                                                  const RbSelectionContext *ctx, const char *selected);
+void rb_resolver_handle_entry_cost_reveal(RbAbilityResolver *self, GameState *g, const char *selected);
+void rb_resolver_handle_looked_at_selection(RbAbilityResolver *self, GameState *g, const char *selected);
+void rb_resolver_handle_stage_selection(RbAbilityResolver *self, GameState *g,
+                                      const RbSelectionContext *ctx, const char *selected);
+void rb_resolver_handle_discard_selection(RbAbilityResolver *self, GameState *g, const char *selected);
+void rb_resolver_handle_heart_color_selection(RbAbilityResolver *self, GameState *g, const char *selected);
+void rb_resolver_handle_choice_condition(RbAbilityResolver *self, GameState *g, const char *selected);
+void rb_resolver_handle_conditional_optional(GameState *g, const char *selected);
+void rb_resolver_handle_draw_any_number(GameState *g, const char *selected);
+void rb_resolver_handle_order_selection(GameState *g, const char *selected);
+void rb_resolver_handle_primary_alternative(RbAbilityResolver *self, GameState *g, const char *selected);
+void rb_resolver_handle_position_destination(RbAbilityResolver *self, GameState *g, const char *selected);
+void rb_resolver_handle_double_baton_touch(GameState *g, const char *selected);
+int  rb_resolver_handle_position_change_choice(RbAbilityResolver *self, GameState *g,
+                                               const char *choice_card_no, const char *selected);
+void rb_resolver_handle_heart_selection(RbAbilityResolver *self, GameState *g, int count,
+                                         const char *const *colors, int n_colors);
+void rb_resolver_handle_select_target(RbAbilityResolver *self, GameState *g,
+                                      const char *target, const char *selected);
+void rb_resolver_execute_selected_cards_from_zone(RbAbilityResolver *self, GameState *g,
+                                                   const char *zone, const int *indices, int n_indices,
+                                                   const char *card_type, int cost_limit,
+                                                   const char *cost_limit_op, int cost_total,
+                                                   const char *cost_total_op, const char *group,
+                                                   const char *const *characters, int n_characters,
+                                                   const char *target_player_id);
+void rb_resolver_handle_energy_zone_selection(GameState *g, int actor, const int *indices, int n_indices, const char *destination);
+void rb_resolver_handle_select_cards_looked_at(RbAbilityResolver *self, GameState *g,
+                                                const int *indices, int n_indices,
+                                                const char *destination, int discard_remaining);
+void rb_resolver_move_non_selected_hand_to_deck_bottom(GameState *g, const char *target_player,
+                                                        const int *snapshot, int snapshot_n);
+void rb_resolver_build_reprompt(RbAbilityResolver *self, GameState *g);
+int  rb_resolver_build_reprompt_full(RbAbilityResolver *self, GameState *g, const RbSelectionContext *ctx,
+                                      const char *zone, int count, const char *en, const char *ja,
+                                      int allow_skip, const int *filtered, int n_filtered,
+                                      const char *tpid, int cost_total, const char *cost_total_op);
+int  rb_resolver_filter_discard_by_budget(RbAbilityResolver *self, GameState *g, int budget);
+int  rb_resolver_filter_discard_by_budget_full(RbAbilityResolver *self, GameState *g,
+                                                int cost_total, const char *cost_total_op,
+                                                int *out_remaining, int *out_indices, int max_out);
+void rb_resolver_handle_selection_epilogue(RbAbilityResolver *self, GameState *g);
+void rb_resolver_apply_effect_modification(RbAbilityResolver *self, GameState *g,
+                                            void (*modifier)(AbilityEffect *));
+void rb_resolver_clear_choice_meta(RbAbilityResolver *self);
+void rb_resolver_clear_choice_state(RbAbilityResolver *self);
+int  rb_resolver_clear_choice_state_and_resume2(RbAbilityResolver *self);
+void rb_resolver_store_pending_choice(GameState *g);
+void rb_resolver_reschedule_pending_choice(GameState *g);
+int  rb_queue_has_pending_actions(const GameState *g);
+int  rb_queue_take_pending_actions(GameState *g);
+void rb_queue_set_pending_actions(GameState *g, int n);
+void rb_set_chosen_target(AbilityEffect *e, const char *target);
+int  rb_resume_with_choice(GameState *g, int selected_idx);
+void rb_emit_choice(GameState *g, int actor, RbChoiceKind kind,
+                    const char *zone, const char *card_type,
+                    int count, int allow_skip, const char *target);
+void rb_choice_set_route(RbChoice *ch, RbChoiceRoute r);
+void rb_choice_set_description(RbChoice *ch, const char *desc);
+void rb_choice_set_bilingual_descriptions(RbChoice *ch, const char *en, const char *ja);
+int  rb_gained_ability_index(int ability_idx);
+const char *rb_choice_description_ja(const RbChoice *ch);
+int  rb_choice_allow_skip(const RbChoice *ch);
+const char *rb_ability_error_to_string(int err);
 
 /* ── Auto-trigger engine + ability use tracking (core/game_state/abilities.rs) ── */
 int  rb_ability_matches_trigger(const Ability *ab, const char *trigger);
+int  rb_ability_master_id(const GameState *g);
 void rb_record_ability_use(GameState *g, int cid, int idx);
 int  rb_collect_constant_hand(const GameState *g, int actor, AbilityEffect *out, int max);
 int  rb_collect_live_modifiers(const GameState *g, int actor, AbilityEffect *out, int max);
@@ -1431,6 +2151,8 @@ int rb_effective_activation_cost_for(const GameState *g, int actor, const Abilit
 /* ── Live success trigger ── */
 int rb_should_trigger_live_success(const GameState *g, int pl);
 
+/* ── Replacement effects (engine/src/core/game_state/abilities.rs) ── */
+
 /* ── Loop detection ── */
 void rb_reset_loop_detection(GameState *g);
 int rb_is_loop_detected(const GameState *g);
@@ -1446,6 +2168,25 @@ void rb_reset_change_flags(GameState *g);
 
 /* ── Choice context injection (stub) ── */
 void rb_inject_choice_ability_context(GameState *g, char *json_buf, size_t buf_sz);
+
+/* ── AbilityRef (engine/src/ability/ability_store.rs) ──
+    A lightweight handle to an ability stored in the bytecode blob.
+    RbAbilityRef carries a uint16_t bytecode index. Call rb_ability_ref_resolve()
+    to decode (with a per-slot lazy cache mirroring Rust's OnceLock<Arc<Ability>>).
+    The returned pointer is static-storage; do NOT free it. Use
+    rb_ability_ref_flush() to release the whole cache (e.g. after rb_unload()). */
+typedef struct {
+    uint16_t idx;
+} RbAbilityRef;
+
+RbAbilityRef rb_ability_ref_index(uint16_t idx);
+uint16_t      rb_ability_ref_idx(const RbAbilityRef *ref);
+const Ability *rb_ability_ref_resolve(const RbAbilityRef *ref); /* cached decode */
+int           rb_ability_ref_decode(const RbAbilityRef *ref, Ability *out); /* write to out */
+const Ability *rb_ability_ref_to_arc(const RbAbilityRef *ref); /* legacy alias for resolve */
+void          rb_ability_ref_flush(void);                       /* free entire cache */
+int           rb_ability_ref_flush_slot(uint16_t idx);          /* free one slot */
+int           rb_ability_ref_cache_size(void);                  /* populated slots (diagnostic) */
 
 /* ── Misc effect handlers (engine/src/ability/effects/misc.rs) ── */
 int rb_execute_misc_effect(GameState *g, int actor, const RbPlayer *self,
@@ -1519,7 +2260,153 @@ const char *rb_effect_type_as_str(RbEffectType t);
 int rb_card_get_score(int card_id);
 
 /* ── game_modifiers.rs: ModifierEntry::total ──
-     Mirrors ModifierEntry::total — returns set + additive combined. */
+      Mirrors ModifierEntry::total — returns set + additive combined. */
 int rb_modifier_total_entry(const RbModifierEntry *e);
+
+/* ── types.rs: Constants ─────────────────────────────────────────────── */
+extern const char *RB_PAY_SKIP_TARGET;
+#define RB_GAINED_ABILITY_INDEX_BASE 10000
+
+/* ── types.rs: ChoiceRoute helpers ───────────────────────────────────── */
+const char *rb_choice_route_to_str(RbChoiceRouteKind r);
+int rb_choice_route_from_str(const char *s, RbChoiceRouteKind *out);
+RbChoiceRouteKind rb_choice_route_new(const char *s);
+RbChoiceRoute rb_choice_route_from_kind(RbChoiceRouteKind k);
+RbChoiceRouteKind rb_choice_route_kind_from_header(RbChoiceRoute r);
+
+/* ── types.rs: RbFullChoice constructors / accessors ─────────────────── */
+RbFullChoice *rb_full_choice_new_select_card(const char *zone, const char *description,
+                                              int count, int allow_skip);
+RbFullChoice *rb_full_choice_new_select_target(const char *target, const char *description,
+                                                int allow_skip);
+RbFullChoice *rb_full_choice_new_select_position(const char *position, const char *description,
+                                                  int allow_skip);
+RbFullChoice *rb_full_choice_new_select_heart_color(int count, const char *const *options,
+                                                     int n_options, const char *description);
+RbFullChoice *rb_repeat_prompt_choice(void);
+const char *rb_full_choice_description_ja(const RbFullChoice *ch);
+int rb_full_choice_allow_skip(const RbFullChoice *ch);
+void rb_full_choice_set_description(RbFullChoice *ch, const char *desc);
+void rb_full_choice_set_bilingual(RbFullChoice *ch, const char *en, const char *ja);
+void rb_full_choice_set_options(RbFullChoice *ch, const char *const *opts, int n);
+void rb_full_choice_set_hc_options(RbFullChoice *ch, const char *const *opts, int n);
+void rb_full_choice_set_aa_options(RbFullChoice *ch, const char *const *opts, int n);
+void rb_full_choice_set_ls_options(RbFullChoice *ch, const char *const *opts, int n);
+void rb_full_choice_to_header(const RbFullChoice *src, RbChoice *dst);
+const char *rb_full_choice_to_json(const RbFullChoice *ch, char *buf, size_t buf_sz);
+void rb_full_choice_free(RbFullChoice *ch);
+
+/* ── types.rs: ChoiceBuilder ─────────────────────────────────────────── */
+RbChoiceBuilder *rb_choice_builder_new(const char *zone, const char *description,
+                                        int count, int allow_skip);
+RbFullChoice *rb_choice_builder_build(RbChoiceBuilder *b);
+void rb_choice_builder_free(RbChoiceBuilder *b);
+RbChoiceBuilder *rb_choice_builder_card_type(RbChoiceBuilder *b, const char *v);
+RbChoiceBuilder *rb_choice_builder_cost_limit(RbChoiceBuilder *b, int v, const char *op);
+RbChoiceBuilder *rb_choice_builder_cost_total(RbChoiceBuilder *b, int v, const char *op);
+RbChoiceBuilder *rb_choice_builder_cost_values(RbChoiceBuilder *b, const uint8_t *vals, int n);
+RbChoiceBuilder *rb_choice_builder_group(RbChoiceBuilder *b, const char *v);
+RbChoiceBuilder *rb_choice_builder_characters(RbChoiceBuilder *b, const char *const *names, int n);
+RbChoiceBuilder *rb_choice_builder_heart_colors(RbChoiceBuilder *b, const char *const *colors, int n);
+RbChoiceBuilder *rb_choice_builder_require_all_heart_colors(RbChoiceBuilder *b, int v);
+RbChoiceBuilder *rb_choice_builder_name_fragments(RbChoiceBuilder *b, const char *const *frags, int n);
+RbChoiceBuilder *rb_choice_builder_destination(RbChoiceBuilder *b, const char *v);
+RbChoiceBuilder *rb_choice_builder_discard_remaining(RbChoiceBuilder *b, int v);
+RbChoiceBuilder *rb_choice_builder_is_select_action(RbChoiceBuilder *b, int v);
+RbChoiceBuilder *rb_choice_builder_target_player_id(RbChoiceBuilder *b, const char *v);
+RbChoiceBuilder *rb_choice_builder_blind(RbChoiceBuilder *b, int v);
+RbChoiceBuilder *rb_choice_builder_is_reveal(RbChoiceBuilder *b, int v);
+RbChoiceBuilder *rb_choice_builder_picker(RbChoiceBuilder *b, const char *v);
+RbChoiceBuilder *rb_choice_builder_description_en(RbChoiceBuilder *b, const char *v);
+RbChoiceBuilder *rb_choice_builder_description_ja(RbChoiceBuilder *b, const char *v);
+RbChoiceBuilder *rb_choice_builder_filtered_indices(RbChoiceBuilder *b, const int *indices, int n);
+
+/* ── types.rs: ChoiceResult helpers ──────────────────────────────────── */
+RbChoiceResultKind rb_choice_result_kind(const RbChoiceResult *r);
+int rb_choice_result_is_skip(const RbChoiceResult *r);
+const char *rb_choice_result_kind_to_str(RbChoiceResultKind k);
+int rb_choice_result_kind_from_str(const char *s, RbChoiceResultKind *out);
+RbChoiceResult *rb_choice_result_new_card_selected(const int *indices, int n);
+RbChoiceResult *rb_choice_result_new_skip(void);
+RbChoiceResult *rb_choice_result_new_target(const char *target);
+void rb_choice_result_free(RbChoiceResult *r);
+
+/* ── types.rs: TriggerEvent ──────────────────────────────────────────── */
+void rb_trigger_event_init(RbTriggerEvent *e);
+void rb_trigger_event_add_moved(RbTriggerEvent *e, int card_id);
+void rb_trigger_event_add_appeared(RbTriggerEvent *e, int card_id, const char *source_zone);
+int rb_trigger_event_has_moved(const RbTriggerEvent *e);
+int rb_trigger_event_has_appeared(const RbTriggerEvent *e);
+int rb_trigger_event_has_position_change(const RbTriggerEvent *e);
+int rb_trigger_event_has_energy_placed(const RbTriggerEvent *e);
+void rb_trigger_event_copy(RbTriggerEvent *dst, const RbTriggerEvent *src);
+
+/* ── types.rs: EffectSpawnContext ────────────────────────────────────── */
+void rb_effect_spawn_context_init(RbEffectSpawnContext *ctx);
+
+/* ── types.rs: StepOutput ────────────────────────────────────────────── */
+void rb_step_output_init(RbStepOutput *out);
+RbStepOutput *rb_step_output_from_value(int value);
+void rb_step_output_merge(RbStepOutput *self, const RbStepOutput *other);
+void rb_step_output_add_card(RbStepOutput *out, int card_id);
+int rb_step_output_has_cards(const RbStepOutput *out);
+int rb_step_output_value(const RbStepOutput *out);
+int rb_step_output_accepted(const RbStepOutput *out);
+const char *rb_step_output_to_json(const RbStepOutput *out, char *buf, size_t buf_sz);
+
+/* ── types.rs: ValueRef ──────────────────────────────────────────────── */
+void rb_value_ref_init_literal(RbValueRef *ref, int value);
+void rb_value_ref_init_step(RbValueRef *ref, const char *step_id);
+void rb_value_ref_init_accepted(RbValueRef *ref, const char *step_id);
+void rb_value_ref_init_offset(RbValueRef *ref, const char *step_id, int offset);
+const char *rb_value_ref_kind_str(const RbValueRef *ref);
+const char *rb_value_ref_kind_to_str(RbValueRefKind k);
+int rb_value_ref_kind_from_str(const char *s, RbValueRefKind *out);
+int rb_value_ref_resolve(const RbValueRef *ref, int (*lookup)(const char *, int *, int *, void *),
+                          void *lookup_ctx, int fallback);
+void rb_value_ref_merge(RbValueRef *self, const RbValueRef *other);
+int rb_value_ref_is_literal(const RbValueRef *ref);
+
+/* ── types.rs: ZoneSnapshot ──────────────────────────────────────────── */
+RbZoneSnapshot rb_zone_snapshot_make(int hand, int stage, int waitroom,
+                                     int energy, int active_energy, int deck);
+RbZoneSnapshot rb_zone_snapshot_from_game_state(const GameState *g);
+
+/* ── types.rs: AbilityTraceNode ──────────────────────────────────────── */
+RbAbilityTraceNode *rb_trace_node_new(const char *label);
+RbAbilityTraceNode *rb_trace_node_with_card(RbAbilityTraceNode *node, const char *card);
+RbAbilityTraceNode *rb_trace_node_with_before(RbAbilityTraceNode *node, RbZoneSnapshot before);
+RbAbilityTraceNode *rb_trace_node_with_after(RbAbilityTraceNode *node, RbZoneSnapshot after);
+RbAbilityTraceNode *rb_trace_node_from_game_state(const char *label, const GameState *g);
+int rb_trace_node_add_child(RbAbilityTraceNode *parent, RbAbilityTraceNode *child);
+void rb_trace_node_free(RbAbilityTraceNode *node);
+
+/* ── types.rs: EffectPipeline ────────────────────────────────────────── */
+RbEffectPipeline *rb_effect_pipeline_new(void);
+void rb_effect_pipeline_free(RbEffectPipeline *p);
+
+/* ── types.rs: StepState ─────────────────────────────────────────────── */
+void rb_step_state_init(RbStepState *ss);
+RbStepState *rb_step_state_new(void);
+void rb_step_state_record(RbStepState *ss, const char *effect_id, const RbStepOutput *output);
+RbStepOutput rb_step_state_get(const RbStepState *ss, const char *step_id);
+void rb_step_state_clear(RbStepState *ss);
+void rb_step_state_free(RbStepState *ss);
+int rb_step_state_record_value(RbStepState *ss, const char *effect_id, int value);
+int rb_step_state_record_cards(RbStepState *ss, const char *effect_id, const int *card_ids, int n);
+
+/* ── types.rs: AbilityError ──────────────────────────────────────────── */
+void rb_ability_error_format(int err, char *out, size_t out_sz,
+                             int p1, int p2, int p3, const char *detail);
+int rb_gained_ability_index(int ability_idx);
+
+/* ── types.rs: ExecutionContext / LookAndSelectStep helpers ──────────── */
+const char *rb_exec_context_kind_to_str(RbExecutionContextKind k);
+int rb_exec_context_kind_from_str(const char *s, RbExecutionContextKind *out);
+const char *rb_las_kind_to_str(RbLookAndSelectStepKind k);
+int rb_las_kind_from_str(const char *s, RbLookAndSelectStepKind *out);
+RbLookAndSelectStep rb_look_and_select_step_look(int count, const char *source);
+RbLookAndSelectStep rb_look_and_select_step_select(int count, int max_per_group);
+RbLookAndSelectStep rb_look_and_select_step_finalize(const char *destination, const char *source_zone);
 
 #endif /* RABUKA_H */
