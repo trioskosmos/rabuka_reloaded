@@ -602,6 +602,13 @@ typedef struct {
     int completed;    /* 1 after entry is done (mirrors Rust entry.completed) */
     int optional_cost_result; /* -1 none, 0 declined, 1 paid (mirrors Rust entry.optional_cost_result) */
     int pending_actions_n;    /* count of pending sequential actions */
+    /* condition_cache — mirrors Rust AbilityQueueEntry.condition_cache: Vec<(String,bool)> for cache:true conditions.
+       The C port stores up to 8 stringified condition keys (hash of condition pointer + variant) + verdict. */
+#define RB_COND_CACHE_CAP 8
+    int  cond_cache_keys[RB_COND_CACHE_CAP]; /* hash of condition pointer (or content hash) */
+    int  cond_cache_vals[RB_COND_CACHE_CAP]; /* 0/1 verdict */
+    int  n_cond_cache;
+    char player_id[16]; /* mirrors Rust entry.player_id (e.g. "player1") for cost-reduction hooks */
 } RbQueueEntry;
 
 #define RB_QUEUE_DEPTH 16
@@ -900,6 +907,9 @@ void rb_queue_promote_entry(GameState *g, int from_index);
 void rb_queue_promote_entry_by_abs(GameState *g, int absolute);
 void rb_queue_set_current_entry(GameState *g, int absolute);
 int rb_queue_has_pending_actions(const GameState *g);
+void rb_queue_set_pending_actions(GameState *g, int count);
+void rb_queue_save_pending_actions(GameState *g, int count);
+int rb_queue_take_pending_actions(GameState *g);
 void rb_resume_position_change(GameState *g, int actor, const AbilityEffect *e, int host_cid, int selected_idx);
 
 /* ── Ability queue: pop_constant_context / take_resolver / has_resolver ──

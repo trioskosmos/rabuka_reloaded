@@ -15,13 +15,17 @@ static int s_match_chars(int cid, const char *chars);
 static int s_pass_filter(int cid, const char *grp, const char *chars);
 static int s_blade_color_idx(const char *bt);
 static int s_heart_idx(const char *h);
+static const char *s_eff_extra(const AbilityEffect *e, const char *k);
+static int s_eff_extra_true(const AbilityEffect *e, const char *k);
+static int s_eff_extra_int(const AbilityEffect *e, const char *k, int dflt);
 
 void rb_effect_change_state(GameState *g, int actor, AbilityEffect *e, int host_cid){
     (void)host_cid;
-    /* ── Read effect fields ── */
+    /* ── Read effect fields (mirrors state.rs::execute_change_state header) ── */
     const char *state_change = NULL;
     for(int i=0;i<e->n_extra;i++) if(e->extra_k[i] && !strcmp(e->extra_k[i],"state")) { state_change=e->extra_v[i]; break; }
-    if(!state_change) for(int i=0;i<e->n_extra;i++) if(e->extra_k[i] && !strcmp(e->extra_k[i],"to_state")) { state_change=e->extra_v[i]; break; }
+    if(!state_change) for(int i=0;i<e->n_extra;i++) if(e->extra_k[i] && !strcmp(e->extra_k[i],"state_change") && e->extra_v[i]) { state_change=e->extra_v[i]; break; }
+    if(!state_change) for(int i=0;i<e->n_extra;i++) if(e->extra_k[i] && !strcmp(e->extra_k[i],"to_state") && e->extra_v[i]) { state_change=e->extra_v[i]; break; }
     if(!state_change) state_change = "wait";
     const char *target = (e->target && *e->target) ? e->target : "self";
     int who = s_who(target, actor);
@@ -32,11 +36,84 @@ void rb_effect_change_state(GameState *g, int actor, AbilityEffect *e, int host_
     for(int i=0;i<e->n_extra;i++) if(e->extra_k[i] && !strcmp(e->extra_k[i],"optional") && e->extra_v[i] && !strcmp(e->extra_v[i],"true")) optional=1;
     int self_cost = 0;
     for(int i=0;i<e->n_extra;i++) if(e->extra_k[i] && !strcmp(e->extra_k[i],"self_cost") && e->extra_v[i] && !strcmp(e->extra_v[i],"true")) self_cost=1;
-    const char *card_type_filter = e->card_type_field;
+    const char *card_type_filter = e->card_type_field[0] ? e->card_type_field : NULL;
+    if(!card_type_filter) for(int i=0;i<e->n_extra;i++) if(e->extra_k[i] && !strcmp(e->extra_k[i],"card_type") && e->extra_v[i]) { card_type_filter=e->extra_v[i]; break; }
     const char *grp = NULL; s_has_group(e, &grp);
     const char *chars = NULL; s_has_chars(e, &chars);
-    int cost_limit = e->count; /* simplified: cost_limit from extra if present */
+    /* group_names is trigger-level when targeting opponent (Rust group_filter = None for opponent) */
+    const char *group_filter = grp;
+    if(target && !strcmp(target,"opponent")) group_filter = NULL;
+    int cost_limit = -1;
     for(int i=0;i<e->n_extra;i++) if(e->extra_k[i] && !strcmp(e->extra_k[i],"cost_limit") && e->extra_v[i]) cost_limit=atoi(e->extra_v[i]);
+    const char *cost_limit_op = NULL;
+    for(int i=0;i<e->n_extra;i++) if(e->extra_k[i] && !strcmp(e->extra_k[i],"cost_limit_operator") && e->extra_v[i]) cost_limit_op=e->extra_v[i];
+    /* per-unit count derivation (1x per N matching cards) — mirrors Rust per_unit block */
+    int per_unit = e->per_unit || s_eff_extra_true(e,"per_unit");
+    if(per_unit){
+        const char *per_src = s_eff_extra(e,"per_unit_source");
+        int per_cnt = e->per_unit_count >0 ? e->per_unit_count : 1;
+        const char *puc = s_eff_extra(e,"per_unit_count");
+        if(puc) per_cnt = atoi(puc) ? atoi(puc) : per_cnt;
+        if(per_src && strstr(per_src,"previous_moved")){
+            int moved = g->n_recently_moved;
+            count = (moved / (per_cnt?per_cnt:1)) * (count?count:1);
+        } else {
+            /* count matching cards in stage zone (mirrors util::zone_cards + CardFilter) */
+            RbPlayer *Ptmp = &g->p[who];
+            int zone_ids[RB_STAGE_SIZE]; int zn=0;
+            for(int q=0;q<RB_STAGE_SIZE;q++) if(Ptmp->stage[q]!=RB_EMPTY_SLOT) zone_ids[zn++]=Ptmp->stage[q];
+            /* apply cost_limit filter if present */
+            int filt_ids[RB_STAGE_SIZE]; int fn=0;
+            for(int i=0;i<zn;i++){
+                int cid=zone_ids[i];
+                if(cost_limit>=0){
+                    Card c; int ccost=0;
+                    if(rb_decode_card_by_index((uint32_t)cid,&c)){ ccost=c.cost; rb_free_card(&c); }
+                    int ok = cost_limit_op && !strcmp(cost_limit_op,"<=") ? ccost<=cost_limit : ccost==cost_limit;
+                    if(!ok && cost_limit_op && !strcmp(cost_limit_op,"<")) ok = ccost<cost_limit;
+                    if(!ok && !cost_limit_op) ok = ccost==cost_limit;
+                    if(!ok) continue;
+                }
+                filt_ids[fn++]=cid;
+            }
+            int matched = fn;
+            /* distinct handling — joint-aware distinct-name count */
+            if(e->distinct_flag){
+                matched = rb_count_distinct_member_name_units(filt_ids, fn);
+            }
+            count = (matched / (per_cnt?per_cnt:1)) * (count?count:1);
+        }
+        group_filter = NULL; /* Rust clears group_name when per_unit */
+    }
+    /* blade_limit dynamic limits — Q266 / C5 (mirrors Rust blade_limit block) */
+    int blade_limit = -1;
+    const char *blade_limit_op = s_eff_extra(e,"blade_limit_operator");
+    for(int i=0;i<e->n_extra;i++) if(e->extra_k[i] && !strcmp(e->extra_k[i],"blade_limit") && e->extra_v[i]) blade_limit=atoi(e->extra_v[i]);
+    int q266_no_target = 0;
+    if(s_eff_extra(e,"blade_limit_from_cost_member") && !strcmp(s_eff_extra(e,"blade_limit_from_cost_member"),"true")){
+        int off = s_eff_extra(e,"blade_limit_offset") ? atoi(s_eff_extra(e,"blade_limit_offset")) : 0;
+        int cost_blade = 0;
+        if(g->mods.n_last_cost_moved_card_ids>0){
+            int cid=g->mods.last_cost_moved_card_ids[0];
+            Card c; if(rb_decode_card_by_index((uint32_t)cid,&c)){ cost_blade=c.blade; rb_free_card(&c); }
+        }
+        int signed_lim = cost_blade - off;
+        if(signed_lim<0){ q266_no_target=1; blade_limit=0; blade_limit_op="<"; }
+        else blade_limit=signed_lim;
+    } else if(s_eff_extra(e,"blade_limit_from_energy_under") && !strcmp(s_eff_extra(e,"blade_limit_from_energy_under"),"true")){
+        int off = s_eff_extra(e,"blade_limit_offset") ? atoi(s_eff_extra(e,"blade_limit_offset")) : 0;
+        int under = 0;
+        if(host_cid>=0){
+            RbPlayer *Ptmp=&g->p[who];
+            for(int q=0;q<RB_STAGE_SIZE;q++) if(Ptmp->stage[q]==host_cid) under=Ptmp->under_cards[q].n;
+        }
+        blade_limit = rb_saturate_u8(under+off);
+    }
+    if(q266_no_target) blade_limit_op="<";
+    /* cost_from_revealed — if set, cost_limit comes from first revealed card */
+    if(s_eff_extra(e,"cost_from_revealed") && !strcmp(s_eff_extra(e,"cost_from_revealed"),"true") && g->n_revealed>0){
+        Card c; if(rb_decode_card_by_index((uint32_t)g->revealed_cards[0],&c)){ cost_limit=c.cost; rb_free_card(&c); }
+    }
 
     /* ── Energy placement: deck → energy zone ── */
     const char *src = e->source;
@@ -46,79 +123,204 @@ void rb_effect_change_state(GameState *g, int actor, AbilityEffect *e, int host_
         return;
     }
 
-    /* ── Member state change (wait/active) ── */
+    /* ── Member state change (wait/active) — mirrors Rust is_member_op branch ── */
     int is_member = (card_type_filter && !strcmp(card_type_filter,"member_card")) || self_cost;
     if(is_member){
         RbPlayer *P = &g->p[who];
-        /* Check if already decided for optional */
+        const char *state_filter = s_eff_extra(e,"state"); /* e.g. state="active" for active→wait only */
+        int is_cannot_activate = 0;
+        if(!strcmp(state_change,"active") && g->player_cannot_activate[who]) is_cannot_activate=1;
+        int exclude_self_id = -1;
+        if(s_eff_extra(e,"exclude_self") && !strcmp(s_eff_extra(e,"exclude_self"),"true") && host_cid>=0) exclude_self_id=host_cid;
+        int is_self_target = (e->self_target_field[0]=='t');
+        /* optional gate — check if any valid target exists before emitting choice (mirrors Rust can_target scan) */
         if(optional){
-            int decided = g->queue.entries[g->queue.cur].optional_cost_result;
+            int decided = -1;
+            if(g->queue.cur>=0 && g->queue.cur < g->queue.n_entries) decided = g->queue.entries[g->queue.cur].optional_cost_result;
             if(decided<0){
-                /* Check if any valid target exists */
                 int can_target = 0;
                 for(int q=0;q<RB_STAGE_SIZE;q++){
                     int cid=P->stage[q];
                     if(cid==RB_EMPTY_SLOT) continue;
+                    if(exclude_self_id>=0 && cid==exclude_self_id) continue;
                     const char *ori = rb_mods_get_orientation((RbMods*)&g->mods, cid);
                     int is_wait = ori && !strcmp(ori,"wait");
                     if(!strcmp(state_change,"active")){
                         if(!is_wait) continue;
+                    } else if(state_filter && !strcmp(state_filter,"active")){
+                        if(is_wait) continue;
                     } else if(!strcmp(state_change,"wait")){
                         if(is_wait) continue;
                     }
-                    if(grp && !rb_card_matches_group_str(cid, grp)) continue;
+                    if(group_filter && !rb_card_matches_group_str(cid, group_filter)) continue;
                     if(!s_match_chars(cid, chars)) continue;
-                    can_target = 1; break;
+                    if(blade_limit>=0){
+                        Card cc; int bl=0;
+                        if(rb_decode_card_by_index((uint32_t)cid,&cc)){ bl=cc.blade; rb_free_card(&cc); }
+                        int ok=1;
+                        if(blade_limit_op && !strcmp(blade_limit_op,"<")) ok = bl < blade_limit;
+                        else if(blade_limit_op && !strcmp(blade_limit_op,"<=")) ok = bl <= blade_limit;
+                        else ok = bl <= blade_limit;
+                        if(!ok) continue;
+                    }
+                    can_target=1; break;
                 }
                 if(!can_target) return;
-                /* Emit optional choice */
                 rb_emit_choice(g, who, RB_CHOICE_SELECT_TARGET, NULL, NULL, 1, 1, "change_state_optional");
-                /* choice_route stored via pending_actions_n marker */
+                if(g->queue.cur>=0) g->queue.entries[g->queue.cur].pending_actions_n = 1;
                 return;
             }
         }
-        /* Collect candidates */
+        /* Collect candidates — honour selected_cards relay (mirrors Rust prior selection) */
         int cands[RB_STAGE_SIZE]; int nc=0;
+        if(g->n_selected_cards>0){
+            for(int s=0;s<g->n_selected_cards;s++){
+                int cid=g->selected_cards[s];
+                for(int q=0;q<RB_STAGE_SIZE;q++) if(P->stage[q]==cid){ cands[nc++]=cid; break; }
+            }
+            if(nc==0){
+                /* prior selection has no card on target stage — fall through to stage scan (Rust Q137 handling) */
+            } else {
+                /* filter the relayed selection by orientation / blade_limit / exclude_self */
+                int fcands[RB_STAGE_SIZE]; int fnc=0;
+                for(int i=0;i<nc;i++){
+                    int cid=cands[i];
+                    if(exclude_self_id>=0 && cid==exclude_self_id) continue;
+                    const char *ori = rb_mods_get_orientation((RbMods*)&g->mods, cid);
+                    int is_wait = ori && !strcmp(ori,"wait");
+                    if(!strcmp(state_change,"active")){ if(!is_wait) continue; }
+                    else if(state_filter && !strcmp(state_filter,"active")){ if(is_wait) continue; }
+                    else if(!strcmp(state_change,"wait")){ if(is_wait) continue; }
+                    if(blade_limit>=0){
+                        Card cc; int bl=0;
+                        if(rb_decode_card_by_index((uint32_t)cid,&cc)){ bl=cc.blade; rb_free_card(&cc); }
+                        int ok=1;
+                        if(blade_limit_op && !strcmp(blade_limit_op,"<")) ok = bl < blade_limit;
+                        else ok = bl <= blade_limit;
+                        if(!ok) continue;
+                    }
+                    fcands[fnc++]=cid;
+                }
+                nc=fnc; for(int i=0;i<nc;i++) cands[i]=fcands[i];
+                if(nc>0) goto candidates_ready;
+            }
+            nc=0;
+        }
         for(int q=0;q<RB_STAGE_SIZE;q++){
             int cid=P->stage[q];
             if(cid==RB_EMPTY_SLOT) continue;
+            if(exclude_self_id>=0 && cid==exclude_self_id) continue;
+            if(group_filter && !rb_card_matches_group_str(cid, group_filter)) continue;
+            if(!s_match_chars(cid, chars)) continue;
+            if(cost_limit>=0){
+                Card cc; int ccost=0;
+                if(rb_decode_card_by_index((uint32_t)cid,&cc)){ ccost=cc.cost; rb_free_card(&cc); }
+                int ok=1;
+                if(cost_limit_op && !strcmp(cost_limit_op,"<=")) ok = ccost<=cost_limit;
+                else if(cost_limit_op && !strcmp(cost_limit_op,"<")) ok = ccost<cost_limit;
+                else ok = ccost==cost_limit;
+                if(!ok) continue;
+            }
+            if(blade_limit>=0){
+                Card cc; int bl=0;
+                if(rb_decode_card_by_index((uint32_t)cid,&cc)){ bl=cc.blade; rb_free_card(&cc); }
+                int ok=1;
+                if(blade_limit_op && !strcmp(blade_limit_op,"<")) ok = bl < blade_limit;
+                else if(blade_limit_op && !strcmp(blade_limit_op,"<=")) ok = bl <= blade_limit;
+                else ok = bl <= blade_limit;
+                if(!ok) continue;
+            }
             const char *ori = rb_mods_get_orientation((RbMods*)&g->mods, cid);
             int is_wait = ori && !strcmp(ori,"wait");
-            if(!strcmp(state_change,"active")){
-                if(!is_wait) continue;
-            } else if(!strcmp(state_change,"wait")){
-                if(is_wait) continue;
-            }
-            if(grp && !rb_card_matches_group_str(cid, grp)) continue;
-            if(!s_match_chars(cid, chars)) continue;
+            int matches_state = 1;
+            if(!strcmp(state_change,"active")) matches_state = is_wait;
+            else if(state_filter && !strcmp(state_filter,"active")) matches_state = !is_wait;
+            else if(!strcmp(state_change,"wait")) matches_state = !is_wait;
+            if(!matches_state) continue;
             cands[nc++]=cid;
         }
-        if(nc==0) return;
-        int change_all = (count==0);
-        int needs_prompt = !change_all && (max || nc>count);
-        if(needs_prompt && g->n_selected_cards==0){
-            int pick = max ? count : count;
-            rb_emit_choice(g, who, RB_CHOICE_SELECT_CARD, "stage", NULL, pick>0?pick:1, max, "change_state");
-            /* Store pending action for re-apply after choice */
-            g->queue.entries[g->queue.cur].pending_actions_n = 1;
+candidates_ready:
+        /* self_cost / self_target restricts to host card */
+        if((self_cost || is_self_target) && g->n_selected_cards==0 && host_cid>=0){
+            int found=0; for(int i=0;i<nc;i++) if(cands[i]==host_cid) found=1;
+            if(found){
+                int fnc=0; for(int i=0;i<nc;i++) if(cands[i]==host_cid) cands[fnc++]=cands[i];
+                nc=fnc;
+            } else {
+                int on_stage=0; for(int q=0;q<RB_STAGE_SIZE;q++) if(P->stage[q]==host_cid) on_stage=1;
+                if(!on_stage) return;
+                const char *ori = rb_mods_get_orientation((RbMods*)&g->mods, host_cid);
+                int already = (!strcmp(state_change,"wait") && ori && !strcmp(ori,"wait")) || (!strcmp(state_change,"active") && (!ori || strcmp(ori,"wait")));
+                if(already) return;
+                if(nc < RB_STAGE_SIZE) cands[nc++]=host_cid;
+            }
+        }
+        /* Q275 wait_immune: action_by=opponent excludes immune members */
+        if(!strcmp(state_change,"wait") && s_eff_extra(e,"action_by") && !strcmp(s_eff_extra(e,"action_by"),"opponent")){
+            int fnc=0;
+            for(int i=0;i<nc;i++){
+                int cid=cands[i];
+                int immune=0;
+                for(int k=0;k<g->n_prohibition;k++) if(strstr(g->prohibition[k],"cannot_wait") && strstr(g->prohibition[k], target)) immune=1;
+                if(!immune) cands[fnc++]=cid;
+            }
+            nc=fnc;
+        }
+        if(nc==0){
+            /* energy fallback (parser emits card_type=energy_card) */
+            const char *ct2 = card_type_filter ? card_type_filter : s_eff_extra(e,"card_type");
+            if(ct2 && !strcmp(ct2,"energy_card")){
+                rb_effect_energy_state_change(g, actor, e);
+            }
             return;
         }
-        /* Apply to selected or first N candidates */
+        int change_all = (count==0);
+        int is_self_target_prompt = (count==1 && strcmp(target,"opponent") && card_type_filter && !strcmp(card_type_filter,"member_card") && host_cid>=0);
+        if(is_self_target_prompt){ for(int i=0;i<nc;i++) if(cands[i]==host_cid) is_self_target_prompt=1; else is_self_target_prompt=0; }
+        int needs_prompt = 0;
+        if(!is_self_target_prompt && g->n_selected_cards==0){
+            if(max && nc>0) needs_prompt=1;
+            else if(!change_all && nc>count) needs_prompt=1;
+        }
+        if(needs_prompt){
+            int pick = count;
+            rb_emit_choice(g, who, RB_CHOICE_SELECT_CARD, "stage", NULL, pick>0?pick:1, max, "change_state");
+            if(g->queue.cur>=0) g->queue.entries[g->queue.cur].pending_actions_n = 1;
+            return;
+        }
         int nchange = change_all ? nc : (count<nc?count:nc);
+        /* snapshot orientations before change */
+        int snap_ids[RB_STAGE_SIZE]; const char *snap_ori[RB_STAGE_SIZE]; int nsnap=nchange;
+        for(int i=0;i<nchange;i++){ snap_ids[i]=cands[i]; snap_ori[i]=rb_mods_get_orientation((RbMods*)&g->mods, cands[i]); }
+        int wait_before=0;
+        for(int i=0;i<nchange;i++){ if(snap_ori[i] && !strcmp(snap_ori[i],"wait")) wait_before++; }
         for(int i=0;i<nchange;i++){
-            int cid = (g->n_selected_cards>0) ? g->selected_cards[i] : cands[i];
-            if(cid<0) continue;
+            int cid=cands[i];
+            if(is_cannot_activate) continue;
+            /* wait_immune suppression at apply time */
+            int immune=0;
+            if(!strcmp(state_change,"wait")){
+                for(int k=0;k<g->n_prohibition;k++) if(strstr(g->prohibition[k],"wait_immune") && g->prohibition[k][0]) immune=0;
+            }
+            if(immune) continue;
             const char *old_ori = rb_mods_get_orientation((RbMods*)&g->mods, cid);
             int was_wait = old_ori && !strcmp(old_ori,"wait");
             int will_wait = !strcmp(state_change,"wait");
             if(was_wait != will_wait){
                 g->state_change_from[cid] = (int8_t)(was_wait?1:0);
                 g->state_change_to[cid] = (int8_t)(will_wait?1:0);
-                if(was_wait && !will_wait) g->last_wait_to_active_count++;
             }
             rb_mods_set_orientation(&g->mods, cid, state_change);
+            if(g->n_selected_cards < RB_MAX_RECENTLY_MOVED){
+                int already=0; for(int s=0;s<g->n_selected_cards;s++) if(g->selected_cards[s]==cid) already=1;
+                if(!already) g->selected_cards[g->n_selected_cards++]=cid;
+            }
+        }
+        if(!strcmp(state_change,"active")){
+            g->last_wait_to_active_count = is_cannot_activate ? 0 : (uint8_t)wait_before;
         }
         rb_fire_auto_and_pending(g, who);
+        if(who!= (actor^1)) rb_fire_auto_and_pending(g, actor^1);
         return;
     }
 
@@ -474,6 +676,25 @@ void rb_effect_modify_cost(GameState *g, int actor, AbilityEffect *e, int host_c
     const char *op="add";
     for(int i=0;i<e->n_extra;i++) if(e->extra_k[i] && !strcmp(e->extra_k[i],"operation") && e->extra_v[i]) op=e->extra_v[i];
     int value = s_value(e, 0);
+    /* per_unit scaling — mirrors Rust execute_modify_cost per_unit block: value *= units (capped by repeat_limit) */
+    if(e->per_unit || s_eff_extra_true(e,"per_unit")){
+        const char *put = s_eff_extra(e,"per_unit_type");
+        const char *loc2 = s_eff_extra(e,"location");
+        const char *put_str = put ? put : (loc2 ? loc2 : "枚");
+        RbPlayer *Ppu = &g->p[s_who(e->target, actor)];
+        /* resolve matching count via distinct-aware zone counting */
+        int per_unit_count = e->per_unit_count>0?e->per_unit_count:1;
+        const char *puc = s_eff_extra(e,"per_unit_count");
+        if(puc) per_unit_count = atoi(puc) ? atoi(puc) : per_unit_count;
+        if(per_unit_count<1) per_unit_count=1;
+        int matching = Ppu->hand.n; /* default hand for modify_cost */
+        if(put_str && !strcmp(put_str,"discard")) matching = g->n_recently_moved;
+        int units = matching / per_unit_count;
+        const char *rl = s_eff_extra(e,"repeat_limit");
+        if(!rl) rl = s_eff_extra(e,"max_repeats");
+        if(rl){ int cap=atoi(rl); if(units>cap) units=cap; }
+        value *= units;
+    }
     int who = s_who(e->target, actor);
     /* modify_yell_count / modify_yell_source are per-player yell modifiers. */
     if(e->action && !strcmp(e->action,"modify_yell_count")){
@@ -614,24 +835,73 @@ void rb_effect_set_heart_copy_from_under(GameState *g, int actor, AbilityEffect 
 
 /* Mirror state.rs::execute_set_heart_type (+ set_heart_type_applied). ref_value
    "placed_under" copies the under-card's hearts; otherwise the member's hearts
-   are recolored (transform) to the chosen heart color via heart_multiplier. */
+   are recolored (transform) to the chosen heart color via heart_multiplier.
+   Handles heart_selection / group filter / target_count with interactive choice. */
 void rb_effect_set_heart_type(GameState *g, int actor, AbilityEffect *e, int host_cid){
     const char *ref=NULL;
     for(int i=0;i<e->n_extra;i++) if(e->extra_k[i]&&!strcmp(e->extra_k[i],"ref_value")&&e->extra_v[i]) ref=e->extra_v[i];
     if(ref && !strcmp(ref,"placed_under")){ rb_effect_set_heart_copy_from_under(g, actor, e, host_cid); return; }
+    int is_self = (e->self_target_field[0]=='t');
+    int heart_selection = s_eff_extra(e,"heart_selection") && !strcmp(s_eff_extra(e,"heart_selection"),"true");
+    const char *grp=NULL; s_has_group(e,&grp);
+    int needs_target = !is_self && (heart_selection || grp || (e->card_type_field[0] && !strcmp(e->card_type_field,"member_card")));
     const char *ht=NULL;
     for(int i=0;i<e->n_extra;i++) if(e->extra_k[i] && (!strcmp(e->extra_k[i],"heart_type")||!strcmp(e->extra_k[i],"heart_color")) && e->extra_v[i]) ht=e->extra_v[i];
     if(!ht) for(int i=0;i<e->n_extra;i++) if(e->extra_k[i] && !strcmp(e->extra_k[i],"heart_colors") && e->extra_v[i]) ht=e->extra_v[i];
-    if(!ht || !strcmp(ht,"selected")) ht="heart00";
-    int col = s_heart_idx(ht);
-    int who = s_who(e->target, actor);
-    int cid=-1;
-    if(g->n_selected_cards>0) cid=g->selected_cards[0];
-    else if(host_cid>=0) cid=host_cid;
-    else for(int q=0;q<RB_STAGE_SIZE;q++) if(g->p[who].stage[q]!=RB_EMPTY_SLOT){ cid=g->p[who].stage[q]; break; }
-    if(cid<0) return;
-    g->mods.heart_multiplier[cid]=(int8_t)col;
-    g->mods.heart_multiplier_amt[cid]=(int8_t)(e->count>=1?e->count:2);
+    /* "selected" means heart type was chosen by preceding select — resolve from queue selected_heart_color */
+    if(ht && !strcmp(ht,"selected")){
+        if(g->queue.selected_heart_color>=0){
+            static char buf[16]; snprintf(buf,sizeof buf,"heart%02d", g->queue.selected_heart_color);
+            ht=buf;
+        } else ht="heart00";
+    }
+    if(!ht) ht="heart00";
+    if(is_self || !needs_target){
+        int col = s_heart_idx(ht);
+        int who = s_who(e->target, actor);
+        int cid=-1;
+        if(g->n_selected_cards>0) cid=g->selected_cards[0];
+        else if(host_cid>=0) cid=host_cid;
+        else for(int q=0;q<RB_STAGE_SIZE;q++) if(g->p[who].stage[q]!=RB_EMPTY_SLOT){ cid=g->p[who].stage[q]; break; }
+        if(cid<0) return;
+        g->mods.heart_multiplier[cid]=(int8_t)col;
+        g->mods.heart_multiplier_amt[cid]=(int8_t)(e->count>=1?e->count:2);
+        return;
+    }
+    if(g->n_selected_cards==0){
+        const char *target = e->target ? e->target : "self";
+        int who = s_who(target, actor);
+        RbPlayer *P=&g->p[who];
+        int stage_ids[RB_STAGE_SIZE]; int sn=0;
+        for(int q=0;q<RB_STAGE_SIZE;q++) if(P->stage[q]!=RB_EMPTY_SLOT) stage_ids[sn++]=P->stage[q];
+        const char *chars=NULL; s_has_chars(e,&chars);
+        int cand[RB_STAGE_SIZE]; int nc=0;
+        for(int i=0;i<sn;i++) if(s_pass_filter(stage_ids[i], grp, chars)) cand[nc++]=stage_ids[i];
+        if(nc==0) return;
+        int tc = 1;
+        const char *tcv=s_eff_extra(e,"target_count");
+        if(tcv) tc=atoi(tcv);
+        if(nc <= tc){
+            for(int i=0;i<nc;i++){ int already=0; for(int s=0;s<g->n_selected_cards;s++) if(g->selected_cards[s]==cand[i]) already=1; if(!already && g->n_selected_cards<RB_MAX_RECENTLY_MOVED) g->selected_cards[g->n_selected_cards++]=cand[i]; }
+            int col = s_heart_idx(ht);
+            int cid=g->selected_cards[0];
+            g->mods.heart_multiplier[cid]=(int8_t)col;
+            g->mods.heart_multiplier_amt[cid]=(int8_t)(e->count>=1?e->count:2);
+        } else {
+            rb_emit_choice(g, actor, RB_CHOICE_SELECT_CARD, "stage", NULL, tc, 0, "heart_type");
+            if(grp) strncpy(g->queue.pending.filter_group, grp, sizeof(g->queue.pending.filter_group)-1);
+            g->queue.deferred = e;
+            g->queue.resume_host = host_cid;
+        }
+        return;
+    }
+    /* already have selected target */
+    {
+        int col = s_heart_idx(ht);
+        int cid=g->selected_cards[0];
+        g->mods.heart_multiplier[cid]=(int8_t)col;
+        g->mods.heart_multiplier_amt[cid]=(int8_t)(e->count>=1?e->count:2);
+    }
 }
 
 /* Mirror state.rs::execute_set_card_identity — rewrite this member's identity to

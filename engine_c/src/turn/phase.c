@@ -121,6 +121,10 @@ void rb_advance_phase(GameState *g) {
         for(int i=0;i<RB_MAX_CARD_IDS;i++) g->moved_this_turn[i]=0;
         g->debut_count_this_turn[0]=g->debut_count_this_turn[1]=0;
         g->position_change_occurred_this_turn=0;
+        /* Clear stage_arrived tracking (mirrors rb_turn's reset of baton arrival-ban).
+            Without this, baton touch remains blocked on the next turn because the
+            existing member's arrival flag is still set. */
+        for(int p=0;p<2;p++) for(int i=0;i<RB_STAGE_SIZE;i++) g->stage_arrived[p][i]=0;
         g->active=g->active^1;
         rb_tick_gained(g); /* expire gained abilities whose duration elapsed (mirrors TemporaryEffect turn-end) */
         g->phase=RB_PHASE_ACTIVE;

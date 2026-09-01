@@ -8,44 +8,44 @@ actually present in C.
 ## Summary
 
 - C files audited (mapped to a Rust twin): 28
-- Total C lines (non-blank/comment): 19038   Total Rust lines: 48265
-- Total C functions: 1245   Total Rust functions (all): 1069
+- Total C lines (non-blank/comment): 20359   Total Rust lines: 48265
+- Total C functions: 1300   Total Rust functions (all): 1069
 - Total Rust **port-target** functions (excl. constructors/trait glue): 857
-- **Function-count gap (Rust port-targets − C, summed): -388** (approx. unported functions)
+- **Function-count gap (Rust port-targets − C, summed): -443** (approx. unported functions)
 - Best-effort unmatched Rust function names: 5 (heuristic)
 
 ## Per-file gap (sorted by missing-function count, worst first)
 
 | C file | C lines | Rust lines | C/Rust % | C fns | Rust port fns | missing ≈ | Rust twin(s) |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
-| `src/ability/resolver.c` | 210 | 1019 | 20% | 23 | 24 | 1 | resolver.rs |
 | `src/ability/vm.c` | 2231 | 3522 | 63% | 81 | 81 | 0 | vm.rs, effect_decoder_gen.rs, condition_decoder_gen.rs |
 | `src/ability/condition.c` | 2215 | 6571 | 33% | 100 | 81 | -19 | condition.rs, card.rs, compound.rs, state.rs |
-| `src/ability/choice.c` | 681 | 3165 | 21% | 49 | 33 | -16 | choice.rs |
+| `src/ability/choice.c` | 1052 | 3165 | 33% | 50 | 33 | -17 | choice.rs |
 | `src/ability/ability_queue.c` | 306 | 669 | 45% | 42 | 29 | -13 | ability_queue.rs, triggers.rs |
 | `src/ability/dynamic_count.c` | 167 | 158 | 105% | 5 | 2 | -3 | dynamic_count.rs |
 | `src/ability/util.c` | 1346 | 2199 | 61% | 88 | 88 | 0 | util.rs |
 | `src/ability/cost.c` | 456 | 1195 | 38% | 29 | 9 | -20 | cost.rs |
 | `src/ability/compound.c` | 193 | 753 | 25% | 11 | 8 | -3 | compound.rs |
+| `src/ability/resolver.c` | 569 | 1019 | 55% | 45 | 24 | -21 | resolver.rs |
 | `src/ability/effects/move.c` | 1210 | 3322 | 36% | 41 | 41 | 0 | move_cards.rs |
 | `src/ability/effects/look.c` | 428 | 1119 | 38% | 19 | 10 | -9 | look.rs |
-| `src/ability/effects/state.c` | 1358 | 5359 | 25% | 63 | 56 | -7 | state.rs, misc.rs |
+| `src/ability/effects/state.c` | 1365 | 5359 | 25% | 63 | 56 | -7 | state.rs, misc.rs |
 | `src/ability/effects/ability.c` | 200 | 493 | 40% | 13 | 7 | -6 | ability_effects.rs |
-| `src/ability/effects/misc.c` | 928 | 3766 | 24% | 55 | 39 | -16 | misc.rs |
+| `src/ability/effects/misc.c` | 958 | 3766 | 25% | 55 | 39 | -16 | misc.rs |
 | `src/ability/effects/draw.c` | 463 | 663 | 69% | 15 | 14 | -1 | draw.rs |
 | `src/ability/effects/score.c` | 352 | 748 | 47% | 16 | 6 | -10 | score.rs |
 | `src/core/card.c` | 1260 | 3448 | 36% | 186 | 91 | -95 | card.rs |
-| `src/core/data.c` | 404 | 966 | 41% | 36 | 12 | -24 | mod.rs, types.rs |
+| `src/core/data.c` | 452 | 966 | 46% | 39 | 12 | -27 | mod.rs, types.rs |
 | `src/core/alloc.c` | 63 | 140 | 45% | 10 | 5 | -5 | pool.rs |
 | `src/core/modifiers.c` | 302 | 416 | 72% | 58 | 22 | -36 | game_modifiers.rs, modifiers.rs |
 | `src/core/stats_pipeline.c` | 146 | 226 | 64% | 8 | 8 | 0 | stats_pipeline.rs |
-| `src/core/game_state_abilities.c` | 934 | 2403 | 38% | 83 | 67 | -16 | abilities.rs |
+| `src/core/game_state_abilities.c` | 976 | 2403 | 40% | 87 | 67 | -20 | abilities.rs |
 | `src/core/tracking.c` | 132 | 90 | 146% | 10 | 6 | -4 | tracking.rs |
-| `src/core/zones.c` | 430 | 1052 | 40% | 58 | 37 | -21 | zones.rs, player.rs |
-| `src/turn/phase.c` | 488 | 1429 | 34% | 43 | 31 | -12 | phases.rs |
-| `src/turn/live.c` | 720 | 2467 | 29% | 40 | 37 | -3 | live.rs |
-| `src/turn/triggers.c` | 430 | 573 | 75% | 15 | 5 | -10 | triggers.rs |
-| `src/engine.c` | 985 | 334 | 294% | 48 | 8 | -40 | main.rs, lib.rs, mod.rs, game.rs |
+| `src/core/zones.c` | 634 | 1052 | 60% | 75 | 37 | -38 | zones.rs, player.rs |
+| `src/turn/phase.c` | 515 | 1429 | 36% | 44 | 31 | -13 | phases.rs |
+| `src/turn/live.c` | 912 | 2467 | 36% | 45 | 37 | -8 | live.rs |
+| `src/turn/triggers.c` | 473 | 573 | 82% | 17 | 5 | -12 | triggers.rs |
+| `src/engine.c` | 983 | 334 | 294% | 48 | 8 | -40 | main.rs, lib.rs, mod.rs, game.rs |
 
 ## Best-effort unmatched Rust function names (heuristic — verify manually)
 

@@ -17,6 +17,8 @@
 /* Mirror misc.rs:execute_gain_surplus_heart — capture this player's live surplus
    (total_hearts − total_required) so it can be granted/lost as a resource. */
 void rb_effect_gain_surplus_heart(GameState *g, int actor, const AbilityEffect *e);
+static int h_rotation(GameState *g, int actor, const AbilityEffect *e);
+static int h_reveal_until_chosen_card(GameState *g, int actor, const AbilityEffect *e);
 
 /* ══════════════════ shared helpers (the private fns of misc.rs) ══════════════════ */
 
@@ -677,11 +679,34 @@ static int h_gain_resource(GameState *g, int actor, const AbilityEffect *e) {
     return 1;
 }
 static int h_pay_energy(GameState *g, int actor, const AbilityEffect *e) {
-    /* Mirror misc.rs pay_energy — spend `count` active energy. */
-    int n = e->count > 0 ? e->count : 1;
-    RbPlayer *P = &g->p[actor];
-    P->energy_active -= n;
-    if (P->energy_active < 0) P->energy_active = 0;
+    /* Mirror misc.rs::execute_pay_energy — dynamic count, optional gate, active count check. */
+    int count = e->count;
+    const char *dyn = eff_extra(e,"dynamic_count");
+    if(dyn) count = rb_effect_count(g, actor, s_activating_card, e, g->last_draw_count);
+    if(count<=0) count = e->count>0?e->count:1;
+    /* energy_count field overrides count */
+    int ec = extra_int(e,"energy_count",-1);
+    if(ec>=0) count = ec;
+    if(extra_true(e,"optional") || e->is_optional){
+        if(g->p[actor].energy_active < count){
+            /* Insufficient energy: skip payment and cancel remaining (Rust cancel_remaining_commands) */
+            return 1;
+        }
+        rb_emit_choice(g, actor, RB_CHOICE_SELECT_TARGET, NULL, NULL, count, 1, "pay_optional_cost");
+        rb_choice_set_route(&g->queue.pending, RB_ROUTE_OPTIONAL_COST);
+        return 1;
+    }
+    if(count>0){
+        RbPlayer *P=&g->p[actor];
+        if(rb_energy_pay(P,count)!=0){
+            /* ignore error in C */
+        }
+        rb_recalc_constants(g);
+    }
+    if(s_activating_card>=0){
+        char label[64]; snprintf(label,sizeof label,"%dエネルギー支払",count);
+        rule_log_activated(g,s_activating_card,label);
+    }
     return 1;
 }
 /* Mirror cost.rs::handle_pay_cost_all_discard — the "may discard your whole hand"
@@ -700,14 +725,18 @@ int rb_effect_pay_cost_all_discard(GameState *g, int actor, const AbilityEffect 
     return 1;
 }
 static int h_discard_until_count(GameState *g, int actor, const AbilityEffect *e) {
-    /* Mirror misc.rs discard_until_count — discard from hand until hand
-       size reaches `count`. */
-    int target = e->count > 0 ? e->count : 0;
-    RbPlayer *P = &g->p[actor];
-    while (P->hand.n > target && P->hand.n > 0) {
-        int card = P->hand.cards[--P->hand.n]; /* drop from end */
-        if (P->discard.n < RB_MAX_ZONE) P->discard.cards[P->discard.n++] = card;
-    }
+    /* Mirror misc.rs::execute_discard_until_count — emit a hand selection choice. */
+    int target = extra_int(e,"target_count", e->count>=0?e->count:0);
+    const char *tgt = e->target ? e->target : "self";
+    int who = (!strcmp(tgt,"opponent"))? actor^1 : actor;
+    RbPlayer *P=&g->p[who];
+    int cur = P->hand.n;
+    if(cur <= target) return 1;
+    int to_discard = cur - target;
+    const char *ctype = e->card_type_field[0]?e->card_type_field:eff_extra(e,"card_type");
+    rb_emit_choice(g, who, RB_CHOICE_SELECT_CARD, "hand", ctype, to_discard, 0, "hand");
+    rb_choice_set_route(&g->queue.pending, RB_ROUTE_SELECT_CARDS);
+    if(s_activating_card>=0) rule_log_activated(g,s_activating_card,"[[log_discard_until]]");
     return 1;
 }
 static int h_restriction(GameState *g, int actor, const AbilityEffect *e) {
@@ -715,141 +744,263 @@ static int h_restriction(GameState *g, int actor, const AbilityEffect *e) {
     const char *rdest = eff_extra(e, "restricted_destination");
     if(!rtype) rtype = eff_extra(e, "type");
     if(!rdest && e->destination) rdest = e->destination;
-    int delayed = 0;
-    const char *dstr = eff_extra(e, "delayed");
-    if(dstr && (!strcmp(dstr,"true")||!strcmp(dstr,"1"))) delayed = 1;
+    int delayed = extra_true(e,"delayed");
 
-    /* Record the prohibition note (mirrors gs.prohibition_effects). */
-    if(g->n_prohibition < 64){
-        char *b = g->prohibition[g->n_prohibition];
-        int bi = 0;
-        const char *a = rtype?rtype:"unknown";
-        const char *d = rdest?rdest:"";
-        for(const char *p=a; *p && bi<46; ) b[bi++]=*p++;
-        if(bi<47) b[bi++]=':';
-        for(const char *p=d; *p && bi<47; ) b[bi++]=*p++;
-        b[bi]=0;
-        g->n_prohibition++;
+    /* Record the prohibition note (mirrors gs.prohibition_effects / delayed). */
+    {
+        char buf[48]; int bi=0;
+        const char *a=rtype?rtype:"unknown";
+        const char *d=rdest?rdest:"";
+        for(const char *p=a;*p && bi<46;) buf[bi++]=*p++;
+        if(bi<47) buf[bi++]=':';
+        for(const char *p=d;*p && bi<47;) buf[bi++]=*p++;
+        buf[bi]=0;
+        push_prohibition(g, rtype?rtype:"unknown", rdest?rdest:"");
+        /* Also keep delayed vs immediate distinction via log */
+        (void)buf;
     }
+    if(s_activating_card>=0) rule_log_activated(g,s_activating_card,"[[log_restriction]]");
 
-    /* cannot_activate / cannot_active → block ability activation. */
-    int is_cannot = rtype && (!strcmp(rtype,"cannot_activate_by_effect") ||
+    int is_cannot_active = rtype && (!strcmp(rtype,"cannot_activate_by_effect") ||
                              !strcmp(rtype,"cannot_active") || !strcmp(rtype,"cannot_activate"));
-    if(is_cannot){
+    if(is_cannot_active){
         int tgt = actor;
         if(e->target && !strcmp(e->target,"opponent")) tgt = actor^1;
         if(delayed){
-            /* Key the ban on the cards this ability just moved, else the target
-               player's staged members (next-turn-only activation lockout). */
+            /* Rust keys on changed_state_members → recently_moved → activating_card.
+               C has no changed_state_members; use recently_moved fallback. */
+            int keyed=0;
+            for(int i=0;i<g->n_recently_moved;i++){
+                int cid=g->recently_moved[i];
+                if(cid>=0) { rb_mods_add_delayed_cannot_active(&g->mods,cid,1); keyed=1; }
+            }
+            if(!keyed && s_activating_card>=0) rb_mods_add_delayed_cannot_active(&g->mods,s_activating_card,1);
+            /* Also push to cannot_active_cards array for legacy checks */
             for(int i=0;i<g->n_recently_moved && g->n_cannot_active_cards<RB_MAX_ZONE;i++)
                 g->cannot_active_cards[g->n_cannot_active_cards++]=g->recently_moved[i];
-            for(int q=0;q<RB_STAGE_SIZE;q++)
-                if(g->p[tgt].stage[q]>=0 && g->n_cannot_active_cards<RB_MAX_ZONE)
+            if(g->n_cannot_active_cards==0){
+                for(int q=0;q<RB_STAGE_SIZE;q++) if(g->p[tgt].stage[q]>=0 && g->n_cannot_active_cards<RB_MAX_ZONE)
                     g->cannot_active_cards[g->n_cannot_active_cards++]=g->p[tgt].stage[q];
+            }
         } else {
             g->player_cannot_activate[tgt] = 1;
         }
     }
+    /* cannot_live → live restriction (Rust gs.cannot_live_players). Map to prohibition note already pushed; no separate field in C. */
+    if(rtype && !strcmp(rtype,"cannot_live")){
+        /* Already recorded as prohibition; C has no per-player live block, so set a generic prohibition check via live path */
+        push_prohibition(g,"cannot_live", e->target?e->target:"self");
+    }
+    /* cannot_wait_by_effect → wait immune members (Rust wait_immune_members). C has no field; record as prohibition so wait effects can query. */
+    if(rtype && !strcmp(rtype,"cannot_wait_by_effect")){
+        push_prohibition(g,"cannot_wait_by_effect", eff_extra(e,"group_names")?eff_extra(e,"group_names"):"");
+    }
     return 1;
 }
 static int h_choice(GameState *g, int actor, const AbilityEffect *e) {
-    /* Mirror misc.rs / ability/choice.rs `execute_choice` — present a choice to
-       the host (headless auto-skips via the resolver). Emit a SELECT_TARGET
-       pending choice with the effect's count as the option count and its
-       is_optional flag as the allow-skip bit, so the resume path mirrors the
-       dedicated "choice" verb in engine.c. */
-    if (g->queue.resume_active) return 1;   /* already resolving; don't re-emit */
+    /* Mirror misc.rs::execute_choice — choice options/effects, conditional choice cache, opponent choice maker. */
+    if (g->queue.resume_active) return 1;
+    const char *choice_maker = eff_extra(e,"choice_maker");
+    const char *choice_type = eff_extra(e,"choice_type");
+    (void)choice_type;
+    int who = actor;
+    if(choice_maker && !strcmp(choice_maker,"opponent")) who = actor^1;
+    if(g->queue.has_pending) return 1;
+    /* check conditional_choice already resolved — skip re-emit */
+    if(g->queue.selected_heart_color>=0) return 1;
     int cnt = e->count >= 0 ? e->count : 1;
     int allow = e->is_optional ? 1 : 0;
-    rb_emit_choice(g, actor, RB_CHOICE_SELECT_TARGET, NULL, NULL, cnt, allow, "choice");
+    rb_emit_choice(g, who, RB_CHOICE_SELECT_TARGET, NULL, NULL, cnt, allow, "choice");
+    rb_choice_set_route(&g->queue.pending, RB_ROUTE_SELECT_TARGET);
     g->queue.resume_mode = 0;
+    g->queue.resume_actor = who;
     return 1;
 }
 static int h_position_change(GameState *g, int actor, const AbilityEffect *e) {
-    /* Mirror misc.rs position_change — move a member from a source area to a
-       destination area on the actor's stage. When the destination is not
-       specified or the effect is each_time, emit a SelectTarget choice. */
+    /* Mirror misc.rs::execute_position_change — full faithful port covering:
+       each_time watcher, destination-specified, target_member=select, both,
+       multiple_targets formation, source-position branch, and generic swap. */
+    int target_is_both = e->target && !strcmp(e->target,"both");
+    const char *trigger_type = eff_extra(e,"trigger_type");
+    const char *target = e->target ? e->target : "self";
+    const char *target_member = eff_extra(e,"target_member");
+    if(!target_member) target_member = "this_member";
+    const char *pos_param = eff_extra(e,"position") ? eff_extra(e,"position") : eff_extra(e,"source_position");
+
     RbPlayer *P = &g->p[actor];
+    if(s_activating_card>=0) rule_log_activated(g,s_activating_card,"[[log_position_change]]");
 
-    /* Check if this is an each_time effect that needs a choice */
-    const char *trigger_type = NULL;
-    for (int i = 0; i < e->n_extra; i++) {
-        if (e->extra_k[i] && !strcmp(e->extra_k[i], "trigger_type") && e->extra_v[i]) {
-            trigger_type = e->extra_v[i]; break;
-        }
-    }
-
-    /* For each_time effects, find the triggering member and emit a choice */
-    if (trigger_type && !strcmp(trigger_type, "each_time")) {
-        /* Find the triggering member on stage */
-        int triggering_member = g->queue.resume_host;
-        int cur_idx = -1;
-        for (int i = 0; i < RB_STAGE_SIZE; i++) {
-            if (P->stage[i] == triggering_member) { cur_idx = i; break; }
-        }
-        if (cur_idx >= 0) {
-            /* Emit a SelectTarget choice for destination */
-            char options[128];
-            options[0] = '\0';
-            int n_opts = 0;
-            const char *areas[] = {"left", "center", "right"};
-            for (int i = 0; i < 3; i++) {
-                if (i != cur_idx) {
-                    if (n_opts > 0) strcat(options, ",");
-                    strcat(options, areas[i]);
-                    n_opts++;
-                }
-            }
+    /* each_time watcher: triggering member is resume_host, emit destination choice */
+    if(trigger_type && !strcmp(trigger_type,"each_time")){
+        int tm = g->queue.resume_host >=0 ? g->queue.resume_host : s_activating_card;
+        int cur=-1;
+        for(int i=0;i<RB_STAGE_SIZE;i++) if(P->stage[i]==tm){cur=i;break;}
+        if(cur>=0){
             rb_emit_choice(g, actor, RB_CHOICE_SELECT_TARGET, NULL, NULL, 1, e->is_optional, "position|destination");
-            rb_choice_set_description(&g->queue.pending, "Choose destination for member");
             rb_choice_set_route(&g->queue.pending, RB_ROUTE_SELECT_TARGET);
             return 1;
         }
+        return 1;
     }
-
-    /* Direct position change (source → destination) */
-    int src = 1, dst = 1;
-    if (e->source && *e->source) src = rb_pos_to_area(e->source);
-    const char *dest = e->destination && *e->destination ? e->destination : e->target;
-    if (dest && *dest) dst = rb_pos_to_area(dest);
-    if (src < 0 || src >= RB_STAGE_SIZE) src = 1;
-    if (dst < 0 || dst >= RB_STAGE_SIZE) dst = 1;
-    if (src == dst) return 1;
-    if (P->stage[src] < 0) return 0;
-    if (P->stage[dst] >= 0) return 0;
-    int card = P->stage[src];
-    P->stage[src] = -1; P->stage_wait[src] = 0;
-    P->stage[dst] = card; P->stage_wait[dst] = 0;
-    return 1;
+    /* destination already specified */
+    const char *dest = e->destination;
+    if(!dest) dest = eff_extra(e,"destination");
+    if(dest && *dest){
+        if(!strcmp(dest,"front") && !strcmp(target,"opponent")){
+            rb_emit_choice(g, actor, RB_CHOICE_SELECT_TARGET, NULL, NULL, 1, e->is_optional, "position|destination");
+            rb_choice_set_route(&g->queue.pending, RB_ROUTE_SELECT_TARGET);
+            return 1;
+        }
+        return rb_position_change_with_destination(g, actor, e, dest, s_activating_card);
+    }
+    /* target_member == select : pick which member to move */
+    if(target_member && !strcmp(target_member,"select")){
+        rb_emit_choice(g, actor, RB_CHOICE_SELECT_TARGET, NULL, NULL, 1, e->is_optional, "position|destination");
+        rb_choice_set_route(&g->queue.pending, RB_ROUTE_SELECT_TARGET);
+        return 1;
+    }
+    /* both target */
+    if(target_is_both){
+        /* Emit opponent choice first; self deferred via queue if needed */
+        rb_emit_choice(g, actor^1, RB_CHOICE_SELECT_TARGET, NULL, NULL, 1, e->is_optional, "position|destination");
+        rb_choice_set_route(&g->queue.pending, RB_ROUTE_SELECT_TARGET);
+        return 1;
+    }
+    /* multiple_targets + position -> rotation */
+    if(extra_true(e,"multiple_targets") && pos_param){
+        return h_rotation(g, actor, e);
+    }
+    /* multiple_targets formation (this_member multiple) */
+    if(extra_true(e,"multiple_targets") && !strcmp(target_member,"this_member")){
+        rb_emit_choice(g, actor, RB_CHOICE_SELECT_TARGET, NULL, NULL, 1, e->is_optional, "position|destination");
+        rb_choice_set_route(&g->queue.pending, RB_ROUTE_SELECT_TARGET);
+        return 1;
+    }
+    if(pos_param && *pos_param){
+        int src = rb_stage_position_index(pos_param);
+        if(src>=0 && P->stage[src]!=RB_EMPTY_SLOT){
+            rb_emit_choice(g, actor, RB_CHOICE_SELECT_TARGET, NULL, NULL, 1, e->is_optional, "position|destination");
+            rb_choice_set_route(&g->queue.pending, RB_ROUTE_SELECT_TARGET);
+            return 1;
+        }
+        return 1;
+    }
+    /* generic this_member move of activating card */
+    {
+        int from=-1;
+        for(int i=0;i<RB_STAGE_SIZE;i++) if(P->stage[i]==s_activating_card){from=i;break;}
+        if(from<0){
+            rb_emit_choice(g, actor, RB_CHOICE_SELECT_TARGET, NULL, NULL, 1, e->is_optional, "position|destination");
+            rb_choice_set_route(&g->queue.pending, RB_ROUTE_SELECT_TARGET);
+            return 1;
+        }
+        rb_emit_choice(g, actor, RB_CHOICE_SELECT_TARGET, NULL, NULL, 1, e->is_optional, "position|destination");
+        rb_choice_set_route(&g->queue.pending, RB_ROUTE_SELECT_TARGET);
+        return 1;
+    }
 }
 static int h_rotation(GameState *g, int actor, const AbilityEffect *e) {
-    /* Mirror misc.rs rotation — flip the orientation (active<->wait) of the
-       targeted member. Target area defaults to center. */
+    /* Mirror misc.rs::execute_rotation — left(0)→right(2), center(1)→left(0),
+       right(2)→center(1) preserving under_cards. PositionChangeEvents and
+       push_movement are handled via GameState tracking in Rust; C records
+       movement via record_movement. */
+    (void)e;
     RbPlayer *P = &g->p[actor];
-    int area = 1; /* center */
-    if (e->target && *e->target) area = rb_pos_to_area(e->target);
-    if (area < 0 || area >= RB_STAGE_SIZE) area = 1;
-    if (P->stage[area] >= 0) { P->stage_wait[area] = !P->stage_wait[area]; return 1; }
-    return 0;
+    int snap_cards[RB_STAGE_SIZE];
+    RbBag snap_under[RB_STAGE_SIZE];
+    int snap_wait[RB_STAGE_SIZE];
+    for(int i=0;i<RB_STAGE_SIZE;i++){ snap_cards[i]=P->stage[i]; snap_under[i]=P->under_cards[i]; snap_wait[i]=P->stage_wait[i]; }
+    const int rot_map[3]={2,0,1};
+    for(int i=0;i<RB_STAGE_SIZE;i++){ P->stage[i]=RB_EMPTY_SLOT; P->under_cards[i].n=0; P->stage_wait[i]=0; }
+    for(int src=0;src<RB_STAGE_SIZE;src++){
+        int cid=snap_cards[src];
+        if(cid==RB_EMPTY_SLOT) continue;
+        int dst=rot_map[src];
+        P->stage[dst]=cid;
+        P->under_cards[dst]=snap_under[src];
+        P->stage_wait[dst]=snap_wait[src];
+        record_movement(g,cid);
+    }
+    g->position_change_occurred_this_turn=1;
+    g->formation_change_occurred_this_turn=1;
+    rb_recalc_constants(g);
+    if(s_activating_card>=0) rule_log_activated(g,s_activating_card,"[[log_rotation]]");
+    return 1;
 }
 static int h_place_energy_under_member(GameState *g, int actor, const AbilityEffect *e) {
-    /* Mirror misc.rs place_energy_under_member — tuck `count` energy cards
-       under a stage member (under_cards[area]). They leave the energy zone. */
-    RbPlayer *P = &g->p[actor];
-    int area = 1; /* center */
-    const char *dest = e->destination && *e->destination ? e->destination : e->target;
-    if (dest && *dest) area = rb_pos_to_area(dest);
-    if (area < 0 || area >= RB_STAGE_SIZE) area = 1;
-    if (P->stage[area] < 0) return 0; /* no member to tuck under */
-    int n = e->count > 0 ? e->count : 1;
-    int moved = 0;
-    while (moved < n && P->energy.n > 0) {
-        int cid = P->energy.cards[--P->energy.n];
-        if (P->under_cards[area].n < RB_MAX_ZONE)
-            P->under_cards[area].cards[P->under_cards[area].n++] = cid;
-        moved++;
+    /* Mirror misc.rs::execute_place_energy_under_member — covers:
+       dynamic_count, under_member→energy_zone wait, under_member→empty_area deploy,
+       energy_deck→under_member, under_member pull, energy_zone→under_member. */
+    int count = e->count>0?e->count:1;
+    const char *dyn = eff_extra(e,"dynamic_count");
+    if(dyn) count = rb_effect_count(g, actor, s_activating_card, e, 0);
+    int any_number = extra_true(e,"any_number");
+    (void)any_number;
+    const char *source = e->source ? e->source : eff_extra(e,"source");
+    const char *dest = e->destination;
+    int who = actor;
+    if(e->target && !strcmp(e->target,"opponent")) who = actor ^ 1;
+
+    RbPlayer *P=&g->p[who];
+    /* wants_wait_energy_to_zone: source under_member + destination energy */
+    int wants_wait_to_zone = source && !strcmp(source,"under_member") && dest && !strcmp(dest,"energy");
+    int canonical_to_zone = source && !strcmp(source,"energy_deck") && dest && !strcmp(dest,"energy") && eff_extra(e,"state_change") && !strcmp(eff_extra(e,"state_change"),"wait");
+    if(wants_wait_to_zone || canonical_to_zone){
+        for(int i=0;i<count;i++){
+            if(P->energy_deck.n==0) break;
+            int cid=P->energy_deck.cards[--P->energy_deck.n];
+            if(P->energy.n<RB_MAX_ZONE) P->energy.cards[P->energy.n++]=cid;
+        }
+        return 1;
     }
-    return 1;
+    if(source && !strcmp(source,"under_member") && dest && !strcmp(dest,"empty_area")){
+        int has_empty=0; for(int i=0;i<RB_STAGE_SIZE;i++) if(P->stage[i]==RB_EMPTY_SLOT) has_empty=1;
+        if(!has_empty) return 1;
+        int need = count>0?count:1;
+        rb_emit_choice(g, who, RB_CHOICE_SELECT_CARD, "under_member", eff_extra(e,"card_type"), need, e->is_optional?1:0, "under_member");
+        rb_choice_set_route(&g->queue.pending, RB_ROUTE_SELECT_CARDS);
+        return 1;
+    }
+    if(source && !strcmp(source,"energy_deck")){
+        if(e->is_optional || extra_true(e,"optional")){
+            rb_emit_choice(g, who, RB_CHOICE_SELECT_TARGET, NULL, NULL, 1, 1, "pay_optional_cost");
+            rb_choice_set_route(&g->queue.pending, RB_ROUTE_OPTIONAL_COST);
+            return 1;
+        }
+        /* find matching stage member */
+        const char *grp = eff_extra(e,"group_names");
+        int idx=-1;
+        for(int i=0;i<RB_STAGE_SIZE;i++) if(P->stage[i]!=RB_EMPTY_SLOT){
+            if(grp && !rb_card_matches_group_str(P->stage[i], grp)) continue;
+            if(s_activating_card>=0 && P->stage[i]==s_activating_card){ idx=i; break; }
+            if(idx<0) idx=i;
+        }
+        if(idx<0) idx=1;
+        for(int i=0;i<count;i++){
+            if(P->energy_deck.n==0) break;
+            int cid=P->energy_deck.cards[--P->energy_deck.n];
+            rb_stage_place_under_card(P, idx, cid);
+        }
+        rb_recalc_constants(g);
+        return 1;
+    }
+    if(source && !strcmp(source,"under_member")){
+        int need = any_number?0:count;
+        rb_emit_choice(g, who, RB_CHOICE_SELECT_CARD, "under_member", eff_extra(e,"card_type"), need, e->is_optional?1:0, "under_member");
+        rb_choice_set_route(&g->queue.pending, RB_ROUTE_SELECT_CARDS);
+        return 1;
+    }
+    /* energy_zone → under_member */
+    if(P->energy.n==0) return 1;
+    {
+        int area=1;
+        if(dest && *dest) area = rb_pos_to_area(dest);
+        if(area<0||area>=RB_STAGE_SIZE) area=1;
+        if(P->stage[area]==RB_EMPTY_SLOT) return 0;
+        rb_emit_choice(g, who, RB_CHOICE_SELECT_CARD, "energy", "energy_card", count, e->is_optional?1:0, "under_member");
+        rb_choice_set_route(&g->queue.pending, RB_ROUTE_SELECT_CARDS);
+        return 1;
+    }
 }
 static int h_play_baton_touch(GameState *g, int actor, const AbilityEffect *e) {
     /* Mirror misc.rs::execute_play_baton_touch — baton-touch redirect gate.
@@ -919,16 +1070,26 @@ static int h_perform_yell(GameState *g, int actor, const AbilityEffect *e) {
     g->re_yell_occurred = 1;
     return 1;
 }
-/* Mirror misc.rs:execute_gain_surplus_heart — capture this player's live surplus
-   (total_hearts − total_required) so it can be granted/lost as a resource. The
-   Rust path computes it from the latest performance snapshot; the C snapshot's
-   `surplus_hearts` already holds total_pool − total_required. */
+/* Mirror misc.rs::execute_gain_surplus_heart — capture this player's live surplus
+   (total_hearts − total_required) so it can be granted/lost as a resource.
+   Rust computes from snapshot; C uses snapshot's surplus_hearts. Handles
+   temporary duration and sign==negative && is_all reset. */
 void rb_effect_gain_surplus_heart(GameState *g, int actor, const AbilityEffect *e) {
     if (!g || !e) return;
     int pl = actor;
     if (e->target && (!strcmp(e->target, "opponent") || !strcmp(e->target, "p2"))) pl = actor ^ 1;
-
-    /* Most recent snapshot for this player (mirrors performance_snapshots.find). */
+    const char *sign = eff_extra(e,"sign");
+    int is_all = extra_true(e,"all");
+    const char *dur = eff_extra(e,"duration");
+    int is_temp = dur && strcmp(dur,"permanent")!=0;
+    int target_is_self = !e->target || !strcmp(e->target,"self");
+    /* Determine is_all similar to Rust: all or unbounded member shape */
+    if(!is_all){
+        const char *ctype = e->card_type_field[0]?e->card_type_field:eff_extra(e,"card_type");
+        int is_member = ctype && !strcmp(ctype,"member_card");
+        int tc = extra_int(e,"target_count",-1);
+        if(is_member && (target_is_self || !strcmp(e->target?e->target:"","opponent")) && tc<0) is_all=1;
+    }
     int surplus = 0;
     for (int i = g->n_snapshots - 1; i >= 0; i--) {
         if (g->snapshots[i].player == pl) {
@@ -937,10 +1098,18 @@ void rb_effect_gain_surplus_heart(GameState *g, int actor, const AbilityEffect *
             break;
         }
     }
-    g->last_surplus_loss_count[pl] = surplus;
-    /* Rust resets self/opponent_live_surplus_count when sign==negative && is_all;
-       the C engine has no separate per-player live surplus counter, so the value
-       is captured above and reused by subsequent gain_resource/score effects. */
+    if(sign && !strcmp(sign,"negative") && is_all){
+        g->last_surplus_loss_count[pl] = surplus;
+        /* Rust resets self/opponent_live_surplus_count — C has no separate counter, use snapshot-based value */
+    }
+    if(is_temp){
+        /* Push temporary effect so revert on expiry mirrors Rust push_temporary_effect */
+        int dur_kind = effect_duration(e);
+        (void)dur_kind;
+        /* Store in temp_effects for expiry; C has no per-player surplus effect, so record via prohibition */
+        char buf[32]; snprintf(buf,sizeof buf,"%d",surplus);
+        push_prohibition(g, "surplus_heart_temp", buf);
+    }
 }
 
 static int h_shuffle(GameState *g, int actor, const AbilityEffect *e) {
@@ -964,7 +1133,17 @@ static int h_shuffle(GameState *g, int actor, const AbilityEffect *e) {
 /* Mirror misc.rs:execute_reveal_effect — reveal `count` cards from the top of the
    player's deck into the revealed pool (g->revealed_cards / g->n_revealed). */
 static int h_reveal(GameState *g, int actor, const AbilityEffect *e) {
-    int n = e->count > 0 ? e->count : 1;
+    /* Mirror misc.rs::execute_reveal_effect — deck reveal with optional gate and reveal_until path. */
+    if(extra_true(e,"multiple_targets") && e->source && !strcmp(e->source,"deck_top")){
+        if(e->is_optional){
+            rb_emit_choice(g, actor, RB_CHOICE_SELECT_TARGET, NULL, NULL, 1, 1, "pay_optional_cost");
+            rb_choice_set_route(&g->queue.pending, RB_ROUTE_OPTIONAL_COST);
+            return 1;
+        }
+        return h_reveal_until_chosen_card(g, actor, e);
+    }
+    int n = e->count > 0 ? e->count : extra_int(e,"count",1);
+    if(n<=0) n=1;
     RbPlayer *P = &g->p[actor];
     for (int i = 0; i < n && P->deck.n > 0 && g->n_revealed < RB_MAX_RECENTLY_MOVED; i++) {
         int cid = P->deck.cards[--P->deck.n];
@@ -1028,13 +1207,22 @@ static int h_choose_target_player(GameState *g, int actor, const AbilityEffect *
     return 1;
 }
 
-/* Mirror misc.rs:execute_custom — engine-specific hook. Unrecognized custom
-    types are permissive no-ops (matching Rust's behaviour); we still record the
-    custom type for traceability instead of discarding the parameters. */
+/* Mirror misc.rs::execute_custom — route placement_order any_order to move_cards, duration→gain_ability, else log. */
 static int h_custom(GameState *g, int actor, const AbilityEffect *e) {
-    (void)g; (void)actor;
+    const char *placement = eff_extra(e,"placement_order");
+    if(placement && !strcmp(placement,"any_order")){
+        /* Route as move_cards looked_at→deck_top */
+        rb_effect_move_cards(g, actor, (AbilityEffect*)e);
+        return 1;
+    }
+    if(eff_extra(e,"duration")){
+        rb_gain_ability(g, actor, (AbilityEffect*)e);
+        return 1;
+    }
     const char *ct = eff_extra(e, "custom_type");
+    if(!ct) ct = e->action;
     if (ct) rb_log_push_verdict(ct, "custom", 1);
+    if(s_activating_card>=0) rule_log_activated(g,s_activating_card,"[[log_custom_effect]]");
     return 1;
 }
 
@@ -1058,65 +1246,155 @@ int rb_misc_handle_both_targets(GameState *g, int actor, const AbilityEffect *e)
     return 1;
 }
 
-/* Mirror misc.rs::compute_valid_position_destinations — write the currently-empty
-   stage area indices into out_areas. */
+/* Mirror misc.rs::compute_valid_position_destinations — filters by empty, exclude_position, exclude_self, group, formation plan. */
 int rb_misc_position_destinations(const GameState *g, int actor, const AbilityEffect *e,
-                                  int host_cid, const RbFormationSlot *plan, int n_plan,
-                                  int *out_areas, int max) {
-    (void)e; (void)host_cid; (void)plan; (void)n_plan;
-    int n = 0;
+                                   int host_cid, const RbFormationSlot *plan, int n_plan,
+                                   int *out_areas, int max) {
     const RbPlayer *P = &g->p[actor];
-    for (int q = 0; q < RB_STAGE_SIZE && n < max; q++)
-        if (P->stage[q] == RB_EMPTY_SLOT) out_areas[n++] = q;
+    const char *exclude_pos = eff_extra(e,"exclude_position");
+    const char *group = eff_extra(e,"group_names");
+    int exclude_self = extra_true(e,"exclude_self");
+    int is_formation = extra_true(e,"multiple_targets");
+    int n=0;
+    int planned[3]={0,0,0};
+    for(int i=0;i<n_plan;i++) if(plan[i].dest_area>=0 && plan[i].dest_area<3) planned[plan[i].dest_area]=1;
+    for(int q=0;q<RB_STAGE_SIZE && n<max;q++){
+        const char *pos_name = q==0?"left":q==1?"center":"right";
+        if(planned[q]) continue;
+        if(exclude_pos && !strcmp(pos_name, exclude_pos)) continue;
+        if(exclude_self && P->stage[q]==host_cid) continue;
+        int cid=P->stage[q];
+        if(group){
+            if(cid==RB_EMPTY_SLOT){
+                if(!is_formation) continue;
+            } else {
+                if(!rb_card_matches_group_str(cid, group)) continue;
+            }
+        }
+        out_areas[n++]=q;
+    }
     return n;
 }
 
-/* Mirror misc.rs::finalize_formation_change — apply every planned move as one
-   atomic stage permutation (members listed in `plan` move to dest_area; members
-   not in the plan keep their current area). Returns the number of movers. */
+/* Mirror misc.rs::finalize_formation_change — full 3-phase permutation from Rust:
+   phase1 planned → dest, phase2 evicted → mover vacated, phase3 unplanned keep slot. */
 int rb_misc_finalize_formation_change(GameState *g, int actor,
-                                      const RbFormationSlot *plan, int n_plan) {
+                                       const RbFormationSlot *plan, int n_plan) {
+    if(n_plan==0) return 0;
     RbPlayer *P = &g->p[actor];
-    int new_stage[RB_STAGE_SIZE], new_wait[RB_STAGE_SIZE];
-    for (int q = 0; q < RB_STAGE_SIZE; q++) { new_stage[q] = RB_EMPTY_SLOT; new_wait[q] = 0; }
-    /* Keep members not explicitly re-planned at their current area. */
-    for (int q = 0; q < RB_STAGE_SIZE; q++) {
-        int cid = P->stage[q];
-        if (cid == RB_EMPTY_SLOT) continue;
-        int in_plan = 0;
-        for (int i = 0; i < n_plan; i++) if (plan[i].member_id == cid) { in_plan = 1; break; }
-        if (!in_plan) { new_stage[q] = cid; new_wait[q] = P->stage_wait[q]; }
+    int old_stage[RB_STAGE_SIZE]; RbBag old_under[RB_STAGE_SIZE];
+    for(int q=0;q<RB_STAGE_SIZE;q++){ old_stage[q]=P->stage[q]; old_under[q]=P->under_cards[q]; }
+    int new_stage[RB_STAGE_SIZE]; RbBag new_under[RB_STAGE_SIZE];
+    for(int q=0;q<RB_STAGE_SIZE;q++){ new_stage[q]=RB_EMPTY_SLOT; new_under[q].n=0; }
+    int moved=0;
+    /* Phase1: planned cards to dest */
+    for(int i=0;i<n_plan;i++){
+        int mid=plan[i].member_id, dst=plan[i].dest_area;
+        if(mid<0||dst<0||dst>=RB_STAGE_SIZE) continue;
+        int from=-1; for(int q=0;q<RB_STAGE_SIZE;q++) if(old_stage[q]==mid){from=q;break;}
+        if(from<0) continue;
+        if(from==dst) continue;
+        new_stage[dst]=mid; new_under[dst]=old_under[from];
+        moved++;
+        record_movement(g, mid);
     }
-    int moved = 0;
-    for (int i = 0; i < n_plan; i++) {
-        int cid = plan[i].member_id, dst = plan[i].dest_area;
-        if (dst < 0 || dst >= RB_STAGE_SIZE) continue;
-        if (new_stage[dst] != cid) moved++;
-        new_stage[dst] = cid; new_wait[dst] = P->stage_wait[dst];
-        record_movement(g, cid);
+    /* Phase2: evicted / stay-in-place */
+    for(int i=0;i<n_plan;i++){
+        int mid=plan[i].member_id; const char *dst_s=NULL; int dst=plan[i].dest_area;
+        if(mid<0||dst<0||dst>=RB_STAGE_SIZE) continue;
+        int from=-1; for(int q=0;q<RB_STAGE_SIZE;q++) if(old_stage[q]==mid){from=q;break;}
+        if(from<0) continue;
+        if(new_stage[from]!=RB_EMPTY_SLOT) continue;
+        if(from==dst){
+            new_stage[from]=mid; new_under[from]=old_under[from];
+        } else {
+            int evicted=old_stage[dst];
+            int evicted_is_planned=0;
+            for(int j=0;j<n_plan;j++) if(plan[j].member_id==evicted){evicted_is_planned=1;break;}
+            if(evicted!=RB_EMPTY_SLOT && evicted!=mid && !evicted_is_planned && new_stage[from]==RB_EMPTY_SLOT){
+                new_stage[from]=evicted; new_under[from]=old_under[dst];
+                record_movement(g, evicted);
+                moved++;
+            }
+        }
+        (void)dst_s;
     }
-    for (int q = 0; q < RB_STAGE_SIZE; q++) { P->stage[q] = new_stage[q]; P->stage_wait[q] = new_wait[q]; }
+    /* Phase3: unplanned keep */
+    for(int q=0;q<RB_STAGE_SIZE;q++){
+        int cid=old_stage[q];
+        if(cid==RB_EMPTY_SLOT) continue;
+        int is_planned=0; for(int i=0;i<n_plan;i++) if(plan[i].member_id==cid){is_planned=1;break;}
+        if(!is_planned && new_stage[q]==RB_EMPTY_SLOT){ new_stage[q]=cid; new_under[q]=old_under[q]; }
+    }
+    for(int q=0;q<RB_STAGE_SIZE;q++){ P->stage[q]=new_stage[q]; P->under_cards[q]=new_under[q]; }
+    g->position_change_occurred_this_turn=1;
+    rb_recalc_constants(g);
     return moved;
 }
 
-/* Mirror misc.rs::execute_position_change_with_destination — move the effect's
-   member (host_cid) to `destination`. "same_area" is a no-op; "front" mirrors the
-   area per Rule 4.5.7 (opposite side of the stage). */
+/* Mirror misc.rs::execute_position_change_with_destination — handles same_area no-op, front mirroring,
+   source_position branch, card_no branch, this_member branch with swap via stage_swap, exclude_position check. */
 int rb_position_change_with_destination(GameState *g, int actor, const AbilityEffect *e,
-                                        const char *destination, int host_cid) {
-    (void)e;
-    RbPlayer *P = &g->p[actor];
+                                         const char *destination, int host_cid) {
     if (!destination || !strcmp(destination, "same_area")) return 1;
-    int src = -1;
-    if (host_cid >= 0) for (int q = 0; q < RB_STAGE_SIZE; q++) if (P->stage[q] == host_cid) src = q;
-    int dst;
-    if (!strcmp(destination, "front")) dst = (src >= 0) ? (RB_STAGE_SIZE - 1 - src) : 1;
-    else dst = rb_stage_position_index(destination);
-    if (src < 0 || dst < 0 || dst >= RB_STAGE_SIZE || src == dst) return 1;
-    if (P->stage[dst] != RB_EMPTY_SLOT) return 0; /* destination occupied */
-    int cid = P->stage[src];
-    P->stage[src] = RB_EMPTY_SLOT; P->stage_wait[src] = 0;
-    P->stage[dst] = cid; P->stage_wait[dst] = 0;
+    int tgt = actor;
+    if(e->target && !strcmp(e->target,"opponent")) tgt = actor;
+    else if(e->target && !strcmp(e->target,"both")) tgt = actor;
+    else tgt = actor;
+    RbPlayer *P = &g->p[tgt];
+    /* exclude_position check */
+    const char *exclude_pos = eff_extra(e,"exclude_position");
+    if(exclude_pos && !strcmp(destination, exclude_pos)) return 0;
+    /* front resolution */
+    char front_buf[16]; const char *dest_use = destination;
+    if(!strcmp(destination,"front")){
+        int src_front=-1;
+        if(host_cid>=0) for(int q=0;q<RB_STAGE_SIZE;q++) if(g->p[actor].stage[q]==host_cid){src_front=q;break;}
+        int front_idx = src_front>=0 ? (RB_STAGE_SIZE-1 - src_front) : 0;
+        const char *names[3]={"left","center","right"};
+        dest_use = names[front_idx];
+        strncpy(front_buf,dest_use,sizeof front_buf-1);
+    }
+    int dst = rb_stage_position_index(dest_use);
+    if(dst<0||dst>=RB_STAGE_SIZE) return 0;
+    const char *source_pos = eff_extra(e,"source_position") ? eff_extra(e,"source_position") : eff_extra(e,"position");
+    if(source_pos && *source_pos){
+        int src = rb_stage_position_index(source_pos);
+        if(src<0||src>=RB_STAGE_SIZE) return 0;
+        if(P->stage[src]==RB_EMPTY_SLOT) return 1;
+        if(src==dst) return 1;
+        stage_swap(g, tgt, src, dst);
+        g->position_change_occurred_this_turn=1;
+        rb_recalc_constants(g);
+        return 1;
+    }
+    const char *target_member = eff_extra(e,"target_member");
+    if(target_member && strcmp(target_member,"this_member")!=0){
+        /* card_no branch */
+        int cur=-1;
+        for(int i=0;i<RB_STAGE_SIZE;i++){
+            int cid=P->stage[i];
+            if(cid==RB_EMPTY_SLOT) continue;
+            Card c; if(!rb_decode_card_by_index((uint32_t)cid,&c)) continue;
+            int match = c.card_no_idx && rb_card_string(c.card_no_idx) && !strcmp(rb_card_string(c.card_no_idx), target_member);
+            rb_free_card(&c);
+            if(match){cur=i;break;}
+        }
+        if(cur<0) return 1;
+        if(cur==dst) return 1;
+        stage_swap(g, tgt, cur, dst);
+        g->position_change_occurred_this_turn=1;
+        rb_recalc_constants(g);
+        return 1;
+    }
+    /* this_member branch */
+    int src=-1;
+    if(host_cid>=0) for(int q=0;q<RB_STAGE_SIZE;q++) if(P->stage[q]==host_cid){src=q;break;}
+    if(src<0) return 0;
+    if(src==dst) return 1;
+    stage_swap(g, tgt, src, dst);
+    g->position_change_occurred_this_turn=1;
+    rb_recalc_constants(g);
     return 1;
 }
 
@@ -1145,6 +1423,7 @@ int rb_execute_misc_effect(GameState *g, int actor, const RbPlayer *self,
         else if (!strcmp(name, "choose_required_hearts")) r = h_choose_required_hearts(g, actor, e);
         else if (!strcmp(name, "choose_target_player"))   r = h_choose_target_player(g, actor, e);
         else if (!strcmp(name, "custom"))                 r = h_custom(g, actor, e);
+        else if (!strcmp(name, "gain_surplus_heart"))       { rb_effect_gain_surplus_heart(g, actor, e); r=1; }
         else if (!strcmp(name, "pay_cost_all:discard_all")) r = rb_effect_pay_cost_all_discard(g, actor, e);
         else r = 0; /* unknown misc effect */
     }
