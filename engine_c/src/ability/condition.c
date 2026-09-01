@@ -1768,6 +1768,47 @@ static int check_ability_filter(const struct GameState *g, int actor, const Cond
     return 0;
 }
 
+/* Mirror card.rs::evaluate_ability_filter_condition_with_card_check.
+   Counts cards in a zone matching an ability filter (no_ability, has_ability,
+   no_ability_type) and compares to count with operator. */
+static int eval_ability_filter_with_card_check(const struct GameState *g, int actor, const Condition *c, const char *filter) {
+    int pl = target_player_idx(actor, c);
+    const char *loc = get_str(c, "location"); if (!loc) loc = "stage";
+    int ids[RB_MAX_ZONE]; int n = zone_ids(g, pl, loc, ids, RB_MAX_ZONE);
+    const CondValue *etv = find_val(c, "ability_filter_triggers");
+    int count_needed = 0; if (!get_i(c, "count", &count_needed)) count_needed = 1;
+    const char *op = get_str(c, "operator"); if (!op) op = ">=";
+    int match_count = 0;
+    for (int i = 0; i < n; i++) {
+        if (ids[i] < 0) continue;
+        int cid = ids[i];
+        int na = rb_card_num_abilities((uint32_t)cid);
+        int has_ability = (na > 0);
+        int m = 0;
+        if (!strcmp(filter, "no_ability")) m = !has_ability;
+        else if (!strcmp(filter, "has_ability")) m = has_ability;
+        else if (!strcmp(filter, "no_ability_type") && has_ability) {
+            /* Card has abilities but NONE match the excluded trigger types */
+            int excluded_match = 0;
+            for (int a = 0; a < na && !excluded_match; a++) {
+                uint32_t aidx;
+                if (!rb_card_get_ability_idx((uint32_t)cid, a, &aidx)) continue;
+                for (uint32_t gi = 0; gi < etv->arr_n && !excluded_match; gi++) {
+                    const char *et = (etv->arr[gi].tag == RB_TAG_STR) ? etv->arr[gi].s : NULL;
+                    if (et && card_ability_trigger_contains(cid, et)) { excluded_match = 1; break; }
+                }
+            }
+            m = !excluded_match;
+        } else m = 1;
+        if (m) match_count++;
+    }
+    if (!strcmp(op, "="))  return match_count == count_needed;
+    if (!strcmp(op, "<=")) return match_count <= count_needed;
+    if (!strcmp(op, "<"))  return match_count < count_needed;
+    if (!strcmp(op, ">"))  return match_count > count_needed;
+    return match_count >= count_needed;
+}
+
 /* check_distinct_names: mirror card.rs:check_distinct_names.
    Validates distinct-name/cost/group constraints for cards in a zone. */
 static int check_distinct_names(const struct GameState *g, int actor, const Condition *c, const char *loc) {
