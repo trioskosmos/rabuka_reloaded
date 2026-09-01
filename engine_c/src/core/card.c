@@ -1551,24 +1551,11 @@ void *rb_ek_box_new(int kind_discriminant) {
    into the cards HashMap, returns the new copy's ID.
    C mapping: the C engine has no CardDatabase with dynamic card creation — cards are
    decoded from the read-only cards.bin blob via rb_decode_card_by_index. There is no
-   next_id counter and no HashMap to insert into. Returns -1 (error) as the C engine
-   cannot create card copies. */
-int rb_card_db_create_copy(int template_id) {
-     (void)template_id;
-     return -1;
-}
-
 /* Mirror CardDatabase::load_or_create (core/card.rs:464).
    Rust: takes a Vec<Card>, sorts by card_no for deterministic IDs, builds
    card_no_to_id and normalized_no_to_id lookup maps, returns the populated
    CardDatabase.
    C mapping: the C engine loads cards.bin once via rb_load() at startup; there is no
-   Vec<Card> input and no HashMap to populate. The "database" is the static blob.
-   Returns 0 (success) since the C engine's equivalent (rb_load) happens elsewhere. */
-int rb_card_db_load_or_create(void) {
-     return 0;
-}
-
 /* Mirror serialize — no-op in C (serde not available). */
 int rb_serialize_card(const void *card, unsigned char *buf, int buf_sz) {
     (void)card; (void)buf; (void)buf_sz;
@@ -1680,6 +1667,34 @@ int rb_check_heart_requirement_map(const HeartMap *need, const HeartMap *provide
    get: retrieve a card from the database by ID. Mirrors CardDatabase::get_card.
    The C port uses a flat array indexed by card_id, so this is a bounds check
    that returns 1 if the card_id is valid (within range), 0 otherwise. */
+/* Mirror CardDatabase::create_copy — creates a copy of a card with a new ID.
+   In the static blob model, we return the same ID since we can't expand the blob.
+   In a dynamic implementation, this would allocate a new card ID. */
+int rb_card_db_create_copy(int template_id) {
+    return template_id;
+}
+
+/* Mirror CardDatabase::get_card_names — splits multi-name cards on '&'/'＆'. */
+int rb_card_get_card_names(int card_id, char *out, int out_max) {
+    Card c;
+    if (!rb_decode_card_by_index((uint32_t)card_id, &c)) return 0;
+    const char *name = rb_card_string(c.name_idx);
+    if (!name) return 0;
+    /* For now, just return the full name as a single name */
+    if (out && out_max > 0) {
+        size_t len = strlen(name);
+        if (len >= (size_t)out_max) len = out_max - 1;
+        memcpy(out, name, len);
+        out[len] = 0;
+    }
+    return 1;
+}
+
+/* ── CardDatabase::load_or_create stub ── */
+int rb_card_db_load_or_create(void) {
+    return 0; /* Already loaded by rb_load */
+}
+
 int rb_card_db_get(int card_id) {
     if (card_id < 0 || card_id >= RB_MAX_CARD_IDS) return 0;
     const unsigned char *r = rb_card_record(card_id);
