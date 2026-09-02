@@ -131,6 +131,16 @@ impl<'a> Display<'a> {
         self.buf.push('\n');
     }
 
+    /// Set a background palette bank (0-14 for 4bpp, 15 for text).
+    pub fn set_background_palette(&mut self, bank: usize, palette: &Palette16) {
+        self.gfx.set_background_palette(bank as u8, palette);
+    }
+
+    /// Get the graphics frame for custom rendering.
+    pub fn graphics(&mut self) -> &mut Graphics<'a> {
+        &mut self.gfx
+    }
+
     /// The buffered text (action-bar lines) for the board renderer.
     pub fn text(&self) -> &str {
         &self.buf
@@ -311,7 +321,7 @@ impl<'a> Display<'a> {
         let mut art_bg = RegularBackground::new(
             Priority::P1,
             RegularBackgroundSize::Background32x32,
-            TileFormat::EightBpp,
+            TileFormat::FourBpp,
         );
         let mut ui_bg = RegularBackground::new(
             Priority::P0,
@@ -343,20 +353,20 @@ impl<'a> Display<'a> {
                 let xi = if is_opp { 2 - i } else { i };
                 let x = 1 + STAGE_PITCH * xi as i32;
                 draw_slot(
-                    &mut art_bg,
-                    &mut ui_bg,
-                    &ui_ts,
-                    &font_ts,
-                    &icon_ts,
-                    e_stage,
-                    slot,
-                    x,
-                    y,
-                    STAGE_CARD,
-                    STAGE_FRONTS,
-                    WAITED_FRONTS,
-                    flipped,
-                );
+                        &mut art_bg,
+                        &mut ui_bg,
+                        &ui_ts,
+                        &font_ts,
+                        &icon_ts,
+                        e_stage,
+                        slot,
+                        x,
+                        y,
+                        STAGE_CARD,
+                        STAGE_FRONTS,
+                        WAITED_FRONTS,
+                        flipped,
+                    );
             }
             // Live/success zone (top 3 rows of stage row)
             for (i, slot) in live.iter().enumerate() {

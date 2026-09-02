@@ -14,6 +14,7 @@ use rabuka_engine::game::platform_ui;
 use rabuka_engine::game_state::GameState;
 
 use crate::board::Board;
+use crate::card_art_gen::CARD_FRONTS;
 use crate::display::Display;
 use crate::input::{Button, Input};
 
@@ -166,6 +167,53 @@ impl<'u, 'd, I: InputSource> platform_ui::PlatformUi for GbaUi<'u, 'd, I> {
     }
     fn wait_vblank(&mut self) {
         self.display.wait();
+    }
+    fn draw_card_image(
+        &mut self,
+        card_no: &str,
+        x: i32,
+        y: i32,
+        cols: i32,
+        rows: i32,
+        palette_index: usize,
+    ) {
+        // Find the card front in CARD_FRONTS (4bpp per-card palette)
+        if let Some(front) = CARD_FRONTS.iter().find(|f| f.card_no == card_no) {
+            let ts = unsafe { agb::display::tiled::TileSet::new(front.tiles, agb::display::tiled::TileFormat::FourBpp) };
+            let mut art_bg = unsafe { agb::display::tiled::RegularBackground::new(
+                agb::display::Priority::P0,
+                agb::display::tiled::RegularBackgroundSize::Background32x32,
+                agb::display::tiled::TileFormat::FourBpp,
+            ) };
+            let mut pal16 = [agb::display::Rgb15::BLACK; 16];
+            for i in 0..16 {
+                let v = front.palette[i * 2] as u16 | ((front.palette[i * 2 + 1] as u16) << 8);
+                pal16[i] = agb::display::Rgb15::new(v);
+            }
+            self.display.set_background_palette(palette_index, &agb::display::Palette16::new(pal16));
+            for ty in 0..rows {
+                for tx in 0..cols {
+                    let sidx = (ty * cols + tx) as u16;
+                    art_bg.set_tile(
+                        (x + tx, y + ty),
+                        &ts,
+                        agb::display::tiled::TileSetting::new(sidx, agb::display::tiled::TileEffect::new(false, false, palette_index as u8)),
+                    );
+                }
+            }
+        }
+    }
+
+    fn show_board_overlay(&mut self, gs: &GameState) {
+        let frame = self.board.build(
+            gs,
+            &self.actionable,
+            &self.action_line,
+            self.action_index,
+            self.action_total,
+        );
+        self.display.render_board_frame(&frame);
+        self.display.swap_buffers();
     }
     fn set_actionable_cards(&mut self, card_nos: &[alloc::string::String]) {
         self.actionable.clear();

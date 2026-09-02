@@ -23,7 +23,7 @@ use crate::menu::show_card_detail;
 /// List rows visible under the title line (screen is 20 text rows).
 const VISIBLE: usize = 8;
 
-/// Scrollable `items` picker. A confirms, B cancels (None).
+/// Scrollable `items` picker. A confirms, B cancels (None), Start cancels (None).
 fn select<I: InputSource>(
     display: &mut Display,
     input: &mut I,
@@ -57,7 +57,7 @@ fn select<I: InputSource>(
             sel = if sel + 1 == items.len() { 0 } else { sel + 1 };
         } else if input.just_pressed(Button::A) {
             return Some(sel);
-        } else if input.just_pressed(Button::B) {
+        } else if input.just_pressed(Button::B) || input.just_pressed(Button::Start) {
             return None;
         }
         display.wait();

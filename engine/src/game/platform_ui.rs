@@ -80,6 +80,24 @@ pub trait PlatformUi {
     fn option_rows(&self) -> usize {
         7
     }
+
+    /// Draw a card's image at (x, y) with given dimensions (in tiles).
+    /// Used by choice menus to show card art next to options.
+    /// `palette_index` is the 4bpp palette bank (0-14) for this card.
+    fn draw_card_image(
+        &mut self,
+        _card_no: &str,
+        _x: i32,
+        _y: i32,
+        _cols: i32,
+        _rows: i32,
+        _palette_index: usize,
+    ) {
+    }
+
+    /// Show the current board as an overlay in menus (L/R pressed in choice menus).
+    fn show_board_overlay(&mut self, _gs: &GameState) {
+    }
 }
 
 /// Width of a single character in half-width columns (CJK glyphs = 2).

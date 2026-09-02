@@ -32,7 +32,7 @@ fn show_lines(ui: &mut dyn PlatformUi, lines: &[String]) {
     const H: usize = 8; // 9 screen rows, one held for a hint bar
     loop {
         ui.clear_screen();
-        ui.println("A/B close, Up/Down scroll");
+        ui.println("A/B/Start close, Up/Down scroll");
         let end = (off + H).min(lines.len());
         for l in off..end {
             ui.println(&lines[l]);
@@ -50,6 +50,7 @@ fn show_lines(ui: &mut dyn PlatformUi, lines: &[String]) {
             || ui.just_pressed_b()
             || ui.just_pressed_l()
             || ui.just_pressed_r()
+            || ui.just_pressed_start()
         {
             return;
         }
@@ -103,6 +104,7 @@ pub fn show_result(ui: &mut dyn PlatformUi, gs: &GameState) {
 }
 
 /// Select from a list of items. Returns the selected index.
+/// Start button also confirms (same as A).
 pub fn select(ui: &mut dyn PlatformUi, items: &[&str], title: &str) -> usize {
     let mut sel: usize = 0;
     let mut scroll: usize = 0;
@@ -141,7 +143,7 @@ pub fn select(ui: &mut dyn PlatformUi, items: &[&str], title: &str) -> usize {
             sel = if sel + 1 == items.len() { 0 } else { sel + 1 };
         } else if ui.just_pressed_l() || ui.just_pressed_r() {
             show_detail(ui, items[sel]);
-        } else if ui.just_pressed_a() {
+        } else if ui.just_pressed_a() || ui.just_pressed_start() {
             return sel;
         }
         ui.wait_vblank();
@@ -201,7 +203,85 @@ pub fn menu_select(
             sel = if sel + 1 == all_items.len() { 0 } else { sel + 1 };
         } else if ui.just_pressed_l() || ui.just_pressed_r() {
             show_detail(ui, &all_items[sel]);
-        } else if ui.just_pressed_a() {
+        } else if ui.just_pressed_a() || ui.just_pressed_start() {
+            if Some(sel) == skip_idx {
+                return None;
+            }
+            return Some(sel);
+        }
+        ui.wait_vblank();
+    }
+}
+
+/// Select from a list of string items with optional card images.
+/// Returns the selected index. If `card_nos` is provided, draws card images
+/// next to each option using `ui.draw_card_image`.
+pub fn menu_select_with_cards(
+    ui: &mut dyn PlatformUi,
+    items: &[String],
+    title: &str,
+    allow_skip: bool,
+    card_nos: Option<&[String]>,
+) -> Option<usize> {
+    let mut all_items: Vec<&str> = items.iter().map(|s| s.as_str()).collect();
+    let skip_idx = if allow_skip {
+        all_items.push("[Skip]");
+        Some(all_items.len() - 1)
+    } else {
+        None
+    };
+    let mut sel: usize = 0;
+    let mut scroll: usize = 0;
+    let vis = ui.option_rows();
+    let cols = ui.option_cols();
+    // Rows are invariant while the menu is open; wrap them once.
+    let rows: Vec<String> = all_items
+        .iter()
+        .map(|item| one_line(&format!("   {item}"), cols))
+        .collect();
+    let card_nos = card_nos.unwrap_or(&[]);
+    let has_images = !card_nos.is_empty();
+    let _img_cols = 3; // 3 tiles wide = 24px
+    let _img_rows = 4; // 4 tiles tall = 32px
+    let _img_x = 26; // Right side of screen (30 - 3 - 1)
+    loop {
+        if sel < scroll {
+            scroll = sel;
+        }
+        if sel >= scroll + vis {
+            scroll = sel + 1 - vis;
+        }
+        ui.clear_screen();
+        ui.println(title);
+        let end = (scroll + vis).min(all_items.len());
+        let mut buf = String::new();
+        for n in scroll..end {
+            buf.clear();
+            buf.push_str(if n == sel { " >" } else { "  " });
+            buf.push_str(&rows[n][2..]);
+            ui.println(&buf);
+        }
+        // Draw card images for visible items
+        if has_images {
+            for (i, n) in (scroll..end).enumerate() {
+                if n < card_nos.len() {
+                    let img_y = 2 + i as i32 * 2; // 2 tile rows per line, plus header
+                    ui.draw_card_image(&card_nos[n], 26, img_y, 3, 4, 0);
+                }
+            }
+        }
+        if all_items.len() > end {
+            ui.println(&format!("  .. {} more", all_items.len() - end));
+        }
+        ui.swap_buffers();
+        ui.poll_input();
+        if ui.just_pressed_up() {
+            sel = if sel == 0 { all_items.len() - 1 } else { sel - 1 };
+        } else if ui.just_pressed_down() {
+            sel = if sel + 1 == all_items.len() { 0 } else { sel + 1 };
+        } else if ui.just_pressed_l() || ui.just_pressed_r() {
+            show_detail(ui, all_items[sel]);
+        } else if ui.just_pressed_a() || ui.just_pressed_start() {
             if Some(sel) == skip_idx {
                 return None;
             }
@@ -402,8 +482,24 @@ pub fn handle_choice(ui: &mut dyn PlatformUi, gs: &mut GameState) -> bool {
                     .collect(),
             };
 
+            // Extract card_nos for image display
+            let card_nos: Vec<String> = match filtered_indices {
+                Some(ref indices) => {
+                    if card_ids.is_empty() {
+                        Vec::new()
+                    } else {
+                        indices
+                            .iter()
+                            .filter(|&&i| i < card_ids.len())
+                            .map(|&i| card_ids[i].to_string())
+                            .collect()
+                    }
+                }
+                None => card_ids.iter().map(|cid| cid.to_string()).collect(),
+            };
+
             if count <= 1 {
-                let sel = menu_select(ui, &items, &description, allow_skip);
+                let sel = menu_select_with_cards(ui, &items, &description, allow_skip, Some(&card_nos));
                 match sel {
                     None => {
                         TurnEngine::resume_with_choice(gs, None, Some(Vec::new())).ok();
@@ -434,7 +530,7 @@ pub fn handle_choice(ui: &mut dyn PlatformUi, gs: &mut GameState) -> bool {
                             }
                         })
                         .collect();
-                    let sel = menu_select(ui, &display_items, &description, allow_skip);
+                    let sel = menu_select_with_cards(ui, &display_items, &description, allow_skip, Some(&card_nos));
                     match sel {
                         None => break,
                         Some(idx) => {
