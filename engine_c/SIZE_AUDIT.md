@@ -8,20 +8,20 @@ actually present in C.
 ## Summary
 
 - C files audited (mapped to a Rust twin): 28
-- Total C lines (non-blank/comment): 23674   Total Rust lines: 48265
-- Total C functions: 1357   Total Rust functions (all): 1069
+- Total C lines (non-blank/comment): 24006   Total Rust lines: 48265
+- Total C functions: 1371   Total Rust functions (all): 1069
 - Total Rust **port-target** functions (excl. constructors/trait glue): 857
-- **Function-count gap (Rust port-targets − C, summed): -500** (approx. unported functions)
+- **Function-count gap (Rust port-targets − C, summed): -514** (approx. unported functions)
 - Best-effort unmatched Rust function names: 20 (heuristic)
 
 ## Per-file gap (sorted by missing-function count, worst first)
 
 | C file | C lines | Rust lines | C/Rust % | C fns | Rust port fns | missing ≈ | Rust twin(s) |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
-| `src/ability/effects/state.c` | 1224 | 5359 | 22% | 34 | 56 | 22 | state.rs, misc.rs |
+| `src/ability/effects/state.c` | 1232 | 5359 | 22% | 34 | 56 | 22 | state.rs, misc.rs |
 | `src/ability/vm.c` | 1723 | 3522 | 48% | 67 | 81 | 14 | vm.rs, effect_decoder_gen.rs, condition_decoder_gen.rs |
-| `src/ability/condition.c` | 2215 | 6571 | 33% | 100 | 81 | -19 | condition.rs, card.rs, compound.rs, state.rs |
-| `src/ability/choice.c` | 1979 | 3165 | 62% | 72 | 33 | -39 | choice.rs |
+| `src/ability/condition.c` | 2510 | 6571 | 38% | 113 | 81 | -32 | condition.rs, card.rs, compound.rs, state.rs |
+| `src/ability/choice.c` | 1996 | 3165 | 63% | 72 | 33 | -39 | choice.rs |
 | `src/ability/ability_queue.c` | 419 | 669 | 62% | 46 | 29 | -17 | ability_queue.rs, triggers.rs |
 | `src/ability/dynamic_count.c` | 263 | 158 | 166% | 9 | 2 | -7 | dynamic_count.rs |
 | `src/ability/util.c` | 1666 | 2199 | 75% | 96 | 88 | -8 | util.rs |
@@ -34,7 +34,7 @@ actually present in C.
 | `src/ability/effects/misc.c` | 1355 | 3766 | 35% | 55 | 39 | -16 | misc.rs |
 | `src/ability/effects/draw.c` | 653 | 663 | 98% | 19 | 14 | -5 | draw.rs |
 | `src/ability/effects/score.c` | 352 | 748 | 47% | 16 | 6 | -10 | score.rs |
-| `src/core/card.c` | 1260 | 3448 | 36% | 186 | 91 | -95 | card.rs |
+| `src/core/card.c` | 1272 | 3448 | 36% | 187 | 91 | -96 | card.rs |
 | `src/core/data.c` | 452 | 966 | 46% | 39 | 12 | -27 | mod.rs, types.rs |
 | `src/core/alloc.c` | 63 | 140 | 45% | 10 | 5 | -5 | pool.rs |
 | `src/core/modifiers.c` | 302 | 416 | 72% | 58 | 22 | -36 | game_modifiers.rs, modifiers.rs |

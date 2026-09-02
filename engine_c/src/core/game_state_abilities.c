@@ -967,6 +967,10 @@ static int queue_moved_cards_abilities(GameState *g, const int *moved_cards, int
     for (int i = 0; i < n_moved; i++) {
         int moved_card_id = moved_cards[i];
         if (moved_card_id < 0) continue;
+        /* Mirror abilities.rs: the moved_cards list is the trigger-context snapshot
+            (recently_moved_cards / those_cards). Cards already on a stage or in a
+            live zone are skipped here (scanned separately by queue_zone_abilities)
+            so they aren't double-queued; batch_triggered_keys dedups the rest. */
         if (g->p[0].stage[0] == moved_card_id || g->p[0].stage[1] == moved_card_id ||
             g->p[0].stage[2] == moved_card_id || g->p[0].live.cards[0] == moved_card_id ||
             g->p[0].live.cards[1] == moved_card_id || g->p[0].live.cards[2] == moved_card_id ||

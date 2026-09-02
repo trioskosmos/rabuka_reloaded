@@ -257,3 +257,6 @@ int test_zone_has_id(TestGame *tg, int pl, const char *zone, int id){
     for(int i=0;i<b->n;i++) if(b->cards[i]==id) return 1;
     return 0;
 }
+
+int test_deck_len(TestGame *tg){ return tg->state.p[0].deck.n; }
+int test_hand_len(TestGame *tg){ return tg->state.p[0].hand.n; }

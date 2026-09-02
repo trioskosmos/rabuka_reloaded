@@ -7,9 +7,9 @@ exit /b
 #>
 
 param(
-    [int]$IntervalMinutes = 5,
+    [int]$IntervalMinutes = 8,
     [string]$WindowTitle = "",
-    [string]$Message = "continue analysing functions and tests and make more subtasks to do to pass to subagents and so on so we can get to all tests in engine_c passing."
+    [string]$Message = "continue analysing functions files and tests and their error messages and make more subtasks to do to and so on so we can get to all tests in engine_c passing."
 )
 
 Add-Type -AssemblyName System.Windows.Forms
@@ -28,6 +28,8 @@ function Send-Message {
         Start-Sleep -Milliseconds 500
     }
     try {
+        [System.Windows.Forms.SendKeys]::SendWait("{ESC}")
+        Start-Sleep -Milliseconds 200
         [System.Windows.Forms.SendKeys]::SendWait($Message)
         Start-Sleep -Milliseconds 200
         [System.Windows.Forms.SendKeys]::SendWait("{ENTER}")

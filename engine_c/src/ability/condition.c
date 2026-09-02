@@ -1976,27 +1976,66 @@ static int resolve_moved_cards_source(const struct GameState *g, int actor, cons
     const char *group = get_str(c, "group");
     const CondValue *gv = find_val(c, "group_names");
     if (gv && gv->tag == RB_TAG_ARRAY && gv->arr_n > 0 && gv->arr[0].tag == RB_TAG_STR) group = gv->arr[0].s;
-    int is_old = src && (!strcmp(src, "preceding_moved") || !strcmp(src, "previous_moved_cards"));
     int pl = target_player_idx(actor, c);
     int ids[RB_MAX_ZONE]; int n = 0;
-    if (is_old) {
+    if (src && !strcmp(src, "those_cards")) {
+        /* Mirror card.rs: source="those_cards" ¨ self.those_cards (cards moved by
+            the immediately preceding move_cards action). */
+        n = g->n_those_cards;
+        for (int i = 0; i < n && i < RB_MAX_ZONE; i++) ids[i] = g->those_cards[i];
+    } else if (src && (!strcmp(src, "preceding_moved") || !strcmp(src, "previous_moved_cards"))) {
         n = g->n_recently_moved;
         for (int i = 0; i < n && i < RB_MAX_ZONE; i++) ids[i] = g->recently_moved[i];
     } else if (dst && *dst) {
-        /* new movement format: filter recently_moved by destination zone */
-        for (int i = 0; i < g->n_recently_moved; i++) {
-            int cid = g->recently_moved[i];
-            /* check if card is in destination zone */
-            int in_dst = 0;
+        /* new movement format: source=zone+dst. Mirror card.rs: prefer the
+            trigger-context moved cards (entry_trigger_moved_cards / those_cards),
+            then recently_moved_cards; filter by destination zone. When the
+            movement-tracking table is empty (manual test setup), fall back to
+            recently_moved_cards unfiltered. */
+        int trigger_ids[RB_MAX_RECENTLY_MOVED]; int trigger_n = 0;
+        if (g->n_those_cards > 0) {
+            trigger_n = g->n_those_cards;
+            for (int i = 0; i < trigger_n && i < RB_MAX_RECENTLY_MOVED; i++) trigger_ids[i] = g->those_cards[i];
+        } else if (g->n_recently_moved > 0) {
+            trigger_n = g->n_recently_moved;
+            for (int i = 0; i < trigger_n && i < RB_MAX_RECENTLY_MOVED; i++) trigger_ids[i] = g->recently_moved[i];
+        }
+        if (trigger_n == 0) {
+            /* No movement context at all: fall back to the destination zone's
+                current contents (Rust's turn_movements-empty path returns true
+                for every event card, i.e. the unfiltered source set). */
+            n = zone_ids(g, pl, dst, ids, RB_MAX_ZONE);
+        } else {
             const RbPlayer *P = &g->p[pl];
-            if (!strcmp(dst, "discard") || !strcmp(dst, "waitroom")) {
-                for (int j = 0; j < P->discard.n; j++) if (P->discard.cards[j] == cid) { in_dst = 1; break; }
-            } else if (!strcmp(dst, "stage")) {
-                for (int j = 0; j < RB_STAGE_SIZE; j++) if (P->stage[j] == cid) { in_dst = 1; break; }
-            } else if (!strcmp(dst, "hand")) {
-                for (int j = 0; j < P->hand.n; j++) if (P->hand.cards[j] == cid) { in_dst = 1; break; }
+            for (int i = 0; i < trigger_n && n < RB_MAX_ZONE; i++) {
+                int cid = trigger_ids[i];
+                if (cid < 0) continue;
+                int in_dst = 0;
+                if (!strcmp(dst, "discard") || !strcmp(dst, "waitroom")) {
+                    for (int j = 0; j < P->discard.n; j++) if (P->discard.cards[j] == cid) { in_dst = 1; break; }
+                } else if (!strcmp(dst, "stage")) {
+                    for (int j = 0; j < RB_STAGE_SIZE; j++) if (P->stage[j] == cid) { in_dst = 1; break; }
+                } else if (!strcmp(dst, "hand")) {
+                    for (int j = 0; j < P->hand.n; j++) if (P->hand.cards[j] == cid) { in_dst = 1; break; }
+                } else if (!strcmp(dst, "deck") || !strcmp(dst, "main_deck")) {
+                    for (int j = 0; j < P->deck.n; j++) if (P->deck.cards[j] == cid) { in_dst = 1; break; }
+                } else if (!strcmp(dst, "energy") || !strcmp(dst, "energy_zone")) {
+                    for (int j = 0; j < P->energy.n; j++) if (P->energy.cards[j] == cid) { in_dst = 1; break; }
+                } else if (!strcmp(dst, "live_card_zone") || !strcmp(dst, "live")) {
+                    for (int j = 0; j < P->live.n; j++) if (P->live.cards[j] == cid) { in_dst = 1; break; }
+                } else if (!strcmp(dst, "success_live_zone") || !strcmp(dst, "success")) {
+                    for (int j = 0; j < P->success.n; j++) if (P->success.cards[j] == cid) { in_dst = 1; break; }
+                } else if (!strcmp(dst, "under_member") || !strcmp(dst, "under")) {
+                    for (int s = 0; s < RB_STAGE_SIZE; s++)
+                        for (int j = 0; j < P->under_cards[s].n; j++)
+                            if (P->under_cards[s].cards[j] == cid) { in_dst = 1; break; }
+                } else if (!strcmp(dst, "revealed_cards")) {
+                    for (int j = 0; j < g->n_revealed; j++) if (g->revealed_cards[j] == cid) { in_dst = 1; break; }
+                } else if (!strcmp(dst, "resolution") || !strcmp(dst, "resolution_zone")) {
+                    for (int j = 0; j < g->resolution.n; j++) if (g->resolution.cards[j] == cid) { in_dst = 1; break; }
+                }
+                if (in_dst) ids[n++] = cid;
             }
-            if (in_dst) ids[n++] = cid;
         }
     } else {
         n = g->n_recently_moved;
