@@ -56,30 +56,30 @@ ds = ["no_std", "bytecode_abilities", "compact_cards", "compact_card_data", "com
 # PS1 target: no_std + alloc, compact like DS (2MB RAM; card data streams from CD)
 ps1 = ["no_std", "bytecode_abilities", "compact_cards", "compact_card_data", "compact_state", "external_card_data"]
 # GBA target: no_std + alloc via agb (baked deck blobs from the engine)
-gba = ["no_std", "bytecode_abilities", "compact_cards", "compact_card_data", "compact_state"]
+gba = ["no_std", "bytecode_abilities", "compact_all"]
 # SNES target: no_std + alloc via rust-mos (mosw65816). Mirrors gba; the SNES
 # can read card/bytecode data from ROM (LoROM up to 4MB) so the compact + baked
 # data pipeline applies. Not yet buildable here (rust-mos not installed).
-snes = ["no_std", "bytecode_abilities", "compact_cards", "compact_card_data", "compact_state"]
+snes = ["no_std", "bytecode_abilities", "compact_all"]
 # Dreamcast target: no_std + alloc via KallistiOS + rustc_codegen_gcc
 dc = ["no_std", "debug_conditions", "bytecode_abilities", "compact_card_data"]
 # Wii target: no_std + alloc via devkitPPC + libogc
 wii = ["no_std", "bytecode_abilities", "compact_card_data"]
 # Atari Jaguar target: no_std + alloc, compact like PS1 (2MB main RAM)
-jaguar = ["no_std", "bytecode_abilities", "compact_cards", "compact_card_data", "compact_state"]
+jaguar = ["no_std", "bytecode_abilities", "compact_all"]
 # WebAssembly target: no_std + alloc, compact like GBA/Jaguar. Compiled to
 # wasm32-unknown-unknown (or wasm32v1-none) and either interpreted (wasm3) or
 # transpiled to C (w2c2/wasm2c) for consoles without a Rust backend.
-wasm = ["no_std", "bytecode_abilities", "compact_cards", "compact_card_data", "compact_state"]
+wasm = ["no_std", "bytecode_abilities", "compact_all"]
 # Philips CD-i target: m68k SCC68070 @ 15.5MHz, 1MB RAM, CD-ROM media.
 # Same compact set as wasm/jaguar/gba — native m68k-unknown-none-elf via LLVM
 # m68k backend (not wasm2c). Proves at ~150-300KB the engine fits 1MB; wasm2c
 # at 3-4MB text does not.
-cdi = ["no_std", "bytecode_abilities", "compact_cards", "compact_card_data", "compact_state"]
+cdi = ["no_std", "bytecode_abilities", "compact_all"]
 # Sega Genesis / Mega Drive target: m68k 68000 @ 7.6MHz, 64KB RAM, 4MB cart ROM.
 # Same compact set as GBA (per-deck baked blobs from ROM XIP, not full CARD_BLOB
 # in RAM). Code executes from ROM (XIP), only heap/stack in 64KB work RAM.
-genesis = ["no_std", "bytecode_abilities", "compact_cards", "compact_card_data", "compact_state"]
+genesis = ["no_std", "bytecode_abilities", "compact_all"]
 # Bytecode abilities: use pre-compiled bytecode instead of JSON serde
 # for ability loading. Dramatically reduces memory footprint (~7KB vs 1.4MB).
 bytecode_abilities = []
@@ -97,6 +97,8 @@ external_card_data = []
 compact_state = []
 # Umbrella: enable all console/embedded optimizations at once.
 console = ["compact_cards", "compact_state"]
+# Umbrella: all three compact features for ROM-constrained targets
+compact_all = ["compact_cards", "compact_card_data", "compact_state"]
 
 [profile.dev]
 # Trim DWARF to line tables only: cuts PDB size/link time dramatically.

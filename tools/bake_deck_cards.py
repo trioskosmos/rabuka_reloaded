@@ -75,27 +75,20 @@ def make_deck_blob(cards_dict, card_nos: list[str]) -> bytes:
         if card is not None:
             wanted.append((n, card))
 
-    strings = [""]
-    idx = {"": 0}
-
-    def intern(s: str) -> int:
-        if s not in idx:
-            idx[s] = len(strings)
-            strings.append(s)
-        return idx[s]
-
+    # Build string table like compile_cards does
+    st = compile_cards.StringTable()
     for _, card in wanted:
         for f in ("card_no", "name", "series", "unit"):
             v = card.get(f)
             if isinstance(v, str):
-                intern(v)
+                st.intern(v)
 
-    strtab = compile_cards.encode_strtab(strings)
+    strtab = compile_cards.encode_strtab(st.get_strings())
     lengths = []
     records = bytearray()
     for _, card in wanted:
         before = len(records)
-        records.extend(compile_cards.encode_card(card, idx))
+        records.extend(compile_cards.encode_card(card, st))
         lengths.append(len(records) - before)
 
     n = len(wanted)

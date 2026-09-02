@@ -321,7 +321,7 @@ impl<'a> Display<'a> {
         let mut art_bg = RegularBackground::new(
             Priority::P1,
             RegularBackgroundSize::Background32x32,
-            TileFormat::FourBpp,
+            TileFormat::EightBpp,
         );
         let mut ui_bg = RegularBackground::new(
             Priority::P0,
@@ -570,7 +570,6 @@ impl<'a> Display<'a> {
             return;
         }
         self.last = self.buf.clone();
-        self.gfx.set_background_palette(0, &TEXT_PALETTE);
 
         let font_ts = unsafe { TileSet::new(&FONT_TILES.0, TileFormat::FourBpp) };
         let icon_ts = unsafe { TileSet::new(&TEXTICON_TILES.0, TileFormat::FourBpp) };
