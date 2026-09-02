@@ -1461,10 +1461,57 @@ void rb_bulk_state_evaluate(GameState *g, int actor, int count, int max, int opt
                              int is_negative, int per_unit, int per_unit_count,
                              int is_self_target, int exclude_self_id, int blade_limit,
                              const char *blade_limit_op, int self_cost){
-    fprintf(stderr,"DEBUG [BULK_STATE_EVAL] actor=%d count=%d max=%d optional=%d is_all=%d state_filter=%s group=%s ctype=%s\n",
-        actor, count, max, optional, is_all, state_filter?state_filter:"null", group_filter?group_filter:"null", ctype?ctype:"null");
+    fprintf(stderr,"DEBUG [BULK_STATE_EVAL] actor=%d count=%d max=%d optional=%d is_all=%d state_filter=%s group=%s ctype=%s host_cid=%d self_target=%d exclude_self=%d\n",
+        actor, count, max, optional, is_all, state_filter?state_filter:"null", group_filter?group_filter:"null", ctype?ctype:"null", host_cid, is_self_target, exclude_self_id);
     if(is_all){ fprintf(stderr,"DEBUG [BULK_IS_ALL] applying to all %s members with filter group=%s ctype=%s\n", state_filter?state_filter:"", group_filter?group_filter:"", ctype?ctype:""); }
-    /* Snapshot, filter, apply, record changes, re-trigger — mirrors Rust execute_change_state */
+    RbPlayer *P = &g->p[actor];
+    int cands[RB_STAGE_SIZE]; int nc = 0;
+    int snap_ids[RB_STAGE_SIZE]; int nsnap = 0;
+    const char *snap_ori[RB_STAGE_SIZE];
+    int wait_before = 0;
+    if(is_self_target && host_cid >= 0){
+        int found = 0; for(int i=0;i<nc;i++) if(cands[i]==host_cid) found=1;
+        if(!found && host_cid>=0){ int on_stage=0; for(int q=0;q<RB_STAGE_SIZE;q++) if(P->stage[q]==host_cid) on_stage=1;
+            if(on_stage){ cands[nc++]=host_cid; fprintf(stderr,"DEBUG [BULK_SELF_TARGET] added host_cid=%d to candidates\n", host_cid); }
+            else { fprintf(stderr,"DEBUG [BULK_SELF_TARGET] host not on stage, returning early\n"); return; }
+        }
+    }
+    /* Filter stage by card_type/group/chars and current orientation */
+    for(int q=0; q<RB_STAGE_SIZE; q++){
+        int cid = P->stage[q]; if(cid == RB_EMPTY_SLOT) continue;
+        if(exclude_self_id >= 0 && cid == exclude_self_id) continue;
+        if(ctype && !rb_card_matches_type(cid, ctype)) continue;
+        if(group_filter && !rb_card_matches_group_str(cid, group_filter)) continue;
+        if(chars && chars[0] && !s_match_chars(cid, chars)) continue;
+        const char *ori = rb_mods_get_orientation((RbMods*)&g->mods, cid);
+        int is_wait = (ori && !strcmp(ori, "wait")) ? 1 : 0;
+        int include = 1;
+        if(state_filter && !strcmp(state_filter, "active")){ if(is_wait) include = 0; }
+        else if(state_filter && !strcmp(state_filter, "wait")){ if(!is_wait) include = 0; }
+        if(include){ cands[nc++] = cid; fprintf(stderr,"DEBUG [BULK_STATE_EVAL] included stage[%d] cid=%d is_wait=%d\n", q, cid, is_wait); }
+    }
+    fprintf(stderr,"DEBUG [BULK_STATE_EVAL] candidates found: %d state_filter=%s\n", nc, state_filter?state_filter:"none");
+    if(nc == 0){ fprintf(stderr,"DEBUG [BULK_STATE_EVAL] no candidates -> returning\n"); return; }
+    int change_all = (count == 0);
+    int change_limit = change_all ? nc : (count < nc ? count : nc);
+    int applied = 0;
+    int was_wait_before = 0; int changed_to_wait = 0;
+    for(int i=0; i<change_limit && i<nc; i++){
+        int cid = cands[i];
+        const char *old_ori = rb_mods_get_orientation((RbMods*)&g->mods, cid);
+        int was_wait = (old_ori && !strcmp(old_ori, "wait")) ? 1 : 0; was_wait_before += was_wait;
+        fprintf(stderr,"DEBUG [BULK_STATE_EVAL] applying: cid=%d filter=%s target=%s old_ori=%s\n", cid, state_filter?state_filter:"", state_filter?state_filter:"", old_ori ? old_ori : "active");
+        if(!strcmp(state_filter ? state_filter : "", "wait")) rb_mods_set_orientation(&g->mods, cid, "wait");
+        else rb_mods_set_orientation(&g->mods, cid, "active");
+        const char *new_ori = rb_mods_get_orientation((RbMods*)&g->mods, cid);
+        if(new_ori && !strcmp(new_ori, "wait")) changed_to_wait++;
+        applied++;
+        fprintf(stderr,"DEBUG [BULK_STATE_EVAL] applied: cid=%d count=%d/%d new_ori=%s applied_total=%d\n", cid, applied, change_limit, new_ori?new_ori:"none", applied);
+        if(blade_limit >= 0){ Card cc; int bl=0; if(rb_decode_card_by_index((uint32_t)cid,&cc)){ bl=cc.blade; rb_free_card(&cc); } fprintf(stderr,"DEBUG [BULK_STATE_EVAL] blade_limit=%d card=%d blade=%d\n", blade_limit, cid, bl); }
+    }
+    fprintf(stderr,"DEBUG [BULK_STATE_EVAL] finished: applied=%d wait_before=%d to_wait=%d\n", applied, was_wait_before, changed_to_wait);
+    rb_recalc_constants(g);
+    rb_trigger_auto_abilities_for_player(g, actor);
 }
 
 /* player_prefix — "P1"/"P2" for the card's owner (mirror misc.rs:player_prefix) */
