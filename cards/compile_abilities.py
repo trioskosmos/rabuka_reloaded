@@ -1,28 +1,21 @@
 ﻿"""Auto-compiler: scans abilities.json, discovers field types, generates bytecode + Rust decoder."""
 
-import json, struct, hashlib, zlib
+import json
+import struct
+import hashlib
+import zlib
 from pathlib import Path
 
-def write_len(out, n):
-    """Write a container length as u8 with 0xFE escape for large values."""
-    if n < 0xFE:
-        out.append(n)
-    else:
-        out.append(0xFE)
-        out.extend(struct.pack("<H", n))
-
-
-def read_len(bc, pos):
-    """Read a container length written by write_len. Returns (n, new_pos)."""
-    if pos >= len(bc):
-        return 0, pos
-    b = bc[pos]
-    if b < 0xFE:
-        return b, pos + 1
-    if pos + 3 > len(bc):
-        return 0, len(bc)
-    return (bc[pos + 1] | (bc[pos + 2] << 8)), pos + 3
-
+from build_lib import (
+    StringTable,
+    write_len,
+    read_len,
+    compress_with_header,
+    write_generation_manifest,
+    write_string_blob,
+    delta_encode_offsets,
+    sha256_short,
+)
 
 
 class BC:
@@ -42,72 +35,17 @@ class BC:
         return bytes(self.data)
 
 
-class StringTable:
-    def __init__(self):
-        self._strings, self._index = [], {}
-
-    def idx(self, s):
-        if not s:
-            return 0xFFFF
-        if isinstance(s, list):
-            s = s[0] if s else ""
-        s = str(s).strip()
-        if not s:
-            return 0xFFFF
-        if s not in self._index:
-            self._index[s] = len(self._strings)
-            self._strings.append(s)
-        return self._index[s]
-
-    def __iter__(self):
-        return iter(self._strings)
-
-    def __len__(self):
-        return len(self._strings)
-
-
 def compile_all(abilities):
     """Store each `unique_abilities[i]` entry as a compact *binary JSON* slice.
 
-    Binary JSON = a tagged tree (see `read_value` in vm.rs) with all strings
-    (object keys AND string values) interned into a single `STRINGS` table and
-    referenced by 2-byte indices. Because field names are no longer repeated as
-    text on every ability, the blob is far smaller than the text JSON (no
-    per-ability key duplication, no whitespace, no UTF-8 quoting) — yet the
-    decoder reconstructs the *exact same* ``serde_json::Value`` the text loader
-    would, and then runs the identical ``from_value`` + ``populate_from_json`` +
-    draw-fix post-processing.
-
-    This is fully data-driven: the codec is generic over any JSON shape, so a
-    new action type or field needs ZERO encoder/decoder changes.
-
-    The top-level ``cards`` field is skipped: it is the card_no→ability mapping
-    consumed only by the loader (not an ``Ability`` field) and is large, so
-    dropping it shrinks the blob with zero effect on the decoded ``Ability``.
+    Binary JSON = a tagged tree with all strings (object keys AND string values)
+    interned into a single `STRINGS` table and referenced by 2-byte indices.
     """
-    # Top-level keys that are loader metadata, not part of `Ability`, and are
-    # large/redundant in the binary.
     SKIP_KEYS = {"cards"}
 
-    strings = []  # interned strings (UTF-8)
-    string_idx = {}  # str -> u16 index
+    strings = StringTable()
 
-    def intern(s):
-        if s not in string_idx:
-            if len(strings) >= 0x10000:
-                # Fallback: pathological case, just re-emit. Should never happen
-                # for our vocabulary (keys + a bounded set of ability text).
-                return 0xFFFF
-            string_idx[s] = len(strings)
-            strings.append(s)
-        return string_idx[s]
-
-    # Keys whose array values are vectors of effect objects in the bytecode
-    # schema (see read_effect_vec_value / read_effect_vec_boxed_value).
     EFFECT_LIST_KEYS = ("actions", "options", "effect_steps")
-
-    # Keys whose dict value is a Condition object (read_condition_value), plus
-    # the array key whose elements are Conditions ("conditions").
     CONDITION_KEYS = (
         "condition",
         "alternative_condition",
@@ -117,8 +55,6 @@ def compile_all(abilities):
         "cause",
     )
 
-    # Condition "type" string -> variant tag. Mirrors the `#[serde(tag = "type")]`
-    # Condition enum in engine/src/core/card.rs, including every alias.
     COND_TO_VARIANT_TAG = {
         "compound": 0,
         "or_condition": 0,
@@ -156,9 +92,6 @@ def compile_all(abilities):
     }
 
     ACTION_TO_VARIANT_TAG = {
-        # Empty action: no-action/no-type dicts that sit directly inside an
-        # effect vector (filter options) decode as variant 3 (SelectTarget),
-        # whose EffectFilter carries the option's fields.
         "": 3,
         "move_cards": 1,
         "discard_card": 1,
@@ -230,14 +163,6 @@ def compile_all(abilities):
         "opponent_action": 14,
     }
 
-    # Cost objects (AbilityCost) carry `type` instead of `action`. The values are
-    # valid action names (ActionType::from_str covers every one), so the alias is
-    # identity — sequential_cost/choice_condition stay distinct ActionType variants
-    # (SequentialCost/ChoiceCondition), they are NOT folded into sequential/choice.
-    # Their sub-effects live in `costs`/`options`, which the decoder reads as
-    # `actions` (the compound list). NOTE: `choice_condition` is also a Condition
-    # variant name, but in the current abilities.json it only appears as a cost type
-    # — verified by scan, and the bytecode deep-compare test guards this corpus.
     COST_TYPE_TO_ACTION = {
         "move_cards": "move_cards",
         "pay_energy": "pay_energy",
@@ -248,9 +173,7 @@ def compile_all(abilities):
         "choice_condition": "choice_condition",
     }
 
-    def enc_val(
-        v, out: bytearray, in_effect_vec: bool = False, is_condition: bool = False
-    ):
+    def enc_val(v, out: bytearray, in_effect_vec: bool = False, is_condition: bool = False):
         if v is None:
             out.append(0x00)
         elif isinstance(v, bool):
@@ -258,11 +181,6 @@ def compile_all(abilities):
         elif isinstance(v, int):
             out.append(0x03)
             if v < 0:
-                # Negative: width byte 0xFF + SIGNED 32-bit two's complement.
-                # The Rust reader (vm.rs read_int) interprets a 0xFF width byte
-                # as a 4-byte payload; writing a raw <q with no width byte
-                # desynced the whole tree walk (the first payload byte was
-                # consumed as the width).
                 out.append(0xFF)
                 out.extend(struct.pack("<I", v & 0xFFFFFFFF))
             elif v <= 0xFD:
@@ -278,7 +196,7 @@ def compile_all(abilities):
             out.extend(struct.pack("<d", v))
         elif isinstance(v, str):
             out.append(0x06)
-            out.extend(struct.pack("<H", intern(v)))
+            out.extend(struct.pack("<H", strings.intern(v)))
         elif isinstance(v, list):
             out.append(0x07)
             write_len(out, len(v))
@@ -286,46 +204,23 @@ def compile_all(abilities):
                 enc_val(item, out, in_effect_vec, is_condition)
         elif isinstance(v, dict):
             if is_condition:
-                # Condition object: encode as TAG_OBJECT_VARIANT with the
-                # Condition variant tag. The "type" key is the tag itself, so it
-                # is dropped before counting the remaining fields (the decoder
-                # dispatches by tag byte). Unknown types fall back to TAG_OBJECT.
                 t = v.get("type") or ""
-                # None if the type string is unknown; 0 is a valid tag (Compound).
                 vtag = COND_TO_VARIANT_TAG.get(t)
-                # `or_condition` is the Compound variant with OR semantics: the
-                # JSON oracle (condition_populate_from_json) forces operator="or"
-                # when the type alias is used. Replicate that at compile time so
-                # the decoded bytecode matches the oracle.
                 if t == "or_condition" and "operator" not in v:
                     v["operator"] = "or"
-                # has_moved / not_moved: the type string IS the discriminator,
-                # but it is stripped below. Preserve it in the `movement` field
-                # so condition_type() classifies the decoded Movement variant
-                # as HasMoved / NotMoved instead of defaulting to NotMoved.
                 if t in ("has_moved", "not_moved") and "movement" not in v:
                     v["movement"] = t
                 if vtag is not None:
                     v.pop("type", None)
-                    out.append(0x09)  # TAG_OBJECT_VARIANT
+                    out.append(0x09)
                     out.append(vtag)
                 else:
-                    out.append(0x08)  # TAG_OBJECT (serde fallback; keeps "type")
+                    out.append(0x08)
                 write_len(out, len(v))
                 for k, val in v.items():
-                    out.extend(struct.pack("<H", intern(str(k))))
-                    enc_val(
-                        val,
-                        out,
-                        k in EFFECT_LIST_KEYS,
-                        k in CONDITION_KEYS or k == "conditions",
-                    )
+                    out.extend(struct.pack("<H", strings.intern(str(k))))
+                    enc_val(val, out, k in EFFECT_LIST_KEYS, k in CONDITION_KEYS or k == "conditions")
             elif "action" not in v:
-                # Cost objects (AbilityCost) use `type`/`zone` instead of
-                # `action`/`source`, and compound costs use `costs`/`options`
-                # instead of `actions`. Alias them here so costs flow through the
-                # same TAG_OBJECT_VARIANT effect decoder as normal effects,
-                # eliminating the runtime normalize_cost_keys serde path.
                 t = v.get("type")
                 if t in COST_TYPE_TO_ACTION:
                     v["action"] = COST_TYPE_TO_ACTION[t]
@@ -338,69 +233,49 @@ def compile_all(abilities):
                                 v["actions"] = v.pop(k)
                                 break
                 elif in_effect_vec:
-                    # Filter option with neither action nor type (direct element
-                    # of an effect vector): fabricate an empty action so it
-                    # decodes as variant 3 (SelectTarget), whose EffectFilter
-                    # carries the option's filter fields (group_names, card_type,
-                    # card_property, ...).
                     v["action"] = ""
             if not is_condition:
                 action = v.get("action", "")
                 vtag = ACTION_TO_VARIANT_TAG.get(action, 0)
                 if vtag:
-                    out.append(0x09)  # TAG_OBJECT_VARIANT
+                    out.append(0x09)
                     out.append(vtag)
                 else:
-                    out.append(0x08)  # TAG_OBJECT
+                    out.append(0x08)
                 write_len(out, len(v))
                 for k, val in v.items():
-                    out.extend(struct.pack("<H", intern(str(k))))
-                    enc_val(
-                        val,
-                        out,
-                        k in EFFECT_LIST_KEYS,
-                        k in CONDITION_KEYS or k == "conditions",
-                    )
+                    out.extend(struct.pack("<H", strings.intern(str(k))))
+                    enc_val(val, out, k in EFFECT_LIST_KEYS, k in CONDITION_KEYS or k == "conditions")
         else:
             out.append(0x00)
 
     def enc_entry(entry, out: bytearray):
-        # Object with `cards` (loader-only mapping) stripped.
         out.append(0x08)
         write_len(out, sum(1 for k in entry if k not in SKIP_KEYS))
         for k, val in entry.items():
             if k in SKIP_KEYS:
                 continue
-            out.extend(struct.pack("<H", intern(str(k))))
-            enc_val(
-                val,
-                out,
-                k in EFFECT_LIST_KEYS,
-                k in CONDITION_KEYS or k == "conditions",
-            )
+            out.extend(struct.pack("<H", strings.intern(str(k))))
+            enc_val(val, out, k in EFFECT_LIST_KEYS, k in CONDITION_KEYS or k == "conditions")
 
-    offsets, bytecode = [], bytearray()
-
-    # Extract card→ability pairs BEFORE encoding (so card_no values get interned)
     card_ability_pairs = []
     for idx, entry in enumerate(abilities):
         for card_entry in entry.get("cards", []):
-            # cards field format: "card_no | Ability Name"
             card_no = card_entry.split(" | ")[0] if " | " in card_entry else card_entry
-            str_idx = intern(card_no)
+            str_idx = strings.intern(card_no)
             card_ability_pairs.append((str_idx, idx))
 
+    offsets, bytecode = [], bytearray()
     for entry in abilities:
         offsets.append(len(bytecode))
         enc_entry(entry, bytecode)
     offsets.append(len(bytecode))
 
-    # ── Phase 3: Reorder strings by frequency, rewrite with u8 indices ──
-    bytecode, offsets, strings, card_ability_pairs = compact_bytecode(
-        bytes(bytecode), offsets, strings, card_ability_pairs
+    bytecode, offsets, strings_list, card_ability_pairs = compact_bytecode(
+        bytes(bytecode), offsets, strings.get_strings(), card_ability_pairs
     )
 
-    return bytes(bytecode), offsets, strings, card_ability_pairs
+    return bytes(bytecode), offsets, strings_list, card_ability_pairs
 
 
 def compact_bytecode(bytecode, offsets, strings, card_ability_pairs):
@@ -408,7 +283,6 @@ def compact_bytecode(bytecode, offsets, strings, card_ability_pairs):
     freq = [0] * len(strings)
 
     def count_one(bc, pos):
-        """Count string references in a single value starting at pos. Return new pos."""
         if pos >= len(bc):
             return pos
         tag = bc[pos]
@@ -416,7 +290,6 @@ def compact_bytecode(bytecode, offsets, strings, card_ability_pairs):
         if tag in (0x00, 0x01, 0x02):
             return pos
         elif tag == 0x03:
-            # variable-width int: 1 byte (≤0xFD), 0xFE+u16, 0xFF+u32, else i64
             if pos >= len(bc):
                 return len(bc)
             b = bc[pos]
@@ -454,7 +327,7 @@ def compact_bytecode(bytecode, offsets, strings, card_ability_pairs):
                 pos = count_one(bc, pos)
             return pos
         elif tag == 0x09:
-            pos += 1  # skip variant tag byte
+            pos += 1
             n, pos = read_len(bc, pos)
             for _ in range(n):
                 if pos + 2 > len(bc):
@@ -467,13 +340,11 @@ def compact_bytecode(bytecode, offsets, strings, card_ability_pairs):
             return pos
         return pos
 
-    # Count frequencies by walking each ability slice
     for i in range(len(offsets) - 1):
         s, e = offsets[i], offsets[i + 1]
         if s < e:
             count_one(bytecode, s)
 
-    # Build reorder map: most frequent strings get indices 0..253
     indexed = list(range(len(strings)))
     indexed.sort(key=lambda i: (-freq[i], i))
     new_idx = [0] * len(strings)
@@ -482,12 +353,10 @@ def compact_bytecode(bytecode, offsets, strings, card_ability_pairs):
 
     new_strings = [strings[old] for old in indexed]
 
-    # Remap card_ability_pairs
     new_pairs = []
     for str_idx, ability_idx in card_ability_pairs:
         new_pairs.append((new_idx[str_idx], ability_idx))
 
-    # Rewrite bytecode with new indices using u8+escape encoding
     new_bytecode = bytearray()
     new_offsets = []
 
@@ -499,7 +368,6 @@ def compact_bytecode(bytecode, offsets, strings, card_ability_pairs):
             out.extend(struct.pack("<H", idx))
 
     def rewrite_one(bc, pos, out):
-        """Rewrite a single value from old bytecode at pos into out. Return new pos."""
         if pos >= len(bc):
             return pos
         tag = bc[pos]
@@ -508,7 +376,6 @@ def compact_bytecode(bytecode, offsets, strings, card_ability_pairs):
         if tag in (0x00, 0x01, 0x02):
             return pos
         elif tag == 0x03:
-            # variable-width int
             if pos >= len(bc):
                 return pos
             b = bc[pos]
@@ -590,68 +457,42 @@ def compact_bytecode(bytecode, offsets, strings, card_ability_pairs):
     return new_bytecode, new_offsets, new_strings, new_pairs
 
 
-# ── Rust code generation ──
 def generate_abilities_gen(bytecode, offsets, strings, card_ability_pairs, build_dir):
-    # Byte data lives in .bin files next to this script's build dir; the generated
-    # Rust embeds them via include_bytes! so rustc never parses millions of hex
-    # tokens (a full rebuild of the engine stays fast).
-    #
-    # Compressed bytecode for host (not snes) - saves ~60% via zlib.
-    # Written by main() to build_dir/abilities.bin.z before this runs.
     assert (build_dir / "abilities.bin.z").exists(), (
         "run main() first: abilities.bin.z must exist before generating abilities_gen.rs"
     )
 
-    # Build string blob + offsets for compact storage (saves ~68KB vs &[&str] fat pointers)
-    # Instead of &[&str] (16 bytes per entry + data), store as single &[u8] blob + u32 offsets
-    blob_bytes = b"".join(s.encode('utf-8') for s in strings)
-    (build_dir / "abilities_strings.bin").write_bytes(blob_bytes)
-    # Offsets: start of each string in blob, plus sentinel end
-    str_offsets = []
-    cur = 0
-    for s in strings:
-        str_offsets.append(cur)
-        cur += len(s.encode('utf-8'))
-    str_offsets.append(cur)
+    blob_bytes, str_offsets = write_string_blob(strings, build_dir / "abilities_strings.bin")
     offsets_hex_str = ", ".join(str(o) for o in str_offsets)
     pair_strs = ", ".join(f"{s},{a}" for s, a in card_ability_pairs)
 
-    # Delta-encode offsets: offsets are monotonically increasing absolute byte
-    # positions, but the per-ability slice lengths (deltas) are small. Storing
-    # u16 deltas instead of u32 absolute positions halves the table. The decoder
-    # rebuilds absolute positions via a running prefix sum at first access.
-    offset_deltas = [offsets[i + 1] - offsets[i] for i in range(len(offsets) - 1)]
-    assert all(d >= 0 for d in offset_deltas), "offsets must be non-decreasing"
-    assert all(d <= 0xFFFF for d in offset_deltas), "delta exceeds u16"
+    offset_deltas = delta_encode_offsets(offsets)
     delta_strs = ", ".join(str(d) for d in offset_deltas)
 
-    # ── snes (16-bit) representation: chunk the bytecode into <=30KB extern
-    # arrays (the max object size on a 16-bit target is ~32KB = isize::MAX, not
-    # 64KB!) and emit a per-ability (chunk_idx:u8, start:u16, len:u16) location
-    # table, so no offset or object ever exceeds the 16-bit limit. The bytes
-    # live in ROM via the linker (extern symbols); the host build keeps the
-    # inline const path below.
-    CHUNK_CAP = 30000  # well under isize::MAX (~32767) so the object is legal
+    CHUNK_CAP = 30000
     snes_chunks, snes_locs, snes_sizes = [], [], []
     cur, cur_start = bytearray(), 0
     for i in range(len(offsets) - 1):
         d = offsets[i + 1] - offsets[i]
         if len(cur) + d > CHUNK_CAP and len(cur) > 0:
-            snes_chunks.append(bytes(cur)); snes_sizes.append(len(cur)); cur = bytearray(); cur_start = 0
+            snes_chunks.append(bytes(cur))
+            snes_sizes.append(len(cur))
+            cur = bytearray()
+            cur_start = 0
         snes_locs.append((len(snes_chunks), cur_start, d))
-        cur += bytecode[offsets[i]:offsets[i + 1]]
+        cur += bytecode[offsets[i] : offsets[i + 1]]
         cur_start += d
     if len(cur) > 0 or not snes_chunks:
-        snes_chunks.append(bytes(cur)); snes_sizes.append(len(cur))
+        snes_chunks.append(bytes(cur))
+        snes_sizes.append(len(cur))
     assert all(s <= 0xFFFF for s in snes_sizes), "chunk too big for u16 offset"
+
     snes_chunk_decls = "\n".join(
-        f'extern "C" {{ pub static BYTECODE_C{ci}: [u8; {len(c)}]; }}'
-        for ci, c in enumerate(snes_chunks)
+        f'extern "C" {{ pub static BYTECODE_C{ci}: [u8; {len(c)}]; }}' for ci, c in enumerate(snes_chunks)
     )
     snes_loc_strs = ", ".join(f"({c},{s},{l})" for c, s, l in snes_locs)
     snes_slice_arms = "\n".join(
-        f'        {ci} => unsafe {{ &BYTECODE_C{ci}[start..start + len] }},'
-        for ci in range(len(snes_chunks))
+        f'        {ci} => unsafe {{ &BYTECODE_C{ci}[start..start + len] }},' for ci in range(len(snes_chunks))
     )
 
     src = f"""// Auto-generated by compile_abilities.py
@@ -714,36 +555,29 @@ pub fn get_string(idx: usize) -> Option<&'static str> {{
     unsafe {{ Some(core::str::from_utf8_unchecked(&STRINGS_BLOB[start..end])) }}
 }}
 
-/// Card_no → ability index pairs. Each entry is (card_no_string_index, ability_index).
+/// Card_no -> ability index pairs. Each entry is (card_no_string_index, ability_index).
 /// Generated from the `cards` field of `unique_abilities`. Used at load time by
-/// `CardLoader::build_abilities_map_shared` to build the card_no → Vec<AbilityRef>
+/// `CardLoader::build_abilities_map_shared` to build the card_no -> Vec<AbilityRef>
 /// mapping without parsing abilities.json into a `serde_json::Value`.
 ///
 /// Format: flat array of [str_idx, ability_idx, str_idx, ability_idx, ...]
 pub const CARD_ABILITY_PAIRS: &[u16] = &[{pair_strs}];
 """
     (build_dir / "abilities_gen.rs").write_text(src, encoding="utf-8")
-    # The crate compiles `src/ability/abilities_gen.rs`, so mirror the artifact
-    # there as well. (Kept in sync so a regen is a single command.)
     engine_dir = Path(__file__).parent.parent / "engine" / "src" / "ability"
     if engine_dir.exists():
         (engine_dir / "abilities_gen.rs").write_text(src, encoding="utf-8")
 
-    # Emit a C object defining the snes `extern` BYTECODE_C* symbols with the
-    # real byte data, so the ROM linker has something to resolve them to.
     c_lines = ['/* Auto-generated by compile_abilities.py: snes BYTECODE chunk data */']
     for ci, c in enumerate(snes_chunks):
         hexs = ", ".join(f"0x{b:02x}" for b in c)
         c_lines.append(f"const unsigned char BYTECODE_C{ci}[{len(c)}] = {{{hexs}}};")
     c_src = "\n".join(c_lines) + "\n"
     (build_dir / "bytecode_data.c").write_text(c_src, encoding="utf-8")
-    (Path(__file__).parent.parent / "platforms" / "snes" / "bytecode_data.c").write_text(
-        c_src, encoding="utf-8"
-    )
+    (Path(__file__).parent.parent / "platforms" / "snes" / "bytecode_data.c").write_text(c_src, encoding="utf-8")
     print(f"  bytecode_data.c: {len(snes_chunks)} chunks")
 
 
-# ── Main ──
 def main():
     root = Path(__file__).parent
     with open(root / "abilities.json", encoding="utf-8") as f:
@@ -756,33 +590,28 @@ def main():
     build_dir.mkdir(parents=True, exist_ok=True)
 
     (build_dir / "abilities.bin").write_bytes(bytecode)
-    # C3: prepend magic+version header before compression so stale blobs fail far from cause
-    # Magic: b'RBKA' (0x52424B41), version: u32 LE 1. The vm.rs asserts this after decompression.
-    MAGIC = b'RBKA'
+    MAGIC = b"RBKA"
     VERSION = 1
-    header = MAGIC + VERSION.to_bytes(4, 'little')
+    header = MAGIC + VERSION.to_bytes(4, "little")
     compressed = zlib.compress(header + bytes(bytecode), level=9)
     (build_dir / "abilities.bin.z").write_bytes(compressed)
-    # Also keep uncompressed with header for debugging
     (build_dir / "abilities.bin").write_bytes(header + bytes(bytecode))
     print(f"\n  abilities.bin: {len(bytecode) + len(header)} bytes ({(len(bytecode)+len(header)) / 1024:.1f}KB) with header")
     print(f"  compressed: {len(compressed)} bytes ({len(compressed) / 1024:.1f}KB) ({100*(1-len(compressed)/(len(bytecode)+len(header))):.1f}% smaller)")
     print(f"  header: magic={MAGIC!r} version={VERSION}")
     print(f"  interned strings: {len(strings)}")
-    print(f"  card→ability pairs: {len(card_ability_pairs)}")
+    print(f"  card->ability pairs: {len(card_ability_pairs)}")
 
     generate_abilities_gen(bytecode, offsets, strings, card_ability_pairs, build_dir)
     print(f"  Avg: {len(bytecode) / len(abilities):.1f} bytes/ability")
 
-    # Write generation manifest for reproducibility tracking
     abilities_json_path = root / "abilities.json"
-    abilities_hash = hashlib.sha256(abilities_json_path.read_bytes()).hexdigest()[:16]
+    abilities_hash = sha256_short(abilities_json_path)
     bytecode_hash = hashlib.sha256(bytecode).hexdigest()[:16]
 
     git_hash = "unknown"
     try:
         import subprocess
-
         result = subprocess.run(
             ["git", "rev-parse", "--short", "HEAD"],
             capture_output=True,
@@ -795,27 +624,22 @@ def main():
     except Exception:
         pass
 
-    # Recompute compressed already includes header above
-    manifest = {
-        "schema": "compiled_abilities.v1",
-        "compiler": "cards/compile_abilities.py",
-        "engine_commit": git_hash,
-        "input": {
-            "source": "cards/abilities.json",
-            "sha256": abilities_hash,
-            "unique_abilities": len(abilities),
-        },
-        "output": {
-            "bytecode_bytes": len(bytecode),
-            "compressed_bytes": len(compressed),
+    write_generation_manifest(
+        build_dir,
+        "compiled_abilities.v1",
+        "cards/compile_abilities.py",
+        "cards/abilities.json",
+        abilities_hash,
+        len(abilities),
+        len(bytecode) + len(header),
+        len(compressed),
+        "abilities",
+        {
             "interned_strings": len(strings),
             "card_ability_pairs": len(card_ability_pairs),
             "sha256": bytecode_hash,
             "compressed_sha256": hashlib.sha256(compressed).hexdigest()[:16],
         },
-    }
-    (build_dir / "generation_manifest.json").write_text(
-        json.dumps(manifest, indent=2) + "\n", encoding="utf-8"
     )
     print(f"  manifest: generation_manifest.json")
 
