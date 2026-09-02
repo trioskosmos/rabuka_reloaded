@@ -22,7 +22,7 @@ import re
 import sys
 from pathlib import Path
 
-from PIL import Image, ImageEnhance, ImageFilter
+from PIL import Image, ImageFilter
 
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO / "cards"))
@@ -57,7 +57,7 @@ FRONT_COLORS = 16
 # palette index 0 (matches display.rs TEXT_PALETTE zone fill).
 PAD_RGB = (26, 35, 50)
 
-CACHE = REPO / "platforms" / "3ds" / ".card_png_cache"
+CACHE = REPO / "web_ui" / "img" / "cards_webp"
 OUT = REPO / "platforms" / "gba" / "src" / "card_art_gen.rs"
 
 
@@ -174,13 +174,6 @@ def bake_ui_tiles():
     return bytes(flat)  # 4 tiles x 32 bytes
 
 
-def preprocess(img):
-    """Mild boost so detail survives 240-colour quantization without crushing darks."""
-    img = ImageEnhance.Color(img).enhance(1.15)
-    img = ImageEnhance.Contrast(img).enhance(1.08)
-    return img
-
-
 def darkest_index(pal):
     """Palette index of the darkest colour (for the baked outline)."""
     best, best_l = 0, 1e9
@@ -190,6 +183,23 @@ def darkest_index(pal):
         if l < best_l:
             best_l, best = l, i
     return best
+
+
+def _quantize_method():
+    """Prefer libimagequant if available, else MAXCOVERAGE."""
+    for name in ("LIBIMAGEQUANT", "LIBIMAGEQUANT"):
+        if hasattr(Image.Quantize, name):
+            try:
+                Image.new("RGB", (1, 1)).quantize(colors=2, method=getattr(Image.Quantize, name))
+                return getattr(Image.Quantize, name)
+            except Exception:
+                pass
+    if hasattr(Image.Quantize, "MAXCOVERAGE"):
+        return Image.Quantize.MAXCOVERAGE
+    return Image.Quantize.MEDIANCUT
+
+
+_QUANT_METHOD = _quantize_method()
 
 
 def build_master_palette(thumbnails):
@@ -242,62 +252,47 @@ def build_palette(thumbnails, colors=240):
         pal_bytes += bytes([c & 0xFF, c >> 8])
     return q, bytes(pal_bytes)
 
-def bake_front_sized_with_master(img, w, h, master_q, grid=None):
-    """object-fit: contain — fit the whole card inside the tile grid, pad the
-    rest with board backdrop colour. Never crops the card. Mirrors the 3DS
-    `_3ds_draw_card_at` (ctru_shim.c:808) which uses min-scale + centering.
-
-    `w`/`h` are the card pixel size; `grid` (tiles_w, tiles_h) defaults to
-    matching. GBA tiles are 8x8 so the grid must be multiples of 8, but the
-    card inside it need not be — that lets stage cards sit at their real
-    0.716 aspect (34x48) inside a 40x48 grid instead of being forced to 32x48."""
-    gw, gh = grid if grid else (w // TILE, h // TILE)
-    iw, ih = img.size
-    scale = min(w / iw, h / ih)  # contain: fit inside, never overflow
-    nw, nh = max(1, int(iw * scale)), max(1, int(ih * scale))
-    small = preprocess(img).resize((nw, nh), Image.LANCZOS)
-    canvas = Image.new("RGB", (gw * TILE, gh * TILE), PAD_RGB)
-    canvas.paste(small, ((gw * TILE - nw) // 2, (gh * TILE - nh) // 2))
-    q = canvas.quantize(palette=master_q, dither=Image.Dither.FLOYDSTEINBERG)
-    px = q.load()
-    return pack_8bpp_tiles(px, gw * TILE, gh * TILE, gw, gh)
-
-
-def bake_live_sized_with_master(img, w, h, master_q, grid=None):
-    """Live mini - object-fit: contain, sharpened for tiny thumbs. Landscape
-    slot (w>h) so landscape live cards fill it instead of being cropped."""
+def bake_with_palette(img, w, h, palette_q, grid=None, dither=Image.Dither.FLOYDSTEINBERG, sharpen=False):
+    """Generic contain-fit + quantize with given palette."""
     gw, gh = grid if grid else (w // TILE, h // TILE)
     iw, ih = img.size
     scale = min(w / iw, h / ih)
     nw, nh = max(1, int(iw * scale)), max(1, int(ih * scale))
-    small = preprocess(img).resize((nw, nh), Image.LANCZOS)
-    try:
-        small = small.filter(ImageFilter.UnsharpMask(radius=0.8, percent=80, threshold=1))
-    except Exception:
-        pass
+    small = img.resize((nw, nh), Image.LANCZOS)
+    if sharpen:
+        try:
+            small = small.filter(ImageFilter.UnsharpMask(radius=0.5, percent=30, threshold=1))
+        except Exception:
+            pass
     canvas = Image.new("RGB", (gw * TILE, gh * TILE), PAD_RGB)
     canvas.paste(small, ((gw * TILE - nw) // 2, (gh * TILE - nh) // 2))
-    q = canvas.quantize(palette=master_q, dither=Image.Dither.FLOYDSTEINBERG)
+    q = canvas.quantize(palette=palette_q, dither=dither)
     px = q.load()
     return pack_8bpp_tiles(px, gw * TILE, gh * TILE, gw, gh)
 
 
-def bake_waited_sized_with_master(img, w, h, master_q, grid=None):
-    """Wait state (tapped) - object-fit: contain, rotated 90° CW.
-    Portrait cards become landscape, rotated 90° clockwise."""
+def bake_front_sized_with_master(img, w, h, palette_q, grid=None):
+    """Hand/Stage front: no sharpen, Floyd-Steinberg dither."""
+    return bake_with_palette(img, w, h, palette_q, grid, dither=Image.Dither.FLOYDSTEINBERG, sharpen=False)
+
+
+def bake_live_sized_with_master(img, w, h, palette_q, grid=None):
+    """Live mini: mild sharpen, ordered dither for small size."""
+    return bake_with_palette(img, w, h, palette_q, grid, dither=Image.Dither.ORDERED, sharpen=True)
+
+
+def bake_waited_sized_with_master(img, w, h, palette_q, grid=None):
+    """Wait state (tapped) - object-fit: contain, rotated 90° CW."""
     gw, gh = grid if grid else (w // TILE, h // TILE)
     iw, ih = img.size
-    # For 90° rotation: target grid is gw x gh (e.g., 4x3), but card is rotated
-    # So we scale to fit inside (gh*8, gw*8) then rotate
-    # Actually: rotate first, then fit into the target grid
-    rotated = preprocess(img).rotate(-90, expand=True)  # -90 = CW
+    rotated = img.rotate(-90, expand=True)  # -90 = CW
     riw, rih = rotated.size
     scale = min((gw * TILE) / riw, (gh * TILE) / rih)
     nw, nh = max(1, int(riw * scale)), max(1, int(rih * scale))
     small = rotated.resize((nw, nh), Image.LANCZOS)
     canvas = Image.new("RGB", (gw * TILE, gh * TILE), PAD_RGB)
     canvas.paste(small, ((gw * TILE - nw) // 2, (gh * TILE - nh) // 2))
-    q = canvas.quantize(palette=master_q, dither=Image.Dither.FLOYDSTEINBERG)
+    q = canvas.quantize(palette=palette_q, dither=Image.Dither.ORDERED)
     px = q.load()
     return pack_8bpp_tiles(px, gw * TILE, gh * TILE, gw, gh)
 
@@ -343,28 +338,18 @@ def bake_stage_front(img):
     return bake_front_sized(img, STAGE_W, STAGE_H)
 
 
-def bake_detail(img):
-    """Resize + quantize one card image to the 96x128 8bpp detail view.
+def bake_detail(img, palette_q, palette_bytes):
+    """Resize + quantize one card image to the 80x112 8bpp detail view.
     object-fit: contain — the whole card fits, padded with black (index 0),
     so nothing is cropped. Landscape cards get side bars instead of being
     squashed or trimmed."""
     iw, ih = img.size
     scale = min(ART_W / iw, ART_H / ih)
     nw, nh = max(1, int(iw * scale)), max(1, int(ih * scale))
-    small = preprocess(img).resize((nw, nh), Image.LANCZOS)
+    small = img.resize((nw, nh), Image.LANCZOS)
     canvas = Image.new("RGB", (ART_W, ART_H), (0, 0, 0))
     canvas.paste(small, ((ART_W - nw) // 2, (ART_H - nh) // 2))
-    q = canvas.quantize(colors=N_COLORS, method=_QUANT_METHOD)  # P mode
-    pal = q.getpalette()
-    pal[0:3] = bytes([0, 0, 0])  # index 0 = black backdrop/transparent
-    q.putpalette(pal)
-    pal = q.getpalette()[: N_COLORS * 3]
-    pal_bytes = bytearray()
-    for i in range(N_COLORS):
-        r, g, b = pal[i * 3], pal[i * 3 + 1], pal[i * 3 + 2]
-        c = to_rgb15(r, g, b)
-        pal_bytes += bytes([c & 0xFF, c >> 8])
-    # 8bpp tile indices (P-mode pixel values are palette indices)
+    q = canvas.quantize(palette=palette_q, dither=Image.Dither.FLOYDSTEINBERG)
     px = q.load()
     tiles = bytearray()
     for ty in range(ART_H // TILE):
@@ -374,7 +359,7 @@ def bake_detail(img):
                 for cc in range(TILE):
                     tile[rr * TILE + cc] = px[tx * TILE + cc, ty * TILE + rr] & 0xFF
             tiles += tile
-    return bytes(pal_bytes), bytes(tiles)
+    return bytes(palette_bytes), bytes(tiles)
 
 
 def fronts_from(entries):
@@ -468,48 +453,59 @@ def write_gen(entries, fronts, stage_fronts, live_fronts, waited_fronts, ui_tile
         f.write("];\n")
 
 
+def make_thumb(img, w, h):
+    """Cover-crop + resize to wxh for palette sampling."""
+    target = w / h
+    iw, ih = img.size
+    if iw / ih > target:
+        nw = int(ih * target)
+        left = (iw - nw) // 2
+        return img.crop((left, 0, left + nw, ih))
+    else:
+        nh = int(iw / target)
+        top = (ih - nh) // 2
+        return img.crop((0, top, iw, top + nh))
+
+
 def main():
     used = deck_card_nos()
     print(f"{len(used)} unique deck cards to bake")
 
-    # First pass: build a shared 256-colour master palette from all
-    # thumbnails (tonc/butano style: one 8bpp palette for a tiled BG).
-    # Use stage-sized thumbs for palette generation (more pixels, richer colours).
-    thumbs = []
-    png_cache = {}
+    # Load all images once from original WebP
+    webp_cache = {}
     for card_no in sorted(used):
-        png = CACHE / f"{card_no}.png"
-        if not png.exists():
+        webp = CACHE / f"{card_no}.webp"
+        if webp.exists():
+            webp_cache[card_no] = Image.open(webp).convert("RGB")
+
+    # Build ONE shared master palette from ALL thumbs at their target sizes
+    thumbs = []
+    for card_no in sorted(used):
+        img = webp_cache.get(card_no)
+        if not img:
             continue
-        img = Image.open(png).convert("RGB")
-        png_cache[card_no] = img
-        # cover-crop + preprocess + resize to stage size, as bake will do
-        target = STAGE_W / STAGE_H
-        iw, ih = img.size
-        if iw / ih > target:
-            nw = int(ih * target)
-            left = (iw - nw) // 2
-            thumb = img.crop((left, 0, left + nw, ih))
-        else:
-            nh = int(iw / target)
-            top = (ih - nh) // 2
-            thumb = img.crop((0, top, iw, top + nh))
-        thumb = preprocess(thumb).resize((STAGE_W, STAGE_H), Image.LANCZOS)
-        thumbs.append(thumb)
-    master_q, master_pal_bytes = build_master_palette(thumbs)
+        for w, h, grid in [
+            (FRONT_W, FRONT_H, FRONT_GRID),   # hand
+            (STAGE_W, STAGE_H, STAGE_GRID),   # stage
+            (LIVE_W, LIVE_H, LIVE_GRID),      # live
+            (WAIT_W, WAIT_H, WAIT_GRID),      # waited
+        ]:
+            thumb = make_thumb(img, w, h).resize((grid[0]*TILE, grid[1]*TILE), Image.LANCZOS)
+            thumbs.append(thumb)
+    master_q, master_pal = build_palette(thumbs, colors=240)
     print(f"master palette: 240 colours from {len(thumbs)} thumbs")
 
     entries = []
     missing = []
     for card_no in sorted(used):
-        png = CACHE / f"{card_no}.png"
-        if not png.exists():
+        webp = CACHE / f"{card_no}.webp"
+        if not webp.exists():
             missing.append(card_no)
             continue
-        img = png_cache[card_no]
+        img = webp_cache[card_no]
         entries.append(
             (card_no,)
-            + bake_detail(img)
+            + bake_detail(img, master_q, master_pal)
             + (
                 bake_front_sized_with_master(img, FRONT_W, FRONT_H, master_q, FRONT_GRID),
                 bake_front_sized_with_master(img, STAGE_W, STAGE_H, master_q, STAGE_GRID),
@@ -523,7 +519,7 @@ def main():
         print("missing:", missing[:20])
 
     ui_tiles = bake_ui_tiles()
-    write_gen(entries, fronts_from(entries), stage_fronts_from(entries), live_fronts_from(entries), waited_fronts_from(entries), ui_tiles, master_pal_bytes)
+    write_gen(entries, fronts_from(entries), stage_fronts_from(entries), live_fronts_from(entries), waited_fronts_from(entries), ui_tiles, master_pal)
     print(f"wrote {OUT} ({os.path.getsize(OUT)} bytes)")
 
 

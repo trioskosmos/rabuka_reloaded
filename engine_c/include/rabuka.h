@@ -1504,6 +1504,62 @@ void rb_card_normalize_no(const char *src, char *out, size_t out_sz);   /* CardD
 void rb_card_normalize_name(const char *src, char *out, size_t out_sz); /* CardDatabase::normalize_name */
 void rb_map_series_to_group(const char *series, char *out, size_t out_sz); /* map_series_to_group */
 
+/* ── Card impl methods (mirror engine/src/core/card.rs Card impl block) ── */
+int rb_card_total_hearts(int card_id);
+int rb_card_has_blade_heart(int card_id);
+int rb_card_has_score_icon(int card_id);
+int rb_card_has_all_blade(int card_id);
+int rb_card_get_score(int card_id);
+int rb_card_need_heart_satisfied(int card_id, const int *need, const int *provided);
+int rb_check_heart_requirement(const int *need, const int *provided);
+
+/* HeartColor — mirrors engine/src/core/card.rs HeartColor enum + impl */
+int rb_heart_color_index(int color);
+int rb_heart_color_from_index(int i);
+const char *rb_heart_color_short_label(int color);
+const char *rb_heart_color_as_str(int color);
+int rb_parse_heart_color(const char *s);
+
+/* ── CardDatabase methods ──────────────────────────────────────────────── */
+int rb_card_get_card_id(const char *card_no);
+int rb_card_get_card_names(int card_id, char *out, size_t out_sz);
+int rb_card_get_card(const char *card_no);
+int rb_card_has_trigger(int card_id, int kind);
+int rb_card_triggerless_text(int card_id, char *out, size_t out_sz);
+int rb_card_filter_subset(int card_id);
+int rb_card_fires_on_opponent_effects(int card_id);
+int rb_card_energy_cost_total(int card_id);
+int rb_card_has_optional_payment(int card_id);
+int rb_card_effective_energy_cost_total(int card_id, int groups_on_stage);
+
+/* ── Card impl methods (mirror engine/src/core/card.rs Card impl block) ── */
+int rb_card_total_hearts(int card_id);
+int rb_card_has_blade_heart(int card_id);
+int rb_card_has_score_icon(int card_id);
+int rb_card_has_all_blade(int card_id);
+int rb_card_get_score(int card_id);
+int rb_card_need_heart_satisfied(int card_id, const int *need, const int *provided);
+int rb_check_heart_requirement(const int *need, const int *provided);
+
+/* HeartColor — mirrors engine/src/core/card.rs HeartColor enum + impl */
+int rb_heart_color_index(int color);
+int rb_heart_color_from_index(int i);
+const char *rb_heart_color_short_label(int color);
+const char *rb_heart_color_as_str(int color);
+int rb_parse_heart_color(const char *s);
+
+/* ── CardDatabase methods ──────────────────────────────────────────────── */
+int rb_card_get_card_id(const char *card_no);
+int rb_card_get_card_names(int card_id, char *out, size_t out_sz);
+int rb_card_get_card(const char *card_no);
+int rb_card_has_trigger(int card_id, int kind);
+int rb_card_triggerless_text(int card_id, char *out, size_t out_sz);
+int rb_card_filter_subset(int card_id);
+int rb_card_fires_on_opponent_effects(int card_id);
+int rb_card_energy_cost_total(int card_id);
+int rb_card_has_optional_payment(int card_id);
+int rb_card_effective_energy_cost_total(int card_id, int groups_on_stage);
+
 /* ── card.rs enum string classification helpers ──
    Mirror the Rust `as_str` / `from_str` impls on the enums defined in
    engine/src/core/card.rs. The int encodings follow the Rust enum discriminant

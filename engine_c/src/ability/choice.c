@@ -1377,6 +1377,19 @@ void rb_resolver_handle_select_target(RbAbilityResolver *self, GameState *g,
             g->queue.entries[g->queue.cur].cost_paid = 1;
         }
         rb_resolver_clear_choice_state(self);
+        /* If player chose to pay, deduct the energy from the deferred effect */
+        if (pay) {
+            GameState *gs = self->gs;
+            if (gs->queue.deferred && gs->queue.cur >= 0 && gs->queue.cur < gs->queue.n_entries) {
+                RbQueueEntry *e = &gs->queue.entries[gs->queue.cur];
+                RbPlayer *W = &gs->p[gs->active];
+                if (W->energy_active >= e->cost) {
+                    W->energy_active -= e->cost;
+                    if (W->energy_active < 0) W->energy_active = 0;
+                }
+            }
+        }
+        rb_resolver_clear_choice_state(self);
         rb_resolver_resume_pending_actions(self);
         return;
     }
