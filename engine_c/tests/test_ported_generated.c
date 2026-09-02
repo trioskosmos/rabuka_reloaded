@@ -4305,9 +4305,9 @@ static void gen_miracle_wave_q182_excess_heart_score_4(void){
     int wave = test_id(&tg, "PL!S-bp3-019-L");
     int filler = test_id(&tg, "PL!-sd1-010-SD");
     // 
-    tg.state.p[0].stage[0] = test_id(&tg;
-    tg.state.p[0].stage[1] = "PL!S-sd1-001-SD");
-    tg.state.p[0].stage[2] = test_id(&tg;
+    tg.state.p[0].stage[0] = test_id(&tg, "PL!S-sd1-001-SD");
+    tg.state.p[0].stage[1] = test_id(&tg, "PL!S-sd1-001-SD");
+    tg.state.p[0].stage[2] = -1;
     test_add_to_hand(&tg, wave);
     // 
     test_add_to_deck(&tg, filler);
@@ -9680,8 +9680,8 @@ static void gen_two_replacements_on_one_live_event_both_recorded(void){
     // // We pin that both are tracked as separate turn_movements and the order is insertion order unless reordered
     int a = test_id(&tg, "PL!S-bp3-019-L");
     int b = test_id(&tg, "PL!-bp3-019-L");
-    tg.state.p[0].stage[0] = test_id(&tg;
-    tg.state.p[0].stage[1] = "PL!-sd1-008-SD");
+    tg.state.p[0].stage[0] = test_id(&tg, "PL!-sd1-008-SD");
+    tg.state.p[0].stage[1] = -1;
     tg.state.p[0].stage[2] = -1;
     // TODO: tg.state.push_movement_event_typed(a, rabuka_engine::core::types::ZoneId::LiveCardZone, rabuka_engine::core::types::ZoneId::SuccessLiveZone, Some(a), "p1", true);
     // TODO: tg.state.push_movement_event_typed(b, rabuka_engine::core::types::ZoneId::LiveCardZone, rabuka_engine::core::types::ZoneId::SuccessLiveZone, Some(b), "p1", true);
@@ -40164,7 +40164,7 @@ static void gen_miyashita_ai_q160_displaced_debuts_still_count(void){
     // // This simulates Q169: the baton touch restriction (Rule 9.6.2.1.2.1) prevents
     // // baton-touching to an area that already had a card arrive this turn.
     // // For this test, we need Center occupied but NOT locked.
-    int center_occupied = tg.state.p[0].stage[1];
+    int center_occupied = (tg.state.p[0].stage[1] != -1);
     CHECK(center_occupied, "miyashita_ai_q160_displaced_debuts_still_count");
     // // Play Ai to Right (empty area) instead of Center, since Center is locked.
     // // This tests that Ai's debut count increment still works.
@@ -57616,9 +57616,9 @@ static void gen_bp5_020_skip_no_draw(void){
     test_add_to_deck_pl(&tg, 1, filler);
     test_add_to_deck_pl(&tg, 0, filler);
     test_add_to_deck_pl(&tg, 1, filler);
-    tg.state.p[0].stage[0] = test_id(&tg;
-    tg.state.p[0].stage[1] = "PL!-sd1-001-SD");
-    tg.state.p[0].stage[2] = test_id(&tg;
+    tg.state.p[0].stage[0] = test_id(&tg, "PL!-sd1-001-SD");
+    tg.state.p[0].stage[1] = test_id(&tg, "PL!-sd1-001-SD");
+    tg.state.p[0].stage[2] = test_id(&tg, "PL!-sd1-001-SD");
     test_add_to_hand(&tg, live);
     test_give_energy(&tg, 20);
     test_pass(&tg);
@@ -57712,8 +57712,8 @@ static void gen_bp5_020_insufficient_energy_no_draw(void){
     test_add_to_deck_pl(&tg, 0, filler);
     test_add_to_deck_pl(&tg, 0, filler);
     test_add_to_deck_pl(&tg, 0, filler);
-    tg.state.p[0].stage[0] = test_id(&tg;
-    tg.state.p[0].stage[1] = "PL!-sd1-001-SD");
+    tg.state.p[0].stage[0] = test_id(&tg, "PL!-sd1-001-SD");
+    tg.state.p[0].stage[1] = -1;
     tg.state.p[0].stage[2] = -1;
     test_add_to_hand(&tg, live);
     test_give_energy(&tg, 0);
@@ -68110,8 +68110,8 @@ static void gen_s_bp2_021_live_success_with_live_in_yell_moves_to_deck_bottom(vo
     int live_in_yell = test_id(&tg, "PL!-sd1-019-SD");
     // // Setup live success scenario: need to trigger LiveSuccess after a successful live
     // // Use fire_trigger helper to directly fire LiveSuccess
-    tg.state.p[0].stage[0] = test_id(&tg;
-    tg.state.p[0].stage[1] = "PL!S-sd1-001-SD");
+    tg.state.p[0].stage[0] = test_id(&tg, "PL!S-sd1-001-SD");
+    tg.state.p[0].stage[1] = -1;
     tg.state.p[0].stage[2] = -1;
     test_add_to_hand(&tg, live);
     test_add_to_deck_pl(&tg, 0, filler);
@@ -68207,8 +68207,8 @@ static void gen_s_bp2_021_live_success_no_live_in_yell_no_move(void){
     int state = 0; // auto-fix missing decl
     int live = test_id(&tg, "PL!S-bp2-021-L");
     int filler = test_id(&tg, "PL!-sd1-010-SD");
-    tg.state.p[0].stage[0] = test_id(&tg;
-    tg.state.p[0].stage[1] = "PL!S-sd1-001-SD");
+    tg.state.p[0].stage[0] = test_id(&tg, "PL!S-sd1-001-SD");
+    tg.state.p[0].stage[1] = -1;
     tg.state.p[0].stage[2] = -1;
     test_add_to_hand(&tg, live);
     test_add_to_deck_pl(&tg, 0, filler);
@@ -68296,8 +68296,8 @@ static void gen_s_bp2_021_live_success_empty_yell_no_move(void){
     int state = 0; // auto-fix missing decl
     int live = test_id(&tg, "PL!S-bp2-021-L");
     int filler = test_id(&tg, "PL!-sd1-010-SD");
-    tg.state.p[0].stage[0] = test_id(&tg;
-    tg.state.p[0].stage[1] = "PL!S-sd1-001-SD");
+    tg.state.p[0].stage[0] = test_id(&tg, "PL!S-sd1-001-SD");
+    tg.state.p[0].stage[1] = -1;
     tg.state.p[0].stage[2] = -1;
     test_add_to_hand(&tg, live);
     test_add_to_deck_pl(&tg, 0, filler);
@@ -68379,8 +68379,8 @@ static void gen_s_bp2_021_live_success_skip_optional(void){
     int live = test_id(&tg, "PL!S-bp2-021-L");
     int filler = test_id(&tg, "PL!-sd1-010-SD");
     int live_in_yell = test_id(&tg, "PL!-sd1-019-SD");
-    tg.state.p[0].stage[0] = test_id(&tg;
-    tg.state.p[0].stage[1] = "PL!S-sd1-001-SD");
+    tg.state.p[0].stage[0] = test_id(&tg, "PL!S-sd1-001-SD");
+    tg.state.p[0].stage[1] = -1;
     tg.state.p[0].stage[2] = -1;
     test_add_to_hand(&tg, live);
     test_add_to_deck_pl(&tg, 0, filler);
@@ -89300,7 +89300,7 @@ static void gen_kanon_q93_partial_resolution_zero_cards(void){
     test_has_pending_choice(&tg);
     // 
     // // Q93: With 0 hand cards, the discard does nothing (no error/crash)
-    CHECK(tg.state.p[0].stage[1], "kanon_q93_partial_resolution_zero_cards");
+    CHECK((tg.state.p[0].stage[1] != -1), "kanon_q93_partial_resolution_zero_cards");
     // 
 }
 
@@ -106915,8 +106915,8 @@ static void gen_opponent_cost_self_higher_scores_in_snapshot(void){
     tg.state.p[0].stage[1] = self_center;
     tg.state.p[0].stage[2] = filler;
     tg.state.p[1].stage[0] = filler;
-    tg.state.p[1].stage[1] = test_id(&tg;
-    tg.state.p[1].stage[2] = "PL!-sd1-010-SD");
+    tg.state.p[1].stage[1] = test_id(&tg, "PL!-sd1-010-SD");
+    tg.state.p[1].stage[2] = filler;
     // // inlined helper fill_both_decks
     // 
     // clear
@@ -115973,9 +115973,9 @@ static void gen_yell_empty_revealed_no_gain(void){
     int sumire = test_id(&tg, "PL!SP-bp2-015-N");
     int wien = test_id(&tg, "PL!SP-bp2-021-N");
     // // Empty yell: per phases.rs yell_occurred = !revealed.is_empty() => false, so no trigger
-    tg.state.p[0].stage[0] = test_id(&tg;
-    tg.state.p[0].stage[1] = "PL!S-sd1-003-SD");
-    tg.state.p[0].stage[2] = sumire;
+    tg.state.p[0].stage[0] = test_id(&tg, "PL!S-sd1-003-SD");
+    tg.state.p[0].stage[1] = sumire;
+    tg.state.p[0].stage[2] = wien;
     // TODO: tg.state.revealed_cards.clear();
     // TODO: tg.state.yell_occurred = false;
     rb_fire_recorded_auto(&tg.state, 0);
@@ -290111,8 +290111,8 @@ static void gen_lovepeace_q150_self_hearts_greater_than_opponent_score_plus_1(vo
     // 
     // // P1: 2 strong members (h01=5, h03=5, h06=3 = 13)
     tg.state.p[0].stage[0] = -1;
-    tg.state.p[0].stage[1] = test_id(&tg;
-    tg.state.p[0].stage[2] = "PL!-pb1-014-R");
+    tg.state.p[0].stage[1] = test_id(&tg, "PL!-pb1-014-R");
+    tg.state.p[0].stage[2] = test_id(&tg, "PL!-PR-003-PR");
     // // P2: 1 weak member (h01=1, h03=1 = 2)
     tg.state.p[1].stage[0] = -1;
     tg.state.p[1].stage[1] = filler;
@@ -290248,8 +290248,8 @@ static void gen_lovepeace_q172_ability_gained_hearts_count_but_not_blade(void){
     // 
     // // P1 stage has 1 member
     tg.state.p[0].stage[0] = -1;
-    tg.state.p[0].stage[1] = test_id(&tg;
-    tg.state.p[0].stage[2] = "PL!-sd1-014-SD");
+    tg.state.p[0].stage[1] = test_id(&tg, "PL!-sd1-014-SD");
+    tg.state.p[0].stage[2] = -1;
     // 
     // // The live card needs hearts. Use a simple live card with low requirements.
     // // PL!-sd1-020-SD: need_heart={heart01=1, heart03=1, heart0=3}, score=2
@@ -290537,7 +290537,7 @@ static void gen_wien_q117_another_member_triggers_yell_reduction(void){
     // // Wien at Center + another member at RightSide (any member = "other")
     tg.state.p[0].stage[0] = -1;
     tg.state.p[0].stage[1] = wien;
-    tg.state.p[0].stage[2] = test_id(&tg;
+    tg.state.p[0].stage[2] = test_id(&tg, "PL!-sd1-010-SD");
     int live_card = test_id(&tg, "PL!-sd1-020-SD");
     test_add_to_hand(&tg, live_card);
     // 
@@ -290566,7 +290566,7 @@ static void gen_wien_q117_another_member_triggers_yell_reduction(void){
     // // count. Read back the actual modifier instead of asserting setup state.
     int delta = 0;
     CHECK_EQ(delta, -8, "wien_q117_another_member_triggers_yell_reduction");
-    CHECK(tg.state.p[0].stage[1], "wien_q117_another_member_triggers_yell_reduction");
+    CHECK((tg.state.p[0].stage[1] != -1), "wien_q117_another_member_triggers_yell_reduction");
     // 
 }
 

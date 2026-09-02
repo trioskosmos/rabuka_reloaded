@@ -67,6 +67,9 @@ pub use game::game_setup;
 #[cfg(feature = "server")]
 pub use game::web_server;
 
+// Choice renderer for card selection menus
+pub mod choice_renderer;
+
 // Effect/condition system
 pub mod ability;
 pub mod ability_queue;

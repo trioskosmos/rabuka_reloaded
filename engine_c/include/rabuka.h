@@ -869,6 +869,7 @@ typedef struct {
     char target_player_id[16];
     int  blind;
     int  is_reveal;
+    int  actor;  /* 0=p1, 1=p2 - which player made the choice */
 } RbChoice;
 
 /* ── Queue entry (mirrors engine/src/ability/ability_queue.rs::AbilityQueueEntry) ── */
@@ -876,6 +877,7 @@ typedef struct {
     int card_id;
     int ability_idx;
     int cost_paid;
+    int cost;  /* ability cost for pay_cost_all_discard etc. */
     int effect_started;
     int completed;
     int  optional_cost_result;
@@ -1505,60 +1507,23 @@ void rb_card_normalize_name(const char *src, char *out, size_t out_sz); /* CardD
 void rb_map_series_to_group(const char *series, char *out, size_t out_sz); /* map_series_to_group */
 
 /* ── Card impl methods (mirror engine/src/core/card.rs Card impl block) ── */
-int rb_card_total_hearts(int card_id);
-int rb_card_has_blade_heart(int card_id);
-int rb_card_has_score_icon(int card_id);
-int rb_card_has_all_blade(int card_id);
-int rb_card_get_score(int card_id);
-int rb_card_need_heart_satisfied(int card_id, const int *need, const int *provided);
+int rb_card_total_hearts(const Card *c);
+int rb_card_has_blade_heart(const Card *c);
+int rb_card_has_score_icon(const Card *c);
+int rb_card_has_all_blade(const Card *c);
+int rb_card_get_score(const Card *c);
+int rb_card_need_heart_satisfied(const Card *c, const int *need, const int *provided);
 int rb_check_heart_requirement(const int *need, const int *provided);
 
 /* HeartColor — mirrors engine/src/core/card.rs HeartColor enum + impl */
 int rb_heart_color_index(int color);
+static inline int rb_heart_index(int color) { return rb_heart_color_index(color); }
 int rb_heart_color_from_index(int i);
 const char *rb_heart_color_short_label(int color);
 const char *rb_heart_color_as_str(int color);
-int rb_parse_heart_color(const char *s);
+RbHeartColor rb_parse_heart_color(const char *s);
 
 /* ── CardDatabase methods ──────────────────────────────────────────────── */
-int rb_card_get_card_id(const char *card_no);
-int rb_card_get_card_names(int card_id, char *out, size_t out_sz);
-int rb_card_get_card(const char *card_no);
-int rb_card_has_trigger(int card_id, int kind);
-int rb_card_triggerless_text(int card_id, char *out, size_t out_sz);
-int rb_card_filter_subset(int card_id);
-int rb_card_fires_on_opponent_effects(int card_id);
-int rb_card_energy_cost_total(int card_id);
-int rb_card_has_optional_payment(int card_id);
-int rb_card_effective_energy_cost_total(int card_id, int groups_on_stage);
-
-/* ── Card impl methods (mirror engine/src/core/card.rs Card impl block) ── */
-int rb_card_total_hearts(int card_id);
-int rb_card_has_blade_heart(int card_id);
-int rb_card_has_score_icon(int card_id);
-int rb_card_has_all_blade(int card_id);
-int rb_card_get_score(int card_id);
-int rb_card_need_heart_satisfied(int card_id, const int *need, const int *provided);
-int rb_check_heart_requirement(const int *need, const int *provided);
-
-/* HeartColor — mirrors engine/src/core/card.rs HeartColor enum + impl */
-int rb_heart_color_index(int color);
-int rb_heart_color_from_index(int i);
-const char *rb_heart_color_short_label(int color);
-const char *rb_heart_color_as_str(int color);
-int rb_parse_heart_color(const char *s);
-
-/* ── CardDatabase methods ──────────────────────────────────────────────── */
-int rb_card_get_card_id(const char *card_no);
-int rb_card_get_card_names(int card_id, char *out, size_t out_sz);
-int rb_card_get_card(const char *card_no);
-int rb_card_has_trigger(int card_id, int kind);
-int rb_card_triggerless_text(int card_id, char *out, size_t out_sz);
-int rb_card_filter_subset(int card_id);
-int rb_card_fires_on_opponent_effects(int card_id);
-int rb_card_energy_cost_total(int card_id);
-int rb_card_has_optional_payment(int card_id);
-int rb_card_effective_energy_cost_total(int card_id, int groups_on_stage);
 
 /* ── card.rs enum string classification helpers ──
    Mirror the Rust `as_str` / `from_str` impls on the enums defined in
@@ -1977,13 +1942,6 @@ int  rb_resolution_clear(GameState *g, int *out, int max);
 int  rb_resolution_len(const GameState *g);
 void rb_record_card_movement(GameState *g, int card_id, int from_zone, int to_zone, int causer, int target);
 
-/* ── HeartColor parsing (engine/src/core/card.rs parse_heart_color / index) ── */
-/* Faithful port of `s.parse::<HeartColor>()` / `HeartColor::index()`. String
-   ↁERbHeartColor; "b_"-prefixed blade hearts strip the prefix and recurse;
-   "heart07"/"b_heart07" ↁEcolorless (RB_HEART_PINK / index 0); unknown ↁEpink. */
-RbHeartColor rb_parse_heart_color(const char *s);
-int          rb_heart_index(RbHeartColor c);
-
 /* ── Effect execution (public for testing / harness) ── */
 void rb_execute_effect(GameState *g, int actor, AbilityEffect *e);
 /* Like rb_execute_effect but carries the resolving card id (Rust activating_card)
@@ -1996,6 +1954,7 @@ const RbChoice *rb_get_pending_choice(const GameState *g);
 int       rb_resume_with_choice(GameState *g, int selected_idx); /* 0..count-1, -1=skip */
 void rb_clear_pending_choice(GameState *g);
 void rb_queue_set_pending_choice(GameState *g, const RbChoice *choice);
+void rb_queue_pause_for_choice(GameState *g, const RbChoice *choice);
 
 /* ── Ability cost payment (engine/src/ability/cost.rs) ── */
 int rb_pay_cost(GameState *g, int actor, const AbilityEffect *cost);
@@ -2313,8 +2272,6 @@ const char *rb_effect_type_as_str(RbEffectType t);
 
 /* ── card.rs: Card::get (score accessor) ──
      Mirrors Card::get_score — returns the printed score for a card. */
-int rb_card_get_score(int card_id);
-
 /* ── game_modifiers.rs: ModifierEntry::total ──
       Mirrors ModifierEntry::total — returns set + additive combined. */
 int rb_modifier_total_entry(const RbModifierEntry *e);

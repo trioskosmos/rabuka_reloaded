@@ -1937,12 +1937,3 @@ RbHeartColor rb_parse_heart_color(const char *s) {
     if (s[0] == 'b' && s[1] == '_') return rb_parse_heart_color(s + 2);
     return RB_HEART_PINK;
 }
-int rb_heart_index(RbHeartColor c) {
-    switch (c) {
-        case RB_HEART_PINK: case RB_HEART_RED: case RB_HEART_YELLOW:
-        case RB_HEART_GREEN: case RB_HEART_BLUE: case RB_HEART_PURPLE:
-        case RB_HEART_ORANGE: return (int)c;
-        case RB_HEART_ALL: return 7;
-        default: return 0;
-    }
-}

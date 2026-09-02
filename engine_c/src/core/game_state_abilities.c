@@ -1391,6 +1391,14 @@ void rb_queue_set_pending_choice(GameState *g, const RbChoice *choice) {
     g->queue.state = RB_QUEUE_AWAITING_CHOICE;
 }
 
+void rb_queue_pause_for_choice(GameState *g, const RbChoice *choice) {
+    rb_queue_set_pending_choice(g, choice);
+    /* Ensure the actor is recorded in the choice for proper routing */
+    if (choice) {
+        g->queue.pending.actor = choice->actor;
+    }
+}
+
 
 
 

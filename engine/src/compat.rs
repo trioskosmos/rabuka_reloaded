@@ -121,6 +121,7 @@ pub(crate) mod atomic {
         pub fn load(&self, _order: core::sync::atomic::Ordering) -> usize {
             self.0.get()
         }
+        #[allow(dead_code)]
         pub fn store(&self, v: usize, _order: core::sync::atomic::Ordering) {
             self.0.set(v);
         }
@@ -137,9 +138,11 @@ pub(crate) mod atomic {
     pub use core::sync::atomic::AtomicU8;
 
     #[cfg(not(target_has_atomic = "8"))]
+    #[allow(dead_code)]
     pub struct AtomicU8(core::cell::Cell<u8>);
 
     #[cfg(not(target_has_atomic = "8"))]
+    #[allow(dead_code)]
     impl AtomicU8 {
         pub const fn new(v: u8) -> Self {
             AtomicU8(core::cell::Cell::new(v))

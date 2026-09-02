@@ -327,7 +327,7 @@ fn blade_total_for(player: &rabuka_engine::player::Player, gs: &GameState) -> i3
 
 fn build_stats_lines(gs: &GameState) -> Vec<String> {
     let me = gs.active_player();
-    let you = if me.id == gs.player1.id { &gs.player2 } else { &gs.player1 };
+    let _you = if me.id == gs.player1.id { &gs.player2 } else { &gs.player1 };
     let mut out: Vec<String> = Vec::new();
     out.push(format!("T{} {:?} {}>", gs.turn_number, gs.current_phase, if me.id==gs.player1.id {"P1"} else {"P2"}));
     // P1 stats

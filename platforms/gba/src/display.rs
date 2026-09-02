@@ -26,6 +26,7 @@ const HAND_CARD: (i32, i32) = (3, 4); // 24x32 grid, 24x32 card
 /// Layout derived from card sizes + font metrics (no magic absolute Y).
 const HEADER_H: i32 = FONT_ROWS; // 2
 const STAGE_H: i32 = STAGE_CARD.1; // 6
+#[allow(dead_code)]
 const HAND_H: i32 = HAND_CARD.1; // 4
 const BAR_H: i32 = FONT_ROWS; // single-line action bar
 
@@ -34,6 +35,7 @@ const HAND_PITCH: i32 = HAND_CARD.0;
 const STAGE_START_X: i32 = 1;
 const LIVE_CARD: (i32, i32) = (3, 2); // 24x16 landscape (live cards are wide)
 const LIVE_PITCH: i32 = LIVE_CARD.0; // badge on card
+#[allow(dead_code)]
 const HAND_START_X: i32 = 0;
 const STAGE_YS: [i32; 2] = [HEADER_H, HEADER_H + STAGE_H]; // [2, 8]
 const HAND_Y: i32 = STAGE_YS[1] + STAGE_H; // 14
@@ -41,6 +43,7 @@ const BAR_Y: i32 = ROWS - BAR_H; // 18
 const INFO_X: i32 = STAGE_START_X + STAGE_PITCH * 3 + 1; // 14
 
 /// Hand capacity derived from screen width, not hardcoded (30 cols / 3 pitch = 10).
+#[allow(dead_code)]
 pub const HAND_FITS: usize = (COLS / HAND_PITCH) as usize; // 10
 
 /// Board UI tile indices inside [`BOARD_UI`] (4bpp text BG, bank 15).
@@ -48,6 +51,7 @@ pub const HAND_FITS: usize = (COLS / HAND_PITCH) as usize; // 10
 const UI_EMPTY: u16 = 0; // 1 tile, solid zone fill
 const UI_BADGE: u16 = 1; // gold actionable diamond
 const UI_MARKER: u16 = 2; // white focus triangle
+#[allow(dead_code)]
 const UI_GOLD: u16 = 3; // solid gold for cursor border
 
 /// Full-screen text via a pre-baked, per-screen-shared glyph tile set, plus a
@@ -222,7 +226,7 @@ impl<'a> Display<'a> {
         mut ty: i32,
         wrap: bool,
     ) {
-        let mut draw_ch = |bg: &mut RegularBackground, ch: char, tx: i32, ty: i32| -> i32 {
+        let draw_ch = |bg: &mut RegularBackground, ch: char, tx: i32, ty: i32| -> i32 {
             let (_, cols) = Self::glyph(ch);
             if tx + cols as i32 > COLS {
                 if !wrap {
@@ -579,6 +583,16 @@ impl<'a> Display<'a> {
             TileFormat::FourBpp,
         );
 
+        // Fill entire screen with zone fill color (UI_EMPTY, palette index 2 = dark blue)
+        // so menus have the same dark blue background as the board.
+        let ui_ts = unsafe { TileSet::new(BOARD_UI, TileFormat::FourBpp) };
+        let e_ui = TileEffect::new(false, false, 15);
+        for ty in 0..ROWS {
+            for tx in 0..COLS {
+                bg.set_tile((tx, ty), &ui_ts, TileSetting::new(UI_EMPTY, e_ui));
+            }
+        }
+
         let e = TileEffect::new(false, false, 0);
         let mut ty = 0i32;
 
@@ -624,7 +638,7 @@ fn draw_slot(
         card
     };
     let fronts = if slot.waited { waited_fronts } else { fronts };
-    let mut empty = |bg: &mut RegularBackground| {
+    let empty = |bg: &mut RegularBackground| {
         for ty in 0..rows {
             for tx in 0..cols {
                 bg.set_tile((x + tx, y + ty), ui_ts, TileSetting::new(UI_EMPTY, e0));

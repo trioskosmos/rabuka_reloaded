@@ -845,7 +845,7 @@ static int pay_cost_inner(GameState *g, int actor, const AbilityEffect *cost) {
                     if (rb_decode_card_by_index((uint32_t)cid, &c)) {
                         int found = 0;
                         for (int v = 0; v < nvals; v++)
-                            if (c.cost == vals[v] || rb_card_get_score(cid) == vals[v]) { found = 1; break; }
+                            if (c.cost == vals[v] || rb_card_get_score(&c) == vals[v]) { found = 1; break; }
                         if (!found) match = 0;
                         rb_free_card(&c);
                     } else match = 0;

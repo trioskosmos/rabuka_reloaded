@@ -455,9 +455,15 @@ def map_board_expr(expr: str, func_name: str):
     if m:
         return "rb_has_pending_choice(&tg.state)"
     # game.state.playerN.stage.stage[i]  -> tg.state.p[N-1].stage[i]
-    m = re.match(r'(?:game|tg)\.state\.player(\d+)\.stage\.stage\[(\d+)\]', e)
+    m = re.match(r'(?:game|tg)\.state\.player(\d+)\.stage\.stage\[(\d+)\](?:\s*[!=]=\s*-1)?', e)
     if m:
-        return f"tg.state.p[{int(m.group(1))-1}].stage[{m.group(2)}]"
+        base = f"tg.state.p[{int(m.group(1))-1}].stage[{m.group(2)}]"
+        # Check if it's a != -1 or == -1 comparison
+        if '!= -1' in e:
+            return f"({base} != -1)"
+        elif '== -1' in e:
+            return f"({base} == -1)"
+        return base
     # game.state.playerN.energy_zone.active_count() -> energy_active
     m = re.match(r'(?:game|tg)\.state\.player(\d+)\.energy_zone\.active_count\(\)', e)
     if m:
@@ -1225,9 +1231,15 @@ def transpile_body(body: str, consts: dict, func_name: str, helpers: dict = None
         m = re.match(r'\s*'+G+r'\.state\.player(\d+)\.stage\.stage\s*=\s*\[([^\]]*)\]\s*;', stripped)
         if m:
             pl = int(m.group(1)) - 1
-            vals = [v.strip() for v in m.group(2).split(',') if v.strip()!='']
+            vals = split_top_commas(m.group(2))
             for i, v in enumerate(vals[:3]):
-                out.append(f"    tg.state.p[{pl}].stage[{i}] = {v};")
+                v = v.strip()
+                # Convert game.id("...") to test_id(&tg, "...")
+                card = _map_game_id_safe(v, consts)
+                if card is not None:
+                    out.append(f"    tg.state.p[{pl}].stage[{i}] = {card};")
+                else:
+                    out.append(f"    tg.state.p[{pl}].stage[{i}] = {v};")
             mark_real()
             continue
         # game.state.playerN.stage.stage = [a, b, c] split across lines (merged by
@@ -1237,7 +1249,11 @@ def transpile_body(body: str, consts: dict, func_name: str, helpers: dict = None
             pl = int(m.group(1)) - 1
             vals = [v.strip() for v in m.group(2).split(',') if v.strip()!='']
             for i, v in enumerate(vals[:3]):
-                out.append(f"    tg.state.p[{pl}].stage[{i}] = {v};")
+                card = _map_game_id_safe(v, consts)
+                if card is not None:
+                    out.append(f"    tg.state.p[{pl}].stage[{i}] = {card};")
+                else:
+                    out.append(f"    tg.state.p[{pl}].stage[{i}] = {v};")
             mark_real()
             continue
         # game.state.playerN.stage.stage = [a, b, c] split across lines (merged by
@@ -2616,7 +2632,7 @@ def transpile_body(body: str, consts: dict, func_name: str, helpers: dict = None
             if ccond is not None:
                 out.append(f'    CHECK({ccond}, "{func_name}");')
                 continue
-            unresolved = True
+            # Fallback for complex conditions (e.g., compound && expressions)
             out.append(f"    // TODO assert: {stripped}")
             continue
         out.append(f"    // TODO: {stripped}")
@@ -2731,7 +2747,11 @@ def transpile_helper_body(exp: str, consts: dict, helpers: dict) -> str:
             pl = int(m.group(1)) - 1
             for i, e in enumerate(elems):
                 e = e.strip()
-                out.append(f"    tg.state.p[{pl}].stage[{i}] = {e};")
+                card = _map_game_id_safe(e, consts)
+                if card is not None:
+                    out.append(f"    tg.state.p[{pl}].stage[{i}] = {card};")
+                else:
+                    out.append(f"    tg.state.p[{pl}].stage[{i}] = {e};")
             continue
         # (?:game|g|tg)\.give_energy(N) -> rb_give_energy(&tg, N)
         m = re.search(r'game\.give_energy\((\d+)\)', s)

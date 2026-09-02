@@ -498,13 +498,20 @@ pub fn handle_choice(ui: &mut dyn PlatformUi, gs: &mut GameState) -> bool {
                 None => card_ids.iter().map(|cid| cid.to_string()).collect(),
             };
 
-            if count <= 1 {
-                let sel = menu_select_with_cards(ui, &items, &description, allow_skip, Some(&card_nos));
+if count <= 1 {
+                let sel = crate::choice_renderer::render_card_choice_grid(
+                    ui,
+                    gs,
+                    &description,
+                    &items,
+                    &card_nos,
+                    allow_skip,
+                );
                 match sel {
                     None => {
                         TurnEngine::resume_with_choice(gs, None, Some(Vec::new())).ok();
                     }
-                    Some(idx) => {
+Some(idx) => {
                         let actual_idx = filtered_indices.as_ref().map(|fi| fi[idx]).unwrap_or(idx);
                         TurnEngine::resume_with_choice(gs, None, Some(vec![actual_idx])).ok();
                     }

@@ -64,6 +64,12 @@ pub trait PlatformUi {
     fn just_pressed_r(&self) -> bool {
         false
     }
+    fn just_pressed_left(&self) -> bool {
+        false
+    }
+    fn just_pressed_right(&self) -> bool {
+        false
+    }
 
     /// Max characters that fit on one menu line, in half-width columns
     /// (a CJK glyph is 2 columns). Used to keep each option on a single

@@ -165,6 +165,12 @@ impl<'u, 'd, I: InputSource> platform_ui::PlatformUi for GbaUi<'u, 'd, I> {
     fn just_pressed_r(&self) -> bool {
         self.input.just_pressed(Button::R)
     }
+    fn just_pressed_left(&self) -> bool {
+        self.input.just_pressed(Button::Left)
+    }
+    fn just_pressed_right(&self) -> bool {
+        self.input.just_pressed(Button::Right)
+    }
     fn wait_vblank(&mut self) {
         self.display.wait();
     }
@@ -180,11 +186,11 @@ impl<'u, 'd, I: InputSource> platform_ui::PlatformUi for GbaUi<'u, 'd, I> {
         // Find the card front in CARD_FRONTS (8bpp shared MASTER_PAL)
         if let Some(front) = CARD_FRONTS.iter().find(|f| f.card_no == card_no) {
             let ts = unsafe { agb::display::tiled::TileSet::new(front.tiles, agb::display::tiled::TileFormat::EightBpp) };
-            let mut art_bg = unsafe { agb::display::tiled::RegularBackground::new(
+            let mut art_bg = agb::display::tiled::RegularBackground::new(
                 agb::display::Priority::P0,
                 agb::display::tiled::RegularBackgroundSize::Background32x32,
                 agb::display::tiled::TileFormat::EightBpp,
-            ) };
+            );
             for ty in 0..rows {
                 for tx in 0..cols {
                     let sidx = (ty * cols + tx) as u16;
