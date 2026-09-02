@@ -507,8 +507,10 @@ def main():
             (card_no,)
             + bake_detail(img, master_q, master_pal)
             + (
-                bake_front_sized_with_master(img, FRONT_W, FRONT_H, master_q, FRONT_GRID),
-                bake_front_sized_with_master(img, STAGE_W, STAGE_H, master_q, STAGE_GRID),
+                # Hand: ordered dithering for clean small image
+                bake_with_palette(img, FRONT_W, FRONT_H, master_q, FRONT_GRID, dither=Image.Dither.ORDERED, sharpen=False),
+                # Stage: Floyd-Steinberg for larger image
+                bake_with_palette(img, STAGE_W, STAGE_H, master_q, STAGE_GRID, dither=Image.Dither.FLOYDSTEINBERG, sharpen=False),
                 bake_live_sized_with_master(img, LIVE_W, LIVE_H, master_q, LIVE_GRID),
                 bake_waited_sized_with_master(img, WAIT_W, WAIT_H, master_q, WAIT_GRID),
             )
