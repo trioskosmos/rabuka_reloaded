@@ -1446,7 +1446,10 @@ int  rb_resolve_gain_heart_color(GameState *g, int actor, AbilityEffect *e,
 void rb_shuffle(int *a, int n);
 int  rb_zone_of_str(const char *s, RbZone *out);    /* map zone wire name */
 
-/* ── Play a card from hand ── */
+/* Main phase action execution (mirrors TurnEngine::execute_main_phase_action).
+   Dispatches UseAbility → activate ability, Pass → advance phase, etc. */
+int rb_execute_main_phase_action(GameState *g, int action_type, int card_id,
+                                 int target_player, int target_idx, int target_zone);
 int  rb_play_card(GameState *g, int pl, int hand_idx);
 int  rb_play_member(GameState *g, int pl, int hand_idx, int stage_pos); /* to stage */
 int  rb_complete_play_with_cost(GameState *g, int pl, int accept); /* answer a paused play-time alt-cost */

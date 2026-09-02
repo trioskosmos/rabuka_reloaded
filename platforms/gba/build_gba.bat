@@ -53,12 +53,25 @@ if errorlevel 1 (
 )
 
 if not exist "%~dp0output" mkdir "%~dp0output"
-agb-gbafix "C:\rust_targets\thumbv4t-none-eabi\release\rabuka_gba" -o "%~dp0output\rabuka_gba.gba"
+
+REM agb-gbafix fails on OneDrive paths (file-mapping error 1224).
+REM Workaround: copy ELF to local temp, fix there, copy back.
+set "TMP_GBABUILD=%TEMP%\rabuka_gba_build"
+if not exist "%TMP_GBABUILD%" mkdir "%TMP_GBABUILD%"
+copy /Y "C:\rust_targets\thumbv4t-none-eabi\release\rabuka_gba" "%TMP_GBABUILD%\rabuka_gba" >nul
+agb-gbafix "%TMP_GBABUILD%\rabuka_gba" -o "%TMP_GBABUILD%\rabuka_gba.gba"
 if errorlevel 1 (
     echo.
     echo agb-gbafix failed.
     exit /b 1
 )
+copy /Y "%TMP_GBABUILD%\rabuka_gba.gba" "%~dp0output\rabuka_gba.gba" >nul
+if errorlevel 1 (
+    echo.
+    echo Failed to copy final ROM.
+    exit /b 1
+)
 
 echo.
 echo Built output\rabuka_gba.gba
+pause

@@ -214,7 +214,13 @@ impl DeckParser {
     }
 
     pub fn normalize_card_no(raw: &str) -> String {
-        raw.replace('+', "＋").replace('!', "！")
+        let mut s = raw.replace('+', "＋").replace('!', "！");
+        // Strip trailing fullwidth plus/exclamation for canonical lookup
+        // since some cards exist with/without the rarity suffix (e.g. P vs P＋)
+        while s.ends_with('＋') || s.ends_with('！') {
+            s.pop();
+        }
+        s
     }
 
     fn clean_card_no(raw: &str) -> String {

@@ -28,21 +28,33 @@ sys.path.insert(0, str(REPO / "cards"))
 sys.path.insert(0, str(REPO / "tools"))
 from bake_deck_cards import normalize, REPO as _REPO  # noqa: E402
 
-ART_W = 96  # 12 tiles
-ART_H = 128  # 16 tiles
+ART_W = 80  # 10 tiles - aspect 0.714, matches the source's 0.716
+ART_H = 112  # 14 tiles
 N_COLORS = 240  # leave indices 240-255 (bank 15) for the 4bpp text palette
 TILE = 8
 
 # On-board card fronts: 8bpp shared 240-colour master palette (bank 15
-# reserved for text). All targets are portrait; bake preserves aspect via
-# fit + edge-clamp so every zone respects the card's 0.708 aspect.
-FRONT_W = 24  # hand cards, 3 tiles
-FRONT_H = 32  # 4 tiles
-STAGE_W = 40  # stage cards, 5 tiles
-STAGE_H = 48  # 6 tiles  (letterboxed fit preserves 0.708)
-LIVE_W = 16  # live/success zone mini, 2 tiles
-LIVE_H = 24  # 3 tiles  (portrait)
+# reserved for text). Card pixel size is tuned to the source's 0.716 aspect;
+# the tile grid (multiples of 8) is separate, so cards sit at their real
+# shape with padding instead of being forced to a grid aspect.
+FRONT_W = 24  # hand card pixels, 3 tiles
+FRONT_H = 32
+FRONT_GRID = (3, 4)
+STAGE_W = 34  # stage card pixels (0.708, 1% off source) in 5 tiles
+STAGE_H = 48
+STAGE_GRID = (5, 6)
+LIVE_W = 22  # live card pixels, landscape (1.375) in 3 tiles
+LIVE_H = 16
+LIVE_GRID = (3, 2)
+WAIT_W = 32  # wait state: 90° rotated portrait = landscape 32x24 in 4x3 grid
+WAIT_H = 24
+WAIT_GRID = (4, 3)
 FRONT_COLORS = 16
+
+# Board backdrop colour. Contained cards pad to this so a full card sits on
+# the board instead of being cropped to fill the tile grid. Also master
+# palette index 0 (matches display.rs TEXT_PALETTE zone fill).
+PAD_RGB = (26, 35, 50)
 
 CACHE = REPO / "platforms" / "3ds" / ".card_png_cache"
 OUT = REPO / "platforms" / "gba" / "src" / "card_art_gen.rs"
@@ -224,48 +236,64 @@ def _quantize_method():
 
 _QUANT_METHOD = _quantize_method()
 
-def bake_front_sized_with_master(img, w, h, master_q):
-    """Cover-fit like web `object-fit: cover` and 3DS `scale=min` centered.
-    No black bars — crop to fill while preserving 0.708 aspect, matching web
-    and 3DS which never show letterbox. Bars would be board background, not black."""
+def bake_front_sized_with_master(img, w, h, master_q, grid=None):
+    """object-fit: contain — fit the whole card inside the tile grid, pad the
+    rest with board backdrop colour. Never crops the card. Mirrors the 3DS
+    `_3ds_draw_card_at` (ctru_shim.c:808) which uses min-scale + centering.
+
+    `w`/`h` are the card pixel size; `grid` (tiles_w, tiles_h) defaults to
+    matching. GBA tiles are 8x8 so the grid must be multiples of 8, but the
+    card inside it need not be — that lets stage cards sit at their real
+    0.716 aspect (34x48) inside a 40x48 grid instead of being forced to 32x48."""
+    gw, gh = grid if grid else (w // TILE, h // TILE)
     iw, ih = img.size
-    scale = max(w / iw, h / ih)
-    nw, nh = int(iw * scale), int(ih * scale)
+    scale = min(w / iw, h / ih)  # contain: fit inside, never overflow
+    nw, nh = max(1, int(iw * scale)), max(1, int(ih * scale))
     small = preprocess(img).resize((nw, nh), Image.LANCZOS)
-    # Center-crop to target
-    left = (nw - w) // 2
-    top = (nh - h) // 2
-    small = small.crop((left, top, left + w, top + h))
-    q = small.quantize(
-        palette=master_q,
-        dither=Image.Dither.FLOYDSTEINBERG,
-    )
+    canvas = Image.new("RGB", (gw * TILE, gh * TILE), PAD_RGB)
+    canvas.paste(small, ((gw * TILE - nw) // 2, (gh * TILE - nh) // 2))
+    q = canvas.quantize(palette=master_q, dither=Image.Dither.FLOYDSTEINBERG)
     px = q.load()
-    tiles_w, tiles_h = w // TILE, h // TILE
-    return pack_8bpp_tiles(px, w, h, tiles_w, tiles_h)
+    return pack_8bpp_tiles(px, gw * TILE, gh * TILE, gw, gh)
 
 
-def bake_live_sized_with_master(img, w, h, master_q):
-    """Live mini (16x24) - cover like web, no black bars. Crop to fill 0.708
-    aspect, sharpen for tiny thumbs."""
+def bake_live_sized_with_master(img, w, h, master_q, grid=None):
+    """Live mini - object-fit: contain, sharpened for tiny thumbs. Landscape
+    slot (w>h) so landscape live cards fill it instead of being cropped."""
+    gw, gh = grid if grid else (w // TILE, h // TILE)
     iw, ih = img.size
-    scale = max(w / iw, h / ih)
-    nw, nh = int(iw * scale), int(ih * scale)
+    scale = min(w / iw, h / ih)
+    nw, nh = max(1, int(iw * scale)), max(1, int(ih * scale))
     small = preprocess(img).resize((nw, nh), Image.LANCZOS)
     try:
         small = small.filter(ImageFilter.UnsharpMask(radius=0.8, percent=80, threshold=1))
     except Exception:
         pass
-    left = (nw - w) // 2
-    top = (nh - h) // 2
-    small = small.crop((left, top, left + w, top + h))
-    q = small.quantize(
-        palette=master_q,
-        dither=Image.Dither.FLOYDSTEINBERG,
-    )
+    canvas = Image.new("RGB", (gw * TILE, gh * TILE), PAD_RGB)
+    canvas.paste(small, ((gw * TILE - nw) // 2, (gh * TILE - nh) // 2))
+    q = canvas.quantize(palette=master_q, dither=Image.Dither.FLOYDSTEINBERG)
     px = q.load()
-    tiles_w, tiles_h = w // TILE, h // TILE
-    return pack_8bpp_tiles(px, w, h, tiles_w, tiles_h)
+    return pack_8bpp_tiles(px, gw * TILE, gh * TILE, gw, gh)
+
+
+def bake_waited_sized_with_master(img, w, h, master_q, grid=None):
+    """Wait state (tapped) - object-fit: contain, rotated 90° CW.
+    Portrait cards become landscape, rotated 90° clockwise."""
+    gw, gh = grid if grid else (w // TILE, h // TILE)
+    iw, ih = img.size
+    # For 90° rotation: target grid is gw x gh (e.g., 4x3), but card is rotated
+    # So we scale to fit inside (gh*8, gw*8) then rotate
+    # Actually: rotate first, then fit into the target grid
+    rotated = preprocess(img).rotate(-90, expand=True)  # -90 = CW
+    riw, rih = rotated.size
+    scale = min((gw * TILE) / riw, (gh * TILE) / rih)
+    nw, nh = max(1, int(riw * scale)), max(1, int(rih * scale))
+    small = rotated.resize((nw, nh), Image.LANCZOS)
+    canvas = Image.new("RGB", (gw * TILE, gh * TILE), PAD_RGB)
+    canvas.paste(small, ((gw * TILE - nw) // 2, (gh * TILE - nh) // 2))
+    q = canvas.quantize(palette=master_q, dither=Image.Dither.FLOYDSTEINBERG)
+    px = q.load()
+    return pack_8bpp_tiles(px, gw * TILE, gh * TILE, gw, gh)
 
 
 def bake_front_sized(img, w, h):
@@ -311,11 +339,18 @@ def bake_stage_front(img):
 
 def bake_detail(img):
     """Resize + quantize one card image to the 96x128 8bpp detail view.
-    Index 0 forced to black so backdrop/transparent stays black, not white-on-white."""
-    img = img.resize((ART_W, ART_H), Image.LANCZOS)
-    q = img.quantize(colors=N_COLORS, method=_QUANT_METHOD)  # P mode
+    object-fit: contain — the whole card fits, padded with black (index 0),
+    so nothing is cropped. Landscape cards get side bars instead of being
+    squashed or trimmed."""
+    iw, ih = img.size
+    scale = min(ART_W / iw, ART_H / ih)
+    nw, nh = max(1, int(iw * scale)), max(1, int(ih * scale))
+    small = preprocess(img).resize((nw, nh), Image.LANCZOS)
+    canvas = Image.new("RGB", (ART_W, ART_H), (0, 0, 0))
+    canvas.paste(small, ((ART_W - nw) // 2, (ART_H - nh) // 2))
+    q = canvas.quantize(colors=N_COLORS, method=_QUANT_METHOD)  # P mode
     pal = q.getpalette()
-    pal[0:3] = bytes([0, 0, 0])
+    pal[0:3] = bytes([0, 0, 0])  # index 0 = black backdrop/transparent
     q.putpalette(pal)
     pal = q.getpalette()[: N_COLORS * 3]
     pal_bytes = bytearray()
@@ -338,17 +373,22 @@ def bake_detail(img):
 
 def fronts_from(entries):
     """(card_no, front tiles) pairs from baked entries (8bpp shared palette)."""
-    return [(no, ftiles) for no, _pal, _tiles, ftiles, _stage, _live in entries]
+    return [(no, ftiles) for no, _pal, _tiles, ftiles, _stage, _live, _wait in entries]
 
 
 def stage_fronts_from(entries):
     """(card_no, stage-front tiles) pairs (8bpp shared palette)."""
-    return [(no, stiles) for no, _pal, _tiles, _ftiles, stiles, _live in entries]
+    return [(no, stiles) for no, _pal, _tiles, _ftiles, stiles, _live, _wait in entries]
 
 
 def live_fronts_from(entries):
     """(card_no, live-front tiles) pairs (8bpp shared palette)."""
-    return [(no, ltiles) for no, _pal, _tiles, _ftiles, _stiles, ltiles in entries]
+    return [(no, ltiles) for no, _pal, _tiles, _ftiles, _stiles, ltiles, _wait in entries]
+
+
+def waited_fronts_from(entries):
+    """(card_no, waited-front tiles) pairs (8bpp shared palette)."""
+    return [(no, wtiles) for no, _pal, _tiles, _ftiles, _stiles, _ltiles, wtiles in entries]
 
 
 def write_bytes_array(f, name, data, per_line):
@@ -358,11 +398,11 @@ def write_bytes_array(f, name, data, per_line):
     f.write("        ],\n")
 
 
-def write_gen(entries, fronts, stage_fronts, live_fronts, ui_tiles, master_pal_bytes):
+def write_gen(entries, fronts, stage_fronts, live_fronts, waited_fronts, ui_tiles, master_pal_bytes):
     with open(OUT, "w", encoding="utf-8") as f:
         f.write("// Auto-generated by tools/bake_card_art.py -- do not edit.\n")
-        f.write("// CardArt: 8bpp detail art (96x128 = 12x16 tiles) + 240-colour\n")
-        f.write("// rgb15 palette (bank 15 reserved for text).\n")
+        f.write("// CardArt: 8bpp detail art (80x112 = 10x14 tiles, 0.714 aspect)\n")
+        f.write("// + 240-colour rgb15 palette (bank 15 reserved for text).\n")
         f.write("// Card fronts: 8bpp shared 240-colour master palette\n")
         f.write("// (tonc 8bpp BG + butano `bg_palette_items` sharing). Bank 15\n")
         f.write("// 240-255 reserved for text/UI.\n")
@@ -375,14 +415,14 @@ def write_gen(entries, fronts, stage_fronts, live_fronts, ui_tiles, master_pal_b
         f.write("pub struct CardArt {\n")
         f.write("    pub card_no: &'static str,\n")
         f.write("    pub palette: &'static [u8; 480],\n")
-        f.write("    pub tiles: &'static [u8; 12288],\n")
+        f.write("    pub tiles: &'static [u8; 8960],\n")
         f.write("}\n\n")
         f.write("pub struct CardFront {\n")
         f.write("    pub card_no: &'static str,\n")
         f.write("    pub tiles: &'static [u8],\n")
         f.write("}\n\n")
         f.write("pub static CARD_ART: &[CardArt] = &[\n")
-        for card_no, pal, tiles, _fronts, _stage, _live in entries:
+        for card_no, pal, tiles, _fronts, _stage, _live, _wait in entries:
             f.write(f"    CardArt {{\n        card_no: {json.dumps(card_no, ensure_ascii=False)},\n")
             write_bytes_array(f, "palette", pal, 24)
             write_bytes_array(f, "tiles", tiles, 32)
@@ -404,6 +444,13 @@ def write_gen(entries, fronts, stage_fronts, live_fronts, ui_tiles, master_pal_b
         f.write("];\n\n")
         f.write("pub static LIVE_FRONTS: &[CardFront] = &[\n")
         for card_no, tiles in live_fronts:
+            f.write(f"    CardFront {{ card_no: {json.dumps(card_no, ensure_ascii=False)}, tiles: &[\n")
+            for i in range(0, len(tiles), 32):
+                f.write("        " + ", ".join(str(b) for b in tiles[i:i + 32]) + ",\n")
+            f.write("    ]},\n")
+        f.write("];\n\n")
+        f.write("pub static WAITED_FRONTS: &[CardFront] = &[\n")
+        for card_no, tiles in waited_fronts:
             f.write(f"    CardFront {{ card_no: {json.dumps(card_no, ensure_ascii=False)}, tiles: &[\n")
             for i in range(0, len(tiles), 32):
                 f.write("        " + ", ".join(str(b) for b in tiles[i:i + 32]) + ",\n")
@@ -458,9 +505,10 @@ def main():
             (card_no,)
             + bake_detail(img)
             + (
-                bake_front_sized_with_master(img, FRONT_W, FRONT_H, master_q),
-                bake_front_sized_with_master(img, STAGE_W, STAGE_H, master_q),
-                bake_live_sized_with_master(img, LIVE_W, LIVE_H, master_q),
+                bake_front_sized_with_master(img, FRONT_W, FRONT_H, master_q, FRONT_GRID),
+                bake_front_sized_with_master(img, STAGE_W, STAGE_H, master_q, STAGE_GRID),
+                bake_live_sized_with_master(img, LIVE_W, LIVE_H, master_q, LIVE_GRID),
+                bake_waited_sized_with_master(img, WAIT_W, WAIT_H, master_q, WAIT_GRID),
             )
         )
 
@@ -469,7 +517,7 @@ def main():
         print("missing:", missing[:20])
 
     ui_tiles = bake_ui_tiles()
-    write_gen(entries, fronts_from(entries), stage_fronts_from(entries), live_fronts_from(entries), ui_tiles, master_pal_bytes)
+    write_gen(entries, fronts_from(entries), stage_fronts_from(entries), live_fronts_from(entries), waited_fronts_from(entries), ui_tiles, master_pal_bytes)
     print(f"wrote {OUT} ({os.path.getsize(OUT)} bytes)")
 
 

@@ -1,14 +1,11 @@
 #!/usr/bin/env python3
 """Mass-port Rust tests to C — extracts TestGame patterns.
-
 Scans engine/tests for files that use TestGame::new + simple helpers
 and emits a C test file that mirrors them via test_game.h.
-
 Handles the constant-recalc pattern (cost/score/heart) which is ~30%
 of the suite and is already green after the variant-byte + modify_cost fixes.
 """
 import re, pathlib, os
-
 def _find_repo_root():
     """Locate the repo root robustly regardless of how the script is invoked
     (relative __file__, msys/Windows path mangling, or a cwd inside a subdir).
@@ -37,11 +34,9 @@ def _find_repo_root():
         return pathlib.Path(__file__).resolve().parents[2]
     except Exception:
         return pathlib.Path(os.getcwd()).resolve()
-
 ROOT = _find_repo_root()
 SRC = ROOT / "engine" / "tests"
 OUT = ROOT / "engine_c" / "tests" / "test_ported_generated.c"
-
 def split_top_commas(s: str):
     """Split on commas that are NOT inside parentheses or brackets (so
     `test_id(&tg, "X")` and `&[NO_BLADE, NO_BLADE, NO_BLADE]` are each treated
@@ -59,13 +54,11 @@ def split_top_commas(s: str):
     if cur.strip():
         out.append(cur)
     return [x.strip() for x in out]
-
 # A test builds a game either via `TestGame::new(db)` or via an imported setup
 # helper (`setup_game` / `make_gs` / `base_setup` / `setup_deck`). Pure-helper
 # unit tests (e.g. `parse_heart_color`, db-query `get_card_by_no` / `load_real_database`)
 # have no game but still transpile to C calls we can run, so accept those signals too.
 SIMPLE_RE = re.compile(r'TestGame::new|setup_game|make_gs|base_setup|setup_deck|parse_heart_color|load_real_database|get_card_by_no')
-
 def is_simple(path: pathlib.Path) -> bool:
     t = path.read_text(encoding="utf-8", errors="ignore")
     if not SIMPLE_RE.search(t):
@@ -82,24 +75,19 @@ def is_simple(path: pathlib.Path) -> bool:
     # (test_select_*, test_set_live_card, test_perform_live); unhandled assertion
     # helpers degrade to TODO comments so the body still compiles and *runs*.
     return True
-
 def extract_tests(path: pathlib.Path):
     t = path.read_text(encoding="utf-8", errors="ignore")
     return re.findall(r'#\[test\]\s*fn\s+(\w+)', t)
-
 def sanitize_c_name(s: str) -> str:
     return re.sub(r'[^0-9a-zA-Z_]', '_', s)
-
 def collect_consts(text: str):
     # const NAME ... = "PL!...";  — handle any const with string literal (type may be &str, String, CardId, etc.)
     m = re.findall(r'const\s+(\w+)\s*[^=]*=\s*"([^"]+)"', text)
     return dict(m)
-
 # Local Rust test helpers that map to native C shims (declared in test_game.h)
 # and must NOT be inlined — leave the call site intact so the transpiler routes
 # it to the matching C shim (e.g. answer_play_choice -> test_answer_play_cost_choice).
 NATIVE_SHIM_HELPERS = {"answer_play_choice"}
-
 def collect_helpers(text: str, test_names):
     """Collect non-#[test] fn definitions (setup_and_trigger, trigger_debut, …)
     so their bodies can be inlined at the call site. Returns dict
@@ -124,7 +112,6 @@ def collect_helpers(text: str, test_names):
             i += 1
         defs[name] = (params, text[start:i-1])
     return defs
-
 def _map_game_id(expr: str, consts: dict):
     e = expr.strip()
     m = re.match(r'game\.id\(\s*(\w+)\s*\)', e)
@@ -134,7 +121,6 @@ def _map_game_id(expr: str, consts: dict):
     if m:
         return f'test_id(&tg, "{m.group(1)}")'
     return e
-
 def _map_game_id_safe(expr: str, consts: dict):
     """Like _map_game_id but returns None when the id cannot be resolved to a
     C call (e.g. game.id(NIJI_LIVES[0]) indexing a const array, or any expr
@@ -144,7 +130,6 @@ def _map_game_id_safe(expr: str, consts: dict):
     if c is None or re.search(r'\bgame\.', c):
         return None
     return c
-
 def expand_helpers(body: str, helpers: dict, consts: dict, depth=0):
     """Recursively inline helper calls (setup_and_trigger, trigger_debut, …)
     with parameter substitution so the call site's body becomes translatable."""
@@ -174,12 +159,10 @@ def expand_helpers(body: str, helpers: dict, consts: dict, depth=0):
             for p, a in zip(params, args):
                 sub[p] = re.sub(r'^&?\s*mut\s*', '', a).strip()
             exp = hbody
-            # A helper may contain the test crate's own setup lines that the
-            # line-based transpiler cannot emit.  The transpiler's own rules
-            # turn `load_real_database` into a no-op comment and
-            # `let mut game = TestGame::new(...)` into
-            # `TestGame tg; test_game_new(&tg);`, so we can keep the helper
-            # and just drop those lines here.
+            # Drop only lines that belong to the test crate's own setup and
+            # would otherwise break the C transpiler.  Do NOT filter the whole
+            # body — a plain helper like fill_decks has no such lines and
+            # dropping them all would silently delete the helper's work.
             kept = []
             for hl in exp.split('\n'):
                 hs = hl.strip()
@@ -194,12 +177,7 @@ def expand_helpers(body: str, helpers: dict, consts: dict, depth=0):
                 # `let db = load_real_database();` — drop them too.
                 if re.match(r'^db(\.clone\(\))?\s*$', hs):
                     continue
-                # Keep `let mut game = TestGame::new(...)` — the transpiler's
-                # own rule rewrites it to `TestGame tg; test_game_new(&tg);`,
-                # binding the helper's game to the caller's `tg`.
-                if re.match(r'\s*let\s+(?:mut\s+)?game\s*=\s*TestGame::new\s*\(', hs):
-                    kept.append(hl); continue
-
+                kept.append(hl)
             exp = '\n'.join(kept)
             for p, a in sub.items():
                 # re.sub treats backslashes in the replacement as escape
@@ -267,10 +245,8 @@ def expand_helpers(body: str, helpers: dict, consts: dict, depth=0):
         else:
             out.append(line)
     return '\n'.join(out)
-
 HEART_IDX = {"Heart00":"0","Heart01":"1","Heart02":"2","Heart03":"3",
                "Heart04":"4","Heart05":"5","Heart06":"6","Heart07":"7"}
-
 def map_modifier_expr(expr: str, func_name: str):
     """Map a Rust modifier accessor expression to a C expression, or None."""
     e = expr.strip()
@@ -337,7 +313,6 @@ def map_modifier_expr(expr: str, func_name: str):
     # plain identifier (a previously-fetched local)
     if re.match(r'^\w+$', e): return e
     return None
-
 ZONE_TO_TESTADD = {
     "main_deck": "test_add_to_deck",
     "deck": "test_add_to_deck",
@@ -350,7 +325,6 @@ ZONE_TO_TESTADD = {
     "waitroom": "test_add_to_discard",
 }
 AREA_MAP = {"Left": "0", "LeftSide": "0", "Center": "1", "Right": "2", "RightSide": "2"}
-
 # HeartColor variant → C enum (Rust Heart00..Heart06 == pink..orange; BAll/Draw/
 # Score/All map per engine/src/core/card.rs heart_color_table!).
 HEART_ENUM = {
@@ -359,7 +333,6 @@ HEART_ENUM = {
     "Heart06": "RB_HEART_ORANGE", "BAll": "RB_HEART_ALL", "All": "RB_HEART_ALL",
     "Draw": "RB_HEART_DRAW", "Score": "RB_HEART_SCORE", "Any": "RB_HEART_ANY",
 }
-
 def map_heart_expr(expr: str):
     """Map a HeartColor pure-expression to C, or None if not a heart expr."""
     e = expr.strip()
@@ -376,11 +349,9 @@ def map_heart_expr(expr: str):
     if m and m.group(1) in HEART_ENUM:
         return HEART_ENUM[m.group(1)]
     return None
-
 # Card field access for decoded `Card` locals (`db.get_card_by_no(...)` → Card).
 CARD_FIELD = {"cost": "cost", "score": "score", "blade": "blade",
               "num_base": "num_base", "num_blade": "num_blade", "num_need": "num_need"}
-
 def map_card_field(expr: str, card_vars):
     """Map `card.cost` / `card.is_live()` (card ∈ card_vars) to C, else None."""
     e = expr.strip()
@@ -394,11 +365,9 @@ def map_card_field(expr: str, card_vars):
     if m and m.group(1) in card_vars and m.group(2) in CARD_FIELD:
         return f'{m.group(1)}.{CARD_FIELD[m.group(2)]}'
     return None
-
 ZONE_NORM = {"main_deck":"deck","deck":"deck","hand":"hand","waitroom":"discard","discard":"discard",
              "live_card_zone":"live","live":"live","success_live_card_zone":"success","success":"success",
              "energy_zone":"energy","energy":"energy","stage":"stage"}
-
 def map_collection_pred(expr: str):
     """Map Rust collection-closure predicates (.stage.stage.iter().any(|&id| id == X),
     .cards.iter().any(|c| c.card_no == "Y") / .cards.contains(&id)) to C bools."""
@@ -423,7 +392,6 @@ def map_collection_pred(expr: str):
         zone = ZONE_NORM.get(m.group(2), m.group(2))
         return f'test_zone_has_id(&tg, {int(m.group(1))-1}, "{zone}", {m.group(3)})'
     return None
-
 def strip_rust_wrappers(expr: str):
     """Drop Rust `Option` noise so the inner value matches C: .unwrap(),
     .unwrap_or(N) and Some(X)."""
@@ -434,7 +402,6 @@ def strip_rust_wrappers(expr: str):
     if m:
         e = m.group(1)
     return e
-
 def resolve_expected_expr(expr: str, declared: set):
     """Resolve an assert_eq! expected-side expression to a C r-value, or None.
     Handles: int literal, declared local, and `local ± int` / `int ± local`
@@ -455,7 +422,6 @@ def resolve_expected_expr(expr: str, declared: set):
     if re.match(r'^\w+$', e) and e in declared:
         return e
     return None
-
 # Player struct fields the C RbPlayer actually has (zone/field aliases resolved).
 KNOWN_PLAYER_FIELD = {
     "score": "score", "energy_active": "energy_active",
@@ -466,7 +432,6 @@ KNOWN_PLAYER_FIELD = {
     "discard": "discard", "deck_refreshed_this_turn": "deck_refreshed_this_turn",
     "life": "life",
 }
-
 def map_board_expr(expr: str, func_name: str):
     """Map a Rust board-access expression (game.state.playerN...) to C, else None."""
     e = expr.strip()
@@ -559,7 +524,6 @@ def map_board_expr(expr: str, func_name: str):
         f = "phase" if m.group(1) == "current_phase" else m.group(1)
         return f"tg.state.{f}"
     return None
-
 def merge_asserts(lines):
     """Merge multi-line assert_eq! blocks into single logical lines."""
     out = []
@@ -584,14 +548,11 @@ def merge_asserts(lines):
     if buf:
         out.append(" ".join(seg.strip() for seg in buf))
     return out
-
 KNOWN_PLAYER_FIELDS = {"energy_active", "score", "deck_refreshed_this_turn", "life"}
-
 def expand_for_loops(lines, consts, depth=0):
     """Expand `for _ in START..END { body }` (range with a literal or const
     upper bound) into repeated body statements so setup such as deck-fill
     pushes actually executes instead of degrading to a TODO comment.
-
     Recursive: a loop unrolled by an outer pass can itself contain loops
     (e.g. `for _ in 0..50 { … }` nested inside `for p in [player1, player2]`),
     so the copied body is re-expanded before being emitted."""
@@ -798,7 +759,6 @@ def expand_for_loops(lines, consts, depth=0):
             out.append("    }")
         i = j
     return out
-
 def join_method_continuations(lines):
     """Rejoin Rust method/field chains split across lines, e.g.
         game.state
@@ -826,14 +786,33 @@ def join_method_continuations(lines):
         else:
             out.append(ln)
     return out
-
+def merge_call_continuations(lines):
+    """Merge Rust method-call continuations that don't start with '.'
+    (e.g. `game.id(\n"PL!..."\n)` split across lines, or
+    `game.state.player1.stage.stage = [\n  a, b, c\n]`).  join_method_continuations
+    only joins lines starting with '.', so these survive unjoined and break
+    the line-based transpiler."""
+    out = []
+    for ln in lines:
+        s = ln.rstrip()
+        if out:
+            prev = out[-1].rstrip()
+            # prev ends with an open paren/bracket/brace, an assignment with no
+            # ';', or a trailing comma/continuation marker
+            if prev.endswith(('(', '[', '{', '=', ',')) or re.search(r'\b(?:game|tg|g|v|g2|game2|self)\.(?:id|new_id|state|mods|stage|hand|deck|waitroom|energy|live|success|performance)\s*$', prev) or re.search(r'\bgame\.state\.player\d+\.\w+\s*$', prev) or prev.endswith(']'):
+                cont = re.sub(r'//.*$', '', s).strip()
+                out[-1] = out[-1].rstrip() + ' ' + cont
+                continue
+        out.append(ln)
+    return out
 def transpile_body(body: str, consts: dict, func_name: str, helpers: dict = None) -> str:
     raw_lines = body.split('\n')
-    lines = join_method_continuations(expand_for_loops(merge_asserts(raw_lines), consts))
+    lines = join_method_continuations(merge_call_continuations(expand_for_loops(merge_asserts(raw_lines), consts)))
     out = []
     seen_tg = False
     declared = set()
     stack = [set()]  # block-scoped declared tracker (prevents int choice redefinition)
+    G = r'(?:game|tg|g|v|g2|game2|self)'
     def push(): stack.append(set())
     def pop():
         if len(stack) > 1:
@@ -860,7 +839,6 @@ def transpile_body(body: str, consts: dict, func_name: str, helpers: dict = None
         if re.match(r'^\w+$', e):
             return e in declared
         return False
-
     def emit_game_id(var, card):
         nonlocal unresolved
         if var not in declared:
@@ -868,7 +846,6 @@ def transpile_body(body: str, consts: dict, func_name: str, helpers: dict = None
             decl(var)
         else:
             out.append(f'    {var} = test_id(&tg, "{card}");')
-
     def assert_resolvable(rust_expr):
         e = rust_expr.strip()
         # Board-access expressions (game.state.playerN...) are always transpiled,
@@ -883,7 +860,6 @@ def transpile_body(body: str, consts: dict, func_name: str, helpers: dict = None
         m = re.match(r'game\.state\.player(\d+)\.(\w+)', e)
         if m: return m.group(2) in KNOWN_PLAYER_FIELDS
         return re.match(r'^\w+$', e) is not None and e in declared
-
     def emit_main_phase_action(text):
         # Parse execute_main_phase_action(...) and emit the matching C call.
         nonlocal unresolved
@@ -939,7 +915,6 @@ def transpile_body(body: str, consts: dict, func_name: str, helpers: dict = None
             mark_real()
             return True
         return False
-
     in_action = False
     action_buf = []
     action_depth = 0
@@ -953,7 +928,6 @@ def transpile_body(body: str, consts: dict, func_name: str, helpers: dict = None
     match_expr = ""
     in_iflet_complex = False
     iflet_complex_depth = 0
-
     for line in lines:
         # Strip Rust integer suffixes (3usize, 0i32, …) that are invalid in C.
         line = re.sub(r'\b(\d+)(?:usize|isize|u8|u16|u32|u64|i8|i16|i32|i64)\b', r'\1', line)
@@ -1059,10 +1033,13 @@ def transpile_body(body: str, consts: dict, func_name: str, helpers: dict = None
             match_depth = 1
             in_match = True
             continue
-        # Consume Result-handling lines that follow action calls.
+        # Consume Result-handling lines that follow action calls — but ONLY when
+        # they are not `let VAR = <expr>` bindings.  A `let` binding introduces a
+        # name that later lines use; swallowing it as a comment leaves the name
+        # undeclared and breaks the C compile (e.g. `let keke1 = test_id(...)`).
         if (re.search(r'^\s*\w*\.expect\(', line) or re.search(r'\.unwrap\(\)', line)
                 or re.search(r'\.is_ok\(\)', line) or re.search(r'\.is_err\(\)', line)
-                or re.search(r'\?;', line)):
+                or re.search(r'\?;', line)) and not re.match(r'\s*let\s+', line):
             out.append(f"    // action result consumed: {line.strip()}")
             continue
         # Inline r-value substitution: game.id("CARD") / game.new_id("CARD") -> C
@@ -1084,6 +1061,24 @@ def transpile_body(body: str, consts: dict, func_name: str, helpers: dict = None
         if not stripped or stripped.startswith("//"):
             out.append(f"    // {stripped}")
             continue
+        # Inline g.id("PL!...") / v.id("PL!...") / g.new_id("PL!...") as
+        # test_id(&tg, "...") when they appear inside another expression.
+        if re.search(r'\b(?:test_|rb_|CHECK|tg\.state|if\s*\()', stripped):
+            def _sub_id(m):
+                arg = m.group(1).strip()
+                # Only rewrite string-literal arguments ("PL!..."); bare const
+                # names (P1_MEMBER) are unresolved Rust card!() macros — leave
+                # them for the let-binding rule below or the TODO fallback.
+                if not ((arg.startswith('"') and arg.endswith('"')) or (arg.startswith("'") and arg.endswith("'"))):
+                    return m.group(0)
+                arg = arg[1:-1]
+                return f'test_id(&tg, "{arg}")'
+            nl = re.sub(G+r'\.new_id\s*\(\s*([^)]*)\s*\)', _sub_id, stripped)
+            nl = re.sub(G+r'\.id\s*\(\s*([^)]*)\s*\)', _sub_id, nl)
+            if nl != stripped:
+                out.append(f"    {nl}")
+                mark_real()
+                continue
         # Passthrough for engine calls already substituted into the body by the
         # pre-pass (fire_live_start -> rb_trigger_live_start + rb_drain_ability_queue).
         # These only ever appear as the result of a substitution, so emit them
@@ -1175,6 +1170,223 @@ def transpile_body(body: str, consts: dict, func_name: str, helpers: dict = None
         if m:
             out.append(f"    rb_advance_phase(&tg.state); rb_advance_phase(&tg.state);")
             continue
+        # game.state.playerN.stage.stage[i] = game.id("...") -> tg.state.p[N-1].stage[i] = test_id(&tg, "...")
+        m = re.match(r'\s*'+G+r'\.state\.player(\d+)\.stage\.stage\[(\d+)\]\s*=\s*'+G+r'\.(?:id|new_id)\s*\(\s*"([^"]+)"\s*\)', stripped)
+        if m:
+            pl = int(m.group(1)) - 1
+            out.append(f"    tg.state.p[{pl}].stage[{m.group(2)}] = test_id(&tg, \"{m.group(3)}\");")
+            mark_real()
+            continue
+        # game.state.playerN.stage.stage = [a, b, c] -> tg.state.p[N-1].stage[0..2] = a,b,c
+        m = re.match(r'\s*'+G+r'\.state\.player(\d+)\.stage\.stage\s*=\s*\[([^\]]*)\]\s*;', stripped)
+        if m:
+            pl = int(m.group(1)) - 1
+            vals = [v.strip() for v in m.group(2).split(',') if v.strip()!='']
+            for i, v in enumerate(vals[:3]):
+                out.append(f"    tg.state.p[{pl}].stage[{i}] = {v};")
+            mark_real()
+            continue
+        # game.state.playerN.stage.stage = [a, b, c] split across lines (merged by
+        # merge_call_continuations into a single line ending with '];')
+        m = re.match(r'\s*'+G+r'\.state\.player(\d+)\.stage\.stage\s*=\s*\[([^\]]*)\]\s*\];', stripped)
+        if m:
+            pl = int(m.group(1)) - 1
+            vals = [v.strip() for v in m.group(2).split(',') if v.strip()!='']
+            for i, v in enumerate(vals[:3]):
+                out.append(f"    tg.state.p[{pl}].stage[{i}] = {v};")
+            mark_real()
+            continue
+        # game.state.playerN.stage.stage = [a, b, c] split across lines (merged by
+        # merge_call_continuations into a single line ending with '];')
+        m = re.match(r'\s*'+G+r'\.state\.player(\d+)\.stage\.stage\s*=\s*\[([^\]]*)\]\s*\];', stripped)
+        if m:
+            pl = int(m.group(1)) - 1
+            vals = [v.strip() for v in m.group(2).split(',') if v.strip()!='']
+            for i, v in enumerate(vals[:3]):
+                out.append(f"    tg.state.p[{pl}].stage[{i}] = {v};")
+            mark_real()
+            continue
+        # game.select_indices(&[...]) -> rb_resume_with_choice(&tg.state, idx) per index
+        m = re.match(r'\s*'+G+r'\.select_indices\s*\(\s*&\[([^\]]*)\]\s*\)\s*;', stripped)
+        if m:
+            idxs = [v.strip() for v in m.group(1).split(',') if v.strip()!='']
+            for idx in idxs:
+                out.append(f"    rb_resume_with_choice(&tg.state, {idx});")
+            mark_real()
+            continue
+        # game.select_option(n) -> rb_resume_with_choice(&tg.state, n)
+        m = re.match(r'\s*'+G+r'\.select_option\s*\(\s*(-?\d+)\s*\)\s*;', stripped)
+        if m:
+            out.append(f"    rb_resume_with_choice(&tg.state, {m.group(1)});")
+            mark_real()
+            continue
+        # game.state.mods.add_heart_modifier(cid, HeartColor::HeartN, val) -> rb_mods_add_heart
+        m = re.match(r'\s*'+G+r'\.state\.mods\.add_heart_modifier\s*\(\s*(\w+)\s*,\s*HeartColor::Heart(\d+)\s*,\s*(\d+)\s*\)', stripped)
+        if m:
+            out.append(f"    rb_mods_add_heart(&tg.state.mods, {m.group(1)}, {int(m.group(2))-1}, {m.group(3)});")
+            mark_real()
+            continue
+        G = r'(?:game|tg|g|v|g2|game2|self)'
+        # Inline g.id("PL!...") / v.id("PL!...") / g.new_id("PL!...") as test_id(&tg, "...")
+        # when they appear inside another expression (arg position).  The standalone
+        # form (a bare line) is handled further down.
+        if re.search(r'\b(?:test_|rb_|CHECK|tg\.state|if\s*\()', stripped):
+            nl = re.sub(G+r'\.new_id\s*\(\s*"([^"]+)"\s*\)', r'test_id(&tg, "\1")', stripped)
+            nl = re.sub(G+r'\.id\s*\(\s*"([^"]+)"\s*\)', r'test_id(&tg, "\1")', nl)
+            if nl != stripped:
+                out.append(f"    {nl}")
+                mark_real()
+                continue
+        # Standalone g.new_id("PL!...") -> test_id(&tg, "PL!...") (Rust TestGame::new_id)
+        m = re.match(r'\s*'+G+r'\.new_id\s*\(\s*"([^"]+)"\s*\)', stripped)
+        if m:
+            out.append(f"    test_id(&tg, \"{m.group(1)}\");")
+            mark_real()
+            continue
+        # Standalone g.id("PL!...") -> test_id(&tg, "PL!...") (Rust TestGame::id)
+        m = re.match(r'\s*'+G+r'\.id\s*\(\s*"([^"]+)"\s*\)', stripped)
+        if m:
+            out.append(f"    test_id(&tg, \"{m.group(1)}\");")
+            mark_real()
+            continue
+        # game.set_live_card(id) -> test_set_live_card(&tg, 0, id) (LiveCardSet shim)
+        m = re.match(r'\s*'+G+r'\.set_live_card\s*\(\s*(\w+)\s*\)', stripped)
+        if m:
+            v = m.group(1)
+            if v not in declared:
+                cl = consts.get(v, v)
+                if cl.startswith('PL!') or cl.startswith('LL-'):
+                    emit_game_id(v, cl)
+            out.append(f"    test_set_live_card(&tg, 0, {v});")
+            mark_real()
+            continue
+        # game.set_live_card(...) split across lines — join into the buffered form
+        # game.pass() -> test_pass(&tg) (mirrors Rust helpers/mod.rs:1185 pass)
+        m = re.match(r'\s*'+G+r'\.pass\s*\(\s*\)', stripped)
+        if m:
+            out.append(f"    test_pass(&tg);")
+            mark_real()
+            continue
+        # game.give_energy(N) -> test_give_energy(&tg, N)
+        m = re.match(r'\s*'+G+r'\.give_energy\s*\(\s*(\d+)\s*\)', stripped)
+        if m:
+            out.append(f"    test_give_energy(&tg, {m.group(1)});")
+            mark_real()
+            continue
+        # game.give_opp_energy(N) -> test_give_opp_energy(&tg, N)
+        m = re.match(r'\s*'+G+r'\.give_opp_energy\s*\(\s*(\d+)\s*\)', stripped)
+        if m:
+            out.append(f"    test_give_opp_energy(&tg, {m.group(1)});")
+            mark_real()
+            continue
+        # game.state.recalculate_constants() -> test_recalc(&tg)
+        m = re.match(r'\s*'+G+r'\.state\.recalculate_constants\s*\(\s*\)', stripped)
+        if m:
+            out.append(f"    test_recalc(&tg);")
+            mark_real()
+            continue
+        # game.state.recalculate_constants() split across lines
+        # game.state.playerN.energy_zone.add_active(N) -> test_set_energy_active(&tg, pl, n)
+        m = re.match(r'\s*'+G+r'\.state\.player(\d+)\.energy_zone\.add_active\s*\(\s*(\d+)\s*\)', stripped)
+        if m:
+            pl = int(m.group(1)) - 1
+            out.append(f"    test_set_energy_active(&tg, {pl}, {m.group(2)});")
+            mark_real()
+            continue
+        # game.state.playerN.energy_zone.set_active_count(N) -> test_set_energy_active(&tg, pl, n)
+        m = re.match(r'\s*'+G+r'\.state\.player(\d+)\.energy_zone\.set_active_count\s*\(\s*(\d+)\s*\)', stripped)
+        if m:
+            pl = int(m.group(1)) - 1
+            out.append(f"    test_set_energy_active(&tg, {pl}, {m.group(2)});")
+            mark_real()
+            continue
+        # game.state.playerN.energy_zone.cards.truncate(N) -> set_active_count + trim bag
+        m = re.match(r'\s*'+G+r'\.state\.player(\d+)\.energy_zone\.cards\.truncate\s*\(\s*(\d+)\s*\)', stripped)
+        if m:
+            pl = int(m.group(1)) - 1
+            out.append(f"    tg.state.p[{pl}].energy.n = {m.group(2)};")
+            out.append(f"    if(tg.state.p[{pl}].energy_active > tg.state.p[{pl}].energy.n) tg.state.p[{pl}].energy_active = tg.state.p[{pl}].energy.n;")
+            mark_real()
+            continue
+        # game.state.playerN.<zone>.cards.truncate(N) -> trim bag to N
+        m = re.match(r'\s*'+G+r'\.state\.player(\d+)\.(\w+)\.cards\.truncate\s*\(\s*(\d+)\s*\)', stripped)
+        if m:
+            pl = int(m.group(1)) - 1
+            z = ZONE_NORM.get(m.group(2), m.group(2))
+            if z in ("hand","deck","discard","energy","live","success"):
+                out.append(f"    tg.state.p[{pl}].{z}.n = {m.group(3)};")
+                mark_real()
+                continue
+        # game.state.playerN.<zone>.cards.push(X) -> test_add_to_<zone>(&tg, pl?, X)
+        m = re.match(r'\s*'+G+r'\.state\.player(\d+)\.(\w+)\.cards\.push\s*\(', stripped)
+        if m:
+            pl = int(m.group(1)) - 1
+            zname = m.group(2)
+            z = ZONE_NORM.get(zname, zname)
+            # balance parentheses to grab the full argument
+            depth = 0; start = m.end(); i = start
+            while i < len(stripped):
+                ch = stripped[i]
+                if ch == '(': depth += 1
+                elif ch == ')':
+                    if depth == 0: break
+                    depth -= 1
+                i += 1
+            val = stripped[start:i].strip()
+            if z == "stage":
+                out.append(f"    tg.state.p[{pl}].stage[0] = {val};")
+                mark_real(); continue
+            fnmap = {"hand":("test_add_to_hand",0),"deck":("test_add_to_deck_pl",1),
+                     "discard":("test_add_to_discard",0),"live":("test_add_to_live",0),
+                     "success":("test_add_to_success",0),"energy":("test_add_to_energy",1),
+                     "energy_deck":("test_add_to_energy_deck",1)}
+            if z in fnmap:
+                fn, needs_pl = fnmap[z]
+                if needs_pl:
+                    out.append(f"    {fn}(&tg, {pl}, {val});")
+                else:
+                    out.append(f"    {fn}(&tg, {val});")
+                mark_real(); continue
+        # game.state.mods.get_heart_modifier(id, HeartColor::HeartN) -> test_get_heart_modifier(&tg, id, N)
+        m = re.match(r'\s*'+G+r'\.state\.mods\.get_heart_modifier\s*\(\s*(\w+)\s*,\s*HeartColor::Heart(\d+)\s*\)', stripped)
+        if m:
+            v = m.group(1)
+            if v not in declared:
+                out.append(f"    int {v} = 0;")
+                decl(v)
+            out.append(f"    test_get_heart_modifier(&tg, {v}, {m.group(2)})")
+            mark_real()
+            continue
+        # game.state.mods.get_blade_modifier(id) -> test_get_blade_modifier(&tg, id)
+        m = re.match(r'\s*'+G+r'\.state\.mods\.get_blade_modifier\s*\(\s*(\w+)\s*\)', stripped)
+        if m:
+            v = m.group(1)
+            if v not in declared:
+                out.append(f"    int {v} = 0;")
+                decl(v)
+            out.append(f"    test_get_blade_modifier(&tg, {v})")
+            mark_real()
+            continue
+        # game.state.mods.get_score_modifier(id) -> test_get_score_modifier(&tg, id)
+        m = re.match(r'\s*'+G+r'\.state\.mods\.get_score_modifier\s*\(\s*(\w+)\s*\)', stripped)
+        if m:
+            v = m.group(1)
+            if v not in declared:
+                out.append(f"    int {v} = 0;")
+                decl(v)
+            out.append(f"    test_get_score_modifier(&tg, {v})")
+            mark_real()
+            continue
+        # game.state.mods.get_cost_modifier(id) -> test_get_cost_modifier(&tg, id)
+        m = re.match(r'\s*'+G+r'\.state\.mods\.get_cost_modifier\s*\(\s*(\w+)\s*\)', stripped)
+        if m:
+            v = m.group(1)
+            if v not in declared:
+                out.append(f"    int {v} = 0;")
+                decl(v)
+            out.append(f"    test_get_cost_modifier(&tg, {v})")
+            mark_real()
+            continue
         if 'TestGame::new' in line:
             if not seen_tg:
                 out.append("    TestGame tg; test_game_new(&tg);")
@@ -1242,7 +1454,6 @@ def transpile_body(body: str, consts: dict, func_name: str, helpers: dict = None
                 # binding the helper's game to the caller's `tg`.
                 if re.match(r'\s*let\s+(?:mut\s+)?game\s*=\s*TestGame::new\s*\(', hs):
                     kept.append(hl); continue
-
             exp = '\n'.join(kept)
             for p, a in sub.items():
                 exp = re.sub(r'\b' + re.escape(p) + r'\b', lambda _m, _a=a: _a, exp)
@@ -1254,6 +1465,30 @@ def transpile_body(body: str, consts: dict, func_name: str, helpers: dict = None
             out.append(f"    // inlined helper {hname}")
             out.extend(exp.split('\n'))
             continue
+        # let VAR = g.id("PL!...") / v.id("PL!...") / g.new_id("PL!...") -> int VAR = test_id(&tg, "...")
+        m = re.match(r'\s*let\s+(?:mut\s+)?(\w+)\s*=\s*'+G+r'\.(?:id|new_id)\s*\(\s*"([^"]+)"\s*\)', line)
+        if m:
+            var = m.group(1); card = m.group(2)
+            if var not in declared:
+                out.append(f'    int {var} = test_id(&tg, "{card}");')
+                decl(var)
+            else:
+                out.append(f'    {var} = test_id(&tg, "{card}");')
+            mark_real()
+            continue
+        # let VAR = g.id(CONST) / v.id(CONST) / g.new_id(CONST) where CONST is a known card const
+        m = re.match(r'\s*let\s+(?:mut\s+)?(\w+)\s*=\s*'+G+r'\.(?:id|new_id)\s*\(\s*(\w+)\s*\)', line)
+        if m:
+            var = m.group(1); cname = m.group(2)
+            cl = consts.get(cname, cname)
+            if cl.startswith('PL!') or cl.startswith('LL-'):
+                if var not in declared:
+                    out.append(f'    int {var} = test_id(&tg, "{cl}");')
+                    decl(var)
+                else:
+                    out.append(f'    {var} = test_id(&tg, "{cl}");')
+                mark_real()
+                continue
         # modifier-let assignment: let X = game.state.mods.get_X_modifier(...)
         m = re.match(r'\s*let\s+(?:mut\s+)?(\w+)\s*=\s*game\.state\.mods\.get_cost_modifier\((\w+)\)', line)
         if m:
@@ -1443,12 +1678,10 @@ def transpile_body(body: str, consts: dict, func_name: str, helpers: dict = None
             for p, a in zip(params, args):
                 sub[p] = re.sub(r'^&?\s*mut\s*', '', a).strip()
             exp = hbody
-            # A helper may contain the test crate's own setup lines that the
-            # line-based transpiler cannot emit.  The transpiler's own rules
-            # turn `load_real_database` into a no-op comment and
-            # `let mut game = TestGame::new(...)` into
-            # `TestGame tg; test_game_new(&tg);`, so we can keep the helper
-            # and just drop those lines here.
+            # Drop only lines that belong to the test crate's own setup and
+            # would otherwise break the C transpiler.  Do NOT filter the whole
+            # body — a plain helper like fill_decks has no such lines and
+            # dropping them all would silently delete the helper's work.
             kept = []
             for hl in exp.split('\n'):
                 hs = hl.strip()
@@ -1463,12 +1696,7 @@ def transpile_body(body: str, consts: dict, func_name: str, helpers: dict = None
                 # `let db = load_real_database();` — drop them too.
                 if re.match(r'^db(\.clone\(\))?\s*$', hs):
                     continue
-                # Keep `let mut game = TestGame::new(...)` — the transpiler's
-                # own rule rewrites it to `TestGame tg; test_game_new(&tg);`,
-                # binding the helper's game to the caller's `tg`.
-                if re.match(r'\s*let\s+(?:mut\s+)?game\s*=\s*TestGame::new\s*\(', hs):
-                    kept.append(hl); continue
-
+                kept.append(hl)
             exp = '\n'.join(kept)
             for p, a in sub.items():
                 # re.sub treats backslashes in the replacement as escape
@@ -2348,10 +2576,8 @@ def transpile_body(body: str, consts: dict, func_name: str, helpers: dict = None
     # the engine) even if some assertions degraded to TODO. Passing is not the
     # goal of this batch; converting + running is.
     return "\n".join(out)
-
 def transpile_helper_body(exp: str, consts: dict, helpers: dict) -> str:
     """Apply the transpiler's board-access rewrites to an inlined helper body.
-
     Helper bodies are emitted verbatim (out.extend) and bypass the
     line-by-line rules, so a helper that references `(?:game|g|tg)\.state.player1...`
     would land in the C output unrewritten.  This function runs the same
@@ -2558,10 +2784,8 @@ def transpile_helper_body(exp: str, consts: dict, helpers: dict) -> str:
         else:
             out.append(ln)
     return "\n".join(out)
-
 def _postprocess_generated_file(path: pathlib.Path):
     """Fixup pass to make the mass-port file compile after the 4%->93% sweep.
-
     Handles three classes of breakage introduced when the 4 `continue` gates
     were removed and vec![X;N] unrolling was added:
     1. `TestGame tg2` redeclaration - keep first, reuse for rest.
@@ -2690,23 +2914,38 @@ def _postprocess_generated_file(path: pathlib.Path):
         if in_func and brace_depth == 0 and ln.strip() == '}':
             in_func = False
             cur_func = None
-    # --- pass 3: add missing int declarations for vars that are used but never declared ---
-    # Collect per-function declared vs used
-    text2 = "\n".join(out)
-    # Split into functions to analyze
-    func_pattern = re.compile(r'static void (gen_\w+)\(void\)\{(.*?)\n\}', re.DOTALL)
-    # We'll do per-function fix by scanning for CHECK/var usage
-    # Simpler: for each function, find all `int VAR` declares, then find all bare VAR uses in CHECK/test_*/tg. that look like undeclared
-    # But we can just rely on compiler errors list: after dedup, remaining errors are undeclared vars.
-    # To avoid needing compiler, we inject a generic header per function: any var that appears as `CHECK(VAR` or `test_*(&tg, VAR)` but not declared, we add `int VAR=0;` after TestGame tg; line.
-    # Instead of heuristic, we brute-force: parse each function body, find all word tokens that are assignments/args that are not declared and not known globals.
-    # Known globals/types
-    known = {"tg","tg2","failures","RB_ZONE_HAND","RB_ZONE_STAGE","RB_PHASE_MAIN","RB_PHASE_ACTIVE","RB_PHASE_ENERGY","RB_PHASE_DRAW","RB_PHASE_LIVE_SET","RB_PHASE_PERFORMANCE","RB_PHASE_VICTORY","RB_PHASE_OPENING","RB_PHASE_RPS","RB_HEART_PINK","RB_HEART_RED","RB_HEART_YELLOW","RB_HEART_GREEN","RB_HEART_BLUE","RB_HEART_PURPLE","RB_HEART_ORANGE","RB_HEART_ALL","RB_HEART_DRAW","RB_HEART_SCORE","RB_HEART_ANY","RB_MAX_CARD_IDS","RB_MAX_RECENTLY_MOVED","int","Card","TestGame","void","static","if","for","while","return","CHECK","CHECK_EQ","CHECK_EQ_STR","test_id","test_add_to_deck","test_add_to_hand","test_add_to_discard","test_add_to_live","test_add_to_success","test_add_to_energy","test_add_to_deck_pl","test_add_to_revealed","test_add_to_stage","test_play_to_stage","test_activate_ability","test_give_energy","test_spend_energy","test_recalc","test_clear_mods_for_card","test_set_live_card","test_has_pending_choice","test_pending_choice_count","test_pending_choice_type","test_get_blade_modifier","test_get_score_modifier","test_get_cost_modifier","test_get_heart_modifier","test_zone_has_id","test_zone_has_card_no","test_filler_hand","test_insert_deck_top","test_set_energy_active","test_place_under","test_drain_auto_choices","test_answer_play_cost_choice","rb_mods_get_cost","rb_mods_get_score","rb_mods_get_blade","rb_mods_get_heart","rb_mods_set_orientation","rb_advance_phase","rb_has_pending_choice","rb_resume_with_choice","rb_drain_ability_queue","rb_trigger_live_start","rb_queue_current_entry","rb_queue_is_empty","rb_phase_name","rb_load","rb_unload","rb_find_card_by_no","rb_decode_card_by_index","rb_card_is_live","rb_card_is_energy","rb_owner_of_card","rb_zone_of_str","rb_parse_heart_color","rb_heart_index","rb_give_energy","rb_pass","rb_perform_live","rb_record_event","rb_fire_recorded_auto","rb_queue_trigger_abilities","rb_use_count","rb_use_limit_reached","rb_pos_change_for_player","rb_misc_position_destinations","printf","fprintf","strstr","strcmp","stderr","__FILE__","__LINE__"}
-    # Also add const names? they are replaced.
-    # For each function, find declared locals
-    final_lines = text2.splitlines()
-    # Re-split and rebuild with missing decls
-    # Find function boundaries
+    # --- pass 3: add missing int declarations for undeclared bare locals ---
+    # Robust token scan: for each function, collect every identifier used in
+    # real (non-comment) code that is not declared, not a known global, and
+    # not a C keyword/type.  Inject `int VAR = 0;` after the TestGame tg;
+    # declaration so the C compiles.  This is a safety net — most vars are
+    # already declared by the line-based transpiler's `let` handling.
+    known = {"tg","tg2","failures","RB_ZONE_HAND","RB_ZONE_STAGE","RB_PHASE_MAIN","RB_PHASE_ACTIVE","RB_PHASE_ENERGY","RB_PHASE_DRAW","RB_PHASE_LIVE_SET","RB_PHASE_PERFORMANCE","RB_PHASE_VICTORY","RB_PHASE_OPENING","RB_PHASE_RPS","RB_HEART_PINK","RB_HEART_RED","RB_HEART_YELLOW","RB_HEART_GREEN","RB_HEART_BLUE","RB_HEART_PURPLE","RB_HEART_ORANGE","RB_HEART_ALL","RB_HEART_DRAW","RB_HEART_SCORE","RB_HEART_ANY","RB_MAX_CARD_IDS","RB_MAX_RECENTLY_MOVED","int","Card","TestGame","void","static","if","for","while","return","CHECK","CHECK_EQ","CHECK_EQ_STR","test_id","test_add_to_deck","test_add_to_hand","test_add_to_discard","test_add_to_live","test_add_to_success","test_add_to_energy","test_add_to_deck_pl","test_add_to_revealed","test_add_to_stage","test_play_to_stage","test_activate_ability","test_give_energy","test_spend_energy","test_recalc","test_clear_mods_for_card","test_set_live_card","test_has_pending_choice","test_pending_choice_count","test_pending_choice_type","test_get_blade_modifier","test_get_score_modifier","test_get_cost_modifier","test_get_heart_modifier","test_zone_has_id","test_zone_has_card_no","test_filler_hand","test_insert_deck_top","test_set_energy_active","test_place_under","test_drain_auto_choices","test_answer_play_cost_choice","rb_mods_get_cost","rb_mods_get_score","rb_mods_get_blade","rb_mods_get_heart","rb_mods_set_orientation","rb_advance_phase","rb_has_pending_choice","rb_resume_with_choice","rb_drain_ability_queue","rb_trigger_live_start","rb_queue_current_entry","rb_queue_is_empty","rb_phase_name","rb_load","rb_unload","rb_find_card_by_no","rb_decode_card_by_index","rb_card_is_live","rb_card_is_energy","rb_owner_of_card","rb_zone_of_str","rb_parse_heart_color","rb_heart_index","rb_give_energy","rb_pass","rb_perform_live","rb_record_event","rb_fire_recorded_auto","rb_queue_trigger_abilities","rb_use_count","rb_use_limit_reached","rb_pos_change_for_player","rb_misc_position_destinations","printf","fprintf","strstr","strcmp","stderr","__FILE__","__LINE__","i","l","score","idx","hc","need","copy","guard","shizuku","ally","shi","honoka","member","card","mira1","mira2","ren","koko","natsume","e1","e2","n2","mia_discarded","total_heart02","id","hb","got_blade","edel1","edel2","edel3","before","swc","c1","c2","b0","b1","b2","hand_before","filler","dive_p1","setsuna","live","trapper","p1_member","p1_live","p2_member","outsider","yoshiko","mari","keke","liella","genki","awaken","mw","p2_live","v","g","g2","game2","self","db","game","s","NIJI_LIVES","FILLER","DIVE","P1_MEMBER","P1_LIVE","P2_MEMBER","TRAPPER","MIRAKURA_RURINO","HIMEKO","KOKO","NON_MIRAKURA_MEMBER","LIVE","MEMBER","LIVECARD","ENERGY","HAND","STAGE","WAITROOM","DISCARD","DECK","SUCCESS","LIVES","HANDCARD","STAGECARD","ENERGYCARD","WAITROOMCARD","DISCARDCARD","DECKCARD","SUCCESSCARD","LIVESCARD","HANDCARD","STAGECARD","ENERGYCARD","WAITROOMCARD","DISCARDCARD","DECKCARD","SUCCESSCARD","LIVESCARD"}
+    keywords = {"int","void","char","float","double","long","short","unsigned","signed","const","static","struct","union","enum","if","else","for","while","do","return","break","continue","switch","case","default","sizeof","typedef","goto","true","false","NULL","void","auto","register","volatile","extern","inline","restrict"}
+    # All test_* / rb_* helper function names (so the token scan doesn't
+    # declare `int test_pass = 0;` etc. when they appear as calls).
+    known.update({
+        "test_game_new","test_id","test_add_to_hand","test_add_to_discard","test_add_to_stage",
+        "test_place_under","test_add_to_success","test_add_to_live","test_add_to_deck","test_add_to_deck_pl",
+        "test_insert_deck_top","test_add_to_energy","test_add_to_energy_deck","test_set_energy_active",
+        "test_add_to_revealed","test_give_energy","test_give_opp_energy","test_play_to_stage",
+        "test_try_play_to_stage","test_recalc","test_clear_mods_for_card","test_set_live_card",
+        "test_fire_debut","test_expire_effects","test_activate_ability","test_drain_auto_choices",
+        "test_spend_energy","test_has_pending_choice","test_pending_choice_count","test_pending_choice_type",
+        "test_card_name","test_stage_has","test_hand_has","test_success_count","test_print_board",
+        "test_pass","test_pending_choice_type","test_get_blade_modifier","test_get_score_modifier",
+        "test_get_cost_modifier","test_get_heart_modifier","test_filler_hand","test_zone_has_card_no",
+        "test_zone_has_id","test_answer_play_cost_choice","rb_mods_get_cost","rb_mods_get_score",
+        "rb_mods_get_blade","rb_mods_get_heart","rb_mods_set_orientation","rb_mods_add_heart",
+        "rb_advance_phase","rb_has_pending_choice","rb_resume_with_choice","rb_drain_ability_queue",
+        "rb_trigger_live_start","rb_queue_current_entry","rb_queue_is_empty","rb_phase_name","rb_load",
+        "rb_unload","rb_find_card_by_no","rb_decode_card_by_index","rb_card_is_live","rb_card_is_energy",
+        "rb_owner_of_card","rb_zone_of_str","rb_parse_heart_color","rb_heart_index","rb_give_energy",
+        "rb_pass","rb_perform_live","rb_record_event","rb_fire_recorded_auto","rb_queue_trigger_abilities",
+        "rb_use_count","rb_use_limit_reached","rb_pos_change_for_player","rb_misc_position_destinations",
+        "printf","fprintf","strstr","strcmp","stderr","__FILE__","__LINE__",
+    })
+    final_lines = out
     func_ranges = []
     cur = None
     start = 0
@@ -2718,52 +2957,32 @@ def _postprocess_generated_file(path: pathlib.Path):
             start = idx
     if cur is not None:
         func_ranges.append((cur, start, len(final_lines)-1))
-    # For each function, collect declared and used
     for fname, s, e in func_ranges:
-        body = "\n".join(final_lines[s:e+1])
+        body = chr(10).join(final_lines[s:e+1])
         declared = set(re.findall(r'\bint\s+(\w+)\b', body))
         declared.update(re.findall(r'\bCard\s+(\w+)\b', body))
+        declared.update(re.findall(r'\bchar\s+(\w+)\b', body))
         declared.add('tg'); declared.add('tg2')
-        # find all word tokens that appear as `, VAR)` or `(VAR` or `VAR =` etc. and are not known/declared
-        # Look for pattern `test_*(&tg, VAR)` or `rb_*(&tg` or `CHECK(VAR` etc.
-        # Instead collect all `, (\w+)` and `\( (\w+)` occurrences and check if VAR is undeclared and looks like a card var
-        candidates = set()
-        for m in re.finditer(r'[\(\,\s]\s*(\w+)\s*[,\)\;]', body):
-            tok = m.group(1)
-            if tok in known or tok in declared or tok.isdigit() or len(tok) < 1:
+        # tokens used in real (non-comment) code
+        real = re.sub(r'//.*', '', body)
+        real = re.sub(r'/\*.*?\*/', '', real, flags=re.DOTALL)
+        used = set(re.findall(r'[A-Za-z_]\w*', real))
+        # tokens used as the first word of a statement that is NOT a known call
+        # (i.e. not `test_*(&tg` / `rb_*` / `CHECK` / `int` / `tg.state` / `if`)
+        missing = set()
+        for tok in used:
+            if tok in known or tok in declared or tok in keywords:
                 continue
-            # skip string literals already removed, skip known macros
-            if tok in ("NULL", "true", "false"):
+            if not re.match(r'^[A-Za-z_]\w*$', tok):
                 continue
-            # if tok appears as a function name (followed by '(') skip
-            # we already filter, but check if `tok(` exists nearby
-            if re.search(r'\b' + re.escape(tok) + r'\s*\(', body):
-                # could be a var or func; we only want vars that are undeclared locals
-                # If tok is a var used as arg, it won't be defined as func, but will appear without `int`
-                # Heuristic: if tok is all lowercase and not in known, likely a card/filler var
-                pass
-            # Only consider vars that appear in a known card context: test_add_*, rb_mods_*, CHECK, etc.
-            # Also include generic loop vars like idx,i,l,hc,id that appear in if/rb_resume
-            if re.search(r'test_\w+\(&tg.*\b' + re.escape(tok) + r'\b', body) or re.search(r'rb_\w+.*\b' + re.escape(tok) + r'\b', body) or re.search(r'CHECK.*\b' + re.escape(tok) + r'\b', body) or re.search(r'if\s*\(.*\b' + re.escape(tok) + r'\b', body) or re.search(r'rb_resume_with_choice\([^,]+,\s*' + re.escape(tok) + r'\b', body):
-                candidates.add(tok)
-        # also check bare `VAR =` assignments where VAR not declared
-        for m in re.finditer(r'^\s*(\w+)\s*=', body, re.MULTILINE):
-            tok = m.group(1)
-            if tok not in declared and tok not in known:
-                # if line is inside function and not a declaration
-                candidates.add(tok)
-        # also check loop vars like `hc = 0;` from degraded `for hc in` 
-        for m in re.finditer(r'for\s+\w+\s+in', body):
-            # degraded loops already declare, but ensure the var is declared
-            lm = re.search(r'for\s+(\w+)\s+in', m.group(0))
-            if lm:
-                tok = lm.group(1)
-                if tok not in declared and tok not in known:
-                    candidates.add(tok)
-        # Filter candidates to those not declared
-        missing = [c for c in candidates if c not in declared]
+            # skip tokens that are actually function calls (followed by '(')
+            if re.search(r'' + re.escape(tok) + r'\s*\(', real):
+                continue
+            # skip tokens that are field accesses (preceded by '.')
+            if re.search(r'\.' + re.escape(tok) + r'', real):
+                continue
+            missing.add(tok)
         if missing:
-            # insert after TestGame tg; line inside this function
             insert_idx = None
             for idx in range(s, e+1):
                 if 'TestGame tg;' in final_lines[idx]:
@@ -2771,16 +2990,72 @@ def _postprocess_generated_file(path: pathlib.Path):
                     break
             if insert_idx is not None:
                 indent = "    "
-                for var in sorted(set(missing)):
-                    # avoid re-adding if already added in this loop
+                for var in sorted(missing):
                     if var in declared:
                         continue
-                    # insert after tg line
                     final_lines.insert(insert_idx+1, f"{indent}int {var} = 0; // auto-fix missing decl")
                     insert_idx += 1
                     declared.add(var)
-                    # adjust e for next iterations
                     e += 1
+    # --- pass 4b: inline g.id("X") / v.id("X") / g2.id("X") / g.new_id("X") ->
+    # test_id(&tg, "X") (string-literal args only; bare const names stay TODO).
+    # This is a whole-file sweep because some bodies emit these calls in
+    # argument position where the line-based transpiler never sees them.
+    G = r'(?:game|tg|g|v|g2|game2|self)'
+    def _sub_id(m):
+        arg = m.group(1).strip()
+        if not ((arg.startswith('"') and arg.endswith('"')) or (arg.startswith("'") and arg.endswith("'"))):
+            return m.group(0)
+        return 'test_id(&tg, "%s")' % arg[1:-1]
+    out3 = []
+    for ln in final_lines:
+        ln = re.sub(G+r'\.new_id\s*\(\s*([^)]*)\s*\)', _sub_id, ln)
+        ln = re.sub(G+r'\.id\s*\(\s*([^)]*)\s*\)', _sub_id, ln)
+        out3.append(ln)
+    final_lines = out3
+    # --- pass 4c: terminate bare test_get_*_modifier(...) / test_id(...) expression statements ---
+    out3b = []
+    for ln in final_lines:
+        s = ln.split('//')[0].strip()
+        if (s.startswith('test_get_') or s.startswith('test_id(&tg')) and s.endswith(')') and not s.endswith(';'):
+            ln = ln.rstrip() + ';'
+        out3b.append(ln)
+    final_lines = out3b
+    # --- pass 4d: rewrite remaining X.id("...") / X.id_ref("...") / X.new_id("...") ---
+    # Any bare `game.id("PL!...")`-style call that survived the line-based
+    # transpiler (e.g. in argument position) becomes test_id(&tg, "...").
+    # Calls with a bare const arg (g.new_id(DIVE)) are unresolvable Rust card!()
+    # macros — comment the line out so it still compiles.
+    out3c = []
+    for ln in final_lines:
+        def _rep(m):
+            arg = m.group(1).strip()
+            # string literal arg -> test_id(&tg, "...")
+            if (arg.startswith('"') and arg.endswith('"')) or (arg.startswith("'") and arg.endswith("'")):
+                return 'test_id(&tg, "%s")' % arg[1:-1]
+            # bare const name -> unresolved Rust card!() macro
+            if re.match(r'^[A-Za-z_]\w*$', arg):
+                return '/* unresolved card const: ' + m.group(0) + ' */'
+            # compound Rust expr -> unresolved
+            return '/* unresolved card expr: ' + m.group(0) + ' */'
+        ln = re.sub(r'(?:game|tg|g|v|g2|game2|self)\.(?:id|id_ref|new_id)\s*\(\s*([^)]*)\s*\)', _rep, ln)
+        out3c.append(ln)
+    final_lines = out3c
+    # --- pass 4e: fix test_id(&tg, &VAR) -> test_id(&tg, VAR) (drop stray &)
+    out3d = []
+    for ln in final_lines:
+        ln = re.sub(r'test_id\(&tg,\s*&(\w+)\)', r'test_id(&tg, \1)', ln)
+        out3d.append(ln)
+    final_lines = out3d
+    # --- pass 4f: declare undeclared bare locals used in if()/rb_resume()/subscript
+    # The pass-3 missing-decl scan only catches vars used in test_*/rb_*/CHECK
+    # contexts.  Degraded `for (i, l) in ...` / `for hc in ...` / `if (idx >= 0)`
+    # leave the loop var declared as `i = 0;` but the pass-3 scan's
+    # `VAR =` regex requires a line start, and `i = 0;` on its own line IS caught.
+    # The remaining misses are vars emitted ONLY inside degraded TODO bodies —
+    # those lines are commented out so the var is never used in real code.
+    # (no-op pass kept for clarity)
+    final_lines = final_lines
     # --- pass 4: second dedup after missing-decl insertion (handles unrolled duplicates) ---
     # Re-run int dedup on final_lines to catch duplicates created by unrolled loops or missing-decl insertion
     out2 = []
@@ -2824,13 +3099,11 @@ def _postprocess_generated_file(path: pathlib.Path):
     final_lines = out2
     path.write_text("\n".join(final_lines), encoding="utf-8")
     print(f"postprocessed {path} ({len(func_ranges)} fns)")
-
 def main():
     import argparse
     ap = argparse.ArgumentParser()
     ap.add_argument("--check", action="store_true")
     args = ap.parse_args()
-
     mods = list((SRC / "test_modules").rglob("*.rs"))
     total = len(mods)
     with_tests = sum(1 for p in mods if re.search(r'#\[test\]', p.read_text(encoding="utf-8", errors="ignore")))
@@ -2850,21 +3123,30 @@ static int failures=0;
 #define CHECK(c,msg) do{ if(!(c)){ fprintf(stderr,"FAIL %s:%d: %s\\n",__FILE__,__LINE__,msg); failures++; } else printf("ok: %s\\n",msg);} while(0)
 #define CHECK_EQ(a,b,msg) do{ if((a)!=(b)){ fprintf(stderr,"FAIL %s:%d: %s (got %d expected %d)\\n",__FILE__,__LINE__,msg,(int)(a),(int)(b)); failures++; } else printf("ok: %s\\n",msg);} while(0)
 #define CHECK_EQ_STR(a,b,msg) do{ if(strcmp((a),(b))!=0){ fprintf(stderr,"FAIL %s:%d: %s (got '%s' expected '%s')\\n",__FILE__,__LINE__,msg,(a),(b)); failures++; } else printf("ok: %s\\n",msg);} while(0)
-
 /* generated — mass-port of simple constant tests (recalculate_constants) */
 """
-
     body_parts = []
     generated = 0
     used_names = {}
     # prioritize smallest files first so the batch fills with easy wins;
     # cap raised to cover the whole simple cohort (262 fns → up to FN_CAP)
     FN_CAP = 4000
+    # Global helper pool from engine/tests/helpers/mod.rs — the shared
+    # TestGame helper methods (fill_decks, give_energy, select_indices,
+    # select_option, drain_auto_ability_choices, pass, set_live_card, …).
+    # These are NOT defined in each test file, so collect_helpers never saw
+    # them and every call degraded to a TODO comment.  Load them once and
+    # merge into each test's per-file helpers.
+    global_helpers = {}
+    _hp = SRC / "helpers" / "mod.rs"
+    if _hp.exists():
+        global_helpers = collect_helpers(_hp.read_text(encoding="utf-8", errors="ignore"), set())
     for path in sorted(simple, key=lambda p: len(extract_tests(p))):
         text = path.read_text(encoding="utf-8", errors="ignore")
         consts = collect_consts(text)
         test_names = set(extract_tests(path))
         helpers = collect_helpers(text, test_names)
+        helpers.update(global_helpers)
         rel = path.relative_to(SRC)
         # extract each test fn body via regex that finds balance
         for m in re.finditer(r'#\[test\]\s*fn\s+(\w+)\s*\([^)]*\)\s*\{', text):
@@ -2915,7 +3197,6 @@ static int failures=0;
                 break
         if generated >= FN_CAP:
             break
-
     body_parts.append("""
 static void generated_zone_conversion(void){
     RbZone z;
@@ -2932,6 +3213,5 @@ static void generated_zone_conversion(void){
     print(f"wrote {OUT} ({generated} fns)")
     _postprocess_generated_file(OUT)
     print(f"postprocessed {OUT}")
-
 if __name__ == "__main__":
     main()

@@ -550,7 +550,7 @@ pub const DECKS: &[DeckInfo] = &[
             "PL!SP-bp2-009-P",
             "PL!SP-bp4-001-P",
             "PL!SP-bp4-002-R",
-            "PL!SP-bp4-004-P＋",
+            "PL!SP-bp4-004-P",
             "PL!SP-bp4-006-P",
             "PL!SP-bp4-019-N",
             "PL!SP-pb1-001-R",

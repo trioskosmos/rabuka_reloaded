@@ -888,8 +888,10 @@ int rb_play_member(GameState *g, int pl, int hand_idx, int stage_pos) {
             if (is_debut || (is_baton && is_baton_tr)) {
                 if (ab.cost && !rb_has_pending_choice(g))
                     rb_execute_effect_ex(g, pl, ab.cost, card);
+                rb_drain_ability_queue(g);
                 if (ab.effect && !rb_has_pending_choice(g))
                     rb_execute_effect_ex(g, pl, ab.effect, card);
+                rb_drain_ability_queue(g);
                 if (rb_has_pending_choice(g)) {
                     /* A child effect deferred a pending choice; its resume parks
                         a raw pointer (g->queue.resume_parent) into THIS ability's
@@ -910,6 +912,7 @@ int rb_play_member(GameState *g, int pl, int hand_idx, int stage_pos) {
         (Auto) abilities — mirrors engine/src/turn/actions.rs
         handle_play_member_to_stage → trigger_auto_abilities_for_player. */
     rb_fire_auto(g, pl);
+    rb_drain_ability_queue(g);
     rb_free_card(&c);
     g->play_depth--;
     return 1;
@@ -945,6 +948,7 @@ int rb_activate_card(GameState *g, int pl, int card_id) {
             g->activation_keepalive_valid = 1;
             g->n_recently_moved = 0;
             rb_execute_effect_ex(g, pl, act, card_id);
+            rb_drain_ability_queue(g);
             if (!g->queue.has_pending) {
                 /* Free act's children first (they are owned by act, not by keepalive) */
                 act->n_child = 0;
@@ -965,8 +969,8 @@ int rb_activate_card(GameState *g, int pl, int card_id) {
         Card c;
         if (rb_decode_card_by_index((uint32_t)card_id, &c)) {
             if (c.ability) {
-                if (c.ability->cost)   { g->n_recently_moved = 0; rb_execute_effect_ex(g, pl, c.ability->cost, card_id); any = 1; }
-                if (c.ability->effect)  { g->n_recently_moved = 0; rb_execute_effect_ex(g, pl, c.ability->effect, card_id); any = 1; }
+                if (c.ability->cost)   { g->n_recently_moved = 0; rb_execute_effect_ex(g, pl, c.ability->cost, card_id); rb_drain_ability_queue(g); any = 1; }
+                if (c.ability->effect)  { g->n_recently_moved = 0; rb_execute_effect_ex(g, pl, c.ability->effect, card_id); rb_drain_ability_queue(g); any = 1; }
             }
             rb_free_card(&c);
         }
@@ -1049,10 +1053,10 @@ static void main_phase(GameState *g, int pl) {
                 played = rb_play_card(g, pl, i);
             }
             rb_free_card(&c);
-            if (rb_has_pending_choice(g)) rb_resume_with_choice(g, -1);
+            if (rb_has_pending_choice(g)) { rb_resume_with_choice(g, -1); rb_drain_ability_queue(g); }
             if (played) { again = 1; break; }
         }
-        if (rb_has_pending_choice(g)) rb_resume_with_choice(g, -1);
+        if (rb_has_pending_choice(g)) { rb_resume_with_choice(g, -1); rb_drain_ability_queue(g); }
     }
     /* activate abilities of staged members (one pass) — host would normally poll choice */
     for (int q = 0; q < RB_STAGE_SIZE; q++) {
@@ -1063,6 +1067,7 @@ static void main_phase(GameState *g, int pl) {
         if (c.ability && c.ability->effect) {
             g->n_recently_moved = 0; /* batch-scope for this staged member */
             rb_execute_effect_ex(g, pl, c.ability->effect, cid);
+            rb_drain_ability_queue(g);
         }
         rb_free_card(&c);
     }
@@ -1139,6 +1144,26 @@ static void rollover(GameState *g) {
     memset(g->state_change_from, 0, sizeof(g->state_change_from));
     memset(g->state_change_to, 0, sizeof(g->state_change_to));
     g->last_wait_to_active_count = 0;
+}
+
+/* Main phase action execution (mirrors TurnEngine::execute_main_phase_action).
+   action_type: 0=UseAbility, 1=Pass, 2=PlayMember, 3=Rock/Paper/Scissors, etc.
+   Returns 0 on success, -1 on error. */
+int rb_execute_main_phase_action(GameState *g, int action_type, int card_id,
+                                 int target_player, int target_idx, int target_zone) {
+    switch (action_type) {
+        case 0: /* UseAbility */
+            if (card_id >= 0) {
+                return rb_activate_card(g, g->active, card_id);
+            }
+            break;
+        case 1: /* Pass */
+            rb_advance_phase(g);
+            return 0;
+        default:
+            break;
+    }
+    return -1;
 }
 
 /* One full turn: active player's normal phase + shared live phase + rollover. */

@@ -24,7 +24,7 @@ pub static DECK_CARD_BLOBS: &[&[u8]] = &[
     include_bytes!("../baked/decks/bp7_abilities_PL!SP.bin"),
     // bp7_unique_abilities: 60 cards, 3744 bytes
     include_bytes!("../baked/decks/bp7_unique_abilities.bin"),
-    // fade deck: 20 cards, 1526 bytes
+    // fade deck: 20 cards, 1523 bytes
     include_bytes!("../baked/decks/fade deck.bin"),
     // hasunosora_cup: 32 cards, 2121 bytes
     include_bytes!("../baked/decks/hasunosora_cup.bin"),

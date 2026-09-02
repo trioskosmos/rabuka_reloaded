@@ -494,22 +494,84 @@ impl CardDatabase {
     }
 
     pub fn get_card_by_no(&self, card_no: &str) -> Option<&Card> {
+        // 1. Exact match
         if let Some(&card_id) = self.card_no_to_id.get(card_no) {
-            self.cards.get(&card_id)
-        } else {
-            None
+            return self.cards.get(&card_id);
         }
+        // 2. Normalized (fullwidth→halfwidth, lowercase→uppercase)
+        let normalized = Self::normalize_card_no(card_no);
+        if let Some(&card_id) = self.normalized_no_to_id.get(&normalized) {
+            return self.cards.get(&card_id);
+        }
+        // 3. Known variant notations: P+ / P＋ / P2 / P+ → P+; R+ / R＋ / R2 → R+; etc.
+        if let Some(variant) = Self::map_known_variants(&normalized) {
+            if let Some(&card_id) = self.normalized_no_to_id.get(&variant) {
+                return self.cards.get(&card_id);
+            }
+        }
+        // 4. Strip trailing rarity suffixes (+, P, R, SEC, etc.) and retry normalized
+        for stripped in Self::strip_rarity_suffixes(&normalized) {
+            if let Some(&card_id) = self.normalized_no_to_id.get(&stripped) {
+                return self.cards.get(&card_id);
+            }
+        }
+        // 5. Contains fallback (last resort)
+        for (k, &card_id) in &self.card_no_to_id {
+            if k.contains(&normalized) || k.contains(&normalized.replace('+', "＋")) {
+                return self.cards.get(&card_id);
+            }
+        }
+        None
+    }
+
+    /// Map known external variant notations to canonical DB keys.
+    /// Handles: P+ / P＋ / P2 / P+ → P+; R+ / R＋ / R2 → R+; etc.
+    fn map_known_variants(s: &str) -> Option<String> {
+        // If the string ends with a known variant suffix, map to the canonical + form
+        for (suffix, canonical) in &[
+            ("P2", "P＋"), ("P+", "P＋"), ("P＋", "P＋"),
+            ("R2", "R＋"), ("R+", "R＋"), ("R＋", "R＋"),
+            ("L2", "L＋"), ("L+", "L＋"), ("L＋", "L＋"),
+            ("N2", "N＋"), ("N+", "N＋"), ("N＋", "N＋"),
+            ("SEC2", "SEC"), ("SEC+", "SEC"), ("SEC＋", "SEC"),
+        ] {
+            if s.ends_with(suffix) {
+                let base = s[..s.len() - suffix.len()].to_string();
+                return Some(base + canonical);
+            }
+        }
+        None
     }
 
     pub fn get_card_id(&self, card_no: &str) -> Option<i16> {
-        // Try exact match first
+        // 1. Exact match
         if let Some(&id) = self.card_no_to_id.get(card_no) {
             return Some(id);
         }
-        // Fallback: uppercase + fullwidth→halfwidth normalization, resolved
-        // through the prebuilt index (no per-miss scan).
+        // 2. Normalized (fullwidth→halfwidth, lowercase→uppercase)
         let normalized = Self::normalize_card_no(card_no);
-        self.normalized_no_to_id.get(&normalized).copied()
+        if let Some(&id) = self.normalized_no_to_id.get(&normalized) {
+            return Some(id);
+        }
+        // 3. Known variant notations: P+ / P＋ / P2 / P+ → P+; R+ / R＋ / R2 → R+; etc.
+        if let Some(variant) = Self::map_known_variants(&normalized) {
+            if let Some(&id) = self.normalized_no_to_id.get(&variant) {
+                return Some(id);
+            }
+        }
+        // 4. Strip trailing rarity suffixes and retry normalized
+        for stripped in Self::strip_rarity_suffixes(&normalized) {
+            if let Some(&id) = self.normalized_no_to_id.get(&stripped) {
+                return Some(id);
+            }
+        }
+        // 5. Contains fallback (last resort)
+        for (k, &id) in &self.card_no_to_id {
+            if k.contains(&normalized) || k.contains(&normalized.replace('+', "＋")) {
+                return Some(id);
+            }
+        }
+        None
     }
 
     /// Normalize card_no for lookup: uppercase, fullwidth → halfwidth.
@@ -558,6 +620,30 @@ impl CardDatabase {
         } else {
             result
         }
+    }
+
+    /// Strip trailing rarity suffixes for fallback lookup.
+    /// Handles: +, ＋, P, R, SEC, L, N, PE, SECE, SECL, SRL, LLE, RE, PR, etc.
+    fn strip_rarity_suffixes(s: &str) -> Vec<String> {
+        let mut out = Vec::new();
+        let mut current = s.to_string();
+        out.push(current.clone());
+        // Repeatedly strip known suffixes
+        loop {
+            let mut shortened = false;
+            for suffix in &["＋", "+", "P+", "R+", "SEC", "SECE", "SECL", "SRL", "LLE", "RE", "PE", "PR", "P", "R", "L", "N"] {
+                if current.ends_with(suffix) {
+                    current = current[..current.len() - suffix.len()].to_string();
+                    out.push(current.clone());
+                    shortened = true;
+                    break;
+                }
+            }
+            if !shortened || current.is_empty() {
+                break;
+            }
+        }
+        out
     }
 
     /// Strip all whitespace from a card name so that inconsistent spacing

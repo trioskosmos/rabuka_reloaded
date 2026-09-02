@@ -6,7 +6,7 @@ use agb::display::tiled::{
 use agb::display::{busy_wait_for_vblank, Graphics, Palette16, Priority, Rgb15, Rgb};
 
 use crate::board::BoardFrame;
-use crate::card_art_gen::{CardArt, BOARD_UI, CARD_FRONTS, LIVE_FRONTS, MASTER_PAL, STAGE_FRONTS};
+use crate::card_art_gen::{CardArt, BOARD_UI, CARD_FRONTS, LIVE_FRONTS, MASTER_PAL, STAGE_FRONTS, WAITED_FRONTS};
 use crate::font_tiles_gen::{FONT_GLYPHS, FONT_TILES};
 use crate::texticons_gen::{TEXTICON_GLYPHS, TEXTICON_TILES};
 
@@ -16,9 +16,12 @@ pub const COLS: i32 = 30;
 pub const ROWS: i32 = 20;
 const FONT_ROWS: i32 = 2;
 
-/// Card tile sizes baked in `tools/bake_card_art.py` (multiples of 8px).
-const STAGE_CARD: (i32, i32) = (5, 6); // 40x48
-const HAND_CARD: (i32, i32) = (3, 4); // 24x32
+/// Card tile grids baked in `tools/bake_card_art.py` (multiples of 8px).
+/// The card pixels inside each grid are tuned to the source's 0.716 aspect;
+/// the grid itself is what the layout uses, so cards sit at their real shape
+/// with padding instead of being forced to a grid aspect.
+const STAGE_CARD: (i32, i32) = (5, 6); // 40x48 grid, 34x48 card
+const HAND_CARD: (i32, i32) = (3, 4); // 24x32 grid, 24x32 card
 
 /// Layout derived from card sizes + font metrics (no magic absolute Y).
 const HEADER_H: i32 = FONT_ROWS; // 2
@@ -29,14 +32,13 @@ const BAR_H: i32 = FONT_ROWS; // single-line action bar
 const STAGE_PITCH: i32 = STAGE_CARD.0; // badge on card saves 1 col
 const HAND_PITCH: i32 = HAND_CARD.0;
 const STAGE_START_X: i32 = 1;
-const LIVE_CARD: (i32, i32) = (2, 3); // 16x24 mini live
+const LIVE_CARD: (i32, i32) = (3, 2); // 24x16 landscape (live cards are wide)
 const LIVE_PITCH: i32 = LIVE_CARD.0; // badge on card
 const HAND_START_X: i32 = 0;
-
 const STAGE_YS: [i32; 2] = [HEADER_H, HEADER_H + STAGE_H]; // [2, 8]
 const HAND_Y: i32 = STAGE_YS[1] + STAGE_H; // 14
 const BAR_Y: i32 = ROWS - BAR_H; // 18
-const INFO_X: i32 = STAGE_START_X + STAGE_PITCH * 3 + 1; // 17 with no-gap pitch
+const INFO_X: i32 = STAGE_START_X + STAGE_PITCH * 3 + 1; // 14
 
 /// Hand capacity derived from screen width, not hardcoded (30 cols / 3 pitch = 10).
 pub const HAND_FITS: usize = (COLS / HAND_PITCH) as usize; // 10
@@ -352,6 +354,7 @@ impl<'a> Display<'a> {
                     y,
                     STAGE_CARD,
                     STAGE_FRONTS,
+                    WAITED_FRONTS,
                     flipped,
                 );
             }
@@ -371,6 +374,7 @@ impl<'a> Display<'a> {
                     y,
                     LIVE_CARD,
                     LIVE_FRONTS,
+                    WAITED_FRONTS,
                     flipped,
                 );
             }
@@ -390,6 +394,7 @@ impl<'a> Display<'a> {
                     y + 3,
                     LIVE_CARD,
                     LIVE_FRONTS,
+                    WAITED_FRONTS,
                     flipped,
                 );
             }
@@ -410,6 +415,7 @@ impl<'a> Display<'a> {
                 HAND_Y,
                 HAND_CARD,
                 CARD_FRONTS,
+                WAITED_FRONTS,
                 false,
             );
         }
@@ -513,9 +519,9 @@ impl<'a> Display<'a> {
                 RegularBackgroundSize::Background32x32,
                 TileFormat::EightBpp,
             );
-            for i in 0..192 {
-                let tx = (i % 12) as i32;
-                let ty = (i / 12) as i32;
+            for i in 0..140 {
+                let tx = (i % 10) as i32;
+                let ty = (i / 10) as i32;
                 abg.set_tile((tx, ty), &art_ts, TileSetting::new(i as u16, TileEffect::new(false, false, 0)));
             }
             abg.show(&mut f);
@@ -529,7 +535,7 @@ impl<'a> Display<'a> {
         // Dark panel behind ability text like 3DS COL_CARD_OPAQUE (render.rs:498)
         let ui_ts = unsafe { TileSet::new(BOARD_UI, TileFormat::FourBpp) };
         for ty in 0..ROWS {
-            for tx in 13..COLS {
+            for tx in 10..COLS {
                 tbg.set_tile((tx, ty), &ui_ts, TileSetting::new(UI_EMPTY, e_text));
             }
         }
@@ -600,9 +606,15 @@ fn draw_slot(
     y: i32,
     card: (i32, i32),
     fronts: &[crate::card_art_gen::CardFront],
+    waited_fronts: &[crate::card_art_gen::CardFront],
     flipped: bool,
     ) {
-    let (cols, rows) = card;
+    let (cols, rows) = if slot.waited {
+        (4, 3) // wait grid: 4x3 tiles = 32x24
+    } else {
+        card
+    };
+    let fronts = if slot.waited { waited_fronts } else { fronts };
     let mut empty = |bg: &mut RegularBackground| {
         for ty in 0..rows {
             for tx in 0..cols {

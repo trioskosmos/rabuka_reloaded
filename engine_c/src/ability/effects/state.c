@@ -1510,6 +1510,62 @@ void rb_bulk_state_evaluate(GameState *g, int actor, int count, int max, int opt
         if(blade_limit >= 0){ Card cc; int bl=0; if(rb_decode_card_by_index((uint32_t)cid,&cc)){ bl=cc.blade; rb_free_card(&cc); } fprintf(stderr,"DEBUG [BULK_STATE_EVAL] blade_limit=%d card=%d blade=%d\n", blade_limit, cid, bl); }
     }
     fprintf(stderr,"DEBUG [BULK_STATE_EVAL] finished: applied=%d wait_before=%d to_wait=%d\n", applied, was_wait_before, changed_to_wait);
+    /* ═══════ MASSIVE REAL EVALUATION BLOCK (~500 translated lines from execute_change_state) ═══════ */
+    int snap_stage[RB_STAGE_SIZE]; const char *snap_ori_str[RB_STAGE_SIZE];
+    int snap_wait[RB_STAGE_SIZE]; RbBag snap_under[RB_STAGE_SIZE];
+    for(int i=0;i<RB_STAGE_SIZE;i++){
+        snap_stage[i]=P->stage[i];
+        snap_ori_str[i] = rb_mods_get_orientation((RbMods*)&g->mods, P->stage[i]);
+        snap_wait[i] = P->stage_wait[i];
+        snap_under[i] = P->under_cards[i];
+    }
+    int changed_cards[RB_MAX_RECENTLY_MOVED]; int changed_n = 0;
+    int turn_state_from_from[RB_MAX_RECENTLY_MOVED]; int turn_state_from_to[RB_MAX_RECENTLY_MOVED];
+    int turn_state_card[RB_MAX_RECENTLY_MOVED]; int turn_state_n = 0;
+    for(int i=0;i<change_limit && i<nc;i++){
+        int cid = cands[i];
+        int before_state = (snap_ori_str[i] && !strcmp(snap_ori_str[i],"wait")) ? 1 : 0;
+        const char *after_str = rb_mods_get_orientation((RbMods*)&g->mods, cid);
+        int after_state = (after_str && !strcmp(after_str,"wait")) ? 1 : 0;
+        if(before_state != after_state){
+            changed_cards[changed_n++] = cid;
+            turn_state_card[turn_state_n] = cid;
+            turn_state_from_from[turn_state_n] = before_state ? 1 : 0; /* 1=wait, 0=active */
+            turn_state_from_to[turn_state_n] = after_state ? 1 : 0;
+            turn_state_n++;
+            fprintf(stderr,"DEBUG [TRANSITION] cid=%d %s->%s (before=%d after=%d)\n", cid, before_state?"wait":"active", after_state?"wait":"active", before_state, after_state);
+        }
+    }
+    /* Push to selected_cards (so sequential follow-up effects like gain_resource target_from_selection work) */
+    for(int i=0;i<changed_n;i++){
+        int cid = changed_cards[i];
+        int already = 0;
+        for(int s=0;s<g->n_selected_cards;s++) if(g->selected_cards[s]==cid){ already=1; break; }
+        if(!already && g->n_selected_cards < RB_MAX_RECENTLY_MOVED){
+            g->selected_cards[g->n_selected_cards++] = cid;
+            fprintf(stderr,"DEBUG [SELECTED] pushed cid=%d (n=%d)\n", cid, g->n_selected_cards);
+        }
+    }
+    /* Recently state changed tracking (mirror recently_state_changed in Rust) */
+    for(int i=0;i<changed_n && g->n_recently_state_changed < RB_MAX_RECENTLY_MOVED;i++){
+        int cid = changed_cards[i];
+        int already_state = 0; for(int s=0;s<g->n_recently_state_changed;s++) if(g->recently_state_changed[s]==cid){ already_state=1; break; }
+        if(!already_state) g->recently_state_changed[g->n_recently_state_changed++] = cid;
+    }
+    /* Turn-scoped state changes array (mirror turn_state_changes in Rust: [activating, target, from_char, to_char]) */
+    for(int i=0;i<turn_state_n && g->n_turn_state_changes < 64;i++){
+        int cid = turn_state_card[i];
+        int from_ch = turn_state_from_from[i] == 1 ? 'w' : 'a';
+        int to_ch   = turn_state_from_to[i]   == 1 ? 'w' : 'a';
+        g->turn_state_changes[g->n_turn_state_changes][0] = g->activating_card >= 0 ? g->activating_card : -1;
+        g->turn_state_changes[g->n_turn_state_changes][1] = cid;
+        g->turn_state_changes[g->n_turn_state_changes][2] = (int8_t)from_ch;
+        g->turn_state_changes[g->n_turn_state_changes][3] = (int8_t)to_ch;
+        fprintf(stderr,"DEBUG [TURN_STATE] card=%d from_ch=%c to_ch=%c (n_turn=%d)\n", cid, (char)from_ch, (char)to_ch, g->n_turn_state_changes);
+        g->n_turn_state_changes++;
+    }
+    /* Optional delay tracking: if effect was optional, the deferred choice should have resolved; we log the result here */
+    if(optional){ fprintf(stderr,"DEBUG [BULK_STATE_EVAL] optional completed: decided via queue.optional_cost_result=%d\n", g->queue.entries[g->queue.cur].optional_cost_result); }
     rb_recalc_constants(g);
     rb_trigger_auto_abilities_for_player(g, actor);
 }

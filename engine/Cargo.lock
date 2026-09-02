@@ -1633,6 +1633,7 @@ dependencies = [
  "actix-web",
  "bincode",
  "bytes",
+ "cfg-if",
  "criterion",
  "env_logger",
  "hashbrown 0.14.5",

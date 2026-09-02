@@ -1921,6 +1921,14 @@ void rb_resolver_handle_heart_selection(RbAbilityResolver *self, GameState *g, i
 }
 
 int rb_has_pending_choice(const GameState *g) { return g ? g->queue.has_pending : 0; }
+const RbChoice *rb_get_pending_choice(const GameState *g) {
+    if (!g || !g->queue.has_pending) return NULL;
+    return &g->queue.pending;
+}
+int rb_get_pending_choice_player_id(const GameState *g) {
+    if (!g || !g->queue.has_pending) return -1;
+    return g->queue.actor;
+}
 void rb_clear_pending_choice(GameState *g) {
     if (!g) return;
     memset(&g->queue.pending, 0, sizeof(g->queue.pending));

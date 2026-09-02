@@ -112,6 +112,7 @@ cards/build/cards_gen.rs
 
 # Regenerated build artifacts (rebuilt by the 3DS/GBA toolchains)
 platforms/3ds/.card_png_cache/
+platforms/gba/preview/
 platforms/3ds/.font_tmp/
 platforms/3ds/romfs/cards.bin
 platforms/3ds/romfs/font.bcfnt

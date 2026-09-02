@@ -126,6 +126,11 @@ fn show_card_list<I: InputSource>(
             if let Some(c) = gs.card_database.get_card(cid) {
                 show_card_detail(display, input, gs, c.card_no.to_string());
             }
+        } else if input.just_pressed(Button::L) {
+            let cid = cards[sel];
+            if let Some(c) = gs.card_database.get_card(cid) {
+                show_card_detail(display, input, gs, c.card_no.to_string());
+            }
         } else if input.just_pressed(Button::B) {
             return;
         }
@@ -401,11 +406,17 @@ pub fn run_start_menu<I: InputSource>(
             String::from("Back to Stats"),
             String::from("Close"),
         ];
-        match select(display, input, &items, "MENU") {
+        match select(display, input, &items, "MENU  Start:Back") {
             Some(0) => show_game_log(display, input, gs),
             Some(1) => run_cards_menu(display, input, gs),
             Some(2) => continue, // back to stats
             _ => return,
         }
+        // Check Start to exit menu entirely
+        input.poll();
+        if input.just_pressed(Button::Start) {
+            return;
+        }
+        display.wait();
     }
 }

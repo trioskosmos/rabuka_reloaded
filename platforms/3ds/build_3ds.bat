@@ -23,21 +23,24 @@ set DEVKITPRO=C:\devkitPro
 set DEVKITARM=%DEVKITPRO%\devkitARM
 set "PATH=%DEVKITARM%\bin;%DEVKITPRO%\tools\bin;%PATH%"
 
-echo [2/7] Checking Rust nightly (pinned to nightly-2025-05-23 for 3DS)...
-where link.exe >nul 2>&1
+echo [2/7] Checking Rust nightly (pinned to nightly-2025-08-15 for 3DS)...
+REM Use where with full path to avoid msys2 link.exe shadowing
+where "%SystemRoot%\System32\link.exe" >nul 2>&1
 if %errorlevel% neq 0 (
   echo [2/7] MSVC link.exe not found, using GNU host toolchain
-  rustup toolchain list 2>nul | findstr /c:"nightly-2025-05-23-x86_64-pc-windows-gnu" >nul
-  if %errorlevel% neq 0 ( rustup toolchain install nightly-2025-05-23-x86_64-pc-windows-gnu --no-self-update )
-  rustup component add rust-src --toolchain nightly-2025-05-23-x86_64-pc-windows-gnu 2>nul
-  set "CARGO_3DS_TOOLCHAIN=+nightly-2025-05-23-x86_64-pc-windows-gnu"
+  rustup toolchain list 2>nul | findstr /c:"nightly-2025-08-15-x86_64-pc-windows-gnu" >nul
+  if %errorlevel% neq 0 ( rustup toolchain install nightly-2025-08-15-x86_64-pc-windows-gnu --no-self-update )
+  rustup component add rust-src --toolchain nightly-2025-08-15-x86_64-pc-windows-gnu 2>nul
+  set "CARGO_3DS_TOOLCHAIN=+nightly-2025-08-15-x86_64-pc-windows-gnu"
+  set "USE_GNU_TOOLCHAIN=1"
 ) else (
-  rustup toolchain list 2>nul | findstr /c:"nightly-2025-05-23" >nul
-  if %errorlevel% neq 0 ( rustup toolchain install nightly-2025-05-23 )
-  rustup component add rust-src --toolchain nightly-2025-05-23-x86_64-pc-windows-msvc 2>nul
-  set "CARGO_3DS_TOOLCHAIN=+nightly-2025-05-23-x86_64-pc-windows-msvc"
+  rustup toolchain list 2>nul | findstr /c:"nightly-2025-08-15" >nul
+  if %errorlevel% neq 0 ( rustup toolchain install nightly-2025-08-15 )
+  rustup component add rust-src --toolchain nightly-2025-08-15-x86_64-pc-windows-msvc 2>nul
+  set "CARGO_3DS_TOOLCHAIN=+nightly-2025-08-15-x86_64-pc-windows-msvc"
+  set "USE_GNU_TOOLCHAIN=0"
 )
-echo [2/7] Rust nightly-2025-05-23 + rust-src ready [!CARGO_3DS_TOOLCHAIN!]
+echo [2/7] Rust nightly-2025-08-15 + rust-src ready [!CARGO_3DS_TOOLCHAIN!]
 
 echo [3/7] Checking cargo-3ds...
 cargo 3ds --version >nul 2>&1
@@ -51,7 +54,14 @@ call :need_bake "%~dp0romfs\cards.bin"
 if errorlevel 1 (
     echo [4/7] Baking cards.bin...
     cd /d "%~dp0..\..\tools\bake"
+    if "!USE_GNU_TOOLCHAIN!"=="1" (
+        set "PATH=%PATH%;C:\devkitPro\msys2\usr\bin"
+    )
     cargo %CARGO_3DS_TOOLCHAIN% run --release -- 3ds "%~dp0romfs"
+    if "!USE_GNU_TOOLCHAIN!"=="1" (
+        REM Restore PATH (strip msys2 again)
+        set "PATH=%PATH:C:\devkitPro\msys2\usr\bin;=%"
+    )
     if !errorlevel! neq 0 (
         echo [FAIL] bake failed.
         pause
@@ -75,26 +85,16 @@ if exist "%~dp0..\..\web_ui\img\cards_webp\*.webp" (
     cd /d "%~dp0"
     call :need_images
     if errorlevel 1 (
-        where py >nul 2>&1
-        if !errorlevel! equ 0 (
-            py -c "import PIL" >nul 2>&1
-            if !errorlevel! equ 0 (
-                py scripts/convert_cards.py
-            ) else (
-                where python3 >nul 2>&1
-                if !errorlevel! equ 0 (
-                    python3 -c "import PIL" >nul 2>&1
-                    if !errorlevel! equ 0 (
-                        python3 scripts/convert_cards.py
-                    ) else (
-                        echo [WARN] Neither py nor python3 has Pillow - skipping card image conversion
-                    )
-                ) else (
-                    echo [WARN] python3 not found - skipping card image conversion
-                )
-            )
+        REM Find python with Pillow
+        set "PY_CMD="
+        where py >nul 2>&1 && py -c "import PIL" >nul 2>&1 && set "PY_CMD=py"
+        if not defined PY_CMD (
+            where python3 >nul 2>&1 && python3 -c "import PIL" >nul 2>&1 && set "PY_CMD=python3"
+        )
+        if defined PY_CMD (
+            %PY_CMD% scripts/convert_cards.py
         ) else (
-            echo [WARN] py not found - skipping card image conversion
+            echo [WARN] Python with Pillow not found - skipping card image conversion
         )
     ) else (
         echo [4/7] Card images are up to date - skipping conversion
@@ -105,9 +105,11 @@ if exist "%~dp0..\..\web_ui\img\cards_webp\*.webp" (
 
 echo [4/7] Japanese font (subset, auto-rebuild on new chars)...
 cd /d "%~dp0"
-where py >nul 2>&1
-if !errorlevel! equ 0 (
-    py scripts\build_font.py
+set "PY_CMD="
+where py >nul 2>&1 && set "PY_CMD=py"
+where python3 >nul 2>&1 && if not defined PY_CMD set "PY_CMD=python3"
+if defined PY_CMD (
+    %PY_CMD% scripts\build_font.py
 ) else (
     echo [WARN] py not found - skipping font rebuild
 )

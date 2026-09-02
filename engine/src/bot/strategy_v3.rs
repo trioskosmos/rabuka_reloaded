@@ -28,13 +28,25 @@ use crate::bot::strategy::StrategyWeights;
 use crate::bot::strategy_v2::V2Policy;
 
 /// Diagnostics counters (printed by the arena bin).
-pub static V3_STATS: [std::sync::atomic::AtomicU64; 5] = [
-    std::sync::atomic::AtomicU64::new(0),
-    std::sync::atomic::AtomicU64::new(0),
-    std::sync::atomic::AtomicU64::new(0),
-    std::sync::atomic::AtomicU64::new(0),
-    std::sync::atomic::AtomicU64::new(0),
-];
+cfg_if::cfg_if! {
+    if #[cfg(target_has_atomic = "64")] {
+        pub static V3_STATS: [std::sync::atomic::AtomicU64; 5] = [
+            std::sync::atomic::AtomicU64::new(0),
+            std::sync::atomic::AtomicU64::new(0),
+            std::sync::atomic::AtomicU64::new(0),
+            std::sync::atomic::AtomicU64::new(0),
+            std::sync::atomic::AtomicU64::new(0),
+        ];
+    } else {
+        pub static V3_STATS: [core::sync::atomic::AtomicU32; 5] = [
+            core::sync::atomic::AtomicU32::new(0),
+            core::sync::atomic::AtomicU32::new(0),
+            core::sync::atomic::AtomicU32::new(0),
+            core::sync::atomic::AtomicU32::new(0),
+            core::sync::atomic::AtomicU32::new(0),
+        ];
+    }
+}
 // 0: live-set calls, 1: dump selects made, 2: held-line confirms,
 // 3: mulligan calls, 4: mulligan discards chosen
 

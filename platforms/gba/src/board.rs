@@ -27,6 +27,9 @@ pub struct Slot {
     pub card_no: Option<String>,
     /// The card is referenced by one of the currently available actions.
     pub actionable: bool,
+    /// Card is in wait state (tapped 90° on 3DS). On GBA we render a
+    /// wait-state indicator instead of rotating (tile grid is fixed).
+    pub waited: bool,
 }
 
 impl Slot {
@@ -34,6 +37,7 @@ impl Slot {
         Slot {
             card_no: None,
             actionable: false,
+            waited: false,
         }
     }
 }
@@ -169,12 +173,14 @@ impl Board {
             if cid == EMPTY_SLOT {
                 Slot::empty()
             } else {
+                let waited = gs.mods.get_orientation_modifier(cid).as_deref() == Some("wait");
                 Slot {
                     card_no: gs
                         .card_database
                         .get_card(cid)
                         .map(|c| c.card_no.to_string()),
                     actionable: false,
+                    waited,
                 }
             }
         };
@@ -194,10 +200,14 @@ impl Board {
         // Live/success zone: 3 slots, empty padded
         let live_slot = |cid: Option<i16>| -> Slot {
             match cid {
-                Some(id) if id != EMPTY_SLOT => Slot {
-                    card_no: gs.card_database.get_card(id).map(|c| c.card_no.to_string()),
-                    actionable: false,
-                },
+                Some(id) if id != EMPTY_SLOT => {
+                    let waited = gs.mods.get_orientation_modifier(id).as_deref() == Some("wait");
+                    Slot {
+                        card_no: gs.card_database.get_card(id).map(|c| c.card_no.to_string()),
+                        actionable: false,
+                        waited,
+                    }
+                }
                 _ => Slot::empty(),
             }
         };
@@ -248,9 +258,14 @@ impl Board {
         let start = self.hand_offset.min(hand_cards.len());
         let end = (start + HAND_VISIBLE).min(hand_cards.len());
         let mut hand: Vec<Slot> = (start..end)
-            .map(|i| Slot {
-                card_no: hand_cards[i].clone(),
-                actionable: is_actionable(&hand_cards[i]),
+            .map(|i| {
+                let cid = me.hand.cards[i];
+                let waited = gs.mods.get_orientation_modifier(cid).as_deref() == Some("wait");
+                Slot {
+                    card_no: hand_cards[i].clone(),
+                    actionable: is_actionable(&hand_cards[i]),
+                    waited,
+                }
             })
             .collect();
         while hand.len() < HAND_VISIBLE {
