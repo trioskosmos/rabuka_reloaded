@@ -49,10 +49,8 @@ WAIT_H = 24
 WAIT_GRID = (4, 3)
 FRONT_COLORS = 16
 
-# Board backdrop colour. Contained cards pad to this so a full card sits on
-# the board instead of being cropped to fill the tile grid. Also master
-# palette index 0 (matches display.rs TEXT_PALETTE zone fill).
-PAD_RGB = (26, 35, 50)
+DUMMY_RGB = (255, 0, 255)  # bright magenta - won't appear in card art, forced to index 0 (transparent)
+PAD_RGB = (26, 35, 50)  # dark blue - board backdrop, must NOT be index 0
 
 CACHE = REPO / "web_ui" / "img" / "cards_webp"
 OUT = REPO / "platforms" / "gba" / "src" / "card_art_gen.rs"
@@ -227,19 +225,28 @@ def build_master_palette(thumbnails):
 
 def build_palette(thumbnails, colors=240):
     """Build a palette from thumbnails. Returns (palette_image P mode, rgb15 bytes).
-    Ensures PAD_RGB is in the palette so padding pixels map correctly."""
+    Index 0 = DUMMY_RGB (bright magenta) - never in card art, becomes transparent on GBA.
+    Index 1 = PAD_RGB (dark blue) - padding color for board backdrop.
+    Indices 2-239 = card art colors."""
     if not thumbnails:
         raise ValueError("no thumbnails for palette")
     w = thumbnails[0].width
     total_h = sum(im.height for im in thumbnails)
-    composite = Image.new("RGB", (w, total_h), (0, 0, 0))
+    # Composite: DUMMY_RGB background (most frequent → index 0 = transparent)
+    # 64px dummy zone on left, thumbnails shifted right by 64px
+    composite = Image.new("RGB", (w + 64, total_h), DUMMY_RGB)
     y = 0
     for im in thumbnails:
-        x = (w - im.width) // 2
-        composite.paste(im, (x, y))
+        # Shift thumbnails right by 64px, centered within their grid
+        composite.paste(im, (64 + (w - im.width) // 2, y))
         y += im.height
-    # Add 1x1 PAD_RGB pixel to guarantee it's in the palette
-    composite.putpixel((0, 0), PAD_RGB)
+    # Force index 0 = DUMMY_RGB by adding MASSIVE dummy pixels at (0,0) to (63,127)
+    # This makes DUMMY_RGB the most frequent color = index 0 (transparent on GBA)
+    for y in range(128):
+        for x in range(64):
+            composite.putpixel((x, y), DUMMY_RGB)
+    # Ensure PAD_RGB is in palette at index 1 (padding color)
+    composite.putpixel((64, 0), PAD_RGB)
     q = composite.quantize(colors=colors, method=_QUANT_METHOD)
     pal = q.getpalette()[: colors * 3]
     pal_bytes = bytearray()
@@ -247,6 +254,9 @@ def build_palette(thumbnails, colors=240):
         r, g, b = pal[i * 3], pal[i * 3 + 1], pal[i * 3 + 2]
         c = to_rgb15(r, g, b)
         pal_bytes += bytes([c & 0xFF, c >> 8])
+    # Create palette image for quantizing card art
+    q = Image.new("P", (1, 1))
+    q.putpalette(pal[:768])
     return q, bytes(pal_bytes)
 
 def bake_with_palette(img, w, h, palette_q, grid=None, dither=Image.Dither.FLOYDSTEINBERG, sharpen=False):
@@ -480,8 +490,7 @@ def main():
         print("missing:", missing[:20])
 
     ui_tiles = bake_ui_tiles()
-    # No master palette needed for fronts (per-card palettes). Use empty bytes for MASTER_PAL compat.
-    write_gen(entries, fronts_from(entries), stage_fronts_from(entries), live_fronts_from(entries), waited_fronts_from(entries), ui_tiles, b"\x00" * 480)
+    write_gen(entries, fronts_from(entries), stage_fronts_from(entries), live_fronts_from(entries), waited_fronts_from(entries), ui_tiles, master_pal)
     print(f"wrote {OUT} ({os.path.getsize(OUT)} bytes)")
 
 

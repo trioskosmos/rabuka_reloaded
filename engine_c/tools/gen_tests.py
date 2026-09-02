@@ -87,7 +87,8 @@ def collect_consts(text: str):
 # Local Rust test helpers that map to native C shims (declared in test_game.h)
 # and must NOT be inlined — leave the call site intact so the transpiler routes
 # it to the matching C shim (e.g. answer_play_choice -> test_answer_play_cost_choice).
-NATIVE_SHIM_HELPERS = {"answer_play_choice"}
+# Also includes helpers like fill_decks, setup_deck that we handle directly in the main transpiler.
+NATIVE_SHIM_HELPERS = {"answer_play_choice", "fill_decks", "setup_deck"}
 def collect_helpers(text: str, test_names):
     """Collect non-#[test] fn definitions (setup_and_trigger, trigger_debut, …)
     so their bodies can be inlined at the call site. Returns dict
@@ -222,6 +223,8 @@ def expand_helpers(body: str, helpers: dict, consts: dict, depth=0):
                     ret = [x.strip() for x in split_top_commas(rm.group(1))]
                     lines2 = lines2[:k]
                 break
+            # Expand loops in the inlined helper body (e.g. fill_decks for _ in 0..30)
+            lines2 = expand_for_loops(lines2, consts)
             out.append(f"    // inlined helper {name}")
             out.extend(lines2)
             if m.group(1):
@@ -798,8 +801,15 @@ def merge_call_continuations(lines):
         if out:
             prev = out[-1].rstrip()
             # prev ends with an open paren/bracket/brace, an assignment with no
-            # ';', or a trailing comma/continuation marker
-            if prev.endswith(('(', '[', '{', '=', ',')) or re.search(r'\b(?:game|tg|g|v|g2|game2|self)\.(?:id|new_id|state|mods|stage|hand|deck|waitroom|energy|live|success|performance)\s*$', prev) or re.search(r'\bgame\.state\.player\d+\.\w+\s*$', prev) or prev.endswith(']'):
+            # ';', or a trailing comma/continuation marker, or boolean operators
+            # Current line starts with && or || (continuation of boolean expression)
+            cont_starts_with_bool = re.match(r'^\s*(&&|\|\|)', s) is not None
+            if (prev.endswith(('(', '[', '{', '=', ',')) or
+                prev.rstrip().endswith(('&&', '||')) or
+                cont_starts_with_bool or
+                re.search(r'\b(?:game|tg|g|v|g2|game2|self)\.(?:id|new_id|state|mods|stage|hand|deck|waitroom|energy|live|success|performance)\s*$', prev) or
+                re.search(r'\bgame\.state\.player\d+\.\w+\s*$', prev) or
+                prev.endswith(']')):
                 cont = re.sub(r'//.*$', '', s).strip()
                 out[-1] = out[-1].rstrip() + ' ' + cont
                 continue
@@ -900,8 +910,11 @@ def transpile_body(body: str, consts: dict, func_name: str, helpers: dict = None
                 out.append(f"    test_play_to_stage(&tg, {card}, {area});")
             mark_real()
             return True
-        if action in ('ActivateAbility', 'UseAbility', 'Pass', 'RockChoice', 'ScissorsChoice', 'PaperChoice', 'ChooseFirstAttacker', 'SkipMulligan', 'MulliganHeader'):
+        if action in ('ActivateAbility', 'UseAbility', 'Pass', 'RockChoice', 'ScissorsChoice', 'PaperChoice', 'ChooseFirstAttacker', 'SkipMulligan', 'MulliganHeader', 'SelectMulligan'):
             if action == 'Pass':
+                out.append(f"    test_pass(&tg);")
+            elif action in ('RockChoice', 'ScissorsChoice', 'PaperChoice', 'ChooseFirstAttacker', 'SkipMulligan', 'SelectMulligan', 'MulliganHeader'):
+                # C engine handles RPS/mulligan phases via rb_advance_phase; emit pass to advance
                 out.append(f"    test_pass(&tg);")
             else:
                 cm = re.search(r'Some\(\s*(\w+)\s*\)', tail)
@@ -1092,6 +1105,15 @@ def transpile_body(body: str, consts: dict, func_name: str, helpers: dict = None
            or 'rb_trigger_live_start(' in line:
             out.append(f"    {stripped}")
             continue
+        # while loop advancing phases until Main/FirstAttackerNormal with deployed_this_turn cleared
+        # Pattern: while !(phase == Main && turn_phase == FirstAttackerNormal && !deployed_this_turn.contains(...)) && guard < N
+        if stripped.startswith('while') and 'current_phase' in stripped and 'turn_phase' in stripped and 'deployed_this_turn' in stripped:
+            # Emit fixed number of passes to advance through a full turn cycle
+            out.append("    for (int _i=0; _i<15; _i++) {")
+            out.append("        test_pass(&tg);")
+            out.append("        test_drain_auto_choices(&tg);")
+            out.append("    }")
+            continue
         # for/while/loop: declare the loop variable so the (degraded) body still
         # compiles and runs once; the loop control itself degrades to a TODO.
         fm = re.match(r'\s*(?:for|while)\s+(?:mut\s+)?(?:\(\s*([^)]*?)\s*\)|&?(\w+|_))\s+in\b', stripped)
@@ -1152,6 +1174,23 @@ def transpile_body(body: str, consts: dict, func_name: str, helpers: dict = None
                         card = e
                     if card:
                         out.append(f"    test_add_to_deck(&tg, {card});")
+            continue
+        # fill_decks(game, filler) -> clear both decks, push 30 filler to each
+        m = re.match(r'\s*fill_decks\s*\(\s*&?\s*mut\s+game\s*,\s*(\w+)\s*\)\s*;?', stripped)
+        if m:
+            filler_var = m.group(1)
+            if filler_var not in declared:
+                # try to resolve from consts
+                if filler_var in consts and consts[filler_var].startswith("PL!"):
+                    filler_var = f'test_id(&tg, "{consts[filler_var]}")'
+                else:
+                    # fallback - assume it's a declared variable
+                    pass
+            out.append(f"    tg.state.p[0].deck.n = 0;")
+            out.append(f"    tg.state.p[1].deck.n = 0;")
+            for _ in range(30):
+                out.append(f"    test_add_to_deck(&tg, {filler_var});")
+                out.append(f"    test_add_to_deck_pl(&tg, 1, {filler_var});")
             continue
         m = re.match(r'\s*trigger_live_start\s*\(\s*&?\s*mut\s+game\s*,\s*(\w+)\s*\)', stripped)
         if m:

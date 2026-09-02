@@ -1811,9 +1811,6 @@ int  rb_move_card(GameState *g, int pl, int card_id, const char *src, const char
 int  rb_move_cards(GameState *g, int pl, const int *card_ids, int n, const char *src, const char *dst, int vacated_area);
 int  rb_resolve_indices_to_ids(const GameState *g, int pl, const char *zone, const int *indices, int n_idx, int *out);
 /* card_property predicates (card.rs::has_blade_heart/has_score_icon/has_all_blade) */
-int rb_card_has_blade_heart(const Card *c);
-int rb_card_has_score_icon(const Card *c);
-int rb_card_has_all_blade(const Card *c);
 int  rb_orientation_matches_state(const char *orientation, const char *state);
 int  rb_card_matches_group_str(int card_id, const char *group_name);
 int  rb_card_matches_any_group(int card_id, const char **groups, int n);
