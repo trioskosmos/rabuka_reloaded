@@ -20,6 +20,7 @@ static const char *s_player_prefix(GameState *g, int card_id);
 /* Mirror engine/src/ability/effects/state.rs::AbilityResolver::execute_change_state.
    Changes member card orientation (wait/active) on the stage. */
 void rb_effect_change_state(GameState *g, int actor, AbilityEffect *e, int host_cid){
+    fprintf(stderr, "DEBUG [EXEC_CHANGE_STATE] entry: actor=%d host_cid=%d target=%s count=%d\n", actor, host_cid, e->target ? e->target : "self", e->count);
     /* ── Read effect fields ── */
     const char *state_change = NULL;
     for(int i=0;i<e->n_extra;i++)
@@ -191,12 +192,18 @@ void rb_effect_change_state(GameState *g, int actor, AbilityEffect *e, int host_
                 }
                 can_target = 1; break;
             }
-            if(!can_target) return;
+            if(!can_target){
+                fprintf(stderr, "DEBUG [EXEC_CHANGE_STATE] optional %s but no valid targets — skipping\n", state_change);
+                return;
+            }
+            fprintf(stderr, "DEBUG [EXEC_CHANGE_STATE] optional choice emitted: state_change=%s who=%d\n", state_change, who);
             rb_emit_choice(g, who, RB_CHOICE_SELECT_TARGET, NULL, NULL, 1, 1, "change_state_optional");
             if(g->queue.cur >= 0) g->queue.entries[g->queue.cur].pending_actions_n = 1;
             return;
         }
     }
+
+    fprintf(stderr, "DEBUG [EXEC_CHANGE_STATE] member_op: target=%s count=%d max=%d state_change=%s is_member=%d\n", target, count, max, state_change, is_member);
 
     /* ── Collect candidates ── */
     int cands[RB_STAGE_SIZE]; int nc = 0;
@@ -234,7 +241,11 @@ void rb_effect_change_state(GameState *g, int actor, AbilityEffect *e, int host_
             }
             nc = fnc;
             for(int i=0;i<nc;i++) cands[i] = fcands[i];
-            if(nc > 0) goto candidates_ready;
+            if(nc > 0){
+                fprintf(stderr, "DEBUG [EXEC_CHANGE_STATE] prior selection filtered nc=%d\n", nc);
+                goto candidates_ready;
+            }
+            fprintf(stderr, "DEBUG [EXEC_CHANGE_STATE] prior selection %d cards has no card on target stage; scanning stage instead\n", g->n_selected_cards);
         }
         nc = 0;
     }
@@ -288,11 +299,17 @@ candidates_ready:
             int on_stage = 0;
             for(int q=0; q<RB_STAGE_SIZE; q++)
                 if(P->stage[q] == host_cid) on_stage = 1;
-            if(!on_stage) return;
+            if(!on_stage){
+                fprintf(stderr, "DEBUG [EXEC_CHANGE_STATE] self_cost: activating card %d not on stage\n", host_cid);
+                return;
+            }
             const char *ori = rb_mods_get_orientation((RbMods*)&g->mods, host_cid);
             int already = (!strcmp(state_change,"wait") && ori && !strcmp(ori,"wait"))
                        || (!strcmp(state_change,"active") && (!ori || strcmp(ori,"wait")));
-            if(already) return;
+            if(already){
+                fprintf(stderr, "DEBUG [EXEC_CHANGE_STATE] self_cost: already %s, skipping host_cid=%d\n", state_change, host_cid);
+                return;
+            }
             if(nc < RB_STAGE_SIZE) cands[nc++] = host_cid;
         }
     }
@@ -342,10 +359,15 @@ candidates_ready:
     for(int i=0;i<nsnap;i++)
         if(snap_ori[i] && !strcmp(snap_ori[i], "wait")) wait_before++;
 
+    fprintf(stderr, "DEBUG [EXEC_CHANGE_STATE] targets nc=%d nchange=%d state_change=%s cannot_activate=%d\n", nc, nchange, state_change, is_cannot_activate);
     /* Apply state changes */
     for(int i=0;i<nchange;i++){
         int cid = cands[i];
-        if(is_cannot_activate) continue;
+        if(is_cannot_activate){
+            fprintf(stderr, "DEBUG [EXEC_CHANGE_STATE] blocked by cannot_activate_by_effect: card_id=%d\n", cid);
+            continue;
+        }
+        fprintf(stderr, "DEBUG [EXEC_CHANGE_STATE] applying: card_id=%d state=%s before_ori=%s\n", cid, state_change, rb_mods_get_orientation((RbMods*)&g->mods, cid) ? rb_mods_get_orientation((RbMods*)&g->mods, cid) : "active");
         const char *old_ori = rb_mods_get_orientation((RbMods*)&g->mods, cid);
         int was_wait = (old_ori && !strcmp(old_ori, "wait"));
         int will_wait = (!strcmp(state_change, "wait"));
@@ -354,16 +376,21 @@ candidates_ready:
             g->state_change_to[cid]   = (int8_t)(will_wait ? 1 : 0);
         }
         rb_mods_set_orientation(&g->mods, cid, state_change);
+        fprintf(stderr, "DEBUG [EXEC_CHANGE_STATE] after: card_id=%d ori=%s\n", cid, rb_mods_get_orientation((RbMods*)&g->mods, cid) ? rb_mods_get_orientation((RbMods*)&g->mods, cid) : "active");
         if(g->n_selected_cards < RB_MAX_RECENTLY_MOVED){
             int already = 0;
             for(int s=0;s<g->n_selected_cards;s++)
                 if(g->selected_cards[s] == cid) already = 1;
-            if(!already) g->selected_cards[g->n_selected_cards++] = cid;
+            if(!already){
+                fprintf(stderr, "DEBUG [EXEC_CHANGE_STATE] pushing card_id=%d to selected_cards (len=%d)\n", cid, g->n_selected_cards);
+                g->selected_cards[g->n_selected_cards++] = cid;
+            }
         }
     }
 
     if(!strcmp(state_change, "active"))
         g->last_wait_to_active_count = is_cannot_activate ? 0 : (uint8_t)wait_before;
+    fprintf(stderr, "DEBUG [EXEC_CHANGE_STATE] wait_before=%d last_wait_to_active=%d\n", wait_before, g->last_wait_to_active_count);
 
     /* Detect actual transitions and push to recently_state_changed / turn_state_changes */
     for(int i=0;i<nsnap;i++){
@@ -374,6 +401,7 @@ candidates_ready:
                 && (!after_ori  || !strcmp(after_ori,"active")))){
             const char *from_str = (!snap_ori[i] || !strcmp(snap_ori[i],"active")) ? "active" : snap_ori[i];
             const char *to_str   = (!after_ori  || !strcmp(after_ori,"active"))  ? "active" : after_ori;
+            fprintf(stderr, "DEBUG [STATE_CHANGE] detected: card=%d %s->%s\n", cid, from_str, to_str);
             if(g->n_recently_state_changed < RB_MAX_RECENTLY_MOVED)
                 g->recently_state_changed[g->n_recently_state_changed++] = cid;
             g->turn_state_changes[g->n_turn_state_changes][0] = g->activating_card >= 0 ? g->activating_card : -1;
@@ -385,6 +413,7 @@ candidates_ready:
     }
 
     /* Re-trigger auto abilities for both players */
+    fprintf(stderr, "DEBUG [STATE_CHANGE] modifier applied, re-triggering auto abilities (state=%s)\n", state_change);
     rb_trigger_auto_abilities_for_player(g, who);
     if(who != (actor ^ 1)) rb_trigger_auto_abilities_for_player(g, actor ^ 1);
 
@@ -419,6 +448,7 @@ candidates_ready:
    Draws `count` energy cards from the energy deck into the energy zone,
    optionally activating them when state_change=="active". */
 void rb_effect_energy_placement(GameState *g, int actor, AbilityEffect *e){
+    fprintf(stderr, "DEBUG [ENERGY_PLACEMENT] actor=%d target=%s count=%d\n", actor, e->target ? e->target : "self", e->count);
     const char *st = NULL;
     for(int i=0;i<e->n_extra;i++)
         if(e->extra_k[i] && !strcmp(e->extra_k[i],"state_change") && e->extra_v[i]){ st=e->extra_v[i]; break; }
@@ -445,6 +475,7 @@ void rb_effect_energy_placement(GameState *g, int actor, AbilityEffect *e){
 /* Mirror engine/src/ability/effects/state.rs::execute_energy_state_change.
    Changes active/wait state of energy zone cards with max/count==0 resolution. */
 void rb_effect_energy_state_change(GameState *g, int actor, AbilityEffect *e){
+    fprintf(stderr, "DEBUG [ENERGY_STATE_CHANGE] actor=%d target=%s state=%s count=%d\n", actor, e->target ? e->target : "self", s_eff_extra(e,"state_change") ? s_eff_extra(e,"state_change") : s_eff_extra(e,"state") ? s_eff_extra(e,"state") : "active", e->count);
     const char *st = NULL;
     int max = 0;
     for(int i=0;i<e->n_extra;i++){
@@ -469,6 +500,13 @@ void rb_effect_energy_state_change(GameState *g, int actor, AbilityEffect *e){
     } else {
         eff = e->count;
     }
+    if(max){
+        fprintf(stderr, "DEBUG [ENERGY] max=true: count=%d available=%d effective=%d\n", e->count, is_active ? (total - (int)P->energy_active) : (int)P->energy_active, eff);
+    } else if(e->count == 0){
+        fprintf(stderr, "DEBUG [ENERGY] count=0 (all): effective=%d\n", eff);
+    } else {
+        fprintf(stderr, "DEBUG [ENERGY] max=false: count=%d effective=%d\n", e->count, eff);
+    }
     if(is_active){
         active += eff;
         if(active > total) active = total;
@@ -479,6 +517,7 @@ void rb_effect_energy_state_change(GameState *g, int actor, AbilityEffect *e){
         if(active < 0) active = 0;
         P->energy_active = active;
     }
+    fprintf(stderr, "DEBUG [ENERGY_STATE_CHANGE] done: total=%d active=%d eff=%d is_active=%d\n", total, P->energy_active, eff, is_active);
 }
 
 /* Mirror engine/src/ability/effects/state.rs::execute_set_cost.
@@ -660,6 +699,39 @@ void rb_effect_set_heart_copy_from_under(GameState *g, int actor, AbilityEffect 
         char logbuf[128];
         snprintf(logbuf, sizeof logbuf, "%s %s: [[log_set_heart_copy:target=%d,source=%d]]", pp, act_name, member, src);
         rb_log_push_verdict(logbuf, "rule_log", 1);
+    }
+}
+
+/* Mirror engine/src/ability/effects/state.rs::execute_set_heart_type_applied.
+   Split from execute_set_heart_type so dispatch stays a pure one-liner.
+   Applies a resolved heart type to the target card(s). */
+void rb_effect_set_heart_type_applied(GameState *g, int actor, const char *heart_type, const char *target, int count, const char *duration, int host_cid){
+    (void)actor; (void)target; (void)count;
+    fprintf(stderr, "DEBUG [SET_HEART_APPLIED] heart_type=%s duration=%s host_cid=%d\n", heart_type ? heart_type : "null", duration ? duration : "null", host_cid);
+    const char *ht = heart_type;
+    if(ht && !strcmp(ht, "selected")){
+        if(g->queue.selected_heart_color >= 0){
+            static char sbuf[16];
+            snprintf(sbuf, sizeof sbuf, "heart%02d", g->queue.selected_heart_color);
+            ht = sbuf;
+        } else ht = "heart00";
+    }
+    if(!ht) ht = "heart00";
+    const char *pp = s_player_prefix(g, g->activating_card >= 0 ? g->activating_card : host_cid);
+    char act_name[64]; act_name[0]=0;
+    if(g->activating_card >= 0){ Card c; if(rb_decode_card_by_index((uint32_t)g->activating_card,&c)){ if(c.name) strncpy(act_name,c.name,sizeof act_name-1); rb_free_card(&c);} }
+    char logbuf[128]; snprintf(logbuf,sizeof logbuf,"%s %s: [[log_set_heart_type:type=%s]]",pp,act_name,ht); rb_log_push_verdict(logbuf,"rule_log",1);
+    int cid = -1;
+    if(g->n_selected_cards > 0) cid = g->selected_cards[0];
+    else if(g->activating_card >= 0) cid = g->activating_card;
+    else if(host_cid >= 0) cid = host_cid;
+    if(cid < 0){ fprintf(stderr,"DEBUG [SET_HEART_APPLIED] no target card\n"); return; }
+    int col = s_heart_idx(ht);
+    g->mods.heart_multiplier[cid] = (int8_t)col;
+    g->mods.heart_multiplier_amt[cid] = (int8_t)1;
+    fprintf(stderr, "DEBUG [SET_HEART_APPLIED] applied cid=%d col=%d ht=%s\n", cid, col, ht);
+    if(duration && strcmp(duration,"permanent")!=0){
+        rb_util_push_temporary_effect(g,"set_heart_type",duration,"self",ht);
     }
 }
 
@@ -911,6 +983,7 @@ void rb_effect_reduce_live_card_set_limit(GameState *g, int actor, AbilityEffect
 void rb_effect_specify_heart_color(GameState *g, int actor, AbilityEffect *e, int host_cid){
     (void)host_cid;
     int choice = s_eff_extra_true(e, "choice");
+    fprintf(stderr, "DEBUG [SPECIFY_HEART] entry: choice_any=%d action=%s\n", choice, e->target?e->target:"null");
     if(choice){
         RbChoice *ch = &g->queue.pending;
         ch->kind = RB_CHOICE_SELECT_HEART_COLOR;
@@ -998,6 +1071,7 @@ void rb_effect_all_blade_timing(GameState *g, int actor, AbilityEffect *e, int h
    Modifies cost with per-unit scaling, set_from_reference, self_target, group/char
    filter, and duration-based temporary effect registration. */
 void rb_effect_modify_cost(GameState *g, int actor, AbilityEffect *e, int host_cid){
+    fprintf(stderr, "DEBUG [MOD_COST_ENTRY] op=%s value=%d target=%s\n", s_eff_extra(e,"operation")?s_eff_extra(e,"operation"):"add", s_value(e,0), e->target?e->target:"self");
     const char *op = "add";
     for(int i=0;i<e->n_extra;i++)
         if(e->extra_k[i] && !strcmp(e->extra_k[i],"operation") && e->extra_v[i]) op = e->extra_v[i];
