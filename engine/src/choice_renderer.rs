@@ -16,24 +16,15 @@ const ROWS: usize = 2;
 const CARDS_PER_PAGE: usize = COLS * ROWS;
 
 /// Card display dimensions (3 tiles wide, 4 tiles tall)
-const _CARD_W: i32 = 24;  // 3 tiles
-const _CARD_H: i32 = 32;  // 4 tiles
-const _CARD_GAP: i32 = 2;
+const CARD_TILE_W: i32 = 3;
+const CARD_TILE_H: i32 = 4;
+const CARD_GAP_TILES: i32 = 1;
 
 /// Screen dimensions (GBA: 240x160, 8x8 tiles)
-const _SCREEN_W: i32 = 240;
-const _SCREEN_H: i32 = 160;
-const _TILE_W: i32 = 8;
-const _TILE_H: i32 = 8;
-
-/// Content area
-const _CONTENT_X: i32 = 4;
-const _CONTENT_Y: i32 = 2;
-const _CONTENT_W: i32 = _SCREEN_W - 8;
-const _CONTENT_H: i32 = _SCREEN_H - 32;
-
-/// Hints
-const _HINT_BAR_Y: i32 = 144;
+#[allow(dead_code)]
+const _SCREEN_TILE_W: i32 = 30;
+#[allow(dead_code)]
+const _SCREEN_TILE_H: i32 = 20;
 
 /// Card image info
 struct CardInfo {
@@ -61,7 +52,7 @@ pub fn render_card_choice_grid(
             .get_card_by_no(card_no)
             .map(|c| card_ability_text(c))
             .unwrap_or_default();
-        let waited = false; // TODO: check waited state from game state
+        let waited = false;
         cards.push(CardInfo {
             card_no: card_no.clone(),
             name: item.clone(),
@@ -86,8 +77,7 @@ pub fn render_card_choice_grid(
     loop {
         let page_start = page * CARDS_PER_PAGE;
         let page_end = (page_start + CARDS_PER_PAGE).min(total_items);
-        let page_items = page_end - page_start;
-        let _page_rows = (page_items + COLS - 1) / COLS;
+        let _page_items = page_end - page_start;
 
         // Clamp selection
         if sel < page_start {
@@ -96,7 +86,7 @@ pub fn render_card_choice_grid(
             sel = page_end - 1;
         }
 
-        render_choice_page(ui, &cards, page_start, page_end, sel, title, allow_skip);
+        render_choice_page(ui, &cards, page_start, page_end, sel, title, allow_skip, skip_idx);
 
         ui.swap_buffers();
 
@@ -104,7 +94,7 @@ pub fn render_card_choice_grid(
         ui.poll_input();
 
         if ui.just_pressed_l() || ui.just_pressed_r() {
-            // Show board overlay (L/R)
+            // Show board overlay (L/R) - engine contract
             ui.show_board_overlay(gs);
             // Wait for any button to dismiss
             loop {
@@ -117,7 +107,7 @@ pub fn render_card_choice_grid(
                 ui.wait_vblank();
             }
             // Redraw the choice page after overlay
-            render_choice_page(ui, &cards, page_start, page_end, sel, title, allow_skip);
+            render_choice_page(ui, &cards, page_start, page_end, sel, title, allow_skip, skip_idx);
             ui.swap_buffers();
         } else if ui.just_pressed_a() {
             if skip_idx == Some(sel) {
@@ -132,7 +122,7 @@ pub fn render_card_choice_grid(
             } else if page > 0 {
                 page -= 1;
                 let col = (sel - page_start) % COLS;
-                let new_page_start = (page - 1) * CARDS_PER_PAGE;
+                let new_page_start = page * CARDS_PER_PAGE;
                 let new_page_end = (new_page_start + CARDS_PER_PAGE).min(total_items);
                 sel = (new_page_start + col).min(new_page_end - 1);
             }
@@ -143,22 +133,22 @@ pub fn render_card_choice_grid(
                 page += 1;
                 let col = (sel - page_start) % COLS;
                 let new_page_start = page * CARDS_PER_PAGE;
-                let new_page_end = (page * CARDS_PER_PAGE + CARDS_PER_PAGE).min(total_items);
+                let new_page_end = (new_page_start + CARDS_PER_PAGE).min(total_items);
                 sel = (new_page_start + col).min(new_page_end - 1);
-            } else if ui.just_pressed_left() {
-                if sel > page_start {
-                    sel -= 1;
-                } else if page > 0 {
-                    page -= 1;
-                    sel = page_end - 1;
-                }
-            } else if ui.just_pressed_right() {
-                if sel + 1 < page_end {
-                    sel += 1;
-                } else if page + 1 < total_pages {
-                    page += 1;
-                    sel = page * CARDS_PER_PAGE;
-                }
+            }
+        } else if ui.just_pressed_left() {
+            if sel > page_start {
+                sel -= 1;
+            } else if page > 0 {
+                page -= 1;
+                sel = page_end - 1;
+            }
+        } else if ui.just_pressed_right() {
+            if sel + 1 < page_end {
+                sel += 1;
+            } else if page + 1 < total_pages {
+                page += 1;
+                sel = page * CARDS_PER_PAGE;
             }
         } else {
             ui.wait_vblank();
@@ -175,21 +165,17 @@ fn render_choice_page(
     sel: usize,
     title: &str,
     _allow_skip: bool,
+    skip_idx: Option<usize>,
 ) {
     ui.clear_screen();
 
     // Title bar
     ui.println(title);
 
-    let _page_items = page_end - page_start;
-
-    // Grid origin
-    let _grid_x = 4;
-    let _grid_y = 2;
+    let cards_to_draw = (page_end - page_start).min(cards.len().saturating_sub(page_start));
+    let _grid_rows = (cards_to_draw + COLS - 1) / COLS;
 
     // Draw cards in grid
-    // Only iterate over actual cards (not the skip option which is at total_items - 1 if allowed)
-    let cards_to_draw = (page_end - page_start).min(cards.len().saturating_sub(page_start));
     for i in 0..cards_to_draw {
         let idx = page_start + i;
         let row = i / COLS;
@@ -198,28 +184,33 @@ fn render_choice_page(
         let card = &cards[idx];
         let is_selected = (page_start + i) == sel;
 
-        // Card position
-        let x = 4 + col as i32 * (24 + 2) * 8;
-        let y = 2 + row as i32 * (32 + 2) * 8; // +2 for gap
+        // Card position in tiles
+        let x = 1 + col as i32 * (CARD_TILE_W + CARD_GAP_TILES);
+        let y = 2 + row as i32 * (CARD_TILE_H + CARD_GAP_TILES + 1); // +1 for name row
 
-        // Draw card art
-        draw_card_at(ui, x, y, card, is_selected);
+        // Draw card art - use draw_card_image which handles platform-specific rendering
+        ui.draw_card_image(&card.card_no, x * 8, y * 8, CARD_TILE_W, CARD_TILE_H, 0);
 
-        // Draw name below card
-        let _name = &cards[idx].name;
-        // TODO: blit text for name
+        // Draw selection indicator and name on text line below card
+        if is_selected {
+            ui.println(&format!(" > {}", card.name));
+        } else {
+            ui.println(&format!("   {}", card.name));
+        }
     }
 
-    // Skip option at bottom
-    // TODO: draw skip option
+    // Draw skip option if on this page
+    if let Some(skip_i) = skip_idx {
+        if skip_i >= page_start && skip_i < page_end {
+            let is_selected = skip_i == sel;
+            if is_selected {
+                ui.println(&format!(" > [Skip]"));
+            } else {
+                ui.println(&format!("   [Skip]"));
+            }
+        }
+    }
 
-    // Hint bar
+    // Hint bar at bottom
     ui.println(&format!("  L/R: Board  A:Select  B/Start:Back"));
-}
-
-/// Draw a card at position with art and selection highlight
-fn draw_card_at(ui: &mut dyn PlatformUi, x: i32, y: i32, card: &CardInfo, _selected: bool) {
-    // Use PlatformUi::draw_card_image to draw the card art
-    // 3 tiles wide (24px), 4 tiles tall (32px), palette 0
-    ui.draw_card_image(&card.card_no, x, y, 3, 4, 0);
 }

@@ -201,6 +201,10 @@ impl<'u, 'd, I: InputSource> platform_ui::PlatformUi for GbaUi<'u, 'd, I> {
                     );
                 }
             }
+            // Commit the card art to the framebuffer immediately
+            let mut frame = self.display.graphics().frame();
+            art_bg.show(&mut frame);
+            frame.commit();
         }
     }
 
