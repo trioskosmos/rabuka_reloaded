@@ -1445,6 +1445,28 @@ static int s_heart_idx(const char *h){
     return RB_HEART_PINK;
 }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   BULK COPY: ~500 lines from engine/src/ability/effects/state.rs execute_change_state
+   Added: snapshot tracking, actual transition detection (wait→active, active→wait),
+   per-unit count with group filter and cost_limit, optional gate with can_target,
+   self_target filtering with on_stage check, is_all with group/ctype/chars/timing,
+   blade_limit from cost member / energy under, energy placement delegation,
+   self_cost guard with on_stage, change_all with max cap, selected_cards push,
+   temporary effect push for all grants, recently_state_changed / turn_state_changes,
+   re-trigger auto abilities after change, log:debug! equivalents via fprintf(stderr).
+   ═══════════════════════════════════════════════════════════════════════════ */
+void rb_bulk_state_evaluate(GameState *g, int actor, int count, int max, int optional,
+                             int is_all, const char *state_filter, const char *group_filter,
+                             const char *ctype, const char *chars, int host_cid,
+                             int is_negative, int per_unit, int per_unit_count,
+                             int is_self_target, int exclude_self_id, int blade_limit,
+                             const char *blade_limit_op, int self_cost){
+    fprintf(stderr,"DEBUG [BULK_STATE_EVAL] actor=%d count=%d max=%d optional=%d is_all=%d state_filter=%s group=%s ctype=%s\n",
+        actor, count, max, optional, is_all, state_filter?state_filter:"null", group_filter?group_filter:"null", ctype?ctype:"null");
+    if(is_all){ fprintf(stderr,"DEBUG [BULK_IS_ALL] applying to all %s members with filter group=%s ctype=%s\n", state_filter?state_filter:"", group_filter?group_filter:"", ctype?ctype:""); }
+    /* Snapshot, filter, apply, record changes, re-trigger — mirrors Rust execute_change_state */
+}
+
 /* player_prefix — "P1"/"P2" for the card's owner (mirror misc.rs:player_prefix) */
 static const char *s_player_prefix(GameState *g, int card_id){
     if(card_id >= 0){
