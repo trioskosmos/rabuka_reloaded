@@ -900,18 +900,23 @@ def transpile_body(body: str, consts: dict, func_name: str, helpers: dict = None
                 out.append(f"    test_play_to_stage(&tg, {card}, {area});")
             mark_real()
             return True
-        if action in ('ActivateAbility',):
-            cm = re.search(r'Some\(\s*(\w+)\s*\)', tail)
-            if not cm:
-                return False
-            card = cm.group(1)
-            if card not in declared:
-                cardlit = consts.get(card, card)
-                if not (cardlit.startswith('PL!') or cardlit.startswith('LL-')):
-                    unresolved = True
+        if action in ('ActivateAbility', 'UseAbility', 'Pass', 'RockChoice', 'ScissorsChoice', 'PaperChoice', 'ChooseFirstAttacker', 'SkipMulligan', 'MulliganHeader'):
+            if action == 'Pass':
+                out.append(f"    test_pass(&tg);")
+            else:
+                cm = re.search(r'Some\(\s*(\w+)\s*\)', tail)
+                if not cm:
                     return False
-                emit_game_id(card, cardlit)
-            out.append(f"    test_activate_ability(&tg, {card});")
+                card = cm.group(1)
+                if card in declared:
+                    out.append(f"    test_activate_ability(&tg, {card});")
+                else:
+                    cardlit = consts.get(card, card)
+                    if not (cardlit.startswith('PL!') or cardlit.startswith('LL-')):
+                        unresolved = True
+                        return False
+                    emit_game_id(card, cardlit)
+                    out.append(f"    test_activate_ability(&tg, {card});")
             mark_real()
             return True
         return False
@@ -1212,12 +1217,14 @@ def transpile_body(body: str, consts: dict, func_name: str, helpers: dict = None
             idxs = [v.strip() for v in m.group(1).split(',') if v.strip()!='']
             for idx in idxs:
                 out.append(f"    rb_resume_with_choice(&tg.state, {idx});")
+                out.append(f"    rb_drain_ability_queue(&tg.state);")
             mark_real()
             continue
         # game.select_option(n) -> rb_resume_with_choice(&tg.state, n)
         m = re.match(r'\s*'+G+r'\.select_option\s*\(\s*(-?\d+)\s*\)\s*;', stripped)
         if m:
             out.append(f"    rb_resume_with_choice(&tg.state, {m.group(1)});")
+            out.append(f"    rb_drain_ability_queue(&tg.state);")
             mark_real()
             continue
         # game.state.mods.add_heart_modifier(cid, HeartColor::HeartN, val) -> rb_mods_add_heart
@@ -1267,7 +1274,29 @@ def transpile_body(body: str, consts: dict, func_name: str, helpers: dict = None
             out.append(f"    test_pass(&tg);")
             mark_real()
             continue
-        # game.give_energy(N) -> test_give_energy(&tg, N)
+        # game.select_indices(&[...]) -> test_select_indices(&tg, [...], n)
+        m = re.match(r'\s*'+G+r'\.select_indices\s*\(\s*&?\[([^\]]+)\]', stripped)
+        if m:
+            idxs = [v.strip() for v in m.group(1).split(',') if v.strip()!='']
+            if idxs:
+                out.append(f"    test_select_indices(&tg, (int[]){{{', '.join(idxs)}}}, {len(idxs)});")
+                out.append(f"    rb_drain_ability_queue(&tg.state);")
+            mark_real()
+            continue
+        # rb_resume_with_choice(&tg.state, ...) -> test_resume_choice + drain
+        m = re.match(r'\s*'+G+r'\.resume_with_choice\s*\(\s*(&tg\.state|tg\.state)\s*,\s*(-?\d+)\s*\)', stripped)
+        if m:
+            out.append(f"    rb_resume_with_choice({m.group(1)}, {m.group(2)});")
+            out.append(f"    rb_drain_ability_queue(&tg.state);")
+            mark_real()
+            continue
+        # rb_resume_with_choice(&tg.state, ...) -> drain
+        m = re.match(r'\s*rb_resume_with_choice\s*\(\s*&tg\.state\s*,\s*(-?\d+)\s*\)', stripped)
+        if m:
+            out.append(f"    rb_resume_with_choice(&tg.state, {m.group(1)});")
+            out.append(f"    rb_drain_ability_queue(&tg.state);")
+            mark_real()
+            continue
         m = re.match(r'\s*'+G+r'\.give_energy\s*\(\s*(\d+)\s*\)', stripped)
         if m:
             out.append(f"    test_give_energy(&tg, {m.group(1)});")
@@ -3047,7 +3076,18 @@ def _postprocess_generated_file(path: pathlib.Path):
         ln = re.sub(r'test_id\(&tg,\s*&(\w+)\)', r'test_id(&tg, \1)', ln)
         out3d.append(ln)
     final_lines = out3d
-    # --- pass 4f: declare undeclared bare locals used in if()/rb_resume()/subscript
+    # --- pass 4f: add rb_drain_ability_queue after every rb_resume_with_choice ---
+    # After answering a choice, the engine needs to drain the queue to process
+    # any new entries or effects.  This pass inserts the drain call immediately
+    # after each `rb_resume_with_choice(&tg.state, ...);` statement.
+    out3e = []
+    for ln in final_lines:
+        out3e.append(ln)
+        s = ln.split('//')[0].strip()
+        if s.startswith('rb_resume_with_choice(&tg.state') and s.endswith(';'):
+            out3e.append('    rb_drain_ability_queue(&tg.state);')
+    final_lines = out3e
+    # --- pass 4g: declare undeclared bare locals used in if()/rb_resume()/subscript
     # The pass-3 missing-decl scan only catches vars used in test_*/rb_*/CHECK
     # contexts.  Degraded `for (i, l) in ...` / `for hc in ...` / `if (idx >= 0)`
     # leave the loop var declared as `i = 0;` but the pass-3 scan's

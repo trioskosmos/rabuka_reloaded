@@ -503,13 +503,28 @@ impl CardDatabase {
         if let Some(&card_id) = self.normalized_no_to_id.get(&normalized) {
             return self.cards.get(&card_id);
         }
-        // 3. Known variant notations: P+ / P＋ / P2 / P+ → P+; R+ / R＋ / R2 → R+; etc.
-        if let Some(variant) = Self::map_known_variants(&normalized) {
-            if let Some(&card_id) = self.normalized_no_to_id.get(&variant) {
+        // 3. Parse base + requested rarity, try exact, then equivalents, then any
+        if let Some((base, requested_rarity)) = Self::parse_base_and_rarity(&normalized) {
+            // Try exact base+rarity
+            let exact = format!("{}-{}", base, requested_rarity);
+            if let Some(&card_id) = self.normalized_no_to_id.get(&exact) {
                 return self.cards.get(&card_id);
             }
+            // Try equivalent rarities
+            for eq in Self::equivalent_rarities(&requested_rarity) {
+                let variant = format!("{}-{}", base, eq);
+                if let Some(&card_id) = self.normalized_no_to_id.get(&variant) {
+                    return self.cards.get(&card_id);
+                }
+            }
+            // Fallback: any rarity for this base
+            for (k, &card_id) in &self.normalized_no_to_id {
+                if k.starts_with(&format!("{}-", base)) {
+                    return self.cards.get(&card_id);
+                }
+            }
         }
-        // 4. Strip trailing rarity suffixes (+, P, R, SEC, etc.) and retry normalized
+        // 4. Strip trailing rarity suffixes and retry normalized (legacy)
         for stripped in Self::strip_rarity_suffixes(&normalized) {
             if let Some(&card_id) = self.normalized_no_to_id.get(&stripped) {
                 return self.cards.get(&card_id);
@@ -524,23 +539,32 @@ impl CardDatabase {
         None
     }
 
-    /// Map known external variant notations to canonical DB keys.
-    /// Handles: P+ / P＋ / P2 / P+ → P+; R+ / R＋ / R2 → R+; etc.
-    fn map_known_variants(s: &str) -> Option<String> {
-        // If the string ends with a known variant suffix, map to the canonical + form
-        for (suffix, canonical) in &[
-            ("P2", "P＋"), ("P+", "P＋"), ("P＋", "P＋"),
-            ("R2", "R＋"), ("R+", "R＋"), ("R＋", "R＋"),
-            ("L2", "L＋"), ("L+", "L＋"), ("L＋", "L＋"),
-            ("N2", "N＋"), ("N+", "N＋"), ("N＋", "N＋"),
-            ("SEC2", "SEC"), ("SEC+", "SEC"), ("SEC＋", "SEC"),
-        ] {
-            if s.ends_with(suffix) {
-                let base = s[..s.len() - suffix.len()].to_string();
-                return Some(base + canonical);
-            }
+    /// Parse card_no into (base, rarity) where base is everything before last dash.
+    fn parse_base_and_rarity(s: &str) -> Option<(String, String)> {
+        if let Some(idx) = s.rfind('-') {
+            Some((s[..idx].to_string(), s[idx + 1..].to_string()))
+        } else {
+            None
         }
-        None
+    }
+
+    /// Return equivalent rarities for fallback lookup.
+    /// Order matters: prefer closer matches.
+    fn equivalent_rarities(rarity: &str) -> Vec<String> {
+        match rarity {
+            // Parallel family (canonical: P＋)
+            "P+" | "P＋" | "P2" => vec!["P＋".to_string()],
+            // Rare family (canonical: R＋)
+            "R+" | "R＋" | "R2" => vec!["R＋".to_string()],
+            // Love/Launch family (canonical: L＋)
+            "L+" | "L＋" | "L2" => vec!["L＋".to_string()],
+            // Normal family (canonical: N＋)
+            "N+" | "N＋" | "N2" => vec!["N＋".to_string()],
+            // Promo family (canonical: PR＋)
+            "PR+" | "PR＋" => vec!["PR＋".to_string()],
+            // Others map to themselves (no equivalents)
+            _ => vec![],
+        }
     }
 
     pub fn get_card_id(&self, card_no: &str) -> Option<i16> {
@@ -553,13 +577,25 @@ impl CardDatabase {
         if let Some(&id) = self.normalized_no_to_id.get(&normalized) {
             return Some(id);
         }
-        // 3. Known variant notations: P+ / P＋ / P2 / P+ → P+; R+ / R＋ / R2 → R+; etc.
-        if let Some(variant) = Self::map_known_variants(&normalized) {
-            if let Some(&id) = self.normalized_no_to_id.get(&variant) {
+        // 3. Parse base + requested rarity, try exact, then equivalents, then any
+        if let Some((base, requested_rarity)) = Self::parse_base_and_rarity(&normalized) {
+            let exact = format!("{}-{}", base, requested_rarity);
+            if let Some(&id) = self.normalized_no_to_id.get(&exact) {
                 return Some(id);
             }
+            for eq in Self::equivalent_rarities(&requested_rarity) {
+                let variant = format!("{}-{}", base, eq);
+                if let Some(&id) = self.normalized_no_to_id.get(&variant) {
+                    return Some(id);
+                }
+            }
+            for (k, &id) in &self.normalized_no_to_id {
+                if k.starts_with(&format!("{}-", base)) {
+                    return Some(id);
+                }
+            }
         }
-        // 4. Strip trailing rarity suffixes and retry normalized
+        // 4. Strip trailing rarity suffixes and retry normalized (legacy)
         for stripped in Self::strip_rarity_suffixes(&normalized) {
             if let Some(&id) = self.normalized_no_to_id.get(&stripped) {
                 return Some(id);
@@ -623,27 +659,13 @@ impl CardDatabase {
     }
 
     /// Strip trailing rarity suffixes for fallback lookup.
-    /// Handles: +, ＋, P, R, SEC, L, N, PE, SECE, SECL, SRL, LLE, RE, PR, etc.
+    /// Uses parse_base_and_rarity to extract base card number.
     fn strip_rarity_suffixes(s: &str) -> Vec<String> {
-        let mut out = Vec::new();
-        let mut current = s.to_string();
-        out.push(current.clone());
-        // Repeatedly strip known suffixes
-        loop {
-            let mut shortened = false;
-            for suffix in &["＋", "+", "P+", "R+", "SEC", "SECE", "SECL", "SRL", "LLE", "RE", "PE", "PR", "P", "R", "L", "N"] {
-                if current.ends_with(suffix) {
-                    current = current[..current.len() - suffix.len()].to_string();
-                    out.push(current.clone());
-                    shortened = true;
-                    break;
-                }
-            }
-            if !shortened || current.is_empty() {
-                break;
-            }
+        if let Some((base, _)) = Self::parse_base_and_rarity(s) {
+            vec![base]
+        } else {
+            vec![s.to_string()]
         }
-        out
     }
 
     /// Strip all whitespace from a card name so that inconsistent spacing

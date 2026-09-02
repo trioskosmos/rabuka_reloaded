@@ -88,6 +88,29 @@ void test_add_to_revealed(TestGame *tg, int card_id){
     if(tg->state.n_revealed < RB_MAX_RECENTLY_MOVED)
         tg->state.revealed_cards[tg->state.n_revealed++]=card_id;
 }
+void test_give_opp_energy(TestGame *tg, int count){
+    int eid = rb_find_card_by_no("LL-E-001-SD");
+    if(eid<0) eid=0;
+    RbPlayer *P=&tg->state.p[1];
+    for(int i=0;i<count;i++){
+        if(P->energy.n < RB_MAX_ZONE) P->energy.cards[P->energy.n++]=eid;
+        if(P->energy_active < RB_MAX_ENERGY_CARDS) P->energy_active++;
+    }
+}
+/* Find a live card with a specific score — mirrors Rust's db lookup.
+   Returns 0 if not found. */
+int test_find_live_by_score(TestGame *tg, int score){
+    extern const RbCard rb_card_db[];
+    extern int rb_card_db_len;
+    for(int i=0;i<rb_card_db_len;i++){
+        const RbCard *c = &rb_card_db[i];
+        if(c->type == RB_CARD_LIVE && c->score == score){
+            return c->id;
+        }
+    }
+    return 0;
+}
+
 void test_give_energy(TestGame *tg, int count){
     int eid = rb_find_card_by_no("LL-E-001-SD");
     if(eid<0) eid=0;
@@ -160,6 +183,13 @@ void test_drain_auto_choices(TestGame *tg){
    the test's select_position_option / accept_position_swap calls. */
 void test_resume_choice(TestGame *tg, int idx){
     if (rb_has_pending_choice(&tg->state)) rb_resume_with_choice(&tg->state, idx);
+}
+
+/* Select indices from a choice — mirrors game.select_indices(&[idx, ...]).
+   Assumes a choice is currently pending. */
+void test_select_indices(TestGame *tg, const int *indices, int n){
+    if (!rb_has_pending_choice(&tg->state)) return;
+    if (n > 0) rb_resume_with_choice(&tg->state, indices[0]);
 }
 int test_has_pending_choice(TestGame *tg){ return rb_has_pending_choice(&tg->state); }
 int test_pending_choice_count(TestGame *tg){ return rb_has_pending_choice(&tg->state) ? 1 : 0; }

@@ -2163,6 +2163,10 @@ void rb_emit_choice(GameState *g, int actor, RbChoiceKind kind,
     g->queue.actor = actor;
     g->queue.deferred = NULL;
     g->queue.state = RB_QUEUE_AWAITING_CHOICE;   /* QueueState FSM (ability_queue.rs) */
+    /* Also pause the queue so the choice gets proper actor/player_id routing */
+    RbChoice ch = g->queue.pending;
+    ch.actor = actor;  /* ensure actor is set for queue entry routing */
+    rb_queue_pause_for_choice(g, &ch);
 }
 
 /* ── Type helpers (ported from engine/src/ability/types.rs) ── */

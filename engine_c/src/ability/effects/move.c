@@ -329,6 +329,7 @@ void rb_move_prompt_card_selection(GameState *g, int actor, const char *zone,
         snprintf(desc, sizeof(desc), "Select %d card(s) from %s", count, zlabel);
     const char *card_type = cmf_extra(e, "card_type");
     rb_emit_choice(g, actor, RB_CHOICE_SELECT_CARD, zone, card_type, count, can_skip, NULL);
+    rb_queue_pause_for_choice(g, &g->queue.pending);
     rb_choice_set_description(&g->queue.pending, desc);
     const char *group = cmf_extra(e, "group_names");
     if (group)
@@ -351,6 +352,7 @@ int rb_move_gate_optional_source(GameState *g, int actor, const AbilityEffect *e
     if (!e->is_optional) return 0;
     if (!rb_move_optional_gate_source(zone_str)) return 0;
     rb_emit_choice(g, actor, RB_CHOICE_SELECT_TARGET, NULL, NULL, count > 0 ? count : 1, 1, "pay_optional_cost");
+    rb_queue_pause_for_choice(g, &g->queue.pending);
     rb_choice_set_route(&g->queue.pending, RB_ROUTE_OPTIONAL_COST);
     return 1;
 }
@@ -863,6 +865,7 @@ int rb_move_place_card_with_stage_choice(
             char desc[128];
             snprintf(desc, sizeof(desc), "Choose position for %s", card_name);
             rb_emit_choice(g, actor, RB_CHOICE_SELECT_TARGET, NULL, NULL, 1, 0, pos_str);
+    rb_queue_pause_for_choice(g, &g->queue.pending);
             rb_choice_set_description(&g->queue.pending, desc);
             rb_choice_set_route(&g->queue.pending, RB_ROUTE_SELECT_TARGET);
             g->queue.resume_mode = 1;
@@ -897,6 +900,7 @@ int rb_move_place_card_with_stage_choice(
             char desc[128];
             snprintf(desc, sizeof(desc), "Choose a member to place %s under", card_name);
             rb_emit_choice(g, actor, RB_CHOICE_SELECT_CARD, "stage", NULL, 1, 0, NULL);
+    rb_queue_pause_for_choice(g, &g->queue.pending);
             rb_choice_set_description(&g->queue.pending, desc);
             rb_choice_set_route(&g->queue.pending, RB_ROUTE_SELECT_CARDS);
             g->queue.resume_mode = 1;
@@ -995,6 +999,7 @@ void rb_move_prompt_deck_top_or_bottom(GameState *g, int actor, int card_id,
     if (!g) return;
     rb_emit_choice(g, actor, RB_CHOICE_SELECT_TARGET, NULL, NULL, 1, allow_skip,
                    "deck_top_or_bottom");
+    rb_queue_pause_for_choice(g, &g->queue.pending);
     rb_choice_set_route(&g->queue.pending, RB_ROUTE_SELECT_TARGET);
     if (g->queue.cur < RB_QUEUE_DEPTH) {
         g->queue.entries[g->queue.cur].card_id = card_id;

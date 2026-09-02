@@ -102,6 +102,7 @@ int rb_move_ask_optional_move_gate(GameState *g, int actor, AbilityEffect *e,
     if (available == 0) return 0;
     (void)desc_ja;
     rb_emit_choice(g, actor, RB_CHOICE_SELECT_TARGET, NULL, NULL, 1, 1, "pay_optional_cost");
+    rb_queue_pause_for_choice(g, &g->queue.pending);
     rb_choice_set_description(&g->queue.pending, desc_en);
     rb_choice_set_route(&g->queue.pending, RB_ROUTE_OPTIONAL_COST);
     g->queue.resume_mode = 5;

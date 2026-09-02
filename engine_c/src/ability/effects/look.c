@@ -102,6 +102,7 @@ void rb_effect_look_at(GameState *g, int actor, AbilityEffect *e){
     }
     /* Surface as SELECT_CARD choice on looked_at zone */
     rb_emit_choice(g, actor, RB_CHOICE_SELECT_CARD, "looked_at", NULL, 1, e->is_optional?1:0, NULL);
+    rb_queue_pause_for_choice(g, &g->queue.pending);
     g->queue.resume_mode = 2; g->queue.resume_eff = e; g->queue.resume_is_select = 0;
     g->queue.resume_actor = actor; g->queue.resume_host = actor;
 }
@@ -116,6 +117,7 @@ void rb_effect_select_cards(GameState *g, int actor, AbilityEffect *e){
     for(int i=0;i<e->n_extra;i++) if(e->extra_k[i] && !strcmp(e->extra_k[i],"card_type")) ctype=e->extra_v[i];
     int cnt=e->count>=0?e->count:1;
     rb_emit_choice(g, actor, RB_CHOICE_SELECT_CARD, zone, ctype, cnt, e->is_optional?1:0, NULL);
+    rb_queue_pause_for_choice(g, &g->queue.pending);
     /* SelectionContext filter (ability/choice.rs): narrow the valid pool to a
         group and/or heart color so a host UI / test picks a legal card. */
     g->queue.pending.filter_group[0] = 0;
@@ -296,6 +298,7 @@ void rb_effect_reveal_until_live_card(GameState *g, int actor, AbilityEffect *e)
     reveal_until(g, who, card_is_live_pred);
     /* surface the looked_at pool as a SELECT_CARD choice so host/tests can read it */
     rb_emit_choice(g, actor, RB_CHOICE_SELECT_CARD, "looked_at", NULL, 1, e->is_optional?1:0, NULL);
+    rb_queue_pause_for_choice(g, &g->queue.pending);
     g->queue.resume_mode = 2; g->queue.resume_eff = e; g->queue.resume_is_select = 0;
     g->queue.resume_actor = actor; g->queue.resume_host = actor;
 }
@@ -308,6 +311,7 @@ void rb_effect_reveal_until_chosen_card(GameState *g, int actor, AbilityEffect *
     g_reveal_ctype = ctype ? ctype : "live_card";
     reveal_until(g, who, ctype ? card_type_pred : card_is_live_pred);
     rb_emit_choice(g, actor, RB_CHOICE_SELECT_CARD, "looked_at", ctype, 1, e->is_optional?1:0, NULL);
+    rb_queue_pause_for_choice(g, &g->queue.pending);
     g->queue.resume_mode = 2; g->queue.resume_eff = e; g->queue.resume_is_select = 0;
     g->queue.resume_actor = actor; g->queue.resume_host = actor;
 }
@@ -340,6 +344,7 @@ void rb_effect_reveal_until_target(GameState *g, int actor, AbilityEffect *e){
         lp->n=0; /* no match → clear pool (mirrors Rust looked_at_cards.clear()) */
     }
     rb_emit_choice(g, actor, RB_CHOICE_SELECT_CARD, "looked_at", ctype, 1, e->is_optional?1:0, NULL);
+    rb_queue_pause_for_choice(g, &g->queue.pending);
     g->queue.resume_mode = 2; g->queue.resume_eff = e; g->queue.resume_is_select = 0;
     g->queue.resume_actor = actor; g->queue.resume_host = actor;
 }
@@ -421,6 +426,7 @@ void rb_effect_reveal(GameState *g, int actor, AbilityEffect *e) {
     if ((!strcmp(source, "hand") || !strcmp(source, "looked_at")) && available > 0) {
         if (is_max || is_optional || count == 0 || count < available) {
             rb_emit_choice(g, actor, RB_CHOICE_SELECT_CARD, source, NULL, any_number ? available : count, any_number || is_optional || is_max, NULL);
+    rb_queue_pause_for_choice(g, &g->queue.pending);
             g->queue.resume_mode = 0; g->queue.resume_eff = e;
             g->queue.resume_is_select = 0;
             g->queue.resume_actor = actor; g->queue.resume_host = actor;
@@ -486,6 +492,7 @@ void rb_effect_select(GameState *g, int actor, AbilityEffect *e) {
     if (count == 0 || lp->n == 0) return;
     if (count > lp->n) count = lp->n;
     rb_emit_choice(g, actor, RB_CHOICE_SELECT_CARD, source, NULL, count, is_optional, NULL);
+    rb_queue_pause_for_choice(g, &g->queue.pending);
     g->queue.resume_mode = 2; g->queue.resume_eff = e;
     g->queue.resume_is_select = 1;
     g->queue.resume_actor = actor; g->queue.resume_host = actor;
@@ -510,6 +517,7 @@ void rb_effect_look_and_select(GameState *g, int actor, AbilityEffect *e) {
     LookPool *lp = &g_look[who];
     int max_select = any_number ? lp->n : (count < lp->n ? count : lp->n);
     rb_emit_choice(g, actor, RB_CHOICE_SELECT_CARD, "looked_at", NULL, max_select, is_optional || is_max || any_number, NULL);
+    rb_queue_pause_for_choice(g, &g->queue.pending);
     g->queue.resume_mode = 2; g->queue.resume_eff = e;
     g->queue.resume_is_select = 1;
     g->queue.resume_actor = actor; g->queue.resume_host = actor;

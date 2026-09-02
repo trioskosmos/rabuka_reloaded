@@ -18,6 +18,7 @@ Run:  py -3 tools/bake_card_art.py
 
 import json
 import os
+import re
 import sys
 from pathlib import Path
 
@@ -65,26 +66,30 @@ def deck_card_nos() -> set:
     cards_dict = json.loads((REPO / "cards" / "cards.json").read_text(encoding="utf-8"))
     by_no = {}
     for k, v in cards_dict.items():
-        by_no.setdefault(normalize(k), k)  # normalized -> original cards.json key
+        by_no.setdefault(normalize(k), k)
     used = set()
     for f in sorted((REPO / "web_ui" / "decks").glob("*.txt")):
         for line in f.read_text(encoding="utf-8").splitlines():
             line = line.strip()
             if not line:
                 continue
-            card_no = None
-            parts = line.split()
-            if parts:
-                if parts[0].isdigit() and len(parts) >= 2:
-                    card_no = " ".join(parts[1:]).split("x")[0].strip()
-                elif parts[-1].isdigit() and len(parts) >= 2:
-                    card_no = " ".join(parts[:-2]) if len(parts) >= 2 else parts[0]
-                else:
-                    card_no = line
-            if card_no:
-                n = normalize(card_no)
+            # Formats: "count x card_no", "card_no x count", or bare card_no
+            m = re.match(r"^(\d+)\s*x\s*(.+)$", line)
+            if m:
+                n = normalize(m.group(2).strip())
                 if n in by_no:
                     used.add(by_no[n])
+                continue
+            m = re.match(r"^(.*?)\s*x\s*(\d+)$", line)
+            if m:
+                n = normalize(m.group(1).strip())
+                if n in by_no:
+                    used.add(by_no[n])
+                continue
+            # Bare card_no
+            n = normalize(line)
+            if n in by_no:
+                used.add(by_no[n])
     return used
 
 
@@ -188,11 +193,8 @@ def darkest_index(pal):
 
 
 def build_master_palette(thumbnails):
-    """Build a single 240-colour master palette from all thumbnails (as Tonc
-    recommends: one shared 8bpp palette for a tiled BG, vs per-tile 16-colour
-    banks). `thumbnails` is a list of RGB PIL Images. Returns
-    (master_palette_image P mode, rgb15 bytes). Indices 240-255 are reserved
-    for the text/UI palette (bank 15), matching `display.rs` detail view."""
+    """Build a single 240-colour master palette from all thumbnails.
+    Returns (master_palette_image P mode, rgb15 bytes). Index 0 forced to PAD_RGB."""
     if not thumbnails:
         raise ValueError("no thumbnails for master palette")
     w = thumbnails[0].width
@@ -203,11 +205,9 @@ def build_master_palette(thumbnails):
         x = (w - im.width) // 2
         composite.paste(im, (x, y))
         y += im.height
-    # 240 colours for art (0-239), 240-255 reserved for text/UI bank 15.
-    # Index 0 is forced to black so the 8bpp BG backdrop/transparent stays black.
     q = composite.quantize(colors=240, method=_QUANT_METHOD)
     pal = q.getpalette()
-    pal[0:3] = bytes([0, 0, 0])
+    pal[0:3] = bytes(PAD_RGB)  # index 0 = board backdrop
     q.putpalette(pal)
     pal = q.getpalette()[: 240 * 3]
     pal_bytes = bytearray()
@@ -218,23 +218,29 @@ def build_master_palette(thumbnails):
     return q, bytes(pal_bytes)
 
 
-def _quantize_method():
-    """Prefer libimagequant if available (far better than MEDIANCUT), else MAXCOVERAGE."""
-    # PIL exposes these as ints on Image.Quantize; check availability
-    for name in ("LIBIMAGEQUANT", "LIBIMAGEQUANT"):
-        if hasattr(Image.Quantize, name):
-            try:
-                # probe: quantize a 1x1 image with it
-                Image.new("RGB", (1, 1)).quantize(colors=2, method=getattr(Image.Quantize, name))
-                return getattr(Image.Quantize, name)
-            except Exception:
-                pass
-    if hasattr(Image.Quantize, "MAXCOVERAGE"):
-        return Image.Quantize.MAXCOVERAGE
-    return Image.Quantize.MEDIANCUT
-
-
-_QUANT_METHOD = _quantize_method()
+def build_palette(thumbnails, colors=240):
+    """Build a palette from thumbnails. Returns (palette_image P mode, rgb15 bytes)."""
+    if not thumbnails:
+        raise ValueError("no thumbnails for palette")
+    w = thumbnails[0].width
+    total_h = sum(im.height for im in thumbnails)
+    composite = Image.new("RGB", (w, total_h), (0, 0, 0))
+    y = 0
+    for im in thumbnails:
+        x = (w - im.width) // 2
+        composite.paste(im, (x, y))
+        y += im.height
+    q = composite.quantize(colors=colors, method=_QUANT_METHOD)
+    pal = q.getpalette()
+    pal[0:3] = bytes(PAD_RGB)
+    q.putpalette(pal)
+    pal = q.getpalette()[: colors * 3]
+    pal_bytes = bytearray()
+    for i in range(colors):
+        r, g, b = pal[i * 3], pal[i * 3 + 1], pal[i * 3 + 2]
+        c = to_rgb15(r, g, b)
+        pal_bytes += bytes([c & 0xFF, c >> 8])
+    return q, bytes(pal_bytes)
 
 def bake_front_sized_with_master(img, w, h, master_q, grid=None):
     """object-fit: contain — fit the whole card inside the tile grid, pad the

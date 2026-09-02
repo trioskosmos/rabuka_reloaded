@@ -394,6 +394,7 @@ static int try_create_target_selection_choice(GameState *g, int actor,
     if(nc <= tc) return 0;
     const char *ctype = e->card_type_field[0] ? e->card_type_field : eff_extra(e,"card_type");
     rb_emit_choice(g, actor, RB_CHOICE_SELECT_CARD, "stage", ctype, tc, 0, NULL);
+    rb_queue_pause_for_choice(g, &g->queue.pending);
     const char *group = eff_extra(e,"group_names");
     if(group) strncpy(g->queue.pending.filter_group, group, sizeof(g->queue.pending.filter_group)-1);
     g->queue.pending.filter_heart = -1;
@@ -696,6 +697,7 @@ static int h_pay_energy(GameState *g, int actor, const AbilityEffect *e){
             return 1;
         }
         rb_emit_choice(g,actor,RB_CHOICE_SELECT_TARGET,NULL,NULL,count,1,"pay_optional_cost");
+    rb_queue_pause_for_choice(g, &g->queue.pending);
         rb_choice_set_route(&g->queue.pending, RB_ROUTE_OPTIONAL_COST);
         return 1;
     }
@@ -723,6 +725,7 @@ static int h_discard_until_count(GameState *g, int actor, const AbilityEffect *e
     int to_discard = cur - target;
     const char *ctype = e->card_type_field[0] ? e->card_type_field : eff_extra(e,"card_type");
     rb_emit_choice(g,who,RB_CHOICE_SELECT_CARD,"hand",ctype,to_discard,0,"hand");
+    rb_queue_pause_for_choice(g, &g->queue.pending);
     rb_choice_set_route(&g->queue.pending, RB_ROUTE_SELECT_CARDS);
     if(s_activating_card>=0)
         rule_log_activated(g,s_activating_card,"[[log_discard_until]]");
@@ -832,6 +835,7 @@ static int h_reveal(GameState *g, int actor, const AbilityEffect *e){
     if(extra_true(e,"multiple_targets") && e->source && !strcmp(e->source,"deck_top")){
         if(e->is_optional){
             rb_emit_choice(g,actor,RB_CHOICE_SELECT_TARGET,NULL,NULL,1,1,"pay_optional_cost");
+    rb_queue_pause_for_choice(g, &g->queue.pending);
             rb_choice_set_route(&g->queue.pending, RB_ROUTE_OPTIONAL_COST);
             return 1;
         }
@@ -874,6 +878,7 @@ static int h_choose_required_hearts(GameState *g, int actor, const AbilityEffect
     int cnt = e->count>=1 ? e->count : 1;
     rb_emit_choice(g,actor,RB_CHOICE_SELECT_TARGET,NULL,NULL,cnt,
                    e->is_optional?1:0,"choose_required_hearts");
+    rb_queue_pause_for_choice(g, &g->queue.pending);
     g->queue.resume_mode = 0;
     g->queue.resume_host = s_activating_card;
     g->queue.resume_actor = actor;
@@ -885,6 +890,7 @@ static int h_choose_target_player(GameState *g, int actor, const AbilityEffect *
     if(g->queue.resume_active) return 1;
     rb_emit_choice(g,actor,RB_CHOICE_SELECT_TARGET,NULL,NULL,1,
                    e->is_optional?1:0,"self_or_opponent");
+    rb_queue_pause_for_choice(g, &g->queue.pending);
     g->queue.resume_mode = 0;
     g->queue.resume_host = s_activating_card;
     g->queue.resume_actor = actor;
@@ -955,6 +961,7 @@ static int h_play_baton_touch(GameState *g, int actor, const AbilityEffect *e){
         if(no<2) return 1;
         int pairs = no*(no-1)/2;
         rb_emit_choice(g,who,RB_CHOICE_SELECT_TARGET,NULL,NULL,pairs,1,"double_baton_touch");
+    rb_queue_pause_for_choice(g, &g->queue.pending);
         g->queue.resume_mode = 1;
         g->queue.resume_eff  = (AbilityEffect *)e;
         g->queue.resume_actor = who;
@@ -1009,6 +1016,7 @@ static int h_place_energy_under_member(GameState *g, int actor, const AbilityEff
         rb_emit_choice(g,who,RB_CHOICE_SELECT_CARD,"under_member",
                        eff_extra(e,"card_type"),need,
                        e->is_optional?1:0,"under_member");
+    rb_queue_pause_for_choice(g, &g->queue.pending);
         rb_choice_set_route(&g->queue.pending, RB_ROUTE_SELECT_CARDS);
         return 1;
     }
@@ -1016,6 +1024,7 @@ static int h_place_energy_under_member(GameState *g, int actor, const AbilityEff
     if(source && !strcmp(source,"energy_deck")){
         if(e->is_optional || extra_true(e,"optional")){
             rb_emit_choice(g,who,RB_CHOICE_SELECT_TARGET,NULL,NULL,1,1,"pay_optional_cost");
+    rb_queue_pause_for_choice(g, &g->queue.pending);
             rb_choice_set_route(&g->queue.pending, RB_ROUTE_OPTIONAL_COST);
             return 1;
         }
@@ -1042,6 +1051,7 @@ static int h_place_energy_under_member(GameState *g, int actor, const AbilityEff
         rb_emit_choice(g,who,RB_CHOICE_SELECT_CARD,"under_member",
                        eff_extra(e,"card_type"),need,
                        e->is_optional?1:0,"under_member");
+    rb_queue_pause_for_choice(g, &g->queue.pending);
         rb_choice_set_route(&g->queue.pending, RB_ROUTE_SELECT_CARDS);
         return 1;
     }
@@ -1054,6 +1064,7 @@ static int h_place_energy_under_member(GameState *g, int actor, const AbilityEff
         if(P->stage[area]==RB_EMPTY_SLOT) return 0;
         rb_emit_choice(g,who,RB_CHOICE_SELECT_CARD,"energy","energy_card",
                        count,e->is_optional?1:0,"under_member");
+    rb_queue_pause_for_choice(g, &g->queue.pending);
         rb_choice_set_route(&g->queue.pending, RB_ROUTE_SELECT_CARDS);
         return 1;
     }
@@ -1083,6 +1094,7 @@ static int h_execute_position_change(GameState *g, int actor, const AbilityEffec
         if(cur>=0){
             rb_emit_choice(g,actor,RB_CHOICE_SELECT_TARGET,NULL,NULL,1,
                            e->is_optional?1:0,"position|destination");
+    rb_queue_pause_for_choice(g, &g->queue.pending);
             rb_choice_set_route(&g->queue.pending, RB_ROUTE_SELECT_TARGET);
             return 1;
         }
@@ -1095,6 +1107,7 @@ static int h_execute_position_change(GameState *g, int actor, const AbilityEffec
         if(!strcmp(dest,"front") && !strcmp(target,"opponent")){
             rb_emit_choice(g,actor,RB_CHOICE_SELECT_TARGET,NULL,NULL,1,
                            e->is_optional?1:0,"position|destination");
+    rb_queue_pause_for_choice(g, &g->queue.pending);
             rb_choice_set_route(&g->queue.pending, RB_ROUTE_SELECT_TARGET);
             return 1;
         }
@@ -1104,6 +1117,7 @@ static int h_execute_position_change(GameState *g, int actor, const AbilityEffec
     if(target_member && !strcmp(target_member,"select")){
         rb_emit_choice(g,actor,RB_CHOICE_SELECT_TARGET,NULL,NULL,1,
                        e->is_optional?1:0,"position|destination");
+    rb_queue_pause_for_choice(g, &g->queue.pending);
         rb_choice_set_route(&g->queue.pending, RB_ROUTE_SELECT_TARGET);
         return 1;
     }
@@ -1111,6 +1125,7 @@ static int h_execute_position_change(GameState *g, int actor, const AbilityEffec
     if(target_is_both){
         rb_emit_choice(g,actor^1,RB_CHOICE_SELECT_TARGET,NULL,NULL,1,
                        e->is_optional?1:0,"position|destination");
+    rb_queue_pause_for_choice(g, &g->queue.pending);
         rb_choice_set_route(&g->queue.pending, RB_ROUTE_SELECT_TARGET);
         return 1;
     }
@@ -1121,6 +1136,7 @@ static int h_execute_position_change(GameState *g, int actor, const AbilityEffec
     if(extra_true(e,"multiple_targets") && !strcmp(target_member,"this_member")){
         rb_emit_choice(g,actor,RB_CHOICE_SELECT_TARGET,NULL,NULL,1,
                        e->is_optional?1:0,"position|destination");
+    rb_queue_pause_for_choice(g, &g->queue.pending);
         rb_choice_set_route(&g->queue.pending, RB_ROUTE_SELECT_TARGET);
         return 1;
     }
@@ -1130,6 +1146,7 @@ static int h_execute_position_change(GameState *g, int actor, const AbilityEffec
         if(src>=0 && P->stage[src]!=RB_EMPTY_SLOT){
             rb_emit_choice(g,actor,RB_CHOICE_SELECT_TARGET,NULL,NULL,1,
                            e->is_optional?1:0,"position|destination");
+    rb_queue_pause_for_choice(g, &g->queue.pending);
             rb_choice_set_route(&g->queue.pending, RB_ROUTE_SELECT_TARGET);
             return 1;
         }
@@ -1142,11 +1159,13 @@ static int h_execute_position_change(GameState *g, int actor, const AbilityEffec
         if(from<0){
             rb_emit_choice(g,actor,RB_CHOICE_SELECT_TARGET,NULL,NULL,1,
                            e->is_optional?1:0,"position|destination");
+    rb_queue_pause_for_choice(g, &g->queue.pending);
             rb_choice_set_route(&g->queue.pending, RB_ROUTE_SELECT_TARGET);
             return 1;
         }
         rb_emit_choice(g,actor,RB_CHOICE_SELECT_TARGET,NULL,NULL,1,
                        e->is_optional?1:0,"position|destination");
+    rb_queue_pause_for_choice(g, &g->queue.pending);
         rb_choice_set_route(&g->queue.pending, RB_ROUTE_SELECT_TARGET);
         return 1;
     }
@@ -1221,6 +1240,7 @@ static int h_choice(GameState *g, int actor, const AbilityEffect *e){
     }
 
     rb_emit_choice(g, who, RB_CHOICE_SELECT_TARGET, NULL, NULL, cnt, allow, "choice");
+    rb_queue_pause_for_choice(g, &g->queue.pending);
     rb_choice_set_route(&g->queue.pending, RB_ROUTE_SELECT_TARGET);
     g->queue.resume_mode  = 0;
     g->queue.resume_actor = who;

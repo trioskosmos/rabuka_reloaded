@@ -116,13 +116,18 @@ def main() -> None:
             if not line:
                 continue
             # Three formats are valid: bare card_no, "card x count",
-            # and "count x card".
+            # and "count x card". Expand quantities.
             m = re.match(r"^(\d+)\s*x\s*(.+)$", line)
             if m:
-                card_nos.append(m.group(2).strip())
+                qty = int(m.group(1))
+                card_nos.extend([m.group(2).strip()] * qty)
                 continue
             m = re.match(r"^(.*?)\s*x\s*(\d+)$", line)
-            card_nos.append(m.group(1) if m else line)
+            if m:
+                qty = int(m.group(2))
+                card_nos.extend([m.group(1).strip()] * qty)
+                continue
+            card_nos.append(line)
         blob = make_deck_blob(cards_dict, card_nos)
         blobs.append((f.stem, len(card_nos), blob))
         print(f"  {f.stem:24s} {len(card_nos):4d} cards -> {len(blob):6d} bytes blob")
@@ -193,10 +198,15 @@ pub const DECKS: &[DeckInfo] = &[
                 continue
             m = re.match(r"^(\d+)\s*x\s*(.+)$", line)
             if m:
-                card_nos.append(m.group(2).strip())
+                qty = int(m.group(1))
+                card_nos.extend([m.group(2).strip()] * qty)
                 continue
             m = re.match(r"^(.*?)\s*x\s*(\d+)$", line)
-            card_nos.append(m.group(1) if m else line)
+            if m:
+                qty = int(m.group(2))
+                card_nos.extend([m.group(1).strip()] * qty)
+                continue
+            card_nos.append(line)
         cards_js = ",\n            ".join(f'"{c}"' for c in card_nos)
         entries.append(
             "    DeckInfo {\n"

@@ -372,6 +372,7 @@ int rb_effect_draw_card(GameState *g, int actor, AbilityEffect *e, int host_cid)
         g->queue.resume_mode = 4;
         rb_emit_choice(g, actor, RB_CHOICE_SELECT_TARGET, NULL, NULL,
                        final_count, 1, "draw:skip");
+    rb_queue_pause_for_choice(g, &g->queue.pending);
         return 0;
     }
 
@@ -463,6 +464,7 @@ void rb_effect_select_effect(GameState *g, int actor, AbilityEffect *e, int host
     int cnt = e->count >= 0 ? e->count : 1;
     rb_emit_choice(g, actor, RB_CHOICE_SELECT_CARD, source, ctype, cnt,
                    e->is_optional ? 1 : 0, NULL);
+    rb_queue_pause_for_choice(g, &g->queue.pending);
     g->queue.pending.filter_group[0] = 0;
     if (group)
         strncpy(g->queue.pending.filter_group, group, sizeof(g->queue.pending.filter_group) - 1);
@@ -503,6 +505,7 @@ void rb_effect_both_hand_keep_shuffle_under(GameState *g, int actor,
         int pick = count < P->hand.n ? count : P->hand.n;
         rb_emit_choice(g, pl, RB_CHOICE_SELECT_CARD, "hand", NULL,
                        pick > 0 ? pick : 1, 1, "keep_shuffle_under");
+    rb_queue_pause_for_choice(g, &g->queue.pending);
         g->queue.resume_mode = 5;
         g->queue.resume_eff = e;
         g->queue.resume_actor = actor;
@@ -555,6 +558,7 @@ void rb_effect_both_hand_keep_shuffle_under(GameState *g, int actor,
         int pick2 = count < Po->hand.n ? count : Po->hand.n;
         rb_emit_choice(g, opp, RB_CHOICE_SELECT_CARD, "hand", NULL,
                        pick2 > 0 ? pick2 : 1, 1, "keep_shuffle_under");
+    rb_queue_pause_for_choice(g, &g->queue.pending);
         g->queue.resume_mode = 5;
         g->queue.resume_eff = e;
         g->queue.resume_actor = actor;
@@ -661,6 +665,7 @@ void rb_effect_select_heart_color(GameState *g, int actor, int count,
     }
     rb_emit_choice(g, actor, RB_CHOICE_SELECT_HEART_COLOR, NULL, NULL,
                    count > 0 ? count : 1, 0, "select_heart_color");
+    rb_queue_pause_for_choice(g, &g->queue.pending);
     g->queue.pending.n_heart_options = 0;
     for (int i = 0; i < nu && i < 8; i++) {
         strncpy(g->queue.pending.heart_options[i], unique[i],
@@ -690,6 +695,7 @@ void rb_effect_select_number(GameState *g, int actor, AbilityEffect *e) {
     int allow = e->is_optional ? 1 : 0;
     rb_emit_choice(g, actor, RB_CHOICE_SELECT_NUMBER, NULL, NULL,
                    max_cost, allow, "choice_number");
+    rb_queue_pause_for_choice(g, &g->queue.pending);
     const char *hc = draw_extra(e, "heart_color");
     if (!hc) hc = draw_extra(e, "heart_colors");
     g->queue.selected_heart_color = (int)rb_parse_heart_color(hc ? hc : "pink");
@@ -722,6 +728,7 @@ void rb_effect_area_select(GameState *g, int actor, AbilityEffect *e, int host_c
     }
     int allow = e->is_optional ? 1 : 0;
     rb_emit_choice(g, actor, RB_CHOICE_SELECT_TARGET, NULL, NULL, nv, allow, "area_select");
+    rb_queue_pause_for_choice(g, &g->queue.pending);
     snprintf(g->queue.pending.description, sizeof(g->queue.pending.description),
              "Choose an area: %s", opts);
 }
@@ -757,6 +764,7 @@ int rb_resolve_gain_heart_color(GameState *g, int actor, AbilityEffect *e,
     if (!heart_selection && nu > 1 && count >= nu) return -1; /* caller distributes */
     rb_emit_choice(g, actor, RB_CHOICE_SELECT_HEART_COLOR, NULL, NULL,
                    count > 0 ? count : 1, 0, "select_heart_color");
+    rb_queue_pause_for_choice(g, &g->queue.pending);
     g->queue.pending.n_heart_options = 0;
     for (int i = 0; i < nu && i < 8; i++) {
         strncpy(g->queue.pending.heart_options[i], unique[i],

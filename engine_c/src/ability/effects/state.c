@@ -198,6 +198,7 @@ void rb_effect_change_state(GameState *g, int actor, AbilityEffect *e, int host_
             }
             fprintf(stderr, "DEBUG [EXEC_CHANGE_STATE] optional choice emitted: state_change=%s who=%d\n", state_change, who);
             rb_emit_choice(g, who, RB_CHOICE_SELECT_TARGET, NULL, NULL, 1, 1, "change_state_optional");
+    rb_queue_pause_for_choice(g, &g->queue.pending);
             if(g->queue.cur >= 0) g->queue.entries[g->queue.cur].pending_actions_n = 1;
             return;
         }
@@ -341,6 +342,7 @@ candidates_ready:
         int pick = count > 0 ? count : 1;
         rb_emit_choice(g, who, RB_CHOICE_SELECT_CARD, "stage", NULL,
                        pick > 0 ? pick : 1, max, "change_state");
+    rb_queue_pause_for_choice(g, &g->queue.pending);
         if(g->queue.cur >= 0) g->queue.entries[g->queue.cur].pending_actions_n = 1;
         return;
     }
@@ -823,6 +825,7 @@ void rb_effect_set_heart_type(GameState *g, int actor, AbilityEffect *e, int hos
             g->mods.heart_multiplier_amt[cid2] = (int8_t)(e->count >= 1 ? e->count : 2);
         } else {
             rb_emit_choice(g, actor, RB_CHOICE_SELECT_CARD, "stage", NULL, tc, 0, "heart_type");
+    rb_queue_pause_for_choice(g, &g->queue.pending);
             if(grp) strncpy(g->queue.pending.filter_group, grp, sizeof(g->queue.pending.filter_group)-1);
             g->queue.deferred = e;
             g->queue.resume_host = host_cid;
@@ -1213,6 +1216,7 @@ static void rb_pos_change_for_player(GameState *g, int who, AbilityEffect *e, in
         if(g->queue.resume_active) return;
         int nc = RB_STAGE_SIZE;
         rb_emit_choice(g, who, RB_CHOICE_SELECT_TARGET, NULL, NULL, nc, 0, "position_change");
+    rb_queue_pause_for_choice(g, &g->queue.pending);
         g->queue.resume_mode = 1;
         g->queue.resume_eff = e;
         g->queue.resume_actor = who;
