@@ -602,6 +602,9 @@ static int h_gain_resource(GameState *g, int actor, const AbilityEffect *e){
               || (!e->source && is_member_ct && player_target && !is_self_target
                   && !eff_extra(e,"exclude_self") && tc<0)
               || (is_member_ct && player_target && tc<0 && !distinct);
+    fprintf(stderr, "DEBUG [GAIN_RESOURCE] kind=%d is_all=%d per_unit=%d tc=%d distinct=%d group=%s ctype=%s who=%d actor=%d\n",
+        kind, is_all, per_unit, tc, distinct, eff_extra(e,"group_names")?eff_extra(e,"group_names"):"none",
+        ctype?ctype:"none", who, actor);
 
     if(try_create_target_selection_choice(g,actor,e,kind,who,is_self_target,
                                           per_unit,exclude_self_id))
@@ -665,6 +668,8 @@ static int h_gain_resource(GameState *g, int actor, const AbilityEffect *e){
 
     apply_blade_resource(g,e,kind,who,t.blade,t.n_blade,activating,is_all,dur,
                           final_count,blades_to_add);
+    fprintf(stderr, "DEBUG [GAIN_RESOURCE] applied blade: targets=%d final=%d blades=%d is_all=%d\n",
+            t.n_blade, final_count, blades_to_add, is_all);
 
     apply_heart_resource(g,e,kind,who,t.heart,t.n_heart,activating,is_self_target,
                          is_all,dur,is_negative,colors,counts,1,final_count);
