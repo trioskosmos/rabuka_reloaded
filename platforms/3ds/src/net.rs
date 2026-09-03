@@ -6,6 +6,7 @@ use rabuka_engine::turn;
 
 use crate::ffi::{_3ds_debug_print};
 use crate::transport::{Transport, ActionSync};
+use crate::uds;
 
 static mut ACTIVE_TRANSPORT: Option<Box<dyn Transport + Send>> = None;
 

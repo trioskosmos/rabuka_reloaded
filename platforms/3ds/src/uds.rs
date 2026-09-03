@@ -26,15 +26,7 @@
     //                          other transports may not need this)
 
 // C shim FFI — all UDS calls go through ctru_shim.c
-extern "C" {
-    fn _3ds_uds_init(is_host: bool) -> i32;
-    fn _3ds_uds_exit();
-    fn _3ds_uds_send(data: *const u8, len: u32) -> i32;
-    fn _3ds_uds_recv(buf: *mut u8, buf_len: u32, out_len: *mut u32) -> i32;
-    fn _3ds_uds_is_connected() -> bool;
-    fn _3ds_uds_scan_networks(out_ids: *mut u16, max_out: i32) -> i32;
-    fn _3ds_uds_connect_network(node_id: u16) -> i32;
-}
+use crate::ffi::{_3ds_uds_init, _3ds_uds_exit, _3ds_uds_send, _3ds_uds_recv, _3ds_uds_is_connected, _3ds_uds_scan_networks, _3ds_uds_connect_network};
 
 pub const MSG_SYNC_SETUP: u8 = 0x01;
 pub const MSG_SYNC_ACTION: u8 = 0x02;
