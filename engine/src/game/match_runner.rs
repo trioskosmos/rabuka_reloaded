@@ -200,16 +200,19 @@ where
     run_match(&mut ui, p1_cards, p2_cards, all_cards, mode)
 }
 
-/// Assemble a match from two deck card-number lists plus the complete `Card`
-/// union, then run the shared game loop to a terminal `GameResult`. Exposed
-/// separately so host tests can drive a full match without console menus.
-pub fn run_match<U: PlatformUi>(
+/// Run a full embedded match with per-frame mixer updates (for GBA audio).
+pub fn run_match_with_mixer<U: PlatformUi, M>(
     ui: &mut U,
     p1_cards: &[&str],
     p2_cards: &[&str],
     all_cards: Vec<Card>,
     mode: MatchMode,
-) -> GameResult {
+    mixer: &mut M,
+    vblank: &agb::interrupt::VBlank,
+) -> GameResult
+where
+    M: agb::sound::mixer::MixerController,
+{
     let mut db = Arc::new(CardDatabase::load_or_create(all_cards));
 
     let nums1: Vec<String> = p1_cards.iter().map(|c| c.to_string()).collect();
@@ -219,9 +222,6 @@ pub fn run_match<U: PlatformUi>(
     let mut pd2 = DeckBuilder::build_deck_from_database(&mut db, nums2).expect("build P2 deck");
     DeckBuilder::add_default_energy_cards_from_database(&mut pd1, &mut db).ok();
     DeckBuilder::add_default_energy_cards_from_database(&mut pd2, &mut db).ok();
-    // Shuffle after adding default energy so the energy deck is fully randomized,
-    // matching the web server and 3DS setup order. Previously shuffle was before
-    // the add, leaving the default-filled energy cards unshuffled at the bottom.
     pd1.shuffle_main_deck();
     pd1.shuffle_energy_deck();
     pd2.shuffle_main_deck();
@@ -262,12 +262,6 @@ pub fn run_match<U: PlatformUi>(
         }
 
         if gs.has_pending_choice() {
-            // Shared routing for every offline target: the engine's
-            // `can_player_act` is the single source of truth for who must
-            // answer a pending choice (choice_player_id + Choice-embedded
-            // picker/target fallback). Every console (DC wasm, 3DS, GBA,
-            // Wii) must consult it — no per-platform re-routing. The ad-hoc
-            // fixes that lived in web_server and 3DS input are now here.
             let is_ai_choice = match mode {
                 MatchMode::AiVsAi => true,
                 MatchMode::VsAi => !gs.can_player_act(0),
@@ -298,11 +292,6 @@ pub fn run_match<U: PlatformUi>(
             continue;
         }
 
-        // In VsAi the human only plays P1. During RPS, `active_player()` stays the
-        // first attacker (P1) for the whole hand, so the AI never gets a turn and
-        // the match soft-locks waiting for a P2 RPS choice. The engine routes RPS
-        // picks positionally (1st act -> P1, 2nd act -> P2), so once P1 has chosen,
-        // the next RPS pick is P2's and must be taken by the AI.
         let rps_ai_turn = matches!(mode, MatchMode::VsAi)
             && gs.current_phase == Phase::RockPaperScissors
             && gs.player1_rps_choice.is_some();
@@ -319,6 +308,10 @@ pub fn run_match<U: PlatformUi>(
         }
         gs.reset_loop_detection();
         game_setup::settle_auto(&mut gs);
+
+        // Update audio mixer once per frame
+        mixer.frame();
+        vblank.wait_for_vblank();
     }
 
     gs.game_result

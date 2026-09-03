@@ -13,7 +13,21 @@ use alloc::vec::Vec;
 
 use rabuka_engine::card::HeartColor;
 use rabuka_engine::core::constants::{EMPTY_SLOT, STAGE_SIZE};
-use rabuka_engine::game_state::GameState;
+use rabuka_engine::game_state::{GameState, Phase};
+
+/// Live-set cards stay face-down until the performance phase — the 3DS
+/// `live_hidden` rule (`platforms/3ds/src/game/mod.rs`: presence visible,
+/// identity hidden) plus the web hidden-card filter. Scored success cards
+/// are public and always shown. Shared by the board renderer and the Start
+/// menu zone viewer so the two never disagree.
+pub fn live_set_hidden(phase: &Phase) -> bool {
+    !matches!(
+        phase,
+        Phase::FirstAttackerPerformance
+            | Phase::SecondAttackerPerformance
+            | Phase::LiveVictoryDetermination
+    )
+}
 
 /// Cards shown per hand window — badge on card saves gap, so pitch = width.
 const SCREEN_COLS: i32 = 30;
@@ -30,6 +44,10 @@ pub struct Slot {
     /// Card is in wait state (tapped 90° on 3DS). On GBA we render a
     /// wait-state indicator instead of rotating (tile grid is fixed).
     pub waited: bool,
+    /// Face-down (identity hidden, presence visible). Used for live-set
+    /// cards before the performance phase, mirroring the 3DS card-back
+    /// display and the web hidden-card filter.
+    pub hidden: bool,
 }
 
 impl Slot {
@@ -38,6 +56,7 @@ impl Slot {
             card_no: None,
             actionable: false,
             waited: false,
+            hidden: false,
         }
     }
 }
@@ -181,6 +200,7 @@ impl Board {
                         .map(|c| c.card_no.to_string()),
                     actionable: false,
                     waited,
+                    hidden: false,
                 }
             }
         };
@@ -198,6 +218,10 @@ impl Board {
         }
 
         // Live/success zone: 3 slots, empty padded
+        // Live-set cards stay face-down (presence visible, identity hidden)
+        // until the performance phase — see `live_set_hidden`. Scored
+        // success cards are public and always shown.
+        let live_hidden = live_set_hidden(&gs.current_phase);
         let live_slot = |cid: Option<i16>| -> Slot {
             match cid {
                 Some(id) if id != EMPTY_SLOT => {
@@ -206,6 +230,21 @@ impl Board {
                         card_no: gs.card_database.get_card(id).map(|c| c.card_no.to_string()),
                         actionable: false,
                         waited,
+                        hidden: false,
+                    }
+                }
+                _ => Slot::empty(),
+            }
+        };
+        let live_set_slot = |cid: Option<i16>| -> Slot {
+            match cid {
+                Some(id) if id != EMPTY_SLOT => {
+                    let waited = gs.mods.get_orientation_modifier(id).as_deref() == Some("wait");
+                    Slot {
+                        card_no: gs.card_database.get_card(id).map(|c| c.card_no.to_string()),
+                        actionable: false,
+                        waited,
+                        hidden: live_hidden,
                     }
                 }
                 _ => Slot::empty(),
@@ -231,7 +270,7 @@ impl Board {
         let p2_live_set_vec: Vec<Slot> = (0..3)
             .map(|i| {
                 let cid = you.live_card_zone.cards.get(i).copied();
-                let mut s = live_slot(cid);
+                let mut s = live_set_slot(cid);
                 s.actionable = is_actionable(&s.card_no);
                 s
             })
@@ -239,7 +278,7 @@ impl Board {
         let p1_live_set_vec: Vec<Slot> = (0..3)
             .map(|i| {
                 let cid = me.live_card_zone.cards.get(i).copied();
-                let mut s = live_slot(cid);
+                let mut s = live_set_slot(cid);
                 s.actionable = is_actionable(&s.card_no);
                 s
             })
@@ -265,6 +304,7 @@ impl Board {
                     card_no: hand_cards[i].clone(),
                     actionable: is_actionable(&hand_cards[i]),
                     waited,
+                    hidden: false,
                 }
             })
             .collect();

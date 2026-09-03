@@ -200,14 +200,17 @@ pub fn menu_select(
 }
 
 /// Select from a list of string items with optional card images.
-/// Returns the selected index. If `card_nos` is provided, draws card images
-/// next to each option using `ui.draw_card_image`.
+/// Returns the selected index. If `card_nos` is provided, draws the focused
+/// row's card image using `ui.draw_card_image`. `dimmed` (1:1 with `items`,
+/// skip row excluded) marks unpickable rows: shown dimmed and A on them is
+/// ignored.
 pub fn menu_select_with_cards(
     ui: &mut dyn PlatformUi,
     items: &[String],
     title: &str,
     allow_skip: bool,
     card_nos: Option<&[String]>,
+    dimmed: Option<&[bool]>,
 ) -> Option<usize> {
     let mut all_items: Vec<&str> = items.iter().map(|s| s.as_str()).collect();
     let skip_idx = if allow_skip {
@@ -227,6 +230,7 @@ pub fn menu_select_with_cards(
         .collect();
     let card_nos = card_nos.unwrap_or(&[]);
     let has_images = !card_nos.is_empty();
+    let is_dimmed = |n: usize| -> bool { dimmed.and_then(|d| d.get(n).copied()).unwrap_or(false) };
     let _img_cols = 3; // 3 tiles wide = 24px
     let _img_rows = 4; // 4 tiles tall = 32px
     let _img_x = 26; // Right side of screen (30 - 3 - 1)
@@ -245,15 +249,23 @@ pub fn menu_select_with_cards(
             buf.clear();
             buf.push_str(if n == sel { " >" } else { "  " });
             buf.push_str(&rows[n][2..]);
+            // Dimmed rows read as unpickable on text-only ports too.
+            if Some(n) != skip_idx && is_dimmed(n) {
+                buf.push_str(" --");
+            }
             ui.println(&buf);
         }
         // Focused-row card preview (3DS-style): a single stage-size image
         // for the highlighted option. Drawing every row would stack
         // overlapping images (6 tall on a 2 pitch) and punch holes through
-        // the list.
+        // the list. Bit flags: 1 = cursor, 2 = dimmed.
         if has_images && sel >= scroll && sel < end && sel < card_nos.len() {
             let img_y = 2 + (sel - scroll) as i32 * 2; // 2 tile rows per line, plus header
-            ui.draw_card_image(&card_nos[sel], 24, img_y, 5, 6, 1);
+            let mut flag = 1usize;
+            if is_dimmed(sel) {
+                flag |= 2;
+            }
+            ui.draw_card_image(&card_nos[sel], 24, img_y, 5, 6, flag);
         }
         if all_items.len() > end {
             ui.println(&format!("  .. {} more", all_items.len() - end));
@@ -270,7 +282,12 @@ pub fn menu_select_with_cards(
             if Some(sel) == skip_idx {
                 return None;
             }
-            return Some(sel);
+            // Dimmed rows can't be picked.
+            if is_dimmed(sel) {
+                ui.wait_vblank();
+            } else {
+                return Some(sel);
+            }
         }
         ui.wait_vblank();
     }
@@ -474,65 +491,79 @@ pub fn handle_choice(ui: &mut dyn PlatformUi, gs: &mut GameState) -> bool {
                     }
                 })
                 .unwrap_or_else(|| gs.active_player());
-            let card_ids = zone_cards(player, &zone);
-            let items: Vec<String> = match filtered_indices {
-                Some(ref indices) => indices
-                    .iter()
-                    .map(|&i| {
-                        if i < card_ids.len() {
-                            gs.card_database
-                                .get_card(card_ids[i])
-                                .map(|c| format!("{} {}", c.card_no, c.name))
-                                .unwrap_or_else(|| format!("#{}", card_ids[i]))
-                        } else {
-                            format!("#{}", i)
-                        }
-                    })
-                    .collect(),
-                None => card_ids
-                    .iter()
-                    .map(|cid| {
-                        gs.card_database
-                            .get_card(*cid)
-                            .map(|c| format!("{} {}", c.card_no, c.name))
-                            .unwrap_or_else(|| format!("#{}", cid))
-                    })
-                    .collect(),
+            // Option pool. Player zones resolve via `zone_cards`, but engine-
+            // global pools don't live on a player: LookedAt (look abilities)
+            // mirrors game_setup's ChoiceSelect resolution. This is also why
+            // a look choice showed imageless "#i" rows before — `card_ids`
+            // was empty so nothing resolved.
+            let is_look_zone = zone == crate::ability::enums::Zone::LookedAt.to_str();
+            let pool_ids: Vec<i16> = if is_look_zone {
+                gs.looked_at_cards.to_vec()
+            } else {
+                zone_cards(player, &zone).to_vec()
             };
+            let card_ids: &[i16] = &pool_ids;
+            // Selectable set. Look zones show ALL looked-at cards with the
+            // non-matching ones dimmed (mirroring the 3DS ChoiceSelect
+            // `disabled` flag); other zones list matching cards only.
+            let selectable = |idx: usize| -> bool {
+                match filtered_indices {
+                    Some(ref fi) if !fi.is_empty() => fi.contains(&idx),
+                    _ => true,
+                }
+            };
+            let show_all = is_look_zone;
+            let shown: Vec<usize> = if show_all {
+                (0..card_ids.len()).collect()
+            } else {
+                match filtered_indices {
+                    Some(ref fi) => fi.iter().copied().filter(|&i| i < card_ids.len()).collect(),
+                    None => (0..card_ids.len()).collect(),
+                }
+            };
+            let name_of = |idx: usize| -> String {
+                gs.card_database
+                    .get_card(card_ids[idx])
+                    .map(|c| format!("{} {}", c.card_no, c.name))
+                    .unwrap_or_else(|| format!("#{}", card_ids[idx]))
+            };
+            let items: Vec<String> = shown.iter().map(|&i| name_of(i)).collect();
 
             // Card numbers for image display (3DS-style grid). These must be
             // the printable card_no strings (e.g. "BP1-005-R") that the
             // port's art lookup understands — NOT the numeric DB ids.
-            let card_no_of = |cid: i16| {
-                gs.card_database
-                    .get_card(cid)
-                    .map(|c| c.card_no.to_string())
-                    .unwrap_or_default()
-            };
-            let card_nos: Vec<String> = match filtered_indices {
-                // Keep 1:1 with `items` (same order/length) so grid images
-                // line up with names; out-of-range slots draw no image.
-                Some(ref indices) => indices
-                    .iter()
-                    .map(|&i| {
-                        if i < card_ids.len() {
-                            card_no_of(card_ids[i])
-                        } else {
-                            String::new()
-                        }
-                    })
-                    .collect(),
-                None => card_ids.iter().map(|&cid| card_no_of(cid)).collect(),
-            };
+            // 1:1 with `items` so grid images line up with names.
+            let card_nos: Vec<String> = shown
+                .iter()
+                .map(|&i| {
+                    gs.card_database
+                        .get_card(card_ids[i])
+                        .map(|c| c.card_no.to_string())
+                        .unwrap_or_default()
+                })
+                .collect();
+            // Dim flags 1:1 with `items` (look zones only; elsewhere None).
+            let dimmed: Vec<bool> = shown.iter().map(|&i| !selectable(i)).collect();
 
 if count <= 1 {
-                let sel = choose_card_grid(ui, gs, &description, &items, &card_nos, allow_skip);
+                let sel = choose_card_grid(
+                    ui,
+                    gs,
+                    &description,
+                    &items,
+                    &card_nos,
+                    allow_skip,
+                    Some(&dimmed),
+                );
                 match sel {
                     None => {
                         TurnEngine::resume_with_choice(gs, None, Some(Vec::new())).ok();
                     }
-Some(idx) => {
-                        let actual_idx = filtered_indices.as_ref().map(|fi| fi[idx]).unwrap_or(idx);
+                    Some(idx) => {
+                        // `shown` maps the grid position back to the zone
+                        // index the engine resolves (look zones show the
+                        // whole pool, so this is the identity there).
+                        let actual_idx = shown.get(idx).copied().unwrap_or(idx);
                         TurnEngine::resume_with_choice(gs, None, Some(vec![actual_idx])).ok();
                     }
                 }
@@ -550,17 +581,31 @@ Some(idx) => {
                         .iter()
                         .enumerate()
                         .map(|(i, name)| {
-                            if selected.contains(&i) {
-                                format!("[X] {}", name)
+                            let mark = if selected.contains(&i) {
+                                "[X]"
+                            } else if dimmed.get(i).copied().unwrap_or(false) {
+                                "[--]"
                             } else {
-                                format!("[ ] {}", name)
-                            }
+                                "[ ]"
+                            };
+                            format!("{} {}", mark, name)
                         })
                         .collect();
-                    let sel = menu_select_with_cards(ui, &display_items, &description, allow_skip, Some(&card_nos));
+                    let sel = menu_select_with_cards(
+                        ui,
+                        &display_items,
+                        &description,
+                        allow_skip,
+                        Some(&card_nos),
+                        Some(&dimmed),
+                    );
                     match sel {
                         None => break,
                         Some(idx) => {
+                            // Dimmed cards can't be picked.
+                            if dimmed.get(idx).copied().unwrap_or(false) {
+                                continue;
+                            }
                             if let Some(pos) = selected.iter().position(|&x| x == idx) {
                                 selected.remove(pos);
                             } else {
@@ -569,10 +614,8 @@ Some(idx) => {
                         }
                     }
                 }
-                let actual_indices: Vec<usize> = match filtered_indices {
-                    Some(ref fi) => selected.iter().map(|&i| fi[i]).collect(),
-                    None => selected,
-                };
+                let actual_indices: Vec<usize> =
+                    selected.iter().map(|&i| shown.get(i).copied().unwrap_or(i)).collect();
                 TurnEngine::resume_with_choice(gs, None, Some(actual_indices)).ok();
             }
             true

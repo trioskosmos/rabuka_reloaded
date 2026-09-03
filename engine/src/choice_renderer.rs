@@ -3,10 +3,9 @@
 //! One screen: title, image grid with cursor border, selected card identity,
 //! its ability preview (the 3DS ability banner, first wrapped line), skip
 //! state, and a two-line hint bar. Select shows the board overlay, L shows
-//! the choice hint (+ source card), R shows the cursor card detail.
-//! D-pad navigation wraps around (Up from the top row reaches the bottom row
-//! and vice versa, same for Left/Right). Start is intentionally inert here —
-//! it is neither confirm (A) nor cancel (B).
+//! the choice hint (+ source card), R shows the cursor card detail, Start
+//! opens the port's start menu (stats + zones). D-pad navigation wraps
+//! around. Start is never confirm (A) nor cancel (B).
 
 extern crate alloc;
 use alloc::format;
@@ -43,7 +42,8 @@ struct CardInfo {
 }
 
 /// Renders a card choice grid (3DS style) with board overlay support.
-/// Returns the selected index, or None if cancelled.
+/// `dimmed` (1:1 with `items`) marks unpickable options: drawn greyed and
+/// A on them is ignored. Returns the selected index, or None if cancelled.
 pub fn render_card_choice_grid(
     ui: &mut dyn PlatformUi,
     gs: &GameState,
@@ -51,6 +51,7 @@ pub fn render_card_choice_grid(
     items: &[String],
     card_nos: &[String],
     allow_skip: bool,
+    dimmed: Option<&[bool]>,
 ) -> Option<usize> {
     let db = &gs.card_database;
     // Build card info list
@@ -90,6 +91,8 @@ pub fn render_card_choice_grid(
 
     let mut sel = 0;
 
+    let is_dimmed = |idx: usize| -> bool { dimmed.and_then(|d| d.get(idx).copied()).unwrap_or(false) };
+
     // Fresh pool for the grid art + text: the previous screen's dead tiles
     // would otherwise pile onto this screen's demand (see reset_vram).
     ui.reset_vram();
@@ -109,6 +112,7 @@ pub fn render_card_choice_grid(
             allow_skip,
             skip_idx,
             total_pages,
+            dimmed,
         );
 
         ui.swap_buffers();
@@ -144,6 +148,7 @@ pub fn render_card_choice_grid(
                 allow_skip,
                 skip_idx,
                 total_pages,
+                dimmed,
             );
             ui.swap_buffers();
         } else if ui.just_pressed_l() {
@@ -185,16 +190,39 @@ pub fn render_card_choice_grid(
                 }
             }
         } else if ui.just_pressed_a() {
-            // Release the grid before the caller rebuilds its screen.
-            ui.reset_vram();
-            if skip_idx == Some(sel) {
-                return None;
+            // Dimmed cards can't be picked — ignore the press.
+            if skip_idx != Some(sel) && is_dimmed(sel) {
+                ui.wait_vblank();
+            } else {
+                // Release the grid before the caller rebuilds its screen.
+                ui.reset_vram();
+                if skip_idx == Some(sel) {
+                    return None;
+                }
+                return Some(sel);
             }
-            return Some(sel);
         } else if ui.just_pressed_b() {
             // Release the grid before the caller rebuilds its screen.
             ui.reset_vram();
             return None;
+        } else if ui.just_pressed_start() {
+            // Start menu over the choice (stats + zones); the choice
+            // resumes when it closes.
+            ui.open_start_menu(gs);
+            // Redraw the choice page after the menu
+            render_choice_page(
+                ui,
+                &cards,
+                page_start,
+                page_end,
+                sel,
+                title,
+                allow_skip,
+                skip_idx,
+                total_pages,
+                dimmed,
+            );
+            ui.swap_buffers();
         } else if ui.just_pressed_left() {
             sel = (sel + total_items - 1) % total_items;
         } else if ui.just_pressed_right() {
@@ -216,8 +244,8 @@ pub fn render_card_choice_grid(
         } else {
             ui.wait_vblank();
         }
-        // NOTE: Start is deliberately inert — it neither confirms (A) nor
-        // cancels (B) a choice.
+        // NOTE: Start opens the menu above (handled in its own branch) —
+        // it never confirms (A) nor cancels (B) a choice.
     }
 }
 
@@ -236,6 +264,7 @@ fn render_choice_page(
     allow_skip: bool,
     skip_idx: Option<usize>,
     total_pages: usize,
+    dimmed: Option<&[bool]>,
 ) {
     ui.clear_screen();
 
@@ -249,8 +278,9 @@ fn render_choice_page(
     let cards_to_draw = (page_end - page_start).min(cards.len().saturating_sub(page_start));
 
     // Draw card art in a grid (coordinates are in tiles, matching the
-    // PlatformUi::draw_card_image contract). `palette_index` carries the
-    // selection flag (1 = cursor) so ports can draw a highlight border.
+    // PlatformUi::draw_card_image contract). `palette_index` is bit flags:
+    // bit 0 = cursor, bit 1 = dimmed (greyed, unpickable) — the 3DS
+    // `disabled` overlay equivalent.
     for i in 0..cards_to_draw {
         let idx = page_start + i;
         let row = i / COLS;
@@ -258,27 +288,38 @@ fn render_choice_page(
 
         let card = &cards[idx];
         let is_selected = (page_start + i) == sel;
+        let is_dimmed = dimmed.and_then(|d| d.get(idx).copied()).unwrap_or(false);
 
         // Card position in tiles (gapless row, centered via GRID_X0)
         let x = GRID_X0 + col as i32 * (CARD_TILE_W + CARD_GAP_TILES);
         let y = GRID_Y + row as i32 * (CARD_TILE_H + CARD_GAP_TILES);
 
-        ui.draw_card_image(
-            &card.card_no,
-            x,
-            y,
-            CARD_TILE_W,
-            CARD_TILE_H,
-            usize::from(is_selected),
-        );
+        let mut flag = 0usize;
+        if is_selected {
+            flag |= 1;
+        }
+        if is_dimmed {
+            flag |= 2;
+        }
+        ui.draw_card_image(&card.card_no, x, y, CARD_TILE_W, CARD_TILE_H, flag);
     }
 
     // Selected card identity (card_no + name, like the 3DS label row).
+    // Dimmed cursors are marked in text too, so text-only ports (whose
+    // draw_card_image is a no-op) still show the unpickable state.
     let on_skip = skip_idx == Some(sel);
     if on_skip {
         ui.println("> [Skip]");
     } else if sel < cards.len() {
-        ui.println(&one_line(&format!("> [{}] {}", cards[sel].card_no, cards[sel].name), 30));
+        let dim_mark = if dimmed.and_then(|d| d.get(sel).copied()).unwrap_or(false) {
+            " --"
+        } else {
+            ""
+        };
+        ui.println(&one_line(
+            &format!("> [{}] {}{}", cards[sel].card_no, cards[sel].name, dim_mark),
+            30,
+        ));
     }
 
     // Ability preview of the selected card (3DS ability banner equivalent,

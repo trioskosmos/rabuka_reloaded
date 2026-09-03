@@ -179,6 +179,9 @@ impl<'u, 'd, I: InputSource> platform_ui::PlatformUi for GbaUi<'u, 'd, I> {
     fn reset_vram(&mut self) {
         self.display.reset_vram();
     }
+    fn open_start_menu(&mut self, gs: &GameState) {
+        crate::overlay::run_start_menu(self.display, self.input, gs);
+    }
     fn draw_card_image(
         &mut self,
         card_no: &str,
@@ -192,9 +195,12 @@ impl<'u, 'd, I: InputSource> platform_ui::PlatformUi for GbaUi<'u, 'd, I> {
         // on one 8bpp BG under the text BG in a single frame. (Committing a
         // throwaway BG per card here would be wiped by swap_buffers and
         // flash.) Coordinates are in tiles, matching the trait contract.
-        // The shared choice grid passes the cursor as palette_index != 0.
+        // palette_index is bit flags: bit 0 = cursor, bit 1 = dimmed
+        // (greyed, unpickable) — mirroring the 3DS `disabled` overlay.
+        let selected = palette_index & 1 != 0;
+        let dimmed = palette_index & 2 != 0;
         self.display
-            .queue_card_image(card_no, x, y, cols, rows, palette_index != 0);
+            .queue_card_image(card_no, x, y, cols, rows, selected, dimmed);
     }
 
     fn show_board_overlay(&mut self, gs: &GameState) {

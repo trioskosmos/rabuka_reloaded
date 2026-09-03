@@ -121,6 +121,12 @@ pub trait PlatformUi {
     fn reset_vram(&mut self) {
     }
 
+    /// In-match Start menu (stats + game log + card zones). Openable from
+    /// the board, the action list, and choice menus. Ports without a start
+    /// menu no-op (Start stays inert there).
+    fn open_start_menu(&mut self, _gs: &GameState) {
+    }
+
     /// Modular detail screen: card art for `art_card_no`, `header` lines,
     /// then scrollable `body` text. One hook serves every detail view —
     /// action detail (L: full action text + acting card), card detail (R:
@@ -173,10 +179,11 @@ pub trait PlatformUi {
 }
 
 /// Graphical card-choice grid (3DS-style): shows one card image per option
-/// instead of a text-only list. Forwards to the shared
-/// [`crate::choice_renderer`] grid, which draws via
-/// [`PlatformUi::draw_card_image`] and composites on ports that queue art
-/// (e.g. GBA `Display::queue_card_image`).
+/// instead of a text-only list. `dimmed` (1:1 with `items`) marks options
+/// that can't be picked — ports render them greyed/dimmed like the 3DS
+/// `disabled` overlay. Forwards to the shared [`crate::choice_renderer`]
+/// grid, which draws via [`PlatformUi::draw_card_image`] and composites on
+/// ports that queue art (e.g. GBA `Display::queue_card_image`).
 pub fn choose_card_grid(
     ui: &mut dyn PlatformUi,
     gs: &GameState,
@@ -184,8 +191,9 @@ pub fn choose_card_grid(
     items: &[String],
     card_nos: &[String],
     allow_skip: bool,
+    dimmed: Option<&[bool]>,
 ) -> Option<usize> {
-    crate::choice_renderer::render_card_choice_grid(ui, gs, title, items, card_nos, allow_skip)
+    crate::choice_renderer::render_card_choice_grid(ui, gs, title, items, card_nos, allow_skip, dimmed)
 }
 
 /// Width of a single character in half-width columns (CJK glyphs = 2).

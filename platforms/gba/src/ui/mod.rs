@@ -8,7 +8,7 @@
 //! expects.
 
 pub use crate::board::{Board, BoardFrame, Slot, HAND_VISIBLE};
-pub use crate::card_art_gen::{CardArt, CardFront, BOARD_UI, CARD_ART, CARD_FRONTS};
+pub use crate::card_art_gen::{CardArt, CardFront, BACK_FRONT, BOARD_UI, CARD_ART, CARD_FRONTS};
 pub use crate::display::Display;
 pub use crate::font_tiles_gen::{FONT_GLYPHS, FONT_TILES};
 pub use crate::texticons_gen::{TEXTICON_GLYPHS, TEXTICON_TILES};

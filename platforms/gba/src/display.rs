@@ -7,7 +7,7 @@ use agb::display::tiled::{
 use agb::display::{busy_wait_for_vblank, Graphics, Palette16, Priority, Rgb15, Rgb};
 
 use crate::board::BoardFrame;
-use crate::card_art_gen::{CardArt, BOARD_UI, CARD_FRONTS, LIVE_FRONTS, MASTER_PAL, STAGE_FRONTS, WAITED_FRONTS};
+use crate::card_art_gen::{CardArt, BACK_FRONT, BOARD_UI, CARD_FRONTS, LIVE_FRONTS, MASTER_PAL, STAGE_FRONTS, WAITED_FRONTS};
 use crate::font_tiles_gen::{FONT_GLYPHS, FONT_TILES};
 use crate::texticons_gen::{TEXTICON_GLYPHS, TEXTICON_TILES};
 
@@ -66,7 +66,8 @@ pub struct Display<'a> {
     /// [`Display::clear`]. `swap_buffers` composites these on an 8bpp BG
     /// underneath the text BG (punching transparent holes in the text fill),
     /// so generic choice menus can show card images like the 3DS grid.
-    /// Coordinates are in tiles; `selected` draws a gold border.
+    /// Coordinates are in tiles; `selected` draws the cursor badge,
+    /// `dimmed` dithers the card dark (unpickable).
     pending_art: Vec<PendingArt>,
 }
 
@@ -78,6 +79,7 @@ struct PendingArt {
     cols: i32,
     rows: i32,
     selected: bool,
+    dimmed: bool,
 }
 
 /// 4bpp text/board palette (bank 0). Entries 7..=15 are the texticon colours,
@@ -388,6 +390,7 @@ impl<'a> Display<'a> {
                         STAGE_CARD,
                         STAGE_FRONTS,
                         WAITED_FRONTS,
+                        BACK_FRONT,
                         flipped,
                     );
             }
@@ -408,6 +411,7 @@ impl<'a> Display<'a> {
                     LIVE_CARD,
                     LIVE_FRONTS,
                     WAITED_FRONTS,
+                    BACK_FRONT,
                     flipped,
                 );
             }
@@ -428,6 +432,7 @@ impl<'a> Display<'a> {
                     LIVE_CARD,
                     LIVE_FRONTS,
                     WAITED_FRONTS,
+                    BACK_FRONT,
                     flipped,
                 );
             }
@@ -449,6 +454,7 @@ impl<'a> Display<'a> {
                 HAND_CARD,
                 CARD_FRONTS,
                 WAITED_FRONTS,
+                BACK_FRONT,
                 false,
             );
         }
@@ -614,7 +620,8 @@ impl<'a> Display<'a> {
     /// Queue a card image for the next [`Display::swap_buffers`]. Called by
     /// the `PlatformUi::draw_card_image` impl so generic choice menus show
     /// real card fronts (3DS-style) instead of a text-only list. Coordinates
-    /// are in tiles; `selected` draws a gold badge over the top-right corner.
+    /// are in tiles; `selected` draws the cursor badge, `dimmed` dithers
+    /// the card dark (unpickable, like the 3DS `disabled` overlay).
     pub fn queue_card_image(
         &mut self,
         card_no: &str,
@@ -623,6 +630,7 @@ impl<'a> Display<'a> {
         cols: i32,
         rows: i32,
         selected: bool,
+        dimmed: bool,
     ) {
         use alloc::string::ToString;
         self.pending_art.push(PendingArt {
@@ -632,6 +640,7 @@ impl<'a> Display<'a> {
             cols,
             rows,
             selected,
+            dimmed,
         });
         // The early-out in swap_buffers compares text only; queued art must
         // force a redraw even when the text is unchanged (cursor moves swap
@@ -733,8 +742,27 @@ impl<'a> Display<'a> {
                         bg.set_tile((q.x + ax, q.y + ay), &ui_ts, TileSetting::BLANK);
                     }
                 }
+                if q.dimmed {
+                    // Dimmed (unpickable): checkerboard dither of dark zone
+                    // fill over the art — the tiled equivalent of the 3DS
+                    // translucent `disabled` overlay. True grayscale would
+                    // need a second baked front set per card; this reads
+                    // the same at menu scale for zero ROM cost.
+                    for ay in 0..q.rows {
+                        for ax in 0..q.cols {
+                            if (ax + ay) % 2 == 0 {
+                                bg.set_tile(
+                                    (q.x + ax, q.y + ay),
+                                    &ui_ts,
+                                    TileSetting::new(UI_EMPTY, e_ui),
+                                );
+                            }
+                        }
+                    }
+                }
                 if q.selected {
                     // Gold badge overlapping the card's top-right corner.
+                    // Drawn after dimming so the cursor stays visible.
                     bg.set_tile(
                         (q.x + q.cols - 1, q.y),
                         &ui_ts,
@@ -781,6 +809,7 @@ fn draw_slot(
     card: (i32, i32),
     fronts: &[crate::card_art_gen::CardFront],
     waited_fronts: &[crate::card_art_gen::CardFront],
+    back: &'static [u8],
     flipped: bool,
     ) {
     let (cols, rows) = if slot.waited {
@@ -796,11 +825,27 @@ fn draw_slot(
             }
         }
     };
+    let art_eff = |fl: bool| if fl { TileEffect::new(true, true, 0) } else { TileEffect::new(false, false, 0) };
     match &slot.card_no {
+        // Face-down: card back at live-slot geometry. `hidden` is only set
+        // on 3x2 live-set slots, matching BACK_FRONT's baked grid.
+        Some(_) if slot.hidden => {
+            let ts = unsafe { TileSet::new(back, TileFormat::EightBpp) };
+            for ty in 0..2 {
+                for tx in 0..3 {
+                    let sidx = if flipped { (1 - ty) * 3 + (2 - tx) } else { ty * 3 + tx } as u16;
+                    art_bg.set_tile(
+                        (x + tx, y + ty),
+                        &ts,
+                        TileSetting::new(sidx, art_eff(flipped)),
+                    );
+                    ui_bg.set_tile((x + tx, y + ty), &ui_ts, TileSetting::BLANK);
+                }
+            }
+        }
         Some(card_no) => match fronts.iter().find(|f| f.card_no == card_no.as_str()) {
             Some(front) => {
                 let ts = unsafe { TileSet::new(front.tiles, TileFormat::EightBpp) };
-                let art_eff = |fl: bool| if fl { TileEffect::new(true, true, 0) } else { TileEffect::new(false, false, 0) };
                 for ty in 0..rows {
                     for tx in 0..cols {
                         let sidx = if flipped { (rows - 1 - ty) * cols + (cols - 1 - tx) } else { ty * cols + tx } as u16;

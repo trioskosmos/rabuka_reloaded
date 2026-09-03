@@ -15,11 +15,15 @@
 //! Inside Match (all overlay the board, Esc-able unless noted):
 //!   Board --Select--> Actions --Select/B--> Board
 //!   Board --Start--> StartMenu --B/Start--> Board
+//!   Actions --Start--> StartMenu --B/Start--> Actions
 //!   Board --R--> CardDetail --A/B/L/R/Start--> Board
 //!   (engine prompt) ChoiceGrid --A--> Match / --B--> Match (cancel/skip)
+//!   ChoiceGrid --Start--> StartMenu --B/Start--> ChoiceGrid
 //!   ChoiceGrid --SL--> board overlay --any--> ChoiceGrid
-//!   ChoiceGrid --L--> ability-source detail --any--> ChoiceGrid
+//!   ChoiceGrid --L--> choice hint detail --any--> ChoiceGrid
 //!   ChoiceGrid --R--> cursor-card detail --any--> ChoiceGrid
+//!   StartMenu --A--> ZoneGrid --B/Start--> StartMenu
+//!   ZoneGrid --A--> CardDetail --A/B/L/R/Start--> ZoneGrid
 //! ```
 //!
 //! Button map per screen:
@@ -29,10 +33,11 @@
 //! | ModeSelect   | move cursor     | -                  | confirm      | -            | confirm      | -      | detail text  | detail text  |
 //! | DeckSelect   | move cursor     | -                  | confirm      | -            | confirm      | -      | detail text  | detail text  |
 //! | Board        | prev/next action| move hand/stage cursor | run action | -        | Start menu   | Actions view | cycle focus Hand->Own->Opp | card detail |
-//! | Actions      | prev/next action| -                  | run action   | back to Board | Start menu  | Board view | full text | card stats |
-//! | StartMenu    | move cursor     | -                  | confirm/sub  | back/close   | back/close   | -      | -            | -            |
+//! | Actions      | prev/next action| -                  | run action   | back to Board | Start menu  | Board view | action+card detail | card detail |
+//! | StartMenu    | move cursor     | -                  | log/zone/close | back/close | back/close   | -      | -            | -            |
+//! | ZoneGrid     | wrap incl. pages| wrap incl. pages   | card detail  | back         | back         | -      | -            | -            |
 //! | CardDetail   | scroll text     | -                  | close        | close        | close        | -      | close        | close        |
-//! | ChoiceGrid   | wrap incl. pages| wrap incl. pages   | pick         | back/skip    | (inert)      | board overlay | choice hint + src | cursor card |
+//! | ChoiceGrid   | wrap incl. pages| wrap incl. pages   | pick         | back/skip    | start menu   | board overlay | choice hint + ability | cursor card |
 //! | Result       | -               | -                  | continue     | -            | continue     | -      | -            | -            |
 
 /// Every screen the GBA port can show. Variants are documentation-first:
@@ -52,14 +57,20 @@ pub enum Screen {
     Board,
     /// In-match full-screen action list (toggled with Select).
     Actions,
-    /// In-match Start overlay: stats, then Game Log / Cards submenus.
+    /// In-match Start overlay: ONE screen — pinned stats on top, scrolling
+    /// list below (Game Log, card zones in waitroom-first order, Close).
     StartMenu,
-    /// Card art + stats popup (R on the focused card, A in zone lists).
+    /// Card grid viewer for one zone (from StartMenu): stage-size art with
+    /// choice-menu navigation; A pops the cursor card's detail.
+    ZoneGrid,
+    /// Card art + stats popup (R on the focused card, A in zone grids).
     CardDetail,
     /// Engine pending-choice prompt: 5x1 stage-size card grid with pagination.
     /// D-pad wraps (Up from the top row reaches the bottom row and vice
-    /// versa); A picks, B backs out/skips, Start is inert, Select shows the
-    /// board, L shows the ability-source card, R the cursor card.
+    /// versa); A picks, B backs out/skips, Start opens the start menu,
+    /// Select shows the board, L shows the choice hint + source ability,
+    /// R the cursor card. Unpickable cards (look filters) render
+    /// dim-dithered; A on them is ignored.
     ChoiceGrid,
     /// Terminal match result. A/Start returns to [`Screen::ModeSelect`].
     Result,
