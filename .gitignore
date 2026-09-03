@@ -166,6 +166,24 @@ engine_c/t_*.txt
 engine_c/q*_out.txt
 engine_c/platforms/
 
+# engine_c toolchains
+engine_c/toolchains/
+
+# engine_c generated test artifacts
+engine_c/tests/test_ported_generated.c
+
+# Genesis build artifacts
+platforms/genesis/c/obj/
+platforms/genesis/c/*.bin
+
+# Generated card binaries
+cards/build/*.bin
+engine/src/core/cards.bin
+engine/src/core/cards_gen.rs
+
+# Generated engine_c sources
+engine_c/src/bytecode_data.c
+
 
 engine_c/src/*.bin
 engine_c/src/core/generated/*.o

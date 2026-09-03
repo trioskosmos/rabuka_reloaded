@@ -19,6 +19,8 @@ use rabuka_gba::input::Input;
 use rabuka_gba::screens::Screen;
 use rabuka_gba::match_runner::run_match_with_mixer;
 
+use agb::sound::mixer::Frequency;
+
 fn load_deck_cards(
     _decks: &[rabuka_gba::decks_baked::DeckInfo],
     idx1: usize,

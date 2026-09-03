@@ -1,7 +1,7 @@
-//! GBA-specific match runner with audio mixer support.
+//! GBA-specific match runner with audio tracker support.
 //!
-//! This wraps the shared engine `run_match` with per-frame mixer updates
-//! and vblank synchronization for background music playback.
+//! Uses agb-tracker crate for .xm tracker music (much smaller than WAV).
+//! Samples + patterns take only KBs vs MBs for raw PCM audio.
 
 use alloc::rc::Rc;
 use alloc::string::{String, ToString};
@@ -18,19 +18,16 @@ use rabuka_engine::game_state::{GameResult, GameState, Phase};
 use rabuka_engine::player::Player;
 use rabuka_engine::turn::TurnEngine;
 
-use agb::sound::mixer::{Mixer, SoundChannel, SoundData};
-use agb::include_wav;
-use agb::fixnum::Num;
+use agb::sound::mixer::{Mixer, Frequency};
+use agb_tracker::{Track, Tracker, include_xm};
 
-/// Background music loaded at compile-time. Must match the mixer frequency (18157 Hz mono).
-static BGM_DATA: SoundData = include_wav!("sfx/next_card.wav");
+/// Background music as tracker module (.xm format - samples + patterns).
+/// Compile-time loaded via include_xm! macro.
+static BGM_TRACK: Track = include_xm!("sfx/next_card.xm");
 
 /// AI turn: pick a random action and execute it.
 fn ai_turn(gs: &mut GameState, acts: &[game_setup::Action]) -> bool {
     use rabuka_engine::game_setup::ActionType;
-    // Mulligan phases MUST be concluded, otherwise the AI can keep toggling
-    // card selections forever and the game can never reach the main phase.
-    // Prefer a Confirm/Skip over the per-card Select actions.
     for a in acts {
         if matches!(
             a.action_type,
@@ -44,8 +41,7 @@ fn ai_turn(gs: &mut GameState, acts: &[game_setup::Action]) -> bool {
     true
 }
 
-/// Auto-resolve a pending choice for the AI (random but legal). Returns false
-/// only if the engine rejects the synthetic answer.
+/// Auto-resolve a pending choice for the AI (random but legal).
 fn ai_handle_choice(gs: &mut GameState) -> bool {
     use rabuka_engine::ability::types::Choice;
     let choice = match gs.get_pending_choice() {
@@ -141,7 +137,7 @@ fn ai_handle_choice(gs: &mut GameState) -> bool {
     }
 }
 
-/// Run a full embedded match with per-frame mixer updates (for GBA audio).
+/// Run a full embedded match with per-frame tracker updates (for GBA audio).
 pub fn run_match_with_mixer<U: PlatformUi>(
     ui: &mut U,
     p1_cards: &[&str],
@@ -151,11 +147,8 @@ pub fn run_match_with_mixer<U: PlatformUi>(
     mixer: &mut Mixer,
     vblank: &agb::interrupt::VBlank,
 ) -> GameResult {
-    // Start background music looping
-    let mut bgm_channel = SoundChannel::new(BGM_DATA);
-    bgm_channel.set_loop(true);
-    bgm_channel.volume(Num::<i16, 8>::from(155)); // ~0.6 in 8.8 fixed point (256 * 0.6 ≈ 155)
-    let _ = mixer.play_sound(bgm_channel);
+    // Initialize tracker for background music
+    let mut bgm_tracker = Tracker::new(&BGM_TRACK);
 
     let mut db = Rc::new(CardDatabase::load_or_create(all_cards));
 
@@ -240,7 +233,8 @@ pub fn run_match_with_mixer<U: PlatformUi>(
         gs.reset_loop_detection();
         game_setup::settle_auto(&mut gs);
 
-        // Update audio mixer once per frame
+        // Update tracker + mixer once per frame
+        bgm_tracker.step(mixer);
         mixer.frame();
         vblank.wait_for_vblank();
     }

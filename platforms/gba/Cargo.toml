@@ -7,6 +7,7 @@ description = "Rabuka Reloaded for the Game Boy Advance (via agb)"
 
 [dependencies]
 agb = "0.25.0"
+agb_tracker = "0.25.0"
 rabuka_engine = { path = "../../engine", default-features = false, features = ["gba"] }
 # agb requires portable-atomic's unsafe-assume-single-core, which 1.14+ dropped
 # support for on thumbv4t (ARMv4T). Pin to the last version that supports it.

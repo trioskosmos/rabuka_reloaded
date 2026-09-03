@@ -1926,10 +1926,27 @@ static void audio_thread(void* arg) {
 }
 
 int _3ds_audio_init(void) {
+    // Check for DSP firmware (required for NDSP on real hardware)
+    FILE* dsp_check = fopen("sdmc:/3ds/dspfirm.cdc", "rb");
+    if (!dsp_check) {
+        char buf[192];
+        snprintf(buf, sizeof(buf),
+            "[AUDIO] DSP firmware not found!\n"
+            "Place dspfirm.cdc at sdmc:/3ds/dspfirm.cdc\n"
+            "Luma3DS: Rosalina (L+Down+Select) -> Misc -> Dump DSP firmware\n");
+        _3ds_text_add_top(buf);
+        // Don't fail - Citra HLE works without it, but warn
+    } else {
+        fclose(dsp_check);
+    }
+
     Result res = ndspInit();
     if (R_FAILED(res)) {
-        char buf[96];
-        snprintf(buf, sizeof(buf), "[AUDIO] ndspInit FAILED (need /3ds/dspfirm.cdc)\n");
+        char buf[128];
+        snprintf(buf, sizeof(buf),
+            "[AUDIO] ndspInit FAILED (rc=%lx)\n"
+            "Real 3DS needs dspfirm.cdc at sdmc:/3ds/dspfirm.cdc\n",
+            (unsigned long)res);
         _3ds_text_add_top(buf);
         return (int)res;
     }
