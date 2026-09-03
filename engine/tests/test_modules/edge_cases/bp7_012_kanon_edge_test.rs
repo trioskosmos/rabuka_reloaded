@@ -40,9 +40,13 @@ fn kanon_select_three_any_order_and_draw() {
     game.select_indices(&[0, 1, 2]);
     game.drain_auto_ability_choices();
     // If any_order, there may be a second choice for ordering; if so, pick any
-    if game.has_pending_choice() {
-        // println!("second choice {:?}", game.get_pending_choice());
-        game.select_indices(&[0, 1, 2]);
+    if let Some(choice) = game.state.get_pending_choice() {
+        match choice {
+            rabuka_engine::ability::types::Choice::SelectCard { .. } | rabuka_engine::ability::types::Choice::SelectTarget { .. } => {
+                game.select_indices(&[0, 1, 2]);
+            }
+            _ => panic!("Unexpected choice type: {:?}", choice),
+        }
         game.drain_auto_ability_choices();
     }
     assert!(game.state.player1.hand.cards.len() >= hand_before - 1, "should have at least hand_before-1 after debut (hand_before {} hand now {:?})", hand_before, game.state.player1.hand.cards);
@@ -92,8 +96,13 @@ fn kanon_only_one_group_present_can_still_select_one() {
     // We just select the one CatChu!
     game.select_indices(&[0]);
     game.drain_auto_ability_choices();
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
+    if let Some(choice) = game.state.get_pending_choice() {
+        match choice {
+            rabuka_engine::ability::types::Choice::SelectCard { .. } | rabuka_engine::ability::types::Choice::SelectTarget { .. } => {
+                game.select_indices(&[0]);
+            }
+            _ => panic!("Unexpected choice type: {:?}", choice),
+        }
         game.drain_auto_ability_choices();
     }
     // Hand after: played kanon (-1) + maybe draw (+1) = >= hand_before -1

@@ -1,4 +1,6 @@
-﻿use alloc::string::String;
+﻿use core::cell::RefCell;
+use alloc::collections::BTreeMap;
+use alloc::string::String;
 use alloc::vec::Vec;
 
 use agb::display::tiled::{
@@ -70,13 +72,16 @@ pub struct Display<'a> {
     /// `dimmed` dithers the card dark (unpickable).
     pending_art: Vec<PendingArt>,
     /// Reusable backgrounds to avoid VRAM allocation leak per frame.
-    board_art_bg: Option<RegularBackground>,
-    board_ui_bg: Option<RegularBackground>,
-    menu_bg: Option<RegularBackground>,
-    menu_art_bg: Option<RegularBackground>,
-    action_bg: Option<RegularBackground>,
-    detail_art_bg: Option<RegularBackground>,
-    detail_text_bg: Option<RegularBackground>,
+    board_art_bg: RegularBackground,
+    board_ui_bg: RegularBackground,
+    menu_bg: RegularBackground,
+    menu_art_bg: RegularBackground,
+    action_bg: RegularBackground,
+    detail_art_bg: RegularBackground,
+    detail_text_bg: RegularBackground,
+    /// Cached TileSet objects to prevent VRAM leak from repeated TileSet::new() calls.
+    /// Key: "front_type:card_no" (e.g., "hand:LL-001", "stage:LL-001", etc.)
+    tile_set_cache: RefCell<BTreeMap<alloc::string::String, TileSet>>,
 }
 
 /// One queued card image for the next [`Display::swap_buffers`].
@@ -154,14 +159,50 @@ impl<'a> Display<'a> {
             last: String::new(),
             detail_active: false,
             pending_art: Vec::new(),
-            board_art_bg: None,
-            board_ui_bg: None,
-            menu_bg: None,
-            menu_art_bg: None,
-            action_bg: None,
-            detail_art_bg: None,
-            detail_text_bg: None,
+            board_art_bg: RegularBackground::new(
+                Priority::P1,
+                RegularBackgroundSize::Background32x32,
+                TileFormat::EightBpp,
+            ),
+            board_ui_bg: RegularBackground::new(
+                Priority::P0,
+                RegularBackgroundSize::Background32x32,
+                TileFormat::FourBpp,
+            ),
+            menu_bg: RegularBackground::new(
+                Priority::P0,
+                RegularBackgroundSize::Background32x32,
+                TileFormat::FourBpp,
+            ),
+            menu_art_bg: RegularBackground::new(
+                Priority::P1,
+                RegularBackgroundSize::Background32x32,
+                TileFormat::EightBpp,
+            ),
+            action_bg: RegularBackground::new(
+                Priority::P0,
+                RegularBackgroundSize::Background32x32,
+                TileFormat::FourBpp,
+            ),
+            detail_art_bg: RegularBackground::new(
+                Priority::P0,
+                RegularBackgroundSize::Background32x32,
+                TileFormat::EightBpp,
+            ),
+            detail_text_bg: RegularBackground::new(
+                Priority::P1,
+                RegularBackgroundSize::Background32x32,
+                TileFormat::FourBpp,
+            ),
+            tile_set_cache: RefCell::new(BTreeMap::new()),
         }
+    }
+
+    /// Get or create a cached TileSet for the given front type and card number.
+    /// Prevents VRAM leak from repeated TileSet::new() calls with same data.
+    fn get_tile_set(&self, front_type: &str, card_no: &str, tiles: &'static [u8]) -> &TileSet {
+        let key = alloc::format!("{}:{}", front_type, card_no);
+        self.tile_set_cache.borrow_mut().entry(key).or_insert_with(|| unsafe { TileSet::new(tiles, TileFormat::EightBpp) })
     }
 
     pub fn clear(&mut self) {
@@ -361,28 +402,17 @@ impl<'a> Display<'a> {
         let ui_ts = unsafe { TileSet::new(BOARD_UI, TileFormat::FourBpp) };
         let e0 = TileEffect::new(false, false, 15);
 
-        // Reuse backgrounds to avoid VRAM allocation leak per frame
-        let mut art_bg = self.board_art_bg.get_or_insert_with(|| RegularBackground::new(
-            Priority::P1,
-            RegularBackgroundSize::Background32x32,
-            TileFormat::EightBpp,
-        ));
-        let mut ui_bg = self.board_ui_bg.get_or_insert_with(|| RegularBackground::new(
-            Priority::P0,
-            RegularBackgroundSize::Background32x32,
-            TileFormat::FourBpp,
-        ));
-
-        // Solid board background on ui BG so gaps/margins are dark blue, not
-        // backdrop black. Card interiors will be cleared to transparent per-slot
-        // so the 8bpp art underneath shows through.
+        // Clear art_bg (8bpp) to transparent (index 0) each frame to prevent ghost cards
+        let clear_8bpp = TileSetting::new(0, TileEffect::new(false, false, 0));
+        let back_ts = unsafe { TileSet::new(BACK_FRONT, TileFormat::EightBpp) };
         for ty in 0..ROWS {
             for tx in 0..COLS {
-                ui_bg.set_tile((tx, ty), &ui_ts, TileSetting::new(UI_EMPTY, e0));
+                self.board_art_bg.set_tile((tx, ty), &back_ts, clear_8bpp);
+                self.board_ui_bg.set_tile((tx, ty), &ui_ts, TileSetting::new(UI_EMPTY, e0));
             }
         }
-        Self::blit_line(&mut ui_bg, &font_ts, &icon_ts, e0, &frame.header, 0, 0);
-        Self::blit_line(&mut ui_bg, &font_ts, &icon_ts, e0, &frame.action_count, COLS - 6, 0);
+        Self::blit_line(&mut self.board_ui_bg, &font_ts, &icon_ts, e0, &frame.header, 0, 0);
+        Self::blit_line(&mut self.board_ui_bg, &font_ts, &icon_ts, e0, &frame.action_count, COLS - 6, 0);
 
         // Stage rows: opponent (flipped 180°) then player, with live success + live set stacked on right
         for (row, y) in STAGE_YS.iter().enumerate() {
@@ -396,28 +426,29 @@ impl<'a> Display<'a> {
             for (i, slot) in stage.iter().enumerate() {
                 let xi = if is_opp { 2 - i } else { i };
                 let x = 1 + STAGE_PITCH * xi as i32;
-                draw_slot(
-                        &mut art_bg,
-                        &mut ui_bg,
-                        &ui_ts,
-                        &font_ts,
-                        &icon_ts,
-                        e_stage,
-                        slot,
-                        x,
-                        y,
-                        STAGE_CARD,
-                        STAGE_FRONTS,
-                        WAITED_FRONTS,
-                        BACK_FRONT,
-                        flipped,
-                    );
+                self.draw_slot(
+                    &mut art_bg,
+                    &mut ui_bg,
+                    &ui_ts,
+                    &font_ts,
+                    &icon_ts,
+                    e_stage,
+                    slot,
+                    x,
+                    y,
+                    STAGE_CARD,
+                    STAGE_FRONTS,
+                    WAITED_FRONTS,
+                    BACK_FRONT,
+                    flipped,
+                    "stage",
+                );
             }
             // Live/success zone (top 3 rows of stage row)
             for (i, slot) in live.iter().enumerate() {
                 let xi = if is_opp { 2 - i } else { i };
                 let x = INFO_X + LIVE_PITCH * xi as i32;
-                draw_slot(
+                self.draw_slot(
                     &mut art_bg,
                     &mut ui_bg,
                     &ui_ts,
@@ -432,13 +463,14 @@ impl<'a> Display<'a> {
                     WAITED_FRONTS,
                     BACK_FRONT,
                     flipped,
+                    "live",
                 );
             }
             // Live card set zone (bottom 3 rows of stage row) — flipped like 3DS landscape handling
             for (i, slot) in live_set.iter().enumerate() {
                 let xi = if is_opp { 2 - i } else { i };
                 let x = INFO_X + LIVE_PITCH * xi as i32;
-                draw_slot(
+                self.draw_slot(
                     &mut art_bg,
                     &mut ui_bg,
                     &ui_ts,
@@ -453,6 +485,7 @@ impl<'a> Display<'a> {
                     WAITED_FRONTS,
                     BACK_FRONT,
                     flipped,
+                    "live",
                 );
             }
         }
@@ -460,7 +493,7 @@ impl<'a> Display<'a> {
         // Hand window; a gold badge marks more cards off-screen right.
         for (i, slot) in frame.hand.iter().enumerate() {
             let x = HAND_PITCH * i as i32;
-            draw_slot(
+            self.draw_slot(
                 &mut art_bg,
                 &mut ui_bg,
                 &ui_ts,
@@ -475,6 +508,7 @@ impl<'a> Display<'a> {
                 WAITED_FRONTS,
                 BACK_FRONT,
                 false,
+                "hand",
             );
         }
         if frame.hand_more {
@@ -581,7 +615,7 @@ impl<'a> Display<'a> {
             // Baked 12x18 tiles address the portrait's own static bytes, so
             // every card uploads its own (pointer, tile) pairs — always the
             // right pixels, never stale, and freed on close.
-            let art_ts = unsafe { TileSet::new(art.tiles, TileFormat::EightBpp) };
+            let art_ts = self.get_tile_set("detail", art.card_no, art.tiles);
             // Reuse background to avoid VRAM allocation leak
             let mut abg = self.detail_art_bg.get_or_insert_with(|| RegularBackground::new(
                 Priority::P0,
@@ -591,7 +625,7 @@ impl<'a> Display<'a> {
             for i in 0..(DETAIL_DW * DETAIL_DH) {
                 let tx = (i % DETAIL_DW) as i32;
                 let ty = (i / DETAIL_DW) as i32 + DETAIL_Y0;
-                abg.set_tile((tx, ty), &art_ts, TileSetting::new(i as u16, TileEffect::new(false, false, 0)));
+                abg.set_tile((tx, ty), art_ts, TileSetting::new(i as u16, TileEffect::new(false, false, 0)));
             }
             abg.show(&mut f);
         }
@@ -757,7 +791,8 @@ impl<'a> Display<'a> {
                 .iter()
                 .find(|f| f.card_no == q.card_no.as_str())
             {
-                let ts = unsafe { TileSet::new(front.tiles, TileFormat::EightBpp) };
+                let front_type = if q.cols == 5 && q.rows == 6 { "stage" } else { "hand" };
+                let ts = self.get_tile_set(front_type, &q.card_no, front.tiles);
                 for ay in 0..q.rows {
                     for ax in 0..q.cols {
                         let sidx = (ay * q.cols + ax) as u16;
@@ -808,6 +843,88 @@ impl<'a> Display<'a> {
         frame.commit();
     }
 
+    /// Draw one card slot: 8bpp shared-palette front art on the art BG (or a
+    /// solid gray slot on the text BG), plus the gold badge in the right gap
+    /// column when the card has valid actions.
+    fn draw_slot(
+        &self,
+        art_bg: &mut RegularBackground,
+        ui_bg: &mut RegularBackground,
+        ui_ts: &TileSet,
+        font_ts: &TileSet,
+        icon_ts: &TileSet,
+        e0: TileEffect,
+        slot: &crate::board::Slot,
+        x: i32,
+        y: i32,
+        card: (i32, i32),
+        fronts: &[crate::card_art_gen::CardFront],
+        waited_fronts: &[crate::card_art_gen::CardFront],
+        back: &'static [u8],
+        flipped: bool,
+        front_type: &str, // "hand", "stage", "live", "waited"
+    ) {
+        let (cols, rows) = if slot.waited {
+            (4, 3) // wait grid: 4x3 tiles = 32x24
+        } else {
+            card
+        };
+        let fronts = if slot.waited { waited_fronts } else { fronts };
+        let art_eff = |fl: bool| if fl { TileEffect::new(true, true, 0) } else { TileEffect::new(false, false, 0) };
+        let empty = |ui_bg: &mut RegularBackground| {
+            for ty in 0..rows {
+                for tx in 0..cols {
+                    ui_bg.set_tile((x + tx, y + ty), ui_ts, TileSetting::new(UI_EMPTY, e0));
+                }
+            }
+        };
+        match &slot.card_no {
+            // Face-down: card back at live-slot geometry. `hidden` is only set
+            // on 3x2 live-set slots, matching BACK_FRONT's baked grid.
+            Some(_) if slot.hidden => {
+                let ts = self.get_tile_set("back", "back", back);
+                for ty in 0..2 {
+                    for tx in 0..3 {
+                        let sidx = if flipped { (1 - ty) * 3 + (2 - tx) } else { ty * 3 + tx } as u16;
+                        art_bg.set_tile(
+                            (x + tx, y + ty),
+                            ts,
+                            TileSetting::new(sidx, art_eff(flipped)),
+                        );
+                        ui_bg.set_tile((x + tx, y + ty), &ui_ts, TileSetting::BLANK);
+                    }
+                }
+            }
+            Some(card_no) => match fronts.iter().find(|f| f.card_no == card_no.as_str()) {
+                Some(front) => {
+                    let ts = self.get_tile_set(front_type, card_no, front.tiles);
+                    for ty in 0..rows {
+                        for tx in 0..cols {
+                            let sidx = if flipped { (rows - 1 - ty) * cols + (cols - 1 - tx) } else { ty * cols + tx } as u16;
+                            art_bg.set_tile(
+                                (x + tx, y + ty),
+                                ts,
+                                TileSetting::new(sidx, art_eff(flipped)),
+                            );
+                            // Clear ui_bg so card art shows through (ui is in front)
+                            ui_bg.set_tile((x + tx, y + ty), &ui_ts, TileSetting::BLANK);
+                        }
+                    }
+                }
+                None => {
+                    empty(ui_bg);
+                    Display::blit_line(ui_bg, font_ts, icon_ts, e0, card_no, x, y + rows / 2);
+                }
+            },
+            None => empty(ui_bg),
+        }
+        if slot.actionable {
+            // Gold badge on the card itself (top-right corner, or bottom-left when flipped 180°)
+            let (bx, by) = if flipped { (x, y + rows - 1) } else { (x + cols - 1, y) };
+            ui_bg.set_tile((bx, by), ui_ts, TileSetting::new(UI_BADGE, e0));
+        }
+    }
+
     pub fn wait(&mut self) {
         busy_wait_for_vblank();
     }
@@ -819,83 +936,3 @@ const DETAIL_DW: usize = 12;
 const DETAIL_DH: usize = 18;
 /// First tile row of the portrait (18 tall on a 20-row screen).
 const DETAIL_Y0: i32 = 1;
-
-/// Draw one card slot: 8bpp shared-palette front art on the art BG (or a
-/// solid gray slot on the text BG), plus the gold badge in the right gap
-/// column when the card has valid actions.
-fn draw_slot(
-    art_bg: &mut RegularBackground,
-    ui_bg: &mut RegularBackground,
-    ui_ts: &TileSet,
-    font_ts: &TileSet,
-    icon_ts: &TileSet,
-    e0: TileEffect,
-    slot: &crate::board::Slot,
-    x: i32,
-    y: i32,
-    card: (i32, i32),
-    fronts: &[crate::card_art_gen::CardFront],
-    waited_fronts: &[crate::card_art_gen::CardFront],
-    back: &'static [u8],
-    flipped: bool,
-    ) {
-    let (cols, rows) = if slot.waited {
-        (4, 3) // wait grid: 4x3 tiles = 32x24
-    } else {
-        card
-    };
-    let fronts = if slot.waited { waited_fronts } else { fronts };
-    let empty = |bg: &mut RegularBackground| {
-        for ty in 0..rows {
-            for tx in 0..cols {
-                bg.set_tile((x + tx, y + ty), ui_ts, TileSetting::new(UI_EMPTY, e0));
-            }
-        }
-    };
-    let art_eff = |fl: bool| if fl { TileEffect::new(true, true, 0) } else { TileEffect::new(false, false, 0) };
-    match &slot.card_no {
-        // Face-down: card back at live-slot geometry. `hidden` is only set
-        // on 3x2 live-set slots, matching BACK_FRONT's baked grid.
-        Some(_) if slot.hidden => {
-            let ts = unsafe { TileSet::new(back, TileFormat::EightBpp) };
-            for ty in 0..2 {
-                for tx in 0..3 {
-                    let sidx = if flipped { (1 - ty) * 3 + (2 - tx) } else { ty * 3 + tx } as u16;
-                    art_bg.set_tile(
-                        (x + tx, y + ty),
-                        &ts,
-                        TileSetting::new(sidx, art_eff(flipped)),
-                    );
-                    ui_bg.set_tile((x + tx, y + ty), &ui_ts, TileSetting::BLANK);
-                }
-            }
-        }
-        Some(card_no) => match fronts.iter().find(|f| f.card_no == card_no.as_str()) {
-            Some(front) => {
-                let ts = unsafe { TileSet::new(front.tiles, TileFormat::EightBpp) };
-                for ty in 0..rows {
-                    for tx in 0..cols {
-                        let sidx = if flipped { (rows - 1 - ty) * cols + (cols - 1 - tx) } else { ty * cols + tx } as u16;
-                        art_bg.set_tile(
-                            (x + tx, y + ty),
-                            &ts,
-                            TileSetting::new(sidx, art_eff(flipped)),
-                        );
-                        // Clear ui_bg so card art shows through (ui is in front)
-                        ui_bg.set_tile((x + tx, y + ty), &ui_ts, TileSetting::BLANK);
-                    }
-                }
-            }
-            None => {
-                empty(ui_bg);
-                Display::blit_line(ui_bg, font_ts, icon_ts, e0, card_no, x, y + rows / 2);
-            }
-        },
-        None => empty(ui_bg),
-    }
-    if slot.actionable {
-        // Gold badge on the card itself (top-right corner, or bottom-left when flipped 180°)
-        let (bx, by) = if flipped { (x, y + rows - 1) } else { (x + cols - 1, y) };
-        ui_bg.set_tile((bx, by), ui_ts, TileSetting::new(UI_BADGE, e0));
-    }
-}

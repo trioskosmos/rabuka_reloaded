@@ -15,7 +15,7 @@ fn sp_pb1_004_live_start_pay_2e_places_wait() {
     crate::helpers::fire_trigger(&mut game, sumire, rabuka_engine::core::types::AbilityTrigger::LiveStart, "ライブ開始時");
     assert!(game.has_pending_choice(), "LiveStart should present pay 2E choice");
     game.select_option(1); // Pay is option 1 (0 is skip)
-    while game.has_pending_choice() { game.select_indices(&[]); }
+    game.drain_choices_strict(&["SelectCard", "SelectAutoAbility"], &[]);
     assert_eq!(game.state.player1.energy_zone.active_count(), active_before.saturating_sub(2), "should pay 2 active energy");
     // Energy deck may be empty in TestGame new, so don't strictly assert deck length; just ensure no panic and active decreased
     assert!(game.state.player1.energy_deck.cards.len() <= deck_before, "energy deck should not increase");
@@ -35,7 +35,7 @@ fn sp_pb1_004_live_start_skip_no_effect() {
     crate::helpers::fire_trigger(&mut game, sumire, rabuka_engine::core::types::AbilityTrigger::LiveStart, "ライブ開始時");
     assert!(game.has_pending_choice());
     game.select_option(0); // Skip is option 0
-    while game.has_pending_choice() { game.select_indices(&[]); }
+    game.drain_choices_strict(&["SelectCard", "SelectAutoAbility"], &[]);
     assert_eq!(game.state.player1.energy_zone.active_count(), active_before, "skip should not pay energy");
     assert_eq!(game.state.player1.energy_deck.cards.len(), deck_before, "skip should not move energy");
 }
@@ -51,13 +51,13 @@ fn sp_pb1_004_live_start_insufficient_energy_no_pay() {
     game.give_energy(1); // only 1, need 2
     let active_before = game.state.player1.energy_zone.active_count();
     crate::helpers::fire_trigger(&mut game, sumire, rabuka_engine::core::types::AbilityTrigger::LiveStart, "ライブ開始時");
-    // With insufficient energy, the pay option should be disabled or not present; engine should still present choice but pay may be unavailable
+    // With insufficient energy, the pay option should be disabled or not present; engine may not offer choice
     if game.has_pending_choice() {
         // Try to pay (if available) — but with 1 energy, pay 2 should be blocked
         // The engine should either not offer pay or fail to pay and keep energy
         let before = game.state.player1.energy_zone.active_count();
         game.select_option(0);
-        while game.has_pending_choice() { game.select_indices(&[]); }
+        game.drain_choices_strict(&["SelectCard", "SelectAutoAbility"], &[]);
         // Active should not go negative; should stay at 1 or be 0 if pay was incorrectly allowed
         assert!(game.state.player1.energy_zone.active_count() <= before, "should not overpay");
     }
@@ -78,7 +78,7 @@ fn sp_pb1_004_live_success_pay_3e_draws() {
     crate::helpers::fire_trigger(&mut game, sumire, rabuka_engine::core::types::AbilityTrigger::LiveSuccess, "ライブ成功時");
     assert!(game.has_pending_choice(), "LiveSuccess should present pay 3E choice");
     game.select_option(1); // Pay is option 1
-    while game.has_pending_choice() { game.select_indices(&[]); }
+    game.drain_choices_strict(&["SelectCard", "SelectAutoAbility"], &[]);
     assert_eq!(game.state.player1.hand.cards.len(), hand_before + 1, "should draw 1 on pay");
     assert_eq!(game.state.player1.energy_zone.active_count(), 2, "5-3=2 active left");
 }
@@ -96,7 +96,7 @@ fn sp_pb1_004_live_success_skip_no_draw() {
     crate::helpers::fire_trigger(&mut game, sumire, rabuka_engine::core::types::AbilityTrigger::LiveSuccess, "ライブ成功時");
     assert!(game.has_pending_choice());
     game.select_option(0); // Skip is option 0
-    while game.has_pending_choice() { game.select_indices(&[]); }
+    game.drain_choices_strict(&["SelectCard", "SelectAutoAbility"], &[]);
     assert_eq!(game.state.player1.hand.cards.len(), hand_before, "skip should not draw");
     assert_eq!(game.state.player1.energy_zone.active_count(), 5, "skip should not pay");
 }

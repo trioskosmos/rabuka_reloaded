@@ -3,12 +3,14 @@ use crate::helpers::*;
 use rabuka_engine::ability::types::Choice;
 
 fn drain_pay(game: &mut TestGame) {
-    let mut guard = 0;
-    while game.has_pending_choice() && guard < 30 {
-        guard += 1;
-        match game.get_pending_choice() {
-            Choice::SelectAutoAbility { .. } => game.select_indices(&[]),
-            _ => break,
+    for _ in 0..30 {
+        if let Some(choice) = game.state.get_pending_choice() {
+            match choice {
+                rabuka_engine::ability::types::Choice::SelectAutoAbility { .. } => game.select_indices(&[]),
+                _ => break,
+            }
+        } else {
+            break;
         }
     }
 }
@@ -56,8 +58,6 @@ fn pb1_004_pay_4e_draw_1() {
 
     advance_live(&mut game);
 
-    // The draw may have fired automatically after paying the energy cost.
-    // Check that the deck was consumed by at least the base draw.
     let deck_after = game.state.player1.main_deck.cards.len();
     assert!(
         deck_before > deck_after,
@@ -105,10 +105,13 @@ fn bp5_020_skip_no_draw() {
     game.set_live_card(live);
     // Directly fire LiveSuccess via trigger to test pay vs skip without full live flow
     crate::helpers::fire_trigger(&mut game, live, rabuka_engine::core::types::AbilityTrigger::LiveSuccess, "ライブ成功時");
-    if game.has_pending_choice() {
-        game.select_option(0); // skip is 0
-        while game.has_pending_choice() { game.select_indices(&[]); }
+    if let Some(choice) = game.state.get_pending_choice() {
+        match choice {
+            rabuka_engine::ability::types::Choice::SelectTarget { .. } => game.select_option(0), // skip is 0
+            _ => panic!("Unexpected choice type: {:?}", choice),
+        }
     }
+    game.drain_choices_strict(&["SelectCard", "SelectAutoAbility"], &[]);
     // Skip should not draw, hand should not have grown beyond the live itself
     assert!(!game.has_pending_choice());
 }
@@ -126,12 +129,17 @@ fn bp5_020_insufficient_energy_no_draw() {
     for _ in 0..5 { game.pass(); }
     game.set_live_card(live);
     crate::helpers::fire_trigger(&mut game, live, rabuka_engine::core::types::AbilityTrigger::LiveSuccess, "ライブ成功時");
-    if game.has_pending_choice() {
-        // Try to pay with 0 energy — should either not offer pay or fail
-        let before = game.state.player1.energy_zone.active_count();
-        game.select_option(1); // try pay (if available)
-        while game.has_pending_choice() { game.select_indices(&[]); }
-        assert!(game.state.player1.energy_zone.active_count() <= before);
+    let before = game.state.player1.energy_zone.active_count();
+    if let Some(choice) = game.state.get_pending_choice() {
+        match choice {
+            rabuka_engine::ability::types::Choice::SelectTarget { .. } => {
+                // Try to pay with 0 energy — should either not offer pay or fail
+                game.select_option(1); // try pay (if available)
+            }
+            _ => panic!("Unexpected choice type: {:?}", choice),
+        }
     }
+    game.drain_choices_strict(&["SelectCard", "SelectAutoAbility"], &[]);
+    assert!(game.state.player1.energy_zone.active_count() <= before);
     assert!(true);
 }

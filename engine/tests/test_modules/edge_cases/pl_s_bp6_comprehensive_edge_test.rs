@@ -6,10 +6,14 @@ fn blade(v: &TestGame, cid: i16) -> i32 {
     v.state.mods.blade_modifiers.get(&cid).map(|e| e.total()).unwrap_or(0)
 }
 fn drain(v: &mut TestGame) {
-    while v.has_pending_choice() {
-        match v.pending_choice_type().as_deref() {
-            Some("SelectAutoAbility") => v.select_indices(&[0]),
-            _ => v.select_indices(&[]),
+    for _ in 0..50 {
+        if let Some(choice) = v.state.get_pending_choice() {
+            match choice {
+                rabuka_engine::ability::types::Choice::SelectAutoAbility { .. } => v.select_indices(&[0]),
+                _ => v.select_indices(&[]),
+            }
+        } else {
+            break;
         }
     }
 }
@@ -157,9 +161,14 @@ fn mari_no_valid_target_no_placement() {
     for _ in 0..40 { g.state.player1.main_deck.cards.push(filler); }
     g.activate_ability(mari);
     // Should still prompt but with 0 filtered (or allow skip)
-    if g.has_pending_choice() {
-        // If 0 filtered, selecting [] should not place anything
-        g.select_indices(&[]);
+    if let Some(choice) = g.state.get_pending_choice() {
+        match choice {
+            rabuka_engine::ability::types::Choice::SelectCard { .. } => {
+                // If 0 filtered, selecting [] should not place anything
+                g.select_indices(&[]);
+            }
+            _ => panic!("Unexpected choice type: {:?}", choice),
+        }
         drain(&mut g);
     }
     // No new member on stage besides Mari's old spot now empty? Mari moved to discard, but no placement

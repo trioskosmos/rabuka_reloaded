@@ -59,9 +59,10 @@ fn s_bp6_015_wait_opponent_multiple_cost2_choose_one() {
     for _ in 0..5 { let f=game.id("PL!-sd1-010-SD"); game.state.player1.main_deck.cards.push(f); }
     game.play_to_stage(yoshiko, MemberArea::Center);
     // Debut should present a choice to pick which cost2 to wait (if multiple)
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
+    assert!(game.has_pending_choice(), "expected SelectCard for multiple cost2 targets");
+    assert_eq!(game.pending_choice_type().as_deref(), Some("SelectCard"));
+    game.select_indices(&[0]);
+    game.drain_choices_strict(&["SelectCard", "SelectAutoAbility"], &[]);
     let waited1 = game.state.mods.get_orientation_modifier(opp1);
     let waited2 = game.state.mods.get_orientation_modifier(opp2);
     let waited_count = [waited1, waited2].iter().filter(|m| m.as_deref()==Some("wait")).count();

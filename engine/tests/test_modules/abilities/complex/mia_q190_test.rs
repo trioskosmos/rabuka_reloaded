@@ -207,8 +207,8 @@ fn mia_q190_no_live_in_hand_still_prompts_skip() {
     game.set_live_card(live_for_zone);
     game.pass(); game.pass();
     // With no live in hand (only filler), the optional cost may still prompt as skippable or may be auto-skipped
-    if game.has_pending_choice() {
-        match game.get_pending_choice() {
+    if let Some(choice) = game.state.get_pending_choice() {
+        match choice {
             Choice::SelectCard { allow_skip, .. } => assert!(*allow_skip),
             other => panic!("expected SelectCard, got {:?}", other),
         }
@@ -235,7 +235,15 @@ fn mia_live_success_distinct_3_recovers() {
     game.state.player1.hand.cards.push(live);
     for _ in 0..5 { game.pass(); }
     game.set_live_card(live);
-    for _ in 0..7 { game.pass(); if game.has_pending_choice() { game.select_indices(&[]); } }
+    for _ in 0..7 {
+        game.pass();
+        if let Some(choice) = game.state.get_pending_choice() {
+            match choice {
+                rabuka_engine::ability::types::Choice::SelectCard { .. } => game.select_indices(&[]),
+                _ => game.select_indices(&[]),
+            }
+        }
+    }
     assert!(!game.has_pending_choice());
 }
 
@@ -255,6 +263,14 @@ fn mia_live_success_distinct_2_no_recover() {
     game.state.player1.hand.cards.push(live);
     for _ in 0..5 { game.pass(); }
     game.set_live_card(live);
-    for _ in 0..7 { game.pass(); if game.has_pending_choice() { game.select_indices(&[]); } }
+    for _ in 0..7 {
+        game.pass();
+        if let Some(choice) = game.state.get_pending_choice() {
+            match choice {
+                rabuka_engine::ability::types::Choice::SelectCard { .. } => game.select_indices(&[]),
+                _ => game.select_indices(&[]),
+            }
+        }
+    }
     assert!(!game.has_pending_choice());
 }

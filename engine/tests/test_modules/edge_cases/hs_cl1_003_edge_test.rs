@@ -23,8 +23,13 @@ fn hs_cl1_already_wait_no_blade() {
     // This test documents the current behavior.
     assert!(res.is_ok(), "re-wait should be ok, got {:?}", res);
     game.drain_auto_ability_choices();
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
+    if let Some(choice) = game.state.get_pending_choice() {
+        match choice {
+            rabuka_engine::ability::types::Choice::SelectCard { .. } => {
+                game.select_indices(&[0]);
+            }
+            _ => panic!("Unexpected choice type: {:?}", choice),
+        }
         game.drain_auto_ability_choices();
     }
     let blade = game.state.mods.get_blade_modifier(card);
@@ -81,8 +86,13 @@ fn hs_cl1_choice_among_multiple_mirakura() {
     // If choice is required, it will be pending; otherwise it auto-picks.
     // We just verify that at least one of the three gets blade after resolution.
     game.drain_auto_ability_choices();
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
+    if let Some(choice) = game.state.get_pending_choice() {
+        match choice {
+            rabuka_engine::ability::types::Choice::SelectCard { .. } => {
+                game.select_indices(&[0]);
+            }
+            _ => panic!("Unexpected choice type: {:?}", choice),
+        }
         game.drain_auto_ability_choices();
     }
     let b0 = game.state.mods.get_blade_modifier(card);

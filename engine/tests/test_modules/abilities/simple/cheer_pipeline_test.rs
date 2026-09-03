@@ -143,15 +143,14 @@ fn cheer_pipeline_score_icon() {
     // (skip = arrange zero cards, legal) and continue until finalized.
     let mut saw_result = false;
     for _ in 0..10 {
-        if game.has_pending_choice() {
+        if let Some(choice) = game.state.get_pending_choice() {
             // DASH's optional arrange is the only expected prompt here.
-            assert_eq!(
-                game.pending_choice_type().as_deref(),
-                Some("SelectCard"),
-                "expected SelectCard (looked_at arrange), got {:?}",
-                game.pending_choice_type()
-            );
-            game.select_indices(&[]);
+            match choice {
+                rabuka_engine::ability::types::Choice::SelectCard { .. } => {
+                    game.select_indices(&[]);
+                }
+                _ => panic!("Unexpected choice type: {:?}", choice),
+            }
             continue;
         }
         let phase = game.state.current_phase.to_string();

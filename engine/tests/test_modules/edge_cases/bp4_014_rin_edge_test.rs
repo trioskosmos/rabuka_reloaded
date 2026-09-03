@@ -79,9 +79,14 @@ fn rin_choice_among_two_mates() {
     // Should have a choice to pick which other member gets blade
     // If the engine auto-picks, at least one of the two mates gets blade
     game.drain_auto_ability_choices();
-    if game.has_pending_choice() {
-        // Choose mate1
-        game.select_indices(&[0]);
+    if let Some(choice) = game.state.get_pending_choice() {
+        match choice {
+            rabuka_engine::ability::types::Choice::SelectCard { .. } => {
+                // Choose mate1
+                game.select_indices(&[0]);
+            }
+            _ => panic!("Unexpected choice type: {:?}", choice),
+        }
         game.drain_auto_ability_choices();
     }
     let b1 = game.state.mods.get_blade_modifier(mate1);

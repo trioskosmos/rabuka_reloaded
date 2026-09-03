@@ -34,8 +34,13 @@ fn riko_opponent_declines_gains_live_total() {
     game.play_to_stage(riko, rabuka_engine::zones::MemberArea::Center);
     game.drain_auto_ability_choices();
     // Opponent has a member but no live, so the live discard choice may be skipped
-    if game.has_pending_choice() {
-        game.select_indices(&[]);
+    if let Some(choice) = game.state.get_pending_choice() {
+        match choice {
+            rabuka_engine::ability::types::Choice::SelectCard { .. } | rabuka_engine::ability::types::Choice::SelectTarget { .. } => {
+                game.select_indices(&[]);
+            }
+            _ => panic!("Unexpected choice type: {:?}", choice),
+        }
         game.drain_auto_ability_choices();
     }
     assert_eq!(game.state.mods.p1_constant_total_score_bonus, 1, "opponent declined/no live -> gain");
@@ -54,8 +59,13 @@ fn riko_opponent_no_live_in_hand_no_choice() {
     game.drain_auto_ability_choices();
     // No live to discard, so opponent cannot discard, but can decline
     // The choice should still be present but with 0 selectable
-    if game.has_pending_choice() {
-        game.select_indices(&[]);
+    if let Some(choice) = game.state.get_pending_choice() {
+        match choice {
+            rabuka_engine::ability::types::Choice::SelectCard { .. } | rabuka_engine::ability::types::Choice::SelectTarget { .. } => {
+                game.select_indices(&[]);
+            }
+            _ => panic!("Unexpected choice type: {:?}", choice),
+        }
         game.drain_auto_ability_choices();
     }
     assert_eq!(game.state.mods.p1_constant_total_score_bonus, 1, "no live -> opponent cannot discard -> gain");

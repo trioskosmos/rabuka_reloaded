@@ -19,21 +19,29 @@ fn yoshi_center_cost4_to_cost6_succeeds() {
     game.state.player1.stage.stage[0] = target_cost4;
     let res = game.try_activate_ability(yoshi);
     assert!(res.is_ok(), "yoshi center should be activatable: {:?}", res);
-    if game.has_pending_choice() {
-        // First choice: discard 1 from hand (cost)
-        game.select_indices(&[0]);
+    // First choice: discard 1 from hand (cost)
+    assert!(game.has_pending_choice(), "expected discard cost prompt");
+    game.select_indices(&[0]);
+    // Second: choose Aqours member to remove (target_cost4) - target is at stage index 0, filtered index 0
+    // If there's only one valid target, it might be auto-selected; check if prompt appears
+    if let Some(choice) = game.state.get_pending_choice() {
+        match choice {
+            rabuka_engine::ability::types::Choice::SelectCard { .. } => {
+                let stage_pos = game.state.player1.stage.stage.iter().position(|&id| id==target_cost4).unwrap();
+                assert_eq!(stage_pos, 0, "target should be at stage 0");
+                game.select_indices(&[0]);
+            }
+            _ => panic!("Unexpected choice type: {:?}", choice),
+        }
     }
-    if game.has_pending_choice() {
-        // Second: choose Aqours member to remove (target_cost4) - target is at stage index 0, filtered index 0
-        let stage_pos = game.state.player1.stage.stage.iter().position(|&id| id==target_cost4).unwrap();
-        assert_eq!(stage_pos, 0, "target should be at stage 0");
-        game.select_indices(&[0]);
+    // Third: choose from discard cost X+2
+    if let Some(choice) = game.state.get_pending_choice() {
+        match choice {
+            rabuka_engine::ability::types::Choice::SelectCard { .. } => game.select_indices(&[0]),
+            _ => panic!("Unexpected choice type: {:?}", choice),
+        }
     }
-    if game.has_pending_choice() {
-        // Third: choose from discard cost X+2
-        game.select_indices(&[0]);
-    }
-    while game.has_pending_choice() { game.select_indices(&[]); }
+    game.drain_choices_strict(&["SelectCard", "SelectAutoAbility"], &[]);
     // After success, candidate should be on stage at same area where target was (index 0)
     assert!(game.state.player1.stage.stage[0]==candidate || game.state.player1.waitroom.cards.contains(&target_cost4), "cost+2 should place candidate in same area");
 }
@@ -52,10 +60,28 @@ fn yoshi_cost4_with_no_cost6_in_discard_no_place() {
     game.state.player1.stage.stage[1]=yoshi;
     game.state.player1.stage.stage[0]=target;
     let _ = game.try_activate_ability(yoshi);
-    if game.has_pending_choice() { game.select_indices(&[0]); }
-    if game.has_pending_choice() { game.select_indices(&[0]); }
-    if game.has_pending_choice() { game.select_indices(&[]); }
-    while game.has_pending_choice() { game.select_indices(&[]); }
+    // First choice: discard 1 from hand (cost)
+    if let Some(choice) = game.state.get_pending_choice() {
+        match choice {
+            rabuka_engine::ability::types::Choice::SelectCard { .. } => game.select_indices(&[0]),
+            _ => panic!("Unexpected choice type: {:?}", choice),
+        }
+    }
+    // Second: choose Aqours member to remove
+    if let Some(choice) = game.state.get_pending_choice() {
+        match choice {
+            rabuka_engine::ability::types::Choice::SelectCard { .. } => game.select_indices(&[0]),
+            _ => panic!("Unexpected choice type: {:?}", choice),
+        }
+    }
+    // Third: no cost6 in discard, so skip
+    if let Some(choice) = game.state.get_pending_choice() {
+        match choice {
+            rabuka_engine::ability::types::Choice::SelectCard { .. } => game.select_indices(&[]),
+            _ => panic!("Unexpected choice type: {:?}", choice),
+        }
+    }
+    game.drain_choices_strict(&["SelectCard", "SelectAutoAbility"], &[]);
     // Target should have been moved to discard, but no candidate placed because no cost6
     assert!(game.state.player1.waitroom.cards.contains(&target), "target should be in discard");
     assert!(!game.state.player1.stage.stage.contains(&wrong_cost), "wrong cost should not be placed");
@@ -70,9 +96,15 @@ fn yoshi_no_other_aqours_no_target() {
     game.state.player1.hand.cards.push(game.id("PL!-sd1-010-SD"));
     game.give_energy(20);
     game.try_activate_ability(yoshi).ok();
-    if game.has_pending_choice() { game.select_indices(&[0]); }
+    // First choice: discard 1 from hand (cost)
+    if let Some(choice) = game.state.get_pending_choice() {
+        match choice {
+            rabuka_engine::ability::types::Choice::SelectCard { .. } => game.select_indices(&[0]),
+            _ => panic!("Unexpected choice type: {:?}", choice),
+        }
+    }
     // With no other Aqours, the second step should have no selectable target, so ability ends after cost
-    while game.has_pending_choice() { game.select_indices(&[]); }
+    game.drain_choices_strict(&["SelectCard", "SelectAutoAbility"], &[]);
     assert!(game.state.player1.stage.stage.contains(&yoshi) || game.state.player1.waitroom.cards.contains(&yoshi), "yoshi should be wait or stage");
 }
 
@@ -103,10 +135,25 @@ fn yoshi_turn1_blocks_second() {
     game.give_energy(20);
     game.state.player1.stage.stage[1]=yoshi;
     let _ = game.try_activate_ability(yoshi);
-    if game.has_pending_choice() { game.select_indices(&[0]); }
-    if game.has_pending_choice() { game.select_indices(&[0]); }
-    if game.has_pending_choice() { game.select_indices(&[0]); }
-    while game.has_pending_choice() { game.select_indices(&[]); }
+    if let Some(choice) = game.state.get_pending_choice() {
+        match choice {
+            rabuka_engine::ability::types::Choice::SelectCard { .. } => game.select_indices(&[0]),
+            _ => panic!("Unexpected choice type: {:?}", choice),
+        }
+    }
+    if let Some(choice) = game.state.get_pending_choice() {
+        match choice {
+            rabuka_engine::ability::types::Choice::SelectCard { .. } => game.select_indices(&[0]),
+            _ => panic!("Unexpected choice type: {:?}", choice),
+        }
+    }
+    if let Some(choice) = game.state.get_pending_choice() {
+        match choice {
+            rabuka_engine::ability::types::Choice::SelectCard { .. } => game.select_indices(&[0]),
+            _ => panic!("Unexpected choice type: {:?}", choice),
+        }
+    }
+    game.drain_choices_strict(&["SelectCard", "SelectAutoAbility"], &[]);
     let res2 = game.try_activate_ability(yoshi);
     assert!(res2.is_err(), "turn1 should block second");
 }

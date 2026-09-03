@@ -92,7 +92,7 @@ fn perform_live(
             );
             prev_phase = phase.clone();
         }
-        if game.has_pending_choice() {
+        if let Some(choice) = game.state.get_pending_choice() {
             on_choice(game);
             continue;
         }

@@ -21,11 +21,15 @@ fn s_bp2_021_live_success_with_live_in_yell_moves_to_deck_bottom() {
     let deck_len_before = game.state.player1.main_deck.cards.len();
     crate::helpers::fire_trigger(&mut game, live, rabuka_engine::core::types::AbilityTrigger::LiveSuccess, "ライブ成功時");
     // The move should be pending as SelectCard over revealed_cards (max 1, allow_skip)
-    if game.has_pending_choice() {
-        // Should offer the live_in_yell as selectable
-        game.select_indices(&[0]);
-        while game.has_pending_choice() { game.select_indices(&[]); }
+    if let Some(choice) = game.state.get_pending_choice() {
+        match choice {
+            rabuka_engine::ability::types::Choice::SelectCard { .. } => {
+                game.select_indices(&[0]);
+            }
+            _ => panic!("Unexpected choice type: {:?}", choice),
+        }
     }
+    game.drain_choices_strict(&["SelectCard", "SelectAutoAbility"], &[]);
     // Live should now be at deck bottom
     let deck = &game.state.player1.main_deck.cards;
     assert!(deck.contains(&live_in_yell) || deck.len() == deck_len_before + 1, "live should be at deck bottom or deck grew");
@@ -46,11 +50,16 @@ fn s_bp2_021_live_success_no_live_in_yell_no_move() {
     game.state.yell_occurred = true;
     let deck_before = game.state.player1.main_deck.cards.clone();
     crate::helpers::fire_trigger(&mut game, live, rabuka_engine::core::types::AbilityTrigger::LiveSuccess, "ライブ成功時");
-    if game.has_pending_choice() {
-        // No live eligible, should be skippable or auto-skip
-        game.select_indices(&[]);
-        while game.has_pending_choice() { game.select_indices(&[]); }
+    if let Some(choice) = game.state.get_pending_choice() {
+        match choice {
+            rabuka_engine::ability::types::Choice::SelectCard { .. } => {
+                // No live eligible, should be skippable or auto-skip
+                game.select_indices(&[]);
+            }
+            _ => panic!("Unexpected choice type: {:?}", choice),
+        }
     }
+    game.drain_choices_strict(&["SelectCard", "SelectAutoAbility"], &[]);
     assert_eq!(game.state.player1.main_deck.cards, deck_before, "no live in yell should not change deck");
 }
 
@@ -67,9 +76,15 @@ fn s_bp2_021_live_success_empty_yell_no_move() {
     game.state.yell_occurred = false;
     let deck_before = game.state.player1.main_deck.cards.clone();
     crate::helpers::fire_trigger(&mut game, live, rabuka_engine::core::types::AbilityTrigger::LiveSuccess, "ライブ成功時");
-    if game.has_pending_choice() {
-        game.select_indices(&[]);
+    if let Some(choice) = game.state.get_pending_choice() {
+        match choice {
+            rabuka_engine::ability::types::Choice::SelectCard { .. } => {
+                game.select_indices(&[]);
+            }
+            _ => panic!("Unexpected choice type: {:?}", choice),
+        }
     }
+    game.drain_choices_strict(&["SelectCard", "SelectAutoAbility"], &[]);
     assert_eq!(game.state.player1.main_deck.cards, deck_before);
 }
 
@@ -88,9 +103,15 @@ fn s_bp2_021_live_success_skip_optional() {
     game.state.yell_occurred = true;
     let deck_before = game.state.player1.main_deck.cards.clone();
     crate::helpers::fire_trigger(&mut game, live, rabuka_engine::core::types::AbilityTrigger::LiveSuccess, "ライブ成功時");
-    if game.has_pending_choice() {
-        game.select_indices(&[]); // skip optional
+    if let Some(choice) = game.state.get_pending_choice() {
+        match choice {
+            rabuka_engine::ability::types::Choice::SelectCard { .. } => {
+                game.select_indices(&[]); // skip optional
+            }
+            _ => panic!("Unexpected choice type: {:?}", choice),
+        }
     }
+    game.drain_choices_strict(&["SelectCard", "SelectAutoAbility"], &[]);
     // Deck should be unchanged when skipped
     assert_eq!(game.state.player1.main_deck.cards, deck_before);
     assert!(game.state.revealed_cards.contains(&live_in_yell) || game.state.player1.main_deck.cards.contains(&live_in_yell)==false, "skip should leave revealed");

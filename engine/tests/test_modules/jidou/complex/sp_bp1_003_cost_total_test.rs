@@ -12,7 +12,13 @@ fn chisato_cost_total_10_triggers() {
     game.state.player1.hand.cards.push(game.new_id("PL!S-bp2-002-R"));
     game.give_energy(5);
     let _ = game.try_activate_ability(chisato);
-    if game.has_pending_choice() { game.select_indices(&[0,1]); while game.has_pending_choice() { game.select_indices(&[]); } }
+    if let Some(choice) = game.state.get_pending_choice() {
+        match choice {
+            rabuka_engine::ability::types::Choice::SelectCard { .. } => game.select_indices(&[0,1]),
+            _ => panic!("Unexpected choice type: {:?}", choice),
+        }
+    }
+    game.drain_choices_strict(&["SelectCard", "SelectAutoAbility"], &[]);
     assert!(true);
 }
 #[test]
@@ -27,7 +33,13 @@ fn chisato_cost_total_20_triggers() {
     game.state.player1.hand.cards.push(high2);
     game.give_energy(5);
     let _ = game.try_activate_ability(chisato);
-    if game.has_pending_choice() { game.select_indices(&[0,1]); while game.has_pending_choice() { game.select_indices(&[]); } }
+    if let Some(choice) = game.state.get_pending_choice() {
+        match choice {
+            rabuka_engine::ability::types::Choice::SelectCard { .. } => game.select_indices(&[0,1]),
+            _ => panic!("Unexpected choice type: {:?}", choice),
+        }
+    }
+    game.drain_choices_strict(&["SelectCard", "SelectAutoAbility"], &[]);
     assert!(true);
 }
 #[test]
@@ -40,7 +52,13 @@ fn chisato_cost_total_no_match_no_bonus() {
     game.state.player1.hand.cards.push(low);
     game.give_energy(5);
     let _ = game.try_activate_ability(chisato);
-    if game.has_pending_choice() { game.select_indices(&[0]); while game.has_pending_choice() { game.select_indices(&[]); } }
+    if let Some(choice) = game.state.get_pending_choice() {
+        match choice {
+            rabuka_engine::ability::types::Choice::SelectCard { .. } => game.select_indices(&[0]),
+            _ => panic!("Unexpected choice type: {:?}", choice),
+        }
+    }
+    game.drain_choices_strict(&["SelectCard", "SelectAutoAbility"], &[]);
     assert!(!game.has_pending_choice());
 }
 #[test]
@@ -52,7 +70,13 @@ fn chisato_empty_hand_no_cost_total() {
     game.state.player1.hand.cards.clear();
     game.give_energy(5);
     let _ = game.try_activate_ability(chisato);
-    if game.has_pending_choice() { game.select_indices(&[]); }
+    if let Some(choice) = game.state.get_pending_choice() {
+        match choice {
+            rabuka_engine::ability::types::Choice::SelectCard { .. } => game.select_indices(&[]),
+            _ => panic!("Unexpected choice type: {:?}", choice),
+        }
+    }
+    game.drain_choices_strict(&["SelectCard", "SelectAutoAbility"], &[]);
     assert!(!game.has_pending_choice());
 }
 #[test]
@@ -66,7 +90,13 @@ fn chisato_turn1_blocks_second() {
     game.state.player1.hand.cards.push(game.new_id("PL!S-bp2-002-R"));
     game.give_energy(5);
     let _ = game.try_activate_ability(chisato);
-    if game.has_pending_choice() { game.select_indices(&[0,1]); while game.has_pending_choice() { game.select_indices(&[]); } }
+    if let Some(choice) = game.state.get_pending_choice() {
+        match choice {
+            rabuka_engine::ability::types::Choice::SelectCard { .. } => game.select_indices(&[0,1]),
+            _ => panic!("Unexpected choice type: {:?}", choice),
+        }
+    }
+    game.drain_choices_strict(&["SelectCard", "SelectAutoAbility"], &[]);
     let res2 = game.try_activate_ability(chisato);
     assert!(res2.is_err(), "turn1 should block second");
 }

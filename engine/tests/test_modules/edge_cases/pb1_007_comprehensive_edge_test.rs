@@ -43,6 +43,7 @@ fn pb1_007_cost_3_with_0_success() {
     let count = game.pending_choice_count();
     assert_eq!(count, 3, "0 success -> cost 3, got {}", count);
     game.select_indices(&[0,1,2]);
+    game.drain_choices_strict(&["SelectCard", "SelectAutoAbility"], &[]);
     assert!(game.state.player1.hand.cards.contains(&mus_live));
 }
 
@@ -58,6 +59,7 @@ fn pb1_007_cost_2_with_1_success() {
     let count = game.pending_choice_count();
     assert_eq!(count, 2, "1 success -> cost 2, got {}", count);
     game.select_indices(&[0,1]);
+    game.drain_choices_strict(&["SelectCard", "SelectAutoAbility"], &[]);
     assert!(game.state.player1.hand.cards.contains(&mus_live));
 }
 
@@ -73,6 +75,7 @@ fn pb1_007_cost_1_with_2_success() {
     let count = game.pending_choice_count();
     assert_eq!(count, 1, "2 success -> cost 1, got {}", count);
     game.select_indices(&[0]);
+    game.drain_choices_strict(&["SelectCard", "SelectAutoAbility"], &[]);
     assert!(game.state.player1.hand.cards.contains(&mus_live));
 }
 
@@ -86,11 +89,11 @@ fn pb1_007_cost_0_with_3_success() {
     game.state.player1.waitroom.cards.push(mus_live);
     let res = game.try_activate_ability(me);
     assert!(res.is_ok(), "cost 1 with 2 success should still activate: {:?}", res);
-    if game.has_pending_choice() {
-        let count = game.pending_choice_count();
-        assert_eq!(count, 1, "2 success -> cost 1 (max before win), got {}", count);
-        game.select_indices(&[0]);
-    }
+    assert!(game.has_pending_choice());
+    let count = game.pending_choice_count();
+    assert_eq!(count, 1, "2 success -> cost 1 (max before win), got {}", count);
+    game.select_indices(&[0]);
+    game.drain_choices_strict(&["SelectCard", "SelectAutoAbility"], &[]);
     assert!(game.state.player1.hand.cards.contains(&mus_live));
 }
 
@@ -103,11 +106,11 @@ fn pb1_007_cost_clamped_0_with_4_success() {
     game.state.player1.waitroom.cards.push(mus_live);
     let res = game.try_activate_ability(me);
     assert!(res.is_ok());
-    if game.has_pending_choice() {
-        let count = game.pending_choice_count();
-        assert_eq!(count, 1, "2 success (max) -> cost 1, got {}", count);
-        game.select_indices(&[0]);
-    }
+    assert!(game.has_pending_choice());
+    let count = game.pending_choice_count();
+    assert_eq!(count, 1, "2 success (max) -> cost 1, got {}", count);
+    game.select_indices(&[0]);
+    game.drain_choices_strict(&["SelectCard", "SelectAutoAbility"], &[]);
     assert!(game.state.player1.hand.cards.contains(&mus_live));
 }
 
@@ -128,6 +131,7 @@ fn pb1_007_insufficient_hand_blocked() {
         let mus_live = game.id("PL!-sd1-020-SD");
         game.state.player1.waitroom.cards.push(mus_live);
         assert!(!game.state.player1.hand.cards.contains(&mus_live));
+        game.drain_choices_strict(&["SelectCard", "SelectAutoAbility"], &[]);
     }
 }
 
@@ -143,6 +147,7 @@ fn pb1_007_non_muse_live_not_retrieved() {
     let count = game.pending_choice_count();
     assert_eq!(count, 2, "1 success -> cost 2, got {}", count);
     game.select_indices(&[0,1]);
+    game.drain_choices_strict(&["SelectCard", "SelectAutoAbility"], &[]);
     assert!(!game.state.player1.hand.cards.contains(&liella_live), "liella live should not be retrieved as μ's filter");
 }
 
@@ -159,8 +164,13 @@ fn pb1_007_turn1_blocks_second() {
     let c = game.pending_choice_count();
     game.select_indices(&(0..c).collect::<Vec<_>>());
     // May have second prompt to choose which μ's live to retrieve if multiple candidates
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
+    if let Some(choice) = game.state.get_pending_choice() {
+        match choice {
+            rabuka_engine::ability::types::Choice::SelectCard { .. } => {
+                game.select_indices(&[0]);
+            }
+            _ => panic!("Unexpected choice type: {:?}", choice),
+        }
     }
     assert!(game.state.player1.hand.cards.contains(&mus1) || game.state.player1.hand.cards.contains(&mus2));
     // Second activation same turn should be blocked

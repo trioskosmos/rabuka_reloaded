@@ -52,6 +52,7 @@ fn mia_q73_deck_has_live_card_after_refresh() {
         "expected SelectCard for the discard cost"
     );
     game.select_indices(&[0]); // discard filler
+    game.drain_choices_strict(&["SelectCard", "SelectAutoAbility"], &[]);
 
     // Now reveal_until_live_card runs. Deck has 3 fillers, then refreshes from waitroom.
     // The live card from waitroom gets revealed and goes to hand.
@@ -94,6 +95,7 @@ fn mia_q102_no_live_card_anywhere() {
         "expected SelectCard for the discard cost"
     );
     game.select_indices(&[0]); // discard filler
+    game.drain_choices_strict(&["SelectCard", "SelectAutoAbility"], &[]);
 
     // After reveal_until_live_card: deck should have 0 cards (all revealed)
     let deck_count = game.state.player1.main_deck.len();
@@ -128,6 +130,7 @@ fn mia_q102_live_immediately_on_top() {
     game.play_to_stage(mia, MemberArea::Center);
     assert!(game.has_pending_choice());
     game.select_indices(&[0]);
+    game.drain_choices_strict(&["SelectCard", "SelectAutoAbility"], &[]);
     assert!(game.state.player1.hand.cards.contains(&live), "live on top should be obtained");
     assert_eq!(game.state.player1.main_deck.cards.len(), 3, "3 filler should remain after revealing 1 live");
 }
@@ -145,9 +148,9 @@ fn mia_q102_skip_cost_still_reveals() {
     for _ in 0..3 { game.state.player1.main_deck.cards.push(filler); }
     game.give_energy(10);
     game.play_to_stage(mia, MemberArea::Center);
-    if game.has_pending_choice() {
-        game.select_indices(&[]); // skip discard cost
-    }
+    assert!(game.has_pending_choice(), "optional discard cost prompt expected");
+    game.select_indices(&[]); // skip discard cost
+    game.drain_choices_strict(&["SelectCard", "SelectAutoAbility"], &[]);
     // Even when skipping cost, the reveal should still happen (or at least no panic)
     assert!(game.state.player1.hand.cards.contains(&live) || game.state.player1.waitroom.cards.contains(&live) || game.state.player1.main_deck.cards.contains(&live), "no panic, live somewhere");
 }
