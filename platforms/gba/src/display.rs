@@ -69,6 +69,14 @@ pub struct Display<'a> {
     /// Coordinates are in tiles; `selected` draws the cursor badge,
     /// `dimmed` dithers the card dark (unpickable).
     pending_art: Vec<PendingArt>,
+    /// Reusable backgrounds to avoid VRAM allocation leak per frame.
+    board_art_bg: Option<RegularBackground>,
+    board_ui_bg: Option<RegularBackground>,
+    menu_bg: Option<RegularBackground>,
+    menu_art_bg: Option<RegularBackground>,
+    action_bg: Option<RegularBackground>,
+    detail_art_bg: Option<RegularBackground>,
+    detail_text_bg: Option<RegularBackground>,
 }
 
 /// One queued card image for the next [`Display::swap_buffers`].
@@ -136,6 +144,9 @@ impl<'a> Display<'a> {
             let v = MASTER_PAL[i * 2] as u16 | ((MASTER_PAL[i * 2 + 1] as u16) << 8);
             gfx.set_background_palette_colour_256(i, Rgb15::new(v));
         }
+        // Wait one VBlank to ensure palette is active before first frame,
+        // preventing black patch at top-left (palette index 0 = backdrop).
+        busy_wait_for_vblank();
         gfx.set_background_palette(15, &TEXT_PALETTE);
         Display {
             gfx,
@@ -143,6 +154,13 @@ impl<'a> Display<'a> {
             last: String::new(),
             detail_active: false,
             pending_art: Vec::new(),
+            board_art_bg: None,
+            board_ui_bg: None,
+            menu_bg: None,
+            menu_art_bg: None,
+            action_bg: None,
+            detail_art_bg: None,
+            detail_text_bg: None,
         }
     }
 
@@ -343,16 +361,17 @@ impl<'a> Display<'a> {
         let ui_ts = unsafe { TileSet::new(BOARD_UI, TileFormat::FourBpp) };
         let e0 = TileEffect::new(false, false, 15);
 
-        let mut art_bg = RegularBackground::new(
+        // Reuse backgrounds to avoid VRAM allocation leak per frame
+        let mut art_bg = self.board_art_bg.get_or_insert_with(|| RegularBackground::new(
             Priority::P1,
             RegularBackgroundSize::Background32x32,
             TileFormat::EightBpp,
-        );
-        let mut ui_bg = RegularBackground::new(
+        ));
+        let mut ui_bg = self.board_ui_bg.get_or_insert_with(|| RegularBackground::new(
             Priority::P0,
             RegularBackgroundSize::Background32x32,
             TileFormat::FourBpp,
-        );
+        ));
 
         // Solid board background on ui BG so gaps/margins are dark blue, not
         // backdrop black. Card interiors will be cleared to transparent per-slot
@@ -504,11 +523,12 @@ impl<'a> Display<'a> {
         let icon_ts = unsafe { TileSet::new(&TEXTICON_TILES.0, TileFormat::FourBpp) };
         let e = TileEffect::new(false, false, 15);
 
-        let mut tbg = RegularBackground::new(
+// Reuse background to avoid VRAM allocation leak
+        let mut tbg = self.action_bg.get_or_insert_with(|| RegularBackground::new(
             Priority::P0,
             RegularBackgroundSize::Background32x32,
             TileFormat::FourBpp,
-        );
+        ));
 
         Self::blit_line(&mut tbg, &font_ts, &icon_ts, e, "ACTIONS [Sel:Board] [Sta:Menu]", 0, 0);
         let mut row = 2i32;
@@ -562,11 +582,12 @@ impl<'a> Display<'a> {
             // every card uploads its own (pointer, tile) pairs — always the
             // right pixels, never stale, and freed on close.
             let art_ts = unsafe { TileSet::new(art.tiles, TileFormat::EightBpp) };
-            let mut abg = RegularBackground::new(
+            // Reuse background to avoid VRAM allocation leak
+            let mut abg = self.detail_art_bg.get_or_insert_with(|| RegularBackground::new(
                 Priority::P0,
                 RegularBackgroundSize::Background32x32,
                 TileFormat::EightBpp,
-            );
+            ));
             for i in 0..(DETAIL_DW * DETAIL_DH) {
                 let tx = (i % DETAIL_DW) as i32;
                 let ty = (i / DETAIL_DW) as i32 + DETAIL_Y0;
@@ -575,11 +596,12 @@ impl<'a> Display<'a> {
             abg.show(&mut f);
         }
 
-        let mut tbg = RegularBackground::new(
+        // Reuse background to avoid VRAM allocation leak
+        let mut tbg = self.detail_text_bg.get_or_insert_with(|| RegularBackground::new(
             Priority::P1,
             RegularBackgroundSize::Background32x32,
             TileFormat::FourBpp,
-        );
+        ));
         // Dark panel behind ability text like 3DS COL_CARD_OPAQUE (render.rs:498)
         let ui_ts = unsafe { TileSet::new(BOARD_UI, TileFormat::FourBpp) };
         for ty in 0..ROWS {
@@ -669,16 +691,18 @@ impl<'a> Display<'a> {
         }
         let font_ts = unsafe { TileSet::new(&FONT_TILES.0, TileFormat::FourBpp) };
         let icon_ts = unsafe { TileSet::new(&TEXTICON_TILES.0, TileFormat::FourBpp) };
-        let mut bg = RegularBackground::new(
+        let ui_ts = unsafe { TileSet::new(BOARD_UI, TileFormat::FourBpp) };
+        let e_ui = TileEffect::new(false, false, 15);
+
+        // Reuse backgrounds to avoid VRAM allocation leak per frame
+        let mut bg = self.menu_bg.get_or_insert_with(|| RegularBackground::new(
             Priority::P0,
             RegularBackgroundSize::Background32x32,
             TileFormat::FourBpp,
-        );
+        ));
 
         // Fill entire screen with zone fill color (UI_EMPTY, palette index 2 = dark blue)
         // so menus have the same dark blue background as the board.
-        let ui_ts = unsafe { TileSet::new(BOARD_UI, TileFormat::FourBpp) };
-        let e_ui = TileEffect::new(false, false, 15);
         for ty in 0..ROWS {
             for tx in 0..COLS {
                 bg.set_tile((tx, ty), &ui_ts, TileSetting::new(UI_EMPTY, e_ui));
@@ -707,12 +731,15 @@ impl<'a> Display<'a> {
         // onto an 8bpp BG and punch transparent holes in the text BG so the
         // art shows through (same layering as the board renderer). Corner
         // ticks mark the selected card.
-        let mut art_bg = RegularBackground::new(
+        let art_bg = self.menu_art_bg.get_or_insert_with(|| RegularBackground::new(
             Priority::P1,
             RegularBackgroundSize::Background32x32,
             TileFormat::EightBpp,
-        );
+        ));
         let art_eff = TileEffect::new(false, false, 0);
+
+        // Sort by Y then X for correct visual z-ordering (top-to-bottom, left-to-right)
+        self.pending_art.sort_by_key(|q| (q.y, q.x));
         for q in self.pending_art.drain(..) {
             // Stage-size requests (5x6, the choice grid) use the stage
             // fronts; anything else uses the hand-size fronts.

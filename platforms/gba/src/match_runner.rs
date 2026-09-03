@@ -15,7 +15,7 @@ use rabuka_engine::game_state::{GameResult, GameState, Phase};
 use rabuka_engine::player::Player;
 use rabuka_engine::turn::TurnEngine;
 
-use agb::sound::mixer::Mixer;
+
 
 /// AI turn using a simplified v6-style heuristic (v6 not available in no_std).
 fn ai_turn(gs: &mut GameState, acts: &[game_setup::Action]) -> bool {
@@ -164,7 +164,6 @@ pub fn run_match_with_mixer<U: PlatformUi>(
     p2_cards: &[&str],
     all_cards: Vec<Card>,
     mode: MatchMode,
-    _mixer: &mut Mixer,
     vblank: &agb::interrupt::VBlank,
 ) -> GameResult {
     let mut db = Rc::new(CardDatabase::load_or_create(all_cards));
@@ -250,8 +249,6 @@ pub fn run_match_with_mixer<U: PlatformUi>(
         gs.reset_loop_detection();
         game_setup::settle_auto(&mut gs);
 
-        // Update mixer once per frame (no tracker)
-        _mixer.frame();
         vblank.wait_for_vblank();
     }
 

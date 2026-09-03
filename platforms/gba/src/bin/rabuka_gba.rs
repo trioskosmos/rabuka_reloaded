@@ -19,7 +19,7 @@ use rabuka_gba::input::Input;
 use rabuka_gba::screens::Screen;
 use rabuka_gba::run_match_with_mixer;
 
-use agb::sound::mixer::Frequency;
+use agb::interrupt::VBlank;
 
 fn load_deck_cards(
     _decks: &[rabuka_gba::decks_baked::DeckInfo],
@@ -33,9 +33,7 @@ fn load_deck_cards(
 
 #[agb::entry]
 fn main(mut gba: agb::Gba) -> ! {
-    // Initialize audio mixer at 18157 Hz (good quality, ~10% CPU for 4 channels)
-    let mut mixer = gba.mixer.mixer(Frequency::Hz18157);
-    let vblank = agb::interrupt::VBlank::get();
+    let vblank = VBlank::get();
 
     let mut display = rabuka_gba::ui::Display::new(gba.graphics.get());
     let mut input = Input::new();
@@ -75,8 +73,8 @@ fn main(mut gba: agb::Gba) -> ! {
         let p2_cards = decks[d2].cards;
         let all_cards = load_deck_cards(decks, d1, d2);
         
-        // Run match with audio mixer frame updates
-        run_match_with_mixer(&mut ui, p1_cards, p2_cards, all_cards, mode, &mut mixer, &vblank);
+        // Run match (no audio)
+        run_match_with_mixer(&mut ui, p1_cards, p2_cards, all_cards, mode, &vblank);
         
         let _ = Screen::Result;
     }
