@@ -11,6 +11,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /build/engine
 
 COPY engine/Cargo.toml engine/Cargo.lock ./
+COPY cards/build/ /build/cards/build/
+COPY engine/src/core/cards_gen.rs ./src/core/cards_gen.rs
 RUN mkdir src && echo "fn main() {}" > src/main.rs && \
     cargo build --release --features server --bin rabuka_engine 2>/dev/null || true && \
     rm -rf src
