@@ -83,14 +83,17 @@ fn show_card_list<I: InputSource>(
         })
         .collect();
     if items.is_empty() {
-        // Info screen, B/A closes.
+        // Info screen, B/A/Start closes.
         display.clear();
         display.println(title);
         display.println("(empty)");
         display.swap_buffers();
         loop {
             input.poll();
-            if input.just_pressed(Button::A) || input.just_pressed(Button::B) {
+            if input.just_pressed(Button::A)
+                || input.just_pressed(Button::B)
+                || input.just_pressed(Button::Start)
+            {
                 return;
             }
             display.wait();
@@ -131,7 +134,7 @@ fn show_card_list<I: InputSource>(
             if let Some(c) = gs.card_database.get_card(cid) {
                 show_card_detail(display, input, gs, c.card_no.to_string());
             }
-        } else if input.just_pressed(Button::B) {
+        } else if input.just_pressed(Button::B) || input.just_pressed(Button::Start) {
             return;
         }
         display.wait();
@@ -156,7 +159,7 @@ fn show_game_log<I: InputSource>(
     let mut off = lines.len().saturating_sub(VISIBLE); // start at the newest
     loop {
         display.clear();
-        display.println("GAME LOG  A/B close");
+        display.println("GAME LOG  A/B/Sta close");
         let end = (off + VISIBLE).min(lines.len());
         for l in off..end {
             display.println(&lines[l]);
@@ -167,7 +170,10 @@ fn show_game_log<I: InputSource>(
             off = off.saturating_sub(1);
         } else if input.just_pressed(Button::Down) && off + VISIBLE < lines.len() {
             off += 1;
-        } else if input.just_pressed(Button::A) || input.just_pressed(Button::B) {
+        } else if input.just_pressed(Button::A)
+            || input.just_pressed(Button::B)
+            || input.just_pressed(Button::Start)
+        {
             return;
         }
         display.wait();
@@ -258,7 +264,7 @@ fn run_cards_menu<I: InputSource>(
             ),
         ];
         let items: Vec<String> = zones.iter().map(|(label, _)| label.clone()).collect();
-        match select(display, input, &items, "CARDS  B back") {
+        match select(display, input, &items, "CARDS  B/Sta back") {
             Some(i) => {
                 let (label, cards) = &zones[i];
                 show_card_list(display, input, gs, label, cards);
@@ -373,7 +379,7 @@ fn show_stats<I: InputSource>(display: &mut Display, input: &mut I, gs: &GameSta
     let mut off = 0usize;
     loop {
         display.clear();
-        display.println("STATS  A:Menu B:Close  Up/Down:Scroll");
+        display.println("STATS  A:Menu B/Sta:Close");
         let end = (off + VISIBLE).min(lines.len());
         for l in off..end { display.println(&lines[l]); }
         if lines.len() > end { display.println(&format!("  .. {} more", lines.len()-end)); }
@@ -382,7 +388,7 @@ fn show_stats<I: InputSource>(display: &mut Display, input: &mut I, gs: &GameSta
         if input.just_pressed(Button::Up) { off = off.saturating_sub(1); }
         else if input.just_pressed(Button::Down) && off + VISIBLE < lines.len() { off += 1; }
         else if input.just_pressed(Button::A) { return Some(true); }
-        else if input.just_pressed(Button::B) { return Some(false); }
+        else if input.just_pressed(Button::B) || input.just_pressed(Button::Start) { return Some(false); }
         display.wait();
     }
 }

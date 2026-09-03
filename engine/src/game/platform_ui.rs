@@ -70,6 +70,9 @@ pub trait PlatformUi {
     fn just_pressed_right(&self) -> bool {
         false
     }
+    fn just_pressed_select(&self) -> bool {
+        false
+    }
 
     /// Max characters that fit on one menu line, in half-width columns
     /// (a CJK glyph is 2 columns). Used to keep each option on a single
@@ -104,6 +107,85 @@ pub trait PlatformUi {
     /// Show the current board as an overlay in menus (L/R pressed in choice menus).
     fn show_board_overlay(&mut self, _gs: &GameState) {
     }
+
+    /// Card detail viewer (art + stats + ability) for `card_no`. Ports with a
+    /// graphical detail screen override this; text ports keep the scrollable
+    /// full-text viewer. Used by choice grids (L = ability source, R = cursor).
+    fn show_card_detail(&mut self, _gs: &GameState, _card_no: &str) {
+    }
+
+    /// Reset VRAM tile pressure (commit an empty frame so the previous
+    /// screen's dead tiles are collected before the next screen allocates).
+    /// Ports with a pooled tile allocator (GBA) override this and call it
+    /// on heavy screen transitions; other ports no-op.
+    fn reset_vram(&mut self) {
+    }
+
+    /// Modular detail screen: card art for `art_card_no`, `header` lines,
+    /// then scrollable `body` text. One hook serves every detail view —
+    /// action detail (L: full action text + acting card), card detail (R:
+    /// stats + ability), choice hint (L: prompt + source card), cursor
+    /// detail (R). The default renders header + body as paginated text;
+    /// ports with art (GBA) override with a graphical screen reusing the
+    /// same parts, so new detail types compose instead of re-rendering.
+    fn show_detail_screen(
+        &mut self,
+        _gs: &GameState,
+        _art_card_no: Option<&str>,
+        header: &[String],
+        body: &str,
+    ) {
+        let cols = self.option_cols();
+        let mut lines: Vec<String> = header.to_vec();
+        if !header.is_empty() && !body.trim().is_empty() {
+            lines.push(String::new());
+        }
+        lines.extend(wrap_text(body, cols));
+        let mut off = 0usize;
+        const H: usize = 8; // 9 screen rows, one held for a hint bar
+        loop {
+            self.clear_screen();
+            self.println("A/B/Start close, Up/Down scroll");
+            let end = (off + H).min(lines.len());
+            for l in off..end {
+                self.println(&lines[l]);
+            }
+            if lines.len() > end {
+                self.println(&format!("  .. {} more", lines.len() - end));
+            }
+            self.swap_buffers();
+            self.poll_input();
+            if self.just_pressed_up() {
+                off = off.saturating_sub(1);
+            } else if self.just_pressed_down() && off + H < lines.len() {
+                off += 1;
+            } else if self.just_pressed_a()
+                || self.just_pressed_b()
+                || self.just_pressed_l()
+                || self.just_pressed_r()
+                || self.just_pressed_start()
+            {
+                return;
+            }
+            self.wait_vblank();
+        }
+    }
+}
+
+/// Graphical card-choice grid (3DS-style): shows one card image per option
+/// instead of a text-only list. Forwards to the shared
+/// [`crate::choice_renderer`] grid, which draws via
+/// [`PlatformUi::draw_card_image`] and composites on ports that queue art
+/// (e.g. GBA `Display::queue_card_image`).
+pub fn choose_card_grid(
+    ui: &mut dyn PlatformUi,
+    gs: &GameState,
+    title: &str,
+    items: &[String],
+    card_nos: &[String],
+    allow_skip: bool,
+) -> Option<usize> {
+    crate::choice_renderer::render_card_choice_grid(ui, gs, title, items, card_nos, allow_skip)
 }
 
 /// Width of a single character in half-width columns (CJK glyphs = 2).

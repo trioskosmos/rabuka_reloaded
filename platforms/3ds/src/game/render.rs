@@ -497,16 +497,28 @@ fn render_detail_mode(ctx: &RenderCtx, text_page: &mut usize) -> f32 {
                     // ability text never bleeds through behind the name)
                     p.rect(Layer::Content, 0.0, CONTENT_Y, 400.0, 188.0, COL_CARD_OPAQUE);
                     // Card portrait (left column)
-                    p.rect(
+                    // Frame shares the portrait depth so it stays registered
+                    // around the card on both eyes.
+                    p.rect_with_depth(
                         Layer::Content,
                         card_x - 2.0,
                         card_y - 2.0,
                         card_w + 4.0,
                         card_h + 4.0,
                         COL_GOLD,
+                        crate::ui::stereo::PORTRAIT_DEPTH,
                     );
                     if let Some((atl, idx)) = atlas.lookup(&card.card_no) {
-                        p.card(Layer::Content, atl, *idx as i32, card_x, card_y, card_w, card_h);
+                        p.card_with_depth(
+                            Layer::Content,
+                            atl,
+                            *idx as i32,
+                            card_x,
+                            card_y,
+                            card_w,
+                            card_h,
+                            crate::ui::stereo::PORTRAIT_DEPTH,
+                        );
                     }
                     // Scrollable ability text (right column) on the BodyText
                     // layer; scrolled lines may reach up into the header region.
@@ -1020,22 +1032,58 @@ fn render_image_choice_grid(ctx: &RenderCtx, mut text_page: usize) -> usize {
                                     COL_CARD
                                 };
                                 unsafe {
-                                    _3ds_top_queue_rect(ix, iy_card, cw, ch + 16.0, border);
-                                    _3ds_top_queue_card(
-                                        c_str.as_ptr() as *const u8,
-                                        *idx as i32,
-                                        ix + 1.0,
-                                        iy_card + 1.0,
-                                        cw - 2.0,
-                                        ch,
+                                    // Cell border shares the card's stereo depth so the
+                                    // card stays registered inside it on both eyes.
+                                    let cell_depth = if di == display_pos {
+                                        crate::ui::stereo::SELECTED_DEPTH
+                                    } else {
+                                        crate::ui::stereo::CARD_DEPTH
+                                    };
+                                    _3ds_top_queue_rect_depth(
+                                        ix,
+                                        iy_card,
+                                        cw,
+                                        ch + 16.0,
+                                        border,
+                                        cell_depth,
                                     );
+                                    // Focused option pops to full stereo depth
+                                    // (+ drop shadow); the rest sit at rest depth.
+                                    if di == display_pos {
+                                        _3ds_top_queue_card_selected(
+                                            c_str.as_ptr() as *const u8,
+                                            *idx as i32,
+                                            ix + 1.0,
+                                            iy_card + 1.0,
+                                            cw - 2.0,
+                                            ch,
+                                        );
+                                    } else {
+                                        _3ds_top_queue_card_depth(
+                                            c_str.as_ptr() as *const u8,
+                                            *idx as i32,
+                                            ix + 1.0,
+                                            iy_card + 1.0,
+                                            cw - 2.0,
+                                            ch,
+                                            crate::ui::stereo::CARD_DEPTH,
+                                        );
+                                    }
                                     if is_disabled {
-                                        _3ds_top_queue_rect(
+                                        // Same stereo depth as the card beneath it,
+                                        // so the dim stays registered per eye.
+                                        let dim_depth = if di == display_pos {
+                                            crate::ui::stereo::SELECTED_DEPTH
+                                        } else {
+                                            crate::ui::stereo::CARD_DEPTH
+                                        };
+                                        _3ds_top_queue_rect_depth(
                                             ix + 1.0,
                                             iy_card + 1.0,
                                             cw - 2.0,
                                             ch,
                                             0xAA000000,
+                                            dim_depth,
                                         );
                                     }
                                     let label = if act.action_type
@@ -1050,12 +1098,13 @@ fn render_image_choice_grid(ctx: &RenderCtx, mut text_page: usize) -> usize {
                                     } else {
                                         format!("{}\0", cn)
                                     };
-                                    _3ds_top_queue_text(
+                                    _3ds_top_queue_text_depth(
                                         ix + 1.0,
                                         iy_card + ch + 1.0,
                                         COL_LIGHT,
                                         SCALE_SMALL,
                                         label.as_ptr(),
+                                        0.2,
                                     );
                                 }
                             }

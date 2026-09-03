@@ -114,6 +114,38 @@ extern "C" {
     pub fn _3ds_top_queue_rect(x: f32, y: f32, w: f32, h: f32, color: u32);
     pub fn _3ds_top_queue_text(x: f32, y: f32, color: u32, scale: f32, text: *const u8);
     pub fn _3ds_top_queue_card(atlas: *const u8, idx: i32, x: f32, y: f32, w: f32, h: f32);
+    // Depth-aware variants: `depth` 0.0 (screen plane, sharp) .. 1.0 (max pop).
+    // The per-eye X offset is symmetric and scales with depth, so flat UI
+    // stays readable while cards float (see ui/stereo.rs for the mapping).
+    pub fn _3ds_top_queue_rect_depth(x: f32, y: f32, w: f32, h: f32, color: u32, depth: f32);
+    pub fn _3ds_top_queue_text_depth(
+        x: f32,
+        y: f32,
+        color: u32,
+        scale: f32,
+        text: *const u8,
+        depth: f32,
+    );
+    pub fn _3ds_top_queue_card_depth(
+        atlas: *const u8,
+        idx: i32,
+        x: f32,
+        y: f32,
+        w: f32,
+        h: f32,
+        depth: f32,
+    );
+    // Selected/focused card: queued at full pop depth with a drop shadow.
+    pub fn _3ds_top_queue_card_selected(atlas: *const u8, idx: i32, x: f32, y: f32, w: f32, h: f32);
+    // Stereoscopic 3D runtime config (top screen). Layer indices match
+    // ui::layers::Layer discriminants (Background=0 .. Hint=5).
+    pub fn _3ds_set_layer_depth(layer: i32, depth: f32);
+    pub fn _3ds_get_layer_depth(layer: i32) -> f32;
+    pub fn _3ds_set_3d_strength(strength: f32);
+    pub fn _3ds_get_3d_strength() -> f32;
+    pub fn _3ds_set_3d_enabled(on: bool);
+    pub fn _3ds_set_3d_max_shift(px: f32);
+    pub fn _3ds_get_3d_slider() -> f32;
     // Bottom screen graphical drawing (setup menus before the board is enabled)
     pub fn _3ds_bot_clear();
     pub fn _3ds_bot_queue_rect(x: f32, y: f32, w: f32, h: f32, color: u32);

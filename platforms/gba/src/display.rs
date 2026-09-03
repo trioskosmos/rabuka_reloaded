@@ -1,4 +1,5 @@
 ﻿use alloc::string::String;
+use alloc::vec::Vec;
 
 use agb::display::tiled::{
     RegularBackground, RegularBackgroundSize, TileEffect, TileFormat, TileSet, TileSetting,
@@ -61,6 +62,22 @@ pub struct Display<'a> {
     buf: String,
     last: String,
     detail_active: bool,
+    /// Card art queued via [`Display::queue_card_image`] since the last
+    /// [`Display::clear`]. `swap_buffers` composites these on an 8bpp BG
+    /// underneath the text BG (punching transparent holes in the text fill),
+    /// so generic choice menus can show card images like the 3DS grid.
+    /// Coordinates are in tiles; `selected` draws a gold border.
+    pending_art: Vec<PendingArt>,
+}
+
+/// One queued card image for the next [`Display::swap_buffers`].
+struct PendingArt {
+    card_no: String,
+    x: i32,
+    y: i32,
+    cols: i32,
+    rows: i32,
+    selected: bool,
 }
 
 /// 4bpp text/board palette (bank 0). Entries 7..=15 are the texticon colours,
@@ -123,11 +140,13 @@ impl<'a> Display<'a> {
             buf: String::new(),
             last: String::new(),
             detail_active: false,
+            pending_art: Vec::new(),
         }
     }
 
     pub fn clear(&mut self) {
         self.buf.clear();
+        self.pending_art.clear();
     }
 
     pub fn println(&mut self, text: &str) {
@@ -451,7 +470,10 @@ impl<'a> Display<'a> {
             ui_bg.set_tile((x, STAGE_YS[1]), &ui_ts, TileSetting::new(UI_MARKER, e0));
         }
         if let Some(idx) = frame.opp_stage_cursor {
-            let x = STAGE_START_X + STAGE_PITCH * idx as i32;
+            // Opponent cards are drawn mirrored (2 - i, like the 3DS far
+            // side), so the cursor must mirror too or it points at the
+            // wrong card.
+            let x = STAGE_START_X + STAGE_PITCH * (2 - idx) as i32;
             ui_bg.set_tile((x, STAGE_YS[0]), &ui_ts, TileSetting::new(UI_MARKER, e0));
         }
 
@@ -508,8 +530,11 @@ impl<'a> Display<'a> {
 
     /// Render a card-detail view: 8bpp art on a P0 background (indices 0-239)
     /// with 4bpp text on P1 using palette bank 15 (indices 240-255).
-    /// `scroll` is the first visible line index — paginated like 3DS detail
-    /// (render.rs:437 lpp 10) to avoid VRAM blow-up with long ability text.
+    /// The 12x18 portrait fills the height left of the text pane (centered
+    /// with one row top and bottom); text keeps its size in the remaining
+    /// 17 columns. `scroll` is the first visible line index — paginated like
+    /// 3DS detail (render.rs:437 lpp 10) to avoid VRAM blow-up with long
+    /// ability text.
     pub fn render_card_detail(&mut self, art: Option<&CardArt>, lines: &[String], scroll: usize) {
         self.last = self.buf.clone();
         self.detail_active = true;
@@ -527,15 +552,18 @@ impl<'a> Display<'a> {
         let mut f = self.gfx.frame();
 
         if let Some(art) = art {
+            // Baked 12x18 tiles address the portrait's own static bytes, so
+            // every card uploads its own (pointer, tile) pairs — always the
+            // right pixels, never stale, and freed on close.
             let art_ts = unsafe { TileSet::new(art.tiles, TileFormat::EightBpp) };
             let mut abg = RegularBackground::new(
                 Priority::P0,
                 RegularBackgroundSize::Background32x32,
                 TileFormat::EightBpp,
             );
-            for i in 0..140 {
-                let tx = (i % 10) as i32;
-                let ty = (i / 10) as i32;
+            for i in 0..(DETAIL_DW * DETAIL_DH) {
+                let tx = (i % DETAIL_DW) as i32;
+                let ty = (i / DETAIL_DW) as i32 + DETAIL_Y0;
                 abg.set_tile((tx, ty), &art_ts, TileSetting::new(i as u16, TileEffect::new(false, false, 0)));
             }
             abg.show(&mut f);
@@ -549,14 +577,14 @@ impl<'a> Display<'a> {
         // Dark panel behind ability text like 3DS COL_CARD_OPAQUE (render.rs:498)
         let ui_ts = unsafe { TileSet::new(BOARD_UI, TileFormat::FourBpp) };
         for ty in 0..ROWS {
-            for tx in 10..COLS {
+            for tx in DETAIL_DW as i32..COLS {
                 tbg.set_tile((tx, ty), &ui_ts, TileSetting::new(UI_EMPTY, e_text));
             }
         }
         const VISIBLE: usize = 8;
         let end = (scroll + VISIBLE).min(lines.len());
         for (i, line) in lines[scroll..end].iter().enumerate() {
-            Self::blit_line(&mut tbg, &font_ts, &icon_ts, e_text, line, 13, i as i32 * 2);
+            Self::blit_line(&mut tbg, &font_ts, &icon_ts, e_text, line, DETAIL_DW as i32 + 1, i as i32 * 2);
         }
         // Scroll indicators like 3DS detail (render.rs:568)
         if scroll > 0 {
@@ -569,12 +597,67 @@ impl<'a> Display<'a> {
         f.commit();
     }
 
+    /// Reset VRAM tile pressure: commit an empty frame so the previous
+    /// screen's tiles (already unreferenced) are garbage-collected before
+    /// the next screen allocates.
+    ///
+    /// agb frees dead tiles only at commit, so without this the dead
+    /// previous screen and the new screen briefly coexist — a 280-tile
+    /// portrait plus a 150-tile choice grid plus CJK text blows the ~500
+    /// 8bpp-tile budget ("Ran out of video RAM for tiles"). Call on heavy
+    /// screen transitions (detail open/close, choice open/close); the one
+    /// blank frame reads as a transition flicker.
+    pub fn reset_vram(&mut self) {
+        let f = self.gfx.frame();
+        f.commit();
+    }
+    /// Queue a card image for the next [`Display::swap_buffers`]. Called by
+    /// the `PlatformUi::draw_card_image` impl so generic choice menus show
+    /// real card fronts (3DS-style) instead of a text-only list. Coordinates
+    /// are in tiles; `selected` draws a gold badge over the top-right corner.
+    pub fn queue_card_image(
+        &mut self,
+        card_no: &str,
+        x: i32,
+        y: i32,
+        cols: i32,
+        rows: i32,
+        selected: bool,
+    ) {
+        use alloc::string::ToString;
+        self.pending_art.push(PendingArt {
+            card_no: card_no.to_string(),
+            x,
+            y,
+            cols,
+            rows,
+            selected,
+        });
+        // The early-out in swap_buffers compares text only; queued art must
+        // force a redraw even when the text is unchanged (cursor moves swap
+        // the highlight while the buffered lines stay identical).
+        self.last.clear();
+    }
+
     pub fn swap_buffers(&mut self) {
-        if self.buf == self.last {
+        if self.buf == self.last && self.pending_art.is_empty() {
             return;
         }
         self.last = self.buf.clone();
 
+        // Bank 15 holds TEXT_PALETTE (white text on dark blue). Bank 0
+        // overlaps the 256-colour card-art master palette, so text drawn
+        // with bank 0 picks up art colours (the old orange-menu bug).
+        // The detail view also overwrites bank 15, so restore it here.
+        self.gfx.set_background_palette(15, &TEXT_PALETTE);
+        if self.detail_active {
+            // Detail view overwrote 0-239 with per-card palette — restore master
+            for i in 0..240 {
+                let v = MASTER_PAL[i * 2] as u16 | ((MASTER_PAL[i * 2 + 1] as u16) << 8);
+                self.gfx.set_background_palette_colour_256(i, Rgb15::new(v));
+            }
+            self.detail_active = false;
+        }
         let font_ts = unsafe { TileSet::new(&FONT_TILES.0, TileFormat::FourBpp) };
         let icon_ts = unsafe { TileSet::new(&TEXTICON_TILES.0, TileFormat::FourBpp) };
         let mut bg = RegularBackground::new(
@@ -593,7 +676,7 @@ impl<'a> Display<'a> {
             }
         }
 
-        let e = TileEffect::new(false, false, 0);
+        let e = TileEffect::new(false, false, 15);
         let mut ty = 0i32;
 
         for line in self.buf.split('\n') {
@@ -604,7 +687,68 @@ impl<'a> Display<'a> {
             ty += 2;
         }
 
+        if self.pending_art.is_empty() {
+            let mut frame = self.gfx.frame();
+            bg.show(&mut frame);
+            frame.commit();
+            return;
+        }
+
+        // Composite queued card art underneath the text BG: blit each front
+        // onto an 8bpp BG and punch transparent holes in the text BG so the
+        // art shows through (same layering as the board renderer). Corner
+        // ticks mark the selected card.
+        let mut art_bg = RegularBackground::new(
+            Priority::P1,
+            RegularBackgroundSize::Background32x32,
+            TileFormat::EightBpp,
+        );
+        let art_eff = TileEffect::new(false, false, 0);
+        for q in self.pending_art.drain(..) {
+            // Stage-size requests (5x6, the choice grid) use the stage
+            // fronts; anything else uses the hand-size fronts.
+            let fronts = if q.cols == 5 && q.rows == 6 {
+                STAGE_FRONTS
+            } else {
+                CARD_FRONTS
+            };
+            if q.card_no.is_empty() {
+                // Marker slot with no art: badge so the cursor stays visible.
+                if q.selected {
+                    bg.set_tile((q.x, q.y), &ui_ts, TileSetting::new(UI_BADGE, e_ui));
+                }
+            } else if let Some(front) = fronts
+                .iter()
+                .find(|f| f.card_no == q.card_no.as_str())
+            {
+                let ts = unsafe { TileSet::new(front.tiles, TileFormat::EightBpp) };
+                for ay in 0..q.rows {
+                    for ax in 0..q.cols {
+                        let sidx = (ay * q.cols + ax) as u16;
+                        art_bg.set_tile(
+                            (q.x + ax, q.y + ay),
+                            &ts,
+                            TileSetting::new(sidx, art_eff),
+                        );
+                        bg.set_tile((q.x + ax, q.y + ay), &ui_ts, TileSetting::BLANK);
+                    }
+                }
+                if q.selected {
+                    // Gold badge overlapping the card's top-right corner.
+                    bg.set_tile(
+                        (q.x + q.cols - 1, q.y),
+                        &ui_ts,
+                        TileSetting::new(UI_BADGE, e_ui),
+                    );
+                }
+            } else {
+                // Unknown card number: leave the zone fill and print the id.
+                Self::blit_line(&mut bg, &font_ts, &icon_ts, e, &q.card_no, q.x, q.y);
+            }
+        }
+
         let mut frame = self.gfx.frame();
+        art_bg.show(&mut frame);
         bg.show(&mut frame);
         frame.commit();
     }
@@ -613,6 +757,13 @@ impl<'a> Display<'a> {
         busy_wait_for_vblank();
     }
 }
+
+/// Detail portrait grid: 12x18 tiles (96x144px) at rows 1-18, centered
+/// vertically next to the text pane.
+const DETAIL_DW: usize = 12;
+const DETAIL_DH: usize = 18;
+/// First tile row of the portrait (18 tall on a 20-row screen).
+const DETAIL_Y0: i32 = 1;
 
 /// Draw one card slot: 8bpp shared-palette front art on the art BG (or a
 /// solid gray slot on the text BG), plus the gold badge in the right gap

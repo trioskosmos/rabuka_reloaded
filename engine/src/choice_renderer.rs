@@ -1,37 +1,45 @@
 //! 3DS-style card choice grid renderer using PlatformUi trait.
-//! Renders a grid of cards with art, names, and ability text.
-//! Supports L/R to show board overlay, A to select, B to cancel.
+//!
+//! One screen: title, image grid with cursor border, selected card identity,
+//! its ability preview (the 3DS ability banner, first wrapped line), skip
+//! state, and a two-line hint bar. Select shows the board overlay, L shows
+//! the choice hint (+ source card), R shows the cursor card detail.
+//! D-pad navigation wraps around (Up from the top row reaches the bottom row
+//! and vice versa, same for Left/Right). Start is intentionally inert here —
+//! it is neither confirm (A) nor cancel (B).
 
 extern crate alloc;
 use alloc::format;
 use alloc::string::String;
+use alloc::string::ToString;
 use alloc::vec::Vec;
 
-use crate::game::platform_ui::{PlatformUi, card_ability_text};
+use crate::game::platform_ui::{PlatformUi, card_ability_text, card_stat_text, one_line, wrap_text};
 use crate::game_state::GameState;
 
-/// Maximum cards per page (5 cols × 2 rows = 10 cards)
+/// Stage-size cards (5x6 tiles) are the largest art that fits a shared grid
+/// (the bigger detail portraits each need their own palette). Five across
+/// with no gaps, one row per page, keeps the text block + art on one screen.
 const COLS: usize = 5;
-const ROWS: usize = 2;
+const ROWS: usize = 1;
 const CARDS_PER_PAGE: usize = COLS * ROWS;
 
-/// Card display dimensions (3 tiles wide, 4 tiles tall)
-const CARD_TILE_W: i32 = 3;
-const CARD_TILE_H: i32 = 4;
-const CARD_GAP_TILES: i32 = 1;
-
-/// Screen dimensions (GBA: 240x160, 8x8 tiles)
-#[allow(dead_code)]
-const _SCREEN_TILE_W: i32 = 30;
-#[allow(dead_code)]
-const _SCREEN_TILE_H: i32 = 20;
+/// Card display dimensions (5 tiles wide, 6 tiles tall = stage size).
+const CARD_TILE_W: i32 = 5;
+const CARD_TILE_H: i32 = 6;
+const CARD_GAP_TILES: i32 = 0;
+/// Left margin: (30 - 5*5) / 2 centers the gapless row.
+const GRID_X0: i32 = 2;
+/// First tile row of the art grid. The text block above is capped at 6 lines
+/// (12 tile rows, 0-11), so punched image holes and corner ticks never eat
+/// status lines.
+const GRID_Y: i32 = 13;
 
 /// Card image info
 struct CardInfo {
     card_no: String,
     name: String,
-    _ability_text: String,
-    _waited: bool,
+    ability_text: String,
 }
 
 /// Renders a card choice grid (3DS style) with board overlay support.
@@ -52,12 +60,10 @@ pub fn render_card_choice_grid(
             .get_card_by_no(card_no)
             .map(|c| card_ability_text(c))
             .unwrap_or_default();
-        let waited = false;
         cards.push(CardInfo {
             card_no: card_no.clone(),
             name: item.clone(),
-            _ability_text: ability_text,
-            _waited: waited,
+            ability_text,
         });
     }
 
@@ -69,94 +75,157 @@ pub fn render_card_choice_grid(
     };
 
     let total_items = items.len() + if allow_skip { 1 } else { 0 };
+    if total_items == 0 {
+        return None;
+    }
     let total_pages = (total_items + CARDS_PER_PAGE - 1) / CARDS_PER_PAGE;
 
-    let mut page = 0;
+    // Card number of the ability currently being resolved (L shows its
+    // detail screen). Cloned up front so the input loop stays simple.
+    let source_card_no: Option<String> = gs
+        .ability_queue
+        .current_entry()
+        .map(|e| e.card_no.clone())
+        .filter(|n| !n.is_empty());
+
     let mut sel = 0;
 
+    // Fresh pool for the grid art + text: the previous screen's dead tiles
+    // would otherwise pile onto this screen's demand (see reset_vram).
+    ui.reset_vram();
+
     loop {
+        let page = sel / CARDS_PER_PAGE;
         let page_start = page * CARDS_PER_PAGE;
         let page_end = (page_start + CARDS_PER_PAGE).min(total_items);
-        let _page_items = page_end - page_start;
 
-        // Clamp selection
-        if sel < page_start {
-            sel = page_start;
-        } else if sel >= page_end {
-            sel = page_end - 1;
-        }
-
-        render_choice_page(ui, &cards, page_start, page_end, sel, title, allow_skip, skip_idx);
+        render_choice_page(
+            ui,
+            &cards,
+            page_start,
+            page_end,
+            sel,
+            title,
+            allow_skip,
+            skip_idx,
+            total_pages,
+        );
 
         ui.swap_buffers();
 
         // Poll input
         ui.poll_input();
 
-        if ui.just_pressed_l() || ui.just_pressed_r() {
-            // Show board overlay (L/R) - engine contract
+        if ui.just_pressed_select() {
+            // Board overlay on Select.
             ui.show_board_overlay(gs);
             // Wait for any button to dismiss
             loop {
                 ui.poll_input();
-                if ui.just_pressed_a() || ui.just_pressed_b() 
-                    || ui.just_pressed_l() || ui.just_pressed_r()
-                    || ui.just_pressed_start() {
+                if ui.just_pressed_a()
+                    || ui.just_pressed_b()
+                    || ui.just_pressed_l()
+                    || ui.just_pressed_r()
+                    || ui.just_pressed_select()
+                    || ui.just_pressed_start()
+                {
                     break;
                 }
                 ui.wait_vblank();
             }
             // Redraw the choice page after overlay
-            render_choice_page(ui, &cards, page_start, page_end, sel, title, allow_skip, skip_idx);
+            render_choice_page(
+                ui,
+                &cards,
+                page_start,
+                page_end,
+                sel,
+                title,
+                allow_skip,
+                skip_idx,
+                total_pages,
+            );
             ui.swap_buffers();
+        } else if ui.just_pressed_l() {
+            // Choice hint detail: the full prompt text plus the source
+            // card's ability (like the base card detail), composed by the
+            // port's detail renderer. Works even with no source card.
+            let src = source_card_no
+                .as_ref()
+                .and_then(|no| db.get_card_by_no(no));
+            let header: Vec<String> = src
+                .map(|c| alloc::vec![format!("[{}] {}", c.card_no, c.name)])
+                .unwrap_or_default();
+            let body = match src {
+                Some(c) => {
+                    let ab = card_ability_text(c);
+                    if ab.trim().is_empty() {
+                        title.to_string()
+                    } else {
+                        format!("{}\n\n{}", title, ab)
+                    }
+                }
+                None => title.to_string(),
+            };
+            ui.show_detail_screen(gs, source_card_no.as_deref(), &header, &body);
+        } else if ui.just_pressed_r() {
+            // Detail of the cursor card (stats + ability).
+            if sel < cards.len() && !cards[sel].card_no.is_empty() {
+                if let Some(c) = db.get_card_by_no(&cards[sel].card_no) {
+                    let header: Vec<String> = alloc::vec![
+                        format!("[{}] {}", c.card_no, c.name),
+                        card_stat_text(c),
+                    ];
+                    ui.show_detail_screen(
+                        gs,
+                        Some(cards[sel].card_no.as_str()),
+                        &header,
+                        &card_ability_text(c),
+                    );
+                }
+            }
         } else if ui.just_pressed_a() {
+            // Release the grid before the caller rebuilds its screen.
+            ui.reset_vram();
             if skip_idx == Some(sel) {
                 return None;
             }
             return Some(sel);
-        } else if ui.just_pressed_b() || ui.just_pressed_start() {
+        } else if ui.just_pressed_b() {
+            // Release the grid before the caller rebuilds its screen.
+            ui.reset_vram();
             return None;
-        } else if ui.just_pressed_up() {
-            if sel >= COLS {
-                sel -= COLS;
-            } else if page > 0 {
-                page -= 1;
-                let col = (sel - page_start) % COLS;
-                let new_page_start = page * CARDS_PER_PAGE;
-                let new_page_end = (new_page_start + CARDS_PER_PAGE).min(total_items);
-                sel = (new_page_start + col).min(new_page_end - 1);
-            }
-        } else if ui.just_pressed_down() {
-            if sel + COLS < page_end {
-                sel += COLS;
-            } else if page + 1 < total_pages {
-                page += 1;
-                let col = (sel - page_start) % COLS;
-                let new_page_start = page * CARDS_PER_PAGE;
-                let new_page_end = (new_page_start + CARDS_PER_PAGE).min(total_items);
-                sel = (new_page_start + col).min(new_page_end - 1);
-            }
         } else if ui.just_pressed_left() {
-            if sel > page_start {
-                sel -= 1;
-            } else if page > 0 {
-                page -= 1;
-                sel = page_end - 1;
-            }
+            sel = (sel + total_items - 1) % total_items;
         } else if ui.just_pressed_right() {
-            if sel + 1 < page_end {
-                sel += 1;
-            } else if page + 1 < total_pages {
-                page += 1;
-                sel = page * CARDS_PER_PAGE;
-            }
+            sel = (sel + 1) % total_items;
+        } else if ui.just_pressed_up() || ui.just_pressed_down() {
+            // Column-preserving vertical wrap: Up from the top row lands on
+            // the bottom row in the same column and vice versa. A short
+            // last row clamps onto its final cell.
+            let up = ui.just_pressed_up();
+            let col = sel % COLS;
+            let rows = (total_items + COLS - 1) / COLS;
+            let row = sel / COLS;
+            let new_row = if up {
+                (row + rows - 1) % rows
+            } else {
+                (row + 1) % rows
+            };
+            sel = (new_row * COLS + col).min(total_items - 1);
         } else {
             ui.wait_vblank();
         }
+        // NOTE: Start is deliberately inert — it neither confirms (A) nor
+        // cancels (B) a choice.
     }
 }
 
-/// Render a single page of the card choice grid
+/// Render a single page of the card choice grid.
+///
+/// Text budget is 6 lines (12 tile rows); art sits at tile row 12+ so the
+/// punched image holes never eat the status lines. Every line is capped at
+/// 30 columns so wrapped engine descriptions cannot overflow the budget.
 fn render_choice_page(
     ui: &mut dyn PlatformUi,
     cards: &[CardInfo],
@@ -164,18 +233,24 @@ fn render_choice_page(
     page_end: usize,
     sel: usize,
     title: &str,
-    _allow_skip: bool,
+    allow_skip: bool,
     skip_idx: Option<usize>,
+    total_pages: usize,
 ) {
     ui.clear_screen();
 
-    // Title bar
-    ui.println(title);
+    let page_no = page_start / CARDS_PER_PAGE + 1;
+    if total_pages > 1 {
+        ui.println(&one_line(&format!("{} [{}/{}]", title, page_no, total_pages.max(1)), 30));
+    } else {
+        ui.println(&one_line(title, 30));
+    }
 
     let cards_to_draw = (page_end - page_start).min(cards.len().saturating_sub(page_start));
-    let _grid_rows = (cards_to_draw + COLS - 1) / COLS;
 
-    // Draw cards in grid
+    // Draw card art in a grid (coordinates are in tiles, matching the
+    // PlatformUi::draw_card_image contract). `palette_index` carries the
+    // selection flag (1 = cursor) so ports can draw a highlight border.
     for i in 0..cards_to_draw {
         let idx = page_start + i;
         let row = i / COLS;
@@ -184,33 +259,54 @@ fn render_choice_page(
         let card = &cards[idx];
         let is_selected = (page_start + i) == sel;
 
-        // Card position in tiles
-        let x = 1 + col as i32 * (CARD_TILE_W + CARD_GAP_TILES);
-        let y = 2 + row as i32 * (CARD_TILE_H + CARD_GAP_TILES + 1); // +1 for name row
+        // Card position in tiles (gapless row, centered via GRID_X0)
+        let x = GRID_X0 + col as i32 * (CARD_TILE_W + CARD_GAP_TILES);
+        let y = GRID_Y + row as i32 * (CARD_TILE_H + CARD_GAP_TILES);
 
-        // Draw card art - use draw_card_image which handles platform-specific rendering
-        ui.draw_card_image(&card.card_no, x * 8, y * 8, CARD_TILE_W, CARD_TILE_H, 0);
-
-        // Draw selection indicator and name on text line below card
-        if is_selected {
-            ui.println(&format!(" > {}", card.name));
-        } else {
-            ui.println(&format!("   {}", card.name));
-        }
+        ui.draw_card_image(
+            &card.card_no,
+            x,
+            y,
+            CARD_TILE_W,
+            CARD_TILE_H,
+            usize::from(is_selected),
+        );
     }
 
-    // Draw skip option if on this page
-    if let Some(skip_i) = skip_idx {
-        if skip_i >= page_start && skip_i < page_end {
-            let is_selected = skip_i == sel;
-            if is_selected {
-                ui.println(&format!(" > [Skip]"));
-            } else {
-                ui.println(&format!("   [Skip]"));
+    // Selected card identity (card_no + name, like the 3DS label row).
+    let on_skip = skip_idx == Some(sel);
+    if on_skip {
+        ui.println("> [Skip]");
+    } else if sel < cards.len() {
+        ui.println(&one_line(&format!("> [{}] {}", cards[sel].card_no, cards[sel].name), 30));
+    }
+
+    // Ability preview of the selected card (3DS ability banner equivalent,
+    // first wrapped line so the text budget holds).
+    if !on_skip && sel < cards.len() {
+        let abil = cards[sel].ability_text.replace('\n', " ");
+        if !abil.trim().is_empty() {
+            if let Some(line) = wrap_text(&abil, 30).into_iter().next() {
+                ui.println(&line);
             }
         }
     }
 
-    // Hint bar at bottom
-    ui.println(&format!("  L/R: Board  A:Select  B/Start:Back"));
+    // Skip row when it sits on this page but the cursor is elsewhere.
+    if allow_skip {
+        if let Some(skip_i) = skip_idx {
+            if !on_skip && skip_i >= page_start && skip_i < page_end {
+                ui.println("  [Skip]");
+            }
+        }
+    }
+
+    // Hint bar: A picks, B goes back (or skips), Select shows the board,
+    // L/R pop card detail screens.
+    if allow_skip {
+        ui.println("A:Pick B:Skip SL:Board");
+    } else {
+        ui.println("A:Pick B:Back SL:Board");
+    }
+    ui.println("L:Hint R:Card");
 }

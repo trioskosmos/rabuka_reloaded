@@ -5,8 +5,11 @@
 use rabuka_engine::card::CardDatabase;
 
 use crate::ffi::_3ds_top_queue_card;
-use crate::ffi::_3ds_top_queue_rect;
+use crate::ffi::_3ds_top_queue_card_depth;
+use crate::ffi::_3ds_top_queue_card_selected;
+use crate::ffi::_3ds_top_queue_rect_depth;
 use crate::ffi::_3ds_top_queue_text;
+use crate::ffi::_3ds_top_queue_text_depth;
 use crate::i18n;
 #[cfg(feature = "3ds")]
 use crate::lang::current_lang;
@@ -114,8 +117,16 @@ pub fn render_card_grid(
         let iy = y_start + row as f32 * (ch + 14.0 + gap);
         let cid = card_ids[i];
         let border = if i == cursor { COL_GOLD } else { COL_CARD };
+        // The whole cell (border + card) shares one stereo depth so the card
+        // stays registered inside its border on both eyes. The cursor cell
+        // pops to full depth (+ drop shadow); the rest use resting depth.
+        let cell_depth = if i == cursor {
+            crate::ui::stereo::SELECTED_DEPTH
+        } else {
+            crate::ui::stereo::CARD_DEPTH
+        };
         unsafe {
-            _3ds_top_queue_rect(ix, iy, cw, ch + 14.0, border);
+            _3ds_top_queue_rect_depth(ix, iy, cw, ch + 14.0, border, cell_depth);
         }
         let cn = card_db
             .get_card(cid)
@@ -124,20 +135,37 @@ pub fn render_card_grid(
         if let Some((atl, idx)) = atlas.lookup(cn) {
             let c_str = std::ffi::CString::new(atl.as_bytes()).unwrap_or_default();
             unsafe {
-                _3ds_top_queue_card(
-                    c_str.as_ptr() as *const u8,
-                    *idx as i32,
-                    ix + 1.0,
-                    iy + 1.0,
-                    cw - 2.0,
-                    ch,
-                );
-                _3ds_top_queue_text(
+                // The cursor card pops to full stereo depth (+ drop shadow);
+                // the rest float at the resting card depth.
+                if i == cursor {
+                    _3ds_top_queue_card_selected(
+                        c_str.as_ptr() as *const u8,
+                        *idx as i32,
+                        ix + 1.0,
+                        iy + 1.0,
+                        cw - 2.0,
+                        ch,
+                    );
+                } else {
+                    _3ds_top_queue_card_depth(
+                        c_str.as_ptr() as *const u8,
+                        *idx as i32,
+                        ix + 1.0,
+                        iy + 1.0,
+                        cw - 2.0,
+                        ch,
+                        crate::ui::stereo::CARD_DEPTH,
+                    );
+                }
+                // Caption rides just above the screen plane so it stays sharp
+                // yet near its card on both eyes.
+                _3ds_top_queue_text_depth(
                     ix + 1.0,
                     iy + ch + 1.0,
                     COL_LIGHT,
                     0.35f32,
                     format!("{}\0", cn).as_ptr(),
+                    0.2,
                 );
             }
         }
@@ -262,10 +290,28 @@ pub fn render_card_detail(
         );
         // Content background below the header
         p.rect(Layer::Content, 0.0, CARD_DETAIL_HEADER_H, 400.0, 240.0 - CARD_DETAIL_HEADER_H, COL_CARD_OPAQUE);
-        // Card portrait (left column)
-        p.rect(Layer::Content, card_x - 2.0, card_y - 2.0, card_w + 4.0, card_h + 4.0, COL_GOLD);
+        // Card portrait (left column) — showcase depth so it lifts off the page.
+        // Frame shares the portrait depth so it stays registered on both eyes.
+        p.rect_with_depth(
+            Layer::Content,
+            card_x - 2.0,
+            card_y - 2.0,
+            card_w + 4.0,
+            card_h + 4.0,
+            COL_GOLD,
+            crate::ui::stereo::PORTRAIT_DEPTH,
+        );
         if let Some((atl, idx)) = atlas.lookup(&card.card_no) {
-            p.card(Layer::Content, atl, *idx as i32, card_x, card_y, card_w, card_h);
+            p.card_with_depth(
+                Layer::Content,
+                atl,
+                *idx as i32,
+                card_x,
+                card_y,
+                card_w,
+                card_h,
+                crate::ui::stereo::PORTRAIT_DEPTH,
+            );
         }
         // Scrollable ability text (right column). Text may scroll up under the
         // header: it's drawn on the BodyText layer (below Cover), then the Cover

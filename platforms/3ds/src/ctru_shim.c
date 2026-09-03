@@ -119,6 +119,7 @@ typedef struct {
     const char *text;  // points into string_pool — no per-op buffer needed
     const char *atlas; // atlas name for card images
     int   atlas_idx;
+    float depth;       // stereo depth: 0.0 = screen plane (sharp) .. 1.0 = max pop
 } DrawOp;
 #define OP_RECT 0
 #define OP_TEXT 1
@@ -163,6 +164,60 @@ static const char* pool_strdup(const char* s) {
     return dest;
 }
 static u32   COL_TOP_BG = 0xFF0A0E1A; // very dark navy
+
+// ---- Stereoscopic 3D state (top screen) ----
+// Each queued draw op carries a depth in [0,1]. The per-eye X offset is
+// symmetric around the screen plane so toggling the slider never makes the
+// whole scene jump:  off_eye = +/- slider * max_shift * strength * depth / 2.
+// Depth semantics (shared with ui/layers.rs + ui/stereo.rs — keep in sync):
+//   0.0 screen plane, always sharp — header text, hint bar, camera preview
+//   0.05..0.15 flat UI — backgrounds, panels, body text
+//   0.55 card images at rest, 0.8 showcased portrait, 1.0 selected card pop
+// Layer indices match the Rust Layer enum discriminants:
+//   0=Background 1=Content 2=BodyText 3=Cover 4=Header 5=Hint
+#define STEREO_LAYERS 6
+static float stereo_layer_depth[STEREO_LAYERS] = {
+    0.05f,  // Background
+    0.15f,  // Content
+    0.10f,  // BodyText (slight lift, stays readable)
+    0.10f,  // Cover
+    0.0f,   // Header (pinned to screen plane)
+    0.0f,   // Hint (pinned to screen plane)
+};
+static float stereo_card_depth = 0.55f;     // default card-image depth
+static float stereo_selected_depth = 1.0f;  // selected/focused card pop
+static float stereo_strength = 2.0f;        // user multiplier (0=off .. 2=pop).
+// Default is 2x pop: the physical 3D slider stays the master switch
+// (slider at 0 = flat image no matter the strength), so users who find
+// it too strong just slide down.
+static float stereo_max_shift = 32.0f;      // px disparity at depth 1, slider max
+static bool  stereo_enabled = true;
+
+void _3ds_set_layer_depth(int layer, float depth) {
+    if (layer < 0 || layer >= STEREO_LAYERS) return;
+    if (depth < 0.0f) depth = 0.0f;
+    if (depth > 1.0f) depth = 1.0f;
+    stereo_layer_depth[layer] = depth;
+}
+float _3ds_get_layer_depth(int layer) {
+    if (layer < 0 || layer >= STEREO_LAYERS) return 0.0f;
+    return stereo_layer_depth[layer];
+}
+void _3ds_set_3d_strength(float strength) {
+    // Up to 2x ("pop" mode). Beyond that the eyes can't fuse the two views
+    // on a 400px screen — it just becomes double vision + crosstalk.
+    if (strength < 0.0f) strength = 0.0f;
+    if (strength > 2.0f) strength = 2.0f;
+    stereo_strength = strength;
+}
+float _3ds_get_3d_strength(void) { return stereo_strength; }
+void _3ds_set_3d_enabled(bool on) { stereo_enabled = on; }
+void _3ds_set_3d_max_shift(float px) {
+    if (px < 0.0f) px = 0.0f;
+    if (px > 64.0f) px = 64.0f;
+    stereo_max_shift = px;
+}
+float _3ds_get_3d_slider(void) { return osGet3DSliderState(); }
 
 // ---- Bottom screen draw-op queue (setup menus before board mode) ----
 // Mirrors the top draw-op queue but renders to the bottom screen when the
@@ -240,6 +295,10 @@ static C2D_Text     tmp_text_obj;
 C2D_Image _3ds_get_card_image(const char* atlas_name, int index);
 static void zone_heights(float h, float* live, float* stage, float* energy, float* hand);
 void _3ds_qr_draw_preview(float x_off);
+// Depth-aware queue variants (defined below; plain variants delegate to these).
+void _3ds_top_queue_rect_depth(float x, float y, float w, float h, u32 color, float depth);
+void _3ds_top_queue_text_depth(float x, float y, u32 color, float scale, const char* text, float depth);
+void _3ds_top_queue_card_depth(const char* atlas, int idx, float x, float y, float w, float h, float depth);
 
 // ---- init / exit ----
 void _3ds_init() {
@@ -454,30 +513,52 @@ float _3ds_board_get_slot_w(int zone_type) {
 void _3ds_top_clear() { draw_op_count = 0; string_pool_pos = 0; }
 
 void _3ds_top_queue_rect(float x, float y, float w, float h, u32 color) {
+    // Flat UI panels sit near the screen plane (see stereo_layer_depth[1]).
+    _3ds_top_queue_rect_depth(x, y, w, h, color, stereo_layer_depth[1]);
+}
+
+void _3ds_top_queue_rect_depth(float x, float y, float w, float h, u32 color, float depth) {
     if (draw_op_count >= MAX_DRAW_OPS) return;
     int i = draw_op_count++;
     draw_op_types[i] = OP_RECT;
     draw_ops[i].x = x; draw_ops[i].y = y;
     draw_ops[i].w = w; draw_ops[i].h = h;
     draw_ops[i].color = color;
+    draw_ops[i].depth = depth;
 }
 
 void _3ds_top_queue_text(float x, float y, u32 color, float scale, const char* text) {
+    // Text defaults to the screen plane so small glyphs never ghost.
+    _3ds_top_queue_text_depth(x, y, color, scale, text, 0.0f);
+}
+
+void _3ds_top_queue_text_depth(float x, float y, u32 color, float scale, const char* text, float depth) {
     if (!text || draw_op_count >= MAX_DRAW_OPS) return;
     int i = draw_op_count++;
     draw_op_types[i] = OP_TEXT;
     draw_ops[i].x = x; draw_ops[i].y = y;
     draw_ops[i].color = color; draw_ops[i].scale = scale;
     draw_ops[i].text = pool_strdup(text);
+    draw_ops[i].depth = depth;
 }
 
 void _3ds_top_queue_card(const char* atlas, int idx, float x, float y, float w, float h) {
+    _3ds_top_queue_card_depth(atlas, idx, x, y, w, h, stereo_card_depth);
+}
+
+void _3ds_top_queue_card_depth(const char* atlas, int idx, float x, float y, float w, float h, float depth) {
     if (!atlas || draw_op_count >= MAX_DRAW_OPS) return;
     int i = draw_op_count++;
     draw_op_types[i] = OP_CARD;
     draw_ops[i].x = x; draw_ops[i].y = y; draw_ops[i].w = w; draw_ops[i].h = h;
     draw_ops[i].atlas = pool_strdup(atlas);
     draw_ops[i].atlas_idx = idx;
+    draw_ops[i].depth = depth;
+}
+
+// Selected/focused card: full pop + drop shadow (see swap-buffers OP_CARD).
+void _3ds_top_queue_card_selected(const char* atlas, int idx, float x, float y, float w, float h) {
+    _3ds_top_queue_card_depth(atlas, idx, x, y, w, h, stereo_selected_depth);
 }
 
 void _3ds_bot_clear() { bot_draw_op_count = 0; bot_string_pool_pos = 0; }
@@ -1150,21 +1231,31 @@ void _3ds_swap_buffers() {
 
     C3D_FrameBegin(C3D_FRAME_SYNCDRAW);
 
-    // TOP SCREEN — stereoscopic 3D: render twice (left + right eye)
-    int eye_count = gfxIs3D() ? 2 : 1;
+    // TOP SCREEN — stereoscopic 3D: render once per eye (left + right).
+    // Offsets are symmetric around the screen plane and scale per-op by its
+    // depth, so flat UI (depth 0) stays pixel-sharp while cards float. The
+    // right-eye pass is skipped when the slider is ~off or 3D is disabled,
+    // halving GPU cost in 2D mode.
     float slider = osGet3DSliderState();
+    if (slider < 0.0f) slider = 0.0f;
+    if (slider > 1.0f) slider = 1.0f;
+    bool stereo = stereo_enabled && gfxIs3D() && slider > 0.02f && stereo_strength > 0.0f;
+    int eye_count = stereo ? 2 : 1;
+    float half_base = slider * stereo_max_shift * stereo_strength * 0.5f;
     for (int eye = 0; eye < eye_count; eye++) {
         C3D_RenderTarget* target = (eye == 0) ? top_target : top_target_right;
-        float x_off = (eye == 1) ? -slider * 48.0f : 0.0f;
+        float eye_sign = (eye == 0) ? 1.0f : -1.0f;
 
         C2D_TargetClear(target, COL_TOP_BG);
         C2D_SceneBegin(target);
-        // Camera preview for QR scan (draws behind text overlays)
-        _3ds_qr_draw_preview(x_off);
+        // Camera preview is live video: pin it to the screen plane (no
+        // disparity) so it never double-visions while the slider is up.
+        _3ds_qr_draw_preview(0.0f);
         C2D_TextBufClear(tmp_text_buf);
         C2D_Font f = custom_font ? custom_font : NULL;
         float font_scale = 1.2f;
         for (int i = 0; i < draw_op_count; i++) {
+                float x_off = stereo ? eye_sign * half_base * draw_ops[i].depth : 0.0f;
                 if (draw_op_types[i] == OP_RECT) {
                     C2D_DrawRectSolid(draw_ops[i].x + x_off, draw_ops[i].y, 0.5f,
                         draw_ops[i].w, draw_ops[i].h, draw_ops[i].color);
@@ -1241,6 +1332,19 @@ void _3ds_swap_buffers() {
                         float by = draw_ops[i].y;
                         float bw = draw_ops[i].w;
                         float bh = draw_ops[i].h;
+                        // Drop shadow for floating cards: a translucent rect offset
+                        // down-right, drawn immediately before the image at the
+                        // same depth so it peeks out behind it. Scales with depth
+                        // so the selected card (depth 1) lifts visibly higher.
+                        // Also visible in 2D mode (x_off == 0), where it is the
+                        // only depth cue.
+                        float cdepth = draw_ops[i].depth;
+                        if (cdepth > 0.3f) {
+                            float shx = 2.0f + 4.0f * cdepth;
+                            float shy = 3.0f + 5.0f * cdepth;
+                            C2D_DrawRectSolid(bx + shx + x_off, by + shy, 0.5f,
+                                bw, bh, C2D_Color32(0, 0, 0, 140));
+                        }
                         if (iw > ih) {
                             // Landscape card (e.g. live cards) in a portrait box:
                             // rotate 90° so it fills the box instead of stretching

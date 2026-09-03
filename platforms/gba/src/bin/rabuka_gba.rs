@@ -10,12 +10,13 @@ use alloc::vec::Vec;
 
 use rabuka_engine::card::Card;
 use rabuka_engine::card_loader::CardLoader;
-use rabuka_engine::game::platform_ui;
+use rabuka_engine::game::platform_ui::{self, MatchMode, PlatformUi};
 use rabuka_engine::rng;
 
 use rabuka_gba::decks_baked::DECKS;
 use rabuka_gba::gba_ui::GbaUi;
 use rabuka_gba::input::Input;
+use rabuka_gba::screens::Screen;
 
 fn load_deck_cards(
     _decks: &[rabuka_gba::decks_baked::DeckInfo],
@@ -35,15 +36,38 @@ fn main(mut gba: agb::Gba) -> ! {
 
     let decks = DECKS;
     let names: Vec<&str> = decks.iter().map(|d| d.name).collect();
+    let modes = ["VS AI", "2 Player", "AI vs AI"];
 
-    // Run the whole flow (mode select -> deck select -> match) forever. If a
-    // match ends early (e.g. the player presses B to pass at the RPS screen, or
-    // a game result is reached), restart cleanly at the mode select instead of
-    // dropping into a frozen black screen.
+    // Explicit boot flow — see `screens::Screen` for the full button map:
+    // ModeSelect -> DeckSelectP1 -> (DeckSelectP2) -> Match -> Result -> ...
+    // A finished match restarts cleanly at ModeSelect instead of freezing.
     loop {
-        let ui = GbaUi::new(&mut display, &mut input);
-        platform_ui::run_embedded_game(ui, &names, |i| decks[i].cards, |a, b| {
-            load_deck_cards(decks, a, b)
-        });
+        let _ = Screen::ModeSelect;
+        let mut ui = GbaUi::new(&mut display, &mut input);
+        let as_ui = &mut ui as &mut dyn PlatformUi;
+        let mode_idx = platform_ui::select(as_ui, &modes, "MODE Up/Dn:A/Start");
+        let mode = match mode_idx {
+            1 => MatchMode::TwoPlayer,
+            2 => MatchMode::AiVsAi,
+            _ => MatchMode::VsAi,
+        };
+
+        let _ = Screen::DeckSelectP1;
+        let d1 = platform_ui::select(as_ui, &names, "P1 DECK Up/Dn:A/Start");
+        let _ = Screen::DeckSelectP2;
+        let d2 = if matches!(mode, MatchMode::TwoPlayer) {
+            platform_ui::select(as_ui, &names, "P2 DECK Up/Dn:A/Start")
+        } else {
+            rng::rand_range(names.len())
+        };
+
+        // Match (Screen::Board/Actions/StartMenu/CardDetail/ChoiceGrid are
+        // driven by the engine from here; Screen::Result shows at the end).
+        let _ = Screen::Board;
+        let p1_cards = decks[d1].cards;
+        let p2_cards = decks[d2].cards;
+        let all_cards = load_deck_cards(decks, d1, d2);
+        platform_ui::run_match(&mut ui, p1_cards, p2_cards, all_cards, mode);
+        let _ = Screen::Result;
     }
 }

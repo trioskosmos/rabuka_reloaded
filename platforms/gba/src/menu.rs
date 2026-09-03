@@ -1,9 +1,20 @@
-//! GBA menu screens — card detail viewer.
+//! GBA menu screens — modular detail viewer.
 //!
 //! The per-match menus (mode/deck select, action list, etc.) live in the
 //! engine's `platform_ui::menu` module and are shared with the other embedded
-//! ports. What lives here is GBA-specific menu UI that used to be inlined in
-//! the binary: the card-detail popup (art + stats, dismissed with A/B/L/R).
+//! ports. What lives here is the GBA-specific detail screen backend: one
+//! paginated renderer (`show_detail_screen`) over three caller-composed
+//! parts — card art, header lines, body text. Every detail type is just a
+//! different composition:
+//!
+//! - card detail (R / zone lists): art + name/stat header + ability body
+//! - action detail (L): acting card art + name/stat header + full action
+//!   text + ability body (composed by the engine)
+//! - choice hint (L): source card art + name header + full prompt text
+//!   (composed by the engine)
+//!
+//! The engine drives these through `PlatformUi::show_detail_screen`, so new
+//! detail types never re-render — they recompose.
 
 extern crate alloc;
 
@@ -11,6 +22,7 @@ use alloc::format;
 use alloc::string::String;
 use alloc::vec::Vec;
 
+use rabuka_engine::game::platform_ui::{card_ability_text, card_stat_text, wrap_text};
 use rabuka_engine::game_state::GameState;
 
 use crate::display::Display;
@@ -18,38 +30,38 @@ use crate::gba_ui::InputSource;
 use crate::input::Button;
 use crate::ui::CARD_ART;
 
-/// Show the focused card's art + stats until A/B/L/R is pressed.
-///
-/// `art` is looked up by `card_no`; the stat line reuses the engine's
-/// `card_stat_text` (mirroring the 3DS detail line) so the bin doesn't carry a
-/// duplicate formatter.
-pub fn show_card_detail<I: InputSource>(
+/// Detail pane width: the portrait takes the left 12 tile columns, text
+/// starts at column 13, so 30 - 13 = 17 columns. Engine wrap keeps
+/// `{{icon}}` tokens whole so they render inline.
+const PANE_COLS: usize = 17;
+
+/// Paginated detail screen over caller-composed parts: `art_card_no` art on
+/// the left, `header` lines, then wrapped `body`. Up/Down scrolls (like the
+/// 3DS detail view); A/B/L/R/Start closes.
+pub fn show_detail_screen<I: InputSource>(
     display: &mut Display,
     input: &mut I,
     gs: &GameState,
-    card_no: String,
+    art_card_no: Option<&str>,
+    header: &[String],
+    body: &str,
 ) {
-    let art = CARD_ART.iter().find(|a| a.card_no == card_no);
+    let _ = gs;
+    let art = art_card_no.and_then(|n| CARD_ART.iter().find(|a| a.card_no == n));
     let mut lines: Vec<String> = Vec::new();
-    if let Some(card) = gs.card_database.get_card_by_no(&card_no) {
-        lines.push(format!("[{}] {}", card.card_no, card.name));
-        let stat = rabuka_engine::game::platform_ui::card_stat_text(card);
-        if !stat.is_empty() {
-            lines.push(stat);
+    for h in header {
+        if h.trim().is_empty() {
+            continue;
         }
-        let abil = rabuka_engine::game::platform_ui::card_ability_text(card);
-        if !abil.is_empty() {
-            // wrap ability text to the detail pane width (30 - 13 = 17 cols);
-            // engine wrap keeps {{icon}} tokens whole so they render inline
-            lines.extend(rabuka_engine::game::platform_ui::wrap_text(
-                &abil,
-                17,
-            ));
-        }
-    } else {
-        lines.push(card_no);
+        lines.extend(wrap_text(h, PANE_COLS));
     }
-    // Paginated like 3DS detail (render.rs:437 lpp 10) — Up/Down scrolls, A/B/L/R closes
+    if !lines.is_empty() && !body.trim().is_empty() {
+        lines.push(String::new());
+    }
+    lines.extend(wrap_text(body, PANE_COLS));
+    // Fresh pool for the portrait + text: the previous screen's dead tiles
+    // would otherwise pile onto this screen's demand (see reset_vram).
+    display.reset_vram();
     let mut scroll = 0usize;
     const VISIBLE: usize = 8;
     display.render_card_detail(art, &lines, scroll);
@@ -65,9 +77,38 @@ pub fn show_card_detail<I: InputSource>(
             || input.just_pressed(Button::B)
             || input.just_pressed(Button::L)
             || input.just_pressed(Button::R)
+            || input.just_pressed(Button::Start)
         {
+            // Release the portrait + text before the caller rebuilds its
+            // own screen, so demands never stack across the transition.
+            display.reset_vram();
             return;
         }
         display.wait();
+    }
+}
+
+/// Card detail: art + `[no] name` / stat header + ability body.
+pub fn show_card_detail<I: InputSource>(
+    display: &mut Display,
+    input: &mut I,
+    gs: &GameState,
+    card_no: String,
+) {
+    if let Some(card) = gs.card_database.get_card_by_no(&card_no) {
+        let header: Vec<String> = alloc::vec![
+            format!("[{}] {}", card.card_no, card.name),
+            card_stat_text(card),
+        ];
+        show_detail_screen(
+            display,
+            input,
+            gs,
+            Some(card_no.as_str()),
+            &header,
+            &card_ability_text(card),
+        );
+    } else {
+        show_detail_screen(display, input, gs, None, &[card_no], "");
     }
 }

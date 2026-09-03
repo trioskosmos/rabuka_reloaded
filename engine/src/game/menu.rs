@@ -17,10 +17,9 @@ use std::format;
 
 use crate::ability::types::Choice;
 use crate::ability::util::zone_cards;
-use crate::card::Card;
 
 use crate::game::game_setup;
-use crate::game::platform_ui::{card_ability_text, card_stat_text, one_line, PlatformUi, wrap_text};
+use crate::game::platform_ui::{card_ability_text, card_stat_text, choose_card_grid, one_line, PlatformUi, wrap_text};
 use crate::game_state::GameState;
 use crate::turn::TurnEngine;
 
@@ -62,19 +61,6 @@ fn show_lines(ui: &mut dyn PlatformUi, lines: &[String]) {
 fn show_detail(ui: &mut dyn PlatformUi, text: &str) {
     let cols = ui.option_cols();
     let lines = wrap_text(text, cols);
-    show_lines(ui, &lines);
-}
-
-/// Scrollable card detail (R): header, stat line, then the ability text.
-fn show_card_stats(ui: &mut dyn PlatformUi, card: &Card) {
-    let cols = ui.option_cols();
-    let mut lines: Vec<String> = Vec::new();
-    lines.push(format!("[{}] {}", card.card_no, card.name));
-    lines.push(card_stat_text(card));
-    let ab = card_ability_text(card);
-    if !ab.is_empty() {
-        lines.extend(wrap_text(&ab, cols));
-    }
     show_lines(ui, &lines);
 }
 
@@ -261,14 +247,13 @@ pub fn menu_select_with_cards(
             buf.push_str(&rows[n][2..]);
             ui.println(&buf);
         }
-        // Draw card images for visible items
-        if has_images {
-            for (i, n) in (scroll..end).enumerate() {
-                if n < card_nos.len() {
-                    let img_y = 2 + i as i32 * 2; // 2 tile rows per line, plus header
-                    ui.draw_card_image(&card_nos[n], 26, img_y, 3, 4, 0);
-                }
-            }
+        // Focused-row card preview (3DS-style): a single stage-size image
+        // for the highlighted option. Drawing every row would stack
+        // overlapping images (6 tall on a 2 pitch) and punch holes through
+        // the list.
+        if has_images && sel >= scroll && sel < end && sel < card_nos.len() {
+            let img_y = 2 + (sel - scroll) as i32 * 2; // 2 tile rows per line, plus header
+            ui.draw_card_image(&card_nos[sel], 24, img_y, 5, 6, 1);
         }
         if all_items.len() > end {
             ui.println(&format!("  .. {} more", all_items.len() - end));
@@ -390,7 +375,32 @@ pub fn human_turn(
             } else if ui.just_pressed_up() {
                 sel = if sel == 0 { acts.len() - 1 } else { sel - 1 };
             } else if ui.just_pressed_l() {
-                show_detail(ui, &acts[sel].description);
+                // Action detail: the full action text plus the acting
+                // card's screen (art/stats/ability), composed by the
+                // port's detail renderer from these parts.
+                let act = &acts[sel];
+                let card = act
+                    .parameters
+                    .as_ref()
+                    .and_then(|p| p.card_no.as_ref())
+                    .and_then(|n| gs.card_database.get_card_by_no(n));
+                match card {
+                    Some(c) => {
+                        let mut header: Vec<String> = Vec::new();
+                        header.push(format!("[{}] {}", c.card_no, c.name));
+                        header.push(card_stat_text(c));
+                        let ab = card_ability_text(c);
+                        let body = if ab.trim().is_empty() {
+                            act.description.clone()
+                        } else {
+                            format!("{}\n\n{}", act.description, ab)
+                        };
+                        ui.show_detail_screen(gs, Some(c.card_no.as_ref()), &header, &body);
+                    }
+                    None => {
+                        ui.show_detail_screen(gs, None, &[], &act.description);
+                    }
+                }
             } else if ui.just_pressed_r() {
                 let card = acts[sel]
                     .parameters
@@ -398,7 +408,15 @@ pub fn human_turn(
                     .and_then(|p| p.card_no.as_ref())
                     .and_then(|n| gs.card_database.get_card_by_no(n));
                 if let Some(c) = card {
-                    show_card_stats(ui, c);
+                    let mut header: Vec<String> = Vec::new();
+                    header.push(format!("[{}] {}", c.card_no, c.name));
+                    header.push(card_stat_text(c));
+                    ui.show_detail_screen(
+                        gs,
+                        Some(c.card_no.as_ref()),
+                        &header,
+                        &card_ability_text(c),
+                    );
                 }
             } else if ui.just_pressed_a() {
                 let _ = game_setup::execute_action(gs, &acts[sel]);
@@ -482,31 +500,33 @@ pub fn handle_choice(ui: &mut dyn PlatformUi, gs: &mut GameState) -> bool {
                     .collect(),
             };
 
-            // Extract card_nos for image display
+            // Card numbers for image display (3DS-style grid). These must be
+            // the printable card_no strings (e.g. "BP1-005-R") that the
+            // port's art lookup understands — NOT the numeric DB ids.
+            let card_no_of = |cid: i16| {
+                gs.card_database
+                    .get_card(cid)
+                    .map(|c| c.card_no.to_string())
+                    .unwrap_or_default()
+            };
             let card_nos: Vec<String> = match filtered_indices {
-                Some(ref indices) => {
-                    if card_ids.is_empty() {
-                        Vec::new()
-                    } else {
-                        indices
-                            .iter()
-                            .filter(|&&i| i < card_ids.len())
-                            .map(|&i| card_ids[i].to_string())
-                            .collect()
-                    }
-                }
-                None => card_ids.iter().map(|cid| cid.to_string()).collect(),
+                // Keep 1:1 with `items` (same order/length) so grid images
+                // line up with names; out-of-range slots draw no image.
+                Some(ref indices) => indices
+                    .iter()
+                    .map(|&i| {
+                        if i < card_ids.len() {
+                            card_no_of(card_ids[i])
+                        } else {
+                            String::new()
+                        }
+                    })
+                    .collect(),
+                None => card_ids.iter().map(|&cid| card_no_of(cid)).collect(),
             };
 
 if count <= 1 {
-                let sel = crate::choice_renderer::render_card_choice_grid(
-                    ui,
-                    gs,
-                    &description,
-                    &items,
-                    &card_nos,
-                    allow_skip,
-                );
+                let sel = choose_card_grid(ui, gs, &description, &items, &card_nos, allow_skip);
                 match sel {
                     None => {
                         TurnEngine::resume_with_choice(gs, None, Some(Vec::new())).ok();
