@@ -1,0 +1,13 @@
+BasicInfo:
+  Title: "Rabuka Reloaded"
+  CompanyCode: "01"
+  ProductCode: "CTR-P-RLDD"
+  ContentType: Application
+
+AccessControlInfo:
+  CoreVersion: 2
+  Priority: 16
+  ServiceAccessControl: "APT:U", "FS:USER", "HID:USER", "GSP::GSP:GPU", "SOC:U", "CFGU", "PTMU:U", "PM:APP", "FRD:U", "CAM:U", "MIC:U"
+
+SystemControlInfo:
+  StackSize: 0x10000

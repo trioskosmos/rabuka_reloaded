@@ -142,23 +142,9 @@ if not exist "%DEVKITPRO%\tools\bin\makerom.exe" goto :skip_cia
 if not exist "%SRC_ELF%" goto :skip_cia
 echo [6/7] Building RomFS binary...
 set "ROMFS_BIN=%~dp0output\_romfs.bin"
-set "RSF_FILE=%~dp0output\_rabuka.rsf"
+set "RSF_FILE=%~dp0rabuka.rsf"
 "%DEVKITPRO%\tools\bin\build_romfs.exe" "%~dp0romfs" "%ROMFS_BIN%" >nul 2>&1
 if errorlevel 1 echo [6/7] build_romfs failed -- trying makerom without it.
-> "%RSF_FILE%" echo BasicInfo:
->>"%RSF_FILE%" echo   Title: "Rabuka Reloaded"
->>"%RSF_FILE%" echo   CompanyCode: "01"
->>"%RSF_FILE%" echo   ProductCode: "CTR-P-RLDD"
->>"%RSF_FILE%" echo   ContentType: Application
->>"%RSF_FILE%" echo .
->>"%RSF_FILE%" echo AccessControlInfo:
->>"%RSF_FILE%" echo   CoreVersion: 2
->>"%RSF_FILE%" echo   Priority: 16
->>"%RSF_FILE%" echo   ServiceAccessControl: "APT:U", "FS:USER", "HID:USER", "GSP::GSP:GPU", "SOC:U", "CFGU", "PTMU:U", "PM:APP", "FRD:U", "CAM:U", "MIC:U"
->>"%RSF_FILE%" echo   SystemCallAccess: 0x01, 0x02, 0x04, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x1E, 0x21, 0x22, 0x23, 0x25, 0x27, 0x28, 0x29, 0x2A, 0x2C, 0x2D, 0x2E, 0x2F, 0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x38, 0x39, 0x3A, 0x3B, 0x3C, 0x3D, 0x3E
->>"%RSF_FILE%" echo.
->>"%RSF_FILE%" echo SystemControlInfo:
->>"%RSF_FILE%" echo   StackSize: 0x10000
 if exist "%ROMFS_BIN%" (
     makerom -f cia -o "%OUT_CIA%" -elf "%SRC_ELF%" -romfs "%ROMFS_BIN%" -rsf "%RSF_FILE%"
 ) else (
@@ -169,7 +155,6 @@ if errorlevel 1 (
 ) else (
     echo [6/7] CIA: output\rabuka_3ds.cia (install via FBI)
 )
-if exist "%RSF_FILE%" del "%RSF_FILE%" >nul 2>&1
 if exist "%ROMFS_BIN%" del "%ROMFS_BIN%" >nul 2>&1
 goto :cia_done
 
