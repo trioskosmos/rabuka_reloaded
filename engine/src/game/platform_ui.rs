@@ -283,6 +283,7 @@ pub fn one_line(text: &str, cols: usize) -> String {
     s
 }
 
+#[cfg(feature = "gba")]
 fn heart_icon_for(c: &crate::card::HeartColor) -> Option<&'static str> {
     use crate::card::HeartColor;
     match c {

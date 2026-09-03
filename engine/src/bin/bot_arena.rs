@@ -166,8 +166,8 @@ fn main() {
     // Do-nothing telemetry: how often a Main phase ends with no member played
     // (ConfirmMainPhase chosen while a deploy was available) and how often a
     // Live Card Set folds to an empty zone.
-    let mut main_decisions = 0u64;
-    let mut main_confirms = 0u64;
+    let mut _main_decisions = 0u64;
+    let mut _main_confirms = 0u64;
     let mut live_decisions = 0u64;
     let mut live_folds = 0u64;
     let mut main_phase_count = 0u64;
@@ -468,7 +468,7 @@ fn main() {
                 BotKind::V5 => strategy_v5::choose_action_v5(&gs, &actions, me),
                 BotKind::Random => actions[rng.range(actions.len())].clone(),
             };
-            main_decisions += 1;
+            _main_decisions += 1;
             if gs.current_phase == Phase::Main {
                 if !cur_is_main {
                     cur_is_main = true;
@@ -497,7 +497,7 @@ fn main() {
                 cur_is_main = false;
             }
             if action.action_type == rabuka_engine::game_setup::ActionType::Pass {
-                main_confirms += 1;
+                _main_confirms += 1;
             }
             if trace {
                 let card_no = action

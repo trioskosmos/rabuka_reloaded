@@ -27,7 +27,7 @@ use crate::game_state::GameState;
 use crate::bot::strategy::StrategyWeights;
 use crate::bot::strategy_v2::V2Policy;
 
-/// Diagnostics counters (printed by the arena bin).
+// Diagnostics counters (printed by the arena bin).
 cfg_if::cfg_if! {
     if #[cfg(target_has_atomic = "64")] {
         pub static V3_STATS: [std::sync::atomic::AtomicU64; 5] = [

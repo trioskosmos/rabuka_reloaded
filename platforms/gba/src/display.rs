@@ -408,7 +408,7 @@ impl<'a> Display<'a> {
         for ty in 0..ROWS {
             for tx in 0..COLS {
                 self.board_art_bg.set_tile((tx, ty), &back_ts, clear_8bpp);
-                self.board_ui_bg.set_tile((tx, ty), &ui_ts, TileSetting::new(UI_EMPTY, e0));
+                ui_bg.set_tile((tx, ty), &ui_ts, TileSetting::new(UI_EMPTY, e0));
             }
         }
         Self::blit_line(&mut self.board_ui_bg, &font_ts, &icon_ts, e0, &frame.header, 0, 0);
@@ -427,8 +427,8 @@ impl<'a> Display<'a> {
                 let xi = if is_opp { 2 - i } else { i };
                 let x = 1 + STAGE_PITCH * xi as i32;
                 self.draw_slot(
-                    &mut art_bg,
-                    &mut ui_bg,
+                    &mut self.board_art_bg,
+                    &mut self.board_ui_bg,
                     &ui_ts,
                     &font_ts,
                     &icon_ts,
@@ -449,8 +449,8 @@ impl<'a> Display<'a> {
                 let xi = if is_opp { 2 - i } else { i };
                 let x = INFO_X + LIVE_PITCH * xi as i32;
                 self.draw_slot(
-                    &mut art_bg,
-                    &mut ui_bg,
+                    &mut self.board_art_bg,
+                    &mut self.board_ui_bg,
                     &ui_ts,
                     &font_ts,
                     &icon_ts,
@@ -471,8 +471,8 @@ impl<'a> Display<'a> {
                 let xi = if is_opp { 2 - i } else { i };
                 let x = INFO_X + LIVE_PITCH * xi as i32;
                 self.draw_slot(
-                    &mut art_bg,
-                    &mut ui_bg,
+                    &mut self.board_art_bg,
+                    &mut self.board_ui_bg,
                     &ui_ts,
                     &font_ts,
                     &icon_ts,
@@ -486,7 +486,7 @@ impl<'a> Display<'a> {
                     BACK_FRONT,
                     flipped,
                     "live",
-                );
+);
             }
         }
 
@@ -494,8 +494,8 @@ impl<'a> Display<'a> {
         for (i, slot) in frame.hand.iter().enumerate() {
             let x = HAND_PITCH * i as i32;
             self.draw_slot(
-                &mut art_bg,
-                &mut ui_bg,
+                &mut self.board_art_bg,
+                &mut self.board_ui_bg,
                 &ui_ts,
                 &font_ts,
                 &icon_ts,
@@ -512,7 +512,7 @@ impl<'a> Display<'a> {
             );
         }
         if frame.hand_more {
-            ui_bg.set_tile(
+            self.board_ui_bg.set_tile(
                 (COLS - 1, HAND_Y),
                 &ui_ts,
                 TileSetting::new(UI_BADGE, e0),
@@ -522,27 +522,27 @@ impl<'a> Display<'a> {
         // Cursor: hand or stage (depending on L-cycled focus). Marker is white triangle.
         if let Some(w) = frame.hand_cursor {
             let x = HAND_PITCH * w as i32;
-            ui_bg.set_tile((x, HAND_Y), &ui_ts, TileSetting::new(UI_MARKER, e0));
+            self.board_ui_bg.set_tile((x, HAND_Y), &ui_ts, TileSetting::new(UI_MARKER, e0));
         }
         if let Some(idx) = frame.own_stage_cursor {
             let x = STAGE_START_X + STAGE_PITCH * idx as i32;
-            ui_bg.set_tile((x, STAGE_YS[1]), &ui_ts, TileSetting::new(UI_MARKER, e0));
+            self.board_ui_bg.set_tile((x, STAGE_YS[1]), &ui_ts, TileSetting::new(UI_MARKER, e0));
         }
         if let Some(idx) = frame.opp_stage_cursor {
             // Opponent cards are drawn mirrored (2 - i, like the 3DS far
             // side), so the cursor must mirror too or it points at the
             // wrong card.
             let x = STAGE_START_X + STAGE_PITCH * (2 - idx) as i32;
-            ui_bg.set_tile((x, STAGE_YS[0]), &ui_ts, TileSetting::new(UI_MARKER, e0));
+            self.board_ui_bg.set_tile((x, STAGE_YS[0]), &ui_ts, TileSetting::new(UI_MARKER, e0));
         }
 
         // Action bar pinned to the bottom (single 16px line; hint lives in header).
         let bar = alloc::format!("> {}", frame.action_line);
-        Self::blit_line(&mut ui_bg, &font_ts, &icon_ts, e0, &bar, 0, BAR_Y);
+        Self::blit_line(&mut self.board_ui_bg, &font_ts, &icon_ts, e0, &bar, 0, BAR_Y);
 
         let mut f = self.gfx.frame();
-        art_bg.show(&mut f);
-        ui_bg.show(&mut f);
+        self.board_art_bg.show(&mut f);
+        self.board_ui_bg.show(&mut f);
         f.commit();
     }
 
@@ -557,14 +557,16 @@ impl<'a> Display<'a> {
         let icon_ts = unsafe { TileSet::new(&TEXTICON_TILES.0, TileFormat::FourBpp) };
         let e = TileEffect::new(false, false, 15);
 
-// Reuse background to avoid VRAM allocation leak
-        let mut tbg = self.action_bg.get_or_insert_with(|| RegularBackground::new(
-            Priority::P0,
-            RegularBackgroundSize::Background32x32,
-            TileFormat::FourBpp,
-        ));
+        // Clear action_bg each frame
+        let ui_ts = unsafe { TileSet::new(BOARD_UI, TileFormat::FourBpp) };
+        let e_ui = TileEffect::new(false, false, 15);
+        for ty in 0..ROWS {
+            for tx in 0..COLS {
+                self.action_bg.set_tile((tx, ty), &ui_ts, TileSetting::new(UI_EMPTY, e_ui));
+            }
+        }
 
-        Self::blit_line(&mut tbg, &font_ts, &icon_ts, e, "ACTIONS [Sel:Board] [Sta:Menu]", 0, 0);
+        Self::blit_line(&mut self.action_bg, &font_ts, &icon_ts, e, "ACTIONS [Sel:Board] [Sta:Menu]", 0, 0);
         let mut row = 2i32;
         for line in self.buf.split('\n') {
             if row + 2 > ROWS {
@@ -579,12 +581,12 @@ impl<'a> Display<'a> {
             } else {
                 e
             };
-            Self::blit_line(&mut tbg, &font_ts, &icon_ts, color, line, 0, row);
+            Self::blit_line(&mut self.action_bg, &font_ts, &icon_ts, color, line, 0, row);
             row += 2;
         }
 
         let mut f = self.gfx.frame();
-        tbg.show(&mut f);
+        self.action_bg.show(&mut f);
         f.commit();
     }
 
@@ -616,46 +618,34 @@ impl<'a> Display<'a> {
             // every card uploads its own (pointer, tile) pairs — always the
             // right pixels, never stale, and freed on close.
             let art_ts = self.get_tile_set("detail", art.card_no, art.tiles);
-            // Reuse background to avoid VRAM allocation leak
-            let mut abg = self.detail_art_bg.get_or_insert_with(|| RegularBackground::new(
-                Priority::P0,
-                RegularBackgroundSize::Background32x32,
-                TileFormat::EightBpp,
-            ));
             for i in 0..(DETAIL_DW * DETAIL_DH) {
                 let tx = (i % DETAIL_DW) as i32;
                 let ty = (i / DETAIL_DW) as i32 + DETAIL_Y0;
-                abg.set_tile((tx, ty), art_ts, TileSetting::new(i as u16, TileEffect::new(false, false, 0)));
+                self.detail_art_bg.set_tile((tx, ty), art_ts, TileSetting::new(i as u16, TileEffect::new(false, false, 0)));
             }
-            abg.show(&mut f);
+            self.detail_art_bg.show(&mut f);
         }
 
-        // Reuse background to avoid VRAM allocation leak
-        let mut tbg = self.detail_text_bg.get_or_insert_with(|| RegularBackground::new(
-            Priority::P1,
-            RegularBackgroundSize::Background32x32,
-            TileFormat::FourBpp,
-        ));
         // Dark panel behind ability text like 3DS COL_CARD_OPAQUE (render.rs:498)
         let ui_ts = unsafe { TileSet::new(BOARD_UI, TileFormat::FourBpp) };
         for ty in 0..ROWS {
             for tx in DETAIL_DW as i32..COLS {
-                tbg.set_tile((tx, ty), &ui_ts, TileSetting::new(UI_EMPTY, e_text));
+                self.detail_text_bg.set_tile((tx, ty), &ui_ts, TileSetting::new(UI_EMPTY, e_text));
             }
         }
         const VISIBLE: usize = 8;
         let end = (scroll + VISIBLE).min(lines.len());
         for (i, line) in lines[scroll..end].iter().enumerate() {
-            Self::blit_line(&mut tbg, &font_ts, &icon_ts, e_text, line, DETAIL_DW as i32 + 1, i as i32 * 2);
+            Self::blit_line(&mut self.detail_text_bg, &font_ts, &icon_ts, e_text, line, DETAIL_DW as i32 + 1, i as i32 * 2);
         }
         // Scroll indicators like 3DS detail (render.rs:568)
         if scroll > 0 {
-            Self::blit_line(&mut tbg, &font_ts, &icon_ts, e_text, "^", 29, 0);
+            Self::blit_line(&mut self.detail_text_bg, &font_ts, &icon_ts, e_text, "^", 29, 0);
         }
         if end < lines.len() {
-            Self::blit_line(&mut tbg, &font_ts, &icon_ts, e_text, "v", 29, 18);
+            Self::blit_line(&mut self.detail_text_bg, &font_ts, &icon_ts, e_text, "v", 29, 18);
         }
-        tbg.show(&mut f);
+        self.detail_text_bg.show(&mut f);
         f.commit();
     }
 
@@ -728,18 +718,10 @@ impl<'a> Display<'a> {
         let ui_ts = unsafe { TileSet::new(BOARD_UI, TileFormat::FourBpp) };
         let e_ui = TileEffect::new(false, false, 15);
 
-        // Reuse backgrounds to avoid VRAM allocation leak per frame
-        let mut bg = self.menu_bg.get_or_insert_with(|| RegularBackground::new(
-            Priority::P0,
-            RegularBackgroundSize::Background32x32,
-            TileFormat::FourBpp,
-        ));
-
-        // Fill entire screen with zone fill color (UI_EMPTY, palette index 2 = dark blue)
-        // so menus have the same dark blue background as the board.
+        // Clear menu_bg each frame
         for ty in 0..ROWS {
             for tx in 0..COLS {
-                bg.set_tile((tx, ty), &ui_ts, TileSetting::new(UI_EMPTY, e_ui));
+                self.menu_bg.set_tile((tx, ty), &ui_ts, TileSetting::new(UI_EMPTY, e_ui));
             }
         }
 
@@ -750,13 +732,13 @@ impl<'a> Display<'a> {
             if ty + 2 > ROWS {
                 break;
             }
-            Self::blit_text(&mut bg, &font_ts, &icon_ts, e, line, 0, ty, true);
+            Self::blit_text(&mut self.menu_bg, &font_ts, &icon_ts, e, line, 0, ty, true);
             ty += 2;
         }
 
         if self.pending_art.is_empty() {
             let mut frame = self.gfx.frame();
-            bg.show(&mut frame);
+            self.menu_bg.show(&mut frame);
             frame.commit();
             return;
         }
@@ -765,11 +747,6 @@ impl<'a> Display<'a> {
         // onto an 8bpp BG and punch transparent holes in the text BG so the
         // art shows through (same layering as the board renderer). Corner
         // ticks mark the selected card.
-        let art_bg = self.menu_art_bg.get_or_insert_with(|| RegularBackground::new(
-            Priority::P1,
-            RegularBackgroundSize::Background32x32,
-            TileFormat::EightBpp,
-        ));
         let art_eff = TileEffect::new(false, false, 0);
 
         // Sort by Y then X for correct visual z-ordering (top-to-bottom, left-to-right)
@@ -785,7 +762,7 @@ impl<'a> Display<'a> {
             if q.card_no.is_empty() {
                 // Marker slot with no art: badge so the cursor stays visible.
                 if q.selected {
-                    bg.set_tile((q.x, q.y), &ui_ts, TileSetting::new(UI_BADGE, e_ui));
+                    self.menu_bg.set_tile((q.x, q.y), &ui_ts, TileSetting::new(UI_BADGE, e_ui));
                 }
             } else if let Some(front) = fronts
                 .iter()
@@ -796,12 +773,12 @@ impl<'a> Display<'a> {
                 for ay in 0..q.rows {
                     for ax in 0..q.cols {
                         let sidx = (ay * q.cols + ax) as u16;
-                        art_bg.set_tile(
+                        self.menu_art_bg.set_tile(
                             (q.x + ax, q.y + ay),
                             &ts,
                             TileSetting::new(sidx, art_eff),
                         );
-                        bg.set_tile((q.x + ax, q.y + ay), &ui_ts, TileSetting::BLANK);
+                        self.menu_bg.set_tile((q.x + ax, q.y + ay), &ui_ts, TileSetting::BLANK);
                     }
                 }
                 if q.dimmed {
@@ -813,7 +790,7 @@ impl<'a> Display<'a> {
                     for ay in 0..q.rows {
                         for ax in 0..q.cols {
                             if (ax + ay) % 2 == 0 {
-                                bg.set_tile(
+                                self.menu_bg.set_tile(
                                     (q.x + ax, q.y + ay),
                                     &ui_ts,
                                     TileSetting::new(UI_EMPTY, e_ui),
@@ -825,7 +802,7 @@ impl<'a> Display<'a> {
                 if q.selected {
                     // Gold badge overlapping the card's top-right corner.
                     // Drawn after dimming so the cursor stays visible.
-                    bg.set_tile(
+                    self.menu_bg.set_tile(
                         (q.x + q.cols - 1, q.y),
                         &ui_ts,
                         TileSetting::new(UI_BADGE, e_ui),
@@ -833,13 +810,13 @@ impl<'a> Display<'a> {
                 }
             } else {
                 // Unknown card number: leave the zone fill and print the id.
-                Self::blit_line(&mut bg, &font_ts, &icon_ts, e, &q.card_no, q.x, q.y);
+                Self::blit_line(&mut self.menu_bg, &font_ts, &icon_ts, e, &q.card_no, q.x, q.y);
             }
         }
 
         let mut frame = self.gfx.frame();
-        art_bg.show(&mut frame);
-        bg.show(&mut frame);
+        self.menu_art_bg.show(&mut frame);
+        self.menu_bg.show(&mut frame);
         frame.commit();
     }
 

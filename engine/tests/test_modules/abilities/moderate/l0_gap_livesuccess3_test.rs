@@ -1,6 +1,5 @@
 /// L0 gap coverage: LiveSuccess optional-energy draw abilities.
 use crate::helpers::*;
-use rabuka_engine::ability::types::Choice;
 
 fn drain_pay(game: &mut TestGame) {
     for _ in 0..30 {

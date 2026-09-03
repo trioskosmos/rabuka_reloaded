@@ -17,7 +17,7 @@ use crate::bot::strategy_v4::{lives_in_hand, passable_count};
 use crate::bot::strategy_v6::{choose_live_set_v6, choose_mulligan_v6};
 use crate::card::{CardDatabase, CardType};
 use crate::game_setup::{Action, ActionType};
-use crate::game_state::{GameState, Phase};
+use crate::game_state::GameState;
 use crate::player::Player;
 
 /// Sum of base hearts on the stage (development in HEARTS).
