@@ -17,12 +17,7 @@ use rabuka_gba::decks_baked::DECKS;
 use rabuka_gba::gba_ui::GbaUi;
 use rabuka_gba::input::Input;
 use rabuka_gba::screens::Screen;
-
-use agb::sound::mixer::{Frequency, Mixer, SoundChannel, SoundData};
-use agb::include_wav;
-
-/// Background music loaded at compile-time. Must match the mixer frequency (18157 Hz mono).
-static BGM_DATA: SoundData = include_wav!("sfx/next_card.wav");
+use rabuka_gba::match_runner::run_match_with_mixer;
 
 fn load_deck_cards(
     _decks: &[rabuka_gba::decks_baked::DeckInfo],
@@ -38,12 +33,7 @@ fn load_deck_cards(
 fn main(mut gba: agb::Gba) -> ! {
     // Initialize audio mixer at 18157 Hz (good quality, ~10% CPU for 4 channels)
     let mut mixer = gba.mixer.mixer(Frequency::Hz18157);
-    
-    // Start background music looping
-    let mut bgm_channel = SoundChannel::new(BGM_DATA);
-    bgm_channel.looping();
-    bgm_channel.volume(0.6); // Slightly lower volume for background
-    let _ = mixer.play_sound(bgm_channel);
+    let vblank = agb::interrupt::VBlank::get();
 
     let mut display = rabuka_gba::ui::Display::new(gba.graphics.get());
     let mut input = Input::new();
@@ -84,8 +74,7 @@ fn main(mut gba: agb::Gba) -> ! {
         let all_cards = load_deck_cards(decks, d1, d2);
         
         // Run match with audio mixer frame updates
-        let vblank = agb::interrupt::VBlank::get();
-        platform_ui::run_match_with_mixer(&mut ui, p1_cards, p2_cards, all_cards, mode, &mut mixer, &vblank);
+        run_match_with_mixer(&mut ui, p1_cards, p2_cards, all_cards, mode, &mut mixer, &vblank);
         
         let _ = Screen::Result;
     }

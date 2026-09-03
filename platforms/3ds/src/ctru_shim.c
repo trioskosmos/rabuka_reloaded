@@ -40,6 +40,9 @@ typedef struct rabuka_qr_data_s rabuka_qr_data;
 void _3ds_qr_free(void *p);
 static rabuka_qr_data *g_rqr = NULL;
 
+// Audio forward declaration (used in _3ds_exit)
+void _3ds_audio_stop(void);
+
 // ---- Text rendering (top screen: stats + card info) ----
 #define TEXTLEN 8192
 static char top_text[TEXTLEN];
@@ -1793,9 +1796,6 @@ int _3ds_qr_poll(void *p, char *out_text, unsigned int out_max) {
 
 // ===================== AUDIO (NDSP streaming OGG — requires /3ds/dspfirm.cdc on SD) =====================
 #include <3ds/ndsp/ndsp.h>
-
-// Forward declarations
-static void _3ds_audio_stop(void);
 
 // Callback-based threaded OGG streaming (pattern: devkitPro 3ds-examples audio/ogg-vorbis-decoding).
 // Uses LightEvent for efficient synchronization instead of polling.
