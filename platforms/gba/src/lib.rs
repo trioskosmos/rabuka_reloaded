@@ -16,3 +16,4 @@ pub mod input;
 pub mod menu;
 pub mod screens;
 pub mod ui;
+pub use match_runner::run_match_with_mixer;

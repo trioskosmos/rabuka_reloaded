@@ -17,7 +17,7 @@ use rabuka_gba::decks_baked::DECKS;
 use rabuka_gba::gba_ui::GbaUi;
 use rabuka_gba::input::Input;
 use rabuka_gba::screens::Screen;
-use rabuka_gba::match_runner::run_match_with_mixer;
+use rabuka_gba::run_match_with_mixer;
 
 use agb::sound::mixer::Frequency;
 

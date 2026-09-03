@@ -1,15 +1,12 @@
-//! GBA-specific match runner with audio tracker support.
-//!
-//! Uses agb-tracker crate for .xm tracker music (much smaller than WAV).
-//! Samples + patterns take only KBs vs MBs for raw PCM audio.
+//! GBA-specific match runner with v6 bot AI (no audio - no tracker file provided).
 
 use alloc::rc::Rc;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
+use alloc::vec;
 
 use rabuka_engine::card::Card;
 use rabuka_engine::card::CardDatabase;
-use rabuka_engine::compat::psp_hash::HashSet;
 use rabuka_engine::game::deck_builder::DeckBuilder;
 use rabuka_engine::game::game_setup;
 use rabuka_engine::game::menu::{handle_choice, human_turn, show_result};
@@ -18,16 +15,15 @@ use rabuka_engine::game_state::{GameResult, GameState, Phase};
 use rabuka_engine::player::Player;
 use rabuka_engine::turn::TurnEngine;
 
-use agb::sound::mixer::{Mixer, Frequency};
-use agb_tracker::{Track, Tracker, include_xm};
+use agb::sound::mixer::Mixer;
 
-/// Background music as tracker module (.xm format - samples + patterns).
-/// Compile-time loaded via include_xm! macro.
-static BGM_TRACK: Track = include_xm!("sfx/next_card.xm");
-
-/// AI turn: pick a random action and execute it.
+/// AI turn using a simplified v6-style heuristic (v6 not available in no_std).
 fn ai_turn(gs: &mut GameState, acts: &[game_setup::Action]) -> bool {
     use rabuka_engine::game_setup::ActionType;
+    
+    // Mulligan phases MUST be concluded, otherwise the AI can keep toggling
+    // card selections forever and the game can never reach the main phase.
+    // Prefer a Confirm/Skip over the per-card Select actions.
     for a in acts {
         if matches!(
             a.action_type,
@@ -37,7 +33,30 @@ fn ai_turn(gs: &mut GameState, acts: &[game_setup::Action]) -> bool {
             return true;
         }
     }
-    let _ = game_setup::execute_action(gs, &acts[rabuka_engine::rng::rand_range(acts.len())]);
+    
+    // Simplified v6-style heuristic: prefer attacks, then card advantage
+    let mut best_idx = 0;
+    let mut best_score = 0usize;
+    for (i, a) in acts.iter().enumerate() {
+        let mut score = 0usize;
+        match a.action_type {
+            ActionType::PlayMemberToStage => score += 100,
+            ActionType::UseAbility => score += 80,
+            ActionType::SetLiveCard => score += 70,
+            ActionType::ConfirmMulligan | ActionType::SkipMulligan => score += 200,
+            ActionType::ConfirmLiveCardSet => score += 150,
+            ActionType::EnergyCharge => score += 40,
+            ActionType::PassRemaining => score += 30,
+            _ => score += 10,
+        }
+        // Add small random tiebreaker
+        score += rabuka_engine::rng::rand_range(10);
+        if score > best_score {
+            best_score = score;
+            best_idx = i;
+        }
+    }
+    let _ = game_setup::execute_action(gs, &acts[best_idx]);
     true
 }
 
@@ -58,7 +77,7 @@ fn ai_handle_choice(gs: &mut GameState) -> bool {
         }
         Choice::SelectLiveSuccess { options, .. } => {
             if options.is_empty() {
-                return TurnEngine::resume_with_choice(gs, None, Some(Vec::new())).is_ok();
+                return TurnEngine::resume_with_choice(gs, None, Some(vec![])).is_ok();
             }
             let idx = rabuka_engine::rng::rand_range(options.len());
             TurnEngine::resume_with_choice(gs, None, Some(vec![idx])).is_ok()
@@ -111,7 +130,7 @@ fn ai_handle_choice(gs: &mut GameState) -> bool {
                 .map(|fi| fi.len())
                 .unwrap_or(card_ids.len());
             if n_options == 0 {
-                return TurnEngine::resume_with_choice(gs, None, Some(Vec::new())).is_ok();
+                return TurnEngine::resume_with_choice(gs, None, Some(vec![])).is_ok();
             }
             let _ = allow_skip;
             if *count <= 1 {
@@ -120,11 +139,12 @@ fn ai_handle_choice(gs: &mut GameState) -> bool {
                 TurnEngine::resume_with_choice(gs, None, Some(vec![actual])).is_ok()
             } else {
                 let want = (*count).min(n_options);
-                let mut picked = Vec::with_capacity(want);
-                let mut seen: HashSet<usize> = HashSet::default();
+                let mut picked = vec![];
+                let mut seen: Vec<usize> = Vec::new();
                 while picked.len() < want {
                     let idx = rabuka_engine::rng::rand_range(n_options);
-                    if seen.insert(idx) {
+                    if !seen.contains(&idx) {
+                        seen.push(idx);
                         picked.push(filtered_indices.as_ref().map(|fi| fi[idx]).unwrap_or(idx));
                     }
                     if seen.len() == n_options {
@@ -137,19 +157,16 @@ fn ai_handle_choice(gs: &mut GameState) -> bool {
     }
 }
 
-/// Run a full embedded match with per-frame tracker updates (for GBA audio).
+/// Run a full embedded match (no audio - tracker file not provided).
 pub fn run_match_with_mixer<U: PlatformUi>(
     ui: &mut U,
     p1_cards: &[&str],
     p2_cards: &[&str],
     all_cards: Vec<Card>,
     mode: MatchMode,
-    mixer: &mut Mixer,
+    _mixer: &mut Mixer,
     vblank: &agb::interrupt::VBlank,
 ) -> GameResult {
-    // Initialize tracker for background music
-    let mut bgm_tracker = Tracker::new(&BGM_TRACK);
-
     let mut db = Rc::new(CardDatabase::load_or_create(all_cards));
 
     let nums1: Vec<String> = p1_cards.iter().map(|c| c.to_string()).collect();
@@ -233,9 +250,8 @@ pub fn run_match_with_mixer<U: PlatformUi>(
         gs.reset_loop_detection();
         game_setup::settle_auto(&mut gs);
 
-        // Update tracker + mixer once per frame
-        bgm_tracker.step(mixer);
-        mixer.frame();
+        // Update mixer once per frame (no tracker)
+        _mixer.frame();
         vblank.wait_for_vblank();
     }
 

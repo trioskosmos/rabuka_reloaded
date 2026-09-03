@@ -64,7 +64,7 @@ docker run -p 8080:8080 rabuka
 
 ```
 rabuka_reloaded/
-├── engine/            # Core Rust crate (~77K LOC, 125 source files)
+├── engine/            # Core Rust crate (~74K LOC hand-written, 125 source files)
 │   ├── src/core/      #   Card data, game state, player, zones, types
 │   ├── src/ability/   #   Ability system: effects, conditions, costs, VM
 │   ├── src/game/      #   Game setup, display, deck builder, web server

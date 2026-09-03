@@ -8,6 +8,7 @@
 use rabuka_engine::game_setup;
 use rabuka_engine::game_state::{GameResult, GameState, Phase};
 use rabuka_engine::turn;
+use rabuka_engine::bot::strategy_v6::choose_action_v6;
 
 use crate::dprintln;
 use crate::ffi::*;
@@ -583,12 +584,21 @@ pub(crate) fn handle_input(
     let is_ai_turn = *ai_vs_ai || (*vs_ai && !mp_can_act(&gs, 0));
     if is_ai_turn && !dirty {
         if acts_cache.len() > 0 {
-            let ai_idx = (unsafe { _3ds_system_tick() } as usize) % acts_cache.len();
-            let action = acts_cache[ai_idx].clone();
-            let p = action.parameters.clone();
+            // Determine which player is the AI (0 = P1, 1 = P2)
+            // In vs_ai mode, human is P1 (index 0), AI is P2 (index 1)
+            // In ai_vs_ai, active player determines which AI acts
+            let ai_player_idx = if *ai_vs_ai {
+                if gs.active_player().id == gs.player1.id { 0 } else { 1 }
+            } else {
+                1 // vs_ai: AI is always P2
+            };
+            
+            let ai_action = choose_action_v6(&gs, &acts_cache, ai_player_idx);
+            
+            let p = ai_action.parameters.clone();
             match turn::TurnEngine::execute_main_phase_action(
                 gs,
-                &action.action_type,
+                &ai_action.action_type,
                 p.as_ref().and_then(|x| x.card_id),
                 p.as_ref().and_then(|x| x.card_indices.clone()),
                 p.as_ref()
@@ -597,7 +607,7 @@ pub(crate) fn handle_input(
             ) {
                 Ok(_) => {}
                 Err(e) => {
-                    dprintln!("[AI] action failed: {}", e);
+                    dprintln!("[AI v6] action failed: {}", e);
                 }
             }
             gs.reset_loop_detection();
