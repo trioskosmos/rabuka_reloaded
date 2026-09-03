@@ -19,7 +19,7 @@ set RUST_LOG=warn
 REM If --ngrok specified, save its auth token argument
 if "%1"=="--ngrok" set NGROK_AUTHTOKEN=%2
 
-start /b cargo run --release --features server --bin rabuka_engine web-server
+start /b C:/rust_targets/release/rabuka_engine.exe web-server
 
 echo Waiting for Rust backend to be ready...
 :wait_loop

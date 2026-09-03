@@ -1264,7 +1264,7 @@ async fn exec_code(
             if let Some(cid) = p.energy_zone.cards.pop() {
                 p.energy_deck.cards.push(cid);
                 p.energy_zone.set_active_count(
-                    p.energy_zone.active_count().min(p.energy_zone.cards.len().u8_count()),
+                    p.energy_zone.active_count().min(p.energy_zone.cards.len() as u8),
                 );
             }
         });
