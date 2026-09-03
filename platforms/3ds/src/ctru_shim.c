@@ -1958,6 +1958,7 @@ int _3ds_audio_init(void) {
 int _3ds_audio_play_ogg(const char* path) {
     _3ds_audio_stop();
 
+    printf("[AUDIO] Opening %s...\n", path);
     FILE* f = fopen(path, "rb");
     if (!f) {
         char buf[128];
@@ -1965,6 +1966,7 @@ int _3ds_audio_play_ogg(const char* path) {
         _3ds_text_add_top(buf);
         return -1;
     }
+    printf("[AUDIO] File opened, calling ov_open...\n");
 
     int err = ov_open(f, &s_audio.vf, NULL, 0);
     if (err < 0) {
@@ -1974,6 +1976,8 @@ int _3ds_audio_play_ogg(const char* path) {
         _3ds_text_add_top(buf);
         return -2;
     }
+    vorbis_info* vi = ov_info(&s_audio.vf, -1);
+    printf("[AUDIO] ov_open OK, channels=%d rate=%d\n", vi->channels, vi->rate);
     s_audio.opened = 1;
 
     if (!audio_init_ndsp(&s_audio.vf)) {
@@ -1981,6 +1985,7 @@ int _3ds_audio_play_ogg(const char* path) {
         _3ds_text_add_top("[AUDIO] audio_init_ndsp failed\n");
         return -3;
     }
+    printf("[AUDIO] NDSP init OK, starting thread...\n");
 
     LightEvent_Init(&s_audio.event, RESET_ONESHOT);
     ndspSetCallback(audio_callback, NULL);
@@ -1999,6 +2004,7 @@ int _3ds_audio_play_ogg(const char* path) {
         _3ds_text_add_top("[AUDIO] threadCreate failed\n");
         return -4;
     }
+    printf("[AUDIO] Thread started, playing!\n");
     return 0;
 }
 

@@ -108,11 +108,14 @@ fn main() {
     unsafe {
         let rc = _3ds_audio_init();
         if rc != 0 {
-            dprintln!("[AUDIO] ndspInit failed rc={} (need /3ds/dspfirm.cdc)", rc);
+            dprintln!("[AUDIO] ndspInit failed rc=0x{:08X}", rc);
         } else {
+            dprintln!("[AUDIO] ndspInit OK, loading next_card.ogg...");
             let rc2 = _3ds_audio_play_ogg(b"romfs:/next_card.ogg\0".as_ptr());
             if rc2 != 0 {
                 dprintln!("[AUDIO] next_card.ogg failed rc={}", rc2);
+            } else {
+                dprintln!("[AUDIO] next_card.ogg playing!");
             }
         }
     }
