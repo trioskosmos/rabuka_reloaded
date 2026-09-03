@@ -6,13 +6,20 @@ FROM rust:slim-bookworm AS rust-builder
 RUN apt-get update && apt-get install -y --no-install-recommends \
     pkg-config \
     libssl-dev \
+    python3 \
     && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /build
+
+# Copy entire repo to generate code
+COPY . .
+
+# Generate cards_gen.rs and abilities build artifacts
+RUN python3 cards/compile_cards.py && python3 cards/compile_abilities.py
 
 WORKDIR /build/engine
 
 COPY engine/Cargo.toml engine/Cargo.lock ./
-COPY cards/build/ /build/cards/build/
-COPY engine/src/core/cards_gen.rs ./src/core/cards_gen.rs
 RUN mkdir src && echo "fn main() {}" > src/main.rs && \
     cargo build --release --features server --bin rabuka_engine 2>/dev/null || true && \
     rm -rf src
