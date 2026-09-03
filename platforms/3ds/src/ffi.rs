@@ -190,4 +190,13 @@ extern "C" {
     pub fn _3ds_audio_play_ogg(path: *const u8) -> i32;
     pub fn _3ds_audio_stop();
     pub fn _3ds_audio_set_volume(vol: f32);
+
+    // PC Transport (BSD sockets via libctru) — Direct LAN multiplayer
+    pub fn _3ds_pc_socket() -> i32;
+    pub fn _3ds_pc_connect(sock: i32, ip_str: *const u8, port: u16) -> i32;
+    pub fn _3ds_pc_send(sock: i32, data: *const u8, len: u32) -> i32;
+    pub fn _3ds_pc_recv(sock: i32, buf: *mut u8, buf_len: u32) -> i32;
+    pub fn _3ds_pc_close(sock: i32) -> i32;
+    pub fn _3ds_pc_is_connected() -> i32;
+    pub fn _3ds_get_local_ip() -> *const u8;
 }

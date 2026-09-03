@@ -1464,19 +1464,27 @@ ssize_t getrandom(void *buf, size_t buflen, unsigned int flags) {
 }
 
 // ---- UDS local wireless multiplayer ----
-
-#define UDS_WLAN_COMM_ID  0xFF150848
-#define UDS_DATA_CHANNEL  1
-#define UDS_MAX_NODES     2
-
-static u32 uds_sharedmem_size = 0x8000; // 32KB — more packet buffering = fewer burst drops
-static u32 uds_recv_buf_size = UDS_DEFAULT_RECVBUFSIZE;
-static u8 uds_data_channel = UDS_DATA_CHANNEL;
-static udsNetworkStruct uds_netstruct;
-static udsBindContext uds_bindctx;
-static bool uds_initialized = false;
-static bool uds_is_host = false;
-static bool uds_connected = false;
+//
+// WHY UDS (ad-hoc) and not infrastructure WiFi / internet?
+// - UDS is the ONLY native 3DS-to-3DS wireless API. No router, no internet, no
+//   port forwarding, no server. Works anywhere two 3DSes are near each other.
+// - Nintendo Network (official online) shut down 2024; not available to homebrew.
+// - Infrastructure mode (BSD sockets via libctru) IS possible for 3DS <-> PC,
+//   but requires same WiFi network + PC companion app. That's a separate
+//   transport layer, not a replacement for UDS. The protocol in uds.rs/net.rs
+//   is transport-agnostic (only ~20 bytes/action).
+//
+// Protocol (transport-agnostic; works over UDS, UDP, TCP, WebSocket, Tailscale):
+//   Host creates a network, client connects.
+//   Both consoles build IDENTICAL GameStates (same seed + deck template IDs),
+//   then run the same deterministic engine. The ONLY gameplay traffic is each
+//   player's chosen action (~20 bytes). Automatic phases settle identically on both.
+//
+// UDS specifics:
+//   - UDS_WLAN_COMM_ID = 0xFF150848 (unique to this app)
+//   - Max 2 nodes (1 host + 1 client), no spectators
+//   - Unreliable datagram; reliability via ACK + seq + retry in Rust layer
+//   - 32KB sharedmem for packet buffering (reduces burst drops)
 
 // App data for network identification (first 4 bytes = magic, rest = random)
 static u8 uds_appdata[0x14] = {0x52, 0x42, 0x4B, 0x00}; // "RBK" + padding
@@ -1632,6 +1640,103 @@ int _3ds_uds_recv(unsigned char *buf, unsigned int buf_len, unsigned int *out_le
 
 int _3ds_uds_is_connected() {
     return uds_connected ? 1 : 0;
+}
+
+// ===================== PC TRANSPORT (BSD sockets via libctru) =====================
+// Direct LAN multiplayer: 3DS <-> PC over UDP on same Wi-Fi network.
+// Uses libctru's netinet/in.h BSD socket API (same as PGGKEC 3DS example).
+// Protocol: 4-byte magic (0x52424B50 "RBKP") + payload (ActionSync/DeckSync).
+
+static int pc_sock = -1;
+static bool pc_connected = false;
+
+int _3ds_pc_socket(void) {
+    if (pc_sock >= 0) return pc_sock;
+
+    int sock = socket(AF_INET, SOCK_DGRAM, 0);
+    if (sock < 0) return -1;
+
+    int flags = fcntl(sock, F_GETFL, 0);
+    if (flags < 0 || fcntl(sock, F_SETFL, flags | O_NONBLOCK) < 0) {
+        close(sock);
+        return -2;
+    }
+
+    struct timeval tv = { .tv_sec = 0, .tv_usec = 200 * 1000 };
+    setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+
+    pc_sock = sock;
+    return sock;
+}
+
+int _3ds_pc_connect(int sock, const unsigned char* ip_str, unsigned short port) {
+    if (sock < 0) return -1;
+
+    struct sockaddr_in addr;
+    memset(&addr, 0, sizeof(addr));
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(port);
+    addr.sin_addr.s_addr = inet_addr((const char*)ip_str);
+
+    if (addr.sin_addr.s_addr == (in_addr_t)-1) return -3;
+
+    int rc = connect(sock, (struct sockaddr*)&addr, sizeof(addr));
+    if (rc < 0) return -4;
+
+    pc_connected = true;
+    return 0;
+}
+
+int _3ds_pc_send(int sock, const unsigned char* data, unsigned int len) {
+    if (!pc_connected || sock < 0) return -1;
+    int rc = send(sock, (const void*)data, len, 0);
+    return rc >= 0 ? rc : -2;
+}
+
+int _3ds_pc_recv(int sock, unsigned char* buf, unsigned int buf_len) {
+    if (!pc_connected || sock < 0) return -1;
+    int rc = recv(sock, (void*)buf, buf_len, 0);
+    return rc;
+}
+
+int _3ds_pc_close(int sock) {
+    if (sock >= 0) {
+        close(sock);
+    }
+    pc_sock = -1;
+    pc_connected = false;
+    return 0;
+}
+
+int _3ds_pc_is_connected(void) {
+    return pc_connected ? 1 : 0;
+}
+
+const char* _3ds_get_local_ip(void) {
+    static char ip_buf[16] = "0.0.0.0";
+    int sock = socket(AF_INET, SOCK_DGRAM, 0);
+    if (sock < 0) return ip_buf;
+
+    struct sockaddr_in dst;
+    memset(&dst, 0, sizeof(dst));
+    dst.sin_family = AF_INET;
+    dst.sin_port = htons(80);
+    inet_aton("8.8.8.8", &dst.sin_addr);
+
+    if (connect(sock, (struct sockaddr*)&dst, sizeof(dst)) == 0) {
+        struct sockaddr_in local;
+        socklen_t len = sizeof(local);
+        if (getsockname(sock, (struct sockaddr*)&local, &len) == 0) {
+            const char* tmp = inet_ntoa(local.sin_addr);
+            if (tmp) {
+                strncpy(ip_buf, tmp, sizeof(ip_buf) - 1);
+                ip_buf[sizeof(ip_buf) - 1] = '\0';
+            }
+        }
+    }
+
+    close(sock);
+    return ip_buf;
 }
 
 // ── QR Code Scanning (FBI's capturecam + quirc, adapted for rabuka FFI) ──

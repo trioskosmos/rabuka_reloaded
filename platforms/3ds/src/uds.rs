@@ -1,11 +1,20 @@
 // UDS local wireless multiplayer for 3DS Rabuka Reloaded.
 //
-// Protocol:
-//   Host creates a UDS network, client scans and connects.
+// WHY UDS (ad-hoc) and not infrastructure WiFi / internet?
+// - UDS is the ONLY native 3DS-to-3DS wireless API. No router, no internet, no
+//   port forwarding, no server. Works anywhere two 3DSes are near each other.
+// - Nintendo Network (official online) shut down 2024; not available to homebrew.
+// - Infrastructure mode (BSD sockets via libctru) IS possible for 3DS <-> PC,
+//   but requires same WiFi network + PC companion app. That's a separate
+//   transport layer, not a replacement for UDS. See net.rs for the protocol
+//   which is transport-agnostic (only ~20 bytes/action).
+//
+// Protocol (transport-agnostic; works over UDS, UDP, TCP, WebSocket, Tailscale):
+//   Host creates a network, client connects.
 //   Both consoles build IDENTICAL GameStates (same seed + deck template IDs),
 //   then run the same deterministic engine. The ONLY gameplay traffic is each
 //   player's chosen action (~20 bytes) — like vs-AI mode where the "AI" is a
-//   human on the second 3DS. Automatic phases settle identically on both.
+//   human on the second 3DS (or PC). Automatic phases settle identically on both.
 //
 // Message types (u8 tag + payload):
 //   0x01 = SyncSetup  — host sends deck order (seed + card IDs) to client
@@ -13,7 +22,8 @@
 //   0x03 = SyncPing   — keepalive / turn acknowledgment
 //   0x04 = SyncQuit   — player is leaving
 //   0x07 = SyncActionAck — receiver acknowledges processing an action, so the
-//                          sender stops retransmitting it (UDS is unreliable)
+//                          sender stops retransmitting it (UDS is unreliable;
+    //                          other transports may not need this)
 
 // C shim FFI — all UDS calls go through ctru_shim.c
 extern "C" {

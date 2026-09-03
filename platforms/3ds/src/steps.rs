@@ -32,7 +32,7 @@ pub enum SetupPhase {
     PickDeck2(usize, usize, bool), // cursor, p1_idx, vs_ai
     Loading(usize, usize, bool), // p1_idx, p2_idx, vs_ai
     Testing,         // On-device test suite
-    // Multiplayer lobby phases
+    // Multiplayer lobby phases (UDS local wireless)
     MultiplayerDeck(usize), // cursor, selecting deck for multiplayer
     MultiplayerPickRole(usize, usize), // deck_idx, role_cursor (0=Host, 1=Client)
     MultiplayerHostWait(usize), // p1_idx: host waiting for client to connect
@@ -40,6 +40,12 @@ pub enum SetupPhase {
     MultiplayerClientHostSelect(usize, Vec<u16>, usize), // p1_idx, host_node_ids, cursor
     MultiplayerSyncDeck(usize, usize, bool), // p1_idx, p2_idx, is_host
     MultiplayerLoading(usize, usize, bool, Option<Vec<u8>>, u64), // p1_idx, p2_idx, is_host, deck_sync_bytes, seed
+    // Multiplayer lobby phases (PC direct LAN)
+    MultiplayerPcPickMode(usize), // cursor: 0=Host, 1=Client
+    MultiplayerPcHostWait(usize), // p1_idx: host waiting for PC client
+    MultiplayerPcClientConnect(usize), // p1_idx: client editing IP and connecting
+    MultiplayerPcSyncDeck(usize, usize, bool), // p1_idx, p2_idx, is_host
+    MultiplayerPcLoading(usize, usize, bool, Option<Vec<u8>>, u64), // p1_idx, p2_idx, is_host, deck_sync_bytes, seed
     QrScan(usize),          // QR code scanning (usize = context pointer, 0=not started)
     QrResult(Vec<String>),  // QR scan result, user can confirm
     QrNotDeck(String, u32), // QR scanned but not a valid deck, shows decoded text, countdown frames

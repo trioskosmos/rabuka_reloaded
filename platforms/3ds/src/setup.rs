@@ -20,8 +20,9 @@ use crate::dprintln;
 use crate::ffi::*;
 use crate::game::PlayState;
 use crate::lang::{current_lang, set_lang, tl, tl_fmt};
+use crate::pc_transport::PcMultiplayer;
 use crate::steps::{Overlay, SetupPhase, Step};
-use crate::uds;
+use crate::uds::{DeckSync, ActionSync};
 use crate::ui::card_atlas::CardAtlas;
 use crate::ui::colors::*;
 use crate::ui::grid::{card_grid_input, render_card_detail, render_card_grid, GridAction};
@@ -1295,6 +1296,67 @@ fn control_guide(
     }
 }
 
+fn multiplayer_pc_pick_mode(
+    cards: &Arc<Vec<Card>>,
+    decks: &Vec<DeckList>,
+    keys: u32,
+    was_dirty: bool,
+    cur: usize,
+) -> Step {
+    let n = decks.len();
+    if n == 0 {
+        return Step::Done(Err("No decks!".into()));
+    }
+
+    if was_dirty {
+        unsafe {
+            _3ds_bot_clear();
+            _3ds_bot_queue_rect(0.0, 0.0, 320.0, 240.0, COL_TOP_BG);
+            _3ds_bot_queue_text(
+                80.0, 8.0, COL_GOLD, SCALE_BODY,
+                format!("{}\0", tl("PC MULTIPLAYER")).as_ptr(),
+            );
+        }
+        let labels = [
+            format!("{} ({})", tl("Host"), tl("3DS hosts, PC connects")),
+            format!("{} ({})", tl("Client"), tl("PC hosts, 3DS connects")),
+        ];
+        for (i, m) in labels.iter().enumerate() {
+            let y = 60.0 + i as f32 * 64.0;
+            let bg = if i == cur { COL_SEL } else { COL_DIM };
+            unsafe {
+                _3ds_bot_queue_rect(20.0, y, 280.0, 50.0, bg);
+            }
+            if i == cur {
+                unsafe {
+                    _3ds_bot_queue_rect(20.0, y, 280.0, 50.0, COL_HIGHLIGHT);
+                }
+            }
+            let color = if i == cur { COL_GOLD } else { COL_LIGHT };
+            unsafe {
+                _3ds_bot_queue_text(30.0, y + 12.0, color, SCALE_BODY, format!("{}\0", m).as_ptr());
+            }
+        }
+        render_hint_bar_bot(&tl("UP/DOWN=select  A=confirm  B=back"));
+    }
+
+    if keys & 0x00000002 != 0 {
+        Step::Setup(cards.clone(), decks.clone(), SetupPhase::MultiplayerDeck(0), true)
+    } else if keys & 0x00000040 != 0 && cur > 0 {
+        Step::Setup(cards.clone(), decks.clone(), SetupPhase::MultiplayerPcPickMode(cur - 1), true)
+    } else if keys & 0x00000080 != 0 && cur + 1 < 2 {
+        Step::Setup(cards.clone(), decks.clone(), SetupPhase::MultiplayerPcPickMode(cur + 1), true)
+    } else if keys & 0x00000001 != 0 {
+        if cur == 0 {
+            Step::Setup(cards.clone(), decks.clone(), SetupPhase::MultiplayerPcHostWait(0), true)
+        } else {
+            Step::Setup(cards.clone(), decks.clone(), SetupPhase::MultiplayerPcClientConnect(0), true)
+        }
+    } else {
+        Step::Setup(cards.clone(), decks.clone(), SetupPhase::MultiplayerPcPickMode(cur), false)
+    }
+}
+
 fn multiplayer_pick_role(
     cards: &Arc<Vec<Card>>,
     decks: &Vec<DeckList>,
@@ -2013,6 +2075,22 @@ pub fn setup_step(
         }
         SetupPhase::MultiplayerLoading(p1_idx, p2_idx, is_host, deck_sync_bytes, seed) => {
             multiplayer_loading(cards, decks, p1_idx, p2_idx, is_host, deck_sync_bytes, seed)
+        }
+        // PC Multiplayer (Direct LAN)
+        SetupPhase::MultiplayerPcPickMode(cur) => {
+            multiplayer_pc_pick_mode(cards, decks, keys, was_dirty, cur)
+        }
+        SetupPhase::MultiplayerPcHostWait(p1_idx) => {
+            multiplayer_pc_host_wait(cards, decks, keys, was_dirty, p1_idx)
+        }
+        SetupPhase::MultiplayerPcClientConnect(p1_idx) => {
+            multiplayer_pc_client_connect(cards, decks, keys, was_dirty, p1_idx)
+        }
+        SetupPhase::MultiplayerPcSyncDeck(p1_idx, p2_idx, is_host) => {
+            multiplayer_pc_sync_deck(cards, decks, was_dirty, p1_idx, p2_idx, is_host)
+        }
+        SetupPhase::MultiplayerPcLoading(p1_idx, p2_idx, is_host, deck_sync_bytes, seed) => {
+            multiplayer_pc_loading(cards, decks, p1_idx, p2_idx, is_host, deck_sync_bytes, seed)
         }
     };
     new_step

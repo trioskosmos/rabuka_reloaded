@@ -24,6 +24,7 @@ A certain school idol collectible card game engine, AI, and web UI — built in 
 | Platform | RAM | Status |
 |----------|-----|--------|
 | **PC / Web** (x86-64, aarch64) | unlimited | ✅ Works |
+| **Android** (ARM64 via Termux) | 4GB+ | ✅ Works — native compile, cloudflared tunnel for free multiplayer |
 | **Nintendo 3DS** (ARM11 @ 268MHz) | 128MB | ✅ Works |
 | **Nintendo Wii** (PowerPC 750 @ 729MHz) | 88MB | 🟡 Code complete — GX FIFO bug blocks Japanese text |
 | **PlayStation Portable** (MIPS R4000 @ 333MHz) | 32MB | 🟡 Code complete — font rendering bug |
@@ -34,6 +35,20 @@ A certain school idol collectible card game engine, AI, and web UI — built in 
 | **WebAssembly** (wasm32 headless) | unlimited | ✅ Works — full no_std engine + bytecode VM; headless AI-vs-AI match harness with C ABI (`platforms/wasm/`) |
 
 **Unlikely to work (no Rust/LLVM target):** SNES (5A22), Mega Drive/Genesis (68000), Atari Jaguar (m68k), Philips CD-i (m68k). Portability analysis for 15+ consoles at [engine/PORTS.md](engine/PORTS.md).
+
+### Android / Termux (Free Multiplayer Hosting)
+
+Run the server **on your phone** with **zero hosting costs** using Cloudflare's free tunneling:
+
+```bash
+# In Termux (install from F-Droid):
+curl -fsSL https://raw.githubusercontent.com/yourusername/rabuka_reloaded/main/android/setup_termux.sh | bash
+cd ~/rabuka_reloaded/engine
+./start_android.sh
+# Share the printed https://*.trycloudflare.com URL with friends!
+```
+
+See [android/README_ANDROID.md](android/README_ANDROID.md) for full guide, troubleshooting, and transfer options.
 
 ## Quick Start
 
@@ -59,6 +74,18 @@ cargo bench
 docker build -f Dockerfile -t rabuka .
 docker run -p 8080:8080 rabuka
 ```
+
+### Android / Termux (Free Multiplayer — No VPS Needed)
+
+```bash
+# Install Termux from F-Droid, then:
+curl -fsSL https://raw.githubusercontent.com/yourusername/rabuka_reloaded/main/android/setup_termux.sh | bash
+cd ~/rabuka_reloaded/engine
+./start_android.sh
+# Share the printed https://*.trycloudflare.com URL with friends!
+```
+
+Full guide: [android/README_ANDROID.md](android/README_ANDROID.md)
 
 ## Project Structure
 
@@ -173,6 +200,7 @@ See [engine/ISSUES_FOUND.md](engine/ISSUES_FOUND.md) for the full list.
 | [docs/QR_DECK_SHARING.md](docs/QR_DECK_SHARING.md) | QR code deck sharing guide |
 | [docs/ABILITY_PIPELINE.md](docs/ABILITY_PIPELINE.md) | Card-text → bytecode pipeline documentation |
 | [docs/REFACTOR_BACKLOG.md](docs/REFACTOR_BACKLOG.md) | Verified-remaining refactor items with necessity verdicts |
+| [android/README_ANDROID.md](android/README_ANDROID.md) | **Android/Termux hosting guide — free multiplayer via cloudflared** |
 
 ## License
 

@@ -1,0 +1,18 @@
+[package]
+name = "pc_relay"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+rabuka_engine = { path = "../engine", default-features = false, features = ["bytecode_abilities", "serde_support"] }
+tokio = { version = "1", features = ["full"] }
+tokio-tungstenite = "0.21"
+tungstenite = "0.21"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+bytes = "1.5"
+uuid = { version = "1", features = ["v4", "serde"] }
+clap = { version = "4", features = ["derive"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+anyhow = "1.0"
