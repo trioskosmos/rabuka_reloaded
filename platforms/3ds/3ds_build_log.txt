@@ -1,0 +1,119 @@
+=== Rabuka 3DS Build Script ===
+
+[1/7] devkitPro found
+[2/7] Checking Rust nightly (pinned to nightly-2025-08-15 for 3DS)...
+[2/7] MSVC link.exe not found, using GNU host toolchain
+info: syncing channel updates for nightly-2025-08-15-x86_64-pc-windows-gnu
+
+  nightly-2025-08-15-x86_64-pc-windows-gnu unchanged - rustc 1.91.0-nightly (898aff704 2025-08-14)
+
+[2/7] Rust nightly-2025-08-15 + rust-src ready [+nightly-2025-08-15-x86_64-pc-windows-gnu]
+[3/7] Checking cargo-3ds...
+[3/7] cargo-3ds ready
+[4/7] Pre-baking card data (unified bake tool)...
+[4/7] cards.bin is up to date - skipping bake
+[4/7] cards.bin + abilities.json ready
+[4/7] Card images (incremental atlas build)...
+[4/7] Card images are up to date - skipping conversion
+[4/7] Japanese font (subset, auto-rebuild on new chars)...
+[font] used chars unchanged (952) - font up to date
+[5/7] Building 3DS binary...
+warning: rabuka_engine@0.1.0: generation_manifest.json may be stale (size hint 1715597 not found) 窶・regenerate
+warning: rabuka_engine@0.1.0: bytecode size: 28593 bytes (compressed, from C:\Users\trios\OneDrive\Documents\rabuka_reloaded\engine\../cards/build/abilities.bin.z)
+warning: rabuka_engine@0.1.0: bytecode uncompressed: 92909 bytes
+   Compiling rabuka_3ds v0.1.0 (C:\Users\trios\OneDrive\Documents\rabuka_reloaded\platforms\3ds)
+warning: unused imports: `_3ds_uds_exit`, `_3ds_uds_init`, `_3ds_uds_is_connected`, `_3ds_uds_recv`, and `_3ds_uds_send`
+ --> src\net.rs:7:36
+  |
+7 | use crate::ffi::{_3ds_debug_print, _3ds_uds_init, _3ds_uds_exit, _3ds_uds_send, _3ds_uds_recv, _3ds_uds_is_connected};
+  |                                    ^^^^^^^^^^^^^  ^^^^^^^^^^^^^  ^^^^^^^^^^^^^  ^^^^^^^^^^^^^  ^^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` on by default
+
+warning: unused import: `crate::ffi::*`
+ --> src\pc_transport.rs:3:5
+  |
+3 | use crate::ffi::*;
+  |     ^^^^^^^^^^^^^
+
+warning: unused import: `TransportType`
+ --> src\pc_transport.rs:4:48
+  |
+4 | use crate::transport::{PcTransport, Transport, TransportType};
+  |                                                ^^^^^^^^^^^^^
+
+warning: unused import: `clear_active_transport`
+  --> src\setup.rs:24:40
+   |
+24 | use crate::net::{set_active_transport, clear_active_transport};
+   |                                        ^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `ActionSync`
+  --> src\setup.rs:26:34
+   |
+26 | use crate::transport::{DeckSync, ActionSync, Transport, UdsTransport, PcTransport};
+   |                                  ^^^^^^^^^^
+
+warning: unnecessary `unsafe` block
+    --> src\setup.rs:1391:22
+     |
+1384 |         unsafe {
+     |         ------ because it's nested under this `unsafe` block
+...
+1391 |             let ip = unsafe { std::ffi::CStr::from_ptr(_3ds_get_local_ip() as *const std::ffi::c_char) }
+     |                      ^^^^^^ unnecessary `unsafe` block
+     |
+     = note: `#[warn(unused_unsafe)]` on by default
+
+warning: variable does not need to be mutable
+    --> src\setup.rs:1460:13
+     |
+1460 |         let mut mp = PcMultiplayer::new();
+     |             ----^^
+     |             |
+     |             help: remove this `mut`
+     |
+     = note: `#[warn(unused_mut)]` on by default
+
+warning: fields `deck_sync_sent`, `deck_sync_received`, and `pending_deck_sync` are never read
+  --> src\pc_transport.rs:9:5
+   |
+ 6 | pub struct PcMultiplayer {
+   |            ------------- fields in this struct
+...
+ 9 |     deck_sync_sent: bool,
+   |     ^^^^^^^^^^^^^^
+10 |     deck_sync_received: bool,
+   |     ^^^^^^^^^^^^^^^^^^
+11 |     pending_deck_sync: Option<Vec<u8>>,
+   |     ^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` on by default
+
+warning: creating a mutable reference to mutable static
+  --> src\net.rs:26:14
+   |
+26 |     unsafe { ACTIVE_TRANSPORT.as_mut().map(|t| f(&mut **t)) }
+   |              ^^^^^^^^^^^^^^^^^^^^^^^^^ mutable reference to mutable static
+   |
+   = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/static-mut-references.html>
+   = note: mutable references to mutable statics are dangerous; it's undefined behavior if any other pointer to the static is used or if any other reference is created for the static while the mutable reference lives
+   = note: `#[warn(static_mut_refs)]` on by default
+
+warning: `rabuka_3ds` (lib) generated 9 warnings (run `cargo fix --lib -p rabuka_3ds` to apply 6 suggestions)
+    Finished `release` profile [optimized] target(s) in 14.65s
+Building smdh: C:/rust_targets\armv6k-nintendo-3ds\release\rabuka_3ds.smdh
+Building 3dsx: C:/rust_targets\armv6k-nintendo-3ds\release\rabuka_3ds.3dsx
+Adding RomFS from C:\Users\trios\OneDrive\Documents\rabuka_reloaded\platforms\3ds\romfs
+[5/7] Build succeeded
+[5/7] 3DSX: output\rabuka_3ds.3dsx
+[6/7] Creating CIA (requires makerom from devkitPro)...
+[6/7] Building RomFS binary...
+[RSF ERROR] Error Proccessing RSF file
+[6/7] CIA: output\rabuka_3ds.cia (install via FBI
+
+=== Build Complete ===
+  3DSX: output\rabuka_3ds.3dsx (run via 3dslink / SD card)
+  CIA:  see above (install via FBI on 3DS)
+
+続行するには何かキーを押してください . . . 

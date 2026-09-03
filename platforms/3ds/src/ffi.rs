@@ -191,6 +191,15 @@ extern "C" {
     pub fn _3ds_audio_stop();
     pub fn _3ds_audio_set_volume(vol: f32);
 
+    // UDS local wireless multiplayer
+    pub fn _3ds_uds_init(is_host: bool) -> i32;
+    pub fn _3ds_uds_exit();
+    pub fn _3ds_uds_send(data: *const u8, len: u32) -> i32;
+    pub fn _3ds_uds_recv(buf: *mut u8, buf_len: u32, out_len: *mut u32) -> i32;
+    pub fn _3ds_uds_is_connected() -> bool;
+    pub fn _3ds_uds_scan_networks(out_ids: *mut u16, max_out: i32) -> i32;
+    pub fn _3ds_uds_connect_network(node_id: u16) -> i32;
+
     // PC Transport (BSD sockets via libctru) — Direct LAN multiplayer
     pub fn _3ds_pc_socket() -> i32;
     pub fn _3ds_pc_connect(sock: i32, ip_str: *const u8, port: u16) -> i32;

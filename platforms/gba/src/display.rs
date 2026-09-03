@@ -1,9 +1,14 @@
-﻿
+use alloc::boxed::Box;
 use alloc::string::String;
 use alloc::vec::Vec;
+use alloc::collections::BTreeMap;
+use alloc::boxed::Box;
 
 use agb::display::tiled::{
     RegularBackground, RegularBackgroundSize, TileEffect, TileFormat, TileSet, TileSetting,
+};
+use agb::display::object::{
+    Object, DynamicSprite256, PaletteVramMulti, PaletteMulti, Size,
 };
 use agb::display::{busy_wait_for_vblank, Graphics, Palette16, Priority, Rgb15, Rgb};
 
@@ -64,20 +69,15 @@ pub struct Display<'a> {
     last: String,
     detail_active: bool,
     /// Card art queued via [`Display::queue_card_image`] since the last
-    /// [`Display::clear`]. `swap_buffers` composites these on an 8bpp BG
-    /// underneath the text BG (punching transparent holes in the text fill),
-    /// so generic choice menus can show card images like the 3DS grid.
-    /// Coordinates are in tiles; `selected` draws the cursor badge,
-    /// `dimmed` dithers the card dark (unpickable).
+    /// [`Display::clear`]. `swap_buffers` composites these on sprites
+    /// underneath the text BG, so generic choice menus can show card images.
     pending_art: Vec<PendingArt>,
-    /// Reusable backgrounds to avoid VRAM allocation leak per frame.
-    board_art_bg: RegularBackground,
-    board_ui_bg: RegularBackground,
-    menu_bg: RegularBackground,
-    menu_art_bg: RegularBackground,
-    action_bg: RegularBackground,
-    detail_art_bg: RegularBackground,
-    detail_text_bg: RegularBackground,
+    /// Single 4bpp text/UI background (zones, text, badges, cursors).
+    text_bg: RegularBackground,
+    /// Sprite cache for all card art (shared master palette).
+    sprite_cache: CardSpriteCache,
+    /// Active card sprites this frame (for showing in correct order).
+    active_sprites: Vec<CardSprite>,
 }
 
 /// One queued card image for the next [`Display::swap_buffers`].
@@ -89,6 +89,58 @@ struct PendingArt {
     rows: i32,
     selected: bool,
     dimmed: bool,
+}
+
+/// Cached SpriteVram for card fronts, keyed by "card_no:size".
+/// Reuses VRAM allocations across frames.
+struct CardSpriteCache {
+    sprites: BTreeMap<String, Vec<agb::display::object::SpriteVram>>,
+    palette: PaletteVramMulti,
+}
+
+impl CardSpriteCache {
+    fn new(_gfx: &mut Graphics) -> Self {
+        // Build 256-colour master palette from baked MASTER_PAL
+        // PaletteMulti is 16 Palette16 entries (16*16=256 colours)
+        // Use Box::leak to get 'static lifetime for PaletteMulti::new
+        let palettes: Box<[Palette16; 16]> = Box::new(core::array::from_fn(|_| Palette16::new([Rgb15::BLACK; 16])));
+        let mut palettes = palettes;
+        for i in 0..240 {
+            let v = MASTER_PAL[i * 2] as u16 | ((MASTER_PAL[i * 2 + 1] as u16) << 8);
+            let palette_idx = i / 16;
+            let colour_idx = i % 16;
+            palettes[palette_idx].update_colour(colour_idx, Rgb15::new(v));
+        }
+        let palette_multi = Box::leak(Box::new(PaletteMulti::new(Box::leak(palettes))));
+        let palette = PaletteVramMulti::new(palette_multi);
+        Self {
+            sprites: BTreeMap::new(),
+            palette,
+        }
+    }
+
+    fn get_or_create(
+        &mut self,
+        card_no: &str,
+        size_tag: &str,
+        front_tiles: &[u8],
+        size: Size,
+    ) -> &[agb::display::object::SpriteVram] {
+        let key = alloc::format!("{}:{}", card_no, size_tag);
+        if !self.sprites.contains_key(&key) {
+            let mut dyn_sprite = DynamicSprite256::new(size);
+            dyn_sprite.data_mut().copy_from_slice(front_tiles);
+            let sprite_vram = dyn_sprite.to_vram(self.palette.clone());
+            self.sprites.insert(key.clone(), alloc::vec![sprite_vram]);
+        }
+        self.sprites.get(&key).unwrap()
+    }
+}
+
+/// An active card sprite to show this frame.
+struct CardSprite {
+    objects: Vec<Object>,
+    priority: Priority,
 }
 
 /// 4bpp text/board palette (bank 0). Entries 7..=15 are the texticon colours,
@@ -149,47 +201,20 @@ impl<'a> Display<'a> {
         // preventing black patch at top-left (palette index 0 = backdrop).
         busy_wait_for_vblank();
         gfx.set_background_palette(15, &TEXT_PALETTE);
+        let sprite_cache = CardSpriteCache::new(&mut gfx);
         Display {
             gfx,
             buf: String::new(),
             last: String::new(),
             detail_active: false,
             pending_art: Vec::new(),
-            board_art_bg: RegularBackground::new(
-                Priority::P1,
-                RegularBackgroundSize::Background32x32,
-                TileFormat::EightBpp,
-            ),
-            board_ui_bg: RegularBackground::new(
+            text_bg: RegularBackground::new(
                 Priority::P0,
                 RegularBackgroundSize::Background32x32,
                 TileFormat::FourBpp,
             ),
-            menu_bg: RegularBackground::new(
-                Priority::P0,
-                RegularBackgroundSize::Background32x32,
-                TileFormat::FourBpp,
-            ),
-            menu_art_bg: RegularBackground::new(
-                Priority::P1,
-                RegularBackgroundSize::Background32x32,
-                TileFormat::EightBpp,
-            ),
-            action_bg: RegularBackground::new(
-                Priority::P0,
-                RegularBackgroundSize::Background32x32,
-                TileFormat::FourBpp,
-            ),
-            detail_art_bg: RegularBackground::new(
-                Priority::P0,
-                RegularBackgroundSize::Background32x32,
-                TileFormat::EightBpp,
-            ),
-            detail_text_bg: RegularBackground::new(
-                Priority::P1,
-                RegularBackgroundSize::Background32x32,
-                TileFormat::FourBpp,
-            ),
+            sprite_cache,
+            active_sprites: Vec::new(),
         }
     }
 
@@ -369,9 +394,70 @@ impl<'a> Display<'a> {
         Self::blit_text(bg, font_ts, icon_ts, e, text, tx0, ty, false);
     }
 
-    /// Render the integrated board: 8bpp shared-palette card art on an
-    /// 8bpp BG underneath a 4bpp text/UI BG, as Tonc/butano recommend for
-    /// many colourful tiles (one 240-colour master palette + bank 15 for text).
+    /// Create a CardSprite for a slot at the given pixel position.
+    fn create_card_sprite(
+        cache: &mut CardSpriteCache,
+        slot: &crate::board::Slot,
+        px: i32,
+        py: i32,
+        card: (i32, i32),
+        fronts: &[crate::card_art_gen::CardFront],
+        waited_fronts: &[crate::card_art_gen::CardFront],
+        back: &'static [u8],
+        flipped: bool,
+        priority: Priority,
+    ) -> Option<CardSprite> {
+        let (cols, rows) = if slot.waited { (4, 3) } else { card };
+        let fronts = if slot.waited { waited_fronts } else { fronts };
+        let size = match (cols * 8, rows * 8) {
+            (24, 32) => Size::S32x32, // hand
+            (40, 48) => Size::S64x64, // stage - needs 64x64
+            (24, 16) => Size::S32x16, // live
+            _ => Size::S32x32,
+        };
+
+        let mut objects = Vec::new();
+
+        match &slot.card_no {
+            Some(_) if slot.hidden => {
+                // Face-down: card back
+                let sprites = cache.get_or_create("back", "live", back, size);
+                let mut obj = Object::new(sprites[0].clone());
+                obj.set_pos((px, py));
+                obj.set_priority(priority);
+                if flipped {
+                    obj.set_hflip(true);
+                    obj.set_vflip(true);
+                }
+                objects.push(obj);
+            }
+            Some(card_no) => {
+                if let Some(front) = fronts.iter().find(|f| f.card_no == card_no.as_str()) {
+                    let sprites = cache.get_or_create(card_no, "hand", front.tiles, size);
+                    let mut obj = Object::new(sprites[0].clone());
+                    obj.set_pos((px, py));
+                    obj.set_priority(priority);
+                    if flipped {
+                        obj.set_hflip(true);
+                        obj.set_vflip(true);
+                    }
+                    objects.push(obj);
+                } else {
+                    return None;
+                }
+            }
+            None => return None,
+        }
+
+        if slot.actionable {
+            // Gold badge on the card itself - rendered on text_bg instead
+            // Could add a small sprite here if needed
+        }
+
+        Some(CardSprite { objects, priority })
+    }
+
+/// Render the integrated board: card art as sprites over a 4bpp text/UI background.
     pub fn render_board_frame(&mut self, frame: &BoardFrame) {
         self.last = self.buf.clone();
         if self.detail_active {
@@ -382,31 +468,23 @@ impl<'a> Display<'a> {
             }
             self.detail_active = false;
         }
-        // TEXT_PALETTE may have been overwritten by detail view's
-        // DETAIL_TEXT_PALETTE — restore it
         self.gfx.set_background_palette(15, &TEXT_PALETTE);
         let font_ts = unsafe { TileSet::new(&FONT_TILES.0, TileFormat::FourBpp) };
         let icon_ts = unsafe { TileSet::new(&TEXTICON_TILES.0, TileFormat::FourBpp) };
         let ui_ts = unsafe { TileSet::new(BOARD_UI, TileFormat::FourBpp) };
         let e0 = TileEffect::new(false, false, 15);
 
-        // Clear art_bg (8bpp) to transparent each frame to prevent ghost cards
-        let clear_8bpp = TileSetting::BLANK;
-        let back_ts = unsafe { TileSet::new(BACK_FRONT, TileFormat::EightBpp) };
+        // Clear text_bg (4bpp) each frame
         for ty in 0..ROWS {
             for tx in 0..COLS {
-                self.board_art_bg.set_tile((tx, ty), &back_ts, clear_8bpp);
-                self.board_ui_bg.set_tile((tx, ty), &ui_ts, TileSetting::new(UI_EMPTY, e0));
-                // Clear detail backgrounds to free VRAM from previous detail view
-                self.detail_art_bg.set_tile((tx, ty), &back_ts, clear_8bpp);
-                self.detail_text_bg.set_tile((tx, ty), &ui_ts, TileSetting::new(UI_EMPTY, e0));
-                // Clear menu backgrounds to free VRAM from previous menu view
-                self.menu_art_bg.set_tile((tx, ty), &back_ts, clear_8bpp);
-                self.menu_bg.set_tile((tx, ty), &ui_ts, TileSetting::new(UI_EMPTY, e0));
+                self.text_bg.set_tile((tx, ty), &ui_ts, TileSetting::new(UI_EMPTY, e0));
             }
         }
-        Self::blit_line(&mut self.board_ui_bg, &font_ts, &icon_ts, e0, &frame.header, 0, 0);
-        Self::blit_line(&mut self.board_ui_bg, &font_ts, &icon_ts, e0, &frame.action_count, COLS - 6, 0);
+
+        Self::blit_line(&mut self.text_bg, &font_ts, &icon_ts, e0, &frame.header, 0, 0);
+        Self::blit_line(&mut self.text_bg, &font_ts, &icon_ts, e0, &frame.action_count, COLS - 6, 0);
+
+        self.active_sprites.clear();
 
         // Stage rows: opponent (flipped 180°) then player, with live success + live set stacked on right
         for (row, y) in STAGE_YS.iter().enumerate() {
@@ -416,127 +494,114 @@ impl<'a> Display<'a> {
             let live = if is_opp { &frame.p2_live } else { &frame.p1_live };
             let live_set = if is_opp { &frame.p2_live_set } else { &frame.p1_live_set };
             let flipped = is_opp;
-            let e_stage = if flipped { TileEffect::new(true, true, 15) } else { e0 };
+
             for (i, slot) in stage.iter().enumerate() {
                 let xi = if is_opp { 2 - i } else { i };
                 let x = 1 + STAGE_PITCH * xi as i32;
-                Self::draw_slot(
-                    &mut self.board_art_bg,
-                    &mut self.board_ui_bg,
-                    &ui_ts,
-                    &font_ts,
-                    &icon_ts,
-                    e_stage,
+                if let Some(sprite) = Self::create_card_sprite(
+                    &mut self.sprite_cache,
                     slot,
-                    x,
-                    y,
+                    x * 8, y * 8,
                     STAGE_CARD,
                     STAGE_FRONTS,
                     WAITED_FRONTS,
                     BACK_FRONT,
                     flipped,
-                    "stage",
-                );
+                    Priority::P1,
+                ) {
+                    self.active_sprites.push(sprite);
+                }
             }
             // Live/success zone (top 3 rows of stage row)
             for (i, slot) in live.iter().enumerate() {
                 let xi = if is_opp { 2 - i } else { i };
                 let x = INFO_X + LIVE_PITCH * xi as i32;
-                Self::draw_slot(
-                    &mut self.board_art_bg,
-                    &mut self.board_ui_bg,
-                    &ui_ts,
-                    &font_ts,
-                    &icon_ts,
-                    e_stage,
+                if let Some(sprite) = Self::create_card_sprite(
+                    &mut self.sprite_cache,
                     slot,
-                    x,
-                    y,
+                    x * 8, y * 8,
                     LIVE_CARD,
                     LIVE_FRONTS,
                     WAITED_FRONTS,
                     BACK_FRONT,
                     flipped,
-                    "live",
-                );
+                    Priority::P1,
+                ) {
+                    self.active_sprites.push(sprite);
+                }
             }
-            // Live card set zone (bottom 3 rows of stage row) — flipped like 3DS landscape handling
+            // Live card set zone (bottom 3 rows of stage row)
             for (i, slot) in live_set.iter().enumerate() {
                 let xi = if is_opp { 2 - i } else { i };
                 let x = INFO_X + LIVE_PITCH * xi as i32;
-                Self::draw_slot(
-                    &mut self.board_art_bg,
-                    &mut self.board_ui_bg,
-                    &ui_ts,
-                    &font_ts,
-                    &icon_ts,
-                    e_stage,
+                if let Some(sprite) = Self::create_card_sprite(
+                    &mut self.sprite_cache,
                     slot,
-                    x,
-                    y + 3,
+                    x * 8, (y + 3) * 8,
                     LIVE_CARD,
                     LIVE_FRONTS,
                     WAITED_FRONTS,
                     BACK_FRONT,
                     flipped,
-                    "live",
-                );
+                    Priority::P1,
+                ) {
+                    self.active_sprites.push(sprite);
+                }
             }
         }
 
         // Hand window; a gold badge marks more cards off-screen right.
-for (i, slot) in frame.hand.iter().enumerate() {
+        for (i, slot) in frame.hand.iter().enumerate() {
             let x = HAND_PITCH * i as i32;
-            Self::draw_slot(
-                &mut self.board_art_bg,
-                &mut self.board_ui_bg,
-                &ui_ts,
-                &font_ts,
-                &icon_ts,
-                e0,
+            if let Some(sprite) = Self::create_card_sprite(
+                &mut self.sprite_cache,
                 slot,
-                x,
-                HAND_Y,
+                x * 8, HAND_Y * 8,
                 HAND_CARD,
                 CARD_FRONTS,
                 WAITED_FRONTS,
                 BACK_FRONT,
                 false,
-                "hand",
-            );
+                Priority::P1,
+            ) {
+                self.active_sprites.push(sprite);
+            }
         }
         if frame.hand_more {
-            self.board_ui_bg.set_tile(
-                (COLS - 1, HAND_Y),
-                &ui_ts,
-                TileSetting::new(UI_BADGE, e0),
-            );
+            self.text_bg.set_tile((COLS - 1, HAND_Y), &ui_ts, TileSetting::new(UI_BADGE, e0));
         }
 
         // Cursor: hand or stage (depending on L-cycled focus). Marker is white triangle.
         if let Some(w) = frame.hand_cursor {
             let x = HAND_PITCH * w as i32;
-            self.board_ui_bg.set_tile((x, HAND_Y), &ui_ts, TileSetting::new(UI_MARKER, e0));
+            self.text_bg.set_tile((x, HAND_Y), &ui_ts, TileSetting::new(UI_MARKER, e0));
         }
         if let Some(idx) = frame.own_stage_cursor {
             let x = STAGE_START_X + STAGE_PITCH * idx as i32;
-            self.board_ui_bg.set_tile((x, STAGE_YS[1]), &ui_ts, TileSetting::new(UI_MARKER, e0));
+            self.text_bg.set_tile((x, STAGE_YS[1]), &ui_ts, TileSetting::new(UI_MARKER, e0));
         }
         if let Some(idx) = frame.opp_stage_cursor {
-            // Opponent cards are drawn mirrored (2 - i, like the 3DS far
-            // side), so the cursor must mirror too or it points at the
-            // wrong card.
             let x = STAGE_START_X + STAGE_PITCH * (2 - idx) as i32;
-            self.board_ui_bg.set_tile((x, STAGE_YS[0]), &ui_ts, TileSetting::new(UI_MARKER, e0));
+            self.text_bg.set_tile((x, STAGE_YS[0]), &ui_ts, TileSetting::new(UI_MARKER, e0));
         }
 
         // Action bar pinned to the bottom (single 16px line; hint lives in header).
         let bar = alloc::format!("> {}", frame.action_line);
-        Self::blit_line(&mut self.board_ui_bg, &font_ts, &icon_ts, e0, &bar, 0, BAR_Y);
+        Self::blit_line(&mut self.text_bg, &font_ts, &icon_ts, e0, &bar, 0, BAR_Y);
 
         let mut f = self.gfx.frame();
-        self.board_art_bg.show(&mut f);
-        self.board_ui_bg.show(&mut f);
+        // Show text background first (behind cards)
+        self.text_bg.show(&mut f);
+        // Show card sprites sorted by Y then X for correct layering
+        self.active_sprites.sort_by_key(|s| {
+            // Use the first object's position as reference
+            s.objects.first().map(|o| o.pos().y).unwrap_or(0)
+        });
+        for sprite in &self.active_sprites {
+            for obj in &sprite.objects {
+                obj.show(&mut f);
+            }
+}
         f.commit();
     }
 
@@ -549,48 +614,41 @@ for (i, slot) in frame.hand.iter().enumerate() {
         self.gfx.set_background_palette(15, &TEXT_PALETTE);
         let font_ts = unsafe { TileSet::new(&FONT_TILES.0, TileFormat::FourBpp) };
         let icon_ts = unsafe { TileSet::new(&TEXTICON_TILES.0, TileFormat::FourBpp) };
-        let e = TileEffect::new(false, false, 15);
-
-        // Clear action_bg each frame
         let ui_ts = unsafe { TileSet::new(BOARD_UI, TileFormat::FourBpp) };
+        let e = TileEffect::new(false, false, 15);
         let e_ui = TileEffect::new(false, false, 15);
+
+        // Clear text_bg each frame
         for ty in 0..ROWS {
             for tx in 0..COLS {
-                self.action_bg.set_tile((tx, ty), &ui_ts, TileSetting::new(UI_EMPTY, e_ui));
+                self.text_bg.set_tile((tx, ty), &ui_ts, TileSetting::new(UI_EMPTY, e_ui));
             }
         }
 
-        Self::blit_line(&mut self.action_bg, &font_ts, &icon_ts, e, "ACTIONS [Sel:Board] [Sta:Menu]", 0, 0);
+        Self::blit_line(&mut self.text_bg, &font_ts, &icon_ts, e, "ACTIONS [Sel:Board] [Sta:Menu]", 0, 0);
         let mut row = 2i32;
         for line in self.buf.split('\n') {
             if row + 2 > ROWS {
                 break;
             }
-            // Color-code action lines like 3DS: gold for play actions,
-            // green for confirm/pass, dim for scroll indicators
             let color = if line.contains("Pass") || line.contains("Confirm") {
-                TileEffect::new(false, false, 15) // white via bank 15
+                TileEffect::new(false, false, 15)
             } else if line.starts_with("  ..") {
                 e
             } else {
                 e
             };
-            Self::blit_line(&mut self.action_bg, &font_ts, &icon_ts, color, line, 0, row);
+            Self::blit_line(&mut self.text_bg, &font_ts, &icon_ts, color, line, 0, row);
             row += 2;
         }
 
         let mut f = self.gfx.frame();
-        self.action_bg.show(&mut f);
+        self.text_bg.show(&mut f);
         f.commit();
     }
 
-    /// Render a card-detail view: 8bpp art on a P0 background (indices 0-239)
-    /// with 4bpp text on P1 using palette bank 15 (indices 240-255).
-    /// The 12x18 portrait fills the height left of the text pane (centered
-    /// with one row top and bottom); text keeps its size in the remaining
-    /// 17 columns. `scroll` is the first visible line index — paginated like
-    /// 3DS detail (render.rs:437 lpp 10) to avoid VRAM blow-up with long
-    /// ability text.
+    /// Render a card-detail view: card art as sprite over a 4bpp text background.
+    /// The 12x18 portrait (96x144px) sits left of the text pane.
     pub fn render_card_detail(&mut self, art: Option<&CardArt>, lines: &[String], scroll: usize) {
         self.last = self.buf.clone();
         self.detail_active = true;
@@ -603,55 +661,57 @@ for (i, slot) in frame.hand.iter().enumerate() {
         }
         let font_ts = unsafe { TileSet::new(&FONT_TILES.0, TileFormat::FourBpp) };
         let icon_ts = unsafe { TileSet::new(&TEXTICON_TILES.0, TileFormat::FourBpp) };
+        let ui_ts = unsafe { TileSet::new(BOARD_UI, TileFormat::FourBpp) };
         let e_text = TileEffect::new(false, false, 15);
 
-        // Clear board backgrounds to free VRAM from previous board view
-        let clear_8bpp = TileSetting::BLANK;
-        let back_ts = unsafe { TileSet::new(BACK_FRONT, TileFormat::EightBpp) };
-        let ui_ts = unsafe { TileSet::new(BOARD_UI, TileFormat::FourBpp) };
-        let e_ui = TileEffect::new(false, false, 15);
+        // Clear text_bg each frame
         for ty in 0..ROWS {
             for tx in 0..COLS {
-                self.board_art_bg.set_tile((tx, ty), &back_ts, clear_8bpp);
-                self.board_ui_bg.set_tile((tx, ty), &ui_ts, TileSetting::new(UI_EMPTY, e_ui));
+                self.text_bg.set_tile((tx, ty), &ui_ts, TileSetting::new(UI_EMPTY, e_text));
             }
         }
 
-        let mut f = self.gfx.frame();
+        self.active_sprites.clear();
 
+        // Create detail card sprite if art provided (96x144 = 64x64 + 32x64, use 64x64 for now)
         if let Some(art) = art {
-            // Baked 12x18 tiles address the portrait's own static bytes, so
-            // every card uploads its own (pointer, tile) pairs — always the
-            // right pixels, never stale, and freed on close.
-            let art_ts = unsafe { TileSet::new(art.tiles, TileFormat::EightBpp) };
-            for i in 0..(DETAIL_DW * DETAIL_DH) {
-                let tx = (i % DETAIL_DW) as i32;
-                let ty = (i / DETAIL_DW) as i32 + DETAIL_Y0;
-                self.detail_art_bg.set_tile((tx, ty), &art_ts, TileSetting::new(i as u16, TileEffect::new(false, false, 0)));
-            }
-            self.detail_art_bg.show(&mut f);
+            // Use S64x64 for the portrait (will clip to 96x144)
+            let sprites = self.sprite_cache.get_or_create("detail", "detail", art.tiles, Size::S64x64);
+            let mut obj = Object::new(sprites[0].clone());
+            obj.set_pos((0, DETAIL_Y0 * 8));
+            obj.set_priority(Priority::P0);
+            self.active_sprites.push(CardSprite {
+                objects: alloc::vec![obj],
+                priority: Priority::P0,
+            });
         }
 
-        // Dark panel behind ability text like 3DS COL_CARD_OPAQUE (render.rs:498)
-        let ui_ts = unsafe { TileSet::new(BOARD_UI, TileFormat::FourBpp) };
+        // Dark panel behind ability text (right side)
         for ty in 0..ROWS {
             for tx in DETAIL_DW as i32..COLS {
-                self.detail_text_bg.set_tile((tx, ty), &ui_ts, TileSetting::new(UI_EMPTY, e_text));
+                self.text_bg.set_tile((tx, ty), &ui_ts, TileSetting::new(UI_EMPTY, e_text));
             }
         }
         const VISIBLE: usize = 8;
         let end = (scroll + VISIBLE).min(lines.len());
         for (i, line) in lines[scroll..end].iter().enumerate() {
-            Self::blit_line(&mut self.detail_text_bg, &font_ts, &icon_ts, e_text, line, DETAIL_DW as i32 + 1, i as i32 * 2);
+            Self::blit_line(&mut self.text_bg, &font_ts, &icon_ts, e_text, line, DETAIL_DW as i32 + 1, i as i32 * 2);
         }
-        // Scroll indicators like 3DS detail (render.rs:568)
+        // Scroll indicators
         if scroll > 0 {
-            Self::blit_line(&mut self.detail_text_bg, &font_ts, &icon_ts, e_text, "^", 29, 0);
+            Self::blit_line(&mut self.text_bg, &font_ts, &icon_ts, e_text, "^", 29, 0);
         }
         if end < lines.len() {
-            Self::blit_line(&mut self.detail_text_bg, &font_ts, &icon_ts, e_text, "v", 29, 18);
+            Self::blit_line(&mut self.text_bg, &font_ts, &icon_ts, e_text, "v", 29, 18);
         }
-        self.detail_text_bg.show(&mut f);
+
+        let mut f = self.gfx.frame();
+        self.text_bg.show(&mut f);
+        for sprite in &self.active_sprites {
+            for obj in &sprite.objects {
+                obj.show(&mut f);
+            }
+        }
         f.commit();
     }
 
@@ -659,12 +719,7 @@ for (i, slot) in frame.hand.iter().enumerate() {
     /// screen's tiles (already unreferenced) are garbage-collected before
     /// the next screen allocates.
     ///
-    /// agb frees dead tiles only at commit, so without this the dead
-    /// previous screen and the new screen briefly coexist — a 280-tile
-    /// portrait plus a 150-tile choice grid plus CJK text blows the ~500
-    /// 8bpp-tile budget ("Ran out of video RAM for tiles"). Call on heavy
-    /// screen transitions (detail open/close, choice open/close); the one
-    /// blank frame reads as a transition flicker.
+    /// With sprites, this is less critical but kept for compatibility.
     pub fn reset_vram(&mut self) {
         let f = self.gfx.frame();
         f.commit();
@@ -706,13 +761,8 @@ for (i, slot) in frame.hand.iter().enumerate() {
         }
         self.last = self.buf.clone();
 
-        // Bank 15 holds TEXT_PALETTE (white text on dark blue). Bank 0
-        // overlaps the 256-colour card-art master palette, so text drawn
-        // with bank 0 picks up art colours (the old orange-menu bug).
-        // The detail view also overwrites bank 15, so restore it here.
         self.gfx.set_background_palette(15, &TEXT_PALETTE);
         if self.detail_active {
-            // Detail view overwrote 0-239 with per-card palette — restore master
             for i in 0..240 {
                 let v = MASTER_PAL[i * 2] as u16 | ((MASTER_PAL[i * 2 + 1] as u16) << 8);
                 self.gfx.set_background_palette_colour_256(i, Rgb15::new(v));
@@ -724,35 +774,10 @@ for (i, slot) in frame.hand.iter().enumerate() {
         let ui_ts = unsafe { TileSet::new(BOARD_UI, TileFormat::FourBpp) };
         let e_ui = TileEffect::new(false, false, 15);
 
-        // Clear menu_bg each frame
+        // Clear text_bg each frame
         for ty in 0..ROWS {
             for tx in 0..COLS {
-                self.menu_bg.set_tile((tx, ty), &ui_ts, TileSetting::new(UI_EMPTY, e_ui));
-            }
-        }
-
-        // Clear menu_art_bg (8bpp) each frame to prevent ghost cards
-        let clear_8bpp = TileSetting::BLANK;
-        let back_ts = unsafe { TileSet::new(BACK_FRONT, TileFormat::EightBpp) };
-        for ty in 0..ROWS {
-            for tx in 0..COLS {
-                self.menu_art_bg.set_tile((tx, ty), &back_ts, clear_8bpp);
-            }
-        }
-
-        // Clear board backgrounds to free VRAM from previous board view
-        for ty in 0..ROWS {
-            for tx in 0..COLS {
-                self.board_art_bg.set_tile((tx, ty), &back_ts, clear_8bpp);
-                self.board_ui_bg.set_tile((tx, ty), &ui_ts, TileSetting::new(UI_EMPTY, e_ui));
-            }
-        }
-
-        // Clear detail backgrounds to free VRAM from previous detail view
-        for ty in 0..ROWS {
-            for tx in 0..COLS {
-                self.detail_art_bg.set_tile((tx, ty), &back_ts, clear_8bpp);
-                self.detail_text_bg.set_tile((tx, ty), &ui_ts, TileSetting::new(UI_EMPTY, e_ui));
+                self.text_bg.set_tile((tx, ty), &ui_ts, TileSetting::new(UI_EMPTY, e_ui));
             }
         }
 
@@ -763,173 +788,69 @@ for (i, slot) in frame.hand.iter().enumerate() {
             if ty + 2 > ROWS {
                 break;
             }
-            Self::blit_text(&mut self.menu_bg, &font_ts, &icon_ts, e, line, 0, ty, true);
+            Self::blit_text(&mut self.text_bg, &font_ts, &icon_ts, e, line, 0, ty, true);
             ty += 2;
         }
 
         if self.pending_art.is_empty() {
             let mut frame = self.gfx.frame();
-            self.menu_bg.show(&mut frame);
+            self.text_bg.show(&mut frame);
             frame.commit();
             return;
         }
 
-        // Composite queued card art underneath the text BG: blit each front
-        // onto an 8bpp BG and punch transparent holes in the text BG so the
-        // art shows through (same layering as the board renderer). Corner
-        // ticks mark the selected card.
-        let art_eff = TileEffect::new(false, false, 0);
+        self.active_sprites.clear();
 
-        // Sort by Y then X for correct visual z-ordering (top-to-bottom, left-to-right)
+        // Sort by Y then X for correct visual z-ordering
         self.pending_art.sort_by_key(|q| (q.y, q.x));
         for q in self.pending_art.drain(..) {
-            // Stage-size requests (5x6, the choice grid) use the stage
-            // fronts; anything else uses the hand-size fronts.
             let fronts = if q.cols == 5 && q.rows == 6 {
                 STAGE_FRONTS
             } else {
                 CARD_FRONTS
             };
             if q.card_no.is_empty() {
-                // Marker slot with no art: badge so the cursor stays visible.
                 if q.selected {
-                    self.menu_bg.set_tile((q.x, q.y), &ui_ts, TileSetting::new(UI_BADGE, e_ui));
+                    self.text_bg.set_tile((q.x, q.y), &ui_ts, TileSetting::new(UI_BADGE, e_ui));
                 }
             } else if let Some(front) = fronts
                 .iter()
                 .find(|f| f.card_no == q.card_no.as_str())
             {
-                let _front_type = if q.cols == 5 && q.rows == 6 { "stage" } else { "hand" };
-                let ts = unsafe { TileSet::new(front.tiles, TileFormat::EightBpp) };
-                for ay in 0..q.rows {
-                    for ax in 0..q.cols {
-                        let sidx = (ay * q.cols + ax) as u16;
-                        self.menu_art_bg.set_tile(
-                            (q.x + ax, q.y + ay),
-                            &ts,
-                            TileSetting::new(sidx, art_eff),
-                        );
-                        self.menu_bg.set_tile((q.x + ax, q.y + ay), &ui_ts, TileSetting::BLANK);
-                    }
-                }
+                let size_tag = if q.cols == 5 && q.rows == 6 { "stage" } else { "hand" };
+                let size = match (q.cols * 8, q.rows * 8) {
+                    (40, 48) => Size::S64x64,
+                    (24, 32) => Size::S32x32,
+                    _ => Size::S32x32,
+                };
+                let sprites = self.sprite_cache.get_or_create(&q.card_no, size_tag, front.tiles, size);
+                let mut obj = Object::new(sprites[0].clone());
+                obj.set_pos((q.x * 8, q.y * 8));
+                obj.set_priority(Priority::P1);
                 if q.dimmed {
-                    // Dimmed (unpickable): checkerboard dither of dark zone
-                    // fill over the art — the tiled equivalent of the 3DS
-                    // translucent `disabled` overlay. True grayscale would
-                    // need a second baked front set per card; this reads
-                    // the same at menu scale for zero ROM cost.
-                    for ay in 0..q.rows {
-                        for ax in 0..q.cols {
-                            if (ax + ay) % 2 == 0 {
-                                self.menu_bg.set_tile(
-                                    (q.x + ax, q.y + ay),
-                                    &ui_ts,
-                                    TileSetting::new(UI_EMPTY, e_ui),
-                                );
-                            }
-                        }
-                    }
+                    // TODO: implement dimming via palette swap or alpha
                 }
                 if q.selected {
-                    // Gold badge overlapping the card's top-right corner.
-                    // Drawn after dimming so the cursor stays visible.
-                    self.menu_bg.set_tile(
-                        (q.x + q.cols - 1, q.y),
-                        &ui_ts,
-                        TileSetting::new(UI_BADGE, e_ui),
-                    );
+                    // Gold badge on top-right of card
+                    self.text_bg.set_tile((q.x + q.cols - 1, q.y), &ui_ts, TileSetting::new(UI_BADGE, e_ui));
                 }
+                self.active_sprites.push(CardSprite {
+                    objects: alloc::vec![obj],
+                    priority: Priority::P1,
+                });
             } else {
-                // Unknown card number: leave the zone fill and print the id.
-                Self::blit_line(&mut self.menu_bg, &font_ts, &icon_ts, e, &q.card_no, q.x, q.y);
+                Self::blit_line(&mut self.text_bg, &font_ts, &icon_ts, e, &q.card_no, q.x, q.y);
             }
         }
 
         let mut frame = self.gfx.frame();
-        self.menu_art_bg.show(&mut frame);
-        self.menu_bg.show(&mut frame);
+        self.text_bg.show(&mut frame);
+        for sprite in &self.active_sprites {
+            for obj in &sprite.objects {
+                obj.show(&mut frame);
+            }
+        }
         frame.commit();
-    }
-
-    /// Draw one card slot: 8bpp shared-palette front art on the art BG (or a
-    /// solid gray slot on the text BG), plus the gold badge in the right gap
-    /// column when the card has valid actions.
-    fn draw_slot(
-        art_bg: &mut RegularBackground,
-        ui_bg: &mut RegularBackground,
-        ui_ts: &TileSet,
-        font_ts: &TileSet,
-        icon_ts: &TileSet,
-        e0: TileEffect,
-        slot: &crate::board::Slot,
-        x: i32,
-        y: i32,
-        card: (i32, i32),
-        fronts: &[crate::card_art_gen::CardFront],
-        waited_fronts: &[crate::card_art_gen::CardFront],
-        back: &'static [u8],
-        flipped: bool,
-        _front_type: &str, // "hand", "stage", "live", "waited"
-    ) {
-        let (cols, rows) = if slot.waited {
-            (4, 3) // wait grid: 4x3 tiles = 32x24
-        } else {
-            card
-        };
-        let fronts = if slot.waited { waited_fronts } else { fronts };
-        let art_eff = |fl: bool| if fl { TileEffect::new(true, true, 0) } else { TileEffect::new(false, false, 0) };
-        let empty = |ui_bg: &mut RegularBackground| {
-            for ty in 0..rows {
-                for tx in 0..cols {
-                    ui_bg.set_tile((x + tx, y + ty), ui_ts, TileSetting::new(UI_EMPTY, e0));
-                }
-            }
-        };
-        match &slot.card_no {
-            // Face-down: card back at live-slot geometry. `hidden` is only set
-            // on 3x2 live-set slots, matching BACK_FRONT's baked grid.
-            Some(_) if slot.hidden => {
-                let ts = unsafe { TileSet::new(back, TileFormat::EightBpp) };
-                for ty in 0..2 {
-                    for tx in 0..3 {
-                        let sidx = if flipped { (1 - ty) * 3 + (2 - tx) } else { ty * 3 + tx } as u16;
-                        art_bg.set_tile(
-                            (x + tx, y + ty),
-                            &ts,
-                            TileSetting::new(sidx, art_eff(flipped)),
-                        );
-                        ui_bg.set_tile((x + tx, y + ty), &ui_ts, TileSetting::BLANK);
-                    }
-                }
-            }
-            Some(card_no) => match fronts.iter().find(|f| f.card_no == card_no.as_str()) {
-                Some(front) => {
-                    let ts = unsafe { TileSet::new(front.tiles, TileFormat::EightBpp) };
-                    for ty in 0..rows {
-                        for tx in 0..cols {
-                            let sidx = if flipped { (rows - 1 - ty) * cols + (cols - 1 - tx) } else { ty * cols + tx } as u16;
-                            art_bg.set_tile(
-                                (x + tx, y + ty),
-                                &ts,
-                                TileSetting::new(sidx, art_eff(flipped)),
-                            );
-                            // Clear ui_bg so card art shows through (ui is in front)
-                            ui_bg.set_tile((x + tx, y + ty), &ui_ts, TileSetting::BLANK);
-                        }
-                    }
-                }
-                None => {
-                    empty(ui_bg);
-                    Display::blit_line(ui_bg, font_ts, icon_ts, e0, card_no, x, y + rows / 2);
-                }
-            },
-            None => empty(ui_bg),
-        }
-        if slot.actionable {
-            // Gold badge on the card itself (top-right corner, or bottom-left when flipped 180°)
-            let (bx, by) = if flipped { (x, y + rows - 1) } else { (x + cols - 1, y) };
-            ui_bg.set_tile((bx, by), ui_ts, TileSetting::new(UI_BADGE, e0));
-        }
     }
 
     pub fn wait(&mut self) {

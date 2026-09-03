@@ -15,7 +15,7 @@ use std::time::{Duration, Instant};
 
 use bytes::{BufMut, BytesMut};
 use clap::Parser;
-use futures::StreamExt;
+use futures_util::{SinkExt, StreamExt};
 use rabuka_engine::{
     card::CardDatabase,
     deck_builder::DeckBuilder,

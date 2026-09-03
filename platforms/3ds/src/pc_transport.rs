@@ -9,8 +9,8 @@ pub struct PcMultiplayer {
     deck_sync_sent: bool,
     deck_sync_received: bool,
     pending_deck_sync: Option<Vec<u8>>,
-    ip_buffer: [u8; 16],
-    ip_cursor: usize,
+    pub ip_buffer: [u8; 16],
+    pub ip_cursor: usize,
 }
 
 impl PcMultiplayer {

@@ -28,6 +28,12 @@
 #include <3ds.h>
 #include <citro2d.h>
 #include <errno.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <netdb.h>
 #include <tremor/ivorbisfile.h>
 #include "fbi_task.h"
 #include "fbi_capturecam.h"
@@ -1463,7 +1469,7 @@ ssize_t getrandom(void *buf, size_t buflen, unsigned int flags) {
     return buflen;
 }
 
-// ---- UDS local wireless multiplayer ----
+// ===================== UDS local wireless multiplayer =====================
 //
 // WHY UDS (ad-hoc) and not infrastructure WiFi / internet?
 // - UDS is the ONLY native 3DS-to-3DS wireless API. No router, no internet, no
@@ -1485,6 +1491,19 @@ ssize_t getrandom(void *buf, size_t buflen, unsigned int flags) {
 //   - Max 2 nodes (1 host + 1 client), no spectators
 //   - Unreliable datagram; reliability via ACK + seq + retry in Rust layer
 //   - 32KB sharedmem for packet buffering (reduces burst drops)
+
+#define UDS_WLAN_COMM_ID  0xFF150848
+#define UDS_DATA_CHANNEL  1
+#define UDS_MAX_NODES     2
+
+static u32 uds_sharedmem_size = 0x8000; // 32KB -- more packet buffering = fewer burst drops
+static u32 uds_recv_buf_size = UDS_DEFAULT_RECVBUFSIZE;
+static u8 uds_data_channel = UDS_DATA_CHANNEL;
+static udsNetworkStruct uds_netstruct;
+static udsBindContext uds_bindctx;
+static bool uds_initialized = false;
+static bool uds_is_host = false;
+static bool uds_connected = false;
 
 // App data for network identification (first 4 bytes = magic, rest = random)
 static u8 uds_appdata[0x14] = {0x52, 0x42, 0x4B, 0x00}; // "RBK" + padding
@@ -1646,6 +1665,29 @@ int _3ds_uds_is_connected() {
 // Direct LAN multiplayer: 3DS <-> PC over UDP on same Wi-Fi network.
 // Uses libctru's netinet/in.h BSD socket API (same as PGGKEC 3DS example).
 // Protocol: 4-byte magic (0x52424B50 "RBKP") + payload (ActionSync/DeckSync).
+
+// Socket constants (libctru may not define all of these)
+#ifndef SO_RCVTIMEO
+#define SO_RCVTIMEO 0x1006
+#endif
+#ifndef SOL_SOCKET
+#define SOL_SOCKET 0xFFFF
+#endif
+#ifndef AF_INET
+#define AF_INET 2
+#endif
+#ifndef SOCK_DGRAM
+#define SOCK_DGRAM 2
+#endif
+#ifndef O_NONBLOCK
+#define O_NONBLOCK 0x800
+#endif
+#ifndef F_GETFL
+#define F_GETFL 3
+#endif
+#ifndef F_SETFL
+#define F_SETFL 4
+#endif
 
 static int pc_sock = -1;
 static bool pc_connected = false;

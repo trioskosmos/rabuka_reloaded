@@ -4,8 +4,27 @@ use rabuka_engine::game_setup;
 use rabuka_engine::game_state::GameState;
 use rabuka_engine::turn;
 
-use crate::ffi::_3ds_debug_print;
+use crate::ffi::{_3ds_debug_print, _3ds_uds_init, _3ds_uds_exit, _3ds_uds_send, _3ds_uds_recv, _3ds_uds_is_connected};
+use crate::transport::{Transport, ActionSync};
 use crate::uds;
+
+
+static mut ACTIVE_TRANSPORT: Option<Box<dyn Transport + Send>> = None;
+
+pub fn set_active_transport(transport: Box<dyn Transport + Send>) {
+    unsafe { ACTIVE_TRANSPORT = Some(transport); }
+}
+
+pub fn clear_active_transport() {
+    unsafe { ACTIVE_TRANSPORT = None; }
+}
+
+fn with_transport<F, R>(f: F) -> Option<R>
+where
+    F: FnOnce(&mut dyn Transport) -> R,
+{
+    unsafe { ACTIVE_TRANSPORT.as_mut().map(|t| f(&mut **t)) }
+}
 
 /// Phase-aware multiplayer turn check.
 /// Returns true if the given player (0=P1, 1=P2) should be able to act.
@@ -106,7 +125,7 @@ pub fn route_authoritative_action(
             .and_then(|s| s.parse::<rabuka_engine::zones::MemberArea>().ok())
             .map(|m| m.to_tag())
             .unwrap_or(0);
-        let sync = uds::ActionSync {
+        let sync = ActionSync {
             action_tag: action_tag_of(&action.action_type),
             card_id: p.as_ref().and_then(|x| x.card_id),
             card_indices: p
@@ -122,7 +141,9 @@ pub fn route_authoritative_action(
         *next_action_seq = next_action_seq.wrapping_add(1);
         let bytes = sync.to_bytes();
         *pending_client_action = Some(bytes.clone());
-        let _ = uds::uds_send(&bytes);
+        if let Some(t) = with_transport(|t| t.send(&bytes)) {
+            let _ = t;
+        }
         *waiting_for_opponent = !mp_can_act(gs, my_id as i32);
     }
     true

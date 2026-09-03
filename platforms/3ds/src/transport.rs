@@ -1,6 +1,6 @@
 #![cfg(feature = "3ds")]
 
-use crate::uds::{ActionSync, DeckSync};
+pub use crate::uds::{ActionSync, DeckSync};
 use crate::ffi::*;
 
 pub const PC_TRANSPORT_PORT: u16 = 7341;

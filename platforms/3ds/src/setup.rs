@@ -21,8 +21,10 @@ use crate::ffi::*;
 use crate::game::PlayState;
 use crate::lang::{current_lang, set_lang, tl, tl_fmt};
 use crate::pc_transport::PcMultiplayer;
+use crate::net::{set_active_transport, clear_active_transport};
 use crate::steps::{Overlay, SetupPhase, Step};
-use crate::uds::{DeckSync, ActionSync};
+use crate::transport::{DeckSync, ActionSync, Transport, UdsTransport, PcTransport};
+use crate::uds;
 use crate::ui::card_atlas::CardAtlas;
 use crate::ui::colors::*;
 use crate::ui::grid::{card_grid_input, render_card_detail, render_card_grid, GridAction};
@@ -83,7 +85,7 @@ fn pick_mode(
     cur: usize,
 ) -> Step {
     unsafe {
-        let cur = cur.min(3);
+        let cur = cur.min(4);
         if was_dirty {
                 _3ds_bot_clear();
                 _3ds_bot_queue_rect(0.0, 0.0, 320.0, 240.0, COL_TOP_BG);
@@ -94,7 +96,7 @@ fn pick_mode(
                     SCALE_BODY,
                     format!("{}\0", tl("SELECT MODE")).as_ptr(),
                 );
-                for (i, m) in ["VS AI", "Sandbox", "QR Scan", "Local MP"]
+                for (i, m) in ["VS AI", "Sandbox", "QR Scan", "Local MP", "PC Multiplayer"]
                     .iter()
                     .enumerate()
                 {
@@ -135,7 +137,7 @@ fn pick_mode(
         let mut tapped: Option<usize> = None;
         if touch_press {
             if t_x >= 10 && t_x <= 310 {
-                for i in 0..4usize {
+                for i in 0..5usize {
                     let ry = 40u32 + (i as u32) * 38;
                     if t_y >= ry && t_y <= ry + 36 {
                         tapped = Some(i);
@@ -160,7 +162,7 @@ fn pick_mode(
                 SetupPhase::PickMode(cur - 1),
                 true,
             )
-        } else if keys & 0x00000080 != 0 && cur + 1 < 4 {
+        } else if keys & 0x00000080 != 0 && cur + 1 < 5 {
             Step::Setup(
                 cards.clone(),
                 decks.clone(),
@@ -194,6 +196,14 @@ fn pick_mode(
                     cards.clone(),
                     decks.clone(),
                     SetupPhase::MultiplayerDeck(0),
+                    true,
+                )
+            } else if tap_cur == 4 {
+                // "PC Multiplayer"
+                Step::Setup(
+                    cards.clone(),
+                    decks.clone(),
+                    SetupPhase::MultiplayerPcPickMode(0),
                     true,
                 )
             } else if n == 0 {
@@ -1357,6 +1367,164 @@ fn multiplayer_pc_pick_mode(
     }
 }
 
+fn multiplayer_pc_host_wait(
+    cards: &Arc<Vec<Card>>,
+    decks: &Vec<DeckList>,
+    keys: u32,
+    was_dirty: bool,
+    p1_idx: usize,
+) -> Step {
+    static mut PC_MP: Option<PcMultiplayer> = None;
+
+    if was_dirty {
+        let mut mp = PcMultiplayer::new();
+        let _ = mp.init_host();
+        unsafe { PC_MP = Some(mp); }
+
+        unsafe {
+            _3ds_bot_clear();
+            _3ds_bot_queue_rect(0.0, 0.0, 320.0, 240.0, COL_TOP_BG);
+            _3ds_bot_queue_text(
+                60.0, 8.0, COL_GOLD, SCALE_BODY,
+                format!("{}\0", tl("PC HOST: Waiting for client...")).as_ptr(),
+            );
+            let ip = unsafe { std::ffi::CStr::from_ptr(_3ds_get_local_ip() as *const std::ffi::c_char) }
+                .to_string_lossy()
+                .to_string();
+            _3ds_bot_queue_text(
+                30.0, 60.0, COL_LIGHT, SCALE_BODY,
+                format!("Your IP: {}\0", ip).as_ptr(),
+            );
+            _3ds_bot_queue_text(
+                30.0, 100.0, COL_LIGHT, SCALE_BODY,
+                format!("Port: {}\0", crate::transport::PC_TRANSPORT_PORT).as_ptr(),
+            );
+            _3ds_bot_queue_text(
+                30.0, 230.0, COL_MED, SCALE_BODY,
+                format!("{}\0", tl("B=cancel")).as_ptr(),
+            );
+        }
+    }
+
+    if keys & 0x00000002 != 0 {
+        unsafe { if let Some(ref mut mp) = PC_MP { mp.shutdown(); } }
+        Step::Setup(cards.clone(), decks.clone(), SetupPhase::MultiplayerPcPickMode(0), true)
+    } else {
+        unsafe {
+            if let Some(ref mut mp) = PC_MP {
+                if mp.poll() && mp.is_connected() {
+                    // Client connected, send deck sync
+                    let seed = _3ds_system_tick() as u64;
+                    let mut cards_vec = (**cards).clone();
+                    CardLoader::attach_abilities(&mut cards_vec);
+                    let db = CardDatabase::load_or_create(cards_vec);
+                    let nums1 = DeckParser::deck_list_to_card_numbers(&decks[p1_idx]);
+                    let to_ids = |nos: &Vec<String>| -> Vec<u16> {
+                        nos.iter().filter_map(|no| db.get_card_id(no).map(|id| id as u16)).collect()
+                    };
+                    let sync = DeckSync {
+                        seed,
+                        p1_main_templates: to_ids(&nums1),
+                        p1_energy_templates: Vec::new(),
+                        p2_main_templates: to_ids(&nums1),
+                        p2_energy_templates: Vec::new(),
+                    };
+                    let _ = mp.send_deck_sync(&sync);
+                    let data = sync.to_bytes();
+                    Step::Setup(
+                        cards.clone(),
+                        decks.clone(),
+                        SetupPhase::MultiplayerPcLoading(p1_idx, p1_idx, true, Some(data), seed),
+                        true,
+                    )
+                } else {
+                    Step::Setup(cards.clone(), decks.clone(), SetupPhase::MultiplayerPcHostWait(p1_idx), false)
+                }
+            } else {
+                Step::Setup(cards.clone(), decks.clone(), SetupPhase::MultiplayerPcHostWait(p1_idx), false)
+            }
+        }
+    }
+}
+
+fn multiplayer_pc_client_connect(
+    cards: &Arc<Vec<Card>>,
+    decks: &Vec<DeckList>,
+    keys: u32,
+    was_dirty: bool,
+    p1_idx: usize,
+) -> Step {
+    static mut PC_MP: Option<PcMultiplayer> = None;
+
+    if was_dirty {
+        let mut mp = PcMultiplayer::new();
+        unsafe { PC_MP = Some(mp); }
+
+        unsafe {
+            _3ds_bot_clear();
+            _3ds_bot_queue_rect(0.0, 0.0, 320.0, 240.0, COL_TOP_BG);
+            _3ds_bot_queue_text(
+                60.0, 8.0, COL_GOLD, SCALE_BODY,
+                format!("{}\0", tl("PC CLIENT: Enter PC IP")).as_ptr(),
+            );
+            _3ds_bot_queue_text(
+                30.0, 230.0, COL_MED, SCALE_BODY,
+                format!("{}\0", tl("L/R=cursor UP/DOWN=digit A=connect B=back")).as_ptr(),
+            );
+        }
+    }
+
+    if keys & 0x00000002 != 0 {
+        unsafe { if let Some(ref mut mp) = PC_MP { mp.shutdown(); } }
+        Step::Setup(cards.clone(), decks.clone(), SetupPhase::MultiplayerPcPickMode(1), true)
+    } else if keys & 0x00000001 != 0 {
+        // A = connect
+        unsafe {
+            if let Some(ref mut mp) = PC_MP {
+                let ip = mp.ip_str();
+                match mp.init_client(&ip) {
+                    Ok(()) => {
+                        Step::Setup(cards.clone(), decks.clone(), SetupPhase::MultiplayerPcSyncDeck(p1_idx, 0, false), true)
+                    }
+                    Err(e) => {
+                        _3ds_bot_clear();
+                        _3ds_bot_queue_rect(0.0, 0.0, 320.0, 240.0, COL_TOP_BG);
+                        _3ds_bot_queue_text(
+                            30.0, 100.0, 0xFF0000FF, SCALE_BODY,
+                            format!("Connect failed: {}\0", e).as_ptr(),
+                        );
+                        Step::Setup(cards.clone(), decks.clone(), SetupPhase::MultiplayerPcClientConnect(p1_idx), true)
+                    }
+                }
+            } else {
+                Step::Setup(cards.clone(), decks.clone(), SetupPhase::MultiplayerPcClientConnect(p1_idx), false)
+            }
+        }
+    } else {
+        // Edit IP
+        unsafe {
+            if let Some(ref mut mp) = PC_MP {
+                let _ = mp.edit_ip(keys);
+                // Redraw IP
+                _3ds_bot_clear();
+                _3ds_bot_queue_rect(0.0, 0.0, 320.0, 240.0, COL_TOP_BG);
+                _3ds_bot_queue_text(60.0, 8.0, COL_GOLD, SCALE_BODY, format!("{}\0", tl("PC CLIENT: Enter PC IP")).as_ptr());
+                let ip = mp.ip_str();
+                let cursor = mp.ip_buffer.iter().position(|&b| b == 0).unwrap_or(15).min(mp.ip_buffer.len());
+                let mut display = String::new();
+                for (i, ch) in ip.chars().enumerate() {
+                    if i == cursor { display.push('['); }
+                    display.push(ch);
+                    if i == cursor { display.push(']'); }
+                }
+                _3ds_bot_queue_text(30.0, 100.0, COL_GOLD, SCALE_LARGE, format!("{}\0", display).as_ptr());
+                _3ds_bot_queue_text(30.0, 230.0, COL_MED, SCALE_BODY, format!("{}\0", tl("L/R=cursor UP/DOWN=digit A=connect B=back")).as_ptr());
+            }
+        }
+        Step::Setup(cards.clone(), decks.clone(), SetupPhase::MultiplayerPcClientConnect(p1_idx), false)
+    }
+}
+
 fn multiplayer_pick_role(
     cards: &Arc<Vec<Card>>,
     decks: &Vec<DeckList>,
@@ -1971,6 +2139,13 @@ fn multiplayer_loading(
                 unsafe {
                     _3ds_board_enable(true);
                 }
+                // Set up active transport for multiplayer
+                let transport: Box<dyn Transport + Send> = if is_host {
+                    Box::new(UdsTransport::new())
+                } else {
+                    Box::new(UdsTransport::new())
+                };
+                set_active_transport(transport);
                 Step::Play(PlayState {
                     gs,
                     cur: 0,
@@ -2006,6 +2181,185 @@ fn multiplayer_loading(
             }
             Err(e) => Step::Done(Err(e)),
         }
+    }
+}
+
+/// PC Multiplayer (Direct LAN) — Sync deck templates (both host and client)
+fn multiplayer_pc_sync_deck(
+    cards: &Arc<Vec<Card>>,
+    decks: &Vec<DeckList>,
+    was_dirty: bool,
+    p1_idx: usize,
+    p2_idx: usize,
+    is_host: bool,
+) -> Step {
+    static mut PC_MP: Option<PcMultiplayer> = None;
+
+    if is_host {
+        // Host already sent sync in MultiplayerPcHostWait, proceed to loading
+        unsafe {
+            if let Some(ref mut mp) = PC_MP {
+                if mp.poll() {
+                    let seed = _3ds_system_tick() as u64;
+                    let mut cards_vec = (**cards).clone();
+                    CardLoader::attach_abilities(&mut cards_vec);
+                    let db = CardDatabase::load_or_create(cards_vec);
+                    let nums1 = DeckParser::deck_list_to_card_numbers(&decks[p1_idx]);
+                    let nums2 = if p1_idx == p2_idx { nums1.clone() } else { DeckParser::deck_list_to_card_numbers(&decks[p2_idx]) };
+                    let to_ids = |nos: &Vec<String>| -> Vec<u16> {
+                        nos.iter().filter_map(|no| db.get_card_id(no).map(|id| id as u16)).collect()
+                    };
+                    let sync = DeckSync {
+                        seed,
+                        p1_main_templates: to_ids(&nums1),
+                        p1_energy_templates: Vec::new(),
+                        p2_main_templates: to_ids(&nums2),
+                        p2_energy_templates: Vec::new(),
+                    };
+                    let data = sync.to_bytes();
+                    Step::Setup(
+                        cards.clone(),
+                        decks.clone(),
+                        SetupPhase::MultiplayerPcLoading(p1_idx, p2_idx, true, Some(data), seed),
+                        true,
+                    )
+                } else {
+                    Step::Setup(cards.clone(), decks.clone(), SetupPhase::MultiplayerPcSyncDeck(p1_idx, p2_idx, true), false)
+                }
+            } else {
+                Step::Setup(cards.clone(), decks.clone(), SetupPhase::MultiplayerPcSyncDeck(p1_idx, p2_idx, true), false)
+            }
+        }
+    } else {
+        // Client: receive deck sync from PC
+        if was_dirty {
+            unsafe {
+                _3ds_bot_clear();
+                _3ds_bot_queue_rect(0.0, 0.0, 320.0, 240.0, COL_TOP_BG);
+                _3ds_bot_queue_text(60.0, 8.0, COL_GOLD, SCALE_BODY, format!("{}\0", tl("Receiving deck data...")).as_ptr());
+            }
+        }
+        unsafe {
+            if let Some(ref mut mp) = PC_MP {
+                if let Some(sync) = mp.recv_deck_sync() {
+                    let sync_bytes = sync.to_bytes();
+                    Step::Setup(
+                        cards.clone(),
+                        decks.clone(),
+                        SetupPhase::MultiplayerPcLoading(p1_idx, p2_idx, false, Some(sync_bytes), sync.seed),
+                        true,
+                    )
+                } else {
+                    Step::Setup(cards.clone(), decks.clone(), SetupPhase::MultiplayerPcSyncDeck(p1_idx, p2_idx, false), false)
+                }
+            } else {
+                Step::Setup(cards.clone(), decks.clone(), SetupPhase::MultiplayerPcSyncDeck(p1_idx, p2_idx, false), false)
+            }
+        }
+    }
+}
+
+/// PC Multiplayer — Load game state from deck sync (same as UDS loading)
+fn multiplayer_pc_loading(
+    cards: &Arc<Vec<Card>>,
+    decks: &Vec<DeckList>,
+    p1_idx: usize,
+    p2_idx: usize,
+    is_host: bool,
+    deck_sync_bytes: Option<Vec<u8>>,
+    seed: u64,
+) -> Step {
+    let r = (|| -> Result<(GameState, CardAtlas), String> {
+        let mut cards_vec = (**cards).clone();
+        CardLoader::attach_abilities(&mut cards_vec);
+        let mut db = Arc::new(CardDatabase::load_or_create(cards_vec));
+        if let Some(ref sync_bytes) = deck_sync_bytes {
+            let sync = DeckSync::from_bytes(sync_bytes).ok_or("Invalid deck sync data")?;
+            let build_from_templates = |db: &mut Arc<CardDatabase>, templates: &Vec<u16>| -> Result<rabuka_engine::deck_builder::Deck, String> {
+                let mut deck = rabuka_engine::deck_builder::Deck { main_deck: std::collections::VecDeque::new(), energy_deck: std::collections::VecDeque::new() };
+                for &tid in templates {
+                    let cid = Arc::make_mut(db).create_copy(tid as i16);
+                    if let Some(card) = db.get_card(cid) {
+                        match card.card_type {
+                            rabuka_engine::card::CardType::Energy => deck.energy_deck.push_back(cid),
+                            _ => deck.main_deck.push_back(cid),
+                        }
+                    }
+                }
+                Ok(deck)
+            };
+            let mut pd1 = build_from_templates(&mut db, &sync.p1_main_templates).map_err(|e| format!("Deck1: {}", e))?;
+            let mut pd2 = build_from_templates(&mut db, &sync.p2_main_templates).map_err(|e| format!("Deck2: {}", e))?;
+            DeckBuilder::add_default_energy_cards_from_database(&mut pd1, &mut db).ok();
+            DeckBuilder::add_default_energy_cards_from_database(&mut pd2, &mut db).ok();
+            rabuka_engine::rng::seed(sync.seed as u32);
+            pd1.shuffle_main_deck(); pd1.shuffle_energy_deck();
+            pd2.shuffle_main_deck(); pd2.shuffle_energy_deck();
+            let mut p1 = Player::new("p1".into(), "P1".into(), true);
+            p1.set_main_deck(pd1.main_deck); p1.set_energy_deck(pd1.energy_deck);
+            let mut p2 = Player::new("p2".into(), "P2".into(), false);
+            p2.set_main_deck(pd2.main_deck); p2.set_energy_deck(pd2.energy_deck);
+            let mut gs = GameState::new(p1, p2, db);
+            game_setup::setup_game(&mut gs);
+            return Ok((gs, CardAtlas::load()));
+        }
+        let nums1 = DeckParser::deck_list_to_card_numbers(&decks[p1_idx]);
+        let nums2 = if p1_idx == p2_idx { nums1.clone() } else { DeckParser::deck_list_to_card_numbers(&decks[p2_idx]) };
+        let mut pd1 = DeckBuilder::build_deck_from_database(&mut db, nums1).map_err(|e| format!("Deck: {}", e))?;
+        let mut pd2 = DeckBuilder::build_deck_from_database(&mut db, nums2).map_err(|e| format!("Deck: {}", e))?;
+        rabuka_engine::rng::seed(seed as u32);
+        pd1.shuffle_main_deck(); pd1.shuffle_energy_deck();
+        pd2.shuffle_main_deck(); pd2.shuffle_energy_deck();
+        DeckBuilder::add_default_energy_cards_from_database(&mut pd1, &mut db).ok();
+        DeckBuilder::add_default_energy_cards_from_database(&mut pd2, &mut db).ok();
+        let mut p1 = Player::new("p1".into(), "P1".into(), true);
+        p1.set_main_deck(pd1.main_deck); p1.set_energy_deck(pd1.energy_deck);
+        let mut p2 = Player::new("p2".into(), "P2".into(), false);
+        p2.set_main_deck(pd2.main_deck); p2.set_energy_deck(pd2.energy_deck);
+        let mut gs = GameState::new(p1, p2, db);
+        game_setup::setup_game(&mut gs);
+        Ok((gs, CardAtlas::load()))
+    })();
+    match r {
+        Ok((gs, atlas)) => {
+            unsafe { _3ds_board_enable(true); }
+            // Set up active transport for PC multiplayer
+            let transport: Box<dyn Transport + Send> = Box::new(PcTransport::new());
+            set_active_transport(transport);
+            Step::Play(PlayState {
+                gs,
+                cur: 0,
+                acts_cache: Vec::new(),
+                dirty: true,
+                redraw: true,
+                atlas,
+                vs_ai: false,
+                ai_vs_ai: false,
+                detail_mode: false,
+                choice_subview: false,
+                text_page: 0,
+                choice_grid_offset: 0,
+                list_scroll: 0,
+                detail_scroll_y: 0.0f32,
+                hand_offset: 0,
+                hand_offset_p2: 0,
+                touch_tap_count: 0,
+                viewing_card: None,
+                zone_viewer: None,
+                zone_viewer_offset: 0,
+                was_touching: false,
+                is_multiplayer: true,
+                is_host,
+                waiting_for_opponent: !is_host,
+                overlay: Overlay::None,
+                pending_client_action: None,
+                last_client_action_seq: 0,
+                next_action_seq: 1,
+                dbg_tx_bytes: 0,
+                dbg_rx_bytes: 0,
+            })
+        }
+        Err(e) => Step::Done(Err(e)),
     }
 }
 
