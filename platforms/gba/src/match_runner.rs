@@ -3,20 +3,24 @@
 //! This wraps the shared engine `run_match` with per-frame mixer updates
 //! and vblank synchronization for background music playback.
 
+use alloc::rc::Rc;
+use alloc::string::{String, ToString};
+use alloc::vec::Vec;
+
 use rabuka_engine::card::Card;
 use rabuka_engine::card::CardDatabase;
+use rabuka_engine::compat::psp_hash::HashSet;
 use rabuka_engine::game::deck_builder::DeckBuilder;
 use rabuka_engine::game::game_setup;
-use rabuka_engine::game::menu::{handle_choice, human_turn, select, show_result};
+use rabuka_engine::game::menu::{handle_choice, human_turn, show_result};
 use rabuka_engine::game::platform_ui::{MatchMode, PlatformUi};
 use rabuka_engine::game_state::{GameResult, GameState, Phase};
 use rabuka_engine::player::Player;
-use rabuka_engine::rng;
 use rabuka_engine::turn::TurnEngine;
-use rabuka_engine::Arc;
 
-use agb::sound::mixer::{Frequency, Mixer, SoundChannel, SoundData};
+use agb::sound::mixer::{Mixer, SoundChannel, SoundData};
 use agb::include_wav;
+use agb::fixnum::Num;
 
 /// Background music loaded at compile-time. Must match the mixer frequency (18157 Hz mono).
 static BGM_DATA: SoundData = include_wav!("sfx/next_card.wav");
@@ -121,7 +125,7 @@ fn ai_handle_choice(gs: &mut GameState) -> bool {
             } else {
                 let want = (*count).min(n_options);
                 let mut picked = Vec::with_capacity(want);
-                let mut seen: rabuka_engine::HashSet<usize> = rabuka_engine::HashSet::default();
+                let mut seen: HashSet<usize> = HashSet::default();
                 while picked.len() < want {
                     let idx = rabuka_engine::rng::rand_range(n_options);
                     if seen.insert(idx) {
@@ -149,11 +153,11 @@ pub fn run_match_with_mixer<U: PlatformUi>(
 ) -> GameResult {
     // Start background music looping
     let mut bgm_channel = SoundChannel::new(BGM_DATA);
-    bgm_channel.looping();
-    bgm_channel.volume(0.6);
+    bgm_channel.set_loop(true);
+    bgm_channel.volume(Num::<i16, 8>::from(155)); // ~0.6 in 8.8 fixed point (256 * 0.6 ≈ 155)
     let _ = mixer.play_sound(bgm_channel);
 
-    let mut db = Arc::new(CardDatabase::load_or_create(all_cards));
+    let mut db = Rc::new(CardDatabase::load_or_create(all_cards));
 
     let nums1: Vec<String> = p1_cards.iter().map(|c| c.to_string()).collect();
     let nums2: Vec<String> = p2_cards.iter().map(|c| c.to_string()).collect();
