@@ -1388,7 +1388,7 @@ fn multiplayer_pc_host_wait(
                 60.0, 8.0, COL_GOLD, SCALE_BODY,
                 format!("{}\0", tl("PC HOST: Waiting for client...")).as_ptr(),
             );
-            let ip = unsafe { std::ffi::CStr::from_ptr(_3ds_get_local_ip() as *const std::ffi::c_char) }
+            let ip = unsafe { std::ffi::CStr::from_ptr(_3ds_get_local_ip() as *const i8) }
                 .to_string_lossy()
                 .to_string();
             _3ds_bot_queue_text(

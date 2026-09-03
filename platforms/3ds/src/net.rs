@@ -4,10 +4,8 @@ use rabuka_engine::game_setup;
 use rabuka_engine::game_state::GameState;
 use rabuka_engine::turn;
 
-use crate::ffi::{_3ds_debug_print, _3ds_uds_init, _3ds_uds_exit, _3ds_uds_send, _3ds_uds_recv, _3ds_uds_is_connected};
+use crate::ffi::{_3ds_debug_print};
 use crate::transport::{Transport, ActionSync};
-use crate::uds;
-
 
 static mut ACTIVE_TRANSPORT: Option<Box<dyn Transport + Send>> = None;
 
@@ -21,9 +19,9 @@ pub fn clear_active_transport() {
 
 fn with_transport<F, R>(f: F) -> Option<R>
 where
-    F: FnOnce(&mut dyn Transport) -> R,
+    F: FnOnce(&mut Box<dyn Transport + Send>) -> R,
 {
-    unsafe { ACTIVE_TRANSPORT.as_mut().map(|t| f(&mut **t)) }
+    unsafe { ACTIVE_TRANSPORT.as_mut().map(f) }
 }
 
 /// Phase-aware multiplayer turn check.

@@ -1,4 +1,3 @@
-use alloc::boxed::Box;
 use alloc::string::String;
 use alloc::vec::Vec;
 use alloc::collections::BTreeMap;
@@ -128,8 +127,12 @@ impl CardSpriteCache {
     ) -> &[agb::display::object::SpriteVram] {
         let key = alloc::format!("{}:{}", card_no, size_tag);
         if !self.sprites.contains_key(&key) {
+            let expected_size = size.size_bytes_256();
+            let mut padded = alloc::vec![0u8; expected_size];
+            let copy_len = front_tiles.len().min(expected_size);
+            padded[..copy_len].copy_from_slice(&front_tiles[..copy_len]);
             let mut dyn_sprite = DynamicSprite256::new(size);
-            dyn_sprite.data_mut().copy_from_slice(front_tiles);
+            dyn_sprite.data_mut().copy_from_slice(&padded);
             let sprite_vram = dyn_sprite.to_vram(self.palette.clone());
             self.sprites.insert(key.clone(), alloc::vec![sprite_vram]);
         }
