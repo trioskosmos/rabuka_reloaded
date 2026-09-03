@@ -3293,8 +3293,7 @@ if util::distinct_should_dedupe(distinct) {
             gs.looked_at_cards.len(),
             indices
         );
-        #[cfg(not(feature = "no_std"))]
-        eprintln!(
+        log::debug!(
             "[LA_DEST_DBG] resolved_dest={:?} discard_remaining={:?} placement_order={:?}",
             destination, discard_remaining, placement_order
         );
