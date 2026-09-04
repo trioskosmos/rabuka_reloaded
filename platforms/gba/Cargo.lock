@@ -532,6 +532,7 @@ name = "rabuka_gba"
 version = "0.1.0"
 dependencies = [
  "agb",
+ "log",
  "portable-atomic",
  "rabuka_engine",
 ]

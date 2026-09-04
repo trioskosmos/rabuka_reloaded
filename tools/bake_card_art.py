@@ -164,6 +164,11 @@ def bake_ui_tiles():
     # Solid gold tile for hand cursor border (opaque)
     tiles.append([4] * 64)
 
+    # Fully transparent tile (index 0) for clearing the front text BG to
+    # see-through, so card sprites (P1) show between the back fill (P2)
+    # and the front text/badges (P0).
+    tiles.append([0] * 64)
+
     flat = bytearray()
     for t in tiles:
         for rr in range(TILE):
@@ -251,7 +256,14 @@ def build_palette(thumbnails, colors=240):
     # Ensure PAD_RGB is in palette at index 1 (padding color)
     composite.putpixel((64, 0), PAD_RGB)
     q = composite.quantize(colors=colors, method=_QUANT_METHOD)
-    pal = q.getpalette()[: colors * 3]
+    pal = list(q.getpalette()[: colors * 3])
+    # PIL does NOT guarantee the most-frequent color lands at index 0, so
+    # force it: index 0 = DUMMY_RGB (transparent on GBA OBJ), index 1 =
+    # PAD_RGB (opaque padding). Card art never contains magenta, so forcing
+    # slot 0 costs one duplicate at worst and guarantees no art pixel maps
+    # to transparent index 0.
+    pal[0], pal[1], pal[2] = DUMMY_RGB
+    pal[3], pal[4], pal[5] = PAD_RGB
     pal_bytes = bytearray()
     for i in range(colors):
         r, g, b = pal[i * 3], pal[i * 3 + 1], pal[i * 3 + 2]
@@ -374,7 +386,8 @@ def write_gen(entries, fronts, stage_fronts, live_fronts, waited_fronts, back_fr
         f.write("// Card fronts: 8bpp shared 240-colour MASTER_PAL.\n")
         f.write("// Detail: 8bpp per-card 240-colour palette.\n")
         f.write("// BOARD_UI: shared bank-15 board tiles (4bpp): 0 empty fill,\n")
-        f.write("// 1 gold actionable badge, 2 white focus marker, 3 solid gold.\n\n")
+        f.write("// 1 gold actionable badge, 2 white focus marker, 3 solid gold,\n")
+        f.write("// 4 fully transparent (front-BG clear).\n\n")
         f.write("pub static MASTER_PAL: [u8; 480] = [\n")
         for i in range(0, len(master_pal_bytes), 24):
             f.write("    " + ", ".join(str(b) for b in master_pal_bytes[i:i + 24]) + ",\n")

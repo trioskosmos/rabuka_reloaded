@@ -1,141 +1,71 @@
-# GBA Display Refactor: Sprite-Based Card Rendering
+# GBA Display: Sprite-Based Card Rendering (as built)
 
-## Problem Summary
+## Layering (GBA: lower number wins; OBJ beats a BG of the SAME number)
 
-The current implementation uses 7 `RegularBackground` layers (4bpp + 8bpp pairs) for card rendering:
-- `board_art_bg`/`board_ui_bg` - board view (hand, stage, live)
-- `menu_bg`/`menu_art_bg` - choice menus
-- `detail_art_bg`/`detail_text_bg` - card detail view
-- `action_bg` - actions screen
+| Layer | Type | Priority | Purpose |
+|-------|------|----------|---------|
+| Front text/UI | `RegularBackground` 4bpp (`ui_front`) | P0 | Text, badges, cursors; cleared with transparent tile 4 |
+| Card art | `Object` sprites 8bpp | P1 | All card fronts/backs, multi-sprite per card |
+| Back fill | `RegularBackground` 4bpp (`ui_back`) | P2 | Opaque zone fill (`UI_EMPTY`), always behind cards |
 
-**Failures:**
-1. **VRAM leak**: 4200 `set_tile` calls/frame just to clear → agb allocator never frees tiles
-2. **Ghost cards**: Clearing with `TileSetting::new(0, ...)` draws card-back tile 0 instead of transparency
-3. **Transition OOM**: Detail (216 tiles) + Board (150 tiles) + Menu (150 tiles) coexist briefly → "ran out of video RAM"
-4. **Wrong abstraction**: Backgrounds are for static tilemaps, not dynamic card sprites
+One priority number per layer — never share a number between a BG and
+sprites you want ordered. `present()` shows back, then sprites, then front.
 
-## Solution: Sprite-Based Architecture
+## Sprites: one card = multiple legal-size Objects
 
-### Hardware Reality (GBA)
-- **128 sprites max**, each 8×8 to 64×64 pixels
-- **OBJ VRAM**: 16 KB (separate from BG VRAM)
-- **OAM**: 128 entries, updated per frame
-- **No manual clearing needed** - sprites not shown = not rendered
-- **agb manages VRAM** via `SpriteVram` + reference counting
+`agb::display::object::Size` only allows 12 sizes
+(8/16/32/64 squares + 16x8, 32x8, 32x16, 64x32, 8x16, 8x32, 16x32, 32x64).
+There is no 40x48 / 24x32 / 96x144 sprite, so each card is tiled
+(`display.rs` `*_PARTS` tables):
 
-### New Architecture
+| Card | Box px | Parts |
+|------|--------|-------|
+| Hand 24x32 | 24x32 | 2x S16x32 |
+| Stage 40x48 | 40x48 | S32x32 + S16x32 + S32x16 + S16x16 |
+| Live 24x16 | 24x16 | S32x16 |
+| Waited 32x24 | centred in slot box | slot box tiling |
+| Detail 96x144 | 96x144 | 6x S32x64 + 3x S32x16 (9 parts) |
 
-| Layer | Type | Purpose | Management |
-|-------|------|---------|------------|
-| Text/UI | `RegularBackground` (4bpp) | Headers, action bar, zone fills, badges, cursors | Static, cleared per frame |
-| Card Art | `Object` (sprites, 8bpp) | All card fronts/backs | Dynamic, created on demand, auto-freed |
+Upload via `DynamicSprite256::set_pixel` (per-pixel, correct under OBJ
+1D mapping for rectangular sizes) — never `data_mut` tile-block copies,
+which assume BG tile order. `clear(0)` after `new()`; gutters stay index 0.
 
-### Sprite Mapping
+## Palette: index 0 is transparent on OBJ
 
-| Card Type | Pixel Size | Sprite Size | Sprites Needed |
-|-----------|------------|-------------|----------------|
-| Stage (40×48) | 34×48 card + padding | 32×32 + 8×16 | 2 |
-| Hand (24×32) | 24×32 | 32×32 | 1 |
-| Live (24×16) | 24×16 | 32×16 | 1 |
-| Detail (96×144) | 96×144 | 64×64 + 32×64 + 64×32 + 32×32 | 4 |
-| Menu choice (24×32) | 24×32 | 32×32 | 1 |
+`tools/bake_card_art.py::build_palette` forces palette index 0 = magenta
+(`DUMMY_RGB`, rgb15 `0x7C1F`) and index 1 = `PAD_RGB`. Baked art contains
+zero index-0 pixels (verified); sprite gutters are filled with 0. If the
+bake ever regresses (index 0 = black again), all dark card pixels turn
+into holes showing the back fill through. Detail art shares the master
+palette — no per-card palette reload, no backdrop flash (BG and OBJ
+palettes are separate hardware blocks; writing art colours to the BG
+palette does nothing for sprites).
 
-**Max concurrent**: 10 hand + 6 stage + 4 live + 1 detail = 21 sprites << 128 limit
+## Opponent flip
 
-### Palette Strategy
+180° rotation is pre-rotated into cached pixels (mirror in box space,
+keyed `:f`), not `hflip+vflip` — multi-part anchor math stays trivial.
 
-- **Single `PaletteVramMulti`** (256 colors) for ALL card sprites
-- Load `MASTER_PAL` once at startup → `PaletteMulti` → `PaletteVramMulti::new()`
-- All `Object::set_palette(&palette_vram_multi)` share it
-- Bank 15 reserved for 4bpp text UI (`TEXT_PALETTE`)
+## VRAM budget (OBJ VRAM = 32 KB)
 
-### Sprite Lifecycle
+Board worst case ~30 KB (10 hand x 1 KB + 6 stage x 2.3 KB + 12 live x
+0.5 KB); detail portrait ~13.5 KB. The two never coexist: `render_board_frame`
+evicts `detail:*` keys, `render_card_detail` / `render_action_text` clear
+the cache, `reset_vram` clears + commits an empty frame. Upload uses
+`try_to_vram`: on OOM the cache is dropped and retried once, then the card
+is skipped (debug-logged) instead of panicking. Cap: 96 cached placements.
 
-```rust
-// On-demand creation, cached by card_no
-struct CardSpriteCache {
-    sprites: HashMap<String, Vec<SpriteVram>>,  // key: "card_no:size"
-    palette: PaletteVramMulti,
-}
+## Dimmed / selected
 
-// Frame rendering
-fn render_board(&mut self, frame: &BoardFrame) {
-    // 1. Clear text BG (4bpp) - cheap, 1 tile repeated
-    // 2. Create/update Objects for visible cards
-    // 3. Show objects in priority order (hand above stage, cursor top)
-    // 4. Frame commit - agb handles OAM upload
-}
+Dimmed (unpickable) = checkerboard dither to transparent at upload time
+(keyed `:d`), showing the dark back fill — mirrors the 3DS disabled
+overlay at zero ROM cost. Selected = gold badge tile on the front layer
+(top-right; bottom-left when flipped).
 
-// No manual clearing! Objects not shown = not in OAM = invisible
-```
+## Success criteria
 
-### Data Structures
-
-```rust
-struct CardSprite {
-    objects: Vec<Object>,           // 1-4 sprites per card
-    size: SpriteSize,               // Stage/Hand/Live/Detail
-    position: (i32, i32),           // screen pixels
-    flipped: bool,                  // opponent cards
-    priority: Priority,             // P0/P1 layering
-}
-
-struct Display {
-    gfx: Graphics,
-    text_bg: RegularBackground,     // single 4bpp BG for all text/UI
-    card_sprites: HashMap<String, CardSprite>,  // active this frame
-    sprite_cache: CardSpriteCache,  // reusable SpriteVram
-    master_palette: PaletteVramMulti,
-    // ... text rendering state
-}
-```
-
-### Rendering Flow
-
-**Board Frame:**
-1. Clear text BG (UI_EMPTY tile)
-2. Render text (header, action bar, cursors) to text BG
-3. For each card slot:
-   - Get/create `CardSprite` from cache
-   - Set position, flip, priority
-   - `object.show(&mut frame)`
-4. `text_bg.show(&mut frame)` (under cards) or over (badges)
-5. `frame.commit()`
-
-**Menu/Detail:** Same pattern, different layout coordinates.
-
-### VRAM Budget
-
-| Resource | Size |
-|----------|------|
-| Text BG (4bpp, 32×32) | ~2 KB tiles + 2 KB map |
-| Master palette (256 color) | 512 bytes |
-| Card sprites (max 21 × 32×32 8bpp) | ~21 KB |
-| **Total** | **~25 KB** << 96 KB VRAM |
-
-### Migration Plan
-
-1. **Add sprite imports** - `agb::display::object::{Object, DynamicSprite256, PaletteVramMulti, Size, Priority}`
-2. **Create `CardSpriteCache`** with `MASTER_PAL` → `PaletteVramMulti`
-3. **Replace 7 backgrounds** with 1 text BG + sprite cache
-4. **Rewrite `draw_slot`** to create/position `Object`s instead of `set_tile`
-5. **Rewrite `render_card_detail`** to use 4 sprites for 96×144 portrait
-6. **Rewrite `swap_buffers`** menu cards as sprites
-7. **Remove all clear loops** - sprites auto-hidden when not shown
-8. **Remove `reset_vram`** - no longer needed
-
-### Risk Mitigation
-
-- **Sprite limit**: 21 max vs 128 available - safe
-- **agb allocator**: `DynamicSprite256::new(Size::S32x32)` allocates from IWRAM, `.to_vram(palette)` uploads to VRAM
-- **Priority**: `Object::set_priority(Priority::P1)` for cards, `P0` for text BG = correct layering
-- **Flipping**: `Object::set_hflip(true)` + `set_vflip(true)` for 180° rotation (opponent)
-- **Transparency**: Sprite pixel 0 = transparent by default in 8bpp mode
-
-## Success Criteria
-
-- [ ] Zero `set_tile` calls for card art
-- [ ] Zero manual clear loops for 8bpp layers
-- [ ] Zero VRAM OOM on any screen transition
-- [ ] < 50 sprites/frame typical
-- [ ] Build passes, ROM runs
+- [x] Zero `set_tile` calls for card art (sprites only)
+- [x] No manual clear loops for art; absent from OAM = invisible
+- [x] No VRAM OOM on transitions (evict + try_to_vram + cap)
+- [x] < 60 objects/frame typical (limit 128)
+- [x] `cargo check` + release ROM build pass
