@@ -32,10 +32,6 @@ impl Input {
     pub fn just_pressed(&self, btn: Button) -> bool {
         self.ctrl.is_just_pressed(to_gba(btn))
     }
-
-    pub fn held(&self, btn: Button) -> bool {
-        self.ctrl.is_pressed(to_gba(btn))
-    }
 }
 
 fn to_gba(btn: Button) -> GbaButton {

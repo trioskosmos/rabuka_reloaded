@@ -466,7 +466,26 @@ pub fn handle_choice(ui: &mut dyn PlatformUi, gs: &mut GameState) -> bool {
                 TurnEngine::resume_with_choice(gs, Some(0), None).ok();
                 return true;
             }
-            let sel = menu_select(ui, &items, &description, false).unwrap_or(0);
+            // Card numbers for the focused-row art preview (same index space
+            // as `items`; rows without a resolvable card show text only).
+            let card_nos: Vec<String> = options
+                .iter()
+                .map(|o| {
+                    o.card_id
+                        .and_then(|cid| gs.card_database.get_card(cid))
+                        .map(|c| c.card_no.to_string())
+                        .unwrap_or_default()
+                })
+                .collect();
+            let sel = menu_select_with_cards(
+                ui,
+                &items,
+                &description,
+                false,
+                Some(&card_nos),
+                None,
+            )
+            .unwrap_or(0);
             TurnEngine::resume_with_choice(gs, Some(sel as i16), None).ok();
             true
         }
@@ -684,6 +703,7 @@ if count <= 1 {
         Choice::SelectLiveSuccess {
             options,
             description,
+            player_id,
             ..
         } => {
             let items: Vec<String> = options.iter().map(|o| o.card_name.clone()).collect();
@@ -691,7 +711,35 @@ if count <= 1 {
                 TurnEngine::resume_with_choice(gs, None, Some(Vec::new())).ok();
                 return true;
             }
-            let sel = menu_select(ui, &items, &description, false).unwrap_or(0);
+            // Card numbers for the focused-row art preview. Options were
+            // built in live-zone order (see try_take_success_zone_choice),
+            // so index back into the deciding player's live zone.
+            let zone: &[i16] = if player_id == gs.player1.id {
+                &gs.player1.live_card_zone.cards
+            } else if player_id == gs.player2.id {
+                &gs.player2.live_card_zone.cards
+            } else {
+                &[]
+            };
+            let card_nos: Vec<String> = options
+                .iter()
+                .enumerate()
+                .map(|(i, _)| {
+                    zone.get(i)
+                        .and_then(|cid| gs.card_database.get_card(*cid))
+                        .map(|c| c.card_no.to_string())
+                        .unwrap_or_default()
+                })
+                .collect();
+            let sel = menu_select_with_cards(
+                ui,
+                &items,
+                &description,
+                false,
+                Some(&card_nos),
+                None,
+            )
+            .unwrap_or(0);
             TurnEngine::resume_with_choice(gs, None, Some(vec![sel])).ok();
             true
         }

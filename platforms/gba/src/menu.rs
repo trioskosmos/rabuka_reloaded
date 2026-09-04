@@ -22,7 +22,7 @@ use alloc::format;
 use alloc::string::String;
 use alloc::vec::Vec;
 
-use rabuka_engine::game::platform_ui::{card_ability_text, card_stat_text, wrap_text};
+use rabuka_engine::game::platform_ui::{card_ability_text, card_stat_text};
 use rabuka_engine::game_state::GameState;
 
 use crate::display::Display;
@@ -31,8 +31,11 @@ use crate::input::Button;
 use crate::ui::CARD_ART;
 
 /// Detail pane width: the portrait takes the left 12 tile columns, text
-/// starts at column 13, so 30 - 13 = 17 columns. Engine wrap keeps
-/// `{{icon}}` tokens whole so they render inline.
+/// starts at column 13, so 30 - 13 = 17 tiles. Wrapped with
+/// [`Display::wrap_pane`] (exact icon/glyph tile widths), NOT the engine
+/// `wrap_text` — the engine estimates `{{icon}}` tokens by bracket-label
+/// width (e.g. `heart_00` = 8) while the GBA draws the 2-tile baked icon,
+/// which used to shatter every stat line onto its own newline.
 const PANE_COLS: usize = 17;
 
 /// Paginated detail screen over caller-composed parts: `art_card_no` art on
@@ -53,12 +56,9 @@ pub fn show_detail_screen<I: InputSource>(
         if h.trim().is_empty() {
             continue;
         }
-        lines.extend(wrap_text(h, PANE_COLS));
+        lines.extend(Display::wrap_pane(h, PANE_COLS));
     }
-    if !lines.is_empty() && !body.trim().is_empty() {
-        lines.push(String::new());
-    }
-    lines.extend(wrap_text(body, PANE_COLS));
+    lines.extend(Display::wrap_pane(body, PANE_COLS));
     // Fresh pool for the portrait + text: the previous screen's dead tiles
     // would otherwise pile onto this screen's demand (see reset_vram).
     display.reset_vram();

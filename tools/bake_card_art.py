@@ -136,8 +136,9 @@ def palette_bytes_16(pal, n=16):
 
 def bake_ui_tiles():
     """Shared board UI tiles (bank-15 palette): single solid gray empty slot,
-    gold badge, focus marker. Single tile repeated for all empty zones is
-    VRAM-cheap (tonc `char block` advice: deduplicate)."""
+    gold badge, focus marker, solid gold, transparent clear, edge badge.
+    Single tile repeated for all empty zones is VRAM-cheap (tonc `char
+    block` advice: deduplicate)."""
 
     tiles = []
 
@@ -169,12 +170,25 @@ def bake_ui_tiles():
     # and the front text/badges (P0).
     tiles.append([0] * 64)
 
+    # Edge badge: gold diamond nudged ~3px right of centre. Badge tiles sit
+    # on 8px boundaries but card art's visible border ends mid-tile, so the
+    # centred diamond either floats over padding (tile x+4) or sits too far
+    # left (tile x+3). This lands between: placed at x+3 it straddles the
+    # visible edge without coming off.
+    edge = [[0] * 8 for _ in range(8)]
+    for y in range(8):
+        d = abs(y - 3.5)
+        for x in range(8):
+            if abs(x - 6.5) + d <= 3:
+                edge[y][x] = 4
+    tiles.append([edge[y][x] for y in range(8) for x in range(8)])
+
     flat = bytearray()
     for t in tiles:
         for rr in range(TILE):
             for cc in range(0, TILE, 2):
                 flat.append(t[rr * TILE + cc] | (t[rr * TILE + cc + 1] << 4))
-    return bytes(flat)  # 4 tiles x 32 bytes
+    return bytes(flat)  # 6 tiles x 32 bytes
 
 
 def darkest_index(pal):
@@ -293,6 +307,18 @@ def bake_with_palette(img, w, h, palette_q, grid=None, dither=Image.Dither.FLOYD
     return pack_8bpp_tiles(px, gw * TILE, gh * TILE, gw, gh)
 
 
+def maybe_upright(img):
+    """Live-card art is landscape; rotate 90° CCW so it fills portrait boxes
+    (hand 24x32, stage 40x48, detail 96x144) instead of letterboxing
+    unreadably small — mirroring the 3DS portrait-box path ("rotate 90° CW
+    (other way from the board's waited cards)": C2D -90° == PIL +90°).
+    Portrait and square sources pass through untouched. The waited bake
+    keeps its own -90° (== 3DS waited +90°). Returns (img, rotated)."""
+    if img.width > img.height:
+        return img.rotate(90, expand=True), True
+    return img, False
+
+
 def bake_front_sized_with_master(img, w, h, palette_q, grid=None):
     """Hand/Stage front: no sharpen, Floyd-Steinberg dither."""
     return bake_with_palette(img, w, h, palette_q, grid, dither=Image.Dither.FLOYDSTEINBERG, sharpen=False)
@@ -329,9 +355,10 @@ def bake_waited_sized_with_master(img, w, h, palette_q, grid=None):
 
 def bake_detail(img, palette_q, palette_bytes):
     """Resize + quantize one card image to the 96x144 8bpp detail view.
-    object-fit: contain — the whole card fits, padded with black (index 0),
-    so nothing is cropped. Landscape cards get side bars instead of being
-    squashed or trimmed."""
+    object-fit: contain — the whole card fits, so nothing is cropped.
+    Landscape (live-card) sources are rotated 90° CW first so they fill the
+    portrait instead of letterboxing with side bars."""
+    img, _ = maybe_upright(img)
     iw, ih = img.size
     scale = min(ART_W / iw, ART_H / ih)
     nw, nh = max(1, int(iw * scale)), max(1, int(ih * scale))
@@ -387,7 +414,8 @@ def write_gen(entries, fronts, stage_fronts, live_fronts, waited_fronts, back_fr
         f.write("// Detail: 8bpp per-card 240-colour palette.\n")
         f.write("// BOARD_UI: shared bank-15 board tiles (4bpp): 0 empty fill,\n")
         f.write("// 1 gold actionable badge, 2 white focus marker, 3 solid gold,\n")
-        f.write("// 4 fully transparent (front-BG clear).\n\n")
+        f.write("// 4 fully transparent (front-BG clear), 5 edge badge (diamond\n")
+        f.write("// nudged right for card-edge placement one tile left of grid).\n\n")
         f.write("pub static MASTER_PAL: [u8; 480] = [\n")
         for i in range(0, len(master_pal_bytes), 24):
             f.write("    " + ", ".join(str(b) for b in master_pal_bytes[i:i + 24]) + ",\n")
@@ -497,14 +525,20 @@ def main():
             missing.append(card_no)
             continue
         img = webp_cache[card_no]
+        # Landscape (live-card) art is rotated 90° CW for the portrait boxes
+        # (hand, stage, detail) so it fills them; the live-zone mini and the
+        # waited bake keep the original orientation.
+        up, rotated = maybe_upright(img)
+        if rotated:
+            print(f"  upright: {card_no}")
         entries.append(
             (card_no,)
             + bake_detail(img, master_q, master_pal)
             + (
                 # Hand minis use the small-size recipe (sharpen + ordered
                 # dither) like the other small assets, not the stage recipe.
-                bake_live_sized_with_master(img, FRONT_W, FRONT_H, master_q, FRONT_GRID),
-                bake_front_sized_with_master(img, STAGE_W, STAGE_H, master_q, STAGE_GRID),
+                bake_live_sized_with_master(up, FRONT_W, FRONT_H, master_q, FRONT_GRID),
+                bake_front_sized_with_master(up, STAGE_W, STAGE_H, master_q, STAGE_GRID),
                 bake_live_sized_with_master(img, LIVE_W, LIVE_H, master_q, LIVE_GRID),
                 bake_waited_sized_with_master(img, WAIT_W, WAIT_H, master_q, WAIT_GRID),
             )

@@ -11,7 +11,6 @@ use alloc::format;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
-use rabuka_engine::card::HeartColor;
 use rabuka_engine::core::constants::{EMPTY_SLOT, STAGE_SIZE};
 use rabuka_engine::game_state::{GameState, Phase};
 
@@ -323,68 +322,11 @@ impl Board {
             Focus::OppStage => p2_stage[self.opp_stage_cursor].card_no.clone(),
         };
 
-        // --- GBA texticon helpers (mirrors 3DS ui/text.rs) ---
-        let heart_idx = |c: &HeartColor| match c {
-            HeartColor::BAll | HeartColor::Draw | HeartColor::Score => None,
-            _ => Some(c.index()),
-        };
-        let hearts_icon = |player: &rabuka_engine::player::Player| {
-            let mut counts = [0u32; 8];
-            for &cid in &player.stage.stage {
-                if cid == EMPTY_SLOT { continue; }
-                if let Some(card) = gs.card_database.get_card(cid) {
-                    if let Some(ref bh) = card.base_heart {
-                        let mult = gs.mods.heart_color_multiplier.get(&cid).copied();
-                        for (col, cnt) in &bh.hearts {
-                            if let Some(idx) = heart_idx(col) {
-                                if let Some(hc) = mult { if hc != *col { continue; } }
-                                counts[idx] += *cnt as u32;
-                            }
-                        }
-                    }
-                }
-            }
-            for (cid, mp) in &gs.mods.heart_modifiers {
-                if !player.stage.stage.contains(cid) { continue; }
-                for (col, val) in mp {
-                    if let Some(idx) = heart_idx(col) {
-                        counts[idx] = (counts[idx] as i32 + val.total()).max(0) as u32;
-                    }
-                }
-            }
-            let mut parts: Vec<String> = Vec::new();
-            for (i, &cnt) in counts.iter().enumerate() {
-                if cnt > 0 {
-                    let name = match i {
-                        0 => "heart_00", 1 => "heart_01", 2 => "heart_02",
-                        3 => "heart_03", 4 => "heart_04", 5 => "heart_05",
-                        6 => "heart_06", _ => "icon_all",
-                    };
-                    parts.push(format!("{{{{{}.png|{}}}}}{}", name, name, cnt));
-                }
-            }
-            if parts.is_empty() { String::new() } else { parts.join(" ") }
-        };
-        let blade_total = |player: &rabuka_engine::player::Player| {
-            let mut total: i32 = 0;
-            for &cid in &player.stage.stage {
-                if cid == EMPTY_SLOT { continue; }
-                if let Some(card) = gs.card_database.get_card(cid) {
-                    let is_wait = gs.mods.orientation_modifiers.get(&cid).map(|o| o.as_str()=="wait").unwrap_or(false);
-                    if is_wait { continue; }
-                    let bm = gs.mods.blade_modifiers.get(&cid).map(|m| m.total()).unwrap_or(0);
-                    total += (card.blade as i32 + bm).max(0);
-                }
-            }
-            total
-        };
-        let p2_hearts = hearts_icon(you);
-        let p1_hearts = hearts_icon(me);
-        let p2_blade = blade_total(you);
-        let p1_blade = blade_total(me);
-        let p2_hb = if p2_hearts.is_empty() && p2_blade==0 { String::new() } else if p2_hearts.is_empty() { format!("{{{{icon_blade.png|BLADE}}}}{}", p2_blade) } else if p2_blade==0 { p2_hearts.clone() } else { format!("{} {{{{icon_blade.png|BLADE}}}}{}", p2_hearts, p2_blade) };
-        let p1_hb = if p1_hearts.is_empty() && p1_blade==0 { String::new() } else if p1_hearts.is_empty() { format!("{{{{icon_blade.png|BLADE}}}}{}", p1_blade) } else if p1_blade==0 { p1_hearts.clone() } else { format!("{} {{{{icon_blade.png|BLADE}}}}{}", p1_hearts, p1_blade) };
-
+        // NOTE: p1_info/p2_info hearts+blade summaries used to be computed
+        // here every frame, but no renderer reads them (the board bar shows
+        // the action line; overlay builds its own stats). Deleted to save
+        // per-frame iteration + String churn — see git history if the text
+        // panes ever need them back.
         BoardFrame {
             header: format!(
                 "T{} {:?} {}",
@@ -394,28 +336,10 @@ impl Board {
             ),
             action_count: format!("{}/{}", action_index + 1, action_total),
             action_line: action_line.to_string(),
-            p2_info: [
-                format!(
-                    "H{} {{{{icon_energy.png|E}}}}{}/{}",
-                    you.hand.cards.len(),
-                    you.energy_zone.active_count(),
-                    you.energy_zone.cards.len()
-                ),
-                if p2_hb.is_empty() {
-                    format!("D{} W{} S{}", you.main_deck.cards.len(), you.waitroom.cards.len(), you.success_live_card_zone.cards.len())
-                } else { p2_hb },
-            ],
-            p1_info: [
-                format!(
-                    "H{} {{{{icon_energy.png|E}}}}{}/{}",
-                    me.hand.cards.len(),
-                    me.energy_zone.active_count(),
-                    me.energy_zone.cards.len()
-                ),
-                if p1_hb.is_empty() {
-                    format!("D{} W{} S{}", me.main_deck.cards.len(), me.waitroom.cards.len(), me.success_live_card_zone.cards.len())
-                } else { p1_hb },
-            ],
+            // Unread by any renderer (see note above): kept as empty fields
+            // for BoardFrame shape compatibility.
+            p2_info: [String::new(), String::new()],
+            p1_info: [String::new(), String::new()],
             p2_stage: [p2_stage[0].clone(), p2_stage[1].clone(), p2_stage[2].clone()],
             p1_stage: [p1_stage[0].clone(), p1_stage[1].clone(), p1_stage[2].clone()],
             p2_live: [

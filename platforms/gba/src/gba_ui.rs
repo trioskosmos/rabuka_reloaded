@@ -3,8 +3,10 @@
 //!
 //! - **Board view** (default): graphical board with card fronts, actionable
 //!   badges and a bottom bar showing the selected action. Up/Down/A drive the
-//!   engine's action list; Left/Right scroll the hand cursor; R pops the art
-//!   detail of the cursored hand card.
+//!   engine's action list; Left/Right move the cursor; B cycles the zone
+//!   focus (Hand -> Own Stage -> Opp Stage); L opens the engine action
+//!   detail (full text + acting card); R pops the art detail of the
+//!   focused card.
 //! - **Actions view**: full-screen action list (Select or B returns). Input
 //!   stays with the engine so Up/Down/A/L/R work exactly like the text ports.
 
@@ -79,8 +81,10 @@ impl<'u, 'd, I: InputSource> GbaUi<'u, 'd, I> {
             return false;
         }
 
-        // L cycles board focus: Hand -> Own Stage -> Opp Stage
-        if self.input.just_pressed(Button::L) {
+        // B cycles board focus (board view only): Hand -> Own Stage -> Opp
+        // Stage. B is free here — the engine's action list ignores it and
+        // every other view already owns it (back/close/cancel).
+        if self.input.just_pressed(Button::B) {
             self.board.cycle_focus();
             let frame = self.board.build(
                 gs,
@@ -103,7 +107,9 @@ impl<'u, 'd, I: InputSource> GbaUi<'u, 'd, I> {
             false
         };
 
-        // R pops detail of focused card (hand or stage); L already handled.
+        // R pops detail of the focused card (hand or stage). L is
+        // deliberately NOT consumed: it falls through to the engine, whose
+        // action detail (full text + acting card) owns L.
         if self.input.just_pressed(Button::R) && !scrolled {
             let frame = self.board.build(
                 gs,

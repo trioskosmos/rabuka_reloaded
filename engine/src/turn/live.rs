@@ -1234,6 +1234,14 @@ impl super::TurnEngine {
             description_ja: Some("ライブエリアからサクセスゾーンに送るカードを選択".to_string()),
         };
         game_state.ability_queue.pause_for_choice(choice);
+        // Explicit decider stamp (mirrors try_create_success_replacement_choice
+        // below): the pause default would attribute this to whatever ability
+        // entry happens to be current — possibly the other player's — and the
+        // match router would then prompt the wrong side (e.g. the AI's live
+        // pick landing on the human's screen).
+        if let Some(entry) = game_state.ability_queue.current_entry_mut() {
+            entry.choice_player_id = Some(player_id.to_string());
+        }
         true
     }
 
