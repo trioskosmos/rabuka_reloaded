@@ -9,9 +9,11 @@ extern crate alloc;
 
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
+use alloc::format;
+use alloc::vec;
 
 use rabuka_engine::card::CardType;
-use rabuka_engine::core::card_binary::{decode_all_cards_from_slice, CARD_BLOB};
+use rabuka_engine::core::card_binary::{decode_card_from_blob, blob_card_count};
 use rabuka_engine::game::sav::{encode_sav, SavDeck};
 
 use crate::display::Display;
@@ -36,7 +38,7 @@ const RECENT_PICKS: usize = 8;
 const MAX_COPIES: u8 = 4;
 
 /// Legality check result.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 enum Legality {
     Legal,
     WrongMemberCount { current: usize },
@@ -48,9 +50,9 @@ impl Legality {
     fn message(&self) -> &'static str {
         match self {
             Legality::Legal => "Legal",
-            Legality::WrongMemberCount { current } => "Member cards: need exactly 48",
-            Legality::WrongLiveCount { current } => "Live cards: need exactly 12",
-            Legality::TooManyCopies { card_no, count } => "Max 4 copies per card base",
+            Legality::WrongMemberCount { current: _ } => "Member cards: need exactly 48",
+            Legality::WrongLiveCount { current: _ } => "Live cards: need exactly 12",
+            Legality::TooManyCopies { card_no: _, count: _ } => "Max 4 copies per card base",
         }
     }
 
@@ -91,7 +93,7 @@ fn check_legality(cards: &[(String, u8)], all_cards: &[CardEntry]) -> Legality {
     // Aggregate copies by base card number
     let mut base_counts: alloc::collections::BTreeMap<String, u8> = alloc::collections::BTreeMap::new();
     for (no, qty) in cards {
-        let base = Self::extract_base_card_no(no);
+        let base = extract_base_card_no(no);
         *base_counts.entry(base).or_insert(0) += *qty;
     }
     for (base, total) in base_counts {
@@ -119,7 +121,7 @@ fn suggest_fixes(legality: &Legality, cards: &[(String, u8)], all_cards: &[CardE
     match legality {
         Legality::WrongMemberCount { current } => {
             // Need more/fewer member cards - suggest member cards from filtered list
-            let diff = (REQUIRED_MEMBER_CARDS as isize - current as isize).abs() as usize;
+            let diff = (REQUIRED_MEMBER_CARDS as isize - *current as isize).abs() as usize;
             filtered_cards.iter()
                 .filter_map(|no| all_cards.iter().find(|c| c.card_no == *no))
                 .filter(|c| c.card_type == CardType::Member)
@@ -129,7 +131,7 @@ fn suggest_fixes(legality: &Legality, cards: &[(String, u8)], all_cards: &[CardE
         }
         Legality::WrongLiveCount { current } => {
             // Need more/fewer live cards - suggest live cards from filtered list
-            let diff = (REQUIRED_LIVE_CARDS as isize - current as isize).abs() as usize;
+            let diff = (REQUIRED_LIVE_CARDS as isize - *current as isize).abs() as usize;
             filtered_cards.iter()
                 .filter_map(|no| all_cards.iter().find(|c| c.card_no == *no))
                 .filter(|c| c.card_type == CardType::Live)
@@ -228,7 +230,7 @@ impl<'a, 'd, I: InputSource> DeckBuilder<'a, 'd, I> {
             all_cards,
             deck_name: String::new(),
             cards: Vec::new(),
-            legality: Legality::TooFewCards { current: 0 },
+            legality: Legality::WrongMemberCount { current: 0 },
             suggestions: Vec::new(),
             field: Field::DeckName,
             series_idx: 0,
@@ -247,17 +249,19 @@ impl<'a, 'd, I: InputSource> DeckBuilder<'a, 'd, I> {
 
     /// Load all non-energy cards from the ROM blob.
     fn load_all_cards() -> Vec<CardEntry> {
-        let cards = decode_all_cards_from_slice(CARD_BLOB);
+        let count = blob_card_count();
         let mut entries = Vec::new();
-        for card in cards {
-            if card.card_type != CardType::Energy {
-                entries.push(CardEntry {
-                    card_no: card.card_no.to_string(),
-                    name: card.name.to_string(),
-                    series: card.series.to_string(),
-                    group: card.group.to_string(),
-                    card_type: card.card_type,
-                });
+        for idx in 0..count {
+            if let Some(card) = decode_card_from_blob(idx) {
+                if card.card_type != CardType::Energy {
+                    entries.push(CardEntry {
+                        card_no: card.card_no.to_string(),
+                        name: card.name.to_string(),
+                        series: card.series.to_string(),
+                        group: card.group.to_string(),
+                        card_type: card.card_type,
+                    });
+                }
             }
         }
         entries
@@ -408,10 +412,10 @@ impl<'a, 'd, I: InputSource> DeckBuilder<'a, 'd, I> {
     /// Add a card to the deck.
     fn add_card(&mut self, card_no: String, qty: u8) {
         // Check total copies across all rarities of same base card (Rule 6.1.1.2)
-        let base_no = Self::extract_base_card_no(&card_no);
+        let base_no = extract_base_card_no(&card_no);
         let mut total_copies = 0;
         for (existing_no, existing_qty) in &self.cards {
-            if Self::extract_base_card_no(existing_no) == base_no {
+            if extract_base_card_no(existing_no) == base_no {
                 total_copies += *existing_qty;
             }
         }
@@ -442,22 +446,7 @@ impl<'a, 'd, I: InputSource> DeckBuilder<'a, 'd, I> {
             self.legality = check_legality(&self.cards, &self.all_cards);
             self.update_suggestions();
         }
-    }
-
-    /// Extract base card number (without rarity suffix) for cross-rarity copy checking.
-    /// e.g., "PL!-BP1-001-R" -> "PL!-BP1-001"
-    fn extract_base_card_no(card_no: &str) -> String {
-        // Find the last dash that separates base from rarity
-        if let Some(last_dash) = card_no.rfind('-') {
-            // Check if suffix is a known rarity
-            let suffix = &card_no[last_dash + 1..];
-            let known_rarities = ["N", "N＋", "R", "R＋", "SR", "SR＋", "SEC", "P", "P＋", "PR", "PR＋", "L", "PE＋", "SECL", "SRE", "SD", "SD2"];
-            if known_rarities.contains(&suffix) {
-                return card_no[..last_dash].to_string();
-            }
-        }
-        card_no.to_string()
-    }
+}
 
     fn update_recent(&mut self, card_no: String, qty: u8) {
         // Remove if already in recent
@@ -591,8 +580,8 @@ impl<'a, 'd, I: InputSource> DeckBuilder<'a, 'd, I> {
         } else if self.input.just_pressed(Button::L) || self.input.just_pressed(Button::R) {
             // Show detail for current card (if any selected)
             if !self.filtered_cards.is_empty() {
-                let card_no = &self.filtered_cards[self.card_idx];
-                self.show_card_detail(card_no);
+                let card_no = self.filtered_cards[self.card_idx].clone();
+                self.show_card_detail(&card_no);
             }
         } else if self.input.just_pressed(Button::Select) {
             // Open zone grid (not available without GameState, skip for now)
@@ -646,7 +635,7 @@ impl<'a, 'd, I: InputSource> DeckBuilder<'a, 'd, I> {
         } else if self.input.just_pressed(Button::L) || self.input.just_pressed(Button::R) {
             if !self.filtered_cards.is_empty() {
                 let card_no = self.filtered_cards[self.card_idx].clone();
-                show_card_detail(self.display, self.input, card_no);
+                self.show_card_detail(&card_no);
             }
         } else if self.input.just_pressed(Button::Select) {
         } else if self.input.just_pressed(Button::Start) {
@@ -802,6 +791,21 @@ impl<'a, 'd, I: InputSource> DeckBuilder<'a, 'd, I> {
 
         self.display.swap_buffers();
     }
+}
+
+/// Extract base card number (without rarity suffix) for cross-rarity copy checking.
+/// e.g., "PL!-BP1-001-R" -> "PL!-BP1-001"
+fn extract_base_card_no(card_no: &str) -> String {
+    // Find the last dash that separates base from rarity
+    if let Some(last_dash) = card_no.rfind('-') {
+        // Check if suffix is a known rarity
+        let suffix = &card_no[last_dash + 1..];
+        let known_rarities = ["N", "N＋", "R", "R＋", "SR", "SR＋", "SEC", "P", "P＋", "PR", "PR＋", "L", "PE＋", "SECL", "SRE", "SD", "SD2"];
+        if known_rarities.contains(&suffix) {
+            return card_no[..last_dash].to_string();
+        }
+    }
+    card_no.to_string()
 }
 
 /// Entry point called from main.

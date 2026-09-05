@@ -282,7 +282,7 @@ fn main(mut gba: agb::Gba) -> ! {
         };
 
         // Shared engine match loop (no platform copy).
-        platform_ui::run_match(&mut ui, p1_cards, p2_cards, all_cards, mode);
+        platform_ui::run_match(&mut ui, &p1_cards, &p2_cards, all_cards, mode);
 
         let _ = Screen::Result;
     }

@@ -19,9 +19,9 @@
 extern crate alloc;
 
 use alloc::string::String;
+use alloc::string::ToString;
 use alloc::vec::Vec;
 
-use rabuka_engine::card::Card;
 use rabuka_engine::card::Card;
 use rabuka_engine::game::platform_ui::{card_ability_text, card_detail_title, card_stat_text};
 use rabuka_engine::game_state::GameState;
@@ -43,22 +43,21 @@ pub fn show_card_detail_with_lookup<I: InputSource, F: Fn(&str) -> Option<&Card>
             card_detail_title(card),
             card_stat_text(card),
         ];
-        show_detail_screen_with_lookup(display, input, Some(card_no), &header, &card_ability_text(card));
+        show_detail_screen_simple(display, input, Some(card_no), &header, &card_ability_text(card));
     } else {
-        show_detail_screen_with_lookup(display, input, None, &[card_no.to_string()], "");
+        show_detail_screen_simple(display, input, None, &[card_no.to_string()], "");
     }
 }
 
-/// Paginated detail screen with custom card lookup for art.
-pub fn show_detail_screen_with_lookup<I: InputSource, F: Fn(&str) -> Option<&Card>>(
+/// Paginated detail screen without GameState (for deck builder).
+pub fn show_detail_screen_simple<I: InputSource>(
     display: &mut Display,
     input: &mut I,
-    art_card_no: Option<&str>,
+    _art_card_no: Option<&str>,
     header: &[String],
     body: &str,
 ) {
-    // We can't use CARD_ART directly without GameState, so we skip art for now
-    // TODO: Add art lookup from card_binary if needed
+    // No art lookup without GameState
     let art: Option<&crate::card_art_gen::CardArt> = None;
     let mut lines: Vec<String> = Vec::new();
     for h in header {

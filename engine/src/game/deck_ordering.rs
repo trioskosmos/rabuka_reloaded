@@ -3,6 +3,14 @@
 //! Single source of truth for Series/Rarity ordering and optimal card sorting.
 //! Used by both GBA deck_builder.rs and web_ui card_browser.html export.
 
+#[cfg(feature = "no_std")]
+extern crate alloc;
+
+#[cfg(feature = "no_std")]
+use alloc::string::{String, ToString};
+#[cfg(feature = "no_std")]
+use alloc::vec::Vec;
+
 /// Official series order (matches GBA builder's SERIES_LIST).
 /// Order by popularity/frequency to minimize Up/Down presses.
 pub const SERIES_ORDER: &[&str] = &[
@@ -56,12 +64,12 @@ pub fn extract_rarity(card_no: &str) -> &str {
 }
 
 /// Extract base card number without rarity (e.g., "PL!-BP1-001-R" -> "PL!-BP1-001").
-pub fn extract_base(card_no: &str) -> &str {
+pub fn extract_base(card_no: &str) -> String {
     let parts: Vec<&str> = card_no.split('-').collect();
     if parts.len() >= 2 {
-        &parts[..parts.len() - 1].join("-")
+        parts[..parts.len() - 1].join("-")
     } else {
-        card_no
+        card_no.to_string()
     }
 }
 
@@ -82,10 +90,12 @@ pub fn sort_deck_for_gba(cards: &mut [(String, u8)]) {
 pub fn flatten_and_sort_for_gba(cards: &[(String, u8)]) -> Vec<String> {
     let mut flat = Vec::new();
     for (card_no, qty) in cards {
-        flat.extend(std::iter::repeat(card_no.as_str()).take(*qty as usize));
+        for _ in 0..*qty {
+            flat.push(card_no.clone());
+        }
     }
     flat.sort_by(|a, b| gba_sort_key(a).cmp(&gba_sort_key(b)));
-    flat.into_iter().map(|s| s.to_string()).collect()
+    flat
 }
 
 #[cfg(test)]

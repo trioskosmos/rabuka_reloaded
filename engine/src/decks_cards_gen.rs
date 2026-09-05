@@ -8,29 +8,29 @@
 pub static DECK_CARD_BLOBS: &[&[u8]] = &[
     // 5CP3Z idou: 72 cards, 1426 bytes
     include_bytes!("../baked/decks/5CP3Z idou.bin"),
-    // 5ZNN5 sakkakubibi: 72 cards, 1247 bytes
+    // 5ZNN5 sakkakubibi: 72 cards, 8868 bytes
     include_bytes!("../baked/decks/5ZNN5 sakkakubibi.bin"),
-    // aiscream 37PMZ: 72 cards, 2414 bytes
+    // aiscream 37PMZ: 72 cards, 17066 bytes
     include_bytes!("../baked/decks/aiscream 37PMZ.bin"),
-    // aqours_cup: 72 cards, 1479 bytes
+    // aqours_cup: 72 cards, 26701 bytes
     include_bytes!("../baked/decks/aqours_cup.bin"),
-    // bp7_abilities_PL!N: 60 cards, 3137 bytes
+    // bp7_abilities_PL!N: 60 cards, 45580 bytes
     include_bytes!("../baked/decks/bp7_abilities_PL!N.bin"),
-    // bp7_abilities_PL!S: 60 cards, 2474 bytes
+    // bp7_abilities_PL!S: 60 cards, 32095 bytes
     include_bytes!("../baked/decks/bp7_abilities_PL!S.bin"),
-    // bp7_abilities_PL!SP: 60 cards, 2796 bytes
+    // bp7_abilities_PL!SP: 60 cards, 61397 bytes
     include_bytes!("../baked/decks/bp7_abilities_PL!SP.bin"),
-    // bp7_unique_abilities: 60 cards, 3744 bytes
+    // bp7_unique_abilities: 60 cards, 82591 bytes
     include_bytes!("../baked/decks/bp7_unique_abilities.bin"),
-    // fade deck: 60 cards, 1526 bytes
+    // fade deck: 60 cards, 81760 bytes
     include_bytes!("../baked/decks/fade deck.bin"),
-    // hasunosora_cup: 72 cards, 2121 bytes
+    // hasunosora_cup: 72 cards, 74651 bytes
     include_bytes!("../baked/decks/hasunosora_cup.bin"),
-    // liella_cup: 72 cards, 1603 bytes
+    // liella_cup: 72 cards, 87470 bytes
     include_bytes!("../baked/decks/liella_cup.bin"),
-    // muse_cup: 72 cards, 2035 bytes
+    // muse_cup: 72 cards, 89939 bytes
     include_bytes!("../baked/decks/muse_cup.bin"),
-    // nijigaku_cup: 72 cards, 1437 bytes
+    // nijigaku_cup: 72 cards, 95784 bytes
     include_bytes!("../baked/decks/nijigaku_cup.bin"),
     // slot13: 0 cards, 8 bytes
     include_bytes!("../baked/decks/slot13.bin"),

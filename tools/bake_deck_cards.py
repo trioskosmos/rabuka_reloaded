@@ -11,6 +11,11 @@ Emits engine/src/decks_cards_gen.rs:
 Each element is a CARD-format blob (header + strtab + length table + records)
 containing only that deck's unique cards, with display-only strings stripped.
 Deck index 0 = first web_ui/decks/*.txt when sorted by name.
+
+OPTIMIZATIONS:
+- Cache cards_dict and parsed deck lists (read once, use twice)
+- Reuse StringTable across decks for interning
+- Parallel blob encoding where possible
 """
 
 import json
@@ -18,6 +23,7 @@ import re
 import struct
 import sys
 from pathlib import Path
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 
 def find_repo_root() -> Path:
@@ -58,12 +64,29 @@ def normalize(raw: str) -> str:
     return "".join(out)
 
 
-def make_deck_blob(cards_dict, card_nos: list[str]) -> bytes:
-    """CARD-format blob with exactly the (deduped, normalized) deck's cards."""
-    cards_by_no = {}
-    for k, v in cards_dict.items():
-        cards_by_no.setdefault(normalize(k), v)
+def parse_deck_file(f: Path) -> list[str]:
+    """Parse a deck file into expanded card_no list."""
+    card_nos = []
+    for line in f.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        m = re.match(r"^(\d+)\s*x\s*(.+)$", line)
+        if m:
+            qty = int(m.group(1))
+            card_nos.extend([m.group(2).strip()] * qty)
+            continue
+        m = re.match(r"^(.*?)\s*x\s*(\d+)$", line)
+        if m:
+            qty = int(m.group(2))
+            card_nos.extend([m.group(1).strip()] * qty)
+            continue
+        card_nos.append(line)
+    return card_nos
 
+
+def make_deck_blob(cards_by_no: dict, card_nos: list[str], st: compile_cards.StringTable) -> bytes:
+    """CARD-format blob with exactly the (deduped, normalized) deck's cards."""
     wanted = []
     seen = set()
     for cn in card_nos:
@@ -75,8 +98,7 @@ def make_deck_blob(cards_dict, card_nos: list[str]) -> bytes:
         if card is not None:
             wanted.append((n, card))
 
-    # Build string table like compile_cards does
-    st = compile_cards.StringTable()
+    # Intern strings using shared StringTable
     for _, card in wanted:
         for f in ("card_no", "name", "series", "unit"):
             v = card.get(f)
@@ -97,33 +119,41 @@ def make_deck_blob(cards_dict, card_nos: list[str]) -> bytes:
 
 
 def main() -> None:
-    cards_dict = json.loads((REPO / "cards" / "cards.json").read_text(encoding="utf-8"))
+    # Load cards.json ONCE
+    cards_json = (REPO / "cards" / "cards.json").read_text(encoding="utf-8")
+    cards_dict = json.loads(cards_json)
+    
+    # Normalize keys once
+    cards_by_no = {}
+    for k, v in cards_dict.items():
+        cards_by_no.setdefault(normalize(k), v)
+    
+    # Parse ALL deck files ONCE
     deck_files = sorted((REPO / "web_ui" / "decks").glob("*.txt"))
     print(f"{len(deck_files)} deck files")
-
-    blobs = []
+    
+    deck_data = []
     for f in deck_files:
-        card_nos = []
-        for line in f.read_text(encoding="utf-8").splitlines():
-            line = line.strip()
-            if not line:
-                continue
-            # Three formats are valid: bare card_no, "card x count",
-            # and "count x card". Expand quantities.
-            m = re.match(r"^(\d+)\s*x\s*(.+)$", line)
-            if m:
-                qty = int(m.group(1))
-                card_nos.extend([m.group(2).strip()] * qty)
-                continue
-            m = re.match(r"^(.*?)\s*x\s*(\d+)$", line)
-            if m:
-                qty = int(m.group(2))
-                card_nos.extend([m.group(1).strip()] * qty)
-                continue
-            card_nos.append(line)
-        blob = make_deck_blob(cards_dict, card_nos)
-        blobs.append((f.stem, len(card_nos), blob))
-        print(f"  {f.stem:24s} {len(card_nos):4d} cards -> {len(blob):6d} bytes blob")
+        card_nos = parse_deck_file(f)
+        deck_data.append((f.stem, card_nos))
+        print(f"  {f.stem:24s} {len(card_nos):4d} cards")
+
+    # Shared StringTable for all decks (faster interning)
+    shared_st = compile_cards.StringTable()
+
+    # Build blobs in parallel
+    blobs = []
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        futures = {executor.submit(make_deck_blob, cards_by_no, card_nos, shared_st): (name, card_nos) 
+                   for name, card_nos in deck_data}
+        for fut in as_completed(futures):
+            name, card_nos = futures[fut]
+            blob = fut.result()
+            blobs.append((name, len(card_nos), blob))
+            print(f"  {name:24s} {len(card_nos):4d} cards -> {len(blob):6d} bytes blob")
+
+    # Sort by name to maintain consistent order
+    blobs.sort(key=lambda x: x[0])
 
     # Keep the 16-slot layout the PSP used; pad the rest empty.
     while len(blobs) < 16:
@@ -167,8 +197,6 @@ def main() -> None:
     # corresponds to blob i. Generating these HERE (not elsewhere) is what
     # prevents the menu list and the baked data from drifting apart — that
     # drift caused "AI player has an empty deck" on every console port.
-    real_decks = [(name, count, blob) for name, count, blob in blobs
-                  if not name.startswith("slot")]
     template = """// Auto-generated by tools/bake_deck_cards.py -- do not edit.
 // Deck index order is ALIGNED with engine/src/decks_cards_gen.rs
 // (both come from web_ui/decks/*.txt sorted by filename).
@@ -183,27 +211,11 @@ pub const DECKS: &[DeckInfo] = &[
 ];
 """
     entries = []
-    for f in deck_files:
-        card_nos = []
-        for line in f.read_text(encoding="utf-8").splitlines():
-            line = line.strip()
-            if not line:
-                continue
-            m = re.match(r"^(\d+)\s*x\s*(.+)$", line)
-            if m:
-                qty = int(m.group(1))
-                card_nos.extend([m.group(2).strip()] * qty)
-                continue
-            m = re.match(r"^(.*?)\s*x\s*(\d+)$", line)
-            if m:
-                qty = int(m.group(2))
-                card_nos.extend([m.group(1).strip()] * qty)
-                continue
-            card_nos.append(line)
+    for name, card_nos in deck_data:
         cards_js = ",\n            ".join(f'"{c}"' for c in card_nos)
         entries.append(
             "    DeckInfo {\n"
-            f'        name: "{f.stem}",\n'
+            f'        name: "{name}",\n'
             "        cards: &[\n            "
             + cards_js
             + ",\n        ],\n    },"

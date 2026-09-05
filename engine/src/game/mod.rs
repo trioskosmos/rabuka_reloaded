@@ -1,4 +1,5 @@
 pub mod deck_builder;
+pub mod deck_ordering;
 pub mod deck_parser;
 pub mod display;
 pub mod game_setup;
