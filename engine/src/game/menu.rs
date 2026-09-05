@@ -213,12 +213,15 @@ pub fn menu_select(
 }
 
 /// Select from a list of string items with optional card images.
-/// Returns the selected index. If `card_nos` is provided, draws the focused
-/// row's card image using `ui.draw_card_image`. `dimmed` (1:1 with `items`,
-/// skip row excluded) marks unpickable rows: shown dimmed and A on them is
-/// ignored.
+/// Returns the selected index. `card_nos` (1:1 with `items`, `""` when a
+/// row has no card) backs the R shortcut: the focused card opens in the
+/// port's art detail viewer ([`PlatformUi::show_card_detail`], text fallback
+/// on text ports), like the 3DS list + detail split. `dimmed` (1:1 with
+/// `items`, skip row excluded) marks unpickable rows: shown dimmed (and
+/// `" --"` suffixed on text ports) and A on them is ignored.
 pub fn menu_select_with_cards(
     ui: &mut dyn PlatformUi,
+    gs: &GameState,
     items: &[String],
     title: &str,
     allow_skip: bool,
@@ -242,11 +245,17 @@ pub fn menu_select_with_cards(
         .map(|item| one_line(&format!("   {item}"), cols))
         .collect();
     let card_nos = card_nos.unwrap_or(&[]);
-    let has_images = !card_nos.is_empty();
     let is_dimmed = |n: usize| -> bool { dimmed.and_then(|d| d.get(n).copied()).unwrap_or(false) };
-    let _img_cols = 3; // 3 tiles wide = 24px
-    let _img_rows = 4; // 4 tiles tall = 32px
-    let _img_x = 26; // Right side of screen (30 - 3 - 1)
+    // Focused-row art lives in the graphical detail viewer (R), like the
+    // 3DS list + detail split — queuing thumbnails here would trample the
+    // full-width text rows on single-screen ports.
+    let row_card = |n: usize| -> &str {
+        if n < card_nos.len() {
+            &card_nos[n]
+        } else {
+            ""
+        }
+    };
     loop {
         if sel < scroll {
             scroll = sel;
@@ -268,18 +277,6 @@ pub fn menu_select_with_cards(
             }
             ui.println(&buf);
         }
-        // Focused-row card preview (3DS-style): a single stage-size image
-        // for the highlighted option. Drawing every row would stack
-        // overlapping images (6 tall on a 2 pitch) and punch holes through
-        // the list. Bit flags: 1 = cursor, 2 = dimmed.
-        if has_images && sel >= scroll && sel < end && sel < card_nos.len() {
-            let img_y = 2 + (sel - scroll) as i32 * 2; // 2 tile rows per line, plus header
-            let mut flag = 1usize;
-            if is_dimmed(sel) {
-                flag |= 2;
-            }
-            ui.draw_card_image(&card_nos[sel], 24, img_y, 5, 6, flag);
-        }
         if all_items.len() > end {
             ui.println(&format!("  .. {} more", all_items.len() - end));
         }
@@ -289,8 +286,17 @@ pub fn menu_select_with_cards(
             sel = if sel == 0 { all_items.len() - 1 } else { sel - 1 };
         } else if ui.just_pressed_down() {
             sel = if sel + 1 == all_items.len() { 0 } else { sel + 1 };
-        } else if ui.just_pressed_l() || ui.just_pressed_r() {
+        } else if ui.just_pressed_l() {
             show_detail(ui, all_items[sel]);
+        } else if ui.just_pressed_r() {
+            // Art detail for card rows (graphical ports show art + stats;
+            // text ports fall back to the same text viewer as L).
+            let no = row_card(sel);
+            if !no.is_empty() {
+                ui.show_card_detail(gs, no);
+            } else {
+                show_detail(ui, all_items[sel]);
+            }
         } else if ui.just_pressed_a() || ui.just_pressed_start() {
             if Some(sel) == skip_idx {
                 return None;
@@ -301,6 +307,118 @@ pub fn menu_select_with_cards(
             } else {
                 return Some(sel);
             }
+        }
+        ui.wait_vblank();
+    }
+}
+
+/// Select from options with full multi-line body text (3DS auto-ability
+/// queue style). `items` are (header, body, card_no) with card_no `""`
+/// when the row has no card. The list anchors the selected option at the
+/// top with ^+N / v+N scroll indicators, so long ability text stays
+/// readable — one_line rows would truncate it away. L shows the row's full
+/// text, R the card's art detail (text fallback without a card). Returns
+/// the selected index, or None if skipped.
+pub fn menu_select_detailed(
+    ui: &mut dyn PlatformUi,
+    gs: &GameState,
+    items: &[(String, String, String)],
+    title: &str,
+    allow_skip: bool,
+) -> Option<usize> {
+    let mut all_items: Vec<(String, String, String)> = items.to_vec();
+    let skip_idx = if allow_skip {
+        all_items.push((
+            String::from("[Skip]"),
+            String::new(),
+            String::new(),
+        ));
+        Some(all_items.len() - 1)
+    } else {
+        None
+    };
+    if all_items.is_empty() {
+        return None;
+    }
+    let mut sel: usize = 0;
+    let vis = ui.option_rows();
+    let cols = ui.option_cols();
+    // Bodies are invariant while the menu is open; wrap once.
+    let bodies: Vec<Vec<String>> = all_items
+        .iter()
+        .map(|(_, body, _)| wrap_text(body, cols))
+        .collect();
+    // Line count of one item (header + body), for the v+N remainder.
+    let item_lines = |n: usize| -> usize { 1 + bodies[n].len() };
+    loop {
+        ui.clear_screen();
+        ui.println(title);
+        if sel > 0 {
+            ui.println(&format!("^ +{}", sel));
+        }
+        // Window anchored at the selected item, like the 3DS queue: the
+        // selected option (and its full ability text) is always visible.
+        let mut shown = 0usize;
+        let mut n = sel;
+        let mut leftover = 0usize;
+        while n < all_items.len() {
+            let need = item_lines(n);
+            if shown > 0 && shown + need > vis {
+                leftover += need;
+                for m in n + 1..all_items.len() {
+                    leftover += item_lines(m);
+                }
+                break;
+            }
+            if shown + need > vis && shown == 0 {
+                // Single option taller than the window: show its head.
+                let (header, _, _) = &all_items[n];
+                ui.println(&format!(" > {}", header));
+                for line in bodies[n].iter().take(vis - 1) {
+                    ui.println(&format!("  {}", line));
+                }
+                leftover = bodies[n].len().saturating_sub(vis - 1);
+                for m in n + 1..all_items.len() {
+                    leftover += item_lines(m);
+                }
+                break;
+            }
+            let (header, _, _) = &all_items[n];
+            ui.println(&format!(
+                "{} {}",
+                if n == sel { " >" } else { "  " },
+                header
+            ));
+            for line in &bodies[n] {
+                ui.println(&format!("  {}", line));
+            }
+            shown += need;
+            n += 1;
+        }
+        if leftover > 0 {
+            ui.println(&format!("v +{}", leftover));
+        }
+        ui.swap_buffers();
+        ui.poll_input();
+        if ui.just_pressed_up() {
+            sel = if sel == 0 { all_items.len() - 1 } else { sel - 1 };
+        } else if ui.just_pressed_down() {
+            sel = if sel + 1 == all_items.len() { 0 } else { sel + 1 };
+        } else if ui.just_pressed_l() {
+            let (header, body, _) = &all_items[sel];
+            show_detail(ui, &format!("{}\n{}", header, body));
+        } else if ui.just_pressed_r() {
+            let (header, body, card_no) = &all_items[sel];
+            if !card_no.is_empty() {
+                ui.show_card_detail(gs, card_no);
+            } else {
+                show_detail(ui, &format!("{}\n{}", header, body));
+            }
+        } else if ui.just_pressed_a() || ui.just_pressed_start() {
+            if Some(sel) == skip_idx {
+                return None;
+            }
+            return Some(sel);
         }
         ui.wait_vblank();
     }
@@ -471,34 +589,31 @@ pub fn handle_choice(ui: &mut dyn PlatformUi, gs: &mut GameState) -> bool {
             description,
             ..
         } => {
-            let items: Vec<String> = options
+            // Full ability text per option (3DS auto-ability queue style):
+            // (header, body, card_no) rows show everything, unlike one_line
+            // truncation which hid what each ability does.
+            let items: Vec<(String, String, String)> = options
                 .iter()
-                .map(|o| format!("{}: {}", o.card_name, o.ability_text))
+                .map(|o| {
+                    let (header, card_no) = match o
+                        .card_id
+                        .and_then(|cid| gs.card_database.get_card(cid))
+                    {
+                        Some(c) => (
+                            format!("[{}] {}", c.card_no, o.card_name),
+                            c.card_no.to_string(),
+                        ),
+                        None => (o.card_name.clone(), String::new()),
+                    };
+                    (header, o.ability_text.clone(), card_no)
+                })
                 .collect();
             if items.is_empty() {
                 TurnEngine::resume_with_choice(gs, Some(0), None).ok();
                 return true;
             }
-            // Card numbers for the focused-row art preview (same index space
-            // as `items`; rows without a resolvable card show text only).
-            let card_nos: Vec<String> = options
-                .iter()
-                .map(|o| {
-                    o.card_id
-                        .and_then(|cid| gs.card_database.get_card(cid))
-                        .map(|c| c.card_no.to_string())
-                        .unwrap_or_default()
-                })
-                .collect();
-            let sel = menu_select_with_cards(
-                ui,
-                &items,
-                &description,
-                false,
-                Some(&card_nos),
-                None,
-            )
-            .unwrap_or(0);
+            let sel =
+                menu_select_detailed(ui, gs, &items, &description, false).unwrap_or(0);
             TurnEngine::resume_with_choice(gs, Some(sel as i16), None).ok();
             true
         }
@@ -625,6 +740,7 @@ if count <= 1 {
                         .collect();
                     let sel = menu_select_with_cards(
                         ui,
+                        gs,
                         &display_items,
                         &description,
                         allow_skip,
@@ -746,6 +862,7 @@ if count <= 1 {
                 .collect();
             let sel = menu_select_with_cards(
                 ui,
+                gs,
                 &items,
                 &description,
                 false,

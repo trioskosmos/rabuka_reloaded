@@ -111,9 +111,48 @@ pub trait PlatformUi {
     }
 
     /// Card detail viewer (art + stats + ability) for `card_no`. Ports with a
-    /// graphical detail screen override this; text ports keep the scrollable
-    /// full-text viewer. Used by choice grids (L = ability source, R = cursor).
-    fn show_card_detail(&mut self, _gs: &GameState, _card_no: &str) {
+    /// graphical detail screen override this; the default is a scrollable
+    /// full-text viewer (name + ability), so row-level R shortcuts work the
+    /// same everywhere. Used by choice grids (L = ability source, R = cursor)
+    /// and card-bearing text menus (R = focused card).
+    fn show_card_detail(&mut self, gs: &GameState, card_no: &str) {
+        let (title, body) = match gs.card_database.get_card_by_no(card_no) {
+            Some(c) => (
+                format!("[{}] {}", c.card_no, c.name),
+                card_ability_text(c),
+            ),
+            None => (card_no.to_string(), String::new()),
+        };
+        let lines = wrap_text(&body, self.option_cols());
+        let mut off = 0usize;
+        const H: usize = 8;
+        loop {
+            self.clear_screen();
+            self.println(&title);
+            let end = (off + H).min(lines.len());
+            for l in off..end {
+                self.println(&lines[l]);
+            }
+            if lines.len() > end {
+                self.println(&format!("  .. {} more", lines.len() - end));
+            }
+            self.swap_buffers();
+            self.poll_input();
+            if self.just_pressed_up() {
+                off = off.saturating_sub(1);
+            } else if self.just_pressed_down() && off + H < lines.len() {
+                off += 1;
+            } else if self.just_pressed_a()
+                || self.just_pressed_b()
+                || self.just_pressed_l()
+                || self.just_pressed_r()
+                || self.just_pressed_start()
+                || self.just_pressed_select()
+            {
+                return;
+            }
+            self.wait_vblank();
+        }
     }
 
     /// Reset VRAM tile pressure (commit an empty frame so the previous
