@@ -4,6 +4,10 @@
 //! builder uses a 5-field input system (Name, Series, Rarity, Card, Qty)
 //! with Left/Right to switch fields and Up/Down to change values. Decks
 //! are written to SRAM via the `sav` codec and appear in DeckSelect.
+//!
+//! NOTE: Energy cards are NOT in the builder's card list. They are auto-generated
+//! by the engine at match start (12 energy cards per player per Rule 6.1.1.3).
+//! The builder only shows Member and Live cards (non-energy).
 
 extern crate alloc;
 

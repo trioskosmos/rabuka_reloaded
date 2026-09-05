@@ -13,6 +13,19 @@ Emits platforms/gba/src/card_art_gen.rs with:
     pub static CARD_FRONTS: &[CardFront] = &[ CardFront { card_no: "...", tiles: include_bytes!(...) }, ... ];
 
 Run:  py -3 tools/bake_card_art.py
+
+=== ROM SIZE CONSTRAINTS ===
+GBA cartridge sizes: 4MB, 8MB, 16MB, 32MB (common). Our target: 32MB max.
+Per-card art cost (detail + 4 fronts):
+  - Detail: 13824 (tiles) + 480 (palette) = 14.3 KB
+  - Fronts (4 variants): ~2-4 KB each = 8-16 KB
+  - Total per card: ~22-30 KB
+  
+2526 non-energy cards × ~25 KB = ~63 MB (exceeds 32MB cart)
+337 deck-used cards × ~25 KB = ~8.4 MB (fits with engine + headroom)
+
+Energy cards are NOT baked — they are handled by the engine at runtime
+(card type Energy gets auto-generated energy art, no WebP source needed).
 """
 
 import json
@@ -29,9 +42,141 @@ REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO / "cards"))
 from bake_deck_cards import normalize  # noqa: E402
 
+# GBA BIOS LZ77 (LZSS) compression - hash-based for speed
+# Header: 32-bit little-endian
+#   bits 0-3: reserved (0)
+#   bits 4-7: compression type (1 = LZ77/LZ10)
+#   bits 8-31: decompressed size
+# Data: LZSS format with 4096-byte sliding window, min match 3, max match 18
+# Flag byte: 1 bit per item (1=literal, 0=match), 8 items per flag byte
+
+def lz77_compress_bios(data: bytes) -> bytes:
+    """Compress data to GBA BIOS LZ77 (LZSS) format using hash-based search.
+    
+    Returns: header (4 bytes) + compressed data
+    Header: type=1 (LZ77) in bits 4-7, decompressed size in bits 8-31
+    """
+    if not data:
+        return b'\x10\x00\x00\x00'  # type=1, size=0
+    
+    window_size = 4096
+    min_match = 3
+    max_match = 18
+    
+    # Hash table for 3-byte sequences (rolling hash)
+    # 256^3 = 16M possible, use 2^16 = 65536 buckets
+    HASH_BITS = 16
+    HASH_SIZE = 1 << HASH_BITS
+    HASH_MASK = HASH_SIZE - 1
+    
+    # Hash chain: for each position, points to previous occurrence of same hash
+    hash_chain = [-1] * len(data)
+    hash_table = [-1] * HASH_SIZE
+    
+    def hash3(pos: int) -> int:
+        """Hash 3 bytes at position."""
+        if pos + 3 > len(data):
+            return 0
+        return ((data[pos] << 8) | (data[pos + 1] << 4) | data[pos + 2]) & HASH_MASK
+    
+    output = bytearray()
+    i = 0
+    flag_byte = 0
+    flag_bit = 0
+    flag_pos = len(output)
+    output.append(0)  # placeholder for flag byte
+    
+    while i < len(data):
+        # Search for best match using hash table
+        best_len = 0
+        best_dist = 0
+        
+        if i + min_match <= len(data):
+            h = hash3(i)
+            # Walk hash chain to find matches
+            j = hash_table[h]
+            search_end = max(0, i - 4096)
+            
+            while j >= search_end:
+                # Quick check: first 3 bytes match (hash collision handled by verification)
+                match_len = 0
+                while (match_len < 18 and 
+                       i + match_len < len(data) and 
+                       j + match_len < i and  # don't read ahead into future
+                       data[j + match_len] == data[i + match_len]):
+                    match_len += 1
+                
+                if match_len >= 3 and match_len > best_len:
+                    best_len = match_len
+                    best_dist = i - j
+                    if best_len == 18:  # max match, stop searching
+                        break
+                
+                # Move to next in chain
+                j = hash_chain[j]
+        
+        # Add current position to hash table
+        if i + min_match <= len(data):
+            h = hash3(i)
+            hash_chain[i] = hash_table[h]
+            hash_table[h] = i
+        
+        if best_len >= 3:
+            # Match found - write flag bit 0
+            flag_byte &= ~(1 << flag_bit)
+            # Write distance (12 bits) and length (4 bits)
+            dist_minus1 = best_dist - 1
+            len_minus3 = best_len - 3
+            output.append((dist_minus1 >> 4) & 0xFF)
+            output.append(((dist_minus1 & 0xF) << 4) | (len_minus3 & 0xF))
+            i += best_len
+        else:
+            # Literal - write flag bit 1
+            flag_byte |= (1 << flag_bit)
+            output.append(data[i])
+            i += 1
+        
+        flag_bit += 1
+        if flag_bit == 8:
+            output[flag_pos] = flag_byte
+            flag_pos = len(output)
+            output.append(0)
+            flag_byte = 0
+            flag_bit = 0
+    
+    if flag_bit > 0:
+        output[flag_pos] = flag_byte
+    
+    decompressed_size = len(data)
+    header = bytes([
+        (1 << 4) | (decompressed_size & 0xFF),
+        (decompressed_size >> 8) & 0xFF,
+        (decompressed_size >> 16) & 0xFF,
+        (decompressed_size >> 24) & 0xFF,
+    ])
+    
+    return header + bytes(output)
+
+
+def lz77_compress_bios_if_smaller(data: bytes) -> bytes:
+    """Compress with LZ77, but return original if compression doesn't help."""
+    compressed = lz77_compress_bios(data)
+    if len(compressed) < len(data):
+        return compressed
+    # Return uncompressed format (type=0)
+    header = bytes([
+        len(data) & 0xFF,
+        (len(data) >> 8) & 0xFF,
+        (len(data) >> 16) & 0xFF,
+        (len(data) >> 24) & 0xFF,
+    ])
+    return header + data
+
+
 ART_W = 96
 ART_H = 144
-N_COLORS = 240  # leave indices 240-255 (bank 15) for the 4bpp text palette
+N_COLORS = 16  # 4bpp detail art (16 colors), shared MASTER_PAL
+DETAIL_BPP = 4
 TILE = 8
 
 # Front geometries (all use shared 8bpp MASTER_PAL now)
@@ -61,12 +206,27 @@ BIN_DIR = REPO / "platforms" / "gba" / "baked" / "card_art"
 MAX_WORKERS = 8  # CPU cores
 
 
+def is_energy_card(card: dict) -> bool:
+    """Check if card is energy type (Japanese 'エネルギー')."""
+    return card.get('type') == 'エネルギー'
+
+
+def all_non_energy_card_nos() -> set:
+    """ALL non-energy card_nos from cards.json (for full card set)."""
+    cards_dict = json.loads((REPO / "cards" / "cards.json").read_text(encoding="utf-8"))
+    used = set()
+    for k, v in cards_dict.items():
+        if not is_energy_card(v):
+            used.add(v["card_no"])
+    return used
+
+
 def deck_card_nos() -> set:
-    """Union of normalized cards.json card_nos used by all decks."""
+    """Union of normalized cards.json card_nos used by all decks (excludes energy)."""
     cards_dict = json.loads((REPO / "cards" / "cards.json").read_text(encoding="utf-8"))
     by_no = {}
     for k, v in cards_dict.items():
-        by_no.setdefault(normalize(k), k)
+        by_no.setdefault(normalize(k), v)
     used = set()
     for f in sorted((REPO / "web_ui" / "decks").glob("*.txt")):
         for line in f.read_text(encoding="utf-8").splitlines():
@@ -77,19 +237,19 @@ def deck_card_nos() -> set:
             m = re.match(r"^(\d+)\s*x\s*(.+)$", line)
             if m:
                 n = normalize(m.group(2).strip())
-                if n in by_no:
-                    used.add(by_no[n])
+                if n in by_no and not is_energy_card(by_no[n]):
+                    used.add(by_no[n]["card_no"])
                 continue
             m = re.match(r"^(.*?)\s*x\s*(\d+)$", line)
             if m:
                 n = normalize(m.group(1).strip())
-                if n in by_no:
-                    used.add(by_no[n])
+                if n in by_no and not is_energy_card(by_no[n]):
+                    used.add(by_no[n]["card_no"])
                 continue
             # Bare card_no
             n = normalize(line)
-            if n in by_no:
-                used.add(by_no[n])
+            if n in by_no and not is_energy_card(by_no[n]):
+                used.add(by_no[n]["card_no"])
     return used
 
 
@@ -117,6 +277,20 @@ def pack_8bpp_tiles(px, w, h, tiles_w, tiles_h):
     return bytes(out)
 
 
+def pack_4bpp_tiles(px, w, h, tiles_w, tiles_h):
+    """Pack 4bpp palette indices into tiles, ty-major then tx. 32B per tile (2 pixels per byte)."""
+    out = bytearray(tiles_w * tiles_h * 32)
+    for ty in range(tiles_h):
+        for tx in range(tiles_w):
+            base = (ty * tiles_w + tx) * 32
+            for rr in range(TILE):
+                for cc in range(0, TILE, 2):
+                    v0 = px[tx * TILE + cc, ty * TILE + rr] & 0x0F
+                    v1 = px[tx * TILE + cc + 1, ty * TILE + rr] & 0x0F
+                    out[base + rr * (TILE // 2) + cc // 2] = v0 | (v1 << 4)
+    return bytes(out)
+
+
 def palette_bytes_16(pal, n=16):
     """First n entries of a PIL palette as rgb15 little-endian bytes."""
     out = bytearray()
@@ -127,13 +301,8 @@ def palette_bytes_16(pal, n=16):
     return bytes(out)
 
 
-def palette_bytes_240(pal):
-    """240 entries of a PIL palette as rgb15 little-endian bytes."""
-    return palette_bytes_16(pal, 240)
-
-
-def build_palette(thumbs, colors=240):
-    """Build shared 240-colour palette from thumbnails."""
+def build_palette(thumbs, colors=16):
+    """Build shared 16-colour palette from thumbnails."""
     contact = Image.new("RGB", (sum(t.width for t in thumbs), max(t.height for t in thumbs)))
     x = 0
     for t in thumbs:
@@ -184,7 +353,7 @@ def make_thumb(img, w, h):
 
 
 def bake_detail(img, palette_q, palette_bytes):
-    """96x144 8bpp detail view."""
+    """96x144 4bpp detail view (16 colors)."""
     img, _ = maybe_upright(img)
     iw, ih = img.size
     scale = min(ART_W / iw, ART_H / ih)
@@ -194,7 +363,7 @@ def bake_detail(img, palette_q, palette_bytes):
     canvas.paste(small, ((ART_W - nw) // 2, (ART_H - nh) // 2))
     q = canvas.quantize(palette=palette_q, dither=Image.Dither.FLOYDSTEINBERG)
     px = q.load()
-    tiles = pack_8bpp_tiles(px, ART_W, ART_H, ART_W // TILE, ART_H // TILE)
+    tiles = pack_4bpp_tiles(px, ART_W, ART_H, ART_W // TILE, ART_H // TILE)
     return bytes(palette_bytes), tiles
 
 
@@ -285,7 +454,7 @@ def build_master_palette(card_nos: list[str], sample_size: int = 500) -> tuple:
             Image.open(BACK_PNG).convert("RGB").resize((LIVE_W, LIVE_H), Image.LANCZOS)
         )
     master_q, master_pal = build_palette(thumbs, colors=240)
-    master_pal_bytes = palette_bytes_240(master_pal)
+    master_pal_bytes = palette_bytes_16(master_pal, 16)
     print(f"master palette: 240 colours from {len(thumbs)} thumbs (sample of {len(sample)} cards)")
     return master_q, master_pal_bytes
 
@@ -306,64 +475,99 @@ def process_card(card_no: str, master_q, master_pal_bytes):
 
 
 def write_gen(entries, fronts, stage_fronts, live_fronts, waited_fronts, back_front, ui_tiles, master_pal_bytes):
-    """Generate card_art_gen.rs with include_bytes! references."""
+    """Generate card_art_gen.rs with include_bytes! references (LZ77 compressed)."""
     BIN_DIR.mkdir(parents=True, exist_ok=True)
 
-    # Write binary files
-    with open(BIN_DIR / "master_pal.bin", "wb") as f:
-        f.write(master_pal_bytes)
+    # Helper to write compressed data
+    def write_compressed(path: Path, data: bytes):
+        compressed = lz77_compress_bios_if_smaller(data)
+        with open(path, "wb") as f:
+            f.write(compressed)
+
+    # Write binary files (compressed)
+    write_compressed(BIN_DIR / "master_pal.bin", master_pal_bytes)
 
     for card_no, pal, tiles, _f, _s, _l, _w in entries:
         safe = sanitize_filename(card_no)
-        with open(BIN_DIR / f"pal_{safe}.bin", "wb") as f:
-            f.write(pal)
-        with open(BIN_DIR / f"tiles_{safe}.bin", "wb") as f:
-            f.write(tiles)
+        write_compressed(BIN_DIR / f"pal_{safe}.bin", pal)
+        write_compressed(BIN_DIR / f"tiles_{safe}.bin", tiles)
 
     for card_no, tiles in fronts:
         safe = sanitize_filename(card_no)
-        with open(BIN_DIR / f"front_{safe}.bin", "wb") as f:
-            f.write(tiles)
+        write_compressed(BIN_DIR / f"front_{safe}.bin", tiles)
 
     for card_no, tiles in stage_fronts:
         safe = sanitize_filename(card_no)
-        with open(BIN_DIR / f"stage_{safe}.bin", "wb") as f:
-            f.write(tiles)
+        write_compressed(BIN_DIR / f"stage_{safe}.bin", tiles)
 
     for card_no, tiles in live_fronts:
         safe = sanitize_filename(card_no)
-        with open(BIN_DIR / f"live_{safe}.bin", "wb") as f:
-            f.write(tiles)
+        write_compressed(BIN_DIR / f"live_{safe}.bin", tiles)
 
     for card_no, tiles in waited_fronts:
         safe = sanitize_filename(card_no)
-        with open(BIN_DIR / f"wait_{safe}.bin", "wb") as f:
-            f.write(tiles)
+        write_compressed(BIN_DIR / f"wait_{safe}.bin", tiles)
 
-    with open(BIN_DIR / "back_front.bin", "wb") as f:
-        f.write(back_front)
+    write_compressed(BIN_DIR / "back_front.bin", back_front)
+    write_compressed(BIN_DIR / "board_ui.bin", ui_tiles)
 
-    with open(BIN_DIR / "board_ui.bin", "wb") as f:
-        f.write(ui_tiles)
-
-    # Generate Rust source with include_bytes!
+    # Generate Rust source with include_bytes! + runtime decompression
     with open(OUT_RS, "w", encoding="utf-8") as f:
         f.write("// Auto-generated by tools/bake_card_art.py -- do not edit.\n")
         f.write("// CardArt: 8bpp detail art (96x144 = 13824 bytes) + 240-colour rgb15 palette\n")
         f.write("// Card fronts: 8bpp shared MASTER_PAL (4bpp on GBA via palette bank)\n")
-        f.write("// All binary data loaded via include_bytes! from ../baked/card_art/\n\n")
+        f.write("// All binary data LZ77-compressed (GBA BIOS SWI 0x11/0x12)\n\n")
 
-        f.write("pub static MASTER_PAL: [u8; 480] = *include_bytes!(\"../baked/card_art/master_pal.bin\");\n\n")
+        f.write("pub static MASTER_PAL: [u8; 32] = *include_bytes!(\"../baked/card_art/master_pal.bin\");\n\n")
 
         f.write("pub struct CardArt {\n")
         f.write("    pub card_no: &'static str,\n")
-        f.write("    pub palette: &'static [u8; 480],\n")
-        f.write("    pub tiles: &'static [u8; 13824],\n")
+        f.write("    pub palette: &'static [u8],\n")
+        f.write("    pub tiles: &'static [u8],\n")
         f.write("}\n\n")
 
         f.write("pub struct CardFront {\n")
         f.write("    pub card_no: &'static str,\n")
         f.write("    pub tiles: &'static [u8],\n")
+        f.write("}\n\n")
+
+        # Runtime decompression helper
+        f.write("pub fn lz77_decompress_wram(src: &[u8], dst: &mut [u8]) {\n")
+        f.write("    let src_ptr = src.as_ptr() as u32;\n")
+        f.write("    let dst_ptr = dst.as_mut_ptr() as u32;\n")
+        f.write("    unsafe {\n")
+        f.write("        core::arch::asm!(\n")
+        f.write("            \"swi 0x11\",\n")
+        f.write("            in(\"r0\") src_ptr,\n")
+        f.write("            in(\"r1\") dst_ptr,\n")
+        f.write("            lateout(\"r0\") _,\n")
+        f.write("            lateout(\"r1\") _,\n")
+        f.write("            lateout(\"r2\") _,\n")
+        f.write("            lateout(\"r3\") _,\n")
+        f.write("            lateout(\"r12\") _,\n")
+        f.write("            lateout(\"lr\") _,\n")
+        f.write("            options(nostack, preserves_flags)\n")
+        f.write("        );\n")
+        f.write("    }\n")
+        f.write("}\n\n")
+
+        f.write("pub fn lz77_decompress_vram(src: &[u8], dst: &mut [u8]) {\n")
+        f.write("    let src_ptr = src.as_ptr() as u32;\n")
+        f.write("    let dst_ptr = dst.as_mut_ptr() as u32;\n")
+        f.write("    unsafe {\n")
+        f.write("        core::arch::asm!(\n")
+        f.write("            \"swi 0x12\",\n")
+        f.write("            in(\"r0\") src_ptr,\n")
+        f.write("            in(\"r1\") dst_ptr,\n")
+        f.write("            lateout(\"r0\") _,\n")
+        f.write("            lateout(\"r1\") _,\n")
+        f.write("            lateout(\"r2\") _,\n")
+        f.write("            lateout(\"r3\") _,\n")
+        f.write("            lateout(\"r12\") _,\n")
+        f.write("            lateout(\"lr\") _,\n")
+        f.write("            options(nostack, preserves_flags)\n")
+        f.write("        );\n")
+        f.write("    }\n")
         f.write("}\n\n")
 
         # CARD_ART
@@ -413,17 +617,23 @@ def write_gen(entries, fronts, stage_fronts, live_fronts, waited_fronts, back_fr
             f.write("    },\n")
         f.write("];\n\n")
 
-        f.write("pub static BACK_FRONT: &[u8] = &*include_bytes!(\"../baked/card_art/back_front.bin\");\n\n")
-        f.write(f"pub static BOARD_UI: &[u8; {len(ui_tiles)}] = &*include_bytes!(\"../baked/card_art/board_ui.bin\");\n")
+        f.write("pub static BACK_FRONT: &[u8] = include_bytes!(\"../baked/card_art/back_front.bin\");\n\n")
+        f.write(f"pub static BOARD_UI: &[u8] = include_bytes!(\"../baked/card_art/board_ui.bin\");\n")
 
 
 def main():
-    used = deck_card_nos()
+    import time
+    start_total = time.time()
+    # Bake ALL non-energy cards (no second-class citizens)
+    used = all_non_energy_card_nos()
     card_list = sorted(used)
-    print(f"{len(card_list)} unique deck cards to bake")
+    print(f"{len(card_list)} unique non-energy cards to bake")
 
     # Build master palette from a representative sample (much faster)
+    print("Building master palette...")
+    start = time.time()
     master_q, master_pal_bytes = build_master_palette(card_list)
+    print(f"Palette build: {time.time() - start:.2f}s")
 
     # Process all cards in parallel
     entries = []
@@ -433,11 +643,18 @@ def main():
     waited_fronts = []
     missing = []
 
+    print("Processing cards...")
+    start = time.time()
+    processed = 0
     with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
         futures = {executor.submit(process_card, card_no, master_q, master_pal_bytes): card_no 
                    for card_no in card_list}
         
         for fut in as_completed(futures):
+            processed += 1
+            if processed % 100 == 0:
+                elapsed = time.time() - start
+                print(f"  Processed {processed}/{len(card_list)} cards ({elapsed:.1f}s, {processed/elapsed:.1f} cards/s)")
             card_no, result = fut.result()
             if result is None:
                 missing.append(card_no)
@@ -451,14 +668,22 @@ def main():
             live_fronts.append((card_no, ltiles))
             waited_fronts.append((card_no, wtiles))
 
-    print(f"baked {len(entries)} cards, missing {len(missing)}")
+    elapsed = time.time() - start
+    print(f"Processed {len(entries)} cards in {elapsed:.1f}s ({len(entries)/elapsed:.1f} cards/s)")
     if missing:
-        print("missing:", missing[:20])
+        print(f"missing: {missing[:20]}")
 
     # These are fast, do sequentially
+    print("Baking UI tiles...")
     ui_tiles = bake_ui_tiles()
+    print("Baking back front...")
     back_front = bake_back_front(master_q)
+    
+    print("Writing output...")
+    start = time.time()
     write_gen(entries, fronts, stage_fronts, live_fronts, waited_fronts, back_front, ui_tiles, master_pal_bytes)
+    print(f"Write gen: {time.time() - start:.2f}s")
+    print(f"Total time: {time.time() - start_total:.1f}s")
     print(f"wrote {OUT_RS}")
 
 
