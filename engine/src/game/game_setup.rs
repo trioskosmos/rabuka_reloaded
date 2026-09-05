@@ -1312,16 +1312,13 @@ fn generate_mulligan_actions(game_state: &GameState) -> Vec<Action> {
         let card = game_state.card_database.get_card(*card_id);
         let card_name = card.map(|c| c.name.as_ref()).unwrap_or("Unknown");
         let card_no_str = card.map(|c| c.card_no.to_string()).unwrap_or_default();
-        let sel_ja = if is_selected {
-            "の選択解除"
-        } else {
-            "を選択"
-        };
         let mut a = make_action_params(
             ActionType::SelectMulligan,
+            // Marker-prefix convention (shared with the multi-pick menus):
+            // state first, name second — the title already says mulligan.
             action_desc!(
-                "{} {} for mulligan",
-                if is_selected { "Deselect" } else { "Select" },
+                "[{}] {}",
+                if is_selected { "x" } else { " " },
                 card_name
             ),
             ActionParameters {
@@ -1334,7 +1331,11 @@ fn generate_mulligan_actions(game_state: &GameState) -> Vec<Action> {
             },
         );
         a.selected = Some(is_selected);
-        a.description_ja = Some(action_desc!("{} {} マリガン", card_name, sel_ja));
+        a.description_ja = Some(action_desc!(
+            "[{}] {}",
+            if is_selected { "x" } else { " " },
+            card_name
+        ));
         actions.push(a);
     }
 
@@ -1976,16 +1977,12 @@ fn generate_live_card_set_actions(game_state: &GameState) -> Vec<Action> {
         let card = game_state.card_database.get_card(*card_id);
         let card_name = card.map(|c| c.name.as_ref()).unwrap_or("Unknown");
         let card_no_str = card.map(|c| c.card_no.to_string()).unwrap_or_default();
-        let sel_ja = if is_selected {
-            "の選択解除"
-        } else {
-            "を選択"
-        };
         let mut a = make_action_params(
             ActionType::SelectLiveCard,
+            // Same marker-prefix convention as mulligan rows.
             action_desc!(
-                "{} {} for live set",
-                if is_selected { "Deselect" } else { "Select" },
+                "[{}] {}",
+                if is_selected { "x" } else { " " },
                 card_name
             ),
             ActionParameters {
@@ -1998,7 +1995,11 @@ fn generate_live_card_set_actions(game_state: &GameState) -> Vec<Action> {
             },
         );
         a.selected = Some(is_selected);
-        a.description_ja = Some(action_desc!("{} {} ライブカード", card_name, sel_ja));
+        a.description_ja = Some(action_desc!(
+            "[{}] {}",
+            if is_selected { "x" } else { " " },
+            card_name
+        ));
         actions.push(a);
     }
 
