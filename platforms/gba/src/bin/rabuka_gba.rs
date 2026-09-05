@@ -17,11 +17,13 @@ use rabuka_engine::game::platform_ui::{self, LinkTransport, MatchMode, PlatformU
 use rabuka_engine::game::sav::SavDeck;
 use rabuka_engine::rng;
 
+use rabuka_gba::deck_builder::run_deck_builder;
 use rabuka_gba::decks_baked::DECKS;
 use rabuka_gba::gba_ui::GbaUi;
 use rabuka_gba::input::{Button, Input};
 use rabuka_gba::link::LinkCable;
 use rabuka_gba::screens::Screen;
+use rabuka_gba::sram::read_sav_decks;
 use rabuka_gba::ui::Display;
 
 /// One side's link deck: display name + main-deck card numbers (no energy —
@@ -151,12 +153,24 @@ fn main(mut gba: agb::Gba) -> ! {
     let mut input = Input::new();
     rng::seed(0x5EED);
 
-    let decks = DECKS;
-    let names: Vec<&str> = decks.iter().map(|d| d.name).collect();
-    let modes = ["VS AI", "2 Player", "Link Host", "Link Join", "AI vs AI"];
+    // Load baked decks
+    let baked_decks = DECKS;
+    // Load custom decks from SRAM
+    let sram_decks = read_sav_decks();
+    
+    // Combine baked and SRAM decks for selection
+    let mut all_deck_names: Vec<String> = baked_decks.iter().map(|d| d.name.to_string()).collect();
+    let mut all_deck_cards: Vec<Vec<String>> = baked_decks.iter().map(|d| d.cards.iter().map(|c| c.to_string()).collect()).collect();
+    
+    for sram_deck in &sram_decks {
+        all_deck_names.push(sram_deck.name.clone());
+        all_deck_cards.push(sram_deck.cards.clone());
+    }
+
+    let modes = ["Deck Builder", "VS AI", "2 Player", "Link Host", "Link Join", "AI vs AI"];
 
     // Explicit boot flow — see `screens::Screen` for the full button map:
-    // ModeSelect -> DeckSelectP1 -> (DeckSelectP2) -> Match -> Result -> ...
+    // ModeSelect -> DeckBuilder/DeckSelectP1 -> (DeckSelectP2) -> Match -> Result -> ...
     // A finished match restarts cleanly at ModeSelect instead of freezing.
     // Mode/deck picks keep GBA-tuned titles (button hints); the match loop
     // itself is the engine's shared `run_match` (AI heuristic included), so
@@ -169,13 +183,36 @@ fn main(mut gba: agb::Gba) -> ! {
         let as_ui = &mut ui as &mut dyn PlatformUi;
         let mode_idx = platform_ui::select(as_ui, &modes, "MODE Up/Dn:A/Start");
 
+        // Deck Builder: create custom deck saved to SRAM
+        if mode_idx == 0 {
+            let _ = Screen::DeckBuilder;
+            let mut ui2 = GbaUi::new(&mut display, &mut input);
+            let _ = run_deck_builder(&mut display, &mut input);
+            // Reload SRAM decks after builder exits
+            let sram_decks = read_sav_decks();
+            all_deck_names.clear();
+            all_deck_cards.clear();
+            for d in baked_decks {
+                all_deck_names.push(d.name.to_string());
+                all_deck_cards.push(d.cards.iter().map(|c| c.to_string()).collect());
+            }
+            for sram_deck in &sram_decks {
+                all_deck_names.push(sram_deck.name.clone());
+                all_deck_cards.push(sram_deck.cards.clone());
+            }
+            continue;
+        }
+
         // Link games leave the shared menu flow: pick a deck, sync over
         // the cable, play the lockstep loop, return here after.
-        if mode_idx == 2 || mode_idx == 3 {
-            let is_host = mode_idx == 2;
+        if mode_idx == 3 || mode_idx == 4 {
+            let is_host = mode_idx == 3;
             let _ = Screen::DeckSelectP1;
-            let d = platform_ui::select(as_ui, &names, "LINK DECK A:Pick");
-            let own = baked_sav_deck(d);
+            let d = platform_ui::select(as_ui, &all_deck_names.iter().map(|s| s.as_str()).collect::<Vec<_>>(), "LINK DECK A:Pick");
+            let own = SavDeck {
+                name: all_deck_names[d].clone(),
+                cards: all_deck_cards[d].clone(),
+            };
             match link_setup(&mut display, &mut input, own, is_host) {
                 Some((mut cable, p1_nos, p2_nos, all_cards, seed)) => {
                     let p1: Vec<&str> = p1_nos.iter().map(|s| s.as_str()).collect();
@@ -201,27 +238,48 @@ fn main(mut gba: agb::Gba) -> ! {
         }
 
         let mode = match mode_idx {
-            1 => MatchMode::TwoPlayer,
-            4 => MatchMode::AiVsAi,
+            1 => MatchMode::VsAi,
+            2 => MatchMode::TwoPlayer,
+            5 => MatchMode::AiVsAi,
             _ => MatchMode::VsAi,
         };
 
         let _ = Screen::DeckSelectP1;
-        let d1 = platform_ui::select(as_ui, &names, "P1 DECK Up/Dn:A/Start");
+        let d1 = platform_ui::select(as_ui, &all_deck_names.iter().map(|s| s.as_str()).collect::<Vec<_>>(), "P1 DECK Up/Dn:A/Start");
         let _ = Screen::DeckSelectP2;
         let d2 = if matches!(mode, MatchMode::TwoPlayer) {
-            platform_ui::select(as_ui, &names, "P2 DECK Up/Dn:A/Start")
+            platform_ui::select(as_ui, &all_deck_names.iter().map(|s| s.as_str()).collect::<Vec<_>>(), "P2 DECK Up/Dn:A/Start")
         } else {
-            rng::rand_range(names.len())
+            rng::rand_range(all_deck_names.len())
         };
 
         // Match (Screen::Board/Actions/StartMenu/CardDetail/ChoiceGrid are
         // driven by the engine from here; Screen::Result shows at the end).
         let _ = Screen::Board;
-        let p1_cards = decks[d1].cards;
-        let p2_cards = decks[d2].cards;
-        let all_cards =
-            rabuka_engine::game::deck_parser::load_two_decks_with_abilities(d1, d2);
+        let p1_cards: Vec<&str> = all_deck_cards[d1].iter().map(|s| s.as_str()).collect();
+        let p2_cards: Vec<&str> = all_deck_cards[d2].iter().map(|s| s.as_str()).collect();
+        // For baked decks, use the baked blob indices; for SRAM decks, we need to resolve cards
+        // For simplicity, always use the deck_parser which loads from baked blobs
+        // SRAM decks will need runtime resolution - for now use baked indices for baked decks
+        let all_cards = if d1 < baked_decks.len() && d2 < baked_decks.len() {
+            rabuka_engine::game::deck_parser::load_two_decks_with_abilities(d1, d2)
+        } else {
+            // One or both decks are from SRAM - resolve from card numbers
+            let mut nos: Vec<String> = Vec::new();
+            for n in &all_deck_cards[d1] { if !nos.contains(n) { nos.push(n.clone()); } }
+            for n in &all_deck_cards[d2] { if !nos.contains(n) { nos.push(n.clone()); } }
+            let mut cards: Vec<Card> = Vec::new();
+            let index = card_binary::blob_index_by_folded_no();
+            for no in nos {
+                if let Some(idx) = card_binary::resolve_card_no(&index, &no) {
+                    if let Some(card) = card_binary::decode_card_from_blob(idx) {
+                        cards.push(card);
+                    }
+                }
+            }
+            CardLoader::attach_abilities(&mut cards);
+            cards
+        };
 
         // Shared engine match loop (no platform copy).
         platform_ui::run_match(&mut ui, p1_cards, p2_cards, all_cards, mode);

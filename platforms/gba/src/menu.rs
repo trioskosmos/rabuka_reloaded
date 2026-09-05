@@ -21,6 +21,8 @@ extern crate alloc;
 use alloc::string::String;
 use alloc::vec::Vec;
 
+use rabuka_engine::card::Card;
+use rabuka_engine::card::Card;
 use rabuka_engine::game::platform_ui::{card_ability_text, card_detail_title, card_stat_text};
 use rabuka_engine::game_state::GameState;
 
@@ -28,6 +30,68 @@ use crate::display::Display;
 use crate::gba_ui::InputSource;
 use crate::input::Button;
 use crate::ui::CARD_ART;
+
+/// Card detail with custom card lookup (for deck builder without GameState).
+pub fn show_card_detail_with_lookup<I: InputSource, F: Fn(&str) -> Option<&Card>>(
+    display: &mut Display,
+    input: &mut I,
+    card_no: &str,
+    lookup: F,
+) {
+    if let Some(card) = lookup(card_no) {
+        let header: Vec<String> = alloc::vec![
+            card_detail_title(card),
+            card_stat_text(card),
+        ];
+        show_detail_screen_with_lookup(display, input, Some(card_no), &header, &card_ability_text(card));
+    } else {
+        show_detail_screen_with_lookup(display, input, None, &[card_no.to_string()], "");
+    }
+}
+
+/// Paginated detail screen with custom card lookup for art.
+pub fn show_detail_screen_with_lookup<I: InputSource, F: Fn(&str) -> Option<&Card>>(
+    display: &mut Display,
+    input: &mut I,
+    art_card_no: Option<&str>,
+    header: &[String],
+    body: &str,
+) {
+    // We can't use CARD_ART directly without GameState, so we skip art for now
+    // TODO: Add art lookup from card_binary if needed
+    let art: Option<&crate::card_art_gen::CardArt> = None;
+    let mut lines: Vec<String> = Vec::new();
+    for h in header {
+        if h.trim().is_empty() {
+            continue;
+        }
+        lines.extend(Display::wrap_pane(h, PANE_COLS));
+    }
+    lines.extend(Display::wrap_pane(body, PANE_COLS));
+    display.reset_vram();
+    let mut scroll = 0usize;
+    const VISIBLE: usize = 8;
+    display.render_card_detail(art, &lines, scroll);
+    loop {
+        input.poll();
+        if input.just_pressed(Button::Up) && scroll > 0 {
+            scroll -= 1;
+            display.render_card_detail(art, &lines, scroll);
+        } else if input.just_pressed(Button::Down) && scroll + VISIBLE < lines.len() {
+            scroll += 1;
+            display.render_card_detail(art, &lines, scroll);
+        } else if input.just_pressed(Button::A)
+            || input.just_pressed(Button::B)
+            || input.just_pressed(Button::L)
+            || input.just_pressed(Button::R)
+            || input.just_pressed(Button::Start)
+        {
+            display.reset_vram();
+            return;
+        }
+        display.wait();
+    }
+}
 
 /// Detail pane width: the portrait takes the left 12 tile columns, text
 /// starts at column 13, so 30 - 13 = 17 tiles. Wrapped with

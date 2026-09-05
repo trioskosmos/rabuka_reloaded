@@ -2,15 +2,16 @@
 //!
 //! Every screen the player can be on, which buttons do what there, and which
 //! screen each button leads to. The flow is driven by `bin/rabuka_gba.rs`
-//! (`ModeSelect -> DeckSelect -> Match -> Result -> ModeSelect`); the engine
-//! owns the in-match details (action list, pending-choice prompts) but each
-//! of those renders through one of the screens below.
+//! (`ModeSelect -> DeckBuilder/DeckSelect -> Match -> Result -> ModeSelect`);
+//! the engine owns the in-match details (action list, pending-choice prompts)
+//! but each of those renders through one of the screens below.
 //!
 //! ```text
-//! Screen::ModeSelect --A/Start--> Screen::DeckSelectP1 --A/Start--> Match
-//!     ^                               | (TwoPlayer only: DeckSelectP2)
-//!     |                               v
-//!     +--A/Start-- Screen::Result <-- match ends --+
+//! Screen::ModeSelect --A/Start on "Deck Builder"--> Screen::DeckBuilder --Done--> ModeSelect
+//! Screen::ModeSelect --A/Start on "VS AI" etc.--> Screen::DeckSelectP1 --A/Start--> Match
+//!     ^                                               | (TwoPlayer only: DeckSelectP2)
+//!     |                                               v
+//!     +--A/Start-- Screen::Result <-- match ends -----+
 //!
 //! Inside Match (all overlay the board, Esc-able unless noted):
 //!   Board --Select--> Actions --Select/B--> Board
@@ -28,26 +29,29 @@
 //!
 //! Button map per screen:
 //!
-//! | Screen       | Up/Down         | Left/Right         | A            | B            | Start        | Select | L            | R            |
-//! |--------------|-----------------|--------------------|--------------|--------------|--------------|--------|--------------|--------------|
-//! | ModeSelect   | move cursor     | -                  | confirm      | -            | confirm      | -      | detail text  | detail text  |
-//! | DeckSelect   | move cursor     | -                  | confirm      | -            | confirm      | -      | detail text  | detail text  |
-//! | Board        | prev/next action| move hand/stage cursor | run action | -        | Start menu   | Actions view | cycle focus Hand->Own->Opp | card detail |
-//! | Actions      | prev/next action| -                  | run action   | back to Board | Start menu  | Board view | action+card detail | card detail |
-//! | StartMenu    | move cursor     | -                  | log/zone/close | back/close | back/close   | -      | -            | -            |
-//! | ZoneGrid     | wrap incl. pages| wrap incl. pages   | card detail  | back         | back         | -      | -            | -            |
-//! | CardDetail   | scroll text     | -                  | close        | close        | close        | -      | close        | close        |
-//! | ChoiceGrid   | wrap incl. pages| wrap incl. pages   | pick         | back/skip    | start menu   | board overlay | choice hint + ability | cursor card |
-//! | Result       | -               | -                  | continue     | -            | continue     | -      | -            | -            |
-
-/// Every screen the GBA port can show. Variants are documentation-first:
-/// the engine still renders Mode/Deck/Result lists, but `bin/rabuka_gba.rs`
-/// visits them in exactly the order below, so "what menu goes where" is
-/// answered here, not scattered across callbacks.
+//! | Screen       | Up/Down           | Left/Right     | A              | B           | Start        | Select | L            | R            |
+//! |--------------|-------------------|----------------|----------------|-------------|--------------|--------|--------------|--------------|
+//! | ModeSelect   | move cursor       | -              | confirm        | -           | confirm      | -      | detail text  | detail text  |
+//! | DeckBuilder  | change value      | change field   | confirm/add    | backspace   | Start menu   | ZoneGrid| card detail  | card detail  |
+//! | DeckSelect   | move cursor       | -              | confirm        | -           | confirm      | -      | detail text  | detail text  |
+//! | Board        | prev/next action  | move cursor    | run action     | -           | Start menu   | Actions| cycle focus  | card detail  |
+//! | Actions      | prev/next action  | -              | run action     | back        | Start menu   | Board  | act+card det | card detail  |
+//! | StartMenu    | move cursor       | -              | log/zone/close | back/close  | back/close   | -      | -            | -            |
+//! | ZoneGrid     | wrap incl. pages  | wrap incl. pages| card detail   | back        | back         | -      | -            | -            |
+//! | CardDetail   | scroll text       | -              | close          | close       | close        | -      | close        | close        |
+//! | ChoiceGrid   | wrap incl. pages  | wrap incl. pages| pick          | back/skip   | start menu   | board  | hint+ability | cursor card  |
+//! | Result       | -                 | -              | continue       | -           | continue     | -      | -            | -            |
+//
+//! Every screen the GBA port can show. Variants are documentation-first:
+//! the engine still renders Mode/Deck/Result lists, but `bin/rabuka_gba.rs`
+//! visits them in exactly the order below, so "what menu goes where" is
+//! answered here, not scattered across callbacks.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Screen {
-    /// Match setup: VS AI / 2 Player / AI vs AI. A/Start confirms.
+    /// Match setup: VS AI / 2 Player / Link Host / Link Join / AI vs AI / Deck Builder. A/Start confirms.
     ModeSelect,
+    /// Custom deck creation: 5-field input (Name, Series, Rarity, Card, Qty) saved to SRAM.
+    DeckBuilder,
     /// Match setup: player 1's deck. A/Start confirms.
     DeckSelectP1,
     /// Match setup (2-player only): player 2's deck. Skipped otherwise
