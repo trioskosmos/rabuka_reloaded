@@ -6,5 +6,6 @@ pub mod language;
 pub mod platform_ui;
 pub mod menu;
 pub mod match_runner;
+pub mod sav;
 #[cfg(feature = "server")]
 pub mod web_server;

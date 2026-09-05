@@ -422,6 +422,68 @@ pub fn find_card_index_by_no(card_no: &str) -> Option<usize> {
     None
 }
 
+/// Fold a card number to canonical match form: uppercase ASCII plus
+/// halfwidth punctuation (`＋`→`+`, `！`→`!`, `－`→`-`, fullwidth alnum→
+/// ASCII). Mirrors the bake's deck output: cards.json and the blob keep
+/// raw fullwidth spellings while deck lists (baked or SRAM) use the
+/// folded form, so the two sides only meet after folding both.
+#[cfg(not(feature = "snes"))]
+pub fn normalize_card_no(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    for ch in s.chars() {
+        match ch {
+            'a'..='z' => out.push((ch as u8 - b'a' + b'A') as char),
+            'ａ'..='ｚ' => out.push(
+                char::from_u32(ch as u32 - 'ａ' as u32 + 'A' as u32).unwrap_or(ch),
+            ),
+            '０'..='９' => out.push(
+                char::from_u32(ch as u32 - '０' as u32 + '0' as u32).unwrap_or(ch),
+            ),
+            '＋' => out.push('+'),
+            '！' => out.push('!'),
+            '－' => out.push('-'),
+            _ => out.push(ch),
+        }
+    }
+    out
+}
+
+/// One-pass index of the full blob for deck resolution: sorted
+/// (folded card_no, blob idx) pairs. Build once at boot, then
+/// binary-search per card — rescanning the blob per card would cost a
+/// full decode pass per lookup. Powers SRAM-deck resolution (GBA).
+#[cfg(not(feature = "snes"))]
+pub fn blob_index_by_folded_no() -> Vec<(String, usize)> {
+    let mut index: Vec<(String, usize)> = Vec::new();
+    for i in 0..blob_card_count() {
+        if let Some(card) = decode_card_from_blob(i) {
+            index.push((normalize_card_no(card.card_no.as_ref()), i));
+        }
+    }
+    index.sort_by(|a, b| a.0.cmp(&b.0));
+    log::debug!(
+        "[BLOB_INDEX] {} entries for {} blob cards",
+        index.len(),
+        blob_card_count()
+    );
+    index
+}
+
+/// Resolve a deck-list card number to a blob index: exact match first
+/// (free when spellings agree), folded-index lookup second (covers
+/// case/width skew between the list and the blob).
+#[cfg(not(feature = "snes"))]
+pub fn resolve_card_no(index: &[(String, usize)], card_no: &str) -> Option<usize> {
+    if let Some(i) = find_card_index_by_no(card_no) {
+        return Some(i);
+    }
+    let want = normalize_card_no(card_no);
+    index
+        .binary_search_by(|(key, _)| key.as_str().cmp(want.as_str()))
+        .ok()
+        .map(|pos| index[pos].1)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -467,6 +529,32 @@ mod tests {
         let card0 = decode_card_from_blob(0).expect("card 0");
         let idx = find_card_index_by_no(&card0.card_no);
         assert_eq!(idx, Some(0), "card 0 should be found by its card_no");
+    }
+
+    #[test]
+    fn test_normalize_card_no_fold() {
+        assert_eq!(normalize_card_no("LL-bp2-001-R＋"), "LL-BP2-001-R+");
+        assert_eq!(normalize_card_no("PL!S-pb1-003-P＋"), "PL!S-PB1-003-P+");
+        assert_eq!(normalize_card_no("BP1-005-R"), "BP1-005-R");
+        // Mirrors the DS/bake fold exactly: fullwidth uppercase is NOT
+        // folded (only fullwidth lowercase + digits are).
+        assert_eq!(normalize_card_no("０１２３４５６７８９"), "0123456789");
+    }
+
+    #[test]
+    fn test_folded_index_resolves_all_blob_cards() {
+        let index = blob_index_by_folded_no();
+        assert!(!index.is_empty(), "index covers the blob");
+        assert!(
+            index.windows(2).all(|w| w[0].0 <= w[1].0),
+            "index is sorted"
+        );
+        // Every blob card resolves through the index (exact or folded).
+        for i in 0..blob_card_count() {
+            let card = decode_card_from_blob(i).expect("card decodes");
+            let got = resolve_card_no(&index, card.card_no.as_ref());
+            assert!(got.is_some(), "card {} resolves", card.card_no);
+        }
     }
 
     #[test]
