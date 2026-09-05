@@ -89,10 +89,17 @@ pub fn show_result(ui: &mut dyn PlatformUi, gs: &GameState) {
     }
 }
 
-/// Select from a list of items. Returns the selected index.
-/// Start button also confirms (same as A).
-pub fn select(ui: &mut dyn PlatformUi, items: &[&str], title: &str) -> usize {
-    let mut sel: usize = 0;
+/// Select from a list of items, starting the cursor at `initial`.
+/// Returns the selected index. Start button also confirms (same as A).
+/// [`select`] is this with `initial = 0`; menus that restore a previous
+/// choice (e.g. the engine language picker) pass it in.
+pub fn select_with_initial(
+    ui: &mut dyn PlatformUi,
+    items: &[&str],
+    title: &str,
+    initial: usize,
+) -> usize {
+    let mut sel: usize = initial.min(items.len().saturating_sub(1));
     let mut scroll: usize = 0;
     let vis = ui.option_rows();
     let cols = ui.option_cols();
@@ -134,6 +141,12 @@ pub fn select(ui: &mut dyn PlatformUi, items: &[&str], title: &str) -> usize {
         }
         ui.wait_vblank();
     }
+}
+
+/// Select from a list of items. Returns the selected index.
+/// Start button also confirms (same as A).
+pub fn select(ui: &mut dyn PlatformUi, items: &[&str], title: &str) -> usize {
+    select_with_initial(ui, items, title, 0)
 }
 
 /// Select from a list of string items with optional skip. Returns None if skipped.

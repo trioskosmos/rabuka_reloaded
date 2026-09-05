@@ -3,9 +3,11 @@
 //! This module defines the `PlatformUi` trait — the seam every console
 //! implements — plus the low-level text/card formatting helpers that are
 //! portable across ports. The *menus* (list selection, turn/choice screens,
-//! result viewer) live in [`menu`], and the *match runner* (mode/deck select +
-//! game loop) lives in [`match_runner`]. Both are re-exported here so the other
-//! ports keep compiling against `rabuka_engine::game::platform_ui::*`.
+//! result viewer) live in [`menu`], the *match runner* (mode/deck select +
+//! game loop) lives in [`match_runner`], and the shared UI *language*
+//! (`Lang` + picker) lives in [`language`]. All three are re-exported here
+//! so the other ports keep compiling against
+//! `rabuka_engine::game::platform_ui::*`.
 
 #[cfg(feature = "no_std")]
 use alloc::format;
@@ -435,3 +437,4 @@ pub fn card_ability_text(card: &Card) -> String {
 
 pub use crate::game::menu::*;
 pub use crate::game::match_runner::*;
+pub use crate::game::language::{Lang, select_language};

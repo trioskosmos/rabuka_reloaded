@@ -2,27 +2,10 @@ use std::collections::HashMap;
 use std::fs;
 use std::sync::OnceLock;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Lang {
-    English,
-    Japanese,
-}
-
-impl Lang {
-    pub fn toggle(self) -> Self {
-        match self {
-            Lang::English => Lang::Japanese,
-            Lang::Japanese => Lang::English,
-        }
-    }
-
-    pub fn label(self) -> &'static str {
-        match self {
-            Lang::English => "English",
-            Lang::Japanese => "日本語",
-        }
-    }
-}
+// The UI language type is owned by the engine (`game::language`) so every
+// port shares one `Lang`; the romfs translation *tables* stay here because
+// they are loaded from platform files at runtime.
+pub use rabuka_engine::game::language::Lang;
 
 struct Translations {
     en: HashMap<String, String>,

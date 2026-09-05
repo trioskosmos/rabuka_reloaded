@@ -2,6 +2,7 @@ pub mod deck_builder;
 pub mod deck_parser;
 pub mod display;
 pub mod game_setup;
+pub mod language;
 pub mod platform_ui;
 pub mod menu;
 pub mod match_runner;
