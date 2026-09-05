@@ -1225,10 +1225,13 @@ impl<'a> Display<'a> {
 
         if let Some(art) = art {
             log::debug!("detail portrait for {}", art.card_no);
+            // Decompress LZ77-compressed tiles (13824 bytes for 96x144 detail art)
+            let mut decompressed_tiles = [0u8; 13824];
+            crate::card_art_gen::lz77_decompress_wram(art.tiles, &mut decompressed_tiles);
             self.push_card(
                 "detail",
                 art.card_no,
-                art.tiles,
+                &decompressed_tiles,
                 12,
                 18,
                 DETAIL_PX.0,
