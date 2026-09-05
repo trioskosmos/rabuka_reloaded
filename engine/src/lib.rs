@@ -61,6 +61,7 @@ pub mod bin_common;
 // Game logic modules
 pub mod game;
 pub use game::deck_builder;
+pub use game::deck_ordering;
 pub use game::deck_parser;
 pub use game::display;
 pub use game::game_setup;

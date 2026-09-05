@@ -696,7 +696,15 @@ function getBaseCardNo(cardNo) {
   return i > 0 ? cardNo.slice(0, i) : cardNo;
 }
 
-// Rabuka Point System (ラブカポイントシステム)
+function extractSeries(cardNo) {
+  const i = cardNo.indexOf('-');
+  return i > 0 ? cardNo.slice(0, i) : cardNo;
+}
+
+function extractRarity(cardNo) {
+  const i = cardNo.lastIndexOf('-');
+  return i > 0 ? cardNo.slice(i + 1) : '';
+}
 // Updated 2026-04-03: total points of point-assigned cards in deck must be ≤ 9
 const POINT_MAP = {
   'PL!N-bp1-003': 4,
@@ -754,11 +762,32 @@ function clearDeck() {
 function exportDeck() {
   if (deckState.cards.size === 0) { toast('Deck is empty'); return; }
   const name = document.getElementById('deck-name').value || 'deck';
-  const lines = [];
-  const entries = [...deckState.cards.entries()].sort((a, b) => a[0].localeCompare(b[0]));
-  for (const [cardNo, entry] of entries) {
-    lines.push(`${cardNo} x ${entry.qty}`);
+  
+  // Expand all cards with quantities
+  const expanded = [];
+  for (const [cardNo, entry] of deckState.cards.entries()) {
+    for (let i = 0; i < entry.qty; i++) {
+      expanded.push(cardNo);
+    }
   }
+  
+  // Sort by optimal GBA navigation order: (series, rarity, cardNo)
+  // Series groups together, then rarity, then alphabetically within
+  expanded.sort((a, b) => {
+    const sa = extractSeries(a), sb = extractSeries(b);
+    if (sa !== sb) return sa.localeCompare(sb);
+    const ra = extractRarity(a), rb = extractRarity(b);
+    if (ra !== rb) return ra.localeCompare(rb);
+    return a.localeCompare(b);
+  });
+  
+  // Re-aggregate
+  const counts = {};
+  for (const c of expanded) {
+    counts[c] = (counts[c] || 0) + 1;
+  }
+  
+  const lines = Object.entries(counts).map(([cardNo, qty]) => `${cardNo} x ${qty}`);
   const text = lines.join('\n');
   const blob = new Blob([text], { type: 'text/plain' });
   const a = document.createElement('a');
@@ -767,9 +796,9 @@ function exportDeck() {
   a.click();
   URL.revokeObjectURL(a.href);
   navigator.clipboard.writeText(text).then(() => {
-    toast(`Exported & copied ${deckState.cards.size} card types`);
+    toast(`Exported & copied ${deckState.cards.size} card types (GBA-optimal)`);
   }).catch(() => {
-    toast(`Exported ${deckState.cards.size} card types`);
+    toast(`Exported ${deckState.cards.size} card types (GBA-optimal)`);
   });
 }
 function addImportedCard(map, cardNo, qty) {
