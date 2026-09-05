@@ -132,7 +132,12 @@ fn ai_handle_choice(gs: &mut GameState) -> bool {
     }
 }
 
-/// AI turn: pick a random action and execute it.
+/// AI turn: score each action with the shared heuristic (attacks and board
+/// presence first, then card advantage — the v6-style weights the handheld
+/// ports converged on; the full v6 bot needs std) and execute the best.
+/// Mulligan phases MUST be concluded first, otherwise the AI can keep
+/// toggling card selections forever and the game never reaches main phase,
+/// so a Confirm/Skip is preferred over the per-card Select actions.
 pub fn ai_turn(gs: &mut GameState, acts: &[game_setup::Action]) -> bool {
     use crate::game_setup::ActionType;
     // Mulligan phases MUST be concluded, otherwise the AI can keep toggling
@@ -147,7 +152,36 @@ pub fn ai_turn(gs: &mut GameState, acts: &[game_setup::Action]) -> bool {
             return true;
         }
     }
-    let _ = game_setup::execute_action(gs, &acts[crate::rng::rand_range(acts.len())]);
+    // Weighted heuristic: prefer attacks, then card advantage. A small
+    // random tiebreaker keeps repeated positions from playing identically.
+    let mut best_idx = 0;
+    let mut best_score = 0usize;
+    for (i, a) in acts.iter().enumerate() {
+        let mut score = 0usize;
+        match a.action_type {
+            ActionType::PlayMemberToStage => score += 100,
+            ActionType::UseAbility => score += 80,
+            ActionType::SetLiveCard => score += 70,
+            ActionType::ConfirmMulligan | ActionType::SkipMulligan => score += 200,
+            ActionType::ConfirmLiveCardSet => score += 150,
+            ActionType::EnergyCharge => score += 40,
+            ActionType::PassRemaining => score += 30,
+            _ => score += 10,
+        }
+        score += crate::rng::rand_range(10);
+        if score > best_score {
+            best_score = score;
+            best_idx = i;
+        }
+    }
+    log::debug!(
+        "[AI_TURN] picked act {} (score {}) of {}: {:?}",
+        best_idx,
+        best_score,
+        acts.len(),
+        acts[best_idx].action_type
+    );
+    let _ = game_setup::execute_action(gs, &acts[best_idx]);
     true
 }
 

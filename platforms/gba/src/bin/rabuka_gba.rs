@@ -17,9 +17,6 @@ use rabuka_gba::decks_baked::DECKS;
 use rabuka_gba::gba_ui::GbaUi;
 use rabuka_gba::input::Input;
 use rabuka_gba::screens::Screen;
-use rabuka_gba::run_match_with_mixer;
-
-use agb::interrupt::VBlank;
 
 fn load_deck_cards(
     _decks: &[rabuka_gba::decks_baked::DeckInfo],
@@ -33,8 +30,6 @@ fn load_deck_cards(
 
 #[agb::entry]
 fn main(mut gba: agb::Gba) -> ! {
-    let vblank = VBlank::get();
-
     let mut display = rabuka_gba::ui::Display::new(gba.graphics.get());
     let mut input = Input::new();
     rng::seed(0x5EED);
@@ -46,6 +41,9 @@ fn main(mut gba: agb::Gba) -> ! {
     // Explicit boot flow — see `screens::Screen` for the full button map:
     // ModeSelect -> DeckSelectP1 -> (DeckSelectP2) -> Match -> Result -> ...
     // A finished match restarts cleanly at ModeSelect instead of freezing.
+    // Mode/deck picks keep GBA-tuned titles (button hints); the match loop
+    // itself is the engine's shared `run_match` (AI heuristic included), so
+    // the port no longer carries its own copy of the game loop.
     loop {
         let _ = Screen::ModeSelect;
         let mut ui = GbaUi::new(&mut display, &mut input);
@@ -72,10 +70,10 @@ fn main(mut gba: agb::Gba) -> ! {
         let p1_cards = decks[d1].cards;
         let p2_cards = decks[d2].cards;
         let all_cards = load_deck_cards(decks, d1, d2);
-        
-        // Run match (no audio)
-        run_match_with_mixer(&mut ui, p1_cards, p2_cards, all_cards, mode, &vblank);
-        
+
+        // Shared engine match loop (no platform copy).
+        platform_ui::run_match(&mut ui, p1_cards, p2_cards, all_cards, mode);
+
         let _ = Screen::Result;
     }
 }
