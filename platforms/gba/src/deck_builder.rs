@@ -478,6 +478,27 @@ impl<'a, 'd, I: InputSource> DeckBuilder<'a, 'd, I> {
         );
     }
 
+    /// Sort key: type order (Member=0, Live=1, Energy=2) then card_no.
+    fn sort_key(&self, card_no: &str) -> (u8, String) {
+        let type_order = self.find_card(card_no).map(|e| match e.card_type {
+            CardType::Member => 0,
+            CardType::Live => 1,
+            CardType::Energy => 2,
+        }).unwrap_or(3);
+        (type_order, card_no.to_string())
+    }
+
+    /// Get sorted deck cards for display.
+    fn sorted_deck(&self) -> Vec<(String, u8)> {
+        let mut entries = self.cards.clone();
+        entries.sort_by(|a, b| {
+            let ka = self.sort_key(&a.0);
+            let kb = self.sort_key(&b.0);
+            ka.cmp(&kb)
+        });
+        entries
+    }
+
     /// Try to save deck to SRAM.
     fn try_save(&mut self) -> bool {
         if self.cards.is_empty() {
@@ -743,9 +764,9 @@ impl<'a, 'd, I: InputSource> DeckBuilder<'a, 'd, I> {
         let qty_prefix = if self.field == Field::Quantity { "> " } else { "  " };
         self.display.println(&format!("{}Qty: [{}]", qty_prefix, self.quantity));
 
-        // Recent picks (max 4 to save space)
-        self.display.println("Rec:");
-        for (i, (no, qty)) in self.recent_picks.iter().take(4).enumerate() {
+        // Deck list (sorted: Member -> Live -> Energy, then card_no)
+        self.display.println("Deck:");
+        for (i, (no, qty)) in self.sorted_deck().iter().take(4).enumerate() {
             if let Some(entry) = self.find_card(no) {
                 self.display.println(&format!(" {}. {}x{}", i + 1, entry.name.chars().take(12).collect::<String>(), qty));
             } else {
