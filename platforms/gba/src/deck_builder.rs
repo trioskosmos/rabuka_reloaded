@@ -50,7 +50,16 @@ impl Legality {
             Legality::Legal => "Legal",
             Legality::WrongMemberCount { current } => "Member cards: need exactly 48",
             Legality::WrongLiveCount { current } => "Live cards: need exactly 12",
-            Legality::TooManyCopies { .. } => "Max 4 copies per card (Rule 6.1.1.2)",
+            Legality::TooManyCopies { card_no, count } => "Max 4 copies per card base",
+        }
+    }
+
+    fn detail(&self) -> Option<String> {
+        match self {
+            Legality::WrongMemberCount { current } => Some(format!("(have {})", current)),
+            Legality::WrongLiveCount { current } => Some(format!("(have {})", current)),
+            Legality::TooManyCopies { card_no, count } => Some(format!("{}: {} copies", card_no, count)),
+            Legality::Legal => None,
         }
     }
 
@@ -78,10 +87,16 @@ fn check_legality(cards: &[(String, u8)], all_cards: &[CardEntry]) -> Legality {
         }
     }
     
-    // Rule 6.1.1.2: Max 4 copies per card_no
+    // Rule 6.1.1.2: Max 4 copies per card base (across all rarities)
+    // Aggregate copies by base card number
+    let mut base_counts: alloc::collections::BTreeMap<String, u8> = alloc::collections::BTreeMap::new();
     for (no, qty) in cards {
-        if *qty > MAX_COPIES {
-            return Legality::TooManyCopies { card_no: no.clone(), count: *qty };
+        let base = Self::extract_base_card_no(no);
+        *base_counts.entry(base).or_insert(0) += *qty;
+    }
+    for (base, total) in base_counts {
+        if total > MAX_COPIES {
+            return Legality::TooManyCopies { card_no: base, count: total };
         }
     }
     
@@ -392,27 +407,56 @@ impl<'a, 'd, I: InputSource> DeckBuilder<'a, 'd, I> {
 
     /// Add a card to the deck.
     fn add_card(&mut self, card_no: String, qty: u8) {
-        // Check if already in deck
+        // Check total copies across all rarities of same base card (Rule 6.1.1.2)
+        let base_no = Self::extract_base_card_no(&card_no);
+        let mut total_copies = 0;
+        for (existing_no, existing_qty) in &self.cards {
+            if Self::extract_base_card_no(existing_no) == base_no {
+                total_copies += *existing_qty;
+            }
+        }
+        
+        // Auto-trim to max 4 copies across all rarities
+        let available_slots = 4u8.saturating_sub(total_copies);
+        if available_slots == 0 {
+            return; // Already at max for this card base
+        }
+        let actual_qty = qty.min(available_slots);
+        
+        // Check if already in deck (same exact card_no)
         for (existing_no, existing_qty) in &mut self.cards {
             if existing_no == &card_no {
-                let new_qty = (*existing_qty + qty).min(4);
+                let new_qty = (*existing_qty + actual_qty).min(4);
                 *existing_qty = new_qty;
-                // Update recent picks
                 self.update_recent(card_no, new_qty);
-                // Update legality
                 self.legality = check_legality(&self.cards, &self.all_cards);
                 self.update_suggestions();
                 return;
             }
         }
+        
         // New card
-        if self.cards.len() < MAX_DECK_CARDS && self.total_cards() + qty as usize <= MAX_DECK_CARDS {
-            self.cards.push((card_no.clone(), qty));
-            self.update_recent(card_no, qty);
-            // Update legality
+        if self.cards.len() < MAX_DECK_CARDS && self.total_cards() + actual_qty as usize <= MAX_DECK_CARDS {
+            self.cards.push((card_no.clone(), actual_qty));
+            self.update_recent(card_no, actual_qty);
             self.legality = check_legality(&self.cards, &self.all_cards);
             self.update_suggestions();
         }
+    }
+
+    /// Extract base card number (without rarity suffix) for cross-rarity copy checking.
+    /// e.g., "PL!-BP1-001-R" -> "PL!-BP1-001"
+    fn extract_base_card_no(card_no: &str) -> String {
+        // Find the last dash that separates base from rarity
+        if let Some(last_dash) = card_no.rfind('-') {
+            // Check if suffix is a known rarity
+            let suffix = &card_no[last_dash + 1..];
+            let known_rarities = ["N", "N＋", "R", "R＋", "SR", "SR＋", "SEC", "P", "P＋", "PR", "PR＋", "L", "PE＋", "SECL", "SRE", "SD", "SD2"];
+            if known_rarities.contains(&suffix) {
+                return card_no[..last_dash].to_string();
+            }
+        }
+        card_no.to_string()
     }
 
     fn update_recent(&mut self, card_no: String, qty: u8) {
@@ -658,14 +702,13 @@ impl<'a, 'd, I: InputSource> DeckBuilder<'a, 'd, I> {
         self.display.clear();
 
         // Header with legality indicator
-        let legality_str = if self.legality.is_legal() { "✓ Legal" } else { "✗ Illegal" };
-        self.display.println(&format!("DECK BUILDER [{}/{}] {} A:Done", self.total_cards(), MAX_DECK_CARDS, legality_str));
+        let legality_str = if self.legality.is_legal() { "OK" } else { "NG" };
+        self.display.println(&format!("DECK [{}/{}] {} A:Done", self.total_cards(), REQUIRED_MAIN_DECK, legality_str));
 
         // Field 1: Deck Name
         let name_prefix = if self.field == Field::DeckName { "> " } else { "  " };
         let mut name_display = format!("{}Name: {}", name_prefix, self.deck_name);
         if self.field == Field::DeckName && self.name_cursor <= self.deck_name.len() {
-            // Show cursor as underscore at current position
             let cursor_pos = name_display.len() - (self.deck_name.len() - self.name_cursor);
             if cursor_pos < name_display.len() {
                 name_display.insert(cursor_pos, '_');
@@ -677,63 +720,61 @@ impl<'a, 'd, I: InputSource> DeckBuilder<'a, 'd, I> {
 
         // Field 2: Series
         let series_prefix = if self.field == Field::Series { "> " } else { "  " };
-        self.display.println(&format!("{}Series: {}", series_prefix, SERIES_LIST[self.series_idx]));
+        self.display.println(&format!("{}Ser: {}", series_prefix, SERIES_LIST[self.series_idx]));
 
         // Field 3: Rarity
         let rarity_prefix = if self.field == Field::Rarity { "> " } else { "  " };
-        self.display.println(&format!("{}Rarity: {}", rarity_prefix, RARITY_LIST[self.rarity_idx]));
+        self.display.println(&format!("{}Rar: {}", rarity_prefix, RARITY_LIST[self.rarity_idx]));
 
         // Field 4: Card
         let card_prefix = if self.field == Field::Card { "> " } else { "  " };
         if !self.filtered_cards.is_empty() {
             let card_no = &self.filtered_cards[self.card_idx];
             if let Some(entry) = self.find_card(card_no) {
-                self.display.println(&format!("{}Card: {}  {}", card_prefix, card_no, entry.name));
+                self.display.println(&format!("{}Crd: {}", card_prefix, entry.name));
             } else {
-                self.display.println(&format!("{}Card: {}", card_prefix, card_no));
+                self.display.println(&format!("{}Crd: {}", card_prefix, card_no));
             }
         } else {
-            self.display.println(&format!("{}Card: (none)", card_prefix));
+            self.display.println(&format!("{}Crd: (none)", card_prefix));
         }
 
         // Field 5: Quantity
         let qty_prefix = if self.field == Field::Quantity { "> " } else { "  " };
-        self.display.println(&format!("{}Qty:   [{}]", qty_prefix, self.quantity));
+        self.display.println(&format!("{}Qty: [{}]", qty_prefix, self.quantity));
 
-        // Legality detail when illegal
-        if !self.legality.is_legal() {
-            self.display.println(&format!("  {}", self.legality.message()));
-            // Auto-fix suggestions
-            if !self.suggestions.is_empty() {
-                self.display.println("  Suggestions:");
-                for s in &self.suggestions {
-                    self.display.println(&format!("    + {}", s));
-                }
-            }
-        }
-
-        self.display.println(""); // spacer
-
-        // Recent picks
-        self.display.println("Recent:");
-        for (i, (no, qty)) in self.recent_picks.iter().enumerate() {
+        // Recent picks (max 4 to save space)
+        self.display.println("Rec:");
+        for (i, (no, qty)) in self.recent_picks.iter().take(4).enumerate() {
             if let Some(entry) = self.find_card(no) {
-                self.display.println(&format!("  {}. {}x{} {}", i + 1, no, qty, entry.name));
+                self.display.println(&format!(" {}. {}x{}", i + 1, entry.name.chars().take(12).collect::<String>(), qty));
             } else {
-                self.display.println(&format!("  {}. {}x{}", i + 1, no, qty));
+                self.display.println(&format!(" {}. {}x{}", i + 1, no, qty));
             }
         }
 
-        // Hint bar
-        self.display.println("");
+        // Legality at bottom
+        if self.legality.is_legal() {
+            self.display.println(" OK");
+        } else {
+            self.display.println(&format!(" NG: {}", self.legality.message()));
+            if let Some(detail) = self.legality.detail() {
+                self.display.println(&format!("   {}", detail));
+            }
+            if !self.suggestions.is_empty() {
+                self.display.println(&format!(" > {}", self.suggestions[0]));
+            }
+        }
+
+        // Hint bar (last line)
         match self.field {
             Field::DeckName => self.display.println("L/R:Detail"),
             Field::Series | Field::Rarity | Field::Card => self.display.println("L/R:Detail"),
             Field::Quantity => {
                 if self.legality.is_legal() {
-                    self.display.println("A:Save B:Remove L/R:Detail");
+                    self.display.println("A:Save B:Del L/R:Det");
                 } else {
-                    self.display.println("B:Remove L/R:Detail (Fix errors to save)");
+                    self.display.println("B:Del L/R:Det Fix>Save");
                 }
             }
         }
