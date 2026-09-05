@@ -13,7 +13,7 @@ use alloc::string::String;
 use alloc::string::ToString;
 use alloc::vec::Vec;
 
-use crate::game::platform_ui::{PlatformUi, card_ability_text, card_stat_text, one_line, wrap_text};
+use crate::game::platform_ui::{PlatformUi, card_ability_text, card_detail_title, card_stat_text, one_line, wrap_text};
 use crate::game_state::GameState;
 
 /// Stage-size cards (5x6 tiles) are the largest art that fits a shared grid
@@ -159,7 +159,7 @@ pub fn render_card_choice_grid(
                 .as_ref()
                 .and_then(|no| db.get_card_by_no(no));
             let header: Vec<String> = src
-                .map(|c| alloc::vec![format!("[{}] {}", c.card_no, c.name)])
+                .map(|c| alloc::vec![card_detail_title(c)])
                 .unwrap_or_default();
             let body = match src {
                 Some(c) => {
@@ -178,7 +178,7 @@ pub fn render_card_choice_grid(
             if sel < cards.len() && !cards[sel].card_no.is_empty() {
                 if let Some(c) = db.get_card_by_no(&cards[sel].card_no) {
                     let header: Vec<String> = alloc::vec![
-                        format!("[{}] {}", c.card_no, c.name),
+                        card_detail_title(c),
                         card_stat_text(c),
                     ];
                     ui.show_detail_screen(

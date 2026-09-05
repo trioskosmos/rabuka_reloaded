@@ -17,8 +17,6 @@ extern crate alloc;
 
 use alloc::vec::Vec;
 
-use rabuka_engine::card::Card;
-use rabuka_engine::card_loader::CardLoader;
 use rabuka_engine::game::platform_ui;
 use rabuka_engine::rng;
 
@@ -54,16 +52,6 @@ impl InputSource for AutoInput {
     }
 }
 
-fn load_deck_cards(
-    _decks: &[rabuka_gba::decks_baked::DeckInfo],
-    idx1: usize,
-    idx2: usize,
-) -> Vec<Card> {
-    let mut cards = rabuka_engine::game::deck_parser::load_two_decks(idx1, idx2);
-    CardLoader::attach_abilities(&mut cards);
-    cards
-}
-
 #[agb::entry]
 fn main(mut gba: agb::Gba) -> ! {
     let mut display = rabuka_gba::ui::Display::new(gba.graphics.get());
@@ -76,7 +64,7 @@ fn main(mut gba: agb::Gba) -> ! {
     loop {
         let ui = GbaUi::new(&mut display, &mut input);
         platform_ui::run_embedded_game(ui, &names, |i| decks[i].cards, |a, b| {
-            load_deck_cards(decks, a, b)
+            rabuka_engine::game::deck_parser::load_two_decks_with_abilities(a, b)
         });
     }
 }

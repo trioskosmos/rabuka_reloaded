@@ -35,8 +35,7 @@ pub struct DeckList {
 /// Load and merge two deck JSON files from DECK_CARD_FILES, deduplicating by card_no.
 /// JSON parsing requires the `serde_support` feature; on no-serde targets (DS/PS1/etc)
 /// this returns cards from the embedded compact blob when available, else empty.
-pub fn load_two_decks(deck1_idx: usize, deck2_idx: usize) -> Vec<crate::card::Card> {
-    #[cfg(feature = "serde_support")]
+pub fn load_two_decks(deck1_idx: usize, deck2_idx: usize) -> Vec<crate::card::Card> {    #[cfg(feature = "serde_support")]
     {
         let json1 = DECK_CARD_FILES[deck1_idx];
         let mut merged: Vec<crate::card::Card> = serde_json::from_str(json1).unwrap_or_default();
@@ -73,6 +72,18 @@ pub fn load_two_decks(deck1_idx: usize, deck2_idx: usize) -> Vec<crate::card::Ca
         }
         merged
     }
+}
+
+/// Load two decks' cards with abilities attached — the one-liner every
+/// console port's boot flow inlines (load_two_decks + attach_abilities).
+/// `no_std`-safe.
+pub fn load_two_decks_with_abilities(
+    deck1_idx: usize,
+    deck2_idx: usize,
+) -> Vec<crate::card::Card> {
+    let mut cards = load_two_decks(deck1_idx, deck2_idx);
+    crate::card_loader::CardLoader::attach_abilities(&mut cards);
+    cards
 }
 
 pub struct DeckParser;

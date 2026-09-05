@@ -109,8 +109,7 @@ fn run_game() {
     };
 
     display.println("Loading...");
-    let mut cards: Vec<Card> = rabuka_engine::deck_parser::load_two_decks(d1, d2);
-    rabuka_engine::card_loader::CardLoader::attach_abilities(&mut cards);
+    let cards: Vec<Card> = rabuka_engine::deck_parser::load_two_decks_with_abilities(d1, d2);
 
     let p1: Vec<&str> = decks[d1].cards.iter().map(|c| c.as_str()).collect();
     let p2: Vec<&str> = decks[d2].cards.iter().map(|c| c.as_str()).collect();

@@ -258,7 +258,7 @@ pub struct ExecCodeRequest {
 #[derive( Clone)]
 #[cfg_attr(feature = "serde_support", derive(Serialize,  Deserialize))]
 pub struct UiConfig {
-    pub current_lang: String,          // "jp" or "en"
+    pub current_lang: crate::game::language::Lang, // serialized as "jp" | "en"
     pub perspective_player: i32,       // 0 or 1
     pub selected_turn: i32,            // -1 means all
     pub selected_perf_turn: i32,       // -1 means latest
@@ -270,7 +270,7 @@ pub struct UiConfig {
 impl Default for UiConfig {
     fn default() -> Self {
         Self {
-            current_lang: "jp".to_string(),
+            current_lang: crate::game::language::Lang::default(),
             perspective_player: 0,
             selected_turn: -1,
             selected_perf_turn: -1,
@@ -951,7 +951,11 @@ async fn set_ui_config(
     let mut ui_config = lock_recover(&data.ui_config);
 
     if let Some(lang) = &req.current_lang {
-        ui_config.current_lang = lang.clone();
+        // Unknown codes are ignored (previous value kept) instead of
+        // stored — the frontend only understands "jp" | "en".
+        if let Some(parsed) = crate::game::language::Lang::from_code(lang) {
+            ui_config.current_lang = parsed;
+        }
     }
     if let Some(perspective) = req.perspective_player {
         ui_config.perspective_player = perspective;

@@ -19,7 +19,7 @@ use crate::ability::types::Choice;
 use crate::ability::util::zone_cards;
 
 use crate::game::game_setup;
-use crate::game::platform_ui::{card_ability_text, card_stat_text, choose_card_grid, one_line, PlatformUi, wrap_text};
+use crate::game::platform_ui::{card_ability_text, card_detail_title, card_stat_text, choose_card_grid, one_line, PlatformUi, wrap_text};
 use crate::game_state::GameState;
 use crate::turn::TurnEngine;
 
@@ -539,7 +539,7 @@ pub fn human_turn(
                 match card {
                     Some(c) => {
                         let mut header: Vec<String> = Vec::new();
-                        header.push(format!("[{}] {}", c.card_no, c.name));
+                        header.push(card_detail_title(c));
                         header.push(card_stat_text(c));
                         let ab = card_ability_text(c);
                         let body = if ab.trim().is_empty() {
@@ -561,7 +561,7 @@ pub fn human_turn(
                     .and_then(|n| gs.card_database.get_card_by_no(n));
                 if let Some(c) = card {
                     let mut header: Vec<String> = Vec::new();
-                    header.push(format!("[{}] {}", c.card_no, c.name));
+                    header.push(card_detail_title(c));
                     header.push(card_stat_text(c));
                     ui.show_detail_screen(
                         gs,
@@ -603,10 +603,9 @@ pub fn handle_choice(ui: &mut dyn PlatformUi, gs: &mut GameState) -> bool {
                         .card_id
                         .and_then(|cid| gs.card_database.get_card(cid))
                     {
-                        Some(c) => (
-                            format!("[{}] {}", c.card_no, o.card_name),
-                            c.card_no.to_string(),
-                        ),
+                        // Option names come from the same DB read, so the
+                        // shared title helper covers both.
+                        Some(c) => (card_detail_title(c), c.card_no.to_string()),
                         None => (o.card_name.clone(), String::new()),
                     };
                     (header, o.ability_text.clone(), card_no)

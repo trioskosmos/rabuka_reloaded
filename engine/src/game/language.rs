@@ -20,8 +20,11 @@ use crate::game::platform_ui::PlatformUi;
 /// UI language. Default is Japanese (matches the 3DS default and the web
 /// server's `"jp"` default).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde_support", derive(serde::Serialize, serde::Deserialize))]
 pub enum Lang {
+    #[cfg_attr(feature = "serde_support", serde(rename = "en"))]
     English,
+    #[cfg_attr(feature = "serde_support", serde(rename = "jp"))]
     Japanese,
 }
 

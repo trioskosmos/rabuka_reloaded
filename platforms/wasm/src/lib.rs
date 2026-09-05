@@ -19,7 +19,6 @@ use core::panic::PanicInfo;
 use alloc::vec::Vec;
 
 use rabuka_engine::card::Card;
-use rabuka_engine::card_loader::CardLoader;
 use rabuka_engine::game::match_runner::{run_match, MatchMode};
 use rabuka_engine::game::platform_ui::PlatformUi;
 use rabuka_engine::rng;
@@ -108,9 +107,7 @@ impl PlatformUi for HostUi {
 }
 
 fn load_deck_cards(idx1: usize, idx2: usize) -> Vec<Card> {
-    let mut cards = rabuka_engine::game::deck_parser::load_two_decks(idx1, idx2);
-    CardLoader::attach_abilities(&mut cards);
-    cards
+    rabuka_engine::game::deck_parser::load_two_decks_with_abilities(idx1, idx2)
 }
 
 /// Playable game: mode select -> deck select -> full match, all rendered

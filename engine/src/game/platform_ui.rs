@@ -117,10 +117,7 @@ pub trait PlatformUi {
     /// and card-bearing text menus (R = focused card).
     fn show_card_detail(&mut self, gs: &GameState, card_no: &str) {
         let (title, body) = match gs.card_database.get_card_by_no(card_no) {
-            Some(c) => (
-                format!("[{}] {}", c.card_no, c.name),
-                card_ability_text(c),
-            ),
+            Some(c) => (card_detail_title(c), card_ability_text(c)),
             None => (card_no.to_string(), String::new()),
         };
         let lines = wrap_text(&body, self.option_cols());
@@ -454,6 +451,12 @@ pub fn card_stat_text(card: &Card) -> String {
         }
         CardType::Energy => String::new(),
     }
+}
+
+/// Detail-screen title line for a card: `[card_no] name`. Every port's
+/// card/art/detail viewer opens with this line, so it lives here once.
+pub fn card_detail_title(card: &Card) -> String {
+    format!("[{}] {}", card.card_no, card.name)
 }
 
 /// A card's ability text. In compact builds `ability_text()` is empty, so the

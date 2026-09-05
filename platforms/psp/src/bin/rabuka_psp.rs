@@ -216,8 +216,7 @@ fn test_ai_vs_ai_psp() -> Result<usize, alloc::string::String> {
         return Err("need 2+ decks".into());
     }
 
-    let mut all_cards = rabuka_engine::deck_parser::load_two_decks(0, 1);
-    CardLoader::attach_abilities(&mut all_cards);
+    let all_cards = rabuka_engine::deck_parser::load_two_decks_with_abilities(0, 1);
 
     // Build DeckList from DeckListEntry
     let to_deck_list = |e: &DeckEntry| -> rabuka_engine::deck_parser::DeckList {

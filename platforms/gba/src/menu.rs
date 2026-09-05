@@ -18,11 +18,10 @@
 
 extern crate alloc;
 
-use alloc::format;
 use alloc::string::String;
 use alloc::vec::Vec;
 
-use rabuka_engine::game::platform_ui::{card_ability_text, card_stat_text};
+use rabuka_engine::game::platform_ui::{card_ability_text, card_detail_title, card_stat_text};
 use rabuka_engine::game_state::GameState;
 
 use crate::display::Display;
@@ -97,7 +96,7 @@ pub fn show_card_detail<I: InputSource>(
 ) {
     if let Some(card) = gs.card_database.get_card_by_no(&card_no) {
         let header: Vec<String> = alloc::vec![
-            format!("[{}] {}", card.card_no, card.name),
+            card_detail_title(card),
             card_stat_text(card),
         ];
         show_detail_screen(
