@@ -21,33 +21,36 @@ use crate::sram::write_sav;
 
 /// Maximum cards in a deck (matches SAV format).
 const MAX_DECK_CARDS: usize = 72;
-/// Minimum cards for a legal deck.
-const MIN_DECK_CARDS: usize = 40;
+/// Official deck construction rules (Rule 6.1.1):
+/// - Exactly 48 member cards
+/// - Exactly 12 live cards
+/// - Energy deck = 12 energy cards (handled by engine)
+const REQUIRED_MEMBER_CARDS: usize = 48;
+const REQUIRED_LIVE_CARDS: usize = 12;
+const REQUIRED_MAIN_DECK: usize = REQUIRED_MEMBER_CARDS + REQUIRED_LIVE_CARDS; // 60
 /// Maximum deck name length (matches SAV_NAME_LEN = 32, 31 chars + NUL).
 const MAX_NAME_LEN: usize = 31;
 /// Recent picks to show.
 const RECENT_PICKS: usize = 8;
-/// Maximum copies of a single card.
+/// Maximum copies of a single card (Rule 6.1.1.2).
 const MAX_COPIES: u8 = 4;
-/// Maximum live cards in deck.
-const MAX_LIVE_CARDS: u8 = 4;
 
 /// Legality check result.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Legality {
     Legal,
-    TooFewCards { current: usize },
-    TooManyCards { current: usize },
-    TooManyLiveCards { count: u8 },
+    WrongMemberCount { current: usize },
+    WrongLiveCount { current: usize },
+    TooManyCopies { card_no: String, count: u8 },
 }
 
 impl Legality {
     fn message(&self) -> &'static str {
         match self {
             Legality::Legal => "Legal",
-            Legality::TooFewCards { .. } => "Too few cards (min 40)",
-            Legality::TooManyCards { .. } => "Too many cards (max 72)",
-            Legality::TooManyLiveCards { .. } => "Too many live cards (max 4)",
+            Legality::WrongMemberCount { current } => "Member cards: need exactly 48",
+            Legality::WrongLiveCount { current } => "Live cards: need exactly 12",
+            Legality::TooManyCopies { .. } => "Max 4 copies per card (Rule 6.1.1.2)",
         }
     }
 
@@ -56,29 +59,74 @@ impl Legality {
     }
 }
 
-/// Check deck legality.
+/// Check deck legality per official rules (Rule 6.1.1).
+/// Main deck: exactly 48 member + exactly 12 live = 60 total.
+/// Energy deck: exactly 12 energy (handled by engine).
+/// Max 4 copies per card_no (Rule 6.1.1.2).
 fn check_legality(cards: &[(String, u8)], all_cards: &[CardEntry]) -> Legality {
-    let total: usize = cards.iter().map(|(_, q)| *q as usize).sum();
+    // Count member and live cards
+    let mut member_count: usize = 0;
+    let mut live_count: usize = 0;
     
-    // Min/max cards
-    if total < MIN_DECK_CARDS {
-        return Legality::TooFewCards { current: total };
-    }
-    if total > MAX_DECK_CARDS {
-        return Legality::TooManyCards { current: total };
+    for (no, qty) in cards {
+        if let Some(entry) = all_cards.iter().find(|c| c.card_no == *no) {
+            match entry.card_type {
+                CardType::Member => member_count += *qty as usize,
+                CardType::Live => live_count += *qty as usize,
+                CardType::Energy => {} // not in main deck
+            }
+        }
     }
     
-    // Live card count
-    let live_count: u8 = cards.iter()
-        .filter_map(|(no, q)| all_cards.iter().find(|c| c.card_no == *no))
-        .filter(|c| c.card_type == CardType::Live)
-        .map(|c| *c.1)
-        .sum();
-    if live_count > MAX_LIVE_CARDS {
-        return Legality::TooManyLiveCards { count: live_count };
+    // Rule 6.1.1.2: Max 4 copies per card_no
+    for (no, qty) in cards {
+        if *qty > MAX_COPIES {
+            return Legality::TooManyCopies { card_no: no.clone(), count: *qty };
+        }
+    }
+    
+    // Rule 6.1.1.1: Exactly 48 member cards
+    if member_count != REQUIRED_MEMBER_CARDS {
+        return Legality::WrongMemberCount { current: member_count };
+    }
+    
+    // Rule 6.1.1.1: Exactly 12 live cards
+    if live_count != REQUIRED_LIVE_CARDS {
+        return Legality::WrongLiveCount { current: live_count };
     }
     
     Legality::Legal
+}
+
+/// Auto-fix suggestions for illegal decks.
+/// Returns up to 3 suggested card numbers to add/replace.
+fn suggest_fixes(legality: &Legality, cards: &[(String, u8)], all_cards: &[CardEntry], filtered_cards: &[String]) -> Vec<String> {
+    match legality {
+        Legality::WrongMemberCount { current } => {
+            // Need more/fewer member cards - suggest member cards from filtered list
+            let diff = (REQUIRED_MEMBER_CARDS as isize - current as isize).abs() as usize;
+            filtered_cards.iter()
+                .filter_map(|no| all_cards.iter().find(|c| c.card_no == *no))
+                .filter(|c| c.card_type == CardType::Member)
+                .take(diff.min(3))
+                .map(|c| c.card_no.clone())
+                .collect()
+        }
+        Legality::WrongLiveCount { current } => {
+            // Need more/fewer live cards - suggest live cards from filtered list
+            let diff = (REQUIRED_LIVE_CARDS as isize - current as isize).abs() as usize;
+            filtered_cards.iter()
+                .filter_map(|no| all_cards.iter().find(|c| c.card_no == *no))
+                .filter(|c| c.card_type == CardType::Live)
+                .take(diff.min(3))
+                .map(|c| c.card_no.clone())
+                .collect()
+        }
+        Legality::TooManyCopies { card_no, count } => {
+            vec![format!("Reduce {} from {} to 4", card_no, count)]
+        }
+        Legality::Legal => vec![],
+    }
 }
 
 /// Character set for deck name input (GBA has no keyboard).
@@ -134,6 +182,7 @@ pub struct DeckBuilder<'a, 'd, I: InputSource> {
     deck_name: String,
     cards: Vec<(String, u8)>, // (card_no, quantity)
     legality: Legality,        // Current legality status
+    suggestions: Vec<String>,  // Auto-fix suggestions
 
     // UI state
     field: Field,
@@ -165,6 +214,7 @@ impl<'a, 'd, I: InputSource> DeckBuilder<'a, 'd, I> {
             deck_name: String::new(),
             cards: Vec::new(),
             legality: Legality::TooFewCards { current: 0 },
+            suggestions: Vec::new(),
             field: Field::DeckName,
             series_idx: 0,
             rarity_idx: 0,
@@ -175,6 +225,7 @@ impl<'a, 'd, I: InputSource> DeckBuilder<'a, 'd, I> {
             recent_picks: Vec::new(),
             filtered_cards: Vec::new(),
         };
+        builder.update_suggestions();
         builder.rebuild_filtered();
         builder
     }
@@ -350,6 +401,7 @@ impl<'a, 'd, I: InputSource> DeckBuilder<'a, 'd, I> {
                 self.update_recent(card_no, new_qty);
                 // Update legality
                 self.legality = check_legality(&self.cards, &self.all_cards);
+                self.update_suggestions();
                 return;
             }
         }
@@ -359,6 +411,7 @@ impl<'a, 'd, I: InputSource> DeckBuilder<'a, 'd, I> {
             self.update_recent(card_no, qty);
             // Update legality
             self.legality = check_legality(&self.cards, &self.all_cards);
+            self.update_suggestions();
         }
     }
 
@@ -370,6 +423,15 @@ impl<'a, 'd, I: InputSource> DeckBuilder<'a, 'd, I> {
         if self.recent_picks.len() > RECENT_PICKS {
             self.recent_picks.truncate(RECENT_PICKS);
         }
+    }
+
+    fn update_suggestions(&mut self) {
+        self.suggestions = suggest_fixes(
+            &self.legality,
+            &self.cards,
+            &self.all_cards,
+            &self.filtered_cards,
+        );
     }
 
     /// Try to save deck to SRAM.
@@ -579,6 +641,7 @@ impl<'a, 'd, I: InputSource> DeckBuilder<'a, 'd, I> {
                 self.recent_picks.retain(|(n, _)| n != &last_no);
                 // Update legality
                 self.legality = check_legality(&self.cards, &self.all_cards);
+                self.update_suggestions();
             }
         } else if self.input.just_pressed(Button::L) || self.input.just_pressed(Button::R) {
             if !self.filtered_cards.is_empty() {
@@ -640,6 +703,13 @@ impl<'a, 'd, I: InputSource> DeckBuilder<'a, 'd, I> {
         // Legality detail when illegal
         if !self.legality.is_legal() {
             self.display.println(&format!("  {}", self.legality.message()));
+            // Auto-fix suggestions
+            if !self.suggestions.is_empty() {
+                self.display.println("  Suggestions:");
+                for s in &self.suggestions {
+                    self.display.println(&format!("    + {}", s));
+                }
+            }
         }
 
         self.display.println(""); // spacer
