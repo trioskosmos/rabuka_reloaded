@@ -4,7 +4,7 @@
 
 | Cart Type | Max ROM | Practical Limit | Our Current |
 |-----------|---------|-----------------|-------------|
-| Standard | 32 MB | 32 MB | **10.8 MB** |
+| Standard | 32 MB | 32 MB | **29.1 MB (8bpp)** / 10.3 MB (4bpp) |
 | Bank-switched | 64 MB | Rare/expensive | — |
 
 **GBA addressable ROM:** 0x08000000 (WS0), 0x0A000000 (WS1), 0x0C000000 (WS2) — all mirror the same physical ROM (gbadoc).
@@ -15,12 +15,12 @@
 
 ### Detail Art (Zoom View)
 - **Resolution:** 96×144 pixels (12×18 tiles)
-- **Format:** 8bpp (256 colors) → 96×144 = 13,824 bytes tiles
-- **Palette:** 240 colors (indices 0-239), rgb15 little-endian → 480 bytes
-- **Total per card:** 14,304 bytes
+- **Format:** 8bpp (240 colors) → 96×144 = 13,824 bytes tiles
+- **Palette:** 240 colors (indices 0-239), rgb15 little-endian → 484 bytes (includes header)
+- **Total per card:** 14,308 bytes
 
 ### Front Variants (Hand/Stage/Live/Waited)
-All use **shared MASTER_PAL** (240 colors, 480 bytes):
+All use **shared MASTER_PAL** (240 colors, 484 bytes):
 
 | Variant | Resolution | Tiles | Size (8bpp) |
 |---------|------------|-------|-------------|
@@ -29,19 +29,19 @@ All use **shared MASTER_PAL** (240 colors, 480 bytes):
 | Live | 22×16 | 3×2 = 6 | 384 B |
 | Waited | 32×24 | 4×3 = 12 | 768 B |
 
-**MASTER_PAL:** 240 colors, shared across all fronts + detail art (Tier 2).
+**MASTER_PAL:** 240 colors, shared across all fronts + detail art.
 
 ---
 
-## Current Build (Deck-Only)
+## Current Build (All 1,809 Non-Energy Cards)
 
-| Metric | Value |
-|--------|-------|
-| Cards baked | 302 (deck-used, non-energy) |
-| Detail art | 302 × 14,304 B = 4.3 MB |
-| Fronts (4 variants) | ~3.5 MB |
-| MASTER_PAL + UI | ~0.5 MB |
-| **Total ROM** | **~10.8 MB** |
+| Metric | Value (8bpp) | Value (4bpp) |
+|--------|--------------|--------------|
+| Cards baked | 1,809 (all non-energy) | 1,809 |
+| Detail art | 1,809 × 14.3 KB = 25.9 MB | 1,809 × 7.1 KB = 12.9 MB |
+| Fronts (4 variants) | ~12.6 MB | ~6.3 MB |
+| MASTER_PAL + UI | ~0.5 MB | ~0.5 MB |
+| **LZ77 compressed ROM** | **29.1 MB** | **10.3 MB** |
 
 ---
 
@@ -49,8 +49,8 @@ All use **shared MASTER_PAL** (240 colors, 480 bytes):
 
 | Type (Japanese) | Count | Baked? |
 |-----------------|-------|--------|
-| メンバー (Member) | 1,518 | Deck-used only |
-| ライブ (Live) | 291 | Deck-used only |
+| メンバー (Member) | 1,518 | Yes (all) |
+| ライブ (Live) | 291 | Yes (all) |
 | エネルギー (Energy) | 717 | **Never** — generated at runtime |
 
 **Energy cards:** Not in WebP sources. Engine generates 12 energy cards/player at match start (Rule 6.1.1.3).
@@ -61,12 +61,17 @@ All use **shared MASTER_PAL** (240 colors, 480 bytes):
 
 Tested on real card art (`LL-PR-004-PR`, 1024×733 source) with hash-based LZ77:
 
-| BPP | Colors | Palette | Raw tiles | Compressed | Ratio | ROM/card |
-|-----|--------|---------|-----------|------------|-------|----------|
-| **4** | 16 | 34 B | 6,912 B | 4,834 B | 69.9% | 4.8 KB |
-| **5** | 32 | 66 B | 13,824 B | 6,104 B | 44.2% | 6.1 KB |
+| BPP | Colors | Palette | Raw tiles | Compressed | Ratio | Est. ROM (1,809 cards) | Headroom |
+|-----|--------|---------|-----------|------------|-------|------------------------|----------|
+| **8** | 240 | 484 B | 13,824 B | 8,351 B | 60.4% | **29.1 MB** | 2.9 MB |
+| **7** | 128 | 258 B | 13,824 B | 7,528 B | 54.5% | ~26 MB | ~6 MB |
+| **6** | 64 | 130 B | 13,824 B | 6,914 B | 50.0% | ~24 MB | ~8 MB |
+| **5** | 32 | 66 B | 13,824 B | 6,104 B | 44.2% | ~21 MB | ~11 MB |
+| **4** | 16 | 34 B | 6,912 B | 4,834 B | 69.9% | **10.3 MB** | 21.7 MB |
 
-### The 4bpp → 5bpp Gap Explained
+**Source:** Tested on `LL-PR-004-PR` (1024×733 WebP) quantized to each palette size with Floyd-Steinberg dithering, compressed with hash-based LZ77 matching BIOS format.
+
+### Why the 4bpp → 5bpp Jump Is So Large
 
 | Factor | 4bpp | 5bpp | Change |
 |--------|------|------|--------|
@@ -85,22 +90,228 @@ Tested on real card art (`LL-PR-004-PR`, 1024×733 source) with hash-based LZ77:
 
 **Concrete cards tested:** `LL-PR-004-PR` (1024×733), `PL!-BP1-001-R` (896×642), `PL!S-BP2-001-R+` (1024×733) — all show same pattern.
 
-## Expansion Scenarios
+---
 
-### Tier 1: All Non-Energy Cards (1,809 cards)
+## Current Build (All 1,809 Non-Energy Cards)
 
-| Approach | ROM | Feasibility |
-|----------|-----|-------------|
-| Current quality, uncompressed | ~36 MB | ❌ Exceeds 32 MB |
-| LZ77 compressed (BIOS SWI 0x11) | ~22 MB | ✅ Fits |
-| LZ77 + shared MASTER_PAL (detail) | ~21 MB | ✅ Comfortable |
-| LZ77 + shared palette + 64×96 detail | ~15 MB | ✅ Headroom |
+| Metric | Value (8bpp) | Value (4bpp) |
+|--------|--------------|--------------|
+| Cards baked | 1,809 (all non-energy) | 1,809 |
+| Detail art | 1,809 × 14.3 KB = 25.9 MB | 1,809 × 7.1 KB = 12.9 MB |
+| Fronts (4 variants) | ~12.6 MB | ~6.3 MB |
+| MASTER_PAL + UI | ~0.5 MB | ~0.5 MB |
+| **LZ77 compressed ROM** | **29.1 MB** | **10.3 MB** |
 
-### Tier 2: All 2,526 Cards
+---
 
-| Approach | ROM | Feasibility |
-|----------|-----|-------------|
-| LZ77 + shared palette + 64×96 | ~21 MB | ✅ Fits 32 MB |
+## Card Database (cards.json)
+
+| Type (Japanese) | Count | Baked? |
+|-----------------|-------|--------|
+| メンバー (Member) | 1,518 | Yes (all) |
+| ライブ (Live) | 291 | Yes (all) |
+| エネルギー (Energy) | 717 | **Never** — generated at runtime |
+
+**Energy cards:** Not in WebP sources. Engine generates 12 energy cards/player at match start (Rule 6.1.1.3).
+
+---
+
+## D-Pad Press Comparison (Optimized vs Alphabetical Export)
+
+Tested on all 13 baked decks with web UI export using GBA-optimal sort (series → rarity → card_no):
+
+| Deck | Original (alphabetical) | Optimized (series→rarity→card_no) | Savings |
+|------|------------------------|-----------------------------------|---------|
+| 5CP3Z idou | 316 | 301 | 15 (5%) |
+| 5ZNN5 sakkakubibi | 324 | 305 | 19 (6%) |
+| aiscream 37PMZ | 359 | 325 | 34 (9%) |
+| aqours_cup | 318 | 303 | 15 (5%) |
+| bp7_abilities_PL!N | 381 | 257 | 124 (33%) |
+| bp7_abilities_PL!S | 374 | 253 | 121 (32%) |
+| bp7_abilities_PL!SP | 377 | 253 | 124 (33%) |
+| bp7_unique_abilities | 385 | 269 | 116 (30%) |
+| fade deck | 276 | 255 | 21 (8%) |
+| hasunosora_cup | 332 | 299 | 33 (10%) |
+| liella_cup | 324 | 307 | 17 (5%) |
+| muse_cup | 338 | 317 | 21 (6%) |
+| nijigaku_cup | 326 | 301 | 25 (8%) |
+| **TOTAL** | **4,430** | **3,745** | **685 (15%)** |
+
+### Example: bp7_abilities_PL!N (60 cards)
+
+**Alphabetical export:** 381 D-pad presses  
+**GBA-optimal export (series→rarity→card_no):** 257 presses (**33% savings**)
+
+**Navigation order:**
+```
+LL/R+:        1 unique, 1 card
+PL!N/L:       7 unique, 9 cards
+PL!N/N:       9 unique, 9 cards
+PL!N/P:      12 unique, 15 cards
+PL!N/P+:      4 unique, 5 cards
+PL!N/R:       8 unique, 8 cards
+PL!N/R+:      4 unique, 4 cards
+PL!N/SEC:     4 unique, 4 cards
+PL!N/SECL:    3 unique, 3 cards
+```
+
+The sort groups by series (PL!N first), then rarity (N→P→P+→R→R+→SEC→SECL), then card_no — matching GBA's Series→Rarity→Card navigation fields exactly.
+
+---
+
+## Card Database (cards.json)
+
+| Type (Japanese) | Count | Baked? |
+|-----------------|-------|--------|
+| メンバー (Member) | 1,518 | Yes (all) |
+| ライブ (Live) | 291 | Yes (all) |
+| エネルギー (Energy) | 717 | **Never** — generated at runtime |
+
+**Energy cards:** Not in WebP sources. Engine generates 12 energy cards/player at match start (Rule 6.1.1.3).
+
+---
+
+## Deck Builder Implementation Status
+
+| Feature | Status |
+|---------|--------|
+| 5-field input (Name, Series, Rarity, Card, Qty) | ✅ Complete |
+| L/R field navigation, U/D value change | ✅ Complete |
+| Character picker for deck name (A-Z, 0-9, kana) | ✅ Complete |
+| Series/Rarity hierarchical filtering | ✅ Complete |
+| Real-time legality (Rule 6.1.1) | ✅ Complete |
+| Auto-trim across rarities (max 4 copies/base card) | ✅ Complete |
+| Auto-fix suggestions (member/live count, copy limit) | ✅ Complete |
+| L/R detail preview | ✅ Complete |
+| Sorted deck display (series→rarity→card_no) | ✅ Complete |
+| SRAM save/load (8 custom decks) | ✅ Complete (stubbed) |
+| SRAM deck validation on boot | ✅ Complete |
+| Boot flow: ModeSelect → DeckBuilder/DeckSelect | ✅ Complete |
+
+**Boot flow:**
+```
+ModeSelect (includes "Deck Builder")
+  → DeckBuilder → saves to SRAM → ModeSelect
+  → DeckSelectP1/P2 (baked + SRAM decks) → Match
+```
+
+---
+
+## D-Pad Press Minimization in Deck Builder
+
+| Technique | Savings |
+|-----------|---------|
+| Series → Rarity → Card filtering | Avoids scrolling 3000+ cards |
+| Auto-trim to max 4 across all rarities | Prevents invalid adds |
+| Quantities default to 1, max 4 | 1-2 presses per card |
+| Sorted deck display (series→rarity→card_no) | Matches nav order, zero reorder |
+| Real-time legality + 1-line suggestion | Fix errors before save |
+| L/R detail preview | Verify before committing |
+
+---
+
+## Atlases vs Individual Files
+
+### 3DS (Texture Atlases)
+- **Method:** Packs multiple cards into .t3x ETC1 texture atlases
+- **Compression:** ETC1 (4bpp) decoded by **PICA200 GPU hardware**
+- **Storage:** Per-set atlases, chunked by area
+- **Manifest:** `cards_manifest.json` maps card → atlas + index
+- **Decode:** `C2D_DrawImageAt` with scaling (GPU handles decode + scale)
+
+### GBA (Individual Files)
+- **Method:** Per-card `.bin` files via `include_bytes!()`
+- **Compression:** LZ77 (CPU) or 4bpp packing
+- **Storage:** ~10k individual `.bin` files in `baked/card_art/`
+- **Decode:** CPU LZ77 (SWI 0x11/0x12) → EWRAM → VRAM
+
+**Why GBA doesn't use atlases:**
+1. **No GPU decode** — GBA has no texture compression hardware
+2. **4 KB tile granularity** — VRAM mapping requires 8×8 tile boundaries
+3. **Random access pattern** — Detail view jumps between arbitrary cards
+4. **Simpler runtime** — No atlas index lookup, direct `include_bytes!()`
+
+**Conclusion:** Atlases don't help GBA — they add complexity without GPU decode benefit.
+
+---
+
+## Current Configuration: 8bpp (All 1,809 Cards)
+
+| Tier | Cards | Quality | Storage |
+|------|-------|---------|---------|
+| **All** | 1,809 (non-energy) | 8bpp detail + shared MASTER_PAL fronts | LZ77 compressed |
+
+**ROM:** 29.1 MB (fits 32 MB, 2.9 MB headroom)
+
+---
+
+## Future: Tiered Strategy (If Headroom Needed)
+
+| Tier | Cards | Quality | Storage |
+|------|-------|---------|---------|
+| **Tier 1** | 302 (deck-used) | 8bpp detail + per-card palette | Uncompressed |
+| **Tier 2** | 1,507 (other) | 5bpp detail + shared MASTER_PAL | LZ77 compressed |
+
+**ROM estimate:** Tier 1: ~5 MB + Tier 2: ~17 MB = **~22 MB** (10 MB headroom)
+
+---
+
+## Bit Depth Configurability
+
+The baker supports adjustable bit depth via constants in `tools/bake_card_art.py`:
+
+```python
+# Current: 8bpp (240 colors) - 29.1 MB ROM
+N_COLORS = 240
+DETAIL_BPP = 8
+
+# Alternative: 5bpp (32 colors) - ~21 MB ROM
+# N_COLORS = 32
+# DETAIL_BPP = 5
+
+# Alternative: 4bpp (16 colors) - 10.3 MB ROM  
+# N_COLORS = 16  
+# DETAIL_BPP = 4
+```
+
+To change: modify constants, re-run `py -3 tools/bake_card_art.py`, rebuild.
+
+---
+
+## Card Database (cards.json)
+
+| Type (Japanese) | Count | Baked? |
+|-----------------|-------|--------|
+| メンバー (Member) | 1,518 | Yes (all) |
+| ライブ (Live) | 291 | Yes (all) |
+| エネルギー (Energy) | 717 | **Never** — generated at runtime |
+
+**Energy cards:** Not in WebP sources. Engine generates 12 energy cards/player at match start (Rule 6.1.1.3).
+
+---
+
+## Atlases vs Individual Files
+
+### 3DS (Texture Atlases)
+- **Method:** Packs multiple cards into .t3x ETC1 texture atlases
+- **Compression:** ETC1 (4bpp) decoded by **PICA200 GPU hardware**
+- **Storage:** Per-set atlases, chunked by area
+- **Manifest:** `cards_manifest.json` maps card → atlas + index
+- **Decode:** `C2D_DrawImageAt` with scaling (GPU handles decode + scale)
+
+### GBA (Individual Files)
+- **Method:** Per-card `.bin` files via `include_bytes!()`
+- **Compression:** LZ77 (CPU) or 4bpp packing
+- **Storage:** ~10k individual `.bin` files in `baked/card_art/`
+- **Decode:** CPU LZ77 (SWI 0x11/0x12) → EWRAM → VRAM
+
+**Why GBA doesn't use atlases:**
+1. **No GPU decode** — GBA has no texture compression hardware
+2. **4 KB tile granularity** — VRAM mapping requires 8×8 tile boundaries
+3. **Random access pattern** — Detail view jumps between arbitrary cards
+4. **Simpler runtime** — No atlas index lookup, direct `include_bytes!()`
+
+**Conclusion:** Atlases don't help GBA — they add complexity without GPU decode benefit.
 
 ---
 
@@ -117,102 +328,123 @@ Tested on real card art (`LL-PR-004-PR`, 1024×733 source) with hash-based LZ77:
 
 **LZ77 spec:** 4096-byte window, min match 3, max match 18.
 
-**In `agb` crate:**
+**In `agb` crate (via inline asm):**
 ```rust
-gba::bios::LZ77UnCompWRAM(src: *const u8, dest: *mut u8);
-gba::bios::LZ77UnCompVRAM(src: *const u8, dest: *mut u16);
+// SWI 0x11: LZ77UnCompWRAM
+core::arch::asm!("swi 0x11", in("r0") src, in("r1") dst, ...);
+
+// SWI 0x12: LZ77UnCompVRAM  
+core::arch::asm!("swi 0x12", in("r0") src, in("r1") dst, ...);
 ```
 
 ### Build-Time Compression
 
 ```python
-# tools/bake_card_art.py additions
-import lz4_flex  # or custom LZ77 matching BIOS format
-
-def compress_lz77_bios(data: bytes) -> bytes:
-    """Produce BIOS-compatible LZ77 (LZSS variant)."""
-    # Use gbacomp / gba-lz77 for byte-identical output
-    # Header: 32-bit (type=1, size=decompressed_len)
-    pass
+# tools/bake_card_art.py - hash-based LZ77 (O(n) vs naive O(n²))
+def lz77_compress_bios(data: bytes) -> bytes:
+    # Header: type=1 (LZ77), size=decompressed_len
+    # Data: LZSS with 4096-byte window, min match 3, max 18
 ```
 
 ### Runtime Usage
 
 ```rust
-// Decompress Tier 2 card on-demand to EWRAM
-let mut ewram_buf = [0u8; 14304]; // detail art size
+// Decompress card art on-demand to EWRAM
+let mut ewram_buf = [0u8; 14308]; // detail art size (incl palette)
 unsafe {
-    gba::bios::LZ77UnCompWRAM(compressed_ptr, ewram_buf.as_mut_ptr());
+    core::arch::asm!(
+        "swi 0x11",
+        in("r0") src_ptr,
+        in("r1") dst_ptr,
+        lateout("r0") _, lateout("r1") _, lateout("r2") _, lateout("r3") _,
+        lateout("r12") _, lateout("lr") _,
+        options(nostack, preserves_flags)
+    );
 }
 // Upload to VRAM for display
 ```
 
-**EWRAM:** 256 KB — fits ~18 Tier 2 detail arts simultaneously. LRU eviction.
+**EWRAM:** 256 KB — fits ~18 detail arts simultaneously. LRU eviction for Tier 2.
 
 ---
 
-## Hybrid Tiered Strategy (Recommended)
+## Current Configuration: 8bpp (All 1,809 Cards)
 
 | Tier | Cards | Quality | Storage |
 |------|-------|---------|---------|
-| **Tier 1** | 302 (deck-used) | Full 96×148 8bpp + per-card palette | Uncompressed, fast |
-| **Tier 2** | 1,507 (other non-energy) | 64×96 4bpp + shared MASTER_PAL | LZ77 compressed |
+| **All** | 1,809 (non-energy) | 8bpp detail + shared MASTER_PAL fronts | LZ77 compressed |
 
-**ROM estimate:**
-- Tier 1: ~10.8 MB (current)
-- Tier 2 compressed: ~9 MB
-- **Total: ~20 MB** — fits 32 MB with headroom
+**ROM:** 29.1 MB (fits 32 MB, 2.9 MB headroom)
 
 ---
 
-## Detail Screen Resolution Fix
+## Future: Tiered Strategy (If Headroom Needed)
 
-**Current:** `ART_W = 96, ART_H = 144` — this IS the baked resolution.
+| Tier | Cards | Quality | Storage |
+|------|-------|---------|---------|
+| **Tier 1** | 302 (deck-used) | 8bpp detail + per-card palette | Uncompressed |
+| **Tier 2** | 1,507 (other) | 5bpp detail + shared MASTER_PAL | LZ77 compressed |
 
-**Display path:** `Display::render_card_detail()` renders the portrait at 96×144 pixels (12×18 tiles) in the left portion of the screen.
-
-**No change needed** — the baked resolution matches what the detail screen uses.
-
----
-
-## Build Process
-
-1. **Deck list** → `tools/bake_deck_cards.py` → `web_ui/decks/*.txt`
-2. **Card art** → `tools/bake_card_art.py` → `platforms/gba/baked/card_art/`
-   - Only bakes cards referenced in decks (non-energy)
-   - Outputs: `pal_*.bin`, `tiles_*.bin`, `front_*.bin`, `stage_*.bin`, `live_*.bin`, `wait_*.bin`
-3. **Rust source** → `include_bytes!()` embeds binary blobs
-4. **Cargo build** → `output/rabuka_gba.gba` (~11 MB)
+**ROM estimate:** Tier 1: ~5 MB + Tier 2: ~17 MB = **~22 MB** (10 MB headroom)
 
 ---
 
-## Adding New Cards
+## Bit Depth Configurability
 
-1. Add card to `cards/cards.json` with WebP image in `web_ui/img/cards_webp/`
-2. Add card to deck file in `web_ui/decks/*.txt`
-3. Run `./build_gba.bat` (re-bakes only changed cards ideally)
-4. Card appears in Deck Builder and baked decks
+The baker supports adjustable bit depth via constants in `tools/bake_card_art.py`:
+
+```python
+# Current: 8bpp (240 colors) - 29.1 MB ROM
+N_COLORS = 240
+DETAIL_BPP = 8
+
+# Alternative: 5bpp (32 colors) - ~21 MB ROM
+# N_COLORS = 32
+# DETAIL_BPP = 5
+
+# Alternative: 4bpp (16 colors) - 10.3 MB ROM  
+# N_COLORS = 16  
+# DETAIL_BPP = 4
+```
+
+To change: modify constants, re-run `py -3 tools/bake_card_art.py`, rebuild.
 
 ---
 
-## Future: Full Card Set (All 1,809 Non-Energy)
+## Card Database (cards.json)
 
-### Required Changes
+| Type (Japanese) | Count | Baked? |
+|-----------------|-------|--------|
+| メンバー (Member) | 1,518 | Yes (all) |
+| ライブ (Live) | 291 | Yes (all) |
+| エネルギー (Energy) | 717 | **Never** — generated at runtime |
 
-1. **Build script:** Switch from `deck_card_nos()` to `all_non_energy_card_nos()`
-2. **Compression:** Add LZ77 compression for Tier 2 cards
-3. **Runtime:** On-demand BIOS decompression with EWRAM cache
-4. **Palette:** Use MASTER_PAL for Tier 2 detail art (no per-card palette)
+**Energy cards:** Not in WebP sources. Engine generates 12 energy cards/player at match start (Rule 6.1.1.3).
 
-### Estimated Timeline
+---
 
-| Task | Effort |
-|------|--------|
-| LZ77 build pipeline | 2-3 hours |
-| Runtime decompress + cache | 3-4 hours |
-| Tier 1/Tier 2 logic | 2 hours |
-| Testing on hardware/emulator | 2 hours |
-| **Total** | **~10 hours** |
+## D-Pad Press Minimization in Deck Builder
+
+| Technique | Savings |
+|-----------|---------|
+| Series → Rarity → Card filtering | Avoids scrolling 3000+ cards |
+| Auto-trim to max 4 across all rarities | Prevents invalid adds |
+| Quantities default to 1, max 4 | 1-2 presses per card |
+| Sorted deck display (series→rarity→card_no) | Matches nav order, zero reorder |
+| Real-time legality + 1-line suggestion | Fix errors before save |
+| L/R detail preview | Verify before committing |
+
+---
+
+## Bit Depth Tradeoff Summary
+
+| Config | ROM | Headroom | Colors | Quality |
+|--------|-----|----------|--------|---------|
+| **8bpp (production)** | **29.1 MB** | 2.9 MB | 240 | Full |
+| 7bpp (option) | ~26 MB | ~6 MB | 128 | High |
+| 6bpp (option) | ~24 MB | ~8 MB | 64 | Good |
+| 5bpp (option) | ~21 MB | 11 MB | 32 | Acceptable |
+| 4bpp (option) | 10.3 MB | 21.7 MB | 16 | Basic |
 
 ---
 
@@ -220,7 +452,7 @@ unsafe {
 
 - [GBATEK BIOS Decompression](https://problemkaputt.de/gbatek-bios-decompression-functions.htm)
 - [gbadoc Memory Layout](https://gbadev.net/gbadoc/memory.html)
-- [agb::bios docs](https://docs.rs/gba/latest/gba/bios/)
+- [agb crate](https://crates.io/crates/agb)
 - [GBA-compress (LZ77/LZ4)](https://github.com/HorstBaerbel/GBA-compress)
 - [gba-lz77 (byte-identical)](https://github.com/lunasorcery/gba-lz77)
 - [GBA Cartridge Specs](https://expertbeacon.com/what-are-the-game-sizes-for-game-boy-advance/)
