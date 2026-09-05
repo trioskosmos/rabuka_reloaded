@@ -28,9 +28,9 @@ pub static DECK_CARD_BLOBS: &[&[u8]] = &[
     include_bytes!("../baked/decks/hasunosora_cup.bin"),
     // liella_cup: 72 cards, 87470 bytes
     include_bytes!("../baked/decks/liella_cup.bin"),
-    // muse_cup: 72 cards, 89939 bytes
+    // muse_cup: 72 cards, 95713 bytes
     include_bytes!("../baked/decks/muse_cup.bin"),
-    // nijigaku_cup: 72 cards, 95784 bytes
+    // nijigaku_cup: 72 cards, 89528 bytes
     include_bytes!("../baked/decks/nijigaku_cup.bin"),
     // slot13: 0 cards, 8 bytes
     include_bytes!("../baked/decks/slot13.bin"),

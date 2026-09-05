@@ -1477,3 +1477,43 @@ const DETAIL_DW: usize = 12;
 const DETAIL_DH: usize = 18;
 /// First tile row of the portrait (18 tall on a 20-row screen).
 const DETAIL_Y0: i32 = 1;
+
+/// Implement PlatformUi for Display so menu functions can use it directly.
+impl rabuka_engine::game::platform_ui::PlatformUi for Display<'_> {
+    fn clear_screen(&mut self) {
+        self.clear();
+    }
+    fn println(&mut self, text: &str) {
+        self.println(text);
+    }
+    fn swap_buffers(&mut self) {
+        self.swap_buffers();
+    }
+    fn poll_input(&mut self) {
+        // Not directly available on Display; menu.rs handles input separately
+    }
+    fn just_pressed_a(&self) -> bool { false }
+    fn just_pressed_b(&self) -> bool { false }
+    fn just_pressed_up(&self) -> bool { false }
+    fn just_pressed_down(&self) -> bool { false }
+    fn just_pressed_start(&self) -> bool { false }
+    fn wait_vblank(&mut self) {
+        busy_wait_for_vblank();
+    }
+    fn reset_vram(&mut self) {
+        self.reset_vram();
+    }
+    fn show_detail_screen(
+        &mut self,
+        _gs: &rabuka_engine::game_state::GameState,
+        _art_card_no: Option<&str>,
+        header: &[String],
+        body: &str,
+    ) {
+        let lines: Vec<String> = header.iter().cloned()
+            .chain(if !header.is_empty() && !body.trim().is_empty() { Some(String::new()) } else { None })
+            .chain(Self::wrap_pane(body, 17))
+            .collect();
+        self.render_card_detail(None, &lines, 0);
+    }
+}

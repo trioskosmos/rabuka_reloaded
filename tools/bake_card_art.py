@@ -33,14 +33,20 @@ import os
 import random
 import re
 import sys
-from concurrent.futures import ThreadPoolExecutor, as_completed
+import time
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
+from functools import lru_cache
 
 from PIL import Image, ImageFilter
 
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO / "cards"))
 from bake_deck_cards import normalize  # noqa: E402
+
+# Pre-compile regex patterns
+RE_COUNT_X = re.compile(r"^(\d+)\s*x\s*(.+)$")
+RE_X_COUNT = re.compile(r"^(.*?)\s*x\s*(\d+)$")
 
 # GBA BIOS LZ77 (LZSS) compression - hash-based for speed
 # Header: 32-bit little-endian
@@ -63,15 +69,16 @@ def lz77_compress_bios(data: bytes) -> bytes:
     min_match = 3
     max_match = 18
     
-    # Hash table for 3-byte sequences (rolling hash)
-    # 256^3 = 16M possible, use 2^16 = 65536 buckets
+    # Hash table for 3-byte sequences - use array for speed
     HASH_BITS = 16
     HASH_SIZE = 1 << HASH_BITS
     HASH_MASK = HASH_SIZE - 1
     
-    # Hash chain: for each position, points to previous occurrence of same hash
-    hash_chain = [-1] * len(data)
-    hash_table = [-1] * HASH_SIZE
+    # Use array for hash chain (stores previous index for each position)
+    import array
+    hash_chain = array.array('H', [0xFFFF] * len(data))
+    # Use array of ints for hash table - initialize with 0xFFFF (sentinel for -1)
+    hash_table = array.array('H', [0xFFFF] * HASH_SIZE)
     
     def hash3(pos: int) -> int:
         """Hash 3 bytes at position."""
@@ -80,11 +87,15 @@ def lz77_compress_bios(data: bytes) -> bytes:
         return ((data[pos] << 8) | (data[pos + 1] << 4) | data[pos + 2]) & HASH_MASK
     
     output = bytearray()
+    # Pre-allocate approximate size (worst case: all literals + flag bytes)
+    output.extend(b'\x00' * (len(data) * 2 + 100))
     i = 0
     flag_byte = 0
     flag_bit = 0
-    flag_pos = len(output)
-    output.append(0)  # placeholder for flag byte
+    flag_pos = 1  # Position of current flag byte in output (index 1 since we prepend)
+    output[0] = 0  # placeholder for first flag byte
+    output[1] = 0  # placeholder for second byte (will be overwritten or literal)
+    output_len = 2
     
     while i < len(data):
         # Search for best match using hash table
@@ -97,13 +108,12 @@ def lz77_compress_bios(data: bytes) -> bytes:
             j = hash_table[h]
             search_end = max(0, i - 4096)
             
-            while j >= search_end:
+            while j != 0xFFFF and j >= search_end:
                 # Quick check: first 3 bytes match (hash collision handled by verification)
                 match_len = 0
-                while (match_len < 18 and 
-                       i + match_len < len(data) and 
-                       j + match_len < i and  # don't read ahead into future
-                       data[j + match_len] == data[i + match_len]):
+                # Unroll loop for common case
+                max_possible = min(max_match, len(data) - i)
+                while match_len < max_possible and data[j + match_len] == data[i + match_len]:
                     match_len += 1
                 
                 if match_len >= 3 and match_len > best_len:
@@ -113,12 +123,12 @@ def lz77_compress_bios(data: bytes) -> bytes:
                         break
                 
                 # Move to next in chain
-                j = hash_chain[j]
+                j = hash_chain[j] if j < len(hash_chain) and hash_chain[j] != 0xFFFF else 0xFFFF
         
         # Add current position to hash table
         if i + min_match <= len(data):
             h = hash3(i)
-            hash_chain[i] = hash_table[h]
+            hash_chain[i] = hash_table[h]  # Store previous index
             hash_table[h] = i
         
         if best_len >= 3:
@@ -127,25 +137,31 @@ def lz77_compress_bios(data: bytes) -> bytes:
             # Write distance (12 bits) and length (4 bits)
             dist_minus1 = best_dist - 1
             len_minus3 = best_len - 3
-            output.append((dist_minus1 >> 4) & 0xFF)
-            output.append(((dist_minus1 & 0xF) << 4) | (len_minus3 & 0xF))
+            output[output_len] = (dist_minus1 >> 4) & 0xFF
+            output[output_len + 1] = ((dist_minus1 & 0xF) << 4) | (len_minus3 & 0xF)
+            output_len += 2
             i += best_len
         else:
             # Literal - write flag bit 1
             flag_byte |= (1 << flag_bit)
-            output.append(data[i])
+            output[output_len] = data[i]
+            output_len += 1
             i += 1
         
         flag_bit += 1
         if flag_bit == 8:
             output[flag_pos] = flag_byte
-            flag_pos = len(output)
-            output.append(0)
+            flag_pos = output_len
+            output[output_len] = 0  # placeholder for next flag byte
+            output_len += 1
             flag_byte = 0
             flag_bit = 0
     
     if flag_bit > 0:
         output[flag_pos] = flag_byte
+    
+    # Truncate to actual length
+    output = output[:output_len]
     
     decompressed_size = len(data)
     header = bytes([
@@ -160,6 +176,14 @@ def lz77_compress_bios(data: bytes) -> bytes:
 
 def lz77_compress_bios_if_smaller(data: bytes) -> bytes:
     """Compress with LZ77, but return original if compression doesn't help."""
+    if len(data) < 16:  # Too small to benefit from compression
+        header = bytes([
+            len(data) & 0xFF,
+            (len(data) >> 8) & 0xFF,
+            (len(data) >> 16) & 0xFF,
+            (len(data) >> 24) & 0xFF,
+        ])
+        return header + data
     compressed = lz77_compress_bios(data)
     if len(compressed) < len(data):
         return compressed
@@ -203,7 +227,27 @@ BACK_GRID = (3, 2)
 CACHE = REPO / "web_ui" / "img" / "cards_webp"
 OUT_RS = REPO / "platforms" / "gba" / "src" / "card_art_gen.rs"
 BIN_DIR = REPO / "platforms" / "gba" / "baked" / "card_art"
-MAX_WORKERS = 8  # CPU cores
+MAX_WORKERS = max(1, (os.cpu_count() or 4) - 1)  # Leave one core free
+
+# Global image cache for palette building (loaded once, reused)
+_image_cache: dict[str, Image.Image] = {}
+
+def load_image_cached(card_no: str) -> Image.Image | None:
+    """Load a single image on demand with caching."""
+    if card_no in _image_cache:
+        return _image_cache[card_no]
+    webp = CACHE / f"{card_no}.webp"
+    if webp.exists():
+        img = Image.open(webp).convert("RGB")
+        _image_cache[card_no] = img
+        return img
+    return None
+
+
+def clear_image_cache():
+    """Clear the image cache to free memory."""
+    global _image_cache
+    _image_cache.clear()
 
 
 def is_energy_card(card: dict) -> bool:
@@ -233,14 +277,13 @@ def deck_card_nos() -> set:
             line = line.strip()
             if not line:
                 continue
-            # Formats: "count x card_no", "card_no x count", or bare card_no
-            m = re.match(r"^(\d+)\s*x\s*(.+)$", line)
+            m = RE_COUNT_X.match(line)
             if m:
                 n = normalize(m.group(2).strip())
                 if n in by_no and not is_energy_card(by_no[n]):
                     used.add(by_no[n]["card_no"])
                 continue
-            m = re.match(r"^(.*?)\s*x\s*(\d+)$", line)
+            m = RE_X_COUNT.match(line)
             if m:
                 n = normalize(m.group(1).strip())
                 if n in by_no and not is_energy_card(by_no[n]):
@@ -253,14 +296,6 @@ def deck_card_nos() -> set:
     return used
 
 
-def load_image(card_no: str):
-    """Load a single image on demand."""
-    webp = CACHE / f"{card_no}.webp"
-    if webp.exists():
-        return card_no, Image.open(webp).convert("RGB")
-    return card_no, None
-
-
 def to_rgb15(r, g, b):
     return ((r >> 3) & 31) | (((g >> 3) & 31) << 5) | (((b >> 3) & 31) << 10)
 
@@ -269,11 +304,13 @@ def pack_8bpp_tiles(px, w, h, tiles_w, tiles_h):
     """Pack 8bpp palette indices into tiles, ty-major then tx. 64B per tile."""
     out = bytearray(tiles_w * tiles_h * 64)
     for ty in range(tiles_h):
+        row_base = ty * tiles_w * 64
         for tx in range(tiles_w):
-            base = (ty * tiles_w + tx) * 64
+            base = row_base + tx * 64
             for rr in range(TILE):
+                row_offset = rr * TILE
                 for cc in range(TILE):
-                    out[base + rr * TILE + cc] = px[tx * TILE + cc, ty * TILE + rr] & 0xFF
+                    out[base + row_offset + cc] = px[tx * TILE + cc, ty * TILE + rr] & 0xFF
     return bytes(out)
 
 
@@ -281,23 +318,28 @@ def pack_4bpp_tiles(px, w, h, tiles_w, tiles_h):
     """Pack 4bpp palette indices into tiles, ty-major then tx. 32B per tile (2 pixels per byte)."""
     out = bytearray(tiles_w * tiles_h * 32)
     for ty in range(tiles_h):
+        row_base = ty * tiles_w * 32
         for tx in range(tiles_w):
-            base = (ty * tiles_w + tx) * 32
+            base = row_base + tx * 32
             for rr in range(TILE):
+                half_row = rr * (TILE // 2)
                 for cc in range(0, TILE, 2):
                     v0 = px[tx * TILE + cc, ty * TILE + rr] & 0x0F
                     v1 = px[tx * TILE + cc + 1, ty * TILE + rr] & 0x0F
-                    out[base + rr * (TILE // 2) + cc // 2] = v0 | (v1 << 4)
+                    out[base + half_row + cc // 2] = v0 | (v1 << 4)
     return bytes(out)
 
 
 def palette_bytes_16(pal, n=16):
     """First n entries of a PIL palette as rgb15 little-endian bytes."""
-    out = bytearray()
+    out = bytearray(n * 2)
+    idx = 0
     for i in range(n):
         r, g, b = pal[i * 3], pal[i * 3 + 1], pal[i * 3 + 2]
         c = to_rgb15(r, g, b)
-        out += bytes([c & 0xFF, c >> 8])
+        out[idx] = c & 0xFF
+        out[idx + 1] = c >> 8
+        idx += 2
     return bytes(out)
 
 
@@ -308,6 +350,11 @@ def palette_bytes_240(pal):
 
 def build_palette(thumbs, colors=240):
     """Build shared 240-colour palette from thumbnails."""
+    if not thumbs:
+        # Fallback palette
+        q = Image.new("RGB", (16, 16))
+        q.putpalette([i for i in range(256)] * 3)
+        return q, q.getpalette()
     contact = Image.new("RGB", (sum(t.width for t in thumbs), max(t.height for t in thumbs)))
     x = 0
     for t in thumbs:
@@ -380,10 +427,10 @@ def bake_back_front(master_q):
 
 def bake_ui_tiles():
     """Shared board UI tiles (bank-15 palette): 6 tiles x 32 bytes = 192 bytes."""
-    tiles = []
+    tiles = bytearray()
 
     # 0: solid gray empty zone fill (color 2)
-    tiles.append(bytes([2] * 64))
+    tiles.extend([2] * 64)
 
     # 1: gold diamond actionable badge (color 4 on transparent 0)
     badge = [[0] * 8 for _ in range(8)]
@@ -392,11 +439,9 @@ def bake_ui_tiles():
         for x in range(8):
             if abs(x - 3.5) + d <= 3:
                 badge[y][x] = 4
-    flat = bytearray()
     for y in range(8):
         for x in range(0, 8, 2):
-            flat.append(badge[y][x] | (badge[y][x + 1] << 4))
-    tiles.append(bytes(flat))
+            tiles.append(badge[y][x] | (badge[y][x + 1] << 4))
 
     # 2: white right-pointing triangle focus marker (color 1)
     marker = [[0] * 8 for _ in range(8)]
@@ -404,17 +449,15 @@ def bake_ui_tiles():
         for x in range(8):
             if x <= 3 + abs(y - 3.5) * 1.4:
                 marker[y][x] = 1
-    flat = bytearray()
     for y in range(8):
         for x in range(0, 8, 2):
-            flat.append(marker[y][x] | (marker[y][x + 1] << 4))
-    tiles.append(bytes(flat))
+            tiles.append(marker[y][x] | (marker[y][x + 1] << 4))
 
     # 3: solid gold (color 4) for hand cursor border
-    tiles.append(bytes([4] * 64))
+    tiles.extend([4] * 64)
 
     # 4: fully transparent (color 0) for clearing front text BG
-    tiles.append(bytes([0] * 64))
+    tiles.extend([0] * 64)
 
     # 5: edge badge - gold diamond nudged right
     edge = [[0] * 8 for _ in range(8)]
@@ -423,13 +466,11 @@ def bake_ui_tiles():
         for x in range(8):
             if abs(x - 6.5) + d <= 3:
                 edge[y][x] = 4
-    flat = bytearray()
     for y in range(8):
         for x in range(0, 8, 2):
-            flat.append(edge[y][x] | (edge[y][x + 1] << 4))
-    tiles.append(bytes(flat))
+            tiles.append(edge[y][x] | (edge[y][x + 1] << 4))
 
-    return b"".join(tiles)  # 6 tiles x 32 bytes = 192 bytes
+    return bytes(tiles)  # 6 tiles x 32 bytes = 192 bytes
 
 
 def sanitize_filename(card_no: str) -> str:
@@ -439,13 +480,18 @@ def sanitize_filename(card_no: str) -> str:
 
 def build_master_palette(card_nos: list[str], sample_size: int = 500) -> tuple:
     """Build master palette from a representative sample of cards."""
-    sample = random.sample(card_nos, min(sample_size, len(card_nos)))
+    if len(card_nos) <= sample_size:
+        sample = card_nos
+    else:
+        # Use random.sample without importing random again
+        import random
+        sample = random.sample(card_nos, sample_size)
+    
     thumbs = []
     for card_no in sample:
-        result = load_image(card_no)
-        if result[1] is None:
+        img = load_image_cached(card_no)
+        if img is None:
             continue
-        img = result[1]
         for w, h, grid in [
             (FRONT_W, FRONT_H, FRONT_GRID),
             (STAGE_W, STAGE_H, STAGE_GRID),
@@ -466,10 +512,9 @@ def build_master_palette(card_nos: list[str], sample_size: int = 500) -> tuple:
 
 def process_card(card_no: str, master_q, master_pal_bytes):
     """Process a single card - returns all baked data."""
-    webp = CACHE / f"{card_no}.webp"
-    if not webp.exists():
+    img = load_image_cached(card_no)
+    if img is None:
         return card_no, None
-    img = Image.open(webp).convert("RGB")
     up, rotated = maybe_upright(img)
     pal, tiles = bake_detail(img, master_q, master_pal_bytes)
     ftiles = bake_with_palette(up, FRONT_W, FRONT_H, master_q, FRONT_GRID, dither=Image.Dither.FLOYDSTEINBERG, sharpen=True)
@@ -626,8 +671,12 @@ def write_gen(entries, fronts, stage_fronts, live_fronts, waited_fronts, back_fr
         f.write(f"pub static BOARD_UI: &[u8] = include_bytes!(\"../baked/card_art/board_ui.bin\");\n")
 
 
+def _process_card_worker(args):
+    """Worker function for multiprocessing - takes tuple of (card_no, master_q, master_pal_bytes)"""
+    return process_card(*args)
+
+
 def main():
-    import time
     start_total = time.time()
     # Bake ALL non-energy cards (no second-class citizens)
     used = all_non_energy_card_nos()
@@ -640,7 +689,7 @@ def main():
     master_q, master_pal_bytes = build_master_palette(card_list)
     print(f"Palette build: {time.time() - start:.2f}s")
 
-    # Process all cards in parallel
+    # Process all cards in parallel using ProcessPoolExecutor for true parallelism
     entries = []
     fronts = []
     stage_fronts = []
@@ -651,9 +700,13 @@ def main():
     print("Processing cards...")
     start = time.time()
     processed = 0
-    with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
-        futures = {executor.submit(process_card, card_no, master_q, master_pal_bytes): card_no 
-                   for card_no in card_list}
+    
+    # Prepare arguments for workers
+    worker_args = [(card_no, master_q, master_pal_bytes) for card_no in card_list]
+    
+    with ProcessPoolExecutor(max_workers=MAX_WORKERS) as executor:
+        # Submit all tasks
+        futures = {executor.submit(_process_card_worker, args): args[0] for args in worker_args}
         
         for fut in as_completed(futures):
             processed += 1
@@ -677,6 +730,9 @@ def main():
     print(f"Processed {len(entries)} cards in {elapsed:.1f}s ({len(entries)/elapsed:.1f} cards/s)")
     if missing:
         print(f"missing: {missing[:20]}")
+
+    # Clear image cache to free memory before final write
+    clear_image_cache()
 
     # These are fast, do sequentially
     print("Baking UI tiles...")

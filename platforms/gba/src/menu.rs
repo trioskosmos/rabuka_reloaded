@@ -23,7 +23,7 @@ use alloc::string::ToString;
 use alloc::vec::Vec;
 
 use rabuka_engine::card::Card;
-use rabuka_engine::game::platform_ui::{card_ability_text, card_detail_title, card_stat_text};
+use rabuka_engine::game::platform_ui::{card_ability_text, card_detail_title, card_stat_text, PlatformUi};
 use rabuka_engine::game_state::GameState;
 
 use crate::display::Display;
@@ -146,14 +146,14 @@ pub fn show_detail_screen<I: InputSource>(
             display.reset_vram();
             return;
         }
-        display.wait();
+        display.wait_vblank();
     }
 }
 
 /// Card detail: art + `[no] name` / stat header + ability body.
 pub fn show_card_detail<I: InputSource>(
     display: &mut Display,
-    input: &mut I,
+    _input: &mut I,
     gs: &GameState,
     card_no: String,
 ) {
@@ -162,15 +162,8 @@ pub fn show_card_detail<I: InputSource>(
             card_detail_title(card),
             card_stat_text(card),
         ];
-        show_detail_screen(
-            display,
-            input,
-            gs,
-            Some(card_no.as_str()),
-            &header,
-            &card_ability_text(card),
-        );
+        display.show_detail_screen(gs, Some(card_no.as_str()), &header, &card_ability_text(card));
     } else {
-        show_detail_screen(display, input, gs, None, &[card_no], "");
+        display.show_detail_screen(gs, None, &[card_no], "");
     }
 }

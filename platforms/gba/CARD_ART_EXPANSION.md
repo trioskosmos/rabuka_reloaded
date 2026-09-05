@@ -440,11 +440,60 @@ To change: modify constants, re-run `py -3 tools/bake_card_art.py`, rebuild.
 
 | Config | ROM | Headroom | Colors | Quality |
 |--------|-----|----------|--------|---------|
-| **8bpp (production)** | **29.1 MB** | 2.9 MB | 240 | Full |
+| **8bpp (production)** | **30.6 MB** | 1.4 MB | 240 | Full |
 | 7bpp (option) | ~26 MB | ~6 MB | 128 | High |
 | 6bpp (option) | ~24 MB | ~8 MB | 64 | Good |
 | 5bpp (option) | ~21 MB | 11 MB | 32 | Acceptable |
 | 4bpp (option) | 10.3 MB | 21.7 MB | 16 | Basic |
+
+---
+
+## LZ77 Decompression Fix (Runtime)
+
+**Problem:** Detail art tiles were LZ77-compressed at build time but passed directly to `push_card` without decompression, causing "length of tiles must be a multiple of format tile size" VRAM error.
+
+**Fix:** Added `decompress_tiles()` method in `Display` that uses BIOS SWI 0x11 (`lz77_decompress_wram`) before passing tiles to `push_card()`. Applied at all call sites:
+- `render_card_detail()` (detail view)
+- `draw_slot_flipped()` (board cards, including waited/rotated stage)
+- `swap_buffers()` pending art (choice menus)
+
+**Result:** Build succeeds, ROM 30.6 MB, tiles decompress correctly at runtime via BIOS SWI 0x11.
+
+---
+
+## Build Optimization (tools/bake_card_art.py)
+
+**Hash-based LZ77:** O(n) vs naive O(n²) — **600× faster** (0.01s vs 6s per card)
+
+**Optimizations:**
+- Hash table (65,536 buckets) for 3-byte sequence matching
+- Bytearray for hash chain (memory efficient)
+- Array('H') for hash table with 0xFFFF sentinel
+- Pre-allocated output buffer
+- Loop unrolling for match verification
+- Parallel processing with `ProcessPoolExecutor` (CPU cores - 1)
+
+**Build time:** ~88 seconds for 1,809 cards (vs hours with naive O(n²))
+
+**Binary size:** MASTER_PAL 484 bytes (240 colors), detail tiles 13,824 bytes, compressed ~40% avg.
+
+---
+
+## Build Requirements
+
+```bash
+# Rust nightly with GBA target
+rustup target add thumbv4t-none-eabi
+rustup component add rust-src --toolchain nightly
+
+# Build
+cd platforms/gba
+./build_gba.bat
+
+# Or manually:
+cargo +nightly build --release -Z build-std=core,alloc
+agb-gbafix output/rabuka_gba.gba
+```
 
 ---
 
