@@ -175,8 +175,8 @@ def lz77_compress_bios_if_smaller(data: bytes) -> bytes:
 
 ART_W = 96
 ART_H = 144
-N_COLORS = 16  # 4bpp detail art (16 colors), shared MASTER_PAL
-DETAIL_BPP = 4
+N_COLORS = 256  # 8bpp detail art (256 colors), shared MASTER_PAL
+DETAIL_BPP = 8
 TILE = 8
 
 # Front geometries (all use shared 8bpp MASTER_PAL now)
@@ -301,8 +301,13 @@ def palette_bytes_16(pal, n=16):
     return bytes(out)
 
 
-def build_palette(thumbs, colors=16):
-    """Build shared 16-colour palette from thumbnails."""
+def palette_bytes_240(pal):
+    """240 entries of a PIL palette as rgb15 little-endian bytes."""
+    return palette_bytes_16(pal, 240)
+
+
+def build_palette(thumbs, colors=240):
+    """Build shared 240-colour palette from thumbnails."""
     contact = Image.new("RGB", (sum(t.width for t in thumbs), max(t.height for t in thumbs)))
     x = 0
     for t in thumbs:
@@ -353,7 +358,7 @@ def make_thumb(img, w, h):
 
 
 def bake_detail(img, palette_q, palette_bytes):
-    """96x144 4bpp detail view (16 colors)."""
+    """96x144 8bpp detail view (240 colors)."""
     img, _ = maybe_upright(img)
     iw, ih = img.size
     scale = min(ART_W / iw, ART_H / ih)
@@ -363,7 +368,7 @@ def bake_detail(img, palette_q, palette_bytes):
     canvas.paste(small, ((ART_W - nw) // 2, (ART_H - nh) // 2))
     q = canvas.quantize(palette=palette_q, dither=Image.Dither.FLOYDSTEINBERG)
     px = q.load()
-    tiles = pack_4bpp_tiles(px, ART_W, ART_H, ART_W // TILE, ART_H // TILE)
+    tiles = pack_8bpp_tiles(px, ART_W, ART_H, ART_W // TILE, ART_H // TILE)
     return bytes(palette_bytes), tiles
 
 
@@ -454,7 +459,7 @@ def build_master_palette(card_nos: list[str], sample_size: int = 500) -> tuple:
             Image.open(BACK_PNG).convert("RGB").resize((LIVE_W, LIVE_H), Image.LANCZOS)
         )
     master_q, master_pal = build_palette(thumbs, colors=240)
-    master_pal_bytes = palette_bytes_16(master_pal, 16)
+    master_pal_bytes = palette_bytes_240(master_pal)
     print(f"master palette: 240 colours from {len(thumbs)} thumbs (sample of {len(sample)} cards)")
     return master_q, master_pal_bytes
 
@@ -518,7 +523,7 @@ def write_gen(entries, fronts, stage_fronts, live_fronts, waited_fronts, back_fr
         f.write("// Card fronts: 8bpp shared MASTER_PAL (4bpp on GBA via palette bank)\n")
         f.write("// All binary data LZ77-compressed (GBA BIOS SWI 0x11/0x12)\n\n")
 
-        f.write("pub static MASTER_PAL: [u8; 32] = *include_bytes!(\"../baked/card_art/master_pal.bin\");\n\n")
+        f.write("pub static MASTER_PAL: [u8; 484] = *include_bytes!(\"../baked/card_art/master_pal.bin\");\n\n")
 
         f.write("pub struct CardArt {\n")
         f.write("    pub card_no: &'static str,\n")

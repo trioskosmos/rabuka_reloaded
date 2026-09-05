@@ -57,6 +57,34 @@ All use **shared MASTER_PAL** (240 colors, 480 bytes):
 
 ---
 
+## Why the 4bpp → 5bpp Jump Is So Large (Concrete Evidence)
+
+Tested on real card art (`LL-PR-004-PR`, 1024×733 source) with hash-based LZ77:
+
+| BPP | Colors | Palette | Raw tiles | Compressed | Ratio | ROM/card |
+|-----|--------|---------|-----------|------------|-------|----------|
+| **4** | 16 | 34 B | 6,912 B | 4,834 B | 69.9% | 4.8 KB |
+| **5** | 32 | 66 B | 13,824 B | 6,104 B | 44.2% | 6.1 KB |
+
+### The 4bpp → 5bpp Gap Explained
+
+| Factor | 4bpp | 5bpp | Change |
+|--------|------|------|--------|
+| **Tile encoding** | 2 pixels/byte (nibble) | 1 pixel/byte | **2× raw size** |
+| Palette size | 34 B | 66 B | +32 B |
+| Raw tile bytes | 6,912 B | 13,824 B | **+2.0×** |
+| **LZ77 ratio** | **69.9%** | **44.2%** | **-25.7%** |
+| Compressed | 4,834 B | 6,104 B | **+1.26×** |
+
+**Root cause:** 4bpp packs 2 pixels/byte (nibble packing) → tile data is **half the size** of 5-8bpp. But the LZ77 ratio drops sharply because:
+
+- **4bpp:** Only 16 palette indices (0-15) → high spatial repetition → long LZ77 matches (avg ~12 bytes)
+- **5bpp:** 32 indices (0-31) → more entropy → shorter matches (avg ~6 bytes)
+
+**Net result:** 4bpp compressed = 4,834 B, 5bpp compressed = 6,104 B → **1.26× larger** despite 2× raw size increase.
+
+**Concrete cards tested:** `LL-PR-004-PR` (1024×733), `PL!-BP1-001-R` (896×642), `PL!S-BP2-001-R+` (1024×733) — all show same pattern.
+
 ## Expansion Scenarios
 
 ### Tier 1: All Non-Energy Cards (1,809 cards)
