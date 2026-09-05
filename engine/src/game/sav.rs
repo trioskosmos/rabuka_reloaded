@@ -46,6 +46,8 @@
 #[cfg(feature = "no_std")]
 use alloc::string::String;
 #[cfg(feature = "no_std")]
+use alloc::string::ToString;
+#[cfg(feature = "no_std")]
 use alloc::vec::Vec;
 #[cfg(not(feature = "no_std"))]
 use std::string::String;

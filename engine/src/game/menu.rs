@@ -424,13 +424,14 @@ pub fn menu_select_detailed(
     }
 }
 
-/// Scrollable action list for a human player's turn.
-/// Returns true if an action was executed, false if the turn was passed.
-pub fn human_turn(
+/// Shared action-list picker behind [`human_turn`] (and link-mode local
+/// picks): drives `ui` over `acts` and returns the picked index. Loops
+/// until A is pressed — callers guarantee a non-empty list.
+pub fn select_action(
     ui: &mut dyn PlatformUi,
-    gs: &mut GameState,
+    gs: &GameState,
     acts: &[game_setup::Action],
-) -> bool {
+) -> usize {
     let mut sel = 0;
     let mut scroll = 0;
     let vis = ui.option_rows().min(9);
@@ -571,12 +572,23 @@ pub fn human_turn(
                     );
                 }
             } else if ui.just_pressed_a() {
-                let _ = game_setup::execute_action(gs, &acts[sel]);
-                return true;
+                return sel;
             }
         }
         ui.wait_vblank();
     }
+}
+
+/// Scrollable action list for a human player's turn.
+/// Returns true if an action was executed, false if the turn was passed.
+pub fn human_turn(
+    ui: &mut dyn PlatformUi,
+    gs: &mut GameState,
+    acts: &[game_setup::Action],
+) -> bool {
+    let sel = select_action(ui, gs, acts);
+    let _ = game_setup::execute_action(gs, &acts[sel]);
+    true
 }
 
 /// Handle a pending player choice (SelectCard, SelectTarget, etc).

@@ -480,3 +480,4 @@ pub fn card_ability_text(card: &Card) -> String {
 pub use crate::game::menu::*;
 pub use crate::game::match_runner::*;
 pub use crate::game::language::{Lang, select_language};
+pub use crate::game::link::{LinkAction, LinkTransport, run_link_match};

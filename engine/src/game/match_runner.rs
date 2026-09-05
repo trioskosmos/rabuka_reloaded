@@ -237,13 +237,16 @@ where
 /// Assemble a match from two deck card-number lists plus the complete `Card`
 /// union, then run the shared game loop to a terminal `GameResult`. Exposed
 /// separately so host tests can drive a full match without console menus.
-pub fn run_match<U: PlatformUi>(
-    ui: &mut U,
+/// Assemble the opening [`GameState`] for two deck card-number lists plus
+/// the complete `Card` union: database, deck build, default energy, shuffle
+/// (energy shuffled after the add, matching web/3DS order), players, setup.
+/// Shared by [`run_match`] and the link-mode loop so both start identical
+/// states from identical inputs (the lockstep invariant).
+pub fn build_match_state(
     p1_cards: &[&str],
     p2_cards: &[&str],
     all_cards: Vec<Card>,
-    mode: MatchMode,
-) -> GameResult {
+) -> GameState {
     let mut db = Arc::new(CardDatabase::load_or_create(all_cards));
 
     let nums1: Vec<String> = p1_cards.iter().map(|c| c.to_string()).collect();
@@ -270,6 +273,17 @@ pub fn run_match<U: PlatformUi>(
 
     let mut gs = GameState::new(p1, p2, db);
     game_setup::setup_game(&mut gs);
+    gs
+}
+
+pub fn run_match<U: PlatformUi>(
+    ui: &mut U,
+    p1_cards: &[&str],
+    p2_cards: &[&str],
+    all_cards: Vec<Card>,
+    mode: MatchMode,
+) -> GameResult {
+    let mut gs = build_match_state(p1_cards, p2_cards, all_cards);
 
     // ---- the shared, honest loop (mirrors the web server's per-request walk) ----
     loop {
