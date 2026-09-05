@@ -667,15 +667,18 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
                             }
                         };
                         let ja_area = area_label_ja(&stage_area);
+                        // Rows are bare area names (the prompt already says what
+                        // is being chosen); "Select " on every row is pure noise
+                        // on 30-column screens.
                         let label = if is_source {
-                            action_desc!("Select {}", capitalize(&stage_area))
+                            action_desc!("{}", capitalize(&stage_area))
                         } else if let Some(ref src) = from_pos {
                             action_desc!("{} → {}", capitalize(src), capitalize(&stage_area))
                         } else {
                             action_desc!("Move to {}", capitalize(&stage_area))
                         };
                         let label_ja = if is_source {
-                            action_desc!("{}を選択", ja_area)
+                            action_desc!("{}", ja_area)
                         } else if let Some(ref src) = from_pos {
                             let ja_src = match src.as_str() {
                                 "left" => "左",
@@ -1573,10 +1576,10 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                                 let mut a = make_action_params(
                                     ActionType::PlayMemberToStage,
                                     action_desc!(
-                                        "{} → {} (cost:{}){}",
+                                        "E{} {} → {}{}",
+                                        cost_display,
                                         card.name,
                                         area_label,
-                                        cost_display,
                                         bt
                                     ),
                                     ActionParameters {
@@ -1615,10 +1618,10 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                                     },
                                 );
                                 a.description_ja = Some(action_desc!(
-                                    "{} → {} (コスト:{}){}",
+                                    "E{} {} → {}{}",
+                                    cost_str,
                                     card.name,
                                     area_label_ja,
-                                    cost_str,
                                     bt_ja
                                 ));
                                 actions.push(a);
@@ -1650,12 +1653,12 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                                     let mut a = make_action_params(
                                         ActionType::PlayMemberToStage,
                                         action_desc!(
-                                            "{} ({}+{})→{} cost:{}",
+                                            "E{} {} ({}+{})→{}",
+                                            pair.cost,
                                             card.name,
                                             src0_en,
                                             src1_en,
-                                            dst_en,
-                                            pair.cost
+                                            dst_en
                                         ),
                                         ActionParameters {
                                             card_id: Some(*card_id),
@@ -1687,12 +1690,12 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                                         },
                                     );
                                     a.description_ja = Some(action_desc!(
-                                        "{} ({}+{})→{} コスト:{}",
+                                        "E{} {} ({}+{})→{}",
+                                        pair.cost,
                                         card.name,
                                         src0_ja,
                                         src1_ja,
-                                        dst_ja,
-                                        pair.cost
+                                        dst_ja
                                     ));
                                     actions.push(a);
                                 }
@@ -1794,12 +1797,12 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                 actions.push(make_action_params(
                     ActionType::UseAbility,
                     action_desc!(
-                        "Use ability on {} ({}): {}{} - Cost: {}",
+                        "E{} {} ({}): {}{}",
+                        effective_cost,
                         card.name,
                         area_name,
                         ability.full_text,
-                        trigger_info,
-                        effective_cost
+                        trigger_info
                     ),
                     ActionParameters {
                         card_id: Some(card_id),
@@ -1891,10 +1894,10 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                 actions.push(make_action_params(
                     ActionType::UseAbility,
                     action_desc!(
-                        "Use ability on {} (discard): {} (起動) - Cost: {}",
+                        "E{} {} (discard, 起動): {}",
+                        effective_cost,
                         card.name,
-                        ability.full_text,
-                        effective_cost
+                        ability.full_text
                     ),
                     ActionParameters {
                         card_id: Some(card_id),

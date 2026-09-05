@@ -466,11 +466,15 @@ pub fn human_turn(
         .iter()
         .map(|a| {
             let line = a.description.lines().next().unwrap_or("");
+            // Card tag disambiguates rows that don't name their card
+            // ("Draw 2", "Pass"...). When the row already contains the
+            // name, appending " [Name]" is pure redundancy, so skip it.
             let tag_str = a
                 .parameters
                 .as_ref()
                 .and_then(|p| p.card_no.as_ref())
                 .and_then(|n| gs.card_database.get_card_by_no(n))
+                .filter(|c| !line.contains(c.name.as_ref()))
                 .map(|c| format!(" [{}]", c.name))
                 .unwrap_or_default();
             one_line(&format!("  {line}{tag_str}"), cols)
@@ -668,10 +672,14 @@ pub fn handle_choice(ui: &mut dyn PlatformUi, gs: &mut GameState) -> bool {
                     None => (0..card_ids.len()).collect(),
                 }
             };
+            // Bare display names here: the grid's selected-identity line
+            // already prints "> [card_no] name", so embedding the number
+            // in the item would show it twice. (The multi-pick list below
+            // re-attaches the number itself, since it has no identity line.)
             let name_of = |idx: usize| -> String {
                 gs.card_database
                     .get_card(card_ids[idx])
-                    .map(|c| format!("{} {}", c.card_no, c.name))
+                    .map(|c| c.name.to_string())
                     .unwrap_or_else(|| format!("#{}", card_ids[idx]))
             };
             let items: Vec<String> = shown.iter().map(|&i| name_of(i)).collect();
@@ -735,7 +743,13 @@ if count <= 1 {
                             } else {
                                 "[ ]"
                             };
-                            format!("{} {}", mark, name)
+                            // The text list has no art/identity line, so the
+                            // card number goes back on (it was stripped from
+                            // `items` for the grid path above).
+                            match card_nos.get(i).map(|s| s.as_str()).unwrap_or("") {
+                                "" => format!("{} {}", mark, name),
+                                no => format!("{} {} {}", mark, no, name),
+                            }
                         })
                         .collect();
                     let sel = menu_select_with_cards(
@@ -770,15 +784,23 @@ if count <= 1 {
         }
         Choice::SelectTarget {
             target,
-            options,
             description,
             allow_skip,
             ..
         } => {
-            let items: Vec<String> = match options {
-                Some(ref opts) if !opts.is_empty() => opts.clone(),
-                _ => (0..2).map(|i| format!("Option {}", i + 1)).collect(),
-            };
+            // Same options the web server and 3DS offer: the shared
+            // pending-choice action list (Yes/No, positions, draw counts,
+            // card choices...). The raw-`options` menu used to degrade to
+            // "Option 1 / Option 2" whenever the ability embedded no
+            // strings, hiding what each pick does.
+            let acts = game_setup::generate_possible_actions(gs);
+            if acts.is_empty() {
+                log::debug!("[CHOICE] SelectTarget '{}' produced no actions", target);
+                TurnEngine::resume_with_choice(gs, Some(-1), None).ok();
+                return true;
+            }
+            let items: Vec<String> =
+                acts.iter().map(|a| a.description.clone()).collect();
             let sel = menu_select(ui, &items, &description, allow_skip);
             match sel {
                 None => match target.as_str() {
@@ -790,7 +812,13 @@ if count <= 1 {
                     }
                 },
                 Some(idx) => {
-                    TurnEngine::resume_with_choice(gs, Some(idx as i16), None).ok();
+                    if game_setup::execute_action(gs, &acts[idx]).is_err() {
+                        log::debug!(
+                            "[CHOICE] SelectTarget '{}' execute failed for act {}",
+                            target,
+                            idx
+                        );
+                    }
                 }
             };
             true
