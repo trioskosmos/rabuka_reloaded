@@ -12,7 +12,8 @@ the width kept proportional, then sliced left-to-right into 16x16 cells
 Transparent pixels get the zone-fill palette index 2 exactly like
 tools/bake_font_tiles.py, so icons sit on menu backgrounds seamlessly.
 Opaque pixels are quantized to the fixed text-palette colours shared with
-display.rs TEXT_PALETTE / DETAIL_TEXT_PALETTE entries 7..=15.
+display.rs TEXT_PALETTE / DETAIL_TEXT_PALETTE entries 4..=15 (4=gold and
+5=green must exist in BOTH palettes or those icon pixels render black).
 
 Run:  py -3 tools/bake_texticon_tiles.py
 Writes platforms/gba/src/texticons_gen.rs + a preview PNG under

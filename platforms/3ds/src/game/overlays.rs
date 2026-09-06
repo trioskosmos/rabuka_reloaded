@@ -99,6 +99,7 @@ pub(crate) fn overlay_input(
     keys: u32,
     is_host: bool,
     redraw: &mut bool,
+    quit_to_menu: &mut bool,
 ) {
     if *overlay != Overlay::None {
         match *overlay {
@@ -108,7 +109,7 @@ pub(crate) fn overlay_input(
                     *redraw = true;
                 }
                 if keys & 0x00000080 != 0 {
-                    *sel = sel.saturating_add(1).min(3);
+                    *sel = sel.saturating_add(1).min(4);
                     *redraw = true;
                 }
                 if keys & 0x00000001 != 0 {
@@ -120,6 +121,11 @@ pub(crate) fn overlay_input(
                             // Toggle language
                             set_lang(current_lang().toggle());
                             i18n::init();
+                            Overlay::StartMenu(*sel)
+                        }
+                        // Quit back to the mode-select menu
+                        4 => {
+                            *quit_to_menu = true;
                             Overlay::StartMenu(*sel)
                         }
                         _ => Overlay::None,
@@ -316,12 +322,12 @@ pub(crate) fn render_overlay(gs: &GameState, overlay: Overlay, is_host: bool, at
     match overlay {
         Overlay::StartMenu(sel) => unsafe {
             _3ds_top_queue_rect(0.0, 0.0, 400.0, 240.0, COL_TOP_BG);
-            _3ds_top_queue_rect(40.0, 50.0, 320.0, 170.0, 0xFF333333);
-            _3ds_top_queue_rect(40.0, 50.0, 320.0, 170.0, 0xFF888888);
+            _3ds_top_queue_rect(40.0, 40.0, 320.0, 190.0, 0xFF333333);
+            _3ds_top_queue_rect(40.0, 40.0, 320.0, 190.0, 0xFF888888);
             let menu_title = tl("MENU");
             _3ds_top_queue_text(
                 160.0,
-                58.0,
+                48.0,
                 COL_GOLD,
                 SCALE_LARGE,
                 format!("{}\0", menu_title).as_ptr(),
@@ -332,9 +338,10 @@ pub(crate) fn render_overlay(gs: &GameState, overlay: Overlay, is_host: bool, at
                 tl("Game Log"),
                 tl("Revealed Cards"),
                 format!("{}: {}", tl("Language"), lang_label),
+                tl("Quit to Menu"),
             ];
             for (i, item) in items.iter().enumerate() {
-                let iy = 85.0 + i as f32 * 30.0;
+                let iy = 75.0 + i as f32 * 28.0;
                 let bg = if i == sel { 0xFF557755 } else { 0xFF555555 };
                 _3ds_top_queue_rect(60.0, iy, 280.0, 26.0, bg);
                 let prefix = "";

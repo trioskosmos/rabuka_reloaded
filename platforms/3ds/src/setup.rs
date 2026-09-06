@@ -739,6 +739,8 @@ fn loading(
                     next_action_seq: 1,
                     dbg_tx_bytes: 0,
                     dbg_rx_bytes: 0,
+                    cards: cards.clone(),
+                    decks: Arc::new(decks.clone()),
                 })
             }
             Err(e) => Step::Done(Err(e)),
@@ -2177,6 +2179,8 @@ fn multiplayer_loading(
                     next_action_seq: 1,
                     dbg_tx_bytes: 0,
                     dbg_rx_bytes: 0,
+                    cards: cards.clone(),
+                    decks: Arc::new(decks.clone()),
                 })
             }
             Err(e) => Step::Done(Err(e)),
@@ -2357,6 +2361,8 @@ fn multiplayer_pc_loading(
                 next_action_seq: 1,
                 dbg_tx_bytes: 0,
                 dbg_rx_bytes: 0,
+                cards: cards.clone(),
+                decks: Arc::new(decks.clone()),
             })
         }
         Err(e) => Step::Done(Err(e)),

@@ -47,6 +47,7 @@ pub(crate) struct InputOut {
     pub dirty: bool,
     pub redraw: bool,
     pub display_pos: usize,
+    pub quit_to_menu: bool,
 }
 
 /// Process one frame of input. `gs`/`acts_cache` are mutated in place; the
@@ -86,6 +87,7 @@ pub(crate) fn handle_input(
     vs_ai: &bool,
     ai_vs_ai: &bool,
     my_player_idx: usize,
+    mut quit_to_menu: bool,
 ) -> InputOut {
     // DPAD/menu navigation is suppressed while an overlay (Start/perf/log/revealed)
     // is open — the overlay consumes D-pad/A/B itself via overlay_input.
@@ -377,8 +379,12 @@ pub(crate) fn handle_input(
         }
     }
 
-    // X toggles card detail mode + narrows action list to selected card
-    if overlay == Overlay::None && keys & 0x00000400 != 0 {
+    // X toggles card detail mode + narrows action list to selected card.
+    // Disabled on the game-over screen.
+    if overlay == Overlay::None
+        && keys & 0x00000400 != 0
+        && gs.game_result == GameResult::Ongoing
+    {
         let has_card = cur < acts_cache.len()
             && acts_cache[cur]
                 .parameters
@@ -436,14 +442,19 @@ pub(crate) fn handle_input(
         }
     }
 
-    // START opens the in-game menu (perf stats / game log / revealed cards)
+    // START opens the in-game menu (perf stats / game log / revealed cards).
+    // On the game-over screen it quits back to the mode-select menu instead.
     if keys & 0x00000008 != 0 {
-        overlay = if overlay == Overlay::None {
-            Overlay::StartMenu(0)
+        if gs.game_result != GameResult::Ongoing {
+            quit_to_menu = true;
         } else {
-            Overlay::None
-        };
-        redraw = true;
+            overlay = if overlay == Overlay::None {
+                Overlay::StartMenu(0)
+            } else {
+                Overlay::None
+            };
+            redraw = true;
+        }
     }
 
     // Multiplayer: both consoles run the SAME engine. The only thing that
@@ -519,10 +530,12 @@ pub(crate) fn handle_input(
         // Don't process local input while waiting
     } else
     // A button executes selected action (skip disabled actions, disabled in zone viewer).
+    // Blocked once the game is over — the game-over screen owns the top screen.
     if overlay == Overlay::None
         && zone_viewer.is_none()
         && keys & 0x00000001 != 0
         && cur < acts_cache.len()
+        && gs.game_result == GameResult::Ongoing
     {
         let is_disabled = acts_cache[cur]
             .parameters
@@ -582,7 +595,7 @@ pub(crate) fn handle_input(
     // In multiplayer: opponent's turn is handled via UDS receive, not AI
     // Uses mp_can_act(gs, 0) which correctly handles pending choices (choice_player_id).
     let is_ai_turn = *ai_vs_ai || (*vs_ai && !mp_can_act(&gs, 0));
-    if is_ai_turn && !dirty {
+    if is_ai_turn && !dirty && gs.game_result == GameResult::Ongoing {
         if acts_cache.len() > 0 {
             // Determine which player is the AI (0 = P1, 1 = P2)
             // In vs_ai mode, human is P1 (index 0), AI is P2 (index 1)
@@ -634,9 +647,10 @@ pub(crate) fn handle_input(
         dirty = true;
     }
 
-    // Touch: tap board zones to view card details, or overlay to select action
+    // Touch: tap board zones to view card details, or overlay to select action.
+    // Disabled on the game-over screen (START quits to menu instead).
     let touching = unsafe { _3ds_touch_down() };
-    if touching && !was_touching {
+    if touching && !was_touching && gs.game_result == GameResult::Ongoing {
         touch_tap_count += 1;
         let mut tx: u32 = 0;
         let mut ty: u32 = 0;
@@ -871,9 +885,24 @@ pub(crate) fn handle_input(
 
             // ===== TAP-TO-DEPLOY (pb dropped, can &mut gs) =====
 
-            // Phase-specific: mulligan hand tap toggles selection
+            // Whether the local human may execute a choice/action right now.
+            // Detail view is ALWAYS allowed (any turn, any phase); only the
+            // choice-execution path is gated by this.
+            let choice_executable = if is_multiplayer {
+                !waiting_for_opponent
+            } else if *ai_vs_ai {
+                false
+            } else if *vs_ai {
+                mp_can_act(&gs, 0)
+            } else {
+                true
+            };
+            // Phase-specific: mulligan hand tap toggles selection.
+            // Only when a HAND card was tapped; stage/opponent taps fall
+            // through to the detail toggle below.
             if let Some(cid) = tapped_card {
                 if tap_active_side
+                    && tapped_hand_idx.is_some()
                     && matches!(
                         gs.current_phase,
                         Phase::MulliganFirstAttacker | Phase::MulliganSecondAttacker
@@ -909,8 +938,11 @@ pub(crate) fn handle_input(
                             break;
                         }
                     }
-                // Live card phase: hand tap toggles selection
+                // Live card phase: hand tap toggles selection.
+                // Only when a HAND card was tapped; other taps fall through
+                // to the detail toggle below.
                 } else if tap_active_side
+                    && tapped_hand_idx.is_some()
                     && matches!(
                         gs.current_phase,
                         Phase::LiveCardSetFirstAttacker | Phase::LiveCardSetSecondAttacker
@@ -946,8 +978,11 @@ pub(crate) fn handle_input(
                             break;
                         }
                     }
-                // Choice image mode: board tap executes the choice directly
-                } else if has_image_choice {
+                // Choice image mode: board tap executes the choice directly,
+                // but ONLY when the local player is the one choosing.
+                // During the opponent's turn / AI turn the tap falls through
+                // to the detail toggle below.
+                } else if has_image_choice && choice_executable {
                     let mut act_idx: Option<usize> = acts_cache.iter().position(|act| {
                         act.parameters.as_ref().and_then(|p| p.card_id) == Some(cid)
                             && matches!(
@@ -1005,9 +1040,12 @@ pub(crate) fn handle_input(
                         }
                     }
                     redraw = true;
-                // Default: toggle card detail view for any tapped card
-                // Skip if a stage zone was tapped — stage handler takes priority
-                } else if stage_tap.is_none() {
+                // Default: toggle card detail view for any tapped card.
+                // Runs even when a stage zone was tapped: if the stage tap
+                // below matches a real PlayMemberToStage/ChoicePosition action
+                // it clears detail_mode again, otherwise the detail view stays.
+                // This keeps tap-to-inspect working on every turn and phase.
+                } else {
                     if Some(cid) == viewing_card {
                         viewing_card = None;
                         detail_mode = false;
@@ -1026,7 +1064,11 @@ pub(crate) fn handle_input(
                     redraw = true;
                 }
             } else if stage_tap.is_none() {
-                viewing_card = None;
+                if viewing_card.is_some() {
+                    viewing_card = None;
+                    detail_mode = false;
+                    redraw = true;
+                }
             }
 
             // Stage zone tap actions (PlayMemberToStage, UseAbility, ChoicePosition)
@@ -1093,8 +1135,9 @@ pub(crate) fn handle_input(
                         break;
                     }
                 }
-                // ChoicePosition: select stage position during choice prompt
-                if !stage_handled && has_image_choice {
+                // ChoicePosition: select stage position during choice prompt.
+                // Only when the local player is the one choosing.
+                if !stage_handled && has_image_choice && choice_executable {
                     for (ai, act) in acts_cache.iter().enumerate() {
                         if act.action_type != game_setup::ActionType::ChoicePosition {
                             continue;
@@ -1156,5 +1199,6 @@ pub(crate) fn handle_input(
         dirty,
         redraw,
         display_pos,
+        quit_to_menu,
     }
 }

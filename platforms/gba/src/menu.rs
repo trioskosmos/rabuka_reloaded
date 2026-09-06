@@ -68,6 +68,7 @@ pub fn show_detail_screen_simple<I: InputSource>(
     }
     lines.extend(Display::wrap_pane(body, PANE_COLS));
     display.reset_vram();
+    agb::println!("DETAIL-SIMPLE lines={} bodylen={}", lines.len(), body.len()); // TEMP
     let mut scroll = 0usize;
     const VISIBLE: usize = 8;
     display.render_card_detail(art, &lines, scroll);
@@ -79,14 +80,25 @@ pub fn show_detail_screen_simple<I: InputSource>(
         } else if input.just_pressed(Button::Down) && scroll + VISIBLE < lines.len() {
             scroll += 1;
             display.render_card_detail(art, &lines, scroll);
-        } else if input.just_pressed(Button::A)
-            || input.just_pressed(Button::B)
-            || input.just_pressed(Button::L)
-            || input.just_pressed(Button::R)
-            || input.just_pressed(Button::Start)
-        {
-            display.reset_vram();
-            return;
+        } else {
+            let closer = if input.just_pressed(Button::A) {
+                "A"
+            } else if input.just_pressed(Button::B) {
+                "B"
+            } else if input.just_pressed(Button::L) {
+                "L"
+            } else if input.just_pressed(Button::R) {
+                "R"
+            } else if input.just_pressed(Button::Start) {
+                "Start"
+            } else {
+                ""
+            };
+            if !closer.is_empty() {
+                agb::println!("DETAIL-SIMPLE close {}", closer); // TEMP
+                display.reset_vram();
+                return;
+            }
         }
         display.wait();
     }
@@ -124,9 +136,16 @@ pub fn show_detail_screen<I: InputSource>(
     // Fresh pool for the portrait + text: the previous screen's dead tiles
     // would otherwise pile onto this screen's demand (see reset_vram).
     display.reset_vram();
+    agb::println!(
+        "DETAIL open art={} lines={} bodylen={}",
+        art_card_no.unwrap_or("-"),
+        lines.len(),
+        body.len()
+    ); // TEMP L/R diagnosis
     let mut scroll = 0usize;
     const VISIBLE: usize = 8;
     display.render_card_detail(art, &lines, scroll);
+    agb::println!("DETAIL rendered"); // TEMP L/R diagnosis
     loop {
         input.poll();
         if input.just_pressed(Button::Up) && scroll > 0 {
@@ -135,16 +154,27 @@ pub fn show_detail_screen<I: InputSource>(
         } else if input.just_pressed(Button::Down) && scroll + VISIBLE < lines.len() {
             scroll += 1;
             display.render_card_detail(art, &lines, scroll);
-        } else if input.just_pressed(Button::A)
-            || input.just_pressed(Button::B)
-            || input.just_pressed(Button::L)
-            || input.just_pressed(Button::R)
-            || input.just_pressed(Button::Start)
-        {
-            // Release the portrait + text before the caller rebuilds its
-            // own screen, so demands never stack across the transition.
-            display.reset_vram();
-            return;
+        } else {
+            let closer = if input.just_pressed(Button::A) {
+                "A"
+            } else if input.just_pressed(Button::B) {
+                "B"
+            } else if input.just_pressed(Button::L) {
+                "L"
+            } else if input.just_pressed(Button::R) {
+                "R"
+            } else if input.just_pressed(Button::Start) {
+                "Start"
+            } else {
+                ""
+            };
+            if !closer.is_empty() {
+                agb::println!("DETAIL close {}", closer); // TEMP L/R diagnosis
+                // Release the portrait + text before the caller rebuilds its
+                // own screen, so demands never stack across the transition.
+                display.reset_vram();
+                return;
+            }
         }
         display.wait_vblank();
     }
@@ -153,17 +183,29 @@ pub fn show_detail_screen<I: InputSource>(
 /// Card detail: art + `[no] name` / stat header + ability body.
 pub fn show_card_detail<I: InputSource>(
     display: &mut Display,
-    _input: &mut I,
+    input: &mut I,
     gs: &GameState,
     card_no: String,
 ) {
     if let Some(card) = gs.card_database.get_card_by_no(&card_no) {
+        agb::println!("CARDDETAIL {}", card_no); // TEMP
         let header: Vec<String> = alloc::vec![
             card_detail_title(card),
             card_stat_text(card),
         ];
-        display.show_detail_screen(gs, Some(card_no.as_str()), &header, &card_ability_text(card));
+        // The input-driven paginated viewer (art lookup included) — NOT
+        // `display.show_detail_screen`, whose PlatformUi impl renders one
+        // frame and returns (no input on Display): routing here flashed
+        // a frame and "closed" instantly, without any portrait.
+        show_detail_screen(
+            display,
+            input,
+            gs,
+            Some(card_no.as_str()),
+            &header,
+            &card_ability_text(card),
+        );
     } else {
-        display.show_detail_screen(gs, None, &[card_no], "");
+        show_detail_screen(display, input, gs, None, &[card_no], "");
     }
 }

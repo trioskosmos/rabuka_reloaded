@@ -7,6 +7,10 @@ mod input;
 mod overlays;
 mod render;
 
+use std::sync::Arc;
+
+use rabuka_engine::card::Card;
+use rabuka_engine::deck_parser::DeckList;
 use rabuka_engine::game_setup;
 use rabuka_engine::game_state::{GameResult, GameState, Phase};
 use rabuka_engine::player::Player;
@@ -15,7 +19,7 @@ use crate::dprintln;
 use crate::ffi::*;
 use crate::lang::tl;
 use crate::net::mp_can_act;
-use crate::steps::{Overlay, Step};
+use crate::steps::{Overlay, SetupPhase, Step};
 use crate::ui::card_atlas::CardAtlas;
 use crate::ui::colors::*;
 use crate::ui::text::*;
@@ -54,14 +58,40 @@ pub struct PlayState {
     pub next_action_seq: u32,
     pub dbg_tx_bytes: u32,
     pub dbg_rx_bytes: u32,
+    /// Deck-select data retained so the START menu / game-over screen can
+    /// quit back to the mode-select menu without reloading from ROM.
+    pub cards: Arc<Vec<Card>>,
+    pub decks: Arc<Vec<DeckList>>,
 }
 
 fn compute_live_need(player: &Player, gs: &GameState) -> Vec<u32> {
-    let mut nh = vec![0u32; 8];
+    // All live cards whose need-hearts count: committed live-zone cards plus,
+    // during the live-set phase, the currently selected hand cards (which are
+    // not in the live zone yet). This makes the counter update live as cards
+    // are selected/deselected.
+    let mut cids: Vec<i16> = Vec::new();
     for &cid in &player.live_card_zone.cards {
-        if cid == -1 {
-            continue;
+        if cid != -1 {
+            cids.push(cid);
         }
+    }
+    if matches!(
+        gs.current_phase,
+        Phase::LiveCardSetFirstAttacker | Phase::LiveCardSetSecondAttacker
+    ) && gs.active_player().id == player.id
+    {
+        for &hi in &gs.live_card_selected_indices {
+            let hi = hi as usize;
+            if hi < player.hand.cards.len() {
+                let cid = player.hand.cards[hi];
+                if cid != -1 {
+                    cids.push(cid);
+                }
+            }
+        }
+    }
+    let mut nh = vec![0u32; 8];
+    for &cid in &cids {
         if let Some(card) = gs.card_database.get_card(cid) {
             if let Some(ref need) = card.need_heart {
                 for (color, count) in &need.hearts {
@@ -73,7 +103,7 @@ fn compute_live_need(player: &Player, gs: &GameState) -> Vec<u32> {
         }
     }
     for (&cid, colors) in &gs.mods.need_heart_modifiers {
-        if player.live_card_zone.cards.contains(&cid) {
+        if cids.contains(&cid) {
             for (color, &val) in colors {
                 if let Some(idx) = heart_color_index(color) {
                     nh[idx] = (nh[idx] as i32 + val.total()).max(0) as u32;
@@ -191,6 +221,8 @@ pub fn play_step(p: PlayState, keys: u32) -> Step {
         mut next_action_seq,
         mut dbg_tx_bytes,
         mut dbg_rx_bytes,
+        cards,
+        decks,
     } = p;
     // Web server pattern: use player_idx (0 or 1) for perspective.
     // No long-lived borrows on gs — look up inline.
@@ -243,7 +275,15 @@ pub fn play_step(p: PlayState, keys: u32) -> Step {
     let mut display_pos = display_order.iter().position(|&fi| fi == cur).unwrap_or(0);
 
     // Input handling (suppressed when overlay is active)
-    overlays::overlay_input(&mut overlay, &gs, keys, is_host, &mut redraw);
+    let mut quit_to_menu = false;
+    overlays::overlay_input(
+        &mut overlay,
+        &gs,
+        keys,
+        is_host,
+        &mut redraw,
+        &mut quit_to_menu,
+    );
     let out = input::handle_input(
         &mut gs,
         &mut acts_cache,
@@ -278,7 +318,11 @@ pub fn play_step(p: PlayState, keys: u32) -> Step {
         vs_ai,
         ai_vs_ai,
         my_player_idx,
+        quit_to_menu,
     );
+    if out.quit_to_menu {
+        return Step::Setup(cards, (*decks).clone(), SetupPhase::PickMode(0), true);
+    }
     cur = out.cur;
     detail_mode = out.detail_mode;
     choice_subview = out.choice_subview;
@@ -630,81 +674,32 @@ pub fn play_step(p: PlayState, keys: u32) -> Step {
             set_live_stats(pref(&gs, 1 - my_player_idx), &gs, true);
         }
 
-        // Compute and set need hearts text for bottom screen live zone
+        // Compute and set need hearts text for bottom screen live zone.
+        // Slot 0 = perspective (own) section, slot 1 = opponent section —
+        // the C board draws each slot in its own section.
         {
-            // P1 (perspective player) need hearts — always show if any
-            let p1_nh = compute_live_need(&gs.player1, &gs);
+            // Own need hearts — always shown (updates live during live-set
+            // selection via compute_live_need).
+            let mine_nh = compute_live_need(pref(&gs, my_player_idx), &gs);
             unsafe {
                 _3ds_set_need_hearts(
-                    0, p1_nh[0], p1_nh[1], p1_nh[2], p1_nh[3], p1_nh[4], p1_nh[5], p1_nh[6],
-                    p1_nh[7],
+                    0, mine_nh[0], mine_nh[1], mine_nh[2], mine_nh[3], mine_nh[4], mine_nh[5],
+                    mine_nh[6], mine_nh[7],
                 );
             }
-            // P2 (opponent) need hearts — hidden until performed
+            // Opponent need hearts — hidden until performed
             if gs.opponent_has_performed(my_player_idx) {
-                let p2_nh = compute_live_need(&gs.player2, &gs);
+                let opp_nh = compute_live_need(pref(&gs, 1 - my_player_idx), &gs);
                 unsafe {
                     _3ds_set_need_hearts(
-                        1, p2_nh[0], p2_nh[1], p2_nh[2], p2_nh[3], p2_nh[4], p2_nh[5], p2_nh[6],
-                        p2_nh[7],
+                        1, opp_nh[0], opp_nh[1], opp_nh[2], opp_nh[3], opp_nh[4], opp_nh[5],
+                        opp_nh[6], opp_nh[7],
                     );
                 }
             } else {
                 unsafe {
                     _3ds_set_need_hearts(1, 0, 0, 0, 0, 0, 0, 0, 0);
                 }
-            }
-        }
-
-        // Game over: show winner on top screen
-        if gs.game_result != GameResult::Ongoing {
-            let winner = match gs.game_result {
-                GameResult::FirstAttackerWins => {
-                    if gs.player1.is_first_attacker {
-                        "P1"
-                    } else {
-                        "P2"
-                    }
-                }
-                GameResult::SecondAttackerWins => {
-                    if gs.player1.is_first_attacker {
-                        "P2"
-                    } else {
-                        "P1"
-                    }
-                }
-                _ => "Draw",
-            };
-            unsafe {
-                _3ds_top_queue_rect(0.0, 0.0, 400.0, 240.0, COL_TOP_BG);
-                let wins_text = tl("Score");
-                _3ds_top_queue_text(
-                    4.0,
-                    100.0,
-                    COL_GOLD,
-                    1.2f32,
-                    format!("{} wins!\0", winner).as_ptr(),
-                );
-                _3ds_top_queue_text(
-                    4.0,
-                    140.0,
-                    COL_LIGHT,
-                    SCALE_BODY,
-                    format!(
-                        "{}: {} vs {}\0",
-                        wins_text,
-                        gs.player1.success_live_card_zone.cards.len(),
-                        gs.player2.success_live_card_zone.cards.len()
-                    )
-                    .as_ptr(),
-                );
-                _3ds_top_queue_text(
-                    4.0,
-                    170.0,
-                    COL_MED,
-                    SCALE_SMALL,
-                    format!("{}\0", tl("Press START to exit")).as_ptr(),
-                );
             }
         }
 
@@ -767,6 +762,60 @@ pub fn play_step(p: PlayState, keys: u32) -> Step {
             overlays::render_overlay(&gs, overlay, is_host, atlas);
         }
 
+        // Game over: full-screen winner panel drawn LAST so nothing else
+        // (board render clears the queue first, overlays paint over it)
+        // can wipe or cover it.
+        if gs.game_result != GameResult::Ongoing {
+            let winner = match gs.game_result {
+                GameResult::FirstAttackerWins => {
+                    if gs.player1.is_first_attacker {
+                        "P1"
+                    } else {
+                        "P2"
+                    }
+                }
+                GameResult::SecondAttackerWins => {
+                    if gs.player1.is_first_attacker {
+                        "P2"
+                    } else {
+                        "P1"
+                    }
+                }
+                _ => "Draw",
+            };
+            unsafe {
+                _3ds_top_queue_rect(0.0, 0.0, 400.0, 240.0, COL_TOP_BG);
+                let wins_text = tl("Score");
+                _3ds_top_queue_text(
+                    4.0,
+                    100.0,
+                    COL_GOLD,
+                    1.2f32,
+                    format!("{} wins!\0", winner).as_ptr(),
+                );
+                _3ds_top_queue_text(
+                    4.0,
+                    140.0,
+                    COL_LIGHT,
+                    SCALE_BODY,
+                    format!(
+                        "{}: {} vs {}\0",
+                        wins_text,
+                        gs.player1.success_live_card_zone.cards.len(),
+                        gs.player2.success_live_card_zone.cards.len()
+                    )
+                    .as_ptr(),
+                );
+                _3ds_top_queue_text(
+                    4.0,
+                    170.0,
+                    COL_MED,
+                    SCALE_SMALL,
+                    format!("{}\0", tl("Press START for menu")).as_ptr(),
+                );
+            }
+        }
+
         dirty = false;
         redraw = false;
     }
@@ -801,6 +850,8 @@ pub fn play_step(p: PlayState, keys: u32) -> Step {
         next_action_seq,
         dbg_tx_bytes,
         dbg_rx_bytes,
+        cards,
+        decks,
     })
 }
 

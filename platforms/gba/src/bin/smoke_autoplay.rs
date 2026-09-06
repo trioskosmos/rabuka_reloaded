@@ -36,18 +36,13 @@ impl InputSource for AutoInput {
         self.frame = self.frame.wrapping_add(1);
     }
     fn just_pressed(&self, btn: Button) -> bool {
-        let f = self.frame % 40;
-        let slow = self.frame % 400;
-        match btn {
-            Button::A => f == 5,
-            Button::Down => f == 15,
-            Button::Up => f == 20,
-            Button::Left => f == 25,
-            Button::Right => f == 30,
-            Button::Select => slow == 200,
-            Button::R => slow == 250,
-            Button::B => slow == 300,
-            _ => false,
+        // Spam A, Down, L — 10 frames each, repeating. Confirms menus,
+        // moves, opens detail; the detail loop consumes the held buttons
+        // to open/close rapidly for stress coverage.
+        match (self.frame / 10) % 3 {
+            0 => btn == Button::A,
+            1 => btn == Button::Down,
+            _ => btn == Button::L,
         }
     }
 }

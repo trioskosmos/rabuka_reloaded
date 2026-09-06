@@ -291,16 +291,6 @@ pub fn render_card_detail(
         // Content background below the header
         p.rect(Layer::Content, 0.0, CARD_DETAIL_HEADER_H, 400.0, 240.0 - CARD_DETAIL_HEADER_H, COL_CARD_OPAQUE);
         // Card portrait (left column) — showcase depth so it lifts off the page.
-        // Frame shares the portrait depth so it stays registered on both eyes.
-        p.rect_with_depth(
-            Layer::Content,
-            card_x - 2.0,
-            card_y - 2.0,
-            card_w + 4.0,
-            card_h + 4.0,
-            COL_GOLD,
-            crate::ui::stereo::PORTRAIT_DEPTH,
-        );
         if let Some((atl, idx)) = atlas.lookup(&card.card_no) {
             p.card_with_depth(
                 Layer::Content,

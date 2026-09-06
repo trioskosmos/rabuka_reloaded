@@ -965,28 +965,39 @@ static void draw_section(PlayerBoard* pb, float y0, float h, bool opponent, bool
         }
         lx += live_slot_w + 2;
     }
-    // Draw own need hearts grid to the right of live cards (own player only)
-    if (!opponent) {
-        int pi = 0;
+    // Draw need hearts (icon + count) to the right of live cards.
+    // Slot 0 is drawn in the own section, slot 1 in the opponent section
+    // (see _3ds_set_need_hearts call sites). Hidden entries are zeroed
+    // Rust-side until revealed.
+    {
+        int pi = opponent ? 1 : 0;
         int cols = (board_view == 2) ? 8 : 4;
         int rows = (board_view == 2) ? 1 : 2;
         float icon_sz = 10.0f;
         float gap = 1.0f;
+        float cell_w = icon_sz + 9.0f + gap;
         for (int i = 0; i < 8; i++) {
             if (need_hearts_counts[pi][i] == 0) continue;
             int col = i % cols;
             int row = i / cols;
             if (row >= rows) break;
-            float ix = lx + 2 + col * (icon_sz + gap);
+            float ix = lx + 2 + col * cell_w;
             float iy = live_y + 2 + row * (icon_sz + gap);
             char atlas_name[64];
-            snprintf(atlas_name, sizeof(atlas_name), "icon_heart_%02d.png.t3x", i);
+            if (i == 7) {
+                snprintf(atlas_name, sizeof(atlas_name), "icon_all.png.t3x");
+            } else {
+                snprintf(atlas_name, sizeof(atlas_name), "icon_heart_%02d.png.t3x", i);
+            }
             C2D_Image img = _3ds_get_card_image(atlas_name, 0);
             if (img.tex) {
                 C2D_DrawImageAt(img, ix, iy, 0.5f, NULL,
                     icon_sz / (float)img.subtex->width,
                     icon_sz / (float)img.subtex->height);
             }
+            char cnt[12];
+            snprintf(cnt, sizeof(cnt), "%u", need_hearts_counts[pi][i]);
+            _3ds_draw_label(cnt, ix + icon_sz + 1, iy - 1, 0xFFFFFFFF, 0.40f);
         }
     }
 

@@ -389,6 +389,7 @@ impl CardSpriteCache {
         if let Some(p) = self.sprites.get_mut(self.key_buf.as_str()) {
             p.last_used = self.frame;
         } else {
+            agb::println!("SPRITE miss {}:{} {}x{}", tag, card_no, grid_w, grid_h); // TEMP crash trace
             // Baked tiles arrive as uniform BIOS streams — normalize once
             // per miss into scratch; cache hits never touch `tiles` at
             // all, so steady frames pay nothing. Scratch fits the largest
@@ -571,6 +572,12 @@ static DETAIL_TEXT_PALETTE: Palette16 = const {
     palette[0] = Rgb15::BLACK;
     palette[1] = Rgb15::WHITE;
     palette[2] = Rgb::new(26, 35, 50).to_rgb15(); // zone fill behind text
+    // Entries 3/4/5 mirror TEXT_PALETTE: baked texticons use gold (4) and
+    // green (5), and without these any such pixel renders BLACK on detail
+    // screens (the "black lines" in ability text — e.g. green hearts).
+    palette[3] = Rgb::new(42, 58, 90).to_rgb15(); // card back
+    palette[4] = Rgb::new(245, 158, 11).to_rgb15(); // gold
+    palette[5] = Rgb::new(46, 204, 113).to_rgb15(); // green
     palette[6] = Rgb::new(160, 174, 192).to_rgb15(); // dim
     palette[7] = Rgb::new(224, 32, 96).to_rgb15(); // icon red
     palette[8] = Rgb::new(240, 128, 176).to_rgb15(); // icon pink
@@ -1281,13 +1288,14 @@ impl<'a> Display<'a> {
 
         if let Some(art) = art {
             log::debug!("detail portrait for {}", art.card_no);
-            // Uniform BIOS stream (see `decompress_lz77`).
-            let mut decompressed_tiles = [0u8; 13824];
-            decompress_lz77(art.tiles, &mut decompressed_tiles);
+            // Pass the baked stream straight through: get_or_upload is the
+            // single point that normalizes streams (decompressing here AND
+            // there fed pixels back into SWI as a fake stream — the wild
+            // jumps on detail open).
             self.push_card(
                 "detail",
                 art.card_no,
-                &decompressed_tiles,
+                art.tiles,
                 12,
                 18,
                 DETAIL_PX.0,
@@ -1559,6 +1567,11 @@ impl rabuka_engine::game::platform_ui::PlatformUi for Display<'_> {
     fn reset_vram(&mut self) {
         self.reset_vram();
     }
+    /// NOTE: single-frame renderer, NOT a blocking menu — Display has no
+    /// input, so this cannot wait for buttons. UI flows must use
+    /// `menu::show_detail_screen` with a real `InputSource` (routing here
+    /// flashed one frame and "closed" instantly). Kept only to satisfy
+    /// the trait; nothing calls it.
     fn show_detail_screen(
         &mut self,
         _gs: &rabuka_engine::game_state::GameState,

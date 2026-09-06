@@ -26,12 +26,17 @@ pub fn heart_color_index(color: &HeartColor) -> Option<usize> {
 }
 
 /// Format need hearts with text icons matching top screen format.
+/// Index 7 is the ALL heart (icon_all), 0-6 are heart_00..heart_06.
 pub fn format_need_hearts_icons(hearts: &[u32]) -> String {
     let mut parts = Vec::new();
     for (i, &count) in hearts.iter().enumerate() {
         if count > 0 {
-            let label = format!("h{:02}{}", i, count);
-            parts.push(heart_label_to_icon(&label));
+            if i == 7 {
+                parts.push(format!("{{{{icon_all.png|ALL}}}}{}", count));
+            } else {
+                let label = format!("h{:02}{}", i, count);
+                parts.push(heart_label_to_icon(&label));
+            }
         }
     }
     if parts.is_empty() {

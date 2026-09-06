@@ -513,8 +513,20 @@ def build_master_palette(card_nos: list[str], sample_size: int = 500) -> tuple:
             Image.open(BACK_PNG).convert("RGB").resize((LIVE_W, LIVE_H), Image.LANCZOS)
         )
     master_q, master_pal = build_palette(thumbs, colors=240)
+    # Reserve palette index 0 as magenta (255,0,255): index 0 is the
+    # hardware-transparent index on OBJ sprites, and the runtime treats
+    # every 0 byte as gutter (see upload_part). Before this reservation,
+    # index 0 held near-white and up to ~24% of some cards' pixels
+    # quantized to it — rendering as black holes. Magenta never occurs
+    # in real art, so forcing it here keeps every natural pixel opaque.
+    # (A genuinely magenta pixel would still land on 0; no card in the
+    # current set does — the bake audit below would print it.)
+    master_pal[0:3] = [255, 0, 255]
+    master_q.putpalette(master_pal)
     master_pal_bytes = palette_bytes_240(master_pal)
-    print(f"master palette: 240 colours from {len(thumbs)} thumbs (sample of {len(sample)} cards)")
+    r, g, b = master_pal[0], master_pal[1], master_pal[2]
+    assert (r, g, b) == (255, 0, 255)
+    print(f"master palette: 240 colours from {len(thumbs)} thumbs (sample of {len(sample)} cards), index 0 reserved magenta")
     return master_q, master_pal_bytes
 
 
@@ -599,8 +611,23 @@ def write_gen(entries, fronts, stage_fronts, live_fronts, waited_fronts, back_fr
         f.write("}\n\n")
 
         # Runtime decompression helper
+        f.write("/// Staging for SWI sources: baked blobs are byte-packed\n")
+        f.write("/// (`include_bytes!` aligns to 1, so most sit at odd addresses),\n")
+        f.write("/// but the BIOS word-loads its source and faults on unaligned\n")
+        f.write("/// addresses. Sized past the largest baked stream (~12.9 KiB).\n")
+        f.write("static mut SWI_SRC_STAGE: [u8; 16384] = [0; 16384];\n\n")
         f.write("pub fn lz77_decompress_wram(src: &[u8], dst: &mut [u8]) {\n")
-        f.write("    let src_ptr = src.as_ptr() as u32;\n")
+        f.write("    let src_ptr = if src.as_ptr() as u32 & 3 == 0 {\n")
+        f.write("        src.as_ptr() as u32\n")
+        f.write("    } else {\n")
+        f.write("        assert!(src.len() <= 16384, \"stream exceeds SWI staging\");\n")
+        f.write("        unsafe {\n")
+        f.write("            let stage = &mut SWI_SRC_STAGE[..src.len()];\n")
+        f.write("            stage.copy_from_slice(src);\n")
+        f.write("            log::debug!(\"[ART] staged unaligned src {}B\", src.len());\n")
+        f.write("            stage.as_mut_ptr() as u32\n")
+        f.write("        }\n")
+        f.write("    };\n")
         f.write("    let dst_ptr = dst.as_mut_ptr() as u32;\n")
         f.write("    unsafe {\n")
         f.write("        core::arch::asm!(\n")
@@ -760,6 +787,23 @@ def main():
     print(f"Processed {len(entries)} cards in {elapsed:.1f}s ({len(entries)/elapsed:.1f} cards/s)")
     if missing:
         print(f"missing: {missing[:20]}")
+
+    # Audit: index 0 is hardware-transparent, so any art pixel quantized
+    # to 0 renders as a hole. With magenta reserved at 0 this must be ~0
+    # everywhere; print the worst offenders either way.
+    worst = []
+    for card_no, _pal, tiles, f, s, li, w in entries:
+        total = len(tiles) + len(f) + len(s) + len(li) + len(w)
+        zeros = tiles.count(0) + f.count(0) + s.count(0) + li.count(0) + w.count(0)
+        if zeros:
+            worst.append((zeros / total, card_no, zeros, total))
+    worst.sort(reverse=True)
+    if worst:
+        print(f"index-0 pixels: {len(worst)} cards affected, worst:")
+        for pct, no, z, total in worst[:10]:
+            print(f"  {pct:.1%} {no} ({z}/{total})")
+    else:
+        print("index-0 pixels: none (all art opaque)")
 
     # Clear image cache to free memory before final write
     clear_image_cache()

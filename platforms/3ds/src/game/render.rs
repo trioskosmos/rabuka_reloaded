@@ -283,13 +283,17 @@ fn draw_game_header(ctx: &RenderCtx) {
         // (mirrors display.rs player_to_display total_hearts logic)
         let p1_hearts = compute_total_hearts(&ctx.gs.player1, ctx.gs);
         let p2_hearts = compute_total_hearts(&ctx.gs.player2, ctx.gs);
-        // Format hearts as texticon string
+        // Format hearts as texticon string (index 7 = ALL heart)
         let format_hearts = |hearts: &[u32]| -> String {
             let mut parts = Vec::new();
             for (i, &count) in hearts.iter().enumerate() {
                 if count > 0 {
-                    let label = format!("h{:02}{}", i, count);
-                    parts.push(heart_label_to_icon(&label));
+                    if i == 7 {
+                        parts.push(format!("{{{{icon_all.png|ALL}}}}{}", count));
+                    } else {
+                        let label = format!("h{:02}{}", i, count);
+                        parts.push(heart_label_to_icon(&label));
+                    }
                 }
             }
             if parts.is_empty() {
@@ -497,17 +501,6 @@ fn render_detail_mode(ctx: &RenderCtx, text_page: &mut usize) -> f32 {
                     // ability text never bleeds through behind the name)
                     p.rect(Layer::Content, 0.0, CONTENT_Y, 400.0, 188.0, COL_CARD_OPAQUE);
                     // Card portrait (left column)
-                    // Frame shares the portrait depth so it stays registered
-                    // around the card on both eyes.
-                    p.rect_with_depth(
-                        Layer::Content,
-                        card_x - 2.0,
-                        card_y - 2.0,
-                        card_w + 4.0,
-                        card_h + 4.0,
-                        COL_GOLD,
-                        crate::ui::stereo::PORTRAIT_DEPTH,
-                    );
                     if let Some((atl, idx)) = atlas.lookup(&card.card_no) {
                         p.card_with_depth(
                             Layer::Content,
