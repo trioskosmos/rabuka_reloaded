@@ -616,6 +616,9 @@ def write_gen(entries, fronts, stage_fronts, live_fronts, waited_fronts, back_fr
         f.write("            options(nostack, preserves_flags)\n")
         f.write("        );\n")
         f.write("    }\n")
+        f.write("    // The asm has no memory operands: without this fence the\n")
+        f.write("    // optimizer may hoist reads of `dst` above the SWI call.\n")
+        f.write("    core::sync::atomic::compiler_fence(core::sync::atomic::Ordering::SeqCst);\n")
         f.write("}\n\n")
 
         f.write("pub fn lz77_decompress_vram(src: &[u8], dst: &mut [u8]) {\n")
