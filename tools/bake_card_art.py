@@ -92,10 +92,12 @@ def lz77_compress_bios(data: bytes) -> bytes:
     i = 0
     flag_byte = 0
     flag_bit = 0
-    flag_pos = 1  # Position of current flag byte in output (index 1 since we prepend)
+    # BIOS layout: flag byte FIRST, then its 8 items. The placeholder
+    # lives at index 0 (a previous revision started items at index 2,
+    # leaving a stray zero that shifted the whole stream).
+    flag_pos = 0
     output[0] = 0  # placeholder for first flag byte
-    output[1] = 0  # placeholder for second byte (will be overwritten or literal)
-    output_len = 2
+    output_len = 1
     
     while i < len(data):
         # Search for best match using hash table
@@ -132,18 +134,19 @@ def lz77_compress_bios(data: bytes) -> bytes:
             hash_table[h] = i
         
         if best_len >= 3:
-            # Match found - write flag bit 0
-            flag_byte &= ~(1 << flag_bit)
-            # Write distance (12 bits) and length (4 bits)
+            # Match: flag bit 1 (MSB-first), then the 2-byte token with
+            # length in the HIGH nibble: ((len-3) << 4) | ((dist-1) >> 8),
+            # ((dist-1) & 0xFF). (A previous revision had the nibbles
+            # swapped AND the polarity inverted — BIOS decoded garbage.)
+            flag_byte |= (1 << (7 - flag_bit))
             dist_minus1 = best_dist - 1
             len_minus3 = best_len - 3
-            output[output_len] = (dist_minus1 >> 4) & 0xFF
-            output[output_len + 1] = ((dist_minus1 & 0xF) << 4) | (len_minus3 & 0xF)
+            output[output_len] = ((len_minus3 & 0xF) << 4) | ((dist_minus1 >> 8) & 0xF)
+            output[output_len + 1] = dist_minus1 & 0xFF
             output_len += 2
             i += best_len
         else:
-            # Literal - write flag bit 1
-            flag_byte |= (1 << flag_bit)
+            # Literal: flag bit stays 0, raw byte follows.
             output[output_len] = data[i]
             output_len += 1
             i += 1
@@ -164,37 +167,37 @@ def lz77_compress_bios(data: bytes) -> bytes:
     output = output[:output_len]
     
     decompressed_size = len(data)
+    # Standard BIOS header: type byte 0x10 exactly, then the full 24-bit
+    # LE size. (A previous revision OR-ed the size low byte into the type
+    # byte, producing 0x90/0xD0 headers the BIOS rejects — every file
+    # whose size wasn't a multiple of 256 decoded as garbage.)
+    assert decompressed_size < (1 << 24), "LZ77 size must fit 24 bits"
     header = bytes([
-        (1 << 4) | (decompressed_size & 0xFF),
+        0x10,
+        decompressed_size & 0xFF,
         (decompressed_size >> 8) & 0xFF,
         (decompressed_size >> 16) & 0xFF,
-        (decompressed_size >> 24) & 0xFF,
     ])
     
     return header + bytes(output)
 
 
 def lz77_compress_bios_if_smaller(data: bytes) -> bytes:
-    """Compress with LZ77, but return original if compression doesn't help."""
-    if len(data) < 16:  # Too small to benefit from compression
-        header = bytes([
-            len(data) & 0xFF,
-            (len(data) >> 8) & 0xFF,
-            (len(data) >> 16) & 0xFF,
-            (len(data) >> 24) & 0xFF,
-        ])
-        return header + data
-    compressed = lz77_compress_bios(data)
-    if len(compressed) < len(data):
-        return compressed
-    # Return uncompressed format (type=0)
-    header = bytes([
-        len(data) & 0xFF,
-        (len(data) >> 8) & 0xFF,
-        (len(data) >> 16) & 0xFF,
-        (len(data) >> 24) & 0xFF,
-    ])
-    return header + data
+    """Compress with LZ77, ALWAYS returning a standard BIOS stream.
+
+    Historical note: this used to return the input raw (with a 4-byte LE
+    length header) when compression didn't pay, and the LZ77 header OR-ed
+    the size low byte into the type byte. Both broke the runtime, which
+    feeds every .bin straight to BIOS SWI 0x11: files whose size low byte
+    wasn't zero (stage/live/back/UI) have an invalid type byte, and raw
+    files decode as garbage. The uniform contract now: every .bin written
+    by write_compressed is a standard stream (0x10 + 3-byte LE size), even
+    when a few bytes larger than raw. Costs ~tens of KB of ROM; buys a
+    runtime with zero format sniffing.
+    """
+    if len(data) == 0:
+        return b'\x10\x00\x00\x00'
+    return lz77_compress_bios(data)
 
 
 ART_W = 96
@@ -426,11 +429,16 @@ def bake_back_front(master_q):
 
 
 def bake_ui_tiles():
-    """Shared board UI tiles (bank-15 palette): 6 tiles x 32 bytes = 192 bytes."""
+    """Shared board UI tiles (bank-15 palette): 6 tiles x 32 bytes = 192 bytes.
+
+    4bpp-packed (2 pixels/byte, low nibble first) to match the FourBpp
+    TileSets in display.rs. A previous revision emitted 64 raw bytes per
+    solid tile (288 total), which decodes as stripes, not solids.
+    """
     tiles = bytearray()
 
     # 0: solid gray empty zone fill (color 2)
-    tiles.extend([2] * 64)
+    tiles.extend([0x22] * 32)
 
     # 1: gold diamond actionable badge (color 4 on transparent 0)
     badge = [[0] * 8 for _ in range(8)]
@@ -454,10 +462,10 @@ def bake_ui_tiles():
             tiles.append(marker[y][x] | (marker[y][x + 1] << 4))
 
     # 3: solid gold (color 4) for hand cursor border
-    tiles.extend([4] * 64)
+    tiles.extend([0x44] * 32)
 
     # 4: fully transparent (color 0) for clearing front text BG
-    tiles.extend([0] * 64)
+    tiles.extend([0x00] * 32)
 
     # 5: edge badge - gold diamond nudged right
     edge = [[0] * 8 for _ in range(8)]
@@ -529,13 +537,22 @@ def write_gen(entries, fronts, stage_fronts, live_fronts, waited_fronts, back_fr
     BIN_DIR.mkdir(parents=True, exist_ok=True)
 
     # Helper to write compressed data
+    written = set()
+
     def write_compressed(path: Path, data: bytes):
         compressed = lz77_compress_bios_if_smaller(data)
         with open(path, "wb") as f:
             f.write(compressed)
+        written.add(path.name)
 
     # Write binary files (compressed)
-    write_compressed(BIN_DIR / "master_pal.bin", master_pal_bytes)
+    # NOTE: master_pal stays RAW — display.rs indexes it directly as
+    # rgb15 pairs (`MASTER_PAL[i*2]`), and the generated static demands
+    # exactly 480 bytes. Compressing it breaks the type AND the palette
+    # parse. Everything else goes through write_compressed.
+    with open(BIN_DIR / "master_pal.bin", "wb") as f:
+        f.write(master_pal_bytes)
+    written.add("master_pal.bin")
 
     for card_no, pal, tiles, _f, _s, _l, _w in entries:
         safe = sanitize_filename(card_no)
@@ -568,7 +585,7 @@ def write_gen(entries, fronts, stage_fronts, live_fronts, waited_fronts, back_fr
         f.write("// Card fronts: 8bpp shared MASTER_PAL (4bpp on GBA via palette bank)\n")
         f.write("// All binary data LZ77-compressed (GBA BIOS SWI 0x11/0x12)\n\n")
 
-        f.write("pub static MASTER_PAL: [u8; 484] = *include_bytes!(\"../baked/card_art/master_pal.bin\");\n\n")
+        f.write("pub static MASTER_PAL: [u8; 480] = *include_bytes!(\"../baked/card_art/master_pal.bin\");\n\n")
 
         f.write("pub struct CardArt {\n")
         f.write("    pub card_no: &'static str,\n")
@@ -669,6 +686,16 @@ def write_gen(entries, fronts, stage_fronts, live_fronts, waited_fronts, back_fr
 
         f.write("pub static BACK_FRONT: &[u8] = include_bytes!(\"../baked/card_art/back_front.bin\");\n\n")
         f.write(f"pub static BOARD_UI: &[u8] = include_bytes!(\"../baked/card_art/board_ui.bin\");\n")
+    written.add("back_front.bin")
+    written.add("board_ui.bin")
+
+    # Prune stale files (cards removed/renamed since the last bake).
+    # Stale .bins are invisible to the build (only referenced files embed)
+    # but they pile up and confuse every future audit — 4,302 of them
+    # accumulated before this step existed.
+    for stale in BIN_DIR.glob("*.bin"):
+        if stale.name not in written:
+            stale.unlink()
 
 
 def _process_card_worker(args):

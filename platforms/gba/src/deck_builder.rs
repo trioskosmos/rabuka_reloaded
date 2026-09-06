@@ -23,7 +23,6 @@ use rabuka_engine::game::sav::{encode_sav, SavDeck};
 use crate::display::Display;
 use crate::gba_ui::InputSource;
 use crate::input::Button;
-use crate::sram::write_sav;
 
 /// Maximum cards in a deck (matches SAV format).
 const MAX_DECK_CARDS: usize = 72;
@@ -120,13 +119,17 @@ fn check_legality(cards: &[(String, u8)], all_cards: &[CardEntry]) -> Legality {
 }
 
 /// Auto-fix suggestions for illegal decks.
-/// Returns up to 3 suggested card numbers to add/replace.
+/// Returns up to 3 suggested card numbers to add/replace. Cards already
+/// in the deck are never suggested (suggesting an owned card, possibly
+/// already at max copies, helps nobody).
 fn suggest_fixes(legality: &Legality, cards: &[(String, u8)], all_cards: &[CardEntry], filtered_cards: &[String]) -> Vec<String> {
+    let owned = |no: &str| cards.iter().any(|(c, _)| c == no);
     match legality {
         Legality::WrongMemberCount { current } => {
             // Need more/fewer member cards - suggest member cards from filtered list
             let diff = (REQUIRED_MEMBER_CARDS as isize - *current as isize).abs() as usize;
             filtered_cards.iter()
+                .filter(|no| !owned(no))
                 .filter_map(|no| all_cards.iter().find(|c| c.card_no == *no))
                 .filter(|c| c.card_type == CardType::Member)
                 .take(diff.min(3))
@@ -137,6 +140,7 @@ fn suggest_fixes(legality: &Legality, cards: &[(String, u8)], all_cards: &[CardE
             // Need more/fewer live cards - suggest live cards from filtered list
             let diff = (REQUIRED_LIVE_CARDS as isize - *current as isize).abs() as usize;
             filtered_cards.iter()
+                .filter(|no| !owned(no))
                 .filter_map(|no| all_cards.iter().find(|c| c.card_no == *no))
                 .filter(|c| c.card_type == CardType::Live)
                 .take(diff.min(3))
@@ -492,7 +496,9 @@ impl<'a, 'd, I: InputSource> DeckBuilder<'a, 'd, I> {
         entries
     }
 
-    /// Try to save deck to SRAM.
+    /// Try to save deck to SRAM. Merges with existing slots by name
+    /// (same name replaces, new names append up to the 8-deck image cap)
+    /// so saving never wipes the other custom decks or converter decks.
     fn try_save(&mut self) -> bool {
         if self.cards.is_empty() {
             return false;
@@ -503,22 +509,35 @@ impl<'a, 'd, I: InputSource> DeckBuilder<'a, 'd, I> {
             return false;
         }
 
+        let mut cards: Vec<String> = Vec::new();
+        for (no, qty) in &self.cards {
+            for _ in 0..*qty {
+                cards.push(no.clone());
+            }
+        }
         let deck = SavDeck {
             name: self.deck_name.clone(),
-            cards: {
-                let mut v = Vec::new();
-                for (no, qty) in &self.cards {
-                    for _ in 0..*qty {
-                        v.push(no.clone());
-                    }
-                }
-                v
-            },
+            cards,
         };
+        // Validate the single deck first (fail loud, write nothing).
+        if encode_sav(core::slice::from_ref(&deck)).is_err() {
+            return false;
+        }
 
-        match encode_sav(&[deck]) {
+        use crate::sram::{read_sav_decks, write_sav};
+        use rabuka_engine::game::sav::{encode_sav as encode_all, MAX_SAV_DECKS};
+        let mut decks = read_sav_decks();
+        match decks.iter_mut().find(|d| d.name == deck.name) {
+            Some(slot) => *slot = deck,
+            None => {
+                if decks.len() >= MAX_SAV_DECKS {
+                    return false;
+                }
+                decks.push(deck);
+            }
+        }
+        match encode_all(&decks) {
             Ok(sav_bytes) => {
-                // Write to SRAM via GBA flash
                 write_sav(&sav_bytes);
                 true
             }

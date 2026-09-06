@@ -26,15 +26,6 @@ use rabuka_gba::screens::Screen;
 use rabuka_gba::sram::read_sav_decks;
 use rabuka_gba::ui::Display;
 
-/// One side's link deck: display name + main-deck card numbers (no energy —
-/// the engine adds default energy at setup, same as baked decks).
-fn baked_sav_deck(idx: usize) -> SavDeck {
-    SavDeck {
-        name: DECKS[idx].name.to_string(),
-        cards: DECKS[idx].cards.iter().map(|c| c.to_string()).collect(),
-    }
-}
-
 /// Resolve card numbers to `Card`s through the full ROM blob (any card,
 /// not just baked ones), then attach abilities. Returns `None` when any
 /// number fails to resolve — the deck is dropped whole, never partial.
@@ -186,7 +177,6 @@ fn main(mut gba: agb::Gba) -> ! {
         // Deck Builder: create custom deck saved to SRAM
         if mode_idx == 0 {
             let _ = Screen::DeckBuilder;
-            let mut ui2 = GbaUi::new(&mut display, &mut input);
             let _ = run_deck_builder(&mut display, &mut input);
             // Reload SRAM decks after builder exits
             let sram_decks = read_sav_decks();

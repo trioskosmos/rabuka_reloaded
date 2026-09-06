@@ -448,16 +448,18 @@ To change: modify constants, re-run `py -3 tools/bake_card_art.py`, rebuild.
 
 ---
 
-## LZ77 Decompression Fix (Runtime)
+## LZ77 Decompression Fix (Runtime + Baker)
 
-**Problem:** Detail art tiles were LZ77-compressed at build time but passed directly to `push_card` without decompression, causing "length of tiles must be a multiple of format tile size" VRAM error.
+**Problem(s):** three independent defects, one symptom each:
 
-**Fix:** Added `decompress_tiles()` method in `Display` that uses BIOS SWI 0x11 (`lz77_decompress_wram`) before passing tiles to `push_card()`. Applied at all call sites:
-- `render_card_detail()` (detail view)
-- `draw_slot_flipped()` (board cards, including waited/rotated stage)
-- `swap_buffers()` pending art (choice menus)
+1. **Boot panic** (`vram_manager.rs:60`): `board_ui.bin` (97 B compressed) fed raw to `TileSet::new(FourBpp)` — 97 % 32 != 0.
+2. **Jumbled cards/background:** the baker's LZ77 stream was not BIOS format at all — the header OR-ed the size low byte into the type byte (`0x90`/`0xD0` files the BIOS rejects), flag polarity/order were inverted vs spec, match bytes were swapped, and a stray zero byte shifted the whole stream. Verified against `grit` output byte-for-byte, not from memory.
+3. **Silent garbage:** the baker emitted raw bytes whenever compression didn't pay, while the runtime blind-decompressed — 717 detail portraits and most fronts decoded as noise.
 
-**Result:** Build succeeds, ROM 30.6 MB, tiles decompress correctly at runtime via BIOS SWI 0x11.
+**Fix (uniform contract, both sides):**
+- Baker (`tools/bake_card_art.py`): every `.bin` is now a standard BIOS stream (`0x10` + 3-byte LE size), even when larger than raw. `master_pal.bin` stays raw (parsed directly, fixed 480 B). `bake_ui_tiles` emits proper 4bpp-packed 192 B (was 288 mixed bytes). Roundtrip-gated by `lzss_gate.py` before any rebake.
+- Runtime (`display.rs`): `decompress_lz77` via BIOS SWI 0x11 at all consumption sites — sprite-cache miss path (all fronts + back), `render_card_detail`, and a once-buffer for `BOARD_UI` (`TileSet` needs `&'static`). Verified: all 10,856 referenced `.bins` decode to exact sizes with an independent spec decoder.
+- Hygiene: the baker prunes stale `.bin` files (4,302 orphans deleted); `pal_*.bin` (~1.2 MB) are embedded but never read — removal candidate for ROM headroom.
 
 ---
 

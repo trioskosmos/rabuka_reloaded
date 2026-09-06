@@ -12,7 +12,7 @@ use agb::display::object::{
 use agb::display::{busy_wait_for_vblank, Graphics, Palette16, Priority, Rgb15, Rgb};
 
 use crate::board::{BoardFrame, Slot};
-use crate::card_art_gen::{CardArt, CardFront, BACK_FRONT, BOARD_UI, CARD_FRONTS, LIVE_FRONTS, MASTER_PAL, STAGE_FRONTS, WAITED_FRONTS};
+use crate::card_art_gen::{CardArt, CardFront, BACK_FRONT, BOARD_UI, CARD_FRONTS, LIVE_FRONTS, MASTER_PAL, STAGE_FRONTS, WAITED_FRONTS, lz77_decompress_wram};
 use crate::font_tiles_gen::{FONT_GLYPHS, FONT_TILES};
 use crate::texticons_gen::{TEXTICON_GLYPHS, TEXTICON_TILES};
 
@@ -389,6 +389,25 @@ impl CardSpriteCache {
         if let Some(p) = self.sprites.get_mut(self.key_buf.as_str()) {
             p.last_used = self.frame;
         } else {
+            // Baked tiles arrive as uniform BIOS streams — normalize once
+            // per miss into scratch; cache hits never touch `tiles` at
+            // all, so steady frames pay nothing. Scratch fits the largest
+            // grid (detail 12x18x64); every caller is smaller or equal.
+            // Single-threaded, synchronous use only (same contract as the
+            // buffer itself): the slice never escapes this branch.
+            let expected = grid_w * grid_h * 64;
+            let tiles: &[u8] = if expected <= TILE_SCRATCH_LEN {
+                let scratch: &mut [u8] = unsafe {
+                    core::slice::from_raw_parts_mut(
+                        core::ptr::addr_of_mut!(TILE_SCRATCH).cast::<u8>(),
+                        TILE_SCRATCH_LEN,
+                    )
+                };
+                decompress_lz77(tiles, &mut scratch[..expected]);
+                &scratch[..expected]
+            } else {
+                tiles
+            };
             if let Some(tt) = twin_tag {
                 self.twin_buf.clear();
                 let _ = write!(
@@ -564,6 +583,43 @@ static DETAIL_TEXT_PALETTE: Palette16 = const {
     palette[15] = Rgb::new(128, 128, 128).to_rgb15(); // icon gray
     Palette16::new(palette)
 };
+
+/// Scratch for normalizing baked tiles on sprite-cache misses (see
+/// `get_or_upload`). Sized for the largest grid (detail 12x18x64).
+/// Single-threaded GBA, synchronous use only — no reentrancy.
+const TILE_SCRATCH_LEN: usize = 13824;
+static mut TILE_SCRATCH: [u8; TILE_SCRATCH_LEN] = [0; TILE_SCRATCH_LEN];
+
+/// Raw 4bpp board UI tiles (6 tiles x 32 bytes = 192). The baker emits a
+/// standard LZ77 stream for it like everything else, but `TileSet::new`
+/// needs `&'static` bytes, which a stack buffer can't provide. Decompress
+/// once into .bss.
+static mut UI_TILES_BUF: [u8; 192] = [0; 192];
+static mut UI_TILES_READY: bool = false;
+
+/// Board UI tiles, decompressed on first use. See [`decompress_lz77`].
+fn board_ui_tiles() -> &'static [u8] {
+    unsafe {
+        if !UI_TILES_READY {
+            let mut dst = [0u8; 192];
+            decompress_lz77(BOARD_UI, &mut dst);
+            UI_TILES_BUF = dst;
+            UI_TILES_READY = true;
+        }
+        &*core::ptr::addr_of!(UI_TILES_BUF)
+    }
+}
+
+/// Fill `dst` from one baked `.bin` stream via BIOS SWI 0x11.
+///
+/// Uniform contract (enforced by `tools/bake_card_art.py`): EVERY .bin is
+/// a standard stream (`0x10` + 3-byte LE size), even when larger than raw —
+/// so there is deliberately no format sniffing here. `dst` must fit the
+/// declared size; callers size it from the grid (`tiles * 64`).
+fn decompress_lz77(src: &[u8], dst: &mut [u8]) {
+    log::debug!("[ART] lz77 {}B -> {}B", src.len(), dst.len());
+    lz77_decompress_wram(src, dst);
+}
 
 impl<'a> Display<'a> {
     pub fn new(mut gfx: Graphics<'a>) -> Self {
@@ -934,7 +990,7 @@ impl<'a> Display<'a> {
         self.gfx.set_background_palette(15, &TEXT_PALETTE);
         let font_ts = unsafe { TileSet::new(&FONT_TILES.0, TileFormat::FourBpp) };
         let icon_ts = unsafe { TileSet::new(&TEXTICON_TILES.0, TileFormat::FourBpp) };
-        let ui_ts = unsafe { TileSet::new(BOARD_UI, TileFormat::FourBpp) };
+        let ui_ts = unsafe { TileSet::new(board_ui_tiles(), TileFormat::FourBpp) };
         let e0 = TileEffect::new(false, false, 15);
 
         self.clear_layers(&ui_ts, e0);
@@ -1146,7 +1202,7 @@ impl<'a> Display<'a> {
         self.gfx.set_background_palette(15, &TEXT_PALETTE);
         let font_ts = unsafe { TileSet::new(&FONT_TILES.0, TileFormat::FourBpp) };
         let icon_ts = unsafe { TileSet::new(&TEXTICON_TILES.0, TileFormat::FourBpp) };
-        let ui_ts = unsafe { TileSet::new(BOARD_UI, TileFormat::FourBpp) };
+        let ui_ts = unsafe { TileSet::new(board_ui_tiles(), TileFormat::FourBpp) };
         let e = TileEffect::new(false, false, 15);
 
         self.clear_layers(&ui_ts, e);
@@ -1218,16 +1274,16 @@ impl<'a> Display<'a> {
         self.gfx.set_background_palette(15, &DETAIL_TEXT_PALETTE);
         let font_ts = unsafe { TileSet::new(&FONT_TILES.0, TileFormat::FourBpp) };
         let icon_ts = unsafe { TileSet::new(&TEXTICON_TILES.0, TileFormat::FourBpp) };
-        let ui_ts = unsafe { TileSet::new(BOARD_UI, TileFormat::FourBpp) };
+        let ui_ts = unsafe { TileSet::new(board_ui_tiles(), TileFormat::FourBpp) };
         let e_text = TileEffect::new(false, false, 15);
 
         self.clear_layers(&ui_ts, e_text);
 
         if let Some(art) = art {
             log::debug!("detail portrait for {}", art.card_no);
-            // Decompress LZ77-compressed tiles (13824 bytes for 96x144 detail art)
+            // Uniform BIOS stream (see `decompress_lz77`).
             let mut decompressed_tiles = [0u8; 13824];
-            crate::card_art_gen::lz77_decompress_wram(art.tiles, &mut decompressed_tiles);
+            decompress_lz77(art.tiles, &mut decompressed_tiles);
             self.push_card(
                 "detail",
                 art.card_no,
@@ -1316,7 +1372,7 @@ impl<'a> Display<'a> {
         self.sprite_cache.evict_prefix("detail:");
         let font_ts = unsafe { TileSet::new(&FONT_TILES.0, TileFormat::FourBpp) };
         let icon_ts = unsafe { TileSet::new(&TEXTICON_TILES.0, TileFormat::FourBpp) };
-        let ui_ts = unsafe { TileSet::new(BOARD_UI, TileFormat::FourBpp) };
+        let ui_ts = unsafe { TileSet::new(board_ui_tiles(), TileFormat::FourBpp) };
         let e_ui = TileEffect::new(false, false, 15);
 
         self.clear_layers(&ui_ts, e_ui);
