@@ -7,7 +7,7 @@
 //! but each of those renders through one of the screens below.
 //!
 //! ```text
-//! Screen::ModeSelect --A/Start on "Deck Builder"--> Screen::DeckBuilder --Done--> ModeSelect
+//! Screen::ModeSelect --A/Start on "VS AI"/"2 Player"/"Link Host"/"Link Join"/"AI vs AI"/"Deck Builder"--> Screen::DeckBuilder/DeckSelectP1 --Done/A/Start--> ModeSelect
 //! Screen::ModeSelect --A/Start on "VS AI" etc.--> Screen::DeckSelectP1 --A/Start--> Match
 //!     ^                                               | (TwoPlayer only: DeckSelectP2)
 //!     |                                               v

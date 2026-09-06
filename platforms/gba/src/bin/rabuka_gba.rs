@@ -158,7 +158,7 @@ fn main(mut gba: agb::Gba) -> ! {
         all_deck_cards.push(sram_deck.cards.clone());
     }
 
-    let modes = ["Deck Builder", "VS AI", "2 Player", "Link Host", "Link Join", "AI vs AI"];
+    let modes = ["VS AI", "2 Player", "Link Host", "Link Join", "AI vs AI", "Deck Builder"];
 
     // Explicit boot flow — see `screens::Screen` for the full button map:
     // ModeSelect -> DeckBuilder/DeckSelectP1 -> (DeckSelectP2) -> Match -> Result -> ...
@@ -175,7 +175,7 @@ fn main(mut gba: agb::Gba) -> ! {
         let mode_idx = platform_ui::select(as_ui, &modes, "MODE Up/Dn:A/Start");
 
         // Deck Builder: create custom deck saved to SRAM
-        if mode_idx == 0 {
+        if mode_idx == 5 {
             let _ = Screen::DeckBuilder;
             let _ = run_deck_builder(&mut display, &mut input);
             // Reload SRAM decks after builder exits
@@ -195,8 +195,8 @@ fn main(mut gba: agb::Gba) -> ! {
 
         // Link games leave the shared menu flow: pick a deck, sync over
         // the cable, play the lockstep loop, return here after.
-        if mode_idx == 3 || mode_idx == 4 {
-            let is_host = mode_idx == 3;
+        if mode_idx == 2 || mode_idx == 3 {
+            let is_host = mode_idx == 2;
             let _ = Screen::DeckSelectP1;
             let d = platform_ui::select(as_ui, &all_deck_names.iter().map(|s| s.as_str()).collect::<Vec<_>>(), "LINK DECK A:Pick");
             let own = SavDeck {
@@ -228,9 +228,9 @@ fn main(mut gba: agb::Gba) -> ! {
         }
 
         let mode = match mode_idx {
-            1 => MatchMode::VsAi,
-            2 => MatchMode::TwoPlayer,
-            5 => MatchMode::AiVsAi,
+            0 => MatchMode::VsAi,
+            1 => MatchMode::TwoPlayer,
+            4 => MatchMode::AiVsAi,
             _ => MatchMode::VsAi,
         };
 
