@@ -30,6 +30,26 @@ pub fn energy_plural(_count: usize) -> &'static str {
     "energy"
 }
 
+/// Convert internal card type to player-friendly string
+pub fn card_type_label(ct: &str) -> String {
+    match ct {
+        "member_card" => "member".to_string(),
+        "live_card" => "live card".to_string(),
+        "energy_card" => "energy card".to_string(),
+        _ => ct.to_string(),
+    }
+}
+
+/// Convert internal card type to player-friendly Japanese string
+pub fn card_type_label_ja(ct: &str) -> String {
+    match ct {
+        "member_card" => "メンバー".to_string(),
+        "live_card" => "ライブカード".to_string(),
+        "energy_card" => "エネルギー".to_string(),
+        _ => ct.to_string(),
+    }
+}
+
 // ============== HEART GAIN DISTRIBUTION ==============
 
 /// Distribute a multi-color heart gain across its color multiset.

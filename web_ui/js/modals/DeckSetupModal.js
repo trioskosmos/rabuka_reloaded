@@ -1,5 +1,5 @@
 import { State } from '../state.js';
-import { Network } from '../network.js';
+import { Network, apiFetch } from '../network.js';
 import { Modals } from '../ui_modals.js';
 import { ModalManager } from '../utils/ModalManager.js';
 import { analyzeDeckList, deckCompositionLabel } from '../card_utils.js';
@@ -90,7 +90,7 @@ export const DeckSetupModal = {
 
         const results = await Promise.all(playerIds.map(async (pid) => {
             try {
-                const resp = await fetch('api/set_deck', {
+                const resp = await apiFetch('api/set_deck', {
                     method: 'POST',
                     headers: Network.getHeaders(),
                     body: JSON.stringify({
@@ -125,7 +125,7 @@ export const DeckSetupModal = {
         if (!confirm(`Load 'Test Deck' for Player ${playerVal === 'both' ? 'Both' : parseInt(playerVal) + 1}?`)) return;
 
         try {
-            const res = await fetch('api/get_test_deck');
+            const res = await apiFetch('api/get_test_deck');
             const data = await res.json();
             if (!data.success) {
                 alert("Failed to load test deck: " + data.error);
@@ -134,7 +134,7 @@ export const DeckSetupModal = {
 
             const cards = data.content;
             const results = await Promise.all(playerIds.map(async (pid) => {
-                const resp = await fetch('api/set_deck', {
+                const resp = await apiFetch('api/set_deck', {
                     method: 'POST',
                     headers: Network.getHeaders(),
                     body: JSON.stringify({

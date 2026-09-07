@@ -1,5 +1,5 @@
 import { State } from './state.js';
-import { Network } from './network.js';
+import { Network, apiFetch } from './network.js';
 import { DragDrop } from './ui_drag_drop.js';
 import { Modals } from './ui_modals.js';
 import { Rendering } from './ui_rendering.js';
@@ -187,12 +187,12 @@ const actionHandlers = {
             const cards = deckData.content;
             const headers = Network?.getHeaders ? Network.getHeaders() : { 'Content-Type': 'application/json' };
             await Promise.all([0, 1].map(pid =>
-                fetch('api/set_deck', {
+                apiFetch('api/set_deck', {
                     method: 'POST', headers,
                     body: JSON.stringify({ player: pid, deck: cards, room_id: State.roomCode })
                 })
             ));
-            const initRes = await fetch('api/init', { method: 'POST', headers });
+            const initRes = await apiFetch('api/init', { method: 'POST', headers });
             if (!initRes.ok) { const e = await initRes.json().catch(() => ({})); throw new Error(e.error || 'Init failed'); }
             State.offlineMode = false;
             await Network.fetchState();

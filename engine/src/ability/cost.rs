@@ -370,25 +370,42 @@ let source = cost.source_str().unwrap_or("");
                 let is_hand_to_waitroom = source_zone == Some(Zone::Hand) && matches!(dest_opt.as_deref(), Some("discard") | Some("waitroom"));
                 let dest_str = if is_hand_to_waitroom { " to waitroom" } else { "" };
                 
-                // Build filter description from cost constraints
-                let filter_parts = {
+                // Build filter description from cost constraints - player-friendly
+                let filter_desc = {
                     let mut parts = Vec::new();
+                    
+                    // Card type (e.g., "member", "live card")
                     if let Some(ct) = cost.card_type_any() {
-                        parts.push(ct.as_card_str().to_string());
+                        parts.push(util::card_type_label(ct.as_card_str()).to_string());
                     }
+                    
+                    // Group names (e.g., "Liella!", "Aqours")
                     if let Some(groups) = cost.group_names_any() {
                         if !groups.is_empty() {
-                            parts.push(groups.join("/"));
+                            parts.push(groups.join(" / "));
                         }
                     }
+                    
+                    // Characters (e.g., "Chika", "Riko")
                     if let Some(chars) = cost.characters_any() {
                         if !chars.is_empty() {
-                            parts.push(chars.join("/"));
+                            parts.push(chars.join(" / "));
                         }
                     }
-                    if cost.cost_limit_any().is_some() {
-                        parts.push("cost ≤".to_string());
+                    
+                    // Cost limit (e.g., "cost 4 or less")
+                    if let Some(limit) = cost.cost_limit_any() {
+                        let op = cost.cost_limit_operator_any().unwrap_or(crate::card::Operator::Lte);
+                        let op_str = match op {
+                            crate::card::Operator::Lte => "or less",
+                            crate::card::Operator::Lt => "less than",
+                            crate::card::Operator::Gte => "or more",
+                            crate::card::Operator::Gt => "more than",
+                            crate::card::Operator::Eq => "equal to",
+                        };
+                        parts.push(format!("cost {} {}", op_str, limit));
                     }
+                    
                     if parts.is_empty() { String::new() } else { format!(" ({})", parts.join(", ")) }
                 };
                 
@@ -401,7 +418,7 @@ let source = cost.source_str().unwrap_or("");
                     format!(
                         "Select any number of {}{} from hand (0-{}){} (or skip)",
                         util::card_plural(max_str),
-                        filter_parts,
+                        filter_desc,
                         max_str,
                         dest_str
                     )
@@ -410,7 +427,7 @@ let source = cost.source_str().unwrap_or("");
                         "Select {} {}{}{}{}",
                         effective_count,
                         util::card_plural(effective_count as usize),
-                        filter_parts,
+                        filter_desc,
                         dest_str,
                         if is_optional { " (or skip)" } else { "" }
                     )
@@ -432,15 +449,26 @@ let source = cost.source_str().unwrap_or("");
                             let filter_ja = {
                                 let mut parts = Vec::new();
                                 if let Some(ct) = cost.card_type_any() {
-                                    parts.push(ct.as_card_str().to_string());
+                                    parts.push(util::card_type_label_ja(ct.as_card_str()).to_string());
                                 }
                                 if let Some(groups) = cost.group_names_any() {
-                                    if !groups.is_empty() { parts.push(groups.join("/")); }
+                                    if !groups.is_empty() { parts.push(groups.join(" / ")); }
                                 }
                                 if let Some(chars) = cost.characters_any() {
-                                    if !chars.is_empty() { parts.push(chars.join("/")); }
+                                    if !chars.is_empty() { parts.push(chars.join(" / ")); }
                                 }
-                                if cost.cost_limit_any().is_some() { parts.push("コスト≤".to_string()); }
+                                if let Some(limit) = cost.cost_limit_any() {
+                                    let op = cost.cost_limit_operator_any().unwrap_or_else(|| "<=".to_string());
+                                    let op_str = match op.as_str() {
+                                        "<=" => "以下",
+                                        "<" => "未満",
+                                        ">=" => "以上",
+                                        ">" => "超",
+                                        "=" => "ちょうど",
+                                        _ => op.as_str(),
+                                    };
+                                    parts.push(format!("コスト{} {}", op_str, limit));
+                                }
                                 if parts.is_empty() { String::new() } else { format!("（{}）", parts.join("、")) }
                             };
                             format!("手札から任意枚控え室に置く{}（スキップ可）", filter_ja)
@@ -448,15 +476,26 @@ let source = cost.source_str().unwrap_or("");
                             let filter_ja = {
                                 let mut parts = Vec::new();
                                 if let Some(ct) = cost.card_type_any() {
-                                    parts.push(ct.as_card_str().to_string());
+                                    parts.push(util::card_type_label_ja(ct.as_card_str()).to_string());
                                 }
                                 if let Some(groups) = cost.group_names_any() {
-                                    if !groups.is_empty() { parts.push(groups.join("/")); }
+                                    if !groups.is_empty() { parts.push(groups.join(" / ")); }
                                 }
                                 if let Some(chars) = cost.characters_any() {
-                                    if !chars.is_empty() { parts.push(chars.join("/")); }
+                                    if !chars.is_empty() { parts.push(chars.join(" / ")); }
                                 }
-                                if cost.cost_limit_any().is_some() { parts.push("コスト≤".to_string()); }
+                                if let Some(limit) = cost.cost_limit_any() {
+                                    let op = cost.cost_limit_operator_any().unwrap_or_else(|| "<=".to_string());
+                                    let op_str = match op.as_str() {
+                                        "<=" => "以下",
+                                        "<" => "未満",
+                                        ">=" => "以上",
+                                        ">" => "超",
+                                        "=" => "ちょうど",
+                                        _ => op.as_str(),
+                                    };
+                                    parts.push(format!("コスト{} {}", op_str, limit));
+                                }
                                 if parts.is_empty() { String::new() } else { format!("（{}）", parts.join("、")) }
                             };
                             format!(

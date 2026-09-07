@@ -1,5 +1,5 @@
 import { State } from '../state.js';
-import { Network } from '../network.js';
+import { Network, apiFetch } from '../network.js';
 import { Modals } from '../ui_modals.js';
 import { ModalManager } from '../utils/ModalManager.js';
 import { DOM_IDS, DISPLAY_VALUES } from '../constants_dom.js';
@@ -340,17 +340,17 @@ export const GameSetupModal = {
             const headers = Network?.getHeaders ? Network.getHeaders() : { 'Content-Type': 'application/json' };
 
             await Promise.all([
-                fetch('api/set_deck', {
+                apiFetch('api/set_deck', {
                     method: 'POST', headers,
                     body: JSON.stringify({ player: 0, deck: p0Deck.main, room_id: State.roomCode })
                 }),
-                fetch('api/set_deck', {
+                apiFetch('api/set_deck', {
                     method: 'POST', headers,
                     body: JSON.stringify({ player: 1, deck: p1Deck.main, room_id: State.roomCode })
                 })
             ]);
 
-            const initRes = await fetch('api/init', {
+            const initRes = await apiFetch('api/init', {
                 method: 'POST', headers,
                 body: JSON.stringify({})
             });
@@ -423,7 +423,7 @@ export const GameSetupModal = {
         if (!resolved) return;
 
         try {
-            const res = await fetch('api/set_deck', {
+            const res = await apiFetch('api/set_deck', {
                 method: 'POST',
                 headers: Network.getHeaders(),
                 body: JSON.stringify({
