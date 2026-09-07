@@ -39,7 +39,7 @@ impl Lcg {
     }
 
     /// Advance and return the raw 64-bit state.
-    pub fn next(&mut self) -> u64 {
+    pub fn next_u64(&mut self) -> u64 {
         self.0 = self
             .0
             .wrapping_mul(6364136223846793005)
@@ -52,7 +52,7 @@ impl Lcg {
         if n == 0 {
             0
         } else {
-            (self.next() >> 33) as usize % n
+            (self.next_u64() >> 33) as usize % n
         }
     }
 }
@@ -79,7 +79,7 @@ mod inner {
         if *guard == 0 {
             *guard = seed_value();
         }
-        super::xorshift32(&mut *guard)
+        super::xorshift32(&mut guard)
     }
 
     fn seed_value() -> u32 {

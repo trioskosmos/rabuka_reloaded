@@ -281,7 +281,7 @@ fn main() {
         let mut place_count = 0u32;
         for rep in 0..replays_per_turn {
             let mut rgs = snap.clone();
-            let seed = rng.next();
+            let seed = rng.next_u64();
             let mut rrng = Lcg(seed);
             let mut seq: Vec<String> = Vec::new();
             let mut guard = 0usize;

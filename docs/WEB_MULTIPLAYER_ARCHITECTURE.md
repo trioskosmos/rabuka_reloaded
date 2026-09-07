@@ -59,9 +59,8 @@
 
 ---
 
-## Target Web Architecture (v3 - WASM P2P) — **THEORETICAL**
+## Target Web Architecture (v3 - WASM P2P with Render Relay)
 
-### Option A: Pure P2P (Zero Server)
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │  GitHub Pages (Free CDN) - STATIC + WASM                         │
@@ -71,9 +70,11 @@
                                │
                                ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│  Cloudflare Workers / Fly.io (Relay Only)                        │
-│  ├── WebSocket / WebRTC relay (~10 MB, no game logic)           │
-│  └── Rate limiting, DDoS protection                              │
+│  Render (Free Tier) - WebSocket Relay + Lobby                    │
+│  ├── WebSocket relay (broadcast actions between players)        │
+│  ├── Room create/join/list                                       │
+│  ├── Player presence / spectate                                  │
+│  └── Replay import/export                                        │
 └─────────────────────────────────────────────────────────────────┘
                                │
                                ▼
@@ -87,39 +88,9 @@
 
 **Per-turn bandwidth**: ~50 B (ActionSync + RNG seeds)
 **Latency**: Local execution + relay (~10-50 ms)
-**Server cost**: $0 (Cloudflare Workers free tier)
+**Server cost**: $0 (Render free tier)
 
-### Option B: Hybrid (Keep Render for Matchmaking/Rooms)
-```
-┌─────────────────────────────────────────────────────────────────┐
-│  GitHub Pages (Free CDN) - STATIC + WASM                         │
-│  ├── rabuka_engine.wasm  (~3-5 MB gzipped)                       │
-│  ├── All static assets (unchanged)                               │
-└─────────────────────────────────────────────────────────────────┘
-                               │
-              ┌──────────────────┴──────────────────┐
-              ▼                                     ▼
-┌─────────────────────────────────┐ ┌─────────────────────────────────┐
-│  Render (Matchmaking/Lobby)     │ │  Cloudflare Workers (Relay)     │
-│  ├── Room create/join/list      │ │  ├── WebSocket relay            │
-│  ├── Player presence            │ │  └── No game logic              │
-│  ├── Spectator state (read-only)│ └─────────────────────────────────┘
-│  └── Replay import/export       │              │
-└─────────────────────────────────┘              │
-                               │                 │
-                               ▼                 ▼
-┌─────────────────────────────────────────────────────────────────┐
-│  Browser A (WASM Engine)          Browser B (WASM Engine)       │
-│  ├── Full deterministic engine    ├── Full deterministic engine │
-│  ├── Local replay/analysis      ├── Local replay/analysis       │
-│  └── Offline play               └── Offline play                │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-**Per-turn bandwidth**: ~50 B (ActionSync + RNG seeds) + optional Render sync
-**Latency**: Local execution + relay (~10-50 ms)
-**Server cost**: $0 (Render free tier + Cloudflare Workers free tier)
-**Benefit**: Keeps room management, spectator mode, replay features on Render
+**Key change from v2**: Game logic executes locally in WASM. Render only relays actions via WebSocket and manages rooms.
 
 ---
 
@@ -196,16 +167,15 @@ pub struct FrameAction {
 
 ## Bandwidth Comparison
 
-| Metric | v1 (Full State) | v2 (Delta/Action) | v3a (WASM P2P Pure) | v3b (WASM Hybrid + Render) |
-|--------|-----------------|-------------------|---------------------|----------------------------|
-| **Per-turn (PVP)** | ~40 KB | **~232 B** | ~50 B | ~50 B |
-| **Initial load** | 30 KB | 30 KB | +5 MB WASM | +5 MB WASM |
-| **Monthly Render (1k games)** | 675 MB | **~2.3 MB** | $0 (deleted) | ~2.3 MB (lobby only) |
-| **Monthly Relay (1k games)** | — | — | ~0.5 MB | ~0.5 MB |
-| **Latency/turn** | 1 RTT (~100ms) | 1 RTT | Local (~0ms) + relay | Local (~0ms) + relay |
-| **Offline/Replay** | ❌ | ❌ (server needed) | ✅ Full local | ✅ Full local |
-| **Cheat prevention** | Server validates | Server validates | Commit-reveal + replay | Commit-reveal + replay |
-| **Room mgmt / Spectate** | Server | Server | ❌ (P2P only) | ✅ Render |
+| Metric | v1 (Full State) | v2 (Delta/Action) | v3 (WASM + Render Relay) |
+|--------|-----------------|-------------------|--------------------------|
+| **Per-turn (PVP)** | ~40 KB | **~232 B** | ~50 B |
+| **Initial load** | 30 KB | 30 KB | +5 MB WASM |
+| **Monthly Render (1k games)** | 675 MB | **~2.3 MB** | ~2.3 MB (relay + lobby) |
+| **Latency/turn** | 1 RTT (~100ms) | 1 RTT | Local (~0ms) + relay |
+| **Offline/Replay** | ❌ | ❌ (server needed) | ✅ Full local |
+| **Cheat prevention** | Server validates | Server validates | Commit-reveal + replay |
+| **Room mgmt / Spectate** | Server | Server | ✅ Render |
 
 ---
 
@@ -294,9 +264,9 @@ Client                          Render Server
   | SSE "update Y" ─────────────► (push)
 ```
 
-### v3 WASM P2P — **0 RTT per turn** (local execution)
+### v3 WASM + Render Relay — **0 RTT per turn** (local execution)
 ```
-Client A (WASM)              Cloudflare Relay           Client B (WASM)
+Client A (WASM)              Render Relay           Client B (WASM)
   | execute_action() ──────────► broadcast ──────────► |
   | apply_state_delta() ◄────── (action only) ◄───────► |
   | (local, instant)                                        |
@@ -325,9 +295,26 @@ Client A (WASM)              Cloudflare Relay           Client B (WASM)
 | `/actions/legal` | 50 | **0** |
 | **Total** | **~150** | **~2** (relay connect + room create) |
 
-### Remaining Server Requests (v3b Hybrid)
-Only lobby/matchmaking on Render:
+### Remaining Server Requests (v3)
+Only lobby/matchmaking/relay on Render:
 - `POST /rooms/create` — once per game
 - `GET /rooms/list` — periodic
 - `GET /rooms/spectate` — spectators only
 - `POST /export_game` / `POST /import_game` — replays
+- WebSocket relay endpoint — new for v3
+
+## Future: WASM + Render Relay (v3) — Effort Estimate
+
+| Component | Status | Effort |
+|-----------|--------|--------|
+| Core engine → WASM | ✅ Compiles (`wasm32-unknown-unknown`) | 0 |
+| Card DB embedding | ✅ `include_bytes!` via `cards.bin` blob | 0 |
+| Determinism audit | ✅ Engine already deterministic (HashMap key lookups only) | 0 |
+| `wasm-bindgen` bindings | ✅ Done (`platforms/wasm/src/`) | 0 |
+| Web Worker off-main-thread | ✅ Done (`web_ui/src/workers/gameWorker.js`) | 0 |
+| Commit-reveal anti-cheat | ❌ Ed25519, replay verify | 3-5 days |
+| Render WebSocket relay | ❌ Add WebSocket endpoint to `web_server.rs` | 1-2 days |
+| Frontend integration | ❌ Switch GameService → WasmGameService | 1-2 days |
+| **Total** | | **~1 week** |
+
+**Verdict**: **~1 week** to move game logic to WASM while keeping Render for relay/lobby. No Cloudflare Workers needed.

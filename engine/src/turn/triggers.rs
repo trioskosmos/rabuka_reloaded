@@ -145,7 +145,7 @@ impl super::TurnEngine {
                         if effect.action
                             == crate::ability::enums::ActionType::SuppressAbilityTrigger
                         {
-                            if effect.suppressed_trigger_any().as_deref() == Some(trigger_name) {
+                            if effect.suppressed_trigger_any() == Some(trigger_name) {
                                 return true;
                             }
                         }

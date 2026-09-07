@@ -337,7 +337,7 @@ impl super::TurnEngine {
                         .map(|(i, a)| (i, a.clone()))
                 })
             {
-                if player.stage.stage.iter().any(|&id| id == card_id) {
+                if player.stage.stage.contains(&card_id) {
                     ability_to_activate = Some(AbilityActivation {
                         idx: crate::ability::types::GAINED_ABILITY_INDEX_BASE + gained.0,
                         ability: crate::Arc::new(gained.1),
@@ -765,7 +765,7 @@ impl super::TurnEngine {
                     "choice" | "choice_string" | "conditional_optional" => {
                         // card_id=None + card_indices absent/empty means skip
                         if card_id.is_none()
-                            && card_indices.as_deref().map_or(true, |v| v.is_empty())
+                            && card_indices.as_deref().is_none_or(|v| v.is_empty())
                         {
                             return Ok(crate::ability::types::ChoiceResult::Skip);
                         }
@@ -894,7 +894,7 @@ impl super::TurnEngine {
                 description: _,
                 ..
             } => {
-                let idx = card_id.unwrap_or(0) as usize;
+                let idx = card_id.and_then(|id| usize::try_from(id).ok()).unwrap_or(0);
                 let chosen = if idx < options.len() {
                     options[idx].clone()
                 } else {
@@ -971,7 +971,7 @@ impl super::TurnEngine {
                 // process_current_ability (each_time watchers) are excluded from
                 // the stale-entries pool when process_player_abilities re-enters.
                 let cutoff = game_state.ability_queue.len();
-                game_state.depth_first_cutoff = Some(cutoff as u16);
+                game_state.depth_first_cutoff = Some(u16::try_from(cutoff).unwrap());
                 game_state.ability_queue.promote_entry_by_abs(queue_index);
                 if game_state.ability_queue.start_next() {
                     let saved_moved = game_state.recently_moved_cards.take();

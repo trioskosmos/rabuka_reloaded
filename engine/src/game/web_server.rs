@@ -3,6 +3,8 @@ use crate::{HashMap, HashSet};
 use actix_cors::Cors;
 use actix_files as fs;
 use actix_web::{web, App, HttpResponse, HttpServer, Responder};
+use actix_web_actors::ws;
+use actix::{Actor, StreamHandler, Addr, SyncArbiter, Arbiter};
 #[cfg(feature = "no_std")]
 use alloc::{
     string::{String, ToString},
@@ -264,6 +266,114 @@ pub struct Room {
     pub recording_action: Option<(i16, u8)>, // pending action (card_id, type_idx)
 }
 
+// WebSocket relay for WASM P2P
+#[derive(Debug)]
+pub struct RelayMessage {
+    pub room_id: String,
+    pub session_id: String,
+    pub payload: String,
+}
+
+pub struct WsRelaySession {
+    pub room_id: String,
+    pub session_id: String,
+    pub addr: Addr<WsRelayActor>,
+}
+
+impl Actor for WsRelaySession {
+    type Context = ws::WebsocketContext<Self>;
+}
+
+impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsRelaySession {
+    fn handle(&mut self, msg: Result<ws::Message, ws::ProtocolError>, ctx: &mut Self::Context) {
+        match msg {
+            Ok(ws::Message::Text(text)) => {
+                // Forward to relay actor for broadcasting
+                self.addr.do_send(RelayMessage {
+                    room_id: self.room_id.clone(),
+                    session_id: self.session_id.clone(),
+                    payload: text.to_string(),
+                });
+            }
+            Ok(ws::Message::Close(reason)) => {
+                ctx.close(reason);
+                ctx.stop();
+            }
+            _ => {}
+        }
+    }
+}
+
+pub struct WsRelayActor {
+    // room_id -> session_id -> Addr<WsRelaySession>
+    sessions: HashMap<String, HashMap<String, Addr<WsRelaySession>>>,
+}
+
+impl Actor for WsRelayActor {
+    type Context = actix::Context<Self>;
+}
+
+impl actix::Handler<RelayMessage> for WsRelayActor {
+    type Result = ();
+
+    fn handle(&mut self, msg: RelayMessage, _ctx: &mut Self::Context) -> Self::Result {
+        if let Some(room_sessions) = self.sessions.get(&msg.room_id) {
+            for (session_id, addr) in room_sessions {
+                if session_id != &msg.session_id {
+                    addr.do_send(ws::Message::Text(msg.payload.clone().into()));
+                }
+            }
+        }
+    }
+}
+
+// Message to register a new WebSocket session
+#[derive(Debug)]
+pub struct JoinRoomRelay {
+    pub room_id: String,
+    pub session_id: String,
+    pub addr: Addr<WsRelaySession>,
+}
+
+impl actix::Message for JoinRoomRelay {
+    type Result = ();
+}
+
+impl actix::Handler<JoinRoomRelay> for WsRelayActor {
+    type Result = ();
+
+    fn handle(&mut self, msg: JoinRoomRelay, _ctx: &mut Self::Context) -> Self::Result {
+        self.sessions
+            .entry(msg.room_id)
+            .or_default()
+            .insert(msg.session_id, msg.addr);
+    }
+}
+
+// Message to unregister a WebSocket session
+#[derive(Debug)]
+pub struct LeaveRoomRelay {
+    pub room_id: String,
+    pub session_id: String,
+}
+
+impl actix::Message for LeaveRoomRelay {
+    type Result = ();
+}
+
+impl actix::Handler<LeaveRoomRelay> for WsRelayActor {
+    type Result = ();
+
+    fn handle(&mut self, msg: LeaveRoomRelay, _ctx: &mut Self::Context) -> Self::Result {
+        if let Some(room_sessions) = self.sessions.get_mut(&msg.room_id) {
+            room_sessions.remove(&msg.session_id);
+            if room_sessions.is_empty() {
+                self.sessions.remove(&msg.room_id);
+            }
+        }
+    }
+}
+
 #[derive( Clone)]
 #[cfg_attr(feature = "serde_support", derive(Serialize,  Deserialize))]
 
@@ -385,6 +495,9 @@ pub struct AppState {
     pub actions_dirty: Arc<Mutex<bool>>,
 
     pub room_broadcasts: Arc<Mutex<HashMap<String, tokio::sync::broadcast::Sender<u64>>>>,
+
+    // WebSocket relay actor for WASM P2P
+    pub relay_addr: actix::Addr<WsRelayActor>,
 }
 
 fn get_room_id_from_req(req: &actix_web::HttpRequest) -> Option<String> {
@@ -2632,6 +2745,40 @@ pub async fn rooms_leave(
     HttpResponse::Ok().json(serde_json::json!({"success": true}))
 }
 
+// WebSocket relay for WASM P2P
+async fn ws_relay(
+    data: web::Data<AppState>,
+    req: actix_web::HttpRequest,
+    stream: web::Payload,
+) -> impl Responder {
+    let room_id = get_room_id_from_req(&req)
+        .unwrap_or_else(|| {
+            req.match_info()
+                .get("room_id")
+                .map(|s| s.to_uppercase())
+                .unwrap_or_default()
+        });
+    
+    if room_id.is_empty() {
+        return HttpResponse::BadRequest().body("Room ID required");
+    }
+
+    let session_id = get_session_token_from_req(&req)
+        .unwrap_or_else(|| Uuid::new_v4().to_string());
+
+    let relay_addr = data.relay_addr.clone();
+    
+    ws::start(
+        WsRelaySession {
+            room_id: room_id.clone(),
+            session_id: session_id.clone(),
+            addr: relay_addr,
+        },
+        &req,
+        stream,
+    )
+}
+
 async fn init_game(
     data: web::Data<AppState>,
     req: Option<web::Json<InitGameRequest>>,
@@ -3117,6 +3264,8 @@ pub async fn run_web_server_with_ngrok(ngrok_authtoken: Option<String>) -> std::
         cached_actions: Arc::new(Mutex::new(Vec::new())),
         actions_dirty: Arc::new(Mutex::new(true)),
         room_broadcasts: Arc::new(Mutex::new(HashMap::default())),
+        // Start WebSocket relay actor
+        relay_addr: SyncArbiter::start(1, || WsRelayActor { sessions: HashMap::new() }),
     });
 
     let port: u16 = std::env::var("PORT")
@@ -3232,6 +3381,8 @@ pub async fn run_web_server_with_ngrok(ngrok_authtoken: Option<String>) -> std::
             .route("/api/rooms/create", web::post().to(rooms_create))
             .route("/api/rooms/join", web::post().to(rooms_join))
             .route("/api/rooms/leave", web::post().to(rooms_leave))
+            // WebSocket relay for WASM P2P
+            .route("/api/relay", web::get().to(ws_relay))
             // Static files with explicit CORS
             .service(
                 fs::Files::new("/engine", "../engine")

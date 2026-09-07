@@ -259,13 +259,10 @@ impl AbilityQueue {
                     if entry.choice_player_id.is_some() {
                         return None;
                     }
-                    let is_opponent_choice = match &choice {
-                        crate::ability::types::Choice::SelectCard {
+                    let is_opponent_choice = matches!(&choice, crate::ability::types::Choice::SelectCard {
                             target_player_id: Some(tpid),
                             ..
-                        } if tpid == "opponent" => true,
-                        _ => false,
-                    };
+                        } if tpid == "opponent");
                     if !is_opponent_choice {
                         return None;
                     }
@@ -294,7 +291,7 @@ impl AbilityQueue {
                     }
                 }
                 self.state = QueueState::WaitingForChoice {
-                    entry_index: idx as u8,
+entry_index: u8::try_from(idx).unwrap(),
                     choice: choice_clone,
                 };
             }
@@ -337,7 +334,7 @@ impl AbilityQueue {
                 };
                 self.entries.push(dummy_entry);
                 self.state = QueueState::WaitingForChoice {
-                    entry_index: (self.entries.len() - 1) as u8,
+                    entry_index: u8::try_from(self.entries.len() - 1).unwrap(),
                     choice: choice_clone,
                 };
             }
@@ -434,7 +431,7 @@ impl AbilityQueue {
             condition_cache: SmallVec::new(),
         });
         self.state = QueueState::ExecutingEffect {
-            entry_index: idx as u8,
+            entry_index: u8::try_from(idx).unwrap(),
         };
     }
 
@@ -533,7 +530,7 @@ impl AbilityQueue {
     /// drain loops to process newly-queued entries in-place.
     pub fn set_current_entry(&mut self, absolute: usize) {
         if absolute < self.entries.len() {
-            self.current_index = absolute as u8;
+            self.current_index = u8::try_from(absolute).unwrap();
         }
     }
 
@@ -565,7 +562,7 @@ impl AbilityQueue {
         s.push('\n');
         s.push_str(&format!("entries={}", self.entries.len()));
         s.push('\n');
-        for (_i, entry) in self.entries.iter().enumerate() {
+        for entry in self.entries.iter() {
             s.push_str(&format!(
                 "  [{}] card={} ab#{} player={} completed={} cost_paid={} effect_started={} optional_cost_result={:?} pending_actions={}\n",
                 entry.ability_index,

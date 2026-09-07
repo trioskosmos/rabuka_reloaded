@@ -2061,12 +2061,10 @@ allocs.push(Allocation {
         let num_cards = card_needs.len();
         let mut per_card_filled = vec![[0u8; 8]; num_cards];
         for a in allocs {
-            if let Ok(target_idx) = usize::try_from(a.target_idx) {
-                if target_idx < num_cards {
-                    if let Ok(color_idx) = usize::try_from(a.color) {
-                        per_card_filled[target_idx][color_idx] += a.amount;
-                    }
-                }
+            let target_idx = usize::from(a.target_idx);
+            if target_idx < num_cards {
+                let color_idx = usize::from(a.color);
+                per_card_filled[target_idx][color_idx] += a.amount;
             }
         }
         // Check each card

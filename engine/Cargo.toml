@@ -15,6 +15,8 @@ serde = { version = "=1.0.228", default-features = false, features = ["derive", 
 serde_json = { version = "=1.0.99", default-features = false, features = ["alloc"], optional = true }
 rand = { version = "0.8", optional = true }
 actix-web = { version = "4.4", optional = true, default-features = false, features = ["macros", "compress-brotli", "compress-gzip", "cookies", "http2", "unicode", "compat", "ws"] }
+actix-web-actors = { version = "4.3", optional = true }
+actix = { version = "0.13", optional = true }
 actix-cors = { version = "0.6", optional = true }
 actix-files = { version = "0.6", optional = true }
 tokio = { version = "1.35", features = ["full"], optional = true }
@@ -35,7 +37,7 @@ json_path_test = ["serde_support"]
 # targets (ds/ps1/psp/wii/dc) where types are serialized via the binary blob.
 serde_support = ["dep:serde", "dep:serde_json", "smallvec/serde", "hashbrown/serde"]
 # Optional server feature: enables the web server and async runtime
-server = ["actix-web", "actix-cors", "actix-files", "tokio", "tokio-stream", "local-ip-address", "uuid", "bytes", "serde_support"]
+server = ["actix-web", "actix-web-actors", "actix", "actix-cors", "actix-files", "tokio", "tokio-stream", "local-ip-address", "uuid", "bytes", "serde_support"]
 # 3DS target: disables TLS-based RNG, uses xorshift64 seeded from svcGetSystemTick
 3ds = ["bytecode_abilities"]
 # Profiling: enables Timer-based instrumentation for flamegraph generation

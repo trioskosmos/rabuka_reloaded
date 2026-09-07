@@ -7,10 +7,14 @@ use alloc::{
 use std::sync::Mutex;
 use std::time::Instant;
 
-static TIMERS: Mutex<Option<HashMap<Vec<&'static str>, (u64, u128)>>> = Mutex::new(None);
+type TimerKey = Vec<&'static str>;
+type TimerValue = (u64, u128);
+type TimerMap = HashMap<TimerKey, TimerValue>;
+
+static TIMERS: Mutex<Option<TimerMap>> = Mutex::new(None);
 static CALL_STACK: Mutex<Vec<&'static str>> = Mutex::new(Vec::new());
 
-fn get_timers() -> std::sync::MutexGuard<'static, Option<HashMap<Vec<&'static str>, (u64, u128)>>> {
+fn get_timers() -> std::sync::MutexGuard<'static, Option<TimerMap>> {
     let mut guard = TIMERS.lock().unwrap();
     if guard.is_none() {
         *guard = Some(HashMap::default());
@@ -83,7 +87,7 @@ pub fn print_results() {
     let guard = get_timers();
     if let Some(ref map) = *guard {
         let mut results: Vec<_> = map.iter().collect();
-        results.sort_by(|a, b| b.1 .1.cmp(&a.1 .1));
+        results.sort_by_key(|a| std::cmp::Reverse(a.1 .1));
         eprintln!("\n=== Timing Results (sorted by total time) ===");
         eprintln!(
             "{:<90} {:>10} {:>15} {:>15} {:>15}",
