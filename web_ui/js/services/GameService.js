@@ -84,8 +84,13 @@ export const GameService = {
         }
     },
 
-    triggerVersionCheck: () => {
-        GameService.checkVersionAndFetch();
+    triggerVersionCheck: (frameId) => {
+        if (frameId !== undefined) {
+            GameService._lastKnownVersion = frameId;
+            GameService.pollDelta(frameId, Network);
+        } else {
+            GameService.checkVersionAndFetch();
+        }
     },
 
     stopGameplayPolling: () => {

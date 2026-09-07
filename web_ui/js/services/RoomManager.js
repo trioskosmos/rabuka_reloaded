@@ -166,8 +166,8 @@ export const RoomManager = {
 
     connectSSE: async () => {
         if (!State.roomCode) return;
-        await SSEClient.connect(State.roomCode, () => {
-            GameService.triggerVersionCheck();
+        await SSEClient.connect(State.roomCode, (frameId) => {
+            GameService.triggerVersionCheck(frameId);
         });
     },
 

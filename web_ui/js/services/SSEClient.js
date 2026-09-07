@@ -12,8 +12,11 @@ export const SSEClient = {
         eventSource = new EventSource(getSseUrl(roomCode));
         eventSource.onmessage = (e) => {
             console.log('[SSE] onmessage:', e.data);
-            if (e.data === 'update' && onUpdate) {
-                onUpdate();
+            // Message format: "update <frame_id>" or "closed"
+            if (e.data.startsWith('update')) {
+                const parts = e.data.split(' ');
+                const frameId = parts[1] ? parseInt(parts[1], 10) : null;
+                if (onUpdate) onUpdate(frameId);
             } else if (e.data === 'closed' && onUpdate) {
                 console.log('[SSE] room closed by opponent');
                 if (window.handleRoomClosed) {

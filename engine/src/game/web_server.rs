@@ -1930,11 +1930,20 @@ async fn rooms_list(data: web::Data<AppState>) -> impl Responder {
 
 /// Notify all SSE clients in a room that state has changed.
 fn notify_room_clients(data: &AppState, room_id: &str) {
-    let broadcasts = lock_recover(&data.room_broadcasts);
-    if let Some(sender) = broadcasts.get(room_id) {
+    let (frame_id, sender) = {
+        let rooms = lock_recover(&data.rooms);
+        let room = rooms.get(room_id);
+        let broadcasts = lock_recover(&data.room_broadcasts);
+        let sender = broadcasts.get(room_id).cloned();
+        let frame_id = room.map(|r| r.frame_counter).unwrap_or(0);
+        (frame_id, sender)
+    };
+    if let Some(sender) = sender {
         let count = sender.receiver_count();
-        let _ = sender.send(());
-        log::debug!("[SSE] Notified room {} ({} clients)", room_id, count);
+        // Send frame_id so clients can request delta
+        let msg = format!("update {}", frame_id);
+        let _ = sender.send(Ok(Bytes::from(msg)));
+        log::debug!("[SSE] Notified room {} (frame {}) ({} clients)", room_id, frame_id, count);
     } else {
         log::debug!("[SSE] No broadcast sender for room {}", room_id);
     }
