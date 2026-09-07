@@ -3,6 +3,7 @@ use crate::{HashMap, HashSet};
 use actix_cors::Cors;
 use actix_files as fs;
 use actix_web::{web, App, HttpResponse, HttpServer, Responder};
+use bytes::Bytes;
 #[cfg(feature = "no_std")]
 use alloc::{
     string::{String, ToString},
@@ -140,11 +141,7 @@ struct GameStateDelta {
     #[cfg_attr(feature = "serde_support", serde(skip_serializing_if = "Option::is_none"))]
     player2_rps_choice: Option<u8>,
     #[cfg_attr(feature = "serde_support", serde(skip_serializing_if = "Option::is_none"))]
-    zone_changes: Option<Vec<ZoneChange>>,
-    #[cfg_attr(feature = "serde_support", serde(skip_serializing_if = "Option::is_none"))]
-    log_entries: Option<Vec<display::LogEntry>>,
-    #[cfg_attr(feature = "serde_support", serde(skip_serializing_if = "Option::is_none"))]
-    pending_choice: Option<display::Choice>,
+    pending_choice: Option<serde_json::Value>,
     #[cfg_attr(feature = "serde_support", serde(skip_serializing_if = "Option::is_none"))]
     legal_actions: Option<Vec<ActionIndex>>,
     #[cfg_attr(feature = "serde_support", serde(skip_serializing_if = "Option::is_none"))]
@@ -364,7 +361,7 @@ pub struct AppState {
 
     pub actions_dirty: Arc<Mutex<bool>>,
 
-    pub room_broadcasts: Arc<Mutex<HashMap<String, tokio::sync::broadcast::Sender<()>>>>,
+    pub room_broadcasts: Arc<Mutex<HashMap<String, tokio::sync::broadcast::Sender<u64>>>>,
 }
 
 fn get_room_id_from_req(req: &actix_web::HttpRequest) -> Option<String> {
@@ -1082,8 +1079,6 @@ async fn game_state_delta(
         rps_winner: game_state.rps_winner,
         player1_rps_choice: game_state.player1_rps_choice,
         player2_rps_choice: game_state.player2_rps_choice,
-        zone_changes: None, // TODO: track zone changes during action execution
-        log_entries: None,  // TODO: return new log entries since `since`
         pending_choice: display.pending_choice.clone(),
         legal_actions: None,
         player1: Some(display.player1.clone()),
@@ -1941,8 +1936,7 @@ fn notify_room_clients(data: &AppState, room_id: &str) {
     if let Some(sender) = sender {
         let count = sender.receiver_count();
         // Send frame_id so clients can request delta
-        let msg = format!("update {}", frame_id);
-        let _ = sender.send(Ok(Bytes::from(msg)));
+        let _ = sender.send(frame_id);
         log::debug!("[SSE] Notified room {} (frame {}) ({} clients)", room_id, frame_id, count);
     } else {
         log::debug!("[SSE] No broadcast sender for room {}", room_id);
@@ -1973,7 +1967,7 @@ async fn sse_events(data: web::Data<AppState>, req: actix_web::HttpRequest) -> i
         broadcasts
             .entry(room_id.clone())
             .or_insert_with(|| {
-                let (tx, _) = tokio::sync::broadcast::channel::<()>(32);
+                let (tx, _) = tokio::sync::broadcast::channel::<u64>(32);
                 tx
             })
             .clone()
@@ -1993,13 +1987,15 @@ async fn sse_events(data: web::Data<AppState>, req: actix_web::HttpRequest) -> i
         tx.send(Ok(Bytes::from("data: connected\n\n"))).ok();
         loop {
             tokio::select! {
-                result = rx.recv() => {
-                    if result.is_ok() {
-                        if tx.send(Ok(Bytes::from("data: update\n\n"))).is_err() {
-                            break;
+                frame_id = rx.recv() => {
+                    match frame_id {
+                        Ok(fid) => {
+                            let msg = format!("data: update {}\n\n", fid);
+                            if tx.send(Ok(Bytes::from(msg))).is_err() {
+                                break;
+                            }
                         }
-                    } else {
-                        break;
+                        Err(_) => break, // channel closed
                     }
                 }
                 _ = tokio::time::sleep(Duration::from_secs(30)) => {
@@ -2491,8 +2487,9 @@ pub async fn rooms_leave(
             // Notify other SSE clients
             let broadcasts = lock_recover(&data.room_broadcasts);
             if let Some(sender) = broadcasts.get(&room_id) {
-                let _ = sender.send(());
-                log::debug!("[SSE] Room {} notified of leave", room_id);
+                let frame_id = room.frame_counter;
+                let _ = sender.send(frame_id);
+                log::debug!("[SSE] Room {} notified of leave (frame {})", room_id, frame_id);
             }
             // Only destroy room if no sessions remain
             if room.sessions.is_empty() {
