@@ -23,9 +23,11 @@ function waitForMetaTag() {
 // Initialize backend URL asynchronously
 let BACKEND_URL_PROMISE = waitForMetaTag().then(injectedBackendUrl => {
     const isGitHubPages = typeof window !== 'undefined' && window.location.hostname.includes('github.io');
-    return injectedBackendUrl || (isGitHubPages
-        ? (window.RABUKA_BACKEND_URL || 'https://your-rabuka-server.onrender.com')
+    const url = injectedBackendUrl || (isGitHubPages
+        ? (window.RABUKA_BACKEND_URL || 'https://rabuka-server.onrender.com')
         : '');
+    console.log('[Network] Resolved backend URL:', url);
+    return url;
 });
 
 // Synchronous getter that blocks until backend URL is ready
@@ -33,6 +35,7 @@ let _cachedBackendUrl = null;
 export async function getBackendUrl() {
     if (_cachedBackendUrl !== null) return _cachedBackendUrl;
     _cachedBackendUrl = await BACKEND_URL_PROMISE;
+    console.log('[Network] Backend URL ready:', _cachedBackendUrl);
     return _cachedBackendUrl;
 }
 
@@ -51,6 +54,7 @@ export function isCrossOrigin() {
 }
 
 export function getSseUrl(roomId) {
+    console.log('[Network] getSseUrl:', roomId, '->', buildSseUrl(roomId));
     return buildSseUrl(roomId);
 }
 
@@ -74,6 +78,7 @@ export function apiHeaders() {
 export async function apiFetch(path, options = {}) {
     // Ensure backend URL is resolved before making request
     await getBackendUrl();
+    console.log('[Network] apiFetch:', path, '->', buildUrl(path));
     const { headers, ...rest } = options;
     return fetch(buildUrl(path), {
         ...rest,
