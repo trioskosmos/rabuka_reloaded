@@ -365,33 +365,52 @@ let source = cost.source_str().unwrap_or("");
                     return Ok(());
                 }
             } else if !matching_indices.is_empty() {
+                let source_zone = Zone::from_str(source);
+                let dest_opt = cost.destination_any();
+                let is_hand_to_waitroom = source_zone == Some(Zone::Hand) && matches!(dest_opt.as_deref(), Some("discard") | Some("waitroom"));
+                let dest_str = if is_hand_to_waitroom { " to waitroom" } else { "" };
+                
+                // Build filter description from cost constraints
+                let filter_parts = {
+                    let mut parts = Vec::new();
+                    if let Some(ct) = cost.card_type_any() {
+                        parts.push(ct.as_card_str().to_string());
+                    }
+                    if let Some(groups) = cost.group_names_any() {
+                        if !groups.is_empty() {
+                            parts.push(groups.join("/"));
+                        }
+                    }
+                    if let Some(chars) = cost.characters_any() {
+                        if !chars.is_empty() {
+                            parts.push(chars.join("/"));
+                        }
+                    }
+                    if cost.cost_limit_any().is_some() {
+                        parts.push("cost ≤".to_string());
+                    }
+                    if parts.is_empty() { String::new() } else { format!(" ({})", parts.join(", ")) }
+                };
+                
                 let desc = if is_any_number {
                     let max_str = if cost.max.unwrap_or(false) {
                         count.min(matching_indices.len())
                     } else {
                         matching_indices.len()
                     };
-                    let dest_str = if source == Zone::Hand && matches!(cost.destination.as_deref(), Some("discard") | Some("waitroom")) {
-                        " to waitroom"
-                    } else {
-                        ""
-                    };
                     format!(
-                        "Select any number of {} from hand (0-{}){} (or skip)",
+                        "Select any number of {}{} from hand (0-{}){} (or skip)",
                         util::card_plural(max_str),
+                        filter_parts,
                         max_str,
                         dest_str
                     )
                 } else {
-                    let dest_str = if source == Zone::Hand && matches!(cost.destination.as_deref(), Some("discard") | Some("waitroom")) {
-                        " to waitroom"
-                    } else {
-                        ""
-                    };
                     format!(
-                        "Select {} {} from hand{}{}",
+                        "Select {} {}{}{}{}",
                         effective_count,
                         util::card_plural(effective_count as usize),
+                        filter_parts,
                         dest_str,
                         if is_optional { " (or skip)" } else { "" }
                     )
@@ -410,16 +429,41 @@ let source = cost.source_str().unwrap_or("");
                 self.pending_choice = Some(
                     Choice::select_cards(source.to_string(), effective_count, desc, is_optional)
                         .description_ja(Some(if is_any_number {
-                            format!("手札から任意枚控え室に置く（スキップ可）")
-                        } else {
-                            format!(
-                                "手札から{}枚控え室に置く{}",
-                                effective_count,
-                                if is_optional {
-                                    "（スキップ可）"
-                                } else {
-                                    ""
+                            let filter_ja = {
+                                let mut parts = Vec::new();
+                                if let Some(ct) = cost.card_type_any() {
+                                    parts.push(ct.as_card_str().to_string());
                                 }
+                                if let Some(groups) = cost.group_names_any() {
+                                    if !groups.is_empty() { parts.push(groups.join("/")); }
+                                }
+                                if let Some(chars) = cost.characters_any() {
+                                    if !chars.is_empty() { parts.push(chars.join("/")); }
+                                }
+                                if cost.cost_limit_any().is_some() { parts.push("コスト≤".to_string()); }
+                                if parts.is_empty() { String::new() } else { format!("（{}）", parts.join("、")) }
+                            };
+                            format!("手札から任意枚控え室に置く{}（スキップ可）", filter_ja)
+                        } else {
+                            let filter_ja = {
+                                let mut parts = Vec::new();
+                                if let Some(ct) = cost.card_type_any() {
+                                    parts.push(ct.as_card_str().to_string());
+                                }
+                                if let Some(groups) = cost.group_names_any() {
+                                    if !groups.is_empty() { parts.push(groups.join("/")); }
+                                }
+                                if let Some(chars) = cost.characters_any() {
+                                    if !chars.is_empty() { parts.push(chars.join("/")); }
+                                }
+                                if cost.cost_limit_any().is_some() { parts.push("コスト≤".to_string()); }
+                                if parts.is_empty() { String::new() } else { format!("（{}）", parts.join("、")) }
+                            };
+                            format!(
+                                "手札から{}枚{}控え室に置く{}",
+                                effective_count,
+                                filter_ja,
+                                if is_optional { "（スキップ可）" } else { "" }
                             )
                         }))
                         .card_type(card_type.clone())

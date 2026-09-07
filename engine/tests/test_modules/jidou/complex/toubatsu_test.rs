@@ -410,5 +410,3 @@ fn toubatsu_swap_arms_own_seat_not_opponent() {
         "P1's swap must not arm P2's center watcher"
     );
 }
-#[test]
-fn toubatsu_unrelated_debut_no_trigger() {
