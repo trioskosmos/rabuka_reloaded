@@ -3465,6 +3465,13 @@ impl Condition {
         direct.or_else(|| self.get_trigger_event()?.self_effect_only)
     }
 
+    /// Whether this movement trigger also watches an area move of the
+    /// activating card (True for 〜か compounds like Sumire bp5-004 ab#0,
+    /// False for pure energy-placement texts like Ren bp7-005 ab#1).
+    pub fn get_watches_area_move(&self) -> Option<bool> {
+        self.get_trigger_event()?.watches_area_move
+    }
+
     pub fn get_heart_colors(&self) -> Option<&[String]> {
         self.common().and_then(|c| c.heart_colors.as_deref()).map(|v| v.as_slice())
     }
@@ -3564,6 +3571,10 @@ pub struct TriggerEvent {
     pub ability_filter: Option<AbilityFilter>,
     pub self_effect_only: Option<bool>,
     pub energy_placed: Option<bool>,
+    /// Parser-set in `_try_movement`: the text also watches an area move
+    /// (〜エリアを移動 / 移動した…). Pure energy-placement texts set False;
+    /// 〜か compounds (area-move OR energy-placed) set True.
+    pub watches_area_move: Option<bool>,
     pub phase: Option<ArcStr>,
     pub phase_target: Option<ArcStr>,
     pub recurrence: Option<ArcStr>,

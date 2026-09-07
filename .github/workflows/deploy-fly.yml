@@ -1,0 +1,27 @@
+name: Deploy Rust Server to Fly.io
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'engine/**'
+      - 'cards/**'
+      - 'Dockerfile'
+      - '.dockerignore'
+      - '.github/workflows/deploy-fly.yml'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Fly CLI
+        uses: superfly/flyctl-actions-setup@v1
+
+      - name: Deploy to Fly.io
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          flyctl deploy --remote-only --ha=false --region ord

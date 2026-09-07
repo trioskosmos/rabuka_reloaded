@@ -125,7 +125,7 @@ export const ActionListView = {
                 const header = document.createElement('div');
                 header.className = 'action-group-header';
                 const energyIcon = `<img src="img/texticon/icon_energy.png" style="height:14px; vertical-align:middle; margin-left: 5px;">`;
-                const displayCost = firstA.parameters?.base_cost ?? 0;
+                const displayCost = firstA.parameters?.final_cost ?? firstA.parameters?.base_cost ?? 0;
                 let cleanName = firstA.parameters?.card_name ?? firstA.description ?? "Unknown";
                 if (State.currentLang === 'en' && firstA.parameters?.card_id !== undefined) {
                     const card = Tooltips.findCardById(firstA.parameters.card_id);

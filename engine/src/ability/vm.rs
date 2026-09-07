@@ -749,6 +749,9 @@ impl<'a> BcReader<'a> {
                         "energy_placed" => {
                             te.energy_placed = self.read_bool_value();
                         }
+                        "watches_area_move" => {
+                            te.watches_area_move = self.read_bool_value();
+                        }
                         "phase" => {
                             te.phase = self.read_arc_str_value();
                         }

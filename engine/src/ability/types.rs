@@ -252,6 +252,30 @@ impl Choice {
         }
     }
 
+    pub fn description_en(&self) -> Option<&str> {
+        match self {
+            Choice::SelectCard { description_en, .. }
+            | Choice::SelectTarget { description_en, .. }
+            | Choice::SelectPosition { description_en, .. }
+            | Choice::SelectHeartColor { description_en, .. }
+            | Choice::SelectHeartType { description_en, .. }
+            | Choice::SelectAutoAbility { description_en, .. }
+            | Choice::SelectLiveSuccess { description_en, .. } => description_en.as_deref(),
+        }
+    }
+
+    pub fn description(&self) -> &str {
+        match self {
+            Choice::SelectCard { description, .. }
+            | Choice::SelectTarget { description, .. }
+            | Choice::SelectPosition { description, .. }
+            | Choice::SelectHeartColor { description, .. }
+            | Choice::SelectHeartType { description, .. }
+            | Choice::SelectAutoAbility { description, .. }
+            | Choice::SelectLiveSuccess { description, .. } => description,
+        }
+    }
+
     /// Whether this choice may be skipped by the player.
     pub fn allow_skip(&self) -> bool {
         match self {

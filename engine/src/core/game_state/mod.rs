@@ -755,10 +755,19 @@ impl GameState {
             .any(|m| (m.dest_zone == "energy" || m.dest_zone == "energy_zone" || m.dest_zone == "under_member") && m.effect_only)
     }
     /// Backward-compat: which player's effect caused the last energy placement.
+    /// Most-recent match wins, effect-driven placements only: a mixed batch
+    /// whose latest placement is opponent-caused must read back the opponent
+    /// (the old first-match lookup misattributed it to self).
     pub fn last_energy_placed_by_player(&self) -> Option<&str> {
         self.batch_movements
             .iter()
-            .find(|m| m.dest_zone == "energy" || m.dest_zone == "energy_zone" || m.dest_zone == "under_member")
+            .rev()
+            .find(|m| {
+                (m.dest_zone == "energy"
+                    || m.dest_zone == "energy_zone"
+                    || m.dest_zone == "under_member")
+                    && m.effect_only
+            })
             .map(|m| m.cause_player_id.as_str())
     }
 

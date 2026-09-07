@@ -840,12 +840,6 @@ impl<'a> ConditionContext<'a> {
                     .get_energy_placed()
                     .or_else(|| te.and_then(|t| t.energy_placed));
 
-                let snapshot_energy = self
-                    .game_state
-                    .entry_snapshot_last_energy_placed_by_effect();
-                let snapshot_energy_player = self
-                    .game_state
-                    .entry_snapshot_last_energy_placed_by_player();
                 let snapshot_area = self.game_state.entry_snapshot_last_area_move_card_id();
                 let snapshot_area_player =
                     self.game_state.entry_snapshot_last_area_move_by_player();
@@ -904,14 +898,33 @@ impl<'a> ConditionContext<'a> {
                         .get_destination()
                         .or_else(|| te.and_then(|t| t.destination.as_deref()))
                         .unwrap_or("");
-                    let energy_val = if snapshot_energy {
-                        true
-                    } else if !self.game_state.last_energy_placed_by_effect() {
-                        false
-                    } else {
-                        // snapshot is false but global is true — use global
-                        true
+                    // Dest-aware placement match: a bare "置き場に置かれた"
+                    // watches ONLY energy/energy_zone arrivals. A
+                    // zone->under_member move satisfies ONLY an explicit
+                    // want_dest=="under_member" watcher (and vice versa), so
+                    // effects parking energy under a member never arm Ren.
+                    let is_watched_placement = |m: &crate::types::MovementEvent| {
+                        let dz_ok = if want_dest.is_empty() {
+                            m.dest_zone == "energy" || m.dest_zone == "energy_zone"
+                        } else {
+                            m.dest_zone == want_dest
+                        };
+                        dz_ok && m.effect_only
                     };
+                    let snapshot_has = self
+                        .game_state
+                        .ability_queue
+                        .current_entry()
+                        .map(|e| e.snapshot_movements.iter().any(|m| is_watched_placement(m)))
+                        .unwrap_or(false);
+                    let live_has = self
+                        .game_state
+                        .batch_movements
+                        .iter()
+                        .any(|m| is_watched_placement(m));
+                    // Pre-enqueue scans have no current entry yet, so the live
+                    // batch governs; post-enqueue the durable snapshot does.
+                    let energy_val = snapshot_has || live_has;
                     // Verify the placed energy's destination matches, when constrained.
                     // Check both the entry snapshot (persistent) and the live batch.
                     let dest_ok = if want_dest.is_empty() {
@@ -938,16 +951,64 @@ impl<'a> ConditionContext<'a> {
                         });
                         snapshot_dest_ok || live_dest_ok
                     };
-                    let energy_player = snapshot_energy_player
-                        .as_deref()
-                        .or_else(|| self.game_state.last_energy_placed_by_player());
-                    energy_val
-                        && dest_ok
-                        && (!self_effect_only.unwrap_or(false) || energy_player == Some(&player.id))
+                    let snapshot_player = self
+                        .game_state
+                        .ability_queue
+                        .current_entry()
+                        .and_then(|e| {
+                            e.snapshot_movements
+                                .iter()
+                                .rev()
+                                .find(|m| is_watched_placement(m))
+                                .map(|m| m.cause_player_id.clone())
+                        });
+                    let live_player = self
+                        .game_state
+                        .batch_movements
+                        .iter()
+                        .rev()
+                        .find(|m| is_watched_placement(m))
+                        .map(|m| m.cause_player_id.clone());
+                    // Most-recent watched placement wins: a mixed batch whose
+                    // latest placement is opponent-caused must NOT satisfy
+                    // self_effect_only (the old first-match lookup did).
+                    let energy_player = snapshot_player.or(live_player);
+                    let player_ok = !self_effect_only.unwrap_or(false)
+                        || energy_player.as_deref() == Some(player.id.as_str());
+                    let verdict = energy_val && dest_ok && player_ok;
+                    log::debug!(
+                        "[ENERGY_PLACED_VERDICT] want_dest='{}' snapshot={} live={} val={} dest_ok={} player={:?} self_only={:?} verdict={}",
+                        want_dest,
+                        snapshot_has,
+                        live_has,
+                        energy_val,
+                        dest_ok,
+                        energy_player,
+                        self_effect_only,
+                        verdict
+                    );
+                    verdict
                 });
-                let has_area_check =
-                    self_effect_only.is_some() || condition.get_movement().unwrap_or("") == "moves";
+                // watches_area_move disambiguates pure-energy texts (Ren
+                // bp7-005 ab#1 — no move language, flag absent because the
+                // pipeline normalizer strips False) from 〜か compounds
+                // (Sumire bp5-004 ab#0: True — either disjunct arms it).
+                // Fallback preserves legacy behavior: an energy watcher
+                // without the flag watches no area move; anything else keeps
+                // the old formula (including the vacuous-true for triggers
+                // like baton_touch that check neither).
+                let watches_area = condition
+                    .get_watches_area_move()
+                    .or_else(|| te.and_then(|t| t.watches_area_move));
+                let has_area_check = watches_area.unwrap_or(false)
+                    || (energy_placed.is_none()
+                        && (self_effect_only.is_some()
+                            || condition.get_movement().unwrap_or("") == "moves"));
                 let has_energy_check = energy_placed.is_some();
+                log::debug!(
+                    "[MOVES_VERDICT] watches_area={:?} has_area={} has_energy={} area_ok={} energy_ok={}",
+                    watches_area, has_area_check, has_energy_check, area_ok, energy_ok
+                );
                 if !has_area_check && !has_energy_check {
                     true
                 } else if has_area_check && has_energy_check {

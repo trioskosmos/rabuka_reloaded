@@ -1,3 +1,5 @@
+import { getSseUrl } from '../network.js';
+
 let eventSource = null;
 
 export const SSEClient = {
@@ -5,7 +7,7 @@ export const SSEClient = {
         if (eventSource) {
             eventSource.close();
         }
-        eventSource = new EventSource(`/api/events?room_id=${roomCode}`);
+        eventSource = new EventSource(getSseUrl(roomCode));
         eventSource.onmessage = (e) => {
             if (e.data === 'update' && onUpdate) {
                 onUpdate();

@@ -12,6 +12,7 @@
     pub mod bp6_020_dancing_stars_watchers_test;
     pub mod bp7_005_ren_ab0_test;
     pub mod bp7_005_ren_jidou_test;
+    pub mod bp7_005_ren_scope_test;
     pub mod bp7_aquarium_yell_source_test;
     pub mod bp7_auto_gap_test;
     pub mod bp7_constant_edge_case_test;

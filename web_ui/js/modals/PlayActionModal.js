@@ -70,7 +70,7 @@ function renderHandCard(index) {
         const translated = (cardNo && State.resolveCardData(cardNo)) ? (window.translateCard ? window.translateCard(State.resolveCardData(cardNo)) : null) : null;
         const displayName = (translated && translated.name) ? translated.name : cardName;
         const energyIcon = '<img src="img/texticon/icon_energy.png" style="height:14px;vertical-align:middle;">';
-        const baseCost = params.base_cost !== undefined ? params.base_cost : (params.cost || '?');
+        const baseCost = params.final_cost ?? params.base_cost ?? params.cost ?? '?';
         const posStr = `[${index + 1}/${_handCardDatas.length}]`;
         cardNameEl.innerHTML = `${displayName} ${posStr} ${energyIcon}${baseCost}`;
     }

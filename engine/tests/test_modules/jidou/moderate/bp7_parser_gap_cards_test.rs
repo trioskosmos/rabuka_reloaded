@@ -21,6 +21,7 @@
 ///       the deck bottom in any order; if you did, draw 1 card.
 use crate::helpers::*;
 use rabuka_engine::core::types::AbilityTrigger;
+use rabuka_engine::zones::MemberArea;
 
 // ====================================================================
 // 1. ウィーン・マルガレーテ (PL!SP-bp7-010-R): 起動
@@ -499,35 +500,39 @@ fn ayumu_energy_under_member_triggers_energy_deck_move() {
     );
 }
 
-/// Negative: energy placed into the energy ZONE (a normal gain, not "under a
-/// member") must NOT trigger 上原歩夢's auto ability.
+/// Negative: a REAL own-effect energy placement into the energy ZONE
+/// (Kahori debut deck → zone, not "under a member") must NOT trigger
+/// Ayumu's auto ability.
 #[test]
 fn ayumu_energy_into_zone_not_under_member_no_trigger() {
     let db = load_real_database();
     let mut game = TestGame::new(db.clone());
 
     let ayumu = game.id("PL!N-bp7-001-R");
-    game.state.player1.stage.stage[1] = ayumu;
-    game.give_energy(2);
-    // Energy deck would be consumed if the ability fired.
-    for _ in 0..4 {
+    game.state.player1.stage.stage = [ayumu, -1, -1];
+    // Energy deck stocked: consumed only if Ayumu wrongly fires.
+    for _ in 0..5 {
         game.state.player1.energy_deck.cards.push(game.id("LL-E-001-SD"));
     }
     let deck_before = game.state.player1.energy_deck.cards.len();
 
-    // Place an energy card directly into the energy zone (a plain gain) —
-    // NOT under a member.
-    let e = game.id("LL-E-001-SD");
-    game.state.player1.energy_zone.cards.push(e);
-    game.state.player1.energy_zone.add_active(1);
+    // Real own-effect zone placement: Kahori debuts, deck → zone WAITED.
+    let placer = game.id("PL!SP-pb1-005-R");
+    game.state.player1.hand.cards.push(placer);
+    game.give_energy(13);
+    let zone_before = game.state.player1.energy_zone.cards.len();
+    game.play_to_stage(placer, MemberArea::RightSide);
+    scan_autos_both(&mut game);
 
-    // The engine scans auto abilities after the placement. No energy was placed
-    // "under a member", so 上原歩夢 must NOT draw from the energy deck.
-    // (The scan is triggered implicitly on the next process; assert deck intact.)
+    assert_eq!(
+        game.state.player1.energy_zone.cards.len(),
+        zone_before + 1,
+        "Kahori debut really placed 1 energy into the zone"
+    );
     assert_eq!(
         game.state.player1.energy_deck.cards.len(),
-        deck_before,
-        "no under-member placement → 上原歩夢 must not consume energy from the deck"
+        deck_before - 1,
+        "energy deck spent exactly the placed card: Ayumu must not fire on zone arrivals"
     );
 }
 

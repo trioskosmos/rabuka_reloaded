@@ -588,51 +588,95 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
             ..
         } => {
             if target == crate::ability::types::PAY_SKIP_TARGET {
+                let desc_en = choice.description_en().unwrap_or(description);
+                let desc_ja = choice.description_ja().unwrap_or(desc_en);
+                let pay_label = if desc_en.is_empty() {
+                    "Pay optional cost".to_string()
+                } else {
+                    desc_en.to_string()
+                };
+                let skip_label = if desc_en.is_empty() {
+                    "Skip optional cost".to_string()
+                } else {
+                    format!("Skip: {}", desc_en)
+                };
+                let pay_label_ja = if desc_ja.is_empty() {
+                    "オプショナルコストを支払う".to_string()
+                } else {
+                    desc_ja.to_string()
+                };
+                let skip_label_ja = if desc_ja.is_empty() {
+                    "オプショナルコストをスキップ".to_string()
+                } else {
+                    format!("スキップ: {}", desc_ja)
+                };
                 return vec![
                     make_action_params(
                         ActionType::ChoiceDecision,
-                        "Pay optional cost",
+                        &pay_label,
                         ActionParameters {
                             card_id: Some(1),
                             card_no: Some("pay_optional_cost".to_string()),
                             ..make_params()
                         },
                     )
-                    .with_ja("オプショナルコストを支払う"),
+                    .with_ja(pay_label_ja),
                     make_action_params(
                         ActionType::ChoiceDecision,
-                        "Skip optional cost",
+                        &skip_label,
                         ActionParameters {
                             card_id: Some(0),
                             card_no: Some("skip_optional_cost".to_string()),
                             ..make_params()
                         },
                     )
-                    .with_ja("オプショナルコストをスキップ"),
+                    .with_ja(skip_label_ja),
                 ];
             }
-            if target == "pay_cost_all:discard_all" {
+if target == "pay_cost_all:discard_all" {
+                let desc_en = choice.description_en().unwrap_or(description);
+                let desc_ja = choice.description_ja().unwrap_or(desc_en);
+                let pay_label = if desc_en.is_empty() {
+                    "Discard all hand".to_string()
+                } else {
+                    desc_en.to_string()
+                };
+                let skip_label = if desc_en.is_empty() {
+                    "Skip optional cost".to_string()
+                } else {
+                    format!("Skip: {}", desc_en)
+                };
+                let pay_label_ja = if desc_ja.is_empty() {
+                    "手札をすべて控え室に置く".to_string()
+                } else {
+                    desc_ja.to_string()
+                };
+                let skip_label_ja = if desc_ja.is_empty() {
+                    "オプショナルコストをスキップ".to_string()
+                } else {
+                    format!("スキップ: {}", desc_ja)
+                };
                 return vec![
                     make_action_params(
                         ActionType::ChoiceDecision,
-                        "Discard all hand",
+                        &pay_label,
                         ActionParameters {
                             card_id: Some(1),
                             card_no: Some("pay_cost_all".to_string()),
                             ..make_params()
                         },
                     )
-                    .with_ja("手札をすべて控え室に置く"),
+                    .with_ja(pay_label_ja),
                     make_action_params(
                         ActionType::ChoiceDecision,
-                        "Skip optional cost",
+                        &skip_label,
                         ActionParameters {
                             card_id: Some(0),
                             card_no: Some("skip_optional_cost".to_string()),
                             ..make_params()
                         },
                     )
-                    .with_ja("オプショナルコストをスキップ"),
+                    .with_ja(skip_label_ja),
                 ];
             }
             if target == "position|destination" || target == "area_select" {
@@ -1465,7 +1509,12 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
 
                                 if !has_baton_touch_protection {
                                     if let Some(existing_member_card) = stage_cards[area_idx] {
-                                        let member_cost = existing_member_card.cost.unwrap_or(0);
+                                        // Include constant cost modifiers (e.g. 唐 可可 +2):
+                                        // parity with core/player.rs baton payment.
+                                        let member_cost = (existing_member_card.cost.unwrap_or(0)
+                                            as i32
+                                            + game_state.mods.get_cost_modifier(existing_member_id))
+                                        .max(1) as u8;
                                         let cost_to_pay =
                                             effective_cost.saturating_sub(member_cost);
                                         if (active_energy_count as u8) >= cost_to_pay {
@@ -1522,11 +1571,21 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                                     .card_database
                                     .get_card(cid1)
                                     .and_then(|c| c.cost)
+                                    .map(|base| {
+                                        (base as i32
+                                            + game_state.mods.get_cost_modifier(cid1))
+                                        .max(1) as u8
+                                    })
                                     .unwrap_or(0);
                                 let cost2 = game_state
                                     .card_database
                                     .get_card(cid2)
                                     .and_then(|c| c.cost)
+                                    .map(|base| {
+                                        (base as i32
+                                            + game_state.mods.get_cost_modifier(cid2))
+                                        .max(1) as u8
+                                    })
                                     .unwrap_or(0);
                                 let combined = cost1 + cost2;
                                 let pair_cost = effective_cost.saturating_sub(combined);
@@ -1601,6 +1660,10 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                                             }
                                         },
                                         base_cost: Some(card_cost),
+                                        // Area-specific price (baton discount + play-cost
+                                        // reductions applied). Mini buttons and headers
+                                        // read final_cost first (see web_ui ActionButtons).
+                                        final_cost: Some(cost_display),
                                         stage_area: Some(area.area.clone()),
                                         // available_areas is only consumed by the UI/web/main.rs
                                         // path; the profiling/bot decision path never reads it, so
@@ -1675,6 +1738,7 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                                                 None
                                             },
                                             base_cost: Some(pair.cost),
+                                            final_cost: Some(pair.cost),
                                             stage_area: Some(pair.placement.clone()),
                                             card_indices: Some(area_indices),
                                             available_areas: if cfg!(feature = "profiling") {

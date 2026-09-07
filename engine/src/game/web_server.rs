@@ -944,6 +944,10 @@ async fn get_status(data: web::Data<AppState>) -> impl Responder {
     }))
 }
 
+async fn health_check() -> impl Responder {
+    HttpResponse::Ok().json(serde_json::json!({ "status": "ok" }))
+}
+
 async fn set_ui_config(
     data: web::Data<AppState>,
     req: web::Json<SetUiConfigRequest>,
@@ -1855,6 +1859,8 @@ async fn sse_events(data: web::Data<AppState>, req: actix_web::HttpRequest) -> i
         .insert_header(("Content-Type", "text/event-stream"))
         .insert_header(("Cache-Control", "no-cache"))
         .insert_header(("Connection", "keep-alive"))
+        .insert_header(("Access-Control-Allow-Origin", "*"))
+        .insert_header(("Access-Control-Allow-Headers", "Content-Type, X-Session-Token, X-Room-Id"))
         .streaming(UnboundedReceiverStream::new(rx_stream))
 }
 
@@ -2845,6 +2851,7 @@ pub async fn run_web_server_with_ngrok(ngrok_authtoken: Option<String>) -> std::
         App::new()
             .wrap(cors)
             .app_data(app_state.clone())
+            .route("/health", web::get().to(health_check))
             .route("/api/game-state", web::get().to(get_game_state))
             .route(
                 "/api/game-state/version",

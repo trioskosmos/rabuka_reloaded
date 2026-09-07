@@ -2028,10 +2028,12 @@ impl GameState {
             .and_then(|e| {
                 e.snapshot_movements
                     .iter()
+                    .rev()
                     .find(|m| {
-                        m.dest_zone == "energy"
+                        (m.dest_zone == "energy"
                             || m.dest_zone == "energy_zone"
-                            || m.dest_zone == "under_member"
+                            || m.dest_zone == "under_member")
+                            && m.effect_only
                     })
             })
             .map(|m| m.cause_player_id.clone())

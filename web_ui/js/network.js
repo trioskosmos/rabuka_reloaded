@@ -4,6 +4,34 @@ import { PlannerService } from './services/PlannerService.js';
 import { GameService } from './services/GameService.js';
 import { DebugService } from './services/DebugService.js';
 
+function getInjectedBackendUrl() {
+    const meta = document.querySelector('meta[name="rabuka-backend-url"]');
+    return meta ? meta.getAttribute('content') : null;
+}
+
+const injectedBackendUrl = getInjectedBackendUrl();
+const isGitHubPages = typeof window !== 'undefined' && window.location.hostname.includes('github.io');
+const BACKEND_URL = injectedBackendUrl || (isGitHubPages
+    ? (window.RABUKA_BACKEND_URL || 'https://your-rabuka-server.onrender.com')
+    : '');
+
+function buildUrl(path) {
+    const cleanPath = path.startsWith('/') ? path.slice(1) : path;
+    return BACKEND_URL ? `${BACKEND_URL}/${cleanPath}` : path;
+}
+
+function buildSseUrl(roomId) {
+    return BACKEND_URL ? `${BACKEND_URL}/api/events?room_id=${roomId}` : `/api/events?room_id=${roomId}`;
+}
+
+export function getBackendUrl() {
+    return BACKEND_URL;
+}
+
+export function isCrossOrigin() {
+    return isGitHubPages && BACKEND_URL.length > 0;
+}
+
 /**
  * Build the standard API request headers from the current session state.
  * Header names are case-insensitive per HTTP, so a single casing is used.
@@ -23,10 +51,14 @@ export function apiHeaders() {
  */
 export function apiFetch(path, options = {}) {
     const { headers, ...rest } = options;
-    return fetch(path, {
+    return fetch(buildUrl(path), {
         ...rest,
         headers: { ...apiHeaders(), ...(headers || {}) }
     });
+}
+
+export function getSseUrl(roomId) {
+    return buildSseUrl(roomId);
 }
 
 /**

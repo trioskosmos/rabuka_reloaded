@@ -1,0 +1,33 @@
+# Exclude heavy card images from Docker build (served from GitHub Pages instead)
+web_ui/img/cards_webp/
+
+# Exclude local build artifacts
+target/
+**/target/
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Exclude IDE/editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Exclude OS files
+.DS_Store
+Thumbs.db
+
+# Exclude test/training data
+training/
+test_output/
+*.bin
+*.csv
+
+# Exclude toolchain downloads
+dc-toolchain/
+
+# Exclude logs
+*.log
+engine_c/run.log

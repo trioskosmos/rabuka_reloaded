@@ -16,6 +16,7 @@
 ///    pass a new member onto the zone: 唐可可 base cost 2 → +2 = 4, so a 9-cost
 ///    card needs 9 - 4 = 5 energy (not 9 - 2 = 7).
 use crate::helpers::*;
+use rabuka_engine::game_setup::{generate_possible_actions, ActionType};
 use rabuka_engine::zones::MemberArea;
 
 const TANG: &str = "PL!SP-bp7-002-R"; // 唐 可可, base cost 2
@@ -237,4 +238,122 @@ fn tang_baton_pass_needs_base_cost_without_bonus() {
 
     let err = game.try_play_to_stage(nine, MemberArea::Center);
     assert!(err.is_err(), "base cost 2 needs 9-2=7 energy, 5 not enough → fail; got: {:?}", err);
+}
+
+// ═════════════════════════════════════════════════════════════════════════
+// Action gate (game_setup) + paid-energy checks
+// ═════════════════════════════════════════════════════════════════════════
+/// Find the PlayMemberToStage action for `card_id` in the generated gate.
+fn gate_action_for(game: &TestGame, card_id: i16) -> rabuka_engine::game_setup::Action {
+    generate_possible_actions(&game.state)
+        .into_iter()
+        .find(|a| {
+            a.action_type == ActionType::PlayMemberToStage
+                && a.parameters.as_ref().and_then(|p| p.card_id) == Some(card_id)
+        })
+        .expect("PlayMemberToStage action must be offered")
+}
+
+/// The UI gate must offer the DISCOUNTED baton cost (9 - 4 = 5), not printed 7.
+#[test]
+fn tang_gate_offers_discounted_baton_cost() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db.clone());
+    let t = place_tang(&mut game, 7);
+    assert_eq!(cost_mod(&game, t), 2, "setup: +2 modifier present");
+
+    let nine = game.id(COST9);
+    game.add_to_hand(nine);
+
+    let action = gate_action_for(&game, nine);
+    let areas = action.parameters.as_ref().and_then(|p| p.available_areas.as_ref()).expect("areas present");
+    let center = areas.iter().find(|a| a.area == "center").expect("center area present");
+    assert!(center.available && center.is_baton_touch, "center baton must be available");
+    assert_eq!(center.cost, 5, "gate must show discounted 9-4=5, not printed 9-2=7");
+    // Mini buttons / headers read final_cost first — must carry the area price.
+    assert_eq!(
+        action.parameters.as_ref().and_then(|p| p.final_cost),
+        Some(5),
+        "action final_cost must be the discounted 5 so .btn.action-btn.mini shows it"
+    );
+}
+
+/// Without the bonus (equal energy → condition fails) the gate shows base 9-2=7.
+#[test]
+fn tang_gate_without_bonus_offers_base_cost() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db.clone());
+    let t = game.id(TANG);
+    game.state.player1.stage.stage = [-1, t, -1];
+    for _ in 0..7 {
+        game.state.player1.energy_zone.cards.push(game.id(ENERGY));
+        game.state.player2.energy_zone.cards.push(game.id(ENERGY));
+    }
+    game.state.player1.energy_zone.add_active(7);
+    game.state.player2.energy_zone.add_active(7);
+    game.state.recalculate_constants();
+    assert_eq!(cost_mod(&game, t), 0, "setup: no +2 (equal energy)");
+
+    let nine = game.id(COST9);
+    game.add_to_hand(nine);
+
+    let action = gate_action_for(&game, nine);
+    let areas = action.parameters.as_ref().and_then(|p| p.available_areas.as_ref()).expect("areas present");
+    let center = areas.iter().find(|a| a.area == "center").expect("center area present");
+    assert_eq!(center.cost, 7, "gate must show base 9-2=7 without bonus");
+    assert_eq!(
+        action.parameters.as_ref().and_then(|p| p.final_cost),
+        Some(7),
+        "action final_cost must be base 7 without bonus"
+    );
+}
+
+/// Paid energy must equal the discounted price: 5 active → 0 remaining.
+#[test]
+fn tang_baton_pays_discounted_energy() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db.clone());
+    let t = place_tang(&mut game, 7);
+    assert_eq!(cost_mod(&game, t), 2, "setup: +2 modifier present");
+
+    let nine = game.id(COST9);
+    game.add_to_hand(nine);
+    game.state.player1.energy_zone.set_active_count(5);
+    assert_eq!(game.state.player1.energy_zone.active_count(), 5);
+
+    game.try_play_to_stage(nine, MemberArea::Center).expect("9-4=5 must succeed");
+    assert_eq!(
+        game.state.player1.energy_zone.active_count(),
+        0,
+        "paid exactly 5 (discounted), not 7"
+    );
+    assert!(game.state.player1.waitroom.cards.contains(&t), "Keke baton-touched to waitroom");
+    assert_eq!(game.state.player1.stage.stage[1], nine, "9-cost occupies center");
+}
+
+/// 唐可可's own play cost from hand is unaffected (base 2): the +2 applies only
+/// once she is on stage, so deploying her to an empty area costs 2 and the
+/// gate offers 2.
+#[test]
+fn tang_own_play_cost_unaffected() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db.clone());
+    game.give_energy(7);
+    game.state.recalculate_constants();
+
+    let t = game.id(TANG);
+    game.add_to_hand(t);
+
+    let action = gate_action_for(&game, t);
+    let areas = action.parameters.as_ref().and_then(|p| p.available_areas.as_ref()).expect("areas present");
+    let center = areas.iter().find(|a| a.area == "center").expect("center area present");
+    assert!(center.available && !center.is_baton_touch, "empty center: normal play");
+    assert_eq!(center.cost, 2, "own play cost is base 2, not +2");
+
+    game.try_play_to_stage(t, MemberArea::Center).expect("play Keke for base cost");
+    assert_eq!(
+        game.state.player1.energy_zone.active_count(),
+        5,
+        "paid base 2 from 7 → 5 remaining"
+    );
 }

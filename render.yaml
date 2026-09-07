@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: rabuka-server
+    runtime: docker
+    repo: https://github.com/trioskosmos/rabuka_reloaded
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    plan: free
+    region: oregon
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: PORT
+        value: "8080"
+      - key: RUST_LOG
+        value: "info"

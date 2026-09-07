@@ -35,6 +35,11 @@ jobs:
           cp -r web_ui/css docs/css
           cp web_ui/card_browser.html web_ui/deck_converter.html web_ui/tutorial.html docs/
 
+      - name: Inject backend URL for GitHub Pages
+        run: |
+          BACKEND_URL="${{ secrets.RABUKA_BACKEND_URL || 'https://your-rabuka-server.onrender.com' }}"
+          sed -i "s|<head>|<head>\n    <meta name=\"rabuka-backend-url\" content=\"${BACKEND_URL}\">|" docs/index.html
+
       - name: Setup Pages
         uses: actions/configure-pages@v5
 

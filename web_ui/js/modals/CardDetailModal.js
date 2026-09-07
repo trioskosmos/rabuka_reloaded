@@ -207,7 +207,7 @@ function render() {
                     const header = document.createElement('div');
                     header.className = 'card-detail-play-header';
                     const energyIcon = '<img src="img/texticon/icon_energy.png" style="height:12px;vertical-align:middle;">';
-                    const displayCost = firstA.parameters?.base_cost ?? 0;
+                    const displayCost = firstA.parameters?.final_cost ?? firstA.parameters?.base_cost ?? 0;
                     let cleanName = firstA.parameters?.card_name ?? firstA.description ?? 'Unknown';
                     if (State.currentLang === 'en' && firstA.parameters?.card_id !== undefined) {
                         const sourceCard = State.resolveCardData(firstA.parameters.card_id);

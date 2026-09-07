@@ -1,14 +1,14 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-09-03T11:23:59.216835+00:00",
+  "generated_at": "2026-09-07T08:46:46.473697+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
     "total_abilities": 2011,
     "unique_abilities": 936
   },
-  "n_files": 574,
-  "n_tests": 3272,
+  "n_files": 575,
+  "n_tests": 3282,
   "total_cards": 771,
   "covered_cards": 771,
   "abilities_on_covered": 936,
@@ -309,10 +309,10 @@
     ]
   },
   "depth_counts": {
-    "L2+choice": 710,
-    "L1+choice": 160,
-    "L2": 24,
-    "L1": 42
+    "L2+choice": 836,
+    "L1+choice": 34,
+    "L2": 49,
+    "L1": 17
   },
   "qa_rulings": {
     "covered": 280,
@@ -469,6 +469,7 @@
         "engine/tests/test_modules/integration/gameplay_test.rs",
         "engine/tests/test_modules/integration/hard_abilities_tier_test.rs",
         "engine/tests/test_modules/integration/parser_issues_e2e_test.rs",
+        "engine/tests/test_modules/jidou/complex/bp7_005_ren_scope_test.rs",
         "engine/tests/test_modules/jidou/complex/card_ability_tests.rs",
         "engine/tests/test_modules/jidou/complex/choice_bullet_test.rs",
         "engine/tests/test_modules/jidou/complex/ll_bp7_001_triple_member_test.rs",
@@ -511,7 +512,7 @@
         "bp6009_center_side_blade2_members_live_total_plus1",
         "bp7024_debut_heart01_with_three_r3birth"
       ],
-      "covering_test_count": 458,
+      "covering_test_count": 462,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -2135,10 +2136,10 @@
       ],
       "base": "PL!HS-bp1-011",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/batches/untested_abilities_batch20_test.rs",
         "engine/tests/test_modules/batches/untested_abilities_batch23_test.rs"
@@ -4241,10 +4242,10 @@
       ],
       "base": "PL!S-bp3-001",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/abilities/simple/chika_center_cost_test.rs",
         "engine/tests/test_modules/jidou/complex/chika_test.rs"
@@ -5540,10 +5541,10 @@
       ],
       "base": "PL!SP-bp4-005",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/abilities/complex/ren_bp4_test.rs"
       ],
@@ -5577,10 +5578,10 @@
       ],
       "base": "PL!SP-bp4-005",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/abilities/complex/ren_bp4_test.rs"
       ],
@@ -5614,10 +5615,10 @@
       ],
       "base": "PL!SP-bp4-008",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/abilities/moderate/sp_bp4_008_position_test.rs",
         "engine/tests/test_modules/jidou/moderate/chisato_jidou_move_analysis_test.rs"
@@ -5656,10 +5657,10 @@
       ],
       "base": "PL!SP-bp4-008",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/abilities/moderate/sp_bp4_008_position_test.rs",
         "engine/tests/test_modules/jidou/moderate/chisato_jidou_move_analysis_test.rs"
@@ -5698,10 +5699,10 @@
       ],
       "base": "PL!SP-bp4-008",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/abilities/moderate/sp_bp4_008_position_test.rs",
         "engine/tests/test_modules/jidou/moderate/chisato_jidou_move_analysis_test.rs"
@@ -6844,10 +6845,10 @@
       ],
       "base": "PL!SP-bp5-002",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/abilities/complex/keke_bp5_test.rs",
         "engine/tests/test_modules/abilities/simple/sp_bp5_leftside_cost_test.rs"
@@ -6984,6 +6985,7 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/abilities/moderate/sumire_bp5_test.rs",
+        "engine/tests/test_modules/jidou/complex/bp7_005_ren_scope_test.rs",
         "engine/tests/test_modules/jidou/moderate/trigger_card_integration_test.rs"
       ],
       "covering_tests": [
@@ -6991,6 +6993,8 @@
         "keke_position_change_swapping_with_natsumi_triggers_natsumi",
         "keke_position_change_swapping_with_sumire_triggers_sumire",
         "opponent_energy_effect_triggers_hazuki_but_not_sumire",
+        "ren_real_swap_move_no_blade",
+        "ren_real_tutor_parks_under_no_blade",
         "sumire_formation_change_triggers",
         "sumire_hazuki_energy_placement_triggers",
         "sumire_keke_skip_no_trigger",
@@ -6998,6 +7002,8 @@
         "sumire_kinako_swap_triggers_sumire",
         "sumire_opponent_effect_move_no_trigger",
         "sumire_position_change_then_energy_use_limit_blocks_second",
+        "sumire_real_debut_places_energy_fires",
+        "sumire_real_swap_fires",
         "sumire_turn_two_limit_resets",
         "test_sumire_area_move_triggers_draw_and_heart",
         "test_sumire_energy_effect_triggers",
@@ -7008,7 +7014,7 @@
         "test_sumire_other_card_move_triggers",
         "test_sumire_use_limit_blocks_second"
       ],
-      "covering_test_count": 20,
+      "covering_test_count": 24,
       "is_null": false,
       "use_limit": 1,
       "watches_abilities": false,
@@ -7937,10 +7943,10 @@
       ],
       "base": "PL!-bp6-006",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/abilities/complex/maki_bp6_006_reveal_test.rs",
         "engine/tests/test_modules/abilities/complex/pl_bp6_006_test.rs"
@@ -8327,10 +8333,10 @@
       ],
       "base": "PL!HS-bp6-001",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/abilities/simple/look_and_select_test.rs"
       ],
@@ -8373,10 +8379,10 @@
       ],
       "base": "PL!HS-bp6-001",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/abilities/simple/look_and_select_test.rs"
       ],
@@ -9843,6 +9849,7 @@
         "engine/tests/test_modules/jidou/complex/ability_combination_test.rs",
         "engine/tests/test_modules/jidou/complex/bp7_005_ren_ab0_test.rs",
         "engine/tests/test_modules/jidou/complex/bp7_005_ren_jidou_test.rs",
+        "engine/tests/test_modules/jidou/complex/bp7_005_ren_scope_test.rs",
         "engine/tests/test_modules/jidou/complex/bp7_ren_both_trigger_test.rs",
         "engine/tests/test_modules/jidou/complex/bp7_ren_energy_placed_gain_blade_test.rs",
         "engine/tests/test_modules/jidou/complex/trigger_scope_test.rs"
@@ -9877,9 +9884,9 @@
         "ren_opponent_energy_move_does_not_trigger",
         "ren_other_member_appearance_does_not_trigger",
         "ren_placed_energy_is_wait_not_active",
-        "ren_verdicts_show_energy_leg_pass"
+        "ren_real_swap_move_no_blade"
       ],
-      "covering_test_count": 38,
+      "covering_test_count": 42,
       "is_null": false,
       "use_limit": 1,
       "watches_abilities": false,
@@ -9915,6 +9922,7 @@
         "engine/tests/test_modules/jidou/complex/ability_combination_test.rs",
         "engine/tests/test_modules/jidou/complex/bp7_005_ren_ab0_test.rs",
         "engine/tests/test_modules/jidou/complex/bp7_005_ren_jidou_test.rs",
+        "engine/tests/test_modules/jidou/complex/bp7_005_ren_scope_test.rs",
         "engine/tests/test_modules/jidou/complex/bp7_ren_both_trigger_test.rs",
         "engine/tests/test_modules/jidou/complex/bp7_ren_energy_placed_gain_blade_test.rs",
         "engine/tests/test_modules/jidou/complex/trigger_scope_test.rs"
@@ -9949,9 +9957,9 @@
         "ren_opponent_energy_move_does_not_trigger",
         "ren_other_member_appearance_does_not_trigger",
         "ren_placed_energy_is_wait_not_active",
-        "ren_verdicts_show_energy_leg_pass"
+        "ren_real_swap_move_no_blade"
       ],
-      "covering_test_count": 38,
+      "covering_test_count": 42,
       "is_null": false,
       "use_limit": 2,
       "watches_abilities": false,
@@ -10300,10 +10308,10 @@
       ],
       "base": "PL!-PR-012",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/batches/untested_abilities_batch10_test.rs",
         "engine/tests/test_modules/batches/untested_abilities_batch18_test.rs",
@@ -10521,15 +10529,20 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/abilities/simple/setsuna_test.rs"
+        "engine/tests/test_modules/abilities/simple/setsuna_test.rs",
+        "engine/tests/test_modules/jidou/complex/bp7_005_ren_scope_test.rs"
       ],
       "covering_tests": [
+        "ren_real_swap_move_no_blade",
+        "ren_real_tutor_parks_under_no_blade",
         "setsuna_debuts_to_vacated_area_not_stage_first_empty",
         "setsuna_energy_placed_under_vacated_area_not_center",
         "setsuna_q157_wait_energy_can_be_placed_under_member",
-        "setsuna_q184_energy_under_member_not_counted"
+        "setsuna_q184_energy_under_member_not_counted",
+        "sumire_real_debut_places_energy_fires",
+        "sumire_real_swap_fires"
       ],
-      "covering_test_count": 4,
+      "covering_test_count": 8,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -11658,10 +11671,10 @@
       ],
       "base": "PL!SP-sd1-011",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/abilities/complex/keke_bp5_test.rs"
       ],
@@ -12048,10 +12061,10 @@
       ],
       "base": "PL!-bp5-002",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/abilities/simple/eli_sequential_cost_test.rs"
       ],
@@ -12691,10 +12704,10 @@
       ],
       "base": "PL!N-bp5-002",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/abilities/complex/mute_kibiriver_test.rs",
         "engine/tests/test_modules/abilities/moderate/kasumi_bp5_002_heart_greater_test.rs"
@@ -12735,10 +12748,10 @@
       ],
       "base": "PL!N-bp5-003",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/abilities/complex/shizuku_bp5_test.rs",
         "engine/tests/test_modules/edge_cases/bp5_003_shizuku_edge_test.rs"
@@ -12894,10 +12907,10 @@
       ],
       "base": "PL!N-bp5-008",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/abilities/simple/emma_bp5_test.rs"
       ],
@@ -13640,10 +13653,10 @@
       ],
       "base": "PL!HS-bp5-007",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/qa/qa_new_tests209.rs"
       ],
@@ -13682,10 +13695,10 @@
       ],
       "base": "PL!HS-bp5-007",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/qa/qa_new_tests209.rs"
       ],
@@ -13724,10 +13737,10 @@
       ],
       "base": "PL!HS-bp5-008",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/jidou/moderate/izumi_bp5_test.rs"
       ],
@@ -13993,7 +14006,7 @@
         "ayumu_constant_three_live_cards_still_gains_blade",
         "ayumu_constant_two_live_cards_gains_blade"
       ],
-      "covering_test_count": 862,
+      "covering_test_count": 864,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -14149,10 +14162,10 @@
       ],
       "base": "PL!-PR-018",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/abilities/simple/edelnote_test.rs"
       ],
@@ -14187,10 +14200,10 @@
       ],
       "base": "PL!-PR-020",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/batches/untested_abilities_batch9_test.rs"
       ],
@@ -14374,10 +14387,10 @@
       ],
       "base": "PL!S-PR-039",
       "covered": true,
-      "depth": "L1",
+      "depth": "L2",
       "has_assert": true,
       "has_choice": false,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/batches/untested_abilities_batch13_test.rs"
       ],
@@ -14661,10 +14674,10 @@
       ],
       "base": "PL!HS-PR-020",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/abilities/simple/edelnote_test.rs",
         "engine/tests/test_modules/jidou/moderate/awake_test.rs"
@@ -15022,10 +15035,10 @@
       ],
       "base": "PL!N-bp1-011",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/abilities/simple/mia_test.rs"
       ],
@@ -15264,10 +15277,10 @@
       ],
       "base": "PL!SP-bp1-010",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/batches/untested_abilities_batch53_test.rs"
       ],
@@ -15543,10 +15556,10 @@
       ],
       "base": "PL!N-sd1-009",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/abilities/simple/kasumi_turn_limit_test.rs",
         "engine/tests/test_modules/qa/qa_new_tests209.rs"
@@ -15703,10 +15716,10 @@
       ],
       "base": "PL!SP-pb1-004",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/abilities/moderate/l0_gap_livesuccess3_test.rs",
         "engine/tests/test_modules/abilities/simple/sp_pb1_004_live_test.rs"
@@ -15745,10 +15758,10 @@
       ],
       "base": "PL!SP-pb1-004",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/abilities/moderate/l0_gap_livesuccess3_test.rs",
         "engine/tests/test_modules/abilities/simple/sp_pb1_004_live_test.rs"
@@ -15793,11 +15806,22 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/abilities/moderate/sumire_bp5_test.rs",
+        "engine/tests/test_modules/jidou/complex/bp7_005_ren_scope_test.rs",
         "engine/tests/test_modules/jidou/complex/bp7_ren_energy_placed_gain_blade_test.rs",
+        "engine/tests/test_modules/jidou/complex/toubatsu_test.rs",
+        "engine/tests/test_modules/jidou/moderate/bp7_parser_gap_cards_test.rs",
         "engine/tests/test_modules/jidou/moderate/trigger_card_integration_test.rs"
       ],
       "covering_tests": [
+        "ayumu_empty_energy_deck_no_effect",
+        "ayumu_energy_into_zone_not_under_member_no_trigger",
+        "ayumu_energy_under_member_triggers_energy_deck_move",
         "hazuki_debut_energy_placement_triggers_energy_watchers",
+        "kanon_empty_discard_no_placement_no_draw",
+        "kanon_missing_group_places_present_but_no_draw",
+        "kanon_one_per_group_not_multiple_from_same_group",
+        "kanon_selects_each_group_to_deck_bottom_and_draws",
+        "kanon_skip_placement_no_draw",
         "keke_position_change_swapping_with_natsumi_triggers_natsumi",
         "keke_position_change_swapping_with_sumire_triggers_sumire",
         "opponent_energy_effect_triggers_hazuki_but_not_sumire",
@@ -15807,6 +15831,8 @@
         "ren_ab1_no_energy_placed_no_blade",
         "ren_ab1_opponent_effect_places_energy_no_blade",
         "ren_ab1_own_effect_places_energy_gains_blade",
+        "ren_real_swap_move_no_blade",
+        "ren_real_tutor_parks_under_no_blade",
         "sumire_formation_change_triggers",
         "sumire_hazuki_energy_placement_triggers",
         "sumire_keke_skip_no_trigger",
@@ -15814,17 +15840,11 @@
         "sumire_kinako_swap_triggers_sumire",
         "sumire_opponent_effect_move_no_trigger",
         "sumire_position_change_then_energy_use_limit_blocks_second",
-        "sumire_turn_two_limit_resets",
-        "test_sumire_area_move_triggers_draw_and_heart",
-        "test_sumire_energy_effect_triggers",
-        "test_sumire_energy_phase_no_trigger",
-        "test_sumire_no_event_no_trigger",
-        "test_sumire_opponent_energy_no_trigger",
-        "test_sumire_opponent_no_trigger",
-        "test_sumire_other_card_move_triggers",
-        "test_sumire_use_limit_blocks_second"
+        "sumire_real_debut_places_energy_fires",
+        "sumire_real_swap_fires",
+        "sumire_turn_two_limit_resets"
       ],
-      "covering_test_count": 26,
+      "covering_test_count": 47,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -16074,10 +16094,10 @@
       ],
       "base": "PL!SP-pb1-010",
       "covered": true,
-      "depth": "L1",
+      "depth": "L2",
       "has_assert": true,
       "has_choice": false,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/abilities/moderate/wien_cost_mod_test.rs"
       ],
@@ -16110,10 +16130,10 @@
       ],
       "base": "PL!SP-pb1-011",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/abilities/simple/fuyumari_test.rs"
       ],
@@ -16211,10 +16231,10 @@
       ],
       "base": "PL!SP-pb1-024",
       "covered": true,
-      "depth": "L1",
+      "depth": "L2",
       "has_assert": true,
       "has_choice": false,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/batches/untested_abilities_batch10_test.rs"
       ],
@@ -16556,10 +16576,10 @@
       ],
       "base": "PL!S-bp2-023",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/jidou/complex/mymai_tonight_test.rs"
       ],
@@ -16872,10 +16892,10 @@
       ],
       "base": "PL!SP-bp2-005",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/batches/untested_abilities_batch53_test.rs"
       ],
@@ -16924,6 +16944,8 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/abilities/complex/ability_engine_fixes_test.rs",
+        "engine/tests/test_modules/jidou/complex/bp7_005_ren_scope_test.rs",
+        "engine/tests/test_modules/jidou/complex/toubatsu_test.rs",
         "engine/tests/test_modules/jidou/moderate/position_change_condition_test.rs"
       ],
       "covering_tests": [
@@ -16945,20 +16967,20 @@
         "non_syncrise_member_moves_to_center_no_trigger",
         "other_card_moves_self_target_does_not_trigger",
         "other_syncrise_member_moves_to_center_ability_card_gains_blades",
+        "ren_real_swap_move_no_blade",
+        "ren_real_tutor_parks_under_no_blade",
         "self_target_card_moves_triggers_own_ability",
+        "sumire_real_debut_places_energy_fires",
+        "sumire_real_swap_fires",
         "syncrise_member_moves_to_center_triggers_blade_gain",
         "syncrise_member_moves_to_non_center_no_trigger",
-        "wakana_008_choice_is_select_target_not_yes_no",
-        "wakana_008_debut_both_occupied_swap_either",
-        "wakana_008_debut_center_swap_with_left_occupant",
-        "wakana_008_debut_center_to_empty_left",
-        "wakana_008_debut_draw_last_card_then_move",
-        "wakana_008_debut_empty_deck_draw_noop_then_move",
-        "wakana_008_debut_left_swap_with_center_occupant",
-        "wakana_008_debut_left_to_empty_center",
-        "wakana_008_debut_move_to_empty_area"
+        "toubatsu_duplicate_names_in_discard_opponent_only_sees_correct_cards",
+        "toubatsu_q118_1_live_card_fails",
+        "toubatsu_q118_2_distinct_live_cards_works",
+        "toubatsu_q263_center_to_area_move_triggers_auto",
+        "toubatsu_real_swap_move_triggers_auto"
       ],
-      "covering_test_count": 44,
+      "covering_test_count": 54,
       "is_null": false,
       "use_limit": 1,
       "watches_abilities": false,
@@ -17007,9 +17029,11 @@
         "toubatsu_duplicate_names_in_discard_opponent_only_sees_correct_cards",
         "toubatsu_q118_1_live_card_fails",
         "toubatsu_q118_2_distinct_live_cards_works",
-        "toubatsu_q263_center_to_area_move_triggers_auto"
+        "toubatsu_q263_center_to_area_move_triggers_auto",
+        "toubatsu_real_swap_move_triggers_auto",
+        "toubatsu_unrelated_debut_no_trigger"
       ],
-      "covering_test_count": 17,
+      "covering_test_count": 19,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -17032,10 +17056,10 @@
       ],
       "base": "PL!SP-bp2-023",
       "covered": true,
-      "depth": "L1",
+      "depth": "L2",
       "has_assert": true,
       "has_choice": false,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/batches/untested_abilities_batch10_test.rs"
       ],
@@ -17448,10 +17472,10 @@
       ],
       "base": "PL!HS-bp2-016",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/abilities/simple/look_and_select_test.rs"
       ],
@@ -17529,10 +17553,10 @@
       ],
       "base": "PL!HS-bp2-024",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/abilities/complex/ladybug_test.rs"
       ],
@@ -18472,10 +18496,10 @@
       ],
       "base": "PL!S-bp3-002",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/abilities/complex/chika_bp7_conditional_result_test.rs"
       ],
@@ -19161,10 +19185,10 @@
       ],
       "base": "PL!-pb1-001",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/abilities/complex/candidate_pool_builder_test.rs",
         "engine/tests/test_modules/abilities/moderate/honoka_test.rs"
@@ -19207,10 +19231,10 @@
       ],
       "base": "PL!-pb1-002",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/abilities/complex/l0_gap_constant5_test.rs",
         "engine/tests/test_modules/jidou/complex/maki_pb1_test.rs"
@@ -19249,10 +19273,10 @@
       ],
       "base": "PL!-pb1-002",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/abilities/complex/l0_gap_constant5_test.rs",
         "engine/tests/test_modules/jidou/complex/maki_pb1_test.rs"
@@ -19691,10 +19715,10 @@
       ],
       "base": "PL!-pb1-011",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/abilities/complex/joint_card_live_start_test.rs",
         "engine/tests/test_modules/jidou/complex/maki_pb1_test.rs"
@@ -19781,10 +19805,10 @@
       ],
       "base": "PL!-pb1-013",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/abilities/complex/umi_pb1_013_test.rs"
       ],
@@ -19980,10 +20004,10 @@
       ],
       "base": "PL!-pb1-016",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/batches/untested_abilities_batch53_test.rs"
       ],
@@ -20217,10 +20241,10 @@
       ],
       "base": "PL!-bp4-006",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/batches/untested_abilities_batch51_test.rs"
       ],
@@ -20368,10 +20392,10 @@
       ],
       "base": "PL!-bp4-016",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/abilities/complex/pl_bp6_006_test.rs"
       ],
@@ -20595,10 +20619,10 @@
       ],
       "base": "PL!N-bp4-006",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/jidou/complex/konata_bp4_test.rs"
       ],
@@ -20997,10 +21021,10 @@
       ],
       "base": "PL!SP-bp4-006",
       "covered": true,
-      "depth": "L1",
+      "depth": "L2",
       "has_assert": true,
       "has_choice": false,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/batches/untested_abilities_batch18_test.rs"
       ],
@@ -21411,10 +21435,10 @@
       ],
       "base": "PL!SP-bp4-026",
       "covered": true,
-      "depth": "L1",
+      "depth": "L2",
       "has_assert": true,
       "has_choice": false,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/batches/untested_abilities_batch18_test.rs"
       ],
@@ -21446,10 +21470,10 @@
       ],
       "base": "PL!SP-bp4-026",
       "covered": true,
-      "depth": "L1",
+      "depth": "L2",
       "has_assert": true,
       "has_choice": false,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/batches/untested_abilities_batch18_test.rs"
       ],
@@ -22601,10 +22625,10 @@
       ],
       "base": "PL!N-pb1-013",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/abilities/simple/ayumu_pb1_test.rs",
         "engine/tests/test_modules/qa/qa_new_tests202.rs"
@@ -22640,10 +22664,10 @@
       ],
       "base": "PL!N-pb1-014",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/batches/untested_abilities_batch23_test.rs"
       ],
@@ -22715,10 +22739,10 @@
       ],
       "base": "PL!N-pb1-016",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/batches/untested_abilities_batch51_test.rs"
       ],
@@ -22840,10 +22864,10 @@
       ],
       "base": "PL!N-pb1-019",
       "covered": true,
-      "depth": "L1",
+      "depth": "L2",
       "has_assert": true,
       "has_choice": false,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/batches/untested_abilities_batch24_test.rs"
       ],
@@ -22875,10 +22899,10 @@
       ],
       "base": "PL!N-pb1-020",
       "covered": true,
-      "depth": "L1",
+      "depth": "L2",
       "has_assert": true,
       "has_choice": false,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/batches/untested_abilities_batch24_test.rs"
       ],
@@ -22910,10 +22934,10 @@
       ],
       "base": "PL!N-pb1-021",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/batches/untested_abilities_batch53_test.rs"
       ],
@@ -23034,10 +23058,10 @@
       ],
       "base": "PL!N-pb1-024",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/batches/untested_abilities_batch53_test.rs"
       ],
@@ -24141,10 +24165,10 @@
       ],
       "base": "PL!HS-pb1-004",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/batches/untested_abilities_batch53_test.rs"
       ],
@@ -24669,10 +24693,10 @@
       ],
       "base": "PL!HS-pb1-013",
       "covered": true,
-      "depth": "L1",
+      "depth": "L2",
       "has_assert": true,
       "has_choice": false,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/batches/untested_abilities_batch10_test.rs"
       ],
@@ -24707,10 +24731,10 @@
       ],
       "base": "PL!HS-pb1-013",
       "covered": true,
-      "depth": "L1",
+      "depth": "L2",
       "has_assert": true,
       "has_choice": false,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/batches/untested_abilities_batch10_test.rs"
       ],
@@ -24987,10 +25011,10 @@
       ],
       "base": "PL!-bp6-002",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/abilities/moderate/card_filter_test.rs"
       ],
@@ -25026,10 +25050,10 @@
       ],
       "base": "PL!-bp6-004",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/abilities/moderate/card_filter_test.rs"
       ],
@@ -25065,10 +25089,10 @@
       ],
       "base": "PL!-bp6-005",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/abilities/moderate/card_filter_test.rs",
         "engine/tests/test_modules/abilities/moderate/rin_bp6_test.rs"
@@ -25108,10 +25132,10 @@
       ],
       "base": "PL!-bp6-008",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/abilities/simple/hanayo_bp6_test.rs"
       ],
@@ -25144,10 +25168,10 @@
       ],
       "base": "PL!-bp6-009",
       "covered": true,
-      "depth": "L1",
+      "depth": "L2",
       "has_assert": true,
       "has_choice": false,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/batches/untested_abilities_batch17_test.rs"
       ],
@@ -25362,10 +25386,10 @@
       ],
       "base": "PL!S-bp6-007",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/batches/untested_abilities_batch9_test.rs"
       ],
@@ -26112,10 +26136,10 @@
       ],
       "base": "PL!SP-pb2-003",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/abilities/moderate/chisato_live_success_test.rs"
       ],
@@ -26151,10 +26175,10 @@
       ],
       "base": "PL!SP-pb2-004",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/batches/untested_abilities_batch9_test.rs"
       ],
@@ -26408,10 +26432,10 @@
       ],
       "base": "PL!SP-pb2-007",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/batches/untested_abilities_batch53_test.rs"
       ],
@@ -26599,10 +26623,10 @@
       ],
       "base": "PL!SP-pb2-011",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/jidou/complex/ability_chain_combo_test.rs",
         "engine/tests/test_modules/jidou/complex/toubatsu_test.rs"
@@ -26615,9 +26639,11 @@
         "toubatsu_duplicate_names_in_discard_opponent_only_sees_correct_cards",
         "toubatsu_q118_1_live_card_fails",
         "toubatsu_q118_2_distinct_live_cards_works",
-        "toubatsu_q263_center_to_area_move_triggers_auto"
+        "toubatsu_q263_center_to_area_move_triggers_auto",
+        "toubatsu_real_swap_move_triggers_auto",
+        "toubatsu_unrelated_debut_no_trigger"
       ],
-      "covering_test_count": 8,
+      "covering_test_count": 10,
       "is_null": false,
       "use_limit": 1,
       "watches_abilities": false,
@@ -26642,10 +26668,10 @@
       ],
       "base": "PL!SP-pb2-011",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/jidou/complex/ability_chain_combo_test.rs",
         "engine/tests/test_modules/jidou/complex/toubatsu_test.rs"
@@ -26658,9 +26684,11 @@
         "toubatsu_duplicate_names_in_discard_opponent_only_sees_correct_cards",
         "toubatsu_q118_1_live_card_fails",
         "toubatsu_q118_2_distinct_live_cards_works",
-        "toubatsu_q263_center_to_area_move_triggers_auto"
+        "toubatsu_q263_center_to_area_move_triggers_auto",
+        "toubatsu_real_swap_move_triggers_auto",
+        "toubatsu_unrelated_debut_no_trigger"
       ],
-      "covering_test_count": 8,
+      "covering_test_count": 10,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -26683,10 +26711,10 @@
       ],
       "base": "PL!SP-pb2-013",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/abilities/complex/keke_pb2_013_debut_test.rs",
         "engine/tests/test_modules/edge_cases/remaining_comprehensive_edge_test.rs"
@@ -27007,10 +27035,10 @@
       ],
       "base": "PL!S-bp7-001",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/abilities/complex/chika_bp7_conditional_result_test.rs"
       ],
@@ -27631,10 +27659,10 @@
       ],
       "base": "PL!N-bp7-002",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/abilities/moderate/bp7_heart_copy_test.rs"
       ],
@@ -28241,18 +28269,22 @@
       "covering_tests": [
         "tang_baton_pass_fails_without_enough_energy",
         "tang_baton_pass_needs_base_cost_without_bonus",
+        "tang_baton_pays_discounted_energy",
         "tang_below_seven_denies_bonus",
         "tang_condition_met_applies_plus2_once",
         "tang_equal_energy_denies_bonus",
+        "tang_gate_offers_discounted_baton_cost",
+        "tang_gate_without_bonus_offers_base_cost",
         "tang_less_energy_denies_bonus",
         "tang_mirror_equal_energy_neither_gets_bonus",
         "tang_mirror_only_more_energy_side_gets_bonus",
         "tang_modified_cost_reduces_baton_pass_energy",
         "tang_more_energy_high_margin_applies_once",
+        "tang_own_play_cost_unaffected",
         "tang_plus2_turns_off_when_opponent_catches_up",
         "tang_recalculate_is_idempotent"
       ],
-      "covering_test_count": 12,
+      "covering_test_count": 16,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -29402,7 +29434,7 @@
         "q266_cost_b2_waits_blade0_not_blade1",
         "q266_cost_b4_waits_blade2_not_blade3"
       ],
-      "covering_test_count": 61,
+      "covering_test_count": 65,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -29941,10 +29973,10 @@
       ],
       "base": "PL!S-PR-042",
       "covered": true,
-      "depth": "L1",
+      "depth": "L2",
       "has_assert": true,
       "has_choice": false,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/batches/untested_abilities_batch13_test.rs"
       ],
@@ -30395,10 +30427,10 @@
       ],
       "base": "PL!SP-PR-022",
       "covered": true,
-      "depth": "L1",
+      "depth": "L2",
       "has_assert": true,
       "has_choice": false,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/batches/untested_abilities_batch17_test.rs"
       ],
@@ -30471,10 +30503,10 @@
       ],
       "base": "PL!HS-PR-016",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/abilities/simple/hanano_test.rs"
       ],
@@ -31375,10 +31407,10 @@
       ],
       "base": "PL!HS-bp1-022",
       "covered": true,
-      "depth": "L1",
+      "depth": "L2",
       "has_assert": true,
       "has_choice": false,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/jidou/moderate/awake_test.rs"
       ],
@@ -31631,7 +31663,7 @@
         "issue16_hanamaru_opponent_higher_cost_no_blade",
         "issue17_suzu_cost_bonus_condition_met"
       ],
-      "covering_test_count": 60,
+      "covering_test_count": 62,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -31978,10 +32010,10 @@
       ],
       "base": "PL!SP-sd1-026",
       "covered": true,
-      "depth": "L1",
+      "depth": "L2",
       "has_assert": true,
       "has_choice": false,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/batches/untested_abilities_batch15_test.rs"
       ],
@@ -32081,10 +32113,10 @@
       ],
       "base": "PL!SP-pb1-017",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/batches/untested_abilities_batch53_test.rs"
       ],
@@ -32702,10 +32734,10 @@
       ],
       "base": "PL!HS-bp2-017",
       "covered": true,
-      "depth": "L1",
+      "depth": "L2",
       "has_assert": true,
       "has_choice": false,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/batches/untested_abilities_batch13_test.rs"
       ],
@@ -32738,10 +32770,10 @@
       ],
       "base": "PL!HS-bp2-018",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/abilities/complex/hs_bp2_018_live_card_zone_test.rs"
       ],
@@ -33336,10 +33368,10 @@
       ],
       "base": "PL!S-pb1-015",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/abilities/simple/look_and_select_test.rs"
       ],
@@ -33477,10 +33509,10 @@
       ],
       "base": "PL!S-pb1-020",
       "covered": true,
-      "depth": "L1",
+      "depth": "L2",
       "has_assert": true,
       "has_choice": false,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/batches/untested_abilities_batch15_test.rs"
       ],
@@ -33512,10 +33544,10 @@
       ],
       "base": "PL!S-pb1-021",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/abilities/complex/l0_gap_subunit_success_test.rs",
         "engine/tests/test_modules/abilities/complex/opponent_live_success_flow_test.rs",
@@ -33722,10 +33754,10 @@
       ],
       "base": "PL!-bp3-024",
       "covered": true,
-      "depth": "L1",
+      "depth": "L2",
       "has_assert": true,
       "has_choice": false,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/abilities/complex/score_condition_integration_test.rs"
       ],
@@ -33766,10 +33798,10 @@
       ],
       "base": "PL!-bp3-024",
       "covered": true,
-      "depth": "L1",
+      "depth": "L2",
       "has_assert": true,
       "has_choice": false,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/abilities/complex/score_condition_integration_test.rs"
       ],
@@ -34855,10 +34887,10 @@
       ],
       "base": "PL!-pb1-028",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/abilities/complex/l0_gap_subunit_success_test.rs",
         "engine/tests/test_modules/abilities/moderate/wao_wao_test.rs"
@@ -34927,10 +34959,10 @@
       ],
       "base": "PL!-pb1-030",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/abilities/complex/l0_gap_subunit_success_test.rs",
         "engine/tests/test_modules/abilities/moderate/b9_more_test.rs"
@@ -34977,10 +35009,10 @@
       ],
       "base": "PL!-pb1-030",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/abilities/complex/l0_gap_subunit_success_test.rs",
         "engine/tests/test_modules/abilities/moderate/b9_more_test.rs"
@@ -35027,10 +35059,10 @@
       ],
       "base": "PL!-pb1-031",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/abilities/moderate/b9_more_test.rs"
       ],
@@ -35588,10 +35620,10 @@
       ],
       "base": "PL!-bp4-024",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/batches/untested_abilities_batch46_test.rs"
       ],
@@ -35625,10 +35657,10 @@
       ],
       "base": "PL!N-bp4-018",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/jidou/complex/konata_bp4_test.rs"
       ],
@@ -36499,10 +36531,10 @@
       ],
       "base": "LL-bp4-001",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/abilities/complex/joint_card_live_start_test.rs"
       ],
@@ -37057,10 +37089,10 @@
       ],
       "base": "PL!-bp5-023",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/jidou/moderate/modify_required_hearts_exclude_heart_test.rs"
       ],
@@ -37092,10 +37124,10 @@
       ],
       "base": "PL!S-bp5-010",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/abilities/complex/pl_s_bp5_010_test.rs",
         "engine/tests/test_modules/jidou/complex/s_bp5_010_global_heart_test.rs"
@@ -37484,10 +37516,10 @@
       ],
       "base": "PL!N-bp5-015",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/batches/untested_abilities_batch42_test.rs"
       ],
@@ -37710,10 +37742,10 @@
       ],
       "base": "PL!N-bp5-029",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/abilities/complex/mute_kibiriver_test.rs"
       ],
@@ -37745,10 +37777,10 @@
       ],
       "base": "PL!N-bp5-030",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/integration/victory_road_test.rs",
         "engine/tests/test_modules/jidou/complex/ability_resolution_watcher_test.rs"
@@ -37800,10 +37832,10 @@
       ],
       "base": "PL!N-bp5-030",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/integration/victory_road_test.rs",
         "engine/tests/test_modules/jidou/complex/ability_resolution_watcher_test.rs"
@@ -38154,10 +38186,10 @@
       ],
       "base": "PL!SP-bp5-020",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/abilities/moderate/l0_gap_livesuccess3_test.rs"
       ],
@@ -38360,10 +38392,10 @@
       ],
       "base": "PL!SP-bp5-026",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/batches/untested_abilities_batch48_test.rs"
       ],
@@ -38464,10 +38496,10 @@
       ],
       "base": "PL!HS-bp5-013",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/batches/untested_abilities_batch46_test.rs"
       ],
@@ -38784,10 +38816,10 @@
       ],
       "base": "PL!HS-bp5-020",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/integration/victory_road_test.rs"
       ],
@@ -40024,10 +40056,10 @@
       ],
       "base": "PL!HS-sd1-017",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/batches/untested_abilities_batch32_test.rs"
       ],
@@ -40482,10 +40514,10 @@
       ],
       "base": "PL!S-sd1-006",
       "covered": true,
-      "depth": "L1",
+      "depth": "L2",
       "has_assert": true,
       "has_choice": false,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/batches/upper_batch_on_yell_test.rs"
       ],
@@ -40678,10 +40710,10 @@
       ],
       "base": "PL!S-sd1-020",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/jidou/complex/mymai_tonight_test.rs",
         "engine/tests/test_modules/jidou/moderate/jimo_ai_dash_test.rs"
@@ -40759,10 +40791,10 @@
       ],
       "base": "PL!HS-pb1-018",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/batches/untested_abilities_batch53_test.rs"
       ],
@@ -40848,10 +40880,10 @@
       ],
       "base": "PL!HS-pb1-021",
       "covered": true,
-      "depth": "L1",
+      "depth": "L2",
       "has_assert": true,
       "has_choice": false,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/batches/untested_abilities_batch12_test.rs"
       ],
@@ -41210,10 +41242,10 @@
       ],
       "base": "PL!HS-pb1-030",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/abilities/simple/edelnote_test.rs",
         "engine/tests/test_modules/qa/qa_new_tests209.rs"
@@ -41298,10 +41330,10 @@
       ],
       "base": "PL!-bp6-012",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/abilities/complex/l0_gap_subunit_success_test.rs",
         "engine/tests/test_modules/abilities/moderate/card_filter_test.rs"
@@ -41443,10 +41475,10 @@
       ],
       "base": "PL!-bp6-016",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/batches/untested_abilities_batch32_test.rs"
       ],
@@ -41768,10 +41800,10 @@
       ],
       "base": "PL!-bp6-024",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/qa/qa_new_tests256.rs",
         "engine/tests/test_modules/qa/qa_new_tests257.rs"
@@ -42033,10 +42065,10 @@
       ],
       "base": "PL!S-bp6-020",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/jidou/complex/choice_bullet_test.rs",
         "engine/tests/test_modules/jidou/complex/kuroe_dia_bp6_test.rs"
@@ -42288,10 +42320,10 @@
       ],
       "base": "PL!HS-bp6-009",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/batches/untested_abilities_batch46_test.rs"
       ],
@@ -42325,10 +42357,10 @@
       ],
       "base": "PL!HS-bp6-010",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/abilities/simple/sayaka_bp6_test.rs"
       ],
@@ -42422,10 +42454,10 @@
       ],
       "base": "PL!HS-bp6-012",
       "covered": true,
-      "depth": "L1",
+      "depth": "L2",
       "has_assert": true,
       "has_choice": false,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/batches/untested_abilities_batch12_test.rs"
       ],
@@ -42650,10 +42682,10 @@
       ],
       "base": "PL!HS-bp6-017",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/jidou/complex/hanabiko_discard_test.rs"
       ],
@@ -43025,10 +43057,10 @@
       ],
       "base": "PL!HS-bp6-030",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/batches/untested_abilities_batch49_test.rs"
       ],
@@ -43164,10 +43196,10 @@
       ],
       "base": "LL-bp6-001",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/abilities/complex/joint_card_live_start_test.rs",
         "engine/tests/test_modules/qa/qa_new_tests246.rs"
@@ -43215,10 +43247,10 @@
       ],
       "base": "LL-bp6-001",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/abilities/complex/joint_card_live_start_test.rs",
         "engine/tests/test_modules/qa/qa_new_tests246.rs"
@@ -43300,10 +43332,10 @@
       ],
       "base": "PL!HS-cl1-002",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/batches/untested_abilities_batch48_test.rs",
         "engine/tests/test_modules/batches/untested_abilities_batch49_test.rs"
@@ -43342,10 +43374,10 @@
       ],
       "base": "PL!HS-cl1-003",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/abilities/simple/bp4_live_start_change_state_gain_test.rs",
         "engine/tests/test_modules/edge_cases/hs_cl1_003_edge_test.rs"
@@ -43379,10 +43411,10 @@
       ],
       "base": "PL!HS-cl1-004",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/batches/untested_abilities_batch49_test.rs"
       ],
@@ -43458,10 +43490,10 @@
       ],
       "base": "PL!HS-cl1-008",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/batches/untested_abilities_batch48_test.rs"
       ],
@@ -43536,10 +43568,10 @@
       ],
       "base": "PL!HS-cl1-010",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/batches/untested_abilities_batch49_test.rs"
       ],
@@ -43618,10 +43650,10 @@
       ],
       "base": "PL!HS-cl1-012",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/batches/untested_abilities_batch50_test.rs"
       ],
@@ -44478,10 +44510,10 @@
       ],
       "base": "PL!SP-pb2-030",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/batches/untested_abilities_batch50_test.rs"
       ],
@@ -44837,10 +44869,10 @@
       ],
       "base": "PL!SP-pb2-049",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/abilities/moderate/neutral_live_success_test.rs"
       ],
@@ -44874,10 +44906,10 @@
       ],
       "base": "PL!SP-pb2-049",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/abilities/moderate/neutral_live_success_test.rs"
       ],
@@ -44954,10 +44986,10 @@
       ],
       "base": "PL!SP-sd1-026",
       "covered": true,
-      "depth": "L1",
+      "depth": "L2",
       "has_assert": true,
       "has_choice": false,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/batches/untested_abilities_batch15_test.rs"
       ],
@@ -45101,10 +45133,10 @@
       ],
       "base": "PL!S-bp7-010",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/batches/untested_abilities_batch9_test.rs"
       ],
@@ -45180,10 +45212,10 @@
       ],
       "base": "PL!S-bp7-012",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/jidou/complex/bp7_kanan_formation_change_test.rs"
       ],
@@ -45214,10 +45246,10 @@
       ],
       "base": "PL!S-bp7-013",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/batches/untested_abilities_batch9_test.rs"
       ],
@@ -45457,10 +45489,10 @@
       ],
       "base": "PL!S-bp7-019",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/batches/untested_abilities_batch32_test.rs"
       ],
@@ -45496,10 +45528,10 @@
       ],
       "base": "PL!S-bp7-021",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/batches/untested_abilities_batch9_test.rs"
       ],
@@ -45588,10 +45620,10 @@
       ],
       "base": "PL!S-bp7-024",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/batches/untested_abilities_batch25_test.rs",
         "engine/tests/test_modules/batches/untested_abilities_batch50_test.rs"
@@ -45627,10 +45659,10 @@
       ],
       "base": "PL!S-bp7-025",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/batches/untested_abilities_batch9_test.rs"
       ],
@@ -46051,10 +46083,10 @@
       ],
       "base": "PL!N-bp7-023",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/batches/untested_abilities_batch44_test.rs"
       ],
@@ -46087,10 +46119,10 @@
       ],
       "base": "PL!N-bp7-024",
       "covered": true,
-      "depth": "L1",
+      "depth": "L2",
       "has_assert": true,
       "has_choice": false,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/batches/untested_abilities_batch17_test.rs"
       ],
@@ -46122,10 +46154,10 @@
       ],
       "base": "PL!N-bp7-027",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/abilities/moderate/bp7_audrey_blade_max_test.rs"
       ],
@@ -46412,10 +46444,10 @@
       ],
       "base": "PL!SP-bp7-013",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/batches/untested_abilities_batch44_test.rs"
       ],
@@ -46510,10 +46542,10 @@
       ],
       "base": "PL!SP-bp7-015",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/batches/untested_abilities_batch42_test.rs"
       ],
@@ -46547,10 +46579,10 @@
       ],
       "base": "PL!SP-bp7-016",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/jidou/complex/bp7_ren_energy_placed_gain_blade_test.rs"
       ],
@@ -46584,10 +46616,10 @@
       ],
       "base": "PL!SP-bp7-017",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/batches/untested_abilities_batch9_test.rs"
       ],
@@ -46628,10 +46660,10 @@
       ],
       "base": "PL!SP-bp7-018",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/batches/untested_abilities_batch42_test.rs"
       ],
@@ -46665,10 +46697,10 @@
       ],
       "base": "PL!SP-bp7-019",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/batches/untested_abilities_batch45_test.rs"
       ],
@@ -46772,10 +46804,10 @@
       ],
       "base": "PL!SP-bp7-025",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/batches/untested_abilities_batch45_test.rs"
       ],
@@ -47184,10 +47216,10 @@
       ],
       "base": "PL!N-sd2-001",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/abilities/moderate/bp7_audrey_blade_max_test.rs"
       ],
@@ -47263,10 +47295,10 @@
       ],
       "base": "PL!N-sd2-005",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/batches/untested_abilities_batch45_test.rs",
         "engine/tests/test_modules/batches/untested_abilities_batch50_test.rs"
@@ -47346,10 +47378,10 @@
       ],
       "base": "PL!N-sd2-009",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/batches/untested_abilities_batch45_test.rs"
       ],

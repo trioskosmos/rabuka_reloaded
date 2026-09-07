@@ -4159,6 +4159,8 @@ def _try_movement(text):
     "置かれるたび" (each_time, hazuki PL!SP-bp4-016-N) stays a comparison_condition
     gated by the each_time scan gate, and "から...に置かれた" (zone_change) is
     handled by _try_zone_placement.
+    Sets trigger_event.watches_area_move=True when the text also watches an
+    area move (absent otherwise — the normalizer strips False).
     """
     # G17: energy placed INTO the zone, past-tense, no source zone.
     is_energy_placed = (
@@ -4225,6 +4227,16 @@ def _try_movement(text):
     # Extract "自分のカードの効果" (own card effect) constraint
     if "自分のカードの効果" in text:
         te_data["self_effect_only"] = True
+    # Whether the text ALSO watches an area move (〜エリアを移動 / 移動した…).
+    # Pure energy-placement texts (e.g. Ren bp7-005 ab#1:
+    # "エネルギー置き場にエネルギーが置かれたとき") carry no move language,
+    # while 〜か compounds (e.g. Sumire bp5-004 ab#0:
+    # "このメンバーがエリアを移動するか…" ) do. The engine uses this to
+    # decide whether the area-move disjunct applies; without it every S1
+    # energy watcher also fires on its own area moves. True is persisted;
+    # False is dropped by the pipeline normalizer, so absent means False.
+    if re.search(r"エリアを移動|移動した|移動している|移動する", text):
+        te_data["watches_area_move"] = True
     # Extract "エネルギーが置かれ" (energy placed) trigger. The placement verb
     # may be separated from エネルギー by a location phrase ("エネルギーが...メンバーの下に置かれた"),
     # so match on the energy subject + the 置かれ/置かれた placement verb.

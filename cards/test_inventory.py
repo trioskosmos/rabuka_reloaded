@@ -71,7 +71,10 @@ TRIGGER_LABEL = {
 }
 
 # heuristic negative hints — match against file/test names only (not full text)
-NEGATIVE_RE = re.compile(r"(negative|cannot|not_|_not|cannot_activate|already_waited|zero_tested|immune|blocked|empty|zero|skip_optional)", re.IGNORECASE)
+# (^|_)no_ covers the widespread `*_no_trigger` / `*_no_effect` / `*_no_blade`
+# naming (e.g. ren_016_no_energy_placed_no_blade); the ^ anchor covers
+# names starting with `no_` like no_live_success_no_trigger.
+NEGATIVE_RE = re.compile(r"(negative|cannot|not_|_not|(^|_)no_|cannot_activate|already_waited|zero_tested|immune|blocked|empty|zero|skip_optional)", re.IGNORECASE)
 # choice/edge signals
 CHOICE_RE = re.compile(r"(has_pending_choice|pending_choice_type|select_indices|drain_auto|SelectCard|SelectTarget)")
 

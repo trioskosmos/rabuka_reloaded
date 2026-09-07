@@ -988,11 +988,15 @@ tdbg!("PHASE_ACTIVE:4 wait activated");
                 db_areas
                     .iter()
                     .filter_map(|&area| {
-                        player
-                            .stage
-                            .get_area(area)
-                            .and_then(|cid| card_db.get_card(cid))
-                            .and_then(|c| c.cost)
+                        player.stage.get_area(area).map(|cid| {
+                            let base = card_db
+                                .get_card(cid)
+                                .and_then(|c| c.cost)
+                                .unwrap_or(0) as i32;
+                            // Include constant cost modifiers (parity with single-baton
+                            // payment in core/player.rs).
+                            (base + game_state.mods.get_cost_modifier(cid)).max(1) as u8
+                        })
                     })
                     .collect()
             };

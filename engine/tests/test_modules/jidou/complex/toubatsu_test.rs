@@ -8,7 +8,37 @@
 /// can you still select 1 and add it to hand? A: No — the effect requires 2 distinct
 /// names to proceed.
 use crate::helpers::*;
+use rabuka_engine::ability::types::Choice;
 use rabuka_engine::zones::MemberArea;
+
+/// Assert the pending prompt is Toubatsu's jidou 3-option (blades / wait /
+/// draw), take the blade bullet, and assert +2 blade lands. This pins the
+/// choice identity, not just pendency: the 登場 prompt or any unrelated
+/// choice fails the option match.
+fn take_blades_option(game: &mut TestGame, toubatsu: i16) {
+    match game.get_pending_choice().clone() {
+        Choice::SelectTarget { target, description, .. } => {
+            assert_eq!(
+                target.as_str(),
+                "choice",
+                "expected the jidou 3-option prompt"
+            );
+            assert!(
+                description.contains("ブレード"),
+                "3-option prompt must offer the blade bullet, got {:?}",
+                description
+            );
+        }
+        other => panic!("expected jidou 3-option prompt, got {:?}", other),
+    }
+    game.select_choice_option(0);
+    scan_autos_both(game);
+    assert_eq!(
+        game.state.mods.get_blade_modifier(toubatsu),
+        2,
+        "blade bullet grants +2 blade until live end"
+    );
+}
 
 /// Positive: 2 distinct live cards in discard → ability proceeds.
 #[test]
@@ -228,9 +258,157 @@ fn toubatsu_q263_center_to_area_move_triggers_auto() {
     rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(&mut game.state, &pid);
     game.state.process_pending_auto_abilities(&pid);
 
-    // Auto should fire with a 3-option choice (blades / wait / draw)
+    // Auto should fire with a 3-option choice (blades / wait / draw).
     assert!(
         game.has_pending_choice(),
         "Q263: Auto ability should create a choice on center→area move"
     );
+    take_blades_option(&mut game, toubatsu);
 }
+
+/// Q263 via a REAL ability: Shiki swaps Toubatsu center → area (own effect).
+/// Same expectation as the synthetic q263 test, driven by an actual 起動.
+/// Both cards are stage-assigned (no debuts) so no debut scan can interfere.
+#[test]
+fn toubatsu_real_swap_move_triggers_auto() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let toubatsu = game.id("PL!SP-pb2-011-R");
+    let shiki = game.id("PL!SP-bp2-008-R");
+    game.state.player1.stage.stage = [-1, toubatsu, shiki];
+    game.give_energy(1); // E for Shiki's kidou
+    assert!(
+        !game.has_pending_choice(),
+        "no trigger before the swap"
+    );
+
+    // Shiki Right → Center: Toubatsu (at Center) is swapped to the Right
+    // by our own card effect.
+    game.activate_ability(shiki);
+    game.drain_auto_ability_choices();
+    assert!(
+        game.has_pending_choice(),
+        "Shiki swap should offer target areas"
+    );
+    let actions = game.generated_actions();
+    let idx = actions
+        .iter()
+        .position(|a| {
+            a.parameters
+                .as_ref()
+                .and_then(|p| p.stage_area.as_deref())
+                .is_some_and(|area| area == "center")
+        })
+        .expect("center target not offered");
+    game.select_generated(idx);
+    game.drain_auto_ability_choices();
+
+    assert_eq!(
+        game.state.player1.stage.stage,
+        [-1, shiki, toubatsu],
+        "swap must have moved Toubatsu center→area via our own effect"
+    );
+    // TAS scan, mirroring the synthetic q263 test above.
+    // Pin the identity, not just pendency (see q263 note above).
+    let pid = game.state.player1.id.clone();
+    rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(&mut game.state, &pid);
+    game.state.process_pending_auto_abilities(&pid);
+
+    assert!(
+        game.has_pending_choice(),
+        "Q263 via real swap: auto ability should create a choice on center→area move"
+    );
+    take_blades_option(&mut game, toubatsu);
+}
+
+/// Unrelated real ability (Kahori debut placing energy, no movement) with
+/// Toubatsu armed in center → silent.
+#[test]
+fn toubatsu_unrelated_debut_no_trigger() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let toubatsu = game.id("PL!SP-pb2-011-R");
+    game.state.player1.stage.stage = [-1, toubatsu, -1];
+    game.state
+        .player1
+        .energy_deck
+        .cards
+        .push(game.id("LL-E-001-SD"));
+    let placer = game.id("PL!SP-pb1-005-R");
+    game.state.player1.hand.cards.push(placer);
+    game.give_energy(13);
+    game.play_to_stage(placer, MemberArea::RightSide);
+    scan_autos_both(&mut game);
+
+    assert_eq!(
+        game.state.player1.stage.stage[1], toubatsu,
+        "Toubatsu still in center"
+    );
+    assert!(
+        !game.has_pending_choice(),
+        "unrelated debut with no movement must not arm the center-move watcher"
+    );
+}
+
+/// Two-seat probe: P1's swap must arm P1's center watcher, never P2's.
+///
+/// The in-resolution movement scan derives its seat from the current queue
+/// entry; while the resolver holds the entry that can resolve to the wrong
+/// seat, and position filters don't check seats. A P2 arming here proves a
+/// cross-seat scan.
+#[test]
+fn toubatsu_swap_arms_own_seat_not_opponent() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let toubatsu1 = game.new_id("PL!SP-pb2-011-R");
+    let shiki = game.new_id("PL!SP-bp2-008-R");
+    let toubatsu2 = game.new_id("PL!SP-pb2-011-R");
+    game.state.player1.stage.stage = [-1, toubatsu1, shiki];
+    game.state.player2.stage.stage = [-1, toubatsu2, -1];
+    game.give_energy(1); // E for Shiki's kidou
+
+    game.activate_ability(shiki);
+    game.drain_auto_ability_choices();
+    let actions = game.generated_actions();
+    let idx = actions
+        .iter()
+        .position(|a| {
+            a.parameters
+                .as_ref()
+                .and_then(|p| p.stage_area.as_deref())
+                .is_some_and(|area| area == "center")
+        })
+        .expect("center target not offered");
+    game.select_generated(idx);
+    game.drain_auto_ability_choices();
+
+    assert_eq!(
+        game.state.player1.stage.stage,
+        [-1, shiki, toubatsu1],
+        "swap must have moved P1 Toubatsu center→area"
+    );
+
+    // P1 first: own watcher must fire with its 3-option.
+    let p1 = game.state.player1.id.clone();
+    rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(&mut game.state, &p1);
+    game.state.process_pending_auto_abilities(&p1);
+    assert!(
+        game.has_pending_choice(),
+        "P1 swap must arm P1's center watcher"
+    );
+    take_blades_option(&mut game, toubatsu1);
+
+    // P2: nothing of hers moved — must stay silent.
+    let p2 = game.state.player2.id.clone();
+    rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(&mut game.state, &p2);
+    game.state.process_pending_auto_abilities(&p2);
+    assert!(
+        !game.has_pending_choice(),
+        "P1's swap must not arm P2's center watcher"
+    );
+}
+#[test]
+fn toubatsu_unrelated_debut_no_trigger() {
