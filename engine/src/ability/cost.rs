@@ -458,14 +458,13 @@ let source = cost.source_str().unwrap_or("");
                                     if !chars.is_empty() { parts.push(chars.join(" / ")); }
                                 }
                                 if let Some(limit) = cost.cost_limit_any() {
-                                    let op = cost.cost_limit_operator_any().unwrap_or_else(|| "<=".to_string());
-                                    let op_str = match op.as_str() {
-                                        "<=" => "以下",
-                                        "<" => "未満",
-                                        ">=" => "以上",
-                                        ">" => "超",
-                                        "=" => "ちょうど",
-                                        _ => op.as_str(),
+                                    let op = cost.cost_limit_operator_any().unwrap_or(crate::card::Operator::Lte);
+                                    let op_str = match op {
+                                        crate::card::Operator::Lte => "以下",
+                                        crate::card::Operator::Lt => "未満",
+                                        crate::card::Operator::Gte => "以上",
+                                        crate::card::Operator::Gt => "超",
+                                        crate::card::Operator::Eq => "ちょうど",
                                     };
                                     parts.push(format!("コスト{} {}", op_str, limit));
                                 }
@@ -485,14 +484,13 @@ let source = cost.source_str().unwrap_or("");
                                     if !chars.is_empty() { parts.push(chars.join(" / ")); }
                                 }
                                 if let Some(limit) = cost.cost_limit_any() {
-                                    let op = cost.cost_limit_operator_any().unwrap_or_else(|| "<=".to_string());
-                                    let op_str = match op.as_str() {
-                                        "<=" => "以下",
-                                        "<" => "未満",
-                                        ">=" => "以上",
-                                        ">" => "超",
-                                        "=" => "ちょうど",
-                                        _ => op.as_str(),
+                                    let op = cost.cost_limit_operator_any().unwrap_or(crate::card::Operator::Lte);
+                                    let op_str = match op {
+                                        crate::card::Operator::Lte => "以下",
+                                        crate::card::Operator::Lt => "未満",
+                                        crate::card::Operator::Gte => "以上",
+                                        crate::card::Operator::Gt => "超",
+                                        crate::card::Operator::Eq => "ちょうど",
                                     };
                                     parts.push(format!("コスト{} {}", op_str, limit));
                                 }
