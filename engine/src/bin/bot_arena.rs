@@ -59,7 +59,7 @@ fn load_test_deck(db: &Arc<CardDatabase>, name: &str) -> Vec<String> {
     }
     // Fallback: synthesize a legal-ish deck of distinct member/live cards.
     let mut nums: Vec<String> = Vec::new();
-    for (_tid, card) in db.cards.iter() {
+    for card in db.cards.values() {
         if !matches!(card.card_type, rabuka_engine::card::CardType::Energy) && nums.len() < 60 {
             nums.push(card.card_no.to_string());
         }
@@ -103,7 +103,7 @@ fn my_hand_lives(gs: &GameState, is_p1: bool, db: &Arc<CardDatabase>) -> usize {
         .cards
         .iter()
         .filter(|&&c| {
-            db.get_card(c).map_or(false, |x| {
+            db.get_card(c).is_some_and(|x| {
                 x.card_type == rabuka_engine::card::CardType::Live
             })
         })
@@ -210,7 +210,7 @@ fn main() {
                     .cards
                     .iter()
                     .filter(|&&c| {
-                        db.get_card(c).map_or(false, |x| {
+                        db.get_card(c).is_some_and(|x| {
                             x.card_type == rabuka_engine::card::CardType::Live
                         })
                     })

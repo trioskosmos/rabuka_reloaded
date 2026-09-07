@@ -1889,8 +1889,8 @@ game_state.set_recently_moved_batch(moved_to_waitroom.into(), Some("live_card_zo
             if i + 1 < n {
                 demand[i][1..7].copy_from_slice(&running[1..7]);
             }
-            for c in 1..7 {
-                running[c] += card_needs[i].need[c];
+            for (c, r) in running.iter_mut().enumerate().skip(1).take(6) {
+                *r += card_needs[i].need[c];
             }
         }
         demand
