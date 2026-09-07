@@ -110,18 +110,26 @@ impl AbilityResolver {
 
             let description = if any_number {
                 format!(
-                    "Select any number of cards from the {} looked-at cards (or skip)",
-                    total_count
+                    "Select any number of {} from the {} looked-at {} (or skip)",
+                    util::card_plural(total_count),
+                    total_count,
+                    util::card_plural(total_count)
                 )
             } else if is_max || optional {
                 format!(
-                    "Select up to {} card(s) from the {} looked-at cards (or skip)",
-                    max_select, total_count
+                    "Select up to {} {} from the {} looked-at {} (or skip)",
+                    max_select,
+                    util::card_plural(max_select as usize),
+                    total_count,
+                    util::card_plural(total_count)
                 )
             } else {
                 format!(
-                    "Select {} card(s) from the {} looked-at cards",
-                    max_select, total_count,
+                    "Select {} {} from the {} looked-at {}",
+                    max_select,
+                    util::card_plural(max_select as usize),
+                    total_count,
+                    util::card_plural(total_count)
                 )
             };
 
@@ -564,8 +572,9 @@ impl AbilityResolver {
             None
         };
         let desc_en = format!(
-            "Select {} card(s) from {}",
+            "Select {} {} from {}",
             count,
+            util::card_plural(count as usize),
             crate::ability::describe::zone_label(Some(&source))
         );
         let desc_ja = format!(

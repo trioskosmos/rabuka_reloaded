@@ -372,13 +372,15 @@ let source = cost.source_str().unwrap_or("");
                         matching_indices.len()
                     };
                     format!(
-                        "Select any number of card(s) from hand (0-{}) (or skip)",
+                        "Select any number of {} from hand (0-{}) (or skip)",
+                        util::card_plural(max_str),
                         max_str
                     )
                 } else {
                     format!(
-                        "Select {} card(s) from hand{}",
+                        "Select {} {} from hand{}",
                         effective_count,
+                        util::card_plural(effective_count as usize),
                         if is_optional { " (or skip)" } else { "" }
                     )
                 };

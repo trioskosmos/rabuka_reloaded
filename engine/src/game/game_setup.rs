@@ -586,29 +586,31 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
             allow_skip,
             options,
             ..
-        } => {
+} => {
             if target == crate::ability::types::PAY_SKIP_TARGET {
                 let desc_en = choice.description_en().unwrap_or(description);
                 let desc_ja = choice.description_ja().unwrap_or(desc_en);
+                // Use allow_skip to determine if this is a cost (skip) or yes/no (no)
+                let is_cost = *allow_skip;
                 let pay_label = if desc_en.is_empty() {
-                    "Pay optional cost".to_string()
+                    if is_cost { "Pay optional cost" } else { "Yes" }.to_string()
                 } else {
                     desc_en.to_string()
                 };
-                let skip_label = if desc_en.is_empty() {
-                    "Skip optional cost".to_string()
+                let skip_label = if is_cost {
+                    "Skip".to_string()
                 } else {
-                    format!("Skip: {}", desc_en)
+                    "No".to_string()
                 };
                 let pay_label_ja = if desc_ja.is_empty() {
-                    "オプショナルコストを支払う".to_string()
+                    if is_cost { "オプショナルコストを支払う" } else { "はい" }.to_string()
                 } else {
                     desc_ja.to_string()
                 };
-                let skip_label_ja = if desc_ja.is_empty() {
-                    "オプショナルコストをスキップ".to_string()
+                let skip_label_ja = if is_cost {
+                    "スキップ".to_string()
                 } else {
-                    format!("スキップ: {}", desc_ja)
+                    "いいえ".to_string()
                 };
                 return vec![
                     make_action_params(
@@ -633,29 +635,22 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
                     .with_ja(skip_label_ja),
                 ];
             }
-if target == "pay_cost_all:discard_all" {
+            if target == "pay_cost_all:discard_all" {
                 let desc_en = choice.description_en().unwrap_or(description);
                 let desc_ja = choice.description_ja().unwrap_or(desc_en);
+                // This is always a cost, so use "Skip"
                 let pay_label = if desc_en.is_empty() {
                     "Discard all hand".to_string()
                 } else {
                     desc_en.to_string()
                 };
-                let skip_label = if desc_en.is_empty() {
-                    "Skip optional cost".to_string()
-                } else {
-                    format!("Skip: {}", desc_en)
-                };
+                let skip_label = "Skip".to_string();
                 let pay_label_ja = if desc_ja.is_empty() {
                     "手札をすべて控え室に置く".to_string()
                 } else {
                     desc_ja.to_string()
                 };
-                let skip_label_ja = if desc_ja.is_empty() {
-                    "オプショナルコストをスキップ".to_string()
-                } else {
-                    format!("スキップ: {}", desc_ja)
-                };
+                let skip_label_ja = "スキップ".to_string();
                 return vec![
                     make_action_params(
                         ActionType::ChoiceDecision,

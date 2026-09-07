@@ -13,6 +13,23 @@ use smallvec::SmallVec;
 #[cfg(not(feature = "no_std"))]
 use std::borrow::Cow;
 
+// ============== SINGULAR/PLURAL HELPER ==============
+
+/// Returns "card" for count=1, "cards" otherwise.
+pub fn card_plural(count: usize) -> &'static str {
+    if count == 1 { "card" } else { "cards" }
+}
+
+/// Returns "member" for count=1, "members" otherwise.
+pub fn member_plural(count: usize) -> &'static str {
+    if count == 1 { "member" } else { "members" }
+}
+
+/// Returns "energy" for count=1, "energy" (same for both) - Japanese uses same word.
+pub fn energy_plural(count: usize) -> &'static str {
+    "energy"
+}
+
 // ============== HEART GAIN DISTRIBUTION ==============
 
 /// Distribute a multi-color heart gain across its color multiset.

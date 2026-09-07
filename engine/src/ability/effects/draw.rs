@@ -100,7 +100,7 @@ impl AbilityResolver {
             self.emit_pay_skip_gate(
                 gs,
                 None,
-                format!("Draw {} card(s)?", count),
+                format!("Draw {} {}?", count, util::card_plural(count as usize)),
                 format!("{}枚ドローする？", count),
                 false,
                 None,
