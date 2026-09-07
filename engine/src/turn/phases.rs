@@ -820,7 +820,7 @@ tdbg!("PHASE_ACTIVE:4 wait activated");
         } else {
             let player = game_state.active_player();
             let reduction: i32 = From::from(player.live_card_set_limit_reduction);
-            let max_allowed = (i32::try_from(MAX_LIVE_CARDS).unwrap() - reduction).max(0) as usize;
+            let max_allowed = usize::try_from((i32::try_from(MAX_LIVE_CARDS).unwrap() - reduction).max(0)).unwrap();
             if game_state.live_card_selected_indices.len() >= max_allowed {
                 return Err("Cannot select more live cards: limit reached".to_string());
             }
@@ -1414,7 +1414,7 @@ tdbg!("PHASE_ACTIVE:4 wait activated");
             if effect.action != ActionType::ModifyCost {
                 continue;
             }
-            let Some(value) = effect.value_any().map(|v| i16::from(v)) else {
+            let Some(value) = effect.value_any().map(i16::from) else {
                 continue;
             };
             if effect.operation_any() != Some("set") {

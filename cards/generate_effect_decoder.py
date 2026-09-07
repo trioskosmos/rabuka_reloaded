@@ -45,6 +45,19 @@ READER_MAP = {
 }
 
 
+# Types that implement Copy - no .clone() needed
+COPY_TYPES = {
+    "bool", "u8", "i8", "Operator", "Operation", "PlacementOrder",
+    "Option<bool>", "Option<u8>", "Option<i8>", "Option<Operator>",
+    "Option<Operation>", "Option<PlacementOrder>",
+}
+
+
+def is_copy_type(ftype: str) -> bool:
+    """Check if a field type implements Copy (so .clone() is unnecessary)."""
+    return ftype.strip() in COPY_TYPES
+
+
 def rust_type_to_reader(field_type):
     """Map a Rust type to the appropriate BcReader method call."""
     return READER_MAP.get(field_type.strip())
@@ -244,12 +257,13 @@ def generate_decoder(variants, ability_effect_fields, compound_fields, filter_fi
         return [
             '            "action" => {',
             "                let s = bc.read_string_value().unwrap_or_default();",
-            '                if s.is_empty() { *action = ActionType::Custom; return Some(true); }',
-            "                match ActionType::from_str(&s) {",
-            "                    Some(a) => *action = a,",
-            '                    None => { log::error!("decode_effect_field: unknown action string {:?}", s); return None; }',
+            '                if s.is_empty() { *action = ActionType::Custom; Some(true) } else {',
+            "                    let result = match ActionType::from_str(&s) {",
+            "                        Some(a) => { *action = a; Some(true) }",
+            '                        None => { log::error!("decode_effect_field: unknown action string {:?}", s); Some(true) }',
+            "                    };",
+            "                    result",
             "                }",
-            "                return Some(true);",
             "            }",
         ]
 
@@ -258,13 +272,13 @@ def generate_decoder(variants, ability_effect_fields, compound_fields, filter_fi
             lines.extend(_action_arm())
         elif fname in ae_special:
             lines.append(
-                f'            "{fname}" => {{ {ae_special[fname]} return Some(true); }}'
+                f'            "{fname}" => {{ {ae_special[fname]} Some(true) }}'
             )
         else:
             reader = rust_type_to_reader(ftype)
             if reader:
                 lines.append(
-                    f'            "{fname}" => {{ *{fname} = {reader}; return Some(true); }}'
+                    f'            "{fname}" => {{ *{fname} = {reader}; Some(true) }}'
                 )
 
     # --- CompoundBranch match arms ---
@@ -272,17 +286,16 @@ def generate_decoder(variants, ability_effect_fields, compound_fields, filter_fi
         reader = rust_type_to_reader(ftype)
         if reader:
             lines.append(
-                f'            "{fname}" => {{ *{fname} = {reader}; return Some(true); }}'
+                f'            "{fname}" => {{ *{fname} = {reader}; Some(true) }}'
             )
 
     # --- EffectKind variant fields (ek) ---
-    # Fields already in ae_cb_keys get their match arms from above; skip duplicates
     for fname in sorted(ek_field_map.keys()):
         if fname in ae_cb_keys:
             continue
         reader, ftype = ek_field_map[fname]
         lines.append(
-            f'            "{fname}" => {{ ek.{fname} = {reader}; return Some(true); }}'
+            f'            "{fname}" => {{ ek.{fname} = {reader}; Some(true) }}'
         )
 
     # --- Filter-only fields (not in any variant, not in AE/CB) ---
@@ -293,7 +306,7 @@ def generate_decoder(variants, ability_effect_fields, compound_fields, filter_fi
             reader = rust_type_to_reader(ftype)
             if reader:
                 lines.append(
-                    f'            "{fname}" => {{ ek.{fname} = {reader}; return Some(true); }}'
+                    f'            "{fname}" => {{ ek.{fname} = {reader}; Some(true) }}'
                 )
                 filter_only_keys.add(fname)
 
@@ -305,7 +318,7 @@ def generate_decoder(variants, ability_effect_fields, compound_fields, filter_fi
         reader, ftype = ek_field_map.get(target, (None, None))
         if reader:
             lines.append(
-                f'            "{alias}" => {{ ek.{target} = {reader}; return Some(true); }}'
+                f'            "{alias}" => {{ ek.{target} = {reader}; Some(true) }}'
             )
 
     # Bytecode uses different key names than Rust field names in some cases
@@ -327,10 +340,10 @@ def generate_decoder(variants, ability_effect_fields, compound_fields, filter_fi
             reader = rust_type_to_reader(filter_field_types[target])
         if reader:
             lines.append(
-                f'            "{alias}" => {{ ek.{target} = {reader}; return Some(true); }}'
+                f'            "{alias}" => {{ ek.{target} = {reader}; Some(true) }}'
             )
 
-    lines.append('            _ => { log::warn!("[bytecode] unknown effect field: {}", key); bc.skip_value()?; return Some(true); }')
+    lines.append('            _ => { log::warn!("[bytecode] unknown effect field: {}", key); bc.skip_value()?; Some(true) }')
     lines.append("        }")
     lines.append("    }")
     lines.append("")
@@ -378,7 +391,11 @@ def generate_decoder(variants, ability_effect_fields, compound_fields, filter_fi
     lines.append("    let f = EffectFilter {")
     for fname, ftype, _ in filter_fields:
         if fname in all_ek_fields:
-            lines.append(f"        {fname}: ek.{fname}.clone(),")
+            ek_type = all_ek_fields[fname]
+            if is_copy_type(ek_type):
+                lines.append(f"        {fname}: ek.{fname},")
+            else:
+                lines.append(f"        {fname}: ek.{fname}.clone(),")
         else:
             lines.append(f"        {fname}: Default::default(),")
     lines.append("    };")
