@@ -7,9 +7,9 @@ exit /b
 #>
 
 param(
-    [int]$IntervalMinutes = 4,
+    [int]$IntervalMinutes = 8,
     [string]$WindowTitle = "",
-    [string]$Message = "continue analysing functions files and tests and their error messages and make more subtasks to do to and so on so we can get to all tests in engine_c passing."
+    [string]$Message = "continue getting to 0 clippy warnings and all tests passing, if it's already 0 go through tests and make them harder better assertions and so on based on what the written card behaviour should be"
 )
 
 Add-Type -AssemblyName System.Windows.Forms

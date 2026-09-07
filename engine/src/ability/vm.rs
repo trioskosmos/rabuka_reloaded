@@ -365,7 +365,7 @@ impl<'a> BcReader<'a> {
         } else if b == 0xFE {
             self.u16().map(|v| v as i64)
         } else if b == 0xFF {
-            self.read_u32().map(|v| v as i32 as i64)
+            self.read_u32().map(|v| v.cast_signed() as i64)
         } else {
             self.i64()
         }
@@ -512,6 +512,7 @@ impl<'a> BcReader<'a> {
         }
     }
 
+    #[allow(clippy::box_collection)]
     fn read_opt_str_vec_value(&mut self) -> Option<Box<Vec<String>>> {
         let tag = self.read_u8()?;
         match tag {
@@ -528,6 +529,7 @@ impl<'a> BcReader<'a> {
         }
     }
 
+    #[allow(clippy::box_collection)]
     fn read_str_vec_value(&mut self) -> Box<Vec<String>> {
         let tag = self.read_u8().unwrap_or(TAG_NULL);
         match tag {
@@ -557,6 +559,7 @@ impl<'a> BcReader<'a> {
         }
     }
 
+    #[allow(clippy::vec_box)]
     fn read_condition_vec_value(&mut self) -> Option<Vec<Box<Condition>>> {
         let tag = self.read_u8()?;
         match tag {
@@ -573,6 +576,7 @@ impl<'a> BcReader<'a> {
         }
     }
 
+    #[allow(clippy::box_collection)]
     fn read_opt_u8_vec_value(&mut self) -> Option<Box<Vec<u8>>> {
         let tag = self.read_u8()?;
         match tag {
@@ -608,6 +612,7 @@ impl<'a> BcReader<'a> {
         }
     }
 
+    #[allow(clippy::box_collection)]
     fn read_positions_characters_value(
         &mut self,
     ) -> Option<Box<Vec<crate::card::PositionCharacter>>> {
@@ -881,6 +886,7 @@ impl<'a> BcReader<'a> {
         }
     }
 
+    #[allow(clippy::vec_box)]
     fn read_effect_vec_value(&mut self) -> Option<Vec<Box<AbilityEffect>>> {
         let tag = self.read_u8()?;
         match tag {
@@ -908,6 +914,7 @@ impl<'a> BcReader<'a> {
         }
     }
 
+    #[allow(clippy::box_collection, clippy::vec_box)]
     fn read_effect_vec_boxed_value(&mut self) -> Option<Box<Vec<Box<AbilityEffect>>>> {
         self.read_effect_vec_value().map(Box::new)
     }
@@ -1092,6 +1099,7 @@ impl<'a> BcReader<'a> {
         }
     }
 
+    #[allow(clippy::box_collection)]
     fn read_or_ability_filters_value(&mut self) -> Option<Box<Vec<AbilityFilterBranch>>> {
         let tag = self.read_u8()?;
         match tag {
@@ -1594,11 +1602,11 @@ impl AbilityEffect {
 
 #[cfg(feature = "json_path_test")]
 fn condition_populate_from_json(cond: &mut Condition, cond_json: &serde_json::Value) {
-    if let Condition::Choice {
-        ref mut options, ..
-    } = cond
-    {
-        if let Some(ref mut opts) = options {
+if let Condition::Choice {
+            options: Some(ref mut opts),
+            ..
+        } = cond
+        {
             if let Some(json_opts) = cond_json.get("options").and_then(|a| a.as_array()) {
                 for (i, opt) in opts.iter_mut().enumerate() {
                     if i < json_opts.len() {
@@ -1607,14 +1615,15 @@ fn condition_populate_from_json(cond: &mut Condition, cond_json: &serde_json::Va
                 }
             }
         }
-    }
-    if let Condition::Complex { ref mut effect, .. } = cond {
-        if let Some(ref mut eff) = effect {
+    if let Condition::Complex {
+            effect: Some(ref mut eff),
+            ..
+        } = cond
+        {
             if let Some(eff_json) = cond_json.get("effect") {
                 eff.populate_from_json(eff_json);
             }
         }
-    }
     if let Condition::Compound {
         ref mut common,
         ref mut conditions,
@@ -1636,13 +1645,12 @@ fn condition_populate_from_json(cond: &mut Condition, cond_json: &serde_json::Va
         }
     }
     if let Condition::Temporal {
-        ref mut condition, ..
+        condition: Some(ref mut sub_cond),
+        ..
     } = cond
     {
-        if let Some(ref mut sub_cond) = condition {
-            if let Some(sub_cond_json) = cond_json.get("condition") {
-                condition_populate_from_json(sub_cond, sub_cond_json);
-            }
+        if let Some(sub_cond_json) = cond_json.get("condition") {
+            condition_populate_from_json(sub_cond, sub_cond_json);
         }
     }
 }

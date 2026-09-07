@@ -394,6 +394,7 @@ fn recv_action<U: PlatformUi, T: LinkTransport>(
             link.send_packet(&[MSG_QUIT]);
             return RecvOutcome::Quit;
         }
+        #[allow(clippy::never_loop)]
         loop {
             match poll_inbound(link, peer_seq) {
                 Inbound::Action(la) => return RecvOutcome::Action(la),
