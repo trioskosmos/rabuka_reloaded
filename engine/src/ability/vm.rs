@@ -1443,9 +1443,10 @@ fn decode_ability_effect_direct(bc: &mut BcReader, _variant: u8) -> Option<Abili
     // Fields like source, target, destination, count exist on AbilityEffect (AE) and also on
     // many EffectKind variants. The AE dispatch consumes them first so ek never sees them.
     // Copy the overlapping AE fields into ek so build_* functions have them.
-    ek.source = source.clone();
+    // source and destination are Option<Zone> (Copy), target is Option<ArcStr> (Clone)
+    ek.source = source;
     ek.target = target.clone();
-    ek.destination = destination.clone();
+    ek.destination = destination;
     ek.count = count_val;
     ek.optional = optional;
     ek.non_stackable = non_stackable;

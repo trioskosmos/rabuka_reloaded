@@ -4,7 +4,7 @@ use actix_cors::Cors;
 use actix_files as fs;
 use actix_web::{web, App, HttpResponse, HttpServer, Responder};
 use actix_web_actors::ws;
-use actix::{Actor, StreamHandler, Addr, SyncArbiter, Arbiter};
+use actix::{Actor, StreamHandler, Addr, SyncArbiter, ActorContext};
 #[cfg(feature = "no_std")]
 use alloc::{
     string::{String, ToString},
@@ -274,6 +274,10 @@ pub struct RelayMessage {
     pub payload: String,
 }
 
+impl actix::Message for RelayMessage {
+    type Result = ();
+}
+
 pub struct WsRelaySession {
     pub room_id: String,
     pub session_id: String,
@@ -304,13 +308,32 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsRelaySession {
     }
 }
 
+// Handle BroadcastText from relay actor
+impl actix::Handler<BroadcastText> for WsRelaySession {
+    type Result = ();
+
+    fn handle(&mut self, msg: BroadcastText, ctx: &mut Self::Context) -> Self::Result {
+        ctx.text(msg.text);
+    }
+}
+
+// Message to broadcast text to a session
+#[derive(Debug)]
+pub struct BroadcastText {
+    pub text: String,
+}
+
+impl actix::Message for BroadcastText {
+    type Result = ();
+}
+
 pub struct WsRelayActor {
     // room_id -> session_id -> Addr<WsRelaySession>
     sessions: HashMap<String, HashMap<String, Addr<WsRelaySession>>>,
 }
 
 impl Actor for WsRelayActor {
-    type Context = actix::Context<Self>;
+    type Context = actix::SyncContext<Self>;
 }
 
 impl actix::Handler<RelayMessage> for WsRelayActor {
@@ -320,7 +343,7 @@ impl actix::Handler<RelayMessage> for WsRelayActor {
         if let Some(room_sessions) = self.sessions.get(&msg.room_id) {
             for (session_id, addr) in room_sessions {
                 if session_id != &msg.session_id {
-                    addr.do_send(ws::Message::Text(msg.payload.clone().into()));
+                    addr.do_send(BroadcastText { text: msg.payload.clone() });
                 }
             }
         }
@@ -2776,7 +2799,7 @@ async fn ws_relay(
         },
         &req,
         stream,
-    )
+    ).expect("Failed to start WebSocket")
 }
 
 async fn init_game(
