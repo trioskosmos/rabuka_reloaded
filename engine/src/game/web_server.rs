@@ -3099,7 +3099,11 @@ pub async fn run_web_server_with_ngrok(ngrok_authtoken: Option<String>) -> std::
     // Need to also add recording fields to room construction
 
     HttpServer::new(move || {
-        let cors = Cors::permissive();
+        let cors = Cors::permissive()
+            .allowed_origin("https://trioskosmos.github.io")
+            .allowed_methods(vec!["GET", "POST", "OPTIONS"])
+            .allowed_headers(vec![actix_web::http::header::CONTENT_TYPE, actix_web::http::header::AUTHORIZATION, actix_web::http::header::HeaderName::from_static("x-session-token"), actix_web::http::header::HeaderName::from_static("x-room-id")])
+            .max_age(3600);
 
         App::new()
             .wrap(cors)
@@ -3139,12 +3143,22 @@ pub async fn run_web_server_with_ngrok(ngrok_authtoken: Option<String>) -> std::
             .route("/api/rooms/create", web::post().to(rooms_create))
             .route("/api/rooms/join", web::post().to(rooms_join))
             .route("/api/rooms/leave", web::post().to(rooms_leave))
-            .service(fs::Files::new("/engine", "../engine").prefer_utf8(true))
-            .service(fs::Files::new("/cards", "../cards").prefer_utf8(true))
+            // Static files with explicit CORS
+            .service(
+                fs::Files::new("/engine", "../engine")
+                    .prefer_utf8(true)
+                    .use_last_modified(true)
+            )
+            .service(
+                fs::Files::new("/cards", "../cards")
+                    .prefer_utf8(true)
+                    .use_last_modified(true)
+            )
             .service(
                 fs::Files::new("/", "../web_ui")
                     .index_file("index.html")
-                    .prefer_utf8(true),
+                    .prefer_utf8(true)
+                    .use_last_modified(true),
             )
     })
     .bind(&bind_addr)
