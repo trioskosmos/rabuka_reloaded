@@ -521,7 +521,7 @@ impl GameState {
                                 if let Some(ref cond) = eff.condition {
                                     if cond.get_self_target().unwrap_or(false)
                                         && cond.get_movement() == Some("moved")
-                                        && cond.get_locations().map_or(true, |l| l.len() < 2)
+                                        && cond.get_locations().is_none_or(|l| l.len() < 2)
                                         && !event.moved_cards.contains(&card_id)
                                     {
                                         continue;
@@ -633,7 +633,7 @@ impl GameState {
                                 if let Some(ref cond) = eff.condition {
                                     if cond.get_self_target().unwrap_or(false)
                                         && cond.get_movement() == Some("moved")
-                                        && cond.get_locations().map_or(true, |l| l.len() < 2)
+                                        && cond.get_locations().is_none_or(|l| l.len() < 2)
                                         && !event.moved_cards.contains(&card_id)
                                     {
                                         continue;
@@ -2128,7 +2128,7 @@ impl GameState {
                         .to_string();
                     let prompt_ja = crate::ability::describe::translate_choice_prompt_en_to_ja(&prompt_en)
                         .or_else(|| {
-                            if entry.choice_effect_text.as_deref().map_or(false, |t| !t.is_empty()) {
+                            if entry.choice_effect_text.as_deref().is_some_and(|t| !t.is_empty()) {
                                 entry.ability.effect.as_ref().map(|e| crate::ability::describe::describe_effect_ja(e))
                             } else {
                                 None

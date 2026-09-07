@@ -527,7 +527,7 @@ impl GameState {
                                                         .any(|&u| {
                                                             self.card_database
                                                                 .get_card(u)
-                                                                .map_or(false, |c| c.is_member())
+                                                                .is_some_and(|c| c.is_member())
                                                         });
                                                 if !has_member_under {
                                                     continue;
