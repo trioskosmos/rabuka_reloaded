@@ -38,6 +38,7 @@ pub struct PlayState {
     pub ai_vs_ai: bool,
     pub detail_mode: bool,
     pub choice_subview: bool,
+    pub choice_hint_detail: bool,
     pub text_page: usize,
     pub choice_grid_offset: usize,
     pub list_scroll: usize,
@@ -180,6 +181,7 @@ pub fn play_step(p: PlayState, keys: u32) -> Step {
         ref ai_vs_ai,
         mut detail_mode,
         mut choice_subview,
+        mut choice_hint_detail,
         mut text_page,
         mut choice_grid_offset,
         mut list_scroll,
@@ -271,6 +273,7 @@ pub fn play_step(p: PlayState, keys: u32) -> Step {
         cur,
         detail_mode,
         choice_subview,
+        choice_hint_detail,
         text_page,
         choice_grid_offset,
         detail_scroll_y,
@@ -305,6 +308,7 @@ pub fn play_step(p: PlayState, keys: u32) -> Step {
     cur = out.cur;
     detail_mode = out.detail_mode;
     choice_subview = out.choice_subview;
+    choice_hint_detail = out.choice_hint_detail;
     text_page = out.text_page;
     choice_grid_offset = out.choice_grid_offset;
     detail_scroll_y = out.detail_scroll_y;
@@ -691,6 +695,7 @@ pub fn play_step(p: PlayState, keys: u32) -> Step {
             display_pos,
             detail_mode,
             choice_subview,
+            choice_hint_detail,
             text_page,
             choice_grid_offset,
             list_scroll,
@@ -809,6 +814,7 @@ pub fn play_step(p: PlayState, keys: u32) -> Step {
         ai_vs_ai: *ai_vs_ai,
         detail_mode,
         choice_subview,
+        choice_hint_detail,
         text_page,
         choice_grid_offset,
         list_scroll,

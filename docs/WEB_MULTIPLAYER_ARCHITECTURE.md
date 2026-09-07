@@ -225,12 +225,25 @@ pub struct FrameAction {
 **Server stores**: Room metadata, game state per active match (~few KB each)
 
 ### GitHub Pages Bandwidth & Caching
-- **100 GB/month soft limit** — your 260 MB images + 5 MB WASM = trivial
-- **Browser caches aggressively**: `Cache-Control: max-age=31536000` (1 year) for immutable assets
+- **Default cache**: **~10 minutes** (GitHub Pages sets `Cache-Control: max-age=600` for static assets)
+- **No custom headers**: Cannot set `Cache-Control: max-age=31536000` on GitHub Pages
 - **First visit**: ~270 MB downloaded (images + WASM)
-- **Repeat visits**: ~0 MB (served from browser cache)
-- **Bandwidth counted**: Only on cache miss (new visitors, cache cleared, new versions)
-- **100 GB/month supports**: ~370k first-time visitors/month (well beyond current scale)
+- **Repeat visits within 10 min**: Served from browser cache
+- **Repeat visits after 10 min**: Revalidated (304 Not Modified if unchanged)
+- **Bandwidth counted**: On every cache miss (new visitors, cache expired, new versions)
+- **100 GB/month soft limit** — supports ~370 first-time visitors/day (270 MB × 370 ≈ 100 GB)
+- **Cost optimization**: For high traffic, consider Cloudflare Pages (free, 1 TB egress) or Cloudflare CDN in front of GitHub Pages
+
+### Bandwidth Optimization Options
+
+| Option | Egress Limit | Cache Control | Setup Effort | Cost |
+|--------|--------------|---------------|--------------|------|
+| **GitHub Pages (current)** | 100 GB/mo | 10 min fixed | 0 | Free |
+| **Cloudflare Pages** | 1 TB/mo | Custom headers | Low (connect repo) | Free |
+| **Cloudflare CDN + GitHub Pages** | 1 TB/mo (CF) | Full control | Medium (CNAME + proxy) | Free |
+| **Cloudflare R2 + Workers** | 10 GB/mo free | Full control | High (migrate storage) | Free tier |
+
+**Recommendation**: If traffic exceeds ~300 new visitors/day, switch to **Cloudflare Pages** (same repo, 1 TB egress, custom cache headers). Or put Cloudflare CDN in front of GitHub Pages (orange-cloud CNAME) for 1 TB free egress + custom cache rules without moving files.
 
 ---
 

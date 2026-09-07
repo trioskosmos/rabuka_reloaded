@@ -5,6 +5,7 @@
 // 1.5 render.rs). Read-only on game state; pagination clamps text_page and
 // list_scroll, which are returned to the caller.
 
+use rabuka_engine::game::platform_ui::card_ability_text;
 use rabuka_engine::game_setup;
 use rabuka_engine::game_state::{GameState, Phase};
 use rabuka_engine::player::Player;
@@ -51,6 +52,7 @@ struct RenderCtx<'a> {
     display_pos: usize,
     detail_mode: bool,
     choice_subview: bool,
+    choice_hint_detail: bool,
     detail_scroll_y: f32,
     viewing_card: Option<i16>,
     zone_viewer: &'a Option<(String, Vec<i16>)>,
@@ -192,6 +194,7 @@ pub(crate) fn render_board(
     display_pos: usize,
     detail_mode: bool,
     choice_subview: bool,
+    choice_hint_detail: bool,
     text_page: usize,
     _choice_grid_offset: usize,
     list_scroll: usize,
@@ -217,6 +220,7 @@ pub(crate) fn render_board(
         display_pos,
         detail_mode,
         choice_subview,
+        choice_hint_detail,
         detail_scroll_y,
         viewing_card,
         zone_viewer,
@@ -395,14 +399,71 @@ fn render_detail_mode(ctx: &RenderCtx, text_page: &mut usize) -> f32 {
     let cur = ctx.cur;
     let acts_cache = ctx.acts_cache;
     let choice_subview = ctx.choice_subview;
+    let choice_hint_detail = ctx.choice_hint_detail;
     let detail_scroll_y = ctx.detail_scroll_y;
     let viewing_card = ctx.viewing_card;
     let atlas = ctx.atlas;
     // Default content starts below the game header so nothing drawn off the
     // detail branches ever overlaps it.
     let mut content_y = CONTENT_Y;
+        // Choice hint detail: show prompt + source card ability (L in choice mode)
+        if choice_hint_detail {
+            unsafe {
+                _3ds_top_queue_rect(0.0, 0.0, 400.0, 240.0, COL_TOP_BG);
+            }
+            let mut all_lines: Vec<String> = Vec::new();
+            // Add choice prompt/description
+            if let Some(choice) = gs.get_pending_choice() {
+                let desc = if current_lang() == Lang::Japanese {
+                    choice.description_ja().unwrap_or(choice.description()).to_string()
+                } else {
+                    choice.description_en().unwrap_or(choice.description()).to_string()
+                };
+                all_lines.push(desc);
+                all_lines.push(String::new());
+            }
+            // Add source card ability
+            let source_card_no = gs
+                .ability_queue
+                .current_entry()
+                .and_then(|e| e.card_id)
+                .and_then(|cid| gs.card_database.get_card(cid))
+                .map(|c| c.card_no.clone());
+            if let Some(card_no) = source_card_no {
+                if let Some(card) = gs.card_database.get_card_by_no(&card_no) {
+                    let ab = card_ability_text(card);
+                    if !ab.trim().is_empty() {
+                        all_lines.push(ab);
+                    }
+                }
+            }
+            let lpp = 10usize;
+            let total_pages = ((all_lines.len() + lpp - 1) / lpp).max(1);
+            *text_page = (*text_page).min(total_pages - 1);
+            let start = *text_page * lpp;
+            let mut ty = 24.0;
+            for line in &all_lines[start..] {
+                if ty > 220.0 {
+                    break;
+                }
+                render_text_with_icons(4.0, ty, line, COL_LIGHT, SCALE_BODY);
+                ty += 18.0;
+            }
+            if total_pages > 1 {
+                unsafe {
+                    _3ds_top_queue_text(
+                        370.0,
+                        4.0,
+                        COL_MED,
+                        SCALE_SMALL,
+                        format!("{}/{}\0", *text_page + 1, total_pages).as_ptr(),
+                    );
+                }
+            }
+            render_hint_bar(&tl("L/B=close  Up/Down=scroll"));
+        }
         // L pressed: show full ability text overlay
-        if choice_subview {
+        else if choice_subview {
             if let Some(cid) = viewing_card {
                 if let Some(card) = gs.card_database.get_card(cid) {
                     unsafe {

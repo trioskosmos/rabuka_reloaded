@@ -39,7 +39,6 @@ const stateInternal = {
     lastIndexedStateId: null,
 
     staticCardDatabase: null,
-    cardIdMapping: null,
 
     TEMPLATE_MASK: 0x1FFFFF,
     INSTANCE_SHIFT: 21,
@@ -334,11 +333,11 @@ const stateInternal = {
     },
 
     loadStaticCardDatabase: async () => {
-        if (State.staticCardDatabase && State.cardIdMapping) return;
+        if (State.staticCardDatabase) return;
 
         try {
             const fetchStaticJson = async (path) => {
-                // Static assets (cards.json, abilities.json, card_id_mapping.json) 
+                // Static assets (cards.json, abilities.json) 
                 // are served from GitHub Pages, not the backend API
                 const response = await fetch(path, { cache: 'force-cache' });
                 if (!response.ok) {
@@ -359,12 +358,6 @@ const stateInternal = {
             }
             State.staticCardDatabase = cardsData;
             console.log('[State] Loaded static card database, total cards:', Object.keys(cardsData).length);
-
-            const mappingData = await fetchStaticJson('engine/card_id_mapping.json');
-            if (mappingData) {
-                State.cardIdMapping = mappingData;
-                console.log('[State] Loaded card ID mapping, total mappings:', Object.keys(mappingData).length);
-            }
 
             // Derive the card image mapping directly from cards.json. This is a
             // pure function of each card's own data (card_no + rare_list), so it

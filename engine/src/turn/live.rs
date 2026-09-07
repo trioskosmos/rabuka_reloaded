@@ -188,12 +188,12 @@ fn record_pretrigger_live_results(
             };
             let mut filled = [0u8; 8];
             for alloc in &snap.breakdown.allocations {
-                if alloc.target_idx == li as u8 {
+                if alloc.target_idx == u8::try_from(li).unwrap() {
                     filled[alloc.color as usize] += alloc.amount;
                 }
             }
-            for c in 0..8 {
-                filled_total[c] += filled[c];
+            for (c, val) in filled.iter().enumerate() {
+                filled_total[c] += *val;
             }
             let mut required = [0u8; 8];
             for (color, needed) in &nh.hearts {
@@ -202,7 +202,7 @@ fn record_pretrigger_live_results(
             if let Some(card_mods) = gs.mods.need_heart_modifiers.get(&l.card_id) {
                 for (color, me) in card_mods {
                     if me.set != 0 {
-                        required[color.index()] = me.set as u8;
+                        required[color.index()] = u8::try_from(me.set).unwrap();
                     }
                 }
                 for (color, me) in card_mods {
@@ -229,8 +229,8 @@ fn record_pretrigger_live_results(
                 if any_hearts + u16::from(icon_all) < u16::from(required[0]) {
                     ok = false;
                 } else {
-                    let used = u16::from(required[0].saturating_sub(any_hearts as u8));
-                    icon_all = icon_all.saturating_sub(used as u8);
+                    let used = u16::from(required[0].saturating_sub(u8::try_from(any_hearts).unwrap()));
+                    icon_all = icon_all.saturating_sub(u8::try_from(used).unwrap());
                 }
             }
             if ok {
@@ -250,9 +250,8 @@ fn record_pretrigger_live_results(
                 all_passed = false;
             }
         }
-        let no_excess = (0..8).all(|c| {
-            snap.total_hearts[c] >= filled_total[c]
-                && snap.total_hearts[c] - filled_total[c] == 0
+        let no_excess = filled_total.iter().enumerate().all(|(c, &ft)| {
+            snap.total_hearts[c] >= ft && snap.total_hearts[c] - ft == 0
         });
         // Same score formula as the post-trigger totals (extras are zero
         // here by construction — trigger bonuses land in pX_extra after
@@ -405,14 +404,14 @@ impl super::TurnEngine {
                 .iter()
                 .rev()
                 .find(|s| s.player_id == p1_id)
-                .map_or(false, |s| !s.lives.is_empty() && s.lives.iter().all(|l| l.passed));
+                .is_some_and(|s| !s.lives.is_empty() && s.lives.iter().all(|l| l.passed));
         let p2_all = p2_has
             && game_state
                 .performance_snapshots
                 .iter()
                 .rev()
                 .find(|s| s.player_id == p2_id)
-                .map_or(false, |s| !s.lives.is_empty() && s.lives.iter().all(|l| l.passed));
+                .is_some_and(|s| !s.lives.is_empty() && s.lives.iter().all(|l| l.passed));
         if ABILITY_DEBUG.load(Ordering::Relaxed) {
             log::debug!("[LIVE-DBG] === VICTORY DETERMINATION ===");
             log::debug!(
@@ -473,7 +472,7 @@ impl super::TurnEngine {
                 let nh = card.need_heart.as_ref().unwrap();
                 let mut filled = EMPTY_H8;
                 for alloc in &snap.breakdown.allocations {
-                    if alloc.target_idx == i as u8 {
+                    if alloc.target_idx == u8::try_from(i).unwrap() {
                         filled[alloc.color as usize] += alloc.amount;
                     }
                 }
@@ -518,9 +517,10 @@ impl super::TurnEngine {
                         }
                     }
                     if ok {
-                        for idx in 1..7 {
-                            if filled[idx] < required_arr[idx] {
-                                let deficit = required_arr[idx] - filled[idx];
+                        for (idx, (&f, &r)) in filled[1..7].iter().zip(required_arr[1..7].iter()).enumerate() {
+                            if f < r {
+                                let actual_idx = idx + 1;
+                                let deficit = required_arr[actual_idx] - filled[actual_idx];
                                 if icon_all >= deficit {
                                     icon_all -= deficit;
                                 } else {
@@ -563,8 +563,8 @@ impl super::TurnEngine {
                                 } else {
                                     String::new()
                                 },
-                                value: total as i16,
-                                color: color.index() as u8,
+                                value: i16::try_from(total).unwrap(),
+                                color: u8::try_from(color.index()).unwrap(),
                                 source: if verbose {
                                     format!("{} req modifier ({})", card.name, color_label)
                                 } else {
@@ -618,7 +618,7 @@ impl super::TurnEngine {
             let mut cumulative_used = EMPTY_H8;
             for i in 0..snap.lives.len() {
                 for alloc in &snap.breakdown.allocations {
-                    if alloc.target_idx == i as u8 {
+                    if alloc.target_idx == u8::try_from(i).unwrap() {
                         let source_idx = match alloc.phase {
                             crate::types::AllocPhase::H00Wild | crate::types::AllocPhase::Wildcard => 0,
                             crate::types::AllocPhase::AllWild
@@ -630,8 +630,8 @@ impl super::TurnEngine {
                     }
                 }
                 let mut spare = EMPTY_H8;
-                for idx in 0..8 {
-                    spare[idx] = snap.total_hearts[idx].saturating_sub(cumulative_used[idx]);
+                for (idx, (&cum, &tot)) in cumulative_used.iter().zip(snap.total_hearts.iter()).enumerate() {
+                    spare[idx] = tot.saturating_sub(cum);
                 }
                 snap.lives[i].spare = spare;
             }
@@ -665,8 +665,8 @@ impl super::TurnEngine {
                         }
                     }
                 }
-                for i in 0..8 {
-                    mc.transform_delta[i] = mc.bonus_hearts[i].saturating_sub(ability_per_color[i]);
+                for (i, (&bh, &apc)) in mc.bonus_hearts.iter().zip(ability_per_color.iter()).enumerate() {
+                    mc.transform_delta[i] = bh.saturating_sub(apc);
                 }
             }
         }
@@ -679,12 +679,12 @@ impl super::TurnEngine {
             let pre = pre_score_flat.get(&cid).copied().unwrap_or(0);
             let delta = post_total - pre;
             if delta != 0 {
-                game_state.mods.add_score_modifier(cid, -delta as i16);
+                game_state.mods.add_score_modifier(cid, i16::try_from(-delta).unwrap());
             }
         }
         for (&cid, &pre_total) in pre_score_flat {
             if !post.contains_key(&cid) {
-                game_state.mods.set_score_modifier(cid, pre_total as i16);
+                game_state.mods.set_score_modifier(cid, i16::try_from(pre_total).unwrap());
             }
         }
         log::debug!("[REVERT_SCORE] reverted {} late score modifiers", post.len());
@@ -711,7 +711,7 @@ impl super::TurnEngine {
                 let base_met = base_cond.is_some_and(|c| ctx.evaluate_condition(c));
                 if alt_met || base_met {
                     let alt_eff = gained.alternative_effect_any();
-                    let prim_eff = gained.compound.primary_effect.as_ref().map(|b| &**b);
+                    let prim_eff = gained.compound.primary_effect.as_deref();
                     let effect_to_apply = if alt_met { alt_eff } else { prim_eff };
                     if let Some(apply) = effect_to_apply {
                         let mut resolver = AbilityResolver::new(game_state.card_database.clone(), Some(*card_id));
@@ -742,7 +742,7 @@ impl super::TurnEngine {
             };
             for app in &late_apps {
                 if (app.effect_type == crate::types::EffectType::ScoreBonus || app.effect_type == crate::types::EffectType::ScoreSet) && player_cards.contains(&app.target_card_id) {
-                    snap.breakdown.scores.push(crate::types::ScoreLine { source: app.ability_text.to_string(), value: app.amount.unsigned_abs() as u8 });
+                    snap.breakdown.scores.push(crate::types::ScoreLine { source: app.ability_text.to_string(), value: u8::try_from(app.amount.unsigned_abs()).unwrap() });
                 }
             }
         }
@@ -757,8 +757,7 @@ impl super::TurnEngine {
             let total_filled: u8 = snap.lives.iter().flat_map(|l| l.filled.iter()).sum();
             let surplus = total_available.saturating_sub(total_filled);
             let mut per_color_surplus = [0u8; 8];
-            for color in 0..8 {
-                let total_color = snap.total_hearts[color];
+            for (color, &total_color) in snap.total_hearts.iter().enumerate() {
                 let filled_color: u8 = snap.lives.iter().map(|l| l.filled[color]).sum();
                 per_color_surplus[color] = total_color.saturating_sub(filled_color);
             }
@@ -1566,7 +1565,7 @@ game_state.set_recently_moved_batch(moved_to_waitroom.into(), Some("live_card_zo
 
             member_contributions.push(MemberContribution {
                 source_id: cid,
-                slot: i as u8,
+                slot: u8::try_from(i).unwrap(),
                 base_hearts: base_h,
                 bonus_hearts: bonus_h,
                 base_blades,
@@ -1593,8 +1592,8 @@ game_state.set_recently_moved_batch(moved_to_waitroom.into(), Some("live_card_zo
         if player.live_card_zone.cards.is_empty() {
             let mut total_hearts_arr = EMPTY_H8;
             for mc in &member_contributions {
-                for c in 0..8 {
-                    total_hearts_arr[c] += mc.base_hearts[c] + mc.bonus_hearts[c];
+                for (c, (&base, &bonus)) in mc.base_hearts.iter().zip(mc.bonus_hearts.iter()).enumerate() {
+                    total_hearts_arr[c] += base + bonus;
                 }
             }
             let total_blade: u8 = member_contributions
@@ -1741,8 +1740,8 @@ game_state.set_recently_moved_batch(moved_to_waitroom.into(), Some("live_card_zo
         // Yell heart source
         let mut yell_heart_arr = EMPTY_H8;
         for yc in &yell_cards {
-            for i in 0..8 {
-                yell_heart_arr[i] += yc.blade_hearts[i];
+            for (i, &bh) in yc.blade_hearts.iter().enumerate() {
+                yell_heart_arr[i] += bh;
             }
         }
         if yell_heart_arr.iter().any(|&v| v > 0) {
@@ -1860,7 +1859,7 @@ game_state.set_recently_moved_batch(moved_to_waitroom.into(), Some("live_card_zo
                         for (color, me) in card_mods {
                             if me.set != 0 {
                                 let idx = color.index();
-                                need[idx] = me.set as u8;
+                                need[idx] = u8::try_from(me.set).unwrap();
                             }
                         }
                         for (color, me) in card_mods {
@@ -1888,9 +1887,7 @@ game_state.set_recently_moved_batch(moved_to_waitroom.into(), Some("live_card_zo
         let mut running = [0u8; 8];
         for i in (0..n).rev() {
             if i + 1 < n {
-                for c in 1..7 {
-                    demand[i][c] = running[c];
-                }
+                demand[i][1..7].copy_from_slice(&running[1..7]);
             }
             for c in 1..7 {
                 running[c] += card_needs[i].need[c];
@@ -1915,15 +1912,15 @@ game_state.set_recently_moved_batch(moved_to_waitroom.into(), Some("live_card_zo
             // Phase 1a: matching colored hearts → specific color req
             for c in 1..7 {
                 if need[c] > 0 && pool[c] > 0 {
-                    let take = pool[c].min(need[c]);
+let take = pool[c].min(need[c]);
                     allocs.push(Allocation {
-                        target_idx: live_idx as u8,
+                        target_idx: u8::try_from(live_idx).unwrap(),
                         target_name: card_name.clone(),
                         source_type: SourceType::Stage,
                         source_name: SourceName::StageHearts,
                         source_slot: None,
                         wildcard: false,
-                        color: c as u8,
+                        color: u8::try_from(c).unwrap(),
                         amount: take,
                         is_bonus: false,
                         phase: AllocPhase::Colored,
@@ -1960,13 +1957,13 @@ game_state.set_recently_moved_batch(moved_to_waitroom.into(), Some("live_card_zo
                     if pool[c] > 0 {
                         let take = pool[c].min(h00_deficit - filled_h00);
                         allocs.push(Allocation {
-                            target_idx: live_idx as u8,
+                            target_idx: u8::try_from(live_idx).unwrap(),
                             target_name: card_name.clone(),
                             source_type: SourceType::Stage,
                             source_name: SourceName::StageHearts,
                             source_slot: None,
                             wildcard: false,
-                            color: c as u8,
+                            color: u8::try_from(c).unwrap(),
                             amount: take,
                             is_bonus: false,
                             phase: AllocPhase::ColoredSurplus,
@@ -1983,7 +1980,7 @@ game_state.set_recently_moved_batch(moved_to_waitroom.into(), Some("live_card_zo
                 if filled_h00 < h00_deficit && pool[0] > 0 {
                     let take = pool[0].min(h00_deficit - filled_h00);
                     allocs.push(Allocation {
-                        target_idx: live_idx as u8,
+                        target_idx: u8::try_from(live_idx).unwrap(),
                         target_name: card_name.clone(),
                         source_type: SourceType::Stage,
                         source_name: SourceName::StageHearts,
@@ -2007,18 +2004,18 @@ game_state.set_recently_moved_batch(moved_to_waitroom.into(), Some("live_card_zo
                     if need[c] > filled[c] && pool[7] > 0 {
                         let deficit = need[c] - filled[c];
                         let take = pool[7].min(deficit);
-                        allocs.push(Allocation {
-                            target_idx: live_idx as u8,
-                            target_name: card_name.clone(),
-                            source_type: SourceType::Stage,
-                            source_name: SourceName::AllHeartIconAll,
-                            source_slot: None,
-                            wildcard: true,
-                            color: c as u8,
-                            amount: take,
-                            is_bonus: false,
-                            phase: AllocPhase::AllCleanup,
-                        });
+allocs.push(Allocation {
+                        target_idx: u8::try_from(live_idx).unwrap(),
+                        target_name: card_name.clone(),
+                        source_type: SourceType::Stage,
+                        source_name: SourceName::AllHeartIconAll,
+                        source_slot: None,
+                        wildcard: true,
+                        color: u8::try_from(c).unwrap(),
+                        amount: take,
+                        is_bonus: false,
+                        phase: AllocPhase::AllCleanup,
+                    });
                         pool[7] -= take;
                         filled[c] += take;
                     }
@@ -2032,8 +2029,8 @@ game_state.set_recently_moved_batch(moved_to_waitroom.into(), Some("live_card_zo
                     let h00_still_needed = h00_remaining.saturating_sub(already_filled_h00);
                     if h00_still_needed > 0 && pool[7] > 0 {
                         let take = pool[7].min(h00_still_needed);
-                        allocs.push(Allocation {
-                            target_idx: live_idx as u8,
+allocs.push(Allocation {
+                        target_idx: u8::try_from(live_idx).unwrap(),
                             target_name: card_name.clone(),
                             source_type: SourceType::Stage,
                             source_name: SourceName::AllHeartIconAll,
@@ -2064,8 +2061,12 @@ game_state.set_recently_moved_batch(moved_to_waitroom.into(), Some("live_card_zo
         let num_cards = card_needs.len();
         let mut per_card_filled = vec![[0u8; 8]; num_cards];
         for a in allocs {
-            if (a.target_idx as usize) < num_cards {
-                per_card_filled[a.target_idx as usize][a.color as usize] += a.amount;
+            if let Ok(target_idx) = usize::try_from(a.target_idx) {
+                if target_idx < num_cards {
+                    if let Ok(color_idx) = usize::try_from(a.color) {
+                        per_card_filled[target_idx][color_idx] += a.amount;
+                    }
+                }
             }
         }
         // Check each card
@@ -2091,9 +2092,10 @@ game_state.set_recently_moved_batch(moved_to_waitroom.into(), Some("live_card_zo
                 }
             }
             if ok {
-                for idx in 1..7 {
-                    if filled[idx] < req[idx] {
-                        let deficit = req[idx] - filled[idx];
+                for (idx, (&f, &r)) in filled[1..7].iter().zip(req[1..7].iter()).enumerate() {
+                    if f < r {
+                        let actual_idx = idx + 1;
+                        let deficit = req[actual_idx] - filled[actual_idx];
                         if icon_all >= deficit {
                             icon_all -= deficit;
                         } else {
@@ -2146,13 +2148,13 @@ game_state.set_recently_moved_batch(moved_to_waitroom.into(), Some("live_card_zo
             if need[c] > 0 && pool[c] > 0 {
                 let take = pool[c].min(need[c]);
                 allocs.push(Allocation {
-                    target_idx: idx as u8,
+                    target_idx: u8::try_from(idx).unwrap(),
                     target_name: card_name.clone(),
                     source_type: SourceType::Stage,
                     source_name: SourceName::StageHearts,
                     source_slot: None,
                     wildcard: false,
-                    color: c as u8,
+                    color: u8::try_from(c).unwrap(),
                     amount: take,
                     is_bonus: false,
                     phase: AllocPhase::Colored,
@@ -2227,13 +2229,13 @@ game_state.set_recently_moved_batch(moved_to_waitroom.into(), Some("live_card_zo
             let mut new_filled = filled;
             if take > 0 {
                 allocs.push(Allocation {
-                    target_idx: idx as u8,
+                    target_idx: u8::try_from(idx).unwrap(),
                     target_name: card_name.clone(),
                     source_type: SourceType::Stage,
                     source_name: SourceName::StageHearts,
                     source_slot: None,
                     wildcard: false,
-                    color: c as u8,
+                    color: u8::try_from(c).unwrap(),
                     amount: take,
                     is_bonus: false,
                     phase: AllocPhase::ColoredSurplus,
@@ -2288,8 +2290,8 @@ game_state.set_recently_moved_batch(moved_to_waitroom.into(), Some("live_card_zo
         // never a specific color. Forced (no choice).
         if h00_deficit > 0 && pool[0] > 0 {
             let take = pool[0].min(h00_deficit);
-            allocs.push(Allocation {
-                target_idx: idx as u8,
+allocs.push(Allocation {
+                    target_idx: u8::try_from(idx).unwrap(),
                 target_name: card_name.clone(),
                 source_type: SourceType::Stage,
                 source_name: SourceName::StageHearts,
@@ -2403,10 +2405,10 @@ game_state.set_recently_moved_batch(moved_to_waitroom.into(), Some("live_card_zo
                 let alloc_color = if target_color == 0 {
                     7
                 } else {
-                    target_color as u8
+                    u8::try_from(target_color).unwrap()
                 };
                 allocs.push(Allocation {
-                    target_idx: idx as u8,
+                    target_idx: u8::try_from(idx).unwrap(),
                     target_name: card_name.clone(),
                     source_type: SourceType::Stage,
                     source_name: SourceName::AllHeartIconAll,
@@ -2554,7 +2556,7 @@ game_state.set_recently_moved_batch(moved_to_waitroom.into(), Some("live_card_zo
                     // Q115: Set-to-X applies first, then additive stacks.
                     for (color, me) in card_mods {
                         if me.set != 0 {
-                            required_arr[color.index()] = me.set as u8;
+                            required_arr[color.index()] = u8::try_from(me.set).unwrap();
                         }
                     }
                     for (color, me) in card_mods {
@@ -2586,9 +2588,10 @@ game_state.set_recently_moved_batch(moved_to_waitroom.into(), Some("live_card_zo
                     }
                 }
                 if ok {
-                    for idx in 1..7 {
-                        if filled[idx] < required_arr[idx] {
-                            let deficit = required_arr[idx] - filled[idx];
+                    for (idx, (&f, &r)) in filled[1..7].iter().zip(required_arr[1..7].iter()).enumerate() {
+                        if f < r {
+                            let actual_idx = idx + 1;
+                            let deficit = required_arr[actual_idx] - filled[actual_idx];
                             if icon_all >= deficit {
                                 icon_all -= deficit;
                             } else {
@@ -2644,7 +2647,7 @@ game_state.set_recently_moved_batch(moved_to_waitroom.into(), Some("live_card_zo
 /// Process the ability_applications recorded during the live performance
 /// and populate MemberContribution ability bonuses, score lines, etc.
 pub fn enrich_from_applications(
-    member_contributions: &mut Vec<MemberContribution>,
+    member_contributions: &mut [MemberContribution],
     breakdown: &mut crate::types::Breakdown,
     triggered_abilities: &mut Vec<crate::types::TriggeredAbility>,
     applications: &[crate::types::AbilityApplication],
@@ -2668,9 +2671,9 @@ pub fn enrich_from_applications(
                         } else {
                             crate::types::ArcStr::default()
                         },
-                        amount: app.amount.unsigned_abs() as u8,
+                        amount: u8::try_from(app.amount.unsigned_abs()).unwrap(),
                         color: app.heart_color,
-                        ability_text: app.ability_text.clone().into(),
+                        ability_text: app.ability_text.clone(),
                     });
                 }
                 crate::types::EffectType::BladeBonus => {
@@ -2684,9 +2687,9 @@ pub fn enrich_from_applications(
                         } else {
                             crate::types::ArcStr::default()
                         },
-                        amount: app.amount.unsigned_abs() as u8,
+                        amount: u8::try_from(app.amount.unsigned_abs()).unwrap(),
                         color: app.heart_color,
-                        ability_text: app.ability_text.clone().into(),
+                        ability_text: app.ability_text.clone(),
                     });
                 }
                 _ => {}
@@ -2700,7 +2703,7 @@ pub fn enrich_from_applications(
                     } else {
                         String::new()
                     },
-                    value: app.amount.unsigned_abs() as u8,
+                    value: u8::try_from(app.amount.unsigned_abs()).unwrap(),
                 });
             }
             crate::types::EffectType::Transform => {
@@ -2713,7 +2716,7 @@ pub fn enrich_from_applications(
                     desc: if ABILITY_DEBUG.load(Ordering::Relaxed) {
                         format!(
                             "All hearts become type {}",
-                            app.heart_color.map_or(0, |c| c)
+                            app.heart_color.unwrap_or(0)
                         )
                     } else {
                         String::new()
@@ -2736,7 +2739,7 @@ pub fn enrich_from_applications(
                 card_name: card
                     .map(|c| crate::types::ArcStr::from(c.name.as_ref()))
                     .unwrap_or_default(),
-                effect_text: app.ability_text.clone().into(),
+                effect_text: app.ability_text.clone(),
                 condition_text: None,
                 is_public: true,
             });

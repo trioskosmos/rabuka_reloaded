@@ -27,6 +27,7 @@ pub(crate) struct InputOut {
     pub cur: usize,
     pub detail_mode: bool,
     pub choice_subview: bool,
+    pub choice_hint_detail: bool,
     pub text_page: usize,
     pub choice_grid_offset: usize,
     pub detail_scroll_y: f32,
@@ -51,7 +52,6 @@ pub(crate) struct InputOut {
 }
 
 /// Process one frame of input. `gs`/`acts_cache` are mutated in place; the
-/// scalar UI state is passed by value and returned.
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn handle_input(
     gs: &mut GameState,
@@ -61,6 +61,7 @@ pub(crate) fn handle_input(
     mut cur: usize,
     mut detail_mode: bool,
     mut choice_subview: bool,
+    mut choice_hint_detail: bool,
     mut text_page: usize,
     mut choice_grid_offset: usize,
     mut detail_scroll_y: f32,
@@ -210,7 +211,21 @@ pub(crate) fn handle_input(
     // L toggles overlay; UP/DOWN/LEFT/RIGHT navigate choices; A confirms
     // Overlay shown: L/B dismiss, UP/DOWN scroll text pages
     if has_image_choice && !detail_mode && zone_viewer.is_none() && overlay == Overlay::None {
-        if choice_subview {
+        if choice_hint_detail {
+            // === Choice hint detail: L/B dismiss, UP/DOWN scroll ===
+            if keys & 0x00000200 != 0 || keys & 0x00000002 != 0 {
+                choice_hint_detail = false;
+                redraw = true;
+            }
+            if keys & 0x00000040 != 0 && text_page > 0 {
+                text_page -= 1;
+                redraw = true;
+            }
+            if keys & 0x00000080 != 0 {
+                text_page += 1;
+                redraw = true;
+            }
+        } else if choice_subview {
             // === Text overlay: L/B dismiss, UP/DOWN page through text ===
             if keys & 0x00000200 != 0 || keys & 0x00000002 != 0 {
                 choice_subview = false;
@@ -239,19 +254,27 @@ pub(crate) fn handle_input(
                 }
             }
         } else {
-            // === Choices: L shows the detail screen for the card whose ability
-            // is being activated; DPAD navigates items ===
+            // === Choices: L shows choice hint detail (prompt + source card ability);
+            // R shows cursor card detail; DPAD navigates items ===
             // Card items use grid navigation; text items use vertical list navigation.
             if keys & 0x00000200 != 0 {
-                if let Some(cid) = gs
-                    .ability_queue
-                    .current_entry()
-                    .and_then(|e| e.card_id)
-                {
-                    viewing_card = Some(cid);
-                    detail_mode = true;
-                    detail_scroll_y = 0.0;
+                // L: show choice hint detail (prompt + source card ability)
+                if let Some(_choice) = gs.get_pending_choice() {
+                    choice_hint_detail = true;
+                    text_page = 0;
                     redraw = true;
+                }
+            }
+            if keys & 0x00000100 != 0 {
+                // R: show cursor card detail
+                if display_pos < display_order.len() {
+                    let fi = display_order[display_pos];
+                    if let Some(cid) = acts_cache[fi].parameters.as_ref().and_then(|p| p.card_id) {
+                        viewing_card = Some(cid);
+                        detail_mode = true;
+                        detail_scroll_y = 0.0;
+                        redraw = true;
+                    }
                 }
             }
             let n = display_order.len();
@@ -1193,6 +1216,7 @@ pub(crate) fn handle_input(
         cur,
         detail_mode,
         choice_subview,
+        choice_hint_detail,
         text_page,
         choice_grid_offset,
         detail_scroll_y,
