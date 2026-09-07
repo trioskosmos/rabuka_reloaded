@@ -251,7 +251,8 @@ impl AbilityResolver {
                 );
 
                 let desc_en = format!(
-                    "Select card(s) to reveal from {}",
+                    "Select {} to reveal from {}",
+                    util::card_plural(choices_count),
                     crate::ability::describe::zone_label(Some(&source))
                 );
                 let desc_ja = format!(
@@ -643,7 +644,7 @@ impl AbilityResolver {
             let choice = Choice::select_cards(
                 Zone::RevealedCards.to_str(),
                 max_select,
-                format!("Select card(s) from revealed cards"),
+                format!("Select {} from revealed cards", util::card_plural(max_select)),
                 optional || any_number || available == 0,
             )
             .description_ja(Some("公開されたカードからカードを選択".to_string()))
@@ -817,13 +818,19 @@ impl AbilityResolver {
             )
         } else if is_max || optional {
             format!(
-                "Select up to {} card(s) from the {} looked-at cards (or skip)",
-                max_select, total_count
+                "Select up to {} {} from the {} looked-at {} (or skip)",
+                max_select,
+                util::card_plural(max_select as usize),
+                total_count,
+                util::card_plural(total_count)
             )
         } else {
             format!(
-                "Select {} card(s) from the {} looked-at cards",
-                max_select, total_count,
+                "Select {} {} from the {} looked-at {}",
+                max_select,
+                util::card_plural(max_select as usize),
+                total_count,
+                util::card_plural(total_count)
             )
         };
 
@@ -919,7 +926,7 @@ impl AbilityResolver {
             self.emit_pay_skip_gate(
                 gs,
                 Some(ChoiceRoute::OptionalCost),
-                format!("Look at {} card(s) (optional cost)?", count),
+                format!("Look at {} {} (optional cost)?", count, util::card_plural(count as usize)),
                 format!("{}枚確認（オプションコスト）？", count),
                 true,
                 None,

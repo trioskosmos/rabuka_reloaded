@@ -26,7 +26,7 @@ pub fn member_plural(count: usize) -> &'static str {
 }
 
 /// Returns "energy" for count=1, "energy" (same for both) - Japanese uses same word.
-pub fn energy_plural(count: usize) -> &'static str {
+pub fn energy_plural(_count: usize) -> &'static str {
     "energy"
 }
 

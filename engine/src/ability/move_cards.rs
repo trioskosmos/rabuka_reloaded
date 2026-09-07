@@ -221,9 +221,9 @@ impl AbilityResolver {
         let zone_display = crate::ability::describe::zone_label(Some(zone));
         let zone_display_ja = crate::ability::describe::zone_label_ja(Some(zone));
         let description = if effect.any_number_any().unwrap_or(false) {
-            format!("Select any number of card(s) from {}", zone_display)
+            format!("Select any number of {} from {}", util::card_plural(count), zone_display)
         } else {
-            format!("Select {} card(s) from {}", count, zone_display)
+            format!("Select {} {} from {}", count, util::card_plural(count), zone_display)
         };
         let description_ja = if effect.any_number_any().unwrap_or(false) {
             format!("{}から任意枚選択", zone_display_ja)
@@ -1017,8 +1017,8 @@ impl AbilityResolver {
                     };
                     let description = card_type_filter
                         .and_then(|_| group_name)
-                        .map(|g| format!("Select {count} {g} card(s)"))
-                        .unwrap_or_else(|| "Select card(s)".to_string().into());
+                        .map(|g| format!("Select {count} {g} {}", util::card_plural(count)))
+                        .unwrap_or_else(|| format!("Select {}", util::card_plural(count)));
                     let description_ja = card_type_filter
                         .and_then(|_| group_name)
                         .map(|g| format!("{g}カードを{count}枚選択"))
@@ -1634,7 +1634,7 @@ impl AbilityResolver {
         } else if effect.optional.unwrap_or(false) && count > 0 {
             // Optional discard: card selection with user-friendly description
             let max_take = count.min(matching.len());
-            let description = format!("Discard up to {} looked-at card(s)?", max_take);
+            let description = format!("Discard up to {} looked-at {}?", max_take, util::card_plural(max_take));
             let description_en = Some(description.clone());
             let description_ja = Some(if max_take == 1 {
                 "見たカードを控え室に置きますか？".to_string()
@@ -3321,8 +3321,8 @@ if util::distinct_should_dedupe(distinct) {
                             *count += 1;
                             if *count > mpg {
                                 return Err(format!(
-                                    "Cannot select more than {} card(s) from the same series ({})",
-                                    mpg, card.series
+                                    "Cannot select more than {} {} from the same series ({})",
+                                    mpg, util::card_plural(mpg as usize), card.series
                                 ));
                             }
                         }
@@ -3476,8 +3476,11 @@ if util::distinct_should_dedupe(distinct) {
                 }
             };
             let description = format!(
-                "Select up to {} more card(s) from the {} remaining looked-at cards",
-                remaining_selections, remaining_available
+                "Select up to {} more {} from the {} remaining looked-at {}",
+                remaining_selections,
+                util::card_plural(remaining_selections as usize),
+                remaining_available,
+                util::card_plural(remaining_available)
             );
             self.pending_choice = Some(
                 Choice::select_cards(
@@ -3529,8 +3532,9 @@ if util::distinct_should_dedupe(distinct) {
                 util::place_card_in_zone(player, card_id, &origin, None, false, 1);
             }
             log::debug!(
-                "[LA_SKIP_RETURN] {} card(s) returned to origin {}",
+                "[LA_SKIP_RETURN] {} {} returned to origin {}",
                 remaining_cards.len(),
+                util::card_plural(remaining_cards.len()),
                 origin
             );
             gs.looked_at_cards.clear();

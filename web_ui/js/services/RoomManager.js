@@ -103,7 +103,7 @@ export const RoomManager = {
                     }
                 }
 
-                RoomManager.connectSSE();
+                await RoomManager.connectSSE();
             } else {
                 alert('Failed to create room: ' + data.error);
             }
@@ -161,12 +161,12 @@ export const RoomManager = {
         if (networkFacade?.fetchState) await networkFacade.fetchState();
 
         GameService.startGameplayPolling();
-        RoomManager.connectSSE();
+        await RoomManager.connectSSE();
     },
 
-    connectSSE: () => {
+    connectSSE: async () => {
         if (!State.roomCode) return;
-        SSEClient.connect(State.roomCode, () => {
+        await SSEClient.connect(State.roomCode, () => {
             GameService.triggerVersionCheck();
         });
     },

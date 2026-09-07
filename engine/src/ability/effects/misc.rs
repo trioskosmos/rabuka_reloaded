@@ -1565,7 +1565,7 @@ impl AbilityResolver {
         let mut pending = gs.ability_queue.take_pending_actions();
         pending.insert(0, saved);
         gs.ability_queue.set_pending_actions(pending);
-        let desc_en = format!("Select {} card(s) to receive {} {}", tc, count, resource);
+        let desc_en = format!("Select {} {} to receive {} {}", tc, util::card_plural(tc), count, resource);
         let resource_label =
             crate::ability::describe::resource_label_ja(Some(resource));
         let desc_ja = format!(
@@ -2370,7 +2370,7 @@ impl AbilityResolver {
             Choice::select_cards(
                 Zone::Energy.to_str(),
                 count as usize,
-                "Choose energy card(s) to place under member",
+                format!("Choose {} {} to place under member", count, util::card_plural(count as usize)),
                 optional,
             )
             .destination(Some("under_member".to_string()))

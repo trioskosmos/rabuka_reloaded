@@ -9,27 +9,49 @@ function getInjectedBackendUrl() {
     return meta ? meta.getAttribute('content') : null;
 }
 
-const injectedBackendUrl = getInjectedBackendUrl();
-const isGitHubPages = typeof window !== 'undefined' && window.location.hostname.includes('github.io');
-const BACKEND_URL = injectedBackendUrl || (isGitHubPages
-    ? (window.RABUKA_BACKEND_URL || 'https://your-rabuka-server.onrender.com')
-    : '');
+// Wait for DOM to be ready before reading meta tag
+function waitForMetaTag() {
+    return new Promise(resolve => {
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', () => resolve(getInjectedBackendUrl()));
+        } else {
+            resolve(getInjectedBackendUrl());
+        }
+    });
+}
+
+// Initialize backend URL asynchronously
+let BACKEND_URL_PROMISE = waitForMetaTag().then(injectedBackendUrl => {
+    const isGitHubPages = typeof window !== 'undefined' && window.location.hostname.includes('github.io');
+    return injectedBackendUrl || (isGitHubPages
+        ? (window.RABUKA_BACKEND_URL || 'https://your-rabuka-server.onrender.com')
+        : '');
+});
+
+// Synchronous getter that blocks until backend URL is ready
+let _cachedBackendUrl = null;
+export async function getBackendUrl() {
+    if (_cachedBackendUrl !== null) return _cachedBackendUrl;
+    _cachedBackendUrl = await BACKEND_URL_PROMISE;
+    return _cachedBackendUrl;
+}
 
 function buildUrl(path) {
+    // This will be called after getBackendUrl() in apiFetch
     const cleanPath = path.startsWith('/') ? path.slice(1) : path;
-    return BACKEND_URL ? `${BACKEND_URL}/${cleanPath}` : path;
+    return _cachedBackendUrl ? `${_cachedBackendUrl}/${cleanPath}` : path;
 }
 
 function buildSseUrl(roomId) {
-    return BACKEND_URL ? `${BACKEND_URL}/api/events?room_id=${roomId}` : `/api/events?room_id=${roomId}`;
-}
-
-export function getBackendUrl() {
-    return BACKEND_URL;
+    return _cachedBackendUrl ? `${_cachedBackendUrl}/api/events?room_id=${roomId}` : `/api/events?room_id=${roomId}`;
 }
 
 export function isCrossOrigin() {
-    return isGitHubPages && BACKEND_URL.length > 0;
+    return typeof window !== 'undefined' && window.location.hostname.includes('github.io') && _cachedBackendUrl?.length > 0;
+}
+
+export function getSseUrl(roomId) {
+    return buildSseUrl(roomId);
 }
 
 /**
@@ -49,16 +71,14 @@ export function apiHeaders() {
  * with any caller-supplied options so every service talks to the server the
  * same way. Returns the raw Response; callers decide how to read it.
  */
-export function apiFetch(path, options = {}) {
+export async function apiFetch(path, options = {}) {
+    // Ensure backend URL is resolved before making request
+    await getBackendUrl();
     const { headers, ...rest } = options;
     return fetch(buildUrl(path), {
         ...rest,
         headers: { ...apiHeaders(), ...(headers || {}) }
     });
-}
-
-export function getSseUrl(roomId) {
-    return buildSseUrl(roomId);
 }
 
 /**

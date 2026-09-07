@@ -1,12 +1,14 @@
-import { getSseUrl } from '../network.js';
+import { getSseUrl, getBackendUrl } from '../network.js';
 
 let eventSource = null;
 
 export const SSEClient = {
-    connect: (roomCode, onUpdate) => {
+    connect: async (roomCode, onUpdate) => {
         if (eventSource) {
             eventSource.close();
         }
+        // Ensure backend URL is resolved before connecting SSE
+        await getBackendUrl();
         eventSource = new EventSource(getSseUrl(roomCode));
         eventSource.onmessage = (e) => {
             if (e.data === 'update' && onUpdate) {
