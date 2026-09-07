@@ -1,9 +1,27 @@
 import { getSseUrl, getBackendUrl } from '../network.js';
 
 let eventSource = null;
+let reconnectAttempt = 0;
+let reconnectTimeout = null;
+let currentRoomCode = null;
+let currentOnUpdate = null;
+
+function scheduleReconnect() {
+    if (reconnectTimeout) clearTimeout(reconnectTimeout);
+    const delay = Math.min(1000 * Math.pow(2, reconnectAttempt), 30000);
+    console.log(`[SSE] Reconnecting in ${delay}ms (attempt ${reconnectAttempt + 1})`);
+    reconnectTimeout = setTimeout(() => {
+        reconnectAttempt++;
+        SSEClient.connect(currentRoomCode, currentOnUpdate);
+    }, delay);
+}
 
 export const SSEClient = {
     connect: async (roomCode, onUpdate) => {
+        currentRoomCode = roomCode;
+        currentOnUpdate = onUpdate;
+        reconnectAttempt = 0;
+
         if (eventSource) {
             eventSource.close();
         }
@@ -26,17 +44,25 @@ export const SSEClient = {
         };
         eventSource.onopen = () => {
             console.log('[SSE] connected to room', roomCode);
+            reconnectAttempt = 0; // Reset on successful connection
         };
         eventSource.onerror = (err) => {
             console.error('[SSE] error:', err);
+            if (eventSource.readyState === EventSource.CLOSED) {
+                scheduleReconnect();
+            }
         };
         return eventSource;
     },
 
     disconnect: () => {
+        if (reconnectTimeout) clearTimeout(reconnectTimeout);
+        reconnectTimeout = null;
         if (eventSource) {
             eventSource.close();
             eventSource = null;
         }
+        currentRoomCode = null;
+        currentOnUpdate = null;
     }
 };

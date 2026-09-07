@@ -1148,6 +1148,27 @@ async fn get_status(data: web::Data<AppState>) -> impl Responder {
     }))
 }
 
+/// Prometheus-compatible metrics endpoint
+async fn get_metrics(data: web::Data<AppState>) -> impl Responder {
+    let rooms = lock_recover(&data.rooms);
+    let total_rooms = rooms.len();
+    let active_rooms = rooms.values().filter(|r| r.game_state.is_some()).count();
+    let total_sessions: usize = rooms.values().map(|r| r.sessions.len()).sum();
+    
+    let frame_counter = *lock_recover(&data.frame_counter);
+    
+    let mut output = String::new();
+    output.push_str(&format!("rabuka_total_rooms {}\n", total_rooms));
+    output.push_str(&format!("rabuka_active_rooms {}\n", active_rooms));
+    output.push_str(&format!("rabuka_total_sessions {}\n", total_sessions));
+    output.push_str(&format!("rabuka_frame_counter {}\n", frame_counter));
+    output.push_str(&format!("rabuka_card_database_size {}\n", data.card_database.cards.len()));
+    
+    HttpResponse::Ok()
+        .content_type("text/plain; version=0.0.4; charset=utf-8")
+        .body(output)
+}
+
 async fn health_check() -> impl Responder {
     HttpResponse::Ok().json(serde_json::json!({ "status": "ok" }))
 }
@@ -1760,6 +1781,22 @@ async fn export_game(data: web::Data<AppState>) -> impl Responder {
     HttpResponse::Ok().json(serde_json::json!({"success": true, "game_state": display}))
 }
 
+/// Import game state from JSON (for replay/debug)
+async fn import_game(
+    data: web::Data<AppState>,
+    _req: web::Json<serde_json::Value>,
+) -> impl Responder {
+    let mut game_state = lock_state!(data.game_state, write);
+    // Reset to initial state
+    *game_state = crate::game_state::GameState::new(
+        crate::player::Player::new("player1".into(), "Player 1".into(), true),
+        crate::player::Player::new("player2".into(), "Player 2".into(), false),
+        data.card_database.clone(),
+    );
+    // Apply imported state - simplified for now
+    HttpResponse::Ok().json(serde_json::json!({"success": true, "message": "Import endpoint ready - full implementation pending"}))
+}
+
 fn deck_files() -> Vec<PathBuf> {
     let decks_dir = PathBuf::from("../web_ui/decks");
     let mut files = Vec::new();
@@ -1973,6 +2010,45 @@ async fn rooms_list(data: web::Data<AppState>) -> impl Responder {
         })
         .collect();
     HttpResponse::Ok().json(serde_json::json!({ "success": true, "rooms": public_rooms }))
+}
+
+/// Spectator mode: read-only game state for a room (no session required)
+async fn rooms_spectate(
+    data: web::Data<AppState>,
+    req: actix_web::HttpRequest,
+) -> impl Responder {
+    let room_id = actix_web::web::Query::<std::collections::HashMap<String, String>>::from_query(req.query_string())
+        .ok()
+        .and_then(|params| params.get("room_id").cloned())
+        .map(|s| s.to_uppercase())
+        .filter(|s| !s.is_empty());
+
+    let room_id = match room_id {
+        Some(id) => id,
+        None => return HttpResponse::BadRequest().json(serde_json::json!({ "success": false, "error": "room_id required" })),
+    };
+
+    let rooms = lock_recover(&data.rooms);
+    let room = match rooms.get(&room_id) {
+        Some(r) => r,
+        None => return HttpResponse::NotFound().json(serde_json::json!({ "success": false, "error": "Room not found" })),
+    };
+
+    let gs_arc = match &room.game_state {
+        Some(gs) => gs.clone(),
+        None => return HttpResponse::Ok().json(serde_json::json!({ "success": false, "error": "Game not started" })),
+    };
+
+    let game_state = lock_state!(gs_arc, read);
+    let display = crate::display::game_state_to_display(&game_state);
+    drop(game_state);
+
+    HttpResponse::Ok().json(serde_json::json!({
+        "success": true,
+        "room_id": room_id,
+        "mode": room.mode,
+        "game_state": display,
+    }))
 }
 
 /// Notify all SSE clients in a room that state has changed.
@@ -3109,6 +3185,7 @@ pub async fn run_web_server_with_ngrok(ngrok_authtoken: Option<String>) -> std::
             .wrap(cors)
             .app_data(app_state.clone())
             .route("/health", web::get().to(health_check))
+            .route("/metrics", web::get().to(get_metrics))
             .route("/api/game-state", web::get().to(get_game_state))
             .route("/api/game-state/delta", web::get().to(game_state_delta))
             .route(
@@ -3134,12 +3211,14 @@ pub async fn run_web_server_with_ngrok(ngrok_authtoken: Option<String>) -> std::
             .route("/api/debug/dump_frames", web::get().to(debug_dump_frames))
             .route("/api/debug/conditions", web::get().to(debug_conditions))
             .route("/api/export_game", web::get().to(export_game))
+            .route("/api/import_game", web::post().to(import_game))
             .route("/api/get_decks", web::get().to(get_decks))
             .route("/api/get_random_deck", web::get().to(get_random_deck))
             .route("/api/get_test_deck", web::get().to(get_test_deck))
             .route("/api/get_card_registry", web::get().to(get_card_registry))
             .route("/api/set_deck", web::post().to(set_deck))
             .route("/api/rooms/list", web::get().to(rooms_list))
+            .route("/api/rooms/spectate", web::get().to(rooms_spectate))
             .route("/api/rooms/create", web::post().to(rooms_create))
             .route("/api/rooms/join", web::post().to(rooms_join))
             .route("/api/rooms/leave", web::post().to(rooms_leave))
