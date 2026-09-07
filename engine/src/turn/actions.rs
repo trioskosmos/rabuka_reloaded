@@ -300,7 +300,7 @@ impl super::TurnEngine {
                             .get(&key)
                             .copied()
                             .unwrap_or(0);
-                        if u8::from(used) >= use_limit {
+                        if used >= use_limit {
                             continue;
                         }
                     }
@@ -404,7 +404,7 @@ impl super::TurnEngine {
             C::SelectCard { zone, .. } => {
                 let idxs = card_indices
                     .map(|v| v.to_vec())
-                    .or_else(|| card_id.map(|id| vec![id as usize]))
+                    .or_else(|| card_id.and_then(|id| usize::try_from(id).ok()).map(|id| vec![id]))
                     .unwrap_or_default();
                 if idxs.is_empty() {
                     vec!["(none)".to_string()]
@@ -424,8 +424,16 @@ impl super::TurnEngine {
                     {
                         // Use the option text when it's a labelled option.
                         if let Some(ref o) = options {
-                            if id >= 0 && (id as usize) < o.len() {
-                                Some(o[id as usize].clone())
+                            if id >= 0 {
+                                if let Ok(idx) = usize::try_from(id) {
+                                    if idx < o.len() {
+                                        Some(o[idx].clone())
+                                    } else {
+                                        Some(id.to_string())
+                                    }
+                                } else {
+                                    Some(id.to_string())
+                                }
                             } else {
                                 Some(id.to_string())
                             }
@@ -434,7 +442,7 @@ impl super::TurnEngine {
                         }
                     }
                     Some(id) => Some(id.to_string()),
-                    None if card_indices.map_or(true, |v| v.is_empty()) => {
+                    None if card_indices.is_none_or(|v| v.is_empty()) => {
                         None // may be skipped; handled by skip flag
                     }
                     None => card_indices
@@ -455,9 +463,16 @@ impl super::TurnEngine {
                 .unwrap_or_default(),
             C::SelectHeartColor { options, .. } | C::SelectHeartType { options, .. } => card_id
                 .map(|id| {
-                    let idx = id as usize;
-                    if idx < options.len() {
-                        vec![options[idx].clone()]
+                    if id >= 0 {
+                        if let Ok(idx) = usize::try_from(id) {
+                            if idx < options.len() {
+                                vec![options[idx].clone()]
+                            } else {
+                                vec!["heart00".to_string()]
+                            }
+                        } else {
+                            vec!["heart00".to_string()]
+                        }
                     } else {
                         vec!["heart00".to_string()]
                     }
@@ -474,9 +489,16 @@ impl super::TurnEngine {
                 .unwrap_or_default(),
             C::SelectAutoAbility { options, .. } => card_id
                 .map(|id| {
-                    let idx = id as usize;
-                    if idx < options.len() {
-                        vec![options[idx].card_name.clone()]
+                    if id >= 0 {
+                        if let Ok(idx) = usize::try_from(id) {
+                            if idx < options.len() {
+                                vec![options[idx].card_name.clone()]
+                            } else {
+                                vec![format!("#{id}")]
+                            }
+                        } else {
+                            vec![format!("#{id}")]
+                        }
                     } else {
                         vec![format!("#{id}")]
                     }
@@ -485,7 +507,7 @@ impl super::TurnEngine {
             C::SelectLiveSuccess { options, .. } => {
                 let idx = card_indices
                     .and_then(|v| v.first().copied())
-                    .or_else(|| card_id.map(|id| id as usize))
+                    .or_else(|| card_id.and_then(|id| usize::try_from(id).ok()))
                     .unwrap_or(0);
                 if idx < options.len() {
                     vec![options[idx].card_name.clone()]
@@ -517,12 +539,12 @@ impl super::TurnEngine {
                     return false;
                 }
                 match target.as_str() {
-                    "primary|alternative" => return card_id == Some(2),
-                    crate::ability::types::PAY_SKIP_TARGET => return card_id == Some(2),
-                    "pay_cost_all:discard_all" => return card_id == Some(2),
+                    "primary|alternative" => card_id == Some(2),
+                    crate::ability::types::PAY_SKIP_TARGET => card_id == Some(2),
+                    "pay_cost_all:discard_all" => card_id == Some(2),
                     "choice" | "choice_string" | "conditional_optional" => {
-                        return card_id.is_none()
-                            && card_indices.map_or(true, |v| v.is_empty())
+                        card_id.is_none()
+                            && card_indices.is_none_or(|v| v.is_empty())
                     }
                     _ => card_id == Some(-1),
                 }
@@ -547,7 +569,7 @@ impl super::TurnEngine {
         // "Unknown source position"), dropping cards without any error.
         {
             let empty_answer = card_id.is_none()
-                && card_indices.as_deref().map_or(true, |v| v.is_empty());
+                && card_indices.as_deref().is_none_or(|v| v.is_empty());
             let skippable = match &choice {
                 crate::ability::types::Choice::SelectCard { allow_skip, .. }
                 | crate::ability::types::Choice::SelectTarget { allow_skip, .. }
@@ -616,7 +638,7 @@ impl super::TurnEngine {
             let player_id = game_state
                 .pending_success_replacement_player_id
                 .take()
-                .unwrap_or_else(|| "player1".to_string().into());
+                .unwrap_or_else(|| "player1".to_string());
             let result = Self::build_choice_result(&choice, card_id, ci, None)?;
             let player = if player_id == game_state.player1.id {
                 &mut game_state.player1
@@ -705,7 +727,7 @@ impl super::TurnEngine {
         match choice {
             crate::ability::types::Choice::SelectCard { .. } => {
                 let indices = card_indices
-                    .unwrap_or_else(|| card_id.map(|id| vec![id as usize]).unwrap_or_default());
+                    .unwrap_or_else(|| card_id.and_then(|id| usize::try_from(id).ok()).map(|id| vec![id]).unwrap_or_default());
                 Ok(crate::ability::types::ChoiceResult::CardSelected { indices })
             }
             crate::ability::types::Choice::SelectTarget {
@@ -761,12 +783,16 @@ impl super::TurnEngine {
                         {
                             if let Some(ref opts) = options {
                                 if let Some(id) = card_id {
-                                    if id >= 0 && (id as usize) < opts.len() {
-                                        return Ok(
-                                            crate::ability::types::ChoiceResult::TargetSelected {
-                                                target: opts[id as usize].clone(),
-                                            },
-                                        );
+                                    if id >= 0 {
+                                        if let Ok(idx) = usize::try_from(id) {
+                                            if idx < opts.len() {
+                                                return Ok(
+                                                    crate::ability::types::ChoiceResult::TargetSelected {
+                                                        target: opts[idx].clone(),
+                                                    },
+                                                );
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -799,12 +825,16 @@ impl super::TurnEngine {
                                     }
                                 }
                                 if let Some(id) = card_id {
-                                    if id >= 0 && (id as usize) < opts.len() {
-                                        return Ok(
-                                            crate::ability::types::ChoiceResult::TargetSelected {
-                                                target: opts[id as usize].clone(),
-                                            },
-                                        );
+                                    if id >= 0 {
+                                        if let Ok(idx) = usize::try_from(id) {
+                                            if idx < opts.len() {
+                                                return Ok(
+                                                    crate::ability::types::ChoiceResult::TargetSelected {
+                                                        target: opts[idx].clone(),
+                                                    },
+                                                );
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -824,12 +854,16 @@ impl super::TurnEngine {
                                     }
                                 }
                                 if let Some(id) = card_id {
-                                    if id >= 0 && (id as usize) < opts.len() {
-                                        return Ok(
-                                            crate::ability::types::ChoiceResult::TargetSelected {
-                                                target: opts[id as usize].clone(),
-                                            },
-                                        );
+                                    if id >= 0 {
+                                        if let Ok(idx) = usize::try_from(id) {
+                                            if idx < opts.len() {
+                                                return Ok(
+                                                    crate::ability::types::ChoiceResult::TargetSelected {
+                                                        target: opts[idx].clone(),
+                                                    },
+                                                );
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -876,7 +910,7 @@ impl super::TurnEngine {
                 description: _,
                 ..
             } => {
-                let idx = card_id.unwrap_or(0) as usize;
+                let idx = card_id.and_then(|id| usize::try_from(id).ok()).unwrap_or(0);
                 let chosen = if idx < options.len() {
                     options[idx].clone()
                 } else {
@@ -890,7 +924,7 @@ impl super::TurnEngine {
                 let idx = card_indices
                     .as_ref()
                     .and_then(|v| v.first().copied())
-                    .or_else(|| card_id.map(|id| id as usize))
+                    .or_else(|| card_id.and_then(|id| usize::try_from(id).ok()))
                     .unwrap_or(0);
                 let card_index = if idx < options.len() {
                     options[idx].card_index
@@ -900,7 +934,7 @@ impl super::TurnEngine {
                 Ok(crate::ability::types::ChoiceResult::LiveSuccessSelected { card_index })
             }
             crate::ability::types::Choice::SelectAutoAbility { options, .. } => {
-                let idx = card_id.unwrap_or(0) as usize;
+                let idx = card_id.and_then(|id| usize::try_from(id).ok()).unwrap_or(0);
                 let queue_idx = if idx < options.len() {
                     options[idx].queue_index
                 } else {
@@ -1094,9 +1128,9 @@ impl super::TurnEngine {
             // Numeric key: (card_id as u8) << 16 | ability_index as u8
             let just_completed_key: Option<u32> =
                 game_state.ability_queue.current_entry().and_then(|e| {
-                    let cid = e.card_id? as u32;
-                    let idx = e.ability_index as u32;
-                    Some((cid << 16) | idx)
+                    let cid = e.card_id?;
+                    let idx = e.ability_index;
+                    Some((u32::try_from(cid).ok()? << 16) | u32::try_from(idx).ok()?)
                 });
             let entry_player_id = game_state
                 .ability_queue
@@ -1170,8 +1204,8 @@ impl super::TurnEngine {
                 game_state.clear_effect_tracking();
                 let player_id = entry_player_id
                     .clone()
-                    .unwrap_or_else(|| "p1".to_string().into());
-                game_state.just_completed_ability_key = just_completed_key.clone();
+                    .unwrap_or_else(|| "p1".to_string());
+                game_state.just_completed_ability_key = just_completed_key;
                 game_state.process_pending_auto_abilities(&player_id);
                 game_state.just_completed_ability_key = None;
                 game_state.clear_movement_tracking();
@@ -1187,15 +1221,15 @@ impl super::TurnEngine {
                         .ability_queue
                         .current_entry()
                         .map(|e| e.player_id.clone())
-                        .unwrap_or_else(|| "p1".to_string().into());
-                    game_state.process_with_completed_key(just_completed_key.clone(), &player_id);
+                        .unwrap_or_else(|| "p1".to_string());
+                    game_state.process_with_completed_key(just_completed_key, &player_id);
                 } else {
                     // Effect completed without sub-choice  Eprocess any newly
                     // enqueued watcher abilities (e.g. each_time triggers).
                     let player_id = entry_player_id
                         .clone()
-                        .unwrap_or_else(|| "p1".to_string().into());
-                    game_state.process_with_completed_key(just_completed_key.clone(), &player_id);
+                        .unwrap_or_else(|| "p1".to_string());
+                    game_state.process_with_completed_key(just_completed_key, &player_id);
                 }
             } else if cost_was_paid {
                 // Record use_limit when ability completes (cost+effect both resolved).
@@ -1214,7 +1248,7 @@ impl super::TurnEngine {
                 if cost_entry_opt_result != Some(false) {
                     let pid = entry_player_id
                         .clone()
-                        .unwrap_or_else(|| "p1".to_string().into());
+                        .unwrap_or_else(|| "p1".to_string());
                     if let Some(crate::game_state::AbilityTrigger::LiveStart) = cost_entry_trigger {
                         if let Some(cid) = cost_entry_card_id {
                             game_state.trigger_each_time_for_member(
@@ -1249,7 +1283,7 @@ impl super::TurnEngine {
                 game_state.clear_effect_tracking();
                 let player_id = entry_player_id
                     .clone()
-                    .unwrap_or_else(|| "p1".to_string().into());
+                    .unwrap_or_else(|| "p1".to_string());
                 if game_state.recently_moved_cards.is_some()
                     || game_state.last_energy_placed_by_effect()
                     || !game_state.recently_appeared_cards.is_empty()
@@ -1258,8 +1292,7 @@ impl super::TurnEngine {
                         moved_cards: game_state
                             .recently_moved_cards
                             .clone()
-                            .unwrap_or_default()
-                            .into(),
+                            .unwrap_or_default(),
                         moved_from_zone: game_state.recently_moved_from_zone.clone(),
                         position_change_occurred: game_state.position_change_occurred_this_turn,
                         energy_placed_by_effect: game_state.last_energy_placed_by_effect(),
@@ -1268,18 +1301,18 @@ impl super::TurnEngine {
                             .map(|s| s.to_string()),
                         ..Default::default()
                     };
-                    game_state.just_completed_ability_key = just_completed_key.clone();
+                    game_state.just_completed_ability_key = just_completed_key;
                     game_state.trigger_auto_abilities_for_player_with_event(&player_id, &event);
                     game_state.just_completed_ability_key = None;
                 }
-                game_state.process_with_completed_key(just_completed_key.clone(), &player_id);
+                game_state.process_with_completed_key(just_completed_key, &player_id);
                 game_state.clear_movement_tracking();
             } else {
                 game_state.ability_queue.complete_current();
                 game_state.clear_effect_tracking();
                 let player_id = entry_player_id
                     .clone()
-                    .unwrap_or_else(|| "p1".to_string().into());
+                    .unwrap_or_else(|| "p1".to_string());
                 if game_state.recently_moved_cards.is_some()
                     || game_state.last_energy_placed_by_effect()
                     || !game_state.recently_appeared_cards.is_empty()
@@ -1288,8 +1321,7 @@ impl super::TurnEngine {
                         moved_cards: game_state
                             .recently_moved_cards
                             .clone()
-                            .unwrap_or_default()
-                            .into(),
+                            .unwrap_or_default(),
                         moved_from_zone: game_state.recently_moved_from_zone.clone(),
                         position_change_occurred: game_state.position_change_occurred_this_turn,
                         energy_placed_by_effect: game_state.last_energy_placed_by_effect(),
@@ -1298,11 +1330,11 @@ impl super::TurnEngine {
                             .map(|s| s.to_string()),
                         ..Default::default()
                     };
-                    game_state.just_completed_ability_key = just_completed_key.clone();
+                    game_state.just_completed_ability_key = just_completed_key;
                     game_state.trigger_auto_abilities_for_player_with_event(&player_id, &event);
                     game_state.just_completed_ability_key = None;
                 }
-                game_state.process_with_completed_key(just_completed_key.clone(), &player_id);
+                game_state.process_with_completed_key(just_completed_key, &player_id);
                 game_state.clear_movement_tracking();
             }
         }
