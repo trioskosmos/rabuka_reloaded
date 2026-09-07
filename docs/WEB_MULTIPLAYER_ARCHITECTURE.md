@@ -8,7 +8,6 @@
 │  ├── index.html, JS, CSS  (~200 KB gzipped)                      │
 │  ├── cards/cards.json      (2.5 MB)                              │
 │  ├── cards/abilities.json  (1.4 MB)                              │
-│  ├── engine/card_id_mapping.json (~500 KB, optional)             │
 │  └── img/cards_webp/       (3,232 × 80 KB = 260 MB)             │
 └─────────────────────────────────────────────────────────────────┘
                               │
@@ -62,21 +61,22 @@
 
 ## Target Web Architecture (v3 - WASM P2P) — **THEORETICAL**
 
+### Option A: Pure P2P (Zero Server)
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │  GitHub Pages (Free CDN) - STATIC + WASM                         │
 │  ├── rabuka_engine.wasm  (~3-5 MB gzipped)                       │
 │  ├── All static assets (unchanged)                               │
 └─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
+                               │
+                               ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │  Cloudflare Workers / Fly.io (Relay Only)                        │
 │  ├── WebSocket / WebRTC relay (~10 MB, no game logic)           │
 │  └── Rate limiting, DDoS protection                              │
 └─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
+                               │
+                               ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │  Browser A (WASM Engine)          Browser B (WASM Engine)       │
 │  ├── Full deterministic engine    ├── Full deterministic engine │
@@ -88,6 +88,38 @@
 **Per-turn bandwidth**: ~50 B (ActionSync + RNG seeds)
 **Latency**: Local execution + relay (~10-50 ms)
 **Server cost**: $0 (Cloudflare Workers free tier)
+
+### Option B: Hybrid (Keep Render for Matchmaking/Rooms)
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  GitHub Pages (Free CDN) - STATIC + WASM                         │
+│  ├── rabuka_engine.wasm  (~3-5 MB gzipped)                       │
+│  ├── All static assets (unchanged)                               │
+└─────────────────────────────────────────────────────────────────┘
+                               │
+              ┌──────────────────┴──────────────────┐
+              ▼                                     ▼
+┌─────────────────────────────────┐ ┌─────────────────────────────────┐
+│  Render (Matchmaking/Lobby)     │ │  Cloudflare Workers (Relay)     │
+│  ├── Room create/join/list      │ │  ├── WebSocket relay            │
+│  ├── Player presence            │ │  └── No game logic              │
+│  ├── Spectator state (read-only)│ └─────────────────────────────────┘
+│  └── Replay import/export       │              │
+└─────────────────────────────────┘              │
+                               │                 │
+                               ▼                 ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  Browser A (WASM Engine)          Browser B (WASM Engine)       │
+│  ├── Full deterministic engine    ├── Full deterministic engine │
+│  ├── Local replay/analysis      ├── Local replay/analysis       │
+│  └── Offline play               └── Offline play                │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Per-turn bandwidth**: ~50 B (ActionSync + RNG seeds) + optional Render sync
+**Latency**: Local execution + relay (~10-50 ms)
+**Server cost**: $0 (Render free tier + Cloudflare Workers free tier)
+**Benefit**: Keeps room management, spectator mode, replay features on Render
 
 ---
 
@@ -157,21 +189,23 @@ pub struct FrameAction {
 | **Delta Polling** | `GameService.js` | Poll `/delta?since=X` after SSE push |
 | **SSE Reconnection** | `SSEClient.js` | Exponential backoff (1s→30s cap) |
 | **SSE Frame ID** | `SSEClient.js` | Server sends `update <frame_id>` |
-| **Static Assets from Pages** | `state.js` | `cards.json`, `card_id_mapping.json` from GitHub Pages |
+| **Static Assets from Pages** | `state.js` | `cards.json`, `abilities.json` from GitHub Pages |
 | **Cross-Origin API** | `network.js` | `apiFetch` → Render, relative fetch → Pages |
 
 ---
 
 ## Bandwidth Comparison
 
-| Metric | v1 (Full State) | v2 (Delta/Action) | v3 (WASM P2P) |
-|--------|-----------------|-------------------|---------------|
-| **Per-turn (PVP)** | ~40 KB | **~232 B** | ~50 B |
-| **Initial load** | 30 KB | 30 KB | +5 MB WASM |
-| **Monthly Render (1k games)** | 675 MB | **~2.3 MB** | ~0.5 MB (relay) |
-| **Latency/turn** | 1 RTT (~100ms) | 1 RTT | Local (~0ms) + relay |
-| **Offline/Replay** | ❌ | ❌ (server needed) | ✅ Full local |
-| **Cheat prevention** | Server validates | Server validates | Commit-reveal + replay |
+| Metric | v1 (Full State) | v2 (Delta/Action) | v3a (WASM P2P Pure) | v3b (WASM Hybrid + Render) |
+|--------|-----------------|-------------------|---------------------|----------------------------|
+| **Per-turn (PVP)** | ~40 KB | **~232 B** | ~50 B | ~50 B |
+| **Initial load** | 30 KB | 30 KB | +5 MB WASM | +5 MB WASM |
+| **Monthly Render (1k games)** | 675 MB | **~2.3 MB** | $0 (deleted) | ~2.3 MB (lobby only) |
+| **Monthly Relay (1k games)** | — | — | ~0.5 MB | ~0.5 MB |
+| **Latency/turn** | 1 RTT (~100ms) | 1 RTT | Local (~0ms) + relay | Local (~0ms) + relay |
+| **Offline/Replay** | ❌ | ❌ (server needed) | ✅ Full local | ✅ Full local |
+| **Cheat prevention** | Server validates | Server validates | Commit-reveal + replay | Commit-reveal + replay |
+| **Room mgmt / Spectate** | Server | Server | ❌ (P2P only) | ✅ Render |
 
 ---
 
@@ -181,14 +215,22 @@ pub struct FrameAction {
 |-------|------|------|
 | `cards.json` | 2.5 MB | GitHub Pages |
 | `abilities.json` | 1.4 MB | GitHub Pages |
-| `card_id_mapping.json` | ~500 KB | GitHub Pages (optional, generated at deploy) |
 | 3,232 card `.webp` | 260 MB | GitHub Pages |
 | `texticon/` UI icons | ~2 MB | GitHub Pages |
 | `tutorial/` images | ~5 MB | GitHub Pages |
 | All JS/CSS/HTML | ~500 KB | GitHub Pages |
+| `rabuka_engine.wasm` (v3) | ~4 MB | GitHub Pages |
 
-**Server serves**: Only dynamic game logic (actions, state deltas, SSE)
+**Server serves**: Only dynamic game logic (actions, state deltas, SSE) in v2; **nothing in v3a**, lobby only in v3b
 **Server stores**: Room metadata, game state per active match (~few KB each)
+
+### GitHub Pages Bandwidth & Caching
+- **100 GB/month soft limit** — your 260 MB images + 5 MB WASM = trivial
+- **Browser caches aggressively**: `Cache-Control: max-age=31536000` (1 year) for immutable assets
+- **First visit**: ~270 MB downloaded (images + WASM)
+- **Repeat visits**: ~0 MB (served from browser cache)
+- **Bandwidth counted**: Only on cache miss (new visitors, cache cleared, new versions)
+- **100 GB/month supports**: ~370k first-time visitors/month (well beyond current scale)
 
 ---
 
@@ -202,11 +244,6 @@ pub struct FrameAction {
   - `allowed_headers: Content-Type, Authorization, X-Session-Token, X-Room-Id, Accept, Origin`
   - `supports_credentials()` + `expose_headers`
   - Removed manual CORS headers from SSE endpoint (middleware handles it)
-
-### Missing `card_id_mapping.json` on GitHub Pages
-- **Issue**: `GET https://trioskosmos.github.io/rabuka_reloaded/engine/card_id_mapping.json 404`
-- **Fix**: Added fallback in deploy workflow (`.github/workflows/deploy-pages.yml:26-37`) to create empty `{}` if file doesn't exist
-- **Client handling**: Already graceful in `state.js:363-367` - optional, doesn't block loading
 
 ### DOM Elements Missing
 - **Issue**: `Element not found: room-code-header`, `room-display`, `system-status-badge`
@@ -229,6 +266,8 @@ pub struct FrameAction {
 | Web Worker off-main-thread | ❌ `postMessage` + `SharedArrayBuffer` | 2 days |
 | Commit-reveal anti-cheat | ❌ Ed25519, replay verify | 3-5 days |
 | Cloudflare Workers relay | ❌ 10 lines Worker script | 1 day |
-| **Total** | | **~3 weeks** |
+| Render lobby (v3b hybrid) | ❌ Room list, presence, spectate | 3 days |
+| **Total (v3a pure)** | | **~3 weeks** |
+| **Total (v3b hybrid)** | | **~3.5 weeks** |
 
-**Verdict**: Stay with v2. It works, costs $0, scales. Port to WASM only when you need true P2P, offline replay, or zero-server-cost at massive scale.
+**Verdict**: Stay with v2. It works, costs $0, scales. Port to WASM only when you need true P2P, offline replay, or zero-server-cost at massive scale. **v3b hybrid keeps Render for lobby/spectate/replay features** while moving gameplay to WASM.
