@@ -16,7 +16,7 @@ export const DeckSetupModal = {
 
     fetchAndPopulateDecks: async () => {
         try {
-            const resp = await fetch('api/get_decks');
+            const resp = await Network.apiFetch('api/get_decks');
             const data = await resp.json();
             if (data.success && data.decks) {
                 Modals.deckPresets = data.decks;

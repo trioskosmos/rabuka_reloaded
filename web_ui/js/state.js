@@ -1,4 +1,5 @@
 import { getAppBaseUrl, isMulliganPhase } from './constants.js';
+import { apiFetch } from './network.js';
 
 const _target = new EventTarget();
 
@@ -107,7 +108,7 @@ const stateInternal = {
         }
 
         try {
-            const res = await fetch('api/ui/config', {
+            const res = await apiFetch('api/ui/config', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(changes)
