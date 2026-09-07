@@ -143,21 +143,8 @@ pub fn choose_action_v7(gs: &GameState, actions: &[Action], me: u8) -> Action {
 
         // Heavy penalty for reducing passable lives (unless it's a Baton Touch upgrade)
         if d_pass < 0.0 && !is_baton_ability {
-            val -= 100.0 * (-d_pass); // -100 per passable lost (was 200)
+            val -= 50.0 * (-d_pass); // -50 per passable lost
             parts.push(format!("PASS_LOSS{}", d_pass as i32));
-        }
-
-        // Moderate penalty for reducing stage hearts/blades (replacing better member with worse)
-        // unless it's a Baton Touch upgrade
-        if !is_baton_ability {
-            if d_stage < 0 {
-                val -= 10.0 * (-d_stage) as f64; // was 50
-                parts.push(format!("HEART_LOSS{}", d_stage));
-            }
-            if d_blades < 0 {
-                val -= 5.0 * (-d_blades) as f64; // was 30
-                parts.push(format!("BLADE_LOSS{}", d_blades));
-            }
         }
 
         if my_sim.hand.cards.len() <= 1 {
@@ -217,7 +204,7 @@ pub fn choose_action_v7(gs: &GameState, actions: &[Action], me: u8) -> Action {
     }
 
     // v6 fix: Pass ranked below any useful deploy.
-    // v8 improvement: Only force play if best action is positive OR Baton Touch exists.
+    // v8: keep productive-member forcing but add replacement penalties
     let best_nonpass = vals
         .iter()
         .enumerate()
@@ -241,14 +228,31 @@ pub fn choose_action_v7(gs: &GameState, actions: &[Action], me: u8) -> Action {
 
     let has_baton = has_baton_touch || has_double_baton;
 
+    // v7's productive member check: any affordable member with hearts/blades
+    let has_productive_member = my_now.hand.cards.iter().any(|&cid| {
+        db.get_card(cid).map_or(false, |c| {
+            if !matches!(c.card_type, CardType::Member) {
+                return false;
+            }
+            if i32::from(c.cost.unwrap_or(99)) > my_now.energy_zone.active_count() as i32 {
+                return false;
+            }
+            let has_hearts = c.base_heart.as_ref().map_or(false, |bh| bh.hearts.values_sum() > 0);
+            let has_blades = c.blade > 0;
+            has_hearts || has_blades
+        })
+    });
+
     for (i, a) in actions.iter().enumerate() {
         if a.action_type == ActionType::Pass {
             if best_nonpass > 0.0 {
                 vals[i] = f64::NEG_INFINITY; // useful deploy exists
-            } else if best_nonpass >= 0.0 || has_baton {
-                vals[i] = -0.5; // neutral play or Baton Touch available, prefer play over pass
+            } else if has_baton {
+                vals[i] = -0.5; // Baton Touch upgrade available
+            } else if has_productive_member {
+                vals[i] = -1.0; // productive member available, don't pass (v7 logic)
             } else {
-                vals[i] = 0.0; // truly nothing useful to do (all plays negative)
+                vals[i] = 0.0; // truly nothing useful
             }
         }
     }

@@ -2309,25 +2309,35 @@ pub async fn rooms_leave(
         }
     };
 
-    // Notify other SSE clients that the room is closing, then destroy it
-    {
-        let broadcasts = lock_recover(&data.room_broadcasts);
-        if let Some(sender) = broadcasts.get(&room_id) {
-            // Send a special "closed" event so other players know to redirect
-            let _ = sender.send(());
-            log::debug!("[SSE] Room {} closing: notified remaining clients", room_id);
-        }
-    }
-    // Remove broadcast channel
-    {
-        let mut broadcasts = lock_recover(&data.room_broadcasts);
-        broadcasts.remove(&room_id);
-    }
-
-    // Destory the room entirely — a leave means the match is over
+    // Remove the session from the room (but keep room for other players)
     {
         let mut rooms = lock_recover(&data.rooms);
-        rooms.remove(&room_id);
+        if let Some(room) = rooms.get_mut(&room_id) {
+            // Try to get session_id from request body
+            let session_id = req
+                .get("session_id")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string());
+            if let Some(sid) = session_id {
+                room.sessions.remove(&sid);
+                log::debug!("[Room] Session {} left room {}", sid, room_id);
+            }
+            // Notify other SSE clients
+            let broadcasts = lock_recover(&data.room_broadcasts);
+            if let Some(sender) = broadcasts.get(&room_id) {
+                let _ = sender.send(());
+                log::debug!("[SSE] Room {} notified of leave", room_id);
+            }
+            // Only destroy room if no sessions remain
+            if room.sessions.is_empty() {
+                rooms.remove(&room_id);
+                {
+                    let mut broadcasts = lock_recover(&data.room_broadcasts);
+                    broadcasts.remove(&room_id);
+                }
+                log::debug!("[Room] Room {} destroyed (empty)", room_id);
+            }
+        }
     }
 
     HttpResponse::Ok().json(serde_json::json!({"success": true}))

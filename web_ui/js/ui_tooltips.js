@@ -5,7 +5,7 @@
 import { State } from './state.js';
 import { TextEnricher } from './utils/TextEnricher.js';
 import { Highlighter } from './components/Highlighter.js';
-import { fixImg } from './constants.js';
+import { fixImg as fixImgPath } from './constants.js';
 import { resolveCardImagePath } from './components/CardRenderer.js';
 
 let tooltipTimeout = null;
@@ -240,7 +240,7 @@ export const Tooltips = {
                 if (imgPath) {
                     imgContainer.innerHTML = '';
                     const img = document.createElement('img');
-                    img.src = fixImg(imgPath);
+                    img.src = fixImgPath(imgPath);
                     img.alt = cardObj.name || '';
                     img.style.display = 'block';
                     img.style.maxWidth = '100%';
