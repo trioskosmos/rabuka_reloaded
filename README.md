@@ -36,19 +36,25 @@ A certain school idol collectible card game engine, AI, and web UI — built in 
 
 **Unlikely to work (no Rust/LLVM target):** SNES (5A22), Mega Drive/Genesis (68000), Atari Jaguar (m68k), Philips CD-i (m68k). Portability analysis for 15+ consoles at [engine/PORTS.md](engine/PORTS.md).
 
-### Android / Termux (Free Multiplayer Hosting)
+### Free Multiplayer Hosting (Zero Cost)
 
-Run the server **on your phone** with **zero hosting costs** using Cloudflare's free tunneling:
+The web UI supports **two free hosting models** for multiplayer:
 
-```bash
-# In Termux (install from F-Droid):
-curl -fsSL https://raw.githubusercontent.com/yourusername/rabuka_reloaded/main/android/setup_termux.sh | bash
-cd ~/rabuka_reloaded/engine
-./start_android.sh
-# Share the printed https://*.trycloudflare.com URL with friends!
-```
+#### Option 1: GitHub Pages (Frontend) + Render/Fly.io (Backend) — Recommended
+- **Frontend**: Static files on GitHub Pages (free CDN, 260 MB card images cached globally)
+- **Backend**: Rust server on Render (free tier: 750 hrs/mo) or Fly.io (free tier: 3 shared-CPU VMs)
+- **Architecture**: Browser loads UI/images from Pages → API/SSE calls go cross-origin to backend
+- **Bandwidth**: ~0 MB on backend (only JSON game state ~2 KB/request); 260 MB served free from GitHub
+- **Deploy**: Push to `master` → GitHub Actions builds Docker image → deploys to Render/Fly + Pages
 
-See [android/README_ANDROID.md](android/README_ANDROID.md) for full guide, troubleshooting, and transfer options.
+#### Option 2: Android/Termux (Phone as Server) — Zero Cloud Cost
+- Run server locally on Android via Termux + cloudflared tunnel
+- Share `https://*.trycloudflare.com` URL with friends
+- **No cloud account needed** — runs on your phone
+
+See [android/README_ANDROID.md](android/README_ANDROID.md) for full guide.
+
+---
 
 ## Quick Start
 

@@ -112,6 +112,60 @@ struct GameStateResponse {
     ui_config: Option<UiConfig>,
 }
 
+/// Minimal response for execute-action: only what the client needs to confirm
+#[derive()]
+#[cfg_attr(feature = "serde_support", derive(Serialize))]
+struct ActionResult {
+    success: bool,
+    #[cfg_attr(feature = "serde_support", serde(skip_serializing_if = "Option::is_none"))]
+    error: Option<String>,
+    frame_id: u64,
+    #[cfg_attr(feature = "serde_support", serde(skip_serializing_if = "Option::is_none"))]
+    state_delta: Option<GameStateDelta>,
+}
+
+/// Incremental state update - only fields that changed since last frame
+#[derive()]
+#[cfg_attr(feature = "serde_support", derive(Serialize))]
+struct GameStateDelta {
+    frame_id: u64,
+    #[cfg_attr(feature = "serde_support", serde(skip_serializing_if = "Option::is_none"))]
+    phase: Option<crate::game_state::Phase>,
+    #[cfg_attr(feature = "serde_support", serde(skip_serializing_if = "Option::is_none"))]
+    active_player: Option<u8>,
+    #[cfg_attr(feature = "serde_support", serde(skip_serializing_if = "Option::is_none"))]
+    rps_winner: Option<u8>,
+    #[cfg_attr(feature = "serde_support", serde(skip_serializing_if = "Option::is_none"))]
+    player1_rps_choice: Option<u8>,
+    #[cfg_attr(feature = "serde_support", serde(skip_serializing_if = "Option::is_none"))]
+    player2_rps_choice: Option<u8>,
+    #[cfg_attr(feature = "serde_support", serde(skip_serializing_if = "Option::is_none"))]
+    zone_changes: Option<Vec<ZoneChange>>,
+    #[cfg_attr(feature = "serde_support", serde(skip_serializing_if = "Option::is_none"))]
+    log_entries: Option<Vec<display::LogEntry>>,
+    #[cfg_attr(feature = "serde_support", serde(skip_serializing_if = "Option::is_none"))]
+    pending_choice: Option<display::Choice>,
+    #[cfg_attr(feature = "serde_support", serde(skip_serializing_if = "Option::is_none"))]
+    legal_actions: Option<Vec<ActionIndex>>,
+    #[cfg_attr(feature = "serde_support", serde(skip_serializing_if = "Option::is_none"))]
+    player1: Option<display::PlayerDisplay>,
+    #[cfg_attr(feature = "serde_support", serde(skip_serializing_if = "Option::is_none"))]
+    player2: Option<display::PlayerDisplay>,
+}
+
+/// Single card movement between zones
+#[derive()]
+#[cfg_attr(feature = "serde_support", derive(Serialize))]
+struct ZoneChange {
+    card_id: i16,
+    from_zone: String,
+    to_zone: String,
+    #[cfg_attr(feature = "serde_support", serde(skip_serializing_if = "Option::is_none"))]
+    from_index: Option<usize>,
+    #[cfg_attr(feature = "serde_support", serde(skip_serializing_if = "Option::is_none"))]
+    to_index: Option<usize>,
+}
+
 #[derive()]
 #[cfg_attr(feature = "serde_support", derive(Deserialize))]
 
@@ -580,6 +634,22 @@ async fn get_actions(data: web::Data<AppState>, req: actix_web::HttpRequest) -> 
     HttpResponse::Ok().json(serde_json::json!({ "actions": actions }))
 }
 
+/// Lightweight legal actions endpoint - returns only action types for quick polling
+async fn get_legal_actions(data: web::Data<AppState>, req: actix_web::HttpRequest) -> impl Responder {
+    let room_id_str = get_room_id_from_req(&req);
+    let gs_arc = resolve_game_state_arc(&data, &req);
+    let game_state = lock_state!(gs_arc, read);
+    let actions = crate::game_setup::generate_possible_actions(&game_state)
+        .into_iter()
+        .map(|a| serde_json::json!({
+            "action_type": a.action_type.to_string(),
+            "description": a.description
+        }))
+        .collect::<Vec<_>>();
+    drop(game_state);
+    HttpResponse::Ok().json(serde_json::json!({ "actions": actions }))
+}
+
 fn actions_with_index(game_state: &GameState) -> Vec<ActionIndex> {
     crate::game_setup::generate_possible_actions(game_state)
         .into_iter()
@@ -886,10 +956,17 @@ pub async fn execute_action(
                     .push(FrameSnapshot::capture(&game_state, *fc, label));
             }
 
-            // Release write lock before building display (read-only work)
+            // Capture frame_id before releasing write lock
+            let frame_id = if let Some(ref rid) = exec_room_id_str {
+                data.rooms.lock().ok().and_then(|r| r.get(rid).map(|room| room.frame_counter)).unwrap_or(0)
+            } else {
+                *lock_recover(&data.frame_counter)
+            };
+
+            // Release write lock before building display
             drop(game_state);
 
-            // Notify other SSE clients that state changed (skip in sandbox mode — single client)
+            // Notify other SSE clients that state changed
             if let Some(rid) = get_room_id_from_req(&http_req) {
                 let is_multiplayer = data
                     .rooms
@@ -902,36 +979,116 @@ pub async fn execute_action(
                 }
             }
 
-            let game_state = lock_state!(gs_arc, read);
-            let mut display = crate::display::game_state_to_display(&game_state);
-            if let Some(ref rid) = exec_room_id_str {
-                if let Ok(rooms) = data.rooms.lock() {
-                    if let Some(room) = rooms.get(rid) {
-                        display.mode = room.mode.clone();
+            // For PVP, return minimal ActionResult; for sandbox/PVE return full state
+            let is_pvp = exec_room_id_str.as_ref().and_then(|rid| {
+                data.rooms.lock().ok().and_then(|r| r.get(rid).map(|room| room.mode.as_str() == "pvp"))
+            }).unwrap_or(false);
+
+            if is_pvp {
+                HttpResponse::Ok().json(ActionResult {
+                    success: true,
+                    error: None,
+                    frame_id,
+                    state_delta: None,
+                })
+            } else {
+                let game_state = lock_state!(gs_arc, read);
+                let mut display = crate::display::game_state_to_display(&game_state);
+                if let Some(ref rid) = exec_room_id_str {
+                    if let Ok(rooms) = data.rooms.lock() {
+                        if let Some(room) = rooms.get(rid) {
+                            display.mode = room.mode.clone();
+                        }
                     }
                 }
-            }
-            if let Some(pid) = pvp_player_pid {
-                filter_display_for_player(&mut display, &game_state, pid);
-                if !pvp_player_can_act(&game_state, pid) {
-                    display.waiting_for_opponent = true;
+                if let Some(pid) = pvp_player_pid {
+                    filter_display_for_player(&mut display, &game_state, pid);
+                    if !pvp_player_can_act(&game_state, pid) {
+                        display.waiting_for_opponent = true;
+                    }
                 }
+                ensure_actions(&data, &game_state, exec_room_id_str.as_deref());
+                let actions = read_actions(&data, exec_room_id_str.as_deref());
+                let final_actions = if display.waiting_for_opponent {
+                    None
+                } else {
+                    Some(actions)
+                };
+                HttpResponse::Ok().json(GameStateResponse {
+                    game_state: display,
+                    legal_actions: final_actions,
+                    ui_config: None,
+                })
             }
-            ensure_actions(&data, &game_state, exec_room_id_str.as_deref());
-            let actions = read_actions(&data, exec_room_id_str.as_deref());
-            let final_actions = if display.waiting_for_opponent {
-                None
-            } else {
-                Some(actions)
-            };
-            HttpResponse::Ok().json(GameStateResponse {
-                game_state: display,
-                legal_actions: final_actions,
-                ui_config: None,
-            })
         }
         Err(e) => HttpResponse::BadRequest().json(serde_json::json!({ "error": e })),
     }
+}
+
+/// Delta endpoint: returns only fields that changed since `since` frame
+async fn game_state_delta(
+    data: web::Data<AppState>,
+    req: actix_web::HttpRequest,
+    query: web::Query<std::collections::HashMap<String, String>>,
+) -> impl Responder {
+    let room_id_str = get_room_id_from_req(&req);
+    let since = query.get("since").and_then(|s| s.parse::<u64>().ok()).unwrap_or(0);
+    
+    let gs_arc = resolve_game_state_arc(&data, &req);
+    let game_state = lock_state!(gs_arc, read);
+    
+    // For now, return current state with frame_id if it's newer than `since`
+    let current_frame = if let Some(ref rid) = room_id_str {
+        data.rooms.lock().ok().and_then(|r| r.get(rid).map(|room| room.frame_counter)).unwrap_or(0)
+    } else {
+        *lock_recover(&data.frame_counter)
+    };
+    
+    if since >= current_frame {
+        return HttpResponse::Ok().json(serde_json::json!({
+            "frame_id": current_frame,
+            "no_changes": true
+        }));
+    }
+    
+    // Build minimal delta - for now return key fields that commonly change
+    let mut display = crate::display::game_state_to_display(&game_state);
+    if let Some(ref rid) = room_id_str {
+        if let Ok(rooms) = data.rooms.lock() {
+            if let Some(room) = rooms.get(rid) {
+                display.mode = room.mode.clone();
+            }
+        }
+    }
+    
+    let session_token = get_session_token_from_req(&req);
+    let pvp_player_pid = room_id_str.as_deref().and_then(|rid| {
+        data.rooms.lock().ok().and_then(|rooms| {
+            rooms.get(rid).and_then(|room| {
+                if room.mode != "pvp" && room.mode != "pve" { return None; }
+                session_token.as_ref().and_then(|token| room.sessions.get(token)).map(|s| s.player_id)
+            })
+        })
+    });
+    
+    if let Some(pid) = pvp_player_pid {
+        filter_display_for_player(&mut display, &game_state, pid);
+    }
+    
+    HttpResponse::Ok().json(GameStateDelta {
+        frame_id: current_frame,
+        phase: Some(game_state.current_phase.clone()),
+        active_player: Some(if game_state.active_player().id == game_state.player1.id { 0 } else { 1 }),
+        rps_winner: game_state.rps_winner,
+        player1_rps_choice: game_state.player1_rps_choice,
+        player2_rps_choice: game_state.player2_rps_choice,
+        zone_changes: None, // TODO: track zone changes during action execution
+        log_entries: None,  // TODO: return new log entries since `since`
+        pending_choice: display.pending_choice.clone(),
+        legal_actions: None,
+        player1: Some(display.player1.clone()),
+        player2: Some(display.player2.clone()),
+    })
 }
 
 async fn get_status(data: web::Data<AppState>) -> impl Responder {
@@ -2863,12 +3020,14 @@ pub async fn run_web_server_with_ngrok(ngrok_authtoken: Option<String>) -> std::
             .app_data(app_state.clone())
             .route("/health", web::get().to(health_check))
             .route("/api/game-state", web::get().to(get_game_state))
+            .route("/api/game-state/delta", web::get().to(game_state_delta))
             .route(
                 "/api/game-state/version",
                 web::get().to(get_game_state_version),
             )
             .route("/api/events", web::get().to(sse_events))
             .route("/api/actions", web::get().to(get_actions))
+            .route("/api/actions/legal", web::get().to(get_legal_actions))
             .route("/api/execute-action", web::post().to(execute_action))
             .route("/api/init", web::post().to(init_game))
             .route("/api/status", web::get().to(get_status))
