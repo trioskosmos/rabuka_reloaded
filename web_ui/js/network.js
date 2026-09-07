@@ -123,6 +123,7 @@ export const Network = {
     resetGame: () => GameService.resetGame(Network),
     startOffline: null,
     changeAI: (aiMode) => GameService.changeAI(aiMode, Network),
+    apiFetch: apiFetch,
 
     // --- Debug Service (Delegated to DebugService) ---
     submitReport: (explanation) => DebugService.submitReport(explanation),

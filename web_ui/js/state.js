@@ -337,10 +337,8 @@ const stateInternal = {
         if (State.staticCardDatabase && State.cardIdMapping) return;
 
         try {
-            const base = getAppBaseUrl();
-            const withBase = (path) => `${base}${path}`.replace(/\/{2,}/g, '/').replace(':/', '://');
             const fetchOptionalJson = async (path, label) => {
-                const response = await fetch(withBase(path));
+                const response = await apiFetch(path);
                 if (!response.ok) {
                     console.warn(`[State] Failed to load ${label}:`, response.status);
                     return null;
@@ -355,10 +353,10 @@ const stateInternal = {
                 return response.json();
             };
 
-            const cardsResponse = await fetch(withBase('cards/cards.json'));
+            const cardsResponse = await apiFetch('cards/cards.json');
             if (!cardsResponse.ok) {
                 console.error('[State] Failed to load cards.json:', cardsResponse.status, cardsResponse.statusText);
-                const fallbackResponse = await fetch(withBase('./cards/cards.json'));
+                const fallbackResponse = await apiFetch('./cards/cards.json');
                 if (!fallbackResponse.ok) {
                     console.error('[State] Failed to load fallback cards.json:', fallbackResponse.status);
                     return;

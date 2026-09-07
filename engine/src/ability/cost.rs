@@ -371,16 +371,28 @@ let source = cost.source_str().unwrap_or("");
                     } else {
                         matching_indices.len()
                     };
+                    let dest_str = if source == Zone::Hand && matches!(cost.destination.as_deref(), Some("discard") | Some("waitroom")) {
+                        " to waitroom"
+                    } else {
+                        ""
+                    };
                     format!(
-                        "Select any number of {} from hand (0-{}) (or skip)",
+                        "Select any number of {} from hand (0-{}){} (or skip)",
                         util::card_plural(max_str),
-                        max_str
+                        max_str,
+                        dest_str
                     )
                 } else {
+                    let dest_str = if source == Zone::Hand && matches!(cost.destination.as_deref(), Some("discard") | Some("waitroom")) {
+                        " to waitroom"
+                    } else {
+                        ""
+                    };
                     format!(
-                        "Select {} {} from hand{}",
+                        "Select {} {} from hand{}{}",
                         effective_count,
                         util::card_plural(effective_count as usize),
+                        dest_str,
                         if is_optional { " (or skip)" } else { "" }
                     )
                 };
@@ -398,10 +410,10 @@ let source = cost.source_str().unwrap_or("");
                 self.pending_choice = Some(
                     Choice::select_cards(source.to_string(), effective_count, desc, is_optional)
                         .description_ja(Some(if is_any_number {
-                            format!("手札から任意枚選択（スキップ可）")
+                            format!("手札から任意枚控え室に置く（スキップ可）")
                         } else {
                             format!(
-                                "手札から{}枚選択{}",
+                                "手札から{}枚控え室に置く{}",
                                 effective_count,
                                 if is_optional {
                                     "（スキップ可）"
