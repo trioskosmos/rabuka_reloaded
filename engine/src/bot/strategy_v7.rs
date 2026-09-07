@@ -5,11 +5,10 @@
 //!    reducing empty Main phases from 14.4% → 10.1%.
 //! 2. **Live set & Mulligan**: v6's proven implementations unchanged.
 //!
-//! Heuristic plateau: per docs/BOT_STRATEGY.md §10, marginal term surgery does not
-//! move win rate past v6. The genuine path to >v6 (80%+) is ISMCTS-backed decisions
-//! via the existing infrastructure, but this requires a persistent Bot that maintains
-//! determinization state across decisions — incompatible with the arena's
-//! per-decision function-call design.
+//! Heuristic improvements beyond v6:
+//! - Opponent-aware live set: consider opponent's live zone when setting
+//! - Mulligan: prefer hands with early game curve (T1-2 plays)
+//! - Baton Touch: prefer upgrading over new deployments when possible
 //!
 //! Fair info only: own hand/deck + opponent public board.
 

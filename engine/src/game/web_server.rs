@@ -2149,8 +2149,6 @@ async fn sse_events(data: web::Data<AppState>, req: actix_web::HttpRequest) -> i
         .insert_header(("Content-Type", "text/event-stream"))
         .insert_header(("Cache-Control", "no-cache"))
         .insert_header(("Connection", "keep-alive"))
-        .insert_header(("Access-Control-Allow-Origin", "*"))
-        .insert_header(("Access-Control-Allow-Headers", "Content-Type, X-Session-Token, X-Room-Id"))
         .streaming(UnboundedReceiverStream::new(rx_stream))
 }
 
@@ -3177,8 +3175,20 @@ pub async fn run_web_server_with_ngrok(ngrok_authtoken: Option<String>) -> std::
     HttpServer::new(move || {
         let cors = Cors::permissive()
             .allowed_origin("https://trioskosmos.github.io")
-            .allowed_methods(vec!["GET", "POST", "OPTIONS"])
-            .allowed_headers(vec![actix_web::http::header::CONTENT_TYPE, actix_web::http::header::AUTHORIZATION, actix_web::http::header::HeaderName::from_static("x-session-token"), actix_web::http::header::HeaderName::from_static("x-room-id")])
+            .allowed_origin("https://trioskosmos.github.io/")
+            .allowed_methods(vec!["GET", "POST", "OPTIONS", "HEAD"])
+            .allowed_headers(vec![
+                actix_web::http::header::CONTENT_TYPE,
+                actix_web::http::header::AUTHORIZATION,
+                actix_web::http::header::HeaderName::from_static("x-session-token"),
+                actix_web::http::header::HeaderName::from_static("x-room-id"),
+                actix_web::http::header::ACCEPT,
+                actix_web::http::header::ORIGIN,
+            ])
+            .expose_headers(vec![
+                actix_web::http::header::HeaderName::from_static("access-control-allow-origin"),
+            ])
+            .supports_credentials()
             .max_age(3600);
 
         App::new()

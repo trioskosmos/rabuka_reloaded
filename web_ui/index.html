@@ -50,6 +50,12 @@
 
     <header class="header">
         <div class="info-bar">
+            <!-- Room Status Row -->
+            <div class="room-status-row" id="room-display" style="display: none;">
+                <span id="system-status-badge" class="status-badge" style="font-size: 0.75rem; padding: 2px 8px; border-radius: 4px; background: var(--bg-tertiary); color: var(--text-muted);">OFFLINE</span>
+                <span id="room-code-header" style="font-family: monospace; font-size: 0.85rem; margin-left: 8px;">---</span>
+            </div>
+            
             <!-- Column 1: Turn/Phase -->
             <div class="header-col col-meta">
                 <div class="header-stat-row"><span class="stat-label">Turn</span> <strong id="turn">1</strong></div>
