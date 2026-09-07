@@ -75,8 +75,9 @@ export const GameService = {
             console.log('[GameService] Version check:', data.version, 'lastKnown:', GameService._lastKnownVersion);
             if (data.version !== undefined && data.version !== GameService._lastKnownVersion) {
                 GameService._lastKnownVersion = data.version;
-                console.log('[GameService] Version changed, fetching state');
-                await GameService.fetchState(Network);
+                console.log('[GameService] Version changed, polling delta');
+                // Use delta instead of full state fetch
+                await GameService.pollDelta(data.version, Network);
             }
         } catch (e) {
             console.error('[GameService] Version check error:', e);
@@ -213,11 +214,31 @@ export const GameService = {
             }
 
             const data = await res.json();
-            if (data.frame_counter !== undefined) {
+            
+            // Handle new minimal ActionResult (PVP) vs full GameStateResponse (sandbox/PVE)
+            if (data.success !== undefined) {
+                // ActionResult format (PVP) - success + frame_id, no full state
+                console.log('[GameService] ActionResult:', data);
+                State._frameCounter = data.frame_id;
+                State._actionLatency = Math.round(performance.now() - actionStart);
+                
+                if (data.state_delta) {
+                    // Apply delta if provided
+                    applyStateDelta(data.state_delta);
+                } else {
+                    // Poll delta endpoint or wait for SSE
+                    await pollDelta(data.frame_id, networkFacade);
+                }
+            } else if (data.frame_counter !== undefined) {
+                // Legacy full state response (sandbox/PVE)
                 State._frameCounter = data.frame_counter;
+                State._actionLatency = Math.round(performance.now() - actionStart);
+                updateStateData(data);
+            } else {
+                // Fallback - assume full state
+                State._actionLatency = Math.round(performance.now() - actionStart);
+                updateStateData(data);
             }
-            State._actionLatency = Math.round(performance.now() - actionStart);
-            updateStateData(data);
             log('Action completed');
 
         } catch (e) {
@@ -226,8 +247,65 @@ export const GameService = {
             if (predicted && networkFacade) {
                 await GameService.fetchState(networkFacade);
             }
-            alert(e.message);
+alert(e.message);
         }
+    },
+
+    // Poll delta endpoint until we get changes since frame_id
+    pollDelta: async (frameId, networkFacade) => {
+        const maxAttempts = 20;
+        for (let i = 0; i < maxAttempts; i++) {
+            try {
+                const res = await apiFetch(`api/game-state/delta?since=${frameId}`);
+                if (res.ok) {
+                    const delta = await res.json();
+                    if (!delta.no_changes) {
+                        console.log('[GameService] Delta received:', delta);
+                        GameService.applyStateDelta(delta);
+                        return;
+                    }
+                }
+            } catch (e) {
+                console.warn('[GameService] Delta poll failed:', e);
+            }
+            await new Promise(r => setTimeout(r, 100));
+        }
+        console.log('[GameService] Delta timeout, fetching full state');
+        if (networkFacade?.fetchState) await networkFacade.fetchState();
+    },
+
+    // Apply delta to current state
+    applyStateDelta: (delta) => {
+        const state = State.data;
+        if (!state) return;
+        
+        const newState = JSON.parse(JSON.stringify(state));
+        
+        if (delta.phase) newState.phase = delta.phase;
+        if (delta.active_player !== undefined) newState.active_player = delta.active_player;
+        if (delta.rps_winner !== undefined) newState.rps_winner = delta.rps_winner;
+        if (delta.player1_rps_choice !== undefined) newState.player1_rps_choice = delta.player1_rps_choice;
+        if (delta.player2_rps_choice !== undefined) newState.player2_rps_choice = delta.player2_rps_choice;
+        if (delta.pending_choice) newState.pending_choice = delta.pending_choice;
+        if (delta.legal_actions) newState.legal_actions = delta.legal_actions;
+        if (delta.player1) newState.player1 = delta.player1;
+        if (delta.player2) newState.player2 = delta.player2;
+        
+        if (delta.log_entries && delta.log_entries.length > 0) {
+            newState.log = (newState.log || []).concat(delta.log_entries);
+        }
+        
+        if (delta.zone_changes && delta.zone_changes.length > 0) {
+            for (const zc of delta.zone_changes) {
+                console.log('[GameService] Zone change:', zc);
+            }
+        }
+        
+        if (delta.frame_id !== undefined) {
+            State._frameCounter = delta.frame_id;
+        }
+        
+        updateStateData(newState);
     },
 
     resetGame: async (networkFacade) => {
