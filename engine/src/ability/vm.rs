@@ -1250,7 +1250,6 @@ fn skip_value_with_tag(bc: &mut BcReader, tag: u8) -> Option<()> {
 
 /// Read a tagged value from a BcReader into a serde_json::Value.
 // ── Direct Ability decoder ──
-
 fn decode_ability(bc: &mut BcReader) -> Option<Ability> {
     let tag = bc.read_u8()?;
     if tag != TAG_OBJECT {

@@ -185,8 +185,8 @@ impl GameState {
         self.scratch_exp_score = old_score;
 
         // Per-player global score bonus (from GainAbility modify_score)
-        self.mods.p1_constant_total_score_bonus = p1_constant_score_bonus as i16;
-        self.mods.p2_constant_total_score_bonus = p2_constant_score_bonus as i16;
+        self.mods.p1_constant_total_score_bonus = i16::try_from(p1_constant_score_bonus).unwrap();
+        self.mods.p2_constant_total_score_bonus = i16::try_from(p2_constant_score_bonus).unwrap();
 
         // Heart — clear old constant heart modifiers first, then re-apply new ones.
         tdbg!("RC:10 HEART");
@@ -291,12 +291,12 @@ impl GameState {
         entry_positions.clear();
         for (pos, &cid) in self.player1.stage.stage.iter().enumerate() {
             if cid != -1 {
-                entry_positions.insert(cid, Some(pos as u8));
+                entry_positions.insert(cid, Some(u8::try_from(pos).unwrap()));
             }
         }
         for (pos, &cid) in self.player2.stage.stage.iter().enumerate() {
             if cid != -1 {
-                entry_positions.entry(cid).or_insert(Some(pos as u8));
+                entry_positions.entry(cid).or_insert(Some(u8::try_from(pos).unwrap()));
             }
         }
         tdbg!("RC:4 ENTRY_POSITIONS_DONE count={}", entry_positions.len());
@@ -400,7 +400,7 @@ impl GameState {
                                 self.player2.id.clone()
                             };
                             jyouji_statuses.push(crate::types::ConstantAbilityStatus {
-                                card_id: card_id,
+                                card_id,
                                 card_name: status_card_name.clone(),
                                 owner: status_owner.clone(),
                                 zone: "stage".to_string(),
@@ -478,7 +478,7 @@ impl GameState {
                                         } else {
                                             1
                                         };
-                                        let delta = (n as i16) * sign_mult;
+                                        let delta = i16::try_from(n).unwrap() * sign_mult;
                                         // Determine blade grant targets:
                                         //   - position "front" (正面のエリア): opponent's
                                         //     mirrored slot (your left faces opp right, etc.)
@@ -603,21 +603,21 @@ impl GameState {
                                                 .entry(card_id)
                                                 .or_default()
                                                 .entry(crate::ability::util::HEART_ALL_KEY.to_string())
-                                                .or_insert(0) += n as i16;
+                                                .or_insert(0) += i16::try_from(n).unwrap();
                                             exp_heart_sources.push(crate::core::game_modifiers::BonusSource {
                                                 source_card_id: card_id,
                                                 ability_text: effect.text.to_string(),
                                                 target_card_id: card_id,
-                                                amount: n as i32,
+                                                amount: i32::from(n),
                                                 color: Some(crate::ability::util::HEART_ALL_KEY.to_string()),
                                                 kind: "heart".to_string(),
                                             });
                                         } else {
                                             let hc_list = effect.heart_colors_any().to_vec();
-                                            let per_entry = crate::ability::util::heart_gain_per_entry(
+                                            let per_entry = i16::try_from(crate::ability::util::heart_gain_per_entry(
                                                 n,
                                                 &hc_list,
-                                            ) as i16;
+                                            )).unwrap();
                                             for hc in &hc_list {
                                                 *exp_heart
                                                     .entry(card_id)
@@ -639,12 +639,12 @@ impl GameState {
                                 }
                             }
                             crate::ability::enums::ActionType::ModifyScore => {
-                                let sv = effect.value_any().unwrap_or(0) as i32;
+                                let sv = i32::from(effect.value_any().unwrap_or(0));
                                 if sv != 0 {
                                     self.mods.constant_score_sources.push((
                                         card_id,
                                         effect.text.to_string(),
-                                        sv as i16,
+                                        i16::try_from(sv).unwrap(),
                                     ));
                                 }
                                 // target="live_total" (parser-emitted for
@@ -663,7 +663,7 @@ impl GameState {
                                         p2_constant_score_bonus += sv;
                                     }
                                 } else {
-                                    *exp_score.entry(card_id).or_insert(0) += sv as i16;
+                                    *exp_score.entry(card_id).or_insert(0) += i16::try_from(sv).unwrap();
                                 }
                             }
                             crate::ability::enums::ActionType::Restriction => {
@@ -767,17 +767,17 @@ impl GameState {
                                     if let Some(ref gained) = effect.gained_effect_any() {
                                         let action = gained.action;
                                         if action
-                                            == crate::ability::enums::ActionType::ModifyScore
-                                        {
-                                            let val = gained.value_any().unwrap_or(0) as i32;
-                                            *bonus_target += val;
-                                            if val != 0 {
-                                                self.mods.constant_score_sources.push((
-                                                    card_id,
-                                                    gain_text.to_string(),
-                                                    val as i16,
-                                                ));
-                                            }
+== crate::ability::enums::ActionType::ModifyScore
+                                    {
+                                        let val = i32::from(gained.value_any().unwrap_or(0));
+                                        *bonus_target += val;
+                                        if val != 0 {
+                                            self.mods.constant_score_sources.push((
+                                                card_id,
+                                                gain_text.to_string(),
+                                                i16::try_from(val).unwrap(),
+                                            ));
+                                        }
                                         } else if action
                                             == crate::ability::enums::ActionType::ConditionalAlternative
                                         {
@@ -804,7 +804,7 @@ impl GameState {
                                                 self.mods.constant_score_sources.push((
                                                     card_id,
                                                     gain_text.to_string(),
-                                                    val as i16,
+                                                    i16::try_from(val).unwrap(),
                                                 ));
                                             }
                                         }
@@ -874,10 +874,8 @@ impl GameState {
                                                 "blade" | "ブレード" => {
                                                     let n = sub
                                                         .resource_icon_count_any()
-                                                        .unwrap_or(sub.count.unwrap_or(1))
-                                                        as i32;
-                                                    *exp_blade.entry(card_id).or_insert(0) +=
-                                                        n as i16;
+                                                        .unwrap_or(sub.count.unwrap_or(1)) as i32;
+                                                    *exp_blade.entry(card_id).or_insert(0) += i16::try_from(n).unwrap();
                                                     exp_blade_sources.push(crate::core::game_modifiers::BonusSource {
                                                         source_card_id: card_id,
                                                         ability_text: effect.text.to_string(),
@@ -888,7 +886,7 @@ impl GameState {
                                                     });
                                                 }
                                                 "heart" | "ハート" => {
-                                                    let n = sub.count.unwrap_or(1) as i32;
+                                                    let n = i32::from(sub.count.unwrap_or(1));
                                                     let hc_list: Vec<String> =
                                                         sub.heart_colors_any().to_vec();
                                                     let per_color = crate::ability::util::heart_gain_per_entry(
@@ -1102,7 +1100,7 @@ impl GameState {
                                 })
                                 .count();
                             log::debug!("[COST_MOD_PER_UNIT_DEBUG] group_matches={}", matches);
-                            matches as u8
+                            u8::try_from(matches).unwrap()
                         } else if Zone::from_str(count_zone) == Some(Zone::UnderMember) {
                             // UnderMember is a 2D structure that zone_cards cannot
                             // represent — flatten every stage slot's under-cards,
@@ -1126,7 +1124,7 @@ impl GameState {
                             log::debug!(
                                 "[COST_MOD_PER_UNIT] under_member group={group_name:?} count={matches}"
                             );
-                            matches as u8
+                            u8::try_from(matches).unwrap()
                         } else {
                             let cards: Vec<i16> =
                                 crate::ability::util::zone_cards(player, count_zone).to_vec();
@@ -1145,7 +1143,7 @@ impl GameState {
                         } else {
                             count
                         };
-                        value = ((effective / per_unit_count) * (value as u8)) as i32;
+                        value = ((effective / per_unit_count) * u8::try_from(value).unwrap()) as i32;
                         log::debug!("[COST_MOD] cid={} zone={} count={} eff={} per_unit_cnt={} val={} exclude={}",
                             cid, count_zone, count, effective, per_unit_count, value, exclude_self);
                     }
@@ -1160,7 +1158,7 @@ impl GameState {
                     let op = op_str;
                     match op {
                         "add" => {
-                            *expected.entry(cid).or_insert(0) += value as i16;
+                            *expected.entry(cid).or_insert(0) += i16::try_from(value).unwrap();
                             cost_sources.push(crate::core::game_modifiers::BonusSource {
                                 source_card_id: cid,
                                 ability_text: effect.text.to_string(),

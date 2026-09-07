@@ -190,7 +190,7 @@ pub fn evaluate_state(gs: &GameState, me: u8, w: &StrategyWeights) -> f64 {
         + ((my.stage_hearts - opp.stage_hearts) as f64) * w.heart
         + ((my.stage_blades - opp.stage_blades) as f64) * w.blade
         + ((my.active_energy - opp.active_energy) as f64) * w.active_energy
-        + ((my.hand_size as f64 - opp.hand_size as f64)) * w.hand_size
+        + (my.hand_size as f64 - opp.hand_size as f64) * w.hand_size
         + (my.hand_live_cards as f64) * w.hand_live_card
         + if my.is_first_attacker { w.first_attacker } else { 0.0 }
 }

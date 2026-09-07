@@ -891,7 +891,6 @@ impl super::TurnEngine {
             crate::ability::types::Choice::SelectHeartColor {
                 count: _,
                 options,
-                description: _,
                 ..
             } => {
                 let idx = card_id.and_then(|id| usize::try_from(id).ok()).unwrap_or(0);
@@ -907,7 +906,6 @@ impl super::TurnEngine {
             crate::ability::types::Choice::SelectHeartType {
                 count: _,
                 options,
-                description: _,
                 ..
             } => {
                 let idx = card_id.and_then(|id| usize::try_from(id).ok()).unwrap_or(0);

@@ -17,7 +17,6 @@ use smallvec::SmallVec;
     feature = "serde_support",
     derive(serde::Serialize, serde::Deserialize)
 )]
-
 pub struct Player {
     pub id: String,
 

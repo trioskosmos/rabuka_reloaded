@@ -1179,7 +1179,6 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
         }
         Choice::SelectPosition {
             position,
-            description: _,
             ..
         } => {
             let choice_ja = choice.description_ja().map(|s| s.to_string());

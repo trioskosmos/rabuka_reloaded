@@ -24,13 +24,13 @@ pub const VICTORY_CARD_COUNT: usize = 3;
 /// of wrapping values above 255 back around — that wrap was never intended.
 #[inline]
 pub fn saturate_u8(v: i32) -> u8 {
-    v.clamp(0, i32::from(u8::MAX)) as u8
+    u8::try_from(v.clamp(0, i32::from(u8::MAX))).unwrap()
 }
 
 /// Same contract as [`saturate_u8`] for i16 quantities.
 #[inline]
 pub fn saturate_i16(v: i32) -> i16 {
-    v.clamp(i32::from(i16::MIN), i32::from(i16::MAX)) as i16
+    i16::try_from(v.clamp(i32::from(i16::MIN), i32::from(i16::MAX))).unwrap()
 }
 
 /// Saturating usize → u8 for card counts, as an extension method so call
@@ -44,6 +44,6 @@ pub trait U8Count {
 impl U8Count for usize {
     #[inline]
     fn u8_count(self) -> u8 {
-        self.min(usize::from(u8::MAX)) as u8
+        u8::try_from(self.min(usize::from(u8::MAX))).unwrap()
     }
 }

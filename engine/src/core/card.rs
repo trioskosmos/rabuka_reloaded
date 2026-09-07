@@ -281,7 +281,7 @@ impl<'de> Deserialize<'de> for HeartMap {
         let hearts = raw
             .hearts
             .into_iter()
-            .map(|(k, v)| (parse_heart_color(&k), v as u8))
+            .map(|(k, v)| (parse_heart_color(&k), u8::try_from(v).unwrap_or(0)))
             .collect();
         Ok(HeartMap(hearts))
     }
@@ -1445,12 +1445,12 @@ impl AbilityEffect {
         }
         macro_rules! u8_field {
             ($key:expr) => {
-                obj.get($key).and_then(|v| v.as_u64()).map(|n| n as u8)
+                obj.get($key).and_then(|v| v.as_u64().and_then(|n| u8::try_from(n).ok()))
             };
         }
         macro_rules! i8_field {
             ($key:expr) => {
-                obj.get($key).and_then(|v| v.as_i64()).map(|n| n as i8)
+                obj.get($key).and_then(|v| v.as_i64().and_then(|n| i8::try_from(n).ok()))
             };
         }
         macro_rules! str_vec_field {

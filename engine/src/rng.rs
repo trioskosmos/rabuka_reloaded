@@ -11,7 +11,6 @@
 ///   - 3DS: `_3ds_system_tick()` from hardware tick counter
 ///   - PSP: via `seed()` function
 ///   - Desktop: constant seed (deterministic between runs; bots use their own RNG)
-
 fn xorshift32(state: &mut u32) -> u32 {
     let mut x = *state;
     if x == 0 {
@@ -52,7 +51,7 @@ impl Lcg {
         if n == 0 {
             0
         } else {
-            (self.next_u64() >> 33) as usize % n
+            usize::try_from((self.next_u64() >> 33) % n as u64).unwrap()
         }
     }
 }
