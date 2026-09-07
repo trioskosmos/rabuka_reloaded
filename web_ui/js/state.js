@@ -337,40 +337,30 @@ const stateInternal = {
         if (State.staticCardDatabase && State.cardIdMapping) return;
 
         try {
-            const fetchOptionalJson = async (path, label) => {
-                const response = await apiFetch(path);
+            const fetchStaticJson = async (path) => {
+                // Static assets (cards.json, abilities.json, card_id_mapping.json) 
+                // are served from GitHub Pages, not the backend API
+                const response = await fetch(path, { cache: 'force-cache' });
                 if (!response.ok) {
-                    console.warn(`[State] Failed to load ${label}:`, response.status);
                     return null;
                 }
-
                 const contentType = response.headers.get('content-type') || '';
                 if (!contentType.toLowerCase().includes('json')) {
-                    console.warn(`[State] Skipping ${label}: expected JSON but got`, contentType || 'unknown content type');
                     return null;
                 }
-
                 return response.json();
             };
 
-            const cardsResponse = await apiFetch('cards/cards.json');
-            if (!cardsResponse.ok) {
-                console.error('[State] Failed to load cards.json:', cardsResponse.status, cardsResponse.statusText);
-                const fallbackResponse = await apiFetch('./cards/cards.json');
-                if (!fallbackResponse.ok) {
-                    console.error('[State] Failed to load fallback cards.json:', fallbackResponse.status);
-                    return;
-                }
-                const cardsData = await fallbackResponse.json();
-                State.staticCardDatabase = cardsData;
-                console.log('[State] Loaded static card database from fallback, total cards:', Object.keys(cardsData).length);
-            } else {
-                const cardsData = await cardsResponse.json();
-                State.staticCardDatabase = cardsData;
-                console.log('[State] Loaded static card database, total cards:', Object.keys(cardsData).length);
+            // Load cards.json from GitHub Pages (static)
+            const cardsData = await fetchStaticJson('cards/cards.json');
+            if (!cardsData) {
+                console.error('[State] Failed to load cards.json from static');
+                return;
             }
+            State.staticCardDatabase = cardsData;
+            console.log('[State] Loaded static card database, total cards:', Object.keys(cardsData).length);
 
-            const mappingData = await fetchOptionalJson('engine/card_id_mapping.json', 'card_id_mapping.json');
+            const mappingData = await fetchStaticJson('engine/card_id_mapping.json');
             if (mappingData) {
                 State.cardIdMapping = mappingData;
                 console.log('[State] Loaded card ID mapping, total mappings:', Object.keys(mappingData).length);
