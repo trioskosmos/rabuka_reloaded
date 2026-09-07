@@ -133,6 +133,33 @@ pub fn choose_action_v7(gs: &GameState, actions: &[Action], me: u8) -> Action {
             parts.push("baton+45".into());
         }
 
+        // Detect Baton Touch ability activation (UseAbility on stage member with BatonTouch trigger)
+        let is_baton_ability = a.action_type == ActionType::UseAbility
+            && a.parameters.as_ref().and_then(|p| p.ability_index).is_some();
+        if is_baton_ability {
+            val += 50.0; // Strongly prefer Baton Touch over regular play
+            parts.push("baton_abil+50".into());
+        }
+
+        // Heavy penalty for reducing passable lives (unless it's a Baton Touch upgrade)
+        if d_pass < 0.0 && !is_baton_ability {
+            val -= 100.0 * (-d_pass); // -100 per passable lost (was 200)
+            parts.push(format!("PASS_LOSS{}", d_pass as i32));
+        }
+
+        // Moderate penalty for reducing stage hearts/blades (replacing better member with worse)
+        // unless it's a Baton Touch upgrade
+        if !is_baton_ability {
+            if d_stage < 0 {
+                val -= 10.0 * (-d_stage) as f64; // was 50
+                parts.push(format!("HEART_LOSS{}", d_stage));
+            }
+            if d_blades < 0 {
+                val -= 5.0 * (-d_blades) as f64; // was 30
+                parts.push(format!("BLADE_LOSS{}", d_blades));
+            }
+        }
+
         if my_sim.hand.cards.len() <= 1 {
             val -= 60.0;
         }
@@ -171,14 +198,18 @@ pub fn choose_action_v7(gs: &GameState, actions: &[Action], me: u8) -> Action {
                 .and_then(|cid| db.get_card(cid))
                 .map(|c| c.card_no.clone())
                 .unwrap_or_default();
-            let baton_mark = if a.parameters.as_ref().and_then(|p| p.use_baton_touch) == Some(true) {
-                "[BATON]"
-            } else {
-                ""
-            };
+            let stage_area = a
+                .parameters
+                .as_ref()
+                .and_then(|p| p.stage_area.as_deref())
+                .unwrap_or("-");
+            let use_baton = a.parameters.as_ref().and_then(|p| p.use_baton_touch) == Some(true);
+            let ability_idx = a.parameters.as_ref().and_then(|p| p.ability_index);
+            let is_baton_ability = ability_idx.is_some() && matches!(a.action_type, ActionType::UseAbility);
+            let baton_mark = if use_baton || is_baton_ability { "[BATON]" } else { "" };
             dbg_lines.push(format!(
-                "    [{}] {:?} {} {} -> {}",
-                i, a.action_type, card_no, baton_mark, parts.join(" ")
+                "    [{}] {:?} {} area={} {}{} -> {}",
+                i, a.action_type, card_no, stage_area, baton_mark, if is_baton_ability { "[BT-ABIL]" } else { "" }, parts.join(" ")
             ));
         }
 
@@ -186,7 +217,7 @@ pub fn choose_action_v7(gs: &GameState, actions: &[Action], me: u8) -> Action {
     }
 
     // v6 fix: Pass ranked below any useful deploy.
-    // v7 improvement: Pass = -1 when affordable productive members exist.
+    // v8 improvement: Only force play if best action is positive OR Baton Touch exists.
     let best_nonpass = vals
         .iter()
         .enumerate()
@@ -194,29 +225,30 @@ pub fn choose_action_v7(gs: &GameState, actions: &[Action], me: u8) -> Action {
         .map(|(_, v)| *v)
         .fold(f64::NEG_INFINITY, f64::max);
 
-    // Check if any affordable member contributes hearts or blades
-    let has_productive_member = my_now.hand.cards.iter().any(|&cid| {
-        db.get_card(cid).map_or(false, |c| {
-            if !matches!(c.card_type, CardType::Member) {
-                return false;
-            }
-            if i32::from(c.cost.unwrap_or(99)) > my_now.energy_zone.active_count() as i32 {
-                return false;
-            }
-            let has_hearts = c.base_heart.as_ref().map_or(false, |bh| bh.hearts.values_sum() > 0);
-            let has_blades = c.blade > 0;
-            has_hearts || has_blades
-        })
+    // Check if there's a Baton Touch action available (upgrade, always worth doing)
+    let has_baton_touch = actions.iter().any(|a| {
+        if a.action_type != ActionType::UseAbility {
+            return false;
+        }
+        a.parameters.as_ref().and_then(|p| p.ability_index).is_some()
     });
+
+    // Also check for double-baton PlayMemberToStage
+    let has_double_baton = actions.iter().any(|a| {
+        a.action_type == ActionType::PlayMemberToStage
+            && a.parameters.as_ref().and_then(|p| p.use_baton_touch) == Some(true)
+    });
+
+    let has_baton = has_baton_touch || has_double_baton;
 
     for (i, a) in actions.iter().enumerate() {
         if a.action_type == ActionType::Pass {
             if best_nonpass > 0.0 {
                 vals[i] = f64::NEG_INFINITY; // useful deploy exists
-            } else if has_productive_member {
-                vals[i] = -1.0; // productive member available, don't pass
+            } else if best_nonpass >= 0.0 || has_baton {
+                vals[i] = -0.5; // neutral play or Baton Touch available, prefer play over pass
             } else {
-                vals[i] = 0.0; // truly nothing useful to do
+                vals[i] = 0.0; // truly nothing useful to do (all plays negative)
             }
         }
     }

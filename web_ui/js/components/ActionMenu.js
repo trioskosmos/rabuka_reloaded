@@ -53,7 +53,8 @@ function autoResolveSandbox(state, actionsDiv) {
     // Turn choice — send once
     if (!_sentTurn) {
         const a = findAction(['choose_first_attacker', 'ChooseFirstAttacker']);
-        if (a) { _sentTurn = true; window.doAction?.(a);
+        console.log('[ActionMenu] ChooseFirstAttacker check:', { _sentTurn, foundAction: a, legal_actions: state.legal_actions?.map(x => x.action_type) });
+        if (a) { _sentTurn = true; console.log('[ActionMenu] Sending ChooseFirstAttacker'); window.doAction?.(a);
             actionsDiv.innerHTML = `<div style="padding:16px;text-align:center;color:var(--text-muted);font-size:0.9rem;">⚡ First attacker</div>`; return true; }
     }
 

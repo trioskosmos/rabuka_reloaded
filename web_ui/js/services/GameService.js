@@ -144,6 +144,7 @@ export const GameService = {
     },
 
     sendAction: async (action, networkFacade) => {
+        console.log('[GameService] sendAction:', action);
         const state = State.data;
         if (!state) return;
 
