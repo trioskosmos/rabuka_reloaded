@@ -2,7 +2,7 @@
 
 use std::ffi::CString;
 
-use rabuka_engine::card::{Card, HeartMap};
+use rabuka_engine::card::{Card, HeartColor, HeartMap};
 use rabuka_engine::core::game_modifiers::GameModifiers;
 use rabuka_engine::game_setup;
 use rabuka_engine::game_state::GameState;
@@ -76,12 +76,64 @@ pub fn heart_label_to_icon(s: &str) -> String {
 }
 
 /// Build heart string from a HeartMap, sorted by heart index (h00 first).
+/// Hearts (`is_need == false`): base + additive heart-modifier total, matching
+/// the engine pipeline (additives stack on top via `total()`).
+/// Need hearts (`is_need == true`): effective need via set-then-additive
+/// semantics (mirror of `stats_pipeline::effective_need_heart`) — a set
+/// modifier replaces the base per color, then additives stack. Display shows
+/// effective totals so a set never double-counts as base + set.
 pub fn build_heart_str(
     hearts: &HeartMap,
     card_id: i16,
     mods: &GameModifiers,
     is_need: bool,
 ) -> String {
+    if is_need {
+        // Effective need: start from base, apply set first, then additives.
+        let mut eff: Vec<(HeartColor, i32)> =
+            hearts.iter().map(|(c, v)| (*c, *v as i32)).collect();
+        if let Some(card_mods) = mods.need_heart_modifiers.get(&card_id) {
+            for (color, me) in card_mods {
+                if me.set != 0 {
+                    if let Some(e) = eff.iter_mut().find(|(c, _)| c == color) {
+                        e.1 = me.set as i32;
+                    } else {
+                        eff.push((*color, me.set as i32));
+                    }
+                }
+            }
+            for (color, me) in card_mods {
+                if me.additive != 0 {
+                    if let Some(e) = eff.iter_mut().find(|(c, _)| c == color) {
+                        e.1 = (e.1 + me.additive as i32).max(0);
+                    } else {
+                        eff.push((*color, (me.additive as i32).max(0)));
+                    }
+                }
+            }
+            // Drop zeroed colors (e.g. set to 0 / reduced to 0).
+            eff.retain(|(_, v)| *v > 0);
+            // Additive-only new colors already pushed above.
+        }
+        let mut entries: Vec<(u8, String)> = eff
+            .iter()
+            .map(|(c, v)| {
+                let code = c.short_label();
+                let num = if code.len() >= 3 && code.as_bytes()[0] == b'h' {
+                    code[1..3].parse::<u8>().unwrap_or(99)
+                } else {
+                    99
+                };
+                (num, format!("{}{}", code, v))
+            })
+            .collect();
+        entries.sort_by_key(|e| e.0);
+        return entries
+            .into_iter()
+            .map(|e| e.1)
+            .collect::<Vec<_>>()
+            .join(" ");
+    }
     let mut entries: Vec<(u8, String)> = hearts
         .iter()
         .map(|(c, v)| {
@@ -91,19 +143,12 @@ pub fn build_heart_str(
             } else {
                 99
             };
-            let bonus = if is_need {
-                mods.need_heart_modifiers
-                    .get(&card_id)
-                    .and_then(|hm| hm.get(c))
-                    .map(|m| m.total())
-                    .unwrap_or(0)
-            } else {
-                mods.heart_modifiers
-                    .get(&card_id)
-                    .and_then(|hm| hm.get(c))
-                    .map(|m| m.total())
-                    .unwrap_or(0)
-            };
+            let bonus = mods
+                .heart_modifiers
+                .get(&card_id)
+                .and_then(|hm| hm.get(c))
+                .map(|m| m.total())
+                .unwrap_or(0);
             let label = if bonus != 0 {
                 format!("{}{}+{}", code, v, bonus)
             } else {
@@ -221,50 +266,106 @@ pub struct CardDisplayStats {
 }
 
 pub fn compute_card_stats(card: &Card, cid: i16, gs: &GameState) -> CardDisplayStats {
+    use rabuka_engine::core::stats_pipeline;
     let is_tapped = gs
         .mods
         .orientation_modifiers
         .get(&cid)
         .map(|o| o.as_str() == "wait")
         .unwrap_or(false);
-    let bm = gs
-        .mods
-        .blade_modifiers
-        .get(&cid)
-        .map(|m| m.total())
-        .unwrap_or(0);
+    // Engine blade pipeline: non-zero set replaces printed, additive stacks.
+    let entry = gs.mods.blade_modifiers.get(&cid).copied().unwrap_or_default();
     let total_blade = if is_tapped {
         0
     } else {
-        (card.blade as i32 + bm).max(0)
+        stats_pipeline::effective_blade(&gs.card_database, cid, entry) as i32
     };
-    let score = card.score.unwrap_or(0) as i32
-        + gs.mods
-            .score_modifiers
-            .get(&cid)
-            .map(|m| m.total())
-            .unwrap_or(0);
-    let cost = card.cost.unwrap_or(0);
-    let heart_str = build_heart_str(
-        &card
-            .base_heart
-            .as_ref()
-            .map(|bh| bh.hearts.clone())
-            .unwrap_or_default(),
+    // Engine score pipeline (mirrors live.rs verdicts): set replaces printed
+    // base, additive stacks on top.
+    let set_score = gs.mods.get_score_set_modifier(cid);
+    let additive =
+        gs.mods.get_score_modifier(cid) - set_score;
+    let base_score = card.score.unwrap_or(0) as i32;
+    let effective_base = if set_score != 0 { set_score } else { base_score };
+    let score = rabuka_engine::constants::saturate_u8(effective_base + additive) as i32;
+    // Engine cost pipeline: set replaces printed base, additive stacks.
+    let printed_cost = card.cost.unwrap_or(0) as i32;
+    let cost_total = gs.mods.get_cost_modifier(cid);
+    let cost_set = gs.mods.get_cost_modifier_set(cid);
+    let cost = if let Some(s) = cost_set {
+        rabuka_engine::constants::saturate_u8(s + (cost_total - s))
+    } else {
+        rabuka_engine::constants::saturate_u8(printed_cost + cost_total)
+    };
+    // Engine heart pipeline: originals after copy/multiplier/override, plus
+    // additive bonuses. Display keeps the base+bonus split like
+    // MemberContribution (base = originals, bonus = positive additive totals).
+    let (base_h, bonus_h) = stats_pipeline::member_heart_detail(
+        &gs.card_database,
         cid,
-        &gs.mods,
-        false,
+        &gs.mods.heart_override,
+        &gs.mods.heart_copy,
+        &gs.mods.heart_color_multiplier,
+        &gs.mods.heart_modifiers,
     );
-    let need_heart_str = build_heart_str(
-        &card
-            .need_heart
-            .as_ref()
-            .map(|bh| bh.hearts.clone())
-            .unwrap_or_default(),
+    let mut heart_parts: Vec<(u8, String)> = Vec::new();
+    for idx in 0..8 {
+        let b = base_h[idx];
+        let bo = bonus_h[idx];
+        if b == 0 && bo == 0 {
+            continue;
+        }
+        let eff = b.saturating_add(bo);
+        let code = match idx {
+            0 => "h00",
+            1 => "h01",
+            2 => "h02",
+            3 => "h03",
+            4 => "h04",
+            5 => "h05",
+            6 => "h06",
+            _ => "h07",
+        };
+        if idx == 7 {
+            // ALL heart has no h07 label; keep the engine "all" token so the
+            // icon mapper renders icon_all.
+            heart_parts.push((99, format!("all{}", eff)));
+        } else if bo > 0 {
+            heart_parts.push((idx as u8, format!("{}{}+{}", code, b, bo as i32)));
+        } else {
+            heart_parts.push((idx as u8, format!("{}{}", code, b)));
+        }
+    }
+    heart_parts.sort_by_key(|e| e.0);
+    let heart_str = heart_parts
+        .into_iter()
+        .map(|e| e.1)
+        .collect::<Vec<_>>()
+        .join(" ");
+    // Engine need pipeline: effective need after set-then-additive.
+    let need_heart_str = stats_pipeline::effective_need_heart(
+        card.need_heart.as_ref(),
         cid,
-        &gs.mods,
-        true,
-    );
+        &gs.mods.need_heart_modifiers,
+    )
+    .map(|eff| {
+        let mut v: Vec<(u8, String)> = eff
+            .hearts
+            .iter()
+            .map(|(c, n)| {
+                let code = c.short_label();
+                let num = if code.len() >= 3 && code.as_bytes()[0] == b'h' {
+                    code[1..3].parse::<u8>().unwrap_or(99)
+                } else {
+                    99
+                };
+                (num, format!("{}{}", code, n))
+            })
+            .collect();
+        v.sort_by_key(|e| e.0);
+        v.into_iter().map(|e| e.1).collect::<Vec<_>>().join(" ")
+    })
+    .unwrap_or_default();
     CardDisplayStats {
         is_tapped,
         total_blade,

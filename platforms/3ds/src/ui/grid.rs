@@ -3,6 +3,7 @@
 #![cfg_attr(not(feature = "3ds"), allow(unused_imports, dead_code))]
 
 use rabuka_engine::card::CardDatabase;
+use rabuka_engine::game_state::GameState;
 
 use crate::ffi::_3ds_top_queue_card;
 use crate::ffi::_3ds_top_queue_card_depth;
@@ -216,39 +217,47 @@ pub fn render_card_detail(
     card_db: &CardDatabase,
     atlas: &CardAtlas,
     scroll_y: f32,
+    gs: Option<&GameState>,
 ) {
     if let Some(card) = card_db.get_card(card_id) {
-        let total_blade = card.blade as i32;
-        let score = card.score.unwrap_or(0) as i32;
-        let cost = card.cost.unwrap_or(0);
-        let heart_str = build_heart_str(
-            &card
-                .base_heart
-                .as_ref()
-                .map(|bh| bh.hearts.clone())
-                .unwrap_or_default(),
-            card_id,
-            &Default::default(),
-            false,
-        );
-        let need_heart_str = build_heart_str(
-            &card
-                .need_heart
-                .as_ref()
-                .map(|bh| bh.hearts.clone())
-                .unwrap_or_default(),
-            card_id,
-            &Default::default(),
-            true,
-        );
-        let stats = CardDisplayStats {
-            total_blade,
-            heart_str,
-            need_heart_str,
-            score,
-            cost,
-            is_tapped: false,
+        // Engine source of truth when a live game state is available:
+        // effective blade/score/cost/hearts/need via compute_card_stats
+        // (stats_pipeline). Setup/deck-preview callers pass None (no
+        // modifiers exist yet) and fall back to printed stats.
+        let stats = if let Some(g) = gs {
+            crate::ui::text::compute_card_stats(card, card_id, g)
+        } else {
+            let heart_str = build_heart_str(
+                &card
+                    .base_heart
+                    .as_ref()
+                    .map(|bh| bh.hearts.clone())
+                    .unwrap_or_default(),
+                card_id,
+                &Default::default(),
+                false,
+            );
+            let need_heart_str = build_heart_str(
+                &card
+                    .need_heart
+                    .as_ref()
+                    .map(|bh| bh.hearts.clone())
+                    .unwrap_or_default(),
+                card_id,
+                &Default::default(),
+                true,
+            );
+            CardDisplayStats {
+                total_blade: card.blade as i32,
+                heart_str,
+                need_heart_str,
+                score: card.score.unwrap_or(0) as i32,
+                cost: card.cost.unwrap_or(0),
+                is_tapped: false,
+            }
         };
+        // NOTE: use `stats.*` fields directly below (no destructuring move):
+        // the stat line borrows the heart strings.
 
         // Layout: 400x240 top screen. Header bar spans full width; the card
         // portrait fills the left column (nearly the full height below the

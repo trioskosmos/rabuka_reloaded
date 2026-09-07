@@ -379,51 +379,65 @@ pub(crate) fn handle_input(
         }
     }
 
-    // X toggles card detail mode + narrows action list to selected card.
+    // X opens the detail screen for the CURRENTLY HIGHLIGHTED card.
+    // Highlight source of truth is display_order[display_pos] (the grid/list
+    // cursor); `cur` can be stale for a frame after a rebuild, so resolve
+    // through the highlight first and fall back to `cur`.
     // Disabled on the game-over screen.
     if overlay == Overlay::None
         && keys & 0x00000400 != 0
         && gs.game_result == GameResult::Ongoing
     {
-        let has_card = cur < acts_cache.len()
-            && acts_cache[cur]
-                .parameters
-                .as_ref()
-                .and_then(|p| p.card_id)
-                .is_some();
-        if !has_card && !detail_mode {
-            // No card on this action — do nothing
-        } else {
-            detail_mode = !detail_mode;
-            detail_scroll_y = 0.0;
-            if detail_mode && cur < acts_cache.len() {
-                // Resolve the real card id the same way the image grid does:
-                // for a SelectAutoAbility choice the action's card_id is an
-                // option index that must be mapped through opt_map.
-                let cid = acts_cache[cur].parameters.as_ref().and_then(|p| p.card_id);
-                let real = cid.and_then(|i| {
-                    let mut m = std::collections::HashMap::new();
-                    if let Some(c) = gs.get_pending_choice() {
-                        use rabuka_engine::ability::types::Choice;
-                        if let Choice::SelectAutoAbility { options, .. } = c {
-                            for (oi, opt) in options.iter().enumerate() {
-                                if let Some(card) = opt.card_id {
-                                    m.insert(oi as i16, card);
-                                }
-                            }
+        let highlighted_fi: Option<usize> = display_order
+            .get(display_pos)
+            .copied()
+            .or_else(|| {
+                if cur < acts_cache.len() {
+                    Some(cur)
+                } else {
+                    None
+                }
+            });
+        // Resolve the real card id the same way the image grid does:
+        // for a SelectAutoAbility choice the action's card_id is an
+        // option index that must be mapped through opt_map.
+        let highlighted_cid: Option<i16> = highlighted_fi.and_then(|fi| {
+            let cid = acts_cache.get(fi)?.parameters.as_ref()?.card_id?;
+            let mut m = std::collections::HashMap::new();
+            if let Some(c) = gs.get_pending_choice() {
+                use rabuka_engine::ability::types::Choice;
+                if let Choice::SelectAutoAbility { options, .. } = c {
+                    for (oi, opt) in options.iter().enumerate() {
+                        if let Some(card) = opt.card_id {
+                            m.insert(oi as i16, card);
                         }
                     }
-                    m.get(&i).copied()
-                });
-                if let Some(rcid) = real {
-                    viewing_card = Some(rcid);
-                } else if let Some(ccid) = cid {
-                    viewing_card = Some(ccid);
                 }
-            } else if !detail_mode {
-                viewing_card = None;
             }
+            Some(m.get(&cid).copied().unwrap_or(cid))
+        });
+        if let Some(hcid) = highlighted_cid {
+            // Toggle when pressing X on the already-viewed card, otherwise
+            // switch the detail view to the newly highlighted card (this also
+            // opens it from closed). Keeps `cur` in sync so A acts on it.
+            if detail_mode && viewing_card == Some(hcid) {
+                detail_mode = false;
+                viewing_card = None;
+            } else {
+                detail_mode = true;
+                viewing_card = Some(hcid);
+                if let Some(fi) = highlighted_fi {
+                    cur = fi;
+                }
+            }
+            detail_scroll_y = 0.0;
+        } else if detail_mode {
+            // Highlighted item is text-only (no card): close an open detail.
+            detail_mode = false;
+            viewing_card = None;
+            detail_scroll_y = 0.0;
         }
+        // No card on this action and no open detail — do nothing.
         redraw = true;
     }
 

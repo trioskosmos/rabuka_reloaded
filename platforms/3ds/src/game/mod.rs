@@ -65,10 +65,10 @@ pub struct PlayState {
 }
 
 fn compute_live_need(player: &Player, gs: &GameState) -> Vec<u32> {
-    // All live cards whose need-hearts count: committed live-zone cards plus,
-    // during the live-set phase, the currently selected hand cards (which are
-    // not in the live zone yet). This makes the counter update live as cards
-    // are selected/deselected.
+    // Engine source of truth: effective need per live card via
+    // stats_pipeline::effective_need_heart (set-then-additive per color).
+    // Covers committed live-zone cards plus, during the live-set phase, the
+    // currently selected hand cards (not in the live zone yet).
     let mut cids: Vec<i16> = Vec::new();
     for &cid in &player.live_card_zone.cards {
         if cid != -1 {
@@ -93,8 +93,13 @@ fn compute_live_need(player: &Player, gs: &GameState) -> Vec<u32> {
     let mut nh = vec![0u32; 8];
     for &cid in &cids {
         if let Some(card) = gs.card_database.get_card(cid) {
-            if let Some(ref need) = card.need_heart {
-                for (color, count) in &need.hearts {
+            let eff = rabuka_engine::core::stats_pipeline::effective_need_heart(
+                card.need_heart.as_ref(),
+                cid,
+                &gs.mods.need_heart_modifiers,
+            );
+            if let Some(e) = eff {
+                for (color, count) in &e.hearts {
                     if let Some(idx) = heart_color_index(color) {
                         nh[idx] += *count as u32;
                     }
@@ -102,52 +107,26 @@ fn compute_live_need(player: &Player, gs: &GameState) -> Vec<u32> {
             }
         }
     }
-    for (&cid, colors) in &gs.mods.need_heart_modifiers {
-        if cids.contains(&cid) {
-            for (color, &val) in colors {
-                if let Some(idx) = heart_color_index(color) {
-                    nh[idx] = (nh[idx] as i32 + val.total()).max(0) as u32;
-                }
-            }
-        }
-    }
     nh
 }
 
-/// Sum the stage total-heart counts (8 colors) for a player, including
-/// heart_modifiers and the heart_color_multiplier. Mirrors display.rs
-/// player_to_display total_hearts logic. Single source of truth.
+/// Sum the stage total-heart counts (8 colors) for a player, taken from the
+/// engine at the appropriate time: Stage::get_available_hearts funnels through
+/// stats_pipeline::stage_hearts (printed base -> heart_copy -> color
+/// multiplier collapse -> heart_override set -> additive modifiers).
+/// Single source of truth — no local re-implementation.
 fn compute_total_hearts(player: &Player, gs: &GameState) -> Vec<u32> {
+    let owned = player.stage.get_available_hearts(
+        &gs.card_database,
+        &gs.mods.heart_override,
+        &gs.mods.heart_modifiers,
+        &gs.mods.heart_color_multiplier,
+        &gs.mods.heart_copy,
+    );
     let mut hearts = vec![0u32; 8];
-    for &cid in &player.stage.stage {
-        if cid == -1 {
-            continue;
-        }
-        if let Some(card) = gs.card_database.get_card(cid) {
-            if let Some(ref base_heart) = card.base_heart {
-                let h_mult = gs.mods.heart_color_multiplier.get(&cid).copied();
-                for (color, count) in &base_heart.hearts {
-                    if let Some(idx) = heart_color_index(color) {
-                        if let Some(hc) = h_mult {
-                            if hc == *color {
-                                hearts[idx] += *count as u32;
-                            }
-                        } else {
-                            hearts[idx] += *count as u32;
-                        }
-                    }
-                }
-            }
-        }
-    }
-    for (cid, modifier) in &gs.mods.heart_modifiers {
-        if !player.stage.stage.contains(cid) {
-            continue;
-        }
-        for (color, val) in modifier {
-            if let Some(idx) = heart_color_index(color) {
-                hearts[idx] = (hearts[idx] as i32 + val.total()).max(0) as u32;
-            }
+    for (color, count) in &owned.hearts {
+        if let Some(idx) = heart_color_index(color) {
+            hearts[idx] += *count as u32;
         }
     }
     hearts

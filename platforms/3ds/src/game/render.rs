@@ -385,7 +385,7 @@ fn render_zone_viewer(ctx: &RenderCtx) {
                 atlas,
             );
         } else {
-            render_card_detail(viewing_card.unwrap(), &gs.card_database, atlas, detail_scroll_y);
+            render_card_detail(viewing_card.unwrap(), &gs.card_database, atlas, detail_scroll_y, Some(gs));
         }
     }
 }
