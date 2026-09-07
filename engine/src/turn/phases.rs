@@ -119,7 +119,7 @@ impl super::TurnEngine {
                             if game_state
                                 .constant_cannot_activate_members
                                 .iter()
-                                .any(|x| x.parse::<i16>().map_or(false, |v| v == cid))
+                                .any(|x| x.parse::<i16>() == Ok(cid))
                             {
                                 return None;
                             }
@@ -629,7 +629,7 @@ tdbg!("PHASE_ACTIVE:4 wait activated");
                 if stage_cards.contains(cid) {
                     bd.scores.push(crate::types::ScoreLine {
                         source: text.clone(),
-                        value: val.unsigned_abs() as u8,
+                        value: u8::try_from(val.unsigned_abs()).unwrap_or(0),
                     });
                 }
             }
@@ -682,11 +682,11 @@ tdbg!("PHASE_ACTIVE:4 wait activated");
         if let Some(pos) = game_state
             .mulligan_selected_indices
             .iter()
-            .position(|&x| x == idx as u8)
+            .position(|&x| x == u8::try_from(idx).unwrap())
         {
             game_state.mulligan_selected_indices.remove(pos);
         } else {
-            game_state.mulligan_selected_indices.push(idx as u8);
+            game_state.mulligan_selected_indices.push(u8::try_from(idx).unwrap());
         }
         Ok(())
     }
@@ -814,17 +814,17 @@ tdbg!("PHASE_ACTIVE:4 wait activated");
         if let Some(pos) = game_state
             .live_card_selected_indices
             .iter()
-            .position(|&x| x == idx as u8)
+            .position(|&x| x == u8::try_from(idx).unwrap())
         {
             game_state.live_card_selected_indices.remove(pos);
         } else {
             let player = game_state.active_player();
-            let reduction = i32::try_from(player.live_card_set_limit_reduction).unwrap_or(0);
+            let reduction: i32 = From::from(player.live_card_set_limit_reduction);
             let max_allowed = (MAX_LIVE_CARDS as i32 - reduction).max(0) as usize;
             if game_state.live_card_selected_indices.len() >= max_allowed {
                 return Err("Cannot select more live cards: limit reached".to_string());
             }
-            game_state.live_card_selected_indices.push(idx as u8);
+            game_state.live_card_selected_indices.push(u8::try_from(idx).unwrap());
         }
         Ok(())
     }
@@ -839,7 +839,7 @@ tdbg!("PHASE_ACTIVE:4 wait activated");
                 game_state
                     .live_card_selected_indices
                     .iter()
-                    .map(|&i| i as usize)
+                    .map(|&i| usize::from(i))
                     .collect()
             });
         let mut sorted_indices: Vec<usize> = live_indices.clone();
@@ -995,7 +995,7 @@ tdbg!("PHASE_ACTIVE:4 wait activated");
                                 .unwrap_or(0) as i32;
                             // Include constant cost modifiers (parity with single-baton
                             // payment in core/player.rs).
-                            (base + game_state.mods.get_cost_modifier(cid)).max(1) as u8
+                            u8::try_from((base + game_state.mods.get_cost_modifier(cid)).max(1)).unwrap_or(0)
                         })
                     })
                     .collect()
@@ -1075,7 +1075,7 @@ tdbg!("PHASE_ACTIVE:4 wait activated");
             } else {
                 Some(db_areas[1] as usize)
             };
-            game_state.last_vacated_stage_area = other_vacated.map(|v| v as u8);
+            game_state.last_vacated_stage_area = other_vacated.map(|v| u8::try_from(v).unwrap());
             // Remove card from hand
             let player = game_state.active_player_mut();
             player.hand.cards.remove(idx);
@@ -1272,14 +1272,14 @@ tdbg!("PHASE_ACTIVE:4 wait activated");
                         .get_card(card_id)
                         .and_then(|c| c.cost)
                         .unwrap_or(0);
-                    game_state.mods.set_cost_modifier(card_id, (base as i32 - red as i32) as i16);
+                    game_state.mods.set_cost_modifier(card_id, i16::try_from(base as i32 - red as i32).unwrap_or(0));
                     game_state.record_ability_application(
                         card_id,
                         "Play-time cost reduction".to_string(),
                         "cost_set",
                         card_id,
                         None,
-                        (base as i32 - red as i32) as i16,
+                        i16::try_from(base as i32 - red as i32).unwrap_or(0),
                     );
                     Self::shuffle_waitroom_members_to_deck_bottom(game_state, &player_id);
                     game_state.push_rule_log(format!(
@@ -1391,7 +1391,7 @@ tdbg!("PHASE_ACTIVE:4 wait activated");
             {
                 return None;
             }
-            effect.count_any().map(|c| c as i8)
+            effect.count_any().map(|c| c.cast_signed())
         })
     }
 
@@ -1414,13 +1414,13 @@ tdbg!("PHASE_ACTIVE:4 wait activated");
             if effect.action != ActionType::ModifyCost {
                 continue;
             }
-            let Some(value) = effect.value_any().and_then(|v| i16::try_from(v).ok()) else {
+            let Some(value) = effect.value_any().and_then(|v| Some(i16::from(v))) else {
                 continue;
             };
-            if effect.operation_any().as_deref() != Some("set") {
+            if effect.operation_any() != Some("set") {
                 continue;
             }
-            if effect.location_any().as_deref() != Some("hand") || !effect.optional.unwrap_or(false) {
+            if effect.location_any() != Some("hand") || !effect.optional.unwrap_or(false) {
                 continue;
             }
             if let Some(chars) = effect.characters_any() {
@@ -1434,7 +1434,7 @@ tdbg!("PHASE_ACTIVE:4 wait activated");
 
     #[inline]
     fn normalize_member_name(s: &str) -> String {
-        s.replace(' ', "").replace('　', "")
+        s.replace([' ', '　'], "")
     }
 
     fn has_play_time_alt_cost_hand_cards(
