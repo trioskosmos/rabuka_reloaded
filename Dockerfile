@@ -11,7 +11,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /build
 
-# Copy entire repo to generate code
+# Copy entire repo
 COPY . .
 
 # Generate cards_gen.rs and abilities build artifacts
@@ -22,11 +22,13 @@ RUN python3 tools/bake_deck_cards.py
 
 WORKDIR /build/engine
 
+# Copy Cargo files first for dependency caching
 COPY engine/Cargo.toml engine/Cargo.lock ./
 RUN mkdir src && echo "fn main() {}" > src/main.rs && \
     cargo build --release --features server --bin rabuka_engine 2>/dev/null || true && \
     rm -rf src
 
+# Copy engine source (generated files are already in place from root-level generation)
 COPY engine/ ./
 RUN cargo build --release --features server --bin rabuka_engine
 
