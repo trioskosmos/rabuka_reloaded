@@ -42,6 +42,19 @@ pub struct FrameSnapshot {
     pub label: String,
     pub p1: FramePlayerState,
     pub p2: FramePlayerState,
+    // The action that produced this frame (for delta sync)
+    pub action: Option<FrameAction>,
+}
+
+#[derive(Debug,  Clone)]
+#[cfg_attr(feature = "serde_support", derive( Serialize,  Deserialize))]
+pub struct FrameAction {
+    pub action_type: String,
+    pub player_id: u8,
+    pub card_id: Option<i16>,
+    pub card_indices: Option<Vec<usize>>,
+    pub stage_area: Option<String>,
+    pub use_baton_touch: bool,
 }
 
 #[derive(Debug,  Clone)]
@@ -59,7 +72,7 @@ pub struct FramePlayerState {
 }
 
 impl FrameSnapshot {
-    pub fn capture(game_state: &crate::game_state::GameState, frame: u64, label: String) -> Self {
+    pub fn capture(game_state: &crate::game_state::GameState, frame: u64, label: String, action: FrameAction) -> Self {
         let p = |player: &crate::player::Player| FramePlayerState {
             hand: player.hand.cards.iter().copied().collect(),
             hand_count: player.hand.cards.len(),
@@ -88,6 +101,7 @@ impl FrameSnapshot {
             label,
             p1: p(&game_state.player1),
             p2: p(&game_state.player2),
+            action: Some(action),
         }
     }
 }
@@ -137,7 +151,7 @@ struct ZoneChange {
     to_index: Option<u16>,
 }
 
-/// Incremental state update - ONLY what changed since last frame
+/// Incremental state update = the action that was executed + any RNG results
 #[derive()]
 #[cfg_attr(feature = "serde_support", derive(Serialize))]
 struct GameStateDelta {
@@ -156,10 +170,20 @@ struct GameStateDelta {
     pending_choice: Option<serde_json::Value>,
     #[cfg_attr(feature = "serde_support", serde(skip_serializing_if = "Option::is_none"))]
     legal_actions: Option<Vec<ActionIndex>>,
+    // The action that was just executed - clients apply this locally
     #[cfg_attr(feature = "serde_support", serde(skip_serializing_if = "Option::is_none"))]
-    zone_changes: Option<Vec<ZoneChange>>,  // ONLY zone movements
+    executed_action: Option<FrameAction>,
+    // Any RNG results that must be synchronized (shuffles, coin flips)
     #[cfg_attr(feature = "serde_support", serde(skip_serializing_if = "Option::is_none"))]
-    log_entries: Option<Vec<serde_json::Value>>,  // New log entries only
+    rng_results: Option<Vec<RngResult>>,
+}
+
+/// RNG result that must be synchronized across clients
+#[derive()]
+#[cfg_attr(feature = "serde_support", derive(Serialize))]
+struct RngResult {
+    rng_type: String,  // "shuffle", "coin_flip", "dice_roll"
+    result: serde_json::Value,
 }
 
 #[derive()]
@@ -872,8 +896,16 @@ pub async fn execute_action(
                         room.actions_dirty = true;
                         room.frame_counter += 1;
                         let label = frame_label(req.action_type.as_deref(), req.card_no.as_deref());
+                        let frame_action = FrameAction {
+                            action_type: req.action_type.as_deref().unwrap_or("Unknown").to_string(),
+                            player_id: pvp_player_pid.map(|p| p as u8).unwrap_or(0),
+                            card_id: req.card_id,
+                            card_indices: req.card_indices.clone(),
+                            stage_area: req.stage_area.clone(),
+                            use_baton_touch: req.use_baton_touch.unwrap_or(false),
+                        };
                         room.frame_history
-                            .push(FrameSnapshot::capture(&game_state, room.frame_counter, label));
+                            .push(FrameSnapshot::capture(&game_state, room.frame_counter, label, frame_action));
 
                         // Recording hook: buffer (state, action) for each step
                         if room.recording && room.recording_before.is_empty() {
@@ -947,9 +979,17 @@ pub async fn execute_action(
                 let mut fc = lock_recover(&data.frame_counter);
                 *fc += 1;
                 let label = frame_label(req.action_type.as_deref(), req.card_no.as_deref());
+                let frame_action = FrameAction {
+                    action_type: req.action_type.as_deref().unwrap_or("Unknown").to_string(),
+                    player_id: pvp_player_pid.map(|p| p as u8).unwrap_or(0),
+                    card_id: req.card_id,
+                    card_indices: req.card_indices.clone(),
+                    stage_area: req.stage_area.clone(),
+                    use_baton_touch: req.use_baton_touch.unwrap_or(false),
+                };
                 data.frame_history
                     .lock_recover()
-                    .push(FrameSnapshot::capture(&game_state, *fc, label));
+                    .push(FrameSnapshot::capture(&game_state, *fc, label, frame_action));
             }
 
             // Capture frame_id before releasing write lock
@@ -1081,6 +1121,9 @@ if let Some(pid) = pvp_player_pid {
 
     let phase_changed = old_frame.as_ref().map(|f| f.phase != format!("{:?}", game_state.current_phase)).unwrap_or(false);
     
+    // Get the executed action from the latest frame
+    let executed_action = old_frame.and_then(|f| f.action);
+    
     HttpResponse::Ok().json(GameStateDelta {
         frame_id: current_frame,
         phase: if phase_changed { Some(game_state.current_phase.clone()) } else { None },
@@ -1090,8 +1133,8 @@ if let Some(pid) = pvp_player_pid {
         player2_rps_choice: game_state.player2_rps_choice,
         pending_choice: display.pending_choice.clone(),
         legal_actions: None,
-        zone_changes: None,
-        log_entries: None,
+        executed_action,
+        rng_results: None,
     })
 }
 
@@ -2693,10 +2736,26 @@ async fn init_game(
             room.frame_counter = 0;
             room.frame_history.clear();
             let gs = Arc::new(RwLock::new(game_state));
+            let _dummy_action = FrameAction {
+                action_type: "GameStart".to_string(),
+                player_id: 0,
+                card_id: None,
+                card_indices: None,
+                stage_area: None,
+                use_baton_touch: false,
+            };
             room.frame_history.push(FrameSnapshot::capture(
                 &gs.read().unwrap(),
                 0,
                 "Game start".into(),
+                FrameAction {
+                    action_type: "GameStart".to_string(),
+                    player_id: 0,
+                    card_id: None,
+                    card_indices: None,
+                    stage_area: None,
+                    use_baton_touch: false,
+                },
             ));
             let display = crate::display::game_state_to_display(&gs.read().unwrap());
             let actions = actions_with_index(&gs.read().unwrap());
@@ -2720,7 +2779,19 @@ async fn init_game(
     lock_recover(&data.future).clear();
     *lock_recover(&data.frame_counter) = 0;
     lock_recover(&data.frame_history).clear();
-    let frame0 = FrameSnapshot::capture(&state_guard, 0, "Game start".into());
+    let frame0 = FrameSnapshot::capture(
+        &state_guard,
+        0,
+        "Game start".into(),
+        FrameAction {
+            action_type: "GameStart".to_string(),
+            player_id: 0,
+            card_id: None,
+            card_indices: None,
+            stage_area: None,
+            use_baton_touch: false,
+        },
+    );
     lock_recover(&data.frame_history).push(frame0);
 
     let display = crate::display::game_state_to_display(&state_guard);
