@@ -2,7 +2,7 @@ import { State, updateStateData } from '../state.js';
 import { log } from '../logger.js';
 import { DOMUtils } from '../utils/DOMUtils.js';
 import { DOM_IDS, COLORS } from '../constants_dom.js';
-import { apiFetch } from '../network.js';
+import { apiFetch, Network } from '../network.js';
 
 /** Backend responses carry legal_actions as {action_type, description, parameters}.
  *  Ensure each has a stable numeric `index` for the UI. */
@@ -76,7 +76,7 @@ export const GameService = {
             if (data.version !== undefined && data.version !== GameService._lastKnownVersion) {
                 GameService._lastKnownVersion = data.version;
                 console.log('[GameService] Version changed, fetching state');
-                await GameService.fetchState(network);
+                await GameService.fetchState(Network);
             }
         } catch (e) {
             console.error('[GameService] Version check error:', e);
