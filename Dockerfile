@@ -14,12 +14,6 @@ WORKDIR /build
 # Copy entire repo
 COPY . .
 
-# Generate cards_gen.rs and abilities build artifacts
-RUN python3 cards/compile_cards.py && python3 cards/compile_abilities.py
-
-# Generate per-deck card blobs (required by include_bytes! in decks_cards_gen.rs)
-RUN python3 tools/bake_deck_cards.py
-
 WORKDIR /build/engine
 
 # Copy Cargo files first for dependency caching
@@ -28,8 +22,16 @@ RUN mkdir src && echo "fn main() {}" > src/main.rs && \
     cargo build --release --features server --bin rabuka_engine 2>/dev/null || true && \
     rm -rf src
 
-# Copy engine source (generated files are already in place from root-level generation)
+# Copy engine source
 COPY engine/ ./
+
+# Generate cards_gen.rs and abilities build artifacts (from engine dir, using ../cards)
+RUN python3 ../cards/compile_cards.py && python3 ../cards/compile_abilities.py
+
+# Generate per-deck card blobs (required by include_bytes! in decks_cards_gen.rs)
+RUN python3 ../tools/bake_deck_cards.py
+
+# Build the actual binary
 RUN cargo build --release --features server --bin rabuka_engine
 
 # ============================================================
