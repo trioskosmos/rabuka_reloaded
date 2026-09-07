@@ -253,21 +253,68 @@ pub struct FrameAction {
 - **Issue**: `[Compat] Permissions-Policy header: Unrecognized feature: 'attribution-reporting'`
 - **Note**: This is a **GitHub Pages** added header, not server-controlled. Browser warning only, no functional impact.
 
+### WASM Conversion (v3) — **IMPLEMENTED 2026-09-07**
+- **Core engine**: Compiles to `wasm32-unknown-unknown` with `wasm` feature (`no_std`, `bytecode_abilities`, `compact_all`)
+- **Card DB**: Embedded via `cards.bin` blob (537 KB) using `compact_card_data` feature
+- **Abilities**: Bytecode format (28 KB compressed) via `bytecode_abilities` feature
+- **RNG**: Deterministic xorshift32 (`engine/src/rng.rs`) - no `thread_rng()`, no time dependence
+- **WASM crate**: `platforms/wasm/` with wasm-bindgen bindings
+  - `WasmGameEngine` class: `execute_action`, `get_state_delta`, `get_legal_actions`, `serialize`
+  - Deterministic RNG exports: `wasm_seed`, `wasm_shuffle`, `wasm_rand_range`
+- **Build output**: 3.56 MB uncompressed, **1.49 MB gzipped** (matches 1-1.5 MB estimate)
+- **Web Worker**: `web_ui/src/workers/gameWorker.js` runs engine off main thread
+- **Frontend**: `WasmGameService.js` drop-in replacement for server-based `GameService`
+- **CI/CD**: GitHub Actions workflow builds WASM + wasm-bindgen on push, deploys to `docs/wasm/`
+- **Determinism**: Verified - engine uses HashMap only for key lookups (deterministic) or display/commutative ops
+
 ---
 
-## Future: WASM P2P (v3) — Effort Estimate
+## Request Flow Optimization (v3)
 
-| Component | Status | Effort |
-|-----------|--------|--------|
-| Core engine → WASM | ✅ Compiles (`wasm32-unknown-unknown`) | 0 |
-| Card DB embedding | ⚠️ 2.5 MB `include_bytes!` or async fetch | 2 days |
-| Determinism audit | ❌ `HashMap` iteration, `thread_rng()`, time | 1 week |
-| `wasm-bindgen` bindings | ❌ Need JS glue | 2 days |
-| Web Worker off-main-thread | ❌ `postMessage` + `SharedArrayBuffer` | 2 days |
-| Commit-reveal anti-cheat | ❌ Ed25519, replay verify | 3-5 days |
-| Cloudflare Workers relay | ❌ 10 lines Worker script | 1 day |
-| Render lobby (v3b hybrid) | ❌ Room list, presence, spectate | 3 days |
-| **Total (v3a pure)** | | **~3 weeks** |
-| **Total (v3b hybrid)** | | **~3.5 weeks** |
+### v2 Current (Server-Based) — ~3 RTT per turn
+```
+Client                          Render Server
+  | POST /execute-action ──────► |
+  | ◄──── 202 ActionResult       |
+  | GET /delta?since=X ────────► |
+  | ◄──── 200 GameStateDelta     |
+  | SSE "update Y" ─────────────► (push)
+```
 
-**Verdict**: Stay with v2. It works, costs $0, scales. Port to WASM only when you need true P2P, offline replay, or zero-server-cost at massive scale. **v3b hybrid keeps Render for lobby/spectate/replay features** while moving gameplay to WASM.
+### v3 WASM P2P — **0 RTT per turn** (local execution)
+```
+Client A (WASM)              Cloudflare Relay           Client B (WASM)
+  | execute_action() ──────────► broadcast ──────────► |
+  | apply_state_delta() ◄────── (action only) ◄───────► |
+  | (local, instant)                                        |
+```
+
+### Request Reduction Summary
+
+| Operation | v2 (Server) | v3 (WASM) | Reduction |
+|-----------|-------------|-----------|-----------|
+| Execute action | POST + GET delta (2 req) | **0 req** (local) | 100% |
+| State sync | SSE push + poll (2 req) | **0 req** (local) | 100% |
+| Legal actions | GET /legal-actions | **0 req** (local) | 100% |
+| RNG sync | Server-generated | **Local** (commit-reveal) | 100% |
+| Initial load | 30 KB | +1.49 MB WASM (one-time) | N/A |
+
+### Bandwidth Per Turn (PVP)
+- **v2**: ~232 B (POST + delta + SSE)
+- **v3**: **~50 B** (ActionSync: tag + player + action + card_id + indices + area + baton + seq)
+
+### Server Requests Eliminated (per game, ~50 turns)
+| Endpoint | v2 Requests | v3 Requests |
+|----------|-------------|-------------|
+| `/execute-action` | 50 | **0** |
+| `/game-state/delta` | 50 | **0** |
+| `/events` (SSE) | 1 persistent | **0** |
+| `/actions/legal` | 50 | **0** |
+| **Total** | **~150** | **~2** (relay connect + room create) |
+
+### Remaining Server Requests (v3b Hybrid)
+Only lobby/matchmaking on Render:
+- `POST /rooms/create` — once per game
+- `GET /rooms/list` — periodic
+- `GET /rooms/spectate` — spectators only
+- `POST /export_game` / `POST /import_game` — replays
