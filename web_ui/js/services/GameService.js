@@ -72,11 +72,15 @@ export const GameService = {
             const res = await apiFetch('api/game-state/version');
             if (!res.ok) return;
             const data = await res.json();
+            console.log('[GameService] Version check:', data.version, 'lastKnown:', GameService._lastKnownVersion);
             if (data.version !== undefined && data.version !== GameService._lastKnownVersion) {
                 GameService._lastKnownVersion = data.version;
+                console.log('[GameService] Version changed, fetching state');
                 await GameService.fetchState(network);
             }
-        } catch (_) {}
+        } catch (e) {
+            console.error('[GameService] Version check error:', e);
+        }
     },
 
     triggerVersionCheck: () => {

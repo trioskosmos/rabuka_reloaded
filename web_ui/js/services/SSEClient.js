@@ -11,6 +11,7 @@ export const SSEClient = {
         await getBackendUrl();
         eventSource = new EventSource(getSseUrl(roomCode));
         eventSource.onmessage = (e) => {
+            console.log('[SSE] onmessage:', e.data);
             if (e.data === 'update' && onUpdate) {
                 onUpdate();
             } else if (e.data === 'closed' && onUpdate) {

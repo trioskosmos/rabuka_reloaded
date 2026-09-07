@@ -62,6 +62,15 @@ function renderFull(body, state, perspectivePlayer) {
     const hasLegalRps = state.legal_actions?.some(a =>
         SIGNS.some(s => a.action_type === s.actionType || a.action_type === s.snakeType)
     );
+    console.log('[RpsView] state:', {
+        legal_actions: state.legal_actions,
+        player1_rps_choice: state.player1_rps_choice,
+        player2_rps_choice: state.player2_rps_choice,
+        rps_winner: state.rps_winner,
+        perspectivePlayer,
+        hasLegalRps,
+        current_phase: state.current_phase,
+    });
 
     const myChoice = myIdx === 0 ? state.player1_rps_choice : state.player2_rps_choice;
     const oppChoice = myIdx === 0 ? state.player2_rps_choice : state.player1_rps_choice;
