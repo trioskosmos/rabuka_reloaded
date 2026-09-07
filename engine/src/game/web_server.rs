@@ -124,7 +124,20 @@ struct ActionResult {
     state_delta: Option<GameStateDelta>,
 }
 
-/// Incremental state update - only fields that changed since last frame
+/// Single card movement between zones (minimal)
+#[derive()]
+#[cfg_attr(feature = "serde_support", derive(Serialize))]
+struct ZoneChange {
+    card_id: i16,
+    from_zone: u8,  // 0=hand, 1=stage_L, 2=stage_C, 3=stage_R, 4=deck, 5=waitroom, 6=energy, 7=stock
+    to_zone: u8,
+    #[cfg_attr(feature = "serde_support", serde(skip_serializing_if = "Option::is_none"))]
+    from_index: Option<u16>,
+    #[cfg_attr(feature = "serde_support", serde(skip_serializing_if = "Option::is_none"))]
+    to_index: Option<u16>,
+}
+
+/// Incremental state update - ONLY what changed since last frame
 #[derive()]
 #[cfg_attr(feature = "serde_support", derive(Serialize))]
 struct GameStateDelta {
@@ -144,9 +157,9 @@ struct GameStateDelta {
     #[cfg_attr(feature = "serde_support", serde(skip_serializing_if = "Option::is_none"))]
     legal_actions: Option<Vec<ActionIndex>>,
     #[cfg_attr(feature = "serde_support", serde(skip_serializing_if = "Option::is_none"))]
-    player1: Option<display::PlayerDisplay>,
+    zone_changes: Option<Vec<ZoneChange>>,  // ONLY zone movements
     #[cfg_attr(feature = "serde_support", serde(skip_serializing_if = "Option::is_none"))]
-    player2: Option<display::PlayerDisplay>,
+    log_entries: Option<Vec<serde_json::Value>>,  // New log entries only
 }
 
 #[derive()]
@@ -1054,21 +1067,31 @@ async fn game_state_delta(
         })
     });
     
-    if let Some(pid) = pvp_player_pid {
+if let Some(pid) = pvp_player_pid {
         filter_display_for_player(&mut display, &game_state, pid);
     }
+
+    // Find the frame at `since` for comparison
+    let old_frame = if since > 0 && since < current_frame {
+        let frames = lock_recover(&data.frame_history);
+        frames.iter().find(|f| f.frame == since).cloned()
+    } else {
+        None
+    };
+
+    let phase_changed = old_frame.as_ref().map(|f| f.phase != format!("{:?}", game_state.current_phase)).unwrap_or(false);
     
     HttpResponse::Ok().json(GameStateDelta {
         frame_id: current_frame,
-        phase: Some(game_state.current_phase.clone()),
+        phase: if phase_changed { Some(game_state.current_phase.clone()) } else { None },
         active_player: Some(if game_state.active_player().id == game_state.player1.id { 0 } else { 1 }),
         rps_winner: game_state.rps_winner,
         player1_rps_choice: game_state.player1_rps_choice,
         player2_rps_choice: game_state.player2_rps_choice,
         pending_choice: display.pending_choice.clone(),
         legal_actions: None,
-        player1: Some(display.player1.clone()),
-        player2: Some(display.player2.clone()),
+        zone_changes: None,
+        log_entries: None,
     })
 }
 
