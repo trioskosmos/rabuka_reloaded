@@ -3,7 +3,6 @@ use crate::{HashMap, HashSet};
 use actix_cors::Cors;
 use actix_files as fs;
 use actix_web::{web, App, HttpResponse, HttpServer, Responder};
-use bytes::Bytes;
 #[cfg(feature = "no_std")]
 use alloc::{
     string::{String, ToString},
@@ -148,19 +147,6 @@ struct GameStateDelta {
     player1: Option<display::PlayerDisplay>,
     #[cfg_attr(feature = "serde_support", serde(skip_serializing_if = "Option::is_none"))]
     player2: Option<display::PlayerDisplay>,
-}
-
-/// Single card movement between zones
-#[derive()]
-#[cfg_attr(feature = "serde_support", derive(Serialize))]
-struct ZoneChange {
-    card_id: i16,
-    from_zone: String,
-    to_zone: String,
-    #[cfg_attr(feature = "serde_support", serde(skip_serializing_if = "Option::is_none"))]
-    from_index: Option<usize>,
-    #[cfg_attr(feature = "serde_support", serde(skip_serializing_if = "Option::is_none"))]
-    to_index: Option<usize>,
 }
 
 #[derive()]
