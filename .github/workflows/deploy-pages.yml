@@ -27,6 +27,16 @@ jobs:
         # platforms/wasm/Cargo.lock (0.2.128); latest CLI emits bindings
         # the checked-in glue may not understand.
         run: cargo install wasm-bindgen-cli --version 0.2.128 --locked
+      - name: Generate baked card artifacts
+        # NOTE: the engine include_bytes!s generated blobs (per-deck card
+        # data, ability bytecode/strings) that are gitignored, so a fresh
+        # checkout cannot compile without them. Same three commands as the
+        # Dockerfile's rust-builder stage — keep in sync with it.
+        run: |
+          python3 ../cards/compile_cards.py
+          python3 ../cards/compile_abilities.py
+          python3 ../tools/bake_deck_cards.py
+        working-directory: engine
       - name: Build WASM
         run: |
           cd platforms/wasm
