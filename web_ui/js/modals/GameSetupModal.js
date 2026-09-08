@@ -301,7 +301,7 @@ export const GameSetupModal = {
             if (gameMode === 'pvp' && State._aiMode) {
                 body.is_ai = true;
             }
-            const roomRes = await fetch('api/rooms/create', {
+            const roomRes = await apiFetch('api/rooms/create', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(body)

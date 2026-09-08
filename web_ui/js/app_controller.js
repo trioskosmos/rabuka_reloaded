@@ -164,7 +164,7 @@ const actionHandlers = {
     'start-test-game': async () => {
         // Create a sandbox room
         if (!State.roomCode) {
-            const roomRes = await fetch('api/rooms/create', {
+            const roomRes = await apiFetch('api/rooms/create', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ mode: 'sandbox' })
@@ -181,7 +181,7 @@ const actionHandlers = {
 
         // Load test decks for both players
         try {
-            const deckRes = await fetch('api/get_test_deck');
+            const deckRes = await apiFetch('api/get_test_deck');
             const deckData = await deckRes.json();
             if (!deckData.success) { alert("Failed to load test deck"); return; }
             const cards = deckData.content;

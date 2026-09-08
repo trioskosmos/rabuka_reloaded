@@ -1,5 +1,5 @@
 import { State } from '../state.js';
-import { Network } from '../network.js';
+import { Network, apiFetch } from '../network.js';
 
 const buildReverseLookup = (source) => Object.fromEntries(
     Object.entries(source)
@@ -211,7 +211,7 @@ export const DebugModal = {
         DebugModal._conditions = null;
         DebugModal._conditionError = null;
         try {
-            const res = await fetch('/api/debug/conditions', {
+            const res = await apiFetch('api/debug/conditions', {
                 headers: State.roomCode ? { 'X-Room-ID': State.roomCode } : {}
             });
             const data = await res.json();

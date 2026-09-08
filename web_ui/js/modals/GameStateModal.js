@@ -1,4 +1,5 @@
 import { State } from '../state.js';
+import { apiFetch } from '../network.js';
 import { ModalManager } from '../utils/ModalManager.js';
 import { Tooltips } from '../ui_tooltips.js';
 import * as i18n from '../i18n/index.js';
@@ -117,7 +118,7 @@ export const GameStateModal = {
         try {
             const controller = new AbortController();
             const timeout = setTimeout(() => controller.abort(), 5000);
-            const res = await fetch('/api/debug/conditions', { signal: controller.signal });
+            const res = await apiFetch('api/debug/conditions', { signal: controller.signal });
             clearTimeout(timeout);
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             _conditionsCache = await res.json();

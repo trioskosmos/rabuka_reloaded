@@ -1,4 +1,5 @@
 import { State } from '../state.js';
+import { apiFetch } from '../network.js';
 
 const AI_ACTION_DELAY = 0;
 const AI_IDLE_DELAY = 200;
@@ -44,7 +45,7 @@ export const AiDriver = {
     },
 
     async _step() {
-        const res = await fetch('api/game-state', {
+        const res = await apiFetch('api/game-state', {
             headers: aiHeaders(State._aiSessionToken)
         });
         if (!res.ok) return false;
@@ -58,7 +59,7 @@ export const AiDriver = {
         const action = actions[Math.floor(Math.random() * actions.length)];
         const p = action.parameters || {};
 
-        const sendRes = await fetch('api/execute-action', {
+        const sendRes = await apiFetch('api/execute-action', {
             method: 'POST',
             headers: aiHeaders(State._aiSessionToken),
             body: JSON.stringify({

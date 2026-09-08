@@ -3,7 +3,7 @@
  * Handles loading, playback, and navigation of game replays.
  */
 import { State, updateStateData } from './state.js';
-import { Network } from './network.js';
+import { Network, apiFetch } from './network.js';
 import { log } from './logger.js';
 import { fixImg } from './constants.js';
 import { DOM_IDS, DISPLAY_VALUES } from './constants_dom.js';
@@ -21,7 +21,7 @@ export const Replay = {
     loadReplay: async () => {
         const filename = (document.getElementById('replay-file')?.value || 'ai_match.json').trim();
         try {
-            const res = await fetch(`api/replay/${filename}?t=${Date.now()}`);
+            const res = await apiFetch(`api/replay/${filename}?t=${Date.now()}`);
             State.replayData = await res.json();
             State.currentFrame = 0;
             const totalEl = document.getElementById('total-frames');
