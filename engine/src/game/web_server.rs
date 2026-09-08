@@ -2044,89 +2044,110 @@ async fn get_test_deck(_data: web::Data<AppState>) -> impl Responder {
     HttpResponse::Ok().json(serde_json::json!({ "success": true, "content": content }))
 }
 
+/// Accept either a JSON array of card numbers or a deck-list string.
+fn parse_deck_numbers(req: &serde_json::Value, field: &str) -> Vec<String> {
+    if let Some(arr) = req.get(field).and_then(|v| v.as_array()) {
+        return arr
+            .iter()
+            .filter_map(|v| {
+                v.as_str()
+                    .map(|s| deck_parser::DeckParser::normalize_card_no(s))
+            })
+            .collect();
+    }
+    let content = req.get(field).and_then(|v| v.as_str()).unwrap_or("");
+    if content.is_empty() {
+        Vec::new()
+    } else {
+        deck_parser::DeckParser::parse_deck_content(content)
+    }
+}
+
+/// Store a deck in a room's staging area. Returns true when both players
+/// have submitted and the room's game state was (re)initialized.
+///
+/// Lock discipline: `data.rooms` is a non-reentrant std Mutex. The guard is
+/// released before `notify_room_clients` runs — notify re-locks `data.rooms`,
+/// so calling it under the guard self-deadlocks the worker thread and wedges
+/// every later rooms operation behind it.
+fn store_room_deck(
+    data: &AppState,
+    room_id: &str,
+    player: i32,
+    deck: Vec<String>,
+    energy_deck: Vec<String>,
+) -> bool {
+    let initialized = {
+        let mut rooms = lock_recover(&data.rooms);
+        let Some(room) = rooms.get_mut(room_id) else {
+            log::warn!("[set_deck] room {room_id} not found; deck for player {player} dropped");
+            return false;
+        };
+        let decks = room.custom_decks.get_or_insert_with(HashMap::new);
+        decks.insert(
+            player,
+            CustomDeck {
+                main: deck,
+                energy: energy_deck,
+            },
+        );
+        if !(decks.contains_key(&0) && decks.contains_key(&1)) {
+            log::debug!("[set_deck] room {room_id}: stored deck for player {player}, waiting for opponent");
+            return false;
+        }
+        if !try_init_room_game_state(room, &data) {
+            log::warn!("[set_deck] room {room_id}: both decks submitted but game init failed");
+            return false;
+        }
+        log::debug!("[set_deck] room {room_id}: both decks submitted, game initialized");
+        true
+    };
+    // Guard released: now safe to notify (notify re-locks data.rooms).
+    notify_room_clients(data, room_id);
+    initialized
+}
+
 pub async fn set_deck(
     data: web::Data<AppState>,
     req: web::Json<serde_json::Value>,
 ) -> impl Responder {
     let player = req.get("player").and_then(|v| v.as_i64()).unwrap_or(0) as i32;
+    // Room IDs are canonicalized to uppercase everywhere else (create,
+    // spectate, X-Room-Id header); do the same here so a lowercase body
+    // value can't silently miss the room and drop the deck.
     let room_id = req
         .get("room_id")
         .and_then(|v| v.as_str())
-        .map(|s| s.to_string());
+        .map(|s| s.to_uppercase())
+        .filter(|s| !s.is_empty());
+    let deck = parse_deck_numbers(&req, "deck");
+    let energy_deck = parse_deck_numbers(&req, "energy_deck");
 
-    let card_numbers: Vec<String> = if let Some(arr) = req.get("deck").and_then(|v| v.as_array()) {
-        arr.iter()
-            .filter_map(|v| {
-                v.as_str()
-                    .map(|s| deck_parser::DeckParser::normalize_card_no(s))
-            })
-            .collect()
-    } else {
-        let deck_content = req.get("deck").and_then(|v| v.as_str()).unwrap_or("");
-        if deck_content.is_empty() {
-            Vec::new()
-        } else {
-            deck_parser::DeckParser::parse_deck_content(deck_content)
-        }
-    };
-    if card_numbers.is_empty() {
+    if deck.is_empty() {
+        log::debug!("[set_deck] rejected empty deck (player {player}, room {room_id:?})");
         return HttpResponse::Ok()
             .json(serde_json::json!({ "success": false, "status": "empty_deck" }));
     }
 
-    // If room_id is present, store deck in the room's custom_decks
-    let mut init_game = false;
-    if let Some(ref rid) = room_id {
-        let mut rooms = lock_recover(&data.rooms);
-        if let Some(room) = rooms.get_mut(rid) {
-            let decks = room.custom_decks.get_or_insert_with(HashMap::new);
-            let deck_entry = decks.entry(player).or_insert_with(|| CustomDeck {
-                main: Vec::new(),
-                energy: Vec::new(),
-            });
-            deck_entry.main = card_numbers.clone();
-            if let Some(energy_arr) = req.get("energy_deck").and_then(|v| v.as_array()) {
-                deck_entry.energy = energy_arr
-                    .iter()
-                    .filter_map(|v| {
-                        v.as_str()
-                            .map(|s| deck_parser::DeckParser::normalize_card_no(s))
-                    })
-                    .collect();
-            }
-            // Check if both players have submitted
-            if decks.contains_key(&0) && decks.contains_key(&1) {
-                if try_init_room_game_state(room, &data) {
-                    init_game = true;
-                    // Notify SSE clients that game state is ready
-                    notify_room_clients(&data, rid);
-                }
-            }
-        }
-    } else {
-        // Legacy sandbox mode: store in global custom_decks
-        if !card_numbers.is_empty() {
-            data.custom_decks
-                .lock_recover()
-                .insert(player, card_numbers);
-        }
-        if let Some(energy_arr) = req.get("energy_deck").and_then(|v| v.as_array()) {
-            let energy_cards: Vec<String> = energy_arr
-                .iter()
-                .filter_map(|v| v.as_str().map(|s| s.to_string()))
-                .collect();
-            if !energy_cards.is_empty() {
+    let room_init = match room_id.clone() {
+        Some(rid) => store_room_deck(&data, &rid, player, deck, energy_deck),
+        // Legacy sandbox mode: global staging consumed by the next init_game.
+        None => {
+            data.custom_decks.lock_recover().insert(player, deck);
+            if !energy_deck.is_empty() {
                 data.custom_energy_decks
                     .lock_recover()
-                    .insert(player, energy_cards);
+                    .insert(player, energy_deck);
             }
+            log::debug!("[set_deck] stored global deck for player {player} (no room)");
+            false
         }
-    }
+    };
 
     HttpResponse::Ok().json(serde_json::json!({
         "success": true,
         "status": "ok",
-        "room_init": init_game,
+        "room_init": room_init,
         "room_id": room_id
     }))
 }
@@ -3233,6 +3254,43 @@ fn action_type_to_idx(at: Option<&str>) -> u8 {
         .unwrap_or(0)
 }
 
+/// Returns true for loopback / RFC 1918 LAN origins used during local dev
+/// (`start.bat`, LAN testing from a phone, etc.). Browsers attach `Origin`
+/// to `<script type="module">` and fetch() calls even when same-origin, and
+/// actix-cors rejects unlisted origins with 400 — so without this the local
+/// UI can't load its own JS. Public internet origins are still restricted to
+/// the explicit allow-list above; LAN is only accepted over plain http.
+fn is_local_dev_origin(origin: &actix_web::http::header::HeaderValue) -> bool {
+    let Ok(origin) = origin.to_str() else {
+        return false;
+    };
+    let (is_https, rest) = match origin
+        .strip_prefix("http://")
+        .map(|r| (false, r))
+        .or_else(|| origin.strip_prefix("https://").map(|r| (true, r)))
+    {
+        Some(v) => v,
+        None => return false,
+    };
+    let host = rest.split(':').next().unwrap_or("").trim_matches(['[', ']']);
+    if host == "localhost" || host == "127.0.0.1" || host == "::1" {
+        return true;
+    }
+    if is_https {
+        return false;
+    }
+    let octets: Vec<&str> = host.split('.').collect();
+    if octets.len() != 4 {
+        return false;
+    }
+    match (octets[0].parse::<u8>(), octets[1].parse::<u8>()) {
+        (Ok(10), _) => true,
+        (Ok(192), Ok(168)) => true,
+        (Ok(172), Ok(b)) if (16..=31).contains(&b) => true,
+        _ => false,
+    }
+}
+
 pub async fn run_web_server() -> std::io::Result<()> {
     run_web_server_with_ngrok(None).await
 }
@@ -3345,9 +3403,13 @@ pub async fn run_web_server_with_ngrok(ngrok_authtoken: Option<String>) -> std::
     // Need to also add recording fields to room construction
 
     HttpServer::new(move || {
-        let cors = Cors::permissive()
+        let cors = Cors::default()
             .allowed_origin("https://trioskosmos.github.io")
-            .allowed_origin("https://trioskosmos.github.io/")
+            // Local dev: browsers send `Origin` on <script type="module">
+            // and other CORS-mode fetches even when same-origin, so the
+            // local server must allow itself (loopback + LAN). Without this
+            // every module script fails with 400 Bad Request.
+            .allowed_origin_fn(|origin, _req_head| is_local_dev_origin(origin))
             .allowed_methods(vec!["GET", "POST", "OPTIONS", "HEAD"])
             .allowed_headers(vec![
                 actix_web::http::header::CONTENT_TYPE,
@@ -3407,6 +3469,15 @@ pub async fn run_web_server_with_ngrok(ngrok_authtoken: Option<String>) -> std::
             // WebSocket relay for WASM P2P
             .route("/api/relay", web::get().to(ws_relay))
             // Static files with explicit CORS
+            // NOTE: /wasm must be mounted BEFORE / — the wasm-bindgen JS glue,
+            // the Web Worker, and test.html all request /wasm/*. The bundle
+            // lives at web_ui/public/wasm/ (checked in), which under the
+            // catch-all "/" mount would resolve to /public/wasm/* (404).
+            .service(
+                fs::Files::new("/wasm", "../web_ui/public/wasm")
+                    .prefer_utf8(true)
+                    .use_last_modified(true),
+            )
             .service(
                 fs::Files::new("/engine", "../engine")
                     .prefer_utf8(true)

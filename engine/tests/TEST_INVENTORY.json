@@ -1,6 +1,6 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-09-07T08:46:46.473697+00:00",
+  "generated_at": "2026-09-08T05:59:21.710656+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
@@ -8,7 +8,7 @@
     "unique_abilities": 936
   },
   "n_files": 575,
-  "n_tests": 3282,
+  "n_tests": 3283,
   "total_cards": 771,
   "covered_cards": 771,
   "abilities_on_covered": 936,
@@ -14006,7 +14006,7 @@
         "ayumu_constant_three_live_cards_still_gains_blade",
         "ayumu_constant_two_live_cards_gains_blade"
       ],
-      "covering_test_count": 864,
+      "covering_test_count": 865,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -15844,7 +15844,7 @@
         "sumire_real_swap_fires",
         "sumire_turn_two_limit_resets"
       ],
-      "covering_test_count": 47,
+      "covering_test_count": 48,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -16980,7 +16980,7 @@
         "toubatsu_q263_center_to_area_move_triggers_auto",
         "toubatsu_real_swap_move_triggers_auto"
       ],
-      "covering_test_count": 54,
+      "covering_test_count": 55,
       "is_null": false,
       "use_limit": 1,
       "watches_abilities": false,
@@ -17031,9 +17031,10 @@
         "toubatsu_q118_2_distinct_live_cards_works",
         "toubatsu_q263_center_to_area_move_triggers_auto",
         "toubatsu_real_swap_move_triggers_auto",
+        "toubatsu_swap_arms_own_seat_not_opponent",
         "toubatsu_unrelated_debut_no_trigger"
       ],
-      "covering_test_count": 19,
+      "covering_test_count": 20,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -26641,9 +26642,10 @@
         "toubatsu_q118_2_distinct_live_cards_works",
         "toubatsu_q263_center_to_area_move_triggers_auto",
         "toubatsu_real_swap_move_triggers_auto",
+        "toubatsu_swap_arms_own_seat_not_opponent",
         "toubatsu_unrelated_debut_no_trigger"
       ],
-      "covering_test_count": 10,
+      "covering_test_count": 11,
       "is_null": false,
       "use_limit": 1,
       "watches_abilities": false,
@@ -26686,9 +26688,10 @@
         "toubatsu_q118_2_distinct_live_cards_works",
         "toubatsu_q263_center_to_area_move_triggers_auto",
         "toubatsu_real_swap_move_triggers_auto",
+        "toubatsu_swap_arms_own_seat_not_opponent",
         "toubatsu_unrelated_debut_no_trigger"
       ],
-      "covering_test_count": 10,
+      "covering_test_count": 11,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -31663,7 +31666,7 @@
         "issue16_hanamaru_opponent_higher_cost_no_blade",
         "issue17_suzu_cost_bonus_condition_met"
       ],
-      "covering_test_count": 62,
+      "covering_test_count": 63,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,

@@ -23,19 +23,28 @@ jobs:
         with:
           target: wasm32-unknown-unknown
       - name: Install wasm-bindgen-cli
-        run: cargo install wasm-bindgen-cli --locked
+        # NOTE: the CLI must match the wasm-bindgen lib version in
+        # platforms/wasm/Cargo.lock (0.2.128); latest CLI emits bindings
+        # the checked-in glue may not understand.
+        run: cargo install wasm-bindgen-cli --version 0.2.128 --locked
       - name: Build WASM
         run: |
           cd platforms/wasm
           cargo build --target wasm32-unknown-unknown --release
       - name: Generate wasm-bindgen bindings
+        # NOTE: cwd is platforms/wasm, so ../.. is the repo root; both
+        # relative paths below resolve inside this repo.
         run: |
+          cd platforms/wasm
           wasm-bindgen --target web --out-dir ../../web_ui/public/wasm \
             ../../platforms/wasm/target/wasm32-unknown-unknown/release/rabuka_wasm.wasm
-      - name: Copy WASM to docs
-        run: |
-          mkdir -p docs/wasm
-          cp web_ui/public/wasm/* docs/wasm/
+      - name: Upload WASM bindings
+        # NOTE: the deploy job runs on a fresh checkout, so the bindings
+        # must travel via artifact — files written here are otherwise lost.
+        uses: actions/upload-artifact@v4
+        with:
+          name: wasm-bindings
+          path: web_ui/public/wasm/
 
   deploy:
     needs: build-wasm
@@ -45,6 +54,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Download WASM bindings
+        uses: actions/download-artifact@v4
+        with:
+          name: wasm-bindings
+          path: wasm-bindings
 
       - name: Copy card data and frontend into docs
         run: |
@@ -56,6 +71,15 @@ jobs:
           cp -r web_ui/js docs/js
           cp -r web_ui/css docs/css
           cp web_ui/index.html web_ui/card_browser.html web_ui/deck_converter.html web_ui/tutorial.html docs/
+          # WASM bundle: serve at BOTH /wasm/ and /public/wasm/ so the local
+          # backend layout (web_server mounts /wasm -> ../web_ui/public/wasm,
+          # catch-all / serves /public/wasm/*) and Pages agree, and the Web
+          # Worker's relative import (../../public/wasm/rabuka_wasm.js from
+          # /src/workers/gameWorker.js) resolves on both.
+          mkdir -p docs/wasm docs/public/wasm docs/src/workers
+          cp wasm-bindings/* docs/wasm/
+          cp wasm-bindings/* docs/public/wasm/
+          cp web_ui/src/workers/gameWorker.js docs/src/workers/
 
       - name: Inject backend URL for GitHub Pages
         run: |

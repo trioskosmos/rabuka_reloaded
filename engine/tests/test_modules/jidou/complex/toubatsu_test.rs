@@ -274,8 +274,8 @@ fn toubatsu_real_swap_move_triggers_auto() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
-    let toubatsu = game.id("PL!SP-pb2-011-R");
-    let shiki = game.id("PL!SP-bp2-008-R");
+    let toubatsu = game.new_id("PL!SP-pb2-011-R");
+    let shiki = game.new_id("PL!SP-bp2-008-R");
     game.state.player1.stage.stage = [-1, toubatsu, shiki];
     game.give_energy(1); // E for Shiki's kidou
     assert!(

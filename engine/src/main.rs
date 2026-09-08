@@ -311,13 +311,13 @@ fn i18n_self_check() {
 #[cfg(feature = "server")]
 fn run_web_server(ngrok_authtoken: Option<String>) {
     println!("Web server starting on http://127.0.0.1:8080");
-    match tokio::runtime::Runtime::new() {
-        Ok(runtime) => {
-            match runtime.block_on(web_server::run_web_server_with_ngrok(ngrok_authtoken)) {
-                Ok(_) => println!("Server shutdown gracefully"),
-                Err(e) => eprintln!("Server error: {}", e),
-            }
-        }
-        Err(e) => eprintln!("Fatal: failed to create tokio runtime: {}", e),
+    // NOTE: HttpServer + SyncArbiter + tokio::spawn require an Actix System.
+    // A plain tokio::Runtime::block_on(...) panics with "System is not running"
+    // (actix-rt). Actix's System runs on Tokio internally, so tokio context is
+    // still available inside the closure.
+    let system = actix_web::rt::System::new();
+    match system.block_on(web_server::run_web_server_with_ngrok(ngrok_authtoken)) {
+        Ok(_) => println!("Server shutdown gracefully"),
+        Err(e) => eprintln!("Server error: {}", e),
     }
 }

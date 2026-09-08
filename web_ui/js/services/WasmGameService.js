@@ -12,7 +12,11 @@ export const WasmGameService = {
     // Initialize WASM engine in Web Worker
     init: async (config) => {
         return new Promise((resolve, reject) => {
-            gameWorker = new Worker(new URL('../workers/gameWorker.js', import.meta.url), { type: 'module' });
+            // NOTE: this file lives at web_ui/js/services/; the worker source
+            // is at web_ui/src/workers/gameWorker.js. Served paths: local
+            // backend mounts ../web_ui at / (so /src/workers/gameWorker.js),
+            // GitHub Pages serves docs/ at root (deploy copies src/workers).
+            gameWorker = new Worker(new URL('../../src/workers/gameWorker.js', import.meta.url), { type: 'module' });
             
             gameWorker.onmessage = (event) => {
                 const { type, payload } = event.data;
@@ -208,6 +212,14 @@ export const WasmGameService = {
         });
         newState.legal_actions = actions;
         updateStateData(newState);
+    },
+
+    // Last exported snapshot (Uint8Array-compatible array). exportGame()
+    // resolves via its own message listener; this handler just caches so the
+    // shared onmessage dispatch never throws on EXPORT_DATA.
+    lastExport: null,
+    handleExport: (payload) => {
+        WasmGameService.lastExport = payload;
     },
 
     // Fetch full state from worker

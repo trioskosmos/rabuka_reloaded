@@ -9,58 +9,50 @@
     <button id="initBtn">Initialize Engine</button>
     <button id="actionBtn" disabled>Execute Action (Pass)</button>
     <pre id="output"></pre>
-    
+
+    <!-- NOTE: this page sits next to the wasm-bindgen glue
+         (rabuka_wasm.js / rabuka_wasm_bg.wasm), served at /wasm/ by the
+         backend and at /wasm/ (+/public/wasm/) on GitHub Pages. Always load
+         through the generated glue — hand-rolled WebAssembly.instantiate
+         with stub imports cannot satisfy wasm-bindgen's externref/memory
+         imports and will always fail. -->
     <script type="module">
+        import init, { WasmGameEngine, wasm_seed, wasm_rand_range } from './rabuka_wasm.js';
+
         const output = document.getElementById('output');
         const initBtn = document.getElementById('initBtn');
         const actionBtn = document.getElementById('actionBtn');
-        
+
         function log(msg) {
             output.textContent += msg + '\n';
             console.log(msg);
         }
-        
+
         let engine = null;
-        
+
         async function initWasm() {
-            log('Fetching WASM...');
-            const response = await fetch('/wasm/rabuka_wasm_bg.wasm');
-            const bytes = await response.arrayBuffer();
-            log(`WASM size: ${bytes.byteLength} bytes`);
-            
-            // Instantiate with minimal imports
-            const imports = {
-                env: {
-                    memory: new WebAssembly.Memory({ initial: 256, maximum: 512 }),
-                    // Required by wasm-bindgen for JS interop
-                    __wbindgen_malloc: (size) => { throw new Error('malloc not implemented'); },
-                    __wbindgen_free: (ptr, size) => { throw new Error('free not implemented'); },
-                    __wbindgen_exn_store: (ptr) => { throw new Error('exn_store not implemented'); },
-                },
-                wasi_snapshot_preview1: {
-                    proc_exit: (code) => { log(`proc_exit: ${code}`); },
-                    fd_write: (fd, iovs, iovs_len, nwritten) => { return 0; },
-                }
-            };
-            
-            log('Instantiating WASM...');
-            const { instance } = await WebAssembly.instantiate(bytes, imports);
+            log('Loading WASM via wasm-bindgen glue...');
+            // No args: resolves rabuka_wasm_bg.wasm relative to this file.
+            await init();
             log('WASM instantiated!');
-            log('Exports: ' + Object.keys(instance.exports).join(', '));
-            
-            engine = instance.exports;
-            
-            // Test: create a game config
-            // We need to serialize the config as the WASM expects
-            // For now, just verify the exports exist
-            if (engine.WasmGameEngine_new) {
-                log('WasmGameEngine_new found');
-                actionBtn.disabled = false;
-            } else {
-                log('WasmGameEngine_new NOT found');
-            }
+            log('Exports: WasmGameEngine, wasm_seed, wasm_rand_range, wasm_shuffle');
+
+            wasm_seed(0x5EED);
+            log('RNG seeded; rand_range(100) = ' + wasm_rand_range(100));
+
+            // Minimal smoke config: empty decks still construct the engine
+            // (real decks come from the app via WasmGameService).
+            engine = new WasmGameEngine({
+                seed: 0x5EED,
+                p1_deck: [],
+                p2_deck: [],
+                p1_energy: [],
+                p2_energy: [],
+            });
+            log('WasmGameEngine constructed; phase = ' + engine.get_phase());
+            actionBtn.disabled = false;
         }
-        
+
         initBtn.addEventListener('click', async () => {
             try {
                 await initWasm();
@@ -70,17 +62,14 @@
                 console.error(e);
             }
         });
-        
+
         actionBtn.addEventListener('click', async () => {
             if (!engine) return;
             try {
-                log('Executing action...');
-                // This will fail without proper serialization
-                // but we can verify the function exists
-                const result = engine.WasmGameEngine_execute_action(engine, 0);
-                log('Action result: ' + result);
+                log('Legal actions: ' + JSON.stringify(engine.get_legal_actions()).slice(0, 300));
+                log('Frame: ' + engine.get_frame_counter().toString() + ' phase: ' + engine.get_phase());
             } catch (e) {
-                log('Action error (expected): ' + e.message);
+                log('Action error: ' + e.message);
             }
         });
     </script>
