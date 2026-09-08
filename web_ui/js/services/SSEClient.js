@@ -1,4 +1,5 @@
 import { getSseUrl, getBackendUrl } from '../network.js';
+import { GameService } from './GameService.js';
 
 let eventSource = null;
 let reconnectAttempt = 0;
@@ -8,8 +9,11 @@ let currentOnUpdate = null;
 
 function scheduleReconnect() {
     if (reconnectTimeout) clearTimeout(reconnectTimeout);
-    const delay = Math.min(1000 * Math.pow(2, reconnectAttempt), 30000);
-    console.log(`[SSE] Reconnecting in ${delay}ms (attempt ${reconnectAttempt + 1})`);
+    // Exponential backoff with jitter, capped at 5s
+    const baseDelay = Math.min(1000 * Math.pow(2, reconnectAttempt), 5000);
+    const jitter = Math.random() * 1000; // 0-1s jitter
+    const delay = baseDelay + jitter;
+    console.log(`[SSE] Reconnecting in ${Math.round(delay)}ms (attempt ${reconnectAttempt + 1})`);
     reconnectTimeout = setTimeout(() => {
         reconnectAttempt++;
         SSEClient.connect(currentRoomCode, currentOnUpdate);
@@ -45,10 +49,12 @@ export const SSEClient = {
         eventSource.onopen = () => {
             console.log('[SSE] connected to room', roomCode);
             reconnectAttempt = 0; // Reset on successful connection
+            GameService.setSseConnected(true);
         };
         eventSource.onerror = (err) => {
             console.error('[SSE] error:', err);
             if (eventSource.readyState === EventSource.CLOSED) {
+                GameService.setSseConnected(false);
                 scheduleReconnect();
             }
         };
@@ -62,6 +68,7 @@ export const SSEClient = {
             eventSource.close();
             eventSource = null;
         }
+        GameService.setSseConnected(false);
         currentRoomCode = null;
         currentOnUpdate = null;
     }

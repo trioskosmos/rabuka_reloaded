@@ -12,6 +12,7 @@ use rabuka_engine::{
 };
 use std::sync::Arc;
 use std::collections::VecDeque;
+use rmp_serde;
 
 // Regular Rust structs (serialized via serde_wasm_bindgen)
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -76,6 +77,11 @@ pub struct JsGameConfig {
     pub p2_deck: Vec<i16>,
     pub p1_energy: Vec<i16>,
     pub p2_energy: Vec<i16>,
+}
+
+// Cache for serialized state to avoid re-allocation
+thread_local! {
+    static SERIALIZE_BUFFER: std::cell::RefCell<Vec<u8>> = std::cell::RefCell::new(Vec::new());
 }
 
 #[wasm_bindgen]
@@ -185,8 +191,30 @@ impl WasmGameEngine {
         serde_wasm_bindgen::to_value(&js_actions).unwrap_or(JsValue::NULL)
     }
     
+    // Zero-copy serialize: returns Uint8Array view into WASM memory
     pub fn serialize(&self) -> Vec<u8> {
-        rmp_serde::to_vec(&self.game_state).unwrap_or_default()
+        SERIALIZE_BUFFER.with(|buf| {
+            let mut buffer = buf.borrow_mut();
+            buffer.clear();
+            rmp_serde::encode::write(&mut *buffer, &self.game_state).unwrap_or_default();
+            buffer.clone()
+        })
+    }
+    
+    // Alternative: return raw pointer + length for true zero-copy (advanced)
+    pub fn serialize_ptr(&self) -> JsValue {
+        SERIALIZE_BUFFER.with(|buf| {
+            let mut buffer = buf.borrow_mut();
+            buffer.clear();
+            rmp_serde::encode::write(&mut *buffer, &self.game_state).unwrap_or_default();
+            // Return as object with pointer info for advanced consumers
+            let uint8_array = js_sys::Uint8Array::new_with_length(buffer.len() as u32);
+            uint8_array.copy_from(&buffer);
+            js_sys::Object::from_entries(&js_sys::Array::of2(
+                &js_sys::Array::of2(&"length".into(), &(buffer.len() as u32).into()),
+                &js_sys::Array::of2(&"data".into(), &uint8_array)
+            )).unwrap().into()
+        })
     }
     
     pub fn get_frame_counter(&self) -> u64 {

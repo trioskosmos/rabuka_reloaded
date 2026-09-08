@@ -70,20 +70,41 @@ export function apiHeaders() {
     };
 }
 
+// In-flight request deduplication cache
+const _inFlightRequests = new Map();
+
 /**
  * Centralized fetch wrapper for the backend API. Merges the standard headers
  * with any caller-supplied options so every service talks to the server the
  * same way. Returns the raw Response; callers decide how to read it.
+ * Deduplicates in-flight GET requests to the same URL.
  */
 export async function apiFetch(path, options = {}) {
     // Ensure backend URL is resolved before making request
     await getBackendUrl();
-    console.log('[Network] apiFetch:', path, '->', buildUrl(path));
+    const url = buildUrl(path);
+    const isGet = !options.method || options.method === 'GET';
+    const cacheKey = isGet ? url : null;
+
+    // Deduplicate in-flight GET requests
+    if (cacheKey && _inFlightRequests.has(cacheKey)) {
+        console.log('[Network] Deduplicating in-flight request:', path);
+        return _inFlightRequests.get(cacheKey);
+    }
+
+    console.log('[Network] apiFetch:', path, '->', url);
     const { headers, ...rest } = options;
-    return fetch(buildUrl(path), {
+    const promise = fetch(url, {
         ...rest,
         headers: { ...apiHeaders(), ...(headers || {}) }
     });
+
+    if (cacheKey) {
+        _inFlightRequests.set(cacheKey, promise);
+        promise.finally(() => _inFlightRequests.delete(cacheKey));
+    }
+
+    return promise;
 }
 
 /**

@@ -54,8 +54,18 @@ export const GameService = {
     },
 
     _lastKnownVersion: -1,
+    _sseConnected: false,
+
+    setSseConnected: (connected) => {
+        GameService._sseConnected = connected;
+        if (connected) {
+            GameService.stopGameplayPolling();
+        }
+    },
 
     startGameplayPolling: () => {
+        // Skip polling entirely when SSE is active - SSE pushes frame_ids
+        if (GameService._sseConnected) return;
         if (window._gameplayPollInterval) return;
         window._gameplayPollInterval = setInterval(async () => {
             if (!State.gameHasStarted || !State.roomCode) {
@@ -68,6 +78,8 @@ export const GameService = {
     },
 
     checkVersionAndFetch: async () => {
+        // Skip version check when SSE is active - SSE message already has frame_id
+        if (GameService._sseConnected) return;
         try {
             const res = await apiFetch('api/game-state/version');
             if (!res.ok) return;
