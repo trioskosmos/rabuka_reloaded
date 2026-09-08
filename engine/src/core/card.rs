@@ -354,6 +354,7 @@ pub struct Card {
 /// [`CardId::from_raw`] / [`CardId::raw`]. The sentinel [`CardId::EMPTY`]
 /// (-1) preserves existing "no card" conventions.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde_support", derive(serde::Serialize, serde::Deserialize))]
 pub struct CardId(i16);
 
 impl CardId {

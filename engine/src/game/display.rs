@@ -1,6 +1,6 @@
 use crate::ability::debug::AbDebug;
 use crate::ability_queue::QueueState;
-use crate::card::CardDatabase;
+use crate::card::{CardDatabase, CardId};
 use crate::card::HeartColor;
 use crate::game_state::{GameState, LOG_BOUND_RULE, LOG_BOUND_STRUCTURED};
 use crate::player::Player;
@@ -433,9 +433,9 @@ pub struct GameStateDisplay {
     #[cfg_attr(feature = "serde_support", serde(default))]
     pub turn_limited_abilities_used: Vec<String>,
     #[cfg_attr(feature = "serde_support", serde(default))]
-    pub auto_ability_trigger_counts: HashMap<String, u8>,
+    pub auto_ability_trigger_counts: HashMap<CardId, u8>,
     #[cfg_attr(feature = "serde_support", serde(default))]
-    pub turn_limit_usage: HashMap<String, u8>,
+    pub turn_limit_usage: HashMap<CardId, u8>,
     #[cfg_attr(feature = "serde_support", serde(default))]
     pub non_stackable_effects: Vec<String>,
     #[cfg_attr(feature = "serde_support", serde(default))]
@@ -486,9 +486,9 @@ pub struct GameStateDisplay {
     #[cfg_attr(feature = "serde_support", serde(default))]
     pub this_batch_triggered_ability_ids: Vec<u32>,
     #[cfg_attr(feature = "serde_support", serde(default))]
-    pub turn1_abilities_played: Vec<String>,
+    pub turn1_abilities_played: Vec<CardId>,
     #[cfg_attr(feature = "serde_support", serde(default))]
-    pub turn2_abilities_played: HashMap<String, u8>,
+    pub turn2_abilities_played: HashMap<CardId, u8>,
     #[cfg_attr(feature = "serde_support", serde(default))]
     pub card_instance_mapping: HashMap<String, u8>,
     #[cfg_attr(feature = "serde_support", serde(default))]
@@ -530,7 +530,7 @@ pub struct GameStateDisplay {
     #[cfg_attr(feature = "serde_support", serde(default))]
     pub heart_color_decision_phase: String,
     #[cfg_attr(feature = "serde_support", serde(default))]
-    pub live_owned_hearts: HashMap<String, Vec<[String; 2]>>,
+    pub live_owned_hearts: HashMap<CardId, Vec<[String; 2]>>,
     #[cfg_attr(feature = "serde_support", serde(default))]
     pub opponent_choice_declined: bool,
     #[cfg_attr(feature = "serde_support", serde(default))]
@@ -1691,8 +1691,8 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
         effect_attribution.values().map(Vec::len).sum::<usize>()
     );
 
-    // Live owned hearts: HashMap<String, Vec<(String, u8)>> -> HashMap<String, Vec<[String; 2]>>
-    let live_owned: HashMap<String, Vec<[String; 2]>> = game_state
+    // Live owned hearts: HashMap<CardId, Vec<(String, u8)>> -> HashMap<CardId, Vec<[String; 2]>>
+    let live_owned: HashMap<CardId, Vec<[String; 2]>> = game_state
         .live_owned_hearts
         .iter()
         .map(|(pid, pairs)| {
@@ -1700,7 +1700,7 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
                 .iter()
                 .map(|(color, count)| [color.clone(), count.to_string()])
                 .collect();
-            (pid.clone(), converted)
+            (*pid, converted)
         })
         .collect();
 
@@ -1897,11 +1897,11 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
             .iter()
             .copied()
             .collect(),
-        turn1_abilities_played: game_state.turn1_abilities_played.iter().cloned().collect(),
+        turn1_abilities_played: game_state.turn1_abilities_played.iter().copied().collect(),
         turn2_abilities_played: game_state
             .turn2_abilities_played
             .iter()
-            .map(|(k, v)| (k.clone(), *v))
+            .map(|(k, v)| (*k, *v))
             .collect(),
         card_instance_mapping: game_state
             .card_instance_mapping

@@ -1,5 +1,5 @@
 use crate::ability_queue::AbilityQueue;
-use crate::card::CardDatabase;
+use crate::card::{CardDatabase, CardId};
 use crate::core::game_modifiers::{CardOrientation, GameModifiers};
 use crate::player::Player;
 use crate::zones::{MemberArea, ResolutionZone};
@@ -97,9 +97,12 @@ pub struct GameState {
     /// [`DEBUG_TRACE_CAP`] entries. Skipped on the wire.
     #[cfg_attr(feature = "serde_support", serde(skip))]
     pub debug_trace: Vec<String>,
-    pub turn1_abilities_played: SmallVec<[String; 8]>,
-    pub turn2_abilities_played: SmallVec<[(String, u8); 8]>,
-    pub live_owned_hearts: SmallVec<[(String, Vec<(String, u8)>); 4]>,
+    /// Ability IDs played this turn (turn 1) — CardId for zero-allocation tracking.
+    pub turn1_abilities_played: SmallVec<[CardId; 8]>,
+    /// Ability IDs played this turn (turn 2) — CardId + count for limit tracking.
+    pub turn2_abilities_played: SmallVec<[(CardId, u8); 8]>,
+    /// Live-owned hearts per member — CardId + (color, count) for display/UI.
+    pub live_owned_hearts: SmallVec<[(CardId, Vec<(String, u8)>); 4]>,
     pub temporary_effects: SmallVec<[TemporaryEffect; 4]>,
     pub prohibition_effects: SmallVec<[String; 4]>,
     pub delayed_prohibition_effects: SmallVec<[String; 4]>,
@@ -114,8 +117,10 @@ pub struct GameState {
     pub turn_limited_abilities_used: HashMap<(i16, usize, u8), u8>,
     pub mulligan_selected_indices: SmallVec<[u8; 6]>,
     pub live_card_selected_indices: SmallVec<[u8; 3]>,
-    pub auto_ability_trigger_counts: SmallVec<[(String, u8); 8]>,
-    pub turn_limit_usage: SmallVec<[(String, u8); 8]>,
+    /// Auto-ability trigger counts per ability — CardId for zero-allocation.
+    pub auto_ability_trigger_counts: SmallVec<[(CardId, u8); 8]>,
+    /// Turn-limit usage per ability — CardId for zero-allocation.
+    pub turn_limit_usage: SmallVec<[(CardId, u8); 8]>,
     pub card_instance_mapping: HashMap<i16, u8>,
     pub areas_placed_this_turn: SmallVec<[String; 8]>,
     pub cards_appeared_this_turn: SmallVec<[i16; 8]>,
@@ -778,6 +783,30 @@ impl GameState {
         }
     }
 
+    /// Internal helper: push a card to a revealed list with metadata.
+    fn push_revealed_internal(
+        card_database: &CardDatabase,
+        cards: &mut SmallVec<[i16; 8]>,
+        meta: &mut SmallVec<[RevealedCardMeta; 8]>,
+        card_id: i16,
+        source_card_id: Option<i16>,
+        is_private: bool,
+        owner: Option<u8>,
+        reveal_type: &'static str,
+    ) {
+        let source_name = source_card_id
+            .and_then(|sid| card_database.get_card(sid))
+            .map(|c| c.name.to_string());
+        cards.push(card_id);
+        meta.push(RevealedCardMeta {
+            source: source_card_id,
+            source_name,
+            is_private,
+            owner,
+            reveal_type: reveal_type.to_string(),
+        });
+    }
+
     /// Push a card to revealed_cards with source/owner/private tracking.
     pub fn push_revealed_card(
         &mut self,
@@ -787,17 +816,16 @@ impl GameState {
         owner: Option<u8>,
         reveal_type: &'static str,
     ) {
-        let source_name = source_card_id
-            .and_then(|sid| self.card_database.get_card(sid))
-            .map(|c| c.name.to_string());
-        self.revealed_cards.push(card_id);
-        self.revealed_card_meta.push(RevealedCardMeta {
-            source: source_card_id,
-            source_name,
+        Self::push_revealed_internal(
+            &self.card_database,
+            &mut self.revealed_cards,
+            &mut self.revealed_card_meta,
+            card_id,
+            source_card_id,
             is_private,
             owner,
-            reveal_type: reveal_type.to_string(),
-        });
+            reveal_type,
+        );
     }
 
     /// Push a card to revealed_cost_cards with source/owner/private tracking.
@@ -809,17 +837,16 @@ impl GameState {
         owner: Option<u8>,
         reveal_type: &'static str,
     ) {
-        let source_name = source_card_id
-            .and_then(|sid| self.card_database.get_card(sid))
-            .map(|c| c.name.to_string());
-        self.revealed_cost_cards.push(card_id);
-        self.revealed_cost_card_meta.push(RevealedCardMeta {
-            source: source_card_id,
-            source_name,
+        Self::push_revealed_internal(
+            &self.card_database,
+            &mut self.revealed_cost_cards,
+            &mut self.revealed_cost_card_meta,
+            card_id,
+            source_card_id,
             is_private,
             owner,
-            reveal_type: reveal_type.to_string(),
-        });
+            reveal_type,
+        );
     }
 
     /// Get the source card ID from the current ability queue entry, if any.

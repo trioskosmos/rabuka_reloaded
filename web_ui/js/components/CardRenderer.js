@@ -86,8 +86,9 @@ export const ImageLoader = {
             }
         };
 
-        // Always use cache-busting on retries and re-renders
-        const loadSrc = (isRetry || this.failedImages.has(src))
+        // Only use cache-busting for explicit refreshAll() calls, not retries
+        // Retries should use the original URL to benefit from browser cache
+        const loadSrc = isRetry === 'refresh'  // Only refreshAll passes 'refresh'
             ? src + (src.includes('?') ? '&' : '?') + '_retry=' + Date.now()
             : src;
         img.src = loadSrc;
@@ -102,7 +103,7 @@ export const ImageLoader = {
         this.failedImages.set(src, 0);
         img.style.opacity = '0.5';
         img.dispatchEvent(new CustomEvent('imageRetrying'));
-        this._doLoad(img, src, true);
+        this._doLoad(img, src, false);  // No cache-busting on retries
     },
 
     loadImage(img, src) {
@@ -156,7 +157,7 @@ export const ImageLoader = {
             if (!src) return;
             // Reset fallback list so failed variants can be retried.
             delete img.dataset.fallbackPaths;
-            this._doLoad(img, src, true);
+            this._doLoad(img, src, 'refresh');
             count++;
         });
         console.log(`[ImageLoader] Refresh all: reloading ${count} image(s)`);
