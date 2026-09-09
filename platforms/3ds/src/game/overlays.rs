@@ -539,7 +539,7 @@ pub(crate) fn render_overlay(gs: &GameState, overlay: Overlay, is_host: bool, at
                                 0xFF88DDFF,
                             ),
                             (
-                                format!("{} {}", tl("Surplus:"), hearts_row(&s.surplus_hearts)),
+                                format!("{} {}", tl("Surplus:"), if s.success { hearts_row(&s.surplus_hearts) } else { tl("N/A (failed)").to_string() }),
                                 0xFF88DDFF,
                             ),
                         ];
@@ -619,7 +619,7 @@ pub(crate) fn render_overlay(gs: &GameState, overlay: Overlay, is_host: bool, at
                                 62.0,
                                 COL_MED,
                                 SCALE_BODY,
-                                format!("{} {}\0", tl("Surplus"), hearts_row(&s.surplus_hearts)).as_ptr(),
+                                format!("{} {}\0", tl("Surplus"), if s.success { hearts_row(&s.surplus_hearts) } else { tl("N/A (failed)").to_string() }).as_ptr(),
                             );
                             let passed = s.lives.iter().filter(|l| l.passed).count();
                             _3ds_top_queue_text(
@@ -780,10 +780,11 @@ pub(crate) fn render_overlay(gs: &GameState, overlay: Overlay, is_host: bool, at
                                     "{}{} {}\0",
                                     hearts_row(&s.total_hearts),
                                     notes_str(s.note_icons, 0),
-                                    tl("surplus")
-                                        .to_string()
-                                        + " "
-                                        + &hearts_row(&s.surplus_hearts),
+                                    if s.success {
+                                        tl("surplus").to_string() + " " + &hearts_row(&s.surplus_hearts)
+                                    } else {
+                                        tl("surplus: N/A (failed)").to_string()
+                                    }
                                 )
                                 .as_ptr(),
                             );

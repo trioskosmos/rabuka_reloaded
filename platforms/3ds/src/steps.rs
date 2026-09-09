@@ -58,7 +58,7 @@ pub enum SetupPhase {
         bool,              // is_multiplayer
         Option<i16>,       // viewing_card (same as zone_viewer)
         Arc<CardDatabase>, // card_db
-        CardAtlas,         // atlas
+        Arc<CardAtlas>,  // atlas (shared one-time manifest parse)
     ),
 }
 

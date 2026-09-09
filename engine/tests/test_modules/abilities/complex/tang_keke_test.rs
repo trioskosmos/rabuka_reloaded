@@ -166,15 +166,26 @@ fn tang_keke_no_liella_in_hand_cost_cannot_pay() {
     let mut game = TestGame::new(db);
     let keke = setup_keke(&mut game);
 
-    // No card in hand — cost cannot be paid
+    // No card in hand — cost cannot be paid.
     game.state.player1.hand.cards.clear();
 
-    // The activate_ability call should fail since cost can't be paid
-    // (no Liella! cards in hand to discard)
-    #[allow(unused_must_use)]
-    {
-        game.try_activate_ability(keke);
-    }
-    // No assertion needed — we're verifying it doesn't panic/crash
-    // The cost validation should prevent activation
+    // The engine refuses the cost at resolution time (debug trace:
+    // "Not enough matching cards in hand to pay cost. Needs 1, has 0")
+    // and reports it via logs, not via Err — so assert the observable
+    // behavior: no cost prompt, nothing discarded, no effect happens.
+    let energy_before = game.state.player1.energy_zone.cards.len();
+    let _ = game.try_activate_ability(keke);
+    assert!(
+        !game.has_pending_choice(),
+        "unpayable cost must not open a discard prompt"
+    );
+    assert_eq!(
+        game.state.player1.energy_zone.cards.len(),
+        energy_before,
+        "no effect may resolve when the cost was not paid"
+    );
+    assert!(
+        game.state.player1.hand.cards.is_empty(),
+        "nothing to discard, hand stays empty"
+    );
 }

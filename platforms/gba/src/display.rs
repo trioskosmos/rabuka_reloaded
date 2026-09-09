@@ -12,7 +12,7 @@ use agb::display::object::{
 use agb::display::{busy_wait_for_vblank, Graphics, Palette16, Priority, Rgb15, Rgb};
 
 use crate::board::{BoardFrame, Slot};
-use crate::card_art_gen::{CardArt, CardFront, BACK_FRONT, BOARD_UI, CARD_FRONTS, LIVE_FRONTS, MASTER_PAL, STAGE_FRONTS, WAITED_FRONTS, lz77_decompress_wram};
+use crate::card_art_gen::{CardArt, CardFront, BACK_FRONT, BOARD_UI, CARD_ART, CARD_FRONTS, LIVE_FRONTS, MASTER_PAL, STAGE_FRONTS, WAITED_FRONTS, lz77_decompress_wram};
 use crate::font_tiles_gen::{FONT_GLYPHS, FONT_TILES};
 use crate::texticons_gen::{TEXTICON_GLYPHS, TEXTICON_TILES};
 
@@ -185,6 +185,31 @@ struct CardSpriteCache {
     /// but those happen only on cache misses (screen transitions).
     key_buf: String,
     twin_buf: String,
+    /// One-time index into the baked front tables: table positions sorted by
+    /// `card_no`. All baked tables (`CARD_ART`, `CARD_FRONTS`, `STAGE_FRONTS`,
+    /// `LIVE_FRONTS`, `WAITED_FRONTS`) are appended in the same completion
+    /// order by `tools/bake_card_art.py`, so a single order serves every
+    /// table — 1809 x u16 (~3.6KB once) instead of a ~1800-entry linear
+    /// string scan per card per frame (~22 scans/frame on the board).
+    /// If the baker ever emits per-table orders, build one order per table.
+    front_order: Vec<u16>,
+}
+
+/// Binary search for `card_no` in a baked table via the shared
+/// [`CardSpriteCache::front_order`]. Misses degrade to text (never to an
+/// invisible slot), same as the old linear scan.
+fn find_in_table<'t, T>(
+    order: &[u16],
+    table: &'t [T],
+    card_no: &str,
+    key: fn(&T) -> &'static str,
+) -> Option<&'t T> {
+    let pos = order
+        .binary_search_by(|&i| key(&table[i as usize]).cmp(card_no))
+        .ok()?;
+    let hit = &table[*order.get(pos)? as usize];
+    debug_assert_eq!(key(hit), card_no);
+    Some(hit)
 }
 
 impl CardSpriteCache {
@@ -214,6 +239,16 @@ impl CardSpriteCache {
         key_buf.reserve(64);
         let mut twin_buf = String::new();
         twin_buf.reserve(64);
+        // One-time sort of table positions by card_no (see `front_order`).
+        // All baked tables share the baker's completion order, so index one
+        // and serve all; lengths must agree or lookups alias the wrong art.
+        debug_assert_eq!(CARD_FRONTS.len(), STAGE_FRONTS.len());
+        debug_assert_eq!(CARD_FRONTS.len(), LIVE_FRONTS.len());
+        debug_assert_eq!(CARD_FRONTS.len(), WAITED_FRONTS.len());
+        debug_assert_eq!(CARD_FRONTS.len(), CARD_ART.len());
+        let mut front_order: Vec<u16> = (0..CARD_FRONTS.len().min(u16::MAX as usize) as u16).collect();
+        front_order.sort_by(|&a, &b| CARD_FRONTS[a as usize].card_no.cmp(&CARD_FRONTS[b as usize].card_no));
+        log::debug!("front index built for {} cards", front_order.len());
         Self {
             sprites: BTreeMap::new(),
             palette,
@@ -221,6 +256,7 @@ impl CardSpriteCache {
             touched: false,
             key_buf,
             twin_buf,
+            front_order,
         }
     }
 

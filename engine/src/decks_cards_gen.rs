@@ -20,7 +20,7 @@ pub static DECK_CARD_BLOBS: &[&[u8]] = &[
     include_bytes!("../baked/decks/bp7_abilities_PL!S.bin"),
     // bp7_abilities_PL!SP: 60 cards, 61397 bytes
     include_bytes!("../baked/decks/bp7_abilities_PL!SP.bin"),
-    // bp7_unique_abilities: 60 cards, 82591 bytes
+    // bp7_unique_abilities: 60 cards, 88524 bytes
     include_bytes!("../baked/decks/bp7_unique_abilities.bin"),
     // fade deck: 60 cards, 81760 bytes
     include_bytes!("../baked/decks/fade deck.bin"),
@@ -28,9 +28,9 @@ pub static DECK_CARD_BLOBS: &[&[u8]] = &[
     include_bytes!("../baked/decks/hasunosora_cup.bin"),
     // liella_cup: 72 cards, 87470 bytes
     include_bytes!("../baked/decks/liella_cup.bin"),
-    // muse_cup: 72 cards, 95713 bytes
+    // muse_cup: 72 cards, 89939 bytes
     include_bytes!("../baked/decks/muse_cup.bin"),
-    // nijigaku_cup: 72 cards, 89528 bytes
+    // nijigaku_cup: 72 cards, 95784 bytes
     include_bytes!("../baked/decks/nijigaku_cup.bin"),
     // slot13: 0 cards, 8 bytes
     include_bytes!("../baked/decks/slot13.bin"),

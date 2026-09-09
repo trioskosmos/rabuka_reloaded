@@ -325,11 +325,37 @@ fn serasu_edelnote_appear_no_opponent_member() {
 
     game.play_to_stage(edelnote_member, MemberArea::LeftSide);
 
-    // Auto fires but opponent has no members → skips cleanly
+    // Auto fires (mandatory trigger) but opponent has no members → fizzle.
     while game.has_pending_choice() {
         game.select_indices(&[]);
     }
-    // No crash is the main assertion
+    scan_autos_both(&mut game);
+
+    // No crash is necessary but not sufficient: assert the fizzle changed
+    // nothing — no member waited anywhere, opponent stage still empty.
+    assert!(
+        game.state.player1.stage.stage.contains(&edelnote_member),
+        "debuted EdelNote member stays staged"
+    );
+    assert!(
+        game.state.player2.stage.stage.iter().all(|&c| c == -1),
+        "opponent stage still empty"
+    );
+    for &cid in game
+        .state
+        .player1
+        .stage
+        .stage
+        .iter()
+        .chain(game.state.player2.stage.stage.iter())
+    {
+        if cid != -1 {
+            assert!(
+                game.state.mods.get_orientation_modifier(cid).is_none(),
+                "nothing waited when there are no opponent members"
+            );
+        }
+    }
 }
 
 // ====================================================================

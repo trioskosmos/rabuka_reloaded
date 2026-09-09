@@ -9,6 +9,9 @@ Generates from the real card database (cards/abilities.json) + test suite
   * docs/ABILITY_MATRIX.md          — trigger×action matrix + condition/set breakdown
   * engine/tests/TEST_INVENTORY.json — machine-readable per-ability rows
   * engine/tests/TEST_INVENTORY.md  — human-readable per-ability index
+  * engine/tests/TEST_QUALITY.md    — fn-level test-smell audit (vacuous /
+                                       synthetic-only / pendency-only /
+                                       confusable-card review prompts)
 
 Depth inference (automated, zero hand-maintenance):
 
@@ -41,6 +44,7 @@ OUT_COVERAGE = ROOT / "engine" / "tests" / "TEST_COVERAGE.md"
 OUT_MATRIX = ROOT / "docs" / "ABILITY_MATRIX.md"
 OUT_JSON = ROOT / "engine" / "tests" / "TEST_INVENTORY.json"
 OUT_MD = ROOT / "engine" / "tests" / "TEST_INVENTORY.md"
+# (OUT_QUALITY is defined in the test-quality section below.)
 
 RARITY_ACTION_LABEL = {
     "move_cards": "move card between zones",
@@ -232,6 +236,267 @@ def infer_depth_for_file(text, rel):
     has_choice = bool(CHOICE_RE.search(text))
     has_negative = bool(NEGATIVE_RE.search(rel))
     return has_assert, has_choice, has_negative
+
+
+# ---------------------------------------------------------------------------
+# Test-quality smells (fn-level static audit). Catches the bug classes that
+# coverage counts miss:
+#   no_assert      — test never asserts (smoke at best).
+#   no_drive       — game state mutated but the engine never driven
+#                    (no scan/activate/play/fire): vacuous negatives/positives.
+#   synthetic_only — trigger event hand-pushed (push_movement_event et al)
+#                    with no real ability resolution driving it in the same fn.
+#   pendency_only  — has_pending_choice asserted without choice identity
+#                    (pending_choice_type/summary/answer) or outcome asserts.
+#   similar_cards  — confusable card numbers (bp2 vs pb2) staged in one file.
+# Report-only: engine/tests/TEST_QUALITY.md, freshness-checked like the rest.
+# ---------------------------------------------------------------------------
+OUT_QUALITY = ROOT / "engine" / "tests" / "TEST_QUALITY.md"
+
+Q_ASSERT_RE = re.compile(r"\bassert(_eq|_ne|_ability)?!\s*\(|\bpanic!\s*\(")
+Q_SCAN_RE = re.compile(
+    r"scan_autos_both|trigger_auto_abilities|process_pending|process_with_completed"
+    r"|activate_ability|try_activate_ability|play_to_stage|try_play_to_stage|fire_trigger"
+    r"|resume_with_choice|execute_main_phase_action"
+    r"|pass_phase|\.pass\(\)|perform_live|ability_verdicts|drain_auto_ability_choices"
+    r"|process_current_ability"
+)
+Q_SETUP_RE = re.compile(
+    r"stage\.stage|energy_zone|energy_deck|main_deck|hand\.cards|waitroom\.cards|live_card_zone"
+)
+Q_SYNTH_RE = re.compile(
+    r"push_movement_event|position_change_events\.push|record_card_movement|set_recently_moved"
+)
+Q_REAL_DRIVER_RE = re.compile(
+    r"activate_ability|play_to_stage|try_play_to_stage|fire_trigger"
+)
+Q_PEND_RE = re.compile(r"has_pending_choice")
+Q_IDENT_RE = re.compile(
+    r"pending_choice_type|pending_choice_summary|select_choice_option|answer_choice|drain_choices_strict"
+)
+Q_OUTCOME_RE = re.compile(
+    r"get_blade_modifier|get_heart_modifier|get_orientation_modifier|get_score_modifier"
+    r"|active_count\(\)|get_under_cards|waitroom\.cards\.len|hand\.cards\.len"
+    r"|energy_zone\.cards\.len|energy_deck\.cards\.len|live_card_zone\.cards|success_live"
+    r"|\.contains\(|is_empty\(\)"
+)
+Q_OUTCOME_MOD_RE = re.compile(
+    r"get_blade_modifier|get_heart_modifier|get_orientation_modifier|get_score_modifier"
+)
+Q_TRIGGER_CTX_RE = re.compile(r"自動|trigger|jidou|watch|fire|auto_|position_change|debut|登場")
+Q_CARD_NO_RE = re.compile(r'"(PL![A-Za-z0-9!\-+＋]+?)"')
+Q_SET_SEG_RE = re.compile(r"-(bp\d+|sd\d+|pb\d+|cl\d+|PR)-")
+
+
+def strip_rust_line_comments(text):
+    return re.sub(r"//[^\n]*", "", text)
+
+
+def split_rust_fns(text, tests_only):
+    """Split Rust source into (name, code-only body, start_line, is_test).
+
+    Brace-matched from the fn's opening brace; string/char literals and
+    comments are skipped so braces inside them don't break matching.
+    With tests_only=True, only #[test] fns are returned (helpers skipped).
+    """
+    out = []
+    pat = (
+        r"^[ \t]*#\[test\][ \t]*\r?\n[ \t]*(?:pub[ \t]+)?fn[ \t]+(\w+)"
+        if tests_only
+        else r"^[ \t]*(?:pub[ \t]+)?fn[ \t]+(\w+)"
+    )
+    for m in re.finditer(pat, text, re.MULTILINE):
+        name = m.group(1)
+        # With tests_only the pattern itself implies #[test]; otherwise look
+        # back for the attribute (the match starts at `fn`, after it).
+        is_test = tests_only or bool(
+            re.search(r"#\[test\]", text[max(0, m.start() - 160) : m.start()])
+        )
+        if tests_only and not is_test:
+            continue
+        i = text.find("{", m.end())
+        if i < 0:
+            continue
+        depth = 0
+        j = i
+        instr = None
+        incomment = None
+        while j < len(text):
+            c = text[j]
+            nxt = text[j + 1] if j + 1 < len(text) else ""
+            if incomment == "line":
+                if c == "\n":
+                    incomment = None
+            elif incomment == "block":
+                if c == "*" and nxt == "/":
+                    incomment = None
+                    j += 1
+            elif instr:
+                if c == "\\":
+                    j += 1
+                elif c == instr:
+                    instr = None
+            else:
+                if c == "/" and nxt == "/":
+                    incomment = "line"
+                elif c == "/" and nxt == "*":
+                    incomment = "block"
+                elif c in "\"'":
+                    instr = c
+                elif c == "{":
+                    depth += 1
+                elif c == "}":
+                    depth -= 1
+                    if depth == 0:
+                        break
+            j += 1
+        body = strip_rust_line_comments(text[i : j + 1])
+        start_line = text.count("\n", 0, m.start()) + 1
+        out.append((name, body, start_line, is_test))
+    return out
+
+
+def split_test_fns(text):
+    """Split test source into (name, code-only body, start_line) tuples.
+
+    See split_rust_fns for the matching rules.
+    """
+    return [
+        (name, body, line)
+        for name, body, line, _is_test in split_rust_fns(text, True)
+    ]
+
+
+def card_group_key(card_no):
+    # Wildcard the set segment (bp2 vs pb2) so confusable prints group
+    # together; the rarity suffix stays so same-card reprints don't flag.
+    return Q_SET_SEG_RE.sub("-SET-", card_no)
+
+
+def audit_test_quality(files):
+    """Run smell detectors over collect_test_files() output.
+
+    Returns {smell: [(rel, fn_name, line, detail), ...]} with detail "" except
+    similar_cards (the confusable numbers).
+    """
+    smells = {
+        "no_assert": [],
+        "no_drive": [],
+        "synthetic_only": [],
+        "pendency_only": [],
+        "similar_cards": [],
+    }
+    for _p, rel, text, _fns in files:
+        fns = split_test_fns(text)
+        # Helper profiles: a test calling a helper that asserts/drives gets
+        # credit (e.g. check_heart_reduction asserts, play_three drives).
+        # Helpers are file-local non-#[test] fns.
+        helper_assert = set()
+        helper_scan = set()
+        for hname, hbody, _hline, is_test in split_rust_fns(text, False):
+            if is_test:
+                continue
+            if Q_ASSERT_RE.search(hbody):
+                helper_assert.add(hname)
+            if Q_SCAN_RE.search(hbody):
+                helper_scan.add(hname)
+        helper_assert_re = (
+            re.compile(r"\b(" + "|".join(sorted(helper_assert)) + r")\s*\(")
+            if helper_assert
+            else None
+        )
+        helper_scan_re = (
+            re.compile(r"\b(" + "|".join(sorted(helper_scan)) + r")\s*\(")
+            if helper_scan
+            else None
+        )
+        file_groups = {}
+        for name, body, line in fns:
+            has_assert = bool(Q_ASSERT_RE.search(body)) or bool(
+                helper_assert_re and helper_assert_re.search(body)
+            )
+            if not has_assert:
+                smells["no_assert"].append((rel, name, line, ""))
+            driven = bool(Q_SCAN_RE.search(body)) or bool(
+                helper_scan_re and helper_scan_re.search(body)
+            )
+            if (
+                Q_SETUP_RE.search(body)
+                and has_assert
+                and not driven
+                and Q_TRIGGER_CTX_RE.search(body)
+            ):
+                smells["no_drive"].append((rel, name, line, ""))
+            # synthetic_only: hand-pushed trigger events are weak evidence only
+            # when the fn asserts a watcher outcome (modifier grants). Pure
+            # tracking-layer characterization tests assert the views
+            # themselves and are out of scope.
+            if (
+                Q_SYNTH_RE.search(body)
+                and not driven
+                and Q_OUTCOME_MOD_RE.search(body)
+            ):
+                smells["synthetic_only"].append((rel, name, line, ""))
+            if (
+                Q_PEND_RE.search(body)
+                and not Q_IDENT_RE.search(body)
+                and not Q_OUTCOME_RE.search(body)
+                and Q_TRIGGER_CTX_RE.search(body)
+            ):
+                smells["pendency_only"].append((rel, name, line, ""))
+            for cn in Q_CARD_NO_RE.findall(body):
+                if cn.startswith("PL!"):
+                    file_groups.setdefault(card_group_key(cn), set()).add(cn)
+        for _key, nos in file_groups.items():
+            if len(nos) > 1:
+                smells["similar_cards"].append((rel, "<file>", 1, ", ".join(sorted(nos))))
+    for rows in smells.values():
+        rows.sort()
+    n_fns = sum(len(split_test_fns(text)) for _p, _rel, text, _fns in files)
+    return smells, n_fns
+
+
+SMELL_DOCS = {
+    "no_assert": "test never asserts (smoke at best — cannot pin behavior)",
+    "no_drive": "trigger-context test that mutates state and asserts but never drives the engine (no scan/activate/play/fire): vacuous negatives/positives",
+    "synthetic_only": "trigger event hand-pushed with no real ability resolution in the same fn (weaker trigger evidence)",
+    "pendency_only": "has_pending_choice asserted without choice identity (pending_choice_type/summary/answer) or outcome asserts",
+    "similar_cards": "confusable card numbers (bp2 vs pb2) staged in one file — human review for wrong-card staging",
+}
+
+
+def render_quality(smells, inv):
+    w = []
+    a = w.append
+    a("# Test quality smells (static audit)")
+    a("")
+    a("_Auto-generated by `cards/test_inventory.py` — do not edit by hand. Rerun `python cards/test_inventory.py` after changing tests._")
+    a("")
+    a("Fn-level static signals over `engine/tests/**/*.rs`. Coverage counts (TEST_COVERAGE.md)")
+    a("answer “does it fire”; this answers “would the test notice if the trigger were wrong”.")
+    a("Report-only: rows are review prompts, not failures.")
+    a("")
+    total_fns = inv["stats"].get("n_test_fns_parsed", 0)
+    if total_fns:
+        a(f"Parsed {total_fns} `#[test]` fns.")
+        a("")
+    for smell, rows in smells.items():
+        a(f"## {smell} ({len(rows)})")
+        a("")
+        a(f"_{SMELL_DOCS[smell]}_")
+        a("")
+        if not rows:
+            a("None.")
+        else:
+            a("| file | test | line | detail |")
+            a("| --- | --- | --- | --- |")
+            shown = rows[:80]
+            for rel, name, line, detail in shown:
+                a(f"| `{rel}` | `{name}` | {line} | {detail} |")
+            if len(rows) > len(shown):
+                a(f"| … | {len(rows) - len(shown)} more |  |  |")
+        a("")
+    return "\n".join(w)
 
 
 def infer_ability_depth(covering_texts, covering_rels, covering_fns):
@@ -438,7 +703,7 @@ def build_inventory():
 
     qa = build_qa_coverage(all_src)
 
-    return {
+    ret = {
         "abilities": rows,
         "stats": stats,
         "n_files": n_files,
@@ -461,6 +726,20 @@ def build_inventory():
         "qa": qa,
         "all_src_len": len(all_src),
     }
+    quality_smells, n_test_fns_parsed = audit_test_quality(files)
+    ret = dict(
+        ret,
+        quality={k: len(v) for k, v in quality_smells.items()},
+        quality_rows={
+            k: [
+                {"file": rel, "test": name, "line": line, "detail": detail}
+                for rel, name, line, detail in v
+            ]
+            for k, v in quality_smells.items()
+        },
+        n_test_fns_parsed=n_test_fns_parsed,
+    )
+    return ret
 
 
 def render_coverage(inv):
@@ -832,6 +1111,16 @@ def main():
     coverage_text = render_coverage(inv)
     matrix_text = render_matrix(inv)
     inventory_md_text = render_inventory_md(inv)
+    quality_text = render_quality(
+        {
+            k: [
+                (r["file"], r["test"], r["line"], r["detail"])
+                for r in v
+            ]
+            for k, v in inv["quality_rows"].items()
+        },
+        inv,
+    )
     # JSON: strip heavy effect/cost for size but keep essentials
     json_rows = []
     for r in inv["abilities"]:
@@ -859,6 +1148,10 @@ def main():
             "effect_cause": r["effect_cause"],
             "jidou_partners": r["jidou_partners"],
         })
+    json_quality = {
+        k: {"count": len(v), "rows": v}
+        for k, v in inv["quality_rows"].items()
+    }
 
     json_text = json.dumps({
         "generated_by": "cards/test_inventory.py",
@@ -894,6 +1187,8 @@ def main():
             "total": inv["specific_requirements_total"],
             "thin_idxs": inv["specific_requirements_thin"],
         },
+        "quality": json_quality,
+        "n_test_fns_parsed": inv["n_test_fns_parsed"],
         "abilities": json_rows,
     }, ensure_ascii=False, indent=2) + "\n"
 
@@ -902,7 +1197,7 @@ def main():
             # ignore volatile timestamp for check
             return re.sub(r'"generated_at":\s*"[^"]*"', '"generated_at": "CHECK"', text)
         ok = True
-        for path, new_text in [(OUT_COVERAGE, coverage_text), (OUT_MATRIX, matrix_text), (OUT_MD, inventory_md_text), (OUT_JSON, json_text)]:
+        for path, new_text in [(OUT_COVERAGE, coverage_text), (OUT_MATRIX, matrix_text), (OUT_MD, inventory_md_text), (OUT_QUALITY, quality_text), (OUT_JSON, json_text)]:
             if not path.exists():
                 print(f"CHECK FAIL: {path.relative_to(ROOT)} missing", file=sys.stderr)
                 ok = False
@@ -930,6 +1225,9 @@ def main():
         OUT_COVERAGE.parent.mkdir(parents=True, exist_ok=True)
         OUT_COVERAGE.write_text(coverage_text, encoding="utf-8")
         print(f"Wrote {OUT_COVERAGE.relative_to(ROOT)} ({len(coverage_text)} bytes)")
+        OUT_QUALITY.parent.mkdir(parents=True, exist_ok=True)
+        OUT_QUALITY.write_text(quality_text, encoding="utf-8")
+        print(f"Wrote {OUT_QUALITY.relative_to(ROOT)} ({len(quality_text)} bytes)")
         OUT_MATRIX.parent.mkdir(parents=True, exist_ok=True)
         OUT_MATRIX.write_text(matrix_text, encoding="utf-8")
         print(f"Wrote {OUT_MATRIX.relative_to(ROOT)} ({len(matrix_text)} bytes)")

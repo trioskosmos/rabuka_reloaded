@@ -753,6 +753,13 @@ impl super::TurnEngine {
         let mut p2_surplus = 0u8;
         let mut p1_surplus = 0u8;
         for snap in &mut game_state.performance_snapshots {
+            // Surplus only exists for successful lives (Q142: surplus means hearts exceed requirements).
+            // Rule 8.3.16: failed lives have no surplus. Q259: heart calculation only at success timing.
+            if !snap.success {
+                snap.surplus_hearts = [0u8; 8];
+                log::debug!("[SURPLUS] player={} FAILED live → surplus_hearts=0", snap.player_id);
+                continue;
+            }
             let total_available: u8 = snap.total_hearts.iter().sum();
             let total_filled: u8 = snap.lives.iter().flat_map(|l| l.filled.iter()).sum();
             let surplus = total_available.saturating_sub(total_filled);

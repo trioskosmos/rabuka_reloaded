@@ -4,6 +4,7 @@ use std::collections::HashMap;
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
+use std::sync::{Arc, OnceLock};
 
 use rabuka_engine::card::Card;
 
@@ -16,7 +17,22 @@ pub struct CardAtlas {
 
 #[cfg(feature = "3ds")]
 impl CardAtlas {
+    /// Parse the manifest from romfs exactly once per process and share it.
+    /// Previously every game start and every deck preview re-did
+    /// `File::open + read_to_string + serde_json` on ~2280 entries on ARM11.
+    pub fn shared() -> Arc<CardAtlas> {
+        static SHARED_ATLAS: OnceLock<Arc<CardAtlas>> = OnceLock::new();
+        SHARED_ATLAS
+            .get_or_init(|| Arc::new(CardAtlas::load_uncached()))
+            .clone()
+    }
+
     pub fn load() -> Self {
+        // Back-compat: cheap clone of the one-time parse, no file I/O.
+        (*CardAtlas::shared()).clone()
+    }
+
+    fn load_uncached() -> Self {
         let path = Path::new("romfs:/cards_manifest.json");
         let mut f = match File::open(path) {
             Ok(f) => f,

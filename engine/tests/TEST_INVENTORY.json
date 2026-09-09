@@ -1,6 +1,6 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-09-08T05:59:21.710656+00:00",
+  "generated_at": "2026-09-09T03:05:22.370646+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
@@ -381,6 +381,1131 @@
       426
     ]
   },
+  "quality": {
+    "no_assert": {
+      "count": 2,
+      "rows": [
+        {
+          "file": "engine/tests/test_modules/jidou/complex/bytecode_validation_test.rs",
+          "test": "bytecode_debug_ability_399",
+          "line": 214,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/jidou/complex/bytecode_validation_test.rs",
+          "test": "bytecode_debug_ability_399_disabled",
+          "line": 237,
+          "detail": ""
+        }
+      ]
+    },
+    "no_drive": {
+      "count": 50,
+      "rows": [
+        {
+          "file": "engine/tests/test_modules/abilities/complex/bp7_cooking_with_love_test.rs",
+          "test": "cooking_accept_shuffles_discard_to_deck_bottom",
+          "line": 217,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/abilities/complex/bp7_cooking_with_love_test.rs",
+          "test": "cooking_condition_checks_discard_not_stage",
+          "line": 192,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/abilities/complex/bp7_cooking_with_love_test.rs",
+          "test": "cooking_decline_does_nothing",
+          "line": 248,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/abilities/complex/distortion_need_hearts_test.rs",
+          "test": "distortion_parse_increase_half_is_increase",
+          "line": 70,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/abilities/complex/energy_and_member_under_test.rs",
+          "test": "kasumi_rule_4553_under_cards_follow_position_change",
+          "line": 129,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/abilities/complex/energy_and_member_under_test.rs",
+          "test": "rina_debit_triggers_with_target_in_discard",
+          "line": 427,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/abilities/complex/energy_and_member_under_test.rs",
+          "test": "rina_rule_4553_under_member_follows_position_change",
+          "line": 479,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/abilities/complex/energy_and_member_under_test.rs",
+          "test": "sayaka_rule_4553_under_members_follow_position_change",
+          "line": 810,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/abilities/complex/pl_hs_bp6_004_test.rs",
+          "test": "ginako_discard_non_ginako_gains_one_blade",
+          "line": 125,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/abilities/complex/pl_hs_bp6_004_test.rs",
+          "test": "ginako_discard_self_gains_two_blades",
+          "line": 37,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/abilities/complex/pl_hs_bp6_004_test.rs",
+          "test": "ginako_skip_cost_gains_zero_blades",
+          "line": 155,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/abilities/complex/pl_hs_bp6_004_test.rs",
+          "test": "two_ginako_discard_one_gains_blade_on_self",
+          "line": 185,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/abilities/moderate/bp7_q267_rinna_mill_refresh_test.rs",
+          "test": "q267_both_players_refresh_their_own_deck",
+          "line": 193,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/abilities/moderate/bp7_q267_rinna_mill_refresh_test.rs",
+          "test": "q267_deck_exactly_seven_no_refresh",
+          "line": 132,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/abilities/moderate/bp7_q267_rinna_mill_refresh_test.rs",
+          "test": "q267_deck_exhausts_mid_mill_refreshes_and_completes",
+          "line": 85,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/abilities/moderate/bp7_q267_rinna_mill_refresh_test.rs",
+          "test": "q267_deck_five_refresh_completes_to_seven",
+          "line": 160,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/batches/untested_choice_change_target_test.rs",
+          "test": "aiko_target_self_looks_at_top_card",
+          "line": 309,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/batches/untested_choice_change_target_test.rs",
+          "test": "azuna_target_self_puts_members_on_deck_bottom",
+          "line": 263,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/batches/untested_choice_change_target_test.rs",
+          "test": "niji_bp5_004_weight_exact_4_blades",
+          "line": 148,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/batches/untested_choice_change_target_test.rs",
+          "test": "shion_not_from_graveyard_no_weight",
+          "line": 206,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/batches/untested_choice_change_target_test.rs",
+          "test": "sp_pr_021_hearts_lt5_no_weight",
+          "line": 229,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/integration/hard_abilities_tier_test.rs",
+          "test": "kinako_hand_cost_minus_two_while_liella_moved",
+          "line": 185,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/integration/hard_abilities_tier_test.rs",
+          "test": "kinako_non_liella_movement_gives_no_discount",
+          "line": 223,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/jidou/complex/b7_constant_ability_test.rs",
+          "test": "mia_constant_blade_per_energy_under",
+          "line": 78,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/jidou/complex/baton_touch_test.rs",
+          "test": "card_count_condition_baton_touch_filter",
+          "line": 284,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/jidou/complex/bp7_like_a_treasure_optional_test.rs",
+          "test": "like_a_treasure_real_mill_accept_adds_niji_and_scores",
+          "line": 107,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/jidou/complex/cards_6_thru_13_test.rs",
+          "test": "c8_q242_19_below_threshold",
+          "line": 313,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/jidou/complex/cards_6_thru_13_test.rs",
+          "test": "c8_q242_both_shuffle_and_retrieve_and_blade",
+          "line": 190,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/jidou/complex/cards_6_thru_13_test.rs",
+          "test": "c8_q242_exactly_20_threshold_met",
+          "line": 280,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/jidou/complex/cards_6_thru_13_test.rs",
+          "test": "c8_q242_no_live_card_still_gains_blade",
+          "line": 240,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/jidou/complex/cards_6_thru_13_test.rs",
+          "test": "c8_q242_p1_only_20_threshold",
+          "line": 347,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/jidou/complex/riko_bp5_center_cost_equal_test.rs",
+          "test": "riko_both_empty_no_trigger",
+          "line": 167,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/jidou/complex/riko_bp5_center_cost_equal_test.rs",
+          "test": "riko_different_costs_no_trigger",
+          "line": 98,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/jidou/complex/riko_bp5_center_cost_equal_test.rs",
+          "test": "riko_left_empty_no_trigger",
+          "line": 121,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/jidou/complex/riko_bp5_center_cost_equal_test.rs",
+          "test": "riko_right_empty_no_trigger",
+          "line": 144,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/jidou/complex/riko_bp5_center_cost_equal_test.rs",
+          "test": "riko_same_cost_different_cards_triggers",
+          "line": 187,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/jidou/moderate/bp7_mia_deck_to_discard_test.rs",
+          "test": "mia_real_dia_mill_decline_no_recover",
+          "line": 139,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/jidou/moderate/bp7_mia_deck_to_discard_test.rs",
+          "test": "mia_real_dia_mill_triggers_ab0",
+          "line": 89,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/jidou/moderate/bp7_mia_optional_recover_test.rs",
+          "test": "mia_accept_discards_one_and_recovers_self",
+          "line": 76,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/jidou/moderate/bp7_mia_optional_recover_test.rs",
+          "test": "mia_does_not_fire_for_other_card",
+          "line": 189,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/jidou/moderate/bp7_mia_optional_recover_test.rs",
+          "test": "mia_empty_hand_no_recover",
+          "line": 141,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/jidou/moderate/bp7_mia_optional_recover_test.rs",
+          "test": "mia_recovers_only_self",
+          "line": 163,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/jidou/moderate/bp7_mia_optional_recover_test.rs",
+          "test": "mia_skip_no_discard_no_recover",
+          "line": 113,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/jidou/moderate/location_condition_cost_test.rs",
+          "test": "cost12_below_threshold_no_trigger",
+          "line": 63,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/jidou/moderate/location_condition_cost_test.rs",
+          "test": "cost13_exact_boundary_triggers",
+          "line": 51,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/jidou/moderate/location_condition_cost_test.rs",
+          "test": "cost13_on_self_triggers",
+          "line": 76,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/jidou/moderate/location_condition_cost_test.rs",
+          "test": "cost9_alone_does_not_meet_cost13_condition",
+          "line": 8,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/qa/q46_kanako_all_heart_timing_test.rs",
+          "test": "q46_kanako_constant_grants_blades_when_condition_met",
+          "line": 14,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/qa/qa_new_tests252.rs",
+          "test": "test_q252_stage_trigger_simulation",
+          "line": 240,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/qa/qa_new_tests257.rs",
+          "test": "live_phase_crossroads_replacement_p1",
+          "line": 13,
+          "detail": ""
+        }
+      ]
+    },
+    "synthetic_only": {
+      "count": 0,
+      "rows": []
+    },
+    "pendency_only": {
+      "count": 101,
+      "rows": [
+        {
+          "file": "engine/tests/test_modules/abilities/complex/ability_engine_fixes_test.rs",
+          "test": "wakana_008_debut_center_to_empty_left",
+          "line": 387,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/abilities/complex/bp7_ai_choice_under_member_test.rs",
+          "test": "ai_condition_fails_with_duplicate_name",
+          "line": 164,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/abilities/complex/bp7_ai_choice_under_member_test.rs",
+          "test": "ai_condition_fails_with_one_diverdiva",
+          "line": 147,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/abilities/complex/bp7_ai_choice_under_member_test.rs",
+          "test": "ai_two_distinct_diverdiva_offers_choice",
+          "line": 67,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/abilities/complex/bp7_cooking_with_love_test.rs",
+          "test": "cooking_both_in_discard_offers_optional",
+          "line": 83,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/abilities/complex/bp7_cooking_with_love_test.rs",
+          "test": "cooking_condition_checks_discard_not_stage",
+          "line": 192,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/abilities/complex/bp7_cooking_with_love_test.rs",
+          "test": "cooking_live_plus_member_with_blade_no_offer",
+          "line": 137,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/abilities/complex/bp7_cooking_with_love_test.rs",
+          "test": "cooking_non_niji_in_discard_no_offer",
+          "line": 172,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/abilities/complex/bp7_cooking_with_love_test.rs",
+          "test": "cooking_only_live_card_no_offer",
+          "line": 102,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/abilities/complex/bp7_cooking_with_love_test.rs",
+          "test": "cooking_only_member_with_blade_no_offer",
+          "line": 155,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/abilities/complex/bp7_cooking_with_love_test.rs",
+          "test": "cooking_only_member_without_blade_no_offer",
+          "line": 119,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/abilities/complex/bp7_dia_look_bottom_select_test.rs",
+          "test": "dia_keeps_one_on_bottom_rest_to_waitroom",
+          "line": 48,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/abilities/complex/hasunosora_pb1_test.rs",
+          "test": "hasunosora_pb1_condition_not_met_no_effect",
+          "line": 84,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/abilities/complex/hasunosora_pb1_test.rs",
+          "test": "hasunosora_pb1_non_hasu_not_targeted",
+          "line": 110,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/abilities/complex/hasunosora_pb1_test.rs",
+          "test": "hasunosora_pb1_only_one_gets_heart04",
+          "line": 141,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/abilities/complex/himeno_bp5_live_start_test.rs",
+          "test": "himeno_bp5_different_group_pair_still_works",
+          "line": 75,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/abilities/complex/joint_card_live_start_test.rs",
+          "test": "test_bp4_debut_trigger_fires_independently",
+          "line": 383,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/abilities/complex/joint_card_live_start_test.rs",
+          "test": "test_bp4_live_start_dual_trigger_fires",
+          "line": 342,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/abilities/complex/position_change_non_optional_test.rs",
+          "test": "non_optional_pc_with_all_positions_excluded_fizzles",
+          "line": 394,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/abilities/moderate/blade_per_discard_test.rs",
+          "test": "two_copies_on_stage_both_gain_blades",
+          "line": 212,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/abilities/moderate/chisato_live_success_test.rs",
+          "test": "chisato_non_liella_move_no_bonus",
+          "line": 82,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/abilities/moderate/neutral_live_success_test.rs",
+          "test": "q261_live_fails_no_trigger",
+          "line": 296,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/abilities/moderate/position_ability_test.rs",
+          "test": "chisato_center_does_not_activate",
+          "line": 171,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/abilities/moderate/position_ability_test.rs",
+          "test": "chisato_left_side_draws_and_discards",
+          "line": 105,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/abilities/moderate/position_ability_test.rs",
+          "test": "chisato_right_side_draws_and_discards",
+          "line": 138,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/abilities/moderate/yoshiko_debut_test.rs",
+          "test": "yoshiko_debit_cost2_redirects_to_budget_card",
+          "line": 387,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/abilities/moderate/yoshiko_debut_test.rs",
+          "test": "yoshiko_debit_two_cost2_ok",
+          "line": 218,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/abilities/moderate/yoshiko_debut_test.rs",
+          "test": "yoshiko_debut_high_cost_not_selectable",
+          "line": 428,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/abilities/simple/pl_s_bp7_007_test.rs",
+          "test": "hanamaru_multiple_valid_forces_selection",
+          "line": 68,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/abilities/simple/pl_s_bp7_007_test.rs",
+          "test": "hanamaru_no_valid_discard_no_action",
+          "line": 140,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/batches/untested_abilities_batch33_test.rs",
+          "test": "bp6_016n_hand_debut_no_look",
+          "line": 61,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/batches/untested_abilities_batch33_test.rs",
+          "test": "bp6_016n_no_appearance_record_no_look",
+          "line": 81,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/batches/untested_abilities_batch34_test.rs",
+          "test": "pr032_waitroom_at_threshold_mills_nothing",
+          "line": 169,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/batches/untested_abilities_batch39_test.rs",
+          "test": "pb1034_choose_first_color_heart03",
+          "line": 51,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/batches/untested_abilities_batch39_test.rs",
+          "test": "pb1036_twin_chooses_heart06",
+          "line": 98,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/batches/untested_abilities_batch42_test.rs",
+          "test": "sumire_three_catchu_draws",
+          "line": 91,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/batches/untested_abilities_batch54_test.rs",
+          "test": "bps7023_optional_liella_reveal_to_deck_top",
+          "line": 98,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/batches/untested_abilities_batch5_test.rs",
+          "test": "wondermates_activates_waited_nijigasaki_enabling_activation",
+          "line": 57,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/batches/untested_abilities_batch6_test.rs",
+          "test": "natsumi_bpb7009_center_waits_low_blade_opponent_only",
+          "line": 160,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/batches/untested_abilities_batch6_test.rs",
+          "test": "sayaka_hspb1010_expensive_opponent_not_eligible",
+          "line": 94,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/batches/untested_abilities_batch6_test.rs",
+          "test": "sayaka_hspb1010_no_big_member_no_effect",
+          "line": 73,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/batches/untested_abilities_batch6_test.rs",
+          "test": "sayaka_hspb1010_waits_cheap_opponent_when_condition_met",
+          "line": 50,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/batches/untested_abilities_batch7_test.rs",
+          "test": "rin_bp4_009_both_stages_empty_does_not_fire",
+          "line": 559,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/batches/untested_abilities_batch7_test.rs",
+          "test": "rin_bp4_009_own_empty_stage_counts_as_zero_and_fires",
+          "line": 603,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/batches/untested_choice_change_target_test.rs",
+          "test": "azuna_target_self_puts_members_on_deck_bottom",
+          "line": 263,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/edge_cases/dive_edge_test.rs",
+          "test": "only_moved_copy_triggers_static_copy_does_not",
+          "line": 92,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/edge_cases/dive_edge_test.rs",
+          "test": "two_static_one_moved_only_one_trigger",
+          "line": 391,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/edge_cases/pr045_comprehensive_edge_test.rs",
+          "test": "pr045_non_baton_no_draw_even_with_cost7_on_stage",
+          "line": 62,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/edge_cases/s_pb1_002_riko_edge_test.rs",
+          "test": "riko_opponent_discards_live_no_gain",
+          "line": 3,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/integration/cross_player_interaction_test.rs",
+          "test": "himeko_gate_blocked_no_reposition_no_koko_response",
+          "line": 94,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/integration/cross_player_round5_test.rs",
+          "test": "mei_cost_gate_and_already_waited_target",
+          "line": 283,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/integration/hard_abilities_tier_test.rs",
+          "test": "kokoro_no_dollchestra_in_hand_no_gate",
+          "line": 159,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/integration/integration_blindspot_test.rs",
+          "test": "ginko_hs_debut_window_rests_cost_le9_member",
+          "line": 164,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/integration/integration_blindspot_test.rs",
+          "test": "karin_live_start_window_rests_exactly_blade4_member",
+          "line": 93,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/jidou/complex/ability_trigger_fix_test.rs",
+          "test": "serasu_double_trigger_regression",
+          "line": 514,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/jidou/complex/ability_trigger_fix_test.rs",
+          "test": "serasu_edelnote_appears_with_non_edelnote_on_stage",
+          "line": 175,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/jidou/complex/ability_trigger_fix_test.rs",
+          "test": "serasu_on_stage_non_edelnote_appears_no_trigger",
+          "line": 86,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/jidou/complex/awaken_the_power_test.rs",
+          "test": "cost_at_least_20_fires",
+          "line": 196,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/jidou/complex/bp6_004_002_audit_test.rs",
+          "test": "dia_bp6_zero_cards_no_trigger",
+          "line": 91,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/jidou/complex/bp6_004_002_audit_test.rs",
+          "test": "riko_bp6_auto_does_not_fire_without_live_card_zone_movement",
+          "line": 199,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/jidou/complex/bp6_004_002_audit_test.rs",
+          "test": "riko_bp6_auto_e2e_heart_success_no_trigger",
+          "line": 289,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/jidou/complex/bp6_004_002_audit_test.rs",
+          "test": "riko_bp6_auto_empty_moved_cards_no_trigger",
+          "line": 942,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/jidou/complex/bp6_004_002_audit_test.rs",
+          "test": "riko_bp6_auto_no_live_cards_anywhere_no_trigger",
+          "line": 411,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/jidou/complex/bp6_004_002_audit_test.rs",
+          "test": "riko_bp6_auto_null_moved_cards_no_trigger",
+          "line": 962,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/jidou/complex/bp6_020_dancing_stars_watchers_test.rs",
+          "test": "bp6020_ab0_center_mus_live_start_repositions_resolving_member",
+          "line": 94,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/jidou/complex/bp6_020_dancing_stars_watchers_test.rs",
+          "test": "bp6020_ab0_once_per_turn_blocks_second_resolution",
+          "line": 229,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/jidou/complex/bp6_020_dancing_stars_watchers_test.rs",
+          "test": "bp6020_ab0_opponent_member_resolution_does_not_arm_own_watcher",
+          "line": 183,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/jidou/complex/bp6_020_dancing_stars_watchers_test.rs",
+          "test": "bp6020_ab1_no_move_this_turn_no_score",
+          "line": 257,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/jidou/complex/bp6_020_dancing_stars_watchers_test.rs",
+          "test": "bp6020_ab1_once_per_turn_single_score_for_two_resolvers",
+          "line": 328,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/jidou/complex/bp6_020_dancing_stars_watchers_test.rs",
+          "test": "bp6020_ab1_q255_moved_before_resolution_scores",
+          "line": 280,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/jidou/complex/choice_bullet_test.rs",
+          "test": "dia_position_change_no_saintsnow_skips_gracefully",
+          "line": 281,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/jidou/complex/daisuki_test.rs",
+          "test": "blade_heart_3_blocks_entire_ability",
+          "line": 106,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/jidou/complex/daisuki_test.rs",
+          "test": "condition_0_revealed_no_trigger",
+          "line": 28,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/jidou/complex/dive_live_card_test.rs",
+          "test": "dive_not_in_live_zone_no_trigger",
+          "line": 35,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/jidou/complex/hanabiko_discard_test.rs",
+          "test": "hanabiko_decline_discard_no_retrieval",
+          "line": 276,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/jidou/complex/hanabiko_discard_test.rs",
+          "test": "hanabiko_hand_to_discard_no_trigger",
+          "line": 145,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/jidou/complex/hanabiko_discard_test.rs",
+          "test": "hanabiko_two_copies_one_moved_one_static",
+          "line": 232,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/jidou/complex/logging_test.rs",
+          "test": "real_choice_flow_emits_offered_and_resolved",
+          "line": 265,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/jidou/complex/mirai_ticket_test.rs",
+          "test": "mirai_ticket_empty_revealed_triggers_and_auto_skips",
+          "line": 157,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/jidou/complex/toubatsu_test.rs",
+          "test": "toubatsu_q263_center_to_area_move_triggers_auto",
+          "line": 221,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/jidou/complex/toubatsu_test.rs",
+          "test": "toubatsu_real_swap_move_triggers_auto",
+          "line": 272,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/jidou/complex/toubatsu_test.rs",
+          "test": "toubatsu_swap_arms_own_seat_not_opponent",
+          "line": 361,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/jidou/complex/toubatsu_test.rs",
+          "test": "toubatsu_unrelated_debut_no_trigger",
+          "line": 327,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/jidou/moderate/stage_to_discard_ability_test.rs",
+          "test": "kohaku_stage_to_discard_triggers_ability",
+          "line": 86,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/qa/qa_new_tests238.rs",
+          "test": "q238_baton_touch_select_opponent_member",
+          "line": 265,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/qa/qa_new_tests238.rs",
+          "test": "q238_baton_touch_triggers_position_change_selection",
+          "line": 201,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/qa/qa_new_tests238.rs",
+          "test": "q238_both_players_members_all_selectable",
+          "line": 135,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/qa/qa_new_tests238.rs",
+          "test": "q238_no_other_members_skips",
+          "line": 113,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/qa/qa_new_tests238.rs",
+          "test": "q238_optional_skip",
+          "line": 302,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/qa/qa_new_tests238.rs",
+          "test": "q238_reposition_opponent_member",
+          "line": 32,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/qa/qa_new_tests238.rs",
+          "test": "q238_reposition_own_member",
+          "line": 85,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/qa/qa_new_tests238.rs",
+          "test": "q238_select_opponent_center",
+          "line": 159,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/qa/qa_new_tests250.rs",
+          "test": "q250_no_appearance_no_trigger",
+          "line": 63,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/qa/qa_new_tests250.rs",
+          "test": "q250_opponent_selects_which_member",
+          "line": 78,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/qa/qa_new_tests250.rs",
+          "test": "q250_self_appearance_triggers",
+          "line": 49,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/qa/qa_new_tests250.rs",
+          "test": "q250_use_limit",
+          "line": 100,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/qa/qa_new_tests251.rs",
+          "test": "q251_has_blade_heart_filtered",
+          "line": 101,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/qa/qa_new_tests251.rs",
+          "test": "q251_wrong_group_filtered",
+          "line": 122,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/qa/qa_new_tests252.rs",
+          "test": "test_q252_non_aqours_no_trigger",
+          "line": 75,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/qa/qa_new_tests252.rs",
+          "test": "test_q252_stage_trigger_simulation",
+          "line": 240,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/qa/qa_new_tests252.rs",
+          "test": "test_q252_use_limit",
+          "line": 163,
+          "detail": ""
+        }
+      ]
+    },
+    "similar_cards": {
+      "count": 30,
+      "rows": [
+        {
+          "file": "engine/tests/test_modules/abilities/complex/ability_engine_fixes_test.rs",
+          "test": "<file>",
+          "line": 1,
+          "detail": "PL!SP-bp2-008-R, PL!SP-pb1-008-R"
+        },
+        {
+          "file": "engine/tests/test_modules/abilities/complex/aurora_flower_identity_test.rs",
+          "test": "<file>",
+          "line": 1,
+          "detail": "PL!HS-bp1-021-L, PL!HS-bp2-021-L"
+        },
+        {
+          "file": "engine/tests/test_modules/abilities/complex/bp7_character_name_condition_test.rs",
+          "test": "<file>",
+          "line": 1,
+          "detail": "PL!S-bp3-003-R＋, PL!S-bp7-003-R＋"
+        },
+        {
+          "file": "engine/tests/test_modules/abilities/complex/deep_resonance_bp3_test.rs",
+          "test": "<file>",
+          "line": 1,
+          "detail": "PL!S-bp2-001-R, PL!S-pb1-001-R"
+        },
+        {
+          "file": "engine/tests/test_modules/abilities/complex/distortion_need_hearts_test.rs",
+          "test": "<file>",
+          "line": 1,
+          "detail": "PL!SP-bp1-012-N, PL!SP-bp4-012-N"
+        },
+        {
+          "file": "engine/tests/test_modules/abilities/complex/energy_and_member_under_test.rs",
+          "test": "<file>",
+          "line": 1,
+          "detail": "PL!N-bp3-013-N, PL!N-bp5-013-N"
+        },
+        {
+          "file": "engine/tests/test_modules/abilities/complex/position_change_multi_test.rs",
+          "test": "<file>",
+          "line": 1,
+          "detail": "PL!HS-bp2-006-R, PL!HS-pb1-006-R"
+        },
+        {
+          "file": "engine/tests/test_modules/abilities/complex/position_change_non_optional_test.rs",
+          "test": "<file>",
+          "line": 1,
+          "detail": "PL!HS-bp2-006-R, PL!HS-pb1-006-R"
+        },
+        {
+          "file": "engine/tests/test_modules/abilities/complex/restriction_mechanics_test.rs",
+          "test": "<file>",
+          "line": 1,
+          "detail": "PL!S-bp5-009-R, PL!S-bp7-009-R"
+        },
+        {
+          "file": "engine/tests/test_modules/abilities/moderate/either_or_state_change_test.rs",
+          "test": "<file>",
+          "line": 1,
+          "detail": "PL!N-bp4-008-R, PL!N-pb1-008-R"
+        },
+        {
+          "file": "engine/tests/test_modules/abilities/simple/eli_sequential_cost_test.rs",
+          "test": "<file>",
+          "line": 1,
+          "detail": "PL!-bp3-002-R, PL!-bp5-002-R"
+        },
+        {
+          "file": "engine/tests/test_modules/batches/untested_abilities_batch10_test.rs",
+          "test": "<file>",
+          "line": 1,
+          "detail": "PL!SP-bp1-013-PR, PL!SP-pb1-013-PR"
+        },
+        {
+          "file": "engine/tests/test_modules/batches/untested_abilities_batch2_test.rs",
+          "test": "<file>",
+          "line": 1,
+          "detail": "PL!-bp3-005-R, PL!-pb1-005-R"
+        },
+        {
+          "file": "engine/tests/test_modules/batches/untested_abilities_batch38_test.rs",
+          "test": "<file>",
+          "line": 1,
+          "detail": "PL!S-bp2-020-L, PL!S-bp3-020-L"
+        },
+        {
+          "file": "engine/tests/test_modules/batches/untested_abilities_batch47_test.rs",
+          "test": "<file>",
+          "line": 1,
+          "detail": "PL!SP-bp4-022-N, PL!SP-bp7-022-N"
+        },
+        {
+          "file": "engine/tests/test_modules/batches/untested_abilities_batch55_test.rs",
+          "test": "<file>",
+          "line": 1,
+          "detail": "PL!SP-bp1-023-L, PL!SP-bp5-023-L, PL!SP-pb1-023-L"
+        },
+        {
+          "file": "engine/tests/test_modules/batches/untested_abilities_batch7_test.rs",
+          "test": "<file>",
+          "line": 1,
+          "detail": "PL!S-bp3-008-R, PL!S-bp5-008-R"
+        },
+        {
+          "file": "engine/tests/test_modules/batches/untested_abilities_batch9_test.rs",
+          "test": "<file>",
+          "line": 1,
+          "detail": "PL!S-bp6-007-R, PL!S-pb1-007-R"
+        },
+        {
+          "file": "engine/tests/test_modules/integration/integration_blindspot_test.rs",
+          "test": "<file>",
+          "line": 1,
+          "detail": "PL!HS-bp5-004-R, PL!HS-bp6-004-R"
+        },
+        {
+          "file": "engine/tests/test_modules/jidou/complex/ability_chain_combo_test.rs",
+          "test": "<file>",
+          "line": 1,
+          "detail": "PL!SP-pb1-006-R, PL!SP-pb2-006-R"
+        },
+        {
+          "file": "engine/tests/test_modules/jidou/complex/cards_6_thru_13_test.rs",
+          "test": "<file>",
+          "line": 1,
+          "detail": "PL!S-PR-015-PR, PL!S-bp2-015-PR"
+        },
+        {
+          "file": "engine/tests/test_modules/jidou/complex/kinako_each_time_blade_test.rs",
+          "test": "<file>",
+          "line": 1,
+          "detail": "PL!SP-bp5-006-R, PL!SP-pb1-006-R"
+        },
+        {
+          "file": "engine/tests/test_modules/jidou/complex/kinako_live_success_or_move_test.rs",
+          "test": "<file>",
+          "line": 1,
+          "detail": "PL!SP-bp5-006-R, PL!SP-pb2-006-R"
+        },
+        {
+          "file": "engine/tests/test_modules/jidou/complex/kinako_sakurakoji_test.rs",
+          "test": "<file>",
+          "line": 1,
+          "detail": "PL!SP-bp5-006-R, PL!SP-pb1-006-R"
+        },
+        {
+          "file": "engine/tests/test_modules/jidou/complex/ll_bp7_001_triple_member_test.rs",
+          "test": "<file>",
+          "line": 1,
+          "detail": "PL!S-bp2-016-N, PL!S-bp3-016-N, PL!S-bp7-016-N"
+        },
+        {
+          "file": "engine/tests/test_modules/jidou/complex/ll_bp7_001_triple_member_test.rs",
+          "test": "<file>",
+          "line": 1,
+          "detail": "PL!SP-bp5-014-N, PL!SP-bp7-014-N"
+        },
+        {
+          "file": "engine/tests/test_modules/jidou/complex/mymai_tonight_test.rs",
+          "test": "<file>",
+          "line": 1,
+          "detail": "PL!S-bp2-023-L, PL!S-bp5-023-L"
+        },
+        {
+          "file": "engine/tests/test_modules/jidou/complex/pb2_under_member_test.rs",
+          "test": "<file>",
+          "line": 1,
+          "detail": "PL!SP-pb1-006-R, PL!SP-pb2-006-R"
+        },
+        {
+          "file": "engine/tests/test_modules/jidou/complex/toubatsu_test.rs",
+          "test": "<file>",
+          "line": 1,
+          "detail": "PL!SP-bp2-011-R, PL!SP-pb2-011-R"
+        },
+        {
+          "file": "engine/tests/test_modules/jidou/complex/trigger_scope_test.rs",
+          "test": "<file>",
+          "line": 1,
+          "detail": "PL!HS-PR-005-PR, PL!HS-bp1-005-PR"
+        }
+      ]
+    }
+  },
+  "n_test_fns_parsed": 3283,
   "abilities": [
     {
       "idx": 0,

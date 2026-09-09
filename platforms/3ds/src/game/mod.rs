@@ -33,7 +33,7 @@ pub struct PlayState {
     pub acts_cache: Vec<game_setup::Action>,
     pub dirty: bool,
     pub redraw: bool,
-    pub atlas: CardAtlas,
+    pub atlas: Arc<CardAtlas>,
     pub vs_ai: bool,
     pub ai_vs_ai: bool,
     pub detail_mode: bool,

@@ -353,7 +353,7 @@ fn pick_deck(
                 .iter()
                 .filter_map(|cn| card_db.get_card_id(cn))
                 .collect();
-            let deck_atlas = CardAtlas::load();
+            let deck_atlas = CardAtlas::shared();
             Step::Setup(
                 cards.clone(),
                 decks.clone(),
@@ -619,7 +619,7 @@ fn pick_deck2(
                 .iter()
                 .filter_map(|cn| card_db.get_card_id(cn))
                 .collect();
-            let deck_atlas = CardAtlas::load();
+            let deck_atlas = CardAtlas::shared();
             Step::Setup(
                 cards.clone(),
                 decks.clone(),
@@ -673,7 +673,7 @@ fn loading(
     vs_ai: bool,
 ) -> Step {
     {
-        let r = (|| -> Result<(GameState, CardAtlas), String> {
+        let r = (|| -> Result<(GameState, Arc<CardAtlas>), String> {
             let mut cards_vec = (**cards).clone();
             CardLoader::attach_abilities(&mut cards_vec);
             let mut db = Arc::new(CardDatabase::load_or_create(cards_vec));
@@ -701,7 +701,7 @@ fn loading(
             p2.set_energy_deck(pd2.energy_deck);
             let mut gs = GameState::new(p1, p2, db);
             game_setup::setup_game(&mut gs);
-            Ok((gs, CardAtlas::load()))
+            Ok((gs, CardAtlas::shared()))
         })();
         match r {
             Ok((gs, atlas)) => {
@@ -1115,7 +1115,7 @@ fn deck_viewer(
     is_multiplayer: bool,
     viewing_card: &mut Option<i16>,
     card_db: &Arc<CardDatabase>,
-    atlas: &CardAtlas,
+    atlas: &Arc<CardAtlas>,
 ) -> Step {
     {
         if was_dirty {
@@ -2058,7 +2058,7 @@ fn multiplayer_loading(
     seed: u64,
 ) -> Step {
     {
-        let r = (|| -> Result<(GameState, CardAtlas), String> {
+        let r = (|| -> Result<(GameState, Arc<CardAtlas>), String> {
             let mut cards_vec = (**cards).clone();
             CardLoader::attach_abilities(&mut cards_vec);
             let mut db = Arc::new(CardDatabase::load_or_create(cards_vec));
@@ -2107,7 +2107,7 @@ fn multiplayer_loading(
                 p2.set_energy_deck(pd2.energy_deck);
                 let mut gs = GameState::new(p1, p2, db);
                 game_setup::setup_game(&mut gs);
-                return Ok((gs, CardAtlas::load()));
+                return Ok((gs, CardAtlas::shared()));
             }
             // No deck sync: build from local files (host or non-multiplayer)
             let nums1 = DeckParser::deck_list_to_card_numbers(&decks[p1_idx]);
@@ -2135,7 +2135,7 @@ fn multiplayer_loading(
             p2.set_energy_deck(pd2.energy_deck);
             let mut gs = GameState::new(p1, p2, db);
             game_setup::setup_game(&mut gs);
-            Ok((gs, CardAtlas::load()))
+            Ok((gs, CardAtlas::shared()))
         })();
         match r {
             Ok((gs, atlas)) => {
@@ -2275,7 +2275,7 @@ fn multiplayer_pc_loading(
     deck_sync_bytes: Option<Vec<u8>>,
     seed: u64,
 ) -> Step {
-    let r = (|| -> Result<(GameState, CardAtlas), String> {
+    let r = (|| -> Result<(GameState, Arc<CardAtlas>), String> {
         let mut cards_vec = (**cards).clone();
         CardLoader::attach_abilities(&mut cards_vec);
         let mut db = Arc::new(CardDatabase::load_or_create(cards_vec));
@@ -2307,7 +2307,7 @@ fn multiplayer_pc_loading(
             p2.set_main_deck(pd2.main_deck); p2.set_energy_deck(pd2.energy_deck);
             let mut gs = GameState::new(p1, p2, db);
             game_setup::setup_game(&mut gs);
-            return Ok((gs, CardAtlas::load()));
+            return Ok((gs, CardAtlas::shared()));
         }
         let nums1 = DeckParser::deck_list_to_card_numbers(&decks[p1_idx]);
         let nums2 = if p1_idx == p2_idx { nums1.clone() } else { DeckParser::deck_list_to_card_numbers(&decks[p2_idx]) };
@@ -2324,7 +2324,7 @@ fn multiplayer_pc_loading(
         p2.set_main_deck(pd2.main_deck); p2.set_energy_deck(pd2.energy_deck);
         let mut gs = GameState::new(p1, p2, db);
         game_setup::setup_game(&mut gs);
-        Ok((gs, CardAtlas::load()))
+        Ok((gs, CardAtlas::shared()))
     })();
     match r {
         Ok((gs, atlas)) => {

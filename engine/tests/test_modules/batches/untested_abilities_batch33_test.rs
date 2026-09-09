@@ -262,5 +262,24 @@ fn bp6_011n_empty_deck_and_empty_hand_is_a_clean_noop() {
     game.state.record_card_appearance(me, "discard");
 
     // Must not panic: draw 0 from an empty deck, discard from an empty hand.
+    let hand_before = game.state.player1.hand.cards.len();
+    let wait_before = game.state.player1.waitroom.cards.len();
     fire_trigger(&mut game, me, AbilityTrigger::Debut, "登場");
+
+    // A clean noop: no cards move anywhere.
+    assert_eq!(
+        game.state.player1.main_deck.cards.len(),
+        0,
+        "empty deck stays empty"
+    );
+    assert_eq!(
+        game.state.player1.hand.cards.len(),
+        hand_before,
+        "empty hand gains nothing"
+    );
+    assert_eq!(
+        game.state.player1.waitroom.cards.len(),
+        wait_before,
+        "nothing discarded on noop"
+    );
 }
