@@ -4745,6 +4745,13 @@ def _try_state_change(text):
         result["trigger_event"]["from_state"] = "wait"
         result["trigger_event"]["to_state"] = "active"
 
+    # Extract "自分のカードの効果" (own card effect) constraint, e.g. Maki
+    # pb1-015 ab#1: 自分のカードの効果によって、相手のステージにいる...
+    # メンバーがウェイト状態になったとき. Absent means False (the pipeline
+    # normalizer strips False).
+    if "自分のカードの効果" in text:
+        result["trigger_event"]["self_effect_only"] = True
+
     if "メインフェイズ" in text:
         result["trigger_event"]["phase"] = "main"
         if "自分の" in text:

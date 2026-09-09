@@ -259,7 +259,8 @@ Q_SCAN_RE = re.compile(
     r"|activate_ability|try_activate_ability|play_to_stage|try_play_to_stage|fire_trigger"
     r"|resume_with_choice|execute_main_phase_action"
     r"|pass_phase|\.pass\(\)|perform_live|ability_verdicts|drain_auto_ability_choices"
-    r"|process_current_ability"
+    r"|process_current_ability|set_live_card|set_energy_card|recalculate_constants"
+    r"|advance_phase|ConditionContext|evaluate_condition|TurnEngine::"
 )
 Q_SETUP_RE = re.compile(
     r"stage\.stage|energy_zone|energy_deck|main_deck|hand\.cards|waitroom\.cards|live_card_zone"
@@ -276,14 +277,22 @@ Q_IDENT_RE = re.compile(
 )
 Q_OUTCOME_RE = re.compile(
     r"get_blade_modifier|get_heart_modifier|get_orientation_modifier|get_score_modifier"
-    r"|active_count\(\)|get_under_cards|waitroom\.cards\.len|hand\.cards\.len"
+    r"|blade_modifiers|heart_modifiers|orientation_modifiers|need_heart|success_zone"
+    r"|active_count\(\)|get_under_cards|under_cards|waitroom\.cards\.len|hand\.cards\.len"
     r"|energy_zone\.cards\.len|energy_deck\.cards\.len|live_card_zone\.cards|success_live"
-    r"|\.contains\(|is_empty\(\)"
+    r"|\.contains\(|is_empty\(\)|![\w.]+\.has_pending_choice"
+    r"|choice_count|prompt_count|n_choices|is_idle\(\)"
 )
 Q_OUTCOME_MOD_RE = re.compile(
     r"get_blade_modifier|get_heart_modifier|get_orientation_modifier|get_score_modifier"
 )
-Q_TRIGGER_CTX_RE = re.compile(r"自動|trigger|jidou|watch|fire|auto_|position_change|debut|登場")
+Q_TRIGGER_CTX_RE = re.compile(r"自動|trigger|jidou|watch|fire|auto_|debut|登場|live_start|live_success|main_phase", re.IGNORECASE)
+# Tests asserting on the parsed ability AST (not game behavior) need no
+# engine drive: they inspect resolved_abilities()/effect structure directly.
+Q_PARSE_AUDIT_RE = re.compile(
+    r"resolved_abilities|operation_any|value_or_count|heart_colors_any"
+    r"|compound\.actions|effect_steps|get_aggregate\(\)"
+)
 Q_CARD_NO_RE = re.compile(r'"(PL![A-Za-z0-9!\-+＋]+?)"')
 Q_SET_SEG_RE = re.compile(r"-(bp\d+|sd\d+|pb\d+|cl\d+|PR)-")
 
@@ -393,23 +402,54 @@ def audit_test_quality(files):
         # Helpers are file-local non-#[test] fns.
         helper_assert = set()
         helper_scan = set()
+        helper_ident = set()
+        helper_outcome = set()
+        helper_bodies = {}
         for hname, hbody, _hline, is_test in split_rust_fns(text, False):
             if is_test:
                 continue
+            helper_bodies[hname] = hbody
             if Q_ASSERT_RE.search(hbody):
                 helper_assert.add(hname)
             if Q_SCAN_RE.search(hbody):
                 helper_scan.add(hname)
-        helper_assert_re = (
-            re.compile(r"\b(" + "|".join(sorted(helper_assert)) + r")\s*\(")
-            if helper_assert
-            else None
-        )
-        helper_scan_re = (
-            re.compile(r"\b(" + "|".join(sorted(helper_scan)) + r")\s*\(")
-            if helper_scan
-            else None
-        )
+            if Q_IDENT_RE.search(hbody):
+                helper_ident.add(hname)
+            if Q_OUTCOME_RE.search(hbody) or Q_OUTCOME_MOD_RE.search(hbody):
+                helper_outcome.add(hname)
+        # Transitive closure: a helper calling a credited helper inherits the
+        # credit (e.g. setup_and_trigger_live_start -> advance_to_live_start).
+        def _close(credited):
+            changed = True
+            while changed:
+                changed = False
+                for hname, hbody in helper_bodies.items():
+                    if hname in credited:
+                        continue
+                    if any(
+                        re.search(r"\b" + c + r"\s*\(", hbody)
+                        for c in credited
+                    ):
+                        credited.add(hname)
+                        changed = True
+            return credited
+
+        helper_assert = _close(set(helper_assert))
+        helper_scan = _close(set(helper_scan))
+        helper_ident = _close(set(helper_ident))
+        helper_outcome = _close(set(helper_outcome))
+
+        def _calls(names):
+            return (
+                re.compile(r"\b(" + "|".join(sorted(names)) + r")\s*\(")
+                if names
+                else None
+            )
+
+        helper_assert_re = _calls(helper_assert)
+        helper_scan_re = _calls(helper_scan)
+        helper_ident_re = _calls(helper_ident)
+        helper_outcome_re = _calls(helper_outcome)
         file_groups = {}
         for name, body, line in fns:
             has_assert = bool(Q_ASSERT_RE.search(body)) or bool(
@@ -425,6 +465,7 @@ def audit_test_quality(files):
                 and has_assert
                 and not driven
                 and Q_TRIGGER_CTX_RE.search(body)
+                and not Q_PARSE_AUDIT_RE.search(body)
             ):
                 smells["no_drive"].append((rel, name, line, ""))
             # synthetic_only: hand-pushed trigger events are weak evidence only
@@ -441,6 +482,9 @@ def audit_test_quality(files):
                 Q_PEND_RE.search(body)
                 and not Q_IDENT_RE.search(body)
                 and not Q_OUTCOME_RE.search(body)
+                and not Q_OUTCOME_MOD_RE.search(body)
+                and not (helper_ident_re and helper_ident_re.search(body))
+                and not (helper_outcome_re and helper_outcome_re.search(body))
                 and Q_TRIGGER_CTX_RE.search(body)
             ):
                 smells["pendency_only"].append((rel, name, line, ""))

@@ -264,12 +264,19 @@ fn hanabiko_two_copies_one_moved_one_static() {
         "hanabiko ab#0 should fire for the moved copy"
     );
 
+    let mut choice_count = 0;
     while g.has_pending_choice() {
+        choice_count += 1;
         g.select_indices(&[0]);
         while g.has_pending_choice() {
             g.select_indices(&[0]); // drain sub-choices
         }
     }
+    assert_eq!(
+        choice_count, 1,
+        "only the moved copy triggers ab#0; static copy must not. got {} choices",
+        choice_count
+    );
 }
 
 /// Sterile room: declined optional discard → no retrieval happens.

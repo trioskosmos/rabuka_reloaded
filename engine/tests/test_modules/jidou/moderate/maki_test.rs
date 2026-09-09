@@ -239,3 +239,157 @@ fn maki_edge_no_opponent_member_no_draw() {
         "No opponent member → no draw"
     );
 }
+
+/// Ab#1 fires on an OWN-effect wait: Shiki swaps Toubatsu, whose jidou waits
+/// the cheap opponent member → Maki draws 1. Real P1-caused chain.
+#[test]
+fn maki_ab1_own_effect_wait_draws() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let maki = game.id("PL!-pb1-015-R");
+    let toubatsu = game.id("PL!SP-pb2-011-R");
+    let shiki = game.id("PL!SP-bp2-008-R");
+    let cheap_opp = game.id("PL!N-PR-009-PR"); // 優木せつ菜, cost 2 (<=4)
+    let filler = game.id("PL!-sd1-010-SD");
+
+    game.state.player1.stage.stage = [maki, toubatsu, shiki];
+    game.state.player2.stage.stage = [cheap_opp, -1, -1];
+    for _ in 0..10 {
+        game.state.player1.main_deck.cards.push(filler);
+    }
+    game.give_energy(10); // Shiki kidou E
+
+    let hand_before = game.state.player1.hand.cards.len();
+    // Shiki Right → Center: Toubatsu swaps to the Right (own effect move).
+    game.activate_ability(shiki);
+    game.drain_auto_ability_choices();
+    let actions = game.generated_actions();
+    let idx = actions
+        .iter()
+        .position(|a| {
+            a.parameters
+                .as_ref()
+                .and_then(|p| p.stage_area.as_deref())
+                == Some("center")
+        })
+        .expect("center target not offered");
+    game.select_generated(idx);
+    game.drain_auto_ability_choices();
+    assert_eq!(
+        game.state.player1.stage.stage,
+        [maki, shiki, toubatsu],
+        "swap moved Toubatsu center→area"
+    );
+
+    // Toubatsu jidou fires on its move: take the wait bullet (index 1),
+    // then the single opponent member auto-resolves.
+    scan_autos_both(&mut game);
+    assert!(
+        game.has_pending_choice(),
+        "Toubatsu jidou should offer its 3-option"
+    );
+    game.select_choice_option(1); // wait bullet
+    game.drain_auto_ability_choices();
+    scan_autos_both(&mut game);
+
+    assert_eq!(
+        game.state.mods.get_orientation_modifier(cheap_opp),
+        Some("wait"),
+        "own effect waited the cheap opponent member"
+    );
+    assert_eq!(
+        game.state.player1.hand.cards.len(),
+        hand_before + 1,
+        "Maki ab#1: own-effect wait → draw 1"
+    );
+}
+
+/// Foreign-caused recorded transition: P2 debuts Ayumu N-bp3-006-R, whose
+/// debut effect waits itself. Maki must stay silent (cost gate aside, the
+/// causer is P2, not an own card effect).
+#[test]
+fn maki_ab1_opponent_caused_wait_no_draw() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let maki = game.id("PL!-pb1-015-R");
+    let ayumu = game.id("PL!N-bp3-006-R"); // cost 9, debut waits itself
+    let filler = game.id("PL!-sd1-010-SD");
+
+    game.state.player1.stage.stage = [-1, maki, -1];
+    for _ in 0..10 {
+        game.state.player1.main_deck.cards.push(filler);
+    }
+    let hand_before = game.state.player1.hand.cards.len();
+
+    game.add_to_hand_for(Side::P2, ayumu);
+    game.give_energy_for(Side::P2, 9);
+    game.try_play_to_stage_for(Side::P2, ayumu, rabuka_engine::zones::MemberArea::Center)
+        .expect("p2 debut of Ayumu");
+    scan_autos_both(&mut game);
+
+    assert_eq!(
+        game.state.mods.get_orientation_modifier(ayumu),
+        Some("wait"),
+        "Ayumu really waited itself via P2's debut effect"
+    );
+    assert_eq!(
+        game.state.player1.hand.cards.len(),
+        hand_before,
+        "opponent-caused wait must not draw for Maki"
+    );
+}
+
+/// Causer isolation: identical recorded transitions differing only in the
+/// recorded cause player. Opponent cause → silent; own cause → draw.
+/// (No printed card isolates the causer dimension — P2 effects that wait
+/// own cheap members don't exist — so this pins the new check directly;
+///
+/// the two real tests above pin the wiring end to end.)
+#[test]
+fn maki_ab1_cause_player_decides() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let maki = game.id("PL!-pb1-015-R");
+    let cheap_opp = game.id("PL!N-PR-009-PR"); // cost 2 (<=4)
+    let filler = game.id("PL!-sd1-010-SD");
+
+    game.state.player1.stage.stage = [-1, maki, -1];
+    game.state.player2.stage.stage = [cheap_opp, -1, -1];
+    for _ in 0..10 {
+        game.state.player1.main_deck.cards.push(filler);
+    }
+    // Mirror an effect-driven wait without running an effect.
+    game.state.mods.add_orientation_modifier(cheap_opp, "wait");
+    let hand_before = game.state.player1.hand.cards.len();
+
+    // Opponent-caused transition → silent.
+    game.state.recently_state_changed.push((
+        cheap_opp,
+        "active".to_string(),
+        "wait".to_string(),
+        "p2".to_string(),
+    ));
+    scan_autos_both(&mut game);
+    assert_eq!(
+        game.state.player1.hand.cards.len(),
+        hand_before,
+        "opponent-caused wait must not draw"
+    );
+
+    // Own-caused transition → draw 1 (turn-1 use still intact).
+    game.state.recently_state_changed.push((
+        cheap_opp,
+        "active".to_string(),
+        "wait".to_string(),
+        "p1".to_string(),
+    ));
+    scan_autos_both(&mut game);
+    assert_eq!(
+        game.state.player1.hand.cards.len(),
+        hand_before + 1,
+        "own-effect wait draws 1"
+    );
+}

@@ -626,6 +626,26 @@ impl AbilityResolver {
 
             // Compare snapshot with current state to detect actual transitions.
             if let Some(before) = gs.state_snapshot_before_change.take() {
+                // Attribute the transitions to the effect's owner for
+                // 自分のカードの効果 scoping: activating card's owner, else
+                // the queue entry player, else unknown ("").
+                let cause_pid: String = gs
+                    .activating_card
+                    .and_then(|cid| {
+                        if gs.player1.contains_card(cid) {
+                            Some(gs.player1.id.clone())
+                        } else if gs.player2.contains_card(cid) {
+                            Some(gs.player2.id.clone())
+                        } else {
+                            None
+                        }
+                    })
+                    .or_else(|| {
+                        gs.ability_queue
+                            .current_entry()
+                            .map(|e| e.player_id.clone())
+                    })
+                    .unwrap_or_default();
                 for (card_id, before_ori) in &before {
                     let after_ori = gs.mods.orientation_modifiers.get(card_id).copied();
                     if *before_ori != after_ori {
@@ -641,6 +661,7 @@ impl AbilityResolver {
                             *card_id,
                             from_str.clone(),
                             to_str.clone(),
+                            cause_pid.clone(),
                         ));
                         // Turn-scoped attributed log (cleared only at the turn
                         // boundary) — consumed by temporal state-change

@@ -28,6 +28,8 @@ extern "C" {
     pub fn _3ds_board_cycle_view();
     pub fn _3ds_board_current_view() -> i32;
     pub fn _3ds_board_clear_cache();
+    // Prewarm one atlas sheet into the C cache (see ctru_shim.c).
+    pub fn _3ds_preload_card(atlas: *const u8);
     // Player slots
     pub fn _3ds_board_set_stage(
         slot: i32,

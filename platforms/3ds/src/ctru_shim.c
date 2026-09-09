@@ -743,6 +743,17 @@ C2D_Image _3ds_get_card_image(const char* atlas_name, int index) {
     return img;
 }
 
+// Preload one atlas sheet into the cache outside the frame, so the first
+// board that shows it doesn't hitch on SD read + decode + VRAM upload
+// mid-swap. Called from the Loading() step for every atlas in the two
+// decks (plus the card back). Safe to call with duplicates / unknowns:
+// hits are a strcmp walk, misses behave exactly like a first-seen draw.
+void _3ds_preload_card(const char* atlas_name) {
+    if (!atlas_name || atlas_name[0] == '\0') return;
+    C2D_Image img = _3ds_get_card_image(atlas_name, 0);
+    (void)img;
+}
+
 // ---- Drawing helpers (call between C2D_SceneBegin / C3D_FrameEnd) ----
 void _3ds_draw_rect(float x, float y, float w, float h, u32 color) {
     C2D_DrawRectSolid(x, y, 0.0f, w, h, color);

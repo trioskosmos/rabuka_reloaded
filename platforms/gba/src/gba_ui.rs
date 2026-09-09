@@ -119,7 +119,7 @@ impl<'u, 'd, I: InputSource> GbaUi<'u, 'd, I> {
                 self.action_total,
             );
             if let Some(cn) = &frame.focused_card {
-                crate::menu::show_card_detail(self.display, self.input, gs, cn.clone());
+                crate::menu::show_card_detail(self.display, self.input, gs, cn);
                 return true;
             }
         }
@@ -221,12 +221,11 @@ impl<'u, 'd, I: InputSource> platform_ui::PlatformUi for GbaUi<'u, 'd, I> {
         self.display.swap_buffers();
     }
     fn show_card_detail(&mut self, gs: &GameState, card_no: &str) {
-        use alloc::string::ToString;
         crate::menu::show_card_detail(
             self.display,
             self.input,
             gs,
-            card_no.to_string(),
+            card_no,
         );
     }
     fn show_detail_screen(

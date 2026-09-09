@@ -189,8 +189,7 @@ fn show_zone_grid<I: InputSource>(
                     display.wait();
                 }
             } else if !rows[sel].1.is_empty() {
-                let no = rows[sel].1.clone();
-                show_card_detail(display, input, gs, no);
+                show_card_detail(display, input, gs, rows[sel].1.as_str());
             }
         } else if input.just_pressed(Button::B) || input.just_pressed(Button::Start) {
             display.reset_vram();

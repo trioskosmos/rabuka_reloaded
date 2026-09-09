@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-09-07T17:43:24.259114",
+  "generated_at": "2026-09-09T13:58:28.757286",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "f1ea498e",
+  "engine_commit": "6c2bd007",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -15054,7 +15054,8 @@
           "trigger_event": {
             "type": "state_change",
             "from_state": "active",
-            "to_state": "wait"
+            "to_state": "wait",
+            "self_effect_only": true
           },
           "target": "opponent",
           "location": "stage",

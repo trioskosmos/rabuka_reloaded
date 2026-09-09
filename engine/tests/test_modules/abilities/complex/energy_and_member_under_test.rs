@@ -429,23 +429,44 @@ fn rina_debit_triggers_with_target_in_discard() {
     let db = load_real_database();
     let mut game = TestGame::new(db.clone());
     let rina = game.id("PL!N-PR-026-PR");
-    let target = game.id("PL!N-PR-009-PR");
+    let target = game.id("PL!N-PR-009-PR"); // 優木せつ菜, cost 2 (<=9)
     let filler = game.id("PL!-sd1-010-SD");
     game.state.player1.stage.stage[1] = rina;
     game.state.player1.waitroom.cards.push(target);
     game.state.player1.waitroom.cards.push(filler);
     game.give_energy(3);
-    // Trigger debut by playing to stage via play_to_stage would need 15 energy.
-    // Instead, manually trigger the debut ability.
-    // 登場 ability doesn't trigger via try_activate_ability — it's not 起動
-    // Instead, place the card on stage and check the ability was parsed
-    let card = db
-        .get_card_by_no("PL!N-PR-026-PR")
-        .expect("Rina PR card should exist");
-    let has_debut = card
-        .resolved_abilities()
-        .any(|a| a.triggers.as_deref() == Some("登場"));
-    assert!(has_debut, "Rina has 登場 ability");
+    // Fire the debut for real (staging her would cost ~15 energy).
+    // Single eligible candidate (only Setsuna is cost<=9 Nijigasaki), so
+    // the engine auto-picks with no prompt.
+    fire_trigger(
+        &mut game,
+        rina,
+        rabuka_engine::core::types::AbilityTrigger::Debut,
+        "登場",
+    );
+    scan_autos_both(&mut game);
+
+    assert!(
+        !game.state.player1.waitroom.cards.contains(&target),
+        "target leaves the waitroom"
+    );
+    assert_eq!(
+        game.state
+            .player1
+            .stage
+            .get_under_cards(MemberArea::Center)
+            .len(),
+        1,
+        "exactly the cost<=9 member parked under Rina"
+    );
+    assert!(
+        game.state
+            .player1
+            .stage
+            .get_under_cards(MemberArea::Center)
+            .contains(&target),
+        "the parked card is the target"
+    );
 }
 
 #[test]

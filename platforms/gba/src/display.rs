@@ -260,6 +260,24 @@ impl CardSpriteCache {
         }
     }
 
+    /// Indexed front lookup (binary search, no per-frame linear scan).
+    fn find_front(&self, table: &'static [CardFront], card_no: &str) -> Option<&'static CardFront> {
+        let hit = find_in_table(&self.front_order, table, card_no, |f| f.card_no);
+        if hit.is_none() {
+            log::debug!("missing front for {}", card_no);
+        }
+        hit
+    }
+
+    /// Indexed detail-art lookup for the card-detail screen.
+    fn find_art(&self, card_no: &str) -> Option<&'static CardArt> {
+        let hit = find_in_table(&self.front_order, CARD_ART, card_no, |a| a.card_no);
+        if hit.is_none() {
+            log::debug!("missing detail art for {}", card_no);
+        }
+        hit
+    }
+
     /// Start a frame. The id wraps after ~2 years at 60fps; on wrap the
     /// whole cache is dropped once so no stale stamp can survive.
     fn begin_frame(&mut self) {
@@ -293,7 +311,7 @@ impl CardSpriteCache {
     }
 
     /// Upload one sprite part: sample the baked tile grid (centred in the
-    /// card box, optionally rotated 180°, optionally 90° CW for the
+    /// card box, optionally rotated 180°, optionally 90° CCW for the
     /// wait-state, and dither-dimmed) via `set_pixel` so rectangular sizes
     /// use the correct OBJ 1D-mapping layout.
     /// Gutter pixels (sprite area outside the card box) stay index 0.
@@ -306,7 +324,7 @@ impl CardSpriteCache {
         box_h: usize,
         flipped: bool,
         dimmed: bool,
-        rot_cw: bool,
+        rot_ccw: bool,
         size: Size,
         dx: usize,
         dy: usize,
@@ -315,8 +333,8 @@ impl CardSpriteCache {
         let art_w = grid_w * 8;
         let art_h = grid_h * 8;
         // Rotated (wait-state) footprint: dimensions swap, like the 3DS
-        // tapped path which rotates to fill the slot.
-        let (rw, rh) = if rot_cw { (art_h, art_w) } else { (art_w, art_h) };
+        // tapped path which rotates 90° CCW to fill the slot.
+        let (rw, rh) = if rot_ccw { (art_h, art_w) } else { (art_w, art_h) };
         // Centre the art inside the card box. Negative only if art overflows
         // the box, in which case the outer pixels clip to transparent.
         let ox = (box_w as i32 - rw as i32) / 2;
@@ -343,10 +361,11 @@ impl CardSpriteCache {
                 } else {
                     (bx as i32, by as i32)
                 };
-                // 90° CW (wait-state, like 3DS tapped): art top-left lands
-                // at box top-right, i.e. (ax,ay) -> (H-1-ay, ax).
-                let (ax, ay) = if rot_cw {
-                    (fy - oy, art_h as i32 - 1 - (fx - ox))
+                // 90° CCW (wait-state, like 3DS tapped): the rotated frame
+                // pixel (fx-ox, fy-oy) samples unrotated (W-1-y, x), i.e.
+                // art top-left lands at box bottom-left.
+                let (ax, ay) = if rot_ccw {
+                    (art_w as i32 - 1 - (fy - oy), fx - ox)
                 } else {
                     (fx - ox, fy - oy)
                 };
@@ -406,7 +425,7 @@ impl CardSpriteCache {
         parts: &[(Size, usize, usize)],
         flipped: bool,
         dimmed: bool,
-        rot_cw: bool,
+        rot_ccw: bool,
         twin_tag: Option<&str>,
     ) -> Option<&[SpriteVram]> {
         use core::fmt::Write as _;
@@ -475,7 +494,7 @@ impl CardSpriteCache {
                     box_h,
                     flipped,
                     dimmed,
-                    rot_cw,
+                    rot_ccw,
                     size,
                     dx,
                     dy,
@@ -505,7 +524,7 @@ impl CardSpriteCache {
                         box_h,
                         flipped,
                         dimmed,
-                        rot_cw,
+                        rot_ccw,
                         size,
                         dx,
                         dy,
@@ -554,17 +573,17 @@ impl CardSpriteCache {
     /// Drop cached placements whose key starts with `prefix` (e.g. detail
     /// portraits before the board re-uploads into the freed OBJ VRAM).
     fn evict_prefix(&mut self, prefix: &str) {
-        let dead: Vec<String> = self
-            .sprites
-            .keys()
-            .filter(|k| k.starts_with(prefix))
-            .cloned()
-            .collect();
-        if !dead.is_empty() {
-            log::debug!("evicting {} sprite keys ({})", dead.len(), prefix);
-            for k in dead {
-                self.sprites.remove(&k);
-            }
+        // Retain in place: the old collect-into-Vec<String> allocated one
+        // String per dead key on every board frame (detail close). Runs on
+        // transitions only, but there is no reason to ever allocate here.
+        let mut dead = 0usize;
+        self.sprites.retain(|k, _| {
+            let drop_it = k.starts_with(prefix);
+            dead += drop_it as usize;
+            !drop_it
+        });
+        if dead > 0 {
+            log::debug!("evicting {} sprite keys ({})", dead, prefix);
         }
     }
 
@@ -994,7 +1013,7 @@ impl<'a> Display<'a> {
         py: i32,
         flipped: bool,
         dimmed: bool,
-        rot_cw: bool,
+        rot_ccw: bool,
     ) {
         // Board stage twins share art but never show together; name the
         // other so a miss evicts it first (no room for both).
@@ -1007,7 +1026,7 @@ impl<'a> Display<'a> {
         // with no intermediate Vec clone.
         match self.sprite_cache.get_or_upload(
             tag, card_no, tiles, grid_w, grid_h, box_w, box_h, parts, flipped,
-            dimmed, rot_cw, twin_tag,
+            dimmed, rot_ccw, twin_tag,
         ) {
             Some(vrams) => {
                 for (vram, &(_, dx, dy)) in vrams.iter().zip(parts.iter()) {
@@ -1114,7 +1133,7 @@ impl<'a> Display<'a> {
         icon_ts: &TileSet,
         ui_ts: &TileSet,
         e: TileEffect,
-        slot: &Slot,
+        slot: &Slot<'_>,
         x: i32,
         y: i32,
         kind: SlotKind,
@@ -1123,13 +1142,13 @@ impl<'a> Display<'a> {
         let Some(card_no) = slot.card_no.as_deref() else {
             return;
         };
-        // Resolve art. Waited stage cards rotate the full stage front 90° CW
-        // to fill the 48px box (like 3DS tapped cards fill their slot);
+        // Resolve art. Waited stage cards rotate the full stage front 90°
+        // CCW to fill the 48px box (like 3DS tapped cards fill their slot);
         // waited hand/live slots keep the small pre-rotated front centred.
-        let (tiles, gw, gh, tag, rot_cw): (&[u8], usize, usize, &str, bool) = if slot.hidden {
+        let (tiles, gw, gh, tag, rot_ccw): (&[u8], usize, usize, &str, bool) = if slot.hidden {
             (BACK_FRONT, 3, 2, "back", false)
         } else if slot.waited && matches!(kind, SlotKind::Stage) {
-            match STAGE_FRONTS.iter().find(|f| f.card_no == card_no) {
+            match self.sprite_cache.find_front(STAGE_FRONTS, card_no) {
                 Some(f) => (f.tiles, kind.grid_w(), kind.grid_h(), "stagew", true),
                 None => {
                     // Missing baked art must degrade to text, never to an
@@ -1149,7 +1168,7 @@ impl<'a> Display<'a> {
                 }
             }
         } else if slot.waited {
-            match WAITED_FRONTS.iter().find(|f| f.card_no == card_no) {
+            match self.sprite_cache.find_front(WAITED_FRONTS, card_no) {
                 Some(f) => (f.tiles, WAIT_GRID.0, WAIT_GRID.1, "wait", false),
                 None => {
                     log::debug!("missing waited front for {}", card_no);
@@ -1167,7 +1186,7 @@ impl<'a> Display<'a> {
             }
         } else {
             let fronts = kind.fronts();
-            match fronts.iter().find(|f| f.card_no == card_no) {
+            match self.sprite_cache.find_front(fronts, card_no) {
                 Some(f) => (f.tiles, kind.grid_w(), kind.grid_h(), kind.tag(), false),
                 None => {
                     Self::blit_line(
@@ -1197,7 +1216,7 @@ impl<'a> Display<'a> {
             y * 8,
             flipped,
             false,
-            rot_cw,
+            rot_ccw,
         );
         if slot.actionable {
             let (bx, by) = Self::badge_tile(x, y, kind, flipped);
@@ -1233,15 +1252,20 @@ impl<'a> Display<'a> {
 
     /// Render the full-screen Actions view: the buffered action list with a
     /// small hint line at the top. Input stays with the engine so Up/Down/A
-    /// drive the list live. No cards here, so the sprite cache is dropped to
-    /// free OBJ VRAM for the next screen.
+    /// drive the list live.
+    ///
+    /// Text-only: no sprites are pushed, so `end_frame` retains the whole
+    /// cache (see `end_frame`'s touched gate) and returning to the board is
+    /// all cache hits with zero re-upload. Do NOT clear here — the old
+    /// clear forced a ~20-card decompress storm on every Actions<->Board
+    /// round trip. (Detail/grid screens still reset: the 9-part portrait
+    /// genuinely doesn't fit alongside the board in 32KB OBJ VRAM.)
     ///
     /// The engine prints more lines than fit (3 headers + up to 7 actions +
     /// a `..more` line); the window follows the `>` cursor so the list
     /// scrolls fully instead of clipping the selected row away.
     pub fn render_action_text(&mut self) {
         self.last = self.buf.clone();
-        self.sprite_cache.clear();
         self.gfx.set_background_palette(15, &TEXT_PALETTE);
         let font_ts = unsafe { TileSet::new(&FONT_TILES.0, TileFormat::FourBpp) };
         let icon_ts = unsafe { TileSet::new(&TEXTICON_TILES.0, TileFormat::FourBpp) };
@@ -1361,6 +1385,11 @@ impl<'a> Display<'a> {
         self.present();
     }
 
+    /// Indexed detail-art lookup for menus (binary search, no linear scan).
+    pub fn find_card_art(&self, card_no: &str) -> Option<&'static CardArt> {
+        self.sprite_cache.find_art(card_no)
+    }
+
     /// Reset VRAM pressure: drop all cached sprites so the next screen
     /// uploads into a free pool. Call on heavy screen transitions (detail
     /// open/close, choice open/close). Deliberately commits NOTHING: an
@@ -1454,10 +1483,7 @@ impl<'a> Display<'a> {
                 if q.selected {
                     self.ui_front.set_tile((q.x, q.y), &ui_ts, TileSetting::new(UI_BADGE, e_ui));
                 }
-            } else if let Some(front) = fronts
-                .iter()
-                .find(|f| f.card_no == q.card_no.as_str())
-            {
+            } else if let Some(front) = self.sprite_cache.find_front(fronts, &q.card_no) {
                 // Menu boxes are exactly the queued tile size (choice grid
                 // cards have no wait-gap, unlike board stage slots).
                 let (box_w, box_h) = ((q.cols * 8) as usize, (q.rows * 8) as usize);

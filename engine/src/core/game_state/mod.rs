@@ -205,8 +205,12 @@ pub struct GameState {
     /// None = no snapshot active.
     pub state_snapshot_before_change: Option<HashMap<i16, Option<CardOrientation>>>,
     /// After a change_state effect executes, records what actually changed:
-    /// (card_id, from_state, to_state). Cleared after post-resolution TAS scan.
-    pub recently_state_changed: SmallVec<[(i16, String, String); 2]>,
+    /// (card_id, from_state, to_state, cause_player_id). The cause is the
+    /// owner of the activating card (falling back to the queue entry player),
+    /// "" when unknown. Needed for 自分のカードの効果 scoping (e.g. Maki
+    /// pb1-015 ab#1 must ignore opponent-caused waits). Cleared after
+    /// post-resolution TAS scan.
+    pub recently_state_changed: SmallVec<[(i16, String, String, String); 2]>,
     /// Turn-scoped state-change log WITH source attribution:
     /// (source activating card, target card, from_state, to_state).
     /// Unlike `recently_state_changed` this survives intermediate ability

@@ -29,7 +29,6 @@ use rabuka_engine::game_state::GameState;
 use crate::display::Display;
 use crate::gba_ui::InputSource;
 use crate::input::Button;
-use crate::ui::CARD_ART;
 
 /// Card detail with custom card lookup (for deck builder without GameState).
 pub fn show_card_detail_with_lookup<I: InputSource, F: Fn(&str) -> Option<&Card>>(
@@ -124,7 +123,7 @@ pub fn show_detail_screen<I: InputSource>(
     body: &str,
 ) {
     let _ = gs;
-    let art = art_card_no.and_then(|n| CARD_ART.iter().find(|a| a.card_no == n));
+    let art = art_card_no.and_then(|n| display.find_card_art(n));
     let mut lines: Vec<String> = Vec::new();
     for h in header {
         if h.trim().is_empty() {
@@ -185,9 +184,9 @@ pub fn show_card_detail<I: InputSource>(
     display: &mut Display,
     input: &mut I,
     gs: &GameState,
-    card_no: String,
+    card_no: &str,
 ) {
-    if let Some(card) = gs.card_database.get_card_by_no(&card_no) {
+    if let Some(card) = gs.card_database.get_card_by_no(card_no) {
         agb::println!("CARDDETAIL {}", card_no); // TEMP
         let header: Vec<String> = alloc::vec![
             card_detail_title(card),
@@ -201,11 +200,11 @@ pub fn show_card_detail<I: InputSource>(
             display,
             input,
             gs,
-            Some(card_no.as_str()),
+            Some(card_no),
             &header,
             &card_ability_text(card),
         );
     } else {
-        show_detail_screen(display, input, gs, None, &[card_no], "");
+        show_detail_screen(display, input, gs, None, &[card_no.to_string()], "");
     }
 }

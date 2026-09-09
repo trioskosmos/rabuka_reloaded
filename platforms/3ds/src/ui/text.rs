@@ -1,6 +1,8 @@
 // Pure text/UI helpers: word wrapping, icon markers, card stat lines.
 
+use std::collections::HashMap;
 use std::ffi::CString;
+use std::sync::{Mutex, OnceLock};
 
 use rabuka_engine::card::{Card, HeartColor, HeartMap};
 use rabuka_engine::core::game_modifiers::GameModifiers;
@@ -38,12 +40,30 @@ pub fn render_text_with_icons(x: f32, y: f32, text: &str, color: u32, scale: f32
     }
 }
 
+/// Icon aspect cache: one FFI round-trip per icon ever, instead of per icon
+/// per wrap per redraw (`_3ds_icon_aspect` re-resolves the sheet each call).
+/// Aspects depend only on the texture file, so entries never go stale.
+fn icon_aspect_cached(atlas_name: &str) -> f32 {
+    static CACHE: OnceLock<Mutex<HashMap<String, f32>>> = OnceLock::new();
+    let cache = CACHE.get_or_init(|| Mutex::new(HashMap::new()));
+    if let Some(&a) = cache.lock().unwrap_or_else(|e| e.into_inner()).get(atlas_name) {
+        return a;
+    }
+    let c_str = CString::new(atlas_name).unwrap_or_default();
+    let aspect = unsafe { _3ds_icon_aspect(c_str.as_ptr() as *const u8) };
+    let mut guard = cache.lock().unwrap_or_else(|e| e.into_inner());
+    if guard.len() >= 64 {
+        guard.clear();
+    }
+    guard.insert(atlas_name.to_string(), aspect);
+    aspect
+}
+
 /// Calculate icon display width at a given height, using actual texture aspect ratio.
 pub fn icon_width_for(file: &str, h: f32) -> f32 {
     let icon_name = file.strip_suffix(".png").unwrap_or(file);
     let atlas_name = format!("icon_{}.png.t3x", icon_name);
-    let c_str = CString::new(atlas_name.as_str()).unwrap_or_default();
-    let aspect = unsafe { _3ds_icon_aspect(c_str.as_ptr() as *const u8) };
+    let aspect = icon_aspect_cached(&atlas_name);
     if aspect > 0.0 {
         h * aspect
     } else {
@@ -221,12 +241,34 @@ pub fn card_stat_line(
 }
 
 /// Measure text pixel width using the 3DS system font (exact, proportional).
+///
+/// Cached: every wrap/truncate/binary-search step re-measures the same
+/// segments, and each miss costs FontParse+Optimize+GetDimensions on ARM11.
+/// Same string + same scale always measures the same (glyphs don't change),
+/// so entries never go stale — not even across language toggles. Bounded:
+/// the map is dropped and restarted past the cap (one bulk free, amortized).
 pub fn measure_text_width(s: &str, scale: f32) -> f32 {
     if s.is_empty() {
         return 0.0;
     }
+    static CACHE: OnceLock<Mutex<HashMap<(String, u32), f32>>> = OnceLock::new();
+    let cache = CACHE.get_or_init(|| Mutex::new(HashMap::new()));
+    let key_bits = scale.to_bits();
+    if let Some(&w) = cache
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .get(&(s.to_string(), key_bits))
+    {
+        return w;
+    }
     let c_str = CString::new(s).unwrap_or_default();
-    unsafe { _3ds_measure_text_width(c_str.as_ptr() as *const u8, scale) }
+    let w = unsafe { _3ds_measure_text_width(c_str.as_ptr() as *const u8, scale) };
+    let mut guard = cache.lock().unwrap_or_else(|e| e.into_inner());
+    if guard.len() >= 512 {
+        guard.clear();
+    }
+    guard.insert((s.to_string(), key_bits), w);
+    w
 }
 
 /// Build a single-line string that never wraps: truncate with an ellipsis if it

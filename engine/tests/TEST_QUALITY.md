@@ -15,62 +15,11 @@ _test never asserts (smoke at best — cannot pin behavior)_
 | `engine/tests/test_modules/jidou/complex/bytecode_validation_test.rs` | `bytecode_debug_ability_399` | 214 |  |
 | `engine/tests/test_modules/jidou/complex/bytecode_validation_test.rs` | `bytecode_debug_ability_399_disabled` | 237 |  |
 
-## no_drive (50)
+## no_drive (0)
 
 _trigger-context test that mutates state and asserts but never drives the engine (no scan/activate/play/fire): vacuous negatives/positives_
 
-| file | test | line | detail |
-| --- | --- | --- | --- |
-| `engine/tests/test_modules/abilities/complex/bp7_cooking_with_love_test.rs` | `cooking_accept_shuffles_discard_to_deck_bottom` | 217 |  |
-| `engine/tests/test_modules/abilities/complex/bp7_cooking_with_love_test.rs` | `cooking_condition_checks_discard_not_stage` | 192 |  |
-| `engine/tests/test_modules/abilities/complex/bp7_cooking_with_love_test.rs` | `cooking_decline_does_nothing` | 248 |  |
-| `engine/tests/test_modules/abilities/complex/distortion_need_hearts_test.rs` | `distortion_parse_increase_half_is_increase` | 70 |  |
-| `engine/tests/test_modules/abilities/complex/energy_and_member_under_test.rs` | `kasumi_rule_4553_under_cards_follow_position_change` | 129 |  |
-| `engine/tests/test_modules/abilities/complex/energy_and_member_under_test.rs` | `rina_debit_triggers_with_target_in_discard` | 427 |  |
-| `engine/tests/test_modules/abilities/complex/energy_and_member_under_test.rs` | `rina_rule_4553_under_member_follows_position_change` | 479 |  |
-| `engine/tests/test_modules/abilities/complex/energy_and_member_under_test.rs` | `sayaka_rule_4553_under_members_follow_position_change` | 810 |  |
-| `engine/tests/test_modules/abilities/complex/pl_hs_bp6_004_test.rs` | `ginako_discard_non_ginako_gains_one_blade` | 125 |  |
-| `engine/tests/test_modules/abilities/complex/pl_hs_bp6_004_test.rs` | `ginako_discard_self_gains_two_blades` | 37 |  |
-| `engine/tests/test_modules/abilities/complex/pl_hs_bp6_004_test.rs` | `ginako_skip_cost_gains_zero_blades` | 155 |  |
-| `engine/tests/test_modules/abilities/complex/pl_hs_bp6_004_test.rs` | `two_ginako_discard_one_gains_blade_on_self` | 185 |  |
-| `engine/tests/test_modules/abilities/moderate/bp7_q267_rinna_mill_refresh_test.rs` | `q267_both_players_refresh_their_own_deck` | 193 |  |
-| `engine/tests/test_modules/abilities/moderate/bp7_q267_rinna_mill_refresh_test.rs` | `q267_deck_exactly_seven_no_refresh` | 132 |  |
-| `engine/tests/test_modules/abilities/moderate/bp7_q267_rinna_mill_refresh_test.rs` | `q267_deck_exhausts_mid_mill_refreshes_and_completes` | 85 |  |
-| `engine/tests/test_modules/abilities/moderate/bp7_q267_rinna_mill_refresh_test.rs` | `q267_deck_five_refresh_completes_to_seven` | 160 |  |
-| `engine/tests/test_modules/batches/untested_choice_change_target_test.rs` | `aiko_target_self_looks_at_top_card` | 309 |  |
-| `engine/tests/test_modules/batches/untested_choice_change_target_test.rs` | `azuna_target_self_puts_members_on_deck_bottom` | 263 |  |
-| `engine/tests/test_modules/batches/untested_choice_change_target_test.rs` | `niji_bp5_004_weight_exact_4_blades` | 148 |  |
-| `engine/tests/test_modules/batches/untested_choice_change_target_test.rs` | `shion_not_from_graveyard_no_weight` | 206 |  |
-| `engine/tests/test_modules/batches/untested_choice_change_target_test.rs` | `sp_pr_021_hearts_lt5_no_weight` | 229 |  |
-| `engine/tests/test_modules/integration/hard_abilities_tier_test.rs` | `kinako_hand_cost_minus_two_while_liella_moved` | 185 |  |
-| `engine/tests/test_modules/integration/hard_abilities_tier_test.rs` | `kinako_non_liella_movement_gives_no_discount` | 223 |  |
-| `engine/tests/test_modules/jidou/complex/b7_constant_ability_test.rs` | `mia_constant_blade_per_energy_under` | 78 |  |
-| `engine/tests/test_modules/jidou/complex/baton_touch_test.rs` | `card_count_condition_baton_touch_filter` | 284 |  |
-| `engine/tests/test_modules/jidou/complex/bp7_like_a_treasure_optional_test.rs` | `like_a_treasure_real_mill_accept_adds_niji_and_scores` | 107 |  |
-| `engine/tests/test_modules/jidou/complex/cards_6_thru_13_test.rs` | `c8_q242_19_below_threshold` | 313 |  |
-| `engine/tests/test_modules/jidou/complex/cards_6_thru_13_test.rs` | `c8_q242_both_shuffle_and_retrieve_and_blade` | 190 |  |
-| `engine/tests/test_modules/jidou/complex/cards_6_thru_13_test.rs` | `c8_q242_exactly_20_threshold_met` | 280 |  |
-| `engine/tests/test_modules/jidou/complex/cards_6_thru_13_test.rs` | `c8_q242_no_live_card_still_gains_blade` | 240 |  |
-| `engine/tests/test_modules/jidou/complex/cards_6_thru_13_test.rs` | `c8_q242_p1_only_20_threshold` | 347 |  |
-| `engine/tests/test_modules/jidou/complex/riko_bp5_center_cost_equal_test.rs` | `riko_both_empty_no_trigger` | 167 |  |
-| `engine/tests/test_modules/jidou/complex/riko_bp5_center_cost_equal_test.rs` | `riko_different_costs_no_trigger` | 98 |  |
-| `engine/tests/test_modules/jidou/complex/riko_bp5_center_cost_equal_test.rs` | `riko_left_empty_no_trigger` | 121 |  |
-| `engine/tests/test_modules/jidou/complex/riko_bp5_center_cost_equal_test.rs` | `riko_right_empty_no_trigger` | 144 |  |
-| `engine/tests/test_modules/jidou/complex/riko_bp5_center_cost_equal_test.rs` | `riko_same_cost_different_cards_triggers` | 187 |  |
-| `engine/tests/test_modules/jidou/moderate/bp7_mia_deck_to_discard_test.rs` | `mia_real_dia_mill_decline_no_recover` | 139 |  |
-| `engine/tests/test_modules/jidou/moderate/bp7_mia_deck_to_discard_test.rs` | `mia_real_dia_mill_triggers_ab0` | 89 |  |
-| `engine/tests/test_modules/jidou/moderate/bp7_mia_optional_recover_test.rs` | `mia_accept_discards_one_and_recovers_self` | 76 |  |
-| `engine/tests/test_modules/jidou/moderate/bp7_mia_optional_recover_test.rs` | `mia_does_not_fire_for_other_card` | 189 |  |
-| `engine/tests/test_modules/jidou/moderate/bp7_mia_optional_recover_test.rs` | `mia_empty_hand_no_recover` | 141 |  |
-| `engine/tests/test_modules/jidou/moderate/bp7_mia_optional_recover_test.rs` | `mia_recovers_only_self` | 163 |  |
-| `engine/tests/test_modules/jidou/moderate/bp7_mia_optional_recover_test.rs` | `mia_skip_no_discard_no_recover` | 113 |  |
-| `engine/tests/test_modules/jidou/moderate/location_condition_cost_test.rs` | `cost12_below_threshold_no_trigger` | 63 |  |
-| `engine/tests/test_modules/jidou/moderate/location_condition_cost_test.rs` | `cost13_exact_boundary_triggers` | 51 |  |
-| `engine/tests/test_modules/jidou/moderate/location_condition_cost_test.rs` | `cost13_on_self_triggers` | 76 |  |
-| `engine/tests/test_modules/jidou/moderate/location_condition_cost_test.rs` | `cost9_alone_does_not_meet_cost13_condition` | 8 |  |
-| `engine/tests/test_modules/qa/q46_kanako_all_heart_timing_test.rs` | `q46_kanako_constant_grants_blades_when_condition_met` | 14 |  |
-| `engine/tests/test_modules/qa/qa_new_tests252.rs` | `test_q252_stage_trigger_simulation` | 240 |  |
-| `engine/tests/test_modules/qa/qa_new_tests257.rs` | `live_phase_crossroads_replacement_p1` | 13 |  |
+None.
 
 ## synthetic_only (0)
 
@@ -78,93 +27,34 @@ _trigger event hand-pushed with no real ability resolution in the same fn (weake
 
 None.
 
-## pendency_only (101)
+## pendency_only (22)
 
 _has_pending_choice asserted without choice identity (pending_choice_type/summary/answer) or outcome asserts_
 
 | file | test | line | detail |
 | --- | --- | --- | --- |
-| `engine/tests/test_modules/abilities/complex/ability_engine_fixes_test.rs` | `wakana_008_debut_center_to_empty_left` | 387 |  |
-| `engine/tests/test_modules/abilities/complex/bp7_ai_choice_under_member_test.rs` | `ai_condition_fails_with_duplicate_name` | 164 |  |
-| `engine/tests/test_modules/abilities/complex/bp7_ai_choice_under_member_test.rs` | `ai_condition_fails_with_one_diverdiva` | 147 |  |
 | `engine/tests/test_modules/abilities/complex/bp7_ai_choice_under_member_test.rs` | `ai_two_distinct_diverdiva_offers_choice` | 67 |  |
 | `engine/tests/test_modules/abilities/complex/bp7_cooking_with_love_test.rs` | `cooking_both_in_discard_offers_optional` | 83 |  |
-| `engine/tests/test_modules/abilities/complex/bp7_cooking_with_love_test.rs` | `cooking_condition_checks_discard_not_stage` | 192 |  |
-| `engine/tests/test_modules/abilities/complex/bp7_cooking_with_love_test.rs` | `cooking_live_plus_member_with_blade_no_offer` | 137 |  |
-| `engine/tests/test_modules/abilities/complex/bp7_cooking_with_love_test.rs` | `cooking_non_niji_in_discard_no_offer` | 172 |  |
-| `engine/tests/test_modules/abilities/complex/bp7_cooking_with_love_test.rs` | `cooking_only_live_card_no_offer` | 102 |  |
-| `engine/tests/test_modules/abilities/complex/bp7_cooking_with_love_test.rs` | `cooking_only_member_with_blade_no_offer` | 155 |  |
-| `engine/tests/test_modules/abilities/complex/bp7_cooking_with_love_test.rs` | `cooking_only_member_without_blade_no_offer` | 119 |  |
-| `engine/tests/test_modules/abilities/complex/bp7_dia_look_bottom_select_test.rs` | `dia_keeps_one_on_bottom_rest_to_waitroom` | 48 |  |
-| `engine/tests/test_modules/abilities/complex/hasunosora_pb1_test.rs` | `hasunosora_pb1_condition_not_met_no_effect` | 84 |  |
-| `engine/tests/test_modules/abilities/complex/hasunosora_pb1_test.rs` | `hasunosora_pb1_non_hasu_not_targeted` | 110 |  |
-| `engine/tests/test_modules/abilities/complex/hasunosora_pb1_test.rs` | `hasunosora_pb1_only_one_gets_heart04` | 141 |  |
-| `engine/tests/test_modules/abilities/complex/himeno_bp5_live_start_test.rs` | `himeno_bp5_different_group_pair_still_works` | 75 |  |
 | `engine/tests/test_modules/abilities/complex/joint_card_live_start_test.rs` | `test_bp4_debut_trigger_fires_independently` | 383 |  |
 | `engine/tests/test_modules/abilities/complex/joint_card_live_start_test.rs` | `test_bp4_live_start_dual_trigger_fires` | 342 |  |
-| `engine/tests/test_modules/abilities/complex/position_change_non_optional_test.rs` | `non_optional_pc_with_all_positions_excluded_fizzles` | 394 |  |
-| `engine/tests/test_modules/abilities/moderate/blade_per_discard_test.rs` | `two_copies_on_stage_both_gain_blades` | 212 |  |
-| `engine/tests/test_modules/abilities/moderate/chisato_live_success_test.rs` | `chisato_non_liella_move_no_bonus` | 82 |  |
-| `engine/tests/test_modules/abilities/moderate/neutral_live_success_test.rs` | `q261_live_fails_no_trigger` | 296 |  |
-| `engine/tests/test_modules/abilities/moderate/position_ability_test.rs` | `chisato_center_does_not_activate` | 171 |  |
-| `engine/tests/test_modules/abilities/moderate/position_ability_test.rs` | `chisato_left_side_draws_and_discards` | 105 |  |
-| `engine/tests/test_modules/abilities/moderate/position_ability_test.rs` | `chisato_right_side_draws_and_discards` | 138 |  |
-| `engine/tests/test_modules/abilities/moderate/yoshiko_debut_test.rs` | `yoshiko_debit_cost2_redirects_to_budget_card` | 387 |  |
-| `engine/tests/test_modules/abilities/moderate/yoshiko_debut_test.rs` | `yoshiko_debit_two_cost2_ok` | 218 |  |
-| `engine/tests/test_modules/abilities/moderate/yoshiko_debut_test.rs` | `yoshiko_debut_high_cost_not_selectable` | 428 |  |
+| `engine/tests/test_modules/abilities/complex/otherwise_condition_flow_test.rs` | `karin_reveal_condition_failed_deck_top_becomes_filler` | 497 |  |
+| `engine/tests/test_modules/abilities/complex/otherwise_condition_flow_test.rs` | `karin_reveal_condition_met_deck_top_becomes_filler` | 456 |  |
+| `engine/tests/test_modules/abilities/complex/otherwise_condition_flow_test.rs` | `karin_reveal_condition_not_met_position_unchanged` | 371 |  |
+| `engine/tests/test_modules/abilities/simple/pl_bp6_003_test.rs` | `kotori_live_start_only_muses_under_two_cost_selected` | 209 |  |
+| `engine/tests/test_modules/abilities/simple/pl_bp6_003_test.rs` | `kotori_live_start_then_live_success_workflow` | 567 |  |
 | `engine/tests/test_modules/abilities/simple/pl_s_bp7_007_test.rs` | `hanamaru_multiple_valid_forces_selection` | 68 |  |
-| `engine/tests/test_modules/abilities/simple/pl_s_bp7_007_test.rs` | `hanamaru_no_valid_discard_no_action` | 140 |  |
-| `engine/tests/test_modules/batches/untested_abilities_batch33_test.rs` | `bp6_016n_hand_debut_no_look` | 61 |  |
-| `engine/tests/test_modules/batches/untested_abilities_batch33_test.rs` | `bp6_016n_no_appearance_record_no_look` | 81 |  |
-| `engine/tests/test_modules/batches/untested_abilities_batch34_test.rs` | `pr032_waitroom_at_threshold_mills_nothing` | 169 |  |
 | `engine/tests/test_modules/batches/untested_abilities_batch39_test.rs` | `pb1034_choose_first_color_heart03` | 51 |  |
 | `engine/tests/test_modules/batches/untested_abilities_batch39_test.rs` | `pb1036_twin_chooses_heart06` | 98 |  |
 | `engine/tests/test_modules/batches/untested_abilities_batch42_test.rs` | `sumire_three_catchu_draws` | 91 |  |
 | `engine/tests/test_modules/batches/untested_abilities_batch54_test.rs` | `bps7023_optional_liella_reveal_to_deck_top` | 98 |  |
-| `engine/tests/test_modules/batches/untested_abilities_batch5_test.rs` | `wondermates_activates_waited_nijigasaki_enabling_activation` | 57 |  |
-| `engine/tests/test_modules/batches/untested_abilities_batch6_test.rs` | `natsumi_bpb7009_center_waits_low_blade_opponent_only` | 160 |  |
-| `engine/tests/test_modules/batches/untested_abilities_batch6_test.rs` | `sayaka_hspb1010_expensive_opponent_not_eligible` | 94 |  |
-| `engine/tests/test_modules/batches/untested_abilities_batch6_test.rs` | `sayaka_hspb1010_no_big_member_no_effect` | 73 |  |
-| `engine/tests/test_modules/batches/untested_abilities_batch6_test.rs` | `sayaka_hspb1010_waits_cheap_opponent_when_condition_met` | 50 |  |
-| `engine/tests/test_modules/batches/untested_abilities_batch7_test.rs` | `rin_bp4_009_both_stages_empty_does_not_fire` | 559 |  |
 | `engine/tests/test_modules/batches/untested_abilities_batch7_test.rs` | `rin_bp4_009_own_empty_stage_counts_as_zero_and_fires` | 603 |  |
-| `engine/tests/test_modules/batches/untested_choice_change_target_test.rs` | `azuna_target_self_puts_members_on_deck_bottom` | 263 |  |
-| `engine/tests/test_modules/edge_cases/dive_edge_test.rs` | `only_moved_copy_triggers_static_copy_does_not` | 92 |  |
-| `engine/tests/test_modules/edge_cases/dive_edge_test.rs` | `two_static_one_moved_only_one_trigger` | 391 |  |
-| `engine/tests/test_modules/edge_cases/pr045_comprehensive_edge_test.rs` | `pr045_non_baton_no_draw_even_with_cost7_on_stage` | 62 |  |
 | `engine/tests/test_modules/edge_cases/s_pb1_002_riko_edge_test.rs` | `riko_opponent_discards_live_no_gain` | 3 |  |
-| `engine/tests/test_modules/integration/cross_player_interaction_test.rs` | `himeko_gate_blocked_no_reposition_no_koko_response` | 94 |  |
-| `engine/tests/test_modules/integration/cross_player_round5_test.rs` | `mei_cost_gate_and_already_waited_target` | 283 |  |
-| `engine/tests/test_modules/integration/hard_abilities_tier_test.rs` | `kokoro_no_dollchestra_in_hand_no_gate` | 159 |  |
-| `engine/tests/test_modules/integration/integration_blindspot_test.rs` | `ginko_hs_debut_window_rests_cost_le9_member` | 164 |  |
-| `engine/tests/test_modules/integration/integration_blindspot_test.rs` | `karin_live_start_window_rests_exactly_blade4_member` | 93 |  |
-| `engine/tests/test_modules/jidou/complex/ability_trigger_fix_test.rs` | `serasu_double_trigger_regression` | 514 |  |
-| `engine/tests/test_modules/jidou/complex/ability_trigger_fix_test.rs` | `serasu_edelnote_appears_with_non_edelnote_on_stage` | 175 |  |
-| `engine/tests/test_modules/jidou/complex/ability_trigger_fix_test.rs` | `serasu_on_stage_non_edelnote_appears_no_trigger` | 86 |  |
-| `engine/tests/test_modules/jidou/complex/awaken_the_power_test.rs` | `cost_at_least_20_fires` | 196 |  |
-| `engine/tests/test_modules/jidou/complex/bp6_004_002_audit_test.rs` | `dia_bp6_zero_cards_no_trigger` | 91 |  |
-| `engine/tests/test_modules/jidou/complex/bp6_004_002_audit_test.rs` | `riko_bp6_auto_does_not_fire_without_live_card_zone_movement` | 199 |  |
 | `engine/tests/test_modules/jidou/complex/bp6_004_002_audit_test.rs` | `riko_bp6_auto_e2e_heart_success_no_trigger` | 289 |  |
-| `engine/tests/test_modules/jidou/complex/bp6_004_002_audit_test.rs` | `riko_bp6_auto_empty_moved_cards_no_trigger` | 942 |  |
-| `engine/tests/test_modules/jidou/complex/bp6_004_002_audit_test.rs` | `riko_bp6_auto_no_live_cards_anywhere_no_trigger` | 411 |  |
-| `engine/tests/test_modules/jidou/complex/bp6_004_002_audit_test.rs` | `riko_bp6_auto_null_moved_cards_no_trigger` | 962 |  |
-| `engine/tests/test_modules/jidou/complex/bp6_020_dancing_stars_watchers_test.rs` | `bp6020_ab0_center_mus_live_start_repositions_resolving_member` | 94 |  |
-| `engine/tests/test_modules/jidou/complex/bp6_020_dancing_stars_watchers_test.rs` | `bp6020_ab0_once_per_turn_blocks_second_resolution` | 229 |  |
-| `engine/tests/test_modules/jidou/complex/bp6_020_dancing_stars_watchers_test.rs` | `bp6020_ab0_opponent_member_resolution_does_not_arm_own_watcher` | 183 |  |
-| `engine/tests/test_modules/jidou/complex/bp6_020_dancing_stars_watchers_test.rs` | `bp6020_ab1_no_move_this_turn_no_score` | 257 |  |
-| `engine/tests/test_modules/jidou/complex/bp6_020_dancing_stars_watchers_test.rs` | `bp6020_ab1_once_per_turn_single_score_for_two_resolvers` | 328 |  |
-| `engine/tests/test_modules/jidou/complex/bp6_020_dancing_stars_watchers_test.rs` | `bp6020_ab1_q255_moved_before_resolution_scores` | 280 |  |
-| `engine/tests/test_modules/jidou/complex/choice_bullet_test.rs` | `dia_position_change_no_saintsnow_skips_gracefully` | 281 |  |
-| `engine/tests/test_modules/jidou/complex/daisuki_test.rs` | `blade_heart_3_blocks_entire_ability` | 106 |  |
-| `engine/tests/test_modules/jidou/complex/daisuki_test.rs` | `condition_0_revealed_no_trigger` | 28 |  |
-| `engine/tests/test_modules/jidou/complex/dive_live_card_test.rs` | `dive_not_in_live_zone_no_trigger` | 35 |  |
-| `engine/tests/test_modules/jidou/complex/hanabiko_discard_test.rs` | `hanabiko_decline_discard_no_retrieval` | 276 |  |
-| `engine/tests/test_modules/jidou/complex/hanabiko_discard_test.rs` | `hanabiko_hand_to_discard_no_trigger` | 145 |  |
-| `engine/tests/test_modules/jidou/complex/hanabiko_discard_test.rs` | `hanabiko_two_copies_one_moved_one_static` | 232 |  |
 | `engine/tests/test_modules/jidou/complex/logging_test.rs` | `real_choice_flow_emits_offered_and_resolved` | 265 |  |
-| `engine/tests/test_modules/jidou/complex/mirai_ticket_test.rs` | `mirai_ticket_empty_revealed_triggers_and_auto_skips` | 157 |  |
-| `engine/tests/test_modules/jidou/complex/toubatsu_test.rs` | `toubatsu_q263_center_to_area_move_triggers_auto` | 221 |  |
-| … | 21 more |  |  |
+| `engine/tests/test_modules/qa/qa_new_tests209.rs` | `q209_kasumi_use_limit_blocks_second` | 354 |  |
+| `engine/tests/test_modules/qa/qa_new_tests238.rs` | `q238_baton_touch_select_opponent_member` | 265 |  |
+| `engine/tests/test_modules/qa/qa_new_tests238.rs` | `q238_baton_touch_triggers_position_change_selection` | 201 |  |
+| `engine/tests/test_modules/qa/qa_new_tests238.rs` | `q238_both_players_members_all_selectable` | 135 |  |
 
 ## similar_cards (30)
 

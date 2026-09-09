@@ -1131,11 +1131,24 @@ impl<'a> ConditionContext<'a> {
                 self.resolve_condition_player("self")
             };
             let stage_set: HashSet<i16> = target_player.stage.stage.iter().copied().collect();
-            for (cid, cfrom, cto) in &self.game_state.recently_state_changed {
+            // 自分のカードの効果 scoping (e.g. Maki pb1-015 ab#1): only
+            // transitions caused by the watcher's own side satisfy the
+            // trigger. The cause is recorded at push time; "" = unknown and
+            // does NOT satisfy a scoping requirement.
+            let require_self_effect = condition.get_self_effect_only().unwrap_or(false);
+            let owner_id = self.resolve_condition_player("self").id.clone();
+            for (cid, cfrom, cto, cause) in &self.game_state.recently_state_changed {
                 if !stage_set.contains(cid) {
                     continue;
                 }
                 if cfrom != from || cto != to {
+                    continue;
+                }
+                if require_self_effect && cause != &owner_id {
+                    log::debug!(
+                        "[STATE_CHANGE_COND] card={} transition {}→{} rejected: cause='{}' != owner='{}' (self_effect_only)",
+                        cid, cfrom, cto, cause, owner_id
+                    );
                     continue;
                 }
                 // Apply extra filters (cost_limit, etc.)

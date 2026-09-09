@@ -665,6 +665,46 @@ fn pick_deck2(
     }
 }
 
+/// Prewarm the C atlas cache for every atlas in the two decks (plus the
+/// card back) while still on the Loading screen, so phase changes and the
+/// first board never hitch on SD read + decode + VRAM upload mid-swap.
+/// Scoped to the cards actually in this game — never the full 2280-card DB
+/// (that would blow the 64-sheet C cache and evict-purple everything).
+fn prewarm_game_atlases(gs: &GameState, atlas: &CardAtlas) {
+    use std::collections::HashSet;
+    let mut seen: HashSet<&str> = HashSet::new();
+    // All names come from `atlas` (or 'static), so one set lifetime works.
+    macro_rules! preload {
+        ($name:expr) => {{
+            let name: &str = $name;
+            if seen.insert(name) {
+                let c = std::ffi::CString::new(name).unwrap_or_default();
+                unsafe { _3ds_preload_card(c.as_ptr() as *const u8) };
+            }
+        }};
+    }
+    // Card back first: hidden live cards show it before anything else.
+    preload!("icon_lltcg-back.png.t3x");
+    for p in [&gs.player1, &gs.player2] {
+        // Zones are distinct SmallVec sizes, so no shared slice — walk each.
+        macro_rules! walk {
+            ($zone:expr) => {
+                for &cid in $zone.iter() {
+                    if let Some(card) = gs.card_database.get_card(cid) {
+                        if let Some((atl, _)) = atlas.lookup(&card.card_no) {
+                            preload!(atl.as_str());
+                        }
+                    }
+                }
+            };
+        }
+        walk!(&p.main_deck.cards);
+        walk!(&p.energy_deck.cards);
+        walk!(&p.hand.cards);
+        walk!(&p.waitroom.cards);
+    }
+}
+
 fn loading(
     cards: &Arc<Vec<Card>>,
     decks: &Vec<DeckList>,
@@ -701,7 +741,9 @@ fn loading(
             p2.set_energy_deck(pd2.energy_deck);
             let mut gs = GameState::new(p1, p2, db);
             game_setup::setup_game(&mut gs);
-            Ok((gs, CardAtlas::shared()))
+            let atlas = CardAtlas::shared();
+            prewarm_game_atlases(&gs, &atlas);
+            Ok((gs, atlas))
         })();
         match r {
             Ok((gs, atlas)) => {
@@ -2107,7 +2149,9 @@ fn multiplayer_loading(
                 p2.set_energy_deck(pd2.energy_deck);
                 let mut gs = GameState::new(p1, p2, db);
                 game_setup::setup_game(&mut gs);
-                return Ok((gs, CardAtlas::shared()));
+                let atlas = CardAtlas::shared();
+                prewarm_game_atlases(&gs, &atlas);
+                return Ok((gs, atlas));
             }
             // No deck sync: build from local files (host or non-multiplayer)
             let nums1 = DeckParser::deck_list_to_card_numbers(&decks[p1_idx]);
@@ -2135,7 +2179,9 @@ fn multiplayer_loading(
             p2.set_energy_deck(pd2.energy_deck);
             let mut gs = GameState::new(p1, p2, db);
             game_setup::setup_game(&mut gs);
-            Ok((gs, CardAtlas::shared()))
+            let atlas = CardAtlas::shared();
+            prewarm_game_atlases(&gs, &atlas);
+            Ok((gs, atlas))
         })();
         match r {
             Ok((gs, atlas)) => {
@@ -2307,7 +2353,9 @@ fn multiplayer_pc_loading(
             p2.set_main_deck(pd2.main_deck); p2.set_energy_deck(pd2.energy_deck);
             let mut gs = GameState::new(p1, p2, db);
             game_setup::setup_game(&mut gs);
-            return Ok((gs, CardAtlas::shared()));
+            let atlas = CardAtlas::shared();
+            prewarm_game_atlases(&gs, &atlas);
+            return Ok((gs, atlas));
         }
         let nums1 = DeckParser::deck_list_to_card_numbers(&decks[p1_idx]);
         let nums2 = if p1_idx == p2_idx { nums1.clone() } else { DeckParser::deck_list_to_card_numbers(&decks[p2_idx]) };
@@ -2324,7 +2372,9 @@ fn multiplayer_pc_loading(
         p2.set_main_deck(pd2.main_deck); p2.set_energy_deck(pd2.energy_deck);
         let mut gs = GameState::new(p1, p2, db);
         game_setup::setup_game(&mut gs);
-        Ok((gs, CardAtlas::shared()))
+        let atlas = CardAtlas::shared();
+        prewarm_game_atlases(&gs, &atlas);
+        Ok((gs, atlas))
     })();
     match r {
         Ok((gs, atlas)) => {
