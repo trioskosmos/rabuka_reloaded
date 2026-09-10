@@ -182,8 +182,6 @@ impl AbilityResolver {
 
             return Ok(());
         }
-
-        self.current_effect = None;
         Ok(())
     }
     pub fn execute_reveal(

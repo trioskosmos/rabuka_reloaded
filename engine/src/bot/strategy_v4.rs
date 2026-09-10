@@ -562,3 +562,8 @@ pub fn choose_mulligan_v4(gs: &GameState, actions: &[Action], db: &CardDatabase)
         .cloned()
         .expect("mulligan actions non-empty")
 }
+
+// Re-exports with generic names for arena
+pub use choose_action_v4 as choose_action;
+pub use choose_live_set_v4 as choose_live_set;
+pub use choose_mulligan_v4 as choose_mulligan;

@@ -412,4 +412,9 @@ pub fn choose_mulligan_v5(gs: &GameState, actions: &[Action], db: &CardDatabase)
     crate::bot::strategy_v4::choose_mulligan_v4(gs, actions, db)
 }
 
+// Re-exports with generic names for arena
+pub use choose_action_v5 as choose_action;
+pub use choose_live_set_v5 as choose_live_set;
+pub use choose_mulligan_v5 as choose_mulligan;
+
 

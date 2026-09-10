@@ -66,6 +66,7 @@ pub enum Zone {
     LookedAtRemaining,
     DeckTopOrBottom,
     Front,
+    LiveTotal,
     /// Fallback for source/destination strings not among the known markers.
     /// Never produced by real card data; exists so `From<&str>`/decode can
     /// always succeed without an owned `Other(String)` (keeps `Zone: Copy`).
@@ -143,6 +144,7 @@ impl Zone {
             Zone::LookedAtRemaining => "looked_at_remaining",
             Zone::DeckTopOrBottom => "deck_top_or_bottom",
             Zone::Front => "front",
+            Zone::LiveTotal => "live_total",
             Zone::Unknown => "unknown",
         }
     }

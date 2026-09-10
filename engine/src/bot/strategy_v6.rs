@@ -385,3 +385,8 @@ fn emit(gs: &GameState, actions: &[Action], desired: &[usize]) -> Action {
 pub fn choose_mulligan_v6(gs: &GameState, actions: &[Action], db: &CardDatabase) -> Action {
     crate::bot::strategy_v4::choose_mulligan_v4(gs, actions, db)
 }
+
+// Re-exports with generic names for arena
+pub use choose_action_v6 as choose_action;
+pub use choose_live_set_v6 as choose_live_set;
+pub use choose_mulligan_v6 as choose_mulligan;

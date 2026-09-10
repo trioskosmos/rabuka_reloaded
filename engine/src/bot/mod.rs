@@ -28,10 +28,10 @@ pub use strategy_v3::{
     analyze_hand, choose_action_heuristic_v3, choose_live_set_action_v3,
     choose_mulligan_action_v3, evaluate_state_v3, V3Plan,
 };
-pub use strategy_v4::{choose_action_v4, choose_live_set_v4, choose_mulligan_v4};
-pub use strategy_v5::{choose_action_v5, choose_live_set_v5, choose_mulligan_v5};
-pub use strategy_v6::{choose_action_v6, choose_live_set_v6, choose_mulligan_v6};
-pub use strategy_v7::{choose_action_v7, choose_live_set_v7, choose_mulligan_v7};
+pub use strategy_v4::{choose_action_v4, choose_live_set_v4, choose_mulligan_v4, choose_action as choose_action_v4_alias, choose_live_set as choose_live_set_v4_alias, choose_mulligan as choose_mulligan_v4_alias};
+pub use strategy_v5::{choose_action_v5, choose_live_set_v5, choose_mulligan_v5, choose_action as choose_action_v5_alias, choose_live_set as choose_live_set_v5_alias, choose_mulligan as choose_mulligan_v5_alias};
+pub use strategy_v6::{choose_action_v6, choose_live_set_v6, choose_mulligan_v6, choose_action as choose_action_v6_alias, choose_live_set as choose_live_set_v6_alias, choose_mulligan as choose_mulligan_v6_alias};
+pub use strategy_v7::{choose_action_v7, choose_live_set_v7, choose_mulligan_v7, choose_action as choose_action_v7_alias, choose_live_set as choose_live_set_v7_alias, choose_mulligan as choose_mulligan_v7_alias};
 
 use crate::card::CardDatabase;
 use crate::game_setup::{Action, ActionType};

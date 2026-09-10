@@ -461,11 +461,11 @@ fn main() {
                     let plan = if active_is_p1 { &plan_p1 } else { &plan_p2 };
                     strategy_v3::choose_action_heuristic_v3(&gs, &actions, me, plan)
                 }
-                BotKind::V4 => strategy_v4::choose_action_v4(&gs, &actions, me),
-                BotKind::V6 => strategy_v6::choose_action_v6(&gs, &actions, me),
-                BotKind::V7 => strategy_v7::choose_action_v7(&gs, &actions, me),
+                BotKind::V4 => strategy_v4::choose_action(&gs, &actions, me),
+                BotKind::V6 => strategy_v6::choose_action(&gs, &actions, me),
+                BotKind::V7 => strategy_v7::choose_action(&gs, &actions, me),
                 BotKind::Conductor => rabuka_engine::bot::conductor::choose_main_conductor(&gs, &actions, me),
-                BotKind::V5 => strategy_v5::choose_action_v5(&gs, &actions, me),
+                BotKind::V5 => strategy_v5::choose_action(&gs, &actions, me),
                 BotKind::Random => actions[rng.range(actions.len())].clone(),
             };
             _main_decisions += 1;
