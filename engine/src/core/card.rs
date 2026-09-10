@@ -2243,6 +2243,11 @@ impl AbilityEffect {
             f.group_names = val;
         }
     }
+    pub fn set_action_by(&mut self, val: Option<ArcStr>) {
+        if let Some(f) = self.kind.as_deref_mut().and_then(|k| k.filter_mut()) {
+            f.action_by = val;
+        }
+    }
     pub fn set_optional(&mut self, val: Option<bool>) {
         self.optional = val;
     }

@@ -244,7 +244,18 @@ impl AbilityResolver {
                 )
                 .group(filter.group.map(|s| s.to_string()))
                 .characters(filter.characters.map(|v| v.to_vec()))
-                .target_player_id(Some(effect.target.as_deref().unwrap_or("self").to_string()))
+                .target_player_id(Some(
+                    effect
+                        .action_by_any()
+                        .map(|ab| {
+                            if ab == "opponent" {
+                                "opponent".to_string()
+                            } else {
+                                "self".to_string()
+                            }
+                        })
+                        .unwrap_or_else(|| "self".to_string()),
+                ))
                 .filtered_indices(filtered_indices)
                 .destination(effect.destination.clone().map(|s| s.to_string()))
                 .discard_remaining(effect.discard_remaining_any())
@@ -2962,14 +2973,19 @@ if util::distinct_should_dedupe(distinct) {
                 gs.entry_effect()
                     .and_then(|e| e.destination.map(|z| z.to_str().to_string()))
             });
-        let target = target_player_id
-            .map(|s| s.to_string())
-            .or_else(|| self.spawn_context.target.clone())
+        // Target for zone operations (whose zone to read/write) comes from spawn_context.target
+        // (set by the effect execution), NOT from target_player_id (who makes the choice).
+        let target = self
+            .spawn_context
+            .target
+            .clone()
             .or_else(|| {
                 gs.entry_effect()
                     .and_then(|e| e.target.clone().map(|s| s.to_string()))
             })
             .unwrap_or_else(|| "self".to_string().into());
+        // target_player_id is only used for choice routing, not for zone operations
+        let _choice_player = target_player_id;
         let card_db = gs.card_database.clone();
         let vacated_area = gs.last_vacated_stage_area;
         log::debug!(

@@ -7730,6 +7730,10 @@ def _try_choose_self_opponent(text):
         return None
     rest = text[len("自分か相手を選ぶ。") :].strip()
     inner = parse_effect(rest)
+    # The text says "自分は..." (I/active player does the selection), so action_by=self
+    # regardless of whether target is self or opponent
+    if isinstance(inner, dict):
+        inner["action_by"] = "self"
     return {
         "text": text,
         "action": "choose_target_player",

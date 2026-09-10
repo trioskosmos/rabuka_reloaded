@@ -280,6 +280,82 @@ fn dia_bp7013_own_waitroom_members_to_deck_bottom() {
 }
 
 // ====================================================================
+// B9-3b PL!S-bp7-013-N 黒澤ダイヤ — 登場: 選択「相手」
+// 自分か相手を選ぶ。自分は、そのプレイヤーの控え室にあるメンバーカードを2枚まで
+// 好きな順番でデッキの下に置く。
+// When choosing "opponent", the ACTIVE PLAYER (自分) still chooses from opponent's waitroom.
+// ====================================================================
+
+#[test]
+fn dia_bp7013_choose_opponent_waitroom_members_to_deck_bottom() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let dia = game.id("PL!S-bp7-013-N");
+    game.add_to_stage(MemberArea::Center, dia);
+
+    // P1 has 2 members in waitroom
+    let m1 = game.id("PL!S-sd1-001-SD");
+    let m2 = game.id("PL!S-sd1-001-SD");
+    let life = game.id("PL!-sd1-019-SD");
+    game.state.player1.waitroom.cards.push(m1);
+    game.state.player1.waitroom.cards.push(life);
+    game.state.player1.waitroom.cards.push(m2);
+
+    // P2 has 2 members in waitroom
+    let m3 = game.id("PL!S-sd1-001-SD");
+    let m4 = game.id("PL!S-sd1-001-SD");
+    let life2 = game.id("PL!-sd1-019-SD");
+    game.state.player2.waitroom.cards.push(m3);
+    game.state.player2.waitroom.cards.push(life2);
+    game.state.player2.waitroom.cards.push(m4);
+
+    fire_trigger(&mut game, dia, AbilityTrigger::Debut, "登場");
+
+    assert!(game.has_pending_choice(), "自分/相手 player choice expected");
+    match game.pending_choice_type().as_deref() {
+        Some("SelectTarget") => game.select_option(1), // 相手 (option 1)
+        other => panic!("expected SelectTarget for player pick, got {other:?}"),
+    }
+
+    // BUG: The choice should be offered to P1 (active player) to pick from P2's waitroom
+    // But currently it might be offered to P2 instead
+    assert!(game.has_pending_choice(), "Card selection from opponent's waitroom expected");
+    let entry = game.state.ability_queue.current_entry().expect("Queue entry");
+    assert_eq!(
+        entry.choice_player_id.as_deref(),
+        Some("p1"),
+        "BUG: choice should be routed to P1 (active player), not opponent"
+    );
+
+    // P1 (active player) selects from P2's waitroom
+    let mut picked = 0;
+    while game.has_pending_choice() && picked < 4 {
+        let filtered_idxs = match game.state.get_pending_choice() {
+            Some(rabuka_engine::ability::types::Choice::SelectCard { filtered_indices: Some(idxs), .. }) => idxs.clone(),
+            _ => break,
+        };
+        if filtered_idxs.is_empty() {
+            break;
+        }
+        game.select_indices(&filtered_idxs);
+        picked += 1;
+    }
+
+    // Cards moved to bottom of P2's deck (order preserved as selected)
+    assert_eq!(
+        game.state.player2.main_deck.cards.len(),
+        2,
+        "both members moved to P2's deck bottom"
+    );
+    assert!(
+        game.state.player2.waitroom.cards.contains(&life2),
+        "the live card was not a legal target and stayed in P2's waitroom"
+    );
+    assert_eq!(game.state.player2.waitroom.cards.len(), 1);
+}
+
+// ====================================================================
 // B9-4 PL!SP-bp7-017-N 桜小路きな子 — 登場:
 // エネルギーデッキから1枚ウェイト状態で置く。そのエネルギーは次のターンの
 // アクティブフェイズにアクティブしない。

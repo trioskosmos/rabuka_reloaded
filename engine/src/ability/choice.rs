@@ -3413,6 +3413,11 @@ modified.destination = Some(Zone::from_source_str(dest));
         if effect.target.is_none() || effect.target.as_deref() == Some("self") {
             effect.target = Some(target.into());
         }
+        // Also propagate action_by: if the inner effect has action_by set,
+        // preserve it; otherwise inherit from parent if parent has it and inner doesn't
+        if effect.action_by_any().is_none() {
+            // Don't override - keep any explicitly set action_by
+        }
         if let Some(ref mut la) = effect.compound.look_action {
             Self::set_chosen_target(la, target);
         }

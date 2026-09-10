@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-09-09T13:58:28.757286",
+  "generated_at": "2026-09-10T17:41:25.553204",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "6c2bd007",
+  "engine_commit": "eda6b90a",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -13245,7 +13245,8 @@
               "destination": "deck_top",
               "placement_order": "any_order",
               "any_number": true
-            }
+            },
+            "action_by": "self"
           }
         ]
       }
@@ -13742,7 +13743,8 @@
                 "destination": "hand"
               }
             ],
-            "conditional": true
+            "conditional": true,
+            "action_by": "self"
           }
         ]
       }
@@ -14074,7 +14076,8 @@
             "count": 2,
             "card_type": "member_card",
             "max": true,
-            "action": "move_cards"
+            "action": "move_cards",
+            "action_by": "self"
           }
         ]
       }
@@ -15574,7 +15577,8 @@
                 "card_type": "card",
                 "count": 1
               }
-            ]
+            ],
+            "action_by": "self"
           }
         ],
         "optional": true
@@ -23338,7 +23342,8 @@
                 "destination": "hand"
               }
             ],
-            "conditional": true
+            "conditional": true,
+            "action_by": "self"
           }
         ]
       }
@@ -36468,7 +36473,8 @@
             "count": 2,
             "card_type": "member_card",
             "max": true,
-            "action": "move_cards"
+            "action": "move_cards",
+            "action_by": "self"
           }
         ]
       }

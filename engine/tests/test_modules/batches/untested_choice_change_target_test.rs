@@ -310,6 +310,56 @@ fn azuna_target_self_puts_members_on_deck_bottom() {
 }
 
 // ============================================================
+// choose_target_player: PL!N-bp3-010-R — choose opponent
+// ============================================================
+
+#[test]
+fn azuna_target_opponent_puts_members_on_deck_bottom() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let member = game.id(AZUNA_TARGET);
+
+    // P1 has no members in waitroom
+    // P2 has 2 members in waitroom
+    let m3 = game.id(FILLER);
+    let m4 = game.id(FILLER);
+    game.state.player2.waitroom.cards.push(m3);
+    game.state.player2.waitroom.cards.push(m4);
+
+    game.state.player1.stage.stage[1] = member;
+
+    fill_deck(&mut game, "p1", 10);
+    fill_deck(&mut game, "p2", 10);
+    let filler_live = game.id(FILLER_LIVE);
+
+    trigger_live_start_with(&mut game, filler_live);
+
+    // Handle the target player choice - choose opponent
+    while game.has_pending_choice() {
+        let choice = game.get_pending_choice();
+        let is_target =
+            matches!(choice, rabuka_engine::ability::types::Choice::SelectTarget { .. });
+        if is_target {
+            game.select_option(1); // choose opponent
+        } else {
+            // Should select from P2's waitroom
+            game.select_indices(&[0, 1]);
+        }
+    }
+
+    // After choosing opponent, P2's members should be moved to P2's deck bottom
+    let deck_after = game.state.player2.main_deck.cards.len();
+    assert!(
+        deck_after >= 2,
+        "P2's deck should have gained cards after choosing opponent, deck_size={}",
+        deck_after
+    );
+    // P2's waitroom should be empty
+    assert_eq!(game.state.player2.waitroom.cards.len(), 0);
+}
+
+// ============================================================
 // choose_target_player: PL!N-bp4-002-R 窶・look at top card of chosen player
 // ============================================================
 

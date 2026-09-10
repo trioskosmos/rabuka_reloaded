@@ -271,6 +271,7 @@ impl AbilityResolver {
         // Execute for self first
         let mut for_self = effect.clone();
         for_self.target = Some("self".into());
+        for_self.set_action_by(Some("self".into())); // self makes the choice
         self.spawn_context.target = Some("self".to_string());
 
         let had_choice_before = self.pending_choice.is_some();
@@ -280,6 +281,7 @@ impl AbilityResolver {
         if self.pending_choice.is_some() && !had_choice_before {
             let mut for_opponent = effect.clone();
             for_opponent.target = Some("opponent".into());
+            for_opponent.set_action_by(Some("opponent".into())); // opponent makes the choice
             // Preserve any existing pending commands (e.g. remaining sequential actions)
             let mut existing = gs.ability_queue.take_pending_actions();
             existing.push(for_opponent);
@@ -290,6 +292,7 @@ impl AbilityResolver {
         // Execute for opponent
         let mut for_opponent = effect.clone();
         for_opponent.target = Some("opponent".into());
+        for_opponent.set_action_by(Some("opponent".into())); // opponent makes the choice
         self.spawn_context.target = Some("opponent".to_string());
         self.execute_effect(gs, &for_opponent)?;
 
