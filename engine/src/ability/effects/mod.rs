@@ -266,10 +266,12 @@ impl AbilityResolver {
             }
             ActionType::DiscardCard => {
                 self.rule_log_activated(gs, "[[log_discard]]");
+                self.current_effect = Some(effect.clone());
                 self.execute_move_cards(gs, effect)
             }
             ActionType::MoveCards => {
                 self.rule_log_activated(gs, "[[log_move]]");
+                self.current_effect = Some(effect.clone());
                 self.execute_move_cards(gs, effect)
             }
             ActionType::GainResource => self.execute_gain_resource(gs, effect),

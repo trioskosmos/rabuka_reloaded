@@ -1,13 +1,11 @@
 //! Strategy bot v7 — significantly stronger than v6.
 //!
 //! Key improvements over v6:
-//! 1. **Opponent-aware evaluation**: tracks opponent blades, success count, live zone
-//! 2. **Anti-stall Pass fix**: Pass = -1 when affordable productive members exist,
+//! 1. **Fixed Pass logic**: Pass = -inf when affordable productive members exist,
 //!    reducing empty Main phases from 14.4% → ~5%
-//! 3. **Energy-aware deployment**: considers cost curve and energy efficiency
-//! 4. **Improved live set**: opponent-aware portfolio selection
-//! 5. **Baton touch priority**: upgrade over new deployment when possible
-//! 6. **Tempo tracking**: turn-aware aggression scaling
+//! 2. **Energy-aware deployment**: considers cost curve and energy efficiency
+//! 3. **Improved mulligan**: prefers hands with early game curve (T1-2 plays)
+//! 4. **Live set**: v6's proven binomial-aware portfolio with fallback logic
 //!
 //! Fair info only: own hand/deck + opponent public board.
 
@@ -51,33 +49,6 @@ fn total_blades_of(p: &Player, gs: &GameState, db: &CardDatabase) -> i32 {
         .sum()
 }
 
-/// Opponent-aware state snapshot for evaluation.
-struct EvalContext {
-    my_passable: i32,
-    my_ammo: i32,
-    my_stage_hearts: i32,
-    my_blades: i32,
-    my_hand_len: i32,
-    my_energy: i32,
-    my_deck_lives: usize,
-    my_deck_len: usize,
-    opp_blades: i32,
-    opp_success: usize,
-    opp_live_zone_count: usize,
-    turn: u8,
-    p_life_draw: f64,
-    waitroom_lives: usize,
-}
-
-fn build_context(gs: &GameState, me: u8, db: &CardDatabase, my_now: &Player) -> EvalContext {
-    let opp_now = if me == 0 { &gs.player2 } else { &gs.player1 };
-    let base_hand_len = my_now.hand.cards.len() as i32;
-    let base_passable = passable_count(gs, me, db) as i32;
-    let base_ammo = lives_in_hand(my_now, db) as i32;
-    let base_stage = stage_hearts_of(my_now, db);
-    let base_blades = total_blades_of(my_now, gs, db);
-    let my_energy = my_now.energy_zone.active_count() as i32;
-
     let deck_lives = my_now
         .main_deck
         .cards
@@ -119,8 +90,10 @@ fn opp_player<'a>(gs: &'a GameState, me: u8) -> &'a Player {
     if me == 0 { &gs.player2 } else { &gs.player1 }
 }
 
-/// MAIN PHASE: significantly improved evaluation with opponent awareness,
-/// energy efficiency, tempo tracking, and fixed pass logic.
+/// MAIN PHASE: v6's proven evaluation + fixed pass logic + energy efficiency.
+/// v6 scoring: passable (60x), ammo (25x), hearts (3x), blades (6x), baton (+45),
+/// hand reserve (-60), life draw (70x), NOOP (-1000).
+/// v7 adds: Pass = -inf when affordable productive members exist, energy efficiency bonus.
 pub fn choose_action_v7(gs: &GameState, actions: &[Action], me: u8) -> Action {
     if actions.len() == 1 {
         return actions[0].clone();
@@ -128,9 +101,28 @@ pub fn choose_action_v7(gs: &GameState, actions: &[Action], me: u8) -> Action {
     let dbg = std::env::var("V7_DEBUG").is_ok();
     let db = &gs.card_database;
     let my_now = if me == 0 { &gs.player1 } else { &gs.player2 };
-    let opp_now = opp_player(gs, me);
 
-    let ctx = build_context(gs, me, db, my_now);
+    let base_hand_len = my_now.hand.cards.len() as i32;
+    let base_passable = passable_count(gs, me, db);
+    let base_ammo = lives_in_hand(my_now, db);
+    let base_stage = stage_hearts_of(my_now, db);
+    let base_blades = total_blades_of(my_now, gs, db);
+    let my_energy = my_now.energy_zone.active_count() as i32;
+
+    let deck_lives = my_now
+        .main_deck
+        .cards
+        .iter()
+        .filter(|&&c| db.get_card(c).map_or(false, |x| x.card_type == CardType::Live))
+        .count();
+    let deck_len = my_now.main_deck.cards.len().max(1);
+    let p_life_draw = deck_lives as f64 / deck_len as f64;
+    let waitroom_lives = my_now
+        .waitroom
+        .cards
+        .iter()
+        .filter(|&&c| db.get_card(c).map_or(false, |x| x.card_type == CardType::Live))
+        .count();
 
     let mut vals: Vec<f64> = vec![f64::NEG_INFINITY; actions.len()];
     let mut dbg_lines: Vec<String> = Vec::new();
@@ -145,19 +137,8 @@ pub fn choose_action_v7(gs: &GameState, actions: &[Action], me: u8) -> Action {
         let cost = card.cost.unwrap_or(0) as i32;
         let blade = card.blade as i32;
         let hearts = card.base_heart.as_ref().map(|bh| bh.hearts.values_sum() as i32).unwrap_or(0);
-        cost <= ctx.my_energy && (blade > 0 || hearts > 0)
+        cost <= my_energy && (blade > 0 || hearts > 0)
     });
-
-    // Turn-based aggression scaling
-    let aggro = match ctx.turn {
-        1..=2 => 1.2,
-        3..=4 => 1.0,
-        5..=6 => 0.9,
-        _ => 0.8,
-    };
-
-    // Desperation: opponent close to winning
-    let desperation = if ctx.opp_success >= 2 { 1.5 } else { 1.0 };
 
     for (i, a) in actions.iter().enumerate() {
         let mut sim = gs.clone();
@@ -166,58 +147,53 @@ pub fn choose_action_v7(gs: &GameState, actions: &[Action], me: u8) -> Action {
         }
         crate::game_setup::settle_single_player_state(&mut sim);
         let my_sim = if me == 0 { &sim.player1 } else { &sim.player2 };
-        let opp_sim = opp_player(&sim, me);
 
         let mut val = 0.0f64;
         let mut parts: Vec<String> = Vec::new();
 
         // 1. Passable lives delta (CRITICAL - 60x)
-        let d_pass = passable_count(&sim, me, db) as f64 - ctx.my_passable as f64;
-        val += 60.0 * d_pass * aggro * desperation;
+        let d_pass = passable_count(&sim, me, db) as f64 - base_passable as f64;
+        val += 60.0 * d_pass;
         if d_pass != 0.0 {
             parts.push(format!("pass{:+}", d_pass));
         }
 
         // 2. Ammo (lives in hand) delta (25x)
         let ammo_after = lives_in_hand(my_sim, db);
-        let d_ammo = ammo_after as f64 - ctx.my_ammo as f64;
-        val += 25.0 * d_ammo * aggro;
+        let d_ammo = ammo_after as f64 - base_ammo as f64;
+        val += 25.0 * d_ammo;
         if d_ammo != 0.0 {
             parts.push(format!("ammo{:+}", d_ammo));
         }
-        if ammo_after == 0 && ctx.my_ammo > 0 {
-            val -= 120.0 * desperation;
+        if ammo_after == 0 && base_ammo > 0 {
+            val -= 120.0;
             parts.push("BURN".into());
         }
 
-        // 3. Stage hearts delta (development) - scaled by aggro
-        let d_stage = stage_hearts_of(my_sim, db) - ctx.my_stage_hearts;
-        val += 3.0 * d_stage as f64 * aggro;
+        // 3. Stage hearts delta (development)
+        let d_stage = stage_hearts_of(my_sim, db) - base_stage;
+        val += 3.0 * d_stage as f64;
         if d_stage != 0 {
             parts.push(format!("hearts{d_stage:+}"));
         }
 
-        // 4. Blades delta (yell power) - CRITICAL for live phase
-        let d_blades = total_blades_of(my_sim, &sim, db) - ctx.my_blades;
-        val += 6.0 * d_blades as f64 * aggro * desperation;
+        // 4. Blades delta (yell power)
+        let d_blades = total_blades_of(my_sim, &sim, db) - base_blades;
+        val += 6.0 * d_blades as f64;
         if d_blades != 0 {
             parts.push(format!("blades{d_blades:+}"));
         }
 
         // 5. Baton touch: prioritized upgrade
         if a.parameters.as_ref().and_then(|p| p.use_baton_touch) == Some(true) {
-            let bonus = 45.0 * aggro;
-            val += bonus;
-            parts.push(format!("baton+{:.0}", bonus));
+            val += 45.0;
+            parts.push("baton+45".into());
         }
 
         // 6. Hand reserve penalty
         if my_sim.hand.cards.len() <= 1 {
-            val -= 60.0 * desperation;
+            val -= 60.0;
             parts.push("HAND_LOW".into());
-        } else if my_sim.hand.cards.len() <= 2 && ctx.turn <= 3 {
-            val -= 20.0;
-            parts.push("HAND_TIGHT".into());
         }
 
         // 7. Energy efficiency bonus - reward playing within curve
@@ -227,10 +203,10 @@ pub fn choose_action_v7(gs: &GameState, actions: &[Action], me: u8) -> Action {
                     let cost = card.cost.unwrap_or(0) as i32;
                     let blade = card.blade as i32;
                     let hearts = card.base_heart.as_ref().map(|bh| bh.hearts.values_sum() as i32).unwrap_or(0);
-                    if cost <= ctx.my_energy {
+                    if cost <= my_energy {
                         // Efficiency: blades+hearts per energy
                         let efficiency = (blade + hearts) as f64 / (cost.max(1) as f64);
-                        val += efficiency * 15.0 * aggro;
+                        val += efficiency * 15.0;
                         parts.push(format!("eff{:.1}", efficiency * 15.0));
                     }
                 }
@@ -238,35 +214,21 @@ pub fn choose_action_v7(gs: &GameState, actions: &[Action], me: u8) -> Action {
         }
 
         // 8. Starvation digging
-        if ctx.my_ammo <= 1 {
-            let drawn = (my_sim.hand.cards.len() as i32 - ctx.my_hand_len).max(0);
-            val += 70.0 * ctx.p_life_draw * drawn as f64 * desperation;
+        if base_ammo <= 1 {
+            let drawn = (my_sim.hand.cards.len() as i32 - base_hand_len).max(0);
+            val += 70.0 * p_life_draw * drawn as f64;
             let wr_now = my_sim
                 .waitroom
                 .cards
                 .iter()
                 .filter(|&&c| db.get_card(c).map_or(false, |x| x.card_type == CardType::Live))
                 .count();
-            if wr_now > ctx.waitroom_lives && ctx.p_life_draw > 0.0 {
+            if wr_now > waitroom_lives && p_life_draw > 0.0 {
                 val += 25.0;
             }
         }
 
-        // 9. Opponent-aware: punish falling behind in blades/success
-        let opp_blades_after = total_blades_of(opp_sim, &sim, db);
-        let opp_success_after = opp_sim.success_live_card_zone.cards.len();
-        let blade_gap = (opp_blades_after - total_blades_of(opp_now, gs, db)) as f64;
-        let success_gap = (opp_success_after as i32 - ctx.opp_success as i32) as f64;
-        if blade_gap > 0.0 {
-            val -= 8.0 * blade_gap * desperation;
-            parts.push(format!("opp_blade_gap{:+}", -8.0 * blade_gap));
-        }
-        if success_gap > 0.0 {
-            val -= 50.0 * success_gap * desperation;
-            parts.push(format!("opp_success_gap{:+}", -50.0 * success_gap));
-        }
-
-        // 10. NOOP breaker
+        // 9. NOOP breaker
         if my_sim.hand.cards.len() == my_now.hand.cards.len()
             && my_sim.energy_zone.active_count() == my_now.energy_zone.active_count()
             && my_sim.stage.stage == my_now.stage.stage
@@ -303,7 +265,7 @@ pub fn choose_action_v7(gs: &GameState, actions: &[Action], me: u8) -> Action {
     }
 
     // FIXED PASS LOGIC: Pass only when NO productive play exists
-    // Productive = score > -10 (allowing small negative for future setup)
+    // Productive = any play with score > -100 (allowing small negative for future setup)
     let best_nonpass = vals
         .iter()
         .enumerate()
@@ -314,7 +276,7 @@ pub fn choose_action_v7(gs: &GameState, actions: &[Action], me: u8) -> Action {
     for (i, a) in actions.iter().enumerate() {
         if a.action_type == ActionType::Pass {
             // Pass = -inf if any productive play exists, else 0
-            vals[i] = if best_nonpass > -10.0 || has_affordable_productive {
+            vals[i] = if best_nonpass > -100.0 || has_affordable_productive {
                 f64::NEG_INFINITY
             } else {
                 0.0
@@ -335,15 +297,13 @@ pub fn choose_action_v7(gs: &GameState, actions: &[Action], me: u8) -> Action {
         let chosen = &actions[best_idx];
         let chosen_confirm = chosen.action_type == ActionType::Pass;
         eprintln!(
-            "V7D t{} phase{:?} hand={} pass={} ammo={} blades={} opp_blades={} opp_succ={} CONFIRM={}\n{}",
+            "V7D t{} phase{:?} hand={} pass={} ammo={} blades={} CONFIRM={}\n{}",
             gs.turn_number,
             gs.current_phase,
             my_now.hand.cards.len(),
-            ctx.my_passable,
-            ctx.my_ammo,
-            ctx.my_blades,
-            ctx.opp_blades,
-            ctx.opp_success,
+            base_passable,
+            base_ammo,
+            base_blades,
             chosen_confirm,
             dbg_lines.join("\n")
         );
@@ -351,7 +311,7 @@ pub fn choose_action_v7(gs: &GameState, actions: &[Action], me: u8) -> Action {
     actions[best_idx].clone()
 }
 
-/// LIVE SET: opponent-aware portfolio with v6's fallback logic (free win, gamble, junk filter).
+/// LIVE SET: v6's proven binomial-aware portfolio with fallback logic.
 pub fn choose_live_set_v7(gs: &GameState, actions: &[Action], db: &CardDatabase) -> Action {
     use crate::bot::strategy_v4::{alloc, hand_lives, heart_pool};
     use crate::bot::strategy_v5::{best_portfolio_scored, nearest_miss_life, player_ref};
@@ -363,60 +323,21 @@ pub fn choose_live_set_v7(gs: &GameState, actions: &[Action], db: &CardDatabase)
     let (my, opp) = player_ref(gs, me);
     let my_succ = my.success_live_card_zone.cards.len() as i32;
     let opp_succ = opp.success_live_card_zone.cards.len() as i32;
-    let opp_live_count = opp.live_card_zone.cards.len();
 
     // Get best portfolio from v5 logic (binomial-aware, score-maximizing among passers)
     let mut desired = best_portfolio_scored(gs, me, db).0;
 
-    // Opponent-aware adjustment: if opponent has strong live zone, we may need higher score
-    let opp_pressure = if opp_live_count >= 2 { 1.3 } else if opp_live_count == 1 { 1.1 } else { 1.0 };
-    let match_point_bonus = if opp_succ >= 2 { 1.2 } else { 1.0 };
-
-    // If we have a good portfolio, consider if we need to push harder
-    if !desired.is_empty() {
-        let my_score: i32 = desired
-            .iter()
-            .filter_map(|&hi| my.hand.cards.get(hi).copied())
-            .filter_map(|cid| db.get_card(cid))
-            .map(|c| c.score.unwrap_or(0) as i32)
-            .sum::<i32>();
-
-        // Estimate opponent's likely score from their live zone
-        let opp_estimated_score: i32 = opp
-            .live_card_zone
-            .cards
-            .iter()
-            .filter_map(|&cid| db.get_card(cid))
-            .map(|c| c.score.unwrap_or(0) as i32)
-            .sum();
-
-        let pressure_multiplier = opp_pressure * match_point_bonus;
-        let required_score = ((opp_estimated_score as f64 * pressure_multiplier) as i32).max(1);
-
-        // If our score is significantly below required, try to find better portfolio
-        if my_score < required_score {
-            let max_slots = (3i32 - i32::from(my.live_card_set_limit_reduction)).max(0) as usize;
-            if desired.len() < max_slots {
-                let pool = heart_pool(gs, me, db);
-                let lives = hand_lives(my, db);
-                // Try to add highest-scoring affordable lives
-                for (hi, _cid, need) in lives.iter().filter(|(hi, _, _)| !desired.contains(hi)) {
-                    if alloc(&pool, need).is_some() {
-                        desired.push(*hi);
-                        break;
-                    }
-                }
-            }
-        }
-    }
-
     // ===== v6 FALLBACK LOGIC =====
     if desired.is_empty() {
+        let trace = std::env::var("V7_TRACE").is_ok();
         // Free win (8.4.3.2): second attacker, opponent zone still empty — any
         // sole passer places regardless of score.
         if gs.current_phase == Phase::LiveCardSetSecondAttacker && opp.live_card_zone.cards.is_empty() {
             if let Some(hi) = cheapest_deterministic_life(gs, me, db) {
                 desired.push(hi);
+                if trace {
+                    eprintln!("V7L t{} me{} FREE_WIN lives=1", gs.turn_number, me);
+                }
                 return emit_live_set(gs, actions, &desired);
             }
         }
@@ -428,6 +349,9 @@ pub fn choose_live_set_v7(gs: &GameState, actions: &[Action], db: &CardDatabase)
         if let Some((p, _deficit, hi)) = nearest_miss_life(gs, me, db) {
             if p >= p_floor {
                 desired.push(hi);
+                if trace {
+                    eprintln!("V7L t{} me{} GAMBLE p={:.2} lives=1", gs.turn_number, me, p);
+                }
             }
         }
 
@@ -460,12 +384,38 @@ pub fn choose_live_set_v7(gs: &GameState, actions: &[Action], db: &CardDatabase)
                 }
                 desired.push(hi);
             }
+            if trace {
+                eprintln!("V7L t{} me{} EMPTY->GAMBLE lives={} junk={} (my_succ={} opp_succ={})", 
+                    gs.turn_number, me, 
+                    desired.iter().filter(|&&hi| {
+                        my.hand.cards.get(hi).copied().map_or(false, |cid| {
+                            db.get_card(cid).map_or(false, |c| c.card_type == CardType::Live)
+                        })
+                    }).count(),
+                    desired.len(),
+                    my_succ, opp_succ);
+            }
+        } else if trace {
+            eprintln!("V7L t{} me{} EMPTY->FOLD (deck_lives={} max_slots={} desired_len={})", 
+                gs.turn_number, me, deck_lives, max_slots, desired.len());
         }
     }
 
     // Fill spare slots with junk draws (even when we have a portfolio)
     let max_slots = (3i32 - i32::from(my.live_card_set_limit_reduction)).max(0) as usize;
     fill_junk_v7(gs, me, db, &mut desired, max_slots);
+
+    if std::env::var("V7_TRACE").is_ok() {
+        let n_lives = desired
+            .iter()
+            .filter(|&&hi| {
+                my.hand.cards.get(hi).copied().map_or(false, |cid| {
+                    db.get_card(cid).map_or(false, |c| c.card_type == CardType::Live)
+                })
+            })
+            .count();
+        eprintln!("V7L t{} me{} SET n={} lives={} junk={}", gs.turn_number, me, desired.len(), n_lives, desired.len() - n_lives);
+    }
 
     emit_live_set(gs, actions, &desired)
 }

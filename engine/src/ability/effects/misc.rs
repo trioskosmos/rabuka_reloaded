@@ -80,6 +80,7 @@ impl AbilityResolver {
             let cl = effect.cost_limit_any();
             let co_binding = effect.cost_limit_operator_any();
             let co = co_binding.as_deref();
+            self.current_effect = Some(effect.clone());
             return self.execute_reveal_until_target(
                 gs,
                 effect.target_name(),
@@ -127,6 +128,7 @@ impl AbilityResolver {
             if routed.destination.is_none() {
                 routed.destination = Some(Zone::DeckTop.to_str().into());
             }
+            self.current_effect = Some(routed.clone());
             return self.execute_move_cards(gs, &routed);
         }
 
@@ -176,6 +178,7 @@ impl AbilityResolver {
 
         if let Some(card_type) = chosen_card_type {
             // Use the existing reveal_until_target functionality
+            self.current_effect = Some(effect.clone());
             self.execute_reveal_until_target(
                 gs,
                 effect.target_name(),

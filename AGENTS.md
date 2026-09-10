@@ -19,3 +19,10 @@
 - Before writing a new gameplay test, search existing tests for similar ability text (same clause shapes) and copy the setup/drain/assert idiom.
 - When a test fails, classify: test bug (wrong expectation/setup), engine bug (fix engine + keep test), or parser gap (regenerate + golden-diff). State which in the commit message.
 - **Gaps are FIXED end-to-end, never documented around.** A parser gap means: add the parser pattern, regenerate `abilities.json` + bytecode, add the engine evaluation branch if missing, and make the test assert the card's full printed behavior. NEVER convert a failing test to `#[ignore]`, delete it, or weaken its assertions to pin broken/partial behavior. Documenting a gap in the audit doc is a complement to fixing it, not a substitute.
+
+## Debugging patterns learned (2026-09-10)
+- **Picker routing bug**: `execute_reveal_effect` calls `execute_reveal` but didn't set `current_effect` first. The `picker` field from the parsed effect was never accessible when building the Choice. Fix: set `current_effect = Some(effect.clone())` in the caller before delegating.
+- **Choice data flow**: `current_effect` → `ChoiceBuilder.picker()` → `Choice::SelectCard.picker` → PCA_G1 routing. If any link is missing, routing falls back to legacy `target_player_id` logic.
+- **Preserve executor intent**: `execute_choice` sets `choice_player_id` via `choice_maker`. PCA_G1 must NOT overwrite if already set.
+- **Debug trace reading**: Look for `picker=None` at PCA_G1 — means data lost between choice creation and routing. Trace backward: choice creation → current_effect → executor.
+- **Fix at source, not sink**: Don't add complex routing logic; ensure the data is present where the choice is built.
