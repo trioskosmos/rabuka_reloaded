@@ -55,6 +55,12 @@ export const GameService = {
 
     _lastKnownVersion: -1,
     _sseConnected: false,
+    // Coalescing flags: every apiFetch is a real request now, so overlapping
+    // callers (250ms poll + SSE push + sendAction + AiDriver refresh) must
+    // collapse instead of piling up over a slow tunnel.
+    _fetchInFlight: false,
+    _fetchQueued: false,
+    _versionCheckInFlight: false,
 
     setSseConnected: (connected) => {
         GameService._sseConnected = connected;
@@ -74,12 +80,15 @@ export const GameService = {
                 return;
             }
             await GameService.checkVersionAndFetch();
-        }, 500);
+        }, 250);
     },
 
     checkVersionAndFetch: async () => {
         // Skip version check when SSE is active - SSE message already has frame_id
         if (GameService._sseConnected) return;
+        // Interval ticks can overlap a slow response — collapse, don't pile up.
+        if (GameService._versionCheckInFlight) return;
+        GameService._versionCheckInFlight = true;
         try {
             const res = await apiFetch('api/game-state/version');
             if (!res.ok) return;
@@ -87,19 +96,25 @@ export const GameService = {
             console.log('[GameService] Version check:', data.version, 'lastKnown:', GameService._lastKnownVersion);
             if (data.version !== undefined && data.version !== GameService._lastKnownVersion) {
                 GameService._lastKnownVersion = data.version;
-                console.log('[GameService] Version changed, polling delta');
-                // Use delta instead of full state fetch
-                await GameService.pollDelta(data.version, Network);
+                console.log('[GameService] Version changed, fetching state');
+                // Fetch full state immediately — the delta endpoint omits
+                // board zones and legal_actions, so delta-only sync leaves
+                // the UI stale and forces a 2s fallback fetch anyway.
+                await GameService.fetchState(Network);
             }
         } catch (e) {
             console.error('[GameService] Version check error:', e);
+        } finally {
+            GameService._versionCheckInFlight = false;
         }
     },
 
     triggerVersionCheck: (frameId) => {
         if (frameId !== undefined) {
+            // SSE push means state is ready — fetch it directly instead of
+            // spinning on the delta endpoint.
             GameService._lastKnownVersion = frameId;
-            GameService.pollDelta(frameId, Network);
+            GameService.fetchState(Network);
         } else {
             GameService.checkVersionAndFetch();
         }
@@ -113,51 +128,69 @@ export const GameService = {
     },
 
     fetchState: async (networkFacade) => {
+        // Collapse overlapping callers into a single request + one queued
+        // follow-up, so the newest state is always picked up.
+        if (GameService._fetchInFlight) {
+            GameService._fetchQueued = true;
+            return;
+        }
+        GameService._fetchInFlight = true;
         try {
-            if (State.replayMode) return;
+            do {
+                GameService._fetchQueued = false;
+                if (State.replayMode) return;
 
-            const res = await apiFetch('api/game-state');
-            if (!res.ok) {
-                throw new Error(`State fetch failed: ${res.status}`);
-            }
-
-            const data = await res.json();
-
-            // Room was closed (opponent left) — redirect to lobby
-            if (data.room_closed) {
-                if (window.handleRoomClosed) {
-                    window.handleRoomClosed();
+                const res = await apiFetch('api/game-state');
+                if (!res.ok) {
+                    throw new Error(`State fetch failed: ${res.status}`);
                 }
-                return;
-            }
 
-            // Room not ready yet (opponent hasn't submitted deck) — keep current state
-            if (data.room_not_ready) {
-                return;
-            }
+                const data = await res.json();
 
-            normalizeLegalActions(data);
+                // Room was closed (opponent left) — redirect to lobby
+                if (data.room_closed) {
+                    if (window.handleRoomClosed) {
+                        window.handleRoomClosed();
+                    }
+                    break;
+                }
 
-            // If setup modal is still open (e.g., first player getting state via SSE), dismiss it
-            const setupModal = document.getElementById(DOM_IDS.MODAL_SETUP);
-            if (setupModal && setupModal.style.display !== 'none') {
-                const roomModal = document.getElementById(DOM_IDS.MODAL_ROOM);
-                if (roomModal) roomModal.style.display = 'none';
-                setupModal.style.display = 'none';
-            }
+                // Room not ready yet (opponent hasn't submitted deck) — keep current state
+                if (data.room_not_ready) {
+                    break;
+                }
 
-            if (data.frame_counter !== undefined) {
-                GameService._lastKnownVersion = data.frame_counter;
-                State._frameCounter = data.frame_counter;
-            }
-            updateStateData(data);
-            State.gameHasStarted = true;
-            GameService.startGameplayPolling();
+                normalizeLegalActions(data);
 
+                // If setup modal is still open (e.g., first player getting state via SSE), dismiss it
+                const setupModal = document.getElementById(DOM_IDS.MODAL_SETUP);
+                if (setupModal && setupModal.style.display !== 'none') {
+                    const roomModal = document.getElementById(DOM_IDS.MODAL_ROOM);
+                    if (roomModal) roomModal.style.display = 'none';
+                    setupModal.style.display = 'none';
+                }
+
+                if (data.frame_counter !== undefined) {
+                    GameService._lastKnownVersion = data.frame_counter;
+                    State._frameCounter = data.frame_counter;
+                }
+                updateStateData(data);
+                State.gameHasStarted = true;
+                GameService.startGameplayPolling();
+            } while (GameService._fetchQueued);
         } catch (e) {
             console.error("Game state fetch error:", e);
             if (networkFacade?.clearPlannerData) networkFacade.clearPlannerData();
-            updateStateData(null);
+            // Keep the current board on transient errors — wiping the state
+            // here blanked the UI on every hiccup.
+        } finally {
+            GameService._fetchInFlight = false;
+            // A fetch requested while we were busy: run one follow-up so the
+            // newest state is always picked up.
+            if (GameService._fetchQueued) {
+                GameService._fetchQueued = false;
+                GameService.fetchState(networkFacade);
+            }
         }
     },
 
@@ -241,10 +274,12 @@ export const GameService = {
                 
                 if (data.state_delta) {
                     // Apply delta if provided
-                    applyStateDelta(data.state_delta);
+                    GameService.applyStateDelta(data.state_delta);
                 } else {
-                    // Poll delta endpoint or wait for SSE
-                    await pollDelta(data.frame_id, networkFacade);
+                    // State is already settled server-side — fetch full state
+                    // immediately instead of spinning on the delta endpoint.
+                    GameService._lastKnownVersion = data.frame_id;
+                    await GameService.fetchState(networkFacade);
                 }
             } else if (data.frame_counter !== undefined) {
                 // Legacy full state response (sandbox/PVE)
@@ -268,27 +303,15 @@ alert(e.message);
         }
     },
 
-    // Poll delta endpoint until we get changes since frame_id
+    // Legacy delta poller (kept for compat). Fetches full state immediately:
+    // the delta endpoint omits board zones and legal_actions, so delta-only
+    // sync can never update the UI and the old 20x100ms spin just added
+    // up to 2s of "AI thinking" stall per move.
     pollDelta: async (frameId, networkFacade) => {
-        const maxAttempts = 20;
-        for (let i = 0; i < maxAttempts; i++) {
-            try {
-                const res = await apiFetch(`api/game-state/delta?since=${frameId}`);
-                if (res.ok) {
-                    const delta = await res.json();
-                    if (!delta.no_changes) {
-                        console.log('[GameService] Delta received:', delta);
-                        GameService.applyStateDelta(delta);
-                        return;
-                    }
-                }
-            } catch (e) {
-                console.warn('[GameService] Delta poll failed:', e);
-            }
-            await new Promise(r => setTimeout(r, 100));
-        }
-        console.log('[GameService] Delta timeout, fetching full state');
-        if (networkFacade?.fetchState) await networkFacade.fetchState();
+        GameService._lastKnownVersion = frameId;
+        const facade = networkFacade || Network;
+        if (facade?.fetchState) await facade.fetchState();
+        else await GameService.fetchState(facade);
     },
 
     // Apply delta to current state
@@ -304,7 +327,10 @@ alert(e.message);
         if (delta.player1_rps_choice !== undefined) newState.player1_rps_choice = delta.player1_rps_choice;
         if (delta.player2_rps_choice !== undefined) newState.player2_rps_choice = delta.player2_rps_choice;
         if (delta.pending_choice) newState.pending_choice = delta.pending_choice;
-        if (delta.legal_actions) newState.legal_actions = delta.legal_actions;
+        if (delta.legal_actions) {
+            newState.legal_actions = delta.legal_actions;
+            normalizeLegalActions(newState);
+        }
         
         // Apply the executed action locally (deterministic replay)
         if (delta.executed_action) {

@@ -23,7 +23,7 @@ import { DOM_IDS, COLORS, DISPLAY_VALUES } from './constants_dom.js';
 
 const POLL_DELAYS = {
     idle: 3000,         // Normal slow polling
-    thinking: 1500,     // Poll faster when AI is thinking
+    thinking: 250,      // Poll fast when AI is thinking (AI acts in ms)
     liveWatch: 1200,    // Poll faster when watching live
     burst: 200,         // Immediate follow-up after change
     error: 5000,
@@ -73,7 +73,7 @@ function updateDebugOverlay() {
         [DOM_IDS.DEBUG_SESSION]: State.sessionToken ? 'VALID' : 'MISSING',
         [DOM_IDS.DEBUG_VIEW]: `P${State.perspectivePlayer + 1}`,
         [DOM_IDS.DEBUG_POLL]: heartbeat,
-        [DOM_IDS.DEBUG_DELAY]: `${getPollingMode()} (${currentDelay}ms)`,
+        [DOM_IDS.DEBUG_DELAY]: `${getPollingMode()} (${getTargetPollDelay()}ms)`,
     });
     if (debugElements.sync) debugElements.sync.style.color = isSynced ? '#00ff00' : COLORS.ACCENT_RED;
 }

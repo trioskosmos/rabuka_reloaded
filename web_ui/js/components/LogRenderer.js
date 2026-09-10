@@ -44,7 +44,7 @@ export const LogRenderer = {
         const logData = state.rule_log || [];
         const structData = state.structured_log || [];
         const lastStruct = structData.length > 0 ? structData[structData.length - 1].text || '' : '';
-        const logHash = logData.length + '|' + (logData.length > 0 ? logData[logData.length - 1] : '') + '|' + structData.length + '|' + lastStruct + '|' + (State.selectedTurn || -1);
+        const logHash = logData.length + '|' + (logData.length > 0 ? logData[logData.length - 1] : '') + '|' + structData.length + '|' + lastStruct + '|' + (State.selectedTurn || -1) + '|' + State.currentLang;
         if (logHash === LogRenderer._lastLogHash && !State.showingFullLog) return;
         LogRenderer._lastLogHash = logHash;
 
@@ -554,6 +554,7 @@ export const LogRenderer = {
     createChoiceBlock: (entry, currentLang, showFriendlyAbilities) => {
         const meta = entry.metadata || {};
         const isResolved = entry.category === 'choice_resolved';
+        const isOwnChoice = entry.player_label === `p${State.perspectivePlayer + 1}`;
         const blockDiv = document.createElement('div');
         blockDiv.className = 'log-group-block choice-resolved-block';
 
@@ -568,10 +569,12 @@ export const LogRenderer = {
         const headerDiv = document.createElement('div');
         headerDiv.className = 'log-entry ability group-header';
         const kindLabel = i18n.t(isResolved ? 'choice_resolved' : 'choice_offered');
-        const countBadge = count > 0
+        const countBadge = isOwnChoice && count > 0
             ? `<span class="choice-result">${i18n.t('choice_pick_of', { count })}</span>`
             : '';
-        const skipBadge = `<span class="choice-skip ${skipAllowed ? 'allowed' : 'denied'}">${skipAllowed ? i18n.t('choice_skip_allowed') : i18n.t('choice_no_skip')}</span>`;
+        const skipBadge = isOwnChoice
+            ? `<span class="choice-skip ${skipAllowed ? 'allowed' : 'denied'}">${skipAllowed ? i18n.t('choice_skip_allowed') : i18n.t('choice_no_skip')}</span>`
+            : '';
         const resolvedBadge = isResolved
             ? `<span class="choice-result">${meta.skipped ? '⤼ ' + i18n.t('skip') : ''}</span>`
             : '';
@@ -611,7 +614,7 @@ export const LogRenderer = {
         }
 
         const visibleOptions = isResolved ? [] : parsed.options;
-        if (visibleOptions.length) {
+        if (isOwnChoice && visibleOptions.length) {
             const box = document.createElement('div');
             box.className = 'log-choice-box';
             const label = document.createElement('div');
@@ -636,7 +639,7 @@ export const LogRenderer = {
             detailsContainer.appendChild(box);
         }
 
-        if (isResolved) {
+        if (isResolved && isOwnChoice) {
             const chosenRow = document.createElement('div');
             chosenRow.className = 'log-choice-picked';
             const picked = (meta.chosen || []).map(LogRenderer._choiceChosenLabel).join(', ')

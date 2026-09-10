@@ -2,7 +2,7 @@ import { State } from '../state.js';
 import { apiFetch } from '../network.js';
 
 const AI_ACTION_DELAY = 0;
-const AI_IDLE_DELAY = 200;
+const AI_IDLE_DELAY = 100;
 
 function aiHeaders(token) {
     return {

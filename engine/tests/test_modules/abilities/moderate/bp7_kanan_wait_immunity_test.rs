@@ -160,3 +160,40 @@ fn kanan_immunity_blocks_umis_debut_cost_wait() {
         "園田海未's cost-limit wait must be blocked by wait-immunity"
     );
 }
+
+/// TEMP-DEBUG: dump Kanan choose-1 payload (pending JSON + actions).
+#[test]
+fn temp_dump_kanan_choose_payload() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let kanan = game.id(KANAN);
+    let filler = game.id("PL!-sd1-010-SD");
+    for _ in 0..30 {
+        game.state.player1.main_deck.cards.push(filler);
+    }
+    game.state.player1.hand.cards.push(kanan);
+    game.give_energy(30);
+    game.play_to_stage(kanan, MemberArea::Center);
+    let mut guard = 0;
+    while game.has_pending_choice() && guard < 20 {
+        guard += 1;
+        let t = game.pending_choice_type();
+        if t.as_deref() == Some("SelectTarget") {
+            if let Some(json) = game.state.get_pending_choice_json() {
+                println!("PENDING_JSON={}", serde_json::to_string(&json).unwrap());
+            }
+            let acts = rabuka_engine::game::game_setup::generate_possible_actions(&game.state);
+            for (i, a) in acts.iter().enumerate() {
+                println!("ACT[{}] desc={:?}", i, a.description);
+                println!("ACT[{}] desc_ja={:?}", i, a.description_ja);
+            }
+            break;
+        } else if t.as_deref() == Some("SelectAutoAbility") {
+            game.select_indices(&[1]);
+        } else if t.as_deref() == Some("SelectCard") {
+            game.select_indices(&[0]);
+        } else {
+            break;
+        }
+    }
+}

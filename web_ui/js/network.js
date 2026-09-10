@@ -70,41 +70,30 @@ export function apiHeaders() {
     };
 }
 
-// In-flight request deduplication cache
-const _inFlightRequests = new Map();
-
 /**
  * Centralized fetch wrapper for the backend API. Merges the standard headers
  * with any caller-supplied options so every service talks to the server the
  * same way. Returns the raw Response; callers decide how to read it.
- * Deduplicates in-flight GET requests to the same URL.
+ *
+ * NOTE: this intentionally issues one fetch per caller. A previous version
+ * shared a single in-flight Response between concurrent GETs to the same URL,
+ * which broke in two ways: a Response body can only be read once, so the
+ * second caller always crashed with "body stream already read"; and the cache
+ * key ignored headers, so the human view could receive the AI session's
+ * response (and vice versa). Overlap is coalesced by the callers instead
+ * (see GameService._fetchInFlight).
  */
 export async function apiFetch(path, options = {}) {
     // Ensure backend URL is resolved before making request
     await getBackendUrl();
     const url = buildUrl(path);
-    const isGet = !options.method || options.method === 'GET';
-    const cacheKey = isGet ? url : null;
-
-    // Deduplicate in-flight GET requests
-    if (cacheKey && _inFlightRequests.has(cacheKey)) {
-        console.log('[Network] Deduplicating in-flight request:', path);
-        return _inFlightRequests.get(cacheKey);
-    }
 
     console.log('[Network] apiFetch:', path, '->', url);
     const { headers, ...rest } = options;
-    const promise = fetch(url, {
+    return fetch(url, {
         ...rest,
         headers: { ...apiHeaders(), ...(headers || {}) }
     });
-
-    if (cacheKey) {
-        _inFlightRequests.set(cacheKey, promise);
-        promise.finally(() => _inFlightRequests.delete(cacheKey));
-    }
-
-    return promise;
 }
 
 /**

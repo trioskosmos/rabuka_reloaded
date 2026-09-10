@@ -331,6 +331,8 @@ export const LogViewerModal = {
             const div = document.createElement('div');
             div.className = 'log-viewer-standalone log-entry-choice';
             const meta = group.ev?.metadata || {};
+            const ev = group.ev;
+            const isOwnChoice = ev?.player_label === `p${State.perspectivePlayer + 1}`;
             const isJp = currentLang !== 'en';
             const prompt = (isJp && meta.prompt_ja) ? meta.prompt_ja
                 : (!isJp && meta.prompt) ? meta.prompt
@@ -338,7 +340,7 @@ export const LogViewerModal = {
                     || (i18n.translateChoiceDescription && meta.prompt
                         ? i18n.translateChoiceDescription(meta.prompt) : '')
                     || i18n.t('choice_default_prompt'));
-            const kindLabel = i18n.t(group.ev?.category === 'choice_offered' ? 'choice_offered' : 'choice_resolved');
+            const kindLabel = i18n.t(ev?.category === 'choice_offered' ? 'choice_offered' : 'choice_resolved');
             const rawOffered = Array.isArray(meta.offered) ? meta.offered : [];
             // Options are the "  - ..." lines; formatting lines (prompt
             // header, type:, skip footers) are not pickable options.
@@ -347,8 +349,8 @@ export const LogViewerModal = {
                 .filter(o => /^-/.test(o))
                 .map(o => o.replace(/^-\s*/, ''));
             const count = meta.offered_count ?? options.length;
-            const countBadge = count > 0 ? ` · ${i18n.t('choice_pick_of', { count })}` : '';
-            const hasOffered = options.length > 0;
+            const countBadge = isOwnChoice && count > 0 ? ` · ${i18n.t('choice_pick_of', { count })}` : '';
+            const hasOffered = isOwnChoice && options.length > 0;
             const offeredList = hasOffered
                 ? options.slice(0, 12)
                     .map(o => '<div class="log-viewer-choice-offer">' + Tooltips.enrichAbilityText(String(o)) + '</div>')
@@ -357,6 +359,8 @@ export const LogViewerModal = {
             const more = hasOffered && options.length > 12 ? `<div class="log-viewer-choice-more">${i18n.t('choice_more', { count: options.length - 12 })}</div>` : '';
             const pickedRaw = group.picked || (meta.skipped ? 'skip' : '');
             const picked = /^skip$/i.test(pickedRaw) ? i18n.t('skip') : (pickedRaw || i18n.t('choice_picked_none'));
+            const isResolved = ev?.category === 'choice_resolved';
+            const showPicked = isOwnChoice && isResolved;
             div.innerHTML = `
                 <div class="log-viewer-turn-badge">T${group.turnNumber}</div>
                 <div class="log-viewer-content">
@@ -366,7 +370,7 @@ export const LogViewerModal = {
                         <ul class="log-viewer-choice-options">${offeredList}</ul>
                         ${more}
                     </div>` : ''}
-                    <div class="log-viewer-choice-picked">${i18n.t('chosen')}: <strong>${picked}</strong></div>
+                    ${showPicked ? `<div class="log-viewer-choice-picked">${i18n.t('chosen')}: <strong>${picked}</strong></div>` : ''}
                 </div>
             `;
             return div;
