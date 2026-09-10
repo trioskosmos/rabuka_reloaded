@@ -188,6 +188,9 @@ impl<'u, 'd, I: InputSource> platform_ui::PlatformUi for GbaUi<'u, 'd, I> {
     fn open_start_menu(&mut self, gs: &GameState) {
         crate::overlay::run_start_menu(self.display, self.input, gs);
     }
+    fn ui_lang(&self) -> rabuka_engine::game::language::Lang {
+        crate::lang::current_lang()
+    }
     fn draw_card_image(
         &mut self,
         card_no: &str,

@@ -233,12 +233,24 @@ impl Action {
         self
     }
 
-    pub fn display_desc(&self, is_ja: bool) -> &str {
-        if is_ja {
+    /// Resolve the display text for a UI language. Japanese falls back to
+    /// the English description when no translation exists; every other
+    /// language shows English (extension point: add `description_<code>`
+    /// fields and match them here when a third language ships).
+    pub fn display_desc_for(&self, lang: crate::game::language::Lang) -> &str {
+        if lang == crate::game::language::Lang::Japanese {
             self.description_ja.as_deref().unwrap_or(&self.description)
         } else {
             &self.description
         }
+    }
+
+    pub fn display_desc(&self, is_ja: bool) -> &str {
+        self.display_desc_for(if is_ja {
+            crate::game::language::Lang::Japanese
+        } else {
+            crate::game::language::Lang::English
+        })
     }
 }
 

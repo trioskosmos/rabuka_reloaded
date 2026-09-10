@@ -36,7 +36,7 @@
 //! | DeckSelect   | move cursor       | -              | confirm        | -           | confirm      | -      | detail text  | detail text  |
 //! | Board        | prev/next action  | move cursor    | run action     | -           | Start menu   | Actions| cycle focus  | card detail  |
 //! | Actions      | prev/next action  | -              | run action     | back        | Start menu   | Board  | act+card det | card detail  |
-//! | StartMenu    | move cursor       | -              | log/zone/close | back/close  | back/close   | -      | -            | -            |
+//! | StartMenu    | move cursor       | -              | log/zone/lang/close | back/close | back/close | -      | -            | -            |
 //! | ZoneGrid     | wrap incl. pages  | wrap incl. pages| card detail   | back        | back         | -      | -            | -            |
 //! | CardDetail   | scroll text       | -              | close          | close       | close        | -      | close        | close        |
 //! | ChoiceGrid   | wrap incl. pages  | wrap incl. pages| pick          | back/skip   | start menu   | board  | hint+ability | cursor card  |

@@ -161,7 +161,11 @@ export const TextEnricher = {
         // Already enriched — contains rendered <img> tags from a previous pass.
         // The tooltip flow sometimes double-enriches (getEffectiveActionText
         // already calls enrichAbilityText, then the caller enriches again).
-        if (text.includes('<img')) return text;
+        // Still convert any leftover {{icon|label}} markers to 【label】 so a
+        // trigger icon can never glue onto ability text as bare "登場...".
+        if (text.includes('<img')) {
+            return text.replace(REGEX_CURLY_TAG, '【$2】');
+        }
 
         const placeholders = [];
 
@@ -215,9 +219,13 @@ export const TextEnricher = {
             if (typeof ICON_DATA_URIs !== 'undefined' && ICON_DATA_URIs[iconKey]) {
                 src = ICON_DATA_URIs[iconKey];
             }
-            return `<span class="icon-wrapper"><img src="${src}" alt="${alt}" style="${style}"><span style="display:none;">${alt}</span></span>`;
+            return `<span class="icon-wrapper"><img src="${src}" alt="${alt}" title="${alt}" style="${style}" onerror="this.outerHTML='【${alt}】'"><span style="display:none;">${alt}</span></span>`;
         });
         text = text.replace(REGEX_NEWLINE, '<br>');
+        // Last resort: any {{icon|label}} the passes above missed (e.g. an
+        // icon filename outside texticon/) renders as 【label】 — never raw
+        // braces, never a label glued onto the following sentence.
+        text = text.replace(REGEX_CURLY_TAG, '【$2】');
 
         return text;
     },

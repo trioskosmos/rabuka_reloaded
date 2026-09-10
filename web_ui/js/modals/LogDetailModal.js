@@ -17,7 +17,8 @@ function hIcon(index) {
 }
 
 function formatLogDetailBody(body) {
-    let enriched = Tooltips.enrichAbilityText(body || '');
+    const marked = (i18n.translateLogMarkers ? i18n.translateLogMarkers(body || '') : (body || ''));
+    let enriched = Tooltips.enrichAbilityText(marked);
     enriched = enriched.replace(/P1 /g, '<span class="log-p-badge p1">P1</span> ');
     enriched = enriched.replace(/P2 /g, '<span class="log-p-badge p2">P2</span> ');
     enriched = enriched.replace(/\[Turn (\d+)\]/g, '<span class="log-turn-prefix">[Turn $1]</span>');
@@ -142,7 +143,8 @@ export const LogDetailModal = {
 
             const passMatch = body.match(/Score:\s*(\d+)/);
             const score = passMatch ? passMatch[1] : '?';
-            result.innerHTML = `<strong>${isPass ? '✓ PASS' : '✗ FAIL'}</strong> ${i18n.t('score')}: ${score}`;
+            const label = isPass ? i18n.t('result_pass') : i18n.t('result_fail');
+            result.innerHTML = `<strong>${isPass ? '✓' : '✗'} ${label}</strong> ${i18n.t('score')}: ${score}`;
             div.appendChild(result);
         }
 

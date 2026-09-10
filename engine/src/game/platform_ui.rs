@@ -57,6 +57,14 @@ pub trait PlatformUi {
     /// [`PlatformUi::render_board`].
     fn set_selected_action(&mut self, _desc: &str, _index: usize, _total: usize) {}
 
+    /// This port's current UI language. The engine resolves bilingual
+    /// action/choice text through it, so language switching works by
+    /// default on every port that tracks a language (3DS, GBA, …).
+    /// Ports without a language setting keep the default (Japanese).
+    fn ui_lang(&self) -> crate::game::language::Lang {
+        crate::game::language::Lang::default()
+    }
+
     /// Shoulder buttons. Default off; consoles without them keep the menu
     /// behaviour unchanged. L/R open the full-text detail viewer on the
     /// currently highlighted option.

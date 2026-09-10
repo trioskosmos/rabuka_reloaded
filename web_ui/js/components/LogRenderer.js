@@ -334,15 +334,37 @@ export const LogRenderer = {
         const structEntries = (state.structured_log || []).filter(
             e => STRUCT.includes(e.category) && e.metadata
         );
+        // Turns that have a structured choice_resolved entry: their raw
+        // "[choice] resolved: ..." rule_log line is a duplicate rendered
+        // properly by the choice block, so the English raw line is dropped.
+        const resolvedTurns = new Set(
+            structEntries.filter(e => e.category === 'choice_resolved').map(e => e.turn || 0)
+        );
+        const isRawChoiceLine = (g) => {
+            const body = g.body || g.entry || '';
+            if (/^\[choice\]/i.test(body.trim())) return true;
+            const entries = g.entries || [];
+            return entries.length > 0 && entries.every(e => /^\[choice\]/i.test(String(e).trim()));
+        };
         const merged = [];
         groupedLogs.forEach((g, idx) => {
             const turnMatch = (g.turnPrefix || g.entry || g.header || '').match(/Turn (\d+)/i);
-            merged.push({ turn: turnMatch ? parseInt(turnMatch[1], 10) : 0, order: idx, type: 'rule', data: g });
+            const turn = turnMatch ? parseInt(turnMatch[1], 10) : 0;
+            if (isRawChoiceLine(g) && resolvedTurns.has(turn)) return; // dup of structured choice
+            merged.push({ turn, order: idx, type: 'rule', data: g });
         });
         structEntries.forEach((e, idx) => {
             merged.push({ turn: e.turn || 0, order: idx, type: e.category, data: e });
         });
         merged.sort((a, b) => b.turn - a.turn || a.order - b.order);
+
+        // Unresolved trigger scans (result "pending", not yet committed) are
+        // engine internals, not player-facing log content — skip them instead
+        // of showing "結果: 条件評価待ち" rows.
+        const isPendingScan = (data) => {
+            const meta = data && data.metadata;
+            return !!meta && meta.result === 'pending' && !meta.resolved;
+        };
 
         merged.forEach(entry => {
                 if (entry.type === 'rule') {
@@ -362,6 +384,7 @@ export const LogRenderer = {
                     const block = LogRenderer.createAbilityResolutionBlock(entry.data, currentLang, showFriendlyAbilities);
                     if (block) section.appendChild(block);
                 } else if (entry.type === 'trigger_evaluation') {
+                    if (isPendingScan(entry.data)) return;
                     const block = LogRenderer.createTriggerEvaluationBlock(entry.data, currentLang, showFriendlyAbilities);
                     if (block) section.appendChild(block);
                 } else if (entry.type === 'choice_resolved' || entry.type === 'choice_offered') {
@@ -437,20 +460,128 @@ export const LogRenderer = {
         return blockDiv;
     },
 
+    // Zone tokens as emitted by the engine's choice labels ("[discard] ...",
+    // "candidates from hand", ...) mapped to translated zone names.
+    _choiceZoneLabel: (token) => {
+        if (!token) return '';
+        const key = 'zone_' + String(token).trim().toLowerCase().replace(/[^a-z_]/g, '');
+        const label = i18n.t(key);
+        return label === key ? String(token) : label;
+    },
+
+    _choiceCardTypeLabel: (token) => {
+        if (!token) return '';
+        const norm = String(token).trim().toLowerCase().replace(/_card$/, '');
+        const key = 'card_type_' + norm;
+        const label = i18n.t(key);
+        return label === key ? String(token) : label;
+    },
+
+    // Prompt in the player's language. New entries carry prompt/prompt_ja
+    // from the engine; legacy entries only have the English description
+    // baked into offered[0], translated via choice_descriptions.
+    _choicePrompt: (meta, offered) => {
+        const isJp = State.currentLang !== 'en';
+        if (isJp && meta.prompt_ja) return meta.prompt_ja;
+        if (!isJp && meta.prompt) return meta.prompt;
+        const fallback = isJp ? (meta.prompt_ja || meta.prompt) : (meta.prompt || meta.prompt_ja);
+        if (fallback && i18n.translateChoiceDescription) {
+            const translated = i18n.translateChoiceDescription(fallback);
+            if (translated && translated !== fallback) return translated;
+        }
+        if (fallback) return fallback;
+        // Legacy: derive from the first offered line.
+        const first = (offered && offered[0]) || '';
+        const m = first.match(/^\[([^\]]+)\]\s*select\s+\d+\s+card\(s\):\s*(.*)$/i);
+        const desc = m ? m[2] : first.replace(/^\s*\(skip[^)]*\)\s*$/i, '');
+        if (desc && i18n.translateChoiceDescription) {
+            return i18n.translateChoiceDescription(desc) || desc;
+        }
+        return desc || i18n.t('choice_default_prompt');
+    },
+
+    // Split raw engine offered lines into { headerZone, headerDesc, typeLine,
+    // options } so formatting lines (type:/skip_allowed) never render as
+    // if they were pickable options.
+    _parseChoiceOffered: (offered) => {
+        const lines = Array.isArray(offered) ? offered : [];
+        let headerZone = '';
+        let headerDesc = '';
+        let typeLine = '';
+        const options = [];
+        lines.forEach((raw, idx) => {
+            const line = String(raw);
+            const trimmed = line.trim();
+            if (/^\(skip/i.test(trimmed)) return; // footer -> header badge
+            if (idx === 0) {
+                const m = line.match(/^\[([^\]]+)\]\s*select\s+\d+\s+card\(s\):\s*(.*)$/i);
+                if (m) {
+                    headerZone = m[1];
+                    headerDesc = (m[2] || '').trim();
+                    return;
+                }
+                if (/^type\s*:/i.test(trimmed)) {
+                    const tok = trimmed.split(':')[1];
+                    typeLine = tok ? tok.trim() : '';
+                    return;
+                }
+                if (trimmed.startsWith('- ') || line.startsWith('  -')) {
+                    options.push(trimmed.replace(/^-\s*/, ''));
+                    return;
+                }
+                headerDesc = trimmed;
+                return;
+            }
+            if (/^type\s*:/i.test(trimmed)) {
+                const tok = trimmed.split(':').slice(1).join(':');
+                typeLine = (tok || '').trim();
+                return;
+            }
+            if (trimmed.startsWith('- ') || line.startsWith('  -') || trimmed.startsWith('-')) {
+                options.push(trimmed.replace(/^-\s*/, ''));
+                return;
+            }
+            if (trimmed) headerDesc = headerDesc ? headerDesc + ' / ' + trimmed : trimmed;
+        });
+        return { headerZone, headerDesc, typeLine, options };
+    },
+
+    _choiceChosenLabel: (name) => {
+        if (/^skip$/i.test(String(name || '').trim())) return i18n.t('skip');
+        return String(name);
+    },
+
     createChoiceBlock: (entry, currentLang, showFriendlyAbilities) => {
         const meta = entry.metadata || {};
         const isResolved = entry.category === 'choice_resolved';
         const blockDiv = document.createElement('div');
         blockDiv.className = 'log-group-block choice-resolved-block';
 
+        const offered = meta.offered || [];
+        const parsed = LogRenderer._parseChoiceOffered(offered);
+        const prompt = LogRenderer._choicePrompt(meta, offered);
+        const count = isResolved
+            ? (meta.offered_count ?? parsed.options.length)
+            : (parsed.options.length || meta.offered_count || 0);
+        const skipAllowed = !!meta.skip_allowed;
+
         const headerDiv = document.createElement('div');
         headerDiv.className = 'log-entry ability group-header';
+        const kindLabel = i18n.t(isResolved ? 'choice_resolved' : 'choice_offered');
+        const countBadge = count > 0
+            ? `<span class="choice-result">${i18n.t('choice_pick_of', { count })}</span>`
+            : '';
+        const skipBadge = `<span class="choice-skip ${skipAllowed ? 'allowed' : 'denied'}">${skipAllowed ? i18n.t('choice_skip_allowed') : i18n.t('choice_no_skip')}</span>`;
+        const resolvedBadge = isResolved
+            ? `<span class="choice-result">${meta.skipped ? '⤼ ' + i18n.t('skip') : ''}</span>`
+            : '';
         headerDiv.innerHTML = `
             <div class="log-entry-icon"></div>
             <div class="log-entry-content">
                 <span class="ability-visual">⚖</span>
-                <strong>${i18n.t(isResolved ? 'choice_resolved' : 'choice_offered') || (isResolved ? 'Choice Resolved' : 'Choice Offered')}</strong>
-                ${isResolved ? `<span class="choice-result">${meta.skipped ? '⤼ skip' : (meta.offered_count !== undefined ? `pick of ${meta.offered_count}` : '')}</span>` : ''}
+                <strong>${kindLabel}</strong>
+                <span class="choice-prompt">${Tooltips.enrichAbilityText(prompt)}</span>
+                ${countBadge}${skipBadge}${resolvedBadge}
             </div>
             <div class="log-group-toggle">▼</div>
         `;
@@ -459,31 +590,58 @@ export const LogRenderer = {
         const detailsContainer = document.createElement('div');
         detailsContainer.className = 'log-group-details';
 
-        const offered = meta.offered || [];
-        if (offered.length) {
+        if (parsed.headerZone) {
+            const zoneRow = document.createElement('div');
+            zoneRow.className = 'log-choice-zone';
+            zoneRow.textContent = LogRenderer._choiceZoneLabel(parsed.headerZone);
+            detailsContainer.appendChild(zoneRow);
+        }
+        if (parsed.headerDesc && parsed.headerDesc !== prompt) {
+            const descRow = document.createElement('div');
+            descRow.className = 'log-choice-desc';
+            const translated = (i18n.translateChoiceDescription && i18n.translateChoiceDescription(parsed.headerDesc)) || parsed.headerDesc;
+            descRow.innerHTML = Tooltips.enrichAbilityText(translated);
+            detailsContainer.appendChild(descRow);
+        }
+        if (parsed.typeLine) {
+            const typeRow = document.createElement('div');
+            typeRow.className = 'log-choice-type';
+            typeRow.textContent = i18n.t('choice_type', { type: LogRenderer._choiceCardTypeLabel(parsed.typeLine) });
+            detailsContainer.appendChild(typeRow);
+        }
+
+        const visibleOptions = isResolved ? [] : parsed.options;
+        if (visibleOptions.length) {
             const box = document.createElement('div');
             box.className = 'log-choice-box';
             const label = document.createElement('div');
             label.className = 'log-choice-label';
-            label.textContent = i18n.t('offered') || 'Offered:';
+            label.textContent = i18n.t('offered');
             box.appendChild(label);
             const ul = document.createElement('ul');
             ul.className = 'log-choice-options';
-            offered.slice(0, 12).forEach(o => {
+            visibleOptions.slice(0, 12).forEach(o => {
                 const li = document.createElement('li');
                 li.className = 'log-choice-option';
-                li.innerHTML = Tooltips.enrichAbilityText(String(o));
+                li.innerHTML = Tooltips.enrichAbilityText(LogRenderer._choiceChosenLabel(o));
                 ul.appendChild(li);
             });
             box.appendChild(ul);
+            if (visibleOptions.length > 12) {
+                const more = document.createElement('div');
+                more.className = 'log-choice-more';
+                more.textContent = i18n.t('choice_more', { count: visibleOptions.length - 12 });
+                box.appendChild(more);
+            }
             detailsContainer.appendChild(box);
         }
 
         if (isResolved) {
             const chosenRow = document.createElement('div');
             chosenRow.className = 'log-choice-picked';
-            const chosen = (meta.chosen || []).join(', ');
-            chosenRow.innerHTML = `<strong>${i18n.t('chosen') || 'Chosen'}:</strong> ${chosen || (meta.skipped ? 'skip' : '—')}`;
+            const picked = (meta.chosen || []).map(LogRenderer._choiceChosenLabel).join(', ')
+                || (meta.skipped ? i18n.t('skip') : i18n.t('choice_picked_none'));
+            chosenRow.innerHTML = `<strong>${i18n.t('chosen')}:</strong> ${picked}`;
             detailsContainer.appendChild(chosenRow);
         }
 
@@ -1033,18 +1191,22 @@ export const LogRenderer = {
     formatLogEntry: (body, turnPrefix, currentLang, showFriendlyAbilities) => {
         if (!body) return "";
 
-        // Handle inline translatable markers [[key:p1=v1:p2=v2]] anywhere in text.
-        // Translates each marker and also resolves known zone/type values.
-        if (body.includes('[[')) {
+        // Inline engine markers [[key:p1=v1,p2=v2]] (comma- or colon-separated
+        // params). Shared helper translates the template AND the values
+        // (trigger_*/zone_*/result_* keys plus bare PASS/FAIL/...) in both
+        // languages, so raw `[[log_performance:...]]` never reaches the log.
+        if (body.includes('[[') && i18n.translateLogMarkers) {
+            body = i18n.translateLogMarkers(body);
+        } else if (body.includes('[[')) {
             body = body.replace(/\[\[([^\]]+)\]\]/g, (match, content) => {
-                const parts = content.split(":");
-                const key = parts[0];
+                const parts = content.split(/[:,]/);
+                const key = parts[0].trim();
                 const params = {};
                 for (let i = 1; i < parts.length; i++) {
                     const eqIdx = parts[i].indexOf("=");
                     if (eqIdx > 0) {
-                        const k = parts[i].slice(0, eqIdx);
-                        let v = parts[i].slice(eqIdx + 1);
+                        const k = parts[i].slice(0, eqIdx).trim();
+                        let v = parts[i].slice(eqIdx + 1).trim();
                         // Translate known value types: zones, card types, trigger names
                         if (v.startsWith("zone_") || v.startsWith("card_type_") || v.startsWith("rps_") || v.startsWith("trigger_") || v.startsWith("cost_skip_") || v.startsWith("result_") || v.startsWith("op_")) {
                             v = i18n.t(v);
@@ -1061,10 +1223,12 @@ export const LogRenderer = {
         let displayText = body;
         let playerTag = "";
 
-        if (body.startsWith("P1 ") || body.startsWith("[P1]")) {
+        // P1/P2 may sit directly against a translated marker
+        // ("P1パフォーマンス:..."), so allow adjacency, not just spaces.
+        if (/^P1(?=[\s\[]|$)|^\[P1\]/.test(body)) {
             playerTag = `<span class="log-p-badge p1">P1</span>`;
             displayText = displayText.replace(/^\[?P1\]?\s?/, '');
-        } else if (body.startsWith("P2 ") || body.startsWith("[P2]")) {
+        } else if (/^P2(?=[\s\[]|$)|^\[P2\]/.test(body)) {
             playerTag = `<span class="log-p-badge p2">P2</span>`;
             displayText = displayText.replace(/^\[?P2\]?\s?/, '');
         }
@@ -1170,7 +1334,8 @@ export const LogRenderer = {
                 (m, score, result) => {
                     const cls = result === 'PASS' ? 'snapshot-score-pass' : 'snapshot-score-fail';
                     const icon = result === 'PASS' ? '✓' : '✗';
-                    return `<span class="${cls}"><img src="img/texticon/icon_score.png" class="heart-mini-icon"> Score: <b>${score}</b> ${icon} ${result}</span>`;
+                    const label = i18n.t(result === 'PASS' ? 'result_pass' : 'result_fail');
+                    return `<span class="${cls}"><img src="img/texticon/icon_score.png" class="heart-mini-icon"> ${i18n.t('score')}: <b>${score}</b> ${icon} ${label}</span>`;
                 });
         }
 
@@ -1180,13 +1345,14 @@ export const LogRenderer = {
                 (m, name, needStr, filledStr, spareStr, score, result) => {
                     const cls = result === 'PASS' ? 'snapshot-live-pass' : 'snapshot-live-fail';
                     const icon = result === 'PASS' ? '✓' : '✗';
+                    const label = i18n.t(result === 'PASS' ? 'result_pass' : 'result_fail');
                     const need = needStr.replace(/(h\d{2}):(\d+)/g,
                         (_, h, n) => `<img src="img/texticon/heart_0${parseInt(h.substring(1))}.png" class="heart-mini-icon">${n}`);
                     const filled = filledStr.replace(/(h\d{2}):(\d+)/g,
                         (_, h, n) => `<img src="img/texticon/heart_0${parseInt(h.substring(1))}.png" class="heart-mini-icon">${n}`);
                     const spare = spareStr.replace(/(h\d{2}):(\d+)/g,
                         (_, h, n) => `<img src="img/texticon/heart_0${parseInt(h.substring(1))}.png" class="heart-mini-icon">${n}`);
-                    return `<span class="${cls}"><img src="img/texticon/icon_score.png" class="heart-mini-icon"> ${name} need[${need}] filled[${filled}] score+${score} ${icon}${result}</span>`;
+                    return `<span class="${cls}"><img src="img/texticon/icon_score.png" class="heart-mini-icon"> ${name} need[${need}] filled[${filled}] score+${score} ${icon}${label}</span>`;
                 });
         }
 

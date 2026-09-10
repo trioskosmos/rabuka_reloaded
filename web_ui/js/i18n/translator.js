@@ -6,31 +6,89 @@
 import { NAME_MAP } from './names.js';
 import { TriggerType, Opcodes as EffectType } from '../generated_constants.js';
 
+/**
+ * Language registry: every supported UI language, default first.
+ * Adding a language = append an entry here + ship
+ * `./js/i18n/locales/<code>.json` (and optionally
+ * `ability_translations_<code>.json`). All cycling/normalizing goes
+ * through this list so no component hardcodes a two-language assumption.
+ */
+export const SUPPORTED_LANGS = [
+    { code: 'jp', label: '日本語', aliases: ['ja', 'japanese', '日本語'] },
+    { code: 'en', label: 'English', aliases: ['english'] },
+];
+
+/** Default UI language (Japanese — matches the card source text). */
+export const DEFAULT_LANG = 'jp';
+
+/** Canonicalize a language tag to a registry code (`ja` → `jp`, case-insensitive). Unknown tags fall back to {@link DEFAULT_LANG} with a warning. */
+export function normalizeLangCode(lang) {
+    const l = String(lang || '').toLowerCase();
+    for (const entry of SUPPORTED_LANGS) {
+        if (entry.code === l || (entry.aliases || []).includes(l)) return entry.code;
+        // BCP-47 style tags (`ja-JP`, `en-US`): match the primary subtag.
+        const primary = l.split('-')[0];
+        if (entry.code === primary || (entry.aliases || []).includes(primary)) return entry.code;
+    }
+    console.warn(`[i18n] unknown language "${lang}", falling back to ${DEFAULT_LANG}`);
+    return DEFAULT_LANG;
+}
+
+/** Cycle to the next supported language (settings toggle behaviour). Works for any registry size. */
+export function nextLangCode(lang) {
+    const cur = normalizeLangCode(lang);
+    const idx = SUPPORTED_LANGS.findIndex(e => e.code === cur);
+    return SUPPORTED_LANGS[(idx + 1) % SUPPORTED_LANGS.length].code;
+}
+
+/** Autonym label for a language code (`jp` → `日本語`). */
+export function langLabel(code) {
+    const entry = SUPPORTED_LANGS.find(e => e.code === normalizeLangCode(code));
+    return entry ? entry.label : String(code);
+}
+
+/** True for the source language (no translation needed). */
+export function isDefaultLang(lang) {
+    return normalizeLangCode(lang) === DEFAULT_LANG;
+}
+
+/** True for Japanese in any accepted spelling (`jp`, `ja`, …). */
+export function isJapanese(lang) {
+    return normalizeLangCode(lang) === 'jp';
+}
+
 let translations = {};
 let abilityTranslations = {};
-let currentLanguage = 'jp';
+let currentLanguage = DEFAULT_LANG;
 
 /**
  * Loads translation data for the specified language.
- * @param {string} lang - 'jp' or 'en'
+ * @param {string} lang - language code or alias (normalized via registry)
  */
-export async function loadTranslations(lang = 'jp') {
-    if (translations[lang]) {
-        currentLanguage = lang;
-        return translations[lang];
+export async function loadTranslations(lang = DEFAULT_LANG) {
+    const code = normalizeLangCode(lang);
+    if (translations[code]) {
+        currentLanguage = code;
+        return translations[code];
     }
 
     try {
-        const response = await fetch(`./js/i18n/locales/${lang}.json`);
-        if (!response.ok) throw new Error(`Failed to load ${lang} translations`);
+        const response = await fetch(`./js/i18n/locales/${code}.json`);
+        if (!response.ok) throw new Error(`Failed to load ${code} translations`);
         const data = await response.json();
-        translations[lang] = data;
+        translations[code] = data;
 
-        if (lang === 'en') {
+        if (code !== DEFAULT_LANG) {
             try {
-                const abResponse = await fetch(`./js/i18n/ability_translations.json`);
-                if (abResponse.ok) {
-                    abilityTranslations = await abResponse.json();
+                // Per-language ability table first, then the legacy English file.
+                const perLang = await fetch(`./js/i18n/ability_translations_${code}.json`);
+                if (perLang.ok) {
+                    abilityTranslations = await perLang.json();
+                } else if (code === 'en') {
+                    const abResponse = await fetch(`./js/i18n/ability_translations.json`);
+                    if (abResponse.ok) {
+                        abilityTranslations = await abResponse.json();
+                    }
                 }
             } catch (e) {
                 console.error('Ability translation load error:', e);
@@ -39,18 +97,18 @@ export async function loadTranslations(lang = 'jp') {
 
         // Backward compatibility globals
         if (typeof window !== 'undefined') {
-            if (lang === 'jp') window.currentTranslationsJP = data;
-            if (lang === 'en') window.currentTranslationsEN = data;
+            if (code === 'jp') window.currentTranslationsJP = data;
+            if (code === 'en') window.currentTranslationsEN = data;
             window.translations = translations; // Expose the full map
         }
 
-        currentLanguage = lang;
+        currentLanguage = code;
         return data;
     } catch (error) {
         console.error('Translation load error:', error);
         // Fallback to empty structure if failed
-        translations[lang] = { triggers: {}, opcodes: {}, params: {}, misc: {} };
-        return translations[lang];
+        translations[code] = { triggers: {}, opcodes: {}, params: {}, misc: {} };
+        return translations[code];
     }
 }
 
@@ -60,6 +118,7 @@ if (typeof window !== 'undefined') {
     window.translateCard = translateCard;
     window.translateMetadata = translateMetadata;
     window.translateChoiceDescription = translateChoiceDescription;
+    window.translateLogMarkers = translateLogMarkers;
     window.t = t;
 }
 
@@ -109,8 +168,20 @@ const UI_FALLBACKS = {
 
 export function t(key, params = {}) {
     if (!key) return '';
-    const langData = translations[currentLanguage] || translations.jp || translations.en || {};
-    let text = (langData.ui && langData.ui[key]) ? langData.ui[key] : UI_FALLBACKS[key] || key;
+    const code = normalizeLangCode(currentLanguage);
+    const langData = translations[code] || translations[DEFAULT_LANG] || {};
+    // Keys live in two places: nested under `ui` (UI labels) and at the
+    // top level (log/trigger/zone/result templates like `cond_result`,
+    // `log_performance`, `trigger_debut`). Check both so neither language
+    // leaks raw keys into the log.
+    let text;
+    if (langData.ui && langData.ui[key] !== undefined) {
+        text = langData.ui[key];
+    } else if (langData[key] !== undefined && typeof langData[key] === 'string') {
+        text = langData[key];
+    } else {
+        text = UI_FALLBACKS[key] || key;
+    }
 
     for (const [k, v] of Object.entries(params)) {
         text = text.replace(new RegExp(`\\{${k}\\}`, 'g'), v);
@@ -161,7 +232,7 @@ export const UNIT_ID_MAP = {
  */
 export function translateCardType(typeJp) {
     if (!typeJp) return '';
-    if (currentLanguage === 'jp') return typeJp;
+    if (isDefaultLang(currentLanguage)) return typeJp;
     
     const langData = translations[currentLanguage] || {};
     const cardTypes = langData.params?.CARD_TYPES || {};
@@ -176,7 +247,7 @@ export function translateCardType(typeJp) {
  */
 export function translateProduct(productJp) {
     if (!productJp) return '';
-    if (currentLanguage === 'jp') return productJp;
+    if (isDefaultLang(currentLanguage)) return productJp;
     
     const langData = translations[currentLanguage] || {};
     const products = langData.params?.PRODUCTS || {};
@@ -191,7 +262,7 @@ export function translateProduct(productJp) {
  */
 export function translateSeries(seriesJp) {
     if (!seriesJp) return '';
-    if (currentLanguage === 'jp') return seriesJp;
+    if (isDefaultLang(currentLanguage)) return seriesJp;
     
     const langData = translations[currentLanguage] || {};
     const series = langData.params?.SERIES || {};
@@ -207,7 +278,7 @@ export function translateSeries(seriesJp) {
  */
 export function translateMetadata(text, category) {
     if (!text) return "";
-    if (currentLanguage === 'jp') return text;
+    if (isDefaultLang(currentLanguage)) return text;
 
     const langData = translations[currentLanguage] || {};
     if (langData.params && langData.params[category] && langData.params[category][text]) {
@@ -228,7 +299,9 @@ export function translateCard(card) {
     let groups = card.groups || [];
     let units = card.units || [];
 
-    if (currentLanguage === 'en') {
+    // NAME_MAP is an English table: only apply for English. Other
+    // languages fall through with source text until their tables ship.
+    if (normalizeLangCode(currentLanguage) === 'en') {
         // Translate Name (Handle compound names like A & B & C)
         if (NAME_MAP[name]) {
             name = NAME_MAP[name];
@@ -335,12 +408,14 @@ class OpcodeParser {
     }
 }
 
-export function translateAbility(rawText, lang = 'jp') {
+export function translateAbility(rawText, lang = DEFAULT_LANG) {
     if (!rawText) return '';
-    if (lang === 'en' && abilityTranslations[rawText]) {
+    const code = normalizeLangCode(lang);
+    // Full-text ability table (loaded for non-default languages).
+    if (!isDefaultLang(code) && abilityTranslations[rawText]) {
         return abilityTranslations[rawText];
     }
-    const tData = translations[lang] || translations.jp;
+    const tData = translations[code] || translations[DEFAULT_LANG];
     if (!tData || Object.keys(tData).length === 0) return rawText;
 
     const lines = rawText.split('\n');
@@ -350,7 +425,7 @@ export function translateAbility(rawText, lang = 'jp') {
         rawLine = rawLine.trim();
         // Try line-by-line ability_translations lookup before pseudocode parsing
         // (handles cards whose ability field contains multiple abilities separated by \n)
-        if (lang === 'en' && abilityTranslations[rawLine]) {
+        if (!isDefaultLang(code) && abilityTranslations[rawLine]) {
             translatedLines.push(abilityTranslations[rawLine]);
             continue;
         }
@@ -370,14 +445,15 @@ export function translateAbility(rawText, lang = 'jp') {
                     .split('_')
                     .map(word => word.charAt(0).toUpperCase() + word.slice(1))
                     .join(' ');
-                translatedLines.push(lang === 'jp' ? `【${parsed.value}】` : `[${displayLabel}]`);
+                translatedLines.push(isDefaultLang(code) ? `【${parsed.value}】` : `[${displayLabel}]`);
             }
             continue;
         }
 
         if (parsed.type === 'logic') {
             // Heuristic check for raw Japanese in what should be pseudocode
-            if (lang === 'en' && /[亜-熙ぁ-んァ-ヶ]/.test(rawLine) && !parsed.prefix) {
+            // (heuristic table is English-specific)
+            if (code === 'en' && /[亜-熙ぁ-んァ-ヶ]/.test(rawLine) && !parsed.prefix) {
                 translatedLines.push(translateHeuristic(rawLine, tData));
                 continue;
             }
@@ -397,14 +473,14 @@ export function translateAbility(rawText, lang = 'jp') {
                     
                     if (nextInst) {
                         const actOp = inst.opcode;
-                        if (lang === 'en') {
+                        if (!isDefaultLang(code)) {
                             joiner = (actOp.startsWith('RECOVER') || actOp === 'MOVE_TO_DECK') ? " from " : " to ";
                         } else {
                             joiner = " ";
                         }
                     }
 
-                    return translateInstruction(inst, tData, lang, blockParams) + joiner;
+                    return translateInstruction(inst, tData, code, blockParams) + joiner;
                 }).join('');
             }).join('; ');
 
@@ -424,6 +500,7 @@ export function translateAbility(rawText, lang = 'jp') {
  * Translates a single structured instruction.
  */
 function translateInstruction(inst, tData, lang, blockParams) {
+    lang = normalizeLangCode(lang);
     const { opcode, args, params } = inst;
     const combinedParams = { ...blockParams, ...params };
     const consumedKeys = new Set();
@@ -448,6 +525,7 @@ function translateInstruction(inst, tData, lang, blockParams) {
         if (tData.params[k]) {
             replacement = tData.params[k][v] || v;
         } else if (k === 'NAME' || k === 'NAMES') {
+            // NAME_MAP is an English table; other languages keep source names.
             replacement = v.split('/').map(n => (lang === 'en' ? (NAME_MAP[n] || n) : n)).join(lang === 'en' ? ' & ' : '＆');
         } else if (k === 'COLOR') {
             replacement = tData.params.COLOR[v] || v;
@@ -473,7 +551,7 @@ function translateInstruction(inst, tData, lang, blockParams) {
     if (colorVal && (opcode.includes('HEART') || opcode.includes('ENERGY'))) {
         const cName = tData.params.COLOR[colorVal] || colorVal;
         const iconTag = (opcode.includes('HEART')) ? `【${cName} Hearts】` : `【${cName} Energy】`;
-        if (lang === 'jp') {
+        if (isDefaultLang(lang)) {
             const jpCName = tData.params.COLOR[colorVal] || colorVal;
             const jpIconTag = (opcode.includes('HEART')) ? `【${jpCName}ハート】` : `【${jpCName}エネ】`;
             translated = translated.replace(/【ハート】|ハート|【エネ】|エネ/, jpIconTag);
@@ -487,7 +565,7 @@ function translateInstruction(inst, tData, lang, blockParams) {
     }
 
     if (opcode === 'CARD_DISCARD') {
-        const discardText = (lang === 'en' ? "Discard" : "控え室");
+        const discardText = (isDefaultLang(lang) ? "控え室" : "Discard");
         translated = targetNames ? `${discardText} (${targetNames})` : discardText;
     } else {
         if (translated.includes('{name}')) {
@@ -529,9 +607,64 @@ function parseParams(paramsStr) {
 
 export function translateChoiceDescription(desc) {
     if (!desc) return '';
-    if (currentLanguage === 'en') return desc;
+    if (!isDefaultLang(currentLanguage)) return desc;
     const langData = translations[currentLanguage] || {};
     return langData.choice_descriptions?.[desc] || desc;
+}
+
+/**
+ * Translates inline engine log markers `[[key:p1=v1,p2=v2]]` (or the legacy
+ * colon-separated `[[key:p1=v1:p2=v2]]`) anywhere in a log line.
+ *
+ * The engine emits markers like
+ *   [[log_ability_result:trigger=trigger_debut,result=result_success]]
+ *   [[log_performance:score=0,result=FAIL]]
+ * so the value side is translated too: `trigger_*` / `zone_*` /
+ * `card_type_*` / `result_*` keys go through `t()`, and bare enum words
+ * (PASS/FAIL/SUCCESS/FAILURE/SKIP/...) map to their `result_*` labels.
+ * Unknown keys are left as the original `[[...]]` so gaps stay visible in
+ * dev instead of rendering as empty text. Exists in EN and JP with parity.
+ */
+const MARKER_BARE_VALUES = {
+    'PASS': 'result_pass',
+    'FAIL': 'result_fail',
+    'SUCCESS': 'result_success',
+    'FAILURE': 'result_failure',
+    'SKIP': 'result_skipped',
+    'SKIPPED': 'result_skipped',
+    'PENDING': 'result_pending',
+};
+
+export function translateLogMarkers(body) {
+    if (!body || !body.includes('[[')) return body;
+    return body.replace(/\[\[([^\]]+)\]\]/g, (match, content) => {
+        // Split key from params on the first ':' or ','.
+        const sepIdx = content.search(/[:,]/);
+        const key = (sepIdx < 0 ? content : content.slice(0, sepIdx)).trim();
+        const rest = sepIdx < 0 ? '' : content.slice(sepIdx + 1);
+        const params = {};
+        // Params may be separated by ':' (legacy) or ',' (engine).
+        for (const chunk of rest.split(/[:,]/)) {
+            const eqIdx = chunk.indexOf('=');
+            if (eqIdx <= 0) continue;
+            const k = chunk.slice(0, eqIdx).trim();
+            let v = chunk.slice(eqIdx + 1).trim();
+            if (!k) continue;
+            if (v.startsWith('zone_') || v.startsWith('card_type_') || v.startsWith('rps_')
+                || v.startsWith('trigger_') || v.startsWith('cost_skip_')
+                || v.startsWith('result_') || v.startsWith('op_')) {
+                const translated = t(v);
+                if (translated !== v) v = translated;
+            } else if (MARKER_BARE_VALUES[v]) {
+                v = t(MARKER_BARE_VALUES[v]);
+            }
+            params[k] = v;
+        }
+        const translated = t(key, params);
+        // Missing template: keep the original marker visible for debugging.
+        if (translated === key) return match;
+        return translated;
+    });
 }
 
 export function getCurrentTranslations() {
@@ -541,11 +674,16 @@ export function getCurrentTranslations() {
 // Single source of truth for which choice prompt to display. The engine always
 // sends `prompt_ja`/`prompt_en`; we just pick by language and warn loudly if the
 // active-language text is missing (so gaps are caught in devtools, not shipped silent).
+// Extension point for a third language: the engine will send `prompt_<code>`
+// fields; look them up by normalized code here with the en/ja fallback below.
 export function getChoicePrompt(choice, lang) {
     if (!choice) return '';
+    const code = normalizeLangCode(lang);
+    const promptByLang = code !== 'jp' && code !== 'en' ? choice[`prompt_${code}`] : undefined;
     const en = choice.prompt_en || choice.title || choice.text || '';
     const ja = choice.prompt_ja || '';
-    if (lang === 'ja') {
+    if (promptByLang) return promptByLang;
+    if (isJapanese(code)) {
         if (!ja) {
             console.warn('[i18n] choice prompt missing Japanese; showing English:', en);
             return en;

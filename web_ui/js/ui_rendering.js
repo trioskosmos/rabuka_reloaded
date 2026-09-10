@@ -202,9 +202,11 @@ export const Rendering = {
 
         Tooltips.highlightPendingSource();
 
-        // Update language button labels
+        // Update language button labels (show the next language's autonym).
+        // NOTE: SettingsModal shows `langLabel(nextLang(newLang))` — same value.
+        const _nextLabel = i18n.langLabel(i18n.nextLangCode(State.currentLang));
         document.querySelectorAll('[data-action="toggle-lang"]').forEach(btn => {
-            btn.textContent = State.currentLang === 'jp' ? 'English' : 'Japanese';
+            btn.textContent = _nextLabel;
         });
 
         AiDriver.think();

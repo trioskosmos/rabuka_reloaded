@@ -16,6 +16,7 @@ use crate::card::TriggerEvent;
 struct ConditionLocals {
     pub ability_filter: Option<ArcStr>,
     pub ability_filter_triggers: Option<Box<Vec<String>>>,
+    pub action_reference: Option<ArcStr>,
     pub activation_position: Option<ArcStr>,
     pub aggregate: Option<ArcStr>,
     pub all: Option<bool>,
@@ -85,6 +86,7 @@ struct ConditionLocals {
     pub scope: Option<ArcStr>,
     pub self_effect_only: Option<bool>,
     pub self_target: Option<bool>,
+    pub shuffle: Option<bool>,
     pub source: Option<ArcStr>,
     pub state: Option<ArcStr>,
     pub sub_checks: Option<Box<LocationSubChecks>>,
@@ -112,6 +114,7 @@ fn decode_condition_field(
     match key {
             "ability_filter" => { l.ability_filter = bc.read_arc_str_value(); return Some(true); }
             "ability_filter_triggers" => { l.ability_filter_triggers = bc.read_opt_str_vec_value(); return Some(true); }
+            "action_reference" => { l.action_reference = bc.read_arc_str_value(); return Some(true); }
             "activation_position" => { l.activation_position = bc.read_arc_str_value(); return Some(true); }
             "aggregate" => { l.aggregate = bc.read_arc_str_value(); return Some(true); }
             "all" => { l.all = bc.read_bool_value(); return Some(true); }
@@ -181,6 +184,7 @@ fn decode_condition_field(
             "scope" => { l.scope = bc.read_arc_str_value(); return Some(true); }
             "self_effect_only" => { l.self_effect_only = bc.read_bool_value(); return Some(true); }
             "self_target" => { l.self_target = bc.read_bool_value(); return Some(true); }
+            "shuffle" => { l.shuffle = bc.read_bool_value(); return Some(true); }
             "source" => { l.source = bc.read_arc_str_value(); return Some(true); }
             "state" => { l.state = bc.read_arc_str_value(); return Some(true); }
             "sub_checks" => { l.sub_checks = bc.read_location_sub_checks_value(); return Some(true); }
@@ -205,6 +209,7 @@ fn build_compound(l: &ConditionLocals) -> Condition {
     Condition::Compound {
         common: Box::new(ConditionCommon {
             ability_filter_triggers: l.ability_filter_triggers.clone(),
+            action_reference: l.action_reference.clone(),
             activation_position: l.activation_position.clone(),
             aggregate: l.aggregate.clone(),
             all: l.all.clone(),
@@ -252,6 +257,7 @@ fn build_compound(l: &ConditionLocals) -> Condition {
             same_name: l.same_name.clone(),
             scope: l.scope.clone(),
             self_target: l.self_target.clone(),
+            shuffle: l.shuffle.clone(),
             source: l.source.clone(),
             target: l.target.clone(),
             temporal: l.temporal.clone(),
@@ -268,6 +274,7 @@ fn build_location(l: &ConditionLocals) -> Condition {
     Condition::Location {
         common: Box::new(ConditionCommon {
             ability_filter_triggers: l.ability_filter_triggers.clone(),
+            action_reference: l.action_reference.clone(),
             activation_position: l.activation_position.clone(),
             aggregate: l.aggregate.clone(),
             all: l.all.clone(),
@@ -315,6 +322,7 @@ fn build_location(l: &ConditionLocals) -> Condition {
             same_name: l.same_name.clone(),
             scope: l.scope.clone(),
             self_target: l.self_target.clone(),
+            shuffle: l.shuffle.clone(),
             source: l.source.clone(),
             target: l.target.clone(),
             temporal: l.temporal.clone(),
@@ -335,6 +343,7 @@ fn build_comparison(l: &ConditionLocals) -> Condition {
     Condition::Comparison {
         common: Box::new(ConditionCommon {
             ability_filter_triggers: l.ability_filter_triggers.clone(),
+            action_reference: l.action_reference.clone(),
             activation_position: l.activation_position.clone(),
             aggregate: l.aggregate.clone(),
             all: l.all.clone(),
@@ -382,6 +391,7 @@ fn build_comparison(l: &ConditionLocals) -> Condition {
             same_name: l.same_name.clone(),
             scope: l.scope.clone(),
             self_target: l.self_target.clone(),
+            shuffle: l.shuffle.clone(),
             source: l.source.clone(),
             target: l.target.clone(),
             temporal: l.temporal.clone(),
@@ -403,6 +413,7 @@ fn build_movement(l: &ConditionLocals) -> Condition {
     Condition::Movement {
         common: Box::new(ConditionCommon {
             ability_filter_triggers: l.ability_filter_triggers.clone(),
+            action_reference: l.action_reference.clone(),
             activation_position: l.activation_position.clone(),
             aggregate: l.aggregate.clone(),
             all: l.all.clone(),
@@ -450,6 +461,7 @@ fn build_movement(l: &ConditionLocals) -> Condition {
             same_name: l.same_name.clone(),
             scope: l.scope.clone(),
             self_target: l.self_target.clone(),
+            shuffle: l.shuffle.clone(),
             source: l.source.clone(),
             target: l.target.clone(),
             temporal: l.temporal.clone(),
@@ -471,6 +483,7 @@ fn build_group(l: &ConditionLocals) -> Condition {
     Condition::Group {
         common: Box::new(ConditionCommon {
             ability_filter_triggers: l.ability_filter_triggers.clone(),
+            action_reference: l.action_reference.clone(),
             activation_position: l.activation_position.clone(),
             aggregate: l.aggregate.clone(),
             all: l.all.clone(),
@@ -518,6 +531,7 @@ fn build_group(l: &ConditionLocals) -> Condition {
             same_name: l.same_name.clone(),
             scope: l.scope.clone(),
             self_target: l.self_target.clone(),
+            shuffle: l.shuffle.clone(),
             source: l.source.clone(),
             target: l.target.clone(),
             temporal: l.temporal.clone(),
@@ -534,6 +548,7 @@ fn build_appearance(l: &ConditionLocals) -> Condition {
     Condition::Appearance {
         common: Box::new(ConditionCommon {
             ability_filter_triggers: l.ability_filter_triggers.clone(),
+            action_reference: l.action_reference.clone(),
             activation_position: l.activation_position.clone(),
             aggregate: l.aggregate.clone(),
             all: l.all.clone(),
@@ -581,6 +596,7 @@ fn build_appearance(l: &ConditionLocals) -> Condition {
             same_name: l.same_name.clone(),
             scope: l.scope.clone(),
             self_target: l.self_target.clone(),
+            shuffle: l.shuffle.clone(),
             source: l.source.clone(),
             target: l.target.clone(),
             temporal: l.temporal.clone(),
@@ -601,6 +617,7 @@ fn build_temporal(l: &ConditionLocals) -> Condition {
     Condition::Temporal {
         common: Box::new(ConditionCommon {
             ability_filter_triggers: l.ability_filter_triggers.clone(),
+            action_reference: l.action_reference.clone(),
             activation_position: l.activation_position.clone(),
             aggregate: l.aggregate.clone(),
             all: l.all.clone(),
@@ -648,6 +665,7 @@ fn build_temporal(l: &ConditionLocals) -> Condition {
             same_name: l.same_name.clone(),
             scope: l.scope.clone(),
             self_target: l.self_target.clone(),
+            shuffle: l.shuffle.clone(),
             source: l.source.clone(),
             target: l.target.clone(),
             temporal: l.temporal.clone(),
@@ -666,6 +684,7 @@ fn build_state(l: &ConditionLocals) -> Condition {
     Condition::State {
         common: Box::new(ConditionCommon {
             ability_filter_triggers: l.ability_filter_triggers.clone(),
+            action_reference: l.action_reference.clone(),
             activation_position: l.activation_position.clone(),
             aggregate: l.aggregate.clone(),
             all: l.all.clone(),
@@ -713,6 +732,7 @@ fn build_state(l: &ConditionLocals) -> Condition {
             same_name: l.same_name.clone(),
             scope: l.scope.clone(),
             self_target: l.self_target.clone(),
+            shuffle: l.shuffle.clone(),
             source: l.source.clone(),
             target: l.target.clone(),
             temporal: l.temporal.clone(),
@@ -730,6 +750,7 @@ fn build_resource(l: &ConditionLocals) -> Condition {
     Condition::Resource {
         common: Box::new(ConditionCommon {
             ability_filter_triggers: l.ability_filter_triggers.clone(),
+            action_reference: l.action_reference.clone(),
             activation_position: l.activation_position.clone(),
             aggregate: l.aggregate.clone(),
             all: l.all.clone(),
@@ -777,6 +798,7 @@ fn build_resource(l: &ConditionLocals) -> Condition {
             same_name: l.same_name.clone(),
             scope: l.scope.clone(),
             self_target: l.self_target.clone(),
+            shuffle: l.shuffle.clone(),
             source: l.source.clone(),
             target: l.target.clone(),
             temporal: l.temporal.clone(),
@@ -792,6 +814,7 @@ fn build_abilityfilter(l: &ConditionLocals) -> Condition {
     Condition::AbilityFilter {
         common: Box::new(ConditionCommon {
             ability_filter_triggers: l.ability_filter_triggers.clone(),
+            action_reference: l.action_reference.clone(),
             activation_position: l.activation_position.clone(),
             aggregate: l.aggregate.clone(),
             all: l.all.clone(),
@@ -839,6 +862,7 @@ fn build_abilityfilter(l: &ConditionLocals) -> Condition {
             same_name: l.same_name.clone(),
             scope: l.scope.clone(),
             self_target: l.self_target.clone(),
+            shuffle: l.shuffle.clone(),
             source: l.source.clone(),
             target: l.target.clone(),
             temporal: l.temporal.clone(),
@@ -855,6 +879,7 @@ fn build_scorethreshold(l: &ConditionLocals) -> Condition {
     Condition::ScoreThreshold {
         common: Box::new(ConditionCommon {
             ability_filter_triggers: l.ability_filter_triggers.clone(),
+            action_reference: l.action_reference.clone(),
             activation_position: l.activation_position.clone(),
             aggregate: l.aggregate.clone(),
             all: l.all.clone(),
@@ -902,6 +927,7 @@ fn build_scorethreshold(l: &ConditionLocals) -> Condition {
             same_name: l.same_name.clone(),
             scope: l.scope.clone(),
             self_target: l.self_target.clone(),
+            shuffle: l.shuffle.clone(),
             source: l.source.clone(),
             target: l.target.clone(),
             temporal: l.temporal.clone(),
@@ -917,6 +943,7 @@ fn build_choice(l: &ConditionLocals) -> Condition {
     Condition::Choice {
         common: Box::new(ConditionCommon {
             ability_filter_triggers: l.ability_filter_triggers.clone(),
+            action_reference: l.action_reference.clone(),
             activation_position: l.activation_position.clone(),
             aggregate: l.aggregate.clone(),
             all: l.all.clone(),
@@ -964,6 +991,7 @@ fn build_choice(l: &ConditionLocals) -> Condition {
             same_name: l.same_name.clone(),
             scope: l.scope.clone(),
             self_target: l.self_target.clone(),
+            shuffle: l.shuffle.clone(),
             source: l.source.clone(),
             target: l.target.clone(),
             temporal: l.temporal.clone(),
@@ -980,6 +1008,7 @@ fn build_complex(l: &ConditionLocals) -> Condition {
     Condition::Complex {
         common: Box::new(ConditionCommon {
             ability_filter_triggers: l.ability_filter_triggers.clone(),
+            action_reference: l.action_reference.clone(),
             activation_position: l.activation_position.clone(),
             aggregate: l.aggregate.clone(),
             all: l.all.clone(),
@@ -1027,6 +1056,7 @@ fn build_complex(l: &ConditionLocals) -> Condition {
             same_name: l.same_name.clone(),
             scope: l.scope.clone(),
             self_target: l.self_target.clone(),
+            shuffle: l.shuffle.clone(),
             source: l.source.clone(),
             target: l.target.clone(),
             temporal: l.temporal.clone(),
@@ -1044,6 +1074,7 @@ fn build_positioncond(l: &ConditionLocals) -> Condition {
     Condition::PositionCond {
         common: Box::new(ConditionCommon {
             ability_filter_triggers: l.ability_filter_triggers.clone(),
+            action_reference: l.action_reference.clone(),
             activation_position: l.activation_position.clone(),
             aggregate: l.aggregate.clone(),
             all: l.all.clone(),
@@ -1091,6 +1122,7 @@ fn build_positioncond(l: &ConditionLocals) -> Condition {
             same_name: l.same_name.clone(),
             scope: l.scope.clone(),
             self_target: l.self_target.clone(),
+            shuffle: l.shuffle.clone(),
             source: l.source.clone(),
             target: l.target.clone(),
             temporal: l.temporal.clone(),
@@ -1106,6 +1138,7 @@ fn build_opponentchoice(l: &ConditionLocals) -> Condition {
     Condition::OpponentChoice {
         common: Box::new(ConditionCommon {
             ability_filter_triggers: l.ability_filter_triggers.clone(),
+            action_reference: l.action_reference.clone(),
             activation_position: l.activation_position.clone(),
             aggregate: l.aggregate.clone(),
             all: l.all.clone(),
@@ -1153,6 +1186,7 @@ fn build_opponentchoice(l: &ConditionLocals) -> Condition {
             same_name: l.same_name.clone(),
             scope: l.scope.clone(),
             self_target: l.self_target.clone(),
+            shuffle: l.shuffle.clone(),
             source: l.source.clone(),
             target: l.target.clone(),
             temporal: l.temporal.clone(),
@@ -1168,6 +1202,7 @@ fn build_opponentlivesuccess(l: &ConditionLocals) -> Condition {
     Condition::OpponentLiveSuccess {
         common: Box::new(ConditionCommon {
             ability_filter_triggers: l.ability_filter_triggers.clone(),
+            action_reference: l.action_reference.clone(),
             activation_position: l.activation_position.clone(),
             aggregate: l.aggregate.clone(),
             all: l.all.clone(),
@@ -1215,6 +1250,7 @@ fn build_opponentlivesuccess(l: &ConditionLocals) -> Condition {
             same_name: l.same_name.clone(),
             scope: l.scope.clone(),
             self_target: l.self_target.clone(),
+            shuffle: l.shuffle.clone(),
             source: l.source.clone(),
             target: l.target.clone(),
             temporal: l.temporal.clone(),
@@ -1230,6 +1266,7 @@ fn build_noexcessheart(l: &ConditionLocals) -> Condition {
     Condition::NoExcessHeart {
         common: Box::new(ConditionCommon {
             ability_filter_triggers: l.ability_filter_triggers.clone(),
+            action_reference: l.action_reference.clone(),
             activation_position: l.activation_position.clone(),
             aggregate: l.aggregate.clone(),
             all: l.all.clone(),
@@ -1277,6 +1314,7 @@ fn build_noexcessheart(l: &ConditionLocals) -> Condition {
             same_name: l.same_name.clone(),
             scope: l.scope.clone(),
             self_target: l.self_target.clone(),
+            shuffle: l.shuffle.clone(),
             source: l.source.clone(),
             target: l.target.clone(),
             temporal: l.temporal.clone(),
@@ -1292,6 +1330,7 @@ fn build_alwaystrue(l: &ConditionLocals) -> Condition {
     Condition::AlwaysTrue {
         common: Box::new(ConditionCommon {
             ability_filter_triggers: l.ability_filter_triggers.clone(),
+            action_reference: l.action_reference.clone(),
             activation_position: l.activation_position.clone(),
             aggregate: l.aggregate.clone(),
             all: l.all.clone(),
@@ -1339,6 +1378,7 @@ fn build_alwaystrue(l: &ConditionLocals) -> Condition {
             same_name: l.same_name.clone(),
             scope: l.scope.clone(),
             self_target: l.self_target.clone(),
+            shuffle: l.shuffle.clone(),
             source: l.source.clone(),
             target: l.target.clone(),
             temporal: l.temporal.clone(),
@@ -1354,6 +1394,7 @@ fn build_anyof(l: &ConditionLocals) -> Condition {
     Condition::AnyOf {
         common: Box::new(ConditionCommon {
             ability_filter_triggers: l.ability_filter_triggers.clone(),
+            action_reference: l.action_reference.clone(),
             activation_position: l.activation_position.clone(),
             aggregate: l.aggregate.clone(),
             all: l.all.clone(),
@@ -1401,6 +1442,7 @@ fn build_anyof(l: &ConditionLocals) -> Condition {
             same_name: l.same_name.clone(),
             scope: l.scope.clone(),
             self_target: l.self_target.clone(),
+            shuffle: l.shuffle.clone(),
             source: l.source.clone(),
             target: l.target.clone(),
             temporal: l.temporal.clone(),
@@ -1417,6 +1459,7 @@ fn build_allrevealedmatchheartcolor(l: &ConditionLocals) -> Condition {
     Condition::AllRevealedMatchHeartColor {
         common: Box::new(ConditionCommon {
             ability_filter_triggers: l.ability_filter_triggers.clone(),
+            action_reference: l.action_reference.clone(),
             activation_position: l.activation_position.clone(),
             aggregate: l.aggregate.clone(),
             all: l.all.clone(),
@@ -1464,6 +1507,7 @@ fn build_allrevealedmatchheartcolor(l: &ConditionLocals) -> Condition {
             same_name: l.same_name.clone(),
             scope: l.scope.clone(),
             self_target: l.self_target.clone(),
+            shuffle: l.shuffle.clone(),
             source: l.source.clone(),
             target: l.target.clone(),
             temporal: l.temporal.clone(),

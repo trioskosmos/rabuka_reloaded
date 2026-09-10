@@ -1632,15 +1632,64 @@ impl AbilityResolver {
         if matching.is_empty() {
             Ok(vec![])
         } else if effect.optional.unwrap_or(false) && count > 0 {
-            // Optional discard: card selection with user-friendly description
+            // Optional looked-at selection: description must match the destination,
+            // not always "Discard" (e.g. Kanan: deck_bottom).
             let max_take = count.min(matching.len());
-            let description = format!("Discard up to {} looked-at {}?", max_take, util::card_plural(max_take));
+            let dest = effect.destination.as_ref().copied();
+            let (description, description_ja_str) = match dest {
+                Some(Zone::DeckBottom) => (
+                    format!(
+                        "Place up to {} looked-at {} on bottom of deck?",
+                        max_take,
+                        util::card_plural(max_take)
+                    ),
+                    if max_take == 1 {
+                        "見たカードをデッキの下に置きますか？".to_string()
+                    } else {
+                        format!("見たカードを最大{}枚までデッキの下に置きますか？", max_take)
+                    },
+                ),
+                Some(Zone::DeckTop) | Some(Zone::Deck) => (
+                    format!(
+                        "Place up to {} looked-at {} on top of deck?",
+                        max_take,
+                        util::card_plural(max_take)
+                    ),
+                    if max_take == 1 {
+                        "見たカードをデッキの上に置きますか？".to_string()
+                    } else {
+                        format!("見たカードを最大{}枚までデッキの上に置きますか？", max_take)
+                    },
+                ),
+                Some(Zone::Hand) => (
+                    format!(
+                        "Add up to {} looked-at {} to hand?",
+                        max_take,
+                        util::card_plural(max_take)
+                    ),
+                    if max_take == 1 {
+                        "見たカードを手札に加えますか？".to_string()
+                    } else {
+                        format!("見たカードを最大{}枚まで手札に加えますか？", max_take)
+                    },
+                ),
+                _ => (
+                    format!("Discard up to {} looked-at {}?", max_take, util::card_plural(max_take)),
+                    if max_take == 1 {
+                        "見たカードを控え室に置きますか？".to_string()
+                    } else {
+                        format!("見たカードを最大{}枚まで控え室に置きますか？", max_take)
+                    },
+                ),
+            };
             let description_en = Some(description.clone());
-            let description_ja = Some(if max_take == 1 {
-                "見たカードを控え室に置きますか？".to_string()
-            } else {
-                format!("見たカードを最大{}枚まで控え室に置きますか？", max_take)
-            });
+            let description_ja = Some(description_ja_str);
+            log::debug!(
+                "[LOOKED_AT_PROMPT] dest={:?} en={:?} ja={:?}",
+                dest,
+                description_en,
+                description_ja
+            );
             let mut filter = util::CardFilter::from_effect(effect);
             // Resolve dynamic cost limit reference (e.g. "previous_moved_card" + offset)
             if let Ok(resolved) = self.resolve_cost_limit_reference(gs, effect) {

@@ -170,7 +170,7 @@ fn pick_mode(
                 true,
             )
         } else if keys & 0x00000100 != 0 {
-            set_lang(current_lang().toggle());
+            set_lang(current_lang().next());
             Step::Setup(
                 cards.clone(),
                 decks.clone(),

@@ -803,6 +803,42 @@ pub fn translate_choice_prompt_en_to_ja(en: &str) -> Option<String> {
             return Some(format!("見たカードから最大{}枚を選択（スキップ可）", n));
         }
     }
+    if let Some(rest) = s.strip_prefix("Place up to ") {
+        let num_end = rest.find(|c: char| !c.is_ascii_digit()).unwrap_or(rest.len());
+        let n: &str = &rest[..num_end];
+        if s.contains("bottom of deck") {
+            if n == "1" {
+                return Some("見たカードをデッキの下に置きますか？".to_string());
+            }
+            return Some(format!("見たカードを最大{}枚までデッキの下に置きますか？", n));
+        }
+        if s.contains("top of deck") {
+            if n == "1" {
+                return Some("見たカードをデッキの上に置きますか？".to_string());
+            }
+            return Some(format!("見たカードを最大{}枚までデッキの上に置きますか？", n));
+        }
+    }
+    if let Some(rest) = s.strip_prefix("Add up to ") {
+        let num_end = rest.find(|c: char| !c.is_ascii_digit()).unwrap_or(rest.len());
+        let n: &str = &rest[..num_end];
+        if s.contains("to hand") {
+            if n == "1" {
+                return Some("見たカードを手札に加えますか？".to_string());
+            }
+            return Some(format!("見たカードを最大{}枚まで手札に加えますか？", n));
+        }
+    }
+    if let Some(rest) = s.strip_prefix("Discard up to ") {
+        let num_end = rest.find(|c: char| !c.is_ascii_digit()).unwrap_or(rest.len());
+        let n: &str = &rest[..num_end];
+        if s.contains("looked-at") {
+            if n == "1" {
+                return Some("見たカードを控え室に置きますか？".to_string());
+            }
+            return Some(format!("見たカードを最大{}枚まで控え室に置きますか？", n));
+        }
+    }
     match s {
         "Repeat effect?" => Some("効果を繰り返しますか？".to_string()),
         "Pay optional cost or skip" => Some("オプションコストを支払うかスキップ".to_string()),

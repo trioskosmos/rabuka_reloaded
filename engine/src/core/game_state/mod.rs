@@ -1103,16 +1103,51 @@ impl GameState {
         }
     }
 
+    /// Number of real options behind a choice (what the player picks from),
+    /// as opposed to `choice_offered_labels().len()` which also counts the
+    /// prompt header, `type:` and `skip_allowed` formatting lines. The rule
+    /// log's "N択" count must use this, otherwise e.g. a 2-option
+    /// self-or-opponent prompt reports "pick of 4".
+    pub fn choice_option_count(&self, choice: &crate::ability::types::Choice) -> usize {
+        use crate::ability::types::Choice as C;
+        match choice {
+            C::SelectCard { filtered_indices, count, .. } => {
+                if let Some(fi) = filtered_indices {
+                    fi.len()
+                } else {
+                    // Unfiltered: the player still picks `count` card(s); fall
+                    // back to count so the log never shows 0 options.
+                    (*count).max(1)
+                }
+            }
+            C::SelectTarget { options, .. } => options.as_ref().map(|o| o.len()).unwrap_or(1).max(1),
+            // left / center / right.
+            C::SelectPosition { .. } => 3,
+            C::SelectHeartColor { options, .. } | C::SelectHeartType { options, .. } => {
+                options.len().max(1)
+            }
+            C::SelectAutoAbility { options, .. } => options.len().max(1),
+            C::SelectLiveSuccess { options, .. } => options.len().max(1),
+        }
+    }
+
     /// Push a `choice_offered` structured entry capturing the options presented
     /// to the player at the moment the choice is stored/committed. Provides the
     /// "offered" half of the offer→resolve pairing in the log.
     pub fn push_choice_offered(&mut self, choice: &crate::ability::types::Choice) {
         let offered = self.choice_offered_labels(choice);
         let skip_allowed = choice.allow_skip();
+        let option_count = self.choice_option_count(choice);
+        log::debug!(
+            "choice_offered: prompt='{}' options={} labels={}",
+            choice.description(),
+            option_count,
+            offered.len()
+        );
         let entry = crate::types::LogEntry {
             text: format!(
                 "[choice] offered: {} option(s){}",
-                offered.len(),
+                option_count,
                 if skip_allowed { " (skip allowed)" } else { "" }
             ),
             turn: self.turn_number,
@@ -1126,6 +1161,8 @@ impl GameState {
             metadata: Some(crate::core::types::LogMetadata::ChoiceOffered {
                 offered,
                 skip_allowed,
+                prompt: choice.description().to_string(),
+                prompt_ja: choice.description_ja().map(|s| s.to_string()),
             }),
         };
         self.push_structured_log(entry);
@@ -1144,12 +1181,19 @@ impl GameState {
         if cfg!(feature = "headless") {
             return;
         }
-        let offered_count = self.choice_offered_labels(choice).len();
+        let offered_count = self.choice_option_count(choice);
         let chosen_final = if skipped {
             vec!["skip".to_string()]
         } else {
             chosen
         };
+        log::debug!(
+            "choice_resolved: prompt='{}' options={} picked='{}' skipped={}",
+            choice.description(),
+            offered_count,
+            chosen_final.join(", "),
+            skipped
+        );
         let entry = crate::types::LogEntry {
             text: format!(
                 "[choice] resolved: offered {} option(s), picked {}",
@@ -1168,6 +1212,8 @@ impl GameState {
                 offered_count,
                 chosen: chosen_final.clone(),
                 skipped,
+                prompt: choice.description().to_string(),
+                prompt_ja: choice.description_ja().map(|s| s.to_string()),
             }),
         };
         self.push_structured_log(entry);

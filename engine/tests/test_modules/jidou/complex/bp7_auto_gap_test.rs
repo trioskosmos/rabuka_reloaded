@@ -508,7 +508,7 @@ fn shioriko_live_phase_wait_discard_activates() {
     game.state.current_phase = Phase::FirstAttackerPerformance;
     game.state
         .recently_state_changed
-        .push((waited, "active".to_string(), "wait".to_string()));
+        .push((waited, "active".to_string(), "wait".to_string(), "".to_string()));
     game.state.mods.orientation_modifiers.insert(waited, CardOrientation::Wait);
 
     let pid = game.state.player1.id.clone();

@@ -1043,18 +1043,45 @@ pub enum LogMetadata {
     /// A player-facing choice was offered. `offered` holds the legal options
     /// (card names, option labels, heart colors, etc.). Consumed by a later
     /// `ChoiceResolved` entry or directly closed when skipped.
+    /// `prompt` is the English/display description from the Choice and
+    /// `prompt_ja` the Japanese prompt when the engine provided one, so the
+    /// web rule log can render the prompt in the player's language instead
+    /// of leaking the raw English description.
     ChoiceOffered {
         offered: Vec<String>,
         skip_allowed: bool,
+        #[cfg_attr(
+            feature = "serde_support",
+            serde(default)
+        )]
+        prompt: String,
+        #[cfg_attr(
+            feature = "serde_support",
+            serde(default, skip_serializing_if = "Option::is_none")
+        )]
+        prompt_ja: Option<String>,
     },
     /// The resolved outcome of a previously-offered choice: what the player
     /// actually picked (`chosen`) and whether they skipped. Only the number of
     /// offered options is stored — the full offered array lives in the
     /// preceding `ChoiceOffered` entry, so a `ChoiceResolved` entry stays compact.
+    /// `offered_count` is the number of real options (not formatting lines).
+    /// `prompt`/`prompt_ja` repeat the offered prompt so the resolved entry
+    /// renders standalone without chasing the preceding offered entry.
     ChoiceResolved {
         offered_count: usize,
         chosen: Vec<String>,
         skipped: bool,
+        #[cfg_attr(
+            feature = "serde_support",
+            serde(default)
+        )]
+        prompt: String,
+        #[cfg_attr(
+            feature = "serde_support",
+            serde(default, skip_serializing_if = "Option::is_none")
+        )]
+        prompt_ja: Option<String>,
     },
 }
 

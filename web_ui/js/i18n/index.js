@@ -3,11 +3,18 @@
  */
 
 export * from './names.js';
-export { 
-    translateAbility, 
-    loadTranslations, 
-    t, 
-    translateCard, 
+export {
+    SUPPORTED_LANGS,
+    DEFAULT_LANG,
+    normalizeLangCode,
+    nextLangCode,
+    langLabel,
+    isDefaultLang,
+    isJapanese,
+    translateAbility,
+    loadTranslations,
+    t,
+    translateCard,
     translateMetadata,
     translateCardType,
     translateProduct,

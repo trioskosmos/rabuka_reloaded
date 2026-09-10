@@ -1,5 +1,6 @@
 import { getAppBaseUrl, isMulliganPhase } from './constants.js';
 import { apiFetch } from './network.js';
+import { normalizeLangCode, DEFAULT_LANG } from './i18n/index.js';
 
 const _target = new EventTarget();
 
@@ -43,8 +44,9 @@ const stateInternal = {
     TEMPLATE_MASK: 0x1FFFFF,
     INSTANCE_SHIFT: 21,
 
-    // Read from Rust ui_config
-    get currentLang() { return uiConfig().current_lang || 'jp'; },
+    // Read from Rust ui_config; always a canonical registry code
+    // (`ja` → `jp`, unknown → default) so every `=== 'jp'` check holds.
+    get currentLang() { return normalizeLangCode(uiConfig().current_lang || DEFAULT_LANG); },
     get showFriendlyAbilities() { return uiConfig().show_friendly_abilities || false; },
     get selectedTurn() { return uiConfig().selected_turn ?? -1; },
     get selectedPerfTurn() { return uiConfig().selected_perf_turn ?? -1; },

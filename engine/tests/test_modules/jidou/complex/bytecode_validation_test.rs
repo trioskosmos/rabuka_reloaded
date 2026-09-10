@@ -79,22 +79,17 @@ mod bytecode_validation {
     /// below. A new parser handler emitting an unmapped value fails here
     /// instead of silently turning an ability into a no-op.
     ///
-    /// Baseline — shadow-schema condition fields (audit §4.6): the JSON puts
-    /// `action_reference` / `reference_card` / `shuffle` / `card_names` on
-    /// condition objects, but the typed Condition struct has no such fields;
-    /// their effect-level twins ARE decoded via EffectFilter, so behavior
-    /// flows through that path until the P9 format-v2 cleanup gives them a
-    /// structural home. Do NOT add entries here for new values — fix the
-    /// mapping instead.
+    /// Baseline — empty. The former shadow-schema condition fields
+    /// (`action_reference` on PL!SP-bp2-001-R＋ ab#0, `shuffle` on
+    /// PL!N-bp7-011-R＋ ab#1) now have structural homes on ConditionCommon
+    /// (card.rs), so they decode instead of tripping the audit. Any NEW
+    /// fallback fails here — fix the mapping, do not append entries.
     #[test]
     fn bytecode_no_silent_decode_fallbacks() {
-        // (card_no, ab# slot) of the entries expected to carry shadow-schema
-        // condition fields (triaged 2026-08-24). The ab# discriminator is
+        // (card_no, ab# slot) of entries expected to carry unmapped condition
+        // fields. Empty: every known key decodes. The ab# discriminator is
         // required: sibling abilities on the same card share the card_no.
-        const KNOWN_FALLBACKS: &[(&str, &str)] = &[
-            ("PL!SP-bp2-001-R＋", "(ab#0)"), // action_reference: "invalidate_ability"
-            ("PL!N-bp7-011-R＋", "(ab#1)"),  // shuffle: true
-        ];
+        const KNOWN_FALLBACKS: &[(&str, &str)] = &[];
         let _ = env_logger::try_init(); // surface [decode_audit] warnings under RUST_LOG
         let json_abilities = load_json_abilities();
         for i in 0..json_abilities.len() {

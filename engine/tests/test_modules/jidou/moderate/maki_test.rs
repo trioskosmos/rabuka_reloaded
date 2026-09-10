@@ -283,8 +283,11 @@ fn maki_ab1_own_effect_wait_draws() {
     );
 
     // Toubatsu jidou fires on its move: take the wait bullet (index 1),
-    // then the single opponent member auto-resolves.
-    scan_autos_both(&mut game);
+    // then the single opponent member auto-resolves. Manual scan (not
+    // scan_autos_both, which would answer the 3-option itself).
+    let pid = game.state.player1.id.clone();
+    rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(&mut game.state, &pid);
+    game.state.process_pending_auto_abilities(&pid);
     assert!(
         game.has_pending_choice(),
         "Toubatsu jidou should offer its 3-option"

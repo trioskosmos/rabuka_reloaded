@@ -109,6 +109,8 @@ fn decode_effect_field(bc: &mut BcReader, key: &str,
             "target_member" => { ek.target_member = bc.read_arc_str_value(); Some(true) }
             "target_from_selection" => { ek.target_from_selection = bc.read_bool_value(); Some(true) }
             "source_position" => { ek.source_position = bc.read_arc_str_value(); Some(true) }
+            "position_compare" => { ek.position_compare = bc.read_arc_str_value(); Some(true) }
+            "source_location" => { ek.source_location = bc.read_arc_str_value(); Some(true) }
             "exclude_selected" => { ek.exclude_selected = bc.read_bool_value(); Some(true) }
             "discard_remaining" => { ek.discard_remaining = bc.read_bool_value(); Some(true) }
             "self_cost" => { ek.self_cost = bc.read_bool_value(); Some(true) }
@@ -164,6 +166,7 @@ fn decode_effect_field(bc: &mut BcReader, key: &str,
             "value" => { ek.value = bc.read_u8_value(); Some(true) }
             "per_group" => { ek.per_group = bc.read_bool_value(); Some(true) }
             "per_group_count" => { ek.per_group_count = bc.read_u8_value(); Some(true) }
+            "per_character" => { ek.per_character = bc.read_bool_value(); Some(true) }
             "placement_order" => { ek.placement_order = bc.read_placement_order_value(); Some(true) }
             "remainder_destination" => { ek.remainder_destination = bc.read_arc_str_value(); Some(true) }
             "remainder_placement_order" => { ek.remainder_placement_order = bc.read_placement_order_value(); Some(true) }
@@ -323,6 +326,7 @@ pub(crate) struct EffectKindLocals {
     pub original_operator: Option<Operator>,
     pub original_value: Option<bool>,
     pub parenthetical: Option<Box<Vec<String>>>,
+    pub per_character: Option<bool>,
     pub per_group: Option<bool>,
     pub per_group_count: Option<u8>,
     pub per_unit: Option<bool>,
@@ -335,6 +339,7 @@ pub(crate) struct EffectKindLocals {
     pub picker: Option<ArcStr>,
     pub placement_order: Option<PlacementOrder>,
     pub position: Option<Box<PositionInfo>>,
+    pub position_compare: Option<ArcStr>,
     pub question: Option<ArcStr>,
     pub quoted_text: Option<Box<QuotedText>>,
     pub ref_offset: Option<i8>,
@@ -361,6 +366,7 @@ pub(crate) struct EffectKindLocals {
     pub sign: Option<ArcStr>,
     pub source: Option<Zone>,
     pub source_card: Option<ArcStr>,
+    pub source_location: Option<ArcStr>,
     pub source_position: Option<ArcStr>,
     pub state: Option<Box<EffectState>>,
     pub state_change: Option<Box<EffectState>>,
@@ -432,6 +438,8 @@ fn build_filter(ek: &EffectKindLocals) -> Option<Box<EffectFilter>> {
         target_member: ek.target_member.clone(),
         target_from_selection: ek.target_from_selection,
         source_position: ek.source_position.clone(),
+        position_compare: ek.position_compare.clone(),
+        source_location: ek.source_location.clone(),
         exclude_selected: ek.exclude_selected,
         discard_remaining: ek.discard_remaining,
         self_cost: ek.self_cost,
@@ -488,6 +496,7 @@ fn build_filter(ek: &EffectKindLocals) -> Option<Box<EffectFilter>> {
         value: ek.value,
         per_group: ek.per_group,
         per_group_count: ek.per_group_count,
+        per_character: ek.per_character,
         placement_order: ek.placement_order,
         remainder_destination: ek.remainder_destination.clone(),
         remainder_placement_order: ek.remainder_placement_order,

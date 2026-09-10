@@ -12,8 +12,8 @@ _test never asserts (smoke at best — cannot pin behavior)_
 
 | file | test | line | detail |
 | --- | --- | --- | --- |
-| `engine/tests/test_modules/jidou/complex/bytecode_validation_test.rs` | `bytecode_debug_ability_399` | 214 |  |
-| `engine/tests/test_modules/jidou/complex/bytecode_validation_test.rs` | `bytecode_debug_ability_399_disabled` | 237 |  |
+| `engine/tests/test_modules/jidou/complex/bytecode_validation_test.rs` | `bytecode_debug_ability_399` | 209 |  |
+| `engine/tests/test_modules/jidou/complex/bytecode_validation_test.rs` | `bytecode_debug_ability_399_disabled` | 232 |  |
 
 ## no_drive (0)
 
@@ -50,7 +50,7 @@ _has_pending_choice asserted without choice identity (pending_choice_type/summar
 | `engine/tests/test_modules/batches/untested_abilities_batch7_test.rs` | `rin_bp4_009_own_empty_stage_counts_as_zero_and_fires` | 603 |  |
 | `engine/tests/test_modules/edge_cases/s_pb1_002_riko_edge_test.rs` | `riko_opponent_discards_live_no_gain` | 3 |  |
 | `engine/tests/test_modules/jidou/complex/bp6_004_002_audit_test.rs` | `riko_bp6_auto_e2e_heart_success_no_trigger` | 289 |  |
-| `engine/tests/test_modules/jidou/complex/logging_test.rs` | `real_choice_flow_emits_offered_and_resolved` | 265 |  |
+| `engine/tests/test_modules/jidou/complex/logging_test.rs` | `real_choice_flow_emits_offered_and_resolved` | 271 |  |
 | `engine/tests/test_modules/qa/qa_new_tests209.rs` | `q209_kasumi_use_limit_blocks_second` | 354 |  |
 | `engine/tests/test_modules/qa/qa_new_tests238.rs` | `q238_baton_touch_select_opponent_member` | 265 |  |
 | `engine/tests/test_modules/qa/qa_new_tests238.rs` | `q238_baton_touch_triggers_position_change_selection` | 201 |  |

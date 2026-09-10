@@ -19,9 +19,28 @@ use crate::ability::types::Choice;
 use crate::ability::util::zone_cards;
 
 use crate::game::game_setup;
+use crate::game::language::Lang;
 use crate::game::platform_ui::{card_ability_text, card_detail_title, card_stat_text, choose_card_grid, one_line, PlatformUi, wrap_text};
 use crate::game_state::GameState;
 use crate::turn::TurnEngine;
+
+/// Resolve a Choice's prompt in the port's language: Japanese prefers
+/// `description_ja`, every other language prefers `description_en`, each
+/// falling back to the Japanese source `description`. Single place to
+/// extend when a third language ships (add `description_<code>` on
+/// [`Choice`] and match it here).
+fn choice_prompt<'a>(choice: &'a Choice, fallback: &'a str, lang: Lang) -> &'a str {
+    match lang {
+        Lang::Japanese => choice
+            .description_ja()
+            .or(choice.description_en())
+            .unwrap_or(fallback),
+        _ => choice
+            .description_en()
+            .or(choice.description_ja())
+            .unwrap_or(fallback),
+    }
+}
 
 /// Scrollable full-text viewer. Shows `lines` in a window; Up/Down scroll,
 /// and A/B/L/R close it back to the menu without disturbing the option list's
@@ -463,10 +482,13 @@ pub fn select_action(
     // Rows carry the neutral 2-char prefix through one_line so the wrapped
     // width matches the original exactly; per frame only bytes [0..2] differ,
     // swapped onto a reused buffer instead of re-running fmt machinery.
+    // Text is resolved in the port's language (PlatformUi::ui_lang, default
+    // Japanese) so language switching works on every console port.
+    let lang = ui.ui_lang();
     let rows: Vec<String> = acts
         .iter()
         .map(|a| {
-            let line = a.description.lines().next().unwrap_or("");
+            let line = a.display_desc_for(lang).lines().next().unwrap_or("");
             // Card tag disambiguates rows that don't name their card
             // ("Draw 2", "Pass"...). When the row already contains the
             // name, appending " [Name]" is pure redundancy, so skip it.
@@ -516,7 +538,7 @@ pub fn select_action(
         }
         ui.set_actionable_cards(&action_cards);
         ui.set_selected_action(
-            acts[sel].description.lines().next().unwrap_or(""),
+            acts[sel].display_desc_for(lang).lines().next().unwrap_or(""),
             sel,
             acts.len(),
         );
@@ -543,15 +565,16 @@ pub fn select_action(
                         header.push(card_detail_title(c));
                         header.push(card_stat_text(c));
                         let ab = card_ability_text(c);
+                        let desc = act.display_desc_for(lang);
                         let body = if ab.trim().is_empty() {
-                            act.description.clone()
+                            desc.to_string()
                         } else {
-                            format!("{}\n\n{}", act.description, ab)
+                            format!("{}\n\n{}", desc, ab)
                         };
                         ui.show_detail_screen(gs, Some(c.card_no.as_ref()), &header, &body);
                     }
                     None => {
-                        ui.show_detail_screen(gs, None, &[], &act.description);
+                        ui.show_detail_screen(gs, None, &[], act.display_desc_for(lang));
                     }
                 }
             } else if ui.just_pressed_r() {
@@ -598,11 +621,17 @@ pub fn handle_choice(ui: &mut dyn PlatformUi, gs: &mut GameState) -> bool {
         Some(c) => c.clone(),
         None => return true,
     };
+    // Port's language for every prompt below. The prompt is resolved once
+    // here (Japanese prefers description_ja, others description_en) so no
+    // arm hardcodes a language; arms keep matching the owned `choice`.
+    let lang = ui.ui_lang();
+    let prompt = choice_prompt(&choice, choice.description(), lang).to_string();
+    let prompt = prompt.as_str();
 
     match choice {
         Choice::SelectAutoAbility {
             options,
-            description,
+            description: _description,
             ..
         } => {
             // Full ability text per option (3DS auto-ability queue style):
@@ -627,8 +656,7 @@ pub fn handle_choice(ui: &mut dyn PlatformUi, gs: &mut GameState) -> bool {
                 TurnEngine::resume_with_choice(gs, Some(0), None).ok();
                 return true;
             }
-            let sel =
-                menu_select_detailed(ui, gs, &items, &description, false).unwrap_or(0);
+            let sel = menu_select_detailed(ui, gs, &items, prompt, false).unwrap_or(0);
             TurnEngine::resume_with_choice(gs, Some(sel as i16), None).ok();
             true
         }
@@ -637,7 +665,7 @@ pub fn handle_choice(ui: &mut dyn PlatformUi, gs: &mut GameState) -> bool {
             count,
             allow_skip,
             target_player_id,
-            description,
+            description: _description,
             filtered_indices,
             ..
         } => {
@@ -715,7 +743,7 @@ if count <= 1 {
                 let sel = choose_card_grid(
                     ui,
                     gs,
-                    &description,
+                    prompt,
                     &items,
                     &card_nos,
                     allow_skip,
@@ -767,7 +795,7 @@ if count <= 1 {
                         ui,
                         gs,
                         &display_items,
-                        &description,
+                        prompt,
                         allow_skip,
                         Some(&card_nos),
                         Some(&dimmed),
@@ -795,7 +823,7 @@ if count <= 1 {
         }
         Choice::SelectTarget {
             target,
-            description,
+            description: _description,
             allow_skip,
             ..
         } => {
@@ -810,9 +838,14 @@ if count <= 1 {
                 TurnEngine::resume_with_choice(gs, Some(-1), None).ok();
                 return true;
             }
-            let items: Vec<String> =
-                acts.iter().map(|a| a.description.clone()).collect();
-            let sel = menu_select(ui, &items, &description, allow_skip);
+            // Resolve option text in the port's language so language
+            // switching applies to choice menus by default (prompt was
+            // resolved once above via choice_prompt).
+            let items: Vec<String> = acts
+                .iter()
+                .map(|a| a.display_desc_for(lang).to_string())
+                .collect();
+            let sel = menu_select(ui, &items, prompt, allow_skip);
             match sel {
                 None => match target.as_str() {
                     "choice" | "choice_string" | "conditional_optional" => {
@@ -835,7 +868,7 @@ if count <= 1 {
             true
         }
         Choice::SelectPosition {
-            description,
+            description: _description,
             allow_skip,
             ..
         } => {
@@ -843,7 +876,7 @@ if count <= 1 {
                 .iter()
                 .map(|s| s.to_string())
                 .collect();
-            let sel = menu_select(ui, &items, &description, allow_skip);
+            let sel = menu_select(ui, &items, prompt, allow_skip);
             match sel {
                 None => TurnEngine::resume_with_choice(gs, Some(-1), None).ok(),
                 Some(idx) => TurnEngine::resume_with_choice(gs, Some(idx as i16), None).ok(),
@@ -852,25 +885,25 @@ if count <= 1 {
         }
         Choice::SelectHeartColor {
             options,
-            description,
+            description: _description,
             ..
         } => {
-            let sel = menu_select(ui, &options, &description, false).unwrap_or(0);
+            let sel = menu_select(ui, &options, prompt, false).unwrap_or(0);
             TurnEngine::resume_with_choice(gs, Some(sel as i16), None).ok();
             true
         }
         Choice::SelectHeartType {
             options,
-            description,
+            description: _description,
             ..
         } => {
-            let sel = menu_select(ui, &options, &description, false).unwrap_or(0);
+            let sel = menu_select(ui, &options, prompt, false).unwrap_or(0);
             TurnEngine::resume_with_choice(gs, Some(sel as i16), None).ok();
             true
         }
         Choice::SelectLiveSuccess {
             options,
-            description,
+            description: _description,
             player_id,
             ..
         } => {
@@ -900,13 +933,7 @@ if count <= 1 {
                 })
                 .collect();
             let sel = menu_select_with_cards(
-                ui,
-                gs,
-                &items,
-                &description,
-                false,
-                Some(&card_nos),
-                None,
+                ui, gs, &items, prompt, false, Some(&card_nos), None,
             )
             .unwrap_or(0);
             TurnEngine::resume_with_choice(gs, None, Some(vec![sel])).ok();

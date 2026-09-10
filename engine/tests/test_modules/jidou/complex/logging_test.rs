@@ -132,9 +132,10 @@ fn choice_metadata_preserves_offered_and_chosen() {
     );
 
     match &offered_entries[0].metadata {
-        Some(LogMetadata::ChoiceOffered { offered, skip_allowed }) => {
+        Some(LogMetadata::ChoiceOffered { offered, skip_allowed, prompt, prompt_ja: _ }) => {
             assert!(!offered.is_empty(), "offered options must be non-empty");
             assert!(*skip_allowed, "SelectCard with allow_skip=true reports skip");
+            assert_eq!(prompt, "choose a live card", "offered prompt must carry the Choice description");
         }
         other => panic!("expected ChoiceOffered metadata, got {:?}", other),
     }
@@ -144,10 +145,15 @@ fn choice_metadata_preserves_offered_and_chosen() {
             offered_count,
             chosen,
             skipped,
+            prompt,
+            prompt_ja: _,
         }) => {
-            assert!(*offered_count > 0, "offered_count must be non-zero");
+            // One filtered candidate -> exactly 1 real option (not the
+            // 3 formatting lines choice_offered_labels produces).
+            assert_eq!(*offered_count, 1, "offered_count must count real options, not label lines");
             assert_eq!(chosen, &["card".to_string()], "chosen must be preserved");
             assert!(!*skipped, "not a skip for a card selection");
+            assert_eq!(prompt, "choose a live card", "resolved prompt must carry the Choice description");
         }
         other => panic!("expected ChoiceResolved metadata, got {:?}", other),
     }
@@ -416,10 +422,60 @@ fn choice_resolved_metadata_is_trimmed_and_captures_chosen() {
             offered_count,
             chosen,
             skipped,
+            prompt: _,
+            prompt_ja: _,
         }) => {
-            assert!(*offered_count > 0, "offered_count must be non-zero");
+            assert_eq!(*offered_count, 1, "offered_count must count real options, not label lines");
             assert_eq!(chosen, &["#0".to_string()], "chosen must be preserved");
             assert!(!*skipped, "not a skip");
+        }
+        other => panic!("expected ChoiceResolved metadata, got {:?}", other),
+    }
+}
+
+#[test]
+fn self_or_opponent_counts_two_options_not_label_lines() {
+    // Screenshot regression: "Choose self or opponent" (2 options) was logged
+    // as "pick of 4" because offered_count counted the prompt header, the two
+    // "  - ..." lines AND the "(skip_allowed=...)" footer. It must be 2.
+    use rabuka_engine::ability::types::Choice;
+    let mut g = TestGame::new(load_real_database());
+
+    let choice = Choice::SelectTarget {
+        target: "self_or_opponent".to_string(),
+        description: "Choose self or opponent".to_string(),
+        description_en: Some("Choose self or opponent".to_string()),
+        description_ja: Some("自分または相手を選択".to_string()),
+        allow_skip: false,
+        options: Some(vec!["自分".to_string(), "相手".to_string()]),
+    };
+    g.state.push_choice_offered(&choice);
+    g.state.push_choice_resolved(&choice, vec!["相手".to_string()], false);
+
+    let offered = g
+        .state
+        .structured_log
+        .iter()
+        .find(|e| e.category == "choice_offered")
+        .expect("expected a choice_offered entry");
+    match &offered.metadata {
+        Some(LogMetadata::ChoiceOffered { prompt, prompt_ja, .. }) => {
+            assert_eq!(prompt, "Choose self or opponent");
+            assert_eq!(prompt_ja.as_deref(), Some("自分または相手を選択"));
+        }
+        other => panic!("expected ChoiceOffered metadata, got {:?}", other),
+    }
+
+    let resolved = g
+        .state
+        .structured_log
+        .iter()
+        .find(|e| e.category == "choice_resolved")
+        .expect("expected a choice_resolved entry");
+    match &resolved.metadata {
+        Some(LogMetadata::ChoiceResolved { offered_count, chosen, .. }) => {
+            assert_eq!(*offered_count, 2, "self-or-opponent has 2 options, not 4 label lines");
+            assert_eq!(chosen, &["相手".to_string()]);
         }
         other => panic!("expected ChoiceResolved metadata, got {:?}", other),
     }

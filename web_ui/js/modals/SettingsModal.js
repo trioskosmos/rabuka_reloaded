@@ -13,12 +13,16 @@ export const SettingsModal = {
     updateLanguage: () => { applyDataI18n(); },
 
     toggleLang: async () => {
-        const newLang = State.currentLang === 'jp' ? 'en' : 'jp';
+        // Cycle through the registry (today: jp ↔ en). Adding a language
+        // needs no change here.
+        const newLang = i18n.nextLangCode(State.currentLang);
         await State.updateUiConfig({ current_lang: newLang });
         await i18n.loadTranslations(newLang);
         applyDataI18n();
+        // Button shows the *next* language's autonym (what you'll switch to).
+        const following = i18n.langLabel(i18n.nextLangCode(newLang));
         document.querySelectorAll('[data-action="toggle-lang"]').forEach(btn => {
-            btn.textContent = newLang === 'jp' ? 'English' : '日本語';
+            btn.textContent = following;
         });
         window.render?.();
     },

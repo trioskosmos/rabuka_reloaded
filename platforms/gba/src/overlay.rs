@@ -357,14 +357,20 @@ pub fn run_start_menu<I: InputSource>(
     enum Item {
         Log,
         Zone(usize),
+        Language,
         Close,
     }
     let zones = menu_zones(gs);
+    let lang_label = || {
+        alloc::format!("Language: {}", crate::lang::current_lang().label())
+    };
     let mut items: Vec<(String, Item)> = Vec::new();
     items.push((String::from("Game Log"), Item::Log));
     for (i, (label, _, _)) in zones.iter().enumerate() {
         items.push((label.clone(), Item::Zone(i)));
     }
+    let lang_idx = items.len();
+    items.push((lang_label(), Item::Language));
     items.push((String::from("Close"), Item::Close));
 
     let mut sel = 0usize;
@@ -400,6 +406,12 @@ pub fn run_start_menu<I: InputSource>(
                 Item::Zone(i) => {
                     let (label, cards, hide) = &zones[i];
                     show_zone_grid(display, input, gs, label, cards, *hide);
+                }
+                Item::Language => {
+                    // Cycle the UI language (engine Lang::SUPPORTED order);
+                    // refresh the row label and stay in the menu.
+                    crate::lang::cycle_lang();
+                    items[lang_idx].0 = lang_label();
                 }
                 Item::Close => return,
             }

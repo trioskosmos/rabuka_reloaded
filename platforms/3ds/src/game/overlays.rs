@@ -118,8 +118,8 @@ pub(crate) fn overlay_input(
                         1 => Overlay::GameLog(0, 0),
                         2 => Overlay::RevealedCards(true, 0, None),
                         3 => {
-                            // Toggle language
-                            set_lang(current_lang().toggle());
+                            // Cycle language (registry order; jp ↔ en today)
+                            set_lang(current_lang().next());
                             i18n::init();
                             Overlay::StartMenu(*sel)
                         }

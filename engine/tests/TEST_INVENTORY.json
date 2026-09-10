@@ -1,6 +1,6 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-09-09T03:44:35.378340+00:00",
+  "generated_at": "2026-09-10T05:05:05.754205+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
@@ -8,7 +8,7 @@
     "unique_abilities": 936
   },
   "n_files": 575,
-  "n_tests": 3283,
+  "n_tests": 3287,
   "total_cards": 771,
   "covered_cards": 771,
   "abilities_on_covered": 936,
@@ -388,13 +388,13 @@
         {
           "file": "engine/tests/test_modules/jidou/complex/bytecode_validation_test.rs",
           "test": "bytecode_debug_ability_399",
-          "line": 214,
+          "line": 209,
           "detail": ""
         },
         {
           "file": "engine/tests/test_modules/jidou/complex/bytecode_validation_test.rs",
           "test": "bytecode_debug_ability_399_disabled",
-          "line": 237,
+          "line": 232,
           "detail": ""
         }
       ]
@@ -515,7 +515,7 @@
         {
           "file": "engine/tests/test_modules/jidou/complex/logging_test.rs",
           "test": "real_choice_flow_emits_offered_and_resolved",
-          "line": 265,
+          "line": 271,
           "detail": ""
         },
         {
@@ -730,7 +730,7 @@
       ]
     }
   },
-  "n_test_fns_parsed": 3283,
+  "n_test_fns_parsed": 3287,
   "abilities": [
     {
       "idx": 0,
@@ -828,6 +828,7 @@
         "engine/tests/test_modules/jidou/moderate/bp7_kanon_under_member_blade_test.rs",
         "engine/tests/test_modules/jidou/moderate/bp7_q271_colorful_dreams_test.rs",
         "engine/tests/test_modules/jidou/moderate/location_condition_cost_test.rs",
+        "engine/tests/test_modules/jidou/moderate/maki_test.rs",
         "engine/tests/test_modules/jidou/moderate/modify_required_hearts_exclude_heart_test.rs"
       ],
       "covering_tests": [
@@ -862,7 +863,7 @@
         "bp6009_center_side_blade2_members_live_total_plus1",
         "bp7024_debut_heart01_with_three_r3birth"
       ],
-      "covering_test_count": 462,
+      "covering_test_count": 469,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -1116,7 +1117,7 @@
         "bp6020_ab0_non_mus_resolver_does_not_reposition_anything",
         "bp6020_ab0_once_per_turn_blocks_second_resolution"
       ],
-      "covering_test_count": 317,
+      "covering_test_count": 320,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -1208,7 +1209,7 @@
         "c8_both_shuffle_under_deck",
         "c8_q242_19_below_threshold"
       ],
-      "covering_test_count": 159,
+      "covering_test_count": 160,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -7953,7 +7954,7 @@
         "no_saint_snow_does_not_fire",
         "only_selects_matching_live_cards"
       ],
-      "covering_test_count": 46,
+      "covering_test_count": 47,
       "is_null": false,
       "use_limit": 1,
       "watches_abilities": false,
@@ -17296,6 +17297,7 @@
         "engine/tests/test_modules/abilities/complex/ability_engine_fixes_test.rs",
         "engine/tests/test_modules/jidou/complex/bp7_005_ren_scope_test.rs",
         "engine/tests/test_modules/jidou/complex/toubatsu_test.rs",
+        "engine/tests/test_modules/jidou/moderate/maki_test.rs",
         "engine/tests/test_modules/jidou/moderate/position_change_condition_test.rs"
       ],
       "covering_tests": [
@@ -17309,6 +17311,13 @@
         "keke_look_select_liella_no_blade_heart_excluded",
         "keke_look_select_liella_with_blade_heart",
         "keke_look_select_sunny_passion_member",
+        "maki_ab0_opponent_wait_blocked_by_wait_immunity",
+        "maki_ab1_cause_player_decides",
+        "maki_ab1_opponent_caused_wait_no_draw",
+        "maki_ab1_own_effect_wait_draws",
+        "maki_edge_cost5_opponent_draws_nothing",
+        "maki_edge_no_opponent_member_no_draw",
+        "maki_q177_debut_triggers_draw_via_ab0",
         "natsumi_009_draw_with_other_5yncri5e",
         "natsumi_009_no_draw_when_alone",
         "natsumi_009_no_draw_with_duplicate_in_hand",
@@ -17321,16 +17330,9 @@
         "ren_real_tutor_parks_under_no_blade",
         "self_target_card_moves_triggers_own_ability",
         "sumire_real_debut_places_energy_fires",
-        "sumire_real_swap_fires",
-        "syncrise_member_moves_to_center_triggers_blade_gain",
-        "syncrise_member_moves_to_non_center_no_trigger",
-        "toubatsu_duplicate_names_in_discard_opponent_only_sees_correct_cards",
-        "toubatsu_q118_1_live_card_fails",
-        "toubatsu_q118_2_distinct_live_cards_works",
-        "toubatsu_q263_center_to_area_move_triggers_auto",
-        "toubatsu_real_swap_move_triggers_auto"
+        "sumire_real_swap_fires"
       ],
-      "covering_test_count": 55,
+      "covering_test_count": 62,
       "is_null": false,
       "use_limit": 1,
       "watches_abilities": false,
@@ -19290,7 +19292,8 @@
         "engine/tests/test_modules/batches/untested_abilities_batch44_test.rs",
         "engine/tests/test_modules/batches/untested_abilities_batch46_test.rs",
         "engine/tests/test_modules/batches/untested_abilities_batch47_test.rs",
-        "engine/tests/test_modules/integration/remaining_quick_test.rs"
+        "engine/tests/test_modules/integration/remaining_quick_test.rs",
+        "engine/tests/test_modules/jidou/moderate/maki_test.rs"
       ],
       "covering_tests": [
         "bp4024_mus_member_gains_blade",
@@ -19322,9 +19325,9 @@
         "kanata_bp3006_debut_enters_wait_state",
         "koko_only_two_kaleidoscope_no_bonus",
         "koko_three_kaleidoscore_grants_heart06_and_blade",
-        "mia_activation_self_wait_draws_two_discards_two"
+        "maki_ab0_opponent_wait_blocked_by_wait_immunity"
       ],
-      "covering_test_count": 57,
+      "covering_test_count": 64,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -20278,8 +20281,11 @@
       "covering_tests": [
         "maki_ab0_opponent_wait_blocked_by_wait_immunity",
         "maki_ab0_plus_ab1_end_to_end",
+        "maki_ab1_cause_player_decides",
         "maki_ab1_draws_on_cost4_or_less_opponent_waited",
         "maki_ab1_no_draw_on_cost_over4_opponent_waited",
+        "maki_ab1_opponent_caused_wait_no_draw",
+        "maki_ab1_own_effect_wait_draws",
         "maki_ab1_use_limit_once_per_turn",
         "maki_debut_pay_cost_opponent_waits_one",
         "maki_debut_skip_cost_no_effect",
@@ -20287,7 +20293,7 @@
         "maki_edge_no_opponent_member_no_draw",
         "maki_q177_debut_triggers_draw_via_ab0"
       ],
-      "covering_test_count": 10,
+      "covering_test_count": 13,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -20321,8 +20327,11 @@
       "covering_tests": [
         "maki_ab0_opponent_wait_blocked_by_wait_immunity",
         "maki_ab0_plus_ab1_end_to_end",
+        "maki_ab1_cause_player_decides",
         "maki_ab1_draws_on_cost4_or_less_opponent_waited",
         "maki_ab1_no_draw_on_cost_over4_opponent_waited",
+        "maki_ab1_opponent_caused_wait_no_draw",
+        "maki_ab1_own_effect_wait_draws",
         "maki_ab1_use_limit_once_per_turn",
         "maki_debut_pay_cost_opponent_waits_one",
         "maki_debut_skip_cost_no_effect",
@@ -20330,7 +20339,7 @@
         "maki_edge_no_opponent_member_no_draw",
         "maki_q177_debut_triggers_draw_via_ab0"
       ],
-      "covering_test_count": 10,
+      "covering_test_count": 13,
       "is_null": false,
       "use_limit": 1,
       "watches_abilities": false,
@@ -23939,9 +23948,10 @@
         "optional_can_skip",
         "real_choice_flow_emits_offered_and_resolved",
         "resolved_ability_leaves_no_pending",
+        "self_or_opponent_counts_two_options_not_label_lines",
         "shared_log_never_leaks_private_zone_card_names"
       ],
-      "covering_test_count": 25,
+      "covering_test_count": 26,
       "is_null": false,
       "use_limit": 1,
       "watches_abilities": false,
@@ -26980,9 +26990,17 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/jidou/complex/ability_chain_combo_test.rs",
-        "engine/tests/test_modules/jidou/complex/toubatsu_test.rs"
+        "engine/tests/test_modules/jidou/complex/toubatsu_test.rs",
+        "engine/tests/test_modules/jidou/moderate/maki_test.rs"
       ],
       "covering_tests": [
+        "maki_ab0_opponent_wait_blocked_by_wait_immunity",
+        "maki_ab1_cause_player_decides",
+        "maki_ab1_opponent_caused_wait_no_draw",
+        "maki_ab1_own_effect_wait_draws",
+        "maki_edge_cost5_opponent_draws_nothing",
+        "maki_edge_no_opponent_member_no_draw",
+        "maki_q177_debut_triggers_draw_via_ab0",
         "pb2006_jidou_once_per_turn_no_second_placement",
         "pb2006_jidou_placement_feeds_constant_cost_up",
         "pb2011_own_live_start_reposition_triggers_own_three_choice",
@@ -26995,7 +27013,7 @@
         "toubatsu_swap_arms_own_seat_not_opponent",
         "toubatsu_unrelated_debut_no_trigger"
       ],
-      "covering_test_count": 11,
+      "covering_test_count": 18,
       "is_null": false,
       "use_limit": 1,
       "watches_abilities": false,
@@ -27026,9 +27044,17 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/jidou/complex/ability_chain_combo_test.rs",
-        "engine/tests/test_modules/jidou/complex/toubatsu_test.rs"
+        "engine/tests/test_modules/jidou/complex/toubatsu_test.rs",
+        "engine/tests/test_modules/jidou/moderate/maki_test.rs"
       ],
       "covering_tests": [
+        "maki_ab0_opponent_wait_blocked_by_wait_immunity",
+        "maki_ab1_cause_player_decides",
+        "maki_ab1_opponent_caused_wait_no_draw",
+        "maki_ab1_own_effect_wait_draws",
+        "maki_edge_cost5_opponent_draws_nothing",
+        "maki_edge_no_opponent_member_no_draw",
+        "maki_q177_debut_triggers_draw_via_ab0",
         "pb2006_jidou_once_per_turn_no_second_placement",
         "pb2006_jidou_placement_feeds_constant_cost_up",
         "pb2011_own_live_start_reposition_triggers_own_three_choice",
@@ -27041,7 +27067,7 @@
         "toubatsu_swap_arms_own_seat_not_opponent",
         "toubatsu_unrelated_debut_no_trigger"
       ],
-      "covering_test_count": 11,
+      "covering_test_count": 18,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -39679,9 +39705,10 @@
         "optional_can_skip",
         "real_choice_flow_emits_offered_and_resolved",
         "resolved_ability_leaves_no_pending",
+        "self_or_opponent_counts_two_options_not_label_lines",
         "shared_log_never_leaks_private_zone_card_names"
       ],
-      "covering_test_count": 25,
+      "covering_test_count": 26,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -39921,7 +39948,7 @@
         "hs_bp5_021_score_bonus_with_three_mirakura_members",
         "hs_bp5_021_single_hasunosora_member_heart_conversion"
       ],
-      "covering_test_count": 50,
+      "covering_test_count": 51,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -40213,7 +40240,7 @@
         "himeno_front_1_opponent_at_left_moves_to_center",
         "himeno_front_3_opponents_select_left_moves_to_center"
       ],
-      "covering_test_count": 71,
+      "covering_test_count": 72,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -40585,7 +40612,7 @@
         "bp6_011n_hand_debut_no_draw",
         "bp6_011n_waitroom_debut_draws_two_discards_one"
       ],
-      "covering_test_count": 374,
+      "covering_test_count": 375,
       "is_null": false,
       "use_limit": 1,
       "watches_abilities": false,

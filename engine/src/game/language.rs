@@ -35,12 +35,35 @@ impl Default for Lang {
 }
 
 impl Lang {
+    /// Language registry: every supported UI language, default first.
+    /// Adding a language = add the variant here (+ its tables in each
+    /// port's locale bundle). All cycling/picking goes through this list
+    /// so no port hardcodes a two-language assumption.
+    pub const SUPPORTED: [Lang; 2] = [Lang::Japanese, Lang::English];
+
+    /// Default UI language (Japanese — matches the card source text).
+    pub const DEFAULT: Lang = Lang::Japanese;
+
+    /// Cycle to the next supported language (START-menu / R-button
+    /// language-switch behaviour). Works for any number of entries in
+    /// [`Lang::SUPPORTED`].
+    pub fn next(self) -> Self {
+        let pos = Self::SUPPORTED
+            .iter()
+            .position(|&l| l == self)
+            .unwrap_or(0);
+        Self::SUPPORTED[(pos + 1) % Self::SUPPORTED.len()]
+    }
+
     /// The other language (START-menu / R-button toggle behaviour).
+    /// Kept for call-site compatibility; delegates to [`Lang::next`].
     pub fn toggle(self) -> Self {
-        match self {
-            Lang::English => Lang::Japanese,
-            Lang::Japanese => Lang::English,
-        }
+        self.next()
+    }
+
+    /// True for the default language (source-text; needs no translation).
+    pub fn is_default(self) -> bool {
+        self == Self::DEFAULT
     }
 
     /// Display name (autonym): shown in menus without a translation table.
@@ -82,10 +105,13 @@ impl Lang {
 /// A/Start confirms (same contract as [`crate::game::menu::select`]).
 pub fn select_language(ui: &mut dyn PlatformUi, current: Lang) -> Lang {
     log::debug!("[LANG] picker opened (current={:?})", current);
-    const ORDER: [Lang; 2] = [Lang::Japanese, Lang::English];
-    let items = [Lang::Japanese.label(), Lang::English.label()];
-    let initial = ORDER.iter().position(|&l| l == current).unwrap_or(0);
-    let picked = ORDER[select_with_initial(ui, &items, "言語 / Language", initial)];
+    // Array (not Vec): this module is no_std-safe for GBA/DS/PS1 targets.
+    let items = Lang::SUPPORTED.map(Lang::label);
+    let initial = Lang::SUPPORTED
+        .iter()
+        .position(|&l| l == current)
+        .unwrap_or(0);
+    let picked = Lang::SUPPORTED[select_with_initial(ui, &items, "言語 / Language", initial)];
     log::debug!("[LANG] picker picked {:?}", picked);
     picked
 }
@@ -98,6 +124,19 @@ mod tests {
     fn toggle_round_trips() {
         assert_eq!(Lang::Japanese.toggle(), Lang::English);
         assert_eq!(Lang::English.toggle(), Lang::Japanese);
+    }
+
+    #[test]
+    fn next_cycles_supported_registry() {
+        // next() walks SUPPORTED in order and wraps around.
+        let mut lang = Lang::DEFAULT;
+        for _ in 0..Lang::SUPPORTED.len() {
+            lang = lang.next();
+        }
+        assert_eq!(lang, Lang::DEFAULT);
+        assert!(Lang::SUPPORTED.contains(&Lang::Japanese));
+        assert!(Lang::SUPPORTED.contains(&Lang::English));
+        assert_eq!(Lang::DEFAULT, Lang::Japanese);
     }
 
     #[test]

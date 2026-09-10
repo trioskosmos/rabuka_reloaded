@@ -1014,6 +1014,16 @@ pub struct EffectFilter {
     pub target_member: Option<ArcStr>,
     pub target_from_selection: Option<bool>,
     pub source_position: Option<ArcStr>,
+    /// Cross-position comparison reference (e.g. "right_side"). The parser
+    /// echoes the condition-level `position_compare` on effect objects; the
+    /// condition side carries the evaluated value. Decoded here so bytecode
+    /// stops warning; no executor reads the effect copy yet.
+    pub position_compare: Option<ArcStr>,
+    /// Origin of a gained ability (corpus: only "under_member"). The
+    /// gain_ability_from_source executor hardcodes the under-member lookup,
+    /// which matches every corpus value — stored for visibility so a future
+    /// new value warns loudly instead of dropping silently.
+    pub source_location: Option<ArcStr>,
     pub exclude_selected: Option<bool>,
     pub discard_remaining: Option<bool>,
     pub self_cost: Option<bool>,
@@ -1070,6 +1080,11 @@ pub struct EffectFilter {
     pub value: Option<u8>,
     pub per_group: Option<bool>,
     pub per_group_count: Option<u8>,
+    /// Cost requires one card PER named character (e.g. LL-bp7-001's three
+    /// names) rather than `count` cards matching any of them. The play-time
+    /// alt-cost hook (phases.rs `play_time_alt_cost_chars`) enforces this via
+    /// the `characters` list with distinct assignment.
+    pub per_character: Option<bool>,
     pub placement_order: Option<PlacementOrder>,
     pub remainder_destination: Option<ArcStr>,
     pub remainder_placement_order: Option<PlacementOrder>,
@@ -1565,6 +1580,8 @@ impl AbilityEffect {
             target_member: str_field!("target_member"),
             target_from_selection: bool_field!("target_from_selection"),
             source_position: str_field!("source_position"),
+            position_compare: str_field!("position_compare"),
+            source_location: str_field!("source_location"),
             exclude_selected: bool_field!("exclude_selected"),
             discard_remaining: bool_field!("discard_remaining"),
             self_cost: bool_field!("self_cost"),
@@ -1630,6 +1647,7 @@ impl AbilityEffect {
             value: u8_field!("value"),
             per_group: bool_field!("per_group"),
             per_group_count: u8_field!("per_group_count"),
+            per_character: bool_field!("per_character"),
             placement_order: None,
             remainder_destination: None,
             remainder_placement_order: None,
@@ -2076,6 +2094,12 @@ impl AbilityEffect {
     filter_str_getter!(source_card_any, source_card);
 
     filter_str_getter!(source_position_any, source_position);
+
+    filter_str_getter!(position_compare_any, position_compare);
+
+    filter_str_getter!(source_location_any, source_location);
+
+    filter_bool_getter!(per_character_any, per_character);
 
     /// String form of the filter-level source zone (mirrors the pre-refactor
     /// `Option<ArcStr>.as_deref()`). The typed form is `source_zone()`.
@@ -3031,6 +3055,18 @@ pub blade_greater_than_all: Option<bool>,
     pub trigger_event: Option<Box<TriggerEvent>>,
     #[cfg_attr(feature = "serde_support", serde(default))]
     pub yell_trigger: Option<bool>,
+    /// Shuffle flag echoed on conditions (e.g. Mia bp7-011 ab#1's
+    /// location_condition "shuffle all waitroom members under deck"). The
+    /// effect-level twin carries the executed value; stored here so the
+    /// condition copy decodes instead of tripping the decode audit.
+    #[cfg_attr(feature = "serde_support", serde(default))]
+    pub shuffle: Option<bool>,
+    /// Which preceding action a result-condition refers to (e.g.
+    /// action_success_condition "これにより無効にした場合" →
+    /// "invalidate_ability"). Stored so it decodes; the conditional_on_result
+    /// executor tracks success structurally.
+    #[cfg_attr(feature = "serde_support", serde(default))]
+    pub action_reference: Option<ArcStr>,
 }
 
 /// The distinct Condition type as a serde internally-tagged enum.
@@ -3550,6 +3586,14 @@ impl Condition {
 
     pub fn get_delta(&self) -> Option<bool> {
         self.common().and_then(|c| c.delta)
+    }
+
+    pub fn get_shuffle(&self) -> Option<bool> {
+        self.common().and_then(|c| c.shuffle)
+    }
+
+    pub fn get_action_reference(&self) -> Option<&str> {
+        self.common().and_then(|c| c.action_reference.as_deref())
     }
 }
 
