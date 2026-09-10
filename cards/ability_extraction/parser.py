@@ -7757,6 +7757,9 @@ def _try_opponent_after_conditional(text):
     fa = parse_action(first.replace("そうした場合、", "").strip())
     rest = opp[len(om.group(0)) :].strip()
     oa = parse_action(om.group(1).strip())
+    # "相手は..." means opponent makes the choice
+    if isinstance(oa, dict):
+        oa["action_by"] = "opponent"
     result = {
         "text": text,
         "action": "sequential",
