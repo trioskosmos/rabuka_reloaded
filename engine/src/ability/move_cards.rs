@@ -1931,7 +1931,7 @@ impl AbilityResolver {
             log::debug!("[UNDER_MEMBER] second call selected={:?}", self.selected_cards);
             let selected_member_id = self.selected_cards[0];
             let idx_opt = {
-                let player = gs.resolve_target_player(target);
+let player = gs.resolve_target_player(&target);
                 player.stage.stage.iter().position(|&id| id == selected_member_id)
             };
             if let Some(idx) = idx_opt {
@@ -2222,8 +2222,7 @@ gs.set_recently_moved_batch(moved.clone().into(), Some("under_member"));
             .map(|z| z.to_str().to_string())
             .unwrap_or_default();
 
-        let raw_target = tgt.as_deref().unwrap_or("self");
-        let target = raw_target;
+        let target = effect.target.as_deref().unwrap_or("self");
         let use_p2 = match target {
             "self" => matches!(
                 gs.ability_master_id().as_deref(),
@@ -2251,7 +2250,7 @@ gs.set_recently_moved_batch(moved.clone().into(), Some("under_member"));
         // For empty_area / stage destinations: skip selection prompt entirely
         // if the target has no empty slots (card text says "メンバーのいないエリアに").
         if Zone::from_str(&destination) == Some(Zone::EmptyArea) {
-            let player = gs.resolve_target_player(target);
+            let player = gs.resolve_target_player(&target);
             let has_empty_slot = (0..3).any(|i| player.stage.stage[i] == -1);
             if !has_empty_slot {
                 return Ok(());
@@ -2402,7 +2401,7 @@ if util::distinct_should_dedupe(distinct) {
                 } else {
                     match self.place_card_with_stage_choice(
                         gs,
-                        target,
+                        &target,
                         card_id,
                         &destination,
                         vacated_stage_area,
@@ -3825,6 +3824,9 @@ if util::distinct_should_dedupe(distinct) {
         gs: &mut GameState,
         effect: &AbilityEffect,
     ) -> Result<(), String> {
+        // Save original spawn_context.target to restore later
+        let original_target = self.spawn_context.target.clone();
+
         // Override spawn_context.target before processing opponent — the generic
         // "both" handler in effects.rs may have set it to "self".
         self.spawn_context.target = Some("opponent".to_string());
@@ -3837,12 +3839,19 @@ if util::distinct_should_dedupe(distinct) {
             let mut self_eff = effect.clone();
             self_eff.target = Some("self".into());
             gs.ability_queue.set_pending_actions(vec![self_eff]);
+            // Restore original target before returning
+            self.spawn_context.target = original_target;
             return Ok(());
         }
         log::debug!("[MOVE_BOTH] No choice created. Processing self now.");
+        // Reset spawn_context.target for self phase
+        self.spawn_context.target = Some("self".to_string());
         let mut self_eff = effect.clone();
         self_eff.target = Some("self".into());
-        self.execute_move_cards(gs, &self_eff)
+        let result = self.execute_move_cards(gs, &self_eff);
+        // Restore original target
+        self.spawn_context.target = original_target;
+        result
     }
 }
 

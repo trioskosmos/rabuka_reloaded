@@ -272,6 +272,32 @@ impl AbilityResolver {
             return Ok(false);
         }
 
+        // Skip if this effect (or its primary_effect) is a MoveCards with multiple_targets to deck
+        // — execute_move_cards_both handles "both" internally with opponent-first order.
+        let is_move_cards_both = effect.action == crate::ability::enums::ActionType::MoveCards
+            && effect.multiple_targets_any().unwrap_or(false)
+            && effect.target.as_deref() == Some("deck");
+        let primary_is_move_cards_both = effect
+            .compound
+            .primary_effect
+            .as_ref()
+            .is_some_and(|pe| {
+                pe.action == crate::ability::enums::ActionType::MoveCards
+                    && pe.multiple_targets_any().unwrap_or(false)
+                    && pe.target.as_deref() == Some("deck")
+            });
+        log::debug!(
+            "[HANDLE_BOTH] action={:?} target={:?} is_mcb={} primary_mcb={} skip={}",
+            effect.action,
+            effect.target,
+            is_move_cards_both,
+            primary_is_move_cards_both,
+            is_move_cards_both || primary_is_move_cards_both
+        );
+        if is_move_cards_both || primary_is_move_cards_both {
+            return Ok(false);
+        }
+
         // Execute for self first
         let mut for_self = effect.clone();
         for_self.target = Some("self".into());
