@@ -3503,55 +3503,62 @@ impl AbilityResolver {
         _effect: &AbilityEffect,
         target: &str,
     ) -> Result<(), String> {
-        let tgt = if target == "both" { "self" } else { target };
-        let (moved_card_ids, original_positions): (Vec<i16>, Vec<(u8, u8)>) = {
-            let player = gs.resolve_target_player_mut(tgt);
-
-            // Snapshot current stage
-            let snapshot_cards = player.stage.stage;
-            let snapshot_under = player.stage.under_cards.clone();
-
-            // Rotation mapping: left(0)→right(2), center(1)→left(0), right(2)→center(1)
-            let rotation_map = [2usize, 0, 1];
-
-            // Clear the stage
-            for i in 0..3 {
-                player.stage.stage[i] = -1;
-                player.stage.under_cards[i].clear();
-            }
-
-            let mut moved = Vec::new();
-            let mut positions = Vec::new();
-            // Place rotated members
-            for src_idx in 0..3 {
-                let card_id = snapshot_cards[src_idx];
-                if card_id == -1 {
-                    continue;
-                }
-                let dest_idx = rotation_map[src_idx];
-                player.stage.stage[dest_idx] = card_id;
-                player.stage.under_cards[dest_idx] = snapshot_under[src_idx].clone();
-                moved.push(card_id);
-                positions.push((src_idx as u8, dest_idx as u8));
-            }
-            (moved, positions)
+        let targets: Vec<&str> = if target == "both" {
+            vec!["self", "opponent"]
+        } else {
+            vec![target]
         };
 
-        for (i, &cid) in moved_card_ids.iter().enumerate() {
-            let (old_pos, new_pos) = original_positions[i];
-            // push_movement_event covers cards_moved_this_turn, turn_area_movements,
-            // last_area_move_card_id/by_player, batch_movements, and
-            // position_change_occurred_this_turn — all needed for TAS "moves" conditions.
-            gs.push_movement_event(cid, "stage", "stage", gs.activating_card, "", true);
-            gs.position_change_events
-                .push(crate::types::PositionChangeEvent {
-                    moved_card_id: cid,
-                    old_position: old_pos,
-                    new_position: new_pos,
-                    cause_card_id: gs.activating_card,
-                    cause_player_id: String::new(),
-                    effect_only: true,
-                });
+        for tgt in targets {
+            let (moved_card_ids, original_positions): (Vec<i16>, Vec<(u8, u8)>) = {
+                let player = gs.resolve_target_player_mut(tgt);
+
+                // Snapshot current stage
+                let snapshot_cards = player.stage.stage;
+                let snapshot_under = player.stage.under_cards.clone();
+
+                // Rotation mapping: left(0)→right(2), center(1)→left(0), right(2)→center(1)
+                let rotation_map = [2usize, 0, 1];
+
+                // Clear the stage
+                for i in 0..3 {
+                    player.stage.stage[i] = -1;
+                    player.stage.under_cards[i].clear();
+                }
+
+                let mut moved = Vec::new();
+                let mut positions = Vec::new();
+                // Place rotated members
+                for src_idx in 0..3 {
+                    let card_id = snapshot_cards[src_idx];
+                    if card_id == -1 {
+                        continue;
+                    }
+                    let dest_idx = rotation_map[src_idx];
+                    player.stage.stage[dest_idx] = card_id;
+                    player.stage.under_cards[dest_idx] = snapshot_under[src_idx].clone();
+                    moved.push(card_id);
+                    positions.push((src_idx as u8, dest_idx as u8));
+                }
+                (moved, positions)
+            };
+
+            for (i, &cid) in moved_card_ids.iter().enumerate() {
+                let (old_pos, new_pos) = original_positions[i];
+                // push_movement_event covers cards_moved_this_turn, turn_area_movements,
+                // last_area_move_card_id/by_player, batch_movements, and
+                // position_change_occurred_this_turn — all needed for TAS "moves" conditions.
+                gs.push_movement_event(cid, "stage", "stage", gs.activating_card, "", true);
+                gs.position_change_events
+                    .push(crate::types::PositionChangeEvent {
+                        moved_card_id: cid,
+                        old_position: old_pos,
+                        new_position: new_pos,
+                        cause_card_id: gs.activating_card,
+                        cause_player_id: String::new(),
+                        effect_only: true,
+                    });
+            }
         }
 
         gs.position_change_occurred_this_turn = true;
