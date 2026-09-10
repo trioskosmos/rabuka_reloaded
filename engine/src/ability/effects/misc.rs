@@ -88,6 +88,7 @@ impl AbilityResolver {
                 co,
             );
         }
+        self.current_effect = Some(effect.clone());
         self.execute_reveal(
             gs,
             effect.source_or(Zone::Hand.to_str()),

@@ -286,6 +286,12 @@ impl AbilityResolver {
                         .target_player_id(Some(target.to_string()))
                         .blind(blind)
                         .is_reveal(true)
+                        .picker(
+                            self.current_effect
+                                .as_ref()
+                                .and_then(|e| e.picker_any())
+                                .map(|s| s.to_string()),
+                        )
                         .build(),
                 );
                 self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };

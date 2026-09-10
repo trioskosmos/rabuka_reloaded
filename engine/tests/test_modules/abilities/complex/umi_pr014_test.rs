@@ -68,6 +68,15 @@ fn umi_pr014_appear_creates_blind_reveal_choice() {
                 Some("opponent"),
                 "target_player_id should be 'opponent' — revealing OPPONENT's hand"
             );
+            // BUG: picker=self means SELF makes the choice, so choice_player_id should be p1
+            let entry = game.state.ability_queue.current_entry().expect("Queue entry");
+            eprintln!("DEBUG: entry.player_id={:?} choice_player_id={:?}", 
+                entry.player_id, entry.choice_player_id);
+            assert_eq!(
+                entry.choice_player_id.as_deref(),
+                Some("p1"),
+                "BUG: picker=self but choice routed to opponent"
+            );
         }
         _ => panic!("Expected SelectCard, got {:?}", choice),
     }

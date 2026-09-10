@@ -2225,6 +2225,15 @@ impl AbilityEffect {
             .map(|s| -> &str { s })
     }
 
+    pub fn picker_any(&self) -> Option<&str> {
+        self.kind
+            .as_deref()?
+            .filter()?
+            .picker
+            .as_ref()
+            .map(|s| -> &str { s })
+    }
+
     filter_str_getter!(question_any, question);
 
     filter_u8_getter!(cost_limit_max_any, cost_limit_max);

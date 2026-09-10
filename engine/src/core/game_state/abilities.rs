@@ -1813,34 +1813,47 @@ impl GameState {
                 }
                 _ => false,
             };
+
+            // If the choice has an explicit picker, use that to determine who makes the choice
+            let picker = match c {
+                crate::ability::types::Choice::SelectCard { picker: Some(ref p), .. } => Some(p.as_str()),
+                _ => None,
+            };
             if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) {
                 log::debug!(
-                    "[PCA_G1] targets={} spawn={:?}",
+                    "[PCA_G1] targets={} spawn={:?} picker={:?} current_effect_action={:?}",
                     targets_opponent,
-                    resolver.spawn_context.target
+                    resolver.spawn_context.target,
+                    picker,
+                    resolver.current_effect.as_ref().map(|e| e.action)
                 );
             }
             if let Some(entry) = self.ability_queue.current_entry_mut() {
-                if targets_opponent {
-                    let current = entry.player_id.clone();
-                    let opponent_id = if current == "p1" { "p2" } else { "p1" };
-                    entry.choice_player_id = Some(opponent_id.to_string());
+                // Preserve choice_player_id if already set by executor (e.g., execute_choice uses choice_maker)
+                if entry.choice_player_id.is_none() {
+                    let choice_player = if let Some(p) = picker {
+                        if p == "opponent" {
+                            if entry.player_id == "p1" { "p2" } else { "p1" }
+                        } else {
+                            &entry.player_id
+                        }
+                    } else if targets_opponent {
+                        if entry.player_id == "p1" { "p2" } else { "p1" }
+                    } else if matches!(c, crate::ability::types::Choice::SelectCard { target_player_id: Some(tpid), .. } if tpid == "self") {
+                        &entry.player_id
+                    } else {
+                        &entry.player_id
+                    };
+                    entry.choice_player_id = Some(choice_player.to_string());
                     if crate::ability::debug::ABILITY_DEBUG
                         .load(core::sync::atomic::Ordering::Relaxed)
                     {
-                        log::debug!("[PCA_G1] SET choice_player_id={}", opponent_id);
+                        log::debug!("[PCA_G1] SET choice_player_id={}", choice_player);
                     }
-                } else if matches!(c, crate::ability::types::Choice::SelectCard { target_player_id: Some(tpid), .. } if tpid == "self")
+                } else if crate::ability::debug::ABILITY_DEBUG
+                    .load(core::sync::atomic::Ordering::Relaxed)
                 {
-                    entry.choice_player_id = Some(entry.player_id.clone());
-                    if crate::ability::debug::ABILITY_DEBUG
-                        .load(core::sync::atomic::Ordering::Relaxed)
-                    {
-                        log::debug!(
-                            "[PCA_G1] RESET choice_player_id to activator={}",
-                            entry.player_id
-                        );
-                    }
+                    log::debug!("[PCA_G1] PRESERVE existing choice_player_id={:?}", entry.choice_player_id);
                 }
             }
 

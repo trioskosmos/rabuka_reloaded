@@ -492,6 +492,10 @@ impl ChoiceBuilder {
         self.filtered_indices = v;
         self
     }
+    pub fn picker(mut self, v: Option<String>) -> Self {
+        self.picker = v;
+        self
+    }
     pub fn destination(mut self, v: Option<String>) -> Self {
         self.destination = v;
         self
