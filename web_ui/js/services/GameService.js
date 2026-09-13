@@ -260,91 +260,66 @@ export const GameService = {
 
             if (!res.ok) {
                 const errorText = await res.text();
-                throw new Error(`Action failed: ${errorText}`);
+                let message = errorText;
+                try {
+                    const parsed = JSON.parse(errorText);
+                    message = parsed.error || parsed.message || errorText;
+                } catch { /* keep raw text */ }
+                // Turn races (double-click, AI reply landing first) come back
+                // as 403s — flag them so the catch below resyncs silently.
+                const err = new Error(`Action failed: ${message}`);
+                err.status = res.status;
+                err.isTurnRace = res.status === 403
+                    || /not your turn|waiting for opponent/i.test(message);
+                throw err;
             }
 
             const data = await res.json();
-            
-            // Handle new minimal ActionResult (PVP) vs full GameStateResponse (sandbox/PVE)
+
+            // Handle minimal ActionResult (2-human PVP) vs full
+            // GameStateResponse (sandbox/PVE/VS AI — server settles AI
+            // replies inline, so the state is already complete).
             if (data.success !== undefined) {
                 // ActionResult format (PVP) - success + frame_id, no full state
                 console.log('[GameService] ActionResult:', data);
                 State._frameCounter = data.frame_id;
                 State._actionLatency = Math.round(performance.now() - actionStart);
-                
-                if (data.state_delta) {
-                    // Apply delta if provided
-                    GameService.applyStateDelta(data.state_delta);
-                } else {
-                    // State is already settled server-side — fetch full state
-                    // immediately instead of spinning on the delta endpoint.
-                    GameService._lastKnownVersion = data.frame_id;
-                    await GameService.fetchState(networkFacade);
-                }
+
+                GameService._lastKnownVersion = data.frame_id;
+                await GameService.fetchState(networkFacade);
             } else if (data.frame_counter !== undefined) {
-                // Legacy full state response (sandbox/PVE)
+                // Full state response (sandbox/PVE, and VS AI rooms now too)
                 State._frameCounter = data.frame_counter;
+                GameService._lastKnownVersion = data.frame_counter;
                 State._actionLatency = Math.round(performance.now() - actionStart);
+                normalizeLegalActions(data);
                 updateStateData(data);
             } else {
                 // Fallback - assume full state
                 State._actionLatency = Math.round(performance.now() - actionStart);
+                normalizeLegalActions(data);
+                if (data.frame_counter !== undefined) {
+                    State._frameCounter = data.frame_counter;
+                    GameService._lastKnownVersion = data.frame_counter;
+                }
                 updateStateData(data);
             }
             log('Action completed');
 
         } catch (e) {
             console.error("Action error:", e);
+            // Turn races are expected (double-click, AI reply landing first):
+            // resync silently instead of popping an alert.
+            if (e.isTurnRace) {
+                if (networkFacade) await GameService.fetchState(networkFacade);
+                return;
+            }
             // Revert predicted state by re-fetching authoritative state
             if (predicted && networkFacade) {
                 await GameService.fetchState(networkFacade);
             }
-alert(e.message);
+            alert(e.message);
         }
-    },
-
-    // Legacy delta poller (kept for compat). Fetches full state immediately:
-    // the delta endpoint omits board zones and legal_actions, so delta-only
-    // sync can never update the UI and the old 20x100ms spin just added
-    // up to 2s of "AI thinking" stall per move.
-    pollDelta: async (frameId, networkFacade) => {
-        GameService._lastKnownVersion = frameId;
-        const facade = networkFacade || Network;
-        if (facade?.fetchState) await facade.fetchState();
-        else await GameService.fetchState(facade);
-    },
-
-    // Apply delta to current state
-    applyStateDelta: (delta) => {
-        const state = State.data;
-        if (!state) return;
-        
-        const newState = JSON.parse(JSON.stringify(state));
-        
-        if (delta.phase) newState.phase = delta.phase;
-        if (delta.active_player !== undefined) newState.active_player = delta.active_player;
-        if (delta.rps_winner !== undefined) newState.rps_winner = delta.rps_winner;
-        if (delta.player1_rps_choice !== undefined) newState.player1_rps_choice = delta.player1_rps_choice;
-        if (delta.player2_rps_choice !== undefined) newState.player2_rps_choice = delta.player2_rps_choice;
-        if (delta.pending_choice) newState.pending_choice = delta.pending_choice;
-        if (delta.legal_actions) {
-            newState.legal_actions = delta.legal_actions;
-            normalizeLegalActions(newState);
-        }
-        
-        // Apply the executed action locally (deterministic replay)
-        if (delta.executed_action) {
-            console.log('[GameService] Replaying executed_action:', delta.executed_action);
-            // The optimistic update already applied this, but we confirm it here
-            // For true deterministic sync, we'd replay the action through the engine
-            // For now, the optimistic update + server confirmation is sufficient
-        }
-        
-        if (delta.frame_id !== undefined) {
-            State._frameCounter = delta.frame_id;
-        }
-        
-        updateStateData(newState);
     },
 
     resetGame: async (networkFacade) => {
@@ -382,15 +357,4 @@ alert(e.message);
             log(`Reset error: ${e.message}`);
         }
     },
-
-    changeAI: async (aiMode, networkFacade) => {
-        try {
-            const res = await apiFetch('api/set_ai', {
-                method: 'POST',
-                body: JSON.stringify({ ai_mode: aiMode })
-            });
-            const data = await res.json();
-            if (!data.success) alert('Failed: ' + data.error);
-        } catch (e) { console.error(e); }
-    }
 };

@@ -4,9 +4,9 @@
 //! - **Board view** (default): graphical board with card fronts, actionable
 //!   badges and a bottom bar showing the selected action. Up/Down/A drive the
 //!   engine's action list; Left/Right move the cursor; B cycles the zone
-//!   focus (Hand -> Own Stage -> Opp Stage); L opens the engine action
-//!   detail (full text + acting card); R pops the art detail of the
-//!   focused card.
+//!   focus forward (Hand -> Own Stage -> Opp Stage); R on an empty slot
+//!   cycles it backward; L opens the engine action detail (full text +
+//!   acting card); R pops the art detail of the focused card.
 //! - **Actions view**: full-screen action list (Select or B returns). Input
 //!   stays with the engine so Up/Down/A/L/R work exactly like the text ports.
 
@@ -107,21 +107,33 @@ impl<'u, 'd, I: InputSource> GbaUi<'u, 'd, I> {
             false
         };
 
-        // R pops detail of the focused card (hand or stage). L is
-        // deliberately NOT consumed: it falls through to the engine, whose
-        // action detail (full text + acting card) owns L.
+        // R pops detail of the focused card (hand or stage). On an empty
+        // slot there is no card to show, so R cycles focus *backward*
+        // instead (B overshoots cost one press, not two). L is deliberately
+        // NOT consumed: it falls through to the engine, whose action detail
+        // (full text + acting card) owns L.
         if self.input.just_pressed(Button::R) && !scrolled {
-            let frame = self.board.build(
+            let mut frame = self.board.build(
                 gs,
                 &self.actionable,
                 &self.action_line,
                 self.action_index,
                 self.action_total,
             );
-            if let Some(cn) = &frame.focused_card {
+            if let Some(cn) = frame.focused_card {
                 crate::menu::show_card_detail(self.display, self.input, gs, cn);
                 return true;
             }
+            self.board.cycle_focus_rev();
+            frame = self.board.build(
+                gs,
+                &self.actionable,
+                &self.action_line,
+                self.action_index,
+                self.action_total,
+            );
+            self.display.render_board_frame(&frame);
+            return true;
         }
 
         let frame = self.board.build(

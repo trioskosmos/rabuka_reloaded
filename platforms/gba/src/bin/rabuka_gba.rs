@@ -104,9 +104,9 @@ fn link_setup(
         }
         display.clear();
         display.println(if is_host {
-            "HOST: wait guest B:Abort"
+            rabuka_gba::lang::tr("HOST: wait guest B:Abort", "ホスト: ゲスト待機 B:中止")
         } else {
-            "JOIN: wait host B:Abort"
+            rabuka_gba::lang::tr("JOIN: wait host B:Abort", "参加: ホスト待機 B:中止")
         });
         display.swap_buffers();
         display.wait();
@@ -131,7 +131,14 @@ fn link_setup(
     let all_cards = match resolve_link_cards(&nos) {
         Some(c) => c,
         None => {
-            wait_screen(display, input, &["Bad peer deck", "A:Menu"]);
+            wait_screen(
+                display,
+                input,
+                &[
+                    rabuka_gba::lang::tr("Bad peer deck", "相手のデッキが不正"),
+                    rabuka_gba::lang::tr("A:Menu", "A:メニュー"),
+                ],
+            );
             return None;
         }
     };
@@ -158,21 +165,33 @@ fn main(mut gba: agb::Gba) -> ! {
         all_deck_cards.push(sram_deck.cards.clone());
     }
 
-    let modes = ["VS AI", "2 Player", "Link Host", "Link Join", "AI vs AI", "Deck Builder"];
-
     // Explicit boot flow — see `screens::Screen` for the full button map:
     // ModeSelect -> DeckBuilder/DeckSelectP1 -> (DeckSelectP2) -> Match -> Result -> ...
     // A finished match restarts cleanly at ModeSelect instead of freezing.
-    // Mode/deck picks keep GBA-tuned titles (button hints); the match loop
-    // itself is the engine's shared `run_match` (AI heuristic included), so
-    // the port no longer carries its own copy of the game loop. Link games
-    // run the shared `run_link_match` lockstep loop instead (same engine,
-    // peer's picks over the cable); abort any link wait with B.
-    loop {
+    // Deck picks are cancelable (B backs out one level: P2 -> P1 ->
+    // ModeSelect). Mode/deck picks keep GBA-tuned titles (button hints);
+    // the match loop itself is the engine's shared `run_match` (AI heuristic
+    // included), so the port no longer carries its own copy of the game
+    // loop. Link games run the shared `run_link_match` lockstep loop
+    // instead (same engine, peer's picks over the cable); abort any link
+    // wait with B.
+    'boot: loop {
         let _ = Screen::ModeSelect;
         let mut ui = GbaUi::new(&mut display, &mut input);
         let as_ui = &mut ui as &mut dyn PlatformUi;
-        let mode_idx = platform_ui::select(as_ui, &modes, "MODE Up/Dn:A/Start");
+        // Mode rows are rebuilt every pass so a language change applies
+        // immediately. Last row cycles the UI language (default Japanese).
+        let mut mode_rows: Vec<String> = rabuka_gba::lang::mode_names()
+            .iter()
+            .map(|s| s.to_string())
+            .collect();
+        mode_rows.push(rabuka_gba::lang::language_row());
+        let mode_refs: Vec<&str> = mode_rows.iter().map(|s| s.as_str()).collect();
+        let mode_idx = platform_ui::select(as_ui, &mode_refs, rabuka_gba::lang::mode_title());
+        if mode_idx == 6 {
+            rabuka_gba::lang::cycle_lang();
+            continue;
+        }
 
         // Deck Builder: create custom deck saved to SRAM
         if mode_idx == 5 {
@@ -198,7 +217,10 @@ fn main(mut gba: agb::Gba) -> ! {
         if mode_idx == 2 || mode_idx == 3 {
             let is_host = mode_idx == 2;
             let _ = Screen::DeckSelectP1;
-            let d = platform_ui::select(as_ui, &all_deck_names.iter().map(|s| s.as_str()).collect::<Vec<_>>(), "LINK DECK A:Pick");
+            let d = match platform_ui::select_opt(as_ui, &all_deck_names.iter().map(|s| s.as_str()).collect::<Vec<_>>(), rabuka_gba::lang::tr("LINK DECK A:Pick B:Back", "リンクデッキ A:決定 B:戻る"), 0) {
+                Some(d) => d,
+                None => continue 'boot, // B: back to ModeSelect
+            };
             let own = SavDeck {
                 name: all_deck_names[d].clone(),
                 cards: all_deck_cards[d].clone(),
@@ -234,13 +256,23 @@ fn main(mut gba: agb::Gba) -> ! {
             _ => MatchMode::VsAi,
         };
 
-        let _ = Screen::DeckSelectP1;
-        let d1 = platform_ui::select(as_ui, &all_deck_names.iter().map(|s| s.as_str()).collect::<Vec<_>>(), "P1 DECK Up/Dn:A/Start");
-        let _ = Screen::DeckSelectP2;
-        let d2 = if matches!(mode, MatchMode::TwoPlayer) {
-            platform_ui::select(as_ui, &all_deck_names.iter().map(|s| s.as_str()).collect::<Vec<_>>(), "P2 DECK Up/Dn:A/Start")
-        } else {
-            rng::rand_range(all_deck_names.len())
+        // Deck picks: B backs out one level (P2 -> P1 -> ModeSelect).
+        // Paging (Left/Right) and detail (L/R) come from the shared picker.
+        let deck_refs: Vec<&str> = all_deck_names.iter().map(|s| s.as_str()).collect();
+        let (d1, d2) = loop {
+            let _ = Screen::DeckSelectP1;
+            let d1 = match platform_ui::select_opt(as_ui, &deck_refs, rabuka_gba::lang::tr("P1 DECK A:Pick B:Back", "P1デッキ A:決定 B:戻る"), 0) {
+                Some(d) => d,
+                None => continue 'boot,
+            };
+            if !matches!(mode, MatchMode::TwoPlayer) {
+                break (d1, rng::rand_range(all_deck_names.len()));
+            }
+            let _ = Screen::DeckSelectP2;
+            match platform_ui::select_opt(as_ui, &deck_refs, rabuka_gba::lang::tr("P2 DECK A:Pick B:Back", "P2デッキ A:決定 B:戻る"), 0) {
+                Some(d2) => break (d1, d2),
+                None => {} // B: re-pick P1
+            }
         };
 
         // Match (Screen::Board/Actions/StartMenu/CardDetail/ChoiceGrid are

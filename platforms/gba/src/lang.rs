@@ -33,3 +33,40 @@ pub fn cycle_lang() -> Lang {
     set_lang(next);
     next
 }
+
+/// Pick the port-chrome string for the current language.
+///
+/// Call sites pass EN first, JA second, so both languages stay visible in
+/// review and the baked-font scanner (`tools/font/used_chars.py` reads Rust
+/// sources) picks up every JA glyph the UI can show. Non-default languages
+/// fall back to English — the same rule as the engine's
+/// `display_desc_for` — until their tables ship.
+pub fn tr(en: &'static str, ja: &'static str) -> &'static str {
+    match current_lang() {
+        Lang::Japanese => ja,
+        _ => en,
+    }
+}
+
+/// Main-menu mode labels in display order, current language.
+pub fn mode_names() -> [&'static str; 6] {
+    [
+        tr("VS AI", "VS AI"),
+        tr("2 Player", "2人プレイ"),
+        tr("Link Host", "リンクホスト"),
+        tr("Link Join", "リンク参加"),
+        tr("AI vs AI", "AI同士"),
+        tr("Deck Builder", "デッキ作成"),
+    ]
+}
+
+/// Main-menu title (with button hints).
+pub fn mode_title() -> &'static str {
+    tr("MODE Up/Dn:A/Start", "モード 上下:A/スタート")
+}
+
+/// Start/main menu language row for the CURRENT language
+/// (mirrors the 3DS `Language: <autonym>` row).
+pub fn language_row() -> alloc::string::String {
+    alloc::format!("{}: {}", tr("Language", "言語"), current_lang().label())
+}

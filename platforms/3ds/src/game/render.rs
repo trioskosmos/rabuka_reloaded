@@ -376,7 +376,7 @@ fn render_zone_viewer(ctx: &RenderCtx) {
                     4.0,
                     COL_GOLD,
                     SCALE_BODY,
-                    format!("{}  (B=close, X=detail)\0", zlabel).as_ptr(),
+                    format!("{}  (B=close, A/X=detail)\0", zlabel).as_ptr(),
                 );
             }
             render_card_grid(
@@ -1574,6 +1574,10 @@ fn render_action_list(ctx: &RenderCtx, mut list_scroll: usize, content_y: f32) -
                         );
                     }
                 }
+                // Hint bar: the normal action list previously had none, so
+                // L/X/R/Select/Start/tap-deploy were all undiscoverable in
+                // the most common match state.
+                render_hint_bar(&tl("A=act X/R=detail L=abil Sel=view St=menu"));
     list_scroll
 }
 

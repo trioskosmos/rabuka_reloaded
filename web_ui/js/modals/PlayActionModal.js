@@ -185,7 +185,7 @@ function renderHandCard(index) {
         }
 
         if (actionsContainer.children.length === 0) {
-            actionsContainer.innerHTML = '<p style="opacity:0.6;text-align:center;padding:16px;">No playable areas available</p>';
+            actionsContainer.innerHTML = `<p style="opacity:0.6;text-align:center;padding:16px;">${i18n.t('no_playable_areas')}</p>`;
         }
     }
 }

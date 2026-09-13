@@ -60,6 +60,8 @@ pub struct JsFrameAction {
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct JsActionIndex {
     pub description: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description_ja: Option<String>,
     pub action_type: String,
     pub index: usize,
 }
@@ -185,6 +187,7 @@ impl WasmGameEngine {
         let actions = rabuka_engine::game_setup::generate_possible_actions(&self.game_state);
         let js_actions: Vec<JsActionIndex> = actions.into_iter().enumerate().map(|(i, a)| JsActionIndex {
             description: a.description,
+            description_ja: a.description_ja,
             action_type: a.action_type.to_string(),
             index: i,
         }).collect();

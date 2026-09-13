@@ -825,19 +825,39 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
                     .collect();
             }
             if target == "choice" {
-                let mut actions: Vec<Action> = description
-                    .split(" / ")
+                // Bilingual options: EN from description_en, JA from
+                // description (source text). Both split on " / " symmetric
+                // with Choice creation; on any shape mismatch fall back to
+                // the legacy JA-only actions so the choice never breaks.
+                let en_parts: Vec<&str> = choice
+                    .description_en()
+                    .map(|en| en.split(" / ").collect())
+                    .unwrap_or_default();
+                let ja_parts: Vec<&str> = description.split(" / ").collect();
+                let bilingual = en_parts.len() == ja_parts.len() && !ja_parts.is_empty();
+                log::debug!(
+                    "[CHOICE_BILINGUAL] target=choice opts={} bilingual={}",
+                    ja_parts.len(),
+                    bilingual
+                );
+                let mut actions: Vec<Action> = ja_parts
+                    .iter()
                     .enumerate()
-                    .map(|(i, opt)| {
-                        make_action_params(
+                    .map(|(i, opt_ja)| {
+                        let a = make_action_params(
                             ActionType::ChoiceOption,
-                            opt,
+                            if bilingual { en_parts[i] } else { *opt_ja },
                             ActionParameters {
                                 card_id: Some(i as i16),
                                 card_no: Some(i.to_string()),
                                 ..make_params()
                             },
-                        )
+                        );
+                        if bilingual {
+                            a.with_ja(*opt_ja)
+                        } else {
+                            a
+                        }
                     })
                     .collect();
                 if *allow_skip {
@@ -1865,7 +1885,7 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                         continue;
                     }
                 }
-                actions.push(make_action_params(
+                let mut ua = make_action_params(
                     ActionType::UseAbility,
                     action_desc!(
                         "E{} {} ({}): {}{}",
@@ -1904,7 +1924,16 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                         final_cost: Some(effective_cost),
                         ..make_params()
                     },
+                );
+                ua.description_ja = Some(action_desc!(
+                    "E{} {} ({}): {}{}",
+                    effective_cost,
+                    card.name,
+                    area_label_ja(area_name),
+                    ability.full_text,
+                    trigger_info
                 ));
+                actions.push(ua);
             }
         }
     }
@@ -1962,7 +1991,7 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                         continue;
                     }
                 }
-                actions.push(make_action_params(
+                let mut ua = make_action_params(
                     ActionType::UseAbility,
                     action_desc!(
                         "E{} {} (discard, 起動): {}",
@@ -1993,7 +2022,14 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                         final_cost: Some(effective_cost),
                         ..make_params()
                     },
+                );
+                ua.description_ja = Some(action_desc!(
+                    "E{} {} (控え室, 起動): {}",
+                    effective_cost,
+                    card.name,
+                    ability.full_text
                 ));
+                actions.push(ua);
             }
         }
     }

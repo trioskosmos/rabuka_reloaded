@@ -66,8 +66,10 @@ pub fn show_detail_screen_simple<I: InputSource>(
         lines.extend(Display::wrap_pane(h, PANE_COLS));
     }
     lines.extend(Display::wrap_pane(body, PANE_COLS));
+    // Hint first: this screen otherwise has zero button hints (the pane
+    // shows art + lines only). Closes on any of A/B/L/R/Start.
+    lines.insert(0, String::from("U/D:scroll A:close"));
     display.reset_vram();
-    agb::println!("DETAIL-SIMPLE lines={} bodylen={}", lines.len(), body.len()); // TEMP
     let mut scroll = 0usize;
     const VISIBLE: usize = 8;
     display.render_card_detail(art, &lines, scroll);
@@ -94,7 +96,6 @@ pub fn show_detail_screen_simple<I: InputSource>(
                 ""
             };
             if !closer.is_empty() {
-                agb::println!("DETAIL-SIMPLE close {}", closer); // TEMP
                 display.reset_vram();
                 return;
             }
@@ -135,16 +136,12 @@ pub fn show_detail_screen<I: InputSource>(
     // Fresh pool for the portrait + text: the previous screen's dead tiles
     // would otherwise pile onto this screen's demand (see reset_vram).
     display.reset_vram();
-    agb::println!(
-        "DETAIL open art={} lines={} bodylen={}",
-        art_card_no.unwrap_or("-"),
-        lines.len(),
-        body.len()
-    ); // TEMP L/R diagnosis
+    // Hint first: this screen otherwise has zero button hints (the pane
+    // shows art + lines only). Closes on any of A/B/L/R/Start.
+    lines.insert(0, String::from("U/D:scroll A:close"));
     let mut scroll = 0usize;
     const VISIBLE: usize = 8;
     display.render_card_detail(art, &lines, scroll);
-    agb::println!("DETAIL rendered"); // TEMP L/R diagnosis
     loop {
         input.poll();
         if input.just_pressed(Button::Up) && scroll > 0 {
@@ -168,7 +165,6 @@ pub fn show_detail_screen<I: InputSource>(
                 ""
             };
             if !closer.is_empty() {
-                agb::println!("DETAIL close {}", closer); // TEMP L/R diagnosis
                 // Release the portrait + text before the caller rebuilds its
                 // own screen, so demands never stack across the transition.
                 display.reset_vram();
@@ -187,7 +183,6 @@ pub fn show_card_detail<I: InputSource>(
     card_no: &str,
 ) {
     if let Some(card) = gs.card_database.get_card_by_no(card_no) {
-        agb::println!("CARDDETAIL {}", card_no); // TEMP
         let header: Vec<String> = alloc::vec![
             card_detail_title(card),
             card_stat_text(card),

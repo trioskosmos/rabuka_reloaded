@@ -19,6 +19,7 @@ use alloc::vec::Vec;
 use std::format;
 
 use crate::card::Card;
+use crate::game::language::{more_line, scroll_hint};
 use crate::game_state::GameState;
 
 /// A console's UI backend. The engine drives menus through this trait; each
@@ -139,7 +140,7 @@ pub trait PlatformUi {
                 self.println(&lines[l]);
             }
             if lines.len() > end {
-                self.println(&format!("  .. {} more", lines.len() - end));
+                self.println(&more_line(lines.len() - end, self.ui_lang()));
             }
             self.swap_buffers();
             self.poll_input();
@@ -197,13 +198,13 @@ pub trait PlatformUi {
         const H: usize = 8; // 9 screen rows, one held for a hint bar
         loop {
             self.clear_screen();
-            self.println("A/B/Start close, Up/Down scroll");
+            self.println(scroll_hint(self.ui_lang()));
             let end = (off + H).min(lines.len());
             for l in off..end {
                 self.println(&lines[l]);
             }
             if lines.len() > end {
-                self.println(&format!("  .. {} more", lines.len() - end));
+                self.println(&more_line(lines.len() - end, self.ui_lang()));
             }
             self.swap_buffers();
             self.poll_input();

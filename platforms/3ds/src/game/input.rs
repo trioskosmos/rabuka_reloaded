@@ -337,6 +337,14 @@ pub(crate) fn handle_input(
         }
     }
 
+    // Snapshot for B-skip below: B closes an open layer; only when no
+    // layer is (or was, this press) open may B answer a choice instead.
+    // Without this, one B press would both close the hint and skip.
+    let b_closes_layer = viewing_card.is_some()
+        || zone_viewer.is_some()
+        || overlay != Overlay::None
+        || choice_hint_detail
+        || choice_subview;
     // B: close menus / overlays / card detail
     if keys & 0x00000002 != 0 {
         if viewing_card.is_some() {
@@ -361,8 +369,10 @@ pub(crate) fn handle_input(
         redraw = true;
     }
 
-    // DPAD LEFT/RIGHT: scroll hand view (0x10 = RIGHT, 0x20 = LEFT)
-    if overlay == Overlay::None && !detail_mode {
+    // DPAD LEFT/RIGHT: scroll hand view (0x10 = RIGHT, 0x20 = LEFT).
+    // Suppressed during image-choice grids, which already bind Left/Right
+    // to cursor navigation — otherwise cursor and hand fight each press.
+    if overlay == Overlay::None && !detail_mode && !has_image_choice {
         let vis = visible_hand_slots();
         let is_my_turn = gs.active_player().id == pref(&gs, my_player_idx).id;
         let (off, max) = if is_my_turn {
@@ -406,9 +416,12 @@ pub(crate) fn handle_input(
     // Highlight source of truth is display_order[display_pos] (the grid/list
     // cursor); `cur` can be stale for a frame after a rebuild, so resolve
     // through the highlight first and fall back to `cur`.
-    // Disabled on the game-over screen.
+    // Disabled on the game-over screen. R mirrors X here: R is dead in
+    // the normal match view, and GBA convention is R = card detail.
+    // Excluded during image-choice grids, where R already opens the
+    // cursor-card detail through its own path below.
     if overlay == Overlay::None
-        && keys & 0x00000400 != 0
+        && (keys & 0x00000400 != 0 || (keys & 0x00000100 != 0 && !has_image_choice))
         && gs.game_result == GameResult::Ongoing
     {
         let highlighted_fi: Option<usize> = display_order
@@ -480,18 +493,26 @@ pub(crate) fn handle_input(
     }
 
     // START opens the in-game menu (perf stats / game log / revealed cards).
-    // On the game-over screen it quits back to the mode-select menu instead.
-    if keys & 0x00000008 != 0 {
-        if gs.game_result != GameResult::Ongoing {
-            quit_to_menu = true;
+    // On the game-over screen A/B/START quit back to the mode-select menu
+    // instead (engine/GBA contract is A-or-Start continues; B joins them).
+    // B only quits with no detail layer open (otherwise it just closes
+    // the layer, same as in-match).
+    let b_quits = keys & 0x00000002 != 0
+        && viewing_card.is_none()
+        && zone_viewer.is_none()
+        && overlay == Overlay::None;
+    if (keys & 0x00000008 != 0 || keys & 0x00000001 != 0 || b_quits)
+        && gs.game_result != GameResult::Ongoing
+    {
+        quit_to_menu = true;
+        redraw = true;
+    } else if keys & 0x00000008 != 0 {
+        overlay = if overlay == Overlay::None {
+            Overlay::StartMenu(0)
         } else {
-            overlay = if overlay == Overlay::None {
-                Overlay::StartMenu(0)
-            } else {
-                Overlay::None
-            };
-            redraw = true;
-        }
+            Overlay::None
+        };
+        redraw = true;
     }
 
     // Multiplayer: both consoles run the SAME engine. The only thing that
@@ -619,8 +640,48 @@ pub(crate) fn handle_input(
             cur = 0;
             dirty = true;
             redraw = true;
-        } // closes else block (disabled action skip)
-    }
+        } // closes inner else (disabled action skip)
+    } // closes A-if; the waiting/A chain above is complete here
+    // B answers a skippable choice through the same routing as A.
+    // Mandatory prompts have no ChoiceSkip action, so B keeps its
+    // close-layers job there (b_closes_layer snapshot above).
+    // Standalone gate repeating the turn checks (cannot chain: the
+    // waiting/A if-else-if above is already complete).
+    if !((is_multiplayer && waiting_for_opponent) || (*vs_ai && !mp_can_act(&gs, 0)))
+        && overlay == Overlay::None
+            && zone_viewer.is_none()
+            && viewing_card.is_none()
+            && !b_closes_layer
+            && keys & 0x00000002 != 0
+            && gs.game_result == GameResult::Ongoing
+            && gs.has_pending_choice()
+    {
+            if let Some(skip_act) = acts_cache
+                .iter()
+                .find(|a| a.action_type == game_setup::ActionType::ChoiceSkip)
+                .cloned()
+            {
+                let skip_disabled = skip_act
+                    .parameters
+                    .as_ref()
+                    .and_then(|p| p.disabled)
+                    .unwrap_or(false);
+                if !skip_disabled {
+                    route_authoritative_action(
+                        gs,
+                        &skip_act,
+                        is_multiplayer,
+                        is_host,
+                        &mut waiting_for_opponent,
+                        &mut pending_client_action,
+                        &mut next_action_seq,
+                    );
+                    cur = 0;
+                    dirty = true;
+                    redraw = true;
+                }
+            }
+        }
 
     let n2 = acts_cache.len();
     if n2 > 0 && cur >= n2 {
@@ -685,9 +746,16 @@ pub(crate) fn handle_input(
     }
 
     // Touch: tap board zones to view card details, or overlay to select action.
-    // Disabled on the game-over screen (START quits to menu instead).
+    // Disabled on the game-over screen (START quits to menu instead) and
+    // while any overlay or viewer covers the board — taps must never fire
+    // game actions behind the Start menu.
     let touching = unsafe { _3ds_touch_down() };
-    if touching && !was_touching && gs.game_result == GameResult::Ongoing {
+    if touching
+        && !was_touching
+        && gs.game_result == GameResult::Ongoing
+        && overlay == Overlay::None
+        && zone_viewer.is_none()
+    {
         touch_tap_count += 1;
         let mut tx: u32 = 0;
         let mut ty: u32 = 0;

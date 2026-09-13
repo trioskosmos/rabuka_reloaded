@@ -124,7 +124,7 @@ fn pick_mode(
                     0.5f32,
                     format!(
                         "{}\0",
-                        tl("Touch=tap  UP/DOWN=move  R=lang/言語  L=help  B=back")
+                        tl("Touch=tap  UP/DOWN=move  R=lang/言語  L=help  B=quit")
                     )
                     .as_ptr(),
                 );
@@ -239,7 +239,10 @@ fn pick_deck(
 ) -> Step {
     {
         if was_dirty {
-            let label = if !vs_ai {
+            // Local-MP preview returns land here too: keep their header.
+            let label = if is_multiplayer {
+                tl("SELECT YOUR DECK")
+            } else if !vs_ai {
                 tl("P1 DECK")
             } else {
                 tl("YOUR DECK")
@@ -252,7 +255,11 @@ fn pick_deck(
                         8.0,
                         COL_GOLD,
                         SCALE_BODY,
-                        format!("SELECT {}\0", label).as_ptr(),
+                        format!(
+                            "{}\0",
+                            tl_fmt("SELECT DECK", &[("label", &label)])
+                        )
+                        .as_ptr(),
                     );
                 }
                 // Top screen: just the selected deck's name. A full card-image
@@ -384,7 +391,11 @@ fn pick_deck(
                 true,
             )
         } else if keys & 0x00000002 != 0 {
-            Step::Setup(cards.clone(), decks.clone(), SetupPhase::PickMode(4), true)
+            // B: back to the originating mode row (mode doubles as the
+            // PickMode cursor: 0 = VS AI, 1 = Sandbox, 3 = Local MP).
+            // The multiplayer branch matters for DeckViewer returns from
+            // the Local-MP deck preview, which lands back here.
+            Step::Setup(cards.clone(), decks.clone(), SetupPhase::PickMode(if is_multiplayer { 3 } else if vs_ai { 0 } else { 1 }), true)
         } else if keys & 0x00000001 != 0 {
             if is_multiplayer {
                 // Local Multiplayer: go to role selection
@@ -466,7 +477,7 @@ fn multiplayer_deck(
                         );
                     }
                 }
-                render_hint_bar_bot(&tl("UP/DOWN=select  A=confirm  B=back"));
+                render_hint_bar_bot(&tl("UP/DOWN=select  A=confirm  X=preview  B=back"));
         }
         // Touch input: tap a deck row selects it (like A).
         let mut t_x: u32 = 0;
@@ -489,7 +500,23 @@ fn multiplayer_deck(
                 }
             }
         }
-        if tapped.is_some() {
+        // X = preview deck contents (same viewer as the P1/P2 picks; its
+        // back target returns to the P1 pick with is_multiplayer set, which
+        // renders this same header and routes A back to role selection).
+        if keys & 0x00000400 != 0 && cur < n {
+            let card_db = std::sync::Arc::new(CardDatabase::load_or_create(cards.as_ref().clone()));
+            let card_ids: Vec<i16> = DeckParser::deck_list_to_card_numbers(&decks[cur])
+                .iter()
+                .filter_map(|cn| card_db.get_card_id(cn))
+                .collect();
+            let deck_atlas = CardAtlas::shared();
+            Step::Setup(
+                cards.clone(),
+                decks.clone(),
+                SetupPhase::DeckViewer(card_ids, 0, 0, false, true, None, card_db, deck_atlas),
+                true,
+            )
+        } else if tapped.is_some() {
             // A = select deck, go to role selection with deck index
             Step::Setup(
                 cards.clone(),
@@ -512,7 +539,8 @@ fn multiplayer_deck(
                 true,
             )
         } else if keys & 0x00000002 != 0 {
-            Step::Setup(cards.clone(), decks.clone(), SetupPhase::PickMode(4), true)
+            // B: back to Local Multiplayer (mode 3), not PC-MP (mode 4).
+            Step::Setup(cards.clone(), decks.clone(), SetupPhase::PickMode(3), true)
         } else if keys & 0x00000001 != 0 {
             // A = select deck, go to role selection with deck index
             Step::Setup(
@@ -580,7 +608,7 @@ fn pick_deck2(
                         );
                     }
                 }
-                render_hint_bar_bot(&tl("X=preview  A=select  B=use same"));
+                render_hint_bar_bot(&tl("X=preview  A=select  B=back  Y=same"));
         }
         // Touch input: tap a deck row selects it (like A).
         let mut t_x: u32 = 0;
@@ -648,6 +676,16 @@ fn pick_deck2(
                 true,
             )
         } else if keys & 0x00000002 != 0 {
+            // B: back to the P1 pick (restores P1's cursor). The P2 pick
+            // previously had no way back at all.
+            Step::Setup(
+                cards.clone(),
+                decks.clone(),
+                SetupPhase::PickDeck(p1_idx, vs_ai, false),
+                true,
+            )
+        } else if keys & 0x00000800 != 0 {
+            // Y: use P1's deck for P2 (the old B behavior, kept on a free key).
             Step::Setup(
                 cards.clone(),
                 decks.clone(),
@@ -802,7 +840,7 @@ fn testing(cards: &Arc<Vec<Card>>, decks: &Vec<DeckList>, keys: u32) -> Step {
                 2.0,
                 COL_GOLD,
                 SCALE_BODY,
-                "=== ON-DEVICE TESTS ===\0".as_ptr(),
+                format!("{}\0", tl("ON-DEVICE TESTS")).as_ptr(),
             );
             let mut ty = 24.0;
             for line in &results {
@@ -812,9 +850,10 @@ fn testing(cards: &Arc<Vec<Card>>, decks: &Vec<DeckList>, keys: u32) -> Step {
                 _3ds_bot_queue_text(4.0, ty, COL_LIGHT, SCALE_SMALL, format!("{}\0", line).as_ptr());
                 ty += 15.0;
             }
-            _3ds_bot_queue_text(4.0, 224.0, COL_MED, SCALE_SMALL, "START=exit\0".as_ptr());
+            _3ds_bot_queue_text(4.0, 224.0, COL_MED, SCALE_SMALL, format!("{}\0", tl("B/START=exit")).as_ptr());
         }
-        if keys & 0x00000008 != 0 {
+        // B joins START as an exit (B=back convention everywhere else).
+        if keys & 0x00000008 != 0 || keys & 0x00000002 != 0 {
             Step::Done(Ok(()))
         } else {
             Step::Setup(cards.clone(), decks.clone(), SetupPhase::Testing, false)
@@ -1153,6 +1192,7 @@ fn deck_viewer(
     was_dirty: bool,
     card_ids: &Vec<i16>,
     mut offset: usize,
+    mut scroll_px: usize,
     vs_ai: bool,
     is_multiplayer: bool,
     viewing_card: &mut Option<i16>,
@@ -1160,6 +1200,15 @@ fn deck_viewer(
     atlas: &Arc<CardAtlas>,
 ) -> Step {
     {
+        // Detail scroll (Up/Down while a card is open); reset whenever no
+        // card is open so each detail starts at the top.
+        if viewing_card.is_none() {
+            scroll_px = 0;
+        } else if keys & 0x00000040 != 0 {
+            scroll_px = scroll_px.saturating_sub(18);
+        } else if keys & 0x00000080 != 0 {
+            scroll_px += 18;
+        }
         if was_dirty {
             unsafe {
                 _3ds_bot_clear();
@@ -1170,13 +1219,13 @@ fn deck_viewer(
                     4.0,
                     COL_GOLD,
                     SCALE_BODY,
-                    format!("{}  ({})\0", tl("DECK PREVIEW"), tl("B=close, X=detail")).as_ptr(),
+                    format!("{}  ({})\0", tl("DECK PREVIEW"), tl("B=close, A/X=detail, U/D=scroll")).as_ptr(),
                 );
             }
             if viewing_card.is_none() {
                 render_card_grid(card_ids, offset, 5, 2, 28.0, card_db, atlas);
             } else {
-                render_card_detail(viewing_card.unwrap(), card_db, atlas, 0.0, None);
+                render_card_detail(viewing_card.unwrap(), card_db, atlas, scroll_px as f32, None);
             }
         }
         let action = card_grid_input(keys, &mut offset, viewing_card, card_ids, 5);
@@ -1193,7 +1242,7 @@ fn deck_viewer(
                 SetupPhase::DeckViewer(
                     card_ids.clone(),
                     offset,
-                    0,
+                    scroll_px,
                     vs_ai,
                     is_multiplayer,
                     *viewing_card,
@@ -1208,7 +1257,7 @@ fn deck_viewer(
                 SetupPhase::DeckViewer(
                     card_ids.clone(),
                     offset,
-                    0,
+                    scroll_px,
                     vs_ai,
                     is_multiplayer,
                     *viewing_card,
@@ -1223,7 +1272,7 @@ fn deck_viewer(
                 SetupPhase::DeckViewer(
                     card_ids.clone(),
                     offset,
-                    0,
+                    scroll_px,
                     vs_ai,
                     is_multiplayer,
                     *viewing_card,
@@ -1254,10 +1303,11 @@ fn control_guide(
                                  R = Toggle language",
             "=== IN-GAME CONTROLS ===\n\n\
                                  Touch = Select cards on board\n\
-                                 L = View card detail overlay\n\
-                                 X = Toggle detail mode\n\
-                                 R = Toggle action view (debug)\n\
-                                 Y = Switch text/graphic mode (debug)\n\
+                                 L = Ability/hint overlay\n\
+                                 X = Toggle card detail\n\
+                                 R = Card detail (lists)\n\
+                                 Y = Cards under stage member\n\
+                                 B = Skip choice / back\n\
                                  START = In-game pause menu",
             "=== GAME MODES ===\n\n\
                                  VS AI: Play against the computer\n\
@@ -1438,11 +1488,18 @@ fn multiplayer_pc_host_wait(
                 .to_string();
             _3ds_bot_queue_text(
                 30.0, 60.0, COL_LIGHT, SCALE_BODY,
-                format!("Your IP: {}\0", ip).as_ptr(),
+                format!("{}\0", tl_fmt("Your IP: {ip}", &[("ip", &ip)])).as_ptr(),
             );
             _3ds_bot_queue_text(
                 30.0, 100.0, COL_LIGHT, SCALE_BODY,
-                format!("Port: {}\0", crate::transport::PC_TRANSPORT_PORT).as_ptr(),
+                format!(
+                    "{}\0",
+                    tl_fmt(
+                        "Port: {port}",
+                        &[("port", &crate::transport::PC_TRANSPORT_PORT.to_string())]
+                    )
+                )
+                .as_ptr(),
             );
             _3ds_bot_queue_text(
                 30.0, 230.0, COL_MED, SCALE_BODY,
@@ -1535,8 +1592,18 @@ fn multiplayer_pc_client_connect(
                         _3ds_bot_clear();
                         _3ds_bot_queue_rect(0.0, 0.0, 320.0, 240.0, COL_TOP_BG);
                         _3ds_bot_queue_text(
-                            30.0, 100.0, 0xFF0000FF, SCALE_BODY,
-                            format!("Connect failed: {}\0", e).as_ptr(),
+                            30.0,
+                            100.0,
+                            0xFF0000FF,
+                            SCALE_BODY,
+                            format!(
+                                "{}\0",
+                                tl_fmt(
+                                    "Connect failed: {e}",
+                                    &[("e", &e.to_string())]
+                                )
+                            )
+                            .as_ptr(),
                         );
                         Step::Setup(cards.clone(), decks.clone(), SetupPhase::MultiplayerPcClientConnect(p1_idx), true)
                     }
@@ -1888,6 +1955,22 @@ fn multiplayer_client_host_select(
 ) -> Step {
     {
         let n = hosts.len();
+        // Touch: tap a host row connects (same as A on it, like deck lists).
+        let mut t_x: u32 = 0;
+        let mut t_y: u32 = 0;
+        unsafe {
+            _3ds_touch_read(&mut t_x, &mut t_y);
+        }
+        let mut tapped: Option<usize> = None;
+        if keys & 0x00100000 != 0 {
+            for i in 0..n {
+                let y = 50.0 + i as f32 * 32.0;
+                if t_x >= 20 && t_x <= 300 && (t_y as f32) >= y && (t_y as f32) < y + 32.0 {
+                    tapped = Some(i);
+                    break;
+                }
+            }
+        }
         if n == 0 {
             Step::Setup(
                 cards.clone(),
@@ -1903,9 +1986,9 @@ fn multiplayer_client_host_select(
                 SetupPhase::MultiplayerClientScan(p1_idx, 0),
                 true,
             )
-        } else if keys & 0x00000001 != 0 {
-            // A = connect to selected host
-            let selected = hosts[cursor];
+        } else if tapped.is_some() || keys & 0x00000001 != 0 {
+            // A = connect to selected host (tap connects the tapped row)
+            let selected = hosts[tapped.unwrap_or(cursor)];
             match uds::uds_connect_network(selected) {
                 Ok(()) => {
                     let hello = [0xAAu8, (p1_idx & 0xFF) as u8];
@@ -1955,7 +2038,12 @@ fn multiplayer_client_host_select(
                             y,
                             col,
                             SCALE_BODY,
-                            format!("{}{}\0", prefix, format!("Host {}", i + 1)).as_ptr(),
+                            format!(
+                                "{}{}\0",
+                                prefix,
+                                tl_fmt("Host {n}", &[("n", &(i + 1).to_string())])
+                            )
+                            .as_ptr(),
                         );
                     }
                 }
@@ -1965,7 +2053,7 @@ fn multiplayer_client_host_select(
                         220.0,
                         COL_MED,
                         SCALE_BODY,
-                        format!("{}\0", tl("A=connect B=back")).as_ptr(),
+                        format!("{}\0", tl("UP/DOWN=move A=connect B=back")).as_ptr(),
                     );
                 }
             Step::Setup(
@@ -2451,7 +2539,7 @@ pub fn setup_step(
         SetupPhase::DeckViewer(
             ref card_ids,
             offset,
-            _,
+            scroll_px,
             vs_ai,
             is_multiplayer,
             ref mut viewing_card,
@@ -2464,6 +2552,7 @@ pub fn setup_step(
             was_dirty,
             card_ids,
             offset,
+            scroll_px,
             vs_ai,
             is_multiplayer,
             viewing_card,

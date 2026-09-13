@@ -53,7 +53,7 @@ pub enum SetupPhase {
     DeckViewer(
         Vec<i16>,          // card_ids (resolved to i16, same as zone_viewer)
         usize,             // cursor
-        usize,             // offset
+        usize,             // detail scroll (px, 0 = top; Up/Down in detail)
         bool,              // vs_ai
         bool,              // is_multiplayer
         Option<i16>,       // viewing_card (same as zone_viewer)

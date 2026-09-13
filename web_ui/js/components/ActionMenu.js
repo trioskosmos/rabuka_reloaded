@@ -230,7 +230,7 @@ export const ActionMenu = {
             passBtn.style.opacity = '0.4';
             passBtn.style.cursor = 'default';
             passBtn.onclick = null;
-            if (passLabel) passLabel.textContent = 'PASS';
+            if (passLabel) passLabel.textContent = i18n.t('pass_btn');
         }
     },
 

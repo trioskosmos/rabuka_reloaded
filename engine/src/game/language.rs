@@ -12,7 +12,13 @@
 //! bundles): baking them into the engine would bloat ROM targets. Ports map
 //! [`Lang::code`] (`"en"` / `"jp"`) to their own table files.
 //!
-//! This module is `no_std`-safe (`core` only) so GBA/DS/PS1 targets can use it.
+//! This module is `no_std`-safe (`core` + `alloc` only) so GBA/DS/PS1 targets
+//! can use it.
+
+#[cfg(feature = "no_std")]
+use alloc::{format, string::String};
+#[cfg(not(feature = "no_std"))]
+use std::{format, string::String};
 
 use crate::game::menu::select_with_initial;
 use crate::game::platform_ui::PlatformUi;
@@ -100,6 +106,30 @@ impl Lang {
     }
 }
 
+/// Scroll-viewer hint bar in the UI language (detail screens, game log).
+pub fn scroll_hint(lang: Lang) -> &'static str {
+    match lang {
+        Lang::Japanese => "A/B/Start:閉じる 上/下:スクロール",
+        _ => "A/B/Start close, Up/Down scroll",
+    }
+}
+
+/// ".. N more" pagination overflow line in the UI language.
+pub fn more_line(remaining: usize, lang: Lang) -> String {
+    match lang {
+        Lang::Japanese => format!("  .. あと{}件", remaining),
+        _ => format!("  .. {} more", remaining),
+    }
+}
+
+/// Skip-row label appended to skippable menus, in the UI language.
+pub fn skip_row(lang: Lang) -> &'static str {
+    match lang {
+        Lang::Japanese => "[スキップ]",
+        _ => "[Skip]",
+    }
+}
+
 /// Language picker menu: shows both autonyms (`日本語` / `English`) under a
 /// bilingual title, cursor starting on `current`. Returns the picked language.
 /// A/Start confirms (same contract as [`crate::game::menu::select`]).
@@ -146,6 +176,16 @@ mod tests {
         assert_eq!(Lang::Japanese.code(), "jp");
         assert_eq!(Lang::English.code(), "en");
         assert_eq!(Lang::default(), Lang::Japanese);
+    }
+
+    #[test]
+    fn console_chrome_is_bilingual() {
+        assert_eq!(scroll_hint(Lang::Japanese), "A/B/Start:閉じる 上/下:スクロール");
+        assert_eq!(scroll_hint(Lang::English), "A/B/Start close, Up/Down scroll");
+        assert_eq!(more_line(3, Lang::Japanese), "  .. あと3件");
+        assert_eq!(more_line(3, Lang::English), "  .. 3 more");
+        assert_eq!(skip_row(Lang::Japanese), "[スキップ]");
+        assert_eq!(skip_row(Lang::English), "[Skip]");
     }
 
     #[test]

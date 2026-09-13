@@ -1,4 +1,5 @@
 import { State } from '../state.js';
+import * as i18n from '../i18n/index.js';
 import { Network, apiFetch } from '../network.js';
 import { Modals } from '../ui_modals.js';
 import { ModalManager } from '../utils/ModalManager.js';
@@ -135,7 +136,7 @@ function updateStatus(status, val) {
     if (!val) { status.textContent = ''; return; }
     const result = parseDeckText(val);
     if (!result) {
-        status.textContent = 'Could not parse';
+        status.textContent = i18n.t('could_not_parse');
         status.style.color = '#ef4444';
         return;
     }
@@ -188,7 +189,7 @@ export const GameSetupModal = {
         const p1Col = document.getElementById('setup-p1-col');
         const title = document.getElementById('setup-title');
         const roomCodeEl = document.getElementById('setup-room-code');
-        if (title) title.textContent = 'Sandbox Setup';
+        if (title) title.textContent = i18n.t('sandbox_setup');
         if (roomCodeEl) {
             roomCodeEl.style.display = DISPLAY_VALUES.NONE;
             roomCodeEl.textContent = '';
@@ -367,6 +368,14 @@ export const GameSetupModal = {
             ModalManager.hide(DOM_IDS.MODAL_SETUP);
             Modals.pvpJoinPid = null;
             await Network.fetchState();
+            // VS AI runs in a pvp room whose opponent is driven locally by
+            // AiDriver — connect SSE so AI moves push to us instead of
+            // relying on the version-poll loop. (Sandbox keeps polling:
+            // the server only broadcasts pvp rooms.)
+            if (gameMode === 'pvp') {
+                const { RoomManager } = await import('../services/RoomManager.js');
+                await RoomManager.connectSSE();
+            }
         } catch (e) {
             console.error(e);
             alert("Network error: " + e.message);
@@ -384,9 +393,9 @@ export const GameSetupModal = {
         const title = document.getElementById('setup-title');
         const roomCodeEl = document.getElementById('setup-room-code');
 
-        if (title) title.textContent = 'Select Your Deck';
+        if (title) title.textContent = i18n.t('select_deck');
         if (roomCodeEl && State.roomCode) {
-            roomCodeEl.textContent = `Room: ${State.roomCode}`;
+            roomCodeEl.textContent = `${i18n.t('room')}: ${State.roomCode}`;
             roomCodeEl.style.display = 'block';
         }
 
@@ -403,7 +412,7 @@ export const GameSetupModal = {
         }
 
         if (startBtn) {
-            startBtn.textContent = 'Submit Deck & Join';
+            startBtn.textContent = i18n.t('submit_join');
             startBtn.setAttribute('data-action', 'submit-game-setup');
         }
 
@@ -443,7 +452,7 @@ export const GameSetupModal = {
                 } else {
                     const startBtn = document.querySelector('[data-action="submit-game-setup"]');
                     if (startBtn) {
-                        startBtn.textContent = 'Waiting for opponent...';
+                        startBtn.textContent = i18n.t('waiting_for_opponent');
                         startBtn.disabled = true;
                     }
                     // Poll for game state every 3s as fallback for SSE
@@ -464,7 +473,7 @@ export const GameSetupModal = {
                     window._pvpPollInterval = pollInterval;
                 }
             } else {
-                alert("Error setting deck: " + (data.error || "Unknown"));
+                alert(i18n.t('error_setting_deck') + ": " + (data.error || "Unknown"));
             }
         } catch (e) {
             console.error(e);
@@ -487,7 +496,7 @@ export const GameSetupModal = {
         const p1Col = document.getElementById('setup-p1-col');
         const title = document.getElementById('setup-title');
         const roomCodeEl = document.getElementById('setup-room-code');
-        if (title) title.textContent = 'VS AI Setup';
+        if (title) title.textContent = i18n.t('vs_ai_setup');
         if (roomCodeEl) {
             roomCodeEl.style.display = DISPLAY_VALUES.NONE;
             roomCodeEl.textContent = '';
@@ -499,7 +508,7 @@ export const GameSetupModal = {
             p1Col.style.opacity = '1';
             p1Col.style.pointerEvents = 'auto';
             const p1Title = p1Col.querySelector('h4');
-            if (p1Title) p1Title.textContent = 'Player 2 (AI)';
+            if (p1Title) p1Title.textContent = i18n.t('player2_ai');
         }
 
         setupAutoConvert(0);

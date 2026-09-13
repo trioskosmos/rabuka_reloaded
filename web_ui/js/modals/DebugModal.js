@@ -1,4 +1,5 @@
 import { State } from '../state.js';
+import * as i18n from '../i18n/index.js';
 import { Network, apiFetch } from '../network.js';
 
 const buildReverseLookup = (source) => Object.fromEntries(
@@ -199,7 +200,7 @@ export const DebugModal = {
         if (!State.data) {
             const container = document.getElementById('debug-inspector-content');
             if (container) {
-                container.innerHTML = '<div style="padding:24px; opacity:0.6; text-align:center; font-size:12px;">Waiting for game state...</div>';
+                container.innerHTML = `<div style="padding:24px; opacity:0.6; text-align:center; font-size:12px;">${i18n.t('waiting_for_state')}</div>`;
             }
             return;
         }

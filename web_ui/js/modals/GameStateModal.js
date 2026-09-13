@@ -133,16 +133,16 @@ export const GameStateModal = {
         const c = document.getElementById('gs-tab-conditions');
         if (!c) return;
 
-        c.innerHTML = '<div style="padding:12px;font-size:0.85rem;opacity:0.6;">Fetching conditions...</div>';
+        c.innerHTML = `<div style="padding:12px;font-size:0.85rem;opacity:0.6;">${i18n.t('fetching_conditions')}</div>`;
 
         GameStateModal.fetchAndCacheConditions().then(conditions => {
             if (_conditionsError) {
-                c.innerHTML = `<div style="padding:12px;color:var(--accent-pink);"><b>Error:</b> ${_conditionsError}</div>`;
+                c.innerHTML = `<div style="padding:12px;color:var(--accent-pink);"><b>${i18n.t('error_prefix')}:</b> ${_conditionsError}</div>`;
                 return;
             }
             if (!Array.isArray(conditions)) conditions = conditions?.conditions ?? [];
             if (!conditions || conditions.length === 0) {
-                c.innerHTML = '<div style="padding:12px;opacity:0.6;">Engine returned no conditions for any card in any zone. This iterates all abilities on all cards currently in play (stage, hand, energy, waitroom, live_zone, success_live_zone). If cards with ability conditions exist, check that the condition is parsed into one of: <code>activation_condition_parsed</code>, <code>condition</code>, <code>alternative_condition</code>, <code>result_condition</code>.</div>';
+                c.innerHTML = `<div style="padding:12px;opacity:0.6;">${i18n.t('no_conditions_dev')}</div>`;
                 return;
             }
 
@@ -151,7 +151,7 @@ export const GameStateModal = {
 
             const rows = conditions.map((cond, i) => {
                 const rCls = cond.result ? 'color:#4ade80;background:rgba(34,197,94,0.15);' : 'color:#f87171;background:rgba(239,68,68,0.12);';
-                const rLbl = cond.result ? 'PASS' : 'FAIL';
+                const rLbl = cond.result ? i18n.t('perf_pass') : i18n.t('perf_fail');
                 const av = cond.actual_value || {};
                 const actualStr = av.measure ? `${esc(av.measure)}` : '-';
                 const thresh = av.threshold != null ? ` [need ≥ ${av.threshold}]` : '';
@@ -318,7 +318,7 @@ export const GameStateModal = {
         const c = document.getElementById('gs-tab-player');
         if (!c) return;
         c.innerHTML = '';
-        if (!s.player1 && !s.player2) { c.textContent = 'No player data'; return; }
+        if (!s.player1 && !s.player2) { c.textContent = i18n.t('no_player_data'); return; }
 
         const cols = document.createElement('div');
         cols.className = 'gs-player-columns';
@@ -444,7 +444,7 @@ export const GameStateModal = {
         const c = document.getElementById('gs-tab-zones');
         if (!c) return;
         c.innerHTML = '';
-        if (!s.player1 && !s.player2) { c.textContent = 'No zone data'; return; }
+        if (!s.player1 && !s.player2) { c.textContent = i18n.t('no_zone_data'); return; }
 
         [s.player1, s.player2].forEach((p, idx) => {
             if (!p) return;

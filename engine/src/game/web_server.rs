@@ -112,6 +112,11 @@ impl FrameSnapshot {
 #[cfg_attr(feature = "serde_support", derive(Serialize,  Deserialize))]
 pub struct ActionIndex {
     pub description: String,
+    #[cfg_attr(
+        feature = "serde_support",
+        serde(skip_serializing_if = "Option::is_none")
+    )]
+    pub description_ja: Option<String>,
     pub action_type: String,
     pub parameters: Option<ActionParameters>,
     pub index: usize,
@@ -229,6 +234,12 @@ pub struct Room {
     pub mode: String, // "sandbox" or "pvp"
 
     pub public: bool,
+
+    /// True when the room's opponent is the browser-driven AI (VS AI).
+    /// Lets execute-action return the full state in one round trip instead
+    /// of the minimal ActionResult + follow-up GET used for 2-human PVP.
+    #[cfg_attr(feature = "serde_support", serde(skip))]
+    pub is_ai_room: bool,
 
     pub created_at: u64,
 
@@ -622,6 +633,7 @@ fn build_action_indexes(game_state: &GameState) -> Vec<ActionIndex> {
         .enumerate()
         .map(|(i, a)| ActionIndex {
             description: a.description,
+            description_ja: a.description_ja,
             action_type: a.action_type.to_string(),
             parameters: a.parameters,
             index: i,
@@ -681,6 +693,250 @@ fn frame_label(action_type: Option<&str>, card_no: Option<&str>) -> String {
         action_type.unwrap_or("?"),
         card_no.map(|n| format!(": {}", n)).unwrap_or_default(),
     )
+}
+
+/// Recording hook shared by the request path and the AI reply loop:
+/// buffer (state, action) for each step, flushing to file at game end.
+/// Extracted verbatim so server-driven AI moves record exactly like
+/// human-driven ones instead of silently dropping training pairs.
+fn record_room_move(
+    room: &mut Room,
+    rid: &str,
+    snapshot: &GameState,
+    game_state: &GameState,
+    action_type: Option<&str>,
+    card_id: Option<i16>,
+) {
+    // Recording hook: buffer (state, action) for each step
+    if room.recording && room.recording_before.is_empty() {
+        // First action: just buffer the before-state
+        room.recording_before = serialize_p1_state(snapshot);
+        room.recording_action = Some((
+            card_id.unwrap_or(0),
+            action_type_to_idx(action_type),
+        ));
+    } else if room.recording {
+        // Subsequent action: write previous buffered pair + current before-state
+        let state_bytes = serialize_p1_state(snapshot);
+        let (cid, aidx) = room.recording_action.unwrap_or((0, 0));
+        room.recording_data
+            .extend_from_slice(&room.recording_before);
+        room.recording_data.extend_from_slice(&cid.to_le_bytes());
+        room.recording_data.push(aidx);
+        room.recording_data.extend_from_slice(&0f32.to_le_bytes()); // reward placeholder
+        room.recording_data.extend_from_slice(&state_bytes);
+        // Buffer current state+action for next write
+        room.recording_before = state_bytes;
+        room.recording_action = Some((
+            card_id.unwrap_or(0),
+            action_type_to_idx(action_type),
+        ));
+    }
+    // Check game end — if over, flush recording to file
+    if game_state.game_result != crate::game_state::GameResult::Ongoing
+        && room.recording
+    {
+        let outcome = match game_state.game_result {
+            crate::game_state::GameResult::FirstAttackerWins => 1.0f32,
+            crate::game_state::GameResult::SecondAttackerWins => -1.0f32,
+            _ => 0.0f32,
+        };
+        // Update reward for last buffered pair
+        if let Some((cid, aidx)) = room.recording_action.take() {
+            room.recording_data
+                .extend_from_slice(&room.recording_before);
+            room.recording_data.extend_from_slice(&cid.to_le_bytes());
+            room.recording_data.push(aidx);
+            room.recording_data
+                .extend_from_slice(&outcome.to_le_bytes());
+            // Last action: no next state, repeat current
+            room.recording_data
+                .extend_from_slice(&room.recording_before);
+        }
+        // Write to file
+        let log_path = format!("../recording_{}.bin", rid);
+        if let Ok(mut f) = std::fs::File::create(&log_path) {
+            use std::io::Write;
+            let _ = f.write_all(&room.recording_data);
+            log::info!("Recording saved to {}", log_path);
+        }
+        room.recording = false;
+        room.recording_data.clear();
+        room.recording_before.clear();
+    }
+}
+
+/// Upper bound on server-driven AI replies per execute-action request.
+/// A normal turn needs a handful of moves; the cap only guards against a
+/// pathological action loop wedging the HTTP worker. The browser-driven
+/// AiDriver remains as a fallback and continues from the version poll if
+/// the cap is ever hit with the AI still to act.
+const AI_REPLY_MOVE_CAP: usize = 60;
+
+/// Build the frame-history entry for one server-driven AI move from the
+/// picked action's parameters.
+fn ai_frame_action(action: &crate::game_setup::Action, ai_pid: u8) -> FrameAction {
+    let p = action.parameters.as_ref();
+    FrameAction {
+        action_type: action.action_type.to_string(),
+        player_id: ai_pid,
+        card_id: p.and_then(|x| x.card_id),
+        card_indices: p.and_then(|x| x.card_indices.clone()),
+        stage_area: p.and_then(|x| x.stage_area.clone()),
+        use_baton_touch: p.and_then(|x| x.use_baton_touch).unwrap_or(false),
+    }
+}
+
+/// Commit one AI reply move with the same per-room bookkeeping a sequential
+/// execute-action request would have produced (undo snapshot, frame history,
+/// recording, activity stamp), so rewind, replay and recording stay coherent.
+fn commit_room_move(
+    data: &AppState,
+    room_id: Option<&str>,
+    game_state: &mut GameState,
+    snapshot: &GameState,
+    had_choice_before: bool,
+    frame_action: FrameAction,
+    label: String,
+) {
+    if let Some(rid) = room_id {
+        if let Ok(mut rooms) = data.rooms.lock() {
+            if let Some(room) = rooms.get_mut(rid) {
+                push_undo_snapshot(
+                    &mut room.history,
+                    snapshot,
+                    game_state,
+                    had_choice_before,
+                );
+                room.future.clear();
+                room.actions_dirty = true;
+                room.frame_counter += 1;
+                record_room_move(
+                    room,
+                    rid,
+                    snapshot,
+                    game_state,
+                    Some(frame_action.action_type.as_str()),
+                    frame_action.card_id,
+                );
+                room.frame_history.push(FrameSnapshot::capture(
+                    game_state,
+                    room.frame_counter,
+                    label,
+                    frame_action,
+                ));
+                room.last_active = SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .unwrap()
+                    .as_secs();
+            }
+        }
+    }
+}
+
+/// Play the AI opponent's replies inline in an AI room until the human
+/// (`human_pid`) can act again or the game ends. Turn routing reuses the
+/// engine contract (`can_player_act`) and the console driver's policy
+/// (`ai_pick_action` / `ai_handle_choice`), so RPS, turn order, mulligan,
+/// live-set and ability choices all route exactly like the embedded match
+/// loop. Returns the number of AI moves committed.
+fn run_ai_replies(
+    data: &AppState,
+    room_id: Option<&str>,
+    game_state: &mut GameState,
+    human_pid: i32,
+) -> usize {
+    use crate::game_setup::ActionType;
+    let ai_pid: u8 = if human_pid == 0 { 1 } else { 0 };
+    let mut moves = 0usize;
+    crate::turn::TurnEngine::check_victory_condition(game_state);
+    while moves < AI_REPLY_MOVE_CAP {
+        if game_state.game_result != crate::game_state::GameResult::Ongoing {
+            break;
+        }
+        if game_state.can_player_act(human_pid) {
+            break;
+        }
+        let _ = settle_single_player_state(game_state);
+        if game_state.game_result != crate::game_state::GameResult::Ongoing {
+            break;
+        }
+        if game_state.can_player_act(human_pid) {
+            break;
+        }
+        if game_state.is_loop_detected() {
+            break;
+        }
+        // Pending choice routed to the AI: answer it like the console driver.
+        // This is a resume (the choice-boundary snapshot is already in
+        // history), so no fresh undo point is pushed.
+        if game_state.has_pending_choice() {
+            let snapshot = game_state.clone();
+            if !crate::game::match_runner::ai_handle_choice(game_state) {
+                break;
+            }
+            let _ = settle_single_player_state(game_state);
+            game_state.reset_loop_detection();
+            commit_room_move(
+                data,
+                room_id,
+                game_state,
+                &snapshot,
+                true,
+                FrameAction {
+                    action_type: "choice_resume".to_string(),
+                    player_id: ai_pid,
+                    card_id: None,
+                    card_indices: None,
+                    stage_area: None,
+                    use_baton_touch: false,
+                },
+                "AI: choice_resume".to_string(),
+            );
+            moves += 1;
+            continue;
+        }
+        let acts = crate::game_setup::generate_possible_actions(game_state);
+        if acts.is_empty() {
+            break;
+        }
+        let Some(idx) = crate::game::match_runner::ai_pick_action(game_state, &acts) else {
+            break;
+        };
+        let action = &acts[idx];
+        // RPS picks are routed positionally: stamp the AI as the chooser so
+        // the handler records the answer for the right player.
+        if matches!(
+            action.action_type,
+            ActionType::RockChoice | ActionType::PaperChoice | ActionType::ScissorsChoice
+        ) {
+            game_state.pending_rps_player_id = Some(ai_pid);
+        }
+        let snapshot = game_state.clone();
+        let frame_action = ai_frame_action(action, ai_pid);
+        let params = action.parameters.clone();
+        let result = crate::turn::TurnEngine::execute_main_phase_action(
+            game_state,
+            &action.action_type,
+            params.as_ref().and_then(|p| p.card_id),
+            params.as_ref().and_then(|p| p.card_indices.clone()),
+            params.as_ref().and_then(|p| {
+                p.stage_area
+                    .as_ref()
+                    .and_then(|s| s.parse::<crate::zones::MemberArea>().ok())
+            }),
+            params.as_ref().and_then(|p| p.use_baton_touch),
+        );
+        if result.is_err() {
+            break;
+        }
+        let _ = settle_single_player_state(game_state);
+        game_state.reset_loop_detection();
+        let label = format!("AI: {}", frame_action.action_type);
+        commit_room_move(data, room_id, game_state, &snapshot, false, frame_action, label);
+        moves += 1;
+    }
+    moves
 }
 
 /// Lightweight version endpoint for polling — returns a sequence number
@@ -797,10 +1053,16 @@ async fn get_legal_actions(data: web::Data<AppState>, req: actix_web::HttpReques
     let game_state = lock_state!(gs_arc, read);
     let actions = crate::game_setup::generate_possible_actions(&game_state)
         .into_iter()
-        .map(|a| serde_json::json!({
-            "action_type": a.action_type.to_string(),
-            "description": a.description
-        }))
+        .map(|a| {
+            let mut obj = serde_json::json!({
+                "action_type": a.action_type.to_string(),
+                "description": a.description
+            });
+            if let Some(ja) = a.description_ja {
+                obj["description_ja"] = serde_json::Value::String(ja);
+            }
+            obj
+        })
         .collect::<Vec<_>>();
     drop(game_state);
     HttpResponse::Ok().json(serde_json::json!({ "actions": actions }))
@@ -812,6 +1074,7 @@ fn actions_with_index(game_state: &GameState) -> Vec<ActionIndex> {
         .enumerate()
         .map(|(i, a)| ActionIndex {
             description: a.description,
+            description_ja: a.description_ja,
             action_type: a.action_type.to_string(),
             parameters: a.parameters,
             index: i,
@@ -987,11 +1250,19 @@ pub async fn execute_action(
     };
     let mut game_state = lock_state!(gs_arc, write);
 
-    let action_type = req
-        .action_type
-        .as_ref()
-        .and_then(|t| t.parse::<ActionType>().ok())
-        .unwrap_or(ActionType::Pass);
+    // An unrecognised action_type used to silently execute a Pass — a typo
+    // could pass the turn. Reject gibberish; only a missing field keeps the
+    // legacy Pass default.
+    let action_type = match req.action_type.as_ref() {
+        None => ActionType::Pass,
+        Some(t) => match t.parse::<ActionType>() {
+            Ok(parsed) => parsed,
+            Err(_) => {
+                return HttpResponse::BadRequest()
+                    .json(serde_json::json!({ "error": format!("Unknown action_type: {}", t) }));
+            }
+        },
+    };
 
     // PVP RPS: set transient player_id so the handler routes to the correct player
     if matches!(
@@ -1018,94 +1289,26 @@ pub async fn execute_action(
                 return HttpResponse::BadRequest().json(serde_json::json!({ "error": e }));
             }
 
-            // Use per-room state when available
+            // Use per-room state when available (same commit helper as AI replies).
             if let Some(ref rid) = exec_room_id_str {
-                if let Ok(mut rooms) = data.rooms.lock() {
-                    if let Some(room) = rooms.get_mut(rid) {
-                        push_undo_snapshot(
-                            &mut room.history,
-                            &snapshot,
-                            &mut game_state,
-                            had_choice_before,
-                        );
-                        room.future.clear();
-                        room.actions_dirty = true;
-                        room.frame_counter += 1;
-                        let label = frame_label(req.action_type.as_deref(), req.card_no.as_deref());
-                        let frame_action = FrameAction {
-                            action_type: req.action_type.as_deref().unwrap_or("Unknown").to_string(),
-                            player_id: pvp_player_pid.map(|p| p as u8).unwrap_or(0),
-                            card_id: req.card_id,
-                            card_indices: req.card_indices.clone(),
-                            stage_area: req.stage_area.clone(),
-                            use_baton_touch: req.use_baton_touch.unwrap_or(false),
-                        };
-                        room.frame_history
-                            .push(FrameSnapshot::capture(&game_state, room.frame_counter, label, frame_action));
-
-                        // Recording hook: buffer (state, action) for each step
-                        if room.recording && room.recording_before.is_empty() {
-                            // First action: just buffer the before-state
-                            room.recording_before = serialize_p1_state(&snapshot);
-                            room.recording_action = Some((
-                                req.card_id.unwrap_or(0),
-                                action_type_to_idx(req.action_type.as_deref()),
-                            ));
-                        } else if room.recording {
-                            // Subsequent action: write previous buffered pair + current before-state
-                            let state_bytes = serialize_p1_state(&snapshot);
-                            let (cid, aidx) = room.recording_action.unwrap_or((0, 0));
-                            room.recording_data
-                                .extend_from_slice(&room.recording_before);
-                            room.recording_data.extend_from_slice(&cid.to_le_bytes());
-                            room.recording_data.push(aidx);
-                            room.recording_data.extend_from_slice(&0f32.to_le_bytes()); // reward placeholder
-                            room.recording_data.extend_from_slice(&state_bytes);
-                            // Buffer current state+action for next write
-                            room.recording_before = state_bytes;
-                            room.recording_action = Some((
-                                req.card_id.unwrap_or(0),
-                                action_type_to_idx(req.action_type.as_deref()),
-                            ));
-                        }
-                        // Check game end — if over, flush recording to file
-                        if game_state.game_result != crate::game_state::GameResult::Ongoing
-                            && room.recording
-                        {
-                            let outcome = match game_state.game_result {
-                                crate::game_state::GameResult::FirstAttackerWins => 1.0f32,
-                                crate::game_state::GameResult::SecondAttackerWins => -1.0f32,
-                                _ => 0.0f32,
-                            };
-                            // Update reward for last buffered pair
-                            if let Some((cid, aidx)) = room.recording_action.take() {
-                                room.recording_data
-                                    .extend_from_slice(&room.recording_before);
-                                room.recording_data.extend_from_slice(&cid.to_le_bytes());
-                                room.recording_data.push(aidx);
-                                room.recording_data
-                                    .extend_from_slice(&outcome.to_le_bytes());
-                                // Last action: no next state, repeat current
-                                room.recording_data
-                                    .extend_from_slice(&room.recording_before);
-                            }
-                            // Write to file
-                            let log_path = format!("../recording_{}.bin", rid);
-                            if let Ok(mut f) = std::fs::File::create(&log_path) {
-                                use std::io::Write;
-                                let _ = f.write_all(&room.recording_data);
-                                eprintln!("Recording saved to {}", log_path);
-                            }
-                            room.recording = false;
-                            room.recording_data.clear();
-                            room.recording_before.clear();
-                        }
-                        room.last_active = SystemTime::now()
-                            .duration_since(UNIX_EPOCH)
-                            .unwrap()
-                            .as_secs();
-                    }
-                }
+                let label = frame_label(req.action_type.as_deref(), req.card_no.as_deref());
+                let frame_action = FrameAction {
+                    action_type: req.action_type.as_deref().unwrap_or("Unknown").to_string(),
+                    player_id: pvp_player_pid.map(|p| p as u8).unwrap_or(0),
+                    card_id: req.card_id,
+                    card_indices: req.card_indices.clone(),
+                    stage_area: req.stage_area.clone(),
+                    use_baton_touch: req.use_baton_touch.unwrap_or(false),
+                };
+                commit_room_move(
+                    &data,
+                    Some(rid),
+                    &mut game_state,
+                    &snapshot,
+                    had_choice_before,
+                    frame_action,
+                    label,
+                );
             } else {
                 let mut history = lock_recover(&data.history);
                 push_undo_snapshot(&mut history, &snapshot, &mut game_state, had_choice_before);
@@ -1128,6 +1331,30 @@ pub async fn execute_action(
                     .push(FrameSnapshot::capture(&game_state, *fc, label, frame_action));
             }
 
+            // Room flags for the reply loop and the response shape below.
+            let (is_pvp, room_is_ai) = exec_room_id_str.as_ref().map(|rid| {
+                data.rooms.lock().ok().and_then(|r| r.get(rid).map(|room| {
+                    (room.mode.as_str() == "pvp", room.is_ai_room)
+                })).unwrap_or((false, false))
+            }).unwrap_or((false, false));
+
+            // VS AI rooms: play the AI's replies inline so one request
+            // covers the full exchange — no per-move round trips, no
+            // "AI thinking" stall. The write lock is held throughout, so
+            // a concurrent browser-driven AI request simply blocks and is
+            // then rejected as not-its-turn (or idles with nothing to do).
+            if room_is_ai {
+                if let Some(human_pid) = pvp_player_pid {
+                    let ai_moves = run_ai_replies(
+                        &data,
+                        exec_room_id_str.as_deref(),
+                        &mut game_state,
+                        human_pid,
+                    );
+                    log::debug!("[AI_REPLY] committed {} AI moves", ai_moves);
+                }
+            }
+
             // Capture frame_id before releasing write lock
             let frame_id = if let Some(ref rid) = exec_room_id_str {
                 data.rooms.lock().ok().and_then(|r| r.get(rid).map(|room| room.frame_counter)).unwrap_or(0)
@@ -1138,25 +1365,19 @@ pub async fn execute_action(
             // Release write lock before building display
             drop(game_state);
 
-            // Notify other SSE clients that state changed
+            // Notify SSE clients that state changed. All room modes notify
+            // (undo/redo/exec_code/set_deck already do); the pvp-only gate
+            // here just starved sandbox rooms of pushes for no benefit —
+            // rooms with no listeners are a no-op send.
             if let Some(rid) = get_room_id_from_req(&http_req) {
-                let is_multiplayer = data
-                    .rooms
-                    .lock()
-                    .ok()
-                    .and_then(|r| r.get(&rid).map(|room| room.mode.as_str() == "pvp"))
-                    .unwrap_or(false);
-                if is_multiplayer {
-                    notify_room_clients(&data, &rid);
-                }
+                notify_room_clients(&data, &rid);
             }
 
-            // For PVP, return minimal ActionResult; for sandbox/PVE return full state
-            let is_pvp = exec_room_id_str.as_ref().and_then(|rid| {
-                data.rooms.lock().ok().and_then(|r| r.get(rid).map(|room| room.mode.as_str() == "pvp"))
-            }).unwrap_or(false);
-
-            if is_pvp {
+            // For 2-human PVP, return minimal ActionResult; for sandbox/PVE
+            // — and for VS AI rooms (AI replies already committed above) —
+            // return the full state so the actor needs no follow-up GET.
+            // (is_pvp / room_is_ai were resolved before the reply loop.)
+            if is_pvp && !room_is_ai {
                 HttpResponse::Ok().json(ActionResult {
                     success: true,
                     error: None,
@@ -2401,7 +2622,7 @@ pub async fn rooms_create(
 ) -> impl Responder {
     // Skip card database loading for now to avoid deserialization errors
 
-    println!("DEBUG: rooms_create called");
+    log::debug!("rooms_create called");
 
     let room_id: String = (0..4)
         .map(|_| {
@@ -2469,8 +2690,8 @@ pub async fn rooms_create(
         let player2 = Player::new("p2".to_string(), "Player 2".to_string(), false);
         let mut fresh_game_state = GameState::new(player1, player2, card_database);
         crate::game_setup::setup_game(&mut fresh_game_state);
-        println!(
-            "DEBUG: Fresh room game state initialized with phase: {:?}",
+        log::debug!(
+            "Fresh room game state initialized with phase: {:?}",
             fresh_game_state.current_phase
         );
         Some(Arc::new(RwLock::new(fresh_game_state)))
@@ -2482,6 +2703,8 @@ pub async fn rooms_create(
         mode: mode.clone(),
 
         public,
+
+        is_ai_room: is_ai_game,
 
         created_at: now,
 
@@ -2506,20 +2729,20 @@ pub async fn rooms_create(
         recording_action: None,
     };
 
-    println!("DEBUG: Inserting room with ID: {}", room_id);
+    log::debug!("Inserting room with ID: {}", room_id);
 
     {
         let mut rooms = lock_recover(&data.rooms);
 
         rooms.insert(room_id.clone(), room);
 
-        println!("DEBUG: Room inserted, total rooms: {}", rooms.len());
+        log::debug!("Room inserted, total rooms: {}", rooms.len());
 
         // Explicitly drop the lock to ensure room is stored
 
         drop(rooms);
 
-        println!("DEBUG: Room lock dropped, room should be stored");
+        log::debug!("Room lock dropped, room should be stored");
     }
 
     // Auto-join creator
@@ -2985,8 +3208,8 @@ async fn init_game(
 
     // Don't call settle_single_player_state here - game should start in RockPaperScissors phase
 
-    println!(
-        "DEBUG: init_game complete, phase: {:?}",
+    log::debug!(
+        "init_game complete, phase: {:?}",
         game_state.current_phase
     );
 
@@ -3383,13 +3606,13 @@ pub async fn run_web_server_with_ngrok(ngrok_authtoken: Option<String>) -> std::
                     let keep = !empty && !stale;
                     if !keep {
                         let reason = if empty { "no sessions" } else { "idle 20m" };
-                        println!("[CLEANUP] Removing stale room {} ({})", id, reason);
+                        log::info!("[CLEANUP] Removing stale room {} ({})", id, reason);
                     }
                     keep
                 });
                 let removed = before - rooms_lock.len();
                 if removed > 0 {
-                    println!(
+                    log::info!(
                         "[CLEANUP] Removed {} stale room(s), {} remaining",
                         removed,
                         rooms_lock.len()

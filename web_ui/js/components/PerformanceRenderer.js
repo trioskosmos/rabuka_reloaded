@@ -1243,7 +1243,7 @@ export const PerformanceRenderer = {
         _lastDisplayResults = displayResults;
         if (!displayResults || Object.keys(displayResults).length === 0) {
             content.innerHTML = `<div class="perf-empty-state">${escapeHtml(tr('no_perf_data', 'No performance data is available yet.'))}</div>`;
-            if (title) title.textContent = 'Performance Breakdown';
+            if (title) title.textContent = tr('performance_breakdown');
             return;
         }
 

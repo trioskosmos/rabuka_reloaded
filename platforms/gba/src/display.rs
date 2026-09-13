@@ -1274,7 +1274,7 @@ impl<'a> Display<'a> {
 
         self.clear_layers(&ui_ts, e);
 
-        Self::blit_line(&mut self.ui_front, &font_ts, &icon_ts, e, "ACTIONS [Sel:Board] [Sta:Menu]", 0, 0);
+        Self::blit_line(&mut self.ui_front, &font_ts, &icon_ts, e, "ACTIONS U/D/A B:Back L/R:pg", 0, 0);
         // Cursor-following window: title pinned, 8 content rows below it.
         // Two borrow-separated passes over buf, zero allocation: the offset
         // pass only reads, the render pass only draws.

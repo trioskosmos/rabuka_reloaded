@@ -26,6 +26,7 @@ use crate::board::live_set_hidden;
 use crate::display::{Display, COLS};
 use crate::gba_ui::InputSource;
 use crate::input::Button;
+use crate::lang::tr;
 use crate::menu::show_card_detail;
 
 /// Grid pages show 5 stage-size cards (mirrors the engine choice grid).
@@ -54,7 +55,7 @@ fn show_game_log<I: InputSource>(
     let mut off = lines.len().saturating_sub(VISIBLE); // start at the newest
     loop {
         display.clear();
-        display.println("GAME LOG  A/B/Sta close");
+        display.println(tr("GAME LOG U/D:Ln L/R:Pg A:Close", "ゲームログ 上下:行 L/R:頁 A:閉じる"));
         let end = (off + VISIBLE).min(lines.len());
         for l in off..end {
             display.println(&lines[l]);
@@ -65,6 +66,10 @@ fn show_game_log<I: InputSource>(
             off = off.saturating_sub(1);
         } else if input.just_pressed(Button::Down) && off + VISIBLE < lines.len() {
             off += 1;
+        } else if input.just_pressed(Button::Left) {
+            off = off.saturating_sub(VISIBLE);
+        } else if input.just_pressed(Button::Right) {
+            off = (off + VISIBLE).min(lines.len().saturating_sub(VISIBLE));
         } else if input.just_pressed(Button::A)
             || input.just_pressed(Button::B)
             || input.just_pressed(Button::Start)
@@ -91,7 +96,7 @@ fn show_zone_grid<I: InputSource>(
     if cards.is_empty() {
         display.clear();
         display.println(title);
-        display.println("(empty)");
+        display.println(tr("(empty)", "(空)"));
         display.swap_buffers();
         loop {
             input.poll();
@@ -109,7 +114,7 @@ fn show_zone_grid<I: InputSource>(
         .iter()
         .map(|&cid| {
             if hidden {
-                (cid, String::new(), String::from("[Hidden]"))
+                (cid, String::new(), String::from(tr("[Hidden]", "[非公開]")))
             } else {
                 match gs.card_database.get_card(cid) {
                     Some(c) => (cid, c.card_no.to_string(), format!("{} {}", c.card_no, c.name)),
@@ -154,7 +159,7 @@ fn show_zone_grid<I: InputSource>(
                 }
             }
         }
-        display.println("A:Detail B:Back");
+        display.println(tr("A:Detail B/Sta:Back", "A:詳細 B/Sta:戻る"));
         display.swap_buffers();
         input.poll();
         if input.just_pressed(Button::Left) {
@@ -176,7 +181,7 @@ fn show_zone_grid<I: InputSource>(
             if hidden {
                 display.clear();
                 display.println(title);
-                display.println("(hidden until performance)");
+                display.println(tr("(hidden until performance)", "(成功時まで非公開)"));
                 display.swap_buffers();
                 loop {
                     input.poll();
@@ -266,7 +271,15 @@ fn build_stats_lines(gs: &GameState) -> Vec<String> {
     let active_idx = if active_is_p1 { 0 } else { 1 };
     let performed = gs.opponent_has_performed(active_idx);
     let mut out: Vec<String> = Vec::new();
-    out.push(format!("T{} {:?} {}>", gs.turn_number, gs.current_phase, if active_is_p1 {"P1"} else {"P2"}));
+    // Phase name follows the UI language; zone counts stay single-letter
+    // compact notation (same as the 3DS header) in both languages.
+    let phase = match crate::lang::current_lang() {
+        rabuka_engine::game::language::Lang::Japanese => {
+            gs.current_phase.label_jp().to_string()
+        }
+        _ => format!("{:?}", gs.current_phase),
+    };
+    out.push(format!("T{} {} {}>", gs.turn_number, phase, if active_is_p1 {"P1"} else {"P2"}));
     let p1 = &gs.player1; let p2 = &gs.player2;
     for (label, p, is_active) in [("P1", p1, active_is_p1), ("P2", p2, !active_is_p1)] {
         let hearts = hearts_icon_for(p, gs);
@@ -276,7 +289,7 @@ fn build_stats_lines(gs: &GameState) -> Vec<String> {
         if !hb.is_empty() {
             for l in wrap_text(&hb, COLS as usize) { out.push(l); }
         } else {
-            out.push(String::from("  Hearts/Blade --"));
+            out.push(String::from(tr("  Hearts/Blade --", "  ハート/ブレード --")));
         }
         // Live need, gated like the 3DS need display (render.rs:316).
         if matches!(gs.current_phase, rabuka_engine::game_state::Phase::LiveCardSetFirstAttacker | rabuka_engine::game_state::Phase::LiveCardSetSecondAttacker | rabuka_engine::game_state::Phase::FirstAttackerPerformance | rabuka_engine::game_state::Phase::SecondAttackerPerformance) {
@@ -296,7 +309,7 @@ fn build_stats_lines(gs: &GameState) -> Vec<String> {
                 let mut need_parts: Vec<String> = Vec::new();
                 for (i, &c) in need_counts.iter().enumerate() { if c>0 { let n = match i {0=>"heart_00",1=>"heart_01",2=>"heart_02",3=>"heart_03",4=>"heart_04",5=>"heart_05",6=>"heart_06",_=>"icon_all"}; need_parts.push(format!("{{{{{}.png|{}}}}}{}", n,n,c)); } }
                 if !need_parts.is_empty() {
-                    out.push(format!("Need {}", need_parts.join(" ")));
+                    out.push(format!("{} {}", tr("Need", "必要"), need_parts.join(" ")));
                 }
             }
         }
@@ -321,21 +334,23 @@ fn menu_zones(gs: &GameState) -> Vec<(String, Vec<i16>, bool)> {
     let hide_live = live_set_hidden(&gs.current_phase);
     let mut revealed: Vec<i16> = gs.revealed_cards.to_vec();
     revealed.extend_from_slice(&gs.revealed_cost_cards);
+    // Zone names are bilingual pairs so the Start menu follows the UI language.
+    let zl = |en: &'static str, ja: &'static str, n: usize| format!("{} ({})", tr(en, ja), n);
     alloc::vec![
-        (format!("Waitroom ({})", me.waitroom.cards.len()), me.waitroom.cards.to_vec(), false),
-        (format!("Opp Waitroom ({})", you.waitroom.cards.len()), you.waitroom.cards.to_vec(), false),
-        (format!("Success ({})", me.success_live_card_zone.cards.len()), me.success_live_card_zone.cards.to_vec(), false),
-        (format!("Opp Success ({})", you.success_live_card_zone.cards.len()), you.success_live_card_zone.cards.to_vec(), false),
-        (format!("Hand ({})", me.hand.cards.len()), me.hand.cards.to_vec(), false),
-        (format!("Main Deck ({})", me.main_deck.cards.len()), me.main_deck.cards.to_vec(), false),
-        (format!("Energy ({})", me.energy_zone.cards.len()), me.energy_zone.cards.to_vec(), false),
-        (format!("Energy Deck ({})", me.energy_deck.cards.len()), me.energy_deck.cards.to_vec(), false),
-        (format!("Exclusion ({})", me.exclusion_zone.cards.len()), me.exclusion_zone.cards.to_vec(), false),
-        (format!("Stage ({})", stage_cards(me).len()), stage_cards(me), false),
-        (format!("Opp Stage ({})", stage_cards(you).len()), stage_cards(you), false),
-        (format!("Live Set ({})", me.live_card_zone.cards.len()), me.live_card_zone.cards.to_vec(), hide_live),
-        (format!("Opp Live Set ({})", you.live_card_zone.cards.len()), you.live_card_zone.cards.to_vec(), hide_live),
-        (format!("Revealed ({})", revealed.len()), revealed, false),
+        (zl("Waitroom", "控え室", me.waitroom.cards.len()), me.waitroom.cards.to_vec(), false),
+        (zl("Opp Waitroom", "相手控え室", you.waitroom.cards.len()), you.waitroom.cards.to_vec(), false),
+        (zl("Success", "成功", me.success_live_card_zone.cards.len()), me.success_live_card_zone.cards.to_vec(), false),
+        (zl("Opp Success", "相手成功", you.success_live_card_zone.cards.len()), you.success_live_card_zone.cards.to_vec(), false),
+        (zl("Hand", "手札", me.hand.cards.len()), me.hand.cards.to_vec(), false),
+        (zl("Main Deck", "山札", me.main_deck.cards.len()), me.main_deck.cards.to_vec(), false),
+        (zl("Energy", "エネルギー", me.energy_zone.cards.len()), me.energy_zone.cards.to_vec(), false),
+        (zl("Energy Deck", "エネデッキ", me.energy_deck.cards.len()), me.energy_deck.cards.to_vec(), false),
+        (zl("Exclusion", "除外", me.exclusion_zone.cards.len()), me.exclusion_zone.cards.to_vec(), false),
+        (zl("Stage", "ステージ", stage_cards(me).len()), stage_cards(me), false),
+        (zl("Opp Stage", "相手ステージ", stage_cards(you).len()), stage_cards(you), false),
+        (zl("Live Set", "ライブセット", me.live_card_zone.cards.len()), me.live_card_zone.cards.to_vec(), hide_live),
+        (zl("Opp Live Set", "相手ライブセット", you.live_card_zone.cards.len()), you.live_card_zone.cards.to_vec(), hide_live),
+        (zl("Revealed", "公開", revealed.len()), revealed, false),
     ]
 }
 
@@ -350,7 +365,7 @@ pub fn run_start_menu<I: InputSource>(
 ) {
     // Pinned header: single hint line + compact stats.
     let mut header: Vec<String> = Vec::new();
-    header.push(String::from("MENU  B/Sta:Close"));
+    header.push(String::from(tr("MENU A:Ok B/Sta:Close", "メニュー A:決定 B/Sta:閉じる")));
     header.extend(build_stats_lines(gs).into_iter().take(5));
     let vis = 10usize.saturating_sub(header.len() + 1).max(2);
 
@@ -365,13 +380,13 @@ pub fn run_start_menu<I: InputSource>(
         alloc::format!("Language: {}", crate::lang::current_lang().label())
     };
     let mut items: Vec<(String, Item)> = Vec::new();
-    items.push((String::from("Game Log"), Item::Log));
+    items.push((String::from(tr("Game Log", "ゲームログ")), Item::Log));
     for (i, (label, _, _)) in zones.iter().enumerate() {
         items.push((label.clone(), Item::Zone(i)));
     }
     let lang_idx = items.len();
     items.push((lang_label(), Item::Language));
-    items.push((String::from("Close"), Item::Close));
+    items.push((String::from(tr("Close", "閉じる")), Item::Close));
 
     let mut sel = 0usize;
     let mut scroll = 0usize;
@@ -392,7 +407,12 @@ pub fn run_start_menu<I: InputSource>(
             display.println(&one_line(&format!("{prefix} {}", items[n].0), COLS as usize));
         }
         if items.len() > end {
-            display.println(&format!("  .. {} more", items.len() - end));
+            display.println(
+                &rabuka_engine::game::language::more_line(
+                    items.len() - end,
+                    crate::lang::current_lang(),
+                ),
+            );
         }
         display.swap_buffers();
         input.poll();

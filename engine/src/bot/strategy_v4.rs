@@ -14,7 +14,7 @@
 //!
 //! No opponent terms exist anywhere in this file.
 
-use crate::card::{CardDatabase, CardType};
+use crate::card::{CardDatabase, CardType, HeartColor};
 use crate::game_setup::{self, Action};
 use crate::game_state::GameState;
 
@@ -147,6 +147,60 @@ pub(crate) fn heart_pool_inner(gs: &GameState, me_player: u8, db: &CardDatabase,
 
 pub(crate) fn heart_pool(gs: &GameState, me_player: u8, db: &CardDatabase) -> Acc {
     heart_pool_inner(gs, me_player, db, 1.0)
+}
+
+/// All heart colors in Acc-index order (matches `hc_index`).
+const ALL_COLORS: [HeartColor; 11] = [
+    HeartColor::Heart00,
+    HeartColor::Heart01,
+    HeartColor::Heart02,
+    HeartColor::Heart03,
+    HeartColor::Heart04,
+    HeartColor::Heart05,
+    HeartColor::Heart06,
+    HeartColor::BAll,
+    HeartColor::Draw,
+    HeartColor::Score,
+    HeartColor::All,
+];
+
+/// Buff hearts currently modifying my stage members (activation/constant
+/// effects, e.g. "until live end +1 heart"). These are PUBLIC engine state
+/// and genuinely feed the yell check, but every bot generation before v7
+/// read only printed `base_heart` and priced buff-granting abilities at ~0
+/// (or negative, when granting the buff waits a member and costs blades).
+pub(crate) fn stage_buff_hearts(gs: &GameState, me_player: u8) -> Acc {
+    let p = if me_player == 0 { &gs.player1 } else { &gs.player2 };
+    let mut acc = [0i32; 11];
+    for &cid in p.stage.stage.iter() {
+        if cid < 0 {
+            continue;
+        }
+        for (idx, color) in ALL_COLORS.iter().enumerate() {
+            // Draw/Score buffs never feed heart checks; skip them so the
+            // pool stays in heart units.
+            if idx == 8 || idx == 9 {
+                continue;
+            }
+            acc[idx] += gs.mods.get_heart_modifier(cid, *color);
+        }
+    }
+    acc
+}
+
+/// `heart_pool_inner` plus buff hearts (v7 accounting).
+pub(crate) fn heart_pool_buffed(
+    gs: &GameState,
+    me_player: u8,
+    db: &CardDatabase,
+    confidence: f64,
+) -> Acc {
+    let mut acc = heart_pool_inner(gs, me_player, db, confidence);
+    let buffs = stage_buff_hearts(gs, me_player);
+    for i in 0..11 {
+        acc[i] += buffs[i];
+    }
+    acc
 }
 
 /// Try allocating `need` from `pool`; returns None if impossible, else the

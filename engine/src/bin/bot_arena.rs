@@ -1,12 +1,12 @@
 //! Bot arena: run N-second matchups between bot versions and random.
 //!
-//! Usage: cargo run --release --bin bot_arena -- [p1] [p2] [budget_secs]
-//!   p1/p2: v1 | v2 | v3 | random   (default: v2 random 10)
+//! Usage: cargo run --release --bin bot_arena -- [p1] [p2] [budget_secs] [deck]
+//!   p1/p2: any name in bot::registry::BotKind::ALL (default: v2 random 10)
 //!
 //! Moved out of tests/test_modules/strategy_bot_test.rs  Ethis is a
 //! benchmark/arena, not a unit test. Run it when you want numbers.
 
-use rabuka_engine::bot::{strategy, strategy_v2, strategy_v3, strategy_v4, strategy_v5, strategy_v6, strategy_v7};
+use rabuka_engine::bot::{registry::BotKind, strategy_v2, strategy_v3};
 use rabuka_engine::card::CardDatabase;
 use rabuka_engine::card_loader;
 use rabuka_engine::deck_parser;
@@ -15,32 +15,8 @@ use rabuka_engine::game_state::{GameResult, GameState, Phase};
 use rabuka_engine::turn::TurnEngine;
 use std::sync::Arc;
 
-#[derive(Clone, Copy, PartialEq)]
-enum BotKind {
-    V1,
-    V2,
-    V3,
-    V4,
-    V5,
-    V6,
-    V7,
-    Conductor,
-    Random,
-}
-
-fn parse_kind(s: &str) -> BotKind {
-    match s {
-        "v1" => BotKind::V1,
-        "v2" => BotKind::V2,
-        "v3" => BotKind::V3,
-        "v4" => BotKind::V4,
-        "v5" => BotKind::V5,
-        "v6" => BotKind::V6,
-        "v7" => BotKind::V7,
-        "conductor" => BotKind::Conductor,
-        _ => BotKind::Random,
-    }
-}
+/// Bot identity lives in [`BotKind`] (`bot/registry.rs`): adding a version
+/// means a new variant + dispatch lines there, never renames here.
 
 use rabuka_engine::rng::Lcg;
 
@@ -112,8 +88,8 @@ fn my_hand_lives(gs: &GameState, is_p1: bool, db: &Arc<CardDatabase>) -> usize {
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
-    let p1_kind = parse_kind(args.get(1).map(|s| s.as_str()).unwrap_or("v2"));
-    let p2_kind = parse_kind(args.get(2).map(|s| s.as_str()).unwrap_or("random"));
+    let p1_kind = BotKind::parse(args.get(1).map(|s| s.as_str()).unwrap_or("v2"));
+    let p2_kind = BotKind::parse(args.get(2).map(|s| s.as_str()).unwrap_or("random"));
     let budget: u64 = args
         .get(3)
         .and_then(|s| s.parse().ok())
@@ -125,17 +101,7 @@ fn main() {
         .cloned()
         .unwrap_or_else(|| "5CP3Z idou".to_string());
 
-    let kind_name = |k: BotKind| match k {
-        BotKind::V1 => "v1",
-        BotKind::V2 => "v2",
-        BotKind::V3 => "v3",
-        BotKind::V4 => "v4",
-        BotKind::V5 => "v5",
-        BotKind::V6 => "v6",
-        BotKind::V7 => "v7",
-        BotKind::Conductor => "conductor",
-        BotKind::Random => "random",
-    };
+    let kind_name = |k: BotKind| k.name();
 
     let mut db = fresh_database();
     let nums = load_test_deck(&db, &deck_name);
@@ -339,59 +305,28 @@ fn main() {
                 continue;
             }
 
-            // Mulligan: v2+ uses its policy; v1/random keep the hand.
+            // Mulligan: dispatched through the registry (v1/random keep the hand).
             if matches!(
                 gs.current_phase,
                 Phase::MulliganFirstAttacker | Phase::MulliganSecondAttacker
             ) {
-                let a = match kind {
-                    BotKind::V2 => {
-                        strategy_v2::choose_mulligan_action_v2(&gs, &actions, &db)
-                    }
-                    BotKind::V3 => {
-                        strategy_v3::choose_mulligan_action_v3(&gs, &actions, &db)
-                    }
-                    BotKind::V4 => strategy_v4::choose_mulligan_v4(&gs, &actions, &db),
-                    BotKind::V5 | BotKind::V6 | BotKind::V7 | BotKind::Conductor => strategy_v4::choose_mulligan_v4(&gs, &actions, &db),
-                    _ => actions
-                        .iter()
-                        .find(|a| {
-                            matches!(
-                                a.action_type,
-                                rabuka_engine::game_setup::ActionType::ConfirmMulligan
-                                    | rabuka_engine::game_setup::ActionType::SkipMulligan
-                            )
-                        })
-                        .unwrap_or(&actions[0])
-                        .clone(),
-                };
+                let a = kind.choose_mulligan(&gs, &actions, &db);
                 let _ = game_setup::execute_action(&mut gs, &a);
                 game_setup::settle_single_player_state(&mut gs);
                 continue;
             }
 
-            // Live card set.
+            // Live card set: dispatched through the registry (random rolls here
+            // because the choice is a raw toggle index, not a policy).
             if matches!(
                 gs.current_phase,
                 Phase::LiveCardSetFirstAttacker | Phase::LiveCardSetSecondAttacker
             ) {
-                let a = match kind {
-                    BotKind::V1 => strategy::choose_live_set_action(&gs, &actions, &db),
-                    BotKind::V2 => {
-                        strategy_v2::choose_live_set_action_v2(&gs, &actions, &db, &v2_policy)
-                    }
-                    BotKind::V3 => {
-                        let plan = if active_is_p1 { &plan_p1 } else { &plan_p2 };
-                        strategy_v3::choose_live_set_action_v3(
-                            &gs, &actions, &db, &v2_policy, plan,
-                        )
-                    }
-                    BotKind::V4 => strategy_v4::choose_live_set_v4(&gs, &actions, &db),
-                    BotKind::V7 => strategy_v7::choose_live_set_v7(&gs, &actions, &db),
-                    BotKind::Conductor => rabuka_engine::bot::conductor::choose_live_set_conductor(&gs, &actions, &db),
-                    BotKind::V5 => strategy_v5::choose_live_set_v5(&gs, &actions, &db),
-                    BotKind::V6 => strategy_v6::choose_live_set_v6(&gs, &actions, &db),
-                    BotKind::Random => actions[rng.range(actions.len())].clone(),
+                let plan = if active_is_p1 { &plan_p1 } else { &plan_p2 };
+                let a = if kind == BotKind::Random {
+                    actions[rng.range(actions.len())].clone()
+                } else {
+                    kind.choose_live_set(&gs, &actions, &db, &v2_policy, plan)
                 };
                 if a.action_type == rabuka_engine::game_setup::ActionType::ConfirmLiveCardSet {
                     live_decisions += 1;
@@ -454,19 +389,12 @@ fn main() {
                     ));
                 }
             }
-            let action = match kind {
-                BotKind::V1 => strategy::choose_action_heuristic(&gs, &actions, me),
-                BotKind::V2 => strategy_v2::choose_action_heuristic_v2(&gs, &actions, me),
-                BotKind::V3 => {
-                    let plan = if active_is_p1 { &plan_p1 } else { &plan_p2 };
-                    strategy_v3::choose_action_heuristic_v3(&gs, &actions, me, plan)
-                }
-                BotKind::V4 => strategy_v4::choose_action(&gs, &actions, me),
-                BotKind::V6 => strategy_v6::choose_action(&gs, &actions, me),
-                BotKind::V7 => strategy_v7::choose_action(&gs, &actions, me),
-                BotKind::Conductor => rabuka_engine::bot::conductor::choose_main_conductor(&gs, &actions, me),
-                BotKind::V5 => strategy_v5::choose_action(&gs, &actions, me),
-                BotKind::Random => actions[rng.range(actions.len())].clone(),
+            // Main phase (and everything else policy-driven): registry dispatch.
+            let plan = if active_is_p1 { &plan_p1 } else { &plan_p2 };
+            let action = if kind == BotKind::Random {
+                actions[rng.range(actions.len())].clone()
+            } else {
+                kind.choose_action(&gs, &actions, me, &v2_policy, plan)
             };
             _main_decisions += 1;
             if gs.current_phase == Phase::Main {

@@ -1161,6 +1161,10 @@ gs.set_recently_moved_batch(card_ids.into(), Some(Zone::LiveCardZone.to_str()));
                     format!("Select up to {} card(s) to keep", count),
                     true,
                 )
+                .description_ja(Some(format!(
+                    "最大{}枚まで手札に残すカードを選択",
+                    count
+                )))
                 .target_player_id(Some("opponent".to_string()))
                 .build();
                 self.keep_shuffle_under_phase = 2;
@@ -2432,6 +2436,23 @@ gs.set_recently_moved_batch(valid_ids.into(), Some("stage"));
                                         .unwrap_or_else(|| o.text.to_string())
                                 })
                                 .collect();
+                            // Keep EN/JA in sync with creation (misc.rs):
+                            // EN generated per remaining effect, JA from text.
+                            let desc_en: Vec<String> = remaining
+                                .iter()
+                                .map(|o| {
+                                    let en =
+                                        crate::ability::describe::describe_effect_en(o);
+                                    if en.trim().is_empty() {
+                                        o.answers_any()
+                                            .as_ref()
+                                            .map(|a| a.join(", "))
+                                            .unwrap_or_else(|| o.text.to_string())
+                                    } else {
+                                        en
+                                    }
+                                })
+                                .collect();
                             if let Some(entry) = gs.ability_queue.current_entry_mut() {
                                 entry.conditional_choice =
                                     Some(ConditionalChoice::Effects(remaining));
@@ -2439,7 +2460,7 @@ gs.set_recently_moved_batch(valid_ids.into(), Some("stage"));
                             self.pending_reprompt_choice = Some(Choice::SelectTarget {
                                 target: "choice".to_string(),
                                 description: desc.join(" / "),
-                                description_en: Some(desc.join(" / ")),
+                                description_en: Some(desc_en.join(" / ")),
                                 description_ja: Some(desc.join(" / ")),
                                 allow_skip: true,
                                 options: None,

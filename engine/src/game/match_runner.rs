@@ -29,7 +29,8 @@ use crate::Arc;
 
 /// Auto-resolve a pending choice for the AI (random but legal). Returns false
 /// only if the engine rejects the synthetic answer.
-fn ai_handle_choice(gs: &mut GameState) -> bool {
+/// Shared with the web server's AI reply loop, hence pub(crate).
+pub(crate) fn ai_handle_choice(gs: &mut GameState) -> bool {
     use crate::ability::types::Choice;
     let choice = match gs.get_pending_choice() {
         Some(c) => c.clone(),
@@ -132,25 +133,53 @@ fn ai_handle_choice(gs: &mut GameState) -> bool {
     }
 }
 
-/// AI turn: score each action with the shared heuristic (attacks and board
-/// presence first, then card advantage — the v6-style weights the handheld
-/// ports converged on; the full v6 bot needs std) and execute the best.
+/// Pick the AI's action without executing it, so callers that commit their
+/// own bookkeeping (like the web server's reply loop) can share the policy.
 /// Mulligan phases MUST be concluded first, otherwise the AI can keep
 /// toggling card selections forever and the game never reaches main phase,
 /// so a Confirm/Skip is preferred over the per-card Select actions.
-pub fn ai_turn(gs: &mut GameState, acts: &[game_setup::Action]) -> bool {
+/// Live-set phases fill unselected slots before confirming — confirming
+/// first would leave the AI with an empty live zone every game.
+/// Otherwise the shared type-weighted heuristic (attacks and board presence
+/// first, then card advantage) with a small random tiebreaker.
+/// Returns None when there is nothing to pick.
+pub(crate) fn ai_pick_action(
+    _gs: &GameState,
+    acts: &[game_setup::Action],
+) -> Option<usize> {
     use crate::game_setup::ActionType;
+    if acts.is_empty() {
+        return None;
+    }
     // Mulligan phases MUST be concluded, otherwise the AI can keep toggling
     // card selections forever and the game can never reach the main phase.
     // Prefer a Confirm/Skip over the per-card Select actions.
-    for a in acts {
-        if matches!(
+    if let Some(i) = acts.iter().position(|a| {
+        matches!(
             a.action_type,
             ActionType::ConfirmMulligan | ActionType::SkipMulligan
-        ) {
-            let _ = game_setup::execute_action(gs, a);
-            return true;
-        }
+        )
+    }) {
+        return Some(i);
+    }
+    // Live-set phases: keep fielding unselected cards; confirm once the set
+    // is full (or nothing selectable remains).
+    let unselected: Vec<usize> = acts
+        .iter()
+        .enumerate()
+        .filter(|(_, a)| {
+            matches!(a.action_type, ActionType::SelectLiveCard) && a.selected != Some(true)
+        })
+        .map(|(i, _)| i)
+        .collect();
+    if !unselected.is_empty() {
+        return Some(unselected[crate::rng::rand_range(unselected.len())]);
+    }
+    if let Some(i) = acts
+        .iter()
+        .position(|a| matches!(a.action_type, ActionType::ConfirmLiveCardSet))
+    {
+        return Some(i);
     }
     // Weighted heuristic: prefer attacks, then card advantage. A small
     // random tiebreaker keeps repeated positions from playing identically.
@@ -174,15 +203,28 @@ pub fn ai_turn(gs: &mut GameState, acts: &[game_setup::Action]) -> bool {
             best_idx = i;
         }
     }
-    log::debug!(
-        "[AI_TURN] picked act {} (score {}) of {}: {:?}",
-        best_idx,
-        best_score,
-        acts.len(),
-        acts[best_idx].action_type
-    );
-    let _ = game_setup::execute_action(gs, &acts[best_idx]);
-    true
+    Some(best_idx)
+}
+
+/// AI turn: pick with the shared policy and execute the best action.
+/// Mulligan phases MUST be concluded first, otherwise the AI can keep
+/// toggling card selections forever and the game never reaches main phase,
+/// so a Confirm/Skip is preferred over the per-card Select actions.
+pub fn ai_turn(gs: &mut GameState, acts: &[game_setup::Action]) -> bool {
+    match ai_pick_action(gs, acts) {
+        Some(best_idx) => {
+            log::debug!(
+                "[AI_TURN] picked act {} of {}: {:?}",
+                best_idx,
+                acts.len(),
+                acts[best_idx].action_type
+            );
+            let _ = game_setup::execute_action(gs, &acts[best_idx]);
+            true
+        }
+        // No legal actions — the caller advances or ends the match.
+        None => false,
+    }
 }
 
 /// How a match is driven.

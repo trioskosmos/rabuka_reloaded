@@ -1279,6 +1279,13 @@ let source = cost.source_str().unwrap_or("");
                                 format!("Select {} stage member(s) to {}", count, state_change,),
                                 false,
                             )
+                            .description_ja(Some(format!(
+                                "ステージのメンバーを{}人{}にする",
+                                count,
+                                crate::ability::describe::state_verb_ja(Some(
+                                    state_change
+                                )),
+                            )))
                             .card_type(cost.card_type_any().map(|s| s.to_string()))
                             .group(cost.group_names_any().clone().map(|v| v.join(",")))
                             .target_player_id(Some(

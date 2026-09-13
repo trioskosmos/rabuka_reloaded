@@ -19,7 +19,7 @@ use crate::ability::types::Choice;
 use crate::ability::util::zone_cards;
 
 use crate::game::game_setup;
-use crate::game::language::Lang;
+use crate::game::language::{more_line, scroll_hint, skip_row, Lang};
 use crate::game::platform_ui::{card_ability_text, card_detail_title, card_stat_text, choose_card_grid, one_line, PlatformUi, wrap_text};
 use crate::game_state::GameState;
 use crate::turn::TurnEngine;
@@ -48,15 +48,17 @@ fn choice_prompt<'a>(choice: &'a Choice, fallback: &'a str, lang: Lang) -> &'a s
 fn show_lines(ui: &mut dyn PlatformUi, lines: &[String]) {
     let mut off = 0usize;
     const H: usize = 8; // 9 screen rows, one held for a hint bar
+    // Console chrome follows the port's language like every other prompt.
+    let lang = ui.ui_lang();
     loop {
         ui.clear_screen();
-        ui.println("A/B/Start close, Up/Down scroll");
+        ui.println(scroll_hint(lang));
         let end = (off + H).min(lines.len());
         for l in off..end {
             ui.println(&lines[l]);
         }
         if lines.len() > end {
-            ui.println(&format!("  .. {} more", lines.len() - end));
+            ui.println(&more_line(lines.len() - end, lang));
         }
         ui.swap_buffers();
         ui.poll_input();
@@ -84,24 +86,43 @@ fn show_detail(ui: &mut dyn PlatformUi, text: &str) {
 }
 
 /// Show the game result screen and wait for a button press.
+/// Follows the port's language (default Japanese) like every other prompt.
 pub fn show_result(ui: &mut dyn PlatformUi, gs: &GameState) {
+    let ja = ui.ui_lang() == Lang::Japanese;
+    let zone_line = |label: &str, p: &crate::core::player::Player| {
+        if ja {
+            format!(
+                "{} 成功:{} 控え室:{}",
+                label,
+                p.success_live_card_zone.cards.len(),
+                p.waitroom.cards.len()
+            )
+        } else {
+            format!(
+                "{} success:{} wait:{}",
+                label,
+                p.success_live_card_zone.cards.len(),
+                p.waitroom.cards.len()
+            )
+        }
+    };
     loop {
         ui.clear_screen();
-        ui.println("=== GAME OVER ===");
+        ui.println(if ja {
+            "=== ゲームオーバー ==="
+        } else {
+            "=== GAME OVER ==="
+        });
         ui.println(&format!("{:?}", gs.game_result));
-        ui.println(&format!(
-            "P1 success:{} wait:{}",
-            gs.player1.success_live_card_zone.cards.len(),
-            gs.player1.waitroom.cards.len()
-        ));
-        ui.println(&format!(
-            "P2 success:{} wait:{}",
-            gs.player2.success_live_card_zone.cards.len(),
-            gs.player2.waitroom.cards.len()
-        ));
-        ui.println("Press A to continue");
+        ui.println(&zone_line("P1", &gs.player1));
+        ui.println(&zone_line("P2", &gs.player2));
+        ui.println(if ja {
+            "A/Bを押して続ける"
+        } else {
+            "Press A/B to continue"
+        });
         ui.poll_input();
-        if ui.just_pressed_a() || ui.just_pressed_start() {
+        if ui.just_pressed_a() || ui.just_pressed_b() || ui.just_pressed_start() {
             break;
         }
         ui.wait_vblank();
@@ -109,16 +130,42 @@ pub fn show_result(ui: &mut dyn PlatformUi, gs: &GameState) {
 }
 
 /// Select from a list of items, starting the cursor at `initial`.
-/// Returns the selected index. Start button also confirms (same as A).
-/// [`select`] is this with `initial = 0`; menus that restore a previous
-/// choice (e.g. the engine language picker) pass it in.
+/// Returns the selected index, or None when `cancelable` and B is pressed.
+/// Start button also confirms (same as A). Left/Right page by one window.
+/// [`select`] is this with `initial = 0` and no cancel; menus that restore
+/// a previous choice (e.g. the engine language picker) pass it in.
 pub fn select_with_initial(
     ui: &mut dyn PlatformUi,
     items: &[&str],
     title: &str,
     initial: usize,
 ) -> usize {
-    let mut sel: usize = initial.min(items.len().saturating_sub(1));
+    select_impl(ui, items, title, initial, false).unwrap_or(0)
+}
+
+/// Cancelable variant of [`select_with_initial`]: B backs out with None
+/// (e.g. deck pickers returning to the previous screen). Ports that used
+/// plain [`select`] keep the old no-cancel behavior untouched.
+pub fn select_opt(
+    ui: &mut dyn PlatformUi,
+    items: &[&str],
+    title: &str,
+    initial: usize,
+) -> Option<usize> {
+    select_impl(ui, items, title, initial, true)
+}
+
+fn select_impl(
+    ui: &mut dyn PlatformUi,
+    items: &[&str],
+    title: &str,
+    initial: usize,
+    cancelable: bool,
+) -> Option<usize> {
+    if items.is_empty() {
+        return None;
+    }
+    let mut sel: usize = initial.min(items.len() - 1);
     let mut scroll: usize = 0;
     let vis = ui.option_rows();
     let cols = ui.option_cols();
@@ -145,7 +192,7 @@ pub fn select_with_initial(
             ui.println(&buf);
         }
         if items.len() > end {
-            ui.println(&format!("  .. {} more", items.len() - end));
+            ui.println(&more_line(items.len() - end, ui.ui_lang()));
         }
         ui.swap_buffers();
         ui.poll_input();
@@ -153,10 +200,16 @@ pub fn select_with_initial(
             sel = if sel == 0 { items.len() - 1 } else { sel - 1 };
         } else if ui.just_pressed_down() {
             sel = if sel + 1 == items.len() { 0 } else { sel + 1 };
+        } else if ui.just_pressed_left() {
+            sel = sel.saturating_sub(vis);
+        } else if ui.just_pressed_right() {
+            sel = (sel + vis).min(items.len() - 1);
         } else if ui.just_pressed_l() || ui.just_pressed_r() {
             show_detail(ui, items[sel]);
         } else if ui.just_pressed_a() || ui.just_pressed_start() {
-            return sel;
+            return Some(sel);
+        } else if cancelable && ui.just_pressed_b() {
+            return None;
         }
         ui.wait_vblank();
     }
@@ -177,7 +230,7 @@ pub fn menu_select(
 ) -> Option<usize> {
     let mut all_items: Vec<&str> = items.iter().map(|s| s.as_str()).collect();
     let skip_idx = if allow_skip {
-        all_items.push("[Skip]");
+        all_items.push(skip_row(ui.ui_lang()));
         Some(all_items.len() - 1)
     } else {
         None
@@ -211,7 +264,7 @@ pub fn menu_select(
             ui.println(&buf);
         }
         if all_items.len() > end {
-            ui.println(&format!("  .. {} more", all_items.len() - end));
+            ui.println(&more_line(all_items.len() - end, ui.ui_lang()));
         }
         ui.swap_buffers();
         ui.poll_input();
@@ -219,6 +272,10 @@ pub fn menu_select(
             sel = if sel == 0 { all_items.len() - 1 } else { sel - 1 };
         } else if ui.just_pressed_down() {
             sel = if sel + 1 == all_items.len() { 0 } else { sel + 1 };
+        } else if ui.just_pressed_left() {
+            sel = sel.saturating_sub(vis);
+        } else if ui.just_pressed_right() {
+            sel = (sel + vis).min(all_items.len() - 1);
         } else if ui.just_pressed_l() || ui.just_pressed_r() {
             show_detail(ui, &all_items[sel]);
         } else if ui.just_pressed_a() || ui.just_pressed_start() {
@@ -226,6 +283,13 @@ pub fn menu_select(
                 return None;
             }
             return Some(sel);
+        } else if ui.just_pressed_b() {
+            // B skips exactly like the [Skip] row: only when skipping is
+            // allowed, otherwise it stays dead (mandatory prompts need an
+            // explicit pick, matching the card grid's B behavior contract).
+            if skip_idx.is_some() {
+                return None;
+            }
         }
         ui.wait_vblank();
     }
@@ -249,7 +313,7 @@ pub fn menu_select_with_cards(
 ) -> Option<usize> {
     let mut all_items: Vec<&str> = items.iter().map(|s| s.as_str()).collect();
     let skip_idx = if allow_skip {
-        all_items.push("[Skip]");
+        all_items.push(skip_row(ui.ui_lang()));
         Some(all_items.len() - 1)
     } else {
         None
@@ -297,7 +361,7 @@ pub fn menu_select_with_cards(
             ui.println(&buf);
         }
         if all_items.len() > end {
-            ui.println(&format!("  .. {} more", all_items.len() - end));
+            ui.println(&more_line(all_items.len() - end, ui.ui_lang()));
         }
         ui.swap_buffers();
         ui.poll_input();
@@ -305,6 +369,10 @@ pub fn menu_select_with_cards(
             sel = if sel == 0 { all_items.len() - 1 } else { sel - 1 };
         } else if ui.just_pressed_down() {
             sel = if sel + 1 == all_items.len() { 0 } else { sel + 1 };
+        } else if ui.just_pressed_left() {
+            sel = sel.saturating_sub(vis);
+        } else if ui.just_pressed_right() {
+            sel = (sel + vis).min(all_items.len() - 1);
         } else if ui.just_pressed_l() {
             show_detail(ui, all_items[sel]);
         } else if ui.just_pressed_r() {
@@ -325,6 +393,13 @@ pub fn menu_select_with_cards(
                 ui.wait_vblank();
             } else {
                 return Some(sel);
+            }
+        } else if ui.just_pressed_b() {
+            // B skips exactly like the [Skip] row: only when skipping is
+            // allowed, otherwise it stays dead (mandatory prompts need an
+            // explicit pick, matching the card grid's B behavior contract).
+            if skip_idx.is_some() {
+                return None;
             }
         }
         ui.wait_vblank();
@@ -348,7 +423,7 @@ pub fn menu_select_detailed(
     let mut all_items: Vec<(String, String, String)> = items.to_vec();
     let skip_idx = if allow_skip {
         all_items.push((
-            String::from("[Skip]"),
+            String::from(skip_row(ui.ui_lang())),
             String::new(),
             String::new(),
         ));
@@ -423,6 +498,10 @@ pub fn menu_select_detailed(
             sel = if sel == 0 { all_items.len() - 1 } else { sel - 1 };
         } else if ui.just_pressed_down() {
             sel = if sel + 1 == all_items.len() { 0 } else { sel + 1 };
+        } else if ui.just_pressed_left() {
+            sel = sel.saturating_sub(vis);
+        } else if ui.just_pressed_right() {
+            sel = (sel + vis).min(all_items.len() - 1);
         } else if ui.just_pressed_l() {
             let (header, body, _) = &all_items[sel];
             show_detail(ui, &format!("{}\n{}", header, body));
@@ -438,6 +517,13 @@ pub fn menu_select_detailed(
                 return None;
             }
             return Some(sel);
+        } else if ui.just_pressed_b() {
+            // B skips exactly like the [Skip] row: only when skipping is
+            // allowed, otherwise it stays dead (mandatory prompts need an
+            // explicit pick, matching the card grid's B behavior contract).
+            if skip_idx.is_some() {
+                return None;
+            }
         }
         ui.wait_vblank();
     }
@@ -460,7 +546,18 @@ pub fn select_action(
     // read-only until an action executes (which returns). Building every line
     // via format! + DB lookups *per poll* was the dominant cost on interpreted
     // console targets (Dreamcast/WAMR), so construct it all once up front.
-    let header_turn = format!("Turn {} | {:?}", gs.turn_number, gs.current_phase);
+    // Text is resolved in the port's language (PlatformUi::ui_lang, default
+    // Japanese) so language switching works on every console port.
+    let lang = ui.ui_lang();
+    // Header phase follows the port's language (zone counts stay compact).
+    let header_turn = match lang {
+        Lang::Japanese => format!(
+            "ターン{} | {}",
+            gs.turn_number,
+            gs.current_phase.label_jp()
+        ),
+        _ => format!("Turn {} | {:?}", gs.turn_number, gs.current_phase),
+    };
     let p1 = &gs.player1;
     let p2 = &gs.player2;
     let is_p1 = gs.active_player().id == "p1";
@@ -482,9 +579,6 @@ pub fn select_action(
     // Rows carry the neutral 2-char prefix through one_line so the wrapped
     // width matches the original exactly; per frame only bytes [0..2] differ,
     // swapped onto a reused buffer instead of re-running fmt machinery.
-    // Text is resolved in the port's language (PlatformUi::ui_lang, default
-    // Japanese) so language switching works on every console port.
-    let lang = ui.ui_lang();
     let rows: Vec<String> = acts
         .iter()
         .map(|a| {
@@ -534,7 +628,7 @@ pub fn select_action(
             ui.println(&buf);
         }
         if acts.len() > end {
-            ui.println(&format!("  .. {} more", acts.len() - end));
+            ui.println(&more_line(acts.len() - end, lang));
         }
         ui.set_actionable_cards(&action_cards);
         ui.set_selected_action(
@@ -549,6 +643,13 @@ pub fn select_action(
                 sel = if sel + 1 == acts.len() { 0 } else { sel + 1 };
             } else if ui.just_pressed_up() {
                 sel = if sel == 0 { acts.len() - 1 } else { sel - 1 };
+            } else if ui.just_pressed_left() {
+                // Page jump (ports that consume Left/Right for their own
+                // cursor report consumed=true above, so this only fires
+                // where the keys would otherwise do nothing).
+                sel = sel.saturating_sub(vis);
+            } else if ui.just_pressed_right() {
+                sel = (sel + vis).min(acts.len() - 1);
             } else if ui.just_pressed_l() {
                 // Action detail: the full action text plus the acting
                 // card's screen (art/stats/ability), composed by the

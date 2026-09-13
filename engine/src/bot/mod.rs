@@ -14,8 +14,10 @@ pub mod strategy_v4;
 pub mod strategy_v5;
 pub mod strategy_v6;
 pub mod strategy_v7;
+pub mod registry;
 pub mod weights;
 
+pub use registry::BotKind;
 pub use ismcts::search;
 pub use ismcts::search_1ply;
 pub use neural::PolicyNet;

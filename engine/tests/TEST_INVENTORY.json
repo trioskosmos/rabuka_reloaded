@@ -1,6 +1,6 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-09-10T05:05:05.754205+00:00",
+  "generated_at": "2026-09-11T07:14:06.573591+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
@@ -8,7 +8,7 @@
     "unique_abilities": 936
   },
   "n_files": 575,
-  "n_tests": 3287,
+  "n_tests": 3290,
   "total_cards": 771,
   "covered_cards": 771,
   "abilities_on_covered": 936,
@@ -730,7 +730,7 @@
       ]
     }
   },
-  "n_test_fns_parsed": 3287,
+  "n_test_fns_parsed": 3290,
   "abilities": [
     {
       "idx": 0,
@@ -991,15 +991,15 @@
         "ayumu_kanon_koko_debut_recover_from_discard",
         "ayumu_live_start_triggers",
         "ayumu_q62_and_name_has_individual_names",
+        "azuna_target_opponent_puts_members_on_deck_bottom",
         "azuna_target_self_puts_members_on_deck_bottom",
         "b_heart07_parses_to_colorless_heart00",
         "b_heart07_yell_contributes_two_colorless_hearts_each",
         "bella_positive_surplus_heart04_ability_fires",
         "bella_q174_no_heart04_surplus_ability_does_not_fire",
-        "bella_q174_no_member_on_stage_ability_does_not_fire",
-        "bp3_002_per_opponent_waited_member_blade"
+        "bella_q174_no_member_on_stage_ability_does_not_fire"
       ],
-      "covering_test_count": 411,
+      "covering_test_count": 412,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -9076,6 +9076,7 @@
       ],
       "covering_tests": [
         "kanan_bp7_both_debut_abilities_in_queue_from_start",
+        "kanan_choose_options_are_bilingual",
         "kanan_immunity_blocks_opponent_karin_wait",
         "kanan_immunity_blocks_umis_debut_cost_wait",
         "kanan_immunity_does_not_block_self_wait",
@@ -9094,7 +9095,7 @@
         "q275_single_legal_target_auto_resolves_no_prompt",
         "q275_without_immunity_immune_member_is_offered_and_waited"
       ],
-      "covering_test_count": 18,
+      "covering_test_count": 19,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -9133,6 +9134,7 @@
       ],
       "covering_tests": [
         "kanan_bp7_both_debut_abilities_in_queue_from_start",
+        "kanan_choose_options_are_bilingual",
         "kanan_immunity_blocks_opponent_karin_wait",
         "kanan_immunity_blocks_umis_debut_cost_wait",
         "kanan_immunity_does_not_block_self_wait",
@@ -9151,7 +9153,7 @@
         "q275_single_legal_target_auto_resolves_no_prompt",
         "q275_without_immunity_immune_member_is_offered_and_waited"
       ],
-      "covering_test_count": 18,
+      "covering_test_count": 19,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -13148,6 +13150,7 @@
       ],
       "covering_tests": [
         "aiko_target_self_looks_at_top_card",
+        "azuna_target_opponent_puts_members_on_deck_bottom",
         "azuna_target_self_puts_members_on_deck_bottom",
         "ginko_hs_debut_window_rests_cost_le9_member",
         "karin_live_start_window_rests_exactly_blade4_member",
@@ -13158,7 +13161,7 @@
         "shion_not_from_graveyard_no_weight",
         "sp_pr_021_hearts_lt5_no_weight"
       ],
-      "covering_test_count": 10,
+      "covering_test_count": 11,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -14357,7 +14360,7 @@
         "ayumu_constant_three_live_cards_still_gains_blade",
         "ayumu_constant_two_live_cards_gains_blade"
       ],
-      "covering_test_count": 865,
+      "covering_test_count": 867,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -14561,6 +14564,7 @@
       "covering_tests": [
         "chika_bp7010_bottom_card_to_fourth_from_top",
         "chika_bp7010_decline_leaves_bottom_card_alone",
+        "dia_bp7013_choose_opponent_waitroom_members_to_deck_bottom",
         "dia_bp7013_own_waitroom_members_to_deck_bottom",
         "guilty_night_option_a_waits_and_suppresses",
         "guilty_night_option_b_draws_instead",
@@ -14573,7 +14577,7 @@
         "tabi_bp7021_mill_tiers_three_members_draw_only",
         "tabi_bp7021_mill_tiers_two_members_no_bonus"
       ],
-      "covering_test_count": 13,
+      "covering_test_count": 14,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -18256,6 +18260,7 @@
       "covering_tests": [
         "chika_bp7010_bottom_card_to_fourth_from_top",
         "chika_bp7010_decline_leaves_bottom_card_alone",
+        "dia_bp7013_choose_opponent_waitroom_members_to_deck_bottom",
         "dia_bp7013_own_waitroom_members_to_deck_bottom",
         "guilty_night_option_a_waits_and_suppresses",
         "guilty_night_option_b_draws_instead",
@@ -18282,10 +18287,9 @@
         "kanon_spbp4_001_non_liella_blocks_placement",
         "kanon_spbp4_001_places_wait_energy_when_liella_only",
         "keke_spbp1002_twelve_energy_live_total_bonus",
-        "ketsumi_no_hikari_per_waited_member_score",
-        "kinako_spbp7017_placed_energy_wont_activate_next_turn"
+        "ketsumi_no_hikari_per_waited_member_score"
       ],
-      "covering_test_count": 65,
+      "covering_test_count": 66,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -19359,6 +19363,7 @@
       ],
       "covering_tests": [
         "aiko_target_self_looks_at_top_card",
+        "azuna_target_opponent_puts_members_on_deck_bottom",
         "azuna_target_self_puts_members_on_deck_bottom",
         "niji_bp5_004_weight_exact_4_blades",
         "niji_choice_activate_energy",
@@ -19366,7 +19371,7 @@
         "shion_not_from_graveyard_no_weight",
         "sp_pr_021_hearts_lt5_no_weight"
       ],
-      "covering_test_count": 7,
+      "covering_test_count": 8,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -20906,6 +20911,7 @@
       ],
       "covering_tests": [
         "aiko_target_self_looks_at_top_card",
+        "azuna_target_opponent_puts_members_on_deck_bottom",
         "azuna_target_self_puts_members_on_deck_bottom",
         "niji_bp5_004_weight_exact_4_blades",
         "niji_choice_activate_energy",
@@ -20913,7 +20919,7 @@
         "shion_not_from_graveyard_no_weight",
         "sp_pr_021_hearts_lt5_no_weight"
       ],
-      "covering_test_count": 7,
+      "covering_test_count": 8,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -22723,6 +22729,7 @@
       ],
       "covering_tests": [
         "aiko_target_self_looks_at_top_card",
+        "azuna_target_opponent_puts_members_on_deck_bottom",
         "azuna_target_self_puts_members_on_deck_bottom",
         "niji_bp5_004_weight_exact_4_blades",
         "niji_choice_activate_energy",
@@ -22730,7 +22737,7 @@
         "shion_not_from_graveyard_no_weight",
         "sp_pr_021_hearts_lt5_no_weight"
       ],
-      "covering_test_count": 7,
+      "covering_test_count": 8,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -25574,6 +25581,7 @@
       ],
       "covering_tests": [
         "aiko_target_self_looks_at_top_card",
+        "azuna_target_opponent_puts_members_on_deck_bottom",
         "azuna_target_self_puts_members_on_deck_bottom",
         "niji_bp5_004_weight_exact_4_blades",
         "niji_choice_activate_energy",
@@ -25581,7 +25589,7 @@
         "shion_not_from_graveyard_no_weight",
         "sp_pr_021_hearts_lt5_no_weight"
       ],
-      "covering_test_count": 7,
+      "covering_test_count": 8,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -25757,6 +25765,7 @@
       "covering_tests": [
         "chika_bp7010_bottom_card_to_fourth_from_top",
         "chika_bp7010_decline_leaves_bottom_card_alone",
+        "dia_bp7013_choose_opponent_waitroom_members_to_deck_bottom",
         "dia_bp7013_own_waitroom_members_to_deck_bottom",
         "guilty_night_option_a_waits_and_suppresses",
         "guilty_night_option_b_draws_instead",
@@ -25769,7 +25778,7 @@
         "tabi_bp7021_mill_tiers_three_members_draw_only",
         "tabi_bp7021_mill_tiers_two_members_no_bonus"
       ],
-      "covering_test_count": 13,
+      "covering_test_count": 14,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -26546,6 +26555,7 @@
       "covering_tests": [
         "chika_bp7010_bottom_card_to_fourth_from_top",
         "chika_bp7010_decline_leaves_bottom_card_alone",
+        "dia_bp7013_choose_opponent_waitroom_members_to_deck_bottom",
         "dia_bp7013_own_waitroom_members_to_deck_bottom",
         "guilty_night_option_a_waits_and_suppresses",
         "guilty_night_option_b_draws_instead",
@@ -26558,7 +26568,7 @@
         "tabi_bp7021_mill_tiers_three_members_draw_only",
         "tabi_bp7021_mill_tiers_two_members_no_bonus"
       ],
-      "covering_test_count": 13,
+      "covering_test_count": 14,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -28101,6 +28111,7 @@
         "c5_single_candidate_auto_waited",
         "c5_threshold_scales_with_energy_under",
         "c5_uses_original_blade_not_current",
+        "kanan_choose_options_are_bilingual",
         "kanan_immunity_blocks_opponent_karin_wait",
         "kanan_immunity_blocks_umis_debut_cost_wait",
         "kanan_immunity_does_not_block_self_wait",
@@ -28116,7 +28127,7 @@
         "q274_non_immune_pick_is_still_waited",
         "q274_without_immunity_the_member_is_waited"
       ],
-      "covering_test_count": 29,
+      "covering_test_count": 30,
       "is_null": false,
       "use_limit": 1,
       "watches_abilities": false,
@@ -30110,6 +30121,7 @@
         "ayumu_kanon_koko_debut_recover_from_discard",
         "ayumu_live_start_triggers",
         "ayumu_q62_and_name_has_individual_names",
+        "azuna_target_opponent_puts_members_on_deck_bottom",
         "azuna_target_self_puts_members_on_deck_bottom",
         "bella_positive_surplus_heart04_ability_fires",
         "bella_q174_no_heart04_surplus_ability_does_not_fire",
@@ -30130,10 +30142,9 @@
         "distortion_same_name_catchu_condition_not_met",
         "distortion_two_same_one_diff_catchu_condition_met",
         "energy_zone_capacity_handled",
-        "hanamaru_score_icon_filter",
-        "hareruya_q64_waitroom_only_five_distinct_liella_condition_met"
+        "hanamaru_score_icon_filter"
       ],
-      "covering_test_count": 80,
+      "covering_test_count": 81,
       "is_null": false,
       "use_limit": 1,
       "watches_abilities": false,
@@ -30777,6 +30788,7 @@
       ],
       "covering_tests": [
         "aiko_target_self_looks_at_top_card",
+        "azuna_target_opponent_puts_members_on_deck_bottom",
         "azuna_target_self_puts_members_on_deck_bottom",
         "niji_bp5_004_weight_exact_4_blades",
         "niji_choice_activate_energy",
@@ -30784,7 +30796,7 @@
         "shion_not_from_graveyard_no_weight",
         "sp_pr_021_hearts_lt5_no_weight"
       ],
-      "covering_test_count": 7,
+      "covering_test_count": 8,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -31308,6 +31320,7 @@
       ],
       "covering_tests": [
         "aiko_target_self_looks_at_top_card",
+        "azuna_target_opponent_puts_members_on_deck_bottom",
         "azuna_target_self_puts_members_on_deck_bottom",
         "chisato_area_move_gains_blade",
         "cooking_accept_gives_heart01_to_all_niji_members",
@@ -31335,10 +31348,9 @@
         "kanata_cost_mills_top_three",
         "kanata_live_card_in_discard_offers_choice",
         "kanata_member_with_blade_heart_does_not_offer_choice",
-        "kanata_member_without_blade_heart_offers_choice",
-        "kanata_no_matching_card_does_not_offer_choice"
+        "kanata_member_without_blade_heart_offers_choice"
       ],
-      "covering_test_count": 119,
+      "covering_test_count": 120,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -31683,6 +31695,7 @@
       "covering_tests": [
         "chika_bp7010_bottom_card_to_fourth_from_top",
         "chika_bp7010_decline_leaves_bottom_card_alone",
+        "dia_bp7013_choose_opponent_waitroom_members_to_deck_bottom",
         "dia_bp7013_own_waitroom_members_to_deck_bottom",
         "guilty_night_option_a_waits_and_suppresses",
         "guilty_night_option_b_draws_instead",
@@ -31709,10 +31722,9 @@
         "honoka_distinct_names_three_members",
         "honoka_distinct_names_two_members",
         "honoka_pr0020_gains_constant_live_total_at_eight",
-        "kanon_alone_cannot_live",
-        "kanon_spbp2023_stacked_energy_threshold_hearts"
+        "kanon_alone_cannot_live"
       ],
-      "covering_test_count": 84,
+      "covering_test_count": 85,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -37285,13 +37297,14 @@
         "engine/tests/test_modules/abilities/moderate/bp7_kanan_wait_immunity_test.rs"
       ],
       "covering_tests": [
+        "kanan_choose_options_are_bilingual",
         "kanan_immunity_blocks_opponent_karin_wait",
         "kanan_immunity_blocks_umis_debut_cost_wait",
         "kanan_immunity_does_not_block_self_wait",
         "kanan_option1_records_protection_on_own_member",
         "kanan_option2_no_protection"
       ],
-      "covering_test_count": 5,
+      "covering_test_count": 6,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -40612,7 +40625,7 @@
         "bp6_011n_hand_debut_no_draw",
         "bp6_011n_waitroom_debut_draws_two_discards_one"
       ],
-      "covering_test_count": 375,
+      "covering_test_count": 376,
       "is_null": false,
       "use_limit": 1,
       "watches_abilities": false,
@@ -44622,6 +44635,7 @@
       "covering_tests": [
         "chika_bp7010_bottom_card_to_fourth_from_top",
         "chika_bp7010_decline_leaves_bottom_card_alone",
+        "dia_bp7013_choose_opponent_waitroom_members_to_deck_bottom",
         "dia_bp7013_own_waitroom_members_to_deck_bottom",
         "guilty_night_option_a_waits_and_suppresses",
         "guilty_night_option_b_draws_instead",
@@ -44648,10 +44662,9 @@
         "honoka_distinct_names_three_members",
         "honoka_distinct_names_two_members",
         "honoka_pr0020_gains_constant_live_total_at_eight",
-        "kanon_alone_cannot_live",
-        "kanon_spbp2023_stacked_energy_threshold_hearts"
+        "kanon_alone_cannot_live"
       ],
-      "covering_test_count": 84,
+      "covering_test_count": 85,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -45523,6 +45536,7 @@
       "covering_tests": [
         "chika_bp7010_bottom_card_to_fourth_from_top",
         "chika_bp7010_decline_leaves_bottom_card_alone",
+        "dia_bp7013_choose_opponent_waitroom_members_to_deck_bottom",
         "dia_bp7013_own_waitroom_members_to_deck_bottom",
         "guilty_night_option_a_waits_and_suppresses",
         "guilty_night_option_b_draws_instead",
@@ -45535,7 +45549,7 @@
         "tabi_bp7021_mill_tiers_three_members_draw_only",
         "tabi_bp7021_mill_tiers_two_members_no_bonus"
       ],
-      "covering_test_count": 13,
+      "covering_test_count": 14,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -45636,6 +45650,7 @@
       "covering_tests": [
         "chika_bp7010_bottom_card_to_fourth_from_top",
         "chika_bp7010_decline_leaves_bottom_card_alone",
+        "dia_bp7013_choose_opponent_waitroom_members_to_deck_bottom",
         "dia_bp7013_own_waitroom_members_to_deck_bottom",
         "guilty_night_option_a_waits_and_suppresses",
         "guilty_night_option_b_draws_instead",
@@ -45648,7 +45663,7 @@
         "tabi_bp7021_mill_tiers_three_members_draw_only",
         "tabi_bp7021_mill_tiers_two_members_no_bonus"
       ],
-      "covering_test_count": 13,
+      "covering_test_count": 14,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -45918,6 +45933,7 @@
       "covering_tests": [
         "chika_bp7010_bottom_card_to_fourth_from_top",
         "chika_bp7010_decline_leaves_bottom_card_alone",
+        "dia_bp7013_choose_opponent_waitroom_members_to_deck_bottom",
         "dia_bp7013_own_waitroom_members_to_deck_bottom",
         "guilty_night_option_a_waits_and_suppresses",
         "guilty_night_option_b_draws_instead",
@@ -45930,7 +45946,7 @@
         "tabi_bp7021_mill_tiers_three_members_draw_only",
         "tabi_bp7021_mill_tiers_two_members_no_bonus"
       ],
-      "covering_test_count": 13,
+      "covering_test_count": 14,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -46049,6 +46065,7 @@
       "covering_tests": [
         "chika_bp7010_bottom_card_to_fourth_from_top",
         "chika_bp7010_decline_leaves_bottom_card_alone",
+        "dia_bp7013_choose_opponent_waitroom_members_to_deck_bottom",
         "dia_bp7013_own_waitroom_members_to_deck_bottom",
         "guilty_night_option_a_waits_and_suppresses",
         "guilty_night_option_b_draws_instead",
@@ -46061,7 +46078,7 @@
         "tabi_bp7021_mill_tiers_three_members_draw_only",
         "tabi_bp7021_mill_tiers_two_members_no_bonus"
       ],
-      "covering_test_count": 13,
+      "covering_test_count": 14,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -46099,6 +46116,7 @@
       ],
       "covering_tests": [
         "aiko_target_self_looks_at_top_card",
+        "azuna_target_opponent_puts_members_on_deck_bottom",
         "azuna_target_self_puts_members_on_deck_bottom",
         "chisato_area_move_gains_blade",
         "cooking_accept_gives_heart01_to_all_niji_members",
@@ -46126,10 +46144,9 @@
         "kanata_cost_mills_top_three",
         "kanata_live_card_in_discard_offers_choice",
         "kanata_member_with_blade_heart_does_not_offer_choice",
-        "kanata_member_without_blade_heart_offers_choice",
-        "kanata_no_matching_card_does_not_offer_choice"
+        "kanata_member_without_blade_heart_offers_choice"
       ],
-      "covering_test_count": 119,
+      "covering_test_count": 120,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -47006,6 +47023,7 @@
       "covering_tests": [
         "chika_bp7010_bottom_card_to_fourth_from_top",
         "chika_bp7010_decline_leaves_bottom_card_alone",
+        "dia_bp7013_choose_opponent_waitroom_members_to_deck_bottom",
         "dia_bp7013_own_waitroom_members_to_deck_bottom",
         "guilty_night_option_a_waits_and_suppresses",
         "guilty_night_option_b_draws_instead",
@@ -47018,7 +47036,7 @@
         "tabi_bp7021_mill_tiers_three_members_draw_only",
         "tabi_bp7021_mill_tiers_two_members_no_bonus"
       ],
-      "covering_test_count": 13,
+      "covering_test_count": 14,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,

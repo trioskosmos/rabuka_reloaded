@@ -3546,6 +3546,14 @@ if util::distinct_should_dedupe(distinct) {
                 remaining_available,
                 util::card_plural(remaining_available)
             );
+            let description_ja = format!(
+                "残りの見たカード{}枚から最大{}枚まで選択（スキップ可）",
+                remaining_available, remaining_selections
+            );
+            log::debug!(
+                "[LOOKED_AT_PROMPT] remaining dest=looked_at en={:?} ja={:?}",
+                description, description_ja
+            );
             self.pending_choice = Some(
                 Choice::select_cards(
                     Zone::LookedAt.to_str(),
@@ -3553,6 +3561,7 @@ if util::distinct_should_dedupe(distinct) {
                     description,
                     true,
                 )
+                .description_ja(Some(description_ja))
                 .card_type(
                     select_action
                         .as_ref()

@@ -124,7 +124,7 @@ function render() {
     if (textEl) {
         textEl.innerHTML = '';
         if (isHidden) {
-            textEl.innerHTML = '<p style="opacity:0.5;">Card is hidden</p>';
+            textEl.innerHTML = `<p style="opacity:0.5;">${i18n.t('card_hidden')}</p>`;
         } else {
             let html = '';
             const groups = (translated?.groups || cardObj.groups || []).join(', ');

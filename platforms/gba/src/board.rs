@@ -137,6 +137,16 @@ impl Board {
         };
     }
 
+    /// Reverse focus cycle (Hand -> Opp Stage -> Own Stage). Reached via R
+    /// on an empty slot, so a B overshoot costs one press instead of two.
+    pub fn cycle_focus_rev(&mut self) {
+        self.focus = match self.focus {
+            Focus::Hand => Focus::OppStage,
+            Focus::OppStage => Focus::OwnStage,
+            Focus::OwnStage => Focus::Hand,
+        };
+    }
+
     /// Move cursor within current focus. For Hand, scrolls hand window.
     pub fn move_focused(&mut self, delta: i32, hand_len: usize) -> bool {
         match self.focus {

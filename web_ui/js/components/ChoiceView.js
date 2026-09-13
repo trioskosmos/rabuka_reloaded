@@ -95,8 +95,21 @@ const ACTION_LABELS = {
     'select_skip': i18n.t('skip'),
 };
 
+/**
+ * Single source of truth for an action's display text: the engine sends
+ * `description` (EN) + `description_ja` (JA). Pick by UI language with a
+ * fallback so a missing translation never blanks the option.
+ */
+function _actionText(action) {
+    if (!action) return '';
+    if (i18n.isJapanese(State.currentLang)) {
+        return action.description_ja || action.description || '';
+    }
+    return action.description || action.description_ja || '';
+}
+
 function _resolveActionLabel(action) {
-    const name = action.parameters?.card_name || action.description || '';
+    const name = action.parameters?.card_name || _actionText(action);
     if (!name || name.startsWith('ACT_') || name.startsWith('CHOOSE_')) {
         return ACTION_LABELS[action.action_type] || action.action_type || '';
     }
@@ -289,7 +302,7 @@ function _buildCardItemFromAction(a, cardByNo) {
     const resolved = cardNo ? State.resolveCardData(cardNo) : null;
     const cardData = cardNo ? (resolved || (cardByNo ? cardByNo[cardNo] : null) || null) : null;
     const isTextAction = cardNo === '-1' || (cardNo && !cardData);
-    let name = cardData?.name || a.parameters?.card_name || a.description || '';
+    let name = cardData?.name || a.parameters?.card_name || _actionText(a);
     if (!name || name.startsWith('ACT_') || name.startsWith('CHOOSE_')) {
         name = _resolveActionLabel(a);
     }
@@ -606,7 +619,7 @@ export const ChoiceView = {
                 const optText = optIdx !== undefined && choice.options[optIdx] ? choice.options[optIdx] : null;
                 const name = isHeart
                     ? cardNo.replace('heart0', '♥').replace('heart', '♥')
-                    : (a.description || optText || a.parameters?.card_name || '');
+                    : (_actionText(a) || optText || a.parameters?.card_name || '');
                 items.push({ card: null, name, action: a, isText: !isHeart });
             });
             return items;
@@ -691,14 +704,24 @@ export const ChoiceView = {
         if (item.isText) {
             const el = document.createElement('div');
             el.className = 'choice-item text-option';
-            el.style.cssText = `
+            // Rich text (icons) must NOT be a flex container: every child
+            // (each icon span, each text run) becomes a flex item and wraps
+            // onto its own line. Block layout keeps icons inline instead.
+            const isRich = item.name.includes('{{');
+            el.style.cssText = isRich ? `
+                display: block; text-align: left;
+                padding: 12px 16px; width: auto; height: auto; min-width: 80px;
+                min-height: 48px; flex-shrink: 1; cursor: pointer; font-size: 0.95rem;
+                background: var(--input-bg, #2a2a3a); border: 2px solid var(--border, #555);
+                border-radius: 8px; color: var(--text, #eee); line-height: 1.5;
+            ` : `
                 display: flex; align-items: center; justify-content: center;
                 padding: 12px 16px; width: auto; height: auto; min-width: 80px;
                 min-height: 48px; flex-shrink: 1; cursor: pointer; font-size: 0.95rem;
                 background: var(--input-bg, #2a2a3a); border: 2px solid var(--border, #555);
                 border-radius: 8px; color: var(--text, #eee);
             `;
-            if (item.name.includes('{{')) {
+            if (isRich) {
                 el.innerHTML = Tooltips.enrichAbilityText(item.name);
             } else {
                 el.textContent = item.name;
@@ -744,17 +767,25 @@ export const ChoiceView = {
             return el;
         }
 
-        // Fallback text element
+        // Fallback text element (same flex-vs-block rule as above: rich
+        // HTML in a flex container puts each icon on its own line).
         const el = document.createElement('div');
         el.className = 'choice-item text-option';
-        el.style.cssText = `
+        const isRichFallback = item.name.includes('{{');
+        el.style.cssText = isRichFallback ? `
+            display: block; text-align: left;
+            padding: 8px 12px; width: 100%; height: auto; flex-shrink: 1;
+            font-size: 0.85rem; background: var(--input-bg, #2a2a3a);
+            border: 1px solid var(--border, #555); border-radius: 6px;
+            color: var(--text, #eee); box-sizing: border-box; line-height: 1.5;
+        ` : `
             display: flex; align-items: center; justify-content: center;
             padding: 8px 12px; width: 100%; height: auto; flex-shrink: 1;
             font-size: 0.85rem; background: var(--input-bg, #2a2a3a);
             border: 1px solid var(--border, #555); border-radius: 6px;
             color: var(--text, #eee); box-sizing: border-box;
         `;
-        if (item.name.includes('{{')) {
+        if (isRichFallback) {
             el.innerHTML = Tooltips.enrichAbilityText(item.name);
         } else {
             el.textContent = item.name;

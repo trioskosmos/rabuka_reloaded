@@ -420,13 +420,21 @@ pub struct ChoiceBuilder {
 }
 
 impl ChoiceBuilder {
+    /// INVARIANT: `description` is the ENGLISH source text; the Japanese
+    /// side goes in `description_ja`. When `description_en` is unset it
+    /// defaults to `description` here, so every SelectCard prompt carries
+    /// `prompt_en` to the frontend without each call site repeating it.
+    /// (Per-site audit 2026-09-11: all SelectCard descriptions are EN.)
     pub fn build(self) -> Choice {
+        let description_en = self
+            .description_en
+            .or_else(|| Some(self.description.clone()));
         Choice::SelectCard {
             zone: self.zone,
             card_type: self.card_type,
             count: self.count,
             description: self.description,
-            description_en: self.description_en,
+            description_en,
             description_ja: self.description_ja,
             allow_skip: self.allow_skip,
             cost_limit: self.cost_limit,

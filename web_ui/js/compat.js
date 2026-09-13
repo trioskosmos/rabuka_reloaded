@@ -93,7 +93,6 @@ export function initializeGlobals(controller = {}) {
         resetGame: () => Network.resetGame(),
         startGame: (mode = 'sandbox') => Modals.startGame(mode),
         forceAdvance: () => Network.forceAction(-1),
-        changeAI: (m) => Network.changeAI(m),
         forceAction: (id) => Network.forceAction(id),
         execCode: (c) => Network.execCode(c),
         startOffline: null
@@ -118,7 +117,6 @@ export function initializeGlobals(controller = {}) {
     window.resetGame = window.Actions.resetGame;
     window.startGame = window.Actions.startGame;
     window.forceAdvance = window.Actions.forceAdvance;
-    window.changeAI = window.Actions.changeAI;
     window.forceAction = window.Actions.forceAction;
     window.execCode = window.Actions.execCode;
 

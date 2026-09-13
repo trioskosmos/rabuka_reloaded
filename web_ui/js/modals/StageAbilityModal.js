@@ -88,7 +88,7 @@ export const StageAbilityModal = {
                     abilityContainer.appendChild(btn);
                 });
             } else {
-                abilityContainer.innerHTML = '<p style="opacity:0.5;text-align:center;padding:16px;">No abilities can be activated</p>';
+                abilityContainer.innerHTML = `<p style="opacity:0.5;text-align:center;padding:16px;">${i18n.t('no_abilities_activatable')}</p>`;
             }
         }
 

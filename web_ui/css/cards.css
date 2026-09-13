@@ -110,9 +110,13 @@
 }
 .choice-item.text-option .icon-wrapper {
     display: inline-flex;
+    vertical-align: middle;
     align-items: center;
     align-self: center;
     line-height: 1;
+}
+.choice-item.text-option .icon-wrapper img {
+    vertical-align: middle;
 }
 
 /* --- Card Choice (Choice view items) --- */

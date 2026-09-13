@@ -353,7 +353,7 @@ pub(crate) fn render_overlay(gs: &GameState, overlay: Overlay, is_host: bool, at
                     format!("{}{}\0", prefix, item).as_ptr(),
                 );
             }
-            render_hint_bar(&tl("UP/DOWN=move, A=select, B=close"));
+            render_hint_bar(&tl("UP/DOWN=move, A=select, B/Start=close"));
         },
         Overlay::GameLog(offset, cursor) => {
             let logs = &gs.rule_log;
@@ -366,7 +366,7 @@ pub(crate) fn render_overlay(gs: &GameState, overlay: Overlay, is_host: bool, at
                     2.0,
                     COL_GOLD,
                     SCALE_BODY,
-                    format!("{}  {} entries (B=close, UP/DOWN=scroll)\0", log_hdr, n).as_ptr(),
+                    format!("{}  {} entries (B/Start=close, U/D=scroll, L/R=page)\0", log_hdr, n).as_ptr(),
                 );
             }
             let max_vis = 12usize;
@@ -440,7 +440,7 @@ pub(crate) fn render_overlay(gs: &GameState, overlay: Overlay, is_host: bool, at
                         COL_GOLD,
                         SCALE_BODY,
                         format!(
-                            "{}  T{} {}  (LEFT/RIGHT=tab, B=back)\0",
+                            "{}  T{} {}  (L/R=tab, U/D=scroll, B=back)\0",
                             tl("Performance"),
                             s.turn,
                             s.player_id
@@ -873,7 +873,7 @@ pub(crate) fn render_overlay(gs: &GameState, overlay: Overlay, is_host: bool, at
                         COL_GOLD,
                         SCALE_BODY,
                         format!(
-                            "{} ({})  {} cards  (B=close, X=detail)\0",
+                            "{} ({})  {} cards  (B=close, A/X=detail, L/R=self/opp)\0",
                             rev_hdr, who, total_cards
                         )
                         .as_ptr(),

@@ -280,6 +280,10 @@ impl AbilityResolver {
             format!("Select up to {} card(s) to keep", count),
             true, // allow_skip — "まで" means up to N
         )
+        .description_ja(Some(format!(
+            "最大{}枚まで手札に残すカードを選択",
+            count
+        )))
         .target_player_id(Some(player_target.to_string()))
         .build()
     }

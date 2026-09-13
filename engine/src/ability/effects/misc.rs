@@ -3707,7 +3707,7 @@ impl AbilityResolver {
             }
         }
         if let Some(effect_options) = options {
-            let description = effect_options
+            let opt_ja: Vec<String> = effect_options
                 .iter()
                 .map(|o| {
                     o.answers_any()
@@ -3715,12 +3715,32 @@ impl AbilityResolver {
                         .map(|a| a.join(", "))
                         .unwrap_or_else(|| o.text.to_string())
                 })
-                .collect::<Vec<_>>()
-                .join(" / ");
+                .collect();
+            let description = opt_ja.join(" / ");
+            // Per-option English for the "choice" option actions: generated
+            // from each option effect so EN UIs don't show Japanese options.
+            // Falls back to the JA text per option when generation is empty.
+            let opt_en: Vec<String> = effect_options
+                .iter()
+                .zip(opt_ja.iter())
+                .map(|(o, ja)| {
+                    let en = crate::ability::describe::describe_effect_en(o);
+                    if en.trim().is_empty() {
+                        ja.clone()
+                    } else {
+                        en
+                    }
+                })
+                .collect();
+            log::debug!(
+                "[CHOICE_BILINGUAL] options={} en={:?}",
+                opt_en.len(),
+                opt_en
+            );
             self.pending_choice = Some(Choice::SelectTarget {
                 target: "choice".to_string(),
                 description: description.clone(),
-                description_en: Some(description.clone()),
+                description_en: Some(opt_en.join(" / ")),
                 description_ja: Some(format!("選択: {}", description)),
                 allow_skip: effect.optional.unwrap_or(false),
                 options: None,

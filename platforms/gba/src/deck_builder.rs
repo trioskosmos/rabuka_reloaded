@@ -51,19 +51,41 @@ enum Legality {
 
 impl Legality {
     fn message(&self) -> &'static str {
+        // Bilingual via the UI language (crate::lang::tr).
+        use crate::lang::tr;
         match self {
-            Legality::Legal => "Legal",
-            Legality::WrongMemberCount { current: _ } => "Member cards: need exactly 48",
-            Legality::WrongLiveCount { current: _ } => "Live cards: need exactly 12",
-            Legality::TooManyCopies { card_no: _, count: _ } => "Max 4 copies per card base",
+            Legality::Legal => tr("Legal", "OK"),
+            Legality::WrongMemberCount { current: _ } => {
+                tr("Member cards: need exactly 48", "メンバーは48枚必要")
+            }
+            Legality::WrongLiveCount { current: _ } => {
+                tr("Live cards: need exactly 12", "ライブは12枚必要")
+            }
+            Legality::TooManyCopies { card_no: _, count: _ } => {
+                tr("Max 4 copies per card base", "同名は最大4枚まで")
+            }
         }
     }
 
     fn detail(&self) -> Option<String> {
+        // format! needs literal templates, so branch per language.
+        let ja = crate::lang::current_lang() == rabuka_engine::game::language::Lang::Japanese;
         match self {
-            Legality::WrongMemberCount { current } => Some(format!("(have {})", current)),
-            Legality::WrongLiveCount { current } => Some(format!("(have {})", current)),
-            Legality::TooManyCopies { card_no, count } => Some(format!("{}: {} copies", card_no, count)),
+            Legality::WrongMemberCount { current } => Some(if ja {
+                format!("(現在{}枚)", current)
+            } else {
+                format!("(have {})", current)
+            }),
+            Legality::WrongLiveCount { current } => Some(if ja {
+                format!("(現在{}枚)", current)
+            } else {
+                format!("(have {})", current)
+            }),
+            Legality::TooManyCopies { card_no, count } => Some(if ja {
+                format!("{}: {}枚", card_no, count)
+            } else {
+                format!("{}: {} copies", card_no, count)
+            }),
             Legality::Legal => None,
         }
     }
@@ -148,7 +170,11 @@ fn suggest_fixes(legality: &Legality, cards: &[(String, u8)], all_cards: &[CardE
                 .collect()
         }
         Legality::TooManyCopies { card_no, count } => {
-            vec![format!("Reduce {} from {} to 4", card_no, count)]
+            if crate::lang::current_lang() == rabuka_engine::game::language::Lang::Japanese {
+                vec![format!("{}を{}枚から4枚に減らす", card_no, count)]
+            } else {
+                vec![format!("Reduce {} from {} to 4", card_no, count)]
+            }
         }
         Legality::Legal => vec![],
     }
@@ -275,11 +301,20 @@ impl<'a, 'd, I: InputSource> DeckBuilder<'a, 'd, I> {
         entries
     }
 
-    /// Run the deck builder loop. Returns true if a deck was saved.
+    /// Run the deck builder loop. Returns true if a deck was saved, false
+    /// if aborted with Start (no exit path used to exist — an illegal deck
+    /// trapped the player, since A:save refuses and nothing else leaves).
     pub fn run(&mut self) -> bool {
         loop {
             self.render();
             self.input.poll();
+
+            // Start aborts from any field without saving (checked before the
+            // per-field handlers; the detail popup consumes Start itself to
+            // close, so this only fires at top level).
+            if self.input.just_pressed(Button::Start) {
+                return false;
+            }
 
             // Handle input based on current field
             match self.field {
@@ -475,6 +510,17 @@ impl<'a, 'd, I: InputSource> DeckBuilder<'a, 'd, I> {
         );
     }
 
+    /// Remove the last-added deck entry (B undo). Shared by the Card and
+    /// Quantity fields.
+    fn pop_last(&mut self) {
+        if let Some((last_no, _)) = self.cards.pop() {
+            self.recent_picks.retain(|(n, _)| n != &last_no);
+            // Update legality
+            self.legality = check_legality(&self.cards, &self.all_cards);
+            self.update_suggestions();
+        }
+    }
+
     /// Sort key: type order (Member=0, Live=1, Energy=2) then card_no.
     fn sort_key(&self, card_no: &str) -> (u8, String) {
         let type_order = self.find_card(card_no).map(|e| match e.card_type {
@@ -571,18 +617,19 @@ impl<'a, 'd, I: InputSource> DeckBuilder<'a, 'd, I> {
                 self.field = Field::Series; // Wrap to next field
             }
         } else if self.input.just_pressed(Button::Up) {
-            self.name_char_idx = (self.name_char_idx + 1) % NAME_CHARSET.len();
+            // Up = previous (matches every engine list: cursor up the screen).
+            if self.name_char_idx == 0 {
+                self.name_char_idx = NAME_CHARSET.len() - 1;
+            } else {
+                self.name_char_idx -= 1;
+            }
             if self.name_cursor < self.deck_name.len() {
                 let mut chars: Vec<char> = self.deck_name.chars().collect();
                 chars[self.name_cursor] = NAME_CHARSET[self.name_char_idx];
                 self.deck_name = chars.into_iter().collect();
             }
         } else if self.input.just_pressed(Button::Down) {
-            if self.name_char_idx == 0 {
-                self.name_char_idx = NAME_CHARSET.len() - 1;
-            } else {
-                self.name_char_idx -= 1;
-            }
+            self.name_char_idx = (self.name_char_idx + 1) % NAME_CHARSET.len();
             if self.name_cursor < self.deck_name.len() {
                 let mut chars: Vec<char> = self.deck_name.chars().collect();
                 chars[self.name_cursor] = NAME_CHARSET[self.name_char_idx];
@@ -607,9 +654,7 @@ impl<'a, 'd, I: InputSource> DeckBuilder<'a, 'd, I> {
                 self.show_card_detail(&card_no);
             }
         } else if self.input.just_pressed(Button::Select) {
-            // Open zone grid (not available without GameState, skip for now)
-        } else if self.input.just_pressed(Button::Start) {
-            // Start menu not available without GameState
+            // Unused (Start aborts from run(); no zone grid without GameState)
         }
         false
     }
@@ -620,11 +665,12 @@ impl<'a, 'd, I: InputSource> DeckBuilder<'a, 'd, I> {
         } else if self.input.just_pressed(Button::Right) {
             self.field = Field::Rarity;
         } else if self.input.just_pressed(Button::Up) {
-            self.series_idx = (self.series_idx + 1) % SERIES_LIST.len();
+            // Up = previous (engine-list convention).
+            self.series_idx = (self.series_idx + SERIES_LIST.len() - 1) % SERIES_LIST.len();
             self.card_idx = 0;
             self.rebuild_filtered();
         } else if self.input.just_pressed(Button::Down) {
-            self.series_idx = (self.series_idx + SERIES_LIST.len() - 1) % SERIES_LIST.len();
+            self.series_idx = (self.series_idx + 1) % SERIES_LIST.len();
             self.card_idx = 0;
             self.rebuild_filtered();
         } else if self.input.just_pressed(Button::A) {
@@ -635,7 +681,7 @@ impl<'a, 'd, I: InputSource> DeckBuilder<'a, 'd, I> {
                 self.show_card_detail(&card_no);
             }
         } else if self.input.just_pressed(Button::Select) {
-        } else if self.input.just_pressed(Button::Start) {
+            // Unused (Start aborts from run())
         }
         false
     }
@@ -646,11 +692,12 @@ impl<'a, 'd, I: InputSource> DeckBuilder<'a, 'd, I> {
         } else if self.input.just_pressed(Button::Right) {
             self.field = Field::Card;
         } else if self.input.just_pressed(Button::Up) {
-            self.rarity_idx = (self.rarity_idx + 1) % RARITY_LIST.len();
+            // Up = previous (engine-list convention).
+            self.rarity_idx = (self.rarity_idx + RARITY_LIST.len() - 1) % RARITY_LIST.len();
             self.card_idx = 0;
             self.rebuild_filtered();
         } else if self.input.just_pressed(Button::Down) {
-            self.rarity_idx = (self.rarity_idx + RARITY_LIST.len() - 1) % RARITY_LIST.len();
+            self.rarity_idx = (self.rarity_idx + 1) % RARITY_LIST.len();
             self.card_idx = 0;
             self.rebuild_filtered();
         } else if self.input.just_pressed(Button::A) {
@@ -661,7 +708,7 @@ impl<'a, 'd, I: InputSource> DeckBuilder<'a, 'd, I> {
                 self.show_card_detail(&card_no);
             }
         } else if self.input.just_pressed(Button::Select) {
-        } else if self.input.just_pressed(Button::Start) {
+            // Unused (Start aborts from run())
         }
         false
     }
@@ -672,28 +719,32 @@ impl<'a, 'd, I: InputSource> DeckBuilder<'a, 'd, I> {
         } else if self.input.just_pressed(Button::Right) {
             self.field = Field::Quantity;
         } else if self.input.just_pressed(Button::Up) {
-            if !self.filtered_cards.is_empty() {
-                self.card_idx = (self.card_idx + 1) % self.filtered_cards.len();
-            }
-        } else if self.input.just_pressed(Button::Down) {
+            // Up = previous (engine-list convention).
             if !self.filtered_cards.is_empty() {
                 self.card_idx = (self.card_idx + self.filtered_cards.len() - 1) % self.filtered_cards.len();
             }
+        } else if self.input.just_pressed(Button::Down) {
+            if !self.filtered_cards.is_empty() {
+                self.card_idx = (self.card_idx + 1) % self.filtered_cards.len();
+            }
         } else if self.input.just_pressed(Button::A) {
+            // A adds outright (use L/R to preview first): the old
+            // detail-then-auto-add surprised adds with no undo.
             if !self.filtered_cards.is_empty() {
                 let card_no = self.filtered_cards[self.card_idx].clone();
-                // Show detail first
-                self.show_card_detail(&card_no);
-                // After detail returns, add the card
                 self.add_card(card_no, self.quantity);
             }
+        } else if self.input.just_pressed(Button::B) {
+            // B undoes the last add (Left already goes back to Rarity,
+            // so B is free here unlike every other field).
+            self.pop_last();
         } else if self.input.just_pressed(Button::L) || self.input.just_pressed(Button::R) {
             if !self.filtered_cards.is_empty() {
                 let card_no = self.filtered_cards[self.card_idx].clone();
                 self.show_card_detail(&card_no);
             }
         } else if self.input.just_pressed(Button::Select) {
-        } else if self.input.just_pressed(Button::Start) {
+            // Unused (Start aborts from run())
         }
         false
     }
@@ -704,9 +755,10 @@ impl<'a, 'd, I: InputSource> DeckBuilder<'a, 'd, I> {
         } else if self.input.just_pressed(Button::Right) {
             self.field = Field::DeckName;
         } else if self.input.just_pressed(Button::Up) {
-            self.quantity = (self.quantity % 4) + 1;
-        } else if self.input.just_pressed(Button::Down) {
+            // Up = previous (engine-list convention).
             self.quantity = if self.quantity == 1 { 4 } else { self.quantity - 1 };
+        } else if self.input.just_pressed(Button::Down) {
+            self.quantity = (self.quantity % 4) + 1;
         } else if self.input.just_pressed(Button::A) {
             // Try to save if deck has cards
             if !self.cards.is_empty() && self.try_save() {
@@ -714,19 +766,14 @@ impl<'a, 'd, I: InputSource> DeckBuilder<'a, 'd, I> {
             }
         } else if self.input.just_pressed(Button::B) {
             // B on quantity = remove last added card
-            if let Some((last_no, _)) = self.cards.pop() {
-                self.recent_picks.retain(|(n, _)| n != &last_no);
-                // Update legality
-                self.legality = check_legality(&self.cards, &self.all_cards);
-                self.update_suggestions();
-            }
+            self.pop_last();
         } else if self.input.just_pressed(Button::L) || self.input.just_pressed(Button::R) {
             if !self.filtered_cards.is_empty() {
                 let card_no = self.filtered_cards[self.card_idx].clone();
                 self.show_card_detail(&card_no);
             }
         } else if self.input.just_pressed(Button::Select) {
-        } else if self.input.just_pressed(Button::Start) {
+            // Unused (Start aborts from run())
         }
         false
     }
@@ -734,13 +781,28 @@ impl<'a, 'd, I: InputSource> DeckBuilder<'a, 'd, I> {
     fn render(&mut self) {
         self.display.clear();
 
-        // Header with legality indicator
+        // Header with legality indicator (format! needs literals: branch).
         let legality_str = if self.legality.is_legal() { "OK" } else { "NG" };
-        self.display.println(&format!("DECK [{}/{}] {} A:Done", self.total_cards(), REQUIRED_MAIN_DECK, legality_str));
+        if crate::lang::current_lang() == rabuka_engine::game::language::Lang::Japanese {
+            self.display.println(&format!(
+                "デッキ [{}/{}] {} A:完了",
+                self.total_cards(),
+                REQUIRED_MAIN_DECK,
+                legality_str
+            ));
+        } else {
+            self.display.println(&format!(
+                "DECK [{}/{}] {} A:Done",
+                self.total_cards(),
+                REQUIRED_MAIN_DECK,
+                legality_str
+            ));
+        }
 
-        // Field 1: Deck Name
+        // Field 1: Deck Name (labels via tr(); values stay data as-is)
+        use crate::lang::tr;
         let name_prefix = if self.field == Field::DeckName { "> " } else { "  " };
-        let mut name_display = format!("{}Name: {}", name_prefix, self.deck_name);
+        let mut name_display = format!("{}{} {}", name_prefix, tr("Name:", "名前:"), self.deck_name);
         if self.field == Field::DeckName && self.name_cursor <= self.deck_name.len() {
             let cursor_pos = name_display.len() - (self.deck_name.len() - self.name_cursor);
             if cursor_pos < name_display.len() {
@@ -751,33 +813,37 @@ impl<'a, 'd, I: InputSource> DeckBuilder<'a, 'd, I> {
         }
         self.display.println(&name_display);
 
-        // Field 2: Series
+        // Field 2: Series (group codes stay data; only the label translates)
         let series_prefix = if self.field == Field::Series { "> " } else { "  " };
-        self.display.println(&format!("{}Ser: {}", series_prefix, SERIES_LIST[self.series_idx]));
+        let series_val = match SERIES_LIST[self.series_idx] {
+            "Other" => tr("Other", "その他"),
+            s => s,
+        };
+        self.display.println(&format!("{}{} {}", series_prefix, tr("Ser:", "シリーズ:"), series_val));
 
-        // Field 3: Rarity
+        // Field 3: Rarity (codes are universal)
         let rarity_prefix = if self.field == Field::Rarity { "> " } else { "  " };
-        self.display.println(&format!("{}Rar: {}", rarity_prefix, RARITY_LIST[self.rarity_idx]));
+        self.display.println(&format!("{}{} {}", rarity_prefix, tr("Rar:", "レア度:"), RARITY_LIST[self.rarity_idx]));
 
         // Field 4: Card
         let card_prefix = if self.field == Field::Card { "> " } else { "  " };
         if !self.filtered_cards.is_empty() {
             let card_no = &self.filtered_cards[self.card_idx];
             if let Some(entry) = self.find_card(card_no) {
-                self.display.println(&format!("{}Crd: {}", card_prefix, entry.name));
+                self.display.println(&format!("{}{} {}", card_prefix, tr("Crd:", "カード:"), entry.name));
             } else {
-                self.display.println(&format!("{}Crd: {}", card_prefix, card_no));
+                self.display.println(&format!("{}{} {}", card_prefix, tr("Crd:", "カード:"), card_no));
             }
         } else {
-            self.display.println(&format!("{}Crd: (none)", card_prefix));
+            self.display.println(&format!("{}{} {}", card_prefix, tr("Crd:", "カード:"), tr("(none)", "(なし)")));
         }
 
         // Field 5: Quantity
         let qty_prefix = if self.field == Field::Quantity { "> " } else { "  " };
-        self.display.println(&format!("{}Qty: [{}]", qty_prefix, self.quantity));
+        self.display.println(&format!("{}{} [{}]", qty_prefix, tr("Qty:", "枚数:"), self.quantity));
 
         // Deck list (sorted: Member -> Live -> Energy, then card_no)
-        self.display.println("Deck:");
+        self.display.println(tr("Deck:", "デッキ:"));
         for (i, (no, qty)) in self.sorted_deck().iter().take(4).enumerate() {
             if let Some(entry) = self.find_card(no) {
                 self.display.println(&format!(" {}. {}x{}", i + 1, entry.name.chars().take(12).collect::<String>(), qty));
@@ -799,15 +865,17 @@ impl<'a, 'd, I: InputSource> DeckBuilder<'a, 'd, I> {
             }
         }
 
-        // Hint bar (last line)
+        // Hint bar (last line). Every field advertises the Start abort:
+        // nothing else in the builder can leave without a legal deck.
         match self.field {
-            Field::DeckName => self.display.println("L/R:Detail"),
-            Field::Series | Field::Rarity | Field::Card => self.display.println("L/R:Detail"),
+            Field::DeckName => self.display.println(tr("A:Next B:Del Sta:Exit", "A:次 B:削除 Sta:終了")),
+            Field::Series | Field::Rarity => self.display.println(tr("A:Next L/R:Det Sta:Exit", "A:次 L/R:詳細 Sta:終了")),
+            Field::Card => self.display.println(tr("A:Add B:Undo L/R:Det Sta:Exit", "A:追加 B:取消 L/R:詳細 Sta:終了")),
             Field::Quantity => {
                 if self.legality.is_legal() {
-                    self.display.println("A:Save B:Del L/R:Det");
+                    self.display.println(tr("A:Save B:Del Sta:Exit", "A:保存 B:削除 Sta:終了"));
                 } else {
-                    self.display.println("B:Del L/R:Det Fix>Save");
+                    self.display.println(tr("B:Del Sta:Exit Fix>Save", "B:削除 Sta:終了 修正>保存"));
                 }
             }
         }

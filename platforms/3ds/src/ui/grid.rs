@@ -63,7 +63,9 @@ pub fn card_grid_input(
             return GridAction::CloseGrid;
         }
     }
-    if keys & 0x00000400 != 0 && viewing_card.is_none() {
+    // X opens detail; A joins it (GBA convention is A=detail, and A is
+    // dead in every grid caller: deck viewer, zone viewer, revealed).
+    if (keys & 0x00000400 != 0 || keys & 0x00000001 != 0) && viewing_card.is_none() {
         if *cursor < total {
             *viewing_card = Some(card_ids[*cursor]);
             return GridAction::OpenDetail(card_ids[*cursor]);

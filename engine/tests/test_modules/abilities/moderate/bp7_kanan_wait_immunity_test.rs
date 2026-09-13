@@ -161,9 +161,11 @@ fn kanan_immunity_blocks_umis_debut_cost_wait() {
     );
 }
 
-/// TEMP-DEBUG: dump Kanan choose-1 payload (pending JSON + actions).
+/// Kanan debut choose-1: option actions must be bilingual (EN description +
+/// JA description_ja) so every UI language can render them. Regression test
+/// for text-options stuck in one language.
 #[test]
-fn temp_dump_kanan_choose_payload() {
+fn kanan_choose_options_are_bilingual() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let kanan = game.id(KANAN);
@@ -174,19 +176,13 @@ fn temp_dump_kanan_choose_payload() {
     game.state.player1.hand.cards.push(kanan);
     game.give_energy(30);
     game.play_to_stage(kanan, MemberArea::Center);
+    // Resolve the debut auto-ability ordering (ab#1 is index 1) and the
+    // look-and-optional-bottom from ab#0, until the choose-1 is pending.
     let mut guard = 0;
     while game.has_pending_choice() && guard < 20 {
         guard += 1;
         let t = game.pending_choice_type();
         if t.as_deref() == Some("SelectTarget") {
-            if let Some(json) = game.state.get_pending_choice_json() {
-                println!("PENDING_JSON={}", serde_json::to_string(&json).unwrap());
-            }
-            let acts = rabuka_engine::game::game_setup::generate_possible_actions(&game.state);
-            for (i, a) in acts.iter().enumerate() {
-                println!("ACT[{}] desc={:?}", i, a.description);
-                println!("ACT[{}] desc_ja={:?}", i, a.description_ja);
-            }
             break;
         } else if t.as_deref() == Some("SelectAutoAbility") {
             game.select_indices(&[1]);
@@ -195,5 +191,28 @@ fn temp_dump_kanan_choose_payload() {
         } else {
             break;
         }
+    }
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectTarget"),
+        "expected Kanan choose-1 SelectTarget"
+    );
+    let acts = rabuka_engine::game::game_setup::generate_possible_actions(&game.state);
+    assert_eq!(acts.len(), 2, "choose-1 must offer 2 options");
+    for (i, a) in acts.iter().enumerate() {
+        let ja = a.description_ja.as_deref().unwrap_or("");
+        assert!(
+            !a.description.is_empty() && !ja.is_empty(),
+            "option {} must be bilingual, got desc={:?} desc_ja={:?}",
+            i,
+            a.description,
+            a.description_ja
+        );
+        assert!(
+            a.description != ja,
+            "option {} EN/JA must differ, got {:?}",
+            i,
+            a.description
+        );
     }
 }

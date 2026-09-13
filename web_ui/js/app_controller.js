@@ -19,64 +19,16 @@ import { StageAbilityModal } from './modals/StageAbilityModal.js';
 import { AbilityQueueModal } from './modals/AbilityQueueModal.js';
 import { LogRenderer } from './components/LogRenderer.js';
 import { ImageLoader } from './components/CardRenderer.js';
-import { DOM_IDS, COLORS, DISPLAY_VALUES } from './constants_dom.js';
+import { DOM_IDS, DISPLAY_VALUES } from './constants_dom.js';
 
-const POLL_DELAYS = {
-    idle: 3000,         // Normal slow polling
-    thinking: 250,      // Poll fast when AI is thinking (AI acts in ms)
-    liveWatch: 1200,    // Poll faster when watching live
-    burst: 200,         // Immediate follow-up after change
-    error: 5000,
-    healthCheck: 30000,
-};
+// Gameplay sync is push-driven (SSE) with a 250ms version-poll fallback in
+// GameService — nothing here computes poll delays anymore. Only the system
+// status heartbeat interval lives on.
+const HEALTH_CHECK_INTERVAL = 30000;
 
 let initialized = false;
 let healthCheckInterval = null;
-let heartbeat = 0;
 let isTabActive = true;
-
-const debugElements = {
-    sync: null, room: null, session: null, view: null, poll: null, delay: null,
-};
-
-function initializeDebugElementCache() {
-    if (debugElements.sync) return;
-    debugElements.sync = DOMUtils.getElement(DOM_IDS.DEBUG_SYNC);
-    debugElements.room = DOMUtils.getElement(DOM_IDS.DEBUG_ROOM);
-    debugElements.session = DOMUtils.getElement(DOM_IDS.DEBUG_SESSION);
-    debugElements.view = DOMUtils.getElement(DOM_IDS.DEBUG_VIEW);
-    debugElements.poll = DOMUtils.getElement(DOM_IDS.DEBUG_POLL);
-    debugElements.delay = DOMUtils.getElement(DOM_IDS.DEBUG_DELAY);
-}
-
-function getPollingMode() {
-    if (!isTabActive) return 'SLEEP';
-    if (State.offlineMode) return 'OFFLINE';
-    if (State.replayMode) return 'REPLAY';
-    return 'LIVE';
-}
-
-function getTargetPollDelay() {
-    if (!isTabActive) return 10000;
-    if (State.replayMode || State.offlineMode || (!State.roomCode && !State.gameHasStarted)) return POLL_DELAYS.idle;
-    if (State.data?.is_ai_thinking) return POLL_DELAYS.thinking;
-    if (State.isLiveWatchOn) return POLL_DELAYS.liveWatch;
-    return POLL_DELAYS.idle;
-}
-
-function updateDebugOverlay() {
-    initializeDebugElementCache();
-    const isSynced = window.StateMaster === State;
-    DOMUtils.updateText({
-        [DOM_IDS.DEBUG_SYNC]: isSynced ? 'OK' : 'MISMATCH',
-        [DOM_IDS.DEBUG_ROOM]: String(State.roomCode || 'NULL'),
-        [DOM_IDS.DEBUG_SESSION]: State.sessionToken ? 'VALID' : 'MISSING',
-        [DOM_IDS.DEBUG_VIEW]: `P${State.perspectivePlayer + 1}`,
-        [DOM_IDS.DEBUG_POLL]: heartbeat,
-        [DOM_IDS.DEBUG_DELAY]: `${getPollingMode()} (${getTargetPollDelay()}ms)`,
-    });
-    if (debugElements.sync) debugElements.sync.style.color = isSynced ? '#00ff00' : COLORS.ACCENT_RED;
-}
 
 function syncRoomDisplay() {
     DOMUtils.setText(DOM_IDS.ROOM_CODE_HEADER, State.roomCode || '---');
@@ -454,7 +406,7 @@ export const AppController = {
         if (!healthCheckInterval) {
             healthCheckInterval = window.setInterval(() => {
                 if (isTabActive) Network.checkSystemStatus();
-            }, POLL_DELAYS.healthCheck);
+            }, HEALTH_CHECK_INTERVAL);
             window.addEventListener('beforeunload', () => {
                 clearInterval(healthCheckInterval);
                 healthCheckInterval = null;
@@ -489,7 +441,6 @@ export const AppController = {
     },
 
     restartPolling() {
-        heartbeat = 0;
         Network.fetchState();
     },
 };

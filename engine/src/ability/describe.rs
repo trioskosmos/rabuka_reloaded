@@ -344,6 +344,9 @@ pub fn describe_effect_en(effect: &AbilityEffect) -> String {
                 "cannot_place" => {
                     "Cannot be placed in the success live card zone".to_string()
                 }
+                "cannot_wait_by_effect" => {
+                    "Do not go to Wait by opponent's effects".to_string()
+                }
                 other => format!("Restriction: {}", other),
             }
         }
@@ -1032,6 +1035,9 @@ pub fn describe_effect_ja(effect: &AbilityEffect) -> String {
                 "cannot_live" => "ライブできない".to_string(),
                 "cannot_place" => {
                     "成功ライブカード置き場に置くことができない".to_string()
+                }
+                "cannot_wait_by_effect" => {
+                    "相手の効果によってはウェイトしない".to_string()
                 }
                 other => format!("{}制限を適用", other),
             }

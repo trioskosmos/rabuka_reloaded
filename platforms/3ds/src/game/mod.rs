@@ -795,7 +795,7 @@ pub fn play_step(p: PlayState, keys: u32) -> Step {
                     170.0,
                     COL_MED,
                     SCALE_SMALL,
-                    format!("{}\0", tl("Press START for menu")).as_ptr(),
+                    format!("{}\0", tl("Press A/B/START for menu")).as_ptr(),
                 );
             }
         }

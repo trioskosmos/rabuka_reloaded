@@ -202,9 +202,15 @@ pub fn render_card_choice_grid(
                 return Some(sel);
             }
         } else if ui.just_pressed_b() {
-            // Release the grid before the caller rebuilds its screen.
-            ui.reset_vram();
-            return None;
+            // B backs out exactly like the [Skip] row: only when skipping
+            // is allowed. On mandatory prompts the press is ignored — an
+            // empty answer is rejected by resume_with_choice, so answering
+            // None would just re-prompt and look like a dead button.
+            if allow_skip {
+                // Release the grid before the caller rebuilds its screen.
+                ui.reset_vram();
+                return None;
+            }
         } else if ui.just_pressed_start() {
             // Start menu over the choice (stats + zones); the choice
             // resumes when it closes.
@@ -342,12 +348,13 @@ fn render_choice_page(
         }
     }
 
-    // Hint bar: A picks, B goes back (or skips), Select shows the board,
+    // Hint bar: A picks, B goes back (or skips) when the prompt allows
+    // it, Select shows the board, Start opens the menu (choice resumes),
     // L/R pop card detail screens.
     if allow_skip {
         ui.println("A:Pick B:Skip SL:Board");
     } else {
-        ui.println("A:Pick B:Back SL:Board");
+        ui.println("A:Pick SL:Board");
     }
-    ui.println("L:Hint R:Card");
+    ui.println("L:Hint R:Card Sta:Menu");
 }

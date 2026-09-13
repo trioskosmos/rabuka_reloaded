@@ -1,13 +1,40 @@
-//! Strategy bot v7 — improved v6 with fixed pass logic and member dev bonus.
+//! Strategy bot v7 — v6 tempo plus main-phase vision fixes.
 //!
-//! This is v6 with minimal targeted improvements:
-//! 1. Reduced passable penalty for member plays (35 vs 60) to encourage board development
-//! 2. Added +15 bonus for productive member plays (has hearts/blades)
+//! v6 is the strongest heuristic bot. Trace analysis (bot_arena --trace,
+//! 5CP3Z idou mirror) showed v6 takes `UseAbility` ~1% of the times it is
+//! offered. Two mechanisms, both fixed here with rule-derived mechanics:
+//!
+//! 1. ABILITY BLINDNESS. v6's hearts/blades accounting reads only PRINTED
+//!    `base_heart`/`blade`, so buff-granting abilities (e.g. "wait: +1 heart
+//!    until live end") price at ~0 or negative, and free card draw (e.g.
+//!    "cost-13+ member out: draw 1") shows no passable/ammo delta and ties
+//!    `Pass`. v7 uses buff-aware accounting and values net draws on
+//!    non-deploy actions.
+//! 2. NO-OP BLINDNESS. v6's no-op breaker compares zone COUNTS only, so a
+//!    pure-buff ability (no count changes) scores -1000 and is never taken.
+//!    v7 extends the breaker to buffs + orientations.
+//!
+//! Deliberately NOT changed (all measured neutral-to-negative in arena):
+//! - Member-deploy economics are v6-verbatim (energy is NOT taxed: unspent
+//!   energy refreshes next turn, so taxing deploys only flips marginal-but-
+//!   real development into Pass-ties, measured +4pp empty mains).
+//! - The live set is v6-verbatim. Two principled attempts regressed ~3pp:
+//!   (a) ranking by a stricter per-color pass probability prefers lower-
+//!   score "safe" sets, but a safe set that loses the comparison places
+//!   NOTHING, exactly like a failed check — score must stay maximized;
+//!   (b) demanding a strict score beat over the opponent's estimated
+//!   ceiling at closeout forces flaky oversized portfolios: the estimate is
+//!   their CEILING, not their set, and the forced portfolio forfeits the
+//!   gift of placing on their outright failure.
+//!
+//! Fairness: everything reads own hand/deck + public board/modifiers only.
+//! No opponent hidden zones, no decklist peeking.
 
 use crate::bot::strategy_v4::{
-    alloc, hand_lives, heart_pool, lives_in_hand, passable_count,
+    alloc, flip_stats, hand_lives, heart_pool, heart_pool_buffed, heart_pool_inner, lives_in_hand,
+    stage_buff_hearts,
 };
-use crate::bot::strategy_v5::{best_portfolio_scored, nearest_miss_life};
+use crate::bot::strategy_v5::binom_ge;
 use crate::card::{CardDatabase, CardType};
 use crate::game_setup::{Action, ActionType};
 use crate::game_state::{GameState, Phase};
@@ -21,10 +48,18 @@ fn player_ref(gs: &GameState, me: u8) -> (&Player, &Player) {
     }
 }
 
-/// Sum of base hearts on the stage (development in HEARTS, the only thing that
-/// passes live checks and places cards).
-fn stage_hearts_of(p: &Player, db: &CardDatabase) -> i32 {
-    p.stage
+fn player_of(gs: &GameState, me: u8) -> &Player {
+    if me == 0 {
+        &gs.player1
+    } else {
+        &gs.player2
+    }
+}
+
+/// Stage hearts + active buffs (what actually passes checks).
+fn stage_hearts_of(p: &Player, gs: &GameState, me: u8, db: &CardDatabase) -> i32 {
+    let base: i32 = p
+        .stage
         .stage
         .iter()
         .filter(|&&c| c >= 0)
@@ -34,10 +69,14 @@ fn stage_hearts_of(p: &Player, db: &CardDatabase) -> i32 {
                 .map(|bh| bh.hearts.values_sum() as i32)
                 .unwrap_or(0)
         })
-        .sum()
+        .sum();
+    let buffs = stage_buff_hearts(gs, me);
+    // Draw/Score buffs (idx 8/9) never feed checks; stage_buff_hearts already
+    // skips them, so a plain sum is in heart units.
+    base + buffs.iter().sum::<i32>()
 }
 
-/// Total blades currently committed (waiting members contribute 0).
+/// Active blades + blade modifiers (waiting members contribute 0, Q133).
 fn total_blades_of(p: &Player, gs: &GameState, db: &CardDatabase) -> i32 {
     p.stage
         .stage
@@ -49,24 +88,61 @@ fn total_blades_of(p: &Player, gs: &GameState, db: &CardDatabase) -> i32 {
                 0
             } else {
                 db.get_card(c).map(|x| x.blade as i32).unwrap_or(0)
+                    + gs.mods.get_blade_modifier(c) as i32
             }
         })
         .sum()
 }
 
-/// MAIN PHASE: aggressive tempo-first development.
+/// Passable lives under the buff-aware mean pool.
+fn passable_count_buffed(gs: &GameState, me: u8, db: &CardDatabase) -> usize {
+    let p = player_of(gs, me);
+    let pool = heart_pool_buffed(gs, me, db, 1.0);
+    hand_lives(p, db)
+        .iter()
+        .filter(|(_, _, need)| alloc(&pool, need).is_some())
+        .count()
+}
+
+/// Orientation fingerprint for the no-op breaker (waiting kills blades).
+fn wait_fingerprint(gs: &GameState, me: u8) -> Vec<bool> {
+    player_of(gs, me)
+        .stage
+        .stage
+        .iter()
+        .map(|&c| {
+            if c < 0 {
+                false
+            } else {
+                gs.mods.get_orientation_modifier(c) == Some("wait")
+            }
+        })
+        .collect()
+}
+
+/// MAIN PHASE: v6 tempo + energy/draw vision on non-deploy actions + buff
+/// vision + buff-aware no-op breaker. Member-deploy economics are v6-verbatim.
+///
+/// Dev levers (ablation only; unset in production):
+/// - `V7_MAIN_V6=1` → delegate to v6's main (isolates live-set changes).
 pub fn choose_action_v7(gs: &GameState, actions: &[Action], me: u8) -> Action {
+    if std::env::var("V7_MAIN_V6").is_ok() {
+        return crate::bot::strategy_v6::choose_action_v6(gs, actions, me);
+    }
     if actions.len() == 1 {
         return actions[0].clone();
     }
     let dbg = std::env::var("V7_DEBUG").is_ok();
     let db = &gs.card_database;
-    let my_now = if me == 0 { &gs.player1 } else { &gs.player2 };
+    let my_now = player_of(gs, me);
     let base_hand_len = my_now.hand.cards.len() as i32;
-    let base_passable = passable_count(gs, me, db);
+    let base_passable = passable_count_buffed(gs, me, db);
     let base_ammo = lives_in_hand(my_now, db);
-    let base_stage = stage_hearts_of(my_now, db);
+    let base_stage = stage_hearts_of(my_now, gs, me, db);
     let base_blades = total_blades_of(my_now, gs, db);
+    let base_energy = my_now.energy_zone.active_count() as i32;
+    let base_buffs = stage_buff_hearts(gs, me);
+    let base_wait = wait_fingerprint(gs, me);
 
     let deck_lives = my_now
         .main_deck
@@ -92,34 +168,16 @@ pub fn choose_action_v7(gs: &GameState, actions: &[Action], me: u8) -> Action {
             continue;
         }
         crate::game_setup::settle_single_player_state(&mut sim);
-        let my_sim = if me == 0 { &sim.player1 } else { &sim.player2 };
+        let my_sim = player_of(&sim, me);
 
         let mut val = 0.0f64;
         let mut parts: Vec<String> = Vec::new();
 
-        // Doctrine 1: passable lives (placements-in-waiting).
-        // When playing a member from hand, reduce the passable penalty since we're
-        // developing the board. The hearts/blades gained compensate for the hand loss.
-        let d_pass = passable_count(&sim, me, db) as f64 - base_passable as f64;
-        let is_member_play = a.action_type == ActionType::PlayMemberToStage;
-        let pass_weight = if is_member_play { 35.0 } else { 60.0 };
-        val += pass_weight * d_pass;
+        // Doctrine 1: passable lives (placements-in-waiting), buff-aware.
+        let d_pass = passable_count_buffed(&sim, me, db) as f64 - base_passable as f64;
+        val += 60.0 * d_pass;
         if d_pass != 0.0 {
             parts.push(format!("pass{:+}", d_pass));
-        }
-
-        // Bonus for productive member play (has hearts or blades)
-        if is_member_play {
-            if let Some(cid) = a.parameters.as_ref().and_then(|p| p.card_id) {
-                if let Some(card) = db.get_card(cid) {
-                    let blade = card.blade as i32;
-                    let hearts = card.base_heart.as_ref().map(|bh| bh.hearts.values_sum() as i32).unwrap_or(0);
-                    if blade > 0 || hearts > 0 {
-                        val += 15.0;
-                        parts.push("member_dev+15".into());
-                    }
-                }
-            }
         }
 
         // Doctrine 2: ammo — lives in hand are future placements.
@@ -134,10 +192,9 @@ pub fn choose_action_v7(gs: &GameState, actions: &[Action], me: u8) -> Action {
             parts.push("BURN".into());
         }
 
-        // Development in HEARTS and BLADES. Blades are the engine of the yell
-        // flip: every extra blade is a fresh Binomial trial that can supply the
-        // hearts a check needs, so board growth compounds into live-set power.
-        let d_stage = stage_hearts_of(my_sim, db) - base_stage;
+        // Development in HEARTS and BLADES, buff-aware: every extra active
+        // blade is a fresh Binomial trial; buffs feed checks for real.
+        let d_stage = stage_hearts_of(my_sim, &sim, me, db) - base_stage;
         val += 3.0 * d_stage as f64;
         if d_stage != 0 {
             parts.push(format!("hearts{d_stage:+}"));
@@ -146,6 +203,24 @@ pub fn choose_action_v7(gs: &GameState, actions: &[Action], me: u8) -> Action {
         val += 6.0 * d_blades as f64;
         if d_blades != 0 {
             parts.push(format!("blades{d_blades:+}"));
+        }
+
+        // Energy pricing and draw vision for NON-DEPLOY actions only: paid
+        // abilities must earn their energy, untaps are income, and a free
+        // draw beats ending the phase. Member plays are excluded — unspent
+        // energy refreshes next turn (activate_all), and their hand cost is
+        // already priced via passable/ammo above.
+        if a.action_type != ActionType::PlayMemberToStage {
+            let d_energy = my_sim.energy_zone.active_count() as i32 - base_energy;
+            val += 2.0 * d_energy as f64;
+            if d_energy != 0 {
+                parts.push(format!("en{d_energy:+}"));
+            }
+            let d_hand = my_sim.hand.cards.len() as i32 - base_hand_len;
+            val += 3.0 * d_hand as f64;
+            if d_hand != 0 {
+                parts.push(format!("hand{d_hand:+}"));
+            }
         }
 
         // Baton touch: discounted upgrade of the power piece (guide curve
@@ -177,11 +252,16 @@ pub fn choose_action_v7(gs: &GameState, actions: &[Action], me: u8) -> Action {
         }
 
         // No-op breaker: an action that changes nothing useful is worthless.
+        // v6 compared zone counts only, which scored pure-buff abilities
+        // -1000 and made them unplayable. Buffs and orientations feed checks,
+        // so they join the fingerprint.
         if my_sim.hand.cards.len() == my_now.hand.cards.len()
             && my_sim.energy_zone.active_count() == my_now.energy_zone.active_count()
             && my_sim.stage.stage == my_now.stage.stage
             && my_sim.main_deck.cards.len() == my_now.main_deck.cards.len()
             && my_sim.waitroom.cards.len() == my_now.waitroom.cards.len()
+            && stage_buff_hearts(&sim, me) == base_buffs
+            && wait_fingerprint(&sim, me) == base_wait
         {
             val -= 1000.0;
             parts.push("NOOP".into());
@@ -210,12 +290,10 @@ pub fn choose_action_v7(gs: &GameState, actions: &[Action], me: u8) -> Action {
         vals[i] = val;
     }
 
-    // v6 fix: `Pass` ends the development phase. It is chosen ONLY when there
-    // is no USEFUL deploy available. A "useful" deploy is any non-Pass action
-    // with value > 0 (adds hearts/blades, raises a passable life, banks ammo,
-    // or draws). This kills the do-nothing turns without clogging the 5-slot
-    // stage with zero-contribution waiting members (which the old flat -2000
-    // penalty wrongly forced us to play).
+    // v6 fix (kept): `Pass` ends the development phase. It is chosen ONLY
+    // when there is no USEFUL deploy available — any non-Pass action with
+    // value > 0 beats it, while a 0-contribution waiting member must not clog
+    // the stage.
     let best_nonpass = vals
         .iter()
         .enumerate()
@@ -244,59 +322,95 @@ pub fn choose_action_v7(gs: &GameState, actions: &[Action], me: u8) -> Action {
         let chosen = &actions[best_idx];
         let chosen_confirm = chosen.action_type == ActionType::Pass;
         eprintln!(
-            "V6D t{} phase{:?} hand={} pass={} ammo={} blades={} CONFIRM={}\n{}",
+            "V7D t{} phase{:?} hand={} pass={} ammo={} blades={} en={} CONFIRM={}\n{}",
             gs.turn_number,
             gs.current_phase,
             my_now.hand.cards.len(),
             base_passable,
             base_ammo,
             base_blades,
+            base_energy,
             chosen_confirm,
             dbg_lines.join("\n")
         );
     }
+    log::debug!(
+        "v7 main t{} phase{:?} hand={} pass={} ammo={} blades={} en={} best_nonpass={:.0} pass={}",
+        gs.turn_number,
+        gs.current_phase,
+        my_now.hand.cards.len(),
+        base_passable,
+        base_ammo,
+        base_blades,
+        base_energy,
+        best_nonpass,
+        actions[best_idx].action_type,
+    );
     actions[best_idx].clone()
 }
 
-/// LIVE SET: binomial-aware, score-maximizing among passers, with free-win and
-/// gamble fallbacks and the junk-draw filter.
+/// LIVE SET: role-dependent portfolios (measured doctrine).
+///
+/// Arena transcripts (v6 mirror, 5CP3Z, 2450 live checks) show placements
+/// come from PASSING ALONE, not outscoring: the winner averages 3.4 while
+/// the loser averages 0.6 (usually failed outright or empty), and 45% of
+/// checks are NO-CONTEST. Both-pass comparisons are rare — EXCEPT against
+/// an opponent that already committed lives, who passes ~86% of the time.
+/// Hence:
+/// - FIRST attacker (opponent unset — comparison unlikely, they fold or fail
+///   ~2/3 of turns): set the SAFEST single life (max P(pass)), greedily
+///   adding more lives only while the bundle stays ≥0.85. Reliability
+///   converts; score is nearly irrelevant here.
+/// - SECOND attacker vs a SET opponent, or anyone at opponent match point
+///   (comparison likely — they will pass something): v6 score-max EV.
+/// - SECOND attacker vs empty zone: free win (cheapest passer, 8.4.3.2).
+/// - No passer: v6 gamble + junk-dig fallback, unchanged.
+///
+/// (Deliberately dropped: per-color ranking — it preferred lower-score
+/// "safe" sets even as second attacker, measured -3pp; strict closeout
+/// beats — the ceiling estimate is not their set, measured -3pp with the
+/// above confounded in.)
 pub fn choose_live_set_v7(gs: &GameState, actions: &[Action], db: &CardDatabase) -> Action {
-    let me = if gs.active_player().id == gs.player1.id { 0u8 } else { 1u8 };
+    if std::env::var("V7_ROLLOUT").is_ok() {
+        return crate::bot::rollout::choose_live_set_v7(gs, actions, db);
+    }
+    let me = if gs.active_player().id == gs.player1.id {
+        0u8
+    } else {
+        1u8
+    };
     let (my, opp) = player_ref(gs, me);
     let my_succ = my.success_live_card_zone.cards.len() as i32;
     let opp_succ = opp.success_live_card_zone.cards.len() as i32;
-    let mut desired = best_portfolio(gs, me, db);
-    let my_score: i32 = desired
-        .iter()
-        .filter_map(|&hi| my.hand.cards.get(hi).copied())
-        .filter_map(|cid| db.get_card(cid))
-        .map(|c| c.score.unwrap_or(0) as i32)
-        .sum();
+    let is_second = gs.current_phase == Phase::LiveCardSetSecondAttacker;
+    let opp_committed = !opp.live_card_zone.cards.is_empty();
+
+    // Comparison likely: opponent committed lives, or must contest at match
+    // point → v6 score-max EV (proven there).
+    if (is_second && opp_committed) || opp_succ >= 2 {
+        return crate::bot::strategy_v6::choose_live_set_v6(gs, actions, db);
+    }
+
+    // Free win (8.4.3.2): second attacker, opponent zone empty.
+    if is_second && !opp_committed {
+        if let Some(hi) = cheapest_deterministic_life(gs, me, db) {
+            return emit(gs, actions, &[hi]);
+        }
+        // No deterministic passer: fall through to safest/gamble below.
+    }
+
+    // First attacker (or second vs empty with no deterministic passer):
+    // safest-single search.
+    let mut desired = safest_portfolio(gs, me, db);
 
     if desired.is_empty() {
-        // Free win (8.4.3.2): second attacker, opponent zone still empty — any
-        // sole passer places regardless of score.
-        if gs.current_phase == Phase::LiveCardSetSecondAttacker && opp.live_card_zone.cards.is_empty()
-        {
-            if let Some(hi) = cheapest_deterministic_life(gs, me, db) {
-                desired.push(hi);
-                return emit(gs, actions, &desired);
-            }
-        }
+        // v6 gamble + junk-dig fallback, unchanged.
+        return crate::bot::strategy_v6::choose_live_set_v6(gs, actions, db);
+    }
 
-        // Gamble: one near-miss life chosen by binomial pass probability, not
-        // paper deficit. Longer odds accepted at opponent match point (folding
-        // there loses outright).
-        let p_floor = if opp_succ >= 2 { 0.10 } else { 0.25 };
-        if let Some((p, _deficit, hi)) = nearest_miss_life(gs, me, db) {
-            if p >= p_floor {
-                desired.push(hi);
-            }
-        }
-
-        // Junk filter: fill remaining slots with dead non-live cards. They are
-        // discarded before the check (can never fail it) and each draws a
-        // replacement — trading dead hand cards for fresh deck digs.
+    // Junk filter (v6-verbatim): spare slots take dead non-live cards —
+    // discarded before the check, each drawing a replacement.
+    {
         let deck_lives = my
             .main_deck
             .cards
@@ -324,42 +438,163 @@ pub fn choose_live_set_v7(gs: &GameState, actions: &[Action], db: &CardDatabase)
                 desired.push(hi);
             }
         }
-        if std::env::var("V7_TRACE").is_ok() {
-            let n_lives = desired
-                .iter()
-                .filter(|&&hi| {
-                    my.hand.cards.get(hi).copied().map_or(false, |cid| {
-                        db.get_card(cid).map_or(false, |c| c.card_type == CardType::Live)
-                    })
-                })
-                .count();
-            eprintln!(
-                "V7L t{} me{} EMPTY->{} lives={} junk={} (my_succ={} opp_succ={})",
-                gs.turn_number,
-                me,
-                if desired.is_empty() { "FOLD" } else { "GAMBLE" },
-                n_lives,
-                desired.len() - n_lives,
-                my_succ,
-                opp_succ
-            );
-        }
-    } else if std::env::var("V7_TRACE").is_ok() {
+    }
+
+    if std::env::var("V7_TRACE").is_ok() {
+        let my_score: i32 = desired
+            .iter()
+            .filter_map(|&hi| my.hand.cards.get(hi).copied())
+            .filter_map(|cid| db.get_card(cid))
+            .map(|c| c.score.unwrap_or(0) as i32)
+            .sum();
         eprintln!(
-            "V7L t{} me{} SET n={} score={}",
+            "V7L t{} me{} SAFE n={} score={} (my_succ={} opp_succ={})",
             gs.turn_number,
             me,
             desired.len(),
-            my_score
+            my_score,
+            my_succ,
+            opp_succ
         );
     }
-
     emit(gs, actions, &desired)
 }
 
-fn cheapest_deterministic_life(gs: &GameState, me: u8, db: &CardDatabase) -> Option<usize> {
-    let (my, _) = player_ref(gs, me);
+/// Safest-single search: rank hand lives by total-shortfall pass probability
+/// (v5's calibrated model), tie-break by score; set the safest, greedily
+/// adding the next-safest while the whole bundle stays ≥0.85 pass. Returns
+/// empty when nothing clears the stance floor (caller falls back to gamble).
+fn safest_portfolio(gs: &GameState, me: u8, db: &CardDatabase) -> Vec<usize> {
+    let (my, opp) = player_ref(gs, me);
     let pool = heart_pool(gs, me, db);
+    let board = heart_pool_inner(gs, me, db, 0.0);
+    let lives = hand_lives(my, db);
+    let max_slots = (3i32 - i32::from(my.live_card_set_limit_reduction)).max(0) as usize;
+    if lives.is_empty() || max_slots == 0 {
+        return Vec::new();
+    }
+    let my_succ = my.success_live_card_zone.cards.len() as i32;
+    let opp_succ = opp.success_live_card_zone.cards.len() as i32;
+    let floor = if opp_succ >= 2 {
+        0.35
+    } else if my_succ >= 2 {
+        0.60
+    } else {
+        0.45
+    };
+    let (blades, density) = flip_stats(gs, me, db);
+    let board_supply: i32 = (0..=7).chain(std::iter::once(10)).map(|i| board[i]).sum();
+
+    // Score every single life: pass probability under the calibrated model.
+    let mut ranked: Vec<(f64, i32, usize)> = Vec::new();
+    for &(hi, cid, ref need) in &lives {
+        if alloc(&pool, need).is_none() {
+            continue;
+        }
+        let req: i32 = (0..=7).chain(std::iter::once(10)).map(|k| need[k]).sum();
+        let shortfall = (req - board_supply.min(req)).max(0);
+        let p = if shortfall == 0 {
+            1.0
+        } else {
+            binom_ge(blades, shortfall, density)
+        };
+        if p < floor {
+            continue;
+        }
+        let score = db.get_card(cid).and_then(|c| c.score).unwrap_or(0) as i32;
+        ranked.push((p, score, hi));
+    }
+    // Safest first, then highest score.
+    ranked.sort_by(|a, b| {
+        b.0.partial_cmp(&a.0)
+            .unwrap_or(std::cmp::Ordering::Equal)
+            .then_with(|| b.1.cmp(&a.1))
+    });
+    // TEMP ANALYSIS: full candidate dump behind V5_LIVE_DEBUG.
+    if std::env::var("V5_LIVE_DEBUG").is_ok() {
+        let hand_desc: Vec<String> = lives
+            .iter()
+            .map(|(hi, cid, need)| {
+                let req: i32 = (0..=7).chain(std::iter::once(10)).map(|k| need[k]).sum();
+                format!(
+                    "hi{}:{}s:req{}",
+                    hi,
+                    db.get_card(*cid).and_then(|c| c.score).unwrap_or(0),
+                    req
+                )
+            })
+            .collect();
+        eprintln!(
+            "V7LD t{} me{} hand=[{}] blades={} dens={:.2} floor={:.2} my{} opp{}",
+            gs.turn_number,
+            me,
+            hand_desc.join(" "),
+            blades,
+            density,
+            floor,
+            my_succ,
+            opp_succ
+        );
+        for (p, score, hi) in ranked.iter().take(6) {
+            eprintln!("    single hi{} score={} p={:.2}", hi, score, p);
+        }
+    }
+    if ranked.is_empty() {
+        return Vec::new();
+    }
+    // Greedy bundle: start with the safest, add next-safest while the whole
+    // bundle stays reliable (≥0.85). Extra reliable score wins the rare
+    // both-pass comparison for free; anything flakier is left for later.
+    let mut desired = vec![ranked[0].2];
+    let mut need_total = [0i32; 11];
+    {
+        let (_, _, first_hi) = ranked[0];
+        if let Some((_, _, need)) = lives.iter().find(|(hi, _, _)| *hi == first_hi) {
+            need_total = *need;
+        }
+    }
+    for &(_, _, hi) in &ranked[1..] {
+        if desired.len() >= max_slots {
+            break;
+        }
+        let Some((_, _, need)) = lives.iter().find(|(hh, _, _)| *hh == hi) else {
+            continue;
+        };
+        let mut grown = need_total;
+        for k in 0..11 {
+            grown[k] += need[k];
+        }
+        // Bundle must still alloc against the mean pool (all-or-nothing).
+        if alloc(&pool, &grown).is_none() {
+            continue;
+        }
+        let req: i32 = (0..=7).chain(std::iter::once(10)).map(|k| grown[k]).sum();
+        let shortfall = (req - board_supply.min(req)).max(0);
+        let p = if shortfall == 0 {
+            1.0
+        } else {
+            binom_ge(blades, shortfall, density)
+        };
+        if p >= 0.85 {
+            desired.push(hi);
+            need_total = grown;
+        }
+    }
+    log::debug!(
+        "v7 safest t{} me{} n={} top_p={:.2}",
+        gs.turn_number,
+        me,
+        desired.len(),
+        ranked[0].0
+    );
+    desired
+}
+
+fn cheapest_deterministic_life(gs: &GameState, me: u8, db: &CardDatabase) -> Option<usize> {
+    // Buff-aware pool (same accounting as the v7 main phase; equal to v6's
+    // whenever no buff modifiers are active).
+    let (my, _) = player_ref(gs, me);
+    let pool = heart_pool_buffed(gs, me, db, 1.0);
     hand_lives(my, db)
         .into_iter()
         .filter(|(_, _, need)| alloc(&pool, need).is_some())
@@ -372,10 +607,6 @@ fn cheapest_deterministic_life(gs: &GameState, me: u8, db: &CardDatabase) -> Opt
         .map(|(hi, _, _)| hi)
 }
 
-fn best_portfolio(gs: &GameState, me: u8, db: &CardDatabase) -> Vec<usize> {
-    best_portfolio_scored(gs, me, db).0
-}
-
 fn emit(gs: &GameState, actions: &[Action], desired: &[usize]) -> Action {
     crate::bot::strategy_common::emit_live_set(gs, actions, desired)
 }
@@ -384,7 +615,8 @@ pub fn choose_mulligan_v7(gs: &GameState, actions: &[Action], db: &CardDatabase)
     crate::bot::strategy_v4::choose_mulligan_v4(gs, actions, db)
 }
 
-// Re-exports with generic names for arena
+// Re-exports with generic names for the registry (bot/registry.rs): adding
+// v8 never renames these, it only adds a dispatch line there.
 pub use choose_action_v7 as choose_action;
 pub use choose_live_set_v7 as choose_live_set;
 pub use choose_mulligan_v7 as choose_mulligan;

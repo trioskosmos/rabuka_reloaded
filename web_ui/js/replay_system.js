@@ -3,6 +3,7 @@
  * Handles loading, playback, and navigation of game replays.
  */
 import { State, updateStateData } from './state.js';
+import * as i18n from './i18n/index.js';
 import { Network, apiFetch } from './network.js';
 import { log } from './logger.js';
 import { fixImg } from './constants.js';
@@ -186,7 +187,7 @@ export const Replay = {
 
     startPlay: () => {
         const btn = document.getElementById('play-btn');
-        if (btn) btn.textContent = '|| Pause';
+        if (btn) btn.textContent = i18n.t('replay_pause');
         State.playInterval = setInterval(Replay.replayNext, 500);
     },
 
@@ -195,7 +196,7 @@ export const Replay = {
             clearInterval(State.playInterval);
             State.playInterval = null;
             const btn = document.getElementById('play-btn');
-            if (btn) btn.textContent = '> Play';
+            if (btn) btn.textContent = i18n.t('replay_play');
         }
     }
 };

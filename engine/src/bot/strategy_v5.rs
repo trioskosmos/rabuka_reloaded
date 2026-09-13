@@ -151,6 +151,9 @@ pub(crate) fn best_portfolio_scored(gs: &GameState, me: u8, db: &CardDatabase) -
     let board_supply: i32 = (0..=7).chain(std::iter::once(10)).map(|i| pool_board[i]).sum();
 
     let mut best: Option<(f64, usize, i32, Vec<usize>)> = None;
+    // TEMP ANALYSIS (V5_LIVE_DEBUG): collect top candidates for the dump.
+    let dump = std::env::var("V5_LIVE_DEBUG").is_ok();
+    let mut all_cands: Vec<(f64, i32, f64, Vec<usize>)> = Vec::new();
     for mask in 1..(1u32 << n) {
         let cnt = mask.count_ones() as usize;
         if cnt > max_slots {
@@ -193,11 +196,44 @@ pub(crate) fn best_portfolio_scored(gs: &GameState, me: u8, db: &CardDatabase) -
         let tie_worthless = score <= e_opp && my_succ >= 2;
         let ev =
             p_pass * (score as f64) * if tie_worthless { 0.5 } else { 1.0 };
+        if dump {
+            all_cands.push((ev, score, p_pass, idxs.clone()));
+        }
         let better = best.as_ref().map_or(true, |(be, bc, _, _)| {
             ev > *be + f64::EPSILON || ((ev - *be).abs() <= f64::EPSILON && cnt < *bc)
         });
         if better {
             best = Some((ev, cnt, score, idxs));
+        }
+    }
+    if dump {
+        all_cands.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
+        let hand_desc: Vec<String> = lives
+            .iter()
+            .map(|(hi, cid, need)| {
+                let req: i32 = (0..=7).chain(std::iter::once(10)).map(|k| need[k]).sum();
+                format!(
+                    "hi{}:{}s:req{}",
+                    hi,
+                    db.get_card(*cid).and_then(|c| c.score).unwrap_or(0),
+                    req
+                )
+            })
+            .collect();
+        eprintln!(
+            "V5LD t{} me{} hand=[{}] blades={} dens={:.2} floor={:.2} e_opp={} my{} opp{}",
+            gs.turn_number,
+            me,
+            hand_desc.join(" "),
+            blades,
+            density,
+            floor,
+            e_opp,
+            my_succ,
+            opp_succ
+        );
+        for (ev, score, p, idxs) in all_cands.iter().take(5) {
+            eprintln!("    cand idxs={:?} score={} p={:.2} ev={:.2}", idxs, score, p, ev);
         }
     }
     best.map(|(ev, _cnt, score, idxs)| (idxs, score, ev))
