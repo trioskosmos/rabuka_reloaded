@@ -613,6 +613,9 @@ static int eval_group(const struct GameState *g, int actor, int host_cid, const 
     }
     int ids[RB_MAX_ZONE]; int n = zone_ids(g, pl, loc, ids, RB_MAX_ZONE);
     if (n == 0) return 0;
+    /* No group list to match against (mirrors Rust: a group condition tests
+       membership in group_names; absent list matches nothing). */
+    if (!gn || gn->tag != RB_TAG_ARRAY || gn->arr_n == 0) return 0;
     for(int i=0;i<n;i++){
         Card card; if(!rb_decode_card_by_index((uint32_t)ids[i],&card)) continue;
         const char *gname = rb_card_string(card.group_idx);
@@ -750,7 +753,7 @@ static int eval_appearance_stage(const struct GameState *g, int actor, int host_
     int all_areas = 0; get_bool(c, "all_areas", &all_areas);
     if (all_areas && n != RB_STAGE_SIZE) return 0;
 
-    /* cost_limit (e.g. コスチE0のメンバ�E) */
+    /* cost_limit (e.g. コスチE0のメンバ�E) */
     if (has_cost_limit) {
         const char *op = get_str(c, "operator"); if (!op) op = "=";
         int cost_match = 0;
@@ -1054,7 +1057,7 @@ static int eval_state(const struct GameState *g, int actor, int host_cid, const 
         int occupied = 0;
         for (int i = 0; i < RB_STAGE_SIZE; i++) if (P->stage[i] != RB_EMPTY_SLOT) occupied++;
         if (occupied == 0) return 0;   /* Rust: stage_cards.is_empty() => false */
-        /* 「このメンバ�Eが…、Eself-state text must NOT be widened by the parser's
+        /* 「このメンバ�Eが…、Eself-state text must NOT be widened by the parser's
            default card_type=member_card, otherwise every waited member on stage
            would satisfy every copy of the card (the two-copy bug). */
         const char *text = get_str(c, "text");
@@ -1979,7 +1982,7 @@ static int resolve_moved_cards_source(const struct GameState *g, int actor, cons
     int pl = target_player_idx(actor, c);
     int ids[RB_MAX_ZONE]; int n = 0;
     if (src && !strcmp(src, "those_cards")) {
-        /* Mirror card.rs: source="those_cards" �� self.those_cards (cards moved by
+        /* Mirror card.rs: source="those_cards" �� self.those_cards (cards moved by
             the immediately preceding move_cards action). */
         n = g->n_those_cards;
         for (int i = 0; i < n && i < RB_MAX_ZONE; i++) ids[i] = g->those_cards[i];

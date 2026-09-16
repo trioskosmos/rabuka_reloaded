@@ -670,10 +670,8 @@ int rb_entry_has_pending_choice(const GameState *g) {
     return g ? g->queue.has_pending : 0;
 }
 
-const RbChoice *rb_get_pending_choice(const GameState *g) {
-    if (!g || !g->queue.has_pending) return NULL;
-    return &g->queue.pending;
-}
+/* NOTE: rb_get_pending_choice lives in src/ability/choice.c (single owner;
+   deleted duplicate here 2026-09-14). */
 
 const AbilityEffect *rb_entry_cost(const GameState *g) {
     if (!g || g->queue.cur < 0 || g->queue.cur >= g->queue.n_entries) return NULL;
@@ -1391,13 +1389,8 @@ void rb_queue_set_pending_choice(GameState *g, const RbChoice *choice) {
     g->queue.state = RB_QUEUE_AWAITING_CHOICE;
 }
 
-void rb_queue_pause_for_choice(GameState *g, const RbChoice *choice) {
-    rb_queue_set_pending_choice(g, choice);
-    /* Ensure the actor is recorded in the choice for proper routing */
-    if (choice) {
-        g->queue.pending.actor = choice->actor;
-    }
-}
+/* NOTE: rb_queue_pause_for_choice lives in src/ability/ability_queue.c
+   (single owner; deleted duplicate here 2026-09-14). */
 
 
 

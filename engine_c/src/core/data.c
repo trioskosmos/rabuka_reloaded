@@ -268,6 +268,10 @@ const unsigned char *rb_card_record(uint32_t i) {
     if (i >= g_num_cards) return NULL;
     return g_card_data + g_card_off[i];
 }
+uint32_t rb_card_record_len(uint32_t i) {
+    if (i >= g_num_cards) return 0;
+    return g_card_off[i + 1] - g_card_off[i];
+}
 uint16_t rb_card_stridx(uint32_t i) {
     if (i >= g_num_cards) return 0;
     return le16(rb_card_record(i) + 2); /* name_idx at offset 2 */

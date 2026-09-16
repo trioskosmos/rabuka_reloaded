@@ -9,6 +9,8 @@ use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 use std::sync::{Arc, OnceLock};
 
+mod trace;
+
 use rabuka_engine::ability::debug::AbDebug;
 use rabuka_engine::ability::types::Choice;
 use rabuka_engine::card::CardDatabase;
@@ -364,12 +366,15 @@ pub struct TestGame {
     debug_enabled: bool,
     pool_positions: RefCell<HashMap<i16, usize>>,
     internal_counter: Cell<i16>,
+    trace: trace::Trace,
     #[cfg(feature = "alloc_tracker")]
     _alloc_guard: Option<rabuka_engine::alloc_counter::AllocGuard>,
 }
 
 impl Drop for TestGame {
     fn drop(&mut self) {
+        // Flush the parity trace (no-op unless RABUKA_TRACE_DIR is set).
+        self.trace.flush();
         if self.debug_enabled {
             // Don't set_debug(false) here — ABILITY_DEBUG is a global AtomicBool
             // and turning it off in one test's Drop can disable it for another
@@ -428,15 +433,25 @@ impl TestGame {
         }
         let debug_enabled = !quiet || std::env::var("RABUKA_DEBUG").is_ok();
 
-        TestGame {
+        let game = TestGame {
             db: state.card_database.clone(),
             state,
             debug_enabled,
             pool_positions: RefCell::new(HashMap::new()),
             internal_counter: Cell::new(20000),
+            trace: trace::Trace::new(),
             #[cfg(feature = "alloc_tracker")]
             _alloc_guard: rabuka_engine::alloc_counter::start(),
+        };
+        if game.trace.live() {
+            let t = std::thread::current()
+                .name()
+                .unwrap_or("unknown")
+                .to_string();
+            game.trace.emit(format!("# test {}", t));
+            trace::dump_state(&game, &game.trace);
         }
+        game
     }
 
     /// Look up a card's numeric ID by card_no in the database.
@@ -661,18 +676,33 @@ impl TestGame {
 
     /// Attempt to play a member card from hand onto the stage. Returns Result.
     pub fn try_play_to_stage(&mut self, card_id: i16, area: MemberArea) -> Result<(), String> {
-        TurnEngine::execute_main_phase_action(
+        if self.trace.live() {
+            self.trace.emit(format!(
+                "A play {} {}",
+                trace::ref_of(self, card_id),
+                area.to_index()
+            ));
+        }
+        let r = TurnEngine::execute_main_phase_action(
             &mut self.state,
             &ActionType::PlayMemberToStage,
             Some(card_id),
             None,
             Some(area),
             Some(false),
-        )
+        );
+        trace::dump_state(self, &self.trace);
+        r
     }
 
     /// Activate the first 起動 (activation) ability on a stage card.
     pub fn activate_ability(&mut self, stage_card_id: i16) {
+        if self.trace.live() {
+            self.trace.emit(format!(
+                "A activate {}",
+                trace::ref_of(self, stage_card_id)
+            ));
+        }
         TurnEngine::execute_main_phase_action(
             &mut self.state,
             &ActionType::UseAbility,
@@ -682,18 +712,27 @@ impl TestGame {
             None,
         )
         .expect("activate_ability failed");
+        trace::dump_state(self, &self.trace);
     }
 
     /// Try to activate ability, returning Result for error handling
     pub fn try_activate_ability(&mut self, stage_card_id: i16) -> Result<(), String> {
-        TurnEngine::execute_main_phase_action(
+        if self.trace.live() {
+            self.trace.emit(format!(
+                "A activate {}",
+                trace::ref_of(self, stage_card_id)
+            ));
+        }
+        let r = TurnEngine::execute_main_phase_action(
             &mut self.state,
             &ActionType::UseAbility,
             Some(stage_card_id),
             None,
             None,
             None,
-        )
+        );
+        trace::dump_state(self, &self.trace);
+        r
     }
 
     /// Activate a SPECIFIC 起動 ability by its runtime index (needed for cards
@@ -710,7 +749,14 @@ impl TestGame {
         stage_card_id: i16,
         ability_index: usize,
     ) -> Result<(), String> {
-        TurnEngine::execute_main_phase_action_with_ability_index(
+        if self.trace.live() {
+            self.trace.emit(format!(
+                "A activate_idx {} {}",
+                trace::ref_of(self, stage_card_id),
+                ability_index
+            ));
+        }
+        let r = TurnEngine::execute_main_phase_action_with_ability_index(
             &mut self.state,
             &ActionType::UseAbility,
             Some(stage_card_id),
@@ -718,11 +764,19 @@ impl TestGame {
             None,
             None,
             Some(ability_index),
-        )
+        );
+        trace::dump_state(self, &self.trace);
+        r
     }
 
     /// Set a live card from hand during LiveCardSet phase.
     pub fn set_live_card(&mut self, card_id: i16) {
+        if self.trace.live() {
+            self.trace.emit(format!(
+                "A setlive {}",
+                trace::ref_of(self, card_id)
+            ));
+        }
         TurnEngine::execute_main_phase_action(
             &mut self.state,
             &ActionType::SetLiveCard,
@@ -732,6 +786,7 @@ impl TestGame {
             None,
         )
         .expect("set_live_card failed");
+        trace::dump_state(self, &self.trace);
     }
 
     /// Check if the ability queue is waiting for a player choice.
@@ -803,17 +858,30 @@ impl TestGame {
 
     /// Select cards by waitroom/hand indices (for SelectCard choices).
     pub fn select_indices(&mut self, indices: &[usize]) {
+        if self.trace.live() {
+            let s = indices
+                .iter()
+                .map(|i| i.to_string())
+                .collect::<Vec<_>>()
+                .join(",");
+            self.trace.emit(format!("A select {}", s));
+        }
         if let Err(_) = self.select_via_generated(indices) {
             TurnEngine::resume_with_choice(&mut self.state, None, Some(indices.to_vec()))
                 .expect("select_indices failed");
         }
+        trace::dump_state(self, &self.trace);
     }
 
     /// Answer a pending 2+-option effect choice ("以下から1つを選ぶ", presented as
     /// a `SelectTarget` with target="choice") by choosing option `idx` (0-based).
     pub fn select_choice_option(&mut self, idx: usize) {
+        if self.trace.live() {
+            self.trace.emit(format!("A selopt {}", idx));
+        }
         TurnEngine::resume_with_choice(&mut self.state, Some(idx as i16), None)
             .expect("select_choice_option failed");
+        trace::dump_state(self, &self.trace);
     }
 
     /// Answer a pending SelectCard choice over the energy zone by selecting the
@@ -827,11 +895,21 @@ impl TestGame {
 
     /// Try to select indices, returning the error instead of panicking.
     pub fn try_select_indices(&mut self, indices: &[usize]) -> Result<(), String> {
-        if let Err(_) = self.select_via_generated(indices) {
+        if self.trace.live() {
+            let s = indices
+                .iter()
+                .map(|i| i.to_string())
+                .collect::<Vec<_>>()
+                .join(",");
+            self.trace.emit(format!("A select {}", s));
+        }
+        let r = if let Err(_) = self.select_via_generated(indices) {
             TurnEngine::resume_with_choice(&mut self.state, None, Some(indices.to_vec()))
         } else {
             Ok(())
-        }
+        };
+        trace::dump_state(self, &self.trace);
+        r
     }
 
     /// For SelectCard choices, find the generated action matching the given indices
@@ -982,8 +1060,12 @@ impl TestGame {
 
     /// Select a choice option by index (for SelectTarget choices like answers, alternatives).
     pub fn select_option(&mut self, option_index: i16) {
+        if self.trace.live() {
+            self.trace.emit(format!("A selopt {}", option_index));
+        }
         TurnEngine::resume_with_choice(&mut self.state, Some(option_index), None)
             .expect("select_option failed");
+        trace::dump_state(self, &self.trace);
     }
 
     /// Generate the list of legal actions the frontend would show for the current
@@ -1030,6 +1112,9 @@ impl TestGame {
             matching.len(),
         );
         let action = matching[nth];
+        if self.trace.live() {
+            self.trace.emit(format!("A selgen {}", nth));
+        }
         TurnEngine::resume_with_choice(
             &mut self.state,
             action.parameters.as_ref().and_then(|p| p.card_id),
@@ -1039,10 +1124,13 @@ impl TestGame {
                 .and_then(|p| p.card_indices.clone()),
         )
         .expect("select_generated failed");
+        trace::dump_state(self, &self.trace);
     }
 
     /// Drain all auto-ability choice prompts, selecting the first option each time.
     pub fn drain_auto_ability_choices(&mut self) {
+        // Inner select_indices steps are engine-internal; record one summary.
+        self.trace.set_quiet(true);
         while let Some(choice) = self.state.get_pending_choice() {
             match choice {
                 Choice::SelectAutoAbility { .. } => {
@@ -1050,6 +1138,11 @@ impl TestGame {
                 }
                 _ => break,
             }
+        }
+        self.trace.set_quiet(false);
+        if self.trace.live() {
+            self.trace.emit("A drain".to_string());
+            trace::dump_state(self, &self.trace);
         }
     }
 
@@ -1183,6 +1276,9 @@ impl TestGame {
 
     /// Advance to the next phase (Pass action).
     pub fn pass(&mut self) {
+        if self.trace.live() {
+            self.trace.emit("A pass".to_string());
+        }
         TurnEngine::execute_main_phase_action(
             &mut self.state,
             &ActionType::Pass,
@@ -1192,6 +1288,7 @@ impl TestGame {
             None,
         )
         .expect("pass failed");
+        trace::dump_state(self, &self.trace);
     }
 
     // ---- Debugging ----
@@ -1536,6 +1633,15 @@ impl TestGame {
     /// Assert hand contains exactly n cards.
     pub fn assert_hand(&self, expected: usize, msg: &str) {
         let actual = self.state.player1.hand.len();
+        if self.trace.live() {
+            trace::dump_state(self, &self.trace);
+            trace::check(
+                &self.trace,
+                format!("hand 1"),
+                actual.to_string(),
+                expected.to_string(),
+            );
+        }
         assert_eq!(
             actual, expected,
             "{}: expected {} cards in hand, got {}",
@@ -1546,6 +1652,17 @@ impl TestGame {
     /// Assert stage position contains the given card.
     pub fn assert_stage_pos(&self, pos: MemberArea, card_id: i16, msg: &str) {
         let actual = self.state.player1.stage.get_area(pos);
+        if self.trace.live() {
+            trace::dump_state(self, &self.trace);
+            trace::check(
+                &self.trace,
+                format!("stage 1 {} {}", pos.to_index(), trace::ref_of(self, card_id)),
+                actual
+                    .map(|id| trace::ref_of(self, id))
+                    .unwrap_or_else(|| "null".into()),
+                trace::ref_of(self, card_id),
+            );
+        }
         assert_eq!(
             actual,
             Some(card_id),
@@ -1560,6 +1677,15 @@ impl TestGame {
     /// Assert energy count equals expected value.
     pub fn assert_energy(&self, expected: u32, msg: &str) {
         let actual = self.state.player1.energy_zone.active_count();
+        if self.trace.live() {
+            trace::dump_state(self, &self.trace);
+            trace::check(
+                &self.trace,
+                format!("energy 1"),
+                actual.to_string(),
+                (expected as u8).to_string(),
+            );
+        }
         assert_eq!(
             actual, expected as u8,
             "{}: expected {} energy, got {}",
@@ -1570,6 +1696,15 @@ impl TestGame {
     /// Assert a card's total blade modifier.
     pub fn assert_blade(&self, card_id: i16, expected: i32, msg: &str) {
         let actual = self.state.mods.get_blade_modifier(card_id);
+        if self.trace.live() {
+            trace::dump_state(self, &self.trace);
+            trace::check(
+                &self.trace,
+                format!("blade {}", trace::ref_of(self, card_id)),
+                actual.to_string(),
+                expected.to_string(),
+            );
+        }
         assert_eq!(actual, expected, "{}", msg);
     }
 
@@ -1648,6 +1783,15 @@ impl TestGame {
 
     /// Assert pending choice type matches expected variant name.
     pub fn assert_pending_choice_type(&self, expected: &str, msg: &str) {
+        if self.trace.live() {
+            trace::dump_state(self, &self.trace);
+            trace::check(
+                &self.trace,
+                format!("pending"),
+                self.pending_choice_type().unwrap_or_else(|| "none".into()),
+                expected.to_string(),
+            );
+        }
         if let Some(choice) = self.state.ability_queue.is_waiting_for_choice() {
             let actual = match choice {
                 Choice::SelectCard { .. } => "SelectCard",

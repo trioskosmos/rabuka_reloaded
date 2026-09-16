@@ -379,6 +379,7 @@ int  rb_decode_card_by_index(uint32_t i, Card *out);    /* 0..num_cards-1 */
 void rb_free_card(Card *c);
 uint16_t rb_card_ability_idx(uint32_t i);   /* 0xFFFF if none  Efirst ability only (legacy) */
 const unsigned char *rb_card_record(uint32_t i);
+uint32_t rb_card_record_len(uint32_t i);
 const unsigned char *rb_bc_slice(uint32_t idx, uint32_t *out_len);
 const char *rb_card_string(uint16_t idx);
 int rb_find_card_by_no(const char *card_no); /* linear scan cards.bin card_no strings, -1 if not found */

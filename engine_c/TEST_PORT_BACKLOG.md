@@ -1,5 +1,35 @@
 # Rust→C Test Port — Remaining Work
 
+> 2026-09-14 PROCESS (the loop — follow it, in order, repeat):
+> 1. Transpile correctly (`tools/gen_tests.py` was deleted 2026-09-14 as
+>    unfixable accretion; replacement is rewritten from the seed list below).
+> 2. For failing ported tests: manually rewrite ONE, work out what the
+>    script needs to handle that pattern, fix the script — never patch the
+>    generated C by hand.
+> 3. Failures that survive a correct port are engine gaps: fix `engine_c`.
+> 4. Repeat. Scenario-replay (`tests/replay.c` trace/scenario mode +
+>    `engine/tests/run_all.rs::scenario_oracle`) stays as the cross-check
+>    for parity-critical behaviors, not the migration vehicle.
+>
+> HAND-PORT RESULTS 2026-09-14 (simple eri + complex suki, kept in
+> /tmp/opencode/handtest.c, NOT repo): both pass on the C engine with zero
+> engine changes — struct mapping (`p[0].stage[0]`) is trivially 1:1, and
+> the engine already handles recalc/orientation, 7-pass live flow, pending
+> SelectCard, select_option, score mods. For these behaviors the ONLY gap
+> is transpiler coverage. The earlier suki-trace divergence was runner
+> state pollution (queue/transients not cleared on load), not an engine
+> bug — after clearing, trace is byte-identical 179/179.
+>
+> SEED LIST for the new script (derived from the two hand ports):
+> 1. trivial id-helpers in expression position (`riko(game)`); 2. `let`
+>    with type annotations + tuple destructuring (symbol table — kills most
+>    of the 91 errors); 3. deck-fill `for _ in 0..N` -> C `for`;
+> 4. multi-statement setup-helper inlining; 5. pass/select_option/
+>    set_live_card (shims exist); 6. `mods.*_modifiers.get(&id).map_or`
+>    chains; 7. `assert!(has_pending_choice())`; 8. `card!()` consts ->
+>    comment-out-and-continue; 9. whole-line drop (never inline-hollow)
+>    for anything unresolvable.
+
 Generated from audit of `engine_c/tests/test_ported_generated.c` (2650 fns; 1382 failing
 checks across 966 fns). Failures are dominated by porting gaps, not engine crashes.
 

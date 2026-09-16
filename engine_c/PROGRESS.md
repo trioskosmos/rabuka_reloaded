@@ -74,20 +74,19 @@ the bottom-up work-order table. Cross-check with `size_audit.py` (C should be a 
 fraction of the Rust twin) and `audit_placeholders.py` (no TODO/STUB markers left).
 
 ## Current gap snapshot (from latest audits — regenerate before trusting)
-- C lines / Rust lines: ~19,038 / 48,265 (~40%). [UPDATED 2026-09-01]
-- C functions: 1,272 / Rust port functions: 857 (C has MORE due to helpers). [UPDATED 2026-09-01]
-- Worst file gaps: `src/ability/resolver.c` (1 missing). [UPDATED 2026-09-01]
-- DEPENDENCY_AUDIT.md: 995 REAL, 246 DONE_SMALL, 31 STUBS (2%). [UPDATED 2026-09-01]
-- Test status: 12 failing assertions across 7 test functions. [UPDATED 2026-09-01]
+- C lines / Rust lines: 23,401 / 48,893 (~48%). [UPDATED 2026-09-14]
+- C functions: 1,231 / Rust port functions: 867 (C has MORE due to helpers). [UPDATED 2026-09-14]
+- Worst file gaps: `src/core/card.c` (2 missing, 7%), `src/ability/vm.c` (14, 48%), `src/ability/effects/state.c` (2, 27%). [UPDATED 2026-09-14]
+- DEPENDENCY_AUDIT.md: 1024 REAL, 224 DONE_SMALL, 38 STUBS (2%), MISSING 137 (header-declared, none called — UNRESOLVED 0). [UPDATED 2026-09-14]
+- Test status: embedded replay suite ALL PASSED; scenario-replay pilot `scenario_eri_w1` byte-identical Rust vs C (`CHECK 1 pass 1 1`). [UPDATED 2026-09-14]
 - Orphaned fragment files (`choice_frag_*.c`): DELETED 2026-09-01.
-- Build status: CLEAN (rb_engine.exe, 677KB). [UPDATED 2026-09-01]
-- Remaining work: Faithfully port complex game logic for ability activation, choice emission, and game state management. The failing tests check specific behaviors that require exact Rust logic replication. Key areas needing faithful ports:
-  - `handle_use_ability` (actions.rs) - ability activation from hand/stage/discard
-  - `execute_position_change` (misc.rs) - position change with choice emission
-  - `execute_reveal` / `execute_select` (look.rs) - reveal/select with choice emission
-  - `trigger_live_success_abilities` (triggers.rs) - energy movement from LiveSuccess
-  - `move_live_to_success_and_handle_wins` (live.rs) - success zone scoring
-- Note: The C engine has 1,272 functions vs Rust's 857 port-target functions because the C port includes many helper functions that don't have direct Rust equivalents. The SIZE_AUDIT gap of -388 means C has MORE functions than Rust.
+- Build status: LINKS CLEAN (`rb_engine.exe` + `rb_engine_replay.exe`) — first clean link since Sep 2. Restored the card DB decoder into `src/core/card.c` (added to Makefile), added `rb_parse_triggers`, removed 16 cross-file duplicate definitions. [UPDATED 2026-09-14]
+- Remaining work:
+  - 137 MISSING are mostly enum `from_str`/`to_str` tables + `rb_choice_builder_*`/`rb_step_*`/`rb_trace_*` families — bulk mechanical ports, none called yet (UNRESOLVED 0).
+  - 38 stubs bottom-up per DEPENDENCY_AUDIT.md (depth-1 list regenerated).
+  - Faithful ports still needed: `handle_use_ability` (actions.rs), `execute_position_change` (misc.rs), `execute_reveal`/`execute_select` (look.rs), `trigger_live_success_abilities` (triggers.rs), `move_live_to_success_and_handle_wins` (live.rs).
+  - Test strategy going forward: scenario-replay (`tests/replay.c` scenario mode + `engine/tests/run_all.rs::scenario_oracle` + `tests/fixtures/scenario_*.txt`) replaces regex test transpilation for new coverage; `gen_tests.py` output stays a red worklist.
+- Note: C has 1,231 functions vs Rust's 867 port-target functions because the C port includes many helper functions without direct Rust equivalents.
 - Ported this session (2026-09-01, 29 commits):
   - **move.rs (30+ functions):** prompt_card_selection, place_card_with_stage_choice, resolve_from_recently_moved, take_cards_from_standard_zone, resolve_cards_from_source, resolve_from_zone, resolve_from_energy_deck, resolve_from_stage, resolve_from_under_member, move_from_revealed, finalize_card_movement, fire_debut_side_effects, handle_select_position, execute_stage_placement_choices, place_energy_under_member_selected, execute_move_cards_both, execute_selected_cards_from_zone, handle_select_cards_looked_at, handle_energy_zone_selection, resolve_from_revealed_cards, resolve_from_those_cards
   - **state.rs (16+ functions):** execute_change_state, execute_energy_placement, execute_energy_state_change, execute_set_card_identity, execute_set_heart_type_applied, execute_set_cost, execute_set_blade_type, execute_specify_heart_color, execute_set_card_identity_all_regions, execute_set_cost_to_use, execute_all_blade_timing, execute_modify_cost, execute_activation_cost, execute_set_heart_copy_from_under, execute_set_heart_type, reduce_live_card_set_limit
@@ -109,4 +108,11 @@ fraction of the Rust twin) and `audit_placeholders.py` (no TODO/STUB markers lef
   - **modifiers.c (12 functions):** record_card_appearance, has_card_appeared_this_turn, clear_card_appearance_tracking, record_baton_touch, get_baton_touch_count, clear_baton_touch_tracking, record_card_movement, clear_card_movement_tracking, remove_revealed_card, clear_revealed_cards, recalculate_constant_cost_modifiers, on_cards_left_zones
   - **phase.c (10+ functions):** execute_performance_phase, play_time_cost_reduction_hook, play_time_cost_reduction_amount, play_time_alt_cost_chars, normalize_member_name, has_play_time_alt_cost_hand_cards, discard_play_time_alt_cost, shuffle_waitroom_members_to_deck_bottom, rps_choice_name, push_rps_log
   - **ability.c (6 functions):** execute_gain_ability_effect, execute_set_card_identity_effect, execute_activate_ability, execute_invalidate_ability, execute_gain_ability, execute_gain_ability_from_source
-- Next: fix 7 failing tests (requires faithful port of complex game logic for ability activation, choice emission, and game state management).
+- Ported 2026-09-14 (link restoration + parity loop):
+  - **card.c (foundation):** `rb_decode_card_by_index` (record layout per `card_binary.rs`), `rb_free_card`, `rb_card_num_abilities` / `rb_card_get_ability_idx` / `rb_decode_card_ability` (pairs table per `card_loader.rs`), `rb_card_is_live/is_energy/is_member`, `rb_card_normalize_name`, `rb_parse_operator`, `rb_ability_has_trigger`, `rb_has_cannot_baton_touch_protection`, `rb_condition_get_cache/group_names/position/distinct`, `rb_effect_position_any`; added `rb_card_record_len` (data.c) + Makefile wiring.
+  - **triggers.c:** `rb_parse_triggers` (token table per `triggers.rs`).
+  - **Dedup (single owner each):** removed `rb_get_pending_choice` + `rb_queue_pause_for_choice` from `game_state_abilities.c` (kept choice.c/ability_queue.c); removed `has_blade_heart/score_icon/all_blade` + `parse_heart_color` + CardDatabase ports from `state.c` (kept util.c/card.c; verified against card.rs:4127-4149).
+  - **Engine bug fixed:** `eval_group` fallthrough dereferenced NULL `group_names` (condition.c) — crashed once the real decoder made decode succeed; now returns 0.
+  - **Scenario fix (test bug):** cost-modifier replay scenario now targets stage + carries `value` extra (was a correct no-op on empty hand).
+  - **Parity loop:** `tests/replay.c` scenario mode + `rb_engine_replay` target + `scenario_oracle` test in `engine/tests/run_all.rs` + pilot `tests/fixtures/scenario_eri_w1.txt`.
+- Next: bulk-port the 137 MISSING enum/builder families (mechanical), then depth-1 stubs; migrate high-value tests to scenarios starting with live→discard and cost/score/heart recalc.

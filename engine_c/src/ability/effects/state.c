@@ -1598,26 +1598,11 @@ int rb_card_total_hearts(const Card *c) {
     return total;
 }
 
-/* Mirror Card::has_blade_heart — blade_heart OR special_heart non-empty. */
-int rb_card_has_blade_heart(const Card *c) {
-    if (!c) return 0;
-    return (c->blade > 0) || (c->has_special && c->special_count > 0);
-}
-
-/* Mirror Card::has_score_icon — special_heart contains Score. */
-int rb_card_has_score_icon(const Card *c) {
-    if (!c) return 0;
-    return (c->has_special && c->special_color == RB_HEART_SCORE);
-}
-
-/* Mirror Card::has_all_blade — blade_heart contains BAll (color 7). */
-int rb_card_has_all_blade(const Card *c) {
-    if (!c) return 0;
-    int r = 0;
-    for (int h = 0; h < c->n_hearts; h++)
-        if (c->heart_color[h] == 7 && c->heart_count[h] > 0) { r = 1; break; }
-    return r;
-}
+/* NOTE: rb_card_has_blade_heart / has_score_icon / has_all_blade live in
+   src/ability/util.c (single owners; deleted duplicates here 2026-09-14).
+   util.c's versions match card.rs: has_blade_heart = blade_heart.is_some()
+   (num_blade>0) or special non-empty; has_all_blade scans the blade section
+   for BAll. */
 
 /* Mirror Card::get_score — score.unwrap_or(0). */
 int rb_card_get_score(const Card *c) {
@@ -1699,74 +1684,12 @@ const char *rb_heart_color_as_str(int color) {
         default: return "heart00";
     }
 }
-/* Mirror HeartColor::from_str / parse_heart_color. */
-RbHeartColor rb_parse_heart_color(const char *s) {
-    if (!s) return 0;
-    if (!strcmp(s, "heart00") || !strcmp(s, "h00") || !strcmp(s, "heart07") || !strcmp(s, "b_heart07")) return 0;
-    if (!strcmp(s, "heart01") || !strcmp(s, "h01")) return 1;
-    if (!strcmp(s, "heart02") || !strcmp(s, "h02")) return 2;
-    if (!strcmp(s, "heart03") || !strcmp(s, "h03")) return 3;
-    if (!strcmp(s, "heart04") || !strcmp(s, "h04")) return 4;
-    if (!strcmp(s, "heart05") || !strcmp(s, "h05")) return 5;
-    if (!strcmp(s, "heart06") || !strcmp(s, "h06")) return 6;
-    if (!strcmp(s, "all") || !strcmp(s, "b_all")) return 7;
-    if (strncmp(s, "b_", 2) == 0) return rb_parse_heart_color(s + 2);
-    return 0;
-}
-
-/* CardDatabase methods — mirrors engine/src/core/card.rs CardDatabase impl. */
-int rb_card_get_card_id(const char *card_no) {
-    if (!card_no) return -1;
-    return rb_find_card_by_no(card_no);
-}
-int rb_card_get_card_names(int card_id, char *out, size_t out_sz) {
-    Card c;
-    if (!rb_decode_card_by_index((uint32_t)card_id, &c)) { if (out_sz) out[0] = 0; return 0; }
-    const char *n = c.name;
-    if (!n) { if (out_sz) out[0] = 0; rb_free_card(&c); return 0; }
-    strncpy(out, n, out_sz - 1);
-    out[out_sz - 1] = 0;
-    rb_free_card(&c);
-    return 1;
-}
-int rb_card_get_card(const char *card_no) {
-    if (!card_no) return 0;
-    return rb_find_card_by_no(card_no) >= 0 ? 1 : 0;
-}
-int rb_card_has_trigger(int card_id, int kind) {
-    int n = rb_card_num_abilities((uint32_t)card_id);
-    for (int i = 0; i < n; i++) {
-        Ability ab;
-        if (!rb_decode_card_ability((uint32_t)card_id, i, &ab)) continue;
-        int r = ab.triggers && strstr(ab.triggers, "起動");
-        rb_free_ability(&ab);
-        if (r) return 1;
-    }
-    return 0;
-}
-int rb_card_triggerless_text(int card_id, char *out, size_t out_sz) {
-    Card c;
-    if (!rb_decode_card_by_index((uint32_t)card_id, &c)) { if (out_sz) out[0] = 0; return 0; }
-    const char *t = c.ability ? c.ability->triggerless_text : NULL;
-    if (!t) { if (out_sz) out[0] = 0; rb_free_card(&c); return 0; }
-    strncpy(out, t, out_sz - 1);
-    out[out_sz - 1] = 0;
-    rb_free_card(&c);
-    return 1;
-}
-int rb_card_filter_subset(int card_id) { (void)card_id; return 0; }
-int rb_card_fires_on_opponent_effects(int card_id) { (void)card_id; return 0; }
-int rb_card_energy_cost_total(int card_id) {
-    Card c;
-    if (!rb_decode_card_by_index((uint32_t)card_id, &c)) return 0;
-    int t = c.cost;
-    rb_free_card(&c);
-    return t;
-}
-int rb_card_has_optional_payment(int card_id) { (void)card_id; return 0; }
-int rb_card_effective_energy_cost_total(int card_id, int groups_on_stage) {
-    int base = rb_card_energy_cost_total(card_id);
-    (void)groups_on_stage;
-    return base;
-}
+/* NOTE: rb_parse_heart_color lives in src/ability/util.c (single owner;
+   deleted duplicate here 2026-09-14). util.c's version covers the full
+   card.rs mapping incl. draw/score/b_all. */
+/* NOTE: CardDatabase-method ports (rb_card_get_card_id/names/get,
+   has_trigger, triggerless_text, filter_subset, fires_on_opponent_effects,
+   energy_cost_total, has_optional_payment, effective_energy_cost_total)
+   live in src/core/card.c (single owner; deleted duplicates here
+   2026-09-14). */
 

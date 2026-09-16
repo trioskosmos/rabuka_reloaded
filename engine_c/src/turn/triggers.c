@@ -603,3 +603,39 @@ const char *rb_trigger_to_texticon(const char *trigger) {
     if (!strcmp(trigger, RB_TSTR_AUTO))           return "jidou";
     return "jyouji";
 }
+
+/* Parse a triggers field ("起動" or "ライブ開始時, 登場") into kinds.
+   Mirrors engine/src/triggers.rs::parse_triggers + TriggerKind::from_token.
+   Comma-separated, whitespace-trimmed; unknown tokens ignored. Returns count. */
+static int kind_of_token(const char *t, RbTriggerKind *out) {
+    if (!strcmp(t, RB_TSTR_ACTIVATION)) *out = RB_TK_ACTIVATION;
+    else if (!strcmp(t, RB_TSTR_AUTO)) *out = RB_TK_AUTO;
+    else if (!strcmp(t, RB_TSTR_CONSTANT)) *out = RB_TK_CONSTANT;
+    else if (!strcmp(t, RB_TSTR_DEBUT) || !strcmp(t, RB_TSTR_DEBUT_EN)) *out = RB_TK_DEBUT;
+    else if (!strcmp(t, RB_TSTR_LIVE_START)) *out = RB_TK_LIVE_START;
+    else if (!strcmp(t, RB_TSTR_LIVE_SUCCESS) || !strcmp(t, RB_TSTR_LIVE_SUCCESS_EN)) *out = RB_TK_LIVE_SUCCESS;
+    else if (!strcmp(t, RB_TSTR_MAIN)) *out = RB_TK_MAIN;
+    else if (!strcmp(t, RB_TSTR_BATON_TOUCH)) *out = RB_TK_BATON_TOUCH;
+    else return 0;
+    return 1;
+}
+int rb_parse_triggers(const char *triggers, RbTriggerKind *out, int max) {
+    if (!triggers || !out || max <= 0) return 0;
+    int n = 0;
+    const char *p = triggers;
+    while (*p && n < max) {
+        while (*p == ' ' || *p == '\t') p++;
+        if (!*p) break;
+        const char *comma = strchr(p, ',');
+        size_t len = comma ? (size_t)(comma - p) : strlen(p);
+        while (len && (p[len-1] == ' ' || p[len-1] == '\t')) len--;
+        char tok[64];
+        if (len >= sizeof tok) len = sizeof tok - 1;
+        memcpy(tok, p, len); tok[len] = 0;
+        RbTriggerKind k;
+        if (kind_of_token(tok, &k)) out[n++] = k;
+        if (!comma) break;
+        p = comma + 1;
+    }
+    return n;
+}

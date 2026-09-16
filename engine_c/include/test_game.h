@@ -80,8 +80,15 @@ int  test_zone_has_card_no(TestGame *tg, int pl, const char *zone, const char *n
 int  test_zone_has_id(TestGame *tg, int pl, const char *zone, int id);
 
 /* Answer a play paused by the play-time alternative-cost hook (Rust answer_play_choice
-    for target "play_time_cost_reduction"). Completes the play at the chosen cost. If no
-    such play is pending, falls back to the generic choice resume. */
+ for target "play_time_cost_reduction"). Completes the play at the chosen cost. If no
+ such play is pending, falls back to the generic choice resume. */
 void test_answer_play_cost_choice(TestGame *tg, int accept);
+
+/* Choice-resume + introspection helpers used by the scenario replay runner
+ (tests/replay.c scenario mode). Defined in src/test_game.c. */
+void test_resume_choice(TestGame *tg, int idx);
+void test_select_indices(TestGame *tg, const int *indices, int n);
+int  test_deck_len(TestGame *tg);
+int  test_hand_len(TestGame *tg);
 
 #endif

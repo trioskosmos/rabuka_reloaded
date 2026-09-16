@@ -1,0 +1,10 @@
+# eri_constant_blade_per_wait_member
+# Migrated from engine/tests/test_modules/jidou/complex/b7_constant_ability_test.rs:11
+# PL!-bp3-002-R ab#1: constant — for each WAIT member on opponent's stage, +1 blade.
+card eri PL!-bp3-002-R
+card opp1 PL!-sd1-010-SD
+stage 1 1 eri
+stage 2 0 opp1
+wait opp1
+recalculate
+expect blade eri 1
