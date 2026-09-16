@@ -8,142 +8,58 @@
 use crate::helpers::*;
 use rabuka_engine::zones::MemberArea;
 
-/// Select 1 out of 2 looked-at cards with any_number=true.
-/// The selected card goes to deck top; the remaining card goes to discard.
+fn debut_ginko() -> (TestGame, [i16; 4]) {
+    let mut game = TestGame::new(load_real_database());
+    let cards = std::array::from_fn(|_| game.id("PL!-sd1-010-SD"));
+    game.state.player1.main_deck.cards = cards.to_vec().into();
+    let opponent_card = game.id("PL!-sd1-010-SD");
+    game.state.player2.main_deck.cards = vec![opponent_card].into();
+    let ginko = game.id("PL!HS-bp2-016-N");
+    game.add_to_hand(ginko);
+    game.give_energy(4);
+    game.play_to_stage(ginko, MemberArea::Center);
+    assert!(game.state.player1.stage.stage.contains(&ginko));
+    assert!(game.state.player1.hand.cards.is_empty());
+    game.assert_select_card("looked_at", 2, true);
+    assert_eq!(game.state.looked_at_cards.as_slice(), &cards[..2]);
+    (game, cards)
+}
 #[test]
 fn look_and_select_any_number_partial_selection() {
-    let db = load_real_database();
-    let mut game = TestGame::new(db);
-
-    let card = game.id("PL!HS-bp2-016-N");
-    let filler = game.id("PL!-sd1-010-SD");
-    let _card_a = game.id("PL!-sd1-014-SD");
-    let _card_b = game.id("PL!-sd1-015-SD");
-
-    game.state.player1.hand.cards.push(card);
-    game.give_energy(4);
-    game.state.player1.main_deck.cards.clear();
-    for _ in 0..5 {
-        game.state.player1.main_deck.cards.push(filler);
-    }
-    game.state.player1.stage.stage = [-1, -1, -1];
-    game.play_to_stage(card, MemberArea::Center);
-
-    assert!(
-        game.has_pending_choice(),
-        "Should have look_and_select choice"
-    );
-
-    // Select 1 card only (index 0).
-    game.select_indices(&[0]);
-
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
-
-    assert!(!game.has_pending_choice(), "Ability should have ended");
-    // The selected card is on deck top, the other was discarded
+    let (mut game, [a, b, c, d]) = debut_ginko();
+    game.select_indices(&[1]);
+    game.assert_select_card("looked_at", 1, true);
+    game.select_indices(&[]);
+    assert!(!game.has_pending_choice());
+    assert_eq!(game.state.player1.main_deck.cards.as_slice(), &[b, c, d]);
+    assert_eq!(game.state.player1.waitroom.cards.as_slice(), &[a]);
+    assert!(game.state.player1.hand.cards.is_empty());
 }
 
 /// Select 2 out of 2 looked-at cards (full batch) with any_number=true.
 /// Both go to deck top, none to discard.
 #[test]
 fn look_and_select_any_number_full_selection() {
-    let db = load_real_database();
-    let mut game = TestGame::new(db);
-
-    let card = game.id("PL!HS-bp2-016-N");
-    let filler = game.id("PL!-sd1-010-SD");
-    let card_a = game.id("PL!-sd1-014-SD");
-    let card_b = game.id("PL!-sd1-015-SD");
-
-    game.state.player1.hand.cards.push(card);
-    game.give_energy(4);
-    game.state.player1.main_deck.cards.clear();
-    game.state.player1.main_deck.cards.push(card_a);
-    game.state.player1.main_deck.cards.push(card_b);
-    for _ in 0..10 {
-        game.state.player1.main_deck.cards.push(filler);
-    }
-    game.state.player1.stage.stage = [-1, -1, -1];
-    game.play_to_stage(card, MemberArea::Center);
-
-    assert!(
-        game.has_pending_choice(),
-        "Should have look_and_select choice"
-    );
-
-    // Select both looked-at cards
+    let (mut game, [a, b, c, d]) = debut_ginko();
     game.select_indices(&[0]);
-    assert!(
-        game.has_pending_choice(),
-        "second looked_at selection prompt expected (1 card remaining)"
-    );
-    assert_eq!(
-        game.pending_choice_type().as_deref(),
-        Some("SelectCard"),
-        "expected SelectCard for the remaining looked_at pick"
-    );
+    game.assert_select_card("looked_at", 1, true);
     game.select_indices(&[0]);
-
-    // Resolve order prompt (any_order)
-    while game.has_pending_choice() {
-        game.select_option(0);
-    }
-
-    assert!(!game.has_pending_choice(), "Ability should have ended");
-    assert!(
-        game.state.player1.main_deck.cards.contains(&card_a),
-        "card_a should be on deck"
-    );
-    assert!(
-        game.state.player1.main_deck.cards.contains(&card_b),
-        "card_b should be on deck"
-    );
+    assert!(!game.has_pending_choice());
+    assert_eq!(game.state.player1.main_deck.cards.as_slice(), &[b, a, c, d]);
+    assert!(game.state.player1.waitroom.cards.is_empty());
+    assert!(game.state.player1.hand.cards.is_empty());
 }
 
 /// Select 0 out of 2 looked-at cards with any_number=true.
 /// Both go to discard.
 #[test]
 fn look_and_select_any_number_skip_all() {
-    let db = load_real_database();
-    let mut game = TestGame::new(db);
-
-    let card = game.id("PL!HS-bp2-016-N");
-    let filler = game.id("PL!-sd1-010-SD");
-    let card_a = game.id("PL!-sd1-014-SD");
-    let card_b = game.id("PL!-sd1-015-SD");
-
-    game.state.player1.hand.cards.push(card);
-    game.give_energy(4);
-    game.state.player1.main_deck.cards.clear();
-    game.state.player1.main_deck.cards.push(card_a);
-    game.state.player1.main_deck.cards.push(card_b);
-    for _ in 0..10 {
-        game.state.player1.main_deck.cards.push(filler);
-    }
-    game.state.player1.stage.stage = [-1, -1, -1];
-    game.play_to_stage(card, MemberArea::Center);
-
-    assert!(
-        game.has_pending_choice(),
-        "Should have look_and_select choice"
-    );
-
-    // Select 0 cards (skip)
+    let (mut game, [a, b, c, d]) = debut_ginko();
     game.select_indices(&[]);
-
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
-
-    assert!(!game.has_pending_choice(), "Ability should have ended");
-    // Docstring: select 0 → BOTH looked-at cards go to discard.
-    assert!(
-        game.state.player1.waitroom.cards.contains(&card_a)
-            && game.state.player1.waitroom.cards.contains(&card_b),
-        "both looked-at cards should be in discard after skipping selection"
-    );
+    assert!(!game.has_pending_choice());
+    assert_eq!(game.state.player1.main_deck.cards.as_slice(), &[c, d]);
+    assert_eq!(game.state.player1.waitroom.cards.as_slice(), &[a, b]);
+    assert!(game.state.player1.hand.cards.is_empty());
 }
 
 #[test]
