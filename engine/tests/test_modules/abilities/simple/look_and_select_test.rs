@@ -64,33 +64,56 @@ fn look_and_select_any_number_skip_all() {
 
 #[test]
 fn look_and_select_dynamic_count_look_at_counts_stage_members_plus_two() {
-    let db = load_real_database();
-    let mut game = TestGame::new(db);
+    assert_kaho_debut_selection(0);
+}
 
-    let card = game.id("PL!HS-bp6-001-R＋");
-    let filler = game.id("PL!-sd1-010-SD");
-    let top_a = game.id("PL!-sd1-014-SD");
-    let top_b = game.id("PL!-sd1-015-SD");
+#[test]
+fn kaho_two_own_members_look_four_and_keep_one() {
+    assert_kaho_debut_selection(1);
+}
 
-    game.state.player1.hand.cards.push(card);
+#[test]
+fn kaho_full_own_stage_looks_five_and_keeps_one() {
+    assert_kaho_debut_selection(2);
+}
+
+fn assert_kaho_debut_selection(allies: usize) {
+    let mut game = TestGame::new(load_real_database());
+    let cards: [i16; 7] = std::array::from_fn(|_| game.id("PL!-sd1-010-SD"));
+    game.state.player1.main_deck.cards = cards.to_vec().into();
+    let opponent_deck = game.id("PL!-sd1-010-SD");
+    game.state.player2.main_deck.cards = vec![opponent_deck].into();
+    for area in 0..3 {
+        let opponent = game.id("PL!-sd1-014-SD");
+        game.state.player2.stage.stage[area] = opponent;
+    }
+    let opponent_stage = game.state.player2.stage.stage;
+    for area in [MemberArea::LeftSide, MemberArea::RightSide].into_iter().take(allies) {
+        let ally = game.id("PL!-sd1-015-SD");
+        game.add_to_stage(area, ally);
+    }
+    let kaho = game.id("PL!HS-bp6-001-R＋");
+    game.add_to_hand(kaho);
     game.give_energy(4);
-    game.state.player1.main_deck.cards.clear();
-    game.state.player1.main_deck.cards.push(top_a);
-    game.state.player1.main_deck.cards.push(top_b);
-    game.state.player1.main_deck.cards.push(filler);
-    game.state.player1.stage.stage = [-1, -1, -1];
-
-    game.play_to_stage(card, MemberArea::Center);
-
-    assert!(
-        game.has_pending_choice(),
-        "Should have look_and_select choice"
-    );
-    assert_eq!(
-        game.state.looked_at_cards.len(),
-        3,
-        "Should look at 3 cards when the entering member is on stage"
-    );
+    game.play_to_stage(kaho, MemberArea::Center);
+    let inspected = allies + 3;
+    assert!(game.state.player1.stage.stage.contains(&kaho));
+    game.assert_select_card("looked_at", 1, false);
+    assert_eq!(game.state.looked_at_cards.as_slice(), &cards[..inspected]);
+    game.select_indices(&[inspected - 1]);
+    assert!(!game.has_pending_choice());
+    let mut expected_deck = vec![cards[inspected - 1]];
+    expected_deck.extend_from_slice(&cards[inspected..]);
+    assert_eq!(game.state.player1.main_deck.cards.as_slice(), expected_deck.as_slice());
+    let mut actual_discard = game.state.player1.waitroom.cards.to_vec();
+    let mut expected_discard = cards[..inspected - 1].to_vec();
+    actual_discard.sort_unstable();
+    expected_discard.sort_unstable();
+    assert_eq!(actual_discard, expected_discard);
+    assert!(game.state.player1.hand.cards.is_empty());
+    assert_eq!(game.state.player2.stage.stage, opponent_stage);
+    assert_eq!(game.state.player2.main_deck.cards.as_slice(), &[opponent_deck]);
+    assert!(game.state.player2.waitroom.cards.is_empty());
 }
 
 /// Debut look_and_select with group_filter — no eligible cards among looked-at.
