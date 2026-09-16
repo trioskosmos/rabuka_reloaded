@@ -12,11 +12,7 @@
     pub mod bp7_cooking_with_love_test;
     pub mod bp7_deck_bottom_source_test;
     pub mod bp7_dia_both_hand_reorder_test;
-    pub mod bp7_dia_look_bottom_select_test;
-    pub mod bp7_ginko_select_discard_deck_bottom_test;
     pub mod bp7_kanata_choice_test;
-    pub mod bp7_kanata_look_select_test;
-    pub mod bp7_mari_look_top_split_test;
     pub mod bp7_q266_natsumi_blade_wait_test;
     pub mod bp7_q270_emma_color_diversity_test;
     pub mod bp7_q272_just_believe_test;
@@ -73,7 +69,6 @@
     pub mod live_success_rules_test;
     pub mod ll_bp1_001_test;
     pub mod ll_joint_test;
-    pub mod looked_at_discard_test;
     pub mod maki_appear_test;
     pub mod maki_bp6_006_reveal_test;
     pub mod mebius_loop_test;

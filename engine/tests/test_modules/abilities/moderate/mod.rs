@@ -28,7 +28,6 @@
     pub mod chika_bp7_reveal_cost_test;
     pub mod chisato_live_success_test;
     pub mod condition_evaluation_test;
-    pub mod draw_one_put_bottom_debut_test;
     pub mod either_or_state_change_test;
     pub mod eli_bp4_test;
     pub mod eli_test;

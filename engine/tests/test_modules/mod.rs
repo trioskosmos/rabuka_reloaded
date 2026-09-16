@@ -14,3 +14,5 @@ pub mod edge_cases;
 pub mod mechanics;
 pub mod integration;
 pub mod support;
+// Behavior-first grouping (gameplay contracts), sources re-homed via #[path].
+pub mod card_flow;

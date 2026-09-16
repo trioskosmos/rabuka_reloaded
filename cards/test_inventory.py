@@ -30,6 +30,7 @@ Run:
     python cards/test_inventory.py --check  # CI: fail if stale
 """
 import argparse
+import hashlib
 import json
 import re
 import sys
@@ -102,6 +103,108 @@ EFFECT_CAUSE_MARKERS = ("効果によって", "効果でも発動する")  # eff
 
 FN_TEST_RE = re.compile(r"^\s*#\[test\]\s*\n\s*(?:pub\s+)?fn\s+(\w+)", re.MULTILINE)
 COVERS_RE = re.compile(r"@covers\s+([A-Z0-9!+\-]+\S*)", re.IGNORECASE)
+
+# ---------------------------------------------------------------------------
+# Ability families (docs/ABILITY_FAMILIES.md).
+#
+# A *family* groups all unique abilities whose printed Japanese text states
+# the same behavioral contract, regardless of card. Families are keyed on the
+# parser's structured fields (already emitted in abilities.json): trigger x
+# effect action x discriminating detail (condition type, target, source/
+# destination, cost shape). This is a *categorization* layer over the parsed
+# data, not a coverage claim: candidate test references come from the same
+# L0 substring pass the coverage report uses, and are labelled candidates.
+# ---------------------------------------------------------------------------
+
+# Discriminating detail extracted per action. Each extractor returns the
+# family-variant key or None when the ability doesn't belong to that family.
+def _move_variant(eff):
+    src, dst = eff.get("source"), eff.get("destination")
+    if not src or not dst:
+        return None
+    return f"{src}->{dst}"
+
+
+def _gain_variant(eff):
+    res = eff.get("resource")
+    if res == "heart":
+        colors = eff.get("heart_colors") or []
+        return f"heart:{'+'.join(colors) if colors else '?'}"
+    return f"{res}:n{eff.get('count', '?')}"
+
+
+def _modify_score_variant(eff):
+    op = eff.get("operation")
+    val = eff.get("value", eff.get("amount"))
+    return f"{op or '?'}{val if val is not None else ''}"
+
+
+def _change_state_variant(eff):
+    return f"{eff.get('state_change') or eff.get('state') or '?'}"
+
+
+def _look_variant(eff):
+    n = eff.get("count")
+    take = eff.get("select_count", "?")
+    return f"look{n or '?'}:take{take if take is not None else '?'}"
+
+
+def _draw_variant(eff):
+    return f"n{eff.get('count', '?')}"
+
+
+def _condition_variant(eff):
+    c = eff.get("condition") or {}
+    return c.get("type") or "none"
+
+
+FAMILY_RULES = [
+    # (family name, trigger set filter or None, variant extractor)
+    ("activation_cost_self_to_discard_recover", {"起動"}, lambda eff, cost:
+        (eff.get("action") == "move_cards" and eff.get("destination") == "hand"
+         and (cost or {}).get("self_cost")) or None),
+    ("debut_look_and_select", {"登場"}, lambda eff, cost:
+        (eff.get("action") == "look_and_select") or None),
+    ("debut_move_cards", {"登場"}, lambda eff, cost:
+        (eff.get("action") == "move_cards") or None),
+    ("debut_draw", {"登場"}, lambda eff, cost:
+        (eff.get("action") == "draw_card") or None),
+    ("debut_change_state", {"登場"}, lambda eff, cost:
+        (eff.get("action") == "change_state") or None),
+    ("constant_conditional_gain", {"常時"}, lambda eff, cost:
+        (eff.get("action") == "gain_resource" and eff.get("condition")) or None),
+    ("constant_modify_cost", {"常時"}, lambda eff, cost:
+        (eff.get("action") == "modify_cost") or None),
+    ("constant_modify_score", {"常時"}, lambda eff, cost:
+        (eff.get("action") == "modify_score") or None),
+    ("constant_restriction", {"常時"}, lambda eff, cost:
+        (eff.get("action") == "restriction") or None),
+    ("live_start_gain", {"ライブ開始時"}, lambda eff, cost:
+        (eff.get("action") == "gain_resource") or None),
+    ("live_success_move_cards", {"ライブ成功時"}, lambda eff, cost:
+        (eff.get("action") == "move_cards") or None),
+    ("live_success_score", {"ライブ成功時"}, lambda eff, cost:
+        (eff.get("action") == "modify_score") or None),
+    ("activation_move_cards", {"起動"}, lambda eff, cost:
+        (eff.get("action") == "move_cards") or None),
+    ("auto_gain", {"自動"}, lambda eff, cost:
+        (eff.get("action") == "gain_resource") or None),
+    ("auto_move_cards", {"自動"}, lambda eff, cost:
+        (eff.get("action") == "move_cards") or None),
+    ("auto_change_state", {"自動"}, lambda eff, cost:
+        (eff.get("action") == "change_state") or None),
+]
+
+# Variant extractors applied inside a family, keyed by family name.
+FAMILY_VARIANT_EXTRACTORS = {
+    "activation_cost_self_to_discard_recover": _move_variant,
+    "debut_move_cards": _move_variant,
+    "live_success_move_cards": _move_variant,
+    "auto_move_cards": _move_variant,
+    "constant_conditional_gain": _condition_variant,
+    "debut_look_and_select": _look_variant,
+    "debut_draw": _draw_variant,
+}
 
 # ---------------------------------------------------------------------------
 # P0.3 ratchet (docs/TEST_HARDENING_PLAN_2026-08-26.md): the soft-guard
@@ -294,6 +397,10 @@ Q_PARSE_AUDIT_RE = re.compile(
     r"|compound\.actions|effect_steps|get_aggregate\(\)"
 )
 Q_CARD_NO_RE = re.compile(r'"(PL![A-Za-z0-9!\-+＋]+?)"')
+# Rust unicode escapes: "PL!N-bp4-007-R\u{ff0b}" is the fullwidth-plus print of
+# "PL!N-bp4-007-R+". Unescape before substring matching so L0 scans don't miss
+# escaped card numbers (previously caused false untested-ability lists).
+Q_RUST_ESCAPE_RE = re.compile(r"\\u\{([0-9a-fA-F]{4,6})\}")
 Q_SET_SEG_RE = re.compile(r"-(bp\d+|sd\d+|pb\d+|cl\d+|PR)-")
 
 
@@ -491,6 +598,16 @@ def audit_test_quality(files):
             for cn in Q_CARD_NO_RE.findall(body):
                 if cn.startswith("PL!"):
                     file_groups.setdefault(card_group_key(cn), set()).add(cn)
+            for m in Q_RUST_ESCAPE_RE.finditer(body):
+                start = body.rfind('"', 0, m.start())
+                end = body.find('"', m.end())
+                if 0 <= start < end:
+                    cn = Q_RUST_ESCAPE_RE.sub(
+                        lambda e: chr(int(e.group(1), 16)),
+                        body[start + 1 : end],
+                    )
+                    if cn.startswith("PL!"):
+                        file_groups.setdefault(card_group_key(cn), set()).add(cn)
         for _key, nos in file_groups.items():
             if len(nos) > 1:
                 smells["similar_cards"].append((rel, "<file>", 1, ", ".join(sorted(nos))))
@@ -600,6 +717,90 @@ def build_qa_coverage(all_src):
     return {"rows": rows, "covered": covered, "total": len(rows)}
 
 
+def build_families(inv):
+    """Group abilities into behavioral families.
+
+    Returns a list of family dicts sorted by size:
+      {name, triggers, total, covered, variants: {variant_key: [ability rows]}}
+    Abilities matching no rule land in 'other/<trigger>:<action>'.
+    """
+    rows = inv["abilities"]
+    families = defaultdict(list)
+    for r in rows:
+        eff = r["effect"] or {}
+        placed = False
+        for name, trig_filter, matcher in FAMILY_RULES:
+            if not (set(r["trigger_list"]) & trig_filter):
+                continue
+            variant_key = None
+            try:
+                variant_key = matcher(eff, r["cost"])
+            except Exception:
+                variant_key = None
+            if variant_key:
+                families[name].append((r, str(variant_key)))
+                placed = True
+                break
+        if not placed:
+            families[f"other:{r['triggers'] or '(none)'}:{r['action']}"].append((r, ""))
+
+    out = []
+    for name, members in families.items():
+        variants = defaultdict(list)
+        for r, vk in members:
+            variants[vk].append(r)
+        out.append({
+            "name": name,
+            "triggers": sorted({t for r, _ in members for t in r["trigger_list"]}),
+            "total": len(members),
+            "covered": sum(1 for r, _ in members if r["covered"]),
+            "variants": dict(variants),
+        })
+    out.sort(key=lambda f: -f["total"])
+    return out
+
+
+def render_families(inv, families):
+    """Render docs/ABILITY_FAMILIES.md — family -> variant -> abilities."""
+    lines = []
+    w = lines.append
+    w("# Ability Families — behavioral grouping of all unique abilities")
+    w("")
+    w("_Auto-generated by `cards/test_inventory.py --families` — do not edit by hand._")
+    w("")
+    w(f"Groups all {len(inv['abilities'])} unique abilities from `cards/abilities.json` by the")
+    w("behavioral contract their parsed effect states (trigger x action x discriminating")
+    w("detail). Test references are **candidate** L0 hits (the card number appears in the")
+    w("file), NOT verified assertions — see TEST_COVERAGE.md for depth semantics.")
+    w("")
+    w("## Index")
+    w("")
+    w("| Family | Abilities | Covered | Variants |")
+    w("|---|---|---|---|")
+    for fam in families:
+        w(f"| [{fam['name']}](#{fam['name']}) | {fam['total']} | {fam['covered']} | {len(fam['variants'])} |")
+    w("")
+    for fam in families:
+        w(f"## {fam['name']}")
+        w("")
+        w(f"Triggers: {', '.join(fam['triggers'])} — {fam['covered']}/{fam['total']} L0-covered.")
+        w("")
+        for vk in sorted(fam["variants"].keys()):
+            rows = fam["variants"][vk]
+            w(f"### variant: {vk or '(no variant)'} — {len(rows)} abilities")
+            w("")
+            w("| Card | Depth | Tests | Text |")
+            w("|---|---|---|---|")
+            shown = sorted(rows, key=lambda r: (-r["covering_test_count"], r["idx"]))
+            for r in shown[:40]:
+                safe = r["full_text"].replace("|", "/").replace("\n", " ")
+                w(f"| `{r['base']}` | {r['depth']} | {r['covering_test_count']} | {safe[:130]} |")
+            if len(rows) > len(shown):
+                w(f"| … | {len(rows) - len(shown)} more |  |  |")
+            w("")
+    return "\n".join(lines) + "\n"
+
+
 def build_inventory():
     abilities, stats = load_abilities()
     files = collect_test_files()
@@ -646,6 +847,15 @@ def build_inventory():
                     if m.group(1).strip() in cards or card_base(m.group(1).strip()) == base:
                         covers_override = m.group(1).strip()
             hit = any(c in text for c in cards) or (base in text)
+            if not hit:
+                # Same card_no written with Rust unicode escapes
+                # (e.g. "PL!N-bp4-007-R\u{ff0b}" for the R+ print).
+                esc = Q_RUST_ESCAPE_RE.search(text)
+                if esc:
+                    unescaped = Q_RUST_ESCAPE_RE.sub(
+                        lambda m: chr(int(m.group(1), 16)), text
+                    )
+                    hit = any(c in unescaped for c in cards) or (base in unescaped)
             if hit:
                 covered_rels.append(rel)
                 covering_texts.append(text)
@@ -1139,6 +1349,11 @@ def main():
     ap.add_argument("--check", action="store_true", help="fail if generated files are stale")
     ap.add_argument("--json-only", action="store_true", help="only write JSON")
     ap.add_argument(
+        "--families",
+        action="store_true",
+        help="also write docs/ABILITY_FAMILIES.md (behavioral grouping index)",
+    )
+    ap.add_argument(
         "--update-softguard-baseline",
         action="store_true",
         help="re-record the soft-guard ratchet baseline (P0.3)",
@@ -1150,6 +1365,15 @@ def main():
         return 0
 
     inv = build_inventory()
+
+    if args.families:
+        families = build_families(inv)
+        OUT_FAMILIES = ROOT / "docs" / "ABILITY_FAMILIES.md"
+        OUT_FAMILIES.write_text(render_families(inv, families), encoding="utf-8")
+        print(f"Wrote {OUT_FAMILIES.relative_to(ROOT)} ({len(families)} families)")
+        for fam in families[:15]:
+            print(f"  {fam['total']:4} abilities  {len(fam['variants']):3} variants  {fam['name']}")
+        return 0
 
     # render
     coverage_text = render_coverage(inv)

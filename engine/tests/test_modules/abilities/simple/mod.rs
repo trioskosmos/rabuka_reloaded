@@ -39,7 +39,6 @@
     pub mod l0_gap_position_blade_test;
     pub mod live_cards_disappear_test;
     pub mod live_success_sequential_test;
-    pub mod look_and_select_test;
     pub mod mei_bp5_test;
     pub mod mia_test;
     pub mod miyashita_ai_pr_test;
