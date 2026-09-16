@@ -56,7 +56,7 @@ _has_pending_choice asserted without choice identity (pending_choice_type/summar
 | `engine/tests/test_modules/qa/qa_new_tests238.rs` | `q238_baton_touch_triggers_position_change_selection` | 201 |  |
 | `engine/tests/test_modules/qa/qa_new_tests238.rs` | `q238_both_players_members_all_selectable` | 135 |  |
 
-## similar_cards (30)
+## similar_cards (31)
 
 _confusable card numbers (bp2 vs pb2) staged in one file — human review for wrong-card staging_
 
@@ -83,6 +83,7 @@ _confusable card numbers (bp2 vs pb2) staged in one file — human review for wr
 | `engine/tests/test_modules/integration/integration_blindspot_test.rs` | `<file>` | 1 | PL!HS-bp5-004-R, PL!HS-bp6-004-R |
 | `engine/tests/test_modules/jidou/complex/ability_chain_combo_test.rs` | `<file>` | 1 | PL!SP-pb1-006-R, PL!SP-pb2-006-R |
 | `engine/tests/test_modules/jidou/complex/cards_6_thru_13_test.rs` | `<file>` | 1 | PL!S-PR-015-PR, PL!S-bp2-015-PR |
+| `engine/tests/test_modules/jidou/complex/chika_test.rs` | `<file>` | 1 | PL!S-bp3-001-R＋, PL!S-bp5-001-R＋ |
 | `engine/tests/test_modules/jidou/complex/kinako_each_time_blade_test.rs` | `<file>` | 1 | PL!SP-bp5-006-R, PL!SP-pb1-006-R |
 | `engine/tests/test_modules/jidou/complex/kinako_live_success_or_move_test.rs` | `<file>` | 1 | PL!SP-bp5-006-R, PL!SP-pb2-006-R |
 | `engine/tests/test_modules/jidou/complex/kinako_sakurakoji_test.rs` | `<file>` | 1 | PL!SP-bp5-006-R, PL!SP-pb1-006-R |
