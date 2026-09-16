@@ -3325,6 +3325,16 @@ if util::distinct_should_dedupe(distinct) {
                 })
             });
         let current = self.current_effect.as_ref();
+        let remainder_dest = select_action
+            .as_ref()
+            .and_then(|sa| sa.remainder_destination_any())
+            .or_else(|| current.and_then(|c| c.remainder_destination_any()))
+            .map(str::to_string);
+        log::debug!(
+            "[LA_REMAINDER] selected_indices={:?} destination={:?}",
+            indices,
+            remainder_dest
+        );
         // Whether the EFFECT TEXT explicitly says what happens to the
         // unselected remainder (e.g. 「残りを控え室に置く」). When it does NOT,
         // a fully-declined optional selection must return the cards to where
@@ -3596,7 +3606,7 @@ if util::distinct_should_dedupe(distinct) {
         // remainder directive): the looked-at cards go back where they came
         // from. Rule 5.7 — 見る only informs; skipping 「置いてもよい」 must not
         // discard or reposition anything.
-        if selected_cards.is_empty() && explicit_discard.is_none() {
+        if selected_cards.is_empty() && explicit_discard.is_none() && remainder_dest.is_none() {
             let origin = self
                 .looked_at_origin
                 .clone()
@@ -3618,11 +3628,6 @@ if util::distinct_should_dedupe(distinct) {
         // If the effect specifies where the REMAINING (unselected) looked-at cards
         // go (e.g. "残りを好きな順番でデッキの下に置く" → deck_bottom), honor that.
         // Otherwise fall back to discard_remaining (discard) or deck top.
-        let remainder_dest = select_action
-            .as_ref()
-            .and_then(|sa| sa.remainder_destination_any())
-            .map(|s| s.to_string())
-            .or_else(|| current.and_then(|c| c.remainder_destination_any()).map(|s| s.to_string()));
         if remainder_dest.as_deref() == Some("looked_at") {
             // Intermediate leg of a multi-destination look split (希 bp3-007):
             // leftovers stay in the pool for the NEXT select step.
