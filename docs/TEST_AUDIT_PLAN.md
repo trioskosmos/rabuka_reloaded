@@ -193,11 +193,16 @@ assumption often repeats.
      principle; the tests themselves assert correctly (Q221 scope, Q233
      decline branch both present and correct).
 4. **Tests that never fire the claimed ability (vacuous):**
-   - PL!-bp6-016-N: card is LiveSuccess look-3/reorder, but the test only
-     debuts and asserts unchanged top-3 — the printed ability never
-     executes. Current name `top_three_membership_pl_bp6_016_n_test.rs`
-     honestly states debut-only. FIX: add a real LiveSuccess firing with a
-     set live card and assert the reorder per printed text.
+   - PL!-bp6-016-N: RESOLVED (commit b8b77cc5). The printed LiveSuccess
+      look-3/reorder was parsed with a count-1 move (only one card returned,
+      no prompt) — engine bug, fixed end-to-end: parser marks the unqualified
+      それらを…デッキの上に置く return `all:true`, move_cards treats
+      looked_at as order-eligible when all, and the order choice now
+      accumulates a full permutation. New file
+      `nozomi_bp6_016_live_success_look_three_reorder_test.rs` asserts all
+      six top orders + unchanged-order with exact deck suffix preservation;
+      old debut-only test renamed to
+      `live_success_reorder_does_not_trigger_on_debut` (negative).
    - WWD delayed lock: success case asserts immediate waited energy only;
      the printed next-turn activation lock is untested. ADD the next-turn
      negative (placed energy must not activate next turn).
