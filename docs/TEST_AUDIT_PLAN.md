@@ -204,12 +204,18 @@ assumption often repeats.
       old debut-only test renamed to
       `live_success_reorder_does_not_trigger_on_debut` (negative).
    - WWD delayed lock: success case asserts immediate waited energy only;
-     the printed next-turn activation lock is untested. ADD the next-turn
-     negative (placed energy must not activate next turn).
-   - Hanamaru identity assertion contains `|| true` — cannot fail.
-     REPLACE with a real identity check (assert the staged card's card_no).
-   - Karin helper selects the FIRST LiveStart of a two-trigger card; the
-     claimed selection cap is unproven. Fire the second trigger and pin it.
+      the printed next-turn activation lock is untested. ADD the next-turn
+      negative (placed energy must not activate next turn).
+   - Hanamaru identity assertion contained `|| true` — RESOLVED
+      (commit fc740bc0): `double_heart04_member_pl_s_bp5_007_r_test.rs`
+      now asserts the fetched hand card IS the Dia heart04×2 print.
+   - Karin second trigger: LEDGER PREMISE DISPROVEN — cards.json probe
+      shows NO 朝香果林 card carries two ライブスタート時 triggers (the
+      two-jidou card in `jidou_combo_edge_test.rs` is 葉月恋
+      PL!SP-bp7-005-R＋, whose `|| true` was fixed in fc740bc0). The
+      actual named-look gap was fixed instead (commit ef39f042):
+      `pl_n_pb1_016_r` now asserts revealed-to-hand identity AND waitroom
+      remainder, not merely "left the deck".
 5. **Weak/missing branches (add tests; never weaken existing):**
    - Bounded drains that never assert termination: add a final
      `assert!(!game.has_pending_choice())` on touch.
