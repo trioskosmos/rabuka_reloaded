@@ -289,147 +289,60 @@ fn any_card_fails_hearts_all_fail() {
 }
 
 /// Winner takes at most 1 card from live zone to success zone (8.4.7, Q83)
+fn assert_two_live_placement(selected: usize) {
+    let mut game = TestGame::new(load_real_database());
+    let deck: Vec<i16> = (0..30).map(|_| game.id("PL!-sd1-010-SD")).collect();
+    let opponent_deck: Vec<i16> = (0..10).map(|_| game.id("PL!-sd1-010-SD")).collect();
+    game.state.player1.main_deck.cards = deck.into();
+    game.state.player2.main_deck.cards = opponent_deck.into();
+    let rin = game.id("PL!-sd1-014-SD");
+    let hanayo = game.id("PL!-sd1-017-SD");
+    let lives = [game.id("PL!HS-bp1-019-L"), game.id("PL!HS-bp1-019-L")];
+    for card in [rin, hanayo, lives[0], lives[1]] {
+        game.add_to_hand(card);
+    }
+    game.give_energy(18);
+    game.play_to_stage(rin, rabuka_engine::zones::MemberArea::Center);
+    game.play_to_stage(hanayo, rabuka_engine::zones::MemberArea::LeftSide);
+    advance_to_live_card_set_p1(&mut game);
+    game.set_live_card(lives[0]);
+    game.set_live_card(lives[1]);
+    assert_eq!(game.state.player1.live_card_zone.cards.as_slice(), &lives);
+    assert!(game.state.player1.hand.cards.is_empty());
+    advance_to_live_start(&mut game);
+    let deck_before = game.state.player1.main_deck.cards.to_vec();
+    let hand_before = game.state.player1.hand.cards.clone();
+    for _ in 0..3 {
+        assert!(!game.has_pending_choice());
+        game.pass();
+    }
+    assert_eq!(game.pending_choice_type().as_deref(), Some("SelectLiveSuccess"));
+    assert_eq!(game.state.player1.live_card_zone.cards.as_slice(), &lives);
+    game.select_indices(&[selected]);
+    assert!(!game.has_pending_choice());
+    assert_eq!(game.state.player1.success_live_card_zone.cards.as_slice(), &[lives[selected]]);
+    assert!(game.state.player1.live_card_zone.cards.is_empty());
+    assert_eq!(game.state.player1.hand.cards, hand_before);
+    assert_eq!(game.state.player1.main_deck.cards.as_slice(), &deck_before[6..]);
+    let mut expected_waitroom = deck_before[..6].to_vec();
+    expected_waitroom.push(lives[1 - selected]);
+    let mut actual_waitroom = game.state.player1.waitroom.cards.to_vec();
+    expected_waitroom.sort_unstable();
+    actual_waitroom.sort_unstable();
+    assert_eq!(actual_waitroom, expected_waitroom);
+    assert!(game.state.player2.success_live_card_zone.cards.is_empty());
+    assert!(game.state.player2.waitroom.cards.is_empty());
+}
+
 #[test]
 fn winner_takes_one_to_success_zone() {
-    let db = load_real_database();
-    let mut game = TestGame::new(db);
-    let live_a = game.id("PL!-sd1-019-SD");
-    let live_b = game.id("PL!-sd1-019-SD");
-    let filler = game.id("PL!-sd1-010-SD");
-    let member = game.id("PL!-sd1-001-SD");
-    game.state.player1.stage.stage = [member, member, member];
-    game.state.player1.hand.cards.push(live_a);
-    game.state.player1.hand.cards.push(live_b);
-    for _ in 0..50 {
-        game.state.player1.main_deck.cards.push(filler);
-    }
-    for _ in 0..20 {
-        game.state.player2.main_deck.cards.push(filler);
-    }
-    advance_to_live_card_set_p1(&mut game);
-    game.set_live_card(live_a);
-    advance_to_live_start(&mut game);
-    game.drain_choices_strict(&["SelectCard", "SelectAutoAbility"], &[]);
-    advance_to_live_victory(&mut game);
-    game.drain_choices_strict(&["SelectCard", "SelectAutoAbility"], &[0]);
-    game.pass();
-    // Q83: exactly ONE card places even though two succeeded; the other
-    // must end in the waitroom.
-    assert_eq!(
-        game.state.player1.success_live_card_zone.cards.len(),
-        1,
-        "Q83: winner moves exactly 1 live card to success zone"
-    );
-    let placed = game.state.player1.success_live_card_zone.cards[0];
-    assert!(
-        placed == live_a || placed == live_b,
-        "placed card is one of the performed lives"
-    );
-    let other = if placed == live_a { live_b } else { live_a };
-    assert!(
-        !game.state.player1.success_live_card_zone.cards.contains(&other),
-        "Q83: only ONE of the successful lives places"
-    );
+    assert_two_live_placement(0);
 }
 
 /// Two live cards, choose the SECOND one for success zone.
 #[test]
 fn two_live_cards_choose_second() {
-    let db = load_real_database();
-    let mut game = TestGame::new(db);
-    let live_a = game.id("PL!-sd1-019-SD");
-    let live_b = game.id("PL!-sd1-019-SD");
-    let filler = game.id("PL!-sd1-010-SD");
-    let member = game.id("PL!-sd1-001-SD");
-    game.state.player1.stage.stage = [member, member, member];
-    game.state.player1.hand.cards.push(live_a);
-    game.state.player1.hand.cards.push(live_b);
-    for _ in 0..50 {
-        game.state.player1.main_deck.cards.push(filler);
-    }
-    for _ in 0..20 {
-        game.state.player2.main_deck.cards.push(filler);
-    }
-
-    // Set first live card during LiveCardSet phase
-    for _ in 0..5 {
-        game.pass();
-    }
-    game.set_live_card(live_a);
-    // Add second live card directly (as if by an effect)
-    game.state.player1.live_card_zone.cards.push(live_b);
-    assert_eq!(
-        game.state.player1.live_card_zone.cards.len(),
-        2,
-        "2 live cards in zone"
-    );
-
-    // Advance through live start
-    game.pass();
-    game.pass();
-    game.drain_choices_strict(&["SelectCard", "SelectAutoAbility"], &[]);
-
-    // Advance to live victory (3 passes)
-    game.pass();
-    game.pass();
-    game.pass();
-
-    // Drain all LiveSuccess ability choices. Each live card has a "look at 3" ability
-    // that creates a look_and_select choice. We need to finish all abilities before
-    // the SelectLiveSuccess multi-card choice appears.
-    let mut attempts = 0;
-    while game.has_pending_choice() && attempts < 20 {
-        attempts += 1;
-        let t = game.pending_choice_type();
-        eprintln!("[DEBUG] draining: choice_type={:?} attempt={}", t, attempts);
-        match t.as_deref() {
-            Some("SelectAutoAbility") => game.select_indices(&[]),
-            Some("SelectCard") => {
-                // Skip the look_and_select by selecting empty (skip)
-                game.select_indices(&[]);
-            }
-            _ => {
-                eprintln!("[DEBUG] unknown choice type, stopping drain");
-                break;
-            }
-        }
-    }
-
-    // Drain loop only processes choices; remaining auto-abilities need pass()
-    // to re-enter `execute_live_victory_determination` which calls
-    // `process_pending_auto_abilities` and eventually reaches the multi-card
-    // choice. Pass up to 10 times until the choice appears.
-    for _ in 0..10 {
-        if !game.has_pending_choice() {
-            game.pass();
-        } else {
-            break;
-        }
-    }
-
-    assert!(
-        game.has_pending_choice(),
-        "SelectLiveSuccess choice should be presented"
-    );
-
-    // Select the SECOND live card (index 1)
-    game.select_indices(&[1]);
-
-    // Verify: the chosen card went to success zone
-    assert_eq!(
-        game.state.player1.success_live_card_zone.cards.len(),
-        1,
-        "Exactly 1 card in success zone"
-    );
-    assert_eq!(
-        game.state.player1.success_live_card_zone.cards[0], live_b,
-        "Second live card (live_b) was chosen for success"
-    );
-    // Verify remaining cards moved to waitroom
-    assert!(
-        game.state.player1.live_card_zone.cards.is_empty(),
-        "Live card zone is empty"
-    );
+    assert_two_live_placement(1);
 }
 
 /// Daydream Mermaid (PL!N-bp4-030-L): Live success — conditional_alternative choice.
@@ -612,105 +525,69 @@ fn daydream_mermaid_q191_niji_in_success_pick_both() {
     );
 }
 
-/// Shared pool depletion: total hearts satisfy each individual card but not both
-/// simultaneously. Rule 8.3.16: if ANY card fails, ALL must fail (zone cleared).
-/// Uses PL!-sd1-001-SD (heart01=1, heart03=2, heart06=1, blade=3) with filler
-/// that has no blade_heart, so yell contributes 0 hearts.
-/// Two PL!-sd1-019-SD need {heart01:1, heart03:1, heart06:1} each → need 6 total,
-/// only have 4 → second card gets only heart03=1 → should fail.
-#[test]
-fn shared_pool_depletion_all_fail() {
-    let db = load_real_database();
-    let mut game = TestGame::new(db);
-    let live = game.id("PL!-sd1-019-SD");
-    let filler = game.id("PL!-sd1-014-SD"); // no blade_heart → yell contributes 0
-    let member = game.id("PL!-sd1-001-SD"); // heart01=1, heart03=2, heart06=1, blade=3
-
-    game.state.player1.stage.stage = [member, -1, -1];
-    game.state.player1.hand.cards.push(live);
-    // Add a second live card
-    let live2 = game.id("PL!-sd1-019-SD");
-    game.state.player1.hand.cards.push(live2);
-    for _ in 0..50 {
-        game.state.player1.main_deck.cards.push(filler);
+fn assert_shared_heart_pool(live_count: usize) {
+    let mut game = TestGame::new(load_real_database());
+    let deck: Vec<i16> = (0..20).map(|_| game.id("PL!-sd1-014-SD")).collect();
+    let opponent_deck: Vec<i16> = (0..10).map(|_| game.id("PL!-sd1-014-SD")).collect();
+    game.state.player1.main_deck.cards = deck.into();
+    game.state.player2.main_deck.cards = opponent_deck.into();
+    let energy = game.id("LL-E-001-SD");
+    game.state.player2.energy_deck.cards.push(energy);
+    let rin = game.id("PL!-sd1-014-SD");
+    let lives: Vec<i16> = (0..live_count).map(|_| game.id("PL!HS-bp1-019-L")).collect();
+    game.add_to_hand(rin);
+    for &live in &lives {
+        game.add_to_hand(live);
     }
-    for _ in 0..20 {
-        game.state.player2.main_deck.cards.push(filler);
-    }
-
+    game.give_energy(9);
+    game.play_to_stage(rin, rabuka_engine::zones::MemberArea::Center);
     advance_to_live_card_set_p1(&mut game);
-    // Set the first live card during LiveCardSet phase
-    game.set_live_card(live);
-    // Add second live card directly (simulating having set 2 cards)
-    game.state.player1.live_card_zone.cards.push(live2);
-    assert_eq!(
-        game.state.player1.live_card_zone.cards.len(),
-        2,
-        "2 live cards in zone"
-    );
-
+    for &live in &lives {
+        game.set_live_card(live);
+    }
+    assert_eq!(game.state.player1.live_card_zone.cards.as_slice(), lives.as_slice());
+    assert!(game.state.player1.hand.cards.is_empty());
     advance_to_live_start(&mut game);
-    game.drain_choices_strict(&["SelectCard", "SelectAutoAbility"], &[]);
-
-    advance_to_live_victory(&mut game);
-
-    // Rule 8.3.16: all live cards should have been cleared (zone empty).
-    assert!(
-        game.state.player1.live_card_zone.cards.is_empty(),
-        "8.3.16: Live card zone cleared when shared pool insufficient"
-    );
-    // No victory choices because the zone was cleared.
-    assert!(
-        !game.has_pending_choice(),
-        "No SelectLiveSuccess choice when performance fails"
-    );
+    let deck_before = game.state.player1.main_deck.cards.to_vec();
+    let hand_before = game.state.player1.hand.cards.clone();
+    let opponent_deck_before = game.state.player2.main_deck.cards.clone();
+    let opponent_hand_before = game.state.player2.hand.cards.clone();
+    for _ in 0..4 {
+        assert!(!game.has_pending_choice());
+        game.pass();
+    }
+    assert!(!game.has_pending_choice());
+    assert!(game.state.player1.live_card_zone.cards.is_empty());
+    assert_eq!(game.state.player1.hand.cards, hand_before);
+    assert_eq!(game.state.player1.main_deck.cards.as_slice(), &deck_before[3..]);
+    let mut expected_waitroom = deck_before[..3].to_vec();
+    if live_count == 1 {
+        assert_eq!(game.state.player1.success_live_card_zone.cards.as_slice(), lives.as_slice());
+    } else {
+        assert!(game.state.player1.success_live_card_zone.cards.is_empty());
+        expected_waitroom.extend_from_slice(&lives);
+    }
+    let mut actual_waitroom = game.state.player1.waitroom.cards.to_vec();
+    actual_waitroom.sort_unstable();
+    expected_waitroom.sort_unstable();
+    assert_eq!(actual_waitroom, expected_waitroom);
+    assert_eq!(game.state.player2.main_deck.cards, opponent_deck_before);
+    assert_eq!(game.state.player2.hand.cards, opponent_hand_before);
+    assert!(game.state.player2.waitroom.cards.is_empty());
+    assert!(game.state.player2.success_live_card_zone.cards.is_empty());
 }
 
-/// Three live cards where pool is insufficient for all three.
-/// Verifies that snap.success = all(l.passed) correctly enforces Rule 8.3.16.
-/// Same card setup as shared_pool_depletion_all_fail but with 3 live cards.
+#[test]
+fn shared_pool_four_hearts_satisfy_one_live() {
+    assert_shared_heart_pool(1);
+}
+
+#[test]
+fn shared_pool_depletion_all_fail() {
+    assert_shared_heart_pool(2);
+}
+
 #[test]
 fn three_live_cards_any_fails_all_fail() {
-    let db = load_real_database();
-    let mut game = TestGame::new(db);
-    let live = game.id("PL!-sd1-019-SD");
-    let filler = game.id("PL!-sd1-014-SD");
-    let member = game.id("PL!-sd1-001-SD");
-
-    game.state.player1.stage.stage = [member, -1, -1];
-    game.state.player1.hand.cards.push(live);
-    let live2 = game.id("PL!-sd1-019-SD");
-    game.state.player1.hand.cards.push(live2);
-    let live3 = game.id("PL!-sd1-019-SD");
-    game.state.player1.hand.cards.push(live3);
-    for _ in 0..50 {
-        game.state.player1.main_deck.cards.push(filler);
-    }
-    for _ in 0..20 {
-        game.state.player2.main_deck.cards.push(filler);
-    }
-
-    advance_to_live_card_set_p1(&mut game);
-    game.set_live_card(live);
-    game.state.player1.live_card_zone.cards.push(live2);
-    game.state.player1.live_card_zone.cards.push(live3);
-    assert_eq!(
-        game.state.player1.live_card_zone.cards.len(),
-        3,
-        "3 live cards in zone"
-    );
-
-    advance_to_live_start(&mut game);
-    game.drain_choices_strict(&["SelectCard", "SelectAutoAbility"], &[]);
-
-    advance_to_live_victory(&mut game);
-
-    assert!(
-        game.state.player1.live_card_zone.cards.is_empty(),
-        "8.3.16: All 3 live cards cleared when hearts insufficient"
-    );
-    assert!(
-        !game.has_pending_choice(),
-        "No victory choices when all 3 live cards fail"
-    );
+    assert_shared_heart_pool(3);
 }

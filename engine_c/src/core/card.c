@@ -113,16 +113,41 @@ int rb_decode_card_ability(uint32_t card_idx, int n, Ability *out) {
 
 /* ── CardDatabase::normalize_name (card.rs:675): strip all whitespace.
    Covers ASCII whitespace plus U+3000 (ideographic space, E3 80 80). ── */
+static size_t card_utf8_char(const char *s, uint32_t *cp) {
+    const unsigned char *p = (const unsigned char *)s;
+    size_t n = 1;
+    uint32_t v = p[0];
+    if (p[0] >= 0xC2 && p[0] <= 0xDF) { n = 2; v &= 0x1F; }
+    else if (p[0] >= 0xE0 && p[0] <= 0xEF) { n = 3; v &= 0x0F; }
+    else if (p[0] >= 0xF0 && p[0] <= 0xF4) { n = 4; v &= 0x07; }
+    for (size_t i = 1; i < n; i++) {
+        if ((p[i] & 0xC0) != 0x80) { *cp = p[0]; return 1; }
+        v = (v << 6) | (p[i] & 0x3F);
+    }
+    *cp = v;
+    return n;
+}
+
+static int card_whitespace(uint32_t cp) {
+    return (cp >= 0x09 && cp <= 0x0D) || cp == 0x20 || cp == 0x85
+        || cp == 0xA0 || cp == 0x1680 || (cp >= 0x2000 && cp <= 0x200A)
+        || cp == 0x2028 || cp == 0x2029 || cp == 0x202F || cp == 0x205F
+        || cp == 0x3000;
+}
+
 void rb_card_normalize_name(const char *src, char *out, size_t out_sz) {
     if (!out || out_sz == 0) return;
     size_t w = 0;
     if (src) {
-        for (size_t i = 0; src[i]; ) {
-            unsigned char c = (unsigned char)src[i];
-            if (c == 0xE3 && (unsigned char)src[i+1] == 0x80 && (unsigned char)src[i+2] == 0x80) { i += 3; continue; }
-            if (c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == '\v' || c == '\f') { i++; continue; }
-            if (w + 1 < out_sz) out[w++] = src[i];
-            i++;
+        while (*src) {
+            uint32_t cp;
+            size_t n = card_utf8_char(src, &cp);
+            if (!card_whitespace(cp)) {
+                if (n >= out_sz - w) break;
+                memmove(out + w, src, n);
+                w += n;
+            }
+            src += n;
         }
     }
     out[w] = 0;
@@ -230,17 +255,12 @@ int rb_condition_get_distinct(const Condition *c) {
     if (v->tag == RB_TAG_TRUE) return 1;
     if (v->tag == RB_TAG_FALSE) return 0;
     if (v->tag == RB_TAG_I64) return (int)v->i;
+    if (v->tag == RB_TAG_STR && v->s) return *v->s && strcmp(v->s, "false") != 0;
     if (v->tag == RB_TAG_OBJECT || v->tag == RB_TAG_OBJVAR) return 1;
     return 0;
 }
 const char *rb_effect_position_any(const AbilityEffect *e) {
-    const char *p = fx_extra(e, "position");
-    if (p) return p;
-    /* nested filter struct shape is flattened into extras by the decoder;
-       fall back to position_compare/area keys used by older bytecode. */
-    p = fx_extra(e, "position_compare");
-    if (p) return p;
-    return fx_extra(e, "area");
+    return fx_extra(e, "position");
 }
 
 /* ── (original CardDatabase-method ports follow) ── */
@@ -249,14 +269,30 @@ int rb_card_get_card_id(const char *card_no) {
     return rb_find_card_by_no(card_no);
 }
 int rb_card_get_card_names(int card_id, char *out, size_t out_sz) {
-    Card c;
-    if (!rb_decode_card_by_index((uint32_t)card_id, &c)) { if (out_sz) out[0] = 0; return 0; }
-    const char *n = c.name;
-    if (!n) { if (out_sz) out[0] = 0; rb_free_card(&c); return 0; }
-    strncpy(out, n, out_sz - 1);
-    out[out_sz - 1] = 0;
-    rb_free_card(&c);
-    return 1;
+    if (!out || !out_sz) return 0;
+    out[0] = 0;
+    const unsigned char *r = rb_card_record((uint32_t)card_id);
+    if (!r || rb_card_record_len((uint32_t)card_id) < 4) return 0;
+    const char *name = rb_card_string(le16p(r + 2));
+    if (!name) return 0;
+    size_t w = 0;
+    int count = 1;
+    while (*name) {
+        uint32_t cp;
+        size_t n = card_utf8_char(name, &cp);
+        if (cp == '&' || cp == 0xFF06) {
+            if (w + 1 >= out_sz) { out[0] = 0; return 0; }
+            out[w++] = 0;
+            count++;
+        } else if (!card_whitespace(cp)) {
+            if (n >= out_sz - w) { out[0] = 0; return 0; }
+            memcpy(out + w, name, n);
+            w += n;
+        }
+        name += n;
+    }
+    out[w] = 0;
+    return count;
 }
 int rb_card_get_card(const char *card_no) {
     if (!card_no) return 0;
@@ -267,34 +303,99 @@ int rb_card_has_trigger(int card_id, int kind) {
     for (int i = 0; i < n; i++) {
         Ability ab;
         if (!rb_decode_card_ability((uint32_t)card_id, i, &ab)) continue;
-        int r = ab.triggers && strstr(ab.triggers, "起動");
+        int r = rb_ability_has_trigger(&ab, (RbTriggerKind)kind);
         rb_free_ability(&ab);
         if (r) return 1;
     }
     return 0;
 }
+const char *rb_ability_triggerless_text(const Ability *a) {
+    if (!a) return "";
+    if (a->triggerless_text) return a->triggerless_text;
+    const char *text = a->full_text ? a->full_text : "";
+    while (*text) {
+        uint32_t cp;
+        size_t n = card_utf8_char(text, &cp);
+        if (!card_whitespace(cp)) break;
+        text += n;
+    }
+    if (!strncmp(text, "【", strlen("【"))) {
+        const char *rest = text + strlen("【");
+        const char *end = strstr(rest, "】");
+        if (end) return text + (end - rest) + strlen("】");
+    }
+    return text;
+}
+
 int rb_card_triggerless_text(int card_id, char *out, size_t out_sz) {
-    Card c;
-    if (!rb_decode_card_by_index((uint32_t)card_id, &c)) { if (out_sz) out[0] = 0; return 0; }
-    const char *t = c.ability ? c.ability->triggerless_text : NULL;
-    if (!t) { if (out_sz) out[0] = 0; rb_free_card(&c); return 0; }
-    strncpy(out, t, out_sz - 1);
-    out[out_sz - 1] = 0;
-    rb_free_card(&c);
+    if (!out || !out_sz) return 0;
+    out[0] = 0;
+    Ability ab = {0};
+    if (!rb_decode_card_ability((uint32_t)card_id, 0, &ab)) return 0;
+    const char *text = rb_ability_triggerless_text(&ab);
+    size_t len = strlen(text);
+    if (len >= out_sz) { rb_free_ability(&ab); return 0; }
+    memcpy(out, text, len + 1);
+    rb_free_ability(&ab);
     return 1;
 }
 int rb_card_filter_subset(int card_id) { (void)card_id; return 0; }
-int rb_card_fires_on_opponent_effects(int card_id) { (void)card_id; return 0; }
-int rb_card_energy_cost_total(int card_id) {
-    Card c;
-    if (!rb_decode_card_by_index((uint32_t)card_id, &c)) return 0;
-    int t = c.cost;
-    rb_free_card(&c);
-    return t;
+int rb_card_fires_on_opponent_effects(int card_id) {
+    int n = rb_card_num_abilities((uint32_t)card_id);
+    for (int i = 0; i < n; i++) {
+        Ability ab = {0};
+        if (!rb_decode_card_ability((uint32_t)card_id, i, &ab)) continue;
+        int fires = rb_effect_fires_on_opponent_effects(ab.effect);
+        rb_free_ability(&ab);
+        if (fires) return 1;
+    }
+    return 0;
 }
-int rb_card_has_optional_payment(int card_id) { (void)card_id; return 0; }
+static int effect_energy_total(const AbilityEffect *e, int groups_on_stage) {
+    if (!e) return 0;
+    if (e->action && !strcmp(e->action, "pay_energy")) {
+        int printed = e->count < 0 ? 0 : rb_saturate_u8(e->count);
+        const char *energy = fx_extra(e, "energy_count");
+        if (!energy || !*energy) energy = fx_extra(e, "energy");
+        if (energy && *energy) {
+            char *end;
+            long value = strtol(energy, &end, 10);
+            if (*energy && !*end && value >= 0 && value <= 255) printed = (int)value;
+        }
+        int reduction = rb_saturate_u8(e->cost_reduction_per_group)
+                      * rb_saturate_u8(groups_on_stage);
+        return rb_saturate_u8(printed - rb_saturate_u8(reduction));
+    }
+    int total = 0;
+    for (int i = 0; i < e->n_child; i++)
+        total = rb_saturate_u8(total + effect_energy_total(e->child[i], groups_on_stage));
+    return total;
+}
+static int effect_optional_payment(const AbilityEffect *e) {
+    if (!e) return 0;
+    if (e->action && !strcmp(e->action, "pay_energy") && e->is_optional) return 1;
+    for (int i = 0; i < e->n_child; i++)
+        if (effect_optional_payment(e->child[i])) return 1;
+    return 0;
+}
+int rb_card_energy_cost_total(int card_id) {
+    Ability ab = {0};
+    if (!rb_decode_card_ability((uint32_t)card_id, 0, &ab)) return 0;
+    int total = effect_energy_total(ab.cost, 0);
+    rb_free_ability(&ab);
+    return total;
+}
+int rb_card_has_optional_payment(int card_id) {
+    Ability ab = {0};
+    if (!rb_decode_card_ability((uint32_t)card_id, 0, &ab)) return 0;
+    int optional = effect_optional_payment(ab.cost);
+    rb_free_ability(&ab);
+    return optional;
+}
 int rb_card_effective_energy_cost_total(int card_id, int groups_on_stage) {
-    int base = rb_card_energy_cost_total(card_id);
-    (void)groups_on_stage;
-    return base;
+    Ability ab = {0};
+    if (!rb_decode_card_ability((uint32_t)card_id, 0, &ab)) return 0;
+    int total = effect_energy_total(ab.cost, groups_on_stage);
+    rb_free_ability(&ab);
+    return total;
 }

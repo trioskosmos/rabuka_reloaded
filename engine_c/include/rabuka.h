@@ -180,7 +180,16 @@ static inline int rb_modifier_total(RbModifierEntry e) { return (int)e.set + (in
 #define RB_MODS_TRACE_TEXT 48
 typedef enum {
     RB_EFFECT_BLADE_BONUS = 0,
-    RB_EFFECT_HEART_BONUS = 1
+    RB_EFFECT_HEART_BONUS = 1,
+    RB_EFFECT_SCORE_BONUS,
+    RB_EFFECT_SCORE_SET,
+    RB_EFFECT_TRANSFORM,
+    RB_EFFECT_NEED_HEART_MOD,
+    RB_EFFECT_HEART_OVERRIDE,
+    RB_EFFECT_COST_BONUS,
+    RB_EFFECT_COST_SET,
+    RB_EFFECT_BLADE_SET,
+    RB_EFFECT_BLADE_TYPE_SET
 } RbEffectType;
 typedef struct {
     int16_t source_card_id;
@@ -439,6 +448,13 @@ typedef enum {
     RB_ZONEID_SELECTED_CARDS,
     RB_ZONEID_RESOLUTION,
     RB_ZONEID_EXCLUSION_ZONE,
+    RB_ZONEID_DECK_TOP_OR_BOTTOM,
+    RB_ZONEID_LOOKED_AT_REMAINING,
+    RB_ZONEID_THOSE_CARDS,
+    RB_ZONEID_PRECEDING_MOVED,
+    RB_ZONEID_RECENTLY_MOVED,
+    RB_ZONEID_FRONT,
+    RB_ZONEID_LIVE_TOTAL,
     RB_ZONEID_UNKNOWN
 } RbZoneId;
 
@@ -476,7 +492,8 @@ typedef enum {
     RB_ABILITY_ZONE_LOOKED_AT_REMAINING,
     RB_ABILITY_ZONE_DECK_TOP_OR_BOTTOM,
     RB_ABILITY_ZONE_FRONT,
-    RB_ABILITY_ZONE_UNKNOWN
+    RB_ABILITY_ZONE_UNKNOWN,
+    RB_ABILITY_ZONE_LIVE_TOTAL
 } RbAbilityZone;
 
 /* ── ability/enums.rs: typed ability enums ── */
@@ -706,7 +723,11 @@ typedef enum {
     RB_PHASE_LIVE_SET,    /* choose live cards */
     RB_PHASE_PERFORMANCE, /* yell + heart resolution */
     RB_PHASE_VICTORY,     /* success determination + turn rollover */
-    RB_PHASE_DONE
+    RB_PHASE_DONE,
+    RB_PHASE_MULLIGAN_FIRST,
+    RB_PHASE_MULLIGAN_SECOND,
+    RB_PHASE_LIVE_SET_SECOND,
+    RB_PHASE_PERFORMANCE_SECOND
 } RbPhase;
 
 const char *rb_phase_name(int phase);
@@ -1439,7 +1460,45 @@ void rb_effect_both_hand_keep_shuffle_under(GameState *g, int actor, AbilityEffe
 /* draw.rs:execute_draw_until_count — draw until hand reaches target_count */
 void rb_effect_draw_until_count(GameState *g, int actor, AbilityEffect *e);
 /* draw.rs:make_card_effect_data — build single-card effect data for resource grant */
-typedef struct { int card_id; int amount; char color[24]; } RbEffectDataSingleCard;
+typedef struct {
+    int card_id; int amount; char color[24];
+} RbEffectDataSingleCard;
+
+typedef struct {
+    int16_t card_id;
+    int16_t amount;
+    char *color;
+} RbCardEffectItem;
+
+typedef struct {
+    int16_t card_id;
+    int16_t amount;
+    const char *color;
+} RbCardEffectItemRef;
+
+typedef enum {
+    RB_EFFECT_DATA_HEART_OVERRIDE,
+    RB_EFFECT_DATA_SINGLE_CARD,
+    RB_EFFECT_DATA_MULTI_CARD,
+    RB_EFFECT_DATA_ALL_CARDS,
+    RB_EFFECT_DATA_SET_BLADE_COUNT,
+    RB_EFFECT_DATA_SURPLUS_HEART,
+    RB_EFFECT_DATA_GAIN_ABILITY
+} RbEffectDataKind;
+
+typedef struct {
+    RbEffectDataKind kind;
+    union {
+        struct { int16_t card_id; char *color; uint8_t count; } heart_override;
+        RbCardEffectItem single_card;
+        struct { RbCardEffectItem *items; size_t count; } multi_card;
+        struct { int16_t amount; } all_cards;
+        struct { int16_t card_id; } set_blade_count;
+        struct { bool is_p1; uint8_t old_value; } surplus_heart;
+        struct { int16_t card_id; int16_t amount; bool is_live_total; } gain_ability;
+    } value;
+} RbEffectData;
+
 RbEffectDataSingleCard rb_make_card_effect_data(int card_id, int amount, const char *color);
 /* draw.rs:resolve_gain_heart_color — returns a fixed heart color idx, or -1 if a
     choice was emitted / not a heart resource. */
@@ -2243,14 +2302,14 @@ void rb_arcstr_deserialize(char *s);
 const char *rb_phase_label_jp(int phase);
 
 /* ── types.rs: EffectData accessors ──
-     Mirrors EffectData enum methods (C EffectData is flattened to single-card). */
-int rb_effect_data_items(const RbEffectDataSingleCard *d, int card_id,
-                         int *out_amount, char *out_color, size_t color_sz);
-int rb_effect_data_is_p1(const RbEffectDataSingleCard *d);
-int rb_effect_data_old_value(const RbEffectDataSingleCard *d);
-int rb_effect_data_count(const RbEffectDataSingleCard *d);
-const char *rb_effect_data_color(const RbEffectDataSingleCard *d);
-int rb_effect_data_amount(const RbEffectDataSingleCard *d);
+     Mirrors EffectData enum methods on the full RbEffectData tagged union. */
+int rb_effect_data_items(const RbEffectData *d, RbCardEffectItemRef **out_items, size_t *out_n);
+int rb_effect_data_is_p1(const RbEffectData *d, bool *out_is_p1);
+int rb_effect_data_old_value(const RbEffectData *d, uint8_t *out_old_value);
+int rb_effect_data_count(const RbEffectData *d, uint8_t *out_count);
+int rb_effect_data_color(const RbEffectData *d, const char **out_color);
+int rb_effect_data_amount(const RbEffectData *d, int16_t *out_amount);
+int rb_effect_data_card_id(const RbEffectData *d, int16_t *out_card_id);
 
 /* ── types.rs: ZoneId::equivalent / matches_source ──
      Zone aliasing for rule-purpose equivalence and zone-change condition matching. */

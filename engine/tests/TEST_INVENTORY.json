@@ -1,6 +1,6 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-09-17T01:08:54.168937+00:00",
+  "generated_at": "2026-09-17T01:32:14.286391+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
@@ -8,7 +8,7 @@
     "unique_abilities": 936
   },
   "n_files": 577,
-  "n_tests": 3305,
+  "n_tests": 3306,
   "total_cards": 771,
   "covered_cards": 771,
   "abilities_on_covered": 936,
@@ -386,19 +386,19 @@
       "count": 5,
       "rows": [
         {
-          "file": "engine/tests/test_modules/abilities/simple/look_and_select_test.rs",
+          "file": "engine/tests/test_modules/card_flow/inspect_top_select_and_discard_remainder.rs",
           "test": "kaho_full_own_stage_looks_five_and_keeps_one",
           "line": 75,
           "detail": ""
         },
         {
-          "file": "engine/tests/test_modules/abilities/simple/look_and_select_test.rs",
+          "file": "engine/tests/test_modules/card_flow/inspect_top_select_and_discard_remainder.rs",
           "test": "kaho_two_own_members_look_four_and_keep_one",
           "line": 70,
           "detail": ""
         },
         {
-          "file": "engine/tests/test_modules/abilities/simple/look_and_select_test.rs",
+          "file": "engine/tests/test_modules/card_flow/inspect_top_select_and_discard_remainder.rs",
           "test": "look_and_select_dynamic_count_look_at_counts_stage_members_plus_two",
           "line": 65,
           "detail": ""
@@ -754,7 +754,7 @@
       ]
     }
   },
-  "n_test_fns_parsed": 3305,
+  "n_test_fns_parsed": 3306,
   "abilities": [
     {
       "idx": 0,
@@ -959,7 +959,6 @@
         "engine/tests/test_modules/abilities/moderate/love_u_test.rs",
         "engine/tests/test_modules/abilities/moderate/rin_bp6_test.rs",
         "engine/tests/test_modules/abilities/moderate/yoshiko_debut_test.rs",
-        "engine/tests/test_modules/abilities/simple/attacker_order_performance_test.rs",
         "engine/tests/test_modules/abilities/simple/blade_heart_colorless_test.rs",
         "engine/tests/test_modules/abilities/simple/cheer_pipeline_test.rs",
         "engine/tests/test_modules/abilities/simple/fixed_customs_test.rs",
@@ -986,6 +985,7 @@
         "engine/tests/test_modules/jidou/moderate/bp7_q271_colorful_dreams_test.rs",
         "engine/tests/test_modules/jidou/moderate/modify_required_hearts_exclude_heart_test.rs",
         "engine/tests/test_modules/jidou/moderate/stage_to_discard_ability_test.rs",
+        "engine/tests/test_modules/mechanics/attacker_order_performance_test.rs",
         "engine/tests/test_modules/qa/q146_per_member_draw_test.rs",
         "engine/tests/test_modules/qa/q148_blade_total_waited_test.rs",
         "engine/tests/test_modules/qa/q159_debut_from_discard_self_cost_test.rs",
@@ -1084,14 +1084,14 @@
         "engine/tests/test_modules/abilities/moderate/l0_gap_livesuccess2_test.rs",
         "engine/tests/test_modules/abilities/moderate/sumire_bp2_center_cost_test.rs",
         "engine/tests/test_modules/abilities/simple/bp7_tomari_discard_all_hand_test.rs",
-        "engine/tests/test_modules/abilities/simple/honoka_bp5_live_score_test.rs",
-        "engine/tests/test_modules/abilities/simple/look_and_select_test.rs",
         "engine/tests/test_modules/abilities/simple/miyata_draw_until_test.rs",
         "engine/tests/test_modules/batches/untested_abilities_batch31_test.rs",
         "engine/tests/test_modules/batches/untested_abilities_batch35_test.rs",
         "engine/tests/test_modules/batches/untested_abilities_batch55_test.rs",
         "engine/tests/test_modules/batches/untested_abilities_test.rs",
         "engine/tests/test_modules/batches/upper_batch_on_yell_test.rs",
+        "engine/tests/test_modules/card_flow/inspect_by_total_live_score.rs",
+        "engine/tests/test_modules/card_flow/inspect_top_select_and_discard_remainder.rs",
         "engine/tests/test_modules/edge_cases/sp_bp2_004_comprehensive_edge_test.rs",
         "engine/tests/test_modules/edge_cases/sp_bp2_004_extra_test11.rs",
         "engine/tests/test_modules/edge_cases/sp_bp2_004_extra_test5.rs",
@@ -1401,7 +1401,7 @@
         "daydream_mermaid_no_niji_in_success_pick_one",
         "daydream_mermaid_q191_niji_in_success_pick_both"
       ],
-      "covering_test_count": 167,
+      "covering_test_count": 168,
       "is_null": true,
       "use_limit": null,
       "watches_abilities": false,
@@ -2262,11 +2262,11 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/abilities/complex/bp7_kanata_look_select_test.rs",
         "engine/tests/test_modules/abilities/complex/miyashita_ai_bp5_test.rs",
         "engine/tests/test_modules/abilities/complex/zero_tested_action_types_test.rs",
         "engine/tests/test_modules/abilities/moderate/chika_bp7_reveal_cost_test.rs",
-        "engine/tests/test_modules/abilities/moderate/shizuku_pb1_test.rs"
+        "engine/tests/test_modules/abilities/moderate/shizuku_pb1_test.rs",
+        "engine/tests/test_modules/card_flow/inspect_top_recruit_no_blade_member.rs"
       ],
       "covering_tests": [
         "chika_low_cost_hand_not_selectable",
@@ -6184,7 +6184,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/abilities/simple/honoka_bp5_live_score_test.rs",
+        "engine/tests/test_modules/card_flow/inspect_by_total_live_score.rs",
         "engine/tests/test_modules/integration/parser_issues_e2e_test_part2.rs"
       ],
       "covering_tests": [
@@ -8725,7 +8725,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/abilities/simple/look_and_select_test.rs"
+        "engine/tests/test_modules/card_flow/inspect_top_select_and_discard_remainder.rs"
       ],
       "covering_tests": [
         "eli_cost_look_three_takes_one_to_hand",
@@ -8779,7 +8779,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/abilities/simple/look_and_select_test.rs"
+        "engine/tests/test_modules/card_flow/inspect_top_select_and_discard_remainder.rs"
       ],
       "covering_tests": [
         "eli_cost_look_three_takes_one_to_hand",
@@ -10596,10 +10596,10 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/abilities/complex/looked_at_discard_test.rs",
         "engine/tests/test_modules/abilities/complex/nagi_live_card_draw_test.rs",
-        "engine/tests/test_modules/abilities/simple/honoka_bp5_live_score_test.rs",
-        "engine/tests/test_modules/abilities/simple/look_and_select_test.rs",
+        "engine/tests/test_modules/card_flow/deck_top_optional_discard.rs",
+        "engine/tests/test_modules/card_flow/inspect_by_total_live_score.rs",
+        "engine/tests/test_modules/card_flow/inspect_top_select_and_discard_remainder.rs",
         "engine/tests/test_modules/integration/gameplay_test.rs"
       ],
       "covering_tests": [
@@ -11735,13 +11735,13 @@
         "engine/tests/test_modules/abilities/complex/ginko_baton_touch_hasu_search_test.rs",
         "engine/tests/test_modules/abilities/complex/hinoshita_test.rs",
         "engine/tests/test_modules/abilities/complex/hs_bp2_001_recover_test.rs",
+        "engine/tests/test_modules/abilities/complex/live_success_rules_test.rs",
         "engine/tests/test_modules/abilities/complex/pipeline_characterization_test.rs",
         "engine/tests/test_modules/abilities/complex/shioriko_bp4_swap_test.rs",
         "engine/tests/test_modules/abilities/moderate/l0_gap_livesuccess_test.rs",
         "engine/tests/test_modules/abilities/moderate/performance_pipeline_test.rs",
         "engine/tests/test_modules/abilities/moderate/performance_snapshot_audit_test.rs",
         "engine/tests/test_modules/abilities/moderate/pl_hs_bp1_003_test.rs",
-        "engine/tests/test_modules/abilities/simple/attacker_order_performance_test.rs",
         "engine/tests/test_modules/abilities/simple/blade_heart_colorless_test.rs",
         "engine/tests/test_modules/abilities/simple/fixed_customs_test.rs",
         "engine/tests/test_modules/abilities/simple/live_cards_disappear_test.rs",
@@ -11758,6 +11758,7 @@
         "engine/tests/test_modules/jidou/complex/natsumi_bp5_test.rs",
         "engine/tests/test_modules/jidou/complex/special_blade_heart_rules_test.rs",
         "engine/tests/test_modules/jidou/moderate/mari_bp2_test.rs",
+        "engine/tests/test_modules/mechanics/attacker_order_performance_test.rs",
         "engine/tests/test_modules/qa/q46_kanako_all_heart_timing_test.rs",
         "engine/tests/test_modules/qa/qa_new_tests209.rs",
         "engine/tests/test_modules/qa/qa_new_tests251.rs",
@@ -11767,6 +11768,7 @@
       "covering_tests": [
         "all_areas_aqours_diff_names_gains_ability",
         "all_areas_hasunosora_with_multiname_gains_score",
+        "any_card_fails_hearts_all_fail",
         "aoku_haruka_live_start_fails_with_only_non_suzu_live_cards",
         "aoku_haruka_live_start_no_score_when_aurora_missing",
         "aoku_haruka_live_start_scores_with_aurora_in_discard",
@@ -11786,17 +11788,16 @@
         "b_heart07_yell_contributes_two_colorless_hearts_each",
         "baton_touch_search_adds_hasu_live_to_hand",
         "blade_pipeline_unified_set_plus_additive",
+        "both_players_have_live_cards",
+        "both_players_live_score_compared",
         "bp4_021_accept_puts_waitroom_card_on_deck_top",
         "bp4_021_skip_leaves_waitroom_intact",
         "bp5_015_debut_mills_exactly_ten",
         "bp6_011n_deck_with_one_card_still_discards",
         "bp6_011n_empty_deck_and_empty_hand_is_a_clean_noop",
-        "bp6_011n_hand_debut_no_draw",
-        "bp6_011n_waitroom_debut_draws_two_discards_one",
-        "bp6_016_look_three_reorder_back_on_top",
-        "bp6_016n_deck_shorter_than_three_looks_whats_there"
+        "bp6_011n_hand_debut_no_draw"
       ],
-      "covering_test_count": 241,
+      "covering_test_count": 255,
       "is_null": true,
       "use_limit": null,
       "watches_abilities": false,
@@ -13059,8 +13060,8 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/abilities/moderate/draw_one_put_bottom_debut_test.rs",
-        "engine/tests/test_modules/batches/untested_abilities_batch32_test.rs"
+        "engine/tests/test_modules/batches/untested_abilities_batch32_test.rs",
+        "engine/tests/test_modules/card_flow/draw_then_bottom_hand_card.rs"
       ],
       "covering_tests": [
         "all_three_cards_parse_to_identical_sequential",
@@ -14287,7 +14288,6 @@
         "engine/tests/test_modules/abilities/complex/ability_engine_fixes_test.rs",
         "engine/tests/test_modules/abilities/complex/aurora_flower_identity_test.rs",
         "engine/tests/test_modules/abilities/complex/ayumu_pb1_constant_test.rs",
-        "engine/tests/test_modules/abilities/complex/bp7_kanata_look_select_test.rs",
         "engine/tests/test_modules/abilities/complex/condition_negative_test.rs",
         "engine/tests/test_modules/abilities/complex/conditional_alternative_test.rs",
         "engine/tests/test_modules/abilities/complex/constant_edge_case_test.rs",
@@ -14327,7 +14327,6 @@
         "engine/tests/test_modules/abilities/simple/chisato_bp5_test.rs",
         "engine/tests/test_modules/abilities/simple/hanano_test.rs",
         "engine/tests/test_modules/abilities/simple/heart_override_test.rs",
-        "engine/tests/test_modules/abilities/simple/honoka_bp5_live_score_test.rs",
         "engine/tests/test_modules/abilities/simple/kanon_test.rs",
         "engine/tests/test_modules/abilities/simple/mia_test.rs",
         "engine/tests/test_modules/abilities/simple/natsumi_test.rs",
@@ -14350,6 +14349,8 @@
         "engine/tests/test_modules/batches/untested_abilities_playthrough_test.rs",
         "engine/tests/test_modules/batches/untested_choice_change_target_test.rs",
         "engine/tests/test_modules/batches/untested_secondary_abilities_test.rs",
+        "engine/tests/test_modules/card_flow/inspect_by_total_live_score.rs",
+        "engine/tests/test_modules/card_flow/inspect_top_recruit_no_blade_member.rs",
         "engine/tests/test_modules/edge_cases/s_pb1_002_riko_edge_test.rs",
         "engine/tests/test_modules/edge_cases/s_pb1_006_yohane_edge_test.rs",
         "engine/tests/test_modules/integration/gameplay_test.rs",
@@ -14413,7 +14414,7 @@
         "ayumu_constant_three_live_cards_still_gains_blade",
         "ayumu_constant_two_live_cards_gains_blade"
       ],
-      "covering_test_count": 869,
+      "covering_test_count": 870,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -17887,7 +17888,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/abilities/simple/look_and_select_test.rs"
+        "engine/tests/test_modules/card_flow/inspect_top_select_and_discard_remainder.rs"
       ],
       "covering_tests": [
         "eli_cost_look_three_takes_one_to_hand",
@@ -27578,8 +27579,8 @@
       "covering_files": [
         "engine/tests/test_modules/abilities/complex/bp7_character_name_condition_test.rs",
         "engine/tests/test_modules/abilities/complex/bp7_dia_both_hand_reorder_test.rs",
-        "engine/tests/test_modules/abilities/complex/bp7_dia_look_bottom_select_test.rs",
-        "engine/tests/test_modules/abilities/complex/bp7_watanabe_under_card_blade_test.rs"
+        "engine/tests/test_modules/abilities/complex/bp7_watanabe_under_card_blade_test.rs",
+        "engine/tests/test_modules/card_flow/inspect_bottom_and_select.rs"
       ],
       "covering_tests": [
         "c6_hand_below_max_nothing_shuffled_under",
@@ -27635,8 +27636,8 @@
       "covering_files": [
         "engine/tests/test_modules/abilities/complex/bp7_character_name_condition_test.rs",
         "engine/tests/test_modules/abilities/complex/bp7_dia_both_hand_reorder_test.rs",
-        "engine/tests/test_modules/abilities/complex/bp7_dia_look_bottom_select_test.rs",
-        "engine/tests/test_modules/abilities/complex/bp7_watanabe_under_card_blade_test.rs"
+        "engine/tests/test_modules/abilities/complex/bp7_watanabe_under_card_blade_test.rs",
+        "engine/tests/test_modules/card_flow/inspect_bottom_and_select.rs"
       ],
       "covering_tests": [
         "c6_hand_below_max_nothing_shuffled_under",
@@ -27738,7 +27739,7 @@
       "covering_files": [
         "engine/tests/test_modules/abilities/complex/bp7_character_name_condition_test.rs",
         "engine/tests/test_modules/abilities/complex/bp7_deck_bottom_source_test.rs",
-        "engine/tests/test_modules/abilities/complex/bp7_mari_look_top_split_test.rs"
+        "engine/tests/test_modules/card_flow/inspect_top_split_remainder.rs"
       ],
       "covering_tests": [
         "mari_bottom_dia_added_to_hand",
@@ -27783,7 +27784,7 @@
       "covering_files": [
         "engine/tests/test_modules/abilities/complex/bp7_character_name_condition_test.rs",
         "engine/tests/test_modules/abilities/complex/bp7_deck_bottom_source_test.rs",
-        "engine/tests/test_modules/abilities/complex/bp7_mari_look_top_split_test.rs"
+        "engine/tests/test_modules/card_flow/inspect_top_split_remainder.rs"
       ],
       "covering_tests": [
         "mari_bottom_dia_added_to_hand",
@@ -29367,8 +29368,6 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/abilities/complex/bp7_dia_look_bottom_select_test.rs",
-        "engine/tests/test_modules/abilities/complex/bp7_ginko_select_discard_deck_bottom_test.rs",
         "engine/tests/test_modules/abilities/complex/bp7_q266_natsumi_blade_wait_test.rs",
         "engine/tests/test_modules/abilities/complex/bp7_q272_just_believe_test.rs",
         "engine/tests/test_modules/abilities/complex/bp7_watanabe_select_self_and_other_test.rs",
@@ -29392,7 +29391,6 @@
         "engine/tests/test_modules/abilities/moderate/bp7_q273_watanabe_cost_test.rs",
         "engine/tests/test_modules/abilities/moderate/bp7_q276_cheer_mode_return_hand_test.rs",
         "engine/tests/test_modules/abilities/moderate/cannot_baton_touch_test.rs",
-        "engine/tests/test_modules/abilities/moderate/draw_one_put_bottom_debut_test.rs",
         "engine/tests/test_modules/abilities/moderate/eli_test.rs",
         "engine/tests/test_modules/abilities/moderate/eri_bp3_test.rs",
         "engine/tests/test_modules/abilities/moderate/hanayo_test.rs",
@@ -29417,6 +29415,9 @@
         "engine/tests/test_modules/batches/untested_abilities_batch42_test.rs",
         "engine/tests/test_modules/batches/untested_abilities_batch43_test.rs",
         "engine/tests/test_modules/batches/untested_abilities_batch44_test.rs",
+        "engine/tests/test_modules/card_flow/draw_then_bottom_hand_card.rs",
+        "engine/tests/test_modules/card_flow/inspect_bottom_and_select.rs",
+        "engine/tests/test_modules/card_flow/recover_and_order_opponent_bottom.rs",
         "engine/tests/test_modules/edge_cases/pr045_comprehensive_edge_test.rs",
         "engine/tests/test_modules/edge_cases/strict_engine_bug_expected_fail_test.rs",
         "engine/tests/test_modules/integration/cross_player_round5_test.rs",
@@ -29468,7 +29469,7 @@
         "bp5015_all_six_colors_present_two_blades",
         "bp5015_missing_colors_no_blades"
       ],
-      "covering_test_count": 448,
+      "covering_test_count": 449,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -29495,8 +29496,6 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/abilities/complex/bp7_dia_look_bottom_select_test.rs",
-        "engine/tests/test_modules/abilities/complex/bp7_ginko_select_discard_deck_bottom_test.rs",
         "engine/tests/test_modules/abilities/complex/bp7_q266_natsumi_blade_wait_test.rs",
         "engine/tests/test_modules/abilities/complex/bp7_q272_just_believe_test.rs",
         "engine/tests/test_modules/abilities/complex/bp7_watanabe_select_self_and_other_test.rs",
@@ -29520,7 +29519,6 @@
         "engine/tests/test_modules/abilities/moderate/bp7_q273_watanabe_cost_test.rs",
         "engine/tests/test_modules/abilities/moderate/bp7_q276_cheer_mode_return_hand_test.rs",
         "engine/tests/test_modules/abilities/moderate/cannot_baton_touch_test.rs",
-        "engine/tests/test_modules/abilities/moderate/draw_one_put_bottom_debut_test.rs",
         "engine/tests/test_modules/abilities/moderate/eli_test.rs",
         "engine/tests/test_modules/abilities/moderate/eri_bp3_test.rs",
         "engine/tests/test_modules/abilities/moderate/hanayo_test.rs",
@@ -29545,6 +29543,9 @@
         "engine/tests/test_modules/batches/untested_abilities_batch42_test.rs",
         "engine/tests/test_modules/batches/untested_abilities_batch43_test.rs",
         "engine/tests/test_modules/batches/untested_abilities_batch44_test.rs",
+        "engine/tests/test_modules/card_flow/draw_then_bottom_hand_card.rs",
+        "engine/tests/test_modules/card_flow/inspect_bottom_and_select.rs",
+        "engine/tests/test_modules/card_flow/recover_and_order_opponent_bottom.rs",
         "engine/tests/test_modules/edge_cases/pr045_comprehensive_edge_test.rs",
         "engine/tests/test_modules/edge_cases/strict_engine_bug_expected_fail_test.rs",
         "engine/tests/test_modules/integration/cross_player_round5_test.rs",
@@ -29596,7 +29597,7 @@
         "bp5015_all_six_colors_present_two_blades",
         "bp5015_missing_colors_no_blades"
       ],
-      "covering_test_count": 448,
+      "covering_test_count": 449,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -29623,13 +29624,13 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/abilities/complex/bp7_dia_look_bottom_select_test.rs",
-        "engine/tests/test_modules/abilities/complex/bp7_ginko_select_discard_deck_bottom_test.rs",
         "engine/tests/test_modules/abilities/complex/live_success_rules_test.rs",
         "engine/tests/test_modules/abilities/moderate/eli_test.rs",
         "engine/tests/test_modules/abilities/moderate/wao_wao_test.rs",
         "engine/tests/test_modules/abilities/simple/hanano_test.rs",
         "engine/tests/test_modules/abilities/simple/s_bp6_015_wait_test.rs",
+        "engine/tests/test_modules/card_flow/inspect_bottom_and_select.rs",
+        "engine/tests/test_modules/card_flow/recover_and_order_opponent_bottom.rs",
         "engine/tests/test_modules/edge_cases/pr045_comprehensive_edge_test.rs",
         "engine/tests/test_modules/edge_cases/strict_engine_bug_expected_fail_test.rs",
         "engine/tests/test_modules/integration/cross_player_round5_test.rs",
@@ -29671,7 +29672,7 @@
         "mei_cost_gate_and_already_waited_target",
         "mei_mirror_standoff_each_side_rests_own_opponent"
       ],
-      "covering_test_count": 115,
+      "covering_test_count": 116,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -29698,13 +29699,13 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/abilities/complex/bp7_dia_look_bottom_select_test.rs",
-        "engine/tests/test_modules/abilities/complex/bp7_ginko_select_discard_deck_bottom_test.rs",
         "engine/tests/test_modules/abilities/complex/live_success_rules_test.rs",
         "engine/tests/test_modules/abilities/moderate/eli_test.rs",
         "engine/tests/test_modules/abilities/moderate/wao_wao_test.rs",
         "engine/tests/test_modules/abilities/simple/hanano_test.rs",
         "engine/tests/test_modules/abilities/simple/s_bp6_015_wait_test.rs",
+        "engine/tests/test_modules/card_flow/inspect_bottom_and_select.rs",
+        "engine/tests/test_modules/card_flow/recover_and_order_opponent_bottom.rs",
         "engine/tests/test_modules/edge_cases/pr045_comprehensive_edge_test.rs",
         "engine/tests/test_modules/edge_cases/strict_engine_bug_expected_fail_test.rs",
         "engine/tests/test_modules/integration/cross_player_round5_test.rs",
@@ -29746,7 +29747,7 @@
         "mei_cost_gate_and_already_waited_target",
         "mei_mirror_standoff_each_side_rests_own_opponent"
       ],
-      "covering_test_count": 115,
+      "covering_test_count": 116,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -29773,11 +29774,11 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/abilities/complex/bp7_dia_look_bottom_select_test.rs",
-        "engine/tests/test_modules/abilities/complex/bp7_ginko_select_discard_deck_bottom_test.rs",
         "engine/tests/test_modules/abilities/simple/hanano_test.rs",
-        "engine/tests/test_modules/abilities/simple/look_and_select_test.rs",
         "engine/tests/test_modules/batches/untested_abilities_batch44_test.rs",
+        "engine/tests/test_modules/card_flow/inspect_bottom_and_select.rs",
+        "engine/tests/test_modules/card_flow/inspect_top_select_and_discard_remainder.rs",
+        "engine/tests/test_modules/card_flow/recover_and_order_opponent_bottom.rs",
         "engine/tests/test_modules/integration/cross_player_round5_test.rs",
         "engine/tests/test_modules/jidou/complex/bp7_constant_edge_case_test.rs"
       ],
@@ -31116,7 +31117,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/abilities/complex/bp7_ginko_select_discard_deck_bottom_test.rs",
+        "engine/tests/test_modules/card_flow/recover_and_order_opponent_bottom.rs",
         "engine/tests/test_modules/integration/cross_player_round5_test.rs"
       ],
       "covering_tests": [
@@ -33822,7 +33823,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/abilities/simple/look_and_select_test.rs"
+        "engine/tests/test_modules/card_flow/inspect_top_select_and_discard_remainder.rs"
       ],
       "covering_tests": [
         "eli_cost_look_three_takes_one_to_hand",
@@ -36636,11 +36637,12 @@
         "one_player_live_auto_higher_score",
         "q147_empty_need_heart_live_succeeds",
         "shared_pool_depletion_all_fail",
+        "shared_pool_four_hearts_satisfy_one_live",
         "three_live_cards_any_fails_all_fail",
         "two_live_cards_choose_second",
         "winner_takes_one_to_success_zone"
       ],
-      "covering_test_count": 15,
+      "covering_test_count": 16,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -40831,7 +40833,7 @@
         "hot_passion_decline_no_opponent_draw",
         "kaguya_live_success_cheer_recover"
       ],
-      "covering_test_count": 111,
+      "covering_test_count": 112,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -41582,7 +41584,7 @@
       "has_choice": true,
       "has_negative": false,
       "covering_files": [
-        "engine/tests/test_modules/abilities/complex/looked_at_discard_test.rs"
+        "engine/tests/test_modules/card_flow/deck_top_optional_discard.rs"
       ],
       "covering_tests": [
         "live_success_discard_4_from_deck_unconditionally",
@@ -43762,7 +43764,7 @@
       "has_choice": true,
       "has_negative": false,
       "covering_files": [
-        "engine/tests/test_modules/abilities/complex/looked_at_discard_test.rs"
+        "engine/tests/test_modules/card_flow/deck_top_optional_discard.rs"
       ],
       "covering_tests": [
         "live_success_discard_4_from_deck_unconditionally",
@@ -46366,7 +46368,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/abilities/complex/bp7_kanata_look_select_test.rs"
+        "engine/tests/test_modules/card_flow/inspect_top_recruit_no_blade_member.rs"
       ],
       "covering_tests": [
         "kanata_no_eligible_among_looked_discards_all",
@@ -46463,8 +46465,8 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/abilities/complex/bp7_kanata_look_select_test.rs",
-        "engine/tests/test_modules/abilities/complex/bp7_q270_emma_color_diversity_test.rs"
+        "engine/tests/test_modules/abilities/complex/bp7_q270_emma_color_diversity_test.rs",
+        "engine/tests/test_modules/card_flow/inspect_top_recruit_no_blade_member.rs"
       ],
       "covering_tests": [
         "emma_all_one_color_no_heart04",

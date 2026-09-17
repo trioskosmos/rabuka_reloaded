@@ -1,6 +1,5 @@
 // Auto-generated. Tests live as sibling .rs files in this folder.
     pub mod abundant_test;
-    pub mod attacker_order_performance_test;
     pub mod ayumu_azuna_test;
     pub mod ayumu_pb1_test;
     pub mod blade_heart_colorless_test;

@@ -1,6 +1,7 @@
 // Auto-generated. Tests live as sibling .rs files in this folder.
     pub mod ability_golden_test;
     pub mod action_coverage_test;
+    pub mod attacker_order_performance_test;
     pub mod corpus_smoke_test;
     pub mod describe_parity_test;
     pub mod heart_color_test;
