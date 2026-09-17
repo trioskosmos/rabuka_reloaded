@@ -2,7 +2,6 @@
 // Regenerated from the directory listing at compile time.
 pub mod delayed_activation_block_pl_sp_bp7_017_n_test;
 pub mod group_only_stage_energy_count_wait_energy_test;
-pub mod l0_gap_constant_test;
 pub mod live_start_optional_payment_wait_energy_test;
 pub mod live_success_waited_pl_sp_bp7_027_l_test;
 pub mod pr_energy_place_cost_test;

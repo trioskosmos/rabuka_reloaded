@@ -259,12 +259,20 @@ covering files as ground truth.
 ## Large naming and placement sweep (2026-09-17) — ongoing
 
 The `untested_*` and `qa_new_tests*` extraction waves are complete, but
-legacy naming cleanup is NOT complete. A fresh glob still finds 12
-`l0_gap_*` files, `batch_nico_bp4_hanayo_test.rs`,
-`upper_batch_on_yell_test.rs`, and `bp5_333_erena_edge_test2.rs`.
-Audit their actual ability contracts before choosing behavior-led names
-and splitting unrelated shapes. Preserve setups and assertions during
-mechanical moves; record behavioral fixes separately.
+legacy naming cleanup is NOT complete. The targeted 12 `l0_gap_*` files,
+`batch_nico_bp4_hanayo_test.rs`, `upper_batch_on_yell_test.rs`, and
+`bp5_333_erena_edge_test2.rs` have now been replaced by 29 behavior-led
+files, preserving their 48 tests. Names were chosen after reading the test
+bodies and exercised printed abilities; unrelated effect shapes were split
+and misplaced constant gains moved out of energy-placement/reveal folders.
+Test names describe the assertions actually present, not stronger coverage
+implied by former card-led names. This is naming/placement cleanup only:
+weak assertions, member cards staged in live zones, and missing negative
+assertions remain follow-up work, not verified ability contracts.
+Inventory was regenerated and `--check` passed. The pre-edit suite had four
+failures in `mari_bp2_test`; post-edit verification is currently blocked by
+concurrent engine changes causing E0502 in `core/game_state/modifiers.rs`.
+No engine or parser code was changed by this naming wave.
 
 The ability is the identity; omit card names and IDs from names unless
 they distinguish a meaningful rule variant. A filename change alone is

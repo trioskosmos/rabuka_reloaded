@@ -289,6 +289,10 @@ impl GameState {
         exp_heart.clear();
         let mut exp_prohibition: Vec<String> = Vec::new();
         let mut exp_delayed_gained_effects = SmallVec::new();
+        // (card_id, gain_text) pairs whose GainAbility constant condition failed
+        // this pass — collected during the loop, applied after it, because the
+        // condition ctx immutably borrows self for the whole entry iteration.
+        let mut lost_gained_texts: Vec<(i16, String)> = Vec::new();
         self.constant_cannot_activate_members.clear();
         let mut exp_global_need_heart: Vec<(i16, String, i16)> = Vec::new();
         // Per-source attribution for everything accumulated below (UI bonus
@@ -398,6 +402,14 @@ impl GameState {
                         .is_none_or(|c| ctx.evaluate_condition(c));
                     log::debug!("[CONSTANT_CONDITION] zone=stage source={} ability={} action={} passes={}",
                         card_id, ability_idx, effect.action, cond_met);
+
+                    if !cond_met {
+                        if effect.action == crate::ability::enums::ActionType::GainAbility {
+                            if let Some(gain_text) = effect.ability_gain_any() {
+                                lost_gained_texts.push((card_id, gain_text.to_string()));
+                            }
+                        }
+                    }
 
                     if cond_met {
                         // Record jyouji status for this card (lazily capture
@@ -938,6 +950,32 @@ impl GameState {
 
             // Restore the previous activating_card
             self.activating_card = prev_activating;
+        }
+        // Apply condition-loss cleanup collected inside the loop (the ctx
+        // borrow ended above): a GainAbility constant whose condition failed
+        // this pass loses its registered gained ability (flat text, structured
+        // entry, grantor attribution) — otherwise stale text/badges and
+        // trigger registrations outlive their condition (Mari bp2-008R＋
+        // losing an Aqours area must lose the gained ライブ成功時 ability).
+        for (card_id, gain_text) in lost_gained_texts {
+            let removed = self
+                .gained_abilities
+                .entry(card_id)
+                .or_default()
+                .iter()
+                .position(|t| *t == gain_text || t.contains(&gain_text));
+            if let Some(idx) = removed {
+                self.gained_abilities.entry(card_id).or_default().remove(idx);
+                if self.gained_abilities.get(&card_id).is_some_and(Vec::is_empty) {
+                    self.gained_abilities.remove(&card_id);
+                }
+            }
+            self.gained_card_abilities.remove(&card_id);
+            self.gained_ability_sources.remove(&card_id);
+            log::debug!(
+                "[GAINED_ABILITY] condition loss → cleared card={}",
+                card_id
+            );
         }
         // Recycle entry_positions allocation into scratch buffer
         self.scratch_entry_positions = entry_positions;
@@ -1522,6 +1560,11 @@ impl GameState {
         // this for the same constant gain_ability repeatedly — don't accumulate
         // duplicate entries (which previously multiplied bonus_triggers badges).
         if !list.contains(&ability_type) {
+            log::debug!(
+                "[GAINED_ABILITY] registered card={} text_chars={}",
+                card_id,
+                ability_type.chars().count()
+            );
             list.push(ability_type);
         }
     }

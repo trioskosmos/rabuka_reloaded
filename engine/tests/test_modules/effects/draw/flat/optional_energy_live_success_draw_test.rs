@@ -1,7 +1,6 @@
-/// L0 gap coverage: LiveSuccess optional-energy draw abilities.
 use crate::helpers::*;
 
-fn drain_pay(game: &mut TestGame) {
+fn drain_auto_ability_choices(game: &mut TestGame) {
     for _ in 0..30 {
         if let Some(choice) = game.state.get_pending_choice() {
             match choice {
@@ -17,7 +16,7 @@ fn drain_pay(game: &mut TestGame) {
 fn advance_live(game: &mut TestGame) {
     for _ in 0..7 {
         game.pass();
-        drain_pay(game);
+        drain_auto_ability_choices(game);
     }
 }
 
@@ -28,7 +27,7 @@ fn fill_decks(game: &mut TestGame, filler: i16) {
     }
 }
 
-fn setup_stage_and_live(game: &mut TestGame, live_no: &str) -> i16 {
+fn setup_stage_and_card_in_live_zone(game: &mut TestGame, live_no: &str) -> i16 {
     let m = game.new_id("PL!-sd1-001-SD");
     game.state.player1.stage.stage = [m, m, m];
     fill_decks(game, game.id_ref("PL!-sd1-010-SD"));
@@ -46,35 +45,12 @@ fn advance_to_live_card_set_p1(game: &mut TestGame) {
     }
 }
 
-/// PL!SP-pb1-004-R: LiveSuccess, pay 4E → draw 1.
 #[test]
-fn pb1_004_pay_4e_draw_1() {
+fn three_energy_live_success_draw_member_in_live_zone_shrinks_deck() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
-    let _live = setup_stage_and_live(&mut game, "PL!SP-pb1-004-R");
-    let deck_before = game.state.player1.main_deck.cards.len();
-
-    advance_live(&mut game);
-
-    let deck_after = game.state.player1.main_deck.cards.len();
-    assert!(
-        deck_before > deck_after,
-        "deck should shrink as draws happen"
-    );
-    assert!(
-        !game.has_pending_choice(),
-        "all prompts resolved"
-    );
-}
-
-/// PL!SP-bp5-020-N: LiveSuccess, pay 1E → draw 1.
-#[test]
-fn bp5_020_pay_1e_draw_1() {
-    let db = load_real_database();
-    let mut game = TestGame::new(db);
-
-    let _live = setup_stage_and_live(&mut game, "PL!SP-bp5-020-N");
+    let _live = setup_stage_and_card_in_live_zone(&mut game, "PL!SP-pb1-004-R");
     let deck_before = game.state.player1.main_deck.cards.len();
 
     advance_live(&mut game);
@@ -91,7 +67,28 @@ fn bp5_020_pay_1e_draw_1() {
 }
 
 #[test]
-fn bp5_020_skip_no_draw() {
+fn one_energy_live_success_draw_member_in_live_zone_shrinks_deck() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let _live = setup_stage_and_card_in_live_zone(&mut game, "PL!SP-bp5-020-N");
+    let deck_before = game.state.player1.main_deck.cards.len();
+
+    advance_live(&mut game);
+
+    let deck_after = game.state.player1.main_deck.cards.len();
+    assert!(
+        deck_before > deck_after,
+        "deck should shrink as draws happen"
+    );
+    assert!(
+        !game.has_pending_choice(),
+        "all prompts resolved"
+    );
+}
+
+#[test]
+fn one_energy_live_success_draw_skip_leaves_no_pending_choice() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let live = game.id("PL!SP-bp5-020-N");
@@ -116,7 +113,7 @@ fn bp5_020_skip_no_draw() {
 }
 
 #[test]
-fn bp5_020_insufficient_energy_no_draw() {
+fn one_energy_live_success_draw_without_granted_energy_does_not_increase_active_energy() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let live = game.id("PL!SP-bp5-020-N");

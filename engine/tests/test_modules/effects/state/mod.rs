@@ -2,9 +2,7 @@
 // Regenerated from the directory listing at compile time.
 pub mod ability_index_execution_test;
 pub mod all_liella_gated_opponent_wait_test;
-pub mod batch_nico_bp4_hanayo_test;
 pub mod bp5_333_comprehensive_edge_test;
-pub mod bp5_333_erena_edge_test2;
 pub mod bp7_ai_choice_under_member_test;
 pub mod bp7_ai_energy_under_member_optional_test;
 pub mod bp7_karin_wait_blade_limit_test;
@@ -19,6 +17,7 @@ pub mod cerise_bouquet_teammate_energy_activation_test;
 pub mod characterization_promoted_test;
 pub mod cost_and_blade_filtered_opponent_wait_test;
 pub mod debut_low_cost_opponent_wait_test;
+pub mod debut_opponent_chooses_active_member_wait_q189_test;
 pub mod debut_optional_single_member_activation_test;
 pub mod either_or_state_change_test;
 pub mod emma_bp5_test;

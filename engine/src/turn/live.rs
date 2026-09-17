@@ -1049,12 +1049,19 @@ impl super::TurnEngine {
             return;
         }
 
-        let (player1_score, player2_score) =
-            Self::compute_pregame_scores(game_state, &need_heart_flat, &pre_score_flat, p1_extra, p2_extra);
         Self::populate_live_verdicts(game_state);
         // NOTE: populate_live_verdicts must run before victory determination so
         // snap.lives[i].passed is populated (Q47/Q48). Removed duplicated inline
         // pass/fail block here — the extracted helper above is now the single source.
+        let (player1_score, player2_score) = {
+            // Q36: ライブ成功時 delayed gains (e.g. Mari bp2-008R＋ gained
+            // ライブの合計スコア) resolve in the victory-determination phase
+            // BEFORE the winner is decided, so they must land in the owner
+            // accumulator before compute_pregame_scores reads it. The success
+            // gate inside uses the pass/fail verdicts populated directly above.
+            Self::process_delayed_gained_effects(game_state);
+            Self::compute_pregame_scores(game_state, &need_heart_flat, &pre_score_flat, p1_extra, p2_extra)
+        };
 
         let (player1_won, player2_won) = Self::determine_winners(
             game_state,
@@ -1076,7 +1083,6 @@ impl super::TurnEngine {
                 .map(|s| (s.player_id.clone(), s.total_score))
                 .collect::<Vec<_>>()
         );
-        Self::process_delayed_gained_effects(game_state);
         Self::merge_late_score_apps(game_state, &player1_id, &player2_id);
         Self::compute_surplus_and_flags(game_state, player1_won, player2_won, &player1_id, &player2_id);
 

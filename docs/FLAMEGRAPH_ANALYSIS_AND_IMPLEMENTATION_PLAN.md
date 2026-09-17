@@ -587,6 +587,59 @@ Reported engine-call time excludes setup, trace serialization/I/O and comparison
 - Strict Clippy was attempted but failed on pre-existing engine-library lint findings; engine files were not changed to resolve them. A clean strict-lint result for the combined build is not claimed.
 - The full engine suite was not run for this tooling-only change.
 
+### Post-audit hardening (later the same day)
+
+An integrity audit and hardening pass fixed these issues in `tools/flamegraph_replay.rs`:
+
+- Bounded trace reads (64 MiB per record), oversized/malformed/truncated record rejection, per-game `1..=2000` step validation, 1 MiB deck read limit with post-parse deck re-read verification.
+- Recordings now write to a `.partial` staging file, publish only after all games succeed via no-clobber hard link, and remove staging on failure; existing destinations are never replaced.
+- Trace header v2 with `deny_unknown_fields`, per-field error messages, per-game seed overflow rejection, and a completion record verifying games/actions after the final game.
+- The header embeds the build identity emitted by the launcher (`replay-build-identity.json`, also passed via `RABUKA_REPLAY_BUILD_IDENTITY` at compile time). Replay rejects traces whose `assets_sha256`, `cargo_lock_sha256`, or feature set differ from the executing build; source/harness digests remain provenance-only so baseline-vs-candidate comparison works.
+- Action matching remains strict whole-payload, ordered comparison (see limitations).
+
+Launcher hardening in `tools/flamegraph_replay.py`:
+
+- Emits the build identity file/environment variable binding the executable to asset/lock/feature digests.
+- Rejects MinGW/MSYS Python via platform detection; preserves rendered compiler diagnostics; rejects redirected/hard-linked build outputs; re-validates the identity file after build.
+
+Generator hardening in `engine/examples/gen_flamegraph.rs`:
+
+- Enforces exact nonzero totals in both render paths, checked aggregation overflow, and rejects ambiguous numeric label suffixes that Inferno would misread as differential input.
+
+Validation after hardening:
+
+- Rust harness: 7 tests passed, typecheck and formatting clean; harness-only Clippy ran clean (the earlier `-D warnings` failure came from pre-existing engine-library lints, which remain unchanged).
+- Python launcher suite: 26 tests passed, 1 skipped (symlink privileges).
+- Native launcher build (non-profiling) and a second profiling build both succeeded with identity + provenance written.
+- End-to-end `tools/smoke_flamegraph_replay.py`: two-game cross-process record/replay passed (477 actions), plus 7 negative cases (deck change, identity mismatch, state divergence, removed selected action, truncation, trailing records, trace already exists).
+- The profiling smoke emitted real folded stacks, which the hardened generator rendered into caller and self-time SVGs (21.8 ms instrumented coverage for 2 games).
+- Legacy v1 traces are rejected; re-record them with the v2 executable.
+
+Remaining known limitations (documented, not fixed):
+
+- Action payloads are compared with strict ordering and full display metadata; a display-only text change or action reordering will reject replay. This is intentional for optimization verification but is not order-insensitive semantic matching.
+- Replay binds deck text and identity digests, not a full card-database snapshot hash, inside the trace itself; compare `replay-build-identity.json`/`provenance.json` across builds before interpreting results.
+- The state projection excludes modifiers, resolver internals, serde-skipped fields, and logs; passing replay is strong evidence of identical behavior, not complete engine equivalence.
+- Engine-call time includes per-call clock overhead and tracing perturbation; it is not clean throughput.
+
+
+## 14. Engine code improvement list (for review — none applied)
+
+Ranked by measured hotspot share (section 4), then by change risk. Percentages are shares of corrected instrumented coverage from captures C/D; they justify investigation, not guaranteed savings. All items preserve gameplay semantics unless marked otherwise.
+
+| # | Improvement | Measured bucket (C share) | Complexity | Risk | Primary files |
+|---|---|---:|---|---|---|
+| 1 | Cache stage-group count per generation call | generate_main_phase_actions 15.5% | Low | Low | game_setup.rs |
+| 2 | Queue: replace `pending_entries()` collect with iterator find | shared (use_ability 11.4%, resume 16.3%) | Very low | Low | abilities.rs |
+| 3 | Queue: zero/one/many selection without index Vec | shared | Low–medium | Low | abilities.rs |
+| 4 | Borrowed stack area descriptors in hand-play generation | generate_main_phase_actions 15.5% | Low–medium | Low–medium | game_setup.rs |
+| 5 | Snapshot built once with final enrichment | performance phase 6.4% | Medium | Medium | phases.rs, live.rs |
+| 6 | Strip text-key prefix once in activation lookup | use_ability 11.4% | Low | Low (exact-match preserved) | abilities.rs |
+| 7 | Defer: numeric activation dispatch | use_ability 11.4% | Medium | Higher (duplicate text/gained identity) | abilities.rs, actions.rs |
+| 8 | Defer: live-zone movement collection redesign | live_victory 6.9% | Medium–high | Medium | live.rs |
+
+Details, preservation requirements, edge cases, and per-item test targets are in sections 6–11. Recommended first batch: items 1–3, measured independently with the section 13 harness (record a baseline trace, replay it against the candidate build, then compare engine-call time and fresh captures).
+
 ## Final recommendation
 
 Begin with **call-local stage-group caching and the two queue-collection removals**, independently tested and measured. Then address borrowed area intermediates and snapshot ownership. Remove repeated text formatting before considering numeric dispatch. Keep gained-ability and duplicate-text correctness changes separate from performance work.

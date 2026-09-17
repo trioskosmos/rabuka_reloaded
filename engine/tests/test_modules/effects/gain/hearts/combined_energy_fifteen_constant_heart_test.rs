@@ -1,41 +1,9 @@
-/// L0 gap coverage: simple Constant (常時) abilities.
-///
-/// Each test places the card, sets up the trigger condition, and asserts
-/// the exact modifier value. Positive + negative pairs where possible.
 use crate::helpers::*;
-
-/// PL!SP-bp1-004-PR 平安名すみれ: 常時 センターにいる場合、ブレード+5。
-#[test]
-fn sumire_pr_center_position_grants_blade() {
-    let db = load_real_database();
-    let mut game = TestGame::new(db);
-
-    let sumire = game.id("PL!SP-bp1-004-PR");
-    game.state.player1.stage.stage = [-1, sumire, -1];
-    game.give_energy(20);
-    game.state.recalculate_constants();
-
-    assert_eq!(
-        game.state.mods.get_blade_modifier(sumire),
-        5,
-        "center position grants +5 blade"
-    );
-
-    // Negative: move out of center → modifier drops.
-    game.state.player1.stage.stage[1] = -1;
-    game.state.player1.stage.stage[0] = sumire;
-    game.state.recalculate_constants();
-    assert_eq!(
-        game.state.mods.get_blade_modifier(sumire),
-        0,
-        "left position → no blade bonus"
-    );
-}
 
 /// PL!N-bp4-007-R+ 優木せつ菜: 常時 自分と相手のエネルギー合計が15枚以上
 /// のかぎり、heart02×2を得る。
 #[test]
-fn bp4_007_setsuna_both_energy_15_grants_heart02x2() {
+fn combined_energy_fifteen_grants_two_heart02_including_waited_energy() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
@@ -99,4 +67,3 @@ fn bp4_007_setsuna_both_energy_15_grants_heart02x2() {
         "15 total cards incl. wait-state energy -> +2 heart02"
     );
 }
-

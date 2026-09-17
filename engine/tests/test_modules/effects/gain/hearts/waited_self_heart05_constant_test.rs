@@ -2,7 +2,7 @@ use crate::helpers::*;
 use rabuka_engine::card::HeartColor;
 
 #[test]
-fn erena_p_variant_wait_gains_heart() {
+fn waited_self_gains_one_heart05_on_parallel_print() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let erena = game.id("PL!-bp5-333-P＋");
@@ -17,7 +17,7 @@ fn erena_p_variant_wait_gains_heart() {
 }
 
 #[test]
-fn erena_wait_then_active_loses_heart() {
+fn reactivating_waited_self_removes_constant_heart05() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let erena = game.id("PL!-bp5-333-R");

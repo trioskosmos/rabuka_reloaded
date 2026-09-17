@@ -20,8 +20,6 @@ pub mod heart_or_requirement_pl_s_pb1_013_n_pl_s_pb1_014_n_test;
 pub mod inspect_by_total_live_score;
 pub mod izumi_bp5_test;
 pub mod kanon_pb2_test;
-pub mod l0_gap_constant6_test;
-pub mod l0_gap_livesuccess2_test;
 pub mod live_success_reveal_top_member_without_blade_heart_total_score_test;
 pub mod mirai_ticket_test;
 pub mod nagi_live_card_draw_test;

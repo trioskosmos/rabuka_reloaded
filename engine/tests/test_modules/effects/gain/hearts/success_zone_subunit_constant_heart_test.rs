@@ -1,6 +1,3 @@
-/// L0 gap coverage: Printemps / lilywhite / BiBi success-zone conditional
-/// heart abilities (PL!-bp6-012-N, PL!-bp6-014-N, PL!-bp6-015-N).
-///
 /// The 成功ライブカード置き場 (success live card zone) only ever contains
 /// LIVE cards in a real game, so each test seeds it with a live card of the
 /// matching subunit and asserts both the positive and negative case.
@@ -28,7 +25,7 @@ const SUBUNIT_LIVE_CASES: &[(&str, &str, HeartColor, &str)] = &[
     ),
 ];
 
-fn assert_success_zone_group_heart(member_no: &str, live_no: &str, color: HeartColor, msg: &str) {
+fn assert_success_zone_subunit_heart_requires_matching_live(member_no: &str, live_no: &str, color: HeartColor, msg: &str) {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
@@ -54,19 +51,19 @@ fn assert_success_zone_group_heart(member_no: &str, live_no: &str, color: HeartC
 }
 
 #[test]
-fn bp6_012_printemps_in_success_grants_heart03() {
+fn success_zone_printemps_live_grants_heart03_only_while_present() {
     let (m, l, c, msg) = SUBUNIT_LIVE_CASES[0];
-    assert_success_zone_group_heart(m, l, c, msg);
+    assert_success_zone_subunit_heart_requires_matching_live(m, l, c, msg);
 }
 
 #[test]
-fn bp6_014_lilywhite_in_success_grants_heart01() {
+fn success_zone_lilywhite_live_grants_heart01_only_while_present() {
     let (m, l, c, msg) = SUBUNIT_LIVE_CASES[1];
-    assert_success_zone_group_heart(m, l, c, msg);
+    assert_success_zone_subunit_heart_requires_matching_live(m, l, c, msg);
 }
 
 #[test]
-fn bp6_015_bibi_in_success_grants_heart06() {
+fn success_zone_bibi_live_grants_heart06_only_while_present() {
     let (m, l, c, msg) = SUBUNIT_LIVE_CASES[2];
-    assert_success_zone_group_heart(m, l, c, msg);
+    assert_success_zone_subunit_heart_requires_matching_live(m, l, c, msg);
 }

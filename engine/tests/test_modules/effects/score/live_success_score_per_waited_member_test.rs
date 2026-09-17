@@ -1,11 +1,9 @@
-/// L0 gap coverage: additional LiveSuccess abilities — score modifiers,
-/// per-unit scoring, and card retrieval from revealed cards.
 use crate::helpers::*;
 
 /// PL!N-bp3-031-L: ライブ成功時 自分のステージにいるウェイト状態の
 /// メンバー1人につき、このカードのスコアを＋１する。
 #[test]
-fn bp3_031_per_waited_member_score_plus1() {
+fn live_success_score_counts_waited_members_but_not_active_members() {
     use rabuka_engine::core::types::AbilityTrigger;
 
     let db = load_real_database();
@@ -64,7 +62,7 @@ fn bp3_031_per_waited_member_score_plus1() {
 /// Both members are WAITED (their blades don't feed yell, but hearts still
 /// count — only blades are wait-restricted).
 #[test]
-fn bp3_031_fires_from_real_live_victory_flow() {
+fn live_success_waited_member_bonus_reaches_performance_score_and_success_zone() {
     use rabuka_engine::card::HeartColor;
 
     let db = load_real_database();
@@ -142,18 +140,4 @@ fn fill_decks(game: &mut TestGame) {
         game.state.player1.main_deck.cards.push(f);
         game.state.player2.main_deck.cards.push(f);
     }
-}
-
-/// PL!SP-bp4-003-R: Constant center → +2 blade.
-#[test]
-fn sp_bp4_003_center_blade() {
-    let db = load_real_database();
-    let mut game = TestGame::new(db);
-    let m = game.id("PL!SP-bp4-003-R");
-    game.state.player1.stage.stage = [-1, m, -1];
-    game.state.recalculate_constants();
-    assert!(
-        game.state.mods.get_blade_modifier(m) >= 2,
-        "center constant grants blade"
-    );
 }
