@@ -116,7 +116,17 @@ fn jidou_both_on_same_card_coexist_and_fire_separately() {
     game.state.push_movement_event(-1, "energy_deck", "energy", Some(card), "p1", true);
     game.state.trigger_auto_abilities_for_player("p1");
     game.state.process_pending_auto_abilities("p1");
-    // Both should have been considered; at worst second adds blade, at least no crash and card still there
+    // The turn1 jidou places a waited energy card into the energy deck; the
+    // turn2 jidou only adds a blade — neither moves cards between energy
+    // zones, so the energy zone count must be exactly unchanged.
     assert!(game.state.player1.stage.stage.contains(&card));
-    assert!(game.state.player1.energy_zone.cards.len() >= after_first || true);
+    assert_eq!(
+        game.state.player1.energy_zone.cards.len(),
+        after_first,
+        "neither jidou moves cards into the energy zone"
+    );
+    assert!(
+        game.state.mods.blade_modifiers.len() > 0,
+        "the turn2 jidou grants its blade on the second sensor"
+    );
 }

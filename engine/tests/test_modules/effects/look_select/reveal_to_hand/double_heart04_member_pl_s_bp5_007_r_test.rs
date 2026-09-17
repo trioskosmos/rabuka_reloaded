@@ -65,9 +65,10 @@ fn pl_s_bp5_007_r_live_success_look_four_adds_one_to_hand_and_three_to_waitroom(
         hand_before + 1,
         "only the heart04×2 member joins the hand"
     );
-    assert!(
-        !game.state.player1.hand.cards.contains(&dia) || true,
-        "(identity checked below via waitroom)"
+    assert_eq!(
+        game.state.player1.hand.cards.first(),
+        Some(&dia),
+        "the heart04×2 member (Dia) is the one fetched to hand"
     );
     assert_eq!(
         game.state.player1.waitroom.cards.len(),
