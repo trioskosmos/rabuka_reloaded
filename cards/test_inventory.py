@@ -27,7 +27,8 @@ parser will honour it for that ability (optional, not required).
 
 Run:
     python cards/test_inventory.py          # regenerate all
-    python cards/test_inventory.py --check  # CI: fail if stale
+    python cards/test_inventory.py --check  # CI: fail if stale (human docs only)
+    python cards/test_inventory.py --check --check-json  # also verify the 1.7 MB JSON
 """
 import argparse
 import hashlib
@@ -1347,6 +1348,11 @@ def render_inventory_md(inv):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--check", action="store_true", help="fail if generated files are stale")
+    ap.add_argument(
+        "--check-json",
+        action="store_true",
+        help="with --check: also verify TEST_INVENTORY.json (excluded by default — it is 1.7 MB and dominates diff churn)",
+    )
     ap.add_argument("--json-only", action="store_true", help="only write JSON")
     ap.add_argument(
         "--families",
@@ -1465,7 +1471,10 @@ def main():
             # ignore volatile timestamp for check
             return re.sub(r'"generated_at":\s*"[^"]*"', '"generated_at": "CHECK"', text)
         ok = True
-        for path, new_text in [(OUT_COVERAGE, coverage_text), (OUT_MATRIX, matrix_text), (OUT_MD, inventory_md_text), (OUT_QUALITY, quality_text), (OUT_JSON, json_text)]:
+        checked = [(OUT_COVERAGE, coverage_text), (OUT_MATRIX, matrix_text), (OUT_MD, inventory_md_text), (OUT_QUALITY, quality_text)]
+        if args.check_json:
+            checked.append((OUT_JSON, json_text))
+        for path, new_text in checked:
             if not path.exists():
                 print(f"CHECK FAIL: {path.relative_to(ROOT)} missing", file=sys.stderr)
                 ok = False
