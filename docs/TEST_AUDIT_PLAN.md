@@ -119,6 +119,36 @@ be re-verified when their family is audited — the per-file vote breakdown
 is in the sort working notes, and `TEST_INVENTORY.md` shows per-ability
 covering files as ground truth.
 
+## Large naming and placement sweep (2026-09-17)
+
+Baseline after extracting batches 7, 17, 37, and 42: `cargo test --test run_all`
+passes all 3308 tests. The next sweep covers all 33 remaining `untested_*`
+Rust files, not isolated opportunistic renames.
+
+1. Inventory each assigned source completely: tests, helpers, card prints,
+   actual asserted behaviors, and destination effect shapes.
+2. Execute independent source-owned partitions:
+   - Look/select: batches 15, 20, 25, 26, 33, 51, 52, 53.
+   - Recovery and blade/cost effects: batches 4, 8, 36, 43, 45, 49, 50, 54.
+   - Compound A: batches 28, 30, 32, 34, 38, 39.
+   - Compound B: batches 40, 41, 44, 55 and secondary abilities.
+   - Sensors/rules/integration/choice: batches 9, 23, 46, abilities choice,
+     change-target choice, and abilities playthrough.
+3. Replace batch/history labels with searchable behavior names. Test and
+   card-specific helper names retain unambiguous print identifiers. Split
+   unrelated shapes; keep genuinely shared flows together. Jidou follows its
+   sensor; integration remains integration when it tests a full playthrough.
+4. Preserve test setups, assertions, and test counts during mechanical moves.
+   Flag substantive coverage issues separately rather than silently weakening
+   tests or claiming a naming sweep audited their behavior.
+5. Workers own source files and new destinations; the coordinator alone
+   integrates shared module declarations and generated reports. Reserve new
+   destination names before writing to avoid concurrent collisions.
+6. Verify no remaining `untested_*` Rust files or obsolete module references,
+   reconcile test counts, run full tests and Clippy, then regenerate inventory
+   and run its freshness/soft-guard checks. Do not automatically commit the
+   new sweep: the requested checkpoint commit preceded these changes.
+
 ## Verification commands
 
 - `cargo test --test run_all` from `engine/` (3292 passed / 0 failed at sort).

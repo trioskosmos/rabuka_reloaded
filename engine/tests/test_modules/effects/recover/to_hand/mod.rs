@@ -39,6 +39,7 @@
     pub mod discard_two_niji_member_recovery_test;
     pub mod optional_discard_subunit_recovery_test;
     pub mod self_to_waitroom_liella_recovery_test;
+    pub mod self_to_waitroom_live_recovery_energy_activation_test;
     pub mod self_wait_discard_niji_live_recovery_test;
     pub mod untested_abilities_batch4_test;
     pub mod untested_abilities_batch45_test;

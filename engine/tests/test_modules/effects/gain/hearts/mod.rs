@@ -25,5 +25,5 @@
     pub mod opponent_energy_ahead_constant_heart_test;
     pub mod stage_member_cost_gated_constant_heart_test;
     pub mod sumire_bp2_center_cost_test;
-    pub mod untested_abilities_batch17_test;
-    pub mod untested_abilities_batch7_test;
+    pub mod subunit_stage_count_gated_debut_heart_test;
+    pub mod success_score_sum_constant_heart_test;

@@ -16,6 +16,7 @@
     pub mod nagi_live_card_draw_test;
     pub mod revealed_distinct_liella_live_retrieval_test;
     pub mod revealed_member_cost_gated_recovery_test;
+    pub mod optional_live_discard_look_five_mei_bp7_018_n_test;
     pub mod smile_test;
     pub mod sp_bp2_015_wien_yell_edge_test;
     pub mod umi_group_live_search;

@@ -37,8 +37,9 @@
     pub mod turn_scope_regression_test;
     pub mod debut_and_live_start_blade_grant_test;
     pub mod own_energy_ahead_constant_blade_test;
-    pub mod untested_abilities_batch37_test;
-    pub mod untested_abilities_batch42_test;
+    pub mod optional_discard_success_zone_blades_maki_bp3_006_r_test;
+    pub mod optional_discard_other_member_blades_honoka_pb1_010_r_test;
+    pub mod all_stage_heart_colors_blades_shizuku_bp5_015_n_test;
     pub mod untested_abilities_batch43_test;
     pub mod untested_abilities_batch49_test;
     pub mod untested_abilities_batch50_test;

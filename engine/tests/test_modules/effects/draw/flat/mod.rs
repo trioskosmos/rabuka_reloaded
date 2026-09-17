@@ -9,6 +9,7 @@
     pub mod l0_gap_livesuccess_test;
     pub mod l0_gap_livesuccess3_test;
     pub mod miyashita_ai_pb1_test;
+    pub mod optional_energy_catchu_trio_draw_sumire_bp7_015_n_test;
     pub mod position_ability_test;
     pub mod q146_per_member_draw_test;
     pub mod sp_pb1_004_live_test;

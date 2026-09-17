@@ -26,12 +26,14 @@
     pub mod qa_new_tests253;
     pub mod replacement_choose_order_test;
     pub mod shizuku_bp4_aggregate_test;
+    pub mod side_member_original_blade_gated_constant_score_test;
     pub mod solitude_test;
     pub mod stellar_phoenix_test;
     pub mod strawberry_test;
     pub mod takaramono_test;
     pub mod tokimeki_test;
     pub mod opponent_energy_gated_score_test;
+    pub mod opponent_surplus_constant_total_score_test;
     pub mod revealed_distinct_liella_score_test;
     pub mod vitamin_test;
     pub mod wakana_shiki_test;

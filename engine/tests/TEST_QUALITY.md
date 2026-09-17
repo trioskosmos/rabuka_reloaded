@@ -32,7 +32,7 @@ _has_pending_choice asserted without choice identity (pending_choice_type/summar
 | --- | --- | --- | --- |
 | `engine/tests/test_modules/effects/compound/s_pb1_002_riko_edge_test.rs` | `riko_opponent_discards_live_no_gain` | 3 |  |
 
-## similar_cards (30)
+## similar_cards (28)
 
 _confusable card numbers (bp2 vs pb2) staged in one file — human review for wrong-card staging_
 
@@ -47,7 +47,6 @@ _confusable card numbers (bp2 vs pb2) staged in one file — human review for wr
 | `engine/tests/test_modules/effects/compound/untested_abilities_batch55_test.rs` | `<file>` | 1 | PL!SP-bp1-023-L, PL!SP-bp5-023-L, PL!SP-pb1-023-L |
 | `engine/tests/test_modules/effects/energy/under_member/energy_and_member_under_test.rs` | `<file>` | 1 | PL!N-bp3-013-N, PL!N-bp5-013-N |
 | `engine/tests/test_modules/effects/gain/blades/mymai_tonight_test.rs` | `<file>` | 1 | PL!S-bp2-023-L, PL!S-bp5-023-L |
-| `engine/tests/test_modules/effects/gain/hearts/untested_abilities_batch7_test.rs` | `<file>` | 1 | PL!S-bp3-008-R, PL!S-bp5-008-R |
 | `engine/tests/test_modules/effects/look_select/reveal_to_hand/distortion_need_hearts_test.rs` | `<file>` | 1 | PL!SP-bp1-012-N, PL!SP-bp4-012-N |
 | `engine/tests/test_modules/effects/look_select/reveal_to_hand/eli_bp5_cost9_search.rs` | `<file>` | 1 | PL!-bp3-002-R, PL!-bp5-002-R |
 | `engine/tests/test_modules/effects/position/kinako_each_time_blade_test.rs` | `<file>` | 1 | PL!SP-bp5-006-R, PL!SP-pb1-006-R |
@@ -59,7 +58,6 @@ _confusable card numbers (bp2 vs pb2) staged in one file — human review for wr
 | `engine/tests/test_modules/effects/score/note_mermaid_distinct_kaleidoscore_test.rs` | `<file>` | 1 | PL!SP-bp1-013-PR, PL!SP-pb1-013-PR |
 | `engine/tests/test_modules/effects/state/cards_6_thru_13_test.rs` | `<file>` | 1 | PL!S-PR-015-PR, PL!S-bp2-015-PR |
 | `engine/tests/test_modules/effects/state/either_or_state_change_test.rs` | `<file>` | 1 | PL!N-bp4-008-R, PL!N-pb1-008-R |
-| `engine/tests/test_modules/effects/state/untested_abilities_batch47_test.rs` | `<file>` | 1 | PL!SP-bp4-022-N, PL!SP-bp7-022-N |
 | `engine/tests/test_modules/integration/integration_blindspot_test.rs` | `<file>` | 1 | PL!HS-bp5-004-R, PL!HS-bp6-004-R |
 | `engine/tests/test_modules/jidou/movement/ability_chain_combo_test.rs` | `<file>` | 1 | PL!SP-pb1-006-R, PL!SP-pb2-006-R |
 | `engine/tests/test_modules/jidou/movement/kinako_live_success_or_move_test.rs` | `<file>` | 1 | PL!SP-bp5-006-R, PL!SP-pb2-006-R |

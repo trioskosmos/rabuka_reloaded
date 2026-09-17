@@ -3,6 +3,7 @@
     pub mod baton_touch_skips_discard_after_self_wait_draw_test;
     pub mod card_ability_tests;
     pub mod draw_then_bottom_hand_card;
+    pub mod lower_stage_cost_draw_then_topdeck_test;
     pub mod natsumi_test;
     pub mod self_wait_draw_then_discard_test;
     pub mod sp_bp4_008_leftside_draw;
