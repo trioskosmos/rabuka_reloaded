@@ -116,6 +116,60 @@ fn assert_kaho_debut_selection(allies: usize) {
     assert!(game.state.player2.waitroom.cards.is_empty());
 }
 
+#[test]
+fn ginko_inspection_refresh_preserves_existing_top_and_recovers_waitroom() {
+    let mut game = TestGame::new(load_real_database());
+    let top = game.id("PL!-sd1-010-SD");
+    let recycled = game.id("PL!-sd1-010-SD");
+    let opponent = game.id("PL!-sd1-010-SD");
+    game.state.player1.main_deck.cards = vec![top].into();
+    game.add_to_discard(recycled);
+    game.state.player2.main_deck.cards = vec![opponent].into();
+    let ginko = game.id("PL!HS-bp2-016-N");
+    game.add_to_hand(ginko);
+    game.give_energy(4);
+    game.play_to_stage(ginko, MemberArea::Center);
+    game.assert_select_card("looked_at", 2, true);
+    assert_eq!(game.state.looked_at_cards.as_slice(), &[top, recycled]);
+    assert!(game.state.player1.waitroom.cards.is_empty());
+    game.select_indices(&[0]);
+    game.assert_select_card("looked_at", 1, true);
+    game.select_indices(&[]);
+    assert!(!game.has_pending_choice());
+    assert_eq!(game.state.player1.main_deck.cards.as_slice(), &[top]);
+    assert_eq!(game.state.player1.waitroom.cards.as_slice(), &[recycled]);
+    assert!(game.state.player1.hand.cards.is_empty());
+    assert!(game.state.player1.stage.stage.contains(&ginko));
+    assert_eq!(game.state.player2.main_deck.cards.as_slice(), &[opponent]);
+}
+
+#[test]
+fn ginko_inspecting_exact_deck_size_does_not_refresh_waitroom() {
+    let mut game = TestGame::new(load_real_database());
+    let a = game.id("PL!-sd1-010-SD");
+    let b = game.id("PL!-sd1-010-SD");
+    let waiting = game.id("PL!-sd1-010-SD");
+    let opponent = game.id("PL!-sd1-010-SD");
+    game.state.player1.main_deck.cards = vec![a, b].into();
+    game.add_to_discard(waiting);
+    game.state.player2.main_deck.cards = vec![opponent].into();
+    let ginko = game.id("PL!HS-bp2-016-N");
+    game.add_to_hand(ginko);
+    game.give_energy(4);
+    game.play_to_stage(ginko, MemberArea::Center);
+    game.assert_select_card("looked_at", 2, true);
+    assert_eq!(game.state.looked_at_cards.as_slice(), &[a, b]);
+    assert_eq!(game.state.player1.waitroom.cards.as_slice(), &[waiting]);
+    game.select_indices(&[1]);
+    game.assert_select_card("looked_at", 1, true);
+    game.select_indices(&[0]);
+    assert!(!game.has_pending_choice());
+    assert_eq!(game.state.player1.main_deck.cards.as_slice(), &[a, b]);
+    assert_eq!(game.state.player1.waitroom.cards.as_slice(), &[waiting]);
+    assert!(game.state.player1.hand.cards.is_empty());
+    assert_eq!(game.state.player2.main_deck.cards.as_slice(), &[opponent]);
+}
+
 /// Debut look_and_select with group_filter — no eligible cards among looked-at.
 /// Should auto-skip without showing a prompt.
 #[test]
