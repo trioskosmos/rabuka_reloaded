@@ -13,6 +13,8 @@ pub mod eli_bp5_cost9_search;
 pub mod eli_sd1_optional_cost_look;
 pub mod empty_hand_skips_optional_discard_look_test;
 pub mod energy_discard_look_pl_sp_bp1_010_r_test;
+pub mod heart05_or_heart06_member_pl_bp5_014_n_test;
+pub mod heart_or_requirement_pl_s_pb1_013_n_pl_s_pb1_014_n_test;
 pub mod inspect_by_total_live_score;
 pub mod izumi_bp5_test;
 pub mod kanon_pb2_test;

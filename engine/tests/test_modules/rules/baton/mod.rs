@@ -2,7 +2,9 @@
 // Regenerated from the directory listing at compile time.
 pub mod baton_touch_restriction_combination_test;
 pub mod baton_touch_test;
+pub mod chika_bp5_001_no_ability_baton_touch_draw_test;
 pub mod chisato_natsumi_test;
 pub mod q29_baton_arrival_test;
+pub mod replacement_name_and_cost_pl_n_pb1_014_r_pl_hs_bp2_008_r_test;
 pub mod sumire_bp4_test;
 pub mod untested_abilities_batch23_test;

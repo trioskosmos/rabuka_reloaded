@@ -5,6 +5,7 @@ pub mod baton_arrivals_pl_hs_bp2_023_l_and_pl_hs_bp2_025_l_test;
 pub mod bp7_aquarium_yell_source_test;
 pub mod bp7_mia_play_cost_reduction_test;
 pub mod bp7_tang_keke_cost_test;
+pub mod chika_bp5_001_no_ability_member_cost_reduction_test;
 pub mod hanamusubi_exclude_self_test;
 pub mod hanayo_bp4_constant_test;
 pub mod himeno_test;

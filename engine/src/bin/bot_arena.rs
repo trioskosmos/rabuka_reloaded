@@ -13,7 +13,255 @@ use rabuka_engine::deck_parser;
 use rabuka_engine::game_setup;
 use rabuka_engine::game_state::{GameResult, GameState, Phase};
 use rabuka_engine::turn::TurnEngine;
+use serde_json::{json, Value};
+use std::collections::HashMap;
+use std::io::{self, Write};
+use std::path::PathBuf;
 use std::sync::Arc;
+
+type ArenaResult<T> = Result<T, Box<dyn std::error::Error>>;
+
+struct Options {
+    p1: BotKind,
+    p2: BotKind,
+    budget: u64,
+    games: Option<u32>,
+    seed: u32,
+    deck: String,
+    audit: Option<PathBuf>,
+    trace: bool,
+    logs: bool,
+}
+
+impl Options {
+    fn parse(args: &[String], env_games: Option<&str>) -> ArenaResult<Self> {
+        let mut positional = Vec::new();
+        let mut games = None;
+        let mut seed = 1u32;
+        let mut audit = None;
+        let mut trace = false;
+        let mut logs = false;
+        let mut args = args.iter();
+        while let Some(arg) = args.next() {
+            match arg.as_str() {
+                "--trace" => trace = true,
+                "--logs" => logs = true,
+                "--games" | "--seed" | "--audit" => {
+                    let value = args.next().filter(|v| !v.starts_with("--"))
+                        .ok_or_else(|| format!("missing value for {arg}"))?;
+                    match arg.as_str() {
+                        "--games" => games = Some(value.parse::<u32>()?),
+                        "--seed" => seed = value.parse::<u32>()?,
+                        _ => audit = Some(PathBuf::from(value)),
+                    }
+                }
+                _ if arg.starts_with("--") => return Err(format!("unknown option: {arg}").into()),
+                _ => positional.push(arg.as_str()),
+            }
+        }
+        if positional.len() > 4 {
+            return Err("expected [p1] [p2] [budget_secs] [deck]".into());
+        }
+        if games.is_none() {
+            games = env_games.map(str::parse::<u32>).transpose()?;
+        }
+        if games == Some(0) || seed == 0 {
+            return Err("game count and seed must be positive".into());
+        }
+        if audit.is_some() && games.is_none() {
+            return Err("--audit requires --games N or ARENA_GAMES=N".into());
+        }
+        let parse_kind = |name: &str| -> ArenaResult<BotKind> {
+            if !BotKind::ALL.contains(&name) {
+                return Err(format!("unknown bot: {name}; expected {}", BotKind::ALL.join(", ")).into());
+            }
+            Ok(BotKind::parse(name))
+        };
+        Ok(Self {
+            p1: parse_kind(positional.first().copied().unwrap_or("v2"))?,
+            p2: parse_kind(positional.get(1).copied().unwrap_or("random"))?,
+            budget: positional.get(2).map(|s| s.parse()).transpose()?.unwrap_or(10),
+            games,
+            seed,
+            deck: positional.get(3).copied().unwrap_or("5CP3Z idou").to_string(),
+            audit,
+            trace,
+            logs,
+        })
+    }
+
+    fn should_start_game(&self, completed: u32, elapsed: std::time::Duration) -> bool {
+        match self.games {
+            Some(count) => completed < count,
+            None => elapsed.as_secs() < self.budget,
+        }
+    }
+}
+
+fn game_seeds(base: u32, game: u32) -> (u32, u64) {
+    let engine = ((u64::from(base) - 1 + u64::from(game) - 1) % u64::from(u32::MAX) + 1) as u32;
+    (engine, 0x5EED_1234_ABCD_0001 ^ u64::from(engine))
+}
+
+fn audit_card(db: &CardDatabase, id: i16) -> Value {
+    if id < 0 {
+        return Value::Null;
+    }
+    match db.get_card(id) {
+        Some(card) => json!({
+            "card_id": id,
+            "card_no": card.card_no,
+            "card_type": card.card_type,
+            "base_cost": card.cost,
+            "base_hearts": card.base_heart,
+            "base_blades": card.blade,
+            "blade_hearts": card.blade_heart,
+            "required_hearts": card.need_heart,
+            "base_score": card.score,
+        }),
+        None => json!({"card_id": id, "unresolved": true}),
+    }
+}
+
+fn audit_cards(db: &CardDatabase, ids: &[i16]) -> Vec<Value> {
+    ids.iter().map(|&id| audit_card(db, id)).collect()
+}
+
+fn audit_view(gs: &GameState) -> Value {
+    let own = gs.active_player();
+    let opponent = if own.id == gs.player1.id { &gs.player2 } else { &gs.player1 };
+    let db = &gs.card_database;
+    json!({
+        "own": {
+            "player": own.id,
+            "is_first_attacker": own.is_first_attacker,
+            "hand": audit_cards(db, &own.hand.cards),
+            "stage_left_center_right": audit_cards(db, &own.stage.stage),
+            "energy": {"active": own.energy_zone.active_count(), "total": own.energy_zone.cards.len()},
+            "success_count": own.success_live_card_zone.cards.len(),
+            "success": audit_cards(db, &own.success_live_card_zone.cards),
+        },
+        "opponent_public": {
+            "stage_left_center_right": audit_cards(db, &opponent.stage.stage),
+            "success_count": opponent.success_live_card_zone.cards.len(),
+            "success": audit_cards(db, &opponent.success_live_card_zone.cards),
+        },
+    })
+}
+
+fn audit_action(gs: &GameState, action: &game_setup::Action) -> ArenaResult<Value> {
+    use game_setup::ActionType;
+    let mut value = serde_json::to_value(action)?;
+    let references_card = matches!(action.action_type,
+        ActionType::SelectMulligan | ActionType::SelectLiveCard | ActionType::PlayMemberToStage
+        | ActionType::UseAbility | ActionType::SetLiveCard | ActionType::ChoiceSelect);
+    if references_card {
+        if let Some(id) = action.parameters.as_ref().and_then(|p| p.card_id) {
+            let own = gs.active_player();
+            let opponent = if own.id == gs.player1.id { &gs.player2 } else { &gs.player1 };
+            let visible = id >= 0 && (own.hand.cards.contains(&id)
+                || own.stage.stage.contains(&id)
+                || own.success_live_card_zone.cards.contains(&id)
+                || own.waitroom.cards.contains(&id)
+                || opponent.stage.stage.contains(&id)
+                || opponent.success_live_card_zone.cards.contains(&id));
+            if visible {
+                value["resolved_card"] = audit_card(&gs.card_database, id);
+            } else {
+                value["identity_redacted"] = json!(true);
+                value["description"] = Value::Null;
+                value["description_ja"] = Value::Null;
+                for field in ["card_id", "card_name", "card_no", "source_ability", "base_cost", "final_cost", "available_areas", "double_baton_pairs"] {
+                    value["parameters"][field] = Value::Null;
+                }
+            }
+        }
+    }
+    Ok(value)
+}
+
+#[derive(Default)]
+struct DecisionAudit {
+    game: u32,
+    decision: u32,
+    errors: u32,
+    boundary: Option<(u8, Phase, String)>,
+    boundary_id: u32,
+    boundary_step: u32,
+    seen: HashMap<String, u32>,
+}
+
+fn write_jsonl(writer: &mut impl Write, value: &Value) -> ArenaResult<()> {
+    serde_json::to_writer(&mut *writer, value)?;
+    writer.write_all(b"\n")?;
+    writer.flush()?;
+    Ok(())
+}
+
+fn emit(audit: &mut Option<std::fs::File>, value: &Value) -> ArenaResult<()> {
+    if let Some(writer) = audit {
+        write_jsonl(writer, value)?;
+    }
+    Ok(())
+}
+
+impl DecisionAudit {
+    fn record(&mut self, gs: &GameState, actions: &[game_setup::Action], chosen: &game_setup::Action) -> ArenaResult<Value> {
+        let boundary = (gs.turn_number, gs.current_phase, gs.active_player().id.clone());
+        if self.boundary.as_ref() != Some(&boundary) {
+            self.boundary = Some(boundary);
+            self.boundary_id += 1;
+            self.boundary_step = 0;
+        }
+        self.boundary_step += 1;
+        let available = actions.iter().map(|a| audit_action(gs, a)).collect::<ArenaResult<Vec<_>>>()?;
+        let chosen_value = audit_action(gs, chosen)?;
+        let snapshot = audit_view(gs);
+        let selected = json!(gs.live_card_selected_indices);
+        let signature = serde_json::to_string(&json!([
+            gs.turn_number, gs.current_phase, gs.active_player().id, snapshot, available, chosen_value, selected
+        ]))?;
+        let repeated_from = self.seen.insert(signature, self.decision);
+        let selection_operation = match chosen.action_type {
+            game_setup::ActionType::SelectLiveCard | game_setup::ActionType::SelectMulligan => {
+                Some(if chosen.selected == Some(true) { "deselect" } else { "select" })
+            }
+            game_setup::ActionType::ConfirmLiveCardSet | game_setup::ActionType::ConfirmMulligan => Some("confirm"),
+            _ => None,
+        };
+        Ok(json!({
+            "event": "decision", "game": self.game, "decision": self.decision,
+            "turn": gs.turn_number, "phase": gs.current_phase,
+            "policy_player": gs.active_player().id,
+            "pending_choice_player": gs.get_pending_choice_player_id(),
+            "pending_choice": gs.get_pending_choice().is_some(),
+            "boundary_id": self.boundary_id, "boundary_step": self.boundary_step,
+            "repeated_visible_decision_from": repeated_from,
+            "live_selected_hand_indices_before": selected,
+            "selection_operation": selection_operation,
+            "view": snapshot, "chosen": chosen_value, "available_actions": available,
+        }))
+    }
+
+    fn execute(&mut self, audit: &mut Option<std::fs::File>, gs: &mut GameState,
+        actions: &[game_setup::Action], chosen: &game_setup::Action) -> ArenaResult<()> {
+        self.decision += 1;
+        if audit.is_some() {
+            emit(audit, &self.record(gs, actions, chosen)?)?;
+        }
+        let result = game_setup::execute_action(gs, chosen);
+        if let Err(error) = &result {
+            self.errors += 1;
+            eprintln!("ARENA game={} decision={} action={} failed: {}", self.game, self.decision, chosen.action_type, error);
+        }
+        emit(audit, &json!({
+            "event": "action_result", "game": self.game, "decision": self.decision,
+            "execution_ok": result.is_ok(),
+        }))?;
+        game_setup::settle_single_player_state(gs);
+        Ok(())
+    }
+}
 
 /// Bot identity lives in [`BotKind`] (`bot/registry.rs`): adding a version
 /// means a new variant + dispatch lines there, never renames here.

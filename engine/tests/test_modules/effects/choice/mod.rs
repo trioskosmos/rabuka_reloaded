@@ -11,5 +11,7 @@ pub mod mill_or_wait_pl_hs_cl1_004_cl_test;
 pub mod opponent_choice_tests;
 pub mod q258_himege_no_target_test;
 pub mod tang_keke_test;
+pub mod target_player_recycle_pl_s_bp7_013_n_test;
 pub mod untested_abilities_test;
 pub mod untested_choice_change_target_test;
+pub mod wait_or_draw_pl_s_bp7_025_l_test;
