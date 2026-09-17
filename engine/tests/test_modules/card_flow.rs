@@ -1,6 +1,9 @@
 #[path = "abilities/simple/look_and_select_test.rs"]
 pub mod inspect_top_select_and_discard_remainder;
 
+#[path = "abilities/simple/honoka_bp5_live_score_test.rs"]
+pub mod inspect_by_total_live_score;
+
 #[path = "abilities/complex/looked_at_discard_test.rs"]
 pub mod deck_top_optional_discard;
 

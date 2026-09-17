@@ -147,24 +147,128 @@ fn honoka_bp5_score_1_looks_at_3() {
 // Test: score=2 → look at 4 (2+2)
 // ---------------------------------------------------------------------------
 
+fn perform_honoka_score_two_live() -> (TestGame, i16) {
+    let mut game = TestGame::new(load_real_database());
+    let deck: Vec<i16> = (0..30).map(|_| game.id("PL!-sd1-010-SD")).collect();
+    let opponent_deck: Vec<i16> = (0..10).map(|_| game.id("PL!-sd1-010-SD")).collect();
+    game.state.player1.main_deck.cards = deck.into();
+    game.state.player2.main_deck.cards = opponent_deck.into();
+    let honoka = game.id("PL!-bp5-001-R\u{ff0b}");
+    let rin = game.id("PL!-sd1-014-SD");
+    let live = game.id("PL!-sd1-020-SD");
+    let cost = game.id("PL!-sd1-017-SD");
+    game.add_to_hand(honoka);
+    game.add_to_hand(rin);
+    game.add_to_hand(live);
+    game.add_to_hand(cost);
+    game.give_energy(13);
+    game.play_to_stage(honoka, rabuka_engine::zones::MemberArea::Center);
+    game.play_to_stage(rin, rabuka_engine::zones::MemberArea::LeftSide);
+    assert!(!game.has_pending_choice());
+    for _ in 0..5 {
+        game.pass();
+        assert!(!game.has_pending_choice());
+    }
+    game.set_live_card(live);
+    for _ in 0..4 {
+        game.pass();
+        assert!(!game.has_pending_choice());
+    }
+    game.pass();
+    game.assert_select_card("hand", 1, true);
+    assert!(game.state.player1.stage.stage.contains(&honoka));
+    assert_eq!(game.state.player1.live_card_zone.cards.as_slice(), &[live]);
+    assert!(game.state.player1.success_live_card_zone.cards.is_empty());
+    (game, live)
+}
+
 #[test]
 fn honoka_bp5_score_2_looks_at_4() {
-    let db = load_real_database();
-    let mut game = TestGame::new(db);
-    let (honoka, deck_before) = setup_honoka(&mut game, "PL!-bp5-001-R\u{ff0b}", 3, 20);
+    let (mut game, live) = perform_honoka_score_two_live();
+    let deck = game.state.player1.main_deck.cards.to_vec();
+    let mut hand = game.state.player1.hand.cards.to_vec();
+    let mut waitroom = game.state.player1.waitroom.cards.to_vec();
+    let opponent_deck = game.state.player2.main_deck.cards.clone();
+    let opponent_hand = game.state.player2.hand.cards.clone();
+    let cost = hand.remove(0);
+    game.select_indices(&[0]);
+    waitroom.push(cost);
+    game.assert_select_card("looked_at", 1, false);
+    assert_eq!(game.state.looked_at_cards.as_slice(), &deck[..4]);
+    assert_eq!(game.state.player1.hand.cards.as_slice(), hand.as_slice());
+    assert_eq!(game.state.player1.waitroom.cards.as_slice(), waitroom.as_slice());
+    game.select_indices(&[2]);
+    hand.push(deck[2]);
+    waitroom.extend([deck[0], deck[1], deck[3]]);
+    assert!(!game.has_pending_choice());
+    assert!(game.state.looked_at_cards.is_empty());
+    assert_eq!(game.state.player1.hand.cards.as_slice(), hand.as_slice());
+    assert_eq!(game.state.player1.waitroom.cards.as_slice(), waitroom.as_slice());
+    assert_eq!(game.state.player1.main_deck.cards.as_slice(), &deck[4..]);
+    assert_eq!(game.state.player2.main_deck.cards, opponent_deck);
+    assert_eq!(game.state.player2.hand.cards, opponent_hand);
+    game.pass();
+    assert_eq!(game.state.player1.success_live_card_zone.cards.as_slice(), &[live]);
+}
 
-    let live2 = game.id("PL!-sd1-020-SD"); // score=2
-    game.state.player1.live_card_zone.cards.push(live2);
+#[test]
+fn honoka_bp5_failed_live_never_offers_discard_or_inspection() {
+    let mut game = TestGame::new(load_real_database());
+    let deck: Vec<i16> = (0..30).map(|_| game.id("PL!-sd1-010-SD")).collect();
+    let opponent_deck: Vec<i16> = (0..10).map(|_| game.id("PL!-sd1-010-SD")).collect();
+    game.state.player1.main_deck.cards = deck.into();
+    game.state.player2.main_deck.cards = opponent_deck.into();
+    let honoka = game.id("PL!-bp5-001-R\u{ff0b}");
+    let live = game.id("PL!-sd1-020-SD");
+    let cost = game.id("PL!-sd1-017-SD");
+    game.add_to_hand(honoka);
+    game.add_to_hand(live);
+    game.add_to_hand(cost);
+    game.give_energy(4);
+    game.play_to_stage(honoka, rabuka_engine::zones::MemberArea::Center);
+    for _ in 0..5 {
+        game.pass();
+        assert!(!game.has_pending_choice());
+    }
+    game.set_live_card(live);
+    game.pass();
+    game.pass();
+    let deck_before = game.state.player1.main_deck.cards.to_vec();
+    let hand_before = game.state.player1.hand.cards.clone();
+    let mut expected_waitroom = game.state.player1.waitroom.cards.to_vec();
+    expected_waitroom.push(live);
+    expected_waitroom.extend_from_slice(&deck_before[..2]);
+    for _ in 0..4 {
+        game.pass();
+        assert!(!game.has_pending_choice());
+        assert!(game.state.looked_at_cards.is_empty());
+    }
+    assert_eq!(game.state.player1.hand.cards, hand_before);
+    assert!(game.state.player1.hand.cards.contains(&cost));
+    assert_eq!(game.state.player1.main_deck.cards.as_slice(), &deck_before[2..]);
+    let mut actual_waitroom = game.state.player1.waitroom.cards.to_vec();
+    actual_waitroom.sort_unstable();
+    expected_waitroom.sort_unstable();
+    assert_eq!(actual_waitroom, expected_waitroom);
+    assert!(game.state.player1.live_card_zone.cards.is_empty());
+    assert!(game.state.player1.success_live_card_zone.cards.is_empty());
+    assert!(game.state.player1.stage.stage.contains(&honoka));
+}
 
-    trigger_live_success(&mut game, honoka);
-    let looked = pay_cost_and_get_look_count(&mut game);
-    assert_eq!(looked, 4, "score=2 → 2+2 = 4 cards looked at");
-
-    drain_after_look(&mut game);
-
-    assert_eq!(game.state.player1.hand.cards.len(), 3);
-    assert_eq!(game.state.player1.waitroom.cards.len(), 4);
-    assert_eq!(game.state.player1.main_deck.cards.len(), deck_before - 4);
+#[test]
+fn honoka_bp5_success_declined_cost_preserves_hand_and_deck() {
+    let (mut game, live) = perform_honoka_score_two_live();
+    let deck = game.state.player1.main_deck.cards.clone();
+    let hand = game.state.player1.hand.cards.clone();
+    let waitroom = game.state.player1.waitroom.cards.clone();
+    game.select_indices(&[]);
+    assert!(!game.has_pending_choice());
+    assert!(game.state.looked_at_cards.is_empty());
+    assert_eq!(game.state.player1.main_deck.cards, deck);
+    assert_eq!(game.state.player1.hand.cards, hand);
+    assert_eq!(game.state.player1.waitroom.cards, waitroom);
+    game.pass();
+    assert_eq!(game.state.player1.success_live_card_zone.cards.as_slice(), &[live]);
 }
 
 // ---------------------------------------------------------------------------

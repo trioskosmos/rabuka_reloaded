@@ -1,6 +1,6 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-09-17T00:32:21.940668+00:00",
+  "generated_at": "2026-09-17T00:57:28.188268+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
@@ -8,7 +8,7 @@
     "unique_abilities": 936
   },
   "n_files": 577,
-  "n_tests": 3298,
+  "n_tests": 3302,
   "total_cards": 771,
   "covered_cards": 771,
   "abilities_on_covered": 936,
@@ -754,7 +754,7 @@
       ]
     }
   },
-  "n_test_fns_parsed": 3298,
+  "n_test_fns_parsed": 3302,
   "abilities": [
     {
       "idx": 0,
@@ -1085,6 +1085,7 @@
         "engine/tests/test_modules/abilities/moderate/sumire_bp2_center_cost_test.rs",
         "engine/tests/test_modules/abilities/simple/bp7_tomari_discard_all_hand_test.rs",
         "engine/tests/test_modules/abilities/simple/honoka_bp5_live_score_test.rs",
+        "engine/tests/test_modules/abilities/simple/look_and_select_test.rs",
         "engine/tests/test_modules/abilities/simple/miyata_draw_until_test.rs",
         "engine/tests/test_modules/batches/untested_abilities_batch31_test.rs",
         "engine/tests/test_modules/batches/untested_abilities_batch35_test.rs",
@@ -1141,7 +1142,7 @@
         "bp6020_ab0_non_mus_resolver_does_not_reposition_anything",
         "bp6020_ab0_once_per_turn_blocks_second_resolution"
       ],
-      "covering_test_count": 320,
+      "covering_test_count": 342,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -6191,6 +6192,7 @@
         "honoka_bp5_deck_1_card_score_1_refreshes",
         "honoka_bp5_deck_exactly_enough",
         "honoka_bp5_deck_refresh_during_look",
+        "honoka_bp5_failed_live_never_offers_discard_or_inspection",
         "honoka_bp5_five_live_cards_looks_at_7",
         "honoka_bp5_high_score_looks_at_8",
         "honoka_bp5_mixed_scores_looks_correctly",
@@ -6209,16 +6211,15 @@
         "honoka_bp5_sec_variant",
         "honoka_bp5_selected_card_goes_to_hand",
         "honoka_bp5_skip_cost_no_effect",
+        "honoka_bp5_success_declined_cost_preserves_hand_and_deck",
         "issue2_kanan_discard_1_gain_1",
         "issue2_kanan_skip_cost_empty_live_gain",
         "issue3_ayumu_compound_both_conditions_met",
         "issue3_ayumu_live_card_in_hand_blocks_effect",
         "issue5_kanon_invalidate_other_liella",
-        "issue8_honoka_live_score_1_plus_2",
-        "issue8_honoka_live_score_2",
-        "issue8_honoka_live_score_dynamic"
+        "issue8_honoka_live_score_1_plus_2"
       ],
-      "covering_test_count": 33,
+      "covering_test_count": 35,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -8727,6 +8728,8 @@
         "engine/tests/test_modules/abilities/simple/look_and_select_test.rs"
       ],
       "covering_tests": [
+        "eli_cost_look_three_takes_one_to_hand",
+        "eli_declined_cost_skips_look_entirely",
         "ginko_inspecting_exact_deck_size_does_not_refresh_waitroom",
         "ginko_inspection_refresh_preserves_existing_top_and_recovers_waitroom",
         "kaho_full_own_stage_looks_five_and_keeps_one",
@@ -8746,7 +8749,7 @@
         "yoshiko_look_select_no_eligible_auto_skip",
         "yoshiko_look_select_skip_cost"
       ],
-      "covering_test_count": 18,
+      "covering_test_count": 20,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -8779,6 +8782,8 @@
         "engine/tests/test_modules/abilities/simple/look_and_select_test.rs"
       ],
       "covering_tests": [
+        "eli_cost_look_three_takes_one_to_hand",
+        "eli_declined_cost_skips_look_entirely",
         "ginko_inspecting_exact_deck_size_does_not_refresh_waitroom",
         "ginko_inspection_refresh_preserves_existing_top_and_recovers_waitroom",
         "kaho_full_own_stage_looks_five_and_keeps_one",
@@ -8798,7 +8803,7 @@
         "yoshiko_look_select_no_eligible_auto_skip",
         "yoshiko_look_select_skip_cost"
       ],
-      "covering_test_count": 18,
+      "covering_test_count": 20,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -10621,15 +10626,15 @@
         "distortion_same_name_catchu_all_active_score_plus_1",
         "distortion_same_name_catchu_condition_not_met",
         "distortion_two_same_one_diff_catchu_condition_met",
+        "eli_cost_look_three_takes_one_to_hand",
+        "eli_declined_cost_skips_look_entirely",
         "energy_zone_capacity_handled",
         "ginko_inspecting_exact_deck_size_does_not_refresh_waitroom",
         "ginko_inspection_refresh_preserves_existing_top_and_recovers_waitroom",
         "hanamaru_score_icon_filter",
-        "hareruya_q64_waitroom_only_five_distinct_liella_condition_met",
-        "hareruya_q74_multiname_distinct_counting",
-        "honoka_bp5_ar_variant"
+        "hareruya_q64_waitroom_only_five_distinct_liella_condition_met"
       ],
-      "covering_test_count": 107,
+      "covering_test_count": 111,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -14408,7 +14413,7 @@
         "ayumu_constant_three_live_cards_still_gains_blade",
         "ayumu_constant_two_live_cards_gains_blade"
       ],
-      "covering_test_count": 867,
+      "covering_test_count": 869,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -17885,6 +17890,8 @@
         "engine/tests/test_modules/abilities/simple/look_and_select_test.rs"
       ],
       "covering_tests": [
+        "eli_cost_look_three_takes_one_to_hand",
+        "eli_declined_cost_skips_look_entirely",
         "ginko_inspecting_exact_deck_size_does_not_refresh_waitroom",
         "ginko_inspection_refresh_preserves_existing_top_and_recovers_waitroom",
         "kaho_full_own_stage_looks_five_and_keeps_one",
@@ -17904,7 +17911,7 @@
         "yoshiko_look_select_no_eligible_auto_skip",
         "yoshiko_look_select_skip_cost"
       ],
-      "covering_test_count": 18,
+      "covering_test_count": 20,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -29778,6 +29785,8 @@
         "chisato_right_side_debut_draws_two_discards_two",
         "compound_condition_two_self_three_opp",
         "dia_keeps_one_on_bottom_rest_to_waitroom",
+        "eli_cost_look_three_takes_one_to_hand",
+        "eli_declined_cost_skips_look_entirely",
         "exactly_two_members_grants",
         "gin_ko_places_opponent_discard_under_opponent_deck",
         "ginko_accept_places_then_rests_blade_gate_member",
@@ -29802,11 +29811,9 @@
         "mei_mirror_standoff_each_side_rests_own_opponent",
         "member_name_constants_selective_gain",
         "mia_activation_self_wait_draws_two_discards_two",
-        "mirror_copies_each_evaluate_against_own_opponent",
-        "mutual_mill_identity_no_cross_pollination",
-        "p2_owned_copy_compares_against_p1_energy"
+        "mirror_copies_each_evaluate_against_own_opponent"
       ],
-      "covering_test_count": 44,
+      "covering_test_count": 46,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -33818,6 +33825,8 @@
         "engine/tests/test_modules/abilities/simple/look_and_select_test.rs"
       ],
       "covering_tests": [
+        "eli_cost_look_three_takes_one_to_hand",
+        "eli_declined_cost_skips_look_entirely",
         "ginko_inspecting_exact_deck_size_does_not_refresh_waitroom",
         "ginko_inspection_refresh_preserves_existing_top_and_recovers_waitroom",
         "kaho_full_own_stage_looks_five_and_keeps_one",
@@ -33837,7 +33846,7 @@
         "yoshiko_look_select_no_eligible_auto_skip",
         "yoshiko_look_select_skip_cost"
       ],
-      "covering_test_count": 18,
+      "covering_test_count": 20,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,

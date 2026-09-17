@@ -26,7 +26,6 @@
     pub mod hanano_test;
     pub mod hanayo_bp6_test;
     pub mod heart_override_test;
-    pub mod honoka_bp5_live_score_test;
     pub mod kagayaiteru_test;
     pub mod kanata_bp1_test;
     pub mod kanon_test;
