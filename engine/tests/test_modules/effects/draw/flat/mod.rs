@@ -17,3 +17,5 @@
     pub mod success_zone_gated_debut_draw_test;
     pub mod waitroom_count_gated_debut_draw_test;
     pub mod boosted_member_live_success_draw_test;
+    pub mod costly_aqours_pl_s_bp7_002_r_test;
+    pub mod debut_one_pl_hs_bp5_011_n_test;

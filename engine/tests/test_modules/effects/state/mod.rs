@@ -34,3 +34,6 @@
     pub mod all_liella_gated_opponent_wait_test;
     pub mod cost_and_blade_filtered_opponent_wait_test;
     pub mod debut_low_cost_opponent_wait_test;
+    pub mod self_wait_printemps_energy_pl_pb1_003_r_test;
+    pub mod success_score_energy_pl_bp4_004_r_test;
+    pub mod low_blade_opponent_wait_pl_hs_bp6_013_r_test;

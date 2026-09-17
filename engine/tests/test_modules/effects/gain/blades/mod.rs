@@ -40,6 +40,11 @@
     pub mod optional_discard_success_zone_blades_maki_bp3_006_r_test;
     pub mod optional_discard_other_member_blades_honoka_pb1_010_r_test;
     pub mod all_stage_heart_colors_blades_shizuku_bp5_015_n_test;
-    pub mod untested_abilities_batch43_test;
-    pub mod untested_abilities_batch49_test;
-    pub mod untested_abilities_batch50_test;
+    pub mod left_area_moved_blades_pl_sp_bp4_017_n_test;
+    pub mod higher_cost_member_pl_hs_bp2_002_r_plus_test;
+    pub mod exact_energy_gain_pl_pr_021_pr_test;
+    pub mod lone_member_pl_hs_pb1_015_r_and_pl_hs_bp6_002_r_test;
+    pub mod self_wait_center_pl_bp4_011_n_and_pl_bp4_017_n_test;
+    pub mod named_chisato_pl_sp_bp7_025_l_test;
+    pub mod costly_hasunosora_pl_hs_cl1_010_cl_test;
+    pub mod moved_right_side_pl_sp_bp4_020_n_test;

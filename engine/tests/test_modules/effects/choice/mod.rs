@@ -9,5 +9,6 @@
     pub mod opponent_choice_tests;
     pub mod q258_himege_no_target_test;
     pub mod tang_keke_test;
+    pub mod mill_or_wait_pl_hs_cl1_004_cl_test;
     pub mod untested_abilities_test;
     pub mod untested_choice_change_target_test;

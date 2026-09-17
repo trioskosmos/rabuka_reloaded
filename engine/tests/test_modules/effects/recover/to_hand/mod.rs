@@ -21,6 +21,7 @@
     pub mod kidou_softlock_test;
     pub mod kotori_bp5_003_test;
     pub mod kotori_test;
+    pub mod lilywhite_gated_live_pl_pb1_007_r_test;
     pub mod location_condition_cost_test;
     pub mod mebius_loop_test;
     pub mod miracle_stay_tune_test;
@@ -41,9 +42,15 @@
     pub mod self_to_waitroom_liella_recovery_test;
     pub mod self_to_waitroom_live_recovery_energy_activation_test;
     pub mod self_wait_discard_niji_live_recovery_test;
-    pub mod untested_abilities_batch4_test;
-    pub mod untested_abilities_batch45_test;
-    pub mod untested_abilities_batch54_test;
-    pub mod untested_abilities_batch8_test;
+    pub mod cost_two_members_pl_hs_bp2_002_r_plus_test;
+    pub mod success_score_live_pl_bp6_013_n_test;
+    pub mod three_5yncri5e_live_pl_sp_bp7_019_n_test;
+    pub mod tied_score_reveals_pl_hs_cl1_012_cl_test;
+    pub mod distinct_trio_reveals_pl_sp_bp2_025_l_test;
+    pub mod success_zone_revealed_members_pl_s_bp5_019_l_test;
+    pub mod optional_energy_member_recovery_pl_sp_sd1_007_sd_test;
+    pub mod energy_discard_live_recovery_pl_sp_sd2_006_sd2_test;
+    pub mod heart01_filtered_live_recovery_pl_pr_004_pr_test;
+    pub mod optional_energy_live_recovery_pl_sp_pb2_007_r_test;
     pub mod wao_wao_test;
     pub mod yoshiko_debut_test;

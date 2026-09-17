@@ -13,8 +13,10 @@
     pub mod modify_required_hearts_global_test;
     pub mod pl_s_bp5_010_test;
     pub mod qa_new_tests254;
+    pub mod success_zone_group_pl_n_sd2_003_sd2_test;
     pub mod umi_q228_test;
-    pub mod untested_abilities_batch36_test;
+    pub mod all_active_stage_pl_s_bp7_020_l_test;
+    pub mod baton_arrivals_pl_hs_bp2_023_l_and_pl_hs_bp2_025_l_test;
     pub mod wien_cost_mod_test;
     pub mod wien_yell_count_test;
     pub mod wonder_zone_max_repeats_test;

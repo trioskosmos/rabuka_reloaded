@@ -10,4 +10,5 @@
     pub mod pl_sp_sd1_002_test;
     pub mod qa_new_tests202;
     pub mod s_bp3_006_cost_ref_test;
+    pub mod waitroom_low_cost_pl_hs_bp6_016_r_test;
     pub mod sayaka_test;

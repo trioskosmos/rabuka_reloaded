@@ -20,9 +20,12 @@
     pub mod smile_test;
     pub mod sp_bp2_015_wien_yell_edge_test;
     pub mod umi_group_live_search;
-    pub mod untested_abilities_batch20_test;
-    pub mod untested_abilities_batch26_test;
-    pub mod untested_abilities_batch33_test;
-    pub mod untested_abilities_batch51_test;
-    pub mod untested_abilities_batch52_test;
-    pub mod untested_abilities_batch53_test;
+    pub mod discard_filtered_look_pl_n_bp3_012_r_pl_hs_bp1_011_pr_test;
+    pub mod discard_mandatory_look_pl_n_pb1_028_n_test;
+    pub mod discard_group_look_pl_sp_pb1_015_n_016_n_pl_n_sd2_012_sd2_test;
+    pub mod waitroom_debut_look_pl_s_bp6_016_n_test;
+    pub mod discard_subunit_look_pl_pb1_016_r_pl_sp_pb1_017_n_pl_hs_pb1_018_n_test;
+    pub mod energy_discard_look_pl_sp_bp1_010_r_test;
+    pub mod optional_energy_look_pl_sp_bp2_005_r_test;
+    pub mod named_member_look_pl_n_pb1_016_r_018_r_021_r_024_r_test;
+    pub mod success_score_gated_look_pl_bp4_006_r_test;

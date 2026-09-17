@@ -25,5 +25,15 @@
     pub mod opponent_energy_ahead_constant_heart_test;
     pub mod stage_member_cost_gated_constant_heart_test;
     pub mod sumire_bp2_center_cost_test;
+    pub mod set_aqours_heart04_pl_s_bp7_024_l_test;
+    pub mod discard_other_member_heart01_pl_bp4_013_n_test;
+    pub mod live_heart02_threshold_gain_pl_s_bp6_010_n_test;
+    pub mod energy_thresholds_pl_sp_pb2_023_n_test;
+    pub mod paid_discard_color_pl_n_sd2_005_sd2_test;
+    pub mod chosen_color_transform_pl_sp_pb2_030_n_test;
+    pub mod paid_energy_color_pl_n_bp7_012_r_test;
+    pub mod energy_thresholds_pl_sp_pb2_027_n_test;
+    pub mod live_zone_heart04_threshold_pl_s_bp5_013_n_test;
+    pub mod chosen_color_transform_pl_n_pb1_034_n_036_n_test;
     pub mod subunit_stage_count_gated_debut_heart_test;
     pub mod success_score_sum_constant_heart_test;

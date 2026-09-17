@@ -43,10 +43,10 @@ _confusable card numbers (bp2 vs pb2) staged in one file — human review for wr
 | `engine/tests/test_modules/effects/choice/ll_bp7_001_triple_member_test.rs` | `<file>` | 1 | PL!SP-bp5-014-N, PL!SP-bp7-014-N |
 | `engine/tests/test_modules/effects/compound/ability_engine_fixes_test.rs` | `<file>` | 1 | PL!SP-bp2-008-R, PL!SP-pb1-008-R |
 | `engine/tests/test_modules/effects/compound/toubatsu_test.rs` | `<file>` | 1 | PL!SP-bp2-011-R, PL!SP-pb2-011-R |
-| `engine/tests/test_modules/effects/compound/untested_abilities_batch38_test.rs` | `<file>` | 1 | PL!S-bp2-020-L, PL!S-bp3-020-L |
 | `engine/tests/test_modules/effects/compound/untested_abilities_batch55_test.rs` | `<file>` | 1 | PL!SP-bp1-023-L, PL!SP-bp5-023-L, PL!SP-pb1-023-L |
 | `engine/tests/test_modules/effects/energy/under_member/energy_and_member_under_test.rs` | `<file>` | 1 | PL!N-bp3-013-N, PL!N-bp5-013-N |
 | `engine/tests/test_modules/effects/gain/blades/mymai_tonight_test.rs` | `<file>` | 1 | PL!S-bp2-023-L, PL!S-bp5-023-L |
+| `engine/tests/test_modules/effects/gain/hearts/live_zone_heart04_threshold_pl_s_bp5_013_n_test.rs` | `<file>` | 1 | PL!S-bp2-020-L, PL!S-bp3-020-L |
 | `engine/tests/test_modules/effects/look_select/reveal_to_hand/distortion_need_hearts_test.rs` | `<file>` | 1 | PL!SP-bp1-012-N, PL!SP-bp4-012-N |
 | `engine/tests/test_modules/effects/look_select/reveal_to_hand/eli_bp5_cost9_search.rs` | `<file>` | 1 | PL!-bp3-002-R, PL!-bp5-002-R |
 | `engine/tests/test_modules/effects/position/kinako_each_time_blade_test.rs` | `<file>` | 1 | PL!SP-bp5-006-R, PL!SP-pb1-006-R |

@@ -9,6 +9,12 @@
     pub mod dazzling_test;
     pub mod dream_with_you_test;
     pub mod energy_state_condition_test;
+    pub mod energy_threshold_score_pl_sp_sd1_026_sd_srl_test;
+    pub mod aqours_heart04_threshold_score_pl_s_pb1_020_l_test;
+    pub mod return_energy_deficit_score_pl_s_bp7_023_l_test;
+    pub mod twelve_energy_pl_sp_pb1_002_r_test;
+    pub mod distinct_waitroom_lives_pl_n_bp4_028_l_test;
+    pub mod waited_members_pl_n_sd2_027_p_test;
     pub mod exact_energy_count_constant_score_test;
     pub mod go_master_success_zone_comparison_test;
     pub mod kasumi_bp5_002_heart_greater_test;
@@ -32,6 +38,7 @@
     pub mod strawberry_test;
     pub mod takaramono_test;
     pub mod tokimeki_test;
+    pub mod optional_energy_return_comparison_pl_sp_bp7_027_l_test;
     pub mod opponent_energy_gated_score_test;
     pub mod opponent_surplus_constant_total_score_test;
     pub mod revealed_distinct_liella_score_test;
