@@ -312,6 +312,106 @@ int rb_find_card_by_no(const char *card_no) {
     return -1;
 }
 
+void rb_effect_data_free(RbEffectData *d) {
+    if (!d) return;
+    switch (d->kind) {
+        case RB_EFFECT_DATA_HEART_OVERRIDE:
+            rb_free(d->value.heart_override.color);
+            break;
+        case RB_EFFECT_DATA_SINGLE_CARD:
+            rb_free(d->value.single_card.color);
+            break;
+        case RB_EFFECT_DATA_MULTI_CARD:
+            for (size_t i = 0; i < d->value.multi_card.count; ++i)
+                rb_free(d->value.multi_card.items[i].color);
+            rb_free(d->value.multi_card.items);
+            break;
+        default:
+            break;
+    }
+    memset(d, 0, sizeof(*d));
+    d->kind = RB_EFFECT_DATA_MULTI_CARD;
+}
+
+int rb_effect_data_clone(const RbEffectData *source, RbEffectData *out) {
+    RbEffectData copy;
+    if (!source || !out) return -1;
+    if (source == out) return 0;
+    copy = *source;
+    switch (source->kind) {
+        case RB_EFFECT_DATA_HEART_OVERRIDE:
+            if (!source->value.heart_override.color) return -1;
+            copy.value.heart_override.color = rb_strdup2(source->value.heart_override.color);
+            if (!copy.value.heart_override.color) return -1;
+            break;
+        case RB_EFFECT_DATA_SINGLE_CARD:
+            if (source->value.single_card.color) {
+                copy.value.single_card.color = rb_strdup2(source->value.single_card.color);
+                if (!copy.value.single_card.color) return -1;
+            }
+            break;
+        case RB_EFFECT_DATA_MULTI_CARD: {
+            size_t n = source->value.multi_card.count;
+            copy.value.multi_card.items = NULL;
+            copy.value.multi_card.count = 0;
+            if (!n) break;
+            if (!source->value.multi_card.items || n > SIZE_MAX / sizeof(RbCardEffectItem)) return -1;
+            copy.value.multi_card.items = rb_malloc(n * sizeof(RbCardEffectItem));
+            if (!copy.value.multi_card.items) return -1;
+            for (size_t i = 0; i < n; ++i) {
+                const RbCardEffectItem *item = &source->value.multi_card.items[i];
+                RbCardEffectItem *dest = &copy.value.multi_card.items[i];
+                *dest = *item;
+                dest->color = item->color ? rb_strdup2(item->color) : NULL;
+                if (item->color && !dest->color) {
+                    rb_effect_data_free(&copy);
+                    return -1;
+                }
+                ++copy.value.multi_card.count;
+            }
+            break;
+        }
+        case RB_EFFECT_DATA_ALL_CARDS:
+        case RB_EFFECT_DATA_SET_BLADE_COUNT:
+        case RB_EFFECT_DATA_SURPLUS_HEART:
+        case RB_EFFECT_DATA_GAIN_ABILITY:
+            break;
+        default:
+            return -1;
+    }
+    *out = copy;
+    return 0;
+}
+
+const char *rb_turn_phase_display(RbTurnPhase phase) {
+    switch (phase) {
+        case RB_TURNP_NORMAL_FIRST: return "FirstAttackerNormal";
+        case RB_TURNP_NORMAL_SECOND: return "SecondAttackerNormal";
+        case RB_TURNP_LIVE: return "Live";
+        default: return "";
+    }
+}
+
+const char *rb_phase_display(RbPhase phase) {
+    switch (phase) {
+        case RB_PHASE_RPS: return "RPS";
+        case RB_PHASE_OPENING: return "Choose 1st";
+        case RB_PHASE_MULLIGAN_FIRST: return "Mulligan (1st)";
+        case RB_PHASE_MULLIGAN_SECOND: return "Mulligan (2nd)";
+        case RB_PHASE_ACTIVE: return "Active";
+        case RB_PHASE_ENERGY: return "Energy";
+        case RB_PHASE_DRAW: return "Draw";
+        case RB_PHASE_MAIN: return "Main";
+        case RB_PHASE_LIVE_SET: return "LiveCardSet (1st)";
+        case RB_PHASE_LIVE_SET_SECOND: return "LiveCardSet (2nd)";
+        case RB_PHASE_PERFORMANCE: return "Perform (1st)";
+        case RB_PHASE_PERFORMANCE_SECOND: return "Perform (2nd)";
+        case RB_PHASE_VICTORY: return "Live Result";
+        case RB_PHASE_DONE: return "Done";
+        default: return "";
+    }
+}
+
 int rb_effect_data_card_id(const RbEffectData *d, int16_t *out_card_id) {
     if (!d || !out_card_id) return 0;
     switch (d->kind) {

@@ -1619,6 +1619,13 @@ int rb_parse_operation(const char *s);
    stores `distinct` as a string; the Boolean branch is not represented). */
 int rb_distinct_info_is_distinct(const char *s);
 
+int rb_need_satisfied(const int base_need[8], const int provided[8], int card_id, const RbMods *mods);
+void rb_member_original_hearts(const RbMods *mods, int card_id, int out[8]);
+void rb_apply_additive_heart_mods(int hearts[8], const RbModifierEntry *mods);
+void rb_effective_blade_parts(RbModifierEntry entry, int printed_blade, int *base, int *additive);
+void rb_member_heart_detail(const RbMods *mods, int card_id, uint8_t base_arr[8], uint8_t bonus_arr[8]);
+int  rb_effective_blade(int card_id, RbModifierEntry entry);
+
 void rb_calc_stage_hearts(const GameState *g, int pl, int out[8]);
 void rb_stage_hearts_pipeline(const GameState *g, int pl, int out[8]);
 void rb_effective_need_heart(const GameState *g, int live_cid, int out[8]);
@@ -2311,6 +2318,10 @@ int rb_effect_data_count(const RbEffectData *d, uint8_t *out_count);
 int rb_effect_data_color(const RbEffectData *d, const char **out_color);
 int rb_effect_data_amount(const RbEffectData *d, int16_t *out_amount);
 int rb_effect_data_card_id(const RbEffectData *d, int16_t *out_card_id);
+int rb_effect_data_clone(const RbEffectData *source, RbEffectData *out);
+void rb_effect_data_free(RbEffectData *d);
+const char *rb_turn_phase_display(RbTurnPhase phase);
+const char *rb_phase_display(RbPhase phase);
 
 /* ── types.rs: ZoneId::equivalent / matches_source ──
      Zone aliasing for rule-purpose equivalence and zone-change condition matching. */

@@ -8,48 +8,28 @@
 
 /* Effective need_heart for a live card: base need + need_heart_modifiers */
 void rb_effective_need_heart(const GameState *g, int live_cid, int out[8]){
-    Card c; if(!rb_decode_card_by_index((uint32_t)live_cid,&c)){ memset(out,0,8*sizeof(int)); return; }
-    for(int i=0;i<8;i++) out[i]=0;
-    for(int h=0;h<c.n_hearts;h++) out[c.heart_color[h]%8]+=c.heart_count[h];
-    for(int col=0;col<8;col++){
-        int mod=rb_mods_get_need_heart((RbMods*)&g->mods, live_cid, col);
-        if(mod) out[col]=rb_saturate_u8(out[col]+mod);
-    }
-    rb_free_card(&c);
-}
-
-void rb_member_original_hearts(const RbMods *mods, int card_id, int out[8]);
-
-/* Stage hearts — faithful port of stats_pipeline.rs::stage_hearts.
-    For each stage slot: member_original_hearts (override/copy/multiplier
-    layers, 9.9.1.1-9.9.1.4), then additive mods stack ON TOP (9.9.1.5),
-    then fold into the pooled output. */
-void rb_stage_hearts_pipeline(const GameState *g, int pl, int out[8]){
+    Card c;
     memset(out, 0, 8 * sizeof(int));
-    if(!g || pl < 0 || pl >= 2) return;
-    const RbMods *mods = &g->mods;
-    for(int s = 0; s < RB_STAGE_SIZE; s++){
-        int card_id = g->p[pl].stage[s];
-        if(card_id == RB_EMPTY_SLOT) continue;
-        int m[8];
-        rb_member_original_hearts(mods, card_id, m);
-        /* 9.9.1.5: additive modifiers stack ON TOP of the set/base value. */
-        for(int col = 0; col < 8; col++){
-            RbModifierEntry e = mods->heart[card_id][col];
-            int delta = rb_modifier_total(e);
-            if(delta == 0) continue;
-            int new_val = rb_saturate_u8(m[col] + delta);
-            m[col] = new_val > 0 ? new_val : 0;
-        }
-        for(int col = 0; col < 8; col++) out[col] += m[col];
+    if(!rb_decode_card_by_index((uint32_t)live_cid, &c)) return;
+    int start = c.num_base + c.num_blade;
+    for(int h = start; h < start + c.num_need && h < c.n_hearts; h++){
+        int color = c.heart_color[h];
+        int col = color <= 6 ? color : (color == 10 ? 7 : 0);
+        out[col] += c.heart_count[h];
+    }
+    int has_need = c.num_need != 0;
+    rb_free_card(&c);
+    if(!has_need || !g || live_cid < 0 || live_cid >= RB_MAX_CARD_IDS) return;
+    for(int col = 0; col < 8; col++){
+        RbModifierEntry me = g->mods.need_heart[live_cid][col];
+        if(me.set != 0) out[col] = (uint8_t)me.set;
+    }
+    for(int col = 0; col < 8; col++){
+        RbModifierEntry me = g->mods.need_heart[live_cid][col];
+        if(me.add != 0) out[col] = rb_saturate_u8(out[col] + me.add);
     }
 }
 
-/* ── Ported from stats_pipeline.rs (unmatched functions) ── */
-
-/* member_original_hearts: compute a member's original hearts after
-   copy/multiplier/override layers. Mirrors Rust member_original_hearts.
-   out is a flat int[8] array of per-color heart counts. */
 void rb_member_original_hearts(const RbMods *mods, int card_id, int out[8]){
     memset(out, 0, 8 * sizeof(int));
     if(card_id < 0 || card_id >= RB_MAX_CARD_IDS) return;
@@ -180,4 +160,29 @@ int rb_need_satisfied(const int base_need[8], const int provided[8], int card_id
     if(empty) return 1;
 
     return rb_check_heart_requirement(eff, provided ? provided : zeros);
+}
+
+/* Stage hearts — faithful port of stats_pipeline.rs::stage_hearts.
+    For each stage slot: member_original_hearts (override/copy/multiplier
+    layers, 9.9.1.1-9.9.1.4), then additive mods stack ON TOP (9.9.1.5),
+    then fold into the pooled output. */
+void rb_stage_hearts_pipeline(const GameState *g, int pl, int out[8]){
+    memset(out, 0, 8 * sizeof(int));
+    if(!g || pl < 0 || pl >= 2) return;
+    const RbMods *mods = &g->mods;
+    for(int s = 0; s < RB_STAGE_SIZE; s++){
+        int card_id = g->p[pl].stage[s];
+        if(card_id == RB_EMPTY_SLOT) continue;
+        int m[8];
+        rb_member_original_hearts(mods, card_id, m);
+        /* 9.9.1.5: additive modifiers stack ON TOP of the set/base value. */
+        for(int col = 0; col < 8; col++){
+            RbModifierEntry e = mods->heart[card_id][col];
+            int delta = rb_modifier_total(e);
+            if(delta == 0) continue;
+            int new_val = rb_saturate_u8(m[col] + delta);
+            m[col] = new_val > 0 ? new_val : 0;
+        }
+        for(int col = 0; col < 8; col++) out[col] += m[col];
+    }
 }

@@ -9,7 +9,7 @@ exit /b
 param(
     [int]$IntervalMinutes = 15,
     [string]$WindowTitle = "",
-    [string]$Message = "continue working out how to organise tests how to standardise how to improve how to add how to make the game more accurate actual rule reading and refactors rewrites and so on no bullshitting improve and add tests as needed. again tests are to verify what is written actually happens in game proper hard tests gameplay only. DON'T TELL ME WHAT YOU ARE GOING TO DO KEEP ITERATING BE AGENETIC KEEP FINDING WHAT HAS TO BE DONE AND DO IT."
+    [string]$Message = "continue working out how to organise tests improving names of files and test functions how to standardise how to improve how to add how to make the game more accurate actual rule reading and refactors rewrites and so on no bullshitting improve. again tests are to verify what is written actually happens in game proper hard tests gameplay only. DON'T TELL ME WHAT YOU ARE GOING TO DO KEEP ITERATING BE AGENETIC KEEP FINDING WHAT HAS TO BE DONE AND DO IT. IT SHOULD BE OBVIOUS WHAT THE ENGINE DOES IF I ASK ABOUT A BUG IN THE FUTURE IT SHOULD BE OBVIOUS WHAT KIND OF CARD THE ABILITY IS FROM AND WHAT EDGE CASE WAS MISSED BY LOOKING AT THE OTHERS."
 )
 
 Add-Type -AssemblyName System.Windows.Forms
