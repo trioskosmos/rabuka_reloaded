@@ -101,8 +101,16 @@ void test_give_opp_energy(TestGame *tg, int count){
    Returns 0 if not found. */
 int test_find_live_by_score(TestGame *tg, int score){
     (void)tg;
-    (void)score;
-    return 0;  // Card database lookup not available in test build
+    uint32_t n = rb_num_cards();
+    for(uint32_t i = 0; i < n; i++){
+        if(!rb_card_is_live((int)i)) continue;
+        Card c;
+        if(!rb_decode_card_by_index(i, &c)) continue;
+        int match = (int)c.score == score;
+        rb_free_card(&c);
+        if(match) return (int)i;
+    }
+    return -1;
 }
 
 void test_give_energy(TestGame *tg, int count){

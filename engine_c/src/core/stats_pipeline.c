@@ -18,38 +18,30 @@ void rb_effective_need_heart(const GameState *g, int live_cid, int out[8]){
     rb_free_card(&c);
 }
 
-/* Stage hearts with copy/multiplier — mirrors Player::calculate_stage_hearts */
+void rb_member_original_hearts(const RbMods *mods, int card_id, int out[8]);
+
+/* Stage hearts — faithful port of stats_pipeline.rs::stage_hearts.
+    For each stage slot: member_original_hearts (override/copy/multiplier
+    layers, 9.9.1.1-9.9.1.4), then additive mods stack ON TOP (9.9.1.5),
+    then fold into the pooled output. */
 void rb_stage_hearts_pipeline(const GameState *g, int pl, int out[8]){
-    rb_calc_stage_hearts(g, pl, out);
-    /* heart_copy: target copies source's base hearts */
-    for(int s=0;s<RB_STAGE_SIZE;s++){
-        int target=g->p[pl].stage[s];
-        if(target==RB_EMPTY_SLOT) continue;
-        int src=g->mods.heart_copy[target];
-        if(src<=0 || src>=RB_MAX_CARD_IDS) continue;
-        /* heart_copy REPLACES the target's own base hearts with the source's. */
-        Card tc; if(rb_decode_card_by_index((uint32_t)target,&tc)){
-            for(int h=0;h<tc.n_hearts;h++){
-                int col=tc.heart_color[h]%8;
-                out[col]-=tc.heart_count[h];
-                if(out[col]<0) out[col]=0;
-            }
-            rb_free_card(&tc);
+    memset(out, 0, 8 * sizeof(int));
+    if(!g || pl < 0 || pl >= 2) return;
+    const RbMods *mods = &g->mods;
+    for(int s = 0; s < RB_STAGE_SIZE; s++){
+        int card_id = g->p[pl].stage[s];
+        if(card_id == RB_EMPTY_SLOT) continue;
+        int m[8];
+        rb_member_original_hearts(mods, card_id, m);
+        /* 9.9.1.5: additive modifiers stack ON TOP of the set/base value. */
+        for(int col = 0; col < 8; col++){
+            RbModifierEntry e = mods->heart[card_id][col];
+            int delta = rb_modifier_total(e);
+            if(delta == 0) continue;
+            int new_val = rb_saturate_u8(m[col] + delta);
+            m[col] = new_val > 0 ? new_val : 0;
         }
-        Card sc; if(rb_decode_card_by_index((uint32_t)src,&sc)){
-            for(int h=0;h<sc.n_hearts;h++) out[sc.heart_color[h]%8]+=sc.heart_count[h];
-            rb_free_card(&sc);
-        }
-    }
-    /* heart_color_multiplier: one colour multiplied by the stored amount */
-    for(int s=0;s<RB_STAGE_SIZE;s++){
-        int cid=g->p[pl].stage[s];
-        if(cid==RB_EMPTY_SLOT) continue;
-        int mult_col=g->mods.heart_multiplier[cid];
-        if(mult_col<0) continue;
-        int amt=g->mods.heart_multiplier_amt[cid];
-        if(amt<1) amt=2;
-        out[mult_col%8]*=amt;
+        for(int col = 0; col < 8; col++) out[col] += m[col];
     }
 }
 
@@ -72,19 +64,21 @@ void rb_member_original_hearts(const RbMods *mods, int card_id, int out[8]){
         }
     }
 
-    int src_id = mods->heart_copy[card_id];
-    int use_id = (src_id > 0 && src_id < RB_MAX_CARD_IDS) ? src_id : card_id;
+    int src_id = mods ? mods->heart_copy[card_id] : -1;
+    int use_id = (src_id >= 0 && src_id < RB_MAX_CARD_IDS) ? src_id : card_id;
 
     Card c;
     if(rb_decode_card_by_index((uint32_t)use_id, &c)){
-        for(int h = 0; h < c.n_hearts; h++){
-            out[c.heart_color[h] % 8] += c.heart_count[h];
+        for(int h = 0; h < c.num_base && h < c.n_hearts; h++){
+            int color = c.heart_color[h];
+            int col = color <= 6 ? color : (color == 10 ? 7 : 0);
+            out[col] += c.heart_count[h];
         }
         rb_free_card(&c);
     }
 
     /* Color multiplier collapses the whole multiset into one color. */
-    int mult_col = mods->heart_multiplier[card_id];
+    int mult_col = mods ? mods->heart_multiplier[card_id] : -1;
     if(mult_col >= 0 && mult_col <= 7){
         int total = 0;
         for(int i = 0; i < 8; i++) total += out[i];
@@ -160,6 +154,7 @@ int rb_need_satisfied(const int base_need[8], const int provided[8], int card_id
     if(card_id < 0 || card_id >= RB_MAX_CARD_IDS) return 1;
 
     int eff[8];
+    const int zeros[8] = {0};
     int empty = 1;
     for(int i = 0; i < 8; i++){
         eff[i] = base_need ? base_need[i] : 0;
@@ -184,22 +179,5 @@ int rb_need_satisfied(const int base_need[8], const int provided[8], int card_id
     for(int i = 0; i < 8; i++) if(eff[i] > 0){ empty = 0; break; }
     if(empty) return 1;
 
-    /* check_heart_requirement: total check + per-color with wildcards */
-    int total_need = 0, total_prov = 0;
-    for(int i = 0; i < 8; i++){
-        if(eff[i] > 0) total_need += eff[i];
-        if(provided && provided[i] > 0) total_prov += provided[i];
-    }
-    if(total_prov < total_need) return 0;
-
-    int wildcard = (provided ? provided[0] : 0) + (provided ? provided[7] : 0);
-    for(int c = 1; c < 7; c++){
-        if(!provided) continue;
-        int deficit = eff[c] - provided[c];
-        if(deficit > 0){
-            if(wildcard < deficit) return 0;
-            wildcard -= deficit;
-        }
-    }
-    return 1;
+    return rb_check_heart_requirement(eff, provided ? provided : zeros);
 }
