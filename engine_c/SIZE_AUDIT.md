@@ -8,18 +8,18 @@ actually present in C.
 ## Summary
 
 - C files audited (mapped to a Rust twin): 28
-- Total C lines (non-blank/comment): 23401   Total Rust lines: 48893
-- Total C functions: 1231   Total Rust functions (all): 1083
+- Total C lines (non-blank/comment): 23811   Total Rust lines: 48898
+- Total C functions: 1248   Total Rust functions (all): 1083
 - Total Rust **port-target** functions (excl. constructors/trait glue): 867
-- **Function-count gap (Rust port-targets − C, summed): -364** (approx. unported functions)
-- Best-effort unmatched Rust function names: 73 (heuristic)
+- **Function-count gap (Rust port-targets − C, summed): -381** (approx. unported functions)
+- Best-effort unmatched Rust function names: 74 (heuristic)
 
 ## Per-file gap (sorted by missing-function count, worst first)
 
 | C file | C lines | Rust lines | C/Rust % | C fns | Rust port fns | missing ≈ | Rust twin(s) |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
-| `src/core/card.c` | 264 | 3569 | 7% | 33 | 95 | 62 | card.rs |
-| `src/ability/vm.c` | 1723 | 3587 | 48% | 67 | 81 | 14 | vm.rs, effect_decoder_gen.rs, condition_decoder_gen.rs |
+| `src/core/card.c` | 541 | 3569 | 15% | 47 | 95 | 48 | card.rs |
+| `src/ability/vm.c` | 1669 | 3587 | 46% | 67 | 81 | 14 | vm.rs, effect_decoder_gen.rs, condition_decoder_gen.rs |
 | `src/ability/effects/state.c` | 1491 | 5430 | 27% | 44 | 56 | 12 | state.rs, misc.rs |
 | `src/ability/condition.c` | 2542 | 6624 | 38% | 113 | 81 | -32 | condition.rs, card.rs, compound.rs, state.rs |
 | `src/ability/choice.c` | 2018 | 3185 | 63% | 74 | 33 | -41 | choice.rs |
@@ -29,18 +29,18 @@ actually present in C.
 | `src/ability/cost.c` | 1217 | 1285 | 94% | 48 | 9 | -39 | cost.rs |
 | `src/ability/compound.c` | 522 | 753 | 69% | 31 | 8 | -23 | compound.rs |
 | `src/ability/resolver.c` | 625 | 1019 | 61% | 42 | 24 | -18 | resolver.rs |
-| `src/ability/effects/move.c` | 1436 | 3399 | 42% | 48 | 41 | -7 | move_cards.rs |
+| `src/ability/effects/move.c` | 1436 | 3404 | 42% | 48 | 41 | -7 | move_cards.rs |
 | `src/ability/effects/look.c` | 436 | 1086 | 40% | 19 | 11 | -8 | look.rs |
 | `src/ability/effects/ability.c` | 404 | 493 | 81% | 23 | 7 | -16 | ability_effects.rs |
 | `src/ability/effects/misc.c` | 1380 | 3819 | 36% | 55 | 39 | -16 | misc.rs |
 | `src/ability/effects/draw.c` | 661 | 667 | 99% | 19 | 14 | -5 | draw.rs |
 | `src/ability/effects/score.c` | 352 | 748 | 47% | 16 | 6 | -10 | score.rs |
-| `src/core/data.c` | 456 | 1033 | 44% | 40 | 12 | -28 | mod.rs, types.rs |
+| `src/core/data.c` | 594 | 1033 | 57% | 41 | 12 | -29 | mod.rs, types.rs |
 | `src/core/alloc.c` | 63 | 140 | 45% | 10 | 5 | -5 | pool.rs |
-| `src/core/modifiers.c` | 302 | 416 | 72% | 58 | 22 | -36 | game_modifiers.rs, modifiers.rs |
-| `src/core/stats_pipeline.c` | 146 | 226 | 64% | 8 | 8 | 0 | stats_pipeline.rs |
+| `src/core/modifiers.c` | 348 | 416 | 83% | 60 | 22 | -38 | game_modifiers.rs, modifiers.rs |
+| `src/core/stats_pipeline.c` | 141 | 226 | 62% | 8 | 8 | 0 | stats_pipeline.rs |
 | `src/core/game_state_abilities.c` | 1295 | 2415 | 53% | 89 | 67 | -22 | abilities.rs |
-| `src/core/tracking.c` | 132 | 87 | 151% | 10 | 6 | -4 | tracking.rs |
+| `src/core/tracking.c` | 140 | 87 | 160% | 10 | 6 | -4 | tracking.rs |
 | `src/core/zones.c` | 634 | 1052 | 60% | 75 | 37 | -38 | zones.rs, player.rs |
 | `src/turn/phase.c` | 515 | 1431 | 35% | 44 | 31 | -13 | phases.rs |
 | `src/turn/live.c` | 912 | 2476 | 36% | 45 | 37 | -8 | live.rs |
@@ -53,9 +53,10 @@ Token-overlap match against C `rb_*` names. High recall, imperfect precision:
 some listed names DO have a C twin under a different name. Use as an
 investigation starting point, not gospel.
 
-- `src/core/card.c` (53 unmatched): `ek_box_new`, `serialize`, `deserialize`, `values_sum`, `get`, `contains_key`, `insert`, `remove`, `entry_or_default`, `keys`, `values`, `raw`, `create_copy`, `load_or_create`, `equivalent_rarities`, `strip_rarity_suffixes`, `default_blade`, `default_empty_string`, `dynamic_count_any`, `exclude_heart_colors_any`, `heart_colors_any`, `operation_any`, `options_any`, `per_unit_heart_colors_any`, `repeat_limit_any`, `resource_on_select_any`, `source_any`, `destination_any`, `count_any`, `target_any`, `target_player`, `placement_target`, `is_self_target`, `is_under_self`, `state_any`, `state_change_any`, `action_by_any`, `picker_any`, `source_or`, `source_zone`, `source_str`, `count_or`, `value_or_count`, `action_by`, `common`, `common_mut`, `has_blade_heart`, `has_blade_heart_strict`, `has_score_icon`, `has_all_blade`, `need_heart_satisfied`, `check_heart_requirement`, `short_label`
+- `src/core/card.c` (52 unmatched): `ek_box_new`, `serialize`, `deserialize`, `values_sum`, `get`, `contains_key`, `insert`, `remove`, `entry_or_default`, `keys`, `values`, `raw`, `create_copy`, `load_or_create`, `equivalent_rarities`, `strip_rarity_suffixes`, `default_blade`, `default_empty_string`, `dynamic_count_any`, `exclude_heart_colors_any`, `heart_colors_any`, `options_any`, `per_unit_heart_colors_any`, `repeat_limit_any`, `resource_on_select_any`, `source_any`, `destination_any`, `count_any`, `target_any`, `target_player`, `placement_target`, `is_self_target`, `is_under_self`, `state_any`, `state_change_any`, `action_by_any`, `picker_any`, `source_or`, `source_zone`, `source_str`, `count_or`, `value_or_count`, `action_by`, `common`, `common_mut`, `has_blade_heart`, `has_blade_heart_strict`, `has_score_icon`, `has_all_blade`, `need_heart_satisfied`, `check_heart_requirement`, `short_label`
 - `src/ability/effects/state.c` (13 unmatched): `execute_custom`, `handle_both_targets`, `handle_bp6_pattern`, `calculate_gain_multiplier`, `execute_gain_resource`, `try_create_target_selection_choice`, `resolve_gain_resource_targets`, `execute_choice`, `execute_restriction`, `execute_re_yell`, `execute_shuffle`, `rule_log_activated`, `execute_perform_yell`
 - `src/ability/ability_queue.c` (3 unmatched): `parse_triggers`, `canonical_trigger`, `trigger_to_texticon`
+- `src/core/data.c` (2 unmatched): `serialize`, `deserialize`
 - `src/core/game_state_abilities.c` (2 unmatched): `write`, `finish`
 - `src/ability/util.c` (1 unmatched): `energy_plural`
 - `src/core/alloc.c` (1 unmatched): `serialize`

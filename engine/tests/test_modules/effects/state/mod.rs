@@ -12,6 +12,7 @@
     pub mod card_count_state_test;
     pub mod cards_6_thru_13_test;
     pub mod catchu_energy_activation_test;
+    pub mod cerise_bouquet_teammate_energy_activation_test;
     pub mod characterization_promoted_test;
     pub mod either_or_state_change_test;
     pub mod emma_bp5_test;
@@ -21,12 +22,15 @@
     pub mod konata_bp1_test;
     pub mod konata_test;
     pub mod maki_pb1_test;
+    pub mod member_activation_debut_and_live_start_test;
     pub mod nico_cannot_activate_test;
     pub mod q137_already_waited_cost_test;
     pub mod riko_bp5_center_cost_equal_test;
     pub mod s_bp6_015_wait_test;
     pub mod sp_bp4_008_rightside_energy;
     pub mod sp_bp5_choice_energy_test;
+    pub mod self_wait_and_nijigasaki_activation_test;
     pub mod state_condition_test;
-    pub mod untested_abilities_batch47_test;
-    pub mod untested_abilities_batch6_test;
+    pub mod all_liella_gated_opponent_wait_test;
+    pub mod cost_and_blade_filtered_opponent_wait_test;
+    pub mod debut_low_cost_opponent_wait_test;

@@ -32,7 +32,7 @@ _has_pending_choice asserted without choice identity (pending_choice_type/summar
 | --- | --- | --- | --- |
 | `engine/tests/test_modules/effects/compound/s_pb1_002_riko_edge_test.rs` | `riko_opponent_discards_live_no_gain` | 3 |  |
 
-## similar_cards (31)
+## similar_cards (30)
 
 _confusable card numbers (bp2 vs pb2) staged in one file — human review for wrong-card staging_
 
@@ -45,7 +45,6 @@ _confusable card numbers (bp2 vs pb2) staged in one file — human review for wr
 | `engine/tests/test_modules/effects/compound/toubatsu_test.rs` | `<file>` | 1 | PL!SP-bp2-011-R, PL!SP-pb2-011-R |
 | `engine/tests/test_modules/effects/compound/untested_abilities_batch38_test.rs` | `<file>` | 1 | PL!S-bp2-020-L, PL!S-bp3-020-L |
 | `engine/tests/test_modules/effects/compound/untested_abilities_batch55_test.rs` | `<file>` | 1 | PL!SP-bp1-023-L, PL!SP-bp5-023-L, PL!SP-pb1-023-L |
-| `engine/tests/test_modules/effects/draw/flat/untested_abilities_batch2_test.rs` | `<file>` | 1 | PL!-bp3-005-R, PL!-pb1-005-R |
 | `engine/tests/test_modules/effects/energy/under_member/energy_and_member_under_test.rs` | `<file>` | 1 | PL!N-bp3-013-N, PL!N-bp5-013-N |
 | `engine/tests/test_modules/effects/gain/blades/mymai_tonight_test.rs` | `<file>` | 1 | PL!S-bp2-023-L, PL!S-bp5-023-L |
 | `engine/tests/test_modules/effects/gain/hearts/untested_abilities_batch7_test.rs` | `<file>` | 1 | PL!S-bp3-008-R, PL!S-bp5-008-R |
@@ -57,7 +56,7 @@ _confusable card numbers (bp2 vs pb2) staged in one file — human review for wr
 | `engine/tests/test_modules/effects/recover/to_hand/deep_resonance_bp3_test.rs` | `<file>` | 1 | PL!S-bp2-001-R, PL!S-pb1-001-R |
 | `engine/tests/test_modules/effects/score/aurora_flower_identity_test.rs` | `<file>` | 1 | PL!HS-bp1-021-L, PL!HS-bp2-021-L |
 | `engine/tests/test_modules/effects/score/chika_test.rs` | `<file>` | 1 | PL!S-bp3-001-R＋, PL!S-bp5-001-R＋ |
-| `engine/tests/test_modules/effects/score/untested_abilities_batch10_test.rs` | `<file>` | 1 | PL!SP-bp1-013-PR, PL!SP-pb1-013-PR |
+| `engine/tests/test_modules/effects/score/note_mermaid_distinct_kaleidoscore_test.rs` | `<file>` | 1 | PL!SP-bp1-013-PR, PL!SP-pb1-013-PR |
 | `engine/tests/test_modules/effects/state/cards_6_thru_13_test.rs` | `<file>` | 1 | PL!S-PR-015-PR, PL!S-bp2-015-PR |
 | `engine/tests/test_modules/effects/state/either_or_state_change_test.rs` | `<file>` | 1 | PL!N-bp4-008-R, PL!N-pb1-008-R |
 | `engine/tests/test_modules/effects/state/untested_abilities_batch47_test.rs` | `<file>` | 1 | PL!SP-bp4-022-N, PL!SP-bp7-022-N |

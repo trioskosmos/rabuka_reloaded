@@ -6,6 +6,7 @@
     pub mod distortion_need_hearts_test;
     pub mod eli_bp5_cost9_search;
     pub mod eli_sd1_optional_cost_look;
+    pub mod empty_hand_skips_optional_discard_look_test;
     pub mod inspect_by_total_live_score;
     pub mod izumi_bp5_test;
     pub mod kanon_pb2_test;
@@ -13,6 +14,8 @@
     pub mod l0_gap_livesuccess2_test;
     pub mod mirai_ticket_test;
     pub mod nagi_live_card_draw_test;
+    pub mod revealed_distinct_liella_live_retrieval_test;
+    pub mod revealed_member_cost_gated_recovery_test;
     pub mod smile_test;
     pub mod sp_bp2_015_wien_yell_edge_test;
     pub mod umi_group_live_search;

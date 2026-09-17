@@ -45,7 +45,7 @@ void rb_member_original_hearts(const RbMods *mods, int card_id, int out[8]){
     }
 
     int src_id = mods ? mods->heart_copy[card_id] : -1;
-    int use_id = (src_id >= 0 && src_id < RB_MAX_CARD_IDS) ? src_id : card_id;
+    int use_id = src_id >= 0 ? src_id : card_id;
 
     Card c;
     if(rb_decode_card_by_index((uint32_t)use_id, &c)){
@@ -103,7 +103,7 @@ void rb_member_heart_detail(const RbMods *mods, int card_id, uint8_t base_arr[8]
     for(int i = 0; i < 8; i++) base_arr[i] = (uint8_t)base[i];
 
     memset(bonus_arr, 0, 8);
-    if(card_id < 0 || card_id >= RB_MAX_CARD_IDS) return;
+    if(!mods || card_id < 0 || card_id >= RB_MAX_CARD_IDS) return;
     for(int col = 0; col < 8; col++){
         RbModifierEntry entry = mods->heart[card_id][col];
         int total = rb_modifier_total(entry);
@@ -172,7 +172,7 @@ void rb_stage_hearts_pipeline(const GameState *g, int pl, int out[8]){
     const RbMods *mods = &g->mods;
     for(int s = 0; s < RB_STAGE_SIZE; s++){
         int card_id = g->p[pl].stage[s];
-        if(card_id == RB_EMPTY_SLOT) continue;
+        if(card_id < 0 || card_id >= RB_MAX_CARD_IDS) continue;
         int m[8];
         rb_member_original_hearts(mods, card_id, m);
         /* 9.9.1.5: additive modifiers stack ON TOP of the set/base value. */

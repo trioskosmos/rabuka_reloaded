@@ -1,6 +1,7 @@
 // Auto-generated. Tests live as sibling .rs files in this folder.
     pub mod ability_engine_fixes_test;
     pub mod ayumu_azuna_test;
+    pub mod boosted_miraku_draw_and_need_heart_reduction_test;
     pub mod bp5_003_shizuku_edge_test;
     pub mod bp5_010_shiori_clamp_test;
     pub mod bp7_deck_bottom_source_test;
@@ -30,6 +31,7 @@
     pub mod nahone_live_start_same_name_test;
     pub mod natsumi_bp5_test;
     pub mod nozomi_test;
+    pub mod optional_member_cost_score_and_live_recovery_test;
     pub mod otherwise_condition_flow_test;
     pub mod pb1_007_comprehensive_edge_test;
     pub mod pl_bp5_012_test;
@@ -55,9 +57,7 @@
     pub mod toubatsu_test;
     pub mod tsunagaru_connect_test;
     pub mod umi_bp3_test;
-    pub mod untested_abilities_batch27_test;
     pub mod untested_abilities_batch28_test;
-    pub mod untested_abilities_batch3_test;
     pub mod untested_abilities_batch30_test;
     pub mod untested_abilities_batch32_test;
     pub mod untested_abilities_batch34_test;
@@ -66,7 +66,6 @@
     pub mod untested_abilities_batch40_test;
     pub mod untested_abilities_batch41_test;
     pub mod untested_abilities_batch44_test;
-    pub mod untested_abilities_batch5_test;
     pub mod untested_abilities_batch55_test;
     pub mod untested_secondary_abilities_test;
     pub mod yoshiko_center_ability_test;

@@ -1,14 +1,18 @@
 // Auto-generated. Tests live as sibling .rs files in this folder.
     pub mod b9_more_test;
     pub mod batch5_test;
+    pub mod dollchestra_live_zone_gated_draw_test;
     pub mod dream_believers_test;
     pub mod hanayo_test;
+    pub mod higher_cost_member_live_success_draw_test;
+    pub mod live_zone_count_gated_draw_test;
     pub mod l0_gap_livesuccess_test;
     pub mod l0_gap_livesuccess3_test;
     pub mod miyashita_ai_pb1_test;
     pub mod position_ability_test;
     pub mod q146_per_member_draw_test;
     pub mod sp_pb1_004_live_test;
-    pub mod untested_abilities_batch13_test;
-    pub mod untested_abilities_batch2_test;
-    pub mod untested_abilities_batch35_test;
+    pub mod stage_member_identity_and_cost_gated_draw_test;
+    pub mod success_zone_gated_debut_draw_test;
+    pub mod waitroom_count_gated_debut_draw_test;
+    pub mod boosted_member_live_success_draw_test;

@@ -1,5 +1,6 @@
 // Auto-generated. Tests live as sibling .rs files in this folder.
     pub mod auto_system_stress_test;
+    pub mod energy_return_cost_position_change_test;
     pub mod formation_change_test;
     pub mod himeno_front_test;
     pub mod kinako_bp5_test;

@@ -2,6 +2,7 @@
     pub mod bp7_cooking_with_love_test;
     pub mod bp7_setsuna_abilities_test;
     pub mod constant_edge_case_test;
+    pub mod combined_stage_count_constant_heart_test;
     pub mod hasunosora_pb1_test;
     pub mod himeno_bp_versions_test;
     pub mod himeno_bp5_live_start_test;
@@ -11,6 +12,7 @@
     pub mod l0_gap_constant5_test;
     pub mod l0_gap_subunit_success_test;
     pub mod liella_baton_energy_comprehensive_edge_test;
+    pub mod paid_heart_color_choice_test;
     pub mod q127_heart_set_plus_global_test;
     pub mod rurino_bp5_test;
     pub mod rurino_test;
@@ -19,6 +21,9 @@
     pub mod setsuna_pb1_test;
     pub mod sp_bp2_004_edge2_test;
     pub mod sp_bp2_004_extra_test2;
+    pub mod side_position_constant_heart_test;
+    pub mod opponent_energy_ahead_constant_heart_test;
+    pub mod stage_member_cost_gated_constant_heart_test;
     pub mod sumire_bp2_center_cost_test;
     pub mod untested_abilities_batch17_test;
     pub mod untested_abilities_batch7_test;

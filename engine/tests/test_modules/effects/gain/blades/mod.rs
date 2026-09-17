@@ -2,6 +2,7 @@
     pub mod ayumu_pb1_constant_test;
     pub mod b7_constant_ability_test;
     pub mod blade_per_discard_test;
+    pub mod combined_success_zone_constant_blade_test;
     pub mod bp4_014_ability_filter_edge_test;
     pub mod bp4_014_rin_edge_test;
     pub mod bp4_live_start_change_state_gain_test;
@@ -16,6 +17,7 @@
     pub mod bp7_ruby_front_blade_test;
     pub mod bp7_under_member_per_unit_blade_test;
     pub mod bp7_watanabe_under_card_blade_test;
+    pub mod energy_count_and_stage_cost_constant_blade_test;
     pub mod eri_bp3_test;
     pub mod hazuki_test;
     pub mod l0_gap_constant2_test;
@@ -33,8 +35,8 @@
     pub mod ren_bp4_test;
     pub mod special_color_test;
     pub mod turn_scope_regression_test;
-    pub mod untested_abilities_batch11_test;
-    pub mod untested_abilities_batch14_test;
+    pub mod debut_and_live_start_blade_grant_test;
+    pub mod own_energy_ahead_constant_blade_test;
     pub mod untested_abilities_batch37_test;
     pub mod untested_abilities_batch42_test;
     pub mod untested_abilities_batch43_test;
