@@ -22,6 +22,7 @@ pub mod link_to_future_test;
 pub mod ll_bp1_001_test;
 pub mod love_u_test;
 pub mod mifune_test;
+pub mod mirakura_stage_threshold_pl_hs_bp5_021_l_test;
 pub mod mute_kibiriver_test;
 pub mod neutral_live_success_test;
 pub mod nonfiction_cost_comparison_test;

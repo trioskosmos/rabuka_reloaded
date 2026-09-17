@@ -45,7 +45,9 @@ fn pl_s_bp5_017_n_live_start_heart05_total_four_grants_heart05() {
     fire_live_start(&mut game, mari);
 
     assert_eq!(
-        game.state.mods.get_heart_modifier(mari, HeartColor::Heart05),
+        game.state
+            .mods
+            .get_heart_modifier(mari, HeartColor::Heart05),
         1,
         "aggregate == 4 satisfies >=4"
     );
@@ -62,7 +64,9 @@ fn pl_s_bp5_017_n_live_start_heart05_total_two_grants_no_heart05() {
     fire_live_start(&mut game, mari);
 
     assert_eq!(
-        game.state.mods.get_heart_modifier(mari, HeartColor::Heart05),
+        game.state
+            .mods
+            .get_heart_modifier(mari, HeartColor::Heart05),
         0,
         "aggregate 2 < 4 -> no grant"
     );
@@ -77,7 +81,9 @@ fn pl_s_bp5_017_n_live_start_empty_live_zone_grants_no_heart05() {
     fire_live_start(&mut game, mari);
 
     assert_eq!(
-        game.state.mods.get_heart_modifier(mari, HeartColor::Heart05),
+        game.state
+            .mods
+            .get_heart_modifier(mari, HeartColor::Heart05),
         0
     );
 }

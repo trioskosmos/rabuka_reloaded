@@ -7,7 +7,11 @@ fn trigger_auto(game: &mut TestGame, cid: i16, trigger: AbilityTrigger, trigger_
     let card = game.db.get_card(cid).unwrap();
     let ab = card
         .resolved_abilities()
-        .find(|a| a.triggers.as_deref().is_some_and(|t| t.contains(trigger_str)))
+        .find(|a| {
+            a.triggers
+                .as_deref()
+                .is_some_and(|t| t.contains(trigger_str))
+        })
         .expect("card should have the requested trigger ability");
     let pid = game.state.player1.id.clone();
     game.state.trigger_auto_ability(

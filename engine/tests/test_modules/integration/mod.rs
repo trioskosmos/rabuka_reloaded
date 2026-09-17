@@ -11,6 +11,5 @@ pub mod parser_issues_e2e_test_part2;
 pub mod parser_issues_e2e_test_part3;
 pub mod remaining_quick_test;
 pub mod sp_bp2_015_proper_gameplay_test;
-pub mod untested_abilities_playthrough_test;
 pub mod victory_road_test;
 pub mod victory_tie_placement_test;

@@ -22,7 +22,9 @@ fn pl_sp_bp7_013_n_constant_three_kaleidoscore_grants_heart06_and_blade() {
     game.state.recalculate_constants();
 
     assert_eq!(
-        game.state.mods.get_heart_modifier(koko, HeartColor::Heart06),
+        game.state
+            .mods
+            .get_heart_modifier(koko, HeartColor::Heart06),
         1,
         "3 KALEIDOSCORE members -> heart06 granted"
     );
@@ -46,7 +48,9 @@ fn pl_sp_bp7_013_n_constant_two_kaleidoscore_grants_no_heart06_or_blade() {
     game.state.recalculate_constants();
 
     assert_eq!(
-        game.state.mods.get_heart_modifier(koko, HeartColor::Heart06),
+        game.state
+            .mods
+            .get_heart_modifier(koko, HeartColor::Heart06),
         0,
         "only 2 KALEIDOSCORE -> no heart06"
     );

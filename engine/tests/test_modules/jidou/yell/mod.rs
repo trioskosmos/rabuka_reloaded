@@ -11,7 +11,5 @@ pub mod qa_new_tests251;
 pub mod sp_bp2_015_021_yell_blade_test;
 pub mod sp_bp2_015_wien_extra_test;
 pub mod sumire_auto_test;
-pub mod untested_abilities_batch46_test;
-pub mod untested_abilities_batch9_test;
 pub mod upper_batch_on_yell_test;
 pub mod wien_n_test;

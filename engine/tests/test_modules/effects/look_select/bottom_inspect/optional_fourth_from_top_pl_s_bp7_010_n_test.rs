@@ -31,8 +31,16 @@ fn pl_s_bp7_010_n_accept_bottom_card_to_fourth_from_top() {
     while game.has_pending_choice() {
         game.select_indices(&[0]);
     }
-    assert_eq!(game.state.player1.main_deck.cards.get(3), Some(&x), "X now sits 4th from the TOP (index 3)");
-    assert_ne!(game.state.player1.main_deck.cards.last(), Some(&x), "X left the bottom");
+    assert_eq!(
+        game.state.player1.main_deck.cards.get(3),
+        Some(&x),
+        "X now sits 4th from the TOP (index 3)"
+    );
+    assert_ne!(
+        game.state.player1.main_deck.cards.last(),
+        Some(&x),
+        "X left the bottom"
+    );
 }
 
 #[test]
@@ -50,6 +58,13 @@ fn pl_s_bp7_010_n_decline_keeps_bottom_card() {
             _ => break,
         }
     }
-    assert!(game.state.player1.main_deck.cards.contains(&x), "declined → X must STAY in the deck (5.7.1: 見る only informs)");
-    assert_eq!(game.state.player1.main_deck.cards.last(), Some(&x), "declined → X stays at the BOTTOM");
+    assert!(
+        game.state.player1.main_deck.cards.contains(&x),
+        "declined → X must STAY in the deck (5.7.1: 見る only informs)"
+    );
+    assert_eq!(
+        game.state.player1.main_deck.cards.last(),
+        Some(&x),
+        "declined → X stays at the BOTTOM"
+    );
 }

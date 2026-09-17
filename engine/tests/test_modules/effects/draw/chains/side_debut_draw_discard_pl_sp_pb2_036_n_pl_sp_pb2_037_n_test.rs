@@ -34,8 +34,7 @@ fn pl_sp_pb2_036_n_right_side_debut_drawn_cards_reach_hand_without_blade_modifie
         "sanity: no stray modifiers"
     );
     assert!(
-        game.state.player1.hand.cards.contains(&d1)
-            && game.state.player1.hand.cards.contains(&d2),
+        game.state.player1.hand.cards.contains(&d1) && game.state.player1.hand.cards.contains(&d2),
         "both drawn cards reached the hand"
     );
 }

@@ -15,7 +15,7 @@ use rabuka_engine::game_state::{GameResult, GameState, Phase};
 use rabuka_engine::turn::TurnEngine;
 use serde_json::{json, Value};
 use std::collections::HashMap;
-use std::io::{self, Write};
+use std::io::Write;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -130,7 +130,8 @@ fn audit_cards(db: &CardDatabase, ids: &[i16]) -> Vec<Value> {
 fn audit_view(gs: &GameState) -> Value {
     let own = gs.active_player();
     let opponent = if own.id == gs.player1.id { &gs.player2 } else { &gs.player1 };
-    let db = &gs.card_database;
+        let hand = own.hand.cards.iter().map(|&id| (id, audit_card(db, id))).collect::<Vec<_>>();
+        let stage = audit_cards(db, &own.stage.stage);
     json!({
         "own": {
             "player": own.id,
@@ -192,7 +193,7 @@ struct DecisionAudit {
 }
 
 fn write_jsonl(writer: &mut impl Write, value: &Value) -> ArenaResult<()> {
-    serde_json::to_writer(&mut *writer, value)?;
+    writer.write_all(&serde_json::to_vec(value)?)?;
     writer.write_all(b"\n")?;
     writer.flush()?;
     Ok(())
@@ -219,7 +220,7 @@ impl DecisionAudit {
         let snapshot = audit_view(gs);
         let selected = json!(gs.live_card_selected_indices);
         let signature = serde_json::to_string(&json!([
-            gs.turn_number, gs.current_phase, gs.active_player().id, snapshot, available, chosen_value, selected
+            gs.turn_number, gs.current_phase, gs.active_player().id, snapshot, available, chosen_value, selected, gs.mulligan_selected_indices
         ]))?;
         let repeated_from = self.seen.insert(signature, self.decision);
         let selection_operation = match chosen.action_type {
@@ -238,6 +239,7 @@ impl DecisionAudit {
             "boundary_id": self.boundary_id, "boundary_step": self.boundary_step,
             "repeated_visible_decision_from": repeated_from,
             "live_selected_hand_indices_before": selected,
+            "mulligan_selected_hand_indices_before": gs.mulligan_selected_indices,
             "selection_operation": selection_operation,
             "view": snapshot, "chosen": chosen_value, "available_actions": available,
         }))
@@ -334,25 +336,36 @@ fn my_hand_lives(gs: &GameState, is_p1: bool, db: &Arc<CardDatabase>) -> usize {
         .count()
 }
 
-fn main() {
-    let args: Vec<String> = std::env::args().collect();
-    let p1_kind = BotKind::parse(args.get(1).map(|s| s.as_str()).unwrap_or("v2"));
-    let p2_kind = BotKind::parse(args.get(2).map(|s| s.as_str()).unwrap_or("random"));
-    let budget: u64 = args
-        .get(3)
-        .and_then(|s| s.parse().ok())
-        .unwrap_or(10);
-    let trace = args.iter().any(|a| a == "--trace");
-    let logs = args.iter().any(|a| a == "--logs");
-    let deck_name = args
-        .get(4)
-        .cloned()
-        .unwrap_or_else(|| "5CP3Z idou".to_string());
+fn main() -> ArenaResult<()> {
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    let env_games = std::env::var("ARENA_GAMES").ok();
+    let options = Options::parse(&args, env_games.as_deref())?;
+    let p1_kind = options.p1;
+    let p2_kind = options.p2;
+    let trace = options.trace;
+    let logs = options.logs;
+    let deck_name = &options.deck;
+    let mut audit = options.audit.as_ref().map(std::fs::File::create).transpose()?;
+    if logs {
+        std::fs::create_dir_all("../test_output/arena_logs")?;
+    }
+    if audit.is_some() && !std::path::Path::new("../web_ui/decks").join(format!("{deck_name}.txt")).is_file() {
+        return Err(format!("audit requires an existing deck file: {deck_name}.txt").into());
+    }
+    emit(&mut audit, &json!({
+        "event": "run_start", "schema_version": 1,
+        "bots": [p1_kind.name(), p2_kind.name()], "deck": deck_name,
+        "games": options.games, "base_seed": options.seed,
+        "iteration_cap_per_game": 600, "same_turn_iteration_cap": 200,
+        "card_stats": "printed/base, not effective modifiers",
+        "visibility": "each row is private to policy_player; opponent snapshot contains stage and success only; non-visible action card identities are redacted",
+        "rng_limitations": "engine global RNG and arena LCG reseeded before each deal; simulations may consume global RNG; no checkpoint replay determinism guarantee",
+    }))?;
 
     let kind_name = |k: BotKind| k.name();
 
     let mut db = fresh_database();
-    let nums = load_test_deck(&db, &deck_name);
+    let nums = load_test_deck(&db, deck_name);
     eprintln!(
         "ARENA deck={} entries={} distinct={}",
         deck_name,
@@ -361,7 +374,6 @@ fn main() {
     );
     let (t1, t2) = build_templates(&mut db, &nums, &nums);
 
-    let mut rng = Lcg(0x5EED_1234_ABCD_0001);
     let v2_policy = strategy_v2::V2Policy::default();
 
     let mut wins = [0u32; 2];
@@ -387,12 +399,6 @@ fn main() {
     let mut main_phase_count = 0u64;
     let mut empty_main_count = 0u64;
     let t0 = std::time::Instant::now();
-    // Optional hard game-count cap (ARENA_GAMES env): removes time-budget
-    // truncation bias when comparing logged vs unlogged runs.
-    let max_games: u32 = std::env::var("ARENA_GAMES")
-        .ok()
-        .and_then(|s| s.parse().ok())
-        .unwrap_or(u32::MAX);
     let mut trace_rows: Vec<String> = Vec::new();
     let mut game_start_idx = 0usize;
     if trace {
@@ -402,9 +408,18 @@ fn main() {
         );
     }
 
-    while t0.elapsed().as_secs() < budget && games < max_games {
+    while options.should_start_game(games, t0.elapsed()) {
         games += 1;
+        let (engine_seed, arena_seed) = game_seeds(options.seed, games);
+        rabuka_engine::rng::seed(engine_seed);
+        let mut rng = Lcg(arena_seed);
+        let mut decisions = DecisionAudit { game: games, ..Default::default() };
+        emit(&mut audit, &json!({
+            "event": "game_start", "game": games,
+            "engine_seed": engine_seed, "arena_seed": arena_seed.to_string(),
+        }))?;
         let mut gs = deal_from_templates(&db, &t1, &t2);
+        let mut end_reason = "iteration_cap";
         // Archetype detection runs once per game over the full own decklist.
         let plan_p1 = strategy_v3::V3Plan::detect(&gs, 0, &db);
         let plan_p2 = strategy_v3::V3Plan::detect(&gs, 1, &db);
@@ -470,11 +485,13 @@ fn main() {
             }
             TurnEngine::check_victory_condition(&mut gs);
             if gs.game_result != GameResult::Ongoing {
+                end_reason = "game_result";
                 break;
             }
             if gs.turn_number == last_turn {
                 stuck += 1;
                 if stuck > 200 {
+                    end_reason = "same_turn_iteration_cap";
                     break;
                 }
             } else {
@@ -529,8 +546,7 @@ fn main() {
             // RPS: random for both (no information to decide with).
             if gs.current_phase == Phase::RockPaperScissors {
                 let a = &actions[rng.range(actions.len())];
-                let _ = game_setup::execute_action(&mut gs, a);
-                game_setup::settle_single_player_state(&mut gs);
+                decisions.execute(&mut audit, &mut gs, &actions, a)?;
                 continue;
             }
 
@@ -548,8 +564,7 @@ fn main() {
                 } else {
                     &actions[rng.range(actions.len())]
                 };
-                let _ = game_setup::execute_action(&mut gs, a);
-                game_setup::settle_single_player_state(&mut gs);
+                decisions.execute(&mut audit, &mut gs, &actions, a)?;
                 continue;
             }
 
@@ -559,8 +574,7 @@ fn main() {
                 Phase::MulliganFirstAttacker | Phase::MulliganSecondAttacker
             ) {
                 let a = kind.choose_mulligan(&gs, &actions, &db);
-                let _ = game_setup::execute_action(&mut gs, &a);
-                game_setup::settle_single_player_state(&mut gs);
+                decisions.execute(&mut audit, &mut gs, &actions, &a)?;
                 continue;
             }
 
@@ -611,8 +625,7 @@ fn main() {
                         gs.player2.success_live_card_zone.cards.len(),
                     ));
                 }
-                let _ = game_setup::execute_action(&mut gs, &a);
-                game_setup::settle_single_player_state(&mut gs);
+                decisions.execute(&mut audit, &mut gs, &actions, &a)?;
                 continue;
             }
 
@@ -697,14 +710,22 @@ fn main() {
                     gs.player2.success_live_card_zone.cards.len(),
                 ));
             }
-            let _ = game_setup::execute_action(&mut gs, &action);
-            game_setup::settle_single_player_state(&mut gs);
+            decisions.execute(&mut audit, &mut gs, &actions, &action)?;
             total_actions += 1;
         }
         total_turns += gs.turn_number as u64;
 
         let z1 = gs.player1.success_live_card_zone.cards.len();
         let z2 = gs.player2.success_live_card_zone.cards.len();
+        if gs.game_result != GameResult::Ongoing {
+            end_reason = "game_result";
+        }
+        emit(&mut audit, &json!({
+            "event": "game_end", "game": games, "turn": gs.turn_number,
+            "end_reason": end_reason, "game_result": gs.game_result,
+            "success_counts": [z1, z2], "decisions": decisions.decision,
+            "execution_errors": decisions.errors,
+        }))?;
         final_hist
             .entry((z1 as u8, z2 as u8))
             .and_modify(|c| *c += 1)
@@ -754,7 +775,7 @@ fn main() {
                     e.turn, e.player_label, e.category, e.text
                 ));
             }
-            let _ = std::fs::write(dir.join(format!("game_{games:03}.txt")), out);
+            std::fs::write(dir.join(format!("game_{games:03}.txt")), out)?;
 
             // Self-contained replay: header + turn timeline + decisions.
             if trace {
@@ -783,10 +804,10 @@ fn main() {
                     replay.push_str(r);
                     replay.push('\n');
                 }
-                let _ = std::fs::write(
+                std::fs::write(
                     dir.join(format!("replay_game_{games:03}.txt")),
                     replay,
-                );
+                )?;
             }
         }
         game_start_idx = trace_rows.len();
@@ -838,9 +859,107 @@ fn main() {
     );
     if trace {
         let path = std::path::Path::new("../test_output/bot_arena_trace.csv");
-        let _ = std::fs::create_dir_all(path.parent().unwrap());
-        let _ = std::fs::write(path, trace_rows.join("\n") + "\n");
+        std::fs::create_dir_all(path.parent().unwrap())?;
+        std::fs::write(path, trace_rows.join("\n") + "\n")?;
         eprintln!("trace written to {}", path.display());
+    }
+    emit(&mut audit, &json!({"event": "run_end", "games": games}))?;
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn args(values: &[&str]) -> Vec<String> {
+        values.iter().map(|s| s.to_string()).collect()
+    }
+
+    #[test]
+    fn fixed_games_ignore_wall_time_and_parse_flags_without_a_deck() {
+        let options = Options::parse(&args(&["v7", "random", "0", "--games", "2", "--audit", "audit.jsonl"]), None).unwrap();
+        assert_eq!(options.deck, "5CP3Z idou");
+        assert!(options.should_start_game(1, std::time::Duration::from_secs(9999)));
+        assert!(!options.should_start_game(2, std::time::Duration::ZERO));
+        let env = Options::parse(&[], Some("3")).unwrap();
+        assert!(env.should_start_game(2, std::time::Duration::from_secs(9999)));
+        let timed = Options::parse(&[], None).unwrap();
+        assert!(!timed.should_start_game(0, std::time::Duration::from_secs(10)));
+    }
+
+    #[test]
+    fn invalid_or_unbounded_audit_options_fail() {
+        for values in [vec!["--audit"], vec!["--audit", "out"], vec!["--games", "0"], vec!["--seed", "0"], vec!["--games", "bad"], vec!["unknown"], vec!["--unknown"]] {
+            assert!(Options::parse(&args(&values), None).is_err());
+        }
+        assert!(Options::parse(&[], Some("bad")).is_err());
+        assert_eq!(Options::parse(&args(&["--games", "2"]), Some("bad")).unwrap().games, Some(2));
+    }
+
+    #[test]
+    fn seeds_are_explicit_nonzero_and_wrap() {
+        assert_eq!(game_seeds(1, 1).0, 1);
+        assert_eq!(game_seeds(1, 2).0, 2);
+        assert_eq!(game_seeds(u32::MAX, 2).0, 1);
+        assert_ne!(game_seeds(1, 1).1, game_seeds(1, 2).1);
+    }
+
+    #[test]
+    fn audit_redacts_hidden_action_identity_and_keeps_complete_visible_actions() {
+        let db = fresh_database();
+        let mut own = rabuka_engine::player::Player::new("p1".into(), "P1".into(), true);
+        let mut opponent = rabuka_engine::player::Player::new("p2".into(), "P2".into(), false);
+        let mut ids: Vec<i16> = db.cards.keys().copied().collect();
+        ids.sort();
+        own.hand.cards.push(ids[0]);
+        opponent.stage.stage[0] = ids[1];
+        opponent.hand.cards.push(ids[2]);
+        opponent.main_deck.cards.push(ids[3]);
+        opponent.live_card_zone.cards.push(ids[4]);
+        let mut gs = GameState::new(own, opponent, db);
+        gs.current_phase = Phase::LiveCardSetFirstAttacker;
+        let actions = game_setup::generate_possible_actions(&gs);
+        let chosen = actions.iter().find(|a| a.action_type == game_setup::ActionType::SelectLiveCard).unwrap();
+        let mut audit = DecisionAudit { game: 1, decision: 1, ..Default::default() };
+        let row = audit.record(&gs, &actions, chosen).unwrap();
+        assert_eq!(row["available_actions"].as_array().unwrap().len(), actions.len());
+        assert_eq!(row["chosen"]["parameters"], serde_json::to_value(chosen).unwrap()["parameters"]);
+        assert_eq!(row["view"]["own"]["hand"][0]["card_no"], gs.card_database.get_card(ids[0]).unwrap().card_no.as_ref());
+        assert_eq!(row["view"]["opponent_public"].as_object().unwrap().len(), 3);
+        for id in &ids[2..5] {
+            assert!(!row.to_string().contains(&format!("\"card_id\":{id},")));
+        }
+        audit.decision = 2;
+        let repeated = audit.record(&gs, &actions, chosen).unwrap();
+        assert_eq!(repeated["boundary_step"], 2);
+        assert_eq!(repeated["repeated_visible_decision_from"], 1);
+        let mut hidden = chosen.clone();
+        hidden.action_type = game_setup::ActionType::ChoiceSelect;
+        hidden.parameters.as_mut().unwrap().card_id = Some(ids[2]);
+        hidden.description = "hidden identity".into();
+        let redacted = audit_action(&gs, &hidden).unwrap();
+        assert_eq!(redacted["identity_redacted"], true);
+        assert!(redacted["parameters"]["card_id"].is_null());
+        assert!(redacted["description"].is_null());
+    }
+
+    #[test]
+    fn jsonl_errors_propagate_including_flush() {
+        struct Fail(bool);
+        impl Write for Fail {
+            fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+                if self.0 { Ok(buf.len()) } else { Err(std::io::Error::other("write failure")) }
+            }
+            fn flush(&mut self) -> std::io::Result<()> {
+                Err(std::io::Error::other("flush failure"))
+            }
+        }
+        assert!(write_jsonl(&mut Fail(false), &json!({})).is_err());
+        assert!(write_jsonl(&mut Fail(true), &json!({})).is_err());
+        let mut output = Vec::new();
+        write_jsonl(&mut output, &json!({"event": "test"})).unwrap();
+        assert_eq!(output.last(), Some(&b'\n'));
+        assert_eq!(serde_json::from_slice::<Value>(&output).unwrap()["event"], "test");
     }
 }
 

@@ -611,8 +611,82 @@ fn emit(gs: &GameState, actions: &[Action], desired: &[usize]) -> Action {
     crate::bot::strategy_common::emit_live_set(gs, actions, desired)
 }
 
+fn opening_curve_keep(costs: &[Option<u8>]) -> Vec<usize> {
+    let mut best = Vec::new();
+    let mut best_rank = (0, 0, 0);
+    for (a, first) in costs.iter().enumerate() {
+        let Some(first) = first else { continue };
+        for (b, second) in costs.iter().enumerate() {
+            let Some(second) = second else { continue };
+            if a == b || u16::from(*first) + u16::from(*second) > 4 {
+                continue;
+            }
+            for (c, bridge) in costs.iter().enumerate() {
+                let Some(bridge) = bridge else { continue };
+                if c == a || c == b || bridge <= first || u16::from(*bridge) > u16::from(*first) + 5 {
+                    continue;
+                }
+                for (d, finish) in costs.iter().enumerate() {
+                    let Some(finish) = finish else { continue };
+                    if d == a || d == b || d == c || finish <= bridge || u16::from(*finish) > u16::from(*bridge) + 6 {
+                        continue;
+                    }
+                    let rank = (*first + *second, *bridge, *finish);
+                    if rank > best_rank {
+                        best_rank = rank;
+                        best = vec![a, b, c, d];
+                    }
+                }
+            }
+        }
+    }
+    best
+}
+
 pub fn choose_mulligan_v7(gs: &GameState, actions: &[Action], db: &CardDatabase) -> Action {
-    crate::bot::strategy_v4::choose_mulligan_v4(gs, actions, db)
+    if std::env::var("V7_MULLIGAN_V4").is_ok() {
+        return crate::bot::strategy_v4::choose_mulligan_v4(gs, actions, db);
+    }
+    let costs: Vec<Option<u8>> = gs.active_player().hand.cards.iter().map(|&id| {
+        db.get_card(id).and_then(|card| {
+            (card.card_type == CardType::Member).then_some(card.cost).flatten()
+        })
+    }).collect();
+    let keep = opening_curve_keep(&costs);
+    if keep.is_empty() {
+        return crate::bot::strategy_v4::choose_mulligan_v4(gs, actions, db);
+    }
+    let mut desired = Vec::new();
+    let mut lives = 0;
+    for (index, &id) in gs.active_player().hand.cards.iter().enumerate() {
+        if db.get_card(id).is_some_and(|card| card.card_type == CardType::Live) {
+            lives += 1;
+            if lives > 3 {
+                desired.push(index);
+            }
+        }
+    }
+    let mut members: Vec<(usize, u8)> = costs.iter().enumerate()
+        .filter_map(|(index, cost)| cost.map(|cost| (index, cost)))
+        .filter(|(index, _)| !keep.contains(index)).collect();
+    members.sort_by_key(|&(_, cost)| std::cmp::Reverse(cost));
+    for (index, _) in members {
+        if desired.len() >= 3 { break; }
+        desired.push(index);
+    }
+    log::debug!("v7 mulligan curve keep={:?} replace={:?}", keep, desired);
+    for action in actions {
+        if action.action_type == ActionType::SelectMulligan {
+            if let Some(index) = action.parameters.as_ref().and_then(|p| p.card_index) {
+                if action.selected == Some(!desired.contains(&index)) {
+                    return action.clone();
+                }
+            }
+        }
+    }
+    actions.iter().find(|action| matches!(action.action_type,
+        ActionType::ConfirmMulligan | ActionType::SkipMulligan))
+        .or_else(|| actions.first()).cloned().expect("mulligan actions non-empty")
 }
 
 // Re-exports with generic names for the registry (bot/registry.rs): adding
@@ -620,3 +694,48 @@ pub fn choose_mulligan_v7(gs: &GameState, actions: &[Action], db: &CardDatabase)
 pub use choose_action_v7 as choose_action;
 pub use choose_live_set_v7 as choose_live_set;
 pub use choose_mulligan_v7 as choose_mulligan;
+
+#[cfg(test)]
+mod mulligan_tests {
+    use super::*;
+
+    #[test]
+    fn mulligan_preserves_connected_curve() {
+        assert_eq!(opening_curve_keep(&[Some(2), Some(2), Some(7), Some(11), None, None]), vec![0, 1, 2, 3]);
+        assert!(opening_curve_keep(&[Some(2), Some(2), Some(11), Some(17), None, None]).is_empty());
+        assert!(opening_curve_keep(&[Some(2), Some(4), Some(7), Some(11), None, None]).is_empty());
+    }
+
+    #[test]
+    fn mulligan_real_hand_recovers_selection_and_confirms() {
+        let cards = crate::card_loader::CardLoader::load_cards_from_file(
+            std::path::Path::new("../cards/cards.json")).unwrap();
+        let db = crate::Arc::new(CardDatabase::load_or_create(cards));
+        let names = ["PL!SP-bp1-005-R", "PL!SP-sd1-019-SD", "PL!SP-bp4-011-R＋",
+            "PL!SP-bp5-006-R", "PL!SP-sd2-023-SD2", "PL!SP-bp4-025-L"];
+        let mut p1 = Player::new("p1".into(), "P1".into(), true);
+        for name in names {
+            let id = db.get_card_id(name).unwrap();
+            assert_eq!(db.get_card(id).unwrap().card_no, name);
+            p1.hand.add_card(id);
+        }
+        let p2 = Player::new("p2".into(), "P2".into(), false);
+        let mut gs = GameState::new(p1, p2, crate::Arc::clone(&db));
+        gs.current_phase = Phase::MulliganFirstAttacker;
+        let actions = crate::game_setup::generate_possible_actions(&gs);
+        let old = crate::bot::strategy_v4::choose_mulligan_v4(&gs, &actions, &db);
+        assert_eq!(old.parameters.as_ref().and_then(|p| p.card_index), Some(3));
+        assert_eq!(choose_mulligan_v7(&gs, &actions, &db).action_type, ActionType::ConfirmMulligan);
+        gs.mulligan_selected_indices.extend([3, 2, 0]);
+        for _ in 0..3 {
+            let actions = crate::game_setup::generate_possible_actions(&gs);
+            let action = choose_mulligan_v7(&gs, &actions, &db);
+            assert_eq!(action.action_type, ActionType::SelectMulligan);
+            assert_eq!(action.selected, Some(true));
+            crate::game_setup::execute_action(&mut gs, &action).unwrap();
+        }
+        assert!(gs.mulligan_selected_indices.is_empty());
+        let actions = crate::game_setup::generate_possible_actions(&gs);
+        assert_eq!(choose_mulligan_v7(&gs, &actions, &db).action_type, ActionType::ConfirmMulligan);
+    }
+}

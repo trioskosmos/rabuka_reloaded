@@ -494,6 +494,45 @@ list**, which a fair player does not have. Now:
 Decisions come from `PublicObservation` only; rollouts operate on
 determinized states (standard PIMC practice).
 
+## 9.1 Mulligan experiment — 2026-09-17
+
+The current v7 source is not a v6 alias: it includes buff-aware Main evaluation
+and role-dependent live selection. Historical descriptions above record earlier
+experiments, not the current implementation. No current superiority claim is
+established by those historical results.
+
+Source 1 uses Draw Liella deck `162YA`, not local movement deck `5CP3Z idou`.
+The latter has no cost-13 members. Apply the guide's curve-completion principle,
+not its entire card-specific keep list, to this different deck.
+
+Source inspection identified a reproducible contradiction: inherited v4 mulligan
+keeps up to three lives, then replaces expensive members until exactly three
+cards are selected. The engine permits zero through six replacements.
+
+Use this ordered opening hand from `5CP3Z idou`:
+
+| Index | Verified card | Cost |
+|---|---|---|
+| 0 | `PL!SP-bp1-005-R` Ren | 2 |
+| 1 | `PL!SP-sd1-019-SD` Shiki | 2 |
+| 2 | `PL!SP-bp4-011-R＋` Tomari | 7 |
+| 3 | `PL!SP-bp5-006-R` Kinako | 11 |
+| 4 | `PL!SP-sd2-023-SD2` | Live |
+| 5 | `PL!SP-bp4-025-L` | Live |
+
+The inherited policy replaces indices 3, 2, 0. Keeping the four members instead
+funds T1 2+2, T2 baton 2→7 for five energy, and T3 baton 7→11 for four energy,
+without favorable draws or optional abilities. This is a guaranteed affordable
+line absent opponent disruption, not a guarantee of live success or optimal play.
+
+Hypothesis: preserve connected opening development rather than blindly replacing
+three cards. Validate selection toggles and confirmation in a regression test;
+then compare the isolated mulligan change against the inherited policy on equal
+seed ranges, both seats, without audit logging. Keep Main and live-set evaluation
+fixed. Record wins, losses, draws, stalls, and sample sizes; use separate small
+audit runs for decision inspection. Seed equality aligns initial deals, not later
+random consumption when policies diverge. Results remain pending.
+
 ## 10. OPEN FIX ORDER (testable via bot_arena, untraced)
 
 1. Root-cause §8.4 allocation-layout sensitivity (poisons all measurement).

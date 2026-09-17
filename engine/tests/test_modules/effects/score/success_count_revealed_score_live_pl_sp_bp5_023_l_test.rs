@@ -18,7 +18,9 @@ fn pl_sp_bp5_023_l_live_success_two_success_cards_and_revealed_score_live_grant_
         game.state.player1.success_live_card_zone.cards.push(s);
     }
     game.state.revealed_cards.clear();
-    game.state.revealed_cards.push(game.new_id("PL!SP-bp1-023-L"));
+    game.state
+        .revealed_cards
+        .push(game.new_id("PL!SP-bp1-023-L"));
 
     fire_trigger(&mut game, live, AbilityTrigger::LiveSuccess, "ライブ成功時");
 
@@ -42,7 +44,9 @@ fn pl_sp_bp5_023_l_live_success_single_success_card_grants_no_score() {
     let s = game.new_id("PL!-sd1-019-SD");
     game.state.player1.success_live_card_zone.cards.push(s);
     game.state.revealed_cards.clear();
-    game.state.revealed_cards.push(game.new_id("PL!SP-bp1-023-L"));
+    game.state
+        .revealed_cards
+        .push(game.new_id("PL!SP-bp1-023-L"));
 
     fire_trigger(&mut game, live, AbilityTrigger::LiveSuccess, "ライブ成功時");
 

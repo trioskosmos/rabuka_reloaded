@@ -49,5 +49,7 @@ pub mod q46_kanako_all_heart_timing_test;
 pub mod ren_bp4_test;
 pub mod self_wait_center_pl_bp4_011_n_and_pl_bp4_017_n_test;
 pub mod special_color_test;
+pub mod success_pile_difference_pl_s_bp6_009_r_plus_test;
+pub mod success_score_comparison_pl_bp4_018_n_test;
 pub mod triggerless_live_other_member_pl_bp4_014_n_test;
 pub mod turn_scope_regression_test;

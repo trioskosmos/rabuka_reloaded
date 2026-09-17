@@ -7,3 +7,4 @@ pub mod recover_and_order_opponent_bottom;
 pub mod revealed_hand_aqours_pl_s_sd1_009_sd_test;
 pub mod revealed_liella_pl_sp_bp7_023_l_test;
 pub mod s_bp2_021_live_success_test;
+pub mod waited_opponent_nijigasaki_topdeck_pl_n_bp4_004_r_plus_test;

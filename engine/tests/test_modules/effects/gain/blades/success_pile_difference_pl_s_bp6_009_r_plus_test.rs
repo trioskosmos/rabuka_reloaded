@@ -15,12 +15,20 @@ fn pl_s_bp6_009_r_plus_constant_blades_follow_opponent_success_pile_lead() {
         game.state.player2.success_live_card_zone.cards.push(live);
     }
     game.state.recalculate_constants();
-    assert_eq!(game.state.mods.get_blade_modifier(ruby), 3, "diff 3 → ブレード3");
+    assert_eq!(
+        game.state.mods.get_blade_modifier(ruby),
+        3,
+        "diff 3 → ブレード3"
+    );
 
     game.state.player1.success_live_card_zone.cards.push(live);
     game.state.player1.success_live_card_zone.cards.push(live);
     game.state.recalculate_constants();
-    assert_eq!(game.state.mods.get_blade_modifier(ruby), 1, "diff 1 → ブレード1");
+    assert_eq!(
+        game.state.mods.get_blade_modifier(ruby),
+        1,
+        "diff 1 → ブレード1"
+    );
 
     game.state.player1.success_live_card_zone.cards.push(live);
     game.state.recalculate_constants();

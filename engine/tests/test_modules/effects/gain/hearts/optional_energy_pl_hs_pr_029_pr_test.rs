@@ -5,12 +5,23 @@ use rabuka_engine::core::types::AbilityTrigger;
 fn fire_live_start(game: &mut TestGame, cid: i16) {
     let ability_id = {
         let card = game.db.get_card(cid).unwrap();
-        let ab = card.resolved_abilities().find(|a| a.triggers.as_deref() == Some("ライブ開始時")).unwrap_or_else(|| panic!("card {} lacks a ライブ開始時 ability", card.card_no));
+        let ab = card
+            .resolved_abilities()
+            .find(|a| a.triggers.as_deref() == Some("ライブ開始時"))
+            .unwrap_or_else(|| panic!("card {} lacks a ライブ開始時 ability", card.card_no));
         format!("{}_{}", card.card_no, ab.full_text)
     };
     let card_no = game.db.get_card(cid).unwrap().card_no.to_string();
     let pid = game.state.player1.id.clone();
-    game.state.trigger_auto_ability(ability_id, AbilityTrigger::LiveStart, pid.clone(), Some(card_no), Some(cid), None, None);
+    game.state.trigger_auto_ability(
+        ability_id,
+        AbilityTrigger::LiveStart,
+        pid.clone(),
+        Some(card_no),
+        Some(cid),
+        None,
+        None,
+    );
     game.state.activating_card = Some(cid);
     game.state.process_pending_auto_abilities(&pid);
 }
@@ -35,8 +46,15 @@ fn pl_hs_pr_029_pr_pay_energy_grants_heart01() {
     fire_live_start(&mut game, me);
     assert!(game.has_pending_choice(), "optional energy cost prompted");
     game.select_option(1);
-    assert_eq!(game.state.mods.get_heart_modifier(me, HeartColor::Heart01), 1, "paid -> heart01 until live end");
-    assert!(game.state.player1.energy_zone.active_count() < active_before, "energy was consumed");
+    assert_eq!(
+        game.state.mods.get_heart_modifier(me, HeartColor::Heart01),
+        1,
+        "paid -> heart01 until live end"
+    );
+    assert!(
+        game.state.player1.energy_zone.active_count() < active_before,
+        "energy was consumed"
+    );
 }
 
 #[test]
@@ -47,5 +65,8 @@ fn pl_hs_pr_029_pr_decline_energy_no_heart01() {
     game.give_energy(3);
     fire_live_start(&mut game, me);
     game.select_indices(&[]);
-    assert_eq!(game.state.mods.get_heart_modifier(me, HeartColor::Heart01), 0);
+    assert_eq!(
+        game.state.mods.get_heart_modifier(me, HeartColor::Heart01),
+        0
+    );
 }

@@ -9,6 +9,7 @@ pub mod discard_group_look_pl_sp_pb1_015_n_016_n_pl_n_sd2_012_sd2_test;
 pub mod discard_mandatory_look_pl_n_pb1_028_n_test;
 pub mod discard_subunit_look_pl_pb1_016_r_pl_sp_pb1_017_n_pl_hs_pb1_018_n_test;
 pub mod distortion_need_hearts_test;
+pub mod double_heart04_member_pl_s_bp5_007_r_test;
 pub mod eli_bp5_cost9_search;
 pub mod eli_sd1_optional_cost_look;
 pub mod empty_hand_skips_optional_discard_look_test;

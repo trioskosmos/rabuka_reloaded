@@ -33,8 +33,7 @@ fn pl_n_bp7_023_n_activation_waits_self_draws_two_discards_two() {
     }
 
     assert!(
-        game.state.player1.hand.cards.contains(&d1)
-            && game.state.player1.hand.cards.contains(&d2),
+        game.state.player1.hand.cards.contains(&d1) && game.state.player1.hand.cards.contains(&d2),
         "drawn cards reached the hand"
     );
     assert!(

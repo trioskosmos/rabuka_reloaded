@@ -37,8 +37,15 @@ fn pl_s_bp7_025_l_choose_wait_sets_delayed_activation_blocks() {
     assert!(picked, "the wait-target selection must be offered");
     for i in 0..2usize {
         let opp = game.state.player2.stage.stage[i];
-        assert_eq!(game.state.mods.get_orientation_modifier(opp), Some("wait"), "opponent member {i} waited");
-        assert!(game.state.mods.is_delayed_cannot_active(opp), "…and will NOT activate next turn");
+        assert_eq!(
+            game.state.mods.get_orientation_modifier(opp),
+            Some("wait"),
+            "opponent member {i} waited"
+        );
+        assert!(
+            game.state.mods.is_delayed_cannot_active(opp),
+            "…and will NOT activate next turn"
+        );
     }
 }
 
@@ -54,5 +61,9 @@ fn pl_s_bp7_025_l_choose_draw_leaves_opponent_unmodified() {
     assert!(game.has_pending_choice());
     game.select_option(1);
     assert_eq!(game.state.player1.hand.cards.len(), 1, "option B → draw 1");
-    assert_eq!(game.state.mods.get_orientation_modifier(o1), None, "opponent untouched by option B");
+    assert_eq!(
+        game.state.mods.get_orientation_modifier(o1),
+        None,
+        "opponent untouched by option B"
+    );
 }
