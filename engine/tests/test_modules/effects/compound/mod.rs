@@ -29,6 +29,7 @@ pub mod izumi_bp6_test;
 pub mod kaleidoscore_trio_heart_blade_pl_sp_bp7_013_n_test;
 pub mod karin_bp4_004_live_start_test;
 pub mod kuroe_dia_bp6_test;
+pub mod live_start_success_count_score_and_required_hearts_q254_test;
 pub mod maki_bp6_006_reveal_test;
 pub mod maki_pb1_006_debut_test;
 pub mod mia_q190_test;

@@ -2,6 +2,6 @@
 // Regenerated from the directory listing at compile time.
 pub mod ally_appear_each_time_test;
 pub mod baton_touch_order_test;
+pub mod edel_note_debut_opponent_wait_q250_test;
 pub mod miyashita_ai_bp3_test;
 pub mod miyashita_ai_test;
-pub mod qa_new_tests250;

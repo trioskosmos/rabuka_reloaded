@@ -2,4 +2,4 @@
 // Regenerated from the directory listing at compile time.
 pub mod ability_resolution_watcher_test;
 pub mod bp6_020_dancing_stars_watchers_test;
-pub mod qa_new_tests255;
+pub mod resolved_center_member_ability_movement_score_q255_test;
