@@ -203,9 +203,17 @@ assumption often repeats.
       six top orders + unchanged-order with exact deck suffix preservation;
       old debut-only test renamed to
       `live_success_reorder_does_not_trigger_on_debut` (negative).
-   - WWD delayed lock: success case asserts immediate waited energy only;
-      the printed next-turn activation lock is untested. ADD the next-turn
-      negative (placed energy must not activate next turn).
+    - WWD delayed lock: RESOLVED — verified `PL!SP-bp7-027-L`
+       (What a Wonderful Dream!!) in cards.json:93798–93825. Added
+       `live_success_placed_energy_skips_next_active_phase_wwd_pl_sp_bp7_027_l`
+       in `live_success_waited_pl_sp_bp7_027_l_test.rs`, preserving the
+       existing immediate-placement test. The new test resolves the real
+       LiveSuccess ability, pins the placed energy's identity, advances via
+       Pass through turn rollover and Active→Energy, and asserts it remains
+       waited while the one-phase lock expires. Commit classification:
+       test coverage gap (not engine bug/parser gap); no engine changes.
+       Verification: WWD 5/5, full run_all 3311/3311, Clippy and cargo check
+       successful (existing warnings), scoped rustfmt check clean.
    - Hanamaru identity assertion contained `|| true` — RESOLVED
       (commit fc740bc0): `double_heart04_member_pl_s_bp5_007_r_test.rs`
       now asserts the fetched hand card IS the Dia heart04×2 print.

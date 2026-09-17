@@ -37,7 +37,7 @@ fn setup_with_revealed(game: &mut TestGame, revealed: &[i16], mitsuki_id: i16) {
 
 /// 蓮ノ空 member card without blade heart → can be placed in waitroom.
 #[test]
-fn q251_member_no_blade_can_move() {
+fn yell_revealed_no_blade_heart_member_moves_to_waitroom_q251() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let member = game.new_id(HASUMARU_MEMBER_NO_BH);
@@ -61,7 +61,7 @@ fn q251_member_no_blade_can_move() {
 /// has_blade_heart() now returns true for cards with special_heart, so the
 /// "NOT has_blade_heart" filter excludes it (Q251 ruling: [Score] cards excluded).
 #[test]
-fn q251_live_special_heart_cannot_move() {
+fn yell_revealed_score_heart_live_stays_revealed_q251() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let live = game.new_id(HASUMARU_LIVE_NO_BH);
@@ -99,7 +99,7 @@ fn q251_live_special_heart_cannot_move() {
 
 /// 蓮ノ空 member WITH blade heart → filtered out (negation on has_blade_heart).
 #[test]
-fn q251_has_blade_heart_filtered() {
+fn yell_revealed_blade_heart_member_offers_no_discard_q251() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let member_bh = game.new_id(HASUMARU_MEMBER);
@@ -120,7 +120,7 @@ fn q251_has_blade_heart_filtered() {
 
 /// Non-蓮ノ空 card → filtered out by group_names.
 #[test]
-fn q251_wrong_group_filtered() {
+fn yell_revealed_wrong_group_offers_no_discard_q251() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let non_hasu = game.new_id(NON_HASUMARU_MEMBER);
@@ -137,7 +137,7 @@ fn q251_wrong_group_filtered() {
 /// Mixed pool: 蓮ノ空 member (no blade) can move, 蓮ノ空 live ([Score]) cannot.
 /// 2 cards in revealed, only 1 matches → auto-takes the matching one.
 #[test]
-fn q251_mixed_pool_only_member_can_move() {
+fn yell_revealed_mixed_pool_moves_member_but_keeps_score_heart_live_q251() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let member = game.new_id(HASUMARU_MEMBER_NO_BH);
@@ -171,7 +171,7 @@ fn q251_mixed_pool_only_member_can_move() {
 /// With 4+ matching cards (more than max take_count=3), a prompt appears
 /// and the user can select 0-3 cards or skip entirely.
 #[test]
-fn q251_skip_optional() {
+fn yell_revealed_optional_discard_decline_keeps_member_revealed_q251() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let m1 = game.new_id(HASUMARU_MEMBER_NO_BH);

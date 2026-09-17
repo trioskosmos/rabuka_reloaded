@@ -16,7 +16,7 @@ use rabuka_engine::core::types::AbilityTrigger;
 /// Both member abilities are fired through the real ability queue (fire_trigger),
 /// so the post-resolution each_time hook arms the watchers exactly like a live phase.
 #[test]
-fn q255_dancing_stars_live_success_after_position_change() {
+fn resolved_live_success_after_center_position_change_adds_one_score_q255() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
@@ -29,12 +29,7 @@ fn q255_dancing_stars_live_success_after_position_change() {
     game.give_energy(10);
 
     // --- Step 1: Honoka's Live Start resolves → ab#0 repositions her ---
-    fire_trigger(
-        &mut game,
-        honoka,
-        AbilityTrigger::LiveStart,
-        "ライブ開始時",
-    );
+    fire_trigger(&mut game, honoka, AbilityTrigger::LiveStart, "ライブ開始時");
     // ab#0 asks for the destination; answer with the first generated option.
     assert!(
         game.has_pending_choice(),
@@ -79,5 +74,9 @@ fn q255_dancing_stars_live_success_after_position_change() {
         "Score modifier should exist on Dancing stars on me!"
     );
     let total = score_mod.unwrap().total();
-    assert_eq!(total, 1, "Score modifier should be exactly +1, got {}", total);
+    assert_eq!(
+        total, 1,
+        "Score modifier should be exactly +1, got {}",
+        total
+    );
 }

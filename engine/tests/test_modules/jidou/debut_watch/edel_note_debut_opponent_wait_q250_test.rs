@@ -47,7 +47,7 @@ fn is_wait(game: &TestGame, id: i16) -> bool {
 /// Q250 core: when the EdelNote member appears on stage,
 /// its auto ability triggers and puts 1 opponent active member into wait.
 #[test]
-fn q250_self_appearance_triggers() {
+fn edel_note_self_debut_waits_lone_active_opponent_member_q250() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let (_, p2_members) = setup_ceras_appearance(&mut game, 1);
@@ -61,7 +61,7 @@ fn q250_self_appearance_triggers() {
 
 /// No appearance (card on stage, no recently_moved) → no trigger.
 #[test]
-fn q250_no_appearance_no_trigger() {
+fn edel_note_without_recent_debut_offers_no_wait_choice_q250() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
@@ -76,7 +76,7 @@ fn q250_no_appearance_no_trigger() {
 
 /// 2 active members → opponent selects which one to put into wait.
 #[test]
-fn q250_opponent_selects_which_member() {
+fn edel_note_debut_waits_selected_opponent_member_only_q250() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let (_, p2_members) = setup_ceras_appearance(&mut game, 2);
@@ -98,7 +98,7 @@ fn q250_opponent_selects_which_member() {
 
 /// Use limit (1/turn): same copy cannot trigger twice in one turn.
 #[test]
-fn q250_use_limit() {
+fn edel_note_debut_wait_same_copy_second_trigger_offers_no_choice_q250() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 

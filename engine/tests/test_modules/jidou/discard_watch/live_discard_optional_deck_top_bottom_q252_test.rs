@@ -37,14 +37,15 @@ fn setup_riko_and_filler(game: &mut TestGame, cards_in_waitroom: &[i16]) -> i16 
         game.state.player1.waitroom.add_card(cid);
     }
     // Simulate engine tracking: these cards were just moved from live_card_zone
-    game.state.set_recently_moved_cards(cards_in_waitroom.to_vec());
+    game.state
+        .set_recently_moved_cards(cards_in_waitroom.to_vec());
     game.state.current_phase = rabuka_engine::game_state::Phase::Main;
     riko
 }
 
 /// Basic trigger: 1 Aqours live card in waitroom → select it → pick top.
 #[test]
-fn test_q252_basic_trigger() {
+fn live_discard_selected_aqours_card_moves_to_deck_top_q252() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let live = game.id(AQOURS_LIVE);
@@ -73,7 +74,7 @@ fn test_q252_basic_trigger() {
 
 /// Non-Aqours live card → condition fails → no trigger.
 #[test]
-fn test_q252_non_aqours_no_trigger() {
+fn live_discard_non_aqours_card_offers_no_deck_move_q252() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let live = game.id("PL!-sd1-019-SD"); // START:DASH!! (µ's)
@@ -88,7 +89,7 @@ fn test_q252_non_aqours_no_trigger() {
 
 /// Q252 main: 2 Aqours live cards in waitroom → choose 1 → pick top.
 #[test]
-fn test_q252_two_cards_choose_one() {
+fn simultaneous_live_discard_moves_only_first_selected_card_to_top_q252() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let live1 = game.id(AQOURS_LIVE);
@@ -122,7 +123,7 @@ fn test_q252_two_cards_choose_one() {
 
 /// Q252: 3 cards, pick the middle one → bottom.
 #[test]
-fn test_q252_three_cards_choose_one() {
+fn simultaneous_live_discard_moves_only_middle_of_three_to_bottom_q252() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let live1 = game.id(AQOURS_LIVE);
@@ -161,7 +162,7 @@ fn test_q252_three_cards_choose_one() {
 
 /// Use limit: 1/turn — second trigger does nothing.
 #[test]
-fn test_q252_use_limit() {
+fn live_discard_deck_move_second_trigger_offers_no_choice_q252() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let live1 = game.id(AQOURS_LIVE);
@@ -187,7 +188,7 @@ fn test_q252_use_limit() {
 
 /// Test: choose 1 of 2, NOT the first.
 #[test]
-fn test_q252_pick_second_card() {
+fn simultaneous_live_discard_moves_second_of_two_to_bottom_q252() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let live1 = game.id(AQOURS_LIVE);
@@ -238,7 +239,7 @@ fn setup_end_to_end(game: &mut TestGame, live_cards: &[i16]) {
 /// Riko is on stage, player sets an Aqours live card, resolves the live victory determination,
 /// which moves the live card to waitroom and should trigger Riko's auto ability automatically.
 #[test]
-fn test_q252_stage_trigger_simulation() {
+fn live_victory_discard_triggers_aqours_card_return_to_top_q252() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
@@ -267,7 +268,7 @@ fn test_q252_stage_trigger_simulation() {
 /// End-to-end: 2 Aqours live cards go to waitroom simultaneously.
 /// Riko's auto ability triggers, player can only choose 1 to put on deck (Q252 ruling).
 #[test]
-fn test_q252_stage_two_cards_simulation() {
+fn live_victory_simultaneous_discard_returns_only_one_card_to_top_q252() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
@@ -305,7 +306,7 @@ fn test_q252_stage_two_cards_simulation() {
 /// Mixed recently_moved: both Aqours and non-Aqours live cards.
 /// Only the Aqours card should be available for selection.
 #[test]
-fn test_q252_mixed_aqours_and_non_aqours() {
+fn live_discard_mixed_groups_returns_only_aqours_card_to_top_q252() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let aqours_live = game.id(AQOURS_LIVE);
@@ -337,7 +338,7 @@ fn test_q252_mixed_aqours_and_non_aqours() {
 /// Non-live cards in recently_moved: only Aqours live cards should trigger.
 /// Aqours member cards placed in waitroom should NOT trigger the ability.
 #[test]
-fn test_q252_non_live_in_recently_moved() {
+fn live_discard_mixed_types_returns_live_to_bottom_and_keeps_member_q252() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let aqours_live = game.id(AQOURS_LIVE);
@@ -373,7 +374,7 @@ fn test_q252_non_live_in_recently_moved() {
 /// Skip/optional: player may decline to move any card.
 /// The effect says "置いてもよい" (may place) — skipping keeps the card in waitroom.
 #[test]
-fn test_q252_skip_optional_move() {
+fn live_discard_optional_deck_move_decline_keeps_card_in_waitroom_q252() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let live = game.id(AQOURS_LIVE);
@@ -400,7 +401,7 @@ fn test_q252_skip_optional_move() {
 /// may expose issues (e.g. partial move, incorrect card count after skip)
 /// that a single-card skip test would not catch.
 #[test]
-fn test_q252_skip_optional_two_cards() {
+fn simultaneous_live_discard_decline_keeps_both_cards_in_waitroom_q252() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let live1 = game.id(AQOURS_LIVE);

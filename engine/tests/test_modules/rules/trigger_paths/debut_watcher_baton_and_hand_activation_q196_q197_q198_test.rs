@@ -27,7 +27,7 @@ const COST11_MEMBER: &str = "PL!-sd1-001-SD";
 
 /// Q198: Baton-touch with cost 11 member → auto does NOT fire (card leaves stage first).
 #[test]
-fn q198_baton_touch_cost11_no_trigger() {
+fn cost11_baton_replacement_moves_debut_watcher_to_waitroom_q198() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
@@ -68,7 +68,7 @@ fn q198_baton_touch_cost11_no_trigger() {
 
 /// Q198: Cost 11 member appears via normal play while Ranju is on stage → auto fires.
 #[test]
-fn q198_normal_appearance_cost11_triggers() {
+fn cost11_debut_with_watcher_retains_nonempty_energy_zone_q198() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
@@ -110,7 +110,7 @@ const COST10_MEMBER: &str = "PL!-bp5-005-R"; // cost 10 member
 
 /// Q197: Baton-touch with cost 10 member → auto does NOT fire.
 #[test]
-fn q197_baton_touch_cost10_no_trigger() {
+fn cost10_baton_replacement_does_not_draw_from_departed_watcher_q197() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
@@ -149,7 +149,7 @@ fn q197_baton_touch_cost10_no_trigger() {
 
 /// Q197: Cost 10 member appears via normal play → auto fires (draw 1).
 #[test]
-fn q197_normal_appearance_cost10_triggers() {
+fn cost10_debut_with_watcher_draws_to_replace_played_card_q197() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
@@ -201,7 +201,7 @@ const SHIZUKU: &str = "PL!N-pb1-003-R";
 
 /// Q196: Activate with 0 members on stage → draw still happens.
 #[test]
-fn q196_activate_zero_members_on_stage() {
+fn hand_activation_empty_stage_resolves_draw_after_discard_choices_q196() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
@@ -261,7 +261,7 @@ fn q196_activate_zero_members_on_stage() {
 
 /// Q196: Activate with a 虹ヶ咲 member on stage → draw + blade granted.
 #[test]
-fn q196_activate_with_niji_member_grants_blade() {
+fn hand_activation_draw_and_lone_nijigasaki_blade_resolve_q196() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
