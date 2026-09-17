@@ -1,5 +1,6 @@
 // Auto-generated. Tests live as sibling .rs files in this folder.
     pub mod card_filter_test;
+    pub mod kanata_bp7_no_blade_search;
     pub mod mei_bp5_test;
     pub mod untested_abilities_batch15_test;
     pub mod untested_abilities_batch25_test;

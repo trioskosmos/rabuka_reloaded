@@ -7,9 +7,9 @@ exit /b
 #>
 
 param(
-    [int]$IntervalMinutes = 8,
+    [int]$IntervalMinutes = 15,
     [string]$WindowTitle = "",
-    [string]$Message = "continue getting to 0 clippy warnings and all tests passing, if it's already 0 go through tests and make them harder better assertions and so on based on what the written card behaviour should be"
+    [string]$Message = "continue working out how to organise tests how to standardise how to improve how to add how to make the game more accurate actual rule reading and refactors rewrites and so on no bullshitting improve and add tests as needed. again tests are to verify what is written actually happens in game proper hard tests gameplay only. DON'T TELL ME WHAT YOU ARE GOING TO DO KEEP ITERATING BE AGENETIC KEEP FINDING WHAT HAS TO BE DONE AND DO IT."
 )
 
 Add-Type -AssemblyName System.Windows.Forms

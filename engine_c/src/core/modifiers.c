@@ -202,19 +202,20 @@ void rb_mods_remove_cost(RbMods *m, int cid, int delta) {
     m->cost[cid].add = saturate_modifier(v);
 }
 
-/* ── heart_override (mirror set_heart_override / remove_heart_override) ──
-   The C field stores only the override heart color (Rust keeps (color, count);
-   the count is not consumed by the portable core). -1 means "no override". */
-void rb_mods_set_heart_override(RbMods *m, int cid, int color) {
-    if (cid < 0 || cid >= RB_MAX_CARD_IDS) return;
+void rb_mods_set_heart_override(RbMods *m, int cid, int color, int count) {
+    if (!m || cid < 0 || cid >= RB_MAX_CARD_IDS || color < 0 || color >= 8) return;
     m->heart_color_override[cid] = (int8_t)color;
+    m->heart_override_count[cid] = rb_saturate_u8(count);
 }
 void rb_mods_remove_heart_override(RbMods *m, int cid) {
-    if (cid < 0 || cid >= RB_MAX_CARD_IDS) return;
+    if (!m || cid < 0 || cid >= RB_MAX_CARD_IDS) return;
     m->heart_color_override[cid] = -1;
+    m->heart_override_count[cid] = 0;
 }
-int rb_mods_get_heart_override(RbMods *m, int cid) {
-    if (cid < 0 || cid >= RB_MAX_CARD_IDS) return -1;
+int rb_mods_get_heart_override(RbMods *m, int cid, int *out_count) {
+    if (!m || cid < 0 || cid >= RB_MAX_CARD_IDS) return -1;
+    if (m->heart_color_override[cid] < 0) return -1;
+    if (out_count) *out_count = m->heart_override_count[cid];
     return m->heart_color_override[cid];
 }
 

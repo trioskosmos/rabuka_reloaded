@@ -219,6 +219,7 @@ typedef struct {
     int8_t          heart_multiplier_amt[RB_MAX_CARD_IDS]; /* multiplier applied to that colour (default 2) */
     int8_t          blade_type[RB_MAX_CARD_IDS];   /* -1 none, else BladeColor idx */
     int8_t          heart_color_override[RB_MAX_CARD_IDS]; /* -1 none (specify_heart_color); else all base hearts counted as this colour */
+    uint8_t         heart_override_count[RB_MAX_CARD_IDS];
     int             last_cost_discard_count;       /* cards discarded as part of the last cost payment */
     int             last_cost_moved_card_ids[8]; /* ids moved for the last cost (mirrors Rust mods.last_cost_moved_card_ids) */
     int             n_last_cost_moved_card_ids;
@@ -269,9 +270,9 @@ void rb_mods_remove_score(RbMods *m, int card_id, int delta);
 void rb_mods_remove_cost(RbMods *m, int card_id, int delta);
 /* heart_override / heart_copy / blade_type / heart_color_multiplier
    (mirror GameModifiers set/get/clear accessors for those fields) */
-void rb_mods_set_heart_override(RbMods *m, int card_id, int color);
+void rb_mods_set_heart_override(RbMods *m, int card_id, int color, int count);
 void rb_mods_remove_heart_override(RbMods *m, int card_id);
-int  rb_mods_get_heart_override(RbMods *m, int card_id);
+int  rb_mods_get_heart_override(RbMods *m, int card_id, int *out_count);
 void rb_mods_set_heart_copy(RbMods *m, int target_card_id, int source_card_id);
 int  rb_mods_get_heart_copy(RbMods *m, int target_card_id);
 void rb_mods_set_blade_type(RbMods *m, int card_id, int color);

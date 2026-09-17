@@ -73,6 +73,17 @@ Work in value order — shared engine paths first, card variants last:
       take / decline-pick / no-eligible / decline-cost). Killed one
       vacuous test (`eli_bp5_skip_both_costs_still_looks` never looked).
 - [x] QA rulings dissolved into behavior families (Q number in filename).
+- [x] Toubatsu wrong-card staging (bp2-011 vs pb2-011 are DIFFERENT cards:
+      debut-only vs auto+live-start). Auto tests now stage `pb2-011-R`;
+      all 3 choice options pinned. See AGENTS.md failure points.
+- [ ] Confusable-number sweep (TOP PRIORITY): walk every `similar_cards`
+      row in `TEST_QUALITY.md` (~31). For each file, verify the staged
+      card's identity against `cards/cards.json` and confirm the test
+      drives the card its header claims. Fix the number or assert identity.
+      NOTE: a pool-flakiness theory for bp2/pb2 was investigated and
+      DISPROVEN — the confusion was static wrong numbers in test source,
+      not nondeterministic lookup. Do not chase pool nondeterminism
+      without a 3-run probe first (AGENTS.md).
 
 - [ ] Cost-9 search family: DONE (see above) — remaining: 蓮ノ空
       sibling lives in `izumi_bp5_test.rs`; unify into the family helper
@@ -80,12 +91,13 @@ Work in value order — shared engine paths first, card variants last:
 - [ ] `TEST_QUALITY.md` review prompts: `no_assert` (kaho pin_top tests
       assert inside a helper — fine, but make it explicit),
       `pendency_only` (22), `similar_cards` (31 confusable bp2/pb2 stagings).
+- [x] `look_select/recruit_stage/` stood up: Proof bp6-029 remainder
+      routing extracted from the integration parser file; Kanata bp7-018
+      negation search moved out of `compound/` (and renamed — "recruit"
+      was a misnomer).
 - [ ] Thin shapes with no dedicated folder yet (votes exist, no top):
-      `live_watch` sensors, opponent-deck target-player flows,
-      recruit-to-stage selects. Folder them when the second card arrives.
-- [ ] `effects/compound/inspect_top_recruit_no_blade_member.rs` is a
-      recruit-shape look misfiled by vote — move to `look_select/`
-      (new `recruit_stage/` folder) when touched.
+      `live_watch` sensors (pb2-006 dual-sensor covered from `movement/`,
+      folder on second card), opponent-deck target-player flows.
 - [ ] Whole-file impurities (kept deliberately; split when auditing):
       `effects/score/chika_test.rs` (activation score + cost reduction),
       `effects/choice/ll_bp7_001_triple_member_test.rs`,

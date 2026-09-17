@@ -50,7 +50,7 @@ fn trigger_toubatsu_with_opponent_member() -> (TestGame, i16, i16) {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
-    let toubatsu = game.id("PL!SP-bp2-011-R");
+    let toubatsu = game.id("PL!SP-pb2-011-R");
     let filler = game.id("PL!-sd1-010-SD");
     for _ in 0..20 {
         game.state.player1.main_deck.cards.push(filler);
@@ -95,12 +95,7 @@ fn toubatsu_wait_option_waits_opponent_member() {
     let (mut game, _toubatsu, opp) = trigger_toubatsu_with_opponent_member();
     assert_toubatsu_3option(&mut game);
     game.select_choice_option(1);
-    assert!(
-        game.has_pending_choice(),
-        "wait bullet must prompt for the member to wait"
-    );
-    game.assert_select_card("stage", 1, false);
-    game.select_indices(&[0]);
+    // Single eligible member → auto-targeted, no follow-up prompt.
     scan_autos_both(&mut game);
     assert!(!game.has_pending_choice());
     assert_eq!(

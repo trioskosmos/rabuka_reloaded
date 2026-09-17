@@ -6,17 +6,11 @@ Fn-level static signals over `engine/tests/**/*.rs`. Coverage counts (TEST_COVER
 answer “does it fire”; this answers “would the test notice if the trigger were wrong”.
 Report-only: rows are review prompts, not failures.
 
-## no_assert (5)
+## no_assert (0)
 
 _test never asserts (smoke at best — cannot pin behavior)_
 
-| file | test | line | detail |
-| --- | --- | --- | --- |
-| `engine/tests/test_modules/characterization/bytecode_validation_test.rs` | `bytecode_debug_ability_399` | 209 |  |
-| `engine/tests/test_modules/characterization/bytecode_validation_test.rs` | `bytecode_debug_ability_399_disabled` | 232 |  |
-| `engine/tests/test_modules/effects/look_select/pin_top/kaho_dynamic_count.rs` | `kaho_full_own_stage_looks_five_and_keeps_one` | 19 |  |
-| `engine/tests/test_modules/effects/look_select/pin_top/kaho_dynamic_count.rs` | `kaho_two_own_members_look_four_and_keep_one` | 14 |  |
-| `engine/tests/test_modules/effects/look_select/pin_top/kaho_dynamic_count.rs` | `look_and_select_dynamic_count_look_at_counts_stage_members_plus_two` | 9 |  |
+None.
 
 ## no_drive (0)
 
@@ -30,34 +24,13 @@ _trigger event hand-pushed with no real ability resolution in the same fn (weake
 
 None.
 
-## pendency_only (22)
+## pendency_only (1)
 
 _has_pending_choice asserted without choice identity (pending_choice_type/summary/answer) or outcome asserts_
 
 | file | test | line | detail |
 | --- | --- | --- | --- |
-| `engine/tests/test_modules/characterization/logging_test.rs` | `real_choice_flow_emits_offered_and_resolved` | 271 |  |
-| `engine/tests/test_modules/effects/compound/otherwise_condition_flow_test.rs` | `karin_reveal_condition_failed_deck_top_becomes_filler` | 497 |  |
-| `engine/tests/test_modules/effects/compound/otherwise_condition_flow_test.rs` | `karin_reveal_condition_met_deck_top_becomes_filler` | 456 |  |
-| `engine/tests/test_modules/effects/compound/otherwise_condition_flow_test.rs` | `karin_reveal_condition_not_met_position_unchanged` | 371 |  |
 | `engine/tests/test_modules/effects/compound/s_pb1_002_riko_edge_test.rs` | `riko_opponent_discards_live_no_gain` | 3 |  |
-| `engine/tests/test_modules/effects/compound/untested_abilities_batch39_test.rs` | `pb1034_choose_first_color_heart03` | 51 |  |
-| `engine/tests/test_modules/effects/compound/untested_abilities_batch39_test.rs` | `pb1036_twin_chooses_heart06` | 98 |  |
-| `engine/tests/test_modules/effects/conditional/pl_s_bp7_007_test.rs` | `hanamaru_multiple_valid_forces_selection` | 68 |  |
-| `engine/tests/test_modules/effects/energy/under_member/pl_bp6_003_test.rs` | `kotori_live_start_only_muses_under_two_cost_selected` | 209 |  |
-| `engine/tests/test_modules/effects/energy/under_member/pl_bp6_003_test.rs` | `kotori_live_start_then_live_success_workflow` | 567 |  |
-| `engine/tests/test_modules/effects/gain/blades/untested_abilities_batch42_test.rs` | `sumire_three_catchu_draws` | 91 |  |
-| `engine/tests/test_modules/effects/gain/hearts/bp7_cooking_with_love_test.rs` | `cooking_both_in_discard_offers_optional` | 83 |  |
-| `engine/tests/test_modules/effects/gain/hearts/untested_abilities_batch7_test.rs` | `rin_bp4_009_own_empty_stage_counts_as_zero_and_fires` | 603 |  |
-| `engine/tests/test_modules/effects/recover/to_hand/untested_abilities_batch54_test.rs` | `bps7023_optional_liella_reveal_to_deck_top` | 98 |  |
-| `engine/tests/test_modules/effects/state/bp7_ai_choice_under_member_test.rs` | `ai_two_distinct_diverdiva_offers_choice` | 67 |  |
-| `engine/tests/test_modules/jidou/discard_watch/bp6_004_002_audit_test.rs` | `riko_bp6_auto_e2e_heart_success_no_trigger` | 289 |  |
-| `engine/tests/test_modules/qa/qa_new_tests209.rs` | `q209_kasumi_use_limit_blocks_second` | 354 |  |
-| `engine/tests/test_modules/qa/qa_new_tests238.rs` | `q238_baton_touch_select_opponent_member` | 265 |  |
-| `engine/tests/test_modules/qa/qa_new_tests238.rs` | `q238_baton_touch_triggers_position_change_selection` | 201 |  |
-| `engine/tests/test_modules/qa/qa_new_tests238.rs` | `q238_both_players_members_all_selectable` | 135 |  |
-| `engine/tests/test_modules/rules/trigger_paths/joint_card_live_start_test.rs` | `test_bp4_debut_trigger_fires_independently` | 383 |  |
-| `engine/tests/test_modules/rules/trigger_paths/joint_card_live_start_test.rs` | `test_bp4_live_start_dual_trigger_fires` | 342 |  |
 
 ## similar_cards (31)
 

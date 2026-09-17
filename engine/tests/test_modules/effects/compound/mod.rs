@@ -20,7 +20,6 @@
     pub mod heart_override_test;
     pub mod himeno_position_change_single_test;
     pub mod hs_bp2_018_live_card_zone_test;
-    pub mod inspect_top_recruit_no_blade_member;
     pub mod izumi_bp6_test;
     pub mod karin_bp4_004_live_start_test;
     pub mod kuroe_dia_bp6_test;

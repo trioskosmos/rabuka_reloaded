@@ -62,19 +62,23 @@ void rb_member_original_hearts(const RbMods *mods, int card_id, int out[8]){
     memset(out, 0, 8 * sizeof(int));
     if(card_id < 0 || card_id >= RB_MAX_CARD_IDS) return;
 
-    /* 9.9.1.4: heart_override replaces the member's original hearts outright.
-       The C field stores only the override color (Rust keeps (color, count);
-       the count is not consumed by the portable core). So we recolor all base
-       hearts to the override color. */
-    int override_color = mods->heart_color_override[card_id];
+    /* 9.9.1.4: heart_override REPLACES originals outright with (color, count). */
+    int override_color = -1;
+    if(mods){
+        override_color = mods->heart_color_override[card_id];
+        if(override_color >= 0 && override_color <= 7){
+            out[override_color] = mods->heart_override_count[card_id];
+            return;
+        }
+    }
+
     int src_id = mods->heart_copy[card_id];
     int use_id = (src_id > 0 && src_id < RB_MAX_CARD_IDS) ? src_id : card_id;
 
     Card c;
     if(rb_decode_card_by_index((uint32_t)use_id, &c)){
         for(int h = 0; h < c.n_hearts; h++){
-            int col = (override_color >= 0 && override_color <= 7) ? override_color : (c.heart_color[h] % 8);
-            out[col] += c.heart_count[h];
+            out[c.heart_color[h] % 8] += c.heart_count[h];
         }
         rb_free_card(&c);
     }
