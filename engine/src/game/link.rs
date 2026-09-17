@@ -459,6 +459,7 @@ pub fn run_link_match<U: PlatformUi, T: LinkTransport>(
             break;
         }
         if gs.is_loop_detected() {
+            eprintln!("[LINK-BREAK] local={} reason=loop_detected phase={:?} rlog={}", local, gs.current_phase, gs.rule_log.len());
             show_result(ui, &gs);
             break;
         }
@@ -488,8 +489,14 @@ pub fn run_link_match<U: PlatformUi, T: LinkTransport>(
                 pickable.iter().map(|&i| acts[i].clone()).collect();
             let idx = pickable[select_action(ui, &gs, &sub_acts)];
             let la = LinkAction::from_action(&acts[idx], my_seq);
+            eprintln!(
+                "[LINK-PICK] local={} phase={:?} turn={} tag={} seq={} p1={:?} p2={:?} rlog={}",
+                local, gs.current_phase, gs.turn_number, la.tag, my_seq,
+                gs.player1_rps_choice, gs.player2_rps_choice, gs.rule_log.len()
+            );
             my_seq = my_seq.wrapping_add(1);
             if !send_reliable(ui, link, &la.encode(), la.seq, &mut peer_seq, &mut stashed) {
+                eprintln!("[LINK-BREAK] local={} reason=send_failed tag={} seq={} phase={:?} rlog={}", local, la.tag, la.seq, gs.current_phase, gs.rule_log.len());
                 break;
             }
             // RPS picks execute positionally (1st -> P1) unless the PVP
@@ -504,17 +511,25 @@ pub fn run_link_match<U: PlatformUi, T: LinkTransport>(
             match recv_action(ui, link, &mut peer_seq, &mut stashed) {
                 RecvOutcome::Action(la) => match find_local_action(&acts, &la) {
                     Some(i) => {
+                        eprintln!(
+                            "[LINK-RECV] local={} phase={:?} tag={} p1={:?} p2={:?} rlog={}",
+                            local, gs.current_phase, la.tag,
+                            gs.player1_rps_choice, gs.player2_rps_choice, gs.rule_log.len()
+                        );
                         if gs.current_phase == Phase::RockPaperScissors {
                             gs.pending_rps_player_id = Some(1 - local);
                         }
                         let _ = game_setup::execute_action(&mut gs, &acts[i]);
                     }
                     None => {
-                        log::debug!("[LINK] no local match for tag={}", la.tag);
+                        eprintln!("[LINK-BREAK] local={} reason=no_match tag={}", local, la.tag);
                         break;
                     }
                 },
-                RecvOutcome::Quit | RecvOutcome::Down => break,
+                RecvOutcome::Quit | RecvOutcome::Down => {
+                    eprintln!("[LINK-BREAK] local={} reason=link_down phase={:?} rlog={}", local, gs.current_phase, gs.rule_log.len());
+                    break;
+                }
             }
         }
         gs.reset_loop_detection();
@@ -664,6 +679,15 @@ mod tests {
             false
         }
         fn wait_vblank(&mut self) {}
+        // The downs() policy keys on the English row text ("Rock"); declaring
+        // English keeps the rendered menu rows in that language. The default
+        // (Japanese) rendered グー/パー, so downs() never matched, both sides
+        // always picked row 0 (Rock vs Rock tie), and the loopback match only
+        // ended when the packet budget killed both sides — symmetrically on
+        // lucky runs, ±1 action apart on unlucky ones (the lockstep flake).
+        fn ui_lang(&self) -> crate::game::language::Lang {
+            crate::game::language::Lang::English
+        }
     }
 
     #[test]

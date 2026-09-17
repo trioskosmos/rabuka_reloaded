@@ -3448,6 +3448,11 @@ def _try_distinct(text):
         "distinct": dist_val,
         "text": text,
     }
+    # 「メンバーがN人(以上)いる」 restricts the counted cards to members;
+    # without this a group live card (e.g. Hasunosora live in the waitroom,
+    # PL!HS-pb1-026-L) satisfies 「蓮ノ空のメンバー」 via its series name.
+    if "メンバー" in text:
+        result["card_type"] = "member_card"
     if locs:
         result["locations"] = locs
     else:

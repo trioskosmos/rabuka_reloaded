@@ -403,7 +403,7 @@ pub fn settle_single_player_state(game_state: &mut GameState) {
 /// Advance automatic phases until a human choice is needed or game ends.
 /// Used by all platform main loops after executing an action.
 pub fn settle_auto(gs: &mut GameState) {
-    for _ in 0..500 {
+    for i in 0..500 {
         if gs.has_pending_choice() || gs.game_result != GameResult::Ongoing {
             break;
         }
@@ -416,6 +416,19 @@ pub fn settle_auto(gs: &mut GameState) {
             TurnEngine::advance_phase(gs);
         } else {
             break;
+        }
+        if i == 499 {
+            // The 500-iteration cap tripped: the auto-advance loop is spinning
+            // without reaching a decision or a terminal result. Log the state
+            // so the spinning phase/choice is diagnosable from RUST_LOG alone.
+            log::debug!(
+                "[SETTLE_AUTO_CAP] phase={:?} turn={} pending_choice={} result={:?} rule_log={}",
+                gs.current_phase,
+                gs.turn_number,
+                gs.has_pending_choice(),
+                gs.game_result,
+                gs.rule_log.len()
+            );
         }
     }
 }

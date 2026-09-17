@@ -371,9 +371,7 @@ int rb_resolver_finalize_choice(RbAbilityResolver *self) {
     int sub_choice = self->sub_choice_created;
     self->sub_choice_created = 0;
     /* pay_deferred_costs now that player confirmed (choice.rs:176) */
-    for (int i = 0; i < self->n_pending_deferred_costs; i++) {
-        /* placeholder: deferred cost pay would call rb_pay_cost */
-    }
+    rb_pay_deferred_costs(gs, gs->queue.actor >= 0 ? gs->queue.actor : 0, NULL);
     if (!should_preserve && !sub_choice) {
         self->has_pending_choice = 0;
         rb_clear_pending_choice(gs);
@@ -715,7 +713,8 @@ int rb_resolver_handle_select_card(RbAbilityResolver *self, GameState *g, const 
         for (int i=0;i<self->n_moved_cards;i++) g->mods.last_cost_moved_card_ids[i]=self->moved_cards[i];
         g->mods.n_last_cost_moved_card_ids=self->n_moved_cards;
         if (cur>=0) g->queue.entries[cur].cost_paid=1;
-        /* pay deferred sub-costs if any (choice.rs:734 pay_deferred_costs) */
+        /* pay deferred sub-costs if any (choice.rs:737 pay_deferred_costs) */
+        rb_pay_deferred_costs(g, actor, NULL);
         return rb_resolver_clear_choice_state_and_resume(self);
     }
 

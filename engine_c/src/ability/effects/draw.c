@@ -146,6 +146,10 @@ int rb_draw_cards_for_player(RbPlayer *player, uint8_t count, const char *source
     int from_stage   = source && (!strcmp(source, "staged") || !strcmp(source, "stage"));
 
     int drawn = 0;
+    /* Unbounded-loop guard (mirrors draw.rs:60-68): counting consecutive
+        rejects bounds the scan to one full deck revolution (rejects rotate
+        to the bottom, so a full cycle with no accept means no match). */
+    int rejected = 0;
     while (drawn < count) {
         int card = -1;
 
@@ -223,6 +227,7 @@ int rb_draw_cards_for_player(RbPlayer *player, uint8_t count, const char *source
         if (matches) {
             draw_place_in_zone(player, card, destination ? destination : "hand");
             drawn++;
+            rejected = 0;
         } else {
             /* Not matching: return to the source pile (Rust pushes back to
                main_deck.cards, which is the bottom of the draw pile). */
@@ -244,6 +249,11 @@ int rb_draw_cards_for_player(RbPlayer *player, uint8_t count, const char *source
             }
             /* from_stage: non-matching staged draw stays removed (Rust doesn't
                push back to stage; the caller handles staged draws separately). */
+            rejected++;
+            if (from_deck && rejected >= player->deck.n) {
+                /* no matching cards remain in deck (draw.rs:66) */
+                break;
+            }
         }
     }
     return drawn;

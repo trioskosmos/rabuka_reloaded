@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-09-17T21:38:59.646601",
+  "generated_at": "2026-09-18T01:22:18.967126",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "3a25700b",
+  "engine_commit": "044eadde",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -3911,6 +3911,7 @@
           "target": "self",
           "distinct": "card_name",
           "text": "自分のステージに名前が異なるメンバーが3人以上いるかぎり",
+          "card_type": "member_card",
           "location": "stage",
           "count": 3,
           "operator": ">=",
@@ -8087,6 +8088,7 @@
           "target": "self",
           "distinct": "card_name",
           "text": "自分の、ステージと控え室に名前の異なる『Liella!』のメンバーが5人以上いる場合",
+          "card_type": "member_card",
           "locations": [
             "discard",
             "stage"
@@ -11890,6 +11892,7 @@
               "target": "self",
               "distinct": "card_name",
               "text": "自分のステージに名前の異なる『CatChu!』のメンバーが2人以上いる場合",
+              "card_type": "member_card",
               "location": "stage",
               "count": 2,
               "operator": ">=",
@@ -11950,6 +11953,7 @@
           "target": "self",
           "distinct": "card_name",
           "text": "自分のステージに名前の異なる『KALEIDOSCORE』のメンバーが2人以上いる場合",
+          "card_type": "member_card",
           "location": "stage",
           "count": 2,
           "operator": ">=",
@@ -12569,6 +12573,7 @@
           "target": "self",
           "distinct": "card_name",
           "text": "自分のステージに「澁谷かのん」、「ウィーン・マルガレーテ」、「鬼塚冬毬」のうち、名前の異なるメンバーが2人以上いる場合",
+          "card_type": "member_card",
           "location": "stage",
           "count": 2,
           "operator": ">=",
@@ -14860,6 +14865,7 @@
           "target": "self",
           "distinct": "card_name",
           "text": "自分のステージに名前の異なる『BiBi』のメンバーが2人以上いる場合",
+          "card_type": "member_card",
           "location": "stage",
           "count": 2,
           "operator": ">=",
@@ -15997,6 +16003,7 @@
           "target": "self",
           "distinct": "card_name",
           "text": "エールにより公開された自分のカードの中に、名前が異なる『Liella!』のメンバーカードが3枚以上ある場合",
+          "card_type": "member_card",
           "location": "revealed_cards",
           "count": 3,
           "operator": ">=",
@@ -16327,6 +16334,7 @@
           "target": "self",
           "distinct": "card_name",
           "text": "エールにより公開された自分のカードの中に名前が異なる『Liella!』のメンバーカードが5枚以上ある場合",
+          "card_type": "member_card",
           "location": "revealed_cards",
           "count": 5,
           "operator": ">=",
@@ -21827,6 +21835,7 @@
           "target": "self",
           "distinct": "card_name",
           "text": "自分のステージに名前の異なる『DiverDiva』のメンバーが2人いる場合",
+          "card_type": "member_card",
           "location": "stage",
           "count": 2,
           "operator": ">=",
@@ -27208,6 +27217,7 @@
           "target": "self",
           "distinct": "card_name",
           "text": "自分のステージに名前の異なる『BiBi』のメンバーが2人以上いる場合",
+          "card_type": "member_card",
           "location": "stage",
           "count": 2,
           "operator": ">=",
@@ -29784,6 +29794,7 @@
               "target": "self",
               "distinct": "card_name",
               "text": "自分のステージに名前の異なるメンバーが3人以上いる場合",
+              "card_type": "member_card",
               "location": "stage",
               "count": 3,
               "operator": ">=",
@@ -30660,6 +30671,7 @@
               "target": "self",
               "distinct": "group_name",
               "text": "それらのメンバーのユニット名がそれぞれ異なる場合",
+              "card_type": "member_card",
               "location": "stage",
               "group_names": [
                 "蓮ノ空"
@@ -31034,6 +31046,7 @@
           "target": "self",
           "distinct": "group_name",
           "text": "自分のステージにグループ名がそれぞれ異なるメンバーが3人以上いる場合",
+          "card_type": "member_card",
           "location": "stage",
           "count": 3,
           "operator": ">=",
@@ -31127,7 +31140,9 @@
             "card_type": "member_card",
             "target": "opponent",
             "action": "change_state",
-            "original_value": true
+            "original_value": true,
+            "blade_limit": 3,
+            "blade_limit_operator": "<="
           }
         ],
         "count": 1,
@@ -32340,7 +32355,7 @@
             "action": "sequential",
             "actions": [
               {
-                "text": "自分の控え室から『スリーズブーケ』のメンバーカード1枚と『蓮ノ空』のライブカード1枚を手札に加える",
+                "text": "『スリーズブーケ』のメンバーカード1枚",
                 "action": "move_cards",
                 "source": "discard",
                 "destination": "hand",
@@ -32349,12 +32364,11 @@
                 "max": true,
                 "target": "self",
                 "group_names": [
-                  "スリーズブーケ",
-                  "蓮ノ空"
+                  "スリーズブーケ"
                 ]
               },
               {
-                "text": "自分の控え室から『スリーズブーケ』のメンバーカード1枚と『蓮ノ空』のライブカード1枚を手札に加える",
+                "text": "『蓮ノ空』のライブカード1枚",
                 "action": "move_cards",
                 "source": "discard",
                 "destination": "hand",
@@ -32363,7 +32377,6 @@
                 "max": true,
                 "target": "self",
                 "group_names": [
-                  "スリーズブーケ",
                   "蓮ノ空"
                 ]
               }
@@ -32580,6 +32593,7 @@
           "target": "self",
           "distinct": "card_name",
           "text": "自分の、ステージと控え室に名前の異なる『蓮ノ空』のメンバーが6人以上いる場合",
+          "card_type": "member_card",
           "locations": [
             "discard",
             "stage"

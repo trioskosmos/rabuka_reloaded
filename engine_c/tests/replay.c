@@ -956,6 +956,26 @@ static void scenario_deferred_costs(void){
     CHECK(rb_energy_active_count(&g2->p[0])==1,"no-op settle leaves energy unchanged");
 }
 
+/* Filtered-draw unbounded-loop guard (draw.rs:60-68): a filtered draw with
+   no matching card in the deck must terminate after one revolution and draw
+   nothing — not spin forever. */
+static void scenario_draw_filter_guard(void){
+    static TestGame tg;
+    test_game_new(&tg);
+    GameState *g=&tg.state;
+    rb_queue_clear(&g->queue);
+    /* deck: two members only — no live_card anywhere */
+    test_add_to_deck(&tg, test_id(&tg,"PL!-sd1-010-SD"));
+    test_add_to_deck(&tg, test_id(&tg,"PL!-sd1-010-SD"));
+    int deck_before=g->p[0].deck.n;
+    AbilityEffect e={0}; e.action="draw_card"; e.count=1;
+    e.extra_k[0]="card_type"; e.extra_v[0]="live_card"; e.n_extra=1;
+    int n=rb_effect_draw_card(g,0,&e,-1);
+    CHECK(n==0,"filtered draw with no match draws nothing");
+    CHECK(g->p[0].deck.n==deck_before,"deck unchanged after full revolution");
+    CHECK(g->p[0].hand.n==0,"hand empty after no-match draw");
+}
+
 int main(int argc, char **argv){
     setvbuf(stdout, NULL, _IONBF, 0); /* unbuffered: a crash must not swallow results */
     CHECK(rb_load("src")==0,"rb_load");
@@ -988,6 +1008,7 @@ int main(int argc, char **argv){
     scenario_phase_determinism();
     scenario_yell_draw_icons();
     scenario_move_looked_at();
+    scenario_draw_filter_guard();
     scenario_deferred_costs();
     rb_unload();
     if(failures){ printf("\n%d FAILURES\n",failures); return 1; }
