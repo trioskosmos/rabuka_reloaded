@@ -11,7 +11,6 @@ pub mod position_change_condition_test;
 pub mod position_change_multi_test;
 pub mod position_change_non_optional_test;
 pub mod position_change_triggers_jidou_move_test;
-pub mod qa_new_tests238;
 pub mod ruby_bp7_center_position_test;
 pub mod self_control_position_change_test;
 pub mod wien_bp5_test;

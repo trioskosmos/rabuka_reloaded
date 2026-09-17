@@ -12,7 +12,7 @@ use crate::helpers::*;
 const OSAWA_RINO: &str = "PL!HS-bp5-003-AR";
 
 /// Manually trigger Rino's auto ability (stage → discard zone change).
-fn trigger_rino_auto(game: &mut TestGame, rino: i16) {
+fn trigger_stage_to_waitroom_auto(game: &mut TestGame, rino: i16) {
     game.state.set_recently_moved_cards(vec![rino]);
     game.state.recently_moved_from_zone = Some("stage".to_string());
     let pid = game.state.player1.id.clone();
@@ -30,7 +30,7 @@ fn count_position_actions(game: &TestGame) -> usize {
 
 /// Q238 main: reposition opponent member.
 #[test]
-fn q238_reposition_opponent_member() {
+fn leaves_stage_repositions_opponent_member_q238() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
@@ -44,7 +44,7 @@ fn q238_reposition_opponent_member() {
     // Manually trigger stage→discard for Rino
     game.state.player1.stage.stage[1] = -1;
     game.state.player1.waitroom.cards.push(rino);
-    trigger_rino_auto(&mut game, rino);
+    trigger_stage_to_waitroom_auto(&mut game, rino);
 
     // Should have a pending choice (optional position_change)
     assert!(
@@ -83,7 +83,7 @@ fn q238_reposition_opponent_member() {
 
 /// Reposition own member (basic case).
 #[test]
-fn q238_reposition_own_member() {
+fn leaves_stage_own_member_position_choice_resolves_q238() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
@@ -93,7 +93,7 @@ fn q238_reposition_own_member() {
     game.state.player1.stage.stage = [own_member, rino, -1];
     game.state.player1.stage.stage[1] = -1;
     game.state.player1.waitroom.cards.push(rino);
-    trigger_rino_auto(&mut game, rino);
+    trigger_stage_to_waitroom_auto(&mut game, rino);
 
     assert!(game.has_pending_choice(), "Rino's auto should fire");
 
@@ -111,7 +111,7 @@ fn q238_reposition_own_member() {
 
 /// No other members on either stage → auto ability skips gracefully.
 #[test]
-fn q238_no_other_members_skips() {
+fn leaves_stage_position_change_without_other_members_skips_q238() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
@@ -121,7 +121,7 @@ fn q238_no_other_members_skips() {
     game.state.player1.stage.stage = [-1, rino, -1];
     game.state.player1.stage.stage[1] = -1;
     game.state.player1.waitroom.cards.push(rino);
-    trigger_rino_auto(&mut game, rino);
+    trigger_stage_to_waitroom_auto(&mut game, rino);
 
     // After moving to discard, no other members on either stage
     // → valid_sources is empty → ability should skip
@@ -133,7 +133,7 @@ fn q238_no_other_members_skips() {
 
 /// Both players have members → all are selectable.
 #[test]
-fn q238_both_players_members_all_selectable() {
+fn leaves_stage_position_change_offers_both_players_members_q238() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
@@ -146,7 +146,7 @@ fn q238_both_players_members_all_selectable() {
     game.state.player2.stage.stage = [-1, opp_center, opp_right];
     game.state.player1.stage.stage[1] = -1;
     game.state.player1.waitroom.cards.push(rino);
-    trigger_rino_auto(&mut game, rino);
+    trigger_stage_to_waitroom_auto(&mut game, rino);
 
     assert!(game.has_pending_choice(), "Rino's auto should fire");
 
@@ -161,7 +161,7 @@ fn q238_both_players_members_all_selectable() {
 
 /// Select opponent center from two opponent members.
 #[test]
-fn q238_select_opponent_center() {
+fn leaves_stage_position_change_swaps_opponent_center_and_left_q238() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
@@ -173,7 +173,7 @@ fn q238_select_opponent_center() {
     game.state.player2.stage.stage = [opp_left, opp_center, -1];
     game.state.player1.stage.stage[1] = -1;
     game.state.player1.waitroom.cards.push(rino);
-    trigger_rino_auto(&mut game, rino);
+    trigger_stage_to_waitroom_auto(&mut game, rino);
 
     assert!(game.has_pending_choice(), "Rino's auto should fire");
     let actions = count_position_actions(&game);
@@ -203,7 +203,7 @@ fn q238_select_opponent_center() {
 /// Baton touch: play a new member to Rurino's area, triggering her auto.
 /// The position change selection should be offered for members on stage.
 #[test]
-fn q238_baton_touch_triggers_position_change_selection() {
+fn baton_leaves_stage_offers_arriver_position_change_q238() {
     let db = load_real_database();
     let mut g = TestGame::new(db);
 
@@ -246,7 +246,7 @@ fn q238_baton_touch_triggers_position_change_selection() {
 
 /// Baton touch with no other members on stage → ability should skip.
 #[test]
-fn q238_baton_touch_no_other_members_skips() {
+fn baton_leaves_stage_lone_arriver_still_offers_position_change_q238() {
     let db = load_real_database();
     let mut g = TestGame::new(db);
 
@@ -277,7 +277,7 @@ fn q238_baton_touch_no_other_members_skips() {
 
 /// Baton touch with opponent members → both own and opponent members selectable.
 #[test]
-fn q238_baton_touch_select_opponent_member() {
+fn baton_leaves_stage_offers_own_and_opponent_position_change_q238() {
     let db = load_real_database();
     let mut g = TestGame::new(db);
 
@@ -318,7 +318,7 @@ fn q238_baton_touch_select_opponent_member() {
 
 /// Player may decline the optional reposition.
 #[test]
-fn q238_optional_skip() {
+fn leaves_stage_declined_position_change_preserves_opponent_position_q238() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
@@ -329,7 +329,7 @@ fn q238_optional_skip() {
     game.state.player2.stage.stage = [-1, opp_member, -1];
     game.state.player1.stage.stage[1] = -1;
     game.state.player1.waitroom.cards.push(rino);
-    trigger_rino_auto(&mut game, rino);
+    trigger_stage_to_waitroom_auto(&mut game, rino);
 
     assert!(game.has_pending_choice(), "Rino's auto should fire");
 

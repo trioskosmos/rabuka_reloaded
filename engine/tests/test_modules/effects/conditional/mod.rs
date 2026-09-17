@@ -3,15 +3,15 @@
 pub mod bp7_kanata_choice_test;
 pub mod chika_bp7_conditional_result_test;
 pub mod conditional_alternative_test;
+pub mod debut_reveal_success_zone_replacement_q256_test;
 pub mod kanon_invalidate_test;
 pub mod keke_bp5_test;
 pub mod keke_pb2_013_debut_test;
 pub mod konata_bp4_test;
+pub mod live_phase_success_zone_replacement_q257_test;
 pub mod ll_joint_test;
 pub mod pl_hs_bp6_004_test;
 pub mod pl_s_bp7_007_test;
-pub mod qa_new_tests256;
-pub mod qa_new_tests257;
 pub mod remaining_comprehensive_edge_test;
 pub mod sp_bp2_004_comprehensive_edge_test;
 pub mod sp_bp2_004_extra_test10;

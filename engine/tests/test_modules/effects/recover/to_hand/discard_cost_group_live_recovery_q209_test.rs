@@ -23,7 +23,7 @@ const FILLER_MEMBER: &str = "PL!-sd1-010-SD";
 
 /// Q209: Discard an EdelNote live card as cost, then retrieve it back.
 #[test]
-fn q209_ceras_discard_edelnote_live_recover_same() {
+fn debut_discard_two_recovers_same_edelnote_live_q209() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
@@ -41,12 +41,18 @@ fn q209_ceras_discard_edelnote_live_recover_same() {
 
     // Debut fires: choose to pay optional cost (discard 2 from hand)?
     // First choice: SelectAutoAbility for the debut trigger
-    assert!(game.has_pending_choice(), "Q209 debut SelectAutoAbility must be offered");
+    assert!(
+        game.has_pending_choice(),
+        "Q209 debut SelectAutoAbility must be offered"
+    );
     game.select_option(0);
 
     // Cost choice: select 2 cards from hand to discard
     // Hand has [edel_live, filler]. Select both (indices 0, 1)
-    assert!(game.has_pending_choice(), "Q209 discard-2 cost must be offered");
+    assert!(
+        game.has_pending_choice(),
+        "Q209 discard-2 cost must be offered"
+    );
     game.select_indices(&[0, 1]);
 
     // Effect: single candidate (the just-discarded edel_live) AUTO-RESOLVES
@@ -64,7 +70,7 @@ fn q209_ceras_discard_edelnote_live_recover_same() {
 
 /// Discard non-EdelNote cards as cost, retrieve different EdelNote from waitroom.
 #[test]
-fn q209_ceras_discard_filler_retrieve_preexisting_edelnote() {
+fn debut_discard_two_recovers_preexisting_edelnote_live_q209() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
@@ -82,11 +88,17 @@ fn q209_ceras_discard_filler_retrieve_preexisting_edelnote() {
 
     game.play_to_stage(ceras, MemberArea::Center);
 
-    assert!(game.has_pending_choice(), "Q209 debut SelectAutoAbility must be offered");
+    assert!(
+        game.has_pending_choice(),
+        "Q209 debut SelectAutoAbility must be offered"
+    );
     game.select_option(0);
 
     // Discard 2 fillers from hand — any_number re-prompt: select both, then skip
-    assert!(game.has_pending_choice(), "Q209 discard-2 cost must be offered");
+    assert!(
+        game.has_pending_choice(),
+        "Q209 discard-2 cost must be offered"
+    );
     game.select_indices(&[0, 1]);
     // any_number cost: selecting exactly the cap (2) finalises — no extra ask.
 
@@ -104,7 +116,7 @@ fn q209_ceras_discard_filler_retrieve_preexisting_edelnote() {
 
 /// No EdelNote live in waitroom → effect skips gracefully.
 #[test]
-fn q209_ceras_no_edelnote_in_discard_skips() {
+fn debut_discard_two_without_edelnote_live_recovers_nothing_q209() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
@@ -125,7 +137,10 @@ fn q209_ceras_no_edelnote_in_discard_skips() {
     game.select_option(0);
 
     // Pay cost: discard 2 fillers
-    assert!(game.has_pending_choice(), "Q209 discard-2 cost must be offered");
+    assert!(
+        game.has_pending_choice(),
+        "Q209 discard-2 cost must be offered"
+    );
     game.select_indices(&[0, 1]);
 
     // No EdelNote live in waitroom → no choice for retrieval
@@ -146,7 +161,7 @@ fn q209_ceras_no_edelnote_in_discard_skips() {
 
 /// Decline the optional cost → no discard, no retrieval.
 #[test]
-fn q209_ceras_decline_cost_no_effect() {
+fn debut_declined_discard_two_preserves_hand_count_q209() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
@@ -161,11 +176,17 @@ fn q209_ceras_decline_cost_no_effect() {
 
     game.play_to_stage(ceras, MemberArea::Center);
 
-    assert!(game.has_pending_choice(), "Q209 debut SelectAutoAbility must be offered");
+    assert!(
+        game.has_pending_choice(),
+        "Q209 debut SelectAutoAbility must be offered"
+    );
     game.select_option(0);
 
     // Cost is optional — select Skip to decline
-    assert!(game.has_pending_choice(), "Q209 optional skip must be offered");
+    assert!(
+        game.has_pending_choice(),
+        "Q209 optional skip must be offered"
+    );
     // The skip action has card_id=-1
     TurnEngine::resume_with_choice(&mut game.state, Some(-1), None).expect("skip");
 
@@ -183,7 +204,7 @@ fn q209_ceras_decline_cost_no_effect() {
 
 /// Multiple EdelNote live cards in waitroom → choose 1.
 #[test]
-fn q209_ceras_multiple_edelnote_choose_one() {
+fn debut_discard_two_selects_one_of_multiple_edelnote_lives_q209() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
@@ -203,14 +224,23 @@ fn q209_ceras_multiple_edelnote_choose_one() {
 
     game.play_to_stage(ceras, MemberArea::Center);
 
-    assert!(game.has_pending_choice(), "Q209 debut SelectAutoAbility must be offered");
+    assert!(
+        game.has_pending_choice(),
+        "Q209 debut SelectAutoAbility must be offered"
+    );
     game.select_option(0);
 
-    assert!(game.has_pending_choice(), "Q209 discard-2 cost must be offered");
+    assert!(
+        game.has_pending_choice(),
+        "Q209 discard-2 cost must be offered"
+    );
     game.select_indices(&[0, 1]); // discard 2 fillers
 
     // Effect: choose which EdelNote live to retrieve
-    assert!(game.has_pending_choice(), "Q209 retrieval select must be offered");
+    assert!(
+        game.has_pending_choice(),
+        "Q209 retrieval select must be offered"
+    );
     game.select_indices(&[1]); // pick the second one
 
     while game.has_pending_choice() {
@@ -235,7 +265,7 @@ const NIJI_LIVE: &str = "PL!N-sd1-025-SD";
 
 /// Q209: Discard a 虹ヶ咲 live card as activation cost, retrieve it back.
 #[test]
-fn q209_kasumi_discard_niji_live_recover_same() {
+fn activation_energy_and_discard_recovers_same_nijigasaki_live_q209() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
@@ -273,7 +303,10 @@ fn q209_kasumi_discard_niji_live_recover_same() {
     // The fixed-count pay_energy step is AUTO-PAID during activation (no
     // prompt); only choice-based steps (hand discard) prompt.
 
-    assert!(game.has_pending_choice(), "hand discard prompt must be pending");
+    assert!(
+        game.has_pending_choice(),
+        "hand discard prompt must be pending"
+    );
     game.select_indices(&[0]); // discard first card (niji_live)
 
     // Drain any residual prompts (defensive; retrieval auto-resolves).
@@ -306,7 +339,7 @@ fn q209_kasumi_discard_niji_live_recover_same() {
 /// No 虹ヶ咲 live in waitroom → cost still payable, effect skips.
 /// (Merged with the former "energy available" variant — identical setup.)
 #[test]
-fn q209_kasumi_no_niji_in_discard_skips() {
+fn activation_energy_and_discard_without_nijigasaki_live_recovers_nothing_q209() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
@@ -352,7 +385,7 @@ fn q209_kasumi_no_niji_in_discard_skips() {
 
 /// Use limit: 1/turn — second activation does nothing.
 #[test]
-fn q209_kasumi_use_limit_blocks_second() {
+fn activation_live_recovery_once_per_turn_blocks_second_use_q209() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
@@ -382,7 +415,10 @@ fn q209_kasumi_use_limit_blocks_second() {
 
     // {E}{E} auto-pays; hand discard prompted; single-candidate retrieval
     // (the just-discarded niji_live) auto-resolves.
-    assert!(game.has_pending_choice(), "hand-discard cost prompt expected");
+    assert!(
+        game.has_pending_choice(),
+        "hand-discard cost prompt expected"
+    );
     game.select_indices(&[0]); // discard
     while game.has_pending_choice() {
         assert!(
@@ -410,7 +446,7 @@ fn q209_kasumi_use_limit_blocks_second() {
 
 /// Retrieve a 虹ヶ咲 live that was pre-existing in waitroom (not the discarded one).
 #[test]
-fn q209_kasumi_retrieve_different_niji_live() {
+fn activation_energy_and_discard_recovers_preexisting_nijigasaki_live_q209() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
@@ -440,7 +476,10 @@ fn q209_kasumi_retrieve_different_niji_live() {
     .expect("activate");
 
     // {E}{E} auto-pays; hand discard prompted.
-    assert!(game.has_pending_choice(), "hand-discard cost prompt expected");
+    assert!(
+        game.has_pending_choice(),
+        "hand-discard cost prompt expected"
+    );
     game.select_indices(&[0]); // discard niji_b
 
     // Waitroom now holds [niji_a, niji_b] → retrieval IS prompted (two

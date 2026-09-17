@@ -1,6 +1,6 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-09-17T12:25:04.729856+00:00",
+  "generated_at": "2026-09-17T12:35:06.285292+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
@@ -790,7 +790,6 @@
         "engine/tests/test_modules/effects/gain/blades/conditional_constant_blade_bonuses_test.rs",
         "engine/tests/test_modules/effects/gain/blades/q148_blade_total_waited_test.rs",
         "engine/tests/test_modules/effects/gain/hearts/constant_edge_case_test.rs",
-        "engine/tests/test_modules/effects/position/qa_new_tests238.rs",
         "engine/tests/test_modules/effects/recover/to_hand/bp7_audrey_blade_max_test.rs",
         "engine/tests/test_modules/effects/recover/to_hand/bp7_q270_emma_color_diversity_test.rs",
         "engine/tests/test_modules/effects/recover/to_hand/bp7_q272_just_believe_test.rs",
@@ -809,6 +808,7 @@
         "engine/tests/test_modules/effects/state/riko_bp5_center_cost_equal_test.rs",
         "engine/tests/test_modules/integration/gameplay_test.rs",
         "engine/tests/test_modules/integration/parser_issues_e2e_test.rs",
+        "engine/tests/test_modules/jidou/leaves_stage/optional_any_player_position_change_q238_test.rs",
         "engine/tests/test_modules/jidou/leaves_stage/stage_to_discard_ability_test.rs",
         "engine/tests/test_modules/jidou/movement/bp7_auto_gap_test.rs",
         "engine/tests/test_modules/jidou/movement/movement_condition_test.rs",
@@ -845,12 +845,12 @@
         "ayumu_q62_and_name_has_individual_names",
         "b_heart07_parses_to_colorless_heart00",
         "b_heart07_yell_contributes_two_colorless_hearts_each",
+        "baton_leaves_stage_lone_arriver_still_offers_position_change_q238",
         "baton_leaves_stage_offers_arriver_position_change_q238",
+        "baton_leaves_stage_offers_own_and_opponent_position_change_q238",
         "bella_positive_surplus_heart04_ability_fires",
         "bella_q174_no_heart04_surplus_ability_does_not_fire",
-        "bella_q174_no_member_on_stage_ability_does_not_fire",
-        "c5_boundary_exact_blade_waited",
-        "c5_bytecode_carries_explicit_offset"
+        "bella_q174_no_member_on_stage_ability_does_not_fire"
       ],
       "covering_test_count": 357,
       "is_null": false,
@@ -912,7 +912,7 @@
         "engine/tests/test_modules/effects/conditional/sp_bp2_004_extra_test8.rs",
         "engine/tests/test_modules/effects/conditional/sp_bp2_004_extra_test9.rs",
         "engine/tests/test_modules/effects/cost_mod/himeno_test.rs",
-        "engine/tests/test_modules/effects/deploy/qa_new_tests202.rs",
+        "engine/tests/test_modules/effects/deploy/paid_energy_same_name_debut_chain_q200_q201_q202_test.rs",
         "engine/tests/test_modules/effects/draw/until_count/miyata_draw_until_test.rs",
         "engine/tests/test_modules/effects/energy/under_member/energy_and_member_under_test.rs",
         "engine/tests/test_modules/effects/gain/blades/bp7_heart_copy_test.rs",
@@ -1108,7 +1108,7 @@
       "covering_files": [
         "engine/tests/test_modules/effects/deploy/ayumu_pb1_test.rs",
         "engine/tests/test_modules/effects/deploy/n_pb1_015_shizuku_test.rs",
-        "engine/tests/test_modules/effects/deploy/qa_new_tests202.rs",
+        "engine/tests/test_modules/effects/deploy/paid_energy_same_name_debut_chain_q200_q201_q202_test.rs",
         "engine/tests/test_modules/integration/parser_issues_e2e_test.rs",
         "engine/tests/test_modules/jidou/discard_watch/bp7_mia_deck_to_discard_test.rs",
         "engine/tests/test_modules/jidou/yell/yell_revealed_no_blade_heart_discard_q251_test.rs"
@@ -2214,7 +2214,7 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/effects/compound/discard_wait_enables_hearts_pl_hs_bp5_016_n_test.rs",
-        "engine/tests/test_modules/effects/deploy/qa_new_tests202.rs",
+        "engine/tests/test_modules/effects/deploy/paid_energy_same_name_debut_chain_q200_q201_q202_test.rs",
         "engine/tests/test_modules/effects/gain/blades/b7_constant_ability_test.rs",
         "engine/tests/test_modules/effects/gain/blades/conditional_constant_blade_bonuses_test.rs",
         "engine/tests/test_modules/effects/gain/blades/eri_bp3_test.rs",
@@ -7520,12 +7520,14 @@
         "engine/tests/test_modules/effects/gain/hearts/himeno_bp_versions_test.rs",
         "engine/tests/test_modules/effects/gain/hearts/rurino_bp5_test.rs",
         "engine/tests/test_modules/effects/gain/hearts/rurino_test.rs",
-        "engine/tests/test_modules/effects/position/qa_new_tests238.rs",
         "engine/tests/test_modules/integration/parser_issues_e2e_test.rs",
-        "engine/tests/test_modules/jidou/leaves_stage/hs_cl1_003_edge_test.rs"
+        "engine/tests/test_modules/jidou/leaves_stage/hs_cl1_003_edge_test.rs",
+        "engine/tests/test_modules/jidou/leaves_stage/optional_any_player_position_change_q238_test.rs"
       ],
       "covering_tests": [
+        "baton_leaves_stage_lone_arriver_still_offers_position_change_q238",
         "baton_leaves_stage_offers_arriver_position_change_q238",
+        "baton_leaves_stage_offers_own_and_opponent_position_change_q238",
         "both_effects_execute",
         "condition_fails_with_no_match",
         "condition_passes_with_bp1_osawa",
@@ -7552,9 +7554,7 @@
         "issue16_hanamaru_opponent_higher_cost_no_blade",
         "issue17_suzu_cost_bonus_condition_met",
         "issue17_suzu_cost_bonus_condition_not_met",
-        "issue1_kanon_invalidate_and_recover",
-        "issue1_kanon_no_liella_on_stage_no_recovery",
-        "issue2_rina_cost_total_10_no_bonus"
+        "issue1_kanon_invalidate_and_recover"
       ],
       "covering_test_count": 59,
       "is_null": false,
@@ -7591,12 +7591,14 @@
         "engine/tests/test_modules/effects/gain/hearts/himeno_bp_versions_test.rs",
         "engine/tests/test_modules/effects/gain/hearts/rurino_bp5_test.rs",
         "engine/tests/test_modules/effects/gain/hearts/rurino_test.rs",
-        "engine/tests/test_modules/effects/position/qa_new_tests238.rs",
         "engine/tests/test_modules/integration/parser_issues_e2e_test.rs",
-        "engine/tests/test_modules/jidou/leaves_stage/hs_cl1_003_edge_test.rs"
+        "engine/tests/test_modules/jidou/leaves_stage/hs_cl1_003_edge_test.rs",
+        "engine/tests/test_modules/jidou/leaves_stage/optional_any_player_position_change_q238_test.rs"
       ],
       "covering_tests": [
+        "baton_leaves_stage_lone_arriver_still_offers_position_change_q238",
         "baton_leaves_stage_offers_arriver_position_change_q238",
+        "baton_leaves_stage_offers_own_and_opponent_position_change_q238",
         "both_effects_execute",
         "condition_fails_with_no_match",
         "condition_passes_with_bp1_osawa",
@@ -7623,9 +7625,7 @@
         "issue16_hanamaru_opponent_higher_cost_no_blade",
         "issue17_suzu_cost_bonus_condition_met",
         "issue17_suzu_cost_bonus_condition_not_met",
-        "issue1_kanon_invalidate_and_recover",
-        "issue1_kanon_no_liella_on_stage_no_recovery",
-        "issue2_rina_cost_total_10_no_bonus"
+        "issue1_kanon_invalidate_and_recover"
       ],
       "covering_test_count": 59,
       "is_null": false,
@@ -11390,8 +11390,8 @@
         "engine/tests/test_modules/effects/compound/ginko_baton_touch_hasu_search_test.rs",
         "engine/tests/test_modules/effects/compound/natsumi_bp5_test.rs",
         "engine/tests/test_modules/effects/compound/shioriko_bp4_swap_test.rs",
-        "engine/tests/test_modules/effects/conditional/qa_new_tests256.rs",
-        "engine/tests/test_modules/effects/conditional/qa_new_tests257.rs",
+        "engine/tests/test_modules/effects/conditional/debut_reveal_success_zone_replacement_q256_test.rs",
+        "engine/tests/test_modules/effects/conditional/live_phase_success_zone_replacement_q257_test.rs",
         "engine/tests/test_modules/effects/cost_mod/success_zone_group_pl_n_sd2_003_sd2_test.rs",
         "engine/tests/test_modules/effects/deck_order/restore/optional_waitroom_to_deck_top_test.rs",
         "engine/tests/test_modules/effects/draw/conditional/success_zone_group_pl_bp6_023_l_test.rs",
@@ -11403,11 +11403,11 @@
         "engine/tests/test_modules/effects/look_select/reveal_to_hand/waitroom_debut_look_pl_s_bp6_016_n_test.rs",
         "engine/tests/test_modules/effects/mill/s9_replacement_timestamp_test.rs",
         "engine/tests/test_modules/effects/other/live_cards_disappear_test.rs",
+        "engine/tests/test_modules/effects/recover/to_hand/discard_cost_group_live_recovery_q209_test.rs",
         "engine/tests/test_modules/effects/recover/to_hand/fixed_customs_test.rs",
         "engine/tests/test_modules/effects/recover/to_hand/hinoshita_test.rs",
         "engine/tests/test_modules/effects/recover/to_hand/hs_bp2_001_recover_test.rs",
         "engine/tests/test_modules/effects/recover/to_hand/pl_hs_bp1_003_test.rs",
-        "engine/tests/test_modules/effects/recover/to_hand/qa_new_tests209.rs",
         "engine/tests/test_modules/effects/restriction/mebius_loop_comprehensive_edge_test.rs",
         "engine/tests/test_modules/effects/score/aurora_flower_identity_test.rs",
         "engine/tests/test_modules/effects/score/distinct_waitroom_lives_pl_n_bp4_028_l_test.rs",
@@ -11420,7 +11420,10 @@
         "engine/tests/test_modules/rules/scoring/special_blade_heart_rules_test.rs"
       ],
       "covering_tests": [
+        "activation_energy_and_discard_recovers_preexisting_nijigasaki_live_q209",
         "activation_energy_and_discard_recovers_same_nijigasaki_live_q209",
+        "activation_energy_and_discard_without_nijigasaki_live_recovers_nothing_q209",
+        "activation_live_recovery_once_per_turn_blocks_second_use_q209",
         "all_areas_aqours_diff_names_gains_ability",
         "all_areas_hasunosora_with_multiname_gains_score",
         "any_card_fails_hearts_all_fail",
@@ -11446,10 +11449,7 @@
         "both_players_have_live_cards",
         "both_players_live_score_compared",
         "butterfly_to_butterfly_wing_matches",
-        "butterfly_wing_to_butterfly_no_match",
-        "candidate_pool_distinct_filter",
-        "candidate_pool_filter_by_card_type_and_group_agrees",
-        "candidate_pool_filter_by_group_name"
+        "butterfly_wing_to_butterfly_no_match"
       ],
       "covering_test_count": 212,
       "is_null": true,
@@ -13645,18 +13645,18 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/recover/to_hand/qa_new_tests209.rs"
+        "engine/tests/test_modules/effects/recover/to_hand/discard_cost_group_live_recovery_q209_test.rs"
       ],
       "covering_tests": [
+        "activation_energy_and_discard_recovers_preexisting_nijigasaki_live_q209",
         "activation_energy_and_discard_recovers_same_nijigasaki_live_q209",
+        "activation_energy_and_discard_without_nijigasaki_live_recovers_nothing_q209",
+        "activation_live_recovery_once_per_turn_blocks_second_use_q209",
         "debut_declined_discard_two_preserves_hand_count_q209",
         "debut_discard_two_recovers_preexisting_edelnote_live_q209",
         "debut_discard_two_recovers_same_edelnote_live_q209",
         "debut_discard_two_selects_one_of_multiple_edelnote_lives_q209",
-        "debut_discard_two_without_edelnote_live_recovers_nothing_q209",
-        "q209_kasumi_no_niji_in_discard_skips",
-        "q209_kasumi_retrieve_different_niji_live",
-        "q209_kasumi_use_limit_blocks_second"
+        "debut_discard_two_without_edelnote_live_recovers_nothing_q209"
       ],
       "covering_test_count": 9,
       "is_null": false,
@@ -13687,18 +13687,18 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/recover/to_hand/qa_new_tests209.rs"
+        "engine/tests/test_modules/effects/recover/to_hand/discard_cost_group_live_recovery_q209_test.rs"
       ],
       "covering_tests": [
+        "activation_energy_and_discard_recovers_preexisting_nijigasaki_live_q209",
         "activation_energy_and_discard_recovers_same_nijigasaki_live_q209",
+        "activation_energy_and_discard_without_nijigasaki_live_recovers_nothing_q209",
+        "activation_live_recovery_once_per_turn_blocks_second_use_q209",
         "debut_declined_discard_two_preserves_hand_count_q209",
         "debut_discard_two_recovers_preexisting_edelnote_live_q209",
         "debut_discard_two_recovers_same_edelnote_live_q209",
         "debut_discard_two_selects_one_of_multiple_edelnote_lives_q209",
-        "debut_discard_two_without_edelnote_live_recovers_nothing_q209",
-        "q209_kasumi_no_niji_in_discard_skips",
-        "q209_kasumi_retrieve_different_niji_live",
-        "q209_kasumi_use_limit_blocks_second"
+        "debut_discard_two_without_edelnote_live_recovers_nothing_q209"
       ],
       "covering_test_count": 9,
       "is_null": false,
@@ -15513,11 +15513,14 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/recover/to_hand/qa_new_tests209.rs",
+        "engine/tests/test_modules/effects/recover/to_hand/discard_cost_group_live_recovery_q209_test.rs",
         "engine/tests/test_modules/rules/trigger_paths/kasumi_turn_limit_test.rs"
       ],
       "covering_tests": [
+        "activation_energy_and_discard_recovers_preexisting_nijigasaki_live_q209",
         "activation_energy_and_discard_recovers_same_nijigasaki_live_q209",
+        "activation_energy_and_discard_without_nijigasaki_live_recovers_nothing_q209",
+        "activation_live_recovery_once_per_turn_blocks_second_use_q209",
         "debut_declined_discard_two_preserves_hand_count_q209",
         "debut_discard_two_recovers_preexisting_edelnote_live_q209",
         "debut_discard_two_recovers_same_edelnote_live_q209",
@@ -15527,10 +15530,7 @@
         "kasumi_limit_is_per_instance",
         "kasumi_no_valid_target_terminates",
         "kasumi_turn1_ability_available_again_next_turn",
-        "kasumi_turn1_ability_offered_only_once_per_turn",
-        "q209_kasumi_no_niji_in_discard_skips",
-        "q209_kasumi_retrieve_different_niji_live",
-        "q209_kasumi_use_limit_blocks_second"
+        "kasumi_turn1_ability_offered_only_once_per_turn"
       ],
       "covering_test_count": 14,
       "is_null": false,
@@ -16210,7 +16210,7 @@
         "engine/tests/test_modules/effects/compound/yoshiko_center_ability_test.rs",
         "engine/tests/test_modules/effects/compound/yoshiko_edge_cases_test.rs",
         "engine/tests/test_modules/effects/compound/yoshiko_filter_test.rs",
-        "engine/tests/test_modules/effects/deploy/qa_new_tests202.rs",
+        "engine/tests/test_modules/effects/deploy/paid_energy_same_name_debut_chain_q200_q201_q202_test.rs",
         "engine/tests/test_modules/effects/gain/blades/l0_gap_livestart2_test.rs",
         "engine/tests/test_modules/effects/gain/blades/turn_scope_regression_test.rs",
         "engine/tests/test_modules/effects/gain/hearts/constant_edge_case_test.rs",
@@ -16289,7 +16289,7 @@
         "engine/tests/test_modules/effects/compound/yoshiko_edge_cases_test.rs",
         "engine/tests/test_modules/effects/compound/yoshiko_filter_test.rs",
         "engine/tests/test_modules/effects/conditional/remaining_comprehensive_edge_test.rs",
-        "engine/tests/test_modules/effects/deploy/qa_new_tests202.rs",
+        "engine/tests/test_modules/effects/deploy/paid_energy_same_name_debut_chain_q200_q201_q202_test.rs",
         "engine/tests/test_modules/effects/deploy/s_bp3_006_cost_ref_test.rs",
         "engine/tests/test_modules/effects/gain/blades/l0_gap_livestart2_test.rs",
         "engine/tests/test_modules/effects/look_select/reveal_to_hand/mirai_ticket_test.rs",
@@ -16406,7 +16406,7 @@
       "covering_files": [
         "engine/tests/test_modules/effects/compound/yoshiko_center_ability_test.rs",
         "engine/tests/test_modules/effects/compound/yoshiko_edge_cases_test.rs",
-        "engine/tests/test_modules/effects/deploy/qa_new_tests202.rs",
+        "engine/tests/test_modules/effects/deploy/paid_energy_same_name_debut_chain_q200_q201_q202_test.rs",
         "engine/tests/test_modules/integration/hard_abilities_tier_test.rs",
         "engine/tests/test_modules/jidou/yell/daisuki_and_dia_test.rs",
         "engine/tests/test_modules/jidou/yell/daisuki_test.rs",
@@ -17597,7 +17597,7 @@
         "engine/tests/test_modules/effects/compound/heart_override_test.rs",
         "engine/tests/test_modules/effects/draw/flat/b9_more_test.rs",
         "engine/tests/test_modules/effects/recover/to_hand/bring_love_test.rs",
-        "engine/tests/test_modules/effects/score/qa_new_tests253.rs"
+        "engine/tests/test_modules/effects/score/live_success_remaining_yell_live_score_q253_test.rs"
       ],
       "covering_tests": [
         "ab1_different_group_moved_to_hand",
@@ -17662,7 +17662,7 @@
         "engine/tests/test_modules/effects/compound/heart_override_test.rs",
         "engine/tests/test_modules/effects/draw/flat/b9_more_test.rs",
         "engine/tests/test_modules/effects/recover/to_hand/bring_love_test.rs",
-        "engine/tests/test_modules/effects/score/qa_new_tests253.rs"
+        "engine/tests/test_modules/effects/score/live_success_remaining_yell_live_score_q253_test.rs"
       ],
       "covering_tests": [
         "ab1_different_group_moved_to_hand",
@@ -22215,7 +22215,7 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/effects/deploy/ayumu_pb1_test.rs",
-        "engine/tests/test_modules/effects/deploy/qa_new_tests202.rs"
+        "engine/tests/test_modules/effects/deploy/paid_energy_same_name_debut_chain_q200_q201_q202_test.rs"
       ],
       "covering_tests": [
         "ayumu_pb1_q199_no_baton_touch_after_effect_placement",
@@ -22367,7 +22367,7 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/effects/deploy/n_pb1_017_miyashita_test.rs",
-        "engine/tests/test_modules/effects/deploy/qa_new_tests202.rs"
+        "engine/tests/test_modules/effects/deploy/paid_energy_same_name_debut_chain_q200_q201_q202_test.rs"
       ],
       "covering_tests": [
         "miyashita_insufficient_energy_cannot_play",
@@ -22586,7 +22586,7 @@
       "has_choice": true,
       "has_negative": false,
       "covering_files": [
-        "engine/tests/test_modules/effects/deploy/qa_new_tests202.rs"
+        "engine/tests/test_modules/effects/deploy/paid_energy_same_name_debut_chain_q200_q201_q202_test.rs"
       ],
       "covering_tests": [
         "paid_energy_same_name_deploy_declined_discard_leaves_opponents_active_q201",
@@ -25365,7 +25365,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/cost_mod/qa_new_tests254.rs",
+        "engine/tests/test_modules/effects/compound/live_start_success_count_score_and_required_hearts_q254_test.rs",
         "engine/tests/test_modules/integration/parser_issues_e2e_test.rs"
       ],
       "covering_tests": [
@@ -25396,9 +25396,9 @@
         "issue7_hajimari_set_required_hearts",
         "issue9_izumi_debut_draw_2_discard_1",
         "issue9_izumi_debut_empty_hand",
+        "live_start_empty_success_zone_preserves_base_required_hearts_q254",
         "live_start_one_success_card_applies_no_score_or_required_hearts_q254",
-        "live_start_success_threshold_sets_required_hearts_distinct_from_base_q254",
-        "live_start_success_threshold_sets_required_hearts_with_high_heart_stage_q254"
+        "live_start_success_threshold_sets_required_hearts_distinct_from_base_q254"
       ],
       "covering_test_count": 34,
       "is_null": false,
@@ -28724,8 +28724,8 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/effects/compound/ginko_baton_touch_hasu_search_test.rs",
-        "engine/tests/test_modules/effects/conditional/qa_new_tests256.rs",
-        "engine/tests/test_modules/effects/conditional/qa_new_tests257.rs",
+        "engine/tests/test_modules/effects/conditional/debut_reveal_success_zone_replacement_q256_test.rs",
+        "engine/tests/test_modules/effects/conditional/live_phase_success_zone_replacement_q257_test.rs",
         "engine/tests/test_modules/effects/cost_mod/bp7_tang_keke_cost_test.rs",
         "engine/tests/test_modules/effects/draw/flat/live_success_compare_revealed_draw_test.rs",
         "engine/tests/test_modules/effects/recover/to_hand/sunny_test.rs",
@@ -28747,8 +28747,8 @@
         "hanaho_play_no_baton_touch_queue_stays_empty",
         "hanaho_played_to_stage_no_baton_touch_does_not_trigger",
         "hanamaru_bp3_016_success_zone_cost_increase_constant_parsed",
-        "live_phase_crossroads_replacement_no_targets",
         "live_phase_declined_replacement_places_original_in_success_zone",
+        "live_phase_no_valid_replacement_places_original_in_success_zone",
         "live_phase_success_zone_replacement_filters_multiple_waitroom_targets",
         "live_phase_success_zone_replacement_preserves_target_identity_pl_bp6_022_l",
         "live_phase_success_zone_replacement_routes_choice_to_player_one",
@@ -32813,8 +32813,8 @@
       "covering_files": [
         "engine/tests/test_modules/effects/compound/maki_pb1_006_debut_test.rs",
         "engine/tests/test_modules/effects/compound/tsunagaru_connect_test.rs",
-        "engine/tests/test_modules/effects/conditional/qa_new_tests256.rs",
-        "engine/tests/test_modules/effects/conditional/qa_new_tests257.rs",
+        "engine/tests/test_modules/effects/conditional/debut_reveal_success_zone_replacement_q256_test.rs",
+        "engine/tests/test_modules/effects/conditional/live_phase_success_zone_replacement_q257_test.rs",
         "engine/tests/test_modules/effects/gain/blades/combined_success_zone_constant_blade_test.rs",
         "engine/tests/test_modules/effects/gain/hearts/success_score_sum_constant_heart_test.rs",
         "engine/tests/test_modules/effects/recover/to_hand/pl_hs_bp1_003_test.rs",
@@ -32830,8 +32830,8 @@
         "debut_reveal_success_zone_replacement_preserves_target_identity_pl_bp6_022_l",
         "duplicate_names_fails_distinct_condition",
         "empty_area_fails_all_areas_condition",
-        "live_phase_crossroads_replacement_no_targets",
         "live_phase_declined_replacement_places_original_in_success_zone",
+        "live_phase_no_valid_replacement_places_original_in_success_zone",
         "live_phase_success_zone_replacement_filters_multiple_waitroom_targets",
         "live_phase_success_zone_replacement_preserves_target_identity_pl_bp6_022_l",
         "live_phase_success_zone_replacement_routes_choice_to_player_one",
@@ -40045,10 +40045,13 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/effects/compound/edelnote_test.rs",
-        "engine/tests/test_modules/effects/recover/to_hand/qa_new_tests209.rs"
+        "engine/tests/test_modules/effects/recover/to_hand/discard_cost_group_live_recovery_q209_test.rs"
       ],
       "covering_tests": [
+        "activation_energy_and_discard_recovers_preexisting_nijigasaki_live_q209",
         "activation_energy_and_discard_recovers_same_nijigasaki_live_q209",
+        "activation_energy_and_discard_without_nijigasaki_live_recovers_nothing_q209",
+        "activation_live_recovery_once_per_turn_blocks_second_use_q209",
         "debut_declined_discard_two_preserves_hand_count_q209",
         "debut_discard_two_recovers_preexisting_edelnote_live_q209",
         "debut_discard_two_recovers_same_edelnote_live_q209",
@@ -40059,10 +40062,7 @@
         "edelnote_single_member",
         "edelnote_three_members_two_same_name",
         "edelnote_two_members_different_names",
-        "edelnote_two_same_name",
-        "q209_kasumi_no_niji_in_discard_skips",
-        "q209_kasumi_retrieve_different_niji_live",
-        "q209_kasumi_use_limit_blocks_second"
+        "edelnote_two_same_name"
       ],
       "covering_test_count": 15,
       "is_null": false,
@@ -40485,7 +40485,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/conditional/qa_new_tests257.rs",
+        "engine/tests/test_modules/effects/conditional/live_phase_success_zone_replacement_q257_test.rs",
         "engine/tests/test_modules/effects/cost_mod/modify_required_hearts_13key_test.rs"
       ],
       "covering_tests": [
@@ -40493,8 +40493,8 @@
         "as_long_as_expiration_on_zone_exit",
         "debut_reveal_success_zone_replacement_preserves_target_identity_pl_bp6_022_l",
         "high_score_mus_live_gets_heart_reduction",
-        "live_phase_crossroads_replacement_no_targets",
         "live_phase_declined_replacement_places_original_in_success_zone",
+        "live_phase_no_valid_replacement_places_original_in_success_zone",
         "live_phase_success_zone_replacement_filters_multiple_waitroom_targets",
         "live_phase_success_zone_replacement_preserves_target_identity_pl_bp6_022_l",
         "live_phase_success_zone_replacement_routes_choice_to_player_one",
@@ -40570,14 +40570,14 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/conditional/qa_new_tests256.rs",
-        "engine/tests/test_modules/effects/conditional/qa_new_tests257.rs"
+        "engine/tests/test_modules/effects/conditional/debut_reveal_success_zone_replacement_q256_test.rs",
+        "engine/tests/test_modules/effects/conditional/live_phase_success_zone_replacement_q257_test.rs"
       ],
       "covering_tests": [
         "debut_reveal_success_zone_placement_replaces_with_waitroom_live_q256",
         "debut_reveal_success_zone_replacement_preserves_target_identity_pl_bp6_022_l",
-        "live_phase_crossroads_replacement_no_targets",
         "live_phase_declined_replacement_places_original_in_success_zone",
+        "live_phase_no_valid_replacement_places_original_in_success_zone",
         "live_phase_success_zone_replacement_filters_multiple_waitroom_targets",
         "live_phase_success_zone_replacement_preserves_target_identity_pl_bp6_022_l",
         "live_phase_success_zone_replacement_routes_choice_to_player_one",
@@ -40968,7 +40968,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/score/qa_new_tests253.rs"
+        "engine/tests/test_modules/effects/score/live_success_remaining_yell_live_score_q253_test.rs"
       ],
       "covering_tests": [
         "live_success_recovery_leaves_revealed_live_for_one_score_modifier_q253",

@@ -6,7 +6,7 @@ use rabuka_engine::zones::MemberArea;
 /// own constant replacement ability fire to place a μ's live card from waitroom instead?
 /// Answer: Yes.
 #[test]
-fn q256_maki_reveal_crossroads_replacement() {
+fn debut_reveal_success_zone_placement_replaces_with_waitroom_live_q256() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
@@ -37,10 +37,7 @@ fn q256_maki_reveal_crossroads_replacement() {
 
     // Step 1: Optional reveal cost — observed: SelectCard zone=hand
     // count=1 allow_skip=true; crossroads is at hand index 0.
-    assert!(
-        game.has_pending_choice(),
-        "reveal-cost prompt expected"
-    );
+    assert!(game.has_pending_choice(), "reveal-cost prompt expected");
     assert_eq!(
         game.pending_choice_type().as_deref(),
         Some("SelectCard"),

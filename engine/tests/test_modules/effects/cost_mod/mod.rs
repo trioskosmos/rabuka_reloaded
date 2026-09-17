@@ -17,7 +17,6 @@ pub mod modify_required_hearts_13key_test;
 pub mod modify_required_hearts_exclude_heart_test;
 pub mod modify_required_hearts_global_test;
 pub mod pl_s_bp5_010_test;
-pub mod qa_new_tests254;
 pub mod success_zone_group_pl_n_sd2_003_sd2_test;
 pub mod umi_q228_test;
 pub mod wien_cost_mod_test;

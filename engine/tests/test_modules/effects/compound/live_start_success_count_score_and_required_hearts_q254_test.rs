@@ -25,7 +25,7 @@ fn fill_decks(game: &mut TestGame) {
 /// With 2+ cards in success_live_card_zone, the ability fires automatically
 /// with no skip/optional choice offered to the player.
 #[test]
-fn q254_mandatory_no_skip_when_condition_met() {
+fn live_start_two_success_cards_apply_score_and_required_hearts_q254() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let live_card = game.id("PL!SP-sd2-023-SD2");
@@ -84,7 +84,7 @@ fn q254_mandatory_no_skip_when_condition_met() {
 /// Threshold boundary: exactly 1 card in success zone → condition NOT met,
 /// no modifiers applied.
 #[test]
-fn q254_one_card_no_effect() {
+fn live_start_one_success_card_applies_no_score_or_required_hearts_q254() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let live_card = game.id("PL!SP-sd2-023-SD2");
@@ -143,7 +143,7 @@ fn q254_one_card_no_effect() {
 
 /// Threshold boundary: 0 cards in success zone → no effect.
 #[test]
-fn q254_zero_cards_no_effect() {
+fn live_start_zero_success_cards_apply_no_score_or_required_hearts_q254() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let live_card = game.id("PL!SP-sd2-023-SD2");
@@ -192,7 +192,7 @@ fn q254_zero_cards_no_effect() {
 
 /// 3+ cards in success zone → condition met, ability triggers (≥2 operator).
 #[test]
-fn q254_three_cards_triggers() {
+fn live_start_three_success_cards_apply_score_and_required_hearts_q254() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let live_card = game.id("PL!SP-sd2-023-SD2");
@@ -251,7 +251,7 @@ fn q254_three_cards_triggers() {
 /// (H02×3 + H03×3 + H06×3 + H00×3 = 12). Proves player cannot opt out
 /// of the harder modified requirement.
 #[test]
-fn q254_modified_requirement_overrides_base_with_stage() {
+fn live_start_success_threshold_sets_required_hearts_distinct_from_base_q254() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let live_card = game.id("PL!SP-sd2-023-SD2");
@@ -314,7 +314,7 @@ fn q254_modified_requirement_overrides_base_with_stage() {
 /// requirement (12 hearts) IS met. Demonstrates the live can succeed
 /// under the modified requirement.
 #[test]
-fn q254_modified_requirement_met_with_high_heart_stage() {
+fn live_start_success_threshold_sets_required_hearts_with_high_heart_stage_q254() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let live_card = game.id("PL!SP-sd2-023-SD2");
@@ -371,7 +371,7 @@ fn q254_modified_requirement_met_with_high_heart_stage() {
 /// Without the condition (0 success zone cards), the base requirement applies.
 /// Same 3-member stage providing 4 hearts passes the base check.
 #[test]
-fn q254_no_condition_uses_base_requirement() {
+fn live_start_empty_success_zone_preserves_base_required_hearts_q254() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let live_card = game.id("PL!SP-sd2-023-SD2");

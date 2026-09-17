@@ -40,7 +40,7 @@ fn answer_prompts(game: &mut TestGame) {
 
 /// GALAXY with no Kanan — live card in yell → +1.
 #[test]
-fn q253_galaxy_gets_plus_one() {
+fn live_success_revealed_live_adds_one_to_final_score_q253() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let galaxy = game.id("PL!S-bp6-023-L");
@@ -83,7 +83,7 @@ fn q253_galaxy_gets_plus_one() {
 
 /// Kanan takes the only live card from yell → GALAXY gets nothing (Q253 ruling).
 #[test]
-fn q253_kanan_first_galaxy_gets_nothing() {
+fn live_success_recovery_removes_only_revealed_live_leaving_zero_score_modifier_q253() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let galaxy = game.id("PL!S-bp6-023-L");
@@ -145,7 +145,7 @@ fn q253_kanan_first_galaxy_gets_nothing() {
 
 /// Two live cards in yell — Kanan takes one, GALAXY still has one → +1.
 #[test]
-fn q253_both_succeed_two_live_cards() {
+fn live_success_recovery_leaves_revealed_live_for_one_score_modifier_q253() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let galaxy = game.id("PL!S-bp6-023-L");

@@ -24,7 +24,7 @@ use rabuka_engine::zones::MemberArea;
 /// Play the deployer, pay its optional 2E, deploy the SAME-NAME low-cost
 /// target from hand, and place it into the first offered area.
 /// Hard-asserts every prompt along the way.
-fn deploy_target(
+fn pay_energy_deploy_same_name_target(
     game: &mut TestGame,
     deployer_no: &str,
     target_no: &str,
@@ -59,8 +59,7 @@ fn deploy_target(
     // Observed: SelectTarget pay_optional_cost gate is offered.
     match game.get_pending_choice() {
         Choice::SelectTarget { target: t, .. }
-            if t == "pay_optional_cost:skip_optional_cost"
-                || t == "conditional_optional" =>
+            if t == "pay_optional_cost:skip_optional_cost" || t == "conditional_optional" =>
         {
             game.select_option(1);
         }
@@ -81,10 +80,7 @@ fn deploy_target(
         "position choice for the deployed member expected"
     );
     assert!(
-        matches!(
-            game.get_pending_choice(),
-            Choice::SelectPosition { .. }
-        ),
+        matches!(game.get_pending_choice(), Choice::SelectPosition { .. }),
         "expected SelectPosition prompt"
     );
     game.select_generated(0);
@@ -113,7 +109,7 @@ fn deploy_target(
 
 // ── Q200: 上原歩夢 deploys 歩夢 whose MANDATORY debut draws 1 / discards 1 ──
 #[test]
-fn q200_uehara_deploy_triggers_mandatory_draw_discard() {
+fn paid_energy_same_name_deploy_triggers_mandatory_draw_discard_q200() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
@@ -124,7 +120,8 @@ fn q200_uehara_deploy_triggers_mandatory_draw_discard() {
     // Deploy. The deployed 歩夢's MANDATORY debut (draw 1, discard 1)
     // fires inside deploy_target; its discard is driven by identity below
     // via the leftover prompt (or auto-resolves on a single candidate).
-    let (target, spare) = deploy_target(&mut game, "PL!N-pb1-013-R", "PL!N-sd1-013-SD");
+    let (target, spare) =
+        pay_energy_deploy_same_name_target(&mut game, "PL!N-pb1-013-R", "PL!N-sd1-013-SD");
     let mut guard = 0;
     while game.has_pending_choice() && guard < 10 {
         guard += 1;
@@ -164,7 +161,7 @@ fn q200_uehara_deploy_triggers_mandatory_draw_discard() {
 
 // ── Q201: 宮下愛 deploys 愛 whose OPTIONAL debut waits 2 opponent ≤4s ──
 #[test]
-fn q201_miyashita_deploy_triggers_opponent_wait() {
+fn paid_energy_same_name_deploy_discard_cost_waits_two_opponents_q201() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
@@ -173,13 +170,16 @@ fn q201_miyashita_deploy_triggers_opponent_wait() {
     let opp_b = game.new_id("PL!-sd1-010-SD"); // cost 4, distinct copy
     game.state.player2.stage.stage = [opp_a, opp_b, -1];
 
-    let (target, spare) = deploy_target(&mut game, "PL!N-pb1-017-R", "PL!N-bp4-005-R");
+    let (target, spare) =
+        pay_energy_deploy_same_name_target(&mut game, "PL!N-pb1-017-R", "PL!N-bp4-005-R");
 
     // Deployed 愛's OPTIONAL debut: pay 1 hand discard → wait up to 2
     // opponent cost≤4 members. It presents as a direct skippable
     // SelectCard over the hand — PAY with the spare.
     match game.get_pending_choice() {
-        Choice::SelectCard { zone, allow_skip, .. } if zone == "hand" => {
+        Choice::SelectCard {
+            zone, allow_skip, ..
+        } if zone == "hand" => {
             assert!(*allow_skip, "cost is optional");
             let spos = game
                 .state
@@ -207,7 +207,14 @@ fn q201_miyashita_deploy_triggers_opponent_wait() {
         guard += 1;
         match game.get_pending_choice() {
             Choice::SelectCard { zone, .. } if zone == "stage" => {
-                let n = game.state.player1.stage.stage.iter().filter(|&&c| c != -1).count();
+                let n = game
+                    .state
+                    .player1
+                    .stage
+                    .stage
+                    .iter()
+                    .filter(|&&c| c != -1)
+                    .count();
                 let idxs: Vec<usize> = (0..n).collect();
                 game.select_indices(&idxs);
             }
@@ -232,7 +239,7 @@ fn q201_miyashita_deploy_triggers_opponent_wait() {
 /// Negative control for Q201: DECLINING the deployed debut's optional cost
 /// leaves the opponent board untouched.
 #[test]
-fn q201_miyashita_decline_leaves_opponents_active() {
+fn paid_energy_same_name_deploy_declined_discard_leaves_opponents_active_q201() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
@@ -240,11 +247,14 @@ fn q201_miyashita_decline_leaves_opponents_active() {
     let opp_b = game.new_id("PL!-sd1-010-SD"); // cost 4, distinct copy
     game.state.player2.stage.stage = [opp_a, opp_b, -1];
 
-    let (target, _spare) = deploy_target(&mut game, "PL!N-pb1-017-R", "PL!N-bp4-005-R");
+    let (target, _spare) =
+        pay_energy_deploy_same_name_target(&mut game, "PL!N-pb1-017-R", "PL!N-bp4-005-R");
 
     // DECLINE the deployed debut's optional cost (empty selection = skip).
     match game.get_pending_choice() {
-        Choice::SelectCard { zone, allow_skip, .. } if zone == "hand" => {
+        Choice::SelectCard {
+            zone, allow_skip, ..
+        } if zone == "hand" => {
             assert!(*allow_skip, "cost is optional");
             game.select_indices(&[]);
         }
@@ -258,7 +268,7 @@ fn q201_miyashita_decline_leaves_opponents_active() {
 
 // ── Q202: ミア・テイラー deploys ミア(PR) whose OPTIONAL debut looks at top 3 ──
 #[test]
-fn q202_mia_deploy_look_top3_adds_one_rest_to_waitroom() {
+fn paid_energy_same_name_deploy_discard_looks_three_takes_one_discards_rest_q202() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
@@ -271,13 +281,16 @@ fn q202_mia_deploy_look_top3_adds_one_rest_to_waitroom() {
     crate::helpers::put_on_deck_top(&mut game, 0, l2);
     crate::helpers::put_on_deck_top(&mut game, 0, l1);
 
-    let (target, spare) = deploy_target(&mut game, "PL!N-pb1-023-R", "PL!N-PR-013-PR");
+    let (target, spare) =
+        pay_energy_deploy_same_name_target(&mut game, "PL!N-pb1-023-R", "PL!N-PR-013-PR");
 
     // Deployed ミア's OPTIONAL debut: pay 1 discard → look top 3 →
     // add 1, rest to waitroom. Direct skippable hand SelectCard — PAY
     // with the spare.
     match game.get_pending_choice() {
-        Choice::SelectCard { zone, allow_skip, .. } if zone == "hand" => {
+        Choice::SelectCard {
+            zone, allow_skip, ..
+        } if zone == "hand" => {
             assert!(*allow_skip, "cost is optional");
             let spos = game
                 .state
@@ -297,7 +310,9 @@ fn q202_mia_deploy_look_top3_adds_one_rest_to_waitroom() {
     while game.has_pending_choice() && guard < 10 {
         guard += 1;
         match game.get_pending_choice() {
-            Choice::SelectCard { count, allow_skip, .. } => {
+            Choice::SelectCard {
+                count, allow_skip, ..
+            } => {
                 if *count >= 1 || !*allow_skip {
                     game.select_indices(&[0]); // top of looked set
                     added = true;

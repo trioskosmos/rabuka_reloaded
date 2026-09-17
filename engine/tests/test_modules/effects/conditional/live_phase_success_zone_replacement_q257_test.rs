@@ -11,7 +11,7 @@ use rabuka_engine::zones::MemberArea;
 /// which creates a dummy queue entry — unlike the ability/resolver path used
 /// by Q256's Maki-debut scenario.
 #[test]
-fn live_phase_crossroads_replacement_p1() {
+fn live_phase_success_zone_replacement_routes_choice_to_player_one() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
@@ -66,7 +66,7 @@ fn live_phase_crossroads_replacement_p1() {
 
 /// Same scenario but the player DECLINES the replacement (skip).
 #[test]
-fn live_phase_crossroads_replacement_skip_p1() {
+fn live_phase_declined_replacement_places_original_in_success_zone() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
@@ -105,7 +105,7 @@ fn live_phase_crossroads_replacement_skip_p1() {
 /// Live phase replacement — Player 2 scenario.
 /// Verifies the choice identity and player_id resolution work for P2.
 #[test]
-fn live_phase_crossroads_replacement_p2() {
+fn live_phase_success_zone_replacement_routes_choice_to_player_two() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
@@ -154,7 +154,7 @@ fn live_phase_crossroads_replacement_p2() {
 /// live card in discard.  This was the specific card that triggered the
 /// "不明なカード" display bug — ensure it resolves correctly.
 #[test]
-fn live_phase_crossroads_replacement_with_dreamin() {
+fn live_phase_success_zone_replacement_preserves_target_identity_pl_bp6_022_l() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
@@ -194,7 +194,7 @@ fn live_phase_crossroads_replacement_with_dreamin() {
 /// Live phase replacement with MULTIPLE μ's live cards in discard.
 /// The player should still be able to pick one.
 #[test]
-fn live_phase_crossroads_replacement_multiple_targets() {
+fn live_phase_success_zone_replacement_filters_multiple_waitroom_targets() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
@@ -245,7 +245,7 @@ fn live_phase_crossroads_replacement_multiple_targets() {
 /// Same as Q256 (Maki-debut path / move_cards path) but using Dreamin' Go! Go!!
 /// as the μ's live card to catch any issues in the resolver path too.
 #[test]
-fn maki_debut_crossroads_replacement_with_dreamin() {
+fn debut_reveal_success_zone_replacement_preserves_target_identity_pl_bp6_022_l() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
@@ -325,7 +325,7 @@ fn maki_debut_crossroads_replacement_with_dreamin() {
 /// No valid μ's live targets in discard — replacement should NOT create a choice.
 /// The card should be placed in the success zone directly.
 #[test]
-fn live_phase_crossroads_replacement_no_targets() {
+fn live_phase_no_valid_replacement_places_original_in_success_zone() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
