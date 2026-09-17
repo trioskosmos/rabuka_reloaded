@@ -12,10 +12,8 @@ use rabuka_engine::ability::types::Choice;
 use rabuka_engine::zones::MemberArea;
 
 /// Assert the pending prompt is Toubatsu's jidou 3-option (blades / wait /
-/// draw), take the blade bullet, and assert +2 blade lands. This pins the
-/// choice identity, not just pendency: the 登場 prompt or any unrelated
-/// choice fails the option match.
-fn take_blades_option(game: &mut TestGame, toubatsu: i16) {
+/// draw). Returns after asserting identity; the caller takes an option.
+fn assert_toubatsu_3option(game: &mut TestGame) {
     match game.get_pending_choice().clone() {
         Choice::SelectTarget { target, description, .. } => {
             assert_eq!(
@@ -31,12 +29,101 @@ fn take_blades_option(game: &mut TestGame, toubatsu: i16) {
         }
         other => panic!("expected jidou 3-option prompt, got {:?}", other),
     }
+}
+
+/// Take the blade bullet, and assert +2 blade lands.
+fn take_blades_option(game: &mut TestGame, toubatsu: i16) {
+    assert_toubatsu_3option(game);
     game.select_choice_option(0);
     scan_autos_both(game);
     assert_eq!(
         game.state.mods.get_blade_modifier(toubatsu),
         2,
         "blade bullet grants +2 blade until live end"
+    );
+}
+
+/// Drive Toubatsu's center→area auto via the synthetic move (mirrors the
+/// q263 test) with an opponent ≤2-blade member staged. Returns the game
+/// with the 3-option prompt pending.
+fn trigger_toubatsu_with_opponent_member() -> (TestGame, i16, i16) {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let toubatsu = game.id("PL!SP-bp2-011-R");
+    let filler = game.id("PL!-sd1-010-SD");
+    for _ in 0..20 {
+        game.state.player1.main_deck.cards.push(filler);
+        game.state.player2.main_deck.cards.push(filler);
+    }
+    let opp = game.new_id("PL!-sd1-010-SD"); // cost 4, blade 1 — wait-eligible
+    game.state.player2.stage.stage[1] = opp;
+
+    game.state.player1.stage.stage[1] = toubatsu;
+    game.state.player1.stage.stage[1] = -1;
+    game.state.player1.stage.stage[0] = toubatsu;
+    game.state
+        .position_change_events
+        .push(rabuka_engine::types::PositionChangeEvent {
+            moved_card_id: toubatsu,
+            old_position: 1u8,
+            new_position: 0u8,
+            cause_card_id: None,
+            cause_player_id: "p1".to_string(),
+            effect_only: false,
+        });
+    game.state.record_card_movement(toubatsu);
+    game.state
+        .push_movement_event(toubatsu, "stage", "stage", None, "p1", false);
+    game.state.position_change_occurred_this_turn = true;
+
+    let pid = game.state.player1.id.clone();
+    rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(&mut game.state, &pid);
+    game.state.process_pending_auto_abilities(&pid);
+
+    assert!(
+        game.has_pending_choice(),
+        "auto ability should create a choice on center→area move"
+    );
+    (game, toubatsu, opp)
+}
+
+/// Q263 option 1 (wait bullet): take it, target the opponent ≤2-blade
+/// member, assert it waits and nothing else moves.
+#[test]
+fn toubatsu_wait_option_waits_opponent_member() {
+    let (mut game, _toubatsu, opp) = trigger_toubatsu_with_opponent_member();
+    assert_toubatsu_3option(&mut game);
+    game.select_choice_option(1);
+    assert!(
+        game.has_pending_choice(),
+        "wait bullet must prompt for the member to wait"
+    );
+    game.assert_select_card("stage", 1, false);
+    game.select_indices(&[0]);
+    scan_autos_both(&mut game);
+    assert!(!game.has_pending_choice());
+    assert_eq!(
+        game.state.mods.get_orientation_modifier(opp).as_deref(),
+        Some("wait"),
+        "opponent ≤2-blade member must be waited"
+    );
+}
+
+/// Q263 option 2 (draw bullet): take it, assert exactly one card drawn and
+/// no further prompts.
+#[test]
+fn toubatsu_draw_option_draws_one() {
+    let (mut game, _toubatsu, _opp) = trigger_toubatsu_with_opponent_member();
+    let hand_before = game.state.player1.hand.cards.len();
+    assert_toubatsu_3option(&mut game);
+    game.select_choice_option(2);
+    scan_autos_both(&mut game);
+    assert!(!game.has_pending_choice());
+    assert_eq!(
+        game.state.player1.hand.cards.len(),
+        hand_before + 1,
+        "draw bullet must draw exactly 1 card"
     );
 }
 
