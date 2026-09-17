@@ -39,10 +39,7 @@ fn private_wars_activates_waited_member_and_grants_only_that_member_one_blade() 
     let (mut game, live, arise, ally) = setup();
     fire(&mut game, live);
     game.select_choice_option(0);
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
-    assert!(!game.has_pending_choice());
+    game.drain_choices_strict(&[], &[]);
     assert_eq!(game.state.mods.get_orientation_modifier(ally).as_deref(), Some("active"));
     assert_eq!(game.state.mods.get_blade_modifier(ally), 1);
     assert_eq!(game.state.mods.get_blade_modifier(arise), 0);
@@ -59,10 +56,7 @@ fn private_wars_waits_original_three_blades_but_not_four() {
     assert_eq!(game.db.get_card(high).unwrap().blade, 4);
     fire(&mut game, live);
     game.select_choice_option(1);
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
-    assert!(!game.has_pending_choice());
+    game.drain_choices_strict(&[], &[]);
     assert_eq!(game.state.mods.get_orientation_modifier(low).as_deref(), Some("wait"));
     assert_ne!(game.state.mods.get_orientation_modifier(high).as_deref(), Some("wait"));
     assert_eq!(game.state.mods.get_orientation_modifier(ally).as_deref(), Some("wait"));

@@ -35,10 +35,12 @@ impl super::TurnEngine {
             for area in areas {
                 if let Some(card_id) = player.stage.get_area(area) {
                     if let Some(card) = game_state.card_database.get_card(card_id) {
-                        log::debug!(
-                            "[DEBUT_TRIG_DBG] stage card_id={} card_no={} card_no_clone={}",
-                            card_id,
+                        log::trace!(
+                            "[DEBUT_SCAN] player={} source={} ({}, id={}) requested={}",
+                            player_id,
+                            card.name,
                             card.card_no,
+                            card_id,
                             card_no_clone
                         );
                         if card.card_no.as_ref() == card_no_clone {
@@ -47,10 +49,14 @@ impl super::TurnEngine {
                                 let trigger_match =
                                     ability.has_trigger(crate::triggers::TriggerKind::Debut);
                                 log::debug!(
-                                    "[DEBUT_TRIG_DBG]   ability={} triggers={:?} match={}",
-                                    ability.full_text,
-                                    ability.triggers,
-                                    trigger_match
+                                    "[TRIGGER_MATCH] player={} source={} ({}, id={}) ability={} trigger=Debut match={} triggers={:?}",
+                                    player_id,
+                                    card.name,
+                                    card.card_no,
+                                    card_id,
+                                    ability_index,
+                                    trigger_match,
+                                    ability.triggers
                                 );
                                 if trigger_match {
                                     // Position gate: skip if activation_position doesn't match this area

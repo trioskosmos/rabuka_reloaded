@@ -320,12 +320,16 @@ impl AbilityResolver {
         trigger: Option<&str>,
         target_card: Option<i16>,
     ) -> Result<(), String> {
-        // Store the gained ability for tracking purposes
-        if let Some(card_id) = gs.activating_card {
+        if let Some(card_id) = target_card {
             gs.gained_abilities
                 .entry(card_id)
                 .or_default()
                 .push(ability_text.to_string());
+            log::debug!(
+                "[GAINED_ABILITY] tracked recipient={} source={:?}",
+                card_id,
+                gs.activating_card
+            );
         }
 
         // Register the gained ability as a REAL synthetic ability so the

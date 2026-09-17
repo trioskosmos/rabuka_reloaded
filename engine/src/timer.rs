@@ -5,6 +5,7 @@ use alloc::{
     vec::Vec,
 };
 use std::sync::Mutex;
+#[cfg(feature = "profiling")]
 use std::time::Instant;
 
 type TimerKey = Vec<&'static str>;
@@ -24,60 +25,69 @@ fn get_timers() -> std::sync::MutexGuard<'static, Option<TimerMap>> {
 
 pub struct Timer {
     label: &'static str,
+    #[cfg(feature = "profiling")]
     start: Instant,
 }
 
 impl Timer {
     pub fn start(label: &'static str) -> Self {
-        if !cfg!(feature = "profiling") {
-            return Timer {
+        #[cfg(not(feature = "profiling"))]
+        {
+            // Profiling off: no clock read, no stack push, no mutex. The
+            // struct is zero-sized-ish and Drop is a no-op — hot paths pay
+            // nothing for Timer construction.
+            return Timer { label };
+        }
+        #[cfg(feature = "profiling")]
+        {
+            if let Ok(mut stack) = CALL_STACK.lock() {
+                stack.push(label);
+            }
+            Timer {
                 label,
                 start: Instant::now(),
-            };
-        }
-        if let Ok(mut stack) = CALL_STACK.lock() {
-            stack.push(label);
-        }
-        Timer {
-            label,
-            start: Instant::now(),
+            }
         }
     }
 }
 
 impl Drop for Timer {
     fn drop(&mut self) {
-        if !cfg!(feature = "profiling") {
-            return;
+        #[cfg(not(feature = "profiling"))]
+        {
+            let _ = self.label;
         }
-        let elapsed = self.start.elapsed().as_nanos();
+        #[cfg(feature = "profiling")]
+        {
+            let elapsed = self.start.elapsed().as_nanos();
 
-        // Reconstruct the full call path (entire stack at this moment)
-        let call_path: Vec<&'static str> = if let Ok(stack) = CALL_STACK.lock() {
-            // Check that we're at the top of the stack
-            if stack.last() == Some(&self.label) {
-                stack.clone()
+            // Reconstruct the full call path (entire stack at this moment)
+            let call_path: Vec<&'static str> = if let Ok(stack) = CALL_STACK.lock() {
+                // Check that we're at the top of the stack
+                if stack.last() == Some(&self.label) {
+                    stack.clone()
+                } else {
+                    vec![self.label]
+                }
             } else {
                 vec![self.label]
-            }
-        } else {
-            vec![self.label]
-        };
+            };
 
-        // Remove ourselves from the call stack
-        if let Ok(mut stack) = CALL_STACK.lock() {
-            if stack.last() == Some(&self.label) {
-                stack.pop();
+            // Remove ourselves from the call stack
+            if let Ok(mut stack) = CALL_STACK.lock() {
+                if stack.last() == Some(&self.label) {
+                    stack.pop();
+                }
             }
-        }
 
-        // Record the time against the full call path
-        if !call_path.is_empty() {
-            let mut guard = get_timers();
-            if let Some(ref mut map) = *guard {
-                let entry = map.entry(call_path).or_insert((0, 0));
-                entry.0 += 1;
-                entry.1 += elapsed;
+            // Record the time against the full call path
+            if !call_path.is_empty() {
+                let mut guard = get_timers();
+                if let Some(ref mut map) = *guard {
+                    let entry = map.entry(call_path).or_insert((0, 0));
+                    entry.0 += 1;
+                    entry.1 += elapsed;
+                }
             }
         }
     }

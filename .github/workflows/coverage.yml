@@ -4,23 +4,29 @@ on:
   push:
     paths:
       - 'cards/abilities.json'
+      - 'cards/cards.json'
       - 'cards/test_inventory.py'
       - 'cards/ability_docs_scripts/**'
-      - 'engine/tests/**'
-      - 'engine/src/ability/**'
       - 'cards/ability_extraction/**'
       - 'cards/generate_condition_decoder.py'
+      - 'cards/generate_effect_decoder.py'
+      - 'engine/tests/**'
+      - 'engine/src/ability/**'
       - 'engine/src/core/card.rs'
+      - '.github/workflows/coverage.yml'
   pull_request:
     paths:
       - 'cards/abilities.json'
+      - 'cards/cards.json'
       - 'cards/test_inventory.py'
       - 'cards/ability_docs_scripts/**'
-      - 'engine/tests/**'
-      - 'engine/src/ability/**'
       - 'cards/ability_extraction/**'
       - 'cards/generate_condition_decoder.py'
+      - 'cards/generate_effect_decoder.py'
+      - 'engine/tests/**'
+      - 'engine/src/ability/**'
       - 'engine/src/core/card.rs'
+      - '.github/workflows/coverage.yml'
   workflow_dispatch:
 
 jobs:

@@ -521,12 +521,14 @@ impl AbilityResolver {
             // offer block. Only a genuinely different presentation is a new offer.
             let offered = gs.choice_offered_labels(choice);
             let sig = choice_offer_sig(&offered, choice.allow_skip());
-            if self.last_offered_sig.as_deref() != Some(sig.as_str()) {
+            let is_new_offer = self.last_offered_sig.as_deref() != Some(sig.as_str());
+            if is_new_offer {
                 gs.push_choice_offered(choice);
                 self.last_offered_sig = Some(sig);
             }
-            // Always-on debug: log every pending choice (ABILITY_DEBUG is set true in tests)
-            if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) {
+            if is_new_offer
+                && crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed)
+            {
                 match choice {
                     crate::ability::types::Choice::SelectCard {
                         zone,
@@ -990,7 +992,7 @@ impl AbilityResolver {
             .current_entry()
             .is_some_and(|e| e.optional_cost_result == Some(false));
         log::debug!(
-            "[KANAN_DEBUG] cost_was_skipped={} optional_cost_result={:?}",
+            "[COST] resolution gate: skipped={} optional_cost_result={:?}",
             cost_was_skipped,
             gs.ability_queue
                 .current_entry()

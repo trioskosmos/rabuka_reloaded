@@ -38,7 +38,8 @@ I've run 5 sub-agents analyzing different aspects of the codebase. Here are the 
 ---
 
 ### 5. **Cost/Energy System Gaps**
-- **`energy_condition` cost type**: validated but **no handler** in `pay_cost_inner` (cost.rs:1097)
+- ~~**`energy_condition` cost type**: validated but **no handler** in `pay_cost_inner` (cost.rs:1097)~~
+  RESOLVED: `ActionType::EnergyCondition` is dispatched in `pay_cost_inner` (cost.rs:964) and cost application (cost.rs:127).
 - **`execute_pay_energy` ignores `spawn_context.target`/`action_by`** (effects/misc.rs:3740, 3761)
 - **`execute_pay_energy_from_revealed` missing** entirely
 - **Hardcoded "self" in optional energy payment** (cost.rs:1160)
@@ -49,7 +50,7 @@ I've run 5 sub-agents analyzing different aspects of the codebase. Here are the 
 ### Priority Fixes (Impact Order)
 1. **Parser**: Add `「選び」` support + missing action types
 2. **ZoneId**: Add 11 missing variants + fix conversions
-3. **Cost**: Implement `energy_condition` handler + fix target resolution in `execute_pay_energy`
+3. **Cost**: Fix target resolution in `execute_pay_energy` (`energy_condition` handler already implemented, see above)
 4. **Conditions**: Add special zone resolution + propagate `selected_card_ids`
 5. **Hardcoded targets**: Audit 100+ locations for `spawn_context.target`/`action_by` usage
 

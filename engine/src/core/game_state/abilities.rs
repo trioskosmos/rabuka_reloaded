@@ -1316,13 +1316,6 @@ impl GameState {
             "player2" => "p2",
             other => other,
         };
-        if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) {
-            log::debug!(
-                "[QUEUE_DIAG] process_player_abilities player={} queue_len={}",
-                player_id,
-                self.ability_queue.len()
-            );
-        }
         let mut reprocess_counts: HashMap<(i16, usize), u8> = HashMap::default();
         let mut batch_rerun = true;
         while batch_rerun {

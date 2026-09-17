@@ -126,14 +126,14 @@ stream. The action names and field names remain JSON names.
 3. `populate_from_json()` reconstructs `EffectKind` and recursively populates
    nested effects and conditions.
 4. A draw-count normalization pass mirrors the text-loader behavior.
-5. If the direct path fails, `get_ability()` logs an error and falls back to
-   reconstructing a JSON value and calling `decode_like_json()`.
+5. There is no `decode_like_json()` fallback: `get_ability()` decodes directly
+   and returns `Err` on malformed data.
 
-Therefore the current bytecode path does reduce the shipped asset and avoids
-loading the complete `abilities.json` file, but it does **not** provide a
-serde-free, allocation-free, typed decoder. The fallback is also only logged;
-`AbilityRef::resolve()` converts a failed decode into `Ability::default()`, which
-can turn corrupt data into a silent no-op.
+The bytecode path reduces the shipped asset and avoids loading the complete
+`abilities.json` file, but it does **not** provide a serde-free,
+allocation-free, typed decoder. A failed decode is logged and converted to
+`Ability::default()` (`ability_store.rs` `AbilityRef::decode`), which can turn
+corrupt data into a silent no-op.
 
 ## Runtime resolution model
 
@@ -324,9 +324,11 @@ Do this before a broad refactor.
 - [x] Add parser validation that rejects unknown action/condition names, impossible
   field combinations, and effects that parse to an empty action list unless
   explicitly marked as null/custom.
-- [x] Change runtime decode APIs to return `Result<Ability, DecodeError>` with the
+- [ ] Change runtime decode APIs to return `Result<Ability, DecodeError>` with the
   ability index and byte range. Do not convert malformed data to a default
-  ability without an explicit compatibility mode.
+  ability without an explicit compatibility mode. (Still open:
+  `ability_store.rs` `AbilityRef::decode` logs and returns `Ability::default()`
+  on decode failure.)
 - [x] Keep `bytecode_deep_compare_test` as a required regeneration gate and add a
   test that every card reference resolves to a valid ability index.
 

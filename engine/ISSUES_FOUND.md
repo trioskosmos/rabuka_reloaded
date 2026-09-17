@@ -5,11 +5,12 @@ _Audited 2026-08-22 against the current tree. The previous list (2026-06-16) had
 
 ## Open
 
-### 1. Exit Code 1 on Successful Build/Test — UNVERIFIED
+### 1. Exit Code 1 on Successful Build/Test — NOT REPRODUCED
 - **Issue**: `cargo build/test/run` reportedly completed successfully but returned exit code 1,
   breaking CI.
-- **Status**: Not re-verified since the original report; no recent evidence of recurrence.
-  If CI fails mysteriously, check this first.
+- **Status**: Re-verified 2026-09-17: `cargo check --lib` and `cargo test --lib` both exit 0
+  (explicit `$LASTEXITCODE` capture) on the current tree. Keeping the note only as a
+  historical record; if CI fails mysteriously, re-check on the failing runner itself.
 
 ## Closed (verified fixed 2026-08-22)
 
@@ -24,4 +25,5 @@ _Audited 2026-08-22 against the current tree. The previous list (2026-06-16) had
 | 8 | Missing `Default` for `GameModifiers` | `src/core/game_modifiers.rs` | `impl Default` at game_modifiers.rs:120 |
 | 9 | `or_insert_with(Vec::new)` instead of `.or_default()` | `src/core/card_loader.rs` | Now uses `.or_default()` (lines ~133, ~159) |
 
-For refactor opportunities and verified-dead code, see [docs/REFACTOR_BACKLOG.md](../docs/REFACTOR_BACKLOG.md).
+For refactor opportunities, see the refactor notes in [docs/AUDITS.md](../docs/AUDITS.md)
+(a standalone REFACTOR_BACKLOG.md does not exist; the link previously pointed there and was dead).

@@ -126,12 +126,12 @@ impl super::resolver::AbilityResolver {
             }
         }
         // Feed the next repeat action + "Repeat?" prompt, one at a time.
-        log::debug!(
-            "[RPA_REPEAT] pending_repeat={} pending_choice={:?}",
-            self.pending_repeat_actions.len(),
-            self.pending_choice.is_some()
-        );
         if !self.pending_repeat_actions.is_empty() && self.pending_choice.is_none() {
+            log::debug!(
+                "[REPEAT] offering another iteration: source={:?} remaining_actions={}",
+                self.activating_card_id,
+                self.pending_repeat_actions.len()
+            );
             let next = self.pending_repeat_actions.remove(0);
             gs.ability_queue.set_pending_actions(vec![*next]);
             self.pending_choice = Some(crate::ability::types::repeat_prompt_choice());
@@ -190,7 +190,7 @@ impl super::resolver::AbilityResolver {
             (false, false, _) => Continuation::Immediate,
         };
         log::debug!(
-            "[FIN_DBG] looked={:?} sub_choice={} has_pending={} was_select_card={} cont={:?}",
+            "[CHOICE] continuation: looked={} sub_choice={} queued_actions={} select_card={} route={:?}",
             is_actual_looked_at_choice, sub_choice, has_pending, was_select_card, cont
         );
         match cont {
@@ -470,7 +470,7 @@ impl super::resolver::AbilityResolver {
         }
 
         log::debug!(
-            "[KANAN_DEBUG] check hand-cost block: zone={} is_hand={} has_cost={} effect_started={}",
+            "[COST] check hand-cost block: zone={} is_hand={} has_cost={} effect_started={}",
             zone,
             Zone::from_str(zone) == Some(Zone::Hand),
             gs.entry_cost().is_some(),
@@ -504,7 +504,7 @@ impl super::resolver::AbilityResolver {
                 .collect();
             if !new_card_ids.is_empty() {
                 log::debug!(
-                    "[KANAN_DEBUG] moving cards: count={} new_card_ids={:?}",
+                    "[COST] moving cards: count={} new_card_ids={:?}",
                     count,
                     new_card_ids
                 );
@@ -550,7 +550,7 @@ impl super::resolver::AbilityResolver {
             }
             if new_card_ids.is_empty() {
                 if !self.moved_cards.is_empty() {
-                    log::debug!("[KANAN_DEBUG] cost finalize: moved_cards={:?}, setting optional_cost_result=true", self.moved_cards);
+                    log::debug!("[COST] cost finalize: moved_cards={:?}, setting optional_cost_result=true", self.moved_cards);
                     gs.mods.last_cost_discard_count = self.moved_cards.len().u8_count();
                     gs.mods.last_cost_moved_card_ids = self.moved_cards.clone();
 gs.set_recently_moved_batch(self.moved_cards.clone(), Some("hand"));
@@ -559,7 +559,7 @@ gs.set_recently_moved_batch(self.moved_cards.clone(), Some("hand"));
                         entry.optional_cost_result = Some(true);
                     }
                 } else if allow_skip {
-                    log::debug!("[KANAN_DEBUG] cost finalize: NO moved cards, setting optional_cost_result=false");
+                    log::debug!("[COST] cost finalize: NO moved cards, setting optional_cost_result=false");
                     if let Some(entry) = gs.ability_queue.current_entry_mut() {
                         entry.cost_paid = true;
                         entry.optional_cost_result = Some(false);
@@ -686,7 +686,7 @@ gs.set_recently_moved_batch(self.moved_cards.clone(), Some("hand"));
                 .map(|c| c as usize)
                 .unwrap_or(usize::MAX);
             if count == 0 && allow_skip && self.moved_cards.len() < cost_max_cap {
-                log::debug!("[KANAN_DEBUG] any_number re-prompt: count={} allow_skip={} new_card_ids.len={} moved_cards={:?}", count, allow_skip, new_card_ids.len(), self.moved_cards);
+                log::debug!("[COST] any_number re-prompt: count={} allow_skip={} new_card_ids.len={} moved_cards={:?}", count, allow_skip, new_card_ids.len(), self.moved_cards);
                 let hand_now: Vec<i16> = {
                     let p = gs.resolve_target_player_mut(&target);
                     p.hand.cards.to_vec()

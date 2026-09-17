@@ -303,8 +303,13 @@ failures (stale artifacts, no code change needed for those two).
    print found. Focused runs: A 103, B 62, C 53, D 26 passed; A/B overlap
    on the 28-test under-member module, so these are not unique-test totals.
    Correct print identity does not establish branch or trigger coverage.
-   Follow-ups now being repaired: under-member zero/one-material tests,
-   real opponent-caused movement no-fire, and gained-effect expiry.
+    Verified follow-ups: under-member zero/one-material gameplay and exact
+    bonuses (28-test module passed); real opponent-caused movement no-fire
+    (6-test module passed); movement blade expiry through victory (3 passed).
+    Gained-total-score recipient/source baton controls passed (2 tests),
+    and LiveEnd expiry with/without a set live passed (2 tests). The no-live
+    expiry case was also rerun with `--exact` (1 passed). Aggregate verification
+    remains pending while the invalid source-leaving setup below is repaired.
    Still open: Special Color current-center condition in
    `ability_chain_combo_test.rs`, member incorrectly set as live in
    `cards_6_thru_13_test.rs`, and revealed-score-icon negative branch.

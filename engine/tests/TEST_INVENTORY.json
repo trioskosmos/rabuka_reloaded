@@ -1,6 +1,6 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-09-17T17:35:25.568742+00:00",
+  "generated_at": "2026-09-17T18:31:26.138947+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
@@ -395,13 +395,13 @@
         {
           "file": "engine/tests/test_modules/effects/score/chika_bp3_001_wait_self_activation_live_total_score_test.rs",
           "test": "wait_member_total_score_expires_at_live_end_even_without_setting_live",
-          "line": 105,
+          "line": 110,
           "detail": ""
         },
         {
           "file": "engine/tests/test_modules/effects/score/chika_bp3_001_wait_self_activation_live_total_score_test.rs",
           "test": "wait_member_total_score_persists_through_victory_and_expires_after_live",
-          "line": 100,
+          "line": 105,
           "detail": ""
         }
       ]
@@ -4517,12 +4517,18 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
+        "engine/tests/test_modules/effects/compound/s_pb1_002_riko_edge_test.rs",
         "engine/tests/test_modules/effects/compound/yoshiko_center_ability_test.rs",
         "engine/tests/test_modules/effects/compound/yoshiko_edge_cases_test.rs",
         "engine/tests/test_modules/effects/compound/yoshiko_filter_test.rs",
         "engine/tests/test_modules/effects/deploy/s_bp3_006_cost_ref_test.rs"
       ],
       "covering_tests": [
+        "declined_discard_total_score_is_lost_when_yoshiko_activation_discards_source",
+        "opponent_declines_eligible_live_discard_preserving_hand_and_granting_total_score",
+        "opponent_discards_live_to_waitroom_preventing_total_score_gain",
+        "opponent_empty_hand_grants_total_score_without_choice",
+        "opponent_without_live_keeps_members_and_grants_total_score_without_choice",
         "test_yoshiko_center_ability_basic_success",
         "test_yoshiko_center_ability_cost_calculation",
         "test_yoshiko_center_ability_exclude_self",
@@ -4549,7 +4555,7 @@
         "yoshiko_sacrifice_and_summon_cost_plus_two_to_vacated_area",
         "yoshiko_sacrifice_from_full_stage_other_members_undisturbed"
       ],
-      "covering_test_count": 25,
+      "covering_test_count": 30,
       "is_null": false,
       "use_limit": 1,
       "watches_abilities": false,
@@ -17597,7 +17603,7 @@
         "engine/tests/test_modules/effects/compound/s_pb1_002_riko_edge_test.rs"
       ],
       "covering_tests": [
-        "declined_discard_total_score_is_lost_when_source_is_replaced",
+        "declined_discard_total_score_is_lost_when_yoshiko_activation_discards_source",
         "opponent_declines_eligible_live_discard_preserving_hand_and_granting_total_score",
         "opponent_discards_live_to_waitroom_preventing_total_score_gain",
         "opponent_empty_hand_grants_total_score_without_choice",

@@ -103,9 +103,6 @@ fn declined_discard_total_score_is_lost_when_yoshiko_activation_discards_source(
     game.assert_select_card("hand", 1, false);
     game.select_indices(&[0]);
     game.drain_auto_ability_choices();
-    game.assert_select_card("stage", 1, false);
-    game.select_indices(&[0]);
-    game.drain_auto_ability_choices();
     assert!(!game.has_pending_choice());
     assert_eq!(game.state.player1.stage.stage, [-1, yoshiko, -1]);
     assert_eq!(game.state.player1.waitroom.cards.as_slice(), &[cost_card, source]);

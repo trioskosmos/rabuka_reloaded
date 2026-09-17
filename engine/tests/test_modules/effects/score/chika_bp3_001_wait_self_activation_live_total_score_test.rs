@@ -41,6 +41,8 @@ fn wait_member_baton_removes_recipient_and_immediately_loses_total_score() {
     assert_eq!(game.state.mods.get_orientation_modifier(recipient), Some("wait"));
     assert_eq!(game.state.mods.get_orientation_modifier(source), None);
     assert_eq!(game.state.mods.p1_constant_total_score_bonus, 1);
+    assert!(game.state.gained_abilities.contains_key(&recipient));
+    assert!(!game.state.gained_abilities.contains_key(&source));
 
     TurnEngine::execute_main_phase_action(
         &mut game.state,
@@ -57,6 +59,9 @@ fn wait_member_baton_removes_recipient_and_immediately_loses_total_score() {
     assert_eq!(game.state.player1.stage.stage, [replacement, source, -1]);
     assert_eq!(game.state.player1.waitroom.cards.as_slice(), &[recipient]);
     assert!(game.state.player1.hand.cards.is_empty());
+    assert!(!game.state.gained_abilities.contains_key(&recipient));
+    assert!(!game.state.gained_card_abilities.contains_key(&recipient));
+    assert!(!game.state.gained_ability_sources.contains_key(&recipient));
     assert_eq!(game.state.mods.p1_constant_total_score_bonus, 0);
 }
 

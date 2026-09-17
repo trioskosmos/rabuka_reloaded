@@ -6,6 +6,8 @@ on:
     paths:
       - 'engine/**'
       - 'cards/**'
+      - 'web_ui/**'
+      - 'tools/**'
       - 'Dockerfile'
       - '.dockerignore'
       - '.github/workflows/deploy-fly.yml'

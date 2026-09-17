@@ -7,6 +7,12 @@ on:
       - 'cards/abilities.json'
       - 'cards/cards.json'
       - 'cards/compile_abilities.py'
+      - 'cards/compile_cards.py'
+      - 'cards/build_lib.py'
+      - 'cards/ability_extraction/**'
+      - 'cards/generate_condition_decoder.py'
+      - 'cards/generate_effect_decoder.py'
+      - 'cards/build/generation_manifest.json'
       - '.github/workflows/engine-tests.yml'
   pull_request:
     paths:
@@ -14,6 +20,12 @@ on:
       - 'cards/abilities.json'
       - 'cards/cards.json'
       - 'cards/compile_abilities.py'
+      - 'cards/compile_cards.py'
+      - 'cards/build_lib.py'
+      - 'cards/ability_extraction/**'
+      - 'cards/generate_condition_decoder.py'
+      - 'cards/generate_effect_decoder.py'
+      - 'cards/build/generation_manifest.json'
       - '.github/workflows/engine-tests.yml'
   workflow_dispatch:
 

@@ -867,6 +867,17 @@ impl GameState {
         source_card_name: Option<String>,
         category: &str,
     ) {
+        log::debug!(
+            target: "rabuka_engine::events",
+            "[T{} {:?}] {}: {} | event={} source={:?} card={:?}",
+            self.turn_number,
+            self.current_phase,
+            player_label,
+            text,
+            category,
+            source_card_id,
+            source_card_name
+        );
         self.push_rule_log(text.clone());
         if !crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) {
             return;
@@ -1139,10 +1150,17 @@ impl GameState {
         let skip_allowed = choice.allow_skip();
         let option_count = self.choice_option_count(choice);
         log::debug!(
-            "choice_offered: prompt='{}' options={} labels={}",
+            target: "rabuka_engine::events",
+            "[T{} {:?}] Choice offered: {} | options={} skip_allowed={} source={:?} card={:?}",
+            self.turn_number,
+            self.current_phase,
             choice.description(),
             option_count,
-            offered.len()
+            skip_allowed,
+            self.activating_card,
+            self.activating_card
+                .and_then(|id| self.card_database.get_card(id))
+                .map(|card| card.name.as_ref())
         );
         let entry = crate::types::LogEntry {
             text: format!(
@@ -1188,11 +1206,18 @@ impl GameState {
             chosen
         };
         log::debug!(
-            "choice_resolved: prompt='{}' options={} picked='{}' skipped={}",
+            target: "rabuka_engine::events",
+            "[T{} {:?}] {} answered '{}': {} | options={} skipped={} source={:?}",
+            self.turn_number,
+            self.current_phase,
+            self.ability_queue.current_entry()
+                .map(|entry| entry.choice_player_id.as_deref().unwrap_or(&entry.player_id))
+                .unwrap_or(&self.active_player().id),
             choice.description(),
-            offered_count,
             chosen_final.join(", "),
-            skipped
+            offered_count,
+            skipped,
+            self.activating_card
         );
         let entry = crate::types::LogEntry {
             text: format!(

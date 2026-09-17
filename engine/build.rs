@@ -90,7 +90,19 @@ const EXCLUDED_MODULES: &[&str] = &["pvp_room_test"];
 
 fn generate_test_module_declarations(root: &Path) {
     fn visit(dir: &Path) -> Option<String> {
-        let entries = std::fs::read_dir(dir).ok()?;
+        // A read_dir failure is not "empty directory": it hides every test
+        // under it from the suite. Surface it and treat this subtree as
+        // absent for the parent's module list (same as before), but loudly.
+        let entries = match std::fs::read_dir(dir) {
+            Ok(e) => e,
+            Err(e) => {
+                println!(
+                    "cargo:warning=build.rs cannot list test dir {}: {e}",
+                    dir.display()
+                );
+                return None;
+            }
+        };
         let mut mods: Vec<String> = Vec::new();
         let mut has_rs = false;
         for entry in entries.flatten() {
@@ -135,10 +147,28 @@ fn generate_test_module_declarations(root: &Path) {
         let mod_rs = dir.join("mod.rs");
         let needs_write = match std::fs::read_to_string(&mod_rs) {
             Ok(existing) => existing != out,
-            Err(_) => true,
+            // A missing mod.rs in a directory with test files means the file
+            // was deleted or never generated — regenerate it (existing
+            // behavior), but a READ failure on an existing file (permissions,
+            // fs error) must not be silently treated as "regenerate".
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => true,
+            Err(e) => {
+                println!(
+                    "cargo:warning=build.rs cannot read {}: {e}; mod.rs regeneration skipped for this directory",
+                    mod_rs.display()
+                );
+                return None;
+            }
         };
         if needs_write {
-            let _ = std::fs::write(&mod_rs, &out);
+            if let Err(e) = std::fs::write(&mod_rs, &out) {
+                // Loud: a failed write silently keeps stale module
+                // declarations, which hides new/renamed tests from the suite.
+                println!(
+                    "cargo:warning=build.rs failed to write {}: {e}",
+                    mod_rs.display()
+                );
+            }
         }
         // A directory participates in its parent's module list if it has any
         // .rs files of its own, or children that do.
