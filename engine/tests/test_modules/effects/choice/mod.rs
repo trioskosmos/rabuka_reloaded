@@ -13,6 +13,7 @@ pub mod mari_test;
 pub mod mill_or_wait_pl_hs_cl1_004_cl_test;
 pub mod opponent_accepts_blades_pl_n_pr_022_pr_test;
 pub mod opponent_choice_tests;
+pub mod optional_energy_edelnote_deploy_or_requirement_test;
 pub mod q258_himege_no_target_test;
 pub mod tang_keke_test;
 pub mod target_player_deck_routing_pl_n_bp3_010_r_pl_n_bp4_002_r_test;

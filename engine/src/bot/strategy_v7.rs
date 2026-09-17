@@ -132,6 +132,20 @@ pub fn choose_action_v7(gs: &GameState, actions: &[Action], me: u8) -> Action {
     if actions.len() == 1 {
         return actions[0].clone();
     }
+    let scores = score_actions(gs, actions, me);
+    let mut best = 0;
+    for i in 1..scores.len() {
+        if scores[i].0 > scores[best].0 {
+            best = i;
+        }
+    }
+    actions[best].clone()
+}
+
+pub fn score_actions(gs: &GameState, actions: &[Action], me: u8) -> Vec<(f64, String)> {
+    if std::env::var("V7_MAIN_V6").is_ok() {
+        return crate::bot::strategy_v6::score_actions(gs, actions, me);
+    }
     let dbg = std::env::var("V7_DEBUG").is_ok();
     let db = &gs.card_database;
     let my_now = player_of(gs, me);
@@ -148,7 +162,7 @@ pub fn choose_action_v7(gs: &GameState, actions: &[Action], me: u8) -> Action {
             .map(|card| i32::from(card.cost.unwrap_or(0))).sum()
     };
     let base_cost = stage_cost(my_now);
-    let development = std::env::var("V7_DEVELOPMENT").is_ok();
+    let development = std::env::var("V7_NO_DEVELOPMENT").is_err();
     let upgrade_baton = std::env::var("V7_UPGRADE_BATON").is_ok();
 
     let deck_lives = my_now
@@ -168,6 +182,7 @@ pub fn choose_action_v7(gs: &GameState, actions: &[Action], me: u8) -> Action {
 
     let mut vals: Vec<f64> = vec![f64::NEG_INFINITY; actions.len()];
     let mut dbg_lines: Vec<String> = Vec::new();
+    let mut breakdowns = vec![String::new(); actions.len()];
 
     for (i, a) in actions.iter().enumerate() {
         let mut sim = gs.clone();
@@ -235,6 +250,7 @@ pub fn choose_action_v7(gs: &GameState, actions: &[Action], me: u8) -> Action {
         let cost_growth = stage_cost(my_sim) - base_cost;
         if development {
             val += 8.0 * f64::from(cost_growth);
+            parts.push(format!("development{:+}", 8 * cost_growth));
         }
         if a.parameters.as_ref().and_then(|p| p.use_baton_touch) == Some(true)
             || ((std::env::var("V7_BATON_VISION").is_ok() || (upgrade_baton && cost_growth > 0))
@@ -309,6 +325,7 @@ pub fn choose_action_v7(gs: &GameState, actions: &[Action], me: u8) -> Action {
         }
 
         vals[i] = val;
+        breakdowns[i] = parts.join(" ");
     }
 
     // v6 fix (kept): `Pass` ends the development phase. It is chosen ONLY
@@ -367,7 +384,7 @@ pub fn choose_action_v7(gs: &GameState, actions: &[Action], me: u8) -> Action {
         best_nonpass,
         actions[best_idx].action_type,
     );
-    actions[best_idx].clone()
+    vals.into_iter().zip(breakdowns).collect()
 }
 
 /// LIVE SET: role-dependent portfolios (measured doctrine).

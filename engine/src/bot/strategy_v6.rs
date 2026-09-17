@@ -79,6 +79,17 @@ pub fn choose_action_v6(gs: &GameState, actions: &[Action], me: u8) -> Action {
     if actions.len() == 1 {
         return actions[0].clone();
     }
+    let scores = score_actions(gs, actions, me);
+    let mut best = 0;
+    for i in 1..scores.len() {
+        if scores[i].0 > scores[best].0 {
+            best = i;
+        }
+    }
+    actions[best].clone()
+}
+
+pub fn score_actions(gs: &GameState, actions: &[Action], me: u8) -> Vec<(f64, String)> {
     let dbg = std::env::var("V6_DEBUG").is_ok();
     let db = &gs.card_database;
     let my_now = if me == 0 { &gs.player1 } else { &gs.player2 };
@@ -105,6 +116,7 @@ pub fn choose_action_v6(gs: &GameState, actions: &[Action], me: u8) -> Action {
 
     let mut vals: Vec<f64> = vec![f64::NEG_INFINITY; actions.len()];
     let mut dbg_lines: Vec<String> = Vec::new();
+    let mut breakdowns = vec![String::new(); actions.len()];
 
     for (i, a) in actions.iter().enumerate() {
         let mut sim = gs.clone();
@@ -210,6 +222,7 @@ pub fn choose_action_v6(gs: &GameState, actions: &[Action], me: u8) -> Action {
         }
 
         vals[i] = val;
+        breakdowns[i] = parts.join(" ");
     }
 
     // v6 fix: `Pass` ends the development phase. It is chosen ONLY when there
@@ -257,7 +270,7 @@ pub fn choose_action_v6(gs: &GameState, actions: &[Action], me: u8) -> Action {
             dbg_lines.join("\n")
         );
     }
-    actions[best_idx].clone()
+    vals.into_iter().zip(breakdowns).collect()
 }
 
 /// LIVE SET: binomial-aware, score-maximizing among passers, with free-win and

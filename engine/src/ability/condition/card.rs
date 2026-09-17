@@ -1915,7 +1915,13 @@ impl<'a> ConditionContext<'a> {
             let cards = util::zone_cards(player, loc.as_str());
             combined.extend_from_slice(cards);
         }
-        log::debug!("[MULTI] combined {} cards", combined.len());
+        log::debug!(
+            "[MULTI] condition={:?} combined={:?} card_type={:?} groups={:?}",
+            condition,
+            combined,
+            card_type_filter,
+            group_names
+        );
 
         let is_distinct = condition.get_distinct().is_some_and(|d| d.is_distinct());
         if is_distinct {

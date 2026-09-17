@@ -84,7 +84,7 @@ static int skip_one(Rdr *r) {
 }
 
 static int skip_value(Rdr *r, uint8_t tag) {
-    uint32_t len, i;
+    uint32_t len, i, key;
     int64_t v;
     uint8_t b;
     switch (tag) {
@@ -104,7 +104,7 @@ static int skip_value(Rdr *r, uint8_t tag) {
         if (tag == RB_TAG_OBJVAR) { if (!rd_u8(r, &b)) return 0; }
         if (!rd_len(r, &len)) return 0;
         for (i = 0; i < len; i++) {
-            if (!rd_idx(r, &i)) return 0;   /* key */
+            if (!rd_idx(r, &key)) return 0;
             if (!skip_one(r)) return 0;      /* value */
         }
         return 1;
@@ -112,8 +112,132 @@ static int skip_value(Rdr *r, uint8_t tag) {
     }
 }
 
+typedef struct { char *s; size_t n, cap; } DecodeText;
+
+static int decode_text_add(DecodeText *t, const char *s, size_t n) {
+    if (n > SIZE_MAX - t->n - 1) return 0;
+    size_t need = t->n + n + 1;
+    if (need > t->cap) {
+        size_t cap = t->cap ? t->cap : 64;
+        while (cap < need) {
+            if (cap > SIZE_MAX / 2) { cap = need; break; }
+            cap *= 2;
+        }
+        char *p = realloc(t->s, cap);
+        if (!p) return 0;
+        t->s = p; t->cap = cap;
+    }
+    memcpy(t->s + t->n, s, n);
+    t->n += n; t->s[t->n] = 0;
+    return 1;
+}
+
+static int decode_text_quote(DecodeText *t, const char *s) {
+    if (!s || !decode_text_add(t, "\"", 1)) return 0;
+    for (const unsigned char *p = (const unsigned char *)s; *p; p++) {
+        char buf[7];
+        if (*p == '"' || *p == '\\') {
+            buf[0] = '\\'; buf[1] = (char)*p;
+            if (!decode_text_add(t, buf, 2)) return 0;
+        } else if (*p < 0x20) {
+            snprintf(buf, sizeof(buf), "\\u%04x", (unsigned)*p);
+            if (!decode_text_add(t, buf, 6)) return 0;
+        } else if (!decode_text_add(t, (const char *)p, 1)) return 0;
+    }
+    return decode_text_add(t, "\"", 1);
+}
+
+static int decode_text_value(Rdr *r, uint8_t tag, DecodeText *t) {
+    uint32_t n, idx;
+    uint8_t st, variant;
+    int64_t v;
+    char buf[64];
+    switch (tag) {
+    case RB_TAG_NULL: return decode_text_add(t, "null", 4);
+    case RB_TAG_TRUE: return decode_text_add(t, "true", 4);
+    case RB_TAG_FALSE: return decode_text_add(t, "false", 5);
+    case RB_TAG_I64:
+        if (!rd_int(r, &v)) return 0;
+        snprintf(buf, sizeof(buf), "%lld", (long long)v);
+        return decode_text_add(t, buf, strlen(buf));
+    case RB_TAG_F64:
+        if ((size_t)(r->end - r->p) < 8) return 0;
+        if (!decode_text_add(t, "{\"$f64\":\"", 9)) return 0;
+        for (int i = 0; i < 8; i++) {
+            snprintf(buf, sizeof(buf), "%02x", (unsigned)r->p[i]);
+            if (!decode_text_add(t, buf, 2)) return 0;
+        }
+        r->p += 8;
+        return decode_text_add(t, "\"}", 2);
+    case RB_TAG_STR:
+        return rd_idx(r, &idx) && decode_text_quote(t, rb_get_string(idx));
+    case RB_TAG_ARRAY:
+        if (!rd_len(r, &n) || !decode_text_add(t, "[", 1)) return 0;
+        for (uint32_t i = 0; i < n; i++) {
+            if (i && !decode_text_add(t, ",", 1)) return 0;
+            if (!rd_u8(r, &st) || !decode_text_value(r, st, t)) return 0;
+        }
+        return decode_text_add(t, "]", 1);
+    case RB_TAG_OBJECT: case RB_TAG_OBJVAR:
+        if (tag == RB_TAG_OBJVAR) {
+            if (!rd_u8(r, &variant)) return 0;
+            snprintf(buf, sizeof(buf), "{\"$variant\":%u,\"$fields\":", (unsigned)variant);
+            if (!decode_text_add(t, buf, strlen(buf))) return 0;
+        }
+        if (!rd_len(r, &n) || !decode_text_add(t, "{", 1)) return 0;
+        for (uint32_t i = 0; i < n; i++) {
+            if (i && !decode_text_add(t, ",", 1)) return 0;
+            if (!rd_idx(r, &idx) || !decode_text_quote(t, rb_get_string(idx)) ||
+                !decode_text_add(t, ":", 1) || !rd_u8(r, &st) ||
+                !decode_text_value(r, st, t)) return 0;
+        }
+        return decode_text_add(t, tag == RB_TAG_OBJVAR ? "}}" : "}", tag == RB_TAG_OBJVAR ? 2 : 1);
+    default: return 0;
+    }
+}
+
+static char *decode_extra_value(Rdr *r, uint8_t tag) {
+    DecodeText t = {0};
+    Rdr scan = *r;
+    if (tag == RB_TAG_STR) {
+        uint32_t idx;
+        if (!rd_idx(r, &idx)) return NULL;
+        return rb_strdup(rb_get_string(idx));
+    }
+    if (tag == RB_TAG_ARRAY) {
+        uint32_t n;
+        int csv = 1;
+        if (!rd_len(&scan, &n)) return NULL;
+        for (uint32_t i = 0; i < n; i++) {
+            uint8_t st;
+            if (!rd_u8(&scan, &st)) { free(t.s); return NULL; }
+            if (st != RB_TAG_STR && st != RB_TAG_I64) { csv = 0; break; }
+            char *s = decode_extra_value(&scan, st);
+            if (!s) { free(t.s); return NULL; }
+            int ok = !i || decode_text_add(&t, ",", 1);
+            int quote = !*s || strpbrk(s, ",\"\r\n") != NULL;
+            if (ok && quote) ok = decode_text_add(&t, "\"", 1);
+            for (const char *p = s; ok && *p; p++) {
+                if (*p == '"') ok = decode_text_add(&t, "\"", 1);
+                if (ok) ok = decode_text_add(&t, p, 1);
+            }
+            if (ok && quote) ok = decode_text_add(&t, "\"", 1);
+            free(s);
+            if (!ok) { free(t.s); return NULL; }
+        }
+        if (csv) {
+            *r = scan;
+            return t.s ? t.s : rb_strdup("");
+        }
+        free(t.s); memset(&t, 0, sizeof(t));
+    }
+    if (!decode_text_value(r, tag, &t)) { free(t.s); return NULL; }
+    return t.s;
+}
+
 /* ── condition tree ── */
 static Condition *read_condition(Rdr *r);          /* fwd */
+static Condition *read_condition_fields(Rdr *r, uint8_t variant);
 static CondValue read_cond_value(Rdr *r, uint8_t tag); /* fwd */
 static void cond_value_free(CondValue *v);          /* fwd */
 static CondValue cond_value_null(void) {
@@ -122,8 +246,8 @@ static CondValue cond_value_null(void) {
 }
 static void cond_value_free(CondValue *v) {
     if (!v) return;
-    if (v->tag == RB_TAG_STR) free(v->s);
-    else if (v->tag == RB_TAG_OBJVAR) rb_free_condition(v->cond);
+    if (v->tag == RB_TAG_STR || v->tag == RB_TAG_F64) free(v->s);
+    else if (v->tag == RB_TAG_OBJVAR || v->tag == RB_TAG_OBJECT) rb_free_condition(v->cond);
     else if (v->tag == RB_TAG_ARRAY) {
         for (uint32_t j = 0; j < v->arr_n; j++) cond_value_free(&v->arr[j]);
         free(v->arr);
@@ -145,59 +269,75 @@ static CondValue read_cond_value(Rdr *r, uint8_t tag) {
     switch (tag) {
     case RB_TAG_NULL: case RB_TAG_FALSE: case RB_TAG_TRUE:
         v.b = (tag == RB_TAG_TRUE); return v;
-    case RB_TAG_I64: { int64_t x; if (rd_int(r, &x)) v.i = x; return v; }
-    case RB_TAG_F64: if (r->p + 8 <= r->end) r->p += 8; return v;
+    case RB_TAG_I64:
+        if (!rd_int(r, &v.i)) goto fail;
+        return v;
+    case RB_TAG_F64:
+        v.s = decode_extra_value(r, tag);
+        if (!v.s) goto fail;
+        return v;
     case RB_TAG_STR: {
-        uint32_t idx; if (rd_idx(r, &idx)) { const char *s = rb_get_string(idx); v.s = rb_strdup(s ? s : ""); }
+        uint32_t idx;
+        if (!rd_idx(r, &idx) || !(v.s = rb_strdup(rb_get_string(idx)))) goto fail;
         return v;
     }
     case RB_TAG_ARRAY: {
-        uint32_t n; if (rd_len(r, &n)) {
-            if (n > RB_MAX_COND_ARR) n = RB_MAX_COND_ARR;
-            v.arr = malloc(sizeof(CondValue) * (n ? n : 1));
-            if (v.arr) for (uint32_t j = 0; j < n; j++) {
-                uint8_t st; if (rd_u8(r, &st)) v.arr[j] = read_cond_value(r, st);
-                else v.arr[j] = cond_value_null();
-            }
-            v.arr_n = n;
+        uint32_t n;
+        if (!rd_len(r, &n) || n > (size_t)(r->end - r->p)) goto fail;
+        if (n && !(v.arr = calloc(n, sizeof(*v.arr)))) goto fail;
+        for (uint32_t j = 0; j < n; j++) {
+            uint8_t st;
+            if (!rd_u8(r, &st)) goto fail;
+            v.arr[j] = read_cond_value(r, st);
+            v.arr_n++;
+            if (v.arr[j].tag == 0xFF) goto fail;
         }
         return v;
     }
     case RB_TAG_OBJECT:
-        skip_value(r, tag); return v;  /* generic object: not used in conditions */
-    case RB_TAG_OBJVAR:
-        v.cond = read_condition(r); return v;
-    default:
+        v.cond = read_condition_fields(r, 0xFF);
+        if (!v.cond) goto fail;
         return v;
+    case RB_TAG_OBJVAR:
+        v.cond = read_condition(r);
+        if (!v.cond) goto fail;
+        return v;
+    default: break;
     }
+fail:
+    cond_value_free(&v);
+    v = cond_value_null();
+    v.tag = 0xFF;
+    return v;
 }
 
-/* Read a full condition: OBJVAR + variant byte + (key, value) fields. */
-static Condition *read_condition(Rdr *r) {
-    uint8_t variant; if (!rd_u8(r, &variant)) return NULL;
-    uint32_t count; if (!rd_len(r, &count)) return NULL;
+static Condition *read_condition_fields(Rdr *r, uint8_t variant) {
+    uint32_t count;
+    if (!rd_len(r, &count) || count > RB_MAX_COND_FIELD) return NULL;
     Condition *c = calloc(1, sizeof(Condition));
     if (!c) return NULL;
     c->variant = variant;
-    if (count > RB_MAX_COND_FIELD) count = RB_MAX_COND_FIELD;
     for (uint32_t i = 0; i < count; i++) {
-        uint32_t kidx; if (!rd_idx(r, &kidx)) break;
-        const char *key = rb_get_string(kidx);
-        uint8_t tag; if (!rd_u8(r, &tag)) break;
-        /* effects nested inside conditions are not evaluated by the engine; skip
-           them to avoid building bogus condition structure. */
-        if (key && (!strcmp(key, "effect") || !strcmp(key, "options") ||
-                    !strcmp(key, "look_action") || !strcmp(key, "select_action") ||
-                    !strcmp(key, "primary_effect") || !strcmp(key, "followup_action") ||
-                    !strcmp(key, "optional_action") || !strcmp(key, "conditional_action"))) {
-            skip_value(r, tag); continue;
-        }
-        CondField *f = &c->fields[c->n_fields];
-        f->key = rb_strdup(key ? key : "");
+        uint32_t kidx;
+        uint8_t tag;
+        if (!rd_idx(r, &kidx) || !rd_u8(r, &tag)) goto fail;
+        CondField *f = &c->fields[c->n_fields++];
+        f->key = rb_strdup(rb_get_string(kidx));
+        if (!f->key) goto fail;
         f->v = read_cond_value(r, tag);
-        c->n_fields++;
+        if (f->v.tag == 0xFF) goto fail;
     }
     return c;
+fail:
+    rb_free_condition(c);
+    return NULL;
+}
+
+/* Mirror Condition's recursive values without interpreting nested effect variants. */
+static Condition *read_condition(Rdr *r) {
+    uint8_t variant;
+    if (!rd_u8(r, &variant)) return NULL;
+    return read_condition_fields(r, variant);
 }
 
 /* ── effect tree ── */
@@ -226,11 +366,30 @@ static int effect_add_child(AbilityEffect *e, AbilityEffect *c) {
     if (!e || !c || e->n_child >= RB_MAX_CHILD) { effect_free(c); return 0; }
     e->child[e->n_child++] = c; return 1;
 }
-static void effect_set_extra(AbilityEffect *e, const char *k, const char *v) {
-    if (!e || e->n_extra >= RB_MAX_EXTRA || !k) return;
-    e->extra_k[e->n_extra] = rb_strdup(k);
-    e->extra_v[e->n_extra] = v ? rb_strdup(v) : NULL;
-    e->n_extra++;
+static int effect_set_extra(AbilityEffect *e, const char *k, const char *v) {
+    if (!e || !k) return 0;
+    int i;
+    for (i = 0; i < e->n_extra; i++)
+        if (!strcmp(e->extra_k[i], k)) break;
+    if (i == RB_MAX_EXTRA) return 0;
+    char *value = v ? rb_strdup(v) : NULL;
+    if (v && !value) return 0;
+    if (i == e->n_extra) {
+        char *key = rb_strdup(k);
+        if (!key) { free(value); return 0; }
+        e->extra_k[i] = key;
+        e->n_extra++;
+    } else free(e->extra_v[i]);
+    e->extra_v[i] = value;
+    return 1;
+}
+
+static int effect_decode_extra(AbilityEffect *e, const char *key, Rdr *r, uint8_t tag) {
+    char *value = decode_extra_value(r, tag);
+    if (!value) return 0;
+    int ok = effect_set_extra(e, key, value);
+    free(value);
+    return ok;
 }
 
 /* decode a single effect from current cursor (assumes TAG_OBJVAR already read).

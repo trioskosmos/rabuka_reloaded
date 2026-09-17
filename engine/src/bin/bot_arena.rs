@@ -6,7 +6,7 @@
 //! Moved out of tests/test_modules/strategy_bot_test.rs  Ethis is a
 //! benchmark/arena, not a unit test. Run it when you want numbers.
 
-use rabuka_engine::bot::{registry::BotKind, strategy_v2, strategy_v3};
+use rabuka_engine::bot::{registry::BotKind, strategy_v2, strategy_v3, strategy_v6, strategy_v7};
 use rabuka_engine::card::CardDatabase;
 use rabuka_engine::card_loader;
 use rabuka_engine::deck_parser;
@@ -29,6 +29,8 @@ struct Options {
     seed: u32,
     deck: String,
     audit: Option<PathBuf>,
+    snapshots: Option<PathBuf>,
+    compare: Option<PathBuf>,
     trace: bool,
     logs: bool,
 }
@@ -39,6 +41,8 @@ impl Options {
         let mut games = None;
         let mut seed = 1u32;
         let mut audit = None;
+        let mut snapshots = None;
+        let mut compare = None;
         let mut trace = false;
         let mut logs = false;
         let mut args = args.iter();
@@ -46,7 +50,7 @@ impl Options {
             match arg.as_str() {
                 "--trace" => trace = true,
                 "--logs" => logs = true,
-                "--games" | "--seed" | "--audit" => {
+                "--games" | "--seed" | "--audit" | "--snapshots" | "--compare" => {
                     let value = args.next().filter(|v| !v.starts_with("--"))
                         .ok_or_else(|| format!("missing value for {arg}"))?;
                     match arg.as_str() {
@@ -85,6 +89,8 @@ impl Options {
             seed,
             deck: positional.get(3).copied().unwrap_or("5CP3Z idou").to_string(),
             audit,
+            snapshots,
+            compare,
             trace,
             logs,
         })

@@ -6,6 +6,7 @@ pub mod bp7_aquarium_yell_source_test;
 pub mod bp7_mia_play_cost_reduction_test;
 pub mod bp7_tang_keke_cost_test;
 pub mod chika_bp5_001_no_ability_member_cost_reduction_test;
+pub mod distinct_stage_waitroom_members_required_hearts_test;
 pub mod hanamusubi_exclude_self_test;
 pub mod hanayo_bp4_constant_test;
 pub mod hand_size_zero_floor_ll_bp2_001_r_plus_test;

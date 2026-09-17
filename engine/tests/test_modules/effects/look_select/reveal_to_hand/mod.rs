@@ -3,6 +3,7 @@
 pub mod bp7_tomari_discard_all_hand_test;
 pub mod burn_energy_under_test;
 pub mod cost9_group_search;
+pub mod debut_group_look_three_reveal_test;
 pub mod deck_top_optional_discard;
 pub mod discard_filtered_look_pl_n_bp3_012_r_pl_hs_bp1_011_pr_test;
 pub mod discard_group_look_pl_sp_pb1_015_n_016_n_pl_n_sd2_012_sd2_test;

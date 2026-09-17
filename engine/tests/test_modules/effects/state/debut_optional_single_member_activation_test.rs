@@ -27,9 +27,16 @@ fn debut_activation(card_no: &str, selected: Option<usize>) {
     assert_eq!(game.state.mods.get_orientation_modifier(left), Some("wait"));
     assert_eq!(
         game.state.mods.get_orientation_modifier(center),
-        Some(if selected == Some(1) { "active" } else { "wait" })
+        Some(if selected == Some(1) {
+            "active"
+        } else {
+            "wait"
+        })
     );
-    assert_eq!(game.state.mods.get_orientation_modifier(enemy), Some("wait"));
+    assert_eq!(
+        game.state.mods.get_orientation_modifier(enemy),
+        Some("wait")
+    );
     assert_eq!(game.state.player1.main_deck.cards, deck);
     assert!(game.state.player1.waitroom.cards.is_empty());
     assert!(game.state.player1.hand.cards.is_empty());

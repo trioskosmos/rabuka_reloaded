@@ -388,6 +388,7 @@ def extract_cost_range(text: str) -> Optional[Dict[str, int]]:
 # where operator_kind is "captured" (the operator word is group 2) or "==". Tried in
 # order; the regexes are not re-coded anywhere else.
 _BLADE_LIMIT_PATTERNS = [
+    (r"ブレードが(\d+)[つ個](以下|以上|未満|超)のメンバー", "captured"),
     (r"ブレード[の]数[がは](\d+)[つ個](以下|以上|未満|超)", "captured"),
     (r"ブレード[の]数[がは](\d+)(以下|以上|未満|超)", "captured"),
     (r"ブレード[の]数[がは]ちょうど(\d+)[つ個]", "=="),
@@ -6308,9 +6309,23 @@ def _fill_defaults_move_cards(action, text, action_text, _cached_source, _cached
             and action.get("destination")
         ):
             sub_actions = []
+            typed_groups = {
+                dict((kw, ct) for ct, kw in card_type_kws)[kw]: group
+                for group, kw in re.findall(
+                    r"『([^』]+)』の(メンバーカード|ライブカード|エネルギーカード)",
+                    text,
+                )
+            }
             for ct in and_types:
+                sub_text = action.get("text", "")
+                if ct in typed_groups:
+                    kw = next(kw for card_type, kw in card_type_kws if card_type == ct)
+                    sub_text = re.search(
+                        rf"『{re.escape(typed_groups[ct])}』の{kw}\d*枚?",
+                        text,
+                    ).group(0)
                 sub = {
-                    "text": action.get("text", ""),
+                    "text": sub_text,
                     "action": "move_cards",
                     "source": action["source"],
                     "destination": action["destination"],
@@ -6319,6 +6334,8 @@ def _fill_defaults_move_cards(action, text, action_text, _cached_source, _cached
                     "max": True,
                     "target": action.get("target", "self"),
                 }
+                if ct in typed_groups:
+                    sub["group_names"] = [typed_groups[ct]]
                 if action.get("optional") is not None:
                     sub["optional"] = action["optional"]
                 sub_actions.append(sub)

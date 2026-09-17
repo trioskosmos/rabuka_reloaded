@@ -17,9 +17,17 @@
 /* ── Forward declarations ── */
 static int rb_queue_spawn_targets_opponent(const GameState *g, int cur);
 
+/* Owned pending-action storage (mirrors Rust entry.pending_actions): deep-clone
+    via rb_effect_data_clone-style copy is effect-tree specific, so we snapshot
+    through the effect tree clone helper if present, else store the pointer
+    ownership transfer. C equivalent of Vec<AbilityEffect>: array of owned
+    pointers with capacity RB_ENTRY_PENDING_CAP. */
+void rb_effect_free(AbilityEffect *e);
+AbilityEffect *rb_effect_deep_clone(const AbilityEffect *src);
+
 /* ==========================================================================
-   Queue lifecycle
-   ========================================================================== */
+    Queue lifecycle
+    ========================================================================== */
 
 void rb_queue_init(RbAbilityQueue *q) {
     if (!q) return;
@@ -28,8 +36,30 @@ void rb_queue_init(RbAbilityQueue *q) {
     q->selected_heart_color = -1;
 }
 
+static void entry_clear_pending_actions(RbQueueEntry *e) {
+    if (!e) return;
+    for (int i = 0; i < RB_ENTRY_PENDING_CAP; i++) {
+        if (e->pending_actions[i]) {
+            rb_effect_free(e->pending_actions[i]);
+            e->pending_actions[i] = NULL;
+        }
+    }
+    e->pending_actions_n = 0;
+}
+
 void rb_queue_clear(RbAbilityQueue *q) {
     if (!q) return;
+    for (int i = 0; i < RB_QUEUE_DEPTH; i++)
+        entry_clear_pending_actions(&q->entries[i]);
+    for (int i = 0; i < RB_ENTRY_PENDING_CAP; i++) {
+        if (q->pending_repeat_actions[i]) {
+            rb_effect_free(q->pending_repeat_actions[i]);
+            q->pending_repeat_actions[i] = NULL;
+        }
+    }
+    q->pending_repeat_actions_n = 0;
+    q->has_pending_reprompt_choice = 0;
+    memset(&q->pending_reprompt_choice, 0, sizeof(q->pending_reprompt_choice));
     memset(q, 0, sizeof(*q));
     q->state = RB_QUEUE_IDLE;
     q->selected_heart_color = -1;
@@ -344,6 +374,11 @@ void rb_queue_set_current_entry(GameState *g, int absolute) {
    Pending actions
    ========================================================================== */
 
+/* ── Pending actions (mirrors Rust set/save/take_pending_actions + the
+    choice.rs:75-146 resume_pending_actions execution loop) ──
+    Storage is per-entry owned AbilityEffect clones; the count-only API is kept
+    for ABI compatibility, and the real commands now survive pause/resume. */
+
 int rb_queue_has_pending_actions(const GameState *g) {
     if (!g) return 0;
     int cur = g->queue.cur;
@@ -351,27 +386,124 @@ int rb_queue_has_pending_actions(const GameState *g) {
     return g->queue.entries[cur].pending_actions_n > 0;
 }
 
+/* Replace the current entry's pending list with deep clones of `actions`
+    (mirrors Rust entry.set_pending_actions(vec)). */
+void rb_queue_store_pending_actions(GameState *g, AbilityEffect *const *actions, int count) {
+    if (!g) return;
+    int cur = g->queue.cur;
+    if (cur < 0 || cur >= g->queue.n_entries) return;
+    RbQueueEntry *e = &g->queue.entries[cur];
+    entry_clear_pending_actions(e);
+    for (int i = 0; i < count && e->pending_actions_n < RB_ENTRY_PENDING_CAP; i++) {
+        if (!actions[i]) continue;
+        e->pending_actions[e->pending_actions_n++] = rb_effect_deep_clone(actions[i]);
+    }
+}
+
 void rb_queue_set_pending_actions(GameState *g, int count) {
     if (!g) return;
     int cur = g->queue.cur;
     if (cur < 0 || cur >= g->queue.n_entries) return;
-    g->queue.entries[cur].pending_actions_n = count > 0 ? count : 0;
+    /* Legacy count-only callers (e.g. conditional-choice re-entry that passes a
+        flag) park N placeholder markers; keep semantics but never exceed cap. */
+    RbQueueEntry *e = &g->queue.entries[cur];
+    if (count > e->pending_actions_n) {
+        for (int i = e->pending_actions_n; i < count && e->pending_actions_n < RB_ENTRY_PENDING_CAP; i++)
+            e->pending_actions[e->pending_actions_n++] = NULL;
+    } else if (count < e->pending_actions_n) {
+        for (int i = count; i < e->pending_actions_n; i++) {
+            rb_effect_free(e->pending_actions[i]);
+            e->pending_actions[i] = NULL;
+        }
+    }
+    e->pending_actions_n = count > 0 ? count : 0;
 }
 
 void rb_queue_save_pending_actions(GameState *g, int count) {
     if (!g || count <= 0) return;
     int cur = g->queue.cur;
     if (cur < 0 || cur >= g->queue.n_entries) return;
-    g->queue.entries[cur].pending_actions_n += count;
+    RbQueueEntry *e = &g->queue.entries[cur];
+    for (int i = 0; i < count && e->pending_actions_n < RB_ENTRY_PENDING_CAP; i++)
+        e->pending_actions[e->pending_actions_n++] = NULL;
 }
 
-int rb_queue_take_pending_actions(GameState *g) {
+/* Take the pending list out (Rust take_pending_actions returns Vec). Returns
+    the count; the caller takes ownership of the popped effect pointers. */
+int rb_queue_take_pending_actions_owned(GameState *g, AbilityEffect **out, int max_out) {
     if (!g) return 0;
     int cur = g->queue.cur;
     if (cur < 0 || cur >= g->queue.n_entries) return 0;
-    int n = g->queue.entries[cur].pending_actions_n;
-    g->queue.entries[cur].pending_actions_n = 0;
+    RbQueueEntry *e = &g->queue.entries[cur];
+    int n = e->pending_actions_n;
+    if (n > RB_ENTRY_PENDING_CAP) n = RB_ENTRY_PENDING_CAP;
+    int taken = 0;
+    for (int i = 0; i < n && taken < max_out; i++) {
+        out[taken++] = e->pending_actions[i];
+        e->pending_actions[i] = NULL;
+    }
+    /* free any beyond max_out to avoid leaks */
+    for (int i = taken; i < n; i++) {
+        rb_effect_free(e->pending_actions[i]);
+        e->pending_actions[i] = NULL;
+    }
+    e->pending_actions_n = 0;
+    return taken;
+}
+
+int rb_queue_take_pending_actions(GameState *g) {
+    AbilityEffect *scratch[RB_ENTRY_PENDING_CAP];
+    int n = rb_queue_take_pending_actions_owned(g, scratch, RB_ENTRY_PENDING_CAP);
+    for (int i = 0; i < n; i++) rb_effect_free(scratch[i]);
     return n;
+}
+
+/* Re-park the remaining `actions[from..count]` (Rust resume_pending_actions
+    merge step, choice.rs:86-105): used when a sub-action paused mid-batch. */
+void rb_queue_repark_pending_actions(GameState *g, AbilityEffect *const *actions,
+                                     int count, int from) {
+    if (!g) return;
+    int cur = g->queue.cur;
+    if (cur < 0 || cur >= g->queue.n_entries) return;
+    RbQueueEntry *e = &g->queue.entries[cur];
+    for (int i = from; i < count && e->pending_actions_n < RB_ENTRY_PENDING_CAP; i++) {
+        if (!actions[i]) continue;
+        e->pending_actions[e->pending_actions_n++] = rb_effect_deep_clone(actions[i]);
+    }
+}
+
+/* Execute parked pending actions one at a time (choice.rs:75-113): stops and
+    leaves the remainder parked as soon as executing one creates a new pending
+    choice; clears the batch when all consumed. Returns number executed. */
+int rb_queue_resume_pending_actions(GameState *g) {
+    if (!g) return 0;
+    int cur = g->queue.cur;
+    if (cur < 0 || cur >= g->queue.n_entries) return 0;
+    RbQueueEntry *e = &g->queue.entries[cur];
+    int actor = (g->queue.actor >= 0) ? g->queue.actor : g->active;
+    int host = g->queue.resume_host;
+    int executed = 0;
+    while (e->pending_actions_n > 0 && !rb_has_pending_choice(g)) {
+        AbilityEffect *cmd = e->pending_actions[0];
+        for (int i = 1; i < e->pending_actions_n; i++)
+            e->pending_actions[i - 1] = e->pending_actions[i];
+        e->pending_actions[e->pending_actions_n - 1] = NULL;
+        e->pending_actions_n--;
+        if (!cmd) continue;
+        if (g->queue.cancel_remaining_commands) {
+            g->queue.cancel_remaining_commands = 0;
+            rb_effect_free(cmd);
+            break;
+        }
+        rb_execute_effect_ex(g, actor, cmd, host);
+        rb_effect_free(cmd);
+        executed++;
+        if (rb_has_pending_choice(g)) {
+            e->effect_started = 1;   /* Rust: entry.effect_started = true (choice.rs:81-83) */
+            break;
+        }
+    }
+    return executed;
 }
 
 /* ==========================================================================

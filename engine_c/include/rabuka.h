@@ -896,6 +896,7 @@ typedef struct {
 } RbChoice;
 
 /* ── Queue entry (mirrors engine/src/ability/ability_queue.rs::AbilityQueueEntry) ── */
+#define RB_ENTRY_PENDING_CAP 8
 typedef struct {
     int card_id;
     int ability_idx;
@@ -907,6 +908,13 @@ typedef struct {
     int  cost_paid_index;
     int  choice_card_no;
     int  pending_actions_n;
+    /* owned pending-action snapshots (mirrors Rust entry.pending_actions):
+        deep-cloned AbilityEffect trees parked across a pause, executed by
+        rb_queue_resume_pending_actions, freed on entry clear. */
+    AbilityEffect *pending_actions[RB_ENTRY_PENDING_CAP];
+    int  has_pending_choice;
+    RbChoice pending_choice;   /* per-entry parked choice (Rust entry.pending_choice) */
+    char spawn_target[64];     /* resolver spawn_context.target for this entry */
     int  triggering_member_id;
     int  use_limit_recorded;
     int  optional_moves_all_moved; /* -1=None, 0=false, 1=true (mirrors Rust Option<bool>) */

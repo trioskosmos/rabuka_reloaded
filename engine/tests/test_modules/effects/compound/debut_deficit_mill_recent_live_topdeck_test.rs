@@ -33,7 +33,10 @@ fn deficit_mill(wait_count: usize, mill_live: bool, take: bool) {
     let mut expected_wait = initial_wait;
     expected_wait.extend_from_slice(&milled);
     assert_eq!(game.state.player1.waitroom.cards.as_slice(), expected_wait);
-    assert_eq!(game.state.player1.main_deck.cards.as_slice(), &deck_before[deficit..]);
+    assert_eq!(
+        game.state.player1.main_deck.cards.as_slice(),
+        &deck_before[deficit..]
+    );
     if mill_live && deficit > 0 {
         game.assert_select_card("discard", 1, true);
         game.select_indices(if take { &[0] } else { &[] });
