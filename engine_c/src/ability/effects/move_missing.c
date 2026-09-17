@@ -36,10 +36,43 @@ int rb_move_optional_gate_source(const char *zone_str);
 
 
 
+int rb_move_looked_at_matches(GameState *g, int cid, AbilityEffect *e);
+int rb_move_resolve_cost_limit_reference(const GameState *g, const AbilityEffect *e);
+
 int rb_move_resolve_source_looked_at(GameState *g, int actor, AbilityEffect *e, int use_p2,
                                       int count, int *out_ids, int max) {
-    (void)g; (void)actor; (void)e; (void)use_p2; (void)count; (void)out_ids; (void)max;
-    return 0;
+    if (!g || !e || !out_ids || max <= 0 || actor < 0 || actor > 1) return 0;
+    int pl = use_p2 ? 1 : 0;
+    int cards[RB_MAX_ZONE], matching[RB_MAX_ZONE], nm = 0;
+    int n = rb_looked_at_pool(pl, cards, RB_MAX_ZONE);
+    int is_all = e->count < 0;
+    for (int i = 0; i < e->n_extra; i++)
+        if (e->extra_k[i] && !strcmp(e->extra_k[i], "all") && e->extra_v[i])
+            is_all |= !strcmp(e->extra_v[i], "true") || !strcmp(e->extra_v[i], "1");
+    for (int i = 0; i < n; i++)
+        if (rb_move_looked_at_matches(g, cards[i], e)) matching[nm++] = cards[i];
+    int take = is_all ? nm : (count < nm ? count : nm);
+    if (take > max) take = max;
+    if (take <= 0) return 0;
+    if (e->is_optional) {
+        rb_move_prompt_card_selection(g, actor, "looked_at", take, 1, e);
+        const char *dest = e->destination ? e->destination : "discard";
+        char desc[128];
+        snprintf(desc, sizeof(desc), "Move up to %d looked-at card(s) to %s?", take, dest);
+        rb_choice_set_description(&g->queue.pending, desc);
+        g->queue.pending.cost_limit = rb_move_resolve_cost_limit_reference(g, e);
+        g->queue.resume_mode = 6;
+        g->queue.resume_eff = e;
+        g->queue.resume_actor = actor;
+        g->queue.resume_draw_target = pl;
+        g->queue.resume_draw_count = take;
+        g->queue.resume_draw_self_id = 0;
+        return 0;
+    }
+    int taken = 0;
+    for (int i = 0; i < take; i++)
+        if (rb_look_remove(pl, matching[i])) out_ids[taken++] = matching[i];
+    return taken;
 }
 
 static const char *cmf_extra(const AbilityEffect *e, const char *k) {

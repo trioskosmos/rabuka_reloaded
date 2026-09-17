@@ -139,6 +139,7 @@ static int do_yell(GameState *g, int pl, int yell_cards[RB_MAX_LIVE_CARDS*3], in
     if (per_live < 1) per_live = 1;
     int total_needed=lives*per_live;
     int revealed=0;
+    int draw_icons=0;
     memset(blade_hearts,0,8*sizeof(int));
     *note_icons=0;
     *n_yell=0;
@@ -172,9 +173,10 @@ static int do_yell(GameState *g, int pl, int yell_cards[RB_MAX_LIVE_CARDS*3], in
         /* all blade/heart/draw/score icons of this card flow through the shared
             helper (mirror live.rs::player_perform_live's yell loop). */
         RbYellIconOutcome o = rb_process_yell_revealed_card_icons(g, cid, override_color, blade_hearts, note_icons);
-        (void)o; /* draw_icons deferred (engine draws after all yell cards revealed) */
+        draw_icons += o.draw_icons;
         revealed++;
     }
+    for(int i=0;i<draw_icons;i++) rb_draw(g, pl);
     return revealed;
 }
 

@@ -130,8 +130,7 @@ fn audit_cards(db: &CardDatabase, ids: &[i16]) -> Vec<Value> {
 fn audit_view(gs: &GameState) -> Value {
     let own = gs.active_player();
     let opponent = if own.id == gs.player1.id { &gs.player2 } else { &gs.player1 };
-        let hand = own.hand.cards.iter().map(|&id| (id, audit_card(db, id))).collect::<Vec<_>>();
-        let stage = audit_cards(db, &own.stage.stage);
+        let db = &gs.card_database;
     json!({
         "own": {
             "player": own.id,
@@ -267,7 +266,6 @@ impl DecisionAudit {
 
 /// Bot identity lives in [`BotKind`] (`bot/registry.rs`): adding a version
 /// means a new variant + dispatch lines there, never renames here.
-
 use rabuka_engine::rng::Lcg;
 
 fn fresh_database() -> Arc<CardDatabase> {

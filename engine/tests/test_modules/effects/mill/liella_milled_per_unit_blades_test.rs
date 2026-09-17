@@ -1,4 +1,4 @@
-/// Tests for 葉月 恋 (PL!SP-bp5-005-R＋):
+﻿/// Tests for 葉月 恋 (PL!SP-bp5-005-R＋):
 ///
 /// Ab#0 (起動, ターン1回):
 ///   デッキの上からカードを3枚控え室に置く：ライブ終了時まで、
@@ -18,7 +18,7 @@ use rabuka_engine::turn::TurnEngine;
 /// Ab#0: Activation sends deck top 3 to discard, grants 1 blade per Liella! member
 /// among those 3. Per-unit formula: (matching / per_unit_count) * count.
 #[test]
-fn ren_ab0_2_liella_among_3_discarded_grants_2_blade() {
+fn hazuki_ren_bp5_005_mill_liella_blade_2_liella_among_3_discarded_grants_2_blade() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
@@ -54,7 +54,7 @@ fn ren_ab0_2_liella_among_3_discarded_grants_2_blade() {
 
 /// Ab#0: 0 Liella! members among the 3 discarded → 0 blade.
 #[test]
-fn ren_ab0_no_liella_no_blade() {
+fn hazuki_ren_bp5_005_mill_liella_blade_no_liella_no_blade() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
@@ -82,7 +82,7 @@ fn ren_ab0_no_liella_no_blade() {
 
 /// Ab#0: All 3 discarded are Liella! members → 3 blade (per-unit: 3/1*1 = 3).
 #[test]
-fn ren_ab0_all_3_liella_grants_3_blade() {
+fn hazuki_ren_bp5_005_mill_liella_blade_all_3_liella_grants_3_blade() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
@@ -110,7 +110,7 @@ fn ren_ab0_all_3_liella_grants_3_blade() {
 
 /// Ab#0: Blade has duration=live_end, persists after activation resolves.
 #[test]
-fn ren_ab0_blade_duration_live_end() {
+fn hazuki_ren_bp5_005_mill_liella_blade_blade_duration_live_end() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
@@ -140,7 +140,7 @@ fn ren_ab0_blade_duration_live_end() {
 /// just placed by the cost are considered. (discard per_unit counts all matching
 /// in discard, so pre-existing ones inflate the count — known limitation.)
 #[test]
-fn ren_ab0_preexisting_liella_in_discard_inflates_count() {
+fn hazuki_ren_bp5_005_mill_liella_blade_preexisting_liella_in_discard_inflates_count() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
@@ -167,11 +167,11 @@ fn ren_ab0_preexisting_liella_in_discard_inflates_count() {
 
     // Without the "those_cards" tracking, engine counts ALL Liella! in discard
     // = 2 pre-existing + 1 just placed = 3
-    // Expected: 1 (only the 1 placed by cost). Limitation is now resolved!
+    // Expected: 1 (only the 1 placed by cost) — those_cards scoping works.
     assert_eq!(
         game.state.mods.get_blade_modifier(ren),
         1,
-        "Expected 1 (only the 1 placed by cost). Limitation is now resolved!"
+        "Expected 1 (only the 1 placed by cost) — those_cards scoping works"
     );
 }
 
@@ -182,7 +182,7 @@ fn ren_ab0_preexisting_liella_in_discard_inflates_count() {
 /// Ab#1: Activate ab#0 (mill 3), then ab#1 auto-triggers. Pay 1 energy,
 /// select 1 card from the 3 milled to recover to hand.
 #[test]
-fn ren_ab1_triggers_after_mill_pay_cost_recover_card() {
+fn hazuki_ren_bp5_005_optional_pay_recovery_triggers_after_mill_pay_cost_recover_card() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
@@ -245,7 +245,7 @@ fn ren_ab1_triggers_after_mill_pay_cost_recover_card() {
 /// Ab#1: Mill 3 different cards, verify the selection offers all 3 positions,
 /// then recover a specific card and confirm it's the right one.
 #[test]
-fn ren_ab1_mill_3_recover_specific_card() {
+fn hazuki_ren_bp5_005_optional_pay_recovery_mill_3_recover_specific_card() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
@@ -311,7 +311,7 @@ fn ren_ab1_mill_3_recover_specific_card() {
 
 /// Ab#1: Decline the optional cost, no card recovered (per Q233).
 #[test]
-fn ren_ab1_decline_cost_no_recovery() {
+fn hazuki_ren_bp5_005_optional_pay_recovery_decline_cost_no_recovery() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
@@ -359,7 +359,7 @@ fn ren_ab1_decline_cost_no_recovery() {
 
 /// Ab#1: Pre-existing cards in discard should NOT be selectable (Q221).
 #[test]
-fn ren_ab1_only_trigger_cards_not_full_discard() {
+fn hazuki_ren_bp5_005_optional_pay_recovery_only_trigger_cards_not_full_discard() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
@@ -426,7 +426,7 @@ fn ren_ab1_only_trigger_cards_not_full_discard() {
 /// card_type_filter "card" is a catch-all that matches every card type.
 /// Paying the optional cost recovers 1 card regardless of the trigger card type.
 #[test]
-fn ren_ab1_card_type_catch_all_matches_any_card() {
+fn hazuki_ren_bp5_005_optional_pay_recovery_card_type_catch_all_matches_any_card() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
@@ -468,7 +468,7 @@ fn ren_ab1_card_type_catch_all_matches_any_card() {
 
 /// 2 Rens: first pays, second declines → only 1 card recovered.
 #[test]
-fn ren_ab1_two_copies_one_pays_one_declines() {
+fn hazuki_ren_bp5_005_optional_pay_recovery_two_copies_one_pays_one_declines() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
@@ -530,7 +530,7 @@ fn ren_ab1_two_copies_one_pays_one_declines() {
 /// batched discard (not per-card). Uses PL!-sd1-011-SD which has a debut
 /// look_and_select: look at top 3, pick 1 to hand, discard rest.
 #[test]
-fn ren_ab1_triggers_once_from_look_and_select_discard() {
+fn hazuki_ren_bp5_005_optional_pay_recovery_triggers_once_from_look_and_select_discard() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
@@ -589,7 +589,7 @@ fn ren_ab1_triggers_once_from_look_and_select_discard() {
 
 /// 2 copies of Ren on stage. Mill 3 → both ab#1 trigger independently.
 #[test]
-fn ren_ab1_two_copies_both_trigger() {
+fn hazuki_ren_bp5_005_optional_pay_recovery_two_copies_both_trigger() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
@@ -640,7 +640,7 @@ fn ren_ab1_two_copies_both_trigger() {
 
 /// Q233: Decline cost → ability can re-trigger when more cards are discarded.
 #[test]
-fn ren_ab1_decline_retrigger_same_turn() {
+fn hazuki_ren_bp5_005_optional_pay_recovery_decline_retrigger_same_turn() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 

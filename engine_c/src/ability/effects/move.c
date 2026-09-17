@@ -292,6 +292,28 @@ int rb_move_resolve_cost_limit_reference(const GameState *g, const AbilityEffect
     return resolved;
 }
 
+int rb_move_looked_at_matches(GameState *g, int cid, AbilityEffect *e) {
+    if (!g || !e || cid < 0) return 0;
+    AbilityEffect filter = *e;
+    filter.n_extra = 0;
+    for (int i = 0; i < e->n_extra; i++) {
+        const char *key = e->extra_k[i];
+        if (key && (!strcmp(key, "cost_limit") || !strcmp(key, "cost_total") ||
+                    !strcmp(key, "characters") || !strcmp(key, "exclude_characters"))) continue;
+        filter.extra_k[filter.n_extra] = e->extra_k[i];
+        filter.extra_v[filter.n_extra++] = e->extra_v[i];
+    }
+    if (!card_matches_filter(cid, &filter)) return 0;
+    const char *chars = cmf_extra(e, "characters");
+    if (chars && !rb_card_matches_characters(cid, &chars, 1)) return 0;
+    const char *excluded = cmf_extra(e, "exclude_characters");
+    if (excluded && rb_card_matches_characters(cid, &excluded, 1)) return 0;
+    int limit = rb_move_resolve_cost_limit_reference(g, e);
+    const char *op = cmf_extra(e, "cost_limit_operator");
+    if (!op) op = cmf_extra(e, "cost_operator");
+    return limit < 0 || rb_card_matches_cost_limit(cid, limit, op ? op : "<=");
+}
+
 /* ── zone_label helper ── */
 static const char *move_zone_label(const char *zone) {
     if (!zone) return "unknown";
@@ -477,16 +499,13 @@ int rb_move_resolve_from_recently_moved(GameState *g, int use_p2,
 
 /* ── resolve_from_looked_at ── */
 int rb_move_resolve_from_looked_at(GameState *g, int use_p2, int *out_ids, int max, int *out_count) {
-    if (!g || !out_ids || !out_count) return -1;
+    if (!g || !out_ids || !out_count || max <= 0) return -1;
     *out_count = 0;
-    RbPlayer *P = mc_player_mut(g, use_p2);
-    int ids[RB_MAX_RECENTLY_MOVED];
-    int n = rb_looked_at_pool(use_p2 ? 1 : 0, ids, RB_MAX_RECENTLY_MOVED);
-    for (int i = 0; i < n && *out_count < max; i++) {
-        out_ids[(*out_count)++] = ids[i];
-        if (P->discard.n < RB_MAX_ZONE)
-            P->discard.cards[P->discard.n++] = ids[i];
-    }
+    int pl = use_p2 ? 1 : 0;
+    int ids[RB_MAX_ZONE];
+    int n = rb_looked_at_pool(pl, ids, RB_MAX_ZONE);
+    for (int i = 0; i < n && *out_count < max; i++)
+        if (rb_look_remove(pl, ids[i])) out_ids[(*out_count)++] = ids[i];
     return 0;
 }
 
@@ -553,8 +572,14 @@ int rb_move_resolve_cards_from_source(GameState *g, int actor, AbilityEffect *e,
         const char *gn = cmf_extra(e, "group_names");
         return rb_move_resolve_from_recently_moved(g, 0, ctype, gn, out_ids, max);
     }
-    if (!strcmp(source, "looked_at")) {
-        return rb_move_resolve_from_looked_at(g, 0, out_ids, max, NULL);
+    int pl = actor;
+    if (e->target && !strcmp(e->target, "opponent")) pl ^= 1;
+    if (!strcmp(source, "looked_at"))
+        return rb_move_resolve_source_looked_at(g, actor, e, pl, count, out_ids, max);
+    if (!strcmp(source, "looked_at_remaining")) {
+        int n = 0;
+        rb_move_resolve_from_looked_at(g, pl, out_ids, max, &n);
+        return n;
     }
     if (!strcmp(source, "revealed_cards")) {
         int n = 0;
@@ -1413,6 +1438,41 @@ void rb_move_execute_selected_cards_from_zone(
     rb_clear_pending_choice(g);
 }
 
+static int move_place_looked_at(GameState *g, int pl, int cid, const char *destination,
+                                const AbilityEffect *e) {
+    if (!strcmp(destination, "looked_at")) {
+        rb_look_add(pl, cid);
+        return 1;
+    }
+    if (!strcmp(destination, "deck") || !strcmp(destination, "deck_top") ||
+        !strcmp(destination, "deck_bottom")) {
+        RbBag *deck = &g->p[pl].deck;
+        if (deck->n >= RB_MAX_ZONE) return 0;
+        int idx = !strcmp(destination, "deck_bottom") ? 0 : deck->n;
+        const char *position = e ? cmf_extra(e, "position") : NULL;
+        int nth = position ? atoi(position) : 0;
+        if (nth > 0 && strcmp(destination, "deck_bottom")) {
+            idx = deck->n - (nth - 1);
+            if (idx < 0) idx = 0;
+        }
+        for (int i = deck->n; i > idx; i--) deck->cards[i] = deck->cards[i - 1];
+        deck->cards[idx] = cid;
+        deck->n++;
+        return 1;
+    }
+    return rb_place_card_in_zone(g, pl, cid, destination, -1);
+}
+
+static void move_track_looked_at(GameState *g, int cid, const AbilityEffect *e) {
+    rb_mods_clear_card(&g->mods, cid);
+    const char *state = e ? cmf_extra(e, "state_change") : NULL;
+    if (state) rb_mods_set_orientation(&g->mods, cid, state);
+    mc_record_movement(g, cid);
+    if (g->n_those_cards < RB_MAX_RECENTLY_MOVED)
+        g->those_cards[g->n_those_cards++] = cid;
+    if (cid >= 0 && cid < RB_MAX_CARD_IDS) g->moved_this_turn[cid] = 1;
+}
+
 /* ── handle_select_cards_looked_at ── */
 void rb_move_handle_select_cards_looked_at(
     GameState *g, int actor, const int *indices, int n_indices,
@@ -1500,8 +1560,21 @@ void rb_effect_move_cards(GameState *g, int actor, AbilityEffect *e){
 
         int src_ids[RB_MAX_ZONE]; int src_area[RB_MAX_ZONE]; int ns=0;
         if(!strcmp(src_s,"looked_at")||!strcmp(src_s,"looked_at_remaining")){
-            ns = rb_looked_at_pool(actor, src_ids, RB_MAX_ZONE);
-            for(int i=0;i<ns;i++) src_area[i]=-1;
+            if (!strcmp(src_s, "looked_at"))
+                ns = rb_move_resolve_source_looked_at(g, actor, e, players[pk], cnt, src_ids, RB_MAX_ZONE);
+            else
+                rb_move_resolve_from_looked_at(g, players[pk], src_ids, RB_MAX_ZONE, &ns);
+            if (g->queue.has_pending) return;
+            g->n_recently_moved = 0;
+            g->n_those_cards = 0;
+            for (int i = 0; i < ns; i++) {
+                if (move_place_looked_at(g, players[pk], src_ids[i], dst_s, e)) {
+                    move_track_looked_at(g, src_ids[i], e);
+                    if (nm < RB_MAX_ZONE) moved_ids[nm++] = src_ids[i];
+                } else rb_look_add(players[pk], src_ids[i]);
+            }
+            rb_recalc_constants(g);
+            continue;
         } else if(relay){
             if(!strcmp(src_s,"selected_cards")){
                 for(int i=0;i<g->n_selected_cards && ns<cnt;i++){ src_ids[ns]=g->selected_cards[i]; src_area[ns]=-1; ns++; }

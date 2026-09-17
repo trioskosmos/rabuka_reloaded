@@ -41,7 +41,6 @@ pub mod pl_hs_bp1_003_test;
 pub mod pl_n_bp1_008_test;
 pub mod poppin_test;
 pub mod qa_new_tests209;
-pub mod ren_test;
 pub mod rin_bp6_test;
 pub mod rin_test;
 pub mod self_to_waitroom_liella_recovery_test;

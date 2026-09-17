@@ -144,6 +144,86 @@ Each item is a full sweep with a green suite + commit between items:
    `--check` churn; keep the four human docs in --check, move the JSON to a
    separate opt-in check so normal runs stay fast.
 
+## Sweep-found issues ledger (inspect + fix; 2026-09-17)
+
+Found while re-homing 66 batch files. Each entry: the flagged claim, and
+how to verify before touching anything. **Verification gate — read first:**
+before editing any flagged test, (a) read the card's actual entry in
+`cards/cards.json` (name, cost, ALL abilities), (b) re-read the test body.
+A flagged "mismatch" may actually be: a multi-ability card whose file tests
+a different ability than the header's (fine if the file is named for the
+tested one), a deliberate characterization pin, or a stale comment with
+correct code. Confirm the test is ACTUALLY wrong before fixing; fix
+end-to-end (assertion + name + placement), classify test bug vs engine bug
+vs parser gap, and state which in the commit message. Grep the card print
+across the whole test tree, not just the flagged file — the same wrong
+assumption often repeats.
+
+1. **Trigger mislabels** (name/header says X, card fires Y):
+   - HS-bp6-013: old name said debut; test fires LiveStart. Verify against
+     cards.json which trigger is printed, rename to match reality
+     (current: `low_blade_opponent_wait_pl_hs_bp6_013_r_test.rs`).
+   - SP-PR-018: fires LiveSuccess and asserts energy count only (old name
+     said wait-state placement). Current:
+     `seven_liella_reveals_pl_sp_pr_018_pr_test.rs` — verify the count-only
+     assertion against the printed rider (placed energy, not waited state).
+2. **Effect mislabels:**
+   - HS-bp6-030: draw+discard, not mill (verified cards.json:81987; renamed
+     `draw_discard_pl_hs_bp6_030_l_test.rs`). DONE.
+   - PL!-pb1-007-R activation cost is discard-three, not mill (renamed
+     `lilywhite_gated_live_pl_pb1_007_r_test.rs`; verify the cost clause in
+     cards.json and that both tests pay the full three-card cost).
+   - Batch43's "score six" staged a score-9 live; renamed to score9 —
+     verify the assertion exercises the >=-threshold boundary, and add the
+     boundary-equal case if missing.
+3. **Character mislabels** (name ≠ staged card):
+   - PL!HS-bp2-008-R is 徒町小鈴 (Kosuzu), NOT 北条そふぃ — old batch9
+     test names said Sofiya. Renamed to behavior names; sweep the suite for
+     other wrong-character names by checking every staged print's name in
+     cards.json against its test name.
+   - PL!S-bp6-001-R is 高海千歌, not "Shion" — same treatment.
+   - Batch46's header referenced PL!HS-bp6-009-R without any test staging
+     it — check whether bp6-009 has coverage elsewhere
+     (TEST_INVENTORY.md ground truth); if not, it is a coverage gap.
+   - RESOLVED — ren_test.rs identity: cards.json confirms
+     PL!SP-bp5-005-R＋ IS 葉月 恋 (given name Ren). The file name "ren" was
+     a legitimate short form, NOT a mismatch — the earlier ledger claim
+     was wrong (multi-ability card, both abilities tested correctly).
+     Remaining work there is only behavior-led renaming per the naming
+     principle; the tests themselves assert correctly (Q221 scope, Q233
+     decline branch both present and correct).
+4. **Tests that never fire the claimed ability (vacuous):**
+   - PL!-bp6-016-N: card is LiveSuccess look-3/reorder, but the test only
+     debuts and asserts unchanged top-3 — the printed ability never
+     executes. Current name `top_three_membership_pl_bp6_016_n_test.rs`
+     honestly states debut-only. FIX: add a real LiveSuccess firing with a
+     set live card and assert the reorder per printed text.
+   - WWD delayed lock: success case asserts immediate waited energy only;
+     the printed next-turn activation lock is untested. ADD the next-turn
+     negative (placed energy must not activate next turn).
+   - Hanamaru identity assertion contains `|| true` — cannot fail.
+     REPLACE with a real identity check (assert the staged card's card_no).
+   - Karin helper selects the FIRST LiveStart of a two-trigger card; the
+     claimed selection cap is unproven. Fire the second trigger and pin it.
+5. **Weak/missing branches (add tests; never weaken existing):**
+   - Bounded drains that never assert termination: add a final
+     `assert!(!game.has_pending_choice())` on touch.
+   - Negatives testing unpayable-cost auto-skip instead of voluntary
+     decline (bp2-005-R, pb2-007-R): add the true decline branch.
+   - Threshold tests asserting only above-threshold: add exact-boundary
+     and below cases per printed inclusivity.
+   - Deficit score return checks active count, not energy-deck origin —
+     pin the deck the returned energy comes from.
+   - Transform tests inspect the modifier map only; assert calculated
+     hearts (and expiry where printed).
+6. **Batch55 header listed six prints with no tests** — look each up in
+   TEST_INVENTORY.md; treat uncovered ones as coverage gaps to fill.
+7. **Multi-ability caution for ALL fixes above**: several flagged cards
+   have 2-3 abilities; a test may legitimately target a different ability
+   than the file header claimed. That is a header/name bug, not a test
+   bug — rename, do not rewrite the test body. Only rewrite behavior when
+   the assertion contradicts the PRINTED text of the exercised ability.
+
 ## Placement confidence
 
 ~130 files were placed by plurality vote at <50% confidence (filler-card

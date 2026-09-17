@@ -178,6 +178,101 @@ static void scenario_opponent_live_success(void){
     g.live_success[1]=0;
     CHECK(rb_eval_condition(&g,0,&cond)==0,"opponent_live_success false when opponent failed");
 }
+static void scenario_move_looked_at(void){
+    static TestGame tg;
+    int member=rb_find_card_by_no("PL!-sd1-010-SD");
+    int other=rb_find_card_by_no("PL!-sd1-001-SD");
+    int live=rb_find_card_by_no("PL!N-bp1-027-L");
+    CHECK(member>=0 && other>=0 && live>=0,"looked-at regression card identities resolve");
+    if(member<0 || other<0 || live<0) return;
+    test_game_new(&tg);
+    rb_look_clear(0);
+    rb_look_clear(1);
+    rb_look_add(0,live);
+    rb_look_add(0,member);
+    rb_look_add(0,other);
+    AbilityEffect e={0};
+    e.action="move_cards"; e.source="looked_at"; e.destination="hand"; e.count=1;
+    strcpy(e.card_type_field,"member_card");
+    rb_execute_effect_ex(&tg.state,0,&e,member);
+    CHECK(tg.state.p[0].hand.n==1 && tg.state.p[0].hand.cards[0]==member,
+          "looked-at move transfers first matching card to hand");
+    int pool[8];
+    int n=rb_looked_at_pool(0,pool,8);
+    CHECK(n==2 && pool[0]==live && pool[1]==other,"looked-at move preserves unmatched pool order");
+    CHECK(tg.state.n_recently_moved==1 && tg.state.recently_moved[0]==member,
+          "looked-at move updates recently moved relay");
+    e.source="looked_at_remaining"; e.destination="discard"; e.count=-1;
+    e.card_type_field[0]=0;
+    rb_execute_effect_ex(&tg.state,0,&e,member);
+    CHECK(tg.state.p[0].discard.n==2 && tg.state.p[0].discard.cards[0]==live &&
+          tg.state.p[0].discard.cards[1]==other,"looked-at remaining moves each leftover exactly once");
+    CHECK(rb_looked_at_pool(0,pool,8)==0,"looked-at remaining empties relay pool");
+    rb_execute_effect_ex(&tg.state,0,&e,member);
+    CHECK(tg.state.p[0].discard.n==2,"empty looked-at relay cannot duplicate cards");
+    test_game_new(&tg);
+    rb_look_clear(0);
+    rb_look_clear(1);
+    rb_look_add(0,member);
+    rb_look_add(1,other);
+    e.source="looked_at"; e.destination="hand"; e.count=1; e.target="opponent";
+    rb_execute_effect_ex(&tg.state,0,&e,member);
+    CHECK(tg.state.p[1].hand.n==1 && tg.state.p[1].hand.cards[0]==other && tg.state.p[0].hand.n==0,
+          "opponent looked-at move uses opponent pool and destination");
+    CHECK(rb_looked_at_pool(0,pool,8)==1 && pool[0]==member,"opponent move leaves actor pool untouched");
+    rb_look_clear(0);
+    rb_look_clear(1);
+}
+
+static void scenario_yell_draw_icons(void){
+    static TestGame tg;
+    int sr=rb_find_card_by_no("PL!N-bp1-027-L");
+    int fill=rb_find_card_by_no("PL!-sd1-010-SD");
+    CHECK(sr>=0 && fill>=0,"yell draw regression card identities resolve");
+    if(sr<0 || fill<0) return;
+    Card card;
+    int decoded=rb_decode_card_by_index((uint32_t)sr,&card);
+    CHECK(decoded,"Solitude Rain decodes");
+    if(!decoded) return;
+    CHECK(card.has_special && card.special_color==RB_HEART_DRAW && card.special_count==1,
+          "Solitude Rain has exactly one draw icon");
+    rb_free_card(&card);
+    for(int success=0;success<2;success++){
+        test_game_new(&tg);
+        test_add_to_live(&tg,sr);
+        test_add_to_deck(&tg,fill);
+        test_add_to_deck(&tg,sr);
+        if(success) for(int c=0;c<8;c++) tg.state.p[0].hearts[c]=30;
+        int passed=rb_perform_live(&tg.state,0);
+        CHECK(passed==success,"yell draw tested with both live verdicts");
+        CHECK(tg.state.p[0].hand.n==1 && tg.state.p[0].hand.cards[0]==fill,
+              "yell draw resolves independently of live success");
+        CHECK(tg.state.p[0].deck.n==0,"yell draw consumes the card below the reveal");
+        CHECK(tg.state.p[0].discard.n==(success?1:2),"yell cards discarded after drawing");
+    }
+    test_game_new(&tg);
+    test_add_to_live(&tg,sr);
+    test_add_to_deck(&tg,sr);
+    for(int i=0;i<3;i++) test_add_to_discard(&tg,fill);
+    rb_perform_live(&tg.state,0);
+    CHECK(tg.state.p[0].hand.n==1 && tg.state.p[0].hand.cards[0]==fill,
+          "yell draw refresh draws only from the previous waitroom");
+    CHECK(tg.state.p[0].deck.n==2,"yell draw refresh leaves two cards in deck");
+    CHECK(tg.state.p[0].discard.n==2,"current yell and failed live excluded from refresh");
+    test_game_new(&tg);
+    test_add_to_live(&tg,sr);
+    test_add_to_deck(&tg,fill);
+    test_add_to_deck(&tg,fill);
+    test_add_to_deck(&tg,sr);
+    test_add_to_deck(&tg,sr);
+    tg.state.yell_count_mod[0]=1;
+    rb_perform_live(&tg.state,0);
+    CHECK(tg.state.p[0].hand.n==2 && tg.state.p[0].hand.cards[0]==fill &&
+          tg.state.p[0].hand.cards[1]==fill,"all yell cards reveal before either draw resolves");
+    CHECK(tg.state.p[0].deck.n==0 && tg.state.p[0].discard.n==3,
+          "multiple yell draws preserve all cards");
+}
+
 static void scenario_phase_determinism(void){
     GameState g1,g2; uint32_t d0[20],d1[20];
     for(int i=0;i<20;i++){ d0[i]=i; d1[i]=20+i; }
@@ -806,6 +901,8 @@ int main(int argc, char **argv){
     scenario_no_excess();
     scenario_opponent_live_success();
     scenario_phase_determinism();
+    scenario_yell_draw_icons();
+    scenario_move_looked_at();
     rb_unload();
     if(failures){ printf("\n%d FAILURES\n",failures); return 1; }
     printf("\nALL REPLAY CHECKS PASSED\n");
