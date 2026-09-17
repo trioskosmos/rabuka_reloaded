@@ -23,6 +23,7 @@ pub mod l0_gap_constant5_test;
 pub mod l0_gap_subunit_success_test;
 pub mod liella_baton_energy_comprehensive_edge_test;
 pub mod live_heart02_threshold_gain_pl_s_bp6_010_n_test;
+pub mod live_start_discard_distinct_heart_colors_q246_test;
 pub mod live_zone_heart04_threshold_pl_s_bp5_013_n_test;
 pub mod live_zone_heart05_threshold_pl_s_bp5_017_n_test;
 pub mod opponent_energy_ahead_constant_heart_test;

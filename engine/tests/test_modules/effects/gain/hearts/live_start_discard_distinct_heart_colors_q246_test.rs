@@ -26,7 +26,7 @@ fn finish_live_setup(game: &mut TestGame) {
 /// Q246 main: partial overlap dedup.
 /// Discard Dia(H02,H05) + Kosuzu(H04,H05,H06) → shared H05 counted once.
 #[test]
-fn test_q246_partial_overlap_dedup() {
+fn live_start_discard_overlapping_heart_colors_gains_each_color_once_q246() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
@@ -116,7 +116,7 @@ fn test_q246_partial_overlap_dedup() {
 /// Subset selection: 3 eligible cards, discard only 2.
 /// Engine must NOT count the unselected card's hearts.
 #[test]
-fn test_q246_subset_selection() {
+fn live_start_discard_subset_excludes_unselected_heart_colors_q246() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
@@ -209,7 +209,7 @@ fn test_q246_subset_selection() {
 
 /// Single card discard: only 1 eligible card, discard it.
 #[test]
-fn test_q246_single_card() {
+fn live_start_discard_single_member_gains_its_three_heart_colors_q246() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
