@@ -1,6 +1,6 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-09-17T00:57:28.188268+00:00",
+  "generated_at": "2026-09-17T01:08:54.168937+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
@@ -8,7 +8,7 @@
     "unique_abilities": 936
   },
   "n_files": 577,
-  "n_tests": 3302,
+  "n_tests": 3305,
   "total_cards": 771,
   "covered_cards": 771,
   "abilities_on_covered": 936,
@@ -754,7 +754,7 @@
       ]
     }
   },
-  "n_test_fns_parsed": 3302,
+  "n_test_fns_parsed": 3305,
   "abilities": [
     {
       "idx": 0,
@@ -1023,7 +1023,7 @@
         "bella_q174_no_heart04_surplus_ability_does_not_fire",
         "bella_q174_no_member_on_stage_ability_does_not_fire"
       ],
-      "covering_test_count": 412,
+      "covering_test_count": 415,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -11796,7 +11796,7 @@
         "bp6_016_look_three_reorder_back_on_top",
         "bp6_016n_deck_shorter_than_three_looks_whats_there"
       ],
-      "covering_test_count": 238,
+      "covering_test_count": 241,
       "is_null": true,
       "use_limit": null,
       "watches_abilities": false,

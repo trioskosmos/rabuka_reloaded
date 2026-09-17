@@ -126,3 +126,90 @@ fn p2_first_attacker_performance_finalizes_p2_snapshot() {
         "the successful live card belongs in P2's live/success zone"
     );
 }
+
+fn finish_live_without_choices(game: &mut TestGame) {
+    let mut saw_result = false;
+    for _ in 0..16 {
+        assert!(!game.has_pending_choice());
+        let phase = game.state.current_phase.to_string();
+        saw_result |= phase.contains("Live Result");
+        if saw_result && phase == "Active" {
+            return;
+        }
+        game.pass();
+    }
+    panic!("live did not finish at the next Active phase");
+}
+
+fn play_attacker_order_live(p1_first: bool, perform: [bool; 2]) -> (TestGame, [i16; 2]) {
+    let mut game = TestGame::new(load_real_database());
+    game.state.player1.is_first_attacker = p1_first;
+    game.state.player2.is_first_attacker = !p1_first;
+    let p1_member = game.id("PL!-sd1-014-SD");
+    let p2_member = game.id("PL!-sd1-014-SD");
+    game.state.player1.stage.stage = [p1_member, -1, -1];
+    game.state.player2.stage.stage = [p2_member, -1, -1];
+    let p1_deck: Vec<i16> = (0..20).map(|_| game.id(FILLER)).collect();
+    let p2_deck: Vec<i16> = (0..20).map(|_| game.id(FILLER)).collect();
+    game.state.player1.main_deck.cards = p1_deck.into();
+    game.state.player2.main_deck.cards = p2_deck.into();
+    let lives = [game.id(DREAM_BELIEVERS), game.id(DREAM_BELIEVERS)];
+    game.add_to_hand_for(Side::P1, lives[0]);
+    game.add_to_hand_for(Side::P2, lives[1]);
+    for _ in 0..5 {
+        game.pass();
+        assert!(!game.has_pending_choice());
+    }
+    let first = if p1_first { 0 } else { 1 };
+    if perform[first] {
+        game.set_live_card(lives[first]);
+    }
+    game.pass();
+    let second = 1 - first;
+    if perform[second] {
+        game.set_live_card(lives[second]);
+    }
+    finish_live_without_choices(&mut game);
+    assert!(game.state.player1.live_card_zone.cards.is_empty());
+    assert!(game.state.player2.live_card_zone.cards.is_empty());
+    (game, lives)
+}
+
+#[test]
+fn sole_winner_becomes_first_attacker_for_next_turn() {
+    for p1_first in [true, false] {
+        let (game, lives) = play_attacker_order_live(p1_first, [!p1_first, p1_first]);
+        assert_eq!(game.state.player1.is_first_attacker, !p1_first);
+        assert_eq!(game.state.player2.is_first_attacker, p1_first);
+        let expected_p1 = if p1_first { vec![] } else { vec![lives[0]] };
+        let expected_p2 = if p1_first { vec![lives[1]] } else { vec![] };
+        assert_eq!(game.state.player1.success_live_card_zone.cards.as_slice(), expected_p1);
+        assert_eq!(game.state.player2.success_live_card_zone.cards.as_slice(), expected_p2);
+    }
+}
+
+#[test]
+fn tied_success_keeps_current_first_attacker() {
+    for p1_first in [true, false] {
+        let (game, lives) = play_attacker_order_live(p1_first, [true, true]);
+        assert_eq!(game.state.player1.success_live_card_zone.cards.as_slice(), &[lives[0]]);
+        assert_eq!(game.state.player2.success_live_card_zone.cards.as_slice(), &[lives[1]]);
+        assert_eq!(game.state.player1.is_first_attacker, p1_first);
+        assert_eq!(game.state.player2.is_first_attacker, !p1_first);
+    }
+}
+
+#[test]
+fn no_performance_keeps_current_first_attacker() {
+    for p1_first in [true, false] {
+        let (game, lives) = play_attacker_order_live(p1_first, [false, false]);
+        assert!(game.state.player1.success_live_card_zone.cards.is_empty());
+        assert!(game.state.player2.success_live_card_zone.cards.is_empty());
+        assert!(game.state.player1.waitroom.cards.is_empty());
+        assert!(game.state.player2.waitroom.cards.is_empty());
+        assert!(game.state.player1.hand.cards.contains(&lives[0]));
+        assert!(game.state.player2.hand.cards.contains(&lives[1]));
+        assert_eq!(game.state.player1.is_first_attacker, p1_first);
+        assert_eq!(game.state.player2.is_first_attacker, !p1_first);
+    }
+}
