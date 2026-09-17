@@ -1,5 +1,5 @@
-/// Q231: 三船栞子 (PL!N-bp5-010-R) — LiveSuccess: excess heart ≥2 → score -1.
-/// Score icon +1, then ability -1, net 0.
+/// Q231: 三船栞子 (PL!N-bp5-010-R) — LiveSuccess: no excess hearts → total score +1;
+/// 2+ excess hearts → total score −1, never below 0.
 use crate::helpers::*;
 
 fn advance_to_live_set(game: &mut TestGame) {
