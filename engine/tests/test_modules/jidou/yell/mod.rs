@@ -1,0 +1,16 @@
+// Auto-generated. Tests live as sibling .rs files in this folder.
+    pub mod blade_heart_types_test;
+    pub mod bp7_fire_bird_blade_gain_test;
+    pub mod daisuki_and_dia_test;
+    pub mod daisuki_test;
+    pub mod jimo_ai_dash_test;
+    pub mod kurosawa_dia_re_yell_test;
+    pub mod miracle_wave_test;
+    pub mod qa_new_tests251;
+    pub mod sp_bp2_015_021_yell_blade_test;
+    pub mod sp_bp2_015_wien_extra_test;
+    pub mod sumire_auto_test;
+    pub mod untested_abilities_batch46_test;
+    pub mod untested_abilities_batch9_test;
+    pub mod upper_batch_on_yell_test;
+    pub mod wien_n_test;

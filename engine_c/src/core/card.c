@@ -13,25 +13,48 @@
 static uint16_t le16p(const unsigned char *p) {
     return (uint16_t)(p[0] | ((uint16_t)p[1] << 8));
 }
-static int card_type_of(const unsigned char *r) { return r[18] & 0x03; }
+static int card_type_of(const unsigned char *r) {
+    int type = r[18] & 0x03;
+    return type == 3 ? 0 : type;
+}
+
+int rb_card_type_from_str(const char *s) {
+    if (!s) return -1;
+    if (!strcmp(s, "member_card")) return 0;
+    if (!strcmp(s, "live_card")) return 1;
+    if (!strcmp(s, "energy_card")) return 2;
+    return -1;
+}
+
+const char *rb_card_type_str(int t) {
+    switch (t) {
+        case 0: return "member_card";
+        case 1: return "live_card";
+        case 2: return "energy_card";
+        default: return "";
+    }
+}
 
 int rb_card_is_live(int card_id) {
     const unsigned char *r = rb_card_record((uint32_t)card_id);
-    return r != NULL && card_type_of(r) == 1;
+    return r != NULL && rb_card_record_len((uint32_t)card_id) >= 25 && card_type_of(r) == 1;
 }
 int rb_card_is_energy(int card_id) {
     const unsigned char *r = rb_card_record((uint32_t)card_id);
-    return r != NULL && card_type_of(r) == 2;
+    return r != NULL && rb_card_record_len((uint32_t)card_id) >= 25 && card_type_of(r) == 2;
 }
 int rb_card_is_member(int card_id) {
     const unsigned char *r = rb_card_record((uint32_t)card_id);
-    return r != NULL && card_type_of(r) == 0;
+    return r != NULL && rb_card_record_len((uint32_t)card_id) >= 25 && card_type_of(r) == 0;
 }
 
 int rb_decode_card_by_index(uint32_t i, Card *out) {
     const unsigned char *r = rb_card_record(i);
     uint32_t len = rb_card_record_len(i);
     if (!r || !out || len < 25) return 0;
+    uint32_t total = (uint32_t)r[22] + r[23] + r[24];
+    uint32_t required = 25 + total * 2 + ((r[18] & 4) ? 2 : 0);
+    if (total > RB_MAX_HEARTS || len < required) return 0;
     memset(out, 0, sizeof(*out));
     out->card_no_idx = le16p(r + 0);
     out->name_idx    = le16p(r + 2);
@@ -42,17 +65,16 @@ int rb_decode_card_by_index(uint32_t i, Card *out) {
     out->product_idx = le16p(r + 12);
     out->rare_idx    = le16p(r + 14);
     out->ability_idx = le16p(r + 16);
-    out->type_flags  = r[18];
-    out->cost        = r[19];
+    out->type_flags  = (uint8_t)((r[18] & ~3u) | (unsigned)card_type_of(r));
+    out->cost        = (r[18] & 8) ? r[19] : 0;
     out->blade       = r[20];
-    out->score       = r[21];
+    out->score       = (r[18] & 16) ? r[21] : 0;
     out->num_base    = r[22];
     out->num_blade   = r[23];
     out->num_need    = r[24];
     /* hearts: (color,count) byte pairs from offset 25 */
     uint32_t pos = 25;
-    uint32_t total = (uint32_t)out->num_base + out->num_blade + out->num_need;
-    for (uint32_t k = 0; k < total && pos + 1 < len; k++) {
+    for (uint32_t k = 0; k < total; k++) {
         if (out->n_hearts < RB_MAX_HEARTS) {
             out->heart_color[out->n_hearts] = r[pos];
             out->heart_count[out->n_hearts] = r[pos + 1];
@@ -64,6 +86,7 @@ int rb_decode_card_by_index(uint32_t i, Card *out) {
     if (out->has_special && pos + 1 < len) {
         out->special_color = r[pos];
         out->special_count = r[pos + 1];
+        out->has_special = out->special_count != 0;
     }
     const char *nm = rb_card_string(out->name_idx);
     out->name = rb_strdup2(nm ? nm : "");
@@ -135,6 +158,54 @@ static int card_whitespace(uint32_t cp) {
         || cp == 0x3000;
 }
 
+static uint32_t card_no_codepoint(uint32_t cp) {
+    if (cp >= 'a' && cp <= 'z') return cp - 'a' + 'A';
+    if (cp >= 0xFF41 && cp <= 0xFF5A) return cp - 0xFF41 + 'A';
+    switch (cp) {
+        case 0xFF0B: return '+';
+        case 0xFF01: return '!';
+        case 0xFF0D: return '-';
+        case 0xFF0A: return '*';
+        case 0xFF03: return '#';
+        default: return cp;
+    }
+}
+
+void rb_card_normalize_no(const char *src, char *out, size_t out_sz) {
+    if (!out || !out_sz) return;
+    size_t w = 0;
+    if (src) {
+        while (*src) {
+            uint32_t cp;
+            size_t n = card_utf8_char(src, &cp);
+            uint32_t normalized = card_no_codepoint(cp);
+            size_t written = normalized == cp ? n : 1;
+            if (written >= out_sz - w) break;
+            if (normalized == cp) memmove(out + w, src, n);
+            else out[w] = (char)normalized;
+            w += written;
+            src += n;
+        }
+    }
+    out[w] = 0;
+}
+
+void rb_map_series_to_group(const char *series, char *out, size_t out_sz) {
+    if (!out || !out_sz) return;
+    const char *group = "";
+    if (series) {
+        if (!strcmp(series, "ラブライブ！")) group = "μ's";
+        else if (!strcmp(series, "ラブライブ！サンシャイン!!")) group = "Aqours";
+        else if (!strcmp(series, "ラブライブ！虹ヶ咲学園スクールアイドル同好会")) group = "虹ヶ咲";
+        else if (!strcmp(series, "ラブライブ！スーパースター!!")) group = "Liella!";
+        else if (!strcmp(series, "蓮ノ空女学院スクールアイドルクラブ")
+              || !strcmp(series, "ラブライブ！蓮ノ空女学院スクールアイドルクラブ")) group = "蓮ノ空";
+    }
+    size_t len = strlen(group);
+    if (len >= out_sz) { out[0] = 0; return; }
+    memcpy(out, group, len + 1);
+}
+
 void rb_card_normalize_name(const char *src, char *out, size_t out_sz) {
     if (!out || out_sz == 0) return;
     size_t w = 0;
@@ -164,12 +235,48 @@ int rb_parse_operator(const char *s) {
     return -1;
 }
 
+int rb_parse_operation(const char *s) {
+    static const char *const names[] = {
+        "add", "decrease", "increase", "remove", "set", "subtract", "set_from_reference"
+    };
+    if (!s) return -1;
+    for (size_t i = 0; i < sizeof(names) / sizeof(names[0]); i++)
+        if (!strcmp(s, names[i])) return (int)i;
+    return -1;
+}
+
+int rb_distinct_info_is_distinct(const char *s) {
+    return s && *s && strcmp(s, "false") != 0;
+}
+
 /* ── Ability::has_trigger (card.rs:834): parse triggers text, match kind ── */
 int rb_ability_has_trigger(const Ability *a, RbTriggerKind kind) {
     if (!a || !a->triggers) return 0;
-    RbTriggerKind out[16];
-    int n = rb_parse_triggers(a->triggers, out, 16);
-    for (int i = 0; i < n; i++) if (out[i] == kind) return 1;
+    const char *p = a->triggers;
+    while (*p) {
+        const char *start = p;
+        const char *end = p;
+        int leading = 1;
+        while (*p && *p != ',') {
+            uint32_t cp;
+            size_t n = card_utf8_char(p, &cp);
+            if (!card_whitespace(cp)) {
+                if (leading) start = p;
+                leading = 0;
+                end = p + n;
+            }
+            p += n;
+        }
+        if (!leading && (size_t)(end - start) < 64) {
+            char token[64];
+            size_t len = (size_t)(end - start);
+            memcpy(token, start, len);
+            token[len] = 0;
+            RbTriggerKind parsed;
+            if (rb_parse_triggers(token, &parsed, 1) == 1 && parsed == kind) return 1;
+        }
+        if (*p) p++;
+    }
     return 0;
 }
 
@@ -237,13 +344,15 @@ int rb_condition_get_cache(const Condition *c, int *out) {
 const char *rb_condition_get_group_names(const Condition *c) {
     const CondValue *v = cond_find(c, "group_names");
     if (v && v->tag == RB_TAG_STR && v->s) return v->s;
+    if (v && v->tag == RB_TAG_ARRAY && v->arr && v->arr_n
+        && v->arr[0].tag == RB_TAG_STR) return v->arr[0].s;
     return NULL;
 }
 const char *rb_condition_get_position(const Condition *c) {
     const CondValue *v = cond_find(c, "position");
     if (v && v->tag == RB_TAG_STR && v->s) return v->s;
     /* nested PositionInfo struct shape: { position: "..." } */
-    if (v && v->tag == RB_TAG_OBJECT && v->cond) {
+    if (v && (v->tag == RB_TAG_OBJECT || v->tag == RB_TAG_OBJVAR) && v->cond) {
         const CondValue *inner = cond_find(v->cond, "position");
         if (inner && inner->tag == RB_TAG_STR && inner->s) return inner->s;
     }
@@ -264,9 +373,75 @@ const char *rb_effect_position_any(const AbilityEffect *e) {
 }
 
 /* ── (original CardDatabase-method ports follow) ── */
+static int card_no_equal(const char *stored, const char *query, int prefix) {
+    while (*stored && *query) {
+        uint32_t a, b;
+        size_t an = card_utf8_char(stored, &a);
+        size_t bn = card_utf8_char(query, &b);
+        if (card_no_codepoint(a) != b) return 0;
+        stored += an;
+        query += bn;
+    }
+    return !*query && (prefix || !*stored);
+}
+
+static int card_no_lookup(const char *query, int prefix) {
+    for (uint32_t i = 0; i < rb_num_cards(); i++) {
+        const unsigned char *r = rb_card_record(i);
+        if (!r || rb_card_record_len(i) < 25) continue;
+        const char *no = rb_card_string(le16p(r));
+        if (no && card_no_equal(no, query, prefix)) return (int)i;
+    }
+    return -1;
+}
+
 int rb_card_get_card_id(const char *card_no) {
     if (!card_no) return -1;
-    return rb_find_card_by_no(card_no);
+    int id = rb_find_card_by_no(card_no);
+    if (id >= 0) return id;
+    size_t len = strlen(card_no);
+    if (len > (SIZE_MAX - 1) / 3) return -1;
+    char *normalized = rb_malloc(len + 1);
+    if (!normalized) return -1;
+    rb_card_normalize_no(card_no, normalized, len + 1);
+    id = card_no_lookup(normalized, 0);
+    char *dash = strrchr(normalized, '-');
+    if (id < 0 && dash) {
+        char saved = dash[1];
+        dash[1] = 0;
+        id = card_no_lookup(normalized, 1);
+        dash[1] = saved;
+        if (id < 0) {
+            *dash = 0;
+            id = card_no_lookup(normalized, 0);
+            *dash = '-';
+        }
+    }
+    if (id < 0) {
+        char *wide = rb_malloc(strlen(normalized) * 3 + 1);
+        if (wide) {
+            char *w = wide;
+            for (const char *p = normalized; *p; p++) {
+                if (*p == '+') {
+                    memcpy(w, "＋", 3);
+                    w += 3;
+                } else *w++ = *p;
+            }
+            *w = 0;
+            for (uint32_t i = 0; i < rb_num_cards(); i++) {
+                const unsigned char *r = rb_card_record(i);
+                if (!r || rb_card_record_len(i) < 25) continue;
+                const char *no = rb_card_string(le16p(r));
+                if (no && (strstr(no, normalized) || strstr(no, wide))) {
+                    id = (int)i;
+                    break;
+                }
+            }
+            rb_free(wide);
+        }
+    }
+    rb_free(normalized);
+    return id;
 }
 int rb_card_get_card_names(int card_id, char *out, size_t out_sz) {
     if (!out || !out_sz) return 0;
@@ -345,7 +520,18 @@ int rb_card_fires_on_opponent_effects(int card_id) {
     for (int i = 0; i < n; i++) {
         Ability ab = {0};
         if (!rb_decode_card_ability((uint32_t)card_id, i, &ab)) continue;
-        int fires = rb_effect_fires_on_opponent_effects(ab.effect);
+        int fires = 0;
+        for (int e = 0; e < 2 && !fires; e++) {
+            const AbilityEffect *fx = e == 0 ? ab.effect : ab.cost;
+            if (!fx) continue;
+            for (int k = 0; k < fx->n_extra && !fires; k++) {
+                if (fx->extra_k[k] && !strcmp(fx->extra_k[k], "parenthetical")
+                    && fx->extra_v[k]) {
+                    const char *p = fx->extra_v[k];
+                    if (strstr(p, "発動する") && strstr(p, "相手")) fires = 1;
+                }
+            }
+        }
         rb_free_ability(&ab);
         if (fires) return 1;
     }

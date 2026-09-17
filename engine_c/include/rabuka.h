@@ -2319,6 +2319,9 @@ int rb_zone_matches_source(RbZoneId zone, const char *source);
 /* ── types.rs: ZoneId::as_str ──
      Converts a ZoneId enum to its wire string. Returns NULL for Unknown. */
 const char *rb_zone_id_as_str(RbZoneId z);
+/* ── types.rs: ZoneId::from_str ──
+     Parse a wire string (incl. "ステージ" alias) into a ZoneId. */
+RbZoneId rb_zone_id_from_str(const char *s);
 
 /* ── types.rs: ZoneId::from_ability_zone / to_ability_zone ──
      Convert between ability::enums::Zone and core::types::ZoneId.

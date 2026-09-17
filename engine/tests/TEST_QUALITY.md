@@ -12,11 +12,11 @@ _test never asserts (smoke at best — cannot pin behavior)_
 
 | file | test | line | detail |
 | --- | --- | --- | --- |
-| `engine/tests/test_modules/card_flow/inspect_top_select_and_discard_remainder.rs` | `kaho_full_own_stage_looks_five_and_keeps_one` | 75 |  |
-| `engine/tests/test_modules/card_flow/inspect_top_select_and_discard_remainder.rs` | `kaho_two_own_members_look_four_and_keep_one` | 70 |  |
-| `engine/tests/test_modules/card_flow/inspect_top_select_and_discard_remainder.rs` | `look_and_select_dynamic_count_look_at_counts_stage_members_plus_two` | 65 |  |
-| `engine/tests/test_modules/jidou/complex/bytecode_validation_test.rs` | `bytecode_debug_ability_399` | 209 |  |
-| `engine/tests/test_modules/jidou/complex/bytecode_validation_test.rs` | `bytecode_debug_ability_399_disabled` | 232 |  |
+| `engine/tests/test_modules/characterization/bytecode_validation_test.rs` | `bytecode_debug_ability_399` | 209 |  |
+| `engine/tests/test_modules/characterization/bytecode_validation_test.rs` | `bytecode_debug_ability_399_disabled` | 232 |  |
+| `engine/tests/test_modules/effects/look_select/pin_top/kaho_dynamic_count.rs` | `kaho_full_own_stage_looks_five_and_keeps_one` | 19 |  |
+| `engine/tests/test_modules/effects/look_select/pin_top/kaho_dynamic_count.rs` | `kaho_two_own_members_look_four_and_keep_one` | 14 |  |
+| `engine/tests/test_modules/effects/look_select/pin_top/kaho_dynamic_count.rs` | `look_and_select_dynamic_count_look_at_counts_stage_members_plus_two` | 9 |  |
 
 ## no_drive (0)
 
@@ -36,28 +36,28 @@ _has_pending_choice asserted without choice identity (pending_choice_type/summar
 
 | file | test | line | detail |
 | --- | --- | --- | --- |
-| `engine/tests/test_modules/abilities/complex/bp7_ai_choice_under_member_test.rs` | `ai_two_distinct_diverdiva_offers_choice` | 67 |  |
-| `engine/tests/test_modules/abilities/complex/bp7_cooking_with_love_test.rs` | `cooking_both_in_discard_offers_optional` | 83 |  |
-| `engine/tests/test_modules/abilities/complex/joint_card_live_start_test.rs` | `test_bp4_debut_trigger_fires_independently` | 383 |  |
-| `engine/tests/test_modules/abilities/complex/joint_card_live_start_test.rs` | `test_bp4_live_start_dual_trigger_fires` | 342 |  |
-| `engine/tests/test_modules/abilities/complex/otherwise_condition_flow_test.rs` | `karin_reveal_condition_failed_deck_top_becomes_filler` | 497 |  |
-| `engine/tests/test_modules/abilities/complex/otherwise_condition_flow_test.rs` | `karin_reveal_condition_met_deck_top_becomes_filler` | 456 |  |
-| `engine/tests/test_modules/abilities/complex/otherwise_condition_flow_test.rs` | `karin_reveal_condition_not_met_position_unchanged` | 371 |  |
-| `engine/tests/test_modules/abilities/simple/pl_bp6_003_test.rs` | `kotori_live_start_only_muses_under_two_cost_selected` | 209 |  |
-| `engine/tests/test_modules/abilities/simple/pl_bp6_003_test.rs` | `kotori_live_start_then_live_success_workflow` | 567 |  |
-| `engine/tests/test_modules/abilities/simple/pl_s_bp7_007_test.rs` | `hanamaru_multiple_valid_forces_selection` | 68 |  |
-| `engine/tests/test_modules/batches/untested_abilities_batch39_test.rs` | `pb1034_choose_first_color_heart03` | 51 |  |
-| `engine/tests/test_modules/batches/untested_abilities_batch39_test.rs` | `pb1036_twin_chooses_heart06` | 98 |  |
-| `engine/tests/test_modules/batches/untested_abilities_batch42_test.rs` | `sumire_three_catchu_draws` | 91 |  |
-| `engine/tests/test_modules/batches/untested_abilities_batch54_test.rs` | `bps7023_optional_liella_reveal_to_deck_top` | 98 |  |
-| `engine/tests/test_modules/batches/untested_abilities_batch7_test.rs` | `rin_bp4_009_own_empty_stage_counts_as_zero_and_fires` | 603 |  |
-| `engine/tests/test_modules/edge_cases/s_pb1_002_riko_edge_test.rs` | `riko_opponent_discards_live_no_gain` | 3 |  |
-| `engine/tests/test_modules/jidou/complex/bp6_004_002_audit_test.rs` | `riko_bp6_auto_e2e_heart_success_no_trigger` | 289 |  |
-| `engine/tests/test_modules/jidou/complex/logging_test.rs` | `real_choice_flow_emits_offered_and_resolved` | 271 |  |
+| `engine/tests/test_modules/characterization/logging_test.rs` | `real_choice_flow_emits_offered_and_resolved` | 271 |  |
+| `engine/tests/test_modules/effects/compound/otherwise_condition_flow_test.rs` | `karin_reveal_condition_failed_deck_top_becomes_filler` | 497 |  |
+| `engine/tests/test_modules/effects/compound/otherwise_condition_flow_test.rs` | `karin_reveal_condition_met_deck_top_becomes_filler` | 456 |  |
+| `engine/tests/test_modules/effects/compound/otherwise_condition_flow_test.rs` | `karin_reveal_condition_not_met_position_unchanged` | 371 |  |
+| `engine/tests/test_modules/effects/compound/s_pb1_002_riko_edge_test.rs` | `riko_opponent_discards_live_no_gain` | 3 |  |
+| `engine/tests/test_modules/effects/compound/untested_abilities_batch39_test.rs` | `pb1034_choose_first_color_heart03` | 51 |  |
+| `engine/tests/test_modules/effects/compound/untested_abilities_batch39_test.rs` | `pb1036_twin_chooses_heart06` | 98 |  |
+| `engine/tests/test_modules/effects/conditional/pl_s_bp7_007_test.rs` | `hanamaru_multiple_valid_forces_selection` | 68 |  |
+| `engine/tests/test_modules/effects/energy/under_member/pl_bp6_003_test.rs` | `kotori_live_start_only_muses_under_two_cost_selected` | 209 |  |
+| `engine/tests/test_modules/effects/energy/under_member/pl_bp6_003_test.rs` | `kotori_live_start_then_live_success_workflow` | 567 |  |
+| `engine/tests/test_modules/effects/gain/blades/untested_abilities_batch42_test.rs` | `sumire_three_catchu_draws` | 91 |  |
+| `engine/tests/test_modules/effects/gain/hearts/bp7_cooking_with_love_test.rs` | `cooking_both_in_discard_offers_optional` | 83 |  |
+| `engine/tests/test_modules/effects/gain/hearts/untested_abilities_batch7_test.rs` | `rin_bp4_009_own_empty_stage_counts_as_zero_and_fires` | 603 |  |
+| `engine/tests/test_modules/effects/recover/to_hand/untested_abilities_batch54_test.rs` | `bps7023_optional_liella_reveal_to_deck_top` | 98 |  |
+| `engine/tests/test_modules/effects/state/bp7_ai_choice_under_member_test.rs` | `ai_two_distinct_diverdiva_offers_choice` | 67 |  |
+| `engine/tests/test_modules/jidou/discard_watch/bp6_004_002_audit_test.rs` | `riko_bp6_auto_e2e_heart_success_no_trigger` | 289 |  |
 | `engine/tests/test_modules/qa/qa_new_tests209.rs` | `q209_kasumi_use_limit_blocks_second` | 354 |  |
 | `engine/tests/test_modules/qa/qa_new_tests238.rs` | `q238_baton_touch_select_opponent_member` | 265 |  |
 | `engine/tests/test_modules/qa/qa_new_tests238.rs` | `q238_baton_touch_triggers_position_change_selection` | 201 |  |
 | `engine/tests/test_modules/qa/qa_new_tests238.rs` | `q238_both_players_members_all_selectable` | 135 |  |
+| `engine/tests/test_modules/rules/trigger_paths/joint_card_live_start_test.rs` | `test_bp4_debut_trigger_fires_independently` | 383 |  |
+| `engine/tests/test_modules/rules/trigger_paths/joint_card_live_start_test.rs` | `test_bp4_live_start_dual_trigger_fires` | 342 |  |
 
 ## similar_cards (31)
 
@@ -65,34 +65,34 @@ _confusable card numbers (bp2 vs pb2) staged in one file — human review for wr
 
 | file | test | line | detail |
 | --- | --- | --- | --- |
-| `engine/tests/test_modules/abilities/complex/ability_engine_fixes_test.rs` | `<file>` | 1 | PL!SP-bp2-008-R, PL!SP-pb1-008-R |
-| `engine/tests/test_modules/abilities/complex/aurora_flower_identity_test.rs` | `<file>` | 1 | PL!HS-bp1-021-L, PL!HS-bp2-021-L |
-| `engine/tests/test_modules/abilities/complex/bp7_character_name_condition_test.rs` | `<file>` | 1 | PL!S-bp3-003-R＋, PL!S-bp7-003-R＋ |
-| `engine/tests/test_modules/abilities/complex/deep_resonance_bp3_test.rs` | `<file>` | 1 | PL!S-bp2-001-R, PL!S-pb1-001-R |
-| `engine/tests/test_modules/abilities/complex/distortion_need_hearts_test.rs` | `<file>` | 1 | PL!SP-bp1-012-N, PL!SP-bp4-012-N |
-| `engine/tests/test_modules/abilities/complex/energy_and_member_under_test.rs` | `<file>` | 1 | PL!N-bp3-013-N, PL!N-bp5-013-N |
-| `engine/tests/test_modules/abilities/complex/position_change_multi_test.rs` | `<file>` | 1 | PL!HS-bp2-006-R, PL!HS-pb1-006-R |
-| `engine/tests/test_modules/abilities/complex/position_change_non_optional_test.rs` | `<file>` | 1 | PL!HS-bp2-006-R, PL!HS-pb1-006-R |
-| `engine/tests/test_modules/abilities/complex/restriction_mechanics_test.rs` | `<file>` | 1 | PL!S-bp5-009-R, PL!S-bp7-009-R |
-| `engine/tests/test_modules/abilities/moderate/either_or_state_change_test.rs` | `<file>` | 1 | PL!N-bp4-008-R, PL!N-pb1-008-R |
-| `engine/tests/test_modules/abilities/simple/eli_sequential_cost_test.rs` | `<file>` | 1 | PL!-bp3-002-R, PL!-bp5-002-R |
-| `engine/tests/test_modules/batches/untested_abilities_batch10_test.rs` | `<file>` | 1 | PL!SP-bp1-013-PR, PL!SP-pb1-013-PR |
-| `engine/tests/test_modules/batches/untested_abilities_batch2_test.rs` | `<file>` | 1 | PL!-bp3-005-R, PL!-pb1-005-R |
-| `engine/tests/test_modules/batches/untested_abilities_batch38_test.rs` | `<file>` | 1 | PL!S-bp2-020-L, PL!S-bp3-020-L |
-| `engine/tests/test_modules/batches/untested_abilities_batch47_test.rs` | `<file>` | 1 | PL!SP-bp4-022-N, PL!SP-bp7-022-N |
-| `engine/tests/test_modules/batches/untested_abilities_batch55_test.rs` | `<file>` | 1 | PL!SP-bp1-023-L, PL!SP-bp5-023-L, PL!SP-pb1-023-L |
-| `engine/tests/test_modules/batches/untested_abilities_batch7_test.rs` | `<file>` | 1 | PL!S-bp3-008-R, PL!S-bp5-008-R |
-| `engine/tests/test_modules/batches/untested_abilities_batch9_test.rs` | `<file>` | 1 | PL!S-bp6-007-R, PL!S-pb1-007-R |
+| `engine/tests/test_modules/characterization/bp7_character_name_condition_test.rs` | `<file>` | 1 | PL!S-bp3-003-R＋, PL!S-bp7-003-R＋ |
+| `engine/tests/test_modules/effects/choice/ll_bp7_001_triple_member_test.rs` | `<file>` | 1 | PL!S-bp2-016-N, PL!S-bp3-016-N, PL!S-bp7-016-N |
+| `engine/tests/test_modules/effects/choice/ll_bp7_001_triple_member_test.rs` | `<file>` | 1 | PL!SP-bp5-014-N, PL!SP-bp7-014-N |
+| `engine/tests/test_modules/effects/compound/ability_engine_fixes_test.rs` | `<file>` | 1 | PL!SP-bp2-008-R, PL!SP-pb1-008-R |
+| `engine/tests/test_modules/effects/compound/toubatsu_test.rs` | `<file>` | 1 | PL!SP-bp2-011-R, PL!SP-pb2-011-R |
+| `engine/tests/test_modules/effects/compound/untested_abilities_batch38_test.rs` | `<file>` | 1 | PL!S-bp2-020-L, PL!S-bp3-020-L |
+| `engine/tests/test_modules/effects/compound/untested_abilities_batch55_test.rs` | `<file>` | 1 | PL!SP-bp1-023-L, PL!SP-bp5-023-L, PL!SP-pb1-023-L |
+| `engine/tests/test_modules/effects/draw/flat/untested_abilities_batch2_test.rs` | `<file>` | 1 | PL!-bp3-005-R, PL!-pb1-005-R |
+| `engine/tests/test_modules/effects/energy/under_member/energy_and_member_under_test.rs` | `<file>` | 1 | PL!N-bp3-013-N, PL!N-bp5-013-N |
+| `engine/tests/test_modules/effects/gain/blades/mymai_tonight_test.rs` | `<file>` | 1 | PL!S-bp2-023-L, PL!S-bp5-023-L |
+| `engine/tests/test_modules/effects/gain/hearts/untested_abilities_batch7_test.rs` | `<file>` | 1 | PL!S-bp3-008-R, PL!S-bp5-008-R |
+| `engine/tests/test_modules/effects/look_select/reveal_to_hand/distortion_need_hearts_test.rs` | `<file>` | 1 | PL!SP-bp1-012-N, PL!SP-bp4-012-N |
+| `engine/tests/test_modules/effects/look_select/reveal_to_hand/eli_bp5_cost9_search.rs` | `<file>` | 1 | PL!-bp3-002-R, PL!-bp5-002-R |
+| `engine/tests/test_modules/effects/position/kinako_each_time_blade_test.rs` | `<file>` | 1 | PL!SP-bp5-006-R, PL!SP-pb1-006-R |
+| `engine/tests/test_modules/effects/position/position_change_multi_test.rs` | `<file>` | 1 | PL!HS-bp2-006-R, PL!HS-pb1-006-R |
+| `engine/tests/test_modules/effects/position/position_change_non_optional_test.rs` | `<file>` | 1 | PL!HS-bp2-006-R, PL!HS-pb1-006-R |
+| `engine/tests/test_modules/effects/recover/to_hand/deep_resonance_bp3_test.rs` | `<file>` | 1 | PL!S-bp2-001-R, PL!S-pb1-001-R |
+| `engine/tests/test_modules/effects/score/aurora_flower_identity_test.rs` | `<file>` | 1 | PL!HS-bp1-021-L, PL!HS-bp2-021-L |
+| `engine/tests/test_modules/effects/score/chika_test.rs` | `<file>` | 1 | PL!S-bp3-001-R＋, PL!S-bp5-001-R＋ |
+| `engine/tests/test_modules/effects/score/untested_abilities_batch10_test.rs` | `<file>` | 1 | PL!SP-bp1-013-PR, PL!SP-pb1-013-PR |
+| `engine/tests/test_modules/effects/state/cards_6_thru_13_test.rs` | `<file>` | 1 | PL!S-PR-015-PR, PL!S-bp2-015-PR |
+| `engine/tests/test_modules/effects/state/either_or_state_change_test.rs` | `<file>` | 1 | PL!N-bp4-008-R, PL!N-pb1-008-R |
+| `engine/tests/test_modules/effects/state/untested_abilities_batch47_test.rs` | `<file>` | 1 | PL!SP-bp4-022-N, PL!SP-bp7-022-N |
 | `engine/tests/test_modules/integration/integration_blindspot_test.rs` | `<file>` | 1 | PL!HS-bp5-004-R, PL!HS-bp6-004-R |
-| `engine/tests/test_modules/jidou/complex/ability_chain_combo_test.rs` | `<file>` | 1 | PL!SP-pb1-006-R, PL!SP-pb2-006-R |
-| `engine/tests/test_modules/jidou/complex/cards_6_thru_13_test.rs` | `<file>` | 1 | PL!S-PR-015-PR, PL!S-bp2-015-PR |
-| `engine/tests/test_modules/jidou/complex/chika_test.rs` | `<file>` | 1 | PL!S-bp3-001-R＋, PL!S-bp5-001-R＋ |
-| `engine/tests/test_modules/jidou/complex/kinako_each_time_blade_test.rs` | `<file>` | 1 | PL!SP-bp5-006-R, PL!SP-pb1-006-R |
-| `engine/tests/test_modules/jidou/complex/kinako_live_success_or_move_test.rs` | `<file>` | 1 | PL!SP-bp5-006-R, PL!SP-pb2-006-R |
-| `engine/tests/test_modules/jidou/complex/kinako_sakurakoji_test.rs` | `<file>` | 1 | PL!SP-bp5-006-R, PL!SP-pb1-006-R |
-| `engine/tests/test_modules/jidou/complex/ll_bp7_001_triple_member_test.rs` | `<file>` | 1 | PL!S-bp2-016-N, PL!S-bp3-016-N, PL!S-bp7-016-N |
-| `engine/tests/test_modules/jidou/complex/ll_bp7_001_triple_member_test.rs` | `<file>` | 1 | PL!SP-bp5-014-N, PL!SP-bp7-014-N |
-| `engine/tests/test_modules/jidou/complex/mymai_tonight_test.rs` | `<file>` | 1 | PL!S-bp2-023-L, PL!S-bp5-023-L |
-| `engine/tests/test_modules/jidou/complex/pb2_under_member_test.rs` | `<file>` | 1 | PL!SP-pb1-006-R, PL!SP-pb2-006-R |
-| `engine/tests/test_modules/jidou/complex/toubatsu_test.rs` | `<file>` | 1 | PL!SP-bp2-011-R, PL!SP-pb2-011-R |
-| `engine/tests/test_modules/jidou/complex/trigger_scope_test.rs` | `<file>` | 1 | PL!HS-PR-005-PR, PL!HS-bp1-005-PR |
+| `engine/tests/test_modules/jidou/movement/ability_chain_combo_test.rs` | `<file>` | 1 | PL!SP-pb1-006-R, PL!SP-pb2-006-R |
+| `engine/tests/test_modules/jidou/movement/kinako_live_success_or_move_test.rs` | `<file>` | 1 | PL!SP-bp5-006-R, PL!SP-pb2-006-R |
+| `engine/tests/test_modules/jidou/movement/kinako_sakurakoji_test.rs` | `<file>` | 1 | PL!SP-bp5-006-R, PL!SP-pb1-006-R |
+| `engine/tests/test_modules/jidou/movement/pb2_under_member_test.rs` | `<file>` | 1 | PL!SP-pb1-006-R, PL!SP-pb2-006-R |
+| `engine/tests/test_modules/jidou/yell/untested_abilities_batch9_test.rs` | `<file>` | 1 | PL!S-bp6-007-R, PL!S-pb1-007-R |
+| `engine/tests/test_modules/rules/conditions/restriction_mechanics_test.rs` | `<file>` | 1 | PL!S-bp5-009-R, PL!S-bp7-009-R |
+| `engine/tests/test_modules/rules/trigger_paths/trigger_scope_test.rs` | `<file>` | 1 | PL!HS-PR-005-PR, PL!HS-bp1-005-PR |

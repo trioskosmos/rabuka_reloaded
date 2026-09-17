@@ -1,0 +1,19 @@
+// Auto-generated. Tests live as sibling .rs files in this folder.
+pub mod ability_mod;
+pub mod choice;
+pub mod compound;
+pub mod conditional;
+pub mod cost_mod;
+pub mod deck_order;
+pub mod deploy;
+pub mod draw;
+pub mod energy;
+pub mod gain;
+pub mod look_select;
+pub mod mill;
+pub mod other;
+pub mod position;
+pub mod recover;
+pub mod restriction;
+pub mod score;
+pub mod state;

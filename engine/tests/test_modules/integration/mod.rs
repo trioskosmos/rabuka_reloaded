@@ -11,5 +11,6 @@
     // pub mod pvp_room_test;
     pub mod remaining_quick_test;
     pub mod sp_bp2_015_proper_gameplay_test;
+    pub mod untested_abilities_playthrough_test;
     pub mod victory_road_test;
     pub mod victory_tie_placement_test;

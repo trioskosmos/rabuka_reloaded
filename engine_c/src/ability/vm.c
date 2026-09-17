@@ -1820,67 +1820,12 @@ void populate_from_json(void *effect, const void *json_val) {
 
 /* Zone::to_str — convert RbZoneId to its wire string. */
 const char *rb_zone_to_str(int z) {
-    switch (z) {
-        case RB_ZONEID_STAGE: return "stage";
-        case RB_ZONEID_HAND: return "hand";
-        case RB_ZONEID_DECK: return "deck";
-        case RB_ZONEID_DECK_TOP: return "deck_top";
-        case RB_ZONEID_DECK_BOTTOM: return "deck_bottom";
-        case RB_ZONEID_DISCARD: return "discard";
-        case RB_ZONEID_WAITROOM: return "waitroom";
-        case RB_ZONEID_ENERGY: return "energy";
-        case RB_ZONEID_ENERGY_ZONE: return "energy_zone";
-        case RB_ZONEID_ENERGY_DECK: return "energy_deck";
-        case RB_ZONEID_SUCCESS_ZONE: return "success_zone";
-        case RB_ZONEID_LIVE_CARD_ZONE: return "live_card_zone";
-        case RB_ZONEID_SUCCESS_LIVE_ZONE: return "success_live_zone";
-        case RB_ZONEID_EMPTY_AREA: return "empty_area";
-        case RB_ZONEID_SAME_AREA: return "same_area";
-        case RB_ZONEID_UNDER_MEMBER: return "under_member";
-        case RB_ZONEID_LOOKED_AT: return "looked_at";
-        case RB_ZONEID_REVEALED_CARDS: return "revealed_cards";
-        case RB_ZONEID_SELECTED_CARDS: return "selected_cards";
-        case RB_ZONEID_RESOLUTION: return "resolution";
-        case RB_ZONEID_EXCLUSION_ZONE: return "exclusion_zone";
-        default: return "unknown";
-    }
+    return rb_zone_id_as_str((RbZoneId)z);
 }
 
 /* Zone::from_source_str — always-succeed conversion. Unknown → RB_ZONEID_UNKNOWN. */
 int rb_zone_from_source_str(const char *s) {
-    int z = RB_ZONEID_UNKNOWN;
-    if (!s) return z;
-    if (rb_zone_of_str(s, (RbZone *)&z)) return z;
-    /* Also try RbZoneId mapping */
-    if (!strcmp(s, "stage")) z = RB_ZONEID_STAGE;
-    else if (!strcmp(s, "hand")) z = RB_ZONEID_HAND;
-    else if (!strcmp(s, "deck")) z = RB_ZONEID_DECK;
-    else if (!strcmp(s, "deck_top")) z = RB_ZONEID_DECK_TOP;
-    else if (!strcmp(s, "deck_bottom")) z = RB_ZONEID_DECK_BOTTOM;
-    else if (!strcmp(s, "discard")) z = RB_ZONEID_DISCARD;
-    else if (!strcmp(s, "waitroom")) z = RB_ZONEID_WAITROOM;
-    else if (!strcmp(s, "energy")) z = RB_ZONEID_ENERGY;
-    else if (!strcmp(s, "energy_zone")) z = RB_ZONEID_ENERGY_ZONE;
-    else if (!strcmp(s, "energy_deck")) z = RB_ZONEID_ENERGY_DECK;
-    else if (!strcmp(s, "success_zone")) z = RB_ZONEID_SUCCESS_ZONE;
-    else if (!strcmp(s, "live_card_zone")) z = RB_ZONEID_LIVE_CARD_ZONE;
-    else if (!strcmp(s, "success_live_zone") || !strcmp(s, "success_live_card_zone")) z = RB_ZONEID_SUCCESS_LIVE_ZONE;
-    else if (!strcmp(s, "empty_area")) z = RB_ZONEID_EMPTY_AREA;
-    else if (!strcmp(s, "same_area")) z = RB_ZONEID_SAME_AREA;
-    else if (!strcmp(s, "under_member") || !strcmp(s, "under")) z = RB_ZONEID_UNDER_MEMBER;
-    else if (!strcmp(s, "looked_at")) z = RB_ZONEID_LOOKED_AT;
-    else if (!strcmp(s, "revealed_cards")) z = RB_ZONEID_REVEALED_CARDS;
-    else if (!strcmp(s, "selected_cards")) z = RB_ZONEID_SELECTED_CARDS;
-    else if (!strcmp(s, "resolution") || !strcmp(s, "resolution_zone")) z = RB_ZONEID_RESOLUTION;
-    else if (!strcmp(s, "exclusion_zone")) z = RB_ZONEID_EXCLUSION_ZONE;
-    else if (!strcmp(s, "preceding_moved")) z = RB_ZONEID_UNKNOWN;
-    else if (!strcmp(s, "recently_moved")) z = RB_ZONEID_UNKNOWN;
-    else if (!strcmp(s, "those_cards")) z = RB_ZONEID_UNKNOWN;
-    else if (!strcmp(s, "looked_at_remaining")) z = RB_ZONEID_UNKNOWN;
-    else if (!strcmp(s, "deck_top_or_bottom")) z = RB_ZONEID_UNKNOWN;
-    else if (!strcmp(s, "front")) z = RB_ZONEID_UNKNOWN;
-    else z = RB_ZONEID_UNKNOWN;
-    return z;
+    return rb_zone_id_from_str(s);
 }
 
 /* Zone::as_str — alias for to_str. */

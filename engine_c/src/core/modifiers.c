@@ -1,6 +1,12 @@
 #include "rabuka.h"
 #include <string.h>
 
+static int16_t saturate_modifier(int64_t value) {
+    if (value > INT16_MAX) return INT16_MAX;
+    if (value < INT16_MIN) return INT16_MIN;
+    return (int16_t)value;
+}
+
 void rb_mods_init(RbMods *m) {
     memset(m, 0, sizeof(*m));
     for(int i=0;i<RB_MAX_CARD_IDS;i++){ m->heart_copy[i]=-1; m->heart_multiplier[i]=-1; m->heart_multiplier_amt[i]=2; m->blade_type[i]=-1; m->heart_color_override[i]=-1; }
@@ -21,7 +27,7 @@ void rb_mods_clear_card(RbMods *m, int cid) {
     m->constant_blade[cid] = 0;
     m->constant_score[cid] = 0;
     m->constant_cost[cid] = 0;
-    for (int c = 0; c < 8; c++) { m->constant_heart[cid][c] = 0; m->constant_need_heart[cid][c] = 0; }
+    for (int c = 0; c < 8; c++) m->constant_heart[cid][c] = 0;
     m->heart_copy[cid] = -1;
     m->heart_multiplier[cid] = -1;
     m->heart_multiplier_amt[cid] = 2;
@@ -36,11 +42,11 @@ int rb_mods_get_blade(RbMods *m, int cid) {
 }
 void rb_mods_add_blade(RbMods *m, int cid, int delta) {
     if (cid < 0 || cid >= RB_MAX_CARD_IDS) return;
-    m->blade[cid].add = rb_saturate_i16((int)m->blade[cid].add + delta);
+    m->blade[cid].add = saturate_modifier((int64_t)m->blade[cid].add + delta);
 }
 void rb_mods_set_blade(RbMods *m, int cid, int v) {
     if (cid < 0 || cid >= RB_MAX_CARD_IDS) return;
-    m->blade[cid].set = rb_saturate_i16(v);
+    m->blade[cid].set = saturate_modifier(v);
 }
 
 /* ── heart (color 0..7) ── */
@@ -50,12 +56,12 @@ int rb_mods_get_heart(RbMods *m, int cid, int color) {
     /* Mirrors Rust GameModifiers::get_heart_modifier: Heart00 (index 0, the
        "colorless"/wildcard heart) is added to every color query. */
     int v = rb_modifier_total(m->heart[cid][color]);
-    if (color != RB_HEART_PINK) v += rb_modifier_total(m->heart[cid][RB_HEART_PINK]);
+    v += rb_modifier_total(m->heart[cid][RB_HEART_PINK]);
     return v;
 }
 void rb_mods_add_heart(RbMods *m, int cid, int color, int delta) {
     if (cid < 0 || cid >= RB_MAX_CARD_IDS || color < 0 || color >= 8) return;
-    m->heart[cid][color].add = rb_saturate_i16((int)m->heart[cid][color].add + delta);
+    m->heart[cid][color].add = saturate_modifier((int64_t)m->heart[cid][color].add + delta);
 }
 
 /* ── need_heart ── */
@@ -65,11 +71,11 @@ int rb_mods_get_need_heart(RbMods *m, int cid, int color) {
 }
 void rb_mods_add_need_heart(RbMods *m, int cid, int color, int delta) {
     if (cid < 0 || cid >= RB_MAX_CARD_IDS || color < 0 || color >= 8) return;
-    m->need_heart[cid][color].add = rb_saturate_i16((int)m->need_heart[cid][color].add + delta);
+    m->need_heart[cid][color].add = saturate_modifier((int64_t)m->need_heart[cid][color].add + delta);
 }
 void rb_mods_set_need_heart(RbMods *m, int cid, int color, int value) {
     if (cid < 0 || cid >= RB_MAX_CARD_IDS || color < 0 || color >= 8) return;
-    m->need_heart[cid][color].set = rb_saturate_i16(value);
+    m->need_heart[cid][color].set = saturate_modifier(value);
 }
 
 /* ── score ── */
@@ -79,11 +85,11 @@ int rb_mods_get_score(RbMods *m, int cid) {
 }
 void rb_mods_add_score(RbMods *m, int cid, int delta) {
     if (cid < 0 || cid >= RB_MAX_CARD_IDS) return;
-    m->score[cid].add = rb_saturate_i16((int)m->score[cid].add + delta);
+    m->score[cid].add = saturate_modifier((int64_t)m->score[cid].add + delta);
 }
 void rb_mods_set_score(RbMods *m, int cid, int value) {
     if (cid < 0 || cid >= RB_MAX_CARD_IDS) return;
-    m->score[cid].set = rb_saturate_i16(value);
+    m->score[cid].set = saturate_modifier(value);
 }
 
 /* ── cost ── */
@@ -93,14 +99,11 @@ int rb_mods_get_cost(RbMods *m, int cid) {
 }
 void rb_mods_add_cost(RbMods *m, int cid, int delta) {
     if (cid < 0 || cid >= RB_MAX_CARD_IDS) return;
-    /* cost additive never goes negative (Rust saturating_sub 0) */
-    int v = (int)m->cost[cid].add + delta;
-    if (v < 0) v = 0;
-    m->cost[cid].add = rb_saturate_i16(v);
+    m->cost[cid].add = saturate_modifier((int64_t)m->cost[cid].add + delta);
 }
 void rb_mods_set_cost(RbMods *m, int cid, int value) {
     if (cid < 0 || cid >= RB_MAX_CARD_IDS) return;
-    m->cost[cid].set = rb_saturate_i16(value);
+    m->cost[cid].set = saturate_modifier(value);
 }
 
 /* ── orientation ── */
@@ -172,22 +175,31 @@ void rb_mods_clear_cost_set(RbMods *m, int cid) {
 /* ── remove (mirror remove_*_modifier: saturating subtract of a previously added delta) ── */
 void rb_mods_remove_blade(RbMods *m, int cid, int delta) {
     if (cid < 0 || cid >= RB_MAX_CARD_IDS) return;
-    m->blade[cid].add = rb_saturate_i16((int)m->blade[cid].add - delta);
+    if (m->blade[cid].add == 0 && m->blade[cid].set == 0) return;
+    m->blade[cid].add = saturate_modifier((int64_t)m->blade[cid].add - delta);
 }
 void rb_mods_remove_heart(RbMods *m, int cid, int color, int delta) {
     if (cid < 0 || cid >= RB_MAX_CARD_IDS || color < 0 || color >= 8) return;
-    m->heart[cid][color].add = rb_saturate_i16((int)m->heart[cid][color].add - delta);
+    if (m->heart[cid][color].add == 0 && m->heart[cid][color].set == 0) return;
+    m->heart[cid][color].add = saturate_modifier((int64_t)m->heart[cid][color].add - delta);
+}
+void rb_mods_remove_need_heart(RbMods *m, int cid, int color, int delta) {
+    if (cid < 0 || cid >= RB_MAX_CARD_IDS || color < 0 || color >= 8) return;
+    if (m->need_heart[cid][color].add == 0 && m->need_heart[cid][color].set == 0) return;
+    m->need_heart[cid][color].add = saturate_modifier((int64_t)m->need_heart[cid][color].add - delta);
 }
 void rb_mods_remove_score(RbMods *m, int cid, int delta) {
     if (cid < 0 || cid >= RB_MAX_CARD_IDS) return;
-    m->score[cid].add = rb_saturate_i16((int)m->score[cid].add - delta);
+    if (m->score[cid].add == 0 && m->score[cid].set == 0) return;
+    m->score[cid].add = saturate_modifier((int64_t)m->score[cid].add - delta);
 }
 void rb_mods_remove_cost(RbMods *m, int cid, int delta) {
     if (cid < 0 || cid >= RB_MAX_CARD_IDS) return;
+    if (m->cost[cid].add == 0 && m->cost[cid].set == 0) return;
     /* Rust remove_cost_modifier clamps the subtract at 0 (no negative cost). */
-    int v = (int)m->cost[cid].add - delta;
+    int64_t v = (int64_t)m->cost[cid].add - delta;
     if (v < 0) v = 0;
-    m->cost[cid].add = rb_saturate_i16(v);
+    m->cost[cid].add = saturate_modifier(v);
 }
 
 /* ── heart_override (mirror set_heart_override / remove_heart_override) ──
@@ -253,7 +265,7 @@ void rb_mods_trace_push(RbMods *m, int source_card_id, const char *ability_text,
     RbAbilityTraceEntry *e = &m->trace[m->n_trace++];
     e->source_card_id = (int16_t)source_card_id;
     e->target_card_id = (int16_t)target_card_id;
-    e->amount = (int16_t)amount;
+    e->amount = saturate_modifier(amount);
     e->effect_type = (int8_t)effect_type;
     e->heart_color = (int8_t)(heart_color < 0 ? -1 : heart_color);
     memset(e->ability_text, 0, RB_MODS_TRACE_TEXT);
@@ -289,8 +301,19 @@ int rb_modifier_total_entry(const RbModifierEntry *e) {
 /* -- record_card_appearance -- */
 void rb_record_card_appearance(GameState *g, int card_id, int source) {
     if (!g || card_id < 0) return;
-    if (g->n_cards_appeared_this_turn < 64) {
+    (void)source;
+    int found = 0;
+    for (int i = 0; i < g->n_cards_appeared_this_turn; i++) {
+        if (g->cards_appeared_this_turn[i] == card_id) { found = 1; break; }
+    }
+    if (!found && g->n_cards_appeared_this_turn < 64) {
         g->cards_appeared_this_turn[g->n_cards_appeared_this_turn++] = card_id;
+    }
+    for (int i = 0; i < g->n_recently_appeared; i++) {
+        if (g->recently_appeared[i] == card_id) return;
+    }
+    if (g->n_recently_appeared < RB_MAX_RECENTLY_MOVED) {
+        g->recently_appeared[g->n_recently_appeared++] = card_id;
     }
 }
 
@@ -310,46 +333,56 @@ void rb_clear_card_appearance_tracking(GameState *g) {
 
 /* -- record_baton_touch -- */
 void rb_record_baton_touch(GameState *g, int pl) {
-    if (!g) return;
-    g->baton_touch_used[pl] = 1;
+    if (!g || pl < 0 || pl >= 2) return;
+    if (pl == 0) g->baton_touch_count_p1++;
+    else g->baton_touch_count_p2++;
 }
 
 /* -- get_baton_touch_count -- */
 int rb_get_baton_touch_count(const GameState *g, int pl) {
-    return g ? g->baton_touch_used[pl] : 0;
+    if (!g || pl < 0 || pl >= 2) return 0;
+    return pl == 0 ? g->baton_touch_count_p1 : g->baton_touch_count_p2;
 }
 
 /* -- clear_baton_touch_tracking -- */
 void rb_clear_baton_touch_tracking(GameState *g) {
     if (!g) return;
-    g->baton_touch_used[0] = 0;
-    g->baton_touch_used[1] = 0;
+    g->baton_touch_count_p1 = 0;
+    g->baton_touch_count_p2 = 0;
+    g->n_baton_touch_arriving_card_ids = 0;
+    g->baton_touch_zero_cost = 0;
+    g->baton_touch_replaced_member_cost = -1;
+    g->baton_touch_replaced_member_id = -1;
+    g->baton_touch_arriving_card_id = -1;
 }
 
 /* -- record_card_movement -- */
 void rb_record_card_movement(GameState *g, int card_id, int from_zone, int to_zone, int causer, int target) {
-    if (!g || card_id < 0) return;
-    if (g->n_recently_moved < RB_MAX_RECENTLY_MOVED)
-        g->recently_moved[g->n_recently_moved++] = card_id;
+    if (!g || card_id < 0 || card_id >= RB_MAX_CARD_IDS) return;
+    (void)from_zone;
+    (void)to_zone;
+    (void)causer;
+    (void)target;
+    g->moved_this_turn[card_id] = 1;
 }
 
 /* -- clear_card_movement_tracking -- */
 void rb_clear_card_movement_tracking(GameState *g) {
     if (!g) return;
-    g->n_recently_moved = 0;
+    memset(g->moved_this_turn, 0, sizeof(g->moved_this_turn));
+    g->n_cards_appeared_this_turn = 0;
 }
 
 /* -- remove_revealed_card -- */
 void rb_remove_revealed_card(GameState *g, int card_id) {
     if (!g) return;
+    int n = 0;
     for (int i = 0; i < g->n_revealed; i++) {
-        if (g->revealed_cards[i] == card_id) {
-            for (int j = i; j < g->n_revealed - 1; j++)
-                g->revealed_cards[j] = g->revealed_cards[j + 1];
-            g->n_revealed--;
-            return;
+        if (g->revealed_cards[i] != card_id) {
+            g->revealed_cards[n++] = g->revealed_cards[i];
         }
     }
+    g->n_revealed = n;
 }
 
 /* -- clear_revealed_cards -- */
@@ -371,7 +404,15 @@ void rb_recalculate_constant_cost_modifiers(GameState *g) {
 
 /* -- on_cards_left_zones -- */
 void rb_on_cards_left_zones(GameState *g, int card_id) {
-    if (!g || card_id < 0) return;
-    /* Simplified: clear gained abilities when card leaves zone */
-    (void)g; (void)card_id;
+    if (!g || card_id < 0 || card_id >= RB_MAX_CARD_IDS) return;
+    rb_mods_clear_card(&g->mods, card_id);
+    for (size_t i = 0; i < sizeof(g->gained_card_ids) / sizeof(g->gained_card_ids[0]); i++) {
+        if (g->gained_card_ids[i] != card_id) continue;
+        for (int j = 0; j < g->gained_card_n[i]; j++) {
+            rb_free_ability(&g->gained_card_abilities[i][j]);
+        }
+        memset(g->gained_card_abilities[i], 0, sizeof(g->gained_card_abilities[i]));
+        g->gained_card_n[i] = 0;
+        g->gained_card_ids[i] = -1;
+    }
 }

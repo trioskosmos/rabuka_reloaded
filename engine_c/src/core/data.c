@@ -312,3 +312,268 @@ int rb_find_card_by_no(const char *card_no) {
     return -1;
 }
 
+int rb_effect_data_card_id(const RbEffectData *d, int16_t *out_card_id) {
+    if (!d || !out_card_id) return 0;
+    switch (d->kind) {
+        case RB_EFFECT_DATA_HEART_OVERRIDE:
+            *out_card_id = d->value.heart_override.card_id;
+            return 1;
+        case RB_EFFECT_DATA_SINGLE_CARD:
+            *out_card_id = d->value.single_card.card_id;
+            return 1;
+        case RB_EFFECT_DATA_SET_BLADE_COUNT:
+            *out_card_id = d->value.set_blade_count.card_id;
+            return 1;
+        case RB_EFFECT_DATA_GAIN_ABILITY:
+            *out_card_id = d->value.gain_ability.card_id;
+            return 1;
+        default:
+            return 0;
+    }
+}
+
+int rb_effect_data_items(const RbEffectData *d, RbCardEffectItemRef **out_items, size_t *out_n) {
+    const RbCardEffectItem *items;
+    size_t n;
+    RbCardEffectItemRef *refs;
+    if (!out_items || !out_n) return -1;
+    *out_items = NULL;
+    *out_n = 0;
+    if (!d) return -1;
+    switch (d->kind) {
+        case RB_EFFECT_DATA_SINGLE_CARD:
+            items = &d->value.single_card;
+            n = 1;
+            break;
+        case RB_EFFECT_DATA_MULTI_CARD:
+            items = d->value.multi_card.items;
+            n = d->value.multi_card.count;
+            break;
+        default:
+            return 0;
+    }
+    if (!n) return 0;
+    if (!items || n > SIZE_MAX / sizeof(*refs)) return -1;
+    refs = rb_malloc(n * sizeof(*refs));
+    if (!refs) return -1;
+    for (size_t i = 0; i < n; ++i) {
+        refs[i].card_id = items[i].card_id;
+        refs[i].amount = items[i].amount;
+        refs[i].color = items[i].color;
+    }
+    *out_items = refs;
+    *out_n = n;
+    return 0;
+}
+
+int rb_effect_data_is_p1(const RbEffectData *d, bool *out_is_p1) {
+    if (!d || !out_is_p1 || d->kind != RB_EFFECT_DATA_SURPLUS_HEART) return 0;
+    *out_is_p1 = d->value.surplus_heart.is_p1;
+    return 1;
+}
+
+int rb_effect_data_old_value(const RbEffectData *d, uint8_t *out_old_value) {
+    if (!d || !out_old_value || d->kind != RB_EFFECT_DATA_SURPLUS_HEART) return 0;
+    *out_old_value = d->value.surplus_heart.old_value;
+    return 1;
+}
+
+int rb_effect_data_count(const RbEffectData *d, uint8_t *out_count) {
+    if (!d || !out_count || d->kind != RB_EFFECT_DATA_HEART_OVERRIDE) return 0;
+    *out_count = d->value.heart_override.count;
+    return 1;
+}
+
+int rb_effect_data_color(const RbEffectData *d, const char **out_color) {
+    if (!d || !out_color) return 0;
+    switch (d->kind) {
+        case RB_EFFECT_DATA_HEART_OVERRIDE:
+            *out_color = d->value.heart_override.color;
+            return *out_color != NULL;
+        case RB_EFFECT_DATA_SINGLE_CARD:
+            *out_color = d->value.single_card.color;
+            return *out_color != NULL;
+        default:
+            return 0;
+    }
+}
+
+const char *rb_phase_label_jp(int phase) {
+    switch (phase) {
+        case RB_PHASE_RPS: return "ジャンケン";
+        case RB_PHASE_OPENING: return "先攻選択";
+        case RB_PHASE_MULLIGAN_FIRST: return "マリガン（先攻）";
+        case RB_PHASE_MULLIGAN_SECOND: return "マリガン（後攻）";
+        case RB_PHASE_ACTIVE: return "アクティブ";
+        case RB_PHASE_ENERGY: return "エネルギー";
+        case RB_PHASE_DRAW: return "ドロー";
+        case RB_PHASE_MAIN: return "メイン";
+        case RB_PHASE_LIVE_SET: return "ライブセット（先攻）";
+        case RB_PHASE_LIVE_SET_SECOND: return "ライブセット（後攻）";
+        case RB_PHASE_PERFORMANCE: return "パフォーマンス（先攻）";
+        case RB_PHASE_PERFORMANCE_SECOND: return "パフォーマンス（後攻）";
+        case RB_PHASE_VICTORY: return "ライブ勝敗判定";
+        case RB_PHASE_DONE: return "終了";
+        default: return "不明";
+    }
+}
+
+const char *rb_effect_type_as_str(RbEffectType t) {
+    switch (t) {
+        case RB_EFFECT_HEART_BONUS: return "heart_bonus";
+        case RB_EFFECT_BLADE_BONUS: return "blade_bonus";
+        case RB_EFFECT_SCORE_BONUS: return "score_bonus";
+        case RB_EFFECT_SCORE_SET: return "score_set";
+        case RB_EFFECT_TRANSFORM: return "transform";
+        case RB_EFFECT_NEED_HEART_MOD: return "need_heart_mod";
+        case RB_EFFECT_HEART_OVERRIDE: return "heart_override";
+        case RB_EFFECT_COST_BONUS: return "cost_bonus";
+        case RB_EFFECT_COST_SET: return "cost_set";
+        case RB_EFFECT_BLADE_SET: return "blade_set";
+        case RB_EFFECT_BLADE_TYPE_SET: return "blade_type_set";
+        default: return "";
+    }
+}
+
+static const struct {
+    RbAbilityZone ability;
+    RbZoneId core;
+} rb_ability_zone_pairs[] = {
+    {RB_ABILITY_ZONE_STAGE, RB_ZONEID_STAGE},
+    {RB_ABILITY_ZONE_HAND, RB_ZONEID_HAND},
+    {RB_ABILITY_ZONE_DECK, RB_ZONEID_DECK},
+    {RB_ABILITY_ZONE_DISCARD, RB_ZONEID_DISCARD},
+    {RB_ABILITY_ZONE_ENERGY, RB_ZONEID_ENERGY},
+    {RB_ABILITY_ZONE_LIVE_CARD_ZONE, RB_ZONEID_LIVE_CARD_ZONE},
+    {RB_ABILITY_ZONE_SUCCESS_LIVE_ZONE, RB_ZONEID_SUCCESS_LIVE_ZONE},
+    {RB_ABILITY_ZONE_REVEALED_CARDS, RB_ZONEID_REVEALED_CARDS},
+    {RB_ABILITY_ZONE_DECK_TOP, RB_ZONEID_DECK_TOP},
+    {RB_ABILITY_ZONE_DECK_BOTTOM, RB_ZONEID_DECK_BOTTOM},
+    {RB_ABILITY_ZONE_DECK_TOP_OR_BOTTOM, RB_ZONEID_DECK_TOP_OR_BOTTOM},
+    {RB_ABILITY_ZONE_FRONT, RB_ZONEID_FRONT},
+    {RB_ABILITY_ZONE_LIVE_TOTAL, RB_ZONEID_LIVE_TOTAL},
+    {RB_ABILITY_ZONE_THOSE_CARDS, RB_ZONEID_THOSE_CARDS},
+    {RB_ABILITY_ZONE_PRECEDING_MOVED, RB_ZONEID_PRECEDING_MOVED},
+    {RB_ABILITY_ZONE_RECENTLY_MOVED, RB_ZONEID_RECENTLY_MOVED},
+    {RB_ABILITY_ZONE_LOOKED_AT_REMAINING, RB_ZONEID_LOOKED_AT_REMAINING},
+    {RB_ABILITY_ZONE_EMPTY_AREA, RB_ZONEID_EMPTY_AREA},
+    {RB_ABILITY_ZONE_SAME_AREA, RB_ZONEID_SAME_AREA},
+    {RB_ABILITY_ZONE_UNDER_MEMBER, RB_ZONEID_UNDER_MEMBER},
+    {RB_ABILITY_ZONE_LOOKED_AT, RB_ZONEID_LOOKED_AT}
+};
+
+RbZoneId rb_zone_id_from_ability_zone(RbAbilityZone ability_zone) {
+    for (size_t i = 0; i < sizeof(rb_ability_zone_pairs) / sizeof(rb_ability_zone_pairs[0]); ++i) {
+        if (rb_ability_zone_pairs[i].ability == ability_zone) return rb_ability_zone_pairs[i].core;
+    }
+    return RB_ZONEID_UNKNOWN;
+}
+
+int rb_zone_id_to_ability_zone(RbZoneId z, RbAbilityZone *out_ability_zone) {
+    if (!out_ability_zone) return -1;
+    switch (z) {
+        case RB_ZONEID_WAITROOM: z = RB_ZONEID_DISCARD; break;
+        case RB_ZONEID_ENERGY_ZONE: z = RB_ZONEID_ENERGY; break;
+        case RB_ZONEID_SUCCESS_ZONE: z = RB_ZONEID_SUCCESS_LIVE_ZONE; break;
+        default: break;
+    }
+    for (size_t i = 0; i < sizeof(rb_ability_zone_pairs) / sizeof(rb_ability_zone_pairs[0]); ++i) {
+        if (rb_ability_zone_pairs[i].core == z) {
+            *out_ability_zone = rb_ability_zone_pairs[i].ability;
+            return 0;
+        }
+    }
+    return -1;
+}
+
+static const struct {
+    RbZoneId id;
+    const char *name;
+} rb_zone_names[] = {
+    {RB_ZONEID_STAGE, "stage"},
+    {RB_ZONEID_HAND, "hand"},
+    {RB_ZONEID_DECK, "deck"},
+    {RB_ZONEID_DECK_TOP, "deck_top"},
+    {RB_ZONEID_DECK_BOTTOM, "deck_bottom"},
+    {RB_ZONEID_DECK_TOP_OR_BOTTOM, "deck_top_or_bottom"},
+    {RB_ZONEID_DISCARD, "discard"},
+    {RB_ZONEID_WAITROOM, "waitroom"},
+    {RB_ZONEID_ENERGY, "energy"},
+    {RB_ZONEID_ENERGY_ZONE, "energy_zone"},
+    {RB_ZONEID_ENERGY_DECK, "energy_deck"},
+    {RB_ZONEID_SUCCESS_ZONE, "success_zone"},
+    {RB_ZONEID_LIVE_CARD_ZONE, "live_card_zone"},
+    {RB_ZONEID_SUCCESS_LIVE_ZONE, "success_live_zone"},
+    {RB_ZONEID_EMPTY_AREA, "empty_area"},
+    {RB_ZONEID_SAME_AREA, "same_area"},
+    {RB_ZONEID_UNDER_MEMBER, "under_member"},
+    {RB_ZONEID_LOOKED_AT, "looked_at"},
+    {RB_ZONEID_LOOKED_AT_REMAINING, "looked_at_remaining"},
+    {RB_ZONEID_REVEALED_CARDS, "revealed_cards"},
+    {RB_ZONEID_SELECTED_CARDS, "selected_cards"},
+    {RB_ZONEID_THOSE_CARDS, "those_cards"},
+    {RB_ZONEID_PRECEDING_MOVED, "preceding_moved"},
+    {RB_ZONEID_RECENTLY_MOVED, "recently_moved"},
+    {RB_ZONEID_FRONT, "front"},
+    {RB_ZONEID_LIVE_TOTAL, "live_total"},
+    {RB_ZONEID_RESOLUTION, "resolution"},
+    {RB_ZONEID_EXCLUSION_ZONE, "exclusion_zone"},
+    {RB_ZONEID_UNKNOWN, "unknown"}
+};
+
+RbZoneId rb_zone_id_from_str(const char *s) {
+    if (!s) return RB_ZONEID_UNKNOWN;
+    if (!strcmp(s, "ステージ")) return RB_ZONEID_STAGE;
+    if (!strcmp(s, "energy_zone")) return RB_ZONEID_ENERGY;
+    if (!strcmp(s, "success_live_card_zone")) return RB_ZONEID_SUCCESS_LIVE_ZONE;
+    if (!strcmp(s, "under")) return RB_ZONEID_UNDER_MEMBER;
+    if (!strcmp(s, "resolution_zone")) return RB_ZONEID_RESOLUTION;
+    for (size_t i = 0; i < sizeof(rb_zone_names) / sizeof(rb_zone_names[0]); ++i) {
+        if (!strcmp(s, rb_zone_names[i].name)) return rb_zone_names[i].id;
+    }
+    return RB_ZONEID_UNKNOWN;
+}
+
+const char *rb_zone_id_as_str(RbZoneId z) {
+    for (size_t i = 0; i < sizeof(rb_zone_names) / sizeof(rb_zone_names[0]); ++i) {
+        if (rb_zone_names[i].id == z) return rb_zone_names[i].name;
+    }
+    return "unknown";
+}
+
+int rb_zone_equivalent(RbZoneId a, RbZoneId b) {
+    return a == b ||
+        (a == RB_ZONEID_DISCARD && b == RB_ZONEID_WAITROOM) ||
+        (a == RB_ZONEID_WAITROOM && b == RB_ZONEID_DISCARD) ||
+        (a == RB_ZONEID_ENERGY && b == RB_ZONEID_ENERGY_ZONE) ||
+        (a == RB_ZONEID_ENERGY_ZONE && b == RB_ZONEID_ENERGY);
+}
+
+int rb_zone_matches_source(RbZoneId zone, const char *source) {
+    RbZoneId requested = rb_zone_id_from_str(source);
+    switch (requested) {
+        case RB_ZONEID_DECK:
+            return zone == RB_ZONEID_DECK || zone == RB_ZONEID_DECK_TOP ||
+                   zone == RB_ZONEID_DECK_BOTTOM;
+        case RB_ZONEID_DISCARD:
+        case RB_ZONEID_WAITROOM:
+            return zone == RB_ZONEID_DISCARD || zone == RB_ZONEID_WAITROOM;
+        default:
+            return zone == requested;
+    }
+}
+
+int rb_effect_data_amount(const RbEffectData *d, int16_t *out_amount) {
+    if (!d || !out_amount) return 0;
+    switch (d->kind) {
+        case RB_EFFECT_DATA_SINGLE_CARD:
+            *out_amount = d->value.single_card.amount;
+            return 1;
+        case RB_EFFECT_DATA_ALL_CARDS:
+            *out_amount = d->value.all_cards.amount;
+            return 1;
+        default:
+            return 0;
+    }
+}
+
