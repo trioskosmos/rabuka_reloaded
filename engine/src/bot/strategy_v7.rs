@@ -56,6 +56,14 @@ fn player_of(gs: &GameState, me: u8) -> &Player {
     }
 }
 
+fn env_weight(name: &str, default: f64) -> f64 {
+    std::env::var(name)
+        .ok()
+        .and_then(|value| value.parse::<f64>().ok())
+        .filter(|value| value.is_finite() && *value >= 0.0)
+        .unwrap_or(default)
+}
+
 /// Stage hearts + active buffs (what actually passes checks).
 fn stage_hearts_of(p: &Player, gs: &GameState, me: u8, db: &CardDatabase) -> i32 {
     let base: i32 = p
@@ -120,6 +128,18 @@ fn wait_fingerprint(gs: &GameState, me: u8) -> Vec<bool> {
         .collect()
 }
 
+/// Blade-modifier fingerprint for the no-op breaker: an activation whose
+/// only effect is granting blades (live-only) changes zone counts nowhere,
+/// but it feeds the flip model that converts blades into check passes.
+fn blade_mod_fingerprint(gs: &GameState, me: u8) -> Vec<i16> {
+    player_of(gs, me)
+        .stage
+        .stage
+        .iter()
+        .map(|&c| if c < 0 { 0i16 } else { gs.mods.get_blade_modifier(c) as i16 })
+        .collect()
+}
+
 /// MAIN PHASE: v6 tempo + energy/draw vision on non-deploy actions + buff
 /// vision + buff-aware no-op breaker. Member-deploy economics are v6-verbatim.
 ///
@@ -157,6 +177,7 @@ pub fn score_actions(gs: &GameState, actions: &[Action], me: u8) -> Vec<(f64, St
     let base_energy = my_now.energy_zone.active_count() as i32;
     let base_buffs = stage_buff_hearts(gs, me);
     let base_wait = wait_fingerprint(gs, me);
+    let base_blade_mods = blade_mod_fingerprint(gs, me);
     let stage_cost = |p: &Player| -> i32 {
         p.stage.stage.iter().filter_map(|&id| db.get_card(id))
             .map(|card| i32::from(card.cost.unwrap_or(0))).sum()
@@ -164,6 +185,8 @@ pub fn score_actions(gs: &GameState, actions: &[Action], me: u8) -> Vec<(f64, St
     let base_cost = stage_cost(my_now);
     let development = std::env::var("V7_NO_DEVELOPMENT").is_err();
     let upgrade_baton = std::env::var("V7_UPGRADE_BATON").is_ok();
+    let heart_weight = env_weight("V7_HEART_WEIGHT", 3.0);
+    let blade_weight = env_weight("V7_BLADE_WEIGHT", 6.0);
 
     let deck_lives = my_now
         .main_deck
@@ -217,12 +240,12 @@ pub fn score_actions(gs: &GameState, actions: &[Action], me: u8) -> Vec<(f64, St
         // Development in HEARTS and BLADES, buff-aware: every extra active
         // blade is a fresh Binomial trial; buffs feed checks for real.
         let d_stage = stage_hearts_of(my_sim, &sim, me, db) - base_stage;
-        val += 3.0 * d_stage as f64;
+        val += heart_weight * d_stage as f64;
         if d_stage != 0 {
             parts.push(format!("hearts{d_stage:+}"));
         }
         let d_blades = total_blades_of(my_sim, &sim, db) - base_blades;
-        val += 6.0 * d_blades as f64;
+        val += blade_weight * d_blades as f64;
         if d_blades != 0 {
             parts.push(format!("blades{d_blades:+}"));
         }
@@ -299,6 +322,7 @@ pub fn score_actions(gs: &GameState, actions: &[Action], me: u8) -> Vec<(f64, St
             && my_sim.waitroom.cards.len() == my_now.waitroom.cards.len()
             && stage_buff_hearts(&sim, me) == base_buffs
             && wait_fingerprint(&sim, me) == base_wait
+            && blade_mod_fingerprint(&sim, me) == base_blade_mods
         {
             val -= 1000.0;
             parts.push("NOOP".into());
@@ -408,12 +432,19 @@ pub fn score_actions(gs: &GameState, actions: &[Action], me: u8) -> Vec<(f64, St
 /// "safe" sets even as second attacker, measured -3pp; strict closeout
 /// beats — the ceiling estimate is not their set, measured -3pp with the
 /// above confounded in.)
+fn choose_live_set_experiment(gs: &GameState, actions: &[Action], db: &CardDatabase) -> Action {
+    crate::bot::strategy_v6::choose_live_set_v6(gs, actions, db)
+}
+
 pub fn choose_live_set_v7(gs: &GameState, actions: &[Action], db: &CardDatabase) -> Action {
     if std::env::var("V7_LIVE_V6").is_ok() {
         return crate::bot::strategy_v6::choose_live_set_v6(gs, actions, db);
     }
     if std::env::var("V7_ROLLOUT").is_ok() {
         return crate::bot::rollout::choose_live_set_v7(gs, actions, db);
+    }
+    if std::env::var("V7_LIVE_EXPERIMENT").is_ok() {
+        return choose_live_set_experiment(gs, actions, db);
     }
     let me = if gs.active_player().id == gs.player1.id {
         0u8

@@ -111,6 +111,14 @@ mod inner {
         *guard = seed;
     }
 
+    pub fn checkpoint() -> u32 {
+        *STATE.lock().unwrap()
+    }
+
+    pub fn restore(state: u32) {
+        seed(state);
+    }
+
     pub fn shuffle_slice<T>(slice: &mut [T]) {
         let n = slice.len();
         if n <= 1 {
@@ -176,6 +184,8 @@ mod inner {
 }
 
 // Public surface
+#[cfg(not(feature = "no_std"))]
+pub use inner::{checkpoint, restore};
 pub use inner::rand_range;
 pub use inner::seed;
 pub use inner::shuffle_slice;

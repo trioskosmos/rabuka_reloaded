@@ -28,6 +28,7 @@ pub(crate) fn draw_cards_for_player(
         return Ok(());
     }
     let mut drawn = 0;
+    let mut rejected = 0;
     while drawn < count as usize {
         if let Some(card) = player.main_deck.draw() {
             let matches_type = util::CardFilter::new()
@@ -54,13 +55,23 @@ pub(crate) fn draw_cards_for_player(
                     }
                 }
                 drawn += 1;
+                rejected = 0;
             } else {
                 player.main_deck.cards.push(card);
+                // Unbounded-loop guard: counting consecutive rejects bounds the
+                // scan to one full deck revolution (rejects rotate to the
+                // bottom, so a full cycle with no accept means no match exists).
+                rejected += 1;
+                if rejected >= player.main_deck.cards.len() {
+                    log::debug!("[DRAW_FILTER] no matching cards remain in deck");
+                    break;
+                }
             }
         } else {
             // Q104 / Rule 10.2.1: deck empty mid-draw → refresh from waitroom
             if player.main_deck.cards.is_empty() && !player.waitroom.cards.is_empty() {
                 player.refresh();
+                rejected = 0;
                 continue;
             }
             break;
@@ -460,6 +471,13 @@ impl AbilityResolver {
         match Zone::from_str(source) {
             Some(Zone::Deck | Zone::DeckTop) => {
                 if let Some(distinct) = is_distinct {
+                    // Distinct draw (「名前の異なる…」): dedupe WHILE drawing, not
+                    // after removal — a post-filter leaves rejected duplicate-name
+                    // cards removed from the deck but placed nowhere (vanish bug).
+                    // Gate on distinct_should_dedupe so pass-through variants keep
+                    // the plain sequential draw below.
+                    let dedupe = util::distinct_should_dedupe(Some(distinct));
+                    let mut seen_names = crate::compat::HashSet::<String>::default();
                     let mut drawn: Vec<i16> = Vec::new();
                     let mut attempts = 0;
                     let max_attempts = player.main_deck.cards.len();
@@ -469,19 +487,36 @@ impl AbilityResolver {
                             let matches_type = util::CardFilter::new()
                                 .card_type_opt(card_type)
                                 .matches_card(&card_db, card);
-                            if matches_type {
-                                drawn.push(card);
-                            } else {
+                            if !matches_type {
+                                // Type rejects return to the deck bottom; they do
+                                // not consume a draw slot.
                                 player.main_deck.cards.push(card);
+                                continue;
                             }
+                            if dedupe {
+                                let name = card_db.get_card(card).map(|c| {
+                                    crate::card::CardDatabase::normalize_name(&c.name)
+                                });
+                                let accepted = match name {
+                                    Some(n) => seen_names.insert(n),
+                                    None => true,
+                                };
+                                if !accepted {
+                                    log::debug!(
+                                        "[DRAW_DISTINCT] retaining duplicate {} in deck",
+                                        card
+                                    );
+                                    player.main_deck.cards.push(card);
+                                    continue;
+                                }
+                            }
+                            drawn.push(card);
                         } else {
                             break;
                         }
                     }
-                    let drawn_distinct =
-                        util::apply_distinct_filter(&drawn, Some(distinct), &card_db);
-                    for card in drawn_distinct {
-                        util::place_card_in_zone(player, card, destination, None, false, 1);
+                    for card in &drawn {
+                        util::place_card_in_zone(player, *card, destination, None, false, 1);
                     }
                 } else {
                     draw_cards_for_player(
@@ -498,11 +533,41 @@ impl AbilityResolver {
                 }
             }
             Some(Zone::Discard) => {
-                let mut cards: SmallVec<[i16; 8]> = (0..final_count as usize)
-                    .filter_map(|_| player.waitroom.cards.pop())
-                    .collect();
-                if let Some(distinct) = is_distinct {
-                    cards = util::apply_distinct_filter(&cards, Some(distinct), &card_db).into();
+                // Distinct from discard: popping THEN filtering would vanish
+                // rejected duplicates (removed from the waitroom, placed
+                // nowhere). Dedupe while popping; duplicates stay in the
+                // waitroom. attempts bounds the whole-zone scan.
+                let dedupe = util::distinct_should_dedupe(is_distinct);
+                let mut seen_names = crate::compat::HashSet::<String>::default();
+                let mut cards: SmallVec<[i16; 8]> = SmallVec::new();
+                let mut attempts = 0;
+                let max_attempts = player.waitroom.cards.len();
+                while cards.len() < final_count as usize && attempts < max_attempts {
+                    attempts += 1;
+                    match player.waitroom.cards.pop() {
+                        Some(card) => {
+                            if dedupe {
+                                let accepted = card_db
+                                    .get_card(card)
+                                    .map(|c| {
+                                        seen_names.insert(
+                                            crate::card::CardDatabase::normalize_name(&c.name),
+                                        )
+                                    })
+                                    .unwrap_or(true);
+                                if !accepted {
+                                    log::debug!(
+                                        "[DRAW_DISTINCT] retaining duplicate {} in discard",
+                                        card
+                                    );
+                                    player.waitroom.cards.insert(0, card);
+                                    continue;
+                                }
+                            }
+                            cards.push(card);
+                        }
+                        None => break,
+                    }
                 }
                 for card in cards {
                     util::place_card_in_zone(player, card, destination, None, false, 1);

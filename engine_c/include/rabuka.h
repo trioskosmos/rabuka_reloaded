@@ -1129,6 +1129,20 @@ typedef struct {
     char     resume_draw_ctype[32];
     int      resume_draw_self_id;   /* self_target_id, or -1 */
     int      just_completed_ability_key; /* (card_id<<16)|ability_idx of last completed ability (prevents re-trigger) */
+    /* pending sequential-action storage (ability_queue.rs entry continuations):
+       owned deep clones parked across a pause; rb_queue_resume_pending_actions
+       executes and frees them. */
+    AbilityEffect *pending_repeat_actions[RB_ENTRY_PENDING_CAP];
+    int pending_repeat_actions_n;
+    int has_pending_reprompt_choice;
+    RbChoice pending_reprompt_choice;
+    /* Rust resolver.cancel_remaining_commands: set when a failed deferred cost
+       must discard the parked batch. */
+    int cancel_remaining_commands;
+    /* deferred sub-costs of a sequential cost (cost.rs pay_deferred_costs):
+       owned deep clones parked until the player confirms the choice gate. */
+    AbilityEffect *pending_deferred_costs[RB_MAX_CHILD];
+    int n_pending_deferred_costs;
 } RbAbilityQueue;
 
 int  rb_queue_push(RbAbilityQueue *q, int card_id, int ability_idx);
@@ -1415,6 +1429,8 @@ void rb_queue_set_current_entry(GameState *g, int absolute);
 int rb_queue_has_pending_actions(const GameState *g);
 void rb_queue_set_pending_actions(GameState *g, int count);
 void rb_queue_save_pending_actions(GameState *g, int count);
+void rb_queue_store_pending_actions(GameState *g, AbilityEffect *const *actions, int count);
+int rb_queue_resume_pending_actions(GameState *g);
 int rb_queue_take_pending_actions(GameState *g);
 void rb_resume_position_change(GameState *g, int actor, const AbilityEffect *e, int host_cid, int selected_idx);
 
@@ -2036,6 +2052,7 @@ void rb_queue_pause_for_choice(GameState *g, const RbChoice *choice);
 int rb_pay_cost(GameState *g, int actor, const AbilityEffect *cost);
 int rb_validate_cost(const GameState *g, int actor, const AbilityEffect *cost);
 int rb_pay_deferred_costs(GameState *g, int actor, const AbilityEffect *cost);
+void rb_cost_clear_deferred(GameState *g);
 int rb_handle_optional_cost_payment(GameState *g, int actor, const AbilityEffect *cost, int pay);
 int rb_handle_pay_cost_all_discard(GameState *g, int actor, const char *selected);
 int rb_cost_has_skip_prompt(const AbilityEffect *cost);

@@ -897,6 +897,65 @@ static int tr_run(const char *path) {
     return tr_failed_checks ? 1 : 0;
 }
 
+/* Sequential deferred-cost parity (Rust cost.rs:760-815 + pay_deferred_costs
+   17-25): [optional pay_energy, mandatory move hand->discard] — the optional
+   binary energy child is DEFERRED (not paid) while the mandatory child emits
+   the gate choice; settling pays the deferred energy exactly once. */
+static void scenario_deferred_costs(void){
+    static TestGame tg;
+    test_game_new(&tg);
+    GameState *g=&tg.state;
+    rb_queue_clear(&g->queue);
+    g->queue.cur=0; g->queue.n_entries=1; g->queue.actor=0;
+    g->queue.entries[0].card_id=0; g->queue.entries[0].ability_idx=0;
+    g->queue.entries[0].optional_cost_result=-1;
+    g->p[0].energy.n=3;
+    rb_energy_set_active_count(&g->p[0],3);
+    test_add_to_hand(&tg, test_id(&tg,"PL!-sd1-010-SD"));
+
+    AbilityEffect seq={0}; seq.action="sequential_cost"; seq.n_child=2;
+    AbilityEffect en={0}; en.action="pay_energy"; en.is_optional=1;
+    en.extra_k[0]="energy_count"; en.extra_v[0]="2"; en.n_extra=1;
+    AbilityEffect mv={0}; mv.action="move_cards"; mv.source="hand";
+    mv.destination="discard"; mv.count=1;
+    seq.child[0]=&en; seq.child[1]=&mv;
+
+    CHECK(rb_pay_cost(g,0,&seq)==1,"sequential cost parks at mandatory gate");
+    CHECK(rb_has_pending_choice(g)==1,"mandatory move child emitted choice");
+    CHECK(rb_energy_active_count(&g->p[0])==3,"deferred energy NOT paid at gate");
+    CHECK(g->queue.entries[0].cost_paid_index==2,"cost_paid_index advanced past both children");
+
+    /* Player confirms the gate: settle with cost=NULL (choice.rs handler). */
+    g->queue.has_pending=0;
+    CHECK(rb_pay_deferred_costs(g,0,NULL)==1,"settle succeeds");
+    CHECK(rb_energy_active_count(&g->p[0])==1,"deferred energy paid exactly once on settle");
+    CHECK(rb_pay_deferred_costs(g,0,NULL)==1,"repeat settle idempotent");
+    CHECK(rb_energy_active_count(&g->p[0])==1,"repeat settle changes nothing");
+
+    /* Insufficient deferred energy (4 vs 1): Rust validates ALL children
+       upfront (cost.rs:766-770), so the whole sequential cost fails at the
+       gate before any deferral — nothing paid, no gate emitted. */
+    static TestGame tg2;
+    test_game_new(&tg2);
+    GameState *g2=&tg2.state;
+    rb_queue_clear(&g2->queue);
+    g2->queue.cur=0; g2->queue.n_entries=1; g2->queue.actor=0;
+    g2->queue.entries[0].card_id=0; g2->queue.entries[0].ability_idx=0;
+    g2->p[0].energy.n=1;
+    rb_energy_set_active_count(&g2->p[0],1);
+    AbilityEffect seq2={0}; seq2.action="sequential_cost"; seq2.n_child=2;
+    AbilityEffect en2={0}; en2.action="pay_energy"; en2.is_optional=1;
+    en2.extra_k[0]="energy_count"; en2.extra_v[0]="4"; en2.n_extra=1;
+    AbilityEffect mv2={0}; mv2.action="move_cards"; mv2.source="hand";
+    mv2.destination="discard"; mv2.count=1;
+    seq2.child[0]=&en2; seq2.child[1]=&mv2;
+    CHECK(rb_pay_cost(g2,0,&seq2)==0,"heavy deferred energy fails validation upfront");
+    CHECK(rb_energy_active_count(&g2->p[0])==1,"nothing paid on failed validation");
+    CHECK(rb_has_pending_choice(g2)==0,"no gate emitted on failed validation");
+    CHECK(rb_pay_deferred_costs(g2,0,&seq2)==1,"settle with empty batch is a no-op");
+    CHECK(rb_energy_active_count(&g2->p[0])==1,"no-op settle leaves energy unchanged");
+}
+
 int main(int argc, char **argv){
     setvbuf(stdout, NULL, _IONBF, 0); /* unbuffered: a crash must not swallow results */
     CHECK(rb_load("src")==0,"rb_load");
@@ -912,6 +971,7 @@ int main(int argc, char **argv){
         printf("\nALL SCENARIO CHECKS PASSED\n");
         return 0;
     }
+    scenario_deferred_costs();
     scenario_draw_and_score();
     scenario_live_performance();
     scenario_move_cards();
@@ -928,6 +988,7 @@ int main(int argc, char **argv){
     scenario_phase_determinism();
     scenario_yell_draw_icons();
     scenario_move_looked_at();
+    scenario_deferred_costs();
     rb_unload();
     if(failures){ printf("\n%d FAILURES\n",failures); return 1; }
     printf("\nALL REPLAY CHECKS PASSED\n");

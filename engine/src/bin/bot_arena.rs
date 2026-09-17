@@ -56,6 +56,8 @@ impl Options {
                     match arg.as_str() {
                         "--games" => games = Some(value.parse::<u32>()?),
                         "--seed" => seed = value.parse::<u32>()?,
+                        "--snapshots" => snapshots = Some(PathBuf::from(value)),
+                        "--compare" => compare = Some(PathBuf::from(value)),
                         _ => audit = Some(PathBuf::from(value)),
                     }
                 }
@@ -72,8 +74,11 @@ impl Options {
         if games == Some(0) || seed == 0 {
             return Err("game count and seed must be positive".into());
         }
-        if audit.is_some() && games.is_none() {
-            return Err("--audit requires --games N or ARENA_GAMES=N".into());
+        if (audit.is_some() || snapshots.is_some()) && games.is_none() {
+            return Err("--audit and --snapshots require --games N or ARENA_GAMES=N".into());
+        }
+        if compare.is_some() && (audit.is_some() || snapshots.is_some() || !positional.is_empty() || trace || logs) {
+            return Err("--compare PATH is a standalone exact-state diagnostic mode".into());
         }
         let parse_kind = |name: &str| -> ArenaResult<BotKind> {
             if !BotKind::ALL.contains(&name) {
@@ -184,6 +189,240 @@ fn audit_action(gs: &GameState, action: &game_setup::Action) -> ArenaResult<Valu
         }
     }
     Ok(value)
+}
+
+type ScoreFn = fn(&GameState, &[game_setup::Action], u8) -> Vec<(f64, String)>;
+
+/// Exact-state equivalence oracle: identical legal-action offers and identical
+/// v6/v7 numeric scoring behavior. Deliberately NOT a byte comparison —
+/// independently rebuilt HashMaps serialize equal content in different
+/// iteration orders while remaining logically identical.
+fn behaviorally_equal(a: &GameState, b: &GameState) -> ArenaResult<bool> {
+    let actions_a = game_setup::generate_possible_actions(a);
+    let actions_b = game_setup::generate_possible_actions(b);
+    if serde_json::to_value(&actions_a)? != serde_json::to_value(&actions_b)? {
+        return Ok(false);
+    }
+    let me = if a.active_player().id == a.player1.id { 0u8 } else { 1u8 };
+    for score in [strategy_v6::score_actions as ScoreFn, strategy_v7::score_actions as ScoreFn] {
+        let (x, y) = (score(a, &actions_a, me), score(b, &actions_b, me));
+        if x.len() != y.len()
+            || x.iter().zip(&y).any(|((s1, c1), (s2, c2))| s1.to_bits() != s2.to_bits() || c1 != c2) {
+            return Ok(false);
+        }
+    }
+    Ok(true)
+}
+
+fn corpus_fold(seed: u32) -> &'static str {
+    if seed % 5 == 0 { "holdout" } else { "train" }
+}
+
+fn snapshot_eligible(gs: &GameState) -> bool {
+    gs.current_phase == Phase::Main && gs.game_result == GameResult::Ongoing
+        && gs.get_pending_choice().is_none()
+        && gs.ability_queue.is_idle() && gs.ability_queue.is_empty()
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+struct SavedCard {
+    id: i16,
+    card_no: String,
+    identity: Value,
+}
+
+/// Opt-in full-hidden-state capture for offline exact-state debugging.
+/// CONTAINS BOTH PLAYERS' PRIVATE INFORMATION (hands, deck order). Never a
+/// fair counterfactual evaluation format; per-action scores are hindsight
+/// diagnostics only.
+#[derive(serde::Serialize, serde::Deserialize)]
+struct SavedPosition {
+    format: String,
+    schema: u32,
+    metadata: Value,
+    /// Global engine xorshift32 state captured pre-decision; restored before
+    /// each bot's scoring/selection so scoring side effects (sim draws) don't
+    /// shift subsequent engine RNG.
+    engine_rng: u32,
+    /// Arena LCG state (instance-owned, pub field) — resumed after replay.
+    arena_rng: u64,
+    /// Physical card copies with exact card_no identity; supports duplicate
+    /// deck copies (per-copy IDs from create_copy).
+    cards: Vec<SavedCard>,
+    card_no_to_id: std::collections::BTreeMap<String, i16>,
+    normalized_no_to_id: std::collections::BTreeMap<String, i16>,
+    next_id: i16,
+    /// Full GameState (serde fields; card_database skipped, reattached here).
+    state: Vec<u8>,
+    /// serde-skipped engine-internal fields (loop history, logs, scratch).
+    internal_state: Vec<u8>,
+    /// Offered actions at capture time; restore rejects any drift.
+    offers: Value,
+}
+
+fn card_identity(card: &rabuka_engine::card::Card) -> ArenaResult<Value> {
+    Ok(json!({
+        "card": serde_json::to_value(card)?,
+        "abilities": card.abilities.iter().map(|a| serde_json::to_value(a.resolve())).collect::<Result<Vec<_>, _>>()?,
+    }))
+}
+
+impl SavedPosition {
+    fn capture(gs: &GameState, arena_rng: &Lcg, metadata: Value) -> ArenaResult<Self> {
+        if !snapshot_eligible(gs) {
+            return Err("snapshot requires idle Main with no pending choices".into());
+        }
+        let db = &gs.card_database;
+        let mut cards = db.cards.iter().map(|(&id, card)| Ok(SavedCard {
+            id, card_no: card.card_no.to_string(), identity: card_identity(card)?,
+        })).collect::<ArenaResult<Vec<_>>>()?;
+        cards.sort_by_key(|c| c.id);
+        Ok(Self {
+            format: "rabuka-arena-exact-state".into(), schema: 1, metadata,
+            engine_rng: rabuka_engine::rng::checkpoint(), arena_rng: arena_rng.0,
+            cards,
+            card_no_to_id: db.card_no_to_id.iter().map(|(k, &v)| (k.clone(), v)).collect(),
+            normalized_no_to_id: db.normalized_no_to_id.iter().map(|(k, &v)| (k.clone(), v)).collect(),
+            next_id: db.next_id,
+            state: rmp_serde::to_vec_named(gs)?,
+            internal_state: rmp_serde::to_vec_named(&(
+                &gs.game_state_history, &gs.structured_log, &gs.debug_trace,
+                &gs.scratch_exp_blade, &gs.scratch_exp_score, &gs.scratch_exp_heart, &gs.scratch_entry_positions,
+            ))?,
+            offers: serde_json::to_value(game_setup::generate_possible_actions(gs))?,
+        })
+    }
+
+    /// Rebuild the physical card database (unique per-copy IDs) and the full
+    /// GameState, then verify card identity against the current card database
+    /// and offers/v6/v7 scoring behavior against the captured record.
+    fn restore(&self, templates: &CardDatabase) -> ArenaResult<GameState> {
+        if self.format != "rabuka-arena-exact-state" || self.schema != 1 {
+            return Err("unsupported snapshot format/schema".into());
+        }
+        let mut db = CardDatabase::new();
+        for saved in &self.cards {
+            let card = templates.card_no_to_id.get(&saved.card_no)
+                .and_then(|&id| templates.get_card(id))
+                .ok_or_else(|| format!("snapshot card unavailable: {}", saved.card_no))?;
+            if card_identity(card)? != saved.identity {
+                return Err(format!("snapshot card/ability identity mismatch: {}", saved.card_no).into());
+            }
+            if saved.id < 0 || saved.id >= self.next_id || db.cards.insert(saved.id, card.clone()).is_some() {
+                return Err("invalid or duplicate physical card ID".into());
+            }
+        }
+        for (name, &id) in &self.card_no_to_id {
+            if db.get_card(id).is_none_or(|c| c.card_no.as_ref() != name) {
+                return Err("invalid exact card lookup in snapshot".into());
+            }
+        }
+        for &id in self.normalized_no_to_id.values() {
+            if db.get_card(id).is_none() { return Err("invalid normalized card lookup in snapshot".into()); }
+        }
+        db.card_no_to_id = self.card_no_to_id.iter().map(|(k, &v)| (k.clone(), v)).collect();
+        db.normalized_no_to_id = self.normalized_no_to_id.iter().map(|(k, &v)| (k.clone(), v)).collect();
+        db.next_id = self.next_id;
+        let mut gs: GameState = rmp_serde::from_slice(&self.state)?;
+        gs.card_database = Arc::new(db);
+        (gs.game_state_history, gs.structured_log, gs.debug_trace,
+            gs.scratch_exp_blade, gs.scratch_exp_score, gs.scratch_exp_heart, gs.scratch_entry_positions)
+            = rmp_serde::from_slice(&self.internal_state)?;
+        if !snapshot_eligible(&gs) {
+            return Err("snapshot state is not an idle Main position".into());
+        }
+        let offers = serde_json::to_value(game_setup::generate_possible_actions(&gs))?;
+        if offers != self.offers {
+            return Err("restored offers drift from captured offers".into());
+        }
+        Ok(gs)
+    }
+
+    /// Atomic-ish write: create-new temp file, fsync, rename; never overwrites.
+    fn write(&self, path: &std::path::Path) -> ArenaResult<()> {
+        if path.exists() { return Err(format!("refusing to overwrite snapshot {}", path.display()).into()); }
+        let temporary = path.with_extension(format!("{}.tmp", std::process::id()));
+        let result = (|| -> ArenaResult<()> {
+            let mut file = std::fs::OpenOptions::new().write(true).create_new(true).open(&temporary)?;
+            file.write_all(&rmp_serde::to_vec_named(self)?)?;
+            file.sync_all()?;
+            std::fs::rename(&temporary, path)?;
+            Ok(())
+        })();
+        if result.is_err() { let _ = std::fs::remove_file(&temporary); }
+        result
+    }
+}
+
+/// Restores the global engine RNG state on drop, including panic paths.
+struct RngRestore(u32);
+impl Drop for RngRestore {
+    fn drop(&mut self) { rabuka_engine::rng::restore(self.0); }
+}
+
+/// Replay one saved position offline: same RNG state restored before each
+/// bot's scoring and selection; emits all available actions with card_no,
+/// per-bot numeric scores (null if nonfinite), component breakdowns, chosen
+/// indices. EXACT-STATE HINDSIGHT DIAGNOSTIC ONLY — not fair counterfactual
+/// outcome evaluation; no win claims.
+fn compare_position(saved: &SavedPosition, templates: &CardDatabase) -> ArenaResult<Value> {
+    let _restore_rng = RngRestore(rabuka_engine::rng::checkpoint());
+    let gs = saved.restore(templates)?;
+    let actions = game_setup::generate_possible_actions(&gs);
+    if actions.is_empty() { return Err("snapshot has no actions".into()); }
+    let me = if gs.active_player().id == gs.player1.id { 0 } else { 1 };
+    let mut bots = serde_json::Map::new();
+    for (name, score, choose) in [
+        ("v6", strategy_v6::score_actions as ScoreFn, strategy_v6::choose_action_v6 as fn(&GameState, &[game_setup::Action], u8) -> game_setup::Action),
+        ("v7", strategy_v7::score_actions as ScoreFn, strategy_v7::choose_action_v7 as fn(&GameState, &[game_setup::Action], u8) -> game_setup::Action),
+    ] {
+        rabuka_engine::rng::restore(saved.engine_rng);
+        let scores = score(&gs, &actions, me);
+        if scores.len() != actions.len() { return Err("score/action length mismatch".into()); }
+        rabuka_engine::rng::restore(saved.engine_rng);
+        let chosen = choose(&gs, &actions, me);
+        let chosen_value = serde_json::to_value(&chosen)?;
+        let chosen_index = actions.iter().position(|a| serde_json::to_value(a).ok().as_ref() == Some(&chosen_value))
+            .ok_or("bot chose an action not offered")?;
+        bots.insert(name.into(), json!({
+            "chosen_index": chosen_index,
+            "scores": scores.iter().map(|(score, components)| json!({
+                "score": if score.is_finite() { Some(*score) } else { None },
+                "components": components,
+            })).collect::<Vec<_>>(),
+        }));
+    }
+    let available = actions.iter().enumerate().map(|(index, a)| Ok(json!({
+        "index": index,
+        "card_no": a.parameters.as_ref().and_then(|p| p.card_id)
+            .and_then(|id| gs.card_database.get_card(id)).map(|c| c.card_no.as_ref()),
+        "action": audit_action(&gs, a)?,
+    }))).collect::<ArenaResult<Vec<_>>>()?;
+    Ok(json!({
+        "format": "rabuka-arena-comparison", "schema": 1, "metadata": saved.metadata,
+        "evaluation": "exact-state debugging only; hidden-state one-ply scores are not fair counterfactual outcome evaluation; no win claims",
+        "snapshot_visibility": "full hidden state is stored offline only; view is policy player's hand and public opponent board",
+        "score_semantics": "final native policy score after Pass override, not win probability; nonfinite values are null",
+        "view": audit_view(&gs), "available_actions": available, "bots": bots,
+        "engine_rng": saved.engine_rng, "arena_rng": saved.arena_rng.to_string(),
+        "policy_environment": std::env::vars().filter(|(key, _)| key.starts_with("V6_") || key.starts_with("V7_")).collect::<std::collections::BTreeMap<_, _>>(),
+    }))
+}
+
+fn compare_path(path: &std::path::Path) -> ArenaResult<()> {
+    let mut files = if path.is_dir() {
+        std::fs::read_dir(path)?.map(|entry| entry.map(|e| e.path())).collect::<Result<Vec<_>, _>>()?
+            .into_iter().filter(|p| p.extension().is_some_and(|e| e == "rmp")).collect::<Vec<_>>()
+    } else { vec![path.to_path_buf()] };
+    files.sort();
+    if files.is_empty() { return Err("no .rmp snapshots found".into()); }
+    let templates = fresh_database();
+    let mut stdout = std::io::stdout().lock();
+    for file in files {
+        let saved: SavedPosition = rmp_serde::from_slice(&std::fs::read(&file)?)?;
+        write_jsonl(&mut stdout, &compare_position(&saved, &templates)?)?;
+    }
+    Ok(())
 }
 
 #[derive(Default)]
@@ -344,6 +583,11 @@ fn main() -> ArenaResult<()> {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let env_games = std::env::var("ARENA_GAMES").ok();
     let options = Options::parse(&args, env_games.as_deref())?;
+    if let Some(path) = &options.compare { return compare_path(path); }
+    if let Some(path) = &options.snapshots {
+        std::fs::create_dir_all(path)?;
+        eprintln!("SNAPSHOTS: full hidden state, offline exact-state debugging only; seed % 5 == 0 is held out; cap 20/game");
+    }
     let p1_kind = options.p1;
     let p2_kind = options.p2;
     let trace = options.trace;
@@ -353,8 +597,8 @@ fn main() -> ArenaResult<()> {
     if logs {
         std::fs::create_dir_all("../test_output/arena_logs")?;
     }
-    if audit.is_some() && !std::path::Path::new("../web_ui/decks").join(format!("{deck_name}.txt")).is_file() {
-        return Err(format!("audit requires an existing deck file: {deck_name}.txt").into());
+    if (audit.is_some() || options.snapshots.is_some()) && !std::path::Path::new("../web_ui/decks").join(format!("{deck_name}.txt")).is_file() {
+        return Err(format!("audit/snapshots require an existing deck file: {deck_name}.txt").into());
     }
     emit(&mut audit, &json!({
         "event": "run_start", "schema_version": 1,
@@ -424,6 +668,7 @@ fn main() -> ArenaResult<()> {
             "engine_seed": engine_seed, "arena_seed": arena_seed.to_string(),
         }))?;
         let mut gs = deal_from_templates(&db, &t1, &t2);
+        let mut captured_turns = std::collections::HashSet::new();
         let mut end_reason = "iteration_cap";
         // Archetype detection runs once per game over the full own decklist.
         let plan_p1 = strategy_v3::V3Plan::detect(&gs, 0, &db);
@@ -547,6 +792,33 @@ fn main() -> ArenaResult<()> {
             let active_is_p1 = gs.active_player().id == "p1";
             let kind = if active_is_p1 { p1_kind } else { p2_kind };
             let me = if active_is_p1 { 0u8 } else { 1u8 };
+            // Opt-in capture: first eligible idle-Main decision per player
+            // turn, hard-capped at 20 per game. RNG states captured as-is;
+            // full hidden state is written offline only.
+            if let Some(directory) = &options.snapshots {
+                if snapshot_eligible(&gs) && captured_turns.len() < 20
+                    && captured_turns.insert((gs.turn_number, me)) {
+                    let metadata = json!({
+                        "game": games, "game_seed": engine_seed, "base_seed": options.seed,
+                        "decision": decisions.decision + 1, "turn": gs.turn_number,
+                        "phase": gs.current_phase, "policy_player": gs.active_player().id,
+                        "fold": corpus_fold(engine_seed),
+                        "split_rule": "game_seed modulo 5 == 0: holdout; otherwise train",
+                        "sampling": "first eligible Main decision per player turn; at most 20 per game",
+                        "deck": deck_name, "bots": [p1_kind.name(), p2_kind.name()],
+                        "policy_environment": std::env::vars().filter(|(key, _)| key.starts_with("V6_") || key.starts_with("V7_")).collect::<std::collections::BTreeMap<_, _>>(),
+                    });
+                    let saved = SavedPosition::capture(&gs, &rng, metadata)?;
+                    let restored = saved.restore(&db)?;
+                    if !behaviorally_equal(&gs, &restored)? {
+                        return Err("snapshot serialization is not lossless for this state".into());
+                    }
+                    saved.write(&directory.join(format!(
+                        "{}-seed-{engine_seed:010}-decision-{:04}.rmp",
+                        corpus_fold(engine_seed), decisions.decision + 1,
+                    )))?;
+                }
+            }
 
             // RPS: random for both (no information to decide with).
             if gs.current_phase == Phase::RockPaperScissors {
@@ -974,6 +1246,106 @@ mod tests {
             resolved[0], resolved[1],
             "identical deck lines must resolve to the same print within a build"
         );
+    }
+
+    #[test]
+    fn snapshot_options_are_bounded_and_split_is_grouped_by_seed() {
+        assert!(Options::parse(&args(&["--snapshots", "positions"]), None).is_err());
+        let options = Options::parse(&args(&["--games", "2", "--snapshots", "positions"]), None).unwrap();
+        assert_eq!(options.snapshots, Some(PathBuf::from("positions")));
+        assert!(options.audit.is_none());
+        let compare = Options::parse(&args(&["--compare", "positions"]), None).unwrap();
+        assert_eq!(compare.compare, Some(PathBuf::from("positions")));
+        assert!(Options::parse(&args(&["--compare", "p", "--snapshots", "q", "--games", "1"]), None).is_err());
+        assert!(Options::parse(&args(&["--compare", "p", "--trace"]), None).is_err());
+        assert!(Options::parse(&args(&["--compare", "p", "v6", "v7"]), None).is_err());
+        for seed in 1..100 {
+            let fold = corpus_fold(seed);
+            assert_eq!(fold == "holdout", seed % 5 == 0);
+        }
+    }
+
+    #[test]
+    fn saved_real_deck_roundtrip_preserves_offers_choices_rng_and_original() {
+        let _restore_rng = RngRestore(rabuka_engine::rng::checkpoint());
+        rabuka_engine::rng::seed(17);
+        let mut db = fresh_database();
+        let nums = load_test_deck(&db, "5CP3Z idou");
+        let (t1, t2) = build_templates(&mut db, &nums, &nums);
+        let mut gs = deal_from_templates(&db, &t1, &t2);
+        let mut setup_rng = Lcg(17321);
+        for _ in 0..100 {
+            if snapshot_eligible(&gs) { break; }
+            if game_setup::auto_advance_one(&mut gs) { continue; }
+            let actions = game_setup::generate_possible_actions(&gs);
+            let action = actions.iter().find(|a| a.action_type == game_setup::ActionType::ConfirmMulligan).unwrap_or(&actions[setup_rng.range(actions.len())]);
+            game_setup::execute_action(&mut gs, action).unwrap();
+            game_setup::settle_single_player_state(&mut gs);
+        }
+        assert!(snapshot_eligible(&gs));
+        // Non-serde engine internals must survive the roundtrip.
+        gs.game_state_history.push(1234567);
+        gs.debug_trace.push("snapshot test".into());
+        let db_before = gs.card_database.cards.len();
+        let arena_rng = Lcg(9876);
+        let rng_before = rabuka_engine::rng::checkpoint();
+        let saved = SavedPosition::capture(&gs, &arena_rng, json!({"game_seed": 17, "fold": corpus_fold(17)})).unwrap();
+        // Capture must not disturb either RNG.
+        assert_eq!(rng_before, rabuka_engine::rng::checkpoint());
+        assert_eq!(arena_rng.0, saved.arena_rng);
+        // Restore replays the exact global engine RNG stream.
+        let expected_rng: Vec<_> = (0..8).map(|_| rabuka_engine::rng::rand_range(1_000_000)).collect();
+        rabuka_engine::rng::restore(saved.engine_rng);
+        assert_eq!(expected_rng, (0..8).map(|_| rabuka_engine::rng::rand_range(1_000_000)).collect::<Vec<_>>());
+        // Arena LCG state roundtrips.
+        assert_eq!(Lcg(saved.arena_rng).next_u64(), Lcg(arena_rng.0).next_u64());
+        // File write: atomic create, refuses overwrite, reload identical.
+        let directory = std::env::temp_dir().join(format!("rabuka-snapshot-test-{}", std::process::id()));
+        std::fs::create_dir_all(&directory).unwrap();
+        let path = directory.join("position.rmp");
+        saved.write(&path).unwrap();
+        assert!(saved.write(&path).is_err());
+        let mut loaded: SavedPosition = rmp_serde::from_slice(&std::fs::read(&path).unwrap()).unwrap();
+        // Physical duplicate-deck IDs: real decks need far more physical IDs
+        // than template card_nos.
+        let template_count = fresh_database().cards.len();
+        assert!(saved.cards.len() > template_count + 100, "real decks require unique physical duplicate-card IDs");
+        let restored = loaded.restore(&fresh_database()).unwrap();
+        // Offers and v6/v7 numeric behavior identical after restore.
+        assert!(behaviorally_equal(&gs, &restored).unwrap());
+        assert_eq!(restored.card_database.cards.len(), db_before);
+        for (&id, card) in &gs.card_database.cards {
+            assert_eq!(restored.card_database.get_card(id).unwrap().card_no, card.card_no);
+        }
+        assert_eq!(restored.game_state_history, gs.game_state_history);
+        assert_eq!(restored.debug_trace, gs.debug_trace);
+        // compare is RNG-clean, deterministic across surrounding RNG use,
+        // scores every offered action, and chooses an offered index.
+        let compare_before = rabuka_engine::rng::checkpoint();
+        let first = compare_position(&loaded, &db).unwrap();
+        assert_eq!(compare_before, rabuka_engine::rng::checkpoint());
+        rabuka_engine::rng::seed(998877);
+        let second = compare_position(&loaded, &db).unwrap();
+        assert_eq!(first, second);
+        assert_eq!(rabuka_engine::rng::checkpoint(), 998877);
+        for name in ["v6", "v7"] {
+            assert_eq!(first["bots"][name]["scores"].as_array().unwrap().len(), saved.offers.as_array().unwrap().len());
+            assert!(first["bots"][name]["chosen_index"].as_u64().is_some());
+        }
+        // Original card DB unmutated by capture/compare paths; capture-time
+        // RNG neutrality was asserted right after SavedPosition::capture, and
+        // compare-time neutrality (relative to each call's entry) above — the
+        // global state here is deliberately 998877 from the determinism probe.
+        assert_eq!(gs.card_database.cards.len(), db_before);
+        // Rejection paths: bad schema, unknown card, ineligible phase.
+        loaded.schema = 999;
+        assert!(loaded.restore(&db).is_err());
+        loaded.schema = 1;
+        loaded.cards[0].card_no = "unsupported-card".into();
+        assert!(loaded.restore(&db).is_err());
+        gs.current_phase = Phase::RockPaperScissors;
+        assert!(SavedPosition::capture(&gs, &arena_rng, json!({})).is_err());
+        std::fs::remove_dir_all(&directory).unwrap();
     }
 
     #[test]

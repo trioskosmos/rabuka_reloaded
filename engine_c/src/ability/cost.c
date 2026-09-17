@@ -9,12 +9,17 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-/* ── Resolver-local state (mirrors AbilityResolver fields not in GameState) ── */
-static int s_pending_deferred_costs[16];
-static int s_n_pending_deferred_costs;
+/* ── Resolver-local state (mirrors AbilityResolver fields not in GameState) ──
+   Deferred sub-costs live in GameState::queue (owned deep clones) so they
+   survive across choice pauses and cannot dangle when the caller's tree is
+   freed — mirrors Rust AbilityResolver.pending_deferred_costs. */
 static int s_pending_energy_payment;
 static int s_stage_select_intent;
 static int s_conditional_choice;
+
+/* forward: alloc.c owns the effect-tree clone/free pair */
+AbilityEffect *rb_effect_deep_clone(const AbilityEffect *src);
+void rb_effect_free(AbilityEffect *e);
 
 /* ── effect-field helpers (mirrors AbilityEffect::*_any() getters) ── */
 static const char *eff_extra(const AbilityEffect *e, const char *k) {
@@ -652,11 +657,13 @@ static int pay_cost_inner(GameState *g, int actor, const AbilityEffect *cost) {
             for (int j = i + 1; j < cost->n_child; j++)
                 if (!has_skip_prompt(cost->child[j])) { has_choice_ahead = 1; break; }
             if (is_binary && has_choice_ahead) {
-                /* Defer: auto-pay without a prompt (clone + strip optionality) */
-                AbilityEffect deferred = *sub;
-                deferred.is_optional = 0;
-                if (s_n_pending_deferred_costs < 16)
-                    s_pending_deferred_costs[s_n_pending_deferred_costs++] = i;
+                /* Defer: auto-pay without a prompt (clone + strip optionality,
+                   mirrors Rust pending_deferred_costs.push(auto)) */
+                if (g->queue.n_pending_deferred_costs >= RB_MAX_CHILD) return 0;
+                AbilityEffect *deferred = rb_effect_deep_clone(sub);
+                if (!deferred) return 0;
+                deferred->is_optional = 0;
+                g->queue.pending_deferred_costs[g->queue.n_pending_deferred_costs++] = deferred;
                 had_binary_auto_pay = 1;
             } else {
                 if (!pay_cost_inner(g, actor, sub)) return 0;
@@ -928,28 +935,35 @@ int rb_validate_cost(const GameState *g, int actor, const AbilityEffect *cost) {
     return validate_cost(g, actor, cost);
 }
 
-/* ── Public: rb_pay_deferred_costs ── */
+/* ── Public: rb_pay_deferred_costs ──
+   Mirrors Rust cost.rs:17-25: pay every stored deferred cost in order, then
+   clear the list. Returns 0 (and clears the list) if any cost cannot be paid. */
 int rb_pay_deferred_costs(GameState *g, int actor, const AbilityEffect *cost) {
-    if (!cost || !cost_is_sequential(cost)) return 1;
-    /* Resume from cost_paid_index (mirrors Rust: start_idx = entry.cost_paid_index) */
-    int start_idx = 0;
-    if (g->queue.cur >= 0 && g->queue.cur < g->queue.n_entries)
-        start_idx = g->queue.entries[g->queue.cur].cost_paid_index;
-    for (int i = start_idx; i < cost->n_child; i++) {
-        int found = 0;
-        for (int d = 0; d < s_n_pending_deferred_costs; d++) {
-            if (s_pending_deferred_costs[d] == i) { found = 1; break; }
-        }
-        if (!found) continue;
-        const AbilityEffect *child = cost->child[i];
-        if (!child) continue;
-        /* Clone and strip optionality (mirrors Rust: let mut auto = sub_cost.clone(); auto.set_optional(Some(false))) */
-        AbilityEffect sub = *child;
-        sub.is_optional = 0;
-        if (!rb_pay_cost(g, actor, &sub)) return 0;
+    (void)cost;
+    if (!g || actor < 0 || actor > 1) return 0;
+    AbilityEffect *deferred[RB_MAX_CHILD];
+    int n = g->queue.n_pending_deferred_costs;
+    for (int i = 0; i < n; i++) {
+        deferred[i] = g->queue.pending_deferred_costs[i];
+        g->queue.pending_deferred_costs[i] = NULL;
     }
-    s_n_pending_deferred_costs = 0;
-    return 1;
+    g->queue.n_pending_deferred_costs = 0;
+    int result = 1;
+    for (int i = 0; i < n; i++) {
+        if (result && !rb_pay_cost(g, actor, deferred[i])) result = 0;
+        rb_effect_free(deferred[i]);
+    }
+    return result;
+}
+
+/* ── Public: rb_cost_clear_deferred ── (skip/decline paths discard the batch) */
+void rb_cost_clear_deferred(GameState *g) {
+    if (!g) return;
+    for (int i = 0; i < g->queue.n_pending_deferred_costs; i++) {
+        rb_effect_free(g->queue.pending_deferred_costs[i]);
+        g->queue.pending_deferred_costs[i] = NULL;
+    }
+    g->queue.n_pending_deferred_costs = 0;
 }
 
 /* ── Public: rb_handle_optional_cost_payment ── */

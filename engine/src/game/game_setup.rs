@@ -424,7 +424,7 @@ pub fn settle_auto(gs: &mut GameState) {
 /// Returns Ok(()) on success, Err(message) on failure. Always resets loop detection.
 pub fn execute_action(gs: &mut GameState, action: &Action) -> Result<(), String> {
     let params = action.parameters.clone();
-    let result = TurnEngine::execute_main_phase_action(
+    let result = TurnEngine::execute_main_phase_action_with_ability_index(
         gs,
         &action.action_type,
         params.as_ref().and_then(|p| p.card_id),
@@ -433,6 +433,7 @@ pub fn execute_action(gs: &mut GameState, action: &Action) -> Result<(), String>
             .as_ref()
             .and_then(|p| p.stage_area.as_ref().and_then(|s| s.parse().ok())),
         params.as_ref().and_then(|p| p.use_baton_touch),
+        params.as_ref().and_then(|p| p.ability_index),
     );
     gs.reset_loop_detection();
     result

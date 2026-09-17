@@ -1,0 +1,11 @@
+# sequential deferred-cost differential (mandatory energy gate + deferred optional second cost)
+# Rust: pay_cost_inner defers optional pay_energy child when a mandatory move
+# child follows; C must settle identically.
+card host PL!-bp3-002-R
+card fodder PL!-sd1-010-SD
+hand 1 host
+hand 1 fodder
+energy 1 3
+recalculate
+expect energy 1 3
+expect hand 1 2
