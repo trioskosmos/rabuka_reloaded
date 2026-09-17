@@ -127,6 +127,8 @@ pub struct GameState {
     pub card_appearance_source: SmallVec<[(i16, String); 4]>,
     pub cards_moved_this_turn: SmallVec<[i16; 16]>,
     pub gained_abilities: HashMap<i16, Vec<String>>,
+    #[cfg_attr(feature = "serde_support", serde(default))]
+    pub constant_gained_abilities: HashMap<i16, Vec<String>>,
     /// Full Ability structs dynamically added to cards via gain_ability.
     /// These are scanned by the trigger pipeline alongside original card abilities.
     pub gained_card_abilities: HashMap<i16, Vec<crate::card::Ability>>,
@@ -497,6 +499,7 @@ impl GameState {
             card_appearance_source: SmallVec::new(),
             cards_moved_this_turn: SmallVec::new(),
             gained_abilities: HashMap::default(),
+            constant_gained_abilities: HashMap::default(),
             gained_card_abilities: HashMap::default(),
             gained_ability_sources: HashMap::default(),
             delayed_gained_effects: SmallVec::new(),

@@ -15,11 +15,35 @@ _test never asserts (smoke at best — cannot pin behavior)_
 | `engine/tests/test_modules/effects/score/chika_bp3_001_wait_self_activation_live_total_score_test.rs` | `wait_member_total_score_expires_at_live_end_even_without_setting_live` | 110 |  |
 | `engine/tests/test_modules/effects/score/chika_bp3_001_wait_self_activation_live_total_score_test.rs` | `wait_member_total_score_persists_through_victory_and_expires_after_live` | 105 |  |
 
-## no_drive (0)
+## no_drive (23)
 
 _trigger-context test that mutates state and asserts but never drives the engine (no scan/activate/play/fire): vacuous negatives/positives_
 
-None.
+| file | test | line | detail |
+| --- | --- | --- | --- |
+| `engine/tests/test_modules/effects/deck_order/restore/both_waitrooms_member_restore_threshold_q242_test.rs` | `debut_both_waitrooms_member_restore_shrinks_own_waitroom` | 4 |  |
+| `engine/tests/test_modules/effects/deck_order/restore/both_waitrooms_member_restore_threshold_q242_test.rs` | `exactly_twenty_restored_members_meet_recovery_and_blade_threshold_q242` | 123 |  |
+| `engine/tests/test_modules/effects/deck_order/restore/both_waitrooms_member_restore_threshold_q242_test.rs` | `nineteen_restored_members_grant_neither_recovery_nor_blades_q242` | 155 |  |
+| `engine/tests/test_modules/effects/deck_order/restore/both_waitrooms_member_restore_threshold_q242_test.rs` | `twenty_members_restored_from_own_waitroom_alone_grant_blades_q242` | 188 |  |
+| `engine/tests/test_modules/effects/deck_order/restore/both_waitrooms_member_restore_threshold_q242_test.rs` | `twenty_restored_members_gain_two_blades_without_recoverable_live_q242` | 84 |  |
+| `engine/tests/test_modules/effects/deck_order/restore/both_waitrooms_member_restore_threshold_q242_test.rs` | `twenty_restored_members_recover_live_and_gain_two_blades_q242` | 35 |  |
+| `engine/tests/test_modules/effects/deck_order/restore/live_start_optional_two_member_bottomdeck_test.rs` | `live_start_optional_two_member_bottomdeck_shrinks_waitroom` | 4 |  |
+| `engine/tests/test_modules/effects/draw/chains/full_group_cost_twenty_draw_three_topdeck_three_test.rs` | `full_group_cost_at_least_twenty_draw_and_topdeck_preserves_hand_count` | 4 |  |
+| `engine/tests/test_modules/effects/draw/chains/full_group_cost_twenty_draw_three_topdeck_three_test.rs` | `full_group_cost_below_twenty_preserves_hand_count` | 30 |  |
+| `engine/tests/test_modules/effects/look_select/niche_filters/all_or_any_three_heart_member_search_test.rs` | `all_three_heart_match_enters_hand_without_nonmatching_filler` | 161 |  |
+| `engine/tests/test_modules/effects/look_select/niche_filters/all_or_any_three_heart_member_search_test.rs` | `all_three_required_hearts_member_is_added_to_hand` | 23 |  |
+| `engine/tests/test_modules/effects/look_select/niche_filters/all_or_any_three_heart_member_search_test.rs` | `no_all_three_heart_match_discards_both_looked_at_members` | 94 |  |
+| `engine/tests/test_modules/effects/look_select/niche_filters/all_or_any_three_heart_member_search_test.rs` | `one_of_three_required_hearts_member_is_discarded` | 67 |  |
+| `engine/tests/test_modules/effects/look_select/niche_filters/all_or_any_three_heart_member_search_test.rs` | `two_of_three_required_hearts_member_is_discarded` | 39 |  |
+| `engine/tests/test_modules/effects/look_select/pin_top/per_group_member_look_pin_reveal_score_test.rs` | `look_per_group_member_discards_remainder_without_score_for_member_reveal` | 4 |  |
+| `engine/tests/test_modules/jidou/debut_watch/other_baton_arrival_draw_test.rs` | `other_member_baton_arrival_draws_one_card` | 5 |  |
+| `engine/tests/test_modules/jidou/leaves_stage/baton_replacement_auto_effects_test.rs` | `group_baton_replacement_places_energy_under_arriving_member` | 138 |  |
+| `engine/tests/test_modules/jidou/leaves_stage/baton_replacement_auto_effects_test.rs` | `other_member_stage_to_waitroom_does_not_trigger_self_live_recovery` | 28 |  |
+| `engine/tests/test_modules/jidou/leaves_stage/baton_replacement_auto_effects_test.rs` | `self_stage_to_waitroom_draw_two_discard_one_leaves_one_card_in_hand` | 53 |  |
+| `engine/tests/test_modules/jidou/leaves_stage/baton_replacement_auto_effects_test.rs` | `self_stage_to_waitroom_draw_two_discard_two_leaves_empty_hand` | 72 |  |
+| `engine/tests/test_modules/jidou/leaves_stage/baton_replacement_auto_effects_test.rs` | `self_stage_to_waitroom_look_five_adds_live_to_hand` | 91 |  |
+| `engine/tests/test_modules/jidou/leaves_stage/baton_replacement_auto_effects_test.rs` | `self_stage_to_waitroom_optional_discard_grants_member_heart05_and_blade` | 114 |  |
+| `engine/tests/test_modules/jidou/leaves_stage/baton_replacement_auto_effects_test.rs` | `self_stage_to_waitroom_recovers_group_live` | 6 |  |
 
 ## synthetic_only (0)
 
@@ -41,13 +65,14 @@ _confusable card numbers (bp2 vs pb2) staged in one file — human review for wr
 | --- | --- | --- | --- |
 | `engine/tests/test_modules/characterization/bp7_character_name_condition_test.rs` | `<file>` | 1 | PL!S-bp3-003-R＋, PL!S-bp7-003-R＋ |
 | `engine/tests/test_modules/effects/ability_mod/energy_cost_aqours_score_pl_s_bp6_007_r_test.rs` | `<file>` | 1 | PL!S-bp6-007-R, PL!S-pb1-007-R |
-| `engine/tests/test_modules/effects/choice/ll_bp7_001_triple_member_test.rs` | `<file>` | 1 | PL!S-bp2-016-N, PL!S-bp3-016-N, PL!S-bp7-016-N |
-| `engine/tests/test_modules/effects/choice/ll_bp7_001_triple_member_test.rs` | `<file>` | 1 | PL!SP-bp5-014-N, PL!SP-bp7-014-N |
 | `engine/tests/test_modules/effects/compound/ability_engine_fixes_test.rs` | `<file>` | 1 | PL!SP-bp2-008-R, PL!SP-pb1-008-R |
 | `engine/tests/test_modules/effects/compound/toubatsu_test.rs` | `<file>` | 1 | PL!SP-bp2-011-R, PL!SP-pb2-011-R |
+| `engine/tests/test_modules/effects/cost_mod/play_time_three_named_member_discard_cost_ten_test.rs` | `<file>` | 1 | PL!S-bp2-016-N, PL!S-bp3-016-N, PL!S-bp7-016-N |
+| `engine/tests/test_modules/effects/cost_mod/play_time_three_named_member_discard_cost_ten_test.rs` | `<file>` | 1 | PL!SP-bp5-014-N, PL!SP-bp7-014-N |
 | `engine/tests/test_modules/effects/energy/under_member/energy_and_member_under_test.rs` | `<file>` | 1 | PL!N-bp3-013-N, PL!N-bp5-013-N |
 | `engine/tests/test_modules/effects/gain/blades/mymai_tonight_test.rs` | `<file>` | 1 | PL!S-bp2-023-L, PL!S-bp5-023-L |
 | `engine/tests/test_modules/effects/gain/hearts/live_zone_heart04_threshold_pl_s_bp5_013_n_test.rs` | `<file>` | 1 | PL!S-bp2-020-L, PL!S-bp3-020-L |
+| `engine/tests/test_modules/effects/look_select/niche_filters/all_or_any_three_heart_member_search_test.rs` | `<file>` | 1 | PL!S-PR-015-PR, PL!S-bp2-015-PR |
 | `engine/tests/test_modules/effects/look_select/reveal_to_hand/distortion_need_hearts_test.rs` | `<file>` | 1 | PL!SP-bp1-012-N, PL!SP-bp4-012-N |
 | `engine/tests/test_modules/effects/look_select/reveal_to_hand/eli_bp5_cost9_search.rs` | `<file>` | 1 | PL!-bp3-002-R, PL!-bp5-002-R |
 | `engine/tests/test_modules/effects/position/kinako_each_time_blade_test.rs` | `<file>` | 1 | PL!SP-bp5-006-R, PL!SP-pb1-006-R |
@@ -57,7 +82,6 @@ _confusable card numbers (bp2 vs pb2) staged in one file — human review for wr
 | `engine/tests/test_modules/effects/score/aurora_flower_identity_test.rs` | `<file>` | 1 | PL!HS-bp1-021-L, PL!HS-bp2-021-L |
 | `engine/tests/test_modules/effects/score/note_mermaid_distinct_kaleidoscore_test.rs` | `<file>` | 1 | PL!SP-bp1-013-PR, PL!SP-pb1-013-PR |
 | `engine/tests/test_modules/effects/score/success_count_revealed_score_live_pl_sp_bp5_023_l_test.rs` | `<file>` | 1 | PL!SP-bp1-023-L, PL!SP-bp5-023-L |
-| `engine/tests/test_modules/effects/state/cards_6_thru_13_test.rs` | `<file>` | 1 | PL!S-PR-015-PR, PL!S-bp2-015-PR |
 | `engine/tests/test_modules/effects/state/either_or_state_change_test.rs` | `<file>` | 1 | PL!N-bp4-008-R, PL!N-pb1-008-R |
 | `engine/tests/test_modules/integration/integration_blindspot_test.rs` | `<file>` | 1 | PL!HS-bp5-004-R, PL!HS-bp6-004-R |
 | `engine/tests/test_modules/jidou/movement/ability_chain_combo_test.rs` | `<file>` | 1 | PL!SP-pb1-006-R, PL!SP-pb2-006-R |

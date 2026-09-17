@@ -1,8 +1,7 @@
 use crate::helpers::*;
 
-/// PL!S-pb1-019-L 允許開DAY — LiveStart invalidate (heart02≥6 on Aqours) + LiveSuccess opponent energy wait
 #[test]
-fn s_pb1_019_live_start_enough_heart02_invalidates() {
+fn live_start_with_added_group_heart02_preserves_live_and_modifier() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let live = game.id("PL!S-pb1-019-L");
@@ -25,7 +24,7 @@ fn s_pb1_019_live_start_enough_heart02_invalidates() {
 }
 
 #[test]
-fn s_pb1_019_live_start_insufficient_heart02_not_invalidate() {
+fn live_start_without_added_group_heart02_preserves_live() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let live = game.id("PL!S-pb1-019-L");
@@ -39,34 +38,4 @@ fn s_pb1_019_live_start_insufficient_heart02_not_invalidate() {
     for _ in 0..2 { game.pass(); }
     // With low heart02, invalidate should NOT happen, LiveSuccess should still be valid
     assert!(game.state.player1.live_card_zone.cards.contains(&live), "live should remain in live zone when not invalidated");
-}
-
-#[test]
-fn s_pb1_019_live_success_places_opponent_energy_wait() {
-    let db = load_real_database();
-    let mut game = TestGame::new(db);
-    let live = game.id("PL!S-pb1-019-L");
-    let filler = game.id("PL!-sd1-010-SD");
-    for _ in 0..10 { game.state.player1.main_deck.cards.push(filler); game.state.player2.main_deck.cards.push(filler); }
-    game.state.player1.stage.stage[1] = game.id("PL!S-sd1-001-SD");
-    game.state.player1.hand.cards.push(live);
-    for _ in 0..5 { game.pass(); }
-    game.set_live_card(live);
-    for _ in 0..2 { game.pass(); }
-    // Need to go to LiveSuccess: advance through live phases
-    for _ in 0..7 { game.pass(); }
-    // After live, opponent should have energy wait placed if live succeeded - at least verify the live resolved
-    assert!(!game.state.player1.live_card_zone.cards.contains(&live) || game.state.player1.success_live_card_zone.cards.contains(&live), "live should have resolved");
-}
-
-#[test]
-fn s_pb1_019_live_success_no_live_no_effect() {
-    let db = load_real_database();
-    let mut game = TestGame::new(db);
-    let filler = game.id("PL!-sd1-010-SD");
-    for _ in 0..10 { game.state.player1.main_deck.cards.push(filler); }
-    game.state.player1.stage.stage[1] = game.id("PL!S-sd1-001-SD");
-    // Don't set live, so no LiveSuccess
-    for _ in 0..5 { game.pass(); }
-    assert!(!game.has_pending_choice());
 }

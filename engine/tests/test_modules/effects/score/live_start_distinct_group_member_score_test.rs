@@ -1,15 +1,3 @@
-/// Tests for PL!HS-bp2-020-L (Link to the FUTURE) — set_card_identity + LiveStart score
-///
-/// ab#0 (常時):
-///   すべての領域にあるこのカードは『スリーズブーケ』、『DOLLCHESTRA』、
-///   『みらくらぱーく！』として扱う。
-///
-/// ab#1 (ライブ開始時):
-///   自分のステージにいる名前の異なる『蓮ノ空』のメンバー1人につき、
-///   このカードのスコアを＋２する。
-///
-/// Action types: set_card_identity (ab#0) — unique, only this card
-///               modify_score (ab#1) — per distinct member on stage
 use crate::helpers::*;
 
 fn advance_to_live_card_set_p1(game: &mut TestGame) {
@@ -29,7 +17,7 @@ fn advance_to_live_start(game: &mut TestGame) {
 
 /// LiveStart with 3 distinct 蓮ノ空 members on stage → +6 score (3 * 2).
 #[test]
-fn link_to_future_three_distinct_members_plus_6() {
+fn live_start_three_distinct_group_members_add_six_score() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
@@ -71,7 +59,7 @@ fn link_to_future_three_distinct_members_plus_6() {
 
 /// LiveStart with 1 蓮ノ空 member → +2 score.
 #[test]
-fn link_to_future_one_member_plus_2() {
+fn live_start_one_group_member_adds_two_score() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
@@ -102,7 +90,7 @@ fn link_to_future_one_member_plus_2() {
 
 /// LiveStart with 0 蓮ノ空 members → +0 score added on top of base score 0.
 #[test]
-fn link_to_future_zero_members_score_0() {
+fn live_start_no_group_members_adds_no_score() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 

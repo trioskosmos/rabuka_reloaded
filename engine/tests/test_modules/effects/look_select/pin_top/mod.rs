@@ -2,3 +2,4 @@
 // Regenerated from the directory listing at compile time.
 pub mod kaho_dynamic_count;
 pub mod paid_three_way_split_pl_bp3_007_r_test;
+pub mod per_group_member_look_pin_reveal_score_test;

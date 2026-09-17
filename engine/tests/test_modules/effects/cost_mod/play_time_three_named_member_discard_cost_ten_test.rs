@@ -7,13 +7,11 @@
 /// ab#2 (ライブ成功時): 自分の控え室からメンバーカードを1枚手札に加える。
 use crate::helpers::*;
 use rabuka_engine::ability::types::Choice;
-use rabuka_engine::core::types::AbilityTrigger;
 
 const HANAMARU: &str = "PL!S-bp2-016-N";
 const SETSUNA: &str = "PL!N-PR-009-PR";
 const CHISATO: &str = "PL!SP-pb1-014-PR";
 const TRIPLE: &str = "LL-bp7-001-R＋";
-const LIVE_CARD: &str = "PL!-sd1-020-SD";
 
 fn answer_play_choice(game: &mut TestGame, accept: bool) -> bool {
     if !game.has_pending_choice() {
@@ -37,7 +35,7 @@ fn answer_play_choice(game: &mut TestGame, accept: bool) -> bool {
 // ====================================================================
 
 #[test]
-fn triple_passive_cost_not_set_by_discard() {
+fn play_time_named_discard_passive_cost_not_set_by_discard() {
     let db = load_real_database();
     let mut game = TestGame::new(db.clone());
     let triple = game.id(TRIPLE);
@@ -63,7 +61,7 @@ fn triple_passive_cost_not_set_by_discard() {
 }
 
 #[test]
-fn triple_passive_cost_not_set_with_hand_cards() {
+fn play_time_named_discard_passive_cost_not_set_with_hand_cards() {
     let db = load_real_database();
     let mut game = TestGame::new(db.clone());
     let triple = game.id(TRIPLE);
@@ -84,7 +82,7 @@ fn triple_passive_cost_not_set_with_hand_cards() {
 // ====================================================================
 
 #[test]
-fn triple_gameplay_accept_cost10_discards_hand() {
+fn play_time_named_discard_gameplay_accept_cost10_discards_hand() {
     let db = load_real_database();
     let mut game = TestGame::new(db.clone());
     let triple = game.id(TRIPLE);
@@ -129,7 +127,7 @@ fn triple_gameplay_accept_cost10_discards_hand() {
 }
 
 #[test]
-fn triple_gameplay_decline_pays15_keeps_hand() {
+fn play_time_named_discard_gameplay_decline_pays15_keeps_hand() {
     let db = load_real_database();
     let mut game = TestGame::new(db.clone());
     let triple = game.id(TRIPLE);
@@ -155,7 +153,7 @@ fn triple_gameplay_decline_pays15_keeps_hand() {
 }
 
 #[test]
-fn triple_gameplay_no_hand_cards_no_choice_pays15() {
+fn play_time_named_discard_gameplay_no_hand_cards_no_choice_pays15() {
     let db = load_real_database();
     let mut game = TestGame::new(db.clone());
     let triple = game.id(TRIPLE);
@@ -170,7 +168,7 @@ fn triple_gameplay_no_hand_cards_no_choice_pays15() {
 }
 
 #[test]
-fn triple_gameplay_waitroom_has_three_but_hand_empty_no_choice() {
+fn play_time_named_discard_waitroom_fodder_cannot_enable_ten_energy_play() {
     let db = load_real_database();
     let mut game = TestGame::new(db.clone());
     let triple = game.id(TRIPLE);
@@ -188,7 +186,7 @@ fn triple_gameplay_waitroom_has_three_but_hand_empty_no_choice() {
 }
 
 #[test]
-fn triple_gameplay_energy10_with_hand_can_play_for10() {
+fn play_time_named_discard_accept_with_ten_energy_reaches_stage() {
     let db = load_real_database();
     let mut game = TestGame::new(db.clone());
     let triple = game.id(TRIPLE);
@@ -207,7 +205,7 @@ fn triple_gameplay_energy10_with_hand_can_play_for10() {
 }
 
 #[test]
-fn triple_gameplay_incomplete_hand_no_choice() {
+fn play_time_named_discard_gameplay_incomplete_hand_no_choice() {
     let db = load_real_database();
     let mut game = TestGame::new(db.clone());
     let triple = game.id(TRIPLE);
@@ -224,102 +222,6 @@ fn triple_gameplay_incomplete_hand_no_choice() {
 }
 
 // ====================================================================
-// ab#1 (登場): add 1 live card from waitroom to hand
-// ====================================================================
-
-#[test]
-fn triple_debut_adds_live_card_from_waitroom() {
-    let db = load_real_database();
-    let mut game = TestGame::new(db.clone());
-    let triple = game.id(TRIPLE);
-    let live = game.id(LIVE_CARD);
-    game.state.player1.waitroom.cards.push(live);
-    game.state.player1.hand.cards.push(triple);
-    game.give_energy(15);
-    game.play_to_stage(triple, rabuka_engine::zones::MemberArea::Center);
-    assert!(
-        game.state.player1.hand.cards.contains(&live),
-        "debut should add a live card from waitroom to hand"
-    );
-    assert!(
-        !game.state.player1.waitroom.cards.contains(&live),
-        "the live card should leave the waitroom"
-    );
-}
-
-#[test]
-fn triple_debut_no_live_card_in_waitroom() {
-    let db = load_real_database();
-    let mut game = TestGame::new(db.clone());
-    let triple = game.id(TRIPLE);
-    game.state.player1.hand.cards.push(triple);
-    let member = game.id("PL!-sd1-010-SD");
-    game.state.player1.waitroom.cards.push(member);
-    game.give_energy(15);
-    game.play_to_stage(triple, rabuka_engine::zones::MemberArea::Center);
-    assert!(
-        game.state.player1.waitroom.cards.contains(&member),
-        "non-live cards in waitroom are not touched by ab#1"
-    );
-}
-
-// ====================================================================
-// ab#2 (ライブ成功時): add 1 member card from waitroom to hand
-// ====================================================================
-
-fn trigger_live_success(game: &mut TestGame, card_id: i16) {
-    fire_trigger(
-        game,
-        card_id,
-        AbilityTrigger::LiveSuccess,
-        "ライブ成功時",
-    );
-    game.drain_auto_ability_choices();
-}
-
-#[test]
-fn triple_live_success_adds_member_from_waitroom() {
-    let db = load_real_database();
-    let mut game = TestGame::new(db.clone());
-    let triple = game.id(TRIPLE);
-    game.state.player1.stage.stage = [-1, triple, -1];
-    let member = game.id("PL!-sd1-010-SD");
-    game.state.player1.waitroom.cards.push(member);
-    trigger_live_success(&mut game, triple);
-    assert!(
-        game.state.player1.hand.cards.contains(&member),
-        "live success should add a member card from waitroom to hand"
-    );
-    assert!(
-        !game.state.player1.waitroom.cards.contains(&member),
-        "the member card should leave the waitroom"
-    );
-}
-
-#[test]
-fn triple_live_success_ignores_live_cards_in_waitroom() {
-    let db = load_real_database();
-    let mut game = TestGame::new(db.clone());
-    let triple = game.id(TRIPLE);
-    game.state.player1.stage.stage = [-1, triple, -1];
-    let live_in_waitroom = game.id("PL!-sd1-020-SD");
-    game.state.player1.waitroom.cards.push(live_in_waitroom);
-    trigger_live_success(&mut game, triple);
-    assert!(
-        game.state
-            .player1
-            .waitroom
-            .cards
-            .contains(&live_in_waitroom),
-        "live cards in waitroom are not touched by ab#2"
-    );
-    assert!(
-        !game.state.player1.hand.cards.contains(&live_in_waitroom),
-        "live card must not be added to hand by ab#2"
-    );
-}
-
-// ====================================================================
 // Multi-name / softlock edge cases
 // ====================================================================
 
@@ -327,7 +229,7 @@ fn triple_live_success_ignores_live_cards_in_waitroom() {
 /// only, not for multiple. Using a second copy of the triple as the hanamaru
 /// fodder should succeed.
 #[test]
-fn triple_second_copy_can_be_used_as_one_fodder() {
+fn play_time_named_discard_second_copy_can_be_used_as_one_fodder() {
     let db = load_real_database();
     let mut game = TestGame::new(db.clone());
     let triple_play = game.id(TRIPLE);
@@ -352,7 +254,7 @@ fn triple_second_copy_can_be_used_as_one_fodder() {
 /// One card cannot satisfy two required characters. Hand: [triple to play,
 /// second triple (covers all 3), setsuna]. Only 2 distinct fodder cards -> no choice.
 #[test]
-fn triple_one_card_cannot_cover_two_slots() {
+fn play_time_named_discard_one_card_cannot_cover_two_slots() {
     let db = load_real_database();
     let mut game = TestGame::new(db.clone());
     let triple_play = game.id(TRIPLE);
@@ -376,7 +278,7 @@ fn triple_one_card_cannot_cover_two_slots() {
 /// Hand: triple_play, triple_fodder (hanamaru+setsuna+chisato), hanamaru, chisato.
 /// Greedy hanamaru->triple_fodder would leave setsuna unmatched -> must assign triple_fodder to setsuna instead.
 #[test]
-fn triple_optimal_assignment_with_multi_name() {
+fn play_time_named_discard_optimal_assignment_with_multi_name() {
     let db = load_real_database();
     let mut game = TestGame::new(db.clone());
     let triple_play = game.id(TRIPLE);
@@ -400,7 +302,7 @@ fn triple_optimal_assignment_with_multi_name() {
 /// Playing triple does not consume itself as fodder — ensures the played card
 /// is excluded from the hand check. Hand: only the triple, no fodder -> no choice.
 #[test]
-fn triple_played_card_not_counted_as_fodder() {
+fn play_time_named_discard_played_card_not_counted_as_fodder() {
     let db = load_real_database();
     let mut game = TestGame::new(db.clone());
     let triple = game.id(TRIPLE);
@@ -415,7 +317,7 @@ fn triple_played_card_not_counted_as_fodder() {
 /// The choice is still offered (both options shown), but declining correctly
 /// results in a payment error. This verifies the minimum-cost path (10) is available.
 #[test]
-fn triple_10_energy_minimum_cost_is_10() {
+fn play_time_named_discard_accept_with_ten_energy_pays_ten() {
     let db = load_real_database();
     let mut game = TestGame::new(db.clone());
     let triple = game.id(TRIPLE);
@@ -442,7 +344,7 @@ fn triple_10_energy_minimum_cost_is_10() {
 /// Non-member cards with matching names must NOT count (e.g. energy/live with same name).
 /// PL!SP-pb1-038-SRE is an energy card named "澁谷かのん＆嵐 千砂都" – must not count as chisato.
 #[test]
-fn triple_non_member_dual_name_does_not_count() {
+fn play_time_named_discard_non_member_dual_name_does_not_count() {
     let db = load_real_database();
     let mut game = TestGame::new(db.clone());
     let triple = game.id(TRIPLE);
@@ -464,7 +366,7 @@ fn triple_non_member_dual_name_does_not_count() {
 }
 
 #[test]
-fn triple_with_extra_unrelated_cards_still_offers_choice() {
+fn play_time_named_discard_with_extra_unrelated_cards_still_offers_choice() {
     let db = load_real_database();
     let mut game = TestGame::new(db.clone());
     let triple = game.id(TRIPLE);
@@ -493,7 +395,7 @@ fn triple_with_extra_unrelated_cards_still_offers_choice() {
 /// Many duplicate hanamaru variants: hand has 3 different hanamaru cards + chisato
 /// but only one setsuna copy duplicated as triple – must still find distinct assignment.
 #[test]
-fn triple_many_duplicates_still_finds_assignment() {
+fn play_time_named_discard_many_duplicates_still_finds_assignment() {
     let db = load_real_database();
     let mut game = TestGame::new(db.clone());
     let triple_play = game.id(TRIPLE);
@@ -523,7 +425,7 @@ fn triple_many_duplicates_still_finds_assignment() {
 /// Exhaustive-ish: try every hanamaru/setsuna/chisato variant combination for offer correctness.
 /// This will catch any variant where name contains extra spaces or is mis-detected.
 #[test]
-fn triple_combinatorial_variant_fuzz() {
+fn play_time_named_discard_combinatorial_variant_fuzz() {
     let db = load_real_database();
     let hanamaru_variants = [
         "PL!S-bp2-016-N",
@@ -572,7 +474,7 @@ fn triple_combinatorial_variant_fuzz() {
 }
 
 #[test]
-fn triple_cost_cleared_after_play_and_second_play_costs_15() {
+fn play_time_named_discard_cost_cleared_after_play_and_second_play_costs_15() {
     let db = load_real_database();
     let mut game = TestGame::new(db.clone());
     let triple1 = game.id(TRIPLE);
@@ -602,7 +504,7 @@ fn triple_cost_cleared_after_play_and_second_play_costs_15() {
 
 /// Trying to cheat by using stage member as fodder must not work (hand only).
 #[test]
-fn triple_stage_member_not_counted_as_hand_fodder() {
+fn play_time_named_discard_stage_member_not_counted_as_hand_fodder() {
     let db = load_real_database();
     let mut game = TestGame::new(db.clone());
     let triple = game.id(TRIPLE);

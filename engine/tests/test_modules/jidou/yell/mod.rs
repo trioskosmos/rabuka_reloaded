@@ -9,6 +9,7 @@ pub mod jimo_ai_dash_test;
 pub mod kurosawa_dia_re_yell_test;
 pub mod live_reveal_hand_limit_draw_test;
 pub mod miracle_wave_test;
+pub mod no_blade_heart_reveal_heart02_test;
 pub mod sp_bp2_015_021_yell_blade_test;
 pub mod sp_bp2_015_wien_extra_test;
 pub mod sumire_auto_test;

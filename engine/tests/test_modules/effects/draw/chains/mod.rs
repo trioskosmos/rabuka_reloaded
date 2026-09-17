@@ -6,6 +6,7 @@ pub mod baton_touch_skips_discard_after_self_wait_draw_test;
 pub mod card_ability_tests;
 pub mod draw_discard_pl_hs_bp6_030_l_test;
 pub mod draw_then_bottom_hand_card;
+pub mod full_group_cost_twenty_draw_three_topdeck_three_test;
 pub mod hand_debut_no_draw_pl_hs_bp6_015_r_test;
 pub mod live_success_draw_then_discard_test;
 pub mod lower_stage_cost_draw_then_topdeck_test;

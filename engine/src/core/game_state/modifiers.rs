@@ -289,10 +289,7 @@ impl GameState {
         exp_heart.clear();
         let mut exp_prohibition: Vec<String> = Vec::new();
         let mut exp_delayed_gained_effects = SmallVec::new();
-        // (card_id, gain_text) pairs whose GainAbility constant condition failed
-        // this pass — collected during the loop, applied after it, because the
-        // condition ctx immutably borrows self for the whole entry iteration.
-        let mut lost_gained_texts: Vec<(i16, String)> = Vec::new();
+        let mut expected_gained_texts: HashMap<i16, Vec<String>> = HashMap::default();
         self.constant_cannot_activate_members.clear();
         let mut exp_global_need_heart: Vec<(i16, String, i16)> = Vec::new();
         // Per-source attribution for everything accumulated below (UI bonus
@@ -402,14 +399,6 @@ impl GameState {
                         .is_none_or(|c| ctx.evaluate_condition(c));
                     log::debug!("[CONSTANT_CONDITION] zone=stage source={} ability={} action={} passes={}",
                         card_id, ability_idx, effect.action, cond_met);
-
-                    if !cond_met {
-                        if effect.action == crate::ability::enums::ActionType::GainAbility {
-                            if let Some(gain_text) = effect.ability_gain_any() {
-                                lost_gained_texts.push((card_id, gain_text.to_string()));
-                            }
-                        }
-                    }
 
                     if cond_met {
                         // Record jyouji status for this card (lazily capture
@@ -787,8 +776,10 @@ impl GameState {
                                         &mut p2_constant_score_bonus
                                     };
 
-                                    // Record the gained ability for tracking
-                                    self.add_gained_ability(card_id, gain_text.to_string());
+                                    let texts = expected_gained_texts.entry(card_id).or_default();
+                                    if !texts.iter().any(|text| text == gain_text) {
+                                        texts.push(gain_text.to_string());
+                                    }
 
                                     // Use gained_effect if available (structured data from parser)
                                     if let Some(ref gained) = effect.gained_effect_any() {
@@ -951,31 +942,46 @@ impl GameState {
             // Restore the previous activating_card
             self.activating_card = prev_activating;
         }
-        // Apply condition-loss cleanup collected inside the loop (the ctx
-        // borrow ended above): a GainAbility constant whose condition failed
-        // this pass loses its registered gained ability (flat text, structured
-        // entry, grantor attribution) — otherwise stale text/badges and
-        // trigger registrations outlive their condition (Mari bp2-008R＋
-        // losing an Aqours area must lose the gained ライブ成功時 ability).
-        for (card_id, gain_text) in lost_gained_texts {
-            let removed = self
-                .gained_abilities
-                .entry(card_id)
-                .or_default()
-                .iter()
-                .position(|t| *t == gain_text || t.contains(&gain_text));
-            if let Some(idx) = removed {
-                self.gained_abilities.entry(card_id).or_default().remove(idx);
-                if self.gained_abilities.get(&card_id).is_some_and(Vec::is_empty) {
-                    self.gained_abilities.remove(&card_id);
+        let previous_gained_texts = core::mem::take(&mut self.constant_gained_abilities);
+        for (card_id, texts) in previous_gained_texts {
+            for text in texts {
+                if expected_gained_texts
+                    .get(&card_id)
+                    .is_some_and(|expected| expected.contains(&text))
+                {
+                    self.constant_gained_abilities.entry(card_id).or_default().push(text);
+                } else {
+                    if let Some(gained) = self.gained_abilities.get_mut(&card_id) {
+                        gained.retain(|entry| entry != &text);
+                        if gained.is_empty() {
+                            self.gained_abilities.remove(&card_id);
+                        }
+                    }
+                    log::debug!(
+                        "[GAINED_ABILITY] constant expired card={} source_on_stage={} text_chars={}",
+                        card_id,
+                        entry_positions.contains_key(&card_id),
+                        text.chars().count()
+                    );
                 }
             }
-            self.gained_card_abilities.remove(&card_id);
-            self.gained_ability_sources.remove(&card_id);
-            log::debug!(
-                "[GAINED_ABILITY] condition loss → cleared card={}",
-                card_id
-            );
+        }
+        for (card_id, texts) in expected_gained_texts {
+            for text in texts {
+                let gained = self.gained_abilities.entry(card_id).or_default();
+                if !gained.contains(&text) {
+                    log::debug!(
+                        "[GAINED_ABILITY] constant registered card={} text_chars={}",
+                        card_id,
+                        text.chars().count()
+                    );
+                    gained.push(text.clone());
+                    let owned = self.constant_gained_abilities.entry(card_id).or_default();
+                    if !owned.contains(&text) {
+                        owned.push(text);
+                    }
+                }
+            }
         }
         // Recycle entry_positions allocation into scratch buffer
         self.scratch_entry_positions = entry_positions;
@@ -1555,6 +1561,12 @@ impl GameState {
         }
     }
     pub fn add_gained_ability(&mut self, card_id: i16, ability_type: String) {
+        if let Some(owned) = self.constant_gained_abilities.get_mut(&card_id) {
+            owned.retain(|text| text != &ability_type);
+            if owned.is_empty() {
+                self.constant_gained_abilities.remove(&card_id);
+            }
+        }
         let list = self.gained_abilities.entry(card_id).or_default();
         // Idempotent: recalculate_constants runs on every state change and calls
         // this for the same constant gain_ability repeatedly — don't accumulate
@@ -1570,6 +1582,7 @@ impl GameState {
     }
 
     pub fn clear_gained_abilities_for_card(&mut self, card_id: i16) {
+        self.constant_gained_abilities.remove(&card_id);
         self.gained_abilities.remove(&card_id);
         self.gained_card_abilities.remove(&card_id);
         self.gained_ability_sources.remove(&card_id);

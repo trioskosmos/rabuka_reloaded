@@ -102,9 +102,24 @@ fn condition_loss_removes_delayed_registration_and_restoring_stage_registers_onc
         let removed = game.state.player1.stage.get_area(changed_area).unwrap();
         game.state.player1.stage.set_area(changed_area, -1);
         game.state.player1.waitroom.cards.push(removed);
+        log::debug!(
+            "[MARI_REMOVAL] area={:?} removed={} print={} mari={} stage={:?}",
+            changed_area,
+            removed,
+            game.db.get_card(removed).unwrap().card_no,
+            mari,
+            game.state.player1.stage.stage
+        );
 
-        for _ in 0..3 {
+        for step in 0..3 {
             game.state.recalculate_constants();
+            log::debug!(
+                "[MARI_REMOVAL] step={} source_on_stage={} delayed={} gained={:?}",
+                step,
+                game.state.player1.stage.stage.contains(&mari),
+                game.state.delayed_gained_effects.len(),
+                game.state.gained_abilities.get(&mari)
+            );
             assert!(game.state.delayed_gained_effects.is_empty());
             assert!(game
                 .state
@@ -311,8 +326,8 @@ fn score_bonus_applied_with_revealed_live_cards() {
 
 #[test]
 fn successful_owners_use_their_own_zero_one_or_three_live_reveals() {
-    for p1_reveals in [0, 1, 3] {
-        for p2_reveals in [0, 1, 3] {
+    for p1_reveals in [0, 1, 2, 3, 4] {
+        for p2_reveals in [0, 1, 2, 3, 4] {
             assert_owner_gameplay([p1_reveals, p2_reveals], [true, true], [true, true]);
         }
     }
@@ -378,6 +393,9 @@ fn assert_owner_gameplay(reveal_counts: [usize; 2], sets_live: [bool; 2], succee
     if sets_live[1] {
         game.set_live_card(live_cards[1]);
     }
+    game.pass();
+    assert!(!game.has_pending_choice());
+    assert_eq!(game.state.current_phase, Phase::FirstAttackerPerformance);
     let yell_lives: [Vec<i16>; 2] = std::array::from_fn(|owner| {
         (0..reveal_counts[owner])
             .map(|_| game.new_id("PL!SP-sd1-023-SD"))
@@ -394,7 +412,6 @@ fn assert_owner_gameplay(reveal_counts: [usize; 2], sets_live: [bool; 2], succee
         }
     }
     for expected in [
-        Phase::FirstAttackerPerformance,
         Phase::SecondAttackerPerformance,
         Phase::LiveVictoryDetermination,
     ] {
@@ -416,7 +433,7 @@ fn assert_owner_gameplay(reveal_counts: [usize; 2], sets_live: [bool; 2], succee
         let bonus = if success {
             match reveal_counts[owner] {
                 0 => 0,
-                1 => 1,
+                1 | 2 => 1,
                 _ => 2,
             }
         } else {

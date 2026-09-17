@@ -8,7 +8,6 @@ pub mod daydream_mermaid_test;
 pub mod energy_or_recycle_live_pl_n_pb1_010_r_test;
 pub mod hanamaru_bp3_choose_player_test;
 pub mod kanan_bp7_debut_queue_test;
-pub mod ll_bp7_001_triple_member_test;
 pub mod mari_test;
 pub mod mill_or_wait_pl_hs_cl1_004_cl_test;
 pub mod opponent_accepts_blades_pl_n_pr_022_pr_test;

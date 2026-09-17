@@ -24,6 +24,7 @@ pub mod live_success_reveal_top_member_without_blade_heart_total_score_test;
 pub mod mirai_ticket_test;
 pub mod nagi_live_card_draw_test;
 pub mod named_member_look_pl_n_pb1_016_r_018_r_021_r_024_r_test;
+pub mod optional_discard_look_five_unit_card_q82_test;
 pub mod optional_energy_look_pl_sp_bp2_005_r_test;
 pub mod optional_live_discard_look_five_mei_bp7_018_n_test;
 pub mod revealed_distinct_liella_live_retrieval_test;

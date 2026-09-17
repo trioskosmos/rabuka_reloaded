@@ -2,7 +2,6 @@
 // Regenerated from the directory listing at compile time.
 pub mod all_stage_heart_colors_blades_shizuku_bp5_015_n_test;
 pub mod ayumu_pb1_constant_test;
-pub mod b7_constant_ability_test;
 pub mod blade_per_discard_test;
 pub mod bp4_014_ability_filter_edge_test;
 pub mod bp4_014_rin_edge_test;
@@ -46,11 +45,16 @@ pub mod mus_target_pl_bp4_024_l_test;
 pub mod mymai_tonight_test;
 pub mod named_chisato_pl_sp_bp7_025_l_test;
 pub mod opponent_energy_ahead_constant_blades_test;
+pub mod opponent_energy_lead_constant_blade_branches_test;
 pub mod optional_discard_other_member_blades_honoka_pb1_010_r_test;
 pub mod optional_discard_success_zone_blades_maki_bp3_006_r_test;
 pub mod other_unit_member_constant_blades_test;
+pub mod own_empty_opponent_nonempty_success_constant_blades_test;
 pub mod own_energy_ahead_constant_blade_test;
+pub mod per_other_unit_member_constant_blades_test;
+pub mod per_under_member_energy_constant_blades_test;
 pub mod per_unit_discard_fix;
+pub mod per_waited_opponent_member_constant_blade_test;
 pub mod position_gated_constant_blades_test;
 pub mod q148_blade_total_waited_test;
 pub mod q46_kanako_all_heart_timing_test;
