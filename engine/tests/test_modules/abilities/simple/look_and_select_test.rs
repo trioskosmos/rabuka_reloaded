@@ -170,48 +170,101 @@ fn ginko_inspecting_exact_deck_size_does_not_refresh_waitroom() {
     assert_eq!(game.state.player2.main_deck.cards.as_slice(), &[opponent]);
 }
 
-/// Debut look_and_select with group_filter — no eligible cards among looked-at.
-/// Should auto-skip without showing a prompt.
+/// Debut look_and_select with group filter — 園田海未 (PL!-sd1-004-SD):
+/// 「デッキの上から5枚見る。その中から『μ's』のライブカードを1枚公開して
+///  手札に加えてもよい。残りを控え室に置く。」
+/// No eligible μ's live card among the looked-at five → auto-skip (no prompt),
+/// and ALL five go to the waitroom.
 #[test]
 fn look_and_select_no_eligible_cards_auto_skips() {
-    let db = load_real_database();
-    let mut game = TestGame::new(db);
-
-    // 園田海未 — debut: look at 5, select up to 1 μ's live card to hand
-    let card = game.id("PL!-sd1-004-SD");
-    let filler = game.id("PL!-sd1-010-SD"); // not a μ's live card
-
-    game.state.player1.hand.cards.push(card);
+    let mut game = TestGame::new(load_real_database());
+    let cards: [i16; 7] = std::array::from_fn(|_| game.id("PL!-sd1-010-SD"));
+    game.state.player1.main_deck.cards = cards.to_vec().into();
+    let opponent = game.id("PL!-sd1-010-SD");
+    game.state.player2.main_deck.cards = vec![opponent].into();
+    let umi = game.id("PL!-sd1-004-SD");
+    game.add_to_hand(umi);
     game.give_energy(11);
-    game.state.player1.main_deck.cards.clear();
-    for _ in 0..5 {
-        game.state.player1.main_deck.cards.push(filler);
-    }
-    game.state.player1.stage.stage = [-1, -1, -1];
-    game.play_to_stage(card, rabuka_engine::zones::MemberArea::Center);
-
-    // No eligible μ's live cards → should auto-skip, no prompt
-    assert!(
-        !game.has_pending_choice(),
-        "No eligible cards → should auto-skip without prompt"
-    );
-
-    // All 5 looked-at cards should have gone to waitroom
+    game.play_to_stage(umi, MemberArea::Center);
+    assert!(!game.has_pending_choice(), "no eligible card → auto-skip");
     assert_eq!(
-        game.state.player1.waitroom.cards.len(),
-        5,
-        "All 5 non-matching cards should be in waitroom"
+        game.state.player1.waitroom.cards.as_slice(),
+        &cards[..5],
+        "all five looked-at non-matching cards go to the waitroom"
     );
+    assert_eq!(
+        game.state.player1.main_deck.cards.as_slice(),
+        &cards[5..],
+        "deck untouched below the looked-at five"
+    );
+    assert!(game.state.player1.hand.cards.is_empty());
+    assert_eq!(game.state.player2.main_deck.cards.as_slice(), &[opponent]);
 }
 
-// ====================================================================
-// 津島善子 (PL!S-pb1-015-N) — debut look_and_select with or_card_types
-// and heart_color_count threshold.
-// Text: 自分のデッキの上からカードを4枚見る。その中から
-//       ハートにheart05を2個以上持つメンバーカードか、
-//       必要ハートにheart05を2以上含むライブカードを
-//       1枚公開して手札に加えてもよい。残りを控え室に置く。
-// ====================================================================
+/// Same printed ability, eligible branch: a μ's live card among the five is
+/// taken to hand (公開 = revealed selection), the rest to the waitroom.
+#[test]
+fn look_and_select_takes_group_live_card_to_hand() {
+    let mut game = TestGame::new(load_real_database());
+    let live = game.id("PL!-sd1-020-SD");
+    let mut cards: Vec<i16> = (0..5).map(|_| game.id("PL!-sd1-010-SD")).collect();
+    cards.insert(2, live);
+    game.state.player1.main_deck.cards = cards.clone().into();
+    let opponent = game.id("PL!-sd1-010-SD");
+    game.state.player2.main_deck.cards = vec![opponent].into();
+    let umi = game.id("PL!-sd1-004-SD");
+    game.add_to_hand(umi);
+    game.give_energy(11);
+    game.play_to_stage(umi, MemberArea::Center);
+    game.assert_select_card("looked_at", 1, true);
+    assert_eq!(game.state.looked_at_cards.as_slice(), &cards[..5]);
+    // Frontend protocol: indices are positions WITHIN filtered_indices
+    // (only the μ's live card passes the group filter → position 0).
+    game.select_indices(&[0]);
+    assert!(!game.has_pending_choice());
+    assert_eq!(game.state.player1.hand.cards.as_slice(), &[live]);
+    let mut wr = game.state.player1.waitroom.cards.to_vec();
+    let mut expected = [&cards[..2], &cards[3..5]].concat();
+    wr.sort_unstable();
+    expected.sort_unstable();
+    assert_eq!(wr, expected);
+    assert_eq!(
+        game.state.player1.main_deck.cards.as_slice(),
+        &cards[5..],
+        "deck untouched below the looked-at five"
+    );
+    assert_eq!(game.state.player2.main_deck.cards.as_slice(), &[opponent]);
+}
+
+/// Declined branch of the same printed ability: skip the 「てもよい」 pick →
+/// nothing returns, ALL five looked-at cards go to the waitroom (残りを控え室に置く
+/// applies even on decline — the remainder directive is explicit).
+#[test]
+fn look_and_select_skip_still_discards_remainder_to_waitroom() {
+    let mut game = TestGame::new(load_real_database());
+    let live = game.id("PL!-sd1-020-SD");
+    let mut cards: Vec<i16> = (0..5).map(|_| game.id("PL!-sd1-010-SD")).collect();
+    cards.insert(2, live);
+    game.state.player1.main_deck.cards = cards.clone().into();
+    let opponent = game.id("PL!-sd1-010-SD");
+    game.state.player2.main_deck.cards = vec![opponent].into();
+    let umi = game.id("PL!-sd1-004-SD");
+    game.add_to_hand(umi);
+    game.give_energy(11);
+    game.play_to_stage(umi, MemberArea::Center);
+    game.assert_select_card("looked_at", 1, true);
+    game.select_indices(&[]);
+    assert!(!game.has_pending_choice());
+    assert!(game.state.player1.hand.cards.is_empty());
+    let mut wr = game.state.player1.waitroom.cards.to_vec();
+    let mut expected = cards.clone();
+    expected.truncate(5);
+    wr.sort_unstable();
+    expected.sort_unstable();
+    assert_eq!(wr, expected, "declined pick still sends 残り to the waitroom");
+    assert_eq!(game.state.player1.main_deck.cards.as_slice(), &cards[5..]);
+    assert_eq!(game.state.player2.main_deck.cards.as_slice(), &[opponent]);
+}
 
 // ====================================================================
 // 津島善子 (PL!S-pb1-015-N) — debut look_and_select with or_card_types

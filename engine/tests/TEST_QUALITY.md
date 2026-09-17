@@ -6,12 +6,15 @@ Fn-level static signals over `engine/tests/**/*.rs`. Coverage counts (TEST_COVER
 answer “does it fire”; this answers “would the test notice if the trigger were wrong”.
 Report-only: rows are review prompts, not failures.
 
-## no_assert (2)
+## no_assert (5)
 
 _test never asserts (smoke at best — cannot pin behavior)_
 
 | file | test | line | detail |
 | --- | --- | --- | --- |
+| `engine/tests/test_modules/abilities/simple/look_and_select_test.rs` | `kaho_full_own_stage_looks_five_and_keeps_one` | 75 |  |
+| `engine/tests/test_modules/abilities/simple/look_and_select_test.rs` | `kaho_two_own_members_look_four_and_keep_one` | 70 |  |
+| `engine/tests/test_modules/abilities/simple/look_and_select_test.rs` | `look_and_select_dynamic_count_look_at_counts_stage_members_plus_two` | 65 |  |
 | `engine/tests/test_modules/jidou/complex/bytecode_validation_test.rs` | `bytecode_debug_ability_399` | 209 |  |
 | `engine/tests/test_modules/jidou/complex/bytecode_validation_test.rs` | `bytecode_debug_ability_399_disabled` | 232 |  |
 

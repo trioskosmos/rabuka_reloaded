@@ -1,6 +1,6 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-09-16T19:47:45.251457+00:00",
+  "generated_at": "2026-09-17T00:32:21.940668+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
@@ -8,7 +8,7 @@
     "unique_abilities": 936
   },
   "n_files": 577,
-  "n_tests": 3292,
+  "n_tests": 3298,
   "total_cards": 771,
   "covered_cards": 771,
   "abilities_on_covered": 936,
@@ -383,8 +383,26 @@
   },
   "quality": {
     "no_assert": {
-      "count": 2,
+      "count": 5,
       "rows": [
+        {
+          "file": "engine/tests/test_modules/abilities/simple/look_and_select_test.rs",
+          "test": "kaho_full_own_stage_looks_five_and_keeps_one",
+          "line": 75,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/abilities/simple/look_and_select_test.rs",
+          "test": "kaho_two_own_members_look_four_and_keep_one",
+          "line": 70,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/abilities/simple/look_and_select_test.rs",
+          "test": "look_and_select_dynamic_count_look_at_counts_stage_members_plus_two",
+          "line": 65,
+          "detail": ""
+        },
         {
           "file": "engine/tests/test_modules/jidou/complex/bytecode_validation_test.rs",
           "test": "bytecode_debug_ability_399",
@@ -736,7 +754,7 @@
       ]
     }
   },
-  "n_test_fns_parsed": 3292,
+  "n_test_fns_parsed": 3298,
   "abilities": [
     {
       "idx": 0,
@@ -8709,11 +8727,17 @@
         "engine/tests/test_modules/abilities/simple/look_and_select_test.rs"
       ],
       "covering_tests": [
+        "ginko_inspecting_exact_deck_size_does_not_refresh_waitroom",
+        "ginko_inspection_refresh_preserves_existing_top_and_recovers_waitroom",
+        "kaho_full_own_stage_looks_five_and_keeps_one",
+        "kaho_two_own_members_look_four_and_keep_one",
         "look_and_select_any_number_full_selection",
         "look_and_select_any_number_partial_selection",
         "look_and_select_any_number_skip_all",
         "look_and_select_dynamic_count_look_at_counts_stage_members_plus_two",
         "look_and_select_no_eligible_cards_auto_skips",
+        "look_and_select_skip_still_discards_remainder_to_waitroom",
+        "look_and_select_takes_group_live_card_to_hand",
         "yoshiko_look_select_both_types_eligible",
         "yoshiko_look_select_discard_remaining",
         "yoshiko_look_select_heart05_1_rejected",
@@ -8722,7 +8746,7 @@
         "yoshiko_look_select_no_eligible_auto_skip",
         "yoshiko_look_select_skip_cost"
       ],
-      "covering_test_count": 12,
+      "covering_test_count": 18,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -8755,11 +8779,17 @@
         "engine/tests/test_modules/abilities/simple/look_and_select_test.rs"
       ],
       "covering_tests": [
+        "ginko_inspecting_exact_deck_size_does_not_refresh_waitroom",
+        "ginko_inspection_refresh_preserves_existing_top_and_recovers_waitroom",
+        "kaho_full_own_stage_looks_five_and_keeps_one",
+        "kaho_two_own_members_look_four_and_keep_one",
         "look_and_select_any_number_full_selection",
         "look_and_select_any_number_partial_selection",
         "look_and_select_any_number_skip_all",
         "look_and_select_dynamic_count_look_at_counts_stage_members_plus_two",
         "look_and_select_no_eligible_cards_auto_skips",
+        "look_and_select_skip_still_discards_remainder_to_waitroom",
+        "look_and_select_takes_group_live_card_to_hand",
         "yoshiko_look_select_both_types_eligible",
         "yoshiko_look_select_discard_remaining",
         "yoshiko_look_select_heart05_1_rejected",
@@ -8768,7 +8798,7 @@
         "yoshiko_look_select_no_eligible_auto_skip",
         "yoshiko_look_select_skip_cost"
       ],
-      "covering_test_count": 12,
+      "covering_test_count": 18,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -10561,6 +10591,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
+        "engine/tests/test_modules/abilities/complex/looked_at_discard_test.rs",
         "engine/tests/test_modules/abilities/complex/nagi_live_card_draw_test.rs",
         "engine/tests/test_modules/abilities/simple/honoka_bp5_live_score_test.rs",
         "engine/tests/test_modules/abilities/simple/look_and_select_test.rs",
@@ -10591,14 +10622,14 @@
         "distortion_same_name_catchu_condition_not_met",
         "distortion_two_same_one_diff_catchu_condition_met",
         "energy_zone_capacity_handled",
+        "ginko_inspecting_exact_deck_size_does_not_refresh_waitroom",
+        "ginko_inspection_refresh_preserves_existing_top_and_recovers_waitroom",
         "hanamaru_score_icon_filter",
         "hareruya_q64_waitroom_only_five_distinct_liella_condition_met",
         "hareruya_q74_multiname_distinct_counting",
-        "honoka_bp5_ar_variant",
-        "honoka_bp5_deck_1_card_score_1_refreshes",
-        "honoka_bp5_deck_exactly_enough"
+        "honoka_bp5_ar_variant"
       ],
-      "covering_test_count": 98,
+      "covering_test_count": 107,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -17854,11 +17885,17 @@
         "engine/tests/test_modules/abilities/simple/look_and_select_test.rs"
       ],
       "covering_tests": [
+        "ginko_inspecting_exact_deck_size_does_not_refresh_waitroom",
+        "ginko_inspection_refresh_preserves_existing_top_and_recovers_waitroom",
+        "kaho_full_own_stage_looks_five_and_keeps_one",
+        "kaho_two_own_members_look_four_and_keep_one",
         "look_and_select_any_number_full_selection",
         "look_and_select_any_number_partial_selection",
         "look_and_select_any_number_skip_all",
         "look_and_select_dynamic_count_look_at_counts_stage_members_plus_two",
         "look_and_select_no_eligible_cards_auto_skips",
+        "look_and_select_skip_still_discards_remainder_to_waitroom",
+        "look_and_select_takes_group_live_card_to_hand",
         "yoshiko_look_select_both_types_eligible",
         "yoshiko_look_select_discard_remaining",
         "yoshiko_look_select_heart05_1_rejected",
@@ -17867,7 +17904,7 @@
         "yoshiko_look_select_no_eligible_auto_skip",
         "yoshiko_look_select_skip_cost"
       ],
-      "covering_test_count": 12,
+      "covering_test_count": 18,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -29325,7 +29362,6 @@
       "covering_files": [
         "engine/tests/test_modules/abilities/complex/bp7_dia_look_bottom_select_test.rs",
         "engine/tests/test_modules/abilities/complex/bp7_ginko_select_discard_deck_bottom_test.rs",
-        "engine/tests/test_modules/abilities/complex/bp7_mari_look_top_split_test.rs",
         "engine/tests/test_modules/abilities/complex/bp7_q266_natsumi_blade_wait_test.rs",
         "engine/tests/test_modules/abilities/complex/bp7_q272_just_believe_test.rs",
         "engine/tests/test_modules/abilities/complex/bp7_watanabe_select_self_and_other_test.rs",
@@ -29425,7 +29461,7 @@
         "bp5015_all_six_colors_present_two_blades",
         "bp5015_missing_colors_no_blades"
       ],
-      "covering_test_count": 450,
+      "covering_test_count": 448,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -29454,7 +29490,6 @@
       "covering_files": [
         "engine/tests/test_modules/abilities/complex/bp7_dia_look_bottom_select_test.rs",
         "engine/tests/test_modules/abilities/complex/bp7_ginko_select_discard_deck_bottom_test.rs",
-        "engine/tests/test_modules/abilities/complex/bp7_mari_look_top_split_test.rs",
         "engine/tests/test_modules/abilities/complex/bp7_q266_natsumi_blade_wait_test.rs",
         "engine/tests/test_modules/abilities/complex/bp7_q272_just_believe_test.rs",
         "engine/tests/test_modules/abilities/complex/bp7_watanabe_select_self_and_other_test.rs",
@@ -29554,7 +29589,7 @@
         "bp5015_all_six_colors_present_two_blades",
         "bp5015_missing_colors_no_blades"
       ],
-      "covering_test_count": 450,
+      "covering_test_count": 448,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -29583,7 +29618,6 @@
       "covering_files": [
         "engine/tests/test_modules/abilities/complex/bp7_dia_look_bottom_select_test.rs",
         "engine/tests/test_modules/abilities/complex/bp7_ginko_select_discard_deck_bottom_test.rs",
-        "engine/tests/test_modules/abilities/complex/bp7_mari_look_top_split_test.rs",
         "engine/tests/test_modules/abilities/complex/live_success_rules_test.rs",
         "engine/tests/test_modules/abilities/moderate/eli_test.rs",
         "engine/tests/test_modules/abilities/moderate/wao_wao_test.rs",
@@ -29627,10 +29661,10 @@
         "hot_passion_empty_energy_deck_no_prompt_no_draw",
         "hot_passion_waited_energy_flips_opponent_score_comparison",
         "live_fails_with_insufficient_hearts",
-        "mari_keeps_one_on_top_rest_to_deck_bottom",
-        "mari_keeps_two_on_top_one_to_deck_bottom"
+        "mei_cost_gate_and_already_waited_target",
+        "mei_mirror_standoff_each_side_rests_own_opponent"
       ],
-      "covering_test_count": 117,
+      "covering_test_count": 115,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -29659,7 +29693,6 @@
       "covering_files": [
         "engine/tests/test_modules/abilities/complex/bp7_dia_look_bottom_select_test.rs",
         "engine/tests/test_modules/abilities/complex/bp7_ginko_select_discard_deck_bottom_test.rs",
-        "engine/tests/test_modules/abilities/complex/bp7_mari_look_top_split_test.rs",
         "engine/tests/test_modules/abilities/complex/live_success_rules_test.rs",
         "engine/tests/test_modules/abilities/moderate/eli_test.rs",
         "engine/tests/test_modules/abilities/moderate/wao_wao_test.rs",
@@ -29703,10 +29736,10 @@
         "hot_passion_empty_energy_deck_no_prompt_no_draw",
         "hot_passion_waited_energy_flips_opponent_score_comparison",
         "live_fails_with_insufficient_hearts",
-        "mari_keeps_one_on_top_rest_to_deck_bottom",
-        "mari_keeps_two_on_top_one_to_deck_bottom"
+        "mei_cost_gate_and_already_waited_target",
+        "mei_mirror_standoff_each_side_rests_own_opponent"
       ],
-      "covering_test_count": 117,
+      "covering_test_count": 115,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -29735,7 +29768,6 @@
       "covering_files": [
         "engine/tests/test_modules/abilities/complex/bp7_dia_look_bottom_select_test.rs",
         "engine/tests/test_modules/abilities/complex/bp7_ginko_select_discard_deck_bottom_test.rs",
-        "engine/tests/test_modules/abilities/complex/bp7_mari_look_top_split_test.rs",
         "engine/tests/test_modules/abilities/simple/hanano_test.rs",
         "engine/tests/test_modules/abilities/simple/look_and_select_test.rs",
         "engine/tests/test_modules/batches/untested_abilities_batch44_test.rs",
@@ -29750,9 +29782,13 @@
         "gin_ko_places_opponent_discard_under_opponent_deck",
         "ginko_accept_places_then_rests_blade_gate_member",
         "ginko_decline_moves_and_rests_nothing",
+        "ginko_inspecting_exact_deck_size_does_not_refresh_waitroom",
+        "ginko_inspection_refresh_preserves_existing_top_and_recovers_waitroom",
         "hanano_no_qualifying_unit_skips_cost",
         "hot_passion_empty_energy_deck_no_prompt_no_draw",
         "hot_passion_waited_energy_flips_opponent_score_comparison",
+        "kaho_full_own_stage_looks_five_and_keeps_one",
+        "kaho_two_own_members_look_four_and_keep_one",
         "koko_only_two_kaleidoscope_no_bonus",
         "koko_three_kaleidoscore_grants_heart06_and_blade",
         "look_and_select_any_number_full_selection",
@@ -29760,21 +29796,17 @@
         "look_and_select_any_number_skip_all",
         "look_and_select_dynamic_count_look_at_counts_stage_members_plus_two",
         "look_and_select_no_eligible_cards_auto_skips",
-        "mari_keeps_one_on_top_rest_to_deck_bottom",
-        "mari_keeps_two_on_top_one_to_deck_bottom",
+        "look_and_select_skip_still_discards_remainder_to_waitroom",
+        "look_and_select_takes_group_live_card_to_hand",
         "mei_cost_gate_and_already_waited_target",
         "mei_mirror_standoff_each_side_rests_own_opponent",
         "member_name_constants_selective_gain",
         "mia_activation_self_wait_draws_two_discards_two",
         "mirror_copies_each_evaluate_against_own_opponent",
         "mutual_mill_identity_no_cross_pollination",
-        "p2_owned_copy_compares_against_p1_energy",
-        "p2_owned_copy_no_bonus_when_p1_not_strictly_ahead",
-        "p2_owned_ginko_targets_p1_board_from_p2_seat",
-        "p2_owned_rina_mills_both_decks_from_p2_seat",
-        "q175_hanano_cross_unit_discard_same_unit_as_each_other"
+        "p2_owned_copy_compares_against_p1_energy"
       ],
-      "covering_test_count": 40,
+      "covering_test_count": 44,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -33786,11 +33818,17 @@
         "engine/tests/test_modules/abilities/simple/look_and_select_test.rs"
       ],
       "covering_tests": [
+        "ginko_inspecting_exact_deck_size_does_not_refresh_waitroom",
+        "ginko_inspection_refresh_preserves_existing_top_and_recovers_waitroom",
+        "kaho_full_own_stage_looks_five_and_keeps_one",
+        "kaho_two_own_members_look_four_and_keep_one",
         "look_and_select_any_number_full_selection",
         "look_and_select_any_number_partial_selection",
         "look_and_select_any_number_skip_all",
         "look_and_select_dynamic_count_look_at_counts_stage_members_plus_two",
         "look_and_select_no_eligible_cards_auto_skips",
+        "look_and_select_skip_still_discards_remainder_to_waitroom",
+        "look_and_select_takes_group_live_card_to_hand",
         "yoshiko_look_select_both_types_eligible",
         "yoshiko_look_select_discard_remaining",
         "yoshiko_look_select_heart05_1_rejected",
@@ -33799,7 +33837,7 @@
         "yoshiko_look_select_no_eligible_auto_skip",
         "yoshiko_look_select_skip_cost"
       ],
-      "covering_test_count": 12,
+      "covering_test_count": 18,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
