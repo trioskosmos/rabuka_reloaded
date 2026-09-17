@@ -35,6 +35,7 @@ pub mod movement_tracking_characterization_test;
 pub mod multiname_card_test;
 pub mod nico_recover_test;
 pub mod optional_discard_subunit_recovery_test;
+pub mod optional_discard_two_split_group_recovery_ginko_test;
 pub mod optional_energy_live_recovery_pl_sp_pb2_007_r_test;
 pub mod optional_energy_member_recovery_pl_sp_sd1_007_sd_test;
 pub mod optional_energy_saint_snow_recovery_and_blades_test;
