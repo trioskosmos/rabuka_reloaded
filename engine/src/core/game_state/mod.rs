@@ -869,10 +869,9 @@ impl GameState {
     ) {
         log::debug!(
             target: "rabuka_engine::events",
-            "[T{} {:?}] {}: {} | event={} source={:?} card={:?}",
+            "[T{} {:?}] {} | event={} source={:?} card={:?}",
             self.turn_number,
             self.current_phase,
-            player_label,
             text,
             category,
             source_card_id,

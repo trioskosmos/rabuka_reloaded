@@ -695,11 +695,31 @@ impl super::TurnEngine {
             return;
         }
         let saved_revealed = core::mem::take(&mut game_state.revealed_cards);
-        if let Some(snap) = game_state.performance_snapshots.first() {
-            game_state.revealed_cards = snap.yell_cards.iter().map(|yc| yc.card_id).collect();
-        }
+        let saved_activating_card = game_state.activating_card;
+        let saved_queue = core::mem::replace(
+            &mut game_state.ability_queue,
+            crate::ability_queue::AbilityQueue::new(),
+        );
         let delayed = core::mem::take(&mut game_state.delayed_gained_effects);
         for (card_id, gained) in &delayed {
+            let Some(owner) = game_state.owner_of_card(*card_id) else {
+                continue;
+            };
+            let Some(snap) = game_state.performance_snapshots.iter().rev().find(|snap| {
+                snap.player_id == owner.id && snap.turn == game_state.turn_number
+            }) else {
+                continue;
+            };
+            if owner.live_card_zone.cards.is_empty()
+                || snap.lives.is_empty()
+                || !snap.lives.iter().all(|live| live.passed)
+            {
+                log::debug!("[DELAYED_GAINED] source={} owner={} skipped unsuccessful performance", card_id, owner.id);
+                continue;
+            }
+            log::debug!("[DELAYED_GAINED] source={} owner={} yell_cards={}", card_id, owner.id, snap.yell_cards.len());
+            game_state.revealed_cards = snap.yell_cards.iter().map(|yc| yc.card_id).collect();
+            game_state.activating_card = Some(*card_id);
             use crate::ability::condition::ConditionContext;
             use crate::ability::enums::ActionType;
             use crate::ability::resolver::AbilityResolver;
@@ -722,6 +742,8 @@ impl super::TurnEngine {
             }
         }
         game_state.revealed_cards = saved_revealed;
+        game_state.activating_card = saved_activating_card;
+        game_state.ability_queue = saved_queue;
         log::debug!("[DELAYED_GAINED] processed {} delayed effects", delayed.len());
     }
 
@@ -1027,7 +1049,6 @@ impl super::TurnEngine {
             return;
         }
 
-        // A4: centralised scoring + pass/fail uses stats_pipeline helpers internally
         let (player1_score, player2_score) =
             Self::compute_pregame_scores(game_state, &need_heart_flat, &pre_score_flat, p1_extra, p2_extra);
         Self::populate_live_verdicts(game_state);
@@ -1045,6 +1066,16 @@ impl super::TurnEngine {
 
         Self::finalize_snapshot_fields(game_state, player1_won, player2_won, player1_score, player2_score, &player1_id);
         Self::revert_live_success_score_modifiers(game_state, &pre_score_flat);
+        log::debug!(
+            "[LIVE_TOTAL_TIMING] post-finalize accum p1={} p2={} snap_totals={:?}",
+            game_state.mods.p1_constant_total_score_bonus,
+            game_state.mods.p2_constant_total_score_bonus,
+            game_state
+                .performance_snapshots
+                .iter()
+                .map(|s| (s.player_id.clone(), s.total_score))
+                .collect::<Vec<_>>()
+        );
         Self::process_delayed_gained_effects(game_state);
         Self::merge_late_score_apps(game_state, &player1_id, &player2_id);
         Self::compute_surplus_and_flags(game_state, player1_won, player2_won, &player1_id, &player2_id);

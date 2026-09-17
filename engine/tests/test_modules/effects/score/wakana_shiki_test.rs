@@ -42,19 +42,23 @@ fn trigger_and_drain(game: &mut TestGame) {
 /// The card counts Liella! members WITHOUT blade_heart ("ブレードハートを持たない").
 /// Per_unit counting uses UnderMember zone (per_unit_type="枚" + member_card) and
 /// honors card_property+negation on the per-unit count, but the negation is NOT
-/// a target filter — Kanon (has blade_heart) still receives the score.
+/// a target filter — Kanon (has blade_heart) still benefits.
 ///
-/// Setup: Shiki (trigger) + Kanon (target, has blade_heart) on stage.
+/// The printed target is ライブの合計スコア (the live's TOTAL score), so the bonus
+/// lands once in the owner's total-score accumulator — never as a per-card
+/// modifier on a stage member.
+///
+/// Setup: Shiki (trigger) + Kanon on stage.
 /// Live card in live_card_zone (required for should_trigger_live_success).
 /// Under-member: 6 Liella! member cards WITHOUT blade_heart (唐 可可).
-/// Expected: 6/2*1 = raw 3, capped at max_repeats=2 → target gets +2.
+/// Expected: 6/2*1 = raw 3, capped at max_repeats=2 → total +2 once.
 #[test]
 fn shiki_per_unit_score_capped_at_2() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
     let shiki = game.id("PL!SP-pb2-008-R");
-    let kanon = game.id("PL!SP-sd1-001-SD"); // Liella!, has blade_heart (score target)
+    let kanon = game.id("PL!SP-sd1-001-SD"); // Liella!, has blade_heart
     let under_card = game.id("PL!SP-sd1-002-SD"); // Liella! member, NO blade_heart (counted)
     let live = game.id("PL!-sd1-020-SD"); // filler live card
     let filler = game.id("PL!-sd1-010-SD");
@@ -81,11 +85,16 @@ fn shiki_per_unit_score_capped_at_2() {
 
     trigger_and_drain(&mut game);
 
-    let score_mod = game.state.mods.get_score_modifier(kanon);
+    let total_bonus = game.state.mods.p1_constant_total_score_bonus;
     assert_eq!(
-        score_mod, 2,
-        "Score should be capped at 2 (raw 6/2*1=3, max_repeats=2), got {}",
-        score_mod
+        total_bonus, 2,
+        "Live total score should be capped at +2 once (raw 6/2*1=3, max_repeats=2), got {}",
+        total_bonus
+    );
+    assert_eq!(
+        game.state.mods.get_score_modifier(kanon),
+        0,
+        "printed target is the live total score, not a per-card member modifier"
     );
 }
 
@@ -122,11 +131,11 @@ fn shiki_per_unit_score_no_cap_needed() {
 
     trigger_and_drain(&mut game);
 
-    let score_mod = game.state.mods.get_score_modifier(kanon);
+    let total_bonus = game.state.mods.p1_constant_total_score_bonus;
     assert_eq!(
-        score_mod, 1,
-        "2 matching /2 * 1 = 1 (under cap of 2), got {}",
-        score_mod
+        total_bonus, 1,
+        "2 matching /2 * 1 = +1 once (under cap of 2), got {}",
+        total_bonus
     );
 }
 
@@ -158,10 +167,10 @@ fn shiki_per_unit_score_zero_matching() {
 
     trigger_and_drain(&mut game);
 
-    let score_mod = game.state.mods.get_score_modifier(kanon);
+    let total_bonus = game.state.mods.p1_constant_total_score_bonus;
     assert_eq!(
-        score_mod, 0,
-        "0 matching cards → 0 score, got {}",
-        score_mod
+        total_bonus, 0,
+        "0 matching cards → no live total score bonus, got {}",
+        total_bonus
     );
 }

@@ -861,6 +861,7 @@ impl AbilityResolver {
                         .energy_zone
                         .active_count() as usize;
                     if active < need {
+                        log::debug!("[CONDITION] source={:?} action={} branch=conditional next_action={} reason=insufficient_energy active={} need={} negation={}", self.activating_card_id, effect.action, cond.action, active, need, is_negation);
                         gs.push_rule_log(format!(
                             "{}: [[log_cost_skip:reason=compound_insufficient_energy,need={},active={}]]",
                             pp, need, active
@@ -881,6 +882,7 @@ impl AbilityResolver {
             if let Some(cost_was_paid) = result {
                 let chose_yes = cost_was_paid;
                 let cmd = route_conditional_branch(effect, chose_yes, is_negation);
+                log::debug!("[CONDITION] source={:?} action={} answer=stored accepted={} negation={} branch={} next_action={:?}", self.activating_card_id, effect.action, chose_yes, is_negation, if cmd.is_none() { "none" } else if chose_yes && is_negation { "optional" } else { "conditional" }, cmd.as_ref().map(|a| a.action));
                 if let Some(cmd) = cmd {
                     gs.ability_queue.set_pending_actions(vec![*cmd]);
                 }

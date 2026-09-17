@@ -583,10 +583,7 @@ impl AbilityResolver {
                         description,
                         ..
                     } => {
-                        log::debug!(
-                        "[CHOICE] SelectHeartColor count={} options={:?} description={}",
-                        count, options, description
-                    );
+                    log::debug!("[CHOICE] source={:?} heart colors: count={} options={:?} prompt={}", self.activating_card_id, count, options, description);
                     }
                     crate::ability::types::Choice::SelectTarget {
                         target,
@@ -595,13 +592,10 @@ impl AbilityResolver {
                         allow_skip,
                         ..
                     } => {
-                        log::debug!("[CHOICE] SelectTarget target={} options={:?} allow_skip={} description={}", target, options, allow_skip, description);
+                        log::debug!("[CHOICE] source={:?} target: target={} options={:?} allow_skip={} prompt={}", self.activating_card_id, target, options, allow_skip, description);
                     }
                     crate::ability::types::Choice::SelectPosition { description, .. } => {
-                        log::debug!(
-                            "[CHOICE] SelectPosition description={}",
-                            description
-                        );
+                        log::debug!("[CHOICE] source={:?} position: prompt={}", self.activating_card_id, description);
                     }
                     crate::ability::types::Choice::SelectHeartType {
                         count,

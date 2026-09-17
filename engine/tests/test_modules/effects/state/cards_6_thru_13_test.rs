@@ -446,56 +446,6 @@ fn c9_arise_activate_and_recover() {
     );
 }
 
-fn assert_live_success_reveal_score(revealed_print: &str, expected_bonus: u32) {
-    let db = load_real_database();
-    let mut g = TestGame::new(db);
-    let nozomi = g.id("PL!-bp6-007-R+");
-    let revealed = g.id(revealed_print);
-    let unrelated_member = g.id("PL!-sd1-001-SD");
-    let live = g.id("PL!-sd1-020-SD");
-    let filler = g.id("PL!-sd1-010-SD");
-    g.state.player1.stage.stage = [-1, nozomi, -1];
-    g.state.player1.hand.cards.extend([live, unrelated_member]);
-    deck(&mut g, filler);
-    g.state.player1.main_deck.cards.insert(5, revealed);
-
-    for _ in 0..5 {
-        g.pass();
-    }
-    assert!(g.state.current_phase.to_string().contains("LiveCardSet"));
-    g.set_live_card(live);
-    for _ in 0..5 {
-        g.pass();
-        assert!(!g.has_pending_choice(), "reveal-to-hand has no choice");
-    }
-
-    assert!(g.state.player1.success_live_card_zone.cards.contains(&live));
-    assert!(g.state.player1.hand.cards.contains(&revealed));
-    assert!(g.state.player1.hand.cards.contains(&unrelated_member));
-    assert!(!g.state.player1.main_deck.cards.contains(&revealed));
-    assert_eq!(g.state.player1.main_deck.cards.first(), Some(&filler));
-    let snapshot = g.state.performance_snapshots.iter()
-        .find(|snapshot| snapshot.player_id == "p1").unwrap();
-    assert!(snapshot.success);
-    assert_eq!(snapshot.lives.len(), 1);
-    assert_eq!(snapshot.total_score as u32, 2 + expected_bonus);
-}
-
-#[test]
-fn c10_reveal_top_member_without_blade_heart_moves_to_hand_and_scores() {
-    assert_live_success_reveal_score("PL!-sd1-001-SD", 1);
-}
-
-#[test]
-fn c10_reveal_top_member_with_blade_heart_moves_without_score() {
-    assert_live_success_reveal_score("PL!-sd1-010-SD", 0);
-}
-
-#[test]
-fn c10_reveal_top_live_without_blade_heart_moves_without_score() {
-    assert_live_success_reveal_score("PL!-sd1-019-SD", 0);
-}
-
 // ========== Card 11: PL!N-bp3-028-L LIVE peek N per Niji ==========
 #[test]
 fn c11_peek_per_niji_selects_keep1() {

@@ -229,11 +229,16 @@ fn kanon_ab1_live_success_pay_optional_cost() {
     game.select_option(1);
 
     // After paying, the ability should complete without freezing.
-    // Verify the score modifier was applied.
+    // The printed target is ライブの合計スコア — the bonus lands once in the
+    // owner's live-total accumulator, not as a per-card modifier on the live.
+    assert_eq!(
+        game.state.mods.p1_constant_total_score_bonus, 1,
+        "Live total score should be +1 after paying 6E"
+    );
     assert_eq!(
         game.state.mods.get_score_modifier(live),
-        1,
-        "Score should be +1 after paying 6E"
+        0,
+        "printed target is the live total score, not a per-card modifier"
     );
 
     // Verify 6 energy was deducted.

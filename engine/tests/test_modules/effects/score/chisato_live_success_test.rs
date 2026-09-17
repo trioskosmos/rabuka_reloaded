@@ -53,7 +53,13 @@ fn score_mod(game: &TestGame, card_id: i16) -> i32 {
     game.state.mods.get_score_modifier(card_id)
 }
 
-/// Liella! card swaps Chisato → she moved by Liella! effect → +1 on live success.
+/// The printed target is ライブの合計スコア — the bonus lands once in the
+/// owner's live-total accumulator, not as a per-card modifier on Chisato.
+fn live_total_bonus(game: &TestGame) -> i16 {
+    game.state.mods.p1_constant_total_score_bonus
+}
+
+/// Liella! card swaps Chisato → she moved by Liella! effect → live total +1.
 #[test]
 fn chisato_liella_move_grants_score() {
     let db = load_real_database();
@@ -72,9 +78,14 @@ fn chisato_liella_move_grants_score() {
     trigger_live_success(&mut game, chisato);
 
     assert_eq!(
-        score_mod(&game, chisato),
+        live_total_bonus(&game),
         1,
-        "Liella! effect moved Chisato → +1 score"
+        "Liella! effect moved Chisato → live total score +1"
+    );
+    assert_eq!(
+        score_mod(&game, chisato),
+        0,
+        "printed target is the live total score, not a per-card modifier"
     );
 }
 
@@ -232,5 +243,9 @@ fn chisato_move_and_live_success_gives_score() {
 
     trigger_live_success(&mut game, chisato);
 
-    assert_eq!(score_mod(&game, chisato), 1, "Liella! move → +1 score");
+    assert_eq!(
+        live_total_bonus(&game),
+        1,
+        "Liella! move → live total score +1"
+    );
 }

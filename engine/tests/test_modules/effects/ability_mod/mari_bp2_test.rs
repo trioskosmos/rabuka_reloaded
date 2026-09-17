@@ -1,6 +1,9 @@
 use crate::helpers::*;
 use rabuka_engine::ability::condition::ConditionContext;
 use rabuka_engine::ability::resolver::AbilityResolver;
+use rabuka_engine::card::HeartColor;
+use rabuka_engine::game_state::Phase;
+use rabuka_engine::turn::TurnEngine;
 use rabuka_engine::zones::MemberArea;
 
 fn advance_to_live_card_set(game: &mut TestGame) {
@@ -22,7 +25,8 @@ fn run_live_through_victory(game: &mut TestGame, live_id: i16) {
         game.select_indices(&[0]);
     }
     game.pass();
-    game.pass();
+    assert_eq!(game.state.current_phase, Phase::LiveVictoryDetermination);
+    TurnEngine::execute_live_victory_determination(&mut game.state);
     while game.has_pending_choice() {
         game.select_indices(&[0]);
     }
@@ -71,6 +75,56 @@ fn all_areas_aqours_diff_names_gains_ability() {
         !game.state.delayed_gained_effects.is_empty(),
         "delayed_gained_effects should be populated"
     );
+}
+
+#[test]
+fn repeated_recalculation_registers_delayed_ability_once() {
+    let mut game = TestGame::new(load_real_database());
+    let mari = setup_stage_with_3_aqours(&mut game).0;
+
+    for _ in 0..5 {
+        game.state.recalculate_constants();
+        assert_eq!(game.state.delayed_gained_effects.len(), 1);
+        assert_eq!(game.state.delayed_gained_effects[0].0, mari);
+        assert_eq!(game.state.gained_abilities.get(&mari).unwrap().len(), 1);
+        assert_eq!(game.state.mods.p1_constant_total_score_bonus, 0);
+        assert_eq!(game.state.mods.p2_constant_total_score_bonus, 0);
+    }
+}
+
+#[test]
+fn condition_loss_removes_delayed_registration_and_restoring_stage_registers_once() {
+    for changed_area in [MemberArea::LeftSide, MemberArea::RightSide] {
+        let mut game = TestGame::new(load_real_database());
+        let (mari, _) = setup_stage_with_3_aqours(&mut game);
+        game.state.recalculate_constants();
+        assert_eq!(game.state.delayed_gained_effects.len(), 1);
+        let removed = game.state.player1.stage.get_area(changed_area).unwrap();
+        game.state.player1.stage.set_area(changed_area, -1);
+        game.state.player1.waitroom.cards.push(removed);
+
+        for _ in 0..3 {
+            game.state.recalculate_constants();
+            assert!(game.state.delayed_gained_effects.is_empty());
+            assert!(game
+                .state
+                .gained_abilities
+                .get(&mari)
+                .is_none_or(|abilities| abilities.is_empty()));
+        }
+
+        game.state
+            .player1
+            .waitroom
+            .cards
+            .retain(|card| *card != removed);
+        game.state.player1.stage.set_area(changed_area, removed);
+        for _ in 0..3 {
+            game.state.recalculate_constants();
+            assert_eq!(game.state.delayed_gained_effects.len(), 1);
+            assert_eq!(game.state.delayed_gained_effects[0].0, mari);
+        }
+    }
 }
 
 /// Empty area → condition fails → no gain.
@@ -137,60 +191,276 @@ fn non_aqours_member_fails_condition() {
     );
 }
 
-/// Full live with condition met + yell revealing live cards →
-/// the delayed gained effect is evaluated and the score bonus is applied.
-/// Uses "WE WILL!!" live card (needs heart02+heart06+heart0), with heart
-/// modifiers added to ensure the live succeeds.
+/// 0 live cards in yell → condition not met → no bonus anywhere.
 #[test]
-fn score_bonus_applied_with_revealed_live_cards() {
+fn zero_live_cards_no_bonus() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
-
-    use rabuka_engine::card::HeartColor;
+    let mari = setup_stage_with_3_aqours(&mut game).0;
     let filler = game.id("PL!-sd1-010-SD");
-    let live_card = game.id("PL!SP-sd1-023-SD"); // WE WILL!! — score=1, need heart02+heart06+heart0
-    let yell_live1 = game.id("PL!SP-sd1-023-SD");
-    let yell_live2 = game.id("PL!SP-sd1-023-SD");
+    let live_card = game.id("PL!SP-sd1-023-SD");
 
-    let (_mari, stage_ids) = setup_stage_with_3_aqours(&mut game);
+    game.state.player1.live_card_zone.cards.push(live_card);
+    game.state.recalculate_constants();
 
-    // WE WILL!! needs heart02×1 + heart06×1 + heart0×1 per card (3 × 3 = 9).
-    // Stage provides: heart02=2+1=3 (Mari:2 + Riko:1), heart05=2+2=4 (Mari:2 + Riko:2 + Dia:2), heart04=2+1=3.
-    // heart06=0, heart0=0.  We need heart06×3.  Add it to the 2nd stage member.
+    game.state.revealed_cards.push(filler);
+    assert!(!evaluate_delayed_mari(&mut game, mari), "No condition met");
+
+    assert_eq!(
+        game.state.mods.p1_constant_total_score_bonus, 0,
+        "No live-total bonus without live cards among reveals"
+    );
+    assert_eq!(
+        game.state.mods.get_score_modifier(live_card),
+        0,
+        "No per-card modifier without live cards among reveals"
+    );
+    assert_eq!(
+        game.state.mods.get_score_modifier(mari),
+        0,
+        "No per-card modifier on Mari without live cards among reveals"
+    );
+}
+
+fn fill_unique_decks(game: &mut TestGame) {
+    for _ in 0..4 {
+        for card_no in [
+            "PL!-sd1-010-SD",
+            "PL!S-bp2-011-N",
+            "PL!S-bp2-012-N",
+            "PL!S-bp2-013-N",
+        ] {
+            let p1_card = game.new_id(card_no);
+            let p2_card = game.new_id(card_no);
+            assert!(game.db.get_card(p1_card).is_some());
+            assert!(game.db.get_card(p2_card).is_some());
+            game.state.player1.main_deck.cards.push(p1_card);
+            game.state.player2.main_deck.cards.push(p2_card);
+        }
+    }
+    for side in [Side::P1, Side::P2] {
+        let energy = game.new_id("LL-E-001-SD");
+        match side {
+            Side::P1 => game.state.player1.energy_deck.cards.push(energy),
+            Side::P2 => game.state.player2.energy_deck.cards.push(energy),
+        }
+    }
+}
+
+#[test]
+fn score_bonus_applied_with_revealed_live_cards() {
+    let mut game = TestGame::new(load_real_database());
+    let (mari, stage_ids) = setup_stage_with_3_aqours(&mut game);
+    fill_unique_decks(&mut game);
+    let live_card = game.new_id("PL!SP-sd1-023-SD");
+    let yell_lives: Vec<_> = (0..3).map(|_| game.new_id("PL!SP-sd1-023-SD")).collect();
+    let draw_card = game.state.player1.main_deck.cards.remove(0);
+    for &card in yell_lives.iter().rev() {
+        game.state.player1.main_deck.cards.insert(0, card);
+    }
+    game.state.player1.main_deck.cards.insert(0, draw_card);
+    game.state.player1.hand.cards.push(live_card);
     game.state
         .mods
-        .add_heart_modifier(stage_ids[1], HeartColor::Heart06, 3);
-
-    // Place the live card in hand
-    game.state.player1.hand.cards.push(live_card);
-    game.state.player1.hand.cards.push(filler);
-    // Stack live cards at the top of the deck (yell will reveal them)
-    game.state.player1.main_deck.cards.clear();
-    game.state.player1.main_deck.cards.push(yell_live2);
-    game.state.player1.main_deck.cards.push(yell_live1);
-    game.state.player1.main_deck.cards.push(live_card);
-    for _ in 0..30 {
-        game.state.player1.main_deck.cards.push(filler);
+        .add_heart_modifier(stage_ids[1], HeartColor::Heart06, 1);
+    for _ in 0..3 {
+        game.state.recalculate_constants();
     }
-    for _ in 0..30 {
-        game.state.player2.main_deck.cards.push(filler);
-    }
-
-    game.state.recalculate_constants();
 
     run_live_through_victory(&mut game, live_card);
 
-    // After victory determination, the delayed gained effect evaluated the
-    // conditional_alternative.  With >= 3 live cards among revealed yell cards,
-    // the >= 3 alternative_condition triggered the +2 bonus.
-    // The modify_score was executed — verify through the ability_applications
-    // recorded during delayed effects processing or via the score breakdown.
-    let mod_score = game.state.mods.get_score_modifier(live_card);
-    assert!(
-        mod_score >= 2,
-        "Score modifier on live card should be >= +2 (Mari bonus). Got {}",
-        mod_score
+    assert!(!game.has_pending_choice());
+    assert_eq!(game.state.current_phase, Phase::LiveVictoryDetermination);
+    assert_eq!(game.state.mods.p1_constant_total_score_bonus, 2);
+    assert_eq!(game.state.mods.p2_constant_total_score_bonus, 0);
+    assert_eq!(game.state.mods.get_score_modifier(mari), 0);
+    assert_eq!(game.state.mods.get_score_modifier(live_card), 0);
+    assert!(game.state.player1.hand.cards.contains(&draw_card));
+    assert!(game
+        .state
+        .player1
+        .success_live_card_zone
+        .cards
+        .contains(&live_card));
+    let snapshot = game
+        .state
+        .performance_snapshots
+        .iter()
+        .find(|snapshot| snapshot.player_id == "p1")
+        .expect("Mari's owner must have a performance snapshot");
+    assert!(snapshot.success);
+    assert_eq!(snapshot.lives.len(), 1);
+    assert_eq!(snapshot.lives[0].card_id, live_card);
+    assert_eq!(snapshot.lives[0].base_score, 1);
+    assert_eq!(snapshot.lives[0].score, 1);
+    assert_eq!(snapshot.total_score, 6);
+    assert_eq!(
+        snapshot
+            .yell_cards
+            .iter()
+            .take(3)
+            .map(|card| card.card_id)
+            .collect::<Vec<_>>(),
+        yell_lives
     );
+    assert!(!snapshot
+        .yell_cards
+        .iter()
+        .any(|card| card.card_id == live_card || card.card_id == draw_card));
+}
+
+#[test]
+fn successful_owners_use_their_own_zero_one_or_three_live_reveals() {
+    for p1_reveals in [0, 1, 3] {
+        for p2_reveals in [0, 1, 3] {
+            assert_owner_gameplay([p1_reveals, p2_reveals], [true, true], [true, true]);
+        }
+    }
+}
+
+#[test]
+fn failed_owner_gets_no_bonus_even_with_three_live_reveals() {
+    for owner in 0..2 {
+        let mut succeeds = [true, true];
+        succeeds[owner] = false;
+        assert_owner_gameplay([3, 3], [true, true], succeeds);
+    }
+}
+
+#[test]
+fn owner_without_live_gets_no_bonus_from_opponents_reveals() {
+    for owner in 0..2 {
+        let mut sets_live = [true, true];
+        sets_live[owner] = false;
+        assert_owner_gameplay([3, 3], sets_live, [true, true]);
+    }
+}
+
+fn assert_owner_gameplay(reveal_counts: [usize; 2], sets_live: [bool; 2], succeeds: [bool; 2]) {
+    let mut game = TestGame::new(load_real_database());
+    let (_, p1_stage) = setup_stage_with_3_aqours(&mut game);
+    let p2_stage = [
+        game.new_id("PL!S-bp2-008-R\u{ff0b}"),
+        game.new_id("PL!S-bp2-011-N"),
+        game.new_id("PL!S-bp2-013-N"),
+    ];
+    game.state.player2.stage.stage = p2_stage;
+    fill_unique_decks(&mut game);
+    let live_cards = [
+        game.new_id("PL!SP-sd1-023-SD"),
+        game.new_id("PL!SP-sd1-023-SD"),
+    ];
+    let stages = [p1_stage.as_slice(), p2_stage.as_slice()];
+    for owner in 0..2 {
+        if succeeds[owner] {
+            game.state
+                .mods
+                .add_heart_modifier(stages[owner][1], HeartColor::Heart06, 1);
+        }
+        if sets_live[owner] {
+            game.add_to_hand_for(
+                if owner == 0 { Side::P1 } else { Side::P2 },
+                live_cards[owner],
+            );
+        }
+    }
+    for _ in 0..3 {
+        game.state.recalculate_constants();
+        assert_eq!(game.state.delayed_gained_effects.len(), 2);
+    }
+    advance_to_live_card_set(&mut game);
+    assert_eq!(game.state.current_phase, Phase::LiveCardSetFirstAttacker);
+    if sets_live[0] {
+        game.set_live_card(live_cards[0]);
+    }
+    game.pass();
+    assert_eq!(game.state.current_phase, Phase::LiveCardSetSecondAttacker);
+    if sets_live[1] {
+        game.set_live_card(live_cards[1]);
+    }
+    let yell_lives: [Vec<i16>; 2] = std::array::from_fn(|owner| {
+        (0..reveal_counts[owner])
+            .map(|_| game.new_id("PL!SP-sd1-023-SD"))
+            .collect()
+    });
+    for (owner, cards) in yell_lives.iter().enumerate() {
+        let deck = if owner == 0 {
+            &mut game.state.player1.main_deck.cards
+        } else {
+            &mut game.state.player2.main_deck.cards
+        };
+        for &card in cards.iter().rev() {
+            deck.insert(0, card);
+        }
+    }
+    for expected in [
+        Phase::FirstAttackerPerformance,
+        Phase::SecondAttackerPerformance,
+        Phase::LiveVictoryDetermination,
+    ] {
+        game.pass();
+        assert!(!game.has_pending_choice());
+        assert_eq!(game.state.current_phase, expected);
+    }
+    TurnEngine::execute_live_victory_determination(&mut game.state);
+    assert!(!game.has_pending_choice());
+    for owner in 0..2 {
+        let player_id = if owner == 0 { "p1" } else { "p2" };
+        let snapshot = game
+            .state
+            .performance_snapshots
+            .iter()
+            .find(|snapshot| snapshot.player_id == player_id)
+            .unwrap();
+        let success = sets_live[owner] && succeeds[owner];
+        let bonus = if success {
+            match reveal_counts[owner] {
+                0 => 0,
+                1 => 1,
+                _ => 2,
+            }
+        } else {
+            0
+        };
+        assert_eq!(
+            snapshot.success, success,
+            "owner={owner} reveals={reveal_counts:?}"
+        );
+        assert_eq!(snapshot.lives.len(), usize::from(sets_live[owner]));
+        if sets_live[owner] {
+            assert_eq!(snapshot.lives[0].card_id, live_cards[owner]);
+            assert_eq!(snapshot.lives[0].passed, succeeds[owner]);
+            let revealed_lives: Vec<_> = snapshot
+                .yell_cards
+                .iter()
+                .filter(|card| {
+                    game.db.get_card(card.card_id).unwrap().card_no == "PL!SP-sd1-023-SD"
+                })
+                .map(|card| card.card_id)
+                .collect();
+            assert_eq!(revealed_lives, yell_lives[owner]);
+        }
+        if success {
+            assert_eq!(
+                snapshot.total_score,
+                1 + reveal_counts[owner] as u8 + bonus as u8,
+                "owner={owner} reveals={reveal_counts:?}"
+            );
+        } else {
+            assert_eq!(snapshot.total_score, 0);
+        }
+        let actual_bonus = if owner == 0 {
+            game.state.mods.p1_constant_total_score_bonus
+        } else {
+            game.state.mods.p2_constant_total_score_bonus
+        };
+        assert_eq!(
+            actual_bonus, bonus,
+            "owner={owner} reveals={reveal_counts:?}"
+        );
+        assert_eq!(game.state.mods.get_score_modifier(live_cards[owner]), 0);
+        assert_eq!(game.state.mods.get_score_modifier(stages[owner][0]), 0);
+    }
 }
 
 /// Helper: evaluate the delayed gained effect for `card_id` with the
@@ -240,15 +510,19 @@ fn one_live_card_plus_one() {
     game.state.revealed_cards.push(live_card);
     assert!(evaluate_delayed_mari(&mut game, mari));
 
-    let on_live = game.state.mods.get_score_modifier(live_card);
-    let on_mari = game.state.mods.get_score_modifier(mari);
-    assert!(
-        on_live == 1 || on_mari == 1,
-        "+1 score expected: live_{}={} mari_{}={}",
-        live_card,
-        on_live,
-        mari,
-        on_mari,
+    assert_eq!(
+        game.state.mods.p1_constant_total_score_bonus, 1,
+        "1 live card among reveals → live total score +1"
+    );
+    assert_eq!(
+        game.state.mods.get_score_modifier(live_card),
+        0,
+        "printed target is the live total score, not a per-card modifier"
+    );
+    assert_eq!(
+        game.state.mods.get_score_modifier(mari),
+        0,
+        "printed target is the live total score, not a per-card modifier"
     );
 }
 
@@ -268,35 +542,18 @@ fn three_live_cards_plus_two() {
         .extend([live_card, live_card, live_card]);
     assert!(evaluate_delayed_mari(&mut game, mari));
 
-    let on_live = game.state.mods.get_score_modifier(live_card);
-    let on_mari = game.state.mods.get_score_modifier(mari);
-    assert!(
-        on_live == 2 || on_mari == 2,
-        "+2 score expected: live_{}={} mari_{}={}",
-        live_card,
-        on_live,
-        mari,
-        on_mari,
+    assert_eq!(
+        game.state.mods.p1_constant_total_score_bonus, 2,
+        "3 live cards among reveals → alternative +2 applied once"
     );
-}
-
-/// 0 live cards in yell → condition not met → score stays 0.
-#[test]
-fn zero_live_cards_no_bonus() {
-    let db = load_real_database();
-    let mut game = TestGame::new(db);
-    let mari = setup_stage_with_3_aqours(&mut game).0;
-    let filler = game.id("PL!-sd1-010-SD");
-    let live_card = game.id("PL!SP-sd1-023-SD");
-
-    game.state.player1.live_card_zone.cards.push(live_card);
-    game.state.recalculate_constants();
-
-    game.state.revealed_cards.push(filler);
-    assert!(!evaluate_delayed_mari(&mut game, mari), "No condition met");
-
-    let on_live = game.state.mods.get_score_modifier(live_card);
-    let on_mari = game.state.mods.get_score_modifier(mari);
-    assert_eq!(on_live, 0, "No bonus without live cards");
-    assert_eq!(on_mari, 0, "No bonus without live cards");
+    assert_eq!(
+        game.state.mods.get_score_modifier(live_card),
+        0,
+        "printed target is the live total score, not a per-card modifier"
+    );
+    assert_eq!(
+        game.state.mods.get_score_modifier(mari),
+        0,
+        "printed target is the live total score, not a per-card modifier"
+    );
 }

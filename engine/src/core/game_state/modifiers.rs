@@ -181,10 +181,23 @@ impl GameState {
         for (&cid, &val) in &exp_score {
             self.mods.add_score_modifier(cid, val);
         }
+        if log::log_enabled!(log::Level::Debug) && old_score != exp_score {
+            log::debug!("[CONSTANT_SCORE] per-card bonuses: {:?} -> {:?}", old_score, exp_score);
+        }
         self.mods.constant_score_bonuses = exp_score;
         self.scratch_exp_score = old_score;
 
         // Per-player global score bonus (from GainAbility modify_score)
+        if log::log_enabled!(log::Level::Debug)
+            && (i32::from(self.mods.p1_constant_total_score_bonus) != p1_constant_score_bonus
+                || i32::from(self.mods.p2_constant_total_score_bonus) != p2_constant_score_bonus)
+        {
+            log::debug!(
+                "[CONSTANT_SCORE] live-total bonus: p1 {} -> {}, p2 {} -> {}",
+                self.mods.p1_constant_total_score_bonus, p1_constant_score_bonus,
+                self.mods.p2_constant_total_score_bonus, p2_constant_score_bonus
+            );
+        }
         self.mods.p1_constant_total_score_bonus = i16::try_from(p1_constant_score_bonus).unwrap();
         self.mods.p2_constant_total_score_bonus = i16::try_from(p2_constant_score_bonus).unwrap();
 
@@ -275,6 +288,7 @@ impl GameState {
         let mut exp_heart = core::mem::take(&mut self.scratch_exp_heart);
         exp_heart.clear();
         let mut exp_prohibition: Vec<String> = Vec::new();
+        let mut exp_delayed_gained_effects = SmallVec::new();
         self.constant_cannot_activate_members.clear();
         let mut exp_global_need_heart: Vec<(i16, String, i16)> = Vec::new();
         // Per-source attribution for everything accumulated below (UI bonus
@@ -382,7 +396,8 @@ impl GameState {
                         .condition
                         .as_ref()
                         .is_none_or(|c| ctx.evaluate_condition(c));
-                    log::debug!("[RC_PROBE] card={} cond_met={}", card_id, cond_met);
+                    log::debug!("[CONSTANT_CONDITION] zone=stage source={} ability={} action={} passes={}",
+                        card_id, ability_idx, effect.action, cond_met);
 
                     if cond_met {
                         // Record jyouji status for this card (lazily capture
@@ -785,7 +800,7 @@ impl GameState {
                                             // based on revealed card count) can't be evaluated at
                                             // constant evaluation time.  Store them for later
                                             // evaluation during execute_live_victory_determination.
-                                            self.delayed_gained_effects
+                                            exp_delayed_gained_effects
                                                 .push((card_id, *(*gained).clone()));
                                         }
                                     } else {
@@ -961,6 +976,7 @@ impl GameState {
         self.evaluate_success_zone_constant_modifiers();
         tdbg!("RC:14b SUCCESS_ZONE_DONE");
         self.refresh_yell_sources();
+        self.delayed_gained_effects = exp_delayed_gained_effects;
     }
 
     /// G8: set each player's yell source from 常時 yell_source_modifier live cards
@@ -1079,28 +1095,19 @@ impl GameState {
                         let count = if count_zone == "stage" && effect.group_names_any().is_some() {
                             let group_name = effect.group_name();
                             let card_db = &self.card_database;
-                            let stage_ids: Vec<i16> = player
+                            let matches = player
                                 .stage
                                 .stage
                                 .iter()
                                 .copied()
                                 .filter(|&id| id != -1)
-                                .collect();
-                            log::debug!(
-                                "[COST_MOD_PER_UNIT_DEBUG] stage_ids={:?} group_name={:?}",
-                                stage_ids,
-                                group_name
-                            );
-                            let matches = stage_ids
-                                .iter()
-                                .filter(|&&id| {
+                                .filter(|&id| {
                                     crate::ability::util::card_matches_group_str(
                                         card_db, id, group_name,
                                     )
                                 })
                                 .count();
-                            log::debug!("[COST_MOD_PER_UNIT_DEBUG] group_matches={}", matches);
-                            u8::try_from(matches).unwrap()
+                            matches.u8_count()
                         } else if Zone::from_str(count_zone) == Some(Zone::UnderMember) {
                             // UnderMember is a 2D structure that zone_cards cannot
                             // represent — flatten every stage slot's under-cards,
@@ -1130,12 +1137,6 @@ impl GameState {
                                 crate::ability::util::zone_cards(player, count_zone).to_vec();
                             cards.len().u8_count()
                         };
-                        log::debug!(
-                            "[COST_MOD_PER_UNIT] cid={} count_zone={} count={}",
-                            cid,
-                            count_zone,
-                            count
-                        );
                         let per_unit_count = effect.per_unit_count_any().unwrap_or(1);
                         let exclude_self = effect.exclude_self_any().unwrap_or(false);
                         let effective = if exclude_self {
@@ -1670,15 +1671,13 @@ impl GameState {
                 _ => None,
             };
             let ctx = ConditionContext::new_with_self(self, self_player);
-            if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) {
-                log::debug!("[SZ_DEBUG] cid={} effect={}", cid, effect.action);
-            }
             let cond_met = effect
                 .condition
                 .as_ref()
                 .is_none_or(|c| ctx.evaluate_condition(c));
             if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) {
-                log::debug!("[SZ_DEBUG] cond_met={}", cond_met);
+                log::debug!("[CONSTANT_CONDITION] zone=success source={} owner={} action={} passes={}",
+                    cid, self_player.map(|p| p.id.as_str()).unwrap_or("unknown"), effect.action, cond_met);
             }
             if !cond_met {
                 self.activating_card = prev_activating;
@@ -1695,6 +1694,19 @@ impl GameState {
 
             self.apply_success_zone_effect(*cid, *player_idx, effect);
             self.activating_card = prev_activating;
+        }
+        if log::log_enabled!(log::Level::Debug) {
+            if old_sz_score != self.mods.success_zone_score_bonuses {
+                log::debug!("[CONSTANT_SCORE] success-zone bonuses: {:?} -> {:?}",
+                    old_sz_score, self.mods.success_zone_score_bonuses);
+            }
+            if old_sz_blade != self.mods.success_zone_blade_bonuses
+                || old_sz_heart != self.mods.success_zone_heart_bonuses
+            {
+                log::debug!("[CONSTANT_RESOURCE] success-zone blades: {:?} -> {:?}; hearts: {:?} -> {:?}",
+                    old_sz_blade, self.mods.success_zone_blade_bonuses,
+                    old_sz_heart, self.mods.success_zone_heart_bonuses);
+            }
         }
     }
 
@@ -1752,14 +1764,15 @@ impl GameState {
                 };
                 if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed)
                 {
-                    log::debug!(
-                        "[SZ_DEBUG] GainResource resource={} amount={} target={} position={:?}",
+                    log::trace!(
+                        "[CONSTANT_RESOURCE] source={} resource={} amount={} target={} position={:?} stage={:?}",
+                        cid,
                         resource,
                         amount,
                         effect.target_name(),
-                        effect.position_any()
+                        effect.position_any(),
+                        player.stage.stage
                     );
-                    log::debug!("[SZ_DEBUG] stage={:?}", player.stage.stage);
                 }
 
                 let candidates: Vec<i16> = player

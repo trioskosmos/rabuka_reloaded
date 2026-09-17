@@ -116,12 +116,12 @@ fn log_move_result(player: &Player, db: &CardDatabase, card_id: i16, source: &st
     {
         return;
     }
-    let (actual, public) = if player.hand.cards.contains(&card_id) {
-        ("hand", false)
-    } else if player.main_deck.cards.contains(&card_id) {
+    let (actual, public) = if player.main_deck.cards.contains(&card_id) {
         ("deck", false)
     } else if player.energy_deck.cards.contains(&card_id) {
         ("energy_deck", false)
+    } else if player.hand.cards.contains(&card_id) {
+        ("hand", false)
     } else if player.live_card_zone.cards.contains(&card_id) {
         ("live_card_zone", false)
     } else if player.waitroom.cards.contains(&card_id) {
@@ -3070,17 +3070,20 @@ if util::distinct_should_dedupe(distinct) {
                 .iter()
                 .filter(|&&idx| {
                     let ok = idx < cards.len() && passes(cards[idx]);
-                    log::debug!(
-                        "[SELECTION_VERDICT] zone={} index={} verdict={}",
-                        zone, idx,
-                        if idx >= cards.len() { "reject_out_of_bounds" } else if ok { "accept" } else { "reject_filter" }
-                    );
-                    log::trace!("[SELECTION_CARD] index={} id={:?}", idx, cards.get(idx));
+                    if !ok {
+                        log::debug!(
+                            "[SELECTION_REJECTED] zone={} index={} reason={}",
+                            zone,
+                            idx,
+                            if idx >= cards.len() { "out_of_bounds" } else { "filter_mismatch" }
+                        );
+                        log::trace!("[SELECTION_CARD] index={} id={:?}", idx, cards.get(idx));
+                    }
                     ok
                 })
                 .copied()
                 .collect();
-            log::debug!("[EXEC_SEL_FILTER_RESULT] filtered_indices={:?}", result);
+            log::debug!("[SELECTION_MAPPED] zone={} requested={:?} accepted={:?}", zone, indices, result);
             result
         };
 

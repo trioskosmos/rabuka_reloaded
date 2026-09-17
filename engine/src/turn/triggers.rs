@@ -48,7 +48,8 @@ impl super::TurnEngine {
                                 let ability = ar.resolve();
                                 let trigger_match =
                                     ability.has_trigger(crate::triggers::TriggerKind::Debut);
-                                log::debug!(
+                                log::log!(
+                                    if trigger_match { log::Level::Debug } else { log::Level::Trace },
                                     "[TRIGGER_MATCH] player={} source={} ({}, id={}) ability={} trigger=Debut match={} triggers={:?}",
                                     player_id,
                                     card.name,
@@ -175,8 +176,8 @@ impl super::TurnEngine {
 
     pub fn trigger_live_start_abilities(game_state: &mut GameState, player_id: &str) {
         if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) {
-            log::debug!(
-                "[TLS_ENTER] player={} phase={:?} turn_phase={:?}",
+            log::trace!(
+                "[LIVE_START_SCAN] player={} phase={:?} turn_phase={:?}",
                 player_id,
                 game_state.current_phase,
                 game_state.current_turn_phase
@@ -202,48 +203,32 @@ impl super::TurnEngine {
             } else {
                 &game_state.player2
             };
-            if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) {
-                log::debug!(
-                    "[TLS_LIVE] player={} live_zone_cards={:?} stage={:?}",
-                    player_id,
-                    player.live_card_zone.cards,
-                    player.stage.stage
-                );
-            }
+            log::trace!(
+                "[LIVE_START_SCAN] player={} live_zone_cards={:?} stage={:?}",
+                player_id,
+                player.live_card_zone.cards,
+                player.stage.stage
+            );
             for card_id in &player.live_card_zone.cards {
-                if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed)
-                {
-                    log::debug!(
-                        "[TLS_LIVE] checking card={} negated={}",
-                        card_id,
-                        game_state.negated_abilities.contains(card_id)
-                    );
-                }
+                log::trace!(
+                    "[LIVE_START_SCAN] checking card={} negated={}",
+                    card_id,
+                    game_state.negated_abilities.contains(card_id)
+                );
                 if game_state.negated_abilities.contains(card_id) {
                     continue;
                 }
                 if let Some(card) = game_state.card_database.get_card(*card_id) {
-                    if crate::ability::debug::ABILITY_DEBUG
-                        .load(core::sync::atomic::Ordering::Relaxed)
-                    {
-                        log::debug!(
-                            "[TLS_LIVE] card_id={} card_no={} abilities={}",
-                            card_id,
-                            card.card_no,
-                            card.abilities.len()
-                        );
-                    }
                     for (aidx, ar) in card.abilities.iter().enumerate() {
                         let ability = ar.resolve();
-                        if crate::ability::debug::ABILITY_DEBUG
-                            .load(core::sync::atomic::Ordering::Relaxed)
-                        {
-                            log::debug!(
-                                "[TLS_LIVE]   aidx={} triggers={:?}",
-                                aidx,
-                                ability.triggers
-                            );
-                        }
+                        log::trace!(
+                            "[LIVE_START_SCAN] source={} ({}, id={}) ability={} triggers={:?}",
+                            card.name,
+                            card.card_no,
+                            card_id,
+                            aidx,
+                            ability.triggers
+                        );
                         if ability.has_trigger(crate::triggers::TriggerKind::LiveStart) {
                             if seen.insert((*card_id, aidx)) {
                                 if crate::ability::debug::ABILITY_DEBUG
@@ -339,9 +324,9 @@ impl super::TurnEngine {
         }
 
         log::debug!(
-            "[LIVE_START_TRIGGER] triggering {} abilities for player {}",
-            abilities_to_trigger.len(),
-            player_id
+            "[LIVE_START_TRIGGER] player={} matched={} enqueuing",
+            player_id,
+            abilities_to_trigger.len()
         );
         game_state.push_debug_note(format!(
             "live_start scan {}: {} ability(ies) fired",
@@ -349,8 +334,8 @@ impl super::TurnEngine {
             abilities_to_trigger.len()
         ));
         for (ability_id, card_no, explicit_card_id) in abilities_to_trigger {
-            log::debug!(
-                "[LIVE_START_TRIGGER]   ability={} card_no={}",
+            log::trace!(
+                "[LIVE_START_TRIGGER] enqueue ability={} card_no={}",
                 ability_id,
                 card_no
             );
@@ -367,7 +352,7 @@ impl super::TurnEngine {
     }
 
     pub fn trigger_auto_abilities_for_player(game_state: &mut GameState, player_id: &str) {
-        log::debug!("[AUTO_TRIGGER] checking stage for player {}", player_id);
+        log::trace!("[AUTO_SCAN] checking stage for player {}", player_id);
         // Delegate to GameState's method, which handles the scan + enqueue
         game_state.trigger_auto_abilities_for_player(player_id);
     }

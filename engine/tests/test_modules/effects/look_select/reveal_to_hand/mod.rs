@@ -22,6 +22,7 @@ pub mod izumi_bp5_test;
 pub mod kanon_pb2_test;
 pub mod l0_gap_constant6_test;
 pub mod l0_gap_livesuccess2_test;
+pub mod live_success_reveal_top_member_without_blade_heart_total_score_test;
 pub mod mirai_ticket_test;
 pub mod nagi_live_card_draw_test;
 pub mod named_member_look_pl_n_pb1_016_r_018_r_021_r_024_r_test;

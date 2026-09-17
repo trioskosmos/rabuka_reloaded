@@ -95,6 +95,20 @@ fn parse_stacks(reader: impl BufRead) -> io::Result<Stacks> {
         if path.iter().any(|frame| frame.trim().is_empty()) {
             return Err(fail("empty stack frame"));
         }
+        if path.iter().any(|frame| {
+            let suffix = frame.split_whitespace().last().unwrap_or_default();
+            let mut parts = suffix.split('.');
+            let integer = parts.next().unwrap_or_default();
+            let fraction = parts.next().unwrap_or_default();
+            parts.next().is_none()
+                && !suffix.is_empty()
+                && integer.bytes().all(|byte| byte.is_ascii_digit())
+                && fraction.bytes().all(|byte| byte.is_ascii_digit())
+        }) {
+            return Err(fail(
+                "numeric stack frame suffix is ambiguous with unsupported differential counts",
+            ));
+        }
         let value = line[split..]
             .trim()
             .parse::<u64>()
@@ -128,14 +142,28 @@ fn exclusive_stacks(inclusive: &Stacks) -> io::Result<Stacks> {
 }
 
 fn total_weight(stacks: &Stacks) -> io::Result<u64> {
-    let total = stacks
-        .values()
-        .try_fold(0u64, |total, value| total.checked_add(*value))
+    checked_total(stacks.values().copied())
+}
+
+fn checked_total(weights: impl IntoIterator<Item = u64>) -> io::Result<u64> {
+    let total = weights
+        .into_iter()
+        .try_fold(0u64, |total, value| total.checked_add(value))
         .ok_or_else(|| invalid("Total duration overflows u64"))?;
     if total == 0 {
         return Err(invalid("Capture contains no positive duration"));
     }
     Ok(total)
+}
+
+fn validate_total(weights: impl IntoIterator<Item = u64>, total: u64) -> io::Result<()> {
+    let actual = checked_total(weights)?;
+    if actual != total {
+        return Err(invalid(format!(
+            "Supplied total {total} does not match duration {actual}"
+        )));
+    }
+    Ok(())
 }
 
 fn inclusive_stacks(exclusive: &Stacks) -> io::Result<Stacks> {
@@ -156,6 +184,7 @@ fn render(
     exclusive: &Stacks,
     total: u64,
 ) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+    validate_total(exclusive.values().copied(), total)?;
     let mut folded = Vec::new();
     for (path, value) in exclusive {
         if *value > 0 {
@@ -189,6 +218,7 @@ fn render(
 }
 
 fn self_time_rows(exclusive: &Stacks, total: u64) -> io::Result<Vec<(String, u64, f64, usize)>> {
+    validate_total(exclusive.values().copied(), total)?;
     let mut leaves: BTreeMap<String, (u64, usize)> = BTreeMap::new();
     for (path, value) in exclusive {
         if *value == 0 {
@@ -196,8 +226,14 @@ fn self_time_rows(exclusive: &Stacks, total: u64) -> io::Result<Vec<(String, u64
         }
         let leaf = path.last().ok_or_else(|| invalid("Empty stack path"))?;
         let entry = leaves.entry(leaf.clone()).or_insert((0, 0));
-        entry.0 += *value;
-        entry.1 += 1;
+        entry.0 = entry
+            .0
+            .checked_add(*value)
+            .ok_or_else(|| invalid("Self-time duration overflows u64"))?;
+        entry.1 = entry
+            .1
+            .checked_add(1)
+            .ok_or_else(|| invalid("Self-time path count overflows usize"))?;
     }
     let mut rows: Vec<_> = leaves
         .into_iter()
@@ -243,6 +279,7 @@ fn render_self_time(
     rows: &[(String, u64, f64, usize)],
     total: u64,
 ) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+    validate_total(rows.iter().map(|row| row.1), total)?;
     let mut folded = Vec::new();
     for (leaf, value, _pct, _paths) in rows {
         if *value > 0 {
@@ -368,6 +405,33 @@ mod tests {
     }
 
     #[test]
+    fn rejects_numeric_frame_suffixes_ambiguous_with_differential_counts() {
+        let mut svg = Vec::new();
+        from_reader(&mut Options::default(), "foo 12 50".as_bytes(), &mut svg).unwrap();
+        let svg = String::from_utf8(svg).unwrap();
+        assert!(svg.contains("foo (50 samples, 100.00%; +76.00%)"));
+        assert!(!svg.contains("foo 12 ("));
+        for input in [
+            "foo 12 50",
+            "foo 12.5 50",
+            "foo 12. 50",
+            "foo 18446744073709551616 50",
+            "root;foo 12 50",
+            "foo 12;child 50",
+            "root;12 50",
+            "12 50",
+        ] {
+            let error = parse_stacks(format!("# header\n{input}").as_bytes()).unwrap_err();
+            assert!(error.to_string().contains("Line 2"));
+            assert!(error.to_string().contains("differential"));
+        }
+        assert_eq!(
+            parse("foo12 1\nfoo 12ms 2\nfoo 12 bar 3\nversion1.2 4").len(),
+            4
+        );
+    }
+
+    #[test]
     fn rejects_incomplete_or_overlapping_inclusive_capture() {
         assert!(exclusive_stacks(&parse("root;child 5"))
             .unwrap_err()
@@ -391,6 +455,62 @@ mod tests {
     fn rejects_zero_and_overflowing_totals() {
         assert!(total_weight(&parse("root 0")).is_err());
         assert!(total_weight(&parse("a 18446744073709551615\nb 1")).is_err());
+    }
+
+    #[test]
+    fn rejects_forged_totals_before_aggregating_or_rendering() {
+        let exclusive = parse("root;a 6\nroot;b 4");
+        let rows = self_time_rows(&exclusive, 10).unwrap();
+        for total in [0, 9, 11, u64::MAX] {
+            assert!(self_time_rows(&exclusive, total).is_err());
+            assert!(render_self_time(&Config::default(), &rows, total).is_err());
+            for reverse in [false, true] {
+                let config = Config {
+                    reverse,
+                    ..Config::default()
+                };
+                assert!(render(&config, &exclusive, total).is_err());
+            }
+        }
+        let mut forged_rows = rows;
+        forged_rows[0].1 += 1;
+        assert!(render_self_time(&Config::default(), &forged_rows, 10).is_err());
+    }
+
+    #[test]
+    fn rejects_empty_zero_and_overflowing_render_inputs() {
+        for exclusive in [
+            Stacks::new(),
+            parse("root 0"),
+            parse("a;leaf 18446744073709551615\nb;leaf 1"),
+            parse("a 18446744073709551615\nb 1"),
+        ] {
+            let rows: Vec<_> = exclusive
+                .iter()
+                .map(|(path, value)| (path.last().unwrap().clone(), *value, 0.0, 1))
+                .collect();
+            for total in [0, 1, u64::MAX] {
+                assert!(self_time_rows(&exclusive, total).is_err());
+                assert!(render_self_time(&Config::default(), &rows, total).is_err());
+                for reverse in [false, true] {
+                    let config = Config {
+                        reverse,
+                        ..Config::default()
+                    };
+                    assert!(render(&config, &exclusive, total).is_err());
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn aggregates_maximum_total_without_overflow() {
+        let exclusive = parse("a;leaf 18446744073709551614\nb;leaf 1\nzero 0");
+        assert_eq!(total_weight(&exclusive).unwrap(), u64::MAX);
+        assert_eq!(
+            self_time_rows(&exclusive, u64::MAX).unwrap(),
+            vec![("leaf".into(), u64::MAX, 100.0, 2)]
+        );
     }
 
     #[test]

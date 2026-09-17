@@ -461,7 +461,7 @@ impl super::resolver::AbilityResolver {
         if self.deferred_conditional_gate {
             self.deferred_conditional_gate = false;
             if indices.is_empty() {
-                log::debug!("[DEFERRED_GATE] skipped -> dropping remaining actions");
+                log::debug!("[CONDITION] source={:?} deferred gate failed: empty selection, dropping remaining actions", self.activating_card_id);
                 if let Some(entry) = gs.ability_queue.current_entry_mut() {
                     entry.pending_actions.clear();
                 }
@@ -1895,7 +1895,7 @@ gs.set_recently_moved_batch(valid_ids.into(), Some(Zone::SuccessLiveZone.to_str(
                     self.moved_cards.clear();
                     gs.clear_recently_moved_batch();
                 }
-                log::debug!("[SELECT_STAGE] no selection: cleared pending commands");
+            log::trace!("[CHOICE] stage selected: no selection, cleared pending commands");
             }
             let stage_indices = ctx.mfi(&ctx.indices);
             log::trace!(
@@ -1931,8 +1931,10 @@ gs.set_recently_moved_batch(valid_ids.into(), Some(Zone::SuccessLiveZone.to_str(
             // of an is_select_action Stage choice declares one; there is no
             // guess-based fallback.
             log::debug!(
-                "[STAGE_SELECT] intent={:?} cards={:?} effect_started={}",
+                "[CHOICE] source={:?} stage selection: intent={:?} mapped_indices={:?} cards={:?} effect_started={}",
+                self.activating_card_id,
                 self.stage_select_intent,
+                stage_indices,
                 cards,
                 gs.ability_queue
                     .current_entry()

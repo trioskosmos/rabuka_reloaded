@@ -54,18 +54,56 @@ impl AbilityResolver {
         let resolved_target = if is_live_total { "self" } else { target.as_str() };
         let orientation_modifiers = gs.mods.orientation_modifiers.clone();
         let last_energy = gs.mods.last_cost_energy_count;
-        // ── live_total: constant total bonus (not per-card) with per-effect floor ──
-        // Only the floor case needs constant routing; other live_total stay per-card
-        // (which saturates via zones.rs) to avoid breaking per_unit live_total cards.
         let has_floor = is_live_total
             && (effect.effect_constraint_any().as_deref() == Some("min:0")
                 || effect.score_floor_any().is_some()
                 || effect.text.contains("未満にはならない"));
-        if is_live_total && has_floor {
+        if is_live_total {
+            let effective_value: u8 = if per_unit {
+                let player = gs.resolve_target_player(resolved_target);
+                let mut filter = util::CardFilter::from_effect(effect);
+                if let Some(ref ct) = card_type_filter {
+                    filter.card_type = Some(ct.as_str());
+                }
+                if let Some(ref g) = group_filter {
+                    filter.group = Some(g.as_str());
+                }
+                filter.exclude_self = exclude_self_id;
+                let pt = per_unit_type_str.as_deref();
+                let effective_per_unit_zone = match pt {
+                    Some("heart_colors") => pt,
+                    _ => location.as_deref().or(pt),
+                };
+                let matching_count = if effective_per_unit_zone == Some("つ") {
+                    log::debug!("[PER_UNIT_つ] last_cost_energy_count={}", last_energy);
+                    last_energy
+                } else {
+                    util::resolve_per_unit_count(
+                        true,
+                        effective_per_unit_zone,
+                        player,
+                        &card_db,
+                        &filter,
+                        heart_colors,
+                        effect.state_any().as_deref(),
+                        &orientation_modifiers,
+                        None,
+                    )
+                };
+                let effective_units = matching_count / per_unit_count_val.max(1);
+                let effective_units = if let Some(cap) = effect.repeat_limit_any() {
+                    effective_units.min(cap)
+                } else {
+                    effective_units
+                };
+                value * effective_units
+            } else {
+                value
+            };
             let delta: i16 = match operation.as_str() {
-                "add" => value as i16,
-                "remove" => -(value as i16),
-                "set" => value as i16,
+                "add" => effective_value as i16,
+                "remove" => -(effective_value as i16),
+                "set" => effective_value as i16,
                 _ => 0,
             };
             // Resolve correctly via player lookup: use resolved_target ("self") to pick owner
@@ -117,7 +155,7 @@ impl AbilityResolver {
                 .unwrap_or_default();
             gs.push_rule_log(format!(
                 "{} {}: [[log_score_modify:op={},value={},applied={},live_total=true,floor={}]]",
-                pp, act_name, operation, value, if clamped_delta != 0 {1} else {0}, has_floor
+                pp, act_name, operation, effective_value, if clamped_delta != 0 {1} else {0}, has_floor
             ));
             gs.record_ability_application(
                 gs.activating_card.unwrap_or(-1),
@@ -140,7 +178,7 @@ impl AbilityResolver {
                 &format!("modify_score_{}", operation),
                 duration.as_deref(),
                 &target,
-                &format!("Modify live_total by {} (clamped delta {})", delta, clamped_delta),
+                &format!("Modify live_total by {} (clamped delta {})", effective_value, clamped_delta),
                 effect_data,
             );
             return Ok(());

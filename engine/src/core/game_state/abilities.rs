@@ -1415,17 +1415,6 @@ impl GameState {
                         entry.ability.full_text,
                         *count
                     );
-                    if crate::ability::debug::ABILITY_DEBUG
-                        .load(core::sync::atomic::Ordering::Relaxed)
-                    {
-                        log::debug!(
-                            "[PCA_INFINITE_LOOP] card={} ({}) ability=\"{}\" processed {} times",
-                            card_name,
-                            entry.card_no,
-                            entry.ability.full_text,
-                            *count
-                        );
-                    }
                     break;
                 }
             }
@@ -1899,8 +1888,8 @@ impl GameState {
             {
                 if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed)
                 {
-                    log::debug!(
-                        "[PCA_TRIGGER] scanning stage watchers pid={} moved={:?}",
+                    log::trace!(
+                        "[AUTO_SCAN] scanning stage watchers pid={} moved={:?}",
                         current_pid,
                         self.recently_moved_cards
                     );
@@ -2588,7 +2577,7 @@ impl GameState {
             let is_expired = match effect.duration {
                 Duration::LiveEnd => {
                     let expired = self.current_turn_phase != TurnPhase::Live;
-                    log::debug!(
+                    log::trace!(
                         "[EXPIRY] LiveEnd check: phase={:?} turn_phase={:?} expired={}",
                         self.current_phase,
                         self.current_turn_phase,
