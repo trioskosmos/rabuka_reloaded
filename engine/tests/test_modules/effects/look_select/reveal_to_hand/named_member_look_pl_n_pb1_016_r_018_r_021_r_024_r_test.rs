@@ -58,6 +58,14 @@ fn pl_n_pb1_016_r_named_look_removes_karin_from_deck() {
         !game.state.player1.main_deck.cards.contains(&karin),
         "Karin left the deck"
     );
+    assert!(
+        game.state.player1.hand.cards.contains(&karin),
+        "the looked Karin member was revealed into the hand"
+    );
+    assert!(
+        game.state.player1.waitroom.cards.contains(&other),
+        "the non-Karin looked card went to the waitroom"
+    );
 }
 
 #[test]
