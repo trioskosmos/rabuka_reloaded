@@ -163,7 +163,7 @@ fn kasumi_rule_4553_under_cards_follow_position_change() {
 // ====================================================================
 
 #[test]
-fn mia_activate_cost_does_not_remove_energy() {
+fn activation_under_energy_cost_removes_one_energy_from_zone() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let mia = game.id("PL!N-pb1-011-R");
@@ -197,7 +197,7 @@ fn mia_activate_cost_does_not_remove_energy() {
 }
 
 #[test]
-fn mia_activate_retrieves_live_even_without_energy_placement() {
+fn activation_paid_under_energy_recovers_exact_nijigasaki_live() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let mia = game.id("PL!N-pb1-011-R");
@@ -207,21 +207,20 @@ fn mia_activate_retrieves_live_even_without_energy_placement() {
     game.state.player1.waitroom.cards.push(niji_live);
     game.state.player1.hand.cards.push(filler);
     game.give_energy(3);
+    let energy = game.state.player1.energy_zone.cards[0];
     game.activate_ability(mia);
-    // Cost choice must be offered even when skipping energy placement is intended
-    assert!(
-        game.has_pending_choice(),
-        "mia cost choice must appear (test then selects 0 to skip placement)"
-    );
+    assert_eq!(game.pending_choice_type().as_deref(), Some("SelectCard"));
     game.select_indices(&[0]);
-    assert!(
-        game.state.player1.hand.cards.contains(&niji_live),
-        "Effect still works (retrieves live) despite cost not placing energy"
-    );
+    assert!(!game.has_pending_choice());
+    assert_eq!(game.state.player1.energy_zone.cards.len(), 2);
+    assert!(!game.state.player1.energy_zone.cards.contains(&energy));
+    assert_eq!(game.state.player1.stage.get_under_cards(MemberArea::Center), &[energy]);
+    assert_eq!(game.state.player1.hand.cards.as_slice(), &[filler, niji_live]);
+    assert!(game.state.player1.waitroom.cards.is_empty());
 }
 
 #[test]
-fn mia_use_limit_not_enforced() {
+fn activation_once_per_turn_blocks_second_under_energy_payment_and_live_recovery() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let mia = game.id("PL!N-pb1-011-R");
@@ -257,7 +256,11 @@ fn mia_use_limit_not_enforced() {
             .stage
             .get_under_cards(MemberArea::Center)
             .len();
-    game.try_activate_ability(mia).ok();
+    let zone_before = game.state.player1.energy_zone.cards.clone();
+    let under_before = game.state.player1.stage.get_under_cards(MemberArea::Center).to_vec();
+    assert!(game.try_activate_ability(mia).is_err());
+    assert_eq!(game.state.player1.energy_zone.cards, zone_before);
+    assert_eq!(game.state.player1.stage.get_under_cards(MemberArea::Center), under_before.as_slice());
     // Verify no change — use_limit blocked effect AND cost
     assert_eq!(
         game.state.player1.hand.cards.len(),
@@ -396,7 +399,7 @@ fn ayumu_bp3n_q157_wait_energy_placed_under() {
 // ====================================================================
 
 #[test]
-fn ayumu_bp5n_heart01_condition_passes_but_modifier_not_found() {
+fn live_start_with_under_energy_grants_one_heart01() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let ayumu = game.id("PL!N-bp5-013-N");
@@ -538,7 +541,7 @@ fn rina_rule_4553_under_member_follows_position_change() {
 // ====================================================================
 
 #[test]
-fn sayaka_activate_effect_does_not_place_under() {
+fn activation_reveals_same_name_hand_member_and_moves_it_under_self() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let sayaka = game.id("PL!HS-pb1-002-R");
@@ -623,7 +626,7 @@ fn sayaka_use_limit_enforced() {
 }
 
 #[test]
-fn sayaka_live_start_per_unit_counts_hand_not_under() {
+fn live_start_three_under_members_grant_three_heart05() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let sayaka = game.id("PL!HS-pb1-002-R");
@@ -658,28 +661,34 @@ fn sayaka_live_start_per_unit_counts_hand_not_under() {
 }
 
 #[test]
-fn sayaka_live_start_zero_under_still_gets_hand_count() {
+fn live_start_no_under_material_ignores_same_name_in_hand_and_grants_no_heart_or_cost() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let sayaka = game.id("PL!HS-pb1-002-R");
-    game.state.player1.stage.stage = [-1, sayaka, -1];
-    let filler_live = game.id("PL!-sd1-020-SD");
-    game.state.player1.hand.cards.push(filler_live);
-    game.state
-        .player1
-        .hand
-        .cards
-        .push(game.id("PL!-sd1-010-SD"));
-    game.give_energy(3);
+    let material = game.new_id("PL!HS-pb1-002-R");
+    let live = game.id("PL!-sd1-020-SD");
     seed_deck(&mut game);
+    game.state.player1.hand.cards.extend([sayaka, material, live]);
+    game.give_energy(2);
+    assert_eq!(game.db.get_card(sayaka).unwrap().card_no, "PL!HS-pb1-002-R");
+    assert_eq!(game.db.get_card(sayaka).unwrap().cost, Some(2));
+    game.play_to_stage(sayaka, MemberArea::Center);
+    assert_eq!(game.state.player1.stage.stage, [-1, sayaka, -1]);
+    assert_eq!(game.state.player1.energy_zone.active_count(), 0);
+    assert_eq!(game.state.player1.hand.cards.as_slice(), &[material, live]);
+    assert!(game.state.player1.stage.get_under_cards(MemberArea::Center).is_empty());
+    assert_eq!(game.state.mods.get_cost_modifier(sayaka), 0);
+    assert_eq!(game.state.mods.get_heart_modifier(sayaka, rabuka_engine::card::HeartColor::Heart05), 0);
     advance_to_live_card_set_p1(&mut game);
-    game.set_live_card(filler_live);
+    game.set_live_card(live);
     advance_to_live_start(&mut game);
-    let heart = game
-        .state
-        .mods
-        .get_heart_modifier(sayaka, rabuka_engine::card::HeartColor::Heart05);
-    assert_eq!(heart, 0, "0 heart05 when no members under");
+    assert!(!game.has_pending_choice());
+    assert_eq!(game.state.player1.stage.stage, [-1, sayaka, -1]);
+    assert!(game.state.player1.stage.get_under_cards(MemberArea::Center).is_empty());
+    assert_eq!(game.state.player1.hand.cards.iter().filter(|&&id| id == material).count(), 1);
+    assert!(!game.state.player1.waitroom.cards.contains(&material));
+    assert_eq!(game.state.mods.get_cost_modifier(sayaka), 0);
+    assert_eq!(game.state.mods.get_heart_modifier(sayaka, rabuka_engine::card::HeartColor::Heart05), 0);
 }
 
 /// Q243: Sayaka's LiveStart max=3 per activation. Second activation re-counts
@@ -802,30 +811,40 @@ fn sayaka_q243_max_three_per_activation_recounts() {
     );
 }
 
-/// Edge: Sayaka with 0 under-cards → LiveStart gives 0 heart05.
 #[test]
-fn sayaka_q243_zero_under_no_heart() {
+fn reveal_same_name_under_then_live_start_grants_one_heart05_and_four_cost() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let sayaka = game.id("PL!HS-pb1-002-R");
-    game.state.player1.stage.stage = [-1, sayaka, -1];
-    let filler = game.id("PL!-sd1-010-SD");
-    game.state
-        .player1
-        .stage
-        .place_under_card(MemberArea::Center, filler);
-    game.give_energy(15);
-
-    // 1 under → LiveStart counts 1 (under max=3)
-    trigger_sayaka_live_start(&mut game, sayaka);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
-    let heart = game
-        .state
-        .mods
-        .get_heart_modifier(sayaka, rabuka_engine::card::HeartColor::Heart05);
-    assert_eq!(heart, 1, "Q243: 1 under-cards → heart05=1");
+    let material = game.new_id("PL!HS-pb1-002-R");
+    let live = game.id("PL!-sd1-020-SD");
+    seed_deck(&mut game);
+    game.state.player1.hand.cards.extend([sayaka, material, live]);
+    game.give_energy(2);
+    assert_eq!(game.db.get_card(sayaka).unwrap().card_no, "PL!HS-pb1-002-R");
+    assert_eq!(game.db.get_card(sayaka).unwrap().cost, Some(2));
+    game.play_to_stage(sayaka, MemberArea::Center);
+    assert_eq!(game.state.player1.stage.stage, [-1, sayaka, -1]);
+    assert_eq!(game.state.player1.energy_zone.active_count(), 0);
+    assert!(game.state.player1.stage.get_under_cards(MemberArea::Center).is_empty());
+    assert_eq!(game.state.mods.get_cost_modifier(sayaka), 0);
+    assert_eq!(game.state.mods.get_heart_modifier(sayaka, rabuka_engine::card::HeartColor::Heart05), 0);
+    game.activate_ability(sayaka);
+    assert!(!game.has_pending_choice());
+    assert_eq!(game.state.player1.stage.get_under_cards(MemberArea::Center), &[material]);
+    assert_eq!(game.state.player1.hand.cards.as_slice(), &[live]);
+    assert!(game.state.player1.waitroom.cards.is_empty());
+    assert_eq!(game.state.mods.get_cost_modifier(sayaka), 0);
+    assert_eq!(game.state.mods.get_heart_modifier(sayaka, rabuka_engine::card::HeartColor::Heart05), 0);
+    advance_to_live_card_set_p1(&mut game);
+    game.set_live_card(live);
+    advance_to_live_start(&mut game);
+    assert!(!game.has_pending_choice());
+    assert_eq!(game.state.player1.stage.get_under_cards(MemberArea::Center), &[material]);
+    assert!(!game.state.player1.hand.cards.contains(&material));
+    assert!(!game.state.player1.waitroom.cards.contains(&material));
+    assert_eq!(game.state.mods.get_cost_modifier(sayaka), 4);
+    assert_eq!(game.state.mods.get_heart_modifier(sayaka, rabuka_engine::card::HeartColor::Heart05), 1);
 }
 
 #[test]

@@ -170,13 +170,15 @@ fn s1_bp7_005_opponent_caused_placement_does_not_fire() {
 
 /// Own-caused control first (proves the ability works in this harness).
 #[test]
-fn s3_bp5_111_own_move_fires() {
+fn own_position_change_rests_on_stage_low_blade_opponent() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
     let watcher = game.new_id("PL!S-bp5-111-R");
     let aqours = game.new_id("PL!S-bp2-015-PR");
-    let opp_member = game.new_id(FILLER); // original blade 1 <= 2
+    let opp_member = game.new_id("PL!HS-PR-018-PR");
+    let filler = game.new_id(FILLER);
+    fill_decks(&mut game, filler);
 
     game.state.player1.stage.stage = [aqours, watcher, -1];
     game.state.player2.stage.stage = [-1, opp_member, -1];
@@ -193,8 +195,15 @@ fn s3_bp5_111_own_move_fires() {
         Some("SelectTarget"),
         "expected SelectTarget (position|destination)"
     );
-    game.select_generated(0);
-    scan_autos_both(&mut game);
+    let actions = game.generated_actions();
+    let left = actions.iter().position(|action| {
+        action.parameters.as_ref().and_then(|p| p.stage_area.as_deref()) == Some("left")
+    }).expect("own ability must offer the Aqours member's area");
+    game.select_generated(left);
+    game.drain_auto_ability_choices();
+    assert!(!game.has_pending_choice());
+    assert_eq!(game.state.player1.stage.stage, [watcher, aqours, -1]);
+    assert_eq!(game.state.player2.stage.stage, [-1, opp_member, -1]);
 
     assert!(
         game.state.mods.get_orientation_modifier(opp_member) == Some("wait"),
@@ -202,38 +211,37 @@ fn s3_bp5_111_own_move_fires() {
     );
 }
 
-/// THE default-scope pin: when the OPPONENT's effect causes the very same
-/// move, the no-parenthetical auto must stay silent.
-///
-/// Opponent-caused move built from a REAL play: P2 debuts HS-pb1-014-R
-/// facing the watcher and its debut drags the watcher across areas.
 #[test]
-fn s3_bp5_111_opponent_caused_move_does_not_fire() {
+fn opponent_drag_without_parenthetical_keeps_on_stage_low_blade_target_active() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
-
-    // Watcher staged alone at P1 center; opponent low-blade target present
-    // (would be waited if the auto wrongly fired).
     let watcher = game.new_id("PL!S-bp5-111-R");
-    let opp_member = game.new_id(FILLER);
-    game.state.player1.stage.stage = [-1, watcher, -1];
-    game.state.player2.stage.stage = [-1, opp_member, -1];
-
-    // P2 assembles the all-みらくらぱーく！ board and debuts its mover at
-    // P2 CENTER — facing P1 CENTER, dragging the watcher out of center.
-    let mirakura_a = game.new_id("PL!HS-bp1-005-PR");
-    let mirakura_b = game.new_id("PL!HS-PR-005-PR");
+    let opp_member = game.new_id("PL!HS-PR-018-PR");
     let mover = game.new_id("PL!HS-pb1-014-R");
-    game.state.player2.stage.stage = [mirakura_a, -1, mirakura_b];
+    let filler = game.new_id(FILLER);
+    fill_decks(&mut game, filler);
+    game.state.player1.stage.stage = [-1, -1, watcher];
+    game.state.player2.stage.stage = [opp_member, -1, -1];
     game.add_to_hand_for(Side::P2, mover);
     game.give_energy_for(Side::P2, 9);
+    assert_ne!(game.state.mods.get_orientation_modifier(opp_member), Some("wait"));
 
     game.try_play_to_stage_for(Side::P2, mover, MemberArea::Center)
-        .expect("p2 debut of the mover");
-    scan_autos_both(&mut game);
-
-    assert!(
-        !(game.state.mods.get_orientation_modifier(opp_member) == Some("wait")),
-        "default scope: opponent-caused move must NOT fire the no-parenthetical auto"
+        .expect("opponent debut must drag the watcher from right to center");
+    game.drain_auto_ability_choices();
+    assert_eq!(game.pending_choice_type().as_deref(), Some("SelectTarget"));
+    let actions = game.generated_actions();
+    let watcher_choice = actions.iter().position(|action| {
+        action.parameters.as_ref().and_then(|p| p.stage_area.as_deref()) == Some("right")
+    }).expect("opponent must be offered the watcher in the right area");
+    game.select_generated(watcher_choice);
+    game.drain_auto_ability_choices();
+    assert!(!game.has_pending_choice(), "opponent drag must finish resolving");
+    assert_eq!(game.state.player1.stage.stage, [-1, watcher, -1]);
+    assert_eq!(game.state.player2.stage.stage, [opp_member, mover, -1]);
+    assert_ne!(
+        game.state.mods.get_orientation_modifier(opp_member),
+        Some("wait"),
+        "opponent-caused movement must not rest the on-stage legal target"
     );
 }

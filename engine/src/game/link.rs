@@ -440,7 +440,16 @@ pub fn run_link_match<U: PlatformUi, T: LinkTransport>(
     p2_cards: &[&str],
     all_cards: Vec<Card>,
 ) -> LinkMatchReport {
-    let mut gs: GameState = build_match_state(p1_cards, p2_cards, all_cards);
+    let gs: GameState = build_match_state(p1_cards, p2_cards, all_cards);
+    run_link_match_prebuilt(ui, link, local, gs)
+}
+
+fn run_link_match_prebuilt<U: PlatformUi, T: LinkTransport>(
+    ui: &mut U,
+    link: &mut T,
+    local: u8,
+    mut gs: GameState,
+) -> LinkMatchReport {
     let mut my_seq: u32 = 0;
     let mut peer_seq: u32 = u32::MAX;
     // A peer pick that arrives while we are sending (only the RPS opener
@@ -459,7 +468,7 @@ pub fn run_link_match<U: PlatformUi, T: LinkTransport>(
             break;
         }
         if gs.is_loop_detected() {
-            eprintln!("[LINK-BREAK] local={} reason=loop_detected phase={:?} rlog={}", local, gs.current_phase, gs.rule_log.len());
+            log::debug!("[LINK-BREAK] local={} reason=loop_detected phase={:?} rlog={}", local, gs.current_phase, gs.rule_log.len());
             show_result(ui, &gs);
             break;
         }
@@ -489,14 +498,14 @@ pub fn run_link_match<U: PlatformUi, T: LinkTransport>(
                 pickable.iter().map(|&i| acts[i].clone()).collect();
             let idx = pickable[select_action(ui, &gs, &sub_acts)];
             let la = LinkAction::from_action(&acts[idx], my_seq);
-            eprintln!(
+            log::debug!(
                 "[LINK-PICK] local={} phase={:?} turn={} tag={} seq={} p1={:?} p2={:?} rlog={}",
                 local, gs.current_phase, gs.turn_number, la.tag, my_seq,
                 gs.player1_rps_choice, gs.player2_rps_choice, gs.rule_log.len()
             );
             my_seq = my_seq.wrapping_add(1);
             if !send_reliable(ui, link, &la.encode(), la.seq, &mut peer_seq, &mut stashed) {
-                eprintln!("[LINK-BREAK] local={} reason=send_failed tag={} seq={} phase={:?} rlog={}", local, la.tag, la.seq, gs.current_phase, gs.rule_log.len());
+                log::debug!("[LINK-BREAK] local={} reason=send_failed tag={} seq={} phase={:?} rlog={}", local, la.tag, la.seq, gs.current_phase, gs.rule_log.len());
                 break;
             }
             // RPS picks execute positionally (1st -> P1) unless the PVP
@@ -511,7 +520,7 @@ pub fn run_link_match<U: PlatformUi, T: LinkTransport>(
             match recv_action(ui, link, &mut peer_seq, &mut stashed) {
                 RecvOutcome::Action(la) => match find_local_action(&acts, &la) {
                     Some(i) => {
-                        eprintln!(
+                        log::debug!(
                             "[LINK-RECV] local={} phase={:?} tag={} p1={:?} p2={:?} rlog={}",
                             local, gs.current_phase, la.tag,
                             gs.player1_rps_choice, gs.player2_rps_choice, gs.rule_log.len()
@@ -522,12 +531,12 @@ pub fn run_link_match<U: PlatformUi, T: LinkTransport>(
                         let _ = game_setup::execute_action(&mut gs, &acts[i]);
                     }
                     None => {
-                        eprintln!("[LINK-BREAK] local={} reason=no_match tag={}", local, la.tag);
+                        log::debug!("[LINK-BREAK] local={} reason=no_match tag={}", local, la.tag);
                         break;
                     }
                 },
                 RecvOutcome::Quit | RecvOutcome::Down => {
-                    eprintln!("[LINK-BREAK] local={} reason=link_down phase={:?} rlog={}", local, gs.current_phase, gs.rule_log.len());
+                    log::debug!("[LINK-BREAK] local={} reason=link_down phase={:?} rlog={}", local, gs.current_phase, gs.rule_log.len());
                     break;
                 }
             }
@@ -624,16 +633,22 @@ mod tests {
     /// fancier policies; first-row needs no counting at all.
     struct TestUi {
         local: u8,
+        lang: crate::game::language::Lang,
         frame: Cell<usize>,
         rows: Vec<String>,
     }
 
     impl TestUi {
         fn new(local: u8) -> Self {
-            TestUi { local, frame: Cell::new(0), rows: Vec::new() }
+            TestUi {
+                local,
+                lang: crate::game::language::Lang::Japanese,
+                frame: Cell::new(0),
+                rows: Vec::new(),
+            }
         }
         fn downs(&self) -> usize {
-            if self.rows.iter().any(|r| r.contains("Rock")) {
+            if self.rows.iter().any(|r| r.contains("Rock") || r.contains("グー")) {
                 return self.local as usize;
             }
             0
@@ -678,15 +693,22 @@ mod tests {
         fn just_pressed_start(&self) -> bool {
             false
         }
-        fn wait_vblank(&mut self) {}
-        // The downs() policy keys on the English row text ("Rock"); declaring
-        // English keeps the rendered menu rows in that language. The default
-        // (Japanese) rendered グー/パー, so downs() never matched, both sides
-        // always picked row 0 (Rock vs Rock tie), and the loopback match only
-        // ended when the packet budget killed both sides — symmetrically on
-        // lucky runs, ±1 action apart on unlucky ones (the lockstep flake).
+        fn wait_vblank(&mut self) {
+            // Frame pacing for the loopback harness only: send_reliable's
+            // retransmit cadence (every 60 spins) assumes 60fps vblank waits.
+            // A no-op here makes spins burn CPU and hub budget at millions
+            // per second — a peer stuck in one reschedule can then strand
+            // its counterpart mid-exchange (±1 action break asymmetry).
+            std::thread::sleep(std::time::Duration::from_micros(120));
+        }
+        // Each console keeps its own language: multiplayer must work across a
+        // mixed-language link (P1 English vs P2 Japanese). The wire carries
+        // numeric action tags, never text, so the languages need not agree —
+        // this test exercises exactly that by giving side 1 English and the
+        // other side Japanese. downs() matches both spellings because the
+        // scripted Paper tiebreak must work in EITHER rendering.
         fn ui_lang(&self) -> crate::game::language::Lang {
-            crate::game::language::Lang::English
+            self.lang
         }
     }
 
@@ -790,6 +812,17 @@ mod tests {
     /// so this runs in seconds even in debug profile.
     #[test]
     fn loopback_full_match_stays_in_lockstep() {
+        for lang_a in crate::game::language::Lang::SUPPORTED {
+            for lang_b in crate::game::language::Lang::SUPPORTED {
+                assert_loopback_lockstep(lang_a, lang_b);
+            }
+        }
+    }
+
+    fn assert_loopback_lockstep(
+        lang_a: crate::game::language::Lang,
+        lang_b: crate::game::language::Lang,
+    ) {
         let json = include_str!("../../../cards/cards.json");
         let all_json =
             crate::card_loader::CardLoader::load_cards_from_strs(json).expect("cards load");
@@ -818,6 +851,8 @@ mod tests {
             .collect();
         let p1: Vec<&str> = p1deck.iter().map(|s| s.as_str()).collect();
         let p2: Vec<&str> = p2deck.iter().map(|s| s.as_str()).collect();
+        let p1b: Vec<&str> = p1deck.iter().map(|s| s.as_str()).collect();
+        let p2b: Vec<&str> = p2deck.iter().map(|s| s.as_str()).collect();
 
         let (mut ta, mut tb) = TestTransport::pair(20_000);
         let hub = ta.hub.clone();
@@ -826,19 +861,37 @@ mod tests {
         // Both sides run concurrently: sequential runs could never
         // exchange a packet (side A would time out waiting for an ack
         // side B hasn't started sending yet).
+        //
+        // States are built SERIALLY before the concurrent section:
+        // build_match_state consumes the shared global RNG (deck shuffles),
+        // and two threads drawing from one Mutex-guarded generator
+        // nondeterministically desync the two decks. Seeding + building
+        // each side serially gives both the same deterministic stream.
+        // Languages intentionally differ (P1 Japanese vs P2 English):
+        // multiplayer must work across a mixed-language link — the wire
+        // carries numeric action tags, never text, so the languages need
+        // not agree. downs() matches both spellings of the RPS row so the
+        // scripted Paper tiebreak works in either rendering.
+        crate::rng::seed(0x5EED);
+        let gs_a = build_match_state(&p1, &p2, all_cards);
+        crate::rng::seed(0x5EED);
+        let gs_b = build_match_state(&p1b, &p2b, all_cards_b);
+
         let (ra, rb) = std::thread::scope(|s| {
-            let hb = s.spawn(|| {
+            let hb = s.spawn(move || {
                 let mut ub = TestUi::new(1);
-                crate::rng::seed(0x5EED);
-                run_link_match(&mut ub, &mut tb, 1, &p1, &p2, all_cards_b)
+                ub.lang = lang_b;
+                run_link_match_prebuilt(&mut ub, &mut tb, 1, gs_b)
             });
             let mut ua = TestUi::new(0);
-            crate::rng::seed(0x5EED);
-            let ra = run_link_match(&mut ua, &mut ta, 0, &p1, &p2, all_cards);
+            ua.lang = lang_a;
+            let ra = run_link_match_prebuilt(&mut ua, &mut ta, 0, gs_a);
             (ra, hb.join().expect("side B finishes"))
         });
 
         assert_eq!(ra.result, rb.result, "both sides agree on the result");
+        assert_ne!(ra.result, GameResult::Ongoing, "match must reach a terminal result");
+        assert!(ra.final_state.game_ended && rb.final_state.game_ended);
 
         fn digest(gs: &GameState) -> String {
             format!(

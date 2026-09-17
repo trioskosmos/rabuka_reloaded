@@ -16,15 +16,6 @@ COPY . .
 
 WORKDIR /build/engine
 
-# Copy Cargo files first for dependency caching
-COPY engine/Cargo.toml engine/Cargo.lock ./
-RUN mkdir src && echo "fn main() {}" > src/main.rs && \
-    cargo build --release --features server --bin rabuka_engine 2>/dev/null || true && \
-    rm -rf src
-
-# Copy engine source
-COPY engine/ ./
-
 # Generate cards_gen.rs and abilities build artifacts (from engine dir, using ../cards)
 RUN python3 ../cards/compile_cards.py && python3 ../cards/compile_abilities.py
 

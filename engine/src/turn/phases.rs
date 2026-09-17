@@ -274,6 +274,13 @@ tdbg!("PHASE_ACTIVE:4 wait activated");
                     // normal phases): cleared only here at the turn rollover.
                     game_state.player1.debut_count_this_turn = 0;
                     game_state.player2.debut_count_this_turn = 0;
+                    if game_state.turn_number == u8::MAX {
+                        if game_state.game_result == crate::game_state::GameResult::Ongoing {
+                            game_state.game_result = crate::game_state::GameResult::Draw;
+                        }
+                        game_state.game_ended = true;
+                        return;
+                    }
                     game_state.turn_number += 1;
                     // Round-scoped activation history (「このターン…アクティブに
                     // していた場合」, Q203): spans both players' main phases and

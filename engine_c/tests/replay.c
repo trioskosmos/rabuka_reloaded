@@ -976,9 +976,180 @@ static void scenario_draw_filter_guard(void){
     CHECK(g->p[0].hand.n==0,"hand empty after no-match draw");
 }
 
+static void scenario_draw_order_and_count(void){
+    static TestGame tg;
+    test_game_new(&tg);
+    GameState *g=&tg.state;
+    int first=test_id(&tg,"PL!-sd1-010-SD");
+    int second=test_id(&tg,"PL!HS-bp1-005-P");
+    CHECK(first>=0 && second>=0 && first!=second,"draw order fixture identities resolve");
+    test_add_to_deck(&tg,first);
+    test_add_to_deck(&tg,second);
+    AbilityEffect e={0}; e.action="draw_card"; e.source="deck";
+    e.destination="hand"; e.count=1;
+    CHECK(rb_effect_draw_card(g,0,&e,-1)==1,"ordered draw takes one card");
+    CHECK(g->p[0].hand.n==1 && g->p[0].hand.cards[0]==first,
+          "ordered draw takes index zero first");
+    CHECK(g->p[0].deck.n==1 && g->p[0].deck.cards[0]==second,
+          "ordered draw retains second card in deck");
+    e.count=3;
+    CHECK(rb_effect_draw_card(g,0,&e,-1)==1,"short deck returns actual drawn count");
+    CHECK(g->p[0].hand.n==2 && g->p[0].hand.cards[0]==first && g->p[0].hand.cards[1]==second,
+          "successive draws preserve exact card order");
+    CHECK(g->p[0].deck.n==0,"short draw exhausts deck");
+    CHECK(g->last_draw_count==3,"draw step records requested final count like Rust");
+}
+
+static void scenario_draw_filter_fields(void){
+    static TestGame tg;
+    for(int decoded=0;decoded<2;decoded++){
+        for(int distinct=0;distinct<2;distinct++){
+            test_game_new(&tg);
+            GameState *g=&tg.state;
+            int member=test_id(&tg,"PL!-sd1-010-SD");
+            int live=test_id(&tg,"PL!N-bp1-027-L");
+            CHECK(member>=0 && live>=0 && !rb_card_is_live(member) && rb_card_is_live(live),
+                  "filter field fixture types verified");
+            test_add_to_deck(&tg,live);
+            test_add_to_deck(&tg,member);
+            test_add_to_stage(&tg,0,member);
+            AbilityEffect e={0}; e.action="draw_card"; e.count=1;
+            e.distinct_flag=distinct;
+            if(decoded) strcpy(e.card_type_field,"member_card");
+            else { e.extra_k[0]="card_type"; e.extra_v[0]="member_card"; e.n_extra=1; }
+            int n=rb_effect_draw_card(g,0,&e,-1);
+            CHECK(n==1 && g->p[0].hand.n==1 && g->p[0].hand.cards[0]==member,
+                  "default-source member filter draws matching deck card");
+            CHECK(g->p[0].stage[0]==member,"filtered draw never substitutes stage for default deck");
+            CHECK(g->p[0].deck.n==1 && g->p[0].deck.cards[0]==live,
+                  "filtered draw rotates rejected card to deck bottom");
+            g->p[0].hand.n=0;
+            n=rb_effect_draw_card(g,0,&e,-1);
+            CHECK(n==0 && g->p[0].hand.n==0,"decoded no-match draw terminates without drawing");
+            CHECK(g->p[0].deck.n==1 && g->p[0].deck.cards[0]==live,
+                  "decoded no-match draw preserves rejected card");
+        }
+    }
+}
+
+static void scenario_optional_distinct_draw_resume(void){
+    static TestGame tg;
+    test_game_new(&tg);
+    GameState *g=&tg.state;
+    int dup=test_id(&tg,"PL!-sd1-010-SD");
+    int other=test_id(&tg,"PL!HS-bp1-005-P");
+    CHECK(dup>=0 && other>=0,"optional distinct fixture identities resolve");
+    test_add_to_deck(&tg,dup);
+    test_add_to_deck(&tg,dup);
+    test_add_to_deck(&tg,other);
+    AbilityEffect e={0}; e.action="draw_card"; e.count=2;
+    e.is_optional=1; e.distinct_flag=1;
+    e.source="deck"; e.destination="hand";
+    rb_execute_effect_ex(g,0,&e,-1);
+    CHECK(rb_has_pending_choice(g)==1,"optional distinct draw parks at gate");
+    CHECK(g->p[0].hand.n==0,"gate acceptance has not drawn yet");
+    rb_resume_with_choice(g,0);
+    CHECK(g->p[0].hand.n==2,"accepted optional draw executes");
+    CHECK(g->p[0].hand.cards[0]==dup && g->p[0].hand.cards[1]==other,
+          "accepted optional draw keeps distinct filtering");
+    CHECK(g->p[0].deck.n==1 && g->p[0].deck.cards[0]==dup,
+          "rejected duplicate stays in deck after resume");
+}
+
+static void scenario_draw_destination_routing(void){
+    static TestGame tg;
+    test_game_new(&tg);
+    GameState *g=&tg.state;
+    int a=test_id(&tg,"PL!-sd1-010-SD");
+    int b=test_id(&tg,"PL!HS-bp1-005-P");
+    CHECK(a>=0 && b>=0,"destination fixture identities resolve");
+    test_add_to_deck(&tg,a);
+    test_add_to_deck(&tg,b);
+    AbilityEffect e={0}; e.action="draw_card"; e.count=1;
+    e.source="deck"; e.destination="discard";
+    rb_execute_effect_ex(g,0,&e,-1);
+    CHECK(g->p[0].discard.n==1 && g->p[0].discard.cards[0]==a,
+          "discard destination routes to waitroom");
+    CHECK(g->p[0].hand.n==0,"discard destination leaves hand empty");
+    CHECK(g->p[0].deck.n==1 && g->p[0].deck.cards[0]==b,
+          "discard destination consumes only the drawn card");
+    test_game_new(&tg);
+    test_add_to_deck(&tg,a);
+    test_add_to_deck(&tg,b);
+    e.destination="deck_top";
+    rb_execute_effect_ex(g,0,&e,-1);
+    CHECK(g->p[0].deck.n==2 && g->p[0].deck.cards[0]==a,
+          "deck_top destination reinserts card on top");
+    CHECK(g->p[0].hand.n==0,"deck_top destination leaves hand empty");
+    test_game_new(&tg);
+    test_add_to_deck(&tg,a);
+    e.destination="stage";
+    rb_execute_effect_ex(g,0,&e,-1);
+    CHECK(g->p[0].stage[0]==a && g->p[0].hand.n==0,
+          "stage destination deploys to first empty slot");
+}
+
+static void scenario_filter_draw_distinct(void){
+    static TestGame tg;
+    for(int source=0;source<2;source++){
+        for(int mode=0;mode<4;mode++){
+            test_game_new(&tg);
+            GameState *g=&tg.state;
+            int first=test_id(&tg,"PL!-sd1-010-SD");
+            int other=test_id(&tg,"PL!HS-bp1-005-P");
+            CHECK(first>=0 && other>=0,"distinct draw fixture cards exist");
+            RbBag *pile=source ? &g->p[0].discard : &g->p[0].deck;
+            pile->n=3;
+            pile->cards[0]=source ? other : first;
+            pile->cards[1]=first;
+            pile->cards[2]=source ? first : other;
+            AbilityEffect e={0}; e.action="draw_card"; e.count=2;
+            e.source=source ? "discard" : "deck"; e.destination="hand";
+            if(mode<3){
+                e.extra_k[0]="distinct";
+                e.extra_v[0]=mode==0 ? "card_name" : mode==1 ? "true" : "distinct";
+                e.n_extra=1;
+            }else e.distinct_flag=1;
+            int n=rb_effect_draw_card(g,0,&e,-1);
+            CHECK(n==2 && g->p[0].hand.n==2,"distinct draw finds two names");
+            CHECK(g->p[0].hand.cards[0]==first && g->p[0].hand.cards[1]==other,
+                  "distinct draw preserves Rust draw order");
+            CHECK(pile->n==1 && pile->cards[0]==first,"distinct draw retains rejected duplicate");
+            g->p[0].hand.n=0;
+            pile->n=2; pile->cards[0]=first; pile->cards[1]=first;
+            e.count=3;
+            n=rb_effect_draw_card(g,0,&e,-1);
+            CHECK(n==1 && g->p[0].hand.n==1,"distinct draw stops with duplicates remaining");
+            CHECK(pile->n==1 && pile->cards[0]==first,"distinct exhausted scan conserves cards");
+        }
+    }
+}
+
+static void scenario_rng_zero_seed(void){
+    rb_seed(0);
+    CHECK(rb_rand()==270369u,"zero seed produces Rust xorshift first value");
+    CHECK(rb_rand()==67634689u,"zero seed produces Rust xorshift second value");
+    rb_seed(1);
+    CHECK(rb_rand()==270369u,"explicit seed one matches Rust zero-seed fallback");
+    rb_seed(7);
+    uint32_t cp=rb_rng_checkpoint();
+    CHECK(rb_rand()!=0,"checkpoint captures live rng state");
+    rb_rng_restore(cp);
+    CHECK(rb_rand()==rb_rng_checkpoint(),"restore replays exact rng stream");
+    RbLcg rng=rb_lcg_new(42);
+    CHECK(rb_lcg_next_u64(&rng)==UINT64_C(10481999410520546993),
+          "LCG first advance matches Rust seed 42");
+    CHECK(rb_lcg_range(&rng,1000)==26,"LCG high-bit range matches Rust");
+}
+
 int main(int argc, char **argv){
     setvbuf(stdout, NULL, _IONBF, 0); /* unbuffered: a crash must not swallow results */
     CHECK(rb_load("src")==0,"rb_load");
+    if (argc > 1 && !strcmp(argv[1], "draw_filter_fields")) {
+        scenario_draw_filter_fields();
+        rb_unload();
+        return failures ? 1 : 0;
+    }
     if (argc > 2 && !strcmp(argv[1], "trace")) {
         int rc = tr_run(argv[2]);
         rb_unload();
@@ -992,6 +1163,7 @@ int main(int argc, char **argv){
         return 0;
     }
     scenario_deferred_costs();
+    scenario_rng_zero_seed();
     scenario_draw_and_score();
     scenario_live_performance();
     scenario_move_cards();
@@ -1009,6 +1181,11 @@ int main(int argc, char **argv){
     scenario_yell_draw_icons();
     scenario_move_looked_at();
     scenario_draw_filter_guard();
+    scenario_draw_order_and_count();
+    scenario_filter_draw_distinct();
+    scenario_draw_destination_routing();
+    scenario_optional_distinct_draw_resume();
+    scenario_draw_filter_fields();
     scenario_deferred_costs();
     rb_unload();
     if(failures){ printf("\n%d FAILURES\n",failures); return 1; }

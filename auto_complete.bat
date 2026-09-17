@@ -7,9 +7,9 @@ exit /b
 #>
 
 param(
-    [int]$IntervalMinutes = 15,
+    [int]$IntervalMinutes = 5,
     [string]$WindowTitle = "",
-    [string]$Message = "continue working out how to organise tests improving names of files and test functions how to standardise how to improve how to add how to make the game more accurate actual rule reading and refactors rewrites and so on no bullshitting improve. again tests are to verify what is written actually happens in game proper hard tests gameplay only. DON'T TELL ME WHAT YOU ARE GOING TO DO KEEP ITERATING BE AGENETIC KEEP FINDING WHAT HAS TO BE DONE AND DO IT. IT SHOULD BE OBVIOUS WHAT THE ENGINE DOES IF I ASK ABOUT A BUG IN THE FUTURE IT SHOULD BE OBVIOUS WHAT KIND OF CARD THE ABILITY IS FROM AND WHAT EDGE CASE WAS MISSED BY LOOKING AT THE OTHERS."
+    [string]$Message = "continue updating and doing work stated in md do the work make the repo better improve the parser engines and tests work."
 )
 
 Add-Type -AssemblyName System.Windows.Forms
@@ -29,6 +29,11 @@ function Send-Message {
     }
     try {
         [System.Windows.Forms.SendKeys]::SendWait("{ESC}")
+        Start-Sleep -Milliseconds 200
+        for ($i = 0; $i -lt 10; $i++) {
+            [System.Windows.Forms.SendKeys]::SendWait("{ENTER}")
+            Start-Sleep -Milliseconds 100
+        }
         Start-Sleep -Milliseconds 200
         [System.Windows.Forms.SendKeys]::SendWait($Message)
         Start-Sleep -Milliseconds 200

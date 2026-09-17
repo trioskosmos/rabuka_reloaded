@@ -4,14 +4,28 @@
 #include <stdio.h>
 
 /* ───────────────────────────── RNG ───────────────────────────── */
-static uint32_t rng_state = 0x12345678u;
-void rb_seed(uint32_t s) { rng_state = s ? s : 0x12345678u; }
+static uint32_t rng_state = 0;
+void rb_seed(uint32_t s) { rng_state = s; }
 uint32_t rb_rand(void) {
-    uint32_t x = rng_state;
+    uint32_t x = rng_state ? rng_state : 1u;
     x ^= x << 13; x ^= x >> 17; x ^= x << 5;
     rng_state = x; return x;
 }
-static int rng_range(int n) { return (int)(rb_rand() % (uint32_t)n); }
+uint32_t rb_rng_checkpoint(void) { return rng_state; }
+void rb_rng_restore(uint32_t state) { rb_seed(state); }
+size_t rb_rand_range(size_t max) { return max ? (size_t)rb_rand() % max : 0; }
+static int rng_range(int n) { return n > 0 ? (int)rb_rand_range((size_t)n) : 0; }
+RbLcg rb_lcg_new(uint64_t seed) {
+    RbLcg rng = { seed };
+    return rng;
+}
+uint64_t rb_lcg_next_u64(RbLcg *rng) {
+    rng->state = rng->state * UINT64_C(6364136223846793005) + UINT64_C(1442695040888963407);
+    return rng->state;
+}
+size_t rb_lcg_range(RbLcg *rng, size_t n) {
+    return n ? (size_t)((rb_lcg_next_u64(rng) >> 33) % (uint64_t)n) : 0;
+}
 
 /* ───────────────────────────── bag helpers ───────────────────────────── */
 static void bag_push(RbBag *b, int c) { if (b->n < RB_MAX_ZONE) b->cards[b->n++] = c; }

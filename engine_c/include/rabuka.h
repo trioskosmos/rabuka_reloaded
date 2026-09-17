@@ -1445,6 +1445,13 @@ int  rb_queue_has_resolver(const GameState *g);
 /* ── RNG (xorshift; deterministic given seed) ── */
 void rb_seed(uint32_t s);
 uint32_t rb_rand(void);
+uint32_t rb_rng_checkpoint(void);
+void rb_rng_restore(uint32_t state);
+size_t rb_rand_range(size_t max);
+typedef struct { uint64_t state; } RbLcg;
+RbLcg rb_lcg_new(uint64_t seed);
+uint64_t rb_lcg_next_u64(RbLcg *rng);
+size_t rb_lcg_range(RbLcg *rng, size_t n);
 
 /* ── Setup ── */
 int  rb_game_init(GameState *g, const uint32_t *deck0, int n0,
@@ -1455,6 +1462,9 @@ void rb_print_state(const GameState *g);
 /* ── Zone helpers (operate on a player's bags) ── */
 int  rb_draw(GameState *g, int pl);                 /* draw 1 to hand */
 int  rb_draw_energy(GameState *g, int pl);          /* draw 1 to energy zone */
+/* Mirror Player::track_deployment (player.rs) — marks deployment so the
+   area cannot be targeted for baton touch this turn. */
+void rb_player_track_deployment(GameState *g, int pl, int card_id);
 int  rb_draw_cards_for_player(RbPlayer *player, uint8_t count, const char *source,
                              const char *destination, const char *card_type_filter,
                              int is_any_number, void *distinct, void *card_db, int self_target_id);

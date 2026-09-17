@@ -146,6 +146,9 @@ fn blade_mod_fingerprint(gs: &GameState, me: u8) -> Vec<i16> {
 /// Dev levers (ablation only; unset in production):
 /// - `V7_MAIN_V6=1` → delegate to v6's main (isolates live-set changes).
 pub fn choose_action_v7(gs: &GameState, actions: &[Action], me: u8) -> Action {
+    if std::env::var_os("V7_MAIN_LEGACY").is_none() {
+        return crate::bot::v7_main::choose_action(gs, actions, me);
+    }
     if std::env::var("V7_MAIN_V6").is_ok() {
         return crate::bot::strategy_v6::choose_action_v6(gs, actions, me);
     }
@@ -163,6 +166,9 @@ pub fn choose_action_v7(gs: &GameState, actions: &[Action], me: u8) -> Action {
 }
 
 pub fn score_actions(gs: &GameState, actions: &[Action], me: u8) -> Vec<(f64, String)> {
+    if std::env::var_os("V7_MAIN_LEGACY").is_none() {
+        return crate::bot::v7_main::score_actions(gs, actions, me);
+    }
     if std::env::var("V7_MAIN_V6").is_ok() {
         return crate::bot::strategy_v6::score_actions(gs, actions, me);
     }
@@ -432,10 +438,6 @@ pub fn score_actions(gs: &GameState, actions: &[Action], me: u8) -> Vec<(f64, St
 /// "safe" sets even as second attacker, measured -3pp; strict closeout
 /// beats — the ceiling estimate is not their set, measured -3pp with the
 /// above confounded in.)
-fn choose_live_set_experiment(gs: &GameState, actions: &[Action], db: &CardDatabase) -> Action {
-    crate::bot::strategy_v6::choose_live_set_v6(gs, actions, db)
-}
-
 pub fn choose_live_set_v7(gs: &GameState, actions: &[Action], db: &CardDatabase) -> Action {
     if std::env::var("V7_LIVE_V6").is_ok() {
         return crate::bot::strategy_v6::choose_live_set_v6(gs, actions, db);
@@ -443,7 +445,7 @@ pub fn choose_live_set_v7(gs: &GameState, actions: &[Action], db: &CardDatabase)
     if std::env::var("V7_ROLLOUT").is_ok() {
         return crate::bot::rollout::choose_live_set_v7(gs, actions, db);
     }
-    if std::env::var("V7_LIVE_EXPERIMENT").is_ok() {
+    if std::env::var_os("V7_LIVE_LEGACY").is_none() {
         return choose_live_set_experiment(gs, actions, db);
     }
     let me = if gs.active_player().id == gs.player1.id {
@@ -679,6 +681,361 @@ fn cheapest_deterministic_life(gs: &GameState, me: u8, db: &CardDatabase) -> Opt
         .map(|(hi, _, _)| hi)
 }
 
+const EXPERIMENT_SAMPLES: usize = 256;
+
+type ExperimentPortfolio = (f64, i32, Vec<usize>);
+type ExperimentSingle = (f64, i32, usize, [i32; 11]);
+
+fn experiment_flip_categories(gs: &GameState, me: u8, db: &CardDatabase) -> (Vec<([i32; 8], usize)>, usize) {
+    let (my, _) = player_ref(gs, me);
+    let override_color = my.stage.stage.iter().find_map(|cid| {
+        gs.mods.blade_type_modifiers.get(cid).copied()
+            .map(crate::turn::live::blade_color_to_heart)
+    });
+    let mut cats: Vec<([i32; 8], usize)> = Vec::new();
+    for &cid in &my.main_deck.cards {
+        let mut total = [0u8; 8];
+        if let Some(card) = db.get_card(cid) {
+            let mut hearts = crate::card::BaseHeart { hearts: crate::card::HeartMap::new() };
+            let mut cheer = 0;
+            crate::turn::live::process_yell_revealed_card_icons(
+                card, override_color, &mut hearts, &mut total, &mut cheer,
+            );
+        }
+        let vector = total.map(i32::from);
+        if let Some((_, count)) = cats.iter_mut().find(|(v, _)| *v == vector) {
+            *count += 1;
+        } else {
+            cats.push((vector, 1));
+        }
+    }
+    cats.sort_unstable_by_key(|(vector, _)| *vector);
+    (cats, my.main_deck.cards.len())
+}
+
+fn experiment_feasible(pool: &[i32; 8], need: &[i32; 11]) -> bool {
+    let mut wildcard = pool[7];
+    let mut bucket_supply = pool[0];
+    for c in 1..=6 {
+        let have = pool[c];
+        let want = need[c];
+        if have >= want {
+            bucket_supply += have - want;
+        } else {
+            let deficit = want - have;
+            if wildcard < deficit {
+                return false;
+            }
+            wildcard -= deficit;
+        }
+    }
+    bucket_supply += wildcard;
+    bucket_supply >= need[0] + need[7] + need[10]
+}
+
+fn experiment_pass_probability(
+    cats: &[([i32; 8], usize)],
+    deck_len: usize,
+    blades: i32,
+    board: &[i32; 8],
+    need: &[i32; 11],
+) -> f64 {
+    if blades <= 0 || cats.is_empty() || deck_len == 0 {
+        return if experiment_feasible(board, need) { 1.0 } else { 0.0 };
+    }
+    let mut deck = Vec::with_capacity(deck_len);
+    for &(vector, count) in cats {
+        deck.extend(std::iter::repeat_n(vector, count));
+    }
+    deck.resize(deck_len, [0; 8]);
+    deck.sort_unstable();
+    let draws = usize::try_from(blades).unwrap_or(usize::MAX).min(deck_len);
+    let mut rng = 0x6a09e667f3bcc909u64;
+    let mut hits = 0usize;
+    for _ in 0..EXPERIMENT_SAMPLES {
+        let mut sampled = deck.clone();
+        let mut pool = *board;
+        for k in 0..draws {
+            rng ^= rng << 13;
+            rng ^= rng >> 7;
+            rng ^= rng << 17;
+            let index = k + usize::try_from(rng % (deck_len - k) as u64)
+                .expect("sample offset fits deck length");
+            sampled.swap(k, index);
+            for (have, extra) in pool.iter_mut().zip(sampled[k]) {
+                *have += extra;
+            }
+        }
+        if experiment_feasible(&pool, need) {
+            hits += 1;
+        }
+    }
+    hits as f64 / EXPERIMENT_SAMPLES as f64
+}
+
+fn experiment_board_pool(gs: &GameState, me: u8, db: &CardDatabase) -> [i32; 8] {
+    let (my, _) = player_ref(gs, me);
+    let hearts = my.stage.get_available_hearts(db, &gs.mods.heart_override,
+        &gs.mods.heart_modifiers, &gs.mods.heart_color_multiplier, &gs.mods.heart_copy);
+    let mut pool = [0i32; 8];
+    for (color, count) in &hearts.hearts {
+        pool[color.index()] += i32::from(*count);
+    }
+    pool
+}
+
+fn experiment_score_of(db: &CardDatabase, cid: i16) -> i32 {
+    db.get_card(cid).and_then(|c| c.score).unwrap_or(0) as i32
+}
+
+fn experiment_lives(gs: &GameState, me: u8, db: &CardDatabase) -> Vec<(usize, i16, [i32; 11])> {
+    let (my, _) = player_ref(gs, me);
+    hand_lives(my, db).into_iter().map(|(hi, cid, _)| {
+        let mut need = [0; 11];
+        let base = db.get_card(cid).and_then(|card| card.need_heart.as_ref());
+        if let Some(effective) = crate::core::stats_pipeline::effective_need_heart(
+            base, cid, &gs.mods.need_heart_modifiers,
+        ) {
+            for (color, count) in &effective.hearts {
+                need[color.index()] += i32::from(*count);
+            }
+        }
+        (hi, cid, need)
+    }).collect()
+}
+
+fn experiment_blades(gs: &GameState, me: u8, db: &CardDatabase) -> i32 {
+    let (my, _) = player_ref(gs, me);
+    i32::from(my.stage.total_blades(db, &gs.mods.blade_modifiers,
+        &gs.mods.orientation_modifiers, false))
+}
+
+fn experiment_junk_fill(gs: &GameState, me: u8, db: &CardDatabase, desired: &mut Vec<usize>) {
+    let (my, _) = player_ref(gs, me);
+    let deck_lives = my
+        .main_deck
+        .cards
+        .iter()
+        .filter(|&&cid| db.get_card(cid).is_some_and(|c| c.card_type == CardType::Live))
+        .count();
+    let max_slots = usize::from(3u8.saturating_sub(my.live_card_set_limit_reduction));
+    if desired.len() >= max_slots || deck_lives == 0 {
+        return;
+    }
+    let mut junk: Vec<(usize, u8)> = my
+        .hand
+        .cards
+        .iter()
+        .enumerate()
+        .filter(|&(i, &cid)| {
+            !desired.contains(&i)
+                && db.get_card(cid).is_some_and(|c| c.card_type != CardType::Live)
+        })
+        .map(|(i, &cid)| (i, db.get_card(cid).and_then(|c| c.cost).unwrap_or(0)))
+        .collect();
+    junk.sort_by_key(|&(_, cost)| std::cmp::Reverse(cost));
+    for &(hi, _) in &junk {
+        if desired.len() >= max_slots {
+            break;
+        }
+        desired.push(hi);
+    }
+}
+
+fn experiment_free_win(gs: &GameState, me: u8, db: &CardDatabase) -> Option<usize> {
+    let pool = experiment_board_pool(gs, me, db);
+    experiment_lives(gs, me, db)
+        .into_iter()
+        .filter(|(_, _, need)| experiment_feasible(&pool, need))
+        .min_by_key(|(hi, cid, _)| {
+            (
+                db.get_card(*cid).and_then(|c| c.score).unwrap_or(0),
+                *hi,
+            )
+        })
+        .map(|(hi, _, _)| hi)
+}
+
+fn experiment_portfolio_rank(
+    gs: &GameState,
+    me: u8,
+    db: &CardDatabase,
+) -> (Vec<ExperimentPortfolio>, Vec<ExperimentSingle>) {
+    let (my, _) = player_ref(gs, me);
+    let lives = hand_lives(my, db);
+    let max_slots = usize::from(3u8.saturating_sub(my.live_card_set_limit_reduction));
+    if lives.is_empty() || max_slots == 0 {
+        return (Vec::new(), Vec::new());
+    }
+    let lives = experiment_lives(gs, me, db);
+    let n = lives.len().min(8);
+    let (cats, deck_len) = experiment_flip_categories(gs, me, db);
+    let blades = experiment_blades(gs, me, db);
+    let board = experiment_board_pool(gs, me, db);
+    let mut needs: Vec<[i32; 11]> = Vec::with_capacity(n);
+    let mut scores: Vec<i32> = Vec::with_capacity(n);
+    for &(_, cid, ref need) in lives.iter().take(n) {
+        needs.push(*need);
+        scores.push(experiment_score_of(db, cid));
+    }
+    let mut singles: Vec<ExperimentSingle> = Vec::new();
+    for bit in 0..n {
+        if needs[bit][8] > 0 || needs[bit][9] > 0 {
+            continue;
+        }
+        let p = experiment_pass_probability(&cats, deck_len, blades, &board, &needs[bit]);
+        if p > 0.0 {
+            singles.push((p, scores[bit], lives[bit].0, needs[bit]));
+        }
+    }
+    singles.sort_by(|a, b| {
+        b.0.partial_cmp(&a.0)
+            .unwrap_or(std::cmp::Ordering::Equal)
+            .then_with(|| b.1.cmp(&a.1))
+            .then_with(|| a.2.cmp(&b.2))
+    });
+    let mut out = Vec::new();
+    for mask in 1..(1u32 << n) {
+        let cnt = mask.count_ones() as usize;
+        if cnt > max_slots {
+            continue;
+        }
+        let mut need_total = [0i32; 11];
+        let mut score = 0i32;
+        let mut idxs = Vec::with_capacity(cnt);
+        let mut unpassable = false;
+        for bit in 0..n {
+            if mask & (1 << bit) != 0 {
+                for k in 0..11 {
+                    need_total[k] += needs[bit][k];
+                }
+                if needs[bit][8] > 0 || needs[bit][9] > 0 {
+                    unpassable = true;
+                }
+                score += scores[bit];
+                idxs.push(lives[bit].0);
+            }
+        }
+        if unpassable {
+            continue;
+        }
+        let p = experiment_pass_probability(&cats, deck_len, blades, &board, &need_total);
+        let (_, opp) = player_ref(gs, me);
+        let floor = if opp.success_live_card_zone.cards.len() >= 2 {
+            0.35
+        } else if my.success_live_card_zone.cards.len() >= 2 {
+            0.60
+        } else {
+            0.45
+        };
+        if p < floor {
+            continue;
+        }
+        out.push((p * score as f64, score, idxs));
+    }
+    out.sort_by(|a, b| {
+        b.0.partial_cmp(&a.0)
+            .unwrap_or(std::cmp::Ordering::Equal)
+            .then_with(|| b.1.cmp(&a.1))
+            .then_with(|| a.2.len().cmp(&b.2.len()))
+    });
+    (out, singles)
+}
+
+fn choose_live_set_experiment(gs: &GameState, actions: &[Action], db: &CardDatabase) -> Action {
+    let me = if gs.active_player().id == gs.player1.id {
+        0u8
+    } else {
+        1u8
+    };
+    let (my, opp) = player_ref(gs, me);
+    let my_succ = my.success_live_card_zone.cards.len();
+    let opp_succ = opp.success_live_card_zone.cards.len();
+    let is_second = gs.current_phase == Phase::LiveCardSetSecondAttacker;
+    let opp_committed = !opp.live_card_zone.cards.is_empty();
+    let floor = if opp_succ >= 2 {
+        0.35
+    } else if my_succ >= 2 {
+        0.60
+    } else {
+        0.45
+    };
+
+    let mut desired: Vec<usize> = Vec::new();
+
+    if my.live_card_set_limit_reduction >= 3 || gs.cannot_live_players.contains(&my.id) {
+        return emit(gs, actions, &desired);
+    }
+    if is_second && !opp_committed {
+        if let Some(hi) = experiment_free_win(gs, me, db) {
+            return emit(gs, actions, &[hi]);
+        }
+    }
+
+    let (ranked, singles) = experiment_portfolio_rank(gs, me, db);
+    let contested = (is_second && opp_committed) || opp_succ >= 2;
+    if contested {
+        if let Some((_, _, idxs)) = ranked.first() {
+            desired = idxs.clone();
+        }
+    } else if let Some(&(_, _, first_hi, _)) = singles.first().filter(|s| s.0 >= floor) {
+        desired.push(first_hi);
+        let lives = experiment_lives(gs, me, db);
+        let mut covered = lives
+            .iter()
+            .find(|(h, _, _)| *h == first_hi)
+            .map(|(_, _, n)| *n)
+            .unwrap_or([0i32; 11]);
+        let cats = experiment_flip_categories(gs, me, db);
+        let blades = experiment_blades(gs, me, db);
+        let board = experiment_board_pool(gs, me, db);
+        let max_slots = usize::from(3u8.saturating_sub(my.live_card_set_limit_reduction));
+        for &(_, _, hi, need) in singles.iter().skip(1) {
+            if desired.len() >= max_slots {
+                break;
+            }
+            let mut grown = covered;
+            for k in 0..11 {
+                grown[k] += need[k];
+            }
+            let pg = experiment_pass_probability(&cats.0, cats.1, blades, &board, &grown);
+            if pg >= 0.85 {
+                desired.push(hi);
+                covered = grown;
+            }
+        }
+    }
+
+    if desired.is_empty() {
+        let gamble_floor = if opp_succ >= 2 { 0.10 } else { 0.25 };
+        if let Some((_, _, hi, _)) = singles.first().filter(|single| single.0 >= gamble_floor) {
+            desired.push(*hi);
+        }
+    }
+
+    experiment_junk_fill(gs, me, db, &mut desired);
+    log::debug!(
+        "v7 experiment t{} me{} n={} contested={}",
+        gs.turn_number,
+        me,
+        desired.len(),
+        contested
+    );
+    if std::env::var("V7_TRACE").is_ok() {
+        let score: i32 = desired
+            .iter()
+            .filter_map(|&hi| my.hand.cards.get(hi).copied())
+            .filter_map(|cid| db.get_card(cid))
+            .map(|c| c.score.unwrap_or(0) as i32)
+            .sum();
+        eprintln!(
+            "V7LE t{} me{} n={} score={} my{} opp{}",
+            gs.turn_number, me, desired.len(), score, my_succ, opp_succ
+        );
+    }
+    emit(gs, actions, &desired)
+}
+
 fn emit(gs: &GameState, actions: &[Action], desired: &[usize]) -> Action {
     crate::bot::strategy_common::emit_live_set(gs, actions, desired)
 }
@@ -827,5 +1184,191 @@ mod mulligan_tests {
         assert!(gs.mulligan_selected_indices.is_empty());
         let actions = crate::game_setup::generate_possible_actions(&gs);
         assert_eq!(choose_mulligan_curve(&gs, &actions, &db).action_type, ActionType::ConfirmMulligan);
+    }
+}
+
+#[cfg(test)]
+mod live_experiment_tests {
+    use super::*;
+
+    fn db_real() -> crate::Arc<CardDatabase> {
+        let cards = crate::card_loader::CardLoader::load_cards_from_file(
+            std::path::Path::new("../cards/cards.json"),
+        )
+        .unwrap();
+        crate::Arc::new(CardDatabase::load_or_create(cards))
+    }
+
+    fn second_attacker_gs(db: &crate::Arc<CardDatabase>) -> (GameState, Player, Player) {
+        let p1 = Player::new("p1".into(), "P1".into(), true);
+        let mut p2 = Player::new("p2".into(), "P2".into(), false);
+        p2.is_first_attacker = false;
+        let mut gs = GameState::new(p1.clone(), p2.clone(), crate::Arc::clone(db));
+        gs.current_phase = Phase::LiveCardSetSecondAttacker;
+        gs.current_turn_phase = crate::game_state::TurnPhase::Live;
+        (gs, p1, p2)
+    }
+
+    fn add_member_deck(db: &CardDatabase, p: &mut Player, name: &str, n: usize) {
+        let id = db.get_card_id(name).unwrap();
+        assert_eq!(db.get_card(id).unwrap().card_no, name);
+        for _ in 0..n {
+            p.main_deck.cards.push(id);
+        }
+    }
+
+    #[test]
+    fn experiment_feasible_matches_engine_bucket_semantics() {
+        let need = [0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+        let mut pool = [0i32; 8];
+        pool[1] = 2;
+        assert!(experiment_feasible(&pool, &need));
+        pool[1] = 1;
+        assert!(!experiment_feasible(&pool, &need));
+        pool[7] = 1;
+        assert!(experiment_feasible(&pool, &need));
+        pool[7] = 0;
+        pool[0] = 1;
+        assert!(
+            !experiment_feasible(&pool, &need),
+            "colorless must not fill heart01"
+        );
+        let bucket_need = [3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+        let mut pool2 = [0i32; 8];
+        pool2[0] = 2;
+        assert!(!experiment_feasible(&pool2, &bucket_need));
+        pool2[0] = 6;
+        assert!(experiment_feasible(&pool2, &bucket_need));
+        let surplus_need = [1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+        let mut pool3 = [0i32; 8];
+        pool3[1] = 2;
+        assert!(experiment_feasible(&pool3, &surplus_need), "surplus feeds bucket");
+        pool3[1] = 0;
+        pool3[2] = 2;
+        assert!(
+            !experiment_feasible(&pool3, &surplus_need),
+            "wrong color cannot fill specific"
+        );
+    }
+
+    #[test]
+    fn experiment_pass_probability_is_per_color_and_deterministic() {
+        let mut cats: Vec<([i32; 8], usize)> = Vec::new();
+        let mut v1 = [0i32; 8];
+        v1[1] = 1;
+        cats.push((v1, 3));
+        let mut v6 = [0i32; 8];
+        v6[6] = 1;
+        cats.push((v6, 3));
+        let need = [0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0];
+        let board = [0i32; 8];
+        let p = experiment_pass_probability(&cats, 6, 2, &board, &need);
+        let p2 = experiment_pass_probability(&cats, 6, 2, &board, &need);
+        assert!((p - p2).abs() < f64::EPSILON, "deterministic");
+        assert!(
+            (p - 0.75).abs() < 0.15,
+            "two flips over a half h06 deck should land near P(>=1 of 2)=0.75, got {p}"
+        );
+        let h06_only = [0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0];
+        let p_two = experiment_pass_probability(&cats, 6, 2, &board, &h06_only);
+        assert!(
+            p_two < p && (p_two - 0.2).abs() < 0.08,
+            "without replacement: two h06 has probability 3/6 * 2/5, got {p_two}"
+        );
+        let need_zero = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+        assert_eq!(
+            experiment_pass_probability(&cats, 6, 2, &board, &need_zero),
+            1.0
+        );
+        let mut colorless = [0i32; 8];
+        colorless[0] = 3;
+        let bucket_need = [3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+        assert_eq!(
+            experiment_pass_probability(&cats, 6, 0, &colorless, &bucket_need),
+            1.0
+        );
+        assert_eq!(
+            experiment_pass_probability(&cats, 6, 0, &colorless, &need),
+            0.0,
+            "colorless cannot fill h06 even with pool"
+        );
+    }
+
+    #[test]
+    fn experiment_ignores_deck_order_and_opponent_hidden_cards() {
+        let db = db_real();
+        let (mut gs, _, _) = second_attacker_gs(&db);
+        let live = db.get_card_id("PL!-sd1-019-SD").unwrap();
+        assert_eq!(db.get_card(live).unwrap().card_no, "PL!-sd1-019-SD");
+        gs.player2.hand.cards.push(live);
+        add_member_deck(&db, &mut gs.player2, "PL!-sd1-005-SD", 8);
+        add_member_deck(&db, &mut gs.player2, "PL!-sd1-002-SD", 8);
+        let member = db.get_card_id("PL!-sd1-010-SD").unwrap();
+        gs.player2.stage.stage = [member, -1, -1];
+        gs.mods.set_blade_modifier(member, 8);
+        let before = experiment_flip_categories(&gs, 1, &db);
+        let rank = experiment_portfolio_rank(&gs, 1, &db);
+        gs.player2.main_deck.cards.reverse();
+        gs.player1.hand.cards.extend([live, member]);
+        gs.player1.main_deck.cards.extend([member, live, live]);
+        assert_eq!(before, experiment_flip_categories(&gs, 1, &db));
+        assert_eq!(rank, experiment_portfolio_rank(&gs, 1, &db));
+        assert!(experiment_free_win(&gs, 1, &db).is_none());
+        gs.mods.heart_modifiers.entry(member).or_default().insert(
+            crate::card::HeartColor::Heart06,
+            crate::core::game_modifiers::ModifierEntry { additive: 1, ..Default::default() },
+        );
+        assert_eq!(experiment_free_win(&gs, 1, &db), Some(0));
+        let mut guard = 0;
+        while gs.current_phase == Phase::LiveCardSetSecondAttacker && guard < 4 {
+            let actions = crate::game_setup::generate_possible_actions(&gs);
+            let action = choose_live_set_experiment(&gs, &actions, &db);
+            crate::game_setup::execute_action(&mut gs, &action).unwrap();
+            guard += 1;
+        }
+        assert!(guard < 4, "selection must converge to confirmation");
+    }
+
+    #[test]
+    fn free_win_requires_true_board_coverage_not_mean_flips() {
+        let db = db_real();
+        let live = db.get_card_id("PL!-sd1-019-SD").unwrap();
+        let need = db.get_card(live).unwrap().need_heart.clone().unwrap();
+        assert_eq!(need.hearts.len(), 3);
+
+        let id005 = db.get_card_id("PL!-sd1-005-SD").unwrap();
+        let id010 = db.get_card_id("PL!-sd1-010-SD").unwrap();
+        let id002 = db.get_card_id("PL!-sd1-002-SD").unwrap();
+
+        let (mut gs, _p1, mut p2) = second_attacker_gs(&db);
+        p2.hand.add_card(live);
+        add_member_deck(&db, &mut p2, "PL!-sd1-005-SD", 8);
+        add_member_deck(&db, &mut p2, "PL!-sd1-010-SD", 8);
+        add_member_deck(&db, &mut p2, "PL!-sd1-002-SD", 8);
+        p2.stage.stage = [id005, id010, id002];
+        gs.player1 = _p1;
+        gs.player2 = p2;
+        let actions = crate::game_setup::generate_possible_actions(&gs);
+        let chosen = choose_live_set_experiment(&gs, &actions, &db);
+        assert_eq!(
+            chosen.action_type,
+            ActionType::SelectLiveCard,
+            "full board coverage must take the free win"
+        );
+
+        let (mut gs2, p1b, mut p2b) = second_attacker_gs(&db);
+        p2b.hand.add_card(live);
+        add_member_deck(&db, &mut p2b, "PL!-sd1-005-SD", 12);
+        add_member_deck(&db, &mut p2b, "PL!-sd1-010-SD", 12);
+        p2b.stage.stage = [id010, -1, -1];
+        gs2.player1 = p1b;
+        gs2.player2 = p2b;
+        let actions2 = crate::game_setup::generate_possible_actions(&gs2);
+        let chosen2 = choose_live_set_experiment(&gs2, &actions2, &db);
+        assert_ne!(
+            chosen2.action_type,
+            ActionType::SelectLiveCard,
+            "h06 missing from board and no b_heart06 flips: must not set the live"
+        );
     }
 }

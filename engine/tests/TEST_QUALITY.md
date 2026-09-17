@@ -6,11 +6,14 @@ Fn-level static signals over `engine/tests/**/*.rs`. Coverage counts (TEST_COVER
 answer “does it fire”; this answers “would the test notice if the trigger were wrong”.
 Report-only: rows are review prompts, not failures.
 
-## no_assert (0)
+## no_assert (2)
 
 _test never asserts (smoke at best — cannot pin behavior)_
 
-None.
+| file | test | line | detail |
+| --- | --- | --- | --- |
+| `engine/tests/test_modules/effects/score/chika_bp3_001_wait_self_activation_live_total_score_test.rs` | `wait_member_total_score_expires_at_live_end_even_without_setting_live` | 105 |  |
+| `engine/tests/test_modules/effects/score/chika_bp3_001_wait_self_activation_live_total_score_test.rs` | `wait_member_total_score_persists_through_victory_and_expires_after_live` | 100 |  |
 
 ## no_drive (0)
 
@@ -24,15 +27,13 @@ _trigger event hand-pushed with no real ability resolution in the same fn (weake
 
 None.
 
-## pendency_only (1)
+## pendency_only (0)
 
 _has_pending_choice asserted without choice identity (pending_choice_type/summary/answer) or outcome asserts_
 
-| file | test | line | detail |
-| --- | --- | --- | --- |
-| `engine/tests/test_modules/effects/compound/s_pb1_002_riko_edge_test.rs` | `riko_opponent_discards_live_no_gain` | 3 |  |
+None.
 
-## similar_cards (27)
+## similar_cards (26)
 
 _confusable card numbers (bp2 vs pb2) staged in one file — human review for wrong-card staging_
 
@@ -64,4 +65,3 @@ _confusable card numbers (bp2 vs pb2) staged in one file — human review for wr
 | `engine/tests/test_modules/jidou/movement/kinako_sakurakoji_test.rs` | `<file>` | 1 | PL!SP-bp5-006-R, PL!SP-pb1-006-R |
 | `engine/tests/test_modules/jidou/movement/pb2_under_member_test.rs` | `<file>` | 1 | PL!SP-pb1-006-R, PL!SP-pb2-006-R |
 | `engine/tests/test_modules/rules/conditions/restriction_mechanics_test.rs` | `<file>` | 1 | PL!S-bp5-009-R, PL!S-bp7-009-R |
-| `engine/tests/test_modules/rules/trigger_paths/trigger_scope_test.rs` | `<file>` | 1 | PL!HS-PR-005-PR, PL!HS-bp1-005-PR |

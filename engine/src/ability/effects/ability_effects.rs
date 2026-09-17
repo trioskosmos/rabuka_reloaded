@@ -85,7 +85,24 @@ impl AbilityResolver {
         }
 
         let targets: Vec<i16> = if self.selected_cards.is_empty() {
-            gs.activating_card.into_iter().collect()
+            // 「これによってウェイト状態になったメンバーは…を得る」 — the gain
+            // carries no explicit target; the anaphora points at the member(s)
+            // put to wait BY THIS ABILITY'S COST, which the engine already
+            // tracks in last_cost_waited_members (cleared per cost payment,
+            // cost.rs pay_cost_change_state; filled by the stage-select
+            // handler). Binding to activating_card instead made Chika
+            // PL!S-bp3-001-R＋'s 「常時ライブの合計スコア＋１」 live/die with
+            // the source instead of the waited member (printed text:
+            // abilities.json — the +1 belongs to これによってウェイト状態に
+            // なったメンバー, so a baton touch removing the source must keep
+            // the bonus and removing the recipient must drop it).
+            let refs_cost_wait =
+                effect.text.contains("これによ") || text.contains("これによ");
+            if refs_cost_wait && !gs.last_cost_waited_members.is_empty() {
+                gs.last_cost_waited_members.clone()
+            } else {
+                gs.activating_card.into_iter().collect()
+            }
         } else {
             core::mem::take(&mut self.selected_cards).to_vec()
         };
@@ -322,6 +339,7 @@ impl AbilityResolver {
         //
         // The old "+N digit parse" fallback only remains for legacy cards
         // whose gain_ability carries no structured gained_effect.
+        let mut gained_constant = false;
         match (gained_effect, target_card) {
             (Some(gained), Some(card_id)) => {
                 let triggers = trigger.and_then(|t| {
@@ -367,6 +385,10 @@ impl AbilityResolver {
                     "[GAINED_ABILITY] registered trigger={:?} on card {}",
                     trigger,
                     card_id
+                );
+                gained_constant = GameState::ability_matches_trigger(
+                    &gained_ability,
+                    &crate::core::types::AbilityTrigger::Constant,
                 );
                 gs.gained_card_abilities
                     .entry(card_id)
@@ -418,6 +440,15 @@ impl AbilityResolver {
             &format!("Gained ability: {}", ability_text),
             self.last_gain_effect_data.take(),
         );
+        if gained_constant {
+            gs.recalculate_constants();
+            log::debug!(
+                "[GAINED_ABILITY] refreshed constants target={:?} total_score=({}, {})",
+                target_card,
+                gs.mods.p1_constant_total_score_bonus,
+                gs.mods.p2_constant_total_score_bonus
+            );
+        }
         Ok(())
     }
 

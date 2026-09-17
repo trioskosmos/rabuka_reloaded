@@ -8,12 +8,14 @@ pub mod observation;
 pub mod rollout;
 pub mod strategy;
 pub mod strategy_common;
+pub mod v7_live;
 pub mod strategy_v2;
 pub mod strategy_v3;
 pub mod strategy_v4;
 pub mod strategy_v5;
 pub mod strategy_v6;
 pub mod strategy_v7;
+mod v7_main;
 pub mod registry;
 pub mod weights;
 

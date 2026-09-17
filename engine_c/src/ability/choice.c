@@ -2096,7 +2096,15 @@ int rb_resume_with_choice(GameState *g, int selected_idx) {
     } else if (mode == 3) {          /* auto-ability → execute deferred body */
         if (!was_skip && def) rb_execute_effect_ex(g, actor, def, host);
     } else if (mode == 4) {         /* optional draw gate (draw.rs execute_draw_wrapper) */
-        if (!was_skip) {
+        if (!was_skip && eff) {
+            /* Re-execute the full draw effect with optional stripped
+               (mirrors Rust compound.rs:514 set_optional(None)): effect-level
+               routing (distinct dedupe, card_type filter, destination) is
+               preserved instead of the reduced low-level draw. */
+            AbilityEffect eff_copy = *eff;
+            eff_copy.is_optional = 0;
+            rb_effect_draw_card(g, actor, &eff_copy, host);
+        } else if (!was_skip) {
             int n = 0;
             int t = g->queue.resume_draw_target;
             int self_id = g->queue.resume_draw_self_id;

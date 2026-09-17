@@ -72,7 +72,7 @@ if errorlevel 1 (
     popd
     exit /b 0
 )
-wasm-bindgen --target web --out-dir "%~dp0web_ui\public\wasm" "%~dp0platforms\wasm\target\wasm32-unknown-unknown\release\rabuka_wasm.wasm"
+wasm-bindgen --target web --out-dir "%~dp0web_ui\public\wasm" "%CARGO_TARGET_DIR%\wasm32-unknown-unknown\release\rabuka_wasm.wasm"
 if errorlevel 1 (
     echo [wasm] wasm-bindgen failed, keeping checked-in bundle.
     popd

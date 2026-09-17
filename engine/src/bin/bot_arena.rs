@@ -138,8 +138,16 @@ fn audit_cards(db: &CardDatabase, ids: &[i16]) -> Vec<Value> {
     ids.iter().map(|&id| audit_card(db, id)).collect()
 }
 
+fn decision_player(gs: &GameState) -> &rabuka_engine::player::Player {
+    if gs.has_pending_choice() {
+        if gs.can_player_act(0) { return &gs.player1; }
+        if gs.can_player_act(1) { return &gs.player2; }
+    }
+    gs.active_player()
+}
+
 fn audit_view(gs: &GameState) -> Value {
-    let own = gs.active_player();
+    let own = decision_player(gs);
     let opponent = if own.id == gs.player1.id { &gs.player2 } else { &gs.player1 };
         let db = &gs.card_database;
     json!({
@@ -168,7 +176,7 @@ fn audit_action(gs: &GameState, action: &game_setup::Action) -> ArenaResult<Valu
         | ActionType::UseAbility | ActionType::SetLiveCard | ActionType::ChoiceSelect);
     if references_card {
         if let Some(id) = action.parameters.as_ref().and_then(|p| p.card_id) {
-            let own = gs.active_player();
+            let own = decision_player(gs);
             let opponent = if own.id == gs.player1.id { &gs.player2 } else { &gs.player1 };
             let visible = id >= 0 && (own.hand.cards.contains(&id)
                 || own.stage.stage.contains(&id)
@@ -203,9 +211,11 @@ fn behaviorally_equal(a: &GameState, b: &GameState) -> ArenaResult<bool> {
     if serde_json::to_value(&actions_a)? != serde_json::to_value(&actions_b)? {
         return Ok(false);
     }
-    let me = if a.active_player().id == a.player1.id { 0u8 } else { 1u8 };
+    let me = if decision_player(a).id == a.player1.id { 0u8 } else { 1u8 };
+    if decision_player(a).id != decision_player(b).id { return Ok(false); }
     for score in [strategy_v6::score_actions as ScoreFn, strategy_v7::score_actions as ScoreFn] {
-        let (x, y) = (score(a, &actions_a, me), score(b, &actions_b, me));
+        let x = policy_call(|| score(a, &actions_a, me));
+        let y = policy_call(|| score(b, &actions_b, me));
         if x.len() != y.len()
             || x.iter().zip(&y).any(|((s1, c1), (s2, c2))| s1.to_bits() != s2.to_bits() || c1 != c2) {
             return Ok(false);
@@ -360,6 +370,48 @@ impl Drop for RngRestore {
     fn drop(&mut self) { rabuka_engine::rng::restore(self.0); }
 }
 
+fn policy_call<T>(call: impl FnOnce() -> T) -> T {
+    let restore = RngRestore(rabuka_engine::rng::checkpoint());
+    let result = call();
+    drop(restore);
+    result
+}
+
+#[derive(Debug, PartialEq, Eq)]
+enum PolicyRoute {
+    Action,
+    Mulligan,
+    LiveSet,
+}
+
+fn policy_route(gs: &GameState) -> PolicyRoute {
+    if gs.has_pending_choice() { return PolicyRoute::Action; }
+    match gs.current_phase {
+        Phase::MulliganFirstAttacker | Phase::MulliganSecondAttacker => PolicyRoute::Mulligan,
+        Phase::LiveCardSetFirstAttacker | Phase::LiveCardSetSecondAttacker => PolicyRoute::LiveSet,
+        _ => PolicyRoute::Action,
+    }
+}
+
+fn choose_policy_action(
+    gs: &GameState,
+    actions: &[game_setup::Action],
+    kinds: [BotKind; 2],
+    v2_policy: &strategy_v2::V2Policy,
+    plans: [&strategy_v3::V3Plan; 2],
+    rng: &mut Lcg,
+) -> game_setup::Action {
+    let me = u8::from(decision_player(gs).id != gs.player1.id);
+    let kind = kinds[me as usize];
+    let plan = plans[me as usize];
+    match policy_route(gs) {
+        PolicyRoute::Mulligan => policy_call(|| kind.choose_mulligan(gs, actions, &gs.card_database)),
+        _ if kind == BotKind::Random => actions[rng.range(actions.len())].clone(),
+        PolicyRoute::LiveSet => policy_call(|| kind.choose_live_set(gs, actions, &gs.card_database, v2_policy, plan)),
+        PolicyRoute::Action => policy_call(|| kind.choose_action(gs, actions, me, v2_policy, plan)),
+    }
+}
+
 /// Replay one saved position offline: same RNG state restored before each
 /// bot's scoring and selection; emits all available actions with card_no,
 /// per-bot numeric scores (null if nonfinite), component breakdowns, chosen
@@ -377,10 +429,10 @@ fn compare_position(saved: &SavedPosition, templates: &CardDatabase) -> ArenaRes
         ("v7", strategy_v7::score_actions as ScoreFn, strategy_v7::choose_action_v7 as fn(&GameState, &[game_setup::Action], u8) -> game_setup::Action),
     ] {
         rabuka_engine::rng::restore(saved.engine_rng);
-        let scores = score(&gs, &actions, me);
+        let scores = policy_call(|| score(&gs, &actions, me));
         if scores.len() != actions.len() { return Err("score/action length mismatch".into()); }
         rabuka_engine::rng::restore(saved.engine_rng);
-        let chosen = choose(&gs, &actions, me);
+        let chosen = policy_call(|| choose(&gs, &actions, me));
         let chosen_value = serde_json::to_value(&chosen)?;
         let chosen_index = actions.iter().position(|a| serde_json::to_value(a).ok().as_ref() == Some(&chosen_value))
             .ok_or("bot chose an action not offered")?;
@@ -452,7 +504,8 @@ fn emit(audit: &mut Option<std::fs::File>, value: &Value) -> ArenaResult<()> {
 
 impl DecisionAudit {
     fn record(&mut self, gs: &GameState, actions: &[game_setup::Action], chosen: &game_setup::Action) -> ArenaResult<Value> {
-        let boundary = (gs.turn_number, gs.current_phase, gs.active_player().id.clone());
+        let owner = decision_player(gs);
+        let boundary = (gs.turn_number, gs.current_phase, owner.id.clone());
         if self.boundary.as_ref() != Some(&boundary) {
             self.boundary = Some(boundary);
             self.boundary_id += 1;
@@ -464,7 +517,7 @@ impl DecisionAudit {
         let snapshot = audit_view(gs);
         let selected = json!(gs.live_card_selected_indices);
         let signature = serde_json::to_string(&json!([
-            gs.turn_number, gs.current_phase, gs.active_player().id, snapshot, available, chosen_value, selected, gs.mulligan_selected_indices
+            gs.turn_number, gs.current_phase, owner.id, gs.active_player().id, snapshot, available, chosen_value, selected, gs.mulligan_selected_indices
         ]))?;
         let repeated_from = self.seen.insert(signature, self.decision);
         let selection_operation = match chosen.action_type {
@@ -477,7 +530,8 @@ impl DecisionAudit {
         Ok(json!({
             "event": "decision", "game": self.game, "decision": self.decision,
             "turn": gs.turn_number, "phase": gs.current_phase,
-            "policy_player": gs.active_player().id,
+            "policy_player": owner.id,
+            "active_player": gs.active_player().id,
             "pending_choice_player": gs.get_pending_choice_player_id(),
             "pending_choice": gs.get_pending_choice().is_some(),
             "boundary_id": self.boundary_id, "boundary_step": self.boundary_step,
@@ -608,7 +662,7 @@ fn main() -> ArenaResult<()> {
         "card_stats": "printed/base, not effective modifiers",
         "identity_note": "card_no is authoritative; card_id can differ across builds for same-number sibling prints (R+/P/P+/SEC)",
         "visibility": "each row is private to policy_player; opponent snapshot contains stage and success only; non-visible action card identities are redacted",
-        "rng_limitations": "engine global RNG and arena LCG reseeded before each deal; simulations may consume global RNG; no checkpoint replay determinism guarantee",
+        "rng_limitations": "engine global RNG and arena LCG reseeded before each deal; engine RNG checkpoint restored immediately after every policy call; no cross-build replay determinism guarantee",
     }))?;
 
     let kind_name = |k: BotKind| k.name();
@@ -671,8 +725,8 @@ fn main() -> ArenaResult<()> {
         let mut captured_turns = std::collections::HashSet::new();
         let mut end_reason = "iteration_cap";
         // Archetype detection runs once per game over the full own decklist.
-        let plan_p1 = strategy_v3::V3Plan::detect(&gs, 0, &db);
-        let plan_p2 = strategy_v3::V3Plan::detect(&gs, 1, &db);
+        let plan_p1 = policy_call(|| strategy_v3::V3Plan::detect(&gs, 0, &db));
+        let plan_p2 = policy_call(|| strategy_v3::V3Plan::detect(&gs, 1, &db));
         let mut last_turn = 0u8;
         let mut stuck = 0u32;
         // Live-phase telemetry: snapshot at every phase change so transcripts
@@ -789,9 +843,8 @@ fn main() -> ArenaResult<()> {
                 continue;
             }
 
-            let active_is_p1 = gs.active_player().id == "p1";
-            let kind = if active_is_p1 { p1_kind } else { p2_kind };
-            let me = if active_is_p1 { 0u8 } else { 1u8 };
+            let policy_is_p1 = decision_player(&gs).id == gs.player1.id;
+            let me = if policy_is_p1 { 0u8 } else { 1u8 };
             // Opt-in capture: first eligible idle-Main decision per player
             // turn, hard-capped at 20 per game. RNG states captured as-is;
             // full hidden state is written offline only.
@@ -801,7 +854,8 @@ fn main() -> ArenaResult<()> {
                     let metadata = json!({
                         "game": games, "game_seed": engine_seed, "base_seed": options.seed,
                         "decision": decisions.decision + 1, "turn": gs.turn_number,
-                        "phase": gs.current_phase, "policy_player": gs.active_player().id,
+                        "phase": gs.current_phase, "policy_player": decision_player(&gs).id,
+                        "active_player": gs.active_player().id,
                         "fold": corpus_fold(engine_seed),
                         "split_rule": "game_seed modulo 5 == 0: holdout; otherwise train",
                         "sampling": "first eligible Main decision per player turn; at most 20 per game",
@@ -820,6 +874,13 @@ fn main() -> ArenaResult<()> {
                 }
             }
 
+            if gs.has_pending_choice() {
+                let action = choose_policy_action(&gs, &actions, [p1_kind, p2_kind], &v2_policy, [&plan_p1, &plan_p2], &mut rng);
+                decisions.execute(&mut audit, &mut gs, &actions, &action)?;
+                total_actions += 1;
+                continue;
+            }
+
             // RPS: random for both (no information to decide with).
             if gs.current_phase == Phase::RockPaperScissors {
                 let a = &actions[rng.range(actions.len())];
@@ -829,7 +890,7 @@ fn main() -> ArenaResult<()> {
 
             // S6: when this side won RPS, take second attacker.
             if gs.current_phase == Phase::ChooseFirstAttacker {
-                let won_rps = gs.rps_winner == Some(if active_is_p1 { 1 } else { 2 });
+                let won_rps = gs.rps_winner == Some(if policy_is_p1 { 1 } else { 2 });
                 let a = if won_rps {
                     actions
                         .iter()
@@ -850,7 +911,7 @@ fn main() -> ArenaResult<()> {
                 gs.current_phase,
                 Phase::MulliganFirstAttacker | Phase::MulliganSecondAttacker
             ) {
-                let a = kind.choose_mulligan(&gs, &actions, &db);
+                let a = choose_policy_action(&gs, &actions, [p1_kind, p2_kind], &v2_policy, [&plan_p1, &plan_p2], &mut rng);
                 decisions.execute(&mut audit, &mut gs, &actions, &a)?;
                 continue;
             }
@@ -861,12 +922,7 @@ fn main() -> ArenaResult<()> {
                 gs.current_phase,
                 Phase::LiveCardSetFirstAttacker | Phase::LiveCardSetSecondAttacker
             ) {
-                let plan = if active_is_p1 { &plan_p1 } else { &plan_p2 };
-                let a = if kind == BotKind::Random {
-                    actions[rng.range(actions.len())].clone()
-                } else {
-                    kind.choose_live_set(&gs, &actions, &db, &v2_policy, plan)
-                };
+                let a = choose_policy_action(&gs, &actions, [p1_kind, p2_kind], &v2_policy, [&plan_p1, &plan_p2], &mut rng);
                 if a.action_type == rabuka_engine::game_setup::ActionType::ConfirmLiveCardSet {
                     live_decisions += 1;
                     if gs.live_card_selected_indices.is_empty() {
@@ -891,11 +947,11 @@ fn main() -> ArenaResult<()> {
                         games,
                         gs.turn_number,
                         gs.current_phase,
-                        if active_is_p1 { "P1" } else { "P2" },
+                        if policy_is_p1 { "P1" } else { "P2" },
                         a.action_type,
                         card_no,
                         sel.join("+"),
-                        my_hand_lives(&gs, active_is_p1, &db),
+                        my_hand_lives(&gs, policy_is_p1, &db),
                         gs.player1.live_card_zone.cards.len(),
                         gs.player2.live_card_zone.cards.len(),
                         gs.player1.success_live_card_zone.cards.len(),
@@ -907,7 +963,7 @@ fn main() -> ArenaResult<()> {
             }
 
             // Main phase.
-            if trace && active_is_p1 {
+            if trace && policy_is_p1 {
                 for (ai, aa) in actions.iter().enumerate() {
                     let cn = aa
                         .parameters
@@ -928,12 +984,7 @@ fn main() -> ArenaResult<()> {
                 }
             }
             // Main phase (and everything else policy-driven): registry dispatch.
-            let plan = if active_is_p1 { &plan_p1 } else { &plan_p2 };
-            let action = if kind == BotKind::Random {
-                actions[rng.range(actions.len())].clone()
-            } else {
-                kind.choose_action(&gs, &actions, me, &v2_policy, plan)
-            };
+            let action = choose_policy_action(&gs, &actions, [p1_kind, p2_kind], &v2_policy, [&plan_p1, &plan_p2], &mut rng);
             _main_decisions += 1;
             if gs.current_phase == Phase::Main {
                 if !cur_is_main {
@@ -978,7 +1029,7 @@ fn main() -> ArenaResult<()> {
                     games,
                     gs.turn_number,
                     gs.current_phase,
-                    if active_is_p1 { "P1" } else { "P2" },
+                    if policy_is_p1 { "P1" } else { "P2" },
                     action.action_type,
                     card_no,
                     gs.player1.live_card_zone.cards.len(),
@@ -1221,6 +1272,96 @@ mod tests {
     }
 
     #[test]
+    fn pending_choice_routes_policy_and_audit_to_owner_before_phase_dispatch() {
+        use rabuka_engine::ability::types::Choice;
+
+        let db = fresh_database();
+        let mut ids: Vec<i16> = db.cards.keys().copied().collect();
+        ids.sort();
+        let p1 = rabuka_engine::player::Player::new("p1".into(), "P1".into(), true);
+        let p2 = rabuka_engine::player::Player::new("p2".into(), "P2".into(), false);
+        let mut gs = GameState::new(p1, p2, db);
+        gs.player1.hand.cards.push(ids[0]);
+        gs.player2.hand.cards.extend_from_slice(&ids[1..3]);
+        gs.turn_number = 6;
+        let v2 = strategy_v2::V2Policy::default();
+        let plan_p1 = policy_call(|| strategy_v3::V3Plan::detect(&gs, 0, &gs.card_database));
+        let plan_p2 = policy_call(|| strategy_v3::V3Plan::detect(&gs, 1, &gs.card_database));
+        let choice = Choice::select_cards("hand", 1, "Select card", false)
+            .target_player_id(Some("opponent".into()))
+            .picker(Some("p2".into()))
+            .build();
+        gs.ability_queue.pause_for_choice(choice);
+        gs.ability_queue.current_entry_mut().unwrap().choice_player_id = Some("p2".into());
+
+        for phase in [Phase::Main, Phase::MulliganFirstAttacker, Phase::LiveCardSetFirstAttacker] {
+            gs.current_phase = phase;
+            assert_eq!(gs.active_player().id, "p1");
+            assert!(!gs.can_player_act(0));
+            assert!(gs.can_player_act(1));
+            assert_eq!(decision_player(&gs).id, "p2");
+            assert_eq!(policy_route(&gs), PolicyRoute::Action);
+            let actions = game_setup::generate_possible_actions(&gs);
+            assert_eq!(actions.len(), 2);
+            assert!(actions.iter().all(|a| a.action_type == game_setup::ActionType::ChoiceSelect));
+            let wrong_policy = policy_call(|| BotKind::V1.choose_action(&gs, &actions, 0, &v2, &plan_p1));
+            let wrong_value = serde_json::to_value(&wrong_policy).unwrap();
+            let seed = (1..1000).find(|&seed| {
+                let index = Lcg(seed).range(actions.len());
+                serde_json::to_value(&actions[index]).unwrap() != wrong_value
+            }).unwrap();
+            let expected = actions[Lcg(seed).range(actions.len())].clone();
+            let chosen = choose_policy_action(&gs, &actions, [BotKind::V1, BotKind::Random], &v2, [&plan_p1, &plan_p2], &mut Lcg(seed));
+            assert_eq!(serde_json::to_value(&chosen).unwrap(), serde_json::to_value(&expected).unwrap());
+            assert_ne!(serde_json::to_value(&chosen).unwrap(), wrong_value);
+            let mut audit = DecisionAudit { game: 4, decision: 73, ..Default::default() };
+            let row = audit.record(&gs, &actions, &chosen).unwrap();
+            assert_eq!(row["policy_player"], "p2");
+            assert_eq!(row["active_player"], "p1");
+            assert_eq!(row["pending_choice_player"], "p2");
+            assert_eq!(row["view"]["own"]["player"], "p2");
+            assert_eq!(row["view"]["own"]["hand"].as_array().unwrap().len(), 2);
+            assert_eq!(row["chosen"]["resolved_card"]["card_id"], chosen.parameters.as_ref().unwrap().card_id.unwrap());
+            let mut hidden = chosen.clone();
+            hidden.parameters.as_mut().unwrap().card_id = Some(ids[0]);
+            assert_eq!(audit_action(&gs, &hidden).unwrap()["identity_redacted"], true);
+            gs.ability_queue.current_entry_mut().unwrap().choice_player_id = Some("p1".into());
+            let next = audit.record(&gs, &actions, &chosen).unwrap();
+            assert_eq!(next["policy_player"], "p1");
+            assert_eq!(next["boundary_id"], 2);
+            assert_eq!(next["boundary_step"], 1);
+            gs.ability_queue.current_entry_mut().unwrap().choice_player_id = Some("p2".into());
+        }
+        gs.ability_queue.pause_for_auto_ability_choice(Choice::SelectAutoAbility {
+            player_id: "p2".into(), options: vec![], description: "Choose ability".into(),
+            description_en: None, description_ja: None,
+        });
+        assert!(gs.get_pending_choice_player_id().is_none());
+        assert_eq!(decision_player(&gs).id, "p2");
+    }
+
+    #[test]
+    fn policy_calls_restore_rng_immediately_and_on_unwind() {
+        let _restore_rng = RngRestore(rabuka_engine::rng::checkpoint());
+        rabuka_engine::rng::seed(7123);
+        let before = rabuka_engine::rng::checkpoint();
+        let expected = rabuka_engine::rng::rand_range(1_000_000);
+        rabuka_engine::rng::restore(before);
+        for _ in 0..2 {
+            let sampled = policy_call(|| rabuka_engine::rng::rand_range(1_000_000));
+            assert_eq!(sampled, expected);
+            assert_eq!(rabuka_engine::rng::checkpoint(), before);
+        }
+        let result = std::panic::catch_unwind(|| policy_call(|| {
+            rabuka_engine::rng::rand_range(1_000_000);
+            panic!("policy failed");
+        }));
+        assert!(result.is_err());
+        assert_eq!(rabuka_engine::rng::checkpoint(), before);
+        assert_eq!(rabuka_engine::rng::rand_range(1_000_000), expected);
+    }
+
+    #[test]
     fn confusable_deck_line_resolves_consistently_and_audit_exposes_card_no() {
         let db = fresh_database();
         let deck = load_test_deck(&db, "5CP3Z idou");
@@ -1312,7 +1453,9 @@ mod tests {
         assert!(saved.cards.len() > template_count + 100, "real decks require unique physical duplicate-card IDs");
         let restored = loaded.restore(&fresh_database()).unwrap();
         // Offers and v6/v7 numeric behavior identical after restore.
+        let equivalence_rng = rabuka_engine::rng::checkpoint();
         assert!(behaviorally_equal(&gs, &restored).unwrap());
+        assert_eq!(rabuka_engine::rng::checkpoint(), equivalence_rng);
         assert_eq!(restored.card_database.cards.len(), db_before);
         for (&id, card) in &gs.card_database.cards {
             assert_eq!(restored.card_database.get_card(id).unwrap().card_no, card.card_no);

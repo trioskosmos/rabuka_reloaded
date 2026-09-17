@@ -8,7 +8,7 @@ use crate::helpers::*;
 
 /// Q94: Debut triggers the auto ability, granting 2 blade.
 #[test]
-fn kinako_q94_debut_grants_2_blade() {
+fn debut_grants_two_blades_until_live_end() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
@@ -29,27 +29,39 @@ fn kinako_q94_debut_grants_2_blade() {
     );
 }
 
-/// Q171: Blade has duration=live_end, persists after ability resolves.
 #[test]
-fn kinako_q171_blade_live_end_duration() {
+fn debut_blades_persist_until_live_victory_then_expire_without_performing() {
+    use rabuka_engine::game_state::Phase;
+
     let db = load_real_database();
     let mut game = TestGame::new(db);
-
-    let kinako = game.id("PL!SP-pb1-006-R");
+    let member = game.id("PL!SP-pb1-006-R");
     let filler = game.id("PL!-sd1-010-SD");
-
-    game.state.player1.hand.cards.push(kinako);
-    game.state.player1.hand.cards.push(filler);
+    fill_decks(&mut game, filler);
+    game.add_to_hand(member);
     game.give_energy(9);
+    game.play_to_stage(member, rabuka_engine::zones::MemberArea::LeftSide);
+    assert_eq!(game.state.mods.get_blade_modifier(member), 2);
 
-    game.state.player1.stage.stage[0] = -1;
-    game.play_to_stage(kinako, rabuka_engine::zones::MemberArea::LeftSide);
-
-    assert_eq!(
-        game.state.mods.get_blade_modifier(kinako),
-        2,
-        "2 blade granted with live_end duration (Q171)"
-    );
+    for _ in 0..20 {
+        if game.state.current_phase == Phase::LiveVictoryDetermination {
+            break;
+        }
+        assert!(!game.has_pending_choice());
+        assert_eq!(game.state.mods.get_blade_modifier(member), 2);
+        game.pass();
+    }
+    assert_eq!(game.state.current_phase, Phase::LiveVictoryDetermination);
+    assert!(game.state.player1.live_card_zone.cards.is_empty());
+    assert!(game.state.player2.live_card_zone.cards.is_empty());
+    assert_eq!(game.state.mods.get_blade_modifier(member), 2);
+    let turn_before = game.state.turn_number;
+    game.pass();
+    assert!(!game.has_pending_choice());
+    assert_eq!(game.state.current_phase, Phase::Active);
+    assert!(game.state.turn_number > turn_before);
+    assert_eq!(game.state.player1.stage.stage[0], member);
+    assert_eq!(game.state.mods.get_blade_modifier(member), 0);
 }
 
 /// Q94 CORE SCENARIO: debut AND area-move each grant +2.
@@ -60,7 +72,7 @@ fn kinako_q171_blade_live_end_duration() {
 /// The area move is driven through a real effect: 桜小路きな子
 /// (PL!SP-bp5-006-R)'s 起動 position-change swaps the two members.
 #[test]
-fn kinako_q94_debut_then_area_move_grants_4_blade() {
+fn debut_then_effect_swap_stacks_two_blade_grants() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 

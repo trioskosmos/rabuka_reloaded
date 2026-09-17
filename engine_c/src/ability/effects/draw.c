@@ -54,10 +54,13 @@ static int draw_count_zone_cards(const RbPlayer *player, const char *source) {
 }
 
 /* Mirrors util::place_card_in_zone(player, card, destination, ...).
-   Returns 1 if the card was placed, 0 if it fell back to hand (zone full / unknown). */
-static int draw_place_in_zone(RbPlayer *player, int card, const char *destination) {
+   Returns 1 if the card was placed, 0 if it fell back to hand (zone full / unknown).
+   g_of_player is the owning GameState (needed only for stage deployment
+   tracking); callers without one pass NULL. */
+static int draw_place_in_zone_g(GameState *g_of_player, RbPlayer *player, int card,
+                                const char *destination) {
     RbZone z;
-    if (rb_zone_of_str(destination, &z) != 0) {
+    if (rb_zone_of_str(destination, &z) == 0) {
         if (player->hand.n < RB_MAX_ZONE)
             player->hand.cards[player->hand.n++] = card;
         return 1;
@@ -68,8 +71,13 @@ static int draw_place_in_zone(RbPlayer *player, int card, const char *destinatio
                 player->hand.cards[player->hand.n++] = card;
             break;
         case RB_ZONE_DECK:
-            if (player->deck.n < RB_MAX_ZONE)
-                player->deck.cards[player->deck.n++] = card;
+            /* Rust (util.rs:2087-2093): deck/deck_top insert at index 0 (top). */
+            if (player->deck.n < RB_MAX_ZONE) {
+                for (int i = player->deck.n; i > 0; i--)
+                    player->deck.cards[i] = player->deck.cards[i - 1];
+                player->deck.cards[0] = card;
+                player->deck.n++;
+            }
             break;
         case RB_ZONE_DISCARD:
             if (player->discard.n < RB_MAX_ZONE)
@@ -88,6 +96,21 @@ static int draw_place_in_zone(RbPlayer *player, int card, const char *destinatio
                 player->success.cards[player->success.n++] = card;
             break;
         case RB_ZONE_STAGE:
+            /* Rust (util.rs:2072-2086): deploy to first empty slot; stage
+               full falls back to discard, not hand. */
+            {
+                int placed = 0;
+                for (int s = 0; s < RB_STAGE_SIZE && !placed; s++)
+                    if (player->stage[s] == RB_EMPTY_SLOT) {
+                        player->stage[s] = card;
+                        placed = 1;
+                    }
+                if (placed && g_of_player)
+                    rb_player_track_deployment(g_of_player, player - g_of_player->p, card);
+                else if (!placed && player->discard.n < RB_MAX_ZONE)
+                    player->discard.cards[player->discard.n++] = card;
+            }
+            break;
         case RB_ZONE_RESOLUTION:
         default:
             if (player->hand.n < RB_MAX_ZONE)
@@ -96,9 +119,9 @@ static int draw_place_in_zone(RbPlayer *player, int card, const char *destinatio
     }
     return 1;
 }
-
-/* Resolve the target player index from e->target, mirroring Rust's
-   AbilityResolver::resolve_target_player. */
+static int draw_place_in_zone(RbPlayer *player, int card, const char *destination) {
+    return draw_place_in_zone_g(NULL, player, card, destination);
+}
 static int draw_target_player(const AbilityEffect *e, int actor) {
     if (e && e->target) {
         if (!strcmp(e->target, "opponent")) return actor ^ 1;
@@ -155,7 +178,7 @@ int rb_draw_cards_for_player(RbPlayer *player, uint8_t count, const char *source
 
         if (from_deck) {
             if (player->deck.n > 0) {
-                if (deck_bottom) {
+                if (!deck_bottom) {
                     card = player->deck.cards[0];
                     for (int i = 1; i < player->deck.n; i++)
                         player->deck.cards[i - 1] = player->deck.cards[i];
@@ -286,7 +309,8 @@ int rb_effect_draw_card(GameState *g, int actor, AbilityEffect *e, int host_cid)
     /* Pull extra fields */
     int is_any_number = 0, is_self_target = 0, per_unit = 0, per_unit_count = 1;
     const char *per_unit_type = NULL, *per_unit_source = NULL;
-    const char *source = e->source, *destination = e->destination, *card_type = NULL;
+    const char *source = e->source, *destination = e->destination;
+    const char *card_type = e->card_type_field[0] ? e->card_type_field : NULL;
     for (int i = 0; i < e->n_extra; i++) {
         const char *k = e->extra_k[i], *v = e->extra_v[i];
         if (!k) continue;
@@ -309,12 +333,7 @@ int rb_effect_draw_card(GameState *g, int actor, AbilityEffect *e, int host_cid)
         else if (!strcmp(k, "card_type"))
             card_type = v;
     }
-    if (!source) {
-        if (card_type && !strcmp(card_type, "member_card"))
-            source = "stage";
-        else
-            source = "deck_top";
-    }
+    if (!source) source = "deck";
     if (!destination) destination = "hand";
 
     /* Count resolution (mirrors execute_draw_wrapper) */
@@ -364,8 +383,13 @@ int rb_effect_draw_card(GameState *g, int actor, AbilityEffect *e, int host_cid)
         return n;
     }
 
-    /* Optional draw: emit pay/skip gate; draw is performed on resume */
+    /* Optional draw: emit pay/skip gate; draw is performed on resume.
+        The saved effect is re-executed on accept with optional stripped
+        (mirrors Rust compound.rs:506-516, which re-runs the original effect
+        with optional=None so effect-level routing — distinct dedupe, filters,
+        destinations — is preserved through the gate). */
     if (e->is_optional) {
+        g->queue.resume_eff = e;
         int tgt = draw_effect_target_player(e, actor);
         g->queue.resume_draw_count = final_count;
         g->queue.resume_draw_target = (e->target && !strcmp(e->target, "both")) ? 2 : tgt;
@@ -427,9 +451,54 @@ int rb_effect_draw_card(GameState *g, int actor, AbilityEffect *e, int host_cid)
         return 0;
     }
 
+    const char *distinct = draw_extra(e, "distinct");
+    int dedupe = e->distinct_flag || (distinct &&
+        (!strcmp(distinct, "card_name") || !strcmp(distinct, "true") ||
+         !strcmp(distinct, "distinct")));
+    int from_discard = !strcmp(source, "discard");
+    int from_top = !strcmp(source, "deck") || !strcmp(source, "deck_top");
+    if (from_discard || (from_top && dedupe)) {
+        RbPlayer *player = &g->p[target];
+        RbBag *pile = from_discard ? &player->discard : &player->deck;
+        int attempts = pile->n;
+        int cards[RB_MAX_ZONE], unique[RB_MAX_ZONE];
+        int drawn = 0;
+        while (drawn < final_count && attempts-- > 0 && pile->n > 0) {
+            int card;
+            if (from_discard) {
+                card = pile->cards[--pile->n];
+            } else {
+                card = pile->cards[0];
+                memmove(pile->cards, pile->cards + 1, (size_t)(--pile->n) * sizeof(int));
+            }
+            int matches = 1;
+            if (!from_discard && card_type) {
+                if (!strcmp(card_type, "live_card")) matches = rb_card_is_live(card);
+                else if (!strcmp(card_type, "member_card"))
+                    matches = !rb_card_is_live(card) && !rb_card_is_energy(card);
+                else if (!strcmp(card_type, "energy_card")) matches = rb_card_is_energy(card);
+            }
+            cards[drawn] = card;
+            if (matches && dedupe)
+                matches = rb_apply_distinct_filter(cards, drawn + 1, RB_DISTINCT_CARDNAME, unique, RB_MAX_ZONE) == drawn + 1;
+            if (matches) {
+                drawn++;
+            } else if (from_discard) {
+                memmove(pile->cards + 1, pile->cards, (size_t)pile->n * sizeof(int));
+                pile->cards[0] = card;
+                pile->n++;
+            } else {
+                pile->cards[pile->n++] = card;
+            }
+        }
+        for (int i = 0; i < drawn; i++)
+            draw_place_in_zone(player, cards[i], destination);
+        g->last_draw_count = final_count;
+        return drawn;
+    }
     int n = rb_draw_cards_for_player(&g->p[target], (uint8_t)final_count, source, destination,
                                      card_type, 0, NULL, NULL, -1);
-    g->last_draw_count = n;
+    g->last_draw_count = final_count;
     return n;
 }
 

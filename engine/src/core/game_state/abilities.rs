@@ -2584,6 +2584,13 @@ impl GameState {
 
     pub fn check_expired_effects(&mut self) {
         let mut expired_indices = Vec::new();
+        // A live-total gain_ability registered a 常時 into gained_card_abilities
+        // and cached its +1 into p*_constant_total_score_bonus. Expiring must
+        // re-derive that accumulator AFTER the registration is cleared, or the
+        // cached bonus outlives the ability itself (PL!S-bp3-001-R＋: the +1
+        // persisted into turn 2 after ライブ終了時まで). Mirrors the gain side,
+        // which refreshes constants right after registering.
+        let mut expired_gain_ability = false;
 
         for (i, effect) in self.temporary_effects.iter().enumerate() {
             let is_expired = match effect.duration {
@@ -2733,6 +2740,7 @@ impl GameState {
                     // gains were never applied per card (they live in the
                     // p*_constant_total_score_bonus accumulator and expire
                     // with the gained_card_abilities entry itself).
+                    expired_gain_ability = true;
                     if let Some(ref data) = effect.effect_data {
                         if let crate::core::types::EffectData::GainAbility {
                             card_id,
@@ -2807,6 +2815,12 @@ impl GameState {
         }
         if self.current_turn_phase != TurnPhase::Live && !self.wait_immune_members.is_empty() {
             self.wait_immune_members.clear();
+        }
+        // Refresh AFTER removals + zone-exit clears: the cached
+        // p*_constant_total_score_bonus must reflect the post-expiry
+        // constant landscape (see expired_gain_ability above).
+        if expired_gain_ability {
+            self.recalculate_constants();
         }
     }
 

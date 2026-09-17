@@ -31,3 +31,10 @@ dc-toolchain/
 # Exclude logs
 *.log
 engine_c/run.log
+
+# Exclude local-only metadata and reference trees
+.git/
+.kilo/
+.opencode/
+research/
+source_images/
