@@ -105,8 +105,9 @@ fn exact_cost_nine_edelnote_enables_requirement_choice_743() {
 fn low_cost_edelnote_or_costly_wrong_group_cannot_enable_choice_743() {
     for stage_card in [LOW, "PL!S-bp5-006-R"] {
         let (mut game, live, high, low) = setup(stage_card);
+        pay(&mut game, true);
         game.drain_choices_strict(&[], &[]);
-        assert_eq!(game.state.player1.energy_zone.active_count(), 5);
+        assert_eq!(game.state.player1.energy_zone.active_count(), 3);
         assert_eq!(game.state.player1.stage.stage, [-1, high, -1]);
         assert_eq!(game.state.player1.waitroom.cards.as_slice(), &[low]);
         assert_requirement(&game, live, false);

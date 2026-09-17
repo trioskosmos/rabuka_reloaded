@@ -4811,6 +4811,14 @@ def _try_heart_possession(text):
         "location": "stage",
         "text": text,
     }
+    if text.strip().startswith("それが") and not extract_location(text):
+        result.pop("location")
+        result.update(
+            type="card_count_condition",
+            source="preceding_moved",
+            count=1,
+            operator=">=",
+        )
     if "持たない" in text:
         result["negation"] = True
     if "icon_all" in text:

@@ -548,7 +548,9 @@ fn debug_group_match(
 #[cfg(not(feature = "no_std"))]
 fn debug_group_match(card_db: &CardDatabase, card_id: i16, group_name: Option<&str>, result: bool) {
     static DEBUG_GROUP: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
-    if !*DEBUG_GROUP.get_or_init(|| std::env::var("RABUKA_DEBUG_GROUP").as_deref() == Ok("1")) {
+    if !log::log_enabled!(log::Level::Trace)
+        || !*DEBUG_GROUP.get_or_init(|| std::env::var("RABUKA_DEBUG_GROUP").as_deref() == Ok("1"))
+    {
         return;
     }
     let card = card_db.get_card(card_id);
@@ -577,7 +579,7 @@ fn debug_group_match(card_db: &CardDatabase, card_id: i16, group_name: Option<&s
         }
         None => String::new(),
     };
-    log::debug!(
+    log::trace!(
         "[GROUP_MATCH] card={}[{}] group={:?} result={} {}",
         card_name,
         card_id,
@@ -2565,8 +2567,8 @@ pub fn get_selection_indices(
     self_target_only: bool,
     skip_empty: bool,
 ) -> Vec<usize> {
-    log::debug!(
-        "[GET_SEL] cards.len={} filter.nh_color={:?} filter.nh_total={:?} ct={:?} group={:?} groups={:?} chars={:?} excl_chars={:?} cost_lim={:?} cost_op={:?} cost_vals={:?} cost_min={:?} cost_max={:?} excl_self={:?} names={:?} hearts={:?} nhc_count={:?} distinct={:?} excl_groups={:?} excl_cards={:?}",
+    log::trace!(
+        "[SELECTION_FILTER] cards.len={} filter.nh_color={:?} filter.nh_total={:?} ct={:?} group={:?} groups={:?} chars={:?} excl_chars={:?} cost_lim={:?} cost_op={:?} cost_vals={:?} cost_min={:?} cost_max={:?} excl_self={:?} names={:?} hearts={:?} nhc_count={:?} distinct={:?} excl_groups={:?} excl_cards={:?}",
         cards.len(),
         filter.need_heart_color,
         filter.need_heart_total,
@@ -2617,7 +2619,9 @@ pub fn resolve_selection(
         self_target_only,
         skip_empty,
     );
-    classify_selection(&idxs, count, is_all, behavior)
+    let outcome = classify_selection(&idxs, count, is_all, behavior);
+    log::debug!("[SELECTION_RESULT] available={} matching={:?} requested={} all={} outcome={:?}", cards.len(), idxs, count, is_all, outcome);
+    outcome
 }
 
 /// Remove cards from a standard (non-stage, non-deck) zone at the given indices.

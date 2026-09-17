@@ -1147,12 +1147,6 @@ impl super::TurnEngine {
                 .ability_queue
                 .current_entry()
                 .and_then(|e| e.optional_cost_result);
-            log::debug!(
-                "[RWC] cost_was_paid={}, effect_started={}, had_pending_sequential={}",
-                cost_was_paid,
-                effect_started,
-                had_pending_sequential
-            );
             // Save activating_card before clearing  Eit must be restored when
             // the ability continues processing (needs_reprocess), otherwise
             // gain_resource etc. in nested sequentials lose their target.
@@ -1184,13 +1178,9 @@ impl super::TurnEngine {
                 .is_some_and(|e| e.optional_cost_result == Some(true));
             let needs_reprocess = effect_ready
                 || (cost_was_paid && !effect_started && had_pending_sequential && chose_to_pay);
-            log::debug!("[RWC_BRANCH] cost_was_paid={} effect_started={} had_pending={} optional_skipped={} pending_cleared={} effect_ready={}",
-                cost_was_paid, effect_started, had_pending_sequential,
-                game_state.ability_queue.current_entry().is_some_and(|e| {
-                    e.cost_paid && e.optional_cost_result == Some(false)
-                        && e.choice_card_no == Some(crate::ability::types::ChoiceRoute::OptionalCost)
-                }),
-                pending_cleared, effect_ready);
+            log::debug!("[CHOICE_RESUME_BRANCH] cost_paid={} effect_started={} had_pending={} optional_skipped={} pending_cleared={} effect_ready={} chose_to_pay={} needs_reprocess={}",
+                cost_was_paid, effect_started, had_pending_sequential, optional_skipped,
+                pending_cleared, effect_ready, chose_to_pay, needs_reprocess);
 
             if optional_skipped || pending_cleared {
                 log::debug!(

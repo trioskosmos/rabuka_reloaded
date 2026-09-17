@@ -100,7 +100,36 @@ impl<'a> ConditionContext<'a> {
                                     })
                                 });
                                 if let Some(card_id) = check_card {
-                                    self.game_state.has_card_moved_this_turn(card_id)
+                                    // Positioned subject (「センターエリアにいる…メン
+                                    // バー」): the member CURRENTLY at the named slot
+                                    // must match the group filter and have moved.
+                                    let groups = nested_condition
+                                        .get_group_names()
+                                        .map(|g| g.to_vec())
+                                        .or_else(|| condition.get_group_names().map(|g| g.to_vec()));
+                                    let card_db = &self.game_state.card_database;
+                                    let in_group = groups.as_ref().map_or(true, |g| {
+                                        g.iter().any(|name| {
+                                            crate::ability::util::card_matches_group_str(
+                                                card_db, card_id, Some(name),
+                                            )
+                                        })
+                                    });
+                                    let moved = self.game_state.has_card_moved_this_turn(card_id);
+                                    log::debug!(
+                                        "[TEMPORAL_TURN] has_moved positioned card={} in_group={} moved={}",
+                                        card_id, in_group, moved
+                                    );
+                                    in_group && moved
+                                } else if condition.get_position().is_some() {
+                                    // Position named but the slot is empty: nobody
+                                    // currently satisfies 「<position>にいる」 — never
+                                    // widen to a whole-stage scan (Special Color's
+                                    // center Liella! leaving center must stop scoring).
+                                    log::debug!(
+                                        "[TEMPORAL_TURN] has_moved position slot empty -> false"
+                                    );
+                                    false
                                 } else if self.game_state.position_change_occurred_this_turn {
                                     let target = condition.get_target().unwrap_or("self");
                                     let player = self.resolve_condition_player(target);

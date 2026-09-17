@@ -1,7 +1,6 @@
 use super::condition::ConditionContext;
 use super::resolver::AbilityResolver;
 use super::types::{AbilityTraceNode, Choice, ExecutionContext, StepOutput, ZoneSnapshot};
-use crate::ability::debug::ABILITY_DEBUG;
 use crate::ability::enums::{ActionType, Zone};
 use crate::ability_queue::ConditionalChoice;
 use crate::card::{AbilityEffect, Condition};
@@ -12,7 +11,6 @@ use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
-use core::sync::atomic::Ordering;
 
 /// Routes a settled conditional_on_optional answer to the branch that fires.
 /// ONE definition of the (chose_yes × negation) matrix, used by
@@ -70,25 +68,6 @@ impl AbilityResolver {
     ) -> Result<(), String> {
         let conditional = effect.conditional.unwrap_or(false);
         let is_further = effect.is_further.unwrap_or(false);
-        #[cfg(not(feature = "no_std"))]
-        let actions_str = effect
-            .compound
-            .actions
-            .as_ref()
-            .map(|a| {
-                a.iter()
-                    .map(|s| s.action.to_str())
-                    .collect::<Vec<_>>()
-                    .join(",")
-            })
-            .unwrap_or_default();
-        #[cfg(not(feature = "no_std"))]
-        if ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) { log::debug!("[DEBUG_SEQ] execute_sequential_effect called! action={} n_actions={} actions=[{}] effect_ptr={:p}",
-            effect.action,
-            effect.compound.actions.as_ref().map(|a| a.len()).unwrap_or(0),
-            actions_str,
-            effect
-        ); }
         // Trace sequential compound effect
         let seq_label = if conditional {
             "sequential_conditional".to_string()
@@ -121,11 +100,8 @@ impl AbilityResolver {
                 .is_none_or(|c| ctx.evaluate_condition(c))
         };
         if !cond_met {
+            log::debug!("[SEQUENCE] source={:?} action={} skipped: sequence condition failed", self.activating_card_id, effect.action);
             return Ok(());
-        }
-
-        if is_further {
-            log::debug!("Further conditional effect (さらに) - executing additional actions");
         }
 
         if let Some(ref actions) = effect.compound.actions {
@@ -153,10 +129,14 @@ impl AbilityResolver {
                 self.pending_repeat_actions.clear();
             }
             log::debug!(
-                "[ABILITY] sequential: {} actions, repeat_max={} card_id={:?}",
+                "[SEQUENCE] source={:?} action={} steps={} iterations={} conditional={} further={} actions={:?}",
+                self.activating_card_id,
+                effect.action,
                 repeat_actions.len(),
                 repeat_max,
-                self.activating_card_id
+                conditional,
+                is_further,
+                repeat_actions.iter().map(|a| a.action).collect::<Vec<_>>()
             );
             // Track if a preceding conditional step was satisfied, for
             // if-then-else (otherwise_condition) support.
@@ -168,26 +148,6 @@ impl AbilityResolver {
                 // cause the next iteration's actions to be skipped.
                 condition_failed = None;
                 'action_loop: for (i, action) in repeat_actions.iter().enumerate() {
-                    if ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) { log::debug!("[DEBUG_RA] i={} action={} len={}",
-                        i,
-                        action.action,
-                        repeat_actions.len()
-                    ); }
-                    if ABILITY_DEBUG.load(Ordering::Relaxed) {
-                        log::debug!(
-                            "[SEQ_TRACE] repeat_idx={} i={} action={}",
-                            repeat_idx,
-                            i,
-                            action.action
-                        );
-                    }
-                    log::debug!(
-                        "[ABILITY]  >> sub-action[{}]: action={} has_condition={} card_id={:?}",
-                        i,
-                        action.action,
-                        action.condition.is_some(),
-                        self.activating_card_id
-                    );
                     // Conditional routing: determine how this step should be
                     // handled based on preceding condition results.
                     //
@@ -201,6 +161,7 @@ impl AbilityResolver {
                     if is_otherwise {
                         match condition_failed {
                             Some(false) => {
+                                log::debug!("[SEQUENCE] source={:?} repeat={} step={} action={} skipped: otherwise branch after passed condition", self.activating_card_id, repeat_idx + 1, i + 1, action.action);
                                 condition_failed = None;
                                 continue 'action_loop;
                             }
@@ -210,6 +171,7 @@ impl AbilityResolver {
                             None => {}
                         }
                     } else if condition_failed == Some(true) && action.condition.is_none() {
+                        log::debug!("[SEQUENCE] source={:?} repeat={} step={} action={} skipped: preceding condition failed", self.activating_card_id, repeat_idx + 1, i + 1, action.action);
                         // Don't reset condition_failed — keep it so ALL subsequent
                         // conditionless actions in this conditional sequential are
                         // skipped, not just the very next one.
@@ -228,6 +190,7 @@ impl AbilityResolver {
                             && repeat_actions[i - 1].condition.as_ref()
                                 == action.condition.as_ref();
                         if same_as_prev {
+                            log::debug!("[SEQUENCE] source={:?} repeat={} step={} action={} decision={} verdict=previous_step condition_failed={:?}", self.activating_card_id, repeat_idx + 1, i + 1, action.action, if condition_failed == Some(true) { "skip" } else { "continue" }, condition_failed);
                             if condition_failed == Some(true) {
                                 continue 'action_loop;
                             }
@@ -248,6 +211,7 @@ impl AbilityResolver {
                             if !action.optional.unwrap_or(false) {
                                 condition_failed = Some(!passed);
                             }
+                            log::debug!("[SEQUENCE] source={:?} repeat={} step={} action={} decision={} passed={} cached={:?} reused_cache={}", self.activating_card_id, repeat_idx + 1, i + 1, action.action, if passed { "continue" } else { "skip: condition failed" }, passed, cached, cached == Some(true));
                             if !passed {
                                 continue 'action_loop;
                             }
@@ -370,21 +334,10 @@ impl AbilityResolver {
                         }
                     }
 
-                    log::debug!(
-                        "[SEQ_LOOP] executing action[{}] action={} pending_before={:?}",
-                        i,
-                        action.action,
-                        self.pending_choice.is_some()
-                    );
                     fn save_remaining(
                         gs: &mut crate::game_state::GameState,
                         remaining: Vec<Box<AbilityEffect>>,
                     ) {
-                        log::debug!(
-                            "[SAVE_REMAINING] count={} actions={:?}",
-                            remaining.len(),
-                            remaining.iter().map(|a| a.action).collect::<Vec<_>>()
-                        );
                         if !remaining.is_empty() {
                             let mut existing = gs.ability_queue.take_pending_actions();
                             existing.extend(remaining.into_iter().map(|b| *b));
@@ -417,20 +370,20 @@ impl AbilityResolver {
                                 s == "discard" || s == "waitroom"
                             }));
                     if is_gated_consequence && self.last_move_moved_any == Some(false) {
+                        log::debug!("[SEQUENCE] source={:?} repeat={} step={} action={} skipped: preceding move moved no cards", self.activating_card_id, repeat_idx + 1, i + 1, action.action);
                         self.last_move_moved_any = None;
                         continue 'action_loop;
                     }
                     self.last_move_moved_any = None;
+                    log::debug!("[SEQUENCE] source={:?} repeat={} step={}/{} action={} execute: condition_failed={:?} pending_before={}", self.activating_card_id, repeat_idx + 1, i + 1, repeat_actions.len(), action.action, condition_failed, self.pending_choice.is_some());
                     match self.execute_effect(gs, &action_to_execute) {
                         Ok(_) => {
-                            if ABILITY_DEBUG.load(Ordering::Relaxed) {
-                                log::debug!(
-                                    "[SEQ_TRACE] after execute: pending={:?}",
-                                    self.pending_choice.is_some()
-                                );
-                            }
                             log::debug!(
-                                "[SEQ_LOOP] after execute: pending={:?}",
+                                "[SEQUENCE] source={:?} repeat={} step={} action={} result=ok pending={}",
+                                self.activating_card_id,
+                                repeat_idx + 1,
+                                i + 1,
+                                action.action,
                                 self.pending_choice.is_some()
                             );
                             // Record this step's output under its id (if any)
@@ -462,7 +415,11 @@ impl AbilityResolver {
                                     .or_insert_with(StepOutput::default)
                                     .merge(&out);
                                 log::debug!(
-                                    "[SEQ_LOOP] recorded step '{}' output: cards={:?} value={:?}",
+                                    "[SEQUENCE] source={:?} repeat={} step={} action={} output_id={} cards={:?} value={:?}",
+                                    self.activating_card_id,
+                                    repeat_idx + 1,
+                                    i + 1,
+                                    action.action,
                                     step_id,
                                     out.cards,
                                     out.value
@@ -562,20 +519,20 @@ impl AbilityResolver {
                                         }
                                     }
                                 }
+                                log::debug!("[SEQUENCE] source={:?} repeat={} step={} action={} paused: deferred_gate={} remaining={:?} repeat_actions={}", self.activating_card_id, repeat_idx + 1, i + 1, action.action, self.deferred_conditional_gate, remaining.iter().map(|a| a.action).collect::<Vec<_>>(), self.pending_repeat_actions.len());
                                 save_remaining(gs, remaining);
                                 return Ok(());
                             } else if self.cancel_remaining_commands {
                                 // An optional sub-action (e.g. pay_energy with insufficient
                                 // energy) requested cancellation of subsequent actions.
                                 self.cancel_remaining_commands = false;
-                                if ABILITY_DEBUG.load(Ordering::Relaxed) {
-                                    log::debug!("[SEQ_TRACE] cancel_remaining_commands set — aborting sequential loop");
-                                }
+                                log::debug!("[SEQUENCE] source={:?} repeat={} step={} action={} stopped: remaining actions cancelled", self.activating_card_id, repeat_idx + 1, i + 1, action.action);
                                 return Ok(());
                             } else if action.optional.unwrap_or(false) {
                                 if action.action == ActionType::ChangeState {
                                     // Optional change_state completed without creating a choice
                                     // (no valid targets). Skip remaining actions (そうした場合).
+                                    log::debug!("[SEQUENCE] source={:?} repeat={} step={} action={} stopped: optional state change had no choice", self.activating_card_id, repeat_idx + 1, i + 1, action.action);
                                     return Ok(());
                                 }
                                 let was_moved = self.moved_cards.len() - moved_before;
@@ -614,7 +571,10 @@ impl AbilityResolver {
                                 condition_failed = Some(was_moved == 0 && was_selected == 0);
                             }
                         }
-                        Err(e) => return Err(e),
+                        Err(e) => {
+                            log::debug!("[SEQUENCE] source={:?} repeat={} step={} action={} result=error pending={} error={}", self.activating_card_id, repeat_idx + 1, i + 1, action.action, self.pending_choice.is_some(), e);
+                            return Err(e);
+                        }
                     }
                 }
                 // After all actions in this iteration, check if repeat_procedure is optional
@@ -913,13 +873,6 @@ impl AbilityResolver {
             }
         }
 
-        if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) {
-            log::debug!(
-                "[COND_OPT] opt={:?} cond={:?}",
-                optional_action.is_some(),
-                conditional_action.is_some()
-            );
-        }
         if optional_action.is_some() && conditional_action.is_some() {
             let result = gs
                 .ability_queue

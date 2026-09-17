@@ -1,6 +1,6 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-09-17T18:31:26.138947+00:00",
+  "generated_at": "2026-09-17T18:56:13.709316+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
@@ -8,7 +8,7 @@
     "unique_abilities": 936
   },
   "n_files": 774,
-  "n_tests": 3373,
+  "n_tests": 3374,
   "total_cards": 771,
   "covered_cards": 770,
   "abilities_on_covered": 935,
@@ -580,7 +580,7 @@
       ]
     }
   },
-  "n_test_fns_parsed": 3373,
+  "n_test_fns_parsed": 3374,
   "abilities": [
     {
       "idx": 0,
@@ -15149,7 +15149,7 @@
         "honoka_distinct_names_two_members",
         "joint_live_start_discard_mixed_named_gains_score3"
       ],
-      "covering_test_count": 78,
+      "covering_test_count": 79,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -15880,10 +15880,11 @@
         "s2_bp4_016_energy_placed_by_opponent_fires",
         "s2_pb1_006_opponent_drag_arms_per_move",
         "s2_pb1_006_own_debut_fires",
+        "special_color_no_score_when_moved_liella_left_center",
         "special_color_set_blades_and_score_twin_in_one_live",
         "tomari_self_and_opponent_blade"
       ],
-      "covering_test_count": 23,
+      "covering_test_count": 24,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -21023,10 +21024,11 @@
         "pb2006_jidou_placement_feeds_constant_cost_up",
         "pb2011_own_live_start_reposition_triggers_own_three_choice",
         "q195_existing_modifier_stacks_on_set_value",
+        "special_color_no_score_when_moved_liella_left_center",
         "special_color_q195_set_blade_liella_at_center",
         "special_color_set_blades_and_score_twin_in_one_live"
       ],
-      "covering_test_count": 20,
+      "covering_test_count": 21,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -21077,10 +21079,11 @@
         "pb2006_jidou_placement_feeds_constant_cost_up",
         "pb2011_own_live_start_reposition_triggers_own_three_choice",
         "q195_existing_modifier_stacks_on_set_value",
+        "special_color_no_score_when_moved_liella_left_center",
         "special_color_q195_set_blade_liella_at_center",
         "special_color_set_blades_and_score_twin_in_one_live"
       ],
-      "covering_test_count": 20,
+      "covering_test_count": 21,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -25835,6 +25838,7 @@
         "pb2011_own_live_start_reposition_triggers_own_three_choice",
         "pb2_kinako_under_member_both_players",
         "ranju_under_plus_one_places_correctly",
+        "special_color_no_score_when_moved_liella_left_center",
         "special_color_set_blades_and_score_twin_in_one_live",
         "strict_highest_cost_respects_modifier",
         "strict_joint_sumire_wien_both_gain_no_blade",
@@ -25848,7 +25852,7 @@
         "strict_pr045_cost8_should_not_draw",
         "umi_conditional_alternative_0_1_2"
       ],
-      "covering_test_count": 22,
+      "covering_test_count": 23,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -25893,6 +25897,7 @@
         "pb2011_own_live_start_reposition_triggers_own_three_choice",
         "pb2_kinako_under_member_both_players",
         "ranju_under_plus_one_places_correctly",
+        "special_color_no_score_when_moved_liella_left_center",
         "special_color_set_blades_and_score_twin_in_one_live",
         "strict_highest_cost_respects_modifier",
         "strict_joint_sumire_wien_both_gain_no_blade",
@@ -25906,7 +25911,7 @@
         "strict_pr045_cost8_should_not_draw",
         "umi_conditional_alternative_0_1_2"
       ],
-      "covering_test_count": 22,
+      "covering_test_count": 23,
       "is_null": false,
       "use_limit": 1,
       "watches_abilities": false,
@@ -26130,6 +26135,7 @@
         "pb2006_jidou_once_per_turn_no_second_placement",
         "pb2006_jidou_placement_feeds_constant_cost_up",
         "pb2011_own_live_start_reposition_triggers_own_three_choice",
+        "special_color_no_score_when_moved_liella_left_center",
         "special_color_set_blades_and_score_twin_in_one_live",
         "toubatsu_draw_option_draws_one",
         "toubatsu_duplicate_names_in_discard_opponent_only_sees_correct_cards",
@@ -26141,7 +26147,7 @@
         "toubatsu_unrelated_debut_no_trigger",
         "toubatsu_wait_option_waits_opponent_member"
       ],
-      "covering_test_count": 20,
+      "covering_test_count": 21,
       "is_null": false,
       "use_limit": 1,
       "watches_abilities": false,
@@ -26186,6 +26192,7 @@
         "pb2006_jidou_once_per_turn_no_second_placement",
         "pb2006_jidou_placement_feeds_constant_cost_up",
         "pb2011_own_live_start_reposition_triggers_own_three_choice",
+        "special_color_no_score_when_moved_liella_left_center",
         "special_color_set_blades_and_score_twin_in_one_live",
         "toubatsu_draw_option_draws_one",
         "toubatsu_duplicate_names_in_discard_opponent_only_sees_correct_cards",
@@ -26197,7 +26204,7 @@
         "toubatsu_unrelated_debut_no_trigger",
         "toubatsu_wait_option_waits_opponent_member"
       ],
-      "covering_test_count": 20,
+      "covering_test_count": 21,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,

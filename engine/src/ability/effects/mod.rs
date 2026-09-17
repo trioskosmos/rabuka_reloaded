@@ -27,22 +27,20 @@ impl AbilityResolver {
         effect: &AbilityEffect,
     ) -> Result<(), String> {
         let mut dbg = AbDebug::new();
-        log::debug!(
-            "[DEBUG_EXEC] execute_effect: action={} effect_ptr={:p}",
-            effect.action,
-            effect
-        );
         dbg.effect(effect);
-        log::debug!(
-            "DEBUG: execute_effect - action: {}, source: {}, destination: {}",
+        log::trace!(
+            "[EFFECT] source={:?} action={} from={} to={} has_steps={} has_actions={}",
+            self.activating_card_id,
             effect.action,
             effect.source_or("none"),
-            effect.destination.map(|z| z.as_str()).unwrap_or("none")
+            effect.destination.map(|z| z.as_str()).unwrap_or("none"),
+            effect.effect_steps.is_some(),
+            effect.compound.actions.is_some()
         );
         #[cfg(not(feature = "no_std"))]
         let exec_snapshot = crate::ability::log::buffer_len();
         if !self.can_activate_effect(gs, effect) {
-            log::debug!("DEBUG: cannot activate effect");
+            log::trace!("[EFFECT] source={:?} action={} skipped: activation gate failed", self.activating_card_id, effect.action);
             // Keep verdicts — condition failure info will be captured by push_ability_result
             return Ok(());
         }
@@ -63,7 +61,9 @@ impl AbilityResolver {
             )
         {
             log::debug!(
-                "DEBUG: skipping draw consequence — placement was incomplete (Q118)"
+                "[EFFECT] source={:?} action={} skipped: placement incomplete (Q118)",
+                self.activating_card_id,
+                effect.action
             );
             return Ok(());
         }
@@ -79,7 +79,9 @@ impl AbilityResolver {
             let effect_key = format!("{}:{}", effect.action, effect.text);
             if gs.non_stackable_effects.iter().any(|x| x == &effect_key) {
                 log::debug!(
-                    "DEBUG: non-stackable effect already active, skipping: {}",
+                    "[EFFECT] source={:?} action={} skipped: non-stackable effect already active key={}",
+                    self.activating_card_id,
+                    effect.action,
                     effect_key
                 );
                 return Ok(());
@@ -214,14 +216,6 @@ impl AbilityResolver {
         // player responds. Legacy dedicated handlers remain as fallback
         // for the case where effect_steps is absent.
         let action_type = effect.action;
-        if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) {
-            log::debug!(
-                "[EXEC_ACTION] action_type={:?} has_steps={} has_actions={}",
-                action_type,
-                effect.effect_steps.is_some(),
-                effect.compound.actions.is_some()
-            );
-        }
 
         // Rule 9.8.1 / Q85 / Q86: Sequential/LookAndSelect routing
         //
@@ -234,18 +228,6 @@ impl AbilityResolver {
         if action_type == ActionType::Sequential || action_type == ActionType::LookAndSelect {
             let steps = effect.normalized_steps();
             if !steps.is_empty() {
-                if action_type == ActionType::Sequential {
-                    log::debug!(
-                        "[DEBUG_STEPS] sequential: n_steps={} actions=[{}] effect.action={}",
-                        steps.len(),
-                        steps
-                            .iter()
-                            .map(|s| s.action.to_str())
-                            .collect::<Vec<_>>()
-                            .join(","),
-                        effect.action
-                    );
-                }
                 let mut normalized = effect.clone();
                 normalized.effect_steps = None;
                 normalized.compound.actions = Some(steps);

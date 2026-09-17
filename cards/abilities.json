@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-09-18T01:22:18.967126",
+  "generated_at": "2026-09-18T05:21:36.602494",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "044eadde",
+  "engine_commit": "d1993354",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -5693,13 +5693,14 @@
           {
             "text": "それがブレードハートを持たないメンバーカードの場合、ライブの合計スコアを+1する",
             "condition": {
-              "type": "location_condition",
+              "type": "card_count_condition",
               "card_type": "member_card",
-              "location": "stage",
               "text": "それがブレードハートを持たないメンバーカードの場合",
+              "source": "preceding_moved",
+              "count": 1,
+              "operator": ">=",
               "negation": true,
-              "card_property": "has_blade_heart",
-              "target": "self"
+              "card_property": "has_blade_heart"
             },
             "action": "modify_score",
             "value": 1,

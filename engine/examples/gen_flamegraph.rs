@@ -13,7 +13,7 @@ use inferno::flamegraph::{from_reader, Options};
 
 type Stacks = BTreeMap<Vec<String>, u64>;
 
-const USAGE: &str = "Usage: gen_flamegraph [input.folded] [output.svg] [--exclusive] [--reverse] [--title TEXT]\nDefaults: folded.txt -> flamegraph.svg; input is inclusive timer nanoseconds.\n--exclusive  Input already contains exclusive nanosecond weights (not sample counts).\n--reverse    Show leaf-first stacks to group costs by callee.\n--title TEXT Override the graph title.\nInput must contain only folded stacks, blank lines, or # comments.";
+const USAGE: &str = "Usage: gen_flamegraph [input.folded] [output.svg] [--exclusive] [--reverse | --self] [--title TEXT]\nDefaults: folded.txt -> flamegraph.svg; input is inclusive timer nanoseconds.\n--exclusive  Input already contains exclusive nanosecond weights (not sample counts).\n--reverse    Show leaf-first stacks to group costs by callee.\n--self       Flat self-time view, aggregating identical leaf labels across callers.\n--title TEXT Override the graph title.\nInput must contain only folded stacks, blank lines, or # comments.";
 
 #[derive(Debug, Default)]
 struct Config {
@@ -21,6 +21,7 @@ struct Config {
     output: PathBuf,
     exclusive: bool,
     reverse: bool,
+    self_time: bool,
     title: Option<String>,
 }
 
@@ -42,6 +43,7 @@ fn parse_args(args: impl IntoIterator<Item = String>) -> io::Result<Option<Confi
             "--help" | "-h" => return Ok(None),
             "--exclusive" => config.exclusive = true,
             "--reverse" => config.reverse = true,
+            "--self" => config.self_time = true,
             "--title" => {
                 config.title = Some(
                     args.next()
@@ -52,6 +54,9 @@ fn parse_args(args: impl IntoIterator<Item = String>) -> io::Result<Option<Confi
             _ if arg.starts_with('-') => return Err(invalid(format!("Unknown option: {arg}"))),
             _ => paths.push(arg),
         }
+    }
+    if config.reverse && config.self_time {
+        return Err(invalid("--reverse and --self are separate views"));
     }
     if paths.len() > 2 {
         return Err(invalid("Expected at most an input and an output path"));
@@ -183,6 +188,28 @@ fn render(
     Ok(svg)
 }
 
+fn self_time_rows(exclusive: &Stacks, total: u64) -> io::Result<Vec<(String, u64, f64, usize)>> {
+    let mut leaves: BTreeMap<String, (u64, usize)> = BTreeMap::new();
+    for (path, value) in exclusive {
+        if *value == 0 {
+            continue;
+        }
+        let leaf = path.last().ok_or_else(|| invalid("Empty stack path"))?;
+        let entry = leaves.entry(leaf.clone()).or_insert((0, 0));
+        entry.0 += *value;
+        entry.1 += 1;
+    }
+    let mut rows: Vec<_> = leaves
+        .into_iter()
+        .map(|(leaf, (value, paths))| {
+            let pct = value as f64 / total as f64 * 100.0;
+            (leaf, value, pct, paths)
+        })
+        .collect();
+    rows.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
+    Ok(rows)
+}
+
 fn print_summary(exclusive: &Stacks, total: u64) -> io::Result<()> {
     let inclusive = inclusive_stacks(exclusive)?;
     let mut rows: Vec<_> = exclusive.iter().filter(|(_, value)| **value > 0).collect();
@@ -211,6 +238,36 @@ fn print_summary(exclusive: &Stacks, total: u64) -> io::Result<()> {
     Ok(())
 }
 
+fn render_self_time(
+    config: &Config,
+    rows: &[(String, u64, f64, usize)],
+    total: u64,
+) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+    let mut folded = Vec::new();
+    for (leaf, value, _pct, _paths) in rows {
+        if *value > 0 {
+            writeln!(folded, "[self] {leaf} {value}")?;
+        }
+    }
+    let mut opt = Options::default();
+    opt.title = config
+        .title
+        .clone()
+        .unwrap_or_else(|| "rabuka_engine self time by leaf".into());
+    opt.subtitle = Some(format!(
+        "{:.3} ms instrumented coverage | {} leaf labels | identical leaves aggregated | not CPU samples or whole-run time",
+        total as f64 / 1_000_000.0,
+        rows.len()
+    ));
+    opt.count_name = "nanoseconds".into();
+    opt.hash = true;
+    opt.frame_height = 20;
+    opt.min_width = 0.0;
+    let mut svg = Vec::new();
+    from_reader(&mut opt, folded.as_slice(), &mut svg)?;
+    Ok(svg)
+}
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let Some(config) = parse_args(std::env::args().skip(1))? else {
         println!("{USAGE}");
@@ -227,6 +284,29 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         exclusive_stacks(&stacks)?
     };
     let total = total_weight(&exclusive)?;
+    if config.self_time {
+        let rows = self_time_rows(&exclusive, total)?;
+        eprintln!(
+            "\nInstrumented coverage: {:.3} ms (not whole-run time)",
+            total as f64 / 1_000_000.0
+        );
+        eprintln!("Top 20 self-time leaf labels; identical labels aggregate across callers.");
+        eprintln!("{:>12} {:>8} {:>6}  Leaf", "Self ms", "Self %", "Paths");
+        for (leaf, value, pct, paths) in rows.iter().take(20) {
+            eprintln!(
+                "{:>12.3} {:>7.2}% {:>6}  {leaf}",
+                *value as f64 / 1_000_000.0,
+                pct,
+                paths
+            );
+        }
+        let svg = render_self_time(&config, &rows, total)?;
+        let mut writer = BufWriter::new(File::create(&config.output)?);
+        writer.write_all(&svg)?;
+        writer.flush()?;
+        eprintln!("Wrote {}", config.output.display());
+        return Ok(());
+    }
     let svg = render(&config, &exclusive, total)?;
     let mut writer = BufWriter::new(File::create(&config.output)?);
     writer.write_all(&svg)?;
@@ -314,6 +394,39 @@ mod tests {
     }
 
     #[test]
+    fn self_time_view_aggregates_and_renders_leaves() {
+        let exclusive = exclusive_stacks(&parse(
+            "root 95\nroot;child 60\nroot;child;leaf 20\nroot;sibling 5\nother 5\nroot;leaf 5",
+        ))
+        .unwrap();
+        let rows = self_time_rows(&exclusive, 100).unwrap();
+        assert_eq!(
+            rows,
+            vec![
+                ("child".to_string(), 40, 40.0, 1),
+                ("leaf".to_string(), 25, 25.0, 2),
+                ("root".to_string(), 25, 25.0, 1),
+                ("other".to_string(), 5, 5.0, 1),
+                ("sibling".to_string(), 5, 5.0, 1),
+            ]
+        );
+        let config = Config {
+            self_time: true,
+            ..Config::default()
+        };
+        let svg = String::from_utf8(render_self_time(&config, &rows, 100).unwrap()).unwrap();
+        assert!(svg.contains("<svg"));
+        assert!(svg.contains("[self] child (40 nanoseconds, 40.00%)"));
+        assert!(svg.contains("5 leaf labels"));
+        assert!(svg.contains("identical leaves aggregated"));
+    }
+
+    #[test]
+    fn rejects_conflicting_view_flags() {
+        assert!(parse_args(["--reverse".into(), "--self".into()]).is_err());
+    }
+
+    #[test]
     fn parses_options_and_preserves_positional_defaults() {
         let default = parse_args(Vec::new()).unwrap().unwrap();
         assert_eq!(default.input, PathBuf::from("folded.txt"));
@@ -327,7 +440,7 @@ mod tests {
             "Example",
         ];
         let config = parse_args(args.map(str::to_owned)).unwrap().unwrap();
-        assert!(config.exclusive && config.reverse);
+        assert!(config.exclusive && config.reverse && !config.self_time);
         assert_eq!(config.title.as_deref(), Some("Example"));
         assert_eq!(config.output, PathBuf::from("out.svg"));
         assert!(parse_args(["--help".into()]).unwrap().is_none());

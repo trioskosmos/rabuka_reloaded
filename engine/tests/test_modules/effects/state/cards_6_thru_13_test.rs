@@ -446,62 +446,54 @@ fn c9_arise_activate_and_recover() {
     );
 }
 
-// ========== Card 10: PL!-bp6-007-R+ LIVE reveal top ==========
-#[test]
-fn c10_reveal_top_adds_to_hand() {
+fn assert_live_success_reveal_score(revealed_print: &str, expected_bonus: u32) {
     let db = load_real_database();
     let mut g = TestGame::new(db);
-    let l = g.id("PL!-bp6-007-R+");
-    let m = g.id("PL!-sd1-001-SD");
-    let f = g.id("PL!-sd1-010-SD");
-    g.state.player1.stage.stage = [m, m, m];
-    g.state.player1.hand.cards.push(l);
-    // P2 has no hand/live card → P1 auto-wins, triggers LiveSuccess
-    g.state.player2.hand.cards.clear();
-    deck(&mut g, f);
-    g.state.player1.main_deck.cards.clear();
-    for _ in 0..30 {
-        g.state.player1.main_deck.cards.push(f);
-    }
-    g.give_energy(5);
-    let hb = g.state.player1.hand.cards.len();
+    let nozomi = g.id("PL!-bp6-007-R+");
+    let revealed = g.id(revealed_print);
+    let unrelated_member = g.id("PL!-sd1-001-SD");
+    let live = g.id("PL!-sd1-020-SD");
+    let filler = g.id("PL!-sd1-010-SD");
+    g.state.player1.stage.stage = [-1, nozomi, -1];
+    g.state.player1.hand.cards.extend([live, unrelated_member]);
+    deck(&mut g, filler);
+    g.state.player1.main_deck.cards.insert(5, revealed);
+
     for _ in 0..5 {
         g.pass();
     }
-    g.set_live_card(l);
-    for _ in 0..2 {
+    assert!(g.state.current_phase.to_string().contains("LiveCardSet"));
+    g.set_live_card(live);
+    for _ in 0..5 {
         g.pass();
+        assert!(!g.has_pending_choice(), "reveal-to-hand has no choice");
     }
-    while g.has_pending_choice() {
-        match g.pending_choice_type().as_deref() {
-            Some("SelectAutoAbility") => {
-                g.select_indices(&[]);
-            }
-            _ => break,
-        }
-    }
-    for _ in 0..3 {
-        g.pass();
-    }
-    while g.has_pending_choice() {
-        match g.pending_choice_type().as_deref() {
-            Some("SelectLiveSuccess") => {
-                g.select_indices(&[0]);
-            }
-            Some("SelectAutoAbility") => {
-                g.select_indices(&[]);
-            }
-            _ => break,
-        }
-    }
-    // Live card removed from hand (set as live), then top card revealed and added.
-    // Net: card count should be >= original minus 1 (the live card that was played).
-    assert!(
-        g.state.player1.hand.cards.len() >= hb - 1,
-        "top card should be added to hand (was {}, now {})",
-        hb,
-        g.state.player1.hand.cards.len()
-    );
+
+    assert!(g.state.player1.success_live_card_zone.cards.contains(&live));
+    assert!(g.state.player1.hand.cards.contains(&revealed));
+    assert!(g.state.player1.hand.cards.contains(&unrelated_member));
+    assert!(!g.state.player1.main_deck.cards.contains(&revealed));
+    assert_eq!(g.state.player1.main_deck.cards.first(), Some(&filler));
+    let snapshot = g.state.performance_snapshots.iter()
+        .find(|snapshot| snapshot.player_id == "p1").unwrap();
+    assert!(snapshot.success);
+    assert_eq!(snapshot.lives.len(), 1);
+    assert_eq!(snapshot.total_score as u32, 2 + expected_bonus);
+}
+
+#[test]
+fn c10_reveal_top_member_without_blade_heart_moves_to_hand_and_scores() {
+    assert_live_success_reveal_score("PL!-sd1-001-SD", 1);
+}
+
+#[test]
+fn c10_reveal_top_member_with_blade_heart_moves_without_score() {
+    assert_live_success_reveal_score("PL!-sd1-010-SD", 0);
+}
+
+#[test]
+fn c10_reveal_top_live_without_blade_heart_moves_without_score() {
+    assert_live_success_reveal_score("PL!-sd1-019-SD", 0);
 }
 
 // ========== Card 11: PL!N-bp3-028-L LIVE peek N per Niji ==========

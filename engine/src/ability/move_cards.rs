@@ -110,6 +110,56 @@ impl<'a> MoveSourceContext<'a> {
     }
 }
 
+fn log_move_result(player: &Player, db: &CardDatabase, card_id: i16, source: &str, requested: &str) {
+    if !log::log_enabled!(log::Level::Debug)
+        && !log::log_enabled!(target: "rabuka_engine::events", log::Level::Debug)
+    {
+        return;
+    }
+    let (actual, public) = if player.hand.cards.contains(&card_id) {
+        ("hand", false)
+    } else if player.main_deck.cards.contains(&card_id) {
+        ("deck", false)
+    } else if player.energy_deck.cards.contains(&card_id) {
+        ("energy_deck", false)
+    } else if player.live_card_zone.cards.contains(&card_id) {
+        ("live_card_zone", false)
+    } else if player.waitroom.cards.contains(&card_id) {
+        ("discard", true)
+    } else if player.stage.stage.contains(&card_id) {
+        ("stage", true)
+    } else if player.energy_zone.cards.contains(&card_id) {
+        ("energy_zone", true)
+    } else if player.success_live_card_zone.cards.contains(&card_id) {
+        ("success_live_zone", true)
+    } else if player.stage.under_cards.iter().any(|cards| cards.contains(&card_id)) {
+        ("under_member", true)
+    } else {
+        log::debug!("[MOVE_RESULT] owner={} source={} requested={} outcome=not_placed", player.id, source, requested);
+        log::trace!("[MOVE_RESULT_CARD] id={}", card_id);
+        return;
+    };
+    log::trace!("[MOVE_RESULT_STATE] owner={} id={} source={} requested={} actual={}", player.id, card_id, source, requested, actual);
+    if public {
+        log::debug!(target: "rabuka_engine::events",
+            "[MOVE_COMMITTED] {}: {} [{}] (id={}) from {} to {}",
+            player.id,
+            db.get_card(card_id).map_or("Unknown card", |card| card.name.as_ref()),
+            db.get_card(card_id).map_or("unknown", |card| card.card_no.as_ref()),
+            card_id,
+            crate::ability::describe::zone_label(Some(source)),
+            crate::ability::describe::zone_label(Some(actual))
+        );
+    } else {
+        log::debug!(target: "rabuka_engine::events",
+            "[MOVE_COMMITTED] {}: 1 card from {} to {} (identity hidden)",
+            player.id,
+            crate::ability::describe::zone_label(Some(source)),
+            crate::ability::describe::zone_label(Some(actual))
+        );
+    }
+}
+
 fn remove_card_from_any_zone(
     player: &mut crate::player::Player,
     last_vacated_stage_area: &mut Option<u8>,
@@ -208,8 +258,7 @@ impl AbilityResolver {
         filtered_indices: Option<Vec<usize>>,
     ) {
         log::debug!(
-            "[PROMPT_SEL@{}] zone={} count={} can_skip={} prop={:?} neg={:?} filtered={:?} excl_chars={:?}",
-            line!(),
+            "[SELECTION_PROMPT] zone={} count={} can_skip={} prop={:?} neg={:?} filtered={:?} excl_chars={:?}",
             zone,
             count,
             can_skip,
@@ -313,6 +362,7 @@ impl AbilityResolver {
                             // Rule 9.6.2.1.2.1: Track card deployed from non-stage.
                             player.track_deployment(card_id);
                         }
+                        log_move_result(gs.resolve_target_player(player_target), &gs.card_database, card_id, source_zone, destination);
                         return Ok(false);
                     }
                 }
@@ -326,12 +376,8 @@ impl AbilityResolver {
                     })
                     .collect::<Vec<_>>()
                     .join(",");
-                let pos_str_dbg = pos_str.clone();
-                let card_no_dbg = gs
-                    .card_database
-                    .get_card(card_id)
-                    .map_or("card", |c| c.card_no.as_ref())
-                    .to_string();
+                log::debug!("[MOVE_PENDING] target={} destination={} reason=position_choice options={}", player_target, destination, pos_str);
+                log::trace!("[MOVE_PENDING_CARD] id={}", card_id);
                 self.pending_choice = Some(Choice::SelectPosition {
                     position: pos_str,
                     description: format!(
@@ -354,18 +400,12 @@ impl AbilityResolver {
                     )),
                     allow_skip: false,
                 });
-                let pos_str_dbg = pos_str_dbg;
-                let card_id_dbg = card_id;
                 self.execution_context = ExecutionContext::MoveCardsPosition {
                     card_id,
                     state_change,
                     target: pos_target,
                     source_zone: source_zone.to_string(),
                 };
-                log::debug!(
-                    "[DEPLOY] {card_no_dbg} (id={card_id_dbg}) waits for the player to choose \
-                     a position from [{pos_str_dbg}] — its 登場 fires after placement",
-                );
                 return Ok(true);
             } else {
                 // Exactly 1 available slot (either empty or, with allow_occupied_stage, occupied)
@@ -379,14 +419,8 @@ impl AbilityResolver {
                     // Rule 9.6.2.1.2.1: Track card deployed from non-stage.
                     player.track_deployment(card_id);
                 }
-                log::debug!(
-                    "[DEPLOY] {} (id={card_id}) placed immediately at slot {slot}",
-                    gs.card_database
-                        .get_card(card_id)
-                        .map_or("card", |c| c.card_no.as_ref()),
-                    card_id = card_id,
-                    slot = slot
-                );
+                log::debug!("[DEPLOY_POSITION] target={} slot={} reason=only_available_slot", player_target, slot);
+                log_move_result(gs.resolve_target_player(player_target), &gs.card_database, card_id, source_zone, destination);
                 return Ok(false);
             }
         }
@@ -449,16 +483,20 @@ impl AbilityResolver {
         } else {
             vacated_area.map(|v| v as usize)
         };
-        log::debug!(
-            "[TRACE_PLACE] dest={} card={} pos_to_use={:?} vacated_area={:?} stage_before={:?}",
+        log::trace!(
+            "[PLACE_INTENT] dest={} card={} pos_to_use={:?} vacated_area={:?} stage_before={:?}",
             destination,
             card_id,
             pos_to_use,
             vacated_area,
             player.stage.stage
         );
-        util::place_card_in_zone(player, card_id, destination, pos_to_use, is_max, count);
-        log::debug!("[TRACE_PLACE] stage_after={:?}", player.stage.stage);
+        let placed = util::place_card_in_zone(player, card_id, destination, pos_to_use, is_max, count);
+        if placed {
+            log_move_result(gs.resolve_target_player(player_target), &gs.card_database, card_id, source_zone, destination);
+        } else {
+            log::debug!("[MOVE_SKIPPED] target={} destination={} reason=insufficient_stage_capacity", player_target, destination);
+        }
         Ok(false)
     }
 
@@ -477,14 +515,10 @@ impl AbilityResolver {
     ) -> Result<Option<Vec<i16>>, String> {
         let cards = util::zone_card_ids(player, zone_name);
         log::debug!(
-            "[TAKE] zone={zone_name} excl_chars={:?} chars={:?} group={:?} cards={:?} ct={:?} count={count} self_only={} all={is_all} can_skip={can_skip}",
-            filter.exclude_characters,
-            filter.characters,
-            filter.group,
-            cards,
-            filter.card_type,
-            effect.is_self_target(),
+            "[TAKE_SOURCE] owner={} zone={} available={} count={} all={} can_skip={} self_only={}",
+            player.id, zone_name, cards.len(), count, is_all, can_skip, effect.is_self_target()
         );
+        log::trace!("[TAKE_SOURCE_CARDS] ids={:?}", cards);
         let filtered_indices = util::matching_indices(&cards, card_db, filter, false);
 
         match util::resolve_selection(
@@ -2371,6 +2405,7 @@ if util::distinct_should_dedupe(distinct) {
             };
             for &card_id in &taken {
                 player.waitroom.add_card(card_id);
+                log_move_result(player, &card_db, card_id, &source, &destination);
             }
             moved_cards.extend(taken);
         } else {
@@ -2394,6 +2429,7 @@ if util::distinct_should_dedupe(distinct) {
                     };
                     let clamped = pos.min(player.main_deck.cards.len());
                     player.main_deck.cards.insert(clamped, card_id);
+                    log_move_result(player, &card_db, card_id, &source, &destination);
                 } else if &*destination == "deck_top_or_bottom" {
                     self.prompt_deck_top_or_bottom(
                         card_id,
@@ -2555,11 +2591,8 @@ if util::distinct_should_dedupe(distinct) {
                 if state_change.as_deref() == Some("wait") {
                     gs.mods.add_orientation_modifier(card_id, "wait");
                 }
-                log::debug!(
-                    "[DEPLOY] player answered the position choice for id={card_id} — \
-                     firing its 登場 now",
-                    card_id = card_id
-                );
+                log::debug!("[DEPLOY_POSITION] target={} position={} placed={} next=debut_side_effects", target, position, placed);
+                log_move_result(gs.resolve_target_player(&target), &gs.card_database, card_id, source_zone, "stage");
                 self.fire_debut_side_effects(gs, card_id, &target);
             }
             _ => {}
@@ -2683,8 +2716,8 @@ if util::distinct_should_dedupe(distinct) {
                 }
             }
         }
-        log::debug!(
-            "[FINALIZE_MOVE] dest={} cards={:?} -> self.moved_cards={:?}",
+        log::trace!(
+            "[MOVE_TRACKING] requested_destination={} recorded_cards={:?} accumulated_cards={:?}",
             destination,
             moved_cards,
             self.moved_cards
@@ -2992,13 +3025,6 @@ if util::distinct_should_dedupe(distinct) {
         let _choice_player = target_player_id;
         let card_db = gs.card_database.clone();
         let vacated_area = gs.last_vacated_stage_area;
-        log::debug!(
-            "[EXEC_SEL] zone={} indices={:?} dest={:?} target={}",
-            zone,
-            indices,
-            destination,
-            target
-        );
 
         // Card-property restriction (e.g. emma bp7-008 「ブレードハートを
         // 持たないメンバーカード」→ card_property="has_blade_heart",
@@ -3040,19 +3066,16 @@ if util::distinct_should_dedupe(distinct) {
         let filtered_indices: Vec<usize> = {
             let player = gs.resolve_target_player(&target);
             let cards = util::zone_cards(player, zone);
-            log::debug!(
-                "[EXEC_SEL_FILTER] zone={} cards.len={} indices={:?}",
-                zone,
-                cards.len(),
-                indices
-            );
             let result: Vec<usize> = indices
                 .iter()
                 .filter(|&&idx| {
                     let ok = idx < cards.len() && passes(cards[idx]);
-                    if idx < cards.len() {
-                        log::debug!("[EXEC_SEL_PASS] idx={} cid={} pass={}", idx, cards[idx], ok);
-                    }
+                    log::debug!(
+                        "[SELECTION_VERDICT] zone={} index={} verdict={}",
+                        zone, idx,
+                        if idx >= cards.len() { "reject_out_of_bounds" } else if ok { "accept" } else { "reject_filter" }
+                    );
+                    log::trace!("[SELECTION_CARD] index={} id={:?}", idx, cards.get(idx));
                     ok
                 })
                 .copied()
@@ -3069,14 +3092,7 @@ if util::distinct_should_dedupe(distinct) {
             } else {
                 Zone::Discard.to_str()
             });
-        if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) {
-            log::debug!(
-                "[EXEC_SEL_DEST] zone={:?} destination={:?} dest={}",
-                zone_enum,
-                destination,
-                dest
-            );
-        }
+        log::debug!("[SELECTION_ROUTE] source={} destination={} fallback={} target={} choice_player={:?}", zone, dest, destination.is_none(), target, target_player_id);
         let mut moved = Vec::new();
         match zone_enum {
             Some(Zone::Hand)
@@ -3116,8 +3132,9 @@ if util::distinct_should_dedupe(distinct) {
                     };
                     if !ok {
                         log::debug!(
-                            "Sum-total cost {} exceeds limit (max {}), selection rejected",
+                            "[SELECTION_REJECTED] reason=total_cost actual={} operator={} limit={}",
                             total_cost,
+                            op,
                             limit
                         );
                         return Ok(());
@@ -3167,6 +3184,9 @@ if util::distinct_should_dedupe(distinct) {
                             }
                         }
                         util::zone_remove_at_indices(player, zone, &filtered_indices);
+                        for &cid in &card_ids {
+                            log_move_result(player, &card_db, cid, zone, dest);
+                        }
                         moved = card_ids;
                     }
                     _ if dest == "deck_top_or_bottom" => {
@@ -3184,11 +3204,10 @@ if util::distinct_should_dedupe(distinct) {
                     }
                     _ => {
                         log::debug!(
-                            "[MOVE_CARDS] zone={} dest={} card_ids={:?} moved={:?} target={}",
+                            "[MOVE_INTENT] source={} destination={} selected_count={} target={}",
                             zone,
                             dest,
-                            card_ids,
-                            moved,
+                            card_ids.len(),
                             target
                         );
                         // Check for success zone replacement (e.g. 錯覚CROSSROADS)
@@ -3204,6 +3223,9 @@ if util::distinct_should_dedupe(distinct) {
                         }
                         let player = gs.resolve_target_player_mut(&target);
                         util::move_cards(player, &card_ids, zone, dest, None, &card_db);
+                        for &cid in &card_ids {
+                            log_move_result(player, &card_db, cid, zone, dest);
+                        }
                         moved = card_ids;
                     }
                 }

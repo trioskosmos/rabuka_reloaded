@@ -208,6 +208,47 @@ def test_zone_placement_deck_to_hand():
     assert result.get("destination") == "hand"
 
 
+def test_revealed_member_without_blade_heart_uses_moved_subject():
+    text = "それがブレードハートを持たないメンバーカードの場合"
+    condition = parse_condition(text)
+    assert condition.get("source") == "preceding_moved", condition
+    assert "location" not in condition, condition
+    assert condition.get("card_type") == "member_card", condition
+    assert condition.get("card_property") == "has_blade_heart", condition
+    assert condition.get("negation") is True, condition
+    assert condition.get("count") == 1, condition
+    assert condition.get("operator") == ">=", condition
+
+
+def test_reveal_to_hand_score_keeps_moved_subject_after_normalization():
+    text = (
+        "自分のデッキの一番上のカードを公開し、手札に加える。"
+        "それがブレードハートを持たないメンバーカードの場合、ライブの合計スコアを＋１する。"
+    )
+    effect = _normalize_effect_tree(parse_effect(text), text)
+    assert effect.get("action") == "sequential", effect
+    move, score = effect["actions"]
+    assert move.get("source") == "deck_top", move
+    assert move.get("destination") == "hand", move
+    assert move.get("count") == 1, move
+    condition = score["condition"]
+    assert condition.get("source") == "preceding_moved", condition
+    assert "location" not in condition, condition
+    assert condition.get("card_property") == "has_blade_heart", condition
+    assert condition.get("card_type") == "member_card", condition
+    assert condition.get("negation") is True, condition
+    assert score.get("target") == "live_total", score
+    assert score.get("value") == 1, score
+
+
+def test_stage_member_without_blade_heart_keeps_stage_subject():
+    condition = parse_condition("ブレードハートを持たないメンバーカードの場合")
+    assert condition.get("location") == "stage", condition
+    assert "source" not in condition, condition
+    assert condition.get("card_property") == "has_blade_heart", condition
+    assert condition.get("negation") is True, condition
+
+
 # ─── run all ──────────────────────────────────────────────────────────────────
 
 tests = {

@@ -308,11 +308,51 @@ failures (stale artifacts, no code change needed for those two).
     (6-test module passed); movement blade expiry through victory (3 passed).
     Gained-total-score recipient/source baton controls passed (2 tests),
     and LiveEnd expiry with/without a set live passed (2 tests). The no-live
-    expiry case was also rerun with `--exact` (1 passed). Aggregate verification
-    remains pending while the invalid source-leaving setup below is repaired.
-   Still open: Special Color current-center condition in
-   `ability_chain_combo_test.rs`, member incorrectly set as live in
-   `cards_6_thru_13_test.rs`, and revealed-score-icon negative branch.
+    expiry case was also rerun with `--exact` (1 passed). Full suite:
+    3359 passed / 0 failed (granted_ability_full_suite.log); inventory
+    regenerated and `--check` clean from repo root.
+    Source-leaving regression repaired end-to-end: the invalid same-turn
+    baton setup was replaced with Yoshiko PL!S-bp3-006-R＋'s printed
+    activation (wait self + hand discard → remove another Aqours member),
+    which legally removes the declined-gain source; score drops 1→0 with
+    exact stage/waitroom/orientation assertions
+    (`declined_discard_total_score_is_lost_when_yoshiko_activation_discards_source`).
+    Granted-ability bookkeeping now tracks the recipient: `gained_abilities`
+    (and synthetic registration) bind to the actual waited cost member, and
+    the baton controls assert the recipient owns the entry while the source
+    does not.
+    Soft-guard ratchet resolved without baseline changes: the two
+    conditional guards in `arise_gated_activate_blade_or_wait_private_wars_test.rs`
+    and the EdelNote payment guard were replaced with strict
+    `drain_choices_strict` completions. The EdelNote negative branch
+    (`low_cost_edelnote_or_costly_wrong_group_cannot_enable_choice_743`) now
+    pays the printed pay-or-skip gate explicitly (printed colon structure
+    offers payment before the cost-9 condition gates the branches) and then
+    asserts the branches stay locked and energy is spent. Debug trace
+    confirmed the prompt origin (`[PAY_SKIP_GATE]` → cost.rs optional-energy
+    gate); engine behavior matched the print, so the fix was test-side.
+    Choice family 92/92 green; final full suite 3359/0
+    (final_full_suite.log); inventory `--check` clean from repo root.
+    Still open: member incorrectly set as live in `cards_6_thru_13_test.rs`,
+    and revealed-score-icon negative branch. RESOLVED: Special Color
+    current-center condition — a real engine defect. The `has_moved`
+    temporal condition ignored the parsed `position` filter
+    (abilities.json:16298/16309 `position: "center"`): when the center slot
+    emptied (member moved OUT of center), the fallback scanned the whole
+    stage and scored anyway. Fixed in
+    `condition::state::evaluate_temporal_condition` (HasMoved arm): a
+    positioned subject now requires the CURRENT occupant of that slot to
+    match the group filter AND have moved; an empty positioned slot returns
+    false; unpositioned conditions (Dancing stars Q255, bp5-014/017,
+    LL-bp5-001) keep the prior whole-stage/activating-card behavior.
+    Scan bounds: only three parsed prints carry positioned `has_moved`
+    (Special Color center, 桜小路きな子 bp4-017 left_side, 鬼塚夏美 bp4-020
+    right_side). Tests: positive now uses a legal out-and-back-into-center
+    sequence; new negative
+    `special_color_no_score_when_moved_liella_left_center` pins 0 score
+    after leaving center. Family 5/5, Q255 family 1/1, full suite 3360/0
+    (special_color_final.log, q255_after_position_fix.log,
+    position_fix_full_suite.log).
 2. **Opponent optional live discard → otherwise gain total score**:
    `s_pb1_002_riko_edge_test.rs` already asserted choice shape and score;
    its `pendency_only` report was not proof of an assertion-free test.
@@ -325,9 +365,9 @@ failures (stale artifacts, no code change needed for those two).
     using the shared constant-trigger matcher. Debug trace confirms +1;
     original three branches passed without test-side recalculation.
     Expanded matrix: interleaved member/live filtered choice, true decline,
-    no-live, empty hand all pass. Source-leaving regression is in progress:
-    same-turn baton setup was invalid (area lock), so use a real removal
-    ability rather than clearing locks or manually removing the source.
+    no-live, empty hand all pass. Source-leaving regression completed: the
+    invalid same-turn baton setup (legal area lock, verified by debug trace)
+    was replaced with Yoshiko's printed removal; see follow-ups above.
 3. **Whole-file impurities** (split on touch, keep bodies): 
    `ll_bp7_001_triple_member_test.rs`, `ren_test.rs` blades half,
    `kotori_bp5_003_test.rs`, `s_pb1_019_live_test.rs`,

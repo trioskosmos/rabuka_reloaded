@@ -112,7 +112,7 @@ impl GameState {
             .current_entry()
             .is_some_and(|e| e.use_limit_recorded)
         {
-            log::debug!("[use_limit] {key:?} already recorded this activation -- skipping");
+            log::trace!("[use_limit] {key:?} already recorded this activation -- skipping");
             return false;
         }
         let entry = self.turn_limited_abilities_used.entry(key).or_insert(0);
@@ -410,8 +410,8 @@ impl GameState {
                                 if crate::ability::debug::ABILITY_DEBUG
                                     .load(core::sync::atomic::Ordering::Relaxed)
                                 {
-                                    log::debug!(
-                                        "[TAS] scanning trigger={:?} cond={}",
+                                    log::trace!(
+                                        "[AUTO_SCAN] trigger={:?} has_condition={}",
                                         ability.triggers,
                                         effect.condition.is_some(),
                                     );
@@ -468,9 +468,12 @@ impl GameState {
                                             .load(core::sync::atomic::Ordering::Relaxed)
                                         {
                                             log::debug!(
-                                                "[TAS_COND] card={} cond_type={:?} passes={}",
+                                                "[AUTO_CONDITION] source={} ({}, id={}) ability={} condition={:?} passes={}",
                                                 card.name,
-                                                condition,
+                                                card.card_no,
+                                                card_id,
+                                                ability_idx,
+                                                condition.get_text(),
                                                 passes
                                             );
                                         }
@@ -993,9 +996,12 @@ impl GameState {
                                 .load(core::sync::atomic::Ordering::Relaxed)
                             {
                                 log::debug!(
-                                    "[QUEUE_DIAG] enqueue player={} card_no={}",
+                                    "[ABILITY_QUEUE] enqueue owner={} card={} id={:?} ability={} trigger={:?}",
                                     entry.player_id,
-                                    entry.card_no
+                                    entry.card_no,
+                                    entry.card_id,
+                                    entry.ability_index,
+                                    entry.trigger_type
                                 );
                             }
                             self.push_debug_note(format!(
@@ -1080,9 +1086,12 @@ impl GameState {
                         .load(core::sync::atomic::Ordering::Relaxed)
                     {
                         log::debug!(
-                            "[QUEUE_DIAG] enqueue player={} card_no={}",
+                            "[ABILITY_QUEUE] enqueue owner={} card={} id={:?} ability={} trigger={:?}",
                             entry.player_id,
-                            entry.card_no
+                            entry.card_no,
+                            entry.card_id,
+                            entry.ability_index,
+                            entry.trigger_type
                         );
                     }
                     self.ability_queue.enqueue(entry);
@@ -1341,7 +1350,7 @@ impl GameState {
                 .collect();
 
             if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) {
-                log::debug!("[QUEUE_DIAG] available_indices={:?}", available_indices);
+                log::trace!("[QUEUE_SCAN] owner={} cutoff={} available_indices={:?}", player_id, pre_len, available_indices);
             }
 
             if available_indices.is_empty() {
@@ -1532,11 +1541,11 @@ impl GameState {
             "player2" => "p2",
             other => other,
         };
-        log::debug!("[PPA_ENTER] raw={} active={} queue_len_before={}", raw_player_id, active_player_id, self.ability_queue.len());
+        log::trace!("[QUEUE_SCAN] raw={} active={} queue_len_before={}", raw_player_id, active_player_id, self.ability_queue.len());
         // Rule 9.5.3.2: Active player resolves ALL their standby abilities first
         // (one at a time, back to rule processing between each)
         self.process_player_abilities(active_player_id);
-        log::debug!("[PPA_AFTER_ACTIVE] queue_len={} has_choice={}", self.ability_queue.len(), self.has_pending_choice());
+        log::trace!("[QUEUE_SCAN] after active: queue_len={} has_choice={}", self.ability_queue.len(), self.has_pending_choice());
         if self.has_pending_choice() {
             return;
         }
@@ -1571,17 +1580,24 @@ impl GameState {
             self.ability_queue.clear();
             return;
         }
-        if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) {
-            log::debug!(
-                "[PCA_ENTER] has_resolver={}",
-                self.ability_queue.has_resolver()
-            );
-        }
         let (card_id, ability, ability_index, cost_already_paid) = {
             let entry = match self.ability_queue.current_entry() {
                 Some(e) => e,
                 None => return,
             };
+            log::debug!(target: "rabuka_engine::events",
+                "{} resolving {} ({}, id={:?}) ability={} trigger={:?} resume={} cost_paid={} effect_started={}",
+                entry.player_id,
+                entry.card_id.and_then(|cid| self.card_database.get_card(cid))
+                    .map(|c| c.name.as_ref()).unwrap_or("unknown"),
+                entry.card_no,
+                entry.card_id,
+                entry.ability_index,
+                entry.trigger_type,
+                self.ability_queue.has_resolver(),
+                entry.cost_paid,
+                entry.effect_started
+            );
             (
                 entry.card_id,
                 entry.ability.clone(),
@@ -1680,7 +1696,6 @@ impl GameState {
         // Check if a resolver already exists (e.g., cost phase completed, effect needs to run).
         // If so, reuse it -- it carries state (revealed_cost_cards, etc.) needed by the effect.
         let mut resolver = if self.ability_queue.has_resolver() {
-            log::debug!("[PCA] Reusing existing resolver for effect execution");
             let mut r = self.ability_queue.take_resolver().unwrap();
             // Don't reset moved_cards/selected_cards -- the effect may need
             // them for cost_reference (e.g. previous_moved_card) or conditions.
@@ -1709,9 +1724,6 @@ impl GameState {
         resolver.debug_trace =
             crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed);
 
-        if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) {
-            log::debug!("[PCA] resolve_ability start");
-        }
         match resolver.resolve_ability(self, &ability, card_id, ability_index) {
             Ok(()) => {
                 self.push_debug_note(format!(
@@ -1720,21 +1732,13 @@ impl GameState {
                     ability_index,
                     resolver.pending_choice.is_some()
                 ));
-                if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed)
-                {
-                    log::debug!("[PCA] resolve_ability OK");
-                }
             }
             Err(e) => {
                 self.push_debug_note(format!(
                     "resolve FAIL card={:?} idx={} err={}",
                     card_id, ability_index, e
                 ));
-                if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed)
-                {
-                    log::debug!("[PCA] resolve_ability FAILED: {}", e);
-                }
-                log::debug!("Failed to resolve ability: {}", e);
+                log::debug!("[ABILITY_RESOLUTION] card={:?} ability={} error={}", card_id, ability_index, e);
                 self.ability_queue.complete_current();
                 self.clear_effect_tracking();
                 return;
@@ -1742,8 +1746,10 @@ impl GameState {
         }
         if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) {
             log::debug!(
-                "[PCA] after resolve: pending={}",
-                resolver.pending_choice.is_some()
+                "[ABILITY_RESOLUTION] card={:?} ability={} status={}",
+                card_id,
+                ability_index,
+                if resolver.pending_choice.is_some() { "waiting_for_choice" } else { "finished" }
             );
         }
 
@@ -1812,16 +1818,8 @@ impl GameState {
                 crate::ability::types::Choice::SelectCard { picker: Some(ref p), .. } => Some(p.as_str()),
                 _ => None,
             };
-            if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) {
-                log::debug!(
-                    "[PCA_G1] targets={} spawn={:?} picker={:?} current_effect_action={:?}",
-                    targets_opponent,
-                    resolver.spawn_context.target,
-                    picker,
-                    resolver.current_effect.as_ref().map(|e| e.action)
-                );
-            }
             if let Some(entry) = self.ability_queue.current_entry_mut() {
+                let preserved_picker = entry.choice_player_id.is_some();
                 // Preserve choice_player_id if already set by executor (e.g., execute_choice uses choice_maker)
                 if entry.choice_player_id.is_none() {
                     let choice_player = if let Some(p) = picker {
@@ -1838,16 +1836,17 @@ impl GameState {
                         &entry.player_id
                     };
                     entry.choice_player_id = Some(choice_player.to_string());
-                    if crate::ability::debug::ABILITY_DEBUG
-                        .load(core::sync::atomic::Ordering::Relaxed)
-                    {
-                        log::debug!("[PCA_G1] SET choice_player_id={}", choice_player);
-                    }
-                } else if crate::ability::debug::ABILITY_DEBUG
-                    .load(core::sync::atomic::Ordering::Relaxed)
-                {
-                    log::debug!("[PCA_G1] PRESERVE existing choice_player_id={:?}", entry.choice_player_id);
                 }
+                log::debug!(
+                    "[CHOICE_ROUTING] owner={} picker={:?} explicit_picker={:?} preserved={} targets_opponent={} spawn={:?} action={:?}",
+                    entry.player_id,
+                    entry.choice_player_id,
+                    picker,
+                    preserved_picker,
+                    targets_opponent,
+                    resolver.spawn_context.target,
+                    resolver.current_effect.as_ref().map(|e| e.action)
+                );
             }
 
             let choice = c.clone();

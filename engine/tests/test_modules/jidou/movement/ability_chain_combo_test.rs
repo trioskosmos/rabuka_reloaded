@@ -236,8 +236,10 @@ fn special_color_set_blades_and_score_twin_in_one_live() {
         "ab#0: center Liella!'s blades set to 3"
     );
 
-    // She then moves out of center (an unrelated effect's reposition).
+    // She leaves center and returns to it (a real repositioning sequence);
+    // at Live Success she is IN center and has moved this turn.
     manually_move(&mut game, liella, 1, 0);
+    manually_move(&mut game, liella, 0, 1);
 
     // Her Live Success resolves → ab#1 sees the center Liella! moved → +1.
     fire_trigger(
@@ -262,5 +264,62 @@ fn special_color_set_blades_and_score_twin_in_one_live() {
         game.state.mods.get_blade_modifier(liella),
         3,
         "ab#0's blade set persists alongside ab#1's score"
+    );
+}
+
+/// Printed condition: 「センターエリアにいる『Liella!』のメンバーが、このターン中に
+/// 移動している場合」 — the member must CURRENTLY be in center when Live Success
+/// resolves. A member who moved out of center does not satisfy the condition
+/// (different shape from Dancing stars Q255, whose condition carries no position).
+#[test]
+fn special_color_no_score_when_moved_liella_left_center() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let special = game.id("PL!SP-bp4-025-L");
+    let liella = game.id("PL!SP-bp1-001-R"); // Liella!, blade=3
+    let filler = game.id("PL!-sd1-010-SD");
+
+    game.state.player1.stage.stage = [-1, liella, -1];
+    game.state.player1.hand.cards.push(special);
+    game.state.player1.hand.cards.push(filler);
+    for _ in 0..10 {
+        game.state.player1.main_deck.cards.push(filler);
+        game.state.player2.main_deck.cards.push(filler);
+    }
+
+    for _ in 0..5 {
+        game.pass();
+    }
+    game.set_live_card(special);
+    game.pass();
+    game.pass();
+    while game.has_pending_choice() {
+        game.drain_choices_strict(&["SelectCard", "SelectAutoAbility"], &[0]);
+    }
+
+    // She moves OUT of center (slot 1 → 0).
+    manually_move(&mut game, liella, 1, 0);
+
+    fire_trigger(
+        &mut game,
+        special,
+        AbilityTrigger::LiveSuccess,
+        "ライブ成功時",
+    );
+    while game.has_pending_choice() {
+        game.drain_choices_strict(&["SelectCard", "SelectAutoAbility"], &[0]);
+    }
+
+    let total = game
+        .state
+        .mods
+        .score_modifiers
+        .get(&special)
+        .map(|m| m.total())
+        .unwrap_or(0);
+    assert_eq!(
+        total, 0,
+        "ab#1: the moved Liella! is no longer in center → no +1 score"
     );
 }

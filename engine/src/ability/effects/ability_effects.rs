@@ -325,7 +325,7 @@ impl AbilityResolver {
                 .entry(card_id)
                 .or_default()
                 .push(ability_text.to_string());
-            log::debug!(
+            log::trace!(
                 "[GAINED_ABILITY] tracked recipient={} source={:?}",
                 card_id,
                 gs.activating_card
@@ -385,11 +385,6 @@ impl AbilityResolver {
                     effect: Some(gained),
                     keywords: None,
                 };
-                log::debug!(
-                    "[GAINED_ABILITY] registered trigger={:?} on card {}",
-                    trigger,
-                    card_id
-                );
                 gained_constant = GameState::ability_matches_trigger(
                     &gained_ability,
                     &crate::core::types::AbilityTrigger::Constant,
@@ -402,6 +397,19 @@ impl AbilityResolver {
                     .entry(card_id)
                     .or_default()
                     .push(gs.activating_card.unwrap_or(-1));
+                log::debug!(
+                    target: "rabuka_engine::events",
+                    "[T{} {:?}] {} gains an ability | recipient={} source={:?} trigger={:?} duration={:?} constant={} live_total={}",
+                    gs.turn_number,
+                    gs.current_phase,
+                    gs.card_database.get_card(card_id).map(|card| card.name.as_ref()).unwrap_or("unknown card"),
+                    card_id,
+                    gs.activating_card,
+                    trigger,
+                    duration,
+                    gained_constant,
+                    is_live_total
+                );
                 // Per-card score gains must ALSO apply immediately: many flows
                 // and assertions read mods.score_modifiers right after
                 // resolution, and live.rs computes live card scores from it.
@@ -447,7 +455,10 @@ impl AbilityResolver {
         if gained_constant {
             gs.recalculate_constants();
             log::debug!(
-                "[GAINED_ABILITY] refreshed constants target={:?} total_score=({}, {})",
+                target: "rabuka_engine::events",
+                "[T{} {:?}] Gained constant applied | recipient={:?} live_total_bonus: p1={} p2={}",
+                gs.turn_number,
+                gs.current_phase,
                 target_card,
                 gs.mods.p1_constant_total_score_bonus,
                 gs.mods.p2_constant_total_score_bonus

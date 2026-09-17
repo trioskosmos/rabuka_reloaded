@@ -190,8 +190,8 @@ impl super::resolver::AbilityResolver {
             (false, false, _) => Continuation::Immediate,
         };
         log::debug!(
-            "[CHOICE] continuation: looked={} sub_choice={} queued_actions={} select_card={} route={:?}",
-            is_actual_looked_at_choice, sub_choice, has_pending, was_select_card, cont
+            "[CHOICE] source={:?} continuation={:?} looked={} preserve={} sub_choice={} queued_actions={} select_card={}",
+            self.activating_card_id, cont, is_actual_looked_at_choice, should_preserve, sub_choice, has_pending, was_select_card
         );
         match cont {
             Continuation::DeferredSelectCard => {
@@ -217,9 +217,10 @@ impl super::resolver::AbilityResolver {
                 }
             }
         }
-        log::debug!(
-            "[FINALIZE_CHOICE] pending={} selected={:?} context={:?}",
-            has_pending_sequential,
+        log::trace!(
+            "[CHOICE] source={:?} finalized: pending={} selected={:?} context={:?}",
+            self.activating_card_id,
+            self.pending_choice.is_some(),
             self.selected_cards,
             context
         );
@@ -410,12 +411,10 @@ impl super::resolver::AbilityResolver {
         context: ExecutionContext,
         ctx: SelectionContext,
     ) -> Result<(), String> {
-        if ABILITY_DEBUG.load(Ordering::Relaxed) {
-            log::debug!(
-                "[SEL_CARD] zone='{}' indices={:?} count={} allow_skip={} context={:?} is_reveal={}",
-                zone, ctx.indices, ctx.count, ctx.allow_skip, context, ctx.is_reveal
-            );
-        }
+        log::debug!(
+            "[CHOICE] source={:?} select cards: zone={} indices={:?} filtered_indices={:?} count={} allow_skip={} reveal={} context={:?}",
+            self.activating_card_id, zone, ctx.indices, ctx.filtered_indices, ctx.count, ctx.allow_skip, ctx.is_reveal, context
+        );
 
         // Distinguish cost vs effect: cost handler only fires when effect NOT yet started.
         // effect_started is false during cost payment, true during effect execution.
@@ -469,8 +468,8 @@ impl super::resolver::AbilityResolver {
             }
         }
 
-        log::debug!(
-            "[COST] check hand-cost block: zone={} is_hand={} has_cost={} effect_started={}",
+        log::trace!(
+            "[COST] hand-payment routing: zone={} is_hand={} has_cost={} effect_started={}",
             zone,
             Zone::from_str(zone) == Some(Zone::Hand),
             gs.entry_cost().is_some(),
@@ -503,8 +502,9 @@ impl super::resolver::AbilityResolver {
                 .filter(|&cid| validate_card(cid))
                 .collect();
             if !new_card_ids.is_empty() {
-                log::debug!(
-                    "[COST] moving cards: count={} new_card_ids={:?}",
+                log::trace!(
+                    "[COST] source={:?} discard intent: required={} cards={:?}",
+                    self.activating_card_id,
                     count,
                     new_card_ids
                 );
@@ -543,14 +543,15 @@ impl super::resolver::AbilityResolver {
                     }
                 }
                 log::debug!(
-                    "[DBG_HSC] moved {} cards, moved_cards.len={}",
-                    new_card_ids.len(),
+                    "[COST] source={:?} discarded cards={:?} total_paid={}",
+                    self.activating_card_id,
+                    new_card_ids,
                     self.moved_cards.len()
                 );
             }
             if new_card_ids.is_empty() {
                 if !self.moved_cards.is_empty() {
-                    log::debug!("[COST] cost finalize: moved_cards={:?}, setting optional_cost_result=true", self.moved_cards);
+                    log::debug!("[COST] source={:?} hand payment complete: cards={:?} optional_cost_result=true", self.activating_card_id, self.moved_cards);
                     gs.mods.last_cost_discard_count = self.moved_cards.len().u8_count();
                     gs.mods.last_cost_moved_card_ids = self.moved_cards.clone();
 gs.set_recently_moved_batch(self.moved_cards.clone(), Some("hand"));
@@ -559,7 +560,7 @@ gs.set_recently_moved_batch(self.moved_cards.clone(), Some("hand"));
                         entry.optional_cost_result = Some(true);
                     }
                 } else if allow_skip {
-                    log::debug!("[COST] cost finalize: NO moved cards, setting optional_cost_result=false");
+                    log::debug!("[COST] source={:?} hand payment skipped: no cards moved, optional_cost_result=false", self.activating_card_id);
                     if let Some(entry) = gs.ability_queue.current_entry_mut() {
                         entry.cost_paid = true;
                         entry.optional_cost_result = Some(false);
@@ -686,7 +687,7 @@ gs.set_recently_moved_batch(self.moved_cards.clone(), Some("hand"));
                 .map(|c| c as usize)
                 .unwrap_or(usize::MAX);
             if count == 0 && allow_skip && self.moved_cards.len() < cost_max_cap {
-                log::debug!("[COST] any_number re-prompt: count={} allow_skip={} new_card_ids.len={} moved_cards={:?}", count, allow_skip, new_card_ids.len(), self.moved_cards);
+                log::debug!("[COST] source={:?} choose more cards or finish: added={} paid_cards={:?} cap={}", self.activating_card_id, new_card_ids.len(), self.moved_cards, cost_max_cap);
                 let hand_now: Vec<i16> = {
                     let p = gs.resolve_target_player_mut(&target);
                     p.hand.cards.to_vec()
@@ -731,8 +732,10 @@ gs.set_recently_moved_batch(self.moved_cards.clone(), Some("hand"));
                 return Ok(());
             }
             log::debug!(
-                "[DBG_HSC] finalizing with {} moved cards",
-                self.moved_cards.len()
+                "[COST] source={:?} finishing hand payment: cards={} deferred_costs={}",
+                self.activating_card_id,
+                self.moved_cards.len(),
+                self.pending_deferred_costs.len()
             );
             self.pay_deferred_costs(gs)?;
             let final_count = self.moved_cards.len().u8_count();
@@ -802,14 +805,10 @@ gs.set_recently_moved_batch(self.moved_cards.clone(), Some("hand"));
             return self.resume_pending_actions(gs);
         }
 
-        if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) {
-            log::debug!(
-                "[OUTER_MATCH] zone={} effect_started={} pending_commands={}",
-                zone,
-                effect_started,
-                gs.ability_queue.has_pending_actions()
-            );
-        }
+        log::trace!(
+            "[CHOICE] selection routing: source={:?} zone={} effect_started={} queued_actions={}",
+            self.activating_card_id, zone, effect_started, gs.ability_queue.has_pending_actions()
+        );
         // "Place a card under a member" resume: the stage-member SelectCard choice
         // from `place_card_with_stage_choice` (destination=under_member) has been
         // answered. Put the pending card (carried in the MoveCardsPosition
@@ -904,8 +903,8 @@ gs.set_recently_moved_batch(self.moved_cards.clone(), Some("hand"));
                 self.handle_energy_zone_selection(gs, indices, count, dst, &mut validate_card)?;
             }
             Some(Zone::SelectedCards) => {
-                log::debug!(
-                    "[SELECTED_CARDS_BEFORE] self.selected_cards={:?} indices={:?}",
+                log::trace!(
+                    "[CHOICE] selection pool={:?} indices={:?}",
                     self.selected_cards,
                     indices
                 );
@@ -917,7 +916,9 @@ gs.set_recently_moved_batch(self.moved_cards.clone(), Some("hand"));
                 }
                 self.selected_cards = cards;
                 log::debug!(
-                    "[SELECTED_CARDS_AFTER] self.selected_cards={:?}",
+                    "[CHOICE] source={:?} selected pool narrowed: indices={:?} cards={:?}",
+                    self.activating_card_id,
+                    indices,
                     self.selected_cards
                 );
             }
@@ -1051,10 +1052,11 @@ gs.set_recently_moved_batch(card_ids.into(), Some(Zone::LiveCardZone.to_str()));
             }
         }
         log::debug!(
-            "▶ Select: {} card(s) selected from zone={:?} → [{}]",
-            self.selected_cards.len(),
+            "[CHOICE] source={:?} selection complete: zone={} selected_count={} cards={:?}",
+            self.activating_card_id,
             zone,
-            self.fmt_ids(&self.selected_cards)
+            self.selected_cards.len(),
+            self.selected_cards
         );
         return self.handle_selection_epilogue(gs, &context);
     }
@@ -1896,8 +1898,8 @@ gs.set_recently_moved_batch(valid_ids.into(), Some(Zone::SuccessLiveZone.to_str(
                 log::debug!("[SELECT_STAGE] no selection: cleared pending commands");
             }
             let stage_indices = ctx.mfi(&ctx.indices);
-            log::debug!(
-                "[SELECT_STAGE_DBG] ctx.indices={:?} mfi={:?} filtered={:?} stage={:?}",
+            log::trace!(
+                "[CHOICE] stage index mapping: indices={:?} mapped={:?} filtered={:?} stage={:?}",
                 ctx.indices,
                 stage_indices,
                 ctx.filtered_indices,
@@ -1920,11 +1922,6 @@ gs.set_recently_moved_batch(valid_ids.into(), Some(Zone::SuccessLiveZone.to_str(
                     log::debug!("[SELECT_STAGE] empty slot idx {}", idx);
                 }
             }
-            log::debug!(
-                "[SELECT_STAGE] is_select_action=true cards={:?} filtered_idx={:?}",
-                cards,
-                ctx.filtered_indices
-            );
             for &cid in &cards {
                 if !self.selected_cards.contains(&cid) {
                     self.selected_cards.push(cid);
@@ -3304,6 +3301,12 @@ modified.destination = Some(Zone::from_source_str(dest));
             }
             let cmd =
                 super::compound::route_conditional_branch(&effect, chose_yes, is_negation);
+            log::debug!(
+                "[CONDITION] source={:?} action={} answer={:?} accepted={} negation={} branch={} next_action={:?}",
+                self.activating_card_id, effect.action, selected, chose_yes, is_negation,
+                if cmd.is_none() { "none" } else if chose_yes && is_negation { "optional" } else { "conditional" },
+                cmd.as_ref().map(|a| a.action)
+            );
             // The player accepted the optional placement. Arm the gate so the
             // trailing "そうしたとき" consequence only fires if the placement
             // actually moved a card. Any optional move that auto-skips (e.g. a

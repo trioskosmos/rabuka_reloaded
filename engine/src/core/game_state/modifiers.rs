@@ -255,7 +255,7 @@ impl GameState {
         // OR skip the debug check entirely on 3DS.
         #[cfg(not(feature = "3ds"))]
         if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) {
-            log::debug!("[SZ_DEBUG] recalculate_constants ENTERED");
+            log::trace!("[SZ_DEBUG] recalculate_constants");
         }
         tdbg!("RC:1 ATOMIC_LOAD_OK");
         let entries = self.collect_constant_stage_effect_ids();
@@ -1603,14 +1603,10 @@ impl GameState {
         use crate::ability::condition::ConditionContext;
 
         if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) {
-            log::debug!("[SZ_DEBUG] evaluate_success_zone_constant_modifiers called");
-            log::debug!(
-                "[SZ_DEBUG] p1 success zone = {:?}",
-                self.player1.success_live_card_zone.cards.to_vec()
-            );
-            log::debug!(
-                "[SZ_DEBUG] p2 success zone = {:?}",
-                self.player2.success_live_card_zone.cards.to_vec()
+            log::trace!(
+                "[CONSTANT_RECALC] success-zone cards: p1={:?} p2={:?}",
+                self.player1.success_live_card_zone.cards,
+                self.player2.success_live_card_zone.cards
             );
         }
 

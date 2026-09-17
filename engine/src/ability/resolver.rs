@@ -129,6 +129,7 @@ pub struct AbilityResolver {
     /// same pending choice re-stored (re-prompt, auto-ability interleave) is not
     /// re-logged as a fresh offer. `None` = never offered yet.
     pub last_offered_sig: Option<String>,
+    last_debug_choice_sig: Option<String>,
     /// Zone the current `looked_at` pool was taken from (rule 5.7: looking at
     /// cards only informs — a DECLINED optional move must return them there,
     /// not to the default remainder destination).
@@ -174,10 +175,12 @@ impl AbilityResolver {
         options: Option<Vec<String>>,
     ) {
         log::debug!(
-            "[PAY_SKIP_GATE] route={:?} desc_en={:?} desc_ja={:?}",
-            route.as_ref().map(|r| format!("{:?}", r)),
+            "[CHOICE] source={:?} optional payment: {} route={:?} retain_route={} allow_skip={}",
+            self.activating_card_id,
             description_en,
-            description_ja
+            route.as_ref().or_else(|| gs.ability_queue.current_entry().and_then(|e| e.choice_card_no.as_ref())),
+            route.is_none(),
+            allow_skip
         );
         self.pending_choice = Some(crate::ability::types::Choice::SelectTarget {
             target: crate::ability::types::PAY_SKIP_TARGET.to_string(),
@@ -230,6 +233,7 @@ impl AbilityResolver {
             formation_plan: SmallVec::new(),
             last_move_moved_any: None,
             last_offered_sig: None,
+            last_debug_choice_sig: None,
             looked_at_origin: None,
             looked_at_deck_position: None,
             stage_select_intent: None,
@@ -276,8 +280,9 @@ impl AbilityResolver {
     }
 
     pub fn can_activate_effect(&self, gs: &mut GameState, effect: &AbilityEffect) -> bool {
-        log::debug!(
-            "[CAN_ACT_ENTER] action={:?} has_cond={}",
+        log::trace!(
+            "[EFFECT] activation check: source={:?} action={} has_condition={}",
+            self.activating_card_id,
             effect.action,
             effect.condition.is_some()
         );
@@ -339,6 +344,7 @@ impl AbilityResolver {
                 // Check cache first — avoids re-evaluation against stale state
                 // (e.g. revealed_cards modified by a prior select_cards filter).
                 if let Some(cached) = self.cached_condition_verdict(gs, condition) {
+                    log::debug!("[CONDITION] source={:?} action={} passed={} verdict=cached type={:?}", self.activating_card_id, effect.action, cached, condition.condition_type());
                     return cached;
                 }
                 let mut cond = condition.clone();
@@ -397,8 +403,8 @@ impl AbilityResolver {
                         condition.condition_type(),
                         condition.get_location()
                     ));
-                    log::debug!("[CAN_ACTIVATE] condition FAILED for {}: type={:?} location={:?} group={:?} exclude={:?}",
-                        effect.action, condition.condition_type(), condition.get_location(), condition.get_group_names(), condition.get_exclude_characters());
+                    log::debug!("[CONDITION] source={:?} action={} passed=false type={:?} location={:?} group={:?} exclude={:?}",
+                        self.activating_card_id, effect.action, condition.condition_type(), condition.get_location(), condition.get_group_names(), condition.get_exclude_characters());
                     return false;
                 }
             }
@@ -420,9 +426,10 @@ impl AbilityResolver {
                 });
                 if !passes {
                     log::debug!(
-                        "[CAN_ACTIVATE] activation_position {:?} failed for {:?}",
-                        act_pos,
-                        card_id
+                        "[CONDITION] source={:?} action={} passed=false activation_position={:?}",
+                        card_id,
+                        effect.action,
+                        act_pos
                     );
                     return false;
                 }
@@ -526,9 +533,20 @@ impl AbilityResolver {
                 gs.push_choice_offered(choice);
                 self.last_offered_sig = Some(sig);
             }
-            if is_new_offer
-                && crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed)
-            {
+            let debug_choice_changed = if log::log_enabled!(log::Level::Debug) {
+                let sig = format!("{:?}|{:?}|{:?}|{:?}|{:?}|{:?}", choice,
+                    self.activating_card_id, self.current_ability_index,
+                    gs.ability_queue.current_entry().and_then(|e| e.choice_card_no.as_ref()),
+                    self.spawn_context, self.execution_context);
+                let changed = is_new_offer || self.last_debug_choice_sig.as_ref() != Some(&sig);
+                self.last_debug_choice_sig = Some(sig);
+                changed
+            } else {
+                false
+            };
+            if debug_choice_changed {
+                log::debug!("[CHOICE] source={:?} route={:?} context={:?}", self.activating_card_id,
+                    gs.ability_queue.current_entry().and_then(|e| e.choice_card_no.as_ref()), self.execution_context);
                 match choice {
                     crate::ability::types::Choice::SelectCard {
                         zone,
@@ -540,9 +558,24 @@ impl AbilityResolver {
                         is_select_action,
                         heart_colors,
                         target_player_id,
+                        filtered_indices,
+                        picker,
+                        destination,
+                        cost_limit,
+                        cost_limit_operator,
+                        cost_total,
+                        cost_total_operator,
+                        cost_values,
+                        characters,
+                        require_all_heart_colors,
+                        name_fragments,
+                        blind,
+                        is_reveal,
+                        discard_remaining,
                         ..
                     } => {
-                        log::debug!("[PENDING_CHOICE] SelectCard zone={} count={} allow_skip={} group={:?} card_type={:?} is_select_action={} heart_colors={:?} target_player_id={:?} description={}", zone, count, allow_skip, group, card_type, is_select_action, heart_colors, target_player_id, description);
+                        log::debug!("[CHOICE] select cards: source={:?} zone={} count={} allow_skip={} group={:?} card_type={:?} select_only={} heart_colors={:?} target_player={:?} picker={:?} destination={:?} indices={:?} prompt={}", self.activating_card_id, zone, count, allow_skip, group, card_type, is_select_action, heart_colors, target_player_id, picker, destination, filtered_indices, description);
+                        log::debug!("[CHOICE] filters: cost_limit={:?} operator={:?} cost_total={:?} total_operator={:?} cost_values={:?} characters={:?} all_hearts={:?} names={:?} blind={} reveal={} discard_remaining={:?}", cost_limit, cost_limit_operator, cost_total, cost_total_operator, cost_values, characters, require_all_heart_colors, name_fragments, blind, is_reveal, discard_remaining);
                     }
                     crate::ability::types::Choice::SelectHeartColor {
                         count,
@@ -551,7 +584,7 @@ impl AbilityResolver {
                         ..
                     } => {
                         log::debug!(
-                        "[PENDING_CHOICE] SelectHeartColor count={} options={:?} description={}",
+                        "[CHOICE] SelectHeartColor count={} options={:?} description={}",
                         count, options, description
                     );
                     }
@@ -562,11 +595,11 @@ impl AbilityResolver {
                         allow_skip,
                         ..
                     } => {
-                        log::debug!("[PENDING_CHOICE] SelectTarget target={} options={:?} allow_skip={} description={}", target, options, allow_skip, description);
+                        log::debug!("[CHOICE] SelectTarget target={} options={:?} allow_skip={} description={}", target, options, allow_skip, description);
                     }
                     crate::ability::types::Choice::SelectPosition { description, .. } => {
                         log::debug!(
-                            "[PENDING_CHOICE] SelectPosition description={}",
+                            "[CHOICE] SelectPosition description={}",
                             description
                         );
                     }
@@ -577,18 +610,18 @@ impl AbilityResolver {
                         ..
                     } => {
                         log::debug!(
-                            "[PENDING_CHOICE] SelectHeartType count={} options={:?} description={}",
+                            "[CHOICE] SelectHeartType count={} options={:?} description={}",
                             count,
                             options,
                             description
                         );
                     }
                     crate::ability::types::Choice::SelectAutoAbility { options, .. } => {
-                        log::debug!("[PENDING_CHOICE] SelectAutoAbility options={:?}", options);
+                        log::debug!("[CHOICE] SelectAutoAbility options={:?}", options);
                     }
                     crate::ability::types::Choice::SelectLiveSuccess { description, .. } => {
                         log::debug!(
-                            "[PENDING_CHOICE] SelectLiveSuccess description={}",
+                            "[CHOICE] SelectLiveSuccess description={}",
                             description
                         );
                     }
@@ -992,8 +1025,10 @@ impl AbilityResolver {
             .current_entry()
             .is_some_and(|e| e.optional_cost_result == Some(false));
         log::debug!(
-            "[COST] resolution gate: skipped={} optional_cost_result={:?}",
-            cost_was_skipped,
+            "[COST] source={:?} ability={} effect_gate={} optional_cost_result={:?}",
+            activating_card,
+            ability_index,
+            if cost_was_skipped { "skip: optional cost unpaid" } else { "continue" },
             gs.ability_queue
                 .current_entry()
                 .and_then(|e| e.optional_cost_result)
@@ -1039,10 +1074,11 @@ impl AbilityResolver {
                 self.push_ability_result(gs, "failure", items, Some(&e));
                 return Err(e);
             }
-            log::debug!(
-                "[AFTER_EXEC] pending={:?} action={:?}",
-                self.pending_choice.is_some(),
-                effect.action
+            log::trace!(
+                "[EFFECT] source={:?} action={} returned: pending={}",
+                activating_card,
+                effect.action,
+                self.pending_choice.is_some()
             );
             if self.pending_choice.is_some() {
                 if !cost_already_paid {
