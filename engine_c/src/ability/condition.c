@@ -1430,6 +1430,14 @@ static int eval_complex(const struct GameState *g, int actor, int host_cid, cons
 }
 
 
+static int eval_opponent_choice(const GameState *g, int actor, const Condition *c) {
+    (void)g;
+    (void)actor;
+    int negation = 0;
+    get_bool(c, "negation", &negation);
+    return !negation;
+}
+
 static int eval_condition_inner_host(const struct GameState *g, int actor, int host_cid, const Condition *c) {
     if (!c) return 1;
     int negation=0; get_bool(c,"negation",&negation);
@@ -1458,11 +1466,7 @@ static int eval_condition_inner_host(const struct GameState *g, int actor, int h
         case RB_COND_COMPLEX:             r = eval_complex(g, actor, host_cid, c); break;
         case RB_COND_POSITION:            r = eval_position(g, actor, c); break;
         case RB_COND_OPPONENT_CHOICE:
-            /* Mirror state.rs:evaluate_opponent_choice_condition  Etrue unless the
-               opponent declined. Headless has no opponent-decline state, so assume
-               the opponent accepted (gs.opponent_choice_declined == false). Negation
-               is applied by rb_eval_condition's top-level wrapper, so return raw. */
-            r = 1;
+            r = eval_opponent_choice(g, actor, c);
             break;
         case RB_COND_OPPONENT_LIVE_SUCCESS:
             /* Mirror state.rs:evaluate_opponent_live_success_condition  Etrue only if
@@ -2941,12 +2945,6 @@ static int eval_complex_new(const GameState *g, int actor, int host_cid, const C
         /* sub-condition index  Esimplified: assume true for any sub */
         return 1;
     }
-    return 1;
-}
-
-/* ── evaluate_opponent_choice_condition: opponent has a choice ── */
-static int eval_opponent_choice(const GameState *g, int actor, const Condition *c) {
-    /* True unless the opponent has no valid choice target */
     return 1;
 }
 

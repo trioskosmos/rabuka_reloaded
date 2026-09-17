@@ -356,6 +356,7 @@ fn main() -> ArenaResult<()> {
         "games": options.games, "base_seed": options.seed,
         "iteration_cap_per_game": 600, "same_turn_iteration_cap": 200,
         "card_stats": "printed/base, not effective modifiers",
+        "identity_note": "card_no is authoritative; card_id can differ across builds for same-number sibling prints (R+/P/P+/SEC)",
         "visibility": "each row is private to policy_player; opponent snapshot contains stage and success only; non-visible action card identities are redacted",
         "rng_limitations": "engine global RNG and arena LCG reseeded before each deal; simulations may consume global RNG; no checkpoint replay determinism guarantee",
     }))?;
@@ -939,6 +940,34 @@ mod tests {
         assert_eq!(redacted["identity_redacted"], true);
         assert!(redacted["parameters"]["card_id"].is_null());
         assert!(redacted["description"].is_null());
+    }
+
+    #[test]
+    fn confusable_deck_line_resolves_consistently_and_audit_exposes_card_no() {
+        let db = fresh_database();
+        let deck = load_test_deck(&db, "5CP3Z idou");
+        let requested: Vec<&String> = deck
+            .iter()
+            .filter(|n| n.to_uppercase().contains("BP4-011"))
+            .collect();
+        assert_eq!(requested.len(), 2, "deck must contain the bp4-011 pair");
+        let resolved: Vec<String> = requested
+            .iter()
+            .map(|n| {
+                db.get_card_id(n.as_str())
+                    .and_then(|id| db.get_card(id))
+                    .map(|c| c.card_no.to_string())
+                    .unwrap_or_default()
+            })
+            .collect();
+        assert!(
+            resolved.iter().all(|r| r.starts_with("PL!SP-bp4-011-")),
+            "both copies must resolve to a bp4-011 print, got {resolved:?}"
+        );
+        assert_eq!(
+            resolved[0], resolved[1],
+            "identical deck lines must resolve to the same print within a build"
+        );
     }
 
     #[test]

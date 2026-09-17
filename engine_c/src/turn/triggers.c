@@ -12,6 +12,30 @@ int rb_trigger_is(const char *triggers, const char *needle) {
     return strstr(triggers, needle) != NULL;
 }
 
+/* Mirror triggers.rs:TriggerKind::from_token (triggers.rs:54-75): trim the
+    token, match against the wire constants; unknown → RB_TK_COUNT (no kind).
+    Whitespace handling mirrors Rust str::trim on both ends. */
+RbTriggerKind rb_trigger_from_token(const char *s) {
+    if (!s) return RB_TK_COUNT;
+    while (*s == ' ' || *s == '\t' || *s == '\r' || *s == '\n') s++;
+    size_t len = strlen(s);
+    while (len > 0 && (s[len-1]==' '||s[len-1]=='\t'||s[len-1]=='\r'||s[len-1]=='\n')) len--;
+    char tok[64];
+    if (len >= sizeof(tok)) return RB_TK_COUNT;
+    memcpy(tok, s, len); tok[len] = 0;
+    if (!strcmp(tok, RB_TSTR_ACTIVATION))   return RB_TK_ACTIVATION;
+    if (!strcmp(tok, RB_TSTR_AUTO))         return RB_TK_AUTO;
+    if (!strcmp(tok, RB_TSTR_CONSTANT))     return RB_TK_CONSTANT;
+    if (!strcmp(tok, RB_TSTR_DEBUT))        return RB_TK_DEBUT;
+    if (!strcmp(tok, RB_TSTR_DEBUT_EN))     return RB_TK_DEBUT;
+    if (!strcmp(tok, RB_TSTR_LIVE_START))   return RB_TK_LIVE_START;
+    if (!strcmp(tok, RB_TSTR_LIVE_SUCCESS)) return RB_TK_LIVE_SUCCESS;
+    if (!strcmp(tok, RB_TSTR_LIVE_SUCCESS_EN)) return RB_TK_LIVE_SUCCESS;
+    if (!strcmp(tok, RB_TSTR_MAIN))         return RB_TK_MAIN;
+    if (!strcmp(tok, RB_TSTR_BATON_TOUCH))  return RB_TK_BATON_TOUCH;
+    return RB_TK_COUNT;
+}
+
 /* Queue all stage members' debut abilities for the player who just played.
      Scan ALL abilities for that card (cards can have debut+constant). Mirrors
      Rust Card.abilities:Vec<AbilityRef> via CARD_ABILITY_PAIRS. */

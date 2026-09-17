@@ -4,6 +4,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+void rb_move_execute_selected_cards_from_zone(GameState *g, int actor, const char *zone,
+    const int *indices, int n_indices, const char *card_type, int cost_limit,
+    const char *cost_limit_op, int cost_total, const char *cost_total_op,
+    const char *group, const char *const *characters, int n_characters,
+    const char *target_player_id);
+void rb_move_handle_select_cards_looked_at(GameState *g, int actor, const int *indices,
+    int n_indices, const char *destination, int discard_remaining);
+
 /* === Assembled choice resolver (ports engine/src/ability/choice.rs) === */
 typedef RbSelectionContext SelectionContext;
 
@@ -158,6 +166,77 @@ int rb_resolver_clear_choice_state_and_resume(RbAbilityResolver *self) {
     return 0;
 }
 
+/* Alias of clear_choice_state_and_resume (choice.rs:3446-3449): clear state
+    then resume pending actions. Kept as a separate symbol for callers that
+    mirror the Rust `…_and_resume2` dispatch site. */
+int rb_resolver_clear_choice_state_and_resume2(RbAbilityResolver *self) {
+    return rb_resolver_clear_choice_state_and_resume(self);
+}
+
+/* mirror choice.rs:reschedule_pending_choice — re-store the pending choice so
+    the host sees an outstanding prompt after a handler consumed it mid-flight. */
+void rb_resolver_reschedule_pending_choice(GameState *g) {
+    if (!g) return;
+    rb_resolver_store_pending_choice(g);
+}
+
+/* mirror choice.rs:execute_selected_cards_from_zone — validate + apply a
+    zone-card selection through the move executor (filters, cost limits,
+    group/character restrictions all live in the move executor). */
+void rb_resolver_execute_selected_cards_from_zone(RbAbilityResolver *self, GameState *g,
+                                                   const char *zone, const int *indices, int n_indices,
+                                                   const char *card_type, int cost_limit,
+                                                   const char *cost_limit_op, int cost_total,
+                                                   const char *cost_total_op, const char *group,
+                                                   const char *const *characters, int n_characters,
+                                                   const char *target_player_id) {
+    if (!self || !g) return;
+    int actor = self->actor >= 0 ? self->actor : g->queue.actor;
+    rb_move_execute_selected_cards_from_zone(g, actor, zone, indices, n_indices,
+                                             card_type, cost_limit,
+                                             cost_limit_op ? cost_limit_op : "<=",
+                                             cost_total, cost_total_op, group,
+                                             characters, n_characters, target_player_id);
+}
+
+/* mirror choice.rs:handle_select_cards_looked_at — delegate to the move-side
+    handler (owns pool removal, destination, discard-remaining). */
+void rb_resolver_handle_select_cards_looked_at(RbAbilityResolver *self, GameState *g,
+                                               const int *indices, int n_indices,
+                                               const char *destination, int discard_remaining) {
+    if (!self || !g) return;
+    int actor = self->actor >= 0 ? self->actor : g->queue.actor;
+    rb_move_handle_select_cards_looked_at(g, actor, indices, n_indices,
+                                          destination, discard_remaining);
+}
+
+/* mirror draw.rs:move_non_selected_hand_to_deck_bottom — cards in the hand at
+    prompt time that were NOT selected return to the deck bottom. */
+void rb_resolver_move_non_selected_hand_to_deck_bottom(GameState *g, const char *target_player,
+                                                       const int *snapshot, int snapshot_n) {
+    if (!g || !snapshot) return;
+    int pl = 0;
+    if (target_player) {
+        if (!strcmp(target_player, "opponent")) pl = g->queue.actor >= 0 ? (g->queue.actor ^ 1) : 1;
+        else if (!strcmp(target_player, "player2")) pl = 1;
+    }
+    RbPlayer *P = &g->p[pl];
+    for (int i = 0; i < snapshot_n; i++) {
+        int cid = snapshot[i];
+        int found = -1;
+        for (int h = 0; h < P->hand.n; h++)
+            if (P->hand.cards[h] == cid) { found = h; break; }
+        if (found < 0) continue;
+        for (int k = found; k < P->hand.n - 1; k++) P->hand.cards[k] = P->hand.cards[k+1];
+        P->hand.n--;
+        if (P->deck.n < RB_MAX_ZONE) {
+            for (int d = P->deck.n; d > 0; d--) P->deck.cards[d] = P->deck.cards[d-1];
+            P->deck.cards[0] = cid;
+            P->deck.n++;
+        }
+    }
+}
+
 /* --- set_chosen_target (choice.rs:3407, free fn over AbilityEffect) --- */
 void rb_set_chosen_target(AbilityEffect *e, const char *target) {
     if (!e || !target) return;
@@ -181,6 +260,14 @@ int rb_resolver_source_card_id(const GameState *g) {
     if (!g) return -1;
     return g->queue.actor >= 0 ? g->queue.actor : -1;
 }
+
+void rb_move_execute_selected_cards_from_zone(GameState *g, int actor, const char *zone,
+    const int *indices, int n_indices, const char *card_type, int cost_limit,
+    const char *cost_limit_op, int cost_total, const char *cost_total_op,
+    const char *group, const char *const *characters, int n_characters,
+    const char *target_player_id);
+void rb_move_handle_select_cards_looked_at(GameState *g, int actor, const int *indices,
+    int n_indices, const char *destination, int discard_remaining);
 
 /* --- resume_execution (choice.rs:58) --- */
 int rb_resolver_resume_execution(RbAbilityResolver *self) {
@@ -1959,6 +2046,9 @@ void rb_resolver_continue_siblings(GameState *g, int actor, int host,
     }
 }
 
+void rb_move_handle_select_cards_looked_at(GameState *g, int actor,
+    const int *indices, int n_indices, const char *destination, int discard_remaining);
+
 int rb_resume_with_choice(GameState *g, int selected_idx) {
     if (!g || !g->queue.has_pending) return 0;
     int actor = g->queue.actor;
@@ -1982,12 +2072,19 @@ int rb_resume_with_choice(GameState *g, int selected_idx) {
             g->queue.selected_heart_color =
                 (int)rb_parse_heart_color(g->queue.pending.heart_options[selected_idx]);
     }
+    if (mode == 6) {
+        rb_move_handle_select_cards_looked_at(g, actor,
+            was_skip ? NULL : &selected_idx, was_skip ? 0 : 1, NULL, -1);
+        if (rb_has_pending_choice(g)) return 1;
+    }
     rb_clear_pending_choice(g);
     g->queue.resume_mode = 0;
     g->queue.resume_eff = NULL;
     g->queue.auto_ability = 0;
     g->queue.state = RB_QUEUE_RESOLVING;   /* resuming / draining an ability */
-    if (mode == 2) {                 /* select_cards → look.ts keep/drop */
+    if (mode == 6) {
+        rb_resolver_continue_siblings(g, actor, host, cont, cont_from);
+    } else if (mode == 2) {                 /* select_cards → look.ts keep/drop */
         const char *dest = eff ? eff->destination : NULL;
         rb_look_resume(g, actor, selected_idx, dest, is_select);
     } else if (mode == 1) {          /* position_change destination selection */

@@ -6,6 +6,7 @@ pub mod formation_change_test;
 pub mod himeno_front_test;
 pub mod kinako_bp5_test;
 pub mod kinako_each_time_blade_test;
+pub mod live_start_subunit_threshold_formation_test;
 pub mod love_wing_bell_test;
 pub mod position_change_condition_test;
 pub mod position_change_multi_test;

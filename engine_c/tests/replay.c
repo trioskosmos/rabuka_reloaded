@@ -89,6 +89,27 @@ static void scenario_condition_gate(void){
     rb_execute_effect(&g,0,&e);
     CHECK(g.p[0].score==sc+5,"condition-gated effect fires when hand>=1");
 }
+static void scenario_opponent_choice_condition(void){
+    static TestGame tg;
+    test_game_new(&tg);
+    Condition cond={0}; cond.variant=RB_COND_OPPONENT_CHOICE;
+    AbilityEffect e={0}; e.action="modify_score"; e.count=2;
+    e.has_condition=1; e.condition=&cond;
+    for(int actor=0;actor<2;actor++){
+        for(int mode=0;mode<3;mode++){
+            cond.n_fields=mode?1:0;
+            cond.fields[0].key="negation";
+            cond.fields[0].v.tag=mode==2?RB_TAG_TRUE:RB_TAG_FALSE;
+            CHECK(rb_eval_condition(&tg.state,actor,&cond)==1,
+                  "opponent-choice default state matches Rust for absent/false/true negation");
+            int before=tg.state.p[actor].score;
+            rb_execute_effect(&tg.state,actor,&e);
+            CHECK(tg.state.p[actor].score==before+2,
+                  "opponent-choice gate applies score effect for either actor");
+        }
+    }
+}
+
 static void scenario_cost_modifier(void){
     GameState g; uint32_t d0[10]={0,1,2,3,4,5,6,7,8,9}; uint32_t d1[10]={10,11,12,13,14,15,16,17,18,19};
     rb_seed(4); rb_game_init(&g,d0,10,d1,10);
@@ -243,6 +264,7 @@ static void scenario_yell_draw_icons(void){
         test_add_to_deck(&tg,fill);
         test_add_to_deck(&tg,sr);
         if(success) for(int c=0;c<8;c++) tg.state.p[0].hearts[c]=30;
+        else rb_mods_add_need_heart(&tg.state.mods,sr,1,100);
         int passed=rb_perform_live(&tg.state,0);
         CHECK(passed==success,"yell draw tested with both live verdicts");
         CHECK(tg.state.p[0].hand.n==1 && tg.state.p[0].hand.cards[0]==fill,
@@ -252,6 +274,7 @@ static void scenario_yell_draw_icons(void){
     }
     test_game_new(&tg);
     test_add_to_live(&tg,sr);
+    rb_mods_add_need_heart(&tg.state.mods,sr,1,100);
     test_add_to_deck(&tg,sr);
     for(int i=0;i<3;i++) test_add_to_discard(&tg,fill);
     rb_perform_live(&tg.state,0);
@@ -266,6 +289,7 @@ static void scenario_yell_draw_icons(void){
     test_add_to_deck(&tg,sr);
     test_add_to_deck(&tg,sr);
     tg.state.yell_count_mod[0]=1;
+    rb_mods_add_need_heart(&tg.state.mods,sr,1,100);
     rb_perform_live(&tg.state,0);
     CHECK(tg.state.p[0].hand.n==2 && tg.state.p[0].hand.cards[0]==fill &&
           tg.state.p[0].hand.cards[1]==fill,"all yell cards reveal before either draw resolves");
@@ -892,6 +916,7 @@ int main(int argc, char **argv){
     scenario_live_performance();
     scenario_move_cards();
     scenario_condition_gate();
+    scenario_opponent_choice_condition();
     scenario_cost_modifier();
     scenario_heart_modifier();
     scenario_look_select();

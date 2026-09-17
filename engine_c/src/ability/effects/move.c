@@ -294,6 +294,7 @@ int rb_move_resolve_cost_limit_reference(const GameState *g, const AbilityEffect
 
 int rb_move_looked_at_matches(GameState *g, int cid, AbilityEffect *e) {
     if (!g || !e || cid < 0) return 0;
+    if (e->card_type_field[0] && !rb_card_matches_type(cid, e->card_type_field)) return 0;
     AbilityEffect filter = *e;
     filter.n_extra = 0;
     for (int i = 0; i < e->n_extra; i++) {
@@ -308,7 +309,8 @@ int rb_move_looked_at_matches(GameState *g, int cid, AbilityEffect *e) {
     if (chars && !rb_card_matches_characters(cid, &chars, 1)) return 0;
     const char *excluded = cmf_extra(e, "exclude_characters");
     if (excluded && rb_card_matches_characters(cid, &excluded, 1)) return 0;
-    int limit = rb_move_resolve_cost_limit_reference(g, e);
+    int limit = g->queue.resume_mode == 6 && g->queue.resume_eff == e ?
+                g->queue.pending.cost_limit : rb_move_resolve_cost_limit_reference(g, e);
     const char *op = cmf_extra(e, "cost_limit_operator");
     if (!op) op = cmf_extra(e, "cost_operator");
     return limit < 0 || rb_card_matches_cost_limit(cid, limit, op ? op : "<=");
@@ -1477,56 +1479,77 @@ static void move_track_looked_at(GameState *g, int cid, const AbilityEffect *e) 
 void rb_move_handle_select_cards_looked_at(
     GameState *g, int actor, const int *indices, int n_indices,
     const char *ctx_destination, int ctx_discard_remaining) {
-    if (!g || !indices || n_indices <= 0) return;
-
-    int pl = actor;
-    const char *destination = ctx_destination ? ctx_destination : "hand";
-    int discard_remaining = ctx_discard_remaining >= 0 ? ctx_discard_remaining : 1;
-
-    int looked_at[RB_MAX_ZONE];
-    int n_looked = rb_looked_at_pool(pl, looked_at, RB_MAX_ZONE);
-    if (n_looked <= 0) return;
-
-    int sorted_idx[RB_MAX_RECENTLY_MOVED];
-    int ns = n_indices < RB_MAX_RECENTLY_MOVED ? n_indices : RB_MAX_RECENTLY_MOVED;
-    for (int i = 0; i < ns; i++) sorted_idx[i] = indices[i];
-    for (int i = 0; i < ns - 1; i++)
-        for (int j = i + 1; j < ns; j++)
-            if (sorted_idx[j] > sorted_idx[i]) { int t = sorted_idx[i]; sorted_idx[i] = sorted_idx[j]; sorted_idx[j] = t; }
-
-    int selected[RB_MAX_RECENTLY_MOVED];
-    int nsel = 0;
+    if (!g || n_indices < 0 || (n_indices > 0 && !indices)) return;
+    AbilityEffect *e = g->queue.resume_eff;
+    int mode = g->queue.resume_mode;
+    int pl = mode == 6 ? g->queue.resume_draw_target : actor;
+    if (pl < 0 || pl > 1) return;
+    const char *destination = e && e->destination ? e->destination :
+                              (ctx_destination ? ctx_destination : "hand");
+    const char *discard = e ? cmf_extra(e, "discard_remaining") : NULL;
+    int explicit_discard = discard != NULL || ctx_discard_remaining >= 0;
+    int discard_remaining = discard ? (!strcmp(discard, "true") || !strcmp(discard, "1")) :
+                            (ctx_discard_remaining >= 0 ? ctx_discard_remaining : 1);
+    const char *rem_dest = e ? cmf_extra(e, "remainder_destination") : NULL;
+    int cards[RB_MAX_ZONE], selected[RB_MAX_ZONE], ns = 0;
+    int n = rb_looked_at_pool(pl, cards, RB_MAX_ZONE);
+    int limit = mode == 6 ? g->queue.resume_draw_count : g->queue.pending.count;
+    if (limit < 0) limit = n;
+    if (n_indices > limit || n_indices > RB_MAX_ZONE) return;
+    for (int i = 0; i < n_indices; i++) {
+        int idx = indices[i];
+        if (idx < 0 || idx >= n || (e && !rb_move_looked_at_matches(g, cards[idx], e))) return;
+        for (int j = 0; j < i; j++) if (indices[j] == idx) return;
+    }
+    for (int i = 0; i < n; i++)
+        for (int j = 0; j < n_indices; j++)
+            if (indices[j] == i) selected[ns++] = cards[i];
     for (int i = 0; i < ns; i++) {
-        int idx = sorted_idx[i];
-        if (idx >= 0 && idx < n_looked) {
-            selected[nsel++] = looked_at[idx];
-            rb_look_remove(pl, looked_at[idx]);
+        int cid = selected[i];
+        if (!rb_look_remove(pl, cid)) continue;
+        if (!move_place_looked_at(g, pl, cid, destination, e)) {
+            rb_look_add(pl, cid);
+            return;
+        }
+        move_track_looked_at(g, cid, e);
+        if (g->n_selected_cards < RB_MAX_RECENTLY_MOVED)
+            g->selected_cards[g->n_selected_cards++] = cid;
+    }
+    if (mode == 6) {
+        g->queue.resume_draw_count -= ns;
+        g->queue.resume_draw_self_id += ns;
+    }
+    n = rb_looked_at_pool(pl, cards, RB_MAX_ZONE);
+    int matching = 0;
+    for (int i = 0; i < n; i++)
+        if (!e || rb_move_looked_at_matches(g, cards[i], e)) matching++;
+    if (mode == 6 && ns > 0 && g->queue.resume_draw_count > 0 && matching > 0) {
+        int remaining = g->queue.resume_draw_count;
+        if (remaining > matching) remaining = matching;
+        rb_move_prompt_card_selection(g, actor, "looked_at", remaining, 1, e);
+        rb_recalc_constants(g);
+        return;
+    }
+    int total_selected = mode == 6 ? g->queue.resume_draw_self_id : ns;
+    if (!rem_dest) {
+        if (!total_selected && !explicit_discard) {
+            extern int rb_look_from_deck(int pl);
+            rem_dest = rb_look_from_deck(pl) ? "deck_top" : "hand";
+        } else rem_dest = discard_remaining ? "discard" : "deck_top";
+    }
+    if (strcmp(rem_dest, "looked_at")) {
+        for (int i = 0; i < n; i++) {
+            int cid = cards[i];
+            if (!rb_look_remove(pl, cid)) continue;
+            if (move_place_looked_at(g, pl, cid, rem_dest, NULL)) {
+                if (!strcmp(rem_dest, "discard") || !strcmp(rem_dest, "waitroom"))
+                    move_track_looked_at(g, cid, NULL);
+            } else rb_look_add(pl, cid);
         }
     }
-
-    int remaining[RB_MAX_RECENTLY_MOVED];
-    int nrem = rb_looked_at_pool(pl, remaining, RB_MAX_RECENTLY_MOVED);
-
-    for (int i = 0; i < nsel; i++) {
-        rb_place_card_in_zone(g, pl, selected[i], destination, -1);
-        if (g->n_selected_cards < RB_MAX_RECENTLY_MOVED)
-            g->selected_cards[g->n_selected_cards++] = selected[i];
-        mc_record_movement(g, selected[i]);
-    }
-
-    const char *rem_dest;
-    if (discard_remaining) {
-        rem_dest = "discard";
-    } else {
-        rem_dest = "deck_bottom";
-    }
-    for (int i = 0; i < nrem; i++) {
-        rb_place_card_in_zone(g, pl, remaining[i], rem_dest, -1);
-    }
-
-    for (int i = 0; i < nrem; i++)
-        rb_look_remove(pl, remaining[i]);
     rb_clear_pending_choice(g);
+    g->queue.resume_mode = 0;
+    g->queue.resume_eff = NULL;
     rb_recalc_constants(g);
 }
 

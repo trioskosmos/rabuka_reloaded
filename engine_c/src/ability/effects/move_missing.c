@@ -60,7 +60,17 @@ int rb_move_resolve_source_looked_at(GameState *g, int actor, AbilityEffect *e, 
         char desc[128];
         snprintf(desc, sizeof(desc), "Move up to %d looked-at card(s) to %s?", take, dest);
         rb_choice_set_description(&g->queue.pending, desc);
+        if (e->card_type_field[0])
+            snprintf(g->queue.pending.card_type, sizeof(g->queue.pending.card_type), "%s", e->card_type_field);
         g->queue.pending.cost_limit = rb_move_resolve_cost_limit_reference(g, e);
+        snprintf(g->queue.pending.cost_limit_op, sizeof(g->queue.pending.cost_limit_op), "<=");
+        for (int i = 0; i < e->n_extra; i++)
+            if (e->extra_k[i] && e->extra_v[i] &&
+                (!strcmp(e->extra_k[i], "cost_limit_operator") || !strcmp(e->extra_k[i], "cost_operator")))
+                snprintf(g->queue.pending.cost_limit_op, sizeof(g->queue.pending.cost_limit_op), "%s", e->extra_v[i]);
+        snprintf(g->queue.pending.target_player_id, sizeof(g->queue.pending.target_player_id), "%s", pl ? "p2" : "p1");
+        g->n_recently_moved = 0;
+        g->n_those_cards = 0;
         g->queue.resume_mode = 6;
         g->queue.resume_eff = e;
         g->queue.resume_actor = actor;

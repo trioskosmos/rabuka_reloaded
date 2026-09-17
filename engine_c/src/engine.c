@@ -453,12 +453,12 @@ static void handle_action(GameState *g, int actor, AbilityEffect *e, int host_ci
         rb_recalc_constants(g);
     } else if (!strcmp(act, "return_to_hand") || !strcmp(act, "bounce") ||
                !strcmp(act, "back_to_hand")) {
-        rb_effect_move_cards(g, who, e); /* source/dest resolved by helper */
+        rb_effect_move_cards(g, actor, e); /* target re-resolved inside */
         (void)O;
     } else if (!strcmp(act, "deck_bottom") || !strcmp(act, "put_on_bottom")) {
         do_move(g, who, RB_ZONE_HAND, RB_ZONE_DECK, cnt, 0);
     } else if (!strcmp(act, "move_cards")) {
-        rb_effect_move_cards(g, who, e);
+        rb_effect_move_cards(g, actor, e);
     } else if (!strcmp(act, "change_state")) {
          rb_effect_change_state(g, actor, e, host_cid);
     } else if (!strcmp(act, "look_at") || !strcmp(act, "reveal") ||

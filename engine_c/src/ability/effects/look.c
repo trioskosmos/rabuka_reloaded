@@ -22,6 +22,10 @@ static LookPool g_look[2]; /* per-player */
 
 void rb_look_clear(int pl){ g_look[pl].n=0; g_look[pl].from_deck=0; g_look[pl].owner=pl; }
 
+int rb_look_from_deck(int pl){
+    return pl>=0 && pl<2 ? g_look[pl].from_deck : 0;
+}
+
 /* Remove a single card id from the looked_at pool for player `pl` (mirrors
    gs.looked_at_cards.remove). Returns 1 if found and removed, 0 otherwise. */
 int rb_look_remove(int pl, int cid){

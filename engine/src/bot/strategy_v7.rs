@@ -143,6 +143,13 @@ pub fn choose_action_v7(gs: &GameState, actions: &[Action], me: u8) -> Action {
     let base_energy = my_now.energy_zone.active_count() as i32;
     let base_buffs = stage_buff_hearts(gs, me);
     let base_wait = wait_fingerprint(gs, me);
+    let stage_cost = |p: &Player| -> i32 {
+        p.stage.stage.iter().filter_map(|&id| db.get_card(id))
+            .map(|card| i32::from(card.cost.unwrap_or(0))).sum()
+    };
+    let base_cost = stage_cost(my_now);
+    let development = std::env::var("V7_DEVELOPMENT").is_ok();
+    let upgrade_baton = std::env::var("V7_UPGRADE_BATON").is_ok();
 
     let deck_lives = my_now
         .main_deck
@@ -225,7 +232,21 @@ pub fn choose_action_v7(gs: &GameState, actions: &[Action], me: u8) -> Action {
 
         // Baton touch: discounted upgrade of the power piece (guide curve
         // 4->9->13). Strongly favored.
-        if a.parameters.as_ref().and_then(|p| p.use_baton_touch) == Some(true) {
+        let cost_growth = stage_cost(my_sim) - base_cost;
+        if development {
+            val += 8.0 * f64::from(cost_growth);
+        }
+        if a.parameters.as_ref().and_then(|p| p.use_baton_touch) == Some(true)
+            || ((std::env::var("V7_BATON_VISION").is_ok() || (upgrade_baton && cost_growth > 0))
+                && a.action_type == ActionType::PlayMemberToStage
+                && a.parameters.as_ref().is_some_and(|p| {
+                    p.available_areas.as_ref().is_some_and(|areas| {
+                        areas.iter().any(|area| {
+                            Some(&area.area) == p.stage_area.as_ref() && area.is_baton_touch
+                        })
+                    })
+                }))
+        {
             val += 45.0;
             parts.push("baton+45".into());
         }
@@ -371,6 +392,9 @@ pub fn choose_action_v7(gs: &GameState, actions: &[Action], me: u8) -> Action {
 /// beats — the ceiling estimate is not their set, measured -3pp with the
 /// above confounded in.)
 pub fn choose_live_set_v7(gs: &GameState, actions: &[Action], db: &CardDatabase) -> Action {
+    if std::env::var("V7_LIVE_V6").is_ok() {
+        return crate::bot::strategy_v6::choose_live_set_v6(gs, actions, db);
+    }
     if std::env::var("V7_ROLLOUT").is_ok() {
         return crate::bot::rollout::choose_live_set_v7(gs, actions, db);
     }
@@ -643,10 +667,18 @@ fn opening_curve_keep(costs: &[Option<u8>]) -> Vec<usize> {
     best
 }
 
-pub fn choose_mulligan_v7(gs: &GameState, actions: &[Action], db: &CardDatabase) -> Action {
-    if std::env::var("V7_MULLIGAN_V4").is_ok() {
-        return crate::bot::strategy_v4::choose_mulligan_v4(gs, actions, db);
-    }
+/// Mulligan: v4 policy (measured stronger), with the curve-keep experiment
+/// preserved behind `V7_MULLIGAN_CURVE=1` for reproduction.
+///
+/// MEASURED 2026-09-17 (5CP3Z idou mirror, 3000 games x both seats, seed 11):
+/// curve-keep 2805 wins vs v4-mulligan 2853 across 6000 games — direction
+/// consistent in both seats (A: 1358<1385, B: 1447<1468), i.e. a small real
+/// regression, not noise. Audit analysis (200 games, analyze_audit.py): the
+/// curve-keep path fires on only ~17% of hands (4 distinct members with a
+/// connected 2->7->11 ladder are rare in this deck's live-heavy opens), and
+/// when it does fire it preserves members whose value the one-ply Main eval
+/// already captures from redraws. v4's expensive-first replacement stays.
+fn choose_mulligan_curve(gs: &GameState, actions: &[Action], db: &CardDatabase) -> Action {
     let costs: Vec<Option<u8>> = gs.active_player().hand.cards.iter().map(|&id| {
         db.get_card(id).and_then(|card| {
             (card.card_type == CardType::Member).then_some(card.cost).flatten()
@@ -689,6 +721,13 @@ pub fn choose_mulligan_v7(gs: &GameState, actions: &[Action], db: &CardDatabase)
         .or_else(|| actions.first()).cloned().expect("mulligan actions non-empty")
 }
 
+pub fn choose_mulligan_v7(gs: &GameState, actions: &[Action], db: &CardDatabase) -> Action {
+    if std::env::var("V7_MULLIGAN_CURVE").is_ok() {
+        return choose_mulligan_curve(gs, actions, db);
+    }
+    crate::bot::strategy_v4::choose_mulligan_v4(gs, actions, db)
+}
+
 // Re-exports with generic names for the registry (bot/registry.rs): adding
 // v8 never renames these, it only adds a dispatch line there.
 pub use choose_action_v7 as choose_action;
@@ -700,14 +739,14 @@ mod mulligan_tests {
     use super::*;
 
     #[test]
-    fn mulligan_preserves_connected_curve() {
+    fn opening_curve_keep_finds_connected_ladder_only() {
         assert_eq!(opening_curve_keep(&[Some(2), Some(2), Some(7), Some(11), None, None]), vec![0, 1, 2, 3]);
         assert!(opening_curve_keep(&[Some(2), Some(2), Some(11), Some(17), None, None]).is_empty());
         assert!(opening_curve_keep(&[Some(2), Some(4), Some(7), Some(11), None, None]).is_empty());
     }
 
     #[test]
-    fn mulligan_real_hand_recovers_selection_and_confirms() {
+    fn mulligan_default_matches_v4_and_curve_variant_recovers_selection() {
         let cards = crate::card_loader::CardLoader::load_cards_from_file(
             std::path::Path::new("../cards/cards.json")).unwrap();
         let db = crate::Arc::new(CardDatabase::load_or_create(cards));
@@ -723,19 +762,22 @@ mod mulligan_tests {
         let mut gs = GameState::new(p1, p2, crate::Arc::clone(&db));
         gs.current_phase = Phase::MulliganFirstAttacker;
         let actions = crate::game_setup::generate_possible_actions(&gs);
-        let old = crate::bot::strategy_v4::choose_mulligan_v4(&gs, &actions, &db);
-        assert_eq!(old.parameters.as_ref().and_then(|p| p.card_index), Some(3));
-        assert_eq!(choose_mulligan_v7(&gs, &actions, &db).action_type, ActionType::ConfirmMulligan);
+        let v4 = crate::bot::strategy_v4::choose_mulligan_v4(&gs, &actions, &db);
+        assert_eq!(v4.parameters.as_ref().and_then(|p| p.card_index), Some(3));
+        let default_choice = choose_mulligan_v7(&gs, &actions, &db);
+        assert_eq!(default_choice.action_type, v4.action_type);
+        assert_eq!(default_choice.parameters.as_ref().and_then(|p| p.card_index),
+            v4.parameters.as_ref().and_then(|p| p.card_index));
         gs.mulligan_selected_indices.extend([3, 2, 0]);
         for _ in 0..3 {
             let actions = crate::game_setup::generate_possible_actions(&gs);
-            let action = choose_mulligan_v7(&gs, &actions, &db);
+            let action = choose_mulligan_curve(&gs, &actions, &db);
             assert_eq!(action.action_type, ActionType::SelectMulligan);
             assert_eq!(action.selected, Some(true));
             crate::game_setup::execute_action(&mut gs, &action).unwrap();
         }
         assert!(gs.mulligan_selected_indices.is_empty());
         let actions = crate::game_setup::generate_possible_actions(&gs);
-        assert_eq!(choose_mulligan_v7(&gs, &actions, &db).action_type, ActionType::ConfirmMulligan);
+        assert_eq!(choose_mulligan_curve(&gs, &actions, &db).action_type, ActionType::ConfirmMulligan);
     }
 }

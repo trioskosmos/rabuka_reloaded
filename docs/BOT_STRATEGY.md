@@ -531,7 +531,107 @@ then compare the isolated mulligan change against the inherited policy on equal
 seed ranges, both seats, without audit logging. Keep Main and live-set evaluation
 fixed. Record wins, losses, draws, stalls, and sample sizes; use separate small
 audit runs for decision inspection. Seed equality aligns initial deals, not later
-random consumption when policies diverge. Results remain pending.
+random consumption when policies diverge.
+
+RESULT (2026-09-17): REJECTED. 3000 games per seat vs v6 (seed 11): curve-keep
+2805 wins vs v4-mulligan 2853 across 6000, same direction both seats
+(A: 1358<1385, B: 1447<1468). Audit analysis (`analyze_audit.py`, 200 games):
+the curve path fires on only ~17% of hands (333/400 confirms still discard 3),
+and stage curve/dev is not the losing factor (t1=3.7→t5=14.5, on-guide).
+Default is v4 mulligan; the variant is preserved behind `V7_MULLIGAN_CURVE=1`.
+Tests pin: default matches v4 on the repro hand; the curve variant recovers a
+stale 3/2/0 selection state (one-ply eval already captures redraws' value).
+
+## 9.2 Where v7 actually loses — measured defect list (2026-09-17)
+
+Method: `bot_arena --audit` JSONL (200 games, v7 v6, 5CP3Z, seed 21, offline
+per §8.4) + `analyze_losses.py` (loss clusters), `pass_probe.py` (affordable-
+deploy Passes), `count_batons.py` (baton visibility), `V7_DEBUG` tables, and
+isolation runs (`V7_MAIN_V6=1`, 3000×2, seed 11). The 87% "failed_checks"
+loss clusters decompose into four mechanisms below; a fifth (mulligan) was
+measured and rejected (§9.1). Fix order = measured frequency × causal role.
+
+### D1. Baton vision is dead code in BOTH v6 and v7 (the big one)
+
+`+45 baton` priority requires `p.use_baton_touch == Some(true)`, but
+`generate_main_phase_actions` (game_setup.rs:1681-1707) never sets that flag —
+it stays `None` (`..make_params()`); the baton flag lives only in
+`available_areas[i].is_baton_touch` (game_setup.rs:1549). Verified three ways:
+0 `use_baton_touch=True` in 2301 audited member plays; 0 `[BATON]` marks in all
+`V7_DEBUG` tables; 970/2301 (42%) of member plays ARE batons (by
+`is_baton_touch`), in 198/200 games. Worse, baton plays carry real NEGATIVE
+deltas: a cost-7 with 3h/0b replacing a cost-2 with 1h/1b scores
+hearts +6 − blades −6 = 0 → tie → loses to `Pass` by action index (g18 t4,
+en=7, twelve deploys offered, chose Pass — the seed of an 18-cost dev gap and
+four straight 3-junk failed sets). v6's `+45` has the same blindness (same
+bug), so neither bot plays the guide's 4→9→13 engine on purpose; deploys
+happen only when they incidentally raise hearts/blades.
+FREQUENCY: ~3.5 bats per game per side; dev-gap ≥6 present in 5% of losses and
+every `failed_checks:2+` example has one.
+FIX (planned): in v7's main eval, detect baton via
+`available_areas` entry matching `stage_area` with `is_baton_touch: true`
+(or from `final_cost < base_cost` + occupied target), NOT via the unset
+parameter. Add a development term for net stage-cost growth (batons are
+discounted upgrades — the only cheap way to 9/11+), not just hearts/blades.
+Do NOT set `use_baton_touch` in the generator: `link.rs:230` matches local
+PVP actions on that exact field and both sides must keep identical semantics.
+MEASURE: paired 3000×2 both seats.
+
+### D2. Sideways-deploy blindness creates empty-main + junk-set spirals
+
+63 Main-phase Passes occurred while affordable nonzero-cost deploys existed
+(1946 Main Passes total; energy 6-8 at 30 of them). `V7_DEBUG` g18-t4 shows
+the gate is CORRECT (best_nonpass=0 → Pass allowed) — the defect is the eval
+scoring a genuine upgrade (2h/1b → 3h/0b cost-7 for E5) at 0 because blades
+dropped. The stage slot is an investment; one-ply deltas cannot see that the
+cost-7 piece funds next turn's baton ladder. This is structural cause #1 from
+V3_WHY_IT_SUCKS, still unfixed: no eval term looks at STAGE COST trajectory
+(the guides' actual metric: T1=4, T2=9, T3=13).
+FIX (planned): add `stage_cost_delta` term (v2 used stage_cost=8; restore a
+moderate weight) so batons/development plays always beat Pass ties.
+
+### D2b. Junk-only live sets burn turns (measured 27%+22%+20%+13% = 87% of
+losses start here). From audit: losers' failed sets are predominantly
+`3(0L+3j)F` — three NON-LIVE cards set, discarded at performance start
+(8.3.4), each drawing 1 — i.e. the bot spends its live-set phase as a card-
+draw engine while holding zero or one real life (e.g. g1 t1-t3, g14 t1-t2).
+The junk filter (3.1a) is correct WHEN spare slots exist after lives; the
+defect is setting junk INSTEAD of lives when `best_portfolio` is empty:
+v6's gamble fallback (v5 verbatim) picks ONE near-miss life but junk-filter
+can crowd the portfolio to 3 cards whose combined requirements fail.
+Also live-set size dist shows 1099/1946 confirms are 3-card (56%) vs guide
+doctrine of fewer, safer lives.
+FIX (planned): when no portfolio clears the stance floor, prefer 1 real
+near-miss life + junk only if slots remain (it already does this) BUT cap
+junk at (max_slots − real_lives); never let junk displace a life from the
+portfolio when one exists. Measure with live-fold + failed-check telemetry.
+
+### D3. Live-set EV ignores opponent's PUBLIC blade count when choosing
+score-max vs safe. v6's `estimate_opp_score` exists but live-set role choice
+uses only `opp_committed`/`opp_succ`; the comparison probability should use
+their visible stage cost/blades (S2 doctrine: their ceiling from public
+board). Impact visible in games where winner's maxCost 24-33 vs loser's 6-15
+(g2, g9, g18, g40, g106): v7 kept setting 3-junk into checks it could never
+win, instead of 温存 + development.
+FIX (planned): L3 comparison-aware sizing: if projected ceiling gap > 2,
+prefer single safest life (or fold at non-match-point) and bank ammo; else
+v6 score-max.
+
+### D4. Turn-4+ energy hoarding (audit: passes at en=9,10,11; §4 doctrine
+says bank only when no upgrade reachable). Small but real; D1/D2 fixes
+should absorb most of it via better deploys; re-measure after D1.
+
+### Process (measured, for reproduction)
+- Loss clusters: `python analyze_losses.py <audit.jsonl> --examples N`
+- Decision tables: `$env:V7_DEBUG='1'` (stderr tables; UNTRACED runs only)
+- Baton visibility: `python count_batons.py` (edit paths)
+- Affordable-pass probe: `python pass_probe.py`
+- Isolation: `V7_MAIN_V6=1` split main vs live-set contribution:
+  A-seat 1392-1415 (v6+0.77pp), B-seat 1467-1375 (v7+1.5pp) → v7's live-set
+  changes are net-positive on B seat but the bundle still loses to v6
+  overall (2805 vs 2832 @6000); main-phase vision fixes are the drag.
+- All arena runs: fixed `--games` + `--seed`, BOTH seats, ≥3000 games each;
+  single-run deltas <2% are noise (binomial σ≈0.9pp at n=3000).
 
 ## 10. OPEN FIX ORDER (testable via bot_arena, untraced)
 

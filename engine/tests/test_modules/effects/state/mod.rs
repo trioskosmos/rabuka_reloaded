@@ -18,6 +18,7 @@ pub mod cerise_bouquet_teammate_energy_activation_test;
 pub mod characterization_promoted_test;
 pub mod cost_and_blade_filtered_opponent_wait_test;
 pub mod debut_low_cost_opponent_wait_test;
+pub mod debut_optional_single_member_activation_test;
 pub mod either_or_state_change_test;
 pub mod emma_bp5_test;
 pub mod hanayo_bp6_test;

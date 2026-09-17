@@ -249,6 +249,157 @@ int rb_distinct_info_is_distinct(const char *s) {
     return s && *s && strcmp(s, "false") != 0;
 }
 
+/* ── card.rs enum string tables (card.rs:2544-2933). Int encodings follow the
+   Rust discriminant order documented in rabuka.h (Active=0/Wait=1; Self=0/
+   Opponent=1; MemberCard=0/LiveCard=1/EnergyCard=2; Stage=0/Hand=1/Deck=2/
+   DeckTop=3/Discard=4/EnergyZone=5/LiveCardZone=6/SuccessLiveZone=7/
+   UnderMember=8/RevealedCards=9). ── */
+
+const char *rb_card_state_str(int s) {
+    switch (s) {
+        case 0: return "active";
+        case 1: return "wait";
+        default: return "";
+    }
+}
+
+int rb_card_state_from_str(const char *s) {
+    if (s && !strcmp(s, "active")) return 0;
+    return 1;
+}
+
+const char *rb_comparison_target_str(int s) {
+    switch (s) {
+        case 0: return "self";
+        case 1: return "opponent";
+        default: return "";
+    }
+}
+
+int rb_comparison_target_from_str(const char *s) {
+    if (s && !strcmp(s, "opponent")) return 1;
+    return 0;
+}
+
+const char *rb_card_property_str(int s) {
+    switch (s) {
+        case 0: return "has_blade_heart";
+        case 1: return "has_score_icon";
+        case 2: return "has_all_blade";
+        default: return "";
+    }
+}
+
+int rb_card_property_from_str(const char *s) {
+    if (!s) return 0;
+    if (!strcmp(s, "has_score_icon")) return 1;
+    if (!strcmp(s, "has_all_blade")) return 2;
+    return 0;
+}
+
+const char *rb_placement_order_str(int s) {
+    return s == 0 ? "any_order" : "";
+}
+
+const char *rb_distinct_type_str(int s) {
+    switch (s) {
+        case 0: return "card_name";
+        case 1: return "true";
+        case 2: return "distinct";
+        default: return "";
+    }
+}
+
+const char *rb_comparison_type_str(int s) {
+    switch (s) {
+        case 0: return "score";
+        case 1: return "cost";
+        case 2: return "count";
+        case 3: return "equality";
+        case 4: return "energy_relative";
+        default: return "";
+    }
+}
+
+int rb_comparison_type_from_str(const char *s) {
+    if (!s) return 0;
+    if (!strcmp(s, "cost")) return 1;
+    if (!strcmp(s, "count")) return 2;
+    if (!strcmp(s, "equality")) return 3;
+    if (!strcmp(s, "energy_relative")) return 4;
+    return 0;
+}
+
+const char *rb_ability_filter_str(int s) {
+    switch (s) {
+        case 0: return "no_ability";
+        case 1: return "has_ability";
+        case 2: return "has_ability_type";
+        case 3: return "no_ability_type";
+        default: return "";
+    }
+}
+
+int rb_ability_filter_from_str(const char *s) {
+    if (!s) return 0;
+    if (!strcmp(s, "has_ability")) return 1;
+    if (!strcmp(s, "has_ability_type")) return 2;
+    if (!strcmp(s, "no_ability_type")) return 3;
+    return 0;
+}
+
+const char *rb_condition_target_str(int s) {
+    switch (s) {
+        case 0: return "self";
+        case 1: return "opponent";
+        case 2: return "both";
+        case 3: return "either";
+        default: return "";
+    }
+}
+
+const char *rb_condition_card_type_str(int s) {
+    switch (s) {
+        case 0: return "member_card";
+        case 1: return "live_card";
+        case 2: return "energy_card";
+        default: return "";
+    }
+}
+
+int rb_condition_card_type_from_str(const char *s) {
+    if (s && !strcmp(s, "live_card")) return 1;
+    if (s && !strcmp(s, "energy_card")) return 2;
+    return 0;
+}
+
+const char *rb_location_str(int s) {
+    switch (s) {
+        case 0: return "stage";
+        case 1: return "hand";
+        case 2: return "deck";
+        case 3: return "deck_top";
+        case 4: return "discard";
+        case 5: return "energy_zone";
+        case 6: return "live_card_zone";
+        case 7: return "success_live_card_zone";
+        case 8: return "under_member";
+        case 9: return "revealed_cards";
+        default: return "";
+    }
+}
+
+/* ── Card::short_label — normalized card name as the short display label. ── */
+const char *rb_card_short_label(int card_id) {
+    static char label[64];
+    Card c;
+    if (!rb_decode_card_by_index((uint32_t)card_id, &c)) return "";
+    const char *name = rb_card_string(c.name_idx);
+    rb_card_normalize_name(name ? name : "", label, sizeof(label));
+    rb_free_card(&c);
+    return label;
+}
+
 /* ── Ability::has_trigger (card.rs:834): parse triggers text, match kind ── */
 int rb_ability_has_trigger(const Ability *a, RbTriggerKind kind) {
     if (!a || !a->triggers) return 0;

@@ -13,6 +13,7 @@ pub mod bp7_watanabe_select_self_and_other_test;
 pub mod check_self_condition_test;
 pub mod chika_bp7_reveal_cost_test;
 pub mod condition_negative_test;
+pub mod debut_deficit_mill_recent_live_topdeck_test;
 pub mod deficit_mill_live_topdeck_pl_n_pr_032_pr_test;
 pub mod discard_mill_live_recovery_pl_hs_pb1_004_r_test;
 pub mod discard_wait_enables_hearts_pl_hs_bp5_016_n_test;
