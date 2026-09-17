@@ -6,7 +6,7 @@ use crate::helpers::*;
 
 /// PL!SP-bp4-003-R: 常時 センターにいる場合、ブレード+2。
 #[test]
-fn sp_bp4_003_center_grants_blade() {
+fn center_grants_at_least_two_blades_pl_sp_bp4_003() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
@@ -24,7 +24,7 @@ fn sp_bp4_003_center_grants_blade() {
 /// PL!-bp3-002-R: 常時 相手のステージにいるウェイト状態のメンバー1人につき、
 /// ブレード+1。
 #[test]
-fn bp3_002_per_opponent_waited_member_blade() {
+fn two_waited_opponents_grant_at_least_two_blades_pl_bp3_002() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
@@ -40,16 +40,13 @@ fn bp3_002_per_opponent_waited_member_blade() {
     game.state.recalculate_constants();
 
     let blade = game.state.mods.get_blade_modifier(member);
-    assert!(
-        blade >= 2,
-        "two waited opponents should grant >= +2 blade"
-    );
+    assert!(blade >= 2, "two waited opponents should grant >= +2 blade");
 }
 
 /// PL!S-pb1-009-R: 常時 相手の成功ライブカード置き場にカードが3枚以上ある場合、
 /// ブレード+3。
 #[test]
-fn pb1_009_opponent_3_success_cards_blade() {
+fn three_opponent_success_cards_satisfy_combined_threshold_pl_s_pb1_009() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 

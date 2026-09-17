@@ -4,6 +4,7 @@ pub mod bp7_q276_cheer_mode_return_hand_test;
 pub mod ginko_any_number_reorder;
 pub mod hanamaru_test;
 pub mod kasumi_test;
+pub mod nozomi_bp6_016_live_success_look_three_reorder_test;
 pub mod rina_bp3_debut_test;
 pub mod skip_all_to_waitroom_pl_hs_bp2_003_r_test;
 pub mod top_three_membership_pl_bp6_016_n_test;

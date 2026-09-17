@@ -11935,6 +11935,12 @@ def _fix_sequential_chain(eff):
         elif sub.get("action") == "move_cards" and prev_was_look_at:
             if sub.get("source") != "looked_at":
                 sub["source"] = "looked_at"
+            if re.fullmatch(
+                r"それら(?:のカード)?を好きな順番でデッキの上に置く[。]?",
+                sub.get("text", "").strip(),
+            ):
+                sub["all"] = True
+                sub.pop("count", None)
             if (
                 sub.get("destination") == "discard"
                 and sub.get("discard_remaining") is not False

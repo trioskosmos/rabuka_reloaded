@@ -3,6 +3,7 @@
 pub mod area_moved_chosen_color_pl_sp_bp5_024_l_test;
 pub mod bp7_cooking_with_love_test;
 pub mod bp7_setsuna_abilities_test;
+pub mod center_highest_cost_heart_empty_and_single_member_test;
 pub mod chosen_color_transform_pl_n_pb1_034_n_036_n_test;
 pub mod chosen_color_transform_pl_sp_pb2_030_n_test;
 pub mod combined_stage_count_constant_heart_test;
@@ -38,7 +39,6 @@ pub mod setsuna_bp5_test;
 pub mod setsuna_pb1_heart_constant_test;
 pub mod setsuna_pb1_test;
 pub mod side_position_constant_heart_test;
-pub mod sp_bp2_004_edge2_test;
 pub mod sp_bp2_004_extra_test2;
 pub mod stage_member_cost_gated_constant_heart_test;
 pub mod subunit_stage_count_gated_debut_heart_test;

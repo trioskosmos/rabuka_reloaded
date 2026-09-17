@@ -389,6 +389,9 @@ pub enum LookAndSelectStep {
         destination: String,
         source_zone: String,
     },
+    Order {
+        ordered: Vec<i16>,
+    },
 }
 
 pub struct ChoiceBuilder {

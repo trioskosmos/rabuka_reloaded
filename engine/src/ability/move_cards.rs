@@ -2296,13 +2296,18 @@ gs.set_recently_moved_batch(moved.clone().into(), Some("under_member"));
         let is_deck_dest = Zone::from_str(&destination) == Some(Zone::Deck)
             || Zone::from_str(&destination) == Some(Zone::DeckTop);
         let is_eligible_source = Zone::from_str(&source) == Some(Zone::Discard)
-            || Zone::from_str(&source) == Some(Zone::SelectedCards);
+            || Zone::from_str(&source) == Some(Zone::SelectedCards)
+            || (Zone::from_str(&source) == Some(Zone::LookedAt) && is_all);
         if is_eligible_source
             && is_deck_dest
             && effect.placement_order_any() == Some(PlacementOrder::AnyOrder)
             && taken.len() > 1
         {
             let taken_count = taken.len();
+            log::debug!(
+                "[ORDER_BEGIN] source={} all={} cards={:?}",
+                source, is_all, taken
+            );
             moved_cards.extend(taken.iter().copied());
             gs.looked_at_cards = taken.clone().into();
             self.pending_choice = Some(Choice::SelectTarget {

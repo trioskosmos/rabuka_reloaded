@@ -3,7 +3,7 @@ use crate::helpers::*;
 
 /// PL!SP-sd2-004-SD2: 常時 センター → ブレード+4。
 #[test]
-fn sd2_004_center_blade_plus4() {
+fn center_grants_four_blades_but_left_does_not_pl_sp_sd2_004() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
@@ -30,7 +30,7 @@ fn sd2_004_center_blade_plus4() {
 
 /// PL!SP-pb2-035-N: 常時 左サイド → ブレード+2。
 #[test]
-fn pb2_035_left_blade_plus2() {
+fn left_side_grants_two_blades_pl_sp_pb2_035() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
@@ -47,7 +47,7 @@ fn pb2_035_left_blade_plus2() {
 
 /// PL!SP-pb2-041-N: 常時 右サイド → ブレード+2。
 #[test]
-fn pb2_041_right_blade_plus2() {
+fn right_side_grants_two_blades_pl_sp_pb2_041() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 

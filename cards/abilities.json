@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-09-10T18:42:11.767597",
+  "generated_at": "2026-09-17T21:38:59.646601",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "bbbc5499",
+  "engine_commit": "3a25700b",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -6682,7 +6682,7 @@
             "action": "move_cards",
             "source": "looked_at",
             "card_type": "card",
-            "count": 1
+            "all": true
           }
         ]
       }
@@ -33011,7 +33011,7 @@
             "action": "move_cards",
             "source": "looked_at",
             "card_type": "card",
-            "count": 1
+            "all": true
           }
         ]
       }

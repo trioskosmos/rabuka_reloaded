@@ -346,6 +346,10 @@ impl super::resolver::AbilityResolver {
                 self.clear_choice_state(gs);
                 self.resume_execution(gs, context)
             }
+            (
+                Some(Choice::SelectTarget { target, allow_skip: false, .. }),
+                ChoiceResult::Skip,
+            ) if target == "order" => Err("Deck ordering cannot be skipped".to_string()),
             (Some(Choice::SelectTarget { .. }), ChoiceResult::Skip) => {
                 // Skip the choice entirely — no option is executed.
                 gs.ability_queue.take_pending_actions();
@@ -2637,36 +2641,59 @@ gs.set_recently_moved_batch(valid_ids.into(), Some("stage"));
     }
 
     fn handle_order_selection(&mut self, gs: &mut GameState, selected: &str) -> Result<(), String> {
-        let ctx = self.execution_context.clone();
-        if let ExecutionContext::LookAndSelect { step } = ctx {
-            if let LookAndSelectStep::Finalize { destination, .. } = step {
-                if Zone::from_str(&destination) == Some(Zone::Deck) {
-                    if let Ok(idx) = selected.parse::<usize>() {
-                        if idx < gs.looked_at_cards.len() {
-                            let card = gs.looked_at_cards.remove(idx);
-                            gs.looked_at_cards.insert(0, card);
-                        }
-                    }
-                    let card_ids: Vec<i16> = gs.looked_at_cards.iter().rev().copied().collect();
-                    let target = self
-                        .spawn_context
-                        .target
-                        .clone()
-                        .or_else(|| {
-                            gs.entry_effect()
-                                .and_then(|e| e.target.clone().map(|s| s.to_string()))
-                        })
-                        .unwrap_or_else(|| "self".to_string().into());
-                    let player = gs.resolve_target_player_mut(&target);
-                    for card_id in card_ids {
-                        player.main_deck.cards.insert(0, card_id);
-                    }
-                    gs.looked_at_cards.clear();
-                }
-            }
+        let mut ordered = match self.execution_context.clone() {
+            ExecutionContext::LookAndSelect {
+                step: LookAndSelectStep::Finalize { destination, .. },
+            } if Zone::from_str(&destination) == Some(Zone::Deck) => Vec::new(),
+            ExecutionContext::LookAndSelect {
+                step: LookAndSelectStep::Order { ordered },
+            } => ordered,
+            _ => return Err("No pending deck order".to_string()),
+        };
+        let idx = selected
+            .parse::<usize>()
+            .ok()
+            .filter(|&idx| idx < gs.looked_at_cards.len())
+            .ok_or_else(|| format!("Invalid deck order selection: {}", selected))?;
+        ordered.push(gs.looked_at_cards.remove(idx));
+        log::debug!(
+            "[ORDER_PICK] index={} ordered={:?} remaining={:?}",
+            idx, ordered, gs.looked_at_cards
+        );
+        if gs.looked_at_cards.len() > 1 {
+            let count = gs.looked_at_cards.len();
+            self.clear_choice_meta(gs);
+            self.pending_choice = Some(Choice::SelectTarget {
+                target: "order".to_string(),
+                description: format!("Choose order for cards on deck ({} cards)", count),
+                description_en: Some(format!("Choose order for cards on deck ({} cards)", count)),
+                description_ja: Some(format!("山札のカード順を選択（{}枚）", count)),
+                allow_skip: false,
+                options: None,
+            });
+            self.execution_context = ExecutionContext::LookAndSelect {
+                step: LookAndSelectStep::Order { ordered },
+            };
+            return Ok(());
         }
-        self.clear_choice_state(gs);
-        Ok(())
+        ordered.extend(gs.looked_at_cards.drain(..));
+        let target = self
+            .spawn_context
+            .target
+            .clone()
+            .or_else(|| {
+                gs.entry_effect()
+                    .and_then(|e| e.target.clone().map(|s| s.to_string()))
+            })
+            .unwrap_or_else(|| "self".to_string());
+        log::debug!("[ORDER_DONE] target={} cards={:?}", target, ordered);
+        let player = gs.resolve_target_player_mut(&target);
+        for &card_id in ordered.iter().rev() {
+            player.main_deck.cards.insert(0, card_id);
+        }
+        self.moved_cards.extend(ordered);
+        self.execution_context = ExecutionContext::None;
+        self.clear_choice_state_and_resume(gs)
     }
 
     fn handle_position_change_choice(
