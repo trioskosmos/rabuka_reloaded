@@ -1,11 +1,14 @@
 pub mod ability_effects;
+pub mod custom;
 pub mod draw;
+pub mod executor;
 pub mod misc;
 mod reveal;
 pub mod score;
 pub mod state;
 
 pub(crate) use draw::draw_cards_for_player;
+pub(crate) use executor::execute_effect_via_registry;
 
 use super::debug::AbDebug;
 use super::enums::ActionType;
@@ -225,9 +228,10 @@ impl AbilityResolver {
         Some(normalized)
     }
 
-    /// MoveCards/DiscardCard shared tail: rule log + current-effect pinning
-    /// + move execution. The only difference between the arms is the log tag.
-    fn execute_logged_move(
+    /// Shared MoveCards/DiscardCard tail (rule log + current-effect pinning
+    /// + move execution) — the registry's logged-move arms delegate here so
+    /// the 3-line sequence lives in exactly one place.
+    pub(crate) fn execute_logged_move(
         &mut self,
         gs: &mut GameState,
         effect: &AbilityEffect,
@@ -236,41 +240,6 @@ impl AbilityResolver {
         self.rule_log_activated(gs, log_tag);
         self.current_effect = Some(effect.clone());
         self.execute_move_cards(gs, effect)
-    }
-
-    /// Push the post-dispatch effect verdict for non-structural action types.
-    fn push_effect_verdict(effect: &AbilityEffect) {
-        // Push effect verdict for non-structural action types
-        let is_structural = matches!(
-            effect.action,
-            ActionType::CompoundAction
-                | ActionType::Sequential
-                | ActionType::Choice
-                | ActionType::ConditionalAlternative
-                | ActionType::ConditionalOnResult
-                | ActionType::ConditionalOnOptional
-        );
-        if is_structural {
-            return;
-        }
-        #[cfg(not(feature = "no_std"))]
-        let val = effect
-            .count
-            .or(effect.value_any())
-            .map(|v| v.to_string())
-            .unwrap_or_default();
-        #[cfg(not(feature = "no_std"))]
-        let details = if !val.is_empty() {
-            format!("{} {}", effect.action, val)
-        } else {
-            effect.action.to_string()
-        };
-        #[cfg(not(feature = "no_std"))]
-        crate::ability::log::push_verdict(crate::ability::log::AbilityLogItem::Effect {
-            text: effect.text.to_string(),
-            action: effect.action.to_string(),
-            details,
-        });
     }
 
     // Q55: Effects resolve as much as possible; partial resolution required when full is impossible.
@@ -336,196 +305,16 @@ impl AbilityResolver {
             return Ok(());
         }
 
-        // Rule 9.2.1: Effect dispatch
-        //
-        // Convert string action to typed enum for stronger dispatch.
-        // Each ActionType variant maps to a dedicated handler:
-        //
-        //   Sequential           → execute_sequential_effect (compound.rs)
-        //   ConditionalAlternative → execute_conditional_alternative (compound.rs)
-        //   LookAndSelect        → execute_look_and_select (look.rs)
-        //   SelectCards          → execute_select_cards (look.rs)
-        //   Draw/DrawCard        → execute_draw_wrapper
-        //   MoveCards/DiscardCard→ execute_move_cards (move_cards.rs)
-        //   PayEnergy            → execute_pay_energy (effects/misc.rs)
-        //   ...and many more
-        //
-        // Compound routing: Sequential and LookAndSelect both route through
-        // the generic sequential pipeline when they carry `effect_steps`.
-        // LookAndSelect is collapsed by the parser into:
-        //   [look_step, select_cards_step, move_selected_step]
-        // The sequential pipeline executes them in order, creating a pending
-        // choice on the select_cards step and resuming naturally when the
-        // player responds. Legacy dedicated handlers remain as fallback
-        // for the case where effect_steps is absent.
+        // Rule 9.2.1: Effect dispatch — table-driven via executor registry
         let action_type = effect.action;
 
+        // Compound routing: Sequential and LookAndSelect both route through
+        // the generic sequential pipeline when they carry `effect_steps`.
         if let Some(normalized) = Self::normalized_sequential_route(effect, action_type) {
             return self.execute_sequential_effect(gs, &normalized);
         }
 
-        let result = match action_type {
-            ActionType::Sequential => self.execute_sequential_effect(gs, effect),
-            ActionType::ConditionalAlternative => self.execute_conditional_alternative(gs, effect),
-            ActionType::LookAndSelect => self.execute_look_and_select(gs, effect),
-            ActionType::SelectCards => self.execute_select_cards(gs, effect),
-            ActionType::DrawCard => self.execute_draw_wrapper(gs, effect),
-            ActionType::DrawUntilCount => {
-                self.execute_draw_until_count(gs, effect);
-                Ok(())
-            }
-            ActionType::DiscardCard => self.execute_logged_move(gs, effect, "[[log_discard]]"),
-            ActionType::MoveCards => self.execute_logged_move(gs, effect, "[[log_move]]"),
-            ActionType::GainResource => self.execute_gain_resource(gs, effect),
-            ActionType::ChangeState => self.execute_change_state(gs, effect),
-            ActionType::ModifyScore => self.execute_modify_score(gs, effect),
-            ActionType::ModifyRequiredHearts => self.execute_modify_required_hearts(gs, effect),
-            ActionType::SetCost => {
-                self.execute_set_cost(gs, effect);
-                Ok(())
-            }
-            ActionType::SetBladeType => {
-                self.execute_set_blade_type(gs, effect);
-                Ok(())
-            }
-            ActionType::SetHeartType => {
-                self.execute_set_heart_type(gs, effect);
-                Ok(())
-            }
-            ActionType::ActivateAbility => {
-                self.execute_activate_ability(gs, effect);
-                Ok(())
-            }
-            ActionType::InvalidateAbility => self.execute_invalidate_ability(gs, effect),
-            ActionType::SuppressAbilityTrigger => self.execute_suppress_ability_trigger(gs, effect),
-            ActionType::GainAbility => self.execute_gain_ability_effect(gs, effect),
-            ActionType::GainAbilityFromSource => self.execute_gain_ability_from_source(gs, effect),
-            ActionType::PlayBatonTouch => self.execute_play_baton_touch(gs, effect),
-            ActionType::Reveal => self.execute_reveal_effect(gs, effect),
-            ActionType::Select => {
-                self.rule_log_activated(gs, "[[log_select]]");
-                self.execute_select_effect(gs, effect)
-            }
-            ActionType::SelectNumber => self.execute_select_number(gs, effect),
-            ActionType::LookAt => self.execute_look_at(gs, effect),
-            ActionType::ModifyRequiredHeartsGlobal => self.execute_modify_required_hearts_standard(
-                gs,
-                effect.operation_any().as_deref().unwrap_or("increase"),
-                effect.value_or_count(1) as u8,
-                effect.heart_colors_any(),
-                effect.target_name(),
-                &effect.text,
-            ),
-            ActionType::ModifyYellCount => {
-                self.execute_modify_yell_count(gs, effect);
-                Ok(())
-            }
-            ActionType::PlaceEnergyUnderMember => {
-                self.execute_place_energy_under_member(gs, effect);
-                Ok(())
-            }
-            ActionType::ActivationCost => {
-                self.execute_activation_cost(gs, effect);
-                Ok(())
-            }
-            ActionType::PositionChange => self.execute_position_change(
-                gs,
-                effect,
-                effect.position_any().cloned(),
-                effect.target_name(),
-                effect
-                    .target_member_any()
-                    .as_deref()
-                    .unwrap_or("this_member"),
-            ),
-            ActionType::Rotation => self.execute_rotation(gs, effect, effect.target_name()),
-
-            ActionType::Choice => self.execute_choice(gs, effect),
-            ActionType::PayEnergy => self.execute_pay_energy(gs, effect),
-            ActionType::SetCardIdentity => self.execute_set_card_identity_effect(gs, effect),
-            ActionType::DiscardUntilCount => self.execute_discard_until_count(gs, effect),
-            // Q57: A "cannot do X" effect takes priority over an effect that would do X.
-            ActionType::Restriction => self.execute_restriction(gs, effect),
-            ActionType::ReYell => {
-                self.execute_re_yell(gs, effect);
-                Ok(())
-            }
-            ActionType::ActivationRestriction => {
-                self.execute_activation_restriction(gs, effect);
-                Ok(())
-            }
-            ActionType::ChooseRequiredHearts => {
-                self.execute_choose_required_hearts(gs);
-                Ok(())
-            }
-            ActionType::ModifyLimit => self.execute_modify_limit(gs, effect),
-            ActionType::ReduceLiveCardSetLimit => {
-                self.execute_reduce_live_card_set_limit(gs, effect);
-                Ok(())
-            }
-            ActionType::SetBladeCount => {
-                self.execute_set_blade_count(gs, effect);
-                Ok(())
-            }
-            ActionType::Custom => self.execute_custom(gs, effect, action_str),
-            ActionType::DoNothing => Ok(()),
-            // G8: yell-source is a 常時 modifier, applied by refresh_yell_sources
-            // during recalculate_constants — nothing to execute as a one-shot.
-            ActionType::ModifyYellSource => Ok(()),
-
-            ActionType::SpecifyHeartColor => {
-                self.execute_specify_heart_color(gs, effect);
-                Ok(())
-            }
-            ActionType::ModifyRequiredHeartsSuccess => {
-                self.execute_modify_required_hearts_success(gs, effect);
-                Ok(())
-            }
-            ActionType::SetCostToUse => self.execute_set_cost_to_use(gs, effect),
-            ActionType::AllBladeTiming => {
-                self.execute_all_blade_timing(gs, effect);
-                Ok(())
-            }
-            ActionType::Shuffle => {
-                self.execute_shuffle(gs, effect);
-                Ok(())
-            }
-            ActionType::RevealPerGroup => self.execute_reveal_per_group(gs, effect),
-            ActionType::ConditionalOnResult => self.execute_conditional_on_result(gs, effect),
-            ActionType::ConditionalOnOptional => self.execute_conditional_on_optional(gs, effect),
-            ActionType::ModifyCost => {
-                self.execute_modify_cost(gs, effect);
-                Ok(())
-            }
-            ActionType::RevealUntilLiveCard => self.execute_reveal_until_live_card(gs, effect),
-            ActionType::RevealUntilChosenCard => self.execute_reveal_until_chosen_card(gs, effect),
-            ActionType::ChooseTargetPlayer => self.execute_choose_target_player(gs, effect),
-            ActionType::PerformYell => {
-                self.execute_perform_yell(gs, effect);
-                Ok(())
-            }
-            // Dispatch-only internal variants — these are routed via separate code paths
-            ActionType::CompoundAction
-            | ActionType::OpponentAction
-            | ActionType::ActionBy
-            | ActionType::SequentialCost
-            | ActionType::ChoiceCondition
-            // RepeatProcedure never dispatches through here: the parser emits it
-            // only as the LAST step of a sequential, which
-            // execute_sequential_effect intercepts via actions.last() and drives
-            // interactively (compound.rs). Verified: abilities.json contains
-            // exactly one repeat_procedure node, in that last-step position.
-            | ActionType::RepeatProcedure
-            | ActionType::EnergyCondition => {
-                log::warn!(
-                    "Unexpected internal action type in execute_effect: {:?}",
-                    effect.action
-                );
-                Ok(())
-            }
-            ActionType::ConditionalOptional => self.execute_conditional_on_optional(gs, effect),
-        };
-        Self::push_effect_verdict(effect);
-        result
+        // Delegate to registered executor (it pushes the verdict itself).
+        execute_effect_via_registry(self, gs, effect)
     }
 }

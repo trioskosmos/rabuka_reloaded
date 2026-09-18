@@ -1,8 +1,8 @@
-use super::debug::AbDebug;
-use super::enums::{ActionType, Zone};
-use super::resolver::AbilityResolver;
-use super::types::{Choice, ChoiceRoute};
-use super::util;
+use super::super::debug::AbDebug;
+use super::super::enums::{ActionType, Zone};
+use super::super::resolver::AbilityResolver;
+use super::super::types::{Choice, ChoiceRoute};
+use crate::ability::util;
 use crate::ability_queue::ConditionalChoice;
 use crate::card::AbilityEffect;
 use crate::game_state::GameState;
@@ -1076,7 +1076,7 @@ let source = cost.source_str().unwrap_or("");
                             .cards
                             .iter()
                             .filter(|&&id| {
-                                super::util::card_matches_type(card_db, id, card_type.as_deref())
+                                util::card_matches_type(card_db, id, card_type.as_deref())
                                     && match cost.cost_values_any() {
                                         Some(vals) if !vals.is_empty() => card_db
                                             .get_card(id)
@@ -1088,11 +1088,11 @@ let source = cost.source_str().unwrap_or("");
                                     // it every hand card was reveal-eligible.
                                     && match cost.group_names_any().as_ref() {
                                         Some(groups) if !groups.is_empty() => groups.iter().any(
-                                            |g| {
-                                                super::util::card_matches_group_str(
-                                                    card_db, id, Some(g.as_str()),
-                                                )
-                                            },
+|g| {
+    util::card_matches_group_str(
+        card_db, id, Some(g.as_str()),
+    )
+},
                                         ),
                                         _ => true,
                                     }

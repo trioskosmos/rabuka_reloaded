@@ -2438,12 +2438,17 @@ def parse_action(text: str) -> Dict[str, Any]:
     action: Dict[str, Any] = {"text": text}
     if dur_code:
         action["duration"] = dur_code
-    # Also check for duration keywords embedded in text
+    # Also check for duration keywords embedded in text.
+    # Table-driven: first matching keyword wins (same order as the legacy
+    # if-chain — longer, more specific phrases must precede shorter ones).
     if "duration" not in action:
-        if "ライブ終了時まで" in text:
-            action["duration"] = "live_end"
-        elif "このターンの間" in text:
-            action["duration"] = "this_turn"
+        for _dur_phrase, _dur_code in (
+            ("ライブ終了時まで", "live_end"),
+            ("このターンの間", "this_turn"),
+        ):
+            if _dur_phrase in text:
+                action["duration"] = _dur_code
+                break
 
     # Extract count, card_type, target, state_change for dispatch rules
     count = extract_count(text)
@@ -5201,6 +5206,183 @@ def _extract_generic_fields(condition, text):
         condition["blade_greater_than_all"] = True
 
 
+def _infer_comparison_target_type(condition, text):
+    condition["type"] = "comparison_condition"
+
+
+def _infer_comparison_kind_type(condition, text):
+    condition["type"] = "comparison_condition"
+    # Only set cost_total for sum-total cost comparisons (合計), not per-card checks
+    if condition.get("comparison_type") == "cost" and condition.get("count"):
+        if "合計" in text:
+            condition["cost_total"] = condition["count"]
+    # Issue 2: Extract count and operator from "合計が、N" patterns when
+    # comparison_type is "cost" and aggregate is "total". This branch fires
+    # BEFORE the aggregate-only branch below, so we must extract here too.
+    if (
+        condition.get("comparison_type") == "cost"
+        and condition.get("aggregate") == "total"
+    ):
+        condition.setdefault("operator", "=")
+        cm = re.search(r"合計が、?(\d+)", text)
+        if cm:
+            condition["count"] = int(cm.group(1))
+            condition["cost_total"] = int(cm.group(1))
+
+
+def _infer_resource_type(condition, text):
+    if (
+        condition.get("resource_type") == "blade"
+        and condition.get("aggregate") == "total"
+    ):
+        condition["type"] = "resource_condition"
+    else:
+        condition["type"] = "comparison_condition"
+
+
+def _infer_group_type(condition, text):
+    condition["type"] = "group_condition"
+    # 「ハートの総数がN以上」 — aggregate over group members' heart totals,
+    # not a member-count. Engine dispatches via get_group_card_count's
+    # aggregate branch (sum_group_hearts_in_stage).
+    if "ハートの総数" in text or ("ハート" in text and "総数" in text):
+        condition["aggregate"] = "total"
+    if "コスト" in text and ("低い" in text or "高い" in text):
+        condition["comparison_type"] = "cost"
+        condition["operator"] = "<" if "低い" in text else ">"
+        cm = extract_cost_modification(text)
+        if cm:
+            condition.update(cm)
+
+
+def _infer_location_card_type(condition, text):
+    condition["type"] = "location_condition"
+
+
+def _infer_location_position_type(condition, text):
+    condition["type"] = "position_condition"
+
+
+def _infer_operator_target_type(condition, text):
+    condition["type"] = "comparison_condition"
+
+
+def _infer_aggregate_total_type(condition, text):
+    if "コスト" in text or "合計が" in text:
+        # "コストの合計がN" or "合計がN" → cost comparison, not score threshold
+        condition["type"] = "comparison_condition"
+        condition["comparison_type"] = "cost"
+        condition["operator"] = "="
+        # Extract the number from "合計がN" or "合計が、N"
+        cm = re.search(r"合計が、?(\d+)", text)
+        if cm:
+            condition["count"] = int(cm.group(1))
+        # Also set cost_total for easier downstream access
+        if "コスト" in text and condition.get("count"):
+            condition["cost_total"] = condition["count"]
+    else:
+        condition["type"] = "score_threshold_condition"
+
+
+def _infer_location_target_type(condition, text):
+    condition["type"] = "location_condition"
+
+
+def _infer_location_operator_type(condition, text):
+    condition.setdefault("target", "self")
+    condition["type"] = "location_condition"
+
+
+def _infer_card_type_only(condition, text):
+    condition.setdefault("count", 1)
+    condition.setdefault("operator", ">=")
+    condition["type"] = "card_count_condition"
+
+
+_CONDITION_TYPE_FALLBACK_KEYS = (
+    "operator",
+    "count",
+    "location",
+    "card_type",
+    "target",
+    "comparison_type",
+    "group_names",
+)
+
+
+def _infer_fielded_fallback_type(condition, text):
+    condition.setdefault("count", 1)
+    condition.setdefault("operator", ">=")
+    condition.setdefault("target", "self")
+    condition["type"] = "comparison_condition"
+
+
+def _infer_characters_type(condition, text):
+    # "それが「X」か「Y」の場合" — a character-name filter on the card just
+    # placed/moved by the preceding step. Counts that card(s) in the
+    # preceding move filtered by character.
+    condition.setdefault("source", "preceding_moved")
+    condition.setdefault("count", 1)
+    condition.setdefault("operator", ">=")
+    condition.setdefault("target", "self")
+    condition["type"] = "location_condition"
+
+
+def _infer_custom_type(condition, text):
+    condition["type"] = "custom"
+
+
+# Priority-ordered type-inference rules for `_infer_condition_type`:
+# (predicate, apply), first match wins. Same order and bodies as the
+# legacy if/elif chain:
+# - comparison_target (directional: self vs opponent) takes priority over
+#   location/card_type; comparison_type "equality" does NOT override — the
+#   engine handles equality in location_condition via target="both" logic.
+# - bare-text custom is last; empty text falls through every row.
+_CONDITION_TYPE_RULES = [
+    (lambda c, t: bool(c.get("comparison_target")), _infer_comparison_target_type),
+    (
+        lambda c, t: bool(c.get("comparison_type"))
+        and c.get("comparison_type") != "equality",
+        _infer_comparison_kind_type,
+    ),
+    (lambda c, t: bool(c.get("resource_type")), _infer_resource_type),
+    (lambda c, t: bool(c.get("group_names")), _infer_group_type),
+    (
+        lambda c, t: bool(c.get("location") and c.get("card_type")),
+        _infer_location_card_type,
+    ),
+    (
+        lambda c, t: bool(c.get("location") and c.get("position")),
+        _infer_location_position_type,
+    ),
+    (
+        lambda c, t: bool(c.get("operator") and c.get("target")),
+        _infer_operator_target_type,
+    ),
+    (
+        lambda c, t: c.get("aggregate") == "total",
+        _infer_aggregate_total_type,
+    ),
+    (
+        lambda c, t: bool(c.get("location") and c.get("target")),
+        _infer_location_target_type,
+    ),
+    (
+        lambda c, t: bool(c.get("location") and c.get("operator")),
+        _infer_location_operator_type,
+    ),
+    (lambda c, t: bool(c.get("card_type")), _infer_card_type_only),
+    (
+        lambda c, t: bool(t.strip())
+        and any(k in c for k in _CONDITION_TYPE_FALLBACK_KEYS),
+        _infer_fielded_fallback_type,
+    ),
+    (lambda c, t: bool(c.get("characters")), _infer_characters_type),
+    (lambda c, t: bool(t.strip()), _infer_custom_type),
+]
+
+
 def _infer_condition_type(condition, text):
     """Determine condition type from extracted fields (mutates condition in place)."""
     # "それが…の場合" / "それらが…の場合" refer to the card(s) moved or
@@ -5215,117 +5397,11 @@ def _infer_condition_type(condition, text):
         and not condition.get("locations")
     ):
         condition.setdefault("source", "preceding_moved")
-    group_names = condition.get("group_names")
-    location = condition.get("location")
-    card_type = condition.get("card_type")
-    count = condition.get("count")
-    operator = condition.get("operator")
-    position = condition.get("position")
 
-    # comparison_target (directional: self vs opponent) takes priority over location/card_type
-    # comparison_type with "equality" should NOT override — the engine handles equality
-    # in location_condition via target="both" logic
-    if condition.get("comparison_target"):
-        condition["type"] = "comparison_condition"
-    elif (
-        condition.get("comparison_type")
-        and condition.get("comparison_type") != "equality"
-    ):
-        condition["type"] = "comparison_condition"
-        # Only set cost_total for sum-total cost comparisons (合計), not per-card checks
-        if condition.get("comparison_type") == "cost" and condition.get("count"):
-            if "合計" in text:
-                condition["cost_total"] = condition["count"]
-        # Issue 2: Extract count and operator from "合計が、N" patterns when
-        # comparison_type is "cost" and aggregate is "total". This branch fires
-        # BEFORE the aggregate-only branch below, so we must extract here too.
-        if (
-            condition.get("comparison_type") == "cost"
-            and condition.get("aggregate") == "total"
-        ):
-            condition.setdefault("operator", "=")
-            cm = re.search(r"合計が、?(\d+)", text)
-            if cm:
-                condition["count"] = int(cm.group(1))
-                condition["cost_total"] = int(cm.group(1))
-    elif condition.get("resource_type"):
-        if (
-            condition.get("resource_type") == "blade"
-            and condition.get("aggregate") == "total"
-        ):
-            condition["type"] = "resource_condition"
-        else:
-            condition["type"] = "comparison_condition"
-    elif group_names:
-        condition["type"] = "group_condition"
-        # 「ハートの総数がN以上」 — aggregate over group members' heart totals,
-        # not a member-count. Engine dispatches via get_group_card_count's
-        # aggregate branch (sum_group_hearts_in_stage).
-        if "ハートの総数" in text or ("ハート" in text and "総数" in text):
-            condition["aggregate"] = "total"
-        if "コスト" in text and ("低い" in text or "高い" in text):
-            condition["comparison_type"] = "cost"
-            condition["operator"] = "<" if "低い" in text else ">"
-            cm = extract_cost_modification(text)
-            if cm:
-                condition.update(cm)
-    elif location and card_type:
-        condition["type"] = "location_condition"
-    elif location and position:
-        condition["type"] = "position_condition"
-    elif condition.get("operator") and condition.get("target"):
-        condition["type"] = "comparison_condition"
-    elif condition.get("aggregate") == "total":
-        if "コスト" in text or "合計が" in text:
-            # "コストの合計がN" or "合計がN" → cost comparison, not score threshold
-            condition["type"] = "comparison_condition"
-            condition["comparison_type"] = "cost"
-            condition["operator"] = "="
-            # Extract the number from "合計がN" or "合計が、N"
-            cm = re.search(r"合計が、?(\d+)", text)
-            if cm:
-                condition["count"] = int(cm.group(1))
-            # Also set cost_total for easier downstream access
-            if "コスト" in text and condition.get("count"):
-                condition["cost_total"] = condition["count"]
-        else:
-            condition["type"] = "score_threshold_condition"
-    elif location and condition.get("target"):
-        condition["type"] = "location_condition"
-    elif location and operator:
-        condition.setdefault("target", "self")
-        condition["type"] = "location_condition"
-    elif condition.get("card_type"):
-        condition.setdefault("count", 1)
-        condition.setdefault("operator", ">=")
-        condition["type"] = "card_count_condition"
-    elif text.strip() and any(
-        k in condition
-        for k in (
-            "operator",
-            "count",
-            "location",
-            "card_type",
-            "target",
-            "comparison_type",
-            "group_names",
-        )
-    ):
-        condition.setdefault("count", 1)
-        condition.setdefault("operator", ">=")
-        condition.setdefault("target", "self")
-        condition["type"] = "comparison_condition"
-    elif condition.get("characters"):
-        # "それが「X」か「Y」の場合" — a character-name filter on the card just
-        # placed/moved by the preceding step. Counts that card(s) in the
-        # preceding move filtered by character.
-        condition.setdefault("source", "preceding_moved")
-        condition.setdefault("count", 1)
-        condition.setdefault("operator", ">=")
-        condition.setdefault("target", "self")
-        condition["type"] = "location_condition"
-    elif text.strip():
-        condition["type"] = "custom"
+    for pred, apply in _CONDITION_TYPE_RULES:
+        if pred(condition, text):
+            apply(condition, text)
+            break
     else:
         return None
     return condition

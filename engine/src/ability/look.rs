@@ -798,7 +798,8 @@ impl AbilityResolver {
         if or_types.is_empty() {
             return None;
         }
-        let maybe_cc = gs.ability_queue.current_entry().and_then(|e| {
+        let entry = gs.ability_queue.current_entry();
+        let maybe_cc = entry.and_then(|e| {
             match &e.conditional_choice {
                 Some(ConditionalChoice::Str(s)) => Some(s.clone()),
                 Some(ConditionalChoice::Strings(v)) => v.first().cloned(),
@@ -842,7 +843,10 @@ impl AbilityResolver {
         self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
         if let Some(e) = gs.ability_queue.current_entry_mut() {
             e.conditional_choice = Some(ConditionalChoice::Strings(or_types.to_vec()));
+            e.choice_card_no = Some(ChoiceRoute::ChoiceString);
         }
+        // Preserve the parent effect so or_card_types can be accessed after sub-effects overwrite current_effect
+        self.parent_effect = Some(effect.clone());
         Some("offered".to_string())
     }
 

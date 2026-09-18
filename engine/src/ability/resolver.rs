@@ -28,6 +28,11 @@ fn drain_verdicts_since(_snapshot: usize) -> Vec<AbilityLogItem> {
     Vec::new()
 }
 
+use super::gates::{
+    pre_cost_gates, post_cost_gates, effect_gates, record_use_limit,
+    handle_pending_choice, use_limit_gate, activation_keywords_gate,
+    UseLimitPhase,
+};
 use super::types::{
     Choice, EffectPipeline, EffectSpawnContext, ExecutionContext, StepState, ZoneSnapshot,
 };
@@ -80,6 +85,9 @@ pub struct AbilityResolver {
     pub activating_card_id: Option<i16>,
     pub execution_context: ExecutionContext,
     pub current_effect: Option<AbilityEffect>,
+    /// Parent effect that created a nested choice (e.g. look_and_select with or_card_types).
+    /// Preserved so choice handlers can access or_card_types after sub-effects overwrite current_effect.
+    pub parent_effect: Option<AbilityEffect>,
     pub is_reveal_cost: bool,
     pub selected_cards: SmallVec<[i16; 4]>,
     /// Member card IDs actually changed state by the most recent change_state
@@ -220,6 +228,7 @@ impl AbilityResolver {
             activating_card_id,
             execution_context: ExecutionContext::None,
             current_effect: None,
+            parent_effect: None,
             is_reveal_cost: false,
             selected_cards: SmallVec::new(),
             changed_state_members: SmallVec::new(),
@@ -764,8 +773,6 @@ impl AbilityResolver {
         );
     }
 
-    /// Returns true if the ability has already been used `use_limit`+ times this turn.
-    ///
     /// USE-LIMIT RECORDING MAP (resolver + choice.rs) — when the key gets
     /// inserted depends on WHERE in the resolution lifecycle the attempt ends:
     ///
@@ -782,40 +789,16 @@ impl AbilityResolver {
     /// choice.rs adds two more variants for OPTIONAL effects whose recording
     /// happens inside the choice resume handler (accepted → record, declined
     /// → never). Any consolidation must keep these distinctions.
-    fn check_use_limit_reached(
-        &self,
-        gs: &GameState,
-        card_id: i16,
-        ability_index: usize,
-        use_limit: u8,
-    ) -> bool {
-        gs.ability_uses_used(card_id, ability_index) >= use_limit
-    }
-
-    /// Record an ability use for this turn, guarded by the effect-activability check
-    /// (unless `unconditional`, in which case the key is always recorded).
-    fn record_ability_use_guarded(
-        &mut self,
-        gs: &mut GameState,
-        key: (i16, usize, u8),
-        ability: &Ability,
-        unconditional: bool,
-    ) {
-        if ability.use_limit.is_none() {
-            return;
-        }
-        let can_activate = unconditional
-            || ability
-                .effect
-                .as_ref()
-                .is_none_or(|e| self.can_activate_effect(gs, e));
-        if can_activate {
-            gs.record_ability_use(key);
-        }
-    }
-
+    ///
+    /// The check/record primitives live in `gates.rs` (`use_limit_gate`,
+    /// `record_use_limit`); the composite gates in `resolve_ability` call them
+    /// directly. The helpers below are the pre-composite call sites kept for
+    /// result-filing (position_fail logging) — not duplicated gate logic.
     /// Post-cost activation-keyword check. Returns Ok(()) when the ability's
     /// position keywords are satisfied (or it has none / isn't an on-stage card).
+    /// Shared by `gate_post_cost_position` (result filing) and
+    /// `gates::post_cost_position_gate` (composite) — one filter, two callers.
+    #[allow(dead_code)]
     fn check_post_cost_position_keywords(
         &mut self,
         gs: &mut GameState,
@@ -861,6 +844,10 @@ impl AbilityResolver {
     }
 
     /// Gate: reject already-exhausted turn-limited abilities.
+    /// Pre-composite filing site: the live path runs `pre_cost_gates()`
+    /// (which owns the reach check via `gates::use_limit_gate`); this stays
+    /// for direct callers that need the `skipped` result filed with debug.
+    #[allow(dead_code)]
     fn gate_ability_use_limit(
         &mut self,
         gs: &mut GameState,
@@ -877,7 +864,7 @@ impl AbilityResolver {
             return Ok(());
         };
         let _ = ability_key;
-        if !self.check_use_limit_reached(gs, card_id, ability_index, use_limit) {
+        if use_limit_gate(self, gs, ability).is_continue() {
             return Ok(());
         }
         let used = gs.ability_uses_used(card_id, ability_index);
@@ -892,8 +879,12 @@ impl AbilityResolver {
     }
 
     /// Gate: activation keywords (center/left/right/turn position restrictions).
+    /// Pre-composite filing site: the live path runs `pre_cost_gates()`
+    /// (which owns the check via `gates::activation_keywords_gate`); this
+    /// stays for direct callers that need the `position_fail` result filed.
+    #[allow(dead_code)]
     fn gate_activation_keywords(
-        &self,
+        &mut self,
         gs: &mut GameState,
         ability: &Ability,
         activating_card: Option<i16>,
@@ -901,8 +892,8 @@ impl AbilityResolver {
         let Some(card_id) = activating_card else {
             return Ok(());
         };
-        let position = gs.find_card_stage_position(card_id);
-        if self.check_keywords(gs, ability.keywords.as_ref().unwrap_or(&vec![]), position) {
+        let _ = card_id;
+        if activation_keywords_gate(self, gs, ability).is_continue() {
             return Ok(());
         }
         let items = drain_verdicts();
@@ -962,6 +953,10 @@ impl AbilityResolver {
 
     /// Record the turn-limit key early (before the effect runs) unless the
     /// effect is still undecided (conditional_on_optional / optional effect).
+    /// Pre-composite phase helper: the live path inlines
+    /// `gates::record_use_limit(Early)` directly; this stays for direct
+    /// callers that resolve an ability without the full pipeline.
+    #[allow(dead_code)]
     fn record_early_ability_use(
         &mut self,
         gs: &mut GameState,
@@ -969,52 +964,29 @@ impl AbilityResolver {
         ability_key: Option<(i16, usize, u8)>,
         cost_already_paid: bool,
     ) {
-        // Record use_limit early only if the effect's conditions can be met
-        // AND it's not a conditional_on_optional (the optional cost hasn't been
-        // decided yet — record after the choice if the player pays).
-        // This prevents consuming use_limit on premature triggers (e.g. auto
-        // abilities queued eagerly before their trigger condition is satisfied).
-        let is_conditional_optional = ability
-            .effect
-            .as_ref()
-            .is_some_and(|e| e.action == crate::ability::enums::ActionType::ConditionalOnOptional);
-        let is_optional_effect = ability
-            .effect
-            .as_ref()
-            .is_some_and(|e| e.optional.unwrap_or(false));
-        // For optional effects (may place / may use), the use_limit is consumed
-        // by the EFFECT execution, not the trigger. If the player skips the
-        // optional effect later, the key is never inserted.
-        if cost_already_paid
-            || self.pending_choice.is_some()
-            || is_conditional_optional
-            || is_optional_effect
-        {
-            return;
-        }
-        if let Some(ref key) = ability_key {
-            self.record_ability_use_guarded(gs, *key, ability, false);
-        }
+        record_use_limit(self, gs, ability, ability_key, cost_already_paid, UseLimitPhase::Early, None);
     }
 
     /// Drain: a pending choice created by cost payment ends resolution here.
     /// Returns true when the caller must `return Ok(())`.
+    /// Pre-composite phase helper: the live path inlines
+    /// `gates::handle_pending_choice(cost)` directly; this stays for direct
+    /// callers.
+    #[allow(dead_code)]
     fn drain_cost_pending_choice(&mut self, gs: &mut GameState, cost_already_paid: bool) -> bool {
-        if self.pending_choice.is_none() {
-            return false;
-        }
-        if !cost_already_paid {
-            if let Some(entry) = gs.ability_queue.current_entry_mut() {
-                entry.cost_paid = true;
-            }
-        }
-        self.store_pending_choice(gs);
-        true
+        let ability = self.current_ability.clone().unwrap_or_default();
+        let key = self.activating_card_id.map(|id| (id, self.current_ability_index.unwrap_or(0), gs.turn_number));
+        handle_pending_choice(self, gs, &ability, key, cost_already_paid, true)
     }
 
     /// Gate: post-cost stage-position keywords gate the effect, not the cost.
     /// Returns true to continue, false when the effect was skipped (result
     /// already recorded — the caller must `return Ok(())`).
+    /// Owns the position_fail result filing (including the auto-ability log
+    /// suppression); the keyword filter itself is shared with
+    /// `gates::post_cost_position_gate` via `check_post_cost_position_keywords`.
+    /// Pre-composite filing site: the live path runs `post_cost_gates()`.
+    #[allow(dead_code)]
     fn gate_post_cost_position(
         &mut self,
         gs: &mut GameState,
@@ -1041,6 +1013,10 @@ impl AbilityResolver {
 
     /// Gate: a skipped optional cost suppresses the primary effect.
     /// Returns true when the effect was skipped (caller must `return Ok(())`).
+    /// Thin delegate to `gates::optional_cost_skip_gate` — the gate owns the
+    /// `optional_cost_result` read; this only files the `skipped` result.
+    /// Pre-composite filing site: the live path runs `post_cost_gates()`.
+    #[allow(dead_code)]
     fn gate_optional_cost_skip(
         &mut self,
         gs: &mut GameState,
@@ -1048,13 +1024,10 @@ impl AbilityResolver {
         ability_index: usize,
         dbg: &mut AbDebug,
     ) -> bool {
-        // When an optional cost was skipped (no eligible cards or player declined),
-        // the primary effect should not run. Handles colon-gated patterns like
-        // "may discard X: gain Y" where the colon gates the effect.
-        let cost_was_skipped = gs
-            .ability_queue
-            .current_entry()
-            .is_some_and(|e| e.optional_cost_result == Some(false));
+        use super::gates::optional_cost_skip_gate;
+        let dummy = Ability::default();
+        let gate_result = optional_cost_skip_gate(self, gs, &dummy);
+        let cost_was_skipped = gate_result.is_stop();
         log::debug!(
             "[COST] source={:?} ability={} effect_gate={} optional_cost_result={:?}",
             activating_card,
@@ -1066,9 +1039,6 @@ impl AbilityResolver {
         );
         if !cost_was_skipped {
             return false;
-        }
-        if let Some(entry) = gs.ability_queue.current_entry_mut() {
-            entry.effect_started = true;
         }
         dbg.p("RESULT", "optional cost skipped — effect not executed");
         let items = drain_verdicts();
@@ -1091,6 +1061,16 @@ impl AbilityResolver {
         let Some(ref effect) = ability.effect else {
             return Ok(false);
         };
+        
+        // Effect-level gates
+        let gate_result = effect_gates().check_all(self, gs, effect);
+        if gate_result.is_stop() {
+            let (reason, result_type) = gate_result.unwrap_stop();
+            let items = drain_verdicts();
+            self.push_ability_result(gs, &result_type, items, Some(&reason));
+            return Ok(true);
+        }
+        
         // Check the effect's condition BEFORE executing. The condition must
         // be met in the current game state (after cost payment). This prevents
         // effects like "choice" from being shown when the condition fails.
@@ -1178,6 +1158,10 @@ impl AbilityResolver {
     }
 
     /// Phase: final turn-limit accounting after the effect ran.
+    /// Pre-composite phase helper: the live path inlines
+    /// `gates::record_use_limit(Final)` directly; this stays for direct
+    /// callers.
+    #[allow(dead_code)]
     fn record_final_ability_use(
         &mut self,
         gs: &mut GameState,
@@ -1185,33 +1169,7 @@ impl AbilityResolver {
         ability_key: Option<(i16, usize, u8)>,
         cost_already_paid: bool,
     ) {
-        if !cost_already_paid {
-            if let Some(ref key) = ability_key {
-                self.record_ability_use_guarded(gs, *key, ability, false);
-            }
-        }
-        if let Some(key) = ability_key {
-            if ability.use_limit.is_some() {
-                // When cost is already paid (e.g. conditional_on_optional's second entry
-                // after the player accepted), the effect already ran and may have moved
-                // cards around.  Re-checking can_activate_effect would see stale state
-                // (the resolver's moved_cards includes cards moved BY this effect), so
-                // the condition can spuriously fail and the key never gets inserted.
-                // Skip the can_activate_effect guard when cost is already paid AND the
-                // ability is a conditional_on_optional (the player already accepted).
-                let is_cond_opt = ability.effect.as_ref().is_some_and(|e| {
-                    e.action == crate::ability::enums::ActionType::ConditionalOnOptional
-                });
-                if (cost_already_paid && is_cond_opt)
-                    || ability
-                        .effect
-                        .as_ref()
-                        .is_none_or(|e| self.can_activate_effect(gs, e))
-                {
-                    gs.record_ability_use(key);
-                }
-            }
-        }
+        record_use_limit(self, gs, ability, ability_key, cost_already_paid, UseLimitPhase::Final, None);
     }
 
     /// Phase: clear per-ability resolver state + close the debug trace.
@@ -1264,10 +1222,14 @@ impl AbilityResolver {
         self.current_ability_index = Some(ability_index);
         gs.activating_card = activating_card;
 
-        self.gate_ability_use_limit(gs, ability, activating_card, ability_index, ability_key, &mut dbg)?;
-
-        // Check activation keywords (center/left/right/turn position restrictions)
-        self.gate_activation_keywords(gs, ability, activating_card)?;
+        // Pre-cost gates
+        let pre_gate_result = pre_cost_gates().check_all(self, gs, ability);
+        if pre_gate_result.is_stop() {
+            let (reason, result_type) = pre_gate_result.unwrap_stop();
+            let items = drain_verdicts();
+            self.push_ability_result(gs, &result_type, items, Some(&reason));
+            return Err(reason);
+        }
 
         let cost_already_paid = gs
             .ability_queue
@@ -1276,14 +1238,20 @@ impl AbilityResolver {
 
         self.pay_ability_cost(gs, ability, cost_already_paid, &mut dbg)?;
 
-        self.record_early_ability_use(gs, ability, ability_key, cost_already_paid);
+        // Early use limit recording
+        record_use_limit(self, gs, ability, ability_key, cost_already_paid, UseLimitPhase::Early, None);
 
-        if self.drain_cost_pending_choice(gs, cost_already_paid) {
+        if handle_pending_choice(self, gs, ability, ability_key, cost_already_paid, true) {
             return Ok(());
         }
 
-        if !self.gate_post_cost_position(gs, ability, activating_card, &card_name, &mut dbg) {
-            return Ok(());
+        // Post-cost gates
+        let post_gate_result = post_cost_gates().check_all(self, gs, ability);
+        if post_gate_result.is_stop() {
+            let (reason, result_type) = post_gate_result.unwrap_stop();
+            let items = drain_verdicts();
+            self.push_ability_result(gs, &result_type, items, Some(&reason));
+            return Err(reason);
         }
 
         // Mark cost as paid when it auto-resolved without creating a pending choice.
@@ -1293,7 +1261,7 @@ impl AbilityResolver {
             }
         }
 
-        if self.gate_optional_cost_skip(gs, activating_card, ability_index, &mut dbg) {
+        if handle_pending_choice(self, gs, ability, ability_key, cost_already_paid, true) {
             return Ok(());
         }
 
@@ -1301,7 +1269,8 @@ impl AbilityResolver {
             return Ok(());
         }
 
-        self.record_final_ability_use(gs, ability, ability_key, cost_already_paid);
+        // Final use limit recording
+        record_use_limit(self, gs, ability, ability_key, cost_already_paid, UseLimitPhase::Final, None);
         self.finish_ability_resolution(gs);
 
         Ok(())

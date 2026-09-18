@@ -18,6 +18,8 @@ use alloc::{
 use core::sync::atomic::Ordering;
 use smallvec::SmallVec;
 
+mod result_handlers;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Continuation {
     Immediate,
@@ -271,130 +273,11 @@ impl super::resolver::AbilityResolver {
     ) -> Result<(), String> {
         let choice = self.pending_choice.clone();
         let context = self.execution_context.clone();
-        match (&choice, result) {
-            (
-                Some(Choice::SelectCard {
-                    zone,
-                    card_type,
-                    count,
-                    description: _,
-                    allow_skip,
-                    cost_limit,
-                    cost_limit_operator,
-                    cost_total,
-                    cost_total_operator,
-                    group,
-                    characters,
-                    filtered_indices,
-                    is_select_action,
-                    ref target_player_id,
-                    blind,
-                    destination,
-                    discard_remaining,
-                    ..
-                }),
-                ChoiceResult::CardSelected { indices },
-            ) => self.handle_select_card(
-                gs,
-                choice.as_ref().unwrap(),
-                zone,
-                context,
-                SelectionContext {
-                    card_type: card_type.clone(),
-                    count: *count,
-                    allow_skip: *allow_skip,
-                    indices: indices.to_vec(),
-                    cost_limit: *cost_limit,
-                    cost_limit_operator: cost_limit_operator.clone(),
-                    cost_total: *cost_total,
-                    cost_total_operator: cost_total_operator.clone(),
-                    group: group.clone(),
-                    characters: characters.clone(),
-                    filtered_indices: filtered_indices.clone(),
-                    is_select_action: *is_select_action,
-                    target_player_id: target_player_id.clone(),
-                    destination: destination.clone(),
-                    discard_remaining: *discard_remaining,
-                    blind: *blind,
-                    is_reveal: choice.as_ref().is_some_and(|c| {
-                        matches!(
-                            c,
-                            Choice::SelectCard {
-                                is_reveal: true,
-                                ..
-                            }
-                        )
-                    }),
-                },
-            ),
-            (
-                Some(Choice::SelectCard {
-                    count: 0,
-                    allow_skip: true,
-                    ..
-                }),
-                ChoiceResult::Skip,
-            ) => {
-                // any_number re-prompt skip: cards were already moved in a
-                // previous sub-selection. Resume pending actions so
-                // downstream actions (e.g. gain_resource) still execute.
-                self.clear_choice_state_and_resume(gs)
-            }
-
-            (
-                Some(Choice::SelectTarget { target, allow_skip: false, .. }),
-                ChoiceResult::Skip,
-            ) if target == "order" => Err("Deck ordering cannot be skipped".to_string()),
-            (Some(Choice::SelectCard { .. } | Choice::SelectTarget { .. }), ChoiceResult::Skip) => {
-                // Skip the choice entirely — no option is executed.
-                gs.ability_queue.take_pending_actions();
-                self.clear_choice_state(gs);
-                self.resume_execution(gs, context)
-            }
-            (
-                Some(Choice::SelectTarget { target, .. }),
-                ChoiceResult::TargetSelected { target: selected },
-            ) if target == "area_select" => {
-                // area_select: selected is either a numeric index (for backward compat
-                // with direct select_option calls) or the actual area name (when the
-                // choice was rendered as position|destination buttons).
-                if let Some(Choice::SelectTarget {
-                    options: Some(ref opts),
-                    ..
-                }) = choice
-                {
-                    if let Ok(idx) = selected.parse::<usize>() {
-                        let opt = opts.get(idx).map(|s| s.as_str()).unwrap_or("left");
-                        self.selected_area = Some(opt.to_string());
-                    } else if opts.contains(&selected) {
-                        self.selected_area = Some(selected.clone());
-                    } else {
-                        self.selected_area = Some(opts[0].clone());
-                    }
-                    self.clear_choice_state(gs);
-                    return self.resume_pending_actions(gs);
-                }
-                self.selected_area = Some(selected.clone());
-                self.clear_choice_state(gs);
-                self.resume_pending_actions(gs)
-            }
-            (
-                Some(Choice::SelectTarget { target, .. }),
-                ChoiceResult::TargetSelected { target: selected },
-            ) => self.handle_select_target(gs, target, &selected),
-            (Some(Choice::SelectPosition { .. }), ChoiceResult::PositionSelected { position }) => {
-                self.handle_select_position(gs, &position, context)
-            }
-            (
-                Some(Choice::SelectHeartColor { count, .. }),
-                ChoiceResult::HeartColorSelected { colors },
-            )
-            | (
-                Some(Choice::SelectHeartType { count, .. }),
-                ChoiceResult::HeartTypeSelected { types: colors },
-            ) => self.handle_heart_selection(gs, *count as u8, &colors),
-            _ => Err("Choice result does not match pending choice".to_string()),
-        }
+        let registry = crate::ability::choice::result_handlers::init_choice_result_registry();
+        let Some(choice) = choice else {
+            return Err("No pending choice".to_string());
+        };
+        registry.handle(self, gs, &choice, &result, context)
     }
 
     /// Consume the deferred そうした場合 gate (parent-conditional sequential
@@ -3443,7 +3326,7 @@ modified.destination = Some(Zone::from_source_str(dest));
                 }
             }
             let cmd =
-                super::compound::route_conditional_branch(&effect, chose_yes, is_negation);
+                super::compound::conditional::route_conditional_branch(&effect, chose_yes, is_negation);
             log::debug!(
                 "[CONDITION] source={:?} action={} answer={:?} accepted={} negation={} branch={} next_action={:?}",
                 self.activating_card_id, effect.action, selected, chose_yes, is_negation,

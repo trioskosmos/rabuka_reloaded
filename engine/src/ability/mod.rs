@@ -37,6 +37,7 @@ pub mod move_cards;
 pub mod resolver;
 pub mod types;
 pub mod util;
+pub mod gates;
 
 pub mod abilities_gen;
 #[cfg(feature = "bytecode_abilities")]

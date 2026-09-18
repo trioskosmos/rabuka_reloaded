@@ -4,7 +4,7 @@ use super::super::resolver::AbilityResolver;
 use super::super::types::{Choice, ChoiceRoute, ExecutionContext};
 use super::super::util;
 use crate::ability_queue::ConditionalChoice;
-use crate::card::{AbilityEffect, PlacementOrder, PositionInfo};
+use crate::card::{AbilityEffect, PositionInfo};
 use crate::game_state::GameState;
 use crate::{HashMap, HashSet};
 #[cfg(feature = "no_std")]
@@ -48,65 +48,13 @@ struct GainTargets {
 }
 
 impl AbilityResolver {
-    pub(crate) fn execute_custom(
-        &mut self,
-        gs: &mut GameState,
-        effect: &AbilityEffect,
-        action_str: &str,
-    ) -> Result<(), String> {
-        // Handle "custom" actions that could not be parsed into a standard action type.
-        // Some custom actions have enough info to re-route to a known handler.
-
-        // 1) Deck reordering: placement_order=any_order → route as move_cards looked_at→deck_top
-        if effect.placement_order_any() == Some(PlacementOrder::AnyOrder) {
-            let mut routed = effect.clone();
-            routed.action = crate::ability::enums::ActionType::MoveCards;
-            if routed.source.is_none() {
-                routed.source = Some(Zone::LookedAt.to_str().into());
-            }
-            if routed.destination.is_none() {
-                routed.destination = Some(Zone::DeckTop.to_str().into());
-            }
-            self.current_effect = Some(routed.clone());
-            return self.execute_move_cards(gs, &routed);
-        }
-
-        // 2) Complex conditional scoring / gain_ability: has duration
-        if effect.duration_any().is_some() {
-            let text = if effect.text.is_empty() {
-                action_str
-            } else {
-                &effect.text
-            };
-            return self.execute_gain_ability(
-                gs,
-                text,
-                effect.target_any().unwrap_or("self"),
-                effect.duration_any().as_deref(),
-                effect.gained_effect_any().cloned(),
-                effect.ability_gain_trigger_any().as_deref(),
-                gs.activating_card,
-            );
-        }
-
-        log::debug!("Unhandled custom action: {}", action_str);
-        let pp = self.player_prefix(gs);
-        let act_name = gs
-            .activating_card
-            .map(|c| self.card_name(c))
-            .unwrap_or_default();
-        gs.rule_log
-            .push(format!("{} {}: [[log_custom_effect]]", pp, act_name));
-        Ok(())
-    }
-
     /// Handles target="both" by executing the effect for self, then opponent.
     /// Returns true if the effect was fully handled (has "both" target), false otherwise.
     pub(crate) fn handle_both_targets(
-        &mut self,
-        gs: &mut GameState,
-        effect: &AbilityEffect,
-    ) -> Result<bool, String> {
+            &mut self,
+            gs: &mut GameState,
+            effect: &AbilityEffect,
+        ) -> Result<bool, String> {
         // Skip if not "both" or if this is position_change (handles "both" internally)
         if effect.target.as_deref() != Some("both")
             || effect.action == crate::ability::enums::ActionType::PositionChange
@@ -3956,5 +3904,5 @@ impl AbilityResolver {
             .map(|c| c.name.to_string())
             .unwrap_or_else(|| format!("Card#{}", card_id))
     }
-
 }
+

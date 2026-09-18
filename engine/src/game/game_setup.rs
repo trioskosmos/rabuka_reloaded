@@ -18,22 +18,28 @@ use serde::{Deserialize, Serialize};
 #[cfg(not(feature = "no_std"))]
 use std::vec::Vec;
 
-pub fn area_label_en(area: &str) -> &str {
-    match area {
-        "left" | "left_side" => "Left",
-        "center" => "Center",
-        "right" | "right_side" => "Right",
-        other => other,
+/// Area label in both languages from ONE table. Previously two
+/// copy-pasted matches (`area_label_en` / `area_label_ja`) that could
+/// drift apart; the `ja` flag selects the column like describe.rs's
+/// `*_inner` helpers.
+fn area_label_inner(area: &str, ja: bool) -> &str {
+    match (area, ja) {
+        ("left" | "left_side", false) => "Left",
+        ("center", false) => "Center",
+        ("right" | "right_side", false) => "Right",
+        ("left" | "left_side", true) => "左",
+        ("center", true) => "センター",
+        ("right" | "right_side", true) => "右",
+        (other, _) => other,
     }
 }
 
+pub fn area_label_en(area: &str) -> &str {
+    area_label_inner(area, false)
+}
+
 pub fn area_label_ja(area: &str) -> &str {
-    match area {
-        "left" | "left_side" => "左",
-        "center" => "センター",
-        "right" | "right_side" => "右",
-        other => other,
-    }
+    area_label_inner(area, true)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -602,6 +608,40 @@ fn make_choice_pair(action_type: ActionType, yes_text: &str, no_text: &str) -> V
     ]
 }
 
+/// Pay/skip (or yes/no) decision pair. ONE builder for the PAY_SKIP and
+/// pay_cost_all arms of `generate_pending_choice_actions` below, which
+/// only differ in labels and the pay card_no.
+fn make_pay_skip_pair(
+    pay_label: String,
+    pay_label_ja: String,
+    pay_card_no: &str,
+    skip_label: String,
+    skip_label_ja: String,
+) -> Vec<Action> {
+    vec![
+        make_action_params(
+            ActionType::ChoiceDecision,
+            &pay_label,
+            ActionParameters {
+                card_id: Some(1),
+                card_no: Some(pay_card_no.to_string()),
+                ..make_params()
+            },
+        )
+        .with_ja(pay_label_ja),
+        make_action_params(
+            ActionType::ChoiceDecision,
+            &skip_label,
+            ActionParameters {
+                card_id: Some(0),
+                card_no: Some("skip_optional_cost".to_string()),
+                ..make_params()
+            },
+        )
+        .with_ja(skip_label_ja),
+    ]
+}
+
 fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> Vec<Action> {
     #[cfg(not(feature = "no_std"))]
     let _timer = crate::timer::Timer::start("generate_pending_choice_actions");
@@ -638,28 +678,13 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
                 } else {
                     "いいえ".to_string()
                 };
-                return vec![
-                    make_action_params(
-                        ActionType::ChoiceDecision,
-                        &pay_label,
-                        ActionParameters {
-                            card_id: Some(1),
-                            card_no: Some("pay_optional_cost".to_string()),
-                            ..make_params()
-                        },
-                    )
-                    .with_ja(pay_label_ja),
-                    make_action_params(
-                        ActionType::ChoiceDecision,
-                        &skip_label,
-                        ActionParameters {
-                            card_id: Some(0),
-                            card_no: Some("skip_optional_cost".to_string()),
-                            ..make_params()
-                        },
-                    )
-                    .with_ja(skip_label_ja),
-                ];
+                return make_pay_skip_pair(
+                    pay_label,
+                    pay_label_ja,
+                    "pay_optional_cost",
+                    skip_label,
+                    skip_label_ja,
+                );
             }
             if target == "pay_cost_all:discard_all" {
                 let desc_en = choice.description_en().unwrap_or(description);
@@ -677,28 +702,13 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
                     desc_ja.to_string()
                 };
                 let skip_label_ja = "スキップ".to_string();
-                return vec![
-                    make_action_params(
-                        ActionType::ChoiceDecision,
-                        &pay_label,
-                        ActionParameters {
-                            card_id: Some(1),
-                            card_no: Some("pay_cost_all".to_string()),
-                            ..make_params()
-                        },
-                    )
-                    .with_ja(pay_label_ja),
-                    make_action_params(
-                        ActionType::ChoiceDecision,
-                        &skip_label,
-                        ActionParameters {
-                            card_id: Some(0),
-                            card_no: Some("skip_optional_cost".to_string()),
-                            ..make_params()
-                        },
-                    )
-                    .with_ja(skip_label_ja),
-                ];
+                return make_pay_skip_pair(
+                    pay_label,
+                    pay_label_ja,
+                    "pay_cost_all",
+                    skip_label,
+                    skip_label_ja,
+                );
             }
             if target == "position|destination" || target == "area_select" {
                 let is_source = description == "Choose which member to move";
@@ -745,13 +755,10 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
                         let label_ja = if is_source {
                             action_desc!("{}", ja_area)
                         } else if let Some(ref src) = from_pos {
-                            let ja_src = match src.as_str() {
-                                "left" => "左",
-                                "center" => "センター",
-                                "right" => "右",
-                                _ => src,
-                            };
-                            action_desc!("{} → {}", ja_src, ja_area)
+                            // Source names here are Title-Case display names
+                            // ("Center") or member names, lowercased above —
+                            // all covered by the shared area table.
+                            action_desc!("{} → {}", area_label_ja(src), ja_area)
                         } else {
                             action_desc!("{}に移動", ja_area)
                         };
@@ -1438,6 +1445,14 @@ fn has_cannot_baton_touch(
     crate::ability::util::has_cannot_baton_touch_protection(card_db, card_id, existing_card)
 }
 
+/// Effective baton-touch cost of a stage member: printed cost plus
+/// constant modifiers, minimum 1. ONE definition shared by the single
+/// and double baton-touch price computations below (and parity with
+/// core/player.rs baton payment).
+fn effective_baton_cost(base_cost: Option<u8>, cost_modifier: i32) -> u8 {
+    (base_cost.unwrap_or(0) as i32 + cost_modifier).max(1) as u8
+}
+
 fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
     #[cfg(not(feature = "no_std"))]
     let _timer = crate::timer::Timer::start("generate_main_phase_actions");
@@ -1488,41 +1503,19 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
 
                     // Precompute per-area baton-touch protection once per hand card
                     // instead of re-scanning the stage member's abilities for every area.
-                    let baton_touch_protected: [bool; 3] = [
-                        stage_card_ids[0] != -1
-                            && stage_cards[0].is_some_and(|existing_card| {
+                    let baton_touch_protected: [bool; 3] = core::array::from_fn(|slot| {
+                        stage_card_ids[slot] != -1
+                            && stage_cards[slot].is_some_and(|existing_card| {
                                 !active_player
                                     .deployed_this_turn
-                                    .contains(&stage_card_ids[0])
+                                    .contains(&stage_card_ids[slot])
                                     && has_cannot_baton_touch(
                                         &game_state.card_database,
                                         *card_id,
                                         existing_card,
                                     )
-                            }),
-                        stage_card_ids[1] != -1
-                            && stage_cards[1].is_some_and(|existing_card| {
-                                !active_player
-                                    .deployed_this_turn
-                                    .contains(&stage_card_ids[1])
-                                    && has_cannot_baton_touch(
-                                        &game_state.card_database,
-                                        *card_id,
-                                        existing_card,
-                                    )
-                            }),
-                        stage_card_ids[2] != -1
-                            && stage_cards[2].is_some_and(|existing_card| {
-                                !active_player
-                                    .deployed_this_turn
-                                    .contains(&stage_card_ids[2])
-                                    && has_cannot_baton_touch(
-                                        &game_state.card_database,
-                                        *card_id,
-                                        existing_card,
-                                    )
-                            }),
-                    ];
+                            })
+                    });
 
                     let mut available_areas = Vec::with_capacity(3);
                     let mut has_any_available = false;
@@ -1551,10 +1544,10 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                                     if let Some(existing_member_card) = stage_cards[area_idx] {
                                         // Include constant cost modifiers (e.g. 唐 可可 +2):
                                         // parity with core/player.rs baton payment.
-                                        let member_cost = (existing_member_card.cost.unwrap_or(0)
-                                            as i32
-                                            + game_state.mods.get_cost_modifier(existing_member_id))
-                                        .max(1) as u8;
+                                        let member_cost = effective_baton_cost(
+                                            existing_member_card.cost,
+                                            game_state.mods.get_cost_modifier(existing_member_id),
+                                        );
                                         let cost_to_pay =
                                             effective_cost.saturating_sub(member_cost);
                                         if (active_energy_count as u8) >= cost_to_pay {
@@ -1607,26 +1600,22 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                             for j in (i + 1)..occupied.len() {
                                 let (_idx1, name1, cid1) = occupied[i];
                                 let (_idx2, name2, cid2) = occupied[j];
-                                let cost1 = game_state
-                                    .card_database
-                                    .get_card(cid1)
-                                    .and_then(|c| c.cost)
-                                    .map(|base| {
-                                        (base as i32
-                                            + game_state.mods.get_cost_modifier(cid1))
-                                        .max(1) as u8
-                                    })
-                                    .unwrap_or(0);
-                                let cost2 = game_state
-                                    .card_database
-                                    .get_card(cid2)
-                                    .and_then(|c| c.cost)
-                                    .map(|base| {
-                                        (base as i32
-                                            + game_state.mods.get_cost_modifier(cid2))
-                                        .max(1) as u8
-                                    })
-                                    .unwrap_or(0);
+                                let baton_cost_for = |cid: i16| {
+                                    // Missing card / missing printed cost stays 0
+                                    // (legacy `unwrap_or(0)`); otherwise the
+                                    // shared floor-at-1 formula applies.
+                                    game_state.card_database.get_card(cid)
+                                        .and_then(|c| c.cost)
+                                        .map(|base| {
+                                            effective_baton_cost(
+                                                Some(base),
+                                                game_state.mods.get_cost_modifier(cid),
+                                            )
+                                        })
+                                        .unwrap_or(0)
+                                };
+                                let cost1 = baton_cost_for(cid1);
+                                let cost2 = baton_cost_for(cid2);
                                 let combined = cost1 + cost2;
                                 let pair_cost = effective_cost.saturating_sub(combined);
                                 let area_names = [name1.to_string(), name2.to_string()];
@@ -1736,12 +1725,7 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                                 let area_indices: Vec<usize> = pair
                                     .areas
                                     .iter()
-                                    .map(|a| match a.as_str() {
-                                        "left" => 0,
-                                        "center" => 1,
-                                        "right" => 2,
-                                        _ => 0,
-                                    })
+                                    .map(|a| crate::ability::util::stage_position_index(a).unwrap_or(0))
                                     .collect();
                                 let (src0_en, src1_en, dst_en) = (
                                     area_label_en(pair.areas[0].as_str()),
