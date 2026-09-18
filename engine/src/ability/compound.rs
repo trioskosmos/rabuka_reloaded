@@ -34,38 +34,33 @@ pub(crate) fn route_conditional_branch(
     }
 }
 
+/// Decision from sequential conditional routing for one step.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum StepRoute {
+    Execute,
+    Skip,
+}
+
+fn save_remaining_actions(
+    gs: &mut crate::game_state::GameState,
+    remaining: Vec<Box<AbilityEffect>>,
+) {
+    if !remaining.is_empty() {
+        let mut existing = gs.ability_queue.take_pending_actions();
+        existing.extend(remaining.into_iter().map(|b| *b));
+        gs.ability_queue.set_pending_actions(existing);
+    }
+}
+
 impl AbilityResolver {
-    // Rule 9.2.1.1 / Q94 / Q107 / Q217: Sequential effect execution
-    //
-    // Executes a list of sub-actions in order (Rule 9.2.1.1: single effects
-    // resolve completely before the next begins). Supports:
-    //
-    //   • Conditions on individual steps (if-then-else routing)
-    //   • "otherwise_condition" steps that fire only when previous cond failed
-    //   • "repeat_procedure" for looping sub-actions
-    //   • Optional steps that gate subsequent actions ("そうした場合")
-    //   • per_unit inheritance from parent to sub-actions
-    //
-    // Q94 / Q255 / Q263: Area-move + sequential
-    //   Each area move is a separate trigger. Sequential effects run once
-    //   per trigger invocation, not once per area move within one trigger.
-    //
-    // Q107: Re-yell after sequential discard
-    //   The sequential pipeline's step_output tracking allows downstream
-    //   conditions to reference upstream results (e.g. "if revealed cards
-    //   had no live → discard → re-yell").
-    //
-    // Q217: "any_number" cost paid as 0 → still counts as "paid" for
-    //   sequential gating (was_moved = 0 but optional_cost_result = true
-    //   because the player affirmatively chose to pay 0).
-    //
-    // Rule 9.6.2.4.2: Even if the card bearing the ability leaves its
-    //   original zone mid-resolution, the remaining steps still resolve.
-    pub fn execute_sequential_effect(
+    /// Setup for a sequential run: trace label/node, step-state reset, and the
+    /// top-level sequence condition gate. `Err(())` means "skipped — caller
+    /// must `return Ok(())`".
+    fn setup_sequential(
         &mut self,
         gs: &mut GameState,
         effect: &AbilityEffect,
-    ) -> Result<(), String> {
+    ) -> Result<Option<AbilityTraceNode>, ()> {
         let conditional = effect.conditional.unwrap_or(false);
         let is_further = effect.is_further.unwrap_or(false);
         // Trace sequential compound effect
@@ -101,29 +96,570 @@ impl AbilityResolver {
         };
         if !cond_met {
             log::debug!("[SEQUENCE] source={:?} action={} skipped: sequence condition failed", self.activating_card_id, effect.action);
-            return Ok(());
+            return Err(());
         }
+        Ok(seq_node)
+    }
+
+    /// Split trailing `repeat_procedure` off the step list.
+    /// Returns `(steps_to_run, total_iterations, has_repeat)`.
+    fn split_repeat_actions(actions: &[Box<AbilityEffect>]) -> (&[Box<AbilityEffect>], u8, bool) {
+        let has_repeat = actions
+            .last()
+            .is_some_and(|a| a.action == ActionType::RepeatProcedure);
+        let repeat_max = if has_repeat {
+            // repeat_limit = max additional iterations (e.g. 4 = 4 more times)
+            // Total iterations = initial + max_repeats
+            actions
+                .last()
+                .and_then(|a| a.repeat_limit_any())
+                .unwrap_or(1)
+                + 1
+        } else {
+            1
+        };
+        let repeat_actions = if has_repeat {
+            &actions[..actions.len() - 1]
+        } else {
+            actions
+        };
+        (repeat_actions, repeat_max, has_repeat)
+    }
+
+    /// Conditional routing for one sequential step:
+    ///  • is_otherwise  → skip if condition met, execute if failed
+    ///  • has condition  → evaluate directly (for otherwise routing)
+    ///  • no condition + parent-conditional → skip if preceding failed
+    fn route_sequential_step(
+        &mut self,
+        gs: &mut GameState,
+        repeat_actions: &[Box<AbilityEffect>],
+        i: usize,
+        repeat_idx: u8,
+        condition_failed: &mut Option<bool>,
+    ) -> StepRoute {
+        let action = &repeat_actions[i];
+        let is_otherwise = action
+            .condition
+            .as_ref()
+            .is_some_and(|c| matches!(c.as_ref(), Condition::AlwaysTrue { .. }));
+        if is_otherwise {
+            match *condition_failed {
+                Some(false) => {
+                    log::debug!("[SEQUENCE] source={:?} repeat={} step={} action={} skipped: otherwise branch after passed condition", self.activating_card_id, repeat_idx + 1, i + 1, action.action);
+                    *condition_failed = None;
+                    return StepRoute::Skip;
+                }
+                Some(true) => {
+                    *condition_failed = None;
+                    return StepRoute::Execute;
+                }
+                None => return StepRoute::Execute,
+            }
+        }
+        if *condition_failed == Some(true) && action.condition.is_none() {
+            log::debug!("[SEQUENCE] source={:?} repeat={} step={} action={} skipped: preceding condition failed", self.activating_card_id, repeat_idx + 1, i + 1, action.action);
+            // Don't reset condition_failed — keep it so ALL subsequent
+            // conditionless actions in this conditional sequential are
+            // skipped, not just the very next one.
+            return StepRoute::Skip;
+        }
+        if action.condition.is_some() {
+            // Evaluate explicit condition — when it fails, skip the
+            // action. Subsequent otherwise-condition steps check the
+            // cached result.
+            // When the same condition text appears on consecutive
+            // actions (parser splits compound predicates like
+            // "if X: do A AND do B" into separate steps), reuse
+            // the first evaluation's result instead of re-evaluating
+            // against stale state (e.g. revealed_cards emptied by
+            // the first action's execution).
+            let same_as_prev = i > 0
+                && repeat_actions[i - 1].condition.as_ref()
+                    == action.condition.as_ref();
+            if same_as_prev {
+                log::debug!("[SEQUENCE] source={:?} repeat={} step={} action={} decision={} verdict=previous_step condition_failed={:?}", self.activating_card_id, repeat_idx + 1, i + 1, action.action, if *condition_failed == Some(true) { "skip" } else { "continue" }, *condition_failed);
+                if *condition_failed == Some(true) {
+                    return StepRoute::Skip;
+                }
+                return StepRoute::Execute;
+            }
+            let cond = action.condition.as_ref().unwrap();
+            // Check cache first — avoids re-evaluation against stale
+            // game state after a choice round-trip.
+            let cached = self.cached_condition_verdict(gs, cond);
+            let passed = if cached == Some(true) {
+                true
+            } else {
+                let ctx = ConditionContext::with_moved_cards(gs, &self.moved_cards);
+                let p = ctx.evaluate_condition(cond);
+                // Cache the result if condition asks for it
+                self.store_condition_verdict(gs, cond, p);
+                p
+            };
+            if !action.optional.unwrap_or(false) {
+                *condition_failed = Some(!passed);
+            }
+            log::debug!("[SEQUENCE] source={:?} repeat={} step={} action={} decision={} passed={} cached={:?} reused_cache={}", self.activating_card_id, repeat_idx + 1, i + 1, action.action, if passed { "continue" } else { "skip: condition failed" }, passed, cached, cached == Some(true));
+            if !passed {
+                return StepRoute::Skip;
+            }
+        }
+        StepRoute::Execute
+    }
+
+    /// Clone a step for execution: strip the already-gated condition and
+    /// inherit per_unit / self_target / card_names from the parent effect.
+    /// Only inherit per_unit properties for actions that support them —
+    /// discard/move_cards actions must not inherit per_unit multipliers.
+    fn prepare_sequential_action(
+        effect: &AbilityEffect,
+        action: &AbilityEffect,
+        i: usize,
+        first: &AbilityEffect,
+    ) -> AbilityEffect {
+        let mut action_to_execute = action.clone();
+        // Clear the condition on the clone — the sequential loop already
+        // checked/gated on it above. Without this, execute_effect →
+        // can_activate_effect re-evaluates the condition against potentially
+        // stale game state (e.g. revealed_cards emptied by a prior step).
+        action_to_execute.condition = None;
+        let supports_per_unit = matches!(
+            action.action,
+            ActionType::DrawCard
+                | ActionType::GainResource
+                | ActionType::ModifyScore
+                | ActionType::ModifyRequiredHearts
+                | ActionType::GainAbility
+                | ActionType::SetBladeCount
+                | ActionType::LookAt
+        );
+        if supports_per_unit {
+            if action_to_execute.per_unit_any().is_none()
+                && effect.per_unit_any().is_some()
+            {
+                action_to_execute.set_per_unit(effect.per_unit_any());
+            }
+            if action_to_execute.per_unit_count_any().is_none()
+                && effect.per_unit_count_any().is_some()
+            {
+                action_to_execute.set_per_unit_count(effect.per_unit_count_any());
+            }
+            if action_to_execute.per_unit_type_any().is_none()
+                && effect.per_unit_type_any().is_some()
+            {
+                action_to_execute
+                    .set_per_unit_type(effect.per_unit_type_any().map(|s| s.into()));
+            }
+            // distinct rides on the per-unit wrapper for
+            // ModifyRequiredHearts (e.g. ディストーション:
+            // "名前の異なる『CatChu!』のメンバー1人につき" applies to BOTH the
+            // heart00-decrease and heart02-increase sub-actions). Without
+            // inheriting it, duplicate-named members count twice.
+            // Deliberately NOT inherited for gain_resource — there,
+            // distinct filters TARGET SELECTION (self_and_other patterns
+            // carry it explicitly per-action) and blind inheritance
+            // breaks "メンバー1人" picking.
+            if action.action == ActionType::ModifyRequiredHearts
+                && action_to_execute.distinct_any().is_none()
+            {
+                if let Some(d) = effect.distinct_any() {
+                    if let Some(f) = action_to_execute
+                        .kind
+                        .as_deref_mut()
+                        .and_then(|k| k.filter_mut())
+                    {
+                        f.distinct = Some(Box::new(d));
+                    }
+                }
+            }
+        }
+        // Inherit self_target from the parent effect or the first
+        // sub-action when this action doesn't have it set.
+        // Japanese grammar attaches "このカード" (this card) to the
+        // first verb only, but the intent applies to all verbs in
+        // a compound sentence (e.g. EMOTION: "card's score+2 AND
+        // required hearts+3" — both target the card itself).
+        // Exception: don't inherit when the current action has an
+        // explicit card_type that differs from the inherited target
+        // (e.g. modify_score self_target bleeds into gain_resource
+        // member_card — the live card is not a member on stage).
+        if action_to_execute.self_target_any().is_none() {
+            let inheritable = if i > 0 {
+                let first_ct_binding = first.card_type_any();
+                let first_ct = first_ct_binding;
+                let cur_ct_binding = action.card_type_any();
+                let cur_ct = cur_ct_binding;
+                // If the first action targets a live card (no card_type
+                // or live_card) and the current targets a member, don't
+                // inherit — they're different cards entirely.
+                !(first_ct != Some(&crate::card::CardType::Member)
+                    && cur_ct == Some(&crate::card::CardType::Member))
+            } else {
+                true
+            };
+            if inheritable {
+                // Only inherit self_target to action types that actually
+                // support it. "このカード" (this card) in a compound sentence
+                // applies to score/heart modifiers, not to generic draw or
+                // move actions. Prevent cascading into nested sequentials
+                // (draw+move inside would inherit from the nested container).
+                let supports_self = matches!(
+                    action.action,
+                    ActionType::ModifyScore
+                        | ActionType::ModifyRequiredHearts
+                        | ActionType::GainResource
+                        | ActionType::ChangeState
+                );
+                if effect.self_target_any().is_some() && supports_self {
+                    action_to_execute.set_self_target(effect.self_target_any());
+                } else if i > 0 && supports_self {
+                    action_to_execute
+                        .set_self_target(first.self_target_any());
+                }
+            }
+        }
+        // Inherit card_names from the parent (set at the sequential
+        // level, e.g. EMOTION's "card_names": ["EMOTION"]) so that
+        // per-unit counting in sub-actions only counts matching cards.
+        if action_to_execute
+            .card_names_any()
+            .map_or(true, |v| v.is_empty())
+            && !effect.card_names_any().map_or(true, |v| v.is_empty())
+        {
+            if let Some(names) = effect.card_names_any() {
+                action_to_execute.set_card_names(names.clone());
+            }
+        }
+        action_to_execute
+    }
+
+    /// "…したとき" (when you do so) gate: a consequence step that immediately
+    /// follows a move is only applied when that move actually moved a card.
+    /// Returns true when the step must be skipped. Always clears the flag so
+    /// it never gates an unrelated later step.
+    fn gate_sequential_consequence(
+        &mut self,
+        action: &AbilityEffect,
+        repeat_idx: u8,
+        i: usize,
+    ) -> bool {
+        // Consequence shapes: a modify_score (G13 "そうしたとき +1") and a
+        // recover-self move (G7 "そうしたとき 控え室からこのカードを手札に加える").
+        // The flag is set by execute_move_cards.
+        let is_gated_consequence = action.action == ActionType::ModifyScore
+            || (action.action == ActionType::MoveCards
+                && action.destination == Some(Zone::Hand)
+                && action.is_self_target()
+                && action.source_any().is_some_and(|s| {
+                    s == "discard" || s == "waitroom"
+                }));
+        if is_gated_consequence && self.last_move_moved_any == Some(false) {
+            log::debug!("[SEQUENCE] source={:?} repeat={} step={} action={} skipped: preceding move moved no cards", self.activating_card_id, repeat_idx + 1, i + 1, action.action);
+            self.last_move_moved_any = None;
+            return true;
+        }
+        self.last_move_moved_any = None;
+        false
+    }
+
+    /// Record a finished step's output under its id (if any) so downstream
+    /// steps in the same sequential can reference it via `ref: "<id>"`.
+    fn record_step_output(&mut self, gs: &mut GameState, action: &AbilityEffect, repeat_idx: u8, i: usize) {
+        if let Some(ref step_id) = action.id_any() {
+            let mut out = StepOutput::default();
+            // Capture cards the step "produced": selected
+            // cards, moved cards, or looked-at cards.
+            // We take whichever is most relevant for the
+            // action type. Heuristic ordering matches
+            // what the cost handlers do: selected > moved
+            // > looked_at.
+            if !self.selected_cards.is_empty() {
+                out.cards.extend_from_slice(&self.selected_cards);
+            } else if !self.moved_cards.is_empty() {
+                out.cards.extend_from_slice(&self.moved_cards);
+            } else if !gs.looked_at_cards.is_empty() {
+                out.cards.extend_from_slice(&gs.looked_at_cards);
+            } else if !gs.revealed_cards.is_empty() {
+                out.cards.extend_from_slice(&gs.revealed_cards);
+            }
+            if self.step_state.last_draw_count > 0 {
+                out.value = Some(self.step_state.last_draw_count as i32);
+            }
+            self.step_state
+                .step_results
+                .entry(step_id.to_string())
+                .or_insert_with(StepOutput::default)
+                .merge(&out);
+            log::debug!(
+                "[SEQUENCE] source={:?} repeat={} step={} action={} output_id={} cards={:?} value={:?}",
+                self.activating_card_id,
+                repeat_idx + 1,
+                i + 1,
+                action.action,
+                step_id,
+                out.cards,
+                out.value
+            );
+        }
+    }
+
+    /// Pause the sequential on a pending choice: arm the deferred
+    /// parent-conditional gate, strip already-settled otherwise conditions
+    /// from the saved remainder, stash repeat state, and park the rest.
+    /// The caller must `return Ok(())` afterwards.
+    #[allow(clippy::too_many_arguments)]
+    fn pause_for_sequential_choice(
+        &mut self,
+        gs: &mut GameState,
+        repeat_actions: &[Box<AbilityEffect>],
+        actions: &[Box<AbilityEffect>],
+        i: usize,
+        action: &AbilityEffect,
+        conditional: bool,
+        condition_failed: Option<bool>,
+        repeats_remaining: u8,
+        has_repeat: bool,
+        repeat_idx: u8,
+    ) {
+        let current_was_optional = action.optional.unwrap_or(false);
+        let is_opponent_action = action.action
+            == ActionType::OpponentAction
+            || action.action_by().as_deref() == Some("opponent");
+        // Parent-conditional (そうした場合) gating: when
+        // the gate could not be evaluated yet (the move
+        // deferred to a selection), arm the deferred
+        // gate so the answer handler attributes the
+        // outcome (empty/skip => drop remaining).
+        if conditional
+            && action.condition.is_none()
+            && condition_failed.is_none()
+            && !is_opponent_action
+        {
+            self.deferred_conditional_gate = true;
+        }
+        // Some handlers fully execute the effect during choice
+        // resolution (SelectCard moves cards, PositionChange swaps
+        // members). Re-executing with optional=None would duplicate
+        // the effect. Detect by Choice variant — the variant
+        // encodes whether the handler completed the work.
+        let completes_in_handler =
+            self.pending_choice.as_ref().is_some_and(|c| {
+                matches!(
+                    c,
+                    crate::ability::types::Choice::SelectCard { .. }
+                )
+            }) || matches!(
+                self.pending_choice.as_ref(),
+                Some(crate::ability::types::Choice::SelectTarget {
+                    target,
+                    ..
+                }) if target == "position|destination"
+            );
+        let mut remaining = if current_was_optional
+            && i + 1 < repeat_actions.len()
+            && !is_opponent_action
+            && !completes_in_handler
+        {
+            let mut acts: Vec<Box<AbilityEffect>> =
+                repeat_actions[i..].to_vec();
+            if !acts.is_empty() {
+                acts[0].set_optional(None);
+            }
+            acts
+        } else {
+            repeat_actions[i + 1..].to_vec()
+        };
+        // When the condition already passed (Some(false)),
+        // strip otherwise-condition actions from remaining
+        // so they aren't re-executed by RPC.
+        if condition_failed == Some(false) {
+            remaining.retain(|a| {
+                !a.condition.as_ref().is_some_and(|c| {
+                    matches!(c.as_ref(), Condition::AlwaysTrue { .. })
+                })
+            });
+        }
+        // Strip AllRevealedMatchHeartColor conditions from
+        // saved pending actions only when the sequential loop
+        // already evaluated a condition and it passed
+        // (condition_failed == Some(false)). When condition_failed
+        // is None, no conditions have been evaluated yet — the
+        // gating must be preserved for proper re-evaluation
+        // during resume_pending_actions.
+        if condition_failed == Some(false) {
+            for a in &mut remaining {
+                if a.condition.as_ref().is_some_and(|c| {
+                    matches!(
+                        c.as_ref(),
+                        Condition::AllRevealedMatchHeartColor { .. }
+                    )
+                }) {
+                    a.condition = None;
+                }
+            }
+        }
+        // Store remaining repeats on the resolver for
+        // one-at-a-time feeding after each iteration completes.
+        // We DON'T pre-load them into pending_commands — that
+        // causes duplication with RPC's merge logic.
+        if repeats_remaining > 0 && has_repeat {
+            if let Some(ref repeat_action) = actions.last() {
+                if repeat_action.action == ActionType::RepeatProcedure
+                    && repeat_action.optional.unwrap_or(false)
+                {
+                    for _ in 0..repeats_remaining {
+                        self.pending_repeat_actions
+                            .extend(repeat_actions.iter().cloned());
+                    }
+                }
+            }
+        }
+        log::debug!("[SEQUENCE] source={:?} repeat={} step={} action={} paused: deferred_gate={} remaining={:?} repeat_actions={}", self.activating_card_id, repeat_idx + 1, i + 1, action.action, self.deferred_conditional_gate, remaining.iter().map(|a| a.action).collect::<Vec<_>>(), self.pending_repeat_actions.len());
+        save_remaining_actions(gs, remaining);
+    }
+
+    /// Post-step tracking for non-choice steps. Returns true when the caller
+    /// must `return Ok(())` (cancelled remainder / optional no-target stop).
+    fn track_sequential_post_step(
+        &mut self,
+        gs: &mut GameState,
+        action: &AbilityEffect,
+        conditional: bool,
+        condition_failed: &mut Option<bool>,
+        moved_before: usize,
+        selected_before: usize,
+        repeat_idx: u8,
+        i: usize,
+    ) -> bool {
+        if self.cancel_remaining_commands {
+            // An optional sub-action (e.g. pay_energy with insufficient
+            // energy) requested cancellation of subsequent actions.
+            self.cancel_remaining_commands = false;
+            log::debug!("[SEQUENCE] source={:?} repeat={} step={} action={} stopped: remaining actions cancelled", self.activating_card_id, repeat_idx + 1, i + 1, action.action);
+            return true;
+        }
+        if action.optional.unwrap_or(false) {
+            if action.action == ActionType::ChangeState {
+                // Optional change_state completed without creating a choice
+                // (no valid targets). Skip remaining actions (そうした場合).
+                log::debug!("[SEQUENCE] source={:?} repeat={} step={} action={} stopped: optional state change had no choice", self.activating_card_id, repeat_idx + 1, i + 1, action.action);
+                return true;
+            }
+            let was_moved = self.moved_cards.len() - moved_before;
+            if was_moved == 0 {
+                // Optional action auto-skipped (e.g., empty source).
+                // Record as "skipped" so conditional_on_optional
+                // can route correctly without prompting.
+                if let Some(entry) = gs.ability_queue.current_entry_mut() {
+                    entry.optional_cost_result = Some(false);
+                }
+            }
+            // Parent-conditional sequential: track implicit
+            // condition via was_moved (old behavior) or
+            // was_selected (state changes that don't move cards
+            // but do select a card to modify, e.g. change_state).
+            // Only set when condition_failed is still None (first
+            // gating action only) — subsequent actions should NOT
+            // overwrite the gate result.
+            if conditional
+                && action.condition.is_none()
+                && condition_failed.is_none()
+            {
+                let was_moved = self.moved_cards.len() - moved_before;
+                let was_selected = self.selected_cards.len() - selected_before;
+                *condition_failed = Some(was_moved == 0 && was_selected == 0);
+            }
+            return false;
+        }
+        if condition_failed.is_none()
+            && !self.pending_choice.is_some()
+            && conditional
+            && action.condition.is_none()
+        {
+            // Parent-conditional sequential: track implicit
+            // condition via was_moved (old behavior).
+            let was_moved = self.moved_cards.len() - moved_before;
+            let was_selected = self.selected_cards.len() - selected_before;
+            *condition_failed = Some(was_moved == 0 && was_selected == 0);
+        }
+        false
+    }
+
+    /// After an iteration, an optional `repeat_procedure` tail asks the
+    /// player whether to run more iterations. Returns true when the prompt
+    /// was issued (caller must `return Ok(())`).
+    fn maybe_prompt_repeat_continue(
+        &mut self,
+        gs: &mut GameState,
+        actions: &[Box<AbilityEffect>],
+        repeat_actions: &[Box<AbilityEffect>],
+        repeats_remaining: u8,
+    ) -> bool {
+        if repeats_remaining == 0 {
+            return false;
+        }
+        if let Some(ref repeat_action) = actions.last() {
+            if repeat_action.action == ActionType::RepeatProcedure
+                && repeat_action.optional.unwrap_or(false)
+            {
+                for _ in 0..repeats_remaining {
+                    self.pending_repeat_actions
+                        .extend(repeat_actions.iter().cloned());
+                }
+                self.pending_choice =
+                    Some(crate::ability::types::repeat_prompt_choice());
+                if let Some(entry) = gs.ability_queue.current_entry_mut() {
+                    entry.choice_card_no =
+                        Some(crate::ability::types::ChoiceRoute::Raw(
+                            "pay_optional_cost".to_string(),
+                        ));
+                }
+                return true;
+            }
+        }
+        false
+    }
+
+    // Rule 9.2.1.1 / Q94 / Q107 / Q217: Sequential effect execution
+    //
+    // Executes a list of sub-actions in order (Rule 9.2.1.1: single effects
+    // resolve completely before the next begins). Supports:
+    //
+    //   • Conditions on individual steps (if-then-else routing)
+    //   • "otherwise_condition" steps that fire only when previous cond failed
+    //   • "repeat_procedure" for looping sub-actions
+    //   • Optional steps that gate subsequent actions ("そうした場合")
+    //   • per_unit inheritance from parent to sub-actions
+    //
+    // Q94 / Q255 / Q263: Area-move + sequential
+    //   Each area move is a separate trigger. Sequential effects run once
+    //   per trigger invocation, not once per area move within one trigger.
+    //
+    // Q107: Re-yell after sequential discard
+    //   The sequential pipeline's step_output tracking allows downstream
+    //   conditions to reference upstream results (e.g. "if revealed cards
+    //   had no live → discard → re-yell").
+    //
+    // Q217: "any_number" cost paid as 0 → still counts as "paid" for
+    //   sequential gating (was_moved = 0 but optional_cost_result = true
+    //   because the player affirmatively chose to pay 0).
+    //
+    // Rule 9.6.2.4.2: Even if the card bearing the ability leaves its
+    //   original zone mid-resolution, the remaining steps still resolve.
+    pub fn execute_sequential_effect(
+        &mut self,
+        gs: &mut GameState,
+        effect: &AbilityEffect,
+    ) -> Result<(), String> {
+        let conditional = effect.conditional.unwrap_or(false);
+        let seq_node = match self.setup_sequential(gs, effect) {
+            Ok(node) => node,
+            Err(()) => return Ok(()),
+        };
 
         if let Some(ref actions) = effect.compound.actions {
-            let has_repeat = actions
-                .last()
-                .is_some_and(|a| a.action == ActionType::RepeatProcedure);
-            let repeat_max = if has_repeat {
-                // repeat_limit = max additional iterations (e.g. 4 = 4 more times)
-                // Total iterations = initial + max_repeats
-                actions
-                    .last()
-                    .and_then(|a| a.repeat_limit_any())
-                    .unwrap_or(1)
-                    + 1
-            } else {
-                1
-            };
-            let repeat_actions = if has_repeat {
-                &actions[..actions.len() - 1]
-            } else {
-                actions.as_slice()
-            };
+            let (repeat_actions, repeat_max, has_repeat) = Self::split_repeat_actions(actions);
 
             if has_repeat {
                 self.pending_repeat_actions.clear();
@@ -135,7 +671,7 @@ impl AbilityResolver {
                 repeat_actions.len(),
                 repeat_max,
                 conditional,
-                is_further,
+                effect.is_further.unwrap_or(false),
                 repeat_actions.iter().map(|a| a.action).collect::<Vec<_>>()
             );
             // Track if a preceding conditional step was satisfied, for
@@ -148,202 +684,18 @@ impl AbilityResolver {
                 // cause the next iteration's actions to be skipped.
                 condition_failed = None;
                 'action_loop: for (i, action) in repeat_actions.iter().enumerate() {
-                    // Conditional routing: determine how this step should be
-                    // handled based on preceding condition results.
-                    //
-                    //  • is_otherwise  → skip if condition met, execute if failed
-                    //  • has condition  → evaluate directly (for otherwise routing)
-                    //  • no condition + parent-conditional → skip if preceding failed
-                    let is_otherwise = action
-                        .condition
-                        .as_ref()
-                        .is_some_and(|c| matches!(c.as_ref(), Condition::AlwaysTrue { .. }));
-                    if is_otherwise {
-                        match condition_failed {
-                            Some(false) => {
-                                log::debug!("[SEQUENCE] source={:?} repeat={} step={} action={} skipped: otherwise branch after passed condition", self.activating_card_id, repeat_idx + 1, i + 1, action.action);
-                                condition_failed = None;
-                                continue 'action_loop;
-                            }
-                            Some(true) => {
-                                condition_failed = None;
-                            }
-                            None => {}
-                        }
-                    } else if condition_failed == Some(true) && action.condition.is_none() {
-                        log::debug!("[SEQUENCE] source={:?} repeat={} step={} action={} skipped: preceding condition failed", self.activating_card_id, repeat_idx + 1, i + 1, action.action);
-                        // Don't reset condition_failed — keep it so ALL subsequent
-                        // conditionless actions in this conditional sequential are
-                        // skipped, not just the very next one.
-                        continue 'action_loop;
-                    } else if action.condition.is_some() && !is_otherwise {
-                        // Evaluate explicit condition — when it fails, skip the
-                        // action. Subsequent otherwise-condition steps check the
-                        // cached result.
-                        // When the same condition text appears on consecutive
-                        // actions (parser splits compound predicates like
-                        // "if X: do A AND do B" into separate steps), reuse
-                        // the first evaluation's result instead of re-evaluating
-                        // against stale state (e.g. revealed_cards emptied by
-                        // the first action's execution).
-                        let same_as_prev = i > 0
-                            && repeat_actions[i - 1].condition.as_ref()
-                                == action.condition.as_ref();
-                        if same_as_prev {
-                            log::debug!("[SEQUENCE] source={:?} repeat={} step={} action={} decision={} verdict=previous_step condition_failed={:?}", self.activating_card_id, repeat_idx + 1, i + 1, action.action, if condition_failed == Some(true) { "skip" } else { "continue" }, condition_failed);
-                            if condition_failed == Some(true) {
-                                continue 'action_loop;
-                            }
-                        } else {
-                            let cond = action.condition.as_ref().unwrap();
-                            // Check cache first — avoids re-evaluation against stale
-                            // game state after a choice round-trip.
-                            let cached = self.cached_condition_verdict(gs, cond);
-                            let passed = if cached == Some(true) {
-                                true
-                            } else {
-                                let ctx = ConditionContext::with_moved_cards(gs, &self.moved_cards);
-                                let p = ctx.evaluate_condition(cond);
-                                // Cache the result if condition asks for it
-                                self.store_condition_verdict(gs, cond, p);
-                                p
-                            };
-                            if !action.optional.unwrap_or(false) {
-                                condition_failed = Some(!passed);
-                            }
-                            log::debug!("[SEQUENCE] source={:?} repeat={} step={} action={} decision={} passed={} cached={:?} reused_cache={}", self.activating_card_id, repeat_idx + 1, i + 1, action.action, if passed { "continue" } else { "skip: condition failed" }, passed, cached, cached == Some(true));
-                            if !passed {
-                                continue 'action_loop;
-                            }
-                        }
-                    }
-
-                    let mut action_to_execute = action.clone();
-                    // Clear the condition on the clone — the sequential loop already
-                    // checked/gated on it above. Without this, execute_effect →
-                    // can_activate_effect re-evaluates the condition against potentially
-                    // stale game state (e.g. revealed_cards emptied by a prior step).
-                    action_to_execute.condition = None;
-                    // Only inherit per_unit properties for actions that support them
-                    // Discard/move_cards actions should not inherit per_unit multipliers
-                    let supports_per_unit = matches!(
-                        action.action,
-                        ActionType::DrawCard
-                            | ActionType::GainResource
-                            | ActionType::ModifyScore
-                            | ActionType::ModifyRequiredHearts
-                            | ActionType::GainAbility
-                            | ActionType::SetBladeCount
-                            | ActionType::LookAt
-                    );
-                    if supports_per_unit {
-                        if action_to_execute.per_unit_any().is_none()
-                            && effect.per_unit_any().is_some()
-                        {
-                            action_to_execute.set_per_unit(effect.per_unit_any());
-                        }
-                        if action_to_execute.per_unit_count_any().is_none()
-                            && effect.per_unit_count_any().is_some()
-                        {
-                            action_to_execute.set_per_unit_count(effect.per_unit_count_any());
-                        }
-                        if action_to_execute.per_unit_type_any().is_none()
-                            && effect.per_unit_type_any().is_some()
-                        {
-                            action_to_execute
-                                .set_per_unit_type(effect.per_unit_type_any().map(|s| s.into()));
-                        }
-                        // distinct rides on the per-unit wrapper for
-                        // ModifyRequiredHearts (e.g. ディストーション:
-                        // "名前の異なる『CatChu!』のメンバー1人につき" applies to BOTH the
-                        // heart00-decrease and heart02-increase sub-actions). Without
-                        // inheriting it, duplicate-named members count twice.
-                        // Deliberately NOT inherited for gain_resource — there,
-                        // distinct filters TARGET SELECTION (self_and_other patterns
-                        // carry it explicitly per-action) and blind inheritance
-                        // breaks "メンバー1人" picking.
-                        if action.action == ActionType::ModifyRequiredHearts
-                            && action_to_execute.distinct_any().is_none()
-                        {
-                            if let Some(d) = effect.distinct_any() {
-                                if let Some(f) = action_to_execute
-                                    .kind
-                                    .as_deref_mut()
-                                    .and_then(|k| k.filter_mut())
-                                {
-                                    f.distinct = Some(Box::new(d));
-                                }
-                            }
-                        }
-                    }
-                    // Inherit self_target from the parent effect or the first
-                    // sub-action when this action doesn't have it set.
-                    // Japanese grammar attaches "このカード" (this card) to the
-                    // first verb only, but the intent applies to all verbs in
-                    // a compound sentence (e.g. EMOTION: "card's score+2 AND
-                    // required hearts+3" — both target the card itself).
-                    // Exception: don't inherit when the current action has an
-                    // explicit card_type that differs from the inherited target
-                    // (e.g. modify_score self_target bleeds into gain_resource
-                    // member_card — the live card is not a member on stage).
-                    if action_to_execute.self_target_any().is_none() {
-                        let inheritable = if i > 0 {
-                            let first_ct_binding = repeat_actions[0].card_type_any();
-                            let first_ct = first_ct_binding;
-                            let cur_ct_binding = action.card_type_any();
-                            let cur_ct = cur_ct_binding;
-                            // If the first action targets a live card (no card_type
-                            // or live_card) and the current targets a member, don't
-                            // inherit — they're different cards entirely.
-                            !(first_ct != Some(&crate::card::CardType::Member)
-                                && cur_ct == Some(&crate::card::CardType::Member))
-                        } else {
-                            true
-                        };
-                        if inheritable {
-                            // Only inherit self_target to action types that actually
-                            // support it. "このカード" (this card) in a compound sentence
-                            // applies to score/heart modifiers, not to generic draw or
-                            // move actions. Prevent cascading into nested sequentials
-                            // (draw+move inside would inherit from the nested container).
-                            let supports_self = matches!(
-                                action.action,
-                                ActionType::ModifyScore
-                                    | ActionType::ModifyRequiredHearts
-                                    | ActionType::GainResource
-                                    | ActionType::ChangeState
-                            );
-                            if effect.self_target_any().is_some() && supports_self {
-                                action_to_execute.set_self_target(effect.self_target_any());
-                            } else if i > 0 && supports_self {
-                                action_to_execute
-                                    .set_self_target(repeat_actions[0].self_target_any());
-                            }
-                        }
-                    }
-                    // Inherit card_names from the parent (set at the sequential
-                    // level, e.g. EMOTION's "card_names": ["EMOTION"]) so that
-                    // per-unit counting in sub-actions only counts matching cards.
-                    if action_to_execute
-                        .card_names_any()
-                        .map_or(true, |v| v.is_empty())
-                        && !effect.card_names_any().map_or(true, |v| v.is_empty())
+                    if self.route_sequential_step(gs, repeat_actions, i, repeat_idx, &mut condition_failed)
+                        == StepRoute::Skip
                     {
-                        if let Some(names) = effect.card_names_any() {
-                            action_to_execute.set_card_names(names.clone());
-                        }
+                        continue 'action_loop;
                     }
 
-                    fn save_remaining(
-                        gs: &mut crate::game_state::GameState,
-                        remaining: Vec<Box<AbilityEffect>>,
-                    ) {
-                        if !remaining.is_empty() {
-                            let mut existing = gs.ability_queue.take_pending_actions();
-                            existing.extend(remaining.into_iter().map(|b| *b));
-                            gs.ability_queue.set_pending_actions(existing);
-                        }
-                    }
+                    let action_to_execute = Self::prepare_sequential_action(
+                        effect,
+                        action,
+                        i,
+                        &repeat_actions[0],
+                    );
 
                     // G3: before executing an opponent-action sub-action, tag the spawn
                     // context so that any choice created inside is routed to the opponent.
@@ -355,26 +707,9 @@ impl AbilityResolver {
 
                     let moved_before = self.moved_cards.len();
                     let selected_before = self.selected_cards.len();
-                    // "…したとき" (when you do so) gate: a consequence step that
-                    // immediately follows a move is only applied when that move
-                    // actually moved a card. Consequence shapes: a modify_score
-                    // (G13 "そうしたとき +1") and a recover-self move
-                    // (G7 "そうしたとき 控え室からこのカードを手札に加える").
-                    // The flag is set by execute_move_cards and cleared after every
-                    // sub-action so it never gates an unrelated later step.
-                    let is_gated_consequence = action.action == ActionType::ModifyScore
-                        || (action.action == ActionType::MoveCards
-                            && action.destination == Some(Zone::Hand)
-                            && action.is_self_target()
-                            && action.source_any().is_some_and(|s| {
-                                s == "discard" || s == "waitroom"
-                            }));
-                    if is_gated_consequence && self.last_move_moved_any == Some(false) {
-                        log::debug!("[SEQUENCE] source={:?} repeat={} step={} action={} skipped: preceding move moved no cards", self.activating_card_id, repeat_idx + 1, i + 1, action.action);
-                        self.last_move_moved_any = None;
+                    if self.gate_sequential_consequence(action, repeat_idx, i) {
                         continue 'action_loop;
                     }
-                    self.last_move_moved_any = None;
                     log::debug!("[SEQUENCE] source={:?} repeat={} step={}/{} action={} execute: condition_failed={:?} pending_before={}", self.activating_card_id, repeat_idx + 1, i + 1, repeat_actions.len(), action.action, condition_failed, self.pending_choice.is_some());
                     match self.execute_effect(gs, &action_to_execute) {
                         Ok(_) => {
@@ -386,189 +721,32 @@ impl AbilityResolver {
                                 action.action,
                                 self.pending_choice.is_some()
                             );
-                            // Record this step's output under its id (if any)
-                            // so downstream steps in the same sequential can
-                            // reference it via `ref: "<id>"`.
-                            if let Some(ref step_id) = action.id_any() {
-                                let mut out = StepOutput::default();
-                                // Capture cards the step "produced": selected
-                                // cards, moved cards, or looked-at cards.
-                                // We take whichever is most relevant for the
-                                // action type. Heuristic ordering matches
-                                // what the cost handlers do: selected > moved
-                                // > looked_at.
-                                if !self.selected_cards.is_empty() {
-                                    out.cards.extend_from_slice(&self.selected_cards);
-                                } else if !self.moved_cards.is_empty() {
-                                    out.cards.extend_from_slice(&self.moved_cards);
-                                } else if !gs.looked_at_cards.is_empty() {
-                                    out.cards.extend_from_slice(&gs.looked_at_cards);
-                                } else if !gs.revealed_cards.is_empty() {
-                                    out.cards.extend_from_slice(&gs.revealed_cards);
-                                }
-                                if self.step_state.last_draw_count > 0 {
-                                    out.value = Some(self.step_state.last_draw_count as i32);
-                                }
-                                self.step_state
-                                    .step_results
-                                    .entry(step_id.to_string())
-                                    .or_insert_with(StepOutput::default)
-                                    .merge(&out);
-                                log::debug!(
-                                    "[SEQUENCE] source={:?} repeat={} step={} action={} output_id={} cards={:?} value={:?}",
-                                    self.activating_card_id,
-                                    repeat_idx + 1,
-                                    i + 1,
-                                    action.action,
-                                    step_id,
-                                    out.cards,
-                                    out.value
-                                );
-                            }
+                            self.record_step_output(gs, action, repeat_idx, i);
                             if self.pending_choice.is_some() {
-                                let current_was_optional = action.optional.unwrap_or(false);
-                                let is_opponent_action = action.action
-                                    == ActionType::OpponentAction
-                                    || action.action_by().as_deref() == Some("opponent");
-                                // Parent-conditional (そうした場合) gating: when
-                                // the gate could not be evaluated yet (the move
-                                // deferred to a selection), arm the deferred
-                                // gate so the answer handler attributes the
-                                // outcome (empty/skip => drop remaining).
-                                if conditional
-                                    && action.condition.is_none()
-                                    && condition_failed.is_none()
-                                    && !is_opponent_action
-                                {
-                                    self.deferred_conditional_gate = true;
-                                }
-                                // Some handlers fully execute the effect during choice
-                                // resolution (SelectCard moves cards, PositionChange swaps
-                                // members). Re-executing with optional=None would duplicate
-                                // the effect. Detect by Choice variant — the variant
-                                // encodes whether the handler completed the work.
-                                let completes_in_handler =
-                                    self.pending_choice.as_ref().is_some_and(|c| {
-                                        matches!(
-                                            c,
-                                            crate::ability::types::Choice::SelectCard { .. }
-                                        )
-                                    }) || matches!(
-                                        self.pending_choice.as_ref(),
-                                        Some(crate::ability::types::Choice::SelectTarget {
-                                            target,
-                                            ..
-                                        }) if target == "position|destination"
-                                    );
-                                let mut remaining = if current_was_optional
-                                    && i + 1 < repeat_actions.len()
-                                    && !is_opponent_action
-                                    && !completes_in_handler
-                                {
-                                    let mut actions: Vec<Box<AbilityEffect>> =
-                                        repeat_actions[i..].to_vec();
-                                    if !actions.is_empty() {
-                                        actions[0].set_optional(None);
-                                    }
-                                    actions
-                                } else {
-                                    repeat_actions[i + 1..].to_vec()
-                                };
-                                // When the condition already passed (Some(false)),
-                                // strip otherwise-condition actions from remaining
-                                // so they aren't re-executed by RPC.
-                                if condition_failed == Some(false) {
-                                    remaining.retain(|a| {
-                                        !a.condition.as_ref().is_some_and(|c| {
-                                            matches!(c.as_ref(), Condition::AlwaysTrue { .. })
-                                        })
-                                    });
-                                }
-                                // Strip AllRevealedMatchHeartColor conditions from
-                                // saved pending actions only when the sequential loop
-                                // already evaluated a condition and it passed
-                                // (condition_failed == Some(false)). When condition_failed
-                                // is None, no conditions have been evaluated yet — the
-                                // gating must be preserved for proper re-evaluation
-                                // during resume_pending_actions.
-                                if condition_failed == Some(false) {
-                                    for a in &mut remaining {
-                                        if a.condition.as_ref().is_some_and(|c| {
-                                            matches!(
-                                                c.as_ref(),
-                                                Condition::AllRevealedMatchHeartColor { .. }
-                                            )
-                                        }) {
-                                            a.condition = None;
-                                        }
-                                    }
-                                }
-                                // Store remaining repeats on the resolver for
-                                // one-at-a-time feeding after each iteration completes.
-                                // We DON'T pre-load them into pending_commands — that
-                                // causes duplication with RPC's merge logic.
-                                if repeats_remaining > 0 && has_repeat {
-                                    if let Some(ref repeat_action) = actions.last() {
-                                        if repeat_action.action == ActionType::RepeatProcedure
-                                            && repeat_action.optional.unwrap_or(false)
-                                        {
-                                            for _ in 0..repeats_remaining {
-                                                self.pending_repeat_actions
-                                                    .extend(repeat_actions.iter().cloned());
-                                            }
-                                        }
-                                    }
-                                }
-                                log::debug!("[SEQUENCE] source={:?} repeat={} step={} action={} paused: deferred_gate={} remaining={:?} repeat_actions={}", self.activating_card_id, repeat_idx + 1, i + 1, action.action, self.deferred_conditional_gate, remaining.iter().map(|a| a.action).collect::<Vec<_>>(), self.pending_repeat_actions.len());
-                                save_remaining(gs, remaining);
+                                self.pause_for_sequential_choice(
+                                    gs,
+                                    repeat_actions,
+                                    actions,
+                                    i,
+                                    action,
+                                    conditional,
+                                    condition_failed,
+                                    repeats_remaining,
+                                    has_repeat,
+                                    repeat_idx,
+                                );
                                 return Ok(());
-                            } else if self.cancel_remaining_commands {
-                                // An optional sub-action (e.g. pay_energy with insufficient
-                                // energy) requested cancellation of subsequent actions.
-                                self.cancel_remaining_commands = false;
-                                log::debug!("[SEQUENCE] source={:?} repeat={} step={} action={} stopped: remaining actions cancelled", self.activating_card_id, repeat_idx + 1, i + 1, action.action);
+                            } else if self.track_sequential_post_step(
+                                gs,
+                                action,
+                                conditional,
+                                &mut condition_failed,
+                                moved_before,
+                                selected_before,
+                                repeat_idx,
+                                i,
+                            ) {
                                 return Ok(());
-                            } else if action.optional.unwrap_or(false) {
-                                if action.action == ActionType::ChangeState {
-                                    // Optional change_state completed without creating a choice
-                                    // (no valid targets). Skip remaining actions (そうした場合).
-                                    log::debug!("[SEQUENCE] source={:?} repeat={} step={} action={} stopped: optional state change had no choice", self.activating_card_id, repeat_idx + 1, i + 1, action.action);
-                                    return Ok(());
-                                }
-                                let was_moved = self.moved_cards.len() - moved_before;
-                                if was_moved == 0 {
-                                    // Optional action auto-skipped (e.g., empty source).
-                                    // Record as "skipped" so conditional_on_optional
-                                    // can route correctly without prompting.
-                                    if let Some(entry) = gs.ability_queue.current_entry_mut() {
-                                        entry.optional_cost_result = Some(false);
-                                    }
-                                }
-                                // Parent-conditional sequential: track implicit
-                                // condition via was_moved (old behavior) or
-                                // was_selected (state changes that don't move cards
-                                // but do select a card to modify, e.g. change_state).
-                                // Only set when condition_failed is still None (first
-                                // gating action only) — subsequent actions should NOT
-                                // overwrite the gate result.
-                                if conditional
-                                    && action.condition.is_none()
-                                    && condition_failed.is_none()
-                                {
-                                    let was_moved = self.moved_cards.len() - moved_before;
-                                    let was_selected = self.selected_cards.len() - selected_before;
-                                    condition_failed = Some(was_moved == 0 && was_selected == 0);
-                                }
-                            } else if condition_failed.is_none()
-                                && !self.pending_choice.is_some()
-                                && conditional
-                                && action.condition.is_none()
-                            {
-                                // Parent-conditional sequential: track implicit
-                                // condition via was_moved (old behavior).
-                                let was_moved = self.moved_cards.len() - moved_before;
-                                let was_selected = self.selected_cards.len() - selected_before;
-                                condition_failed = Some(was_moved == 0 && was_selected == 0);
                             }
                         }
                         Err(e) => {
@@ -579,26 +757,8 @@ impl AbilityResolver {
                 }
                 // After all actions in this iteration, check if repeat_procedure is optional
                 // and we have remaining repeats — ask player whether to continue.
-                if repeats_remaining > 0 {
-                    if let Some(ref repeat_action) = actions.last() {
-                        if repeat_action.action == ActionType::RepeatProcedure
-                            && repeat_action.optional.unwrap_or(false)
-                        {
-                            for _ in 0..repeats_remaining {
-                                self.pending_repeat_actions
-                                    .extend(repeat_actions.iter().cloned());
-                            }
-                            self.pending_choice =
-                                Some(crate::ability::types::repeat_prompt_choice());
-                            if let Some(entry) = gs.ability_queue.current_entry_mut() {
-                                entry.choice_card_no =
-                                    Some(crate::ability::types::ChoiceRoute::Raw(
-                                        "pay_optional_cost".to_string(),
-                                    ));
-                            }
-                            return Ok(());
-                        }
-                    }
+                if self.maybe_prompt_repeat_continue(gs, actions, repeat_actions, repeats_remaining) {
+                    return Ok(());
                 }
             }
         }

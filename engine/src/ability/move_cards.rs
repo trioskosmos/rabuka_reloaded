@@ -1471,6 +1471,265 @@ gs.set_recently_moved_batch(moved.clone().into(), Some("under_member"));
         Ok(vec![])
     }
 
+    /// Parse the 1-based deck position from the effect into a 0-based index.
+    /// Unifies the two copy-pasted `PositionInfo` parses (spawn context + placement).
+    fn parse_effect_deck_pos(effect: &AbilityEffect) -> Option<usize> {
+        effect
+            .position_any()
+            .as_ref()
+            .and_then(|p| match p {
+                crate::card::PositionInfo::String(s) => s.parse::<usize>().ok(),
+                crate::card::PositionInfo::Struct { position, .. } => {
+                    position.as_ref().and_then(|s| s.parse::<usize>().ok())
+                }
+            })
+            .map(|p| if p > 0 { p - 1 } else { 0 })
+    }
+
+    /// Resolve `or_card_types` ("pick which type to search for"). Returns the
+    /// chosen card-type filter, or `None` + `Ok(false)` when a choice was
+    /// issued and the caller must return early.
+    pub(crate) fn resolve_or_card_type(
+        &mut self,
+        gs: &mut GameState,
+        effect: &AbilityEffect,
+    ) -> Result<(Option<String>, bool), String> {
+        let Some(or_types) = effect.or_card_types_any() else {
+            return Ok((effect.card_type_any().map(|s| s.to_string()), true));
+        };
+        if or_types.is_empty() {
+            return Ok((effect.card_type_any().map(|s| s.to_string()), true));
+        }
+        let chosen = gs
+            .ability_queue
+            .current_entry()
+            .and_then(|e| e.conditional_choice.clone());
+        match chosen {
+            Some(ConditionalChoice::Str(s)) => Ok((Some(s), true)),
+            _ => {
+                let type_labels: Vec<String> = or_types
+                    .iter()
+                    .map(|t| crate::ability::describe::card_type_label(Some(t)).to_string())
+                    .collect();
+                self.pending_choice = Some(Choice::SelectTarget {
+                    target: "choice_string".to_string(),
+                    description: format!("Pick card type: {}", type_labels.join(" / ")),
+                    description_en: Some(format!(
+                        "Pick card type: {}",
+                        type_labels.join(" / ")
+                    )),
+                    description_ja: Some(format!(
+                        "カードタイプを選択: {}",
+                        type_labels.join(" / ")
+                    )),
+                    allow_skip: false,
+                    options: Some(type_labels),
+                });
+                self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
+                if let Some(e) = gs.ability_queue.current_entry_mut() {
+                    e.conditional_choice =
+                        Some(ConditionalChoice::Strings(or_types.to_vec()));
+                }
+                Ok((None, false))
+            }
+        }
+    }
+
+    /// Resolve `name_constraint == contains_all` from revealed cards into name fragments.
+    fn resolve_name_fragments(gs: &GameState, effect: &AbilityEffect) -> Option<Vec<String>> {
+        if effect.name_constraint_any().as_deref() != Some("contains_all")
+            || effect.name_constraint_source_any().as_deref() != Some("revealed_card")
+        {
+            return None;
+        }
+        let fragments: Vec<String> = gs
+            .revealed_cost_cards
+            .iter()
+            .chain(gs.revealed_cards.iter())
+            .filter_map(|&id| {
+                let card = gs.card_database.get_card(id)?;
+                Some(
+                    card.name
+                        .replace("\u{FF06}", "&")
+                        .split('&')
+                        .map(|s| s.to_string())
+                        .collect::<Vec<_>>(),
+                )
+            })
+            .flatten()
+            .collect();
+        if fragments.is_empty() {
+            None
+        } else {
+            Some(fragments)
+        }
+    }
+
+    /// Deck-order prompt for multi-card moves to the deck with AnyOrder.
+    /// Returns true when the prompt was issued (caller must return early).
+    pub(crate) fn maybe_prompt_deck_order(
+        &mut self,
+        gs: &mut GameState,
+        effect: &AbilityEffect,
+        taken: &[i16],
+        source: &str,
+        destination: &str,
+        moved_cards: &mut Vec<i16>,
+    ) -> bool {
+        let is_deck_dest = Zone::from_str(destination) == Some(Zone::Deck)
+            || Zone::from_str(destination) == Some(Zone::DeckTop);
+        let is_eligible_source = Zone::from_str(source) == Some(Zone::Discard)
+            || Zone::from_str(source) == Some(Zone::SelectedCards)
+            || (Zone::from_str(source) == Some(Zone::LookedAt)
+                && effect.all_any().unwrap_or(false));
+        if !(is_eligible_source
+            && is_deck_dest
+            && effect.placement_order_any() == Some(PlacementOrder::AnyOrder)
+            && taken.len() > 1)
+        {
+            return false;
+        }
+        let taken_count = taken.len();
+        log::debug!(
+            "[ORDER_BEGIN] source={} all={} cards={:?}",
+            source,
+            effect.all_any().unwrap_or(false),
+            taken
+        );
+        moved_cards.extend(taken.iter().copied());
+        gs.looked_at_cards = taken.to_vec().into();
+        self.pending_choice = Some(Choice::SelectTarget {
+            target: "order".to_string(),
+            description: format!("Choose order for cards on deck ({} cards)", taken_count),
+            description_en: Some(format!(
+                "Choose order for cards on deck ({} cards)",
+                taken_count
+            )),
+            description_ja: Some(format!("山札のカード順を選択（{}枚）", taken_count)),
+            allow_skip: false,
+            options: None,
+        });
+        self.execution_context = ExecutionContext::LookAndSelect {
+            step: LookAndSelectStep::Finalize {
+                destination: Zone::Deck.to_str().to_string(),
+                source_zone: String::new(),
+            },
+        };
+        true
+    }
+
+    /// Place taken cards into the destination. Returns `Ok(true)` when a
+    /// sub-choice was issued and the caller must return early.
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn place_taken_cards(
+        &mut self,
+        gs: &mut GameState,
+        taken: &[i16],
+        source: &str,
+        destination: &str,
+        target: Option<&str>,
+        effect: &AbilityEffect,
+        use_p2: bool,
+        vacated_stage_area: Option<u8>,
+        is_max: bool,
+        count: usize,
+        deck_pos: Option<usize>,
+        card_db: &CardDatabase,
+        moved_cards: &mut Vec<i16>,
+    ) -> Result<bool, String> {
+        let stage_full = {
+            let player = if use_p2 { &gs.player2 } else { &gs.player1 };
+            Zone::from_str(destination) == Some(Zone::Stage)
+                && !effect.allow_occupied_stage_any().unwrap_or(false)
+                && player.stage.stage.iter().all(|&id| id != -1)
+        };
+        if stage_full {
+            log::debug!(
+                "[MOVE_CARDS] stage is full, returning {} cards to discard",
+                taken.len()
+            );
+            let player = if use_p2 {
+                &mut gs.player2
+            } else {
+                &mut gs.player1
+            };
+            for &card_id in taken {
+                player.waitroom.add_card(card_id);
+                log_move_result(player, card_db, card_id, source, destination);
+            }
+            moved_cards.extend(taken.iter().copied());
+            return Ok(false);
+        }
+        for &card_id in taken {
+            // Check for success zone replacement (e.g. 錯覚CROSSROADS)
+            if self.maybe_prompt_success_replacement(
+                gs,
+                card_id,
+                destination,
+                target.unwrap_or("self"),
+            ) {
+                return Ok(true);
+            }
+            if Zone::from_str(destination) == Some(Zone::Deck) && deck_pos.is_some() && !is_max
+            {
+                let pos = deck_pos.unwrap_or(0);
+                let player = if use_p2 {
+                    &mut gs.player2
+                } else {
+                    &mut gs.player1
+                };
+                let clamped = pos.min(player.main_deck.cards.len());
+                player.main_deck.cards.insert(clamped, card_id);
+                log_move_result(player, card_db, card_id, source, destination);
+            } else if destination == "deck_top_or_bottom" {
+                self.prompt_deck_top_or_bottom(
+                    card_id,
+                    effect.state_change_any().map(|s| s.to_string()),
+                    target.unwrap_or("self").to_string(),
+                    source.to_string(),
+                    effect.optional.unwrap_or(false),
+                );
+                return Ok(true);
+            } else {
+                match self.place_card_with_stage_choice(
+                    gs,
+                    target.unwrap_or("self"),
+                    card_id,
+                    destination,
+                    vacated_stage_area,
+                    is_max,
+                    count,
+                    effect.state_change_any().map(|s| s.to_string()),
+                    deck_pos,
+                    source,
+                    effect.allow_occupied_stage_any().unwrap_or(false),
+                    effect.is_under_self(),
+                ) {
+                    Ok(true) => {
+                        return Ok(true);
+                    }
+                    Ok(false) => {
+                        moved_cards.push(card_id);
+                    }
+                    Err(_) => {
+                        let player = if use_p2 {
+                            &mut gs.player2
+                        } else {
+                            &mut gs.player1
+                        };
+                        let src_zone = if source == "those_cards" {
+                            Zone::Discard.to_str()
+                        } else {
+                            source
+                        };
+                        util::place_card_in_zone(player, card_id, src_zone, None, false, 1);
+                    }
+                }
+            }
+        }
+        Ok(false)
+    }
+
     pub fn execute_move_cards(
         &mut self,
         gs: &mut GameState,
@@ -1496,47 +1755,10 @@ gs.set_recently_moved_batch(moved.clone().into(), Some("under_member"));
         let group_name = effect.group_name();
 
         // Handle or_card_types: let the player pick which type to search for
-        let card_type_owned: Option<String> = if let Some(or_types) = &effect.or_card_types_any() {
-            if or_types.is_empty() {
-                effect.card_type_any().map(|s| s.to_string())
-            } else {
-                let chosen = gs
-                    .ability_queue
-                    .current_entry()
-                    .and_then(|e| e.conditional_choice.clone());
-                match chosen {
-                    Some(ConditionalChoice::Str(s)) => Some(s),
-                    _ => {
-                        let type_labels: Vec<String> = or_types
-                            .iter()
-                            .map(|t| crate::ability::describe::card_type_label(Some(t)).to_string())
-                            .collect();
-                        self.pending_choice = Some(Choice::SelectTarget {
-                            target: "choice_string".to_string(),
-                            description: format!("Pick card type: {}", type_labels.join(" / ")),
-                            description_en: Some(format!(
-                                "Pick card type: {}",
-                                type_labels.join(" / ")
-                            )),
-                            description_ja: Some(format!(
-                                "カードタイプを選択: {}",
-                                type_labels.join(" / ")
-                            )),
-                            allow_skip: false,
-                            options: Some(type_labels),
-                        });
-                        self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
-                        if let Some(e) = gs.ability_queue.current_entry_mut() {
-                            e.conditional_choice =
-                                Some(ConditionalChoice::Strings(or_types.to_vec()));
-                        }
-                        return Ok(());
-                    }
-                }
-            }
-        } else {
-            effect.card_type_any().map(|s| s.to_string())
-        };
+        let (card_type_owned, or_resolved) = self.resolve_or_card_type(gs, effect)?;
+        if !or_resolved {
+            return Ok(());
+        }
         let card_type_filter: Option<&str> = card_type_owned.as_deref();
         let tgt = effect.target.clone();
         let is_self_cost = effect.self_cost_any().unwrap_or(false);
@@ -1552,34 +1774,7 @@ gs.set_recently_moved_batch(moved.clone().into(), Some("under_member"));
         let character_filter: Option<Vec<String>> = effect.characters_any().cloned();
 
         // Resolve name_constraint (e.g. "contains_all" from a revealed card)
-        let name_fragments: Option<Vec<String>> = if effect.name_constraint_any().as_deref()
-            == Some("contains_all")
-            && effect.name_constraint_source_any().as_deref() == Some("revealed_card")
-        {
-            let fragments: Vec<String> = gs
-                .revealed_cost_cards
-                .iter()
-                .chain(gs.revealed_cards.iter())
-                .filter_map(|&id| {
-                    let card = gs.card_database.get_card(id)?;
-                    Some(
-                        card.name
-                            .replace("\u{FF06}", "&")
-                            .split('&')
-                            .map(|s| s.to_string())
-                            .collect::<Vec<_>>(),
-                    )
-                })
-                .flatten()
-                .collect();
-            if fragments.is_empty() {
-                None
-            } else {
-                Some(fragments)
-            }
-        } else {
-            None
-        };
+        let name_fragments: Option<Vec<String>> = Self::resolve_name_fragments(gs, effect);
 
         let mut moved_cards: Vec<i16> = Vec::new();
         let source = effect
@@ -1662,40 +1857,7 @@ gs.set_recently_moved_batch(moved.clone().into(), Some("under_member"));
                 entry.optional_moves_all_moved = Some(false);
             }
         }
-        let is_deck_dest = Zone::from_str(&destination) == Some(Zone::Deck)
-            || Zone::from_str(&destination) == Some(Zone::DeckTop);
-        let is_eligible_source = Zone::from_str(&source) == Some(Zone::Discard)
-            || Zone::from_str(&source) == Some(Zone::SelectedCards)
-            || (Zone::from_str(&source) == Some(Zone::LookedAt) && is_all);
-        if is_eligible_source
-            && is_deck_dest
-            && effect.placement_order_any() == Some(PlacementOrder::AnyOrder)
-            && taken.len() > 1
-        {
-            let taken_count = taken.len();
-            log::debug!(
-                "[ORDER_BEGIN] source={} all={} cards={:?}",
-                source, is_all, taken
-            );
-            moved_cards.extend(taken.iter().copied());
-            gs.looked_at_cards = taken.clone().into();
-            self.pending_choice = Some(Choice::SelectTarget {
-                target: "order".to_string(),
-                description: format!("Choose order for cards on deck ({} cards)", taken_count),
-                description_en: Some(format!(
-                    "Choose order for cards on deck ({} cards)",
-                    taken_count
-                )),
-                description_ja: Some(format!("山札のカード順を選択（{}枚）", taken_count)),
-                allow_skip: false,
-                options: None,
-            });
-            self.execution_context = ExecutionContext::LookAndSelect {
-                step: LookAndSelectStep::Finalize {
-                    destination: Zone::Deck.to_str().to_string(),
-                    source_zone: String::new(),
-                },
-            };
+        if self.maybe_prompt_deck_order(gs, effect, &taken, &source, &destination, &mut moved_cards) {
             return Ok(());
         }
 
@@ -1710,107 +1872,24 @@ if util::distinct_should_dedupe(distinct) {
 }
 
         // --- STEP 3: Place cards in destination ---
-        let deck_pos = effect
-            .position_any()
-            .as_ref()
-            .and_then(|p| match p {
-                crate::card::PositionInfo::String(s) => s.parse::<usize>().ok(),
-                crate::card::PositionInfo::Struct { position, .. } => {
-                    position.as_ref().and_then(|s| s.parse::<usize>().ok())
-                }
-            })
-            .map(|p| if p > 0 { p - 1 } else { 0 });
+        let deck_pos = Self::parse_effect_deck_pos(effect);
 
-        let stage_full = {
-            let player = if use_p2 { &gs.player2 } else { &gs.player1 };
-            Zone::from_str(&destination) == Some(Zone::Stage)
-                && !effect.allow_occupied_stage_any().unwrap_or(false)
-                && player.stage.stage.iter().all(|&id| id != -1)
-        };
-
-        if stage_full {
-            log::debug!(
-                "[MOVE_CARDS] stage is full, returning {} cards to discard",
-                taken.len()
-            );
-            let player = if use_p2 {
-                &mut gs.player2
-            } else {
-                &mut gs.player1
-            };
-            for &card_id in &taken {
-                player.waitroom.add_card(card_id);
-                log_move_result(player, &card_db, card_id, &source, &destination);
-            }
-            moved_cards.extend(taken);
-        } else {
-            for &card_id in &taken {
-                // Check for success zone replacement (e.g. 錯覚CROSSROADS)
-                if self.maybe_prompt_success_replacement(
-                    gs,
-                    card_id,
-                    &destination,
-                    tgt.as_deref().unwrap_or("self"),
-                ) {
-                    return Ok(());
-                }
-                if Zone::from_str(&destination) == Some(Zone::Deck) && deck_pos.is_some() && !is_max
-                {
-                    let pos = deck_pos.unwrap();
-                    let player = if use_p2 {
-                        &mut gs.player2
-                    } else {
-                        &mut gs.player1
-                    };
-                    let clamped = pos.min(player.main_deck.cards.len());
-                    player.main_deck.cards.insert(clamped, card_id);
-                    log_move_result(player, &card_db, card_id, &source, &destination);
-                } else if &*destination == "deck_top_or_bottom" {
-                    self.prompt_deck_top_or_bottom(
-                        card_id,
-                        effect.state_change_any().map(|s| s.to_string()),
-                        tgt.as_deref().unwrap_or("self").to_string(),
-                        source.to_string(),
-                        effect.optional.unwrap_or(false),
-                    );
-                    return Ok(());
-                } else {
-                    match self.place_card_with_stage_choice(
-                        gs,
-                        &target,
-                        card_id,
-                        &destination,
-                        vacated_stage_area,
-                        is_max,
-                        count,
-                        effect.state_change_any().map(|s| s.to_string()),
-                        deck_pos,
-                        &source,
-                        effect.allow_occupied_stage_any().unwrap_or(false),
-                        effect.is_under_self(),
-                    ) {
-                        Ok(true) => {
-                            return Ok(());
-                        }
-                        Ok(false) => {
-                            moved_cards.push(card_id);
-                        }
-                        Err(_) => {
-                            let player = if use_p2 {
-                                &mut gs.player2
-                            } else {
-                                &mut gs.player1
-                            };
-                            let src_zone = if &*source == "those_cards" {
-                                Zone::Discard.to_str()
-                            } else {
-                                &*source
-                            };
-                            util::place_card_in_zone(player, card_id, src_zone, None, false, 1);
-                        }
-                    }
-                }
-            }
+        if self.place_taken_cards(
+            gs,
+            &taken,
+            &source,
+            &destination,
+            tgt.as_deref(),
+            effect,
+            use_p2,
+            vacated_stage_area,
+            is_max,
+            count,
+            deck_pos,
+            &card_db,
+            &mut moved_cards,
+        )? {
+            return Ok(());
         }
 
         let state_change = effect.state_change_any().map(|s| s.to_string());

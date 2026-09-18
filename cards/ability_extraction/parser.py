@@ -12610,6 +12610,186 @@ def _json_has_field(obj, field, value=None):
     return _json_has(obj, check)
 
 
+def _match_in_quotes(text, m):
+    """Matched text inside 「」 quotes is probably an ability name, not effect context."""
+    start = text.rfind("「", 0, m.start())
+    end = text.find("」", m.end())
+    return start != -1 and end != -1 and m.start() > start and m.end() < end
+
+
+def _match_in_parens(text, m):
+    """Matched text inside parenthetical clauses ( ... ) is game-rule reminder
+    text, not actual card effect. Checks both ASCII and full-width parens."""
+    for o, c in [("(", ")"), ("（", "）")]:
+        before = text[: m.start()]
+        after = text[m.end() :]
+        last_open = before.rfind(o)
+        if last_open == -1:
+            continue
+        between = before[last_open + 1 :]
+        if c in between:
+            continue
+        next_close = after.find(c)
+        if next_close != -1:
+            return True
+    return False
+
+
+def _report_semantic_issue(all_issues, seen_by_rule, rule_name, cards, i, trigger, snippet, desc):
+    """Append a semantic issue with per-rule+cards dedup.
+
+    Unifies the dozen copy-pasted `dedup_key` blocks across the structural
+    checks and the regex-rule loop below."""
+    dedup_key = (rule_name, frozenset(cards) if cards else i)
+    if dedup_key not in seen_by_rule:
+        seen_by_rule[dedup_key] = True
+        all_issues.append((rule_name, cards, trigger, snippet, desc))
+
+
+def _check_change_state_energy_type(eff, t, cards, i, trigger, all_issues, seen_by_rule):
+    # change_state: energy needs card_type=energy_card
+    if (
+        eff.get("action") == "change_state"
+        and "エネルギー" in t
+        and "メンバー" not in t
+    ):
+        if eff.get("card_type") != "energy_card":
+            all_issues.append(
+                (
+                    "energy_card_type",
+                    cards,
+                    trigger,
+                    t[
+                        max(0, t.find("エネルギー") - 10) : t.find("エネルギー")
+                        + 30
+                    ],
+                    "energy change_state without card_type=energy_card",
+                ),
+            )
+
+
+def _check_move_cards_cost_limit(eff, t, cards, i, trigger, all_issues, seen_by_rule):
+    # move_cards: cost_limit in text but not in effect
+    if eff.get("action") == "move_cards" and re.search(r"コスト\d+", t):
+        has_cl = (
+            eff.get("cost_limit") is not None
+            or eff.get("cost_limit_min") is not None
+            or eff.get("cost_limit_max") is not None
+            or eff.get("cost_limit_operator") is not None
+        )
+        if not has_cl:
+            cond = eff.get("condition") or {}
+            has_cl = (
+                cond.get("cost_limit") is not None
+                or cond.get("cost_limit_min") is not None
+                or cond.get("cost_limit_max") is not None
+            )
+        if not has_cl:
+            _report_semantic_issue(
+                all_issues,
+                seen_by_rule,
+                "cost_limit",
+                cards,
+                i,
+                trigger,
+                t[max(0, t.find("コスト") - 10) : t.find("コスト") + 30],
+                "'コスト' referenced in text but no cost_limit in effect or condition",
+            )
+
+
+def _check_look_select_reveal_hearts(eff, t, cards, i, trigger, all_issues, seen_by_rule):
+    # look_and_select: heart_colors on select parent but not on reveal sub-action
+    if eff.get("action") == "look_and_select":
+        sa = eff.get("select_action")
+        if sa and isinstance(sa, dict):
+            for act in sa.get("actions", []):
+                if (
+                    isinstance(act, dict)
+                    and act.get("action") == "reveal"
+                    and not act.get("heart_colors")
+                ):
+                    if sa.get("heart_colors"):
+                        _report_semantic_issue(
+                            all_issues,
+                            seen_by_rule,
+                            "reveal_heart_colors",
+                            cards,
+                            i,
+                            trigger,
+                            t[:60],
+                            "heart_colors on select parent but not on reveal sub-action",
+                        )
+
+
+def _check_sequential_sub_patterns(sub, j, acts, cards, i, trigger, all_issues, seen_by_rule):
+    if sub.get("action") in ("specify_heart_color", "reveal"):
+        if sub.get("group_names"):
+            dedup_key = (
+                f"leaked_group_names[{j}]",
+                frozenset(cards) if cards else i,
+            )
+            if dedup_key not in seen_by_rule:
+                seen_by_rule[dedup_key] = True
+                all_issues.append(
+                    (
+                        "leaked_group_names",
+                        cards,
+                        trigger,
+                        f"[{j}] action={sub['action']} group_names={sub['group_names']}",
+                        f"sub-action '{sub['action']}' has leaked group_names={sub['group_names']}",
+                    ),
+                )
+    if sub.get("action") == "select_cards" and sub.get("discard_remaining"):
+        for k in range(j + 1, len(acts)):
+            if (
+                isinstance(acts[k], dict)
+                and acts[k].get("action") == "move_cards"
+            ):
+                dedup_key = (
+                    f"discard_remaining_conflict[{j},{k}]",
+                    frozenset(cards) if cards else i,
+                )
+                if dedup_key not in seen_by_rule:
+                    seen_by_rule[dedup_key] = True
+                    all_issues.append(
+                        (
+                            "discard_remaining_conflict",
+                            cards,
+                            trigger,
+                            f"[{j}] select_cards discard_remaining + [{k}] move_cards",
+                            f"select_cards with discard_remaining=True conflicts with explicit move_cards at [{k}]",
+                        ),
+                    )
+                    break
+    if sub.get("condition") and j > 0:
+        prev = acts[j - 1]
+        if isinstance(prev, dict) and prev.get("condition"):
+            prev_text = prev["condition"].get("text")
+            cur_text = sub["condition"].get("text")
+            if prev_text and cur_text and prev_text == cur_text:
+                if not sub["condition"].get("cache"):
+                    # shared_condition_no_cache is an optimization hint, not a correctness issue
+                    pass
+
+
+def _check_sequential_patterns(eff, cards, i, trigger, all_issues, seen_by_rule):
+    # Structural validation: sequential action patterns
+    if eff.get("action") == "sequential":
+        acts = eff.get("actions", [])
+        for j, sub in enumerate(acts):
+            if not isinstance(sub, dict):
+                continue
+            _check_sequential_sub_patterns(sub, j, acts, cards, i, trigger, all_issues, seen_by_rule)
+
+
+def _check_structural_semantics(eff, t, cards, i, trigger, all_issues, seen_by_rule):
+    """Non-regex structural checks for one ability entry."""
+    _check_change_state_energy_type(eff, t, cards, i, trigger, all_issues, seen_by_rule)
+    _check_move_cards_cost_limit(eff, t, cards, i, trigger, all_issues, seen_by_rule)
+    _check_look_select_reveal_hearts(eff, t, cards, i, trigger, all_issues, seen_by_rule)
+    _check_sequential_patterns(eff, cards, i, trigger, all_issues, seen_by_rule)
+
+
 def _validate_semantic(abilities):
     """Validate parsed JSON against text patterns to find missing mechanics.
 
@@ -12619,29 +12799,6 @@ def _validate_semantic(abilities):
     Returns a list of issues: (rule_name, cards, trigger, snippet, desc).
     """
     issues = []
-
-    # Matched text inside 「」 quotes is probably an ability name, not effect context.
-    def _in_quotes(text, m):
-        start = text.rfind("「", 0, m.start())
-        end = text.find("」", m.end())
-        return start != -1 and end != -1 and m.start() > start and m.end() < end
-
-    # Matched text inside parenthetical clauses ( ... ) is game-rule reminder text,
-    # not actual card effect.  Check for both ASCII and full-width parens.
-    def _in_parens(text, m):
-        for o, c in [("(", ")"), ("（", "）")]:
-            before = text[: m.start()]
-            after = text[m.end() :]
-            last_open = before.rfind(o)
-            if last_open == -1:
-                continue
-            between = before[last_open + 1 :]
-            if c in between:
-                continue
-            next_close = after.find(c)
-            if next_close != -1:
-                return True
-        return False
 
     RULES = [
         # ─── Per-unit scaling ───
@@ -13080,11 +13237,11 @@ def _validate_semantic(abilities):
             for m in re.finditer(pattern, t):
                 # Skip matches inside quoted ability names (「」) — those are text
                 # references, not actual mechanic descriptions.
-                if _in_quotes(t, m):
+                if _match_in_quotes(t, m):
                     continue
                 # Skip matches inside parenthetical clauses ( ) / （） — those
                 # are game-rule reminder text, not card effect descriptions.
-                if _in_parens(t, m):
+                if _match_in_parens(t, m):
                     continue
                 # Check if JSON correctly handles the mechanic
                 if not check_fn(entry, eff):
@@ -13092,150 +13249,21 @@ def _validate_semantic(abilities):
                     start = max(0, m.start() - 20)
                     end = min(len(t), m.end() + 30)
                     snippet = t[start:end]
-                    dedup_key = (rule_name, frozenset(cards) if cards else i)
-                    if dedup_key not in seen_by_rule:
-                        seen_by_rule[dedup_key] = True
-                        all_issues.append((rule_name, cards, trigger, snippet, desc))
+                    _report_semantic_issue(all_issues, seen_by_rule, rule_name, cards, i, trigger, snippet, desc)
 
         # ─── Structural checks (not regex-based) ─────────────────────────
-        # change_state: energy needs card_type=energy_card
-        if (
-            eff.get("action") == "change_state"
-            and "エネルギー" in t
-            and "メンバー" not in t
-        ):
-            if eff.get("card_type") != "energy_card":
-                all_issues.append(
-                    (
-                        "energy_card_type",
-                        cards,
-                        trigger,
-                        t[
-                            max(0, t.find("エネルギー") - 10) : t.find("エネルギー")
-                            + 30
-                        ],
-                        "energy change_state without card_type=energy_card",
-                    ),
-                )
+        _check_change_state_energy_type(eff, t, cards, i, trigger, all_issues, seen_by_rule)
+        _check_move_cards_cost_limit(eff, t, cards, i, trigger, all_issues, seen_by_rule)
+        _check_look_select_reveal_hearts(eff, t, cards, i, trigger, all_issues, seen_by_rule)
+        _check_sequential_patterns(eff, cards, i, trigger, all_issues, seen_by_rule)
 
-        # move_cards: cost_limit in text but not in effect
-        if eff.get("action") == "move_cards" and re.search(r"コスト\d+", t):
-            has_cl = (
-                eff.get("cost_limit") is not None
-                or eff.get("cost_limit_min") is not None
-                or eff.get("cost_limit_max") is not None
-                or eff.get("cost_limit_operator") is not None
-            )
-            if not has_cl:
-                cond = eff.get("condition") or {}
-                has_cl = (
-                    cond.get("cost_limit") is not None
-                    or cond.get("cost_limit_min") is not None
-                    or cond.get("cost_limit_max") is not None
-                )
-            if not has_cl:
-                dedup_key = ("cost_limit", frozenset(cards) if cards else i)
-                if dedup_key not in seen_by_rule:
-                    seen_by_rule[dedup_key] = True
-                    all_issues.append(
-                        (
-                            "cost_limit",
-                            cards,
-                            trigger,
-                            t[max(0, t.find("コスト") - 10) : t.find("コスト") + 30],
-                            "'コスト' referenced in text but no cost_limit in effect or condition",
-                        ),
-                    )
+    _print_semantic_report(all_issues, len(abilities))
+    return all_issues
 
-        # look_and_select: heart_colors on select parent but not on reveal sub-action
-        if eff.get("action") == "look_and_select":
-            sa = eff.get("select_action")
-            if sa and isinstance(sa, dict):
-                for act in sa.get("actions", []):
-                    if (
-                        isinstance(act, dict)
-                        and act.get("action") == "reveal"
-                        and not act.get("heart_colors")
-                    ):
-                        if sa.get("heart_colors"):
-                            dedup_key = (
-                                "reveal_heart_colors",
-                                frozenset(cards) if cards else i,
-                            )
-                            if dedup_key not in seen_by_rule:
-                                seen_by_rule[dedup_key] = True
-                                all_issues.append(
-                                    (
-                                        "reveal_heart_colors",
-                                        cards,
-                                        trigger,
-                                        t[:60],
-                                        "heart_colors on select parent but not on reveal sub-action",
-                                    ),
-                                )
 
-        # Structural validation: sequential action patterns
-        if eff.get("action") == "sequential":
-            acts = eff.get("actions", [])
-            for j, sub in enumerate(acts):
-                if not isinstance(sub, dict):
-                    continue
-                if sub.get("action") in ("specify_heart_color", "reveal"):
-                    if sub.get("group_names"):
-                        dedup_key = (
-                            f"leaked_group_names[{j}]",
-                            frozenset(cards) if cards else i,
-                        )
-                        if dedup_key not in seen_by_rule:
-                            seen_by_rule[dedup_key] = True
-                            all_issues.append(
-                                (
-                                    f"leaked_group_names",
-                                    cards,
-                                    trigger,
-                                    f"[{j}] action={sub['action']} group_names={sub['group_names']}",
-                                    f"sub-action '{sub['action']}' has leaked group_names={sub['group_names']}",
-                                ),
-                            )
-                if sub.get("action") == "select_cards" and sub.get("discard_remaining"):
-                    for k in range(j + 1, len(acts)):
-                        if (
-                            isinstance(acts[k], dict)
-                            and acts[k].get("action") == "move_cards"
-                        ):
-                            dedup_key = (
-                                f"discard_remaining_conflict[{j},{k}]",
-                                frozenset(cards) if cards else i,
-                            )
-                            if dedup_key not in seen_by_rule:
-                                seen_by_rule[dedup_key] = True
-                                all_issues.append(
-                                    (
-                                        "discard_remaining_conflict",
-                                        cards,
-                                        trigger,
-                                        f"[{j}] select_cards discard_remaining + [{k}] move_cards",
-                                        f"select_cards with discard_remaining=True conflicts with explicit move_cards at [{k}]",
-                                    ),
-                                )
-                            break
-                if sub.get("condition") and j > 0:
-                    prev = acts[j - 1]
-                    if isinstance(prev, dict) and prev.get("condition"):
-                        prev_text = prev["condition"].get("text")
-                        cur_text = sub["condition"].get("text")
-                        if prev_text and cur_text and prev_text == cur_text:
-                            if not sub["condition"].get("cache"):
-                                dedup_key = (
-                                    f"shared_condition_no_cache[{j}]",
-                                    frozenset(cards) if cards else i,
-                                )
-                                if dedup_key not in seen_by_rule:
-                                    seen_by_rule[dedup_key] = True
-                                    # shared_condition_no_cache is an optimization hint, not a correctness issue
-                                    pass
-
-    # ─── Print report ────────────────────────────────────────────────────
+def _print_semantic_report(all_issues, total_abilities):
+    """Print the grouped missing-mechanics report. Extracted from
+    `_validate_semantic` so the validator reads as collect → report."""
     # Group by rule
     by_rule = {}
     for r in all_issues:
@@ -13244,7 +13272,7 @@ def _validate_semantic(abilities):
     print("=" * 80)
     print("MISSING MECHANICS ANALYSIS")
     print("=" * 80)
-    print(f"\nTotal abilities checked: {len(abilities)}")
+    print(f"\nTotal abilities checked: {total_abilities}")
     print(f"Total mismatches found: {len(all_issues)}")
     print(f"Unique rule types triggered: {len(by_rule)}")
     print()
@@ -13331,9 +13359,7 @@ def _validate_semantic(abilities):
     print("END OF MISSING MECHANICS REPORT")
     print(f"{'=' * 80}")
 
-    issues = all_issues
-    print(f"  Validation complete: {len(issues)} issues found")
-    return issues
+    print(f"  Validation complete: {len(all_issues)} issues found")
 
 
 def _list_rules() -> None:

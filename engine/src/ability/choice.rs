@@ -397,6 +397,658 @@ impl super::resolver::AbilityResolver {
         }
     }
 
+    /// Consume the deferred そうした場合 gate (parent-conditional sequential
+    /// whose gating move deferred to THIS selection): an empty/skipped answer
+    /// drops the remaining actions; a real answer lets them run.
+    pub(in crate::ability::choice) fn consume_deferred_gate(
+        &mut self,
+        gs: &mut GameState,
+        indices: &[usize],
+    ) {
+        if self.deferred_conditional_gate {
+            self.deferred_conditional_gate = false;
+            if indices.is_empty() {
+                log::debug!("[CONDITION] source={:?} deferred gate failed: empty selection, dropping remaining actions", self.activating_card_id);
+                if let Some(entry) = gs.ability_queue.current_entry_mut() {
+                    entry.pending_actions.clear();
+                }
+            }
+        }
+    }
+
+    /// "Place a card under a member" resume: the stage-member SelectCard choice
+    /// from `place_card_with_stage_choice` (destination=under_member) has been
+    /// answered. Put the pending card (carried in the MoveCardsPosition
+    /// execution context) under the chosen stage member. Returns true when the
+    /// choice was an under_member placement (caller must resume pending actions).
+    pub(in crate::ability::choice) fn resume_under_member_placement(
+        &mut self,
+        gs: &mut GameState,
+        zone: &str,
+        ctx: &SelectionContext,
+        context: &ExecutionContext,
+    ) -> bool {
+        if Zone::from_str(zone) != Some(Zone::Stage)
+            || ctx.destination.as_deref() != Some(Zone::UnderMember.to_str())
+        {
+            return false;
+        }
+        if let ExecutionContext::MoveCardsPosition {
+            card_id,
+            state_change,
+            target,
+            source_zone,
+        } = context
+        {
+            let (card_id, target, source_zone, state_change) =
+                (*card_id, target.clone(), source_zone.clone(), state_change.clone());
+            self.pending_choice = None;
+            let player = gs.resolve_target_player_mut(&target);
+            let chosen_idx = ctx
+                .mfi(&ctx.indices)
+                .first()
+                .copied()
+                .filter(|&i| i < 3)
+                .unwrap_or(1);
+            if chosen_idx < 3 && player.stage.stage[chosen_idx] != -1 {
+                let area = util::pos_to_area(chosen_idx);
+                player.stage.place_under_card(area, card_id);
+                gs.mods.clear_all_for_card(card_id);
+                gs.record_card_movement(card_id);
+                if !self.moved_cards.contains(&card_id) {
+                    self.moved_cards.push(card_id);
+                }
+                if state_change.as_deref() == Some("wait") {
+                    gs.mods.add_orientation_modifier(card_id, "wait");
+                }
+                let pid = gs
+                    .ability_queue
+                    .current_entry()
+                    .map(|e| e.player_id.clone())
+                    .unwrap_or_default();
+                gs.push_movement_event(
+                    card_id,
+                    &source_zone,
+                    "under_member",
+                    gs.activating_card,
+                    &pid,
+                    true,
+                );
+                gs.recalculate_constants();
+            }
+            return true;
+        }
+        false
+    }
+
+    /// Narrow the SelectedCards pool in place to the chosen indices.
+    pub(in crate::ability::choice) fn narrow_selected_pool(&mut self, indices: &[usize]) {
+        log::trace!(
+            "[CHOICE] selection pool={:?} indices={:?}",
+            self.selected_cards,
+            indices
+        );
+        let mut cards = SmallVec::new();
+        for &i in indices.iter() {
+            if i < self.selected_cards.len() {
+                cards.push(self.selected_cards[i]);
+            }
+        }
+        self.selected_cards = cards;
+        log::debug!(
+            "[CHOICE] source={:?} selected pool narrowed: indices={:?} cards={:?}",
+            self.activating_card_id,
+            indices,
+            self.selected_cards
+        );
+    }
+
+    /// LiveCardZone effect path: move validated cards to the destination and
+    /// accumulate them into `selected_cards` / recently-moved.
+    pub(in crate::ability::choice) fn move_live_card_zone_cards(
+        &mut self,
+        gs: &mut GameState,
+        ctx: &SelectionContext,
+        target_player_id: &Option<String>,
+        card_db: &crate::card::CardDatabase,
+        validate_card: &mut impl FnMut(i16) -> bool,
+    ) {
+        let edst = gs.entry_destination().map(|s| s.to_string());
+        let dst_str = ctx
+            .destination
+            .clone()
+            .or(edst)
+            .unwrap_or_else(|| Zone::Discard.to_string().into());
+        let tgt = target_player_id
+            .clone()
+            .unwrap_or_else(|| "self".to_string().into());
+        let player = gs.resolve_target_player_mut(&tgt);
+        let card_ids: Vec<i16> = ctx.mfi(&ctx.indices)
+            .iter()
+            .filter_map(|&i| player.live_card_zone.cards.get(i).copied())
+            .filter(|&cid| validate_card(cid))
+            .collect();
+        let moved = util::move_cards(
+            player,
+            &card_ids,
+            Zone::LiveCardZone.to_str(),
+            &dst_str,
+            None,
+            card_db,
+        );
+        if moved > 0 {
+            for &cid in &card_ids {
+                if !self.selected_cards.contains(&cid) {
+                    self.selected_cards.push(cid);
+                }
+            }
+            gs.set_recently_moved_batch(card_ids.into(), Some(Zone::LiveCardZone.to_str()));
+        }
+    }
+
+    /// LiveCardZone select-action path: take chosen cards out of the zone into
+    /// `selected_cards` without moving them elsewhere.
+    pub(in crate::ability::choice) fn take_live_card_zone_selection(
+        &mut self,
+        gs: &mut GameState,
+        ctx: &SelectionContext,
+        target_player_id: &Option<String>,
+    ) {
+        let target = target_player_id
+            .clone()
+            .unwrap_or_else(|| "self".to_string().into());
+        let player = gs.resolve_target_player_mut(&target);
+        let mapped_indices = ctx.mfi(&ctx.indices);
+        let mut cards: Vec<i16> = Vec::new();
+        for &i in mapped_indices.iter() {
+            if i < player.live_card_zone.cards.len() {
+                let cid = player.live_card_zone.cards[i];
+                if !self.selected_cards.contains(&cid) {
+                    self.selected_cards.push(cid);
+                    cards.push(cid);
+                }
+            }
+        }
+        player.live_card_zone.cards.retain(|c| !cards.contains(c));
+        log::debug!(
+            "[LIVE_CARD_SELECTION] selected_cards={:?} removed from live_card_zone",
+            self.selected_cards
+        );
+    }
+
+    /// UnderMember effect path: move validated cards, accumulate movement, and
+    /// re-prompt for any_number selections while cards remain. Returns true
+    /// when a re-prompt was issued (caller must return early).
+    pub(in crate::ability::choice) fn handle_under_member_zone(
+        &mut self,
+        gs: &mut GameState,
+        ctx: &SelectionContext,
+        target_player_id: &Option<String>,
+        validate_card: &mut impl FnMut(i16) -> bool,
+    ) -> Result<bool, String> {
+        let edst = gs.entry_destination().map(|s| s.to_string());
+        let dst_str = ctx
+            .destination
+            .clone()
+            .or(edst)
+            .unwrap_or_else(|| Zone::EnergyDeck.to_str().to_string().into());
+        let tgt = target_player_id
+            .clone()
+            .unwrap_or_else(|| "self".to_string().into());
+        let moved = self.move_from_under_member(
+            gs,
+            &ctx.indices,
+            validate_card,
+            &dst_str,
+            &tgt,
+        )?;
+        if !moved.is_empty() {
+            self.moved_cards.extend(moved.iter().copied());
+            // Accumulate across any_number re-prompts unconditionally
+            // (same card ID can appear multiple times under a member).
+            gs.accumulate_recently_moved(&moved);
+        }
+        // any_number re-prompt: after each selection, show remaining cards
+        // Empty indices = player chose to stop selecting (skip).
+        if ctx.indices.is_empty() {
+            return Ok(false);
+        }
+        if ctx.count == 0 && ctx.allow_skip {
+            let player = gs.resolve_target_player_mut(&tgt);
+            let mut remaining_idxs: Vec<usize> = Vec::new();
+            let mut global_idx = 0;
+            for si in 0..3 {
+                for &cid in &player.stage.under_cards[si] {
+                    if validate_card(cid) {
+                        remaining_idxs.push(global_idx);
+                    }
+                    global_idx += 1;
+                }
+            }
+            if !remaining_idxs.is_empty() {
+                self.pending_choice = Some(
+                    Choice::select_cards(
+                        Zone::UnderMember.to_str(),
+                        0,
+                        "Select more energy cards (or skip to finish)",
+                        true,
+                    )
+                    .description_ja(Some(
+                        "エネルギーカードをさらに選択（スキップで終了）".to_string(),
+                    ))
+                    .card_type(Some("energy_card".to_string()))
+                    .target_player_id(Some(tgt.clone()))
+                    .filtered_indices(Some(remaining_idxs))
+                    .build(),
+                );
+                self.store_pending_choice(gs);
+                return Ok(true);
+            }
+        }
+        Ok(false)
+    }
+
+    /// Indices into `hand` whose cards validate, optionally restricted to one unit.
+    /// Unifies the three copy-pasted hand-scan loops in the cost-payment path.
+    fn hand_matching_indices(
+        hand: &[i16],
+        card_db: &crate::card::CardDatabase,
+        validate: &mut impl FnMut(i16) -> bool,
+        unit: Option<&crate::core::types::ArcStr>,
+        require_unit: bool,
+    ) -> Vec<usize> {
+        (0..hand.len())
+            .filter(|i| {
+                let cid = hand[*i];
+                validate(cid)
+                    && unit.as_ref().map_or(!require_unit, |un| {
+                        card_db.get_card(cid).and_then(|c| c.unit.as_ref()) == Some(un)
+                    })
+            })
+            .collect()
+    }
+
+    /// Move validated hand-cost cards to discard + feed movement tracking.
+    /// Returns the newly moved card IDs.
+    pub(in crate::ability::choice) fn discard_hand_cost_selection(
+        &mut self,
+        gs: &mut GameState,
+        target: &str,
+        hand_cards: &[i16],
+        cost_hand_indices: &[usize],
+        card_db: &crate::card::CardDatabase,
+        validate_card: &mut impl FnMut(i16) -> bool,
+        count: usize,
+    ) -> Vec<i16> {
+        let new_card_ids: Vec<i16> = cost_hand_indices
+            .iter()
+            .filter_map(|&i| {
+                if i < hand_cards.len() {
+                    Some(hand_cards[i])
+                } else {
+                    None
+                }
+            })
+            .filter(|&cid| validate_card(cid))
+            .collect();
+        if new_card_ids.is_empty() {
+            return new_card_ids;
+        }
+        log::trace!(
+            "[COST] source={:?} discard intent: required={} cards={:?}",
+            self.activating_card_id,
+            count,
+            new_card_ids
+        );
+        let player = gs.resolve_target_player_mut(target);
+        let _ = util::move_cards(
+            player,
+            &new_card_ids,
+            Zone::Hand.to_str(),
+            Zone::Discard.to_str(),
+            None,
+            card_db,
+        );
+        // R1 unification: cost discards are real zone changes and must
+        // feed the movement-tracking views (cards_moved_this_turn,
+        // turn/batch logs) like every other move. Cost payment ⇒
+        // effect_only=false.
+        for &cid in &new_card_ids {
+            let cause = gs.activating_card;
+            gs.push_movement_event(
+                cid,
+                Zone::Hand.to_str(),
+                Zone::Discard.to_str(),
+                cause,
+                target,
+                false,
+            );
+        }
+        gs.mods.last_cost_discard_count += new_card_ids.len().u8_count();
+        gs.mods
+            .last_cost_moved_card_ids
+            .extend(new_card_ids.iter().copied());
+        for &cid in &new_card_ids {
+            self.moved_cards.push(cid);
+            if !self.selected_cards.contains(&cid) {
+                self.selected_cards.push(cid);
+            }
+        }
+        log::debug!(
+            "[COST] source={:?} discarded cards={:?} total_paid={}",
+            self.activating_card_id,
+            new_card_ids,
+            self.moved_cards.len()
+        );
+        new_card_ids
+    }
+
+    /// Issue a hand-cost re-prompt for `remaining` more cards.
+    /// Unifies the three build_reprompt call sites (partial, same-unit, any_number).
+    pub(in crate::ability::choice) fn reprompt_hand_cost(
+        &mut self,
+        gs: &mut GameState,
+        ctx: &SelectionContext,
+        remaining: usize,
+        desc: String,
+        desc_ja: String,
+        allow_skip: bool,
+        filtered: Option<Vec<usize>>,
+        target: String,
+        cost_total: Option<u8>,
+        cost_total_operator: Option<String>,
+    ) {
+        self.pending_choice = Some(
+            self.build_reprompt(
+                ctx,
+                Zone::Hand.to_str(),
+                remaining,
+                desc,
+                desc_ja,
+                allow_skip,
+                filtered,
+                Some(target),
+                cost_total,
+                cost_total_operator,
+            )
+            .build(),
+        );
+        self.store_pending_choice(gs);
+    }
+
+    /// Full hand cost-payment flow (fixed-count, same-unit, any_number).
+    /// Always handles the choice when called — the caller must return early.
+    pub(in crate::ability::choice) fn handle_hand_cost_payment(
+        &mut self,
+        gs: &mut GameState,
+        ctx: &SelectionContext,
+        indices: &[usize],
+        count: usize,
+        allow_skip: bool,
+        cost_total: Option<u8>,
+        cost_total_operator: Option<String>,
+        target_player_id: &Option<String>,
+        card_db: &crate::card::CardDatabase,
+        validate_card: &mut impl FnMut(i16) -> bool,
+    ) -> Result<(), String> {
+        if !indices.is_empty() {
+            if let Some(entry) = gs.ability_queue.current_entry_mut() {
+                entry.optional_cost_result = Some(true);
+            }
+        }
+        let target = target_player_id
+            .clone()
+            .unwrap_or_else(|| "self".to_string().into());
+        let hand_cards: Vec<i16> = {
+            let p = gs.resolve_target_player_mut(&target);
+            p.hand.cards.to_vec()
+        };
+        let cost_hand_indices = ctx.mfi(indices);
+        let new_card_ids = self.discard_hand_cost_selection(
+            gs,
+            &target,
+            &hand_cards,
+            &cost_hand_indices,
+            card_db,
+            validate_card,
+            count,
+        );
+        if new_card_ids.is_empty() {
+            if !self.moved_cards.is_empty() {
+                log::debug!("[COST] source={:?} hand payment complete: cards={:?} optional_cost_result=true", self.activating_card_id, self.moved_cards);
+                gs.mods.last_cost_discard_count = self.moved_cards.len().u8_count();
+                gs.mods.last_cost_moved_card_ids = self.moved_cards.clone();
+                gs.set_recently_moved_batch(self.moved_cards.clone(), Some("hand"));
+                if let Some(entry) = gs.ability_queue.current_entry_mut() {
+                    entry.cost_paid = true;
+                    entry.optional_cost_result = Some(true);
+                }
+            } else if allow_skip {
+                log::debug!("[COST] source={:?} hand payment skipped: no cards moved, optional_cost_result=false", self.activating_card_id);
+                if let Some(entry) = gs.ability_queue.current_entry_mut() {
+                    entry.cost_paid = true;
+                    entry.optional_cost_result = Some(false);
+                }
+            }
+            self.pending_choice = None;
+            return Ok(());
+        }
+        // Rule 9.4.2.3: cost must be paid in full. Once a player selects the
+        // first card for a fixed-count cost, they are committed — no bail-out.
+        if count > 0 && new_card_ids.len() < count {
+            let remaining = count - new_card_ids.len();
+            let hand_now: Vec<i16> = {
+                let p = gs.resolve_target_player_mut(&target);
+                p.hand.cards.to_vec()
+            };
+            let same_unit_name = gs
+                .entry_cost()
+                .and_then(|c| c.same_unit_name_any())
+                .unwrap_or(false);
+            let same_unit_filter = if same_unit_name {
+                self.moved_cards
+                    .first()
+                    .and_then(|&cid| card_db.get_card(cid))
+                    .and_then(|c| c.unit.clone())
+            } else {
+                None
+            };
+            let available_idxs =
+                Self::hand_matching_indices(&hand_now, card_db, validate_card, same_unit_filter.as_ref(), false);
+            let fi = if available_idxs.is_empty() {
+                None
+            } else {
+                Some(available_idxs)
+            };
+            self.reprompt_hand_cost(
+                gs,
+                ctx,
+                remaining,
+                format!("Select {} more card(s) from hand for cost", remaining),
+                format!("コストとして手札からさらに{}枚選択", remaining),
+                false, // Rule 9.4.2.3: no bail-out once committed
+                fi,
+                target.clone(),
+                cost_total,
+                cost_total_operator.clone(),
+            );
+            return Ok(());
+        }
+        // Same-unit cost: after selecting the first card, re-prompt
+        // for remaining cards filtered to only the chosen unit.
+        if count > 0 && new_card_ids.len() == count {
+            if let Some(cost) = gs.entry_cost() {
+                if cost.same_unit_name_any().unwrap_or(false) {
+                    let total_needed = cost.count.unwrap_or(1) as usize;
+                    let total_moved = self.moved_cards.len();
+                    if total_moved < total_needed {
+                        let remaining = total_needed - total_moved;
+                        let hand_now: Vec<i16> = {
+                            let p = gs.resolve_target_player_mut(&target);
+                            p.hand.cards.to_vec()
+                        };
+                        let unit_name = self
+                            .moved_cards
+                            .first()
+                            .and_then(|&cid| card_db.get_card(cid))
+                            .and_then(|c| c.unit.clone());
+                        let same_unit_idxs = Self::hand_matching_indices(
+                            &hand_now,
+                            card_db,
+                            validate_card,
+                            unit_name.as_ref(),
+                            true,
+                        );
+                        if same_unit_idxs.is_empty() {
+                            return Err(format!(
+                                "Cannot pay cost: not enough cards with unit '{}' in hand",
+                                unit_name.unwrap_or_default()
+                            ));
+                        }
+                        self.reprompt_hand_cost(
+                            gs,
+                            ctx,
+                            remaining,
+                            format!(
+                                "Select {} more card(s) with the same unit name",
+                                remaining
+                            ),
+                            format!("同じユニット名のカードをさらに{}枚選択", remaining),
+                            false,
+                            Some(same_unit_idxs),
+                            target.clone(),
+                            cost_total,
+                            cost_total_operator.clone(),
+                        );
+                        return Ok(());
+                    }
+                }
+            }
+        }
+        // Re-prompt for any_number costs: after each selection, ask
+        // if the player wants to select more cards or skip to finish.
+        let cost_max_cap = gs
+            .entry_cost()
+            .and_then(|c| c.count)
+            .map(|c| c as usize)
+            .unwrap_or(usize::MAX);
+        if count == 0 && allow_skip && self.moved_cards.len() < cost_max_cap {
+            log::debug!("[COST] source={:?} choose more cards or finish: added={} paid_cards={:?} cap={}", self.activating_card_id, new_card_ids.len(), self.moved_cards, cost_max_cap);
+            let hand_now: Vec<i16> = {
+                let p = gs.resolve_target_player_mut(&target);
+                p.hand.cards.to_vec()
+            };
+            let available_idxs =
+                Self::hand_matching_indices(&hand_now, card_db, validate_card, None, false);
+            let fi = if available_idxs.is_empty() {
+                None
+            } else {
+                Some(available_idxs)
+            };
+            let desc = if fi.as_ref().map_or(0, |v| v.len()) > 0 {
+                "Select more card(s) from hand for cost (or skip to finish)".to_string()
+            } else {
+                "No more matching cards in hand (skip to finish)".to_string()
+            };
+            let desc_ja = if fi.as_ref().map_or(0, |v| v.len()) > 0 {
+                "コストとして手札からさらに選択（スキップで終了）".to_string()
+            } else {
+                "手札に一致するカードがありません（スキップで終了）".to_string()
+            };
+            self.reprompt_hand_cost(
+                gs,
+                ctx,
+                0,
+                desc,
+                desc_ja,
+                true,
+                fi,
+                target.clone(),
+                cost_total,
+                cost_total_operator.clone(),
+            );
+            return Ok(());
+        }
+        log::debug!(
+            "[COST] source={:?} finishing hand payment: cards={} deferred_costs={}",
+            self.activating_card_id,
+            self.moved_cards.len(),
+            self.pending_deferred_costs.len()
+        );
+        self.pay_deferred_costs(gs)?;
+        let final_count = self.moved_cards.len().u8_count();
+        gs.mods.last_cost_discard_count = final_count;
+        gs.mods.last_cost_moved_card_ids = self.moved_cards.clone();
+        gs.set_recently_moved_batch(self.moved_cards.clone(), Some("hand"));
+        if let Some(entry) = gs.ability_queue.current_entry_mut() {
+            entry.cost_paid = true;
+        }
+        self.pending_choice = None;
+        Ok(())
+    }
+
+    /// Energy cost-payment flow. Always handles the choice when called.
+    pub(in crate::ability::choice) fn handle_energy_cost_payment(
+        &mut self,
+        gs: &mut GameState,
+        ctx: &SelectionContext,
+        indices: &[usize],
+        cost_total: Option<u8>,
+        cost_total_operator: Option<String>,
+        target_player_id: &Option<String>,
+    ) -> Result<(), String> {
+        let count_paid = indices.len();
+        if count_paid > 0 {
+            let player =
+                gs.resolve_target_player_mut(target_player_id.as_deref().unwrap_or("self"));
+            player.energy_zone.pay_energy(count_paid as u8)?;
+            gs.mods.last_cost_energy_count += count_paid as u8;
+            if let Some(entry) = gs.ability_queue.current_entry_mut() {
+                entry.cost_paid = true;
+                entry.optional_cost_result = Some(true);
+            }
+            // Energy-count constants (「エネルギーがちょうどN枚あるかぎり」)
+            // are live state — re-evaluate right after the payment.
+            gs.recalculate_constants();
+        }
+        let energy_left = {
+            let player =
+                gs.resolve_target_player(target_player_id.as_deref().unwrap_or("self"));
+            player.energy_zone.active_energy_count
+        };
+        if count_paid > 0 && energy_left > 0 {
+            let efi: Vec<usize> = (0..energy_left as usize).collect();
+            let target = target_player_id
+                .clone()
+                .unwrap_or_else(|| "self".to_string().into());
+            self.pending_choice = Some(
+                self.build_reprompt(
+                    ctx,
+                    Zone::Energy.to_str(),
+                    0,
+                    format!(
+                        "Select energy card to pay (active: {}). Skip when done",
+                        energy_left
+                    ),
+                    format!(
+                        "エネルギーカードを選択（アクティブ: {}）完了でスキップ",
+                        energy_left
+                    ),
+                    true,
+                    Some(efi),
+                    Some(target),
+                    cost_total,
+                    cost_total_operator.clone(),
+                )
+                .build(),
+            );
+            self.store_pending_choice(gs);
+            return Ok(());
+        }
+        self.clear_choice_state(gs);
+        self.resume_pending_actions(gs)
+    }
+
     pub(in crate::ability::choice) fn handle_select_card(
         &mut self,
         gs: &mut GameState,
@@ -448,19 +1100,7 @@ impl super::resolver::AbilityResolver {
         let mut validate_card =
             |cid: i16| -> bool { validate_filter.matches(&card_db, cid, false) };
 
-        // Consume the deferred そうした場合 gate (parent-conditional
-        // sequential whose gating move deferred to THIS selection): an
-        // empty/skipped answer drops the remaining actions; a real answer
-        // lets them run.
-        if self.deferred_conditional_gate {
-            self.deferred_conditional_gate = false;
-            if indices.is_empty() {
-                log::debug!("[CONDITION] source={:?} deferred gate failed: empty selection, dropping remaining actions", self.activating_card_id);
-                if let Some(entry) = gs.ability_queue.current_entry_mut() {
-                    entry.pending_actions.clear();
-                }
-            }
-        }
+        self.consume_deferred_gate(gs, indices);
 
         log::trace!(
             "[COST] hand-payment routing: zone={} is_hand={} has_cost={} effect_started={}",
@@ -471,390 +1111,40 @@ impl super::resolver::AbilityResolver {
         );
         if Zone::from_str(zone) == Some(Zone::Hand) && gs.entry_cost().is_some() && !effect_started
         {
-            if !indices.is_empty() {
-                if let Some(entry) = gs.ability_queue.current_entry_mut() {
-                    entry.optional_cost_result = Some(true);
-                }
-            }
-            let target = target_player_id
-                .clone()
-                .unwrap_or_else(|| "self".to_string().into());
-            let hand_cards: Vec<i16> = {
-                let p = gs.resolve_target_player_mut(&target);
-                p.hand.cards.to_vec()
-            };
-            let cost_hand_indices = ctx.mfi(indices);
-            let new_card_ids: Vec<i16> = cost_hand_indices
-                .iter()
-                .filter_map(|&i| {
-                    if i < hand_cards.len() {
-                        Some(hand_cards[i])
-                    } else {
-                        None
-                    }
-                })
-                .filter(|&cid| validate_card(cid))
-                .collect();
-            if !new_card_ids.is_empty() {
-                log::trace!(
-                    "[COST] source={:?} discard intent: required={} cards={:?}",
-                    self.activating_card_id,
-                    count,
-                    new_card_ids
-                );
-                let player = gs.resolve_target_player_mut(&target);
-                let _ = util::move_cards(
-                    player,
-                    &new_card_ids,
-                    Zone::Hand.to_str(),
-                    Zone::Discard.to_str(),
-                    None,
-                    &card_db,
-                );
-                // R1 unification: cost discards are real zone changes and must
-                // feed the movement-tracking views (cards_moved_this_turn,
-                // turn/batch logs) like every other move. Cost payment ⇒
-                // effect_only=false.
-                for &cid in &new_card_ids {
-                    let cause = gs.activating_card;
-                    gs.push_movement_event(
-                        cid,
-                        Zone::Hand.to_str(),
-                        Zone::Discard.to_str(),
-                        cause,
-                        &target,
-                        false,
-                    );
-                }
-                gs.mods.last_cost_discard_count += new_card_ids.len().u8_count();
-                gs.mods
-                    .last_cost_moved_card_ids
-                    .extend(new_card_ids.iter().copied());
-                for &cid in &new_card_ids {
-                    self.moved_cards.push(cid);
-                    if !self.selected_cards.contains(&cid) {
-                        self.selected_cards.push(cid);
-                    }
-                }
-                log::debug!(
-                    "[COST] source={:?} discarded cards={:?} total_paid={}",
-                    self.activating_card_id,
-                    new_card_ids,
-                    self.moved_cards.len()
-                );
-            }
-            if new_card_ids.is_empty() {
-                if !self.moved_cards.is_empty() {
-                    log::debug!("[COST] source={:?} hand payment complete: cards={:?} optional_cost_result=true", self.activating_card_id, self.moved_cards);
-                    gs.mods.last_cost_discard_count = self.moved_cards.len().u8_count();
-                    gs.mods.last_cost_moved_card_ids = self.moved_cards.clone();
-gs.set_recently_moved_batch(self.moved_cards.clone(), Some("hand"));
-                    if let Some(entry) = gs.ability_queue.current_entry_mut() {
-                        entry.cost_paid = true;
-                        entry.optional_cost_result = Some(true);
-                    }
-                } else if allow_skip {
-                    log::debug!("[COST] source={:?} hand payment skipped: no cards moved, optional_cost_result=false", self.activating_card_id);
-                    if let Some(entry) = gs.ability_queue.current_entry_mut() {
-                        entry.cost_paid = true;
-                        entry.optional_cost_result = Some(false);
-                    }
-                }
-                self.pending_choice = None;
-                return Ok(());
-            }
-            // Rule 9.4.2.3: cost must be paid in full. Once a player selects the
-            // first card for a fixed-count cost, they are committed — no bail-out.
-            if count > 0 && new_card_ids.len() < count {
-                let remaining = count - new_card_ids.len();
-                let hand_now: Vec<i16> = {
-                    let p = gs.resolve_target_player_mut(&target);
-                    p.hand.cards.to_vec()
-                };
-                let same_unit_name = gs
-                    .entry_cost()
-                    .and_then(|c| c.same_unit_name_any())
-                    .unwrap_or(false);
-                let same_unit_filter = if same_unit_name {
-                    self.moved_cards
-                        .first()
-                        .and_then(|&cid| card_db.get_card(cid))
-                        .and_then(|c| c.unit.clone())
-                } else {
-                    None
-                };
-                let available_idxs: Vec<usize> = (0..hand_now.len())
-                    .filter(|i| {
-                        let cid = hand_now[*i];
-                        validate_card(cid)
-                            && same_unit_filter.as_ref().map_or(true, |unit| {
-                                card_db.get_card(cid).and_then(|c| c.unit.as_ref()) == Some(unit)
-                            })
-                    })
-                    .collect();
-                let fi = if available_idxs.is_empty() {
-                    None
-                } else {
-                    Some(available_idxs)
-                };
-                self.pending_choice = Some(
-                    self.build_reprompt(
-                        &ctx,
-                        Zone::Hand.to_str(),
-                        remaining,
-                        format!("Select {} more card(s) from hand for cost", remaining),
-                        format!("コストとして手札からさらに{}枚選択", remaining),
-                        false, // Rule 9.4.2.3: no bail-out once committed
-                        fi,
-                        Some(target.clone()),
-                        cost_total,
-                        cost_total_operator.clone(),
-                    )
-                    .build(),
-                );
-                self.store_pending_choice(gs);
-                return Ok(());
-            }
-            // Same-unit cost: after selecting the first card, re-prompt
-            // for remaining cards filtered to only the chosen unit.
-            if count > 0 && !new_card_ids.is_empty() && new_card_ids.len() == count {
-                if let Some(cost) = gs.entry_cost() {
-                    if cost.same_unit_name_any().unwrap_or(false) {
-                        let total_needed = cost.count.unwrap_or(1) as usize;
-                        let total_moved = self.moved_cards.len();
-                        if total_moved < total_needed {
-                            let remaining = total_needed - total_moved;
-                            let hand_now: Vec<i16> = {
-                                let p = gs.resolve_target_player_mut(&target);
-                                p.hand.cards.to_vec()
-                            };
-                            let unit_name = self
-                                .moved_cards
-                                .first()
-                                .and_then(|&cid| card_db.get_card(cid))
-                                .and_then(|c| c.unit.clone());
-                            let same_unit_idxs: Vec<usize> = (0..hand_now.len())
-                                .filter(|i| {
-                                    let cid = hand_now[*i];
-                                    validate_card(cid)
-                                        && unit_name.as_ref().map_or(false, |un| {
-                                            card_db.get_card(cid).and_then(|c| c.unit.as_ref())
-                                                == Some(un)
-                                        })
-                                })
-                                .collect();
-                            if same_unit_idxs.is_empty() {
-                                return Err(format!(
-                                    "Cannot pay cost: not enough cards with unit '{}' in hand",
-                                    unit_name.unwrap_or_default()
-                                ));
-                            }
-                            self.pending_choice = Some(
-                                self.build_reprompt(
-                                    &ctx,
-                                    Zone::Hand.to_str(),
-                                    remaining,
-                                    format!(
-                                        "Select {} more card(s) with the same unit name",
-                                        remaining
-                                    ),
-                                    format!("同じユニット名のカードをさらに{}枚選択", remaining),
-                                    false,
-                                    Some(same_unit_idxs),
-                                    Some(target.clone()),
-                                    cost_total,
-                                    cost_total_operator.clone(),
-                                )
-                                .build(),
-                            );
-                            self.store_pending_choice(gs);
-                            return Ok(());
-                        }
-                    }
-                }
-            }
-            // Re-prompt for any_number costs: after each selection, ask
-            // if the player wants to select more cards or skip to finish.
-            let cost_max_cap = gs
-                .entry_cost()
-                .and_then(|c| c.count)
-                .map(|c| c as usize)
-                .unwrap_or(usize::MAX);
-            if count == 0 && allow_skip && self.moved_cards.len() < cost_max_cap {
-                log::debug!("[COST] source={:?} choose more cards or finish: added={} paid_cards={:?} cap={}", self.activating_card_id, new_card_ids.len(), self.moved_cards, cost_max_cap);
-                let hand_now: Vec<i16> = {
-                    let p = gs.resolve_target_player_mut(&target);
-                    p.hand.cards.to_vec()
-                };
-                let available_idxs: Vec<usize> = (0..hand_now.len())
-                    .filter(|i| {
-                        let cid = hand_now[*i];
-                        validate_card(cid)
-                    })
-                    .collect();
-                let fi = if available_idxs.is_empty() {
-                    None
-                } else {
-                    Some(available_idxs)
-                };
-                let desc = if fi.as_ref().map_or(0, |v| v.len()) > 0 {
-                    "Select more card(s) from hand for cost (or skip to finish)".to_string()
-                } else {
-                    "No more matching cards in hand (skip to finish)".to_string()
-                };
-                let desc_ja = if fi.as_ref().map_or(0, |v| v.len()) > 0 {
-                    "コストとして手札からさらに選択（スキップで終了）".to_string()
-                } else {
-                    "手札に一致するカードがありません（スキップで終了）".to_string()
-                };
-                self.pending_choice = Some(
-                    self.build_reprompt(
-                        &ctx,
-                        Zone::Hand.to_str(),
-                        0,
-                        desc,
-                        desc_ja,
-                        true,
-                        fi,
-                        Some(target.clone()),
-                        cost_total,
-                        cost_total_operator.clone(),
-                    )
-                    .build(),
-                );
-                self.store_pending_choice(gs);
-                return Ok(());
-            }
-            log::debug!(
-                "[COST] source={:?} finishing hand payment: cards={} deferred_costs={}",
-                self.activating_card_id,
-                self.moved_cards.len(),
-                self.pending_deferred_costs.len()
+            return self.handle_hand_cost_payment(
+                gs,
+                &ctx,
+                indices,
+                count,
+                allow_skip,
+                cost_total,
+                cost_total_operator.clone(),
+                target_player_id,
+                &card_db,
+                &mut validate_card,
             );
-            self.pay_deferred_costs(gs)?;
-            let final_count = self.moved_cards.len().u8_count();
-            gs.mods.last_cost_discard_count = final_count;
-            gs.mods.last_cost_moved_card_ids = self.moved_cards.clone();
-gs.set_recently_moved_batch(self.moved_cards.clone(), Some("hand"));
-            if let Some(entry) = gs.ability_queue.current_entry_mut() {
-                entry.cost_paid = true;
-            }
-            self.pending_choice = None;
-            return Ok(());
         }
 
         if Zone::from_str(zone) == Some(Zone::Energy)
             && !effect_started
             && ctx.destination.as_deref() != Some("under_member")
         {
-            let count_paid = indices.len();
-            if count_paid > 0 {
-                let player =
-                    gs.resolve_target_player_mut(target_player_id.as_deref().unwrap_or("self"));
-                player.energy_zone.pay_energy(count_paid as u8)?;
-                gs.mods.last_cost_energy_count += count_paid as u8;
-                if let Some(entry) = gs.ability_queue.current_entry_mut() {
-                    entry.cost_paid = true;
-                    entry.optional_cost_result = Some(true);
-                }
-                // Energy-count constants (「エネルギーがちょうどN枚あるかぎり」)
-                // are live state — re-evaluate right after the payment.
-                gs.recalculate_constants();
-            }
-            let energy_left = {
-                let player =
-                    gs.resolve_target_player(target_player_id.as_deref().unwrap_or("self"));
-                player.energy_zone.active_energy_count
-            };
-            if count_paid > 0 && energy_left > 0 {
-                let efi: Vec<usize> = (0..energy_left as usize).collect();
-                let target = target_player_id
-                    .clone()
-                    .unwrap_or_else(|| "self".to_string().into());
-                self.pending_choice = Some(
-                    self.build_reprompt(
-                        &ctx,
-                        Zone::Energy.to_str(),
-                        0,
-                        format!(
-                            "Select energy card to pay (active: {}). Skip when done",
-                            energy_left
-                        ),
-                        format!(
-                            "エネルギーカードを選択（アクティブ: {}）完了でスキップ",
-                            energy_left
-                        ),
-                        true,
-                        Some(efi),
-                        Some(target),
-                        cost_total,
-                        cost_total_operator.clone(),
-                    )
-                    .build(),
-                );
-                self.store_pending_choice(gs);
-                return Ok(());
-            }
-            self.clear_choice_state(gs);
-            return self.resume_pending_actions(gs);
+            return self.handle_energy_cost_payment(
+                gs,
+                &ctx,
+                indices,
+                cost_total,
+                cost_total_operator.clone(),
+                target_player_id,
+            );
         }
 
         log::trace!(
             "[CHOICE] selection routing: source={:?} zone={} effect_started={} queued_actions={}",
             self.activating_card_id, zone, effect_started, gs.ability_queue.has_pending_actions()
         );
-        // "Place a card under a member" resume: the stage-member SelectCard choice
-        // from `place_card_with_stage_choice` (destination=under_member) has been
-        // answered. Put the pending card (carried in the MoveCardsPosition
-        // execution context) under the chosen stage member and finish the move.
-        if Zone::from_str(zone) == Some(Zone::Stage)
-            && ctx.destination.as_deref() == Some(Zone::UnderMember.to_str())
-        {
-            if let ExecutionContext::MoveCardsPosition {
-                card_id,
-                state_change,
-                target,
-                source_zone,
-            } = &context
-            {
-                let (card_id, target, source_zone, state_change) =
-                    (*card_id, target.clone(), source_zone.clone(), state_change.clone());
-                self.pending_choice = None;
-                let player = gs.resolve_target_player_mut(&target);
-                let chosen_idx = ctx
-                    .mfi(&ctx.indices)
-                    .first()
-                    .copied()
-                    .filter(|&i| i < 3)
-                    .unwrap_or(1);
-                if chosen_idx < 3 && player.stage.stage[chosen_idx] != -1 {
-                    let area = util::pos_to_area(chosen_idx);
-                    player.stage.place_under_card(area, card_id);
-                    gs.mods.clear_all_for_card(card_id);
-                    gs.record_card_movement(card_id);
-                    if !self.moved_cards.contains(&card_id) {
-                        self.moved_cards.push(card_id);
-                    }
-                    if state_change.as_deref() == Some("wait") {
-                        gs.mods.add_orientation_modifier(card_id, "wait");
-                    }
-                    let pid = gs
-                        .ability_queue
-                        .current_entry()
-                        .map(|e| e.player_id.clone())
-                        .unwrap_or_default();
-                    gs.push_movement_event(
-                        card_id,
-                        &source_zone,
-                        "under_member",
-                        gs.activating_card,
-                        &pid,
-                        true,
-                    );
-                    gs.recalculate_constants();
-                }
-                return self.resume_pending_actions(gs);
-            }
+        if self.resume_under_member_placement(gs, zone, &ctx, &context) {
+            return self.resume_pending_actions(gs);
         }
         match Zone::from_str(zone) {
             Some(Zone::Hand) => {
@@ -897,142 +1187,21 @@ gs.set_recently_moved_batch(self.moved_cards.clone(), Some("hand"));
                 self.handle_energy_zone_selection(gs, indices, count, dst, &mut validate_card)?;
             }
             Some(Zone::SelectedCards) => {
-                log::trace!(
-                    "[CHOICE] selection pool={:?} indices={:?}",
-                    self.selected_cards,
-                    indices
-                );
-                let mut cards = SmallVec::new();
-                for &i in indices.iter() {
-                    if i < self.selected_cards.len() {
-                        cards.push(self.selected_cards[i]);
-                    }
-                }
-                self.selected_cards = cards;
-                log::debug!(
-                    "[CHOICE] source={:?} selected pool narrowed: indices={:?} cards={:?}",
-                    self.activating_card_id,
-                    indices,
-                    self.selected_cards
-                );
+                self.narrow_selected_pool(indices);
             }
             Some(Zone::LiveCardZone) => {
                 if is_select_action {
-                    let target = target_player_id
-                        .clone()
-                        .unwrap_or_else(|| "self".to_string().into());
-                    let player = gs.resolve_target_player_mut(&target);
-                    let mapped_indices = ctx.mfi(indices);
-                    let mut cards: Vec<i16> = Vec::new();
-                    for &i in mapped_indices.iter() {
-                        if i < player.live_card_zone.cards.len() {
-                            let cid = player.live_card_zone.cards[i];
-                            if !self.selected_cards.contains(&cid) {
-                                self.selected_cards.push(cid);
-                                cards.push(cid);
-                            }
-                        }
-                    }
-                    player.live_card_zone.cards.retain(|c| !cards.contains(c));
-                    log::debug!(
-                        "[LIVE_CARD_SELECTION] selected_cards={:?} removed from live_card_zone",
-                        self.selected_cards
-                    );
+                    self.take_live_card_zone_selection(gs, &ctx, target_player_id);
                 } else {
-                    let edst = gs.entry_destination().map(|s| s.to_string());
-                    let dst_str = ctx
-                        .destination
-                        .clone()
-                        .or(edst)
-                        .unwrap_or_else(|| Zone::Discard.to_string().into());
-                    let tgt = target_player_id
-                        .clone()
-                        .unwrap_or_else(|| "self".to_string().into());
-                    let player = gs.resolve_target_player_mut(&tgt);
-                    let card_ids: Vec<i16> = ctx.mfi(indices)
-                        .iter()
-                        .filter_map(|&i| player.live_card_zone.cards.get(i).copied())
-                        .filter(|&cid| validate_card(cid))
-                        .collect();
-                    let moved = util::move_cards(
-                        player,
-                        &card_ids,
-                        Zone::LiveCardZone.to_str(),
-                        &dst_str,
-                        None,
-                        &card_db,
-                    );
-                    if moved > 0 {
-                        for &cid in &card_ids {
-                            if !self.selected_cards.contains(&cid) {
-                                self.selected_cards.push(cid);
-                            }
-                        }
-gs.set_recently_moved_batch(card_ids.into(), Some(Zone::LiveCardZone.to_str()));
-                    }
+                    self.move_live_card_zone_cards(gs, &ctx, target_player_id, &card_db, &mut validate_card);
                 }
             }
             Some(Zone::Stage) => {
                 self.handle_stage_selection(gs, &ctx, &mut validate_card)?;
             }
             Some(Zone::UnderMember) => {
-                let edst = gs.entry_destination().map(|s| s.to_string());
-                let dst_str = ctx
-                    .destination
-                    .clone()
-                    .or(edst)
-                    .unwrap_or_else(|| Zone::EnergyDeck.to_str().to_string().into());
-                let tgt = target_player_id
-                    .clone()
-                    .unwrap_or_else(|| "self".to_string().into());
-                let moved = self.move_from_under_member(
-                    gs,
-                    &ctx.indices,
-                    &mut validate_card,
-                    &dst_str,
-                    &tgt,
-                )?;
-                if !moved.is_empty() {
-                    self.moved_cards.extend(moved.iter().copied());
-                    // Accumulate across any_number re-prompts unconditionally
-                    // (same card ID can appear multiple times under a member).
-                    gs.accumulate_recently_moved(&moved);
-                }
-                // any_number re-prompt: after each selection, show remaining cards
-                // Empty indices = player chose to stop selecting (skip).
-                if ctx.indices.is_empty() {
-                    // Done selecting — fall through to handle_selection_epilogue
-                } else if ctx.count == 0 && ctx.allow_skip {
-                    let player = gs.resolve_target_player_mut(&tgt);
-                    let mut remaining_idxs: Vec<usize> = Vec::new();
-                    let mut global_idx = 0;
-                    for si in 0..3 {
-                        for &cid in &player.stage.under_cards[si] {
-                            if validate_card(cid) {
-                                remaining_idxs.push(global_idx);
-                            }
-                            global_idx += 1;
-                        }
-                    }
-                    if !remaining_idxs.is_empty() {
-                        self.pending_choice = Some(
-                            Choice::select_cards(
-                                Zone::UnderMember.to_str(),
-                                0,
-                                "Select more energy cards (or skip to finish)",
-                                true,
-                            )
-                            .description_ja(Some(
-                                "エネルギーカードをさらに選択（スキップで終了）".to_string(),
-                            ))
-                            .card_type(Some("energy_card".to_string()))
-                            .target_player_id(Some(tgt.clone()))
-                            .filtered_indices(Some(remaining_idxs))
-                            .build(),
-                        );
-                        self.store_pending_choice(gs);
-                        return Ok(());
-                    }
+                if self.handle_under_member_zone(gs, &ctx, target_player_id, &mut validate_card)? {
+                    return Ok(());
                 }
             }
             Some(Zone::SuccessLiveZone) => {

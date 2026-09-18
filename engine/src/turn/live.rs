@@ -1529,47 +1529,32 @@ game_state.set_recently_moved_batch(moved_to_waitroom.into(), Some("live_card_zo
         Ok(())
     }
 
-    pub fn player_perform_live(
+    /// Q68/Rule: "cannot_live" discards live cards during performance.
+    /// Returns the discarded card ids for `moved_live_card_ids`.
+    fn discard_live_on_cannot_live(
         player: &mut crate::player::Player,
-        resolution_zone: &mut crate::zones::ResolutionZone,
-        _player_id: &str,
+    ) -> Vec<i16> {
+        let moved: Vec<i16> = player.live_card_zone.cards.iter().copied().collect();
+        player
+            .waitroom
+            .cards
+            .extend(player.live_card_zone.cards.drain(..));
+        moved
+    }
+
+    /// A1+A2: member heart+blade layering via stats_pipeline (single source
+    /// of truth). One entry per occupied stage slot.
+    #[allow(clippy::too_many_arguments)]
+    fn build_member_contributions(
+        player: &crate::player::Player,
         card_db: &CardDatabase,
         blade_modifiers: &HashMap<i16, ModifierEntry>,
         heart_override: &HashMap<i16, (HeartColor, u8)>,
         heart_modifiers: &HashMap<i16, HashMap<HeartColor, ModifierEntry>>,
-        blade_type_modifiers: &HashMap<i16, BladeColor>,
-        orientation_modifiers: &HashMap<i16, crate::core::game_modifiers::CardOrientation>,
-        need_heart_modifiers: &HashMap<i16, HashMap<HeartColor, ModifierEntry>>,
         heart_color_multiplier: &HashMap<i16, HeartColor>,
         heart_copy: &HashMap<i16, i16>,
-        cannot_live: bool,
-    ) -> LivePerformanceData {
-        #[cfg(not(feature = "no_std"))]
-        let _t = crate::timer::Timer::start("player_perform_live");
-        // Q68/Rule: "cannot_live" discards live cards during performance; no yell, no live.
-        if cannot_live {
-            let moved: Vec<i16> = player.live_card_zone.cards.iter().copied().collect();
-            player
-                .waitroom
-                .cards
-                .extend(player.live_card_zone.cards.drain(..));
-            return LivePerformanceData {
-                yell_count: 0,
-                note_icons: 0,
-                revealed_ids: Vec::new(),
-                member_contributions: Vec::new(),
-                yell_cards: Vec::new(),
-                total_hearts: [0; 8],
-                allocations: Vec::new(),
-                heart_sources: Vec::new(),
-                blade_sources: Vec::new(),
-                draw_effects_occurred: false,
-                live_card_ids: vec![],
-                moved_live_card_ids: moved,
-            };
-        }
-
-        // A1+A2: Use stats_pipeline for heart+blade layering (single source of truth)
+        orientation_modifiers: &HashMap<i16, crate::core::game_modifiers::CardOrientation>,
+    ) -> Vec<MemberContribution> {
         let mut member_contributions = Vec::new();
         for i in 0..3 {
             let cid = player.stage.stage[i];
@@ -1630,52 +1615,56 @@ game_state.set_recently_moved_batch(moved_to_waitroom.into(), Some("live_card_zo
                 cid, i, base_h, bonus_h, base_blades, bonus_blades
             );
         }
+        member_contributions
+    }
 
-        // Q32/Rule 8.3.6: If the live card zone is empty, no yell, no live card processing.
-        // But member contributions and stage hearts are still returned.
-        if player.live_card_zone.cards.is_empty() {
-            let mut total_hearts_arr = EMPTY_H8;
-            for mc in &member_contributions {
-                for (c, (&base, &bonus)) in mc.base_hearts.iter().zip(mc.bonus_hearts.iter()).enumerate() {
-                    total_hearts_arr[c] += base + bonus;
-                }
+    /// Q32/Rule 8.3.6: empty live zone means no yell and no live card
+    /// processing — but member contributions and stage hearts still apply.
+    fn empty_live_performance(
+        member_contributions: Vec<MemberContribution>,
+    ) -> LivePerformanceData {
+        let mut total_hearts_arr = EMPTY_H8;
+        for mc in &member_contributions {
+            for (c, (&base, &bonus)) in mc.base_hearts.iter().zip(mc.bonus_hearts.iter()).enumerate() {
+                total_hearts_arr[c] += base + bonus;
             }
-            let total_blade: u8 = member_contributions
-                .iter()
-                .filter(|m| !m.is_wait)
-                .map(|m| m.base_blades + m.bonus_blades)
-                .sum();
-            return LivePerformanceData {
-                yell_count: total_blade,
-                note_icons: 0,
-                revealed_ids: Vec::new(),
-                member_contributions,
-                yell_cards: Vec::new(),
-                total_hearts: total_hearts_arr,
-                allocations: Vec::new(),
-                heart_sources: Vec::new(),
-                blade_sources: Vec::new(),
-                draw_effects_occurred: false,
-                live_card_ids: vec![],
-                moved_live_card_ids: Vec::new(),
-            };
         }
+        let total_blade: u8 = member_contributions
+            .iter()
+            .filter(|m| !m.is_wait)
+            .map(|m| m.base_blades + m.bonus_blades)
+            .sum();
+        LivePerformanceData {
+            yell_count: total_blade,
+            note_icons: 0,
+            revealed_ids: Vec::new(),
+            member_contributions,
+            yell_cards: Vec::new(),
+            total_hearts: total_hearts_arr,
+            allocations: Vec::new(),
+            heart_sources: Vec::new(),
+            blade_sources: Vec::new(),
+            draw_effects_occurred: false,
+            live_card_ids: vec![],
+            moved_live_card_ids: Vec::new(),
+        }
+    }
 
-        let total_blade =
-            player
-                .stage
-                .total_blades(card_db, blade_modifiers, orientation_modifiers, false);
-
+    /// Reveal `total_blade` yell cards into the resolution zone.
+    /// Q104 / Q100 / Rule 10.2.1: refresh from waitroom when the deck runs
+    /// out mid-draw. G8: 恋になりたいAQUARIUM reveals from the deck bottom.
+    fn reveal_yell_cards(
+        player: &mut crate::player::Player,
+        resolution_zone: &mut crate::zones::ResolutionZone,
+        total_blade: u8,
+    ) {
         // Q40: Yell must complete ALL checks — even if hearts are already satisfied,
         // the full blade-count of yell cards is always revealed.
-        let mut yell_cards = Vec::new();
-        // Q104 / Q100 / Rule 10.2.1: refresh from waitroom when deck runs out mid-draw.
         let from_bottom = player.yell_from_bottom;
         for _ in 0..total_blade {
             if player.main_deck.cards.is_empty() && !player.waitroom.cards.is_empty() {
                 player.refresh();
             }
-            // G8: 恋になりたいAQUARIUM makes the yell reveal from the deck bottom.
             let card_id = if from_bottom {
                 player.main_deck.draw_bottom()
             } else {
@@ -1685,6 +1674,124 @@ game_state.set_recently_moved_batch(moved_to_waitroom.into(), Some("live_card_zo
                 resolution_zone.cards.push(card_id);
             }
         }
+    }
+
+    /// Process yell-zone cards into results, folding blade hearts into the
+    /// owned/total pools. Draw icons are only counted here (Q42 defers the
+    /// actual draws until every yell card is revealed).
+    /// Returns `(yell_cards, cheer_icon_count, total_draw_icons)`.
+    fn process_yell_zone_cards(
+        resolution_zone: &crate::zones::ResolutionZone,
+        card_db: &CardDatabase,
+        override_color: Option<HeartColor>,
+        owned_hearts: &mut BaseHeart,
+        total_hearts_arr: &mut [u8; 8],
+    ) -> (Vec<YellCardResult>, u8, u8) {
+        let mut yell_cards = Vec::new();
+        let mut cheer_icon_count = 0u8;
+        let mut total_draw_icons = 0u8;
+        for card_id in &resolution_zone.cards {
+            if let Some(card) = card_db.get_card(*card_id) {
+                let outcome = process_yell_revealed_card_icons(
+                    card,
+                    override_color,
+                    owned_hearts,
+                    total_hearts_arr,
+                    &mut cheer_icon_count,
+                );
+                total_draw_icons += outcome.draw_icons;
+
+                yell_cards.push(YellCardResult {
+                    card_id: *card_id,
+                    blade_hearts: outcome.blade_hearts,
+                    note_icons: outcome.note_icons,
+                    draw_icons: outcome.draw_icons,
+                    card_no: card_db
+                        .get_card(*card_id)
+                        .map(|c| crate::types::ArcStr::from(c.card_no.as_ref()))
+                        .unwrap_or_default(),
+                });
+            }
+        }
+        (yell_cards, cheer_icon_count, total_draw_icons)
+    }
+
+    /// Q43: each draw icon revealed during yell draws 1 card (after all yell
+    /// cards are revealed). Refreshes from waitroom mid-draw per Q104.
+    fn draw_for_yell_icons(
+        player: &mut crate::player::Player,
+        total_draw_icons: u8,
+    ) {
+        for _ in 0..total_draw_icons {
+            if player.main_deck.cards.is_empty() && !player.waitroom.cards.is_empty() {
+                player.refresh();
+            }
+            if let Some(new_card) = player.main_deck.draw() {
+                player.hand.add_card(new_card);
+            }
+        }
+    }
+
+    pub fn player_perform_live(
+        player: &mut crate::player::Player,
+        resolution_zone: &mut crate::zones::ResolutionZone,
+        _player_id: &str,
+        card_db: &CardDatabase,
+        blade_modifiers: &HashMap<i16, ModifierEntry>,
+        heart_override: &HashMap<i16, (HeartColor, u8)>,
+        heart_modifiers: &HashMap<i16, HashMap<HeartColor, ModifierEntry>>,
+        blade_type_modifiers: &HashMap<i16, BladeColor>,
+        orientation_modifiers: &HashMap<i16, crate::core::game_modifiers::CardOrientation>,
+        need_heart_modifiers: &HashMap<i16, HashMap<HeartColor, ModifierEntry>>,
+        heart_color_multiplier: &HashMap<i16, HeartColor>,
+        heart_copy: &HashMap<i16, i16>,
+        cannot_live: bool,
+    ) -> LivePerformanceData {
+        #[cfg(not(feature = "no_std"))]
+        let _t = crate::timer::Timer::start("player_perform_live");
+        // Q68/Rule: "cannot_live" discards live cards during performance; no yell, no live.
+        if cannot_live {
+            let moved = Self::discard_live_on_cannot_live(player);
+            return LivePerformanceData {
+                yell_count: 0,
+                note_icons: 0,
+                revealed_ids: Vec::new(),
+                member_contributions: Vec::new(),
+                yell_cards: Vec::new(),
+                total_hearts: [0; 8],
+                allocations: Vec::new(),
+                heart_sources: Vec::new(),
+                blade_sources: Vec::new(),
+                draw_effects_occurred: false,
+                live_card_ids: vec![],
+                moved_live_card_ids: moved,
+            };
+        }
+
+        // A1+A2: Use stats_pipeline for heart+blade layering (single source of truth)
+        let member_contributions = Self::build_member_contributions(
+            player,
+            card_db,
+            blade_modifiers,
+            heart_override,
+            heart_modifiers,
+            heart_color_multiplier,
+            heart_copy,
+            orientation_modifiers,
+        );
+
+        // Q32/Rule 8.3.6: If the live card zone is empty, no yell, no live card processing.
+        // But member contributions and stage hearts are still returned.
+        if player.live_card_zone.cards.is_empty() {
+            return Self::empty_live_performance(member_contributions);
+        }
+
+        let total_blade =
+            player
+                .stage
+                .total_blades(card_db, blade_modifiers, orientation_modifiers, false);
+
+        Self::reveal_yell_cards(player, resolution_zone, total_blade);
 
         // Compute owned hearts from stage
         let mut owned_hearts = player.stage.get_available_hearts(
@@ -1708,7 +1815,6 @@ game_state.set_recently_moved_batch(moved_to_waitroom.into(), Some("live_card_zo
             .next();
 
         // Process yell cards and build YellCardResult + track heart allocations
-        let mut cheer_icon_count = 0u8;
         let mut heart_sources: Vec<HeartSource> = Vec::new();
         let mut blade_sources: Vec<BladeSource> = Vec::new();
         let mut total_hearts_arr = EMPTY_H8;
@@ -1742,44 +1848,17 @@ game_state.set_recently_moved_batch(moved_to_waitroom.into(), Some("live_card_zo
         });
 
         // Q42: Defer draw effects until after all yell cards have been revealed.
-        // Count draw icons during the loop, then process all draws at once after.
-        let mut total_draw_icons = 0u8;
+        let (yell_cards, cheer_icon_count, total_draw_icons) = Self::process_yell_zone_cards(
+            resolution_zone,
+            card_db,
+            override_color,
+            &mut owned_hearts,
+            &mut total_hearts_arr,
+        );
 
-        for card_id in &resolution_zone.cards {
-            if let Some(card) = card_db.get_card(*card_id) {
-                let outcome = process_yell_revealed_card_icons(
-                    card,
-                    override_color,
-                    &mut owned_hearts,
-                    &mut total_hearts_arr,
-                    &mut cheer_icon_count,
-                );
-                total_draw_icons += outcome.draw_icons;
-
-                yell_cards.push(YellCardResult {
-                    card_id: *card_id,
-                    blade_hearts: outcome.blade_hearts,
-                    note_icons: outcome.note_icons,
-                    draw_icons: outcome.draw_icons,
-                    card_no: card_db
-                        .get_card(*card_id)
-                        .map(|c| crate::types::ArcStr::from(c.card_no.as_ref()))
-                        .unwrap_or_default(),
-                });
-            }
-        }
-
-        // Q43: Each draw icon revealed during yell draws 1 card.
-        // Process all deferred draw effects after all yell cards are revealed (Q42).
-        // Q104 / Rule 10.2.1: refresh from waitroom when deck runs out mid-draw.
-        for _ in 0..total_draw_icons {
-            if player.main_deck.cards.is_empty() && !player.waitroom.cards.is_empty() {
-                player.refresh();
-            }
-            if let Some(new_card) = player.main_deck.draw() {
-                player.hand.add_card(new_card);
-            }
-        }
+        // Q43: Each draw icon revealed during yell draws 1 card, after all
+        // yell cards are revealed. Q104 refresh applies mid-draw.
+        Self::draw_for_yell_icons(player, total_draw_icons);
 
         // Yell heart source
         let mut yell_heart_arr = EMPTY_H8;

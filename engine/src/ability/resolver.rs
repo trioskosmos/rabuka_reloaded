@@ -847,6 +847,371 @@ impl AbilityResolver {
         Ok(())
     }
 
+    /// Gate: reject already-exhausted turn-limited abilities.
+    fn gate_ability_use_limit(
+        &mut self,
+        gs: &mut GameState,
+        ability: &Ability,
+        activating_card: Option<i16>,
+        ability_index: usize,
+        ability_key: Option<(i16, usize, u8)>,
+        dbg: &mut AbDebug,
+    ) -> Result<(), String> {
+        let Some(card_id) = activating_card else {
+            return Ok(());
+        };
+        let Some(use_limit) = ability.use_limit else {
+            return Ok(());
+        };
+        let _ = ability_key;
+        if !self.check_use_limit_reached(gs, card_id, ability_index, use_limit) {
+            return Ok(());
+        }
+        let used = gs.ability_uses_used(card_id, ability_index);
+        let msg = format!(
+            "Ability already used {} of {} times this turn",
+            used, use_limit
+        );
+        dbg.p("RESULT", &msg);
+        let items = drain_verdicts();
+        self.push_ability_result(gs, "skipped", items, Some(&msg));
+        Err(msg)
+    }
+
+    /// Gate: activation keywords (center/left/right/turn position restrictions).
+    fn gate_activation_keywords(
+        &self,
+        gs: &mut GameState,
+        ability: &Ability,
+        activating_card: Option<i16>,
+    ) -> Result<(), String> {
+        let Some(card_id) = activating_card else {
+            return Ok(());
+        };
+        let position = gs.find_card_stage_position(card_id);
+        if self.check_keywords(gs, ability.keywords.as_ref().unwrap_or(&vec![]), position) {
+            return Ok(());
+        }
+        let items = drain_verdicts();
+        self.push_ability_result(
+            gs,
+            "position_fail",
+            items,
+            Some("Activation keywords not satisfied"),
+        );
+        Err(
+            "Activation keywords not satisfied (e.g. card not at required position)"
+                .to_string(),
+        )
+    }
+
+    /// Phase: pay the ability cost (with modify-cost applied). No-op when the
+    /// queue entry already records a paid cost.
+    fn pay_ability_cost(
+        &mut self,
+        gs: &mut GameState,
+        ability: &Ability,
+        cost_already_paid: bool,
+        dbg: &mut AbDebug,
+    ) -> Result<(), String> {
+        if cost_already_paid {
+            return Ok(());
+        }
+        let Some(ref cost) = ability.cost else {
+            return Ok(());
+        };
+        let cost = self.apply_modify_cost_to_ability_cost(gs, cost, ability);
+        if let Err(e) = self.pay_cost(gs, &cost) {
+            dbg.p("RESULT", format_args!("COST FAILED: {}", e));
+            let items = drain_verdicts();
+            self.push_ability_result(gs, "cost_fail", items, Some(&e));
+            return Err(e);
+        }
+        dbg.p("RESULT", "cost paid ✓");
+        #[cfg(not(feature = "no_std"))]
+        let cost_desc = format!(
+            "{}: {}→{} {}",
+            cost.action,
+            cost.source.map(|z| z.as_str()).unwrap_or("?"),
+            cost.destination.map(|z| z.as_str()).unwrap_or("?"),
+            cost.count.unwrap_or(cost.energy_count_any().unwrap_or(1))
+        );
+        #[cfg(not(feature = "no_std"))]
+        push_verdict(AbilityLogItem::Cost {
+            text: cost.text.to_string(),
+            expectation: cost_desc,
+            actual: "支払済".into(),
+            passed: true,
+            optional: cost.optional.unwrap_or(false),
+        });
+        Ok(())
+    }
+
+    /// Record the turn-limit key early (before the effect runs) unless the
+    /// effect is still undecided (conditional_on_optional / optional effect).
+    fn record_early_ability_use(
+        &mut self,
+        gs: &mut GameState,
+        ability: &Ability,
+        ability_key: Option<(i16, usize, u8)>,
+        cost_already_paid: bool,
+    ) {
+        // Record use_limit early only if the effect's conditions can be met
+        // AND it's not a conditional_on_optional (the optional cost hasn't been
+        // decided yet — record after the choice if the player pays).
+        // This prevents consuming use_limit on premature triggers (e.g. auto
+        // abilities queued eagerly before their trigger condition is satisfied).
+        let is_conditional_optional = ability
+            .effect
+            .as_ref()
+            .is_some_and(|e| e.action == crate::ability::enums::ActionType::ConditionalOnOptional);
+        let is_optional_effect = ability
+            .effect
+            .as_ref()
+            .is_some_and(|e| e.optional.unwrap_or(false));
+        // For optional effects (may place / may use), the use_limit is consumed
+        // by the EFFECT execution, not the trigger. If the player skips the
+        // optional effect later, the key is never inserted.
+        if cost_already_paid
+            || self.pending_choice.is_some()
+            || is_conditional_optional
+            || is_optional_effect
+        {
+            return;
+        }
+        if let Some(ref key) = ability_key {
+            self.record_ability_use_guarded(gs, *key, ability, false);
+        }
+    }
+
+    /// Drain: a pending choice created by cost payment ends resolution here.
+    /// Returns true when the caller must `return Ok(())`.
+    fn drain_cost_pending_choice(&mut self, gs: &mut GameState, cost_already_paid: bool) -> bool {
+        if self.pending_choice.is_none() {
+            return false;
+        }
+        if !cost_already_paid {
+            if let Some(entry) = gs.ability_queue.current_entry_mut() {
+                entry.cost_paid = true;
+            }
+        }
+        self.store_pending_choice(gs);
+        true
+    }
+
+    /// Gate: post-cost stage-position keywords gate the effect, not the cost.
+    /// Returns true to continue, false when the effect was skipped (result
+    /// already recorded — the caller must `return Ok(())`).
+    fn gate_post_cost_position(
+        &mut self,
+        gs: &mut GameState,
+        ability: &Ability,
+        activating_card: Option<i16>,
+        card_name: &str,
+        dbg: &mut AbDebug,
+    ) -> bool {
+        // Check position keywords (Center/LeftSide/RightSide) AFTER cost payment.
+        // Position checks gate the effect, not the cost — the test expects cost to still be paid.
+        if let Some(card_id) = activating_card {
+            match self.check_post_cost_position_keywords(gs, ability, Some(card_id), card_name) {
+                Err(_) => {
+                    dbg.p("RESULT", "position requirement not met — effect skipped");
+                    let items = drain_verdicts();
+                    self.push_ability_result(gs, "position_fail", items, None);
+                    return false;
+                }
+                Ok(()) => {}
+            }
+        }
+        true
+    }
+
+    /// Gate: a skipped optional cost suppresses the primary effect.
+    /// Returns true when the effect was skipped (caller must `return Ok(())`).
+    fn gate_optional_cost_skip(
+        &mut self,
+        gs: &mut GameState,
+        activating_card: Option<i16>,
+        ability_index: usize,
+        dbg: &mut AbDebug,
+    ) -> bool {
+        // When an optional cost was skipped (no eligible cards or player declined),
+        // the primary effect should not run. Handles colon-gated patterns like
+        // "may discard X: gain Y" where the colon gates the effect.
+        let cost_was_skipped = gs
+            .ability_queue
+            .current_entry()
+            .is_some_and(|e| e.optional_cost_result == Some(false));
+        log::debug!(
+            "[COST] source={:?} ability={} effect_gate={} optional_cost_result={:?}",
+            activating_card,
+            ability_index,
+            if cost_was_skipped { "skip: optional cost unpaid" } else { "continue" },
+            gs.ability_queue
+                .current_entry()
+                .and_then(|e| e.optional_cost_result)
+        );
+        if !cost_was_skipped {
+            return false;
+        }
+        if let Some(entry) = gs.ability_queue.current_entry_mut() {
+            entry.effect_started = true;
+        }
+        dbg.p("RESULT", "optional cost skipped — effect not executed");
+        let items = drain_verdicts();
+        self.push_ability_result(gs, "skipped", items, Some("optional cost not paid"));
+        true
+    }
+
+    /// Phase: check the effect condition, execute it, and file the
+    /// pending-choice bookkeeping when the effect asks the player something.
+    /// Returns `Ok(true)` when the caller must `return Ok(())`.
+    fn run_ability_effect(
+        &mut self,
+        gs: &mut GameState,
+        ability: &Ability,
+        ability_key: Option<(i16, usize, u8)>,
+        activating_card: Option<i16>,
+        cost_already_paid: bool,
+        dbg: &mut AbDebug,
+    ) -> Result<bool, String> {
+        let Some(ref effect) = ability.effect else {
+            return Ok(false);
+        };
+        // Check the effect's condition BEFORE executing. The condition must
+        // be met in the current game state (after cost payment). This prevents
+        // effects like "choice" from being shown when the condition fails.
+        if effect.condition.is_some() || effect.activation_condition_parsed_any().is_some() {
+            let passed = self.can_activate_effect(gs, effect);
+            if !passed {
+                // For 起動 (activation) abilities, the player deliberately paid the
+                // cost, so the attempt counts toward the turn limit even when the
+                // effect's condition isn't met.  AUTO-triggered abilities preserve
+                // their use_limit for when the board state actually satisfies the
+                // condition.
+                if ability.use_limit.is_some()
+                    && ability.has_trigger(crate::triggers::TriggerKind::Activation)
+                {
+                    if let Some(ref key) = ability_key {
+                        gs.record_ability_use(*key);
+                    }
+                }
+                dbg.p("RESULT", "effect condition not met — skipped");
+                let items = drain_verdicts();
+                self.push_ability_result(gs, "failure", items, None);
+                return Ok(true);
+            }
+        }
+        if let Err(e) = self.execute_effect(gs, effect) {
+            dbg.p("RESULT", format_args!("EFFECT FAILED: {}", e));
+            let items = drain_verdicts();
+            self.push_ability_result(gs, "failure", items, Some(&e));
+            return Err(e);
+        }
+        log::trace!(
+            "[EFFECT] source={:?} action={} returned: pending={}",
+            activating_card,
+            effect.action,
+            self.pending_choice.is_some()
+        );
+        if self.pending_choice.is_none() {
+            dbg.p("RESULT", "effect applied ✓");
+            let items = drain_verdicts();
+            self.push_ability_result(gs, "success", items, None);
+            return Ok(false);
+        }
+        if !cost_already_paid {
+            if let Some(entry) = gs.ability_queue.current_entry_mut() {
+                entry.cost_paid = true;
+            }
+            // Don't record use_limit yet when the pending choice is:
+            // - "conditional_optional" (may pay) — player decides at choice
+            // - "position|destination" for optional effects (may place)
+            //   Record after the choice resolves if they actually did it.
+            let is_optional_pos = matches!(
+                self.pending_choice,
+                Some(Choice::SelectTarget { ref target, .. })
+                if target == "position|destination"
+            ) && ability
+                .effect
+                .as_ref()
+                .is_some_and(|e| e.optional.unwrap_or(false));
+            let skip_use_limit = matches!(
+                self.pending_choice,
+                Some(Choice::SelectTarget { ref target, .. })
+                if target == "conditional_optional"
+            ) || is_optional_pos;
+            if let Some(ref key) = ability_key {
+                if ability.use_limit.is_some() && !skip_use_limit {
+                    gs.record_ability_use(*key);
+                }
+            }
+        }
+        // Mark effect as started when a pending choice comes from effect
+        // execution (not cost). This prevents RWC from re-entering the
+        // ability after the effect's choice resolves.
+        let is_paid = cost_already_paid
+            || gs
+                .ability_queue
+                .current_entry()
+                .is_some_and(|e| e.cost_paid);
+        if is_paid {
+            if let Some(entry) = gs.ability_queue.current_entry_mut() {
+                entry.effect_started = true;
+            }
+        }
+        self.store_pending_choice(gs);
+        Ok(true)
+    }
+
+    /// Phase: final turn-limit accounting after the effect ran.
+    fn record_final_ability_use(
+        &mut self,
+        gs: &mut GameState,
+        ability: &Ability,
+        ability_key: Option<(i16, usize, u8)>,
+        cost_already_paid: bool,
+    ) {
+        if !cost_already_paid {
+            if let Some(ref key) = ability_key {
+                self.record_ability_use_guarded(gs, *key, ability, false);
+            }
+        }
+        if let Some(key) = ability_key {
+            if ability.use_limit.is_some() {
+                // When cost is already paid (e.g. conditional_on_optional's second entry
+                // after the player accepted), the effect already ran and may have moved
+                // cards around.  Re-checking can_activate_effect would see stale state
+                // (the resolver's moved_cards includes cards moved BY this effect), so
+                // the condition can spuriously fail and the key never gets inserted.
+                // Skip the can_activate_effect guard when cost is already paid AND the
+                // ability is a conditional_on_optional (the player already accepted).
+                let is_cond_opt = ability.effect.as_ref().is_some_and(|e| {
+                    e.action == crate::ability::enums::ActionType::ConditionalOnOptional
+                });
+                if (cost_already_paid && is_cond_opt)
+                    || ability
+                        .effect
+                        .as_ref()
+                        .is_none_or(|e| self.can_activate_effect(gs, e))
+                {
+                    gs.record_ability_use(key);
+                }
+            }
+        }
+    }
+
+    /// Phase: clear per-ability resolver state + close the debug trace.
+    fn finish_ability_resolution(&mut self, gs: &mut GameState) {
+        gs.activating_card = None;
+        self.current_ability = None;
+        self.current_ability_index = None;
+
+        if self.debug_trace {
+            self.pipeline.trace.after = Some(ZoneSnapshot::from_game_state(gs));
+        }
+    }
+
     pub fn resolve_ability(
         &mut self,
         gs: &mut GameState,
@@ -886,122 +1251,26 @@ impl AbilityResolver {
         self.current_ability_index = Some(ability_index);
         gs.activating_card = activating_card;
 
-        if let Some(card_id) = activating_card {
-            if let Some(use_limit) = ability.use_limit {
-                if self.check_use_limit_reached(gs, card_id, ability_index, use_limit) {
-                    let used = gs.ability_uses_used(card_id, ability_index);
-                    let msg = format!(
-                        "Ability already used {} of {} times this turn",
-                        used, use_limit
-                    );
-                    dbg.p("RESULT", &msg);
-                    let items = drain_verdicts();
-                    self.push_ability_result(gs, "skipped", items, Some(&msg));
-                    return Err(msg);
-                }
-            }
-        }
+        self.gate_ability_use_limit(gs, ability, activating_card, ability_index, ability_key, &mut dbg)?;
 
         // Check activation keywords (center/left/right/turn position restrictions)
-        if let Some(card_id) = activating_card {
-            let position = gs.find_card_stage_position(card_id);
-            if !self.check_keywords(gs, ability.keywords.as_ref().unwrap_or(&vec![]), position) {
-                let items = drain_verdicts();
-                self.push_ability_result(
-                    gs,
-                    "position_fail",
-                    items,
-                    Some("Activation keywords not satisfied"),
-                );
-                return Err(
-                    "Activation keywords not satisfied (e.g. card not at required position)"
-                        .to_string(),
-                );
-            }
-        }
+        self.gate_activation_keywords(gs, ability, activating_card)?;
 
         let cost_already_paid = gs
             .ability_queue
             .current_entry()
             .is_some_and(|e| e.cost_paid);
 
-        if !cost_already_paid {
-            if let Some(ref cost) = ability.cost {
-                let cost = self.apply_modify_cost_to_ability_cost(gs, cost, ability);
-                if let Err(e) = self.pay_cost(gs, &cost) {
-                    dbg.p("RESULT", format_args!("COST FAILED: {}", e));
-                    let items = drain_verdicts();
-                    self.push_ability_result(gs, "cost_fail", items, Some(&e));
-                    return Err(e);
-                }
-                dbg.p("RESULT", "cost paid ✓");
-                #[cfg(not(feature = "no_std"))]
-                let cost_desc = format!(
-                    "{}: {}→{} {}",
-                    cost.action,
-                    cost.source.map(|z| z.as_str()).unwrap_or("?"),
-                    cost.destination.map(|z| z.as_str()).unwrap_or("?"),
-                    cost.count.unwrap_or(cost.energy_count_any().unwrap_or(1))
-                );
-                #[cfg(not(feature = "no_std"))]
-                push_verdict(AbilityLogItem::Cost {
-                    text: cost.text.to_string(),
-                    expectation: cost_desc,
-                    actual: "支払済".into(),
-                    passed: true,
-                    optional: cost.optional.unwrap_or(false),
-                });
-            }
-        }
+        self.pay_ability_cost(gs, ability, cost_already_paid, &mut dbg)?;
 
-        // Record use_limit early only if the effect's conditions can be met
-        // AND it's not a conditional_on_optional (the optional cost hasn't been
-        // decided yet — record after the choice if the player pays).
-        // This prevents consuming use_limit on premature triggers (e.g. auto
-        // abilities queued eagerly before their trigger condition is satisfied).
-        let is_conditional_optional = ability
-            .effect
-            .as_ref()
-            .is_some_and(|e| e.action == crate::ability::enums::ActionType::ConditionalOnOptional);
-        let is_optional_effect = ability
-            .effect
-            .as_ref()
-            .is_some_and(|e| e.optional.unwrap_or(false));
-        // For optional effects (may place / may use), the use_limit is consumed
-        // by the EFFECT execution, not the trigger. If the player skips the
-        // optional effect later, the key is never inserted.
-        if !cost_already_paid
-            && self.pending_choice.is_none()
-            && !is_conditional_optional
-            && !is_optional_effect
-        {
-            if let Some(ref key) = ability_key {
-                self.record_ability_use_guarded(gs, *key, ability, false);
-            }
-        }
+        self.record_early_ability_use(gs, ability, ability_key, cost_already_paid);
 
-        if self.pending_choice.is_some() {
-            if !cost_already_paid {
-                if let Some(entry) = gs.ability_queue.current_entry_mut() {
-                    entry.cost_paid = true;
-                }
-            }
-            self.store_pending_choice(gs);
+        if self.drain_cost_pending_choice(gs, cost_already_paid) {
             return Ok(());
         }
 
-        // Check position keywords (Center/LeftSide/RightSide) AFTER cost payment.
-        // Position checks gate the effect, not the cost — the test expects cost to still be paid.
-        if let Some(card_id) = activating_card {
-            match self.check_post_cost_position_keywords(gs, ability, Some(card_id), &card_name) {
-                Err(_) => {
-                    dbg.p("RESULT", "position requirement not met — effect skipped");
-                    let items = drain_verdicts();
-                    self.push_ability_result(gs, "position_fail", items, None);
-                    return Ok(());
-                }
-                Ok(()) => {}
-            }
+        if !self.gate_post_cost_position(gs, ability, activating_card, &card_name, &mut dbg) {
+            return Ok(());
         }
 
         // Mark cost as paid when it auto-resolved without creating a pending choice.
@@ -1011,153 +1280,16 @@ impl AbilityResolver {
             }
         }
 
-        // When an optional cost was skipped (no eligible cards or player declined),
-        // the primary effect should not run. Handles colon-gated patterns like
-        // "may discard X: gain Y" where the colon gates the effect.
-        let cost_was_skipped = gs
-            .ability_queue
-            .current_entry()
-            .is_some_and(|e| e.optional_cost_result == Some(false));
-        log::debug!(
-            "[COST] source={:?} ability={} effect_gate={} optional_cost_result={:?}",
-            activating_card,
-            ability_index,
-            if cost_was_skipped { "skip: optional cost unpaid" } else { "continue" },
-            gs.ability_queue
-                .current_entry()
-                .and_then(|e| e.optional_cost_result)
-        );
-        if cost_was_skipped {
-            if let Some(entry) = gs.ability_queue.current_entry_mut() {
-                entry.effect_started = true;
-            }
-            dbg.p("RESULT", "optional cost skipped — effect not executed");
-            let items = drain_verdicts();
-            self.push_ability_result(gs, "skipped", items, Some("optional cost not paid"));
+        if self.gate_optional_cost_skip(gs, activating_card, ability_index, &mut dbg) {
             return Ok(());
         }
 
-        if let Some(ref effect) = ability.effect {
-            // Check the effect's condition BEFORE executing. The condition must
-            // be met in the current game state (after cost payment). This prevents
-            // effects like "choice" from being shown when the condition fails.
-            if effect.condition.is_some() || effect.activation_condition_parsed_any().is_some() {
-                let passed = self.can_activate_effect(gs, effect);
-                if !passed {
-                    // For 起動 (activation) abilities, the player deliberately paid the
-                    // cost, so the attempt counts toward the turn limit even when the
-                    // effect's condition isn't met.  AUTO-triggered abilities preserve
-                    // their use_limit for when the board state actually satisfies the
-                    // condition.
-                    if ability.use_limit.is_some()
-                        && ability.has_trigger(crate::triggers::TriggerKind::Activation)
-                    {
-                        if let Some(ref key) = ability_key {
-                            gs.record_ability_use(*key);
-                        }
-                    }
-                    dbg.p("RESULT", "effect condition not met — skipped");
-                    let items = drain_verdicts();
-                    self.push_ability_result(gs, "failure", items, None);
-                    return Ok(());
-                }
-            }
-            if let Err(e) = self.execute_effect(gs, effect) {
-                dbg.p("RESULT", format_args!("EFFECT FAILED: {}", e));
-                let items = drain_verdicts();
-                self.push_ability_result(gs, "failure", items, Some(&e));
-                return Err(e);
-            }
-            log::trace!(
-                "[EFFECT] source={:?} action={} returned: pending={}",
-                activating_card,
-                effect.action,
-                self.pending_choice.is_some()
-            );
-            if self.pending_choice.is_some() {
-                if !cost_already_paid {
-                    if let Some(entry) = gs.ability_queue.current_entry_mut() {
-                        entry.cost_paid = true;
-                    }
-                    // Don't record use_limit yet when the pending choice is:
-                    // - "conditional_optional" (may pay) — player decides at choice
-                    // - "position|destination" for optional effects (may place)
-                    //   Record after the choice resolves if they actually did it.
-                    let is_optional_pos = matches!(
-                        self.pending_choice,
-                        Some(Choice::SelectTarget { ref target, .. })
-                            if target == "position|destination"
-                    ) && ability
-                        .effect
-                        .as_ref()
-                        .is_some_and(|e| e.optional.unwrap_or(false));
-                    let skip_use_limit = matches!(
-                        self.pending_choice,
-                        Some(Choice::SelectTarget { ref target, .. })
-                            if target == "conditional_optional"
-                    ) || is_optional_pos;
-                    if let Some(ref key) = ability_key {
-                        if ability.use_limit.is_some() && !skip_use_limit {
-                            gs.record_ability_use(*key);
-                        }
-                    }
-                }
-                // Mark effect as started when a pending choice comes from effect
-                // execution (not cost). This prevents RWC from re-entering the
-                // ability after the effect's choice resolves.
-                let is_paid = cost_already_paid
-                    || gs
-                        .ability_queue
-                        .current_entry()
-                        .is_some_and(|e| e.cost_paid);
-                if is_paid {
-                    if let Some(entry) = gs.ability_queue.current_entry_mut() {
-                        entry.effect_started = true;
-                    }
-                }
-                self.store_pending_choice(gs);
-                return Ok(());
-            }
-            dbg.p("RESULT", "effect applied ✓");
-            let items = drain_verdicts();
-            self.push_ability_result(gs, "success", items, None);
+        if self.run_ability_effect(gs, ability, ability_key, activating_card, cost_already_paid, &mut dbg)? {
+            return Ok(());
         }
 
-        if !cost_already_paid {
-            if let Some(ref key) = ability_key {
-                self.record_ability_use_guarded(gs, *key, ability, false);
-            }
-        }
-        if let Some(key) = ability_key {
-            if ability.use_limit.is_some() {
-                // When cost is already paid (e.g. conditional_on_optional's second entry
-                // after the player accepted), the effect already ran and may have moved
-                // cards around.  Re-checking can_activate_effect would see stale state
-                // (the resolver's moved_cards includes cards moved BY this effect), so
-                // the condition can spuriously fail and the key never gets inserted.
-                // Skip the can_activate_effect guard when cost is already paid AND the
-                // ability is a conditional_on_optional (the player already accepted).
-                let is_cond_opt = ability.effect.as_ref().is_some_and(|e| {
-                    e.action == crate::ability::enums::ActionType::ConditionalOnOptional
-                });
-                if (cost_already_paid && is_cond_opt)
-                    || ability
-                        .effect
-                        .as_ref()
-                        .is_none_or(|e| self.can_activate_effect(gs, e))
-                {
-                    gs.record_ability_use(key);
-                }
-            }
-        }
-
-        gs.activating_card = None;
-        self.current_ability = None;
-        self.current_ability_index = None;
-
-        if self.debug_trace {
-            self.pipeline.trace.after = Some(ZoneSnapshot::from_game_state(gs));
-        }
+        self.record_final_ability_use(gs, ability, ability_key, cost_already_paid);
+        self.finish_ability_resolution(gs);
 
         Ok(())
     }
