@@ -196,7 +196,10 @@ pub(crate) fn handle_choice_string_selection(
     Ok(())
 }
 
-/// Handle choice string store.
+/// Handle choice string store: the number/heart-color pick made by a
+/// preceding `select_number` / `select` step. Persists the chosen value as
+/// `ConditionalChoice::Str` so later comparison conditions (e.g. Kosuzu's
+/// "cost >= chosen number") can read it, then resumes the sequential chain.
 pub(crate) fn handle_choice_string_store(
     resolver: &mut AbilityResolver,
     gs: &mut GameState,
@@ -215,8 +218,13 @@ pub(crate) fn handle_choice_string_store(
         selected,
         chosen.is_some()
     );
+    if let Some(ref s) = chosen {
+        if let Some(entry) = gs.ability_queue.current_entry_mut() {
+            entry.conditional_choice = Some(ConditionalChoice::Str(s.clone()));
+        }
+        log::debug!("[DBG_CHOICE] stored conditional_choice");
+    }
     resolver.pending_choice = None;
-    resolver.clear_choice_meta(gs);
     resolver.resume_pending_actions(gs)?;
     Ok(())
 }
