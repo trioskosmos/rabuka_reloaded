@@ -376,12 +376,29 @@ failures (stale artifacts, no code change needed for those two).
     no-live, empty hand all pass. Source-leaving regression completed: the
     invalid same-turn baton setup (legal area lock, verified by debug trace)
     was replaced with Yoshiko's printed removal; see follow-ups above.
-3. **Whole-file impurities** (split on touch, keep bodies): 
-   `ll_bp7_001_triple_member_test.rs`, `ren_test.rs` blades half,
+3. **Whole-file impurities and naming sweep** (keep bodies):
+   Wave 2 completed: nine originals (`ll_bp7_001_triple_member_test.rs`,
    `kotori_bp5_003_test.rs`, `s_pb1_019_live_test.rs`,
    `cards_6_thru_13_test.rs`, `bp7_auto_gap_test.rs`,
    `b7_constant_ability_test.rs`, `himeno_test.rs`,
-   `link_to_future_test.rs`, `constant_edge_case_test.rs`.
+   `link_to_future_test.rs`, `constant_edge_case_test.rs`) became 37
+   behavior-led test files plus two support modules. Independent comparison
+   against HEAD preserved all 119 tests exactly once and all 22 helpers;
+   body-token changes were verified helper-call renames only.
+   Wave 3 added `_test` suffixes to 23 files; the subsequent full suite
+   passed 3368 tests with no failures. Suffix completion does not imply
+   all filenames or test functions are behavior-led.
+   Wave 4 is in progress across compound, state, jidou, gain/cost and
+   smaller effect families. Its checkpoint could not compile because of
+   concurrent `engine/src/ability/move_cards` module extraction errors;
+   no engine changes are part of this naming sweep. Completed gain/cost
+   batch: 25 originals became 27 files (145 tests); parent recover/position
+   batch: nine files (31 tests). Independent comparison found every test
+   and helper exactly once. Parent bodies match modulo `ruby_id` renamed
+   to `fixed_center_id`; gain/cost has two tests and one helper differing
+   from 5088ce4d, all already identical in pre-rename commit 643f9e10.
+   Remaining batch preservation, full-suite and regenerated inventory
+   checks remain pending.
 4. **Parametrize twin abilities**: 3+ per-card files for one shape →
    shared helper + thin wrappers (cost9_group_search pattern).
 5. **Weak branches from the ledger** (§5 above): drain termination,

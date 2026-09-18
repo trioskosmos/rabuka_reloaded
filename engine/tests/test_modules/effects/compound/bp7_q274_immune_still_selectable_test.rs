@@ -42,7 +42,7 @@ fn is_waited(game: &TestGame, id: i16) -> bool {
 /// choice. When that "stage" SelectCard appears, we capture its filtered_indices (the
 /// offered stage positions) and select the member whose stage position == `select_pos`.
 /// Returns the offered stage positions (the members the opponent COULD pick).
-fn run_karin_wait(game: &mut TestGame, select_pos: usize) -> Vec<usize> {
+fn run_opponent_under_energy_blade_limit_wait(game: &mut TestGame, select_pos: usize) -> Vec<usize> {
     let karin = game.id(KARIN);
     game.state.player2.stage.stage[1] = karin;
     let e = game.id(ENERGY);
@@ -102,7 +102,7 @@ fn q274_immune_target_still_offered_and_not_waited() {
 
     // Player2 (opponent) becomes active and activates 朝香果林's wait.
     set_active(&mut game, false);
-    let offered = run_karin_wait(&mut game, /*select*/ 1 /* kanan's stage index */);
+    let offered = run_opponent_under_energy_blade_limit_wait(&mut game, /*select*/ 1 /* kanan's stage index */);
 
     // Q274 core: the wait-immune member was OFFERED as a legal target choice.
     assert!(
@@ -135,7 +135,7 @@ fn q274_non_immune_pick_is_still_waited() {
     game.state.player1.stage.stage[0] = non_immune;
 
     set_active(&mut game, false);
-    let offered = run_karin_wait(&mut game, 0 /* non-immune μs stage index */);
+    let offered = run_opponent_under_energy_blade_limit_wait(&mut game, 0 /* non-immune μs stage index */);
 
     assert!(offered.contains(&0), "non-immune member should be offered; offered={:?}", offered);
     assert!(
@@ -162,7 +162,7 @@ fn q274_without_immunity_the_member_is_waited() {
     assert!(game.state.wait_immune_members.is_empty(), "no immunity expected");
 
     set_active(&mut game, false);
-    let offered = run_karin_wait(&mut game, 1);
+    let offered = run_opponent_under_energy_blade_limit_wait(&mut game, 1);
 
     assert!(offered.contains(&1), "果南 should be selectable; offered={:?}", offered);
     assert!(

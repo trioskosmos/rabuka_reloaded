@@ -27,7 +27,7 @@ passed = 0
 failed = 0
 
 
-def test(name, fn):
+def run_check(name, fn):
     global passed, failed
     try:
         fn()
@@ -255,7 +255,7 @@ tests = {
     k: v for k, v in sorted(globals().items()) if k.startswith("test_") and callable(v)
 }
 for name, fn in tests.items():
-    test(name, fn)
+    run_check(name, fn)
 
 print(f"\n{passed} passed, {failed} failed")
 if failed:

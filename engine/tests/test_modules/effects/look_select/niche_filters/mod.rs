@@ -2,7 +2,7 @@
 // Regenerated from the directory listing at compile time.
 pub mod all_or_any_three_heart_member_search_test;
 pub mod card_filter_test;
-pub mod kanata_bp7_no_blade_search;
+pub mod look_seven_select_three_heart_member_test;
 pub mod mei_bp5_test;
-pub mod yoshiko_heart_threshold;
-pub mod you_debut_test;
+pub mod no_blade_heart_group_look_test;
+pub mod or_types_heart05_threshold_look_test;

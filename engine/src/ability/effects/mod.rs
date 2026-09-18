@@ -1,6 +1,7 @@
 pub mod ability_effects;
 pub mod draw;
 pub mod misc;
+mod reveal;
 pub mod score;
 pub mod state;
 

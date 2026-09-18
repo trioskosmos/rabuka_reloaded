@@ -33,91 +33,89 @@ impl super::TurnEngine {
                 crate::zones::MemberArea::RightSide,
             ];
             for area in areas {
-                if let Some(card_id) = player.stage.get_area(area) {
-                    if let Some(card) = game_state.card_database.get_card(card_id) {
-                        log::trace!(
-                            "[DEBUT_SCAN] player={} source={} ({}, id={}) requested={}",
-                            player_id,
-                            card.name,
-                            card.card_no,
-                            card_id,
-                            card_no_clone
-                        );
-                        if card.card_no.as_ref() == card_no_clone {
-                            for (ability_index, ar) in card.abilities.iter().enumerate() {
-                                let ability = ar.resolve();
-                                let trigger_match =
-                                    ability.has_trigger(crate::triggers::TriggerKind::Debut);
-                                log::log!(
-                                    if trigger_match { log::Level::Debug } else { log::Level::Trace },
-                                    "[TRIGGER_MATCH] player={} source={} ({}, id={}) ability={} trigger=Debut match={} triggers={:?}",
-                                    player_id,
-                                    card.name,
-                                    card.card_no,
-                                    card_id,
-                                    ability_index,
-                                    trigger_match,
-                                    ability.triggers
-                                );
-                                if trigger_match {
-                                    // Position gate: skip if activation_position doesn't match this area
-                                    if !crate::zones::check_effect_position(
-                                        ability
-                                            .effect
-                                            .as_ref()
-                                            .and_then(|e| e.activation_position_any()),
-                                        area,
-                                    ) {
-                                        continue;
-                                    }
-                                    // Skip abilities that require baton touch if baton touch wasn't used
-                                    if !baton_touch_used
-                                        && ability
-                                            .effect
-                                            .as_ref()
-                                            .and_then(|e| e.condition.as_ref())
-                                            .is_some_and(|c| {
-                                                c.get_baton_touch_trigger().unwrap_or(false)
-                                            })
-                                    {
-                                        continue;
-                                    }
-                                    if crate::ability::debug::ABILITY_DEBUG
-                                        .load(core::sync::atomic::Ordering::Relaxed)
-                                    {
-                                        let card_name = &card.name;
-                                        let pp = player_id_clone.clone();
-                                        GameState::push_structured_log_to(&mut game_state.structured_log, LogEntry {
-                                            text: format!(
-                                                "{pp} {card_name} [ステージ]: 能力確認 [登場]"
-                                            ),
-                                            turn: game_state.turn_number,
-                                            player_label: pp,
-                                            source_card_id: Some(card_id),
-                                            source_card_name: Some(card_name.to_string()),
-                                            category: "trigger_evaluation".to_string(),
-                                            metadata: Some(crate::core::types::LogMetadata::TriggerEvaluation {
-                                                trigger: "debut".to_string(),
-                                                zone: "stage".to_string(),
-                                                result: "pending".to_string(),
-                                                ability_index,
-                                                ability_text: ability.full_text.clone(),
-                                            }),
-                                        });
-                                    }
-                                    let ability_id =
-                                        format!("{}_{}", card_no_clone, ability.full_text);
-                                    abilities_to_trigger.push((
-                                        ability_id,
-                                        card_no_clone.clone(),
-                                        card_id,
-                                    ));
-                                }
-                            }
-                            break;
-                        }
-                    }
+                let Some(card_id) = player.stage.get_area(area) else {
+                    continue;
+                };
+                let Some(card) = game_state.card_database.get_card(card_id) else {
+                    continue;
+                };
+                log::trace!(
+                    "[DEBUT_SCAN] player={} source={} ({}, id={}) requested={}",
+                    player_id,
+                    card.name,
+                    card.card_no,
+                    card_id,
+                    card_no_clone
+                );
+                if card.card_no.as_ref() != card_no_clone {
+                    continue;
                 }
+                for (ability_index, ability_ref) in card.abilities.iter().enumerate() {
+                    let ability = ability_ref.resolve();
+                    let trigger_match = ability.has_trigger(crate::triggers::TriggerKind::Debut);
+                    log::log!(
+                        if trigger_match { log::Level::Debug } else { log::Level::Trace },
+                        "[TRIGGER_MATCH] player={} source={} ({}, id={}) ability={} trigger=Debut match={} triggers={:?}",
+                        player_id, card.name, card.card_no, card_id,
+                        ability_index, trigger_match, ability.triggers
+                    );
+                    if !trigger_match {
+                        continue;
+                    }
+                    if !crate::zones::check_effect_position(
+                        ability
+                            .effect
+                            .as_ref()
+                            .and_then(|effect| effect.activation_position_any()),
+                        area,
+                    ) {
+                        continue;
+                    }
+                    if !baton_touch_used
+                        && ability
+                            .effect
+                            .as_ref()
+                            .and_then(|effect| effect.condition.as_ref())
+                            .is_some_and(|condition| {
+                                condition.get_baton_touch_trigger().unwrap_or(false)
+                            })
+                    {
+                        continue;
+                    }
+                    if crate::ability::debug::ABILITY_DEBUG
+                        .load(core::sync::atomic::Ordering::Relaxed)
+                    {
+                        GameState::push_structured_log_to(
+                            &mut game_state.structured_log,
+                            LogEntry {
+                                text: format!(
+                                    "{} {} [ステージ]: 能力確認 [登場]",
+                                    player_id_clone, card.name
+                                ),
+                                turn: game_state.turn_number,
+                                player_label: player_id_clone.clone(),
+                                source_card_id: Some(card_id),
+                                source_card_name: Some(card.name.to_string()),
+                                category: "trigger_evaluation".to_string(),
+                                metadata: Some(
+                                    crate::core::types::LogMetadata::TriggerEvaluation {
+                                        trigger: "debut".to_string(),
+                                        zone: "stage".to_string(),
+                                        result: "pending".to_string(),
+                                        ability_index,
+                                        ability_text: ability.full_text.clone(),
+                                    },
+                                ),
+                            },
+                        );
+                    }
+                    abilities_to_trigger.push((
+                        format!("{}_{}", card_no_clone, ability.full_text),
+                        card_no_clone.clone(),
+                        card_id,
+                    ));
+                }
+                break;
             }
         }
 
@@ -141,37 +139,22 @@ impl super::TurnEngine {
         } else {
             &game_state.player2
         };
-        let check_card = |card_id: i16| -> bool {
-            if card_id == -1 {
-                return false;
-            }
-            if let Some(card) = game_state.card_database.get_card(card_id) {
-                for ar in &card.abilities {
-                    let ability = ar.resolve();
-                    if let Some(ref effect) = ability.effect {
-                        if effect.action
-                            == crate::ability::enums::ActionType::SuppressAbilityTrigger
-                        {
-                            if effect.suppressed_trigger_any() == Some(trigger_name) {
-                                return true;
-                            }
-                        }
-                    }
-                }
-            }
-            false
-        };
-        for &card_id in &player.stage.stage {
-            if check_card(card_id) {
-                return true;
-            }
-        }
-        for &card_id in &player.live_card_zone.cards {
-            if check_card(card_id) {
-                return true;
-            }
-        }
-        false
+        player
+            .stage
+            .stage
+            .iter()
+            .chain(player.live_card_zone.cards.iter())
+            .copied()
+            .filter(|&card_id| card_id != -1)
+            .filter_map(|card_id| game_state.card_database.get_card(card_id))
+            .any(|card| {
+                card.abilities.iter().any(|ability_ref| {
+                    ability_ref.resolve().effect.as_ref().is_some_and(|effect| {
+                        effect.action == crate::ability::enums::ActionType::SuppressAbilityTrigger
+                            && effect.suppressed_trigger_any() == Some(trigger_name)
+                    })
+                })
+            })
     }
 
     pub fn trigger_live_start_abilities(game_state: &mut GameState, player_id: &str) {
@@ -209,116 +192,93 @@ impl super::TurnEngine {
                 player.live_card_zone.cards,
                 player.stage.stage
             );
-            for card_id in &player.live_card_zone.cards {
-                log::trace!(
-                    "[LIVE_START_SCAN] checking card={} negated={}",
-                    card_id,
-                    game_state.negated_abilities.contains(card_id)
-                );
-                if game_state.negated_abilities.contains(card_id) {
+            let live_cards = player.live_card_zone.cards.iter().map(|&id| (id, None));
+            let stage_cards = player.stage.stage.iter().enumerate().map(|(index, &id)| {
+                let area = crate::zones::MemberArea::from_index(index)
+                    .unwrap_or(crate::zones::MemberArea::RightSide);
+                (id, Some(area))
+            });
+            for (card_id, position) in live_cards.chain(stage_cards) {
+                if position.is_none() {
+                    log::trace!(
+                        "[LIVE_START_SCAN] checking card={} negated={}",
+                        card_id,
+                        game_state.negated_abilities.contains(&card_id)
+                    );
+                }
+                if (position.is_some() && card_id == -1)
+                    || game_state.negated_abilities.contains(&card_id)
+                {
                     continue;
                 }
-                if let Some(card) = game_state.card_database.get_card(*card_id) {
-                    for (aidx, ar) in card.abilities.iter().enumerate() {
-                        let ability = ar.resolve();
+                let Some(card) = game_state.card_database.get_card(card_id) else {
+                    continue;
+                };
+                let (zone, zone_label) = if position.is_some() {
+                    ("stage", "ステージ")
+                } else {
+                    ("live_card_zone", "ライブ置場")
+                };
+                for (ability_index, ability_ref) in card.abilities.iter().enumerate() {
+                    let ability = ability_ref.resolve();
+                    if position.is_some_and(|area| {
+                        !crate::zones::check_effect_position(
+                            ability
+                                .effect
+                                .as_ref()
+                                .and_then(|effect| effect.activation_position_any()),
+                            area,
+                        )
+                    }) {
+                        continue;
+                    }
+                    if position.is_none() {
                         log::trace!(
                             "[LIVE_START_SCAN] source={} ({}, id={}) ability={} triggers={:?}",
                             card.name,
                             card.card_no,
                             card_id,
-                            aidx,
+                            ability_index,
                             ability.triggers
                         );
-                        if ability.has_trigger(crate::triggers::TriggerKind::LiveStart) {
-                            if seen.insert((*card_id, aidx)) {
-                                if crate::ability::debug::ABILITY_DEBUG
-                                    .load(core::sync::atomic::Ordering::Relaxed)
-                                {
-                                    let card_name = &card.name;
-                                    let pp = player_id_clone.clone();
-                                    GameState::push_structured_log_to(&mut game_state.structured_log, LogEntry {
-                                        text: format!(
-                                            "{pp} {card_name} [ライブ置場]: 能力確認 [ライブ開始時]"
-                                        ),
-                                        turn: game_state.turn_number,
-                                        player_label: pp,
-                                        source_card_id: Some(*card_id),
-                                        source_card_name: Some(card_name.to_string()),
-                                        category: "trigger_evaluation".to_string(),
-                                        metadata: Some(
-                                            crate::core::types::LogMetadata::TriggerEvaluation {
-                                                trigger: "live_start".to_string(),
-                                                zone: "live_card_zone".to_string(),
-                                                result: "pending".to_string(),
-                                                ability_index: aidx,
-                                                ability_text: ability.full_text.clone(),
-                                            },
-                                        ),
-                                    });
-                                }
-                                let ability_id = format!("{}_{}", card.card_no, ability.full_text);
-                                abilities_to_trigger.push((
-                                    ability_id,
-                                    card.card_no.to_string(),
-                                    Some(*card_id),
-                                ));
-                            }
-                        }
                     }
-                }
-            }
-            for (stage_idx, &card_id) in player.stage.stage.iter().enumerate() {
-                let card_position = crate::zones::MemberArea::from_index(stage_idx)
-                    .unwrap_or(crate::zones::MemberArea::RightSide);
-                if card_id != -1 && !game_state.negated_abilities.contains(&card_id) {
-                    if let Some(card) = game_state.card_database.get_card(card_id) {
-                        for (aidx, ar) in card.abilities.iter().enumerate() {
-                            let ability = ar.resolve();
-                            if !crate::zones::check_effect_position(
-                                ability
-                                    .effect
-                                    .as_ref()
-                                    .and_then(|e| e.activation_position_any()),
-                                card_position,
-                            ) {
-                                continue;
-                            }
-                            if ability.has_trigger(crate::triggers::TriggerKind::LiveStart) {
-                                if seen.insert((card_id, aidx)) {
-                                    if crate::ability::debug::ABILITY_DEBUG
-                                        .load(core::sync::atomic::Ordering::Relaxed)
-                                    {
-                                        let card_name = &card.name;
-                                        let pp = player_id_clone.clone();
-                                        GameState::push_structured_log_to(&mut game_state.structured_log, LogEntry {
-                                            text: format!(
-                                                "{pp} {card_name} [ステージ]: 能力確認 [ライブ開始時]"
-                                            ),
-                                            turn: game_state.turn_number,
-                                            player_label: pp,
-                                            source_card_id: Some(card_id),
-                                            source_card_name: Some(card_name.to_string()),
-                                            category: "trigger_evaluation".to_string(),
-                                            metadata: Some(crate::core::types::LogMetadata::TriggerEvaluation {
-                                                trigger: "live_start".to_string(),
-                                                zone: "stage".to_string(),
-                                                result: "pending".to_string(),
-                                                ability_index: aidx,
-                                                ability_text: ability.full_text.clone(),
-                                            }),
-                                        });
-                                    }
-                                    let ability_id =
-                                        format!("{}_{}", card.card_no, ability.full_text);
-                                    abilities_to_trigger.push((
-                                        ability_id,
-                                        card.card_no.to_string(),
-                                        Some(card_id),
-                                    ));
-                                }
-                            }
-                        }
+                    if !ability.has_trigger(crate::triggers::TriggerKind::LiveStart)
+                        || !seen.insert((card_id, ability_index))
+                    {
+                        continue;
                     }
+                    if crate::ability::debug::ABILITY_DEBUG
+                        .load(core::sync::atomic::Ordering::Relaxed)
+                    {
+                        GameState::push_structured_log_to(
+                            &mut game_state.structured_log,
+                            LogEntry {
+                                text: format!(
+                                    "{} {} [{zone_label}]: 能力確認 [ライブ開始時]",
+                                    player_id_clone, card.name
+                                ),
+                                turn: game_state.turn_number,
+                                player_label: player_id_clone.clone(),
+                                source_card_id: Some(card_id),
+                                source_card_name: Some(card.name.to_string()),
+                                category: "trigger_evaluation".to_string(),
+                                metadata: Some(
+                                    crate::core::types::LogMetadata::TriggerEvaluation {
+                                        trigger: "live_start".to_string(),
+                                        zone: zone.to_string(),
+                                        result: "pending".to_string(),
+                                        ability_index,
+                                        ability_text: ability.full_text.clone(),
+                                    },
+                                ),
+                            },
+                        );
+                    }
+                    abilities_to_trigger.push((
+                        format!("{}_{}", card.card_no, ability.full_text),
+                        card.card_no.to_string(),
+                        Some(card_id),
+                    ));
                 }
             }
         }
@@ -386,193 +346,133 @@ impl super::TurnEngine {
             } else {
                 &game_state.player2
             };
-            let skip_negated =
-                |gs: &GameState, id: i16| -> bool { gs.negated_abilities.contains(&id) };
-            for (area, index) in [
-                (crate::zones::MemberArea::LeftSide, 0),
-                (crate::zones::MemberArea::Center, 1),
-                (crate::zones::MemberArea::RightSide, 2),
-            ] {
-                let card_id = player.stage.stage[index];
-                if card_id != -1 && !skip_negated(game_state, card_id) {
-                    if let Some(card) = game_state.card_database.get_card(card_id) {
-                        let card_no = card.card_no.to_string();
-                        for (aidx, ar) in card.abilities.iter().enumerate() {
-                            let ability = ar.resolve();
-                            if !crate::zones::check_effect_position(
-                                ability
-                                    .effect
-                                    .as_ref()
-                                    .and_then(|e| e.activation_position_any()),
-                                area,
-                            ) {
-                                continue;
-                            }
-                            if ability.has_trigger(crate::triggers::TriggerKind::LiveSuccess) {
-                                if !seen.insert((card_id, aidx)) {
-                                    continue;
-                                }
-                                if crate::ability::debug::ABILITY_DEBUG
-                                    .load(core::sync::atomic::Ordering::Relaxed)
-                                {
-                                    let card_name = &card.name;
-                                    let pp = player_id_clone.clone();
-                                    GameState::push_structured_log_to(&mut game_state.structured_log, LogEntry {
-                                        text: format!(
-                                            "{pp} {card_name} [ステージ]: 能力確認 [ライブ成功時]"
-                                        ),
-                                        turn: game_state.turn_number,
-                                        player_label: pp,
-                                        source_card_id: Some(card_id),
-                                        source_card_name: Some(card_name.to_string()),
-                                        category: "trigger_evaluation".to_string(),
-                                        metadata: Some(
-                                            crate::core::types::LogMetadata::TriggerEvaluation {
-                                                trigger: "live_success".to_string(),
-                                                zone: "stage".to_string(),
-                                                result: "pending".to_string(),
-                                                ability_index: aidx,
-                                                ability_text: ability.full_text.clone(),
-                                            },
-                                        ),
-                                    });
-                                }
-                                let ability_id = format!("{}_{}", card_no, ability.full_text);
-                                abilities_to_trigger.push((ability_id, card_no.clone(), card_id));
-                            }
-                        }
-                        // Also check gained card abilities
-                        if let Some(gained_list) = game_state.gained_card_abilities.get(&card_id) {
-                            for (gidx, gained_ability) in gained_list.iter().enumerate() {
-                                if !crate::zones::check_effect_position(
-                                    gained_ability
-                                        .effect
-                                        .as_ref()
-                                        .and_then(|e| e.activation_position_any()),
-                                    area,
-                                ) {
-                                    continue;
-                                }
-                                if gained_ability
-                                    .has_trigger(crate::triggers::TriggerKind::LiveSuccess)
-                                {
-                                    if !seen.insert((card_id, crate::ability::types::GAINED_ABILITY_INDEX_BASE + gidx)) {
-                                        continue;
-                                    }
-                                    if crate::ability::debug::ABILITY_DEBUG
-                                        .load(core::sync::atomic::Ordering::Relaxed)
-                                    {
-                                        let pp = player_id_clone.clone();
-                                        GameState::push_structured_log_to(&mut game_state.structured_log, LogEntry {
-                                        text: format!(
-                                            "{pp} card#{card_id} [ステージ/獲得]: 能力確認 [ライブ成功時]"
-                                        ),
-                                        turn: game_state.turn_number,
-                                        player_label: pp,
-                                        source_card_id: Some(card_id),
-                                        source_card_name: None,
-                                        category: "trigger_evaluation".to_string(),
-                                        metadata: Some(crate::core::types::LogMetadata::TriggerEvaluation {
-                                            trigger: "live_success".to_string(),
-                                            zone: "stage_gained".to_string(),
-                                            result: "pending".to_string(),
-                                            ability_index: crate::ability::types::GAINED_ABILITY_INDEX_BASE + gidx,
-                                            ability_text: gained_ability.full_text.clone(),
-                                        }),
-                                    });
-                                    }
-                                    let ability_id = format!("{}_gained_{}", card_no, gidx);
-                                    abilities_to_trigger.push((
-                                        ability_id,
-                                        card_no.clone(),
-                                        card_id,
-                                    ));
-                                }
-                            }
-                        }
-                    }
+            let stage_cards = [
+                crate::zones::MemberArea::LeftSide,
+                crate::zones::MemberArea::Center,
+                crate::zones::MemberArea::RightSide,
+            ]
+            .into_iter()
+            .enumerate()
+            .map(|(index, area)| (player.stage.stage[index], Some(area)));
+            let live_cards = player.live_card_zone.cards.iter().map(|&id| (id, None));
+            for (card_id, position) in stage_cards.chain(live_cards) {
+                if position.is_some()
+                    && (card_id == -1 || game_state.negated_abilities.contains(&card_id))
+                {
+                    continue;
                 }
-            }
-            for card_id in &player.live_card_zone.cards {
-                if let Some(card) = game_state.card_database.get_card(*card_id) {
-                    let card_no = card.card_no.to_string();
-                    for (aidx, ar) in card.abilities.iter().enumerate() {
-                        let ability = ar.resolve();
-                        let trigger_match =
-                            ability.has_trigger(crate::triggers::TriggerKind::LiveSuccess);
-                        if !trigger_match {
-                            continue;
-                        }
-                        if !seen.insert((*card_id, aidx)) {
-                            continue;
-                        }
-                        if crate::ability::debug::ABILITY_DEBUG
-                            .load(core::sync::atomic::Ordering::Relaxed)
-                        {
-                            let card_name = &card.name;
-                            let pp = player_id_clone.clone();
-                            GameState::push_structured_log_to(
-                                &mut game_state.structured_log,
-                                LogEntry {
-                                    text: format!(
-                                        "{pp} {card_name} [ライブ置場]: 能力確認 [ライブ成功時]"
-                                    ),
-                                    turn: game_state.turn_number,
-                                    player_label: pp,
-                                    source_card_id: Some(*card_id),
-                                    source_card_name: Some(card_name.to_string()),
-                                    category: "trigger_evaluation".to_string(),
-                                    metadata: Some(
-                                        crate::core::types::LogMetadata::TriggerEvaluation {
-                                            trigger: "live_success".to_string(),
-                                            zone: "live_card_zone".to_string(),
-                                            result: "pending".to_string(),
-                                            ability_index: aidx,
-                                            ability_text: ability.full_text.clone(),
-                                        },
-                                    ),
-                                },
-                            );
-                        }
-                        let ability_id = format!("{}_{}", card_no, ability.full_text);
-                        abilities_to_trigger.push((ability_id, card_no.clone(), *card_id));
+                let Some(card) = game_state.card_database.get_card(card_id) else {
+                    continue;
+                };
+                let card_no = card.card_no.to_string();
+                let (zone, zone_label) = if position.is_some() {
+                    ("stage", "ステージ")
+                } else {
+                    ("live_card_zone", "ライブ置場")
+                };
+                for (ability_index, ability_ref) in card.abilities.iter().enumerate() {
+                    let ability = ability_ref.resolve();
+                    if position.is_some_and(|area| {
+                        !crate::zones::check_effect_position(
+                            ability
+                                .effect
+                                .as_ref()
+                                .and_then(|effect| effect.activation_position_any()),
+                            area,
+                        )
+                    }) {
+                        continue;
                     }
-                    // Also check gained card abilities
-                    if let Some(gained_list) = game_state.gained_card_abilities.get(card_id) {
-                        for (gidx, gained_ability) in gained_list.iter().enumerate() {
-                            if gained_ability
-                                .has_trigger(crate::triggers::TriggerKind::LiveSuccess)
-                            {
-                                if !seen.insert((*card_id, crate::ability::types::GAINED_ABILITY_INDEX_BASE + gidx)) {
-                                    continue;
-                                }
-                                if crate::ability::debug::ABILITY_DEBUG
-                                    .load(core::sync::atomic::Ordering::Relaxed)
-                                {
-                                    let pp = player_id_clone.clone();
-                                    GameState::push_structured_log_to(&mut game_state.structured_log, LogEntry {
-                                    text: format!(
-                                        "{pp} card#{card_id} [ライブ置場/獲得]: 能力確認 [ライブ成功時]"
-                                    ),
-                                    turn: game_state.turn_number,
-                                    player_label: pp,
-                                    source_card_id: Some(*card_id),
-                                    source_card_name: None,
-                                    category: "trigger_evaluation".to_string(),
-                                    metadata: Some(crate::core::types::LogMetadata::TriggerEvaluation {
+                    if !ability.has_trigger(crate::triggers::TriggerKind::LiveSuccess)
+                        || !seen.insert((card_id, ability_index))
+                    {
+                        continue;
+                    }
+                    if crate::ability::debug::ABILITY_DEBUG
+                        .load(core::sync::atomic::Ordering::Relaxed)
+                    {
+                        GameState::push_structured_log_to(
+                            &mut game_state.structured_log,
+                            LogEntry {
+                                text: format!(
+                                    "{} {} [{zone_label}]: 能力確認 [ライブ成功時]",
+                                    player_id_clone, card.name
+                                ),
+                                turn: game_state.turn_number,
+                                player_label: player_id_clone.clone(),
+                                source_card_id: Some(card_id),
+                                source_card_name: Some(card.name.to_string()),
+                                category: "trigger_evaluation".to_string(),
+                                metadata: Some(
+                                    crate::core::types::LogMetadata::TriggerEvaluation {
                                         trigger: "live_success".to_string(),
-                                        zone: "live_card_zone_gained".to_string(),
+                                        zone: zone.to_string(),
                                         result: "pending".to_string(),
-                                        ability_index: crate::ability::types::GAINED_ABILITY_INDEX_BASE + gidx,
-                                        ability_text: gained_ability.full_text.clone(),
-                                    }),
-                                });
-                                }
-                                let ability_id = format!("{}_gained_{}", card_no, gidx);
-                                abilities_to_trigger.push((ability_id, card_no.clone(), *card_id));
-                            }
-                        }
+                                        ability_index,
+                                        ability_text: ability.full_text.clone(),
+                                    },
+                                ),
+                            },
+                        );
                     }
+                    abilities_to_trigger.push((
+                        format!("{}_{}", card_no, ability.full_text),
+                        card_no.clone(),
+                        card_id,
+                    ));
+                }
+                let Some(gained_list) = game_state.gained_card_abilities.get(&card_id) else {
+                    continue;
+                };
+                for (gained_index, ability) in gained_list.iter().enumerate() {
+                    if position.is_some_and(|area| {
+                        !crate::zones::check_effect_position(
+                            ability
+                                .effect
+                                .as_ref()
+                                .and_then(|effect| effect.activation_position_any()),
+                            area,
+                        )
+                    }) {
+                        continue;
+                    }
+                    let ability_index =
+                        crate::ability::types::GAINED_ABILITY_INDEX_BASE + gained_index;
+                    if !ability.has_trigger(crate::triggers::TriggerKind::LiveSuccess)
+                        || !seen.insert((card_id, ability_index))
+                    {
+                        continue;
+                    }
+                    if crate::ability::debug::ABILITY_DEBUG
+                        .load(core::sync::atomic::Ordering::Relaxed)
+                    {
+                        GameState::push_structured_log_to(
+                            &mut game_state.structured_log,
+                            LogEntry {
+                                text: format!(
+                                    "{} card#{card_id} [{zone_label}/獲得]: 能力確認 [ライブ成功時]",
+                                    player_id_clone
+                                ),
+                                turn: game_state.turn_number,
+                                player_label: player_id_clone.clone(),
+                                source_card_id: Some(card_id),
+                                source_card_name: None,
+                                category: "trigger_evaluation".to_string(),
+                                metadata: Some(crate::core::types::LogMetadata::TriggerEvaluation {
+                                    trigger: "live_success".to_string(),
+                                    zone: format!("{zone}_gained"),
+                                    result: "pending".to_string(),
+                                    ability_index,
+                                    ability_text: ability.full_text.clone(),
+                                }),
+                            },
+                        );
+                    }
+                    abilities_to_trigger.push((
+                        format!("{}_gained_{}", card_no, gained_index),
+                        card_no.clone(),
+                        card_id,
+                    ));
                 }
             }
         }

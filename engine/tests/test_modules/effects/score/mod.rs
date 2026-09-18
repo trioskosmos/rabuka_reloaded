@@ -22,6 +22,7 @@ pub mod liella_heart_total_score_test;
 pub mod live_start_distinct_group_member_score_test;
 pub mod live_success_remaining_yell_live_score_q253_test;
 pub mod live_success_score_per_waited_member_test;
+pub mod live_success_surplus_score_zero_floor_test;
 pub mod ll_bp1_001_test;
 pub mod love_u_test;
 pub mod mirakura_stage_threshold_pl_hs_bp5_021_l_test;

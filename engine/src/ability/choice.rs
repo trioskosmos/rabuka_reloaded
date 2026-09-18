@@ -146,7 +146,7 @@ impl super::resolver::AbilityResolver {
     }
 
     /// Shared epilogue: clear pending_choice, resume execution, process pending sequential actions.
-    fn finalize_choice(
+    pub(in crate::ability::choice) fn finalize_choice(
         &mut self,
         gs: &mut GameState,
         context: &ExecutionContext,
@@ -227,7 +227,7 @@ impl super::resolver::AbilityResolver {
         Ok(())
     }
 
-    fn reveal_selected_looked_at(&mut self, gs: &mut GameState, indices: &[usize]) {
+    pub(in crate::ability::choice) fn reveal_selected_looked_at(&mut self, gs: &mut GameState, indices: &[usize]) {
         let mut revealed_ids = Vec::new();
         let source = gs.current_ability_source_card_id();
         let looked_owner = gs
@@ -340,18 +340,12 @@ impl super::resolver::AbilityResolver {
                 // downstream actions (e.g. gain_resource) still execute.
                 self.clear_choice_state_and_resume(gs)
             }
-            (Some(Choice::SelectCard { .. }), ChoiceResult::Skip) => {
-                // Clear pending commands saved by sequential conditional handlers
-                // so that skipped optional sub-actions don't re-execute as mandatory.
-                gs.ability_queue.take_pending_actions();
-                self.clear_choice_state(gs);
-                self.resume_execution(gs, context)
-            }
+
             (
                 Some(Choice::SelectTarget { target, allow_skip: false, .. }),
                 ChoiceResult::Skip,
             ) if target == "order" => Err("Deck ordering cannot be skipped".to_string()),
-            (Some(Choice::SelectTarget { .. }), ChoiceResult::Skip) => {
+            (Some(Choice::SelectCard { .. } | Choice::SelectTarget { .. }), ChoiceResult::Skip) => {
                 // Skip the choice entirely — no option is executed.
                 gs.ability_queue.take_pending_actions();
                 self.clear_choice_state(gs);
@@ -403,7 +397,7 @@ impl super::resolver::AbilityResolver {
         }
     }
 
-    fn handle_select_card(
+    pub(in crate::ability::choice) fn handle_select_card(
         &mut self,
         gs: &mut GameState,
         choice: &Choice,
@@ -1061,7 +1055,7 @@ gs.set_recently_moved_batch(card_ids.into(), Some(Zone::LiveCardZone.to_str()));
         return self.handle_selection_epilogue(gs, &context);
     }
 
-    fn build_reprompt(
+    pub(in crate::ability::choice) fn build_reprompt(
         &self,
         ctx: &SelectionContext,
         zone: &str,
@@ -1085,7 +1079,7 @@ gs.set_recently_moved_batch(card_ids.into(), Some(Zone::LiveCardZone.to_str()));
             .target_player_id(tpid)
     }
 
-    fn handle_hand_selection(
+    pub(in crate::ability::choice) fn handle_hand_selection(
         &mut self,
         gs: &mut GameState,
         ctx: &SelectionContext,
@@ -1405,7 +1399,7 @@ gs.set_recently_moved_batch(card_ids.into(), Some(Zone::LiveCardZone.to_str()));
         self.handle_selection_epilogue(gs, context)
     }
 
-    fn handle_reveal_selection(
+    pub(in crate::ability::choice) fn handle_reveal_selection(
         &mut self,
         gs: &mut GameState,
         ctx: &SelectionContext,
@@ -1548,7 +1542,7 @@ gs.set_recently_moved_batch(card_ids.into(), Some(Zone::LiveCardZone.to_str()));
         self.resume_pending_actions(gs)
     }
 
-    fn handle_revealed_cards_selection(
+    pub(in crate::ability::choice) fn handle_revealed_cards_selection(
         &mut self,
         gs: &mut GameState,
         ctx: &SelectionContext,
@@ -1609,7 +1603,7 @@ gs.set_recently_moved_batch(card_ids.into(), Some(Zone::LiveCardZone.to_str()));
         Ok(())
     }
 
-    fn handle_success_live_zone_selection(
+    pub(in crate::ability::choice) fn handle_success_live_zone_selection(
         &mut self,
         gs: &mut GameState,
         ctx: &SelectionContext,
@@ -1657,7 +1651,7 @@ gs.set_recently_moved_batch(valid_ids.into(), Some(Zone::SuccessLiveZone.to_str(
         self.resume_pending_actions(gs)
     }
 
-    fn handle_entry_cost_reveal(
+    pub(in crate::ability::choice) fn handle_entry_cost_reveal(
         &mut self,
         gs: &mut GameState,
         ctx: &SelectionContext,
@@ -1755,7 +1749,7 @@ gs.set_recently_moved_batch(valid_ids.into(), Some(Zone::SuccessLiveZone.to_str(
     //
     // Q122: If the effect is a rearrangement (look + rearrange on deck),
     //   no refresh happens until cards actually leave the deck zone.
-    fn handle_looked_at_selection(
+    pub(in crate::ability::choice) fn handle_looked_at_selection(
         &mut self,
         gs: &mut GameState,
         ctx: &SelectionContext,
@@ -1864,7 +1858,7 @@ gs.set_recently_moved_batch(valid_ids.into(), Some(Zone::SuccessLiveZone.to_str(
         self.finalize_choice(gs, context)
     }
 
-    fn handle_stage_selection(
+    pub(in crate::ability::choice) fn handle_stage_selection(
         &mut self,
         gs: &mut GameState,
         ctx: &SelectionContext,
@@ -2041,7 +2035,7 @@ gs.set_recently_moved_batch(valid_ids.into(), Some("stage"));
         Ok(())
     }
 
-    fn filter_discard_by_budget(
+    pub(in crate::ability::choice) fn filter_discard_by_budget(
         &self,
         gs: &GameState,
         ctx: &SelectionContext,
@@ -2077,7 +2071,7 @@ gs.set_recently_moved_batch(valid_ids.into(), Some("stage"));
         (remaining_budget, all_idxs)
     }
 
-    fn handle_discard_selection(
+    pub(in crate::ability::choice) fn handle_discard_selection(
         &mut self,
         gs: &mut GameState,
         ctx: &SelectionContext,
@@ -2366,7 +2360,7 @@ gs.set_recently_moved_batch(valid_ids.into(), Some("stage"));
         self.handle_selection_epilogue(gs, context)
     }
 
-    fn handle_selection_epilogue(
+    pub(in crate::ability::choice) fn handle_selection_epilogue(
         &mut self,
         gs: &mut GameState,
         context: &ExecutionContext,
@@ -2378,7 +2372,7 @@ gs.set_recently_moved_batch(valid_ids.into(), Some("stage"));
         self.finalize_choice(gs, context)
     }
 
-    fn handle_select_target(
+    pub(in crate::ability::choice) fn handle_select_target(
         &mut self,
         gs: &mut GameState,
         target: &str,
@@ -2605,7 +2599,7 @@ gs.set_recently_moved_batch(valid_ids.into(), Some("stage"));
         Ok(())
     }
 
-    fn handle_draw_any_number(&mut self, gs: &mut GameState, selected: &str) -> Result<(), String> {
+    pub(in crate::ability::choice) fn handle_draw_any_number(&mut self, gs: &mut GameState, selected: &str) -> Result<(), String> {
         let Ok(count) = selected.parse::<usize>() else {
             log::warn!("[DRAW_ANY] non-numeric count {:?}; rejecting selection", selected);
             return Err(format!("invalid selection: {:?}", selected));
@@ -2639,7 +2633,7 @@ gs.set_recently_moved_batch(valid_ids.into(), Some("stage"));
         Ok(())
     }
 
-    fn handle_order_selection(&mut self, gs: &mut GameState, selected: &str) -> Result<(), String> {
+    pub(in crate::ability::choice) fn handle_order_selection(&mut self, gs: &mut GameState, selected: &str) -> Result<(), String> {
         let mut ordered = match self.execution_context.clone() {
             ExecutionContext::LookAndSelect {
                 step: LookAndSelectStep::Finalize { destination, .. },
@@ -2695,7 +2689,7 @@ gs.set_recently_moved_batch(valid_ids.into(), Some("stage"));
         self.clear_choice_state_and_resume(gs)
     }
 
-    fn handle_position_change_choice(
+    pub(in crate::ability::choice) fn handle_position_change_choice(
         &mut self,
         gs: &mut GameState,
         choice_card_no: Option<ChoiceRoute>,
@@ -2799,34 +2793,7 @@ gs.set_recently_moved_batch(valid_ids.into(), Some("stage"));
                     }
 modified.destination = Some(Zone::from_source_str(dest));
                     if let Some(ref src_pos) = explicit_source_pos {
-                        let target = modified.target.as_deref().unwrap_or("self");
-                        let player = gs.resolve_target_player_mut(target);
-                        let src_idx = crate::ability::util::stage_position_index(src_pos)
-                            .unwrap_or(999);
-                        let dst_idx =
-                            crate::ability::util::stage_position_index(&fixed_dest).unwrap_or(999);
-                        if src_idx != dst_idx
-                            && src_idx < 3
-                            && dst_idx < 3
-                            && player.stage.stage[src_idx] != -1
-                        {
-                            let from = util::pos_to_area(src_idx);
-                            let to = util::pos_to_area(dst_idx);
-                            let tgt_id = player.stage.stage[dst_idx];
-                            let src_id = player.stage.stage[src_idx];
-                            if let Err(e) = player.stage.position_change(from, to) {
-                                log::debug!("Direct position change failed: {}", e);
-                            } else {
-                                gs.position_change_occurred_this_turn = true;
-                                if src_id != -1 {
-                                    gs.record_card_movement(src_id);
-                                }
-                                if tgt_id != -1 {
-                                    gs.record_card_movement(tgt_id);
-                                }
-                            }
-                        }
-                        gs.trigger_auto_abilities_for_movement_current();
+                        Self::apply_selected_position_change(gs, &modified, src_pos, &fixed_dest);
                     }
                     self.clear_choice_state_and_resume(gs)?;
                     return Ok(());
@@ -2953,32 +2920,7 @@ modified.destination = Some(Zone::from_source_str(dest));
             // Use explicit_source_pos if available (handles Choice/compound
             // effects where source_position_any() returns None).
             if let Some(ref src_pos) = explicit_source_pos {
-                let target = modified.target.as_deref().unwrap_or("self");
-                let player = gs.resolve_target_player_mut(target);
-                let src_idx = crate::ability::util::stage_position_index(src_pos).unwrap_or(999);
-                let dst_idx = crate::ability::util::stage_position_index(dest).unwrap_or(999);
-                if src_idx != dst_idx
-                    && src_idx < 3
-                    && dst_idx < 3
-                    && player.stage.stage[src_idx] != -1
-                {
-                    let from = util::pos_to_area(src_idx);
-                    let to = util::pos_to_area(dst_idx);
-                    let tgt_id = player.stage.stage[dst_idx];
-                    let src_id = player.stage.stage[src_idx];
-                    if let Err(e) = player.stage.position_change(from, to) {
-                        log::debug!("Direct position change failed: {}", e);
-                    } else {
-                        gs.position_change_occurred_this_turn = true;
-                        if src_id != -1 {
-                            gs.record_card_movement(src_id);
-                        }
-                        if tgt_id != -1 {
-                            gs.record_card_movement(tgt_id);
-                        }
-                    }
-                }
-                gs.trigger_auto_abilities_for_movement_current();
+                Self::apply_selected_position_change(gs, &modified, src_pos, dest);
             } else {
                 if let Err(e) = self.execute_position_change_with_destination(gs, &modified, dest) {
                     log::debug!("Failed to execute position change: {}", e);
@@ -2992,7 +2934,37 @@ modified.destination = Some(Zone::from_source_str(dest));
         Ok(())
     }
 
-    fn apply_effect_modification<F>(
+    pub(in crate::ability::choice) fn apply_selected_position_change(
+        gs: &mut GameState,
+        effect: &AbilityEffect,
+        source: &str,
+        destination: &str,
+    ) {
+        let target = effect.target.as_deref().unwrap_or("self");
+        let player = gs.resolve_target_player_mut(target);
+        let src_idx = util::stage_position_index(source).unwrap_or(999);
+        let dst_idx = util::stage_position_index(destination).unwrap_or(999);
+        if src_idx != dst_idx && src_idx < 3 && dst_idx < 3 && player.stage.stage[src_idx] != -1 {
+            let from = util::pos_to_area(src_idx);
+            let to = util::pos_to_area(dst_idx);
+            let tgt_id = player.stage.stage[dst_idx];
+            let src_id = player.stage.stage[src_idx];
+            if let Err(e) = player.stage.position_change(from, to) {
+                log::debug!("Direct position change failed: {}", e);
+            } else {
+                gs.position_change_occurred_this_turn = true;
+                if src_id != -1 {
+                    gs.record_card_movement(src_id);
+                }
+                if tgt_id != -1 {
+                    gs.record_card_movement(tgt_id);
+                }
+            }
+        }
+        gs.trigger_auto_abilities_for_movement_current();
+    }
+
+    pub(in crate::ability::choice) fn apply_effect_modification<F>(
         &mut self,
         gs: &mut GameState,
         modifier: F,
@@ -3009,7 +2981,7 @@ modified.destination = Some(Zone::from_source_str(dest));
         Ok(())
     }
 
-    fn handle_primary_alternative(
+    pub(in crate::ability::choice) fn handle_primary_alternative(
         &mut self,
         gs: &mut GameState,
         selected: &str,
@@ -3031,7 +3003,7 @@ modified.destination = Some(Zone::from_source_str(dest));
         })
     }
 
-    fn handle_position_destination(
+    pub(in crate::ability::choice) fn handle_position_destination(
         &mut self,
         gs: &mut GameState,
         selected: &str,
@@ -3152,7 +3124,7 @@ modified.destination = Some(Zone::from_source_str(dest));
         }
     }
 
-    fn handle_double_baton_touch(
+    pub(in crate::ability::choice) fn handle_double_baton_touch(
         &mut self,
         gs: &mut GameState,
         selected: &str,
@@ -3230,7 +3202,7 @@ modified.destination = Some(Zone::from_source_str(dest));
         self.resume_pending_actions(gs)
     }
 
-    fn handle_conditional_optional(
+    pub(in crate::ability::choice) fn handle_conditional_optional(
         &mut self,
         gs: &mut GameState,
         selected: &str,
@@ -3327,7 +3299,7 @@ modified.destination = Some(Zone::from_source_str(dest));
         Ok(())
     }
 
-    fn handle_heart_color_selection(
+    pub(in crate::ability::choice) fn handle_heart_color_selection(
         &mut self,
         gs: &mut GameState,
         selected: &str,
@@ -3351,7 +3323,7 @@ modified.destination = Some(Zone::from_source_str(dest));
         self.resume_pending_actions(gs)
     }
 
-    fn handle_choice_condition(
+    pub(in crate::ability::choice) fn handle_choice_condition(
         &mut self,
         gs: &mut GameState,
         selected: &str,
@@ -3403,7 +3375,7 @@ modified.destination = Some(Zone::from_source_str(dest));
         Ok(())
     }
 
-    fn handle_heart_selection(
+    pub(in crate::ability::choice) fn handle_heart_selection(
         &mut self,
         gs: &mut GameState,
         count: u8,
@@ -3439,7 +3411,7 @@ modified.destination = Some(Zone::from_source_str(dest));
         self.pending_deferred_costs.clear();
     }
 
-    fn clear_choice_state(&mut self, gs: &mut GameState) {
+    pub(in crate::ability::choice) fn clear_choice_state(&mut self, gs: &mut GameState) {
         if self.sub_choice_created {
             self.sub_choice_created = false;
         } else {
@@ -3448,7 +3420,7 @@ modified.destination = Some(Zone::from_source_str(dest));
         self.clear_choice_meta(gs);
     }
 
-    fn clear_choice_state_and_resume(&mut self, gs: &mut GameState) -> Result<(), String> {
+    pub(in crate::ability::choice) fn clear_choice_state_and_resume(&mut self, gs: &mut GameState) -> Result<(), String> {
         self.clear_choice_state(gs);
         self.resume_pending_actions(gs)
     }
@@ -3456,7 +3428,7 @@ modified.destination = Some(Zone::from_source_str(dest));
     /// Recursively set target on all sub-effects that don't have an explicit target.
     /// Excludes draw/draw_card actions (always target self) and select_cards (handled
     /// via spawn_context.target fallback in handle_select_card_internal).
-    fn set_chosen_target(effect: &mut AbilityEffect, target: &str) {
+    pub(in crate::ability::choice) fn set_chosen_target(effect: &mut AbilityEffect, target: &str) {
         if matches!(
             effect.action,
             ActionType::DrawCard | ActionType::SelectCards

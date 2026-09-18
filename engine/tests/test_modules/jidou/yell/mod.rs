@@ -2,16 +2,17 @@
 // Regenerated from the directory listing at compile time.
 pub mod blade_heart_types_test;
 pub mod blade_heartless_member_threshold_all_heart_test;
-pub mod bp7_fire_bird_blade_gain_test;
 pub mod daisuki_and_dia_test;
 pub mod daisuki_test;
 pub mod jimo_ai_dash_test;
 pub mod kurosawa_dia_re_yell_test;
 pub mod live_reveal_hand_limit_draw_test;
 pub mod miracle_wave_test;
+pub mod no_blade_heart_reveal_gain_heart06_or_heart03_test;
+pub mod no_blade_heart_reveal_gain_heart_edges_q112_test;
 pub mod no_blade_heart_reveal_heart02_test;
-pub mod sp_bp2_015_021_yell_blade_test;
-pub mod sp_bp2_015_wien_extra_test;
-pub mod sumire_auto_test;
+pub mod no_blade_heart_reveal_heart06_member_as_live_q112_q113_test;
+pub mod no_blade_heart_reveal_two_watchers_modifier_bounds_test;
 pub mod wien_n_test;
 pub mod yell_revealed_no_blade_heart_discard_q251_test;
+pub mod zero_yell_optional_live_discard_q264_test;

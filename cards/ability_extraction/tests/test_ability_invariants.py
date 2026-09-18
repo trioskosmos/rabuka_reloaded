@@ -30,7 +30,7 @@ passed = 0
 failed = 0
 
 
-def test(name, fn):
+def run_check(name, fn):
     global passed, failed
     try:
         fn()
@@ -126,8 +126,8 @@ def test_appearance_has_trigger_event():
 
 
 if __name__ == "__main__":
-    test("self-appearance has no card_type", test_self_appearance_has_no_card_type)
-    test("or_condition aggregates trigger_event", test_or_condition_aggregates_trigger_event)
-    test("appearance_condition has trigger_event", test_appearance_has_trigger_event)
+    run_check("self-appearance has no card_type", test_self_appearance_has_no_card_type)
+    run_check("or_condition aggregates trigger_event", test_or_condition_aggregates_trigger_event)
+    run_check("appearance_condition has trigger_event", test_appearance_has_trigger_event)
     print(f"\n{passed} passed, {failed} failed")
     sys.exit(1 if failed else 0)

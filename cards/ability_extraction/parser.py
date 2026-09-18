@@ -80,17 +80,58 @@ Condition types produced (type field in condition dict):
 import re
 import copy
 import sys
-from functools import lru_cache
 from typing import Dict, Any, Optional, Tuple, List
 
 
 from parser_utils import (
-    extract_count,
     extract_dynamic_count,
     COUNT_PATTERN,
     normalize_fullwidth_digits,
     strip_suffix_period,
     extract_by_pattern,
+    extract_cost_values,
+    extract_all_quoted_names,
+    extract_all_groups,
+    detect_card_property,
+    LOCATION_PATTERNS,
+    POSITION_KEYWORDS,
+    _ALL_KW_RE,
+    PriorityRegistry,
+    ActionRule,
+    EffectPattern,
+)
+
+from cost_parser import (
+    _COST_HANDLERS,
+    _COST_FLAG_RULES,
+    _COST_BATON_TOUCH_PATTERNS,
+    _register_cost,
+    _cost_verb_choice,
+    _cost_energy,
+    _cost_sequential,
+    _cost_reveal,
+    _cost_choice_comma,
+    _classify_cost,
+    _extract_basic_cost_fields,
+    _fill_cost_source,
+    _fill_cost_destination,
+    _infer_destination_from_source,
+    _mark_discard_all_hand,
+    _mark_self_cost,
+    parse_cost,
+)
+from parser_fields import (
+    detect_position_matches,
+    detect_positions,
+    detect_icon_positions,
+    set_cross_position_fields,
+    extract_state_change,
+    extract_optional,
+    extract_max,
+    _quoted_names,
+    _has_shuffle,
+    detect_exclude_self,
+    extract_count,
     extract_source,
     extract_destination,
     extract_target,
@@ -98,47 +139,16 @@ from parser_utils import (
     extract_operator,
     extract_cost_limit,
     extract_cost_limit_with_operator,
-    extract_cost_values,
     extract_picker,
-    extract_all_quoted_names,
-    extract_all_groups,
-    detect_card_property,
     detect_require_all_hearts,
     check_original_value,
-    STATE_CHANGE_PATTERNS,
-    LOCATION_PATTERNS,
-    POSITION_KEYWORDS,
-    _ALL_KW_RE,
-    _OPTIONAL_RE,
-    _SHUFFLE_RE,
-    PriorityRegistry,
-    ActionRule,
-    EffectPattern,
 )
 
 # ======================================================================
 # EXTRACTION MEMOIZATION (Phase 3: single-pass field extraction)
 # ======================================================================
-# Every extractor below is a pure function of its text and is re-invoked
-# many times per text across the pipeline (parse_action, _fill_defaults,
-# _walk, post-fixes). Memoizing at the name level means every call site —
-# existing or future — computes each field once per unique text, instead of
-# threading caches through signatures. Only scalar-returning extractors are
-# wrapped; list/dict-returning ones stay unmemoized so callers can mutate
-# results freely.
-extract_count = lru_cache(maxsize=16384)(extract_count)
-extract_source = lru_cache(maxsize=16384)(extract_source)
-extract_destination = lru_cache(maxsize=16384)(extract_destination)
-extract_target = lru_cache(maxsize=16384)(extract_target)
-extract_card_type = lru_cache(maxsize=16384)(extract_card_type)
-extract_operator = lru_cache(maxsize=16384)(extract_operator)
-extract_cost_limit = lru_cache(maxsize=16384)(extract_cost_limit)
-extract_cost_limit_with_operator = lru_cache(maxsize=16384)(
-    extract_cost_limit_with_operator
-)
-extract_picker = lru_cache(maxsize=16384)(extract_picker)
-detect_require_all_hearts = lru_cache(maxsize=16384)(detect_require_all_hearts)
-check_original_value = lru_cache(maxsize=16384)(check_original_value)
+# Scalar extractors are lru_cache-wrapped at the name level in parser_fields
+# (single owner); every call site in this module uses those cached versions.
 
 # ============== CONFIGURATION CONSTANTS ==============
 SPLIT_LIMIT = 1
@@ -172,74 +182,8 @@ SPLIT_LIMIT = 1
 
 
 # ============== POSITION RESOLUTION (single owner) ==============
-# All position/area logic lives in this one section. The keyword map is the only
-# copy (kept in parser_utils.POSITION_KEYWORDS); the icon map and every detector
-# are defined exactly once here, so there is no second place for a position rule
-# to drift into. Previously this was duplicated as a hardcoded icon map inside
-# detect_icon_positions and reimplemented inline across several call sites.
-ICON_POSITION_TEMPLATES: Dict[str, str] = {
-    "{{center.png|センター}}": "center",
-    "{{leftside.png|左サイド}}": "left_side",
-    "{{rightside.png|右サイド}}": "right_side",
-}
-
-
-def detect_position_matches(text: str) -> List[Tuple[str, str]]:
-    """Return ``(keyword, position)`` pairs in ``POSITION_KEYWORDS`` order.
-
-    Deduplicated by position value so ``センターエリア`` and ``センター`` both
-    contribute only one ``"center"``.
-    """
-    seen: set = set()
-    matches: List[Tuple[str, str]] = []
-    for keyword, pos in POSITION_KEYWORDS.items():
-        if pos in seen:
-            continue
-        if keyword in text:
-            seen.add(pos)
-            matches.append((keyword, pos))
-    return matches
-
-
-def detect_positions(text: str) -> List[str]:
-    """All position values found via ``POSITION_KEYWORDS`` (keyword-based only)."""
-    return [pos for _, pos in detect_position_matches(text)]
-
-
-def detect_icon_positions(text: str) -> List[str]:
-    """All positions from {{center.png|...}}/{{leftside.png|...}}/{{rightside.png|...}} templates."""
-    return [pos for tmpl, pos in ICON_POSITION_TEMPLATES.items() if tmpl in text]
-
-
-def format_positions(positions: List[str]) -> str:
-    """Join position list into a comma-separated string, or return empty string."""
-    return ",".join(positions)
-
-
-def set_cross_position_fields(target, text):
-    """Detect positions in text and set position/position_compare on target.
-
-    For cross-comparison patterns like "left vs right" where the engine
-    needs to compare values at two positions. Sets target["position"] to
-    the first detected position and target["position_compare"] to the second.
-    Returns True if any position was set. Does not overwrite existing position.
-    """
-    if "position" in target:
-        return False
-    matched = {pos for _, pos in detect_position_matches(text)}
-    if "left_side" in matched and "right_side" in matched:
-        target["position"] = "left_side"
-        target["position_compare"] = "right_side"
-    elif len(matched) == 1:
-        target["position"] = next(iter(matched))
-    elif len(matched) > 1:
-        positions_list = sorted(matched)
-        target["position"] = positions_list[0]
-        target["position_compare"] = positions_list[1]
-    else:
-        return False
-    return True
-
+# Position/area logic lives in parser_fields (single owner for the keyword map,
+# icon map, and every detector).
 
 # ============== TEMPORAL CONDITION PATTERNS ==============
 TEMPORAL_PATTERNS = [
@@ -370,9 +314,6 @@ def extract_locations(text: str) -> Optional[List[str]]:
     return None
 
 
-def extract_state_change(text: str) -> Optional[str]:
-    """Extract state change (wait/active)."""
-    return extract_by_pattern(text, STATE_CHANGE_PATTERNS)
 
 
 def extract_cost_range(text: str) -> Optional[Dict[str, int]]:
@@ -467,11 +408,6 @@ def extract_deck_position_constraint(text: str) -> Optional[Dict[str, Any]]:
     return result if result else None
 
 
-def extract_optional(text: str) -> bool:
-    """Check if action is optional."""
-    return _OPTIONAL_RE.search(text) is not None
-
-
 def extract_heart_types(text: str) -> List[str]:
     """Extract heart type identifiers (e.g. heart02, heart01) from icon markup."""
     return re.findall(r"heart_(\d+)\.png\|heart(\d+)", text)  # type: ignore[return-value]
@@ -498,11 +434,6 @@ def strip_parenthetical(text: str) -> str:
     return text.strip()
 
 
-def extract_max(text: str) -> bool:
-    """Check if count has 'max' modifier (まで)."""
-    return "人まで" in text or "枚まで" in text or "つまで" in text or "個まで" in text
-
-
 def categorize_quoted_text(quoted_text: List[str]) -> Dict[str, List[str]]:
     """Categorize quoted text into character names and ability texts."""
     result = {"characters": [], "abilities": []}
@@ -517,12 +448,6 @@ def categorize_quoted_text(quoted_text: List[str]) -> Dict[str, List[str]]:
 def deduped_groups(text):
     """Group names from 『』, deduplicated preserving first-seen order."""
     return list(dict.fromkeys(extract_all_groups(text)))
-
-
-def _quoted_names(text: str) -> List[str]:
-    """All 「...」 names. Single owner for the quoted-name regex so the pattern is
-    not re-coded at a dozen call sites."""
-    return re.findall(r"「([^」]+)」", text)
 
 
 def _quoted_group_names(text: str) -> List[str]:
@@ -563,37 +488,12 @@ def extract_name_exclusions(text):
     return includes, excludes
 
 
-def _split_include_exclude_chars(text):
-    """Split「name」markers into (include_chars, exclude_chars) lists.
-
-    A name is treated as excluded when the three characters following its
-    closing「are「以外」.
-    """
-    names = _quoted_names(text)
-    include_chars = []
-    exclude_chars = []
-    for name in names:
-        idx = text.find(f"「{name}」")
-        if idx >= 0:
-            after = text[idx + len(f"「{name}」") : idx + len(f"「{name}」") + 3]
-            if after.startswith("以外"):
-                exclude_chars.append(name)
-            else:
-                include_chars.append(name)
-    return include_chars, exclude_chars
-
-
 _ICON_SUB_RE = re.compile(r"\{\{([^|]+)\|([^}]+)\}\}")
 
 
 def _strip_icon_annotations(text):
     """Turn {{icon|label}} markers into 【label】 and drop「」brackets."""
     return _ICON_SUB_RE.sub(r"【\2】", text).replace("「", "").replace("」", "").strip()
-
-
-def _has_shuffle(text):
-    """Detect a shuffle instruction in `text`."""
-    return _SHUFFLE_RE.search(text) is not None
 
 
 def extract_cost_modification(text: str) -> Optional[Dict[str, Any]]:
@@ -618,18 +518,6 @@ def extract_cost_modification(text: str) -> Optional[Dict[str, Any]]:
             result["threshold_operator"] = COST_THRESHOLD_TYPES[mod_type]
 
     return result if result else None
-
-
-def detect_exclude_self(text: str) -> bool:
-    """Return True if text contains 'exclude other members' patterns.
-    Core patterns shared across all call sites: このメンバー以外, ほかのメンバー.
-    Sites needing このカード以外 or 「name」以外 add those explicitly.
-    """
-    if "このメンバー以外" in text:
-        return True
-    if re.search(r"ほかの.*?(?:メンバー|カード)", text):
-        return True
-    return False
 
 
 def extract_heart_colors_from_text(text: str) -> list:
@@ -834,148 +722,6 @@ def parse_complex_condition(text: str) -> Optional[Dict[str, Any]]:
 # either a substring to look for in the text or a callable returning truthy when
 # the flag applies. These do not depend on other cost fields, so they are applied
 # in one pass instead of being re-coded inline below.
-_COST_FLAG_RULES = [
-    ("同じグループ名", "group_reference", "same_group_name"),
-    (extract_optional, "optional", True),
-    (_has_shuffle, "shuffle", True),
-    (detect_exclude_self, "exclude_self", True),
-    ("同じユニット名", "same_unit_name", True),
-]
-
-# Baton-touch source/group extraction, single source instead of two hand-written
-# re.search calls.
-_COST_BATON_TOUCH_PATTERNS = [
-    (r"「([^」]+)」からバトンタッチ", "baton_touch_source"),
-    (r"『([^』]+)』からバトンタッチ", "baton_touch_group"),
-]
-
-
-def _mark_discard_all_hand(cost, text):
-    """Discard-all-hand costs (手札をすべて控え室に置く) must mark `all`.
-    Without this the engine defaults the count to 1 and only asks to discard a
-    single card instead of discarding the entire hand."""
-    if (
-        cost.get("source") == "hand"
-        and cost.get("destination") == "discard"
-        and re.search(r"手札を\s*(すべて|全て|全部)|手札の\s*(すべて|全て|全部)", text)
-    ):
-        cost["all"] = True
-        cost.pop("count", None)
-
-
-def _infer_destination_from_source(cost, text):
-    """Infer destination from source when not explicitly stated in the text."""
-    if "source" in cost and "destination" not in cost:
-        if cost["source"] == "hand" and (
-            "控え室に置く" in text or "控え室に置いて" in text
-        ):
-            cost["destination"] = "discard"
-        elif cost["source"] == "discard" and "手札に加える" in text:
-            cost["destination"] = "hand"
-
-
-def _fill_cost_source(cost, text):
-    """Set source/zone from explicit 'hand' keywords and extract_source()."""
-    if "手札を" in text or "手札の" in text:
-        cost["source"] = "hand"
-        cost["zone"] = "hand"  # Add zone for choice creation
-    src = extract_source(text)
-    if src and "source" not in cost:
-        cost["source"] = src
-        # Set zone based on source if not already set
-        if "zone" not in cost:
-            cost["zone"] = src
-
-
-def _fill_cost_destination(cost, text):
-    """Set destination from extract_destination() and the energy-deck keyword."""
-    dst = extract_destination(text)
-    if dst:
-        cost["destination"] = dst
-    if "エネルギーデッキに置く" in text:
-        cost["destination"] = "energy_deck"
-        # "エネルギーN枚をエネルギーデッキに置く" — energy returns to the deck
-        # from the energy zone. Without a source the engine defaults to
-        # discard, which never holds energy, so the cost could never be paid.
-        if "source" not in cost and "エネルギー" in text:
-            cost["source"] = "energy_zone"
-
-
-def _mark_self_cost(cost, text):
-    """Mark self_cost when the cost refers to this member specifically
-    (このメンバー[をが]) and isn't excluding it or other members."""
-    if (
-        "このメンバー" in text
-        and "このメンバー以外" not in text
-        and not bool(re.search(r"ほかの.*?メンバー", text))
-    ):
-        if re.search(r"このメンバー[をが]", text):
-            cost["self_cost"] = True
-
-
-def _extract_basic_cost_fields(cost, text):
-    """Extract common fields for cost dict (source, dest, count, card_type, etc.)."""
-    _fill_cost_source(cost, text)
-    _fill_cost_destination(cost, text)
-    _infer_destination_from_source(cost, text)
-    _mark_discard_all_hand(cost, text)
-    # State change
-    sc = extract_state_change(text)
-    if sc:
-        cost["state_change"] = sc
-    # Count, type, target
-    cnt = extract_count(text)
-    if cnt:
-        cost["count"] = cnt
-    ct = extract_card_type(text)
-    if ct:
-        cost["card_type"] = ct
-    tgt = extract_target(text)
-    if tgt:
-        cost["target"] = tgt
-    # Groups, names, flags
-    gns = extract_all_groups(text)
-    if gns:
-        cost["group_names"] = gns
-    for test, field, value in _COST_FLAG_RULES:
-        cond = test(text) if callable(test) else (test in text)
-        if cond:
-            cost[field] = value
-    if "バトンタッチ" in text:
-        for pat, field in _COST_BATON_TOUCH_PATTERNS:
-            m = re.search(pat, text)
-            if m:
-                cost[field] = m.group(1)
-    # Cost limit
-    cl = extract_cost_limit(text)
-    if cl:
-        cost["cost_limit"] = cl
-        op = extract_operator(text)
-        if op:
-            cost["cost_limit_operator"] = op
-    # Discrete cost values (OR) — "コストが10か20" → cost_values: [10, 20]
-    cv = extract_cost_values(text)
-    if cv:
-        cost["cost_values"] = cv
-        cost.pop("cost_limit", None)
-    _mark_self_cost(cost, text)
-    # Card names from 「」 — detect exclusion patterns (「name」以外)
-    include_chars, exclude_chars = _split_include_exclude_chars(text)
-    if include_chars:
-        cost["characters"] = include_chars
-    if exclude_chars:
-        cost["exclude_characters"] = exclude_chars
-
-    # Extract position restrictions (e.g., "センター", "左サイド").
-    # Skip keywords that only appear inside icon templates {{...}} — those
-    # are activation-requirement positions (e.g. {{center.png|センター}}),
-    # already captured as activation_position on the effect. Only set cost
-    # position from bare (non-icon) keywords which indicate target filtering.
-    if "position" not in cost:
-        clean_text = re.sub(r"\{\{[^}]+?\}\}", "", text)
-        set_cross_position_fields(cost, clean_text)
-
-
 def _try_duration_prefix(text):
     """ライブ終了時まで / ターン終了時まで / そのターンの間 — strip prefix and mark duration.
     Only matches if the pattern is at the very start of the text,
@@ -1295,255 +1041,6 @@ def parse_ability(triggerless_text: str) -> Dict[str, Any]:
 # set fields instead return None and fall through to the generic field
 # accumulation + type classification at the bottom of parse_cost.
 # ======================================================================
-_COST_HANDLERS: List[Any] = []
-
-
-def _register_cost(handler):
-    _COST_HANDLERS.append(handler)
-    return handler
-
-
-@_register_cost
-def _cost_verb_choice(text, cost):
-    """Choice cost with "か" (OR marker) without trailing comma - BEFORE energy handler.
-    e.g. "{{E}}{{E}}支払うか手札を2枚控え室に置いてもよい" -> choice: [pay 2E, discard 2]."""
-    verb_choice_m = re.search(r"(.*(?:支払う|置く|加える|公開する))か(.+)", text)
-    if not verb_choice_m:
-        return None
-    full_opt1 = text[: text.find("か", text.find(verb_choice_m.group(1)))].strip()
-    if not full_opt1:
-        full_opt1 = verb_choice_m.group(1).strip()
-    opt2 = verb_choice_m.group(2).strip()
-    return {
-        "text": text,
-        "type": "choice_condition",
-        "options": [parse_cost(full_opt1), parse_cost(opt2)],
-    }
-
-
-@_register_cost
-def _cost_energy(text, cost):
-    """Energy cost: count energy icons at start + distinct action (more specific)."""
-    if not text.strip().startswith("{{icon_energy.png|E}}"):
-        return None
-    energy_end = text.find("}}", text.rfind("{{icon_energy.png|E}}")) + 2
-    energy_text = text[:energy_end].strip()
-    other_text = text[energy_end:].strip()
-    if energy_text and other_text:
-        other_cost = parse_cost(other_text)
-        if other_cost.get("type") not in (None, "custom"):
-            result = {
-                "text": text,
-                "type": "sequential_cost",
-                "costs": [parse_cost(energy_text), other_cost],
-            }
-            if extract_optional(text):
-                result["optional"] = True
-                for cp in result["costs"]:
-                    cp["optional"] = True
-            return result
-    energy_count = text.count("{{icon_energy.png|E}}")
-    cost["type"] = "pay_energy"
-    cost["energy"] = energy_count
-    cost["zone"] = "energy_zone"
-    cost["count"] = energy_count
-    if extract_optional(text):
-        cost["optional"] = True
-    if "好きな数" in text or "任意の数" in text:
-        cost["any_number"] = True
-    if extract_max(text):
-        cost["max"] = True
-    return cost
-
-
-@_register_cost
-def _cost_sequential(text, cost):
-    """Sequential cost (~し、~ or ~て、~)."""
-    if "、" not in text:
-        return None
-    parts = text.split("、")
-    first_ends_with = parts[0].strip()[-1] if parts[0].strip() else ""
-    if len(parts) < 2 or not (
-        first_ends_with in ("し", "て")
-        or parts[0].strip().endswith("し")
-        or parts[0].strip().endswith("て")
-    ):
-        return None
-    cost_parts = []
-    for i, part in enumerate(parts):
-        if (
-            i == 0
-            and not part.strip().endswith("し")
-            and not part.strip().endswith("て")
-        ):
-            part = part.strip() + "し"
-        cost_parts.append(parse_cost(part.strip()))
-    result = {"text": text, "type": "sequential_cost", "costs": cost_parts}
-    if "position" in cost:
-        result["position"] = cost["position"]
-        if "position_compare" in cost:
-            result["position_compare"] = cost["position_compare"]
-    if any(cp.get("optional") for cp in cost_parts):
-        result["optional"] = True
-        for cp in cost_parts:
-            cp["optional"] = True
-    return result
-
-
-@_register_cost
-def _cost_reveal(text, cost):
-    """Reveal cost (公開する/公開し)."""
-    if "公開する" not in text and "公開し" not in text:
-        return None
-    cost["type"] = "reveal"
-    if "手札" in text:
-        cost["source"] = "hand"
-    cm = re.search(COUNT_PATTERN, text)
-    if cm:
-        cost["count"] = int(cm.group(1))
-    ct = extract_card_type(text)
-    if ct:
-        cost["card_type"] = ct
-    gns = extract_all_groups(text)
-    if gns:
-        cost["group_names"] = gns
-    return cost
-
-
-@_register_cost
-def _cost_choice_comma(text, cost):
-    """Choice cost (~か、~)."""
-    if "か、" not in text:
-        return None
-    parts = text.split("か、", SPLIT_LIMIT)
-    if len(parts) != 2:
-        return None
-    return {
-        "text": text,
-        "type": "choice_condition",
-        "options": [parse_cost(parts[0].strip()), parse_cost(parts[1].strip())],
-    }
-
-
-def _classify_cost(cost, text):
-    """Fallback type classification for costs not matched by a structural rule."""
-    if cost.get("destination") == "under_member":
-        # Placing a card under a member: infer the placed card's type from the
-        # object, not from the "このメンバーの下に" location phrase.
-        #   energy under member: "エネルギー置き場にあるエネルギー1枚を…下に置く"
-        #   member under member: "このカードを…登場したメンバーの下に置く"
-        if re.search(r"エネルギー\s*\d*\s*枚", text) or "エネルギーカード" in text:
-            cost["card_type"] = "energy_card"
-        elif "このカード" in text or "メンバーカード" in text:
-            cost["card_type"] = "member_card"
-        if not cost.get("source"):
-            src = extract_source(text)
-            cost["source"] = src or "energy_zone"
-        return "place_energy_under_member"
-    if cost.get("source") and cost.get("destination"):
-        return "move_cards"
-    if cost.get("destination") in ("energy_deck", "energy_zone") and not cost.get(
-        "source"
-    ):
-        return "move_cards"
-    if (
-        "ウェイトにする" in text
-        or "ウェイト状態で置く" in text
-        or "ウェイト状態で登場させる" in text
-        or "アクティブにする" in text
-    ):
-        return "change_state"
-    if cost.get("state_change"):
-        return "change_state"
-    if "{{icon_energy.png|E}}" in text and ("支払う" in text or "支払って" in text):
-        cost["energy"] = text.count("{{icon_energy.png|E}}")
-        if extract_optional(text):
-            cost["optional"] = True
-        return "pay_energy"
-    if cost.get("source"):
-        if cost["source"] == "hand" and (
-            "控え室に置く" in text or "控え室に置いて" in text
-        ):
-            cost["destination"] = "discard"
-            return "move_cards"
-        if cost["source"] == "discard" and "手札に加える" in text:
-            cost["destination"] = "hand"
-            return "move_cards"
-        if cost.get("destination"):
-            return "move_cards"
-        return "custom"
-    return "custom"
-
-
-def parse_cost(text: str) -> Dict[str, Any]:
-    """Parse a cost text. Dispatches through the _COST_HANDLERS registry
-    (see COST RULE REGISTRY above); falls back to generic field accumulation
-    + _classify_cost when no structural rule matches."""
-    cost: Dict[str, Any] = {"text": text}
-
-    # Extract basic fields first for all cost types
-    _extract_basic_cost_fields(cost, text)
-
-    for handler in _COST_HANDLERS:
-        result = handler(text, cost)
-        if result is not None:
-            return result
-
-    # ---------------- Generic accumulation + classification ----------------
-    # Deck bottom placement (early return to avoid custom fallback)
-    deck_bottom_kw = (
-        "デッキの一番下に置く",
-        "デッキの一番下に置いて",
-        "デッキの下に置く",
-        "デッキの下に置いて",
-        "山札の下に置く",
-        "山札の下に置いて",
-    )
-    if any(kw in text for kw in deck_bottom_kw):
-        cost["destination"] = "deck_bottom"
-        cost["type"] = "move_cards"
-        src = extract_source(text)
-        if src:
-            cost["source"] = src
-    if _has_shuffle(text):
-        cost["shuffle"] = True
-    include_chars, exclude_chars = _split_include_exclude_chars(text)
-    if include_chars:
-        cost["characters"] = include_chars
-    if exclude_chars:
-        cost["exclude_characters"] = exclude_chars
-    if extract_optional(text):
-        cost["optional"] = True
-    gns = extract_all_groups(text)
-    if gns:
-        cost["group_names"] = gns
-    cnt = extract_count(text)
-    if cnt:
-        cost["count"] = cnt
-    if extract_max(text):
-        cost["max"] = True
-        cost["any_number"] = True
-    if (
-        "好きな枚数" in text
-        or "好きな枚数まで" in text
-        or "任意の枚数" in text
-        or "好きな組み合わせ" in text
-    ):
-        cost["any_number"] = True
-    ct = extract_card_type(text)
-    if ct:
-        cost["card_type"] = ct
-    tgt = extract_target(text)
-    if tgt:
-        cost["target"] = tgt
-    if "好きな順番で" in text:
-        cost["placement_order"] = "any_order"
-    # Classify cost type if not set by a rule above
-    if "type" not in cost:
-        cost["type"] = _classify_cost(cost, text)
-    return cost
-
-
 def parse_effect(text: str) -> Dict[str, Any]:
     """Parse an effect text. Tries handlers in priority order, then falls back to single action."""
     text = normalize_fullwidth_digits(text).strip()

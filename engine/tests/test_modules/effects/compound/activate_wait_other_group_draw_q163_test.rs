@@ -1,0 +1,91 @@
+use crate::helpers::*;
+
+#[test]
+fn wait_other_group_draw_q163_self_excluded_no_other_group_cost_fails() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let emma = game.id("PL!N-bp3-008-R\u{ff0b}");
+    let filler = game.id("PL!-sd1-010-SD");
+
+    game.state.player1.stage.stage[0] = filler;
+    game.state.player1.stage.stage[1] = emma;
+    game.state.player1.stage.stage[2] = filler;
+
+    game.state.player1.hand.cards.push(filler);
+    game.state.player1.main_deck.cards.clear();
+    for _ in 0..30 {
+        game.state.player1.main_deck.cards.push(filler);
+    }
+
+    // Activate ability
+    game.activate_ability(emma);
+
+    // Cost: wait a にこ member other than self.
+    // With only エマ (a にこ member) on stage and exclude_self=true,
+    // no valid candidates → cost should fail silently
+    // (the ability should not proceed to draw)
+
+    // Drain any pending choices
+    while game.has_pending_choice() {
+        game.select_indices(&[]);
+    }
+
+    // Cost should fail since exclude_self leaves no candidates.
+    // The failed cost should not proceed to draw.
+    let hand_count = game.state.player1.hand.cards.len();
+    // hand started with 1 filler, never drew because ability cost failed
+    assert_eq!(
+        hand_count, 1,
+        "No draw happened because cost couldn't be paid (got {})",
+        hand_count
+    );
+}
+
+#[test]
+fn wait_other_group_draw_q163_other_group_member_pays_cost() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let emma = game.id("PL!N-bp3-008-R\u{ff0b}");
+    // 虹ヶ咲 member: any 虹ヶ咲 series member card
+    let niji = game.id("PL!N-sd1-001-SD");
+    let filler = game.id("PL!-sd1-010-SD");
+
+    game.state.player1.stage.stage[0] = filler;
+    game.state.player1.stage.stage[1] = emma;
+    game.state.player1.stage.stage[2] = niji;
+
+    game.state.player1.main_deck.cards.clear();
+    for _ in 0..30 {
+        game.state.player1.main_deck.cards.push(filler);
+    }
+
+    // Activate Emma's ability
+    game.activate_ability(emma);
+
+    // Cost: wait a 虹ヶ咲 member other than self — niji is the ONLY candidate,
+    // so the engine auto-applies the wait (single legal target, no prompt needed).
+    // Strict: verify the wait was actually applied to niji (not emma, not filler).
+    let niji_waited = game
+        .state
+        .mods
+        .get_orientation_modifier(niji)
+        .map_or(false, |o| o == "wait");
+    assert!(niji_waited, "niji (only 虹ヶ咲 candidate) must be auto-waited as cost");
+    let emma_waited = game
+        .state
+        .mods
+        .get_orientation_modifier(emma)
+        .map_or(false, |o| o == "wait");
+    assert!(!emma_waited, "exclude_self: Emma herself must NOT be waited");
+    let filler_waited = game
+        .state
+        .mods
+        .get_orientation_modifier(filler)
+        .map_or(false, |o| o == "wait");
+    assert!(!filler_waited, "non-虹ヶ咲 filler must NOT be waited");
+
+    let hand_count = game.state.player1.hand.cards.len();
+    assert!(hand_count > 0, "Should have drawn 1 card after cost");
+}

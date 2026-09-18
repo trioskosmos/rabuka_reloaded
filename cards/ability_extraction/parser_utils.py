@@ -2,11 +2,16 @@
 Parser utilities for ability extraction.
 This module contains pure utility functions for text processing, regex extraction,
 pattern lists, and normalization used across the parsing pipeline.
+Single owner for shared field/position helpers and the scalar-extractor
+memoization (lru_cache at the name level, so every call site in the pipeline
+computes each field once per unique text; list/dict-returning extractors stay
+unmemoized so callers can mutate results freely).
 """
 
 import re
 import inspect
 from dataclasses import dataclass, field
+from functools import lru_cache
 from typing import Any, Dict, List, Optional, Tuple, Callable
 
 # Precompiled regex patterns for performance

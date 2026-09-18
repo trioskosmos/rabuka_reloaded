@@ -2,18 +2,18 @@
 // Regenerated from the directory listing at compile time.
 pub mod arise_gated_activate_blade_or_wait_private_wars_test;
 pub mod blade_option_exclude_self_pl_s_bp5_004_r_test;
-pub mod bp7_q275_forcepick_wait_test;
 pub mod choice_bullet_test;
+pub mod chosen_player_live_bottomdeck_then_draw_test;
+pub mod chosen_player_look_two_reorder_discard_test;
 pub mod daydream_mermaid_test;
+pub mod discard_self_from_hand_no_named_blade_target_q258_test;
 pub mod energy_or_recycle_live_pl_n_pb1_010_r_test;
-pub mod hanamaru_bp3_choose_player_test;
+pub mod forced_self_wait_excludes_immune_q275_test;
 pub mod kanan_bp7_debut_queue_test;
-pub mod mari_test;
 pub mod mill_or_wait_pl_hs_cl1_004_cl_test;
 pub mod opponent_accepts_blades_pl_n_pr_022_pr_test;
-pub mod opponent_choice_tests;
+pub mod opponent_choice_test;
 pub mod optional_energy_edelnote_deploy_or_requirement_test;
-pub mod q258_himege_no_target_test;
 pub mod tang_keke_test;
 pub mod target_player_deck_routing_pl_n_bp3_010_r_pl_n_bp4_002_r_test;
 pub mod target_player_recycle_pl_s_bp7_013_n_test;

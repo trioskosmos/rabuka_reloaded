@@ -3,7 +3,7 @@
 pub mod attacker_order_performance_test;
 pub mod b8_live_timing_test;
 pub mod cheer_pipeline_test;
-pub mod draw_phase_fix;
+pub mod draw_phase_fix_test;
 pub mod live_success_rules_test;
 pub mod opponent_live_success_flow_test;
 pub mod performance_phase_rules_test;
