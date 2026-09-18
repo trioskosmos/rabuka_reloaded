@@ -79,6 +79,11 @@ impl fmt::Display for ChoiceRoute {
     }
 }
 
+/// A paused question to a player. Executors build one into
+/// `AbilityResolver::pending_choice` instead of deciding themselves; the
+/// answer comes back as a `ChoiceResult` via `provide_choice_result`
+/// (choice.rs) or `resume_pending_actions`, and execution continues.
+/// Rendered to UI menus by `choice_renderer` / `game/menu.rs`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(
     feature = "serde_support",
@@ -310,6 +315,9 @@ pub struct AutoAbilityOption {
     pub card_id: Option<i16>,
 }
 
+/// A player's answer to a `Choice`. Must pair with the pending variant
+/// (`SelectCard` ↔ `CardSelected`, `SelectTarget` ↔ `TargetSelected`, …);
+/// mismatches are rejected by `provide_choice_result`.
 #[derive(Debug, Clone)]
 
 pub enum ChoiceResult {
@@ -323,6 +331,10 @@ pub enum ChoiceResult {
     Skip,
 }
 
+/// What an in-flight multi-step execution is waiting on. Saved on
+/// `AbilityResolver::execution_context` when a choice pauses execution so
+/// the answer handler knows which step to resume (under-member placement,
+/// look-and-select finalization, …). `None` = no pending continuation.
 #[derive(Debug, Clone, PartialEq)]
 
 pub enum ExecutionContext {

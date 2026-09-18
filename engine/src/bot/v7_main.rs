@@ -1,16 +1,12 @@
 use crate::bot::strategy_common::{acc_add, requirements_met, Acc};
-use crate::card::{CardDatabase, CardType};
+use crate::card::CardType;
 use crate::core::stats_pipeline;
 use crate::game_setup::{self, Action, ActionType};
 use crate::game_state::{GameResult, GameState, Phase};
-use crate::player::Player;
 
-fn player(gs: &GameState, me: u8) -> &Player {
-    if me == 0 { &gs.player1 } else { &gs.player2 }
-}
 
 fn board(gs: &GameState, me: u8) -> (Acc, i32, i32) {
-    let p = player(gs, me);
+    let p = gs.seat_player(me);
     let hearts = stats_pipeline::stage_hearts(
         &p.stage.stage, &gs.card_database, &gs.mods.heart_override,
         &gs.mods.heart_copy, &gs.mods.heart_color_multiplier, &gs.mods.heart_modifiers,
@@ -33,7 +29,7 @@ fn board(gs: &GameState, me: u8) -> (Acc, i32, i32) {
 }
 
 fn member_reserve(gs: &GameState, me: u8, id: i16) -> f64 {
-    let p = player(gs, me);
+    let p = gs.seat_player(me);
     let Some(card) = gs.card_database.get_card(id) else { return 0.0; };
     if card.card_type != CardType::Member { return 0.0; }
     let cost = i32::from(card.cost.unwrap_or(0));
@@ -59,7 +55,7 @@ struct Features {
 }
 
 fn features(gs: &GameState, me: u8) -> Features {
-    let p = player(gs, me);
+    let p = gs.seat_player(me);
     let (pool, blades, cost) = board(gs, me);
     let mut mean = pool;
     let mut units = [0.0; 11];
@@ -132,8 +128,8 @@ struct Search<'a> {
 impl Search<'_> {
     fn evaluate(&self, gs: &GameState) -> f64 {
         let own = features(gs, self.me);
-        let opp = player(gs, 1 - self.me);
-        let original_opp = player(self.root, 1 - self.me);
+        let opp = gs.seat_player(1 - self.me);
+        let original_opp = self.root.seat_player(1 - self.me);
         let (_, opp_blades, opp_cost) = board(gs, 1 - self.me);
         value(&own, &self.base, self.deploy)
             - 8.0 * (opp_cost - self.opponent.cost) as f64
@@ -237,24 +233,4 @@ pub fn choose_action(gs: &GameState, actions: &[Action], me: u8) -> Action {
         action_type: ActionType::Pass, description: "pass".into(),
         description_ja: None, parameters: None, selected: None,
     })
-}
-
-pub fn choose_mulligan(gs: &GameState, actions: &[Action], db: &CardDatabase) -> Action {
-    let mut discard = Vec::new();
-    let mut members = Vec::new();
-    let mut lives = 0;
-    for (index, &id) in gs.active_player().hand.cards.iter().enumerate() {
-        let Some(card) = db.get_card(id) else { continue; };
-        match card.card_type {
-            CardType::Live => { lives += 1; if lives > 3 { discard.push(index); } }
-            CardType::Member => members.push((index, card.cost.unwrap_or(0))),
-            CardType::Energy => {}
-        }
-    }
-    members.sort_by_key(|&(_, cost)| std::cmp::Reverse(cost));
-    for (index, _) in members {
-        if discard.len() >= 3 { break; }
-        discard.push(index);
-    }
-    crate::bot::strategy_common::emit_mulligan(gs, actions, &discard)
 }

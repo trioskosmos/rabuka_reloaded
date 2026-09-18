@@ -2171,10 +2171,8 @@ if util::distinct_should_dedupe(distinct) {
         if let Some(card) = card {
             let card_no = card.card_no.to_string();
 
-            if player_id == gs.player1.id {
-                gs.player1.debut_count_this_turn += 1;
-            } else if player_id == gs.player2.id {
-                gs.player2.debut_count_this_turn += 1;
+            if let Some(player) = gs.try_player_by_id_mut(&player_id) {
+                player.debut_count_this_turn += 1;
             }
 
             let mut debut_abilities = 0;

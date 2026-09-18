@@ -16,11 +16,7 @@ fn plural(n: u8, word: &str) -> String {
 }
 
 fn maybe_plural(count: Option<u8>, word: &str) -> String {
-    match count {
-        Some(1) => format!("1 {}", word),
-        Some(n) => format!("{} {}s", n, word),
-        None => format!("1 {}", word),
-    }
+    plural(count.unwrap_or(1), word)
 }
 
 fn zone_label_inner(zone: Option<&str>, ja: bool) -> &str {

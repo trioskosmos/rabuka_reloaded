@@ -40,12 +40,17 @@ impl TestGame {
     }
 
     pub fn select_indices(&mut self, indices: &[usize]) {
-        self.trace_selection(indices);
-        self.resume_indices(indices).expect("select_indices failed");
-        trace::dump_state(self, &self.trace);
+        self.do_select_indices(indices)
+            .expect("select_indices failed");
     }
 
     pub fn try_select_indices(&mut self, indices: &[usize]) -> Result<(), String> {
+        self.do_select_indices(indices)
+    }
+
+    /// ONE selection core: trace + resume + dump. `select_indices` expects
+    /// success, `try_select_indices` returns the result.
+    fn do_select_indices(&mut self, indices: &[usize]) -> Result<(), String> {
         self.trace_selection(indices);
         let r = self.resume_indices(indices);
         trace::dump_state(self, &self.trace);
@@ -122,11 +127,28 @@ impl TestGame {
     }
 
     pub fn select_choice_option(&mut self, idx: usize) {
+        self.resume_traced(
+            format!("A selopt {}", idx),
+            Some(idx as i16),
+            None,
+            "select_choice_option failed",
+        );
+    }
+
+    /// ONE traced-resume core for scalar answers: trace + resume + dump.
+    /// `select_option`, `select_choice_option` and `select_generated` differ
+    /// only in label and payload.
+    fn resume_traced(
+        &mut self,
+        label: String,
+        selected: Option<i16>,
+        indices: Option<Vec<usize>>,
+        expect_msg: &str,
+    ) {
         if self.trace.live() {
-            self.trace.emit(format!("A selopt {}", idx));
+            self.trace.emit(label);
         }
-        TurnEngine::resume_with_choice(&mut self.state, Some(idx as i16), None)
-            .expect("select_choice_option failed");
+        TurnEngine::resume_with_choice(&mut self.state, selected, indices).expect(expect_msg);
         trace::dump_state(self, &self.trace);
     }
 
@@ -179,11 +201,7 @@ impl TestGame {
     }
 
     pub fn select_indices_sequential(&mut self, indices: &[usize]) {
-        if indices.is_empty() {
-            self.select_indices(indices);
-            return;
-        }
-        if !self.is_any_number_choice() {
+        if indices.is_empty() || !self.is_any_number_choice() {
             self.select_indices(indices);
             return;
         }
@@ -204,12 +222,12 @@ impl TestGame {
     }
 
     pub fn select_option(&mut self, option_index: i16) {
-        if self.trace.live() {
-            self.trace.emit(format!("A selopt {}", option_index));
-        }
-        TurnEngine::resume_with_choice(&mut self.state, Some(option_index), None)
-            .expect("select_option failed");
-        trace::dump_state(self, &self.trace);
+        self.resume_traced(
+            format!("A selopt {}", option_index),
+            Some(option_index),
+            None,
+            "select_option failed",
+        );
     }
 
     pub fn generated_actions(&self) -> Vec<Action> {
@@ -236,19 +254,15 @@ impl TestGame {
             matching.len(),
         );
         let action = &matching[nth];
-        if self.trace.live() {
-            self.trace.emit(format!("A selgen {}", nth));
-        }
-        TurnEngine::resume_with_choice(
-            &mut self.state,
+        self.resume_traced(
+            format!("A selgen {}", nth),
             action.parameters.as_ref().and_then(|p| p.card_id),
             action
                 .parameters
                 .as_ref()
                 .and_then(|p| p.card_indices.clone()),
-        )
-        .expect("select_generated failed");
-        trace::dump_state(self, &self.trace);
+            "select_generated failed",
+        );
     }
 
     pub fn drain_auto_ability_choices(&mut self) {

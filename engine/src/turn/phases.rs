@@ -399,11 +399,7 @@ tdbg!("PHASE_ACTIVE:4 wait activated");
             is_first,
             revealed_ids
         );
-        let yell_owner: Option<u8> = if performer_id == game_state.player1.id {
-            Some(0)
-        } else {
-            Some(1)
-        };
+        let yell_owner: Option<u8> = Some(game_state.seat_index_by_id(&performer_id));
         for cid in &revealed_ids {
             game_state.push_revealed_card(*cid, None, false, yell_owner, "yell");
         }
@@ -413,19 +409,11 @@ tdbg!("PHASE_ACTIVE:4 wait activated");
         if game_state.initial_yell_revealed_cards.is_empty() {
             game_state.initial_yell_revealed_cards = game_state.revealed_cards.clone();
         }
-        let cheer_buf = if performer_id == game_state.player1.id {
-            &mut game_state.player1_cheer_revealed_cards
-        } else {
-            &mut game_state.player2_cheer_revealed_cards
-        };
+        let cheer_buf = game_state.cheer_revealed_cards_mut(&performer_id);
         for cid in &revealed_ids {
             cheer_buf.push(*cid);
         }
-        if performer_id == game_state.player1.id {
-            game_state.player1_cheer_blade_heart_count = note_icons;
-        } else {
-            game_state.player2_cheer_blade_heart_count = note_icons;
-        }
+        game_state.set_cheer_count_by_id(&performer_id, note_icons);
 
         // If cards moved from live_card_zone to waitroom during yell phase
         // (cannot_live path), set recently_moved_cards so the 8.3.13 check

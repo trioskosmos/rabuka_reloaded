@@ -146,17 +146,19 @@ impl TestGame {
         }
     }
 
-    pub fn assert_hand(&self, expected: usize, msg: &str) {
-        let actual = self.state.player1.hand.len();
+    /// ONE trace hook for value assertions: dump + CHECK line when tracing.
+    /// `assert_hand`, `assert_energy`, `assert_blade`, `assert_stage_pos` and
+    /// `assert_pending_choice_type` all report through here.
+    fn trace_check(&self, label: String, actual: String, expected: String) {
         if self.trace.live() {
             trace::dump_state(self, &self.trace);
-            trace::check(
-                &self.trace,
-                format!("hand 1"),
-                actual.to_string(),
-                expected.to_string(),
-            );
+            trace::check(&self.trace, label, actual, expected);
         }
+    }
+
+    pub fn assert_hand(&self, expected: usize, msg: &str) {
+        let actual = self.state.player1.hand.len();
+        self.trace_check("hand 1".into(), actual.to_string(), expected.to_string());
         assert_eq!(
             actual, expected,
             "{}: expected {} cards in hand, got {}",
@@ -166,21 +168,17 @@ impl TestGame {
 
     pub fn assert_stage_pos(&self, pos: MemberArea, card_id: i16, msg: &str) {
         let actual = self.state.player1.stage.get_area(pos);
-        if self.trace.live() {
-            trace::dump_state(self, &self.trace);
-            trace::check(
-                &self.trace,
-                format!(
-                    "stage 1 {} {}",
-                    pos.to_index(),
-                    trace::ref_of(self, card_id)
-                ),
-                actual
-                    .map(|id| trace::ref_of(self, id))
-                    .unwrap_or_else(|| "null".into()),
-                trace::ref_of(self, card_id),
-            );
-        }
+        self.trace_check(
+            format!(
+                "stage 1 {} {}",
+                pos.to_index(),
+                trace::ref_of(self, card_id)
+            ),
+            actual
+                .map(|id| trace::ref_of(self, id))
+                .unwrap_or_else(|| "null".into()),
+            trace::ref_of(self, card_id),
+        );
         assert_eq!(
             actual,
             Some(card_id),
@@ -194,15 +192,11 @@ impl TestGame {
 
     pub fn assert_energy(&self, expected: u32, msg: &str) {
         let actual = self.state.player1.energy_zone.active_count();
-        if self.trace.live() {
-            trace::dump_state(self, &self.trace);
-            trace::check(
-                &self.trace,
-                format!("energy 1"),
-                actual.to_string(),
-                (expected as u8).to_string(),
-            );
-        }
+        self.trace_check(
+            "energy 1".into(),
+            actual.to_string(),
+            (expected as u8).to_string(),
+        );
         assert_eq!(
             actual, expected as u8,
             "{}: expected {} energy, got {}",
@@ -212,15 +206,11 @@ impl TestGame {
 
     pub fn assert_blade(&self, card_id: i16, expected: i32, msg: &str) {
         let actual = self.state.mods.get_blade_modifier(card_id);
-        if self.trace.live() {
-            trace::dump_state(self, &self.trace);
-            trace::check(
-                &self.trace,
-                format!("blade {}", trace::ref_of(self, card_id)),
-                actual.to_string(),
-                expected.to_string(),
-            );
-        }
+        self.trace_check(
+            format!("blade {}", trace::ref_of(self, card_id)),
+            actual.to_string(),
+            expected.to_string(),
+        );
         assert_eq!(actual, expected, "{}", msg);
     }
 
@@ -257,13 +247,7 @@ impl TestGame {
     }
 
     pub fn assert_selection_contains(&self, expected_card_no: &str, expected_name: &str) {
-        let json = self
-            .state
-            .get_pending_choice_json()
-            .expect("No pending choice JSON available");
-        let cards = json["selection_cards"]
-            .as_array()
-            .expect("No selection_cards in choice JSON");
+        let cards = self.pending_selection_cards();
         let found = cards.iter().any(|c| {
             c["card_no"].as_str() == Some(expected_card_no)
                 && c["name"].as_str() == Some(expected_name)
@@ -276,13 +260,7 @@ impl TestGame {
     }
 
     pub fn assert_selection_not_contains(&self, card_no: &str) {
-        let json = self
-            .state
-            .get_pending_choice_json()
-            .expect("No pending choice JSON available");
-        let cards = json["selection_cards"]
-            .as_array()
-            .expect("No selection_cards in choice JSON");
+        let cards = self.pending_selection_cards();
         let found = cards.iter().any(|c| c["card_no"].as_str() == Some(card_no));
         assert!(
             !found,
@@ -292,15 +270,11 @@ impl TestGame {
     }
 
     pub fn assert_pending_choice_type(&self, expected: &str, msg: &str) {
-        if self.trace.live() {
-            trace::dump_state(self, &self.trace);
-            trace::check(
-                &self.trace,
-                format!("pending"),
-                self.pending_choice_type().unwrap_or_else(|| "none".into()),
-                expected.to_string(),
-            );
-        }
+        self.trace_check(
+            "pending".into(),
+            self.pending_choice_type().unwrap_or_else(|| "none".into()),
+            expected.to_string(),
+        );
         if let Some(choice) = self.state.ability_queue.is_waiting_for_choice() {
             let actual = choice_type(choice);
             assert_eq!(
@@ -314,5 +288,16 @@ impl TestGame {
                 msg, expected
             );
         }
+    }
+
+    /// ONE fetch for the pending choice's `selection_cards` array.
+    /// `assert_selection_contains` / `assert_selection_not_contains` share it.
+    fn pending_selection_cards(&self) -> Vec<serde_json::Value> {
+        self.state
+            .get_pending_choice_json()
+            .expect("No pending choice JSON available")["selection_cards"]
+            .as_array()
+            .expect("No selection_cards in choice JSON")
+            .to_vec()
     }
 }

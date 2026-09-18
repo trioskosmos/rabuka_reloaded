@@ -256,21 +256,10 @@ fn record_pretrigger_live_results(
         // Same score formula as the post-trigger totals (extras are zero
         // here by construction — trigger bonuses land in pX_extra after
         // this point).
-        let seat = if seat_index == 0 {
-            &gs.player1
-        } else {
-            &gs.player2
-        };
-        let cheer = if seat_index == 0 {
-            gs.player1_cheer_blade_heart_count
-        } else {
-            gs.player2_cheer_blade_heart_count
-        };
-        let bonus = if seat_index == 0 {
-            gs.mods.p1_constant_total_score_bonus
-        } else {
-            gs.mods.p2_constant_total_score_bonus
-        };
+        let seat_no = u8::try_from(seat_index).unwrap_or(0);
+        let seat = gs.seat_player(seat_no);
+        let cheer = gs.seat_cheer_count(seat_no);
+        let bonus = gs.seat_score_bonus(seat_no);
         let pre_score = seat.live_card_zone.calculate_live_score(
             &gs.card_database,
             cheer,
@@ -819,7 +808,6 @@ impl super::TurnEngine {
         let Some(rb) = game_state.pending_reyell_rebuild.take() else {
             return;
         };
-        let is_p1 = rb.owner == game_state.player1.id;
         log::debug!(
             "[REYELL_APPLY_DEFERRED] owner={} n={} note_icons={} prev={}",
             rb.owner,
@@ -836,11 +824,9 @@ impl super::TurnEngine {
             snap.yell_cards = rb.yell_cards.clone();
             snap.total_hearts = rb.total_hearts;
         }
-        if is_p1 {
-            game_state.player1_cheer_blade_heart_count = rb.note_icons;
-        } else {
-            game_state.player2_cheer_blade_heart_count = rb.note_icons;
-        }
+        // The owner id already selects the player: one id-keyed write
+        // replaces the `is_p1` branch (phases.rs shares the setter).
+        game_state.set_cheer_count_by_id(&rb.owner.clone(), rb.note_icons);
         game_state.re_yell_occurred = false;
         log::debug!("[REYELL_DEFERRED] applied pending rebuild for owner={}", rb.owner);
     }

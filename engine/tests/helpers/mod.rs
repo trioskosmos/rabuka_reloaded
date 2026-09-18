@@ -141,12 +141,13 @@ pub fn fire_trigger(
 }
 
 pub fn scan_autos_both(game: &mut TestGame) {
-    let p1 = game.state.player1.id.clone();
-    game.state.trigger_auto_abilities_for_player(&p1);
-    game.state.process_pending_auto_abilities(&p1);
-    let p2 = game.state.player2.id.clone();
-    game.state.trigger_auto_abilities_for_player(&p2);
-    game.state.process_pending_auto_abilities(&p2);
+    for pid in [
+        game.state.player1.id.clone(),
+        game.state.player2.id.clone(),
+    ] {
+        game.state.trigger_auto_abilities_for_player(&pid);
+        game.state.process_pending_auto_abilities(&pid);
+    }
     if game.has_pending_choice() {
         answer_choice(game, 0);
     }
@@ -278,23 +279,21 @@ impl TestGame {
         area: MemberArea,
     ) -> Result<(), String> {
         self.set_active_side(side);
-        TurnEngine::execute_main_phase_action(
-            &mut self.state,
+        self.run_main_action(
+            None,
             &ActionType::PlayMemberToStage,
             Some(card_id),
-            None,
             Some(area),
-            Some(false),
+            None,
         )
     }
 
     pub fn activate_ability_for(&mut self, side: Side, stage_card_id: i16) -> Result<(), String> {
         self.set_active_side(side);
-        TurnEngine::execute_main_phase_action(
-            &mut self.state,
+        self.run_main_action(
+            None,
             &ActionType::UseAbility,
             Some(stage_card_id),
-            None,
             None,
             None,
         )
@@ -320,63 +319,86 @@ impl TestGame {
         self.give_energy_for(Side::P1, count);
     }
 
+    /// ONE runner for every main-phase test action: optional trace label,
+    /// engine call (ability-indexed or plain), state dump. All the
+    /// `play_*/activate_*/set_live_card/pass` wrappers below delegate here
+    /// so the trace/dump discipline can't diverge between them.
+    fn run_main_action(
+        &mut self,
+        trace_label: Option<String>,
+        action: &ActionType,
+        card_id: Option<i16>,
+        area: Option<MemberArea>,
+        ability_index: Option<usize>,
+    ) -> Result<(), String> {
+        if let Some(label) = trace_label {
+            if self.trace.live() {
+                self.trace.emit(label);
+            }
+        }
+        let r = if let Some(idx) = ability_index {
+            TurnEngine::execute_main_phase_action_with_ability_index(
+                &mut self.state,
+                action,
+                card_id,
+                None,
+                None,
+                None,
+                Some(idx),
+            )
+        } else {
+            // Area-carrying (play-to-stage) calls pass Some(false) as the
+            // trailing flag; all other actions pass None. Matches every
+            // historical per-action call site.
+            let flag = area.map(|_| false);
+            TurnEngine::execute_main_phase_action(
+                &mut self.state,
+                action,
+                card_id,
+                None,
+                area,
+                flag,
+            )
+        };
+        trace::dump_state(self, &self.trace);
+        r
+    }
+
     pub fn play_to_stage(&mut self, card_id: i16, area: MemberArea) {
         self.try_play_to_stage(card_id, area)
             .expect("play_to_stage failed");
     }
 
     pub fn try_play_to_stage(&mut self, card_id: i16, area: MemberArea) -> Result<(), String> {
-        if self.trace.live() {
-            self.trace.emit(format!(
+        self.run_main_action(
+            Some(format!(
                 "A play {} {}",
                 trace::ref_of(self, card_id),
                 area.to_index()
-            ));
-        }
-        let r = TurnEngine::execute_main_phase_action(
-            &mut self.state,
+            )),
             &ActionType::PlayMemberToStage,
             Some(card_id),
-            None,
             Some(area),
-            Some(false),
-        );
-        trace::dump_state(self, &self.trace);
-        r
+            None,
+        )
     }
 
     pub fn activate_ability(&mut self, stage_card_id: i16) {
-        if self.trace.live() {
-            self.trace
-                .emit(format!("A activate {}", trace::ref_of(self, stage_card_id)));
-        }
-        TurnEngine::execute_main_phase_action(
-            &mut self.state,
-            &ActionType::UseAbility,
-            Some(stage_card_id),
-            None,
-            None,
-            None,
-        )
-        .expect("activate_ability failed");
-        trace::dump_state(self, &self.trace);
+        self.try_activate_ability(stage_card_id)
+            .expect("activate_ability failed");
     }
 
     pub fn try_activate_ability(&mut self, stage_card_id: i16) -> Result<(), String> {
-        if self.trace.live() {
-            self.trace
-                .emit(format!("A activate {}", trace::ref_of(self, stage_card_id)));
-        }
-        let r = TurnEngine::execute_main_phase_action(
-            &mut self.state,
+        self.run_main_action(
+            Some(format!(
+                "A activate {}",
+                trace::ref_of(self, stage_card_id)
+            )),
             &ActionType::UseAbility,
             Some(stage_card_id),
             None,
             None,
-            None,
-        );
-        trace::dump_state(self, &self.trace);
-        r
+        )
     }
 
     pub fn activate_ability_index(&mut self, stage_card_id: i16, ability_index: usize) {
@@ -389,57 +411,33 @@ impl TestGame {
         stage_card_id: i16,
         ability_index: usize,
     ) -> Result<(), String> {
-        if self.trace.live() {
-            self.trace.emit(format!(
+        self.run_main_action(
+            Some(format!(
                 "A activate_idx {} {}",
                 trace::ref_of(self, stage_card_id),
                 ability_index
-            ));
-        }
-        let r = TurnEngine::execute_main_phase_action_with_ability_index(
-            &mut self.state,
+            )),
             &ActionType::UseAbility,
             Some(stage_card_id),
             None,
-            None,
-            None,
             Some(ability_index),
-        );
-        trace::dump_state(self, &self.trace);
-        r
+        )
     }
 
     pub fn set_live_card(&mut self, card_id: i16) {
-        if self.trace.live() {
-            self.trace
-                .emit(format!("A setlive {}", trace::ref_of(self, card_id)));
-        }
-        TurnEngine::execute_main_phase_action(
-            &mut self.state,
+        self.run_main_action(
+            Some(format!("A setlive {}", trace::ref_of(self, card_id))),
             &ActionType::SetLiveCard,
             Some(card_id),
             None,
             None,
-            None,
         )
         .expect("set_live_card failed");
-        trace::dump_state(self, &self.trace);
     }
 
     pub fn pass(&mut self) {
-        if self.trace.live() {
-            self.trace.emit("A pass".to_string());
-        }
-        TurnEngine::execute_main_phase_action(
-            &mut self.state,
-            &ActionType::Pass,
-            None,
-            None,
-            None,
-            None,
-        )
-        .expect("pass failed");
-        trace::dump_state(self, &self.trace);
+        self.run_main_action(Some("A pass".to_string()), &ActionType::Pass, None, None, None)
+            .expect("pass failed");
     }
 }
 
@@ -453,19 +451,12 @@ pub fn fill_decks(game: &mut TestGame, filler: i16) {
 }
 
 pub fn put_on_deck_top(game: &mut TestGame, player: u8, card: i16) {
-    let deck = match player {
-        0 => &mut game.state.player1.main_deck.cards,
-        _ => &mut game.state.player2.main_deck.cards,
-    };
-    deck.insert(0, card);
+    game.state.seat_player_mut(player).main_deck.cards.insert(0, card);
 }
 
 pub fn fill_energy_deck(game: &mut TestGame, player: u8, count: usize) {
     let db = game.db.clone();
-    let deck = match player {
-        0 => &mut game.state.player1.energy_deck,
-        _ => &mut game.state.player2.energy_deck,
-    };
+    let deck = &mut game.state.seat_player_mut(player).energy_deck;
     let energy = card_id(&db, "LL-E-001-SD");
     for _ in 0..count {
         deck.cards.push(energy);

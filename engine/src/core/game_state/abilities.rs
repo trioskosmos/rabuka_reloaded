@@ -2399,11 +2399,9 @@ impl GameState {
     /// belong to, not just a single `card.group` field.
     pub fn distinct_stage_groups(&self, player_id: &str) -> u8 {
         const CANONICAL_GROUPS: [&str; 5] = ["μ's", "Aqours", "虹ヶ咲", "Liella!", "蓮ノ空"];
-        let player = if player_id == self.player2.id {
-            &self.player2
-        } else {
-            &self.player1
-        };
+        let player = self
+            .try_player_by_id(player_id)
+            .unwrap_or(&self.player1);
         let mut count = 0u8;
         for group in CANONICAL_GROUPS {
             let matched = player.stage.stage.iter().any(|&cid| {

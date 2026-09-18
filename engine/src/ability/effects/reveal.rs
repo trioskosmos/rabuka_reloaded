@@ -301,11 +301,7 @@ impl AbilityResolver {
                 owner: gs.resolve_target_player(target).id.clone(),
                 prev_note_icons: {
                     let player = gs.resolve_target_player(target);
-                    if player.id == gs.player1.id {
-                        gs.player1_cheer_blade_heart_count
-                    } else {
-                        gs.player2_cheer_blade_heart_count
-                    }
+                    gs.cheer_count_by_id(&player.id)
                 },
                 yell_cards,
                 total_hearts,

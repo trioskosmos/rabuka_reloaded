@@ -1016,12 +1016,10 @@ if count <= 1 {
             // Card numbers for the focused-row art preview. Options were
             // built in live-zone order (see try_take_success_zone_choice),
             // so index back into the deciding player's live zone.
-            let zone: &[i16] = if player_id == gs.player1.id {
-                &gs.player1.live_card_zone.cards
-            } else if player_id == gs.player2.id {
-                &gs.player2.live_card_zone.cards
-            } else {
-                &[]
+            // Unknown ids preview nothing (legacy `&[]` fallback).
+            let zone: &[i16] = match gs.try_player_by_id(player_id.as_str()) {
+                Some(player) => &player.live_card_zone.cards,
+                None => &[],
             };
             let card_nos: Vec<String> = options
                 .iter()

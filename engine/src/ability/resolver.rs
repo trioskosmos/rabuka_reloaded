@@ -54,6 +54,19 @@ fn choice_offer_sig(offered: &[String], skip_allowed: bool) -> String {
     sig
 }
 
+/// The ability execution engine. ONE resolver instance drives a whole game;
+/// per-ability scratch state below is reset by `resolve_ability` phases
+/// (resolver.rs) so concurrent/queued abilities never see stale data.
+///
+/// Data flow (see `resolve_ability` → `execute_effect` in effects/mod.rs):
+///   queue entry → gates (use-limit, keywords, cost) → `execute_effect`
+///     → ActionType match → per-action handler (move_cards.rs, cost.rs,
+///       look.rs, effects/*, compound.rs for Sequential/Conditional*)
+///     → pending `Choice` (choice.rs builds, `answer_choice` resumes)
+///     → movement/results recorded on `GameState` (mods, queues, logs).
+///
+/// Cross-step communication rides on `GameState` (moved/selected cards,
+/// revealed pools, queue entries), never on globals.
 #[derive(Clone, Debug)]
 pub struct AbilityResolver {
     pub pending_choice: Option<Choice>,
@@ -1294,24 +1307,6 @@ impl AbilityResolver {
         Ok(())
     }
 
-    pub fn card_matches_type(
-        &self,
-        gs: &mut GameState,
-        card_id: i16,
-        card_type_filter: Option<&str>,
-    ) -> bool {
-        util::card_matches_type(&gs.card_database, card_id, card_type_filter)
-    }
-
-    pub fn card_matches_cost_limit(
-        &self,
-        gs: &mut GameState,
-        card_id: i16,
-        cost_limit: Option<u8>,
-    ) -> bool {
-        util::card_matches_cost_limit(&gs.card_database, card_id, cost_limit)
-    }
-
     /// Walk the ability's effect tree to find modify_cost sub-actions and adjust the cost.
     /// Handles patterns like "コストはグループ名1種類につきE減る" (cost reduced per group name).
     fn apply_modify_cost_to_ability_cost(
@@ -1326,59 +1321,78 @@ impl AbilityResolver {
                 if mod_cost.operation_any().as_deref() == Some("subtract")
                     && mod_cost.per_unit_any().unwrap_or(false)
                 {
-                    let per_unit_type_owned = mod_cost.per_unit_type_any();
-                    let per_unit_type = per_unit_type_owned.as_deref();
-                    if per_unit_type == Some("group_name") {
-                        // Count distinct group names on self's stage
-                        // (shared with generation's effective-cost evaluator).
-                        let groups = gs.distinct_stage_groups("self");
-                        let per_unit_count = mod_cost.per_unit_count_any().unwrap_or(1);
-                        let reduction = (groups / per_unit_count) * mod_cost.count.unwrap_or(1);
-                        if cost.action == crate::ability::enums::ActionType::PayEnergy {
-                            let new_energy = cost
-                                .energy_count_any()
-                                .unwrap_or(0)
-                                .saturating_sub(reduction);
-                            cost.set_energy_count(Some(new_energy));
-                        }
-                    } else if matches!(
-                        per_unit_type,
-                        Some("success_live_card_zone")
-                            | Some("success_live_zone")
-                            | Some("live_card_zone")
-                            | Some("live_zone")
-                    ) && cost.action == crate::ability::enums::ActionType::MoveCards
-                    {
-                        // PB1-007: hand discard 3 reduced by 1 per success live (e.g. PL!-pb1-007-R)
-                        // per_unit_type may be live_card_zone due to parser gap; handle both.
-                        let player_id = gs
-                            .ability_queue
-                            .current_entry()
-                            .map(|e| e.player_id.clone())
-                            .unwrap_or_else(|| gs.player1.id.clone());
-                        let success_len = if player_id == gs.player1.id {
-                            gs.player1.success_live_card_zone.cards.len() as u8
-                        } else {
-                            gs.player2.success_live_card_zone.cards.len() as u8
-                        };
-                        let per_unit_cnt = mod_cost.per_unit_count_any().unwrap_or(1);
-                        let unit = mod_cost.count.unwrap_or(1);
-                        let reduction = (success_len / per_unit_cnt) * unit;
-                        let new_count = cost.count.unwrap_or(0).saturating_sub(reduction);
-                        cost.count = Some(new_count);
-                        log::debug!(
-                            "[COST_REDUCE_HAND] success_len={} per_unit_cnt={} unit={} reduction={} new_count={}",
-                            success_len,
-                            per_unit_cnt,
-                            unit,
-                            reduction,
-                            new_count
-                        );
-                    }
+                    self.apply_per_unit_cost_reduction(gs, &mut cost, &mod_cost);
                 }
             }
         }
         cost
+    }
+
+    /// Per-unit cost reduction: `(units / per_unit_count) * amount`.
+    /// ONE definition of the reduction math shared by the group-count and
+    /// success-zone branches below (and generation's effective-cost
+    /// evaluator, which inlines the same formula).
+    fn per_unit_reduction(total_units: u8, per_unit_count: u8, unit_amount: u8) -> u8 {
+        (total_units / per_unit_count.max(1)) * unit_amount
+    }
+
+    /// Apply a parsed per-unit modify_cost to a cloned ability cost.
+    fn apply_per_unit_cost_reduction(
+        &self,
+        gs: &mut GameState,
+        cost: &mut AbilityEffect,
+        mod_cost: &AbilityEffect,
+    ) {
+        let per_unit_count = mod_cost.per_unit_count_any().unwrap_or(1);
+        let unit = mod_cost.count.unwrap_or(1);
+        let per_unit_type = mod_cost.per_unit_type_any();
+        if per_unit_type.as_deref() == Some("group_name") {
+            // Count distinct group names on self's stage
+            // (shared with generation's effective-cost evaluator).
+            let groups = gs.distinct_stage_groups("self");
+            let reduction = Self::per_unit_reduction(groups, per_unit_count, unit);
+            if cost.action == crate::ability::enums::ActionType::PayEnergy {
+                let new_energy = cost
+                    .energy_count_any()
+                    .unwrap_or(0)
+                    .saturating_sub(reduction);
+                cost.set_energy_count(Some(new_energy));
+            }
+            return;
+        }
+        if matches!(
+            per_unit_type.as_deref(),
+            Some("success_live_card_zone")
+                | Some("success_live_zone")
+                | Some("live_card_zone")
+                | Some("live_zone")
+        ) && cost.action == crate::ability::enums::ActionType::MoveCards
+        {
+            // PB1-007: hand discard 3 reduced by 1 per success live (e.g. PL!-pb1-007-R)
+            // per_unit_type may be live_card_zone due to parser gap; handle both.
+            let player_id = gs
+                .ability_queue
+                .current_entry()
+                .map(|e| e.player_id.clone())
+                .unwrap_or_else(|| gs.player1.id.clone());
+            let success_len = gs
+                .try_player_by_id(&player_id)
+                .unwrap_or(&gs.player2)
+                .success_live_card_zone
+                .cards
+                .len() as u8;
+            let reduction = Self::per_unit_reduction(success_len, per_unit_count, unit);
+            let new_count = cost.count.unwrap_or(0).saturating_sub(reduction);
+            cost.count = Some(new_count);
+            log::debug!(
+                "[COST_REDUCE_HAND] success_len={} per_unit_cnt={} unit={} reduction={} new_count={}",
+                success_len,
+                per_unit_count,
+                unit,
+                reduction,
+                new_count
+            );
+        }
     }
 
     pub fn card_db(&self) -> Arc<CardDatabase> {

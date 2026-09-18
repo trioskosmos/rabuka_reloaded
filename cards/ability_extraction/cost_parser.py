@@ -102,8 +102,10 @@ def _extract_basic_cost_fields(cost, text):
     _fill_cost_destination(cost, text)
     _infer_destination_from_source(cost, text)
     _mark_discard_all_hand(cost, text)
-    apply_extracted_fields(cost, text, (("state_change", extract_state_change),))
-    apply_extracted_fields(cost, text, _COST_CARD_FIELDS)
+    apply_extracted_fields(cost, text, (
+        ("state_change", extract_state_change),
+        *_COST_CARD_FIELDS,
+    ))
     for test, field, value in _COST_FLAG_RULES:
         if test(text) if callable(test) else test in text:
             cost[field] = value
@@ -230,33 +232,104 @@ def _cost_choice_comma(text, cost):
     return _choice_cost(text, parts)
 
 
+def _apply_under_member_classification(cost, text):
+    if re.search(r"エネルギー\s*\d*\s*枚", text) or "エネルギーカード" in text:
+        cost["card_type"] = "energy_card"
+    elif "このカード" in text or "メンバーカード" in text:
+        cost["card_type"] = "member_card"
+    if not cost.get("source"):
+        cost["source"] = extract_source(text) or "energy_zone"
+    return "place_energy_under_member"
+
+
+def _apply_pay_energy_classification(cost, text):
+    cost["energy"] = text.count("{{icon_energy.png|E}}")
+    if extract_optional(text):
+        cost["optional"] = True
+    return "pay_energy"
+
+
+def _apply_source_only_classification(cost, text):
+    _infer_destination_from_source(cost, text)
+    if cost.get("destination"):
+        return "move_cards"
+    return None
+
+
+# Ordered classification table for `_classify_cost`: first match wins.
+# Each row is (predicate, apply). The predicates run in the same order as
+# the legacy if-chain; `apply` performs the branch's field writes and
+# returns the cost type. `_infer_destination_from_source` inside the
+# source-only row can promote it to move_cards, hence the Optional return.
+_CLASSIFY_COST_RULES = [
+    (
+        lambda cost, text: cost.get("destination") == "under_member",
+        _apply_under_member_classification,
+    ),
+    (
+        lambda cost, text: bool(cost.get("source") and cost.get("destination")),
+        lambda cost, text: "move_cards",
+    ),
+    (
+        lambda cost, text: cost.get("destination") in ("energy_deck", "energy_zone")
+        and not cost.get("source"),
+        lambda cost, text: "move_cards",
+    ),
+    (
+        lambda cost, text: any(
+            phrase in text
+            for phrase in (
+                "ウェイトにする",
+                "ウェイト状態で置く",
+                "ウェイト状態で登場させる",
+                "アクティブにする",
+            )
+        )
+        or cost.get("state_change"),
+        lambda cost, text: "change_state",
+    ),
+    (
+        lambda cost, text: "{{icon_energy.png|E}}" in text
+        and ("支払う" in text or "支払って" in text),
+        _apply_pay_energy_classification,
+    ),
+    (
+        lambda cost, text: bool(cost.get("source")),
+        _apply_source_only_classification,
+    ),
+]
+
+
 def _classify_cost(cost, text):
-    if cost.get("destination") == "under_member":
-        if re.search(r"エネルギー\s*\d*\s*枚", text) or "エネルギーカード" in text:
-            cost["card_type"] = "energy_card"
-        elif "このカード" in text or "メンバーカード" in text:
-            cost["card_type"] = "member_card"
-        if not cost.get("source"):
-            cost["source"] = extract_source(text) or "energy_zone"
-        return "place_energy_under_member"
-    if cost.get("source") and cost.get("destination"):
-        return "move_cards"
-    if cost.get("destination") in ("energy_deck", "energy_zone") and not cost.get("source"):
-        return "move_cards"
-    if any(phrase in text for phrase in (
-        "ウェイトにする", "ウェイト状態で置く", "ウェイト状態で登場させる", "アクティブにする"
-    )) or cost.get("state_change"):
-        return "change_state"
-    if "{{icon_energy.png|E}}" in text and ("支払う" in text or "支払って" in text):
-        cost["energy"] = text.count("{{icon_energy.png|E}}")
-        if extract_optional(text):
-            cost["optional"] = True
-        return "pay_energy"
-    if cost.get("source"):
-        _infer_destination_from_source(cost, text)
-        if cost.get("destination"):
-            return "move_cards"
+    for check, apply in _CLASSIFY_COST_RULES:
+        if check(cost, text):
+            result = apply(cost, text)
+            if result is not None:
+                return result
     return "custom"
+
+
+# Post-handler tail flags for `parse_cost`: (trigger phrases, field, value).
+# One table replaces the copy-pasted `any(phrase in text)` blocks. The
+# deck-bottom case keeps its bespoke shape (it also backfills source and
+# the move_cards type in field-insertion order) and stays ahead of the
+# table so regenerated JSON stays byte-identical.
+_DECK_BOTTOM_PHRASES = (
+    "デッキの一番下に置く",
+    "デッキの一番下に置いて",
+    "デッキの下に置く",
+    "デッキの下に置いて",
+    "山札の下に置く",
+    "山札の下に置いて",
+)
+_TAIL_FLAG_PHRASES = (
+    (
+        ("好きな枚数", "好きな枚数まで", "任意の枚数", "好きな組み合わせ"),
+        "any_number",
+        True,
+    ),
+    (("好きな順番で",), "placement_order", "any_order"),
+)
 
 
 def parse_cost(text: str) -> Dict[str, Any]:
@@ -266,22 +339,16 @@ def parse_cost(text: str) -> Dict[str, Any]:
         result = handler(text, cost)
         if result is not None:
             return result
-    if any(keyword in text for keyword in (
-        "デッキの一番下に置く", "デッキの一番下に置いて", "デッキの下に置く",
-        "デッキの下に置いて", "山札の下に置く", "山札の下に置いて",
-    )):
+    if any(phrase in text for phrase in _DECK_BOTTOM_PHRASES):
         cost["destination"] = "deck_bottom"
         cost["type"] = "move_cards"
         apply_extracted_fields(cost, text, (("source", extract_source),))
+    for phrases, field, value in _TAIL_FLAG_PHRASES:
+        if any(phrase in text for phrase in phrases):
+            cost[field] = value
     if extract_max(text):
         cost["max"] = True
         cost["any_number"] = True
-    if any(phrase in text for phrase in (
-        "好きな枚数", "好きな枚数まで", "任意の枚数", "好きな組み合わせ",
-    )):
-        cost["any_number"] = True
-    if "好きな順番で" in text:
-        cost["placement_order"] = "any_order"
     if "type" not in cost:
         cost["type"] = _classify_cost(cost, text)
     return cost

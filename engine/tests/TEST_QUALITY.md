@@ -51,11 +51,13 @@ _trigger event hand-pushed with no real ability resolution in the same fn (weake
 
 None.
 
-## pendency_only (0)
+## pendency_only (1)
 
 _has_pending_choice asserted without choice identity (pending_choice_type/summary/answer) or outcome asserts_
 
-None.
+| file | test | line | detail |
+| --- | --- | --- | --- |
+| `engine/tests/test_modules/effects/compound/discard_two_self_and_other_group_debut_retrigger_test.rs` | `discard_two_debut_retrigger_offers_count_two_selection` | 47 |  |
 
 ## similar_cards (26)
 
@@ -74,8 +76,7 @@ _confusable card numbers (bp2 vs pb2) staged in one file — human review for wr
 | `engine/tests/test_modules/effects/gain/hearts/live_zone_heart04_threshold_pl_s_bp5_013_n_test.rs` | `<file>` | 1 | PL!S-bp2-020-L, PL!S-bp3-020-L |
 | `engine/tests/test_modules/effects/look_select/niche_filters/all_or_any_three_heart_member_search_test.rs` | `<file>` | 1 | PL!S-PR-015-PR, PL!S-bp2-015-PR |
 | `engine/tests/test_modules/effects/look_select/reveal_to_hand/distortion_need_hearts_test.rs` | `<file>` | 1 | PL!SP-bp1-012-N, PL!SP-bp4-012-N |
-| `engine/tests/test_modules/effects/look_select/reveal_to_hand/eli_bp5_cost9_search.rs` | `<file>` | 1 | PL!-bp3-002-R, PL!-bp5-002-R |
-| `engine/tests/test_modules/effects/position/kinako_each_time_blade_test.rs` | `<file>` | 1 | PL!SP-bp5-006-R, PL!SP-pb1-006-R |
+| `engine/tests/test_modules/effects/look_select/reveal_to_hand/eli_bp5_cost9_search_test.rs` | `<file>` | 1 | PL!-bp3-002-R, PL!-bp5-002-R |
 | `engine/tests/test_modules/effects/position/position_change_multi_test.rs` | `<file>` | 1 | PL!HS-bp2-006-R, PL!HS-pb1-006-R |
 | `engine/tests/test_modules/effects/position/position_change_non_optional_test.rs` | `<file>` | 1 | PL!HS-bp2-006-R, PL!HS-pb1-006-R |
 | `engine/tests/test_modules/effects/recover/to_hand/deep_resonance_bp3_test.rs` | `<file>` | 1 | PL!S-bp2-001-R, PL!S-pb1-001-R |
@@ -85,7 +86,8 @@ _confusable card numbers (bp2 vs pb2) staged in one file — human review for wr
 | `engine/tests/test_modules/effects/state/either_or_state_change_test.rs` | `<file>` | 1 | PL!N-bp4-008-R, PL!N-pb1-008-R |
 | `engine/tests/test_modules/integration/integration_blindspot_test.rs` | `<file>` | 1 | PL!HS-bp5-004-R, PL!HS-bp6-004-R |
 | `engine/tests/test_modules/jidou/movement/ability_chain_combo_test.rs` | `<file>` | 1 | PL!SP-pb1-006-R, PL!SP-pb2-006-R |
-| `engine/tests/test_modules/jidou/movement/kinako_live_success_or_move_test.rs` | `<file>` | 1 | PL!SP-bp5-006-R, PL!SP-pb2-006-R |
-| `engine/tests/test_modules/jidou/movement/kinako_sakurakoji_test.rs` | `<file>` | 1 | PL!SP-bp5-006-R, PL!SP-pb1-006-R |
+| `engine/tests/test_modules/jidou/movement/appearance_and_repeated_swaps_stack_blades_test.rs` | `<file>` | 1 | PL!SP-bp5-006-R, PL!SP-pb1-006-R |
+| `engine/tests/test_modules/jidou/movement/debut_or_self_area_move_gain_two_blades_q94_q171_test.rs` | `<file>` | 1 | PL!SP-bp5-006-R, PL!SP-pb1-006-R |
+| `engine/tests/test_modules/jidou/movement/live_success_or_self_move_place_discard_group_member_under_self_test.rs` | `<file>` | 1 | PL!SP-bp5-006-R, PL!SP-pb2-006-R |
 | `engine/tests/test_modules/jidou/movement/pb2_under_member_test.rs` | `<file>` | 1 | PL!SP-pb1-006-R, PL!SP-pb2-006-R |
 | `engine/tests/test_modules/rules/conditions/restriction_mechanics_test.rs` | `<file>` | 1 | PL!S-bp5-009-R, PL!S-bp7-009-R |

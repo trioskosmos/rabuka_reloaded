@@ -3386,17 +3386,8 @@ impl<'a> ConditionContext<'a> {
                 });
 
                 if is_live_zone {
-                    let is_p1 = player.id == self.game_state.player1.id;
-                    let cheer_blade = if is_p1 {
-                        self.game_state.player1_cheer_blade_heart_count
-                    } else {
-                        self.game_state.player2_cheer_blade_heart_count
-                    };
-                    let constant_bonus = if is_p1 {
-                        self.game_state.mods.p1_constant_total_score_bonus
-                    } else {
-                        self.game_state.mods.p2_constant_total_score_bonus
-                    };
+                    let cheer_blade = self.game_state.cheer_count_by_id(&player.id);
+                    let constant_bonus = self.game_state.score_bonus_by_id(&player.id);
 
                     let score_flat: HashMap<i16, i32> = self
                         .game_state

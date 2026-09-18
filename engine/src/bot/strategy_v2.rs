@@ -172,11 +172,7 @@ pub fn choose_live_set_action_v2(
     db: &CardDatabase,
     policy: &V2Policy,
 ) -> Action {
-    let (me, opp) = if gs.active_player().id == gs.player1.id {
-        (&gs.player1, &gs.player2)
-    } else {
-        (&gs.player2, &gs.player1)
-    };
+    let (me, opp) = gs.seated_pair(gs.active_player_index());
     let my_success = me.success_live_card_zone.cards.len();
     let opp_success = opp.success_live_card_zone.cards.len();
 

@@ -1,5 +1,4 @@
 {
-  "engine/tests/helpers/mod.rs": 2,
-  "engine/tests/test_modules/effects/compound/pb1_007_comprehensive_edge_test.rs": 1,
-  "engine/tests/test_modules/effects/draw/flat/sp_pb1_004_live_test.rs": 1
+  "engine/tests/helpers/mod.rs": 1,
+  "engine/tests/test_modules/effects/compound/pb1_007_comprehensive_edge_test.rs": 1
 }

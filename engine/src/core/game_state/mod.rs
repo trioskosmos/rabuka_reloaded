@@ -636,41 +636,13 @@ impl GameState {
                 self.second_attacker_mut()
             }
             Phase::FirstAttackerPerformance | Phase::LiveVictoryDetermination => {
-                if self.player1.is_first_attacker {
-                    &mut self.player1
-                } else {
-                    &mut self.player2
-                }
+                self.first_attacker_mut()
             }
-            Phase::SecondAttackerPerformance => {
-                if self.player1.is_first_attacker {
-                    &mut self.player2
-                } else {
-                    &mut self.player1
-                }
-            }
+            Phase::SecondAttackerPerformance => self.second_attacker_mut(),
             _ => match self.current_turn_phase {
-                TurnPhase::FirstAttackerNormal => {
-                    if self.player1.is_first_attacker {
-                        &mut self.player1
-                    } else {
-                        &mut self.player2
-                    }
-                }
-                TurnPhase::SecondAttackerNormal => {
-                    if self.player1.is_first_attacker {
-                        &mut self.player2
-                    } else {
-                        &mut self.player1
-                    }
-                }
-                TurnPhase::Live => {
-                    if self.player1.is_first_attacker {
-                        &mut self.player1
-                    } else {
-                        &mut self.player2
-                    }
-                }
+                TurnPhase::FirstAttackerNormal => self.first_attacker_mut(),
+                TurnPhase::SecondAttackerNormal => self.second_attacker_mut(),
+                TurnPhase::Live => self.first_attacker_mut(),
             },
         }
     }
@@ -704,6 +676,139 @@ impl GameState {
             &mut self.player2
         } else {
             &mut self.player1
+        }
+    }
+
+    /// Seat-indexed views. Seat 0 is player1, seat 1 is player2 — the same
+    /// convention the live engine (`seat_index`) and the bots (`me: u8`)
+    /// already use. ONE definition replaces the per-file `if me == 0` /
+    /// `if seat_index == 0` chains (live.rs, strategy_v7.rs, ...).
+    pub fn seat_player(&self, seat: u8) -> &Player {
+        if seat == 0 {
+            &self.player1
+        } else {
+            &self.player2
+        }
+    }
+
+    pub fn seat_player_mut(&mut self, seat: u8) -> &mut Player {
+        if seat == 0 {
+            &mut self.player1
+        } else {
+            &mut self.player2
+        }
+    }
+
+    /// `(me, opp)` pair for a seat index. Replaces the bot-local
+    /// `player_ref` helpers and the inline `(me, opp)` tuples.
+    pub fn seated_pair(&self, me: u8) -> (&Player, &Player) {
+        if me == 0 {
+            (&self.player1, &self.player2)
+        } else {
+            (&self.player2, &self.player1)
+        }
+    }
+
+    /// Seat index of the active player (0 = player1). Replaces the
+    /// `if active_player().id == player1.id { 0 } else { 1 }` chains.
+    pub fn active_player_index(&self) -> u8 {
+        if self.active_player().id == self.player1.id {
+            0
+        } else {
+            1
+        }
+    }
+
+    /// Borrow the player whose `id` matches, or `None` for unknown ids.
+    /// Callers pick their own fallback (`unwrap_or`) so legacy defaults
+    /// stay explicit at each site instead of hiding in a shared helper.
+    pub fn try_player_by_id(&self, id: &str) -> Option<&Player> {
+        if id == self.player1.id {
+            Some(&self.player1)
+        } else if id == self.player2.id {
+            Some(&self.player2)
+        } else {
+            None
+        }
+    }
+
+    pub fn try_player_by_id_mut(&mut self, id: &str) -> Option<&mut Player> {
+        if id == self.player1.id {
+            Some(&mut self.player1)
+        } else if id == self.player2.id {
+            Some(&mut self.player2)
+        } else {
+            None
+        }
+    }
+
+    /// Cheer (note-icon) count banked for `player_id`'s last yell.
+    /// Unknown ids read player2's count, matching the legacy `else` arms
+    /// (condition/card.rs, condition/state.rs is flag-keyed and untouched,
+    /// effects/reveal.rs).
+    pub fn cheer_count_by_id(&self, player_id: &str) -> u8 {
+        if player_id == self.player1.id {
+            self.player1_cheer_blade_heart_count
+        } else {
+            self.player2_cheer_blade_heart_count
+        }
+    }
+
+    pub fn set_cheer_count_by_id(&mut self, player_id: &str, count: u8) {
+        if player_id == self.player1.id {
+            self.player1_cheer_blade_heart_count = count;
+        } else {
+            self.player2_cheer_blade_heart_count = count;
+        }
+    }
+
+    /// Constant total-score bonus banked for `player_id`.
+    pub fn score_bonus_by_id(&self, player_id: &str) -> i16 {
+        if player_id == self.player1.id {
+            self.mods.p1_constant_total_score_bonus
+        } else {
+            self.mods.p2_constant_total_score_bonus
+        }
+    }
+
+    /// Seat index for a player id (0 = player1, else 1). Matches the
+    /// `yell_owner` convention in phases.rs.
+    pub fn seat_index_by_id(&self, player_id: &str) -> u8 {
+        if player_id == self.player1.id {
+            0
+        } else {
+            1
+        }
+    }
+
+    /// Mutable revealed-cheer buffer for `player_id`.
+    pub fn cheer_revealed_cards_mut(
+        &mut self,
+        player_id: &str,
+    ) -> &mut SmallVec<[i16; 8]> {
+        if player_id == self.player1.id {
+            &mut self.player1_cheer_revealed_cards
+        } else {
+            &mut self.player2_cheer_revealed_cards
+        }
+    }
+
+    /// Seat-indexed cheer count (seat 0 = player1). For the live
+    /// pre-trigger scoring triple.
+    pub fn seat_cheer_count(&self, seat: u8) -> u8 {
+        if seat == 0 {
+            self.player1_cheer_blade_heart_count
+        } else {
+            self.player2_cheer_blade_heart_count
+        }
+    }
+
+    /// Seat-indexed constant score bonus (seat 0 = player1).
+    pub fn seat_score_bonus(&self, seat: u8) -> i16 {
+        if seat == 0 {
+            self.mods.p1_constant_total_score_bonus
+        } else {
+            self.mods.p2_constant_total_score_bonus
         }
     }
 

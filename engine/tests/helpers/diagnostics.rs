@@ -69,11 +69,11 @@ pub fn ability_verdicts(game: &mut TestGame, player: &str) -> String {
 
     set_debug(true);
     clear_verdicts();
-    let pid = if player == "p1" || player == &game.state.player1.id {
-        game.state.player1.id.clone()
-    } else {
-        game.state.player2.id.clone()
-    };
+    let pid = game
+        .state
+        .try_player_by_id(player)
+        .map(|p| p.id.clone())
+        .unwrap_or_else(|| game.state.player2.id.clone());
     rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(&mut game.state, &pid);
     let scan_verdicts = drain_verdicts();
     game.state.process_pending_auto_abilities(&pid);
@@ -169,45 +169,32 @@ impl TestGame {
     }
 
     pub fn dbg_hand(&self) {
-        let cards: Vec<String> = self
-            .state
-            .player1
-            .hand
-            .cards
-            .iter()
-            .map(|&id| self.name(id))
-            .collect();
-        eprintln!("[HAND] {:?}", cards);
+        self.dbg_zone("[HAND]", &self.state.player1.hand.cards, false);
     }
 
     pub fn dbg_discard(&self) {
-        let cards: Vec<String> = self
-            .state
-            .player1
-            .waitroom
-            .cards
-            .iter()
-            .map(|&id| self.name(id))
-            .collect();
-        eprintln!("[DISCARD] {:?}", cards);
+        self.dbg_zone("[DISCARD]", &self.state.player1.waitroom.cards, false);
     }
 
     pub fn dbg_stage(&self) {
-        let cards: Vec<String> = self
-            .state
-            .player1
-            .stage
-            .stage
+        let stage: Vec<i16> = self.state.player1.stage.stage.to_vec();
+        self.dbg_zone("[STAGE]", &stage, true);
+    }
+
+    /// ONE zone printer for the `dbg_*` family: names every card id,
+    /// rendering empty stage slots as "empty".
+    fn dbg_zone(&self, label: &str, cards: &[i16], empty_slots: bool) {
+        let named: Vec<String> = cards
             .iter()
             .map(|&id| {
-                if id == -1 {
+                if empty_slots && id == -1 {
                     "empty".into()
                 } else {
                     self.name(id)
                 }
             })
             .collect();
-        eprintln!("[STAGE] {:?}", cards);
+        eprintln!("{} {:?}", label, named);
     }
 
     pub fn event_trace_contains(&self, needle: &str) -> bool {

@@ -21,79 +21,75 @@ use alloc::{
 };
 
 impl AbilityResolver {
-    // Q55: Effects resolve as much as possible; partial resolution required when full is impossible.
-    pub fn execute_effect(
-        &mut self,
-        gs: &mut GameState,
-        effect: &AbilityEffect,
-    ) -> Result<(), String> {
-        let mut dbg = AbDebug::new();
-        dbg.effect(effect);
-        log::trace!(
-            "[EFFECT] source={:?} action={} from={} to={} has_steps={} has_actions={}",
-            self.activating_card_id,
-            effect.action,
-            effect.source_or("none"),
-            effect.destination.map(|z| z.as_str()).unwrap_or("none"),
-            effect.effect_steps.is_some(),
-            effect.compound.actions.is_some()
-        );
-        #[cfg(not(feature = "no_std"))]
-        let exec_snapshot = crate::ability::log::buffer_len();
-        if !self.can_activate_effect(gs, effect) {
-            log::trace!("[EFFECT] source={:?} action={} skipped: activation gate failed", self.activating_card_id, effect.action);
-            // Keep verdicts — condition failure info will be captured by push_ability_result
-            return Ok(());
+    /// Activation gate: skipped effects resolve to Ok without verdicts —
+    /// condition failure info is captured by push_ability_result upstream.
+    /// Returns true when the caller must `return Ok(())`.
+    fn gate_effect_activation(&mut self, gs: &mut GameState, effect: &AbilityEffect) -> bool {
+        if self.can_activate_effect(gs, effect) {
+            return false;
         }
-        // Q118 all-or-nothing "そうしたとき": after an accepted conditional_on_optional
-        // placement that could not place every required card (e.g. a group missing
-        // from the discard pile), the trailing draw consequence must not fire. This
-        // guard catches the consequence whether it runs in the sequential loop or
-        // via resume_pending_actions.
+        log::trace!("[EFFECT] source={:?} action={} skipped: activation gate failed", self.activating_card_id, effect.action);
+        // Keep verdicts — condition failure info will be captured by push_ability_result
+        true
+    }
+
+    /// Q118 all-or-nothing "そうしたとき": after an accepted
+    /// conditional_on_optional placement that could not place every required
+    /// card, the trailing draw consequence must not fire — whether it runs
+    /// in the sequential loop or via resume_pending_actions.
+    fn gate_incomplete_placement(&self, gs: &mut GameState, effect: &AbilityEffect) -> bool {
         let placement_incomplete = gs
             .ability_queue
             .current_entry()
             .and_then(|e| e.optional_moves_all_moved)
             == Some(false);
-        if placement_incomplete
+        if !(placement_incomplete
             && matches!(
                 effect.action,
                 ActionType::DrawCard | ActionType::DrawUntilCount
-            )
+            ))
         {
+            return false;
+        }
+        log::debug!(
+            "[EFFECT] source={:?} action={} skipped: placement incomplete (Q118)",
+            self.activating_card_id,
+            effect.action
+        );
+        true
+    }
+
+    /// Non-stackable check: skip if this effect is already active.
+    /// Returns true when the caller must `return Ok(())`.
+    fn check_non_stackable(&mut self, gs: &mut GameState, effect: &AbilityEffect) -> bool {
+        if !effect.non_stackable.unwrap_or(false) {
+            return false;
+        }
+        let effect_key = format!("{}:{}", effect.action, effect.text);
+        if gs.non_stackable_effects.iter().any(|x| x == &effect_key) {
             log::debug!(
-                "[EFFECT] source={:?} action={} skipped: placement incomplete (Q118)",
+                "[EFFECT] source={:?} action={} skipped: non-stackable effect already active key={}",
                 self.activating_card_id,
-                effect.action
+                effect.action,
+                effect_key
             );
-            return Ok(());
+            return true;
         }
-        // Drain condition verdicts from the can_activate_effect pre-check;
-        // the effect execution will produce its own items and we don't want duplicates.
-        #[cfg(not(feature = "no_std"))]
-        {
-            let _pre = crate::ability::log::drain_verdicts_since(exec_snapshot);
-        }
+        gs.non_stackable_effects.push(effect_key);
+        false
+    }
 
-        // non_stackable check: skip if this effect is already active
-        if effect.non_stackable.unwrap_or(false) {
-            let effect_key = format!("{}:{}", effect.action, effect.text);
-            if gs.non_stackable_effects.iter().any(|x| x == &effect_key) {
-                log::debug!(
-                    "[EFFECT] source={:?} action={} skipped: non-stackable effect already active key={}",
-                    self.activating_card_id,
-                    effect.action,
-                    effect_key
-                );
-                return Ok(());
-            }
-            gs.non_stackable_effects.push(effect_key);
-        }
-
-        // Effect details are captured in the structured ability_resolution entry
-
-        // Legacy opponent_action wrapper (pre-parser-flatten). Flat effects
-        // carry target="opponent" directly and dispatch via ActionType.
+    /// Legacy opponent_action wrapper (pre-parser-flatten) + flat
+    /// `action_by: opponent` tagging. Returns `Ok(true)` when the caller
+    /// must `return Ok(())` (unwrapped recursion finished, or a fully
+    /// opponent-handled Custom needs nothing).
+    fn prepare_opponent_routing(
+        &mut self,
+        gs: &mut GameState,
+        effect: &AbilityEffect,
+    ) -> Result<bool, String> {
+        // Flat effects carry target="opponent" directly and dispatch via
+        // ActionType; only the legacy wrapper needs unwrapping.
         if effect.action == ActionType::OpponentAction {
             if let Some(ref opponent_action) = effect.opponent_action() {
                 // G3: tag spawn context so choices created for this
@@ -104,16 +100,15 @@ impl AbilityResolver {
                     modified.target = Some("opponent".into());
                 }
                 self.execute_effect(gs, &modified)?;
-                return Ok(());
+                return Ok(true);
             }
         }
 
         gs.reset_replacement_effect_flags();
-        let action_str = effect.action.to_str();
 
         // Empty action (default) with action_by means it was entirely handled by opponent
         if effect.action == ActionType::Custom && effect.action_by().is_some() {
-            return Ok(());
+            return Ok(true);
         }
 
         // G3: for non-empty actions with action_by: opponent, tag spawn context
@@ -121,7 +116,17 @@ impl AbilityResolver {
         if effect.action_by().as_deref() == Some("opponent") {
             self.spawn_context.target = Some("opponent".to_string());
         }
+        Ok(false)
+    }
 
+    /// Run registered replacement effects for `action_str`.
+    /// Returns `Ok(true)` when handled (caller returns `Ok(())`); the
+    /// choice-based path returns `Err` to signal the pending choice.
+    fn run_replacement_effects(
+        &mut self,
+        gs: &mut GameState,
+        action_str: &str,
+    ) -> Result<bool, String> {
         let replacement_indices: Vec<usize> = gs
             .replacement_effects
             .iter()
@@ -130,36 +135,40 @@ impl AbilityResolver {
             .map(|(i, _)| i)
             .collect();
 
-        if !replacement_indices.is_empty() {
-            for idx in replacement_indices {
-                if gs.replacement_effects[idx].is_choice_based {
-                    let description =
-                        format!("Apply replacement effect for action '{}'?", action_str);
-                    self.pending_choice = Some(Choice::SelectTarget {
-                        target: "apply_replacement".to_string(),
-                        description: description.clone(),
-                        description_en: Some(description.clone()),
-                        description_ja: Some(format!(
-                            "アクション「{}」の置き換え効果を適用？",
-                            action_str
-                        )),
-                        allow_skip: false,
-                        options: None,
-                    });
-                    return Err("Pending choice required: apply replacement effect".to_string());
-                } else {
-                    let effects_to_execute =
-                        gs.replacement_effects[idx].replacement_effects.clone();
-                    let card_id = gs.replacement_effects[idx].card_id;
-                    for replacement_effect in &effects_to_execute {
-                        self.execute_effect(gs, replacement_effect)?;
-                    }
-                    gs.mark_replacement_effect_applied(card_id);
-                }
-            }
-            return Ok(());
+        if replacement_indices.is_empty() {
+            return Ok(false);
         }
+        for idx in replacement_indices {
+            if gs.replacement_effects[idx].is_choice_based {
+                let description =
+                    format!("Apply replacement effect for action '{}'?", action_str);
+                self.pending_choice = Some(Choice::SelectTarget {
+                    target: "apply_replacement".to_string(),
+                    description: description.clone(),
+                    description_en: Some(description.clone()),
+                    description_ja: Some(format!(
+                        "アクション「{}」の置き換え効果を適用？",
+                        action_str
+                    )),
+                    allow_skip: false,
+                    options: None,
+                });
+                return Err("Pending choice required: apply replacement effect".to_string());
+            }
+            let effects_to_execute =
+                gs.replacement_effects[idx].replacement_effects.clone();
+            let card_id = gs.replacement_effects[idx].card_id;
+            for replacement_effect in &effects_to_execute {
+                self.execute_effect(gs, replacement_effect)?;
+            }
+            gs.mark_replacement_effect_applied(card_id);
+        }
+        Ok(true)
+    }
 
+    /// Register a "replacement" effect_type for its original event.
+    /// Returns true when registered (caller returns `Ok(())`).
+    fn register_replacement_effect(&mut self, gs: &mut GameState, effect: &AbilityEffect) -> bool {
         if let Some(ref effect_type) = effect.effect_type() {
             if *effect_type == "replacement" {
                 let original_event = effect.replaces_event_any().clone();
@@ -180,8 +189,141 @@ impl AbilityResolver {
                         is_choice_based,
                     );
                 }
-                return Ok(());
+                return true;
             }
+        }
+        false
+    }
+
+    /// Rule 9.2.1 compound routing: Sequential and LookAndSelect carrying
+    /// `effect_steps` collapse into the generic sequential pipeline
+    /// ([look, select, move] in order). Returns the normalized Sequential
+    /// effect when this route applies.
+    fn normalized_sequential_route(
+        effect: &AbilityEffect,
+        action_type: ActionType,
+    ) -> Option<AbilityEffect> {
+        // Rule 9.8.1 / Q85 / Q86: Sequential/LookAndSelect routing
+        //
+        // Q85: LookAndSelect with insufficient deck → refresh mid-look
+        //   (handled inside execute_look_at, which implements the 4-step
+        //   procedure: look available → refresh → look remaining → resolve)
+        //
+        // Q86: LookAndSelect with exactly enough cards → no refresh during
+        //   look. After resolution, if deck is 0, refresh on next check timing.
+        if action_type != ActionType::Sequential && action_type != ActionType::LookAndSelect {
+            return None;
+        }
+        let steps = effect.normalized_steps();
+        if steps.is_empty() {
+            return None;
+        }
+        let mut normalized = effect.clone();
+        normalized.effect_steps = None;
+        normalized.compound.actions = Some(steps);
+        normalized.action = ActionType::Sequential;
+        Some(normalized)
+    }
+
+    /// MoveCards/DiscardCard shared tail: rule log + current-effect pinning
+    /// + move execution. The only difference between the arms is the log tag.
+    fn execute_logged_move(
+        &mut self,
+        gs: &mut GameState,
+        effect: &AbilityEffect,
+        log_tag: &str,
+    ) -> Result<(), String> {
+        self.rule_log_activated(gs, log_tag);
+        self.current_effect = Some(effect.clone());
+        self.execute_move_cards(gs, effect)
+    }
+
+    /// Push the post-dispatch effect verdict for non-structural action types.
+    fn push_effect_verdict(effect: &AbilityEffect) {
+        // Push effect verdict for non-structural action types
+        let is_structural = matches!(
+            effect.action,
+            ActionType::CompoundAction
+                | ActionType::Sequential
+                | ActionType::Choice
+                | ActionType::ConditionalAlternative
+                | ActionType::ConditionalOnResult
+                | ActionType::ConditionalOnOptional
+        );
+        if is_structural {
+            return;
+        }
+        #[cfg(not(feature = "no_std"))]
+        let val = effect
+            .count
+            .or(effect.value_any())
+            .map(|v| v.to_string())
+            .unwrap_or_default();
+        #[cfg(not(feature = "no_std"))]
+        let details = if !val.is_empty() {
+            format!("{} {}", effect.action, val)
+        } else {
+            effect.action.to_string()
+        };
+        #[cfg(not(feature = "no_std"))]
+        crate::ability::log::push_verdict(crate::ability::log::AbilityLogItem::Effect {
+            text: effect.text.to_string(),
+            action: effect.action.to_string(),
+            details,
+        });
+    }
+
+    // Q55: Effects resolve as much as possible; partial resolution required when full is impossible.
+    pub fn execute_effect(
+        &mut self,
+        gs: &mut GameState,
+        effect: &AbilityEffect,
+    ) -> Result<(), String> {
+        let mut dbg = AbDebug::new();
+        dbg.effect(effect);
+        log::trace!(
+            "[EFFECT] source={:?} action={} from={} to={} has_steps={} has_actions={}",
+            self.activating_card_id,
+            effect.action,
+            effect.source_or("none"),
+            effect.destination.map(|z| z.as_str()).unwrap_or("none"),
+            effect.effect_steps.is_some(),
+            effect.compound.actions.is_some()
+        );
+        #[cfg(not(feature = "no_std"))]
+        let exec_snapshot = crate::ability::log::buffer_len();
+        if self.gate_effect_activation(gs, effect) {
+            return Ok(());
+        }
+        if self.gate_incomplete_placement(gs, effect) {
+            return Ok(());
+        }
+        // Drain condition verdicts from the can_activate_effect pre-check;
+        // the effect execution will produce its own items and we don't want duplicates.
+        #[cfg(not(feature = "no_std"))]
+        {
+            let _pre = crate::ability::log::drain_verdicts_since(exec_snapshot);
+        }
+
+        // non_stackable check: skip if this effect is already active
+        if self.check_non_stackable(gs, effect) {
+            return Ok(());
+        }
+
+        // Effect details are captured in the structured ability_resolution entry
+
+        if self.prepare_opponent_routing(gs, effect)? {
+            return Ok(());
+        }
+
+        let action_str = effect.action.to_str();
+
+        if self.run_replacement_effects(gs, action_str)? {
+            return Ok(());
+        }
+
+        if self.register_replacement_effect(gs, effect) {
+            return Ok(());
         }
 
         // Rule 9.8 / Q158: Handle target="both" generically
@@ -218,23 +360,8 @@ impl AbilityResolver {
         // for the case where effect_steps is absent.
         let action_type = effect.action;
 
-        // Rule 9.8.1 / Q85 / Q86: Sequential/LookAndSelect routing
-        //
-        // Q85: LookAndSelect with insufficient deck → refresh mid-look
-        //   (handled inside execute_look_at, which implements the 4-step
-        //   procedure: look available → refresh → look remaining → resolve)
-        //
-        // Q86: LookAndSelect with exactly enough cards → no refresh during
-        //   look. After resolution, if deck is 0, refresh on next check timing.
-        if action_type == ActionType::Sequential || action_type == ActionType::LookAndSelect {
-            let steps = effect.normalized_steps();
-            if !steps.is_empty() {
-                let mut normalized = effect.clone();
-                normalized.effect_steps = None;
-                normalized.compound.actions = Some(steps);
-                normalized.action = ActionType::Sequential;
-                return self.execute_sequential_effect(gs, &normalized);
-            }
+        if let Some(normalized) = Self::normalized_sequential_route(effect, action_type) {
+            return self.execute_sequential_effect(gs, &normalized);
         }
 
         let result = match action_type {
@@ -247,16 +374,8 @@ impl AbilityResolver {
                 self.execute_draw_until_count(gs, effect);
                 Ok(())
             }
-            ActionType::DiscardCard => {
-                self.rule_log_activated(gs, "[[log_discard]]");
-                self.current_effect = Some(effect.clone());
-                self.execute_move_cards(gs, effect)
-            }
-            ActionType::MoveCards => {
-                self.rule_log_activated(gs, "[[log_move]]");
-                self.current_effect = Some(effect.clone());
-                self.execute_move_cards(gs, effect)
-            }
+            ActionType::DiscardCard => self.execute_logged_move(gs, effect, "[[log_discard]]"),
+            ActionType::MoveCards => self.execute_logged_move(gs, effect, "[[log_move]]"),
             ActionType::GainResource => self.execute_gain_resource(gs, effect),
             ActionType::ChangeState => self.execute_change_state(gs, effect),
             ActionType::ModifyScore => self.execute_modify_score(gs, effect),
@@ -406,36 +525,7 @@ impl AbilityResolver {
             }
             ActionType::ConditionalOptional => self.execute_conditional_on_optional(gs, effect),
         };
-        // Push effect verdict for non-structural action types
-        let is_structural = matches!(
-            effect.action,
-            ActionType::CompoundAction
-                | ActionType::Sequential
-                | ActionType::Choice
-                | ActionType::ConditionalAlternative
-                | ActionType::ConditionalOnResult
-                | ActionType::ConditionalOnOptional
-        );
-        if !is_structural {
-            #[cfg(not(feature = "no_std"))]
-            let val = effect
-                .count
-                .or(effect.value_any())
-                .map(|v| v.to_string())
-                .unwrap_or_default();
-            #[cfg(not(feature = "no_std"))]
-            let details = if !val.is_empty() {
-                format!("{} {}", effect.action, val)
-            } else {
-                effect.action.to_string()
-            };
-            #[cfg(not(feature = "no_std"))]
-            crate::ability::log::push_verdict(crate::ability::log::AbilityLogItem::Effect {
-                text: effect.text.to_string(),
-                action: effect.action.to_string(),
-                details,
-            });
-        }
+        Self::push_effect_verdict(effect);
         result
     }
 }

@@ -40,21 +40,6 @@ use crate::game_setup::{Action, ActionType};
 use crate::game_state::{GameState, Phase};
 use crate::player::Player;
 
-fn player_ref(gs: &GameState, me: u8) -> (&Player, &Player) {
-    if me == 0 {
-        (&gs.player1, &gs.player2)
-    } else {
-        (&gs.player2, &gs.player1)
-    }
-}
-
-fn player_of(gs: &GameState, me: u8) -> &Player {
-    if me == 0 {
-        &gs.player1
-    } else {
-        &gs.player2
-    }
-}
 
 fn env_weight(name: &str, default: f64) -> f64 {
     std::env::var(name)
@@ -104,7 +89,7 @@ fn total_blades_of(p: &Player, gs: &GameState, db: &CardDatabase) -> i32 {
 
 /// Passable lives under the buff-aware mean pool.
 fn passable_count_buffed(gs: &GameState, me: u8, db: &CardDatabase) -> usize {
-    let p = player_of(gs, me);
+    let p = gs.seat_player(me);
     let pool = heart_pool_buffed(gs, me, db, 1.0);
     hand_lives(p, db)
         .iter()
@@ -114,7 +99,7 @@ fn passable_count_buffed(gs: &GameState, me: u8, db: &CardDatabase) -> usize {
 
 /// Orientation fingerprint for the no-op breaker (waiting kills blades).
 fn wait_fingerprint(gs: &GameState, me: u8) -> Vec<bool> {
-    player_of(gs, me)
+    gs.seat_player(me)
         .stage
         .stage
         .iter()
@@ -132,7 +117,7 @@ fn wait_fingerprint(gs: &GameState, me: u8) -> Vec<bool> {
 /// only effect is granting blades (live-only) changes zone counts nowhere,
 /// but it feeds the flip model that converts blades into check passes.
 fn blade_mod_fingerprint(gs: &GameState, me: u8) -> Vec<i16> {
-    player_of(gs, me)
+    gs.seat_player(me)
         .stage
         .stage
         .iter()
@@ -174,7 +159,7 @@ pub fn score_actions(gs: &GameState, actions: &[Action], me: u8) -> Vec<(f64, St
     }
     let dbg = std::env::var("V7_DEBUG").is_ok();
     let db = &gs.card_database;
-    let my_now = player_of(gs, me);
+    let my_now = gs.seat_player(me);
     let base_hand_len = my_now.hand.cards.len() as i32;
     let base_passable = passable_count_buffed(gs, me, db);
     let base_ammo = lives_in_hand(my_now, db);
@@ -219,7 +204,7 @@ pub fn score_actions(gs: &GameState, actions: &[Action], me: u8) -> Vec<(f64, St
             continue;
         }
         crate::game_setup::settle_single_player_state(&mut sim);
-        let my_sim = player_of(&sim, me);
+        let my_sim = sim.seat_player(me);
 
         let mut val = 0.0f64;
         let mut parts: Vec<String> = Vec::new();
@@ -448,12 +433,8 @@ pub fn choose_live_set_v7(gs: &GameState, actions: &[Action], db: &CardDatabase)
     if std::env::var_os("V7_LIVE_LEGACY").is_none() {
         return choose_live_set_experiment(gs, actions, db);
     }
-    let me = if gs.active_player().id == gs.player1.id {
-        0u8
-    } else {
-        1u8
-    };
-    let (my, opp) = player_ref(gs, me);
+    let me = gs.active_player_index();
+    let (my, opp) = gs.seated_pair(me);
     let my_succ = my.success_live_card_zone.cards.len() as i32;
     let opp_succ = opp.success_live_card_zone.cards.len() as i32;
     let is_second = gs.current_phase == Phase::LiveCardSetSecondAttacker;
@@ -539,7 +520,7 @@ pub fn choose_live_set_v7(gs: &GameState, actions: &[Action], db: &CardDatabase)
 /// adding the next-safest while the whole bundle stays ≥0.85 pass. Returns
 /// empty when nothing clears the stance floor (caller falls back to gamble).
 fn safest_portfolio(gs: &GameState, me: u8, db: &CardDatabase) -> Vec<usize> {
-    let (my, opp) = player_ref(gs, me);
+    let (my, opp) = gs.seated_pair(me);
     let pool = heart_pool(gs, me, db);
     let board = heart_pool_inner(gs, me, db, 0.0);
     let lives = hand_lives(my, db);
@@ -667,7 +648,7 @@ fn safest_portfolio(gs: &GameState, me: u8, db: &CardDatabase) -> Vec<usize> {
 fn cheapest_deterministic_life(gs: &GameState, me: u8, db: &CardDatabase) -> Option<usize> {
     // Buff-aware pool (same accounting as the v7 main phase; equal to v6's
     // whenever no buff modifiers are active).
-    let (my, _) = player_ref(gs, me);
+    let (my, _) = gs.seated_pair(me);
     let pool = heart_pool_buffed(gs, me, db, 1.0);
     hand_lives(my, db)
         .into_iter()
@@ -687,7 +668,7 @@ type ExperimentPortfolio = (f64, i32, Vec<usize>);
 type ExperimentSingle = (f64, i32, usize, [i32; 11]);
 
 fn experiment_flip_categories(gs: &GameState, me: u8, db: &CardDatabase) -> (Vec<([i32; 8], usize)>, usize) {
-    let (my, _) = player_ref(gs, me);
+    let (my, _) = gs.seated_pair(me);
     let override_color = my.stage.stage.iter().find_map(|cid| {
         gs.mods.blade_type_modifiers.get(cid).copied()
             .map(crate::turn::live::blade_color_to_heart)
@@ -774,7 +755,7 @@ fn experiment_pass_probability(
 }
 
 fn experiment_board_pool(gs: &GameState, me: u8, db: &CardDatabase) -> [i32; 8] {
-    let (my, _) = player_ref(gs, me);
+    let (my, _) = gs.seated_pair(me);
     let hearts = my.stage.get_available_hearts(db, &gs.mods.heart_override,
         &gs.mods.heart_modifiers, &gs.mods.heart_color_multiplier, &gs.mods.heart_copy);
     let mut pool = [0i32; 8];
@@ -789,7 +770,7 @@ fn experiment_score_of(db: &CardDatabase, cid: i16) -> i32 {
 }
 
 fn experiment_lives(gs: &GameState, me: u8, db: &CardDatabase) -> Vec<(usize, i16, [i32; 11])> {
-    let (my, _) = player_ref(gs, me);
+    let (my, _) = gs.seated_pair(me);
     hand_lives(my, db).into_iter().map(|(hi, cid, _)| {
         let mut need = [0; 11];
         let base = db.get_card(cid).and_then(|card| card.need_heart.as_ref());
@@ -805,13 +786,13 @@ fn experiment_lives(gs: &GameState, me: u8, db: &CardDatabase) -> Vec<(usize, i1
 }
 
 fn experiment_blades(gs: &GameState, me: u8, db: &CardDatabase) -> i32 {
-    let (my, _) = player_ref(gs, me);
+    let (my, _) = gs.seated_pair(me);
     i32::from(my.stage.total_blades(db, &gs.mods.blade_modifiers,
         &gs.mods.orientation_modifiers, false))
 }
 
 fn experiment_junk_fill(gs: &GameState, me: u8, db: &CardDatabase, desired: &mut Vec<usize>) {
-    let (my, _) = player_ref(gs, me);
+    let (my, _) = gs.seated_pair(me);
     let deck_lives = my
         .main_deck
         .cards
@@ -861,7 +842,7 @@ fn experiment_portfolio_rank(
     me: u8,
     db: &CardDatabase,
 ) -> (Vec<ExperimentPortfolio>, Vec<ExperimentSingle>) {
-    let (my, _) = player_ref(gs, me);
+    let (my, _) = gs.seated_pair(me);
     let lives = hand_lives(my, db);
     let max_slots = usize::from(3u8.saturating_sub(my.live_card_set_limit_reduction));
     if lives.is_empty() || max_slots == 0 {
@@ -920,7 +901,7 @@ fn experiment_portfolio_rank(
             continue;
         }
         let p = experiment_pass_probability(&cats, deck_len, blades, &board, &need_total);
-        let (_, opp) = player_ref(gs, me);
+        let (_, opp) = gs.seated_pair(me);
         let floor = if opp.success_live_card_zone.cards.len() >= 2 {
             0.35
         } else if my.success_live_card_zone.cards.len() >= 2 {
@@ -943,12 +924,8 @@ fn experiment_portfolio_rank(
 }
 
 fn choose_live_set_experiment(gs: &GameState, actions: &[Action], db: &CardDatabase) -> Action {
-    let me = if gs.active_player().id == gs.player1.id {
-        0u8
-    } else {
-        1u8
-    };
-    let (my, opp) = player_ref(gs, me);
+    let me = gs.active_player_index();
+    let (my, opp) = gs.seated_pair(me);
     let my_succ = my.success_live_card_zone.cards.len();
     let opp_succ = opp.success_live_card_zone.cards.len();
     let is_second = gs.current_phase == Phase::LiveCardSetSecondAttacker;
