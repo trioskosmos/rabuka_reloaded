@@ -872,6 +872,243 @@ impl super::TurnEngine {
         game_state.player2.stage_hearts = Some(p2_stage);
     }
 
+    /// Pre-trigger score-modifier snapshots (flat maps) so LiveSuccess
+    /// deltas are measured without double-counting. ONE home for the two
+    /// `mods.*.iter().map(|(&k, e)| ...)` snapshots below.
+    fn snapshot_score_flats(
+        game_state: &GameState,
+    ) -> (
+        HashMap<i16, i32>,
+        HashMap<i16, HashMap<HeartColor, ModifierEntry>>,
+    ) {
+        // Capture pre-trigger score modifiers so we can avoid double-counting:
+        // calculate_live_score gets the PRE values, and pX_extra carries only
+        // the delta from LiveSuccess-triggered abilities.
+        let pre_score_flat: HashMap<i16, i32> = game_state
+            .mods
+            .score_modifiers
+            .iter()
+            .map(|(&k, e)| (k, e.total()))
+            .collect();
+        // Determine winner — use PRE-trigger modifiers so LiveSuccess
+        // triggered changes only apply via pX_extra (no double-count).
+        let need_heart_flat: HashMap<i16, HashMap<HeartColor, ModifierEntry>> =
+            game_state
+                .mods
+                .need_heart_modifiers
+                .iter()
+                .map(|(&k, colors)| {
+                    let flat: HashMap<HeartColor, ModifierEntry> =
+                        colors.iter().map(|(&c, e)| (c, *e)).collect();
+                    (k, flat)
+                })
+                .collect();
+        (pre_score_flat, need_heart_flat)
+    }
+
+    /// Per-snapshot heart surplus, computed BEFORE LiveSuccess abilities
+    /// fire (allocation is already finalised). Feeds color-filtered surplus
+    /// conditions (e.g. La Bella Patria heart04 >= 1, Q174).
+    fn compute_snapshot_surplus(
+        game_state: &mut GameState,
+        player2_id: &str,
+    ) {
+        for snap in &mut game_state.performance_snapshots {
+            let total_hearts: u8 = snap.total_hearts.iter().sum();
+            // Disjoint-field borrows (same shape as the inline original):
+            // compare ids without holding a whole-state borrow.
+            let is_p1 = snap.player_id == game_state.player1.id;
+            let player = if is_p1 {
+                &game_state.player1
+            } else {
+                &game_state.player2
+            };
+            let required: u8 = player
+                .live_card_zone
+                .cards
+                .iter()
+                .filter_map(|&id| game_state.card_database.get_card(id))
+                .filter_map(|c| c.need_heart.as_ref())
+                .flat_map(|nh| nh.hearts.values())
+                .sum();
+            let surplus = total_hearts.saturating_sub(required);
+            if snap.player_id == player2_id {
+                game_state.opponent_live_surplus_count = surplus;
+            } else {
+                game_state.self_live_surplus_count = surplus;
+            }
+            // NOTE: snap.lives[i].filled is NOT yet populated at this point —
+            // that happens later in this function. Derive filled from
+            // snap.breakdown.allocations, which are already finalised.
+            let mut per_color = [0u8; 8];
+            {
+                let mut filled_per_color = [0u8; 8];
+                for alloc in &snap.breakdown.allocations {
+                    if alloc.color < 8 {
+                        filled_per_color[alloc.color as usize] = filled_per_color
+                            [alloc.color as usize]
+                            .saturating_add(alloc.amount);
+                    }
+                }
+                for color in 0..8 {
+                    per_color[color] =
+                        snap.total_hearts[color].saturating_sub(filled_per_color[color]);
+                }
+            }
+            snap.surplus_hearts = per_color;
+        }
+        game_state.live_surplus_ready_this_turn = true;
+    }
+
+    /// Score delta since the pre-trigger snapshot for one side's live zone.
+    fn side_score_extra(
+        game_state: &GameState,
+        pre_score_flat: &HashMap<i16, i32>,
+        live_zone: &[i16],
+    ) -> u8 {
+        let score_cur: HashMap<i16, i32> = game_state
+            .mods
+            .score_modifiers
+            .iter()
+            .map(|(&k, e)| (k, e.total()))
+            .collect();
+        crate::constants::saturate_u8(Self::score_delta_since(
+            &score_cur,
+            pre_score_flat,
+            live_zone,
+        ))
+    }
+
+    /// LiveSuccess trigger orchestration across re-entries: restores saved
+    /// extras when both sides resolved, otherwise fires the pending side's
+    /// triggers and measures its score delta. Returns `None` when a choice
+    /// pends (caller must return early).
+    fn resolve_live_success_extras(
+        game_state: &mut GameState,
+        player1_id: &str,
+        player2_id: &str,
+        pre_score_flat: &HashMap<i16, i32>,
+    ) -> Option<(u8, u8)> {
+        // Q48: A live can be won even with total score 0 or less
+        // (score comparison determines the winner regardless of absolute value).
+        if game_state.live_success_triggered_this_turn && game_state.live_success_p2_fired {
+            // Re-entry after BOTH players' triggers already resolved.
+            // Restore saved extras (e.g. if a later auto-ability creates a choice).
+            return Some((
+                game_state.live_success_p1_extra,
+                game_state.live_success_p2_extra,
+            ));
+        }
+        if !game_state.live_success_triggered_this_turn {
+            // First entry: init state, process surplus, fire P1 triggers.
+            game_state.live_success_triggered_this_turn = true;
+            game_state.live_success_p2_fired = false;
+
+            Self::compute_snapshot_surplus(game_state, player2_id);
+
+            Self::trigger_live_success_abilities(game_state, player1_id);
+            Self::trigger_auto_abilities_for_player(game_state, player1_id);
+            game_state.process_pending_auto_abilities(player1_id);
+            if game_state.has_pending_choice() {
+                return None;
+            }
+            // each_time LIVE_SUCCESS triggers fire post-resolution
+            // in process_current_ability (abilities.rs)
+            let p1_extra = Self::side_score_extra(
+                game_state,
+                pre_score_flat,
+                &game_state.player1.live_card_zone.cards.clone(),
+            );
+            game_state.live_success_p1_extra = p1_extra;
+            game_state.live_success_p2_fired = true;
+        }
+        // P2 trigger block (shared between first entry and re-entry paths)
+        // Set flag BEFORE triggering so that if P2's ability creates a choice
+        // and the function returns early, P2 is not re-triggered on re-entry.
+        game_state.live_success_p2_fired = true;
+        Self::trigger_live_success_abilities(game_state, player2_id);
+        Self::trigger_auto_abilities_for_player(game_state, player2_id);
+        game_state.process_pending_auto_abilities(player2_id);
+        if game_state.has_pending_choice() {
+            return None;
+        }
+        // each_time LIVE_SUCCESS triggers fire post-resolution
+        // in process_current_ability (abilities.rs)
+        let p2_extra = Self::side_score_extra(
+            game_state,
+            pre_score_flat,
+            &game_state.player2.live_card_zone.cards.clone(),
+        );
+        game_state.live_success_p2_extra = p2_extra;
+        Some((game_state.live_success_p1_extra, p2_extra))
+    }
+
+    /// Debug-only per-snapshot performance lines for the rule log.
+    fn log_performance_summary(game_state: &mut GameState) {
+        if !ABILITY_DEBUG.load(Ordering::Relaxed) {
+            return;
+        }
+        for snap in &game_state.performance_snapshots {
+            let player = fmt_player_id(&snap.player_id);
+            let mut live_details = String::new();
+            for (i, live) in snap.lives.iter().enumerate() {
+                let live_result = if live.passed { "PASS" } else { "FAIL" };
+                if i > 0 {
+                    live_details.push_str(", ");
+                }
+                let _ = core::fmt::Write::write_fmt(
+                    &mut live_details,
+                    format_args!("live score+{} → {}", live.score, live_result),
+                );
+            }
+            let perf_result = if snap.success { "PASS" } else { "FAIL" };
+            let detail_str = if live_details.is_empty() {
+                String::new()
+            } else {
+                format!(" [{}]", live_details)
+            };
+            GameState::push_rule_log_to(
+                &mut game_state.rule_log,
+                format!(
+                    "[Turn {}] {} [[log_performance:score={},result={}]]{}",
+                    snap.turn, player, snap.total_score, perf_result, detail_str,
+                ),
+            );
+        }
+    }
+
+    /// Move live cards to success and apply Rule 8.4.13 (sole mover becomes
+    /// first attacker). Returns `(p1_now, p1_added, p2_now, p2_added)` for
+    /// the structured summary below.
+    fn move_to_success_and_update_attacker(
+        game_state: &mut GameState,
+        player1_won: bool,
+        player2_won: bool,
+    ) -> (usize, bool, usize, bool) {
+        let p1_before = game_state.player1.success_live_card_zone.cards.len();
+        let p2_before = game_state.player2.success_live_card_zone.cards.len();
+        log::debug!(
+            "[MULTI_DEBUG] About to call move_live_to_success p1_won={} p2_won={}",
+            player1_won,
+            player2_won
+        );
+        Self::move_live_to_success_and_handle_wins(game_state, player1_won, player2_won);
+
+        // Rule 8.4.13: If only one player moved a card to success this live, they become first attacker
+        let p1_now = game_state.player1.success_live_card_zone.cards.len();
+        let p2_now = game_state.player2.success_live_card_zone.cards.len();
+        let p1_added = p1_now > p1_before;
+        let p2_added = p2_now > p2_before;
+        if p1_added && !p2_added {
+            game_state.player1.is_first_attacker = true;
+            game_state.player2.is_first_attacker = false;
+        } else if p2_added && !p1_added {
+            game_state.player1.is_first_attacker = false;
+            game_state.player2.is_first_attacker = true;
+        }
+        (p1_now, p1_added, p2_now, p2_added)
+    }
+
     pub fn execute_live_victory_determination(game_state: &mut GameState) {
         Self::apply_deferred_reyell(game_state);
 
@@ -883,29 +1120,7 @@ impl super::TurnEngine {
         let player1_id = game_state.player1.id.clone();
         let player2_id = game_state.player2.id.clone();
 
-        // Capture pre-trigger score modifiers so we can avoid double-counting:
-        // calculate_live_score gets the PRE values, and pX_extra carries only
-        // the delta from LiveSuccess-triggered abilities.
-        let pre_score_flat: HashMap<i16, i32> = game_state
-            .mods
-            .score_modifiers
-            .iter()
-            .map(|(&k, e)| (k, e.total()))
-            .collect();
-
-        // Determine winner — use PRE-trigger modifiers so LiveSuccess
-        // triggered changes only apply via pX_extra (no double-count).
-        let need_heart_flat: HashMap<i16, HashMap<crate::card::HeartColor, ModifierEntry>> =
-            game_state
-                .mods
-                .need_heart_modifiers
-                .iter()
-                .map(|(&k, colors)| {
-                    let flat: HashMap<HeartColor, ModifierEntry> =
-                        colors.iter().map(|(&c, e)| (c, *e)).collect();
-                    (k, flat)
-                })
-                .collect();
+        let (pre_score_flat, need_heart_flat) = Self::snapshot_score_flats(game_state);
 
         // BUG#5: record per-seat outcomes BEFORE LiveSuccess triggers fire
         // (Q36: they resolve at determination timing and must see both
@@ -918,117 +1133,15 @@ impl super::TurnEngine {
 
         // Q48: A live can be won even with total score 0 or less
         // (score comparison determines the winner regardless of absolute value).
-        let p1_extra: u8;
-        let p2_extra: u8;
-        if game_state.live_success_triggered_this_turn && game_state.live_success_p2_fired {
-            // Re-entry after BOTH players' triggers already resolved.
-            // Restore saved extras (e.g. if a later auto-ability creates a choice).
-            p1_extra = game_state.live_success_p1_extra;
-            p2_extra = game_state.live_success_p2_extra;
-        } else {
-            if !game_state.live_success_triggered_this_turn {
-                // First entry: init state, process surplus, fire P1 triggers.
-                game_state.live_success_triggered_this_turn = true;
-                game_state.live_success_p2_fired = false;
-
-                for snap in &mut game_state.performance_snapshots {
-                    let total_hearts: u8 = snap.total_hearts.iter().sum();
-                    let player = if snap.player_id == player1_id {
-                        &game_state.player1
-                    } else {
-                        &game_state.player2
-                    };
-                    let required: u8 = player
-                        .live_card_zone
-                        .cards
-                        .iter()
-                        .filter_map(|&id| game_state.card_database.get_card(id))
-                        .filter_map(|c| c.need_heart.as_ref())
-                        .flat_map(|nh| nh.hearts.values())
-                        .sum();
-                    let surplus = total_hearts.saturating_sub(required);
-                    if snap.player_id == player2_id {
-                        game_state.opponent_live_surplus_count = surplus;
-                    } else {
-                        game_state.self_live_surplus_count = surplus;
-                    }
-                    // Compute per-color surplus NOW, before LiveSuccess abilities fire.
-                    // Allocation is already finalised (performance phase completed).
-                    // snap.surplus_hearts is read by color-filtered surplus conditions
-                    // (e.g. La Bella Patria heart04 >= 1, Q174).
-                    // NOTE: snap.lives[i].filled is NOT yet populated at this point —
-                    // that happens later in this function. Derive filled from
-                    // snap.breakdown.allocations, which are already finalised.
-                    let mut per_color = [0u8; 8];
-                    {
-                        let mut filled_per_color = [0u8; 8];
-                        for alloc in &snap.breakdown.allocations {
-                            if alloc.color < 8 {
-                                filled_per_color[alloc.color as usize] = filled_per_color
-                                    [alloc.color as usize]
-                                    .saturating_add(alloc.amount);
-                            }
-                        }
-                        for color in 0..8 {
-                            per_color[color] =
-                                snap.total_hearts[color].saturating_sub(filled_per_color[color]);
-                        }
-                    }
-                    snap.surplus_hearts = per_color;
-                }
-                game_state.live_surplus_ready_this_turn = true;
-
-                Self::trigger_live_success_abilities(game_state, &player1_id);
-                Self::trigger_auto_abilities_for_player(game_state, &player1_id);
-                game_state.process_pending_auto_abilities(&player1_id);
-                if game_state.has_pending_choice() {
-                    return;
-                }
-                // each_time LIVE_SUCCESS triggers fire post-resolution
-                // in process_current_ability (abilities.rs)
-                let score_cur: HashMap<i16, i32> = game_state
-                    .mods
-                    .score_modifiers
-                    .iter()
-                    .map(|(&k, e)| (k, e.total()))
-                    .collect();
-                p1_extra = crate::constants::saturate_u8(Self::score_delta_since(
-                    &score_cur,
-                    &pre_score_flat,
-                    &game_state.player1.live_card_zone.cards,
-                ));
-                game_state.live_success_p1_extra = p1_extra;
-                game_state.live_success_p2_fired = true;
-            } else {
-                // Re-entry after P1 triggers resolved but P2 still pending.
-                p1_extra = game_state.live_success_p1_extra;
-            }
-
-            // P2 trigger block (shared between first entry and re-entry paths)
-            // Set flag BEFORE triggering so that if P2's ability creates a choice
-            // and the function returns early, P2 is not re-triggered on re-entry.
-            game_state.live_success_p2_fired = true;
-            Self::trigger_live_success_abilities(game_state, &player2_id);
-            Self::trigger_auto_abilities_for_player(game_state, &player2_id);
-            game_state.process_pending_auto_abilities(&player2_id);
-            if game_state.has_pending_choice() {
-                return;
-            }
-            // each_time LIVE_SUCCESS triggers fire post-resolution
-            // in process_current_ability (abilities.rs)
-            let score_cur2: HashMap<i16, i32> = game_state
-                .mods
-                .score_modifiers
-                .iter()
-                .map(|(&k, e)| (k, e.total()))
-                .collect();
-            p2_extra = crate::constants::saturate_u8(Self::score_delta_since(
-                &score_cur2,
-                &pre_score_flat,
-                &game_state.player2.live_card_zone.cards,
-            ));
-            game_state.live_success_p2_extra = p2_extra;
-        }
+        let (p1_extra, p2_extra) = match Self::resolve_live_success_extras(
+            game_state,
+            &player1_id,
+            &player2_id,
+            &pre_score_flat,
+        ) {
+            Some(extras) => extras,
+            None => return,
+        };
 
         // Drain any remaining LiveSuccess auto-abilities (choice-gated re-entries)
         if Self::drain_pending_live_success_choices(game_state, &player1_id, &player2_id) {
@@ -1073,36 +1186,7 @@ impl super::TurnEngine {
         Self::compute_surplus_and_flags(game_state, player1_won, player2_won, &player1_id, &player2_id);
 
         // Push performance summary to rule log
-
-        if ABILITY_DEBUG.load(Ordering::Relaxed) {
-            for snap in &game_state.performance_snapshots {
-                let player = fmt_player_id(&snap.player_id);
-                let mut live_details = String::new();
-                for (i, live) in snap.lives.iter().enumerate() {
-                    let live_result = if live.passed { "PASS" } else { "FAIL" };
-                    if i > 0 {
-                        live_details.push_str(", ");
-                    }
-                    let _ = core::fmt::Write::write_fmt(
-                        &mut live_details,
-                        format_args!("live score+{} → {}", live.score, live_result),
-                    );
-                }
-                let perf_result = if snap.success { "PASS" } else { "FAIL" };
-                let detail_str = if live_details.is_empty() {
-                    String::new()
-                } else {
-                    format!(" [{}]", live_details)
-                };
-                GameState::push_rule_log_to(
-                    &mut game_state.rule_log,
-                    format!(
-                        "[Turn {}] {} [[log_performance:score={},result={}]]{}",
-                        snap.turn, player, snap.total_score, perf_result, detail_str,
-                    ),
-                );
-            }
-        }
+        Self::log_performance_summary(game_state);
 
         // NOTE: cannot-place restrictions (メビウスループ PL!S-pb1-022-L) are NOT
         // pre-discarded here. Their conditions (「合計スコアが同じ場合」) are
@@ -1110,27 +1194,8 @@ impl super::TurnEngine {
         // dynamic prohibition_effects entry and move_live_to_success_and_
         // handle_wins routes the card to the waitroom via can_place_card_in_zone;
         // untied, no prohibition exists and the winner places normally.
-        let p1_before = game_state.player1.success_live_card_zone.cards.len();
-        let p2_before = game_state.player2.success_live_card_zone.cards.len();
-        log::debug!(
-            "[MULTI_DEBUG] About to call move_live_to_success p1_won={} p2_won={}",
-            player1_won,
-            player2_won
-        );
-        Self::move_live_to_success_and_handle_wins(game_state, player1_won, player2_won);
-
-        // Rule 8.4.13: If only one player moved a card to success this live, they become first attacker
-        let p1_now = game_state.player1.success_live_card_zone.cards.len();
-        let p2_now = game_state.player2.success_live_card_zone.cards.len();
-        let p1_added = p1_now > p1_before;
-        let p2_added = p2_now > p2_before;
-        if p1_added && !p2_added {
-            game_state.player1.is_first_attacker = true;
-            game_state.player2.is_first_attacker = false;
-        } else if p2_added && !p1_added {
-            game_state.player1.is_first_attacker = false;
-            game_state.player2.is_first_attacker = true;
-        }
+        let (p1_now, p1_added, p2_now, p2_added) =
+            Self::move_to_success_and_update_attacker(game_state, player1_won, player2_won);
 
         // ── Structured live-check summary (one line: verdict + both sides).
         // Only the engine knows pass/fail/scores — emit them here so replays
