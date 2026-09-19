@@ -149,6 +149,15 @@ impl ResumeSnapshot {
     }
 }
 
+/// A resolved activatable ability: index, parsed ability, and the zone
+/// it activates from. Shared by the printed-ability and gained-ability
+/// paths of `handle_use_ability`.
+struct AbilityActivation {
+    idx: usize,
+    ability: crate::Arc<crate::card::Ability>,
+    loc: Zone,
+}
+
 impl super::TurnEngine {
     pub fn execute_main_phase_action(
         game_state: &mut GameState,
@@ -326,6 +335,128 @@ impl super::TurnEngine {
         }
     }
 
+    /// Zone an activation ability plays from: explicit location condition
+    /// (hand/discard) or stage by default.
+    fn activation_location(ability: &crate::card::Ability) -> Zone {
+        ability
+            .effect
+            .as_ref()
+            .and_then(|e| e.activation_condition_parsed_any())
+            .and_then(|c| {
+                if c.condition_type() == Some(ConditionType::LocationCondition)
+                    || matches!(c.get_location(), Some("hand") | Some("discard"))
+                {
+                    Zone::from_str(c.get_location().unwrap_or(""))
+                } else {
+                    None
+                }
+            })
+            .unwrap_or(Zone::Stage)
+    }
+
+    /// Can this card activate this ability from `loc` right now?
+    fn can_activate_at_location(
+        player: &crate::player::Player,
+        ability: &crate::card::Ability,
+        card_id: i16,
+        loc: Zone,
+    ) -> bool {
+        match loc {
+            Zone::Hand => player.hand.cards.contains(&card_id),
+            Zone::Discard => player.waitroom.cards.contains(&card_id),
+            Zone::Stage => {
+                let stage_position =
+                    player.stage.stage.iter().position(|&id| id == card_id);
+                if let Some(pos) = stage_position {
+                    let stage_area = crate::ability::util::pos_to_area(pos);
+                    crate::zones::check_trigger_position(
+                        ability.triggers.as_deref(),
+                        stage_area,
+                    ) && crate::zones::check_effect_position(
+                        ability
+                            .effect
+                            .as_ref()
+                            .and_then(|e| e.activation_position_any()),
+                        stage_area,
+                    )
+                } else {
+                    false
+                }
+            }
+            _ => false,
+        }
+    }
+
+    /// Mandatory-cost affordability pre-check: same evaluator as generation
+    /// (rules 9.6.2.3 — an unpayable cost is not a legal activation).
+    /// Optional payments may be skipped, so they never block here.
+    fn check_mandatory_activation_cost(
+        game_state: &GameState,
+        player_id: &str,
+        ability: &crate::card::Ability,
+        active_energy: u8,
+    ) -> Result<(), String> {
+        if let Some(ref cost) = ability.cost {
+            let groups = game_state.distinct_stage_groups(player_id);
+            let effective =
+                game_state.effective_activation_cost_for(cost, groups) as u32;
+            if !cost.has_optional_payment() && effective > u32::from(active_energy) {
+                return Err(format!(
+                    "Cannot activate: cost {} energy exceeds active {}",
+                    effective, active_energy
+                ));
+            }
+        }
+        Ok(())
+    }
+
+    /// Gained-ability fallback: an Activation trigger granted to this card
+    /// by another effect (indexed past GAINED_ABILITY_INDEX_BASE).
+    fn find_gained_activation(
+        game_state: &GameState,
+        player: &crate::player::Player,
+        card_id: i16,
+    ) -> Option<AbilityActivation> {
+        let (gained_idx, gained) = game_state
+            .gained_card_abilities
+            .get(&card_id)
+            .and_then(|list| {
+                list.iter()
+                    .enumerate()
+                    .find(|(_, a)| a.has_trigger(crate::triggers::TriggerKind::Activation))
+                    .map(|(i, a)| (i, a.clone()))
+            })?;
+        if !player.stage.stage.contains(&card_id) {
+            return None;
+        }
+        Some(AbilityActivation {
+            idx: crate::ability::types::GAINED_ABILITY_INDEX_BASE + gained_idx,
+            ability: crate::Arc::new(gained),
+            loc: Zone::Stage,
+        })
+    }
+
+    /// Queue id for the activation: gained abilities use the
+    /// "card_no_gained_{idx}" format so trigger_auto_ability's
+    /// gained-ability code path can find and enqueue them.
+    fn activation_ability_id(
+        game_state: &GameState,
+        card_no: &str,
+        card_id: i16,
+        idx: usize,
+        ability: &crate::card::Ability,
+    ) -> String {
+        if let Some(gidx) = crate::ability::types::gained_ability_index(idx) {
+            debug_assert!(
+                game_state.gained_card_abilities.contains_key(&card_id),
+                "gained ability index but no gained_card_abilities entry"
+            );
+            format!("{}_gained_{}", card_no, gidx)
+        } else {
+            format!("{}_{}", card_no, ability.full_text)
+        }
+    }
+
     fn handle_use_ability(
         game_state: &mut GameState,
         card_id: Option<i16>,
@@ -352,12 +483,6 @@ impl super::TurnEngine {
             "P2"
         };
 
-        struct AbilityActivation {
-            idx: usize,
-            ability: crate::Arc<crate::card::Ability>,
-            loc: Zone,
-        }
-
         // Find the requested ability, or the first one for legacy callers, that can
         // be activated from the current location.
         let mut ability_to_activate: Option<AbilityActivation> = None;
@@ -367,20 +492,7 @@ impl super::TurnEngine {
             }
             let ability = ar.resolve();
             if ability.has_trigger(crate::triggers::TriggerKind::Activation) {
-                let loc = ability
-                    .effect
-                    .as_ref()
-                    .and_then(|e| e.activation_condition_parsed_any())
-                    .and_then(|c| {
-                        if c.condition_type() == Some(ConditionType::LocationCondition)
-                            || matches!(c.get_location(), Some("hand") | Some("discard"))
-                        {
-                            Zone::from_str(c.get_location().unwrap_or(""))
-                        } else {
-                            None
-                        }
-                    })
-                    .unwrap_or(Zone::Stage);
+                let loc = Self::activation_location(&ability);
 
                 log::debug!(
                     "[ACTIVATE_CHECK] ability idx={} triggers={:?} loc={:?} card_pos={:?}",
@@ -389,60 +501,24 @@ impl super::TurnEngine {
                     loc,
                     player.stage.stage.iter().position(|&id| id == card_id)
                 );
-                let can_activate = match loc {
-                    Zone::Hand => player.hand.cards.contains(&card_id),
-                    Zone::Discard => player.waitroom.cards.contains(&card_id),
-                    Zone::Stage => {
-                        let stage_position =
-                            player.stage.stage.iter().position(|&id| id == card_id);
-                        if let Some(pos) = stage_position {
-                            let stage_area = crate::ability::util::pos_to_area(pos);
-                            crate::zones::check_trigger_position(
-                                ability.triggers.as_deref(),
-                                stage_area,
-                            ) && crate::zones::check_effect_position(
-                                ability
-                                    .effect
-                                    .as_ref()
-                                    .and_then(|e| e.activation_position_any()),
-                                stage_area,
-                            )
-                        } else {
-                            false
-                        }
-                    }
-                    _ => false,
-                };
-
-                if can_activate {
+                if Self::can_activate_at_location(&player, &ability, card_id, loc) {
                     // Check use limit
                     if let Some(use_limit) = ability.use_limit {
                         let key = (card_id, idx, game_state.turn_number);
-                        let used = game_state
-                            .turn_limited_abilities_used
-                            .get(&key)
-                            .copied()
-                            .unwrap_or(0);
-                        if used >= use_limit {
+                        if !crate::ability::util::ability_under_use_limit(
+                            game_state,
+                            &key,
+                            use_limit,
+                        ) {
                             continue;
                         }
                     }
-                    // Mandatory-cost affordability pre-check: same evaluator
-                    // as generation (rules 9.6.2.3  Ean unpayable cost is not
-                    // a legal activation). Optional payments may be skipped,
-                    // so they never block here.
-                    if let Some(ref cost) = ability.cost {
-                        let groups = game_state.distinct_stage_groups(&player_id);
-                        let effective =
-                            game_state.effective_activation_cost_for(cost, groups) as u32;
-                        let active = player.energy_zone.active_count();
-                        if !cost.has_optional_payment() && effective > u32::from(active) {
-                            return Err(format!(
-                                "Cannot activate: cost {} energy exceeds active {}",
-                                effective, active
-                            ));
-                        }
-                    }
+                    Self::check_mandatory_activation_cost(
+                        game_state,
+                        &player_id,
+                        &ability,
+                        player.energy_zone.active_count(),
+                    )?;
                     ability_to_activate = Some(AbilityActivation { idx, ability, loc });
                     break;
                 }
@@ -450,24 +526,7 @@ impl super::TurnEngine {
         }
 
         if ability_to_activate.is_none() {
-            if let Some(gained) = game_state
-                .gained_card_abilities
-                .get(&card_id)
-                .and_then(|list| {
-                    list.iter()
-                        .enumerate()
-                        .find(|(_, a)| a.has_trigger(crate::triggers::TriggerKind::Activation))
-                        .map(|(i, a)| (i, a.clone()))
-                })
-            {
-                if player.stage.stage.contains(&card_id) {
-                    ability_to_activate = Some(AbilityActivation {
-                        idx: crate::ability::types::GAINED_ABILITY_INDEX_BASE + gained.0,
-                        ability: crate::Arc::new(gained.1),
-                        loc: Zone::Stage,
-                    });
-                }
-            }
+            ability_to_activate = Self::find_gained_activation(game_state, player, card_id);
         }
 
         let AbilityActivation { ability, loc, idx } = ability_to_activate
@@ -487,15 +546,8 @@ impl super::TurnEngine {
         // Gained abilities use the "card_no_gained_{idx}" format so
         // trigger_auto_ability's gained-ability code path (line ~683)
         // can find and enqueue them.
-        let ability_id = if let Some(gidx) = crate::ability::types::gained_ability_index(idx) {
-            debug_assert!(
-                game_state.gained_card_abilities.contains_key(&card_id),
-                "gained ability index but no gained_card_abilities entry"
-            );
-            format!("{}_gained_{}", card.card_no, gidx)
-        } else {
-            format!("{}_{}", card.card_no, ability.full_text)
-        };
+        let ability_id =
+            Self::activation_ability_id(game_state, &card.card_no, card_id, idx, &ability);
         game_state.trigger_auto_ability(
             ability_id,
             crate::game_state::AbilityTrigger::Activation,

@@ -1,6 +1,6 @@
 use crate::core::constants::U8Count;
 use super::enums::{ActionType, Zone};
-use crate::card::{parse_heart_color, AbilityFilter, CardDatabase, DistinctType, Operator};
+use crate::card::{parse_heart_color, Ability, AbilityFilter, CardDatabase, DistinctType, Operator};
 use crate::{HashMap, HashSet};
 #[cfg(feature = "no_std")]
 use alloc::{
@@ -23,6 +23,64 @@ pub use selection::{classify_selection, get_selection_indices, resolve_selection
 
 // Labels, heart gains and constant per_unit live in `util/{labels,hearts}`.
 // (Bodies moved out; re-exported at the top of this file.)
+
+// ============== ABILITY ACTIVATION GATES ==============
+// Shared predicates for "can this ability be offered/activated": used by
+// action generation (game_setup.rs) AND activation handling
+// (turn/actions). ONE definition — the engine must never offer an action
+// it would then refuse to execute (or vice versa).
+
+/// Main/Activation/Auto-with-cost/BatonTouch triggers make an ability
+/// activatable in the main phase.
+pub fn ability_trigger_can_activate(ability: &Ability) -> bool {
+    ability.has_trigger(crate::triggers::TriggerKind::Main)
+        || ability.has_trigger(crate::triggers::TriggerKind::Activation)
+        || (ability.has_trigger(crate::triggers::TriggerKind::Auto) && ability.cost.is_some())
+        || ability.has_trigger(crate::triggers::TriggerKind::BatonTouch)
+}
+
+/// Turn-limit gate: true while the ability may still be used this turn.
+pub fn ability_under_use_limit(
+    game_state: &crate::game_state::GameState,
+    key: &(i16, usize, u8),
+    use_limit: u8,
+) -> bool {
+    let used = game_state
+        .turn_limited_abilities_used
+        .get(key)
+        .copied()
+        .unwrap_or(0);
+    u8::from(used) < use_limit
+}
+
+/// True when the ability activates from the discard pile
+/// (activation_condition_parsed with location = discard). The stage scan
+/// skips these; the discard scan requires them.
+pub fn activates_from_discard(ability: &Ability) -> bool {
+    ability
+        .effect
+        .as_ref()
+        .and_then(|e| e.activation_condition_parsed_any())
+        .is_some_and(|c| {
+            Zone::from_str(c.get_location().unwrap_or("")) == Some(Zone::Discard)
+        })
+}
+
+/// Effective activation cost (printed, payable): mandatory unpayable costs
+/// are withheld by the caller, optional-payment ones stay offered.
+pub fn ability_effective_cost(
+    game_state: &crate::game_state::GameState,
+    ability: &Ability,
+    groups: u8,
+) -> (u8, u8) {
+    match ability.cost.as_ref() {
+        Some(c) => (
+            c.energy_cost_total() as u8,
+            game_state.effective_activation_cost_for(c, groups) as u8,
+        ),
+        None => (0, 0),
+    }
+}
 
 // ============== MODIFY COST ==============
 

@@ -1445,59 +1445,6 @@ fn has_cannot_baton_touch(
     crate::ability::util::has_cannot_baton_touch_protection(card_db, card_id, existing_card)
 }
 
-/// Main/Activation/Auto-with-cost/BatonTouch triggers make an ability
-/// activatable in the main phase. ONE predicate shared by the stage and
-/// discard scans in `generate_main_phase_actions` below.
-fn ability_trigger_can_activate(ability: &crate::card::Ability) -> bool {
-    ability.has_trigger(crate::triggers::TriggerKind::Main)
-        || ability.has_trigger(crate::triggers::TriggerKind::Activation)
-        || (ability.has_trigger(crate::triggers::TriggerKind::Auto) && ability.cost.is_some())
-        || ability.has_trigger(crate::triggers::TriggerKind::BatonTouch)
-}
-
-/// Turn-limit gate: true while the ability may still be used this turn.
-fn ability_under_use_limit(
-    game_state: &GameState,
-    key: &(i16, usize, u8),
-    use_limit: u8,
-) -> bool {
-    let used = game_state
-        .turn_limited_abilities_used
-        .get(key)
-        .copied()
-        .unwrap_or(0);
-    u8::from(used) < use_limit
-}
-
-/// True when the ability activates from the discard pile
-/// (activation_condition_parsed with location = discard). The stage scan
-/// skips these; the discard scan requires them.
-fn activates_from_discard(ability: &crate::card::Ability) -> bool {
-    ability
-        .effect
-        .as_ref()
-        .and_then(|e| e.activation_condition_parsed_any())
-        .is_some_and(|c| {
-            Zone::from_str(c.get_location().unwrap_or("")) == Some(Zone::Discard)
-        })
-}
-
-/// Effective activation cost (printed, payable): mandatory unpayable costs
-/// are withheld by the caller, optional-payment ones stay offered.
-fn ability_effective_cost(
-    game_state: &GameState,
-    ability: &crate::card::Ability,
-    groups: u8,
-) -> (u8, u8) {
-    match ability.cost.as_ref() {
-        Some(c) => (
-            c.energy_cost_total() as u8,
-            game_state.effective_activation_cost_for(c, groups) as u8,
-        ),
-        None => (0, 0),
-    }
-}
-
 fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
     #[cfg(not(feature = "no_std"))]
     let _timer = crate::timer::Timer::start("generate_main_phase_actions");
@@ -1861,7 +1808,7 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
             let card_position: MemberArea = area_name.parse().unwrap_or(MemberArea::Center);
             for (ability_index, ar) in card.abilities.iter().enumerate() {
                 let ability = ar.resolve();
-                if !ability_trigger_can_activate(&ability) {
+                if !crate::ability::util::ability_trigger_can_activate(&ability) {
                     continue;
                 }
                 if !crate::zones::check_trigger_position(ability.triggers.as_deref(), card_position)
@@ -1879,13 +1826,13 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                 }
 
                 // Skip abilities that can only activate from the discard pile
-                if activates_from_discard(&ability) {
+                if crate::ability::util::activates_from_discard(&ability) {
                     continue;
                 }
 
                 let ability_key = (card_id, ability_index, game_state.turn_number);
                 if let Some(use_limit) = ability.use_limit {
-                    if !ability_under_use_limit(game_state, &ability_key, use_limit) {
+                    if !crate::ability::util::ability_under_use_limit(game_state, &ability_key, use_limit) {
                         continue;
                     }
                 }
@@ -1902,7 +1849,7 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                 // optional-payment components keep the ability offered so the
                 // player can skip just that part (wakana bp2-008).
                 let (base_cost, effective_cost) =
-                    ability_effective_cost(game_state, &ability, groups);
+                    crate::ability::util::ability_effective_cost(game_state, &ability, groups);
                 if let Some(c) = ability.cost.as_ref() {
                     if !c.has_optional_payment()
                         && effective_cost > active_player.energy_zone.active_count()
@@ -1969,16 +1916,16 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
         if let Some(card) = game_state.card_database.get_card(card_id) {
             for (ability_index, ar) in card.abilities.iter().enumerate() {
                 let ability = ar.resolve();
-                if !activates_from_discard(&ability) {
+                if !crate::ability::util::activates_from_discard(&ability) {
                     continue;
                 }
-                if !ability_trigger_can_activate(&ability) {
+                if !crate::ability::util::ability_trigger_can_activate(&ability) {
                     continue;
                 }
 
                 let ability_key = (card_id, ability_index, game_state.turn_number);
                 if let Some(use_limit) = ability.use_limit {
-                    if !ability_under_use_limit(game_state, &ability_key, use_limit) {
+                    if !crate::ability::util::ability_under_use_limit(game_state, &ability_key, use_limit) {
                         continue;
                     }
                 }
@@ -1986,7 +1933,7 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                 // Same effective-cost gate as stage activations: mandatory
                 // unpayable costs are withheld, optional ones stay offered.
                 let (base_cost, effective_cost) =
-                    ability_effective_cost(game_state, &ability, groups);
+                    crate::ability::util::ability_effective_cost(game_state, &ability, groups);
                 if let Some(c) = ability.cost.as_ref() {
                     if !c.has_optional_payment()
                         && effective_cost > active_player.energy_zone.active_count()
