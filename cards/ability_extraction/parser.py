@@ -121,6 +121,7 @@ from cost_parser import (
     parse_cost,
 )
 from parser_fields import (
+    apply_group_exclusions,
     detect_position_matches,
     detect_positions,
     detect_icon_positions,
@@ -4955,8 +4956,23 @@ def _extract_resource_fields(condition, text):
             condition["count"] = sc
 
 
-def _extract_generic_fields(condition, text):
-    """Extract all generic fields from text into condition dict (no early return)."""
+# Ordered movement markers for conditions: first match wins.
+# Same order as the legacy if-chain.
+_CONDITION_MOVEMENT_RULES = (
+    ("移動した", "moved"),
+    ("移動する", "moves"),
+)
+
+# Ordered distinct markers for conditions: first match wins.
+# Same order as the legacy if-chain.
+_DISTINCT_MARKER_RULES = (
+    (("コストがそれぞれ異なる",), "cost"),
+    (("名前が異なる", "名前の異なる", "カード名が異なる"), "card_name"),
+    (("グループ名が異なる", "グループ名がそれぞれ異なる"), "group_name"),
+)
+
+
+def _extract_character_names(condition, text):
     # Character names: 「A」か「B」か「C」がいる, 「A」と「B」がいる,
     # 「A」、「B」、「C」のうち (any number of names with か/と/、 separators)
     cm = re.search(r"((?:「[^」]+」[とか、]? ?)+)(?:」?がいる|」?のうち)", text)
@@ -4980,6 +4996,8 @@ def _extract_generic_fields(condition, text):
             if more:
                 condition["characters"] = list(more.groups())
 
+
+def _extract_condition_card_names(condition, text):
     # Card name filter: カード名に「DreamBelievers」を含む
     cn = re.search(r"カード名に「([^」]+)」を含む", text)
     if cn:
@@ -4990,11 +5008,8 @@ def _extract_generic_fields(condition, text):
     if cn_exact:
         condition["card_names"] = [cn_exact.group(1)]
 
-    # Group/unit names: 『虹ヶ咲』 etc.
-    gns = extract_all_groups(text)
-    if gns:
-        condition["group_names"] = gns
 
+def _extract_target_location(condition, text):
     # Use positional check for non-contiguous comparison patterns
     # Target
     tgt = extract_target(text)
@@ -5023,6 +5038,8 @@ def _extract_generic_fields(condition, text):
     ):
         condition["location"] = "under_member"
 
+
+def _extract_ability_filter(condition, text):
     # Ability filter: has ability / no ability
     if "能力を持つ" in text and "能力を持たない" not in text:
         condition["ability_filter"] = "has_ability"
@@ -5041,6 +5058,82 @@ def _extract_generic_fields(condition, text):
                 condition["ability_filter_triggers"] = [t[1] for t in triggers]
         else:
             condition["ability_filter"] = "no_ability"
+
+
+def _extract_self_markers(condition, text):
+    # Self-location check: "このカードが...にある" — condition checks if THIS SPECIFIC
+    # CARD is in the zone, not just "any card". Set check_self = True to distinguish
+    # from generic presence checks.
+    if "このカードが" in text and re.search(r"に(ある|いる)", text):
+        condition["check_self"] = True
+    # check_self conditions check a specific card's location — heart_colors on
+    # the condition is effect metadata leaked by the parser. Strip it here.
+    if condition.get("check_self") and "heart_colors" in condition:
+        del condition["heart_colors"]
+
+    # Self-target: "このメンバーが" / "このメンバーは" / "このカードが" / "このカードは"
+    # (without "以外") means the condition refers to this specific card.
+    # Uses self_target (distinct from target="self" which can come from
+    # extract_target's "自分の" zone-reference match).
+    if re.search(r"この(メンバー|カード)[がは]", text) and "以外" not in text:
+        condition["self_target"] = True
+
+    # Includes
+    if "含む" in text and "その中に" in text:
+        condition["includes"] = True
+        condition["includes_pattern"] = "nested"
+
+
+def _extract_movement_marker(condition, text):
+    # Movement
+    for phrase, movement in _CONDITION_MOVEMENT_RULES:
+        if phrase in text:
+            condition["movement"] = movement
+            break
+    # "置かれた" (was placed) — single-location self_target triggers
+    # (multi-location "置かれた" like discard-from-stage use the engine's
+    # 2-locations mechanism and should NOT get movement:"moved")
+    if "置かれた" in text and "locations" not in condition:
+        condition["movement"] = "moved"
+
+
+def _extract_distinct_marker(condition, text):
+    # Distinct flags
+    for phrases, distinct in _DISTINCT_MARKER_RULES:
+        if any(kw in text for kw in phrases):
+            condition["distinct"] = distinct
+            return
+
+
+def _extract_group_scope(condition, text):
+    # Group
+    gns = extract_all_groups(text)
+    if gns:
+        condition["group_names"] = gns
+    # Exclude group (以外)
+    apply_group_exclusions(condition, text)
+    # Detect "のみ" (only/all members must match the group)
+    if gns:
+        if "のみの場合" in text or (
+            "のみ" in text
+            and ("ステージ" in text or "メンバー" in text or "カードが" in text)
+        ):
+            condition["all_members"] = True
+
+
+def _extract_generic_fields(condition, text):
+    """Extract all generic fields from text into condition dict (no early return)."""
+    _extract_character_names(condition, text)
+    _extract_condition_card_names(condition, text)
+
+    # Group/unit names: 『虹ヶ咲』 etc. (reconciled with exclusions later in
+    # _extract_group_scope; this early pass feeds the middle blocks below)
+    gns = extract_all_groups(text)
+    if gns:
+        condition["group_names"] = gns
+
+    _extract_target_location(condition, text)
+    _extract_ability_filter(condition, text)
 
     # Delta tracking for surplus heart loss ("これにより失っている場合")
     if "失っている" in text and "これにより" in text:
@@ -5074,38 +5167,8 @@ def _extract_generic_fields(condition, text):
     ):
         condition["negation"] = True
 
-    # Self-location check: "このカードが...にある" — condition checks if THIS SPECIFIC
-    # CARD is in the zone, not just "any card". Set check_self = True to distinguish
-    # from generic presence checks.
-    if "このカードが" in text and re.search(r"に(ある|いる)", text):
-        condition["check_self"] = True
-    # check_self conditions check a specific card's location — heart_colors on
-    # the condition is effect metadata leaked by the parser. Strip it here.
-    if condition.get("check_self") and "heart_colors" in condition:
-        del condition["heart_colors"]
-
-    # Self-target: "このメンバーが" / "このメンバーは" / "このカードが" / "このカードは"
-    # (without "以外") means the condition refers to this specific card.
-    # Uses self_target (distinct from target="self" which can come from
-    # extract_target's "自分の" zone-reference match).
-    if re.search(r"この(メンバー|カード)[がは]", text) and "以外" not in text:
-        condition["self_target"] = True
-
-    # Includes
-    if "含む" in text and "その中に" in text:
-        condition["includes"] = True
-        condition["includes_pattern"] = "nested"
-
-    # Movement
-    if "移動した" in text:
-        condition["movement"] = "moved"
-    elif "移動する" in text:
-        condition["movement"] = "moves"
-    # "置かれた" (was placed) — single-location self_target triggers
-    # (multi-location "置かれた" like discard-from-stage use the engine's
-    # 2-locations mechanism and should NOT get movement:"moved")
-    if "置かれた" in text and "locations" not in condition:
-        condition["movement"] = "moved"
+    _extract_self_markers(condition, text)
+    _extract_movement_marker(condition, text)
 
     # Cost limit (e.g., "コスト10以上" → cost_limit=10, cost_limit_operator=">=")
     cl_op = extract_cost_limit_with_operator(text)
@@ -5128,12 +5191,7 @@ def _extract_generic_fields(condition, text):
             break
 
     # Distinct flags
-    if "コストがそれぞれ異なる" in text:
-        condition["distinct"] = "cost"
-    elif any(kw in text for kw in ["名前が異なる", "名前の異なる", "カード名が異なる"]):
-        condition["distinct"] = "card_name"
-    elif "グループ名が異なる" in text or "グループ名がそれぞれ異なる" in text:
-        condition["distinct"] = "group_name"
+    _extract_distinct_marker(condition, text)
 
     # All areas
     if "エリアすべて" in text:
@@ -5158,26 +5216,7 @@ def _extract_generic_fields(condition, text):
     if vm:
         condition["values"] = [int(v) for v in re.findall(r"\d+", vm.group(0))]
 
-    # Group
-    gns = extract_all_groups(text)
-    if gns:
-        condition["group_names"] = gns
-    # Exclude group (以外)
-    exc_gns = re.findall(r"『([^』]+)』以外", text)
-    if exc_gns:
-        condition["exclude_group_names"] = exc_gns
-        # Remove excluded groups from regular group_names
-        if "group_names" in condition:
-            condition["group_names"] = [
-                g for g in condition["group_names"] if g not in exc_gns
-            ]
-    # Detect "のみ" (only/all members must match the group)
-    if gns:
-        if "のみの場合" in text or (
-            "のみ" in text
-            and ("ステージ" in text or "メンバー" in text or "カードが" in text)
-        ):
-            condition["all_members"] = True
+    _extract_group_scope(condition, text)
 
     # Cost limit
     cl = extract_cost_limit(text)
@@ -6052,16 +6091,10 @@ def _fill_hearts_operation(action, text):
 
 
 def _fill_exclude_groups(action, text):
-    # Exclude group names: detect 「以外」 pattern
+    # Exclude group names: detect 『X』以外 pattern (shared helper, also
+    # used by the condition extractor).
     if "以外" in text:
-        exc_gns = re.findall(r"『([^』]+)』以外", text)
-        if exc_gns:
-            action["exclude_group_names"] = exc_gns
-            # Remove excluded groups from regular group_names if set
-            if action.get("group_names"):
-                action["group_names"] = [
-                    g for g in action["group_names"] if g not in exc_gns
-                ]
+        apply_group_exclusions(action, text)
 
 
 def _fill_per_unit_extras(action, text, a):

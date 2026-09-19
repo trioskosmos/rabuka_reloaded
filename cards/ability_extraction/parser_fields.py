@@ -132,3 +132,20 @@ def apply_character_filters(target, text):
         target["characters"] = includes
     if excludes:
         target["exclude_characters"] = excludes
+
+
+def apply_group_exclusions(target, text):
+    """Extract 『X』以外 group exclusions into `exclude_group_names` and
+    remove them from an already-extracted `group_names` list.
+
+    ONE home for the pattern previously copy-pasted between the action
+    filler (`_fill_exclude_groups`) and the condition extractor
+    (`_extract_generic_fields`).
+    """
+    exc_gns = re.findall(r"『([^』]+)』以外", text)
+    if exc_gns:
+        target["exclude_group_names"] = exc_gns
+        if target.get("group_names"):
+            target["group_names"] = [
+                g for g in target["group_names"] if g not in exc_gns
+            ]
