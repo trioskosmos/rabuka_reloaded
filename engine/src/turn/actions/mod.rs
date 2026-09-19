@@ -26,6 +26,129 @@ macro_rules! tdbg {
     ($($arg:tt)*) => {};
 }
 
+/// Snapshot of everything the completion branches of
+/// `resume_queue_with_choice` read from the queue entry (captured BEFORE
+/// `complete_current()` removes it) plus the caller-side resume flags.
+struct ResumeSnapshot {
+    just_completed_key: Option<u32>,
+    entry_player_id: Option<String>,
+    cost_entry_trigger: Option<crate::game_state::AbilityTrigger>,
+    cost_entry_card_id: Option<i16>,
+    cost_entry_opt_result: Option<bool>,
+    saved_activating_card: Option<i16>,
+    saved_activating_ability_index: Option<usize>,
+    optional_skipped: bool,
+    pending_cleared: bool,
+}
+
+/// Which completion path a finished answer takes.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum ResumeOutcome {
+    CompleteSkipped,
+    Reprocess,
+    FinishPaid,
+    /// Neither skipped, reprocess, nor paid: just complete and scan.
+    /// (The original if/else-if chain's final `else`.)
+    CompleteIdle,
+}
+
+impl ResumeSnapshot {
+    /// Capture the snapshot and decide the outcome. Centralizes the flag
+    /// computation previously smeared across the three branches, with the
+    /// single CHOICE_RESUME_BRANCH debug line.
+    fn capture(
+        game_state: &mut GameState,
+        had_pending_sequential: bool,
+    ) -> (Self, ResumeOutcome) {
+        let entry = game_state.ability_queue.current_entry();
+        let cost_was_paid = entry.is_some_and(|e| e.cost_paid);
+        let effect_started = game_state
+            .ability_queue
+            .current_entry()
+            .is_some_and(|e| e.effect_started);
+        // Capture key and player_id BEFORE complete_current() removes the entry.
+        // Numeric key: (card_id as u8) << 16 | ability_index as u8
+        let just_completed_key: Option<u32> =
+            game_state.ability_queue.current_entry().and_then(|e| {
+                let cid = e.card_id?;
+                let idx = e.ability_index;
+                Some((u32::try_from(cid).ok()? << 16) | u32::try_from(idx).ok()?)
+            });
+        let entry_player_id = game_state
+            .ability_queue
+            .current_entry()
+            .map(|e| e.player_id.clone());
+        // Capture each_time trigger info before entry is lost
+        let cost_entry_trigger = game_state
+            .ability_queue
+            .current_entry()
+            .map(|e| e.trigger_type.clone());
+        let cost_entry_card_id = game_state
+            .ability_queue
+            .current_entry()
+            .and_then(|e| e.card_id);
+        let cost_entry_opt_result = game_state
+            .ability_queue
+            .current_entry()
+            .and_then(|e| e.optional_cost_result);
+        // Save activating_card before clearing — it must be restored when
+        // the ability continues processing (needs_reprocess), otherwise
+        // gain_resource etc. in nested sequentials lose their target.
+        let saved_activating_card = game_state.activating_card;
+        let saved_activating_ability_index = game_state.activating_ability_index;
+        game_state.activating_card = None;
+        game_state.activating_ability_index = None;
+
+        let optional_skipped = game_state.ability_queue.current_entry().is_some_and(|e| {
+            e.cost_paid
+                && e.optional_cost_result == Some(false)
+                && e.choice_card_no == Some(crate::ability::types::ChoiceRoute::OptionalCost)
+        });
+        // Re-check pending commands — they may have been cleared by the choice
+        // handler (e.g. optional draw skip), leaving the sequential stranded.
+        // Only fire when effect hasn't started yet (the skip is between optional
+        // draw choice and the draw action itself). Normal sequential mid-execution
+        // has effect_started=true and must NOT be cancelled.
+        let pending_cleared = cost_was_paid
+            && !effect_started
+            && had_pending_sequential
+            && !game_state.ability_queue.has_pending_actions();
+        let effect_ready = cost_was_paid && !had_pending_sequential && !effect_started;
+        // When an optional choice inside a sequential is resolved with "pay",
+        // re-process so remaining pending actions can execute.
+        let chose_to_pay = game_state
+            .ability_queue
+            .current_entry()
+            .is_some_and(|e| e.optional_cost_result == Some(true));
+        let needs_reprocess = effect_ready
+            || (cost_was_paid && !effect_started && had_pending_sequential && chose_to_pay);
+        log::debug!("[CHOICE_RESUME_BRANCH] cost_paid={} effect_started={} had_pending={} optional_skipped={} pending_cleared={} effect_ready={} chose_to_pay={} needs_reprocess={}",
+            cost_was_paid, effect_started, had_pending_sequential, optional_skipped,
+            pending_cleared, effect_ready, chose_to_pay, needs_reprocess);
+        let snap = Self {
+            just_completed_key,
+            entry_player_id,
+            cost_entry_trigger,
+            cost_entry_card_id,
+            cost_entry_opt_result,
+            saved_activating_card,
+            saved_activating_ability_index,
+            optional_skipped,
+            pending_cleared,
+        };
+        let outcome = if optional_skipped || pending_cleared {
+            ResumeOutcome::CompleteSkipped
+        } else if needs_reprocess {
+            ResumeOutcome::Reprocess
+        } else if cost_was_paid {
+            ResumeOutcome::FinishPaid
+        } else {
+            ResumeOutcome::CompleteIdle
+        };
+        (snap, outcome)
+    }
+}
+
 impl super::TurnEngine {
     pub fn execute_main_phase_action(
         game_state: &mut GameState,
@@ -935,11 +1058,20 @@ impl super::TurnEngine {
         }
     }
 
-    fn resume_queue_with_choice(
+    /// `entry_player_id.clone().unwrap_or_else(|| "p1")` appears at every
+    /// completion site below. ONE fallback for "no entry, assume p1".
+    fn entry_player_or_p1(entry_player_id: &Option<String>) -> String {
+        entry_player_id.clone().unwrap_or_else(|| "p1".to_string())
+    }
+
+    /// AutoAbility-choice fast path of `resume_queue_with_choice`: promote
+    /// the chosen entry and run it, then drain stale same-player entries.
+    /// Returns `Ok(true)` when this path handled the answer.
+    fn resume_auto_ability_choice(
         game_state: &mut GameState,
-        choice: crate::ability::types::Choice,
+        choice: &crate::ability::types::Choice,
         result: crate::ability::types::ChoiceResult,
-    ) -> Result<(), String> {
+    ) -> Result<bool, String> {
         if let crate::ability_queue::QueueState::WaitingForAutoAbilityChoice { .. } =
             game_state.ability_queue.get_state()
         {
@@ -976,46 +1108,56 @@ impl super::TurnEngine {
                 // sequential effect sub-choice), the cutoff carries forward to
                 // the next process_player_abilities entry.
                 if !game_state.has_pending_choice() && game_state.ability_queue.is_idle() {
-                    let pid = player_id.clone();
-                    let mut drain_iters = 0;
-                    while !game_state.has_pending_choice() && game_state.ability_queue.is_idle() {
-                        drain_iters += 1;
-                        if drain_iters > 50 {
-                            break;
-                        }
-                        let new_idx = (cutoff..game_state.ability_queue.len()).find(|&i| {
-                            game_state.ability_queue.is_entry_available(i)
-                                && game_state.ability_queue.entry_player_id(i) == Some(&pid)
-                        });
-                        match new_idx {
-                            Some(idx) => {
-                                game_state.ability_queue.set_current_entry(idx);
-                                if !game_state.ability_queue.start_next() {
-                                    break;
-                                }
-                                game_state.process_current_ability();
-                                if game_state.has_pending_choice() {
-                                    break;
-                                }
-                            }
-                            None => break,
-                        }
-                    }
+                    Self::drain_stale_auto_entries(game_state, cutoff, &player_id);
                 }
                 if !game_state.has_pending_choice() && !player_id.is_empty() {
                     game_state.process_pending_auto_abilities(&player_id);
                 }
-                return Ok(());
-            } else {
-                return Err("Expected AutoAbilitySelected result".to_string());
+                return Ok(true);
+            }
+            return Err("Expected AutoAbilitySelected result".to_string());
+        }
+        Ok(false)
+    }
+
+    /// Drain stale same-player entries queued past `cutoff` (each_time
+    /// watchers), stopping at the first pending choice or after 50 rounds.
+    fn drain_stale_auto_entries(game_state: &mut GameState, cutoff: usize, pid: &str) {
+        let mut drain_iters = 0;
+        while !game_state.has_pending_choice() && game_state.ability_queue.is_idle() {
+            drain_iters += 1;
+            if drain_iters > 50 {
+                break;
+            }
+            let new_idx = (cutoff..game_state.ability_queue.len()).find(|&i| {
+                game_state.ability_queue.is_entry_available(i)
+                    && game_state
+                        .ability_queue
+                        .entry_player_id(i)
+                        .is_some_and(|id| id == pid)
+            });
+            match new_idx {
+                Some(idx) => {
+                    game_state.ability_queue.set_current_entry(idx);
+                    if !game_state.ability_queue.start_next() {
+                        break;
+                    }
+                    game_state.process_current_ability();
+                    if game_state.has_pending_choice() {
+                        break;
+                    }
+                }
+                None => break,
             }
         }
+    }
 
-        game_state.ability_queue.resume_with_choice();
-        let had_pending_sequential = game_state.ability_queue.has_pending_actions();
-
-        // Take the persistent resolver from the queue entry
-        let mut resolver = match game_state.ability_queue.take_resolver() {
+    /// Take the persistent resolver off the queue entry. Fails when the
+    /// entry carries none (cannot resume an answer without resolver state).
+    fn take_queue_resolver(
+        game_state: &mut GameState,
+    ) -> Result<Box<crate::ability::resolver::AbilityResolver>, String> {
+        match game_state.ability_queue.take_resolver() {
             Some(mut r) => {
                 let selected = r.selected_cards.clone();
                 log::debug!(
@@ -1024,12 +1166,222 @@ impl super::TurnEngine {
                     selected
                 );
                 r.sub_choice_created = false;
-                r
+                Ok(r)
             }
-            None => {
-                return Err("No resolver found on queue entry".to_string());
+            None => Err("No resolver found on queue entry".to_string()),
+        }
+    }
+
+    /// G1/G3: does a pending sub-choice target the opponent? ONE predicate
+    /// for the SelectCard (target_player_id + spawn context) and
+    /// SelectPosition (MoveCardsPosition context) shapes.
+    fn sub_choice_targets_opponent(
+        resolver: &crate::ability::resolver::AbilityResolver,
+        sub_choice: &crate::ability::types::Choice,
+    ) -> bool {
+        let targets = match sub_choice {
+            crate::ability::types::Choice::SelectCard {
+                target_player_id: Some(tpid),
+                ..
+            } if tpid == "opponent"
+                && resolver.spawn_context.target.as_deref() == Some("opponent") =>
+            {
+                true
             }
+            crate::ability::types::Choice::SelectPosition { .. }
+                if matches!(
+                    resolver.execution_context,
+                    crate::ability::types::ExecutionContext::MoveCardsPosition { ref target, .. }
+                    if target == "opponent"
+                ) =>
+            {
+                true
+            }
+            _ => false,
         };
+        log::debug!(
+            "[RWC_G1] tpid_opp={} spawn={:?} choice={:?}",
+            targets,
+            resolver.spawn_context.target,
+            sub_choice
+        );
+        targets
+    }
+
+    /// Route the paused choice to the right player: opponent choices go to
+    /// the opponent (via the canonical `opponent_id`, not a p1/p2 literal),
+    /// self-targeted SelectCards reset to the activator.
+    fn route_sub_choice_player(
+        game_state: &mut GameState,
+        sub_choice: &crate::ability::types::Choice,
+        targets_opponent: bool,
+    ) {
+        let current_pid = game_state
+            .ability_queue
+            .current_entry()
+            .map(|e| e.player_id.clone());
+        let Some(current) = current_pid else {
+            return;
+        };
+        let self_targeted = matches!(sub_choice, crate::ability::types::Choice::SelectCard { target_player_id: Some(tpid), .. } if tpid == "self");
+        if targets_opponent {
+            let opponent_id = game_state.opponent_id(&current);
+            log::debug!("[RWC_G1] SET choice_player_id={}", opponent_id);
+            if let Some(entry) = game_state.ability_queue.current_entry_mut() {
+                entry.choice_player_id = Some(opponent_id);
+            }
+        } else if self_targeted {
+            log::debug!("[RWC_G1] RESET choice_player_id to activator={}", current);
+            if let Some(entry) = game_state.ability_queue.current_entry_mut() {
+                entry.choice_player_id = Some(current);
+            }
+        }
+    }
+
+    /// Skipped-optional / stranded-sequential completion: finish the entry,
+    /// clear tracking, and resume pending autos for the completing player.
+    fn complete_skipped_ability(game_state: &mut GameState, snap: &ResumeSnapshot) {
+        log::debug!(
+            "[RWC] optional_skipped={} pending_cleared={} completing ability",
+            snap.optional_skipped,
+            snap.pending_cleared
+        );
+        game_state.ability_queue.complete_current();
+        game_state.clear_effect_tracking();
+        let player_id = Self::entry_player_or_p1(&snap.entry_player_id);
+        game_state.just_completed_ability_key = snap.just_completed_key;
+        game_state.process_pending_auto_abilities(&player_id);
+        game_state.just_completed_ability_key = None;
+        game_state.clear_movement_tracking();
+    }
+
+    /// Reprocess path: the ability is still executing, so restore the saved
+    /// activating card, store the resolver back, and re-enter processing.
+    fn reprocess_ability(
+        game_state: &mut GameState,
+        resolver: Box<crate::ability::resolver::AbilityResolver>,
+        snap: &ResumeSnapshot,
+    ) {
+        // Restore activating_card — the ability is still executing.
+        game_state.activating_card = snap.saved_activating_card;
+        game_state.activating_ability_index = snap.saved_activating_ability_index;
+        log::debug!("[RWC] needs_reprocess=true: storing resolver and calling PCA");
+        game_state.ability_queue.set_resolver(resolver);
+        game_state.process_current_ability();
+        if game_state.has_pending_choice() {
+            let player_id = game_state
+                .ability_queue
+                .current_entry()
+                .map(|e| e.player_id.clone())
+                .unwrap_or_else(|| "p1".to_string());
+            game_state.process_with_completed_key(snap.just_completed_key, &player_id);
+        } else {
+            // Effect completed without sub-choice — process any newly
+            // enqueued watcher abilities (e.g. each_time triggers).
+            let player_id = Self::entry_player_or_p1(&snap.entry_player_id);
+            game_state.process_with_completed_key(snap.just_completed_key, &player_id);
+        }
+    }
+
+    /// Shared completion tail: finish the entry, fire movement-based
+    /// triggers (TAS scan), and resume. Used by the paid-finish path AND
+    /// the idle path — previously copy-pasted in both.
+    fn complete_and_scan(game_state: &mut GameState, snap: &ResumeSnapshot) {
+        game_state.ability_queue.complete_current();
+        game_state.clear_effect_tracking();
+        let player_id = Self::entry_player_or_p1(&snap.entry_player_id);
+        // Post-resolution TAS scan for movement-based triggers.
+        // Mirrors process_current_ability's post-resolution scan, which is
+        // NOT called when a resolver completes via this path.
+        // Must run AFTER complete_current() to match process_current_ability ordering.
+        if game_state.recently_moved_cards.is_some()
+            || game_state.last_energy_placed_by_effect()
+            || !game_state.recently_appeared_cards.is_empty()
+        {
+            let event = crate::ability::types::TriggerEvent {
+                moved_cards: game_state
+                    .recently_moved_cards
+                    .clone()
+                    .unwrap_or_default(),
+                moved_from_zone: game_state.recently_moved_from_zone.clone(),
+                position_change_occurred: game_state.position_change_occurred_this_turn,
+                energy_placed_by_effect: game_state.last_energy_placed_by_effect(),
+                energy_placed_by_player: game_state
+                    .last_energy_placed_by_player()
+                    .map(|s| s.to_string()),
+                ..Default::default()
+            };
+            game_state.just_completed_ability_key = snap.just_completed_key;
+            game_state.trigger_auto_abilities_for_player_with_event(&player_id, &event);
+            game_state.just_completed_ability_key = None;
+        }
+        game_state.process_with_completed_key(snap.just_completed_key, &player_id);
+        game_state.clear_movement_tracking();
+    }
+
+    /// Paid-finish path: record use-limit, fire post-resolution each_time
+    /// triggers, then complete (unless a sub-choice is pending).
+    /// Returns true when the caller must return early.
+    fn finish_paid_ability(game_state: &mut GameState, snap: &ResumeSnapshot) -> bool {
+        // Record use_limit when ability completes (cost+effect both resolved).
+        // Insert for any ability with use_limit, unless the player declined
+        // an optional action (signaled by optional_cost_result == Some(false)).
+        if snap.cost_entry_opt_result != Some(false) {
+            if let Some(entry) = game_state.ability_queue.current_entry() {
+                if let Some(cid) = entry.card_id {
+                    let turn = game_state.turn_number;
+                    let key = (cid, entry.ability_index, turn);
+                    game_state.record_ability_use(key);
+                }
+            }
+        }
+        // Post-resolution each_time for LiveStart/LiveSuccess
+        if snap.cost_entry_opt_result != Some(false) {
+            let pid = Self::entry_player_or_p1(&snap.entry_player_id);
+            if let Some(crate::game_state::AbilityTrigger::LiveStart) = snap.cost_entry_trigger {
+                if let Some(cid) = snap.cost_entry_card_id {
+                    game_state.trigger_each_time_for_member(
+                        &pid,
+                        crate::triggers::LIVE_START,
+                        cid,
+                    );
+                }
+            } else if let Some(crate::game_state::AbilityTrigger::LiveSuccess) =
+                snap.cost_entry_trigger
+            {
+                if let Some(cid) = snap.cost_entry_card_id {
+                    game_state.trigger_each_time_for_member(
+                        &pid,
+                        crate::triggers::LIVE_SUCCESS,
+                        cid,
+                    );
+                }
+            }
+        }
+        // Don't complete if a pending choice (e.g. SelectPosition) was
+        // created by the current effect — it would be orphaned.
+        if game_state.has_pending_choice() {
+            log::debug!("[RWC] skipping complete_current — pending choice exists");
+            return true;
+        }
+        Self::complete_and_scan(game_state, snap);
+        false
+    }
+
+    fn resume_queue_with_choice(
+        game_state: &mut GameState,
+        choice: crate::ability::types::Choice,
+        result: crate::ability::types::ChoiceResult,
+    ) -> Result<(), String> {
+        if Self::resume_auto_ability_choice(game_state, &choice, result.clone())? {
+            return Ok(());
+        }
+
+        game_state.ability_queue.resume_with_choice();
+        let had_pending_sequential = game_state.ability_queue.has_pending_actions();
+
+        // Take the persistent resolver from the queue entry
+        let mut resolver = Self::take_queue_resolver(game_state)?;
         resolver.pending_choice = Some(choice);
         let res = resolver.provide_choice_result(game_state, result);
 
@@ -1055,265 +1407,30 @@ impl super::TurnEngine {
         );
 
         if resolver.pending_choice.is_some() {
-            // Sub-choice created  Estore resolver back on entry and pause queue
+            // Sub-choice created — store resolver back on entry and pause queue
             let sub_choice = resolver.pending_choice.clone().unwrap();
             // G1/G3: route pending choice to opponent if it targets opponent
-            let targets_opponent = match &sub_choice {
-                crate::ability::types::Choice::SelectCard {
-                    target_player_id: Some(tpid),
-                    ..
-                } if tpid == "opponent"
-                    && resolver.spawn_context.target.as_deref() == Some("opponent") =>
-                {
-                    true
-                }
-                crate::ability::types::Choice::SelectPosition { .. }
-                    if matches!(
-                        resolver.execution_context,
-                        crate::ability::types::ExecutionContext::MoveCardsPosition { ref target, .. }
-                        if target == "opponent"
-                    ) =>
-                {
-                    true
-                }
-                _ => false,
-            };
-            log::debug!(
-                "[RWC_G1] tpid_opp={} spawn={:?} choice={:?}",
-                targets_opponent,
-                resolver.spawn_context.target,
-                &sub_choice
-            );
-            if let Some(entry) = game_state.ability_queue.current_entry_mut() {
-                if targets_opponent {
-                    let current = entry.player_id.clone();
-                    let opponent_id = if current == "p1" { "p2" } else { "p1" };
-                    entry.choice_player_id = Some(opponent_id.to_string());
-                    log::debug!("[RWC_G1] SET choice_player_id={}", opponent_id);
-                } else if matches!(&sub_choice, crate::ability::types::Choice::SelectCard { target_player_id: Some(tpid), .. } if tpid == "self")
-                {
-                    entry.choice_player_id = Some(entry.player_id.clone());
-                    log::debug!(
-                        "[RWC_G1] RESET choice_player_id to activator={}",
-                        entry.player_id
-                    );
-                }
-            }
+            let targets_opponent = Self::sub_choice_targets_opponent(&resolver, &sub_choice);
+            Self::route_sub_choice_player(game_state, &sub_choice, targets_opponent);
             resolver.store_pending_choice(game_state);
             game_state.ability_queue.set_resolver(resolver);
             game_state.ability_queue.pause_for_choice(sub_choice);
         } else {
-            // No more choices  Eability execution finished
-            let cost_was_paid = game_state
-                .ability_queue
-                .current_entry()
-                .is_some_and(|e| e.cost_paid);
-            let effect_started = game_state
-                .ability_queue
-                .current_entry()
-                .is_some_and(|e| e.effect_started);
-            // Capture key and player_id BEFORE complete_current() removes the entry.
-            // Numeric key: (card_id as u8) << 16 | ability_index as u8
-            let just_completed_key: Option<u32> =
-                game_state.ability_queue.current_entry().and_then(|e| {
-                    let cid = e.card_id?;
-                    let idx = e.ability_index;
-                    Some((u32::try_from(cid).ok()? << 16) | u32::try_from(idx).ok()?)
-                });
-            let entry_player_id = game_state
-                .ability_queue
-                .current_entry()
-                .map(|e| e.player_id.clone());
-            // Capture each_time trigger info before entry is lost
-            let cost_entry_trigger = game_state
-                .ability_queue
-                .current_entry()
-                .map(|e| e.trigger_type.clone());
-            let cost_entry_card_id = game_state
-                .ability_queue
-                .current_entry()
-                .and_then(|e| e.card_id);
-            let cost_entry_opt_result = game_state
-                .ability_queue
-                .current_entry()
-                .and_then(|e| e.optional_cost_result);
-            // Save activating_card before clearing  Eit must be restored when
-            // the ability continues processing (needs_reprocess), otherwise
-            // gain_resource etc. in nested sequentials lose their target.
-            let saved_activating_card = game_state.activating_card;
-            let saved_activating_ability_index = game_state.activating_ability_index;
-            game_state.activating_card = None;
-            game_state.activating_ability_index = None;
-
-            let optional_skipped = game_state.ability_queue.current_entry().is_some_and(|e| {
-                e.cost_paid
-                    && e.optional_cost_result == Some(false)
-                    && e.choice_card_no == Some(ChoiceRoute::OptionalCost)
-            });
-            // Re-check pending commands  Ethey may have been cleared by the choice
-            // handler (e.g. optional draw skip), leaving the sequential stranded.
-            // Only fire when effect hasn't started yet (the skip is between optional
-            // draw choice and the draw action itself). Normal sequential mid-execution
-            // has effect_started=true and must NOT be cancelled.
-            let pending_cleared = cost_was_paid
-                && !effect_started
-                && had_pending_sequential
-                && !game_state.ability_queue.has_pending_actions();
-            let effect_ready = cost_was_paid && !had_pending_sequential && !effect_started;
-            // When an optional choice inside a sequential is resolved with "pay",
-            // re-process so remaining pending actions can execute.
-            let chose_to_pay = game_state
-                .ability_queue
-                .current_entry()
-                .is_some_and(|e| e.optional_cost_result == Some(true));
-            let needs_reprocess = effect_ready
-                || (cost_was_paid && !effect_started && had_pending_sequential && chose_to_pay);
-            log::debug!("[CHOICE_RESUME_BRANCH] cost_paid={} effect_started={} had_pending={} optional_skipped={} pending_cleared={} effect_ready={} chose_to_pay={} needs_reprocess={}",
-                cost_was_paid, effect_started, had_pending_sequential, optional_skipped,
-                pending_cleared, effect_ready, chose_to_pay, needs_reprocess);
-
-            if optional_skipped || pending_cleared {
-                log::debug!(
-                    "[RWC] optional_skipped={} pending_cleared={} completing ability",
-                    optional_skipped,
-                    pending_cleared
-                );
-                game_state.ability_queue.complete_current();
-                game_state.clear_effect_tracking();
-                let player_id = entry_player_id
-                    .clone()
-                    .unwrap_or_else(|| "p1".to_string());
-                game_state.just_completed_ability_key = just_completed_key;
-                game_state.process_pending_auto_abilities(&player_id);
-                game_state.just_completed_ability_key = None;
-                game_state.clear_movement_tracking();
-            } else if needs_reprocess {
-                // Restore activating_card  Ethe ability is still executing.
-                game_state.activating_card = saved_activating_card;
-                game_state.activating_ability_index = saved_activating_ability_index;
-                log::debug!("[RWC] needs_reprocess=true: storing resolver and calling PCA");
-                game_state.ability_queue.set_resolver(resolver);
-                game_state.process_current_ability();
-                if game_state.has_pending_choice() {
-                    let player_id = game_state
-                        .ability_queue
-                        .current_entry()
-                        .map(|e| e.player_id.clone())
-                        .unwrap_or_else(|| "p1".to_string());
-                    game_state.process_with_completed_key(just_completed_key, &player_id);
-                } else {
-                    // Effect completed without sub-choice  Eprocess any newly
-                    // enqueued watcher abilities (e.g. each_time triggers).
-                    let player_id = entry_player_id
-                        .clone()
-                        .unwrap_or_else(|| "p1".to_string());
-                    game_state.process_with_completed_key(just_completed_key, &player_id);
+            // No more choices — ability execution finished
+            let (snap, outcome) = ResumeSnapshot::capture(game_state, had_pending_sequential);
+            match outcome {
+                ResumeOutcome::CompleteSkipped => {
+                    Self::complete_skipped_ability(game_state, &snap)
                 }
-            } else if cost_was_paid {
-                // Record use_limit when ability completes (cost+effect both resolved).
-                // Insert for any ability with use_limit, unless the player declined
-                // an optional action (signaled by optional_cost_result == Some(false)).
-                if cost_entry_opt_result != Some(false) {
-                    if let Some(entry) = game_state.ability_queue.current_entry() {
-                        if let Some(cid) = entry.card_id {
-                            let turn = game_state.turn_number;
-                            let key = (cid, entry.ability_index, turn);
-                            game_state.record_ability_use(key);
-                        }
+                ResumeOutcome::Reprocess => {
+                    Self::reprocess_ability(game_state, resolver, &snap)
+                }
+                ResumeOutcome::FinishPaid => {
+                    if Self::finish_paid_ability(game_state, &snap) {
+                        return Ok(());
                     }
                 }
-                // Post-resolution each_time for LiveStart/LiveSuccess
-                if cost_entry_opt_result != Some(false) {
-                    let pid = entry_player_id
-                        .clone()
-                        .unwrap_or_else(|| "p1".to_string());
-                    if let Some(crate::game_state::AbilityTrigger::LiveStart) = cost_entry_trigger {
-                        if let Some(cid) = cost_entry_card_id {
-                            game_state.trigger_each_time_for_member(
-                                &pid,
-                                crate::triggers::LIVE_START,
-                                cid,
-                            );
-                        }
-                    } else if let Some(crate::game_state::AbilityTrigger::LiveSuccess) =
-                        cost_entry_trigger
-                    {
-                        if let Some(cid) = cost_entry_card_id {
-                            game_state.trigger_each_time_for_member(
-                                &pid,
-                                crate::triggers::LIVE_SUCCESS,
-                                cid,
-                            );
-                        }
-                    }
-                }
-                // Don't complete if a pending choice (e.g. SelectPosition) was
-                // created by the current effect  Eit would be orphaned.
-                if game_state.has_pending_choice() {
-                    log::debug!("[RWC] skipping complete_current  Epending choice exists");
-                    return Ok(());
-                }
-                // Post-resolution TAS scan for movement-based triggers.
-                // Mirrors process_current_ability's post-resolution scan (line ~1072)
-                // which is NOT called when a resolver completes via this path.
-                // Must run AFTER complete_current() to match process_current_ability ordering.
-                game_state.ability_queue.complete_current();
-                game_state.clear_effect_tracking();
-                let player_id = entry_player_id
-                    .clone()
-                    .unwrap_or_else(|| "p1".to_string());
-                if game_state.recently_moved_cards.is_some()
-                    || game_state.last_energy_placed_by_effect()
-                    || !game_state.recently_appeared_cards.is_empty()
-                {
-                    let event = crate::ability::types::TriggerEvent {
-                        moved_cards: game_state
-                            .recently_moved_cards
-                            .clone()
-                            .unwrap_or_default(),
-                        moved_from_zone: game_state.recently_moved_from_zone.clone(),
-                        position_change_occurred: game_state.position_change_occurred_this_turn,
-                        energy_placed_by_effect: game_state.last_energy_placed_by_effect(),
-                        energy_placed_by_player: game_state
-                            .last_energy_placed_by_player()
-                            .map(|s| s.to_string()),
-                        ..Default::default()
-                    };
-                    game_state.just_completed_ability_key = just_completed_key;
-                    game_state.trigger_auto_abilities_for_player_with_event(&player_id, &event);
-                    game_state.just_completed_ability_key = None;
-                }
-                game_state.process_with_completed_key(just_completed_key, &player_id);
-                game_state.clear_movement_tracking();
-            } else {
-                game_state.ability_queue.complete_current();
-                game_state.clear_effect_tracking();
-                let player_id = entry_player_id
-                    .clone()
-                    .unwrap_or_else(|| "p1".to_string());
-                if game_state.recently_moved_cards.is_some()
-                    || game_state.last_energy_placed_by_effect()
-                    || !game_state.recently_appeared_cards.is_empty()
-                {
-                    let event = crate::ability::types::TriggerEvent {
-                        moved_cards: game_state
-                            .recently_moved_cards
-                            .clone()
-                            .unwrap_or_default(),
-                        moved_from_zone: game_state.recently_moved_from_zone.clone(),
-                        position_change_occurred: game_state.position_change_occurred_this_turn,
-                        energy_placed_by_effect: game_state.last_energy_placed_by_effect(),
-                        energy_placed_by_player: game_state
-                            .last_energy_placed_by_player()
-                            .map(|s| s.to_string()),
-                        ..Default::default()
-                    };
-                    game_state.just_completed_ability_key = just_completed_key;
-                    game_state.trigger_auto_abilities_for_player_with_event(&player_id, &event);
-                    game_state.just_completed_ability_key = None;
-                }
-                game_state.process_with_completed_key(just_completed_key, &player_id);
-                game_state.clear_movement_tracking();
+                ResumeOutcome::CompleteIdle => Self::complete_and_scan(game_state, &snap),
             }
         }
         Ok(())
