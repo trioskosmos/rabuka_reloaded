@@ -23,6 +23,12 @@ pub enum MemberArea {
 }
 
 impl MemberArea {
+    /// All stage areas in slot order. ONE definition for the
+    /// `[LeftSide, Center, RightSide]` literal previously copy-pasted at
+    /// every per-area loop (game_setup estimates, phases double-baton).
+    pub const ALL: [MemberArea; 3] =
+        [MemberArea::LeftSide, MemberArea::Center, MemberArea::RightSide];
+
     /// Returns the opposing player's front area for this area.
     /// Rule 4.5.7: Left side face opponent's right side, center faces center, right side faces opponent's left side.
     pub fn front_area(&self) -> MemberArea {

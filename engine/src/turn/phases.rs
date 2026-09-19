@@ -886,6 +886,198 @@ tdbg!("PHASE_ACTIVE:4 wait activated");
     // the now-empty area can receive a new member the same turn.
     // Q87: Baton touch can be performed multiple times per turn, but a member
     // who entered via baton touch cannot baton touch again that turn.
+    /// Double-baton play: replace BOTH specified members, pay the combined
+    /// cost, place the card, and fire debut/auto triggers. Extracted from
+    /// `handle_play_member_to_stage`, which resumes with the single path.
+    #[allow(clippy::too_many_arguments)]
+    fn play_double_baton(
+        game_state: &mut GameState,
+        card_id: i16,
+        card_no: &str,
+        player_id: &str,
+        idx: usize,
+        area: crate::zones::MemberArea,
+        db_areas: [crate::zones::MemberArea; 2],
+        card_db: &crate::card::CardDatabase,
+    ) -> Result<(), String> {
+        // Calculate cost before modifying state
+        let card_entry = card_db.get_card(card_id);
+        let card_cost = card_entry.and_then(|c| c.cost).unwrap_or(0);
+        let replaced_costs: Vec<u8> = {
+            let player = game_state.active_player();
+            db_areas
+                .iter()
+                .filter_map(|&area| {
+                    player.stage.get_area(area).map(|cid| {
+                        // Include constant cost modifiers (parity with single-baton
+                        // payment in core/player.rs). Missing data stays 0.
+                        card_db
+                            .get_card(cid)
+                            .and_then(|c| c.cost)
+                            .map(|base| {
+                                crate::constants::floored_cost(
+                                    base,
+                                    game_state.mods.get_cost_modifier(cid),
+                                )
+                            })
+                            .unwrap_or(0)
+                    })
+                })
+                .collect()
+        };
+        let combined_reduction: u8 = replaced_costs.iter().sum();
+        let hand_count = game_state.active_player().hand.cards.len();
+        let stage = &game_state.active_player().stage;
+        let success_zone = &game_state.active_player().success_live_card_zone.cards;
+        let cost_reduction = crate::ability::util::calculate_play_cost_reduction(
+            stage,
+            success_zone,
+            hand_count,
+            card_id,
+            card_db,
+        );
+        let final_cost = card_cost
+            .saturating_sub(cost_reduction)
+            .saturating_sub(combined_reduction);
+        if final_cost > 0 {
+            let player = game_state.active_player_mut();
+            if player.energy_zone.active_count() < final_cost {
+                return Err("Not enough energy to play this card".to_string());
+            }
+            player.energy_zone.pay_energy(final_cost)?;
+        }
+        // Check cannot_baton_touch protection for each target member
+        {
+            let player = game_state.active_player();
+            for &area2 in &db_areas {
+                if let Some(existing_card_id) = player.stage.get_area(area2) {
+                    let has_protection = card_db
+                        .get_card(existing_card_id)
+                        .is_some_and(|existing_card| {
+                            crate::ability::util::has_cannot_baton_touch_protection(
+                                card_db,
+                                card_id,
+                                existing_card,
+                            )
+                        });
+                    if has_protection {
+                        return Err(
+                            "Cannot baton touch: member has baton touch discard protection"
+                                .to_string(),
+                        );
+                    }
+                }
+            }
+        }
+        // Replace both specified members first
+        let double_replaced_ids: Vec<i16> = {
+            let player = game_state.active_player_mut();
+            let mut replaced = Vec::new();
+            for &area2 in &db_areas {
+                if let Some(existing_card_id) = player.stage.get_area(area2) {
+                    let _ = player
+                        .remove_member_from_stage_with_recycling(area2 as usize, card_db);
+                    player.waitroom.cards.push(existing_card_id);
+                    replaced.push(existing_card_id);
+                }
+            }
+            replaced
+        };
+        for &replaced_id in &double_replaced_ids {
+            // B2: typed choke point — alias drift ("energy"/"energy_zone" etc) dies here
+            game_state.push_movement_event_typed(
+                replaced_id,
+                crate::types::ZoneId::Stage,
+                crate::types::ZoneId::Waitroom,
+                Some(card_id),
+                player_id,
+                false,
+            );
+        }
+        // Track the non-placement vacated area for empty_area deployment
+        let other_vacated = if db_areas[0] != area {
+            Some(db_areas[0] as usize)
+        } else {
+            Some(db_areas[1] as usize)
+        };
+        game_state.last_vacated_stage_area = other_vacated.map(|v| u8::try_from(v).unwrap());
+        // Remove card from hand
+        let player = game_state.active_player_mut();
+        player.hand.cards.remove(idx);
+        // Place card in chosen placement area
+        player.stage.stage[area as usize] = card_id;
+        // Rule 9.6.2.1.2.1: Card came from hand (non-stage), track it.
+        // remove_member_from_stage_with_recycling already cleaned up the old card IDs.
+        player.track_deployment(card_id);
+        // Record 2 baton touches
+        for _ in 0..2 {
+            game_state.record_baton_touch(player_id, Some(card_id));
+        }
+        game_state.baton_touch_replaced_member_id = {
+            let player = game_state.active_player();
+            player.waitroom.cards.last().copied()
+        };
+        game_state.active_player_mut().debut_count_this_turn += 1;
+        game_state.record_card_appearance(card_id, "hand");
+        game_state.baton_touch_arriving_card_id = Some(card_id);
+
+        Self::trigger_debut_abilities(game_state, player_id, card_no, final_cost, true);
+        Self::trigger_auto_abilities_for_player(game_state, player_id);
+        let db_opponent_id = game_state.opponent_id(player_id);
+        Self::trigger_auto_abilities_for_player(game_state, &db_opponent_id);
+        game_state.process_pending_auto_abilities(player_id);
+        tdbg!("PHASE_AUTO:0 recalc");
+        game_state.recalculate_constants();
+        tdbg!("PHASE_AUTO:1 recalc OK");
+
+        log::debug!("[TRACK_MOVE] card_id={} player_id={}", card_id, player_id);
+        Ok(())
+    }
+
+    /// After a baton-touch play, queue the Debut trigger of every stage
+    /// member carrying a BatonTouch ability. Extracted from
+    /// `handle_play_member_to_stage`.
+    fn trigger_baton_touch_abilities(game_state: &mut GameState, player_id: &str) {
+        for area in crate::zones::MemberArea::ALL {
+            let card_no = if let Some(card_id) = game_state.active_player().stage.get_area(area)
+            {
+                if let Some(card) = game_state.card_database.get_card(card_id) {
+                    let bt_card_id = card_id;
+                    card.abilities
+                        .iter()
+                        .filter(|ar| {
+                            ar.resolve()
+                                .has_trigger(crate::triggers::TriggerKind::BatonTouch)
+                        })
+                        .map(|ar| {
+                            let ability = ar.resolve();
+                            (
+                                format!("{}_{}", card.card_no, ability.full_text),
+                                card.card_no.to_string(),
+                                bt_card_id,
+                            )
+                        })
+                        .collect()
+                } else {
+                    Vec::new()
+                }
+            } else {
+                Vec::new()
+            };
+            for (ability_id, card_no, bt_card_id) in card_no {
+                game_state.trigger_auto_ability(
+                    ability_id,
+                    crate::game_state::AbilityTrigger::Debut,
+                    player_id.to_string(),
+                    Some(card_no),
+                    Some(bt_card_id),
+                    None,
+                    None,
+                );
+            }
+        }
+    }
+
     pub fn handle_play_member_to_stage(
         game_state: &mut GameState,
         card_id: Option<i16>,
@@ -928,12 +1120,10 @@ tdbg!("PHASE_ACTIVE:4 wait activated");
         let double_baton_areas: Option<[crate::zones::MemberArea; 2]> =
             card_indices.as_ref().and_then(|indices| {
                 if indices.len() == 2 {
-                    let areas = [
-                        crate::zones::MemberArea::LeftSide,
-                        crate::zones::MemberArea::Center,
-                        crate::zones::MemberArea::RightSide,
-                    ];
-                    Some([areas[indices[0]], areas[indices[1]]])
+                    Some([
+                        crate::zones::MemberArea::ALL[indices[0]],
+                        crate::zones::MemberArea::ALL[indices[1]],
+                    ])
                 } else {
                     None
                 }
@@ -944,15 +1134,13 @@ tdbg!("PHASE_ACTIVE:4 wait activated");
             stage_area.unwrap_or(db_areas[0])
         } else {
             stage_area.unwrap_or_else(|| {
-                let areas = [
-                    crate::zones::MemberArea::LeftSide,
-                    crate::zones::MemberArea::Center,
-                    crate::zones::MemberArea::RightSide,
-                ];
-                if let Some(empty) = areas.iter().find(|&&a| player.stage.get_area(a).is_none()) {
+                if let Some(empty) = crate::zones::MemberArea::ALL
+                    .iter()
+                    .find(|&&a| player.stage.get_area(a).is_none())
+                {
                     *empty
                 } else {
-                    areas[0]
+                    crate::zones::MemberArea::ALL[0]
                 }
             })
         };
@@ -975,138 +1163,16 @@ tdbg!("PHASE_ACTIVE:4 wait activated");
         // BEFORE placing the card. Single baton via the area buttons stays single — the
         // constant ability (play_baton_touch, count>1) is offered as separate gold buttons.
         if let Some(db_areas) = double_baton_areas {
-            // Calculate cost before modifying state
-            let card_entry = card_db.get_card(card_id);
-            let card_cost = card_entry.and_then(|c| c.cost).unwrap_or(0);
-            let replaced_costs: Vec<u8> = {
-                let player = game_state.active_player();
-                db_areas
-                    .iter()
-                    .filter_map(|&area| {
-                        player.stage.get_area(area).map(|cid| {
-                            // Include constant cost modifiers (parity with single-baton
-                            // payment in core/player.rs). Missing data stays 0.
-                            game_state.card_database.get_card(cid)
-                                .and_then(|c| c.cost)
-                                .map(|base| {
-                                    crate::constants::floored_cost(
-                                        base,
-                                        game_state.mods.get_cost_modifier(cid),
-                                    )
-                                })
-                                .unwrap_or(0)
-                        })
-                    })
-                    .collect()
-            };
-            let combined_reduction: u8 = replaced_costs.iter().sum();
-            let hand_count = game_state.active_player().hand.cards.len();
-            let stage = &game_state.active_player().stage;
-            let success_zone = &game_state.active_player().success_live_card_zone.cards;
-            let cost_reduction = crate::ability::util::calculate_play_cost_reduction(
-                stage,
-                success_zone,
-                hand_count,
+            return Self::play_double_baton(
+                game_state,
                 card_id,
+                &card_no,
+                &player_id,
+                idx,
+                area,
+                db_areas,
                 &card_db,
             );
-            let final_cost = card_cost
-                .saturating_sub(cost_reduction)
-                .saturating_sub(combined_reduction);
-            if final_cost > 0 {
-                let player = game_state.active_player_mut();
-                if player.energy_zone.active_count() < final_cost {
-                    return Err("Not enough energy to play this card".to_string());
-                }
-                player.energy_zone.pay_energy(final_cost)?;
-            }
-            // Check cannot_baton_touch protection for each target member
-            {
-                let player = game_state.active_player();
-                for &area2 in &db_areas {
-                    if let Some(existing_card_id) = player.stage.get_area(area2) {
-                        let has_protection = card_db
-                            .get_card(existing_card_id)
-                            .is_some_and(|existing_card| {
-                                crate::ability::util::has_cannot_baton_touch_protection(
-                                    &card_db,
-                                    card_id,
-                                    existing_card,
-                                )
-                            });
-                        if has_protection {
-                            return Err(
-                                "Cannot baton touch: member has baton touch discard protection"
-                                    .to_string(),
-                            );
-                        }
-                    }
-                }
-            }
-            // Replace both specified members first
-            let double_replaced_ids: Vec<i16> = {
-                let player = game_state.active_player_mut();
-                let mut replaced = Vec::new();
-                for &area2 in &db_areas {
-                    if let Some(existing_card_id) = player.stage.get_area(area2) {
-                        let _ = player
-                            .remove_member_from_stage_with_recycling(area2 as usize, &card_db);
-                        player.waitroom.cards.push(existing_card_id);
-                        replaced.push(existing_card_id);
-                    }
-                }
-                replaced
-            };
-            for &replaced_id in &double_replaced_ids {
-                // B2: typed choke point — alias drift ("energy"/"energy_zone" etc) dies here
-                game_state.push_movement_event_typed(
-                    replaced_id,
-                    crate::types::ZoneId::Stage,
-                    crate::types::ZoneId::Waitroom,
-                    Some(card_id),
-                    &player_id,
-                    false,
-                );
-            }
-            // Track the non-placement vacated area for empty_area deployment
-            let other_vacated = if db_areas[0] != area {
-                Some(db_areas[0] as usize)
-            } else {
-                Some(db_areas[1] as usize)
-            };
-            game_state.last_vacated_stage_area = other_vacated.map(|v| u8::try_from(v).unwrap());
-            // Remove card from hand
-            let player = game_state.active_player_mut();
-            player.hand.cards.remove(idx);
-            // Place card in chosen placement area
-            player.stage.stage[area as usize] = card_id;
-            // Rule 9.6.2.1.2.1: Card came from hand (non-stage), track it.
-            // remove_member_from_stage_with_recycling already cleaned up the old card IDs.
-            player.track_deployment(card_id);
-            // Record 2 baton touches
-            for _ in 0..2 {
-                game_state.record_baton_touch(&player_id, Some(card_id));
-            }
-            game_state.baton_touch_replaced_member_id =
-                double_baton_areas.as_ref().and_then(|_areas| {
-                    let player = game_state.active_player();
-                    player.waitroom.cards.last().copied()
-                });
-            game_state.active_player_mut().debut_count_this_turn += 1;
-            game_state.record_card_appearance(card_id, "hand");
-            game_state.baton_touch_arriving_card_id = Some(card_id);
-
-            Self::trigger_debut_abilities(game_state, &player_id, &card_no, final_cost, true);
-            Self::trigger_auto_abilities_for_player(game_state, &player_id);
-            let db_opponent_id = game_state.opponent_id(&player_id);
-            Self::trigger_auto_abilities_for_player(game_state, &db_opponent_id);
-            game_state.process_pending_auto_abilities(&player_id);
-            tdbg!("PHASE_AUTO:0 recalc");
-            game_state.recalculate_constants();
-            tdbg!("PHASE_AUTO:1 recalc OK");
-
-            log::debug!("[TRACK_MOVE] card_id={} player_id={}", card_id, player_id);
-            return Ok(());
         }
 
         // Resolve the cost modifier for the member that baton touch would replace
@@ -1188,48 +1254,7 @@ tdbg!("PHASE_ACTIVE:4 wait activated");
         tdbg!("PHASE_AUTO2:1 recalc OK");
 
         if baton_touch_used {
-            for area in [
-                crate::zones::MemberArea::LeftSide,
-                crate::zones::MemberArea::Center,
-                crate::zones::MemberArea::RightSide,
-            ] {
-                let card_no = if let Some(card_id) = game_state.active_player().stage.get_area(area)
-                {
-                    if let Some(card) = game_state.card_database.get_card(card_id) {
-                        let bt_card_id = card_id;
-                        card.abilities
-                            .iter()
-                            .filter(|ar| {
-                                ar.resolve()
-                                    .has_trigger(crate::triggers::TriggerKind::BatonTouch)
-                            })
-                            .map(|ar| {
-                                let ability = ar.resolve();
-                                (
-                                    format!("{}_{}", card.card_no, ability.full_text),
-                                    card.card_no.to_string(),
-                                    bt_card_id,
-                                )
-                            })
-                            .collect()
-                    } else {
-                        Vec::new()
-                    }
-                } else {
-                    Vec::new()
-                };
-                for (ability_id, card_no, bt_card_id) in card_no {
-                    game_state.trigger_auto_ability(
-                        ability_id,
-                        crate::game_state::AbilityTrigger::Debut,
-                        player_id.clone(),
-                        Some(card_no),
-                        Some(bt_card_id),
-                        None,
-                        None,
-                    );
-                }
-            }
+            Self::trigger_baton_touch_abilities(game_state, &player_id);
         }
 
         // Discard triggers are handled by the unified moved-cards scan
