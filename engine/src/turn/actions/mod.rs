@@ -1543,12 +1543,9 @@ impl super::TurnEngine {
     /// `is_p1` selects the player; the id String is only cloned on the rare
     /// path where a card actually moves (needed for the movement event).
     fn check_invalid_live_cards(game_state: &mut GameState, is_p1: bool) {
+        let seat = if is_p1 { 0 } else { 1 };
         let invalids: Vec<(usize, i16, bool)> = {
-            let player = if is_p1 {
-                &game_state.player1
-            } else {
-                &game_state.player2
-            };
+            let player = game_state.seat_player(seat);
             player
                 .live_card_zone
                 .cards
@@ -1567,19 +1564,11 @@ impl super::TurnEngine {
         if invalids.is_empty() {
             return;
         }
-        let player_id = if is_p1 {
-            game_state.player1.id.clone()
-        } else {
-            game_state.player2.id.clone()
-        };
+        let player_id = game_state.seat_player(seat).id.clone();
         // Live-zone membership changed ↁEconstant outputs may differ.
         let mut moved = Vec::new();
         for &(i, card_id, is_energy) in invalids.iter().rev() {
-            let player = if is_p1 {
-                &mut game_state.player1
-            } else {
-                &mut game_state.player2
-            };
+            let player = game_state.seat_player_mut(seat);
             if i < player.live_card_zone.cards.len() {
                 player.live_card_zone.cards.remove(i);
                 if is_energy {
