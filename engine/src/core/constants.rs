@@ -33,6 +33,31 @@ pub fn saturate_i16(v: i32) -> i16 {
     i16::try_from(v.clamp(i32::from(i16::MIN), i32::from(i16::MAX))).unwrap()
 }
 
+/// Effective value of a printed u8 stat plus a constant modifier, kept wide.
+///
+/// ONE home for the `printed as i32 + get_*_modifier` chain smeared across
+/// condition evaluation and cost math (comparison.rs, predicates.rs,
+/// condition/card.rs). Callers narrow with [`saturate_u8`]/[`saturate_i16`]
+/// or keep the i32 for sums — either way the entry cast lives here, once.
+#[inline]
+pub fn effective_stat(printed: u8, modifier: i32) -> i32 {
+    printed as i32 + modifier
+}
+
+/// Effective playable cost with floor-at-1: `(base + modifier).max(1)`,
+/// saturated to u8.
+///
+/// Canonical home for the baton-touch price formula: the payment itself
+/// (core/player.rs), the estimates (game_setup.rs) and the double-baton
+/// path (turn/phases.rs) previously spelled it three different ways
+/// (`as u8` wrapping, `try_from(..).unwrap_or(0)`). Values above 255
+/// saturate instead of wrapping — unreachable in this game (costs ≤ ~15,
+/// modifiers ±single digits) and never intended.
+#[inline]
+pub fn floored_cost(base: u8, modifier: i32) -> u8 {
+    u8::try_from((base as i32 + modifier).max(1)).unwrap_or(u8::MAX)
+}
+
 /// Saturating usize → u8 for card counts, as an extension method so call
 /// sites read `.len().u8_count()` instead of `.len() as u8`. Zone sizes are
 /// small in practice, but waitrooms/decks CAN exceed 255 in long games and a

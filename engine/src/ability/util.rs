@@ -1500,8 +1500,8 @@ pub fn filter_current_blade(
                 .map(|c| c.blade as i32)
                 .unwrap_or(0);
             let set = gs.mods.get_blade_set_modifier(cid);
-            let effective = if set != 0 { set as i32 } else { base };
-            let additive = gs.mods.get_blade_modifier(cid) - set as i32;
+            let effective = if set != 0 { set } else { base };
+            let additive = gs.mods.get_blade_modifier(cid) - set;
             let total = crate::constants::saturate_u8(effective + additive);
             compare_counts(Some(op), total, bl)
         })

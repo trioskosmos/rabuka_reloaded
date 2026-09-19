@@ -81,7 +81,7 @@ fn total_blades_of(p: &Player, gs: &GameState, db: &CardDatabase) -> i32 {
                 0
             } else {
                 db.get_card(c).map(|x| x.blade as i32).unwrap_or(0)
-                    + gs.mods.get_blade_modifier(c) as i32
+                    + gs.mods.get_blade_modifier(c)
             }
         })
         .sum()
@@ -121,7 +121,13 @@ fn blade_mod_fingerprint(gs: &GameState, me: u8) -> Vec<i16> {
         .stage
         .stage
         .iter()
-        .map(|&c| if c < 0 { 0i16 } else { gs.mods.get_blade_modifier(c) as i16 })
+        .map(|&c| {
+            if c < 0 {
+                0i16
+            } else {
+                crate::constants::saturate_i16(gs.mods.get_blade_modifier(c))
+            }
+        })
         .collect()
 }
 

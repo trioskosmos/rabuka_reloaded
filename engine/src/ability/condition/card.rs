@@ -323,7 +323,7 @@ impl<'a> ConditionContext<'a> {
                                         .heart_modifiers
                                         .get(&cid)
                                         .and_then(|hm| hm.get(&color))
-                                        .map(|e| e.set as i32 + e.additive as i32)
+                                        .map(|e| e.total())
                                         .unwrap_or(0)
                                 })
                                 .sum();
@@ -956,7 +956,7 @@ impl<'a> ConditionContext<'a> {
             .get(&card_id)
             .map(|hm| {
                 hm.values()
-                    .map(|e| e.set as i32 + e.additive as i32)
+                    .map(|e| e.total())
                     .sum::<i32>()
             })
             .unwrap_or(0);
@@ -1787,9 +1787,10 @@ impl<'a> ConditionContext<'a> {
     fn modified_cost(&self, cid: i16) -> Option<u8> {
         let card = self.game_state.card_database.get_card(cid)?;
         let cost = card.cost.unwrap_or(0);
-        Some(crate::constants::saturate_u8(
-            cost as i32 + self.game_state.mods.get_cost_modifier(cid),
-        ))
+        Some(crate::constants::saturate_u8(crate::constants::effective_stat(
+            cost,
+            self.game_state.mods.get_cost_modifier(cid),
+        )))
     }
 
     /// Count DISTINCT heart-color types present across `cards`, gated on
@@ -3461,8 +3462,10 @@ impl<'a> ConditionContext<'a> {
                 for card_id in &player.stage.stage {
                     if *card_id != -1 {
                         if let Some(card) = self.game_state.card_database.get_card(*card_id) {
-                            total_cost += card.cost.unwrap_or(0) as i32
-                                + self.game_state.mods.get_cost_modifier(*card_id);
+                            total_cost += crate::constants::effective_stat(
+                                card.cost.unwrap_or(0),
+                                self.game_state.mods.get_cost_modifier(*card_id),
+                            );
                         }
                     }
                 }
@@ -3580,7 +3583,10 @@ impl<'a> ConditionContext<'a> {
                     }
                     if let Some(base) = card_db.get_card(id).and_then(|c| c.cost) {
                         let v = crate::constants::saturate_u8(
-                            base as i32 + self.game_state.mods.get_cost_modifier(id),
+                            crate::constants::effective_stat(
+                                base,
+                                self.game_state.mods.get_cost_modifier(id),
+                            ),
                         );
                         if v > max_cost {
                             max_cost = v;
@@ -3740,9 +3746,12 @@ impl<'a> ConditionContext<'a> {
                 .moved_cards
                 .iter()
                 .filter_map(|&id| {
-                    let base = card_db.get_card(id).and_then(|c| c.cost).unwrap_or(0) as i32;
+                    let base = card_db.get_card(id).and_then(|c| c.cost).unwrap_or(0);
                     Some(crate::constants::saturate_u8(
-                        base + self.game_state.mods.get_cost_modifier(id),
+                        crate::constants::effective_stat(
+                            base,
+                            self.game_state.mods.get_cost_modifier(id),
+                        ),
                     ))
                 })
                 .sum();
@@ -3760,9 +3769,12 @@ impl<'a> ConditionContext<'a> {
                 .revealed_cards
                 .iter()
                 .filter_map(|&id| {
-                    let base = card_db.get_card(id).and_then(|c| c.cost).unwrap_or(0) as i32;
+                    let base = card_db.get_card(id).and_then(|c| c.cost).unwrap_or(0);
                     Some(crate::constants::saturate_u8(
-                        base + self.game_state.mods.get_cost_modifier(id),
+                        crate::constants::effective_stat(
+                            base,
+                            self.game_state.mods.get_cost_modifier(id),
+                        ),
                     ))
                 })
                 .sum();

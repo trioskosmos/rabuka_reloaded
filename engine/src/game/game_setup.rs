@@ -1445,14 +1445,6 @@ fn has_cannot_baton_touch(
     crate::ability::util::has_cannot_baton_touch_protection(card_db, card_id, existing_card)
 }
 
-/// Effective baton-touch cost of a stage member: printed cost plus
-/// constant modifiers, minimum 1. ONE definition shared by the single
-/// and double baton-touch price computations below (and parity with
-/// core/player.rs baton payment).
-fn effective_baton_cost(base_cost: Option<u8>, cost_modifier: i32) -> u8 {
-    (base_cost.unwrap_or(0) as i32 + cost_modifier).max(1) as u8
-}
-
 fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
     #[cfg(not(feature = "no_std"))]
     let _timer = crate::timer::Timer::start("generate_main_phase_actions");
@@ -1544,8 +1536,8 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                                     if let Some(existing_member_card) = stage_cards[area_idx] {
                                         // Include constant cost modifiers (e.g. 唐 可可 +2):
                                         // parity with core/player.rs baton payment.
-                                        let member_cost = effective_baton_cost(
-                                            existing_member_card.cost,
+                                        let member_cost = crate::constants::floored_cost(
+                                            existing_member_card.cost.unwrap_or(0),
                                             game_state.mods.get_cost_modifier(existing_member_id),
                                         );
                                         let cost_to_pay =
@@ -1607,8 +1599,8 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                                     game_state.card_database.get_card(cid)
                                         .and_then(|c| c.cost)
                                         .map(|base| {
-                                            effective_baton_cost(
-                                                Some(base),
+                                            crate::constants::floored_cost(
+                                                base,
                                                 game_state.mods.get_cost_modifier(cid),
                                             )
                                         })

@@ -984,13 +984,17 @@ tdbg!("PHASE_ACTIVE:4 wait activated");
                     .iter()
                     .filter_map(|&area| {
                         player.stage.get_area(area).map(|cid| {
-                            let base = card_db
-                                .get_card(cid)
-                                .and_then(|c| c.cost)
-                                .unwrap_or(0) as i32;
                             // Include constant cost modifiers (parity with single-baton
-                            // payment in core/player.rs).
-                            u8::try_from((base + game_state.mods.get_cost_modifier(cid)).max(1)).unwrap_or(0)
+                            // payment in core/player.rs). Missing data stays 0.
+                            game_state.card_database.get_card(cid)
+                                .and_then(|c| c.cost)
+                                .map(|base| {
+                                    crate::constants::floored_cost(
+                                        base,
+                                        game_state.mods.get_cost_modifier(cid),
+                                    )
+                                })
+                                .unwrap_or(0)
                         })
                     })
                     .collect()

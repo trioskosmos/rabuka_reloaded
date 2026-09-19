@@ -161,9 +161,11 @@ impl<'a> ConditionContext<'a> {
     }
 
     fn evaluate_activating_cost(&self, condition: &Condition, act: i16) -> bool {
-        let printed = self.printed_cost(act) as i32;
-        let effective =
-            (printed + self.game_state.mods.get_cost_modifier(act)).clamp(0, u8::MAX as i32);
+        let printed = self.printed_cost(act);
+        let effective = crate::constants::saturate_u8(crate::constants::effective_stat(
+            printed,
+            self.game_state.mods.get_cost_modifier(act),
+        ));
         let threshold = condition.get_count().unwrap_or(0);
         let op = condition.get_operator().unwrap_or(">=");
         log::debug!(target: "rabuka_engine::ability::condition::card",
@@ -176,7 +178,7 @@ impl<'a> ConditionContext<'a> {
         );
         compare_counts(
             Some(op),
-            u8::try_from(effective).unwrap_or(u8::MAX),
+            effective,
             threshold,
         )
     }
@@ -193,9 +195,10 @@ impl<'a> ConditionContext<'a> {
         let op = condition.get_operator();
         ids.iter().any(|&id| {
             let original = card_db.get_card(id).and_then(|c| c.score).unwrap_or(0);
-            let current = crate::constants::saturate_u8(
-                original as i32 + self.game_state.mods.get_score_modifier(id),
-            );
+            let current = crate::constants::saturate_u8(crate::constants::effective_stat(
+                original,
+                self.game_state.mods.get_score_modifier(id),
+            ));
             compare_counts(op, current, original)
         })
     }
@@ -348,7 +351,12 @@ impl<'a> ConditionContext<'a> {
         cards
             .iter()
             .filter(|&&id| self.matches_condition_groups_and_type(condition, id))
-            .map(|&id| self.printed_cost(id) as i32 + self.game_state.mods.get_cost_modifier(id))
+            .map(|&id| {
+                crate::constants::effective_stat(
+                    self.printed_cost(id),
+                    self.game_state.mods.get_cost_modifier(id),
+                )
+            })
             .sum()
     }
 

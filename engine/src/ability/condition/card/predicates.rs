@@ -122,9 +122,10 @@ impl<'a> ConditionContext<'a> {
     }
 
     pub(super) fn effective_condition_cost(&self, card_id: i16) -> u8 {
-        crate::constants::saturate_u8(
-            self.printed_cost(card_id) as i32 + self.game_state.mods.get_cost_modifier(card_id),
-        )
+        crate::constants::saturate_u8(crate::constants::effective_stat(
+            self.printed_cost(card_id),
+            self.game_state.mods.get_cost_modifier(card_id),
+        ))
     }
 
     pub(super) fn matches_condition_groups_and_type(

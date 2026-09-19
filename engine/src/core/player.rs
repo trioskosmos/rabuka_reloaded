@@ -264,7 +264,8 @@ impl Player {
                         // Resolved by the caller (from &game_state.mods) and passed in
                         // to avoid cloning the entire GameModifiers per action.
                         let cost_mod = replaced_member_cost_mod;
-                        let replaced_member_cost = (base_cost as i32 + cost_mod).max(1) as u8;
+                        let replaced_member_cost =
+                            crate::constants::floored_cost(base_cost, cost_mod);
 
                         // Store the replaced member cost for later use
                         baton_touch_replaced_cost = Some(replaced_member_cost);
