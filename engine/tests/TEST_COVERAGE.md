@@ -224,7 +224,13 @@ Highest-risk category: requires a full live phase with another ability resolving
 
 ## Official QA rulings (cards/qa_data.json)
 
-- **Rulings covered by tests:** 280 / 280 (100%)
+- **Rulings covered by tests:** 279 / 280 (99%)
+
+Uncovered rulings (no test references the Q-id or any related card):
+
+| Ruling | Related card |
+|---|---|
+| Q57 | `?` |
 
 ## Inventory
 

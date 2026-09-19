@@ -1,6 +1,6 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-09-18T06:12:44.424898+00:00",
+  "generated_at": "2026-09-19T01:03:38.740042+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
@@ -316,9 +316,11 @@
     "none": 1
   },
   "qa_rulings": {
-    "covered": 280,
+    "covered": 279,
     "total": 280,
-    "uncovered_ids": []
+    "uncovered_ids": [
+      "Q57"
+    ]
   },
   "jidou_conjunction": {
     "ability_watchers": [
