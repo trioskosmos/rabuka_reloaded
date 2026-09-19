@@ -5932,28 +5932,45 @@ def _fill_defaults_move_cards(action, text, action_text, _cached_source, _cached
     return action.get("action")
 
 
-def _fill_defaults(action, text, _cached_source=None, _cached_dest=None):
-    """Consolidated post-dispatch normalization. Fills defaults every action needs.
+# Shared (type-keyword) table for the two or_card_types blocks in
+# `_fill_defaults` (か-pair scan and のどちらか scan). ONE definition so
+# the keyword set cannot drift between them.
+_OR_CARD_TYPE_KEYWORDS = [
+    ("live_card", "ライブカード"),
+    ("member_card", "メンバーカード"),
+    ("energy_card", "エネルギーカード"),
+]
 
-    Field ownership (C6): parse_action owns ALL field extraction (source,
-    destination, count, card_type, target, state_change, cost_limit,
-    optional, max, position and group_names). This function ONLY fills
-    defaults for fields left unset (guarded by `not in action`) plus
-    action-type-specific defaults, so it is safe to call on fresh
-    sub-action dicts. No extraction should be added here — add it to
-    parse_action instead.
-    """
-    action_text = action.get("text", text) or text
+# Ordered operation phrases for modify_required_hearts: first match wins.
+# Same order as the legacy if-chain (減らす-family before 増やす-family
+# before になる, defaulting to decrease).
+_MODIFY_HEARTS_OPERATION_RULES = (
+    (("減らす", "減らし", "減る", "減って"), "decrease"),
+    (("増やす", "増える", "増やし"), "increase"),
+    (("になる", "にする"), "set"),
+)
+
+# Ordered source zones for select actions: first matching phrase wins.
+# Same order as the legacy if-chain.
+_SELECT_SOURCE_RULES = (
+    (("控え室にある", "控え室の"), "discard"),
+    (("手札の", "手札にある"), "hand"),
+    (("ステージにいる", "ステージの"), "stage"),
+    (("ライブ中の", "ライブカード置き場"), "live_card_zone"),
+    (("それらの中から",), "revealed_cards"),
+)
+
+
+def _fill_draw_shuffle(action, text, _cached_source, _cached_dest):
+    """Draw/shuffle normalization. Returns the (possibly updated) action name."""
     a = action.get("action")
-    # Normalize "revealed_card" (singular) to "revealed_cards" (plural) for consistency
-    if action.get("source") == "revealed_card":
-        action["source"] = "revealed_cards"
     if a == "draw":
         action["action"] = "draw_card"
         a = "draw_card"
     if a == "draw_card":
         action.setdefault("source", "deck")
         action.setdefault("destination", "hand")
+        return a
     # Shuffle is always combined with a move action (shuffle then place).
     # If dispatch matched shuffle but text also has a destination pattern, emit move_cards with shuffle flag.
     if a == "shuffle":
@@ -5974,30 +5991,30 @@ def _fill_defaults(action, text, _cached_source=None, _cached_dest=None):
                 ct = _infer_card_type(text, action)
                 if ct:
                     action["card_type"] = ct
-            a = "move_cards"
+            return "move_cards"
+    return a
 
-    if action.get("source") == "selected_cards":
-        action.setdefault("count", 1)
-    if a == "gain_resource" and "resource" not in action:
+
+def _fill_gain_resource(action, text, action_text):
+    if action.get("action") != "gain_resource":
+        return
+    if "resource" not in action:
         infer_resource(action, text)
-    if a == "gain_resource":
-        infer_count_from_icons(action, action_text)
-        if action.get("count") is None:
-            action["count"] = 1
-        # Extract target_count from "N人" (e.g., "メンバー1人" → target_count=1)
-        tc_match = re.search(r"(\d+)人", text)
-        if tc_match:
-            action["target_count"] = int(tc_match.group(1))
-        # Extract distinct_card_name from "名前の異なる" (different name constraint)
-        if "名前の異なる" in text:
-            action["distinct"] = "card_name"
-    # same_name: applied to ALL action types, not just gain_resource
-    if "same_name" not in action and (
-        "と同じ名前" in text or ("同じ名前" in text and "持つ" in text)
-    ):
-        action["same_name"] = True
-    # Heart gains already have their multiset set by infer_count_from_icons
-    # (above). For those, do NOT re-derive heart_colors from the full text,
+    infer_count_from_icons(action, action_text)
+    if action.get("count") is None:
+        action["count"] = 1
+    # Extract target_count from "N人" (e.g., "メンバー1人" → target_count=1)
+    tc_match = re.search(r"(\d+)人", text)
+    if tc_match:
+        action["target_count"] = int(tc_match.group(1))
+    # Extract distinct_card_name from "名前の異なる" (different name constraint)
+    if "名前の異なる" in text:
+        action["distinct"] = "card_name"
+
+
+def _fill_heart_colors(action, text):
+    # Heart gains already have their multiset set by infer_count_from_icons.
+    # For those, do NOT re-derive heart_colors from the full text,
     # which would leak condition/requirement hearts onto the gain effect.
     if "heart_colors" not in action and not _is_heart_gain(action, text):
         hc = extract_heart_colors_from_text(text)
@@ -6021,21 +6038,20 @@ def _fill_defaults(action, text, _cached_source=None, _cached_dest=None):
             if action.get("heart_colors"):
                 action.pop("heart_colors", None)
                 action.pop("require_all_heart_colors", None)
-    if a == "modify_required_hearts" and "operation" not in action:
-        # 減らし is the continuative (連用) form used mid-sentence: "A減らし、B増やす"
-        if (
-            "減らす" in text
-            or "減らし" in text
-            or "減る" in text
-            or "減って" in text
-        ):
-            action["operation"] = "decrease"
-        elif "増やす" in text or "増える" in text or "増やし" in text:
-            action["operation"] = "increase"
-        elif "になる" in text or "にする" in text:
-            action["operation"] = "set"
-        else:
-            action["operation"] = "decrease"
+
+
+def _fill_hearts_operation(action, text):
+    if action.get("action") != "modify_required_hearts" or "operation" in action:
+        return
+    # 減らし is the continuative (連用) form used mid-sentence: "A減らし、B増やす"
+    for phrases, op in _MODIFY_HEARTS_OPERATION_RULES:
+        if any(p in text for p in phrases):
+            action["operation"] = op
+            return
+    action["operation"] = "decrease"
+
+
+def _fill_exclude_groups(action, text):
     # Exclude group names: detect 「以外」 pattern
     if "以外" in text:
         exc_gns = re.findall(r"『([^』]+)』以外", text)
@@ -6046,34 +6062,130 @@ def _fill_defaults(action, text, _cached_source=None, _cached_dest=None):
                 action["group_names"] = [
                     g for g in action["group_names"] if g not in exc_gns
                 ]
-    # per_unit_type: detect heart colors vs member counts
-    if a in (
+
+
+def _fill_per_unit_extras(action, text, a):
+    if a not in (
         "modify_score",
         "gain_resource",
         "modify_cost",
         "perform_yell",
-        "modify_required_hearts",
     ):
-        if action.get("per_unit"):
-            if "色につき" in text or "色に付き" in text:
-                action["per_unit_type"] = "heart_colors"
-            elif "コスト" in text and "につき" in text:
-                action["per_unit_type"] = "cost"
-                cm = re.search(r"コスト(\d+)につき", text)
-                if cm:
-                    action["per_unit_count"] = int(cm.group(1))
-            # Issue 15: per_unit_source from "これにより控え室に置いたカード" pattern
-            if "これにより" in text and ("置いた" in text or "置かれた" in text):
-                action["per_unit_source"] = "previous_moved_cards"
-        # Issue 15: max_repeats from "N枚までしか" / "N回までしか" patterns
-        max_m = re.search(r"(\d+)(?:枚|回|つ)までしか", text)
-        if not max_m:
-            max_m = re.search(r"(\d+)までしか", text)
-        if max_m:
-            action["max_repeats"] = int(max_m.group(1))
-        # Issue 6: Detect timing constraint for gain_resource
-        if "このターンに登場" in text and a == "gain_resource":
-            action["timing_condition"] = "appeared_this_turn"
+        return
+    if action.get("per_unit"):
+        if "色につき" in text or "色に付き" in text:
+            action["per_unit_type"] = "heart_colors"
+        elif "コスト" in text and "につき" in text:
+            action["per_unit_type"] = "cost"
+            cm = re.search(r"コスト(\d+)につき", text)
+            if cm:
+                action["per_unit_count"] = int(cm.group(1))
+        # Issue 15: per_unit_source from "これにより控え室に置いたカード" pattern
+        if "これにより" in text and ("置いた" in text or "置かれた" in text):
+            action["per_unit_source"] = "previous_moved_cards"
+    # Issue 15: max_repeats from "N枚までしか" / "N回までしか" patterns
+    max_m = re.search(r"(\d+)(?:枚|回|つ)までしか", text)
+    if not max_m:
+        max_m = re.search(r"(\d+)までしか", text)
+    if max_m:
+        action["max_repeats"] = int(max_m.group(1))
+    # Issue 6: Detect timing constraint for gain_resource
+    if "このターンに登場" in text and a == "gain_resource":
+        action["timing_condition"] = "appeared_this_turn"
+
+
+def _fill_select_source(action, text):
+    # Infer source for select actions from common location patterns.
+    # When multiple zones appear in text (e.g. count reference mentions stage
+    # but actual selection is from waiting room), prefer the selection source.
+    for phrases, source in _SELECT_SOURCE_RULES:
+        if any(p in text for p in phrases):
+            action["source"] = source
+            return
+
+
+def _fill_select_target(action, text):
+    # Fix target for select actions: when both "自分の" and "相手の" appear in text
+    # (e.g., count reference mentions opponent but selection is from your waiting room),
+    # extract_target may incorrectly return "both". Override to the correct player
+    # based on the source zone's owner.
+    src = action.get("source", "")
+    zones = (("discard", "控え室"), ("stage", "ステージ"), ("hand", "手札"))
+    for zone, word in zones:
+        if src == zone:
+            own = f"自分の{word}"
+            opp = f"相手の{word}"
+            if own in text and opp not in text:
+                action["target"] = "self"
+            elif opp in text and own not in text:
+                action["target"] = "opponent"
+            return
+
+
+def _fill_or_card_types(action, text, pop_card_type):
+    or_types = []
+    for t, kw in _OR_CARD_TYPE_KEYWORDS:
+        if kw in text:
+            or_types.append(t)
+            if t == "member_card" and pop_card_type:
+                cl = extract_cost_limit(text)
+                if cl:
+                    action["cost_limit"] = cl
+    if len(or_types) >= 2:
+        action["or_card_types"] = or_types
+        if pop_card_type:
+            action.pop("card_type", None)
+
+
+def _fill_need_heart(action, text):
+    # Parse need_heart constraints like "{{heart_06.png|heart06}}を3以上含むライブカード"
+    nh = re.search(r"(?:heart\d{2}|heart\d{2}[^」]*?})を(\d+)以上含む", text)
+    if nh:
+        # Extract the heart color from the raw text (either bare "heart06" or icon "{{heart_06.png|heart06}}")
+        color_match = re.search(r"heart(\d{2})", text[: nh.end()])
+        if color_match:
+            action["need_heart_color"] = f"heart{int(color_match.group(1)):02d}"
+            action["need_heart_total"] = int(nh.group(1))
+            action["need_heart_operator"] = ">="
+
+    # Also parse plain-text patterns like "ハートを4つ以上持つ" (without heart icon)
+    nh2 = re.search(r"ハートを(\d+)つ以上持つ", text)
+    if nh2:
+        # Total heart icon count threshold (any colors)
+        action["need_heart_total"] = int(nh2.group(1))
+        action["need_heart_operator"] = ">="
+
+
+def _fill_defaults(action, text, _cached_source=None, _cached_dest=None):
+    """Consolidated post-dispatch normalization. Fills defaults every action needs.
+
+    Field ownership (C6): parse_action owns ALL field extraction (source,
+    destination, count, card_type, target, state_change, cost_limit,
+    optional, max, position and group_names). This function ONLY fills
+    defaults for fields left unset (guarded by `not in action`) plus
+    action-type-specific defaults, so it is safe to call on fresh
+    sub-action dicts. No extraction should be added here — add it to
+    parse_action instead.
+    """
+    action_text = action.get("text", text) or text
+    a = action.get("action")
+    # Normalize "revealed_card" (singular) to "revealed_cards" (plural) for consistency
+    if action.get("source") == "revealed_card":
+        action["source"] = "revealed_cards"
+    a = _fill_draw_shuffle(action, text, _cached_source, _cached_dest)
+
+    if action.get("source") == "selected_cards":
+        action.setdefault("count", 1)
+    _fill_gain_resource(action, text, action_text)
+    # same_name: applied to ALL action types, not just gain_resource
+    if "same_name" not in action and (
+        "と同じ名前" in text or ("同じ名前" in text and "持つ" in text)
+    ):
+        action["same_name"] = True
+    _fill_heart_colors(action, text)
+    _fill_hearts_operation(action, text)
+    _fill_exclude_groups(action, text)
+    _fill_per_unit_extras(action, text, a)
     if "original_value" not in action and ("元々持つ" in text or "元々" in text):
         action["original_value"] = True
     if "このカード" in text:
@@ -6100,18 +6212,11 @@ def _fill_defaults(action, text, _cached_source=None, _cached_dest=None):
                 action["cost_limit_operator"] = extract_operator(text) or "="
     # OR card types for ALL action types (not just move_cards/select)
     if a not in ("move_cards", "select") and "or_card_types" not in action:
-        card_type_kws = [
-            ("live_card", "ライブカード"),
-            ("member_card", "メンバーカード"),
-            ("energy_card", "エネルギーカード"),
-        ]
         if re.search(
             r"(ライブカード|メンバーカード|エネルギーカード).*か.*(ライブカード|メンバーカード|エネルギーカード)",
             text,
         ):
-            or_types = [t for t, kw in card_type_kws if kw in text]
-            if len(or_types) >= 2:
-                action["or_card_types"] = or_types
+            _fill_or_card_types(action, text, pop_card_type=False)
     a = _fill_defaults_count_and_refine(action, text, action_text, a)
 
     if "optional" not in action and extract_optional(text):
@@ -6120,37 +6225,13 @@ def _fill_defaults(action, text, _cached_source=None, _cached_dest=None):
     # When multiple zones appear in text (e.g. count reference mentions stage
     # but actual selection is from waiting room), prefer the selection source.
     if a == "select" and "source" not in action:
-        if "控え室にある" in text or "控え室の" in text:
-            action["source"] = "discard"
-        elif "手札の" in text or "手札にある" in text:
-            action["source"] = "hand"
-        elif "ステージにいる" in text or "ステージの" in text:
-            action["source"] = "stage"
-        elif "ライブ中の" in text or "ライブカード置き場" in text:
-            action["source"] = "live_card_zone"
-        elif "それらの中から" in text:
-            action["source"] = "revealed_cards"
+        _fill_select_source(action, text)
     # Fix target for select actions: when both "自分の" and "相手の" appear in text
     # (e.g., count reference mentions opponent but selection is from your waiting room),
     # extract_target may incorrectly return "both". Override to the correct player
     # based on the source zone's owner.
     if a == "select" and action.get("target") == "both":
-        src = action.get("source", "")
-        if src == "discard":
-            if "自分の控え室" in text and "相手の控え室" not in text:
-                action["target"] = "self"
-            elif "相手の控え室" in text and "自分の控え室" not in text:
-                action["target"] = "opponent"
-        elif src == "stage":
-            if "自分のステージ" in text and "相手のステージ" not in text:
-                action["target"] = "self"
-            elif "相手のステージ" in text and "自分のステージ" not in text:
-                action["target"] = "opponent"
-        elif src == "hand":
-            if "自分の手札" in text and "相手の手札" not in text:
-                action["target"] = "self"
-            elif "相手の手札" in text and "自分の手札" not in text:
-                action["target"] = "opponent"
+        _fill_select_target(action, text)
     if "max" not in action and extract_max(text):
         action["max"] = True
     if "好きな枚数" in text or "好きな枚数まで" in text or "任意の枚数" in text:
@@ -6179,42 +6260,12 @@ def _fill_defaults(action, text, _cached_source=None, _cached_dest=None):
         if op:
             action["original_operator"] = op
     if a == "select" and "のどちらか" in text:
-        or_types = []
-        for t, kw in [
-            ("live_card", "ライブカード"),
-            ("member_card", "メンバーカード"),
-            ("energy_card", "エネルギーカード"),
-        ]:
-            if kw in text:
-                or_types.append(t)
-                if t == "member_card":
-                    cl = extract_cost_limit(text)
-                    if cl:
-                        action["cost_limit"] = cl
-        if len(or_types) >= 2:
-            action["or_card_types"] = or_types
-            action.pop("card_type", None)
+        _fill_or_card_types(action, text, pop_card_type=True)
     if action.get("per_unit") and "dynamic_count" not in action:
         action["dynamic_count"] = {"type": "per_unit", "reference": "unit_count"}
         if "count" in action and action["count"] is None:
             del action["count"]
-
-    # Parse need_heart constraints like "{{heart_06.png|heart06}}を3以上含むライブカード"
-    nh = re.search(r"(?:heart\d{2}|heart\d{2}[^」]*?})を(\d+)以上含む", text)
-    if nh:
-        # Extract the heart color from the raw text (either bare "heart06" or icon "{{heart_06.png|heart06}}")
-        color_match = re.search(r"heart(\d{2})", text[: nh.end()])
-        if color_match:
-            action["need_heart_color"] = f"heart{int(color_match.group(1)):02d}"
-            action["need_heart_total"] = int(nh.group(1))
-            action["need_heart_operator"] = ">="
-
-    # Also parse plain-text patterns like "ハートを4つ以上持つ" (without heart icon)
-    nh2 = re.search(r"ハートを(\d+)つ以上持つ", text)
-    if nh2:
-        # Total heart icon count threshold (any colors)
-        action["need_heart_total"] = int(nh2.group(1))
-        action["need_heart_operator"] = ">="
+    _fill_need_heart(action, text)
 
 
 # ======================================================================

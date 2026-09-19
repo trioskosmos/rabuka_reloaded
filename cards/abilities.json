@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-09-18T05:21:36.602494",
+  "generated_at": "2026-09-19T11:43:15.038935",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "d1993354",
+  "engine_commit": "8704e050",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -29094,7 +29094,6 @@
           "heart00"
         ],
         "operation": "decrease",
-        "max_repeats": 3,
         "self_target": true,
         "per_unit": true,
         "per_unit_count": 2,
@@ -29113,6 +29112,7 @@
           "position": "center",
           "type": "group_condition"
         },
+        "max_repeats": 3,
         "value": 2,
         "position": "center"
       }
