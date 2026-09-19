@@ -718,6 +718,77 @@ impl super::TurnEngine {
         Self::resume_queue_with_choice(game_state, choice, result)
     }
 
+    /// Binary yes/no-style targets (`pay` vs `skip`). ONE table for the
+    /// PAY_SKIP / pay_cost_all / primary|alternative arms, which only differ
+    /// in labels. Returns `None` for non-binary targets.
+    fn binary_target_result(target: &str, card_id: Option<i16>) -> Option<String> {
+        const ROWS: &[(&str, &str, &str)] = &[
+            (
+                crate::ability::types::PAY_SKIP_TARGET,
+                "pay_optional_cost",
+                "skip_optional_cost",
+            ),
+            ("pay_cost_all:discard_all", "pay_cost_all", "skip_optional_cost"),
+            ("primary|alternative", "alternative", "primary"),
+        ];
+        ROWS.iter().find(|(t, _, _)| *t == target).map(|(_, one, other)| {
+            if card_id == Some(1) {
+                one.to_string()
+            } else {
+                other.to_string()
+            }
+        })
+    }
+
+    /// Map an answer (indices channel first, then card id) through an option
+    /// list. Shared by the position|destination / area_select /
+    /// double_baton_touch / self_or_opponent arms: before this helper each
+    /// spelled the same nested lookup, and an indices-channel answer that
+    /// fell through became the raw number as destination ("0" matches no
+    /// zone — the card was silently dropped).
+    fn lookup_option_target(
+        options: Option<&Vec<String>>,
+        card_id: Option<i16>,
+        card_indices: &Option<Vec<usize>>,
+    ) -> Option<String> {
+        let opts = options?;
+        if let Some(&idx) = card_indices.as_deref().and_then(|v| v.first()) {
+            if idx < opts.len() {
+                return Some(opts[idx].clone());
+            }
+        }
+        if let Some(id) = card_id {
+            if id >= 0 {
+                if let Ok(idx) = usize::try_from(id) {
+                    if idx < opts.len() {
+                        return Some(opts[idx].clone());
+                    }
+                }
+            }
+        }
+        None
+    }
+
+    /// Bounds-checked option pick with fallback. Shared by the
+    /// SelectHeartColor / SelectHeartType arms (both default heart00).
+    fn pick_heart_option(options: &[String], card_id: Option<i16>) -> String {
+        let idx = card_id.and_then(|id| usize::try_from(id).ok()).unwrap_or(0);
+        options
+            .get(idx)
+            .cloned()
+            .unwrap_or_else(|| "heart00".to_string())
+    }
+
+    /// Answer index, indices channel first, then card id, else 0. Shared by
+    /// the SelectLiveSuccess / SelectAutoAbility arms.
+    fn answer_index(card_id: Option<i16>, card_indices: &Option<Vec<usize>>) -> usize {
+        card_indices
+            .as_ref()
+            .and_then(|v| v.first().copied())
+            .or_else(|| card_id.and_then(|id| usize::try_from(id).ok()))
+            .unwrap_or(0)
+    }
+
     fn build_choice_result(
         choice: &crate::ability::types::Choice,
         card_id: Option<i16>,
@@ -741,26 +812,10 @@ impl super::TurnEngine {
                     options
                 );
                 let selected = match target.as_str() {
-                    crate::ability::types::PAY_SKIP_TARGET => {
-                        if card_id == Some(1) {
-                            "pay_optional_cost".to_string()
-                        } else {
-                            "skip_optional_cost".to_string()
-                        }
-                    }
-                    "pay_cost_all:discard_all" => {
-                        if card_id == Some(1) {
-                            "pay_cost_all".to_string()
-                        } else {
-                            "skip_optional_cost".to_string()
-                        }
-                    }
-                    "primary|alternative" => {
-                        if card_id == Some(1) {
-                            "alternative".to_string()
-                        } else {
-                            "primary".to_string()
-                        }
+                    t @ (crate::ability::types::PAY_SKIP_TARGET
+                    | "pay_cost_all:discard_all"
+                    | "primary|alternative") => {
+                        Self::binary_target_result(t, card_id).unwrap_or_default()
                     }
                     "choice" | "choice_string" | "conditional_optional" => {
                         // card_id=None + card_indices absent/empty means skip
@@ -781,20 +836,14 @@ impl super::TurnEngine {
                                 "position_change:opponent:front".to_string(),
                             ))
                         {
-                            if let Some(ref opts) = options {
-                                if let Some(id) = card_id {
-                                    if id >= 0 {
-                                        if let Ok(idx) = usize::try_from(id) {
-                                            if idx < opts.len() {
-                                                return Ok(
-                                                    crate::ability::types::ChoiceResult::TargetSelected {
-                                                        target: opts[idx].clone(),
-                                                    },
-                                                );
-                                            }
-                                        }
-                                    }
-                                }
+                            if let Some(found) =
+                                Self::lookup_option_target(options.as_ref(), card_id, &None)
+                            {
+                                return Ok(
+                                    crate::ability::types::ChoiceResult::TargetSelected {
+                                        target: found,
+                                    },
+                                );
                             }
                         }
                         // For position|destination choices, look up the option text in the
@@ -807,65 +856,36 @@ impl super::TurnEngine {
                             || target == "area_select"
                             || target == "double_baton_touch"
                         {
-                            if let Some(ref opts) = options {
-                                // Indices channel (select_indices / web UI): map the
-                                // first index through the option list. Before this arm
-                                // existed, an indices-channel answer fell through and
-                                // the raw number became the destination string ("0"),
-                                // which matches no zone — the card was silently dropped
-                                // (found by zone_change_gate_test riko_responds_only_to_own_side).
-                                if let Some(&idx) =
-                                    card_indices.as_deref().and_then(|v| v.first())
-                                {
-                                    if idx < opts.len() {
-                                        return Ok(crate::ability::types::ChoiceResult::
-                                            TargetSelected {
-                                                target: opts[idx].clone(),
-                                            });
-                                    }
-                                }
-                                if let Some(id) = card_id {
-                                    if id >= 0 {
-                                        if let Ok(idx) = usize::try_from(id) {
-                                            if idx < opts.len() {
-                                                return Ok(
-                                                    crate::ability::types::ChoiceResult::TargetSelected {
-                                                        target: opts[idx].clone(),
-                                                    },
-                                                );
-                                            }
-                                        }
-                                    }
-                                }
+                            // Indices channel (select_indices / web UI): map the
+                            // first index through the option list. Before this arm
+                            // existed, an indices-channel answer fell through and
+                            // the raw number became the destination string ("0"),
+                            // which matches no zone — the card was silently dropped
+                            // (found by zone_change_gate_test riko_responds_only_to_own_side).
+                            if let Some(found) = Self::lookup_option_target(
+                                options.as_ref(),
+                                card_id,
+                                &card_indices,
+                            ) {
+                                return Ok(
+                                    crate::ability::types::ChoiceResult::TargetSelected {
+                                        target: found,
+                                    },
+                                );
                             }
                         }
                         // For self_or_opponent, look up option text by index from card_indices
                         if target == "self_or_opponent" {
-                            if let Some(ref opts) = options {
-                                if let Some(ref indices) = card_indices {
-                                    if let Some(&idx) = indices.first() {
-                                        if idx < opts.len() {
-                                            return Ok(
-                                                crate::ability::types::ChoiceResult::TargetSelected {
-                                                    target: opts[idx].clone(),
-                                                },
-                                            );
-                                        }
-                                    }
-                                }
-                                if let Some(id) = card_id {
-                                    if id >= 0 {
-                                        if let Ok(idx) = usize::try_from(id) {
-                                            if idx < opts.len() {
-                                                return Ok(
-                                                    crate::ability::types::ChoiceResult::TargetSelected {
-                                                        target: opts[idx].clone(),
-                                                    },
-                                                );
-                                            }
-                                        }
-                                    }
-                                }
+                            if let Some(found) = Self::lookup_option_target(
+                                options.as_ref(),
+                                card_id,
+                                &card_indices,
+                            ) {
+                                return Ok(
+                                    crate::ability::types::ChoiceResult::TargetSelected {
+                                        target: found,
+                                    },
+                                );
                             }
                         }
                         match card_id {
@@ -879,65 +899,35 @@ impl super::TurnEngine {
             }
             crate::ability::types::Choice::SelectPosition { .. } => {
                 let pos = card_id
-                    .map(|id| match id {
-                        0 => "left".into(),
-                        1 => "center".into(),
-                        2 => "right".into(),
-                        _ => "center".into(),
-                    })
-                    .unwrap_or_else(|| "center".into());
+                    .and_then(|id| usize::try_from(id).ok())
+                    .and_then(|idx| ["left", "center", "right"].get(idx).copied())
+                    .unwrap_or("center")
+                    .to_string();
                 Ok(crate::ability::types::ChoiceResult::PositionSelected { position: pos })
             }
             crate::ability::types::Choice::SelectHeartColor {
                 count: _,
                 options,
                 ..
-            } => {
-                let idx = card_id.and_then(|id| usize::try_from(id).ok()).unwrap_or(0);
-                let chosen = if idx < options.len() {
-                    options[idx].clone()
-                } else {
-                    "heart00".to_string()
-                };
-                Ok(crate::ability::types::ChoiceResult::HeartColorSelected {
-                    colors: vec![chosen],
-                })
-            }
+            } => Ok(crate::ability::types::ChoiceResult::HeartColorSelected {
+                colors: vec![Self::pick_heart_option(options, card_id)],
+            }),
             crate::ability::types::Choice::SelectHeartType {
                 count: _,
                 options,
                 ..
-            } => {
-                let idx = card_id.and_then(|id| usize::try_from(id).ok()).unwrap_or(0);
-                let chosen = if idx < options.len() {
-                    options[idx].clone()
-                } else {
-                    "heart00".to_string()
-                };
-                Ok(crate::ability::types::ChoiceResult::HeartTypeSelected {
-                    types: vec![chosen],
-                })
-            }
+            } => Ok(crate::ability::types::ChoiceResult::HeartTypeSelected {
+                types: vec![Self::pick_heart_option(options, card_id)],
+            }),
             crate::ability::types::Choice::SelectLiveSuccess { options, .. } => {
-                let idx = card_indices
-                    .as_ref()
-                    .and_then(|v| v.first().copied())
-                    .or_else(|| card_id.and_then(|id| usize::try_from(id).ok()))
-                    .unwrap_or(0);
-                let card_index = if idx < options.len() {
-                    options[idx].card_index
-                } else {
-                    0
-                };
+                let idx = Self::answer_index(card_id, &card_indices);
+                let card_index = options.get(idx).map(|o| o.card_index).unwrap_or(0);
                 Ok(crate::ability::types::ChoiceResult::LiveSuccessSelected { card_index })
             }
             crate::ability::types::Choice::SelectAutoAbility { options, .. } => {
+                // NOTE: card_id only (no indices channel) — preserved as-is.
                 let idx = card_id.and_then(|id| usize::try_from(id).ok()).unwrap_or(0);
-                let queue_idx = if idx < options.len() {
-                    options[idx].queue_index
-                } else {
-                    0
-                };
+                let queue_idx = options.get(idx).map(|o| o.queue_index).unwrap_or(0);
                 Ok(crate::ability::types::ChoiceResult::AutoAbilitySelected {
                     queue_index: queue_idx,
                 })
