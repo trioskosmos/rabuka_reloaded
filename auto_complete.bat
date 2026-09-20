@@ -9,7 +9,7 @@ exit /b
 param(
     [int]$IntervalMinutes = 5,
     [string]$WindowTitle = "",
-    [string]$Message = "in the rust engine and parser and tests: I want god files broken up. I want simplification across the board. I want unification of helpers and methods that can be reused. I want less if-if-if-if-if-if- else routing. I want code legibility up. I want interpretability of the codebase and how things connect to each other up. I want elegance. I want superfluous excess bloat code cleaned up and removed. I want it all done fully. No excuses. No waiting for my decisions. Get it all done,"
+    [string]$Message = "in the rust engine and parser and tests: I want god functions broken up. I want simplification across the board. I want unification of helpers and methods that can be reused. I want less if-if-if-if-if-if- else routing. I want code legibility up. I want interpretability of the codebase and how things connect to each other up. I want elegance. I want superfluous excess bloat code cleaned up and removed. I want it all done fully. No excuses. No waiting for my decisions. Get it all done,"
 )
 
 Add-Type -AssemblyName System.Windows.Forms
