@@ -60,6 +60,33 @@ def detect_icon_positions(text: str) -> List[str]:
     return [position for template, position in ICON_POSITION_TEMPLATES.items() if template in text]
 
 
+# (full form, short form, code) for parenthetical position detection.
+# The short form is a substring of the full form ("センター" in
+# "センターエリア"), so `short in note` is exactly equivalent to the
+# legacy `full in note or short in note` checks. Shared by
+# _merge_parenthetical's three internal copies (condition builder,
+# single/multi position detection) so the keyword set cannot drift.
+NOTE_POSITION_KEYWORDS = (
+    ("センターエリア", "センター", "center"),
+    ("左サイドエリア", "左サイド", "left_side"),
+    ("右サイドエリア", "右サイド", "right_side"),
+)
+
+
+def detect_note_positions(note: str) -> List[str]:
+    """Position codes mentioned in a parenthetical note, sorted.
+
+    The legacy call sites iterated center/left/right in an order that
+    coincides with sorted order, so the returned list matches them
+    element-for-element (including the `[0] if len == 1` single case).
+    """
+    found = []
+    for _full, short, code in NOTE_POSITION_KEYWORDS:
+        if short in note:
+            found.append(code)
+    return sorted(found)
+
+
 def format_positions(positions: List[str]) -> str:
     return ",".join(positions)
 

@@ -122,6 +122,7 @@ from cost_parser import (
 )
 from parser_fields import (
     apply_group_exclusions,
+    detect_note_positions,
     detect_position_matches,
     detect_positions,
     detect_icon_positions,
@@ -12446,12 +12447,7 @@ def _merge_parenthetical(target, parenthetical):
                 # where parse_condition returns "custom" because the text has "場合" but
                 # no matching handler. Build condition directly for these.
                 if "エリアにいる場合" in note:
-                    pos_map = {
-                        "センター": "center",
-                        "左サイド": "left_side",
-                        "右サイド": "right_side",
-                    }
-                    detected_pos = [v for k, v in pos_map.items() if k in note]
+                    detected_pos = detect_note_positions(note)
                     cond_parsed = {
                         "type": "location_condition",
                         "location": "stage",
@@ -12463,16 +12459,7 @@ def _merge_parenthetical(target, parenthetical):
                 if cond_parsed and cond_parsed.get("type") != "custom":
                     target["activation_condition_parsed"] = cond_parsed
             # Detect all mentioned positions
-            has_center = "センターエリア" in note or "センター" in note
-            has_left = "左サイドエリア" in note or "左サイド" in note
-            has_right = "右サイドエリア" in note or "右サイド" in note
-            positions = []
-            if has_center:
-                positions.append("center")
-            if has_left:
-                positions.append("left_side")
-            if has_right:
-                positions.append("right_side")
+            positions = detect_note_positions(note)
             if len(positions) == 1:
                 target["activation_position"] = positions[0]
             elif len(positions) > 1:
