@@ -19,7 +19,7 @@ use crate::card::CardDatabase;
 use crate::game_setup::{self, Action};
 use crate::game_state::{GameResult, GameState};
 
-use super::strategy_v5::{binom_ge, nearest_miss_life, player_ref};
+use super::strategy_v5::{binom_ge, nearest_miss_life};
 
 /// Number of candidate portfolios priced per contested decision.
 const TOP_K: usize = 4;
@@ -31,7 +31,7 @@ const HORIZON_TURNS: u8 = 2;
 const MAX_ITERS: usize = 500;
 
 fn value_outcome(gs: &GameState, me: u8, start_succ: (i32, i32)) -> f64 {
-    let (my, opp) = player_ref(gs, me);
+    let (my, opp) = gs.seated_pair(me);
     match gs.game_result {
         GameResult::FirstAttackerWins => {
             if me == 0 {
@@ -211,7 +211,7 @@ pub fn price_portfolios(
 /// capped at TOP_K; plus the empty (junk-dig) baseline; plus the best
 /// probability-gated gamble life when nothing deterministic passes.
 pub fn enumerate_candidates(gs: &GameState, me: u8, db: &CardDatabase) -> Vec<Vec<usize>> {
-    let (my, _) = player_ref(gs, me);
+    let (my, _) = gs.seated_pair(me);
     let pool = heart_pool(gs, me, db);
     let lives = hand_lives(my, db);
     let max_slots =
@@ -295,7 +295,7 @@ thread_local! {
 }
 
 fn plan_key(gs: &GameState, me: u8) -> (u8, u8, u64) {
-    let (my, _) = player_ref(gs, me);
+    let (my, _) = gs.seated_pair(me);
     let side = if matches!(
         gs.current_phase,
         crate::game_state::Phase::LiveCardSetFirstAttacker
@@ -317,8 +317,8 @@ fn plan_key(gs: &GameState, me: u8) -> (u8, u8, u64) {
 /// candidate portfolios out with both sides on proven policies; uncontested
 /// checks delegate to the cheap heuristic path (v5 logic).
 pub fn choose_live_set_v7(gs: &GameState, actions: &[Action], db: &CardDatabase) -> Action {
-    let me = if gs.active_player().id == gs.player1.id { 0u8 } else { 1u8 };
-    let (_, opp) = player_ref(gs, me);
+    let me = gs.active_player_index();
+    let (_, opp) = gs.seated_pair(me);
     let opp_succ = opp.success_live_card_zone.cards.len() as i32;
     let contested = !opp.live_card_zone.cards.is_empty() || opp_succ >= 2;
 
@@ -334,7 +334,7 @@ pub fn choose_live_set_v7(gs: &GameState, actions: &[Action], db: &CardDatabase)
         let mut plan = candidates[idx].clone();
         // Fill spare slots with junk draws exactly like the heuristic path,
         // so the priced comparison matches what will actually be set.
-        let (my, _) = player_ref(gs, me);
+        let (my, _) = gs.seated_pair(me);
         let max_slots =
             (3i32 - i32::from(my.live_card_set_limit_reduction)).max(0) as usize;
         let deck_lives = my

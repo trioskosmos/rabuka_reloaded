@@ -22,7 +22,7 @@ use crate::card::{CardDatabase, CardType};
 use crate::game_setup::{self, Action};
 use crate::game_state::GameState;
 
-use super::strategy_v5::player_ref;
+
 
 /// Guide curve: the score a developed deck should be able to place per turn.
 pub fn curve_target(turn: u8) -> i32 {
@@ -59,7 +59,7 @@ pub fn choose_main_conductor(gs: &GameState, actions: &[Action], me: u8) -> Acti
         return actions[0].clone();
     }
     let db = &gs.card_database;
-    let (my_now, _) = player_ref(gs, me);
+    let (my_now, _) = gs.seated_pair(me);
     let plan = read_plan(gs);
     let base_hand_len = my_now.hand.cards.len() as i32;
     let base_passable = passable_count(gs, me, db);
@@ -168,7 +168,7 @@ pub fn choose_main_conductor(gs: &GameState, actions: &[Action], me: u8) -> Acti
 
 /// Passing portfolios (mean pool), scored. Returns (score, indices).
 fn passing_portfolios(gs: &GameState, me: u8, db: &CardDatabase) -> Vec<(i32, Vec<usize>)> {
-    let (my, _) = player_ref(gs, me);
+    let (my, _) = gs.seated_pair(me);
     let pool = heart_pool(gs, me, db);
     let lives = hand_lives(my, db);
     let max_slots =
@@ -211,8 +211,8 @@ fn passing_portfolios(gs: &GameState, me: u8, db: &CardDatabase) -> Vec<(i32, Ve
 }
 
 pub fn choose_live_set_conductor(gs: &GameState, actions: &[Action], db: &CardDatabase) -> Action {
-    let me = if gs.active_player().id == gs.player1.id { 0u8 } else { 1u8 };
-    let (my, opp) = player_ref(gs, me);
+    let me = gs.active_player_index();
+    let (my, opp) = gs.seated_pair(me);
     let max_slots =
         (3i32 - i32::from(my.live_card_set_limit_reduction)).max(0) as usize;
 
@@ -245,7 +245,7 @@ pub fn choose_live_set_conductor(gs: &GameState, actions: &[Action], db: &CardDa
 }
 
 fn fill_junk(gs: &GameState, me: u8, db: &CardDatabase, desired: &mut Vec<usize>, max_slots: usize) {
-    let (my, _) = player_ref(gs, me);
+    let (my, _) = gs.seated_pair(me);
     let deck_lives = my
         .main_deck
         .cards

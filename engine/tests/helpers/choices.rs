@@ -313,59 +313,64 @@ impl TestGame {
         }
     }
 
-    fn dbg_choice_string(&self) -> String {
+    /// Both pending-choice sources in one view: the live queue choice first,
+    /// else the serialized JSON fallback. Every inspector below reads
+    /// through this instead of repeating the two-source fallback chain.
+    fn pending_choice_view(&self) -> PendingChoiceView<'_> {
         if let Some(choice) = self.state.ability_queue.is_waiting_for_choice() {
-            format!("{:#?}", choice)
-        } else if let Some(ref pc) = self.state.get_pending_choice_json() {
-            format!("{}", pc)
+            PendingChoiceView::Live(choice)
+        } else if let Some(pc) = self.state.get_pending_choice_json() {
+            PendingChoiceView::Json(pc)
         } else {
-            "(none)".into()
+            PendingChoiceView::None
+        }
+    }
+
+    fn dbg_choice_string(&self) -> String {
+        match self.pending_choice_view() {
+            PendingChoiceView::Live(choice) => format!("{:#?}", choice),
+            PendingChoiceView::Json(pc) => format!("{}", pc),
+            PendingChoiceView::None => "(none)".into(),
         }
     }
 
     pub fn pending_choice_type(&self) -> Option<String> {
-        if let Some(choice) = self.state.ability_queue.is_waiting_for_choice() {
-            Some(choice_type(choice).to_string())
-        } else if let Some(ref pc) = self.state.get_pending_choice_json() {
-            let name = match pc["choice_type"].as_str() {
-                Some(
-                    name @ ("SelectCard" | "SelectTarget" | "SelectPosition" | "SelectHeartColor"
-                    | "SelectHeartType" | "SelectAutoAbility" | "SelectLiveSuccess"),
-                ) => name,
-                _ => "Unknown",
-            };
-            Some(name.to_string())
-        } else {
-            None
+        match self.pending_choice_view() {
+            PendingChoiceView::Live(choice) => Some(choice_type(choice).to_string()),
+            PendingChoiceView::Json(pc) => Some(
+                match pc["choice_type"].as_str() {
+                    Some(
+                        name @ ("SelectCard" | "SelectTarget" | "SelectPosition" | "SelectHeartColor"
+                        | "SelectHeartType" | "SelectAutoAbility" | "SelectLiveSuccess"),
+                    ) => name,
+                    _ => "Unknown",
+                }
+                .to_string(),
+            ),
+            PendingChoiceView::None => None,
         }
     }
 
     pub fn pending_choice_count(&self) -> usize {
-        if let Some(choice) = self.state.ability_queue.is_waiting_for_choice() {
-            if let Choice::SelectCard { count, .. } = choice {
-                return *count;
-            }
-        } else if let Some(ref pc) = self.state.get_pending_choice_json() {
-            if let Some(count) = pc["count"].as_u64() {
-                return count as usize;
-            }
+        match self.pending_choice_view() {
+            PendingChoiceView::Live(Choice::SelectCard { count, .. }) => *count,
+            PendingChoiceView::Live(_) => 0,
+            PendingChoiceView::Json(pc) => pc["count"].as_u64().map_or(0, |c| c as usize),
+            PendingChoiceView::None => 0,
         }
-        0
     }
 
     pub fn dbg_choice(&self) {
-        if let Some(choice) = self.state.ability_queue.is_waiting_for_choice() {
-            eprintln!("[CHOICE] {:?}", choice);
-        } else if let Some(ref pc) = self.state.get_pending_choice_json() {
-            eprintln!("[CHOICE] (json) {:?}", pc);
-        } else {
-            eprintln!("[CHOICE] none");
+        match self.pending_choice_view() {
+            PendingChoiceView::Live(choice) => eprintln!("[CHOICE] {:?}", choice),
+            PendingChoiceView::Json(pc) => eprintln!("[CHOICE] (json) {:?}", pc),
+            PendingChoiceView::None => eprintln!("[CHOICE] none"),
         }
     }
 
     pub fn pending_choice_summary(&self) -> String {
-        if let Some(choice) = self.state.ability_queue.is_waiting_for_choice() {
-            return match choice {
+        match self.pending_choice_view() {
+            PendingChoiceView::Live(choice) => match choice {
                 Choice::SelectCard {
                     zone, card_type, count, allow_skip, group, filtered_indices, ..
                 } => format!(
@@ -375,11 +380,16 @@ impl TestGame {
                 ),
                 Choice::SelectTarget { target, .. } => format!("SelectTarget target={}", target),
                 _ => choice_type(choice).to_string(),
-            };
+            },
+            PendingChoiceView::Json(pc) => format!("(json) {}", pc),
+            PendingChoiceView::None => "none".to_string(),
         }
-        if let Some(ref pc) = self.state.get_pending_choice_json() {
-            return format!("(json) {}", pc);
-        }
-        "none".to_string()
     }
+}
+
+/// See `TestGame::pending_choice_view`: live queue choice, JSON fallback, or absent.
+enum PendingChoiceView<'a> {
+    Live(&'a Choice),
+    Json(serde_json::Value),
+    None,
 }

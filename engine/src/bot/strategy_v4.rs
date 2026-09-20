@@ -482,7 +482,7 @@ pub fn choose_action_v4(gs: &GameState, actions: &[Action], me: u8) -> Action {
 // ── Live set: maximize PASSING lives, nothing else ──────────────────────
 
 pub fn choose_live_set_v4(gs: &GameState, actions: &[Action], db: &CardDatabase) -> Action {
-    let me = if gs.active_player().id == gs.player1.id { 0u8 } else { 1u8 };
+    let me = gs.active_player_index();
     let my = if me == 0 { &gs.player1 } else { &gs.player2 };
     // Full-mean flip credit: calibration (calibrate.rs, 8130 decisions)
     // showed 0.6× UNDERPERFORMS — its fail-bucket still placed 33% vs

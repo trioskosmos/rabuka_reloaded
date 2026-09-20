@@ -1484,7 +1484,7 @@ if let Some(pid) = pvp_player_pid {
     HttpResponse::Ok().json(GameStateDelta {
         frame_id: current_frame,
         phase: if phase_changed { Some(game_state.current_phase.clone()) } else { None },
-        active_player: Some(if game_state.active_player().id == game_state.player1.id { 0 } else { 1 }),
+        active_player: Some(game_state.active_player_index()),
         rps_winner: game_state.rps_winner,
         player1_rps_choice: game_state.player1_rps_choice,
         player2_rps_choice: game_state.player2_rps_choice,

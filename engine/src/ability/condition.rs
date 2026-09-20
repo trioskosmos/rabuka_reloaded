@@ -326,6 +326,23 @@ pub fn push_cond_verdict(
 }
 
 impl<'a> ConditionContext<'a> {
+    /// True when the gated ability's owner (`self_player`) is the active player.
+    /// Unknown owner (`None`) passes — preserves the legacy `unwrap_or(true)`.
+    fn owner_is_active(&self) -> bool {
+        self.self_player
+            .map(|p| p.id == self.game_state.active_player().id)
+            .unwrap_or(true)
+    }
+
+    /// True when the owner is NOT the active player (unknown owner passes).
+    /// Separate from `!owner_is_active()` because the legacy default is
+    /// `true` on both arms when the owner is unknown.
+    fn owner_is_opponent(&self) -> bool {
+        self.self_player
+            .map(|p| p.id != self.game_state.active_player().id)
+            .unwrap_or(true)
+    }
+
     /// Phase gate: checks whether the condition's phase restriction (if any) is
     /// satisfied.  Handles "自分のメインフェイズ" (self's main phase),
     /// "相手のメインフェイズ" (opponent's main phase), and plain
@@ -341,77 +358,114 @@ impl<'a> ConditionContext<'a> {
         else {
             return true; // no phase restriction
         };
-        match phase {
-            "main" | "main_phase" => {
-                if self.game_state.current_phase != Phase::Main {
-                    return false;
-                }
-                let pt = condition
-                    .get_phase_target()
-                    .or_else(|| te.and_then(|t| t.phase_target.as_deref()));
-                match pt {
-                    Some("self") => self
-                        .self_player
-                        .map(|p| p.id == self.game_state.active_player().id)
-                        .unwrap_or(true),
-                    Some("opponent") => self
-                        .self_player
-                        .map(|p| p.id != self.game_state.active_player().id)
-                        .unwrap_or(true),
-                    _ => true,
-                }
-            }
-            "active_phase" => {
-                if self.game_state.current_phase != Phase::Active {
-                    return false;
-                }
-                let pt = condition
-                    .get_phase_target()
-                    .or_else(|| te.and_then(|t| t.phase_target.as_deref()));
-                match pt {
-                    Some("self") => self
-                        .self_player
-                        .map(|p| p.id == self.game_state.active_player().id)
-                        .unwrap_or(true),
-                    Some("opponent") => self
-                        .self_player
-                        .map(|p| p.id != self.game_state.active_player().id)
-                        .unwrap_or(true),
-                    _ => true,
-                }
-            }
-            "live_phase" => {
-                if !matches!(
-                    self.game_state.current_phase,
-                    Phase::LiveCardSetFirstAttacker
-                        | Phase::LiveCardSetSecondAttacker
-                        | Phase::FirstAttackerPerformance
-                        | Phase::SecondAttackerPerformance
-                        | Phase::LiveVictoryDetermination
-                ) {
-                    return false;
-                }
-                let pt = condition
-                    .get_phase_target()
-                    .or_else(|| te.and_then(|t| t.phase_target.as_deref()));
-                match pt {
-                    Some("self") => self
-                        .self_player
-                        .map(|p| p.id == self.game_state.active_player().id)
-                        .unwrap_or(true),
-                    Some("opponent") => self
-                        .self_player
-                        .map(|p| p.id != self.game_state.active_player().id)
-                        .unwrap_or(true),
-                    _ => true,
-                }
-            }
+        // Phase membership only — owner matching is shared below.
+        let phase_ok = match phase {
+            "main" | "main_phase" => self.game_state.current_phase == Phase::Main,
+            "active_phase" => self.game_state.current_phase == Phase::Active,
+            "live_phase" => matches!(
+                self.game_state.current_phase,
+                Phase::LiveCardSetFirstAttacker
+                    | Phase::LiveCardSetSecondAttacker
+                    | Phase::FirstAttackerPerformance
+                    | Phase::SecondAttackerPerformance
+                    | Phase::LiveVictoryDetermination
+            ),
+            _ => true,
+        };
+        if !phase_ok {
+            return false;
+        }
+        match condition
+            .get_phase_target()
+            .or_else(|| te.and_then(|t| t.phase_target.as_deref()))
+        {
+            Some("self") => self.owner_is_active(),
+            Some("opponent") => self.owner_is_opponent(),
             _ => true,
         }
     }
 
-    pub fn evaluate_condition(&self, condition: &Condition) -> bool {
-        // Handle aggregate total with heart_colors — runs before type dispatch.
+    /// Routes a `Comparison` condition to its sub-evaluator: both-value,
+    /// highest-cost-on-stage, all-cost comparison, or generic comparison.
+    fn route_comparison_condition(&self, condition: &Condition) -> bool {
+        if Self::is_both_condition(condition) {
+            self.evaluate_both_condition(condition)
+        } else if Self::is_highest_cost_on_stage(condition) {
+            self.evaluate_highest_cost_on_stage_condition(condition)
+        } else if Self::is_all_cost_comparison(condition) {
+            self.evaluate_all_cost_comparison_condition(condition)
+        } else {
+            self.evaluate_comparison_condition(condition)
+        }
+    }
+
+    /// both_condition: has values but NO operator and NO comparison_type.
+    fn is_both_condition(condition: &Condition) -> bool {
+        condition.get_values().is_some() && condition.get_operator().is_none()
+    }
+
+    /// highest_cost_on_stage_condition: position set, no count, no
+    /// position_compare, and NO comparison_target (a set comparison_target,
+    /// e.g. "opponent", means cross-player comparison instead).
+    fn is_highest_cost_on_stage(condition: &Condition) -> bool {
+        condition.get_position().is_some()
+            && condition.get_count().is_none()
+            && condition.get_position_compare().is_none()
+            && condition.get_comparison_target().is_none()
+    }
+
+    /// all_cost_comparison_condition: cost comparison, no position/count/values,
+    /// comparison_target is either None or Self_, AND all=true.
+    fn is_all_cost_comparison(condition: &Condition) -> bool {
+        condition.get_comparison_type() == Some("cost")
+            && condition.get_position().is_none()
+            && condition.get_count().is_none()
+            && condition.get_values().is_none()
+            && (condition.get_comparison_target().is_none()
+                || condition.get_comparison_target()
+                    == Some(crate::card::ComparisonTarget::Self_))
+            && condition.get_all().unwrap_or(false)
+    }
+
+    /// Routes a `Location` condition: counted (or preceding-moved) checks go to
+    /// the card-count evaluator — or the combined-zone one for distinct
+    /// multi-location conditions — while plain presence uses location.
+    fn route_location_condition(&self, condition: &Condition) -> bool {
+        if condition.get_count().is_some() || condition.get_source() == Some("preceding_moved") {
+            if condition.get_distinct().is_some_and(|d| d.is_distinct())
+                && condition.get_locations().is_some()
+            {
+                self.evaluate_multi_location_condition(condition)
+            } else {
+                self.evaluate_card_count_condition(condition)
+            }
+        } else {
+            self.evaluate_location_condition(condition)
+        }
+    }
+
+    /// Routes a `Resource` condition to the resource or blade evaluator.
+    fn route_resource_condition(&self, condition: &Condition) -> bool {
+        if condition.get_resource_type().is_some() {
+            self.evaluate_resource_condition(condition)
+        } else {
+            self.evaluate_card_blade_condition(condition)
+        }
+    }
+
+    /// Routes a `State` condition: from/to transitions, energy orientation,
+    /// or plain stage state.
+    fn route_state_condition(&self, condition: &Condition, has_energy_state: bool) -> bool {
+        if condition.get_from_state().is_some() || condition.get_to_state().is_some() {
+            self.evaluate_state_change_condition(condition)
+        } else if has_energy_state {
+            self.evaluate_energy_state_condition(condition)
+        } else {
+            self.evaluate_state_condition(condition)
+        }
+    }
+
+    pub fn evaluate_condition(&self, condition: &Condition) -> bool {        // Handle aggregate total with heart_colors — runs before type dispatch.
         // Skip early return for TemporalCondition so the phase gate is checked too.
         if !matches!(condition, Condition::Temporal { .. })
             && condition.get_aggregate() == Some("total")
@@ -449,72 +503,15 @@ impl<'a> ConditionContext<'a> {
         // For all other types: run evaluator, then push generic verdict
         let result: bool = match condition {
             Condition::Appearance { .. } => self.evaluate_appearance_condition(condition),
-            Condition::Comparison { .. } => {
-                // both_condition: has values but NO operator and NO comparison_type
-                if condition.get_values().is_some() && condition.get_operator().is_none() {
-                    self.evaluate_both_condition(condition)
-                } else if condition.get_position().is_some()
-                    && condition.get_count().is_none()
-                    && condition.get_position_compare().is_none()
-                    && condition.get_comparison_target().is_none()
-                {
-                    // highest_cost_on_stage_condition: position set, no count,
-                    // no position_compare, and NO comparison_target (if comparison_target
-                    // is set, e.g. "opponent", it's a cross-player comparison handled by
-                    // evaluate_comparison_condition instead).
-                    self.evaluate_highest_cost_on_stage_condition(condition)
-                } else if condition.get_comparison_type() == Some("cost")
-                    && condition.get_position().is_none()
-                    && condition.get_count().is_none()
-                    && condition.get_values().is_none()
-                    && (condition.get_comparison_target().is_none()
-                        || condition.get_comparison_target()
-                            == Some(crate::card::ComparisonTarget::Self_))
-                    && condition.get_all().unwrap_or(false)
-                {
-                    // all_cost_comparison_condition: cost comparison, no position/count/values,
-                    // comparison_target is either None or Self_, AND all=true
-                    self.evaluate_all_cost_comparison_condition(condition)
-                } else {
-                    self.evaluate_comparison_condition(condition)
-                }
-            }
-            Condition::Location { .. } => {
-                if condition.get_count().is_some()
-                    || condition.get_source() == Some("preceding_moved")
-                {
-                    // For distinct conditions with multiple locations (e.g. stage+waitroom),
-                    // route to evaluate_multi_location_condition which handles combined zones.
-                    if condition.get_distinct().is_some_and(|d| d.is_distinct())
-                        && condition.get_locations().is_some()
-                    {
-                        self.evaluate_multi_location_condition(condition)
-                    } else {
-                        self.evaluate_card_count_condition(condition)
-                    }
-                } else {
-                    self.evaluate_location_condition(condition)
-                }
-            }
-            Condition::Resource { .. } => {
-                if condition.get_resource_type().is_some() {
-                    self.evaluate_resource_condition(condition)
-                } else {
-                    self.evaluate_card_blade_condition(condition)
-                }
-            }
+            Condition::Comparison { .. } => self.route_comparison_condition(condition),
+            Condition::Location { .. } => self.route_location_condition(condition),
+            Condition::Resource { .. } => self.route_resource_condition(condition),
             Condition::Group { .. } => self.evaluate_group_condition(condition),
             Condition::PositionCond { .. } => self.evaluate_position_condition(condition),
             Condition::Temporal { .. } => self.evaluate_temporal_condition(condition),
             Condition::Movement { .. } => self.evaluate_movement_condition(condition),
             Condition::State { energy_state, .. } => {
-                if condition.get_from_state().is_some() || condition.get_to_state().is_some() {
-                    self.evaluate_state_change_condition(condition)
-                } else if energy_state.is_some() {
-                    self.evaluate_energy_state_condition(condition)
-                } else {
-                    self.evaluate_state_condition(condition)
-                }
+                self.route_state_condition(condition, energy_state.is_some())
             }
             Condition::AbilityFilter { .. } => self.evaluate_ability_filter_condition(condition),
             Condition::AnyOf { .. } => self.evaluate_any_of_condition(condition),

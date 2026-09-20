@@ -44,19 +44,11 @@ pub(crate) fn binom_ge(n: i32, k: i32, p: f64) -> f64 {
     prob.clamp(0.0, 1.0)
 }
 
-pub(crate) fn player_ref(gs: &GameState, me: u8) -> (&crate::player::Player, &crate::player::Player) {
-    if me == 0 {
-        (&gs.player1, &gs.player2)
-    } else {
-        (&gs.player2, &gs.player1)
-    }
-}
-
 /// Opponent's achievable live score this turn, from their PUBLIC board
 /// (S2: median hearts ≁E2·score + 1..2). Own deck density proxies their
 /// flips  Efair information only.
 pub fn estimate_opp_score(gs: &GameState, me: u8, db: &CardDatabase) -> i32 {
-    let (_, opp) = player_ref(gs, me);
+    let (_, opp) = gs.seated_pair(me);
     let mut pool = 0i32;
     for &cid in opp.stage.stage.iter() {
         if cid < 0 {
@@ -111,7 +103,7 @@ pub fn best_portfolio(gs: &GameState, me: u8, db: &CardDatabase) -> Vec<usize> {
 /// only win when their check fails outright  Ediscount it. Everything else
 /// ranks by expected placed-score, chess-style: play my best, no despair.
 pub(crate) fn best_portfolio_scored(gs: &GameState, me: u8, db: &CardDatabase) -> (Vec<usize>, i32, f64) {
-    let (my, opp) = player_ref(gs, me);
+    let (my, opp) = gs.seated_pair(me);
     let pool = heart_pool(gs, me, db);
     let lives = hand_lives(my, db);
     let max_slots =
@@ -256,8 +248,8 @@ pub fn choose_action_v6(gs: &GameState, actions: &[Action], me: u8) -> Action {
 }
 
 pub fn choose_live_set_v5(gs: &GameState, actions: &[Action], db: &CardDatabase) -> Action {
-    let me = if gs.active_player().id == gs.player1.id { 0u8 } else { 1u8 };
-    let (my, opp) = player_ref(gs, me);
+    let me = gs.active_player_index();
+    let (my, opp) = gs.seated_pair(me);
     let my_succ = my.success_live_card_zone.cards.len() as i32;
     let opp_succ = opp.success_live_card_zone.cards.len() as i32;
     let mut desired = best_portfolio(gs, me, db);
@@ -375,7 +367,7 @@ pub fn choose_live_set_v5(gs: &GameState, actions: &[Action], db: &CardDatabase)
 }
 
 fn cheapest_deterministic_life(gs: &GameState, me: u8, db: &CardDatabase) -> Option<usize> {
-    let (my, _) = player_ref(gs, me);
+    let (my, _) = gs.seated_pair(me);
     let pool = heart_pool(gs, me, db);
     hand_lives(my, db)
         .into_iter()
@@ -397,7 +389,7 @@ fn cheapest_deterministic_life(gs: &GameState, me: u8, db: &CardDatabase) -> Opt
 /// in the only colors that mattered.
 /// Returns (estimated pass probability, paper deficit, hand index).
 pub(crate) fn nearest_miss_life(gs: &GameState, me: u8, db: &CardDatabase) -> Option<(f64, i32, usize)> {
-    let (my, _) = player_ref(gs, me);
+    let (my, _) = gs.seated_pair(me);
     let board = crate::bot::strategy_v4::heart_pool_inner(gs, me, db, 0.0);
     let dens = crate::bot::strategy_v4::blade_unit_densities(gs, me, db);
     let (blades, _) = flip_stats(gs, me, db);

@@ -422,7 +422,7 @@ fn compare_position(saved: &SavedPosition, templates: &CardDatabase) -> ArenaRes
     let gs = saved.restore(templates)?;
     let actions = game_setup::generate_possible_actions(&gs);
     if actions.is_empty() { return Err("snapshot has no actions".into()); }
-    let me = if gs.active_player().id == gs.player1.id { 0 } else { 1 };
+    let me = gs.active_player_index();
     let mut bots = serde_json::Map::new();
     for (name, score, choose) in [
         ("v6", strategy_v6::score_actions as ScoreFn, strategy_v6::choose_action_v6 as fn(&GameState, &[game_setup::Action], u8) -> game_setup::Action),

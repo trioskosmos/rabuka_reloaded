@@ -52,26 +52,17 @@ pub enum TriggerKind {
 impl TriggerKind {
     /// Parse one comma-separated token of a `triggers` field.
     pub fn from_token(token: &str) -> Option<Self> {
-        let t = token.trim();
-        if t == ACTIVATION {
-            Some(Self::Activation)
-        } else if t == AUTO {
-            Some(Self::Auto)
-        } else if t == CONSTANT {
-            Some(Self::Constant)
-        } else if t == DEBUT || t == DEBUT_EN {
-            Some(Self::Debut)
-        } else if t == LIVE_START {
-            Some(Self::LiveStart)
-        } else if t == LIVE_SUCCESS || t == LIVE_SUCCESS_EN {
-            Some(Self::LiveSuccess)
-        } else if t == MAIN {
-            Some(Self::Main)
-        } else if t == BATON_TOUCH {
-            Some(Self::BatonTouch)
-        } else {
-            None
-        }
+        Some(match token.trim() {
+            ACTIVATION => Self::Activation,
+            AUTO => Self::Auto,
+            CONSTANT => Self::Constant,
+            DEBUT | DEBUT_EN => Self::Debut,
+            LIVE_START => Self::LiveStart,
+            LIVE_SUCCESS | LIVE_SUCCESS_EN => Self::LiveSuccess,
+            MAIN => Self::Main,
+            BATON_TOUCH => Self::BatonTouch,
+            _ => return None,
+        })
     }
 }
 
@@ -87,22 +78,23 @@ pub fn parse_triggers(triggers: &str) -> impl Iterator<Item = TriggerKind> + '_ 
 /// match a `trigger_evaluation` entry against its eventual `ability_resolution`.
 /// Kept in one place so trigger-scan, resolver, and negated-skip all agree.
 pub fn canonical_trigger(raw: &str) -> String {
-    let key = if raw.contains(DEBUT) || raw.contains(DEBUT_EN) {
-        "debut"
-    } else if raw.contains(LIVE_START) {
-        "live_start"
-    } else if raw.contains(LIVE_SUCCESS) || raw.contains(LIVE_SUCCESS_EN) {
-        "live_success"
-    } else if raw.contains(ACTIVATION) {
-        "activation"
-    } else if raw.contains(CONSTANT) {
-        "constant"
-    } else if raw.contains(AUTO) {
-        "auto"
-    } else {
-        "unknown"
-    };
-    key.to_string()
+    // Priority-ordered table: the first needle found in the text wins.
+    // Order matches the legacy if-else chain exactly.
+    const TABLE: &[(&str, &str)] = &[
+        (DEBUT, "debut"),
+        (DEBUT_EN, "debut"),
+        (LIVE_START, "live_start"),
+        (LIVE_SUCCESS, "live_success"),
+        (LIVE_SUCCESS_EN, "live_success"),
+        (ACTIVATION, "activation"),
+        (CONSTANT, "constant"),
+        (AUTO, "auto"),
+    ];
+    TABLE
+        .iter()
+        .find(|(needle, _)| raw.contains(needle))
+        .map(|(_, key)| key.to_string())
+        .unwrap_or_else(|| "unknown".to_string())
 }
 
 // Jidou auto trigger types parsed from abilities.json (17 sub-types):

@@ -388,7 +388,7 @@ pub fn choose_live_set_action_v3(
     // smallest count — it can never discover the guides' escalating arc
     // (1点→2点→3点→multi-life). Instead: maximize TOTAL SCORE subject to
     // deterministic heart coverage from the stage pool, up to 3 lives.
-    let me = if gs.active_player().id == gs.player1.id { 0u8 } else { 1u8 };
+    let me = gs.active_player_index();
     plan_score_portfolio(gs, actions, db, me)
 }
 

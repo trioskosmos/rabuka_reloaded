@@ -93,22 +93,25 @@ pub(crate) fn process_yell_revealed_card_icons(
             // Q45: ALL-blade (BAll) can be treated as any color heart.
             // Mapped to HeartColor::All (icon_all, index 7) so the UI
             // displays icon_all.png for BAll yell hearts.
-            if effective_color == HeartColor::BAll {
-                *owned_hearts.hearts.entry_or_default(HeartColor::All) += amount;
-                bh_arr[7] += amount;
-                total_hearts[7] += amount;
-            } else if effective_color == HeartColor::Draw {
-                draw_icons += amount;
-            // Q44: Each score icon revealed during yell adds 1 to total score.
-            } else if effective_color == HeartColor::Score {
-                note_icons += amount;
-                *cheer_count += amount;
-            } else {
-                let idx = effective_color.index();
-                if idx < 8 {
-                    *owned_hearts.hearts.entry_or_default(effective_color) += amount;
-                    bh_arr[idx] += amount;
-                    total_hearts[idx] += amount;
+            match effective_color {
+                HeartColor::BAll => {
+                    *owned_hearts.hearts.entry_or_default(HeartColor::All) += amount;
+                    bh_arr[7] += amount;
+                    total_hearts[7] += amount;
+                }
+                HeartColor::Draw => draw_icons += amount,
+                // Q44: Each score icon revealed during yell adds 1 to total score.
+                HeartColor::Score => {
+                    note_icons += amount;
+                    *cheer_count += amount;
+                }
+                other => {
+                    let idx = other.index();
+                    if idx < 8 {
+                        *owned_hearts.hearts.entry_or_default(other) += amount;
+                        bh_arr[idx] += amount;
+                        total_hearts[idx] += amount;
+                    }
                 }
             }
         }
@@ -118,11 +121,13 @@ pub(crate) fn process_yell_revealed_card_icons(
     // on Solitude Rain when it is milled back into the deck and revealed).
     if let Some(ref sh) = card.special_heart {
         for (color, count) in &sh.hearts {
-            if *color == HeartColor::Draw {
-                draw_icons += count;
-            } else if *color == HeartColor::Score {
-                note_icons += count;
-                *cheer_count += count;
+            match *color {
+                HeartColor::Draw => draw_icons += count,
+                HeartColor::Score => {
+                    note_icons += count;
+                    *cheer_count += count;
+                }
+                _ => {}
             }
         }
     }

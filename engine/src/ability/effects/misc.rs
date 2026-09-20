@@ -3890,7 +3890,7 @@ impl AbilityResolver {
                 return "P2".to_string();
             }
         }
-        if gs.player1.id == gs.active_player().id {
+        if gs.active_player_index() == 0 {
             "P1"
         } else {
             "P2"

@@ -33,14 +33,6 @@ use crate::game_setup::{Action, ActionType};
 use crate::game_state::{GameState, Phase};
 use crate::player::Player;
 
-fn player_ref(gs: &GameState, me: u8) -> (&Player, &Player) {
-    if me == 0 {
-        (&gs.player1, &gs.player2)
-    } else {
-        (&gs.player2, &gs.player1)
-    }
-}
-
 /// Sum of base hearts on the stage (development in HEARTS, the only thing that
 /// passes live checks and places cards).
 fn stage_hearts_of(p: &Player, db: &CardDatabase) -> i32 {
@@ -276,8 +268,8 @@ pub fn score_actions(gs: &GameState, actions: &[Action], me: u8) -> Vec<(f64, St
 /// LIVE SET: binomial-aware, score-maximizing among passers, with free-win and
 /// gamble fallbacks and the junk-draw filter.
 pub fn choose_live_set_v6(gs: &GameState, actions: &[Action], db: &CardDatabase) -> Action {
-    let me = if gs.active_player().id == gs.player1.id { 0u8 } else { 1u8 };
-    let (my, opp) = player_ref(gs, me);
+    let me = gs.active_player_index();
+    let (my, opp) = gs.seated_pair(me);
     let my_succ = my.success_live_card_zone.cards.len() as i32;
     let opp_succ = opp.success_live_card_zone.cards.len() as i32;
     let mut desired = best_portfolio(gs, me, db);
@@ -373,7 +365,7 @@ pub fn choose_live_set_v6(gs: &GameState, actions: &[Action], db: &CardDatabase)
 }
 
 fn cheapest_deterministic_life(gs: &GameState, me: u8, db: &CardDatabase) -> Option<usize> {
-    let (my, _) = player_ref(gs, me);
+    let (my, _) = gs.seated_pair(me);
     let pool = heart_pool(gs, me, db);
     hand_lives(my, db)
         .into_iter()
