@@ -1369,20 +1369,12 @@ fn generate_choose_first_attacker_actions(game_state: &GameState) -> Vec<Action>
 }
 
 fn generate_mulligan_actions(game_state: &GameState) -> Vec<Action> {
-    let is_first = matches!(
-        game_state.current_phase,
-        crate::game_state::Phase::MulliganFirstAttacker
-    );
-    let player_name = if is_first {
-        if game_state.first_attacker().id == game_state.player1.id {
-            "Player 1"
-        } else {
-            "Player 2"
-        }
-    } else if game_state.first_attacker().id == game_state.player1.id {
-        "Player 2"
-    } else {
+    // The deciding player is always the active one (first attacker in the
+    // first window, second attacker in the second).
+    let player_name = if game_state.active_player_index() == 0 {
         "Player 1"
+    } else {
+        "Player 2"
     };
     let mulligan_player = game_state.active_player();
 
@@ -1431,18 +1423,6 @@ fn generate_mulligan_actions(game_state: &GameState) -> Vec<Action> {
     }
 
     actions
-}
-
-/// Returns true if `existing_card` prevents a baton touch from `card_id`
-/// (i.e. it has a `cannot_baton_touch` restriction that is not excluded by
-/// `card_id`'s groups). Extracted from the action-generation hot path so the
-/// per-hand-card, per-area scan runs only once per area.
-fn has_cannot_baton_touch(
-    card_db: &crate::card::CardDatabase,
-    card_id: i16,
-    existing_card: &crate::card::Card,
-) -> bool {
-    crate::ability::util::has_cannot_baton_touch_protection(card_db, card_id, existing_card)
 }
 
 fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
@@ -1501,7 +1481,7 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                                 !active_player
                                     .deployed_this_turn
                                     .contains(&stage_card_ids[slot])
-                                    && has_cannot_baton_touch(
+                                    && crate::ability::util::has_cannot_baton_touch_protection(
                                         &game_state.card_database,
                                         *card_id,
                                         existing_card,
@@ -1992,20 +1972,12 @@ fn generate_live_card_set_actions(game_state: &GameState) -> Vec<Action> {
     let _timer = crate::timer::Timer::start("generate_live_card_set_actions");
     let active_player = game_state.active_player();
 
-    let is_first = matches!(
-        game_state.current_phase,
-        crate::game_state::Phase::LiveCardSetFirstAttacker
-    );
-    let player_name = if is_first {
-        if game_state.first_attacker().id == game_state.player1.id {
-            "Player 1"
-        } else {
-            "Player 2"
-        }
-    } else if game_state.first_attacker().id == game_state.player1.id {
-        "Player 2"
-    } else {
+    // The deciding player is always the active one (first attacker in the
+    // first window, second attacker in the second).
+    let player_name = if game_state.active_player_index() == 0 {
         "Player 1"
+    } else {
+        "Player 2"
     };
 
     let mut actions = vec![{
