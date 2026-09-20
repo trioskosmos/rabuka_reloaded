@@ -14,6 +14,177 @@ use alloc::{
 };
 
 impl AbilityResolver {
+    /// Indices into `looked_at` matching the select action: non-empty
+    /// `options` override the filter (OR across options); otherwise the
+    /// action's own filter applies, or everything when unfiltered.
+    /// Collapses the two copy-pasted filter blocks (empty-options and
+    /// missing-options took the identical path).
+    fn looked_at_matching_indices(
+        looked_at: &[i16],
+        card_db: &crate::card::CardDatabase,
+        select_action: &AbilityEffect,
+    ) -> Vec<usize> {
+        // Compute which looked-at card indices match the filter.
+        // Keep ALL cards in looked_at_cards — non-matching ones appear
+        // greyed out in the choice. filtered_indices restricts selection.
+        if let Some(opts) = &select_action.options_any() {
+            if !opts.is_empty() {
+                return looked_at
+                    .iter()
+                    .enumerate()
+                    .filter(|&(_, &card_id)| {
+                        opts.iter().any(|opt| {
+                            let f = super::util::CardFilter::from_effect(opt);
+                            f.matches(card_db, card_id, false)
+                        })
+                    })
+                    .map(|(i, _)| i)
+                    .collect();
+            }
+        }
+        let filter = super::util::CardFilter::from_effect(select_action);
+        if !filter.has_filter() {
+            return (0..looked_at.len()).collect();
+        }
+        looked_at
+            .iter()
+            .enumerate()
+            .filter(|&(_, &card_id)| filter.matches(card_db, card_id, false))
+            .map(|(i, _)| i)
+            .collect()
+    }
+
+    /// No looked-at card matched: discard the pool to waitroom and queue
+    /// the followup action, if any. Always handles the answer (caller
+    /// returns early).
+    fn discard_unmatched_looked_at(
+        &mut self,
+        gs: &mut GameState,
+        effect: &AbilityEffect,
+    ) {
+        log::warn!(
+            "[look] no matching cards among {} looked-at; discarding all to waitroom (effect: {})",
+            gs.looked_at_cards.len(),
+            effect.text
+        );
+        let cards = core::mem::take(&mut gs.looked_at_cards);
+        let player_target = effect.target_name();
+        let player = gs.resolve_target_player_mut(player_target);
+        for &card_id in &cards {
+            player.waitroom.add_card(card_id);
+        }
+        if let Some(ref followup) = effect.compound.followup_action {
+            let mut existing = gs.ability_queue.take_pending_actions();
+            existing.push(followup.as_ref().clone());
+            gs.ability_queue.set_pending_actions(existing);
+        }
+    }
+
+    /// Offer the looked-at selection choice (or discard-and-continue when
+    /// nothing matches). Extracted from `execute_look_and_select`.
+    fn offer_looked_at_selection(
+        &mut self,
+        gs: &mut GameState,
+        effect: &AbilityEffect,
+        select_action: &AbilityEffect,
+    ) -> Result<(), String> {
+        let any_number = select_action.any_number_any().unwrap_or(false);
+        let count = select_action.count.unwrap_or(1);
+        let optional = select_action.optional.unwrap_or(false);
+
+        let card_db = &gs.card_database;
+        let total_count = gs.looked_at_cards.len();
+
+        let matching_indices =
+            Self::looked_at_matching_indices(&gs.looked_at_cards, card_db, select_action);
+
+        let matching_count = matching_indices.len();
+        if matching_count == 0 {
+            self.discard_unmatched_looked_at(gs, effect);
+            return Ok(());
+        }
+        let is_max = select_action.max.unwrap_or(false);
+        let max_select = if any_number {
+            matching_count
+        } else {
+            core::cmp::min(count as usize, matching_count)
+        };
+
+        let description = if any_number {
+            format!(
+                "Select any number of {} from the {} looked-at {} (or skip)",
+                util::card_plural(total_count),
+                total_count,
+                util::card_plural(total_count)
+            )
+        } else if is_max || optional {
+            format!(
+                "Select up to {} {} from the {} looked-at {} (or skip)",
+                max_select,
+                util::card_plural(max_select as usize),
+                total_count,
+                util::card_plural(total_count)
+            )
+        } else {
+            format!(
+                "Select {} {} from the {} looked-at {}",
+                max_select,
+                util::card_plural(max_select as usize),
+                total_count,
+                util::card_plural(total_count)
+            )
+        };
+
+        let desc_ja = if any_number {
+            format!(
+                "確認した{}枚のカードから好きな枚数を選択（スキップ可）",
+                total_count
+            )
+        } else if is_max || optional {
+            format!(
+                "確認した{}枚のカードから最大{}枚を選択（スキップ可）",
+                total_count, max_select
+            )
+        } else {
+            format!(
+                "確認した{}枚のカードから{}枚を選択",
+                total_count, max_select
+            )
+        };
+        let choice = Choice::select_cards(
+            Zone::LookedAt.to_str(),
+            max_select,
+            description.clone(),
+            optional || is_max || any_number,
+        )
+        .description_ja(Some(desc_ja))
+        .card_type(select_action.card_type_any().map(|s| s.to_string()))
+        .cost_limit(
+            select_action.cost_limit_any(),
+            select_action
+                .cost_limit_operator_any()
+                .map(|s| s.to_string()),
+        )
+        .group(
+            select_action
+                .group_names_any()
+                .as_ref()
+                .and_then(|v| v.first().cloned()),
+        )
+        .characters(select_action.characters_any().cloned())
+        .filtered_indices(Some(matching_indices))
+        .build();
+        self.pending_choice = Some(choice);
+        self.execution_context = ExecutionContext::LookAndSelect {
+            step: LookAndSelectStep::Select {
+                count: max_select,
+                max_per_group: select_action.per_group_count_any(),
+            },
+        };
+
+        Ok(())
+    }
+
     pub fn execute_look_and_select(
         &mut self,
         gs: &mut GameState,
@@ -26,161 +197,7 @@ impl AbilityResolver {
         }
 
         if let Some(ref select_action) = effect.compound.select_action {
-            let any_number = select_action.any_number_any().unwrap_or(false);
-            let count = select_action.count.unwrap_or(1);
-            let optional = select_action.optional.unwrap_or(false);
-
-            let card_db = &gs.card_database;
-            let total_count = gs.looked_at_cards.len();
-
-            // Compute which looked-at card indices match the filter.
-            // Keep ALL cards in looked_at_cards — non-matching ones appear
-            // Compute which looked-at card indices match the filter.
-            // Keep ALL cards in looked_at_cards — non-matching ones appear
-            // greyed out in the choice. filtered_indices restricts selection.
-            let matching_indices: Vec<usize> = if let Some(opts) = &select_action.options_any() {
-                if opts.is_empty() {
-                    // Empty options → skip OR filter, use regular filter below
-                    let filter = super::util::CardFilter::from_effect(select_action);
-                    if filter.has_filter() {
-                        gs.looked_at_cards
-                            .iter()
-                            .enumerate()
-                            .filter(|&(_, &card_id)| filter.matches(card_db, card_id, false))
-                            .map(|(i, _)| i)
-                            .collect()
-                    } else {
-                        (0..total_count).collect()
-                    }
-                } else {
-                    gs.looked_at_cards
-                        .iter()
-                        .enumerate()
-                        .filter(|&(_, &card_id)| {
-                            opts.iter().any(|opt| {
-                                let f = super::util::CardFilter::from_effect(opt);
-                                f.matches(card_db, card_id, false)
-                            })
-                        })
-                        .map(|(i, _)| i)
-                        .collect()
-                }
-            } else {
-                let filter = super::util::CardFilter::from_effect(select_action);
-                if filter.has_filter() {
-                    gs.looked_at_cards
-                        .iter()
-                        .enumerate()
-                        .filter(|&(_, &card_id)| filter.matches(card_db, card_id, false))
-                        .map(|(i, _)| i)
-                        .collect()
-                } else {
-                    (0..total_count).collect()
-                }
-            };
-
-            let matching_count = matching_indices.len();
-            if matching_count == 0 {
-                log::warn!(
-                    "[look] no matching cards among {} looked-at; discarding all to waitroom (effect: {})",
-                    gs.looked_at_cards.len(),
-                    effect.text
-                );
-                let cards = core::mem::take(&mut gs.looked_at_cards);
-                let player_target = effect.target_name();
-                let player = gs.resolve_target_player_mut(player_target);
-                for &card_id in &cards {
-                    player.waitroom.add_card(card_id);
-                }
-                if let Some(ref followup) = effect.compound.followup_action {
-                    let mut existing = gs.ability_queue.take_pending_actions();
-                    existing.push(followup.as_ref().clone());
-                    gs.ability_queue.set_pending_actions(existing);
-                }
-                return Ok(());
-            }
-            let is_max = select_action.max.unwrap_or(false);
-            let max_select = if any_number {
-                matching_count
-            } else if is_max || optional {
-                core::cmp::min(count as usize, matching_count)
-            } else {
-                core::cmp::min(count as usize, matching_count)
-            };
-
-            let description = if any_number {
-                format!(
-                    "Select any number of {} from the {} looked-at {} (or skip)",
-                    util::card_plural(total_count),
-                    total_count,
-                    util::card_plural(total_count)
-                )
-            } else if is_max || optional {
-                format!(
-                    "Select up to {} {} from the {} looked-at {} (or skip)",
-                    max_select,
-                    util::card_plural(max_select as usize),
-                    total_count,
-                    util::card_plural(total_count)
-                )
-            } else {
-                format!(
-                    "Select {} {} from the {} looked-at {}",
-                    max_select,
-                    util::card_plural(max_select as usize),
-                    total_count,
-                    util::card_plural(total_count)
-                )
-            };
-
-            let desc_ja = if any_number {
-                format!(
-                    "確認した{}枚のカードから好きな枚数を選択（スキップ可）",
-                    total_count
-                )
-            } else if is_max || optional {
-                format!(
-                    "確認した{}枚のカードから最大{}枚を選択（スキップ可）",
-                    total_count, max_select
-                )
-            } else {
-                format!(
-                    "確認した{}枚のカードから{}枚を選択",
-                    total_count, max_select
-                )
-            };
-            let choice = Choice::select_cards(
-                Zone::LookedAt.to_str(),
-                max_select,
-                description.clone(),
-                optional || is_max || any_number,
-            )
-            .description_ja(Some(desc_ja))
-            .card_type(select_action.card_type_any().map(|s| s.to_string()))
-            .cost_limit(
-                select_action.cost_limit_any(),
-                select_action
-                    .cost_limit_operator_any()
-                    .map(|s| s.to_string()),
-            )
-            .group(
-                select_action
-                    .group_names_any()
-                    .as_ref()
-                    .and_then(|v| v.first().cloned()),
-            )
-            .characters(select_action.characters_any().cloned())
-            .filtered_indices(Some(matching_indices))
-            .build();
-            self.pending_choice = Some(choice);
-            self.execution_context = ExecutionContext::LookAndSelect {
-                step: LookAndSelectStep::Select {
-                    count: max_select,
-                    max_per_group: select_action.per_group_count_any(),
-                },
-            };
-
-            return Ok(());
+            return self.offer_looked_at_selection(gs, effect, select_action);
         }
         Ok(())
     }
