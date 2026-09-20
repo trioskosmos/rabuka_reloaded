@@ -2,6 +2,7 @@ use crate::constants::MAX_LIVE_CARDS;
 use crate::game_state::{GameState, Phase};
 use crate::types::LogEntry;
 use crate::HashMap;
+use smallvec::SmallVec;
 #[cfg(feature = "no_std")]
 use alloc::{
     string::{String, ToString},
@@ -659,12 +660,16 @@ tdbg!("PHASE_ACTIVE:4 wait activated");
 
     // Q16: First player determined by RPS. Q17: First player mulligans first.
     // Q18: Only one mulligan per player. Q19: Mulligan is optional (can skip).
-    pub(crate) fn handle_mulligan_selection(
-        game_state: &mut GameState,
+    /// Answer index for hand-selection prompts (mulligan, live-card set):
+    /// explicit indices win, else look the card id up in hand, else 0.
+    /// ONE definition shared by `handle_mulligan_selection` and
+    /// `handle_live_card_selection`.
+    fn resolve_hand_answer_index(
+        game_state: &GameState,
         card_id: Option<i16>,
         card_indices: Option<Vec<usize>>,
-    ) -> Result<(), String> {
-        let idx = if let Some(indices) = card_indices {
+    ) -> usize {
+        if let Some(indices) = card_indices {
             indices.first().copied().unwrap_or(0)
         } else if let Some(cid) = card_id {
             game_state
@@ -673,15 +678,63 @@ tdbg!("PHASE_ACTIVE:4 wait activated");
                 .unwrap_or(0)
         } else {
             0
-        };
-        if let Some(pos) = game_state
-            .mulligan_selected_indices
-            .iter()
-            .position(|&x| x == u8::try_from(idx).unwrap())
-        {
-            game_state.mulligan_selected_indices.remove(pos);
+        }
+    }
+
+    /// Remove `idx` from a selection list. Returns true when something was
+    /// removed (deselected). Callers push after their own limit checks —
+    /// shared by the mulligan toggle and the limit-gated live-card toggle.
+    fn deselect_index<const N: usize>(selected: &mut SmallVec<[u8; N]>, idx: usize) -> bool
+    where
+        [u8; N]: smallvec::Array<Item = u8>,
+    {
+        let v = u8::try_from(idx).unwrap();
+        if let Some(pos) = selected.iter().position(|&x| x == v) {
+            selected.remove(pos);
+            true
         } else {
-            game_state.mulligan_selected_indices.push(u8::try_from(idx).unwrap());
+            false
+        }
+    }
+
+    /// Advance MulliganFirstAttacker → MulliganSecondAttacker → Active,
+    /// logging turn start on entering Active. Returns false when the
+    /// current phase isn't a mulligan phase (caller returns Ok early).
+    /// Shared by confirmation and skip.
+    fn advance_mulligan_phase(game_state: &mut GameState) -> bool {
+        let is_second = game_state.current_phase == Phase::MulliganSecondAttacker;
+        let next_phase = match game_state.current_phase {
+            Phase::MulliganFirstAttacker => Phase::MulliganSecondAttacker,
+            Phase::MulliganSecondAttacker => Phase::Active,
+            _ => return false,
+        };
+        if is_second {
+            Self::log_turn_start(game_state);
+            Self::log_phase(game_state, "phase_active_first");
+        }
+        game_state.current_phase = next_phase;
+        true
+    }
+
+    /// Sort + dedup indices for descending removal (so earlier removals
+    /// don't shift later targets). Shared by both confirmation paths.
+    fn deduped_desc(indices: Vec<usize>) -> Vec<usize> {
+        let mut sorted = indices;
+        sorted.sort_unstable();
+        sorted.dedup();
+        sorted.into_iter().rev().collect()
+    }
+
+    pub(crate) fn handle_mulligan_selection(
+        game_state: &mut GameState,
+        card_id: Option<i16>,
+        card_indices: Option<Vec<usize>>,
+    ) -> Result<(), String> {
+        let idx = Self::resolve_hand_answer_index(game_state, card_id, card_indices);
+        if !Self::deselect_index(&mut game_state.mulligan_selected_indices, idx) {
+            game_state
+                .mulligan_selected_indices
+                .push(u8::try_from(idx).unwrap());
         }
         Ok(())
     }
@@ -690,12 +743,9 @@ tdbg!("PHASE_ACTIVE:4 wait activated");
         game_state: &mut GameState,
         card_indices: Option<Vec<usize>>,
     ) -> Result<(), String> {
-        let is_first_turn_active = game_state.current_phase == Phase::MulliganSecondAttacker;
-        let next_phase = match game_state.current_phase {
-            Phase::MulliganFirstAttacker => Phase::MulliganSecondAttacker,
-            Phase::MulliganSecondAttacker => Phase::Active,
-            _ => return Ok(()),
-        };
+        if !Self::advance_mulligan_phase(game_state) {
+            return Ok(());
+        }
         // Use provided indices (from PVP/local selection) or fallback to server state
         let mulligan_indices: Vec<usize> = card_indices.unwrap_or_else(|| {
             game_state
@@ -705,12 +755,9 @@ tdbg!("PHASE_ACTIVE:4 wait activated");
                 .collect()
         });
         // Sort descending so removals don't shift other targets
-        let mut sorted_indices = mulligan_indices.clone();
-        sorted_indices.sort_unstable();
-        sorted_indices.dedup();
         let mut removed_count = 0;
         let player = game_state.active_player_mut();
-        for &idx in sorted_indices.iter().rev() {
+        for &idx in Self::deduped_desc(mulligan_indices).iter() {
             if idx < player.hand.cards.len() {
                 let card = player.hand.cards.remove(idx);
                 player.main_deck.cards.push(card);
@@ -724,28 +771,13 @@ tdbg!("PHASE_ACTIVE:4 wait activated");
             }
         }
         game_state.mulligan_selected_indices.clear();
-        if is_first_turn_active && next_phase == Phase::Active {
-            Self::log_turn_start(game_state);
-            Self::log_phase(game_state, "phase_active_first");
-        }
-        game_state.current_phase = next_phase;
         log::debug!("Mulligan confirmed: {} cards mulliganed", removed_count);
         Ok(())
     }
 
     pub(crate) fn handle_mulligan_skip(game_state: &mut GameState) -> Result<(), String> {
-        let is_first_turn_active = game_state.current_phase == Phase::MulliganSecondAttacker;
         game_state.mulligan_selected_indices.clear();
-        let next_phase = match game_state.current_phase {
-            Phase::MulliganFirstAttacker => Phase::MulliganSecondAttacker,
-            Phase::MulliganSecondAttacker => Phase::Active,
-            _ => return Ok(()),
-        };
-        if is_first_turn_active && next_phase == Phase::Active {
-            Self::log_turn_start(game_state);
-            Self::log_phase(game_state, "phase_active_first");
-        }
-        game_state.current_phase = next_phase;
+        Self::advance_mulligan_phase(game_state);
         Ok(())
     }
 
@@ -796,31 +828,17 @@ tdbg!("PHASE_ACTIVE:4 wait activated");
         card_id: Option<i16>,
         card_indices: Option<Vec<usize>>,
     ) -> Result<(), String> {
-        let idx = if let Some(indices) = card_indices {
-            indices.first().copied().unwrap_or(0)
-        } else if let Some(cid) = card_id {
-            game_state
-                .active_player()
-                .get_card_index_by_id(cid)
-                .unwrap_or(0)
-        } else {
-            0
-        };
-        if let Some(pos) = game_state
-            .live_card_selected_indices
-            .iter()
-            .position(|&x| x == u8::try_from(idx).unwrap())
-        {
-            game_state.live_card_selected_indices.remove(pos);
-        } else {
-            let player = game_state.active_player();
-            let reduction: i32 = From::from(player.live_card_set_limit_reduction);
-            let max_allowed = usize::try_from((i32::try_from(MAX_LIVE_CARDS).unwrap() - reduction).max(0)).unwrap();
-            if game_state.live_card_selected_indices.len() >= max_allowed {
-                return Err("Cannot select more live cards: limit reached".to_string());
-            }
-            game_state.live_card_selected_indices.push(u8::try_from(idx).unwrap());
+        let idx = Self::resolve_hand_answer_index(game_state, card_id, card_indices);
+        if Self::deselect_index(&mut game_state.live_card_selected_indices, idx) {
+            return Ok(());
         }
+        let player = game_state.active_player();
+        let reduction: i32 = From::from(player.live_card_set_limit_reduction);
+        let max_allowed = usize::try_from((i32::try_from(MAX_LIVE_CARDS).unwrap() - reduction).max(0)).unwrap();
+        if game_state.live_card_selected_indices.len() >= max_allowed {
+            return Err("Cannot select more live cards: limit reached".to_string());
+        }
+        game_state.live_card_selected_indices.push(u8::try_from(idx).unwrap());
         Ok(())
     }
 
@@ -837,13 +855,11 @@ tdbg!("PHASE_ACTIVE:4 wait activated");
                     .map(|&i| usize::from(i))
                     .collect()
             });
-        let mut sorted_indices: Vec<usize> = live_indices.clone();
-        sorted_indices.sort_unstable();
-        sorted_indices.dedup();
+        // Sort descending so removals don't shift other targets
         let player = game_state.active_player_mut();
         let max_live = MAX_LIVE_CARDS - player.live_card_zone.cards.len();
         let mut placed = 0usize;
-        for &idx in sorted_indices.iter().rev() {
+        for &idx in Self::deduped_desc(live_indices).iter() {
             if placed >= max_live {
                 break;
             }
