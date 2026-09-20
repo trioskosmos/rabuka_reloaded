@@ -11735,213 +11735,175 @@ def _fix_condition_enrichment(eff, t, fix_stats):
             fix_stats["need_heart"] = fix_stats.get("need_heart", 0) + 1
 
 
-def _process_pre_fix(ability: Dict[str, Any], fix_stats: Dict[str, int]) -> None:
-    """Pre-fix pass: condition re-parse, target fix, action inference, sequential chain fixes, targeted fixes."""
-    # ─── Pre-fix pass (merged from 3 separate loops) ───────────────────────────
-    # 1. Re-parse condition texts to pick up newer parser fields (cost_limit etc.)
-    # 2. Fix target=both when comparison_target is set → target should be self.
-    # 3. Infer action for effects with no action; apply sequential chain fixes.
-    # ─────────────────────────────────────────────────────────────────────────────
-    ability_text = ability.get("full_text") or ability.get("triggerless_text", "")
-    eff = ability.get("effect")
-    if not isinstance(eff, dict):
+def _prefix_condition_reparse(ability, eff, cond):
+    """Re-parse condition texts to pick up newer parser fields (cost_limit
+    etc.), merging missing fields without overwriting existing values."""
+    if not (isinstance(cond, dict) and cond.get("text")):
         return
-    cond = eff.get("condition")
+    cond_text = cond["text"]
+    reparse = parse_condition(cond_text)
+    if reparse:
+        # Merge missing fields — never overwrite existing values.
+        for key in ("cost_limit", "cost_limit_operator"):
+            if key in reparse and key not in cond:
+                cond[key] = reparse[key]
+        # Merge movement and direction fields.
+        if "movement" in reparse and reparse["movement"] != cond.get("movement"):
+            cond["movement"] = reparse["movement"]
+        if "area_direction" in reparse and "area_direction" not in cond:
+            cond["area_direction"] = reparse["area_direction"]
+    # Fix missing yell_trigger for "エールにより公開された" cards.
+    # Only applies to auto abilities (自動) — not ライブ成功時 etc.
+    # Skip when the condition checks for a specific card_type with negation
+    # (e.g. "no live card among revealed") — yell_trigger would short-circuit
+    # to "did a yell happen?" instead of checking the actual revealed cards.
+    if ability.get("triggers") == "自動":
+        has_yell_text = (
+            "エールしたとき" in cond_text or "エールにより公開された" in cond_text
+        )
+        has_specific_type_check = cond.get("card_type") and cond.get("negation")
+        if (
+            cond.get("yell_trigger") is None
+            and has_yell_text
+            and not has_specific_type_check
+        ):
+            cond["yell_trigger"] = True
 
-    # --- 1. Pre-fix pass logic ---
 
-    # --- 1. Condition re-parse ---
-    if isinstance(cond, dict) and cond.get("text"):
-        cond_text = cond["text"]
-        reparse = parse_condition(cond_text)
-        if reparse:
-            # Merge missing fields — never overwrite existing values.
-            for key in ("cost_limit", "cost_limit_operator"):
-                if key in reparse and key not in cond:
-                    cond[key] = reparse[key]
-            # Merge movement and direction fields.
-            if "movement" in reparse and reparse["movement"] != cond.get("movement"):
-                cond["movement"] = reparse["movement"]
-            if "area_direction" in reparse and "area_direction" not in cond:
-                cond["area_direction"] = reparse["area_direction"]
-        # Fix missing yell_trigger for "エールにより公開された" cards.
-        # Only applies to auto abilities (自動) — not ライブ成功時 etc.
-        # Skip when the condition checks for a specific card_type with negation
-        # (e.g. "no live card among revealed") — yell_trigger would short-circuit
-        # to "did a yell happen?" instead of checking the actual revealed cards.
-        if ability.get("triggers") == "自動":
-            has_yell_text = (
-                "エールしたとき" in cond_text or "エールにより公開された" in cond_text
-            )
-            has_specific_type_check = cond.get("card_type") and cond.get("negation")
-            if (
-                cond.get("yell_trigger") is None
-                and has_yell_text
-                and not has_specific_type_check
-            ):
-                cond["yell_trigger"] = True
+# Ordered action inference for effects with no action: first field-set
+# present wins. Same order as the legacy if-chain.
+_ACTION_INFERENCE_RULES = (
+    (("source", "destination"), "move_cards"),
+    (("actions",), "sequential"),
+    (("opponent_action",), "opponent_action"),
+)
 
-    # --- 2. Fix target=both when comparison_target is set ---
-    # comparison_target handles the opponent side, so target should be self.
-    if isinstance(cond, dict):
-        if cond.get("target") == "both" and cond.get("comparison_target"):
-            cond["target"] = "self"
 
-    # --- 3. Action inference ---
+def _infer_effect_action(eff):
     if not eff.get("action"):
-        if eff.get("source") and eff.get("destination"):
-            eff["action"] = "move_cards"
-        elif eff.get("actions"):
-            eff["action"] = "sequential"
-        elif eff.get("opponent_action"):
-            eff["action"] = "opponent_action"
+        for fields, action in _ACTION_INFERENCE_RULES:
+            if all(f in eff for f in fields):
+                eff["action"] = action
+                return
 
-    _fix_sequential_chain(eff)
 
-    # --- 2. Targeted fixes logic ---
-    t = ability.get("triggerless_text", "")
-
-    # FIX 2 dissolved 2026-08 into _try_each_time (the only producer of
-    # trigger_type="each_time"): the [optional pay_energy, effect] →
-    # conditional_on_optional reshape now happens at parse time.
-
-    # FIX 3 dissolved 2026-08 into parse_effect's dispatcher: the
-    # conditional_on_optional sub-action "optional" strip now runs at parse
-    # time (the positive/negative_action renames had no producer — dead).
-
-    # FIX 6 removed 2026-08 (byte-diff verified): no pipeline producer emits an
-    # opponent_action wrapper anymore — _try_opponent_action flattens at
-    # parse time. Kept as history note only.
-
-    # FIX 7/7b dissolved 2026-08 into the producers: 「能力を持たない」 now
-    # derives ability_filter at parse time in _handle_cost_modification
-    # (modify_cost) and parse_action (select/select_cards) via
-    # _apply_no_ability_filter.
-
-    _fix_condition_enrichment(eff, t, fix_stats)
-
-    # FIX 9 dissolved 2026-08 into _try_kore_niyori_result (its only
-    # parse-time producer of text-derived result_conditions): ブレードハート /
-    # スコア icon card_property + heart_source/baton_touch enrichment now runs
-    # where the condition is built.
-    # FIX 9b dissolved 2026-08 into _try_kore_niyori_result: followup
-    # "このメンバー" → self_target/self_cost now derived at the producer.
-
+def _fix_primary_negation(eff, fix_stats):
     # FIX 10: Primary effect fixes — negation condition
     pe = eff.get("primary_effect")
-    if isinstance(pe, dict):
-        pet = pe.get("text", "") or ""
-        # Negation condition from text — extract just the condition part (before first 、after とき)
-        if (
-            not pe.get("condition")
-            and ("ない" in pet or "いない" in pet)
-            and "とき" in pet
-        ):
-            idx = pet.find("とき")
-            if idx > 0:
-                rest = pet[idx + 2 :]
-                comma = rest.find("、")
-                if comma > 0:
-                    neg_text = pet[: idx + 2 + comma]
-                else:
-                    neg_text = pet[: idx + 2]
+    if not isinstance(pe, dict):
+        return
+    pet = pe.get("text", "") or ""
+    # Negation condition from text — extract just the condition part (before first 、after とき)
+    if (
+        not pe.get("condition")
+        and ("ない" in pet or "いない" in pet)
+        and "とき" in pet
+    ):
+        idx = pet.find("とき")
+        if idx > 0:
+            rest = pet[idx + 2 :]
+            comma = rest.find("、")
+            if comma > 0:
+                neg_text = pet[: idx + 2 + comma]
             else:
                 neg_text = pet
-            neg_text = neg_text.rstrip("。")
-            neg_cond = {
-                "type": "location_condition",
-                "location": "revealed_cards",
-                "target": "self",
-                "text": neg_text,
-                "negation": True,
-            }
-            pe["condition"] = neg_cond
-            pe["card_type"] = "card"
-            pe.pop("target", None)
-            fix_stats["primary_neg"] += 1
-        # all:false on single-target primary when parent has all:true
-        if eff.get("all") and "all" not in pe and pe.get("count") == 1:
-            pe["all"] = False
+        else:
+            neg_text = pet
+        neg_text = neg_text.rstrip("。")
+        neg_cond = {
+            "type": "location_condition",
+            "location": "revealed_cards",
+            "target": "self",
+            "text": neg_text,
+            "negation": True,
+        }
+        pe["condition"] = neg_cond
+        pe["card_type"] = "card"
+        pe.pop("target", None)
+        fix_stats["primary_neg"] += 1
+    # all:false on single-target primary when parent has all:true
+    if eff.get("all") and "all" not in pe and pe.get("count") == 1:
+        pe["all"] = False
 
-    # FIX 11 removed 2026-08 (removal-diff triage: 0 corpus abilities change):
-    # no current producer leaks exclude_self/group_names onto sequential
-    # pay_energy sub-actions, nor activation_position into followup actions.
 
+def _fix_compound_gain_split(eff, cond, t):
     # FIX 12: compound condition → split gain_resource into sequential with two actions
-    if isinstance(cond, dict) and cond.get("type") == "compound":
-        if eff.get("action") == "gain_resource":
-            et = eff.get("text", "") or t
-            if "{{icon_all.png|ハート}}" in et and "{{icon_blade.png|ブレード}}" in et:
-                blade_count = et.count("{{icon_blade.png|ブレード}}")
-                heart_count = et.count("{{icon_all.png|ハート}}")
-                actions = [
-                    {
-                        "action": "gain_resource",
-                        "resource": "blade",
-                        "count": blade_count,
-                        "text": et,
-                    },
-                    {
-                        "action": "gain_resource",
-                        "resource": "heart",
-                        "heart_type": "all",
-                        "count": heart_count,
-                        "text": et,
-                    },
-                ]
-                eff["action"] = "sequential"
-                eff["actions"] = actions
-                eff.pop("resource", None)
-                eff.pop("count", None)
-                # Propagate group_names from condition or any sub-condition
-                if isinstance(cond, dict):
-                    gns = cond.get("group_names")
-                    if not gns:
-                        for sc in cond.get("conditions", []):
-                            if isinstance(sc, dict) and sc.get("group_names"):
-                                gns = sc["group_names"]
-                                break
-                    if gns:
-                        eff["group_names"] = gns
+    if not (isinstance(cond, dict) and cond.get("type") == "compound"):
+        return
+    if eff.get("action") != "gain_resource":
+        return
+    et = eff.get("text", "") or t
+    if "{{icon_all.png|ハート}}" in et and "{{icon_blade.png|ブレード}}" in et:
+        blade_count = et.count("{{icon_blade.png|ブレード}}")
+        heart_count = et.count("{{icon_all.png|ハート}}")
+        actions = [
+            {
+                "action": "gain_resource",
+                "resource": "blade",
+                "count": blade_count,
+                "text": et,
+            },
+            {
+                "action": "gain_resource",
+                "resource": "heart",
+                "heart_type": "all",
+                "count": heart_count,
+                "text": et,
+            },
+        ]
+        eff["action"] = "sequential"
+        eff["actions"] = actions
+        eff.pop("resource", None)
+        eff.pop("count", None)
+        # Propagate group_names from condition or any sub-condition
+        if isinstance(cond, dict):
+            gns = cond.get("group_names")
+            if not gns:
+                for sc in cond.get("conditions", []):
+                    if isinstance(sc, dict) and sc.get("group_names"):
+                        gns = sc["group_names"]
+                        break
+            if gns:
+                eff["group_names"] = gns
 
+
+def _fix_spurious_sequential_change_state(eff):
     # FIX 13: Remove spurious change_state actions inside sequential containers.
     # When _try_implicit_sequential splits "これによりアクティブにしたメンバーと、このメンバーは"
     # the conjunction phrase "これにより...と" is incorrectly parsed as change_state.
     # This pollutes selected_cards with wrong members. Remove the spurious change_state
     # so the subsequent gain_resource with multiple_targets targets correctly.
-    if eff.get("action") == "sequential":
-        new_actions = []
-        for sub in eff.get("actions", []):
-            if isinstance(sub, dict) and sub.get("action") == "sequential":
-                inner_acts = sub.get("actions", [])
-                filtered = [
-                    a
-                    for a in inner_acts
-                    if not (
-                        isinstance(a, dict)
-                        and a.get("action") == "change_state"
-                        and "これにより" in a.get("text", "")
-                        and "と" in a.get("text", "")
-                    )
-                ]
-                if len(filtered) < len(inner_acts):
-                    if len(filtered) == 1:
-                        new_actions.append(filtered[0])
-                    else:
-                        sub["actions"] = filtered
-                        new_actions.append(sub)
+    if eff.get("action") != "sequential":
+        return
+    new_actions = []
+    for sub in eff.get("actions", []):
+        if isinstance(sub, dict) and sub.get("action") == "sequential":
+            inner_acts = sub.get("actions", [])
+            filtered = [
+                a
+                for a in inner_acts
+                if not (
+                    isinstance(a, dict)
+                    and a.get("action") == "change_state"
+                    and "これにより" in a.get("text", "")
+                    and "と" in a.get("text", "")
+                )
+            ]
+            if len(filtered) < len(inner_acts):
+                if len(filtered) == 1:
+                    new_actions.append(filtered[0])
                 else:
+                    sub["actions"] = filtered
                     new_actions.append(sub)
             else:
                 new_actions.append(sub)
-        if new_actions != eff.get("actions", []):
-            eff["actions"] = new_actions
+        else:
+            new_actions.append(sub)
+    if new_actions != eff.get("actions", []):
+        eff["actions"] = new_actions
 
-    # FIX 14: sequential chaining — infer select_cards → move_cards implied source
-    # NOTE (2026-08): the line below used to claim "infer select_cards →
-    # move_cards implied source" but has only ever been a stats counter.
-    fix_stats["compound_split"] += 1
 
+def _fix_auto_condition(ability, eff, t, fix_stats):
     # FIX 13: Auto abilities with no condition — extract from text
     if (
         ability.get("triggers") == "自動"
@@ -11958,11 +11920,49 @@ def _process_pre_fix(ability: Dict[str, Any], fix_stats: Dict[str, int]) -> None
                     fix_stats["auto_trigger"] += 1
                     break
 
-    # FIX 15 dissolved 2026-08 into parse_action (single-target position_change
-    # → exclude_self, Rule 11.10.1) — derived where the action is built.
-    # FIX N removed 2026-08 (removal-diff triage: 0 corpus abilities change):
-    # _try_heart_select_reveal already attaches the all_revealed_match_heart_color
-    # condition at parse time, so this backfill never fires.
+
+def _process_pre_fix(ability: Dict[str, Any], fix_stats: Dict[str, int]) -> None:
+    """Pre-fix pass: condition re-parse, target fix, action inference, sequential chain fixes, targeted fixes."""
+    # ─── Pre-fix pass (merged from 3 separate loops) ───────────────────────────
+    # 1. Re-parse condition texts to pick up newer parser fields (cost_limit etc.)
+    # 2. Fix target=both when comparison_target is set → target should be self.
+    # 3. Infer action for effects with no action; apply sequential chain fixes.
+    # ─────────────────────────────────────────────────────────────────────────────
+    ability_text = ability.get("full_text") or ability.get("triggerless_text", "")
+    eff = ability.get("effect")
+    if not isinstance(eff, dict):
+        return
+    cond = eff.get("condition")
+
+    _prefix_condition_reparse(ability, eff, cond)
+
+    # --- 2. Fix target=both when comparison_target is set ---
+    # comparison_target handles the opponent side, so target should be self.
+    if isinstance(cond, dict):
+        if cond.get("target") == "both" and cond.get("comparison_target"):
+            cond["target"] = "self"
+
+    _infer_effect_action(eff)
+
+    _fix_sequential_chain(eff)
+
+    # --- 2. Targeted fixes logic ---
+    t = ability.get("triggerless_text", "")
+
+    _fix_condition_enrichment(eff, t, fix_stats)
+
+    _fix_primary_negation(eff, fix_stats)
+
+    _fix_compound_gain_split(eff, cond, t)
+
+    _fix_spurious_sequential_change_state(eff)
+
+    # FIX 14: sequential chaining — infer select_cards → move_cards implied source
+    # NOTE (2026-08): the line below used to claim "infer select_cards →
+    # move_cards implied source" but has only ever been a stats counter.
+    fix_stats["compound_split"] += 1
+
+    _fix_auto_condition(ability, eff, t, fix_stats)
 
 
 def _fix_conditional_on_result(eff, t):
