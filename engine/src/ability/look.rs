@@ -1192,6 +1192,31 @@ impl AbilityResolver {
 
         Ok(())
     }
+    /// Push a drawn card into the revealed pool and test termination.
+    /// Returns true when matched (caller breaks). Shared by the fresh-draw
+    /// and post-refresh paths below, which were copy-pasted.
+    fn reveal_until_check<F>(
+        gs: &mut GameState,
+        card_db: &crate::card::CardDatabase,
+        cid: i16,
+        ru_source: Option<i16>,
+        ru_owner: Option<u8>,
+        termination_check: &F,
+        all_revealed: &mut Vec<i16>,
+        matched_idx: &mut Option<usize>,
+    ) -> bool
+    where
+        F: Fn(&crate::card::CardDatabase, i16) -> bool,
+    {
+        all_revealed.push(cid);
+        gs.push_revealed_card(cid, ru_source, false, ru_owner, "ability");
+        if termination_check(card_db, cid) {
+            *matched_idx = Some(all_revealed.len() - 1);
+            return true;
+        }
+        false
+    }
+
     /// Draw from deck until `termination_check` passes, refreshing from waitroom if deck empties.
     fn reveal_until<F>(
         &mut self,
@@ -1215,10 +1240,16 @@ impl AbilityResolver {
             };
             match card_id {
                 Some(cid) => {
-                    all_revealed.push(cid);
-                    gs.push_revealed_card(cid, ru_source, false, ru_owner, "ability");
-                    if termination_check(&card_db, cid) {
-                        matched_idx = Some(all_revealed.len() - 1);
+                    if Self::reveal_until_check(
+                        gs,
+                        &card_db,
+                        cid,
+                        ru_source,
+                        ru_owner,
+                        &termination_check,
+                        &mut all_revealed,
+                        &mut matched_idx,
+                    ) {
                         break;
                     }
                 }
@@ -1235,10 +1266,16 @@ impl AbilityResolver {
                     }
                     player.main_deck.shuffle();
                     if let Some(cid) = player.main_deck.draw() {
-                        all_revealed.push(cid);
-                        gs.push_revealed_card(cid, ru_source, false, ru_owner, "ability");
-                        if termination_check(&card_db, cid) {
-                            matched_idx = Some(all_revealed.len() - 1);
+                        if Self::reveal_until_check(
+                            gs,
+                            &card_db,
+                            cid,
+                            ru_source,
+                            ru_owner,
+                            &termination_check,
+                            &mut all_revealed,
+                            &mut matched_idx,
+                        ) {
                             break;
                         }
                     } else {
