@@ -964,46 +964,103 @@ impl AbilityResolver {
         Some("offered".to_string())
     }
 
-    pub fn execute_look_at(
-        &mut self,
-        gs: &mut GameState,
-        effect: &AbilityEffect,
-    ) -> Result<(), String> {
+    /// Look count: dynamic count, then per-unit multiplication.
+    fn resolve_look_count(&mut self, gs: &mut GameState, effect: &AbilityEffect) -> u8 {
         let base_count: u8 = if let Some(ref dc) = effect.dynamic_count_any() {
             self.resolve_dynamic_count(gs, dc)
         } else {
             effect.count_or(1) as u8
         };
-        let count = if effect.per_unit_any().unwrap_or(false) {
-            use crate::ability::util;
-            let player = gs.resolve_target_player(effect.target_name());
-            let filter = util::CardFilter::from_effect(effect);
-            let per_mult = util::resolve_per_unit_count(
-                true,
-                effect.per_unit_type_any().as_deref(),
-                player,
-                &gs.card_database,
-                &filter,
-                effect.heart_colors_any(),
-                None,
-                &crate::HashMap::default(),
-                None,
-            );
-            base_count * per_mult
-        } else {
-            base_count
+        if !effect.per_unit_any().unwrap_or(false) {
+            return base_count;
+        }
+        let player = gs.resolve_target_player(effect.target_name());
+        let filter = util::CardFilter::from_effect(effect);
+        let per_mult = util::resolve_per_unit_count(
+            true,
+            effect.per_unit_type_any().as_deref(),
+            player,
+            &gs.card_database,
+            &filter,
+            effect.heart_colors_any(),
+            None,
+            &crate::HashMap::default(),
+            None,
+        );
+        base_count * per_mult
+    }
+
+    /// Optional look cost: offer the pay/skip gate. Returns true when
+    /// offered (caller returns early).
+    fn maybe_offer_look_cost_gate(
+        &mut self,
+        gs: &mut GameState,
+        effect: &AbilityEffect,
+        count: u8,
+    ) -> bool {
+        if !effect.optional.unwrap_or(false) {
+            return false;
+        }
+        self.emit_pay_skip_gate(
+            gs,
+            Some(ChoiceRoute::OptionalCost),
+            format!("Look at {} {} (optional cost)?", count, util::card_plural(count as usize)),
+            format!("{}枚確認（オプションコスト）？", count),
+            true,
+            None,
+        );
+        true
+    }
+
+    /// Fetch the looked-at pool for a source zone. Deck arms drain;
+    /// everything else peeks (filtered later by the select step).
+    fn fetch_look_pool(
+        player: &mut crate::player::Player,
+        source: &str,
+        count: usize,
+        fetch_all: bool,
+    ) -> Vec<i16> {
+        let take_cards = |cards: &[i16]| -> Vec<i16> {
+            if fetch_all {
+                cards.to_vec()
+            } else {
+                cards.iter().take(count).copied().collect()
+            }
         };
+        match Zone::from_str(source) {
+            Some(Zone::Deck) | Some(Zone::DeckTop) => {
+                player.main_deck.draw_multiple(count)
+            }
+            Some(Zone::DeckBottom) => {
+                // "自分のデッキの下からN枚見る" — take (and REMOVE) the bottom N
+                // cards of the deck. The bottom-most card is the last index.
+                let n = player.main_deck.cards.len();
+                let start = n.saturating_sub(count);
+                player.main_deck.cards.drain(start..).collect()
+            }
+            Some(Zone::Stage) => {
+                let sc: Vec<i16> = player
+                    .stage
+                    .stage
+                    .iter()
+                    .filter(|&&id| id != -1)
+                    .copied()
+                    .collect();
+                take_cards(&sc)
+            }
+            _ => take_cards(util::zone_cards(player, source)),
+        }
+    }
+
+    pub fn execute_look_at(
+        &mut self,
+        gs: &mut GameState,
+        effect: &AbilityEffect,
+    ) -> Result<(), String> {
+        let count = self.resolve_look_count(gs, effect);
         let target = effect.target_name();
         let source = effect.source_or(Zone::Deck.to_str());
-        if effect.optional.unwrap_or(false) {
-            self.emit_pay_skip_gate(
-                gs,
-                Some(ChoiceRoute::OptionalCost),
-                format!("Look at {} {} (optional cost)?", count, util::card_plural(count as usize)),
-                format!("{}枚確認（オプションコスト）？", count),
-                true,
-                None,
-            );
+        if self.maybe_offer_look_cost_gate(gs, effect, count) {
             return Ok(());
         }
         // Rule 10.2.2.2 / Q85: If deck has fewer cards than needed, take
@@ -1020,36 +1077,7 @@ impl AbilityResolver {
         let player = gs.resolve_target_player_mut(target);
 
         let fetch_all = effect.all_any().unwrap_or(false);
-        let take_cards = |cards: &[i16]| -> Vec<i16> {
-            if fetch_all {
-                cards.to_vec()
-            } else {
-                cards.iter().take(count as usize).copied().collect()
-            }
-        };
-        let cards: Vec<i16> = match Zone::from_str(source) {
-            Some(Zone::Deck) | Some(Zone::DeckTop) => {
-                player.main_deck.draw_multiple(count as usize)
-            }
-            Some(Zone::DeckBottom) => {
-                // "自分のデッキの下からN枚見る" — take (and REMOVE) the bottom N
-                // cards of the deck. The bottom-most card is the last index.
-                let n = player.main_deck.cards.len();
-                let start = n.saturating_sub(count as usize);
-                player.main_deck.cards.drain(start..).collect()
-            }
-            Some(Zone::Stage) => {
-                let sc: Vec<i16> = player
-                    .stage
-                    .stage
-                    .iter()
-                    .filter(|&&id| id != -1)
-                    .copied()
-                    .collect();
-                take_cards(&sc)
-            }
-            _ => take_cards(util::zone_cards(player, source)),
-        };
+        let cards: Vec<i16> = Self::fetch_look_pool(player, source, count as usize, fetch_all);
 
         gs.looked_at_cards = cards.into();
         // Remember where the pool came from: a DECLINED optional move must
