@@ -4911,50 +4911,63 @@ def _extract_comparison_fields(condition, text):
             condition["type"] = "comparison_condition"
 
 
-def _extract_resource_fields(condition, text):
-    """Extract heart count, heart_colors, energy, surplus_heart from text."""
-    if "heart" in text and (
+def _extract_heart_resource(condition, text):
+    if not ("heart" in text and (
         "つ以上持つ" in text or "枚持つ" in text or "つ持つ" in text
-    ):
-        hc = extract_count(text)
-        if hc:
-            condition["count"] = hc
-            if re.search(r"heart_\d+.*?heart_\d+", text):
-                hts = []
-                for i in range(1, 7):
-                    if f"heart_0{i}" in text:
-                        hts.append(f"heart_0{i}")
-                if hts:
-                    condition["resource_type"] = "heart"
-                    condition["heart_types"] = hts
-                    tm = re.search(r"合計(\d+)種類以上", text)
-                    if tm:
-                        condition["types_count"] = int(tm.group(1))
-                        condition["operator"] = ">="
-            else:
-                for pat, rt in [
-                    ("heart_01", "heart_01"),
-                    ("heart_02", "heart_02"),
-                    ("heart_06", "heart_06"),
-                ]:
-                    if pat in text:
-                        condition["resource_type"] = rt
-                        break
-                else:
-                    condition["resource_type"] = "heart"
-    hc = extract_heart_colors_from_text(text)
+    )):
+        return
+    hc = extract_count(text)
     if hc:
-        condition["heart_colors"] = hc
+        condition["count"] = hc
+        if re.search(r"heart_\d+.*?heart_\d+", text):
+            hts = []
+            for i in range(1, 7):
+                if f"heart_0{i}" in text:
+                    hts.append(f"heart_0{i}")
+            if hts:
+                condition["resource_type"] = "heart"
+                condition["heart_types"] = hts
+                tm = re.search(r"合計(\d+)種類以上", text)
+                if tm:
+                    condition["types_count"] = int(tm.group(1))
+                    condition["operator"] = ">="
+        else:
+            for pat, rt in [
+                ("heart_01", "heart_01"),
+                ("heart_02", "heart_02"),
+                ("heart_06", "heart_06"),
+            ]:
+                if pat in text:
+                    condition["resource_type"] = rt
+                    break
+            else:
+                condition["resource_type"] = "heart"
+
+
+def _extract_energy_resource(condition, text):
     if "エネルギー" in text:
         condition["resource_type"] = "energy"
         ec = extract_count(text)
         if ec:
             condition["count"] = ec
+
+
+def _extract_surplus_resource(condition, text):
     if "余剰ハート" in text:
         condition["resource_type"] = "surplus_heart"
         sc = extract_count(text)
         if sc:
             condition["count"] = sc
+
+
+def _extract_resource_fields(condition, text):
+    """Extract heart count, heart_colors, energy, surplus_heart from text."""
+    _extract_heart_resource(condition, text)
+    hc = extract_heart_colors_from_text(text)
+    if hc:
+        condition["heart_colors"] = hc
+    _extract_energy_resource(condition, text)
+    _extract_surplus_resource(condition, text)
 
 
 # Ordered movement markers for conditions: first match wins.
