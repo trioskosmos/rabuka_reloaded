@@ -1065,9 +1065,10 @@ impl AbilityResolver {
         }
         // Rule 10.2.2.2 / Q85: If deck has fewer cards than needed, take
         // what's available (Q85 multi-step: draw → refresh → draw remaining).
-        let look_from_deck = Zone::from_str(source) == Some(Zone::Deck)
-            || Zone::from_str(source) == Some(Zone::DeckTop)
-            || Zone::from_str(source) == Some(Zone::DeckBottom);
+        let look_from_deck = matches!(
+            Zone::from_str(source),
+            Some(Zone::Deck | Zone::DeckTop | Zone::DeckBottom)
+        );
         if look_from_deck {
             let deck_count = gs.resolve_target_player(target).main_deck.cards.len();
             if (deck_count as u8) < count {
@@ -1142,7 +1143,7 @@ impl AbilityResolver {
         let target = effect.target_name();
         let card_db = gs.card_database.clone();
         let card_ids: Vec<i16> = {
-            let player = gs.resolve_target_player_mut(target);
+            let player = gs.resolve_target_player(target);
             match Zone::from_str(source) {
                 Some(Zone::Hand) => player.hand.cards.iter().copied().collect(),
                 Some(Zone::Deck) => player
@@ -1156,6 +1157,8 @@ impl AbilityResolver {
                     player.waitroom.cards.iter().copied().collect()
                 }
                 Some(Zone::LookedAt) => gs.looked_at_cards.to_vec(),
+                // NOTE: intentionally NOT shared with collect_select_candidates:
+                // other zones (stage/live/...) must yield nothing here.
                 _ => vec![],
             }
         };
