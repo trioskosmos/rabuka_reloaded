@@ -201,6 +201,81 @@ impl AbilityResolver {
         }
         Ok(())
     }
+    /// Revealable card count for a source zone (hand / looked-at / deck).
+    fn reveal_available(
+        player: &crate::player::Player,
+        looked_at_len: usize,
+        source: &str,
+    ) -> usize {
+        // Support player selection for reveal: when count allows choice, prompt instead of auto-revealing all
+        match Zone::from_str(source) {
+            Some(Zone::Hand) => player.hand.cards.len(),
+            Some(Zone::LookedAt) => looked_at_len,
+            Some(Zone::Deck) | Some(Zone::DeckTop) => player.main_deck.cards.len(),
+            _ => 0,
+        }
+    }
+
+    /// Offer the reveal-count choice. Reads the current effect for
+    /// cost/group/character/picker metadata, then parks the prompt.
+    /// Always handles the answer (caller returns early).
+    fn offer_reveal_choice(
+        &mut self,
+        source: &str,
+        target: &str,
+        card_type: Option<&str>,
+        blind: bool,
+        choices_count: usize,
+        allow_skip: bool,
+    ) {
+        let desc_en = format!(
+            "Select {} to reveal from {}",
+            util::card_plural(choices_count),
+            crate::ability::describe::zone_label(Some(source))
+        );
+        let desc_ja = format!(
+            "{}から公開するカードを選択",
+            crate::ability::describe::zone_label_ja(Some(source))
+        );
+        let cost_limit = self
+            .current_effect
+            .as_ref()
+            .and_then(|e| e.cost_limit_any());
+        let cost_limit_operator = self
+            .current_effect
+            .as_ref()
+            .and_then(|e| e.cost_limit_operator_any())
+            .map(|s| s.to_string());
+        let group = self
+            .current_effect
+            .as_ref()
+            .and_then(|e| e.group_names_any())
+            .and_then(|v| v.first().cloned());
+        let characters = self
+            .current_effect
+            .as_ref()
+            .and_then(|e| e.characters_any().cloned());
+        let picker = self
+            .current_effect
+            .as_ref()
+            .and_then(|e| e.picker_any())
+            .map(|s| s.to_string());
+        self.pending_choice = Some(
+            Choice::select_cards(source.to_string(), choices_count, desc_en, allow_skip)
+                .description_ja(Some(desc_ja))
+                .card_type(card_type.map(|s| s.to_string()))
+                .cost_limit(cost_limit, cost_limit_operator)
+                .group(group)
+                .characters(characters)
+                .target_player_id(Some(target.to_string()))
+                .blind(blind)
+                .is_reveal(true)
+                .picker(picker)
+                .build(),
+        );
+        self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
+    }
+
     pub fn execute_reveal(
         &mut self,
         gs: &mut GameState,
@@ -222,15 +297,9 @@ impl AbilityResolver {
             .as_ref()
             .is_some_and(|e| e.any_number_any().unwrap_or(false));
         let looked_at_len = gs.looked_at_cards.len();
-        let player = gs.resolve_target_player_mut(target);
+        let player = gs.resolve_target_player(target);
 
-        // Support player selection for reveal: when count allows choice, prompt instead of auto-revealing all
-        let available = match Zone::from_str(source) {
-            Some(Zone::Hand) => player.hand.cards.len(),
-            Some(Zone::LookedAt) => looked_at_len,
-            Some(Zone::Deck) | Some(Zone::DeckTop) => player.main_deck.cards.len(),
-            _ => 0,
-        };
+        let available = Self::reveal_available(player, looked_at_len, source);
 
         log::debug!(
             "DEBUG: execute_reveal - source: {}, available: {}, count: {}, any_number: {}",
@@ -265,51 +334,14 @@ impl AbilityResolver {
                     allow_skip
                 );
 
-                let desc_en = format!(
-                    "Select {} to reveal from {}",
-                    util::card_plural(choices_count),
-                    crate::ability::describe::zone_label(Some(&source))
+                self.offer_reveal_choice(
+                    source,
+                    target,
+                    card_type,
+                    blind,
+                    choices_count,
+                    allow_skip,
                 );
-                let desc_ja = format!(
-                    "{}から公開するカードを選択",
-                    crate::ability::describe::zone_label_ja(Some(&source))
-                );
-                self.pending_choice = Some(
-                    Choice::select_cards(source.to_string(), choices_count, desc_en, allow_skip)
-                        .description_ja(Some(desc_ja))
-                        .card_type(card_type.map(|s| s.to_string()))
-                        .cost_limit(
-                            self.current_effect
-                                .as_ref()
-                                .and_then(|e| e.cost_limit_any()),
-                            self.current_effect
-                                .as_ref()
-                                .and_then(|e| e.cost_limit_operator_any())
-                                .map(|s| s.to_string()),
-                        )
-                        .group(
-                            self.current_effect
-                                .as_ref()
-                                .and_then(|e| e.group_names_any())
-                                .and_then(|v| v.first().cloned()),
-                        )
-                        .characters(
-                            self.current_effect
-                                .as_ref()
-                                .and_then(|e| e.characters_any().cloned()),
-                        )
-                        .target_player_id(Some(target.to_string()))
-                        .blind(blind)
-                        .is_reveal(true)
-                        .picker(
-                            self.current_effect
-                                .as_ref()
-                                .and_then(|e| e.picker_any())
-                                .map(|s| s.to_string()),
-                        )
-                        .build(),
-                );
-                self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
                 return Ok(());
             } else {
                 log::debug!("DEBUG: Not creating choice - conditions not met");
@@ -329,30 +361,13 @@ impl AbilityResolver {
                     // deck (the parenthetical "nothing happens" behavior).
                     player.main_deck.cards[..take_count].to_vec()
                 }
-                Some(Zone::LookedAt) => gs
-                    .looked_at_cards
-                    .iter()
-                    .filter(|&&card_id| {
-                        super::util::card_matches_type(&card_db, card_id, card_type) && {
-                            if heart_colors.is_empty() {
-                                true
-                            } else if require_all_heart_colors {
-                                super::util::card_matches_all_heart_colors(
-                                    &card_db,
-                                    card_id,
-                                    heart_colors,
-                                )
-                            } else {
-                                super::util::card_matches_heart_colors(
-                                    &card_db,
-                                    card_id,
-                                    heart_colors,
-                                )
-                            }
-                        }
-                    })
-                    .copied()
-                    .collect(),
+                Some(Zone::LookedAt) => Self::filter_select_candidates(
+                    &gs.looked_at_cards,
+                    &card_db,
+                    card_type,
+                    heart_colors,
+                    require_all_heart_colors,
+                ),
                 _ => vec![],
             }
         };
@@ -422,24 +437,26 @@ impl AbilityResolver {
         }
     }
 
-    /// Type + heart-color filter over select candidates.
+    /// Type + heart-color filter over select candidates. Shared by
+    /// `execute_select` (filter from the effect) and the `execute_reveal`
+    /// looked-at path (filter from explicit parameters).
     fn filter_select_candidates(
         card_ids: &[i16],
         card_db: &crate::card::CardDatabase,
         card_type: Option<&str>,
-        effect: &AbilityEffect,
+        heart_colors: &[String],
+        require_all_heart_colors: bool,
     ) -> Vec<i16> {
         card_ids
             .iter()
             .filter(|&&card_id| {
                 super::util::card_matches_type(card_db, card_id, card_type) && {
-                    let hc = effect.heart_colors_any();
-                    if hc.is_empty() {
+                    if heart_colors.is_empty() {
                         true
-                    } else if effect.require_all_heart_colors_any().unwrap_or(false) {
-                        super::util::card_matches_all_heart_colors(card_db, card_id, hc)
+                    } else if require_all_heart_colors {
+                        super::util::card_matches_all_heart_colors(card_db, card_id, heart_colors)
                     } else {
-                        super::util::card_matches_heart_colors(card_db, card_id, hc)
+                        super::util::card_matches_heart_colors(card_db, card_id, heart_colors)
                     }
                 }
             })
@@ -589,8 +606,13 @@ impl AbilityResolver {
             count as usize,
         );
 
-        let filtered: Vec<i16> =
-            Self::filter_select_candidates(&card_ids, &card_db, card_type, effect);
+        let filtered: Vec<i16> = Self::filter_select_candidates(
+            &card_ids,
+            &card_db,
+            card_type,
+            effect.heart_colors_any(),
+            effect.require_all_heart_colors_any().unwrap_or(false),
+        );
 
         if let Some(distinct) = effect.distinct_any() {
             let distinct_filter = super::util::filter_from_parts_full(
