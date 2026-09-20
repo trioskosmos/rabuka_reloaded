@@ -1,14 +1,14 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-09-20T05:51:45.116346+00:00",
+  "generated_at": "2026-09-20T07:12:43.471240+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
     "total_abilities": 2011,
     "unique_abilities": 936
   },
-  "n_files": 830,
-  "n_tests": 3385,
+  "n_files": 831,
+  "n_tests": 3386,
   "total_cards": 771,
   "covered_cards": 771,
   "abilities_on_covered": 936,
@@ -378,7 +378,6 @@
   "specific_requirements": {
     "total": 141,
     "thin_idxs": [
-      260,
       261,
       380,
       499,
@@ -729,7 +728,7 @@
       ]
     }
   },
-  "n_test_fns_parsed": 3385,
+  "n_test_fns_parsed": 3386,
   "abilities": [
     {
       "idx": 0,
@@ -15217,12 +15216,14 @@
       "has_choice": true,
       "has_negative": false,
       "covering_files": [
-        "engine/tests/test_modules/effects/draw/chains/activation_draw_then_discard_test.rs"
+        "engine/tests/test_modules/effects/draw/chains/activation_draw_then_discard_test.rs",
+        "engine/tests/test_modules/effects/draw/flat/turn1_energy_draw_discard_pl_sp_bp1_009_r_test.rs"
       ],
       "covering_tests": [
+        "natsumi_turn1_energy_draw_discard_full_behavior",
         "sp_bp1_009_activation_draws_one_discards_one"
       ],
-      "covering_test_count": 1,
+      "covering_test_count": 2,
       "is_null": false,
       "use_limit": 1,
       "watches_abilities": false,

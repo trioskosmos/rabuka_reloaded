@@ -72,7 +72,34 @@ cargo 3ds build --bin harness --release
 - rust3ds organizations and templates (cargo-3ds, rust3ds-template): https://github.com/rust3ds
 - Docker images and community notes: search `rust 3ds cargo-3ds` on GitHub for useful starting points.
 
-If you'd like, I can now:
-- Attempt a local cross-build using a known Docker image and report exact compile failures (I can create a Dockerfile and try a build), or
-- Produce a smaller checklist of specific code locations to patch (I can grep for `tokio::`, `actix`, `std::net`, `spawn`, and generate a patch set that gates or stubs them), or
-- Both.
+## Port status (merged from PORT_TO_3DS.md, 2026-09-20)
+
+What was already done on desktop (all verified in-tree):
+
+- **Cargo feature gating** — `actix-web`, `tokio`, `local-ip-address`, `uuid`, `bytes`
+  and friends are optional behind the `server` feature (`engine/Cargo.toml`).
+  `cargo build --no-default-features` yields a binary with no networking/async deps.
+- **Interactive harness** — `engine/src/bin/harness.rs`: REPL hot-seat play, legal-action
+  listing, auto-advance through automatic phases.
+- **Auto-play proof of concept** — `engine/src/bin/rabuka_3ds.rs`: fully automated game
+  loop (RPS Rock-vs-Paper, first-option picks, mulligan skip, first-card live set).
+  Run it with `cargo run --bin rabuka_3ds --no-default-features` from `engine/`.
+- See also `platforms/3ds/README.md` for the standalone PoC layout.
+
+Dependency risk table (always-on deps without `server`):
+
+| Crate | 3DS risk | Notes |
+|-------|----------|-------|
+| `log` | Low | Works with ctr-std |
+| `env_logger` | Medium | Needs stderr; replace with 3DS log output |
+| `serde` + `serde_json` | Low | Heavy but portable; consider `serde_json` optional |
+| `rand` | Medium | `getrandom` syscall may require 3DS backend |
+| `smallvec` | Low | No OS dependencies |
+
+Key failpoints beyond §5: `cards.json` loads from a relative path (`../cards/cards.json`)
+— on 3DS load from SD (`/3ds/rabuka/cards.json`); the global `GAME_STATE` `Mutex` can
+be a `RefCell` single-threaded; ~128MB RAM budget favors the bytecode card store
+over JSON inflation.
+
+Next: set up `devkitARM` + `cargo-3ds` (Linux/WSL or Docker), add `ctru-rs` behind a
+`3ds` feature flag, cross-compile, and test on Citra first.

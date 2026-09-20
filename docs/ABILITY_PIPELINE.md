@@ -1,6 +1,7 @@
 # Ability pipeline: current architecture, failure points, and plan
 
-Last reviewed: 2026-07-29
+Last reviewed: 2026-09-20 (module paths refreshed after the ability/
+cost/compound/turn-actions directory breakup; routing logic unchanged)
 
 This document is an engineering map of the ability system. It is intentionally
 about data flow and ownership rather than a complete card-ability reference.
@@ -188,7 +189,7 @@ cache data, and the persistent `AbilityResolver`. This is why recreating a
 resolver after every choice is unsafe; its state includes selected cards,
 revealed cards, repeat state, formation plans, and other cross-step context.
 
-`engine/src/turn/actions.rs::resume_with_choice()` is the external resumption
+`engine/src/turn/actions/` (`mod.rs`) `::resume_with_choice()` is the external resumption
 boundary. It validates the pending choice, applies the selected result, returns
 the queue to execution, and continues until the resolver either asks for
 another choice or completes.
@@ -198,12 +199,12 @@ another choice or completes.
 `AbilityResolver::resolve_ability()` coordinates the phases:
 
 1. Validate the ability's activation condition and cost.
-2. Pay the cost in `cost.rs`. Sequential, optional, energy, movement, and
+2. Pay the cost in `cost/handlers.rs`. Sequential, optional, energy, movement, and
    choice-based costs can all suspend execution.
 3. Execute the effect through `effects/mod.rs::execute_effect()`.
-4. Route compound effects through `compound.rs`, look/select behavior through
+4. Route compound effects through `compound/`, look/select behavior through
    `look.rs`, movement through `move_cards.rs`, and choice continuation through
-   `choice.rs`.
+   `choice.rs` (+ `choice/` submodules).
 5. Apply replacement effects, target routing, and non-stackable checks as part
    of effect execution.
 6. Complete the queue entry or store the resolver and pending choice.
@@ -213,9 +214,9 @@ The action-to-domain map is currently:
 | Concern | Main implementation |
 | --- | --- |
 | Central action dispatch | `engine/src/ability/effects/mod.rs` |
-| Costs and payment | `engine/src/ability/cost.rs` |
-| Choice application/resumption | `engine/src/ability/choice.rs` |
-| Sequential/conditional/repeat effects | `engine/src/ability/compound.rs` |
+| Costs and payment | `engine/src/ability/cost/handlers.rs` |
+| Choice application/resumption | `engine/src/ability/choice.rs` (+ `choice/`) |
+| Sequential/conditional/repeat effects | `engine/src/ability/compound/` |
 | Look/reveal/select flows | `engine/src/ability/look.rs` |
 | Card movement | `engine/src/ability/move_cards.rs` |
 | Score and heart changes | `engine/src/ability/effects/score.rs` |
@@ -592,9 +593,9 @@ When debugging a single ability, start by identifying the `action` string in
 2. Look up the `action` in the table above — go to that handler.
 3. If the ability has a `condition`, check `ability/condition/card.rs` for the
    condition evaluator and `ability/condition.rs` for the entry point.
-4. If the ability has a `cost`, check `ability/cost.rs`.
+4. If the ability has a `cost`, check `ability/cost/handlers.rs`.
 5. If the ability is a compound (sequential/choice/conditional), check
-   `ability/compound.rs`.
+   `ability/compound/`.
 6. If the ability involves player choice, check `ability/choice.rs`.
 7. If the ability involves card movement, check `ability/move_cards.rs`.
 8. If the ability involves look/reveal/select, check `ability/look.rs`.

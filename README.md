@@ -196,7 +196,7 @@ See [engine/ISSUES_FOUND.md](engine/ISSUES_FOUND.md) for the full list.
 |----------|-------------|
 | [engine/PORTS.md](engine/PORTS.md) | 450-line console port feasibility analysis for 15+ consoles |
 | [platforms/gba/output/GBA_PORT_NOTES.md](platforms/gba/output/GBA_PORT_NOTES.md) | GBA port build/toolchain + object-text rendering + VRAM crash fix |
-| [engine/PORT_TO_3DS.md](engine/PORT_TO_3DS.md) | 3DS porting plan and progress |
+| [engine/3DS_CROSS_COMPILE_GUIDE.md](engine/3DS_CROSS_COMPILE_GUIDE.md) | 3DS porting guide, plan, and progress |
 | [docs/memory_optimization_combined.md](docs/memory_optimization_combined.md) | Unified memory & bytecode optimization guide (supersedes the older memory docs) |
 | [engine/ISSUES_FOUND.md](engine/ISSUES_FOUND.md) | Known build issues, warnings, and clippy lints |
 | [engine/tests/WRITING_TESTS.md](engine/tests/WRITING_TESTS.md) | 530-line guide for writing card tests |
@@ -205,7 +205,7 @@ See [engine/ISSUES_FOUND.md](engine/ISSUES_FOUND.md) for the full list.
 | [ai_design/rabuka_bot_design.md](ai_design/rabuka_bot_design.md) | Bot architecture overview |
 | [docs/QR_DECK_SHARING.md](docs/QR_DECK_SHARING.md) | QR code deck sharing guide |
 | [docs/ABILITY_PIPELINE.md](docs/ABILITY_PIPELINE.md) | Card-text → bytecode pipeline documentation |
-| [docs/REFACTOR_BACKLOG.md](docs/REFACTOR_BACKLOG.md) | Verified-remaining refactor items with necessity verdicts |
+| [docs/AUDITS.md](docs/AUDITS.md) | Consolidated audits incl. refactor notes |
 | [android/README_ANDROID.md](android/README_ANDROID.md) | **Android/Termux hosting guide — free multiplayer via cloudflared** |
 
 ## License

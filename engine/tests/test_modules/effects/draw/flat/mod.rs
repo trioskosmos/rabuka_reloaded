@@ -21,4 +21,5 @@ pub mod stage_member_identity_and_cost_gated_draw_test;
 pub mod success_zone_gated_debut_draw_test;
 pub mod success_zone_group_live_success_draw_test;
 pub mod surplus_heart01_live_success_draw_test;
+pub mod turn1_energy_draw_discard_pl_sp_bp1_009_r_test;
 pub mod waitroom_count_gated_debut_draw_test;
