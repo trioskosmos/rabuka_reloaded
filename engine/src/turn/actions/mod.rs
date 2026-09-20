@@ -178,6 +178,67 @@ impl super::TurnEngine {
         )
     }
 
+    /// Refill hand from live zone on pass during live-card-set phases.
+    /// Shared by the FirstAttacker / SecondAttacker pass arms, which differ
+    /// only in tag and next phase.
+    fn refill_live_zone_hand(game_state: &mut GameState, tag: &str) {
+        let player = game_state.active_player_mut();
+        let cards_placed = player.live_card_zone.cards.len();
+        for _ in 0..cards_placed {
+            let _ = player.draw_card();
+        }
+        game_state.push_debug_note(format!(
+            "pass live_card_set({}): refill +{} from live zone",
+            tag, cards_placed
+        ));
+    }
+
+    /// Numeric RPS value for a choice action.
+    fn rps_choice_value(action: &crate::game_setup::ActionType) -> u8 {
+        match action {
+            crate::game_setup::ActionType::RockChoice => 0,
+            crate::game_setup::ActionType::PaperChoice => 1,
+            crate::game_setup::ActionType::ScissorsChoice => 2,
+            _ => unreachable!(),
+        }
+    }
+
+    /// Route an RPS pick: PVP sessions use the stored player id, sandbox
+    /// plays P1 then P2 sequentially.
+    fn handle_rps_choice(game_state: &mut GameState, choice_value: u8) -> Result<(), String> {
+        // PVP: route by player_id from session
+        if let Some(pid) = game_state.pending_rps_player_id {
+            let r = if pid == 0 {
+                Self::handle_rps_choice_p1(game_state, choice_value)
+            } else {
+                Self::handle_rps_choice_p2(game_state, choice_value)
+            };
+            game_state.pending_rps_player_id = None;
+            r
+        } else {
+            // Sandbox / no player context: sequential (P1 then P2)
+            if game_state.player1_rps_choice.is_none() {
+                Self::handle_rps_choice_p1(game_state, choice_value)
+            } else {
+                Self::handle_rps_choice_p2(game_state, choice_value)
+            }
+        }
+    }
+
+    /// First/second attacker choice: set flags, draw 6 each, enter mulligan.
+    /// The two arms differ only in the RPS-winner polarity.
+    fn handle_choose_attacker(game_state: &mut GameState, p1_first: bool) -> Result<(), String> {
+        game_state.player1.is_first_attacker = p1_first;
+        game_state.player2.is_first_attacker = !p1_first;
+        for _ in 0..6 {
+            game_state.player1.draw_card();
+            game_state.player2.draw_card();
+        }
+        game_state.current_phase = Phase::MulliganFirstAttacker;
+        game_state.mulligan_selected_indices.clear();
+        Ok(())
+    }
+
     pub fn execute_main_phase_action_with_ability_index(
         game_state: &mut GameState,
         action: &crate::game_setup::ActionType,
@@ -212,28 +273,12 @@ impl super::TurnEngine {
         match action {
                 crate::game_setup::ActionType::Pass => match game_state.current_phase {
                     Phase::LiveCardSetFirstAttacker => {
-                        let player = game_state.active_player_mut();
-                        let cards_placed = player.live_card_zone.cards.len();
-                        for _ in 0..cards_placed {
-                            let _ = player.draw_card();
-                        }
-                        game_state.push_debug_note(format!(
-                            "pass live_card_set(FA): refill +{} from live zone",
-                            cards_placed
-                        ));
+                        Self::refill_live_zone_hand(game_state, "FA");
                         game_state.current_phase = Phase::LiveCardSetSecondAttacker;
                         Ok(())
                     }
                     Phase::LiveCardSetSecondAttacker => {
-                        let player = game_state.active_player_mut();
-                        let cards_placed = player.live_card_zone.cards.len();
-                        for _ in 0..cards_placed {
-                            let _ = player.draw_card();
-                        }
-                        game_state.push_debug_note(format!(
-                            "pass live_card_set(SA): refill +{} from live zone",
-                            cards_placed
-                        ));
+                        Self::refill_live_zone_hand(game_state, "SA");
                         Self::advance_phase(game_state);
                         Ok(())
                     }
@@ -246,53 +291,13 @@ impl super::TurnEngine {
             crate::game_setup::ActionType::RockChoice
             | crate::game_setup::ActionType::PaperChoice
             | crate::game_setup::ActionType::ScissorsChoice => {
-                let choice_value = match action {
-                    crate::game_setup::ActionType::RockChoice => 0,
-                    crate::game_setup::ActionType::PaperChoice => 1,
-                    crate::game_setup::ActionType::ScissorsChoice => 2,
-                    _ => unreachable!(),
-                };
-                // PVP: route by player_id from session
-                if let Some(pid) = game_state.pending_rps_player_id {
-                    let r = if pid == 0 {
-                        Self::handle_rps_choice_p1(game_state, choice_value)
-                    } else {
-                        Self::handle_rps_choice_p2(game_state, choice_value)
-                    };
-                    game_state.pending_rps_player_id = None;
-                    r
-                } else {
-                    // Sandbox / no player context: sequential (P1 then P2)
-                    if game_state.player1_rps_choice.is_none() {
-                        Self::handle_rps_choice_p1(game_state, choice_value)
-                    } else {
-                        Self::handle_rps_choice_p2(game_state, choice_value)
-                    }
-                }
+                Self::handle_rps_choice(game_state, Self::rps_choice_value(action))
             }
             crate::game_setup::ActionType::ChooseFirstAttacker => {
-                let p1_first = game_state.rps_winner != Some(2);
-                game_state.player1.is_first_attacker = p1_first;
-                game_state.player2.is_first_attacker = !p1_first;
-                for _ in 0..6 {
-                    game_state.player1.draw_card();
-                    game_state.player2.draw_card();
-                }
-                game_state.current_phase = Phase::MulliganFirstAttacker;
-                game_state.mulligan_selected_indices.clear();
-                Ok(())
+                Self::handle_choose_attacker(game_state, game_state.rps_winner != Some(2))
             }
             crate::game_setup::ActionType::ChooseSecondAttacker => {
-                let p1_first = game_state.rps_winner == Some(2);
-                game_state.player1.is_first_attacker = p1_first;
-                game_state.player2.is_first_attacker = !p1_first;
-                for _ in 0..6 {
-                    game_state.player1.draw_card();
-                    game_state.player2.draw_card();
-                }
-                game_state.current_phase = Phase::MulliganFirstAttacker;
-                game_state.mulligan_selected_indices.clear();
-                Ok(())
+                Self::handle_choose_attacker(game_state, game_state.rps_winner == Some(2))
             }
             crate::game_setup::ActionType::SelectMulligan => {
                 Self::handle_mulligan_selection(game_state, card_id, card_indices)
