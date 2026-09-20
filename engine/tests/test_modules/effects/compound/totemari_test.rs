@@ -88,6 +88,8 @@ fn tote_mari_q68_can_still_set_live_card() {
 }
 
 /// Performance phase discards live cards when cannot_live is active (Q68).
+/// Q57: the "cannot do" prohibition beats the "do a live" effect — the live
+/// is set and performed anyway, yet nothing succeeds and nothing scores.
 #[test]
 fn tote_mari_q68_live_performance_discards_live_card() {
     let db = load_real_database();
@@ -158,6 +160,12 @@ fn tote_mari_q68_live_performance_discards_live_card() {
     assert!(
         game.state.player1.waitroom.cards.contains(&live),
         "P1 live card moved to waitroom"
+    );
+
+    // Q57: prohibition wins over the performed effect — no success, no score.
+    assert!(
+        game.state.player1.success_live_card_zone.cards.is_empty(),
+        "Q57: prohibited live must not reach the success zone"
     );
 
     // P2's live card should still be present (opponent unaffected by cannot_live)

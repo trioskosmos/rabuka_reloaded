@@ -1,17 +1,17 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-09-19T01:03:38.740042+00:00",
+  "generated_at": "2026-09-20T05:51:45.116346+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
     "total_abilities": 2011,
     "unique_abilities": 936
   },
-  "n_files": 829,
-  "n_tests": 3382,
+  "n_files": 830,
+  "n_tests": 3385,
   "total_cards": 771,
-  "covered_cards": 770,
-  "abilities_on_covered": 935,
+  "covered_cards": 771,
+  "abilities_on_covered": 936,
   "trigger_counts": {
     "起動": [
       96,
@@ -22,7 +22,7 @@
       269
     ],
     "ライブ開始時": [
-      267,
+      268,
       268
     ],
     "(none)": [
@@ -56,7 +56,7 @@
       160
     ],
     "sequential": [
-      219,
+      220,
       220
     ],
     "unknown": [
@@ -198,7 +198,7 @@
       88
     ],
     "location_condition": [
-      72,
+      73,
       73
     ],
     "movement:baton_touch": [
@@ -288,7 +288,7 @@
       82
     ],
     "bp7": [
-      110,
+      111,
       111
     ],
     "pb1": [
@@ -309,18 +309,15 @@
     ]
   },
   "depth_counts": {
-    "L2+choice": 723,
+    "L2+choice": 724,
     "L1+choice": 90,
     "L1": 40,
-    "L2": 82,
-    "none": 1
+    "L2": 82
   },
   "qa_rulings": {
-    "covered": 279,
+    "covered": 280,
     "total": 280,
-    "uncovered_ids": [
-      "Q57"
-    ]
+    "uncovered_ids": []
   },
   "jidou_conjunction": {
     "ability_watchers": [
@@ -732,7 +729,7 @@
       ]
     }
   },
-  "n_test_fns_parsed": 3382,
+  "n_test_fns_parsed": 3385,
   "abilities": [
     {
       "idx": 0,
@@ -2294,9 +2291,13 @@
         "engine/tests/test_modules/characterization/zero_tested_action_types_test.rs",
         "engine/tests/test_modules/effects/compound/live_start_waited_opponent_count_group_member_topdeck_test.rs",
         "engine/tests/test_modules/effects/conditional/discard_group_look_four_or_recover_live_test.rs",
+        "engine/tests/test_modules/effects/draw/conditional/live_start_energy_return_ren_draw_pl_sp_bp7_026_l_test.rs",
         "engine/tests/test_modules/effects/gain/blades/q46_kanako_all_heart_timing_test.rs"
       ],
       "covering_tests": [
+        "dears_accept_cost_with_ren_draws_two_discards_one",
+        "dears_accept_cost_without_ren_pays_but_no_draw",
+        "dears_decline_cost_nothing_happens",
         "kanon_invalidate_liella_live_start",
         "live_start_waited_opponent_group_topdeck_increases_deck_with_two_waited",
         "live_start_waited_opponent_group_topdeck_initially_active_opponent_net_deck_unchanged",
@@ -2318,7 +2319,7 @@
         "vivid_world_live_phase_blade_and_success",
         "vivid_world_missing_heart_color"
       ],
-      "covering_test_count": 20,
+      "covering_test_count": 23,
       "is_null": false,
       "use_limit": 1,
       "watches_abilities": false,
@@ -44878,14 +44879,20 @@
         "PL!SP-bp7-026-L"
       ],
       "base": "PL!SP-bp7-026",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
-      "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covered": true,
+      "depth": "L2+choice",
+      "has_assert": true,
+      "has_choice": true,
+      "has_negative": true,
+      "covering_files": [
+        "engine/tests/test_modules/effects/draw/conditional/live_start_energy_return_ren_draw_pl_sp_bp7_026_l_test.rs"
+      ],
+      "covering_tests": [
+        "dears_accept_cost_with_ren_draws_two_discards_one",
+        "dears_accept_cost_without_ren_pays_but_no_draw",
+        "dears_decline_cost_nothing_happens"
+      ],
+      "covering_test_count": 3,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
