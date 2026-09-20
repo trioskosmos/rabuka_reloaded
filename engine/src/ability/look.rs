@@ -383,6 +383,169 @@ impl AbilityResolver {
 
         Ok(())
     }
+    /// Zone pool for a select-from-zone effect. Read-only over the player
+    /// plus the looked-at / revealed / already-selected pools.
+    /// (`execute_select` resolves the player immutably for this step, so
+    /// all inputs borrow shared.)
+    fn collect_select_candidates(
+        player: &crate::player::Player,
+        looked_at: &[i16],
+        revealed: &[i16],
+        selected: &[i16],
+        source: &str,
+        count: usize,
+    ) -> Vec<i16> {
+        match Zone::from_str(source) {
+            Some(Zone::Hand) => player.hand.cards.iter().copied().collect(),
+            Some(Zone::Deck) => player
+                .main_deck
+                .cards
+                .iter()
+                .take(count)
+                .copied()
+                .collect(),
+            Some(Zone::Discard) | Some(Zone::Waitroom) => {
+                player.waitroom.cards.iter().copied().collect()
+            }
+            Some(Zone::Stage) => player
+                .stage
+                .stage
+                .iter()
+                .filter(|&&id| id != -1)
+                .copied()
+                .collect(),
+            Some(Zone::LookedAt) => looked_at.to_vec(),
+            Some(Zone::LiveCardZone) => player.live_card_zone.cards.iter().copied().collect(),
+            Some(Zone::SelectedCards) => selected.to_vec(),
+            Some(Zone::RevealedCards) => revealed.to_vec(),
+            _ => vec![],
+        }
+    }
+
+    /// Type + heart-color filter over select candidates.
+    fn filter_select_candidates(
+        card_ids: &[i16],
+        card_db: &crate::card::CardDatabase,
+        card_type: Option<&str>,
+        effect: &AbilityEffect,
+    ) -> Vec<i16> {
+        card_ids
+            .iter()
+            .filter(|&&card_id| {
+                super::util::card_matches_type(card_db, card_id, card_type) && {
+                    let hc = effect.heart_colors_any();
+                    if hc.is_empty() {
+                        true
+                    } else if effect.require_all_heart_colors_any().unwrap_or(false) {
+                        super::util::card_matches_all_heart_colors(card_db, card_id, hc)
+                    } else {
+                        super::util::card_matches_heart_colors(card_db, card_id, hc)
+                    }
+                }
+            })
+            .copied()
+            .collect()
+    }
+
+    /// Clamp the select count against the pool. Returns `None` when there
+    /// is nothing to offer (caller returns early): zero count, empty pool,
+    /// or a distinct shortfall (Q118 — lets conditional sequentials detect
+    /// the failure instead of offering an impossible choice).
+    fn clamp_select_count(pool_len: usize, count: u8, distinct: bool) -> Option<u8> {
+        if count == 0 || pool_len == 0 {
+            return None;
+        }
+        // Q118: If distinct filter reduced available cards below the required count,
+        // bail out so conditional sequential effects can detect the failure.
+        // Only applies when distinct constraint is active — regular selects
+        // (e.g. "pick up to N" where N > available) should still proceed.
+        if distinct && pool_len < count as usize {
+            return None;
+        }
+        Some(count.min(pool_len.u8_count()))
+    }
+
+    /// Index mapping for the select prompt: stage positions map back to
+    /// stage slots; distinct-filtered or discard-narrowed pools map back to
+    /// the source pool; otherwise the prompt addresses the pool directly.
+    fn select_filtered_indices(
+        gs: &mut GameState,
+        source: &str,
+        target: &str,
+        card_ids: &[i16],
+        distinct: bool,
+    ) -> Option<Vec<usize>> {
+        if Zone::from_str(source) == Some(Zone::Stage) {
+            let looked = gs.looked_at_cards.clone();
+            Some(
+                looked
+                    .iter()
+                    .filter_map(|&id| {
+                        gs.resolve_target_player_mut(target)
+                            .stage
+                            .stage
+                            .iter()
+                            .position(|&sid| sid == id)
+                    })
+                    .collect(),
+            )
+        } else if distinct
+            || (gs.looked_at_cards.len() < card_ids.len()
+                && Zone::from_str(source) == Some(Zone::Discard))
+        {
+            let looked = gs.looked_at_cards.clone();
+            Some(
+                looked
+                    .iter()
+                    .map(|&id| card_ids.iter().position(|&cid| cid == id).unwrap_or(0))
+                    .collect(),
+            )
+        } else {
+            None
+        }
+    }
+
+    /// Build the select-cards prompt for `execute_select`.
+    #[allow(clippy::too_many_arguments)]
+    fn build_select_choice(
+        source: &str,
+        count: u8,
+        optional: bool,
+        effect: &AbilityEffect,
+        filtered_indices: Option<Vec<usize>>,
+        target: &str,
+    ) -> Choice {
+        let desc_en = format!(
+            "Select {} {} from {}",
+            count,
+            util::card_plural(count as usize),
+            crate::ability::describe::zone_label(Some(source))
+        );
+        let desc_ja = format!(
+            "{}から{}枚のカードを選択",
+            crate::ability::describe::zone_label_ja(Some(source)),
+            count
+        );
+        Choice::select_cards(source.to_string(), count as usize, desc_en, optional)
+            .description_ja(Some(desc_ja))
+            .card_type(effect.card_type_any().map(|s| s.to_string()))
+            .cost_limit(
+                effect.cost_limit_any(),
+                effect.cost_limit_operator_any().map(|s| s.to_string()),
+            )
+            .group(
+                effect
+                    .group_names_any()
+                    .as_ref()
+                    .and_then(|v| v.first().cloned()),
+            )
+            .characters(effect.characters_any().cloned())
+            .filtered_indices(filtered_indices)
+            .target_player_id(Some(target.to_string()))
+            .is_select_action(true)
+            .build()
+    }
+
     pub fn execute_select(
         &mut self,
         gs: &mut GameState,
@@ -403,7 +566,6 @@ impl AbilityResolver {
         let card_type = chosen_card_type
             .as_deref()
             .or(ct_binding.map(|ct| ct.as_card_str()));
-        let target = effect.target_name().to_string();
         let count = effect
             .count
             .or_else(|| {
@@ -415,50 +577,20 @@ impl AbilityResolver {
             .unwrap_or(1);
         let optional = effect.optional.unwrap_or(false);
         let card_db = gs.card_database.clone();
-        let player = gs.resolve_target_player_mut(&target);
+        let target = effect.target_name().to_string();
+        let player = gs.resolve_target_player(&target);
 
-        let card_ids: Vec<i16> = match Zone::from_str(source) {
-            Some(Zone::Hand) => player.hand.cards.iter().copied().collect(),
-            Some(Zone::Deck) => player
-                .main_deck
-                .cards
-                .iter()
-                .take(count as usize)
-                .copied()
-                .collect(),
-            Some(Zone::Discard) | Some(Zone::Waitroom) => {
-                player.waitroom.cards.iter().copied().collect()
-            }
-            Some(Zone::Stage) => player
-                .stage
-                .stage
-                .iter()
-                .filter(|&&id| id != -1)
-                .copied()
-                .collect(),
-            Some(Zone::LookedAt) => gs.looked_at_cards.to_vec(),
-            Some(Zone::LiveCardZone) => player.live_card_zone.cards.iter().copied().collect(),
-            Some(Zone::SelectedCards) => self.selected_cards.to_vec(),
-            Some(Zone::RevealedCards) => gs.revealed_cards.to_vec(),
-            _ => vec![],
-        };
+        let card_ids: Vec<i16> = Self::collect_select_candidates(
+            player,
+            &gs.looked_at_cards,
+            &gs.revealed_cards,
+            &self.selected_cards,
+            source,
+            count as usize,
+        );
 
-        let filtered: Vec<i16> = card_ids
-            .iter()
-            .filter(|&&card_id| {
-                super::util::card_matches_type(&card_db, card_id, card_type) && {
-                    let hc = effect.heart_colors_any();
-                    if hc.is_empty() {
-                        true
-                    } else if effect.require_all_heart_colors_any().unwrap_or(false) {
-                        super::util::card_matches_all_heart_colors(&card_db, card_id, hc)
-                    } else {
-                        super::util::card_matches_heart_colors(&card_db, card_id, hc)
-                    }
-                }
-            })
-            .copied()
-            .collect();
+        let filtered: Vec<i16> =
+            Self::filter_select_candidates(&card_ids, &card_db, card_type, effect);
 
         if let Some(distinct) = effect.distinct_any() {
             let distinct_filter = super::util::filter_from_parts_full(
@@ -496,80 +628,23 @@ impl AbilityResolver {
             }
         }
 
-        if count == 0 {
-            return Ok(());
-        }
-        if gs.looked_at_cards.is_empty() {
-            return Ok(());
-        }
-        // Q118: If distinct filter reduced available cards below the required count,
-        // bail out so conditional sequential effects can detect the failure.
-        // Only applies when distinct constraint is active — regular selects
-        // (e.g. "pick up to N" where N > available) should still proceed.
-        if effect.distinct_any().is_some() && gs.looked_at_cards.len() < count as usize {
-            return Ok(());
-        }
-        let count = count.min(gs.looked_at_cards.len().u8_count());
-
-        let filtered_indices: Option<Vec<usize>> = if Zone::from_str(source) == Some(Zone::Stage) {
-            let looked = gs.looked_at_cards.clone();
-            Some(
-                looked
-                    .iter()
-                    .filter_map(|&id| {
-                        gs.resolve_target_player_mut(&target)
-                            .stage
-                            .stage
-                            .iter()
-                            .position(|&sid| sid == id)
-                    })
-                    .collect(),
-            )
-        } else if effect.distinct_any().is_some()
-            || (gs.looked_at_cards.len() < card_ids.len()
-                && Zone::from_str(source) == Some(Zone::Discard))
-        {
-            let looked = gs.looked_at_cards.clone();
-            Some(
-                looked
-                    .iter()
-                    .map(|&id| card_ids.iter().position(|&cid| cid == id).unwrap_or(0))
-                    .collect(),
-            )
-        } else {
-            None
-        };
-        let desc_en = format!(
-            "Select {} {} from {}",
+        let Some(count) = Self::clamp_select_count(
+            gs.looked_at_cards.len(),
             count,
-            util::card_plural(count as usize),
-            crate::ability::describe::zone_label(Some(&source))
-        );
-        let desc_ja = format!(
-            "{}から{}枚のカードを選択",
-            crate::ability::describe::zone_label_ja(Some(&source)),
-            count
-        );
-        self.pending_choice = Some(
-            Choice::select_cards(source.to_string(), count as usize, desc_en, optional)
-                .description_ja(Some(desc_ja))
-                .card_type(effect.card_type_any().map(|s| s.to_string()))
-                .cost_limit(
-                    effect.cost_limit_any(),
-                    effect.cost_limit_operator_any().map(|s| s.to_string()),
-                )
-                .group(
-                    effect
-                        .group_names_any()
-                        .as_ref()
-                        .and_then(|v| v.first().cloned()),
-                )
-                .characters(effect.characters_any().cloned())
-                .filtered_indices(filtered_indices.clone())
-                .target_player_id(Some(target.clone()))
-                .is_select_action(true)
-                .build(),
-        );
+            effect.distinct_any().is_some(),
+        ) else {
+            return Ok(());
+        };
+        let filtered_indices =
+            Self::select_filtered_indices(gs, source, &target, &card_ids, effect.distinct_any().is_some());
+        self.pending_choice = Some(Self::build_select_choice(
+            source,
+            count,
+            optional,
+            effect,
+            filtered_indices,
+            &target,
+        ));
         self.stage_select_intent =
             Some(crate::ability::types::StageSelectIntent::CollectTargets);
         self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
