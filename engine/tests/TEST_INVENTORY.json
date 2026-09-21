@@ -1,6 +1,6 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-09-20T07:12:43.471240+00:00",
+  "generated_at": "2026-09-21T06:27:47.274785+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
@@ -8,7 +8,7 @@
     "unique_abilities": 936
   },
   "n_files": 831,
-  "n_tests": 3386,
+  "n_tests": 3394,
   "total_cards": 771,
   "covered_cards": 771,
   "abilities_on_covered": 936,
@@ -309,8 +309,8 @@
     ]
   },
   "depth_counts": {
-    "L2+choice": 724,
-    "L1+choice": 90,
+    "L2+choice": 726,
+    "L1+choice": 88,
     "L1": 40,
     "L2": 82
   },
@@ -378,7 +378,6 @@
   "specific_requirements": {
     "total": 141,
     "thin_idxs": [
-      261,
       380,
       499,
       510,
@@ -728,7 +727,7 @@
       ]
     }
   },
-  "n_test_fns_parsed": 3386,
+  "n_test_fns_parsed": 3394,
   "abilities": [
     {
       "idx": 0,
@@ -1942,7 +1941,7 @@
         "issue12_proof_look_and_select_cost_20plus",
         "issue12_proof_look_and_select_cost_30plus"
       ],
-      "covering_test_count": 144,
+      "covering_test_count": 148,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -15211,19 +15210,23 @@
       ],
       "base": "PL!SP-bp1-009",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/effects/draw/chains/activation_draw_then_discard_test.rs",
         "engine/tests/test_modules/effects/draw/flat/turn1_energy_draw_discard_pl_sp_bp1_009_r_test.rs"
       ],
       "covering_tests": [
+        "natsumi_available_again_next_turn",
+        "natsumi_direct_second_activation_refused",
+        "natsumi_exact_energy_sufficient",
         "natsumi_turn1_energy_draw_discard_full_behavior",
+        "natsumi_unaffordable_not_offered",
         "sp_bp1_009_activation_draws_one_discards_one"
       ],
-      "covering_test_count": 2,
+      "covering_test_count": 6,
       "is_null": false,
       "use_limit": 1,
       "watches_abilities": false,
@@ -15246,17 +15249,21 @@
       ],
       "base": "PL!SP-bp1-010",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/effects/look_select/reveal_to_hand/energy_discard_look_pl_sp_bp1_010_r_test.rs"
       ],
       "covering_tests": [
-        "pl_sp_bp1_010_r_energy_discard_activation_fetches_liella_from_look_five"
+        "pl_sp_bp1_010_r_decline_fetch_liella_goes_to_waitroom",
+        "pl_sp_bp1_010_r_empty_hand_not_offered_activation_refused",
+        "pl_sp_bp1_010_r_energy_discard_activation_fetches_liella_from_look_five",
+        "pl_sp_bp1_010_r_no_liella_in_five_all_to_waitroom",
+        "pl_sp_bp1_010_r_unaffordable_energy_not_offered"
       ],
-      "covering_test_count": 1,
+      "covering_test_count": 5,
       "is_null": false,
       "use_limit": 1,
       "watches_abilities": false,
@@ -30610,7 +30617,7 @@
         "issue1_kanon_invalidate_and_recover",
         "issue1_kanon_no_liella_on_stage_no_recovery"
       ],
-      "covering_test_count": 127,
+      "covering_test_count": 131,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -30835,7 +30842,7 @@
         "issue14_koware_yasuki_card_exists",
         "issue15_mirai_ticket_card_exists"
       ],
-      "covering_test_count": 92,
+      "covering_test_count": 96,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,

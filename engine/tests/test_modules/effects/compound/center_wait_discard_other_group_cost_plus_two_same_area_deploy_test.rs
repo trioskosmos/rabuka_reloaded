@@ -146,9 +146,14 @@ fn center_wait_discard_cost_plus_two_deploy_fails_no_hand_cards() {
     // Don't add any cards to hand
     game.give_energy(5);
 
-    // Activate ability — cost validation fails (hand empty, need 1 discard)
-    // Error is caught internally, ability completes with no state change
-    game.activate_ability(yoshiko);
+    // Activate ability — cost validation fails (hand empty, need 1 discard).
+    // The mandatory-unpayable activation is refused with Err (Rule 9.4.2.3/Q56).
+    let result = game.try_activate_ability(yoshiko);
+    assert!(
+        result.is_err(),
+        "unpayable discard cost must refuse activation, got {:?}",
+        result
+    );
 
     // No pending choice was created (cost validation failed before choice)
     assert!(

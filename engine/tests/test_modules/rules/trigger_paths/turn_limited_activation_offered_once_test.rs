@@ -127,7 +127,11 @@ fn kasumi_turn1_ability_available_again_next_turn() {
     );
 
     // Next turn: the limit resets and the ability is offered again.
+    // Refund the spent cost (2E + 1 hand card) so the offer reflects the
+    // reset limit, not leftover affordability.
     game.state.turn_number += 1;
+    game.give_energy(2);
+    game.add_to_hand(filler);
     assert_eq!(
         count_kasumi_use_offers(&game, kasumi),
         1,

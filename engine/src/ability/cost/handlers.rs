@@ -47,10 +47,11 @@ fn get_change_state_candidates(
     self_cost: bool,
     check_name: bool,
     state: Option<&str>,
+    activating_card: Option<i16>,
 ) -> Vec<i16> {
     let player = gs.resolve_target_player(target);
     let card_db = &gs.card_database;
-    let activating_id = gs.activating_card;
+    let activating_id = activating_card;
 
     player
         .stage
@@ -162,6 +163,30 @@ impl AbilityResolver {
                 }
                 Ok(())
             }
+            _ => Self::validate_leaf_cost(gs, cost),
+        }
+    }
+
+    /// Leaf validation shared by `validate_cost` (pay time) and
+    /// `validate_mandatory_cost` (offer/activation time). Read-only.
+    fn validate_leaf_cost(gs: &GameState, cost: &AbilityEffect) -> Result<(), String> {
+        Self::validate_leaf_cost_for(gs, cost, gs.activating_card)
+    }
+
+    /// Leaf validation with an explicit activating card (offer/activation
+    /// time run before `gs.activating_card` is set, so callers pass the
+    /// card under consideration for self_cost/exclude_self filtering).
+    fn validate_leaf_cost_for(
+        gs: &GameState,
+        cost: &AbilityEffect,
+        activating_card: Option<i16>,
+    ) -> Result<(), String> {
+        match cost.action {
+            // Sequential trees are unwrapped by the callers (validate_cost
+            // strictly, validate_mandatory_cost skipping optional parts).
+            ActionType::SequentialCost => {
+                unreachable!("sequential costs are unwrapped by the caller")
+            }
             ActionType::ChoiceCondition => Ok(()),
             ActionType::MoveCards => {
                 let count = cost.count.unwrap_or(1) as usize;
@@ -216,6 +241,7 @@ let source = cost.source_str().unwrap_or("");
                         cost.self_cost_any().unwrap_or(false),
                         false,
                         Some("active"),
+                        activating_card,
                     );
                     if candidates.is_empty() {
                         return Err("No active members on stage to wait (Q137)".to_string());
@@ -224,6 +250,44 @@ let source = cost.source_str().unwrap_or("");
                 Ok(())
             }
             _ => Ok(()),
+        }
+    }
+
+    /// Upfront mandatory-cost check for offer generation and activation.
+    /// Optional sub-costs skip at pay time via gates (wakana bp2-008, umi
+    /// Q228) and are excluded here; "any number"/"up to N" sub-costs are
+    /// payable with whatever is available; PayEnergy is owned by the energy
+    /// gates (incl. optional-energy and cost-reduction semantics).
+    /// Everything else uses the same leaf rules as pay time, so a
+    /// mandatory-unpayable ability is refused (Rule 9.4.2.3/Q56) instead of
+    /// fizzling at resolution after partial payment.
+    pub fn validate_mandatory_cost(
+        gs: &GameState,
+        cost: &AbilityEffect,
+        activating_card: Option<i16>,
+    ) -> Result<(), String> {
+        // Whole optional/any-number/max costs resolve to pay-zero-or-skip.
+        if cost.optional.unwrap_or(false)
+            || cost.any_number_any().unwrap_or(false)
+            || cost.max.unwrap_or(false)
+        {
+            return Ok(());
+        }
+        match cost.action {
+            ActionType::SequentialCost => {
+                if let Some(ref costs) = cost.compound.actions {
+                    for sub_cost in costs {
+                        Self::validate_mandatory_cost(gs, sub_cost, activating_card)?;
+                    }
+                }
+                Ok(())
+            }
+            // Options are validated when chosen at pay time.
+            ActionType::ChoiceCondition => Ok(()),
+            // Owned by the energy gates (check_mandatory_activation_cost +
+            // the offer-site energy filter).
+            ActionType::PayEnergy => Ok(()),
+            _ => Self::validate_leaf_cost_for(gs, cost, activating_card),
         }
     }
 
@@ -744,9 +808,10 @@ let source = cost.source_str().unwrap_or("");
                     cost.group_names_any(),
                     exclude_self,
                     cost.self_cost_any().unwrap_or(false),
-                    false,
-                    Some("active"),
-                );
+                        false,
+                        Some("active"),
+                        gs.activating_card,
+                    );
                 if candidates.is_empty() {
                     return Ok(());
                 }
@@ -784,6 +849,7 @@ let source = cost.source_str().unwrap_or("");
                 cost.self_cost_any().unwrap_or(false),
                 true,
                 Some("active"),
+                gs.activating_card,
             );
             log::debug!("[CHANGE_STATE] candidates={:?}", candidates);
 
@@ -1337,6 +1403,7 @@ let source = cost.source_str().unwrap_or("");
                         false,
                         false,
                         Some("active"),
+                        gs.activating_card,
                     );
 
                     // Q137 / Rule 1.3.2.1: No active members to wait — cost cannot be paid.

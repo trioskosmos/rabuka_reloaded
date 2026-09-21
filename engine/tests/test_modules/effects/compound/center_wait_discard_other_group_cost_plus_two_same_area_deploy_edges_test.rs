@@ -245,8 +245,13 @@ fn center_other_member_cost_plus_two_deploy_empty_hand_cost_fails() {
     // No cards in hand → cost can't be paid
     game.give_energy(15);
 
-    game.activate_ability(yoshiko);
-    // Cost resolution should fail silently (not crash)
+    // No cards in hand — cost can't be paid: refused with Err (Rule 9.4.2.3/Q56).
+    let result = game.try_activate_ability(yoshiko);
+    assert!(
+        result.is_err(),
+        "unpayable discard cost must refuse activation, got {:?}",
+        result
+    );
     while game.has_pending_choice() {
         game.select_indices(&[]);
     }

@@ -19,12 +19,17 @@ fn wait_other_group_draw_q163_self_excluded_no_other_group_cost_fails() {
     }
 
     // Activate ability
-    game.activate_ability(emma);
+    let result = game.try_activate_ability(emma);
 
-    // Cost: wait a にこ member other than self.
-    // With only エマ (a にこ member) on stage and exclude_self=true,
-    // no valid candidates → cost should fail silently
-    // (the ability should not proceed to draw)
+    // Cost: wait a ????member other than self.
+    // With only ????(a ????member) on stage and exclude_self=true,
+    // no valid candidates — the mandatory cost is unpayable, so activation
+    // is refused outright (Rule 9.4.2.3/Q56) and the ability never draws.
+    assert!(
+        result.is_err(),
+        "unpayable wait cost must refuse activation, got {:?}",
+        result
+    );
 
     // Drain any pending choices
     while game.has_pending_choice() {

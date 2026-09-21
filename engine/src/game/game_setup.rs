@@ -1836,6 +1836,19 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                     {
                         continue;
                     }
+                    // Mandatory non-energy costs (discard, wait, ...) must
+                    // also be payable or the ability is not offered
+                    // (Rule 9.4.2.3/Q56). Optional components stay offerable
+                    // (wakana/umi Q228 skip at pay time).
+                    if crate::ability::resolver::AbilityResolver::validate_mandatory_cost(
+                        game_state,
+                        &c.0,
+                        Some(card_id),
+                    )
+                    .is_err()
+                    {
+                        continue;
+                    }
                 }
                 let mut ua = make_action_params(
                     ActionType::UseAbility,
@@ -1917,6 +1930,16 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                 if let Some(c) = ability.cost.as_ref() {
                     if !c.has_optional_payment()
                         && effective_cost > active_player.energy_zone.active_count()
+                    {
+                        continue;
+                    }
+                    // Same mandatory-cost gate as stage activations above.
+                    if crate::ability::resolver::AbilityResolver::validate_mandatory_cost(
+                        game_state,
+                        &c.0,
+                        Some(card_id),
+                    )
+                    .is_err()
                     {
                         continue;
                     }

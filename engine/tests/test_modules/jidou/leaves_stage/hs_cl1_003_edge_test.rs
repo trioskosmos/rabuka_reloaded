@@ -18,10 +18,11 @@ fn hs_cl1_already_wait_no_blade() {
         None,
         None,
     );
-    // Already wait: cost is already satisfied, engine still allows activation
-    // but per current engine, no blade is granted (wait is not re-applied).
-    // This test documents the current behavior.
-    assert!(res.is_ok(), "re-wait should be ok, got {:?}", res);
+    // Already wait: "wait this member" cannot be paid for an already-waited
+    // member (Q137) — the mandatory cost is unpayable, so activation is
+    // refused (Rule 9.4.2.3/Q56) and no blade is granted.
+    assert!(res.is_err(), "re-wait of an already-wait member must be refused, got {:?}", res);
+    assert!(!game.has_pending_choice(), "no dangling prompt");
     game.drain_auto_ability_choices();
     if let Some(choice) = game.state.get_pending_choice() {
         match choice {

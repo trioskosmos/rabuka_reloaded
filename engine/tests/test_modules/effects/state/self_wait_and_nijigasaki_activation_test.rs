@@ -80,6 +80,10 @@ fn wondermates_n_sd2_025_live_start_waited_nijigasaki_activates_and_retains_abil
 
     let filler = game.id(FILLER);
     fill_decks(&mut game, filler);
+    // Fund Kanata so her 起動 is genuinely payable (2E draw; discard needs
+    // a hand card): the usability assert below must mean something.
+    game.give_energy(2);
+    game.add_to_hand(game.new_id(FILLER));
     trigger_auto(
         &mut game,
         wondermates,

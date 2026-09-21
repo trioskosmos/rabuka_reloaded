@@ -537,10 +537,22 @@ impl super::TurnEngine {
         let AbilityActivation { ability, loc, idx } = ability_to_activate
             .ok_or("No activatable ability found for this card at its current location")?;
 
-        // NOTE: no affordability pre-check here. Unpayable activations fizzle
-        // quietly at resolution (wakana bp2-008 "no_energy_skips_effect",
-        // umi Q228 insufficiency)  Ehard-erroring them broke both behaviors.
-        // Bots avoid dead presses via their no-op breakers instead.
+        // The activating card is known from here on: record it before any
+        // cost logic so self-referential filters resolve to this card.
+        game_state.activating_card = Some(card_id);
+
+        // Mandatory costs must be fully payable BEFORE anything happens
+        // (Rule 9.4.2.3 / Q56): a mandatory-unpayable activation is refused
+        // here, never fizzled at resolution. Optional components skip at pay
+        // time (wakana bp2-008, umi Q228) and are excluded from this check;
+        // energy stays owned by check_mandatory_activation_cost above.
+        if let Some(ref cost) = ability.cost {
+            crate::ability::resolver::AbilityResolver::validate_mandatory_cost(
+                game_state,
+                &cost.0,
+                Some(card_id),
+            )?;
+        }
 
         if loc == Zone::Hand {
             let player = game_state.active_player_mut();

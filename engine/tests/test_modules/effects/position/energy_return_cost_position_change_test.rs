@@ -47,12 +47,13 @@ fn tomari_sp_bp7_022_activation_without_energy_keeps_member_on_stage() {
 
     let me = game.id("PL!SP-bp7-022-N");
     game.state.player1.stage.stage[1] = me;
-    // NO energy at all -> the {E} cost cannot be paid; activation no-ops
-    // without panicking.
-    game.activate_ability(me);
-    while game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
+    // NO energy at all -> the mandatory {E} cost cannot be paid: activation
+    // is refused (Rule 9.4.2.3/Q56), nothing moves, nothing is recorded.
+    let result = game.try_activate_ability(me);
+    assert!(
+        result.is_err(),
+        "mandatory energy cost with 0 energy must refuse activation"
+    );
     assert!(
         game.state.player1.stage.stage.iter().any(|&c| c == me),
         "member stays on stage"
