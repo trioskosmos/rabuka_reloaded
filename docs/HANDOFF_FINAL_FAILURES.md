@@ -84,5 +84,6 @@ File: `engine/tests/test_modules/effects/position/auto_system_stress_test.rs`
 - `engine_c_wip/` binaries are build artifacts; leave them.
 - `new_id(X)` past 11 instances of one card_no aliases the template — keep
   per-card `new_id` counts ≤11 (deck filler must reuse ONE id).
-- `docs/THIN_COVERAGE_ANALYSIS.md` is partly stale (pb2-020/Riko/PR-025
-  sections predate their completion); refresh or drop at commit time.
+- ~~`docs/THIN_COVERAGE_ANALYSIS.md` is partly stale~~ — **REFRESHED 2026-09-22**
+  (open questions closed, gap #3 filter-aware FIXED, gap #7 expiry largely
+  closed + Riko test, Shioriko/HAPPY moved to DONE).

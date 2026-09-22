@@ -199,13 +199,17 @@ let source = cost.source_str().unwrap_or("");
                 ) {
                     return Ok(());
                 }
-                let available = util::get_zone_card_count(player, source);
+                // Filter-aware: "discard a Liella! card" is unpayable when
+                // the hand has cards but none match the cost filter.
+                let filter = cost.filter_subset();
+                let available =
+                    util::count_in_zone(player, source, &filter, &gs.card_database) as usize;
                 // Rule 9.4.2.3 / Q56: Costs must be paid in full.
                 // If even one sub-cost cannot be fully paid, the entire
                 // cost is impossible and the ability cannot be activated.
                 if available < count {
                     return Err(format!(
-                        "Not enough cards in {}: need {}, have {}",
+                        "Not enough cards in {} matching cost filter: need {}, have {}",
                         source, count, available
                     ));
                 }

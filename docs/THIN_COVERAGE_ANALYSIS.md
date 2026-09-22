@@ -23,11 +23,10 @@ offer generation and `handle_use_ability`. 7 existing tests had encoded the
 fizzle — each re-verified against its card text (all mandatory) and converted
 to refusal asserts. Skip-at-pay for optional costs (wakana/umi Q228) untouched.
 
-### `PL!S-bp7-011-N` Riko (was ZERO behavior tests → 4)
+### `PL!S-bp7-011-N` Riko (was ZERO behavior tests → 5)
 Card was only mill fodder. Now: all-Aqours (unwait + 2 blades + limit), mixed
 (stays wait, no blades), already-wait refused, empty-deck mills-nothing-grants-
-nothing (no vacuous bonus). Blade EXPIRY at live end still unasserted (global
-gap §7).
+nothing (no vacuous bonus), blade EXPIRY at live end (added 2026-09-22).
 
 ### `PL!SP-pb2-020-R` Natsumi yell (was negative-only → 4 + Q264)
 Positive path was never executed. Now: discard Liella live → +2 yells
@@ -63,53 +62,42 @@ validator — holds); 0-energy refused without waiting self.
 Natsumi mirror at 2-card scale: limit pins, already-wait refusal, empty-hand
 forced full-discard, next-turn fresh-instance offer.
 
-## IN PROGRESS
-
-### `PL!N-bp7-022-N` Shioriko (was accept-only → +6 tests, 3 failing pre-regen)
-🔧 PARSER GAP (fix written, awaiting regen): the optional discard + そうしたとき
-follow-up were SILENTLY DROPPED — parsed effect is a bare unconditional
-change_state (cost null). The old accept test passed vacuously (free reactivate,
-no discard ever paid). New handler `_try_discard_hand_reactivate_optional`
-(Tier 2, Shioriko-specific per G7/G13/G16 precedent) builds the proven
-`sequential + conditional:true` shape (pb2-020 contract): optional hand discard
-→ activate the waited Niji member.
-- Tests added: decline, non-live-phase, non-Niji, empty-hand auto-skip,
-  turn1 second-wait, self-wait. Three fail pre-regen as expected (no prompt /
-  free reactivate) — they are the fix's acceptance criteria.
-- Residual imprecision (documented, not fixed): with MULTIPLE waited Niji the
-  consequence filters + prompts instead of tracking the exact trigger subject
-  (`triggering_member_id` is dead plumbing — no scan populates it). Single-
-  waited case (the realistic one) auto-resolves correctly.
+## DONE (moved from IN PROGRESS)
+### `PL!N-bp7-022-N` Shioriko (was accept-only → +6 tests) 🔧 PARSER
+The optional discard + そうしたとき follow-up were SILENTLY DROPPED. Fixed
+via `_try_discard_hand_reactivate_optional` (Tier 2) building
+`sequential + conditional:true` (pb2-020 contract): optional hand discard →
+activate the waited Niji member. Residual imprecision documented (multiple
+waited Niji → filters + prompts; single-waited auto-resolves).
 
 ### `PL!S-bp7-020-L` HAPPY PARTY TRAIN (was 4 → 8)
-Closed the four listed gaps in `stacking_and_edges_pl_s_bp7_020_l_test.rs`:
-stacking both gates → heart0 −2; empty-deck mill shortfall (no reduction, no
-panic); opponent-waited does not break the own-stage gate (own-waited does);
-reduction honored at performance (`required[heart0]` = base 3 + (−2) = 1,
-live passes on leftover colored surplus).
+Closed the four gaps: stacking both gates → heart0 −2; empty-deck mill
+shortfall; opponent-waited does not break own-stage gate; reduction honored
+at performance.
 
 ## REMAINING
 (None — the nine-card thin march is closed: bp7-011 → pb2-020 → PR-025 →
 sd2-006 → bp6-016 → bp4-010 → bp7-023 → bp7-022 → bp7-020.)
 
-## Open questions (under investigation)
-- q94/q171 + s2_pb1_006 failures (`left: 4, right: 2` — double blades): did the
-  just_completed fix expose tests that encoded the old suppression, or over-fire?
-  Card texts pending verification.
-- PR-025 budget test fails ONLY in full-suite parallel runs
-  ("Only member cards can be placed on stage") while passing targeted —
-  possible shared-global contamination or order dependence. Pending.
+## Open questions
+- **CLOSED:** q94/q171 + s2_pb1_006 — card texts verified against `cards.json`
+  (`PL!SP-pb1-006-R` / `PL!N-PR-025-PR`); tests encode correct behavior; green.
+- **CLOSED:** PR-025 budget flake — `new_id` template-fallback + budget rewrite;
+  full suite 3× green (3416/0).
 
 ## Overall testing gaps (beyond the 9 cards)
 
 1. **Fodder-only coverage counts as covered.** bp7-011 proved L0 ("card
    referenced") can mean "mill seed". Trust `depth`, not L0.
-2. **Mandatory-cost refusal is brand new (`651a2d78`).** Wait-self / discard /
-   energy costs need the already-paid-state case everywhere; opportunistic
-   conversions done, no systematic pass yet.
-3. **Filter-aware validation still raw-count.** `validate_mandatory_cost`
-   counts zone cards without cost filters ("discard a Liella! card" + 3
-   non-Liella validates Ok, fizzles at pay). Deferred follow-up.
+2. **Mandatory-cost refusal (`651a2d78`).** Wait-self / discard / energy
+   refusal pins exist (hs_cl1, center_wait, activate_wait, energy_return/
+   discard, Q137); opportunistic conversions done. Filter-mismatch pass added
+   Tang Ke Ke + Kinako (2026-09-22).
+3. **Filter-aware validation FIXED (2026-09-22).** `validate_mandatory_cost`
+   MoveCards branch now uses `cost.filter_subset()` + `count_in_zone` —
+   "discard a Liella! card" with only non-Liella in hand is refused at
+   offer, not fizzled at pay. Acceptance: `tang_keke_nonmatching_hand_refuses_cost_no_prompt`
+   + strengthened Kinako high-cost refusal (no prompt / no discard).
 4. **Optional-decline (`てもよい`) matrix is per-card ad hoc.** Accept usually
    tested; decline often not.
 5. **Exact-cost / unaffordable edges exist for 3 cards.** Highest-value cheap
@@ -117,8 +105,13 @@ sd2-006 → bp6-016 → bp4-010 → bp7-023 → bp7-022 → bp7-020.)
 6. **Hostile double-fire pinned for 3 cards** (Kasumi, Natsumi, Wien-010) +
    jidou-budget pins (PR-025, pb2-020). `use_limit_gate` path still deserves a
    systematic pass.
-7. **Duration expiry almost never asserted** ("until live end" gains checked at
-   grant, not expiry).
+7. **Duration expiry — substantially covered (2026-09-22).** 15+ tests assert
+   live_end expiry (victory_road, parser_issues Natsumi, blindspot real
+   rollover, Chika score ×2, mebius, Maki bp6, Chisato/Natsumi, Liella mill,
+   ALL-hearts, mymai, modifier_layer, q94/q171). Riko bp7-011 blade expiry
+   test added this session. Parser mid-sentence `ライブ終了時まで` duration
+   gap (46 misses, AUDITS §3.1/`_strip_duration_prefix` startswith-only)
+   remains SKIPPED (known victory_road regression if applied naively).
 8. **Deck-shortfall paths** covered sporadically (bp4-010 empty energy deck ✔,
    Riko empty deck ✔) but not systematically.
 

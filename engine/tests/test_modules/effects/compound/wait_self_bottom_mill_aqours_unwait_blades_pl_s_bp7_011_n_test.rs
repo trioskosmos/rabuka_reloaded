@@ -154,3 +154,31 @@ fn riko_empty_deck_mills_nothing_grants_nothing() {
         "milling nothing must not satisfy 'all Aqours' (no vacuous bonus)"
     );
 }
+
+#[test]
+fn riko_blade_expires_at_live_end() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let a = game.new_id(AQOURS_A);
+    let b = game.new_id(AQOURS_B);
+    let riko = riko_setup(&mut game, vec![a, b]);
+
+    game.activate_ability(riko);
+    assert!(!game.has_pending_choice());
+    assert_eq!(
+        game.state.mods.get_blade_modifier(riko),
+        2,
+        "all Aqours: exactly 2 blades"
+    );
+
+    // Advance past LiveVictoryDetermination so duration=live_end expires.
+    for _ in 0..20 {
+        game.pass();
+    }
+
+    assert_eq!(
+        game.state.mods.get_blade_modifier(riko),
+        0,
+        "blade must expire after live end"
+    );
+}

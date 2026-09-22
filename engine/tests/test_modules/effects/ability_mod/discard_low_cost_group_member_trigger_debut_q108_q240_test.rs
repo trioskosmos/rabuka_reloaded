@@ -238,9 +238,18 @@ fn discard_low_cost_group_member_trigger_debut_activate_high_cost_card_stays_in_
         None,
     );
 
-    // Regardless of result, the high-cost card should still be in hand
+    // Filter-aware validation: hand has a card but none match (cost>4) →
+    // refuse at offer, no SelectCard prompt, no discard.
+    assert!(
+        !game.has_pending_choice(),
+        "unpayable filtered cost must not open a discard prompt"
+    );
     assert!(
         game.state.player1.hand.cards.contains(&high_cost),
         "High cost card should remain in hand (not eligible for cost_limit=4)"
+    );
+    assert!(
+        game.state.player1.waitroom.cards.is_empty(),
+        "nothing may be discarded when cost is refused"
     );
 }

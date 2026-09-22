@@ -189,3 +189,37 @@ fn tang_keke_no_liella_in_hand_cost_cannot_pay() {
         "nothing to discard, hand stays empty"
     );
 }
+
+#[test]
+fn tang_keke_nonmatching_hand_refuses_cost_no_prompt() {
+    // Hand is non-empty but contains NO Liella! cards → filter-aware
+    // validation must refuse the activation (Rule 9.4.2.3/Q56), not
+    // open a discard prompt and fizzle later.
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let keke = setup_keke(&mut game);
+
+    // Aqours member (not Liella!) — matches zone count but not cost filter.
+    let aqours = game.id("PL!S-sd1-010-SD");
+    game.state.player1.hand.cards.push(aqours);
+
+    let energy_before = game.state.player1.energy_zone.cards.len();
+    let _ = game.try_activate_ability(keke);
+    assert!(
+        !game.has_pending_choice(),
+        "unpayable filtered cost must not open a discard prompt"
+    );
+    assert_eq!(
+        game.state.player1.energy_zone.cards.len(),
+        energy_before,
+        "no effect may resolve when the cost was not paid"
+    );
+    assert!(
+        game.state.player1.hand.cards.contains(&aqours),
+        "non-matching card must stay in hand"
+    );
+    assert!(
+        game.state.player1.waitroom.cards.is_empty(),
+        "nothing may be discarded when cost is refused"
+    );
+}

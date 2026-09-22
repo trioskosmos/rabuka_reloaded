@@ -751,7 +751,7 @@ Raw-vs-parsed gap (from `jp_mine_tmp.py`):
 | Phrase | Raw lines | Unique abs with phrase | Parsed with flag | Gap |
 |---|---|---|---|---|
 | `につき` (per-unit) | 132 | 66 | 57 | **9 (13% miss)** |
-| `まで` (up-to / duration) | 575 | 256 | 210 | **46 (17% miss)** — `ライブ終了時まで` often lacks `duration:live_end` |
+| `まで` (up-to / duration) | 575 | 256 | 210 | **46 (17% miss)** — `ライブ終了時まで` often lacks `duration:live_end` (prefix-only `_strip_duration_prefix`; mid-sentence loses duration. Engine expiry tests cover prefix-parsed cases; fix still SKIPPED — see §6.5) |
 | `かぎり` (as long as) | 127 | 65 | 63 | 2 |
 | `代わりに` (instead) | 16 | 10 | 0 | **10 (100% miss)** — no `replacement/restriction` mapping |
 | `として扱う` (treat as) | 17 | 6 | 1 | **5 (83% miss)** — only 1 has `SetCardIdentity/treat_as` |
@@ -819,7 +819,7 @@ Two abilities (`PL!HS-bp1-003-R`, `PL!HS-bp1-019-L` via parenthetical) use `す�
 2. **Decoder unknown-field warning** (`effect_decoder_gen.rs:207` / `condition_decoder_gen.rs:185` / `vm.rs:207`) — count skipped fields and assert zero in tests; surfaces all 92 stranded fields.
 3. **Move `select` before catch-all `move_cards`** + fix `split_cost_effect` bracket depth (`parser.py:600`) — fixes the oldest KNOWN_BUG with no engine change.
 4. **`代わりに` / `として扱う` coverage** — add 2 `ActionRule`/`EffectPattern` rows + `SetCardIdentity` / `modify_yell_source` promotion; knocks 100% and 83% gaps to 0.
-5. **Duration strip for mid-sentence `まで`** — change `_strip_duration_prefix` to `search` not `startswith`, or add `per_unit_type`/`duration` propagation in `_normalize_effect_tree` (`parser.py:1326`).
+5. **Duration strip for mid-sentence `まで`** — change `_strip_duration_prefix` to `search` not `startswith`, or add `per_unit_type`/`duration` propagation in `_normalize_effect_tree` (`parser.py:1326`). **Still SKIPPED** (naive apply breaks `victory_road` each_time; needs coordinated parser+engine PR + golden re-baseline). Duration *expiry* tests are green for prefix-parsed abilities (2026-09-22).
 
 ---
 
