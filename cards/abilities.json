@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-09-22T15:10:55.514741",
+  "generated_at": "2026-09-22T15:23:59.191931",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "58aea466",
+  "engine_commit": "7656d2be",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -17937,7 +17937,8 @@
           "type": "state_condition",
           "state": "wait",
           "text": "このメンバーがウェイト状態であるかぎり",
-          "card_type": "member_card"
+          "card_type": "member_card",
+          "self_target": true
         },
         "duration": "as_long_as",
         "conditional": true,

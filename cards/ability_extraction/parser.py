@@ -4116,6 +4116,8 @@ def _try_state(text):
     gns = extract_all_groups(text)
     if gns:
         result["group_names"] = gns
+    if re.search(r"この(メンバー|カード)[がは]", text) and "以外" not in text:
+        result["self_target"] = True
     return result
 
 

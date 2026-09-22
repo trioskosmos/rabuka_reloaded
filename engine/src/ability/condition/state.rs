@@ -422,10 +422,9 @@ impl<'a> ConditionContext<'a> {
                     }
                     // For "このメンバーがウェイト..." self-state, card_type=member_card is parser default and should NOT be treated as an ANY filter.
                     // Otherwise every waited member on stage would grant the heart to every Erena copy (two-copy bug).
-                    let is_self_text = condition
-                        .get_text()
-                        .is_some_and(|t| t.contains("このメンバーが"));
-                    let has_filter = if is_self_text && condition.get_check_self().is_none() {
+                    let is_self = condition.get_self_target().unwrap_or(false)
+                        || condition.get_check_self().unwrap_or(false);
+                    let has_filter = if is_self {
                         // Force self-branch for このメンバー self-state regardless of generic card_type.
                         false
                     } else {
@@ -465,12 +464,6 @@ impl<'a> ConditionContext<'a> {
 
     pub(crate) fn evaluate_energy_state_condition(&self, condition: &Condition) -> bool {
         let mut energy_state = condition.get_energy_state().unwrap_or("");
-        if energy_state.is_empty() {
-            // abilities.json for idx 389/855 emits "state":"active" not "energy_state"
-            if condition.get_text().map(|t| t.contains("アクティブ")).unwrap_or(false) {
-                energy_state = "active";
-            }
-        }
         let target = condition.get_target().unwrap_or("self");
         let player = self.resolve_condition_player(target);
         let result = match energy_state {
@@ -1080,34 +1073,13 @@ impl<'a> ConditionContext<'a> {
     ///   移動したとき (past tense) — "has_moved" standalone
     ///   登場か、エリアを移動したとき — "has_moved" with appearance OR
     fn evaluate_has_moved(&self, condition: &Condition, _player: &crate::player::Player) -> bool {
-        let card_moved_position = self.activating_card_id.is_some_and(|cid| {
+        let _ = condition;
+        self.activating_card_id.is_some_and(|cid| {
             self.game_state
                 .position_change_events
                 .iter()
                 .any(|e| e.moved_card_id == cid)
-        });
-
-        if condition
-            .get_text()
-            .map(|t| t.contains("登場"))
-            .unwrap_or(false)
-        {
-            let has_appeared = self.activating_card_id.is_some_and(|cid| {
-                // Batch-scoped guard: when moved_cards is non-empty, the card
-                // must be in the current batch to avoid stale turn-level data.
-                let batch_ok = self.moved_cards.is_empty()
-                    || self.moved_cards.contains(&cid)
-                    || self
-                        .game_state
-                        .recently_moved_cards
-                        .as_ref()
-                        .map_or(false, |v| v.contains(&cid));
-                batch_ok && self.game_state.has_card_appeared_this_turn(cid)
-            });
-            has_appeared || card_moved_position
-        } else {
-            card_moved_position
-        }
+        })
     }
 
     pub(crate) fn evaluate_score_threshold_condition(&self, condition: &Condition) -> bool {
@@ -1146,11 +1118,7 @@ impl<'a> ConditionContext<'a> {
                     return actual >= target_count;
                 }
             }
-            let is_opponent = condition.get_target().unwrap_or("self") == "opponent"
-                || condition
-                    .get_text()
-                    .map(|t| t.contains("相手"))
-                    .unwrap_or(false);
+            let is_opponent = condition.get_target().unwrap_or("self") == "opponent";
             // First pass: check recently_state_changed for actual transitions.
             // This is the primary source — only cards that actually changed state
             // should satisfy the condition.
