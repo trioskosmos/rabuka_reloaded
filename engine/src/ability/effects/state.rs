@@ -790,8 +790,7 @@ impl AbilityResolver {
             // offers only ACTIVE cards, activating only WAITED ones. Offering
             // (or auto-taking) an already-correct card would move the active
             // counter without changing any state.
-            let is_activate =
-                state_change == "active" || state_change == "アクティブ";
+            let is_activate = state_change == "active";
             let active_len = player.energy_zone.active_count() as usize;
             let state_indices: Vec<usize> = valid_indices
                 .iter()
@@ -801,7 +800,7 @@ impl AbilityResolver {
 
             let effective_count = if max {
                 let available = match state_change {
-                    "active" | "アクティブ" => player
+                    "active" => player
                         .energy_zone
                         .cards
                         .len()
@@ -818,7 +817,7 @@ impl AbilityResolver {
                 capped
             } else if count == 0 {
                 let val = match state_change {
-                    "active" | "アクティブ" => player
+                    "active" => player
                         .energy_zone
                         .cards
                         .len()
@@ -852,7 +851,6 @@ impl AbilityResolver {
             if !max
                 && state_indices.len() > effective_count as usize
                 && state_change != "active"
-                && state_change != "アクティブ"
             {
                 let active_n = active_len;
                 let waited_n = player
@@ -906,8 +904,7 @@ impl AbilityResolver {
             (wait_cards, wait_positions)
         };
 
-        let active_cards: Vec<i16> = if state_change == "active" || state_change == "アクティブ"
-        {
+        let active_cards: Vec<i16> = if state_change == "active" {
             // The eligible WAITING energies selected above — identical set to
             // wait_cards. Re-scanning from zone index 0 would re-include
             // already-active cards and double-count them.
@@ -917,7 +914,7 @@ impl AbilityResolver {
         };
 
         match state_change {
-            "wait" | "ウェイト" => {
+            "wait" => {
                 // Wait-immunity: members protected by a `cannot_wait_by_effect`
                 // restriction are not put to WAIT by the OPPONENT's effects
                 // ("相手の効果によってはウェイトしない").
@@ -964,7 +961,7 @@ impl AbilityResolver {
                     player.energy_zone.set_indices_waited(&idx);
                 }
             }
-            "active" | "アクティブ" => {
+            "active" => {
                 for card_id in &active_cards {
                     gs.mods.add_orientation_modifier(*card_id, "active");
                     // Turn-scoped attributed log (see GameState::turn_state_changes).
