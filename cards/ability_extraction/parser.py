@@ -9154,6 +9154,12 @@ def _try_ability_activation(text):
             trigger_raw = trigger_raw.split("|")[1]
         result["target_trigger"] = trigger_raw
         result["ability_text"] = "%s_ability" % trigger_raw
+    else:
+        for kw in ("登場", "ライブ開始時", "ライブ成功時", "起動", "常時"):
+            if kw in target_raw:
+                result["target_trigger"] = kw
+                result["ability_text"] = "%s_ability" % kw
+                break
     # Extract count (e.g., "1つ" in "能力1つを発動させる")
     cnt = extract_count(text)
     if cnt:

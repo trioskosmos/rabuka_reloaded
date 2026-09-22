@@ -164,16 +164,9 @@ impl AbilityResolver {
             single.into_iter().collect()
         };
 
-        // The ability trigger to fire. When the parser leaves target_trigger null
-        // (only the human target text "…登場能力…" remains), infer 登場.
-        let trigger = target_trigger.or_else(|| {
-            let t = effect.target_name();
-            if t.contains("登場") {
-                Some("登場")
-            } else {
-                None
-            }
-        });
+        // The ability trigger to fire. Parser always emits target_trigger
+        // (icon markup or plain JP keyword fallback in _try_activate_ability).
+        let trigger = target_trigger;
 
         let player_id = gs
             .ability_queue
