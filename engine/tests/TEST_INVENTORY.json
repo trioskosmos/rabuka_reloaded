@@ -1,6 +1,6 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-09-22T04:33:18.243647+00:00",
+  "generated_at": "2026-09-22T04:54:34.344238+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
@@ -8,7 +8,7 @@
     "unique_abilities": 936
   },
   "n_files": 836,
-  "n_tests": 3430,
+  "n_tests": 3432,
   "total_cards": 771,
   "covered_cards": 771,
   "abilities_on_covered": 936,
@@ -726,7 +726,7 @@
       ]
     }
   },
-  "n_test_fns_parsed": 3430,
+  "n_test_fns_parsed": 3432,
   "abilities": [
     {
       "idx": 0,
@@ -1764,9 +1764,10 @@
         "tang_keke_discard_member_without_blade_heart_choose_any_number",
         "tang_keke_discard_non_member_liella_card_choose_one",
         "tang_keke_no_liella_in_hand_cost_cannot_pay",
+        "tang_keke_nonmatching_hand_refuses_cost_no_prompt",
         "tang_keke_use_limit_blocks_second_activation"
       ],
-      "covering_test_count": 20,
+      "covering_test_count": 21,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -11022,7 +11023,7 @@
         "kanon_skip_cost_effect_not_executed",
         "kanon_stage_full_falls_back_to_hand"
       ],
-      "covering_test_count": 62,
+      "covering_test_count": 63,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -25419,9 +25420,10 @@
         "tang_keke_discard_member_without_blade_heart_choose_any_number",
         "tang_keke_discard_non_member_liella_card_choose_one",
         "tang_keke_no_liella_in_hand_cost_cannot_pay",
+        "tang_keke_nonmatching_hand_refuses_cost_no_prompt",
         "tang_keke_use_limit_blocks_second_activation"
       ],
-      "covering_test_count": 5,
+      "covering_test_count": 6,
       "is_null": false,
       "use_limit": 1,
       "watches_abilities": false,
@@ -43419,10 +43421,11 @@
         "live_start_bottom_three_mills_deck_bottom_three",
         "riko_all_aqours_mill_unwaits_and_grants_two_blades",
         "riko_already_wait_refused",
+        "riko_blade_expires_at_live_end",
         "riko_empty_deck_mills_nothing_grants_nothing",
         "riko_mixed_mill_stays_wait_no_blades"
       ],
-      "covering_test_count": 6,
+      "covering_test_count": 7,
       "is_null": false,
       "use_limit": 1,
       "watches_abilities": false,
@@ -43559,10 +43562,11 @@
         "live_start_mills_bottom_one_preserving_hand",
         "riko_all_aqours_mill_unwaits_and_grants_two_blades",
         "riko_already_wait_refused",
+        "riko_blade_expires_at_live_end",
         "riko_empty_deck_mills_nothing_grants_nothing",
         "riko_mixed_mill_stays_wait_no_blades"
       ],
-      "covering_test_count": 7,
+      "covering_test_count": 8,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -43647,10 +43651,11 @@
         "live_start_bottom_three_mills_deck_bottom_three",
         "riko_all_aqours_mill_unwaits_and_grants_two_blades",
         "riko_already_wait_refused",
+        "riko_blade_expires_at_live_end",
         "riko_empty_deck_mills_nothing_grants_nothing",
         "riko_mixed_mill_stays_wait_no_blades"
       ],
-      "covering_test_count": 6,
+      "covering_test_count": 7,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
