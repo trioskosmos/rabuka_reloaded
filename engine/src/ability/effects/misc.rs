@@ -2184,16 +2184,25 @@ impl AbilityResolver {
         if gs.resolve_target_player(&target).energy_zone.cards.is_empty() {
             return;
         }
+        // State counts so the player can tell active apart from waited —
+        // both are selectable here, unlike payment menus.
+        let (active_n, waited_n) = {
+            let player = gs.resolve_target_player(&target);
+            let active = player.energy_zone.active_count() as usize;
+            (active, player.energy_zone.cards.len().saturating_sub(active))
+        };
+        let state_suffix_en = format!(" (active: {}, waited: {})", active_n, waited_n);
+        let state_suffix_ja = format!("（アクティブ：{}、ウェイト：{}）", active_n, waited_n);
         let desc_ja = if count == 1 {
-            "このメンバーの下に置くエネルギーカードを選択".to_string()
+            format!("このメンバーの下に置くエネルギーカードを選択{}", state_suffix_ja)
         } else {
-            format!("このメンバーの下に置くエネルギーカードを{}枚選択", count)
+            format!("このメンバーの下に置くエネルギーカードを{}枚選択{}", count, state_suffix_ja)
         };
         self.pending_choice = Some(
             Choice::select_cards(
                 Zone::Energy.to_str(),
                 count as usize,
-                format!("Choose {} {} to place under member", count, util::card_plural(count as usize)),
+                format!("Choose {} {} to place under member{}", count, util::card_plural(count as usize), state_suffix_en),
                 optional,
             )
             .destination(Some("under_member".to_string()))

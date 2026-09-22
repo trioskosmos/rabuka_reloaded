@@ -1,0 +1,34 @@
+﻿
+> C:\Users\trios\OneDrive\Documents\rabuka_reloaded\engine\src\triggers.rs:54:    pub fn from_token(token: &str) -> Opt
+ion<Self> {
+  C:\Users\trios\OneDrive\Documents\rabuka_reloaded\engine\src\triggers.rs:55:        let t = token.trim();
+  C:\Users\trios\OneDrive\Documents\rabuka_reloaded\engine\src\triggers.rs:56:        if t == ACTIVATION {
+  C:\Users\trios\OneDrive\Documents\rabuka_reloaded\engine\src\triggers.rs:57:            Some(Self::Activation)
+  C:\Users\trios\OneDrive\Documents\rabuka_reloaded\engine\src\triggers.rs:58:        } else if t == AUTO {
+  C:\Users\trios\OneDrive\Documents\rabuka_reloaded\engine\src\triggers.rs:59:            Some(Self::Auto)
+  C:\Users\trios\OneDrive\Documents\rabuka_reloaded\engine\src\triggers.rs:60:        } else if t == CONSTANT {
+  C:\Users\trios\OneDrive\Documents\rabuka_reloaded\engine\src\triggers.rs:61:            Some(Self::Constant)
+  C:\Users\trios\OneDrive\Documents\rabuka_reloaded\engine\src\triggers.rs:62:        } else if t == DEBUT || t == DEBU
+T_EN {
+  C:\Users\trios\OneDrive\Documents\rabuka_reloaded\engine\src\triggers.rs:63:            Some(Self::Debut)
+  C:\Users\trios\OneDrive\Documents\rabuka_reloaded\engine\src\triggers.rs:64:        } else if t == LIVE_START {
+  C:\Users\trios\OneDrive\Documents\rabuka_reloaded\engine\src\triggers.rs:65:            Some(Self::LiveStart)
+  C:\Users\trios\OneDrive\Documents\rabuka_reloaded\engine\src\triggers.rs:66:        } else if t == LIVE_SUCCESS || t 
+== LIVE_SUCCESS_EN {
+  C:\Users\trios\OneDrive\Documents\rabuka_reloaded\engine\src\triggers.rs:67:            Some(Self::LiveSuccess)
+  C:\Users\trios\OneDrive\Documents\rabuka_reloaded\engine\src\triggers.rs:68:        } else if t == MAIN {
+  C:\Users\trios\OneDrive\Documents\rabuka_reloaded\engine\src\triggers.rs:69:            Some(Self::Main)
+  C:\Users\trios\OneDrive\Documents\rabuka_reloaded\engine\src\triggers.rs:70:        } else if t == BATON_TOUCH {
+  C:\Users\trios\OneDrive\Documents\rabuka_reloaded\engine\src\triggers.rs:71:            Some(Self::BatonTouch)
+  C:\Users\trios\OneDrive\Documents\rabuka_reloaded\engine\src\triggers.rs:72:        } else {
+  C:\Users\trios\OneDrive\Documents\rabuka_reloaded\engine\src\triggers.rs:73:            None
+  C:\Users\trios\OneDrive\Documents\rabuka_reloaded\engine\src\triggers.rs:74:        }
+  C:\Users\trios\OneDrive\Documents\rabuka_reloaded\engine\src\triggers.rs:75:    }
+  C:\Users\trios\OneDrive\Documents\rabuka_reloaded\engine\src\triggers.rs:76:}
+  C:\Users\trios\OneDrive\Documents\rabuka_reloaded\engine\src\triggers.rs:77:
+  C:\Users\trios\OneDrive\Documents\rabuka_reloaded\engine\src\triggers.rs:78:/// Parse the full `triggers` field (e.g.
+ "起動" or "ライブ開始時, 登場")
+  C:\Users\trios\OneDrive\Documents\rabuka_reloaded\engine\src\triggers.rs:79:/// into its component kinds. Unknown tok
+ens are ignored so newly printed
+
+

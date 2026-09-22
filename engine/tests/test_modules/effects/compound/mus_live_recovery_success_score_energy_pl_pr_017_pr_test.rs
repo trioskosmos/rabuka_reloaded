@@ -23,7 +23,11 @@ fn pl_pr_017_pr_activation_recovers_mus_live_and_activates_two_energy_at_nine_sc
 
     let me = game.id("PL!-PR-017-PR");
     game.state.player1.stage.stage[1] = me;
-    game.give_energy(2);
+    game.give_energy(4);
+    // Two genuinely-waited energies: the +2 below must come from real
+    // waited cards, not phantom counter arithmetic (all-active zones have
+    // nothing to activate).
+    game.state.player1.energy_zone.set_active_count(2);
     let mus_live = game.new_id("PL!-sd1-019-SD");
     game.state.player1.waitroom.cards.push(mus_live);
     let s9 = game.new_id("PL!S-pb1-023-L");
@@ -39,7 +43,7 @@ fn pl_pr_017_pr_activation_recovers_mus_live_and_activates_two_energy_at_nine_sc
     assert_eq!(
         game.state.player1.energy_zone.active_count(),
         4,
-        "score total 9 >= 9 -> 2 energies ACTIVATED (2->4)"
+        "score total 9 >= 9 -> 2 waited energies ACTIVATED (2->4)"
     );
 }
 

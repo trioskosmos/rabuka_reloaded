@@ -105,7 +105,10 @@ fn emma_bp4008_energy_side_leaves_member_waited() {
     game.state.mods.add_orientation_modifier(nijigasaki, "wait");
     game.state.player1.stage.stage[1] = emma;
     game.add_to_hand(game.id(FILLER));
-    game.give_energy(3);
+    game.give_energy(4);
+    // One genuinely-waited energy for the +1 below (all-active zones have
+    // nothing to activate).
+    game.state.player1.energy_zone.set_active_count(3);
     let energy_before = game.state.player1.energy_zone.active_count();
 
     game.activate_ability(emma);

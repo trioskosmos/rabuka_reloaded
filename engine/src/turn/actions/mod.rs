@@ -1318,7 +1318,7 @@ impl super::TurnEngine {
         game_state.ability_queue.complete_current();
         game_state.clear_effect_tracking();
         let player_id = Self::entry_player_or_p1(&snap.entry_player_id);
-        game_state.just_completed_ability_key = snap.just_completed_key;
+        game_state.set_just_completed(snap.just_completed_key);
         game_state.process_pending_auto_abilities(&player_id);
         game_state.just_completed_ability_key = None;
         game_state.clear_movement_tracking();
@@ -1380,7 +1380,7 @@ impl super::TurnEngine {
                     .map(|s| s.to_string()),
                 ..Default::default()
             };
-            game_state.just_completed_ability_key = snap.just_completed_key;
+            game_state.set_just_completed(snap.just_completed_key);
             game_state.trigger_auto_abilities_for_player_with_event(&player_id, &event);
             game_state.just_completed_ability_key = None;
         }

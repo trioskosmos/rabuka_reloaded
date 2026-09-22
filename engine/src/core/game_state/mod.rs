@@ -276,6 +276,12 @@ pub struct GameState {
     /// other abilities on the same card (e.g. each_time) to fire.
     /// Encoded as `(card_id as u8) << 16 | ability_index as u8`.
     pub just_completed_ability_key: Option<u32>,
+    /// Movement batch the just-completed ability resolved on. The re-scan
+    /// guard skips ONLY scans of this same batch (stale re-scans) — a fresh
+    /// batch (different moved cards, or any movement after an empty batch)
+    /// may re-fire the ability, which turn2+ budgets require. Empty means
+    /// "unknown batch": guard as before (skip on key match).
+    pub just_completed_moved: SmallVec<[i16; 4]>,
     /// Batch-scoped set of ability IDs already enqueued during the current movement batch.
     /// Prevents each_time/movement abilities from being re-enqueued across multiple
     /// post-resolution TAS scans within the same batch. Cleared at post-loop batch scan.
@@ -563,6 +569,7 @@ impl GameState {
             activating_card: None,
             activating_ability_index: None,
             just_completed_ability_key: None,
+            just_completed_moved: SmallVec::new(),
             this_batch_triggered_ability_ids: SmallVec::new(),
             depth_first_cutoff: None,
             // 1-byte aligned

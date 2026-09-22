@@ -137,12 +137,17 @@ fn step2_p1_then_p2() {
     let e1 = energy_p1(&game);
     activate_and_drain(&mut game, p1_m, "p1");
     assert_eq!(energy_p1(&game) - e1, 2);
-    // Advance: Main→Active→Energy→Draw→Main (P2's turn)
+    // Advance: Main→Active→Energy→Draw→Main (P2's turn). The Active phase
+    // re-activates everything, so P2 spends first (like P1's plays did) to
+    // have genuinely-waited energy for the +2 below.
     pass_phase(&mut game);
     pass_phase(&mut game);
     pass_phase(&mut game);
     pass_phase(&mut game);
     // P2
+    let p2_filler = game.id("PL!-sd1-010-SD");
+    game.state.player2.hand.cards.push(p2_filler);
+    game.play_to_stage(p2_filler, MemberArea::RightSide);
     let e2 = energy_p2(&game);
     activate_and_drain(&mut game, p2_m, "p2");
     assert_eq!(energy_p2(&game) - e2, 2);
@@ -202,11 +207,15 @@ fn step4_turn2_reset() {
     activate_and_drain(&mut game, mover, "t1p1");
     assert_eq!(energy_p1(&game), 2);
 
-    // T1 P2 Main
+    // T1 P2 Main. The Active phase re-activated everything, so P2 spends
+    // first (a filler play taps energy) to have genuinely-waited energy.
     pass_phase(&mut game);
     pass_phase(&mut game);
     pass_phase(&mut game);
     pass_phase(&mut game);
+    let p2_filler = game.id("PL!-sd1-010-SD");
+    game.state.player2.hand.cards.push(p2_filler);
+    game.play_to_stage(p2_filler, MemberArea::RightSide);
     let p2e = energy_p2(&game);
     activate_and_drain(&mut game, p2_mover, "t1p2");
     assert_eq!(energy_p2(&game) - p2e, 2);
@@ -228,19 +237,27 @@ fn step4_turn2_reset() {
         rabuka_engine::types::TurnPhase::FirstAttackerNormal
     );
 
-    // T2 P1 Main
+    // T2 P1 Main. T2 Active re-activated everything: leave 2 genuinely
+    // waited so the +2 below comes from real cards (also proves the turn2
+    // limit reset lets the watcher fire again).
     pass_phase(&mut game);
     pass_phase(&mut game);
     pass_phase(&mut game);
+    game.state.player1.energy_zone.set_active_count(
+        game.state.player1.energy_zone.cards.len().saturating_sub(2) as u8,
+    );
     let e_before = energy_p1(&game);
     activate_and_drain(&mut game, mover, "t2p1");
     assert_eq!(energy_p1(&game) - e_before, 2);
 
-    // T2 P2 Main
+    // T2 P2 Main (same waited setup as T1 P2).
     pass_phase(&mut game);
     pass_phase(&mut game);
     pass_phase(&mut game);
     pass_phase(&mut game);
+    game.state.player2.energy_zone.set_active_count(
+        game.state.player2.energy_zone.cards.len().saturating_sub(2) as u8,
+    );
     let p2e_before = energy_p2(&game);
     activate_and_drain(&mut game, p2_mover, "t2p2");
     assert_eq!(energy_p2(&game) - p2e_before, 2);

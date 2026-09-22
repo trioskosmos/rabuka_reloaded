@@ -1842,6 +1842,18 @@ pub fn zone_card_ids(player: &crate::player::Player, zone: &str) -> Vec<i16> {
     zone_cards(player, zone).to_vec()
 }
 
+/// Indices of ACTIVE energy cards. Positional convention: cards
+/// `[0..active_count]` are active, the rest waited. Shared by every energy
+/// menu so offerable sets can't diverge per call site.
+pub fn active_energy_indices(player: &crate::player::Player) -> Vec<usize> {
+    (0..player.energy_zone.active_count() as usize).collect()
+}
+
+/// Indices of WAITED energy cards (complement of `active_energy_indices`).
+pub fn waited_energy_indices(player: &crate::player::Player) -> Vec<usize> {
+    (player.energy_zone.active_count() as usize..player.energy_zone.cards.len()).collect()
+}
+
 /// Count cards matching filter in a zone for a given player.
 pub fn count_in_zone(
     player: &crate::player::Player,

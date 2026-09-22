@@ -64,7 +64,10 @@ fn catchu_basic_two_distinct_activate_2() {
     game.state.player1.stage.stage[1] = catchu;
     game.state.player1.stage.stage[2] = filler;
 
-    game.give_energy(3);
+    game.give_energy(5);
+    // Two genuinely-waited energies: the +2 below must come from real
+    // waited cards (all-active zones have nothing to activate).
+    game.state.player1.energy_zone.set_active_count(3);
     assert_eq!(game.state.player1.energy_zone.active_count(), 3);
 
     advance_to_live_card_set_p1(&mut game);
@@ -148,7 +151,9 @@ fn catchu_duplicate_names_dedup_to_1() {
     game.state.player1.stage.stage[1] = catchu_a;
     game.state.player1.stage.stage[2] = catchu_dup;
 
-    game.give_energy(3);
+    game.give_energy(5);
+    // Two genuinely-waited energies (see basic test).
+    game.state.player1.energy_zone.set_active_count(3);
     assert_eq!(game.state.player1.energy_zone.active_count(), 3);
 
     advance_to_live_card_set_p1(&mut game);
@@ -175,7 +180,9 @@ fn catchu_single_member_activate_1() {
     game.state.player1.stage.stage[0] = mei;
     game.state.player1.stage.stage[1] = filler;
 
-    game.give_energy(3);
+    game.give_energy(4);
+    // One genuinely-waited energy for the +1 below.
+    game.state.player1.energy_zone.set_active_count(3);
     assert_eq!(game.state.player1.energy_zone.active_count(), 3);
 
     advance_to_live_card_set_p1(&mut game);
@@ -228,7 +235,9 @@ fn catchu_self_as_member_on_stage_plus_one_other() {
     game.state.player1.stage.stage[1] = catchu;
     game.state.player1.stage.stage[2] = filler;
 
-    game.give_energy(3);
+    game.give_energy(5);
+    // Two genuinely-waited energies (see basic test).
+    game.state.player1.energy_zone.set_active_count(3);
     assert_eq!(game.state.player1.energy_zone.active_count(), 3);
 
     advance_to_live_card_set_p1(&mut game);

@@ -211,8 +211,8 @@ fn recovered_live_activates_only_available_energy_candidates_pl_s_bp3_008_r() {
 
     assert_eq!(
         game.state.player1.energy_zone.active_count(),
-        4,
-        "activate 4 requested but only 3 candidate energies exist → Q167 partial \
-         resolution activates those 3 instead of aborting (1+3=4)"
+        3,
+        "activate 4 requested but only 2 waited energies exist → Q167 partial \
+         resolution activates those 2 instead of aborting (1+2=3)"
     );
 }

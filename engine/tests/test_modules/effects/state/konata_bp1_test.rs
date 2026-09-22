@@ -26,6 +26,11 @@ fn setup_konata(game: &mut TestGame, hand_fillers: usize, energy: usize) -> i16 
         game.state.player1.main_deck.cards.push(filler);
     }
     game.give_energy(energy);
+    // Leave exactly 2 waited: the activate-2 below must come from real
+    // waited cards (all-active zones have nothing to activate).
+    game.state.player1.energy_zone.set_active_count(
+        (energy as u8).saturating_sub(2),
+    );
     konata
 }
 

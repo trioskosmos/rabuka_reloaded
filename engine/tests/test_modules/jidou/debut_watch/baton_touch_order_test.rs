@@ -84,8 +84,9 @@ fn baton_touch_activates_energy() {
     );
     assert_eq!(
         e_after,
-        e_before + 1,
-        "baton_touch: -1 cost + 2 activation = +1 net"
+        e_before,
+        "baton_touch: -1 cost, 1 genuinely-waited energy available for the \
+         +2 activation → Q167 partial +1 nets to e_before"
     );
 }
 

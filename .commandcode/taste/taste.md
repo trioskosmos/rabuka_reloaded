@@ -1,0 +1,6 @@
+- Prefers breaking up god files into smaller focused modules. Confidence: 0.9
+- Prefers simplification across the board with unified reusable helpers/methods and removal of superfluous bloat code. Confidence: 0.9
+- Prefers minimal if-if-else routing chains, favoring cleaner dispatch. Confidence: 0.85
+- Prefers fully autonomous execution with no excuses and no waiting for decisions to get it all done. Confidence: 0.9
+- Prefers verifying changed files are non-superfluous, fixing issues, then committing to git, using separate commits per completed phase. Confidence: 0.8
+- Prefers fixing failing tests by properly restoring intended behavior as written rather than superficial passes. Confidence: 0.8

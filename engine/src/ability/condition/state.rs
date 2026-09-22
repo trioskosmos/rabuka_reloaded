@@ -1202,6 +1202,22 @@ impl<'a> ConditionContext<'a> {
                         continue;
                     }
                 }
+                // Apply group filter to the transitioned card itself (e.g. a
+                // Niji member became wait — not just any wait while a group
+                // member stands around). Mirrors the cost filter above.
+                if let Some(groups) = condition.get_group_names() {
+                    if !groups.is_empty() {
+                        let card_db = &self.game_state.card_database;
+                        let group_ok = groups.iter().any(|g| {
+                            crate::ability::util::card_matches_group_str(
+                                card_db, *cid, Some(g),
+                            )
+                        });
+                        if !group_ok {
+                            continue;
+                        }
+                    }
+                }
                 log::debug!(
                     "[STATE_CHANGE_COND] card={} transition {}→{} matches (recently_state_changed)",
                     cid,

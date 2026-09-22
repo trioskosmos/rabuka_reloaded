@@ -593,6 +593,12 @@ use alloc::{
 pub struct EnergyZone {
     // Rule 5.1: Energy Zone - Where energy cards are placed and activated
     // Q15: Energy deck cards are face-down; energy zone cards are face-up.
+    //
+    // POSITIONAL CONVENTION (canonical for counts): cards[0..active_energy_count]
+    // are active, the rest waited. Every mutation below preserves it — state
+    // changes swap cards across the boundary instead of leaving
+    // active/waited cards intermixed. Menus and filters rely on
+    // util::{active,waited}_energy_indices, which encode the same rule.
     pub cards: SmallVec<[i16; MAX_ENERGY_CARDS]>,
     pub(crate) active_energy_count: u8,
 }
@@ -674,6 +680,102 @@ impl EnergyZone {
         // Set all energy cards to active state
         self.active_energy_count = self.cards.len().u8_count();
         // log::debug!("Activated {} energy cards (active_energy_count={})", self.cards.len(), self.active_energy_count);
+    }
+
+    /// Push an ACTIVE card while preserving the positional convention:
+    /// inserted at the active/wait boundary (not appended — appending an
+    /// active card past waited ones would corrupt the prefix).
+    pub fn push_active(&mut self, card_id: i16) {
+        let at = (self.active_energy_count as usize).min(self.cards.len());
+        self.cards.insert(at, card_id);
+        self.active_energy_count = self.active_energy_count.saturating_add(1);
+    }
+
+    /// Push a WAITED card: appended past the active prefix (no count change).
+    pub fn push_waited(&mut self, card_id: i16) {
+        self.cards.push(card_id);
+    }
+
+    /// Mark the card at `index` waited, preserving the convention by swapping
+    /// it with the last active card. No-op if already waited or out of range.
+    /// Returns true when a state change happened.
+    /// NOTE: prefer the batch `set_indices_*` below for multi-index changes —
+    /// per-index swaps re-point later indices, which alias under duplicate ids.
+    pub fn mark_waited(&mut self, index: usize) -> bool {
+        let active = self.active_energy_count as usize;
+        if index >= active || index >= self.cards.len() {
+            return false;
+        }
+        let last_active = active - 1;
+        self.cards.swap(index, last_active);
+        self.active_energy_count = self.active_energy_count.saturating_sub(1);
+        true
+    }
+
+    /// Set exactly the given INDICES to waited, preserving relative order:
+    /// rebuilds as [still-active in order] ++ [rest in order] and recounts.
+    /// Fully positional — duplicate ids are harmless. Indices out of range
+    /// are ignored; already-waited indices are no-ops.
+    pub fn set_indices_waited(&mut self, indices: &[usize]) {
+        let active = self.active_energy_count as usize;
+        let mut still_active = Vec::with_capacity(self.cards.len());
+        let mut rest = Vec::with_capacity(self.cards.len());
+        for (i, &cid) in self.cards.iter().enumerate() {
+            if indices.contains(&i) || i >= active {
+                rest.push(cid);
+            } else {
+                still_active.push(cid);
+            }
+        }
+        let new_active = still_active.len();
+        still_active.extend(rest.into_iter());
+        self.cards = still_active.into_iter().collect();
+        self.active_energy_count = new_active.u8_count();
+    }
+
+    /// Set exactly the given INDICES to active (mirror of `set_indices_waited`):
+    /// rebuilds as [newly + still-active in order] ++ [rest in order].
+    pub fn set_indices_active(&mut self, indices: &[usize]) {
+        let active = self.active_energy_count as usize;
+        let mut now_active = Vec::with_capacity(self.cards.len());
+        let mut rest = Vec::with_capacity(self.cards.len());
+        for (i, &cid) in self.cards.iter().enumerate() {
+            if indices.contains(&i) || i < active {
+                now_active.push(cid);
+            } else {
+                rest.push(cid);
+            }
+        }
+        let new_active = now_active.len();
+        now_active.extend(rest.into_iter());
+        self.cards = now_active.into_iter().collect();
+        self.active_energy_count = new_active.u8_count();
+    }
+
+    /// Mark the card at `index` active, preserving the convention by swapping
+    /// it with the first waited card. No-op if already active or out of range.
+    /// Returns true when a state change happened.
+    pub fn mark_active(&mut self, index: usize) -> bool {
+        let active = self.active_energy_count as usize;
+        if index < active || index >= self.cards.len() {
+            return false;
+        }
+        self.cards.swap(index, active);
+        self.active_energy_count = self.active_energy_count.saturating_add(1);
+        true
+    }
+
+    /// Remove and return the card at `index`, adjusting the counter only when
+    /// an actually-active card leaves (positional check BEFORE removal).
+    /// Returns None when out of range.
+    pub fn remove_at(&mut self, index: usize) -> Option<i16> {
+        if index >= self.cards.len() {
+            return None;
+        }
+        if index < self.active_energy_count as usize {
+            self.active_energy_count = self.active_energy_count.saturating_sub(1);
+        }
+        Some(self.cards.remove(index))
     }
 }
 

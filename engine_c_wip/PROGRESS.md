@@ -1,7 +1,7 @@
 # engine_c — C port of the Rabuka engine
 
 > ## THE RULE
-> Port `engine/src/...` into `engine_c/src/...` **file-by-file, faithfully**. Every
+> Port `engine/src/...` into `engine_c_wip/src/...` **file-by-file, faithfully**. Every
 > branch, every state mutation. A function that compiles but only clears state and
 > returns, or only calls `rb_resolver_clear_choice_state_and_resume`, is a **STUB**,
 > not a port. Parity = the real Rust logic is reproduced.

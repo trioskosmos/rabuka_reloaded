@@ -1,4 +1,4 @@
-use std::cell::{Cell, RefCell};
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::sync::{Arc, OnceLock};
 
@@ -165,7 +165,6 @@ pub struct TestGame {
     pub state: GameState,
     debug_enabled: bool,
     pool_positions: RefCell<HashMap<i16, usize>>,
-    internal_counter: Cell<i16>,
     trace: trace::Trace,
     #[cfg(feature = "alloc_tracker")]
     _alloc_guard: Option<rabuka_engine::alloc_counter::AllocGuard>,
@@ -193,7 +192,6 @@ impl TestGame {
             state,
             debug_enabled,
             pool_positions: RefCell::new(HashMap::new()),
-            internal_counter: Cell::new(20000),
             trace: trace::Trace::new(),
             #[cfg(feature = "alloc_tracker")]
             _alloc_guard: rabuka_engine::alloc_counter::start(),
@@ -227,10 +225,13 @@ impl TestGame {
     }
 
     pub fn new_id(&self, card_no: &str) -> i16 {
-        self.consume_id(card_no, |_| {
-            let cid = self.internal_counter.get();
-            self.internal_counter.set(cid + 1);
-            cid
+        self.consume_id(card_no, |template_id| {
+            // Past the 11-copy pool: fall back to the shared template id
+            // (same as id()). Always real card data, never a collision —
+            // at the cost of aliasing: instances past 11 are NOT distinct.
+            // Bulk deck filler must use game.id() (shared template) anyway;
+            // staged/played/tracked cards must stay within pool range.
+            template_id
         })
     }
 
@@ -267,9 +268,10 @@ impl TestGame {
     pub fn give_energy_for(&mut self, side: Side, count: usize) {
         for _ in 0..count {
             let energy_card = self.id("LL-E-001-SD");
-            self.player_for(side).energy_zone.cards.push(energy_card);
+            // Insert at the active boundary so the positional convention
+            // (prefix = active) holds even when waited energy exists.
+            self.player_for(side).energy_zone.push_active(energy_card);
         }
-        self.player_for(side).energy_zone.add_active(count as u8);
     }
 
     pub fn try_play_to_stage_for(

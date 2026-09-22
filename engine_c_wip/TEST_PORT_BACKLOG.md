@@ -30,7 +30,7 @@
 >    comment-out-and-continue; 9. whole-line drop (never inline-hollow)
 >    for anything unresolvable.
 
-Generated from audit of `engine_c/tests/test_ported_generated.c` (2650 fns; 1382 failing
+Generated from audit of `engine_c_wip/tests/test_ported_generated.c` (2650 fns; 1382 failing
 checks across 966 fns). Failures are dominated by porting gaps, not engine crashes.
 
 ## Backlog

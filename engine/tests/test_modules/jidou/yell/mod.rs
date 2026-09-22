@@ -14,5 +14,6 @@ pub mod no_blade_heart_reveal_heart02_test;
 pub mod no_blade_heart_reveal_heart06_member_as_live_q112_q113_test;
 pub mod no_blade_heart_reveal_two_watchers_modifier_bounds_test;
 pub mod wien_n_test;
+pub mod yell_discard_liella_live_extra_yells_pl_sp_pb2_020_r_test;
 pub mod yell_revealed_no_blade_heart_discard_q251_test;
 pub mod zero_yell_optional_live_discard_q264_test;

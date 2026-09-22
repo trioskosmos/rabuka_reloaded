@@ -3596,8 +3596,59 @@ def _try_or(text):
                 "type": "or",
                 "events": leg_events,
             }
+        result = _fix_distributed_baton_arrival(result, text)
         return result
     return None
+
+
+def _fix_distributed_baton_arrival(result, text):
+    """Fix "このメンバーか、ほかのメンバーがバトンタッチして登場(したとき)".
+
+    The baton-touch arrival distributes over BOTH disjuncts (self arrival OR
+    other-member arrival). The generic か、 split above misreads the first leg
+    as a static presence check ("このメンバー" on stage — always true once
+    staged), so the ability fires on any trigger scan, e.g. a plain debut.
+    Rewrite that leg as the self-arrival movement leg; the engine's
+    baton_touch evaluator (replaced-in-own-waitroom gate) handles the rest.
+    """
+    if result.get("type") != "or_condition":
+        return result
+    if "このメンバーか、" not in text or "バトンタッチして登場" not in text:
+        return result
+    conds = result.get("conditions", [])
+    if len(conds) < 2:
+        return result
+    last = conds[-1]
+    if not (last.get("type") == "movement_condition"
+            and last.get("movement") == "baton_touch"):
+        return result
+    fixed = False
+    new_conds = []
+    for leg in conds[:-1]:
+        if (leg.get("type") == "location_condition"
+                and "このメンバー" in leg.get("text", "")
+                and leg.get("trigger_event") is None):
+            new_conds.append({
+                "type": "movement_condition",
+                "movement": "baton_touch",
+                "target": leg.get("target", "self"),
+                "baton_touch_trigger": True,
+                "text": text,
+                "trigger_event": {
+                    "type": "baton_touch",
+                    "tense": "past",
+                    "location": "stage",
+                },
+            })
+            fixed = True
+        else:
+            new_conds.append(leg)
+    if not fixed:
+        return result
+    new_conds.append(last)
+    result = dict(result)
+    result["conditions"] = new_conds
+    return result
 
 
 def _extract_place_restriction_destination(text):
@@ -4859,6 +4910,84 @@ def _try_discard_hand_recover_self_optional(text):
         discard_opt,
         {"action": "sequential", "actions": [discard_done, cons]},
     )
+
+
+def _try_discard_hand_reactivate_optional(text):
+    """Shioriko bp7-022 ab#0: '<trigger>になったとき、手札をN枚控え室に置いても
+    よい。そうしたとき、そのメンバーをアクティブにする' → sequential
+    conditional:true with the trigger as its condition.
+    optional: discard N from hand (may). On accept: activate the waited
+    trigger member (Niji group hardcoded per the card-specific precedent of
+    G7/G13/G16 — the group lives in the trigger clause, not this substring).
+    Without this, the generic conditional path misreads the discard as a
+    comparison condition and the reactivate as unconditional (free activate
+    with no discard — the bp7-022 bug)."""
+    if "手札を" not in text or "控え室に置いてもよい" not in text:
+        return None
+    if "そうしたとき" not in text:
+        return None
+    pre, _, post = text.partition("そうしたとき")
+    # The optional clause starts at 手札を; anything before it is trigger.
+    hi = pre.find("手札を")
+    if hi < 0:
+        return None
+    trig_text = pre[:hi].strip().rstrip("、")
+    opt_text = pre[hi:].strip()
+    cons_text = post.strip().lstrip("、")
+    if "そのメンバーをアクティブにする" not in cons_text:
+        return None
+    # Trigger is the "<group-wait>になったとき" clause (any phase gate was
+    # stripped before parse_effect and is merged back by parse_ability).
+    # It must be the group wait-watcher; anything else falls through.
+    # Rebuilt as a state_change_condition (active→wait on the group member):
+    # a bare group_condition would only check group PRESENCE on stage and
+    # fire for any wait event regardless of who waited (the bp7-022 trigger
+    # bug). Mirrors pb1-015's state_change shape.
+    trig_text = trig_text.strip()
+    if trig_text.endswith("になったとき"):
+        trig_text = trig_text[: -len("になったとき")] + "になったとき"
+    group_leg = parse_condition(trig_text)
+    if (not isinstance(group_leg, dict)
+            or group_leg.get("type") != "group_condition"
+            or not group_leg.get("group_names")):
+        return None
+    trigger_cond = dict(group_leg)
+    trigger_cond["type"] = "state_change_condition"
+    trigger_cond["from_state"] = "active"
+    trigger_cond["to_state"] = "wait"
+    trigger_cond["trigger_event"] = {
+        "type": "state_change",
+        "from_state": "active",
+        "to_state": "wait",
+    }
+    m = re.search(r"(\d+)枚", opt_text)
+    count = int(m.group(1)) if m else 1
+    discard_opt = {
+        "action": "move_cards",
+        "source": "hand",
+        "destination": "discard",
+        "count": count,
+        "card_type": "card",
+        "target": "self",
+        "optional": True,
+        "text": opt_text,
+    }
+    cons = {
+        "action": "change_state",
+        "state_change": "active",
+        "count": 1,
+        "card_type": "member_card",
+        "group_names": ["虹ヶ咲"],
+        "target": "self",
+        "text": cons_text,
+    }
+    return {
+        "text": text,
+        "action": "sequential",
+        "conditional": True,
+        "condition": trigger_cond,
+        "actions": [discard_opt, cons],
+    }
 
 
 def _extract_comparison_fields(condition, text):
@@ -9824,6 +9953,7 @@ _EFFECT_HANDLERS = [
     _try_those_cards_add_hand_optional,  # G13: それらのカードの中から…手札に加えてもよい。そうしたとき…
     _try_discard_shuffle_to_bottom_optional,  # G16: 控え室N枚選びシャッフル→デッキ一番下・そうしたとき…
     _try_discard_hand_recover_self_optional,  # G7: 手札をN枚控え室に置いてもよい。そうしたとき、控え室からこのカードを手札に加える
+    _try_discard_hand_reactivate_optional,  # Shioriko bp7-022: 手札をN枚控え室に置いてもよい。そうしたとき、そのメンバーをアクティブにする
     _try_discard_live_and_member_optional,  # B6: 控え室にライブカードとmember無ブレードがある場合→シャッフルデッキ下・そうしたときheart01
     _try_unless_effect,  # しないかぎり (unless-pay)
     _try_opponent_action,  # 相手は... (opponent action)

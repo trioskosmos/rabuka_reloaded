@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-09-19T11:43:15.038935",
+  "generated_at": "2026-09-21T17:41:04.824133",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "8704e050",
+  "engine_commit": "651a2d78",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -23552,11 +23552,16 @@
           "operator": "or",
           "conditions": [
             {
-              "text": "自分のステージに、このメンバー",
+              "type": "movement_condition",
+              "movement": "baton_touch",
               "target": "self",
-              "location": "stage",
-              "card_type": "member_card",
-              "type": "location_condition"
+              "baton_touch_trigger": true,
+              "text": "自分のステージに、このメンバーか、ほかのメンバーがバトンタッチして登場したとき",
+              "trigger_event": {
+                "type": "baton_touch",
+                "tense": "past",
+                "location": "stage"
+              }
             },
             {
               "type": "movement_condition",
@@ -37219,6 +37224,8 @@
       "cost": null,
       "effect": {
         "text": "自分のステージにいる『虹ヶ咲』のメンバー1人がウェイト状態になったとき、手札を1枚控え室に置いてもよい。そうしたとき、そのメンバーをアクティブにする",
+        "action": "sequential",
+        "conditional": true,
         "condition": {
           "type": "compound",
           "operator": "and",
@@ -37242,14 +37249,40 @@
               "location": "stage",
               "card_type": "member_card",
               "count": 1,
-              "type": "group_condition"
+              "type": "state_change_condition",
+              "from_state": "active",
+              "to_state": "wait",
+              "trigger_event": {
+                "type": "state_change",
+                "from_state": "active",
+                "to_state": "wait"
+              }
             }
           ]
         },
-        "state_change": "active",
-        "card_type": "member_card",
-        "action": "change_state",
-        "count": 1
+        "actions": [
+          {
+            "action": "move_cards",
+            "source": "hand",
+            "destination": "discard",
+            "count": 1,
+            "card_type": "card",
+            "target": "self",
+            "optional": true,
+            "text": "手札を1枚控え室に置いてもよい。"
+          },
+          {
+            "action": "change_state",
+            "state_change": "active",
+            "count": 1,
+            "card_type": "member_card",
+            "group_names": [
+              "虹ヶ咲"
+            ],
+            "target": "self",
+            "text": "そのメンバーをアクティブにする"
+          }
+        ]
       }
     },
     {

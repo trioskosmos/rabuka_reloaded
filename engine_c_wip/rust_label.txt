@@ -1,0 +1,31 @@
+﻿
+> C:\Users\trios\OneDrive\Documents\rabuka_reloaded\engine\src\core\card.rs:4203:macro_rules! heart_color_table {
+  C:\Users\trios\OneDrive\Documents\rabuka_reloaded\engine\src\core\card.rs:4204:    ($macro:ident) => {
+  C:\Users\trios\OneDrive\Documents\rabuka_reloaded\engine\src\core\card.rs:4205:        $macro! {
+  C:\Users\trios\OneDrive\Documents\rabuka_reloaded\engine\src\core\card.rs:4206:            Heart00 => "heart00", "h00
+", 0,
+  C:\Users\trios\OneDrive\Documents\rabuka_reloaded\engine\src\core\card.rs:4207:            Heart01 => "heart01", "h01
+", 1,
+  C:\Users\trios\OneDrive\Documents\rabuka_reloaded\engine\src\core\card.rs:4208:            Heart02 => "heart02", "h02
+", 2,
+  C:\Users\trios\OneDrive\Documents\rabuka_reloaded\engine\src\core\card.rs:4209:            Heart03 => "heart03", "h03
+", 3,
+  C:\Users\trios\OneDrive\Documents\rabuka_reloaded\engine\src\core\card.rs:4210:            Heart04 => "heart04", "h04
+", 4,
+  C:\Users\trios\OneDrive\Documents\rabuka_reloaded\engine\src\core\card.rs:4211:            Heart05 => "heart05", "h05
+", 5,
+  C:\Users\trios\OneDrive\Documents\rabuka_reloaded\engine\src\core\card.rs:4212:            Heart06 => "heart06", "h06
+", 6,
+  C:\Users\trios\OneDrive\Documents\rabuka_reloaded\engine\src\core\card.rs:4213:            BAll   => "b_all",   "b_al
+l", 0,
+  C:\Users\trios\OneDrive\Documents\rabuka_reloaded\engine\src\core\card.rs:4214:            Draw   => "draw",    "draw
+",  0,
+  C:\Users\trios\OneDrive\Documents\rabuka_reloaded\engine\src\core\card.rs:4215:            Score  => "score",   "scor
+e", 0,
+  C:\Users\trios\OneDrive\Documents\rabuka_reloaded\engine\src\core\card.rs:4216:            All    => "all",     "all"
+,   7,
+  C:\Users\trios\OneDrive\Documents\rabuka_reloaded\engine\src\core\card.rs:4217:        }
+  C:\Users\trios\OneDrive\Documents\rabuka_reloaded\engine\src\core\card.rs:4218:    };
+  C:\Users\trios\OneDrive\Documents\rabuka_reloaded\engine\src\core\card.rs:4219:}
+
+

@@ -1039,8 +1039,10 @@ let source = cost.source_str().unwrap_or("");
                         ));
                         return Ok(());
                     }
-                    // Show active energy cards for selection (one by one with skip)
-                    let filtered_indices: Vec<usize> = (0..active_count as usize).collect();
+                    // Show active energy cards for selection (one by one with skip).
+                    // Waited cards are never offerable for payment — only the
+                    // active prefix (see active_energy_indices).
+                    let filtered_indices = util::active_energy_indices(player);
                     self.pending_choice = Some(
                         Choice::select_cards(
                             Zone::Energy.to_str().to_string(),
@@ -1120,12 +1122,18 @@ let source = cost.source_str().unwrap_or("");
                         player.energy_zone.cards.len()
                     ));
                 }
-                for _ in 0..count {
-                    if let Some(card) = player.energy_zone.cards.pop() {
-                        player.energy_deck.cards.push(card);
-                    }
-                }
-                player.energy_zone.sub_active(count as u8);
+        for _ in 0..count {
+            // Pop from the end; remove_at keeps the counter honest about
+            // whether the popped card was active (old code blindly
+            // decremented even for waited cards).
+            if player.energy_zone.cards.is_empty() {
+                break;
+            }
+            let tail = player.energy_zone.cards.len() - 1;
+            if let Some(card) = player.energy_zone.remove_at(tail) {
+                player.energy_deck.cards.push(card);
+            }
+        }
                 Ok(())
             }
             ActionType::Reveal => {

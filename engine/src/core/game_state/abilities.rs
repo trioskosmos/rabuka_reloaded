@@ -92,6 +92,29 @@ impl GameState {
         self.ability_uses_used(card_id, ability_index) < limit
     }
 
+    /// Record a completed ability for the re-scan guard, snapshotting the
+    /// current movement batch alongside the key. The guard (see
+    /// `just_completed_batch_matches`) skips only re-scans of this same
+    /// batch — a fresh batch may re-fire the ability (turn2+ budgets).
+    pub fn set_just_completed(&mut self, key: Option<u32>) {
+        self.just_completed_ability_key = key;
+        self.just_completed_moved = self.recently_moved_cards.clone().unwrap_or_default();
+    }
+
+    /// Re-scan guard predicate: skip the just-completed ability only when the
+    /// scan shows the SAME movement batch it resolved on (stale re-scan) or
+    /// when either side is empty (batch unknown — preserve legacy caution).
+    /// A scan with a DIFFERENT non-empty batch is a fresh event and may
+    /// re-fire the ability (turn2+ budgets). This is the only behavior change
+    /// vs the old skip-on-key-match: same-key + different-nonempty-batch now
+    /// fires instead of being silently swallowed.
+    fn just_completed_batch_matches(&self, moved: &[i16]) -> bool {
+        if self.just_completed_moved.is_empty() || moved.is_empty() {
+            return true;
+        }
+        self.just_completed_moved.as_slice() == moved
+    }
+
     /// Record one use of a limited ability this turn. This is the **only** method
     /// that mutates `turn_limited_abilities_used`.
     ///
@@ -565,10 +588,12 @@ impl GameState {
                                     }
                                 }
                             }
-                            if skip_this_card_auto_key == Some(num_key) {
-                                continue;
-                            }
-                            if skip_this_card_auto_key == Some(num_key) {
+                            // Re-scan guard: skip the just-completed ability only
+                            // on the SAME movement batch it resolved on (stale
+                            // re-scan). A fresh batch may re-fire it (turn2+).
+                            if skip_this_card_auto_key == Some(num_key)
+                                && self.just_completed_batch_matches(&event.moved_cards)
+                            {
                                 continue;
                             }
                             // Batch-scoped guard: prevent re-enqueue of any ability
@@ -644,7 +669,10 @@ impl GameState {
                                 }
                             }
                             let num_key = ((card_id as u32) << 16) | (ability_idx as u32);
-                            if skip_this_card_auto_key == Some(num_key) {
+                            // Same batch-scoped re-scan guard as the stage loop.
+                            if skip_this_card_auto_key == Some(num_key)
+                                && self.just_completed_batch_matches(&event.moved_cards)
+                            {
                                 continue;
                             }
                             if self.this_batch_triggered_ability_ids.contains(&num_key) {
@@ -720,7 +748,10 @@ impl GameState {
                                 }
                             }
                             let num_key = ((moved_card_id as u32) << 16) | (ability_idx as u32);
-                            if skip_this_card_auto_key == Some(num_key) {
+                            // Same batch-scoped re-scan guard as the stage loop.
+                            if skip_this_card_auto_key == Some(num_key)
+                                && self.just_completed_batch_matches(&event.moved_cards)
+                            {
                                 continue;
                             }
                             if self.this_batch_triggered_ability_ids.contains(&num_key) {
@@ -1904,7 +1935,7 @@ impl GameState {
                         .map(|s| s.to_string()),
                     ..Default::default()
                 };
-                self.just_completed_ability_key = just_completed_key;
+                self.set_just_completed(just_completed_key);
                 self.trigger_auto_abilities_for_player_with_event(&current_pid, &event);
                 // just_completed_ability_key intentionally NOT cleared here --                 // process_pending_auto_abilities' post-loop TAS (line ~803)
                 // also needs the guard to prevent re-enqueueing the same
@@ -2439,7 +2470,7 @@ impl GameState {
 
     /// Set just_completed_ability_key, process pending auto abilities, then clear it.
     pub fn process_with_completed_key(&mut self, key: Option<u32>, player_id: &str) {
-        self.just_completed_ability_key = key;
+        self.set_just_completed(key);
         self.process_pending_auto_abilities(player_id);
         self.just_completed_ability_key = None;
     }

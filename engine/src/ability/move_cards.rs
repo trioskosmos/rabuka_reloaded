@@ -2942,18 +2942,19 @@ if util::distinct_should_dedupe(distinct) {
             let cids: Vec<i16> = {
                 let player = gs.resolve_target_player_mut("self");
                 let mut removed = Vec::new();
+                // High→low so earlier removals don't shift later indices.
+                // remove_at adjusts the counter only for actually-active
+                // cards (positional convention).
                 for &i in indices.iter().rev() {
                     if i < player.energy_zone.cards.len()
                         && validate_card(player.energy_zone.cards[i])
                     {
-                        removed.push(player.energy_zone.cards.remove(i));
+                        if let Some(cid) = player.energy_zone.remove_at(i) {
+                            removed.push(cid);
+                        }
                     }
                 }
                 removed.reverse();
-                player.energy_zone.active_energy_count = player
-                    .energy_zone
-                    .active_energy_count
-                    .saturating_sub(removed.len().u8_count());
                 removed
             };
             if dst == Zone::UnderMember.to_str() {
@@ -3069,7 +3070,9 @@ if util::distinct_should_dedupe(distinct) {
         ));
     }
 
-    /// Execute energy zone cards: move to wait state.
+    /// Execute energy zone cards: move to wait state. Only actually-active
+    /// cards move the counter (mark_waited is a no-op for already-waited);
+    /// the wait mod write below stays idempotent.
     pub fn execute_selected_energy_zone_cards(
         &mut self,
         gs: &mut GameState,
@@ -3077,14 +3080,13 @@ if util::distinct_should_dedupe(distinct) {
         _count: usize,
     ) -> Result<(), String> {
         let player = gs.resolve_target_player_mut("self");
+        // Snapshot the selected ids BEFORE rebuilding (positions shift).
         let to_mark: Vec<i16> = indices
             .iter()
             .filter_map(|&i| player.energy_zone.cards.get(i).copied())
             .collect();
-        player.energy_zone.active_energy_count = player
-            .energy_zone
-            .active_energy_count
-            .saturating_sub(to_mark.len().u8_count());
+        // Positional rebuild (duplicate-id safe): no id re-resolution.
+        player.energy_zone.set_indices_waited(indices);
         for cid in to_mark {
             gs.mods.clear_all_for_card(cid);
             gs.mods.add_orientation_modifier(cid, "wait");

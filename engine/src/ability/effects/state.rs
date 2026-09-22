@@ -770,7 +770,7 @@ impl AbilityResolver {
         } else {
             None
         };
-        let (wait_cards, deactivate_count) = {
+        let (wait_cards, wait_positions) = {
             let player = gs.resolve_target_player_mut(target);
 
             let mut filter = effect.filter_subset();
@@ -786,6 +786,18 @@ impl AbilityResolver {
             filter.exclude_self = exclude_self_id;
             let valid_indices =
                 util::matching_indices(&player.energy_zone.cards, &card_db, &filter, false);
+            // State gate for the menu AND the auto-pick below: deactivating
+            // offers only ACTIVE cards, activating only WAITED ones. Offering
+            // (or auto-taking) an already-correct card would move the active
+            // counter without changing any state.
+            let is_activate =
+                state_change == "active" || state_change == "アクティブ";
+            let active_len = player.energy_zone.active_count() as usize;
+            let state_indices: Vec<usize> = valid_indices
+                .iter()
+                .copied()
+                .filter(|&i| (i < active_len) != is_activate)
+                .collect();
 
             let effective_count = if max {
                 let available = match state_change {
@@ -821,15 +833,15 @@ impl AbilityResolver {
             };
 
             // Partial resolution (Q167: 「実行可能な限り解決する」): when the
-            // zone holds fewer matching candidates than requested, resolve as
-            // many as possible instead of aborting the whole effect. Legacy
+            // zone holds fewer STATE-MATCHING candidates than requested, resolve
+            // as many as possible instead of aborting the whole effect. Legacy
             // behavior (candidates ≥ requested) is untouched.
-            let effective_count = if valid_indices.len() < effective_count as usize {
-                let capped = valid_indices.len().u8_count();
+            let effective_count = if state_indices.len() < effective_count as usize {
+                let capped = state_indices.len().u8_count();
                 log::debug!(
                     "[ENERGY] partial: requested={} candidates={} effective={}",
                     effective_count,
-                    valid_indices.len(),
+                    state_indices.len(),
                     capped
                 );
                 capped
@@ -838,15 +850,21 @@ impl AbilityResolver {
             };
 
             if !max
-                && valid_indices.len() > effective_count as usize
+                && state_indices.len() > effective_count as usize
                 && state_change != "active"
                 && state_change != "アクティブ"
             {
+                let active_n = active_len;
+                let waited_n = player
+                    .energy_zone
+                    .cards
+                    .len()
+                    .saturating_sub(active_len);
                 let desc_en = format!(
-                    "Select {} energy card(s) to deactivate (set to wait)",
-                    effective_count
+                    "Select {} energy card(s) to deactivate (set to wait) (active: {}, waited: {})",
+                    effective_count, active_n, waited_n
                 );
-                let desc_ja = format!("待機状態にするエネルギーカードを{}枚選択", effective_count);
+                let desc_ja = format!("待機状態にするエネルギーカードを{}枚選択（アクティブ：{}、ウェイト：{}）", effective_count, active_n, waited_n);
                 self.pending_choice = Some(
                     Choice::select_cards(
                         Zone::Energy.to_str(),
@@ -857,6 +875,7 @@ impl AbilityResolver {
                     .description_ja(Some(desc_ja))
                     .card_type(card_type_filter.map(|s| s.to_string()))
                     .group(group_filter.map(|s| s.to_string()))
+                    .filtered_indices(Some(state_indices.clone()))
                     .target_player_id(Some(target.to_string()))
                     .build(),
                 );
@@ -864,7 +883,7 @@ impl AbilityResolver {
                 return Ok(());
             }
 
-            let wait_cards: Vec<i16> = valid_indices
+            let wait_cards: Vec<i16> = state_indices
                 .iter()
                 .take(effective_count as usize)
                 .filter_map(|i| {
@@ -875,8 +894,16 @@ impl AbilityResolver {
                     }
                 })
                 .collect();
+            // Positional indices of the cards to change (parallel to
+            // wait_cards above) for the zone rebuild below.
+            let wait_positions: Vec<usize> = state_indices
+                .iter()
+                .take(effective_count as usize)
+                .copied()
+                .filter(|i| *i < player.energy_zone.cards.len())
+                .collect();
 
-            (wait_cards, effective_count)
+            (wait_cards, wait_positions)
         };
 
         let active_cards: Vec<i16> = if state_change == "active" || state_change == "アクティブ"
@@ -921,9 +948,20 @@ impl AbilityResolver {
                     }
                     gs.mods.add_orientation_modifier(*card_id, "wait");
                 }
-                for _ in 0..deactivate_count {
+                // Counter + positions move together through the zone rebuild
+                // (skipping immune members). No blind arithmetic.
+                {
+                    let skip_set = skip.clone();
                     let player = gs.resolve_target_player_mut(target);
-                    player.energy_zone.sub_active(1);
+                    let idx: Vec<usize> = wait_positions
+                        .iter()
+                        .copied()
+                        .filter(|&i| {
+                            i < player.energy_zone.cards.len()
+                                && !skip_set.contains(&player.energy_zone.cards[i])
+                        })
+                        .collect();
+                    player.energy_zone.set_indices_waited(&idx);
                 }
             }
             "active" | "アクティブ" => {
@@ -937,8 +975,11 @@ impl AbilityResolver {
                         "active".to_string(),
                     ));
                 }
-                let player = gs.resolve_target_player_mut(target);
-                player.energy_zone.add_active(active_cards.len().u8_count());
+                // Same positions the ids were taken from (parallel arrays).
+                {
+                    let player = gs.resolve_target_player_mut(target);
+                    player.energy_zone.set_indices_active(&wait_positions);
+                }
             }
             _ => {}
         }

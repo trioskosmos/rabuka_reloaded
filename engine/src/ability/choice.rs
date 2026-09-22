@@ -900,7 +900,13 @@ impl super::resolver::AbilityResolver {
             player.energy_zone.active_energy_count
         };
         if count_paid > 0 && energy_left > 0 {
-            let efi: Vec<usize> = (0..energy_left as usize).collect();
+            // Active prefix only — waited energy can never pay (shared helper
+            // with the cost-side menu so the offerable set can't diverge).
+            let efi = {
+                let player =
+                    gs.resolve_target_player(target_player_id.as_deref().unwrap_or("self"));
+                crate::ability::util::active_energy_indices(player)
+            };
             let target = target_player_id
                 .clone()
                 .unwrap_or_else(|| "self".to_string().into());

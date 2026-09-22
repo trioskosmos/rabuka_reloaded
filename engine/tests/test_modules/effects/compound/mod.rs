@@ -74,3 +74,4 @@ pub mod success_score_six_discard_two_live_recovery_test;
 pub mod totemari_test;
 pub mod toubatsu_test;
 pub mod tsunagaru_connect_test;
+pub mod wait_self_bottom_mill_aqours_unwait_blades_pl_s_bp7_011_n_test;

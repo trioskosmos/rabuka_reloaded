@@ -435,9 +435,10 @@ impl Player {
 
     pub fn draw_energy(&mut self) -> Option<i16> {
         self.energy_deck.draw().inspect(|&card_id| {
-            self.energy_zone.cards.push(card_id);
-
-            self.energy_zone.add_active(1);
+            // Insert at the active boundary (not append): the drawn card is
+            // active, and appending past waited cards would corrupt the
+            // active-prefix convention.
+            self.energy_zone.push_active(card_id);
         })
     }
 
