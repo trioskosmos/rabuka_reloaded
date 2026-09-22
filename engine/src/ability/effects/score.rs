@@ -56,8 +56,7 @@ impl AbilityResolver {
         let last_energy = gs.mods.last_cost_energy_count;
         let has_floor = is_live_total
             && (effect.effect_constraint_any().as_deref() == Some("min:0")
-                || effect.score_floor_any().is_some()
-                || effect.text.contains("未満にはならない"));
+                || effect.score_floor_any().is_some());
         if is_live_total {
             let effective_value: u8 = if per_unit {
                 let player = gs.resolve_target_player(resolved_target);
@@ -326,8 +325,7 @@ impl AbilityResolver {
         };
 
         let has_floor = effect.score_floor_any().is_some()
-            || effect_constraint.as_deref() == Some("min:0")
-            || effect.text.contains("未満にはならない");
+            || effect_constraint.as_deref() == Some("min:0");
         let mut count_applied = 0u8;
         for (card_id, delta) in &live_card_ids {
             if has_floor {
