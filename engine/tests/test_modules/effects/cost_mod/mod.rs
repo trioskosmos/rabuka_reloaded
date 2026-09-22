@@ -18,6 +18,7 @@ pub mod pl_s_bp5_010_test;
 pub mod play_time_three_named_member_discard_cost_ten_test;
 pub mod seven_energy_lead_stage_cost_two_bonus_test;
 pub mod shuffle_waitroom_members_optional_play_discount_test;
+pub mod stacking_and_edges_pl_s_bp7_020_l_test;
 pub mod success_zone_group_pl_n_sd2_003_sd2_test;
 pub mod success_zone_high_cost_group_deploy_discount_test;
 pub mod success_zone_score_six_stage_cost_three_bonus_test;

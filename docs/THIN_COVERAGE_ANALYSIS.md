@@ -81,14 +81,16 @@ no discard ever paid). New handler `_try_discard_hand_reactivate_optional`
   (`triggering_member_id` is dead plumbing — no scan populates it). Single-
   waited case (the realistic one) auto-resolves correctly.
 
-## REMAINING
+### `PL!S-bp7-020-L` HAPPY PARTY TRAIN (was 4 → 8)
+Closed the four listed gaps in `stacking_and_edges_pl_s_bp7_020_l_test.rs`:
+stacking both gates → heart0 −2; empty-deck mill shortfall (no reduction, no
+panic); opponent-waited does not break the own-stage gate (own-waited does);
+reduction honored at performance (`required[heart0]` = base 3 + (−2) = 1,
+live passes on leftover colored surplus).
 
-### `PL!S-bp7-020-L` HAPPY PARTY TRAIN (L2, 4 tests — best of the nine)
-Both abilities have positive + negative pins. Missing:
-- ❌ STACKING: A and B both true → reduced twice? Combined value unasserted.
-- ❌ B with EMPTY deck → mill-shortfall + condition-on-no-card path.
-- ❌ A with opponent waited but own all active → own-stage gate precision.
-- ❌ reduction honored at performance end-to-end (modifier asserted only).
+## REMAINING
+(None — the nine-card thin march is closed: bp7-011 → pb2-020 → PR-025 →
+sd2-006 → bp6-016 → bp4-010 → bp7-023 → bp7-022 → bp7-020.)
 
 ## Open questions (under investigation)
 - q94/q171 + s2_pb1_006 failures (`left: 4, right: 2` — double blades): did the
@@ -121,7 +123,7 @@ Both abilities have positive + negative pins. Missing:
    Riko empty deck ✔) but not systematically.
 
 March order executed: bp7-011 → pb2-020 → PR-025 → sd2-006 → bp6-016 →
-bp4-010 → bp7-023 → bp7-022 → (remaining) bp7-020.
+bp4-010 → bp7-023 → bp7-022 → bp7-020 (done).
 
 ---
 

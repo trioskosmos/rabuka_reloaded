@@ -76,6 +76,8 @@ File: `engine/tests/test_modules/effects/position/auto_system_stress_test.rs`
    the +2 must come from a real swap onto genuinely-waited energy.
 4. Then: bp7-020 stacking test (last thin card), `test_inventory.py` regen +
    `--check`, full suite green, commit everything above.
+   [DONE 2026-09-22: stacking/empty-deck/own-stage/performance tests added;
+   inventory regenerated; suite green; committed.]
 
 ## Landmines (do not touch blindly)
 - `git stash` list is full of ancient entries — never pop.

@@ -15,7 +15,7 @@ _test never asserts (smoke at best — cannot pin behavior)_
 | `engine/tests/test_modules/effects/score/chika_bp3_001_wait_self_activation_live_total_score_test.rs` | `wait_member_total_score_expires_at_live_end_even_without_setting_live` | 110 |  |
 | `engine/tests/test_modules/effects/score/chika_bp3_001_wait_self_activation_live_total_score_test.rs` | `wait_member_total_score_persists_through_victory_and_expires_after_live` | 105 |  |
 
-## no_drive (23)
+## no_drive (24)
 
 _trigger-context test that mutates state and asserts but never drives the engine (no scan/activate/play/fire): vacuous negatives/positives_
 
@@ -36,6 +36,7 @@ _trigger-context test that mutates state and asserts but never drives the engine
 | `engine/tests/test_modules/effects/look_select/niche_filters/all_or_any_three_heart_member_search_test.rs` | `one_of_three_required_hearts_member_is_discarded` | 67 |  |
 | `engine/tests/test_modules/effects/look_select/niche_filters/all_or_any_three_heart_member_search_test.rs` | `two_of_three_required_hearts_member_is_discarded` | 39 |  |
 | `engine/tests/test_modules/effects/look_select/pin_top/per_group_member_look_pin_reveal_score_test.rs` | `look_per_group_member_discards_remainder_without_score_for_member_reveal` | 4 |  |
+| `engine/tests/test_modules/jidou/debut_watch/baton_arrival_self_budget_gates_pl_n_pr_025_pr_test.rs` | `setsuna_self_baton_arrival_draws_one` | 45 |  |
 | `engine/tests/test_modules/jidou/debut_watch/other_baton_arrival_draw_test.rs` | `other_member_baton_arrival_draws_one_card` | 5 |  |
 | `engine/tests/test_modules/jidou/leaves_stage/baton_replacement_auto_effects_test.rs` | `group_baton_replacement_places_energy_under_arriving_member` | 138 |  |
 | `engine/tests/test_modules/jidou/leaves_stage/baton_replacement_auto_effects_test.rs` | `other_member_stage_to_waitroom_does_not_trigger_self_live_recovery` | 28 |  |
