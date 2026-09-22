@@ -557,6 +557,9 @@
         "ability_gain_trigger": {
           "type": "string"
         },
+        "anaphora": {
+          "type": "string"
+        },
         "gained_effect": {
           "type": "effect"
         },

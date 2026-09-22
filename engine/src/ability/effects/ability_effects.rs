@@ -96,8 +96,7 @@ impl AbilityResolver {
             // abilities.json — the +1 belongs to これによってウェイト状態に
             // なったメンバー, so a baton touch removing the source must keep
             // the bonus and removing the recipient must drop it).
-            let refs_cost_wait =
-                effect.text.contains("これによ") || text.contains("これによ");
+            let refs_cost_wait = effect.anaphora_any().as_deref() == Some("cost_waited");
             if refs_cost_wait && !gs.last_cost_waited_members.is_empty() {
                 gs.last_cost_waited_members.clone()
             } else {

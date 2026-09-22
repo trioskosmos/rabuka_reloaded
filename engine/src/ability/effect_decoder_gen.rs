@@ -195,6 +195,7 @@ fn decode_effect_field(bc: &mut BcReader, key: &str,
             "heart_color" => { ek.heart_color = bc.read_arc_str_value(); Some(true) }
             "ability_gain" => { ek.ability_gain = bc.read_arc_str_value(); Some(true) }
             "ability_gain_trigger" => { ek.ability_gain_trigger = bc.read_arc_str_value(); Some(true) }
+            "anaphora" => { ek.anaphora = bc.read_arc_str_value(); Some(true) }
             "gained_effect" => { ek.gained_effect = bc.read_effect_value(); Some(true) }
             "ability_text" => { ek.ability_text = bc.read_arc_str_value(); Some(true) }
             "target_trigger" => { ek.target_trigger = bc.read_arc_str_value(); Some(true) }
@@ -242,6 +243,7 @@ pub(crate) struct EffectKindLocals {
     pub alternative_condition: Option<Box<Condition>>,
     pub alternative_count_type: Option<ArcStr>,
     pub alternative_effect: Option<Box<AbilityEffect>>,
+    pub anaphora: Option<ArcStr>,
     pub answers: Option<Box<Vec<String>>>,
     pub any_number: Option<bool>,
     pub baton_touch_trigger: Option<bool>,
@@ -526,6 +528,7 @@ fn build_filter(ek: &EffectKindLocals) -> Option<Box<EffectFilter>> {
         heart_color: ek.heart_color.clone(),
         ability_gain: ek.ability_gain.clone(),
         ability_gain_trigger: ek.ability_gain_trigger.clone(),
+        anaphora: ek.anaphora.clone(),
         gained_effect: ek.gained_effect.clone(),
         ability_text: ek.ability_text.clone(),
         target_trigger: ek.target_trigger.clone(),

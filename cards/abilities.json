@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-09-22T15:05:14.837978",
+  "generated_at": "2026-09-22T15:08:25.091559",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "aa20a15e",
+  "engine_commit": "6b3d590f",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -2517,6 +2517,7 @@
         "duration": "live_end",
         "card_type": "member_card",
         "action": "gain_ability",
+        "anaphora": "cost_waited",
         "ability_gain_trigger": "常時",
         "ability_gain": "【常時】ライブの合計スコアを+1する。",
         "parenthetical": [

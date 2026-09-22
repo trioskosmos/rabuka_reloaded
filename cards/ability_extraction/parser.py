@@ -2346,6 +2346,8 @@ def _check_ability_gain_from_text(text, action):
     if not is_ability_gain:
         return False
     action["action"] = "gain_ability"
+    if "これによ" in text:
+        action["anaphora"] = "cost_waited"
     if quoted_text:
         categorized = categorize_quoted_text(quoted_text)
         if categorized["abilities"]:

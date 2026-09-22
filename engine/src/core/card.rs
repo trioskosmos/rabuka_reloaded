@@ -1114,6 +1114,9 @@ pub struct EffectFilter {
     pub heart_color: Option<ArcStr>,
     pub ability_gain: Option<ArcStr>,
     pub ability_gain_trigger: Option<ArcStr>,
+    /// Anaphora reference: "cost_waited" for 「これによってウェイト状態になった
+    /// メンバーは…」 (points at members put to wait by this ability's cost).
+    pub anaphora: Option<ArcStr>,
     pub gained_effect: Option<Box<AbilityEffect>>,
     pub ability_text: Option<ArcStr>,
     pub target_trigger: Option<ArcStr>,
@@ -1680,6 +1683,7 @@ impl AbilityEffect {
             heart_color: str_field!("heart_color"),
             ability_gain: str_field!("ability_gain"),
             ability_gain_trigger: str_field!("ability_gain_trigger"),
+            anaphora: str_field!("anaphora"),
             gained_effect: effect_field!("gained_effect"),
             ability_text: str_field!("ability_text"),
             target_trigger: str_field!("target_trigger"),
@@ -1796,6 +1800,8 @@ impl AbilityEffect {
     filter_str_getter!(ability_gain_any, ability_gain);
 
     filter_str_getter!(ability_gain_trigger_any, ability_gain_trigger);
+
+    filter_str_getter!(anaphora_any, anaphora);
 
     filter_str_getter!(ability_text_any, ability_text);
 
