@@ -847,14 +847,6 @@ impl GameState {
         if match_count <= 1 {
             return match_count;
         }
-        let ct = condition.get_text();
-        if ct.is_some_and(|t| t.contains("すべて") || t.contains("全て") || t.contains("全部"))
-        {
-            return 1;
-        }
-        if ct.is_some_and(|t| t.contains("1枚以上") || t.contains("1つ以上")) {
-            return 1;
-        }
         if condition.get_count() == Some(1) && condition.get_operator() == Some(">=") {
             return 1;
         }
