@@ -2074,25 +2074,11 @@ impl<'a> ConditionContext<'a> {
                 }
             }
             Some(Zone::Discard) | Some(Zone::Waitroom) => {
-                if condition
-                    .get_text()
-                    .map_or(false, |t| t.contains("手札から"))
-                {
-                    // Event-based: only count recently-moved cards from hand
-                    if let Some(ref moved) = self.game_state.recently_moved_cards {
-                        let from_hand =
-                            self.game_state.recently_moved_from_zone.as_deref() == Some("hand");
-                        if !from_hand {
-                            return 0;
-                        }
-                        count_filtered(moved, card_type)
-                    } else {
-                        0
-                    }
-                } else {
-                    // State-based: count all cards in the zone
-                    count_filtered(&player.waitroom.cards, card_type)
-                }
+                // State-based: count all cards in the zone. Movement-scoped
+                // counts (手札から…置かれた) use source=preceding_moved and
+                // never reach this arm (resolved earlier via
+                // resolve_moved_cards_source).
+                count_filtered(&player.waitroom.cards, card_type)
             }
             None | Some(_) => match card_type {
                 "live_card" => {
