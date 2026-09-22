@@ -9596,6 +9596,8 @@ def _try_restriction_effect(text):
         result["target"] = "opponent"
     if "このターン" in text:
         result["duration"] = "this_turn"
+    if "ライブ終了時まで" in text or "ライブ終了まで" in text:
+        result["duration"] = "live_end"
     if "メンバー" in text:
         result["card_type"] = "member_card"
     if "エネルギー" in text:
@@ -11295,6 +11297,56 @@ def _walk_split_look(node):
     return node
 
 
+def _stamp_mid_sentence_duration(node, root_text):
+    """Stamp duration on temp actions whose own text carries the phrase mid-sentence.
+    No text is mutated. Choice options inherit nothing (local phrase only)."""
+    TEMP = {
+        "gain_resource", "modify_score", "change_state",
+        "set_blade_count", "restriction", "gain_ability",
+        "modify_cost", "modify_required_hearts",
+    }
+    if not isinstance(node, dict):
+        return
+    if node.get("action") == "choice":
+        for opt in node.get("options", []):
+            if isinstance(opt, dict) and "duration" not in opt:
+                code = detect_duration_code(opt.get("text", "") or "")
+                if code:
+                    opt["duration"] = code
+        return
+    local = None
+    txt = node.get("text", "") or ""
+    if txt:
+        local = detect_duration_code(txt)
+    if local and node.get("action") in TEMP and "duration" not in node:
+        node["duration"] = local
+    prop = node.get("duration") or local
+    for key in ("actions", "options", "conditions"):
+        arr = node.get(key)
+        if isinstance(arr, list):
+            for child in arr:
+                if isinstance(child, dict):
+                    if prop and child.get("action") in TEMP and "duration" not in child:
+                        child["duration"] = prop
+                    _stamp_mid_sentence_duration(child, root_text)
+    for key in ("condition", "primary_effect", "alternative_effect",
+                "followup_action", "optional_action", "conditional_action",
+                "gained_effect", "select_action", "look_action"):
+        ch = node.get(key)
+        if isinstance(ch, dict):
+            if prop and ch.get("action") in TEMP and "duration" not in ch:
+                ch["duration"] = prop
+            _stamp_mid_sentence_duration(ch, root_text)
+    if (node.get("action") in ("conditional_alternative", "conditional_on_result")
+            and node.get("primary_effect")):
+        pd = node["primary_effect"].get("duration")
+        for key in ("alternative_effect", "followup_action"):
+            alt = node.get(key)
+            if pd and isinstance(alt, dict) and "duration" not in alt:
+                if alt.get("action") in TEMP:
+                    alt["duration"] = pd
+
+
 def _normalize_effect_tree(effect, original_text=None):
     if not effect or not isinstance(effect, dict):
         return effect
@@ -11334,6 +11386,7 @@ def _normalize_effect_tree(effect, original_text=None):
     _fix_select_self_and_other(effect)
     _fix_energy_difference_dynamic_count(effect)
     src = original_text or effect.get("text", "") or ""
+    _stamp_mid_sentence_duration(effect, src)
     _mark_under_card_gain(effect, src)
     # "『X』のメンバーからバトンタッチして登場した場合" — the baton-touch source group
     # is a GATING CONDITION, not a target filter on the action steps. Attach it as

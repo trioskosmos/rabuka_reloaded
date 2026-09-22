@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-09-21T17:41:04.824133",
+  "generated_at": "2026-09-22T15:05:14.837978",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "651a2d78",
+  "engine_commit": "aa20a15e",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -1178,7 +1178,8 @@
           "action": "modify_score",
           "value": 1,
           "operation": "add",
-          "target": "live_total"
+          "target": "live_total",
+          "duration": "live_end"
         }
       }
     },
@@ -2539,7 +2540,8 @@
           "action": "modify_score",
           "value": 1,
           "operation": "add",
-          "target": "live_total"
+          "target": "live_total",
+          "duration": "live_end"
         }
       }
     },
@@ -2833,7 +2835,8 @@
           "action": "modify_score",
           "value": 1,
           "operation": "add",
-          "target": "live_total"
+          "target": "live_total",
+          "duration": "live_end"
         }
       }
     },
@@ -2903,7 +2906,8 @@
             "card_type": "member_card",
             "target": "self",
             "exclude_self": true,
-            "action": "change_state"
+            "action": "change_state",
+            "duration": "live_end"
           },
           {
             "text": "それぞれ{{heart_04.png|heart04}}を得る",
@@ -3003,7 +3007,8 @@
               "action": "modify_score",
               "value": 1,
               "operation": "add",
-              "target": "live_total"
+              "target": "live_total",
+              "duration": "live_end"
             }
           }
         ]
@@ -4332,7 +4337,8 @@
               "action": "modify_score",
               "value": 1,
               "operation": "add",
-              "target": "live_total"
+              "target": "live_total",
+              "duration": "live_end"
             }
           }
         ],
@@ -4808,7 +4814,8 @@
               "card_type": "member_card",
               "action": "change_state",
               "count": 1,
-              "activation_position": "left_side"
+              "activation_position": "left_side",
+              "duration": "live_end"
             },
             {
               "text": "2枚ある場合、ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る",
@@ -9705,6 +9712,7 @@
               "card_type": "member_card",
               "action": "change_state",
               "count": 1,
+              "duration": "live_end",
               "self_cost": true
             },
             "text": "自分のデッキの一番上のカードを控え室に置いてもよい。そうした場合、ライブ終了時まで、{{icon_blade.png|ブレード}}を得る。これにより控え室に置いたカードがライブカードの場合、このメンバーをウェイトにする。自分はこの手順をさらに4回まで繰り返してもよい"
@@ -13064,7 +13072,8 @@
                 "action": "modify_score",
                 "value": 1,
                 "operation": "add",
-                "target": "live_total"
+                "target": "live_total",
+                "duration": "live_end"
               }
             },
             "conditional_negation": true
@@ -14150,7 +14159,8 @@
             "resource": "blade",
             "count": 1,
             "multiple_targets": true,
-            "original_value": true
+            "original_value": true,
+            "duration": "live_end"
           }
         ],
         "original_value": true
@@ -14517,8 +14527,10 @@
             "action": "modify_score",
             "value": 2,
             "operation": "add",
-            "target": "live_total"
+            "target": "live_total",
+            "duration": "live_end"
           },
+          "duration": "live_end",
           "location": "success_live_card_zone"
         },
         "condition": {
@@ -14559,7 +14571,8 @@
             "action": "modify_score",
             "value": 1,
             "operation": "add",
-            "target": "live_total"
+            "target": "live_total",
+            "duration": "live_end"
           },
           "location": "success_live_card_zone"
         },
@@ -14961,7 +14974,8 @@
             "action": "modify_score",
             "value": 1,
             "operation": "add",
-            "target": "live_total"
+            "target": "live_total",
+            "duration": "live_end"
           }
         }
       }
@@ -15384,7 +15398,8 @@
           "action": "modify_score",
           "value": 1,
           "operation": "add",
-          "target": "live_total"
+          "target": "live_total",
+          "duration": "live_end"
         }
       }
     },
@@ -19672,7 +19687,8 @@
           "action": "modify_score",
           "value": 1,
           "operation": "add",
-          "target": "live_total"
+          "target": "live_total",
+          "duration": "live_end"
         }
       }
     },
@@ -23116,7 +23132,8 @@
           "action": "modify_score",
           "value": 1,
           "operation": "add",
-          "target": "live_total"
+          "target": "live_total",
+          "duration": "live_end"
         }
       }
     },
@@ -24161,7 +24178,8 @@
           "action": "modify_score",
           "value": 3,
           "operation": "add",
-          "target": "live_total"
+          "target": "live_total",
+          "duration": "live_end"
         }
       }
     },
@@ -24703,7 +24721,8 @@
           "action": "modify_score",
           "value": 1,
           "operation": "add",
-          "target": "live_total"
+          "target": "live_total",
+          "duration": "live_end"
         }
       }
     },
@@ -28177,7 +28196,8 @@
             "self_target": true,
             "group_names": [
               "虹ヶ咲"
-            ]
+            ],
+            "duration": "live_end"
           },
           {
             "text": "自分のステージにいる『虹ヶ咲』のメンバー1人は、{{icon_blade.png|ブレード}}を得る",
@@ -29231,7 +29251,8 @@
             "multiple_targets": true,
             "group_names": [
               "μ's"
-            ]
+            ],
+            "duration": "live_end"
           }
         ],
         "group_names": [
@@ -31132,11 +31153,11 @@
                 "card_type": "member_card",
                 "action": "gain_resource",
                 "resource": "blade",
-                "count": 1,
-                "duration": "live_end"
+                "count": 1
               }
             ],
-            "text": "ウェイト状態のメンバー1人をアクティブにし、ライブ終了時まで、そのメンバーは{{icon_blade.png|ブレード}}を得る。"
+            "text": "ウェイト状態のメンバー1人をアクティブにし、ライブ終了時まで、そのメンバーは{{icon_blade.png|ブレード}}を得る。",
+            "duration": "live_end"
           },
           {
             "text": "相手のステージにいる元々持つ{{icon_blade.png|ブレード}}が3つ以下のメンバー1人をウェイトにする",
@@ -36366,7 +36387,8 @@
             },
             "group_names": [
               "Aqours"
-            ]
+            ],
+            "duration": "live_end"
           },
           {
             "text": "{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る",
@@ -38728,7 +38750,8 @@
             "state_change": "active",
             "card_type": "member_card",
             "action": "change_state",
-            "count": 1
+            "count": 1,
+            "duration": "live_end"
           },
           {
             "text": "そのメンバーは{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る",

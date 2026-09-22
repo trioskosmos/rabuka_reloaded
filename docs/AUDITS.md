@@ -751,7 +751,7 @@ Raw-vs-parsed gap (from `jp_mine_tmp.py`):
 | Phrase | Raw lines | Unique abs with phrase | Parsed with flag | Gap |
 |---|---|---|---|---|
 | `につき` (per-unit) | 132 | 66 | 57 | **9 (13% miss)** |
-| `まで` (up-to / duration) | 575 | 256 | 210 | **46 (17% miss)** — `ライブ終了時まで` often lacks `duration:live_end` (prefix-only `_strip_duration_prefix`; mid-sentence loses duration. Engine expiry tests cover prefix-parsed cases; fix still SKIPPED — see §6.5) |
+| `まで` (up-to / duration) | 575 | 256 | 210 | **FIXED 2026-09-22** — `_stamp_mid_sentence_duration` + `_try_restriction_effect` live_end clause; suite 3418/0 (was 46 miss) |
 | `かぎり` (as long as) | 127 | 65 | 63 | 2 |
 | `代わりに` (instead) | 16 | 10 | 0 | **10 (100% miss)** — no `replacement/restriction` mapping |
 | `として扱う` (treat as) | 17 | 6 | 1 | **5 (83% miss)** — only 1 has `SetCardIdentity/treat_as` |
@@ -819,7 +819,7 @@ Two abilities (`PL!HS-bp1-003-R`, `PL!HS-bp1-019-L` via parenthetical) use `す�
 2. **Decoder unknown-field warning** (`effect_decoder_gen.rs:207` / `condition_decoder_gen.rs:185` / `vm.rs:207`) — count skipped fields and assert zero in tests; surfaces all 92 stranded fields.
 3. **Move `select` before catch-all `move_cards`** + fix `split_cost_effect` bracket depth (`parser.py:600`) — fixes the oldest KNOWN_BUG with no engine change.
 4. **`代わりに` / `として扱う` coverage** — add 2 `ActionRule`/`EffectPattern` rows + `SetCardIdentity` / `modify_yell_source` promotion; knocks 100% and 83% gaps to 0.
-5. **Duration strip for mid-sentence `まで`** — change `_strip_duration_prefix` to `search` not `startswith`, or add `per_unit_type`/`duration` propagation in `_normalize_effect_tree` (`parser.py:1326`). **Still SKIPPED** (naive apply breaks `victory_road` each_time; needs coordinated parser+engine PR + golden re-baseline). Duration *expiry* tests are green for prefix-parsed abilities (2026-09-22).
+5. **Duration strip for mid-sentence `まで`** — **FIXED 2026-09-22** via `_stamp_mid_sentence_duration` (`parser.py:11300`, called from `_normalize_effect_tree`) which stamps duration on TEMP actions without mutating text, plus `ライブ終了時まで`→`live_end` in `_try_restriction_effect`. Full suite **3418 passed / 0 failed** (T15–T17 green).
 
 ---
 
@@ -928,7 +928,7 @@ The test's expectation (`SelectHeartColor`) is actually driven by `gain_resource
 | **Kept: `split_cost_effect` bracket/template depth** `parser.py:602` + unified `extract_card_abilities.py:40,381` | 11 cards have `：` inside `「」『』（）` (forward-safe; currently 0 mis-split but future cards would break) | 11 | 0 | **DONE** |
 | **Kept: ALL-blade `is_null` → `all_blade_timing`** `extract_card_abilities.py:214` + `parser.py:2502` 2-field | **1 unique** (`(必要ハート…ALLブレード…)`) — **14 cards** (`PL!HS-PR-010-PR` etc.) now `all_blade_timing` instead of silent `is_null` | 14 | 0 after narrow fix (previously 5 failures with spurious `sequential`) | **DONE** |
 | **Skipped: `のうち、1つを選ぶ` → `choice` (heart/blade)** | 8 unique, 18 cards (`PL!HS-sd1-008-SD` etc.) would flip `select` → `choice` | 18 | **1 immediate** (`pl_hs_sd1_008` `SelectCard` vs `SelectHeartColor`), **+4 hidden** (other heart-selection tests share same routing) — total 5/2349 would fail; `28 passed` parser tests stay green but `cargo test` fails | **SKIPPED** |
-| **Skipped: mid-sentence `まで` duration** (`_strip_duration_prefix` `search`) | 1 unique mid-sentence `ライブ終了時まで` not at prefix (remaining `duration` gap) | ~3 cards | 1 (`victory_road` each_time mis-drain when `text.replace` stripped inside `「」`) | **SKIPPED** |
+| **FIXED: mid-sentence `まで` duration** (`_stamp_mid_sentence_duration` + restriction live_end) | temp-leaf duration stamping without text mutation | ~29 | 0 (suite 3418/0) | **DONE** |
 | **Skipped: score per-unit `(エールで出たスコア1つにつき…)`** | 1 unique `is_null` (`PL!HS-bp1-019-L` `(エールで出たスコア…)`) — 1 card | 1 | 1 (`custom` → `modify_score` per-unit would need `score` handler; naive promote gives `custom` with `per_unit` but `action:custom` → `Ok(())` no-op, still silent) | **SKIPPED** |
 
 **Total:** **Kept fixes affect 1 + 143 + 11 ≈ 155 unique abilities (≈ 270 cards)** but only **1 unique (14 cards) was previously completely broken** (`all_blade_timing` 83% miss). The remaining 143 fullwidth / 11 split fixes are correctness hardening — they prevent future regressions and fix subtle `count=None` cases that were previously compensated by fallback defaults. **Skipped fixes would affect ≈10 unique (22 cards)** and cause **5/2349 engine failures** if applied naively; they need a coordinated `parser.py` + `engine/src/ability/choice.rs`/`effects/score.rs` + `turn.rs` PR with `abilities.json` golden re-baseline.
