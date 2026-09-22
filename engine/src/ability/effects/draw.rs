@@ -746,7 +746,7 @@ impl AbilityResolver {
         heart_colors: &[String],
         heart_selection: bool,
     ) -> Result<Option<String>, String> {
-        if resource != "heart" && resource != "ハート" {
+        if resource != "heart" {
             return Ok(None);
         }
         if heart_colors.is_empty() && !heart_selection && effect.heart_type_any().is_none() {
