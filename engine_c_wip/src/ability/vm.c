@@ -358,6 +358,7 @@ static void effect_free(AbilityEffect *e) {
     effect_free(e->followup_action);
     effect_free(e->optional_action);
     effect_free(e->conditional_action);
+    effect_free(e->gained_effect);
     rb_free_condition(e->result_condition);
     rb_free_condition(e->alternative_condition);
     free(e);
@@ -496,6 +497,10 @@ static AbilityEffect *decode_effect_body(Rdr *r) {
                     else { effect_free(e->conditional_action); e->conditional_action = c; }
                 }
             } else skip_value(r, tag);
+            continue;
+        }
+        if (key && strcmp(key, "gained_effect") == 0) {
+            e->gained_effect = decode_effect_value(r, tag);
             continue;
         }
         /* compound scalar fields mirrored from AbilityEffect::compound / root. These

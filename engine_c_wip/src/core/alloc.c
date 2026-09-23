@@ -54,6 +54,7 @@ void rb_effect_free(AbilityEffect *e) {
     rb_effect_free(e->followup_action);
     rb_effect_free(e->optional_action);
     rb_effect_free(e->conditional_action);
+    rb_effect_free(e->gained_effect);
     rb_free_condition(e->result_condition);
     rb_free_condition(e->alternative_condition);
     rb_free(e);
@@ -124,6 +125,7 @@ AbilityEffect *rb_effect_deep_clone(const AbilityEffect *src) {
     e->followup_action = src->followup_action ? rb_effect_deep_clone(src->followup_action) : NULL;
     e->optional_action = src->optional_action ? rb_effect_deep_clone(src->optional_action) : NULL;
     e->conditional_action = src->conditional_action ? rb_effect_deep_clone(src->conditional_action) : NULL;
+    e->gained_effect = src->gained_effect ? rb_effect_deep_clone(src->gained_effect) : NULL;
     return e;
 }
 

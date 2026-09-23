@@ -109,6 +109,7 @@ typedef struct AbilityEffect {
     struct AbilityEffect *followup_action;
     struct AbilityEffect *optional_action;
     struct AbilityEffect *conditional_action;
+    struct AbilityEffect *gained_effect;
     Condition *result_condition;       /* a Condition, not an effect */
     Condition *alternative_condition;   /* a Condition, not an effect */
     int   repeat_limit;                /* repeat_procedure: max ADDITIONAL iterations */
