@@ -168,16 +168,27 @@ fn main() {
 /// Execute one action against the game state — exactly as the web server does.
 /// Returns true on success, false on error.
 fn execute_action(game_state: &mut GameState, action: &rabuka_engine::game_setup::Action) -> bool {
-    let params = action.parameters.clone();
+    let (card_id, card_indices, stage_area, use_baton_touch) = action
+        .parameters
+        .as_ref()
+        .map(|p| {
+            (
+                p.card_id,
+                p.card_indices.clone(),
+                p.stage_area_index
+                    .and_then(|index| rabuka_engine::zones::MemberArea::from_index(index as usize))
+                    .or_else(|| p.stage_area.as_deref().and_then(|s| s.parse().ok())),
+                p.use_baton_touch,
+            )
+        })
+        .unwrap_or((None, None, None, None));
     let res = turn::TurnEngine::execute_main_phase_action(
         game_state,
         &action.action_type,
-        params.as_ref().and_then(|p| p.card_id),
-        params.as_ref().and_then(|p| p.card_indices.clone()),
-        params
-            .as_ref()
-            .and_then(|p| p.stage_area.as_ref().and_then(|s| s.parse().ok())),
-        params.as_ref().and_then(|p| p.use_baton_touch),
+        card_id,
+        card_indices,
+        stage_area,
+        use_baton_touch,
     );
     match res {
         Ok(_) => {

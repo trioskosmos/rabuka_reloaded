@@ -397,6 +397,7 @@ static int effect_decode_extra(AbilityEffect *e, const char *key, Rdr *r, uint8_
     Rust: TAG_OBJECT_VARIANT (0x09) + variant u8 + len + fields.
     The variant selects EffectKind but C stores only action string; we consume
     the byte and ignore it. Mirrors vm.rs:decode_ability_effect_direct . */
+static AbilityEffect *decode_effect_value(Rdr *r, uint8_t tag);
 static AbilityEffect *decode_effect_body(Rdr *r) {
     uint8_t variant;
     if (!rd_u8(r, &variant)) return NULL;

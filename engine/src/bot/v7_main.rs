@@ -31,29 +31,25 @@ pub(crate) fn baton_from_params(gs: &GameState, me: u8, p: &ActionParameters) ->
     if p.card_indices.is_some() {
         return true;
     }
-    if let Some(areas) = p.available_areas.as_ref() {
-        if let Some(stage) = p.stage_area.as_ref() {
-            if areas
-                .iter()
-                .any(|area| area.area.as_ref() == stage && area.is_baton_touch)
-            {
-                return true;
-            }
-        }
-    }
-    let Some(stage) = p.stage_area.as_ref() else {
+    let stage = p
+        .stage_area_index
+        .and_then(|index| crate::zones::MemberArea::from_index(index as usize))
+        .or_else(|| p.stage_area.as_deref()?.parse().ok());
+    let Some(stage) = stage else {
         return false;
     };
-    let idx = match stage.as_str() {
-        "left" => 0,
-        "center" => 1,
-        "right" => 2,
-        _ => return false,
-    };
+    if let Some(areas) = p.available_areas.as_ref() {
+        if areas
+            .iter()
+            .any(|area| area.area.as_ref() == stage.as_str() && area.is_baton_touch)
+        {
+            return true;
+        }
+    }
     gs.seat_player(me)
         .stage
         .stage
-        .get(idx)
+        .get(stage.to_index())
         .copied()
         .unwrap_or(-1)
         != -1

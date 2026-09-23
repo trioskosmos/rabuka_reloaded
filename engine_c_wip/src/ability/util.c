@@ -1778,6 +1778,8 @@ void rb_util_push_temporary_effect(
     te->blade = 0;
     te->score = 0;
     te->cost = 0;
+    te->gained_card_id = -1;
+    te->gained_index = -1;
     for (int c = 0; c < 8; c++) { te->heart[c] = 0; te->need_heart[c] = 0; }
     (void)target_player_id;
     (void)description;
@@ -1794,6 +1796,8 @@ int rb_push_temporary_effect(GameState *g, int card_id, int dur, int blade,
     e->blade = blade;
     e->score = score;
     e->cost = cost;
+    e->gained_card_id = -1;
+    e->gained_index = -1;
     for (int i = 0; i < 8; i++) {
         e->heart[i] = heart ? heart[i] : 0;
         e->need_heart[i] = need_heart ? need_heart[i] : 0;

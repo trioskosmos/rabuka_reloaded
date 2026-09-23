@@ -4,6 +4,7 @@
 #include <stdio.h>
 
 extern const uint32_t RBKA_NUM_ABILITIES;
+AbilityEffect *rb_effect_deep_clone(const AbilityEffect *src);
 
 /* ════════════════════════════════════════════════════════════════════
     AbilityRef — faithful C translation of engine/src/ability/ability_store.rs
@@ -215,41 +216,116 @@ typedef struct {
 static Gained g_gained[MAX_GAINED];
 static int g_n=0;
 
-void rb_gain_ability(GameState *g, int actor, AbilityEffect *e){
-    int who=actor;
-    if(e->target && !strcmp(e->target,"opponent")) who=actor^1;
-    RbPlayer *P=&g->p[who];
-    int target=-1;
-    for(int q=0;q<RB_STAGE_SIZE;q++) if(P->stage[q]!=RB_EMPTY_SLOT){ target=P->stage[q]; break; }
-    if(target==-1 && P->hand.n>0) target=P->hand.cards[0];
-    if(target==-1) return;
-    int score=0, blade=0, heart=0, need=0;
-    for(int i=0;i<e->n_extra;i++){
-        if(!e->extra_k[i]) continue;
-        if(!strcmp(e->extra_k[i],"value"))      score=atoi(e->extra_v[i]);
-        else if(!strcmp(e->extra_k[i],"blade"))  blade=atoi(e->extra_v[i]);
-        else if(!strcmp(e->extra_k[i],"heart"))  heart=atoi(e->extra_v[i]);
-        else if(!strcmp(e->extra_k[i],"need_heart")) need=atoi(e->extra_v[i]);
+static const char *gain_extra(const AbilityEffect *e, const char *key) {
+    if (!e) return NULL;
+    for (int i = 0; i < e->n_extra; i++) {
+        if (e->extra_k[i] && !strcmp(e->extra_k[i], key)) return e->extra_v[i];
     }
-    if(!score) score=e->count>=0?e->count:1;
-    if(g_n < MAX_GAINED){
-        Gained *gg=&g_gained[g_n++];
-        gg->target=target; gg->score=score; gg->blade=blade; gg->heart=heart;
-        gg->need_heart=need; gg->turns=2; /* live one full round */
-        if(score) rb_mods_add_score(&g->mods, target, score);
-        if(blade) rb_mods_add_blade(&g->mods, target, blade);
-        if(heart) rb_mods_add_heart(&g->mods, target, 0, heart);
-        if(need)  rb_mods_add_need_heart(&g->mods, target, 0, need);
+    return NULL;
+}
+
+static int gain_value(const AbilityEffect *e) {
+    const char *value = gain_extra(e, "value");
+    if (value) return atoi(value);
+    return e && e->count >= 0 ? e->count : 0;
+}
+
+static int gain_target(const GameState *g, int actor, const AbilityEffect *e) {
+    const char *target_card = gain_extra(e, "target_card");
+    if (target_card) return atoi(target_card);
+    if (g->n_selected_cards > 0) return g->selected_cards[0];
+    if (g->activating_card >= 0) return g->activating_card;
+    if (g->queue.resume_host >= 0) return g->queue.resume_host;
+    for (int i = 0; i < RB_STAGE_SIZE; i++) {
+        if (g->p[actor].stage[i] != RB_EMPTY_SLOT) return g->p[actor].stage[i];
+    }
+    return -1;
+}
+
+static int gain_duration(const char *duration) {
+    if (!duration) return RB_TEMP_PERM;
+    if (strstr(duration, "live") || strstr(duration, "ライブ")) return RB_TEMP_LIVE_END;
+    if (strstr(duration, "turn") || strstr(duration, "ターン")) return RB_TEMP_TURN_END;
+    return RB_TEMP_PERM;
+}
+
+void rb_gain_ability(GameState *g, int actor, AbilityEffect *e) {
+    if (!g || !e) return;
+
+    if (e->gained_effect) {
+        int target_actor = actor;
+        if (e->target && !strcmp(e->target, "opponent")) target_actor = actor ^ 1;
+        int target = gain_target(g, target_actor, e);
+        if (target < 0) return;
+        const char *text = gain_extra(e, "ability_gain");
+        if (!text) text = e->text;
+        const char *trigger = gain_extra(e, "ability_gain_trigger");
+        if (!trigger) trigger = gain_extra(e, "trigger");
+
+        Ability gained;
+        memset(&gained, 0, sizeof(gained));
+        gained.use_limit = -1;
+        gained.full_text = rb_strdup2(text);
+        gained.triggerless_text = rb_strdup2(text);
+        gained.triggers = rb_strdup2(trigger);
+        gained.effect = rb_effect_deep_clone(e->gained_effect);
+        int index = rb_register_gained_ability(g, target, &gained);
+        if (index < 0) {
+            rb_free_ability(&gained);
+            return;
+        }
+
+        const AbilityEffect *inner = e->gained_effect;
+        int is_live_total = inner->target && !strcmp(inner->target, "live_total");
+        if (!is_live_total && inner->action && !strcmp(inner->action, "modify_score")) {
+            rb_mods_add_score(&g->mods, target, (int16_t)gain_value(inner));
+        }
+
+        int dur = gain_duration(gain_extra(e, "duration"));
+        if (dur != RB_TEMP_PERM && g->n_temp_effects < RB_MAX_TEMP_EFFECTS) {
+            RbTempEffect te;
+            memset(&te, 0, sizeof(te));
+            te.card_id = target;
+            te.dur = dur;
+            te.score = is_live_total ? 0 : gain_value(inner);
+            te.gained_card_id = target;
+            te.gained_index = index;
+            g->temp_effects[g->n_temp_effects++] = te;
+        }
+        if (trigger && rb_trigger_is(trigger, "常時")) rb_recalc_constants(g);
+        return;
+    }
+
+    int who = actor;
+    if (e->target && !strcmp(e->target, "opponent")) who = actor ^ 1;
+    RbPlayer *P = &g->p[who];
+    int target = -1;
+    for (int q = 0; q < RB_STAGE_SIZE; q++) {
+        if (P->stage[q] != RB_EMPTY_SLOT) { target = P->stage[q]; break; }
+    }
+    if (target == -1 && P->hand.n > 0) target = P->hand.cards[0];
+    if (target == -1) return;
+    int score = gain_value(e);
+    int blade = gain_extra(e, "blade") ? atoi(gain_extra(e, "blade")) : 0;
+    int heart = gain_extra(e, "heart") ? atoi(gain_extra(e, "heart")) : 0;
+    int need = gain_extra(e, "need_heart") ? atoi(gain_extra(e, "need_heart")) : 0;
+    if (g_n < MAX_GAINED) {
+        Gained *gg = &g_gained[g_n++];
+        gg->target = target; gg->score = score; gg->blade = blade; gg->heart = heart;
+        gg->need_heart = need; gg->turns = 2;
+        if (score) rb_mods_add_score(&g->mods, target, score);
+        if (blade) rb_mods_add_blade(&g->mods, target, blade);
+        if (heart) rb_mods_add_heart(&g->mods, target, 0, heart);
+        if (need)  rb_mods_add_need_heart(&g->mods, target, 0, need);
     }
 }
 
 void rb_invalidate_ability(GameState *g, int actor, AbilityEffect *e){
-    (void)e;
     /* Mirror ability_effects.rs::execute_invalidate_ability — revoke every gained
         ability owned by the targeted player (revert its score/blade/heart/need
         bonus, then drop). */
     int who=actor;
-    if(e->target && !strcmp(e->target,"opponent")) who=actor^1;
+    if(e && e->target && !strcmp(e->target,"opponent")) who=actor^1;
     for(int i=g_n-1;i>=0;i--){
         int t=g_gained[i].target;
         if(rb_owner_of_card(g, t) == who){
@@ -261,6 +337,16 @@ void rb_invalidate_ability(GameState *g, int actor, AbilityEffect *e){
             g_n--;
         }
     }
+    int synthetic_changed = 0;
+    for (int slot = 0; slot < 64; slot++) {
+        int card_id = g->gained_card_ids[slot];
+        if (card_id < 0 || rb_owner_of_card(g, card_id) != who) continue;
+        while (rb_card_num_gained_abilities(g, card_id) > 0) {
+            rb_remove_gained_ability(g, card_id, 0);
+            synthetic_changed = 1;
+        }
+    }
+    if (synthetic_changed) rb_recalc_constants(g);
 }
 
 void rb_tick_gained(GameState *g){
@@ -373,56 +459,7 @@ void rb_suppress_ability_trigger(GameState *g, int actor, AbilityEffect *e, int 
 
 /* -- execute_gain_ability_effect -- */
 void rb_execute_gain_ability_effect(GameState *g, int actor, AbilityEffect *e) {
-    if (!g || !e) return;
-    /* Register the gained ability in GameState.gained_card_abilities so that
-       constant abilities granted by this effect are evaluated correctly. */
-    int target_cid = -1;
-    for (int i = 0; i < e->n_extra; i++) {
-        if (e->extra_k[i] && !strcmp(e->extra_k[i], "target_card") && e->extra_v[i]) {
-            target_cid = atoi(e->extra_v[i]);
-            break;
-        }
-    }
-    if (target_cid < 0) {
-        /* Resolve target from actor's stage or hand. */
-        RbPlayer *P = &g->p[actor];
-        for (int q = 0; q < RB_STAGE_SIZE; q++) {
-            if (P->stage[q] != RB_EMPTY_SLOT) { target_cid = P->stage[q]; break; }
-        }
-        if (target_cid < 0 && P->hand.n > 0) target_cid = P->hand.cards[0];
-    }
-    if (target_cid < 0) return;
-
-    /* Find or create a gained-ability slot for this card. */
-    int slot = -1;
-    for (int i = 0; i < g->n_gained_cards; i++) {
-        if (g->gained_card_ids[i] == target_cid) { slot = i; break; }
-    }
-    if (slot < 0 && g->n_gained_cards < 64) {
-        slot = g->n_gained_cards++;
-        g->gained_card_ids[slot] = target_cid;
-        g->gained_card_n[slot] = 0;
-    }
-    if (slot < 0) return;
-    if (g->gained_card_n[slot] >= 4) return;
-
-    /* Decode the ability from the effect's action (ability index). */
-    int ab_idx = -1;
-    for (int i = 0; i < e->n_extra; i++) {
-        if (e->extra_k[i] && !strcmp(e->extra_k[i], "ability_index") && e->extra_v[i]) {
-            ab_idx = atoi(e->extra_v[i]);
-            break;
-        }
-    }
-    if (ab_idx < 0 && e->action) {
-        ab_idx = atoi(e->action);
-    }
-    if (ab_idx < 0) return;
-
-    int na = g->gained_card_n[slot];
-    if (!rb_get_ability((uint32_t)ab_idx, &g->gained_card_abilities[slot][na])) return;
-    g->gained_card_n[slot]++;
-    (void)actor;
+    rb_gain_ability(g, actor, e);
 }
 
 /* -- execute_set_card_identity_effect -- */
@@ -479,51 +516,7 @@ void rb_execute_invalidate_ability(GameState *g, int actor, AbilityEffect *e) {
 
 /* -- execute_gain_ability -- */
 void rb_execute_gain_ability(GameState *g, int actor, AbilityEffect *e) {
-    if (!g || !e) return;
-    /* Resolve the target card and ability index from the effect, then store
-       the decoded ability in GameState.gained_card_abilities for constant
-       evaluation by the auto-trigger engine. */
-    int target_cid = -1;
-    for (int i = 0; i < e->n_extra; i++) {
-        if (e->extra_k[i] && !strcmp(e->extra_k[i], "target_card") && e->extra_v[i]) {
-            target_cid = atoi(e->extra_v[i]);
-            break;
-        }
-    }
-    if (target_cid < 0) {
-        RbPlayer *P = &g->p[actor];
-        for (int q = 0; q < RB_STAGE_SIZE; q++) {
-            if (P->stage[q] != RB_EMPTY_SLOT) { target_cid = P->stage[q]; break; }
-        }
-    }
-    if (target_cid < 0) return;
-
-    int ab_idx = -1;
-    for (int i = 0; i < e->n_extra; i++) {
-        if (e->extra_k[i] && !strcmp(e->extra_k[i], "ability_index") && e->extra_v[i]) {
-            ab_idx = atoi(e->extra_v[i]);
-            break;
-        }
-    }
-    if (ab_idx < 0) return;
-
-    int slot = -1;
-    for (int i = 0; i < g->n_gained_cards; i++) {
-        if (g->gained_card_ids[i] == target_cid) { slot = i; break; }
-    }
-    if (slot < 0 && g->n_gained_cards < 64) {
-        slot = g->n_gained_cards++;
-        g->gained_card_ids[slot] = target_cid;
-        g->gained_card_n[slot] = 0;
-    }
-    if (slot < 0) return;
-    if (g->gained_card_n[slot] >= 4) return;
-
-    int na = g->gained_card_n[slot];
-    if (rb_get_ability((uint32_t)ab_idx, &g->gained_card_abilities[slot][na])) {
-        g->gained_card_n[slot]++;
-    }
-    (void)actor;
+    rb_gain_ability(g, actor, e);
 }
 
 /* -- execute_gain_ability_from_source -- */

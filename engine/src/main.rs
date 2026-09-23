@@ -199,6 +199,7 @@ fn output_actions() {
                     card_index: p.card_index,
                     card_indices: p.card_indices,
                     stage_area: p.stage_area,
+                    stage_area_index: p.stage_area_index,
                     use_baton_touch: p.use_baton_touch,
                     card_name: p.card_name,
                     card_no: p.card_no,

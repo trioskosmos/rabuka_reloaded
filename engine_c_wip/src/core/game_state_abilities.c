@@ -134,6 +134,35 @@ static void rb_clear_gained_abilities(GameState *g, uint32_t cid) {
     g->gained_card_ids[s] = -1;
 }
 
+int rb_register_gained_ability(GameState *g, int card_id, const Ability *ability) {
+    if (!g || card_id < 0) return -1;
+    return rb_add_gained_ability(g, (uint32_t)card_id, ability);
+}
+
+int rb_remove_gained_ability(GameState *g, int card_id, int index) {
+    if (!g || card_id < 0 || index < 0) return 0;
+    int s = find_gained_slot(g, (uint32_t)card_id);
+    if (s < 0 || index >= g->gained_card_n[s]) return 0;
+    rb_free_ability(&g->gained_card_abilities[s][index]);
+    for (int i = index; i + 1 < g->gained_card_n[s]; i++) {
+        g->gained_card_abilities[s][i] = g->gained_card_abilities[s][i + 1];
+    }
+    g->gained_card_n[s]--;
+    memset(&g->gained_card_abilities[s][g->gained_card_n[s]], 0, sizeof(Ability));
+    if (g->gained_card_n[s] == 0) g->gained_card_ids[s] = -1;
+    return 1;
+}
+
+int rb_card_num_gained_abilities(const GameState *g, int card_id) {
+    if (!g || card_id < 0) return 0;
+    return rb_card_num_gained_abilities_internal(g, (uint32_t)card_id);
+}
+
+const Ability *rb_card_gained_ability(const GameState *g, int card_id, int index) {
+    if (!g || card_id < 0) return NULL;
+    return rb_card_gained_ability_internal(g, (uint32_t)card_id, index);
+}
+
 /* ── collect_constant_ids_for ──────────────────────────────────────── */
 
 typedef struct { int card_id; int ability_idx; } RbConstantIdPair;

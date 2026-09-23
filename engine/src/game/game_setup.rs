@@ -318,6 +318,8 @@ pub struct ActionParameters {
     pub card_index: Option<usize>, // Array position - kept for backward compatibility
     pub card_indices: Option<Vec<usize>>, // For selecting multiple cards (e.g., live cards)
     pub stage_area: Option<String>, // "left", "center", "right"
+    #[cfg_attr(feature = "serde_support", serde(skip))]
+    pub stage_area_index: Option<u8>,
     pub use_baton_touch: Option<bool>, // Whether to use baton touch cost reduction
     // Card grouping information for improved UI
     pub card_name: Option<String>,
@@ -497,6 +499,13 @@ pub fn settle_auto(gs: &mut GameState) {
     }
 }
 
+fn stage_area_from_parameters(params: &ActionParameters) -> Option<MemberArea> {
+    params
+        .stage_area_index
+        .and_then(|index| MemberArea::from_index(index as usize))
+        .or_else(|| params.stage_area.as_deref()?.parse().ok())
+}
+
 /// Execute a game action extracted from the action parameters.
 /// Returns Ok(()) on success, Err(message) on failure. Always resets loop detection.
 pub fn execute_action(gs: &mut GameState, action: &Action) -> Result<(), String> {
@@ -507,7 +516,7 @@ pub fn execute_action(gs: &mut GameState, action: &Action) -> Result<(), String>
             (
                 p.card_id,
                 p.card_indices.clone(),
-                p.stage_area.as_deref().and_then(|s| s.parse().ok()),
+                stage_area_from_parameters(p),
                 p.use_baton_touch,
                 p.ability_index,
             )
@@ -620,6 +629,7 @@ fn make_params() -> ActionParameters {
         card_index: None,
         card_indices: None,
         stage_area: None,
+        stage_area_index: None,
         use_baton_touch: None,
         card_name: None,
         card_no: None,
@@ -1529,6 +1539,8 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
         let estimated = (active_player.hand.cards.len() * 3 + 1).min(64);
         actions.reserve(estimated);
 
+        let display = action_display_enabled();
+
         // Cache stage card data: read once, not once per hand card
         let stage_card_ids = [
             active_player.stage.stage[0],
@@ -1574,7 +1586,6 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
 
                     let mut available_areas = Vec::with_capacity(3);
                     let mut has_any_available = false;
-                    let display = action_display_enabled();
 
                     for (area_idx, area_name) in ["left", "center", "right"].iter().enumerate() {
                         let mut area_info = AreaInfo {
@@ -1767,7 +1778,18 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                                         // reductions applied). Mini buttons and headers
                                         // read final_cost first (see web_ui ActionButtons).
                                         final_cost: Some(cost_display),
-                                         stage_area: Some(area.area.to_string()),
+                                        stage_area: if display {
+                                            Some(area.area.to_string())
+                                        } else {
+                                            None
+                                        },
+                                        stage_area_index: Some(
+                                            area.area
+                                                .as_ref()
+                                                .parse::<MemberArea>()
+                                                .map(|area| area.to_index() as u8)
+                                                .unwrap_or(0),
+                                        ),
                                         // available_areas is decision data for v7 baton
                                         // vision (is_baton_touch on the chosen stage_area);
                                         // always built. double_baton_pairs is UI-only.
@@ -1841,7 +1863,12 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                                             },
                                             base_cost: Some(pair.cost),
                                             final_cost: Some(pair.cost),
-                                            stage_area: Some(pair.placement.to_string()),
+                                            stage_area: if display {
+                                                Some(pair.placement.to_string())
+                                            } else {
+                                                None
+                                            },
+                                            stage_area_index: Some(pair.placement.to_index() as u8),
                                             card_indices: Some(area_indices),
                                             available_areas: if cfg!(feature = "profiling") {
                                                 None
@@ -1885,10 +1912,7 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
         (active_player.stage.stage[2], "right"),
     ];
 
-    // Effective cost: printed total minus per-group reductions
-    // (single source of truth shared with execution). Computed once for
-    // both the stage and discard scans below.
-    let groups = game_state.distinct_stage_groups(&active_player.id);
+    let mut groups_cache: Option<u8> = None;
 
     for (card_id, area_name) in stage_positions {
         if card_id == -1 {
@@ -1938,8 +1962,14 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                 // costs that cannot be paid are NOT offered (rules 9.6.2.3);
                 // optional-payment components keep the ability offered so the
                 // player can skip just that part (wakana bp2-008).
-                let (base_cost, effective_cost) =
-                    crate::ability::util::ability_effective_cost(game_state, &ability, groups);
+                let (base_cost, effective_cost) = if ability.cost.is_some() {
+                    let groups = *groups_cache.get_or_insert_with(|| {
+                        game_state.distinct_stage_groups(&active_player.id)
+                    });
+                    crate::ability::util::ability_effective_cost(game_state, &ability, groups)
+                } else {
+                    (0, 0)
+                };
                 if let Some(c) = ability.cost.as_ref() {
                     if !c.has_optional_payment()
                         && effective_cost > active_player.energy_zone.active_count()
@@ -2036,8 +2066,14 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
 
                 // Same effective-cost gate as stage activations: mandatory
                 // unpayable costs are withheld, optional ones stay offered.
-                let (base_cost, effective_cost) =
-                    crate::ability::util::ability_effective_cost(game_state, &ability, groups);
+                let (base_cost, effective_cost) = if ability.cost.is_some() {
+                    let groups = *groups_cache.get_or_insert_with(|| {
+                        game_state.distinct_stage_groups(&active_player.id)
+                    });
+                    crate::ability::util::ability_effective_cost(game_state, &ability, groups)
+                } else {
+                    (0, 0)
+                };
                 if let Some(c) = ability.cost.as_ref() {
                     if !c.has_optional_payment()
                         && effective_cost > active_player.energy_zone.active_count()

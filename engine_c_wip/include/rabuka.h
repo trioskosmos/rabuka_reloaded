@@ -358,6 +358,8 @@ int  rb_decode_ability(uint32_t idx, Ability *out);     /* returns 1 on success 
 int  rb_get_ability(uint32_t idx, Ability *out);         /* returns 1 even for empty/default */
 int  rb_count_empty_bytecode_abilities(void);            /* audit: empty slices */
 void rb_free_ability(Ability *a);
+void rb_effect_free(AbilityEffect *e);
+AbilityEffect *rb_effect_deep_clone(const AbilityEffect *e);
 void rb_free_condition(Condition *c);
 
 /* ── Trigger system (mirrors engine/src/triggers.rs) ── */
@@ -1179,8 +1181,12 @@ typedef struct {
     int live_required[RB_MAX_LIVE_CARDS][8];
     int live_filled[RB_MAX_LIVE_CARDS][8];
     int live_score_detail[RB_MAX_LIVE_CARDS];
-    int surplus_per_color[8];          /* per-color surplus (compute_surplus_and_flags) */
+     int surplus_per_color[8];
+     int yell_cards[RB_MAX_LIVE_CARDS * 3];
+     int n_yell_cards;
+     int yell_blade_hearts[8];
 } RbLiveSnapshot;
+
 
 /* A modifier granted by a trigger with a Duration that must be reverted when
    the duration expires. Mirrors engine/src/core/game_state/mod.rs TemporaryEffect.
@@ -1190,6 +1196,11 @@ typedef struct {
 #define RB_TEMP_PERM      0
 #define RB_TEMP_LIVE_END  1
 #define RB_TEMP_TURN_END  2
+#define RB_MAX_DELAYED_GAINED 16
+typedef struct {
+    int card_id;
+    AbilityEffect *effect;
+} RbDelayedGainedEffect;
 typedef struct {
     int card_id;            /* host card the effect belongs to */
     int dur;                /* RB_TEMP_* duration kind */
@@ -1198,6 +1209,8 @@ typedef struct {
     int cost;
     int heart[8];
     int need_heart[8];
+    int gained_card_id;
+    int gained_index;
 } RbTempEffect;
 
 /* Replacement effect (used by GameState at line 819). */
@@ -1226,8 +1239,10 @@ typedef struct {
 } RbPositionChangeEvent;
 
 typedef struct GameState {
-    RbPlayer p[2];
-    RbMods   mods;
+     RbPlayer p[2];
+     int      stage_hearts[2][8];
+     RbMods   mods;
+
     RbAbilityQueue queue;
     /* Keep-alive for an in-flight activation that pends a choice mid-resolution.
        rb_activate_card wraps cost+effect into a heap effect tree and stores the
@@ -1262,8 +1277,12 @@ typedef struct GameState {
     int      n_selected_cards;
     int      assignment[RB_MAX_RECENTLY_MOVED]; /* distinct-name assignment for alt-cost (phases.rs) */
     int      n_assignment;
-    int      live_success[2];   /* per player: did this player pass their live this turn */
-    int      live_score[2];      /* per player: total score from the most recent live performance */
+     int      live_success[2];
+     int      live_score[2];
+     int      live_batch_mode;
+     int      live_pre_score[2][RB_MAX_CARD_IDS];
+     int      live_pre_valid[2];
+
     int      p1_live_won;       /* Rule 8.4.13: P1 won the live (placed to success) this turn */
     int      p2_live_won;       /* Rule 8.4.13: P2 won the live (placed to success) this turn */
     /* live-surplus / no-excess flags (mirror live.rs::compute_surplus_and_flags +
@@ -1307,8 +1326,11 @@ typedef struct GameState {
     int      mulligan_done[2];     /* per-player mulligan done flag */
     int      live_set_player;
     RbBag    resolution;             /* resolution zone (temp holding) */
-    RbTempEffect temp_effects[RB_MAX_TEMP_EFFECTS];
-    int      n_temp_effects;
+     RbTempEffect temp_effects[RB_MAX_TEMP_EFFECTS];
+     int      n_temp_effects;
+     RbDelayedGainedEffect delayed_gained_effects[RB_MAX_DELAYED_GAINED];
+     int      n_delayed_gained_effects;
+
     int      stage_arrived[2][RB_STAGE_SIZE]; /* set when a member was deployed this turn (baton arrival-ban, Rule 9.6.2.1.2.1) */
     int      baton_touch_used[2];             /* baton used this play-action (once-per-action limit) */
     int      baton_last_vacated_area[2];      /* stage area vacated by the most recent baton (mirrors Rust last_vacated_stage_area) */
@@ -1582,6 +1604,10 @@ void rb_record_event(GameState *g, int pl, const char *trig);
 int  rb_fire_recorded_auto(GameState *g, int pl);
 int  rb_process_pending_auto_abilities(GameState *g);
 void rb_recalc_constants(GameState *g);
+int  rb_register_gained_ability(GameState *g, int card_id, const Ability *ability);
+int  rb_remove_gained_ability(GameState *g, int card_id, int index);
+int  rb_card_num_gained_abilities(const GameState *g, int card_id);
+const Ability *rb_card_gained_ability(const GameState *g, int card_id, int index);
 void rb_check_expired_effects(GameState *g, int which);
 void rb_advance_phase(GameState *g);
 
@@ -1615,7 +1641,10 @@ int rb_card_has_score_icon(const Card *c);
 int rb_card_has_all_blade(const Card *c);
 int rb_card_get_score(const Card *c);
 int rb_card_need_heart_satisfied(const Card *c, const int *need, const int *provided);
-int rb_check_heart_requirement(const int *need, const int *provided);
+int  rb_check_heart_requirement(const int *need, const int *provided);
+int  rb_live_calculate_score(const GameState *g, int pl, int cheer_blade_heart_count,
+                              const int *stage_hearts, int constant_total_score_bonus);
+
 
 /* HeartColor — mirrors engine/src/core/card.rs HeartColor enum + impl */
 int rb_heart_color_index(int color);
@@ -1671,6 +1700,7 @@ void rb_calc_stage_hearts(const GameState *g, int pl, int out[8]);
 void rb_stage_hearts_pipeline(const GameState *g, int pl, int out[8]);
 void rb_effective_need_heart(const GameState *g, int live_cid, int out[8]);
 int  rb_perform_live(GameState *g, int pl);
+void rb_execute_live_victory_determination(GameState *g);
 /* ── live.rs standalone helpers (ported) ── */
 /* Mirror live.rs::blade_color_to_heart: map a set_blade_type blade color to the
     heart color its icons become (colored 1..6 → same index; All → icon_all idx 7).

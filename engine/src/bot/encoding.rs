@@ -160,12 +160,9 @@ pub fn action_target_zone(action: &Action, obs: &PublicObservation) -> ActionTar
             let pos = action
                 .parameters
                 .as_ref()
-                .and_then(|p| p.stage_area.as_deref())
-                .map(|s| match s {
-                    "left" => 0u8,
-                    "center" => 1,
-                    "right" => 2,
-                    _ => 0,
+                .and_then(|p| {
+                    p.stage_area_index
+                        .or_else(|| p.stage_area.as_deref().and_then(|s| s.parse().ok()))
                 })
                 .unwrap_or(0);
             ActionTargetZone {

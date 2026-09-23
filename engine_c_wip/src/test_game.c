@@ -12,8 +12,10 @@ void test_game_new(TestGame *tg){
     tg->state.cheer_check_base = -1;
     tg->state.baton_touch_replaced_member_cost = -1;
     tg->state.baton_touch_replaced_member_id = -1;
-    tg->state.baton_touch_arriving_card_id = -1;
+     tg->state.baton_touch_arriving_card_id = -1;
+     for (int i = 0; i < 64; i++) tg->state.gained_card_ids[i] = -1;
 }
+
 
 int test_id(TestGame *tg, const char *card_no){
     (void)tg;

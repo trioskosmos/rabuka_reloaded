@@ -86,8 +86,67 @@ static char *rb_strdup_heap(const char *s) {
     return p;
 }
 
+static void rb_cond_value_release(CondValue *v) {
+    if (!v) return;
+    if (v->tag == RB_TAG_STR || v->tag == RB_TAG_F64) free(v->s);
+    else if (v->tag == RB_TAG_OBJVAR || v->tag == RB_TAG_OBJECT) rb_free_condition(v->cond);
+    else if (v->tag == RB_TAG_ARRAY) {
+        for (uint32_t i = 0; i < v->arr_n; i++) rb_cond_value_release(&v->arr[i]);
+        free(v->arr);
+    }
+}
+
+static CondValue *rb_cond_value_clone(const CondValue *src) {
+    if (!src) return NULL;
+    CondValue *out = (CondValue *)calloc(1, sizeof(*out));
+    if (!out) return NULL;
+    out->tag = src->tag;
+    out->i = src->i;
+    out->b = src->b;
+    if (src->tag == RB_TAG_STR || src->tag == RB_TAG_F64) {
+        out->s = rb_strdup_heap(src->s);
+        if (src->s && !out->s) { free(out); return NULL; }
+    } else if (src->tag == RB_TAG_OBJVAR || src->tag == RB_TAG_OBJECT) {
+        out->cond = rb_condition_clone(src->cond);
+        if (src->cond && !out->cond) { free(out); return NULL; }
+    } else if (src->tag == RB_TAG_ARRAY && src->arr_n > 0) {
+        out->arr = (CondValue *)calloc(src->arr_n, sizeof(*out->arr));
+        if (!out->arr) { free(out); return NULL; }
+        for (uint32_t i = 0; i < src->arr_n; i++) {
+            CondValue *copy = rb_cond_value_clone(&src->arr[i]);
+            if (!copy) {
+                for (uint32_t j = 0; j < i; j++) rb_cond_value_release(&out->arr[j]);
+                free(out->arr);
+                free(out);
+                return NULL;
+            }
+            out->arr[i] = *copy;
+            free(copy);
+        }
+        out->arr_n = src->arr_n;
+    }
+    return out;
+}
+
 static Condition *rb_condition_clone(const Condition *c) {
-    return rb_condition_clone(c);
+    if (!c) return NULL;
+    Condition *out = (Condition *)calloc(1, sizeof(*out));
+    if (!out) return NULL;
+    out->variant = c->variant;
+    for (uint32_t i = 0; i < c->n_fields; i++) {
+        CondField *dst = &out->fields[out->n_fields];
+        dst->key = rb_strdup_heap(c->fields[i].key);
+        CondValue *value = rb_cond_value_clone(&c->fields[i].v);
+        if (value) dst->v = *value;
+        if (!dst->key || !value) {
+            free(value);
+            rb_free_condition(out);
+            return NULL;
+        }
+        free(value);
+        out->n_fields++;
+    }
+    return out;
 }
 
 AbilityEffect *rb_effect_deep_clone(const AbilityEffect *src) {

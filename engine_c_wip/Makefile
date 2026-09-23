@@ -8,9 +8,10 @@ OBJ     := $(SRC:.c=.o)
 OBJ_LIB := src/ability/enums.o src/ability/types.o src/ability/vm.o src/ability/condition.o src/ability/choice.o src/ability/ability_queue.o src/ability/dynamic_count.o src/ability/util.o src/ability/cost.o src/ability/compound.o src/ability/resolver.o src/ability/effects/move.o src/ability/effects/move_missing.o src/ability/effects/look.o src/ability/effects/state.o src/ability/effects/ability.o src/ability/effects/misc.o src/ability/effects/draw.o src/ability/effects/score.o src/ability/log.o src/ability/debug.o src/ability/abilities_gen.o src/core/card.o src/core/data.o src/core/alloc.o src/core/modifiers.o src/core/stats_pipeline.o src/core/game_state_abilities.o src/core/tracking.o src/core/zones.o src/bytecode_data.o src/core/generated/bytecode_blob.o src/core/generated/gen_data.o src/turn/phase.o src/turn/live.o src/turn/triggers.o src/engine.o src/test_game.o
 TARGET  := rb_engine
 GENERATED := tests/test_ported_generated.c
+MECHANICS := tests/test_mechanics.c
 AUDIT   := tools/audit_actions.c
 
-.PHONY: all test audit regen clean
+.PHONY: all test audit regen clean mechanics
 all: $(TARGET)
 
 regen:
@@ -33,6 +34,12 @@ $(TARGET)_generated: $(OBJ_LIB) $(GENERATED)
 $(TARGET)_replay: $(OBJ_LIB) tests/replay.c
 	$(CC) $(CFLAGS) -o $@ $(OBJ_LIB) tests/replay.c
 
+$(TARGET)_mechanics: $(OBJ_LIB) $(MECHANICS)
+	$(CC) $(CFLAGS) -o $@ $(OBJ_LIB) $(MECHANICS)
+
+mechanics: $(TARGET)_mechanics
+	./$(TARGET)_mechanics
+
  $(TARGET)_debug: $(OBJ_LIB) src/debug_umi.o
 	$(CC) $(CFLAGS) -o $@ $(OBJ_LIB) src/debug_umi.o
 
@@ -44,4 +51,4 @@ $(TARGET)_audit: $(OBJ_LIB) $(AUDIT)
 	$(CC) $(CFLAGS) -o $@ $(OBJ_LIB) $(AUDIT)
 
 clean:
-	rm -f $(OBJ) $(TARGET) $(TARGET)_test $(TARGET)_audit $(TARGET)_replay $(TARGET)_generated
+	rm -f $(OBJ) $(TARGET) $(TARGET)_test $(TARGET)_audit $(TARGET)_replay $(TARGET)_generated $(TARGET)_mechanics

@@ -89,6 +89,12 @@ pub fn search(
     actions[best_idx].clone()
 }
 
+fn action_area(p: &crate::game_setup::ActionParameters) -> Option<crate::zones::MemberArea> {
+    p.stage_area_index
+        .and_then(|index| crate::zones::MemberArea::from_index(index as usize))
+        .or_else(|| p.stage_area.as_deref().and_then(parse_area))
+}
+
 /// Run one determinized rollout for `action`; returns (normalized value, immediate_win).
 fn run_rollout(
     obs: &PublicObservation,
@@ -106,8 +112,7 @@ fn run_rollout(
         &action.action_type,
         p.as_ref().and_then(|p| p.card_id),
         p.as_ref().and_then(|p| p.card_indices.clone()),
-        p.as_ref()
-            .and_then(|p| p.stage_area.as_deref().and_then(parse_area)),
+        p.as_ref().and_then(action_area),
         p.as_ref().and_then(|p| p.use_baton_touch),
     );
     game_setup::settle_single_player_state(&mut state);

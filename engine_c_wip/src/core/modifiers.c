@@ -409,6 +409,7 @@ void rb_recalculate_constant_cost_modifiers(GameState *g) {
 void rb_on_cards_left_zones(GameState *g, int card_id) {
     if (!g || card_id < 0 || card_id >= RB_MAX_CARD_IDS) return;
     rb_mods_clear_card(&g->mods, card_id);
+    int gained_changed = 0;
     for (size_t i = 0; i < sizeof(g->gained_card_ids) / sizeof(g->gained_card_ids[0]); i++) {
         if (g->gained_card_ids[i] != card_id) continue;
         for (int j = 0; j < g->gained_card_n[i]; j++) {
@@ -417,5 +418,7 @@ void rb_on_cards_left_zones(GameState *g, int card_id) {
         memset(g->gained_card_abilities[i], 0, sizeof(g->gained_card_abilities[i]));
         g->gained_card_n[i] = 0;
         g->gained_card_ids[i] = -1;
+        gained_changed = 1;
     }
+    if (gained_changed) rb_recalc_constants(g);
 }

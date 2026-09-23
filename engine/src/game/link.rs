@@ -33,7 +33,7 @@ use std::string::String;
 use std::vec::Vec;
 
 use crate::card::Card;
-use crate::game::game_setup::{self, Action, ActionType};
+use crate::game::game_setup::{self, Action, ActionParameters, ActionType};
 use crate::game::match_runner::build_match_state;
 use crate::game::menu::{select_action, show_result};
 use crate::game::platform_ui::PlatformUi;
@@ -87,6 +87,26 @@ pub struct LinkAction {
     pub seq: u32,
 }
 
+fn action_stage_tag(params: Option<&ActionParameters>) -> u8 {
+    params
+        .and_then(|p| {
+            p.stage_area_index
+                .and_then(|index| match index {
+                    0 => Some(1),
+                    1 => Some(2),
+                    2 => Some(3),
+                    _ => None,
+                })
+                .or_else(|| match p.stage_area.as_deref() {
+                    Some("left") => Some(1),
+                    Some("center") => Some(2),
+                    Some("right") => Some(3),
+                    _ => None,
+                })
+        })
+        .unwrap_or(0)
+}
+
 impl LinkAction {
     /// Encode the sender's pick. The leading byte is [`MSG_ACTION`].
     pub fn from_action(a: &Action, seq: u32) -> Self {
@@ -97,12 +117,7 @@ impl LinkAction {
             card_indices: params
                 .and_then(|p| p.card_indices.clone())
                 .unwrap_or_default(),
-            stage_area: match params.and_then(|p| p.stage_area.as_deref()) {
-                Some("left") => 1,
-                Some("center") => 2,
-                Some("right") => 3,
-                _ => 0,
-            },
+            stage_area: action_stage_tag(params),
             use_baton_touch: params.and_then(|p| p.use_baton_touch).unwrap_or(false),
             ability_index: params.and_then(|p| p.ability_index).map(|i| i as u16),
             seq,
@@ -209,12 +224,7 @@ fn link_pickable(a: &Action) -> bool {
 /// (tag, card_id, indices, area, baton, ability) key recovers the row.
 pub fn find_local_action(acts: &[Action], link: &LinkAction) -> Option<usize> {
     let want_area = |a: &Action| -> u8 {
-        match a.parameters.as_ref().and_then(|p| p.stage_area.as_deref()) {
-            Some("left") => 1,
-            Some("center") => 2,
-            Some("right") => 3,
-            _ => 0,
-        }
+        action_stage_tag(a.parameters.as_ref())
     };
     acts.iter().position(|a| {
         link_pickable(a)
@@ -766,6 +776,7 @@ mod tests {
                 card_index: None,
                 card_indices: None,
                 stage_area: None,
+                stage_area_index: None,
                 use_baton_touch: None,
                 card_name: None,
                 card_no: None,

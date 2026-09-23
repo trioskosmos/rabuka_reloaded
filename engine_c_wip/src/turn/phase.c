@@ -87,13 +87,11 @@ void rb_advance_phase(GameState *g) {
     if(g->phase==RB_PHASE_PERFORMANCE){
         rb_recalc_constants(g);
         /* Perform the live calculation for both players */
+        g->live_batch_mode = 1;
         rb_perform_live(g, 0);
         rb_perform_live(g, 1);
-        /* Trigger LiveSuccess abilities for both players */
-        rb_trigger_live_success(g, 0);
-        rb_trigger_live_success(g, 1);
-        rb_process_pending_auto_abilities(g);
-        rb_drain_ability_queue(g);
+        g->live_batch_mode = 0;
+        rb_execute_live_victory_determination(g);
         g->phase=RB_PHASE_VICTORY;
         return;
     }

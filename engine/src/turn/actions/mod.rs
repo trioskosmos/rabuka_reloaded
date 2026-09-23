@@ -752,8 +752,10 @@ impl super::TurnEngine {
         card_id: Option<i16>,
         card_indices: Option<Vec<usize>>,
     ) -> Result<(), String> {
-        let pending = game_state.ability_queue.is_waiting_for_choice().cloned();
-        let choice = pending.ok_or("No pending choice to resume")?;
+        let choice = game_state
+            .ability_queue
+            .take_waiting_choice()
+            .ok_or("No pending choice to resume")?;
 
         // Robustness (P3): a NON-skippable prompt must never receive an
         // empty answer. Previously such answers fell through to handlers
@@ -784,12 +786,8 @@ impl super::TurnEngine {
                         "SelectLiveSuccess"
                     }
                 };
-                // Unsatisfiable SelectCard: generator only offers an empty stub
-                // when zero eligible cards exist (game_setup.rs actions.is_empty()).
-                // Rejecting that forever soft-locks the arena (same-turn cap draws).
-                // Auto-skip when nothing was selectable; still reject empty if
-                // real picks were offered (P3 still guards those).
                 if matches!(choice, crate::ability::types::Choice::SelectCard { .. }) {
+                    game_state.ability_queue.restore_waiting_choice(choice);
                     let offered = crate::game_setup::generate_possible_actions(game_state);
                     let has_selectable = offered.iter().any(|a| {
                         a.action_type == crate::game_setup::ActionType::ChoiceSelect
@@ -800,16 +798,23 @@ impl super::TurnEngine {
                                 .and_then(|p| p.card_indices.as_deref())
                                 .is_some_and(|v| !v.is_empty())
                     });
+                    let choice = game_state
+                        .ability_queue
+                        .take_waiting_choice()
+                        .ok_or("No pending choice to resume")?;
                     if !has_selectable {
                         log::debug!(
                             "[CHOICE] empty non-skippable SelectCard with no eligible cards — auto-skip (was: {kind})"
                         );
                         return Self::resume_queue_with_choice(
                             game_state,
-                            choice.clone(),
+                            choice,
                             crate::ability::types::ChoiceResult::Skip,
                         );
                     }
+                    game_state.ability_queue.restore_waiting_choice(choice);
+                } else {
+                    game_state.ability_queue.restore_waiting_choice(choice);
                 }
                 return Err(format!(
                     "non-skippable {kind} prompt requires a selection - empty answer rejected",
@@ -820,23 +825,24 @@ impl super::TurnEngine {
         // Record a structured `choice_resolved` entry: what was offered vs chosen.
         // Skipped under `headless`  Ethe label computation itself allocates.
         #[cfg(not(feature = "headless"))]
-        game_state.push_choice_resolved(
-            &choice,
-            Self::profile_chosen_labels(game_state, &choice, card_id, card_indices.as_deref()),
-            Self::profile_choice_is_skip(&choice, card_id, card_indices.as_deref()),
-        );
+        if crate::game_setup::logging_enabled() {
+            game_state.push_choice_resolved(
+                &choice,
+                Self::profile_chosen_labels(game_state, &choice, card_id, card_indices.as_deref()),
+                Self::profile_choice_is_skip(&choice, card_id, card_indices.as_deref()),
+            );
+        }
         #[cfg(feature = "headless")]
         {
             let _ = (&choice, &card_id, &card_indices);
         }
 
-        let ci = card_indices.clone();
         // Handle non-ability choices early (live success, etc.)
         if matches!(
             choice,
             crate::ability::types::Choice::SelectLiveSuccess { .. }
         ) {
-            let result = Self::build_choice_result(&choice, card_id, ci.clone(), None)?;
+            let result = Self::build_choice_result(&choice, card_id, card_indices.clone(), None)?;
             if let crate::ability::types::ChoiceResult::LiveSuccessSelected { card_index } = &result
             {
                 let player_id = match &choice {
@@ -857,7 +863,7 @@ impl super::TurnEngine {
                 .pending_success_replacement_player_id
                 .take()
                 .unwrap_or_else(|| "player1".to_string());
-            let result = Self::build_choice_result(&choice, card_id, ci, None)?;
+            let result = Self::build_choice_result(&choice, card_id, card_indices, None)?;
             let player = if player_id == game_state.player1.id {
                 &mut game_state.player1
             } else {
@@ -1165,13 +1171,13 @@ impl super::TurnEngine {
     fn resume_auto_ability_choice(
         game_state: &mut GameState,
         choice: &crate::ability::types::Choice,
-        result: crate::ability::types::ChoiceResult,
+        result: &crate::ability::types::ChoiceResult,
     ) -> Result<bool, String> {
         if let crate::ability_queue::QueueState::WaitingForAutoAbilityChoice { .. } =
             game_state.ability_queue.get_state()
         {
-            if let crate::ability::types::ChoiceResult::AutoAbilitySelected { queue_index } = result
-            {
+            if let crate::ability::types::ChoiceResult::AutoAbilitySelected { queue_index } = result {
+                let queue_index = *queue_index;
                 let player_id = if let crate::ability::types::Choice::SelectAutoAbility {
                     ref player_id,
                     ..
@@ -1468,7 +1474,7 @@ impl super::TurnEngine {
         choice: crate::ability::types::Choice,
         result: crate::ability::types::ChoiceResult,
     ) -> Result<(), String> {
-        if Self::resume_auto_ability_choice(game_state, &choice, result.clone())? {
+        if Self::resume_auto_ability_choice(game_state, &choice, &result)? {
             return Ok(());
         }
 

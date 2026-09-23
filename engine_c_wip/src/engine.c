@@ -434,9 +434,14 @@ static void handle_action(GameState *g, int actor, AbilityEffect *e, int host_ci
         if (W->energy_active < 0) W->energy_active = 0;
         rb_recalc_constants(g);
     } else if (!strcmp(act, "modify_score") || !strcmp(act, "gain_score")) {
-        /* target=="both" adjusts BOTH players' scores (mirrors gain_resource). */
-        if (e->target && !strcmp(e->target, "both")) { g->p[actor].score += cnt; g->p[actor ^ 1].score += cnt; }
-        else W->score += cnt;
+        if (e->target && !strcmp(e->target, "live_total")) {
+            rb_execute_modify_score(g, actor, e);
+        } else if (e->target && !strcmp(e->target, "both")) {
+            g->p[actor].score += cnt;
+            g->p[actor ^ 1].score += cnt;
+        } else {
+            W->score += cnt;
+        }
     } else if (!strcmp(act, "gain_heart") ||
                 !strcmp(act, "place_heart")) {
         int col = (g->queue.selected_heart_color >= 0)

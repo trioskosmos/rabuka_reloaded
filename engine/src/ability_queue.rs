@@ -53,7 +53,7 @@ pub enum QueueState {
     /// Currently paying cost for an ability
     PayingCost { entry_index: u8 },
     /// Waiting for user choice (cost payment, target selection, etc.)
-    WaitingForChoice { entry_index: u8, choice: Choice },
+    WaitingForChoice { entry_index: u8, choice: Option<Choice> },
     /// Executing the effect of an ability
     ExecutingEffect { entry_index: u8 },
     /// Ability completed, will transition to Idle
@@ -170,8 +170,33 @@ impl AbilityQueue {
     pub fn is_waiting_for_choice(&self) -> Option<&Choice> {
         match &self.state {
             QueueState::WaitingForAutoAbilityChoice { choice } => Some(choice),
-            QueueState::WaitingForChoice { choice, .. } => Some(choice),
+            QueueState::WaitingForChoice { choice, .. } => choice.as_ref(),
             _ => None,
+        }
+    }
+
+    pub fn take_waiting_choice(&mut self) -> Option<Choice> {
+        match &mut self.state {
+            QueueState::WaitingForChoice { choice, .. } => choice.take(),
+            QueueState::WaitingForAutoAbilityChoice { choice } => Some(choice.clone()),
+            _ => None,
+        }
+    }
+
+    pub fn restore_waiting_choice(&mut self, pending: Choice) {
+        match &mut self.state {
+            QueueState::WaitingForChoice { choice, .. } => {
+                if choice.is_none() {
+                    *choice = Some(pending);
+                }
+            }
+            QueueState::ExecutingEffect { entry_index } => {
+                self.state = QueueState::WaitingForChoice {
+                    entry_index: *entry_index,
+                    choice: Some(pending),
+                };
+            }
+            _ => {}
         }
     }
 
@@ -249,7 +274,6 @@ impl AbilityQueue {
 
     /// Pause for user choice during ability execution
     pub fn pause_for_choice(&mut self, choice: Choice) {
-        let choice_clone = choice.clone();
         match &mut self.state {
             QueueState::PayingCost { entry_index }
             | QueueState::ExecutingEffect { entry_index } => {
@@ -292,7 +316,7 @@ impl AbilityQueue {
                 }
                 self.state = QueueState::WaitingForChoice {
 entry_index: u8::try_from(idx).unwrap(),
-                    choice: choice_clone,
+                    choice: Some(choice),
                 };
             }
             QueueState::Idle | QueueState::Completed { .. } => {
@@ -335,7 +359,7 @@ entry_index: u8::try_from(idx).unwrap(),
                 self.entries.push(dummy_entry);
                 self.state = QueueState::WaitingForChoice {
                     entry_index: u8::try_from(self.entries.len() - 1).unwrap(),
-                    choice: choice_clone,
+                    choice: Some(choice),
                 };
             }
             QueueState::WaitingForChoice { .. }

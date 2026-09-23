@@ -2411,6 +2411,10 @@ static int count_for_player_target(const GameState *g, int actor, int pl, const 
                 total += s < 0 ? 0 : s;
             }
         }
+        int bonus = pl == 0
+                  ? g->mods.p1_constant_total_score_bonus
+                  : g->mods.p2_constant_total_score_bonus;
+        if (bonus > 0) total += bonus;
         return total;
     }
     if (comparison_type && !strcmp(comparison_type, "cost")) {

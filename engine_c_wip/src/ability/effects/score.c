@@ -73,6 +73,41 @@ static int collect_candidates(const GameState *g, int pl, const char *card_type,
     return n;
 }
 
+static int score_per_unit_count(const GameState *gs, int actor, const AbilityEffect *e,
+                                const char *location, const char *group,
+                                const char *heart_colors, const char *card_type,
+                                int self_target) {
+    const RbPlayer *P = &gs->p[actor];
+    int ids[RB_MAX_ZONE];
+    int n = 0;
+    if (!location || !strcmp(location, "stage") || !strcmp(location, "member_area")) {
+        for (int i = 0; i < RB_STAGE_SIZE; i++) {
+            if (P->stage[i] != RB_EMPTY_SLOT) ids[n++] = P->stage[i];
+        }
+    } else if (!strcmp(location, "live_card_zone") || !strcmp(location, "live")) {
+        for (int i = 0; i < P->live.n; i++) ids[n++] = P->live.cards[i];
+    } else if (!strcmp(location, "success_live_zone") ||
+               !strcmp(location, "success_live_card_zone") || !strcmp(location, "success")) {
+        for (int i = 0; i < P->success.n; i++) ids[n++] = P->success.cards[i];
+    } else {
+        return 0;
+    }
+
+    int count = 0;
+    int active = gs->queue.resume_host;
+    for (int i = 0; i < n; i++) {
+        int cid = ids[i];
+        if (group && !rb_card_matches_group_str(cid, group)) continue;
+        if (heart_colors && !heart_color_matches(cid, heart_colors)) continue;
+        if (card_type && !strcmp(card_type, "member_card") && !rb_card_is_member(cid)) continue;
+        if (card_type && !strcmp(card_type, "live_card") && !rb_card_is_live(cid)) continue;
+        if (card_type && !strcmp(card_type, "energy_card") && !rb_card_is_energy(cid)) continue;
+        if (self_target && cid != active) continue;
+        count++;
+    }
+    return count;
+}
+
 int rb_execute_modify_score(GameState *gs, int actor, AbilityEffect *e) {
     if (!gs || !e) return -1;
     const char *op = sc_extra(e, "operation"); if (!op) op = "add";
@@ -100,16 +135,14 @@ int rb_execute_modify_score(GameState *gs, int actor, AbilityEffect *e) {
     if (is_live_total) {
         int effective_value = value;
         if (per_unit) {
-            int recv_tmp[RB_MAX_ZONE];
-            int nc = collect_candidates(gs, actor, card_type, self_target, recv_tmp, RB_MAX_ZONE);
-            int nr = 0;
-            for (int i = 0; i < nc; i++) {
-                int cid = recv_tmp[i];
-                if (group && !rb_card_matches_group_str(cid, group)) continue;
-                if (heart_colors && !heart_color_matches(cid, heart_colors)) continue;
-                nr++;
-            }
-            int units = nr / per_unit_count;
+            const char *per_unit_type = sc_extra(e, "per_unit_type");
+            const char *zone = location;
+            if ((!zone || !*zone) && per_unit_type &&
+                strcmp(per_unit_type, "heart_colors") != 0) zone = per_unit_type;
+            int matching_count = score_per_unit_count(gs, actor, e, zone, group,
+                                                        heart_colors, card_type,
+                                                        self_target);
+            int units = matching_count / per_unit_count;
             if (e->repeat_limit > 0 && units > e->repeat_limit) units = e->repeat_limit;
             effective_value = value * units;
         }
@@ -147,7 +180,6 @@ int rb_execute_modify_score(GameState *gs, int actor, AbilityEffect *e) {
         if (!(clamped_delta == 0 && has_floor && delta < 0)) {
             *bonus = (int16_t)(current_bonus + clamped_delta);
         }
-        (void)location;
         return 0;
     }
 
