@@ -1,5 +1,6 @@
 #include "rabuka.h"
 #include <string.h>
+#include <stdio.h>
 
 /* Turn phase machine — mirrors engine/src/turn/phases.rs:advance_phase
    Two TurnPhases per round: FirstAttackerNormal / SecondAttackerNormal / Live.
@@ -13,16 +14,24 @@ static void activate_wait_members(GameState *g, int pl) {
     /* collect owned card ids for delayed tick */
     for(int s=0;s<RB_STAGE_SIZE;s++) if(P->stage[s]!=RB_EMPTY_SLOT) owned[n_owned++]=P->stage[s];
     for(int i=0;i<P->energy.n;i++) owned[n_owned++]=P->energy.cards[i];
-    for(int q=0;q<RB_STAGE_SIZE;q++) if(P->stage[q]!=RB_EMPTY_SLOT && P->stage_wait[q]){
+    for(int q=0;q<RB_STAGE_SIZE;q++) if(P->stage[q]!=RB_EMPTY_SLOT &&
+        (P->stage_wait[q] || (rb_mods_get_orientation(&g->mods, P->stage[q]) &&
+                             !strcmp(rb_mods_get_orientation(&g->mods, P->stage[q]), "wait")))) {
         if(rb_mods_is_delayed_cannot_active(&g->mods,P->stage[q])) continue;
         P->stage_wait[q]=0;
+        rb_mods_set_orientation(&g->mods, P->stage[q], "active");
     }
     rb_mods_tick_delayed_for(&g->mods, owned, n_owned);
-    if(P->energy_active < P->energy.n) P->energy_active = P->energy.n;
+    int excluded_energy = 0;
+    for (int i = 0; i < P->energy.n; i++)
+        if (rb_mods_is_delayed_cannot_active(&g->mods, P->energy.cards[i])) excluded_energy++;
+    P->energy_active = P->energy.n - excluded_energy;
+    if(P->energy_active < 0) P->energy_active = 0;
 }
 
 void rb_advance_phase(GameState *g) {
     if(g->winner!=-1) return;
+    if(rb_has_pending_choice(g)) return;
     /* Mulligan phases are no-ops for headless/skip */
     if(g->phase==RB_PHASE_RPS || g->phase==RB_PHASE_OPENING){
         g->phase=RB_PHASE_ACTIVE;
@@ -64,6 +73,23 @@ void rb_advance_phase(GameState *g) {
         return;
     }
     if(g->phase==RB_PHASE_LIVE_SET){
+        RbPlayer *P = &g->p[g->active];
+        int placed = P->live.n;
+        for (int i = 0; i < placed; i++) {
+            for (int h = 0; h < P->hand.n; h++) {
+                if (P->hand.cards[h] == P->live.cards[i]) {
+                    for (int k = h; k < P->hand.n - 1; k++) P->hand.cards[k] = P->hand.cards[k + 1];
+                    P->hand.n--;
+                    break;
+                }
+            }
+        }
+        for (int i = 0; i < placed; i++) rb_draw(g, g->active);
+        if (g->active == g->first_attacker) {
+            g->active = g->second_attacker;
+            return;
+        }
+        g->active = g->first_attacker;
         /* Load-bearing: re-evaluates constant abilities before performance (mirrors
            engine/src/turn/phases.rs:222 check_timing at LiveCardSetSecond→FirstPerformance).
            Without this q127_wien leaves_stage_modifier_removed breaks.
@@ -92,10 +118,18 @@ void rb_advance_phase(GameState *g) {
         rb_perform_live(g, 1);
         g->live_batch_mode = 0;
         rb_execute_live_victory_determination(g);
+        g->live_victory_pending = rb_has_pending_choice(g);
+        fprintf(stderr, "[LIVE_VICTORY_PHASE] initial pending=%d\n", g->live_victory_pending);
         g->phase=RB_PHASE_VICTORY;
         return;
     }
     if(g->phase==RB_PHASE_VICTORY){
+        if(g->live_victory_pending){
+            rb_execute_live_victory_determination(g);
+            fprintf(stderr, "[LIVE_VICTORY_PHASE] resume pending=%d\n", rb_has_pending_choice(g));
+            if(rb_has_pending_choice(g)) return;
+            g->live_victory_pending = 0;
+        }
         /* victory check + rollover */
         /* Rule 8.4.13: determine who placed a live this turn; if only one player
             did, they become first attacker next round (mirrors live.rs::
@@ -123,7 +157,7 @@ void rb_advance_phase(GameState *g) {
             Without this, baton touch remains blocked on the next turn because the
             existing member's arrival flag is still set. */
         for(int p=0;p<2;p++) for(int i=0;i<RB_STAGE_SIZE;i++) g->stage_arrived[p][i]=0;
-        g->active=g->active^1;
+        g->active=g->first_attacker;
         rb_tick_gained(g); /* expire gained abilities whose duration elapsed (mirrors TemporaryEffect turn-end) */
         g->phase=RB_PHASE_ACTIVE;
     }

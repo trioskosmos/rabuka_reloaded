@@ -1,6 +1,6 @@
 #![cfg(feature = "3ds")]
-// Play state machine (Phase C): the Step::Play handler, moved verbatim from the
-// bin (see extract_play.py). PlayState replaces the old 32-field tuple.
+// Play state machine (Phase C): the Step::Play handler, moved from the former
+// inline bin handler. PlayState replaces the old 32-field tuple.
 
 mod action_list;
 mod input;

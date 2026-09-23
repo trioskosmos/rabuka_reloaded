@@ -1,9 +1,8 @@
-use rabuka_engine::core::constants::U8Count;
 use std::fs::File;
 use std::io::Write;
 use std::sync::Arc;
 
-use rabuka_engine::bot::encoding::{action_target_zone, ActionEncoding, EncodedState};
+use rabuka_engine::bot::encoding::{action_target_zone, ActionEncoding, EncodedState, ACTION_TYPE_COUNT};
 use rabuka_engine::bot::neural::PolicyNet;
 use rabuka_engine::bot::PublicObservation;
 use rabuka_engine::card::CardDatabase;
@@ -60,7 +59,7 @@ fn main() {
 
     let mut out = File::create(&out_path).expect("create output");
     let state_dim = EncodedState::state_dim();
-    let state_dim_u32 = state_dim as u8;
+    let state_dim_u32 = state_dim as u32;
 
     let mut total_steps: u64 = 0;
     let mut p1_wins = 0u32;
@@ -140,7 +139,7 @@ fn main() {
                     .map(|a| {
                         let target = action_target_zone(a, &obs);
                         ActionEncoding {
-                            action_type: action_type_idx(&a.action_type),
+                            action_type: action_type_idx(&a.action_type).min(ACTION_TYPE_COUNT as u8 - 1),
                             target_card_id: a
                                 .parameters
                                 .as_ref()
@@ -201,8 +200,8 @@ fn main() {
             last.done = true;
         }
 
-        // Write trajectory: [n_steps:u8] [step_1] [step_2] ...
-        let n_steps = trajectory.len().u8_count();
+        // Write trajectory: [n_steps:u32] [step_1] [step_2] ...
+        let n_steps = trajectory.len() as u32;
         let _ = out.write_all(&n_steps.to_le_bytes());
         for step in &trajectory {
             let n_actions = step.actions.len() as u16;

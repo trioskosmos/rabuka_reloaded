@@ -55,8 +55,8 @@ pub struct RevealedCardMeta {
 }
 
 pub use crate::types::{
-    AbilityApplication, AbilityBonus, AbilityTrigger, Adjustment, Allocation, BladeSource,
-    Breakdown, Duration, EffectEntry, GameResult, HeartSource, LiveCardResult, LivePerformanceData,
+    AbilityApplication, AbilityBonus, AbilityInvalidation, AbilityTrigger, Adjustment, Allocation,
+    BladeSource, Breakdown, Duration, EffectEntry, GameResult, HeartSource, LiveCardResult,
     LogEntry, MemberContribution, MovementEvent, PerformanceSnapshot, Phase, ReplacementEffect,
     ScoreLine, TemporaryEffect, TriggeredAbility, TurnPhase, YellCardResult,
 };
@@ -156,6 +156,8 @@ pub struct GameState {
     #[cfg_attr(feature = "serde_support", serde(skip))]
     pub scratch_constant_effect_ids: Vec<(i16, usize)>,
     pub negated_abilities: SmallVec<[i16; 8]>,
+    #[cfg_attr(feature = "serde_support", serde(default))]
+    pub ability_invalidations: SmallVec<[AbilityInvalidation; 4]>,
     pub replacement_effects: SmallVec<[ReplacementEffect; 2]>,
     pub constant_ability_statuses: SmallVec<[crate::types::ConstantAbilityStatus; 6]>,
     pub revealed_cards: SmallVec<[i16; 8]>,
@@ -516,8 +518,10 @@ impl GameState {
             scratch_exp_heart: HashMap::default(),
             scratch_entry_positions: HashMap::default(),
             scratch_constant_effect_ids: Vec::new(),
-            negated_abilities: SmallVec::new(),
-            replacement_effects: SmallVec::new(),
+             negated_abilities: SmallVec::new(),
+             ability_invalidations: SmallVec::new(),
+             replacement_effects: SmallVec::new(),
+
             constant_ability_statuses: SmallVec::new(),
             revealed_cards: SmallVec::new(),
             revealed_card_meta: SmallVec::new(),

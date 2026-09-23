@@ -47,8 +47,14 @@ pub(crate) fn execute_conditional_on_result(
 
     let condition_met = result_condition
         .map(|c| {
-            let ctx = ConditionContext::with_moved_cards(gs, &resolver.moved_cards);
-            ctx.evaluate_condition(c)
+            if let Some(reference) = c.get_action_reference() {
+                resolver
+                    .last_action_result
+                    .is_some_and(|(action, succeeded)| action.to_str() == reference && succeeded)
+            } else {
+                let ctx = ConditionContext::with_moved_cards(gs, &resolver.moved_cards);
+                ctx.evaluate_condition(c)
+            }
         })
         .unwrap_or(true);
 

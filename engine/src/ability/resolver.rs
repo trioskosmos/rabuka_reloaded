@@ -143,6 +143,7 @@ pub struct AbilityResolver {
     /// `modify_score` step directly following a `those_cards`→hand move must
     /// only apply when the move actually added a card.
     pub last_move_moved_any: Option<bool>,
+    pub last_action_result: Option<(crate::ability::enums::ActionType, bool)>,
     /// Formation change plan: (member_id, chosen_destination) pairs accumulated
     /// across sequential choices.  All swaps execute as a batch at the end.
     pub formation_plan: SmallVec<[(i16, String); 2]>,
@@ -253,8 +254,10 @@ impl AbilityResolver {
             pending_reprompt_choice: None,
             log_items: Vec::new(),
             formation_plan: SmallVec::new(),
-            last_move_moved_any: None,
-            last_offered_sig: None,
+             last_move_moved_any: None,
+             last_action_result: None,
+             last_offered_sig: None,
+
             last_debug_choice_sig: None,
             looked_at_origin: None,
             looked_at_deck_position: None,
@@ -1196,6 +1199,7 @@ impl AbilityResolver {
         ability_index: usize,
     ) -> Result<(), String> {
         let mut dbg = AbDebug::new();
+        self.last_action_result = None;
         // Clear structured verdict buffer from any previous ability
         #[cfg(not(feature = "no_std"))]
         crate::ability::log::clear_verdicts();

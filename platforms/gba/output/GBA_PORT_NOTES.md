@@ -129,4 +129,19 @@ agb's panic handler logs to the mGBA debug console. To capture:
 
 - Screens are capped at 240 groups; very long lines can be truncated.
 - Full match auto-play and manual play need longer soak testing.
-- No audio, no card art (text-only like the DS/PS1 ports).
+- No audio; card art is currently limited to the focused detail view.
+
+## Consolidated feature status
+
+The former board/card-image and deck-builder plans are consolidated here. The
+implemented GBA front-end has separate Board and Action views on the 240×160
+screen, a D-pad cursor, selected-card detail with baked 8bpp art, and shared
+Series → Rarity → Card ordering for the web exporter and deck builder.
+
+The deck builder supports hierarchical card filtering, quantity limits,
+legality feedback, deck-name entry, and eight SRAM custom decks. Card art is
+baked from the shared WebP cache; active-match cards are loaded into the
+runtime set. Remaining work is on-board card fronts, richer zone highlighting,
+and hardware soak testing. Focused rendering and asset-format details remain
+in [`../CARD_ART_EXPANSION.md`](../CARD_ART_EXPANSION.md) and
+[`../SPRITE_REFACTOR.md`](../SPRITE_REFACTOR.md).

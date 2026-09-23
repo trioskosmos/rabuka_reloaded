@@ -272,6 +272,22 @@ def test_deck_position_insert_maime_still_works():
     assert pos and str(pos.get('position')) == '4', f"FULL: {result}"
 
 
+def test_invalidate_ability_targets_live_start():
+    result = parse_action(
+        "自分のステージにいる『Liella!』のメンバー1人のすべての{{live_start.png|ライブ開始時}}能力を、ライブ終了時まで、無効にしてもよい"
+    )
+    assert result.get('action') == 'invalidate_ability'
+    assert result.get('target_trigger') == 'ライブ開始時'
+
+
+def test_invalidate_ability_uses_nearest_trigger_icon():
+    result = parse_action(
+        "このカードの{{heart_02.png|heart02}}{{live_success.png|ライブ成功時}}能力を無効にする"
+    )
+    assert result.get('action') == 'invalidate_ability'
+    assert result.get('target_trigger') == 'ライブ成功時'
+
+
 if __name__ == '__main__':
     import traceback
     tests = [(k, v) for k, v in sorted(globals().items()) if k.startswith('test_')]

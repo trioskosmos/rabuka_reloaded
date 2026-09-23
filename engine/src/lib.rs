@@ -77,5 +77,7 @@ pub mod ability_queue;
 pub mod rng;
 #[cfg(not(feature = "no_std"))]
 pub mod timer;
+#[cfg(all(not(feature = "no_std"), feature = "serde_support"))]
+pub mod replay;
 pub mod triggers;
 pub mod turn;

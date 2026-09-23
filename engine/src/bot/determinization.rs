@@ -71,6 +71,7 @@ impl DeterminizationSampler {
 
         let mut gs = GameState::new(my_player, opp_player, Arc::clone(&self.card_database));
         gs.current_phase = obs.current_phase.clone();
+        gs.current_turn_phase = obs.current_turn_phase;
         gs.turn_number = obs.turn_number;
         gs.game_result = obs.game_result.clone();
         for &cid in &obs.resolution_zone {

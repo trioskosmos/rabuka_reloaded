@@ -686,6 +686,9 @@
         "self_target": {
           "type": "bool"
         },
+        "target_trigger": {
+          "type": "string"
+        },
         "exclude_self": {
           "type": "bool"
         },

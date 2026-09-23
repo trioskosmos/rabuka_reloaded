@@ -84,7 +84,7 @@ What was already done on desktop (all verified in-tree):
 - **Auto-play proof of concept** — `engine/src/bin/rabuka_3ds.rs`: fully automated game
   loop (RPS Rock-vs-Paper, first-option picks, mulligan skip, first-card live set).
   Run it with `cargo run --bin rabuka_3ds --no-default-features` from `engine/`.
-- See also `platforms/3ds/README.md` for the standalone PoC layout.
+- See also `platforms/3ds/` for the active platform-specific build wrapper.
 
 Dependency risk table (always-on deps without `server`):
 
@@ -103,3 +103,13 @@ over JSON inflation.
 
 Next: set up `devkitARM` + `cargo-3ds` (Linux/WSL or Docker), add `ctru-rs` behind a
 `3ds` feature flag, cross-compile, and test on Citra first.
+
+## Historical debugging notes
+
+Earlier freezes were investigated as three classes of failure: Horizon OS
+cooperative scheduling/watchdog pressure, pending-choice detection or stale
+action caches, and platform-specific rendering/input paths. The old hypotheses
+referenced the retired `engine_3ds` layout and should not be treated as current
+code locations. When reproducing a freeze, first trace the current
+`platforms/3ds` settle loop, `has_pending_choice()`, action-cache invalidation,
+and explicit `aptMainLoop()` yields, then compare desktop and hardware behavior.

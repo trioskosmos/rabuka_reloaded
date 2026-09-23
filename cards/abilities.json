@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-09-23T11:07:41.669245",
+  "generated_at": "2026-09-24T08:46:01.390016",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
-  "source_file": "cards\\cards.json",
-  "engine_commit": "40752b52",
+  "source_file": "cards/cards.json",
+  "engine_commit": "d5044f28",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -1753,6 +1753,7 @@
           ],
           "optional": true,
           "action": "invalidate_ability",
+          "target_trigger": "ライブ開始時",
           "all": false
         },
         "result_condition": {
@@ -25985,6 +25986,7 @@
           "type": "group_condition"
         },
         "action": "invalidate_ability",
+        "target_trigger": "ライブ成功時",
         "self_target": true,
         "heart_colors": [
           "heart02"

@@ -1940,8 +1940,27 @@ _register_action(
 _register_action(
     ActionRule(match_any=["起動でき", "起動して"], action="activate_ability")
 )
+def _nearest_invalidation_trigger(text):
+    ability_pos = text.find("能力")
+    if ability_pos < 0:
+        return None
+    prefix = text[:ability_pos]
+    triggers = ("登場", "ライブ開始時", "ライブ成功時", "起動", "常時")
+    for icon in reversed(re.findall(r"\{\{[^|{}]+\|([^}]+)\}\}", prefix)):
+        if icon in triggers:
+            return icon
+    positions = [(prefix.rfind(trigger), trigger) for trigger in triggers]
+    positions = [(position, trigger) for position, trigger in positions if position >= 0]
+    return max(positions)[1] if positions else None
+
+
 _register_action(
-    ActionRule(match="無効に", exclude="無効にできない", action="invalidate_ability")
+    ActionRule(
+        match="無効に",
+        exclude="無効にできない",
+        action="invalidate_ability",
+        setter=lambda t, a: a.update({"target_trigger": _nearest_invalidation_trigger(t)}),
+    )
 )
 _register_action(
     ActionRule(

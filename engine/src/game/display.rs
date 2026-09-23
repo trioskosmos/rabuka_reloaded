@@ -1879,7 +1879,12 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
             .cloned()
             .collect(),
         constant_ability_statuses: game_state.constant_ability_statuses.to_vec(),
-        negated_abilities: game_state.negated_abilities.iter().copied().collect(),
+        negated_abilities: game_state
+            .negated_abilities
+            .iter()
+            .copied()
+            .chain(game_state.ability_invalidations.iter().map(|entry| entry.card_id))
+            .collect(),
         temporary_effects: temp_effects,
         replacement_effects: repl_effects,
         ability_queue_state: queue_state_str,

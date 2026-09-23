@@ -641,6 +641,12 @@ static void record_ability_use_guarded(GameState *g, int card_id, int ability_id
 int rb_resolve_ability(GameState *g, int actor, const Ability *ab, int ability_idx, int host_cid, int *resolved) {
     if (resolved) *resolved = 0;
     if (!g || !ab) return 0;
+    if (host_cid == 1049)
+        fprintf(stderr, "[RESOLVE_MERMAID] cur=%d state=%d pending=%d cost=%d started=%d effect=%s\n",
+                g->queue.cur, g->queue.state, g->queue.has_pending,
+                g->queue.cur >= 0 && g->queue.cur < g->queue.n_entries ? g->queue.entries[g->queue.cur].cost_paid : -1,
+                g->queue.cur >= 0 && g->queue.cur < g->queue.n_entries ? g->queue.entries[g->queue.cur].effect_started : -1,
+                ab->effect && ab->effect->action ? ab->effect->action : "none");
 
     /* initialize resolver globals (mirrors Rust self.current_ability etc.) */
     g_current_ability = *ab; /* shallow copy of strings */

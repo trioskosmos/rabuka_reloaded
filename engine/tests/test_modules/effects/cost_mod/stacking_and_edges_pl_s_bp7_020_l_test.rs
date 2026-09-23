@@ -5,7 +5,7 @@
 ///   ab#1: 自分のデッキの下からカードを1枚控え室に置く。それが『Aqours』の
 ///         メンバーカードの場合、…
 ///
-/// Gaps closed here (docs/THIN_COVERAGE_ANALYSIS.md):
+/// Gaps closed here (docs/TEST_AUDIT_PLAN.md):
 ///   - STACKING: A and B both true → reduced twice (−2), not clamped to −1
 ///   - B with EMPTY deck → mill-shortfall + condition-on-no-card path (no panic)
 ///   - A with opponent waited but own all active → own-stage gate precision

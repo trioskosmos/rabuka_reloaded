@@ -203,11 +203,11 @@ impl super::TurnEngine {
                     log::trace!(
                         "[LIVE_START_SCAN] checking card={} negated={}",
                         card_id,
-                        game_state.negated_abilities.contains(&card_id)
+                        game_state.is_ability_invalidated(card_id, &AbilityTrigger::LiveStart)
                     );
                 }
                 if (position.is_some() && card_id == -1)
-                    || game_state.negated_abilities.contains(&card_id)
+                    || game_state.is_ability_invalidated(card_id, &AbilityTrigger::LiveStart)
                 {
                     continue;
                 }
@@ -357,7 +357,8 @@ impl super::TurnEngine {
             let live_cards = player.live_card_zone.cards.iter().map(|&id| (id, None));
             for (card_id, position) in stage_cards.chain(live_cards) {
                 if position.is_some()
-                    && (card_id == -1 || game_state.negated_abilities.contains(&card_id))
+                    && (card_id == -1
+                        || game_state.is_ability_invalidated(card_id, &AbilityTrigger::LiveSuccess))
                 {
                     continue;
                 }

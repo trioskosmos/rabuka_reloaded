@@ -67,6 +67,49 @@ impl GameState {
         }
     }
 
+    pub fn is_ability_invalidated(&self, card_id: i16, trigger: &AbilityTrigger) -> bool {
+        self.ability_invalidations
+            .iter()
+            .any(|entry| entry.card_id == card_id && &entry.trigger == trigger)
+            || self.negated_abilities.contains(&card_id)
+    }
+
+    pub fn card_has_ability_trigger(&self, card_id: i16, trigger: &AbilityTrigger) -> bool {
+        self.card_database
+            .get_card(card_id)
+            .is_some_and(|card| {
+                card.abilities
+                    .iter()
+                    .any(|ability| Self::ability_matches_trigger(&ability.resolve(), trigger))
+            })
+            || self
+                .gained_card_abilities
+                .get(&card_id)
+                .is_some_and(|abilities| {
+                    abilities
+                        .iter()
+                        .any(|ability| Self::ability_matches_trigger(ability, trigger))
+                })
+    }
+
+    pub fn try_add_ability_invalidation(
+        &mut self,
+        card_id: i16,
+        trigger: AbilityTrigger,
+        duration: Duration,
+    ) -> bool {
+        if self.is_ability_invalidated(card_id, &trigger) || !self.card_has_ability_trigger(card_id, &trigger) {
+            return false;
+        }
+        self.ability_invalidations.push(crate::core::types::AbilityInvalidation {
+            card_id,
+            trigger,
+            duration,
+            created_turn: self.turn_number,
+        });
+        true
+    }
+
     /// Uses of `(card_id, ability_index)` already consumed this turn.
     pub fn ability_uses_used(&self, card_id: i16, ability_index: usize) -> u8 {
         self.turn_limited_abilities_used
@@ -1006,6 +1049,7 @@ impl GameState {
                         let resolved_ability = ability.resolve();
                         if Self::ability_matches_trigger(&resolved_ability, &trigger_type)
                             && requested_text == Some(resolved_ability.full_text.as_str())
+                            && !self.is_ability_invalidated(cid, &trigger_type)
                         {
                             let entry = self.build_ability_queue_entry(
                                 card_no.clone(),
@@ -1058,7 +1102,9 @@ impl GameState {
                                             if Self::ability_matches_trigger(
                                                 gained_ability,
                                                 &trigger_type,
-                                            ) {
+                                            )
+                                                && !self.is_ability_invalidated(card_id_val, &trigger_type)
+                                            {
                                                 let entry = self.build_ability_queue_entry(
                                                     card_no.clone(),
                                                     crate::ability::types::GAINED_ABILITY_INDEX_BASE + gidx,
@@ -1119,6 +1165,9 @@ impl GameState {
         triggering_member_id: Option<i16>,
     ) {
         if let Some(card_id) = explicit_card_id {
+            if self.is_ability_invalidated(card_id, &trigger_type) {
+                return;
+            }
             if let Some(card) = self.card_database.get_card(card_id) {
                 if let Some(ar) = card.abilities.get(ability_index) {
                     let entry = self.build_ability_queue_entry(
@@ -1618,7 +1667,7 @@ impl GameState {
             self.ability_queue.clear();
             return;
         }
-        let (card_id, ability, ability_index, cost_already_paid) = {
+        let (card_id, ability, ability_index, trigger_type, cost_already_paid) = {
             let entry = match self.ability_queue.current_entry() {
                 Some(e) => e,
                 None => return,
@@ -1640,12 +1689,12 @@ impl GameState {
                 entry.card_id,
                 entry.ability.clone(),
                 entry.ability_index,
+                entry.trigger_type.clone(),
                 entry.cost_paid,
             )
         };
 
-        // Skip resolution if this card's abilities are negated
-        if card_id.is_some() && self.negated_abilities.contains(&card_id.unwrap()) {
+        if card_id.is_some_and(|id| self.is_ability_invalidated(id, &trigger_type)) {
             log::debug!(
                 "[NEGATED] card_id={:?} is negated -- skipping ability resolution",
                 card_id
@@ -2665,6 +2714,17 @@ impl GameState {
                 expired_indices.push(i);
             }
         }
+
+        self.ability_invalidations.retain(|entry| match &entry.duration {
+            crate::core::types::Duration::LiveEnd | crate::core::types::Duration::ThisLive => {
+                self.current_turn_phase == TurnPhase::Live
+            }
+            crate::core::types::Duration::ThisTurn => self.turn_number == entry.created_turn,
+            crate::core::types::Duration::Permanent => true,
+            crate::core::types::Duration::AsLongAs | crate::core::types::Duration::Unless => {
+                self.current_turn_phase == TurnPhase::Live
+            }
+        });
 
         if !expired_indices.is_empty() {
             // Clear heart_color_multiplier only when a live-scoped effect expires.

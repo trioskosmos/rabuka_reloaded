@@ -35,7 +35,7 @@ The inverted index (`INVERTED_ABILITIES_CONDENSED.md`, `INVERTED_ABILITIES_ABSTR
 
 ## Output Files
 
-_Generated outputs are **not checked in** — regenerate with the scripts above._
+Inversion reports are generated locally and are not checked in. The canonical inventory reports listed below are checked in and CI-validated; regenerate them with `python ../test_inventory.py`.
 
 | File | Produced by | Description |
 |------|-------------|-------------|

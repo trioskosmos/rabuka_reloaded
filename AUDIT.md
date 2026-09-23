@@ -1,4 +1,7 @@
-# Repository audit — 2026-09-17
+# Repository audit — current findings
+
+This is the current repository-level audit. Historical progress logs and
+resolved findings are retained in [`docs/AUDITS.md`](docs/AUDITS.md).
 
 ## Scope and status
 
@@ -87,11 +90,9 @@ The initial suspicion about `.github/workflows/deploy-pages.yml:24` was disprove
 - Impact: the standalone image omits assets the frontend requests locally. Static Pages hosting has those images, but that does not satisfy the advertised standalone Docker path.
 - Confidence: source-level integration defect; no container/browser reproduction performed.
 
-### B13 — Medium — Auto-continue script types into an unverified foreground window
+### B13 — Medium — Auto-continue script types into an unverified foreground window (resolved by removal)
 
-- Evidence: `auto_complete.bat:25-36` ignores `AppActivate`'s success result, sends Escape, raw message text, and Enter; the default target title is empty (line 11). The loop repeats indefinitely (lines 52-55).
-- Impact: changing focus or a failed activation can submit a long instruction to an unrelated application. `SendKeys` also interprets special characters in custom text rather than guaranteeing literal entry.
-- Direction: require verified target identity and safe literal text delivery; never rely on focus alone.
+- The unsafe `auto_complete.bat` helper was removed during the 2026-09-24 cleanup because it had no product caller and could send text to an unrelated foreground window.
 
 ### B14 — Low — Root dependency audit is an empty scan presented as an audit
 
@@ -169,7 +170,7 @@ The initial suspicion about `.github/workflows/deploy-pages.yml:24` was disprove
 | Files | Review depth |
 |---|---|
 | `AGENTS.md`, `README.md`, `DEPENDENCY_AUDIT.md` | Full |
-| `Dockerfile`, `.dockerignore`, `.gitignore`, `.gitattributes`, `cloudbuild.yaml`, `render.yaml`, `start.bat`, `auto_complete.bat` | Full |
+| `Dockerfile`, `.dockerignore`, `.gitignore`, `.gitattributes`, `cloudbuild.yaml`, `render.yaml`, `start.bat` | Full |
 | `.github/workflows/coverage.yml`, `.github/workflows/engine-tests.yml`, `.github/workflows/deploy-pages.yml`, `.github/workflows/deploy-server.yml`, `.github/workflows/deploy-fly.yml` | Full |
 | `engine/Cargo.toml`, `engine/.cargo/config.toml`, `engine/build.rs` | Full |
 | `engine/src/lib.rs`, `engine/src/rng.rs`, `engine/src/timer.rs`, `engine/src/triggers.rs`, `engine/src/alloc_counter.rs` | Full |
@@ -335,7 +336,7 @@ Documentation-impact severity, not a claim of additional independently reproduce
 | D20 | Low | `docs/parity_plan.md:52,62,164` | Lists test_find_live_by_score missing despite implementation at `engine_c/src/test_game.c:102-113`. Behavior parity not executed. |
 | D21 | Medium | `engine/PORTS.md:809,814,838` | Wii std/JSON architecture claim conflicts with current no_std/bytecode/compact features. |
 | D22 | Low | `engine/PORTS.md:63-65,77,387-389,1015-1023` | Early absolute impossibility verdicts conflict with later working GBA/DC discussion and corrected ROM/RAM analysis. |
-| D23 | Low | `docs/3ds/HANG_DEBUGGING.md:16,137-140` | Debugging paths use absent engine_3ds rather than platforms/3ds. Historical causes not revalidated. |
+| D23 | Low | Historical `docs/3ds/HANG_DEBUGGING.md` (consolidated 2026-09-24) | Old debugging paths used the retired `engine_3ds` layout; current reproduction notes live in `engine/3DS_CROSS_COMPILE_GUIDE.md`. |
 | D24 | Low | `docs/3ds/VISUAL_DESIGN.md:72-84` | RGB888 and rgba values mislabeled packed RGB565 hexadecimal. |
 | D25 | Low | `docs/gba_deck_builder_plan.md:19,54,165` | Eight prefix series / 80-character alphabet differ from seven labels and longer current alphabet in `platforms/gba/src/deck_builder.rs:184-208`. |
 | D26 | Low | `docs/ABILITY_FAMILIES.md:14-15,108` | Sampled generated anchor fragments retain colons removed by GFM heading slugging; index navigation fails under GitHub rendering. |
@@ -343,7 +344,7 @@ Documentation-impact severity, not a claim of additional independently reproduce
 
 ### Documentation per-file coverage
 
-Fully read: `docs/ABILITY_PIPELINE.md` (598 lines), `docs/AUDITS.md` (1825), `docs/BOT_STRATEGY.md` (779), `docs/EFFECT_ARCHITECTURE.md` (169), `docs/ROADMAP.md` (56), `docs/TEST_AUDIT_PLAN.md` (302), `docs/WEB_MULTIPLAYER_ARCHITECTURE.md` (320), `docs/QR_DECK_SHARING.md` (104), `docs/parity_plan.md` (166), `docs/memory_optimization_combined.md` (255), `docs/gba_board_and_card_images.md` (336), `docs/gba_deck_builder_plan.md` (218), `docs/3ds/HANG_DEBUGGING.md` (140), `docs/3ds/freeze_checklist.md` (90), `docs/3ds/PC_TRANSPORT_IMPLEMENTATION.md` (115), `docs/3ds/VISUAL_DESIGN.md` (214), `docs/index.html` (11), `engine/PORTS.md` (1371), `engine/ISSUES_FOUND.md` (27), `engine/3DS_CROSS_COMPILE_GUIDE.md` (78), `engine/PORT_TO_3DS.md` (110).
+Fully read: `docs/ABILITY_PIPELINE.md`, `docs/AUDITS.md`, `docs/BOT_STRATEGY.md`, `docs/EFFECT_ARCHITECTURE.md`, `docs/TEST_AUDIT_PLAN.md`, `docs/WEB_MULTIPLAYER_ARCHITECTURE.md`, `docs/QR_DECK_SHARING.md`, `docs/memory_optimization_combined.md`, `docs/gba_board_and_card_images.md`, `docs/gba_deck_builder_plan.md`, `docs/3ds/PC_TRANSPORT_IMPLEMENTATION.md`, `docs/3ds/VISUAL_DESIGN.md`, `engine/PORTS.md`, `engine/ISSUES_FOUND.md`, and `engine/3DS_CROSS_COMPILE_GUIDE.md`. The former 3DS debugging and handoff documents are now compatibility stubs.
 
 Generated inventory read, not semantic coverage validation: `docs/ABILITY_MATRIX.md` (125 lines). Sample only: `docs/ABILITY_FAMILIES.md:1-240` of 1972. `docs/img/**` inventory was initially truncated; image contents/completeness not audited. A full document read does not independently validate every historical implementation assertion.
 
@@ -374,8 +375,8 @@ Static evidence only; no executable verification. Reviewer inspected `1ab04279` 
 | BT19 | Medium | `engine/src/bin/calibrate.rs:80-106`; `engine/src/bot/strategy_v4.rs:100-145` | Copied calibration predictor uses wildcard expected flips rather than current v4 colored distribution. | Call shared versioned predictor. |
 | BT20 | Medium | `engine/benches/performance.rs:100-153,166-170` | Completion benchmark accepts stuck/capped games and ignores execution errors; phase advance can bypass pending choices; microbenchmark includes randomized setup. | Fixed valid fixtures, separate setup, explicit completion/errors. |
 | BT21 | Medium | `engine/src/bot/rollout.rs:292-314,325-328` | Thread-local plan cache omits game/player/board/opponent/modifier identity, allowing cross-game stale plan reuse. | Decision-scoped cache or complete key/lifecycle. |
-| BT22 | Medium | `tools/analysis/analyze_checks.py:6`; `tools/analysis/analyze_curve.py:6`; `tools/analysis/analyze_perf.py:8`; `tools/analysis/analyze_stall.py:6,27`; `tools/analysis/show_game.py:10`; `engine/src/bin/bot_arena.rs:482` | Consumers expect ENTER while producer emits ENTER:<phase>; empty/zero reports or unpack-None failure result. | Versioned trace schema and missing-record errors. |
-| BT23 | Medium | `tools/analysis/analyze_throws.py:21` | **FIXED 2026-09-23** during tools/analysis move: invalid `el    if` token corrected to `elif`. | Include utility scripts in syntax validation. |
+| BT22 | Medium | Historical CSV analyzers (removed 2026-09-24); current producer emits `ENTER:<phase>` | Obsolete readers were removed; current JSONL analyzers are the supported path. |
+| BT23 | Medium | Historical `analyze_throws.py` syntax defect (file removed 2026-09-24) | Resolved by removing the obsolete CSV reader. |
 | BT24 | Medium | `tools/analysis/analyze_losses.py:93-100,118-123` | Per-turn failures inferred from final successes; later success masks earlier failure. folded_all predicate requires both nonempty values and an empty map, so never fires. | Adjacent live-boundary attribution and valid emptiness predicate. |
 | BT25 | Medium | `engine/tests/test_modules/characterization/action_coverage_test.rs:32-47,61-120` | Counts almost every attempted activation error as action coverage; no valid trigger/effect postcondition, shallow compound scan, empty coverage can pass. | Prove target action executed under valid fixture and nonempty coverage. |
 | BT26 | Medium | `engine/tests/test_modules/characterization/corpus_smoke_test.rs:21-81` | Ignored activation errors/bounded draining do not prove each ability executed; uniqueness map resets per player and omits under-cards, energy decks, resolution zone. | Execution outcome accounting and global conservation invariants. |
@@ -387,7 +388,7 @@ Static evidence only; no executable verification. Reviewer inspected `1ab04279` 
 | BT32 | Low | `engine/src/bot/mod.rs:45-65`; `engine/src/bot/ismcts.rs:96,116` | Exposed rollout-depth/heuristic/progressive-widening settings do not control this search path. | Implement semantics or remove unsupported configuration. |
 | BT33 | Low | `tools/analysis/analyze_logs.py:12-15,30` | Two-word result regex skips single-word DRAW headers. | Structured/complete result parsing. |
 | BT34 | Low | `tools/analysis/pass_probe.py:15-19,32-39` | Early Main/Pass filters make later live-set branch unreachable. | Separate phase analysis. |
-| BT35 | Low | `tools/analysis/count_batons.py`; `tools/analysis/extract_examples.py`; `tools/analysis/pass_probe.py` | **FIXED 2026-09-23** during tools/analysis move: hardcoded temp paths replaced with `sys.argv` inputs (extract_examples still has a fixed GAMES map). | Path/selection arguments and dataset metadata. |
+| BT35 | Low | `tools/analysis/count_batons.py`; `tools/analysis/pass_probe.py` | The one-off extractor was removed; remaining tools use explicit inputs. | Keep dataset metadata with current reports. |
 | BT36 | Low | `engine/src/bin/harness.rs:139-151` | EOF returns zero bytes, not error, so input loop repeatedly prints invalid input instead of exiting. | Treat zero read as EOF. |
 
 ### Bot/training/test per-file coverage
@@ -398,7 +399,7 @@ Full reads under `engine/src/bin`: `bot_arena.rs`, `bot_data_gen.rs`, `bot_demo.
 
 Full reads: `engine/examples/ds3_smoke.rs`, `engine/examples/gen_flamegraph.rs`, `engine/examples/play_and_observe.rs`, `engine/benches/performance.rs`, `training/train_ppo.py`, `ai_design/nn_architecture.md`. Training binaries inventory only; `ai_design/rabuka_bot_design.md` unreviewed.
 
-Full reads under `tools/analysis/` (moved from engine root 2026-09-23): `analyze_audit.py`, `analyze_checks.py`, `analyze_curve.py`, `analyze_deck.py`, `analyze_logs.py`, `analyze_losses.py`, `analyze_perf.py`, `analyze_stall.py`, `analyze_throws.py`, `count_batons.py`, `extract_examples.py`, `pass_probe.py`, `search_card.py`, `show_game.py`. Also full read: `engine/cargo`.
+Full reads under `tools/analysis/`: `analyze_audit.py`, `analyze_deck.py`, `analyze_logs.py`, `analyze_losses.py`, `analyze_success_zones.py`, `analyze_v7_trace.py`, `count_batons.py`, `hunt_bad_plays.py`, `pass_probe.py`. Obsolete CSV readers and one-off reports were removed during the 2026-09-24 cleanup. Also full read: `engine/cargo`.
 
 Full test reads only: `engine/tests/run_all.rs`, `engine/tests/test_modules/characterization/action_coverage_test.rs`, `engine/tests/test_modules/characterization/corpus_smoke_test.rs`, `engine/tests/test_modules/integration/e2e_basic_game_test.rs`, plus inline bot_arena/strategy_v7 tests. Other `engine/tests/**/*.rs` underwent a smell search capped at80 results, **not a file-by-file semantic review**. Separate search found no explicit references to the named neural/determinization/search APIs; this does not exclude indirect tests. Helpers, support, repetitive ability/rule bodies, generated inventories, and concurrent new tests remain unreviewed by this reviewer.
 
@@ -435,9 +436,9 @@ Integration qualification for B12: the reviewer confirmed mapped/local image res
 | Inventory / unreviewed | All11 `web_ui/css` files; `web_ui/js/app_controller.js`, `compat.js`, `constants_dom.js`, `interaction_adapter.js`, `layout.js`, `logger.js`, `main.js`, `replay_system.js`, `state.js`, `ui_drag_drop.js`, `ui_modals.js`, `ui_rendering.js`, `view_state.js` (coordinator's state.js excerpts do not constitute full review) |
 | Inventory / unreviewed | Components `ActionButtons.js`, `ActionListView.js`, `ActionMenu.js`, `AiDriver.js`, `BoardRenderer.js`, `ChoiceView.js`, `HeaderStats.js`, `Highlighter.js`, `LogRenderer.js`, `PerformanceRenderer.js`, `RpsView.js`, `ZoneViewer.js` |
 | Inventory / unreviewed | All15 `web_ui/js/modals` files; services `DebugService.js`, `PlannerService.js`; utils `Attribution.js`, `DOMUtils.js`, `LogFilter.js`, `ModalManager.js`, `PerformanceMonitor.js`, `StringUtils.js`, `TextEnricher.js`; i18n index/names/translator/locales; `web_ui/js/tests/ui_logs.test.js`; `web_ui/public/wasm/test.html` |
-| Inventory / unreviewed | `cards/add_new_cards.py`, `deck_compression.py`, `describe_fidelity_report.py`, `find_bad_tests.py`, `fix_images.py`, `pipeline_report.py`, `scrape_all.py`, `scrape_new_cards.py`, `scrape_qa.py`, `scrape_stats.py`, `test_inventory.py`, `ABILITY_DOCUMENTATION.md` |
-| Inventory / unreviewed | Extraction `_d.py`, `analyze_phrases.py`, `card_overrides.py`, `gap_report.py`, `parser.py`, `parser_utils.py`, parser notes/plans/baseline, all six extraction test files, ability_docs_scripts analysis/inversion/README |
-| Inventory / unreviewed | Tools `analyze_deck_ordering.py`, `analyze_decks.py`, `bake_card_art.py`, `bake_font_tiles.py`, `bake_texticon_tiles.py`, `compare_dpad.py`, `gen_cjk_font.py`, `gen_sjis_table.py`, `merge_yoster_ja.py`, `preview_card_art.py`, `reorder_for_gba.py`, `test_bpp.py`, `font/used_chars.py`, `bake/Cargo.toml`, `bake/src/main.rs` |
+| Inventory / unreviewed | `cards/add_new_cards.py`, `deck_compression.py`, `describe_fidelity_report.py`, `pipeline_report.py`, `scrape_all.py`, `scrape_qa.py`, `test_inventory.py`, `ABILITY_DOCUMENTATION.md` |
+| Inventory / unreviewed | Extraction `analyze_phrases.py`, `card_overrides.py`, `gap_report.py`, `parser.py`, `parser_utils.py`, parser notes/plans/baseline, all six extraction test files, ability_docs_scripts analysis/inversion/README |
+| Inventory / unreviewed | Tools `bake_card_art.py`, `bake_font_tiles.py`, `bake_texticon_tiles.py`, `gen_cjk_font.py`, `reorder_for_gba.py`, `font/used_chars.py`, `bake/Cargo.toml`, `bake/src/main.rs` |
 | Generated/data/vendor inventory only | Master cards/abilities/QA JSON, cards/build outputs, generated_constants/assets_registry/translations, qrcode.min.js, WASM generated glue, images, all13 listed deck files, fonts/character lists, mkpsxiso vendor binaries/docs, tool lockfile |
 
 Glob inventory was initially capped; the reviewer does not claim a complete filesystem inventory. Most UI rendering, the large parser, scrapers, art/font tooling and test bodies remain substantive audit gaps. Incidental cache/log/base64 search matches are not review coverage.

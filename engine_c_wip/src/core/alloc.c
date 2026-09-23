@@ -48,6 +48,7 @@ void rb_effect_free(AbilityEffect *e) {
     rb_free(e->destination); rb_free(e->target);
     rb_free_condition(e->condition);
     for (int i = 0; i < e->n_child; i++) rb_effect_free(e->child[i]);
+    for (int i = 0; i < e->n_options; i++) rb_effect_free(e->options[i]);
     for (int i = 0; i < e->n_extra; i++) { rb_free(e->extra_k[i]); rb_free(e->extra_v[i]); }
     rb_effect_free(e->primary_effect);
     rb_effect_free(e->alternative_effect);
@@ -178,6 +179,12 @@ AbilityEffect *rb_effect_deep_clone(const AbilityEffect *src) {
         AbilityEffect *cc = rb_effect_deep_clone(src->child[i]);
         if (!cc) break;
         e->child[e->n_child++] = cc;
+    }
+    e->n_options = 0;
+    for (int i = 0; i < src->n_options && i < RB_MAX_CHILD; i++) {
+        AbilityEffect *opt = rb_effect_deep_clone(src->options[i]);
+        if (!opt) break;
+        e->options[e->n_options++] = opt;
     }
     e->primary_effect = src->primary_effect ? rb_effect_deep_clone(src->primary_effect) : NULL;
     e->alternative_effect = src->alternative_effect ? rb_effect_deep_clone(src->alternative_effect) : NULL;

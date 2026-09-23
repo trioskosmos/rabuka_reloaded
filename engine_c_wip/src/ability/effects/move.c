@@ -93,6 +93,7 @@ static int cmf_has_heart(const Card *c, int hc){
 }
 static int card_matches_filter(int card_idx, AbilityEffect *e){
     const char *ctype = cmf_extra(e,"card_type");
+    if(!ctype && e->card_type_field[0]) ctype = e->card_type_field;
     if(ctype && !card_matches_card_type_filter(card_idx, ctype)) return 0;
     const char *gn = cmf_extra(e,"group_names");
     if(gn && !rb_card_matches_group_str(card_idx, gn)) return 0;
@@ -537,6 +538,10 @@ int rb_move_take_cards_from_standard_zone(GameState *g, int actor,
                                        e->self_target_field[0] && !strcmp(e->self_target_field, "true"), -1,
                                        idxs, RB_MAX_ZONE);
     int outcome = rb_classify_selection(idxs, mn, count, is_all);
+    if (outcome == 1 && !strcmp(zone_name, "discard") && !is_all) {
+        rb_move_prompt_card_selection(g, actor, zone_name, count, can_skip, e);
+        return -1;
+    }
     if (outcome == 1 && can_skip && mn > 0) {
         if (is_all) {
             rb_zone_remove_at_indices(g, pl, zone_name, idxs, mn);
@@ -1606,6 +1611,11 @@ void rb_effect_move_cards(GameState *g, int actor, AbilityEffect *e){
             } else {
                 for(int i=0;i<g->n_recently_moved && ns<cnt;i++){ src_ids[ns]=g->recently_moved[i]; src_area[ns]=-1; ns++; }
             }
+        } else if(!strcmp(src_s,"energy_deck")){
+            for(int i=0;i<cnt && i<A->energy_deck.n;i++){
+                int cid=A->energy_deck.cards[i];
+                if(rb_card_is_energy(cid)){ src_ids[ns]=cid; src_area[ns]=-1; ns++; }
+            }
         } else {
             RbZone src=RB_ZONE_HAND; rb_zone_of_str(src_s,&src);
             if(src==RB_ZONE_STAGE){ for(int pos=0;pos<RB_STAGE_SIZE && ns<cnt;pos++) if(A->stage[pos]>=0 && card_matches_filter(A->stage[pos],e)){ src_ids[ns]=A->stage[pos]; src_area[ns]=pos; ns++; } }
@@ -1620,7 +1630,14 @@ void rb_effect_move_cards(GameState *g, int actor, AbilityEffect *e){
         int moved=0;
         for(int i=0;i<ns;i++){
             int cid=src_ids[i];
-            if(!find_and_remove_card(A,cid)) continue;
+            if(!strcmp(src_s,"energy_deck")){
+                int found=0;
+                for(int j=0;j<A->energy_deck.n;j++) if(A->energy_deck.cards[j]==cid){
+                    for(int k=j;k<A->energy_deck.n-1;k++) A->energy_deck.cards[k]=A->energy_deck.cards[k+1];
+                    A->energy_deck.n--; found=1; break;
+                }
+                if(!found) continue;
+            } else if(!find_and_remove_card(A,cid)) continue;
             if(dst_stage){
                 int area=dst_area;
                 if(area==-2) area=src_area[i];
@@ -1659,4 +1676,8 @@ void rb_effect_move_cards(GameState *g, int actor, AbilityEffect *e){
     g->n_those_cards = nm < RB_MAX_RECENTLY_MOVED ? nm : RB_MAX_RECENTLY_MOVED;
     for(int i=0;i<g->n_those_cards;i++) g->those_cards[i]=moved_ids[i];
     for(int i=0;i<nm;i++) g->moved_this_turn[moved_ids[i]] = 1;
+    const char *state_change = cmf_extra(e, "state_change");
+    if (state_change && *state_change)
+        rb_move_finalize_card_movement(g, actor, moved_ids, nm, dst_s, src_s,
+                                       state_change, e->target);
 }

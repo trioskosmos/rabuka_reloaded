@@ -157,23 +157,23 @@ ll_dbg.txt
 # DeepSeek training harness (local experiments)
 /deepseek-harness/
 
-# engine_c build outputs and transpiler scratch logs
-engine_c/rb_engine.exe
-engine_c/rb_engine_*.exe
-engine_c/*.txt
-engine_c/err*.txt
-engine_c/out*.txt
-engine_c/p_*.txt
-engine_c/r_*.txt
-engine_c/t_*.txt
-engine_c/q*_out.txt
-engine_c/platforms/
+# engine_c_wip build outputs and transpiler scratch logs
+engine_c_wip/rb_engine.exe
+engine_c_wip/rb_engine_*.exe
+engine_c_wip/*.txt
+engine_c_wip/err*.txt
+engine_c_wip/out*.txt
+engine_c_wip/p_*.txt
+engine_c_wip/r_*.txt
+engine_c_wip/t_*.txt
+engine_c_wip/q*_out.txt
+engine_c_wip/platforms/
 
-# engine_c toolchains
-engine_c/toolchains/
+# engine_c_wip toolchains
+engine_c_wip/toolchains/
 
-# engine_c generated test artifacts
-engine_c/tests/test_ported_generated.c
+# engine_c_wip generated test artifacts
+engine_c_wip/tests/test_ported_generated.c
 
 # Genesis build artifacts
 platforms/genesis/c/obj/
@@ -185,12 +185,11 @@ engine/src/core/cards.bin
 engine/baked/decks/*.bin
 engine/src/core/cards_gen.rs
 
-# Generated engine_c sources
-engine_c/src/bytecode_data.c
+# Generated engine_c_wip sources
+engine_c_wip/src/bytecode_data.c
 
+engine_c_wip/src/*.bin
+engine_c_wip/src/core/generated/*.o
+engine_c_wip/src/**/*.o
 
-engine_c/src/*.bin
-engine_c/src/core/generated/*.o
-engine_c/src/**/*.o
-
-engine_c/debug_eli.exe
+engine_c_wip/debug_eli.exe

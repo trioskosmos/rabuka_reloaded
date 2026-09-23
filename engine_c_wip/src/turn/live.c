@@ -80,10 +80,13 @@ static RbYellIconOutcome rb_process_yell_revealed_card_icons(const GameState *g,
     /* BAll (b_heart07, color 7) doubling — a card carrying an All-color heart
         doubles every other heart icon on that same card (the All heart itself is
         the doubling source and is NOT doubled). */
+    int blade_start = c.num_base;
+    int blade_end = blade_start + c.num_blade;
+    if (blade_end > c.n_hearts) blade_end = c.n_hearts;
     int has_ball=0;
-    for(int h=0;h<c.n_hearts;h++) if(c.heart_color[h]==7 && c.heart_count[h]>0) has_ball=1;
+    for(int h=blade_start;h<blade_end;h++) if(c.heart_color[h]==7 && c.heart_count[h]>0) has_ball=1;
     int mult = has_ball ? 2 : 1;
-    for(int h=0;h<c.n_hearts;h++){
+    for(int h=blade_start;h<blade_end;h++){
         int col=c.heart_color[h];
         /* override_color (live.rs::player_perform_live) recolors every yell card's
             heart icons to a stage member's set_blade_type heart color; Draw/Score
@@ -105,13 +108,20 @@ static RbYellIconOutcome rb_process_yell_revealed_card_icons(const GameState *g,
 
 /* Yell: reveal top yell_count cards per live (default 1) and harvest blade hearts.
     Returns number of yell cards revealed, fills blade_hearts[8] + note_icons. */
-static int do_yell(GameState *g, int pl, int yell_cards[RB_MAX_LIVE_CARDS*3], int *n_yell, int blade_hearts[8], int *note_icons){
+static int do_yell(GameState *g, int pl, int yell_cards[RB_MAX_ZONE], int *n_yell, int blade_hearts[8], int *note_icons){
     RbPlayer *P=&g->p[pl];
     int lives=P->live.n;
     if(lives==0) return 0;
-    int per_live = 1 + (pl >= 0 && pl < 2 ? g->yell_count_mod[pl] : 0); /* modify_yell_count adds per-live */
-    if (per_live < 1) per_live = 1;
-    int total_needed=lives*per_live;
+    int total_needed = 0;
+    for (int si = 0; si < RB_STAGE_SIZE; si++) {
+        int cid = P->stage[si];
+        if (cid == RB_EMPTY_SLOT || cid < 0) continue;
+        RbModifierEntry blade_entry = g->mods.blade[cid];
+        total_needed += rb_effective_blade(cid, blade_entry);
+    }
+    if (pl >= 0 && pl < 2 && g->yell_count_mod[pl] > 0)
+        total_needed += lives * g->yell_count_mod[pl];
+    if (total_needed < 1) total_needed = 1;
     int revealed=0;
     int draw_icons=0;
     memset(blade_hearts,0,8*sizeof(int));
@@ -193,11 +203,10 @@ static void rb_greedy_allocate(int *pool /*[8]*/, const int *needs /*[n][8]*/, i
                 pool[c]-=take; filledc[c]+=take;
             }
         }
-        /* Phase 3a: remaining deficit filled by surplus colored hearts (h00 bucket) */
         int total_filled=0; for(int c=0;c<8;c++) total_filled+=filledc[c];
         int total_required=0; for(int c=0;c<8;c++) total_required+=need[c];
         int h00_deficit = total_required - total_filled; if(h00_deficit<0) h00_deficit=0;
-        if(h00_deficit>0){
+        if(h00_deficit>0 && need[0]>0){
             int surplus_colors[6]; int ns=0;
             for(int c=1;c<7;c++) if(pool[c]>0) surplus_colors[ns++]=c;
             /* demand-aware: sort by (pool[c]-future[i][c]) descending */
@@ -281,6 +290,14 @@ static int allocate_and_verdict(const GameState *g, int pl, const int total_hear
     rb_build_card_needs(g, pl, needs, &n);
     rb_compute_future_demand(needs, n, future);
     rb_greedy_allocate(pool, needs, n, future, filled);
+    fprintf(stderr, "[LIVE_ALLOCATION] pl=%d lives=%d hearts=[%d,%d,%d,%d,%d,%d,%d,%d]\n",
+            pl, n, total_hearts[0], total_hearts[1], total_hearts[2], total_hearts[3],
+            total_hearts[4], total_hearts[5], total_hearts[6], total_hearts[7]);
+    for (int di = 0; di < n; di++) {
+        fprintf(stderr, "[LIVE_ALLOCATION_CARD] idx=%d need=[%d,%d,%d,%d,%d,%d,%d,%d] filled=[%d,%d,%d,%d,%d,%d,%d,%d]\n",
+                di, needs[di*8], needs[di*8+1], needs[di*8+2], needs[di*8+3], needs[di*8+4], needs[di*8+5], needs[di*8+6], needs[di*8+7],
+                filled[di*8], filled[di*8+1], filled[di*8+2], filled[di*8+3], filled[di*8+4], filled[di*8+5], filled[di*8+6], filled[di*8+7]);
+    }
     int all_pass = rb_allocations_pass(filled, needs, n) ? 1 : 0;
 
     int total_required_all=0;
@@ -288,7 +305,8 @@ static int allocate_and_verdict(const GameState *g, int pl, const int total_hear
     for(int i=0;i<n;i++) for(int k=0;k<8;k++) total_required_all+=needs[i*8+k];
 
     /* snapshot detail consumed by rb_populate_live_verdicts / rb_compute_surplus_and_flags */
-    RbLiveSnapshot *sn = (g->n_snapshots>0) ? (RbLiveSnapshot*)&g->snapshots[g->n_snapshots-1] : NULL;
+    RbLiveSnapshot *sn = (g->n_snapshots < RB_MAX_SNAPSHOTS)
+        ? (RbLiveSnapshot*)&g->snapshots[g->n_snapshots] : NULL;
 
     for(int li=0; li<P->live.n; li++){
         int need[8]; memcpy(need, needs+li*8, 8*sizeof(int));
@@ -312,7 +330,7 @@ static int allocate_and_verdict(const GameState *g, int pl, const int total_hear
     }
     int lt_bonus = (pl == 0) ? (int)g->mods.p1_constant_total_score_bonus
                              : (int)g->mods.p2_constant_total_score_bonus;
-    if (lt_bonus > 0) total_score += lt_bonus;
+    if (all_pass && lt_bonus > 0) total_score += lt_bonus;
     if (total_score < 0) total_score = 0;
     if (total_score > 255) total_score = 255;
     if(out_passed) *out_passed=all_pass;
@@ -332,7 +350,7 @@ int rb_perform_live(GameState *g, int pl){
     g->re_yell_note_icons = 0;
     memset(g->re_yell_blade_hearts, 0, sizeof(g->re_yell_blade_hearts));
     g->n_revealed = 0;
-    int yell_cards[RB_MAX_LIVE_CARDS*3]; int n_yell=0;
+    int yell_cards[RB_MAX_ZONE]; int n_yell=0;
     int blade_hearts[8]={0}; int note_icons=0;
     do_yell(g, pl, yell_cards, &n_yell, blade_hearts, &note_icons);
 
@@ -346,7 +364,18 @@ int rb_perform_live(GameState *g, int pl){
 
     int passed=0, live_score=0, surplus=-1;
     int live_passed[RB_MAX_LIVE_CARDS]={0};
+    if (g->n_snapshots < RB_MAX_SNAPSHOTS)
+        memset(&g->snapshots[g->n_snapshots], 0, sizeof(g->snapshots[g->n_snapshots]));
     allocate_and_verdict(g, pl, total_hearts, &passed, &live_score, &surplus, live_passed);
+    int has_stage = 0;
+    for (int i = 0; i < RB_STAGE_SIZE; i++) {
+        if (P->stage[i] != RB_EMPTY_SLOT && P->stage[i] >= 0) has_stage = 1;
+    }
+    if (!has_stage) {
+        passed = 0;
+        live_score = 0;
+        memset(live_passed, 0, sizeof(live_passed));
+    }
     g->live_success[pl] = passed; /* record this turn's live result for opponent_live_success */
     /* push snapshot for parity diff (trace_game oracle) — surplus feeds
        NoExcessHeart condition (engine/src/turn/live.rs compute_surplus_and_flags) */
@@ -355,6 +384,11 @@ int rb_perform_live(GameState *g, int pl){
         s->player=pl; s->turn=g->turn; s->n_lives=P->live.n;
         for(int i=0;i<P->live.n && i<RB_MAX_LIVE_CARDS;i++) s->lives[i]=P->live.cards[i];
         s->n_yell_cards = n_yell;
+        for (int i = 0; i < P->live.n && i < RB_MAX_LIVE_CARDS; i++) {
+            int required[8] = {0};
+            rb_effective_need_heart(g, P->live.cards[i], required);
+            memcpy(s->live_required[i], required, sizeof(required));
+        }
         for (int i = 0; i < n_yell && i < RB_MAX_LIVE_CARDS * 3; i++) {
             s->yell_cards[i] = yell_cards[i];
         }
@@ -363,7 +397,7 @@ int rb_perform_live(GameState *g, int pl){
         s->total_score=live_score; s->success=passed;
         s->surplus_hearts = surplus;
         s->note_icons = note_icons;
-        for(int i=0;i<P->live.n && i<RB_MAX_LIVE_CARDS;i++) s->live_passed[i]=live_passed[i];
+        for(int i=0;i<P->live.n && i<RB_MAX_LIVE_CARDS;i++) s->live_passed[i]=passed ? live_passed[i] : 0;
     }
     if (g->live_batch_mode) {
         g->live_pre_valid[pl] = 1;
@@ -423,6 +457,17 @@ int rb_perform_live(GameState *g, int pl){
         /* Mirror live.rs::populate_live_verdicts — finalize per-live pass/fail on
             the now-current allocation (post LiveSuccess/Auto/re_yell modifiers). */
         rb_populate_live_verdicts(g);
+        passed = 1;
+        for (int i = 0; i < P->live.n && i < RB_MAX_LIVE_CARDS; i++) {
+            if (!g->snapshots[g->n_snapshots - 1].live_passed[i]) passed = 0;
+        }
+        if (!passed || !has_stage) {
+            passed = 0;
+            live_score = 0;
+            g->snapshots[g->n_snapshots - 1].total_score = 0;
+            g->snapshots[g->n_snapshots - 1].success = 0;
+            g->snapshots[g->n_snapshots - 1].live_passed[0] = 0;
+        }
     }
     /* revert_live_success_score_modifiers (live.rs): the score grants from the
         LiveSuccess/Auto abilities fired above are event-scoped and must not leak
@@ -479,8 +524,7 @@ void rb_determine_live_winners(const GameState *g, int *p1_won, int *p2_won) {
     else if (!p1_all && p2_all)    { r0 = 0; r1 = 1; }
     else if (g->live_score[0] > g->live_score[1]) { r0 = 1; r1 = 0; }
     else if (g->live_score[1] > g->live_score[0]) { r0 = 0; r1 = 1; }
-    else if (g->first_attacker == 0)         { r0 = 1; r1 = 0; }
-    else                                     { r0 = 0; r1 = 1; }
+    else                                     { r0 = 1; r1 = 1; }
     if (p1_won) *p1_won = r0;
     if (p2_won) *p2_won = r1;
 }
@@ -526,9 +570,10 @@ void rb_finalize_snapshot_fields(GameState *g, int p1_won, int p2_won,
     for(int si=0;si<g->n_snapshots;si++){
         RbLiveSnapshot *s=&g->snapshots[si];
         int sc    = (s->player==0) ? p1_score : p2_score;
-        s->total_score = sc;
         int all_passed=1;
         for(int i=0;i<s->n_lives && i<RB_MAX_LIVE_CARDS;i++) if(!s->live_passed[i]) all_passed=0;
+        if (!all_passed) sc = 0;
+        s->total_score = sc;
         s->success = all_passed && sc>0;
     }
 }
@@ -758,10 +803,7 @@ void rb_record_pretrigger_live_results(GameState *g) {
     for (int i = 0; i < g->n_snapshots; i++) {
         RbLiveSnapshot *s = &g->snapshots[i];
         if (s->turn != g->turn) continue;
-        int passed = s->n_lives > 0;
-        for (int j = 0; j < s->n_lives; j++) {
-            if (!s->live_passed[j]) passed = 0;
-        }
+        int passed = s->n_lives > 0 && s->success;
         if (s->player == 0) {
             g->live_success[0] = passed;
         } else {
@@ -851,8 +893,9 @@ void rb_process_delayed_gained_effects(GameState *g) {
 
 void rb_merge_late_score_apps(GameState *g) {
     if (!g || g->n_snapshots == 0) return;
-    RbLiveSnapshot *s = &g->snapshots[g->n_snapshots - 1];
     int trace_n = rb_mods_trace_len(&g->mods);
+    if (trace_n == 0) return;
+    RbLiveSnapshot *s = &g->snapshots[g->n_snapshots - 1];
     for (int i = 0; i < trace_n; i++) {
         const RbAbilityTraceEntry *entry = &g->mods.trace[i];
         if (entry->effect_type != RB_EFFECT_SCORE_BONUS &&
@@ -872,14 +915,16 @@ void rb_move_live_to_success_and_handle_wins(GameState *g) {
     if (!g) return;
     for (int pl = 0; pl < 2; pl++) {
         int won = pl == 0 ? g->p1_live_won : g->p2_live_won;
+        int placed = 0;
         while (g->p[pl].live.n > 0) {
             int cid = g->p[pl].live.cards[0];
             for (int i = 0; i < g->p[pl].live.n - 1; i++) {
                 g->p[pl].live.cards[i] = g->p[pl].live.cards[i + 1];
             }
             g->p[pl].live.n--;
-            if (won && rb_success_len(&g->p[pl]) < RB_MAX_ZONE) {
+            if (won && !placed && rb_success_len(&g->p[pl]) < RB_MAX_ZONE) {
                 rb_success_add(&g->p[pl], cid);
+                placed = 1;
             } else {
                 rb_waitroom_add(&g->p[pl], cid);
             }
@@ -956,15 +1001,25 @@ void rb_execute_live_victory_determination(GameState *g) {
     rb_rebuild_stage_hearts_with_yell(g);
     rb_record_pretrigger_live_results(g);
 
-    rb_trigger_live_success(g, 0);
-    rb_trigger_auto_abilities(g, 0, "ライブ成功時");
-    rb_process_pending_auto_abilities(g);
-    if (rb_has_pending_choice(g)) return;
+    if (g->live_victory_stage == 0) {
+        rb_trigger_live_success(g, 0);
+        rb_process_pending_auto_abilities(g);
+        if (rb_has_pending_choice(g)) {
+            g->live_victory_stage = 1;
+            return;
+        }
+    }
 
-    rb_trigger_live_success(g, 1);
-    rb_trigger_auto_abilities(g, 1, "ライブ成功時");
-    rb_process_pending_auto_abilities(g);
-    if (rb_has_pending_choice(g)) return;
+    if (g->live_victory_stage <= 1) {
+        rb_trigger_live_success(g, 1);
+        rb_process_pending_auto_abilities(g);
+        if (rb_has_pending_choice(g)) {
+            g->live_victory_stage = 2;
+            return;
+        }
+    }
+
+    g->live_victory_stage = 2;
     rb_drain_pending_live_success_choices(g);
     if (rb_has_pending_choice(g)) return;
 
@@ -989,6 +1044,7 @@ void rb_execute_live_victory_determination(GameState *g) {
     rb_merge_late_score_apps(g);
     rb_compute_surplus_and_flags(g, p1_won, p2_won);
     rb_move_live_to_success_and_handle_wins(g);
+    g->live_victory_stage = 0;
 }
 
 /* Mirror live.rs::process_player_live_result — move a single player's live card

@@ -57,6 +57,14 @@ void rb_queue_clear(RbAbilityQueue *q) {
             q->pending_repeat_actions[i] = NULL;
         }
     }
+    for (int i = 0; i < RB_ENTRY_PENDING_CAP; i++) {
+        if (q->choice_options[i]) {
+            rb_effect_free(q->choice_options[i]);
+            q->choice_options[i] = NULL;
+        }
+    }
+    q->choice_options_n = 0;
+    q->choice_reprompt_pending = 0;
     q->pending_repeat_actions_n = 0;
     q->has_pending_reprompt_choice = 0;
     memset(&q->pending_reprompt_choice, 0, sizeof(q->pending_reprompt_choice));

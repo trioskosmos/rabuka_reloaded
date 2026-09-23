@@ -215,6 +215,6 @@ Highest-risk category: requires a full live phase with another ability resolving
 ## Inventory
 
 - Full per-ability index: [`engine/tests/TEST_INVENTORY.md`](TEST_INVENTORY.md) / [`TEST_INVENTORY.json`](TEST_INVENTORY.json)
-- Trigger×action matrix: [`docs/ABILITY_MATRIX.md`](../docs/ABILITY_MATRIX.md)
+- Trigger×action matrix: [`docs/ABILITY_MATRIX.md`](../../docs/ABILITY_MATRIX.md)
 - Regenerate: `python cards/test_inventory.py`  •  CI check: `python cards/test_inventory.py --check`
 

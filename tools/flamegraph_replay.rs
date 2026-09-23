@@ -1,9 +1,13 @@
 use rabuka_engine::bin_common;
+use rabuka_engine::bot::registry::BotKind;
+use rabuka_engine::bot::strategy_v2::V2Policy;
+use rabuka_engine::bot::strategy_v3::V3Plan;
 use rabuka_engine::card::CardDatabase;
 use rabuka_engine::card_loader::CardLoader;
 use rabuka_engine::deck_parser::DeckParser;
-use rabuka_engine::game_setup::{self, Action};
-use rabuka_engine::game_state::{GameResult, GameState};
+use rabuka_engine::game_setup::{self, Action, ActionType};
+use rabuka_engine::game_state::{GameResult, GameState, Phase};
+use rabuka_engine::replay::{observe, Completion, GameTrace, Header, Step};
 use rabuka_engine::rng::{self, Lcg};
 use rabuka_engine::turn::TurnEngine;
 use serde::{Deserialize, Serialize};
@@ -14,7 +18,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-const USAGE: &str = "flamegraph_replay record TRACE DECK GAMES ENGINE_SEED POLICY_SEED\nflamegraph_replay replay TRACE DECK\nRun from the engine directory. TRACE must not exist for recording.\nRecord/replay uses the profile_target execution entry point, not execute_action.\nChecks a documented state projection, not complete engine equivalence.\nProfiling builds emit folded stacks to stdout; diagnostics go to stderr.";
+const USAGE: &str = "flamegraph_replay record TRACE DECK GAMES ENGINE_SEED POLICY_SEED [POLICY]\nflamegraph_replay replay TRACE DECK\nRun from the engine directory. TRACE must not exist for recording.\nRecord/replay uses execute_action plus settle_single_player_state.\nChecks a documented state projection, not complete engine equivalence.\nProfiling builds emit folded stacks to stdout; diagnostics go to stderr.";
 
 #[derive(Debug)]
 struct Config {
@@ -24,6 +28,7 @@ struct Config {
     games: usize,
     engine_seed: u32,
     policy_seed: u64,
+    policy: String,
 }
 
 fn invalid(message: impl Into<String>) -> io::Error {
@@ -35,7 +40,7 @@ fn parse_args(args: &[String]) -> io::Result<Option<Config>> {
         return Ok(None);
     }
     let record = args.first().map(String::as_str) == Some("record");
-    if !(record && args.len() == 6
+    if !(record && (args.len() == 6 || args.len() == 7)
         || args.first().map(String::as_str) == Some("replay") && args.len() == 3)
     {
         return Err(invalid(USAGE));
@@ -63,7 +68,15 @@ fn parse_args(args: &[String]) -> io::Result<Option<Config>> {
         } else {
             0
         },
+        policy: if record {
+            args.get(6).cloned().unwrap_or_else(|| "random".into())
+        } else {
+            "random".into()
+        },
     };
+    if record && !BotKind::ALL.contains(&config.policy.as_str()) {
+        return Err(invalid(format!("Unknown policy: {}", config.policy)));
+    }
     if record && (config.games == 0 || config.games > 10_000 || config.engine_seed == 0) {
         return Err(invalid(
             "Games must be 1..=10000 and engine seed must be nonzero",
@@ -72,74 +85,10 @@ fn parse_args(args: &[String]) -> io::Result<Option<Config>> {
     Ok(Some(config))
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-#[serde(deny_unknown_fields)]
-struct Header {
-    version: u32,
-    projection: String,
-    profiling: bool,
-    deck_text: String,
-    games: usize,
-    engine_seed: u32,
-    policy_seed: u64,
-    build_identity: Value,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-#[serde(deny_unknown_fields)]
-struct Step {
-    operation: String,
-    actions: Vec<Value>,
-    selected: Option<Value>,
-    result: Option<String>,
-    state: Value,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-#[serde(deny_unknown_fields)]
-struct GameTrace {
-    game: usize,
-    initial: Value,
-    steps: Vec<Step>,
-}
-
-fn observe(gs: &GameState) -> Result<Value, serde_json::Error> {
-    let mut usage: Vec<_> = gs
-        .turn_limited_abilities_used
-        .iter()
-        .map(|(k, v)| (*k, *v))
-        .collect();
-    usage.sort_unstable();
-    Ok(json!({
-        "players": [serde_json::to_value(&gs.player1)?, serde_json::to_value(&gs.player2)?],
-        "phase": serde_json::to_value(gs.current_phase)?,
-        "turn_phase": serde_json::to_value(gs.current_turn_phase)?,
-        "turn": gs.turn_number,
-        "result": serde_json::to_value(&gs.game_result)?,
-        "ended": gs.game_ended,
-        "rng": rng::checkpoint(),
-        "queue": serde_json::to_value(&gs.ability_queue)?,
-        "snapshots": serde_json::to_value(&gs.performance_snapshots)?,
-        "resolution_zone": serde_json::to_value(&gs.resolution_zone)?,
-        "usage": usage,
-        "batch_movements": serde_json::to_value(&gs.batch_movements)?,
-        "turn_movements": serde_json::to_value(&gs.turn_movements)?,
-        "turn_area_movements": serde_json::to_value(&gs.turn_area_movements)?,
-        "depth_first_cutoff": gs.depth_first_cutoff,
-        "rps": [gs.player1_rps_choice, gs.player2_rps_choice, gs.rps_winner],
-    }))
-}
 
 fn execute(gs: &mut GameState, action: &Action) -> Result<(), String> {
     let p = action.parameters.as_ref();
-    TurnEngine::execute_main_phase_action(
-        gs,
-        &action.action_type,
-        p.and_then(|p| p.card_id),
-        p.and_then(|p| p.card_indices.clone()),
-        p.and_then(|p| p.stage_area.as_deref().and_then(|s| s.parse().ok())),
-        p.and_then(|p| p.use_baton_touch),
-    )
+    bin_common::execute_and_settle(gs, action)
 }
 
 fn mismatch(expected: &Value, actual: &Value, path: &str) -> Option<String> {
@@ -187,10 +136,45 @@ fn verify<T: Serialize>(
     Ok(())
 }
 
+fn decision_player(gs: &GameState) -> &rabuka_engine::player::Player {
+    if gs.has_pending_choice() {
+        if gs.can_player_act(0) {
+            return &gs.player1;
+        }
+        if gs.can_player_act(1) {
+            return &gs.player2;
+        }
+    }
+    gs.active_player()
+}
+
+#[derive(Clone, Copy)]
+enum PolicyRoute {
+    Action,
+    Mulligan,
+    LiveSet,
+}
+
+fn policy_route(gs: &GameState) -> PolicyRoute {
+    if gs.has_pending_choice() {
+        return PolicyRoute::Action;
+    }
+    match gs.current_phase {
+        Phase::MulliganFirstAttacker | Phase::MulliganSecondAttacker => PolicyRoute::Mulligan,
+        Phase::LiveCardSetFirstAttacker | Phase::LiveCardSetSecondAttacker => PolicyRoute::LiveSet,
+        _ => PolicyRoute::Action,
+    }
+}
+
 fn run_game(
     gs: &mut GameState,
+    db: &CardDatabase,
     game: usize,
-    policy: &mut Lcg,
+    policy: BotKind,
+    policy_seed: &mut Lcg,
+    v2_policy: &V2Policy,
+    plan_p1: &V3Plan,
+    plan_p2: &V3Plan,
     expected: Option<&GameTrace>,
     measured: &mut Duration,
 ) -> Result<GameTrace, Box<dyn std::error::Error>> {
@@ -288,7 +272,77 @@ fn run_game(
                         .position(|a| Some(a) == expected.selected.as_ref())
                         .ok_or_else(|| invalid("Recorded semantic action is not available"))?
                 } else {
-                    policy.range(actions.len())
+                    let selected_action = if policy == BotKind::Random {
+                        let decision_id = decision_player(gs).id.clone();
+                        let me = u8::from(decision_id != gs.player1.id);
+                        let policy_is_p1 = me == 0;
+                        match policy_route(gs) {
+                            PolicyRoute::Mulligan | PolicyRoute::LiveSet => {
+                                actions[policy_seed.range(actions.len())].clone()
+                            }
+                            PolicyRoute::Action => {
+                                if gs.current_phase == Phase::RockPaperScissors {
+                                    actions[policy_seed.range(actions.len())].clone()
+                                } else if gs.current_phase == Phase::ChooseFirstAttacker {
+                                    let won_rps =
+                                        gs.rps_winner == Some(if policy_is_p1 { 1 } else { 2 });
+                                    if won_rps {
+                                        actions
+                                            .iter()
+                                            .find(|a| {
+                                                a.action_type == ActionType::ChooseSecondAttacker
+                                            })
+                                            .cloned()
+                                            .unwrap_or_else(|| {
+                                                actions[policy_seed.range(actions.len())].clone()
+                                            })
+                                    } else {
+                                        actions[policy_seed.range(actions.len())].clone()
+                                    }
+                                } else {
+                                    actions[policy_seed.range(actions.len())].clone()
+                                }
+                            }
+                        }
+                    } else if gs.current_phase == Phase::RockPaperScissors {
+                        actions[policy_seed.range(actions.len())].clone()
+                    } else if gs.current_phase == Phase::ChooseFirstAttacker {
+                        let decision_id = decision_player(gs).id.clone();
+                        let policy_is_p1 = decision_id == gs.player1.id;
+                        let won_rps = gs.rps_winner == Some(if policy_is_p1 { 1 } else { 2 });
+                        if won_rps {
+                            actions
+                                .iter()
+                                .find(|a| a.action_type == ActionType::ChooseSecondAttacker)
+                                .cloned()
+                                .unwrap_or_else(|| actions[policy_seed.range(actions.len())].clone())
+                        } else {
+                            actions[policy_seed.range(actions.len())].clone()
+                        }
+                    } else {
+                        let decision_id = decision_player(gs).id.clone();
+                        let me = u8::from(decision_id != gs.player1.id);
+                        let plan = if me == 0 { plan_p1 } else { plan_p2 };
+                        let checkpoint = rng::checkpoint();
+                        let selected = match policy_route(gs) {
+                            PolicyRoute::Mulligan => {
+                                policy.choose_mulligan(gs, &actions, db)
+                            }
+                            PolicyRoute::LiveSet => {
+                                policy.choose_live_set(gs, &actions, db, v2_policy, plan)
+                            }
+                            PolicyRoute::Action => {
+                                policy.choose_action(gs, &actions, me, v2_policy, plan)
+                            }
+                        };
+                        rng::restore(checkpoint);
+                        selected
+                    };
+                    let selected_value = serde_json::to_value(&selected_action)?;
+                    step.actions
+                        .iter()
+                        .position(|a| a == &selected_value)
+                        .ok_or_else(|| invalid("Policy selected an unavailable action"))?
                 };
                 step.selected = Some(step.actions[selected].clone());
                 let start = Instant::now();
@@ -401,14 +455,6 @@ fn write_record<T: Serialize>(
     Ok(())
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq)]
-#[serde(deny_unknown_fields)]
-struct Completion {
-    complete: bool,
-    games: usize,
-    actions: usize,
-}
-
 fn validate_identity(expected: &Value, actual: &Value) -> io::Result<()> {
     for key in [
         "format",
@@ -433,13 +479,25 @@ fn validate_identity(expected: &Value, actual: &Value) -> io::Result<()> {
 }
 
 fn validate_header(header: &Header, deck: &str) -> io::Result<()> {
-    if header.version != 2 {
+    if header.version != 3 {
         return Err(invalid(
-            "header/version: expected 2; re-record legacy traces",
+            "header/version: expected 3; re-record legacy traces",
         ));
     }
-    if header.projection != "players-queue-snapshots-movements-v1" {
+    if header.projection != "players-queue-snapshots-movements-observations-v2" {
         return Err(invalid("header/projection: unsupported projection"));
+    }
+    if header.feature_schema != 1 {
+        return Err(invalid("header/feature_schema: unsupported feature schema"));
+    }
+    if header.execution != "execute-and-settle-v1" {
+        return Err(invalid("header/execution: unsupported execution profile"));
+    }
+    if !["flamegraph_replay", "sim_bench"].contains(&header.producer.as_str()) {
+        return Err(invalid("header/producer: unsupported producer"));
+    }
+    if !BotKind::ALL.contains(&header.policy.as_str()) {
+        return Err(invalid("header/policy: unsupported policy"));
     }
     if header.profiling != cfg!(feature = "profiling") {
         return Err(invalid("header/profiling: build mode differs"));
@@ -493,18 +551,24 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         read_line::<Header>(reader)?
     } else {
         Header {
-            version: 2,
-            projection: "players-queue-snapshots-movements-v1".into(),
+            version: 3,
+            projection: "players-queue-snapshots-movements-observations-v2".into(),
+            feature_schema: 1,
+            execution: "execute-and-settle-v1".into(),
             profiling: cfg!(feature = "profiling"),
+            producer: "flamegraph_replay".into(),
             deck_text: deck_text.clone(),
             games: config.games,
             engine_seed: config.engine_seed,
             policy_seed: config.policy_seed,
+            policy: config.policy.clone(),
             build_identity: build_identity.clone(),
         }
     };
     validate_header(&header, &deck_text)?;
-    validate_identity(&header.build_identity, &build_identity)?;
+    if header.producer == "flamegraph_replay" {
+        validate_identity(&header.build_identity, &build_identity)?;
+    }
     let cards = CardLoader::load_cards_from_file(std::path::Path::new("../cards/cards.json"))?;
     let mut db = Arc::new(CardDatabase::load_or_create(cards));
     let deck = DeckParser::parse_deck_file(&config.deck)?;
@@ -532,10 +596,25 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         };
         let seed = header.engine_seed + game as u32;
         rng::seed(seed);
-        let mut policy = Lcg::new(header.policy_seed.wrapping_add(game as u64));
+        let mut policy = Lcg::new(0x5EED_1234_ABCD_0001 ^ u64::from(seed));
         let mut gs =
             bin_common::deal_game(&db, &p1, &p2, "player1", "Player 1", "player2", "Player 2");
-        let trace = run_game(&mut gs, game, &mut policy, expected.as_ref(), &mut measured)?;
+        let v2_policy = V2Policy::default();
+        let plan_p1 = V3Plan::detect(&gs, 0, &db);
+        let plan_p2 = V3Plan::detect(&gs, 1, &db);
+        let policy_kind = BotKind::parse(&header.policy);
+        let trace = run_game(
+            &mut gs,
+            &db,
+            game,
+            policy_kind,
+            &mut policy,
+            &v2_policy,
+            &plan_p1,
+            &plan_p2,
+            expected.as_ref(),
+            &mut measured,
+        )?;
         actions += trace
             .steps
             .iter()
@@ -585,13 +664,17 @@ mod tests {
 
     fn header() -> Header {
         Header {
-            version: 2,
-            projection: "players-queue-snapshots-movements-v1".into(),
+            version: 3,
+            projection: "players-queue-snapshots-movements-observations-v2".into(),
+            feature_schema: 1,
+            execution: "execute-and-settle-v1".into(),
             profiling: cfg!(feature = "profiling"),
+            producer: "flamegraph_replay".into(),
             deck_text: "deck".into(),
             games: 2,
             engine_seed: 42,
             policy_seed: 7,
+            policy: "random".into(),
             build_identity: json!({}),
         }
     }

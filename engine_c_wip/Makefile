@@ -9,9 +9,13 @@ OBJ_LIB := src/ability/enums.o src/ability/types.o src/ability/vm.o src/ability/
 TARGET  := rb_engine
 GENERATED := tests/test_ported_generated.c
 MECHANICS := tests/test_mechanics.c
+LIVE_RULES := tests/test_live_success_rules.c
+PHASE_RULES := tests/test_phase_machine_rules.c
+PERFORMANCE_RULES := tests/test_performance_phase_rules.c
+SURPLUS_HEART := tests/test_surplus_heart.c
 AUDIT   := tools/audit_actions.c
 
-.PHONY: all test audit regen clean mechanics
+.PHONY: all test audit regen clean mechanics live-rules phase-rules performance-rules surplus-heart
 all: $(TARGET)
 
 regen:
@@ -37,8 +41,32 @@ $(TARGET)_replay: $(OBJ_LIB) tests/replay.c
 $(TARGET)_mechanics: $(OBJ_LIB) $(MECHANICS)
 	$(CC) $(CFLAGS) -o $@ $(OBJ_LIB) $(MECHANICS)
 
+$(TARGET)_live_rules: $(OBJ_LIB) $(LIVE_RULES)
+	$(CC) $(CFLAGS) -o $@ $(OBJ_LIB) $(LIVE_RULES)
+
 mechanics: $(TARGET)_mechanics
 	./$(TARGET)_mechanics
+
+live-rules: $(TARGET)_live_rules
+	./$(TARGET)_live_rules
+
+$(TARGET)_phase_rules: $(OBJ_LIB) $(PHASE_RULES)
+	$(CC) $(CFLAGS) -o $@ $(OBJ_LIB) $(PHASE_RULES)
+
+$(TARGET)_performance_rules: $(OBJ_LIB) $(PERFORMANCE_RULES)
+	$(CC) $(CFLAGS) -o $@ $(OBJ_LIB) $(PERFORMANCE_RULES)
+
+$(TARGET)_surplus_heart: $(OBJ_LIB) $(SURPLUS_HEART)
+	$(CC) $(CFLAGS) -o $@ $(OBJ_LIB) $(SURPLUS_HEART)
+
+phase-rules: $(TARGET)_phase_rules
+	./$(TARGET)_phase_rules
+
+performance-rules: $(TARGET)_performance_rules
+	./$(TARGET)_performance_rules
+
+surplus-heart: $(TARGET)_surplus_heart
+	./$(TARGET)_surplus_heart
 
  $(TARGET)_debug: $(OBJ_LIB) src/debug_umi.o
 	$(CC) $(CFLAGS) -o $@ $(OBJ_LIB) src/debug_umi.o
@@ -51,4 +79,4 @@ $(TARGET)_audit: $(OBJ_LIB) $(AUDIT)
 	$(CC) $(CFLAGS) -o $@ $(OBJ_LIB) $(AUDIT)
 
 clean:
-	rm -f $(OBJ) $(TARGET) $(TARGET)_test $(TARGET)_audit $(TARGET)_replay $(TARGET)_generated $(TARGET)_mechanics
+	rm -f $(OBJ) $(TARGET) $(TARGET)_test $(TARGET)_audit $(TARGET)_replay $(TARGET)_generated $(TARGET)_mechanics $(TARGET)_live_rules

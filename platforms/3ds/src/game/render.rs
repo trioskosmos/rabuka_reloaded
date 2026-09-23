@@ -1417,7 +1417,7 @@ fn render_action_list(ctx: &RenderCtx, mut list_scroll: usize, content_y: f32) -
                             format!("{{{{icon_energy.png|E}}}}{} {}", base_cost, name)
                         };
                         let mut areas = String::new();
-                        let area_costs: std::collections::HashMap<String, (u8, bool)> =
+                        let area_costs: std::collections::HashMap<&str, (u8, bool)> =
                             if let Some(ref p) = acts_cache[display_order[di]].parameters {
                                 p.available_areas
                                     .as_ref()
@@ -1425,7 +1425,10 @@ fn render_action_list(ctx: &RenderCtx, mut list_scroll: usize, content_y: f32) -
                                         areas_vec
                                             .iter()
                                             .map(|a| {
-                                                (a.area.clone(), (a.cost, a.is_baton_touch))
+                                                (
+                                                    a.area.as_deref(),
+                                                    (a.cost, a.is_baton_touch),
+                                                )
                                             })
                                             .collect()
                                     })
@@ -1472,7 +1475,7 @@ fn render_action_list(ctx: &RenderCtx, mut list_scroll: usize, content_y: f32) -
                                 }
                             }
                             // Regular single-area action with per-area cost
-                            let area_cost_info = area_costs.get(&stage);
+                            let area_cost_info = area_costs.get(stage.as_str());
                             let area_str = match area_cost_info {
                                 Some((cost, _)) if *cost > 0 => format!(
                                     "{} {{{{icon_energy.png|E}}}}{}{}{}",
@@ -1627,7 +1630,10 @@ fn render_board_highlights(ctx: &RenderCtx) {
                                     .available_areas
                                     .as_ref()
                                     .and_then(|areas| {
-                                        areas.iter().find(|a| &a.area == sa).map(|a| a.cost)
+                                        areas
+                                            .iter()
+                                            .find(|a| a.area.as_deref() == sa.as_str())
+                                            .map(|a| a.cost)
                                     })
                                     .unwrap_or(0);
                                 unsafe {

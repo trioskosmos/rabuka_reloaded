@@ -1210,7 +1210,7 @@ def render_coverage(inv):
     w("## Inventory")
     w("")
     w(f"- Full per-ability index: [`engine/tests/TEST_INVENTORY.md`](TEST_INVENTORY.md) / [`TEST_INVENTORY.json`](TEST_INVENTORY.json)")
-    w(f"- Trigger×action matrix: [`docs/ABILITY_MATRIX.md`](../docs/ABILITY_MATRIX.md)")
+    w(f"- Trigger×action matrix: [`docs/ABILITY_MATRIX.md`](../../docs/ABILITY_MATRIX.md)")
     w(f"- Regenerate: `python cards/test_inventory.py`  •  CI check: `python cards/test_inventory.py --check`")
     w("")
 

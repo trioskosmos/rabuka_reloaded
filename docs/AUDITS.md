@@ -1,4 +1,7 @@
-# Audits
+# Audits — historical archive
+
+The current repository-level findings are maintained in [`../AUDIT.md`](../AUDIT.md).
+This file preserves the dated audit and refactor history that informed it.
 
 _Consolidated from: FULL_STACK_AUDIT_2026-08-23.md, FRESH_AUDIT_2026-08-19.md, CODE_AUDIT_2026-08-23.md, DEEP_READ_2026-08-25.md, CASTING_AUDIT.md, EFFECT_ONLY_AUDIT.md, PAIN_POINTS.md, RULES_GAP_ANALYSIS.md_
 
@@ -29,7 +32,7 @@ _Consolidated from: FULL_STACK_AUDIT_2026-08-23.md, FRESH_AUDIT_2026-08-19.md, C
 | 08-24 | 0fd0d1c2 | **F2 validation rules landed**: per_unit scaling, cannot_restriction scope, effect_self_clamp. Baseline records exactly 1 known gap (bp5-010 score clamp) as regression floor. The other two rules pass clean on the whole corpus |
 | 08-24 | b97b5621 | **F3 fidelity report landed**: `describe_dump` bin + `cards/describe_fidelity_report.py`. Immediately surfaced + fixed 2 real describe bugs: LL-bp7-001 rendered as 「Eを3増やす」 (modify_cost arm used additive count instead of set value) and restriction arms rendering raw tokens. Remaining low-overlap entries are F4-class (conditions not rendered by describe) |
 | — | — | Deferred with rationale: R1 movement-tracking unification (54 refs/12 files; direct writes to recently_moved_* are scratch-channel assignments from choice/move handlers — needs characterization tests before touching); owner-resolution boilerplate (~17 sites but borrow contexts differ per site) |
-| 08-24 | d5e30686..7d17afe5 | Phase 5 FIX-block triage started (empirical removal + byte-diff per block): **FIX 6 removed** (opponent_action flattening has no producer anymore); **FIX 2 & FIX 3 verified load-bearing** and documented (removal changes 4 resp. 2 corpus abilities). Lesson: these blocks are mostly live compensations for handler-emitted shapes — dissolution requires fixing the producers first, exactly as PARSER_UNTANGLE_PLAN warned |
+| 08-24 | d5e30686..7d17afe5 | Phase 5 FIX-block triage started (empirical removal + byte-diff per block): **FIX 6 removed** (opponent_action flattening has no producer anymore); **FIX 2 & FIX 3 verified load-bearing** and documented (removal changes 4 resp. 2 corpus abilities). Lesson: these blocks are mostly live compensations for handler-emitted shapes — dissolution requires fixing the producers first, exactly as PARSER_NOTES warned |
 | 08-24 | c71b8937..7716714e | Phase 5 triage continued: FIX 7/7b, 9, 9b all verified LOAD-BEARING (1–2 abilities each) and documented; FIX 14 comment corrected (stats-only counter, never did source inference). PARSER_NOTES.md now carries the full triage table + Phase 8 marked done |
 | 08-24 | 3bd92579 | Test-gap burn-down: batch 10 covers 3 depth-none abilities with positive+negative cases (higher-cost-member draw gate, success-zone comparison score, distinct-name KALEIDOSCORE count). depth=none 164→159, covered cards 600→615, suite 2598/0 |
 | 08-24 | cf1c640f | Test-gap burn-down: batch 11 covers 4 cl1/sd2/pb2 abilities (debut blade-3, conditional constant heart03 pos+neg, opponent-side cost≤2 rest). depth=none →156, suite **2602/0**. Note: dual-trigger cards (「登場, ライブ開始時」) need `contains` matching, not equality, in trigger lookup |
@@ -196,7 +199,7 @@ hit instead of silently approximating.
 ## Part 2 — Duplication & merge opportunities
 
 ### Python side (parser ecosystem)
-*(known debt in PARSER_NOTES/PARSER_UNTANGLE_PLAN summarized; new finds flagged)*
+*(known debt in PARSER_NOTES summarized; new finds flagged)*
 
 | # | Merge | Notes |
 |---|-------|-------|
@@ -259,7 +262,7 @@ Part-0 holes; several silent-fallback paths can eat a regression unnoticed.
 8. P3 ActionRule conversion; R9/R10 small consolidations
 9. R1 movement-tracking unification (medium effort, removes drift class)
 
-### Wave 2 — Parser consolidation (golden-file gated, per PARSER_UNTANGLE_PLAN loop)
+### Wave 2 — Parser consolidation (golden-file gated, per the parser notes workflow)
 10. P1: extract script calls real `parse_ability` (activates stronger back-fill → treat output diffs
     as improvements, review each)
 11. Plan Phases 2-5 (single-pass extraction, merge tree walks, dissolve FIX blocks) exactly as written
@@ -577,7 +580,7 @@ fidelity check:
 |---|---|---|
 | 「〜につき」 | 66 | 58 yes; **8 uncovered** (parenthetical post-yell bonuses riding on perform_yell/score nodes — e.g. PL!N-bp1-029-L Eutopia) |
 | 「その後」 | 30 | 29/30 via sequential |
-| 「「X」以外」 exclusion lists | 44 | mostly covered (PARSER_UNTANGLE_PLAN note partially stale — 『group』以外/「name」以外 ARE parsed at parser.py:5719/:6520/:6850); remaining gaps: 選んだカード以外-shuffles, 手札以外から登場, Q&A それ以外 branches (~6 abilities) |
+| 「「X」以外」 exclusion lists | 44 | mostly covered (PARSER_NOTES note partially stale — 『group』以外/「name」以外 ARE parsed at parser.py:5719/:6520/:6850); remaining gaps: 選んだカード以外-shuffles, 手札以外から登場, Q&A それ以外 branches (~6 abilities) |
 | 「この効果では…ない」 self-clamps | 9 (1 real) | **0** — e.g. PL!N-bp5-010-R's 「スコアは０未満にならない」 clamp has no structural home; check if hardcoded in score.rs |
 | 「できない」 negation | 11 (5 non-parenthetical) | covered via restriction/negation/conditional_negation |
 | 「〜ごとに」「最大まで」「直後」 | 0 | not in this game's dialect |
@@ -973,7 +976,7 @@ Deleted the 3 JSON-reading tests that only did `db.get_card(...).action == "…"
 
 # Master Refactor Plan — 2026-08-23 (rev 2)
 
-Unified roadmap merging the original engine audit, `docs/CASTING_AUDIT.md` (~1,034 unchecked cast sites), and `cards/ability_extraction/PARSER_UNTANGLE_PLAN.md` (13.6K-line Python parser). Everything gets done eventually; order below is by risk-then-value. Every item gates on `cargo test --test run_all` (2541 baseline) and, for parser work, byte-identical `abilities.json`.
+Unified roadmap merging the original engine audit, `docs/CASTING_AUDIT.md` (~1,034 unchecked cast sites), and `cards/ability_extraction/PARSER_NOTES.md` (13.6K-line Python parser). Everything gets done eventually; order below is by risk-then-value. Every item gates on `cargo test --test run_all` (2541 baseline) and, for parser work, byte-identical `abilities.json`.
 
 ## ✅ DONE (this session)
 
@@ -1082,7 +1085,7 @@ Four live generations sharing scaffolding incl. 5 copies of `.expect("live set a
 ### D4. timer.rs / alloc_counter.rs hygiene
 timer: `cfg!()` runtime branches paid when profiling off; ignored lock failures; println/eprintln stream mismatch. alloc_counter: env vars read twice; counting allocator overhead even when env-disabled.
 
-## QUEUE E — Parser untangle (Python track; byte-gated per PARSER_UNTANGLE_PLAN.md)
+## QUEUE E — Parser untangle (Python track; byte-gated per PARSER_NOTES.md)
 
 Verification loop already specified there (regen ref → change → fc.exe /b compare minus generated_at; engine suite + python tests + --check).
 
@@ -1145,7 +1148,7 @@ virtual sources (`"those_cards"`, `"preceding_moved"`, …), destinations
 `SelectTargetKind` magic strings, and condition caches keyed by
 `format!("{:?}")`.
 
-Python side: PARSER_UNTANGLE_PLAN.md is fully landed (all phases executed or
+Python side: PARSER_NOTES.md is fully landed (all phases executed or
 rescoped with rationale); remaining parser debt is the small list in
 PARSER_NOTES.md. Nothing new to add there from this pass beyond what
 FULL_STACK_AUDIT P1–P9 already records.
@@ -1273,7 +1276,7 @@ Everything here stays inside existing files; no new modules.
   only (effects/mod.rs:59–64).
 - Python parser: untangle plan verified landed; `_propagate_context` /
   FIX-block residue matches the characterized blast radii in
-  PARSER_UNTANGLE_PLAN.md's appendix.
+  PARSER_NOTES.md's appendix.
 
 ## 6. Suggested execution order
 

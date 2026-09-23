@@ -26,13 +26,13 @@ NUM_ZONES = 15
 ACTION_TYPE_EMBED_DIM = 16
 NUM_ACTION_TYPES = 25
 POSITION_FEATURES = 4
-GLOBAL_FEATURES = 28
+GLOBAL_FEATURES = 29
 ACTION_ENC_DIM = (
     ACTION_TYPE_EMBED_DIM + CARD_EMBED_DIM + ZONE_EMBED_DIM + POSITION_FEATURES
 )
 HIDDEN = 256
 STATE_DIM = (
-    8 * CARD_EMBED_DIM + 6 * (CARD_EMBED_DIM + POSITION_FEATURES) + GLOBAL_FEATURES
+    9 * CARD_EMBED_DIM + 6 * (CARD_EMBED_DIM + POSITION_FEATURES) + GLOBAL_FEATURES
 )
 
 
@@ -72,14 +72,13 @@ class PolicyNetTorch(nn.Module):
         extra = torch.zeros(*p_.shape[:-1], 3, device=p_.device)
         return torch.cat([self.action_type_embed(at_), c_, z_, p_, extra], dim=-1)
 
-    def forward(self, s, all_at, all_cid, all_zon, all_pos, chosen):
+    def forward(self, s, all_at, all_cid, all_zon, all_pos, chosen, action_mask):
         h = self.encode_state(s)
         v = self.forward_value(h)
         ae = self.encode_actions(all_at, all_cid, all_zon, all_pos)
         logits = h.unsqueeze(-2) + self.fc_action(ae)
         logits = self.fc_policy(F.relu(logits)).squeeze(-1)
-        mask = (all_at > 0) | (all_cid != 0)
-        logits = logits.masked_fill(~mask, -1e9)
+        logits = logits.masked_fill(~action_mask, -1e9)
         dist = Categorical(F.softmax(logits, dim=-1))
         return dist.log_prob(chosen), v, dist.entropy()
 
@@ -216,15 +215,15 @@ def compute_gae(trajs, gamma, lam):
 # ─── PPO ────────────────────────────────────────────────────────────────
 @dataclass
 class Config:
-    lr = 3e-4
-    gamma = 0.99
-    lam = 0.95
-    eps = 0.2
-    vf = 0.5
-    ent = 0.01
-    max_norm = 0.5
-    epochs = 10
-    batch = 256
+    lr: float
+    gamma: float = 0.99
+    lam: float = 0.95
+    eps: float = 0.2
+    vf: float = 0.5
+    ent: float = 0.01
+    max_norm: float = 0.5
+    epochs: int = 10
+    batch: int = 256
 
 
 def train(model, trajs, cfg, device, save_path):
@@ -248,6 +247,7 @@ def train(model, trajs, cfg, device, save_path):
             cid_t = torch.zeros(bs, ma, dtype=torch.long, device=device)
             zon_t = torch.zeros(bs, ma, dtype=torch.long, device=device)
             pos_t = torch.zeros(bs, ma, dtype=torch.long, device=device)
+            action_mask = torch.zeros(bs, ma, dtype=torch.bool, device=device)
             ch_t = torch.zeros(bs, dtype=torch.long, device=device)
             old_lp = torch.zeros(bs, device=device)
             ret_t = torch.zeros(bs, device=device)
@@ -255,6 +255,7 @@ def train(model, trajs, cfg, device, save_path):
             for i, s in enumerate(batch):
                 s_t[i] = torch.from_numpy(s.state)
                 na = len(s.actions)
+                action_mask[i, :na] = True
                 for j in range(na):
                     at_t[i, j] = int(s.actions[j, 0])
                     cid_t[i, j] = int(s.actions[j, 1])
@@ -262,9 +263,11 @@ def train(model, trajs, cfg, device, save_path):
                     pos_t[i, j] = int(s.actions[j, 3])
                 ch_t[i] = s.chosen_idx
                 old_lp[i] = s.old_log_prob
-                ret_t[i] = s.old_value  # after GAE, this is the return
+                ret_t[i] = float(s.old_value)  # after GAE, this is the return
 
-            new_lp, vals, ent = model.forward(s_t, at_t, cid_t, zon_t, pos_t, ch_t)
+            new_lp, vals, ent = model.forward(
+                s_t, at_t, cid_t, zon_t, pos_t, ch_t, action_mask
+            )
             adv = ret_t - vals.detach()
             adv = (adv - adv.mean()) / (adv.std() + 1e-8)
 

@@ -80,5 +80,16 @@ Output: `output\rabuka.ps-exe` (i.e. `platforms/ps1/output/rabuka.ps-exe`; a val
 ```
 duckstation-qt-x64-ReleaseLTCG.exe platforms\ps1\output\rabuka.ps-exe
 ```
+
 DuckStation boots the EXE through the BIOS; the game renders white text on the
 PS1 framebuffer.
+
+## RAM-fit audit summary
+
+The dated RAM audit was consolidated here. The port's final measured layout is
+approximately 989 KB text, 773 KB data/rodata, and 192 KB BSS, fitting the
+2 MB target with about 77 KB slack. The large full-card buffer was replaced by
+compact per-deck blobs in the shared engine, and the 256 KB heap was reduced
+to a measured working set. Remaining validation is hardware/emulator soak
+testing and optional further code-size reduction; the original section-by-
+section measurements remain in Git history.

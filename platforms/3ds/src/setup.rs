@@ -2,8 +2,8 @@
 // Per-SetupPhase handlers extracted from the bin's Step::Setup match arm.
 
 // Setup state machine: one handler function per SetupPhase.
-// Each handler returns the next Step. Bodies were moved verbatim from the
-// Step::Setup match arm in the bin (see extract_setup.py).
+// Each handler returns the next Step. Bodies were moved from the former inline
+// Step::Setup match arm in the bin.
 
 use std::collections::HashMap;
 use std::sync::Arc;

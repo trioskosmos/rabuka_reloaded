@@ -220,8 +220,8 @@ static void test_both_lives_compare_scores(void) {
     rb_execute_live_victory_determination(&tg.state);
     CHECK(test_zone_has_id(&tg, 0, "success", live),
           "first attacker places the tied live");
-    CHECK(!test_zone_has_id(&tg, 1, "success", live),
-          "second attacker does not place the tied live");
+    CHECK(test_zone_has_id(&tg, 1, "success", live),
+          "second attacker also places the tied live");
 }
 
 static void test_single_live_auto_wins(void) {

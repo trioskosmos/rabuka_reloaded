@@ -814,6 +814,27 @@ int rb_resolver_handle_select_card(RbAbilityResolver *self, GameState *g, const 
         char idxbuf[32]; snprintf(idxbuf,sizeof(idxbuf),"%d",idx);
         rb_resolver_handle_revealed_cards_selection(self,g,&ctx2,was_skip?NULL:idxbuf); return 0;
     }
+    if (!strcmp(zone,"energy_deck")) {
+        if (!was_skip) {
+            int ids[RB_MAX_ZONE];
+            int n = rb_zone_cards(g, actor, "energy_deck", ids, RB_MAX_ZONE);
+            if (idx >= 0 && idx < n) {
+                int cid = ids[idx];
+                rb_waitroom_remove_card(&g->p[actor], cid);
+                const char *dst = g->queue.resume_move_destination[0] ?
+                    g->queue.resume_move_destination : "energy_zone";
+                rb_place_card_in_zone(g, actor, cid, dst, -1);
+                if (self->n_moved_cards < RB_MAX_RECENTLY_MOVED)
+                    self->moved_cards[self->n_moved_cards++] = cid;
+                if (self->n_selected_cards < RB_MAX_RECENTLY_MOVED)
+                    self->selected_cards[self->n_selected_cards++] = cid;
+                if (g->n_recently_moved < RB_MAX_RECENTLY_MOVED)
+                    g->recently_moved[g->n_recently_moved++] = cid;
+            }
+        }
+        rb_resolver_handle_selection_epilogue(self, g);
+        return 0;
+    }
     if (!strcmp(zone,"energy")) {
         if (!was_skip) {
             int ids[RB_MAX_ZONE]; int n=rb_zone_cards(g, actor,"energy",ids,RB_MAX_ZONE);
@@ -1299,19 +1320,16 @@ int rb_resolver_filter_discard_by_budget(RbAbilityResolver *self, GameState *g, 
    sub_choice handling. Mirrors Rust branching exactly. */
 void rb_resolver_handle_discard_selection(RbAbilityResolver *self, GameState *g, const char *selected) {
     if (!g) { rb_resolver_clear_choice_state_and_resume(self); return; }
+    fprintf(stderr, "[DISCARD_RESULT] selected=%s count=%d reprompt=%d\n",
+            selected ? selected : "skip", g->queue.pending.count, g->queue.choice_reprompt_pending);
     int actor = g->queue.actor;
     int sel_idx = selected ? atoi(selected) : -1;
     int is_skip = (sel_idx < 0);
     int pending_count = g->queue.pending.count;
     int allow_skip = g->queue.pending.allow_skip;
-    int is_select_action = (g->queue.pending.card_type[0] != '\0' || g->queue.pending.target[0]==0);
-    /* Rust heuristic for select_action: ctx.is_select_action (explicit) else
-       for discard zone default is_select_action true for choice.rs path */
-    /* Use the pending card_type as proxy: non-empty => is_select_action else false.
-       For this handler we treat waitroom select as is_select_action when requested. */
-    int treat_as_select = 0;
-    if (g->queue.resume_eff && g->queue.resume_eff->action && !strcmp(g->queue.resume_eff->action,"select_cards")) treat_as_select=1;
-    if (is_select_action || treat_as_select) {
+    int treat_as_select = g->queue.resume_eff && g->queue.resume_eff->action &&
+        !strcmp(g->queue.resume_eff->action,"select_cards");
+    if (treat_as_select) {
         /* is_select_action branch (choice.rs:2082-2142) */
         if (!is_skip) {
             int ids[RB_MAX_ZONE]; int n = rb_zone_cards(g, actor, "waitroom", ids, RB_MAX_ZONE);
@@ -1357,12 +1375,16 @@ void rb_resolver_handle_discard_selection(RbAbilityResolver *self, GameState *g,
             /* partial pick handling when mapped < count (choice.rs:2175-2322) */
             int ids[RB_MAX_ZONE]; int n = rb_zone_cards(g, actor, "waitroom", ids, RB_MAX_ZONE);
             int mapped = (sel_idx < n) ? 1 : 0; /* simplified: single pick */
+            fprintf(stderr, "[DISCARD_PICK] actor=%d active=%d selected=%d available=%d count=%d mapped=%d sub_choice=%d p0_discard=%d p1_discard=%d\n",
+                    actor, g->active, sel_idx, n, pending_count, mapped, self->sub_choice_created,
+                    g->p[0].discard.n, g->p[1].discard.n);
             if (mapped < pending_count) {
                 /* First execute the move for the current pick */
                 if (sel_idx>=0 && sel_idx<n) {
                     int cid = ids[sel_idx];
                     rb_waitroom_remove_card(&g->p[actor], cid);
-                    const char *dst = g->queue.pending.target[0] ? g->queue.pending.target : "hand";
+                    const char *dst = g->queue.resume_move_destination[0] ? g->queue.resume_move_destination :
+                        (g->queue.pending.target[0] ? g->queue.pending.target : "hand");
                     if (g->queue.resume_eff && g->queue.resume_eff->destination) dst = g->queue.resume_eff->destination;
                     rb_choice_send_to_dst(g, actor, cid, dst);
                     if(self->n_moved_cards < RB_MAX_RECENTLY_MOVED) self->moved_cards[self->n_moved_cards++]=cid;
@@ -1401,24 +1423,66 @@ void rb_resolver_handle_discard_selection(RbAbilityResolver *self, GameState *g,
         }
         if (!is_skip) {
             int ids[RB_MAX_ZONE]; int n = rb_zone_cards(g, actor, "waitroom", ids, RB_MAX_ZONE);
-            if (sel_idx>=0 && sel_idx<n) {
-                int cid = ids[sel_idx];
+            int moved = 0;
+            if (sel_idx>=0 && sel_idx<n){
+                int cid=ids[sel_idx];
                 rb_waitroom_remove_card(&g->p[actor], cid);
-                const char *dst = g->queue.pending.target[0] ? g->queue.pending.target : "hand";
+                const char *dst = g->queue.resume_move_destination[0] ? g->queue.resume_move_destination :
+                    (g->queue.pending.target[0] ? g->queue.pending.target : "hand");
                 if (g->queue.resume_eff && g->queue.resume_eff->destination) dst = g->queue.resume_eff->destination;
                 rb_choice_send_to_dst(g, actor, cid, dst);
                 if(self->n_moved_cards < RB_MAX_RECENTLY_MOVED) self->moved_cards[self->n_moved_cards++]=cid;
                 if(g->n_recently_moved<RB_MAX_RECENTLY_MOVED) g->recently_moved[g->n_recently_moved++]=cid;
+                moved = 1;
             }
+            fprintf(stderr, "[DISCARD_MOVE] selected=%d available=%d moved=%d destination=%s reprompt=%d\n",
+                    sel_idx, n, moved, g->queue.resume_move_destination, g->queue.choice_reprompt_pending);
             if (self->sub_choice_created) { self->sub_choice_created=0; /* store pending reprompt */ }
         }
         rb_resolver_handle_selection_epilogue(self, g);
     }
 }
 
-/* Faithful port of choice.rs:2363 handle_selection_epilogue */
+static void clear_choice_options(GameState *g) {
+    for (int i = 0; i < RB_ENTRY_PENDING_CAP; i++) {
+        if (g->queue.choice_options[i]) {
+            rb_effect_free(g->queue.choice_options[i]);
+            g->queue.choice_options[i] = NULL;
+        }
+    }
+    g->queue.choice_options_n = 0;
+    g->queue.choice_reprompt_pending = 0;
+}
+
+static void emit_choice_reprompt(GameState *g) {
+    if (!g || g->queue.choice_options_n <= 0) return;
+    int actor = g->queue.actor >= 0 ? g->queue.actor : g->active;
+    rb_emit_choice(g, actor, RB_CHOICE_SELECT_TARGET, NULL, NULL,
+                   g->queue.choice_options_n, 1, "choice");
+    rb_choice_set_description(&g->queue.pending, "Choose another effect, or skip to finish");
+    rb_choice_set_route(&g->queue.pending, RB_ROUTE_CONDITIONAL_CHOICE);
+    g->queue.state = RB_QUEUE_AWAITING_CHOICE;
+    rb_resolver_store_pending_choice(g);
+    fprintf(stderr, "[CHOICE_REPROMPT_STORED] pending=%d actor=%d options=%d\n",
+            rb_has_pending_choice(g), g->queue.actor, g->queue.choice_options_n);
+}
+
 void rb_resolver_handle_selection_epilogue(RbAbilityResolver *self, GameState *g) {
     if (!self || !g) return;
+    fprintf(stderr, "[CHOICE_EPILOGUE] pending=%d options=%d reprompt=%d queue_actions=%d resolver_pending=%d\n",
+            rb_has_pending_choice(g), g->queue.choice_options_n, g->queue.choice_reprompt_pending,
+            rb_queue_has_pending_actions(g), self->has_pending_choice);
+    if (g->queue.choice_reprompt_pending)
+        fprintf(stderr, "[CHOICE_EPILOGUE] pending=%d options=%d\n",
+                rb_has_pending_choice(g), g->queue.choice_options_n);
+    if (g->queue.choice_reprompt_pending) {
+        rb_clear_pending_choice(g);
+        if (g->queue.choice_options_n > 0) {
+            emit_choice_reprompt(g);
+            return;
+        }
+        clear_choice_options(g);
+    }
     if (rb_queue_has_pending_actions(g) && !rb_has_pending_choice(g) && !self->has_pending_choice) {
         rb_resolver_clear_choice_meta(self);
         /* Rust clear_choice_state without dropping pending_choice (but epilogue only when none) */
@@ -1437,20 +1501,78 @@ void rb_resolver_handle_select_target(RbAbilityResolver *self, GameState *g,
     if (!self || !g) return;
     const char *tgt = target ? target : (g->queue.pending.target[0] ? g->queue.pending.target : "");
     const char *sel = selected ? selected : "";
-    /* choice_card_no routing (Rust: ChoiceRoute::Choice with ConditionalChoice::Effects) */
     if (g->queue.pending.route == RB_ROUTE_CONDITIONAL_CHOICE) {
         int idx = atoi(sel);
-        if (idx >= 0) {
-            /* record conditional_choice index, clear stale pending, schedule selected effect */
-            self->conditional_choice = idx;
-            self->has_pending_choice = 0;
-            rb_clear_pending_choice(g);
-            /* In Rust this would set pending_actions = vec![selected_effect] + optional reprompt.
-               C approximates by draining one pending entry. */
-            rb_queue_set_pending_actions(g, 1);
-            rb_resolver_resume_pending_actions(self);
+        char choice_debug[128];
+        snprintf(choice_debug, sizeof(choice_debug),
+                 "[CHOICE_RESULT] selected=%s available=%d reprompt=%d",
+                 sel, g->queue.choice_options_n, g->queue.choice_reprompt_pending);
+        rb_log_push_verdict(choice_debug, "debug", 1);
+        fprintf(stderr, "%s\n", choice_debug);
+        if (idx < 0 || idx >= g->queue.choice_options_n) {
+            clear_choice_options(g);
+            rb_resolver_clear_choice_state(self);
             return;
         }
+        AbilityEffect *selected = g->queue.choice_options[idx];
+        for (int i = idx; i + 1 < g->queue.choice_options_n; i++)
+            g->queue.choice_options[i] = g->queue.choice_options[i + 1];
+        g->queue.choice_options_n--;
+        g->queue.choice_options[g->queue.choice_options_n] = NULL;
+        self->conditional_choice = idx;
+        self->has_pending_choice = 0;
+        rb_clear_pending_choice(g);
+        if (g->queue.cur >= 0 && g->queue.cur < g->queue.n_entries)
+            g->queue.entries[g->queue.cur].effect_started = 1;
+        int reprompt = g->queue.choice_reprompt_pending;
+        if (!reprompt) {
+            for (int i = 0; i < g->queue.choice_options_n; i++) {
+                rb_effect_free(g->queue.choice_options[i]);
+                g->queue.choice_options[i] = NULL;
+            }
+            g->queue.choice_options_n = 0;
+        }
+        if (!selected) return;
+        int actor = g->queue.actor;
+        if (selected->target && !strcmp(selected->target, "self")) actor = g->active;
+        else if (selected->target && !strcmp(selected->target, "opponent")) actor = g->active^1;
+        int host = g->queue.resume_host;
+        g->queue.resume_move_destination[0] = '\0';
+        g->queue.resume_move_state[0] = '\0';
+        g->queue.resume_eff = NULL;
+        int discard_move = selected->action && !strcmp(selected->action, "move_cards") &&
+            selected->source && (!strcmp(selected->source, "discard") || !strcmp(selected->source, "waitroom"));
+        if (discard_move) {
+            const char *card_type = selected->card_type_field;
+            rb_emit_choice(g, actor, RB_CHOICE_SELECT_CARD, "discard", card_type,
+                           selected->count >= 0 ? selected->count : 1, 0, NULL);
+            rb_queue_pause_for_choice(g, &g->queue.pending);
+            g->queue.actor = actor;
+            rb_choice_set_route(&g->queue.pending, RB_ROUTE_SELECT_CARDS);
+            g->queue.resume_mode = 0;
+        } else {
+            rb_execute_effect_ex(g, actor, selected, host);
+        }
+        if (rb_has_pending_choice(g)) {
+            if (selected->destination)
+                strncpy(g->queue.resume_move_destination, selected->destination,
+                        sizeof(g->queue.resume_move_destination) - 1);
+            for (int i = 0; i < selected->n_extra; i++) {
+                if (selected->extra_k[i] && !strcmp(selected->extra_k[i], "state_change"))
+                    strncpy(g->queue.resume_move_state, selected->extra_v[i],
+                            sizeof(g->queue.resume_move_state) - 1);
+            }
+            g->queue.resume_host = host;
+        }
+        rb_effect_free(selected);
+        if (!rb_has_pending_choice(g) && reprompt) {
+            if (g->queue.choice_options_n > 0) {
+                emit_choice_reprompt(g);
+            } else {
+                clear_choice_options(g);
+            }
+        }
+        return;
     }
     /* target-based routing via typed enum (SelectTargetKind) */
     if (!strcmp(tgt, "choice") || !strcmp(tgt, "choice_string")) {
@@ -2050,6 +2172,8 @@ void rb_move_handle_select_cards_looked_at(GameState *g, int actor,
 
 int rb_resume_with_choice(GameState *g, int selected_idx) {
     if (!g || !g->queue.has_pending) return 0;
+    fprintf(stderr, "[RESUME_ANY] kind=%d zone=%s target=%s route=%d mode=%d idx=%d\n",
+            g->queue.pending.kind, g->queue.pending.zone, g->queue.pending.target, g->queue.pending.route, g->queue.resume_mode, selected_idx);
     int actor = g->queue.actor;
     int mode = g->queue.resume_mode;
     int is_select = g->queue.resume_is_select;
@@ -2061,8 +2185,27 @@ int rb_resume_with_choice(GameState *g, int selected_idx) {
     int cont_from = g->queue.resume_child + 1;
     int was_skip = (selected_idx < 0);
     int kind = g->queue.pending.kind;   /* captured BEFORE rb_clear_pending_choice */
+    RbChoice saved_pending = g->queue.pending;
     RbAbilityResolver self; memset(&self, 0, sizeof(self));
     self.gs = g; self.actor = actor; self.host_cid = host;
+    if (g->queue.pending.route == RB_ROUTE_CONDITIONAL_CHOICE) {
+        self.pending_choice = g->queue.pending;
+        self.has_pending_choice = 1;
+        char choice_sel[32];
+        choice_sel[0] = '\0';
+        if (!was_skip) snprintf(choice_sel, sizeof(choice_sel), "%d", selected_idx);
+        rb_resolver_handle_select_target(&self, g, g->queue.pending.target[0] ?
+                                        g->queue.pending.target : "choice", choice_sel);
+        if (rb_has_pending_choice(g)) {
+            g->queue.state = RB_QUEUE_AWAITING_CHOICE;
+        } else {
+            g->queue.resume_mode = 0;
+            g->queue.resume_eff = NULL;
+            g->queue.state = RB_QUEUE_IDLE;
+            rb_drain_ability_queue(g);
+        }
+        return 1;
+    }
     g->queue.choice_result = selected_idx;   /* record the player's pick (select_number etc.) */
     /* Heart-color choice (draw.rs::execute_select_heart_color): map the picked
         option index back to a color so the following gain_resource consumes it. */
@@ -2164,6 +2307,8 @@ int rb_resume_with_choice(GameState *g, int selected_idx) {
         }
         switch (kind) {
         case RB_CHOICE_SELECT_CARD: {
+            g->queue.pending = saved_pending;
+            g->queue.has_pending = 1;
             /* Faithful handle_select_card dispatch: reveal and hand-cost selections
                 are applied directly by the handler (which moves cards / records the
                 cost result). Plain selects still re-run the deferred effect, because
@@ -2179,18 +2324,19 @@ int rb_resume_with_choice(GameState *g, int selected_idx) {
             int rev = (ptarget && strstr(ptarget, "reveal")) || (pzone && strstr(pzone, "reveal"));
             int cost_hand = (!eff_started && hc && !strcmp(pzone, "hand"));
             rb_resolver_handle_select_card(&self, g, selected);
-            if (!was_skip && def && !rev && !cost_hand) {
+            if (!was_skip && def && !rev && !cost_hand && !rb_has_pending_choice(g)) {
                 if (is_cost) rb_pay_cost(g, actor, def);
                 else         rb_execute_effect_ex(g, actor, def, host);
             }
-            rb_resolver_continue_siblings(g, actor, host, cont, cont_from);
+            if (!rb_has_pending_choice(g))
+                rb_resolver_continue_siblings(g, actor, host, cont, cont_from);
             break;
         }
         case RB_CHOICE_SELECT_TARGET:
             /* record the chosen target via the handler, then run the deferred
                 effect that consumes it (C models target selection via deferral). */
             rb_resolver_handle_select_target(&self, g, NULL, selected);
-            if (!was_skip && def) {
+            if (!was_skip && def && !rb_has_pending_choice(g)) {
                 if (def->action && (!strcmp(def->action, "pay_energy") ||
                                     !strcmp(def->action, "pay_cost") ||
                                     !strcmp(def->action, "activation_cost") ||
@@ -2199,7 +2345,8 @@ int rb_resume_with_choice(GameState *g, int selected_idx) {
                 else
                     rb_execute_effect_ex(g, actor, def, host);
             }
-            rb_resolver_continue_siblings(g, actor, host, cont, cont_from);
+            if (!rb_has_pending_choice(g))
+                rb_resolver_continue_siblings(g, actor, host, cont, cont_from);
             break;
         case RB_CHOICE_SELECT_HEART_COLOR:
             /* record the picked heart color via the handler, then run the deferred
@@ -2247,6 +2394,9 @@ int rb_resume_with_choice(GameState *g, int selected_idx) {
         runs: if a choice is still pending we must yield to the host; otherwise we
         drop back to IDLE and drain the queued auto/trigger abilities now
         (mirrors Rust provide_choice_result → resume_execution → drain). */
+    fprintf(stderr, "[CHOICE_RESUME_END] pending=%d state=%d options=%d reprompt=%d\n",
+            rb_has_pending_choice(g), g->queue.state, g->queue.choice_options_n,
+            g->queue.choice_reprompt_pending);
     if (rb_has_pending_choice(g)) {
         g->queue.state = RB_QUEUE_AWAITING_CHOICE;
     } else {

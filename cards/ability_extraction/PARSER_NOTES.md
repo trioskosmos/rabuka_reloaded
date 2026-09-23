@@ -95,3 +95,10 @@ genuine pipeline steps, each with a known ability-count blast radius.
 - Deleted `_validate_output()` from extract_card_abilities.py (~240 lines);
   merged into single `_validate_semantic()` with recursive tree walking
 - `_try_per_unit` 350 → 25 lines; `parse_action` reduced by 130 lines
+
+## Untangle plan status
+
+The former `PARSER_UNTANGLE_PLAN.md` is consolidated here. All planned phases
+were executed or explicitly rescoped with byte-diff and test evidence. The
+remaining live debt is the structural work listed above; the old phase-by-phase
+plan is retained in Git history rather than maintained as a second status file.

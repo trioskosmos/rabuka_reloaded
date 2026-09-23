@@ -414,4 +414,20 @@ failures (stale artifacts, no code change needed for those two).
    (c) rerun `test_inventory.py --families` and audit any family whose
    per-ability file count diverges wildly from siblings, (d) after every
    parser change regenerate artifacts FIRST (stale artifacts caused two
-   false failures today) and rerun the failing filter before diagnosing.
+    false failures today) and rerun the failing filter before diagnosing.
+
+## Completed thin-coverage campaign (2026-09-22)
+
+The nine-card thin-coverage march is closed. It covered Natsumi debut,
+Wien mandatory-cost refusal, Riko blade expiry, Natsumi yell, Setsuna's
+baton-arrival watcher, Kinako payment, Izumi cost/limit edges, Mia's
+Natsumi mirror, and Shioriko's optional discard/reactivation. The campaign
+also closed HAPPY PARTY TRAIN stacking, empty-deck, own-stage, and
+performance-reduction gaps.
+
+The durable rules from that campaign are now part of this document's audit
+method: verify the actual card identity and printed text, test both fire and
+no-fire paths, distinguish voluntary decline from cost refusal, assert exact
+threshold boundaries, and regenerate artifacts before investigating failures.
+The detailed card-by-card report was consolidated here; its original history
+remains in Git history.

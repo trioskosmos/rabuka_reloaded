@@ -96,6 +96,8 @@ typedef struct AbilityEffect {
     int   is_further;
     struct AbilityEffect *child[RB_MAX_CHILD];
     int   n_child;
+    struct AbilityEffect *options[RB_MAX_CHILD];
+    int   n_options;
     char *extra_k[RB_MAX_EXTRA];
     char *extra_v[RB_MAX_EXTRA];
     int   n_extra;
@@ -1145,6 +1147,11 @@ typedef struct {
     int pending_repeat_actions_n;
     int has_pending_reprompt_choice;
     RbChoice pending_reprompt_choice;
+    AbilityEffect *choice_options[RB_ENTRY_PENDING_CAP];
+    int choice_options_n;
+    int choice_reprompt_pending;
+    char resume_move_destination[32];
+    char resume_move_state[16];
     /* Rust resolver.cancel_remaining_commands: set when a failed deferred cost
        must discard the parked batch. */
     int cancel_remaining_commands;
@@ -1280,6 +1287,8 @@ typedef struct GameState {
      int      live_success[2];
      int      live_score[2];
      int      live_batch_mode;
+     int      live_victory_pending;
+     int      live_victory_stage;
      int      live_pre_score[2][RB_MAX_CARD_IDS];
      int      live_pre_valid[2];
 
@@ -1701,6 +1710,7 @@ void rb_stage_hearts_pipeline(const GameState *g, int pl, int out[8]);
 void rb_effective_need_heart(const GameState *g, int live_cid, int out[8]);
 int  rb_perform_live(GameState *g, int pl);
 void rb_execute_live_victory_determination(GameState *g);
+void rb_process_player_live_result(GameState *g, int pl, int won, int must_skip, int can_place);
 /* ── live.rs standalone helpers (ported) ── */
 /* Mirror live.rs::blade_color_to_heart: map a set_blade_type blade color to the
     heart color its icons become (colored 1..6 → same index; All → icon_all idx 7).

@@ -201,11 +201,12 @@ See [engine/ISSUES_FOUND.md](engine/ISSUES_FOUND.md) for the full list.
 | [engine/ISSUES_FOUND.md](engine/ISSUES_FOUND.md) | Known build issues, warnings, and clippy lints |
 | [engine/tests/WRITING_TESTS.md](engine/tests/WRITING_TESTS.md) | 530-line guide for writing card tests |
 | [cards/ABILITY_DOCUMENTATION.md](cards/ABILITY_DOCUMENTATION.md) | Ability system reference |
-| [ai_design/nn_architecture.md](ai_design/nn_architecture.md) | Neural network design document |
-| [ai_design/rabuka_bot_design.md](ai_design/rabuka_bot_design.md) | Bot architecture overview |
+| [ai_design/rabuka_bot_design.md](ai_design/rabuka_bot_design.md) | Current bot and neural-policy design |
+| [ai_design/nn_architecture.md](ai_design/nn_architecture.md) | Consolidated neural architecture pointer |
 | [docs/QR_DECK_SHARING.md](docs/QR_DECK_SHARING.md) | QR code deck sharing guide |
 | [docs/ABILITY_PIPELINE.md](docs/ABILITY_PIPELINE.md) | Card-text → bytecode pipeline documentation |
-| [docs/AUDITS.md](docs/AUDITS.md) | Consolidated audits incl. refactor notes |
+| [AUDIT.md](AUDIT.md) | Current repository findings and maintenance hazards |
+| [docs/AUDITS.md](docs/AUDITS.md) | Historical audit and refactor archive |
 | [android/README_ANDROID.md](android/README_ANDROID.md) | **Android/Termux hosting guide — free multiplayer via cloudflared** |
 
 ## License

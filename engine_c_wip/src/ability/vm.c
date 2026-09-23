@@ -352,6 +352,7 @@ static void effect_free(AbilityEffect *e) {
     free(e->destination); free(e->target);
     rb_free_condition(e->condition);
     for (int i = 0; i < e->n_child; i++) effect_free(e->child[i]);
+    for (int i = 0; i < e->n_options; i++) effect_free(e->options[i]);
     for (int i = 0; i < e->n_extra; i++) { free(e->extra_k[i]); free(e->extra_v[i]); }
     effect_free(e->primary_effect);
     effect_free(e->alternative_effect);
@@ -466,6 +467,20 @@ static AbilityEffect *decode_effect_body(Rdr *r) {
                         if (st == RB_TAG_OBJVAR) {
                             AbilityEffect *c = decode_effect_body(r);
                             if (c) effect_add_child(e, c);
+                        } else skip_value(r, st);
+                    }
+                }
+            } else skip_value(r, tag);
+            continue;
+        }
+        if (key && strcmp(key, "options") == 0) {
+            if (tag == RB_TAG_ARRAY) {
+                uint32_t n; if (rd_len(r, &n)) {
+                    for (uint32_t j = 0; j < n && e->n_options < RB_MAX_CHILD; j++) {
+                        uint8_t st; if (!rd_u8(r, &st)) break;
+                        if (st == RB_TAG_OBJVAR) {
+                            AbilityEffect *c = decode_effect_body(r);
+                            if (c) e->options[e->n_options++] = c;
                         } else skip_value(r, st);
                     }
                 }

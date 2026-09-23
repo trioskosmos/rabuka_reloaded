@@ -117,15 +117,22 @@ int rb_should_trigger_live_success(const GameState *g, int pl) {
 /* Queue every ライブ成功時 (LiveSuccess) ability on a single card, deduplicated
    by (card_id, ability_idx). Mirrors the per-card scan in
    turn/triggers.rs::trigger_live_success_abilities. */
-static int queue_live_success_for_card(GameState *g, int pl, int cid) {
+static int queue_live_success_for_card(GameState *g, int pl, int cid, int occurrence) {
     int queued = 0;
     int n = rb_card_num_abilities((uint32_t)cid);
     for (int i = 0; i < n; i++) {
         Ability ab; if (!rb_decode_card_ability((uint32_t)cid, i, &ab)) continue;
         if (ab.triggers && rb_trigger_is(ab.triggers, "ライブ成功時")) {
+            fprintf(stderr, "[LIVE_SUCCESS_TRIGGER] cid=%d ab=%d occurrence=%d use_limit=%d effect=%s options=%d\n",
+                    cid, i, occurrence, ab.use_limit,
+                    ab.effect && ab.effect->action ? ab.effect->action : "none",
+                    ab.effect ? ab.effect->n_options : -1);
             int key = (cid << 16) | (i & 0xFFFF);
-            if (key != g->just_completed_ability_key &&
-                !rb_use_limit_reached(&g->queue, cid, i, ab.use_limit < 0 ? 99 : ab.use_limit, g->turn)) {
+            int limit = ab.use_limit < 0 ? 99 : ab.use_limit;
+            int reached = rb_use_limit_reached(&g->queue, cid, i, limit + occurrence, g->turn);
+            fprintf(stderr, "[LIVE_SUCCESS_QUEUE] cid=%d ab=%d occurrence=%d limit=%d reached=%d completed=%d\n",
+                    cid, i, occurrence, limit + occurrence, reached, key == g->just_completed_ability_key);
+            if (key != g->just_completed_ability_key && !reached) {
                 rb_queue_push(&g->queue, cid, i);
                 rb_record_use(&g->queue, cid, i, g->turn);
                 queued++;
@@ -148,16 +155,23 @@ int rb_trigger_live_success(GameState *g, int pl) {
     for (int i = 0; i < g->p[pl].live.n; i++) {
         int cid = g->p[pl].live.cards[i];
         if (cid == RB_EMPTY_SLOT) continue;
-        queued += queue_live_success_for_card(g, pl, cid);
+        int occurrence = 0;
+        for (int k = 0; k < i; k++) {
+            if (g->p[pl].live.cards[k] == cid) occurrence++;
+        }
+        queued += queue_live_success_for_card(g, pl, cid, occurrence);
     }
     for (int s = 0; s < RB_STAGE_SIZE; s++) {
         int cid = g->p[pl].stage[s];
         if (cid == RB_EMPTY_SLOT) continue;
-        queued += queue_live_success_for_card(g, pl, cid);
-    }
-    /* Process the queued abilities so their effects resolve (e.g., move energy) */
-    if (queued > 0) {
-        rb_drain_ability_queue(g);
+        int occurrence = 0;
+        for (int k = 0; k < g->p[pl].live.n; k++) {
+            if (g->p[pl].live.cards[k] == cid) occurrence++;
+        }
+        for (int k = 0; k < s; k++) {
+            if (g->p[pl].stage[k] == cid) occurrence++;
+        }
+        queued += queue_live_success_for_card(g, pl, cid, occurrence);
     }
     return queued;
 }

@@ -46,6 +46,11 @@ static int sp_card_need_hearts(int card_id, int out[8]) {
         out[sp_heart_index(card.heart_color[i])] += card.heart_count[i];
     }
     int has_need = card.num_need != 0;
+    if (rb_ability_debug_enabled()) {
+        fprintf(stderr, "[NEED_DECODE] card=%d base=%d blade=%d need=%d n_hearts=%d out=%d,%d,%d,%d,%d,%d,%d,%d\n",
+                card_id, card.num_base, card.num_blade, card.num_need, card.n_hearts,
+                out[0], out[1], out[2], out[3], out[4], out[5], out[6], out[7]);
+    }
     rb_free_card(&card);
     return has_need;
 }

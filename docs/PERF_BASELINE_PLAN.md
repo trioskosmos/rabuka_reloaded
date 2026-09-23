@@ -70,12 +70,12 @@ profiling-on vs profiling-off as if timers were the only difference; bare
 While establishing the baseline, scattered one-off analysis scripts are
 consolidated:
 
-- All `engine/analyze_*.py`, `engine/*_probe.py`, `engine/show_game.py`,
-  `engine/search_card.py`, `engine/count_batons.py`,
-  `engine/extract_examples.py`, `engine/hunt_bad_plays.py` →
-  **`tools/analysis/`**
-- Root `tmp_joint_report.py` → `tools/analysis/joint_series_report.py`
-- Root `tmp_duration_gaps.py` → `tools/analysis/ability_duration_gaps.py`
+- Current arena analyzers live in **`tools/analysis/`** and consume the
+  versioned JSONL audit format. The obsolete CSV readers and one-off report
+  scripts were removed rather than maintained alongside the current path.
+- Root `tmp_joint_report.py` and `tmp_duration_gaps.py` were one-off reports; their
+  useful conclusions are retained here or in the current audit, and the temporary
+  analyzers were removed.
 - CWD-relative paths (`../test_output/...`) rewritten to resolve from the
   repo root via `Path(__file__)`.
 - Hardcoded `C:\Users\trios\AppData\Local\Temp\...` paths replaced with
@@ -230,8 +230,37 @@ orders of magnitude).
 
 - Engine RNG is now **per-thread**, not process-global: a second thread
   that never calls `seed` starts from the platform default (`1` on
-  desktop), not from the main thread’s mid-stream state. Single-threaded
+  desktop), not from the main thread's mid-stream state. Single-threaded
   callers are unchanged. The `link.rs` concurrent test builds both
   states serially before spawn (already required with the old Mutex).
 - Do not compare absolute gps of multi-job runs to single-job baselines
   without labeling `jobs=`.
+
+## Deterministic replay harness
+
+The external record/replay harness is the supported way to compare an
+optimization candidate against a captured workload. It is implemented by
+`tools/flamegraph_replay.py`, `tools/flamegraph_replay.rs`, and
+`tools/test_flamegraph_replay.py`; it does not modify the engine build script.
+
+Build it outside the repository, then record and replay from `engine/`:
+
+```powershell
+py -3 tools/flamegraph_replay.py build --build-dir "C:\\Users\\trios\\AppData\\Local\\Temp\\kilo\\replay-build"
+& "C:\\Users\\trios\\AppData\\Local\\Temp\\kilo\\replay-build\\target\\release\\flamegraph_replay.exe" record "C:\\Users\\trios\\AppData\\Local\\Temp\\kilo\\replay-trace.jsonl" "../web_ui/decks/muse_cup.txt" 2 42 7
+& "C:\\Users\\trios\\AppData\\Local\\Temp\\kilo\\replay-build\\target\\release\\flamegraph_replay.exe" replay "C:\\Users\\trios\\AppData\\Local\\Temp\\kilo\\replay-trace.jsonl" "../web_ui/decks/muse_cup.txt"
+```
+
+The launcher records source, asset, lockfile, feature, compiler, and executable
+identity in `provenance.json`; replay rejects a mismatched build identity. It
+checks ordered action payloads and a bounded state projection, including zones,
+phase, RNG checkpoint, queue, snapshots, movement history, and RPS choices.
+
+This is strong regression evidence, not complete engine equivalence: modifiers,
+resolver internals, serde-skipped fields, and logs are outside the projection,
+and display metadata changes intentionally invalidate a trace. Engine-call time
+also includes tracing and clock overhead, so use clean `sim_bench` numbers for
+throughput claims.
+
+The old investigation and its detailed capture history were consolidated here;
+the phase-by-phase record remains in Git history.

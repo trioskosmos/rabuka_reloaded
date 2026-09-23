@@ -1346,3 +1346,23 @@ Phase 4 — Iteration:
 12. Anthony, T. et al. (2017). "Thinking Fast and Slow with Deep Learning and Tree Search." *NeurIPS 2017* (Expert Iteration).
 13. DeepMind OpenSpiel: https://github.com/deepmind/open_spiel
 14. Rabuka Reloaded engine docs: `engine/rules/rules_1_06.txt`
+
+## 18. Representation decision — explicit features for the first policy model
+
+The earlier learned-embedding design in this document remains useful as a
+research alternative, but it is not the current implementation target. The
+first trainable policy model should use explicit card features so related cards
+share structure and the model is not dominated by a free-floating card lookup.
+
+Use a compact card vector containing card type, normalized blade and cost,
+base-heart and blade-heart counts, ability presence/count, live score, and a
+small group projection. Add zone and stage-position features at the state
+layer, and include ability index, effect type, and activation cost in the action
+vector. This reduces the state representation substantially while making the
+ability and resource signals visible to the policy head.
+
+This is a design direction, not a claim that the PPO collector, trainer, and
+Rust inference path already agree on dimensions or trajectory format. Define
+and version those interfaces before treating the model as operational. The
+original `nn_architecture.md` proposal is preserved as a compatibility stub;
+its detailed historical discussion remains in Git history.

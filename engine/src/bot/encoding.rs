@@ -4,8 +4,9 @@ use crate::game_setup::Action;
 pub const CARD_EMBED_DIM: usize = 128;
 pub const ZONE_EMBED_DIM: usize = 16;
 pub const ACTION_TYPE_EMBED_DIM: usize = 16;
+pub const ACTION_TYPE_COUNT: usize = 25;
 pub const POSITION_FEATURES: usize = 4;
-pub const GLOBAL_FEATURES: usize = 28; // 12 phase one-hot + 16 scalar features
+pub const GLOBAL_FEATURES: usize = 29;
 pub const ACTION_ENC_DIM: usize =
     ACTION_TYPE_EMBED_DIM + CARD_EMBED_DIM + ZONE_EMBED_DIM + POSITION_FEATURES;
 
@@ -106,8 +107,7 @@ impl EncodedState {
     }
 
     pub fn state_dim() -> usize {
-        // 8 sum zones × 128 + 6 positional zones × (128 + 4) + globals
-        8 * CARD_EMBED_DIM + 6 * (CARD_EMBED_DIM + POSITION_FEATURES) + GLOBAL_FEATURES
+        9 * CARD_EMBED_DIM + 6 * (CARD_EMBED_DIM + POSITION_FEATURES) + GLOBAL_FEATURES
     }
 
 }
@@ -127,7 +127,14 @@ impl ActionEncoding {
         action_type_embed: &[f32],
     ) -> Vec<f32> {
         let mut v = Vec::with_capacity(ACTION_ENC_DIM);
-        v.extend_from_slice(action_type_embed);
+        let action_row = (self.action_type as usize).min(ACTION_TYPE_COUNT - 1)
+            * ACTION_TYPE_EMBED_DIM;
+        let action_end = action_row + ACTION_TYPE_EMBED_DIM;
+        if action_end <= action_type_embed.len() {
+            v.extend_from_slice(&action_type_embed[action_row..action_end]);
+        } else {
+            v.extend_from_slice(&action_type_embed[..ACTION_TYPE_EMBED_DIM]);
+        }
         let cid = self.target_card_id.max(0) as usize;
         let base = cid * CARD_EMBED_DIM;
         let ce = if base + CARD_EMBED_DIM <= card_embed.len() {
@@ -140,6 +147,7 @@ impl ActionEncoding {
         let zbase = zid * ZONE_EMBED_DIM;
         v.extend_from_slice(&zone_embed[zbase..zbase + ZONE_EMBED_DIM]);
         v.push((self.position as f32) / 3.0);
+        v.push(0.0);
         v.push(0.0);
         v.push(0.0);
         v
@@ -165,10 +173,12 @@ pub fn action_target_zone(action: &Action, obs: &PublicObservation) -> ActionTar
                         .or_else(|| p.stage_area.as_deref().and_then(|s| s.parse().ok()))
                 })
                 .unwrap_or(0);
-            ActionTargetZone {
-                zone: ZoneId::MyStagePos0,
-                position: pos,
-            }
+            let zone = match pos {
+                1 => ZoneId::MyStagePos1,
+                2 => ZoneId::MyStagePos2,
+                _ => ZoneId::MyStagePos0,
+            };
+            ActionTargetZone { zone, position: pos }
         }
         ActionType::UseAbility => {
             // Target is the card whose ability we're using
@@ -176,10 +186,12 @@ pub fn action_target_zone(action: &Action, obs: &PublicObservation) -> ActionTar
                 // Check if it's on our stage
                 if obs.me.stage.contains(&cid) {
                     let pos = obs.me.stage.iter().position(|&c| c == cid).unwrap_or(0) as u8;
-                    return ActionTargetZone {
-                        zone: ZoneId::MyStagePos0,
-                        position: pos,
+                    let zone = match pos {
+                        1 => ZoneId::MyStagePos1,
+                        2 => ZoneId::MyStagePos2,
+                        _ => ZoneId::MyStagePos0,
                     };
+                    return ActionTargetZone { zone, position: pos };
                 }
             }
             ActionTargetZone {
@@ -241,3 +253,34 @@ pub fn action_type_index(t: &crate::game_setup::ActionType) -> u8 {
         ActionType::PassRemaining => 24,
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn state_dimension_matches_all_encoded_zones() {
+        assert_eq!(EncodedState::state_dim(), 1973);
+    }
+
+    #[test]
+    fn action_encoding_selects_one_action_type_row() {
+        let mut rows = vec![0.0; ACTION_TYPE_COUNT * ACTION_TYPE_EMBED_DIM];
+        rows[0] = 1.0;
+        rows[ACTION_TYPE_EMBED_DIM] = 2.0;
+        let action = ActionEncoding {
+            action_type: 1,
+            target_card_id: 0,
+            target_zone: 0,
+            position: 0,
+        };
+        let encoded = action.encode(
+            &[0.0; CARD_EMBED_DIM],
+            &[0.0; ZONE_EMBED_DIM],
+            &rows,
+        );
+        assert_eq!(encoded.len(), ACTION_ENC_DIM);
+        assert_eq!(encoded[0], 2.0);
+    }
+}
+

@@ -32,9 +32,15 @@ use rabuka_engine::deck_builder::Deck;
 use rabuka_engine::deck_parser;
 use rabuka_engine::game_setup::{self, ActionType};
 use rabuka_engine::game_state::{GameResult, GameState, Phase};
+use rabuka_engine::replay::{observe, Completion, GameTrace, Header, Step};
 use rabuka_engine::rng::Lcg;
 use rabuka_engine::turn::TurnEngine;
+use serde::Serialize;
+use serde_json::json;
 use std::collections::BTreeMap;
+use std::fs::OpenOptions;
+use std::io::{BufWriter, Write};
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Instant;
 
@@ -46,9 +52,11 @@ Usage: cargo run --release --bin sim_bench -- [options]
   --seed S        base engine seed (default 1)
   --policy P      random (default) | v1..v7 | conductor
   --repeat R      repeat the full deck sweep R times (default 1)
-  --jobs N        worker threads per deck sweep (default 1 = baseline)
-  --alloc         print allocator delta after the timed loop
-                  (requires --features alloc_tracker + RABUKA_ALLOC_TRACK)
+   --jobs N        worker threads per deck sweep (default 1 = baseline)
+   --per-game      print per-game outcome, end reason, and action count
+   --trace PATH    write replay-compatible JSONL for one deck and one repeat
+   --alloc         print allocator delta after the timed loop
+                   (requires --features alloc_tracker + RABUKA_ALLOC_TRACK)
   --help          show this help";
 
 #[derive(Clone)]
@@ -61,6 +69,8 @@ struct Options {
     repeat: u32,
     jobs: u32,
     alloc: bool,
+    per_game: bool,
+    trace: Option<PathBuf>,
 }
 
 fn parse_args() -> Result<Options, String> {
@@ -73,6 +83,8 @@ fn parse_args() -> Result<Options, String> {
         repeat: 1,
         jobs: 1,
         alloc: false,
+        per_game: false,
+        trace: None,
     };
     let mut args = std::env::args().skip(1);
     while let Some(arg) = args.next() {
@@ -82,6 +94,14 @@ fn parse_args() -> Result<Options, String> {
                 std::process::exit(0);
             }
             "--alloc" => opts.alloc = true,
+            "--per-game" => opts.per_game = true,
+            "--trace" => {
+                let value = args
+                    .next()
+                    .filter(|v| !v.starts_with("--"))
+                    .ok_or_else(|| "missing value for --trace".to_string())?;
+                opts.trace = Some(PathBuf::from(value));
+            }
             "--games" | "--deck" | "--seed" | "--policy" | "--repeat" | "--jobs" => {
                 let value = args
                     .next()
@@ -111,6 +131,9 @@ fn parse_args() -> Result<Options, String> {
     }
     if opts.games == 0 || opts.seed == 0 || opts.repeat == 0 || opts.jobs == 0 {
         return Err("--games, --seed, --repeat, and --jobs must be positive".into());
+    }
+    if opts.trace.is_some() && (opts.deck.is_none() || opts.repeat != 1 || opts.jobs != 1) {
+        return Err("--trace requires --deck, --repeat 1, and --jobs 1".into());
     }
     Ok(opts)
 }
@@ -174,6 +197,7 @@ struct GameStats {
     end_reason: &'static str,
     outcome: GameOutcome,
     game_result: GameResult,
+    trace: Option<GameTrace>,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -185,7 +209,9 @@ fn run_game(
     arena_seed: u64,
     policy: BotKind,
     v2_policy: &strategy_v2::V2Policy,
-) -> GameStats {
+    game: usize,
+    record: bool,
+) -> Result<GameStats, String> {
     rabuka_engine::rng::seed(engine_seed);
     let mut rng = Lcg(arena_seed);
     let mut gs = rabuka_engine::bin_common::deal_game(
@@ -214,6 +240,15 @@ fn run_game(
         ),
     };
 
+    let mut trace = if record {
+        Some(GameTrace {
+            game,
+            initial: observe(&gs).map_err(|error| error.to_string())?,
+            steps: Vec::new(),
+        })
+    } else {
+        None
+    };
     let mut actions_total = 0u64;
     let mut end_reason = "iteration_cap";
     let mut last_turn = 0u8;
@@ -223,6 +258,15 @@ fn run_game(
         TurnEngine::check_victory_condition(&mut gs);
         if gs.game_result != GameResult::Ongoing {
             end_reason = "game_result";
+            if let Some(trace) = trace.as_mut() {
+                trace.steps.push(Step {
+                    operation: "finished".into(),
+                    actions: Vec::new(),
+                    selected: None,
+                    result: None,
+                    state: observe(&gs).map_err(|error| error.to_string())?,
+                });
+            }
             break;
         }
         if gs.turn_number == last_turn {
@@ -237,12 +281,30 @@ fn run_game(
         }
 
         if game_setup::auto_advance_one(&mut gs) {
+            if let Some(trace) = trace.as_mut() {
+                trace.steps.push(Step {
+                    operation: "auto".into(),
+                    actions: Vec::new(),
+                    selected: None,
+                    result: None,
+                    state: observe(&gs).map_err(|error| error.to_string())?,
+                });
+            }
             continue;
         }
 
         let actions = game_setup::generate_possible_actions(&gs);
         if actions.is_empty() {
             TurnEngine::advance_phase(&mut gs);
+            if let Some(trace) = trace.as_mut() {
+                trace.steps.push(Step {
+                    operation: "empty_advance".into(),
+                    actions: Vec::new(),
+                    selected: None,
+                    result: None,
+                    state: observe(&gs).map_err(|error| error.to_string())?,
+                });
+            }
             continue;
         }
 
@@ -306,16 +368,37 @@ fn run_game(
             }
         };
 
-        let _ = bin_common_execute(&mut gs, &chosen);
+        let execution_result = bin_common_execute(&mut gs, &chosen);
+        if record {
+            if let Some(error) = execution_result.as_ref().err() {
+                return Err(format!("game {game} action failed: {error}"));
+            }
+            if let Some(trace) = trace.as_mut() {
+                let action_values = actions
+                    .iter()
+                    .map(serde_json::to_value)
+                    .collect::<Result<Vec<_>, _>>()
+                    .map_err(|error| error.to_string())?;
+                let selected = serde_json::to_value(&chosen).map_err(|error| error.to_string())?;
+                trace.steps.push(Step {
+                    operation: "action".into(),
+                    actions: action_values,
+                    selected: Some(selected),
+                    result: Some("ok".into()),
+                    state: observe(&gs).map_err(|error| error.to_string())?,
+                });
+            }
+        }
         actions_total += 1;
     }
 
-    GameStats {
+    Ok(GameStats {
         actions: actions_total,
         end_reason,
         outcome: classify_winner(&gs),
         game_result: gs.game_result,
-    }
+        trace,
+    })
 }
 
 fn bin_common_execute(gs: &mut GameState, action: &game_setup::Action) -> Result<(), String> {
@@ -338,6 +421,55 @@ fn outcome_label(o: GameOutcome) -> &'static str {
         GameOutcome::Draw => "draw",
         GameOutcome::Stuck => "stuck",
     }
+}
+
+struct TraceWriter {
+    writer: BufWriter<std::fs::File>,
+    actions: usize,
+}
+
+impl TraceWriter {
+    fn new(path: &std::path::Path, header: &Header) -> Result<Self, String> {
+        let file = OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(path)
+            .map_err(|error| format!("{}: {error}", path.display()))?;
+        let mut writer = BufWriter::new(file);
+        write_json_line(&mut writer, header)?;
+        Ok(Self { writer, actions: 0 })
+    }
+
+    fn write_game(&mut self, game: &GameTrace) -> Result<(), String> {
+        self.actions += game
+            .steps
+            .iter()
+            .filter(|step| step.operation == "action")
+            .count();
+        write_json_line(&mut self.writer, game)
+    }
+
+    fn finish(mut self, games: usize) -> Result<(), String> {
+        let completion = Completion {
+            complete: true,
+            games,
+            actions: self.actions,
+        };
+        write_json_line(&mut self.writer, &completion)?;
+        self.writer
+            .flush()
+            .map_err(|error| error.to_string())?;
+        self.writer
+            .get_ref()
+            .sync_all()
+            .map_err(|error| error.to_string())
+    }
+}
+
+fn write_json_line<T: Serialize>(writer: &mut impl Write, value: &T) -> Result<(), String> {
+    let bytes = serde_json::to_vec(value).map_err(|error| error.to_string())?;
+    writer.write_all(&bytes).map_err(|error| error.to_string())?;
+    writer.write_all(b"\n").map_err(|error| error.to_string())
 }
 
 fn load_templates(db: &mut Arc<CardDatabase>, deck_name: &str) -> Result<(Deck, Deck), String> {
@@ -389,6 +521,7 @@ fn run_sweep(
     deck_names: &[String],
     games: u32,
     repeat_tag: usize,
+    trace_writer: &mut Option<TraceWriter>,
 ) -> Result<Vec<DeckRun>, String> {
     let v2_policy = strategy_v2::V2Policy::default();
     let mut runs = Vec::with_capacity(deck_names.len());
@@ -416,8 +549,25 @@ fn run_sweep(
                     arena_seed,
                     opts.policy,
                     &v2_policy,
-                );
+                    g as usize,
+                    trace_writer.is_some(),
+                )?;
+                if let Some(writer) = trace_writer.as_mut() {
+                    let trace = stats
+                        .trace
+                        .as_ref()
+                        .ok_or_else(|| "trace was not recorded".to_string())?;
+                    writer.write_game(trace)?;
+                }
                 total_actions += stats.actions;
+                if opts.per_game {
+                    println!(
+                        "GAME deck={name} index={g} outcome={} end={} actions={}",
+                        outcome_label(stats.outcome),
+                        stats.end_reason,
+                        stats.actions
+                    );
+                }
                 *outcomes.entry(outcome_label(stats.outcome)).or_insert(0) += 1;
                 *ends.entry(stats.end_reason).or_insert(0) += 1;
                 let _ = stats.game_result;
@@ -461,10 +611,21 @@ fn run_sweep(
                                     arena_seed,
                                     opts.policy,
                                     v2_policy,
-                                );
-                                actions += stats.actions;
-                                *local_outcomes.entry(outcome_label(stats.outcome)).or_insert(0) +=
-                                    1;
+                                    g as usize,
+                                    false,
+                                )
+                                .expect("sim_bench worker failed");
+                                 actions += stats.actions;
+                                 if opts.per_game {
+                                     println!(
+                                         "GAME deck={name} index={g} outcome={} end={} actions={}",
+                                         outcome_label(stats.outcome),
+                                         stats.end_reason,
+                                         stats.actions
+                                     );
+                                 }
+                                 *local_outcomes.entry(outcome_label(stats.outcome)).or_insert(0) +=
+                                     1;
                                 *local_ends.entry(stats.end_reason).or_insert(0) += 1;
                                 let _ = stats.game_result;
                             }
@@ -540,6 +701,33 @@ fn real_main() -> Result<(), String> {
     let mut db = Arc::new(CardDatabase::load_or_create(cards));
     let deck_names = list_decks(&opts.deck)?;
     let setup_secs = setup_t0.elapsed().as_secs_f64();
+    let mut trace_writer = if let Some(path) = opts.trace.as_ref() {
+        let deck_path = std::path::Path::new("../web_ui/decks")
+            .join(format!("{}.txt", deck_names[0]));
+        let deck_text = std::fs::read_to_string(&deck_path)
+            .map_err(|error| format!("{}: {error}", deck_path.display()))?;
+        let build_identity = std::env::var("RABUKA_REPLAY_BUILD_IDENTITY")
+            .ok()
+            .and_then(|value| serde_json::from_str(&value).ok())
+            .unwrap_or_else(|| json!({}));
+        let header = Header {
+            version: 3,
+            projection: "players-queue-snapshots-movements-observations-v2".into(),
+            feature_schema: 1,
+            execution: "execute-and-settle-v1".into(),
+            profiling: cfg!(feature = "profiling"),
+            producer: "sim_bench".into(),
+            deck_text,
+            games: opts.games as usize,
+            engine_seed: opts.seed,
+            policy_seed: 0x5EED_1234_ABCD_0001,
+            policy: opts.policy_raw.clone(),
+            build_identity,
+        };
+        Some(TraceWriter::new(path, &header)?)
+    } else {
+        None
+    };
 
     println!(
         "SIM_BENCH setup_secs={:.3} decks={} games={} repeat={} jobs={} seed={} policy={} display={} logs={} debug_assertions={}",
@@ -596,7 +784,8 @@ fn real_main() -> Result<(), String> {
                         opts.seed ^ 0xA5A5_A5A5,
                         (passes as u32) * 10_000 + (di as u32) * 10 + w + 1,
                     );
-                    let _ = run_game(&db, &t1w, &t2w, es, ps, opts.policy, &v2w);
+                    let _ = run_game(&db, &t1w, &t2w, es, ps, opts.policy, &v2w, 0, false)
+                        .expect("sim_bench warmup failed");
                     warmup_games += 1;
                 }
             }
@@ -622,8 +811,19 @@ fn real_main() -> Result<(), String> {
     // ── Timed sweeps ────────────────────────────────────────────────────
     let mut all_runs: Vec<DeckRun> = Vec::new();
     for rep in 0..opts.repeat {
-        let runs = run_sweep(&opts, &mut db, &deck_names, opts.games, rep as usize)?;
+        let runs = run_sweep(
+            &opts,
+            &mut db,
+            &deck_names,
+            opts.games,
+            rep as usize,
+            &mut trace_writer,
+        )?;
         all_runs.extend(runs);
+    }
+
+    if let Some(writer) = trace_writer.take() {
+        writer.finish(opts.games as usize)?;
     }
 
     // Drop the alloc guard BEFORE printing the aggregate so its report

@@ -6,7 +6,7 @@ cost/compound/turn-actions directory breakup; routing logic unchanged)
 This document is an engineering map of the ability system. It is intentionally
 about data flow and ownership rather than a complete card-ability reference.
 The schema and card-facing semantics live in
-[`cards/ABILITY_DOCUMENTATION.md`](cards/ABILITY_DOCUMENTATION.md).
+[`cards/ABILITY_DOCUMENTATION.md`](../cards/ABILITY_DOCUMENTATION.md).
 
 ## Executive summary
 
@@ -519,7 +519,20 @@ That order reduces risk while improving the day-to-day task of fixing one
 ability. It also prevents a decoder rewrite from masking parser or rule-model
 bugs, which are the more fundamental source of ambiguity today.
 
-## Appendix A: Action type → handler lookup
+## Shared effect and condition fields
+
+The completed field-consolidation work is part of this pipeline contract.
+`EffectFilter` is the single source of truth for shared effect fields, and
+`ConditionCommon` holds the shared condition fields; the generated decoders
+read those structures directly. When changing either model, regenerate the
+corresponding decoder and run the full engine suite.
+
+For a new mechanic, write the printed-behavior tests first, identify the
+matching handler family, change the parser/model/engine at the source, then
+regenerate artifacts and verify both the positive path and the relevant
+no-fire, boundary, choice, and duration paths. Do not preserve a compensating
+patch when the producing handler can be corrected safely.
+
 
 When debugging a single ability, start by identifying the `action` string in
 `abilities.json`, then jump to the handler below. All paths are relative to

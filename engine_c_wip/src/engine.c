@@ -83,15 +83,14 @@ int rb_draw(GameState *g, int pl) {
     if (P->deck.n == 0) rb_player_refresh(g, pl);   /* refresh shuffles waitroom in */
     if (P->deck.n == 0) return 0;
     if (P->hand.n >= RB_MAX_HAND) return 0;
-    bag_push(&P->hand, bag_take_first(&P->deck));
+    bag_push(&P->hand, bag_remove_at(&P->deck, 0));
     return 1;
 }
 int rb_draw_energy(GameState *g, int pl) {
     RbPlayer *P = &g->p[pl];
-    if (P->deck.n == 0) rb_player_refresh(g, pl);
-    if (P->deck.n == 0) return 0;
+    if (P->energy_deck.n == 0) return 0;
     if (P->energy.n >= RB_MAX_ENERGY_CARDS) return 0;
-    bag_push(&P->energy, bag_take_first(&P->deck));
+    bag_push(&P->energy, bag_remove_at(&P->energy_deck, 0));
     if (P->energy_active < RB_MAX_ENERGY_CARDS) P->energy_active++;
     return 1;
 }
@@ -661,11 +660,8 @@ static void handle_action(GameState *g, int actor, AbilityEffect *e, int host_ci
             (chose_yes, negation) matrix. */
         rb_compound_conditional_on_optional(g, actor, e, -1, host_cid);
     } else if (!strcmp(act, "choice")) {
-        int allow = e->is_optional ? 1 : 0;
-        rb_emit_choice(g, actor, RB_CHOICE_SELECT_TARGET, NULL, NULL, cnt, allow, act);
-        /* Heart-color choice: stash the chosen color for the following gain (mirrors
-            Rust execute_choice → conditional_choice). */
-        g->queue.selected_heart_color = heart_color_of(e, -1);
+        int choice_resolved = 0;
+        rb_execute_misc_effect(g, actor, W, e, &choice_resolved);
     } else if (!strcmp(act, "select_number")) {
         /* Mirror ability/choice.rs select_number — emit a count-choice the host
             answers; the chosen number is recorded in queue.choice_result on resume

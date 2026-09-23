@@ -231,24 +231,37 @@ impl AbilityResolver {
         gs: &mut GameState,
         effect: &AbilityEffect,
     ) -> Result<(), String> {
-        let db = &gs.card_database;
-        let is_self = effect.is_self_target();
+        let trigger = match effect.target_trigger_any() {
+            Some("ライブ開始時") => crate::game_state::AbilityTrigger::LiveStart,
+            Some("ライブ成功時") => crate::game_state::AbilityTrigger::LiveSuccess,
+            _ => {
+                self.last_action_result = Some((effect.action, false));
+                return Err("invalidate_ability has no supported target_trigger".to_string());
+            }
+        };
+        let duration = effect
+            .duration_any()
+            .map(crate::ability::util::parse_duration)
+            .unwrap_or(crate::core::types::Duration::Permanent);
 
-        if is_self {
-            // Self-targeting: invalidate the activating card itself (works for any zone)
-            if let Some(card_id) = gs.activating_card {
+        if effect.is_self_target() {
+            let Some(card_id) = gs.activating_card else {
+                self.last_action_result = Some((effect.action, false));
+                return Err("no activating card for self-targeted invalidation".to_string());
+            };
+            let succeeded = gs.try_add_ability_invalidation(card_id, trigger, duration);
+            self.last_action_result = Some((effect.action, succeeded));
+            if succeeded {
                 let pp = self.player_prefix(gs);
                 let cn = self.card_name(card_id);
                 gs.rule_log
                     .push(format!("{} {}: [[log_negate_ability_self]]", pp, cn));
-                gs.negated_abilities.push(card_id);
-                return Ok(());
             }
-            return Err("no activating card for self-targeted invalidation".to_string());
+            return Ok(());
         }
 
-        // Other-targeting: find valid target on stage
-        let player = gs.resolve_target_player(effect.target.as_deref().unwrap_or("self"));
+        let target = effect.target.as_deref().unwrap_or("self");
+        let player = gs.resolve_target_player(target);
         let stage_ids: Vec<i16> = player
             .stage
             .stage
@@ -256,25 +269,61 @@ impl AbilityResolver {
             .copied()
             .filter(|&id| id != -1)
             .collect();
-
-        let mut filter = super::util::CardFilter::from_effect(effect);
-        if let Some(activating) = gs.activating_card {
-            filter.exclude_self = Some(activating);
-        }
-        let valid = super::util::matching_ids(&stage_ids, db, &filter, true);
+        let filter = super::util::CardFilter::from_effect(effect);
+        let valid: Vec<i16> = super::util::matching_ids(&stage_ids, &gs.card_database, &filter, true)
+            .into_iter()
+            .filter(|card_id| gs.card_has_ability_trigger(*card_id, &trigger))
+            .collect();
 
         if valid.is_empty() {
-            return Err("no valid targets for invalidation".to_string());
+            self.last_action_result = Some((effect.action, false));
+            return Ok(());
         }
 
-        if let Some(activating) = gs.activating_card {
+        if self.selected_cards.is_empty() {
+            let filtered_indices: Vec<usize> = player
+                .stage
+                .stage
+                .iter()
+                .enumerate()
+                .filter_map(|(index, &card_id)| valid.contains(&card_id).then_some(index))
+                .collect();
+            self.pending_choice = Some(
+                crate::ability::types::Choice::select_cards(
+                    crate::ability::enums::Zone::Stage.to_str(),
+                    1,
+                    "Select one member whose ability will be invalidated",
+                    effect.optional_any().unwrap_or(false),
+                )
+                .description_ja(Some("無効化する能力のメンバーを選択".to_string()))
+                .card_type(effect.card_type_any().map(|ct| format!("{:?}", ct)))
+                .group(effect.group_names_any().and_then(|g| g.first().cloned()))
+                .filtered_indices(Some(filtered_indices))
+                .target_player_id(Some(target.to_string()))
+                .is_select_action(true)
+                .build(),
+            );
+            self.stage_select_intent =
+                Some(crate::ability::types::StageSelectIntent::CollectTargets);
+            self.execution_context = crate::ability::types::ExecutionContext::SingleEffect {
+                effect_index: 0,
+            };
+            gs.ability_queue.set_pending_actions(vec![effect.clone()]);
+            return Ok(());
+        }
+
+        let selected = self.selected_cards.first().copied();
+        let succeeded = selected.is_some_and(|card_id| {
+            valid.contains(&card_id)
+                && gs.try_add_ability_invalidation(card_id, trigger, duration)
+        });
+        self.selected_cards.clear();
+        self.last_action_result = Some((effect.action, succeeded));
+        if succeeded {
             let pp = self.player_prefix(gs);
-            let cn = self.card_name(activating);
+            let cn = self.card_name(gs.activating_card.unwrap_or_default());
             gs.rule_log
                 .push(format!("{} {}: [[log_negate_ability]]", pp, cn));
-            if let Some(&target_id) = valid.first() {
-                gs.negated_abilities.push(target_id);
-            }
         }
         Ok(())
     }

@@ -1218,30 +1218,46 @@ static int h_choice(GameState *g, int actor, const AbilityEffect *e){
     if(g->queue.resume_active) return 1;
 
     const char *choice_maker = eff_extra(e,"choice_maker");
-    int who = actor;
-    if(choice_maker && !strcmp(choice_maker,"opponent")) who = actor^1;
+    int who = g->active;
+    if(choice_maker && !strcmp(choice_maker,"opponent")) who = g->active^1;
 
     if(g->queue.has_pending) return 1;
-    if(g->queue.selected_heart_color>=0) return 1;
 
     int cnt   = e->count>=0 ? e->count : 1;
     int allow = e->is_optional ? 1 : 0;
+    for (int i = 0; i < g->queue.choice_options_n; i++) {
+        rb_effect_free(g->queue.choice_options[i]);
+        g->queue.choice_options[i] = NULL;
+    }
+    g->queue.choice_options_n = 0;
+    g->queue.choice_reprompt_pending = 0;
+    for (int i = 0; i < e->n_options && i < RB_ENTRY_PENDING_CAP; i++) {
+        int source_index = e->n_options - 1 - i;
+        g->queue.choice_options[i] = rb_effect_deep_clone(e->options[source_index]);
+        if (g->queue.choice_options[i]) g->queue.choice_options_n++;
+    }
 
     /* Propagate parent choice's group_names to each child option (unless options
        define their own groups). */
     const char *group_names = eff_extra(e,"group_names");
-    if(group_names && *group_names){
-        /* This is a selection-filter group_names: it narrows which cards can be
-           chosen. The C choice model doesn't have per-option group propagation
-           (that's handled in Rust via ConditionalChoice::Effects); we record the
-           group in the pending choice's filter_group. */
-        strncpy(g->queue.pending.filter_group, group_names,
-                sizeof(g->queue.pending.filter_group)-1);
-    }
+    const char *alternative_count_type = eff_extra(e,"alternative_count_type");
+    g->queue.choice_reprompt_pending = e->alternative_condition &&
+        alternative_count_type && !strcmp(alternative_count_type,"any_number") &&
+        rb_eval_condition_for_host(g, actor, g->queue.resume_host, e->alternative_condition);
+    char choice_debug[128];
+    snprintf(choice_debug, sizeof(choice_debug),
+             "[CHOICE_C] options=%d any_number=%d pending_options=%d",
+             e->n_options, g->queue.choice_reprompt_pending, g->queue.choice_options_n);
+    rb_log_push_verdict(choice_debug, "debug", 1);
+    fprintf(stderr, "%s\n", choice_debug);
 
     rb_emit_choice(g, who, RB_CHOICE_SELECT_TARGET, NULL, NULL, cnt, allow, "choice");
+    if(group_names && *group_names)
+        strncpy(g->queue.pending.filter_group, group_names,
+                sizeof(g->queue.pending.filter_group)-1);
     rb_queue_pause_for_choice(g, &g->queue.pending);
-    rb_choice_set_route(&g->queue.pending, RB_ROUTE_SELECT_TARGET);
+    g->queue.actor = who;
+    rb_choice_set_route(&g->queue.pending, RB_ROUTE_CONDITIONAL_CHOICE);
     g->queue.resume_mode  = 0;
     g->queue.resume_actor = who;
     return 1;

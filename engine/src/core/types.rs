@@ -212,6 +212,18 @@ pub enum Duration {
     Unless,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(
+    feature = "serde_support",
+    derive(serde::Serialize, serde::Deserialize)
+)]
+pub struct AbilityInvalidation {
+    pub card_id: i16,
+    pub trigger: AbilityTrigger,
+    pub duration: Duration,
+    pub created_turn: u8,
+}
+
 #[derive(Debug, Clone)]
 #[cfg_attr(
     feature = "serde_support",

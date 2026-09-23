@@ -11,7 +11,7 @@ pub struct PolicyNet {
     pub card_embed: Vec<f32>,
     // Zone embedding table [15, 16]
     pub zone_embed: Vec<f32>,
-    // Action type embedding table [16, 16]
+    // Action type embedding table [25, 16]
     pub action_type_embed: Vec<f32>,
     // State trunk: W1_state [HIDDEN, state_dim], b1 [HIDDEN]
     pub w1_state: Vec<f32>,
@@ -32,7 +32,7 @@ impl PolicyNet {
         Self {
             card_embed: vec![0.0f32; CARD_EMBED_TABLE_SIZE * CARD_EMBED_DIM],
             zone_embed: vec![0.0f32; NUM_ZONES * ZONE_EMBED_DIM],
-            action_type_embed: vec![0.0f32; 16 * ACTION_TYPE_EMBED_DIM],
+            action_type_embed: vec![0.0f32; ACTION_TYPE_COUNT * ACTION_TYPE_EMBED_DIM],
             w1_state: vec![0.0f32; HIDDEN * state_dim],
             b1: vec![0.0f32; HIDDEN],
             w1_action: vec![0.0f32; HIDDEN * ACTION_ENC_DIM],
@@ -68,8 +68,8 @@ impl PolicyNet {
             self.zone_embed[i] = read_f32(&buf, &mut pos);
         }
 
-        // action_type_embed [16, 16]
-        for i in 0..16 * ACTION_TYPE_EMBED_DIM {
+        // action_type_embed [25, 16]
+        for i in 0..ACTION_TYPE_COUNT * ACTION_TYPE_EMBED_DIM {
             self.action_type_embed[i] = read_f32(&buf, &mut pos);
         }
 
@@ -127,7 +127,7 @@ impl PolicyNet {
             s
         };
 
-        let stage_enc = |cards: &[i16; 3], under: &[Vec<i16>; 3]| -> [Vec<f32>; 3] {
+        let stage_enc = |cards: &[i16; 3], waited: &[bool; 3], under: &[Vec<i16>; 3]| -> [Vec<f32>; 3] {
             let mut out = [vec![], vec![], vec![]];
             for pos in 0..3 {
                 let cid = cards[pos];
@@ -136,8 +136,8 @@ impl PolicyNet {
                     continue;
                 }
                 let mut v = embed_card(cid);
-                // orientation: 1 for active (positive card id)
-                v.push(1.0);
+                // orientation: 1 for active, 0 for waited
+                v.push(if waited[pos] { 0.0 } else { 1.0 });
                 // underlay count
                 let ucnt = under[pos].len() as f32;
                 v.push(ucnt / 5.0);
@@ -150,36 +150,30 @@ impl PolicyNet {
             out
         };
 
-        let my_stage_enc = stage_enc(&obs.me.stage, &obs.me.under_cards);
-        let opp_stage_enc = stage_enc(&obs.opp.stage, &obs.opp.under_cards);
+        let my_stage_enc = stage_enc(&obs.me.stage, &obs.me.stage_waited, &obs.me.under_cards);
+        let opp_stage_enc = stage_enc(&obs.opp.stage, &obs.opp.stage_waited, &obs.opp.under_cards);
 
-        // Globals: [phase_onehot(12), turn, hand, opp_hand, my_ae, opp_ae,
-        //          my_deck, opp_deck, my_succ, opp_succ, is_first,
-        //          my_energy_len, opp_energy_len, my_live, opp_live,
-        //          my_blade, opp_blade]
         let mut globals = vec![0.0f32; GLOBAL_FEATURES];
         let pi = phase_as_u8(&obs.current_phase) as usize;
-        if pi < 12 {
+        if pi < 13 {
             globals[pi] = 1.0;
         }
-        globals[12] = obs.turn_number as f32 / 30.0;
-        globals[13] = obs.me.hand.len() as f32 / 10.0;
-        globals[14] = obs.opp.hand_size as f32 / 10.0;
-        globals[15] = obs.me.active_energy_count as f32 / 15.0;
-        globals[16] = obs.opp.active_energy_count as f32 / 15.0;
-        globals[17] = obs.me.main_deck_size as f32 / 60.0;
-        globals[18] = obs.opp.main_deck_size as f32 / 60.0;
-        globals[19] = obs.me.success_zone.len() as f32 / 3.0;
-        globals[20] = obs.opp.success_zone.len() as f32 / 3.0;
-        globals[21] = if obs.me.is_first_attacker { 1.0 } else { 0.0 };
-        globals[22] = obs.me.energy_zone.len() as f32 / 20.0;
-        globals[23] = obs.opp.energy_zone.len() as f32 / 20.0;
-        globals[24] = obs.me.live_zone.len() as f32 / 3.0;
-        globals[25] = obs.opp.live_zone.len() as f32 / 3.0;
-        let my_blade = obs.me.stage.iter().filter(|&&c| c >= 0).count() as f32;
-        let opp_blade = obs.opp.stage.iter().filter(|&&c| c >= 0).count() as f32;
-        globals[26] = my_blade / 3.0;
-        globals[27] = opp_blade / 3.0;
+        globals[13] = obs.turn_number as f32 / 30.0;
+        globals[14] = obs.me.hand_size as f32 / 10.0;
+        globals[15] = obs.opp.hand_size as f32 / 10.0;
+        globals[16] = obs.me.active_energy_count as f32 / 15.0;
+        globals[17] = obs.opp.active_energy_count as f32 / 15.0;
+        globals[18] = obs.me.main_deck_size as f32 / 60.0;
+        globals[19] = obs.opp.main_deck_size as f32 / 60.0;
+        globals[20] = obs.me.features.success_count as f32 / 3.0;
+        globals[21] = obs.opp.features.success_count as f32 / 3.0;
+        globals[22] = if obs.me.is_first_attacker { 1.0 } else { 0.0 };
+        globals[23] = obs.me.energy_zone.len() as f32 / 20.0;
+        globals[24] = obs.opp.energy_zone.len() as f32 / 20.0;
+        globals[25] = obs.me.live_zone.len() as f32 / 3.0;
+        globals[26] = obs.opp.live_zone.len() as f32 / 3.0;
+        globals[27] = obs.me.features.active_blades as f32 / 12.0;
+        globals[28] = obs.opp.features.active_blades as f32 / 12.0;
 
         EncodedState {
             my_hand: sum_embeds(&obs.me.hand),
