@@ -13,9 +13,12 @@ LIVE_RULES := tests/test_live_success_rules.c
 PHASE_RULES := tests/test_phase_machine_rules.c
 PERFORMANCE_RULES := tests/test_performance_phase_rules.c
 SURPLUS_HEART := tests/test_surplus_heart.c
+OPPONENT_LIVE_FLOW := tests/test_opponent_live_success_flow.c
+LIVE_MOVEMENT := tests/test_live_card_zone_movement.c
+RESTRICTIONS := tests/test_restriction_mechanics.c
 AUDIT   := tools/audit_actions.c
 
-.PHONY: all test audit regen clean mechanics live-rules phase-rules performance-rules surplus-heart
+.PHONY: all test audit regen clean mechanics live-rules phase-rules performance-rules surplus-heart opponent-live-flow live-movement restrictions
 all: $(TARGET)
 
 regen:
@@ -67,6 +70,24 @@ performance-rules: $(TARGET)_performance_rules
 
 surplus-heart: $(TARGET)_surplus_heart
 	./$(TARGET)_surplus_heart
+
+$(TARGET)_opponent_live_flow: $(OBJ_LIB) $(OPPONENT_LIVE_FLOW)
+	$(CC) $(CFLAGS) -o $@ $(OBJ_LIB) $(OPPONENT_LIVE_FLOW)
+
+$(TARGET)_live_movement: $(OBJ_LIB) $(LIVE_MOVEMENT)
+	$(CC) $(CFLAGS) -o $@ $(OBJ_LIB) $(LIVE_MOVEMENT)
+
+$(TARGET)_restrictions: $(OBJ_LIB) $(RESTRICTIONS)
+	$(CC) $(CFLAGS) -o $@ $(OBJ_LIB) $(RESTRICTIONS)
+
+opponent-live-flow: $(TARGET)_opponent_live_flow
+	./$(TARGET)_opponent_live_flow
+
+live-movement: $(TARGET)_live_movement
+	./$(TARGET)_live_movement
+
+restrictions: $(TARGET)_restrictions
+	./$(TARGET)_restrictions
 
  $(TARGET)_debug: $(OBJ_LIB) src/debug_umi.o
 	$(CC) $(CFLAGS) -o $@ $(OBJ_LIB) src/debug_umi.o

@@ -7,9 +7,8 @@
    test_game_new, test_id, add_to_hand/stage/discard, give_energy,
    play_to_stage, activate_ability, recalc, board introspection.
    Uses the real card database (cards.bin) via rb_find_card_by_no.
-   Pool semantics: test_id() returns the same template index for each call
-   (no per-copy pool). Tests needing two distinct copies of same card_no
-   should use distinct card_nos in C or check single-copy behaviour.
+   test_id() returns the shared template index; test_new_id() allocates a
+   distinct instance backed by that same card record, matching Rust's pool.
    Mirrors Rust helpers/mod.rs:407 TestGame::new in Main phase. */
 
 typedef struct {
@@ -18,6 +17,7 @@ typedef struct {
 
 void test_game_new(TestGame *tg);
 int  test_id(TestGame *tg, const char *card_no); /* card index or -1, like Rust i16 */
+int  test_new_id(TestGame *tg, const char *card_no); /* distinct copy or -1 */
 void test_add_to_hand(TestGame *tg, int card_id);
 void test_add_to_discard(TestGame *tg, int card_id);
 void test_add_to_stage(TestGame *tg, int area, int card_id); /* area 0=left 1=center 2=right */

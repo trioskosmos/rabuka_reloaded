@@ -1,6 +1,8 @@
 /* ===== AUTO-ASSEMBLED from choice.rs port fragments ===== */
 #include "rabuka.h"
 #include <string.h>
+
+extern int rb_complete_double_baton(GameState *g, int selected_pair);
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -2005,19 +2007,8 @@ void rb_resolver_handle_double_baton_touch(GameState *g, const char *selected) {
         rb_drain_ability_queue(g);
         return;
     }
-    /* validate second baton target not protected */
-    int incoming = g->queue.resume_host;
-    int existing = -1;
-    if (choice >=0 && choice < RB_STAGE_SIZE) existing = g->p[actor].stage[choice];
-    if (existing >=0 && rb_has_cannot_baton_touch_protection(incoming, existing)) {
-        /* protected: cannot baton, skip */
-        RbAbilityResolver tmp; memset(&tmp,0,sizeof(tmp)); tmp.gs=g;
-        rb_resolver_clear_choice_state(&tmp);
-        rb_drain_ability_queue(g);
-        return;
-    }
-    if (choice >=0 && choice < RB_STAGE_SIZE) {
-        rb_play_member(g, actor, 0, choice); /* simplified baton placement */
+    if (choice >= 0) {
+        rb_complete_double_baton(g, choice);
     }
     RbAbilityResolver tmp; memset(&tmp,0,sizeof(tmp)); tmp.gs=g;
     rb_resolver_clear_choice_state(&tmp);
@@ -2335,7 +2326,7 @@ int rb_resume_with_choice(GameState *g, int selected_idx) {
         case RB_CHOICE_SELECT_TARGET:
             /* record the chosen target via the handler, then run the deferred
                 effect that consumes it (C models target selection via deferral). */
-            rb_resolver_handle_select_target(&self, g, NULL, selected);
+            rb_resolver_handle_select_target(&self, g, saved_pending.target[0] ? saved_pending.target : NULL, selected);
             if (!was_skip && def && !rb_has_pending_choice(g)) {
                 if (def->action && (!strcmp(def->action, "pay_energy") ||
                                     !strcmp(def->action, "pay_cost") ||

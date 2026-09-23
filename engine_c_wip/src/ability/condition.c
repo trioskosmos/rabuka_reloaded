@@ -12,6 +12,8 @@ static int count_surplus_heart(const struct GameState *g, int actor, const Condi
 static int eval_resource_count(const GameState *g, int actor, const Condition *c);
 static int eval_card_count(const GameState *g, int actor, const Condition *c);
 static int eval_card_blade(const GameState *g, int actor, const Condition *c);
+static int resolve_moved_cards_source(const GameState *g, int actor, const Condition *c,
+                                      int *out_ids, int max, int *out_n);
 
 static int s_heart_idx(const char *h){
     if(!h) return RB_HEART_ALL;
@@ -279,6 +281,20 @@ static int eval_location(const struct GameState *g, int actor, int host_cid, con
     /* Rust evaluates check_self FIRST and short-circuits on it. */
     int cs = eval_check_self(g, actor, host_cid, c);
     if (cs >= 0) return cs;
+    const char *movement_source = get_str(c, "source");
+    const char *movement_destination = get_str(c, "destination");
+    int old_movement = movement_source &&
+        (!strcmp(movement_source, "preceding_moved") ||
+         !strcmp(movement_source, "previous_moved_cards"));
+    int new_movement = movement_destination && !old_movement;
+    if (old_movement || new_movement) {
+        int moved_ids[RB_MAX_ZONE];
+        int moved_n = 0;
+        resolve_moved_cards_source(g, actor, c, moved_ids, RB_MAX_ZONE, &moved_n);
+        int threshold = 1;
+        get_i(c, "count", &threshold);
+        return eval_operator(moved_n, get_str(c, "operator"), threshold);
+    }
     int has_count = 0; int cnt_thr = 1;
     int tmp;
     has_count = get_i(c, "count", &tmp); if (has_count) cnt_thr = tmp;
@@ -299,6 +315,10 @@ static int eval_location(const struct GameState *g, int actor, int host_cid, con
     if (!loc) loc = "stage";
     int pl = target_player_idx(actor, c);
     const char *ctype = get_str(c, "card_type");
+    const char *temporal = get_str(c, "temporal");
+    if (temporal && !strcmp(temporal, "this_turn") &&
+        (!strcmp(loc, "deck") || !strcmp(loc, "main_deck")))
+        return g->p[pl].deck_refreshed_this_turn;
     /* group_names / group filter (mirrors Rust CardFilter.group_names substring match) */
     const char *group = get_str(c, "group");
     const CondValue *gv = find_val(c, "group_names");
@@ -639,10 +659,17 @@ static int eval_group(const struct GameState *g, int actor, int host_cid, const 
    Sums the hearts of matching cards in the zone and compares to aggregate_total. */
 static int eval_group_aggregate(const GameState *g, int actor, const Condition *c) {
     int agg_total = 0;
-    if (!get_i(c, "aggregate_total", &agg_total) || agg_total <= 0) return -1;
+    int is_total = 0;
+    const char *aggregate = get_str(c, "aggregate");
+    if (aggregate && !strcmp(aggregate, "total")) {
+        if (!get_i(c, "count", &agg_total) || agg_total <= 0) return -1;
+        is_total = 1;
+    } else if (!get_i(c, "aggregate_total", &agg_total) || agg_total <= 0) {
+        return -1;
+    }
     int pl = target_player_idx(actor, c);
     const char *loc = get_str(c, "location"); if (!loc) loc = "stage";
-    const char *op = get_str(c, "aggregate_total_operator");
+    const char *op = is_total ? get_str(c, "operator") : get_str(c, "aggregate_total_operator");
     if (!op) op = ">=";
     /* Sum hearts for all cards in the zone matching the group filter */
     int ids[RB_MAX_ZONE]; int n = zone_ids(g, pl, loc, ids, RB_MAX_ZONE);
@@ -912,11 +939,12 @@ static int eval_temporal(const struct GameState *g, int actor, int host_cid, con
             const char *ctype = get_str(c, "card_type");
             const char *tgt = get_str(c, "target");
             int who = (tgt && !strcmp(tgt,"opponent")) ? (actor^1) : actor;
+            if (loc && (!strcmp(loc,"deck") || !strcmp(loc,"main_deck")))
+                return g->p[who].deck_refreshed_this_turn;
             if (has_count && (!loc || !strcmp(loc,"stage")) &&
                 (!ctype || !strcmp(ctype,"member_card"))) {
                 const char *group = get_str(c, "group_names");
                 if (group && *group) {
-                    /* count stage members matching the group that moved this turn. */
                     int matching = 0;
                     for (int q=0; q<RB_STAGE_SIZE; q++) {
                         int cid = g->p[who].stage[q];
@@ -1468,12 +1496,23 @@ static int eval_condition_inner_host(const struct GameState *g, int actor, int h
         case RB_COND_OPPONENT_CHOICE:
             r = eval_opponent_choice(g, actor, c);
             break;
-        case RB_COND_OPPONENT_LIVE_SUCCESS:
-            /* Mirror state.rs:evaluate_opponent_live_success_condition  Etrue only if
-                the owner's OPPONENT passed their live THIS TURN (g->live_success
-                tracks each player's per-turn live result, set in live.c). */
-            r = g->live_success[actor ^ 1] ? 1 : 0;
+        case RB_COND_OPPONENT_LIVE_SUCCESS: {
+            int owner = host_cid >= 0 ? rb_owner_of_card(g, host_cid) : -1;
+            if (owner < 0) owner = actor;
+            int opponent = owner ^ 1;
+            r = g->live_success[opponent] ? 1 : 0;
+            int no_excess = 0;
+            get_bool(c, "no_excess_heart", &no_excess);
+            if (r) {
+                if (no_excess)
+                    r = opponent == 0 ? g->p1_live_success_no_excess
+                                      : g->p2_live_success_no_excess;
+            }
+            fprintf(stderr, "[OPP_LIVE_SUCCESS_EVAL] host=%d owner=%d actor=%d opponent=%d won=%d no_excess_requested=%d result=%d\n",
+                    host_cid, owner, actor, opponent, g->live_success[opponent], no_excess, r);
             break;
+        }
+
         case RB_COND_NO_EXCESS_HEART:     r = eval_no_excess(g, actor, c); break;
         case RB_COND_ALWAYS_TRUE:         r = 1; break;
         case RB_COND_ANY_OF:              r = eval_any_of(g, actor, c); break;
@@ -1994,55 +2033,37 @@ static int resolve_moved_cards_source(const struct GameState *g, int actor, cons
         n = g->n_recently_moved;
         for (int i = 0; i < n && i < RB_MAX_ZONE; i++) ids[i] = g->recently_moved[i];
     } else if (dst && *dst) {
-        /* new movement format: source=zone+dst. Mirror card.rs: prefer the
-            trigger-context moved cards (entry_trigger_moved_cards / those_cards),
-            then recently_moved_cards; filter by destination zone. When the
-            movement-tracking table is empty (manual test setup), fall back to
-            recently_moved_cards unfiltered. */
-        int trigger_ids[RB_MAX_RECENTLY_MOVED]; int trigger_n = 0;
+        int trigger_ids[RB_MAX_RECENTLY_MOVED];
+        int trigger_n = g->n_recently_moved;
         if (g->n_those_cards > 0) {
             trigger_n = g->n_those_cards;
-            for (int i = 0; i < trigger_n && i < RB_MAX_RECENTLY_MOVED; i++) trigger_ids[i] = g->those_cards[i];
-        } else if (g->n_recently_moved > 0) {
-            trigger_n = g->n_recently_moved;
-            for (int i = 0; i < trigger_n && i < RB_MAX_RECENTLY_MOVED; i++) trigger_ids[i] = g->recently_moved[i];
-        }
-        if (trigger_n == 0) {
-            /* No movement context at all: fall back to the destination zone's
-                current contents (Rust's turn_movements-empty path returns true
-                for every event card, i.e. the unfiltered source set). */
-            n = zone_ids(g, pl, dst, ids, RB_MAX_ZONE);
+            for (int i = 0; i < trigger_n && i < RB_MAX_RECENTLY_MOVED; i++)
+                trigger_ids[i] = g->those_cards[i];
         } else {
-            const RbPlayer *P = &g->p[pl];
-            for (int i = 0; i < trigger_n && n < RB_MAX_ZONE; i++) {
+            for (int i = 0; i < trigger_n && i < RB_MAX_RECENTLY_MOVED; i++)
+                trigger_ids[i] = g->recently_moved[i];
+        }
+        int target_pl = pl;
+        RbZoneId destination = rb_zone_id_from_str(dst);
+        if (g->n_batch_movements > 0) {
+            for (int i = 0; i < trigger_n && n < max; i++) {
                 int cid = trigger_ids[i];
-                if (cid < 0) continue;
-                int in_dst = 0;
-                if (!strcmp(dst, "discard") || !strcmp(dst, "waitroom")) {
-                    for (int j = 0; j < P->discard.n; j++) if (P->discard.cards[j] == cid) { in_dst = 1; break; }
-                } else if (!strcmp(dst, "stage")) {
-                    for (int j = 0; j < RB_STAGE_SIZE; j++) if (P->stage[j] == cid) { in_dst = 1; break; }
-                } else if (!strcmp(dst, "hand")) {
-                    for (int j = 0; j < P->hand.n; j++) if (P->hand.cards[j] == cid) { in_dst = 1; break; }
-                } else if (!strcmp(dst, "deck") || !strcmp(dst, "main_deck")) {
-                    for (int j = 0; j < P->deck.n; j++) if (P->deck.cards[j] == cid) { in_dst = 1; break; }
-                } else if (!strcmp(dst, "energy") || !strcmp(dst, "energy_zone")) {
-                    for (int j = 0; j < P->energy.n; j++) if (P->energy.cards[j] == cid) { in_dst = 1; break; }
-                } else if (!strcmp(dst, "live_card_zone") || !strcmp(dst, "live")) {
-                    for (int j = 0; j < P->live.n; j++) if (P->live.cards[j] == cid) { in_dst = 1; break; }
-                } else if (!strcmp(dst, "success_live_zone") || !strcmp(dst, "success")) {
-                    for (int j = 0; j < P->success.n; j++) if (P->success.cards[j] == cid) { in_dst = 1; break; }
-                } else if (!strcmp(dst, "under_member") || !strcmp(dst, "under")) {
-                    for (int s = 0; s < RB_STAGE_SIZE; s++)
-                        for (int j = 0; j < P->under_cards[s].n; j++)
-                            if (P->under_cards[s].cards[j] == cid) { in_dst = 1; break; }
-                } else if (!strcmp(dst, "revealed_cards")) {
-                    for (int j = 0; j < g->n_revealed; j++) if (g->revealed_cards[j] == cid) { in_dst = 1; break; }
-                } else if (!strcmp(dst, "resolution") || !strcmp(dst, "resolution_zone")) {
-                    for (int j = 0; j < g->resolution.n; j++) if (g->resolution.cards[j] == cid) { in_dst = 1; break; }
+                int in_event_cards = 0;
+                for (int j = 0; j < trigger_n; j++)
+                    if (trigger_ids[j] == cid) { in_event_cards = 1; break; }
+                if (!in_event_cards) continue;
+                for (int j = 0; j < g->n_batch_movements; j++) {
+                    const RbBatchMovement *movement = &g->batch_movements[j];
+                    if (movement->moved_card_id != cid ||
+                        (src && *src && !rb_zone_matches_source(movement->source_zone, src)) ||
+                        movement->cause_player_id != target_pl ||
+                        !rb_zone_equivalent(movement->dest_zone, destination)) continue;
+                    ids[n++] = cid;
+                    break;
                 }
-                if (in_dst) ids[n++] = cid;
             }
+        } else {
+            for (int i = 0; i < trigger_n && n < max; i++) ids[n++] = trigger_ids[i];
         }
     } else {
         n = g->n_recently_moved;
@@ -2054,6 +2075,14 @@ static int resolve_moved_cards_source(const struct GameState *g, int actor, cons
         int cid = ids[i];
         if (ctype && !card_matches_card_type_filter(cid, ctype)) continue;
         if (group && !rb_card_matches_group_str(cid, group)) continue;
+        if (dst && *dst) {
+            int destination_ids[RB_MAX_ZONE];
+            int destination_n = zone_ids(g, pl, dst, destination_ids, RB_MAX_ZONE);
+            int in_destination = 0;
+            for (int i = 0; i < destination_n; i++)
+                if (destination_ids[i] == cid) { in_destination = 1; break; }
+            if (!in_destination) continue;
+        }
         out_ids[filtered++] = cid;
     }
     *out_n = filtered;

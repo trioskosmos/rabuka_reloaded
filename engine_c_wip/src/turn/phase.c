@@ -214,7 +214,9 @@ void rb_check_invalid_live_cards(GameState *g, int is_p1) {
             int c = bag_remove_at_local(&P->live, i);
             if (rb_card_is_energy(c)) bag_push_local(&P->energy_deck, c);
             else                       bag_push_local(&P->discard, c);
-            rb_record_card_movement(g, c, 0, 0, is_p1 ? 0 : 1, 0);
+            rb_record_card_movement(g, c, RB_ZONEID_LIVE_CARD_ZONE,
+                                    rb_card_is_energy(c) ? RB_ZONEID_ENERGY_DECK : RB_ZONEID_WAITROOM,
+                                    is_p1 ? 0 : 1, 0);
         }
     }
 }

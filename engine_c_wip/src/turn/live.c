@@ -795,11 +795,16 @@ void rb_record_pretrigger_live_results(GameState *g) {
         RbLiveSnapshot *s = &g->snapshots[i];
         if (s->turn != g->turn) continue;
         int passed = s->n_lives > 0 && s->success;
+        int no_excess = passed && s->surplus_hearts == 0;
         if (s->player == 0) {
             g->live_success[0] = passed;
+            g->p1_live_success_no_excess = no_excess;
         } else {
             g->live_success[1] = passed;
+            g->p2_live_success_no_excess = no_excess;
         }
+        fprintf(stderr, "[EARLY_SEAT] pl=%d won=%d no_excess=%d surplus=%d\n",
+                s->player, passed, no_excess, s->surplus_hearts);
     }
 }
 
@@ -1024,6 +1029,7 @@ void rb_execute_live_victory_determination(GameState *g) {
     rb_compute_pregame_scores(g, p1_extra, p2_extra, &p1_score, &p2_score);
     g->live_score[0] = p1_score;
     g->live_score[1] = p2_score;
+    fprintf(stderr, "[LIVE_SCORE] p1=%d p2=%d\n", p1_score, p2_score);
 
     int p1_won = 0;
     int p2_won = 0;

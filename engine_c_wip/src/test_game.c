@@ -21,6 +21,16 @@ int test_id(TestGame *tg, const char *card_no){
     (void)tg;
     return rb_find_card_by_no(card_no);
 }
+int test_new_id(TestGame *tg, const char *card_no){
+    static int next_copy_id = -1;
+    (void)tg;
+    int template_id = rb_find_card_by_no(card_no);
+    if (template_id < 0) return -1;
+    if (next_copy_id < 0) next_copy_id = (int)rb_num_cards();
+    if (next_copy_id >= RB_MAX_CARD_IDS) return -1;
+    if (!rb_register_card_copy(next_copy_id, template_id)) return -1;
+    return next_copy_id++;
+}
 void test_add_to_hand(TestGame *tg, int card_id){
     RbPlayer *P=&tg->state.p[0];
     if(P->hand.n < RB_MAX_ZONE) P->hand.cards[P->hand.n++]=card_id;

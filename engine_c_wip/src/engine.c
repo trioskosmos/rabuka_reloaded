@@ -211,6 +211,7 @@ void rb_emit_choice(GameState *g, int actor, RbChoiceKind kind,
 static int s_exec_depth = 0;
 void rb_execute_effect_ex(GameState *g, int actor, AbilityEffect *e, int host_cid) {
     if (!e) return;
+    g->queue.resume_host = host_cid;
     /* Bound recursion: a deeply-nested effect tree (or a chain of ability effects
         that move/activate members) can recurse through this fn and overflow the
         stack. Headless caps the depth; effects past the cap are skipped (the same
@@ -438,6 +439,8 @@ static void handle_action(GameState *g, int actor, AbilityEffect *e, int host_ci
         } else if (e->target && !strcmp(e->target, "both")) {
             g->p[actor].score += cnt;
             g->p[actor ^ 1].score += cnt;
+        } else if (host_cid >= 0) {
+            rb_execute_modify_score(g, actor, e);
         } else {
             W->score += cnt;
         }
@@ -709,9 +712,7 @@ static int effect_has_restriction(const AbilityEffect *e, const char *restrictio
         for (int i = 0; i < e->n_extra; i++)
             if (e->extra_k[i] && !strcmp(e->extra_k[i], "exclude_group_names")) { ex = e->extra_v[i]; break; }
         if (ex && *ex) {
-            /* Rust passes the restriction string verbatim to card_matches_any_group,
-               which does substring matching against the card's series/unit/name/group. */
-            if (rb_card_matches_group_str(incoming_cid, ex)) return 0;
+            if (ex && *ex && rb_card_matches_group_str(incoming_cid, ex)) return 0;
         }
         return 1;
     }
@@ -797,8 +798,75 @@ static int rb_detect_alt_cost(GameState *g, int card, int *set_out) {
     return 0;
 }
 
+static int effect_is_double_baton(const AbilityEffect *e) {
+    if (!e || !e->action) return 0;
+    if (!strcmp(e->action, "double_baton_touch")) return e->count > 1;
+    if (!strcmp(e->action, "play_baton_touch") && e->count > 1) return 1;
+    for (int i = 0; i < e->n_child; i++)
+        if (effect_is_double_baton(e->child[i])) return 1;
+    if (effect_is_double_baton(e->primary_effect)) return 1;
+    if (effect_is_double_baton(e->alternative_effect)) return 1;
+    if (effect_is_double_baton(e->followup_action)) return 1;
+    if (effect_is_double_baton(e->optional_action)) return 1;
+    if (effect_is_double_baton(e->conditional_action)) return 1;
+    return 0;
+}
+
+int rb_complete_double_baton(GameState *g, int selected_pair) {
+    if (!g || selected_pair < 0) return 0;
+    int actor = g->queue.actor;
+    if (actor < 0 || actor > 1 || !g->queue.resume_host) return 0;
+    int card = g->queue.resume_host;
+    RbPlayer *P = &g->p[actor];
+    int eligible[RB_STAGE_SIZE];
+    int n = 0;
+    for (int q = 0; q < RB_STAGE_SIZE; q++)
+        if (P->stage[q] != RB_EMPTY_SLOT && !g->stage_arrived[actor][q])
+            eligible[n++] = q;
+    int i1, i2;
+    if (n == 2) { i1 = eligible[0]; i2 = eligible[1]; }
+    else if (selected_pair == 0) { i1 = eligible[0]; i2 = eligible[1]; }
+    else if (selected_pair == 1) { i1 = eligible[0]; i2 = eligible[2]; }
+    else { i1 = eligible[1]; i2 = eligible[2]; }
+    if (i1 >= RB_STAGE_SIZE || i2 >= RB_STAGE_SIZE) return 0;
+    int old1 = P->stage[i1], old2 = P->stage[i2];
+    for (int u = 0; u < P->under_cards[i1].n; u++)
+        rb_send_to_waitroom(g, actor, P->under_cards[i1].cards[u]);
+    for (int u = 0; u < P->under_cards[i2].n; u++)
+        rb_send_to_waitroom(g, actor, P->under_cards[i2].cards[u]);
+    P->under_cards[i1].n = 0;
+    P->under_cards[i2].n = 0;
+    rb_send_to_waitroom(g, actor, old1);
+    rb_send_to_waitroom(g, actor, old2);
+    P->stage[i1] = RB_EMPTY_SLOT;
+    P->stage[i2] = RB_EMPTY_SLOT;
+    g->stage_arrived[actor][i1] = 0;
+    g->stage_arrived[actor][i2] = 0;
+    int hand_idx = -1;
+    for (int i = 0; i < P->hand.n; i++) if (P->hand.cards[i] == card) { hand_idx = i; break; }
+    if (hand_idx < 0) return 0;
+    for (int i = hand_idx; i + 1 < P->hand.n; i++) P->hand.cards[i] = P->hand.cards[i + 1];
+    P->hand.n--;
+    int dst = g->baton_last_vacated_area[actor];
+    if (dst < 0 || dst >= RB_STAGE_SIZE || dst == i1 || dst == i2) dst = i1;
+    P->stage[dst] = card;
+    P->stage_wait[dst] = 0;
+    g->stage_arrived[actor][dst] = 1;
+    g->baton_touch_used[actor] = 1;
+    g->baton_touch_count_p1 += actor == 0 ? 2 : 0;
+    g->baton_touch_count_p2 += actor == 1 ? 2 : 0;
+    g->baton_touch_replaced_member_id = old2;
+    g->baton_touch_arriving_card_id = card;
+    g->recently_moved[0] = old1;
+    if (g->n_recently_moved < 1) g->n_recently_moved = 1;
+    rb_fire_debut(g, actor, card);
+    rb_fire_auto(g, actor);
+    rb_drain_ability_queue(g);
+    return 1;
+}
+
 int rb_play_member(GameState *g, int pl, int hand_idx, int stage_pos) {
-    RbPlayer *P = &g->p[pl];
+    RbPlayer *P=&g->p[pl];
     if (hand_idx < 0 || hand_idx >= P->hand.n) return 0;
     if (stage_pos < 0 || stage_pos >= RB_STAGE_SIZE) return 0;
     /* Bound re-entrancy: a debut/baton effect that places another member would
@@ -809,7 +877,34 @@ int rb_play_member(GameState *g, int pl, int hand_idx, int stage_pos) {
     Card c;
     if (!rb_decode_card_by_index((uint32_t)P->hand.cards[hand_idx], &c)) { g->play_depth--; return 0; }
     int cid = P->hand.cards[hand_idx];
+    int n = rb_card_num_abilities((uint32_t)cid);
+    for (int ai = 0; ai < n; ai++) {
+        Ability ab;
+        if (!rb_decode_card_ability((uint32_t)cid, ai, &ab)) continue;
+        int is_double = effect_is_double_baton(ab.effect);
+        rb_free_ability(&ab);
+        if (is_double) {
+            int ne = 0;
+            for (int q = 0; q < RB_STAGE_SIZE; q++)
+                if (P->stage[q] != RB_EMPTY_SLOT && !g->stage_arrived[pl][q]) ne++;
+            if (ne >= 2) {
+                int pairs = ne * (ne - 1) / 2;
+                g->baton_last_vacated_area[pl] = stage_pos;
+                rb_emit_choice(g, pl, RB_CHOICE_SELECT_TARGET, NULL, NULL, pairs, 1, "double_baton_touch");
+                rb_queue_pause_for_choice(g, &g->queue.pending);
+                g->queue.resume_mode = 0;
+                g->queue.resume_host = cid;
+                rb_choice_set_route(&g->queue.pending, RB_ROUTE_SELECT_TARGET);
+                g->queue.resume_actor = pl;
+                g->play_depth--;
+                return 1;
+            }
+        }
+        break;
+    }
+    rb_free_card(&c);
     int is_baton = (P->stage[stage_pos] >= 0); /* playing onto an occupied area */
+
 
     /* Baton-touch legality gates (Rule 9.6.2.1.2.1): cannot replace a member that
        arrived THIS turn, and a member with cannot_baton_touch restriction is

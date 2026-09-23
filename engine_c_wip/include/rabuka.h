@@ -404,6 +404,7 @@ uint32_t rb_card_record_len(uint32_t i);
 const unsigned char *rb_bc_slice(uint32_t idx, uint32_t *out_len);
 const char *rb_card_string(uint16_t idx);
 int rb_find_card_by_no(const char *card_no); /* linear scan cards.bin card_no strings, -1 if not found */
+int rb_register_card_copy(int copy_id, int template_id);
 /* Multi-ability support  Ecards can have 1..N abilities (e.g. hanayo debut+constant).
    The pairs table RBKA_CARD_ABILITY_PAIRS maps card_no string idx ↁEability idx.
    Use these to iterate all abilities for a card (mirrors Rust Card.abilities:Vec). */

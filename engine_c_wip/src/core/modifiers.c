@@ -362,11 +362,22 @@ void rb_clear_baton_touch_tracking(GameState *g) {
 /* -- record_card_movement -- */
 void rb_record_card_movement(GameState *g, int card_id, int from_zone, int to_zone, int causer, int target) {
     if (!g || card_id < 0 || card_id >= RB_MAX_CARD_IDS) return;
-    (void)from_zone;
-    (void)to_zone;
-    (void)causer;
-    (void)target;
     g->moved_this_turn[card_id] = 1;
+    if (g->n_batch_movements < (int)(sizeof(g->batch_movements) / sizeof(g->batch_movements[0]))) {
+        RbBatchMovement *movement = &g->batch_movements[g->n_batch_movements++];
+        movement->moved_card_id = card_id;
+        movement->source_zone = from_zone;
+        movement->dest_zone = to_zone;
+        movement->cause_player_id = causer;
+        movement->effect_only = target;
+    }
+    if (g->n_recently_moved < RB_MAX_RECENTLY_MOVED) {
+        g->recently_moved[g->n_recently_moved++] = card_id;
+    } else {
+        memmove(g->recently_moved, g->recently_moved + 1,
+                (RB_MAX_RECENTLY_MOVED - 1) * sizeof(g->recently_moved[0]));
+        g->recently_moved[RB_MAX_RECENTLY_MOVED - 1] = card_id;
+    }
 }
 
 /* -- clear_card_movement_tracking -- */

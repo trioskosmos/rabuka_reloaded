@@ -257,6 +257,18 @@ int rb_card_matches_group_str(int card_id, const char *group_name) {
     char *unorm = u  ? norm_str(u)  : NULL;
     char *nnorm = c.name ? norm_str(c.name) : NULL;
 
+    if (!strcmp(group_name, "みらくらぱーく！")) {
+        int match = (s && strstr(s, group_name) != NULL) ||
+                    (g && strstr(g, group_name) != NULL) ||
+                    (u && strstr(u, group_name) != NULL);
+        rb_free_card(&c);
+        if (gn) rb_free(gn);
+        if (gnorm) rb_free(gnorm);
+        if (unorm) rb_free(unorm);
+        if (nnorm) rb_free(nnorm);
+        return match;
+    }
+
     int match = 0;
     if (gnorm) {
         /* Exact and substring match on raw strings */

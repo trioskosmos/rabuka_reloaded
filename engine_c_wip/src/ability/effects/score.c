@@ -63,7 +63,8 @@ static int collect_candidates(const GameState *g, int pl, const char *card_type,
     for (int i = 0; i < RB_STAGE_SIZE && n < max; i++)
         if (P->stage[i] != RB_EMPTY_SLOT) out[n++] = P->stage[i];
     if (self_target) {
-        int act = g->queue.resume_host >= 0 ? g->queue.resume_host : -1;
+        int act = g->queue.resume_host >= 0 ? g->queue.resume_host :
+                  (g->activating_card >= 0 ? g->activating_card : -1);
         if (act >= 0) {
             int seen = 0;
             for (int i = 0; i < n; i++) if (out[i] == act) { seen = 1; break; }
@@ -227,10 +228,29 @@ int rb_execute_modify_score(GameState *gs, int actor, AbilityEffect *e) {
                 int cur = rb_mods_get_score(&gs->mods, cid);
                 if (cur + delta < 0) continue; /* floor at 0 */
             }
-            if (!strcmp(op, "set")) rb_mods_set_score(&gs->mods, cid, (int16_t)delta);
-            else rb_mods_add_score(&gs->mods, cid, (int16_t)delta);
+            if (self_target && cid == (gs->queue.resume_host >= 0 ? gs->queue.resume_host : gs->activating_card)) {
+                rb_mods_add_score(&gs->mods, cid, (int16_t)delta);
+                for (int si = gs->n_snapshots - 1; si >= 0; si--) {
+                    RbLiveSnapshot *snapshot = &gs->snapshots[si];
+                    if (snapshot->player != pl) continue;
+                    for (int li = 0; li < snapshot->n_lives; li++) {
+                        if (snapshot->lives[li] == cid) {
+                            snapshot->live_score_detail[li] += delta;
+                            si = -1;
+                            break;
+                        }
+                    }
+                    if (si < 0) break;
+                }
+            } else if (!strcmp(op, "set")) {
+                rb_mods_set_score(&gs->mods, cid, (int16_t)delta);
+            } else {
+                rb_mods_add_score(&gs->mods, cid, (int16_t)delta);
+            }
             applied++;
         }
+        fprintf(stderr, "[SCORE_MODIFY] actor=%d target=%s applied=%d value=%d\n",
+                actor, resolved_target ? resolved_target : "-", applied, final_value);
         (void)location;
     }
     return 0;

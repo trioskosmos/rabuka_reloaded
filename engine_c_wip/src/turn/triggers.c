@@ -321,8 +321,29 @@ static void apply_constant_effect(GameState *g, int pl, int host_cid,
         const char *res=NULL;
         for(int i=0;i<e->n_extra;i++) if(e->extra_k[i] && !strcmp(e->extra_k[i],"resource")) res=e->extra_v[i];
         int cnt=e->count>=0?e->count:1;
-        for(int i=0;i<e->n_extra;i++) if(e->extra_k[i] && !strcmp(e->extra_k[i],"sign") && e->extra_v[i] && !strcmp(e->extra_v[i],"negative")) cnt = -cnt;
+        for(int i=0;i<e->n_extra;i++) if(e->extra_k[i] && !strcmp(e->extra_k[i],"sign") && e->extra_v[i] && !strcmp(e->extra_v[i],"negative")) cnt=-cnt;
         if (res && (!strcmp(res,"blade")||!strcmp(res,"ブレード"))) {
+            if (pos && !strcmp(pos,"front")) {
+                int source_idx = 0;
+                for (int q = 0; q < RB_STAGE_SIZE; q++)
+                    if (g->p[pl].stage[q] == host_cid) { source_idx = q; break; }
+                int dest_idx = RB_STAGE_SIZE - 1 - source_idx;
+                tgt_pl = 1 - pl;
+                tgt_cid = g->p[tgt_pl].stage[dest_idx];
+                const char *cost_op = NULL;
+                int cost_limit = -1;
+                for (int i = 0; i < e->n_extra; i++) {
+                    if (e->extra_k[i] && !strcmp(e->extra_k[i],"cost_limit_operator")) cost_op = e->extra_v[i];
+                    if (e->extra_k[i] && !strcmp(e->extra_k[i],"cost_limit")) cost_limit = atoi(e->extra_v[i]);
+                }
+                if (tgt_cid == RB_EMPTY_SLOT) return;
+                Card target_card;
+                if (!rb_decode_card_by_index((uint32_t)tgt_cid, &target_card)) return;
+                int target_cost = target_card.cost;
+                int allowed = cost_limit < 0 || rb_compare_counts(cost_op, target_cost, cost_limit);
+                rb_free_card(&target_card);
+                if (!allowed) return;
+            }
             rb_mods_add_blade(&g->mods, tgt_cid, cnt);
             if(!acc) g->mods.constant_blade[tgt_cid]+=cnt;
             if(acc) acc->blade+=cnt;
