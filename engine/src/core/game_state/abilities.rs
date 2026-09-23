@@ -246,7 +246,8 @@ impl GameState {
     }
 
     /// Collect (card_id, ability_index) pairs for constant abilities on stage.
-    /// Returns lightweight index pairs instead of cloned AbilityEffects --     /// callers re-lookup through the card_database Arc to avoid 152B ÁEN clones.
+    /// Returns lightweight index pairs instead of cloned AbilityEffects --
+    /// callers re-lookup through the card_database Arc to avoid 152B clones.
     pub(crate) fn collect_constant_stage_effect_ids(&self) -> Vec<(i16, usize)> {
         self.collect_constant_ids_for(self.stage_card_ids())
     }
@@ -1355,25 +1356,32 @@ impl GameState {
                     .unwrap_or_else(|| self.ability_queue.len() as u16) as usize;
             self.depth_first_cutoff = None;
 
-            let available_indices: Vec<usize> = (0..pre_len)
-                .filter(|&i| {
-                    self.ability_queue.is_entry_available(i)
-                        && self.ability_queue.entry_player_id(i) == Some(player_id)
-                })
-                .collect();
+            let mut available_indices = (0..pre_len).filter(|&i| {
+                self.ability_queue.is_entry_available(i)
+                    && self.ability_queue.entry_player_id(i) == Some(player_id)
+            });
+            let first = available_indices.next();
+            let second = available_indices.next();
 
             if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) {
-                log::trace!("[QUEUE_SCAN] owner={} cutoff={} available_indices={:?}", player_id, pre_len, available_indices);
+                let debug_indices: Vec<usize> = (0..pre_len)
+                    .filter(|&i| {
+                        self.ability_queue.is_entry_available(i)
+                            && self.ability_queue.entry_player_id(i) == Some(player_id)
+                    })
+                    .collect();
+                log::trace!("[QUEUE_SCAN] owner={} cutoff={} available_indices={:?}", player_id, pre_len, debug_indices);
             }
 
-            if available_indices.is_empty() {
+            let Some(idx) = first else {
                 break;
-            }
+            };
 
-            if available_indices.len() > 1 {
-                let options = available_indices
-                    .iter()
-                    .filter_map(|&idx| {
+            if let Some(second) = second {
+                let options = core::iter::once(idx)
+                    .chain(core::iter::once(second))
+                    .chain(available_indices)
+                    .filter_map(|idx| {
                         let entry = self.ability_queue.get_entry(idx)?;
                         let cid = entry.card_id.unwrap_or(0);
                         let card_name = self
@@ -1403,8 +1411,6 @@ impl GameState {
                 self.ability_queue.pause_for_auto_ability_choice(choice);
                 break;
             }
-
-            let idx = available_indices[0];
             self.ability_queue.promote_entry_by_abs(idx);
             if !self.ability_queue.start_next() {
                 break;

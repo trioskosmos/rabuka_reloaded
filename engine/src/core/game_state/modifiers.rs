@@ -176,11 +176,13 @@ impl GameState {
         // Blade
         tdbg!("RC:7 BLADE");
         let old_blade = core::mem::take(&mut self.mods.constant_blade_bonuses);
-        for (cid, val) in &old_blade {
-            self.mods.remove_blade_modifier(*cid, *val);
-        }
-        for (&cid, &val) in &exp_blade {
-            self.mods.add_blade_modifier(cid, val);
+        if old_blade != exp_blade {
+            for (cid, val) in &old_blade {
+                self.mods.remove_blade_modifier(*cid, *val);
+            }
+            for (&cid, &val) in &exp_blade {
+                self.mods.add_blade_modifier(cid, val);
+            }
         }
         self.mods.constant_blade_bonuses = exp_blade;
         self.mods.constant_blade_sources = exp_blade_sources;
@@ -189,11 +191,13 @@ impl GameState {
         // Score
         tdbg!("RC:9 SCORE");
         let old_score = core::mem::take(&mut self.mods.constant_score_bonuses);
-        for (cid, val) in &old_score {
-            self.mods.remove_score_modifier(*cid, *val);
-        }
-        for (&cid, &val) in &exp_score {
-            self.mods.add_score_modifier(cid, val);
+        if old_score != exp_score {
+            for (cid, val) in &old_score {
+                self.mods.remove_score_modifier(*cid, *val);
+            }
+            for (&cid, &val) in &exp_score {
+                self.mods.add_score_modifier(cid, val);
+            }
         }
         if log::log_enabled!(log::Level::Debug) && old_score != exp_score {
             log::debug!("[CONSTANT_SCORE] per-card bonuses: {:?} -> {:?}", old_score, exp_score);
@@ -220,19 +224,21 @@ impl GameState {
         // Must drain the OLD map so bonuses from cards that left the stage are removed.
         {
             let old_heart = core::mem::take(&mut self.mods.constant_heart_bonuses);
-            for (cid, cols) in &old_heart {
-                for (color_str, &delta) in cols {
-                    let hc = crate::card::parse_heart_color(color_str);
-                    self.mods.remove_heart_modifier(*cid, hc, delta as i16);
+            if old_heart != exp_heart {
+                for (cid, cols) in &old_heart {
+                    for (color_str, &delta) in cols {
+                        let hc = crate::card::parse_heart_color(color_str);
+                        self.mods.remove_heart_modifier(*cid, hc, delta as i16);
+                    }
+                }
+                for (cid, cols) in &exp_heart {
+                    for (color_str, delta) in cols {
+                        let hc = crate::card::parse_heart_color(color_str);
+                        self.mods.add_heart_modifier(*cid, hc, *delta as i16);
+                    }
                 }
             }
             self.scratch_exp_heart = old_heart;
-        }
-        for (cid, cols) in &exp_heart {
-            for (color_str, delta) in cols {
-                let hc = crate::card::parse_heart_color(color_str);
-                self.mods.add_heart_modifier(*cid, hc, *delta as i16);
-            }
         }
         self.mods.constant_heart_bonuses = exp_heart;
         self.mods.constant_heart_sources = exp_heart_sources;
@@ -250,15 +256,17 @@ impl GameState {
         tdbg!("RC:12 GLOBAL_NEED_HEART");
         // Clear old constant global need_heart modifiers, then re-apply new ones.
         let old_global_nh = core::mem::take(&mut self.mods.constant_global_need_heart);
-        for (card_id, color_str, delta) in &old_global_nh {
-            let hc = crate::card::parse_heart_color(color_str);
-            self.mods
-                .add_need_heart_modifier(*card_id, hc, -*delta as i16);
-        }
-        for (card_id, color_str, delta) in &exp_global_need_heart {
-            let hc = crate::card::parse_heart_color(color_str);
-            self.mods
-                .add_need_heart_modifier(*card_id, hc, *delta as i16);
+        if old_global_nh != exp_global_need_heart {
+            for (card_id, color_str, delta) in &old_global_nh {
+                let hc = crate::card::parse_heart_color(color_str);
+                self.mods
+                    .add_need_heart_modifier(*card_id, hc, -*delta as i16);
+            }
+            for (card_id, color_str, delta) in &exp_global_need_heart {
+                let hc = crate::card::parse_heart_color(color_str);
+                self.mods
+                    .add_need_heart_modifier(*card_id, hc, *delta as i16);
+            }
         }
         self.mods.constant_global_need_heart = exp_global_need_heart;
         self.mods.constant_need_heart_sources = exp_global_nh_sources;
@@ -1040,30 +1048,25 @@ impl GameState {
     fn refresh_yell_sources(&mut self) {
         let db = self.card_database.clone();
         for player in [&mut self.player1, &mut self.player2] {
-            player.yell_from_bottom = false;
-            let cids: Vec<i16> = player
+            player.yell_from_bottom = player
                 .live_card_zone
                 .cards
                 .iter()
                 .chain(player.success_live_card_zone.cards.iter())
                 .copied()
-                .collect();
-            for cid in cids {
-                let Some(card) = db.get_card(cid) else { continue };
-                let has_yell_bottom = card.abilities.iter().any(|ar| {
-                    let a = ar.resolve();
-                    a.triggers.as_ref().is_some_and(|t| {
-                        t.contains(crate::triggers::CONSTANT)
-                    }) && a.effect.as_ref().is_some_and(|e| {
-                        e.action == crate::ability::enums::ActionType::ModifyYellSource
-                            && e.yell_source_any().as_deref() == Some("deck_bottom")
+                .any(|cid| {
+                    let Some(card) = db.get_card(cid) else { return false };
+                    card.abilities.iter().any(|ar| {
+                        let ability = ar.resolve();
+                        ability.triggers.as_ref().is_some_and(|trigger| {
+                            trigger.contains(crate::triggers::CONSTANT)
+                        }) && ability.effect.as_ref().is_some_and(|effect| {
+                            effect.action
+                                == crate::ability::enums::ActionType::ModifyYellSource
+                                && effect.yell_source_any().as_deref() == Some("deck_bottom")
+                        })
                     })
                 });
-                if has_yell_bottom {
-                    player.yell_from_bottom = true;
-                    break;
-                }
-            }
         }
     }
 
@@ -1252,19 +1255,22 @@ impl GameState {
         }
 
         let old_bonuses = core::mem::take(&mut self.mods.constant_cost_bonuses);
-        for (cid, old) in &old_bonuses {
-            self.mods.remove_cost_modifier(*cid, *old as i16);
-        }
-        // Clear previously-applied set overrides that are no longer active.
         let old_sets = core::mem::take(&mut self.mods.constant_cost_set_bonuses);
-        for cid in old_sets.keys() {
-            self.mods.remove_cost_modifier_set(*cid);
+        if old_bonuses != expected {
+            for (cid, old) in &old_bonuses {
+                self.mods.remove_cost_modifier(*cid, *old as i16);
+            }
+            for (&cid, &new_val) in &expected {
+                self.mods.add_cost_modifier(cid, new_val as i16);
+            }
         }
-        for (&cid, &new_val) in &expected {
-            self.mods.add_cost_modifier(cid, new_val as i16);
-        }
-        for (&cid, &new_val) in &expected_set {
-            self.mods.set_cost_modifier(cid, new_val as i16);
+        if old_sets != expected_set {
+            for cid in old_sets.keys() {
+                self.mods.remove_cost_modifier_set(*cid);
+            }
+            for (&cid, &new_val) in &expected_set {
+                self.mods.set_cost_modifier(cid, new_val as i16);
+            }
         }
         self.mods.constant_cost_bonuses = expected;
         self.mods.constant_cost_set_bonuses = expected_set;
@@ -1701,15 +1707,15 @@ impl GameState {
         // Track non-stackable effects locally so they are reset each evaluation
         let mut local_non_stackable: HashSet<String> = HashSet::default();
 
-        let zone_cards_p1 = self.player1.success_live_card_zone.cards.clone();
-        let zone_cards_p2 = self.player2.success_live_card_zone.cards.clone();
-
         // Collect all (cid, player_index, effect) pairs upfront to avoid borrow conflicts
         let mut entries: Vec<(i16, usize, crate::card::AbilityEffect)> = Vec::new();
-        for (player_idx, zone_cards) in [(0usize, &zone_cards_p1), (1, &zone_cards_p2)] {
+        for (player_idx, zone_cards) in [
+            (0usize, &self.player1.success_live_card_zone.cards),
+            (1, &self.player2.success_live_card_zone.cards),
+        ] {
             for cid in zone_cards {
                 let card = match self.card_database.get_card(*cid) {
-                    Some(c) => c.clone(),
+                    Some(c) => c,
                     None => continue,
                 };
                 for ar in &card.abilities {

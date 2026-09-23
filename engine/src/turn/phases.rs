@@ -1,7 +1,6 @@
 use crate::constants::MAX_LIVE_CARDS;
 use crate::game_state::{GameState, Phase};
 use crate::types::LogEntry;
-use crate::HashMap;
 use smallvec::SmallVec;
 #[cfg(feature = "no_std")]
 use alloc::{
@@ -310,41 +309,19 @@ tdbg!("PHASE_ACTIVE:4 wait activated");
         #[cfg(not(feature = "no_std"))]
         let _t = crate::timer::Timer::start("execute_performance_phase");
         let mut resolution_zone = core::mem::take(&mut game_state.resolution_zone);
-        // Take snapshots of modifier state BEFORE auto-ability triggers
-        // (these are type-converted flat copies, not references — no borrow conflict)
-        let hm: HashMap<i16, HashMap<crate::card::HeartColor, crate::core::game_modifiers::ModifierEntry>> =
-            game_state
-                .mods
-                .heart_modifiers
-                .iter()
-                .map(|(&k, colors)| {
-                    let flat: HashMap<crate::card::HeartColor, crate::core::game_modifiers::ModifierEntry> =
-                        colors.iter().map(|(&c, e)| (c, *e)).collect();
-                    (k, flat)
-                })
-                .collect();
-        let nhm: HashMap<
-            i16,
-            HashMap<crate::card::HeartColor, crate::core::game_modifiers::ModifierEntry>,
-        > = game_state
-            .mods
-            .need_heart_modifiers
-            .iter()
-            .map(|(&k, colors)| {
-                let flat: HashMap<
-                    crate::card::HeartColor,
-                    crate::core::game_modifiers::ModifierEntry,
-                > = colors.iter().map(|(&c, e)| (c, *e)).collect();
-                (k, flat)
-            })
-            .collect();
         let nhm_flat: Vec<(
             i16,
             crate::card::HeartColor,
             crate::core::game_modifiers::ModifierEntry,
-        )> = nhm
+        )> = game_state
+            .mods
+            .need_heart_modifiers
             .iter()
-            .flat_map(|(&k, colors)| colors.iter().map(move |(&c, e)| (k, c, *e)))
+            .flat_map(|(&card_id, colors)| {
+                colors
+                    .iter()
+                    .map(move |(&color, entry)| (card_id, color, *entry))
+            })
             .collect();
         let player_id = if is_first {
             game_state.first_attacker().id.clone()
@@ -385,10 +362,10 @@ tdbg!("PHASE_ACTIVE:4 wait activated");
                 card_db,
                 bm,
                 ho,
-                &hm,
+                &game_state.mods.heart_modifiers,
                 btm,
                 om,
-                &nhm,
+                &game_state.mods.need_heart_modifiers,
                 hcm,
                 hcopy,
                 cannot_live,
@@ -504,9 +481,9 @@ tdbg!("PHASE_ACTIVE:4 wait activated");
                 player,
                 &mut resolution_zone,
                 &game_state.card_database,
-                &nhm,
+                &game_state.mods.need_heart_modifiers,
                 current_ho,
-                &hm,
+                &game_state.mods.heart_modifiers,
                 current_hcm,
                 current_hcopy,
                 &yell_data.live_card_ids,
