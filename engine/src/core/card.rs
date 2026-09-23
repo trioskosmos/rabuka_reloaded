@@ -1354,6 +1354,10 @@ pub struct AbilityEffect {
     /// an upper bound — affordability must not hard-block offers.
     #[cfg_attr(feature = "serde_support", serde(default))]
     pub cost_reduction_per_group: Option<u8>,
+    /// Trigger clause watches an ability resolution
+    /// (「…能力が解決したとき/解決するたび」), stamped by the parser.
+    #[cfg_attr(feature = "serde_support", serde(default))]
+    pub watches_ability_resolution: Option<bool>,
 }
 
 impl AbilityEffect {

@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-09-22T15:23:59.191931",
+  "generated_at": "2026-09-23T11:00:57.290900",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
-  "source_file": "cards/cards.json",
-  "engine_commit": "7656d2be",
+  "source_file": "cards\\cards.json",
+  "engine_commit": "b20a928b",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -30002,14 +30002,14 @@
               "target": "self"
             },
             {
-              "text": "自分のステージにいるメンバーの{{live_start.png|ライブ開始時}}能力が解決する",
+              "text": "自分のステージにいるメンバーの{{live_start.png|ライブ開始時}}能力が解決するたび",
               "target": "self",
               "location": "stage",
               "card_type": "member_card",
               "type": "location_condition"
             }
           ],
-          "text": "そのメンバーが{{icon_all.png|ハート}}を持たない場合、かつ、自分のステージにいるメンバーの{{live_start.png|ライブ開始時}}能力が解決する"
+          "text": "そのメンバーが{{icon_all.png|ハート}}を持たない場合、かつ、自分のステージにいるメンバーの{{live_start.png|ライブ開始時}}能力が解決するたび"
         },
         "card_type": "member_card",
         "action": "gain_resource",
@@ -30017,6 +30017,7 @@
         "heart_type": "all",
         "count": 1,
         "duration": "live_end",
+        "watches_ability_resolution": true,
         "trigger_type": "each_time"
       }
     },
@@ -30037,9 +30038,10 @@
         "count": 1,
         "source": "deck",
         "destination": "hand",
+        "watches_ability_resolution": true,
         "trigger_type": "each_time",
         "condition": {
-          "text": "自分のステージにいるメンバーの{{live_success.png|ライブ成功時}}能力が解決する",
+          "text": "自分のステージにいるメンバーの{{live_success.png|ライブ成功時}}能力が解決するたび",
           "target": "self",
           "location": "stage",
           "card_type": "member_card",
@@ -33119,6 +33121,7 @@
         "card_type": "member_card",
         "action": "position_change",
         "exclude_self": true,
+        "watches_ability_resolution": true,
         "trigger_type": "each_time",
         "condition": {
           "text": "自分のステージのセンターエリアにいる『μ's』のメンバーの{{live_start.png|ライブ開始時}}能力が解決したとき",
@@ -33186,6 +33189,7 @@
         "value": 1,
         "operation": "add",
         "self_target": true,
+        "watches_ability_resolution": true,
         "trigger_type": "each_time",
         "group_names": [
           "μ's"

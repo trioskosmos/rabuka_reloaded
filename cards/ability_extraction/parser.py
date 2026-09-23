@@ -235,10 +235,12 @@ DURATION_MARKER = "かぎり"
 COMPOUND_OPERATOR = "かつ"
 PER_UNIT_MARKER = "につき"
 EACH_TIME_MARKER = "たび"
-# 「…（ライブ開始時/ライブ成功時）能力が解決したとき」 — resolution watchers
-# (Dancing stars on me! PL!-bp6-020-L). Same each_time semantics as 〜たび:
-# the trigger is an ability RESOLUTION event, not a board state query.
-ABILITY_RESOLVE_MARKER = "能力が解決し"
+# 「…（ライブ開始時/ライブ成功時）能力が解決したとき/解決するたび」 — resolution
+# watchers (Dancing stars on me! PL!-bp6-020-L, Victory Road PL!N-bp5-030-L).
+# Same each_time semantics as 〜たび: the trigger is an ability RESOLUTION
+# event, not a board state query. Marker is stem-agnostic (解決) so both
+# したとき (stem+た) and するたび (dictionary+たび) match.
+ABILITY_RESOLVE_MARKER = "能力が解決"
 ALTERNATIVE_MARKER = "代わりに"
 
 # ============== DURATION PREFIXES ==============
@@ -7480,7 +7482,7 @@ def _try_each_time(text):
     # したとき and するたび are equivalent triggering shapes (any per-turn
     # cap comes from ターン1回, parsed separately).
     if ABILITY_RESOLVE_MARKER in text:
-        m = re.search(r"([^。、]*能力が解決し(?:たとき|するたび))(?:、|$)", text)
+        m = re.search(r"([^。、]*能力が解決(?:したとき|するたび))(?:、|$)", text)
         if m:
             rest = text[m.end() :].strip()
             sub = parse_effect(rest)
@@ -7492,6 +7494,7 @@ def _try_each_time(text):
                 # effect body would be read as a source/destination by
                 # position_change execution.
                 sub.pop("position", None)
+                sub["watches_ability_resolution"] = True
                 return _finish_each_time(text, m.group(1).strip(), sub)
     if EACH_TIME_MARKER not in text:
         return None

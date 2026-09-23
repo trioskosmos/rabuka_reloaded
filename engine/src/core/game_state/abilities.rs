@@ -1219,18 +1219,8 @@ impl GameState {
     /// LS/LSS ability completes — their group/location condition also reads
     /// as a static board query, so the TAS must never fire them on its own.
     fn effect_is_ability_resolution_watcher(effect: &crate::card::AbilityEffect) -> bool {
-        fn tree_has(cond: &crate::card::Condition) -> bool {
-            if cond.get_text().is_some_and(|t| t.contains("能力が解決")) {
-                return true;
-            }
-            cond.get_conditions()
-                .is_some_and(|cs| cs.iter().any(|c| tree_has(c)))
-        }
         effect.trigger_type_any().as_deref() == Some("each_time")
-            && effect
-                .condition
-                .as_ref()
-                .is_some_and(|c| tree_has(c))
+            && effect.watches_ability_resolution.unwrap_or(false)
     }
 
     /// Internal: Process all standby abilities for a single player.
