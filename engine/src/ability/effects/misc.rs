@@ -32,8 +32,8 @@ enum ResourceKind {
 impl ResourceKind {
     fn from_str(s: &str) -> Self {
         match s {
-            "blade" | "ブレード" => ResourceKind::Blade,
-            "heart" | "ハート" => ResourceKind::Heart,
+            "blade" => ResourceKind::Blade,
+            "heart" => ResourceKind::Heart,
             _ => ResourceKind::Other,
         }
     }

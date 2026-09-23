@@ -99,10 +99,7 @@ impl GameState {
                     continue;
                 };
                 if effect.action != crate::ability::enums::ActionType::GainResource
-                    || !matches!(
-                        effect.resource_any().as_deref(),
-                        Some("blade") | Some("ブレード")
-                    )
+                    || !matches!(effect.resource_any().as_deref(), Some("blade"))
                 {
                     continue;
                 }
@@ -431,7 +428,7 @@ impl GameState {
                         match effect.action {
                             crate::ability::enums::ActionType::GainResource => {
                                 match effect.resource_any().as_deref().unwrap_or("") {
-                                    "blade" | "ブレード" => {
+                                    "blade" => {
                                         let n = if let Some(ref dc) = effect.dynamic_count_any() {
                                             self.resolve_dynamic_count(
                                                 dc,
@@ -571,7 +568,7 @@ impl GameState {
                                             });
                                         }
                                     }
-                                    "heart" | "ハート" => {
+                                    "heart" => {
                                         let n = if let Some(ref dc) = effect.dynamic_count_any() {
                                             // Unified dynamic_count resolution (dynamic_count.rs).
                                             // The constant path has no resolver step context, so
@@ -885,7 +882,7 @@ impl GameState {
                                             == crate::ability::enums::ActionType::GainResource
                                         {
                                             match sub.resource_any().as_deref().unwrap_or("") {
-                                                "blade" | "ブレード" => {
+                                                "blade" => {
                                                     let n = sub
                                                         .resource_icon_count_any()
                                                         .unwrap_or(sub.count.unwrap_or(1)) as i32;
@@ -899,7 +896,7 @@ impl GameState {
                                                         kind: "blade".to_string(),
                                                     });
                                                 }
-                                                "heart" | "ハート" => {
+                                                "heart" => {
                                                     let n = i32::from(sub.count.unwrap_or(1));
                                                     let hc_list: Vec<String> =
                                                         sub.heart_colors_any().to_vec();
@@ -1876,7 +1873,7 @@ impl GameState {
                     );
                 }
                 match resource {
-                    "blade" | "ブレード" => {
+                    "blade" => {
                         for &target_id in &candidates {
                             if crate::ability::debug::ABILITY_DEBUG
                                 .load(core::sync::atomic::Ordering::Relaxed)
@@ -1905,7 +1902,7 @@ impl GameState {
                             );
                         }
                     }
-                    "heart" | "ハート" => {
+                    "heart" => {
                         let heart_colors = if effect.heart_colors_any().is_empty() {
                             vec!["heart01".to_string()]
                         } else {
