@@ -388,6 +388,8 @@ impl GameState {
         let player_id_clone = player_id.to_string();
         let mut abilities_to_trigger: Vec<(i16, usize, i16)> = Vec::new();
         let skip_this_card_auto_key = self.just_completed_ability_key.clone();
+        let just_completed_batch_matches =
+            self.just_completed_batch_matches(&event.moved_cards);
         {
             let player = if player_id_clone == self.player1.id {
                 &self.player1
@@ -593,7 +595,7 @@ impl GameState {
                             // on the SAME movement batch it resolved on (stale
                             // re-scan). A fresh batch may re-fire it (turn2+).
                             if skip_this_card_auto_key == Some(num_key)
-                                && self.just_completed_batch_matches(&event.moved_cards)
+                                && just_completed_batch_matches
                             {
                                 continue;
                             }
@@ -672,7 +674,7 @@ impl GameState {
                             let num_key = ((card_id as u32) << 16) | (ability_idx as u32);
                             // Same batch-scoped re-scan guard as the stage loop.
                             if skip_this_card_auto_key == Some(num_key)
-                                && self.just_completed_batch_matches(&event.moved_cards)
+                                && just_completed_batch_matches
                             {
                                 continue;
                             }
@@ -751,7 +753,7 @@ impl GameState {
                             let num_key = ((moved_card_id as u32) << 16) | (ability_idx as u32);
                             // Same batch-scoped re-scan guard as the stage loop.
                             if skip_this_card_auto_key == Some(num_key)
-                                && self.just_completed_batch_matches(&event.moved_cards)
+                                && just_completed_batch_matches
                             {
                                 continue;
                             }
@@ -823,7 +825,7 @@ impl GameState {
         {
             return 1;
         }
-        let matching: Vec<&i16> = moved_cards
+        let match_count = moved_cards
             .iter()
             .filter(|&&cid| {
                 if cid == -1 {
@@ -843,8 +845,8 @@ impl GameState {
                 }
                 true
             })
-            .collect();
-        let match_count = matching.len().u8_count();
+            .count()
+            .u8_count();
         if match_count <= 1 {
             return match_count;
         }

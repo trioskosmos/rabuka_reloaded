@@ -592,10 +592,10 @@ tdbg!("PHASE_ACTIVE:4 wait activated");
 
         // Add constant score source info into breakdown.scores
         {
-            let stage_cards: Vec<i16> = if is_first {
-                game_state.first_attacker().stage.stage.to_vec()
+            let stage_cards = if is_first {
+                &game_state.first_attacker().stage.stage
             } else {
-                game_state.second_attacker().stage.stage.to_vec()
+                &game_state.second_attacker().stage.stage
             };
             for (cid, text, val) in &game_state.mods.constant_score_sources {
                 if stage_cards.contains(cid) {
@@ -902,7 +902,7 @@ tdbg!("PHASE_ACTIVE:4 wait activated");
         // Calculate cost before modifying state
         let card_entry = card_db.get_card(card_id);
         let card_cost = card_entry.and_then(|c| c.cost).unwrap_or(0);
-        let replaced_costs: Vec<u8> = {
+        let combined_reduction: u8 = {
             let player = game_state.active_player();
             db_areas
                 .iter()
@@ -922,9 +922,8 @@ tdbg!("PHASE_ACTIVE:4 wait activated");
                             .unwrap_or(0)
                     })
                 })
-                .collect()
+                .sum()
         };
-        let combined_reduction: u8 = replaced_costs.iter().sum();
         let hand_count = game_state.active_player().hand.cards.len();
         let stage = &game_state.active_player().stage;
         let success_zone = &game_state.active_player().success_live_card_zone.cards;

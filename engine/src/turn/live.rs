@@ -746,8 +746,8 @@ impl super::TurnEngine {
         if late_apps.is_empty() {
             return;
         }
-        let p1_cards = &game_state.player1.live_card_zone.cards.clone();
-        let p2_cards = &game_state.player2.live_card_zone.cards.clone();
+        let p1_cards = &game_state.player1.live_card_zone.cards;
+        let p2_cards = &game_state.player2.live_card_zone.cards;
         for snap in game_state.performance_snapshots.iter_mut() {
             let player_cards = if snap.player_id == p1_id {
                 p1_cards
@@ -1022,7 +1022,7 @@ impl super::TurnEngine {
             let p1_extra = Self::side_score_extra(
                 game_state,
                 pre_score_flat,
-                &game_state.player1.live_card_zone.cards.clone(),
+                &game_state.player1.live_card_zone.cards,
             );
             game_state.live_success_p1_extra = p1_extra;
             game_state.live_success_p2_fired = true;
@@ -1042,7 +1042,7 @@ impl super::TurnEngine {
         let p2_extra = Self::side_score_extra(
             game_state,
             pre_score_flat,
-            &game_state.player2.live_card_zone.cards.clone(),
+            &game_state.player2.live_card_zone.cards,
         );
         game_state.live_success_p2_extra = p2_extra;
         Some((game_state.live_success_p1_extra, p2_extra))

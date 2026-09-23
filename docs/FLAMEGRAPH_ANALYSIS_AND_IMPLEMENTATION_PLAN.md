@@ -4,11 +4,10 @@
 
 This document consolidates the flamegraph investigation, real captures, visualization improvements, and proposed engine optimizations from 2026-09-17.
 
-- Engine optimization changes described here are **proposals, not implemented changes**.
+- Engine optimization work is now being implemented in small, behavior-preserving batches.
+- The first verified batch is committed as `0db481aa` (`perf: reduce constant recalculation copies`).
 - The profiling work edited `engine/examples/gen_flamegraph.rs`, not engine gameplay source.
-- The subsequent implementation investigation was read-only.
-- Unrelated working-tree changes were present during the investigation and were left alone.
-- Source references are to the inspected working tree around commit `d1993354`; line numbers may move.
+- Source references are to the inspected working tree; line numbers may move.
 - Successful game runs are workload evidence, not proof of behavioral equivalence or comprehensive engine correctness.
 
 ## 1. Original measurement problem
@@ -623,7 +622,7 @@ Remaining known limitations (documented, not fixed):
 - Engine-call time includes per-call clock overhead and tracing perturbation; it is not clean throughput.
 
 
-## 14. Engine code improvement list (for review — none applied)
+## 14. Engine code improvement list (review and implementation roadmap)
 
 Ranked by measured hotspot share (section 4), then by change risk. Percentages are shares of corrected instrumented coverage from captures C/D; they justify investigation, not guaranteed savings. All items preserve gameplay semantics unless marked otherwise.
 
@@ -640,7 +639,52 @@ Ranked by measured hotspot share (section 4), then by change risk. Percentages a
 
 Details, preservation requirements, edge cases, and per-item test targets are in sections 6–11. Recommended first batch: items 1–3, measured independently with the section 13 harness (record a baseline trace, replay it against the candidate build, then compare engine-call time and fresh captures).
 
-## Final recommendation
+## 15. Additional implementation batches
+
+The following items are ordered by expected benefit and risk. Each item should be implemented and validated independently before the next item is combined with it.
+
+### Batch A: allocation and repeated-scan removal
+
+- Count matching moved cards directly in `trigger_instance_count` instead of collecting references.
+- Count `zone_cards` directly in per-unit constant cost recalculation.
+- Borrow activation-position text instead of allocating a `String` before splitting.
+- Resolve under-card abilities once instead of resolving each ability twice.
+- Compute the completed-batch predicate once per auto-ability scan.
+- Remove stage-card vector copies used only for membership checks in performance scoring.
+- Replace the double-baton cost vector with two scalar values.
+- Pass live-zone slices directly from late-score and live-success helpers.
+- Pass borrowed hand slices into alternative-cost candidate generation.
+- Fill movement-event `SmallVec`s directly from movement iterators.
+
+### Batch B: call-local indexes and compact representations
+
+- Reuse scratch storage for constant ability IDs.
+- Build a call-local owner/zone index for constant cost modifiers.
+- Build an event-local membership index for automatic ability scans.
+- Reuse card metadata and avoid repeated player/card `String` construction during queueing.
+- Share immutable movement snapshots between queued abilities.
+- Use compact ownership membership for performance-phase application filtering.
+- Borrow heart-color slices while iterating constant effects.
+- Cache the distinct stage-group count once per action-generation call.
+- Build action area descriptors without allocating owned metadata for rejected candidates.
+
+### Batch C: larger ownership and snapshot changes
+
+- Build the final performance snapshot once and transfer enrichment vectors.
+- Redesign current-ability queue ownership to avoid cloning the active ability.
+- Replace front-removal loops with an order-preserving live-zone drain.
+- Record exact live-card movement IDs instead of rediscovering them from waitroom.
+- Replace nested performance modifier snapshots with compact representations.
+
+### Rejected or deferred
+
+- Do not add a dirty flag to constant recalculation without a complete invalidation model.
+- Do not introduce broad condition or ability caches with incomplete invalidation.
+- Do not replace recursive distinct-card assignment with a greedy algorithm.
+- Do not remove performance, modifier, or score snapshots required by later trigger re-entry.
+- Do not merge automatic-ability zone scans without proving identical ordering and ownership semantics.
+- Do not remove provenance strings or assume map iteration order is irrelevant.
+
 
 Begin with **call-local stage-group caching and the two queue-collection removals**, independently tested and measured. Then address borrowed area intermediates and snapshot ownership. Remove repeated text formatting before considering numeric dispatch. Keep gained-ability and duplicate-text correctness changes separate from performance work.
 

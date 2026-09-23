@@ -390,10 +390,7 @@ impl GameState {
                             | ("right" | "right_side", Some(2))
                     )
                 };
-                let pos_ok = if let Some(act) = effect
-                    .activation_position_any()
-                    .map(|s| s.to_string())
-                {
+                let pos_ok = if let Some(act) = effect.activation_position_any() {
                     act.split(',')
                         .map(|p| p.trim())
                         .any(|p| pos_matches(p, card_pos))
@@ -1190,9 +1187,9 @@ impl GameState {
                             );
                             u8::try_from(matches).unwrap()
                         } else {
-                            let cards: Vec<i16> =
-                                crate::ability::util::zone_cards(player, count_zone).to_vec();
-                            cards.len().u8_count()
+                            crate::ability::util::zone_cards(player, count_zone)
+                                .len()
+                                .u8_count()
                         };
                         let per_unit_count = effect.per_unit_count_any().unwrap_or(1);
                         let exclude_self = effect.exclude_self_any().unwrap_or(false);
