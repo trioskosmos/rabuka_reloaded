@@ -519,7 +519,10 @@ int rb_live_calculate_score(const GameState *g, int pl, int cheer_blade_heart_co
         if(satisfied) total_score += card_score;
     }
     total_score += cheer_blade_heart_count;
-    total_score += constant_total_score_bonus;
+    /* saturate_u8(constant_total_score_bonus): negative contributions clamp to 0
+       (zones.rs:565-566). Callers that pass the live mods field get correct
+       behaviour; legacy 0 callers are unchanged. */
+    if (constant_total_score_bonus > 0) total_score += constant_total_score_bonus;
     if(total_score < 0) total_score = 0;
     if(total_score > 255) total_score = 255;
     return total_score;

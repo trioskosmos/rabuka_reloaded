@@ -1553,14 +1553,12 @@ impl GameState {
         }
 
         // Rule 9.5.3.3: Then non-active player resolves ALL theirs
-        let non_active_id = {
-            let pending = self.ability_queue.pending_entries();
-            pending
-                .iter()
-                .find(|e| e.player_id != active_player_id)
-                .map(|e| e.player_id.clone())
-                .unwrap_or_default()
-        };
+        let non_active_id = self
+            .ability_queue
+            .pending_entries_iter()
+            .find(|e| e.player_id != active_player_id)
+            .map(|e| e.player_id.clone())
+            .unwrap_or_default();
         if !non_active_id.is_empty() {
             self.process_player_abilities(&non_active_id);
         }

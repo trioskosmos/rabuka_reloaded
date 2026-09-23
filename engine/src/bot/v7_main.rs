@@ -35,7 +35,7 @@ pub(crate) fn baton_from_params(gs: &GameState, me: u8, p: &ActionParameters) ->
         if let Some(stage) = p.stage_area.as_ref() {
             if areas
                 .iter()
-                .any(|area| &area.area == stage && area.is_baton_touch)
+                .any(|area| area.area.as_ref() == stage && area.is_baton_touch)
             {
                 return true;
             }

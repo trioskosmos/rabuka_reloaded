@@ -11,6 +11,8 @@ void rb_mods_init(RbMods *m) {
     memset(m, 0, sizeof(*m));
     for(int i=0;i<RB_MAX_CARD_IDS;i++){ m->heart_copy[i]=-1; m->heart_multiplier[i]=-1; m->heart_multiplier_amt[i]=2; m->blade_type[i]=-1; m->heart_color_override[i]=-1; }
     m->n_trace = 0;
+    m->p1_constant_total_score_bonus = 0;
+    m->p2_constant_total_score_bonus = 0;
 }
 
 void rb_mods_clear_card(RbMods *m, int cid) {

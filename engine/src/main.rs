@@ -207,27 +207,33 @@ fn output_actions() {
                     base_cost: p.base_cost,
                     final_cost: p.final_cost,
                     double_baton_pairs: p.double_baton_pairs.map(|pairs| {
-                        pairs
-                            .into_iter()
-                            .map(|db| DoubleBatonPair {
-                                areas: db.areas,
-                                placement: db.placement,
-                                cost: db.cost,
-                            })
-                            .collect()
+                        Arc::new(
+                            pairs
+                                .iter()
+                                .cloned()
+                                .map(|db| DoubleBatonPair {
+                                    areas: db.areas,
+                                    placement: db.placement,
+                                    cost: db.cost,
+                                })
+                                .collect(),
+                        )
                     }),
                     disabled: p.disabled,
                     available_areas: p.available_areas.map(|areas| {
-                        areas
-                            .into_iter()
-                            .map(|ai| AreaInfo {
-                                area: ai.area,
-                                available: ai.available,
-                                cost: ai.cost,
-                                is_baton_touch: ai.is_baton_touch,
-                                existing_member_name: ai.existing_member_name,
-                            })
-                            .collect()
+                        Arc::new(
+                            areas
+                                .iter()
+                                .cloned()
+                                .map(|ai| AreaInfo {
+                                    area: ai.area,
+                                    available: ai.available,
+                                    cost: ai.cost,
+                                    is_baton_touch: ai.is_baton_touch,
+                                    existing_member_name: ai.existing_member_name,
+                                })
+                                .collect(),
+                        )
                     }),
                 }),
                 selected: sa.selected,

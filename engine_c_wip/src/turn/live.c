@@ -51,34 +51,8 @@ int rb_try_all_distribution(const GameState *g, int pl) {
 
 
 
-/* Compute stage hearts for player pl (mirrors stats_pipeline::stage_hearts).
-   Members' base hearts + heart modifiers + blade converted to pink. */
 void rb_calc_stage_hearts(const GameState *g, int pl, int out[8]){
-    memset(out,0,8*sizeof(int));
-    const RbPlayer *P=&g->p[pl];
-    for(int s=0;s<RB_STAGE_SIZE;s++){
-        int cid=P->stage[s];
-        if(cid==RB_EMPTY_SLOT) continue;
-        Card c; if(!rb_decode_card_by_index((uint32_t)cid,&c)) continue;
-        int hco = g->mods.heart_color_override[cid];
-        for(int h=0;h<c.n_hearts;h++){
-            int col = (hco>=0 && hco<=7) ? hco : c.heart_color[h]%8;
-            out[col]+=c.heart_count[h];
-        }
-        /* specify_heart_color: recolor all of this member's base hearts to the
-            overridden colour (state.rs::execute_specify_heart_color). */
-        int blade=(int)c.blade + rb_mods_get_blade((RbMods*)&g->mods, cid);
-        if(blade>0){
-            /* set_blade_type recolor (state.rs::execute_set_blade_type): a colored
-                blade_type routes the member's blade into that heart color instead of
-                pink; blade_type<0 (none) or pink(0) stays pink. Mirrors Rust's
-                blade_color->HeartColor mapping (draw/score never produced by blade). */
-            int bt = g->mods.blade_type[cid];
-            if(bt>=1 && bt<=6) out[bt]+=blade; else out[RB_HEART_PINK]+=blade;
-        }
-        for(int col=0;col<8;col++){ int mod=rb_mods_get_heart((RbMods*)&g->mods, cid, col); if(mod) out[col]+=mod; }
-        rb_free_card(&c);
-    }
+    rb_stage_hearts_pipeline(g, pl, out);
 }
 
 /* Per-card yell icon tally (mirror live.rs::process_yell_revealed_card_icons).
@@ -335,6 +309,14 @@ static int allocate_and_verdict(const GameState *g, int pl, const int total_hear
             memcpy(sn->live_required[li], need, 8*sizeof(int));
             memcpy(sn->live_filled[li], filled+li*8, 8*sizeof(int));
         }
+    }
+    /* Constant live-TOTAL score bonus (Rust zones.rs:calculate_live_score adds
+       saturate_u8(constant_total_score_bonus) after the per-card sum). */
+    if (all_pass) {
+        int lt_bonus = (pl == 0) ? (int)g->mods.p1_constant_total_score_bonus
+                                 : (int)g->mods.p2_constant_total_score_bonus;
+        if (lt_bonus > 0) total_score += lt_bonus;
+        else if (lt_bonus < 0 && total_score + lt_bonus >= 0) total_score += lt_bonus;
     }
     if(out_passed) *out_passed=all_pass;
     if(out_score) *out_score=total_score;

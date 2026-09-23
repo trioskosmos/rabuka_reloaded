@@ -1,188 +1,206 @@
 #include "rabuka.h"
+#include <stdio.h>
 #include <string.h>
 
-/* Stats pipeline — mirrors engine/src/core/stats_pipeline.rs
-   Single source for stage heart computation: base hearts + heart_override
-   + heart_modifiers + heart_copy × heart_color_multiplier. Used by
-   rb_calc_stage_hearts (live.c) and constant re-eval. */
-
-/* Effective need_heart for a live card: base need + need_heart_modifiers */
-void rb_effective_need_heart(const GameState *g, int live_cid, int out[8]){
-    Card c;
-    memset(out, 0, 8 * sizeof(int));
-    if(!rb_decode_card_by_index((uint32_t)live_cid, &c)) return;
-    int start = c.num_base + c.num_blade;
-    for(int h = start; h < start + c.num_need && h < c.n_hearts; h++){
-        int color = c.heart_color[h];
-        int col = color <= 6 ? color : (color == 10 ? 7 : 0);
-        out[col] += c.heart_count[h];
-    }
-    int has_need = c.num_need != 0;
-    rb_free_card(&c);
-    if(!has_need || !g || live_cid < 0 || live_cid >= RB_MAX_CARD_IDS) return;
-    for(int col = 0; col < 8; col++){
-        RbModifierEntry me = g->mods.need_heart[live_cid][col];
-        if(me.set != 0) out[col] = (uint8_t)me.set;
-    }
-    for(int col = 0; col < 8; col++){
-        RbModifierEntry me = g->mods.need_heart[live_cid][col];
-        if(me.add != 0) out[col] = rb_saturate_u8(out[col] + me.add);
-    }
+static int sp_heart_index(uint8_t color) {
+    if (color <= 6) return color;
+    if (color == 10) return 7;
+    return 0;
 }
 
-void rb_member_original_hearts(const RbMods *mods, int card_id, int out[8]){
+static int sp_any_hearts(const int hearts[8]) {
+    for (int i = 0; i < 8; i++) {
+        if (hearts[i] > 0) return 1;
+    }
+    return 0;
+}
+
+static void sp_debug_hearts(const char *tag, int card_id, const int hearts[8]) {
+    if (!rb_ability_debug_enabled()) return;
+    fprintf(stderr,
+            "[%s] card=%d hearts=[%d,%d,%d,%d,%d,%d,%d,%d]\n",
+            tag, card_id, hearts[0], hearts[1], hearts[2], hearts[3],
+            hearts[4], hearts[5], hearts[6], hearts[7]);
+}
+
+static void sp_card_base_hearts(int card_id, int out[8]) {
     memset(out, 0, 8 * sizeof(int));
-    if(card_id < 0 || card_id >= RB_MAX_CARD_IDS) return;
+    if (card_id < 0 || card_id >= RB_MAX_CARD_IDS) return;
 
-    /* 9.9.1.4: heart_override REPLACES originals outright with (color, count). */
-    int override_color = -1;
-    if(mods){
-        override_color = mods->heart_color_override[card_id];
-        if(override_color >= 0 && override_color <= 7){
-            out[override_color] = mods->heart_override_count[card_id];
-            return;
-        }
+    Card card;
+    if (!rb_decode_card_by_index((uint32_t)card_id, &card)) return;
+    for (int i = 0; i < card.num_base && i < card.n_hearts; i++) {
+        out[sp_heart_index(card.heart_color[i])] += card.heart_count[i];
+    }
+    rb_free_card(&card);
+}
+
+static int sp_card_need_hearts(int card_id, int out[8]) {
+    memset(out, 0, 8 * sizeof(int));
+    if (card_id < 0 || card_id >= RB_MAX_CARD_IDS) return 0;
+
+    Card card;
+    if (!rb_decode_card_by_index((uint32_t)card_id, &card)) return 0;
+    int start = card.num_base + card.num_blade;
+    for (int i = start; i < start + card.num_need && i < card.n_hearts; i++) {
+        out[sp_heart_index(card.heart_color[i])] += card.heart_count[i];
+    }
+    int has_need = card.num_need != 0;
+    rb_free_card(&card);
+    return has_need;
+}
+
+static int sp_effective_need_heart(const GameState *g, int card_id, int out[8]) {
+    if (!sp_card_need_hearts(card_id, out)) return 0;
+    if (!g || card_id < 0 || card_id >= RB_MAX_CARD_IDS) return 1;
+
+    for (int color = 0; color < 8; color++) {
+        RbModifierEntry entry = g->mods.need_heart[card_id][color];
+        if (entry.set != 0) out[color] = (uint8_t)entry.set;
+    }
+    for (int color = 0; color < 8; color++) {
+        RbModifierEntry entry = g->mods.need_heart[card_id][color];
+        if (entry.add != 0) out[color] = rb_saturate_u8(out[color] + entry.add);
+    }
+    return 1;
+}
+
+void rb_member_original_hearts(const RbMods *mods, int card_id, int out[8]) {
+    memset(out, 0, 8 * sizeof(int));
+    if (card_id < 0 || card_id >= RB_MAX_CARD_IDS) return;
+
+    int override_color = mods ? mods->heart_color_override[card_id] : -1;
+    if (override_color >= 0 && override_color < 8) {
+        out[override_color] += mods->heart_override_count[card_id];
+        return;
     }
 
-    int src_id = mods ? mods->heart_copy[card_id] : -1;
-    int use_id = src_id >= 0 ? src_id : card_id;
+    int source_id = mods && mods->heart_copy[card_id] >= 0
+                  ? mods->heart_copy[card_id]
+                  : card_id;
+    sp_card_base_hearts(source_id, out);
 
-    Card c;
-    if(rb_decode_card_by_index((uint32_t)use_id, &c)){
-        for(int h = 0; h < c.num_base && h < c.n_hearts; h++){
-            int color = c.heart_color[h];
-            int col = color <= 6 ? color : (color == 10 ? 7 : 0);
-            out[col] += c.heart_count[h];
-        }
-        rb_free_card(&c);
-    }
-
-    /* Color multiplier collapses the whole multiset into one color. */
-    int mult_col = mods ? mods->heart_multiplier[card_id] : -1;
-    if(mult_col >= 0 && mult_col <= 7){
+    if (mods && mods->heart_multiplier[card_id] >= 0) {
+        int color = mods->heart_multiplier[card_id];
         int total = 0;
-        for(int i = 0; i < 8; i++) total += out[i];
+        for (int i = 0; i < 8; i++) total += out[i];
         memset(out, 0, 8 * sizeof(int));
-        out[mult_col] = total;
+        out[color] = total;
     }
 }
 
-/* apply_additive_heart_mods: 9.9.1.5 — additive modifiers stack ON TOP,
-   saturating at 0/255. mods is an array of 8 RbModifierEntry (per color).
-   Mirrors Rust apply_additive_heart_mods. */
-void rb_apply_additive_heart_mods(int hearts[8], const RbModifierEntry *mods){
-    for(int col = 0; col < 8; col++){
-        int delta = rb_modifier_total(mods[col]);
-        if(delta == 0) continue;
-        int new_val = rb_saturate_u8(hearts[col] + delta);
-        if(new_val > 0) hearts[col] = new_val; else hearts[col] = 0;
+void rb_apply_additive_heart_mods(int hearts[8], const RbModifierEntry *mods) {
+    if (!mods) return;
+    for (int color = 0; color < 8; color++) {
+        int delta = rb_modifier_total(mods[color]);
+        if (delta == 0) continue;
+        int value = rb_saturate_u8(hearts[color] + delta);
+        hearts[color] = value > 0 ? value : 0;
     }
 }
 
-/* effective_blade_parts: blade layering (9.9.1.4->.5). A non-zero SET
-   replaces the printed blade; additive stacks either way.
-   Returns (effective_base, additive_bonus) via pointers.
-   Mirrors Rust effective_blade_parts. */
-void rb_effective_blade_parts(RbModifierEntry entry, int printed_blade, int *base, int *additive){
-    if(entry.set != 0){
+void rb_effective_blade_parts(RbModifierEntry entry, int printed_blade,
+                              int *base, int *additive) {
+    if (!base || !additive) return;
+    if (entry.set != 0) {
         *base = rb_saturate_u8(rb_modifier_total(entry));
         *additive = 0;
-    } else {
-        *base = printed_blade;
-        *additive = rb_saturate_u8(rb_modifier_total(entry));
+        return;
     }
+    *base = printed_blade;
+    *additive = rb_saturate_u8(rb_modifier_total(entry));
 }
 
-/* member_heart_detail: per-member heart detail (base_arr, bonus_arr).
-   base = original hearts after copy/multiplier/override (no additives).
-   bonus = additive contributions (positive deltas only).
-   Mirrors Rust member_heart_detail. */
-void rb_member_heart_detail(const RbMods *mods, int card_id, uint8_t base_arr[8], uint8_t bonus_arr[8]){
+void rb_member_heart_detail(const RbMods *mods, int card_id,
+                            uint8_t base_arr[8], uint8_t bonus_arr[8]) {
+    if (!base_arr || !bonus_arr) return;
+
     int base[8];
     rb_member_original_hearts(mods, card_id, base);
-    for(int i = 0; i < 8; i++) base_arr[i] = (uint8_t)base[i];
-
-    memset(bonus_arr, 0, 8);
-    if(!mods || card_id < 0 || card_id >= RB_MAX_CARD_IDS) return;
-    for(int col = 0; col < 8; col++){
-        RbModifierEntry entry = mods->heart[card_id][col];
-        int total = rb_modifier_total(entry);
-        if(total > 0) bonus_arr[col] += (uint8_t)total;
+    for (int i = 0; i < 8; i++) {
+        base_arr[i] = (uint8_t)rb_saturate_u8(base[i]);
     }
+
+    memset(bonus_arr, 0, 8 * sizeof(uint8_t));
+    if (!mods || card_id < 0 || card_id >= RB_MAX_CARD_IDS) {
+        sp_debug_hearts("HEART_DETAIL_BASE", card_id, base);
+        return;
+    }
+    for (int color = 0; color < 8; color++) {
+        int total = rb_modifier_total(mods->heart[card_id][color]);
+        if (total > 0) {
+            bonus_arr[color] = (uint8_t)rb_saturate_u8(bonus_arr[color] + total);
+        }
+    }
+    sp_debug_hearts("HEART_DETAIL_BASE", card_id, base);
 }
 
-/* effective_blade: effective blade for a single card after modifiers.
-   Mirrors Rust effective_blade. */
-int rb_effective_blade(int card_id, RbModifierEntry entry){
+int rb_effective_blade(int card_id, RbModifierEntry entry) {
     int printed = 0;
-    Card c;
-    if(rb_decode_card_by_index((uint32_t)card_id, &c)){
-        printed = c.blade;
-        rb_free_card(&c);
+    Card card;
+    if (card_id >= 0 && card_id < RB_MAX_CARD_IDS &&
+        rb_decode_card_by_index((uint32_t)card_id, &card)) {
+        printed = card.blade;
+        rb_free_card(&card);
     }
-    if(entry.set != 0){
-        return rb_saturate_u8(rb_modifier_total(entry));
-    } else {
-        return rb_saturate_u8(printed + rb_modifier_total(entry));
-    }
+    if (entry.set != 0) return rb_saturate_u8(rb_modifier_total(entry));
+    return rb_saturate_u8(printed + rb_modifier_total(entry));
 }
 
-/* need_satisfied: check whether a live card's need is satisfied by a heart
-   pool, using the canonical check_heart_requirement helper.
-   Mirrors Rust need_satisfied. Returns 1 if satisfied, 0 otherwise. */
-int rb_need_satisfied(const int base_need[8], const int provided[8], int card_id, const RbMods *mods){
-    if(card_id < 0 || card_id >= RB_MAX_CARD_IDS) return 1;
+void rb_effective_need_heart(const GameState *g, int live_cid, int out[8]) {
+    if (!out) return;
+    sp_effective_need_heart(g, live_cid, out);
+    sp_debug_hearts("NEED_HEART_PIPELINE", live_cid, out);
+}
 
-    int eff[8];
-    const int zeros[8] = {0};
-    int empty = 1;
-    for(int i = 0; i < 8; i++){
-        eff[i] = base_need ? base_need[i] : 0;
-        if(eff[i] > 0) empty = 0;
-    }
-    if(empty) return 1;
+int rb_need_satisfied(const int base_need[8], const int provided[8],
+                      int card_id, const RbMods *mods) {
+    if (!base_need) return 1;
 
-    /* Q115/Q127: Set-to-X applies first (per-color), then additive stacks. */
-    for(int col = 0; col < 8; col++){
-        RbModifierEntry me = mods->need_heart[card_id][col];
-        if(me.set != 0) eff[col] = me.set;
+    int effective[8];
+    int zeros[8] = {0};
+    if (!provided) provided = zeros;
+    for (int i = 0; i < 8; i++) effective[i] = base_need[i];
+    if (!sp_any_hearts(effective)) return 1;
+    if (!mods || card_id < 0 || card_id >= RB_MAX_CARD_IDS) {
+        return rb_check_heart_requirement(effective, provided);
     }
-    for(int col = 0; col < 8; col++){
-        RbModifierEntry me = mods->need_heart[card_id][col];
-        if(me.add != 0){
-            int new_val = rb_saturate_u8(eff[col] + me.add);
-            if(new_val > 0) eff[col] = new_val; else eff[col] = 0;
+
+    for (int color = 0; color < 8; color++) {
+        RbModifierEntry entry = mods->need_heart[card_id][color];
+        if (entry.set != 0) effective[color] = (uint8_t)entry.set;
+    }
+    for (int color = 0; color < 8; color++) {
+        RbModifierEntry entry = mods->need_heart[card_id][color];
+        if (entry.add != 0) {
+            effective[color] = rb_saturate_u8(effective[color] + entry.add);
         }
     }
+    if (!sp_any_hearts(effective)) return 1;
 
-    empty = 1;
-    for(int i = 0; i < 8; i++) if(eff[i] > 0){ empty = 0; break; }
-    if(empty) return 1;
-
-    return rb_check_heart_requirement(eff, provided ? provided : zeros);
+    int result = rb_check_heart_requirement(effective, provided);
+    if (rb_ability_debug_enabled()) {
+        fprintf(stderr, "[NEED_CHECK] card=%d need=%d,%d,%d,%d,%d,%d,%d,%d -> %s\n",
+                card_id, effective[0], effective[1], effective[2], effective[3],
+                effective[4], effective[5], effective[6], effective[7],
+                result ? "PASS" : "FAIL");
+    }
+    return result;
 }
 
-/* Stage hearts — faithful port of stats_pipeline.rs::stage_hearts.
-    For each stage slot: member_original_hearts (override/copy/multiplier
-    layers, 9.9.1.1-9.9.1.4), then additive mods stack ON TOP (9.9.1.5),
-    then fold into the pooled output. */
-void rb_stage_hearts_pipeline(const GameState *g, int pl, int out[8]){
+void rb_stage_hearts_pipeline(const GameState *g, int pl, int out[8]) {
+    if (!out) return;
     memset(out, 0, 8 * sizeof(int));
-    if(!g || pl < 0 || pl >= 2) return;
-    const RbMods *mods = &g->mods;
-    for(int s = 0; s < RB_STAGE_SIZE; s++){
-        int card_id = g->p[pl].stage[s];
-        if(card_id < 0 || card_id >= RB_MAX_CARD_IDS) continue;
-        int m[8];
-        rb_member_original_hearts(mods, card_id, m);
-        /* 9.9.1.5: additive modifiers stack ON TOP of the set/base value. */
-        for(int col = 0; col < 8; col++){
-            RbModifierEntry e = mods->heart[card_id][col];
-            int delta = rb_modifier_total(e);
-            if(delta == 0) continue;
-            int new_val = rb_saturate_u8(m[col] + delta);
-            m[col] = new_val > 0 ? new_val : 0;
-        }
-        for(int col = 0; col < 8; col++) out[col] += m[col];
+    if (!g || pl < 0 || pl > 1) return;
+
+    for (int slot = 0; slot < RB_STAGE_SIZE; slot++) {
+        int card_id = g->p[pl].stage[slot];
+        if (card_id == RB_EMPTY_SLOT || card_id < 0 || card_id >= RB_MAX_CARD_IDS) continue;
+
+        int hearts[8];
+        rb_member_original_hearts(&g->mods, card_id, hearts);
+        rb_apply_additive_heart_mods(hearts, g->mods.heart[card_id]);
+        sp_debug_hearts("HEART_PIPELINE", card_id, hearts);
+        for (int color = 0; color < 8; color++) out[color] += hearts[color];
     }
 }

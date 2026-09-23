@@ -29,6 +29,14 @@ impl MemberArea {
     pub const ALL: [MemberArea; 3] =
         [MemberArea::LeftSide, MemberArea::Center, MemberArea::RightSide];
 
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            MemberArea::LeftSide => "left",
+            MemberArea::Center => "center",
+            MemberArea::RightSide => "right",
+        }
+    }
+
     /// Returns the opposing player's front area for this area.
     /// Rule 4.5.7: Left side face opponent's right side, center faces center, right side faces opponent's left side.
     pub fn front_area(&self) -> MemberArea {

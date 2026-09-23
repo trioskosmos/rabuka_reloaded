@@ -7,7 +7,8 @@ use crate::game_state::GameState;
 use crate::game_state::{GameResult, Phase};
 use crate::turn::TurnEngine;
 use crate::zones::MemberArea;
-use crate::HashSet;
+use crate::types::ArcStr;
+use crate::{Arc, HashSet};
 #[cfg(feature = "no_std")]
 use alloc::{
     string::{String, ToString},
@@ -329,8 +330,8 @@ pub struct ActionParameters {
     pub source_ability: Option<String>, // Full ability text block (for display)
     pub base_cost: Option<u8>,
     pub final_cost: Option<u8>,
-    pub available_areas: Option<Vec<AreaInfo>>,
-    pub double_baton_pairs: Option<Vec<DoubleBatonPair>>, // Available double baton pair+placement options
+    pub available_areas: Option<Arc<Vec<AreaInfo>>>,
+    pub double_baton_pairs: Option<Arc<Vec<DoubleBatonPair>>>, // Available double baton pair+placement options
     #[cfg_attr(
         feature = "serde_support",
         serde(skip_serializing_if = "Option::is_none")
@@ -341,11 +342,18 @@ pub struct ActionParameters {
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "serde_support", derive(Serialize, Deserialize))]
 pub struct AreaInfo {
-    pub area: String,
+    pub area: ArcStr,
     pub available: bool,
     pub cost: u8,
     pub is_baton_touch: bool,
-    pub existing_member_name: Option<String>,
+    pub existing_member_name: Option<ArcStr>,
+}
+
+#[derive(Clone, Copy)]
+struct DoubleBatonOption {
+    areas: [MemberArea; 2],
+    placement: MemberArea,
+    cost: u8,
 }
 
 #[derive(Clone, Debug)]
@@ -492,17 +500,27 @@ pub fn settle_auto(gs: &mut GameState) {
 /// Execute a game action extracted from the action parameters.
 /// Returns Ok(()) on success, Err(message) on failure. Always resets loop detection.
 pub fn execute_action(gs: &mut GameState, action: &Action) -> Result<(), String> {
-    let params = action.parameters.clone();
+    let (card_id, card_indices, stage_area, use_baton_touch, ability_index) = action
+        .parameters
+        .as_ref()
+        .map(|p| {
+            (
+                p.card_id,
+                p.card_indices.clone(),
+                p.stage_area.as_deref().and_then(|s| s.parse().ok()),
+                p.use_baton_touch,
+                p.ability_index,
+            )
+        })
+        .unwrap_or((None, None, None, None, None));
     let result = TurnEngine::execute_main_phase_action_with_ability_index(
         gs,
         &action.action_type,
-        params.as_ref().and_then(|p| p.card_id),
-        params.as_ref().and_then(|p| p.card_indices.clone()),
-        params
-            .as_ref()
-            .and_then(|p| p.stage_area.as_ref().and_then(|s| s.parse().ok())),
-        params.as_ref().and_then(|p| p.use_baton_touch),
-        params.as_ref().and_then(|p| p.ability_index),
+        card_id,
+        card_indices,
+        stage_area,
+        use_baton_touch,
+        ability_index,
     );
     gs.reset_loop_detection();
     result
@@ -1538,12 +1556,6 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                     let effective_cost = card_cost.saturating_sub(reduction);
                     let active_energy_count = active_player.energy_zone.active_count();
 
-                    let areas = [
-                        (crate::zones::MemberArea::LeftSide, "left"),
-                        (crate::zones::MemberArea::Center, "center"),
-                        (crate::zones::MemberArea::RightSide, "right"),
-                    ];
-
                     // Precompute per-area baton-touch protection once per hand card
                     // instead of re-scanning the stage member's abilities for every area.
                     let baton_touch_protected: [bool; 3] = core::array::from_fn(|slot| {
@@ -1564,9 +1576,9 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                     let mut has_any_available = false;
                     let display = action_display_enabled();
 
-                    for (area_idx, (_area, area_name)) in areas.iter().enumerate() {
+                    for (area_idx, area_name) in ["left", "center", "right"].iter().enumerate() {
                         let mut area_info = AreaInfo {
-                            area: area_name.to_string(),
+                            area: ArcStr::from(*area_name),
                             available: false,
                             cost: card_cost,
                             is_baton_touch: false,
@@ -1600,7 +1612,7 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                                             area_info.is_baton_touch = true;
                                             if display {
                                                 area_info.existing_member_name =
-                                                    Some(existing_member_card.name.to_string());
+                                                    Some(ArcStr::from(existing_member_card.name.as_ref()));
                                             }
                                             has_any_available = true;
                                         }
@@ -1624,32 +1636,23 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                     });
 
                     let (double_baton_pairs, any_double_baton_available) = if has_double_baton {
-                        // Reuse the per-area protection computed above.
-                        let cannot_baton_touch_protected = &baton_touch_protected;
-                        let occupied: Vec<(usize, &str, i16)> = [0, 1, 2]
+                        let occupied: Vec<(usize, MemberArea, i16)> = [0, 1, 2]
                             .iter()
                             .filter(|&&idx| stage_card_ids[idx] != -1)
-                            // Rule 9.6.2.1.2.1: Check card identity, not area identity.
                             .filter(|&&idx| {
                                 !active_player
                                     .deployed_this_turn
                                     .contains(&stage_card_ids[idx])
                             })
-                            .filter(|&&idx| !cannot_baton_touch_protected[idx])
-                            .map(|&idx| {
-                                let area_names = ["left", "center", "right"];
-                                (idx, area_names[idx], stage_card_ids[idx])
-                            })
+                            .filter(|&&idx| !baton_touch_protected[idx])
+                            .map(|&idx| (idx, MemberArea::ALL[idx], stage_card_ids[idx]))
                             .collect();
                         let mut pairs = Vec::new();
                         for i in 0..occupied.len() {
                             for j in (i + 1)..occupied.len() {
-                                let (_idx1, name1, cid1) = occupied[i];
-                                let (_idx2, name2, cid2) = occupied[j];
+                                let (_idx1, area1, cid1) = occupied[i];
+                                let (_idx2, area2, cid2) = occupied[j];
                                 let baton_cost_for = |cid: i16| {
-                                    // Missing card / missing printed cost stays 0
-                                    // (legacy `unwrap_or(0)`); otherwise the
-                                    // shared floor-at-1 formula applies.
                                     game_state.card_database.get_card(cid)
                                         .and_then(|c| c.cost)
                                         .map(|base| {
@@ -1660,19 +1663,19 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                                         })
                                         .unwrap_or(0)
                                 };
-                                let cost1 = baton_cost_for(cid1);
-                                let cost2 = baton_cost_for(cid2);
-                                let combined = cost1 + cost2;
-                                let pair_cost = effective_cost.saturating_sub(combined);
-                                let area_names = [name1.to_string(), name2.to_string()];
-                                for placement in [name1.to_string(), name2.to_string()] {
-                                    if (active_energy_count as u8) >= pair_cost {
-                                        pairs.push(DoubleBatonPair {
-                                            areas: area_names.to_vec(),
-                                            placement,
-                                            cost: pair_cost,
-                                        });
-                                    }
+                                let pair_cost =
+                                    effective_cost.saturating_sub(baton_cost_for(cid1) + baton_cost_for(cid2));
+                                if (active_energy_count as u8) >= pair_cost {
+                                    pairs.push(DoubleBatonOption {
+                                        areas: [area1, area2],
+                                        placement: area1,
+                                        cost: pair_cost,
+                                    });
+                                    pairs.push(DoubleBatonOption {
+                                        areas: [area1, area2],
+                                        placement: area2,
+                                        cost: pair_cost,
+                                    });
                                 }
                             }
                         }
@@ -1681,14 +1684,35 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                     } else {
                         (None, false)
                     };
+                    let display_pairs = if display && cfg!(not(feature = "profiling")) {
+                        double_baton_pairs.as_ref().map(|pairs| {
+                            Arc::new(
+                                pairs
+                                    .iter()
+                                    .map(|pair| DoubleBatonPair {
+                                        areas: pair
+                                            .areas
+                                            .iter()
+                                            .map(|area| area.to_string())
+                                            .collect(),
+                                        placement: pair.placement.to_string(),
+                                        cost: pair.cost,
+                                    })
+                                    .collect(),
+                            )
+                        })
+                    } else {
+                        None
+                    };
+                    let available_areas = Arc::new(available_areas);
 
                     if has_any_available || any_double_baton_available {
-                        for area in &available_areas {
+                        for area in available_areas.iter() {
                             if !area.available {
                                 continue;
                             }
-                            let area_label = area_label_en(area.area.as_str());
-                            let area_label_ja = area_label_ja(area.area.as_str());
+                            let area_label = area_label_en(area.area.as_ref());
+                            let area_label_ja = area_label_ja(area.area.as_ref());
                             let cost_display = area.cost;
                             let bt = if area.is_baton_touch {
                                 action_desc!(
@@ -1743,21 +1767,21 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                                         // reductions applied). Mini buttons and headers
                                         // read final_cost first (see web_ui ActionButtons).
                                         final_cost: Some(cost_display),
-                                        stage_area: Some(area.area.clone()),
+                                         stage_area: Some(area.area.to_string()),
                                         // available_areas is decision data for v7 baton
                                         // vision (is_baton_touch on the chosen stage_area);
                                         // always built. double_baton_pairs is UI-only.
                                         available_areas: if cfg!(feature = "profiling") {
                                             None
                                         } else {
-                                            Some(available_areas.clone())
+                                            Some(Arc::clone(&available_areas))
                                         },
                                         double_baton_pairs: if cfg!(feature = "profiling")
                                             || !display
                                         {
                                             None
                                         } else {
-                                            double_baton_pairs.clone()
+                                            display_pairs.clone()
                                         },
                                         ..make_params()
                                     },
@@ -1779,7 +1803,7 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                                 let area_indices: Vec<usize> = pair
                                     .areas
                                     .iter()
-                                    .map(|a| crate::ability::util::stage_position_index(a).unwrap_or(0))
+                                    .map(|area| area.to_index())
                                     .collect();
                                 let (src0_en, src1_en, dst_en) = (
                                     area_label_en(pair.areas[0].as_str()),
@@ -1817,19 +1841,19 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                                             },
                                             base_cost: Some(pair.cost),
                                             final_cost: Some(pair.cost),
-                                            stage_area: Some(pair.placement.clone()),
+                                            stage_area: Some(pair.placement.to_string()),
                                             card_indices: Some(area_indices),
                                             available_areas: if cfg!(feature = "profiling") {
                                                 None
                                             } else {
-                                                Some(available_areas.clone())
+                                                Some(Arc::clone(&available_areas))
                                             },
                                             double_baton_pairs: if cfg!(feature = "profiling")
                                                 || !display
                                             {
                                                 None
                                             } else {
-                                                double_baton_pairs.clone()
+                                                display_pairs.clone()
                                             },
                                             ..make_params()
                                         },

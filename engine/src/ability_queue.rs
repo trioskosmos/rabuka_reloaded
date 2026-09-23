@@ -448,7 +448,11 @@ entry_index: u8::try_from(idx).unwrap(),
 
     /// Get all pending entries
     pub fn pending_entries(&self) -> Vec<&AbilityQueueEntry> {
-        self.entries.iter().filter(|e| !e.completed).collect()
+        self.pending_entries_iter().collect()
+    }
+
+    pub fn pending_entries_iter(&self) -> impl Iterator<Item = &AbilityQueueEntry> {
+        self.entries.iter().filter(|e| !e.completed)
     }
 
     /// Store deferred sequential commands on the current entry.

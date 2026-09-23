@@ -491,7 +491,7 @@ tdbg!("PHASE_ACTIVE:4 wait activated");
         // rule 8.4.13 makes P2 the first attacker, `is_first == true` still
         // means "the FIRST attacker's window", and the first attacker is P2.
         let performer_is_p1 = performer_id == game_state.player1.id;
-        let perf_data = {
+        let mut perf_data = {
             let current_ho = &game_state.mods.heart_override;
             let current_hcm = &game_state.mods.heart_color_multiplier;
             let current_hcopy = &game_state.mods.heart_copy;
@@ -540,11 +540,11 @@ tdbg!("PHASE_ACTIVE:4 wait activated");
             (p.id.clone(), p)
         };
         // Enrich member contributions from ability_applications before snapshot
-        let mut mc = perf_data.member_contributions.clone();
+        let mut mc = core::mem::take(&mut perf_data.member_contributions);
         let mut bd = crate::types::Breakdown {
-            hearts: perf_data.heart_sources.clone(),
-            blades: perf_data.blade_sources.clone(),
-            allocations: perf_data.allocations.clone(),
+            hearts: core::mem::take(&mut perf_data.heart_sources),
+            blades: core::mem::take(&mut perf_data.blade_sources),
+            allocations: core::mem::take(&mut perf_data.allocations),
             requirements: Vec::new(),
             transforms: Vec::new(),
             scores: Vec::new(),
@@ -601,7 +601,8 @@ tdbg!("PHASE_ACTIVE:4 wait activated");
         );
 
         // Also collect draw effect triggered ability
-        if perf_data.draw_effects_occurred {
+        let draw_effects_occurred = perf_data.draw_effects_occurred;
+        if draw_effects_occurred {
             tas.push(crate::types::TriggeredAbility {
                 source_card_id: -1,
                 name: "Draw Effect".to_string(),
@@ -612,14 +613,6 @@ tdbg!("PHASE_ACTIVE:4 wait activated");
             });
         }
 
-        let mut snap = crate::turn::live::build_snapshot(
-            turn,
-            &perf_player_id,
-            &perf_data,
-            &game_state.card_database,
-            note_icons,
-            &nhm_flat,
-        );
         // Add constant score source info into breakdown.scores
         {
             let stage_cards: Vec<i16> = if is_first {
@@ -637,10 +630,17 @@ tdbg!("PHASE_ACTIVE:4 wait activated");
             }
         }
 
-        // Replace placeholder data with enriched versions from ability_applications
-        snap.member_contributions = mc;
-        snap.breakdown = bd;
-        snap.triggered_abilities = tas;
+        let snap = crate::turn::live::build_snapshot(
+            turn,
+            &perf_player_id,
+            perf_data,
+            &game_state.card_database,
+            note_icons,
+            &nhm_flat,
+            mc,
+            bd,
+            tas,
+        );
         game_state.push_performance_snapshot(snap);
         let pid = perf_player_id;
         Self::trigger_auto_abilities_for_player(game_state, &pid);
@@ -649,7 +649,7 @@ tdbg!("PHASE_ACTIVE:4 wait activated");
         let opponent_id = game_state.opponent_id(&pid);
         Self::trigger_auto_abilities_for_player(game_state, &opponent_id);
         game_state.process_pending_auto_abilities(&opponent_id);
-        if perf_data.draw_effects_occurred {
+        if draw_effects_occurred {
             Self::trigger_auto_abilities_for_player(game_state, &pid);
             game_state.process_pending_auto_abilities(&pid);
             Self::trigger_auto_abilities_for_player(game_state, &opponent_id);

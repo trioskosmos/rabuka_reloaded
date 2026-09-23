@@ -94,6 +94,63 @@ int rb_execute_modify_score(GameState *gs, int actor, AbilityEffect *e) {
                     || (sc_extra(e, "effect_constraint") && !strcmp(sc_extra(e, "effect_constraint"), "min:0"))
                     || (e->text && strstr(e->text, "未満にはならない"));
 
+    /* Faithful port of score.rs:60-184 — live_total routes into the per-player
+       constant TOTAL score bonus (not a per-card modifier). Floor (min:0)
+       clamps so base_total + current_bonus + delta stays >= 0. */
+    if (is_live_total) {
+        int effective_value = value;
+        if (per_unit) {
+            int recv_tmp[RB_MAX_ZONE];
+            int nc = collect_candidates(gs, actor, card_type, self_target, recv_tmp, RB_MAX_ZONE);
+            int nr = 0;
+            for (int i = 0; i < nc; i++) {
+                int cid = recv_tmp[i];
+                if (group && !rb_card_matches_group_str(cid, group)) continue;
+                if (heart_colors && !heart_color_matches(cid, heart_colors)) continue;
+                nr++;
+            }
+            int units = nr / per_unit_count;
+            if (e->repeat_limit > 0 && units > e->repeat_limit) units = e->repeat_limit;
+            effective_value = value * units;
+        }
+        int delta = !strcmp(op, "remove") ? -effective_value : effective_value;
+        int owner_p1 = 1;
+        {
+            int pl = actor;
+            /* resolved_target "self" → effect-scoped to the live owner; for
+               actor-side constants that is the acting player. */
+            owner_p1 = (pl == 0);
+        }
+        int16_t *bonus = owner_p1 ? &gs->mods.p1_constant_total_score_bonus
+                                  : &gs->mods.p2_constant_total_score_bonus;
+        int base_total = 0;
+        {
+            const RbPlayer *P = owner_p1 ? &gs->p[0] : &gs->p[1];
+            for (int i = 0; i < P->live.n; i++) {
+                Card c; if (rb_decode_card_by_index((uint32_t)P->live.cards[i], &c)) {
+                    base_total += (int)c.score; rb_free_card(&c);
+                }
+            }
+            for (int i = 0; i < P->success.n; i++) {
+                Card c; if (rb_decode_card_by_index((uint32_t)P->success.cards[i], &c)) {
+                    base_total += (int)c.score; rb_free_card(&c);
+                }
+            }
+        }
+        int current_bonus = (int)*bonus;
+        int projected_total = base_total + current_bonus + delta;
+        int clamped_delta = delta;
+        if (has_floor && projected_total < 0) {
+            int max_negative = -(base_total + current_bonus);
+            clamped_delta = max_negative > delta ? max_negative : delta;
+        }
+        if (!(clamped_delta == 0 && has_floor && delta < 0)) {
+            *bonus = (int16_t)(current_bonus + clamped_delta);
+        }
+        (void)location;
+        return 0;
+    }
+
     /* Resolve the set of players to apply to. */
     int pls[2]; int npl = 0;
     if (resolved_target && !strcmp(resolved_target, "both")) { pls[0] = 0; pls[1] = 1; npl = 2; }

@@ -245,9 +245,26 @@ static void apply_constant_effect(GameState *g, int pl, int host_cid, AbilityEff
         if(acc) acc->cost+=cnt;
     } else if (!strcmp(e->action,"modify_score")) {
         int cnt=e->count>=0?e->count:1;
-        rb_mods_add_score(&g->mods, tgt_cid, cnt);
-        if(!acc) g->mods.constant_score[tgt_cid]+=cnt;
-        if(acc) acc->score+=cnt;
+        for(int i=0;i<e->n_extra;i++) if(e->extra_k[i] && !strcmp(e->extra_k[i],"value")){
+            int v=atoi(e->extra_v[i]); if(v) cnt=v;
+        }
+        /* target="live_total" (parser-emitted for 「ライブの合計スコアを＋１する」)
+           modifies the player's live TOTAL — route into the per-player
+           accumulator (mirrors modifiers.rs:687-694). Keying under card_id
+           could never match a live card and silently no-op'd. */
+        const char *ms_target = e->target ? e->target : NULL;
+        if (ms_target && !strcmp(ms_target, "live_total")) {
+            int16_t *bonus = (pl == 0) ? &g->mods.p1_constant_total_score_bonus
+                                       : &g->mods.p2_constant_total_score_bonus;
+            if (!acc) *bonus = (int16_t)(*bonus + cnt);
+            /* acc path: temporary-scoped; still credit the live total so a
+               live-scoped grant participates until its temp reverts. */
+            if (acc) *bonus = (int16_t)(*bonus + cnt);
+        } else {
+            rb_mods_add_score(&g->mods, tgt_cid, cnt);
+            if(!acc) g->mods.constant_score[tgt_cid]+=cnt;
+            if(acc) acc->score+=cnt;
+        }
     } else if (!strcmp(e->action,"gain_blade") || !strcmp(e->action,"add_blade") ||
                !strcmp(e->action,"gain_blade_heart") || !strcmp(e->action,"set_blade_count") ||
                !strcmp(e->action,"modify_blade")) {
@@ -450,6 +467,14 @@ void rb_recalc_constants(GameState *g) {
        engine/src/core/game_state/modifiers.rs:recalculate_constants — unconditionally
        (no staleness gating) because energy/position/success mutates on paths a
        dirty-flag cannot see (see Rust comment: gating breaks 51 tests). */
+    /* live-total bonus: constant scan rebuilds from scratch (Rust
+       commit_constant_results assigns the scan accumulators over the old
+       values). Scratch fields hold the rebuild; applied after the scan. */
+    int16_t scan_p1_total = 0, scan_p2_total = 0;
+    int16_t saved_p1 = g->mods.p1_constant_total_score_bonus;
+    int16_t saved_p2 = g->mods.p2_constant_total_score_bonus;
+    g->mods.p1_constant_total_score_bonus = 0;
+    g->mods.p2_constant_total_score_bonus = 0;
     for (int i = 0; i < RB_MAX_CARD_IDS; i++) {
         if (g->mods.constant_blade[i]) { rb_mods_add_blade(&g->mods, i, -g->mods.constant_blade[i]); g->mods.constant_blade[i]=0; }
         if (g->mods.constant_score[i]) { rb_mods_add_score(&g->mods, i, -g->mods.constant_score[i]); g->mods.constant_score[i]=0; }
@@ -459,6 +484,7 @@ void rb_recalc_constants(GameState *g) {
             if (g->mods.constant_need_heart[i][c]) { rb_mods_add_need_heart(&g->mods, i, c, -g->mods.constant_need_heart[i][c]); g->mods.constant_need_heart[i][c]=0; }
         }
     }
+    (void)scan_p1_total; (void)scan_p2_total; (void)saved_p1; (void)saved_p2;
     for (int pl=0; pl<2; pl++) {
         /* Constant abilities can be owned by cards anywhere the player controls:
            on stage, in the success live-card zone, or the live-card zone. Rust's

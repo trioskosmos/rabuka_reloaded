@@ -2930,10 +2930,13 @@ pub fn enrich_from_applications(
 pub fn build_snapshot(
     turn: u8,
     player_id: &str,
-    perf: &LivePerformanceData,
+    perf: LivePerformanceData,
     card_db: &CardDatabase,
     note_icons: u8,
     performance_need_heart_modifiers: &[(i16, HeartColor, ModifierEntry)],
+    member_contributions: Vec<crate::types::MemberContribution>,
+    breakdown: crate::types::Breakdown,
+    triggered_abilities: Vec<crate::types::TriggeredAbility>,
 ) -> crate::types::PerformanceSnapshot {
     let mut lives = Vec::new();
     // Use perf.live_card_ids (captured before heart check cleared the zone)
@@ -2960,60 +2963,17 @@ pub fn build_snapshot(
         turn,
         player_id: player_id.to_string(),
         lives,
-        member_contributions: perf.member_contributions.clone(),
-        yell_cards: perf.yell_cards.clone(),
+        member_contributions,
+        yell_cards: perf.yell_cards,
         total_hearts: perf.total_hearts,
         total_score: 0,
         success: false,
         note_icons,
         yell_count: perf.yell_count,
-        breakdown: crate::types::Breakdown {
-            hearts: perf.heart_sources.clone(),
-            blades: perf.blade_sources.clone(),
-            allocations: perf.allocations.clone(),
-            requirements: Vec::new(),
-            transforms: Vec::new(),
-            scores: Vec::new(),
-        },
-        triggered_abilities: {
-            let mut seen = HashSet::<&ArcStr>::default();
-            let mut tas = Vec::new();
-            for mc in &perf.member_contributions {
-                for ab in mc
-                    .ability_heart_bonuses
-                    .iter()
-                    .chain(mc.ability_blade_bonuses.iter())
-                {
-                    if !seen.insert(&ab.ability_text) {
-                        continue;
-                    }
-                    let card = card_db.get_card(mc.source_id);
-                    tas.push(crate::types::TriggeredAbility {
-                        source_card_id: mc.source_id,
-                        name: ab.source.to_string(),
-                        card_name: card
-                            .map(|c| crate::types::ArcStr::from(c.name.as_ref()))
-                            .unwrap_or_default(),
-                        effect_text: ab.ability_text.clone(),
-                        condition_text: None,
-                        is_public: true,
-                    });
-                }
-            }
-            if perf.draw_effects_occurred {
-                tas.push(crate::types::TriggeredAbility {
-                    source_card_id: -1,
-                    name: "Draw Effect".to_string(),
-                    card_name: crate::types::ArcStr::default(),
-                    effect_text: "カードを引く効果が発動しました".to_string().into(),
-                    condition_text: None,
-                    is_public: true,
-                });
-            }
-            tas
-        },
+        breakdown,
+        triggered_abilities,
         surplus_hearts: [0; 8],
-        revealed_ids: perf.revealed_ids.clone(),
+        revealed_ids: perf.revealed_ids,
         p0_wins: false,
         p1_wins: false,
         performance_need_heart_modifiers: performance_need_heart_modifiers.to_vec(),

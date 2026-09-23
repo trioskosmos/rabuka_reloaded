@@ -214,6 +214,12 @@ typedef struct {
     int16_t         constant_cost[RB_MAX_CARD_IDS];
     int16_t         constant_heart[RB_MAX_CARD_IDS][8];  /* per-color, cleared on recalc */
     int16_t         constant_need_heart[RB_MAX_CARD_IDS][8];
+    /* Per-player live TOTAL score bonus (Rust game_modifiers.rs
+       p1/p2_constant_total_score_bonus). Constant scan with target="live_total"
+       and runtime execute_modify_score live_total both feed these; consumed by
+       live score (rb_live_calculate_score / allocate_and_verdict). */
+    int16_t         p1_constant_total_score_bonus;
+    int16_t         p2_constant_total_score_bonus;
     int16_t         heart_copy[RB_MAX_CARD_IDS];   /* target→source */
     int8_t          heart_multiplier[RB_MAX_CARD_IDS]; /* -1 none, else colour 0..7 */
     int8_t          heart_multiplier_amt[RB_MAX_CARD_IDS]; /* multiplier applied to that colour (default 2) */
