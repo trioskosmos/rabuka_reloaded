@@ -1358,6 +1358,11 @@ pub struct AbilityEffect {
     /// (「…能力が解決したとき/解決するたび」), stamped by the parser.
     #[cfg_attr(feature = "serde_support", serde(default))]
     pub watches_ability_resolution: Option<bool>,
+    /// 「(対戦相手のカードの効果でも発動する。)」 — stamped by the parser
+    /// when the effect carries that parenthetical; the engine reads the
+    /// bool instead of re-matching JP text.
+    #[cfg_attr(feature = "serde_support", serde(default))]
+    pub fires_on_opponent_effects: Option<bool>,
 }
 
 impl AbilityEffect {
@@ -1365,17 +1370,10 @@ impl AbilityEffect {
     /// trigger events caused by the OPPOSING player's card effects. Without
     /// the marker, a movement-watching 自動 fires on own-side causes only.
     ///
-    /// The marker is the decoded parenthetical attached to this effect's
-    /// filter box; see `GameState::fire_opponent_cause_watchers_for_move`.
+    /// Value is stamped by the parser into `fires_on_opponent_effects`
+    /// (see `GameState::fire_opponent_cause_watchers_for_move`).
     pub fn fires_on_opponent_effects(&self) -> bool {
-        self.kind
-            .as_ref()
-            .and_then(|k| k.filter())
-            .and_then(|f| f.parenthetical.as_ref())
-            .is_some_and(|ps| {
-                ps.iter()
-                    .any(|p| p.contains("発動する") && p.contains("相手"))
-            })
+        self.fires_on_opponent_effects.unwrap_or(false)
     }
 
     /// Total ACTIVE-ENERGY cost of this cost block.

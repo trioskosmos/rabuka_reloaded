@@ -1412,6 +1412,7 @@ fn decode_ability_effect_direct(bc: &mut BcReader, _variant: u8) -> Option<Abili
     let mut conditional_negation: Option<bool> = None;
     let mut cost_reduction_per_group: Option<u8> = None;
     let mut watches_ability_resolution: Option<bool> = None;
+    let mut fires_on_opponent_effects: Option<bool> = None;
     let mut ek = EffectKindLocals::default();
 
     for _ in 0..count {
@@ -1434,6 +1435,7 @@ fn decode_ability_effect_direct(bc: &mut BcReader, _variant: u8) -> Option<Abili
             &mut effect_steps,
             &mut cost_reduction_per_group,
             &mut watches_ability_resolution,
+            &mut fires_on_opponent_effects,
             &mut look_action,
             &mut select_action,
             &mut actions,
@@ -1481,6 +1483,7 @@ fn decode_ability_effect_direct(bc: &mut BcReader, _variant: u8) -> Option<Abili
         effect_steps,
         cost_reduction_per_group,
         watches_ability_resolution,
+        fires_on_opponent_effects,
         compound: Box::new(crate::card::CompoundBranch {
             look_action,
             select_action,

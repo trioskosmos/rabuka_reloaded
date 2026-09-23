@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-09-23T11:00:57.290900",
+  "generated_at": "2026-09-23T11:07:41.669245",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards\\cards.json",
-  "engine_commit": "b20a928b",
+  "engine_commit": "40752b52",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -10177,7 +10177,8 @@
         "duration": "live_end",
         "parenthetical": [
           "対戦相手のカードの効果でも発動する。"
-        ]
+        ],
+        "fires_on_opponent_effects": true
       }
     },
     {
@@ -11698,7 +11699,8 @@
         },
         "parenthetical": [
           "対戦相手のカードの効果でも発動する。"
-        ]
+        ],
+        "fires_on_opponent_effects": true
       }
     },
     {
@@ -25007,7 +25009,8 @@
         },
         "parenthetical": [
           "対戦相手のカードの効果でも発動する。"
-        ]
+        ],
+        "fires_on_opponent_effects": true
       }
     },
     {
@@ -28426,6 +28429,7 @@
         "parenthetical": [
           "相手のカードの効果でも発動する。"
         ],
+        "fires_on_opponent_effects": true,
         "target": "self"
       }
     },
@@ -35322,7 +35326,8 @@
         "duration": "live_end",
         "parenthetical": [
           "対戦相手のカードの効果でも発動する。"
-        ]
+        ],
+        "fires_on_opponent_effects": true
       }
     },
     {
@@ -35359,7 +35364,8 @@
         "duration": "live_end",
         "parenthetical": [
           "対戦相手のカードの効果でも発動する。"
-        ]
+        ],
+        "fires_on_opponent_effects": true
       }
     },
     {
@@ -35447,7 +35453,8 @@
         "duration": "live_end",
         "parenthetical": [
           "対戦相手のカードの効果でも発動する。"
-        ]
+        ],
+        "fires_on_opponent_effects": true
       }
     },
     {

@@ -20,6 +20,7 @@ fn decode_effect_field(bc: &mut BcReader, key: &str,
     effect_steps: &mut Option<Vec<Box<AbilityEffect>>>,
     cost_reduction_per_group: &mut Option<u8>,
     watches_ability_resolution: &mut Option<bool>,
+    fires_on_opponent_effects: &mut Option<bool>,
     // CompoundBranch fields
     look_action: &mut Option<Box<AbilityEffect>>,
     select_action: &mut Option<Box<AbilityEffect>>,
@@ -59,6 +60,7 @@ fn decode_effect_field(bc: &mut BcReader, key: &str,
             "effect_steps" => { *effect_steps = bc.read_effect_vec_value(); Some(true) }
             "cost_reduction_per_group" => { *cost_reduction_per_group = bc.read_u8_value(); Some(true) }
             "watches_ability_resolution" => { *watches_ability_resolution = bc.read_bool_value(); Some(true) }
+            "fires_on_opponent_effects" => { *fires_on_opponent_effects = bc.read_bool_value(); Some(true) }
             "look_action" => { *look_action = bc.read_effect_value(); Some(true) }
             "select_action" => { *select_action = bc.read_effect_value(); Some(true) }
             "actions" => { *actions = bc.read_effect_vec_value(); Some(true) }

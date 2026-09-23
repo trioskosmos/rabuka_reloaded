@@ -12646,6 +12646,11 @@ def _merge_parenthetical(target, parenthetical):
         return
     target["parenthetical"] = parenthetical
     for note in parenthetical:
+        # 「(対戦相手のカードの効果でも発動する。)」 — structured stamp so the
+        # engine never re-matches JP text at runtime (mirrors
+        # watches_ability_resolution).
+        if "発動する" in note and "相手" in note:
+            target["fires_on_opponent_effects"] = True
         if "起動できる" in note or "発動する" in note:
             # Only parse positional conditions from parenthetical notes
             # (e.g. "センターエリアにいる場合のみ発動できる").

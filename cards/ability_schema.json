@@ -194,6 +194,9 @@
     "watches_ability_resolution": {
       "type": "bool"
     },
+    "fires_on_opponent_effects": {
+      "type": "bool"
+    },
     "location": {
       "type": "zone"
     },
