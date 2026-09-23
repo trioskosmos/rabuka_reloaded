@@ -479,7 +479,8 @@ void rb_determine_live_winners(const GameState *g, int *p1_won, int *p2_won) {
     else if (!p1_all && p2_all)    { r0 = 0; r1 = 1; }
     else if (g->live_score[0] > g->live_score[1]) { r0 = 1; r1 = 0; }
     else if (g->live_score[1] > g->live_score[0]) { r0 = 0; r1 = 1; }
-    else                                     { r0 = 1; r1 = 1; } /* tie -> both place */
+    else if (g->first_attacker == 0)         { r0 = 1; r1 = 0; }
+    else                                     { r0 = 0; r1 = 1; }
     if (p1_won) *p1_won = r0;
     if (p2_won) *p2_won = r1;
 }

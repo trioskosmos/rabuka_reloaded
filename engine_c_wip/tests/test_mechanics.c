@@ -4,6 +4,15 @@
 
 static int failures;
 
+static void drain_all_choices(TestGame *tg) {
+    int guard = 0;
+    while (test_has_pending_choice(tg) && guard++ < 100) {
+        test_resume_choice(tg, 0);
+    }
+}
+
+
+
 #define CHECK(condition, message) do { \
     if (!(condition)) { \
         fprintf(stderr, "FAIL: %s\n", message); \
@@ -165,6 +174,78 @@ static void test_performance_snapshot(void) {
     CHECK(snapshot.n_lives == 1 && snapshot.lives[0] == live,
           "snapshot records the performed live card");
 }
+static void test_live_failure_moves_to_waitroom(void) {
+    TestGame tg;
+    test_game_new(&tg);
+    tg.state.live_batch_mode = 1;
+    int live = test_id(&tg, "PL!N-sd1-025-SD");
+    int member = test_id(&tg, "PL!S-sd1-003-SD");
+    int filler = test_id(&tg, "PL!-sd1-010-SD");
+    CHECK(live >= 0 && member >= 0 && filler >= 0,
+          "live failure fixtures exist");
+    if (live < 0 || member < 0 || filler < 0) return;
+    test_add_to_live(&tg, live);
+    rb_perform_live(&tg.state, 0);
+    rb_execute_live_victory_determination(&tg.state);
+    drain_all_choices(&tg);
+    rb_execute_live_victory_determination(&tg.state);
+    CHECK(!test_zone_has_id(&tg, 0, "success", live),
+          "insufficient hearts do not enter success");
+    CHECK(test_zone_has_id(&tg, 0, "discard", live),
+          "failed live enters the waitroom");
+}
+
+static void test_both_lives_compare_scores(void) {
+    TestGame tg;
+    test_game_new(&tg);
+    tg.state.live_batch_mode = 1;
+    int live = test_id(&tg, "PL!N-sd1-025-SD");
+    int member = test_id(&tg, "PL!S-sd1-001-SD");
+    int filler = test_id(&tg, "PL!-sd1-010-SD");
+    CHECK(live >= 0 && member >= 0 && filler >= 0,
+          "two-live fixtures exist");
+    if (live < 0 || member < 0 || filler < 0) return;
+    test_add_to_stage(&tg, 0, member);
+    test_set_opp_stage(&tg, 0, member);
+    for (int i = 0; i < 30; i++) {
+        test_add_to_deck(&tg, filler);
+        test_add_to_deck_pl(&tg, 1, filler);
+    }
+    test_add_to_live(&tg, live);
+    test_add_to_opp_live(&tg, live);
+    rb_perform_live(&tg.state, 0);
+    rb_perform_live(&tg.state, 1);
+    rb_execute_live_victory_determination(&tg.state);
+    drain_all_choices(&tg);
+    rb_execute_live_victory_determination(&tg.state);
+    CHECK(test_zone_has_id(&tg, 0, "success", live),
+          "first attacker places the tied live");
+    CHECK(!test_zone_has_id(&tg, 1, "success", live),
+          "second attacker does not place the tied live");
+}
+
+static void test_single_live_auto_wins(void) {
+    TestGame tg;
+    test_game_new(&tg);
+    tg.state.live_batch_mode = 1;
+    int live = test_id(&tg, "PL!N-sd1-025-SD");
+    int member = test_id(&tg, "PL!S-sd1-001-SD");
+    int filler = test_id(&tg, "PL!-sd1-010-SD");
+    CHECK(live >= 0 && member >= 0 && filler >= 0,
+          "single-live fixtures exist");
+    if (live < 0 || member < 0 || filler < 0) return;
+    test_add_to_stage(&tg, 0, member);
+    for (int i = 0; i < 30; i++) test_add_to_deck(&tg, filler);
+    test_add_to_live(&tg, live);
+    rb_perform_live(&tg.state, 0);
+    rb_execute_live_victory_determination(&tg.state);
+    drain_all_choices(&tg);
+    rb_execute_live_victory_determination(&tg.state);
+    CHECK(test_zone_has_id(&tg, 0, "success", live),
+          "unopposed live is placed");
+    CHECK(!test_zone_has_id(&tg, 1, "success", live),
+          "unopposed live leaves the opponent empty");
+}
 int main(void) {
     if (rb_load("src") != 0) {
         fprintf(stderr, "FAIL: database load\n");
@@ -177,6 +258,9 @@ int main(void) {
     test_invalid_energy_movement();
     test_movement_tracking_clear();
     test_performance_snapshot();
+    test_live_failure_moves_to_waitroom();
+    test_both_lives_compare_scores();
+    test_single_live_auto_wins();
     rb_unload();
     if (failures) return 1;
     printf("ALL MECHANIC CHECKS PASSED\n");
