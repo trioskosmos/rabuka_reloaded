@@ -57,6 +57,18 @@ pub(crate) fn execute_conditional_on_result(
             }
         })
         .unwrap_or(true);
+    log::debug!(
+        "[CONDITIONAL_RESULT] source={:?} action_reference={} action_succeeded={:?} condition_met={}",
+        resolver.activating_card_id,
+        result_condition
+            .and_then(|condition| condition.get_action_reference())
+            .unwrap_or("none"),
+        resolver
+            .last_action_result
+            .as_ref()
+            .map(|(_, succeeded)| *succeeded),
+        condition_met
+    );
 
     if condition_met {
         if let Some(followup) = followup_action {

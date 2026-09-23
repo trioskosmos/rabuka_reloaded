@@ -493,6 +493,29 @@ static int eval_comparison_inner(const struct GameState *g, int actor, int host_
         const char *op=get_str(c,"operator");
         return eval_operator(sum, op, thr);
     }
+    const char *resource = get_str(c, "resource_type");
+    if (resource && strncmp(resource, "heart", 5) == 0) {
+        int color = atoi(resource[5] == '_' ? resource + 6 : resource + 5);
+        const char *heart_pos = get_str(c, "position");
+        int pos_idx = stage_index_of_position(heart_pos);
+        int start = pos_idx >= 0 ? pos_idx : 0;
+        int end = pos_idx >= 0 ? pos_idx + 1 : RB_STAGE_SIZE;
+        int actual = 0;
+        const RbPlayer *P = &g->p[target_player_idx(actor, c)];
+        for (int i = start; i < end; i++) {
+            int cid = P->stage[i];
+            if (cid == RB_EMPTY_SLOT) continue;
+            Card cc;
+            if (!rb_decode_card_by_index((uint32_t)cid, &cc)) continue;
+            for (int h = 0; h < cc.n_hearts && h < cc.num_base; h++)
+                if ((int)cc.heart_color[h] == color) actual += cc.heart_count[h];
+            rb_free_card(&cc);
+        }
+        int threshold = 0;
+        get_i(c, "count", &threshold);
+        const char *operator = get_str(c, "operator");
+        return eval_operator(actual, operator ? operator : ">=", threshold);
+    }
     const char *pos = get_str(c, "position");
     if (pos && !strcmp(pos, "center") && loc && !strcmp(loc, "stage")) {
         return eval_highest_cost(g, actor, host_cid, c);
@@ -2612,13 +2635,23 @@ static int eval_resource_count(const GameState *g, int actor, const Condition *c
         count = count_surplus_heart(g, actor, c, tgt);
     }
     else if (strncmp(rt, "heart", 5) == 0) {
-        int col = atoi(rt + 5);
-        for (int i = 0; i < RB_STAGE_SIZE; i++) {
+        int col = atoi(rt[5] == '_' ? rt + 6 : rt + 5);
+        const char *pos = get_str(c, "position");
+        int start = 0;
+        int end = RB_STAGE_SIZE;
+        int pos_idx = stage_index_of_position(pos);
+        if (pos_idx >= 0) {
+            start = pos_idx;
+            end = pos_idx + 1;
+        }
+        for (int i = start; i < end; i++) {
             int cid = P->stage[i];
             if (cid == RB_EMPTY_SLOT) continue;
             Card cc;
             if (rb_decode_card_by_index((uint32_t)cid, &cc)) {
-                if (col < cc.n_hearts) count += cc.heart_count[col];
+                for (int h = 0; h < cc.n_hearts && h < cc.num_base; h++) {
+                    if ((int)cc.heart_color[h] == col) count += cc.heart_count[h];
+                }
                 rb_free_card(&cc);
             }
         }

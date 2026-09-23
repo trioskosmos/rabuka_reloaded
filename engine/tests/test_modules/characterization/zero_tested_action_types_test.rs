@@ -6,7 +6,7 @@
 use crate::helpers::*;
 use rabuka_engine::card::{BaseHeart, HeartColor, HeartMap};
 use rabuka_engine::game_setup::ActionType;
-use rabuka_engine::game_state::Phase;
+use rabuka_engine::game_state::{AbilityTrigger, Phase};
 use rabuka_engine::turn::TurnEngine;
 use rabuka_engine::zones::MemberArea;
 
@@ -18,7 +18,8 @@ fn kanon_invalidate_liella_live_start() {
     let mut game = TestGame::new(db);
 
     let kanon = game.id("PL!SP-bp2-001-R＋");
-    let target = game.id("PL!SP-pb1-001-R"); // Kanon duplicate with live_start ability
+    let target = game.id("PL!SP-sd1-003-SD");
+    let recovery = game.id("PL!SP-pb1-001-R");
     let filler = game.id("PL!-sd1-010-SD");
 
     game.state.player1.main_deck.cards.clear();
@@ -31,51 +32,38 @@ fn kanon_invalidate_liella_live_start() {
         game.state.player2.main_deck.cards.push(filler);
     }
 
-    // Stage: other Liella! member on left, target at Center (will be replaced by baton touch)
-    let other_liella = game.id("PL!SP-sd1-001-SD");
-    game.state.player1.stage.stage = [other_liella, target, -1];
+    game.state.player1.stage.stage = [target, -1, -1];
     game.state.player1.hand.cards.push(kanon);
+    game.state.player1.waitroom.cards.push(recovery);
     game.give_energy(20);
 
-    // Play Kanon to Center with baton touch (replaces target)
     TurnEngine::execute_main_phase_action(
         &mut game.state,
         &ActionType::PlayMemberToStage,
         Some(kanon),
         None,
         Some(MemberArea::Center),
-        Some(true),
+        Some(false),
     )
-    .expect("Play Kanon with baton touch");
+    .expect("Play Kanon to Center");
+    game.drain_choices_strict(&["SelectCard"], &[0]);
 
-    // Process pending auto abilities (debut trigger)
-    while game.has_pending_choice() {
-        game.select_option(0); // Yes, invalidate
-    }
+    assert_eq!(game.state.player1.stage.stage[0], target);
+    assert_eq!(game.state.player1.stage.stage[1], kanon);
+    assert!(game
+        .state
+        .is_ability_invalidated(target, &AbilityTrigger::LiveStart));
+    assert!(game.state.player1.hand.cards.contains(&recovery));
+    assert!(!game.state.player1.waitroom.cards.contains(&recovery));
+    assert_eq!(game.state.player1.hand.cards.len(), 1);
+
+    TurnEngine::trigger_live_start_abilities(&mut game.state, "p1");
     game.state.process_pending_auto_abilities("p1");
-
-    // Kanon played to Center via baton touch
-    assert_eq!(
-        game.state.player1.stage.stage[1], kanon,
-        "Kanon occupies Center after baton touch"
-    );
-    // The invalidate follow-up recovered the replaced target from waitroom to hand
-    // Baton touch moved target→waitroom, then followup moved target→hand
-    assert_eq!(
-        game.state.player1.hand.cards.len(),
-        1,
-        "Hand: kanon played from hand (0) → recovery adds 1 = 1"
-    );
     assert!(
-        game.state.player1.hand.cards.contains(&target),
-        "Target card recovered from waitroom to hand by invalidate followup"
+        !game.has_pending_choice(),
+        "invalidated LiveStart must not offer its optional cost"
     );
-    // No blade/heart modifiers should remain on the invalidated target
-    assert_eq!(
-        game.state.mods.get_blade_modifier(target),
-        0,
-        "Target's blade modifiers nullified"
-    );
+    assert_eq!(game.state.mods.get_blade_modifier(target), 0);
 }
 
 /// VIVID WORLD: both abilities through a real live phase.

@@ -98,15 +98,34 @@ impl GameState {
         trigger: AbilityTrigger,
         duration: Duration,
     ) -> bool {
-        if self.is_ability_invalidated(card_id, &trigger) || !self.card_has_ability_trigger(card_id, &trigger) {
-            return false;
-        }
-        self.ability_invalidations.push(crate::core::types::AbilityInvalidation {
+        let already_invalidated = self.is_ability_invalidated(card_id, &trigger);
+        let has_trigger = self.card_has_ability_trigger(card_id, &trigger);
+        log::debug!(
+            "[INVALIDATE_REGISTER] card_id={} trigger={:?} duration={:?} already_invalidated={} has_trigger={}",
             card_id,
             trigger,
             duration,
-            created_turn: self.turn_number,
-        });
+            already_invalidated,
+            has_trigger
+        );
+        if already_invalidated || !has_trigger {
+            return false;
+        }
+        let created_turn = self.turn_number;
+        self.ability_invalidations
+            .push(crate::core::types::AbilityInvalidation {
+                card_id,
+                trigger: trigger.clone(),
+                duration: duration.clone(),
+                created_turn,
+            });
+        log::debug!(
+            "[INVALIDATE_REGISTERED] card_id={} trigger={:?} duration={:?} created_turn={}",
+            card_id,
+            trigger,
+            duration,
+            created_turn
+        );
         true
     }
 

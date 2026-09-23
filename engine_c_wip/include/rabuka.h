@@ -180,7 +180,7 @@ static inline int rb_modifier_total(RbModifierEntry e) { return (int)e.set + (in
    modifier helpers (engine/src/core/game_modifiers.rs). Used for snapshot
    attribution; the portable core keeps a bounded ring (no consumer yet). */
 #define RB_MODS_TRACE_CAP 64
-#define RB_MODS_TRACE_TEXT 48
+#define RB_MODS_TRACE_TEXT 128
 typedef enum {
     RB_EFFECT_BLADE_BONUS = 0,
     RB_EFFECT_HEART_BONUS = 1,
@@ -1131,6 +1131,7 @@ typedef struct {
         Str(color) consumed by execute_gain_resource). Set when a select/choice with a
         heart_color extra is answered; the following gain_resource reads it. -1 = none. */
     int      selected_heart_color;
+    AbilityEffect *target_selection_eff;
     /* optional-draw gate resume (mirror draw.rs:execute_draw_wrapper +
         emit_pay_skip_gate). On resume we perform the draw directly instead of
         re-executing the effect (which would re-emit the gate → infinite loop). */

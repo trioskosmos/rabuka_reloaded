@@ -566,6 +566,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     };
     validate_header(&header, &deck_text)?;
+    game_setup::set_action_display(header.producer != "sim_bench");
     if header.producer == "flamegraph_replay" {
         validate_identity(&header.build_identity, &build_identity)?;
     }

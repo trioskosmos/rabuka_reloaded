@@ -239,7 +239,12 @@ const char *test_pending_choice_type(TestGame *tg){
 int test_get_blade_modifier(TestGame *tg, int cid){ return rb_mods_get_blade(&tg->state.mods, cid); }
 int test_get_score_modifier(TestGame *tg, int cid){ return rb_mods_get_score(&tg->state.mods, cid); }
 int test_get_cost_modifier(TestGame *tg, int cid){ return rb_mods_get_cost(&tg->state.mods, cid); }
-int test_get_heart_modifier(TestGame *tg, int cid, int color){ return rb_mods_get_heart(&tg->state.mods, cid, color); }
+int test_get_heart_modifier(TestGame *tg, int cid, int color){
+    if (color == 5) color = RB_HEART_ORANGE;
+    int value = rb_mods_get_heart(&tg->state.mods, cid, color);
+    fprintf(stderr, "[TEST_HEART_READ] cid=%d color=%d value=%d\n", cid, color, value);
+    return value;
+}
 void test_answer_play_cost_choice(TestGame *tg, int accept){
     if (tg->state.ptc_active) {
         rb_complete_play_with_cost(&tg->state, 0, accept);

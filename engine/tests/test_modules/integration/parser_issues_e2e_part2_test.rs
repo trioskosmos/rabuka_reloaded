@@ -2,25 +2,6 @@
 use crate::helpers::*;
 use rabuka_engine::zones::MemberArea;
 
-fn fill_decks(game: &mut TestGame) {
-    let f = game.id_ref("PL!-sd1-010-SD");
-    for _ in 0..20 {
-        game.state.player1.main_deck.cards.push(f);
-        game.state.player2.main_deck.cards.push(f);
-    }
-}
-
-fn advance_to_live_card_set_p1(game: &mut TestGame) {
-    for _ in 0..5 {
-        game.pass();
-    }
-}
-
-fn advance_to_live_start(game: &mut TestGame) {
-    game.pass();
-    game.pass();
-}
-
 // ====================================================================
 // Issue 2: PL!S-bp5-003-R (松浦果南) — dynamic count from cost
 // Text: 手札のブレードハートを持たないメンバーカードを2枚まで控え室に
@@ -187,8 +168,7 @@ fn issue3_ayumu_live_card_in_hand_blocks_effect() {
 // Issue 5: PL!SP-bp2-001-R+ (澁谷かのん) — select ANY Liella! member
 // Text: 自分のステージにいる『Liella!』のメンバー1人のすべての
 // [ライブ開始時]能力を、ライブ終了時まで、無効にしてもよい。
-// Trigger: ライブ開始時 (LiveStart)
-// Nuance: can select ANY 1 Liella! member (not just self/target all).
+// Trigger: 登場 (Debut)
 // ====================================================================
 
 #[test]
@@ -196,36 +176,24 @@ fn issue5_kanon_invalidate_other_liella() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let kanon = game.id("PL!SP-bp2-001-R\u{ff0b}");
-    let chisato = game.id("PL!SP-bp2-002-R");
-    let live = game.id("PL!-sd1-019-SD");
+    let target = game.id("PL!SP-sd1-003-SD");
+    let recovery = game.id("PL!SP-sd1-001-SD");
 
-    // Kanon + Chisato (another Liella! member) on stage
-    game.state.player1.stage.stage[0] = kanon;
-    game.state.player1.stage.stage[1] = chisato;
-    game.state.player1.hand.cards.push(live);
-    fill_decks(&mut game);
+    game.state.player1.stage.stage = [target, -1, -1];
+    game.state.player1.hand.cards.push(kanon);
+    game.state.player1.waitroom.cards.push(recovery);
+    game.give_energy(13);
 
-    advance_to_live_card_set_p1(&mut game);
-    game.set_live_card(live);
-    advance_to_live_start(&mut game);
+    game.play_to_stage(kanon, MemberArea::Center);
+    game.drain_choices_strict(&["SelectCard"], &[0]);
 
-    while game.has_pending_choice() {
-        if game.pending_choice_type().as_deref() == Some("SelectAutoAbility") {
-            game.select_indices(&[]);
-        } else {
-            game.select_indices(&[0]);
-        }
-    }
-
-    // Both remain on stage (no crash from incorrect targeting)
-    assert!(
-        game.state.player1.stage.stage.contains(&kanon),
-        "5a: kanon stays"
-    );
-    assert!(
-        game.state.player1.stage.stage.contains(&chisato),
-        "5b: chisato stays"
-    );
+    assert!(game.state.is_ability_invalidated(
+        target,
+        &rabuka_engine::game_state::AbilityTrigger::LiveStart
+    ));
+    assert!(game.state.player1.stage.stage.contains(&kanon));
+    assert!(game.state.player1.stage.stage.contains(&target));
+    assert!(game.state.player1.hand.cards.contains(&recovery));
 }
 
 // ====================================================================

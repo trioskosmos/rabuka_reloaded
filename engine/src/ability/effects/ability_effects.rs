@@ -270,10 +270,25 @@ impl AbilityResolver {
             .filter(|&id| id != -1)
             .collect();
         let filter = super::util::CardFilter::from_effect(effect);
-        let valid: Vec<i16> = super::util::matching_ids(&stage_ids, &gs.card_database, &filter, true)
-            .into_iter()
-            .filter(|card_id| gs.card_has_ability_trigger(*card_id, &trigger))
+        let matching = super::util::matching_ids(&stage_ids, &gs.card_database, &filter, true);
+        let valid: Vec<i16> = matching
+            .iter()
+            .copied()
+            .filter(|card_id| {
+                gs.card_has_ability_trigger(*card_id, &trigger)
+                    && !gs.is_ability_invalidated(*card_id, &trigger)
+            })
             .collect();
+        log::debug!(
+            "[INVALIDATE] source={:?} target={} trigger={:?} card_type={:?} group={:?} matching={:?} valid={:?}",
+            gs.activating_card,
+            target,
+            trigger,
+            effect.card_type_any(),
+            effect.group_names_any(),
+            matching,
+            valid
+        );
 
         if valid.is_empty() {
             self.last_action_result = Some((effect.action, false));
@@ -296,7 +311,11 @@ impl AbilityResolver {
                     effect.optional_any().unwrap_or(false),
                 )
                 .description_ja(Some("無効化する能力のメンバーを選択".to_string()))
-                .card_type(effect.card_type_any().map(|ct| format!("{:?}", ct)))
+                .card_type(
+                    effect
+                        .card_type_any()
+                        .map(|card_type| card_type.as_card_str().to_string()),
+                )
                 .group(effect.group_names_any().and_then(|g| g.first().cloned()))
                 .filtered_indices(Some(filtered_indices))
                 .target_player_id(Some(target.to_string()))

@@ -181,6 +181,12 @@ int rb_execute_modify_score(GameState *gs, int actor, AbilityEffect *e) {
         if (!(clamped_delta == 0 && has_floor && delta < 0)) {
             *bonus = (int16_t)(current_bonus + clamped_delta);
         }
+        int source = gs->queue.resume_host >= 0 ? gs->queue.resume_host : gs->activating_card;
+        if (source >= 0 && clamped_delta != 0) {
+            rb_mods_trace_push(&gs->mods, source, e->text,
+                               !strcmp(op, "set") ? RB_EFFECT_SCORE_SET : RB_EFFECT_SCORE_BONUS,
+                               source, -1, clamped_delta);
+        }
         return 0;
     }
 
@@ -246,6 +252,12 @@ int rb_execute_modify_score(GameState *gs, int actor, AbilityEffect *e) {
                 rb_mods_set_score(&gs->mods, cid, (int16_t)delta);
             } else {
                 rb_mods_add_score(&gs->mods, cid, (int16_t)delta);
+            }
+            int source = gs->queue.resume_host >= 0 ? gs->queue.resume_host : gs->activating_card;
+            if (source >= 0) {
+                rb_mods_trace_push(&gs->mods, source, e->text,
+                                   !strcmp(op, "set") ? RB_EFFECT_SCORE_SET : RB_EFFECT_SCORE_BONUS,
+                                   cid, -1, delta);
             }
             applied++;
         }

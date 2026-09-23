@@ -42,7 +42,7 @@ fn issue1_kanon_invalidate_and_recover() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let kanon = game.id("PL!SP-bp2-001-R\u{ff0b}");
-    let other_liella = game.id("PL!SP-sd1-001-SD");
+    let other_liella = game.id("PL!SP-sd1-003-SD");
     let liella_discard = game.id("PL!SP-sd1-002-SD");
     let filler = game.id("PL!-sd1-010-SD");
 
@@ -52,7 +52,12 @@ fn issue1_kanon_invalidate_and_recover() {
     game.state.player1.waitroom.cards.push(liella_discard);
     game.give_energy(13);
     game.play_to_stage(kanon, MemberArea::Center);
+    game.drain_choices_strict(&["SelectCard"], &[0]);
 
+    assert!(game.state.is_ability_invalidated(
+        other_liella,
+        &rabuka_engine::game_state::AbilityTrigger::LiveStart
+    ));
     assert!(
         game.state.player1.hand.cards.contains(&liella_discard),
         "1a: must recover Liella! from discard after invalidate"

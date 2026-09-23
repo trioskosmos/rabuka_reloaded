@@ -202,6 +202,7 @@ static void do_move_filtered(GameState *g, int actor, RbZone src, RbZone dst, in
 
 /* ───────────────────────────── effect execution ───────────────────────────── */
 static void handle_action(GameState *g, int actor, AbilityEffect *e, int host_cid);
+AbilityEffect *rb_effect_deep_clone(const AbilityEffect *src);
 void rb_emit_choice(GameState *g, int actor, RbChoiceKind kind,
                     const char *zone, const char *card_type,
                     int count, int allow_skip, const char *target);
@@ -328,11 +329,13 @@ static void handle_action(GameState *g, int actor, AbilityEffect *e, int host_ci
         }
         int amt = cnt < 0 ? -cnt : cnt;
         int sign = cnt < 0 ? -1 : 1;
-        int self_target = 0; const char *gn = NULL;
+        int self_target = 0; const char *gn = NULL; int target_count = -1;
         for (int i = 0; i < e->n_extra; i++) {
             if (e->extra_k[i] && !strcmp(e->extra_k[i], "self_target") &&
                 e->extra_v[i] && !strcmp(e->extra_v[i], "true")) self_target = 1;
             if (e->extra_k[i] && !strcmp(e->extra_k[i], "group_names")) gn = e->extra_v[i];
+            if (e->extra_k[i] && !strcmp(e->extra_k[i], "target_count") && e->extra_v[i])
+                target_count = atoi(e->extra_v[i]);
         }
         if (!res || !strcmp(res, "energy")) {
             /* target=="both" grants energy to BOTH players (mirrors gain_resource). */
@@ -345,14 +348,21 @@ static void handle_action(GameState *g, int actor, AbilityEffect *e, int host_ci
                 if (EP->energy_active > RB_MAX_ENERGY_CARDS) EP->energy_active = RB_MAX_ENERGY_CARDS;
             }
         } else {
-            int recips[RB_STAGE_SIZE + 1]; int nr = 0;
-            if (self_target && !gn) {
-                /* no group/card_type filter → the resolving (host) card */
+            int recips[RB_STAGE_SIZE * 2 + 1]; int nr = 0;
+            const char *position = NULL;
+            for (int i = 0; i < e->n_extra; i++) {
+                if (e->extra_k[i] && !strcmp(e->extra_k[i], "position")) {
+                    position = e->extra_v[i];
+                    break;
+                }
+            }
+            int position_idx = position ? rb_stage_position_index(position) : -1;
+            if (g->n_selected_cards > 0) {
+                for (int i = 0; i < g->n_selected_cards && nr < (int)(sizeof(recips)/sizeof(recips[0])); i++)
+                    recips[nr++] = g->selected_cards[i];
+            } else if (self_target && !gn && target_count < 0) {
                 if (host_cid >= 0) recips[nr++] = host_cid;
             } else {
-                /* mirror Rust resolve_gain_resource_targets: when a group/card_type
-                    filter is present, targets are the matching stage members of
-                    the indicated player(s). target=="both" grants to BOTH players. */
                 int tgt_players[2]; int ntp = 0;
                 if (e->target && !strcmp(e->target, "both")) { tgt_players[ntp++] = actor; tgt_players[ntp++] = actor ^ 1; }
                 else tgt_players[ntp++] = target_player(e, actor);
@@ -361,11 +371,31 @@ static void handle_action(GameState *g, int actor, AbilityEffect *e, int host_ci
                     for (int q = 0; q < RB_STAGE_SIZE; q++) {
                         int cid = TP->stage[q];
                         if (cid == RB_EMPTY_SLOT) continue;
+                        if (position_idx >= 0 && q != position_idx) continue;
                         if (gn && !rb_card_matches_group_str(cid, gn)) continue;
+                        if (e->card_type_field[0] && !rb_card_matches_type(cid, e->card_type_field)) continue;
                         if (nr < (int)(sizeof(recips)/sizeof(recips[0]))) recips[nr++] = cid;
                     }
                 }
             }
+            fprintf(stderr, "[GR_TARGET] resource=%s selected=%d candidates=%d target_count=%d host=%d\n",
+                    res ? res : "-", g->n_selected_cards, nr, target_count, host_cid);
+            if (g->n_selected_cards == 0 && target_count > 0 && nr > target_count) {
+                if (g->queue.target_selection_eff) rb_effect_free(g->queue.target_selection_eff);
+                g->queue.target_selection_eff = rb_effect_deep_clone(e);
+                rb_emit_choice(g, actor, RB_CHOICE_SELECT_CARD, "stage",
+                               e->card_type_field[0] ? e->card_type_field : "member_card",
+                               target_count, 0, "gain_resource_targets");
+                if (gn) strncpy(g->queue.pending.filter_group, gn, sizeof(g->queue.pending.filter_group) - 1);
+                strncpy(g->queue.pending.target_player_id, e->target ? e->target : "self",
+                        sizeof(g->queue.pending.target_player_id) - 1);
+                rb_choice_set_route(&g->queue.pending, RB_ROUTE_SELECT_CARDS);
+                g->queue.resume_host = host_cid;
+                g->queue.resume_eff = e;
+                return;
+            }
+            if (g->n_selected_cards == 0 && target_count > 0 && nr > target_count)
+                nr = target_count;
             /* Filtered grants (group/card_type) must NOT fall back to the host
                 when no member matches — Rust grants to the matching set only, so
                 a "boost other μ's members" ability yields 0 when none are present.
@@ -395,6 +425,8 @@ static void handle_action(GameState *g, int actor, AbilityEffect *e, int host_ci
                     }
                     g->queue.selected_heart_color = -1; /* consumed by this grant */
                     rb_mods_add_heart(&g->mods, cid, col, amt * sign);
+                    fprintf(stderr, "[GR_HEART_APPLY] cid=%d color=%d amount=%d modifier=%d\n",
+                            cid, col, amt * sign, rb_mods_get_heart(&g->mods, cid, col));
                     if (dur != RB_TEMP_PERM) {
                         RbTempEffect te; memset(&te, 0, sizeof(te));
                         te.card_id = cid; te.dur = dur; te.heart[col] = (int16_t)(amt * sign);
@@ -413,6 +445,10 @@ static void handle_action(GameState *g, int actor, AbilityEffect *e, int host_ci
                survive rb_recalc_constants (which owns the constant_* tracking);
                only recalc for permanent grants. */
             if (dur == RB_TEMP_PERM) rb_recalc_constants(g);
+            for (int r = 0; r < nr; r++)
+                fprintf(stderr, "[GR_FINAL] cid=%d orange=%d temp_count=%d\n",
+                        recips[r], rb_mods_get_heart(&g->mods, recips[r], RB_HEART_ORANGE),
+                        g->n_temp_effects);
         }
     } else if (!strcmp(act, "pay_energy") || !strcmp(act, "pay_cost") ||
                !strcmp(act, "activation_cost")) {
@@ -996,8 +1032,14 @@ int rb_play_member(GameState *g, int pl, int hand_idx, int stage_pos) {
             int is_debut = ab.triggers && rb_trigger_is(ab.triggers, "登場");
             int is_baton_tr = ab.triggers && strstr(ab.triggers, "バトンタッチ");
             if (is_debut || (is_baton && is_baton_tr)) {
-                if (ab.cost && !rb_has_pending_choice(g))
-                    rb_execute_effect_ex(g, pl, ab.cost, card);
+                if (ab.cost && !rb_has_pending_choice(g)) {
+                    rb_pay_cost(g, pl, ab.cost);
+                    if (rb_has_pending_choice(g) && ab.effect) {
+                        g->queue.deferred = ab.effect;
+                        g->queue.resume_host = card;
+                        g->queue.resume_eff = ab.effect;
+                    }
+                }
                 rb_drain_ability_queue(g);
                 if (ab.effect && !rb_has_pending_choice(g))
                     rb_execute_effect_ex(g, pl, ab.effect, card);

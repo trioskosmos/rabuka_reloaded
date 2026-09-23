@@ -1242,7 +1242,9 @@ void rb_resolver_handle_stage_selection(RbAbilityResolver *self, GameState *g,
        In C is_select_action is signaled via queue.pending.card_type == "member_card" or target "under_member".
        For is_select_action we just record selected_cards (no immediate zone move); effect will move later.
        Otherwise we move stage cards to dst. */
-    int pl = g->queue.actor;
+    int pl = rb_resolve_target_player(g, g->queue.pending.target_player_id[0] ?
+                                     g->queue.pending.target_player_id : "self");
+    if (pl < 0 || pl > 1) pl = g->queue.actor;
     int is_select = (g->queue.pending.card_type[0] != '\0'); /* proxy for is_select_action */
     int idx = selected ? atoi(selected) : -1;
     if (is_select) {
@@ -1252,9 +1254,28 @@ void rb_resolver_handle_stage_selection(RbAbilityResolver *self, GameState *g,
         } else {
             int ids[RB_MAX_ZONE];
             int n = rb_zone_cards(g, pl, "stage", ids, RB_MAX_ZONE);
-            if (idx >= 0 && idx < n) {
-                int cid = ids[idx];
+            int selected_idx = idx;
+            if (!strcmp(g->queue.pending.target, "gain_resource_targets")) {
+                int eligible[RB_STAGE_SIZE];
+                int ne = 0;
+                for (int i = 0; i < n; i++) {
+                    if (g->queue.pending.card_type[0] &&
+                        !rb_card_matches_type(ids[i], g->queue.pending.card_type)) continue;
+                    if (g->queue.pending.filter_group[0] &&
+                        !rb_card_matches_group_str(ids[i], g->queue.pending.filter_group)) continue;
+                    eligible[ne++] = ids[i];
+                }
+                n = ne;
+                memcpy(ids, eligible, (size_t)n * sizeof(ids[0]));
+            }
+            if (selected_idx >= 0 && selected_idx < n) {
+                int cid = ids[selected_idx];
+                fprintf(stderr, "[STAGE_TARGET_RESULT] pick=%d eligible=%d cid=%d target=%s\n",
+                        selected_idx, n, cid, g->queue.pending.target);
                 if (self->n_selected_cards < RB_MAX_RECENTLY_MOVED) self->selected_cards[self->n_selected_cards++] = cid;
+                if (!strcmp(g->queue.pending.target, "gain_resource_targets") &&
+                    g->n_selected_cards < RB_MAX_RECENTLY_MOVED)
+                    g->selected_cards[g->n_selected_cards++] = cid;
             }
         }
         rb_resolver_clear_choice_state_and_resume(self);
@@ -2172,6 +2193,7 @@ int rb_resume_with_choice(GameState *g, int selected_idx) {
     int host = g->queue.resume_host;
     /* Capture the deferred effect BEFORE clearing the queue (clearing nulls it). */
     AbilityEffect *def = g->queue.deferred;
+    AbilityEffect *target_selection_eff = g->queue.target_selection_eff;
     const AbilityEffect *cont = g->queue.resume_parent;
     int cont_from = g->queue.resume_child + 1;
     int was_skip = (selected_idx < 0);
@@ -2315,9 +2337,20 @@ int rb_resume_with_choice(GameState *g, int selected_idx) {
             int rev = (ptarget && strstr(ptarget, "reveal")) || (pzone && strstr(pzone, "reveal"));
             int cost_hand = (!eff_started && hc && !strcmp(pzone, "hand"));
             rb_resolver_handle_select_card(&self, g, selected);
+            if (rb_has_pending_choice(g) && def) g->queue.deferred = def;
+            if (!was_skip && target_selection_eff && !rb_has_pending_choice(g)) {
+                rb_execute_effect_ex(g, actor, target_selection_eff, host);
+                rb_effect_free(target_selection_eff);
+                g->queue.target_selection_eff = NULL;
+                g->n_selected_cards = 0;
+            }
             if (!was_skip && def && !rev && !cost_hand && !rb_has_pending_choice(g)) {
                 if (is_cost) rb_pay_cost(g, actor, def);
                 else         rb_execute_effect_ex(g, actor, def, host);
+            }
+            if (target_selection_eff) {
+                g->queue.cur++;
+                g->queue.n_entries = 0;
             }
             if (!rb_has_pending_choice(g))
                 rb_resolver_continue_siblings(g, actor, host, cont, cont_from);

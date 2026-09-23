@@ -1,6 +1,6 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-09-23T21:34:09.242576+00:00",
+  "generated_at": "2026-09-23T23:46:02.852108+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
@@ -8,7 +8,7 @@
     "unique_abilities": 936
   },
   "n_files": 836,
-  "n_tests": 3432,
+  "n_tests": 3435,
   "total_cards": 771,
   "covered_cards": 771,
   "abilities_on_covered": 936,
@@ -726,7 +726,7 @@
       ]
     }
   },
-  "n_test_fns_parsed": 3432,
+  "n_test_fns_parsed": 3435,
   "abilities": [
     {
       "idx": 0,
@@ -3470,7 +3470,7 @@
         "issue2_kanan_discard_1_gain_1",
         "issue2_kanan_skip_cost_empty_live_gain"
       ],
-      "covering_test_count": 67,
+      "covering_test_count": 70,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -11679,25 +11679,48 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
+        "engine/tests/test_modules/characterization/zero_tested_action_types_test.rs",
         "engine/tests/test_modules/effects/compound/live_start_bottom_one_mill_live_heart_source_test.rs",
         "engine/tests/test_modules/effects/compound/live_start_bottom_three_mill_all_group_heart_test.rs",
         "engine/tests/test_modules/effects/compound/live_start_optional_bottom_mill_named_recovery_source_test.rs",
-        "engine/tests/test_modules/effects/gain/blades/bp7_under_member_per_unit_blade_test.rs"
+        "engine/tests/test_modules/effects/conditional/kanon_invalidate_test.rs",
+        "engine/tests/test_modules/effects/gain/blades/bp7_under_member_per_unit_blade_test.rs",
+        "engine/tests/test_modules/integration/parser_issues_e2e_part2_test.rs",
+        "engine/tests/test_modules/integration/parser_issues_e2e_test.rs"
       ],
       "covering_tests": [
         "chika_constant_blade_counts_only_under",
         "chika_constant_blade_per_member_under",
         "chika_constant_blade_zero_under",
-        "live_start_bottom_three_all_aqours_gives_heart04",
-        "live_start_bottom_three_mills_deck_bottom_three",
-        "live_start_mills_bottom_one_preserving_hand",
-        "live_start_optional_bottom_mill_removes_bottom_card_from_deck",
-        "shizuku_live_start_blade_counts_only_under",
-        "shizuku_live_start_blade_dedups_same_name",
-        "shizuku_live_start_blade_per_distinct_under",
-        "shizuku_live_start_blade_zero_under"
+        "issue10_dream_with_you_high_blade_plus_1_score",
+        "issue10_dream_with_you_no_blade_no_score",
+        "issue11_fanfare_15plus_cards_gives_blade",
+        "issue11_fanfare_few_cards_no_blade",
+        "issue13_kurage_card_exists",
+        "issue14_koware_yasuki_card_exists",
+        "issue15_mirai_ticket_card_exists",
+        "issue16_hanamaru_all_cost_higher_than_opponent_gains_blade",
+        "issue16_hanamaru_opponent_higher_cost_no_blade",
+        "issue17_suzu_cost_bonus_condition_met",
+        "issue17_suzu_cost_bonus_condition_not_met",
+        "issue1_kanon_invalidate_and_recover",
+        "issue1_kanon_no_liella_on_stage_no_recovery",
+        "issue2_kanan_discard_1_gain_1",
+        "issue2_kanan_skip_cost_empty_live_gain",
+        "issue2_rina_cost_total_10_no_bonus",
+        "issue2_rina_cost_total_6_draws_card",
+        "issue3_ayumu_compound_both_conditions_met",
+        "issue3_ayumu_live_card_in_hand_blocks_effect",
+        "issue3_karin_live_start_draw_card",
+        "issue4_you_exclude_aqours_live_start",
+        "issue5_kanon_invalidate_other_liella",
+        "issue5_solitude_rain_heart_color_scoring",
+        "issue6_natsumi_blade_expires_after_live_victory_determination",
+        "issue6_natsumi_low_energy_no_blade",
+        "issue6_natsumi_self_and_other_blade",
+        "issue6_natsumi_self_only_blade"
       ],
-      "covering_test_count": 11,
+      "covering_test_count": 61,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -13917,6 +13940,7 @@
         "engine/tests/test_modules/effects/compound/toubatsu_test.rs",
         "engine/tests/test_modules/effects/conditional/conditional_alternative_test.rs",
         "engine/tests/test_modules/effects/conditional/discard_group_look_four_or_recover_live_test.rs",
+        "engine/tests/test_modules/effects/conditional/kanon_invalidate_test.rs",
         "engine/tests/test_modules/effects/cost_mod/hanamusubi_exclude_self_test.rs",
         "engine/tests/test_modules/effects/cost_mod/modify_required_hearts_global_test.rs",
         "engine/tests/test_modules/effects/cost_mod/pl_s_bp5_010_test.rs",
@@ -14031,7 +14055,7 @@
         "b_heart07_yell_contributes_two_colorless_hearts_each",
         "bella_positive_surplus_heart04_ability_fires"
       ],
-      "covering_test_count": 702,
+      "covering_test_count": 706,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -16630,8 +16654,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/integration/gameplay_test.rs",
-        "engine/tests/test_modules/integration/parser_issues_e2e_part2_test.rs"
+        "engine/tests/test_modules/integration/gameplay_test.rs"
       ],
       "covering_tests": [
         "ai_screeam_answer_both_discard",
@@ -16661,11 +16684,11 @@
         "hanamaru_score_icon_filter",
         "hareruya_q64_waitroom_only_five_distinct_liella_condition_met",
         "hareruya_q74_multiname_distinct_counting",
-        "issue2_kanan_discard_1_gain_1",
-        "issue2_kanan_skip_cost_empty_live_gain",
-        "issue3_ayumu_compound_both_conditions_met"
+        "kanon_activation_choice_condition_discard_flow",
+        "kanon_activation_choice_condition_wait_option",
+        "kosuzu_choose_number_adds_to_hand"
       ],
-      "covering_test_count": 71,
+      "covering_test_count": 60,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -30746,7 +30769,6 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/characterization/decode_audit_behavior_pins_test.rs",
-        "engine/tests/test_modules/characterization/zero_tested_action_types_test.rs",
         "engine/tests/test_modules/effects/compound/live_start_bottom_one_mill_live_heart_source_test.rs",
         "engine/tests/test_modules/effects/compound/live_start_bottom_three_mill_all_group_heart_test.rs",
         "engine/tests/test_modules/effects/compound/live_start_optional_bottom_mill_named_recovery_source_test.rs",
@@ -30768,6 +30790,7 @@
         "engine/tests/test_modules/effects/score/zettai_lover_test.rs",
         "engine/tests/test_modules/effects/state/catchu_energy_activation_test.rs",
         "engine/tests/test_modules/integration/gameplay_test.rs",
+        "engine/tests/test_modules/integration/parser_issues_e2e_part2_test.rs",
         "engine/tests/test_modules/integration/parser_issues_e2e_part3_test.rs",
         "engine/tests/test_modules/integration/parser_issues_e2e_test.rs",
         "engine/tests/test_modules/jidou/movement/movement_condition_test.rs",
@@ -30805,7 +30828,7 @@
         "catchu_basic_two_distinct_activate_2",
         "catchu_duplicate_names_dedup_to_1"
       ],
-      "covering_test_count": 285,
+      "covering_test_count": 291,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -30878,7 +30901,7 @@
         "issue14_koware_yasuki_card_exists",
         "issue15_mirai_ticket_card_exists"
       ],
-      "covering_test_count": 96,
+      "covering_test_count": 99,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,

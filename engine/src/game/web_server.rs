@@ -867,45 +867,15 @@ fn run_ai_replies(
         if game_state.is_loop_detected() {
             break;
         }
-        // Pending choice routed to the AI: answer it like the console driver.
-        // This is a resume (the choice-boundary snapshot is already in
-        // history), so no fresh undo point is pushed.
-        if game_state.has_pending_choice() {
-            let snapshot = game_state.clone();
-            if !crate::game::match_runner::ai_handle_choice(game_state) {
-                break;
-            }
-            let _ = settle_single_player_state(game_state);
-            game_state.reset_loop_detection();
-            commit_room_move(
-                data,
-                room_id,
-                game_state,
-                &snapshot,
-                true,
-                FrameAction {
-                    action_type: "choice_resume".to_string(),
-                    player_id: ai_pid,
-                    card_id: None,
-                    card_indices: None,
-                    stage_area: None,
-                    use_baton_touch: false,
-                },
-                "AI: choice_resume".to_string(),
-            );
-            moves += 1;
-            continue;
-        }
+        let had_choice_before = game_state.has_pending_choice();
         let acts = crate::game_setup::generate_possible_actions(game_state);
         if acts.is_empty() {
             break;
         }
-        let Some(idx) = crate::game::match_runner::ai_pick_action(game_state, &acts) else {
+        let Some(action) = crate::game::match_runner::ai_pick_action_v7(game_state, &acts, ai_pid)
+        else {
             break;
         };
-        let action = &acts[idx];
-        // RPS picks are routed positionally: stamp the AI as the chooser so
-        // the handler records the answer for the right player.
         if matches!(
             action.action_type,
             ActionType::RockChoice | ActionType::PaperChoice | ActionType::ScissorsChoice
@@ -913,7 +883,7 @@ fn run_ai_replies(
             game_state.pending_rps_player_id = Some(ai_pid);
         }
         let snapshot = game_state.clone();
-        let frame_action = ai_frame_action(action, ai_pid);
+        let frame_action = ai_frame_action(&action, ai_pid);
         let params = action.parameters.clone();
         let result = crate::turn::TurnEngine::execute_main_phase_action(
             game_state,
@@ -933,7 +903,15 @@ fn run_ai_replies(
         let _ = settle_single_player_state(game_state);
         game_state.reset_loop_detection();
         let label = format!("AI: {}", frame_action.action_type);
-        commit_room_move(data, room_id, game_state, &snapshot, false, frame_action, label);
+        commit_room_move(
+            data,
+            room_id,
+            game_state,
+            &snapshot,
+            had_choice_before,
+            frame_action,
+            label,
+        );
         moves += 1;
     }
     moves

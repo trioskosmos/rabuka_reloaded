@@ -1,4 +1,5 @@
 use crate::helpers::*;
+use rabuka_engine::game_state::AbilityTrigger;
 use rabuka_engine::zones::MemberArea;
 
 fn advance_to_live_card_set_p1(game: &mut TestGame) {
@@ -50,10 +51,16 @@ fn genki_zenkai_invalidates_own_live_success() {
         game.select_indices(&[]);
     }
 
-    // After live_start resolved, the card should be in negated_abilities
     assert!(
-        game.state.negated_abilities.contains(&genki),
-        "Genki Zenkai should be in negated_abilities after live_start triggers invalidation"
+        game.state
+            .is_ability_invalidated(genki, &AbilityTrigger::LiveSuccess),
+        "Genki Zenkai should invalidate only its LiveSuccess ability"
+    );
+    assert!(
+        !game
+            .state
+            .is_ability_invalidated(genki, &AbilityTrigger::LiveStart),
+        "Genki Zenkai LiveStart must remain valid"
     );
 
     // Advance through performance → live_success should NOT fire
@@ -120,10 +127,11 @@ fn genki_zenkai_live_success_fires_when_condition_not_met() {
         game.select_indices(&[]);
     }
 
-    // Condition NOT met → card should NOT be in negated_abilities
     assert!(
-        !game.state.negated_abilities.contains(&genki),
-        "Genki Zenkai should NOT be in negated_abilities (condition not met)"
+        !game
+            .state
+            .is_ability_invalidated(genki, &AbilityTrigger::LiveSuccess),
+        "Genki Zenkai LiveSuccess must remain valid when the condition is not met"
     );
 
     // Advance through performance → live_success SHOULD fire
