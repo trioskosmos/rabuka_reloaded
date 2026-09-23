@@ -85,6 +85,86 @@ static void test_live_score_consumes_bonus(void) {
     }
 }
 
+static void test_invalid_live_movement(void) {
+    TestGame tg;
+    test_game_new(&tg);
+    int member = test_id(&tg, "PL!-sd1-010-SD");
+    test_add_to_live(&tg, member);
+    test_add_to_stage(&tg, 0, member);
+    for (int i = 0; i < 30; i++) {
+        test_add_to_deck(&tg, member);
+        test_add_to_deck_pl(&tg, 1, member);
+    }
+    rb_check_timing(&tg.state);
+    CHECK(!test_zone_has_id(&tg, 0, "live", member),
+          "invalid live member leaves the live zone");
+    CHECK(test_zone_has_id(&tg, 0, "discard", member),
+          "invalid live member goes to the waitroom");
+    CHECK(tg.state.moved_this_turn[member],
+          "invalid live movement records the card movement");
+}
+
+static void test_invalid_energy_movement(void) {
+    TestGame tg;
+    test_game_new(&tg);
+    int energy = test_id(&tg, "LL-E-001-SD");
+    int filler = test_id(&tg, "PL!-sd1-010-SD");
+    test_add_to_live(&tg, energy);
+    test_add_to_stage(&tg, 0, filler);
+    for (int i = 0; i < 30; i++) {
+        test_add_to_deck(&tg, filler);
+        test_add_to_deck_pl(&tg, 1, filler);
+    }
+    rb_check_timing(&tg.state);
+    CHECK(!test_zone_has_id(&tg, 0, "live", energy),
+          "invalid energy leaves the live zone");
+    int found = 0;
+    for (int i = 0; i < tg.state.p[0].energy_deck.n; i++) {
+        if (tg.state.p[0].energy_deck.cards[i] == energy) found = 1;
+    }
+    CHECK(found, "invalid live energy returns to the energy deck");
+}
+
+static void test_movement_tracking_clear(void) {
+    TestGame tg;
+    test_game_new(&tg);
+    int card = test_id(&tg, "PL!-sd1-010-SD");
+    tg.state.moved_this_turn[card] = 1;
+    CHECK(tg.state.moved_this_turn[card], "movement tracking records a card");
+    rb_clear_movement_tracking(&tg.state);
+    CHECK(!tg.state.moved_this_turn[card], "movement tracking clears at turn start");
+}
+
+static void test_performance_snapshot(void) {
+    TestGame tg;
+    test_game_new(&tg);
+    int live = test_id(&tg, "PL!-bp3-026-L");
+    int center = test_id(&tg, "PL!-pb1-014-R");
+    int right = test_id(&tg, "PL!-PR-003-PR");
+    int filler = test_id(&tg, "PL!-sd1-010-SD");
+    CHECK(live >= 0 && center >= 0 && right >= 0 && filler >= 0,
+          "performance pipeline fixtures exist");
+    if (live < 0 || center < 0 || right < 0 || filler < 0) return;
+    test_add_to_stage(&tg, 1, center);
+    test_add_to_stage(&tg, 2, right);
+    for (int i = 0; i < 40; i++) {
+        test_add_to_deck(&tg, filler);
+        test_add_to_deck_pl(&tg, 1, filler);
+    }
+    test_add_to_live(&tg, live);
+    rb_perform_live(&tg.state, 0);
+    CHECK(tg.state.n_snapshots == 1, "performance creates one snapshot");
+    if (tg.state.n_snapshots != 1) return;
+    RbLiveSnapshot snapshot = tg.state.snapshots[0];
+    int member_hearts = 0;
+    for (int i = 0; i < 8; i++) member_hearts += snapshot.total_hearts[i];
+    int yell_hearts = 0;
+    for (int i = 0; i < 8; i++) yell_hearts += snapshot.yell_blade_hearts[i];
+    CHECK(member_hearts + yell_hearts > 0, "snapshot records performance hearts");
+    CHECK(snapshot.total_score > 0, "snapshot records a positive score");
+    CHECK(snapshot.n_lives == 1 && snapshot.lives[0] == live,
+          "snapshot records the performed live card");
+}
 int main(void) {
     if (rb_load("src") != 0) {
         fprintf(stderr, "FAIL: database load\n");
@@ -93,6 +173,10 @@ int main(void) {
     test_gained_live_total_bonus();
     test_direct_live_total_bonus();
     test_live_score_consumes_bonus();
+    test_invalid_live_movement();
+    test_invalid_energy_movement();
+    test_movement_tracking_clear();
+    test_performance_snapshot();
     rb_unload();
     if (failures) return 1;
     printf("ALL MECHANIC CHECKS PASSED\n");

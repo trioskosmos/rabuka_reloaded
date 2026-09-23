@@ -178,8 +178,9 @@ void rb_check_invalid_live_cards(GameState *g, int is_p1) {
         int cid = P->live.cards[i];
         if (!rb_card_is_live(cid)) {
             int c = bag_remove_at_local(&P->live, i);
-            if (rb_card_is_energy(c)) bag_push_local(&P->energy, c);
+            if (rb_card_is_energy(c)) bag_push_local(&P->energy_deck, c);
             else                       bag_push_local(&P->discard, c);
+            rb_record_card_movement(g, c, 0, 0, is_p1 ? 0 : 1, 0);
         }
     }
 }

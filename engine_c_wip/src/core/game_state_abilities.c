@@ -307,6 +307,8 @@ int rb_can_place_card_in_zone(const GameState *g, int cid, const char *zone) {
 
 void rb_clear_movement_tracking(GameState *g) {
     if (!g) return;
+    memset(g->moved_this_turn, 0, sizeof(g->moved_this_turn));
+    g->n_cards_appeared_this_turn = 0;
     g->n_recently_moved = 0;
     g->n_recently_appeared = 0;
     g->n_recently_state_changed = 0;
