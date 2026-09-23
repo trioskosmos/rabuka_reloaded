@@ -288,7 +288,7 @@ impl super::TurnEngine {
             player_id,
             abilities_to_trigger.len()
         );
-        game_state.push_debug_note(format!(
+        game_state.push_debug_note_fmt(format_args!(
             "live_start scan {}: {} ability(ies) fired",
             player_id,
             abilities_to_trigger.len()

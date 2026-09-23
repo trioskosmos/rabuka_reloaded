@@ -535,7 +535,7 @@ random consumption when policies diverge.
 
 RESULT (2026-09-17): REJECTED. 3000 games per seat vs v6 (seed 11): curve-keep
 2805 wins vs v4-mulligan 2853 across 6000, same direction both seats
-(A: 1358<1385, B: 1447<1468). Audit analysis (`analyze_audit.py`, 200 games):
+(A: 1358<1385, B: 1447<1468). Audit analysis (`tools/analysis/analyze_audit.py`, 200 games):
 the curve path fires on only ~17% of hands (333/400 confirms still discard 3),
 and stage curve/dev is not the losing factor (t1=3.7→t5=14.5, on-guide).
 Default is v4 mulligan; the variant is preserved behind `V7_MULLIGAN_CURVE=1`.
@@ -545,8 +545,8 @@ stale 3/2/0 selection state (one-ply eval already captures redraws' value).
 ## 9.2 Where v7 actually loses — measured defect list (2026-09-17)
 
 Method: `bot_arena --audit` JSONL (200 games, v7 v6, 5CP3Z, seed 21, offline
-per §8.4) + `analyze_losses.py` (loss clusters), `pass_probe.py` (affordable-
-deploy Passes), `count_batons.py` (baton visibility), `V7_DEBUG` tables, and
+per §8.4) + `tools/analysis/analyze_losses.py` (loss clusters), `tools/analysis/pass_probe.py` (affordable-
+deploy Passes), `tools/analysis/count_batons.py` (baton visibility), `V7_DEBUG` tables, and
 isolation runs (`V7_MAIN_V6=1`, 3000×2, seed 11). The 87% "failed_checks"
 loss clusters decompose into four mechanisms below; a fifth (mulligan) was
 measured and rejected (§9.1). Fix order = measured frequency × causal role.
@@ -684,16 +684,16 @@ STATUS (2026-09-23): **fixed** — `v7_main::pick_best` prefers a baton
 `log::debug!("v7_main baton-tie-break ...")`). Pass still wins ties against
 non-baton 0s (anti-clog for empty-slot bodies). Empty-slot cost≥1 plays already
 score `>0` via the `8.0 × stage-cost` term and never needed the break.
-Analyzer (`analyze_v7_trace.py`) now flags `Pass over 0.00 member deploy` as
+Analyzer (`tools/analysis/analyze_v7_trace.py`) now flags `Pass over 0.00 member deploy` as
 class A. Remaining hole in the same game: t5 generated **zero** member plays
 (hand=8, en=8) — likely live-set junk-discard of members (8.3.4), not scorer;
 re-check if empty mains stay ≥15% after this fix.
 
 ### Process (measured, for reproduction)
-- Loss clusters: `python analyze_losses.py <audit.jsonl> --examples N`
+- Loss clusters: `python tools/analysis/analyze_losses.py <audit.jsonl> --examples N`
 - Decision tables: `$env:V7_DEBUG='1'` (stderr tables; UNTRACED runs only)
-- Baton visibility: `python count_batons.py` (edit paths)
-- Affordable-pass probe: `python pass_probe.py`
+- Baton visibility: `python tools/analysis/count_batons.py <audit.jsonl>`
+- Affordable-pass probe: `python tools/analysis/pass_probe.py <audit.jsonl>`
 - Isolation: `V7_MAIN_V6=1` split main vs live-set contribution:
   A-seat 1392-1415 (v6+0.77pp), B-seat 1467-1375 (v7+1.5pp) → v7's live-set
   changes are net-positive on B seat but the hybrid (v6 main + v7 live) still

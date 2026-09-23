@@ -87,7 +87,7 @@ pub(crate) fn execute_conditional_on_optional(
                     .active_count() as usize;
                 if active < need {
                     log::debug!("[CONDITION] source={:?} action={} branch=conditional next_action={} reason=insufficient_energy active={} need={} negation={}", resolver.activating_card_id, effect.action, cond.action, active, need, is_negation);
-                    gs.push_rule_log(format!(
+                    gs.push_rule_log_fmt(format_args!(
                         "{}: [[log_cost_skip:reason=compound_insufficient_energy,need={},active={}]]",
                         pp, need, active
                     ));

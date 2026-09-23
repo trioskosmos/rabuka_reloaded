@@ -32,8 +32,11 @@ impl super::TurnEngine {
     /// No-op under the `headless` feature (bot playouts never render these).
     #[cfg(not(feature = "headless"))]
     fn log_phase(game_state: &mut GameState, marker_key: &str) {
+        if !crate::game_setup::logging_enabled() {
+            return;
+        }
         let text = format!("[[{}]]", marker_key);
-        game_state.push_debug_note(format!("phase {}", marker_key));
+        game_state.push_debug_note_fmt(format_args!("phase {}", marker_key));
         game_state.push_rule_log(text.clone());
         game_state.push_structured_log(LogEntry {
             text,
@@ -52,6 +55,9 @@ impl super::TurnEngine {
     /// Log the start of a new turn.
     /// Uses [[turn_start:turn=N]] translatable marker.
     fn log_turn_start(game_state: &mut GameState) {
+        if !crate::game_setup::logging_enabled() {
+            return;
+        }
         let text = format!("[[turn_start:turn={}]]", game_state.turn_number);
         game_state.push_rule_log(text.clone());
         game_state.push_structured_log(LogEntry {
@@ -1322,7 +1328,7 @@ tdbg!("PHASE_ACTIVE:4 wait activated");
                         i16::try_from(base as i32 - red as i32).unwrap_or(0),
                     );
                     Self::shuffle_waitroom_members_to_deck_bottom(game_state, &player_id);
-                    game_state.push_rule_log(format!(
+                    game_state.push_rule_log_fmt(format_args!(
                         "{} uses play-time cost reduction: {} cost reduced by {}, waitroom members shuffled to deck bottom",
                         player_id, card_id, red
                     ));
@@ -1342,7 +1348,7 @@ tdbg!("PHASE_ACTIVE:4 wait activated");
                         None,
                         set_value,
                     );
-                    game_state.push_rule_log(format!(
+                    game_state.push_rule_log_fmt(format_args!(
                         "{} uses play-time alternative cost: discarded {n} members, cost set to {set_value}",
                         player_id
                     ));
@@ -1673,6 +1679,9 @@ tdbg!("PHASE_ACTIVE:4 wait activated");
     }
 
     fn push_rps_log(game_state: &mut GameState, p1: u8, p2: u8, winner_str: &str) {
+        if !crate::game_setup::logging_enabled() {
+            return;
+        }
         let p1_name = Self::rps_choice_name(p1);
         let p2_name = Self::rps_choice_name(p2);
         let text = format!("P1: {} vs P2: {} → {}", p1_name, p2_name, winner_str);

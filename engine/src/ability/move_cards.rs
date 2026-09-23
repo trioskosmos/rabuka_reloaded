@@ -3064,7 +3064,7 @@ if util::distinct_should_dedupe(distinct) {
             .activating_card
             .map(|c| self.card_name(c))
             .unwrap_or_default();
-        gs.push_rule_log(format!(
+        gs.push_rule_log_fmt(format_args!(
             "{} {}: [[log_energy_under:n={}]]",
             pp, act_name, cids.len()
         ));

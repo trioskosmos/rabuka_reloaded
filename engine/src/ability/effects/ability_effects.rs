@@ -207,7 +207,7 @@ impl AbilityResolver {
                         None,
                     );
                     let pp = self.player_prefix(gs);
-                    gs.push_rule_log(format!(
+                    gs.push_rule_log_fmt(format_args!(
                         "{} {}: [[log_activated_ability:trigger={}]]",
                         pp, trig, name
                     ));
@@ -289,7 +289,7 @@ impl AbilityResolver {
         if let Some(card_id) = gs.activating_card {
             let pp = self.player_prefix(gs);
             let cn = self.card_name(card_id);
-            gs.push_rule_log(format!(
+            gs.push_rule_log_fmt(format_args!(
                 "{} {}: [[log_suppress_ability:trigger={}]]",
                 pp, cn, trigger
             ));
@@ -431,7 +431,7 @@ impl AbilityResolver {
             .activating_card
             .map(|c| self.card_name(c))
             .unwrap_or_default();
-        gs.push_rule_log(format!(
+        gs.push_rule_log_fmt(format_args!(
             "{} {}: [[log_gain_ability]]: {}",
             pp, act_name, ability_text
         ));
@@ -597,7 +597,7 @@ impl AbilityResolver {
             .iter()
             .map(|&cid| self.card_name(cid))
             .collect();
-        gs.push_rule_log(format!(
+        gs.push_rule_log_fmt(format_args!(
             "{} {}: [[log_gain_ability_from_source]]: {}",
             pp,
             act_name,

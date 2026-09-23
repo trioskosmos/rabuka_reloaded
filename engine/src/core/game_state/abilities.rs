@@ -1027,7 +1027,7 @@ impl GameState {
                                     entry.trigger_type
                                 );
                             }
-                            self.push_debug_note(format!(
+                            self.push_debug_note_fmt(format_args!(
                                 "queue+ {} card={} trigger={:?}",
                                 ability_id,
                                 entry.card_no,
@@ -1641,51 +1641,55 @@ impl GameState {
                 })
                 .unwrap_or("?");
             // Push ability_resolution entry
-            let log_text = format!(
-                "{pp} {card_name} [{zone}]: [[log_ability_result:trigger=trigger_{trigger_str},result=result_skipped_negated]]"
-            );
-            self.push_rule_log(log_text.clone());
-            if !crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) {
-                self.ability_queue.complete_current();
-                self.activating_card = None;
-                self.activating_ability_index = None;
-                return;
+            if crate::game_setup::logging_enabled()
+                || crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed)
+            {
+                let log_text = format!(
+                    "{pp} {card_name} [{zone}]: [[log_ability_result:trigger=trigger_{trigger_str},result=result_skipped_negated]]"
+                );
+                self.push_rule_log_fmt(format_args!("{}", log_text));
+                if !crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) {
+                    self.ability_queue.complete_current();
+                    self.activating_card = None;
+                    self.activating_ability_index = None;
+                    return;
+                }
+                let fallback_entry = crate::types::LogEntry {
+                    text: log_text,
+                    turn: self.turn_number,
+                    player_label: pp.clone(),
+                    source_card_id: card_id,
+                    source_card_name: Some(card_name),
+                    category: "ability_resolution".to_string(),
+                    metadata: Some(crate::core::types::LogMetadata::AbilityResolution {
+                        result: "skipped".to_string(),
+                        trigger: trigger_str.clone(),
+                        #[cfg(feature = "serde_support")]
+                        items: Vec::new(),
+                        ability_text: ability_text.to_string(),
+                        zone: zone.to_string(),
+                        error: Some("cards".to_string()),
+                        resolved: Some(false),
+                    }),
+                };
+                // Commit to the matching trigger_evaluation entry, or push standalone.
+                self.commit_or_push_structured(
+                    card_id,
+                    &trigger_str,
+                    Some(ability_index),
+                    crate::core::types::LogMetadata::AbilityResolution {
+                        result: "skipped".to_string(),
+                        trigger: trigger_str.clone(),
+                        #[cfg(feature = "serde_support")]
+                        items: Vec::new(),
+                        ability_text: ability_text.to_string(),
+                        zone: zone.to_string(),
+                        error: Some("card negated".to_string()),
+                        resolved: Some(false),
+                    },
+                    fallback_entry,
+                );
             }
-            let fallback_entry = crate::types::LogEntry {
-                text: log_text,
-                turn: self.turn_number,
-                player_label: pp.clone(),
-                source_card_id: card_id,
-                source_card_name: Some(card_name),
-                category: "ability_resolution".to_string(),
-                metadata: Some(crate::core::types::LogMetadata::AbilityResolution {
-                    result: "skipped".to_string(),
-                    trigger: trigger_str.clone(),
-                    #[cfg(feature = "serde_support")]
-                    items: Vec::new(),
-                    ability_text: ability_text.to_string(),
-                    zone: zone.to_string(),
-                    error: Some("cards".to_string()),
-                    resolved: Some(false),
-                }),
-            };
-            // Commit to the matching trigger_evaluation entry, or push standalone.
-            self.commit_or_push_structured(
-                card_id,
-                &trigger_str,
-                Some(ability_index),
-                crate::core::types::LogMetadata::AbilityResolution {
-                    result: "skipped".to_string(),
-                    trigger: trigger_str.clone(),
-                    #[cfg(feature = "serde_support")]
-                    items: Vec::new(),
-                    ability_text: ability_text.to_string(),
-                    zone: zone.to_string(),
-                    error: Some("card negated".to_string()),
-                    resolved: Some(false),
-                },
-                fallback_entry,
-            );
             self.ability_queue.complete_current();
             self.activating_card = None;
             self.activating_ability_index = None;
@@ -1728,7 +1732,7 @@ impl GameState {
 
         match resolver.resolve_ability(self, &ability, card_id, ability_index) {
             Ok(()) => {
-                self.push_debug_note(format!(
+                self.push_debug_note_fmt(format_args!(
                     "resolve ok card={:?} idx={} pending_choice={}",
                     card_id,
                     ability_index,
@@ -1736,7 +1740,7 @@ impl GameState {
                 ));
             }
             Err(e) => {
-                self.push_debug_note(format!(
+                self.push_debug_note_fmt(format_args!(
                     "resolve FAIL card={:?} idx={} err={}",
                     card_id, ability_index, e
                 ));

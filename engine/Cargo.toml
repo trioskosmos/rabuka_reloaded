@@ -140,6 +140,12 @@ name = "profile_target"
 path = "src/bin/profile_target.rs"
 test = false
 
+# Canonical full-game throughput bench (docs/PERF_BASELINE_PLAN.md).
+[[bin]]
+name = "sim_bench"
+path = "src/bin/sim_bench.rs"
+test = false
+
 [[bin]]
 name = "harness"
 path = "src/bin/harness.rs"

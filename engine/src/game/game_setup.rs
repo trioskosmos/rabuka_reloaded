@@ -18,6 +18,54 @@ use serde::{Deserialize, Serialize};
 #[cfg(not(feature = "no_std"))]
 use std::vec::Vec;
 
+#[cfg(feature = "no_std")]
+use core::sync::atomic::{AtomicBool, Ordering};
+#[cfg(not(feature = "no_std"))]
+use std::sync::atomic::{AtomicBool, Ordering};
+
+/// Runtime display gate for action-generation UI strings (EN/JA descriptions,
+/// card_name/card_no/source_ability copies, existing_member_name labels).
+/// Default ON so web/UI paths are unchanged. Headless benches (`sim_bench`)
+/// turn it off to skip `format!`/`to_string` on every decision step.
+/// Decision fields (`card_id`, `stage_area`, `available_areas`, costs,
+/// `ability_index`, `card_indices`) are always built.
+static ACTION_DISPLAY: AtomicBool = AtomicBool::new(true);
+
+/// Enable/disable display-only fields on generated `Action`s.
+/// Thread-safe; process-global. Default is enabled.
+pub fn set_action_display(enabled: bool) {
+    ACTION_DISPLAY.store(enabled, Ordering::Relaxed);
+}
+
+/// Whether display-only action fields should be materialized.
+#[inline]
+pub fn action_display_enabled() -> bool {
+    ACTION_DISPLAY.load(Ordering::Relaxed)
+}
+
+/// Runtime gate for rule/structured/debug log materialization (format!,
+/// LogEntry construction, choice offer/resolve payloads). Default ON so
+/// web/tests keep full history. Training/sim turn it off.
+static LOGGING: AtomicBool = AtomicBool::new(true);
+
+/// Enable/disable log string materialization. Thread-safe; process-global.
+pub fn set_logging_enabled(enabled: bool) {
+    LOGGING.store(enabled, Ordering::Relaxed);
+}
+
+/// Whether hot-path log strings should be built.
+#[inline]
+pub fn logging_enabled() -> bool {
+    LOGGING.load(Ordering::Relaxed)
+}
+
+/// Training/headless speed: strip UI Action strings and log materialization.
+/// Web/UI paths must leave this at the default (full display + logs).
+pub fn set_training_mode(enabled: bool) {
+    set_action_display(!enabled);
+    set_logging_enabled(!enabled);
+}
+
 /// Area label in both languages from ONE table. Previously two
 /// copy-pasted matches (`area_label_en` / `area_label_ja`) that could
 /// drift apart; the `ja` flag selects the column like describe.rs's
@@ -207,7 +255,7 @@ impl core::str::FromStr for ActionType {
 
 macro_rules! action_desc {
     ($($arg:tt)*) => {
-        if cfg!(not(feature = "profiling")) {
+        if cfg!(not(feature = "profiling")) && action_display_enabled() {
             format!($($arg)*)
         } else {
             String::new()
@@ -235,7 +283,9 @@ pub struct Action {
 
 impl Action {
     pub fn with_ja(mut self, ja: impl Into<String>) -> Self {
-        self.description_ja = Some(ja.into());
+        if action_display_enabled() {
+            self.description_ja = Some(ja.into());
+        }
         self
     }
 
@@ -516,7 +566,11 @@ pub fn test_ai_vs_ai(
 
 fn make_action(action_type: ActionType, description: impl Into<String>) -> Action {
     Action {
-        description: description.into(),
+        description: if action_display_enabled() {
+            description.into()
+        } else {
+            String::new()
+        },
         description_ja: None,
         action_type,
         parameters: None,
@@ -530,7 +584,11 @@ fn make_action_params(
     params: ActionParameters,
 ) -> Action {
     Action {
-        description: description.into(),
+        description: if action_display_enabled() {
+            description.into()
+        } else {
+            String::new()
+        },
         description_ja: None,
         action_type,
         parameters: Some(params),
@@ -1384,7 +1442,9 @@ fn generate_mulligan_actions(game_state: &GameState) -> Vec<Action> {
             action_desc!("Confirm {}'s mulligan", player_name),
             ActionParameters { ..make_params() },
         );
-        a.description_ja = Some(action_desc!("{}のマリガンを確定", player_name));
+        if action_display_enabled() {
+            a.description_ja = Some(action_desc!("{}のマリガンを確定", player_name));
+        }
         a
     }];
 
@@ -1394,7 +1454,12 @@ fn generate_mulligan_actions(game_state: &GameState) -> Vec<Action> {
             .contains(&(hand_index as u8));
         let card = game_state.card_database.get_card(*card_id);
         let card_name = card.map(|c| c.name.as_ref()).unwrap_or("Unknown");
-        let card_no_str = card.map(|c| c.card_no.to_string()).unwrap_or_default();
+        let display = action_display_enabled();
+        let card_no_str = if display {
+            card.map(|c| c.card_no.to_string()).unwrap_or_default()
+        } else {
+            String::new()
+        };
         let mut a = make_action_params(
             ActionType::SelectMulligan,
             // Marker-prefix convention (shared with the multi-pick menus):
@@ -1408,17 +1473,23 @@ fn generate_mulligan_actions(game_state: &GameState) -> Vec<Action> {
                 card_id: Some(*card_id),
                 card_index: Some(hand_index),
                 card_indices: Some(vec![hand_index]),
-                card_name: Some(card_name.to_string()),
-                card_no: Some(card_no_str),
+                card_name: if display {
+                    Some(card_name.to_string())
+                } else {
+                    None
+                },
+                card_no: if display { Some(card_no_str) } else { None },
                 ..make_params()
             },
         );
         a.selected = Some(is_selected);
-        a.description_ja = Some(action_desc!(
-            "[{}] {}",
-            if is_selected { "x" } else { " " },
-            card_name
-        ));
+        if display {
+            a.description_ja = Some(action_desc!(
+                "[{}] {}",
+                if is_selected { "x" } else { " " },
+                card_name
+            ));
+        }
         actions.push(a);
     }
 
@@ -1491,6 +1562,7 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
 
                     let mut available_areas = Vec::with_capacity(3);
                     let mut has_any_available = false;
+                    let display = action_display_enabled();
 
                     for (area_idx, (_area, area_name)) in areas.iter().enumerate() {
                         let mut area_info = AreaInfo {
@@ -1526,8 +1598,10 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                                             area_info.available = true;
                                             area_info.cost = cost_to_pay;
                                             area_info.is_baton_touch = true;
-                                            area_info.existing_member_name =
-                                                Some(existing_member_card.name.to_string());
+                                            if display {
+                                                area_info.existing_member_name =
+                                                    Some(existing_member_card.name.to_string());
+                                            }
                                             has_any_available = true;
                                         }
                                     }
@@ -1632,7 +1706,11 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                             } else {
                                 String::new()
                             };
-                            let cost_str = cost_display.to_string();
+                            let cost_str = if display {
+                                cost_display.to_string()
+                            } else {
+                                String::new()
+                            };
                             {
                                 let mut a = make_action_params(
                                     ActionType::PlayMemberToStage,
@@ -1647,14 +1725,14 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                                         card_id: Some(*card_id),
                                         card_index: Some(hand_index),
                                         card_name: {
-                                            if cfg!(not(feature = "profiling")) {
+                                            if cfg!(not(feature = "profiling")) && display {
                                                 Some(card.name.to_string())
                                             } else {
                                                 None
                                             }
                                         },
                                         card_no: {
-                                            if cfg!(not(feature = "profiling")) {
+                                            if cfg!(not(feature = "profiling")) && display {
                                                 Some(card.card_no.to_string())
                                             } else {
                                                 None
@@ -1666,15 +1744,17 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                                         // read final_cost first (see web_ui ActionButtons).
                                         final_cost: Some(cost_display),
                                         stage_area: Some(area.area.clone()),
-                                        // available_areas is only consumed by the UI/web/main.rs
-                                        // path; the profiling/bot decision path never reads it, so
-                                        // skip the Vec<AreaInfo> clone in profiling builds.
+                                        // available_areas is decision data for v7 baton
+                                        // vision (is_baton_touch on the chosen stage_area);
+                                        // always built. double_baton_pairs is UI-only.
                                         available_areas: if cfg!(feature = "profiling") {
                                             None
                                         } else {
                                             Some(available_areas.clone())
                                         },
-                                        double_baton_pairs: if cfg!(feature = "profiling") {
+                                        double_baton_pairs: if cfg!(feature = "profiling")
+                                            || !display
+                                        {
                                             None
                                         } else {
                                             double_baton_pairs.clone()
@@ -1682,13 +1762,15 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                                         ..make_params()
                                     },
                                 );
-                                a.description_ja = Some(action_desc!(
-                                    "E{} {} → {}{}",
-                                    cost_str,
-                                    card.name,
-                                    area_label_ja,
-                                    bt_ja
-                                ));
+                                if display {
+                                    a.description_ja = Some(action_desc!(
+                                        "E{} {} → {}{}",
+                                        cost_str,
+                                        card.name,
+                                        area_label_ja,
+                                        bt_ja
+                                    ));
+                                }
                                 actions.push(a);
                             }
                         }
@@ -1723,12 +1805,12 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                                         ActionParameters {
                                             card_id: Some(*card_id),
                                             card_index: Some(hand_index),
-                                            card_name: if cfg!(not(feature = "profiling")) {
+                                            card_name: if cfg!(not(feature = "profiling")) && display {
                                                 Some(card.name.to_string())
                                             } else {
                                                 None
                                             },
-                                            card_no: if cfg!(not(feature = "profiling")) {
+                                            card_no: if cfg!(not(feature = "profiling")) && display {
                                                 Some(card.card_no.to_string())
                                             } else {
                                                 None
@@ -1742,7 +1824,9 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                                             } else {
                                                 Some(available_areas.clone())
                                             },
-                                            double_baton_pairs: if cfg!(feature = "profiling") {
+                                            double_baton_pairs: if cfg!(feature = "profiling")
+                                                || !display
+                                            {
                                                 None
                                             } else {
                                                 double_baton_pairs.clone()
@@ -1750,14 +1834,16 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                                             ..make_params()
                                         },
                                     );
-                                    a.description_ja = Some(action_desc!(
-                                        "E{} {} ({}+{})→{}",
-                                        pair.cost,
-                                        card.name,
-                                        src0_ja,
-                                        src1_ja,
-                                        dst_ja
-                                    ));
+                                    if display {
+                                        a.description_ja = Some(action_desc!(
+                                            "E{} {} ({}+{})→{}",
+                                            pair.cost,
+                                            card.name,
+                                            src0_ja,
+                                            src1_ja,
+                                            dst_ja
+                                        ));
+                                    }
                                     actions.push(a);
                                 }
                             }
@@ -1862,25 +1948,24 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                     ),
                     ActionParameters {
                         card_id: Some(card_id),
-                        // Display-only fields; the profiling/bot path routes UseAbility by
-                        // card_id alone (handle_use_ability), so skip the String allocs.
-                        stage_area: if cfg!(not(feature = "profiling")) {
+                        // Display-only fields; bot routes UseAbility by card_id alone.
+                        stage_area: if cfg!(not(feature = "profiling")) && action_display_enabled() {
                             Some(area_name.to_string())
                         } else {
                             None
                         },
-                        card_name: if cfg!(not(feature = "profiling")) {
+                        card_name: if cfg!(not(feature = "profiling")) && action_display_enabled() {
                             Some(card.name.to_string())
                         } else {
                             None
                         },
-                        card_no: if cfg!(not(feature = "profiling")) {
+                        card_no: if cfg!(not(feature = "profiling")) && action_display_enabled() {
                             Some(card.card_no.to_string())
                         } else {
                             None
                         },
                         ability_index: Some(ability_index),
-                        source_ability: if cfg!(not(feature = "profiling")) {
+                        source_ability: if cfg!(not(feature = "profiling")) && action_display_enabled() {
                             Some(ability.full_text.clone())
                         } else {
                             None
@@ -1890,14 +1975,16 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                         ..make_params()
                     },
                 );
-                ua.description_ja = Some(action_desc!(
-                    "E{} {} ({}): {}{}",
-                    effective_cost,
-                    card.name,
-                    area_label_ja(area_name),
-                    ability.full_text,
-                    trigger_info
-                ));
+                if action_display_enabled() {
+                    ua.description_ja = Some(action_desc!(
+                        "E{} {} ({}): {}{}",
+                        effective_cost,
+                        card.name,
+                        area_label_ja(area_name),
+                        ability.full_text,
+                        trigger_info
+                    ));
+                }
                 actions.push(ua);
             }
         }
@@ -1955,18 +2042,18 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                     ActionParameters {
                         card_id: Some(card_id),
                         // Display-only fields; profiling/bot routes UseAbility by card_id.
-                        card_name: if cfg!(not(feature = "profiling")) {
+                        card_name: if cfg!(not(feature = "profiling")) && action_display_enabled() {
                             Some(card.name.to_string())
                         } else {
                             None
                         },
-                        card_no: if cfg!(not(feature = "profiling")) {
+                        card_no: if cfg!(not(feature = "profiling")) && action_display_enabled() {
                             Some(card.card_no.to_string())
                         } else {
                             None
                         },
                         ability_index: Some(ability_index),
-                        source_ability: if cfg!(not(feature = "profiling")) {
+                        source_ability: if cfg!(not(feature = "profiling")) && action_display_enabled() {
                             Some(ability.full_text.clone())
                         } else {
                             None
@@ -1976,12 +2063,14 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                         ..make_params()
                     },
                 );
-                ua.description_ja = Some(action_desc!(
-                    "E{} {} (控え室, 起動): {}",
-                    effective_cost,
-                    card.name,
-                    ability.full_text
-                ));
+                if action_display_enabled() {
+                    ua.description_ja = Some(action_desc!(
+                        "E{} {} (控え室, 起動): {}",
+                        effective_cost,
+                        card.name,
+                        ability.full_text
+                    ));
+                }
                 actions.push(ua);
             }
         }
@@ -2009,7 +2098,9 @@ fn generate_live_card_set_actions(game_state: &GameState) -> Vec<Action> {
             action_desc!("Confirm {}'s live card set", player_name),
             ActionParameters { ..make_params() },
         );
-        a.description_ja = Some(action_desc!("{}のライブカードセットを確定", player_name));
+        if action_display_enabled() {
+            a.description_ja = Some(action_desc!("{}のライブカードセットを確定", player_name));
+        }
         a
     }];
 
@@ -2027,7 +2118,12 @@ fn generate_live_card_set_actions(game_state: &GameState) -> Vec<Action> {
         }
         let card = game_state.card_database.get_card(*card_id);
         let card_name = card.map(|c| c.name.as_ref()).unwrap_or("Unknown");
-        let card_no_str = card.map(|c| c.card_no.to_string()).unwrap_or_default();
+        let display = action_display_enabled();
+        let card_no_str = if display {
+            card.map(|c| c.card_no.to_string()).unwrap_or_default()
+        } else {
+            String::new()
+        };
         let mut a = make_action_params(
             ActionType::SelectLiveCard,
             // Same marker-prefix convention as mulligan rows.
@@ -2040,17 +2136,23 @@ fn generate_live_card_set_actions(game_state: &GameState) -> Vec<Action> {
                 card_id: Some(*card_id),
                 card_index: Some(hand_index),
                 card_indices: Some(vec![hand_index]),
-                card_name: Some(card_name.to_string()),
-                card_no: Some(card_no_str),
+                card_name: if display {
+                    Some(card_name.to_string())
+                } else {
+                    None
+                },
+                card_no: if display { Some(card_no_str) } else { None },
                 ..make_params()
             },
         );
         a.selected = Some(is_selected);
-        a.description_ja = Some(action_desc!(
-            "[{}] {}",
-            if is_selected { "x" } else { " " },
-            card_name
-        ));
+        if display {
+            a.description_ja = Some(action_desc!(
+                "[{}] {}",
+                if is_selected { "x" } else { " " },
+                card_name
+            ));
+        }
         actions.push(a);
     }
 

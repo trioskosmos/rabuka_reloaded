@@ -27,6 +27,23 @@ macro_rules! tdbg {
 macro_rules! tdbg {
     ($($arg:tt)*) => {};
 }
+
+/// UI-only provenance string: empty (no alloc) when training has logs off.
+#[inline]
+fn ui_text(s: &str) -> String {
+    if crate::game_setup::logging_enabled() {
+        s.to_string()
+    } else {
+        String::new()
+    }
+}
+
+/// UI-only kind label for BonusSource.
+#[inline]
+fn ui_kind(s: &str) -> String {
+    ui_text(s)
+}
+
 impl GameState {
     /// Compute the opponent-front targets for a constant "正面のエリア" (front area)
     /// ability. Given the activating card's stage slot, mirrors to the opponent's
@@ -129,11 +146,11 @@ impl GameState {
                 *exp_blade.entry(host).or_insert(0) += count;
                 exp_blade_sources.push(crate::core::game_modifiers::BonusSource {
                     source_card_id: under_cid,
-                    ability_text: effect.text.to_string(),
+                    ability_text: ui_text(&effect.text),
                     target_card_id: host,
                     amount: count as i32,
                     color: None,
-                    kind: "blade".to_string(),
+                    kind: ui_kind("blade"),
                 });
             }
         }
@@ -402,7 +419,7 @@ impl GameState {
                         // name/owner only now that the condition passed).
                         // Skipped under `headless` — display-only summary data.
                         #[cfg(not(feature = "headless"))]
-                        {
+                        if crate::game_setup::logging_enabled() {
                             let status_card_name = card_db
                                 .get_card(card_id)
                                 .map(|c| c.name.to_string())
@@ -417,7 +434,7 @@ impl GameState {
                                 card_name: status_card_name.clone(),
                                 owner: status_owner.clone(),
                                 zone: "stage".to_string(),
-                                ability_text: effect.text.to_string(),
+                                ability_text: ui_text(&effect.text),
                                 all_conditions_met: pos_ok && cond_met,
                                 conditions: vec![crate::types::ConditionResult {
                                     text: "条件".to_string(),
@@ -508,11 +525,11 @@ impl GameState {
                                                 *exp_blade.entry(tid).or_insert(0) += delta;
                                                 exp_blade_sources.push(crate::core::game_modifiers::BonusSource {
                                                     source_card_id: card_id,
-                                                    ability_text: effect.text.to_string(),
+                                                    ability_text: ui_text(&effect.text),
                                                     target_card_id: tid,
                                                     amount: delta as i32,
                                                     color: None,
-                                                    kind: "blade".to_string(),
+                                                    kind: ui_kind("blade"),
                                                 });
                                             }
                                         } else if effect.all_any().unwrap_or(false) {
@@ -549,22 +566,22 @@ impl GameState {
                                                 *exp_blade.entry(mid).or_insert(0) += delta;
                                                 exp_blade_sources.push(crate::core::game_modifiers::BonusSource {
                                                     source_card_id: card_id,
-                                                    ability_text: effect.text.to_string(),
+                                                    ability_text: ui_text(&effect.text),
                                                     target_card_id: mid,
                                                     amount: delta as i32,
                                                     color: None,
-                                                    kind: "blade".to_string(),
+                                                    kind: ui_kind("blade"),
                                                 });
                                             }
                                         } else {
                                             *exp_blade.entry(card_id).or_insert(0) += delta;
                                             exp_blade_sources.push(crate::core::game_modifiers::BonusSource {
                                                 source_card_id: card_id,
-                                                ability_text: effect.text.to_string(),
+                                                ability_text: ui_text(&effect.text),
                                                 target_card_id: card_id,
                                                 amount: delta as i32,
                                                 color: None,
-                                                kind: "blade".to_string(),
+                                                kind: ui_kind("blade"),
                                             });
                                         }
                                     }
@@ -619,11 +636,11 @@ impl GameState {
                                                 .or_insert(0) += i16::try_from(n).unwrap();
                                             exp_heart_sources.push(crate::core::game_modifiers::BonusSource {
                                                 source_card_id: card_id,
-                                                ability_text: effect.text.to_string(),
+                                                ability_text: ui_text(&effect.text),
                                                 target_card_id: card_id,
                                                 amount: i32::from(n),
                                                 color: Some(crate::ability::util::HEART_ALL_KEY.to_string()),
-                                                kind: "heart".to_string(),
+                                                kind: ui_kind("heart"),
                                             });
                                         } else {
                                             let hc_list = effect.heart_colors_any().to_vec();
@@ -639,11 +656,11 @@ impl GameState {
                                                     .or_insert(0) += per_entry;
                                                 exp_heart_sources.push(crate::core::game_modifiers::BonusSource {
                                                     source_card_id: card_id,
-                                                    ability_text: effect.text.to_string(),
+                                                    ability_text: ui_text(&effect.text),
                                                     target_card_id: card_id,
                                                     amount: per_entry as i32,
                                                     color: Some(hc.clone()),
-                                                    kind: "heart".to_string(),
+                                                    kind: ui_kind("heart"),
                                                 });
                                             }
                                         }
@@ -656,7 +673,7 @@ impl GameState {
                                 if sv != 0 {
                                     self.mods.constant_score_sources.push((
                                         card_id,
-                                        effect.text.to_string(),
+                                        ui_text(&effect.text),
                                         i16::try_from(sv).unwrap(),
                                     ));
                                 }
@@ -753,11 +770,11 @@ impl GameState {
                                         .or_insert(0) += 1i16;
                                     exp_heart_sources.push(crate::core::game_modifiers::BonusSource {
                                         source_card_id: card_id,
-                                        ability_text: effect.text.to_string(),
+                                        ability_text: ui_text(&effect.text),
                                         target_card_id: card_id,
                                         amount: 1,
                                         color: Some("all".to_string()),
-                                        kind: "gained_ability".to_string(),
+                                        kind: ui_kind("gained_ability"),
                                     });
                                 } else if let Some(gain_text) = effect.ability_gain_any().as_deref()
                                 {
@@ -771,7 +788,7 @@ impl GameState {
 
                                     let texts = expected_gained_texts.entry(card_id).or_default();
                                     if !texts.iter().any(|text| text == gain_text) {
-                                        texts.push(gain_text.to_string());
+                                        texts.push(ui_text(&gain_text));
                                     }
 
                                     // Use gained_effect if available (structured data from parser)
@@ -785,7 +802,7 @@ impl GameState {
                                         if val != 0 {
                                             self.mods.constant_score_sources.push((
                                                 card_id,
-                                                gain_text.to_string(),
+                                                ui_text(&gain_text),
                                                 i16::try_from(val).unwrap(),
                                             ));
                                         }
@@ -814,7 +831,7 @@ impl GameState {
                                             if val != 0 {
                                                 self.mods.constant_score_sources.push((
                                                     card_id,
-                                                    gain_text.to_string(),
+                                                    ui_text(&gain_text),
                                                     i16::try_from(val).unwrap(),
                                                 ));
                                             }
@@ -858,11 +875,11 @@ impl GameState {
                                         exp_global_nh_sources.push(
                                             crate::core::game_modifiers::BonusSource {
                                                 source_card_id: host_id,
-                                                ability_text: effect.text.to_string(),
+                                                ability_text: ui_text(&effect.text),
                                                 target_card_id: *card_id,
                                                 amount: delta as i32,
                                                 color: Some(color.clone()),
-                                                kind: "need_heart".to_string(),
+                                                kind: ui_kind("need_heart"),
                                             },
                                         );
                                     }
@@ -889,11 +906,11 @@ impl GameState {
                                                     *exp_blade.entry(card_id).or_insert(0) += i16::try_from(n).unwrap();
                                                     exp_blade_sources.push(crate::core::game_modifiers::BonusSource {
                                                         source_card_id: card_id,
-                                                        ability_text: effect.text.to_string(),
+                                                        ability_text: ui_text(&effect.text),
                                                         target_card_id: card_id,
                                                         amount: n,
                                                         color: None,
-                                                        kind: "blade".to_string(),
+                                                        kind: ui_kind("blade"),
                                                     });
                                                 }
                                                 "heart" => {
@@ -912,11 +929,11 @@ impl GameState {
                                                             .or_insert(0) += per_color;
                                                         exp_heart_sources.push(crate::core::game_modifiers::BonusSource {
                                                             source_card_id: card_id,
-                                                            ability_text: effect.text.to_string(),
+                                                            ability_text: ui_text(&effect.text),
                                                             target_card_id: card_id,
                                                             amount: per_color as i32,
                                                             color: Some(hc.clone()),
-                                                            kind: "heart".to_string(),
+                                                            kind: ui_kind("heart"),
                                                         });
                                                     }
                                                 }
@@ -1199,33 +1216,33 @@ impl GameState {
                             *expected.entry(cid).or_insert(0) += i16::try_from(value).unwrap();
                             cost_sources.push(crate::core::game_modifiers::BonusSource {
                                 source_card_id: cid,
-                                ability_text: effect.text.to_string(),
+                                ability_text: ui_text(&effect.text),
                                 target_card_id: cid,
                                 amount: value,
                                 color: None,
-                                kind: "cost".to_string(),
+                                kind: ui_kind("cost"),
                             });
                         }
                         "subtract" => {
                             *expected.entry(cid).or_insert(0) -= value as i16;
                             cost_sources.push(crate::core::game_modifiers::BonusSource {
                                 source_card_id: cid,
-                                ability_text: effect.text.to_string(),
+                                ability_text: ui_text(&effect.text),
                                 target_card_id: cid,
                                 amount: -(value),
                                 color: None,
-                                kind: "cost".to_string(),
+                                kind: ui_kind("cost"),
                             });
                         }
                         "set" => {
                             expected_set.insert(cid, value as i16);
                             cost_sources.push(crate::core::game_modifiers::BonusSource {
                                 source_card_id: cid,
-                                ability_text: effect.text.to_string(),
+                                ability_text: ui_text(&effect.text),
                                 target_card_id: cid,
                                 amount: value,
                                 color: None,
-                                kind: "cost_set".to_string(),
+                                kind: ui_kind("cost_set"),
                             });
                         }
                         _ => {}
@@ -1893,11 +1910,11 @@ impl GameState {
                             self.mods.success_zone_blade_sources.push(
                                 crate::core::game_modifiers::BonusSource {
                                     source_card_id: cid,
-                                    ability_text: effect.text.to_string(),
+                                    ability_text: ui_text(&effect.text),
                                     target_card_id: target_id,
                                     amount,
                                     color: None,
-                                    kind: "blade".to_string(),
+                                    kind: ui_kind("blade"),
                                 },
                             );
                         }
@@ -1924,11 +1941,11 @@ impl GameState {
                                 self.mods.success_zone_heart_sources.push(
                                     crate::core::game_modifiers::BonusSource {
                                         source_card_id: cid,
-                                        ability_text: effect.text.to_string(),
+                                        ability_text: ui_text(&effect.text),
                                         target_card_id: target_id,
                                         amount: per_color as i32,
                                         color: Some(color_str.clone()),
-                                        kind: "heart".to_string(),
+                                        kind: ui_kind("heart"),
                                     },
                                 );
                             }
@@ -1969,11 +1986,11 @@ impl GameState {
                             self.mods.success_zone_score_sources.push(
                                 crate::core::game_modifiers::BonusSource {
                                     source_card_id: cid,
-                                    ability_text: effect.text.to_string(),
+                                    ability_text: ui_text(&effect.text),
                                     target_card_id: target_id,
                                     amount: value as i32,
                                     color: None,
-                                    kind: "score_set".to_string(),
+                                    kind: ui_kind("score_set"),
                                 },
                             );
                         }
@@ -1987,11 +2004,11 @@ impl GameState {
                             self.mods.success_zone_score_sources.push(
                                 crate::core::game_modifiers::BonusSource {
                                     source_card_id: cid,
-                                    ability_text: effect.text.to_string(),
+                                    ability_text: ui_text(&effect.text),
                                     target_card_id: target_id,
                                     amount: value as i32,
                                     color: None,
-                                    kind: "score".to_string(),
+                                    kind: ui_kind("score"),
                                 },
                             );
                         }

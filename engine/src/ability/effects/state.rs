@@ -1051,7 +1051,7 @@ impl AbilityResolver {
             .map(|c| self.card_name(c))
             .unwrap_or_default();
         let bt_str = blade_type.unwrap_or("none");
-        gs.push_rule_log(format!(
+        gs.push_rule_log_fmt(format_args!(
             "{} {}: [[log_set_blade_type:type={}]]",
             pp, act_name, bt_str
         ));
@@ -1262,7 +1262,7 @@ impl AbilityResolver {
             other => other,
         };
         let ht = resolved_heart_type.unwrap_or("heart00").to_string();
-        gs.push_rule_log(format!(
+        gs.push_rule_log_fmt(format_args!(
             "{} {}: [[log_set_heart_type:type={}]]",
             pp, act_name, ht
         ));
@@ -1343,7 +1343,7 @@ impl AbilityResolver {
         let Some(source) = source_card else {
             return;
         };
-        gs.push_rule_log(format!(
+        gs.push_rule_log_fmt(format_args!(
             "{} {}: [[log_set_heart_copy:target={},source={}]]",
             pp, act_name, member_card, source
         ));
@@ -1381,7 +1381,7 @@ impl AbilityResolver {
             .activating_card
             .map(|c| self.card_name(c))
             .unwrap_or_default();
-        gs.push_rule_log(format!(
+        gs.push_rule_log_fmt(format_args!(
             "{} {}: [[log_activation_cost:op={},value={}]]",
             pp, act_name, operation, value
         ));
@@ -1427,7 +1427,7 @@ impl AbilityResolver {
             .activating_card
             .map(|c| self.card_name(c))
             .unwrap_or_default();
-        gs.push_rule_log(format!(
+        gs.push_rule_log_fmt(format_args!(
             "{} {}: [[log_reduce_live_set_limit:n={}]]",
             pp, act_name, count
         ));
@@ -1443,7 +1443,7 @@ impl AbilityResolver {
             .activating_card
             .map(|c| self.card_name(c))
             .unwrap_or_default();
-        gs.push_rule_log(format!(
+        gs.push_rule_log_fmt(format_args!(
             "{} {}: [[log_set_blade_count:n={}]]",
             pp, act_name, value
         ));
@@ -1656,7 +1656,7 @@ impl AbilityResolver {
             .activating_card
             .map(|c| self.card_name(c))
             .unwrap_or_default();
-        gs.push_rule_log(format!(
+        gs.push_rule_log_fmt(format_args!(
             "{} {}: [[log_modify_cost:op={},value={}]]",
             pp, act_name, operation, value
         ));

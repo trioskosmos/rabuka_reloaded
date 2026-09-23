@@ -252,7 +252,7 @@ impl super::resolver::AbilityResolver {
                 .collect();
             if !names.is_empty() {
                 let turn = gs.turn_number;
-                gs.push_rule_log(format!(
+                gs.push_rule_log_fmt(format_args!(
                     "[Turn {}] P{} [[log_reveal_looked:n={}]]",
                     turn,
                     if core::ptr::eq(gs.active_player(), &gs.player1) {
@@ -1550,7 +1550,7 @@ impl super::resolver::AbilityResolver {
             let player_label =
                 super::util::target_player_label(&target, gs.ability_master_id().as_deref());
             let turn = gs.turn_number;
-            gs.push_rule_log(format!(
+            gs.push_rule_log_fmt(format_args!(
                 "[Turn {}] {} [[log_reveal_hand:n={}]]",
                 turn,
                 player_label,
@@ -1771,7 +1771,7 @@ gs.set_recently_moved_batch(valid_ids.into(), Some(Zone::SuccessLiveZone.to_str(
                 2
             };
             if !names.is_empty() {
-                gs.push_rule_log(format!(
+                gs.push_rule_log_fmt(format_args!(
                     "[Turn {}] P{} [[log_reveal_cost]]: {}",
                     turn,
                     player_num,

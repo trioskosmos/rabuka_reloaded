@@ -1253,6 +1253,9 @@ impl super::TurnEngine {
                 (false, true) => "P2-WINS",
                 _ => "NO-CONTEST",
             };
+            if !crate::game_setup::logging_enabled() {
+                return;
+            }
             game_state.push_structured_log(crate::types::LogEntry {
                 text: format!(
                     "LIVE {} | P1 {} → succ={}(+{}) | P2 {} → succ={}(+{})",

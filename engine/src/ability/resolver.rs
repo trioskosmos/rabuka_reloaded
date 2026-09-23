@@ -418,12 +418,13 @@ impl AbilityResolver {
                 // Cache the result if the condition asks for it
                 self.store_condition_verdict(gs, condition, passed);
                 if !passed {
-                    gs.push_debug_note(format!(
+                    let act = gs.activating_card;
+                    let act_pos = effect.action.to_str();
+                    let ct = condition.condition_type();
+                    let loc = condition.get_location();
+                    gs.push_debug_note_fmt(format_args!(
                         "gate BLOCK card={:?} action={} cond_type={:?} location={:?}",
-                        gs.activating_card,
-                        effect.action.to_str(),
-                        condition.condition_type(),
-                        condition.get_location()
+                        act, act_pos, ct, loc
                     ));
                     log::debug!("[CONDITION] source={:?} action={} passed=false type={:?} location={:?} group={:?} exclude={:?}",
                         self.activating_card_id, effect.action, condition.condition_type(), condition.get_location(), condition.get_group_names(), condition.get_exclude_characters());
@@ -735,42 +736,46 @@ impl AbilityResolver {
             error: error.map(|e| e.to_string()),
             resolved: None,
         };
-        let log_text = format!(
-            "{pp} {card_name} [{zone}]: [[log_ability_result:trigger=trigger_{trigger_str},result=result_{}]]",
-            result
-        );
-        gs.push_rule_log(log_text.clone());
-        if !crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) {
-            return;
+        if crate::game_setup::logging_enabled()
+            || crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed)
+        {
+            let log_text = format!(
+                "{pp} {card_name} [{zone}]: [[log_ability_result:trigger=trigger_{trigger_str},result=result_{}]]",
+                result
+            );
+            gs.push_rule_log_fmt(format_args!("{}", log_text));
+            if !crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) {
+                return;
+            }
+            let fallback_entry = LogEntry {
+                text: log_text,
+                turn: gs.turn_number,
+                player_label: pp.clone(),
+                source_card_id: card_id,
+                source_card_name: Some(card_name),
+                category: "ability_resolution".to_string(),
+                metadata: Some(meta),
+            };
+            // Commit to the matching trigger_evaluation entry (or push standalone).
+            // Use the resolver's stored index (or the queue's current entry) because
+            // the queue entry may have changed during effect execution.
+            gs.commit_or_push_structured(
+                card_id,
+                &trigger_str,
+                self.current_ability_index,
+                crate::core::types::LogMetadata::AbilityResolution {
+                    result: result.to_string(),
+                    trigger: trigger_str.clone(),
+                    #[cfg(feature = "serde_support")]
+                    items: items_json.clone(),
+                    ability_text: ability_text.clone(),
+                    zone: zone.clone(),
+                    error: error.map(|e| e.to_string()),
+                    resolved: Some(true),
+                },
+                fallback_entry,
+            );
         }
-        let fallback_entry = LogEntry {
-            text: log_text,
-            turn: gs.turn_number,
-            player_label: pp.clone(),
-            source_card_id: card_id,
-            source_card_name: Some(card_name),
-            category: "ability_resolution".to_string(),
-            metadata: Some(meta),
-        };
-        // Commit to the matching trigger_evaluation entry (or push standalone).
-        // Use the resolver's stored index (not the queue's current entry) because
-        // the queue entry may have changed during effect execution.
-        gs.commit_or_push_structured(
-            card_id,
-            &trigger_str,
-            self.current_ability_index,
-            crate::core::types::LogMetadata::AbilityResolution {
-                result: result.to_string(),
-                trigger: trigger_str.clone(),
-                #[cfg(feature = "serde_support")]
-                items: items_json.clone(),
-                ability_text: ability_text.clone(),
-                zone: zone.clone(),
-                error: error.map(|e| e.to_string()),
-                resolved: Some(true),
-            },
-            fallback_entry,
-        );
     }
 
     /// USE-LIMIT RECORDING MAP (resolver + choice.rs) — when the key gets
@@ -832,7 +837,7 @@ impl AbilityResolver {
                         && !ability.has_trigger(crate::triggers::TriggerKind::Debut)
                     {
                         let pp2 = gs.player_prefix();
-                        gs.push_rule_log(format!(
+                        gs.push_rule_log_fmt(format_args!(
                             "{pp2} {card_name}: [[log_position_fail:keyword={kw:?}]]"
                         ));
                     }

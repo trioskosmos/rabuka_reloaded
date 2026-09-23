@@ -387,7 +387,7 @@ impl AbilityResolver {
             let turn = gs.turn_number;
             let master = gs.ability_master_id();
             let player_label = super::util::target_player_label(target, master.as_deref());
-            gs.push_rule_log(format!(
+            gs.push_rule_log_fmt(format_args!(
                 "[Turn {}] {} [[log_reveal_zone:source={}]] » {}",
                 turn,
                 player_label,
@@ -1184,7 +1184,7 @@ impl AbilityResolver {
             let turn = gs.turn_number;
             let master = gs.ability_master_id();
             let player_label = super::util::target_player_label(target, master.as_deref());
-            gs.push_rule_log(format!(
+            gs.push_rule_log_fmt(format_args!(
                 "[Turn {}] {} [[log_reveal_group:n={},source=zone_{}]]",
                 turn,
                 player_label,
@@ -1298,7 +1298,7 @@ impl AbilityResolver {
                 .filter_map(|id| card_db.get_card(*id))
                 .map(|c| c.name.to_string())
                 .collect();
-            gs.push_rule_log(format!(
+            gs.push_rule_log_fmt(format_args!(
                 "[Turn {}] {} [[log_reveal_deck_until:found={}]]: {}",
                 turn,
                 player_label,

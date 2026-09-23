@@ -634,9 +634,14 @@ fn my_hand_lives(gs: &GameState, is_p1: bool, db: &Arc<CardDatabase>) -> usize {
 }
 
 fn main() -> ArenaResult<()> {
+    // Training default: strip Action display strings + log materialization.
+    // `--logs` (options.logs) keeps engine logs for arena file dumps.
+    // Web path never enters this binary.
     let args: Vec<String> = std::env::args().skip(1).collect();
     let env_games = std::env::var("ARENA_GAMES").ok();
     let options = Options::parse(&args, env_games.as_deref())?;
+    rabuka_engine::game_setup::set_action_display(false);
+    rabuka_engine::game_setup::set_logging_enabled(options.logs);
     if let Some(path) = &options.compare { return compare_path(path); }
     if let Some(path) = &options.snapshots {
         std::fs::create_dir_all(path)?;

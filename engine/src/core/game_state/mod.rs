@@ -982,6 +982,9 @@ impl GameState {
         source_card_name: Option<String>,
         category: &str,
     ) {
+        if !crate::game_setup::logging_enabled() {
+            return;
+        }
         log::debug!(
             target: "rabuka_engine::events",
             "[T{} {:?}] {} | event={} source={:?} card={:?}",
@@ -1079,6 +1082,9 @@ impl GameState {
         meta: crate::core::types::LogMetadata,
         fallback_entry: crate::types::LogEntry,
     ) {
+        if !crate::game_setup::logging_enabled() {
+            return;
+        }
         if let Some(cid) = card_id {
             for entry in self.structured_log.iter_mut().rev() {
                 if entry.category != "trigger_evaluation" {
@@ -1260,6 +1266,9 @@ impl GameState {
     /// to the player at the moment the choice is stored/committed. Provides the
     /// "offered" half of the offer→resolve pairing in the log.
     pub fn push_choice_offered(&mut self, choice: &crate::ability::types::Choice) {
+        if !crate::game_setup::logging_enabled() {
+            return;
+        }
         let offered = self.choice_offered_labels(choice);
         let skip_allowed = choice.allow_skip();
         let option_count = self.choice_option_count(choice);
@@ -1309,8 +1318,8 @@ impl GameState {
         skipped: bool,
     ) {
         // Headless bot playouts never render choice history — skip the
-        // label/format work entirely.
-        if cfg!(feature = "headless") {
+        // label/format work entirely. Training mode does the same at runtime.
+        if cfg!(feature = "headless") || !crate::game_setup::logging_enabled() {
             return;
         }
         let offered_count = self.choice_option_count(choice);
@@ -1358,7 +1367,7 @@ impl GameState {
         self.push_structured_log(entry);
         // Also emit a plain-text line so text-only log consumers (e.g. the 3DS
         // game log history) surface the choice result without structured data.
-        self.push_rule_log(format!(
+        self.push_rule_log_fmt(format_args!(
             "[choice] resolved: offered {} option(s), picked {}",
             offered_count,
             chosen_final.join(", ")
@@ -1368,12 +1377,27 @@ impl GameState {
     /// Push a line to the rule log. Bounded to a fixed window so memory can't
     /// grow unbounded during a long match.
     pub fn push_rule_log(&mut self, text: String) {
+        if !crate::game_setup::logging_enabled() {
+            return;
+        }
         Self::push_rule_log_to(&mut self.rule_log, text);
+    }
+
+    /// Format-args push: no-ops before `format_args!` materializes a String
+    /// when training mode has logs off.
+    pub fn push_rule_log_fmt(&mut self, args: core::fmt::Arguments<'_>) {
+        if !crate::game_setup::logging_enabled() {
+            return;
+        }
+        Self::push_rule_log_to(&mut self.rule_log, args.to_string());
     }
 
     /// Push an entry to the structured log. Bounded to a fixed window (see
     /// `LOG_BOUND_STRUCTURED`); the newest entries are kept.
     pub fn push_structured_log(&mut self, entry: crate::types::LogEntry) {
+        if !crate::game_setup::logging_enabled() {
+            return;
+        }
         Self::push_structured_log_to(&mut self.structured_log, entry);
     }
 
@@ -1382,6 +1406,9 @@ impl GameState {
     /// Use for facts a test/support dump needs: phase transitions, trigger
     /// firings, queue outcomes — not per-card hot-loop noise.
     pub fn push_debug_note(&mut self, text: String) {
+        if !crate::game_setup::logging_enabled() {
+            return;
+        }
         const DEBUG_TRACE_CAP: usize = 600;
         self.debug_trace.push(format!("[T{}]", self.turn_number));
         let last = self.debug_trace.len() - 1;
@@ -1390,6 +1417,14 @@ impl GameState {
             self.debug_trace
                 .drain(0..self.debug_trace.len() - DEBUG_TRACE_CAP);
         }
+    }
+
+    /// Format-args push for debug notes: skips materialization when logs are off.
+    pub fn push_debug_note_fmt(&mut self, args: core::fmt::Arguments<'_>) {
+        if !crate::game_setup::logging_enabled() {
+            return;
+        }
+        self.push_debug_note(args.to_string());
     }
 
     /// True when any debug-trace event contains `needle`.
@@ -1410,6 +1445,9 @@ impl GameState {
         log: &mut Vec<crate::types::LogEntry>,
         entry: crate::types::LogEntry,
     ) {
+        if !crate::game_setup::logging_enabled() {
+            return;
+        }
         log.push(entry);
         Self::truncate_structured_log(log);
     }

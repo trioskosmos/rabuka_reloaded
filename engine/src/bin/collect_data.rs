@@ -11,6 +11,7 @@ use rabuka_engine::game_state::{GameResult, GameState, Phase};
 use rabuka_engine::turn::TurnEngine;
 
 fn main() {
+    rabuka_engine::game_setup::set_training_mode(true);
     let cards_path = std::path::Path::new("../cards/cards.json");
     let cards = card_loader::CardLoader::load_cards_from_file(cards_path).unwrap();
     let mut db = Arc::new(CardDatabase::load_or_create(cards));

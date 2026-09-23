@@ -187,7 +187,7 @@ impl super::TurnEngine {
         for _ in 0..cards_placed {
             let _ = player.draw_card();
         }
-        game_state.push_debug_note(format!(
+        game_state.push_debug_note_fmt(format_args!(
             "pass live_card_set({}): refill +{} from live zone",
             tag, cards_placed
         ));
@@ -575,7 +575,7 @@ impl super::TurnEngine {
             None,
         );
         game_state.process_pending_auto_abilities(&player_id);
-        game_state.push_rule_log(format!(
+        game_state.push_rule_log_fmt(format_args!(
             "{} [[log_activation]] {}: {}",
             log_prefix, card.name, ability.full_text
         ));

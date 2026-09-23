@@ -583,7 +583,7 @@ impl AbilityResolver {
         } else {
             destination
         };
-        gs.push_rule_log(format!(
+        gs.push_rule_log_fmt(format_args!(
             "{} {}: [[log_draw:n={},from=zone_{},to=zone_{}]]",
             pp, act_name, final_count, source, dst
         ));

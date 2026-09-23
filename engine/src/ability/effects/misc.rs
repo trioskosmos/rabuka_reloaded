@@ -1103,7 +1103,7 @@ impl AbilityResolver {
             .activating_card
             .map(|c| self.card_name(c))
             .unwrap_or_default();
-        gs.push_rule_log(format!(
+        gs.push_rule_log_fmt(format_args!(
             "{} {}: [[log_gain_resource:n={},type={}]]",
             pp,
             act_name,
@@ -3652,7 +3652,7 @@ impl AbilityResolver {
             .activating_card
             .map(|c| self.card_name(c))
             .unwrap_or_default();
-        gs.push_rule_log(format!(
+        gs.push_rule_log_fmt(format_args!(
             "{} {}: [[log_discard_until:n={}]]",
             pp, act_name, target_count
         ));
@@ -3827,7 +3827,7 @@ impl AbilityResolver {
             .activating_card
             .map(|c| self.card_name(c))
             .unwrap_or_default();
-        gs.push_rule_log(format!(
+        gs.push_rule_log_fmt(format_args!(
             "{} {}: [[log_activation_restriction:target={}]]",
             pp, act_name, target
         ));
@@ -3845,7 +3845,7 @@ impl AbilityResolver {
             options: None,
         });
         let pp = self.player_prefix(gs);
-        gs.push_rule_log(format!("{}: [[log_heart_select]]", pp));
+        gs.push_rule_log_fmt(format_args!("{}: [[log_heart_select]]", pp));
     }
 
     pub(crate) fn execute_choose_target_player(
@@ -3882,7 +3882,7 @@ impl AbilityResolver {
             .and_then(|id| gs.card_database.get_card(id))
             .map(|c| c.name.to_string())
             .unwrap_or_default();
-        gs.push_rule_log(format!("{} {}: {}", pp, cn, label));
+        gs.push_rule_log_fmt(format_args!("{} {}: {}", pp, cn, label));
     }
 
     pub(crate) fn player_prefix(&self, gs: &GameState) -> String {        if let Some(card_id) = gs.activating_card {
