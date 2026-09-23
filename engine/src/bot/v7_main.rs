@@ -257,6 +257,35 @@ fn simulation_state(gs: &GameState, me: u8) -> GameState {
     sim
 }
 
+/// Best-index selection with a baton-over-Pass tie-break.
+///
+/// Pass is always `actions[0]` and a free equal-stat baton swap scores
+/// exactly 0.00 (Δcost=Δhearts=Δblades=0), so strict `>` kept Pass on every
+/// 0–0 tie → empty-main spiral (seed 42: t3/t4/t6, empty Main 7/20=35%).
+/// On an exact finite tie, prefer a baton `PlayMemberToStage` over Pass.
+/// Pass still wins ties against non-baton 0s (anti-clog for empty-slot bodies).
+fn pick_best(gs: &GameState, me: u8, actions: &[Action], scores: &[(f64, String)]) -> usize {
+    let mut best = 0usize;
+    for i in 1..scores.len() {
+        let si = scores[i].0;
+        let sb = scores[best].0;
+        if si > sb {
+            best = i;
+        } else if si == sb && si.is_finite()
+            && actions[best].action_type == ActionType::Pass
+            && actions[i].action_type != ActionType::Pass
+            && is_baton_action(gs, me, &actions[i])
+        {
+            log::debug!(
+                "v7_main baton-tie-break t{} me{} idx{} {:?} score={:.2} beats Pass",
+                gs.turn_number, me, i, actions[i].action_type, si
+            );
+            best = i;
+        }
+    }
+    best
+}
+
 pub fn score_actions(gs: &GameState, actions: &[Action], me: u8) -> Vec<(f64, String)> {
     let _rng = RngGuard(crate::rng::checkpoint());
     let root = simulation_state(gs, me);
@@ -274,14 +303,14 @@ pub fn score_actions(gs: &GameState, actions: &[Action], me: u8) -> Vec<(f64, St
         }
         if action.action_type == ActionType::Pass && !pending {
             // Keep Pass visible in V7_DEBUG traces (was short-circuited).
-            if std::env::var_os("V7_DEBUG").is_some() {
-                eprintln!(
-                    "V7M t{} me{} pass None value=0.00 choices=0 depth=0 status=end-main",
-                    gs.turn_number, me
-                );
-            }
-            scores.push((0.0, "end-main=0".into()));
-            continue;
+        if std::env::var_os("V7_DEBUG").is_some() {
+            eprintln!(
+                "V7M t={} me={} act=Pass card=- area=- fc=- value=0.00 choices=0 depth=0 status=end-main st=- bl=- h={} en={} hand={} ammo={} succ={}",
+                gs.turn_number, me, base.hearts, base.energy, base.hand, base.ammo, base.success
+            );
+        }
+        scores.push((0.0, "end-main=0".into()));
+        continue;
         }
         crate::rng::seed(0x7637);
         let mut sim = root.clone();
@@ -311,28 +340,43 @@ pub fn score_actions(gs: &GameState, actions: &[Action], me: u8) -> Vec<(f64, St
         );
         if std::env::var_os("V7_DEBUG").is_some() {
             let (_, blades, cost) = board(&root, me);
+            let card = action
+                .parameters
+                .as_ref()
+                .and_then(|p| p.card_no.clone())
+                .unwrap_or_else(|| "-".into());
+            let area = action
+                .parameters
+                .as_ref()
+                .and_then(|p| p.stage_area.clone())
+                .unwrap_or_else(|| "-".into());
+            let fc = action
+                .parameters
+                .as_ref()
+                .and_then(|p| p.final_cost)
+                .map(i32::from)
+                .unwrap_or(-1);
             eprintln!(
-                "V7M t{} me{} {:?} {:?} {} | st={} bl={} h={}/{} en={} hand={} ammo={} succ={}",
-                gs.turn_number, me, action.action_type, action.parameters, explanation,
-                cost, blades, base.hearts, base.cost, base.energy, base.hand, base.ammo, base.success,
+                "V7M t={} me={} act={} card={} area={} fc={} {} st={} bl={} h={} en={} hand={} ammo={} succ={}",
+                gs.turn_number, me, action.action_type, card, area, fc, explanation,
+                cost, blades, base.hearts, base.energy, base.hand, base.ammo, base.success,
             );
         }
         scores.push((score, explanation));
     }
     if std::env::var_os("V7_DEBUG").is_some() {
-        let mut best = 0usize;
-        for i in 1..scores.len() {
-            if scores[i].0 > scores[best].0 {
-                best = i;
-            }
-        }
+        let best = pick_best(gs, me, actions, &scores);
         let chosen = actions.get(best);
+        let card = chosen
+            .and_then(|a| a.parameters.as_ref())
+            .and_then(|p| p.card_no.clone())
+            .unwrap_or_else(|| "-".into());
         eprintln!(
-            "V7CH t{} me{} CHOSEN {:?} {:?} score={:.2} note={}",
+            "V7CH t={} me={} act={} card={} score={:.2} note={}",
             gs.turn_number,
             me,
-            chosen.map(|a| a.action_type),
-            chosen.and_then(|a| a.parameters.as_ref()),
+            chosen.map(|a| a.action_type).unwrap_or(ActionType::Pass),
+            card,
             scores.get(best).map(|(s, _)| *s).unwrap_or(f64::NEG_INFINITY),
             scores.get(best).map(|(_, n)| n.as_str()).unwrap_or(""),
         );
@@ -342,10 +386,7 @@ pub fn score_actions(gs: &GameState, actions: &[Action], me: u8) -> Vec<(f64, St
 
 pub fn choose_action(gs: &GameState, actions: &[Action], me: u8) -> Action {
     let scores = score_actions(gs, actions, me);
-    let mut best = 0;
-    for i in 1..scores.len() {
-        if scores[i].0 > scores[best].0 { best = i; }
-    }
+    let best = pick_best(gs, me, actions, &scores);
     let chosen = actions.get(best).cloned().unwrap_or(Action {
         action_type: ActionType::Pass, description: "pass".into(),
         description_ja: None, parameters: None, selected: None,

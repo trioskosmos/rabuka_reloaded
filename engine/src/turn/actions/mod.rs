@@ -784,9 +784,35 @@ impl super::TurnEngine {
                         "SelectLiveSuccess"
                     }
                 };
+                // Unsatisfiable SelectCard: generator only offers an empty stub
+                // when zero eligible cards exist (game_setup.rs actions.is_empty()).
+                // Rejecting that forever soft-locks the arena (same-turn cap draws).
+                // Auto-skip when nothing was selectable; still reject empty if
+                // real picks were offered (P3 still guards those).
+                if matches!(choice, crate::ability::types::Choice::SelectCard { .. }) {
+                    let offered = crate::game_setup::generate_possible_actions(game_state);
+                    let has_selectable = offered.iter().any(|a| {
+                        a.action_type == crate::game_setup::ActionType::ChoiceSelect
+                            && a.parameters.as_ref().and_then(|p| p.disabled) != Some(true)
+                            && a
+                                .parameters
+                                .as_ref()
+                                .and_then(|p| p.card_indices.as_deref())
+                                .is_some_and(|v| !v.is_empty())
+                    });
+                    if !has_selectable {
+                        log::debug!(
+                            "[CHOICE] empty non-skippable SelectCard with no eligible cards — auto-skip (was: {kind})"
+                        );
+                        return Self::resume_queue_with_choice(
+                            game_state,
+                            choice.clone(),
+                            crate::ability::types::ChoiceResult::Skip,
+                        );
+                    }
+                }
                 return Err(format!(
-                    "non-skippable {} prompt requires a selection - empty answer rejected",
-                    kind
+                    "non-skippable {kind} prompt requires a selection - empty answer rejected",
                 ));
             }
         }

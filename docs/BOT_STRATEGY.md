@@ -667,6 +667,28 @@ STATUS: not yet targeted. Pass pricing experiments (Pass=−0.05 + energy tax)
 were catastrophic (draw explosion) and reverted; Pass stays flat 0.0.
 D4 needs a *positive* deploy-side fix (see D2 residual), not a Pass penalty.
 
+### D5. Pass wins exact 0–0 ties against free baton deploys (FIXED 2026-09-23)
+
+Root-cause of empty-Main spirals when the stage is full: free equal-stat baton
+swaps score exactly `0.00` (Δcost=Δhearts=Δblades=0), Pass short-circuits to
+exactly `0.0`, and selection uses strict `>` with Pass always first in the
+list → Pass wins every 0–0 tie. One-game examination (fade deck, seed 42,
+`test_output/decks/game_s42_report.md`): t3/t4/t6 all took Pass over three
+free `[BATON]` deploys at 0.00; empty Main **7/20 = 35%**; hearts stuck at
+h=3 through t6 while v6 developed every turn; final 0–3. v6's gate only forces
+Pass to −∞ when `best_nonpass > 0`, so identical baton ties lose there too
+(v6 avoided the spiral this shuffle only because non-identical swaps print
+positive via hearts/blades).
+STATUS (2026-09-23): **fixed** — `v7_main::pick_best` prefers a baton
+`PlayMemberToStage` over Pass on exact finite ties (permanent
+`log::debug!("v7_main baton-tie-break ...")`). Pass still wins ties against
+non-baton 0s (anti-clog for empty-slot bodies). Empty-slot cost≥1 plays already
+score `>0` via the `8.0 × stage-cost` term and never needed the break.
+Analyzer (`analyze_v7_trace.py`) now flags `Pass over 0.00 member deploy` as
+class A. Remaining hole in the same game: t5 generated **zero** member plays
+(hand=8, en=8) — likely live-set junk-discard of members (8.3.4), not scorer;
+re-check if empty mains stay ≥15% after this fix.
+
 ### Process (measured, for reproduction)
 - Loss clusters: `python analyze_losses.py <audit.jsonl> --examples N`
 - Decision tables: `$env:V7_DEBUG='1'` (stderr tables; UNTRACED runs only)
