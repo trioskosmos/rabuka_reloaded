@@ -135,31 +135,21 @@ pub fn check_effect_position(effect_pos: Option<&str>, card_position: MemberArea
             let trimmed = p.trim();
             matches!(
                 (trimmed, card_position),
-                ("center" | "中央", MemberArea::Center)
-                    | ("left" | "左" | "左側" | "left_side", MemberArea::LeftSide)
-                    | (
-                        "right" | "右" | "右側" | "right_side",
-                        MemberArea::RightSide
-                    )
+                ("center", MemberArea::Center)
+                    | ("left" | "left_side", MemberArea::LeftSide)
+                    | ("right" | "right_side", MemberArea::RightSide)
             )
         });
     }
     match (pos, card_position) {
-        ("center" | "中央", MemberArea::Center) => true,
-        ("left" | "左" | "左側" | "left_side", MemberArea::LeftSide) => true,
-        ("right" | "右" | "右側" | "right_side", MemberArea::RightSide) => true,
-        _ => {
-            !(pos == "center"
-                || pos == "left"
-                || pos == "right"
-                || pos == "左"
-                || pos == "右"
-                || pos == "中央"
-                || pos == "左側"
-                || pos == "右側"
-                || pos == "left_side"
-                || pos == "right_side")
-        }
+        ("center", MemberArea::Center) => true,
+        ("left" | "left_side", MemberArea::LeftSide) => true,
+        ("right" | "right_side", MemberArea::RightSide) => true,
+        _ => !(pos == "center"
+            || pos == "left"
+            || pos == "right"
+            || pos == "left_side"
+            || pos == "right_side"),
     }
 }
 
