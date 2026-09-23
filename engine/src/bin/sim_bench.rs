@@ -2,16 +2,21 @@
 //!
 //! Usage (from `engine/`):
 //!   cargo run --release --bin sim_bench -- [--games N] [--deck NAME]
-//!       [--seed S] [--policy random|v1|...|v7|conductor] [--repeat R] [--alloc]
+//!       [--seed S] [--policy random|v1|...|v7|conductor] [--repeat R]
+//!       [--jobs N] [--alloc]
 //!
 //! - Default: every deck in `../web_ui/decks`, `--games 2000` per deck,
-//!   `--policy random`, `--repeat 1`.
+//!   `--policy random`, `--repeat 1`, `--jobs 1` (single-thread baseline).
 //! - Execute path is `game_setup::execute_action` + `settle_single_player_state`
 //!   (the bot_arena / search / RL path), NOT `profile_target`'s raw loop.
 //! - Card DB + deck templates load outside the timed region; per-game deal +
 //!   full play loop are inside.
 //! - Deterministic: per-game `rng::seed(engine_seed)` + local `rng::Lcg`
-//!   (bot_arena `game_seeds` pattern). Bot policy calls restore the engine RNG.
+//!   (bot_arena `game_seeds` pattern). Engine RNG is thread-local; bot policy
+//!   calls restore that thread's engine RNG. Same seeds → same games at any
+//!   `--jobs`.
+//! - `--jobs N` runs games of one deck on N threads (std::thread::scope).
+//!   Keep `--jobs 1` when comparing to recorded baselines.
 //!
 //! This bin intentionally does NOT init a logger and does NOT enable the
 //! `profiling` feature (both change measured behavior).
@@ -41,6 +46,7 @@ Usage: cargo run --release --bin sim_bench -- [options]
   --seed S        base engine seed (default 1)
   --policy P      random (default) | v1..v7 | conductor
   --repeat R      repeat the full deck sweep R times (default 1)
+  --jobs N        worker threads per deck sweep (default 1 = baseline)
   --alloc         print allocator delta after the timed loop
                   (requires --features alloc_tracker + RABUKA_ALLOC_TRACK)
   --help          show this help";
@@ -53,6 +59,7 @@ struct Options {
     policy: BotKind,
     policy_raw: String,
     repeat: u32,
+    jobs: u32,
     alloc: bool,
 }
 
@@ -64,6 +71,7 @@ fn parse_args() -> Result<Options, String> {
         policy: BotKind::Random,
         policy_raw: "random".into(),
         repeat: 1,
+        jobs: 1,
         alloc: false,
     };
     let mut args = std::env::args().skip(1);
@@ -74,7 +82,7 @@ fn parse_args() -> Result<Options, String> {
                 std::process::exit(0);
             }
             "--alloc" => opts.alloc = true,
-            "--games" | "--deck" | "--seed" | "--policy" | "--repeat" => {
+            "--games" | "--deck" | "--seed" | "--policy" | "--repeat" | "--jobs" => {
                 let value = args
                     .next()
                     .filter(|v| !v.starts_with("--"))
@@ -84,6 +92,7 @@ fn parse_args() -> Result<Options, String> {
                     "--deck" => opts.deck = Some(value),
                     "--seed" => opts.seed = value.parse().map_err(|e| format!("--seed: {e}"))?,
                     "--repeat" => opts.repeat = value.parse().map_err(|e| format!("--repeat: {e}"))?,
+                    "--jobs" => opts.jobs = value.parse().map_err(|e| format!("--jobs: {e}"))?,
                     "--policy" => {
                         if !BotKind::ALL.contains(&value.as_str()) {
                             return Err(format!(
@@ -100,8 +109,8 @@ fn parse_args() -> Result<Options, String> {
             other => return Err(format!("unknown option: {other}\n{USAGE}")),
         }
     }
-    if opts.games == 0 || opts.seed == 0 || opts.repeat == 0 {
-        return Err("--games, --seed, and --repeat must be positive".into());
+    if opts.games == 0 || opts.seed == 0 || opts.repeat == 0 || opts.jobs == 0 {
+        return Err("--games, --seed, --repeat, and --jobs must be positive".into());
     }
     Ok(opts)
 }
@@ -393,25 +402,90 @@ fn run_sweep(
         // the identical game sequence so cross-repeat spread measures timing
         // noise only (not seed→game-length variance, which can exceed 70%).
         let seed_offset = (runs.len() as u32).wrapping_mul(100_000);
+        let base_seed = opts.seed.wrapping_add(seed_offset);
+        let jobs = opts.jobs.min(games.max(1));
         let t0 = Instant::now();
-        for g in 0..games {
-            let (engine_seed, arena_seed) = game_seeds(
-                opts.seed.wrapping_add(seed_offset),
-                g.wrapping_add(1),
-            );
-            let stats = run_game(
-                db,
-                &t1,
-                &t2,
-                engine_seed,
-                arena_seed,
-                opts.policy,
-                &v2_policy,
-            );
-            total_actions += stats.actions;
-            *outcomes.entry(outcome_label(stats.outcome)).or_insert(0) += 1;
-            *ends.entry(stats.end_reason).or_insert(0) += 1;
-            let _ = stats.game_result;
+        if jobs <= 1 {
+            for g in 0..games {
+                let (engine_seed, arena_seed) = game_seeds(base_seed, g.wrapping_add(1));
+                let stats = run_game(
+                    db,
+                    &t1,
+                    &t2,
+                    engine_seed,
+                    arena_seed,
+                    opts.policy,
+                    &v2_policy,
+                );
+                total_actions += stats.actions;
+                *outcomes.entry(outcome_label(stats.outcome)).or_insert(0) += 1;
+                *ends.entry(stats.end_reason).or_insert(0) += 1;
+                let _ = stats.game_result;
+            }
+        } else {
+            // Parallel: one game index → one seed pair, independent of worker.
+            // Engine RNG is thread-local; each run_game seeds that worker.
+            let chunks: Vec<(u32, u32)> = {
+                let per = games / jobs;
+                let rem = games % jobs;
+                let mut out = Vec::with_capacity(jobs as usize);
+                let mut start = 0u32;
+                for j in 0..jobs {
+                    let len = per + u32::from(j < rem);
+                    out.push((start, start + len));
+                    start += len;
+                }
+                out
+            };
+            let parts = std::thread::scope(|scope| {
+                let handles: Vec<_> = chunks
+                    .iter()
+                    .map(|&(start, end)| {
+                        let db = &*db;
+                        let t1 = &t1;
+                        let t2 = &t2;
+                        let v2_policy = &v2_policy;
+                        scope.spawn(move || {
+                            let mut actions = 0u64;
+                            let mut local_outcomes: BTreeMap<&'static str, u32> =
+                                BTreeMap::new();
+                            let mut local_ends: BTreeMap<&'static str, u32> = BTreeMap::new();
+                            for g in start..end {
+                                let (engine_seed, arena_seed) =
+                                    game_seeds(base_seed, g.wrapping_add(1));
+                                let stats = run_game(
+                                    db,
+                                    t1,
+                                    t2,
+                                    engine_seed,
+                                    arena_seed,
+                                    opts.policy,
+                                    v2_policy,
+                                );
+                                actions += stats.actions;
+                                *local_outcomes.entry(outcome_label(stats.outcome)).or_insert(0) +=
+                                    1;
+                                *local_ends.entry(stats.end_reason).or_insert(0) += 1;
+                                let _ = stats.game_result;
+                            }
+                            (actions, local_outcomes, local_ends)
+                        })
+                    })
+                    .collect();
+                handles
+                    .into_iter()
+                    .map(|h| h.join().expect("sim_bench worker panicked"))
+                    .collect::<Vec<_>>()
+            });
+            for (actions, local_outcomes, local_ends) in parts {
+                total_actions += actions;
+                for (k, v) in local_outcomes {
+                    *outcomes.entry(k).or_insert(0) += v;
+                }
+                for (k, v) in local_ends {
+                    *ends.entry(k).or_insert(0) += v;
+                }
+            }
         }
         let secs = t0.elapsed().as_secs_f64();
         runs.push(DeckRun {
@@ -433,6 +507,8 @@ fn run_sweep(
 }
 
 fn main() {
+    fn assert_send<T: Send>() {}
+    assert_send::<GameState>();
     if cfg!(debug_assertions) {
         eprintln!("SIM_BENCH=DEBUG-BUILD: numbers are NOT comparable to --release baselines!");
     }
@@ -466,11 +542,12 @@ fn real_main() -> Result<(), String> {
     let setup_secs = setup_t0.elapsed().as_secs_f64();
 
     println!(
-        "SIM_BENCH setup_secs={:.3} decks={} games={} repeat={} seed={} policy={} display={} logs={} debug_assertions={}",
+        "SIM_BENCH setup_secs={:.3} decks={} games={} repeat={} jobs={} seed={} policy={} display={} logs={} debug_assertions={}",
         setup_secs,
         deck_names.len(),
         opts.games,
         opts.repeat,
+        opts.jobs,
         opts.seed,
         opts.policy_raw,
         display,
@@ -621,12 +698,13 @@ fn real_main() -> Result<(), String> {
     }
 
     println!(
-        "\nSIM_BENCH_SUMMARY policy={} seed={} games={} decks={} repeat={} total_secs={:.3} mean_gps={:.3} mean_aps={:.1} total_actions={}",
+        "\nSIM_BENCH_SUMMARY policy={} seed={} games={} decks={} repeat={} jobs={} total_secs={:.3} mean_gps={:.3} mean_aps={:.1} total_actions={}",
         opts.policy_raw,
         opts.seed,
         opts.games,
         deck_names.len(),
         opts.repeat,
+        opts.jobs,
         total_secs,
         mean_gps,
         mean_aps,

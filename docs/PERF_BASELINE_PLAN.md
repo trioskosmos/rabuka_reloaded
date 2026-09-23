@@ -172,3 +172,66 @@ Raw: `test_output/train_logs_{on,off}_ab.txt`.
 
 - Criterion `game_throughput` A/B vs saved `base` after broader multi-deck
   sim_bench confirmation.
+
+---
+
+## Phase 2 — Parallel multi-game execution (`--jobs`)
+
+Status: implemented and measured. Goal: biggest honest throughput lever —
+run independent full games on multiple threads (multi-core ≈ cores×, not
+orders of magnitude).
+
+### Thread-safety audit (desktop)
+
+| Hazard | Finding |
+|---|---|
+| `GameState` | No `Rc`/`RefCell`/`Cell` in `core` — `Send` (asserted in `sim_bench` `main`) |
+| Engine RNG | **Was** `static Mutex<u32>` with `seed`/`checkpoint`/`restore` per game — concurrent games stomped each other. **Now** thread-local `RefCell<u32>` on the std path (`rng.rs`); same API, per-thread streams |
+| `bot/rollout` PLAN_CACHE | already `thread_local!` |
+| `ability/log` VERDICT_BUFFER | already `thread_local!` |
+| `ABILITY_DEBUG` buffers / `timer` | `Mutex` — off on the sim path (no `profiling`, debug flag false) |
+| `ability_store` / bytecode / executors | `OnceLock` — fine |
+| `Pool`/`EkBox` | `unsafe impl Send/Sync` + `Mutex` free list |
+| `ACTION_DISPLAY` / `LOGGING` | `AtomicBool`, set once before workers |
+| `card_binary` `static mut` blob | read-only after load on desktop path |
+
+### `sim_bench --jobs N`
+
+- Default **`--jobs 1`** (baseline-comparable, single-thread).
+- `--jobs N` splits one deck’s game range across `std::thread::scope`
+  workers; each game index still maps to one `game_seeds` pair (worker-
+  independent). Engine RNG is thread-local; `run_game` seeds that worker.
+- Setup + summary lines print `jobs=`.
+- Keep `--jobs 1` when comparing to recorded baselines / Criterion.
+
+### Measured (same binary, `5CP3Z idou`, seed 1, 500×3, random, training gates off)
+
+| jobs | run | mean_gps | total_actions |
+|---|---|---|---|
+| 1 | A | 195.1 | 390186 |
+| 1 | B (warmer) | **221.8** | 390186 |
+| 8 | A | **840.4** | 390186 |
+| 8 | B | **840.9** | 390186 |
+
+- **Determinism:** `total_actions`, outcome histogram (741/723/36), and
+  end reasons identical across all four runs → same games at any `--jobs`.
+- **Speedup (honest):** 840.9 / 221.8 ≈ **3.8×** at `--jobs 8` (not 10⁴;
+  limited by cores + SMT + short games / sync overhead).
+- Raw: `test_output/jobs{1,8}_ab{,_rep}.txt`.
+
+### Verification
+
+- `cargo build --release --bin sim_bench` + `--bins` OK
+- `cargo test --test run_all` → **3418 passed**
+- `python cards/test_inventory.py --check` EXIT=0
+- `py_compile` tools/analysis OK; `tools/baseline.ps1` PARSE_OK
+
+### Caveats
+
+- Engine RNG is now **per-thread**, not process-global: a second thread
+  that never calls `seed` starts from the platform default (`1` on
+  desktop), not from the main thread’s mid-stream state. Single-threaded
+  callers are unchanged. The `link.rs` concurrent test builds both
+  states serially before spawn (already required with the old Mutex).
+- Do not compare absolute gps of multi-job runs to single-job baselines
+  without labeling `jobs=`.

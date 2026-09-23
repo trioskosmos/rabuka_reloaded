@@ -4,7 +4,10 @@
 /// state is 4 bytes, period is 2^32-1, good enough for game use.
 ///
 /// Platform-specific sync:
-///   - Desktop/3DS: `Mutex<u32>` (std)
+///   - Desktop/3DS: thread-local `RefCell<u32>` (std) — each worker thread
+///     owns an independent stream so parallel game simulation does not
+///     stomp `seed`/`checkpoint`/`restore` across games. Single-thread
+///     callers see the same API and per-thread determinism as before.
 ///   - PSP: `UnsafeCell<u32>` (no_std)
 ///
 /// Platform-specific seeding:
@@ -59,7 +62,7 @@ impl Lcg {
 // ── std path (desktop + 3DS) ─────────────────────────────────────────────
 #[cfg(not(feature = "no_std"))]
 mod inner {
-    use std::sync::Mutex;
+    use std::cell::RefCell;
 
     #[cfg(feature = "3ds")]
     extern "C" {
@@ -71,14 +74,21 @@ mod inner {
         fn timer_ms_gettime64() -> u64;
     }
 
-    static STATE: Mutex<u32> = Mutex::new(0);
+    thread_local! {
+        static STATE: RefCell<u32> = const { RefCell::new(0) };
+    }
+
+    fn with_state<R>(f: impl FnOnce(&mut u32) -> R) -> R {
+        STATE.with(|s| f(&mut s.borrow_mut()))
+    }
 
     fn next_u32() -> u32 {
-        let mut guard = STATE.lock().unwrap();
-        if *guard == 0 {
-            *guard = seed_value();
-        }
-        super::xorshift32(&mut guard)
+        with_state(|state| {
+            if *state == 0 {
+                *state = seed_value();
+            }
+            super::xorshift32(state)
+        })
     }
 
     fn seed_value() -> u32 {
@@ -107,12 +117,11 @@ mod inner {
     }
 
     pub fn seed(seed: u32) {
-        let mut guard = STATE.lock().unwrap();
-        *guard = seed;
+        with_state(|state| *state = seed);
     }
 
     pub fn checkpoint() -> u32 {
-        *STATE.lock().unwrap()
+        with_state(|state| *state)
     }
 
     pub fn restore(state: u32) {
