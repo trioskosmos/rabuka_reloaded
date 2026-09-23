@@ -105,13 +105,13 @@ impl GameState {
                 None => continue,
             };
             for (_ability_idx, ar) in card.abilities.iter().enumerate() {
+                let ability = ar.resolve();
                 if !GameState::ability_matches_trigger(
-                    &ar.resolve(),
+                    &ability,
                     &crate::game_state::AbilityTrigger::Constant,
                 ) {
                     continue;
                 }
-                let ability = ar.resolve();
                 let Some(ref effect) = ability.effect else {
                     continue;
                 };
@@ -152,6 +152,46 @@ impl GameState {
                     color: None,
                     kind: ui_kind("blade"),
                 });
+            }
+        }
+    }
+
+    fn collect_reusable_constant_stage_effect_ids(&self, ids: &mut Vec<(i16, usize)>) {
+        for cid in self
+            .player1
+            .stage
+            .stage
+            .iter()
+            .chain(self.player2.stage.stage.iter())
+            .copied()
+            .filter(|cid| *cid != -1)
+        {
+            if let Some(card) = self.card_database.get_card(cid) {
+                for (idx, ar) in card.abilities.iter().enumerate() {
+                    let ability = ar.resolve();
+                    if Self::ability_matches_trigger(
+                        &ability,
+                        &crate::game_state::AbilityTrigger::Constant,
+                    ) && ability.effect.is_some()
+                    {
+                        ids.push((cid, idx));
+                    }
+                }
+            }
+            for (gidx, ability) in self
+                .gained_card_abilities
+                .get(&cid)
+                .into_iter()
+                .flatten()
+                .enumerate()
+            {
+                if Self::ability_matches_trigger(
+                    ability,
+                    &crate::game_state::AbilityTrigger::Constant,
+                ) && ability.effect.is_some()
+                {
+                    ids.push((cid, crate::ability::types::GAINED_ABILITY_INDEX_BASE + gidx));
+                }
             }
         }
     }
@@ -293,7 +333,9 @@ impl GameState {
             log::trace!("[SZ_DEBUG] recalculate_constants");
         }
         tdbg!("RC:1 ATOMIC_LOAD_OK");
-        let entries = self.collect_constant_stage_effect_ids();
+        let mut entries = core::mem::take(&mut self.scratch_constant_effect_ids);
+        entries.clear();
+        self.collect_reusable_constant_stage_effect_ids(&mut entries);
         tdbg!("RC:2 COLLECT_EFFECTS_OK len={}", entries.len());
         self.mods.constant_score_sources.clear();
 
@@ -648,12 +690,12 @@ impl GameState {
                                                 kind: ui_kind("heart"),
                                             });
                                         } else {
-                                            let hc_list = effect.heart_colors_any().to_vec();
-                                            let per_entry = i16::try_from(crate::ability::util::heart_gain_per_entry(
-                                                n,
-                                                &hc_list,
-                                            )).unwrap();
-                                            for hc in &hc_list {
+                                            let hc_list = effect.heart_colors_any();
+                                            let per_entry = i16::try_from(
+                                                n / hc_list.len().max(1) as i32,
+                                            )
+                                            .unwrap();
+                                            for hc in hc_list {
                                                 *exp_heart
                                                     .entry(card_id)
                                                     .or_default()
@@ -854,8 +896,6 @@ impl GameState {
                             crate::ability::enums::ActionType::ModifyRequiredHeartsGlobal => {
                                 let target_name = effect.target_name();
                                 let target_player = self.resolve_target_player(target_name);
-                                let target_cards: Vec<i16> =
-                                    target_player.live_card_zone.cards.to_vec();
                                 let value = effect.value_or_count(1) as i32;
                                 let op_str = effect.operation_any().unwrap_or("increase");
                                 let op = op_str;
@@ -864,17 +904,18 @@ impl GameState {
                                     "decrease" => -value,
                                     _ => value,
                                 };
-                                let colors: Vec<String> = if effect.heart_colors_any().is_empty() {
-                                    vec![crate::ability::util::HEART_ALL_KEY.to_string()]
-                                } else {
-                                    effect.heart_colors_any().to_vec()
-                                };
+                                let heart_colors = effect.heart_colors_any();
+                                let colors = heart_colors.iter().map(String::as_str).chain(
+                                    heart_colors
+                                        .is_empty()
+                                        .then_some(crate::ability::util::HEART_ALL_KEY),
+                                );
                                 let host_id = card_id;
-                                for card_id in &target_cards {
-                                    for color in &colors {
+                                for card_id in &target_player.live_card_zone.cards {
+                                    for color in colors.clone() {
                                         exp_global_need_heart.push((
                                             *card_id,
-                                            color.clone(),
+                                            color.to_string(),
                                             delta as i16,
                                         ));
                                         exp_global_nh_sources.push(
@@ -883,7 +924,7 @@ impl GameState {
                                                 ability_text: ui_text(&effect.text),
                                                 target_card_id: *card_id,
                                                 amount: delta as i32,
-                                                color: Some(color.clone()),
+                                                color: Some(color.to_string()),
                                                 kind: ui_kind("need_heart"),
                                             },
                                         );
@@ -920,13 +961,10 @@ impl GameState {
                                                 }
                                                 "heart" => {
                                                     let n = i32::from(sub.count.unwrap_or(1));
-                                                    let hc_list: Vec<String> =
-                                                        sub.heart_colors_any().to_vec();
-                                                    let per_color = crate::ability::util::heart_gain_per_entry(
-                                                        n,
-                                                        &hc_list,
-                                                    ) as i16;
-                                                    for hc in &hc_list {
+                                                    let hc_list = sub.heart_colors_any();
+                                                    let per_color =
+                                                        (n / hc_list.len().max(1) as i32) as i16;
+                                                    for hc in hc_list {
                                                         *exp_heart
                                                             .entry(card_id)
                                                             .or_default()
@@ -1028,6 +1066,7 @@ impl GameState {
         tdbg!("RC:13 COST_MODIFIERS_WITH_ENTRIES");
         let hand_ids = self.collect_constant_hand_effect_ids();
         self.recalculate_constant_cost_modifiers_with_ids(&entries, &hand_ids);
+        self.scratch_constant_effect_ids = entries;
         tdbg!("RC:13b COST_MODIFIERS_DONE");
 
         // Evaluate constant abilities from success live card zone (e.g. Love wing bell)
@@ -1084,6 +1123,26 @@ impl GameState {
         let mut expected_set: HashMap<i16, i16> = HashMap::default();
         // Per-source attribution for the committed cost bonuses.
         let mut cost_sources: Vec<crate::core::game_modifiers::BonusSource> = Vec::new();
+        let mut p1_memberships: HashSet<i16> = HashSet::default();
+        let mut p2_memberships: HashSet<i16> = HashSet::default();
+        p1_memberships.extend(
+            self.player1
+                .stage
+                .stage
+                .iter()
+                .chain(self.player1.hand.cards.iter())
+                .chain(self.player1.energy_zone.cards.iter())
+                .copied(),
+        );
+        p2_memberships.extend(
+            self.player2
+                .stage
+                .stage
+                .iter()
+                .chain(self.player2.hand.cards.iter())
+                .chain(self.player2.energy_zone.cards.iter())
+                .copied(),
+        );
         {
             // Chain stage and hand ability IDs, look up each effect, filter to ModifyCost
             let all_ids = stage_ids.iter().chain(hand_ids.iter());
@@ -1113,12 +1172,8 @@ impl GameState {
                 // perspective. A shared context would evaluate every copy as if
                 // it belonged to player1, wrongly applying a mirror-match ability
                 // to both sides when only the side with more energy should qualify.
-                let owner_in_p1 = self.player1.stage.stage.contains(&cid)
-                    || self.player1.hand.cards.contains(&cid)
-                    || self.player1.energy_zone.cards.contains(&cid);
-                let owner_in_p2 = self.player2.stage.stage.contains(&cid)
-                    || self.player2.hand.cards.contains(&cid)
-                    || self.player2.energy_zone.cards.contains(&cid);
+                let owner_in_p1 = p1_memberships.contains(&cid);
+                let owner_in_p2 = p2_memberships.contains(&cid);
                 let self_player = if owner_in_p1 {
                     Some(&self.player1)
                 } else if owner_in_p2 {
@@ -1923,15 +1978,14 @@ impl GameState {
                         }
                     }
                     "heart" => {
-                        let heart_colors = if effect.heart_colors_any().is_empty() {
-                            vec!["heart01".to_string()]
-                        } else {
-                            effect.heart_colors_any().to_vec()
-                        };
-                        let per_color =
-                            crate::ability::util::heart_gain_per_entry(amount, &heart_colors) as i16;
+                        let heart_colors = effect.heart_colors_any();
+                        let per_color = (amount / heart_colors.len().max(1) as i32) as i16;
+                        let colors = heart_colors
+                            .iter()
+                            .map(String::as_str)
+                            .chain(heart_colors.is_empty().then_some("heart01"));
                         for &target_id in &candidates {
-                            for color_str in &heart_colors {
+                            for color_str in colors.clone() {
                                 let hc = crate::card::parse_heart_color(color_str);
                                 self.mods.add_heart_modifier(target_id, hc, per_color);
                                 *self
@@ -1939,7 +1993,7 @@ impl GameState {
                                     .success_zone_heart_bonuses
                                     .entry(target_id)
                                     .or_default()
-                                    .entry(color_str.clone())
+                                    .entry(color_str.to_string())
                                     .or_insert(0) += per_color;
                                 self.mods.success_zone_heart_sources.push(
                                     crate::core::game_modifiers::BonusSource {
@@ -1947,7 +2001,7 @@ impl GameState {
                                         ability_text: ui_text(&effect.text),
                                         target_card_id: target_id,
                                         amount: per_color as i32,
-                                        color: Some(color_str.clone()),
+                                        color: Some(color_str.to_string()),
                                         kind: ui_kind("heart"),
                                     },
                                 );

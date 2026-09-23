@@ -475,6 +475,7 @@ entry_index: u8::try_from(idx).unwrap(),
         self.pending_entries_iter().collect()
     }
 
+    /// Iterate pending entries directly without materializing an intermediate collection.
     pub fn pending_entries_iter(&self) -> impl Iterator<Item = &AbilityQueueEntry> {
         self.entries.iter().filter(|e| !e.completed)
     }

@@ -1531,6 +1531,7 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
     let mut actions =
         vec![make_action(ActionType::Pass, "Pass - End Main Phase")
             .with_ja("パス - メインフェーズ終了")];
+    let stage_groups = game_state.distinct_stage_groups(&active_player.id);
 
     if !game_state.is_action_prohibited("play_member") {
         // Rule 7.7.2.2: Main Phase - Can play member cards to stage.
@@ -1584,17 +1585,16 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                             })
                     });
 
-                    let mut available_areas = Vec::with_capacity(3);
+                    let area_names = ["left", "center", "right"];
+                    let mut area_candidates: [(usize, &'static str, bool, u8, bool, Option<&str>); 3] =
+                        [(0, "left", false, card_cost, false, None), (1, "center", false, card_cost, false, None), (2, "right", false, card_cost, false, None)];
                     let mut has_any_available = false;
 
-                    for (area_idx, area_name) in ["left", "center", "right"].iter().enumerate() {
-                        let mut area_info = AreaInfo {
-                            area: ArcStr::from(*area_name),
-                            available: false,
-                            cost: card_cost,
-                            is_baton_touch: false,
-                            existing_member_name: None,
-                        };
+                    for (area_idx, area_name) in area_names.iter().enumerate() {
+                        let mut cost = card_cost;
+                        let mut available = false;
+                        let mut is_baton_touch = false;
+                        let mut existing_member_name = None;
 
                         if stage_card_ids[area_idx] != -1 {
                             let existing_member_id = stage_card_ids[area_idx];
@@ -1618,12 +1618,12 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                                         let cost_to_pay =
                                             effective_cost.saturating_sub(member_cost);
                                         if (active_energy_count as u8) >= cost_to_pay {
-                                            area_info.available = true;
-                                            area_info.cost = cost_to_pay;
-                                            area_info.is_baton_touch = true;
+                                            available = true;
+                                            cost = cost_to_pay;
+                                            is_baton_touch = true;
                                             if display {
-                                                area_info.existing_member_name =
-                                                    Some(ArcStr::from(existing_member_card.name.as_ref()));
+                                                existing_member_name =
+                                                    Some(existing_member_card.name.as_ref());
                                             }
                                             has_any_available = true;
                                         }
@@ -1631,11 +1631,12 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                                 }
                             }
                         } else if (active_energy_count as u8) >= effective_cost {
-                            area_info.available = true;
-                            area_info.cost = effective_cost;
+                            available = true;
+                            cost = effective_cost;
                             has_any_available = true;
                         }
-                        available_areas.push(area_info);
+                        area_candidates[area_idx] =
+                            (area_idx, area_name, available, cost, is_baton_touch, existing_member_name);
                     }
 
                     // Check if this card has play_baton_touch with count > 1 (double baton)
@@ -1647,22 +1648,26 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                     });
 
                     let (double_baton_pairs, any_double_baton_available) = if has_double_baton {
-                        let occupied: Vec<(usize, MemberArea, i16)> = [0, 1, 2]
-                            .iter()
-                            .filter(|&&idx| stage_card_ids[idx] != -1)
-                            .filter(|&&idx| {
-                                !active_player
+                        let mut occupied = [None; 3];
+                        let mut occupied_count = 0;
+                        for idx in 0..3 {
+                            if stage_card_ids[idx] != -1
+                                && !active_player
                                     .deployed_this_turn
                                     .contains(&stage_card_ids[idx])
-                            })
-                            .filter(|&&idx| !baton_touch_protected[idx])
-                            .map(|&idx| (idx, MemberArea::ALL[idx], stage_card_ids[idx]))
-                            .collect();
-                        let mut pairs = Vec::new();
-                        for i in 0..occupied.len() {
-                            for j in (i + 1)..occupied.len() {
-                                let (_idx1, area1, cid1) = occupied[i];
-                                let (_idx2, area2, cid2) = occupied[j];
+                                && !baton_touch_protected[idx]
+                            {
+                                occupied[occupied_count] =
+                                    Some((idx, MemberArea::ALL[idx], stage_card_ids[idx]));
+                                occupied_count += 1;
+                            }
+                        }
+                        let mut pairs = [None; 6];
+                        let mut pair_count = 0;
+                        for i in 0..occupied_count {
+                            for j in (i + 1)..occupied_count {
+                                let (_idx1, area1, cid1) = occupied[i].unwrap();
+                                let (_idx2, area2, cid2) = occupied[j].unwrap();
                                 let baton_cost_for = |cid: i16| {
                                     game_state.card_database.get_card(cid)
                                         .and_then(|c| c.cost)
@@ -1677,21 +1682,30 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                                 let pair_cost =
                                     effective_cost.saturating_sub(baton_cost_for(cid1) + baton_cost_for(cid2));
                                 if (active_energy_count as u8) >= pair_cost {
-                                    pairs.push(DoubleBatonOption {
+                                    pairs[pair_count] = Some(DoubleBatonOption {
                                         areas: [area1, area2],
                                         placement: area1,
                                         cost: pair_cost,
                                     });
-                                    pairs.push(DoubleBatonOption {
+                                    pair_count += 1;
+                                    pairs[pair_count] = Some(DoubleBatonOption {
                                         areas: [area1, area2],
                                         placement: area2,
                                         cost: pair_cost,
                                     });
+                                    pair_count += 1;
                                 }
                             }
                         }
-                        let available = !pairs.is_empty();
-                        (if available { Some(pairs) } else { None }, available)
+                        let available = pair_count > 0;
+                        (
+                            if available {
+                                Some(pairs.into_iter().flatten().collect::<Vec<_>>())
+                            } else {
+                                None
+                            },
+                            available,
+                        )
                     } else {
                         (None, false)
                     };
@@ -1715,10 +1729,28 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                     } else {
                         None
                     };
-                    let available_areas = Arc::new(available_areas);
+                    let available_areas = if has_any_available || any_double_baton_available {
+                        Some(Arc::new(
+                            area_candidates
+                                .iter()
+                                .map(|(_, area_name, available, cost, is_baton_touch, existing_member_name)| {
+                                    AreaInfo {
+                                        area: ArcStr::from(*area_name),
+                                        available: *available,
+                                        cost: *cost,
+                                        is_baton_touch: *is_baton_touch,
+                                        existing_member_name: existing_member_name
+                                            .map(ArcStr::from),
+                                    }
+                                })
+                                .collect::<Vec<_>>(),
+                        ))
+                    } else {
+                        None
+                    };
 
                     if has_any_available || any_double_baton_available {
-                        for area in available_areas.iter() {
+                        for area in available_areas.as_ref().unwrap().iter() {
                             if !area.available {
                                 continue;
                             }
@@ -1796,7 +1828,7 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                                         available_areas: if cfg!(feature = "profiling") {
                                             None
                                         } else {
-                                            Some(Arc::clone(&available_areas))
+                                            Some(Arc::clone(available_areas.as_ref().unwrap()))
                                         },
                                         double_baton_pairs: if cfg!(feature = "profiling")
                                             || !display
@@ -1873,7 +1905,7 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                                             available_areas: if cfg!(feature = "profiling") {
                                                 None
                                             } else {
-                                                Some(Arc::clone(&available_areas))
+                                                Some(Arc::clone(available_areas.as_ref().unwrap()))
                                             },
                                             double_baton_pairs: if cfg!(feature = "profiling")
                                                 || !display
@@ -1911,8 +1943,6 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
         (active_player.stage.stage[1], "center"),
         (active_player.stage.stage[2], "right"),
     ];
-
-    let mut groups_cache: Option<u8> = None;
 
     for (card_id, area_name) in stage_positions {
         if card_id == -1 {
@@ -1963,10 +1993,11 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                 // optional-payment components keep the ability offered so the
                 // player can skip just that part (wakana bp2-008).
                 let (base_cost, effective_cost) = if ability.cost.is_some() {
-                    let groups = *groups_cache.get_or_insert_with(|| {
-                        game_state.distinct_stage_groups(&active_player.id)
-                    });
-                    crate::ability::util::ability_effective_cost(game_state, &ability, groups)
+                    crate::ability::util::ability_effective_cost(
+                        game_state,
+                        &ability,
+                        stage_groups,
+                    )
                 } else {
                     (0, 0)
                 };
@@ -2067,10 +2098,11 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                 // Same effective-cost gate as stage activations: mandatory
                 // unpayable costs are withheld, optional ones stay offered.
                 let (base_cost, effective_cost) = if ability.cost.is_some() {
-                    let groups = *groups_cache.get_or_insert_with(|| {
-                        game_state.distinct_stage_groups(&active_player.id)
-                    });
-                    crate::ability::util::ability_effective_cost(game_state, &ability, groups)
+                    crate::ability::util::ability_effective_cost(
+                        game_state,
+                        &ability,
+                        stage_groups,
+                    )
                 } else {
                     (0, 0)
                 };

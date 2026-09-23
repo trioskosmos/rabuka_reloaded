@@ -768,6 +768,8 @@ impl GameState {
             }
         }
         let moved = Some(event.moved_cards.clone());
+        let mut cached_card_id = None;
+        let mut cached_card_no = String::new();
         for (card_id, ability_idx, _stage_card_id) in abilities_to_trigger {
             let num_key = ((card_id as u32) << 16) | (ability_idx as u32);
             if !self.this_batch_triggered_ability_ids.contains(&num_key) {
@@ -783,16 +785,18 @@ impl GameState {
             if !self.ability_has_remaining_uses(card_id, ability_idx) {
                 continue;
             }
-            // Look up card_no from the card_id for the queue entry
-            let card_no = self
-                .card_database
-                .get_card(card_id)
-                .map(|c| String::from(c.card_no.as_ref()))
-                .unwrap_or_default();
-            self.trigger_auto_ability_by_index(
+            if cached_card_id != Some(card_id) {
+                cached_card_id = Some(card_id);
+                cached_card_no = self
+                    .card_database
+                    .get_card(card_id)
+                    .map(|c| String::from(c.card_no.as_ref()))
+                    .unwrap_or_default();
+            }
+            self.trigger_auto_ability_by_index_refs(
                 AbilityTrigger::Auto,
-                player_id_clone.clone(),
-                Some(card_no),
+                &player_id_clone,
+                Some(cached_card_no.as_str()),
                 Some(card_id),
                 ability_idx,
                 moved.clone(),
@@ -963,10 +967,10 @@ impl GameState {
                     owner_pid,
                     moved_card_id
                 );
-                self.trigger_auto_ability_by_index(
+                self.trigger_auto_ability_by_index_refs(
                     AbilityTrigger::Auto,
-                    owner_pid.clone(),
-                    Some(card_no.clone()),
+                    owner_pid.as_str(),
+                    Some(card_no.as_str()),
                     Some(watcher_id),
                     ability_idx,
                     Some(smallvec::smallvec![moved_card_id]),
@@ -995,12 +999,13 @@ impl GameState {
             if let Some(cid) = card_id {
                 if let Some(card) = self.card_database.get_card(cid) {
                     // Check original abilities
-                    let expected_id = |ability: &crate::card::Ability| -> String {
-                        format!("{}_{}", card_no, ability.full_text)
-                    };
+                    let requested_text = ability_id
+                        .strip_prefix(card_no.as_str())
+                        .and_then(|suffix| suffix.strip_prefix('_'));
                     for (ability_index, ability) in card.abilities.iter().enumerate() {
-                        if Self::ability_matches_trigger(&ability.resolve(), &trigger_type)
-                            && ability_id == expected_id(&ability.resolve())
+                        let resolved_ability = ability.resolve();
+                        if Self::ability_matches_trigger(&resolved_ability, &trigger_type)
+                            && requested_text == Some(resolved_ability.full_text.as_str())
                         {
                             let entry = self.build_ability_queue_entry(
                                 card_no.clone(),
@@ -1092,16 +1097,36 @@ impl GameState {
         trigger_moved_cards: Option<SmallVec<[i16; 4]>>,
         triggering_member_id: Option<i16>,
     ) {
+        self.trigger_auto_ability_by_index_refs(
+            trigger_type,
+            &player_id,
+            source_card_id.as_deref(),
+            explicit_card_id,
+            ability_index,
+            trigger_moved_cards,
+            triggering_member_id,
+        )
+    }
+
+    fn trigger_auto_ability_by_index_refs(
+        &mut self,
+        trigger_type: AbilityTrigger,
+        player_id: &str,
+        source_card_id: Option<&str>,
+        explicit_card_id: Option<i16>,
+        ability_index: usize,
+        trigger_moved_cards: Option<SmallVec<[i16; 4]>>,
+        triggering_member_id: Option<i16>,
+    ) {
         if let Some(card_id) = explicit_card_id {
             if let Some(card) = self.card_database.get_card(card_id) {
                 if let Some(ar) = card.abilities.get(ability_index) {
-                    let card_no_str = source_card_id.unwrap_or_default();
                     let entry = self.build_ability_queue_entry(
-                        card_no_str,
+                        source_card_id.unwrap_or_default().to_string(),
                         ability_index,
                         ar.to_arc(),
                         Some(card_id),
-                        player_id,
+                        player_id.to_string(),
                         trigger_type,
                         trigger_moved_cards,
                         triggering_member_id,
@@ -1311,10 +1336,10 @@ impl GameState {
                 .get_card(cid)
                 .map(|c| String::from(c.card_no.as_ref()))
                 .unwrap_or_default();
-            self.trigger_auto_ability_by_index(
+            self.trigger_auto_ability_by_index_refs(
                 crate::game_state::AbilityTrigger::Auto,
-                player_id_clone.clone(),
-                Some(card_no),
+                &player_id_clone,
+                Some(card_no.as_str()),
                 Some(cid),
                 ability_idx,
                 None,
@@ -1517,13 +1542,12 @@ impl GameState {
         let moved_marker = self.recently_moved_cards.is_some();
         let appeared_marker = !self.recently_appeared_cards.is_empty();
         if moved_marker || self.last_energy_placed_by_effect() || appeared_marker {
-            let batch_ids: Vec<i16> = self
-                .batch_movements
-                .iter()
-                .map(|m| m.moved_card_id)
-                .collect();
             let event = crate::ability::types::TriggerEvent {
-                moved_cards: batch_ids.into(),
+                moved_cards: self
+                    .batch_movements
+                    .iter()
+                    .map(|m| m.moved_card_id)
+                    .collect(),
                 energy_placed_by_effect: self.last_energy_placed_by_effect(),
                 ..Default::default()
             };
@@ -1573,6 +1597,12 @@ impl GameState {
         self.ability_queue.clear_completed();
     }
 
+    /// Resolve the active queue entry while keeping its resolver and completion
+    /// state in one borrow of `GameState`. A helper split is not safe without
+    /// transferring part of that state out: `resolve_ability` mutably borrows
+    /// `GameState`, while the same flow must read and update queue entry flags,
+    /// store the resolver for choice resume, and preserve the exact post-resolve
+    /// scan and debug-log ordering. Keep this ownership boundary intact.
     pub(crate) fn process_current_ability(&mut self) {
         // Safety timeout: a runaway ability re-trigger loop (e.g. an each_time
         // watcher re-queued by its own effect's movement) must never spin forever.

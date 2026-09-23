@@ -153,6 +153,8 @@ pub struct GameState {
     pub scratch_exp_heart: HashMap<i16, HashMap<String, i16>>,
     #[cfg_attr(feature = "serde_support", serde(skip))]
     pub scratch_entry_positions: HashMap<i16, Option<u8>>,
+    #[cfg_attr(feature = "serde_support", serde(skip))]
+    pub scratch_constant_effect_ids: Vec<(i16, usize)>,
     pub negated_abilities: SmallVec<[i16; 8]>,
     pub replacement_effects: SmallVec<[ReplacementEffect; 2]>,
     pub constant_ability_statuses: SmallVec<[crate::types::ConstantAbilityStatus; 6]>,
@@ -513,6 +515,7 @@ impl GameState {
             scratch_exp_score: HashMap::default(),
             scratch_exp_heart: HashMap::default(),
             scratch_entry_positions: HashMap::default(),
+            scratch_constant_effect_ids: Vec::new(),
             negated_abilities: SmallVec::new(),
             replacement_effects: SmallVec::new(),
             constant_ability_statuses: SmallVec::new(),

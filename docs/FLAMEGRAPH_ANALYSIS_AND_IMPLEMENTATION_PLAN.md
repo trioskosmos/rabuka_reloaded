@@ -676,7 +676,25 @@ The following items are ordered by expected benefit and risk. Each item should b
 - Record exact live-card movement IDs instead of rediscovering them from waitroom.
 - Replace nested performance modifier snapshots with compact representations.
 
-### Rejected or deferred
+### Implementation status
+
+Implemented and covered by the full engine suite:
+
+- Direct moved-card counting, constant-zone length counting, borrowed activation text, one-time batch-match evaluation, and direct stage/live slices.
+- Modifier owner membership indexes, borrowed heart-color iteration, live-target iteration, and reusable constant-effect ID scratch storage.
+- Ability queue/card metadata reuse, direct movement-event collection, activation text-prefix stripping, and allocation-free pending-entry iteration.
+- Borrowed alternative-cost hands, compact performer ownership membership, moved-ID transfer, fixed action-generation descriptors, cached stage-group counts, and live-zone draining.
+- Exact moved live-card tracking and direct live-success score-delta lookup.
+
+Deferred because a safe implementation would require a broader semantic redesign:
+
+- Event-local zone/owner indexing for automatic ability scans.
+- Shared movement snapshots across queue entries.
+- Avoiding active-ability cloning without changing resolver/choice-resume ownership.
+- Replacing nested performance score snapshots without changing public snapshot representations.
+- Fully compacting performance enrichment/snapshot structures.
+- Consolidating all constant-effect allocation paths into one representation.
+
 
 - Do not add a dirty flag to constant recalculation without a complete invalidation model.
 - Do not introduce broad condition or ability caches with incomplete invalidation.
@@ -686,6 +704,4 @@ The following items are ordered by expected benefit and risk. Each item should b
 - Do not remove provenance strings or assume map iteration order is irrelevant.
 
 
-Begin with **call-local stage-group caching and the two queue-collection removals**, independently tested and measured. Then address borrowed area intermediates and snapshot ownership. Remove repeated text formatting before considering numeric dispatch. Keep gained-ability and duplicate-text correctness changes separate from performance work.
-
-The verified outcome so far is improved flamegraph accounting, real captures, stable investigation priorities, and a concrete implementation plan—not an engine speedup.
+The completed batches now cover the safe allocation, scan, queue, action-generation, modifier, phase, and live-path improvements listed above. The remaining deferred items require ownership or public-representation changes and should be handled as separate design projects rather than mixed into this performance batch.

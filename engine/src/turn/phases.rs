@@ -1,12 +1,12 @@
 use crate::constants::MAX_LIVE_CARDS;
 use crate::game_state::{GameState, Phase};
 use crate::types::LogEntry;
-use smallvec::SmallVec;
 #[cfg(feature = "no_std")]
 use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
+use smallvec::SmallVec;
 #[cfg(feature = "3ds")]
 extern "C" {
     fn _3ds_tdbg(msg: *const u8);
@@ -146,11 +146,12 @@ impl super::TurnEngine {
                         .iter()
                         .filter(|&&c| game_state.mods.is_delayed_cannot_active(c))
                         .count();
-                    let owned: crate::HashSet<i16> = turn_player.all_card_ids().into_iter().collect();
+                    let owned: crate::HashSet<i16> =
+                        turn_player.all_card_ids().into_iter().collect();
                     for &cid in &to_activate {
                         game_state.mods.add_orientation_modifier(cid, "active");
                     }
-tdbg!("PHASE_ACTIVE:4 wait activated");
+                    tdbg!("PHASE_ACTIVE:4 wait activated");
                     // Q280: tick delayed cannot-active flags for THIS turn player's own
                     // cards only. An opponent's intervening active phase must NOT clear
                     // a "次のターンのアクティブフェイズにアクティブしない" flag.
@@ -423,7 +424,10 @@ tdbg!("PHASE_ACTIVE:4 wait activated");
         if !game_state.has_pending_choice() || !pending_is_auto_order {
             game_state.yell_occurred = false;
         } else {
-            log::debug!("[YELL_WINDOW_DEFERRED] performer={} yell_occurred kept true for SelectAutoAbility", performer_id);
+            log::debug!(
+                "[YELL_WINDOW_DEFERRED] performer={} yell_occurred kept true for SelectAutoAbility",
+                performer_id
+            );
         }
 
         // Rule 8.3.13.1: If a re-yell occurred, apply the rebuilt yell data
@@ -502,8 +506,9 @@ tdbg!("PHASE_ACTIVE:4 wait activated");
         // If live cards moved to waitroom during the heart/live check
         // (requirement failure path), set recently_moved_cards and re-check
         // auto abilities so zone-change triggers fire (e.g. Riko BP6).
-        if !perf_data.moved_live_card_ids.is_empty() {
-            game_state.set_recently_moved_batch(perf_data.moved_live_card_ids.clone().into(), None);
+        let moved_live_card_ids = core::mem::take(&mut perf_data.moved_live_card_ids);
+        if !moved_live_card_ids.is_empty() {
+            game_state.set_recently_moved_batch(moved_live_card_ids.into(), None);
             game_state.trigger_auto_abilities_for_player(&performer_id);
             game_state.process_pending_auto_abilities(&performer_id);
         }
@@ -531,29 +536,20 @@ tdbg!("PHASE_ACTIVE:4 wait activated");
         // BOTH players before the first performance phase; consuming all at once would
         // leave the second player's snapshot empty. Only enrich apps whose source or
         // target card belongs to the current performer.
-        let performer_owned_ids: Vec<i16> = {
+        let performer_owned_ids: crate::HashSet<i16> = {
             let p = if perf_player_id == game_state.player1.id {
                 &game_state.player1
             } else {
                 &game_state.player2
             };
-            let mut ids = Vec::new();
-            for &cid in p.stage.stage.iter() {
-                if cid != -1 {
-                    ids.push(cid);
-                }
-            }
-            for &cid in p.live_card_zone.cards.iter() {
-                if cid != -1 {
-                    ids.push(cid);
-                }
-            }
-            for &cid in p.success_live_card_zone.cards.iter() {
-                if cid != -1 {
-                    ids.push(cid);
-                }
-            }
-            ids
+            p.stage
+                .stage
+                .iter()
+                .chain(p.live_card_zone.cards.iter())
+                .chain(p.success_live_card_zone.cards.iter())
+                .copied()
+                .filter(|&cid| cid != -1)
+                .collect()
         };
         let all_apps = core::mem::take(&mut game_state.ability_applications);
         let mut apps = Vec::new();
@@ -817,11 +813,14 @@ tdbg!("PHASE_ACTIVE:4 wait activated");
         }
         let player = game_state.active_player();
         let reduction: i32 = From::from(player.live_card_set_limit_reduction);
-        let max_allowed = usize::try_from((i32::try_from(MAX_LIVE_CARDS).unwrap() - reduction).max(0)).unwrap();
+        let max_allowed =
+            usize::try_from((i32::try_from(MAX_LIVE_CARDS).unwrap() - reduction).max(0)).unwrap();
         if game_state.live_card_selected_indices.len() >= max_allowed {
             return Err("Cannot select more live cards: limit reached".to_string());
         }
-        game_state.live_card_selected_indices.push(u8::try_from(idx).unwrap());
+        game_state
+            .live_card_selected_indices
+            .push(u8::try_from(idx).unwrap());
         Ok(())
     }
 
@@ -949,15 +948,16 @@ tdbg!("PHASE_ACTIVE:4 wait activated");
             let player = game_state.active_player();
             for &area2 in &db_areas {
                 if let Some(existing_card_id) = player.stage.get_area(area2) {
-                    let has_protection = card_db
-                        .get_card(existing_card_id)
-                        .is_some_and(|existing_card| {
-                            crate::ability::util::has_cannot_baton_touch_protection(
-                                card_db,
-                                card_id,
-                                existing_card,
-                            )
-                        });
+                    let has_protection =
+                        card_db
+                            .get_card(existing_card_id)
+                            .is_some_and(|existing_card| {
+                                crate::ability::util::has_cannot_baton_touch_protection(
+                                    card_db,
+                                    card_id,
+                                    existing_card,
+                                )
+                            });
                     if has_protection {
                         return Err(
                             "Cannot baton touch: member has baton touch discard protection"
@@ -973,8 +973,7 @@ tdbg!("PHASE_ACTIVE:4 wait activated");
             let mut replaced = Vec::new();
             for &area2 in &db_areas {
                 if let Some(existing_card_id) = player.stage.get_area(area2) {
-                    let _ = player
-                        .remove_member_from_stage_with_recycling(area2 as usize, card_db);
+                    let _ = player.remove_member_from_stage_with_recycling(area2 as usize, card_db);
                     player.waitroom.cards.push(existing_card_id);
                     replaced.push(existing_card_id);
                 }
@@ -1037,8 +1036,7 @@ tdbg!("PHASE_ACTIVE:4 wait activated");
     /// `handle_play_member_to_stage`.
     fn trigger_baton_touch_abilities(game_state: &mut GameState, player_id: &str) {
         for area in crate::zones::MemberArea::ALL {
-            let card_no = if let Some(card_id) = game_state.active_player().stage.get_area(area)
-            {
+            let card_no = if let Some(card_id) = game_state.active_player().stage.get_area(area) {
                 if let Some(card) = game_state.card_database.get_card(card_id) {
                     let bt_card_id = card_id;
                     card.abilities
@@ -1162,14 +1160,7 @@ tdbg!("PHASE_ACTIVE:4 wait activated");
         // constant ability (play_baton_touch, count>1) is offered as separate gold buttons.
         if let Some(db_areas) = double_baton_areas {
             return Self::play_double_baton(
-                game_state,
-                card_id,
-                &card_no,
-                &player_id,
-                idx,
-                area,
-                db_areas,
-                &card_db,
+                game_state, card_id, &card_no, &player_id, idx, area, db_areas, &card_db,
             );
         }
 
@@ -1286,7 +1277,10 @@ tdbg!("PHASE_ACTIVE:4 wait activated");
 
         // Re-entry: we already offered the choice and it was answered.
         if let Some(play) = game_state.play_time_cost_play.take() {
-            let accepted = game_state.play_time_cost_reduction_accepted.take().unwrap_or(false);
+            let accepted = game_state
+                .play_time_cost_reduction_accepted
+                .take()
+                .unwrap_or(false);
             if accepted {
                 if let Some(red) = reduction {
                     let base = game_state
@@ -1294,7 +1288,10 @@ tdbg!("PHASE_ACTIVE:4 wait activated");
                         .get_card(card_id)
                         .and_then(|c| c.cost)
                         .unwrap_or(0);
-                    game_state.mods.set_cost_modifier(card_id, i16::try_from(base as i32 - red as i32).unwrap_or(0));
+                    game_state.mods.set_cost_modifier(
+                        card_id,
+                        i16::try_from(base as i32 - red as i32).unwrap_or(0),
+                    );
                     game_state.record_ability_application(
                         card_id,
                         "Play-time cost reduction".to_string(),
@@ -1313,7 +1310,10 @@ tdbg!("PHASE_ACTIVE:4 wait activated");
                     // per slot from hand, set cost to the ability's value.
                     let n = chars.len();
                     if !Self::discard_play_time_alt_cost(game_state, &player_id, card_id, &chars) {
-                        return Err("Required hand cards for play-time alternative cost not found".to_string());
+                        return Err(
+                            "Required hand cards for play-time alternative cost not found"
+                                .to_string(),
+                        );
                     }
                     game_state.mods.set_cost_modifier(card_id, set_value);
                     game_state.record_ability_application(
@@ -1343,9 +1343,7 @@ tdbg!("PHASE_ACTIVE:4 wait activated");
                     options: Some(vec!["No".to_string(), "Yes".to_string()]),
                     allow_skip: true,
                     description: "Use this card's play-time cost reduction?".to_string(),
-                    description_en: Some(
-                        "Use this card's play-time cost reduction?".to_string(),
-                    ),
+                    description_en: Some("Use this card's play-time cost reduction?".to_string()),
                     description_ja: Some(
                         "このカードのプレイ時コスト軽減を使用しますか？".to_string(),
                     ),
@@ -1423,7 +1421,10 @@ tdbg!("PHASE_ACTIVE:4 wait activated");
     /// optional, and a named-character list (one distinct hand card each).
     /// Returns (required character names, set-cost value). Generalizes the
     /// former LL-bp7-001-only hardcode.
-    fn play_time_alt_cost_chars(game_state: &GameState, card_id: i16) -> Option<(Vec<String>, i16)> {
+    fn play_time_alt_cost_chars(
+        game_state: &GameState,
+        card_id: i16,
+    ) -> Option<(Vec<String>, i16)> {
         use crate::ability::enums::ActionType;
         let card = game_state.card_database.get_card(card_id)?;
         for ab in card.resolved_abilities() {
@@ -1462,8 +1463,8 @@ tdbg!("PHASE_ACTIVE:4 wait activated");
         card_id: i16,
         chars: &[String],
     ) -> bool {
-        let hand_ids: Vec<i16> = game_state.active_player().hand.cards.to_vec();
-        Self::can_assign_hand_for_alt_cost(game_state, &hand_ids, chars, Some(card_id))
+        let hand_ids = &game_state.active_player().hand.cards;
+        Self::can_assign_hand_for_alt_cost(game_state, hand_ids, chars, Some(card_id))
     }
 
     fn can_assign_hand_for_alt_cost(
@@ -1543,20 +1544,16 @@ tdbg!("PHASE_ACTIVE:4 wait activated");
         played_card_id: i16,
         chars: &[String],
     ) -> bool {
-        let hand_snapshot: Vec<i16> = if player_id == game_state.player1.id {
-            game_state.player1.hand.cards.to_vec()
+        let hand = if player_id == game_state.player1.id {
+            &game_state.player1.hand.cards
         } else {
-            game_state.player2.hand.cards.to_vec()
+            &game_state.player2.hand.cards
         };
-        let cands = match Self::build_alt_cost_candidates(
-            game_state,
-            &hand_snapshot,
-            chars,
-            Some(played_card_id),
-        ) {
-            Some(c) => c,
-            None => return false,
-        };
+        let cands =
+            match Self::build_alt_cost_candidates(game_state, hand, chars, Some(played_card_id)) {
+                Some(c) => c,
+                None => return false,
+            };
         let to_discard = match Self::find_distinct_assignment_k(&cands) {
             Some(a) => a,
             None => return false,
@@ -1578,7 +1575,14 @@ tdbg!("PHASE_ACTIVE:4 wait activated");
             }
         }
         for cid in removed {
-            game_state.push_movement_event_typed(cid, crate::types::ZoneId::Hand, crate::types::ZoneId::Waitroom, None, player_id, false);
+            game_state.push_movement_event_typed(
+                cid,
+                crate::types::ZoneId::Hand,
+                crate::types::ZoneId::Waitroom,
+                None,
+                player_id,
+                false,
+            );
         }
         true
     }
@@ -1594,7 +1598,11 @@ tdbg!("PHASE_ACTIVE:4 wait activated");
                 &game_state.player2
             };
             for &cid in &player.waitroom.cards {
-                if game_state.card_database.get_card(cid).is_some_and(|c| c.is_member()) {
+                if game_state
+                    .card_database
+                    .get_card(cid)
+                    .is_some_and(|c| c.is_member())
+                {
                     members.push(cid);
                 } else {
                     remaining.push(cid);

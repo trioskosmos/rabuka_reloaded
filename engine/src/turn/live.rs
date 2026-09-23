@@ -84,12 +84,11 @@ pub(crate) fn process_yell_revealed_card_icons(
             };
             // Draw/Score special icons are never converted by
             // set_blade_type — they pass through unchanged.
-            let effective_color =
-                if matches!(*color, HeartColor::Draw | HeartColor::Score) {
-                    *color
-                } else {
-                    override_color.unwrap_or(*color)
-                };
+            let effective_color = if matches!(*color, HeartColor::Draw | HeartColor::Score) {
+                *color
+            } else {
+                override_color.unwrap_or(*color)
+            };
             // Q45: ALL-blade (BAll) can be treated as any color heart.
             // Mapped to HeartColor::All (icon_all, index 7) so the UI
             // displays icon_all.png for BAll yell hearts.
@@ -214,8 +213,7 @@ fn record_pretrigger_live_results(
                     if me.additive != 0 {
                         let idx = color.index();
                         let current = required[idx] as i32;
-                        required[idx] =
-                            crate::constants::saturate_u8(current + me.additive as i32);
+                        required[idx] = crate::constants::saturate_u8(current + me.additive as i32);
                     }
                 }
             }
@@ -234,7 +232,8 @@ fn record_pretrigger_live_results(
                 if any_hearts + u16::from(icon_all) < u16::from(required[0]) {
                     ok = false;
                 } else {
-                    let used = u16::from(required[0].saturating_sub(u8::try_from(any_hearts).unwrap()));
+                    let used =
+                        u16::from(required[0].saturating_sub(u8::try_from(any_hearts).unwrap()));
                     icon_all = icon_all.saturating_sub(u8::try_from(used).unwrap());
                 }
             }
@@ -255,9 +254,10 @@ fn record_pretrigger_live_results(
                 all_passed = false;
             }
         }
-        let no_excess = filled_total.iter().enumerate().all(|(c, &ft)| {
-            snap.total_hearts[c] >= ft && snap.total_hearts[c] - ft == 0
-        });
+        let no_excess = filled_total
+            .iter()
+            .enumerate()
+            .all(|(c, &ft)| snap.total_hearts[c] >= ft && snap.total_hearts[c] - ft == 0);
         // Same score formula as the post-trigger totals (extras are zero
         // here by construction — trigger bonuses land in pX_extra after
         // this point).
@@ -324,20 +324,6 @@ fn record_pretrigger_live_results(
 }
 
 impl super::TurnEngine {
-    fn score_delta_since(
-        current: &HashMap<i16, i32>,
-        snapshot: &HashMap<i16, i32>,
-        zone_cards: &[i16],
-    ) -> i32 {
-        let mut total = 0i32;
-        for &cid in zone_cards {
-            let cur = current.get(&cid).copied().unwrap_or(0);
-            let prev = snapshot.get(&cid).copied().unwrap_or(0);
-            total += cur - prev;
-        }
-        total
-    }
-
     fn drain_pending_live_success_choices(
         game_state: &mut GameState,
         p1_id: &str,
@@ -345,12 +331,16 @@ impl super::TurnEngine {
     ) -> bool {
         game_state.process_pending_auto_abilities(p1_id);
         if game_state.has_pending_choice() {
-            log::debug!("[LIVE] pending choice after draining p1 live_success queue — early return");
+            log::debug!(
+                "[LIVE] pending choice after draining p1 live_success queue — early return"
+            );
             return true;
         }
         game_state.process_pending_auto_abilities(p2_id);
         if game_state.has_pending_choice() {
-            log::debug!("[LIVE] pending choice after draining p2 live_success queue — early return");
+            log::debug!(
+                "[LIVE] pending choice after draining p2 live_success queue — early return"
+            );
             return true;
         }
         false
@@ -379,7 +369,13 @@ impl super::TurnEngine {
             Some(pre_score_flat),
             game_state.mods.p2_constant_total_score_bonus,
         ) + p2_extra;
-        log::debug!("[LIVE_SCORE] p1={} p2={} extras p1={} p2={}", p1, p2, p1_extra, p2_extra);
+        log::debug!(
+            "[LIVE_SCORE] p1={} p2={} extras p1={} p2={}",
+            p1,
+            p2,
+            p1_extra,
+            p2_extra
+        );
         (p1, p2)
     }
 
@@ -410,11 +406,17 @@ impl super::TurnEngine {
             log::debug!("[LIVE-DBG] === VICTORY DETERMINATION ===");
             log::debug!(
                 "[LIVE-DBG] P1 score={} has={} all_passed={} zone={:?}",
-                p1_score, p1_has, p1_all, game_state.player1.live_card_zone.cards
+                p1_score,
+                p1_has,
+                p1_all,
+                game_state.player1.live_card_zone.cards
             );
             log::debug!(
                 "[LIVE-DBG] P2 score={} has={} all_passed={} zone={:?}",
-                p2_score, p2_has, p2_all, game_state.player2.live_card_zone.cards
+                p2_score,
+                p2_has,
+                p2_all,
+                game_state.player2.live_card_zone.cards
             );
         }
         let res = if !p1_all && !p2_all {
@@ -430,7 +432,13 @@ impl super::TurnEngine {
         } else {
             (true, true)
         };
-        log::debug!("[LIVE_WINNERS] p1_won={} p2_won={} p1_all={} p2_all={}", res.0, res.1, p1_all, p2_all);
+        log::debug!(
+            "[LIVE_WINNERS] p1_won={} p2_won={} p1_all={} p2_all={}",
+            res.0,
+            res.1,
+            p1_all,
+            p2_all
+        );
         res
     }
 
@@ -459,7 +467,11 @@ impl super::TurnEngine {
                     let base_score = card.get_score() as i32;
                     let set_score = game_state.mods.get_score_set_modifier(lc_id);
                     let additive = game_state.mods.get_score_modifier(lc_id) - set_score;
-                    let effective_base = if set_score != 0 { set_score } else { base_score };
+                    let effective_base = if set_score != 0 {
+                        set_score
+                    } else {
+                        base_score
+                    };
                     snap.lives[i].score = crate::constants::saturate_u8(effective_base + additive);
                     continue;
                 }
@@ -471,7 +483,12 @@ impl super::TurnEngine {
                     }
                 }
                 if ABILITY_DEBUG.load(Ordering::Relaxed) {
-                    log::debug!("[LIVE-DBG] live[{}] card={} filled_from_allocs={:?}", i, card.card_no, filled);
+                    log::debug!(
+                        "[LIVE-DBG] live[{}] card={} filled_from_allocs={:?}",
+                        i,
+                        card.card_no,
+                        filled
+                    );
                 }
                 // Use stats_pipeline::effective_need_heart for required array
                 let eff = crate::core::stats_pipeline::effective_need_heart(
@@ -485,7 +502,11 @@ impl super::TurnEngine {
                     required_arr[color.index()] = *needed;
                 }
                 if ABILITY_DEBUG.load(Ordering::Relaxed) {
-                    log::debug!("[LIVE-DBG] live[{}] required (via pipeline)={:?}", i, required_arr);
+                    log::debug!(
+                        "[LIVE-DBG] live[{}] required (via pipeline)={:?}",
+                        i,
+                        required_arr
+                    );
                 }
                 let passed = {
                     let mut icon_all = filled[7];
@@ -495,7 +516,10 @@ impl super::TurnEngine {
                     if ABILITY_DEBUG.load(Ordering::Relaxed) {
                         log::debug!(
                             "[LIVE-DBG] live[{}] total_filled={} total_required={} icon_all={}",
-                            i, total_filled, total_required, icon_all
+                            i,
+                            total_filled,
+                            total_required,
+                            icon_all
                         );
                     }
                     if total_filled < total_required {
@@ -511,7 +535,11 @@ impl super::TurnEngine {
                         }
                     }
                     if ok {
-                        for (idx, (&f, &r)) in filled[1..7].iter().zip(required_arr[1..7].iter()).enumerate() {
+                        for (idx, (&f, &r)) in filled[1..7]
+                            .iter()
+                            .zip(required_arr[1..7].iter())
+                            .enumerate()
+                        {
                             if f < r {
                                 let actual_idx = idx + 1;
                                 let deficit = required_arr[actual_idx] - filled[actual_idx];
@@ -527,7 +555,10 @@ impl super::TurnEngine {
                     if ABILITY_DEBUG.load(Ordering::Relaxed) {
                         log::debug!(
                             "[LIVE-DBG] live[{}] VERDICT: passed={} filled={:?} required={:?}",
-                            i, ok, filled, required_arr
+                            i,
+                            ok,
+                            filled,
+                            required_arr
                         );
                     }
                     ok
@@ -594,7 +625,11 @@ impl super::TurnEngine {
                 let base_score = card.get_score() as i32;
                 let set_score = game_state.mods.get_score_set_modifier(lc_id);
                 let additive = game_state.mods.get_score_modifier(lc_id) - set_score;
-                let effective_base = if set_score != 0 { set_score } else { base_score };
+                let effective_base = if set_score != 0 {
+                    set_score
+                } else {
+                    base_score
+                };
                 snap.lives[i].score = crate::constants::saturate_u8(effective_base + additive);
             }
         }
@@ -614,7 +649,8 @@ impl super::TurnEngine {
                 for alloc in &snap.breakdown.allocations {
                     if alloc.target_idx == u8::try_from(i).unwrap() {
                         let source_idx = match alloc.phase {
-                            crate::types::AllocPhase::H00Wild | crate::types::AllocPhase::Wildcard => 0,
+                            crate::types::AllocPhase::H00Wild
+                            | crate::types::AllocPhase::Wildcard => 0,
                             crate::types::AllocPhase::AllWild
                             | crate::types::AllocPhase::CAll
                             | crate::types::AllocPhase::AllCleanup => 7,
@@ -624,7 +660,11 @@ impl super::TurnEngine {
                     }
                 }
                 let mut spare = EMPTY_H8;
-                for (idx, (&cum, &tot)) in cumulative_used.iter().zip(snap.total_hearts.iter()).enumerate() {
+                for (idx, (&cum, &tot)) in cumulative_used
+                    .iter()
+                    .zip(snap.total_hearts.iter())
+                    .enumerate()
+                {
                     spare[idx] = tot.saturating_sub(cum);
                 }
                 snap.lives[i].spare = spare;
@@ -640,16 +680,35 @@ impl super::TurnEngine {
             };
             if zone_empty {
                 if ABILITY_DEBUG.load(Ordering::Relaxed) {
-                    log::debug!("[LIVE-DBG] player={} live_card_zone empty → total_score forced to 0", snap.player_id);
+                    log::debug!(
+                        "[LIVE-DBG] player={} live_card_zone empty → total_score forced to 0",
+                        snap.player_id
+                    );
                 }
                 snap.total_score = 0;
             }
             snap.success = snap.lives.iter().all(|l| l.passed) && snap.total_score > 0;
             if ABILITY_DEBUG.load(Ordering::Relaxed) {
-                log::debug!("[LIVE-DBG] player={} SUCCESS={} total_score={} all_passed={}", snap.player_id, snap.success, snap.total_score, snap.lives.iter().all(|l| l.passed));
+                log::debug!(
+                    "[LIVE-DBG] player={} SUCCESS={} total_score={} all_passed={}",
+                    snap.player_id,
+                    snap.success,
+                    snap.total_score,
+                    snap.lives.iter().all(|l| l.passed)
+                );
             }
-            snap.base_score_total = snap.lives.iter().filter(|l| l.passed).map(|l| l.score).sum();
-            snap.card_bonus_total = snap.lives.iter().filter(|l| l.passed).map(|l| l.score.saturating_sub(l.base_score)).sum();
+            snap.base_score_total = snap
+                .lives
+                .iter()
+                .filter(|l| l.passed)
+                .map(|l| l.score)
+                .sum();
+            snap.card_bonus_total = snap
+                .lives
+                .iter()
+                .filter(|l| l.passed)
+                .map(|l| l.score.saturating_sub(l.base_score))
+                .sum();
             for mc in &mut snap.member_contributions {
                 let mut ability_per_color = [0u8; 8];
                 for ab in &mc.ability_heart_bonuses {
@@ -659,29 +718,55 @@ impl super::TurnEngine {
                         }
                     }
                 }
-                for (i, (&bh, &apc)) in mc.bonus_hearts.iter().zip(ability_per_color.iter()).enumerate() {
+                for (i, (&bh, &apc)) in mc
+                    .bonus_hearts
+                    .iter()
+                    .zip(ability_per_color.iter())
+                    .enumerate()
+                {
                     mc.transform_delta[i] = bh.saturating_sub(apc);
                 }
             }
         }
-        log::debug!("[FINALIZE_SNAPSHOT] p1_won={} p2_won={} p1_score={} p2_score={}", p1_won, p2_won, p1_score, p2_score);
+        log::debug!(
+            "[FINALIZE_SNAPSHOT] p1_won={} p2_won={} p1_score={} p2_score={}",
+            p1_won,
+            p2_won,
+            p1_score,
+            p2_score
+        );
     }
 
-    fn revert_live_success_score_modifiers(game_state: &mut GameState, pre_score_flat: &HashMap<i16, i32>) {
-        let post: HashMap<i16, i32> = game_state.mods.score_modifiers.iter().map(|(&k, e)| (k, e.total())).collect();
+    fn revert_live_success_score_modifiers(
+        game_state: &mut GameState,
+        pre_score_flat: &HashMap<i16, i32>,
+    ) {
+        let post: HashMap<i16, i32> = game_state
+            .mods
+            .score_modifiers
+            .iter()
+            .map(|(&k, e)| (k, e.total()))
+            .collect();
         for (&cid, post_total) in &post {
             let pre = pre_score_flat.get(&cid).copied().unwrap_or(0);
             let delta = post_total - pre;
             if delta != 0 {
-                game_state.mods.add_score_modifier(cid, i16::try_from(-delta).unwrap());
+                game_state
+                    .mods
+                    .add_score_modifier(cid, i16::try_from(-delta).unwrap());
             }
         }
         for (&cid, &pre_total) in pre_score_flat {
             if !post.contains_key(&cid) {
-                game_state.mods.set_score_modifier(cid, i16::try_from(pre_total).unwrap());
+                game_state
+                    .mods
+                    .set_score_modifier(cid, i16::try_from(pre_total).unwrap());
             }
         }
-        log::debug!("[REVERT_SCORE] reverted {} late score modifiers", post.len());
+        log::debug!(
+            "[REVERT_SCORE] reverted {} late score modifiers",
+            post.len()
+        );
     }
 
     fn process_delayed_gained_effects(game_state: &mut GameState) {
@@ -699,19 +784,31 @@ impl super::TurnEngine {
             let Some(owner) = game_state.owner_of_card(*card_id) else {
                 continue;
             };
-            let Some(snap) = game_state.performance_snapshots.iter().rev().find(|snap| {
-                snap.player_id == owner.id && snap.turn == game_state.turn_number
-            }) else {
+            let Some(snap) = game_state
+                .performance_snapshots
+                .iter()
+                .rev()
+                .find(|snap| snap.player_id == owner.id && snap.turn == game_state.turn_number)
+            else {
                 continue;
             };
             if owner.live_card_zone.cards.is_empty()
                 || snap.lives.is_empty()
                 || !snap.lives.iter().all(|live| live.passed)
             {
-                log::debug!("[DELAYED_GAINED] source={} owner={} skipped unsuccessful performance", card_id, owner.id);
+                log::debug!(
+                    "[DELAYED_GAINED] source={} owner={} skipped unsuccessful performance",
+                    card_id,
+                    owner.id
+                );
                 continue;
             }
-            log::debug!("[DELAYED_GAINED] source={} owner={} yell_cards={}", card_id, owner.id, snap.yell_cards.len());
+            log::debug!(
+                "[DELAYED_GAINED] source={} owner={} yell_cards={}",
+                card_id,
+                owner.id,
+                snap.yell_cards.len()
+            );
             game_state.revealed_cards = snap.yell_cards.iter().map(|yc| yc.card_id).collect();
             game_state.activating_card = Some(*card_id);
             use crate::ability::condition::ConditionContext;
@@ -728,7 +825,8 @@ impl super::TurnEngine {
                     let prim_eff = gained.compound.primary_effect.as_deref();
                     let effect_to_apply = if alt_met { alt_eff } else { prim_eff };
                     if let Some(apply) = effect_to_apply {
-                        let mut resolver = AbilityResolver::new(game_state.card_database.clone(), Some(*card_id));
+                        let mut resolver =
+                            AbilityResolver::new(game_state.card_database.clone(), Some(*card_id));
                         resolver.activating_card_id = Some(*card_id);
                         let _ = resolver.execute_effect(game_state, apply);
                     }
@@ -738,7 +836,10 @@ impl super::TurnEngine {
         game_state.revealed_cards = saved_revealed;
         game_state.activating_card = saved_activating_card;
         game_state.ability_queue = saved_queue;
-        log::debug!("[DELAYED_GAINED] processed {} delayed effects", delayed.len());
+        log::debug!(
+            "[DELAYED_GAINED] processed {} delayed effects",
+            delayed.len()
+        );
     }
 
     fn merge_late_score_apps(game_state: &mut GameState, p1_id: &str, p2_id: &str) {
@@ -757,15 +858,27 @@ impl super::TurnEngine {
                 continue;
             };
             for app in &late_apps {
-                if (app.effect_type == crate::types::EffectType::ScoreBonus || app.effect_type == crate::types::EffectType::ScoreSet) && player_cards.contains(&app.target_card_id) {
-                    snap.breakdown.scores.push(crate::types::ScoreLine { source: app.ability_text.to_string(), value: u8::try_from(app.amount.unsigned_abs()).unwrap() });
+                if (app.effect_type == crate::types::EffectType::ScoreBonus
+                    || app.effect_type == crate::types::EffectType::ScoreSet)
+                    && player_cards.contains(&app.target_card_id)
+                {
+                    snap.breakdown.scores.push(crate::types::ScoreLine {
+                        source: app.ability_text.to_string(),
+                        value: u8::try_from(app.amount.unsigned_abs()).unwrap(),
+                    });
                 }
             }
         }
         log::debug!("[LATE_SCORE] merged {} late score apps", late_apps.len());
     }
 
-    fn compute_surplus_and_flags(game_state: &mut GameState, p1_won: bool, p2_won: bool, p1_id: &str, p2_id: &str) {
+    fn compute_surplus_and_flags(
+        game_state: &mut GameState,
+        p1_won: bool,
+        p2_won: bool,
+        p1_id: &str,
+        p2_id: &str,
+    ) {
         let mut p2_surplus = 0u8;
         let mut p1_surplus = 0u8;
         for snap in &mut game_state.performance_snapshots {
@@ -773,7 +886,10 @@ impl super::TurnEngine {
             // Rule 8.3.16: failed lives have no surplus. Q259: heart calculation only at success timing.
             if !snap.success {
                 snap.surplus_hearts = [0u8; 8];
-                log::debug!("[SURPLUS] player={} FAILED live → surplus_hearts=0", snap.player_id);
+                log::debug!(
+                    "[SURPLUS] player={} FAILED live → surplus_hearts=0",
+                    snap.player_id
+                );
                 continue;
             }
             let total_available: u8 = snap.total_hearts.iter().sum();
@@ -785,7 +901,14 @@ impl super::TurnEngine {
                 per_color_surplus[color] = total_color.saturating_sub(filled_color);
             }
             snap.surplus_hearts = per_color_surplus;
-            log::debug!("[SURPLUS] player={} total_avail={} total_filled={} surplus={} per_color={:?}", snap.player_id, total_available, total_filled, surplus, per_color_surplus);
+            log::debug!(
+                "[SURPLUS] player={} total_avail={} total_filled={} surplus={} per_color={:?}",
+                snap.player_id,
+                total_available,
+                total_filled,
+                surplus,
+                per_color_surplus
+            );
             if snap.player_id == p1_id {
                 p1_surplus = surplus;
             } else if snap.player_id == p2_id {
@@ -805,7 +928,13 @@ impl super::TurnEngine {
         game_state.p1_live_success_no_excess = p1_surplus == 0;
         game_state.p2_live_success_this_turn = p2_won;
         game_state.p2_live_success_no_excess = p2_surplus == 0;
-        log::debug!("[SURPLUS_FLAGS] p1_surplus={} p2_surplus={} p1_won={} p2_won={}", p1_surplus, p2_surplus, p1_won, p2_won);
+        log::debug!(
+            "[SURPLUS_FLAGS] p1_surplus={} p2_surplus={} p1_won={} p2_won={}",
+            p1_surplus,
+            p2_surplus,
+            p1_won,
+            p2_won
+        );
     }
 
     fn apply_deferred_reyell(game_state: &mut GameState) {
@@ -833,7 +962,10 @@ impl super::TurnEngine {
         // replaces the `is_p1` branch (phases.rs shares the setter).
         game_state.set_cheer_count_by_id(&rb.owner.clone(), rb.note_icons);
         game_state.re_yell_occurred = false;
-        log::debug!("[REYELL_DEFERRED] applied pending rebuild for owner={}", rb.owner);
+        log::debug!(
+            "[REYELL_DEFERRED] applied pending rebuild for owner={}",
+            rb.owner
+        );
     }
 
     fn rebuild_stage_hearts_with_yell(game_state: &mut GameState) {
@@ -897,27 +1029,23 @@ impl super::TurnEngine {
             .collect();
         // Determine winner — use PRE-trigger modifiers so LiveSuccess
         // triggered changes only apply via pX_extra (no double-count).
-        let need_heart_flat: HashMap<i16, HashMap<HeartColor, ModifierEntry>> =
-            game_state
-                .mods
-                .need_heart_modifiers
-                .iter()
-                .map(|(&k, colors)| {
-                    let flat: HashMap<HeartColor, ModifierEntry> =
-                        colors.iter().map(|(&c, e)| (c, *e)).collect();
-                    (k, flat)
-                })
-                .collect();
+        let need_heart_flat: HashMap<i16, HashMap<HeartColor, ModifierEntry>> = game_state
+            .mods
+            .need_heart_modifiers
+            .iter()
+            .map(|(&k, colors)| {
+                let flat: HashMap<HeartColor, ModifierEntry> =
+                    colors.iter().map(|(&c, e)| (c, *e)).collect();
+                (k, flat)
+            })
+            .collect();
         (pre_score_flat, need_heart_flat)
     }
 
     /// Per-snapshot heart surplus, computed BEFORE LiveSuccess abilities
     /// fire (allocation is already finalised). Feeds color-filtered surplus
     /// conditions (e.g. La Bella Patria heart04 >= 1, Q174).
-    fn compute_snapshot_surplus(
-        game_state: &mut GameState,
-        player2_id: &str,
-    ) {
+    fn compute_snapshot_surplus(game_state: &mut GameState, player2_id: &str) {
         for snap in &mut game_state.performance_snapshots {
             let total_hearts: u8 = snap.total_hearts.iter().sum();
             // Disjoint-field borrows (same shape as the inline original):
@@ -950,9 +1078,8 @@ impl super::TurnEngine {
                 let mut filled_per_color = [0u8; 8];
                 for alloc in &snap.breakdown.allocations {
                     if alloc.color < 8 {
-                        filled_per_color[alloc.color as usize] = filled_per_color
-                            [alloc.color as usize]
-                            .saturating_add(alloc.amount);
+                        filled_per_color[alloc.color as usize] =
+                            filled_per_color[alloc.color as usize].saturating_add(alloc.amount);
                     }
                 }
                 for color in 0..8 {
@@ -971,17 +1098,16 @@ impl super::TurnEngine {
         pre_score_flat: &HashMap<i16, i32>,
         live_zone: &[i16],
     ) -> u8 {
-        let score_cur: HashMap<i16, i32> = game_state
-            .mods
-            .score_modifiers
-            .iter()
-            .map(|(&k, e)| (k, e.total()))
-            .collect();
-        crate::constants::saturate_u8(Self::score_delta_since(
-            &score_cur,
-            pre_score_flat,
-            live_zone,
-        ))
+        let mut total = 0i32;
+        for &cid in live_zone {
+            let current = game_state
+                .mods
+                .score_modifiers
+                .get(&cid)
+                .map_or(0, |entry| entry.total());
+            total += current - pre_score_flat.get(&cid).copied().unwrap_or(0);
+        }
+        crate::constants::saturate_u8(total)
     }
 
     /// LiveSuccess trigger orchestration across re-entries: restores saved
@@ -1130,11 +1256,7 @@ impl super::TurnEngine {
         // BUG#5: record per-seat outcomes BEFORE LiveSuccess triggers fire
         // (Q36: they resolve at determination timing and must see both
         // performances' results).
-        record_pretrigger_live_results(
-            game_state,
-            &need_heart_flat,
-            &pre_score_flat,
-        );
+        record_pretrigger_live_results(game_state, &need_heart_flat, &pre_score_flat);
 
         // Q48: A live can be won even with total score 0 or less
         // (score comparison determines the winner regardless of absolute value).
@@ -1164,7 +1286,13 @@ impl super::TurnEngine {
             // accumulator before compute_pregame_scores reads it. The success
             // gate inside uses the pass/fail verdicts populated directly above.
             Self::process_delayed_gained_effects(game_state);
-            Self::compute_pregame_scores(game_state, &need_heart_flat, &pre_score_flat, p1_extra, p2_extra)
+            Self::compute_pregame_scores(
+                game_state,
+                &need_heart_flat,
+                &pre_score_flat,
+                p1_extra,
+                p2_extra,
+            )
         };
 
         let (player1_won, player2_won) = Self::determine_winners(
@@ -1175,7 +1303,14 @@ impl super::TurnEngine {
             player2_score,
         );
 
-        Self::finalize_snapshot_fields(game_state, player1_won, player2_won, player1_score, player2_score, &player1_id);
+        Self::finalize_snapshot_fields(
+            game_state,
+            player1_won,
+            player2_won,
+            player1_score,
+            player2_score,
+            &player1_id,
+        );
         Self::revert_live_success_score_modifiers(game_state, &pre_score_flat);
         log::debug!(
             "[LIVE_TOTAL_TIMING] post-finalize accum p1={} p2={} snap_totals={:?}",
@@ -1188,7 +1323,13 @@ impl super::TurnEngine {
                 .collect::<Vec<_>>()
         );
         Self::merge_late_score_apps(game_state, &player1_id, &player2_id);
-        Self::compute_surplus_and_flags(game_state, player1_won, player2_won, &player1_id, &player2_id);
+        Self::compute_surplus_and_flags(
+            game_state,
+            player1_won,
+            player2_won,
+            &player1_id,
+            &player2_id,
+        );
 
         // Push performance summary to rule log
         Self::log_performance_summary(game_state);
@@ -1259,13 +1400,7 @@ impl super::TurnEngine {
             game_state.push_structured_log(crate::types::LogEntry {
                 text: format!(
                     "LIVE {} | P1 {} → succ={}(+{}) | P2 {} → succ={}(+{})",
-                    verdict,
-                    p1_sum,
-                    p1_now,
-                    p1_added as u8,
-                    p2_sum,
-                    p2_now,
-                    p2_added as u8
+                    verdict, p1_sum, p1_now, p1_added as u8, p2_sum, p2_now, p2_added as u8
                 ),
                 turn: game_state.turn_number,
                 player_label: "SYSTEM".into(),
@@ -1282,38 +1417,40 @@ impl super::TurnEngine {
         won: bool,
         must_skip: bool,
         can_place: bool,
-    ) {
+    ) -> Vec<i16> {
         let card_count = player.live_card_zone.cards.len();
+        let mut moved_to_waitroom = Vec::new();
         if won && !must_skip && card_count > 0 {
             let card_id = player.live_card_zone.cards.remove(0);
             if can_place {
                 player.success_live_card_zone.cards.push(card_id);
             } else {
                 player.waitroom.cards.push(card_id);
+                moved_to_waitroom.push(card_id);
             }
         }
-        while !player.live_card_zone.cards.is_empty() {
-            let card_id = player.live_card_zone.cards.remove(0);
-            player.waitroom.cards.push(card_id);
-        }
+        let remaining = core::mem::take(&mut player.live_card_zone.cards);
+        moved_to_waitroom.extend_from_slice(&remaining);
+        player.waitroom.cards.extend(remaining);
+        moved_to_waitroom
     }
 
-    fn try_take_success_zone_choice(
-        game_state: &mut GameState,
+    fn build_success_zone_choice(
+        game_state: &GameState,
         won: bool,
         must_skip: bool,
         cards_count: usize,
-        cards: Vec<i16>,
+        cards: &[i16],
         player_id: &str,
-    ) -> bool {
+    ) -> Option<crate::ability::types::Choice> {
         if !won || must_skip || cards_count <= 1 {
-            return false;
+            return None;
         }
         let can_place = cards.iter().any(|&cid| {
             game_state.can_place_card_in_zone(cid, Zone::SuccessLiveZone.to_str(), player_id)
         });
         if !can_place {
-            return false;
+            return None;
         }
         let options: Vec<crate::ability::types::LiveSuccessOption> = cards
             .iter()
@@ -1327,24 +1464,25 @@ impl super::TurnEngine {
                 card_index: i,
             })
             .collect();
-        let choice = crate::ability::types::Choice::SelectLiveSuccess {
+        Some(crate::ability::types::Choice::SelectLiveSuccess {
             player_id: player_id.to_string(),
             count: 1,
             options,
             description: "Choose which live card goes to your success zone".to_string(),
             description_en: Some("Choose which live card goes to your success zone".to_string()),
             description_ja: Some("ライブエリアからサクセスゾーンに送るカードを選択".to_string()),
-        };
+        })
+    }
+
+    fn pause_success_zone_choice(
+        game_state: &mut GameState,
+        choice: crate::ability::types::Choice,
+        player_id: &str,
+    ) {
         game_state.ability_queue.pause_for_choice(choice);
-        // Explicit decider stamp (mirrors try_create_success_replacement_choice
-        // below): the pause default would attribute this to whatever ability
-        // entry happens to be current — possibly the other player's — and the
-        // match router would then prompt the wrong side (e.g. the AI's live
-        // pick landing on the human's screen).
         if let Some(entry) = game_state.ability_queue.current_entry_mut() {
             entry.choice_player_id = Some(player_id.to_string());
         }
-        true
     }
 
     pub fn move_live_to_success_and_handle_wins(
@@ -1368,21 +1506,26 @@ impl super::TurnEngine {
             p1_must_skip,
             p2_must_skip
         );
-        if Self::try_take_success_zone_choice(
+        if let Some(choice) = Self::build_success_zone_choice(
             game_state,
             player1_won,
             p1_must_skip,
             p1_cards,
-            game_state.player1.live_card_zone.cards.to_vec(),
+            &game_state.player1.live_card_zone.cards,
             &p1_id,
-        ) || Self::try_take_success_zone_choice(
+        ) {
+            Self::pause_success_zone_choice(game_state, choice, &p1_id);
+            return;
+        }
+        if let Some(choice) = Self::build_success_zone_choice(
             game_state,
             player2_won,
             p2_must_skip,
             p2_cards,
-            game_state.player2.live_card_zone.cards.to_vec(),
+            &game_state.player2.live_card_zone.cards,
             &p2_id,
         ) {
+            Self::pause_success_zone_choice(game_state, choice, &p2_id);
             return;
         }
 
@@ -1409,39 +1552,21 @@ impl super::TurnEngine {
             }
         }
 
-        // Record what cards actually move to the waitroom (discard)
-        let mut moved_to_waitroom = Vec::new();
-
-        let p1_live_before = game_state.player1.live_card_zone.cards.clone();
-        let p2_live_before = game_state.player2.live_card_zone.cards.clone();
-
-        Self::process_player_live_result(
+        let mut moved_to_waitroom = Self::process_player_live_result(
             &mut game_state.player1,
             player1_won,
             p1_must_skip,
             p1_can_place,
         );
-        Self::process_player_live_result(
+        moved_to_waitroom.extend(Self::process_player_live_result(
             &mut game_state.player2,
             player2_won,
             p2_must_skip,
             p2_can_place,
-        );
-
-        // Find which cards ended up in waitroom
-        for cid in p1_live_before {
-            if game_state.player1.waitroom.cards.contains(&cid) {
-                moved_to_waitroom.push(cid);
-            }
-        }
-        for cid in p2_live_before {
-            if game_state.player2.waitroom.cards.contains(&cid) {
-                moved_to_waitroom.push(cid);
-            }
-        }
+        ));
 
         if !moved_to_waitroom.is_empty() {
-game_state.set_recently_moved_batch(moved_to_waitroom.into(), Some("live_card_zone"));
+            game_state.set_recently_moved_batch(moved_to_waitroom.into(), Some("live_card_zone"));
 
             // Scan and queue triggers for both players
             Self::trigger_auto_abilities_for_player(game_state, &p1_id);
@@ -1580,19 +1705,14 @@ game_state.set_recently_moved_batch(moved_to_waitroom.into(), Some("live_card_zo
         }
         let card_id = player.live_card_zone.cards.remove(selected_index);
         player.success_live_card_zone.cards.push(card_id);
-        while !player.live_card_zone.cards.is_empty() {
-            player
-                .waitroom
-                .add_card(player.live_card_zone.cards.remove(0));
-        }
+        let remaining = core::mem::take(&mut player.live_card_zone.cards);
+        player.waitroom.cards.extend(remaining);
         Ok(())
     }
 
     /// Q68/Rule: "cannot_live" discards live cards during performance.
     /// Returns the discarded card ids for `moved_live_card_ids`.
-    fn discard_live_on_cannot_live(
-        player: &mut crate::player::Player,
-    ) -> Vec<i16> {
+    fn discard_live_on_cannot_live(player: &mut crate::player::Player) -> Vec<i16> {
         let moved: Vec<i16> = player.live_card_zone.cards.iter().copied().collect();
         player
             .waitroom
@@ -1684,7 +1804,12 @@ game_state.set_recently_moved_batch(moved_to_waitroom.into(), Some("live_card_zo
     ) -> LivePerformanceData {
         let mut total_hearts_arr = EMPTY_H8;
         for mc in &member_contributions {
-            for (c, (&base, &bonus)) in mc.base_hearts.iter().zip(mc.bonus_hearts.iter()).enumerate() {
+            for (c, (&base, &bonus)) in mc
+                .base_hearts
+                .iter()
+                .zip(mc.bonus_hearts.iter())
+                .enumerate()
+            {
                 total_hearts_arr[c] += base + bonus;
             }
         }
@@ -1777,10 +1902,7 @@ game_state.set_recently_moved_batch(moved_to_waitroom.into(), Some("live_card_zo
 
     /// Q43: each draw icon revealed during yell draws 1 card (after all yell
     /// cards are revealed). Refreshes from waitroom mid-draw per Q104.
-    fn draw_for_yell_icons(
-        player: &mut crate::player::Player,
-        total_draw_icons: u8,
-    ) {
+    fn draw_for_yell_icons(player: &mut crate::player::Player, total_draw_icons: u8) {
         for _ in 0..total_draw_icons {
             if player.main_deck.cards.is_empty() && !player.waitroom.cards.is_empty() {
                 player.refresh();
@@ -2048,7 +2170,8 @@ game_state.set_recently_moved_batch(moved_to_waitroom.into(), Some("live_card_zo
                             if me.additive != 0 {
                                 let idx = color.index();
                                 let current = need[idx] as i32;
-                                need[idx] = crate::constants::saturate_u8(current + me.additive as i32);
+                                need[idx] =
+                                    crate::constants::saturate_u8(current + me.additive as i32);
                             }
                         }
                     }
@@ -2094,7 +2217,7 @@ game_state.set_recently_moved_batch(moved_to_waitroom.into(), Some("live_card_zo
             // Phase 1a: matching colored hearts → specific color req
             for c in 1..7 {
                 if need[c] > 0 && pool[c] > 0 {
-let take = pool[c].min(need[c]);
+                    let take = pool[c].min(need[c]);
                     allocs.push(Allocation {
                         target_idx: u8::try_from(live_idx).unwrap(),
                         target_name: card_name.clone(),
@@ -2186,18 +2309,18 @@ let take = pool[c].min(need[c]);
                     if need[c] > filled[c] && pool[7] > 0 {
                         let deficit = need[c] - filled[c];
                         let take = pool[7].min(deficit);
-allocs.push(Allocation {
-                        target_idx: u8::try_from(live_idx).unwrap(),
-                        target_name: card_name.clone(),
-                        source_type: SourceType::Stage,
-                        source_name: SourceName::AllHeartIconAll,
-                        source_slot: None,
-                        wildcard: true,
-                        color: u8::try_from(c).unwrap(),
-                        amount: take,
-                        is_bonus: false,
-                        phase: AllocPhase::AllCleanup,
-                    });
+                        allocs.push(Allocation {
+                            target_idx: u8::try_from(live_idx).unwrap(),
+                            target_name: card_name.clone(),
+                            source_type: SourceType::Stage,
+                            source_name: SourceName::AllHeartIconAll,
+                            source_slot: None,
+                            wildcard: true,
+                            color: u8::try_from(c).unwrap(),
+                            amount: take,
+                            is_bonus: false,
+                            phase: AllocPhase::AllCleanup,
+                        });
                         pool[7] -= take;
                         filled[c] += take;
                     }
@@ -2211,8 +2334,8 @@ allocs.push(Allocation {
                     let h00_still_needed = h00_remaining.saturating_sub(already_filled_h00);
                     if h00_still_needed > 0 && pool[7] > 0 {
                         let take = pool[7].min(h00_still_needed);
-allocs.push(Allocation {
-                        target_idx: u8::try_from(live_idx).unwrap(),
+                        allocs.push(Allocation {
+                            target_idx: u8::try_from(live_idx).unwrap(),
                             target_name: card_name.clone(),
                             source_type: SourceType::Stage,
                             source_name: SourceName::AllHeartIconAll,
@@ -2470,8 +2593,8 @@ allocs.push(Allocation {
         // never a specific color. Forced (no choice).
         if h00_deficit > 0 && pool[0] > 0 {
             let take = pool[0].min(h00_deficit);
-allocs.push(Allocation {
-                    target_idx: u8::try_from(idx).unwrap(),
+            allocs.push(Allocation {
+                target_idx: u8::try_from(idx).unwrap(),
                 target_name: card_name.clone(),
                 source_type: SourceType::Stage,
                 source_name: SourceName::StageHearts,
@@ -2743,7 +2866,8 @@ allocs.push(Allocation {
                         if me.additive != 0 {
                             let idx = color.index();
                             let current = required_arr[idx] as i32;
-                            required_arr[idx] = crate::constants::saturate_u8(current + me.additive as i32);
+                            required_arr[idx] =
+                                crate::constants::saturate_u8(current + me.additive as i32);
                         }
                     }
                 }
@@ -2768,7 +2892,11 @@ allocs.push(Allocation {
                     }
                 }
                 if ok {
-                    for (idx, (&f, &r)) in filled[1..7].iter().zip(required_arr[1..7].iter()).enumerate() {
+                    for (idx, (&f, &r)) in filled[1..7]
+                        .iter()
+                        .zip(required_arr[1..7].iter())
+                        .enumerate()
+                    {
                         if f < r {
                             let actual_idx = idx + 1;
                             let deficit = required_arr[actual_idx] - filled[actual_idx];
@@ -2786,12 +2914,9 @@ allocs.push(Allocation {
         });
         let moved_live_card_ids: Vec<i16> = if any_requirement_failed {
             log::debug!("[LIVE] Heart requirement not met — sending all live cards to waitroom");
-            let moved: Vec<i16> = player.live_card_zone.cards.iter().copied().collect();
-            while !player.live_card_zone.cards.is_empty() {
-                let card_id = player.live_card_zone.cards.remove(0);
-                player.waitroom.cards.push(card_id);
-            }
-            moved
+            let moved = core::mem::take(&mut player.live_card_zone.cards);
+            player.waitroom.cards.extend_from_slice(&moved);
+            moved.into_vec()
         } else {
             Vec::new()
         };
@@ -2894,10 +3019,7 @@ pub fn enrich_from_applications(
                         String::new()
                     },
                     desc: if ABILITY_DEBUG.load(Ordering::Relaxed) {
-                        format!(
-                            "All hearts become type {}",
-                            app.heart_color.unwrap_or(0)
-                        )
+                        format!("All hearts become type {}", app.heart_color.unwrap_or(0))
                     } else {
                         String::new()
                     },
