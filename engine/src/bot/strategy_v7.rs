@@ -181,7 +181,6 @@ pub fn score_actions(gs: &GameState, actions: &[Action], me: u8) -> Vec<(f64, St
     };
     let base_cost = stage_cost(my_now);
     let development = std::env::var("V7_NO_DEVELOPMENT").is_err();
-    let upgrade_baton = std::env::var("V7_UPGRADE_BATON").is_ok();
     let heart_weight = env_weight("V7_HEART_WEIGHT", 3.0);
     let blade_weight = env_weight("V7_BLADE_WEIGHT", 6.0);
 
@@ -266,25 +265,27 @@ pub fn score_actions(gs: &GameState, actions: &[Action], me: u8) -> Vec<(f64, St
         }
 
         // Baton touch: discounted upgrade of the power piece (guide curve
-        // 4->9->13). Strongly favored.
+        // 4->9->13). Strongly favored. D1: detect via occupied target /
+        // available_areas, never via the unset `use_baton_touch` param.
+        // Ablation: V7_PRE_D=1 restores the dead key; V7_NO_BATON=1 disables.
         let cost_growth = stage_cost(my_sim) - base_cost;
         if development {
             val += 8.0 * f64::from(cost_growth);
             parts.push(format!("development{:+}", 8 * cost_growth));
         }
-        if a.parameters.as_ref().and_then(|p| p.use_baton_touch) == Some(true)
-            || ((std::env::var("V7_BATON_VISION").is_ok() || (upgrade_baton && cost_growth > 0))
-                && a.action_type == ActionType::PlayMemberToStage
-                && a.parameters.as_ref().is_some_and(|p| {
-                    p.available_areas.as_ref().is_some_and(|areas| {
-                        areas.iter().any(|area| {
-                            Some(&area.area) == p.stage_area.as_ref() && area.is_baton_touch
-                        })
-                    })
-                }))
-        {
+        let baton_hit = a.parameters.as_ref().is_some_and(|p| {
+            p.use_baton_touch == Some(true)
+                || crate::bot::v7_main::baton_from_params(gs, me, p)
+        });
+        // D1: detect-only in the default path — `development` (8× cost growth)
+        // already prices batons; a flat +45 double-counted and regressed ~18pp
+        // (measured 2026-09-23). Flat bonus kept behind V7_BATON_FLAT for
+        // ablation reproduction.
+        if baton_hit && std::env::var("V7_BATON_FLAT").is_ok() {
             val += 45.0;
             parts.push("baton+45".into());
+        } else if baton_hit {
+            parts.push("baton".into());
         }
 
         // Hand reserve: a 1-card hand can neither set lives nor pay costs.
@@ -334,7 +335,10 @@ pub fn score_actions(gs: &GameState, actions: &[Action], me: u8) -> Vec<(f64, St
                 .and_then(|cid| db.get_card(cid))
                 .map(|c| c.card_no.clone())
                 .unwrap_or_default();
-            let baton_mark = if a.parameters.as_ref().and_then(|p| p.use_baton_touch) == Some(true) {
+            let baton_mark = if a.parameters.as_ref().is_some_and(|p| {
+                p.use_baton_touch == Some(true)
+                    || crate::bot::v7_main::baton_from_params(gs, me, p)
+            }) {
                 "[BATON]"
             } else {
                 ""
@@ -929,6 +933,18 @@ fn experiment_portfolio_rank(
     (out, singles)
 }
 
+fn count_lives(gs: &GameState, desired: &[usize], db: &CardDatabase) -> usize {
+    let (my, _) = gs.seated_pair(gs.active_player_index());
+    desired
+        .iter()
+        .filter(|&&hi| {
+            my.hand.cards.get(hi).copied().map_or(false, |cid| {
+                db.get_card(cid).is_some_and(|c| c.card_type == CardType::Live)
+            })
+        })
+        .count()
+}
+
 fn choose_live_set_experiment(gs: &GameState, actions: &[Action], db: &CardDatabase) -> Action {
     let me = gs.active_player_index();
     let (my, opp) = gs.seated_pair(me);
@@ -958,8 +974,46 @@ fn choose_live_set_experiment(gs: &GameState, actions: &[Action], db: &CardDatab
     let (ranked, singles) = experiment_portfolio_rank(gs, me, db);
     let contested = (is_second && opp_committed) || opp_succ >= 2;
     if contested {
-        if let Some((_, _, idxs)) = ranked.first() {
-            desired = idxs.clone();
+        // D3: comparison-aware sizing. If even our best floor-clearing
+        // portfolio cannot beat the opponent's PUBLIC ceiling by a real
+        // margin, a multi-life score-max set only donates ammo — prefer the
+        // single safest life (max P(we pass); placement then rides on their
+        // failure). Fold only when the opponent zone is still empty (nothing
+        // to gift) and no single clears the floor. Reverse-gate: V7_PRE_D=1
+        // keeps pure score-max (old behavior).
+        let ceiling_enabled = std::env::var_os("V7_PRE_D").is_none()
+            && std::env::var_os("V7_NO_CEILING").is_none();
+        let mut chose_single = false;
+        if ceiling_enabled {
+            let e_opp = crate::bot::strategy_v5::estimate_opp_score(gs, me, db);
+            let best_score = ranked.iter().map(|(_, s, _)| *s).max();
+            if let Some(best_score) = best_score {
+                let gap = e_opp - best_score;
+                if gap > 2 && my_succ < 2 && opp_succ < 2 {
+                    if let Some(&(_, _, first_hi, _)) = singles.first().filter(|s| s.0 >= floor) {
+                        desired.push(first_hi);
+                        chose_single = true;
+                        log::debug!(
+                            "v7 ceiling-single t{} me{} e_opp={} best={} gap={} hi={} p={:.2}",
+                            gs.turn_number, me, e_opp, best_score, gap, first_hi,
+                            singles.first().map(|s| s.0).unwrap_or(0.0)
+                        );
+                    } else if !opp_committed {
+                        log::debug!(
+                            "v7 ceiling-fold t{} me{} e_opp={} best={} gap={} floor={:.2}",
+                            gs.turn_number, me, e_opp, best_score, gap, floor
+                        );
+                        return emit(gs, actions, &desired);
+                    }
+                }
+            }
+        }
+        if !chose_single {
+            if let Some((_, _, idxs)) = ranked.first() {
+                desired = idxs.clone();
+            } else if let Some(&(_, _, first_hi, _)) = singles.first().filter(|s| s.0 >= floor) {
+                desired.push(first_hi);
+            }
         }
     } else if let Some(&(_, _, first_hi, _)) = singles.first().filter(|s| s.0 >= floor) {
         desired.push(first_hi);
@@ -989,20 +1043,55 @@ fn choose_live_set_experiment(gs: &GameState, actions: &[Action], db: &CardDatab
         }
     }
 
-    if desired.is_empty() {
+    // D2b desperation life: MEASURED 2026-09-23 (seed 11, 3000×2) — picking a
+    // below-floor life instead of pure junk cost ~1pp vs v6 (3175-2437 vs
+    // ceiling-only 3231-2373). Below-floor lives lose the card for near-zero
+    // place chance; junk at least draws replacements. OFF by default;
+    // V7_D2B=1 re-enables for ablation.
+    let d2b_enabled = std::env::var("V7_D2B").is_ok()
+        && std::env::var_os("V7_PRE_D").is_none()
+        && std::env::var_os("V7_PURE_JUNK").is_none();
+    if desired.is_empty() && d2b_enabled {
+        // D2b: never emit a pure-junk set. Gamble one near-miss life at the
+        // usual floor; if even that fails, still take the best single life
+        // (p > 0) — a failed life check at least contests; 3 junk cards
+        // auto-fail while burning the turn. Reverse-gates: V7_PRE_D=1,
+        // V7_PURE_JUNK=1.
+        let gamble_floor = if opp_succ >= 2 { 0.10 } else { 0.25 };
+        if let Some((_, _, hi, _)) = singles.first().filter(|single| single.0 >= gamble_floor) {
+            desired.push(*hi);
+        } else if let Some((p, _, hi, _)) = singles.iter().find(|single| single.0 > 0.0) {
+            desired.push(*hi);
+            log::debug!(
+                "v7 desperation-life t{} me{} hi={} p={:.2} (below floor {:.2})",
+                gs.turn_number, me, hi, p, gamble_floor
+            );
+        }
+    } else if desired.is_empty() {
         let gamble_floor = if opp_succ >= 2 { 0.10 } else { 0.25 };
         if let Some((_, _, hi, _)) = singles.first().filter(|single| single.0 >= gamble_floor) {
             desired.push(*hi);
         }
     }
 
+    let lives_before_junk = count_lives(gs, &desired, db);
     experiment_junk_fill(gs, me, db, &mut desired);
+    let n_lives = count_lives(gs, &desired, db);
     log::debug!(
-        "v7 experiment t{} me{} n={} contested={}",
+        "v7 experiment t{} me{} n={} lives={} junk={} contested={} floor={:.2} my{} opp{}",
         gs.turn_number,
         me,
         desired.len(),
-        contested
+        n_lives,
+        desired.len() - n_lives,
+        contested,
+        floor,
+        my_succ,
+        opp_succ
+    );
+    debug_assert!(
+        lives_before_junk == n_lives,
+        "junk fill must never displace a life (D2b)"
     );
     if std::env::var("V7_TRACE").is_ok() {
         let score: i32 = desired

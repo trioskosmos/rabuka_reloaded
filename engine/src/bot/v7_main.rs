@@ -1,8 +1,63 @@
 use crate::bot::strategy_common::{acc_add, requirements_met, Acc};
 use crate::card::CardType;
 use crate::core::stats_pipeline;
-use crate::game_setup::{self, Action, ActionType};
+use crate::game_setup::{self, Action, ActionType, ActionParameters};
 use crate::game_state::{GameResult, GameState, Phase};
+
+/// D1: baton vision from action params, not the unset `use_baton_touch`.
+/// A PlayMemberToStage targeting an occupied stage slot (or a double-baton
+/// `card_indices` pair, or an `available_areas` entry flagged
+/// `is_baton_touch` for the chosen `stage_area`) IS a baton touch.
+/// Generator never sets `use_baton_touch` (link.rs matches on it); occupied
+/// target ⇒ baton is the generator's own rule (game_setup.rs:1504-1541).
+/// Reverse-gates for ablation: `V7_PRE_D=1` or `V7_NO_BATON=1`.
+pub(crate) fn is_baton_action(gs: &GameState, me: u8, a: &Action) -> bool {
+    if std::env::var_os("V7_PRE_D").is_some() || std::env::var_os("V7_NO_BATON").is_some() {
+        return a.parameters.as_ref().and_then(|p| p.use_baton_touch) == Some(true);
+    }
+    if a.action_type != ActionType::PlayMemberToStage {
+        return false;
+    }
+    let Some(p) = a.parameters.as_ref() else {
+        return false;
+    };
+    if p.use_baton_touch == Some(true) {
+        return true;
+    }
+    baton_from_params(gs, me, p)
+}
+
+pub(crate) fn baton_from_params(gs: &GameState, me: u8, p: &ActionParameters) -> bool {
+    if p.card_indices.is_some() {
+        return true;
+    }
+    if let Some(areas) = p.available_areas.as_ref() {
+        if let Some(stage) = p.stage_area.as_ref() {
+            if areas
+                .iter()
+                .any(|area| &area.area == stage && area.is_baton_touch)
+            {
+                return true;
+            }
+        }
+    }
+    let Some(stage) = p.stage_area.as_ref() else {
+        return false;
+    };
+    let idx = match stage.as_str() {
+        "left" => 0,
+        "center" => 1,
+        "right" => 2,
+        _ => return false,
+    };
+    gs.seat_player(me)
+        .stage
+        .stage
+        .get(idx)
+        .copied()
+        .unwrap_or(-1)
+        != -1
+}
 
 
 fn board(gs: &GameState, me: u8) -> (Acc, i32, i32) {
@@ -100,7 +155,14 @@ fn features(gs: &GameState, me: u8) -> Features {
 }
 
 fn value(now: &Features, base: &Features, deploy: bool) -> f64 {
-    let mut score = 8.0 * (now.cost - base.cost) as f64
+    // Development weight: default 8.0 (historical). V7_DEV_WEIGHT for
+    // ablation — losses still cluster on dev_gap (audit 2026-09-23).
+    let dev_w: f64 = std::env::var("V7_DEV_WEIGHT")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .filter(|w: &f64| w.is_finite() && *w >= 0.0)
+        .unwrap_or(8.0);
+    let mut score = dev_w * (now.cost - base.cost) as f64
         + 3.0 * (now.hearts - base.hearts) as f64
         + 6.0 * (now.blades - base.blades) as f64
         + 60.0 * (now.coverage - base.coverage)
@@ -126,6 +188,17 @@ struct Search<'a> {
 }
 
 impl Search<'_> {
+    /// Node budget per root action. Default 64 (historical); V7_NODES env
+    /// for ablation. Budget-limited leaves return eval-1.0, so a larger
+    /// budget mainly deepens choice chains rather than changing scalars.
+    fn node_budget() -> usize {
+        std::env::var("V7_NODES")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .filter(|n: &usize| *n > 0)
+            .unwrap_or(64)
+    }
+
     fn evaluate(&self, gs: &GameState) -> f64 {
         let own = features(gs, self.me);
         let opp = gs.seat_player(1 - self.me);
@@ -145,12 +218,12 @@ impl Search<'_> {
         if !gs.can_player_act(self.me as i32) {
             return (self.evaluate(gs), depth, "opponent-choice");
         }
-        if depth >= 8 || self.nodes >= 64 {
+        if depth >= 8 || self.nodes >= Self::node_budget() {
             return (self.evaluate(gs) - 1.0, depth, "choice-budget");
         }
         let mut best = (f64::NEG_INFINITY, depth, "execution-error");
         for action in game_setup::generate_possible_actions(gs) {
-            if self.nodes >= 64 { break; }
+            if self.nodes >= Self::node_budget() { break; }
             if action.parameters.as_ref().and_then(|p| p.disabled) == Some(true) { continue; }
             self.nodes += 1;
             crate::rng::seed(0x7637 + depth as u32);
@@ -190,6 +263,9 @@ pub fn score_actions(gs: &GameState, actions: &[Action], me: u8) -> Vec<(f64, St
     let base = features(&root, me);
     let opponent = features(&root, 1 - me);
     let pending = gs.has_pending_choice();
+    // MEASURED 2026-09-23: Pass=-0.05 + energy tax exploded draws
+    // (1569/3000, avg turns 3.7) — every UseAbility at score≈0 then beat
+    // Pass and main never ended cleanly. Keep flat 0.0 (v6 doctrine).
     let mut scores = Vec::with_capacity(actions.len());
     for action in actions {
         if action.parameters.as_ref().and_then(|p| p.disabled) == Some(true) {
@@ -197,6 +273,13 @@ pub fn score_actions(gs: &GameState, actions: &[Action], me: u8) -> Vec<(f64, St
             continue;
         }
         if action.action_type == ActionType::Pass && !pending {
+            // Keep Pass visible in V7_DEBUG traces (was short-circuited).
+            if std::env::var_os("V7_DEBUG").is_some() {
+                eprintln!(
+                    "V7M t{} me{} pass None value=0.00 choices=0 depth=0 status=end-main",
+                    gs.turn_number, me
+                );
+            }
             scores.push((0.0, "end-main=0".into()));
             continue;
         }
@@ -211,14 +294,48 @@ pub fn score_actions(gs: &GameState, actions: &[Action], me: u8) -> Vec<(f64, St
             deploy: action.action_type == ActionType::PlayMemberToStage, nodes: 0,
         };
         let (mut score, depth, status) = search.complete(&sim, 0);
+        // D1 baton vision: DETECT for logging/[BATON] marks, but do NOT add a
+        // flat bonus. MEASURED 2026-09-23 (seed 11, 3000×2): +45 → 39.5% vs
+        // v6 (folds 3.7%); +12 with ammo-guard → 50.5%; flat 0 → baseline.
+        // The `value()` development term (8× stage-cost growth) already prices
+        // discounted upgrades — a flat baton bonus double-counts and over-dumps
+        // the hand (live-set folds 0.3%→4.1% at +45).
+        let baton = is_baton_action(gs, me, action);
         if !pending && action.action_type == ActionType::UseAbility && score <= 0.0 {
             score -= 0.01;
         }
-        let explanation = format!("value={score:.2} choices={} depth={depth} status={status}", search.nodes);
+        let explanation = format!(
+            "value={score:.2} choices={} depth={depth} status={status}{}",
+            search.nodes,
+            if baton { " [BATON]" } else { "" }
+        );
         if std::env::var_os("V7_DEBUG").is_some() {
-            eprintln!("V7M t{} me{} {} {:?} {}", gs.turn_number, me, action.action_type, action.parameters, explanation);
+            let (_, blades, cost) = board(&root, me);
+            eprintln!(
+                "V7M t{} me{} {:?} {:?} {} | st={} bl={} h={}/{} en={} hand={} ammo={} succ={}",
+                gs.turn_number, me, action.action_type, action.parameters, explanation,
+                cost, blades, base.hearts, base.cost, base.energy, base.hand, base.ammo, base.success,
+            );
         }
         scores.push((score, explanation));
+    }
+    if std::env::var_os("V7_DEBUG").is_some() {
+        let mut best = 0usize;
+        for i in 1..scores.len() {
+            if scores[i].0 > scores[best].0 {
+                best = i;
+            }
+        }
+        let chosen = actions.get(best);
+        eprintln!(
+            "V7CH t{} me{} CHOSEN {:?} {:?} score={:.2} note={}",
+            gs.turn_number,
+            me,
+            chosen.map(|a| a.action_type),
+            chosen.and_then(|a| a.parameters.as_ref()),
+            scores.get(best).map(|(s, _)| *s).unwrap_or(f64::NEG_INFINITY),
+            scores.get(best).map(|(_, n)| n.as_str()).unwrap_or(""),
+        );
     }
     scores
 }
@@ -229,8 +346,18 @@ pub fn choose_action(gs: &GameState, actions: &[Action], me: u8) -> Action {
     for i in 1..scores.len() {
         if scores[i].0 > scores[best].0 { best = i; }
     }
-    actions.get(best).cloned().unwrap_or(Action {
+    let chosen = actions.get(best).cloned().unwrap_or(Action {
         action_type: ActionType::Pass, description: "pass".into(),
         description_ja: None, parameters: None, selected: None,
-    })
+    });
+    log::debug!(
+        "v7_main chosen t{} me{} {:?} params={:?} score={:.2} note={}",
+        gs.turn_number,
+        me,
+        chosen.action_type,
+        chosen.parameters,
+        scores.get(best).map(|(s, _)| *s).unwrap_or(f64::NEG_INFINITY),
+        scores.get(best).map(|(_, n)| n.as_str()).unwrap_or(""),
+    );
+    chosen
 }

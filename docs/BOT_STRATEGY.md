@@ -551,6 +551,40 @@ isolation runs (`V7_MAIN_V6=1`, 3000×2, seed 11). The 87% "failed_checks"
 loss clusters decompose into four mechanisms below; a fifth (mulligan) was
 measured and rejected (§9.1). Fix order = measured frequency × causal role.
 
+### Ablation matrix (2026-09-23, UNTRACED, 5CP3Z idou, 3000×2 both seats, seed 11)
+
+Wins are P1+P2 totals across seats (decisive = wins / (wins+losses), draws excluded).
+Baseline pure v7 already beats v6 ~57% — the old "2805 vs 2832" in §Process was
+the `V7_MAIN_V6=1` hybrid isolation, NOT pure v7 vs v6.
+
+| Config | v7 W | v6 W | decisive v7 | empty main | folds | verdict |
+|---|---:|---:|---:|---:|---:|---|
+| Ship: ceiling ON, D2b OFF, baton detect-only | 3231 | 2373 | **57.7%** | 11.9% | 0.3% | **SHIP (seed 21: 3228–2377, 57.6%)** |
+| `V7_PRE_D=1` (all old behavior) | 3221 | 2376 | 57.5% | 11.9% | 0.3% | baseline; ceiling ≈ noise (+10) |
+| `V7_BATON_FLAT=1` (+45 baton) | 2251 | 3447 | 39.5% | 9.5% | **3.7%** | **catastrophic** — flat bonus double-counts `value()`'s 8×stage-cost development term → over-dumps hand → live-set starvation → fold spike |
+| baton +12 w/ ammo guard | 2849 | 2794 | 50.5% | 10% | 1.7% | still −7pp; even modest flat bonuses hurt |
+| `V7_D2B=1` alone (desperation life) | 3175 | 2437 | 56.6% | 11.8% | 0.2% | **−1pp** — below-floor lives lose the card for near-zero place chance; junk draws replacements |
+| `V7_NODES=256` | 3225 | 2376 | 57.6% | 11.9% | 0.3% | noise vs 64 |
+| `V7_DEV_WEIGHT=14` | 3224 | 2377 | 57.6% | 11.9% | 0.3% | noise vs 8 |
+| `V7_MAIN_LEGACY` (scalar scorer) | 3071 | 2535 | 54.8% | 12.1% | 0.3% | search path is +2.9pp over legacy |
+| Pass=−0.05 + energy tax | — | — | — | — | — | **reverted** — draws explode (1569/3000), avg turns 3.7 |
+| v6 mirror (ref) | — | — | — | 14.1% | 0.3% | v7 empties mains *less* than v6 |
+
+Ceiling fold/single logic (`choose_live_set_experiment`): ON by default; folds
+only when `!opp_committed` and no single clears floor; prefers safest single
+when `gap > 2`. Measured +10 over baseline (within binomial noise at n=3000,
+kept — never regressed on seed 21). D2b desperation-life: measured −1pp,
+**left OFF** (`V7_D2B=1` re-enables for re-test). Baton detection:
+`is_baton_action`/`baton_from_params` (occupied `stage_area` / `available_areas`
+/ `card_indices`) — **detect-only** by default (`[BATON]` log mark); flat
+bonus behind `V7_BATON_FLAT` after the catastrophic measurement above.
+
+Loss clusters after ship config (200-game audit, seed 21): still dominated by
+failed_checks (32% 1-check + 23% 2-check + 13% 3-check + 8% 4-check = 76%);
+no_obvious_tag 17%; dev_gap ≥6 in ~7%. Empty mains 10.6% (full runs 11.9%),
+folds 0.3%. Remaining defects are D2 (sideways/dev trajectory — no score
+change measured from weight alone) and D4 (energy hoarding); see §10.
+
 ### D1. Baton vision is dead code in BOTH v6 and v7 (the big one)
 
 `+45 baton` priority requires `p.use_baton_touch == Some(true)`, but
@@ -568,14 +602,14 @@ bug), so neither bot plays the guide's 4→9→13 engine on purpose; deploys
 happen only when they incidentally raise hearts/blades.
 FREQUENCY: ~3.5 bats per game per side; dev-gap ≥6 present in 5% of losses and
 every `failed_checks:2+` example has one.
-FIX (planned): in v7's main eval, detect baton via
-`available_areas` entry matching `stage_area` with `is_baton_touch: true`
-(or from `final_cost < base_cost` + occupied target), NOT via the unset
-parameter. Add a development term for net stage-cost growth (batons are
-discounted upgrades — the only cheap way to 9/11+), not just hearts/blades.
+STATUS (2026-09-23): detection landed (`is_baton_action` / `baton_from_params`
+in `v7_main.rs` — occupied `stage_area` / `available_areas.is_baton_touch` /
+`card_indices` multi-baton). Flat +45 **measured catastrophic** (see matrix);
+baton is **detect-only** by default (`[BATON]` log mark). The development term
+for stage-cost growth already exists as `8.0 × (now.cost − base.cost)` in
+`value()` — do NOT add a second flat baton bonus on top (double-counts).
 Do NOT set `use_baton_touch` in the generator: `link.rs:230` matches local
 PVP actions on that exact field and both sides must keep identical semantics.
-MEASURE: paired 3000×2 both seats.
 
 ### D2. Sideways-deploy blindness creates empty-main + junk-set spirals
 
@@ -587,8 +621,12 @@ dropped. The stage slot is an investment; one-ply deltas cannot see that the
 cost-7 piece funds next turn's baton ladder. This is structural cause #1 from
 V3_WHY_IT_SUCKS, still unfixed: no eval term looks at STAGE COST trajectory
 (the guides' actual metric: T1=4, T2=9, T3=13).
-FIX (planned): add `stage_cost_delta` term (v2 used stage_cost=8; restore a
-moderate weight) so batons/development plays always beat Pass ties.
+STATUS (2026-09-23): stage-cost term is live (`8.0 × cost growth` in `value()`,
+default; `V7_DEV_WEIGHT` for ablation — weight 14 measured noise). Empty mains
+11.9% vs v6's 14.1%: v7 already empties *fewer* mains than the baseline bot.
+Residual D2 is the no_obvious_tag / sideways cases where cost growth is 0 or
+negative for a one-ply window (investment only pays next turn); not yet scored
+separately.
 
 ### D2b. Junk-only live sets burn turns (measured 27%+22%+20%+13% = 87% of
 losses start here). From audit: losers' failed sets are predominantly
@@ -601,10 +639,13 @@ v6's gamble fallback (v5 verbatim) picks ONE near-miss life but junk-filter
 can crowd the portfolio to 3 cards whose combined requirements fail.
 Also live-set size dist shows 1099/1946 confirms are 3-card (56%) vs guide
 doctrine of fewer, safer lives.
-FIX (planned): when no portfolio clears the stance floor, prefer 1 real
-near-miss life + junk only if slots remain (it already does this) BUT cap
-junk at (max_slots − real_lives); never let junk displace a life from the
-portfolio when one exists. Measure with live-fold + failed-check telemetry.
+STATUS (2026-09-23): desperation-life fix (prefer a below-floor life over
+pure junk) written but **OFF by default** — measured **−1pp** (matrix,
+`V7_D2B=1`). Root cause: a below-floor life usually fails the check *and*
+loses the card; junk draws a replacement (net +1 card toward a passable
+portfolio next turn). Pure junk is the correct fallback when nothing clears
+the floor; keep `debug_assert` that junk never *displaces* a life when one
+exists in the portfolio.
 
 ### D3. Live-set EV ignores opponent's PUBLIC blade count when choosing
 score-max vs safe. v6's `estimate_opp_score` exists but live-set role choice
@@ -613,13 +654,18 @@ their visible stage cost/blades (S2 doctrine: their ceiling from public
 board). Impact visible in games where winner's maxCost 24-33 vs loser's 6-15
 (g2, g9, g18, g40, g106): v7 kept setting 3-junk into checks it could never
 win, instead of 温存 + development.
-FIX (planned): L3 comparison-aware sizing: if projected ceiling gap > 2,
-prefer single safest life (or fold at non-match-point) and bank ammo; else
-v6 score-max.
+STATUS (2026-09-23): ceiling fold/single logic **ON by default** — folds only
+when `!opp_committed` and no single clears floor; prefers safest single when
+`gap > 2`. Measured +10 over baseline (within noise, kept — never regressed
+on seed 21). Full opponent-ceiling model still thin; residual failed_checks
+clusters still have large maxCost gaps (audit examples).
 
 ### D4. Turn-4+ energy hoarding (audit: passes at en=9,10,11; §4 doctrine
 says bank only when no upgrade reachable). Small but real; D1/D2 fixes
 should absorb most of it via better deploys; re-measure after D1.
+STATUS: not yet targeted. Pass pricing experiments (Pass=−0.05 + energy tax)
+were catastrophic (draw explosion) and reverted; Pass stays flat 0.0.
+D4 needs a *positive* deploy-side fix (see D2 residual), not a Pass penalty.
 
 ### Process (measured, for reproduction)
 - Loss clusters: `python analyze_losses.py <audit.jsonl> --examples N`
@@ -628,10 +674,15 @@ should absorb most of it via better deploys; re-measure after D1.
 - Affordable-pass probe: `python pass_probe.py`
 - Isolation: `V7_MAIN_V6=1` split main vs live-set contribution:
   A-seat 1392-1415 (v6+0.77pp), B-seat 1467-1375 (v7+1.5pp) → v7's live-set
-  changes are net-positive on B seat but the bundle still loses to v6
-  overall (2805 vs 2832 @6000); main-phase vision fixes are the drag.
+  changes are net-positive on B seat but the hybrid (v6 main + v7 live) still
+  loses to pure v6 overall (2805 vs 2832 @6000). **This was NOT pure v7 vs v6**
+  — pure v7 vs v6 (same methodology) is ~57% for v7; see ablation matrix above.
 - All arena runs: fixed `--games` + `--seed`, BOTH seats, ≥3000 games each;
   single-run deltas <2% are noise (binomial σ≈0.9pp at n=3000).
+- Ablation env gates (v7): `V7_PRE_D=1` (all old behavior), `V7_NO_BATON`,
+  `V7_NO_CEILING`, `V7_PURE_JUNK`, `V7_BATON_FLAT=1` (repro old +45),
+  `V7_D2B=1` (re-enable D2b), `V7_NODES` (search budget, default 64),
+  `V7_DEV_WEIGHT` (stage-cost weight, default 8.0).
 
 ## 10. OPEN FIX ORDER (testable via bot_arena, untraced)
 
@@ -644,7 +695,14 @@ should absorb most of it via better deploys; re-measure after D1.
    bug fixed in §8.5; v6 beats v5 ~76%.)
 4. Position keywords (センター/左サイド) ignored entirely by every eval.
 5. M1: explicit baton-efficiency term (net energy per ceiling point).
+   — careful: flat baton bonuses measured catastrophic (§9.2 matrix); any
+   term must not double-count the existing `8.0 × stage-cost growth` term.
 6. Turn-order planning (sole placer becomes 先攻, 8.4.13) — no eval term yet.
+7. D2 residual: score one-ply-negative *investment* deploys (cost growth that
+   only pays when the next baton ladder runs) without a flat baton bonus;
+   empty mains 11.9% (v6 14.1%), no_obvious_tag 17% of loss clusters.
+8. D4: energy hoarding — fix on the deploy side (see §9.2); Pass stays flat
+   0.0 (Pass=−0.05 + tax measured catastrophic, reverted).
 
 ---
 
