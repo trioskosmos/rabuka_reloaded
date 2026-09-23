@@ -112,7 +112,7 @@ static int do_yell(GameState *g, int pl, int yell_cards[RB_MAX_ZONE], int *n_yel
     RbPlayer *P=&g->p[pl];
     int lives=P->live.n;
     if(lives==0) return 0;
-    int total_needed = 0;
+    int total_needed = 1;
     for (int si = 0; si < RB_STAGE_SIZE; si++) {
         int cid = P->stage[si];
         if (cid == RB_EMPTY_SLOT || cid < 0) continue;
@@ -262,7 +262,7 @@ static int rb_allocations_pass(const int *filled /*[n][8]*/, const int *needs /*
         if(total_filled < total_required) return 0;
         int icon_all = filledc[7];
         if(need[0]>0){
-            int any=0; for(int c=0;c<7;c++) any+=filledc[c];
+            int any=filledc[0]; for(int c=1;c<7;c++) any+=filledc[c];
             if(any + icon_all < need[0]) return 0;
             int u = need[0]-any; if(u<0) u=0;
             if(u>icon_all) u=icon_all;
@@ -367,15 +367,6 @@ int rb_perform_live(GameState *g, int pl){
     if (g->n_snapshots < RB_MAX_SNAPSHOTS)
         memset(&g->snapshots[g->n_snapshots], 0, sizeof(g->snapshots[g->n_snapshots]));
     allocate_and_verdict(g, pl, total_hearts, &passed, &live_score, &surplus, live_passed);
-    int has_stage = 0;
-    for (int i = 0; i < RB_STAGE_SIZE; i++) {
-        if (P->stage[i] != RB_EMPTY_SLOT && P->stage[i] >= 0) has_stage = 1;
-    }
-    if (!has_stage) {
-        passed = 0;
-        live_score = 0;
-        memset(live_passed, 0, sizeof(live_passed));
-    }
     g->live_success[pl] = passed; /* record this turn's live result for opponent_live_success */
     /* push snapshot for parity diff (trace_game oracle) — surplus feeds
        NoExcessHeart condition (engine/src/turn/live.rs compute_surplus_and_flags) */
@@ -461,7 +452,7 @@ int rb_perform_live(GameState *g, int pl){
         for (int i = 0; i < P->live.n && i < RB_MAX_LIVE_CARDS; i++) {
             if (!g->snapshots[g->n_snapshots - 1].live_passed[i]) passed = 0;
         }
-        if (!passed || !has_stage) {
+        if (!passed) {
             passed = 0;
             live_score = 0;
             g->snapshots[g->n_snapshots - 1].total_score = 0;
@@ -545,7 +536,7 @@ void rb_populate_live_verdicts(GameState *g){
             for(int c=0;c<8;c++){ total_filled+=filled[c]; total_req+=req[c]; }
             int ok = total_filled>=total_req;
             if(ok && req[0]>0){
-                int any=0; for(int c=0;c<7;c++) any+=filled[c];
+                int any=filled[0]; for(int c=1;c<7;c++) any+=filled[c];
                 if(any+icon_all < req[0]) ok=0;
                 else { int used=req[0]-any; if(used<0) used=0; icon_all-=used; if(icon_all<0) icon_all=0; }
             }

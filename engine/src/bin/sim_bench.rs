@@ -766,7 +766,7 @@ fn real_main() -> Result<(), String> {
     //   2. CPU frequency / turbo ramp — needs sustained load, not a few games.
     // So: cycle all decks until ~WARMUP_SECS of wall time (default 10s),
     // always completing at least one full pass over deck_names first.
-    {
+    if opts.trace.is_none() {
         let warmup_secs: f64 = std::env::var("SIM_BENCH_WARMUP_SECS")
             .ok()
             .and_then(|s| s.parse().ok())

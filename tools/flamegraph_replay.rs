@@ -597,8 +597,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let seed = header.engine_seed + game as u32;
         rng::seed(seed);
         let mut policy = Lcg::new(0x5EED_1234_ABCD_0001 ^ u64::from(seed));
-        let mut gs =
-            bin_common::deal_game(&db, &p1, &p2, "player1", "Player 1", "player2", "Player 2");
+        let (p1_id, p1_name, p2_id, p2_name) = if header.producer == "sim_bench" {
+            ("p1", "P1", "p2", "P2")
+        } else {
+            ("player1", "Player 1", "player2", "Player 2")
+        };
+        let mut gs = bin_common::deal_game(&db, &p1, &p2, p1_id, p1_name, p2_id, p2_name);
         let v2_policy = V2Policy::default();
         let plan_p1 = V3Plan::detect(&gs, 0, &db);
         let plan_p2 = V3Plan::detect(&gs, 1, &db);
