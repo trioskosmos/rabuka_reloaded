@@ -90,9 +90,12 @@ int rb_trigger_live_start(GameState *g, int pl) {
             Ability ab; if(!rb_decode_card_ability((uint32_t)cid,i,&ab)) continue;
             if(ab.triggers && rb_trigger_is(ab.triggers,"ライブ開始時")){
                 if(!rb_use_limit_reached(&g->queue, cid, i, ab.use_limit<0?99:ab.use_limit,g->turn)){
+                    fprintf(stderr, "[LIVE_START_SCAN] pl=%d zone=stage cid=%d ab=%d queued=1\n", pl, cid, i);
                     rb_queue_push(&g->queue, cid, i);
                     rb_record_use(&g->queue, cid, i, g->turn);
                     queued++;
+                } else {
+                    fprintf(stderr, "[LIVE_START_SCAN] pl=%d zone=stage cid=%d ab=%d queued=0 use_limit\n", pl, cid, i);
                 }
             }
             rb_free_ability(&ab);
