@@ -1410,8 +1410,7 @@ tdbg!("PHASE_ACTIVE:4 wait activated");
         use crate::ability::enums::ActionType;
         let card = game_state.card_database.get_card(card_id)?;
         card.resolved_abilities().find_map(|ab| {
-            let triggers = ab.triggers.as_deref().unwrap_or("");
-            if !triggers.contains("常時") {
+            if !ab.has_trigger(crate::triggers::TriggerKind::Constant) {
                 return None;
             }
             let effect = ab.effect.as_ref()?;
@@ -1446,8 +1445,7 @@ tdbg!("PHASE_ACTIVE:4 wait activated");
         use crate::ability::enums::ActionType;
         let card = game_state.card_database.get_card(card_id)?;
         for ab in card.resolved_abilities() {
-            let triggers = ab.triggers.as_deref().unwrap_or("");
-            if !triggers.contains("常時") {
+            if !ab.has_trigger(crate::triggers::TriggerKind::Constant) {
                 continue;
             }
             let effect = ab.effect.as_ref()?;
