@@ -1301,6 +1301,12 @@ fn nico_q181_area_freed_after_card_leaves() {
         game.state.player1.waitroom.cards.contains(&cheap),
         "Removed card back in waitroom"
     );
+
+    let replacement = game.new_id("PL!SP-sd1-019-SD");
+    game.state.player1.hand.cards.push(replacement);
+    game.give_energy(10);
+    game.play_to_stage(replacement, rabuka_engine::zones::MemberArea::Center);
+    assert_eq!(game.state.player1.stage.stage[1], replacement);
 }
 
 // ── Empty area restriction: only appears on empty areas ────────────
