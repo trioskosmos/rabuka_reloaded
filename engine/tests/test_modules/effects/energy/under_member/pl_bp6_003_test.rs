@@ -384,6 +384,42 @@ fn kotori_q247_preexisting_under_skip_live_start_no_heart() {
 }
 
 #[test]
+fn kotori_q247_p_variant_preexisting_under_does_not_double_heart() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let kotori = game.id("PL!-bp6-003-P");
+    let muse = game.id("PL!-sd1-005-SD");
+    let under_card = game.id("PL!-sd1-005-SD");
+    let filler_live = game.id("PL!-sd1-020-SD");
+
+    game.state.player1.stage.stage = [-1, kotori, -1];
+    place_under(&mut game, MemberArea::Center, under_card);
+    game.state.player1.hand.cards.push(muse);
+    game.state.player1.hand.cards.push(filler_live);
+    seed_deck(&mut game);
+    game.give_energy(3);
+
+    process_live_start_ability(&mut game, kotori);
+    game.select_indices(&[0]);
+    game.select_option(0);
+
+    assert_eq!(
+        game.state
+            .player1
+            .stage
+            .get_under_cards(MemberArea::Center)
+            .len(),
+        2
+    );
+    assert_eq!(
+        game.state
+            .mods
+            .get_heart_modifier(kotori, HeartColor::Heart01),
+        1
+    );
+}
+
+#[test]
 fn kotori_live_start_second_activation_asks_one_card_not_two() {
     let db = load_real_database();
     let mut game = TestGame::new(db);

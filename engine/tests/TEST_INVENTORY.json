@@ -1,6 +1,6 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-09-24T21:23:56.973056+00:00",
+  "generated_at": "2026-09-24T21:25:52.892353+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
@@ -8,7 +8,7 @@
     "unique_abilities": 936
   },
   "n_files": 839,
-  "n_tests": 3493,
+  "n_tests": 3494,
   "total_cards": 771,
   "covered_cards": 771,
   "abilities_on_covered": 936,
@@ -678,7 +678,7 @@
       ]
     }
   },
-  "n_test_fns_parsed": 3493,
+  "n_test_fns_parsed": 3494,
   "abilities": [
     {
       "idx": 0,
@@ -814,7 +814,7 @@
         "center_mus_with_2_heart03_reduces_1",
         "center_mus_zero_heart03_no_reduction"
       ],
-      "covering_test_count": 381,
+      "covering_test_count": 382,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -7993,6 +7993,7 @@
         "kotori_multiple_under_only_one_deployed",
         "kotori_no_empty_slot_keeps_under",
         "kotori_no_member_under_no_choice",
+        "kotori_q247_p_variant_preexisting_under_does_not_double_heart",
         "kotori_q247_preexisting_under_does_not_double_heart",
         "kotori_q247_preexisting_under_skip_live_start_no_heart",
         "kotori_skip_optional_does_nothing",
@@ -8006,7 +8007,7 @@
         "q148_blade_total_below_threshold",
         "q148_blade_total_includes_waited_member"
       ],
-      "covering_test_count": 23,
+      "covering_test_count": 24,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -8052,6 +8053,7 @@
         "kotori_multiple_under_only_one_deployed",
         "kotori_no_empty_slot_keeps_under",
         "kotori_no_member_under_no_choice",
+        "kotori_q247_p_variant_preexisting_under_does_not_double_heart",
         "kotori_q247_preexisting_under_does_not_double_heart",
         "kotori_q247_preexisting_under_skip_live_start_no_heart",
         "kotori_skip_optional_does_nothing",
@@ -8065,7 +8067,7 @@
         "q148_blade_total_below_threshold",
         "q148_blade_total_includes_waited_member"
       ],
-      "covering_test_count": 23,
+      "covering_test_count": 24,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
