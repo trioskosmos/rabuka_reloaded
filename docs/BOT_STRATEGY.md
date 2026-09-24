@@ -692,6 +692,16 @@ This is controlled by `V7_NO_STRICT_CLOSE=1`; `V7_PRE_D=1` disables it. It is
 not a general comparison-probability model yet, but it captures the highest-value
 rule that scalar pass floors previously missed.
 
+### D3c. Public opponent ceiling and minimum winning set (2026-09-24)
+The live policy no longer estimates the opponent from our own deck density. It
+uses only public opponent stage hearts/blades plus a neutral unknown-flip prior,
+then applies the documented score bands. In a contested check, the default
+minimum-win rule chooses the highest-probability portfolio that reaches the
+required comparison score; it does not blindly maximize `probability × score`.
+At two successes the required score is strict; below two, a tie is acceptable.
+`V7_NO_MIN_WIN=1` restores the old ranking. This is a human-style decision rule,
+not a trained model.
+
 - Loss clusters: `python tools/analysis/analyze_losses.py <audit.jsonl> --examples N`
 - Decision tables: `$env:V7_DEBUG='1'` (stderr tables; UNTRACED runs only)
 - Baton visibility: `python tools/analysis/count_batons.py <audit.jsonl>`
@@ -707,7 +717,8 @@ rule that scalar pass floors previously missed.
   `V7_NO_CEILING`, `V7_PURE_JUNK`, `V7_BATON_FLAT=1` (repro old +45),
   `V7_D2B=1` (re-enable D2b), `V7_NODES` (search budget, default 64),
   `V7_DEV_WEIGHT` (stage-cost weight, default 8.0), `V7_FUTURE=0`,
-  `V7_FUTURE_WEIGHT` (trajectory weight, default 2.0), `V7_NO_STRICT_CLOSE=1`.
+  `V7_FUTURE_WEIGHT` (trajectory weight, default 2.0), `V7_NO_STRICT_CLOSE=1`,
+  `V7_NO_MIN_WIN=1`.
 
 ## 10. OPEN FIX ORDER (testable via bot_arena, untraced)
 

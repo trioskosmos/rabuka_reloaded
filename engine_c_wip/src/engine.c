@@ -212,6 +212,9 @@ void rb_emit_choice(GameState *g, int actor, RbChoiceKind kind,
 static int s_exec_depth = 0;
 void rb_execute_effect_ex(GameState *g, int actor, AbilityEffect *e, int host_cid) {
     if (!e) return;
+    if (rb_ability_debug_enabled() || (e->action && !strcmp(e->action, "draw_until_count")))
+        fprintf(stderr, "[EXEC_EFFECT_ENTER] action=%s host=%d pending=%d depth=%d ptr=%p\n",
+                e->action ? e->action : "-", host_cid, rb_has_pending_choice(g), s_exec_depth, (void *)e);
     g->queue.resume_host = host_cid;
     /* Bound recursion: a deeply-nested effect tree (or a chain of ability effects
         that move/activate members) can recurse through this fn and overflow the
@@ -219,8 +222,18 @@ void rb_execute_effect_ex(GameState *g, int actor, AbilityEffect *e, int host_ci
         ability would re-resolve on a later drain pass). */
     if (s_exec_depth > 64) return;
     s_exec_depth++;
-    if (rb_has_pending_choice(g)) { s_exec_depth--; return; }
-    if (e->has_condition && e->condition && !rb_eval_condition_for_host(g, actor, host_cid, e->condition)) { s_exec_depth--; return; }
+    if (rb_has_pending_choice(g)) {
+        if (e->action && !strcmp(e->action, "draw_until_count"))
+            fprintf(stderr, "[EXEC_EFFECT_STOP] pending action=%s\n", e->action);
+        s_exec_depth--;
+        return;
+    }
+    if (e->has_condition && e->condition) {
+        int condition_ok = rb_eval_condition_for_host(g, actor, host_cid, e->condition);
+        if (e->action && !strcmp(e->action, "draw_until_count"))
+            fprintf(stderr, "[EXEC_EFFECT_COND] action=%s ok=%d\n", e->action, condition_ok);
+        if (!condition_ok) { s_exec_depth--; return; }
+    }
     for (int i = 0; i < e->n_child; i++) {
         if (!(e->action && rb_executor_is_structural(e->action))) {
             rb_execute_effect_ex(g, actor, e->child[i], host_cid);
@@ -264,6 +277,8 @@ void rb_execute_effect_ex(GameState *g, int actor, AbilityEffect *e, int host_ci
             }
     }
     if (!e->action) { s_exec_depth--; return; }
+    if (e->action && !strcmp(e->action, "draw_until_count"))
+        fprintf(stderr, "[EXEC_EFFECT_DISPATCH] has=%d action=%s\n", rb_executor_has_executor(e->action), e->action);
     if (rb_executor_has_executor(e->action))
         rb_executor_execute(g, actor, e, host_cid);
     else
@@ -1060,6 +1075,9 @@ int rb_play_member(GameState *g, int pl, int hand_idx, int stage_pos) {
                         g->queue.deferred = ab.effect;
                         g->queue.resume_host = card;
                         g->queue.resume_eff = ab.effect;
+                        fprintf(stderr, "[DEBUT_COST_PENDING] card=%d deferred=%p eff=%p cur=%d n=%d state=%d\n",
+                                card, (void *)g->queue.deferred, (void *)ab.effect,
+                                g->queue.cur, g->queue.n_entries, g->queue.state);
                     }
                 }
                 rb_drain_ability_queue(g);

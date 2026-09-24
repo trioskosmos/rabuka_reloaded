@@ -698,7 +698,12 @@ void rb_effect_both_hand_keep_shuffle_under(GameState *g, int actor,
 void rb_effect_draw_until_count(GameState *g, int actor, AbilityEffect *e) {
     if (!g || !e) return;
     int target_count = 0;
+    fprintf(stderr, "[DRAW_UNTIL_FIELDS] action=%s count=%d target=%s destination=%s source=%s n_extra=%d\n",
+            e->action ? e->action : "-", e->count, e->target ? e->target : "-",
+            e->destination ? e->destination : "-", e->source ? e->source : "-", e->n_extra);
     for (int i = 0; i < e->n_extra; i++) {
+        fprintf(stderr, "[DRAW_UNTIL_EXTRA] key=%s value=%s\n",
+                e->extra_k[i] ? e->extra_k[i] : "-", e->extra_v[i] ? e->extra_v[i] : "-");
         if (e->extra_k[i] && !strcmp(e->extra_k[i], "target_count") && e->extra_v[i]) {
             target_count = atoi(e->extra_v[i]);
             break;
@@ -713,9 +718,14 @@ void rb_effect_draw_until_count(GameState *g, int actor, AbilityEffect *e) {
     /* Only draw-until-count for Hand destination (Rust matches Zone::Hand) */
     const char *dst = e->destination ? e->destination : "hand";
     RbZone z;
-    if (rb_zone_of_str(dst, &z) != 0 || z != RB_ZONE_HAND) return;
+    int zone_result = rb_zone_of_str(dst, &z);
+    fprintf(stderr, "[DRAW_UNTIL_ZONE] dst=%s result=%d zone=%d expected=%d\n",
+            dst, zone_result, (int)z, (int)RB_ZONE_HAND);
+    if (zone_result == 0 || z != RB_ZONE_HAND) return;
     int current = P->hand.n;
     int to_draw = target_count > current ? target_count - current : 0;
+    fprintf(stderr, "[DRAW_UNTIL] actor=%d who=%d target=%d current=%d deck=%d to_draw=%d dst=%s\n",
+            actor, who, target_count, current, P->deck.n, to_draw, dst);
     if (to_draw > 0)
         rb_draw_cards_for_player(P, (uint8_t)to_draw, "deck", dst, NULL, 0, NULL, NULL, -1);
 }

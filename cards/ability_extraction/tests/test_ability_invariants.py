@@ -23,9 +23,9 @@ for _parent in _here.parents:
         ABILITIES_JSON = candidate
         break
 assert ABILITIES_JSON is not None, f"could not locate cards/abilities.json from {_here}"
-SCHEMA_JSON = ABILITIES_JSON.with_name("ability_schema.json")
 
 _SELF_APPEARANCE_PATTERNS = ("このメンバーが登場", "このカードが登場")
+_CANONICAL_DURATIONS = {"this_turn", "live_end", "as_long_as", "unless", "permanent"}
 
 passed = 0
 failed = 0
@@ -57,10 +57,8 @@ def load():
         return json.load(f)
 
 
-def test_end_of_live_duration_is_canonical():
+def test_duration_codes_are_canonical():
     data = load()
-    with open(SCHEMA_JSON, encoding="utf-8") as f:
-        schema = json.load(f)
     used = {
         node["duration"]
         for ability in data["unique_abilities"]
@@ -69,10 +67,8 @@ def test_end_of_live_duration_is_canonical():
         for node in walk_nodes(root)
         if isinstance(node.get("duration"), str)
     }
-    allowed = set(schema["field_types"]["duration"]["values"])
-    end_of_live_codes = {"live_end", "until_end_of_live"}
-    assert allowed & end_of_live_codes == {"live_end"}
-    assert used & end_of_live_codes == {"live_end"}
+    assert used <= _CANONICAL_DURATIONS
+    assert "until_end_of_live" not in used
 
 
 # ─── Invariant 1: self-appearance conditions must NOT carry card_type ───
@@ -145,7 +141,7 @@ def test_appearance_has_trigger_event():
 
 
 if __name__ == "__main__":
-    run_check("end-of-live duration is canonical", test_end_of_live_duration_is_canonical)
+    run_check("duration codes are canonical", test_duration_codes_are_canonical)
     run_check("self-appearance has no card_type", test_self_appearance_has_no_card_type)
     run_check("or_condition aggregates trigger_event", test_or_condition_aggregates_trigger_event)
     run_check("appearance_condition has trigger_event", test_appearance_has_trigger_event)

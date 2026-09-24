@@ -248,9 +248,9 @@ DURATION_PREFIX_MAP = {
     "ライブ終了時まで": "live_end",
     "ライブ終了まで": "live_end",
     "このターンの間": "this_turn",
-    "このライブの間": "this_live",
-    "ターン終了時まで": "turn_end",
-    "そのターンの間": "turn_end",
+    "このライブの間": "live_end",
+    "ターン終了時まで": "this_turn",
+    "そのターンの間": "this_turn",
 }
 
 # ======================================================================
@@ -1742,19 +1742,6 @@ _register_action(
 )
 _register_action(
     ActionRule(
-        condition=lambda t, a: (
-            "加える" in t
-            and "選ぶ" not in t
-            and "選び" not in t
-            and a.get("source") is not None
-            and "手札に加える" in t
-            and extract_count(t) is not None
-        ),
-        action="select",
-    )
-)
-_register_action(
-    ActionRule(
         match_any=["加える", "加え"],
         exclude_any=["選ぶ", "選び"],
         action="move_cards",
@@ -1912,7 +1899,9 @@ _register_action(
 _register_action(
     ActionRule(
         condition=lambda t: "1つを選ぶ" in t
-        and ("以下から" in t or "のうち" in t),
+        and ("以下から" in t or "のうち" in t)
+        and "{{heart_" not in t
+        and "ハート" not in t,
         action="choice",
     )
 )
@@ -2393,9 +2382,10 @@ def _check_ability_gain_from_text(text, action):
 
 def _check_heart_blade_split_from_text(text, action):
     """Check for heart+blade concurrent grant → sequential. Returns result dict or None."""
+    all_heart_count = text.count("{{icon_all.png|ハート}}")
     if (
         "{{icon_blade.png|ブレード}}" not in text
-        or "{{heart" not in text
+        or ("{{heart" not in text and all_heart_count == 0)
         or "得る" not in text
         or "N人が" in text
         or _blade_icon_is_target_filter(text)
@@ -2410,8 +2400,24 @@ def _check_heart_blade_split_from_text(text, action):
     actions = []
     if blade_count:
         actions.append({"action": "gain_resource", "resource": "blade", "count": blade_count})
+    if all_heart_count:
+        actions.append(
+            {
+                "action": "gain_resource",
+                "resource": "heart",
+                "heart_type": "all",
+                "count": all_heart_count,
+            }
+        )
     if heart_colors:
-        actions.append({"action": "gain_resource", "resource": "heart", "heart_colors": heart_colors, "count": len(heart_colors)})
+        actions.append(
+            {
+                "action": "gain_resource",
+                "resource": "heart",
+                "heart_colors": heart_colors,
+                "count": len(heart_colors),
+            }
+        )
     if not actions:
         return None
     tc_match = re.search(r"(\d+)人", text)
@@ -3617,17 +3623,23 @@ def _try_or(text):
             p is None or p.get("type") in ("custom",) for p in parsed
         ):
             continue
-        # Aggregate each leg's trigger_event so the engine can prefilter by
-        # real event types instead of relying on an always-true leg.
-        leg_events = [p.get("trigger_event") for p in parsed if p.get("trigger_event")]
-        result = {"type": "or_condition",
-        "operator": "or", "conditions": parsed, "text": text}
+        result = {
+            "type": "or_condition",
+            "operator": "or",
+            "conditions": parsed,
+            "text": text,
+        }
+        result = _fix_distributed_baton_arrival(result, text)
+        leg_events = [
+            leg.get("trigger_event")
+            for leg in result.get("conditions", [])
+            if leg.get("trigger_event")
+        ]
         if leg_events:
             result["trigger_event"] = {
                 "type": "or",
                 "events": leg_events,
             }
-        result = _fix_distributed_baton_arrival(result, text)
         return result
     return None
 
@@ -6762,8 +6774,8 @@ def _try_per_unit(text):
     # Extract duration from per_text (e.g., "ライブ終了時まで、カード1枚につき")
     for prefix, code in [
         ("ライブ終了時まで", "live_end"),
-        ("このターンの間", "turn_end"),
-        ("ターン終了時まで", "turn_end"),
+        ("このターンの間", "this_turn"),
+        ("ターン終了時まで", "this_turn"),
     ]:
         if per_text.startswith(prefix):
             result["duration"] = code
@@ -7129,7 +7141,7 @@ def _try_cost_set_from_reference(text):
     n = int(m.group("n"))
     offset = -n if m.group("dir") == "低い" else n
     dur_txt = m.group("dur") or "ライブ終了時まで"
-    duration = "live_end" if "ライブ" in dur_txt else "turn_end"
+    duration = "live_end" if "ライブ" in dur_txt else "this_turn"
     modify = {
         "action": "modify_cost",
         "operation": "set_from_reference",

@@ -86,8 +86,12 @@ static void json_string(Buffer *b, const char *s) {
     }
     buffer_put(b, "\"");
 }
-static int find_card_for_deck(const char *card_no) {
-    int direct = rb_find_card_by_no(card_no);
+static int find_card_for_deck(const char *raw) {
+    char normalized[128];
+    const char *card_no = raw;
+    int direct;
+    if (rb_normalize_card_no(raw, normalized, sizeof(normalized)) == 0) card_no = normalized;
+    direct = rb_find_card_by_no(card_no);
     if (direct >= 0) return direct;
     for (uint32_t i = 0; i < rb_num_cards(); i++) {
         Card c;
@@ -207,39 +211,10 @@ static void append_preset_card(Buffer *b, int *first, const char *card_no) {
 }
 
 static int preset_card(const char *line, char *card_no, int *qty) {
-    const char *marker;
-    const char *start = line;
-    size_t n;
-    while (*start == ' ' || *start == '\t') start++;
-    if (!*start || *start == '#') return 0;
-    if (*start >= '0' && *start <= '9') {
-        char *end = NULL;
-        long count = strtol(start, &end, 10);
-        if (end && (*end == ' ' || *end == '\t') && end[1] == 'x' && (end[2] == ' ' || end[2] == '\t')) {
-            start = end + 3;
-            while (*start == ' ' || *start == '\t') start++;
-            if (count <= 0) return 0;
-            n = strlen(start);
-            if (n == 0 || n >= 128) return 0;
-            memcpy(card_no, start, n + 1);
-            *qty = (int)count;
-            return 1;
-        }
-    }
-    marker = strstr(start, " x ");
-    if (marker) {
-        n = (size_t)(marker - start);
-        if (n == 0 || n >= 128) return 0;
-        memcpy(card_no, start, n);
-        card_no[n] = '\0';
-        *qty = atoi(marker + 3);
-    } else {
-        n = strlen(start);
-        if (n == 0 || n >= 128) return 0;
-        memcpy(card_no, start, n + 1);
-        *qty = 1;
-    }
-    return *qty > 0;
+    uint8_t quantity;
+    if (!line || !card_no || !qty || !rb_parse_deck_line(line, card_no, 128, &quantity)) return 0;
+    *qty = quantity;
+    return 1;
 }
 
 static void append_deck_file_content(Buffer *b, const char *web_root, const char *filename) {

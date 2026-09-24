@@ -1310,7 +1310,11 @@ static int rb_process_current_ability(GameState *g) {
         return 0;
     }
 
-    int actor = g->queue.actor;
+    int actor = rb_owner_of_card(g, cid);
+    if (actor < 0) actor = g->queue.actor;
+    if (rb_ability_debug_enabled())
+        fprintf(stderr, "[PROCESS_CURRENT] cid=%d ab=%d owner=%d queue_actor=%d use=%d\n",
+                cid, aidx, actor, g->queue.actor, ab.use_limit);
 
     if (ab.use_limit > 0) {
         if (rb_resolver_use_limit_reached(g, cid, aidx, ab.use_limit)) {
@@ -1374,6 +1378,9 @@ int rb_process_player_abilities(GameState *g, int pl) {
 
 int rb_process_pending_auto_abilities(GameState *g) {
     if (!g) return 0;
+    if (rb_ability_debug_enabled())
+        fprintf(stderr, "[AUTO_PROCESS_ENTER] state=%d pending=%d cur=%d n=%d\n",
+                g->queue.state, g->queue.has_pending, g->queue.cur, g->queue.n_entries);
     if (g->queue.has_pending) return 0;
     int total = 0;
     for (int pl = 0; pl < 2; pl++)

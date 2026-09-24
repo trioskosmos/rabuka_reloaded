@@ -3416,6 +3416,26 @@ impl AbilityResolver {
         let options = opt_binding.as_ref();
         let cm_binding = effect.choice_maker_any();
         let choice_maker = cm_binding.as_deref();
+        let heart_colors = effect.heart_colors_any();
+        if !heart_colors.is_empty()
+            && options.is_none()
+            && choice_options.is_none()
+            && choice_type.is_none()
+        {
+            log::debug!(
+                "[CHOICE_HEART] colors={:?} count={} source={:?}",
+                heart_colors,
+                effect.count_or(1),
+                effect.source_any()
+            );
+            self.execute_select_heart_color(
+                gs,
+                effect.count_or(1),
+                &heart_colors.to_vec(),
+                effect.target_name(),
+            );
+            return Ok(());
+        }
         // If a selection was already made (from a prior choice resolution),
         // execute the selected option's effect instead of creating another choice.
         if let Some(effect_options) = options {

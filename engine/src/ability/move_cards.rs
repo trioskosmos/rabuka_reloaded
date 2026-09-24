@@ -1580,8 +1580,18 @@ gs.set_recently_moved_batch(moved.clone().into(), Some("under_member"));
             || Zone::from_str(destination) == Some(Zone::DeckTop);
         let is_eligible_source = Zone::from_str(source) == Some(Zone::Discard)
             || Zone::from_str(source) == Some(Zone::SelectedCards)
+            || Zone::from_str(source) == Some(Zone::Hand)
             || (Zone::from_str(source) == Some(Zone::LookedAt)
                 && effect.all_any().unwrap_or(false));
+        log::debug!(
+            "[ORDER_CHECK] source={} destination={} eligible_source={} deck_dest={} placement={:?} taken_len={}",
+            source,
+            destination,
+            is_eligible_source,
+            is_deck_dest,
+            effect.placement_order_any(),
+            taken.len()
+        );
         if !(is_eligible_source
             && is_deck_dest
             && effect.placement_order_any() == Some(PlacementOrder::AnyOrder)
@@ -1597,7 +1607,16 @@ gs.set_recently_moved_batch(moved.clone().into(), Some("under_member"));
             taken
         );
         moved_cards.extend(taken.iter().copied());
-        gs.looked_at_cards = taken.to_vec().into();
+        let mut order_pool = taken.to_vec();
+        if Zone::from_str(source) == Some(Zone::Hand) {
+            order_pool.reverse();
+        }
+        log::debug!(
+            "[ORDER_POOL] source={} cards={:?}",
+            source,
+            order_pool
+        );
+        gs.looked_at_cards = order_pool.into();
         self.pending_choice = Some(Choice::SelectTarget {
             target: "order".to_string(),
             description: format!("Choose order for cards on deck ({} cards)", taken_count),
@@ -2359,6 +2378,37 @@ if util::distinct_should_dedupe(distinct) {
                 Zone::Discard.to_str()
             });
         log::debug!("[SELECTION_ROUTE] source={} destination={} fallback={} target={} choice_player={:?}", zone, dest, destination.is_none(), target, target_player_id);
+        if zone_enum == Some(Zone::Hand) {
+            if let Some(effect) = self
+                .current_effect
+                .clone()
+                .or_else(|| gs.entry_effect().cloned())
+            {
+                let mut order_indices = filtered_indices.clone();
+                order_indices.sort_unstable_by(|a, b| b.cmp(a));
+                let order_card_ids = {
+                    let player = gs.resolve_target_player(&target);
+                    util::resolve_indices_to_ids(player, zone, &order_indices)
+                };
+                let mut order_moved = Vec::new();
+                if self.maybe_prompt_deck_order(
+                    gs,
+                    &effect,
+                    &order_card_ids,
+                    zone,
+                    dest,
+                    &mut order_moved,
+                ) {
+                    let removed = {
+                        let player = gs.resolve_target_player_mut(&target);
+                        util::zone_remove_at_indices(player, zone, &filtered_indices)
+                    };
+                    gs.on_cards_left_zones(&removed);
+                    self.sub_choice_created = true;
+                    return Ok(());
+                }
+            }
+        }
         let mut moved = Vec::new();
         match zone_enum {
             Some(Zone::Hand)

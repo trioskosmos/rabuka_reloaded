@@ -40,46 +40,30 @@ impl AbilityResolver {
     /// conditional_on_optional placement that could not place every required
     /// card, the trailing draw consequence must not fire — whether it runs
     /// in the sequential loop or via resume_pending_actions.
-    fn gate_incomplete_placement(&self, gs: &mut GameState, effect: &AbilityEffect) -> bool {
-        let placement_incomplete = gs
-            .ability_queue
-            .current_entry()
-            .and_then(|e| e.optional_moves_all_moved)
-            == Some(false);
-        if !(placement_incomplete
-            && matches!(
-                effect.action,
-                ActionType::DrawCard | ActionType::DrawUntilCount
-            ))
-        {
-            return false;
+    fn gate_incomplete_placement(&mut self, gs: &mut GameState, effect: &AbilityEffect) -> bool {
+        let stopped = super::gates::incomplete_placement_gate(self, gs, effect).is_stop();
+        if stopped {
+            log::debug!(
+                "[EFFECT] source={:?} action={} skipped: placement incomplete (Q118)",
+                self.activating_card_id,
+                effect.action
+            );
         }
-        log::debug!(
-            "[EFFECT] source={:?} action={} skipped: placement incomplete (Q118)",
-            self.activating_card_id,
-            effect.action
-        );
-        true
+        stopped
     }
 
     /// Non-stackable check: skip if this effect is already active.
     /// Returns true when the caller must `return Ok(())`.
     fn check_non_stackable(&mut self, gs: &mut GameState, effect: &AbilityEffect) -> bool {
-        if !effect.non_stackable.unwrap_or(false) {
-            return false;
-        }
-        let effect_key = format!("{}:{}", effect.action, effect.text);
-        if gs.non_stackable_effects.iter().any(|x| x == &effect_key) {
+        let stopped = super::gates::non_stackable_gate(self, gs, effect).is_stop();
+        if stopped {
             log::debug!(
-                "[EFFECT] source={:?} action={} skipped: non-stackable effect already active key={}",
+                "[EFFECT] source={:?} action={} skipped: non-stackable effect already active",
                 self.activating_card_id,
-                effect.action,
-                effect_key
+                effect.action
             );
-            return true;
         }
-        gs.non_stackable_effects.push(effect_key);
-        false
+        stopped
     }
 
     /// Legacy opponent_action wrapper (pre-parser-flatten) + flat

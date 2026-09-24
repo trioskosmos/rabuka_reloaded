@@ -36,6 +36,7 @@ use crate::bot::strategy_v4::{
 };
 use crate::bot::strategy_v5::binom_ge;
 use crate::card::{CardDatabase, CardType};
+use crate::core::stats_pipeline;
 use crate::game_setup::{Action, ActionType};
 use crate::game_state::{GameState, Phase};
 use crate::player::Player;
@@ -85,6 +86,26 @@ fn total_blades_of(p: &Player, gs: &GameState, db: &CardDatabase) -> i32 {
             }
         })
         .sum()
+}
+
+fn public_opponent_ceiling(gs: &GameState, me: u8, db: &CardDatabase) -> i32 {
+    let (_, opp) = gs.seated_pair(me);
+    let hearts = stats_pipeline::stage_hearts(
+        &opp.stage.stage,
+        db,
+        &gs.mods.heart_override,
+        &gs.mods.heart_copy,
+        &gs.mods.heart_color_multiplier,
+        &gs.mods.heart_modifiers,
+    );
+    let blades = opp.stage.total_blades(
+        db,
+        &gs.mods.blade_modifiers,
+        &gs.mods.orientation_modifiers,
+        false,
+    );
+    let pool = hearts.hearts.values().copied().map(i32::from).sum::<i32>() + (blades as i32) / 2;
+    if pool < 3 { 0 } else { ((pool - 1) / 2).min(12) }
 }
 
 /// Passable lives under the buff-aware mean pool.
@@ -985,7 +1006,7 @@ pub(crate) fn choose_live_set_experiment(gs: &GameState, actions: &[Action], db:
             && std::env::var_os("V7_NO_CEILING").is_none();
         let mut chose_single = false;
         if ceiling_enabled {
-            let e_opp = crate::bot::strategy_v5::estimate_opp_score(gs, me, db);
+            let e_opp = public_opponent_ceiling(gs, me, db);
             let best_score = ranked.iter().map(|(_, s, _)| *s).max();
             if let Some(best_score) = best_score {
                 let gap = e_opp - best_score;
@@ -1009,7 +1030,7 @@ pub(crate) fn choose_live_set_experiment(gs: &GameState, actions: &[Action], db:
             }
         }
         if ceiling_enabled && std::env::var_os("V7_NO_MIN_WIN").is_none() {
-            let e_opp = crate::bot::strategy_v5::estimate_opp_score(gs, me, db);
+            let e_opp = public_opponent_ceiling(gs, me, db);
             let required = e_opp + i32::from(my_succ >= 2);
             let mut best: Option<(f64, i32, Vec<usize>)> = None;
             for (ev, score, idxs) in &ranked {
@@ -1051,7 +1072,7 @@ pub(crate) fn choose_live_set_experiment(gs: &GameState, actions: &[Action], db:
             && std::env::var_os("V7_NO_STRICT_CLOSE").is_none()
             && std::env::var_os("V7_PRE_D").is_none()
         {
-            let e_opp = crate::bot::strategy_v5::estimate_opp_score(gs, me, db);
+            let e_opp = public_opponent_ceiling(gs, me, db);
             let best_score = ranked.first().map(|(_, score, _)| *score).unwrap_or(0);
             if best_score <= e_opp {
                 if let Some(&(_, _, first_hi, _)) = singles.first().filter(|s| s.0 >= floor) {

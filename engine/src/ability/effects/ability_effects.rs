@@ -239,10 +239,16 @@ impl AbilityResolver {
                 return Err("invalidate_ability has no supported target_trigger".to_string());
             }
         };
-        let duration = effect
-            .duration_any()
-            .map(crate::ability::util::parse_duration)
-            .unwrap_or(crate::core::types::Duration::Permanent);
+        let duration = match effect.duration_any() {
+            Some(code) => match crate::ability::util::parse_duration(code) {
+                Some(duration) => duration,
+                None => {
+                    self.last_action_result = Some((effect.action, false));
+                    return Err(format!("unsupported duration code: {code}"));
+                }
+            },
+            None => crate::core::types::Duration::Permanent,
+        };
 
         if effect.is_self_target() {
             let Some(card_id) = gs.activating_card else {

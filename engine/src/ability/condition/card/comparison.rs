@@ -340,11 +340,21 @@ impl<'a> ConditionContext<'a> {
             };
             self.sum_condition_costs(condition, &card_ids)
         };
-        compare_counts(
+        let result = compare_counts(
             Some(operator),
             crate::constants::saturate_u8(sum_cost),
             total,
-        )
+        );
+        log::debug!(
+            "[COST_TOTAL] sum={} threshold={} operator={} result={} location={:?} target={}",
+            sum_cost,
+            total,
+            operator,
+            result,
+            condition.get_location(),
+            condition.get_target().unwrap_or("self"),
+        );
+        result
     }
 
     fn sum_condition_costs(&self, condition: &Condition, cards: &[i16]) -> i32 {

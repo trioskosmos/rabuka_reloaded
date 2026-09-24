@@ -201,6 +201,12 @@ int test_pending_choice_count(TestGame *tg){ return rb_has_pending_choice(&tg->s
 void test_set_live_card(TestGame *tg, int zone, int card_id){
     RbPlayer *P=&tg->state.p[0];
     if(zone<0||zone>=RB_MAX_LIVE_CARDS) return;
+    for (int i = 0; i < P->hand.n; i++) {
+        if (P->hand.cards[i] == card_id) {
+            rb_hand_remove_card(P, i);
+            break;
+        }
+    }
     P->live.cards[zone]=card_id;
     if(zone+1 > P->live.n) P->live.n = zone+1;
 }

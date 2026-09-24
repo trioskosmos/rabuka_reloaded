@@ -100,12 +100,17 @@ static void scenario_opponent_choice_condition(void){
             cond.n_fields=mode?1:0;
             cond.fields[0].key="negation";
             cond.fields[0].v.tag=mode==2?RB_TAG_TRUE:RB_TAG_FALSE;
-            CHECK(rb_eval_condition(&tg.state,actor,&cond)==1,
-                  "opponent-choice default state matches Rust for absent/false/true negation");
+            int expected = mode == 2 ? 0 : 1;
+            CHECK(rb_eval_condition(&tg.state,actor,&cond)==expected,
+                  "opponent-choice condition honors default and negation");
             int before=tg.state.p[actor].score;
             rb_execute_effect(&tg.state,actor,&e);
-            CHECK(tg.state.p[actor].score==before+2,
-                  "opponent-choice gate applies score effect for either actor");
+            if (expected)
+                CHECK(tg.state.p[actor].score==before+2,
+                      "opponent-choice gate applies score effect for either actor");
+            else
+                CHECK(tg.state.p[actor].score==before,
+                      "opponent-choice negation blocks score effect");
         }
     }
 }

@@ -1071,7 +1071,7 @@ impl AbilityResolver {
         };
         
         // Effect-level gates
-        let gate_result = effect_gates().check_all(self, gs, effect);
+        let gate_result = effect_gates().check_effect(self, gs, effect);
         if gate_result.is_stop() {
             let (reason, result_type) = gate_result.unwrap_stop();
             let items = drain_verdicts();
@@ -1232,7 +1232,7 @@ impl AbilityResolver {
         gs.activating_card = activating_card;
 
         // Pre-cost gates
-        let pre_gate_result = pre_cost_gates().check_all(self, gs, ability);
+        let pre_gate_result = pre_cost_gates().check_ability(self, gs, ability);
         if pre_gate_result.is_stop() {
             let (reason, result_type) = pre_gate_result.unwrap_stop();
             let items = drain_verdicts();
@@ -1255,7 +1255,7 @@ impl AbilityResolver {
         }
 
         // Post-cost gates
-        let post_gate_result = post_cost_gates().check_all(self, gs, ability);
+        let post_gate_result = post_cost_gates().check_ability(self, gs, ability);
         if post_gate_result.is_stop() {
             let (reason, result_type) = post_gate_result.unwrap_stop();
             let items = drain_verdicts();

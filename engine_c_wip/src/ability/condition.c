@@ -754,6 +754,8 @@ static int eval_group_aggregate(const GameState *g, int actor, const Condition *
     const char *loc = get_str(c, "location"); if (!loc) loc = "stage";
     const char *op = is_total ? get_str(c, "operator") : get_str(c, "aggregate_total_operator");
     if (!op) op = ">=";
+    if (rb_ability_debug_enabled())
+        fprintf(stderr, "[COND_GROUP_AGG] actor=%d pl=%d loc=%s op=%s thr=%d\n", actor, pl, loc, op, agg_total);
     /* Sum hearts for all cards in the zone matching the group filter */
     int ids[RB_MAX_ZONE]; int n = zone_ids(g, pl, loc, ids, RB_MAX_ZONE);
     int total = 0;
@@ -770,6 +772,13 @@ static int eval_group_aggregate(const GameState *g, int actor, const Condition *
         }
         total += get_card_total_hearts(g, ids[i]);
     }
+    if (rb_ability_debug_enabled())
+        fprintf(stderr, "[COND_GROUP_AGG] total=%d result=%d\n", total,
+                !strcmp(op, ">=") ? total >= agg_total :
+                !strcmp(op, ">") ? total > agg_total :
+                !strcmp(op, "<=") ? total <= agg_total :
+                !strcmp(op, "<") ? total < agg_total :
+                !strcmp(op, "==") ? total == agg_total : total >= agg_total);
     if (!strcmp(op, ">=")) return total >= agg_total;
     if (!strcmp(op, ">"))  return total > agg_total;
     if (!strcmp(op, "<=")) return total <= agg_total;
@@ -992,6 +1001,10 @@ static int phase_in_live(const struct GameState *g) {
     return g->phase==RB_PHASE_LIVE_SET || g->phase==RB_PHASE_PERFORMANCE || g->phase==RB_PHASE_VICTORY;
 }
 static int eval_temporal(const struct GameState *g, int actor, int host_cid, const Condition *c) {
+    if (rb_ability_debug_enabled())
+        fprintf(stderr, "[COND_TEMPORAL_START] actor=%d host=%d temporal=%s phase=%s\n", actor, host_cid,
+                get_str(c, "temporal") ? get_str(c, "temporal") : "-",
+                get_str(c, "phase") ? get_str(c, "phase") : "-");
     int tn=0;
     if (get_i(c,"turn_number",&tn)) {
         const char *op = get_str(c,"operator");
@@ -1081,8 +1094,13 @@ static int eval_temporal(const struct GameState *g, int actor, int host_cid, con
                     if (host_cid >= 0) return card_moved_this_turn(g, host_cid);
                     return 0;
                 }
-                return eval_condition_inner_host(g, actor, host_cid, nested);
+                int nested_result = eval_condition_inner_host(g, actor, host_cid, nested);
+                if (rb_ability_debug_enabled())
+                    fprintf(stderr, "[COND_TEMPORAL] nested=%d host=%d actor=%d\n", nested_result, host_cid, actor);
+                return nested_result;
             }
+            if (rb_ability_debug_enabled())
+                fprintf(stderr, "[COND_TEMPORAL] no_gate host=%d actor=%d\n", host_cid, actor);
             return 1; /* Rust default when nothing gates */
         }
     }
@@ -1544,7 +1562,7 @@ static int eval_complex(const struct GameState *g, int actor, int host_cid, cons
 static int eval_opponent_choice(const GameState *g, int actor, const Condition *c) {
     (void)actor;
     (void)c;
-    return g && g->opponent_choice_declined;
+    return g && !g->opponent_choice_declined;
 }
 
 static int eval_condition_inner_host(const struct GameState *g, int actor, int host_cid, const Condition *c) {

@@ -74,6 +74,11 @@ impl<'a> ConditionContext<'a> {
                 ),
             );
             let op = condition.get_operator().unwrap_or("and");
+            log::debug!(
+                "[COMPOUND_EVAL] operator={} children={:?}",
+                op,
+                conditions.iter().map(|child| child.condition_type()).collect::<Vec<_>>()
+            );
             #[cfg(not(feature = "no_std"))]
             let before = crate::ability::log::buffer_len();
             let (passed_count, result) = self.evaluate_condition_list(conditions, op);

@@ -373,10 +373,6 @@ static void resolve_gain_resource_targets(GameState *g, int who,
     }
 }
 
-/* Guard: the effect that emitted a target-selection choice. On re-entry the
-   guard clears and the grant proceeds. */
-static const AbilityEffect *s_target_choice_effect = NULL;
-
 /* Create a target-selection choice when target_count > matching candidates.
    Returns 1 when a choice was created (caller must stop processing). */
 static int try_create_target_selection_choice(GameState *g, int actor,
@@ -385,8 +381,8 @@ static int try_create_target_selection_choice(GameState *g, int actor,
     int tc = extra_int(e,"target_count",-1);
     int distinct = e->distinct_flag || extra_true(e,"distinct");
     if(tc<0 || is_self_target || per_unit || kind==RB_RES_OTHER) return 0;
+    if(g->queue.target_selection_eff) return 0;
     if(!(g->n_selected_cards==0 || distinct)) return 0;
-    if(s_target_choice_effect==e){ s_target_choice_effect=NULL; return 0; }
     int cand[RB_MISC_MAX_TARGETS];
     int nc = collect_stage_candidates(g,who,e,exclude_self_id,
                                       g->n_selected_cards>0,
@@ -395,15 +391,15 @@ static int try_create_target_selection_choice(GameState *g, int actor,
     const char *ctype = e->card_type_field[0] ? e->card_type_field : eff_extra(e,"card_type");
     rb_emit_choice(g, actor, RB_CHOICE_SELECT_CARD, "stage", ctype, tc, 0, NULL);
     rb_queue_pause_for_choice(g, &g->queue.pending);
-    const char *group = eff_extra(e,"group_names");
+    const char *group = eff_extra(e, "group_names");
     if(group) strncpy(g->queue.pending.filter_group, group, sizeof(g->queue.pending.filter_group)-1);
     g->queue.pending.filter_heart = -1;
     rb_choice_set_route(&g->queue.pending, RB_ROUTE_SELECT_CARDS);
-    g->queue.deferred = (AbilityEffect *)e;
+    g->queue.target_selection_eff = rb_effect_deep_clone(e);
+    if (!g->queue.target_selection_eff) return 0;
     g->queue.resume_mode = 0;
     g->queue.resume_actor = actor;
     g->queue.resume_host  = s_activating_card;
-    s_target_choice_effect = e;
     return 1;
 }
 
@@ -1106,7 +1102,7 @@ static int h_execute_position_change(GameState *g, int actor, const AbilityEffec
     if(dest && *dest){
         if(!strcmp(dest,"front") && !strcmp(target,"opponent")){
             rb_emit_choice(g,actor,RB_CHOICE_SELECT_TARGET,NULL,NULL,1,
-                           e->is_optional?1:0,"position|destination");
+                           e->is_optional?1:0,"position_change:opponent:front");
     rb_queue_pause_for_choice(g, &g->queue.pending);
             rb_choice_set_route(&g->queue.pending, RB_ROUTE_SELECT_TARGET);
             return 1;

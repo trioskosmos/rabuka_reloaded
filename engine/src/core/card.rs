@@ -1275,7 +1275,9 @@ impl EffectKind {
             | "modify_required_hearts_global"
             | "modify_required_hearts_success" => EffectKind::ModifyHearts { filter },
             "gain_resource" | "pay_energy" => EffectKind::GainResource { filter },
-            "change_state" | "set_card_identity" => EffectKind::ChangeState { filter },
+            "change_state" | "set_card_identity" | "set_card_identity_all_regions" => {
+                EffectKind::ChangeState { filter }
+            }
             "gain_ability"
             | "gain_ability_from_source"
             | "invalidate_ability"
@@ -2012,7 +2014,14 @@ impl AbilityEffect {
             .map(|op| op.as_str())
     }
 
-    filter_bool_getter!(optional_any, optional);
+    pub fn optional_any(&self) -> Option<bool> {
+        self.optional.or_else(|| {
+            self.kind
+                .as_deref()
+                .and_then(|k| k.filter())
+                .and_then(|f| f.optional)
+        })
+    }
 
     pub fn options_any(&self) -> Option<&Vec<Box<AbilityEffect>>> {
         self.kind.as_deref()?.filter()?.options.as_deref()
@@ -2112,36 +2121,35 @@ impl AbilityEffect {
     /// String form of the filter-level source zone (mirrors the pre-refactor
     /// `Option<ArcStr>.as_deref()`). The typed form is `source_zone()`.
     pub fn source_any(&self) -> Option<&str> {
-        self.kind.as_deref()?.filter()?.source.map(|z| z.as_str())
+        self.source
+            .map(|z| z.as_str())
+            .or_else(|| self.kind.as_deref()?.filter()?.source.map(|z| z.as_str()))
     }
 
     /// String form of the filter-level destination zone.
     pub fn destination_any(&self) -> Option<&str> {
-        self.kind
-            .as_deref()?
-            .filter()?
-            .destination
+        self.destination
             .map(|z| z.as_str())
+            .or_else(|| self.kind.as_deref()?.filter()?.destination.map(|z| z.as_str()))
     }
 
     pub fn count_any(&self) -> Option<u8> {
-        let filter_count = self
-            .kind
-            .as_deref()
-            .and_then(|k| k.filter())
-            .and_then(|f| f.count);
-        filter_count.or(self.count)
+        self.count.or_else(|| {
+            self.kind
+                .as_deref()
+                .and_then(|k| k.filter())
+                .and_then(|f| f.count)
+        })
     }
 
     pub fn target_any(&self) -> Option<&str> {
-        let variant_target = self
-            .kind
-            .as_deref()?
-            .filter()?
-            .target
-            .as_ref()
-            .map(|s| -> &str { s });
-        variant_target.or_else(|| self.target.as_deref())
+        self.target.as_deref().or_else(|| {
+            self.kind
+                .as_deref()?
+                .filter()?
+                .target
+                .as_deref()
+        })
     }
 
     /// Typed player-target subset of `target`. Returns `None` when the merged
@@ -2246,7 +2254,14 @@ impl AbilityEffect {
 
     filter_u8_getter!(cost_limit_max_any, cost_limit_max);
 
-    filter_bool_getter!(non_stackable_any, non_stackable);
+    pub fn non_stackable_any(&self) -> Option<bool> {
+        self.non_stackable.or_else(|| {
+            self.kind
+                .as_deref()
+                .and_then(|k| k.filter())
+                .and_then(|f| f.non_stackable)
+        })
+    }
 }
 
 impl AbilityEffect {
@@ -2267,6 +2282,9 @@ impl AbilityEffect {
     }
     pub fn set_optional(&mut self, val: Option<bool>) {
         self.optional = val;
+        if let Some(f) = self.kind.as_deref_mut().and_then(|k| k.filter_mut()) {
+            f.optional = val;
+        }
     }
     filter_setter!(set_energy_count, energy_count: u8);
     filter_setter!(set_per_unit, per_unit: bool);

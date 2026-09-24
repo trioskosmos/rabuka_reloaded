@@ -123,12 +123,10 @@ def test_gain_blade_per_unit():
                    resource='blade')
     assert result.get('per_unit') is True, f"Expected per_unit=True, got: {result}"
 
-# ─── KNOWN BUGS (documented, not yet fixed) ───────────────────────────────────
-
-def test_select_shadowed_by_move_cards():
+def test_discard_to_hand_move_uses_move_action():
     check(
         '自分の控え室からライブカードを1枚手札に加える',
-        'select',
+        'move_cards',
         source='discard',
         destination='hand',
         card_type='live_card',
@@ -138,7 +136,7 @@ def test_select_shadowed_by_move_cards():
 
 def test_choice_shadowed_by_select():
     check(
-        '{{heart_01.png|heart01}}か{{heart_03.png|heart03}}か{{heart_06.png|heart06}}のうち、1つを選ぶ',
+        '赤か青か黄のうち、1つを選ぶ',
         'choice',
         count=1,
     )

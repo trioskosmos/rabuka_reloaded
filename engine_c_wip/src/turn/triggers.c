@@ -133,8 +133,8 @@ static int queue_live_success_for_card(GameState *g, int pl, int cid, int occurr
         Ability ab; if (!rb_decode_card_ability((uint32_t)cid, i, &ab)) continue;
         if (ab.triggers && rb_trigger_is(ab.triggers, "ライブ成功時") &&
             !rb_ability_is_invalidated(g, cid, "ライブ成功時")) {
-            fprintf(stderr, "[LIVE_SUCCESS_TRIGGER] cid=%d ab=%d occurrence=%d use_limit=%d effect=%s options=%d\n",
-                    cid, i, occurrence, ab.use_limit,
+            fprintf(stderr, "[LIVE_SUCCESS_TRIGGER] pl=%d owner=%d cid=%d ab=%d occurrence=%d use_limit=%d effect=%s options=%d\n",
+                    pl, rb_owner_of_card(g, cid), cid, i, occurrence, ab.use_limit,
                     ab.effect && ab.effect->action ? ab.effect->action : "none",
                     ab.effect ? ab.effect->n_options : -1);
             int key = (cid << 16) | (i & 0xFFFF);
@@ -160,6 +160,9 @@ static int queue_live_success_for_card(GameState *g, int pl, int cid, int occurr
    which iterates player.live_card_zone then player.stage). Gated by
    rb_should_trigger_live_success so it only fires on a successful live. */
 int rb_trigger_live_success(GameState *g, int pl) {
+    if (rb_ability_debug_enabled())
+        fprintf(stderr, "[LIVE_SUCCESS_TRIGGER_ENTER] pl=%d state=%d pending=%d cur=%d n=%d\n",
+                pl, g->queue.state, g->queue.has_pending, g->queue.cur, g->queue.n_entries);
     if (!rb_should_trigger_live_success(g, pl)) return 0;
     int queued = 0;
     for (int i = 0; i < g->p[pl].live.n; i++) {

@@ -4,16 +4,14 @@
 
 use crate::game_state::Duration;
 
-/// Parse a duration code into [`Duration`]. Unknown codes fall back to
-/// `ThisLive` (the historical behavior).
-pub fn parse_duration(s: &str) -> Duration {
+pub fn parse_duration(s: &str) -> Option<Duration> {
     match s {
-        "this_turn" => Duration::ThisTurn,
-        "live_end" => Duration::LiveEnd,
-        "as_long_as" => Duration::AsLongAs,
-        "permanent" => Duration::Permanent,
-        "this_live" => Duration::ThisLive,
-        _ => Duration::ThisLive,
+        "this_turn" => Some(Duration::ThisTurn),
+        "live_end" => Some(Duration::LiveEnd),
+        "as_long_as" => Some(Duration::AsLongAs),
+        "unless" => Some(Duration::Unless),
+        "permanent" => Some(Duration::Permanent),
+        _ => None,
     }
 }
 
@@ -48,6 +46,15 @@ pub fn push_temporary_effect(
 ) {
     if let Some(d) = duration {
         if d != "permanent" {
+            let Some(duration) = parse_duration(d) else {
+                log::error!(
+                    "unsupported duration code '{}' for temporary effect '{}': {}",
+                    d,
+                    effect_type,
+                    description
+                );
+                return;
+            };
             if !is_revertable_effect_type(effect_type) {
                 log::warn!(
                     "temporary effect type '{}' has no expiry revert handler; \
@@ -62,7 +69,7 @@ pub fn push_temporary_effect(
                 .temporary_effects
                 .push(crate::game_state::TemporaryEffect {
                     effect_type: effect_type.to_string(),
-                    duration: parse_duration(d),
+                    duration,
                     created_turn: game_state.turn_number,
                     created_phase: game_state.current_phase.clone(),
                     target_player_id: target_player_id.to_string(),
@@ -71,5 +78,27 @@ pub fn push_temporary_effect(
                     effect_data,
                 });
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parses_canonical_duration_codes() {
+        assert_eq!(parse_duration("this_turn"), Some(Duration::ThisTurn));
+        assert_eq!(parse_duration("live_end"), Some(Duration::LiveEnd));
+        assert_eq!(parse_duration("as_long_as"), Some(Duration::AsLongAs));
+        assert_eq!(parse_duration("unless"), Some(Duration::Unless));
+        assert_eq!(parse_duration("permanent"), Some(Duration::Permanent));
+    }
+
+    #[test]
+    fn rejects_noncanonical_duration_codes() {
+        assert_eq!(parse_duration("turn_end"), None);
+        assert_eq!(parse_duration("this_live"), None);
+        assert_eq!(parse_duration("until_used"), None);
+        assert_eq!(parse_duration("next_turn"), None);
     }
 }

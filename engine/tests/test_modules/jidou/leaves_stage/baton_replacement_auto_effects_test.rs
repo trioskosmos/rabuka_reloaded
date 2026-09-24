@@ -1,7 +1,22 @@
 use crate::helpers::*;
 use crate::test_modules::support::baton_swap_auto_helpers::*;
+use rabuka_engine::ability::types::Choice;
 use rabuka_engine::card::HeartColor;
 use rabuka_engine::zones::MemberArea;
+
+fn resolve_rurino_choices(game: &mut TestGame) {
+    let mut guard = 0;
+    while game.has_pending_choice() {
+        guard += 1;
+        assert!(guard < 20, "Rurino created too many choice prompts");
+        assert!(
+            matches!(game.get_pending_choice(), Choice::SelectAutoAbility { .. }),
+            "Rurino's exact draw-then-discard flow must not ask for a choice: {:?}",
+            game.get_pending_choice()
+        );
+        game.select_indices(&[]);
+    }
+}
 
 #[test]
 fn self_stage_to_waitroom_recovers_group_live() {
@@ -70,22 +85,44 @@ fn self_stage_to_waitroom_draw_two_discard_one_leaves_one_card_in_hand() {
 }
 
 #[test]
-fn self_stage_to_waitroom_draw_two_discard_two_leaves_empty_hand() {
+fn self_stage_to_waitroom_draws_then_discards_the_exact_two_cards() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let rurino = game.id("PL!HS-bp6-019-N");
     let arriver = game.id("PL!-sd1-002-SD");
-    append_twenty_filler_cards(&mut game);
+    let draw_first = game.id("PL!N-bp1-026-L");
+    let draw_second = game.id("PL!SP-bp1-023-L");
+    let deck_remainder = game.id("PL!S-sd1-001-SD");
+
+    game.state.player1.main_deck.cards.clear();
+    game.state.player1.main_deck.cards.push(draw_first);
+    game.state.player1.main_deck.cards.push(draw_second);
+    game.state.player1.main_deck.cards.push(deck_remainder);
+    game.state.player1.hand.cards.clear();
+    game.state.player1.waitroom.cards.clear();
 
     replace_member_by_baton_touch(&mut game, rurino, arriver, MemberArea::Center);
-    resolve_auto_choices_accepting_optionals(&mut game);
+    resolve_rurino_choices(&mut game);
 
-    // hand empty after playing arriver; auto draws 2, discards 2 → final 0.
     assert_eq!(
-        game.state.player1.hand.cards.len(),
-        0,
-        "大沢瑠璃乃: draw 2, discard 2 → net hand 0"
+        game.state.player1.stage.get_area(MemberArea::Center),
+        Some(arriver),
+        "the arriving member should remain on the baton-touched area"
     );
+    assert_eq!(
+        game.state.player1.main_deck.cards.as_slice(),
+        &[deck_remainder],
+        "Rurino must draw exactly the two top cards and leave the rest in order"
+    );
+    assert!(
+        game.state.player1.hand.cards.is_empty(),
+        "Rurino must discard the two newly drawn cards"
+    );
+    let waitroom = &game.state.player1.waitroom.cards;
+    assert_eq!(waitroom.len(), 3, "only Rurino and its two discarded cards should be in the waitroom");
+    assert_eq!(waitroom[0], rurino, "the baton-touched member should be in the waitroom");
+    assert!(waitroom.contains(&draw_first));
+    assert!(waitroom.contains(&draw_second));
 }
 
 #[test]

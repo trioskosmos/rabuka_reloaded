@@ -22,6 +22,8 @@ from parser import (
     _try_zone_placement,
     extract_name_exclusions,
     extract_operator,
+    DURATION_PREFIX_MAP,
+    _strip_duration_prefix,
 )
 
 passed = 0
@@ -286,6 +288,29 @@ def test_baton_touch_displaced_card_under_arriver_uses_discard_source():
     assert condition.get("trigger_event", {}).get("location") == "discard", condition
 
 
+def test_distributed_baton_arrival_reaggregates_trigger_events():
+    ability = parse_ability(
+        "自分のステージに、このメンバーか、ほかのメンバーが"
+        "バトンタッチして登場したとき、カードを1枚引く。"
+    )
+    effect = ability["effect"]
+    condition = effect["condition"]
+    assert condition["type"] == "or_condition", condition
+    legs = condition["conditions"]
+    assert [leg["type"] for leg in legs] == [
+        "movement_condition",
+        "movement_condition",
+    ], condition
+    leg_events = [leg["trigger_event"] for leg in legs]
+    assert all(leg_events), condition
+    assert condition["trigger_event"] == {
+        "type": "or",
+        "events": leg_events,
+    }, condition
+    assert effect["action"] == "draw_card", effect
+    assert effect["count"] == 1, effect
+
+
 def test_sequential_baton_placement_is_validated_after_source_inference():
     ability = parse_ability(
         "{{toujyou.png|登場}}バトンタッチして登場した場合、このバトンタッチで控え室に置かれた『Liella!』のメンバーカードを1枚、このメンバーの下に置く。"
@@ -293,6 +318,33 @@ def test_sequential_baton_placement_is_validated_after_source_inference():
     effect = ability["effect"]
     assert effect.get("action") == "sequential", effect
     assert effect["actions"][1].get("source") == "those_cards", effect
+
+
+def test_all_heart_and_blade_gain_is_split():
+    text = "自分のライブ中のカードが3枚以上あり、その中に『虹ヶ咲』のライブカードを1枚以上含む場合、{{icon_all.png|ハート}}{{icon_all.png|ハート}}{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る"
+    effect = parse_effect(text)
+    assert effect.get("action") == "sequential", effect
+    assert effect["actions"][0].get("resource") == "blade", effect
+    assert effect["actions"][0].get("count") == 2, effect
+    assert effect["actions"][1].get("resource") == "heart", effect
+    assert effect["actions"][1].get("heart_type") == "all", effect
+    assert effect["actions"][1].get("count") == 2, effect
+
+
+def test_duration_prefixes_use_canonical_codes():
+    expected = {
+        "ライブ終了時まで": "live_end",
+        "ライブ終了まで": "live_end",
+        "このターンの間": "this_turn",
+        "このライブの間": "live_end",
+        "ターン終了時まで": "this_turn",
+        "そのターンの間": "this_turn",
+    }
+    assert DURATION_PREFIX_MAP == expected
+    for prefix, code in expected.items():
+        text, parsed = _strip_duration_prefix(prefix)
+        assert text == ""
+        assert parsed == code
 
 
 # ─── run all ──────────────────────────────────────────────────────────────────

@@ -1418,6 +1418,39 @@ impl<'a> ConditionContext<'a> {
         let g_player = self.resolve_condition_player(g_target);
         let g_location = condition.get_location().unwrap_or("");
 
+        if condition.get_all_areas().unwrap_or(false)
+            && Zone::from_str(g_location) == Some(Zone::Stage)
+        {
+            let card_db = &self.game_state.card_database;
+            let groups = condition.get_group_names().unwrap_or(&[]);
+            let card_type = condition.get_card_type().map(|ct| ct.as_str());
+            let excluded = condition.get_exclude_characters().unwrap_or(&[]);
+            let result = g_player.stage.stage.iter().all(|&card_id| {
+                card_id != -1
+                    && (groups.is_empty()
+                        || groups.iter().any(|group| {
+                            util::card_matches_group_str(card_db, card_id, Some(group))
+                        }))
+                    && card_type.is_none_or(|ct| {
+                        util::card_matches_type(card_db, card_id, Some(ct))
+                    })
+                    && !excluded.iter().any(|name| {
+                        card_db.get_card(card_id).is_some_and(|card| {
+                            crate::card::CardDatabase::normalize_name(&card.name)
+                                .contains(&crate::card::CardDatabase::normalize_name(name))
+                                || card.card_no.contains(name)
+                        })
+                    })
+            });
+            log::debug!(
+                "[GROUP_ALL_AREAS] target={} result={} stage={:?}",
+                g_target,
+                result,
+                g_player.stage.stage
+            );
+            return result;
+        }
+
         // Aggregate total check (sum of heart values, e.g. heart02 >= 6)
         if let Some(res) = self.check_aggregate_total(condition, &g_player, g_location) {
             return res;

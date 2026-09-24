@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-09-24T21:45:07.229036",
+  "generated_at": "2026-09-24T23:45:38.296266",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "495d84c1",
+  "engine_commit": "dd4d355f",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -1073,6 +1073,7 @@
             "action": "gain_resource",
             "resource": "blade",
             "count": 2,
+            "card_type": "card",
             "text": "自分のライブ中のカードが3枚以上あり、その中に『虹ヶ咲』のライブカードを1枚以上含む場合、{{icon_all.png|ハート}}{{icon_all.png|ハート}}{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る"
           },
           {
@@ -1080,11 +1081,9 @@
             "resource": "heart",
             "heart_type": "all",
             "count": 2,
+            "card_type": "card",
             "text": "自分のライブ中のカードが3枚以上あり、その中に『虹ヶ咲』のライブカードを1枚以上含む場合、{{icon_all.png|ハート}}{{icon_all.png|ハート}}{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る"
           }
-        ],
-        "group_names": [
-          "虹ヶ咲"
         ]
       }
     },
@@ -23604,6 +23603,11 @@
           "trigger_event": {
             "type": "or",
             "events": [
+              {
+                "type": "baton_touch",
+                "tense": "past",
+                "location": "stage"
+              },
               {
                 "type": "baton_touch",
                 "tense": "past",

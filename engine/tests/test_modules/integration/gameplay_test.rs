@@ -3145,6 +3145,8 @@ fn dia_sd1_optional_draw_pay_then_deck_top() {
     assert!(!game.state.player1.hand.cards.is_empty());
 
     game.try_select_indices(&[0, 1]).unwrap(); // place 2 on deck → Deck=10, Hand=2
+    assert_eq!(game.pending_choice_type(), Some("SelectTarget".to_string()));
+    game.select_option(0);
 
     assert!(!game.has_pending_choice());
 

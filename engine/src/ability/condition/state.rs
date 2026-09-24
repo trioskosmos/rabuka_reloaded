@@ -1,6 +1,6 @@
 use crate::core::constants::U8Count;
 use super::ConditionContext;
-use crate::ability::enums::{ConditionType, Zone};
+use crate::ability::enums::Zone;
 use crate::ability::util;
 use crate::ability::util::compare_counts;
 use crate::card::{CardProperty, Condition};
@@ -73,19 +73,25 @@ impl<'a> ConditionContext<'a> {
                     created_turn == self.game_state.turn_number
                 } else {
                     if let Some(nested_condition) = condition.get_condition() {
+                        let nested_movement = match nested_condition {
+                            Condition::Movement { movement, .. } => {
+                                movement.as_deref().unwrap_or("not_moved")
+                            }
+                            _ => "",
+                        };
                         log::debug!(
-                            "[TEMPORAL_TURN] nested type={:?}",
-                            nested_condition.condition_type()
+                            "[TEMPORAL_TURN] nested movement={:?}",
+                            nested_movement
                         );
-                        match nested_condition.condition_type() {
-                            Some(ConditionType::NotMoved) => {
+                        match nested_movement {
+                            "not_moved" => {
                                 if let Some(activating_card_id) = self.activating_card_id {
                                     !self.game_state.has_card_moved_this_turn(activating_card_id)
                                 } else {
                                     true
                                 }
                             }
-                            Some(ConditionType::HasMoved) => {
+                            "has_moved" => {
                                 let check_card = condition.get_position().and_then(|pos| {
                                     pos.get_position().and_then(|pos_str| {
                                         let target = condition.get_target().unwrap_or("self");

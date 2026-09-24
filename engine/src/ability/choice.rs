@@ -2742,11 +2742,27 @@ gs.set_recently_moved_batch(valid_ids.into(), Some("stage"));
                     .and_then(|e| e.target.clone().map(|s| s.to_string()))
             })
             .unwrap_or_else(|| "self".to_string());
+        let card_nos: Vec<String> = ordered
+            .iter()
+            .map(|&card_id| {
+                gs.card_database
+                    .get_card(card_id)
+                    .map(|card| card.card_no.to_string())
+                    .unwrap_or_default()
+            })
+            .collect();
         log::debug!("[ORDER_DONE] target={} cards={:?}", target, ordered);
         let player = gs.resolve_target_player_mut(&target);
         for &card_id in ordered.iter().rev() {
             player.main_deck.cards.insert(0, card_id);
         }
+        log::debug!(
+            "[ORDER_DONE] target={} cards={:?} card_nos={:?} deck_after={:?}",
+            target,
+            ordered,
+            card_nos,
+            player.main_deck.cards
+        );
         self.moved_cards.extend(ordered);
         self.execution_context = ExecutionContext::None;
         self.clear_choice_state_and_resume(gs)

@@ -663,6 +663,10 @@ int rb_drain_ability_queue(GameState *g) {
     int ran = 0;
     for (int i = 0; i < g->queue.n_entries; i++) {
         RbQueueEntry *e = &g->queue.entries[i];
+        if (rb_ability_debug_enabled())
+            fprintf(stderr, "[QUEUE_SCAN] idx=%d n=%d cid=%d ab=%d started=%d completed=%d\n",
+                    i, g->queue.n_entries, e->card_id, e->ability_idx,
+                    e->effect_started, e->completed);
         if (e->effect_started) continue;
         e->effect_started = 1;
         int n = rb_card_num_abilities((uint32_t)e->card_id);

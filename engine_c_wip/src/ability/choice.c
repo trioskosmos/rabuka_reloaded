@@ -2345,6 +2345,9 @@ int rb_resume_with_choice(GameState *g, int selected_idx) {
     /* Capture the deferred effect BEFORE clearing the queue (clearing nulls it). */
     AbilityEffect *def = g->queue.deferred;
     AbilityEffect *target_selection_eff = g->queue.target_selection_eff;
+    fprintf(stderr, "[RESUME_CAPTURE] def=%p target=%p eff=%p cur=%d n=%d state=%d pending=%d\n",
+            (void *)def, (void *)target_selection_eff, (void *)eff,
+            g->queue.cur, g->queue.n_entries, g->queue.state, g->queue.has_pending);
     const AbilityEffect *cont = g->queue.resume_parent;
     int cont_from = g->queue.resume_child + 1;
     int was_skip = (selected_idx < 0);
@@ -2498,6 +2501,8 @@ int rb_resume_with_choice(GameState *g, int selected_idx) {
                 g->n_selected_cards = 0;
             }
             if (!was_skip && def && !rev && !cost_hand && !rb_has_pending_choice(g)) {
+                fprintf(stderr, "[RESUME_EXEC] def=%p action=%s is_cost=%d host=%d\n",
+                        (void *)def, def->action ? def->action : "-", is_cost, host);
                 if (is_cost) rb_pay_cost(g, actor, def);
                 else         rb_execute_effect_ex(g, actor, def, host);
             }

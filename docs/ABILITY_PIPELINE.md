@@ -230,11 +230,11 @@ The action-to-domain map is currently:
 The original document correctly identified the symptom, but some of its
 explanations were out of date. The current causes are:
 
-### 1. The schema is implicit
+### 1. The wire contract is distributed
 
-There is no single schema file that defines the relationship between parser
-output, Rust fields, action names, condition names, and handler behavior. That
-contract is spread across:
+There is no standalone ability schema. The relationship between parser output,
+Rust fields, action names, condition names, and handler behavior is owned by
+code:
 
 - parser registries and normalization code;
 - `ActionType::from_str()` in `enums.rs`;
@@ -268,10 +268,11 @@ or never reach `EffectKind`.
 
 ### 4. Dispatch knowledge is distributed
 
-The central match gives one entry point, but handler-specific semantics are
-spread across cost, compound, choice, movement, condition, and effect modules.
-There is no generated registry containing action name, accepted fields,
-handler, choice behavior, and test coverage.
+The executor match now gives one explicit entry point, but handler-specific
+semantics remain spread across cost, compound, choice, movement, condition,
+and effect modules. Accepted fields and choice behavior are therefore tested
+at the model and handler boundaries rather than through a separate schema
+artifact.
 
 ### 5. Runtime errors are too easy to hide
 
@@ -343,31 +344,25 @@ Do this before a broad refactor.
 - [x] Merged duplicate `_propagate()` and `_propagate_if_missing()` into one
   function with `skip_existing` parameter
 
-### Phase 1: create a machine-readable contract
+### Phase 1: keep the contract in code
 
-- [x] Introduce a schema or registry (`cards/ability_schema.json`) that describes, for each action and condition:
-  - canonical JSON name and aliases;
-  - required and optional fields;
-  - nested effect/condition fields;
-  - target and choice behavior;
-  - Rust action/variant mapping;
-  - handler module;
-  - whether the action is authoring-only, runtime-only, or both.
+- [x] Keep canonical action and condition names in the typed Rust enums and
+  wire-string tables.
+- [x] Keep field decoding generated from the Rust model definitions rather
+  than maintaining a second ability schema.
+- [x] Make executor and choice dispatch exhaustive so every variant has an
+  explicit classification.
+- [ ] Add model-level getter/setter and nested-effect parity tests for each
+  migrated domain.
 
-The first version does not need to generate all Rust. It should generate a
-validation report and the action-to-handler reference. This gives the project
-a single place to answer "what does this field mean?" without forcing a risky
-rewrite.
-
-The registry should also distinguish parser normalization from game semantics.
-For example, a parser may normalize `look_and_select` into effect steps, while
-the runtime still needs to preserve the original rule-level meaning for logs
-and debugging.
+The parser remains responsible for Japanese phrase recognition and
+normalization. The runtime remains responsible for typed semantics and handler
+dispatch. No separate schema artifact is required to connect those layers.
 
 ### Phase 2: remove the dual effect representation incrementally
 
-- [x] Schema cross-reference validator (`cards/validate_schema.py`) catches drift
-  between schema, compiler opcodes, Rust enum variants, and handler coverage.
+- [x] Keep `AbilityEffect` common fields as the canonical runtime source and
+  make shared accessors fall back to the typed payload during migration.
 - [ ] Define typed fields and conversion tests for one domain, such as compound
   effects.
 - [ ] Make handlers read the canonical typed form.
@@ -381,12 +376,12 @@ Do not start by flattening every field into one large struct. That would remove
 some enum boilerplate but preserve the ambiguity about which fields are valid
 for which action.
 
-### Phase 3: improve decoding only after the contract is stable
+### Phase 3: improve decoding after the model migration
 
 The current generic binary-JSON format is a reasonable compatibility layer. A
-typed decoder can be considered after Phase 1 and Phase 2, provided it has:
+typed decoder can be considered after the model migration, provided it has:
 
-- a schema-derived or otherwise single-source field mapping;
+- a single-source field mapping in the Rust model and generator;
 - exact deep comparison against the compatibility decoder;
 - malformed-input tests and versioning;
 - parity tests for every supported platform feature;

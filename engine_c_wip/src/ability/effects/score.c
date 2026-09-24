@@ -240,18 +240,6 @@ int rb_execute_modify_score(GameState *gs, int actor, AbilityEffect *e) {
             }
             if (self_target && cid == (gs->queue.resume_host >= 0 ? gs->queue.resume_host : gs->activating_card)) {
                 rb_mods_add_score(&gs->mods, cid, (int16_t)delta);
-                for (int si = gs->n_snapshots - 1; si >= 0; si--) {
-                    RbLiveSnapshot *snapshot = &gs->snapshots[si];
-                    if (snapshot->player != pl) continue;
-                    for (int li = 0; li < snapshot->n_lives; li++) {
-                        if (snapshot->lives[li] == cid) {
-                            snapshot->live_score_detail[li] += delta;
-                            si = -1;
-                            break;
-                        }
-                    }
-                    if (si < 0) break;
-                }
             } else if (!strcmp(op, "set")) {
                 rb_mods_set_score(&gs->mods, cid, (int16_t)delta);
             } else {

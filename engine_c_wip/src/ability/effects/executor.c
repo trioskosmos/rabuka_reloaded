@@ -130,7 +130,10 @@ static int execute_repeat(GameState *g, int actor, AbilityEffect *effect, int ho
 int rb_executor_execute(GameState *g, int actor, AbilityEffect *effect, int host_cid)
 {
     if (!g || !effect || !effect->action) return 0;
-    if (!find_executor(effect->action)) return 0;
+    if (!find_executor(effect->action)) {
+        fprintf(stderr, "[EXECUTOR_MISS] action=%s\n", effect->action);
+        return 0;
+    }
     if (rb_ability_debug_enabled())
         fprintf(stderr, "[EXECUTOR] action=%s host=%d cond=%d\n",
                 effect->action, host_cid, effect->has_condition);
@@ -140,6 +143,7 @@ int rb_executor_execute(GameState *g, int actor, AbilityEffect *effect, int host
     if (strcmp(action, "draw_card") == 0 || strcmp(action, "draw") == 0) {
         result = rb_effect_draw_card(g, actor, effect, host_cid);
     } else if (strcmp(action, "draw_until_count") == 0) {
+        fprintf(stderr, "[EXECUTOR_DRAW_UNTIL] actor=%d ptr=%p\n", actor, (void *)effect);
         rb_effect_draw_until_count(g, actor, effect);
     } else if (strcmp(action, "move_cards") == 0) {
         rb_effect_move_cards(g, actor, effect);
@@ -187,7 +191,17 @@ int rb_executor_execute(GameState *g, int actor, AbilityEffect *effect, int host
                strcmp(action, "custom") == 0) {
         result = execute_misc(g, actor, effect, host_cid);
     } else if (strcmp(action, "modify_score") == 0 || strcmp(action, "gain_score") == 0) {
-        result = rb_execute_modify_score(g, actor, effect);
+        if (host_cid < 0 && !effect->target && !effect->self_target_field[0]) {
+            const char *operation = effect_extra(effect, "operation");
+            int value = effect->count >= 0 ? effect->count : 1;
+            const char *value_text = effect_extra(effect, "value");
+            if (value_text) value = atoi(value_text);
+            int delta = operation && !strcmp(operation, "remove") ? -value : value;
+            g->p[actor].score += delta;
+            result = 1;
+        } else {
+            result = rb_execute_modify_score(g, actor, effect);
+        }
     } else if (strcmp(action, "modify_required_hearts") == 0 ||
                strcmp(action, "modify_required_hearts_success") == 0) {
         result = strcmp(action, "modify_required_hearts_success") == 0

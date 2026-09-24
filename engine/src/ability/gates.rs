@@ -5,6 +5,14 @@ use crate::ability::types::Choice;
 use crate::card::{Ability, AbilityEffect};
 use crate::game_state::GameState;
 
+#[cfg(feature = "no_std")]
+use alloc::{
+    boxed::Box,
+    format,
+    string::{String, ToString},
+    vec::Vec,
+};
+
 /// Result of a gate check — either continue or stop with a reason.
 #[derive(Debug, Clone, PartialEq)]
 pub enum GateResult {
@@ -49,7 +57,7 @@ impl<T: ?Sized> CompositeGate<T> {
 
 impl CompositeGate<AbilityGateFn> {
     #[inline]
-    pub fn check_all(&self, resolver: &mut crate::ability::resolver::AbilityResolver, gs: &mut GameState, ability: &Ability) -> GateResult {
+    pub fn check_ability(&self, resolver: &mut crate::ability::resolver::AbilityResolver, gs: &mut GameState, ability: &Ability) -> GateResult {
         for gate in &self.gates {
             let result = gate(resolver, gs, ability);
             if result.is_stop() {
@@ -62,7 +70,7 @@ impl CompositeGate<AbilityGateFn> {
 
 impl CompositeGate<EffectGateFn> {
     #[inline]
-    pub fn check_all(&self, resolver: &mut crate::ability::resolver::AbilityResolver, gs: &mut GameState, effect: &AbilityEffect) -> GateResult {
+    pub fn check_effect(&self, resolver: &mut crate::ability::resolver::AbilityResolver, gs: &mut GameState, effect: &AbilityEffect) -> GateResult {
         for gate in &self.gates {
             let result = gate(resolver, gs, effect);
             if result.is_stop() {
@@ -257,10 +265,7 @@ pub fn post_cost_gates() -> CompositeGate<AbilityGateFn> {
 /// Effect execution gates (run before each effect).
 #[inline]
 pub fn effect_gates() -> CompositeGate<EffectGateFn> {
-    CompositeGate::new(vec![
-        Box::new(non_stackable_gate),
-        Box::new(incomplete_placement_gate),
-    ])
+    CompositeGate::new(vec![Box::new(incomplete_placement_gate)])
 }
 
 /// Unified use limit recording logic.

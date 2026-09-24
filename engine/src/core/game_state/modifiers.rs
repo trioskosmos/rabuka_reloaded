@@ -6,7 +6,7 @@ use alloc::{
     vec::Vec,
 };
 use crate::ability::enums::Zone;
-use crate::core::types::{Duration, TemporaryEffect};
+use crate::core::types::TemporaryEffect;
 use crate::{HashMap, HashSet};
 use smallvec::SmallVec;
 
@@ -1336,6 +1336,14 @@ impl GameState {
         count: u8,
         duration: &str,
     ) {
+        let Some(duration) = crate::ability::util::parse_duration(duration) else {
+            log::error!(
+                "unsupported heart override duration '{}' for card {}",
+                duration,
+                card_id
+            );
+            return;
+        };
         self.mods.set_heart_override(card_id, color, count);
         #[cfg(feature = "serde_support")]
         {
@@ -1352,11 +1360,7 @@ impl GameState {
         }
         self.temporary_effects.push(TemporaryEffect {
             effect_type: "heart_override".to_string(),
-            duration: match duration {
-                "live_end" => Duration::LiveEnd,
-                "this_turn" => Duration::ThisTurn,
-                _ => Duration::ThisLive,
-            },
+            duration,
             created_turn: self.turn_number,
             created_phase: self.current_phase.clone(),
             target_player_id: String::new(),

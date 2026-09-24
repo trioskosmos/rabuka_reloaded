@@ -26,21 +26,26 @@ static char *trim_copy(const char *start, size_t length)
 
 int rb_normalize_card_no(const char *raw, char *out, size_t out_size)
 {
+    const char *start;
     size_t length;
     if (!raw || !out || out_size == 0) return -1;
-    while (*raw == ' ' || *raw == '\t') raw++;
-    length = strlen(raw);
-    while (length > 0 && isspace((unsigned char)raw[length - 1])) length--;
+    while (*raw && isspace((unsigned char)*raw)) raw++;
+    start = raw;
+    while (*raw && !isspace((unsigned char)*raw)) raw++;
+    length = (size_t)(raw - start);
     if (length == 0 || length >= out_size) return -1;
-    memcpy(out, raw, length);
+    memcpy(out, start, length);
     out[length] = '\0';
+    while (length > 0 && (out[length - 1] == '+' || out[length - 1] == '!')) length--;
     while (length >= 3 && (unsigned char)out[length - 3] == 0xef &&
            (unsigned char)out[length - 2] == 0xbc &&
-           ((unsigned char)out[length - 1] == 0x9b || (unsigned char)out[length - 1] == 0x81)) {
+           ((unsigned char)out[length - 1] == 0x8b ||
+            (unsigned char)out[length - 1] == 0x81 ||
+            (unsigned char)out[length - 1] == 0x9b)) {
         length -= 3;
     }
     out[length] = '\0';
-    return 0;
+    return length > 0 ? 0 : -1;
 }
 
 static int parse_quantity(const char *text, uint8_t *quantity)

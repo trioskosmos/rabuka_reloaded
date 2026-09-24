@@ -147,6 +147,7 @@ static void deck_parser_matches_rust_formats(void)
     const char *content = "3 x PL!N-bp1-026-L\nPL!N-bp1-029-L x 2\n// comment\nPL!N-bp3-001-SEC";
     char **cards = NULL;
     size_t count = 0;
+    char normalized[64];
     CHECK_EQ(rb_parse_deck_content(content, &cards, &count), 0,
              "deck content parser accepts supported formats");
     CHECK_EQ(count, 6, "deck parser expands quantities");
@@ -157,6 +158,14 @@ static void deck_parser_matches_rust_formats(void)
     }
     for (size_t i = 0; i < count; i++) free(cards[i]);
     free(cards);
+    CHECK_EQ(rb_normalize_card_no(" TEST-001-SD+ ", normalized, sizeof(normalized)), 0,
+             "card number normalization accepts surrounding whitespace");
+    CHECK(!strcmp(normalized, "TEST-001-SD"),
+          "card number normalization strips rarity suffix");
+    CHECK_EQ(rb_normalize_card_no("TEST-001-SD!", normalized, sizeof(normalized)), 0,
+             "card number normalization accepts exclamation suffix");
+    CHECK(!strcmp(normalized, "TEST-001-SD"),
+          "card number normalization strips fullwidth exclamation suffix");
 }
 
 int main(void)

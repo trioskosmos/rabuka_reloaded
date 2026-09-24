@@ -13,12 +13,12 @@ use alloc::string::{String, ToString};
 /// `to_str` is uniformly `&self`. Human-facing label tables stay hand-written
 /// because their phrasing is intentionally irregular.
 macro_rules! wire_tables {
-    ($($variant:ident => $wire:literal),+ $(,)?) => {
+    ($($variant:ident => $wire:literal $(| $alias:literal)*),+ $(,)?) => {
         /// Convert a wire string to the typed value.
         /// Returns None for unrecognized names (makes typos detectable at parse time).
         pub fn from_str(s: &str) -> Option<Self> {
             match s {
-                $($wire => Some(Self::$variant),)+
+                $($wire $(| $alias)* => Some(Self::$variant),)+
                 _ => None,
             }
         }
@@ -396,6 +396,7 @@ impl ActionType {
         PositionChange => "position_change",
         Rotation => "rotation",
         PlaceEnergyUnderMember => "place_energy_under_member",
+        SetCardIdentity => "set_card_identity",
         ModifyRequiredHeartsSuccess => "modify_required_hearts_success",
         GainResource => "gain_resource",
         PayEnergy => "pay_energy",
@@ -409,7 +410,6 @@ impl ActionType {
         ModifyCost => "modify_cost",
         ModifyYellSource => "modify_yell_source",
         SetCost => "set_cost",
-        SetCardIdentity => "set_card_identity",
         SetCostToUse => "set_cost_to_use",
         // Score and hearts
         ModifyScore => "modify_score",
