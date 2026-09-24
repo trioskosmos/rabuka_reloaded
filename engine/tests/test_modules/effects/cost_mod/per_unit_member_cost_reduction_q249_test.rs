@@ -1,4 +1,5 @@
 use crate::helpers::*;
+use rabuka_engine::zones::MemberArea;
 
 fn reset_both_main_decks_to_ten_fillers(game: &mut TestGame, filler: i16) {
     game.state.player1.main_deck.cards.clear();
@@ -132,4 +133,23 @@ fn three_unit_members_reduce_cost_before_baton_touch_q249() {
         0,
         "All 4 energy consumed (20 base - 6 reduction - 10 baton touch)"
     );
+}
+
+#[test]
+fn p_variant_receives_mirakura_cost_reduction_q249() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let himeno = game.id("PL!HS-bp6-006-P");
+    let mirakura = game.id("PL!HS-bp1-005-R");
+    let filler = game.id("PL!-sd1-010-SD");
+
+    game.state.player1.hand.cards.push(himeno);
+    game.state.player1.stage.stage = [mirakura, -1, -1];
+    reset_both_main_decks_to_ten_fillers(&mut game, filler);
+    game.state.recalculate_constant_cost_modifiers();
+    assert_eq!(game.state.mods.get_cost_modifier(himeno), -2);
+
+    game.give_energy(18);
+    game.play_to_stage(himeno, MemberArea::Center);
+    assert_eq!(game.state.player1.energy_zone.active_count(), 0);
 }

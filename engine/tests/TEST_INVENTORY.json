@@ -1,6 +1,6 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-09-24T21:19:09.706045+00:00",
+  "generated_at": "2026-09-24T21:22:06.981065+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
@@ -8,7 +8,7 @@
     "unique_abilities": 936
   },
   "n_files": 839,
-  "n_tests": 3491,
+  "n_tests": 3492,
   "total_cards": 771,
   "covered_cards": 771,
   "abilities_on_covered": 936,
@@ -678,7 +678,7 @@
       ]
     }
   },
-  "n_test_fns_parsed": 3491,
+  "n_test_fns_parsed": 3492,
   "abilities": [
     {
       "idx": 0,
@@ -1072,7 +1072,7 @@
         "burn_one_under_moves_and_scores_when_total_10",
         "burn_skip_optional_no_score_even_with_10_total"
       ],
-      "covering_test_count": 301,
+      "covering_test_count": 302,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -8661,13 +8661,14 @@
         "niko_pb1009_suppresses_effect_activations_for_the_turn",
         "no_unit_members_leaves_play_cost_unchanged",
         "one_unit_member_reduces_play_cost_by_two",
+        "p_variant_receives_mirakura_cost_reduction_q249",
         "repeated_delayed_cannot_active_does_not_extend_owner_ticks",
         "ruby_bpb7009_front_blade_loss_respects_mirror_and_cost",
         "sumire_bpb4004_double_baton_removes_both_and_clamps_cost",
         "three_unit_members_reduce_cost_before_baton_touch_q249",
         "two_unit_members_reduce_play_cost_by_four"
       ],
-      "covering_test_count": 13,
+      "covering_test_count": 14,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -8710,13 +8711,14 @@
         "niko_pb1009_suppresses_effect_activations_for_the_turn",
         "no_unit_members_leaves_play_cost_unchanged",
         "one_unit_member_reduces_play_cost_by_two",
+        "p_variant_receives_mirakura_cost_reduction_q249",
         "repeated_delayed_cannot_active_does_not_extend_owner_ticks",
         "ruby_bpb7009_front_blade_loss_respects_mirror_and_cost",
         "sumire_bpb4004_double_baton_removes_both_and_clamps_cost",
         "three_unit_members_reduce_cost_before_baton_touch_q249",
         "two_unit_members_reduce_play_cost_by_four"
       ],
-      "covering_test_count": 13,
+      "covering_test_count": 14,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -8759,13 +8761,14 @@
         "niko_pb1009_suppresses_effect_activations_for_the_turn",
         "no_unit_members_leaves_play_cost_unchanged",
         "one_unit_member_reduces_play_cost_by_two",
+        "p_variant_receives_mirakura_cost_reduction_q249",
         "repeated_delayed_cannot_active_does_not_extend_owner_ticks",
         "ruby_bpb7009_front_blade_loss_respects_mirror_and_cost",
         "sumire_bpb4004_double_baton_removes_both_and_clamps_cost",
         "three_unit_members_reduce_cost_before_baton_touch_q249",
         "two_unit_members_reduce_play_cost_by_four"
       ],
-      "covering_test_count": 13,
+      "covering_test_count": 14,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -11186,7 +11189,7 @@
         "hanayo_skip_optional_cost_no_effect",
         "hs_pb1_003_debut_discards_feed_auto_gain"
       ],
-      "covering_test_count": 123,
+      "covering_test_count": 124,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -11257,7 +11260,7 @@
         "hs_cl1_009_live_success_hasunosora_cost_four_recovers_revealed_member",
         "hs_cl1_009_live_success_hasunosora_cost_nine_recovers_revealed_member"
       ],
-      "covering_test_count": 68,
+      "covering_test_count": 69,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
