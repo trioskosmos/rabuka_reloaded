@@ -1,6 +1,6 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-09-24T21:16:30.634936+00:00",
+  "generated_at": "2026-09-24T21:19:09.706045+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
@@ -8,7 +8,7 @@
     "unique_abilities": 936
   },
   "n_files": 839,
-  "n_tests": 3490,
+  "n_tests": 3491,
   "total_cards": 771,
   "covered_cards": 771,
   "abilities_on_covered": 936,
@@ -678,7 +678,7 @@
       ]
     }
   },
-  "n_test_fns_parsed": 3490,
+  "n_test_fns_parsed": 3491,
   "abilities": [
     {
       "idx": 0,
@@ -8221,7 +8221,7 @@
         "own_live_zone_discard_optional_deck_no_live_cards_anywhere_no_trigger",
         "own_live_zone_discard_optional_deck_non_aq_live_alone_no_trigger"
       ],
-      "covering_test_count": 49,
+      "covering_test_count": 50,
       "is_null": false,
       "use_limit": 1,
       "watches_abilities": false,
@@ -8291,7 +8291,7 @@
         "own_live_zone_discard_optional_deck_no_live_cards_anywhere_no_trigger",
         "own_live_zone_discard_optional_deck_non_aq_live_alone_no_trigger"
       ],
-      "covering_test_count": 49,
+      "covering_test_count": 50,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -10501,9 +10501,10 @@
         "simultaneous_live_discard_decline_keeps_both_cards_in_waitroom_q252",
         "simultaneous_live_discard_moves_only_first_selected_card_to_top_q252",
         "simultaneous_live_discard_moves_only_middle_of_three_to_bottom_q252",
-        "simultaneous_live_discard_moves_second_of_two_to_bottom_q252"
+        "simultaneous_live_discard_moves_second_of_two_to_bottom_q252",
+        "simultaneous_live_discard_p_variant_selects_one_q252"
       ],
-      "covering_test_count": 29,
+      "covering_test_count": 30,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -14107,7 +14108,7 @@
         "b_heart07_yell_contributes_two_colorless_hearts_each",
         "bella_positive_surplus_heart04_ability_fires"
       ],
-      "covering_test_count": 727,
+      "covering_test_count": 728,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,

@@ -423,3 +423,40 @@ fn simultaneous_live_discard_decline_keeps_both_cards_in_waitroom_q252() {
         "live2 remains in waitroom after skip"
     );
 }
+
+#[test]
+fn simultaneous_live_discard_p_variant_selects_one_q252() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let riko = game.id("PL!S-bp6-002-P");
+    let live1 = game.id(AQOURS_LIVE);
+    let live2 = game.new_id(AQOURS_LIVE);
+    let filler = game.new_id("PL!-sd1-010-SD");
+    let card = game.db.get_card(riko).unwrap();
+    let ability = card.resolved_abilities().next().unwrap();
+
+    game.state.player1.stage.stage[1] = riko;
+    for _ in 0..20 {
+        game.state.player1.main_deck.cards.push(filler);
+    }
+    game.state.player1.waitroom.add_card(live1);
+    game.state.player1.waitroom.add_card(live2);
+    game.state.set_recently_moved_cards(vec![live1, live2]);
+    game.state.trigger_auto_ability(
+        format!("{}_{}", card.card_no, ability.full_text),
+        AbilityTrigger::Auto,
+        "player1".to_string(),
+        Some(card.card_no.to_string()),
+        Some(riko),
+        None,
+        None,
+    );
+    game.state.process_pending_auto_abilities("player1");
+
+    game.select_indices(&[1]);
+    game.select_option(1);
+
+    assert_eq!(game.state.player1.main_deck.cards.last(), Some(&live2));
+    assert!(game.state.player1.waitroom.cards.contains(&live1));
+    assert!(!game.state.player1.waitroom.cards.contains(&live2));
+}
