@@ -198,7 +198,7 @@ fn live_start_three_success_cards_apply_score_and_required_hearts_q254() {
     let live_card = game.id("PL!SP-sd2-023-SD2");
     let past_1 = game.id("PL!-sd1-020-SD");
     let past_2 = game.id("PL!-sd1-021-SD");
-    let past_3 = game.id("PL!-sd1-020-SD");
+    let past_3 = game.id("PL!-sd1-022-SD");
 
     game.state.player1.success_live_card_zone.cards.push(past_1);
     game.state.player1.success_live_card_zone.cards.push(past_2);
@@ -429,4 +429,35 @@ fn live_start_empty_success_zone_preserves_base_required_hearts_q254() {
     let base = card.need_heart.as_ref().unwrap();
     assert_eq!(*base.hearts.get(&HeartColor::Heart03).unwrap_or(&0), 1);
     assert_eq!(*base.hearts.get(&HeartColor::Heart00).unwrap_or(&0), 2);
+}
+
+#[test]
+fn live_start_p_variant_applies_mandatory_success_threshold_q254() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let live_card = game.id("PL!SP-sd2-023-P");
+    let past_1 = game.id("PL!-sd1-020-SD");
+    let past_2 = game.id("PL!-sd1-021-SD");
+
+    game.state.player1.success_live_card_zone.cards.push(past_1);
+    game.state.player1.success_live_card_zone.cards.push(past_2);
+    game.state.player1.hand.cards.push(live_card);
+    fill_decks(&mut game);
+
+    advance_to_live_card_set_p1(&mut game);
+    game.set_live_card(live_card);
+    advance_to_live_start(&mut game);
+
+    while game.has_pending_choice() {
+        game.select_indices(&[]);
+    }
+
+    assert!(!game.has_pending_choice());
+    assert_eq!(game.state.mods.get_score_modifier(live_card), 5);
+    assert_eq!(
+        game.state
+            .mods
+            .get_need_heart_modifier(live_card, HeartColor::Heart00),
+        3
+    );
 }

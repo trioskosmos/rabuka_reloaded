@@ -1,6 +1,6 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-09-24T21:08:26.754900+00:00",
+  "generated_at": "2026-09-24T21:13:45.607793+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
@@ -8,7 +8,7 @@
     "unique_abilities": 936
   },
   "n_files": 839,
-  "n_tests": 3488,
+  "n_tests": 3489,
   "total_cards": 771,
   "covered_cards": 771,
   "abilities_on_covered": 936,
@@ -678,7 +678,7 @@
       ]
     }
   },
-  "n_test_fns_parsed": 3488,
+  "n_test_fns_parsed": 3489,
   "abilities": [
     {
       "idx": 0,
@@ -25396,9 +25396,9 @@
         "issue9_izumi_debut_empty_hand",
         "live_start_empty_success_zone_preserves_base_required_hearts_q254",
         "live_start_one_success_card_applies_no_score_or_required_hearts_q254",
-        "live_start_success_threshold_sets_required_hearts_distinct_from_base_q254"
+        "live_start_p_variant_applies_mandatory_success_threshold_q254"
       ],
-      "covering_test_count": 34,
+      "covering_test_count": 35,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -28995,12 +28995,21 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
+        "engine/tests/test_modules/effects/compound/live_start_success_count_score_and_required_hearts_q254_test.rs",
         "engine/tests/test_modules/effects/gain/blades/bp7_q271_colorful_dreams_test.rs",
         "engine/tests/test_modules/rules/phases/cheer_pipeline_test.rs"
       ],
       "covering_tests": [
         "cheer_pipeline_draw_and_score_icons",
         "cheer_pipeline_score_icon",
+        "live_start_empty_success_zone_preserves_base_required_hearts_q254",
+        "live_start_one_success_card_applies_no_score_or_required_hearts_q254",
+        "live_start_p_variant_applies_mandatory_success_threshold_q254",
+        "live_start_success_threshold_sets_required_hearts_distinct_from_base_q254",
+        "live_start_success_threshold_sets_required_hearts_with_high_heart_stage_q254",
+        "live_start_three_success_cards_apply_score_and_required_hearts_q254",
+        "live_start_two_success_cards_apply_score_and_required_hearts_q254",
+        "live_start_zero_success_cards_apply_no_score_or_required_hearts_q254",
         "q271_ab0_niji_member_gains_blade",
         "q271_ab0_non_niji_member_no_blade",
         "q271_blade_hearts_do_not_add_a_color",
@@ -29011,7 +29020,7 @@
         "q271_three_distinct_base_hearts_scores",
         "q271_two_base_hearts_no_score"
       ],
-      "covering_test_count": 11,
+      "covering_test_count": 19,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
