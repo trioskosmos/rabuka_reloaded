@@ -639,6 +639,9 @@ static int eval_group(const struct GameState *g, int actor, int host_cid, const 
        to ONE of the listed groups (e.g. 『Aqours』か『SaintSnow、E. */
     int all_members_val = 0;
     int all_members = get_i(c, "all_members", &all_members_val) ? all_members_val : 0;
+    const char *condition_text = get_str(c, "text");
+    if (!all_members && condition_text && strstr(condition_text, "のみの場合"))
+        all_members = 1;
     if (all_members) {
         const CondValue *gv = find_val(c, "group_names");
         if (!gv || gv->tag != RB_TAG_ARRAY || gv->arr_n == 0) {

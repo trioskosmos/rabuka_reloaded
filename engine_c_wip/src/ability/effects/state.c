@@ -1230,6 +1230,27 @@ static void rb_pos_change_for_player(GameState *g, int who, AbilityEffect *e, in
         return;
     }
     if(!strcmp(dst_pos, "same_area")) return;
+    if(!strcmp(dst_pos, "front") && host_cid >= 0){
+        int owner = -1;
+        int occupied[RB_STAGE_SIZE];
+        int n_occupied = 0;
+        for(int side=0;side<2;side++){
+            for(int i=0;i<RB_STAGE_SIZE;i++){
+                if(g->p[side].stage[i]==host_cid) owner=side;
+                if(side==who && g->p[side].stage[i]!=RB_EMPTY_SLOT)
+                    occupied[n_occupied++]=i;
+            }
+        }
+        if(owner>=0 && who!=owner && n_occupied>0){
+            rb_emit_choice(g,owner,RB_CHOICE_SELECT_TARGET,NULL,NULL,n_occupied,0,
+                           "position_change:opponent:front");
+            rb_choice_set_description(&g->queue.pending,"Choose which opponent member to move");
+            rb_choice_set_route(&g->queue.pending,RB_ROUTE_SELECT_TARGET);
+            g->queue.resume_host=host_cid;
+            g->queue.resume_actor=who;
+            return;
+        }
+    }
     int dst = rb_pos_to_area(dst_pos);
     if(dst < 0) return;
     RbPlayer *P = &g->p[who];

@@ -22,9 +22,11 @@ MAX_DISTINCT_NAMES := tests/test_max_distinct_names.c
 BATON_TOUCH := tests/test_baton_touch.c
 MEMBER_ACTIVATION := tests/test_member_activation_debut_live_start.c
 B8_LIVE_TIMING := tests/test_b8_live_timing.c
+CROSS_PLAYER := tests/test_cross_player_interaction.c
+DRAW_PHASE_FIX := tests/test_draw_phase_fix.c
 AUDIT   := tools/audit_actions.c
 
-.PHONY: all test audit regen clean mechanics live-rules phase-rules performance-rules surplus-heart opponent-live-flow live-movement restrictions condition-eval target-selection max-distinct-names baton-touch member-activation b8-live-timing
+.PHONY: all test audit regen clean mechanics live-rules phase-rules performance-rules surplus-heart opponent-live-flow live-movement restrictions condition-eval target-selection max-distinct-names baton-touch member-activation b8-live-timing cross-player draw-phase-fix
 all: $(TARGET)
 
 regen:
@@ -130,6 +132,18 @@ member-activation: $(TARGET)_member_activation
 
 b8-live-timing: $(TARGET)_b8_live_timing
 	./$(TARGET)_b8_live_timing
+
+$(TARGET)_cross_player: $(OBJ_LIB) $(CROSS_PLAYER)
+	$(CC) $(CFLAGS) -o $@ $(OBJ_LIB) $(CROSS_PLAYER)
+
+$(TARGET)_draw_phase_fix: $(OBJ_LIB) $(DRAW_PHASE_FIX)
+	$(CC) $(CFLAGS) -o $@ $(OBJ_LIB) $(DRAW_PHASE_FIX)
+
+cross-player: $(TARGET)_cross_player
+	./$(TARGET)_cross_player
+
+draw-phase-fix: $(TARGET)_draw_phase_fix
+	./$(TARGET)_draw_phase_fix
 
  $(TARGET)_debug: $(OBJ_LIB) src/debug_umi.o
 	$(CC) $(CFLAGS) -o $@ $(OBJ_LIB) src/debug_umi.o

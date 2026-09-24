@@ -3,6 +3,8 @@
 #include <string.h>
 
 extern int rb_complete_double_baton(GameState *g, int selected_pair);
+extern void rb_fire_opponent_cause_watchers_for_move(GameState *g, int moved_card_id,
+                                                      int causer_player);
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -1759,29 +1761,37 @@ int rb_resolver_handle_position_change_choice(RbAbilityResolver *self, GameState
     if (pc_prefix) {
         const char *after = pc_prefix + strlen("position_change:");
         if (!strncmp(after, "opponent:front", 15)) {
-            /* opponent:front — apply directly via effect modification */
-            AbilityEffect modified;
-            memset(&modified, 0, sizeof(modified));
-            modified.action = NULL; /* placeholder: would clone entry effect */
-            /* In C we execute position change directly */
             int actor = g->queue.actor;
-            int pl = (!strcmp("opponent", "self")) ? (actor ^ 1) : actor;
+            int pl = actor ^ 1;
             RbPlayer *P = &g->p[pl];
-            int src_idx = rb_stage_position_index("front");
-            int dst_idx = rb_stage_position_index(sel);
-    if (src_idx >= 0 && dst_idx >= 0 && src_idx < RB_STAGE_SIZE && dst_idx < RB_STAGE_SIZE
-        && P->stage[src_idx] >= 0) {
-        int a = P->stage[src_idx], b = P->stage[dst_idx];
-        P->stage[src_idx] = b; P->stage_wait[src_idx] = P->stage_wait[dst_idx];
-        P->stage[dst_idx] = a; P->stage_wait[dst_idx] = P->stage_wait[src_idx];
-        g->position_change_occurred_this_turn = 1;
-        rb_record_card_movement(g, a, 0, 0, 0, 0);
-        if (b >= 0) rb_record_card_movement(g, b, 0, 0, 0, 0);
-            rb_trigger_auto_abilities_for_movement_current(g);
+            int occupied[RB_STAGE_SIZE];
+            int n_occupied = 0;
+            for (int i = 0; i < RB_STAGE_SIZE; i++)
+                if (P->stage[i] >= 0) occupied[n_occupied++] = i;
+            int pick = atoi(sel);
+            int src_idx = pick >= 0 && pick < n_occupied ? occupied[pick] : -1;
+            int dst_idx = -1;
+            int host = g->queue.resume_host;
+            for (int i = 0; i < RB_STAGE_SIZE; i++)
+                if (host >= 0 && g->p[actor].stage[i] == host) dst_idx = i;
+            if (dst_idx < 0) dst_idx = 1;
+            if (src_idx >= 0 && src_idx != dst_idx && P->stage[src_idx] >= 0) {
+                int moved = P->stage[src_idx];
+                int displaced = P->stage[dst_idx];
+                int moved_wait = P->stage_wait[src_idx];
+                int displaced_wait = P->stage_wait[dst_idx];
+                P->stage[src_idx] = displaced;
+                P->stage_wait[src_idx] = displaced_wait;
+                P->stage[dst_idx] = moved;
+                P->stage_wait[dst_idx] = moved_wait;
+                g->position_change_occurred_this_turn = 1;
+                rb_record_card_movement(g, moved, 0, 0, actor, 1);
+                rb_recalc_constants(g);
+                rb_fire_opponent_cause_watchers_for_move(g, moved, actor);
+            }
             rb_resolver_clear_choice_state_and_resume(self);
             return 0;
         }
-    }
     /* Parse target and position from "position_change:target:select" or "position_change:target:member" */
         const char *first_colon = strchr(after, ':');
         if (first_colon) {
@@ -1946,9 +1956,9 @@ int rb_resolver_handle_position_change_choice(RbAbilityResolver *self, GameState
                 rb_record_card_movement(g, a, 0, 0, 0, 0);
                 if (b >= 0) rb_record_card_movement(g, b, 0, 0, 0, 0);
                 rb_trigger_auto_abilities_for_movement_current(g);
-    }
-    rb_resolver_clear_choice_state_and_resume(self);
-    return 0;
+            }
+            rb_resolver_clear_choice_state_and_resume(self);
+            return 0;
 }
 
 void rb_resolver_apply_effect_modification(RbAbilityResolver *self, GameState *g,

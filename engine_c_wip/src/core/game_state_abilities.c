@@ -1049,6 +1049,8 @@ void rb_fire_opponent_cause_watchers_for_move(GameState *g, int moved_card_id,
                                               int causer_player) {
     if (!g || moved_card_id < 0) return;
     int owner = rb_owner_of_card(g, moved_card_id);
+    fprintf(stderr, "[OPP_CAUSE_MOVE] moved=%d owner=%d causer=%d recent=%d\n",
+            moved_card_id, owner, causer_player, g->n_recently_moved);
     if (owner < 0 || owner == causer_player) return;
     const RbPlayer *op = &g->p[owner];
     for (int s = 0; s < RB_STAGE_SIZE; s++) {
@@ -1065,9 +1067,14 @@ void rb_fire_opponent_cause_watchers_for_move(GameState *g, int moved_card_id,
                 if (ab.effect->extra_k[k] && !strcmp(ab.effect->extra_k[k], "fires_on_opponent_effects")
                     && ab.effect->extra_v[k] && !strcmp(ab.effect->extra_v[k], "true"))
                     fires_opp = 1;
+            extern int rb_card_fires_on_opponent_effects(int card_id);
+            if (!fires_opp && rb_card_fires_on_opponent_effects(watcher_id))
+                fires_opp = 1;
             if (!fires_opp) { rb_free_ability(&ab); continue; }
             if (!ab.effect->condition) { rb_free_ability(&ab); continue; }
             int passes = rb_eval_condition_for_host(g, owner, watcher_id, ab.effect->condition);
+            fprintf(stderr, "[OPP_CAUSE_WATCHER] watcher=%d ability=%d moved=%d passes=%d\n",
+                    watcher_id, a, moved_card_id, passes);
             if (!passes) { rb_free_ability(&ab); continue; }
             int num_key = rb_queue_key(watcher_id, a);
             int dup = 0;
