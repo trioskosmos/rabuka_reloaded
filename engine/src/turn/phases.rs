@@ -942,12 +942,22 @@ impl super::TurnEngine {
         let hand_count = game_state.active_player().hand.cards.len();
         let stage = &game_state.active_player().stage;
         let success_zone = &game_state.active_player().success_live_card_zone.cards;
+        let waited_stage_cards: Vec<i16> = stage
+            .stage
+            .iter()
+            .copied()
+            .filter(|card_id| {
+                *card_id != -1
+                    && game_state.mods.get_orientation_modifier(*card_id) == Some("wait")
+            })
+            .collect();
         let cost_reduction = crate::ability::util::calculate_play_cost_reduction(
             stage,
             success_zone,
             hand_count,
             card_id,
             card_db,
+            &waited_stage_cards,
         );
         let final_cost = card_cost
             .saturating_sub(cost_reduction)
@@ -1196,6 +1206,17 @@ impl super::TurnEngine {
         let played_card_cost_mod = played_card_id
             .and_then(|cid| game_state.mods.get_cost_modifier_set(cid))
             .unwrap_or(0);
+        let waited_stage_cards: Vec<i16> = game_state
+            .active_player()
+            .stage
+            .stage
+            .iter()
+            .copied()
+            .filter(|card_id| {
+                *card_id != -1
+                    && game_state.mods.get_orientation_modifier(*card_id) == Some("wait")
+            })
+            .collect();
 
         let player = game_state.active_player_mut();
         let (cost_paid, baton_touch_used, replaced_member_cost, replaced_member_id) = player
@@ -1206,6 +1227,7 @@ impl super::TurnEngine {
                 &card_db,
                 replaced_member_cost_mod,
                 played_card_cost_mod,
+                &waited_stage_cards,
             )?;
         game_state.baton_touch_zero_cost = baton_touch_used && cost_paid == 0;
         game_state.baton_touch_replaced_member_cost = replaced_member_cost;

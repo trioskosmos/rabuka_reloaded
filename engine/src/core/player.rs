@@ -202,6 +202,7 @@ impl Player {
         card_db: &CardDatabase,
         replaced_member_cost_mod: i32,
         played_card_cost_mod: i32,
+        waited_stage_cards: &[i16],
     ) -> Result<(u8, bool, Option<u8>, Option<i16>), String> {
         // Rule 8.2: Main Phase - Play member card from hand to stage
 
@@ -230,6 +231,7 @@ impl Player {
                 card_id,
                 card_db,
                 played_card_cost_mod,
+                waited_stage_cards,
             );
 
             // Rule 9.6.2.3.2: Baton touch - if 1+ energy to pay, can send member from target area to waitroom instead

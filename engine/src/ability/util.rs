@@ -186,6 +186,7 @@ pub fn calculate_play_cost_reduction(
     hand_count: usize,
     card_id: i16,
     card_db: &CardDatabase,
+    waited_stage_cards: &[i16],
 ) -> u8 {
     let card = match card_db.get_card(card_id) {
         Some(c) => c,
@@ -226,6 +227,7 @@ pub fn calculate_play_cost_reduction(
                 stage,
                 hand_count,
                 true, // enforce hand-condition guard (card is on stage, not in hand)
+                waited_stage_cards,
             ) {
                 // Stack: sum reductions from all qualifying stage cards
                 cost_reduction += r;
@@ -245,6 +247,7 @@ pub fn calculate_play_cost_reduction(
                     stage,
                     hand_count,
                     false, // live cards have no hand-condition guard
+                    waited_stage_cards,
                 ) {
                     cost_reduction = cost_reduction.max(r);
                     break;
@@ -271,6 +274,7 @@ pub fn compute_play_cost(
     card_id: i16,
     card_db: &CardDatabase,
     set_override: i32,
+    waited_stage_cards: &[i16],
 ) -> u8 {
     let Some(card) = card_db.get_card(card_id) else {
         return 0;
@@ -285,6 +289,7 @@ pub fn compute_play_cost(
         hand_count,
         card_id,
         card_db,
+        waited_stage_cards,
     );
     // Cost increase from 常時 abilities (success_live_zone cards → +cost).
     let mut increase: u8 = 0;
@@ -331,6 +336,7 @@ fn scan_abilities_for_cost_reduction(
     stage: &crate::core::zones::Stage,
     hand_count: usize,
     hand_condition_guard: bool,
+    waited_stage_cards: &[i16],
 ) -> Option<u8> {
     for ar in abilities {
         let ability = ar.resolve();
@@ -346,6 +352,24 @@ fn scan_abilities_for_cost_reduction(
             if hand_condition_guard {
                 if let Some(ref cond) = effect.condition {
                     if cond.get_location() == Some("hand") {
+                        continue;
+                    }
+                }
+            }
+            if let Some(condition) = effect.condition.as_ref() {
+                if condition.get_state().map(|state| state.as_str()) == Some("wait") {
+                    let groups = effect.group_names_any();
+                    let condition_met = stage.stage.iter().any(|stage_id| {
+                        *stage_id != -1
+                            && waited_stage_cards.contains(stage_id)
+                            && groups
+                                .as_deref()
+                                .map(|names| {
+                                    card_matches_any_group(card_db, *stage_id, names)
+                                })
+                                .unwrap_or(true)
+                    });
+                    if !condition_met {
                         continue;
                     }
                 }

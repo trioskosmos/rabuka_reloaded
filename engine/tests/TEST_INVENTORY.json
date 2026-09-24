@@ -1,6 +1,6 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-09-24T22:02:41.713881+00:00",
+  "generated_at": "2026-09-24T22:19:11.143613+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
@@ -8,7 +8,7 @@
     "unique_abilities": 936
   },
   "n_files": 839,
-  "n_tests": 3497,
+  "n_tests": 3498,
   "total_cards": 771,
   "covered_cards": 771,
   "abilities_on_covered": 936,
@@ -678,7 +678,7 @@
       ]
     }
   },
-  "n_test_fns_parsed": 3497,
+  "n_test_fns_parsed": 3498,
   "abilities": [
     {
       "idx": 0,
@@ -1906,7 +1906,7 @@
         "issue12_compass_can_activate_sayaka_live_start_again_q243",
         "issue12_proof_look_and_select_cost_20plus"
       ],
-      "covering_test_count": 152,
+      "covering_test_count": 153,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -3073,6 +3073,7 @@
         "karin_edge_hand_unchanged",
         "karin_edge_non_niji_not_selectable",
         "karin_edge_not_opponent_waitroom",
+        "q206_waited_emma_reduces_baton_cost_to_fifteen",
         "saikou_edge_both_scores",
         "saikou_edge_no_cards",
         "saikou_edge_score1_only",
@@ -3081,7 +3082,7 @@
         "sayaka_activation_charges_energy_and_terminates",
         "sayaka_unaffordable_not_offered_and_press_rejected"
       ],
-      "covering_test_count": 23,
+      "covering_test_count": 24,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -5198,7 +5199,7 @@
         "issue6_you_timed_heart_zero_for_setup_members",
         "issue7_hajimari_no_success_live_no_effect"
       ],
-      "covering_test_count": 55,
+      "covering_test_count": 56,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -5266,7 +5267,7 @@
         "issue6_you_timed_heart_zero_for_setup_members",
         "issue7_hajimari_no_success_live_no_effect"
       ],
-      "covering_test_count": 55,
+      "covering_test_count": 56,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -5530,13 +5531,13 @@
         "mifune_different_name_in_success_zone_no_heart04",
         "mifune_empty_success_zone_no_heart04",
         "mifune_same_name_in_success_zone_gains_heart04",
+        "q206_waited_emma_reduces_baton_cost_to_fifteen",
         "saikou_edge_both_scores",
         "saikou_edge_no_cards",
         "saikou_edge_score1_only",
-        "saikou_edge_score2_only",
-        "saikou_edge_score5_only"
+        "saikou_edge_score2_only"
       ],
-      "covering_test_count": 38,
+      "covering_test_count": 39,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -5596,13 +5597,13 @@
         "mifune_different_name_in_success_zone_no_heart04",
         "mifune_empty_success_zone_no_heart04",
         "mifune_same_name_in_success_zone_gains_heart04",
+        "q206_waited_emma_reduces_baton_cost_to_fifteen",
         "saikou_edge_both_scores",
         "saikou_edge_no_cards",
         "saikou_edge_score1_only",
-        "saikou_edge_score2_only",
-        "saikou_edge_score5_only"
+        "saikou_edge_score2_only"
       ],
-      "covering_test_count": 38,
+      "covering_test_count": 39,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -6518,7 +6519,7 @@
         "issue6_you_timed_heart_zero_for_setup_members",
         "issue7_hajimari_no_success_live_no_effect"
       ],
-      "covering_test_count": 48,
+      "covering_test_count": 49,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -13073,6 +13074,7 @@
         "karin_edge_non_niji_not_selectable",
         "karin_edge_not_opponent_waitroom",
         "mifune_q231_excess_heart_2_score_cancels_to_0",
+        "q206_waited_emma_reduces_baton_cost_to_fifteen",
         "saikou_edge_both_scores",
         "saikou_edge_no_cards",
         "saikou_edge_score1_only",
@@ -13084,10 +13086,9 @@
         "surplus_conditioned_score_p_and_ar_variants_share_floor",
         "surplus_conditioned_score_parser_conditions_exclude_surplus_one",
         "surplus_conditioned_score_parser_emits_floor",
-        "surplus_conditioned_score_sequential_both_conditions_present",
-        "surplus_conditioned_score_with_base_live_bonus_not_below_minus_two"
+        "surplus_conditioned_score_sequential_both_conditions_present"
       ],
-      "covering_test_count": 30,
+      "covering_test_count": 31,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -14117,7 +14118,7 @@
         "b_heart07_yell_contributes_two_colorless_hearts_each",
         "bella_positive_surplus_heart04_ability_fires"
       ],
-      "covering_test_count": 730,
+      "covering_test_count": 731,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -18906,13 +18907,14 @@
         "karin_edge_hand_unchanged",
         "karin_edge_non_niji_not_selectable",
         "karin_edge_not_opponent_waitroom",
+        "q206_waited_emma_reduces_baton_cost_to_fifteen",
         "saikou_edge_both_scores",
         "saikou_edge_no_cards",
         "saikou_edge_score1_only",
         "saikou_edge_score2_only",
         "saikou_edge_score5_only"
       ],
-      "covering_test_count": 21,
+      "covering_test_count": 22,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -20285,9 +20287,9 @@
         "niji_bp5_partner_low_cost_nothing_fires",
         "niji_bp5_partner_not_nijigasaki_nothing_fires",
         "niji_bp5_partner_with_blade_heart_nothing_fires",
-        "rina_copied_live_success_ability_does_nothing_without_energy_deficit"
+        "q206_waited_emma_reduces_baton_cost_to_fifteen"
       ],
-      "covering_test_count": 45,
+      "covering_test_count": 46,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -21851,6 +21853,7 @@
       "covering_files": [
         "engine/tests/test_modules/effects/state/either_or_state_change_test.rs",
         "engine/tests/test_modules/integration/gameplay_test.rs",
+        "engine/tests/test_modules/integration/parser_issues_e2e_part3_test.rs",
         "engine/tests/test_modules/integration/remaining_quick_test.rs",
         "engine/tests/test_modules/rules/scoring/surplus_heart_test.rs"
       ],
@@ -21886,7 +21889,7 @@
         "distortion_q97_all_active_no_catchu_score_plus_1",
         "distortion_same_name_catchu_all_active_score_plus_1"
       ],
-      "covering_test_count": 79,
+      "covering_test_count": 101,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -21916,6 +21919,7 @@
       "covering_files": [
         "engine/tests/test_modules/effects/state/either_or_state_change_test.rs",
         "engine/tests/test_modules/integration/gameplay_test.rs",
+        "engine/tests/test_modules/integration/parser_issues_e2e_part3_test.rs",
         "engine/tests/test_modules/integration/remaining_quick_test.rs",
         "engine/tests/test_modules/rules/scoring/surplus_heart_test.rs"
       ],
@@ -21951,7 +21955,7 @@
         "distortion_q97_all_active_no_catchu_score_plus_1",
         "distortion_same_name_catchu_all_active_score_plus_1"
       ],
-      "covering_test_count": 79,
+      "covering_test_count": 101,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -23391,13 +23395,13 @@
         "karin_edge_hand_unchanged",
         "karin_edge_non_niji_not_selectable",
         "karin_edge_not_opponent_waitroom",
+        "q206_waited_emma_reduces_baton_cost_to_fifteen",
         "saikou_edge_both_scores",
         "saikou_edge_no_cards",
         "saikou_edge_score1_only",
-        "saikou_edge_score2_only",
-        "saikou_edge_score5_only"
+        "saikou_edge_score2_only"
       ],
-      "covering_test_count": 30,
+      "covering_test_count": 31,
       "is_null": false,
       "use_limit": 2,
       "watches_abilities": false,
@@ -23456,13 +23460,13 @@
         "karin_edge_hand_unchanged",
         "karin_edge_non_niji_not_selectable",
         "karin_edge_not_opponent_waitroom",
+        "q206_waited_emma_reduces_baton_cost_to_fifteen",
         "saikou_edge_both_scores",
         "saikou_edge_no_cards",
         "saikou_edge_score1_only",
-        "saikou_edge_score2_only",
-        "saikou_edge_score5_only"
+        "saikou_edge_score2_only"
       ],
-      "covering_test_count": 30,
+      "covering_test_count": 31,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -23525,7 +23529,7 @@
         "kasumi_debut_place_two_energy_under",
         "kasumi_debut_skip_optional_no_energy_moved"
       ],
-      "covering_test_count": 49,
+      "covering_test_count": 50,
       "is_null": false,
       "use_limit": 1,
       "watches_abilities": false,
@@ -23588,7 +23592,7 @@
         "kasumi_debut_place_two_energy_under",
         "kasumi_debut_skip_optional_no_energy_moved"
       ],
-      "covering_test_count": 49,
+      "covering_test_count": 50,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -30880,7 +30884,7 @@
         "issue17_suzu_cost_bonus_condition_not_met",
         "issue1_kanon_invalidate_and_recover"
       ],
-      "covering_test_count": 135,
+      "covering_test_count": 136,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -31032,7 +31036,7 @@
         "catchu_basic_two_distinct_activate_2",
         "catchu_duplicate_names_dedup_to_1"
       ],
-      "covering_test_count": 292,
+      "covering_test_count": 293,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -32873,16 +32877,16 @@
         "karin_edge_hand_unchanged",
         "karin_edge_non_niji_not_selectable",
         "karin_edge_not_opponent_waitroom",
+        "q206_waited_emma_reduces_baton_cost_to_fifteen",
         "q271_ab0_niji_member_gains_blade",
         "q271_ab0_non_niji_member_no_blade",
         "q271_blade_hearts_do_not_add_a_color",
         "q271_blade_hearts_do_not_satisfy_condition",
         "q271_blade_hearts_mapping_to_colors_still_not_met",
         "q271_no_revealed_cards_no_score",
-        "q271_one_card_with_three_base_hearts_scores",
-        "q271_three_distinct_base_hearts_scores"
+        "q271_one_card_with_three_base_hearts_scores"
       ],
-      "covering_test_count": 43,
+      "covering_test_count": 44,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -33750,13 +33754,14 @@
         "karin_edge_hand_unchanged",
         "karin_edge_non_niji_not_selectable",
         "karin_edge_not_opponent_waitroom",
+        "q206_waited_emma_reduces_baton_cost_to_fifteen",
         "saikou_edge_both_scores",
         "saikou_edge_no_cards",
         "saikou_edge_score1_only",
         "saikou_edge_score2_only",
         "saikou_edge_score5_only"
       ],
-      "covering_test_count": 21,
+      "covering_test_count": 22,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -40010,13 +40015,14 @@
         "karin_edge_hand_unchanged",
         "karin_edge_non_niji_not_selectable",
         "karin_edge_not_opponent_waitroom",
+        "q206_waited_emma_reduces_baton_cost_to_fifteen",
         "saikou_edge_both_scores",
         "saikou_edge_no_cards",
         "saikou_edge_score1_only",
         "saikou_edge_score2_only",
         "saikou_edge_score5_only"
       ],
-      "covering_test_count": 21,
+      "covering_test_count": 22,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,

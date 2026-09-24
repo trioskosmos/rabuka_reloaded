@@ -115,6 +115,7 @@ fn on_stage_card_does_not_reduce_other_cards_cost() {
         game.state.player1.hand.cards.len(),
         other,
         &game.db,
+        &[],
     );
 
     assert_eq!(
@@ -147,6 +148,7 @@ fn on_stage_card_ignores_hand_for_other_card_cost() {
         game.state.player1.hand.cards.len(),
         other,
         &game.db,
+        &[],
     );
 
     assert_eq!(

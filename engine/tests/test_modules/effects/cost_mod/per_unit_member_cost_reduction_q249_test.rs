@@ -118,6 +118,7 @@ fn three_unit_members_reduce_cost_before_baton_touch_q249() {
         game.state.player1.hand.cards.len(),
         himeno,
         &game.db,
+        &[],
     );
     assert_eq!(
         reduction, 6,

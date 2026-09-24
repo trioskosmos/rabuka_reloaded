@@ -1,6 +1,8 @@
 /// E2E gameplay tests for manual guide Issues 4,6,7,9,11,12,13.
 use crate::helpers::*;
 use rabuka_engine::card::HeartColor;
+use rabuka_engine::game_setup::ActionType;
+use rabuka_engine::turn::TurnEngine;
 use rabuka_engine::zones::MemberArea;
 
 fn fill_decks(game: &mut TestGame) {
@@ -665,6 +667,50 @@ fn issue12_compass_can_activate_sayaka_live_start_again_q243() {
         3
     );
     assert_eq!(guard, 1, "COMPASS selected Sayaka and resolved her LiveStart");
+}
+
+#[test]
+fn q206_waited_emma_reduces_baton_cost_to_fifteen() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let emma = game.id("PL!N-pb1-008-P＋");
+    let waited_emma = game.id("PL!N-pb1-008-R");
+    let filler = game.id("PL!-sd1-010-SD");
+
+    game.state.player1.stage.stage[1] = waited_emma;
+    game.state.mods.add_orientation_modifier(waited_emma, "wait");
+    game.state.player1.hand.cards.push(emma);
+    for _ in 0..10 {
+        game.state.player1.main_deck.cards.push(filler);
+    }
+    game.give_energy(15);
+    let normal_cost = rabuka_engine::ability::util::compute_play_cost(
+        &game.state.player1,
+        emma,
+        &game.db,
+        0,
+        &[],
+    );
+    let waited_cost = rabuka_engine::ability::util::compute_play_cost(
+        &game.state.player1,
+        emma,
+        &game.db,
+        0,
+        &[waited_emma],
+    );
+    assert_eq!(waited_cost, normal_cost.saturating_sub(2));
+    TurnEngine::execute_main_phase_action(
+        &mut game.state,
+        &ActionType::PlayMemberToStage,
+        Some(emma),
+        None,
+        Some(MemberArea::Center),
+        Some(true),
+    )
+    .expect("Q206 15-energy baton touch should succeed");
+
+    assert_eq!(game.state.player1.stage.stage[1], emma);
+    assert!(game.state.player1.waitroom.cards.contains(&waited_emma));
 }
 
 // ====================================================================
