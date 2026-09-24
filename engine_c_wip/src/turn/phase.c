@@ -726,6 +726,7 @@ RbGeneratedActionList rb_generate_action_candidates(const GameState *state) {
 
     RbGeneratedAction pass;
     memset(&pass, 0, sizeof(pass));
+    pass.action_type = 1;
     actions[result.count++] = pass;
     if (rb_is_action_prohibited(state, "play_member")) {
         result.actions = actions;
