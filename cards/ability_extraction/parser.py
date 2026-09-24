@@ -10602,9 +10602,12 @@ def _walk_propagate_text_context_fields(d, d_ctx, ctx_text):
                     needs_group = own_has_group or d.get("distinct")
                     if (
                         needs_group
-                        and d.get("action") != "gain_resource"
+                        and                         (
+                            d.get("action") != "gain_resource" or d.get("per_unit")
+                        )
                         and d.get("type") != "card_count_condition"
                         and (d.get("action") != "modify_cost" or d.get("per_unit"))
+
                     ):
                         d["group_names"] = gms
                 else:
@@ -10632,9 +10635,9 @@ def _walk_propagate_text_context_fields(d, d_ctx, ctx_text):
                         g in node_text for g in gms
                     ):
                         if (
-                            d.get("action") != "gain_resource"
-                            and d.get("type") != "card_count_condition"
-                            and (d.get("action") != "modify_cost" or d.get("per_unit"))
+                            d.get("action") != "gain_resource" or d.get("per_unit")
+                        ) and d.get("type") != "card_count_condition" and (
+                            d.get("action") != "modify_cost" or d.get("per_unit")
                         ):
                             d["group_names"] = gms
 
