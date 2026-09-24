@@ -785,6 +785,51 @@ fn experiment_pass_probability(
     hits as f64 / EXPERIMENT_SAMPLES as f64
 }
 
+fn experiment_sample_pools(
+    cats: &[([i32; 8], usize)],
+    deck_len: usize,
+    blades: i32,
+    board: &[i32; 8],
+) -> Vec<[i32; 8]> {
+    if blades <= 0 || cats.is_empty() || deck_len == 0 {
+        return vec![*board; EXPERIMENT_SAMPLES];
+    }
+    let mut deck = Vec::with_capacity(deck_len);
+    for &(vector, count) in cats {
+        deck.extend(std::iter::repeat_n(vector, count));
+    }
+    deck.resize(deck_len, [0; 8]);
+    deck.sort_unstable();
+    let draws = usize::try_from(blades).unwrap_or(usize::MAX).min(deck_len);
+    let mut rng = 0x6a09e667f3bcc909u64;
+    let mut pools = Vec::with_capacity(EXPERIMENT_SAMPLES);
+    for _ in 0..EXPERIMENT_SAMPLES {
+        let mut sampled = deck.clone();
+        let mut pool = *board;
+        for k in 0..draws {
+            rng ^= rng << 13;
+            rng ^= rng >> 7;
+            rng ^= rng << 17;
+            let index = k + usize::try_from(rng % (deck_len - k) as u64)
+                .expect("sample offset fits deck length");
+            sampled.swap(k, index);
+            for (have, extra) in pool.iter_mut().zip(sampled[k]) {
+                *have += extra;
+            }
+        }
+        pools.push(pool);
+    }
+    pools
+}
+
+fn experiment_pass_probability_pools(pools: &[[i32; 8]], need: &[i32; 11]) -> f64 {
+    if pools.is_empty() {
+        return 0.0;
+    }
+    pools.iter().filter(|pool| experiment_feasible(pool, need)).count() as f64
+        / pools.len() as f64
+}
+
 fn experiment_board_pool(gs: &GameState, me: u8, db: &CardDatabase) -> [i32; 8] {
     let (my, _) = gs.seated_pair(me);
     let hearts = my.stage.get_available_hearts(db, &gs.mods.heart_override,
@@ -834,7 +879,7 @@ fn experiment_junk_fill(gs: &GameState, me: u8, db: &CardDatabase, desired: &mut
     if desired.len() >= max_slots || deck_lives == 0 {
         return;
     }
-    let future_junk = std::env::var_os("V7_FUTURE_JUNK").is_some();
+    let future_junk = std::env::var_os("V7_NO_FUTURE_JUNK").is_none();
     let max_stage_cost = my
         .stage
         .stage
@@ -922,6 +967,9 @@ fn experiment_portfolio_rank(
     let (cats, deck_len) = experiment_flip_categories(gs, me, db);
     let blades = experiment_blades(gs, me, db);
     let board = experiment_board_pool(gs, me, db);
+    let shared_pools = std::env::var_os("V7_SHARED_SAMPLES").is_some().then(|| {
+        experiment_sample_pools(&cats, deck_len, blades, &board)
+    });
     let mut needs: Vec<[i32; 11]> = Vec::with_capacity(n);
     let mut scores: Vec<i32> = Vec::with_capacity(n);
     for &(_, cid, ref need) in lives.iter().take(n) {
@@ -933,7 +981,10 @@ fn experiment_portfolio_rank(
         if needs[bit][8] > 0 || needs[bit][9] > 0 {
             continue;
         }
-        let p = experiment_pass_probability(&cats, deck_len, blades, &board, &needs[bit]);
+        let p = shared_pools.as_ref().map_or_else(
+            || experiment_pass_probability(&cats, deck_len, blades, &board, &needs[bit]),
+            |pools| experiment_pass_probability_pools(pools, &needs[bit]),
+        );
         if p > 0.0 {
             singles.push((p, scores[bit], lives[bit].0, needs[bit]));
         }
@@ -969,7 +1020,10 @@ fn experiment_portfolio_rank(
         if unpassable {
             continue;
         }
-        let p = experiment_pass_probability(&cats, deck_len, blades, &board, &need_total);
+        let p = shared_pools.as_ref().map_or_else(
+            || experiment_pass_probability(&cats, deck_len, blades, &board, &need_total),
+            |pools| experiment_pass_probability_pools(pools, &need_total),
+        );
         let (_, opp) = gs.seated_pair(me);
         let floor = if opp.success_live_card_zone.cards.len() >= 2 {
             0.35

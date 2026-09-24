@@ -70,98 +70,159 @@ typedef struct {
 
 static RbYellIconOutcome rb_process_yell_revealed_card_icons(const GameState *g,
         int cid, int override_color, int total_hearts[8], int *cheer_count){
-    RbYellIconOutcome out; memset(&out,0,sizeof(out));
-    Card c; if(!rb_decode_card_by_index((uint32_t)cid,&c)) return out;
-    /* printed blade -> pink (recolored by set_blade_type) */
-    if(c.blade>0){
-        int bt=g->mods.blade_type[cid];
-        if(bt>=1 && bt<=6) out.blade_hearts[bt]+=c.blade; else out.blade_hearts[RB_HEART_PINK]+=c.blade;
-    }
-    /* BAll (b_heart07, color 7) doubling — a card carrying an All-color heart
-        doubles every other heart icon on that same card (the All heart itself is
-        the doubling source and is NOT doubled). */
+    RbYellIconOutcome out;
+    Card c;
+    memset(&out, 0, sizeof(out));
+    if (!total_hearts || !cheer_count || !g || cid < 0) return out;
+    if (!rb_decode_card_by_index((uint32_t)cid, &c)) return out;
+
     int blade_start = c.num_base;
     int blade_end = blade_start + c.num_blade;
     if (blade_end > c.n_hearts) blade_end = c.n_hearts;
-    int has_ball=0;
-    for(int h=blade_start;h<blade_end;h++) if(c.heart_color[h]==7 && c.heart_count[h]>0) has_ball=1;
-    int mult = has_ball ? 2 : 1;
-    for(int h=blade_start;h<blade_end;h++){
-        int col=c.heart_color[h];
-        /* override_color (live.rs::player_perform_live) recolors every yell card's
-            heart icons to a stage member's set_blade_type heart color; Draw/Score
-            special icons pass through unchanged. */
-        int eff = (override_color>=0 && col!=RB_HEART_DRAW && col!=RB_HEART_SCORE) ? override_color : col;
-        if(eff==RB_HEART_DRAW){ out.draw_icons += c.heart_count[h]; }
-        else if(eff==7){ out.blade_hearts[7]+=c.heart_count[h]; }                 /* BAll source, not doubled */
-        else if(eff==RB_HEART_SCORE){ int n=c.heart_count[h]*mult; out.note_icons+=n; *cheer_count+=n; }
-        else { out.blade_hearts[eff%8]+=c.heart_count[h]*mult; }
+    for (int h = blade_start; h < blade_end; h++) {
+        int raw_color = c.heart_color[h];
+        int amount = c.heart_count[h];
+        if (raw_color == RB_HEART_PINK) amount *= 2;
+        int effective_color = raw_color;
+        if (override_color >= 0 && raw_color != RB_HEART_PINK &&
+            raw_color != RB_HEART_DRAW && raw_color != RB_HEART_SCORE) {
+            effective_color = override_color;
+        }
+        if (effective_color == RB_HEART_DRAW) {
+            out.draw_icons += amount;
+        } else if (effective_color == RB_HEART_SCORE) {
+            out.note_icons += amount;
+            *cheer_count += amount;
+        } else if (effective_color == RB_HEART_ALL || effective_color == 7) {
+            out.blade_hearts[7] += amount;
+        } else if (effective_color == RB_HEART_PINK) {
+            out.blade_hearts[0] += amount;
+        } else if (effective_color >= RB_HEART_RED && effective_color <= RB_HEART_ORANGE) {
+            out.blade_hearts[effective_color] += amount;
+        }
     }
-    if(c.has_special){
-        if(c.special_color==RB_HEART_DRAW) out.draw_icons+=c.special_count;
-        else if(c.special_color==RB_HEART_SCORE){ int n=c.special_count; out.note_icons+=n; *cheer_count+=n; }
+    if (c.has_special) {
+        if (c.special_color == RB_HEART_DRAW) {
+            out.draw_icons += c.special_count;
+        } else if (c.special_color == RB_HEART_SCORE) {
+            out.note_icons += c.special_count;
+            *cheer_count += c.special_count;
+        }
     }
-    for(int i=0;i<8;i++) total_hearts[i]+=out.blade_hearts[i];
+    for (int i = 0; i < 8; i++) total_hearts[i] += out.blade_hearts[i];
     rb_free_card(&c);
     return out;
 }
 
-/* Yell: reveal top yell_count cards per live (default 1) and harvest blade hearts.
-    Returns number of yell cards revealed, fills blade_hearts[8] + note_icons. */
-static int do_yell(GameState *g, int pl, int yell_cards[RB_MAX_ZONE], int *n_yell, int blade_hearts[8], int *note_icons){
-    RbPlayer *P=&g->p[pl];
-    int lives=P->live.n;
-    if(lives==0) return 0;
-    int total_needed = 1;
-    for (int si = 0; si < RB_STAGE_SIZE; si++) {
-        int cid = P->stage[si];
-        if (cid == RB_EMPTY_SLOT || cid < 0) continue;
-        RbModifierEntry blade_entry = g->mods.blade[cid];
-        total_needed += rb_effective_blade(cid, blade_entry);
-    }
-    if (pl >= 0 && pl < 2 && g->yell_count_mod[pl] > 0)
-        total_needed += lives * g->yell_count_mod[pl];
-    if (total_needed < 1) total_needed = 1;
-    int revealed=0;
-    int draw_icons=0;
-    memset(blade_hearts,0,8*sizeof(int));
-    *note_icons=0;
-    *n_yell=0;
-    const char *src = (pl>=0 && pl<2 && g->yell_source[pl][0]) ? g->yell_source[pl] : "deck_top";
-    int from_bottom = (!strcmp(src,"deck_bottom") || !strcmp(src,"bottom"));
-    int from_discard = (!strcmp(src,"discard") || !strcmp(src,"waitroom"));
-    int from_hand    = !strcmp(src,"hand");
-    /* override_color (mirror live.rs::player_perform_live): the first stage
-        member's set_blade_type, mapped to a heart color, recolors every yell
-        card's heart icons. -1 = no override. */
-    int override_color=-1;
-    for(int i=0;i<RB_STAGE_SIZE;i++){
-        int cid=P->stage[i];
-        if(cid==RB_EMPTY_SLOT) continue;
-        int bt=g->mods.blade_type[cid];
-        if(bt>=0){ override_color=rb_blade_color_to_heart(bt); break; }
-    }
-    for(int i=0;i<total_needed;i++){
-        int cid=-1;
-        if(from_bottom){
-            if(P->deck.n>0){ cid=P->deck.cards[0]; for(int k=1;k<P->deck.n;k++) P->deck.cards[k-1]=P->deck.cards[k]; P->deck.n--; }
-        } else if(from_discard){
-            if(P->discard.n>0) cid=P->discard.cards[--P->discard.n];
-        } else if(from_hand){
-            if(P->hand.n>0) cid=P->hand.cards[--P->hand.n];
-        } else { /* deck_top (default) */
-            if(P->deck.n>0) cid=P->deck.cards[--P->deck.n];
+static int rb_yell_refresh_deck(GameState *g, int pl)
+{
+    if (!g || pl < 0 || pl > 1) return 0;
+    RbPlayer *player = &g->p[pl];
+    if (player->deck.n > 0 || player->discard.n == 0) return 0;
+    rb_shuffle(player->discard.cards, player->discard.n);
+    int count = player->discard.n;
+    if (count > RB_MAX_ZONE - player->deck.n) count = RB_MAX_ZONE - player->deck.n;
+    for (int i = 0; i < count; i++) player->deck.cards[player->deck.n++] = player->discard.cards[i];
+    player->discard.n -= count;
+    if (player->discard.n > 0) {
+        int remaining = player->discard.n;
+        for (int i = count; i < count + remaining; i++) {
+            int source_index = i - count;
+            if (source_index < player->discard.n)
+                player->discard.cards[source_index] = player->discard.cards[source_index + count];
         }
-        if(cid<0) break; /* source exhausted */
-        yell_cards[(*n_yell)++]=cid;
-        /* all blade/heart/draw/score icons of this card flow through the shared
-            helper (mirror live.rs::player_perform_live's yell loop). */
-        RbYellIconOutcome o = rb_process_yell_revealed_card_icons(g, cid, override_color, blade_hearts, note_icons);
-        draw_icons += o.draw_icons;
-        revealed++;
+        player->discard.n = remaining;
     }
-    for(int i=0;i<draw_icons;i++) rb_draw(g, pl);
-    return revealed;
+    player->deck_refreshed_this_turn = 1;
+    return count > 0;
+}
+
+static int rb_yell_count_delta(const GameState *g, int pl)
+{
+    if (!g || pl < 0 || pl > 1) return 0;
+    int delta = g->yell_count_mod[pl];
+    int slot = pl + 1;
+    for (int i = 0; i < g->n_yell_count_modifiers; i++) {
+        if (g->yell_count_modifiers[i].slot == slot)
+            delta += g->yell_count_modifiers[i].delta;
+    }
+    return delta;
+}
+
+static int rb_stage_member_waited(const GameState *g, int pl, int slot)
+{
+    if (!g || pl < 0 || pl > 1 || slot < 0 || slot >= RB_STAGE_SIZE) return 0;
+    int card_id = g->p[pl].stage[slot];
+    if (card_id == RB_EMPTY_SLOT || card_id < 0) return 0;
+    if (g->p[pl].stage_wait[slot]) return 1;
+    const char *orientation = rb_mods_get_orientation((RbMods *)&g->mods, card_id);
+    return orientation && !strcmp(orientation, "wait");
+}
+
+static int do_yell(GameState *g, int pl, int yell_cards[RB_MAX_ZONE], int *n_yell,
+                   int blade_hearts[8], int *note_icons)
+{
+    if (!g || pl < 0 || pl > 1 || !yell_cards || !n_yell || !blade_hearts || !note_icons)
+        return 0;
+    RbPlayer *player = &g->p[pl];
+    memset(blade_hearts, 0, 8 * sizeof(int));
+    *note_icons = 0;
+    *n_yell = 0;
+    if (player->live.n == 0) return 0;
+
+    int total_needed = 0;
+    for (int slot = 0; slot < RB_STAGE_SIZE; slot++) {
+        int card_id = player->stage[slot];
+        if (card_id == RB_EMPTY_SLOT || card_id < 0 || rb_stage_member_waited(g, pl, slot))
+            continue;
+        total_needed += rb_effective_blade(card_id, g->mods.blade[card_id]);
+    }
+    total_needed += rb_yell_count_delta(g, pl);
+    if (total_needed < 0) total_needed = 0;
+    if (total_needed > RB_MAX_ZONE) total_needed = RB_MAX_ZONE;
+
+    const char *source = g->yell_source[pl][0] ? g->yell_source[pl] : "deck_top";
+    int from_bottom = player->yell_from_bottom || !strcmp(source, "deck_bottom") ||
+                      !strcmp(source, "bottom");
+    int from_discard = !strcmp(source, "discard") || !strcmp(source, "waitroom");
+    int from_hand = !strcmp(source, "hand");
+    int override_color = -1;
+    for (int slot = 0; slot < RB_STAGE_SIZE; slot++) {
+        int card_id = player->stage[slot];
+        if (card_id == RB_EMPTY_SLOT || rb_stage_member_waited(g, pl, slot)) continue;
+        int blade_type = g->mods.blade_type[card_id];
+        if (blade_type >= 0) {
+            override_color = rb_blade_color_to_heart(blade_type);
+            break;
+        }
+    }
+
+    int draw_icons = 0;
+    for (int i = 0; i < total_needed && *n_yell < RB_MAX_ZONE; i++) {
+        int card_id = -1;
+        if (from_bottom) {
+            rb_yell_refresh_deck(g, pl);
+            if (player->deck.n > 0) card_id = player->deck.cards[--player->deck.n];
+        } else if (from_discard) {
+            if (player->discard.n > 0) card_id = player->discard.cards[--player->discard.n];
+        } else if (from_hand) {
+            if (player->hand.n > 0) card_id = player->hand.cards[--player->hand.n];
+        } else {
+            rb_yell_refresh_deck(g, pl);
+            if (player->deck.n > 0) {
+                card_id = player->deck.cards[0];
+                for (int j = 1; j < player->deck.n; j++) player->deck.cards[j - 1] = player->deck.cards[j];
+                player->deck.n--;
+            }
+        }
+        if (card_id < 0) break;
+        yell_cards[(*n_yell)++] = card_id;
+        RbYellIconOutcome outcome = rb_process_yell_revealed_card_icons(
+            g, card_id, override_color, blade_hearts, note_icons);
+        draw_icons += outcome.draw_icons;
+    }
+    for (int i = 0; i < draw_icons; i++) rb_draw(g, pl);
+    return *n_yell;
 }
 
 /* ───────────────────────────── allocation (mirror live.rs compute_allocations) ───────────────────────────── */
@@ -278,6 +339,9 @@ static int rb_allocations_pass(const int *filled /*[n][8]*/, const int *needs /*
     return 1;
 }
 
+int rb_backtrack_allocate(const int pool[8], const int card_needs[8], int n_cards,
+                          int *out_allocs, int max_allocs);
+
 /* Greedy allocation + verdict (mirror compute_allocations / check_live_success).
    Returns 1 if all lives pass. Computes surplus (total - required) for no_excess
    checks. */
@@ -290,6 +354,29 @@ static int allocate_and_verdict(const GameState *g, int pl, const int total_hear
     rb_build_card_needs(g, pl, needs, &n);
     rb_compute_future_demand(needs, n, future);
     rb_greedy_allocate(pool, needs, n, future, filled);
+    int all_pass = rb_allocations_pass(filled, needs, n) ? 1 : 0;
+    if (!all_pass && n > 0) {
+        int backtrack_allocs[RB_MAX_LIVE_CARDS * 8 * 255];
+        int max_allocs = (int)(sizeof(backtrack_allocs) / sizeof(backtrack_allocs[0]));
+        memset(backtrack_allocs, -1, sizeof(backtrack_allocs));
+        if (rb_backtrack_allocate(total_hearts, (const int *)needs, n,
+                                   backtrack_allocs, max_allocs)) {
+            memset(filled, 0, sizeof(filled));
+            int used = 0;
+            while (used < max_allocs && backtrack_allocs[used] >= 0) {
+                int entry = backtrack_allocs[used++];
+                int card = entry / 8;
+                int color = entry % 8;
+                if (card >= 0 && card < n && color >= 0 && color < 8)
+                    filled[card * 8 + color]++;
+            }
+            if (used > 0) {
+                all_pass = rb_allocations_pass(filled, needs, n) ? 1 : 0;
+                fprintf(stderr, "[LIVE_ALLOCATION_BACKTRACK] pl=%d entries=%d pass=%d\n",
+                        pl, used, all_pass);
+            }
+        }
+    }
     fprintf(stderr, "[LIVE_ALLOCATION] pl=%d lives=%d hearts=[%d,%d,%d,%d,%d,%d,%d,%d]\n",
             pl, n, total_hearts[0], total_hearts[1], total_hearts[2], total_hearts[3],
             total_hearts[4], total_hearts[5], total_hearts[6], total_hearts[7]);
@@ -298,7 +385,6 @@ static int allocate_and_verdict(const GameState *g, int pl, const int total_hear
                 di, needs[di*8], needs[di*8+1], needs[di*8+2], needs[di*8+3], needs[di*8+4], needs[di*8+5], needs[di*8+6], needs[di*8+7],
                 filled[di*8], filled[di*8+1], filled[di*8+2], filled[di*8+3], filled[di*8+4], filled[di*8+5], filled[di*8+6], filled[di*8+7]);
     }
-    int all_pass = rb_allocations_pass(filled, needs, n) ? 1 : 0;
 
     int total_required_all=0;
     int total_pool=0; for(int k=0;k<8;k++) total_pool+=total_hearts[k];
@@ -389,6 +475,9 @@ int rb_perform_live(GameState *g, int pl){
         s->surplus_hearts = surplus;
         s->note_icons = note_icons;
         for(int i=0;i<P->live.n && i<RB_MAX_LIVE_CARDS;i++) s->live_passed[i]=passed ? live_passed[i] : 0;
+    }
+    for (int i = 0; i < n_yell; i++) {
+        if (P->discard.n < RB_MAX_ZONE) P->discard.cards[P->discard.n++] = yell_cards[i];
     }
     if (g->live_batch_mode) {
         g->live_pre_valid[pl] = 1;
@@ -493,10 +582,6 @@ int rb_perform_live(GameState *g, int pl){
             P->live.n--;
             if(P->discard.n < RB_MAX_ZONE) P->discard.cards[P->discard.n++]=cid;
         }
-    }
-    /* yell cards go to discard (resolution) after use */
-    for(int i=0;i<n_yell;i++){
-        if(P->discard.n < RB_MAX_ZONE) P->discard.cards[P->discard.n++]=yell_cards[i];
     }
     return passed;
 }
@@ -1336,19 +1421,6 @@ int rb_try_surplus_compositions(int *pool, const int card_needs[8], int n_cards,
    requirements are satisfied given its filled array. Implements canonical
    acceptance rules: total coverage, heart0 bucket, per-color deficits. */
 int rb_card_ok_with_wildcard(const int filled[8], const int need[8]) {
-    int total_filled = 0, total_need = 0;
-    for (int i = 0; i < 8; i++) { total_filled += filled[i]; total_need += need[i]; }
-    if (total_filled >= total_need) return 1;
-    int heart0_need = need[0];
-    int heart0_filled = filled[0];
-    int icon_all = filled[7];
-    if (heart0_filled + icon_all < heart0_need) return 0;
-    for (int color = 1; color < 7; color++) {
-        if (filled[color] < need[color]) {
-            int deficit = need[color] - filled[color];
-            if (icon_all < deficit) return 0;
-            icon_all -= deficit;
-        }
-    }
-    return 1;
+    if (!filled || !need) return 0;
+    return bt_card_ok(filled, need);
 }

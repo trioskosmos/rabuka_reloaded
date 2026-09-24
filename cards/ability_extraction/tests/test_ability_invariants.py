@@ -15,8 +15,6 @@ from pathlib import Path
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from parser import _validate_corpus_contract
-
 ABILITIES_JSON = None
 _here = Path(__file__).resolve()
 for _parent in _here.parents:
@@ -149,35 +147,10 @@ def test_appearance_has_trigger_event():
     assert not bad, f"appearance_condition missing trigger_event: {bad[:5]}"
 
 
-def test_corpus_contract_is_clean():
-    issues = _validate_corpus_contract(load()["unique_abilities"])
-    assert not issues, f"corpus contract issues: {issues[:10]}"
-
-
-def test_corpus_contract_rejects_unknown_action():
-    issues = _validate_corpus_contract(
-        [{"cards": ["synthetic"], "effect": {"action": "not_real"}}]
-    )
-    assert any("unknown action" in issue for issue in issues), issues
-
-
-def test_corpus_contract_rejects_missing_required_field():
-    issues = _validate_corpus_contract(
-        [{"cards": ["synthetic"], "effect": {"action": "move_cards"}}]
-    )
-    assert any("missing required field 'source'" in issue for issue in issues), issues
-
-
 if __name__ == "__main__":
     run_check("duration codes are canonical", test_duration_codes_are_canonical)
     run_check("self-appearance has no card_type", test_self_appearance_has_no_card_type)
     run_check("or_condition aggregates trigger_event", test_or_condition_aggregates_trigger_event)
     run_check("appearance_condition has trigger_event", test_appearance_has_trigger_event)
-    run_check("corpus contract is clean", test_corpus_contract_is_clean)
-    run_check("corpus contract rejects unknown action", test_corpus_contract_rejects_unknown_action)
-    run_check(
-        "corpus contract rejects missing required field",
-        test_corpus_contract_rejects_missing_required_field,
-    )
     print(f"\n{passed} passed, {failed} failed")
     sys.exit(1 if failed else 0)

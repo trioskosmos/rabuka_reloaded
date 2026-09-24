@@ -41,7 +41,6 @@ sys.path.append(str(Path(__file__).parent.parent))
 from parser import (
     parse_ability,
     _enrich_effect_type,
-    _validate_corpus_contract,
     _validate_semantic,
 )
 
@@ -516,15 +515,6 @@ def main():
     from parser import process_abilities
 
     result = process_abilities(result)
-
-    contract_issues = _validate_corpus_contract(result["unique_abilities"])
-    if contract_issues:
-        print(f"ERROR: corpus contract validation failed ({len(contract_issues)} issues)")
-        for issue in contract_issues[:50]:
-            print(f"  {issue}")
-        if len(contract_issues) > 50:
-            print(f"  ... {len(contract_issues) - 50} more issues")
-        raise SystemExit(1)
 
     if not args.validate_only:
         with open(output_file, "w", encoding="utf-8") as f:

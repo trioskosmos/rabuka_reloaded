@@ -39,7 +39,10 @@ int rb_zone_total_blades(const GameState *g, int pl, int include_waited) {
     for (int s = 0; s < RB_STAGE_SIZE; s++) {
         int cid = P->stage[s];
         if (cid == RB_EMPTY_SLOT) continue;
-        if (!include_waited && P->stage_wait[s]) continue;
+        if (!include_waited) {
+            const char *orientation = rb_mods_get_orientation((RbMods *)&g->mods, cid);
+            if (P->stage_wait[s] || (orientation && !strcmp(orientation, "wait"))) continue;
+        }
         Card c; if (!rb_decode_card_by_index((uint32_t)cid, &c)) continue;
         int eff = (int)c.blade + rb_mods_get_blade((RbMods *)&g->mods, cid);
         rb_free_card(&c);

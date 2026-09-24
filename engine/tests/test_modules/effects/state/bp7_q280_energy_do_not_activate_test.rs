@@ -279,7 +279,7 @@ fn q280_mei_live_success_abilities_compose_before_payment() {
     seed_energy_deck(&mut game, 2);
 
     trigger_mei_live_success(&mut game, mei);
-    let placed: Vec<i16> = game.state.player1.energy_zone.cards.clone();
+    let placed: Vec<i16> = game.state.player1.energy_zone.cards.to_vec();
     assert_eq!(placed.len(), 2);
     assert_eq!(game.state.player1.energy_zone.active_count(), 0);
     assert!(placed

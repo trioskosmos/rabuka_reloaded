@@ -140,3 +140,58 @@ fn qzero_under_is_zero_blades() {
     let blades = run_and_get_blade(&mut game, &[]);
     assert_eq!(blades, 0, "no under-cards → 0 blades, got {}", blades);
 }
+
+#[test]
+fn q279_duplicate_joint_cards_count_as_one_name() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let blades = run_and_get_blade(&mut game, &[JOINT, JOINT]);
+    assert_eq!(blades, 1, "two copies of the same joint → 1 blade, got {}", blades);
+}
+
+#[test]
+fn q279_single_plus_duplicate_joint_cards_count_each_name_once() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let blades = run_and_get_blade(&mut game, &[AYUMU, JOINT, JOINT]);
+    assert_eq!(blades, 2, "one single plus duplicate joint names → 2 blades, got {}", blades);
+}
+
+#[test]
+fn q278_ability_placed_card_and_joint_are_counted_at_live_start() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let shizuku = game.id(SHIZUKU);
+    let ayumu = game.id(AYUMU);
+    game.state.player1.stage.stage = [-1, shizuku, -1];
+    game.state.player1.waitroom.cards.push(ayumu);
+    seed_deck(&mut game);
+
+    game.activate_ability(shizuku);
+    let mut guard = 0;
+    while game.has_pending_choice() && guard < 8 {
+        game.select_indices(&[0]);
+        guard += 1;
+    }
+    assert!(game.state.player1.stage.under_cards[1].contains(&ayumu));
+
+    let joint = game.id(JOINT);
+    game.state.player1.stage.place_under_card(MemberArea::Center, joint);
+    game.give_energy(3);
+    let live = game.id("PL!-sd1-020-SD");
+    game.state.player1.hand.cards.push(live);
+    for _ in 0..5 {
+        game.pass();
+    }
+    game.set_live_card(live);
+    game.pass();
+    game.pass();
+
+    assert_eq!(game.state.mods.get_heart_copy(shizuku), Some(ayumu));
+    assert_eq!(
+        game.state.mods.get_blade_modifier(shizuku),
+        2,
+        "the ability-placed member and the joint must both count at Live Start"
+    );
+}

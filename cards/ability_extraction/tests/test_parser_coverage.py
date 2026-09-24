@@ -365,6 +365,21 @@ def test_q280_energy_placement_restriction_is_delayed_per_card():
     assert restriction.get("delayed") is True, restriction
 
 
+def test_q279_distinct_under_member_blade_gain_is_parsed():
+    text = (
+        "ライブ終了時まで、このメンバーの下に置かれている名前の異なるメンバーカード1枚につき、"
+        "{{icon_blade.png|ブレード}}を得る。"
+    )
+    effect = _normalize_effect_tree(parse_effect(text), text)
+    assert effect.get("action") == "gain_resource", effect
+    assert effect.get("resource") == "blade", effect
+    assert effect.get("per_unit") is True, effect
+    assert effect.get("distinct") == "card_name", effect
+    assert effect.get("location") == "under_member", effect
+    assert effect.get("card_type") == "member_card", effect
+    assert effect.get("duration") == "live_end", effect
+
+
 # ─── run all ──────────────────────────────────────────────────────────────────
 
 tests = {

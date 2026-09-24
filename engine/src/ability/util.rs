@@ -2370,27 +2370,35 @@ pub fn apply_distinct_filter(
 ///   because the joint's constituent names are already present as standalones.
 pub fn count_distinct_member_name_units(cards: &[i16], card_db: &CardDatabase) -> usize {
     let mut single_names: HashSet<String> = HashSet::default();
-    let mut joints: Vec<i16> = Vec::new();
+    let mut joint_names: HashSet<String> = HashSet::default();
+    let mut joints: Vec<Vec<String>> = Vec::new();
     for &id in cards {
         let Some(card) = card_db.get_card(id) else { continue };
-        let raw = card.name.trim();
-        if raw.contains('&') {
-            joints.push(id);
-        } else {
-            single_names.insert(CardDatabase::normalize_name(&card.name));
+        let names = card_db.get_card_names(id);
+        if names.len() > 1 {
+            let full_name = CardDatabase::normalize_name(&card.name).replace('＆', "&");
+            if joint_names.insert(full_name) {
+                joints.push(names);
+            }
+        } else if let Some(name) = names.first() {
+            single_names.insert(name.clone());
         }
     }
     let mut count = single_names.len();
-    for id in joints {
-        let Some(card) = card_db.get_card(id) else { continue };
-        let has_new = card
-            .name
-            .split('&')
-            .any(|part| !single_names.contains(&CardDatabase::normalize_name(part)));
-        if has_new {
+    for names in &joints {
+        if names
+            .iter()
+            .any(|part| !single_names.contains(part))
+        {
             count += 1;
         }
     }
+    log::debug!(
+        "[DISTINCT_MEMBER_NAMES] singles={} unique_joints={} units={}",
+        single_names.len(),
+        joint_names.len(),
+        count
+    );
     count
 }
 

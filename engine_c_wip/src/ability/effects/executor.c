@@ -269,10 +269,20 @@ int rb_executor_execute(GameState *g, int actor, AbilityEffect *effect, int host
         if (effect->primary_effect)
             routed.primary_effect = effect->primary_effect;
         rb_execute_effect_ex(g, actor, &routed, host_cid);
+    } else if (strcmp(action, "modify_yell_source") == 0) {
+        const char *source = effect_extra(effect, "yell_source");
+        if (!source) source = effect->source;
+        int target = rb_target_player_index(effect->target, actor == 0 ? "p1" : "p2");
+        if (target < 0) target = actor;
+        if (target >= 0 && target < 2 && source) {
+            snprintf(g->yell_source[target], sizeof(g->yell_source[target]), "%s", source);
+            g->p[target].yell_from_bottom = !strcmp(source, "deck_bottom") ||
+                                           !strcmp(source, "bottom");
+        }
+        result = 1;
     } else if (strcmp(action, "action_by") == 0 ||
                strcmp(action, "choice_condition") == 0 ||
                strcmp(action, "energy_condition") == 0 ||
-               strcmp(action, "modify_yell_source") == 0 ||
                strcmp(action, "do_nothing") == 0) {
         result = 1;
     } else {
