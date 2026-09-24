@@ -26,6 +26,7 @@
 ///     Effect=for each distinct heart COLOR among discarded cards, gain 1 of that color.
 ///
 use crate::helpers::*;
+use rabuka_engine::game_setup::ActionType;
 use rabuka_engine::{card::HeartColor, zones::MemberArea};
 
 // ─────────────────────────────────────────────────────────────
@@ -200,9 +201,9 @@ fn test_bp2_live_start_discard_any_number_gains_blade_per_card() {
     );
 }
 
-/// Skipping the optional cost (0 cards) grants 0 blades.
+/// Q217: choosing zero cards pays zero and gains no blade.
 #[test]
-fn test_bp2_live_start_skip_cost_gains_no_blade() {
+fn test_bp2_live_start_choose_zero_pays_no_cards_and_gains_no_blade() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
@@ -230,10 +231,17 @@ fn test_bp2_live_start_skip_cost_gains_no_blade() {
         "bp2 should prompt for card selection"
     );
 
-    // Skip — select no cards
+    assert!(
+        !game
+            .generated_actions()
+            .iter()
+            .any(|action| action.action_type == ActionType::ChoiceSkip),
+        "Q217: choose zero must not be represented as optional skip: {:?}",
+        game.get_pending_choice()
+    );
     game.select_indices(&[]);
 
-    assert!(!game.has_pending_choice(), "Should resolve after skip");
+    assert!(!game.has_pending_choice(), "Should resolve after choosing zero");
 
     let blades = game.state.mods.get_blade_modifier(joint);
     assert_eq!(blades, 0, "Skipping bp2 cost should give 0 blades");

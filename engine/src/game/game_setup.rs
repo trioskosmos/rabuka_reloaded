@@ -1087,6 +1087,7 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
             zone,
             card_type,
             description,
+            count,
             allow_skip,
             ref filtered_indices,
             cost_limit,
@@ -1302,7 +1303,7 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
                 );
                 actions.push(a);
             }
-            if *allow_skip {
+            if *allow_skip && *count != 0 {
                 let mut a = make_action_params(
                     ActionType::ChoiceSkip,
                     "Skip",
