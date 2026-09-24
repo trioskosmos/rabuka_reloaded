@@ -51,3 +51,37 @@ fn pl_s_bp6_007_r_energy_cost_grants_aqours_constant_score_abilities() {
         "up to TWO 『Aqours』 members each gain ライブの合計スコア+1 (μ's member excluded)"
     );
 }
+
+#[test]
+fn hanamaru_q_constant_score_success_threshold_matrix() {
+    for success_count in 0..=3 {
+        let db = load_real_database();
+        let mut game = TestGame::new(db);
+        let hanamaru = game.id("PL!S-bp6-007-R");
+        game.add_to_stage(MemberArea::Center, hanamaru);
+        for _ in 0..success_count {
+            game.state
+                .player2
+                .success_live_card_zone
+                .add_card(game.new_id("PL!-sd1-019-SD"));
+        }
+        game.give_energy(2);
+        fire_trigger(
+            &mut game,
+            hanamaru,
+            AbilityTrigger::LiveStart,
+            "ライブ開始時",
+        );
+        let mut guard = 0;
+        while game.has_pending_choice() && guard < 8 {
+            guard += 1;
+            game.select_indices(&[0, 1]);
+        }
+        game.state.recalculate_constants();
+        assert_eq!(
+            game.state.mods.p1_constant_total_score_bonus,
+            i16::from(u8::from(success_count >= 2)),
+            "success_count={success_count}"
+        );
+    }
+}
