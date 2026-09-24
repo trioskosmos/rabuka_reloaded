@@ -15,6 +15,29 @@ fn advance_to_live_success(game: &mut TestGame) {
     game.pass();
 }
 
+fn setup_daydream_energy_choice() -> TestGame {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let mermaid = game.id("PL!N-bp4-030-L");
+    let filler = game.id("PL!-sd1-010-SD");
+    let h05 = game.id("PL!S-sd1-003-SD");
+    let h06 = game.id("PL!-PR-015-PR");
+    let energy = game.id("LL-E-001-SD");
+    game.state.player1.stage.stage = [h06, h05, -1];
+    game.state.player1.hand.cards.push(mermaid);
+    for _ in 0..15 {
+        game.state.player1.main_deck.cards.push(filler);
+        game.state.player2.main_deck.cards.push(filler);
+    }
+    for _ in 0..5 {
+        game.state.player1.energy_deck.cards.push(energy);
+    }
+    advance_to_live_card_set_p1(&mut game);
+    game.set_live_card(mermaid);
+    advance_to_live_success(&mut game);
+    game
+}
+
 #[test]
 fn daydream_mermaid_choice_appears_and_selects_energy() {
     let db = load_real_database();
@@ -48,6 +71,16 @@ fn daydream_mermaid_choice_appears_and_selects_energy() {
         game.state.player1.energy_zone.cards.len() > energy_before,
         "Energy should be placed from energy deck"
     );
+}
+
+#[test]
+fn daydream_mermaid_choice_cannot_be_applied_twice_q191() {
+    let mut game = setup_daydream_energy_choice();
+    assert!(game.has_pending_choice());
+    game.select_option(0);
+    let energy_after = game.state.player1.energy_zone.cards.len();
+    assert!(!game.has_pending_choice());
+    assert_eq!(game.state.player1.energy_zone.cards.len(), energy_after);
 }
 
 #[test]
