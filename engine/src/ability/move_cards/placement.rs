@@ -260,19 +260,31 @@ impl AbilityResolver {
         {
             let player = gs.resolve_target_player(target);
             let player_id = player.id.clone();
-            let has_valid_targets = player.waitroom.cards.iter().any(|&cid| {
-                gs.card_database.get_card(cid).is_some_and(|c| {
-                    c.is_live()
-                        && group_names.iter().any(|gn| {
-                            crate::ability::util::card_matches_group_str(
-                                &gs.card_database,
+            let filtered_indices: Vec<usize> = player
+                .waitroom
+                .cards
+                .iter()
+                .enumerate()
+                .filter_map(|(index, &cid)| {
+                    let matches = gs.card_database.get_card(cid).is_some_and(|c| {
+                        c.is_live()
+                            && group_names.iter().any(|gn| {
+                                crate::ability::util::card_matches_group_str(
+                                    &gs.card_database,
+                                    cid,
+                                    Some(gn),
+                                )
+                            })
+                            && gs.can_place_card_in_zone(
                                 cid,
-                                Some(gn),
+                                Zone::SuccessLiveZone.to_str(),
+                                &player.id,
                             )
-                        })
+                    });
+                    matches.then_some(index)
                 })
-            });
-            if has_valid_targets {
+                .collect();
+            if !filtered_indices.is_empty() {
                 gs.pending_success_replacement_card_id = Some(card_id);
                 gs.pending_success_replacement_player_id = Some(player_id);
                 let group_name = group_names.into_iter().next().unwrap_or_default();
@@ -286,6 +298,7 @@ impl AbilityResolver {
                 .description_ja(Some("控え室から成功ゾーンに置くライブカードを選んでください（スキップで元のカードを置きます）".to_string()))
                 .card_type(Some("live_card".to_string()))
                 .group(Some(group_name))
+                .filtered_indices(Some(filtered_indices))
                 .target_player_id(Some("self".to_string()))
                 .build();
                 self.pending_choice = Some(choice);

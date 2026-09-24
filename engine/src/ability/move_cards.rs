@@ -169,14 +169,16 @@ impl AbilityResolver {
         } else {
             source
         };
-        if !self.selected_cards.is_empty()
-            && Zone::from_str(source_str) == Some(Zone::SelectedCards)
-        {
-            let selected = self.selected_cards.clone();
+        if Zone::from_str(source_str) == Some(Zone::SelectedCards) {
+            let selected: Vec<i16> = if self.selected_cards.is_empty() {
+                gs.revealed_cost_cards.iter().copied().collect()
+            } else {
+                self.selected_cards.iter().copied().collect()
+            };
             for &card_id in &selected {
                 remove_card_from_any_zone(player, &mut gs.last_vacated_stage_area, card_id);
             }
-            return Ok(selected.to_vec());
+            return Ok(selected);
         }
 
         if source_str == "recently_moved" {
@@ -1295,11 +1297,6 @@ impl AbilityResolver {
     ) -> Result<Vec<i16>, String> {
         // Inline pick: writes gs.last_vacated_stage_area below conflict with
         // a whole-gs borrow.
-        let player = if c.use_p2 {
-            &mut gs.player2
-        } else {
-            &mut gs.player1
-        };
         let effect = c.effect;
         let count = c.count;
         let selected = self.selected_cards.clone();
@@ -1313,12 +1310,20 @@ impl AbilityResolver {
             util::SelectionOutcome::Exact(indices) => {
                 let taken: Vec<i16> = indices.iter().map(|&i| selected[i]).collect();
                 for &card_id in &taken {
+                    let player = if c.use_p2 {
+                        &mut gs.player2
+                    } else {
+                        &mut gs.player1
+                    };
                     remove_card_from_any_zone(
                         player,
                         &mut gs.last_vacated_stage_area,
                         card_id,
                     );
+                    gs.remove_revealed_card(card_id);
+                    gs.remove_revealed_cost_card(card_id);
                 }
+                self.selected_cards.retain(|card_id| !taken.contains(card_id));
                 // Card left any zone → full zone-exit cleanup (rule 4.1.4)
                 gs.on_cards_left_zones(&taken);
                 Ok(taken)
@@ -1726,6 +1731,13 @@ gs.set_recently_moved_batch(moved.clone().into(), Some("under_member"));
         card_db: &CardDatabase,
         moved_cards: &mut Vec<i16>,
     ) -> Result<bool, String> {
+        for &card_id in taken {
+            let was_cost_revealed = gs.revealed_cost_cards.contains(&card_id);
+            if was_cost_revealed {
+                gs.remove_revealed_card(card_id);
+            }
+            gs.remove_revealed_cost_card(card_id);
+        }
         let stage_full = {
             let player = if use_p2 { &gs.player2 } else { &gs.player1 };
             Zone::from_str(destination) == Some(Zone::Stage)
@@ -1964,6 +1976,11 @@ gs.set_recently_moved_batch(moved.clone().into(), Some("under_member"));
             &destination,
             &card_db,
         )?;
+        if effect.optional.unwrap_or(false) && taken.is_empty() && self.pending_choice.is_none() {
+            if let Some(entry) = gs.ability_queue.current_entry_mut() {
+                entry.optional_cost_result = Some(false);
+            }
+        }
         // Q118 all-or-nothing: inside an accepted conditional_on_optional placement,
         // a move that found no card AND offered no choice (e.g. a group missing from
         // the discard pile) makes the placement incomplete, so the trailing

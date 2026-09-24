@@ -1,6 +1,6 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-09-24T18:23:35.567276+00:00",
+  "generated_at": "2026-09-24T20:52:33.146600+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
@@ -8,7 +8,7 @@
     "unique_abilities": 936
   },
   "n_files": 839,
-  "n_tests": 3477,
+  "n_tests": 3486,
   "total_cards": 771,
   "covered_cards": 771,
   "abilities_on_covered": 936,
@@ -678,7 +678,7 @@
       ]
     }
   },
-  "n_test_fns_parsed": 3477,
+  "n_test_fns_parsed": 3486,
   "abilities": [
     {
       "idx": 0,
@@ -11401,7 +11401,7 @@
         "engine/tests/test_modules/effects/ability_mod/full_distinct_group_stage_grants_yell_live_score_test.rs",
         "engine/tests/test_modules/effects/compound/shioriko_bp4_swap_test.rs",
         "engine/tests/test_modules/effects/conditional/debut_reveal_success_zone_replacement_q256_test.rs",
-        "engine/tests/test_modules/effects/conditional/live_phase_success_zone_replacement_q257_test.rs",
+        "engine/tests/test_modules/effects/conditional/live_phase_success_zone_replacement_q256_test.rs",
         "engine/tests/test_modules/effects/cost_mod/success_zone_group_pl_n_sd2_003_sd2_test.rs",
         "engine/tests/test_modules/effects/deck_order/restore/optional_waitroom_to_deck_top_test.rs",
         "engine/tests/test_modules/effects/draw/conditional/success_zone_group_pl_bp6_023_l_test.rs",
@@ -11466,7 +11466,7 @@
         "butterfly_wing_to_butterfly_no_match",
         "candidate_pool_distinct_filter"
       ],
-      "covering_test_count": 221,
+      "covering_test_count": 230,
       "is_null": true,
       "use_limit": null,
       "watches_abilities": false,
@@ -28702,7 +28702,7 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/effects/conditional/debut_reveal_success_zone_replacement_q256_test.rs",
-        "engine/tests/test_modules/effects/conditional/live_phase_success_zone_replacement_q257_test.rs",
+        "engine/tests/test_modules/effects/conditional/live_phase_success_zone_replacement_q256_test.rs",
         "engine/tests/test_modules/effects/cost_mod/seven_energy_lead_stage_cost_two_bonus_test.rs",
         "engine/tests/test_modules/effects/draw/flat/live_success_compare_revealed_draw_test.rs",
         "engine/tests/test_modules/effects/live_start/dazzling_game_test.rs",
@@ -28718,7 +28718,6 @@
         "dazzling_live_start_leaves_draw_and_colorless_icons_unchanged",
         "dazzling_live_start_recolors_listed_blade_hearts_to_purple",
         "dazzling_q187_exclude_selected_liella_other_pickable",
-        "debut_reveal_success_zone_placement_replaces_with_waitroom_live_q256",
         "debut_reveal_success_zone_replacement_preserves_target_identity_pl_bp6_022_l",
         "empty_waitroom_resolves_cleanly",
         "equal_cost_replaced_no_trigger",
@@ -28735,16 +28734,17 @@
         "live_phase_success_zone_replacement_preserves_target_identity_pl_bp6_022_l",
         "live_phase_success_zone_replacement_routes_choice_to_player_one",
         "live_phase_success_zone_replacement_routes_choice_to_player_two",
-        "maki_sd1_006_success_zone_restriction_parsed",
-        "member_in_waitroom_ignored",
-        "mixed_waitroom_only_hasu_selectable",
-        "muse_bp6_009_r_center_with_two_original_blade_side_members_adds_one_live_total_score",
-        "non_hasu_live_not_added",
-        "q266_cost_b0_waits_nothing_incl_blade0",
-        "q266_cost_b1_waits_nothing",
-        "q266_cost_b2_waits_blade0_not_blade1"
+        "maki_q256_accepts_crossroads_replacement",
+        "maki_q256_can_decline_reveal",
+        "maki_q256_declines_crossroads_replacement",
+        "maki_q256_empty_success_still_attempts_placement",
+        "maki_q256_filters_multiple_mus_targets",
+        "maki_q256_non_crossroads_reveal_bypasses_replacement",
+        "maki_q256_non_mus_waitroom_does_not_prompt",
+        "maki_q256_selects_exact_success_card",
+        "maki_q256_uses_only_the_cost_revealed_card"
       ],
-      "covering_test_count": 65,
+      "covering_test_count": 74,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -32742,7 +32742,7 @@
         "engine/tests/test_modules/effects/compound/debut_group_live_topdeck_waited_opponent_draw_test.rs",
         "engine/tests/test_modules/effects/compound/tsunagaru_connect_test.rs",
         "engine/tests/test_modules/effects/conditional/debut_reveal_success_zone_replacement_q256_test.rs",
-        "engine/tests/test_modules/effects/conditional/live_phase_success_zone_replacement_q257_test.rs",
+        "engine/tests/test_modules/effects/conditional/live_phase_success_zone_replacement_q256_test.rs",
         "engine/tests/test_modules/effects/gain/blades/combined_success_zone_constant_blade_test.rs",
         "engine/tests/test_modules/effects/gain/hearts/success_score_sum_constant_heart_test.rs",
         "engine/tests/test_modules/effects/recover/to_hand/pl_hs_bp1_003_test.rs",
@@ -32764,7 +32764,6 @@
         "debut_live_topdeck_place_mus_live_on_deck_top",
         "debut_live_topdeck_self_wait_not_enough",
         "debut_live_topdeck_wait_in_all_positions_triggers",
-        "debut_reveal_success_zone_placement_replaces_with_waitroom_live_q256",
         "debut_reveal_success_zone_replacement_preserves_target_identity_pl_bp6_022_l",
         "duplicate_names_fails_distinct_condition",
         "empty_area_fails_all_areas_condition",
@@ -32777,10 +32776,11 @@
         "live_score_includes_global_bonus",
         "live_score_no_bonus_when_condition_fails",
         "live_victory_p1_wins_with_global_bonus_p2_without",
-        "missing_hasunosora_member_fails_condition",
-        "multiname_card_matches_hasunosora_group"
+        "maki_q256_accepts_crossroads_replacement",
+        "maki_q256_can_decline_reveal",
+        "maki_q256_declines_crossroads_replacement"
       ],
-      "covering_test_count": 48,
+      "covering_test_count": 57,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -40462,7 +40462,8 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/conditional/live_phase_success_zone_replacement_q257_test.rs",
+        "engine/tests/test_modules/effects/conditional/debut_reveal_success_zone_replacement_q256_test.rs",
+        "engine/tests/test_modules/effects/conditional/live_phase_success_zone_replacement_q256_test.rs",
         "engine/tests/test_modules/effects/cost_mod/modify_required_hearts_13key_test.rs"
       ],
       "covering_tests": [
@@ -40477,6 +40478,16 @@
         "live_phase_success_zone_replacement_routes_choice_to_player_one",
         "live_phase_success_zone_replacement_routes_choice_to_player_two",
         "low_score_mus_live_gets_no_reduction",
+        "maki_q256_accepts_crossroads_replacement",
+        "maki_q256_can_decline_reveal",
+        "maki_q256_declines_crossroads_replacement",
+        "maki_q256_empty_success_still_attempts_placement",
+        "maki_q256_filters_multiple_mus_targets",
+        "maki_q256_non_crossroads_reveal_bypasses_replacement",
+        "maki_q256_non_mus_waitroom_does_not_prompt",
+        "maki_q256_selects_exact_success_card",
+        "maki_q256_uses_only_the_cost_revealed_card",
+        "maki_q256_without_live_card_in_hand_does_nothing",
         "mixed_scores_filter_correctly",
         "no_live_cards_no_crash",
         "non_mus_high_score_gets_no_reduction",
@@ -40486,7 +40497,7 @@
         "p2_activator_respects_score_threshold",
         "p2_activator_targets_p2_not_p1"
       ],
-      "covering_test_count": 19,
+      "covering_test_count": 29,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -40548,19 +40559,28 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/effects/conditional/debut_reveal_success_zone_replacement_q256_test.rs",
-        "engine/tests/test_modules/effects/conditional/live_phase_success_zone_replacement_q257_test.rs"
+        "engine/tests/test_modules/effects/conditional/live_phase_success_zone_replacement_q256_test.rs"
       ],
       "covering_tests": [
-        "debut_reveal_success_zone_placement_replaces_with_waitroom_live_q256",
         "debut_reveal_success_zone_replacement_preserves_target_identity_pl_bp6_022_l",
         "live_phase_declined_replacement_places_original_in_success_zone",
         "live_phase_no_valid_replacement_places_original_in_success_zone",
         "live_phase_success_zone_replacement_filters_multiple_waitroom_targets",
         "live_phase_success_zone_replacement_preserves_target_identity_pl_bp6_022_l",
         "live_phase_success_zone_replacement_routes_choice_to_player_one",
-        "live_phase_success_zone_replacement_routes_choice_to_player_two"
+        "live_phase_success_zone_replacement_routes_choice_to_player_two",
+        "maki_q256_accepts_crossroads_replacement",
+        "maki_q256_can_decline_reveal",
+        "maki_q256_declines_crossroads_replacement",
+        "maki_q256_empty_success_still_attempts_placement",
+        "maki_q256_filters_multiple_mus_targets",
+        "maki_q256_non_crossroads_reveal_bypasses_replacement",
+        "maki_q256_non_mus_waitroom_does_not_prompt",
+        "maki_q256_selects_exact_success_card",
+        "maki_q256_uses_only_the_cost_revealed_card",
+        "maki_q256_without_live_card_in_hand_does_nothing"
       ],
-      "covering_test_count": 8,
+      "covering_test_count": 17,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,

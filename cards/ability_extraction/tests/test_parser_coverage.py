@@ -395,6 +395,17 @@ def test_live_start_score_gate_filters_own_live_cards():
     assert condition.get("target") == "self", condition
 
 
+def test_maki_previous_reveal_source_is_resolution_scoped():
+    ability = parse_ability(
+        "{{toujyou.png|登場}}手札のライブカードを1枚公開してもよい：自分の成功ライブカード置き場にあるカードを1枚手札に加える。そうした場合、これにより公開したカードを自分の成功ライブカード置き場に置く。"
+    )
+    action = ability["effect"]["actions"][1]
+    assert action.get("source") == "selected_cards", action
+    assert action.get("count") == 1, action
+    assert "dynamic_count" not in action, action
+    assert ability["effect"].get("conditional") is not True, ability["effect"]
+
+
 def test_excluded_this_member_state_change_is_not_self_targeted():
     ability = parse_ability(
         "{{live_start.png|ライブ開始時}}自分のステージにいるこのメンバー以外のウェイト状態のメンバー1人をアクティブにする"

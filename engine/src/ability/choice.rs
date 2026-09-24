@@ -20,6 +20,19 @@ use smallvec::SmallVec;
 
 mod result_handlers;
 
+fn effect_uses_selected_cards(effect: &AbilityEffect) -> bool {
+    effect.source == Some(Zone::SelectedCards)
+        || effect
+            .compound
+            .actions
+            .as_ref()
+            .is_some_and(|actions| {
+                actions
+                    .iter()
+                    .any(|action| effect_uses_selected_cards(action))
+            })
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Continuation {
     Immediate,
@@ -965,13 +978,13 @@ impl super::resolver::AbilityResolver {
 
         // Handle reveal action: push selected cards to revealed_cards, don't discard.
         if ctx.is_reveal && Zone::from_str(zone) == Some(Zone::Hand) {
-            return self.handle_reveal_selection(gs, &ctx);
+            return self.handle_reveal_selection(gs, &ctx, &context);
         }
 
         if !effect_started
             && gs
                 .entry_cost()
-                .is_some_and(|c| c.action == ActionType::Reveal)
+                .is_some_and(|cost| cost.action == ActionType::Reveal)
         {
             return self.handle_entry_cost_reveal(gs, &ctx, &context);
         }
@@ -1430,6 +1443,17 @@ impl super::resolver::AbilityResolver {
                     }
                 }
             }
+            let selected_hand_ids: Vec<i16> = {
+                let hand_target = ctx
+                    .target_player_id
+                    .clone()
+                    .unwrap_or_else(|| "self".to_string());
+                let hand_cards = gs.resolve_target_player(&hand_target).hand.cards.clone();
+                all_idxs
+                    .iter()
+                    .filter_map(|index| hand_cards.get(*index).copied())
+                    .collect()
+            };
             self.execute_selected_cards_from_zone(
                 gs,
                 Zone::Hand.to_str(),
@@ -1443,7 +1467,21 @@ impl super::resolver::AbilityResolver {
                 ctx.characters.as_ref(),
                 ctx.target_player_id.as_deref(),
             )?;
-            self.selected_cards.clear();
+            let keep_selected = self
+                .current_effect
+                .clone()
+                .or_else(|| gs.entry_effect().cloned())
+                .or_else(|| {
+                    gs.ability_queue
+                        .current_entry()
+                        .and_then(|entry| entry.ability.effect.as_deref().cloned())
+                })
+                .is_some_and(|effect| effect_uses_selected_cards(&effect));
+            if keep_selected {
+                self.selected_cards = selected_hand_ids.into();
+            } else {
+                self.selected_cards.clear();
+            }
         }
         if ctx.allow_skip {
             if let Some(entry) = gs.ability_queue.current_entry_mut() {
@@ -1466,6 +1504,7 @@ impl super::resolver::AbilityResolver {
         &mut self,
         gs: &mut GameState,
         ctx: &SelectionContext,
+        context: &ExecutionContext,
     ) -> Result<(), String> {
         let effect_started = gs
             .ability_queue
@@ -1551,6 +1590,14 @@ impl super::resolver::AbilityResolver {
         for &cid in &revealed_card_ids {
             gs.push_revealed_card(cid, source, false, owner, "ability");
         }
+        if revealed_card_ids.is_empty() && ctx.allow_skip && !effect_started {
+            self.selected_cards.clear();
+            if let Some(entry) = gs.ability_queue.current_entry_mut() {
+                entry.cost_paid = true;
+                entry.optional_cost_result = Some(false);
+            }
+            return self.finalize_choice(gs, context);
+        }
         if !revealed_card_ids.is_empty() {
             let player_label =
                 super::util::target_player_label(&target, gs.ability_master_id().as_deref());
@@ -1562,12 +1609,20 @@ impl super::resolver::AbilityResolver {
                 revealed_card_ids.len()
             ));
         }
+        let selected_effect = self
+            .current_effect
+            .clone()
+            .or_else(|| gs.entry_effect().cloned())
+            .filter(effect_uses_selected_cards);
         if !effect_started {
             let cost_source = gs.current_ability_source_card_id();
             let cost_owner = util::target_player_index(&target, gs.ability_master_id().as_deref());
             for &cid in &revealed_card_ids {
                 gs.push_revealed_cost_card(cid, cost_source, false, cost_owner, "cost");
             }
+        }
+        if selected_effect.is_some() {
+            self.selected_cards = revealed_card_ids.clone().into();
         }
 
         if ctx.count == 0 && ctx.allow_skip && !effect_started && !all_indices.is_empty() {
@@ -1602,6 +1657,14 @@ impl super::resolver::AbilityResolver {
         }
 
         self.clear_choice_state(gs);
+        if let Some(effect) = selected_effect {
+            if !effect_started {
+                if let Some(entry) = gs.ability_queue.current_entry_mut() {
+                    entry.effect_started = true;
+                }
+                gs.ability_queue.set_pending_actions(vec![effect]);
+            }
+        }
         self.resume_pending_actions(gs)
     }
 
@@ -1759,8 +1822,20 @@ gs.set_recently_moved_batch(valid_ids.into(), Some(Zone::SuccessLiveZone.to_str(
             })
             .collect();
         let count = cost.count.unwrap_or(1) as usize;
+        if card_ids.is_empty() && cost.optional.unwrap_or(false) {
+            self.selected_cards.clear();
+            if let Some(entry) = gs.ability_queue.current_entry_mut() {
+                entry.cost_paid = true;
+                entry.optional_cost_result = Some(false);
+            }
+            return self.finalize_choice(gs, context);
+        }
         if card_ids.len() < count {
             return Err("Not enough valid cards to reveal for cost".to_string());
+        }
+        if let Some(entry) = gs.ability_queue.current_entry_mut() {
+            entry.cost_paid = true;
+            entry.optional_cost_result = Some(!card_ids.is_empty());
         }
         if !card_ids.is_empty() {
             let card_db = &gs.card_database;
@@ -1791,11 +1866,23 @@ gs.set_recently_moved_batch(valid_ids.into(), Some(Zone::SuccessLiveZone.to_str(
         } else {
             Some(1)
         };
-        for card_id in card_ids {
-            gs.push_revealed_card(card_id, cost_source, false, cost_owner, "cost");
-            gs.push_revealed_cost_card(card_id, cost_source, false, cost_owner, "cost");
+        for card_id in &card_ids {
+            gs.push_revealed_card(*card_id, cost_source, false, cost_owner, "cost");
+            gs.push_revealed_cost_card(*card_id, cost_source, false, cost_owner, "cost");
         }
-        self.finalize_choice(gs, context)
+        self.selected_cards = card_ids.into();
+        let selected_effect = self
+            .current_effect
+            .clone()
+            .or_else(|| gs.entry_effect().cloned())
+            .filter(effect_uses_selected_cards);
+        if let Some(effect) = selected_effect {
+            if let Some(entry) = gs.ability_queue.current_entry_mut() {
+                entry.effect_started = true;
+            }
+            gs.ability_queue.set_pending_actions(vec![effect]);
+        }
+        self.resume_pending_actions(gs)
     }
 
     // Q86 / Q122: Handle user's selection from looked_at_cards
@@ -2401,7 +2488,6 @@ gs.set_recently_moved_batch(valid_ids.into(), Some("stage"));
                         all_idxs.push(idx);
                     }
                 }
-                self.selected_cards.clear();
             }
             self.execute_selected_cards_from_zone(
                 gs,
@@ -2416,6 +2502,7 @@ gs.set_recently_moved_batch(valid_ids.into(), Some("stage"));
                 ctx.characters.as_ref(),
                 ctx.target_player_id.as_deref(),
             )?;
+            self.selected_cards.clear();
             if self.sub_choice_created {
                 self.store_pending_choice(gs);
             }
@@ -3087,6 +3174,11 @@ modified.destination = Some(Zone::from_source_str(dest));
         gs: &mut GameState,
         selected: &str,
     ) -> Result<(), String> {
+        if self.selected_cards.is_empty() {
+            if let Some(&card_id) = gs.revealed_cost_cards.last() {
+                self.selected_cards.push(card_id);
+            }
+        }
         // Check if we have a saved MoveCardsPosition context (card was already taken from source zone).
         // If so, place the card directly instead of re-running the entire effect which would fail
         // because the card is no longer in the source zone.

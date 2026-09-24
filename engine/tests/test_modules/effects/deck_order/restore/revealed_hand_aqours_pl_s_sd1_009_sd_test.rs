@@ -1,4 +1,5 @@
 use crate::helpers::*;
+use rabuka_engine::ability::types::Choice;
 use rabuka_engine::core::types::AbilityTrigger;
 
 fn fire_live_start(game: &mut TestGame, cid: i16) {
@@ -36,18 +37,37 @@ fn pl_s_sd1_009_sd_live_start_revealed_aqours_card_moves_from_hand_to_deck() {
     game.state.player1.stage.stage[1] = ruby;
 
     let aqours_card = game.new_id("PL!S-sd1-003-SD");
-    let non_aq = game.new_id("PL!-sd1-010-SD");
-    game.add_to_hand(aqours_card);
-    game.add_to_hand(non_aq);
+    let non_aqours = game.new_id("PL!-sd1-010-SD");
+    game.state.player1.hand.cards.clear();
+    game.state.revealed_cards.clear();
+    game.state.revealed_cost_cards.clear();
+    game.state.player1.hand.cards = vec![non_aqours, aqours_card].into();
 
     fire_live_start(&mut game, ruby);
 
     assert!(game.has_pending_choice(), "reveal cost gate offered");
-    game.select_option(1);
+    match game.get_pending_choice() {
+        Choice::SelectTarget { target, .. } if target == "position|destination" => {
+            game.select_option(0);
+        }
+        _ => game.select_option(1),
+    }
     let mut guard = 0;
     while game.has_pending_choice() && guard < 10 {
         guard += 1;
-        game.select_indices(&[0]);
+        if game.pending_choice_type().as_deref() != Some("SelectCard") {
+            game.select_option(0);
+            continue;
+        }
+        let hand_index = game
+            .state
+            .player1
+            .hand
+            .cards
+            .iter()
+            .position(|card_id| *card_id == aqours_card)
+            .expect("Aqours card in hand");
+        game.select_indices(&[hand_index]);
     }
 
     assert!(

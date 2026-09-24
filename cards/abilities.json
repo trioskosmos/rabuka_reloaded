@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-09-25T04:27:27.948842",
+  "generated_at": "2026-09-25T05:21:56.152981",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "f3008c9e",
+  "engine_commit": "125bbf7f",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -7097,11 +7097,7 @@
         "actions": [
           {
             "text": "これにより公開したカードをこのメンバーの下に置く",
-            "source": "revealed_cards",
-            "dynamic_count": {
-              "type": "revealed_cards",
-              "reference": "previous_reveal"
-            },
+            "source": "selected_cards",
             "destination": "under_member",
             "card_type": "member_card",
             "action": "move_cards",
@@ -18281,11 +18277,7 @@
       },
       "effect": {
         "text": "これにより公開したカードをこのメンバーの下に置く",
-        "source": "revealed_cards",
-        "dynamic_count": {
-          "type": "revealed_cards",
-          "reference": "previous_reveal"
-        },
+        "source": "selected_cards",
         "destination": "under_member",
         "card_type": "member_card",
         "action": "move_cards",
@@ -23040,19 +23032,14 @@
           },
           {
             "text": "これにより公開したカードを自分の成功ライブカード置き場に置く",
-            "source": "revealed_cards",
-            "dynamic_count": {
-              "type": "revealed_cards",
-              "reference": "previous_reveal"
-            },
+            "source": "selected_cards",
             "destination": "success_live_zone",
             "card_type": "live_card",
             "target": "self",
             "action": "move_cards",
             "count": 1
           }
-        ],
-        "conditional": true
+        ]
       }
     },
     {
@@ -26222,15 +26209,11 @@
           },
           {
             "text": "これにより公開したカードを控え室に置く",
-            "source": "revealed_cards",
-            "dynamic_count": {
-              "type": "revealed_cards",
-              "reference": "previous_reveal"
-            },
+            "source": "selected_cards",
             "destination": "discard",
             "action": "move_cards",
-            "card_type": "card",
-            "count": 1
+            "count": 1,
+            "card_type": "card"
           }
         ]
       }
@@ -32214,15 +32197,11 @@
         "actions": [
           {
             "text": "これにより公開したカードをデッキの一番上か一番下に置き",
-            "source": "revealed_cards",
-            "dynamic_count": {
-              "type": "revealed_cards",
-              "reference": "previous_reveal"
-            },
+            "source": "selected_cards",
             "destination": "deck_top_or_bottom",
             "action": "move_cards",
-            "card_type": "card",
-            "count": 1
+            "count": 1,
+            "card_type": "card"
           },
           {
             "text": "{{icon_blade.png|ブレード}}を得る",

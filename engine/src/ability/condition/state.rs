@@ -469,7 +469,7 @@ impl<'a> ConditionContext<'a> {
     }
 
     pub(crate) fn evaluate_energy_state_condition(&self, condition: &Condition) -> bool {
-        let mut energy_state = condition.get_energy_state().unwrap_or("");
+        let energy_state = condition.get_energy_state().unwrap_or("");
         let target = condition.get_target().unwrap_or("self");
         let player = self.resolve_condition_player(target);
         let result = match energy_state {

@@ -2,14 +2,14 @@ use crate::helpers::*;
 use rabuka_engine::turn::TurnEngine;
 use rabuka_engine::zones::MemberArea;
 
-/// Q257: Live phase success zone replacement with 錯覚CROSSROADS (PL!-bp6-024-L).
+/// Q256: Live phase success zone replacement with 錯覚CROSSROADS (PL!-bp6-024-L).
 /// When the live phase places Crossroads in the success zone, its constant
 /// replacement ability should fire, letting the player substitute a μ's live
 /// card from discard instead.
 ///
-/// This tests the LIVE PHASE path (via move_live_to_success_and_handle_wins)
-/// which creates a dummy queue entry — unlike the ability/resolver path used
-/// by Q256's Maki-debut scenario.
+/// This tests the LIVE PHASE path (via move_live_to_success_and_handle_wins),
+/// which creates a dummy queue entry for the ability-resolver path exercised by
+/// the direct Maki-debut Q256 scenario.
 #[test]
 fn live_phase_success_zone_replacement_routes_choice_to_player_one() {
     let db = load_real_database();

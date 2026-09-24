@@ -1604,7 +1604,25 @@ impl GameState {
     }
 
     pub fn remove_revealed_card(&mut self, card_id: i16) {
-        self.revealed_cards.retain(|id| *id != card_id);
+        if let Some(index) = self.revealed_cards.iter().position(|id| *id == card_id) {
+            self.revealed_cards.remove(index);
+            if index < self.revealed_card_meta.len() {
+                self.revealed_card_meta.remove(index);
+            }
+        }
+    }
+
+    pub fn remove_revealed_cost_card(&mut self, card_id: i16) {
+        if let Some(index) = self
+            .revealed_cost_cards
+            .iter()
+            .position(|id| *id == card_id)
+        {
+            self.revealed_cost_cards.remove(index);
+            if index < self.revealed_cost_card_meta.len() {
+                self.revealed_cost_card_meta.remove(index);
+            }
+        }
     }
 
     pub fn clear_revealed_cards(&mut self) {

@@ -414,13 +414,16 @@ fn step_zero_to_one_live_start_full_ability() {
     TurnEngine::trigger_live_start_abilities(&mut game.state, "p1");
     game.state.process_pending_auto_abilities("p1");
 
-    while game.has_pending_choice() {
+    for _ in 0..32 {
+        if !game.has_pending_choice() {
+            break;
+        }
         match game.pending_choice_type().as_deref() {
             Some("SelectCard") => {
                 game.select_indices(&[0]);
             }
-            Some("position|destination") => {
-                game.select_option(0);
+            Some("SelectTarget") | Some("position|destination") => {
+                game.select_generated(0);
             }
             Some(t) if t.contains("destination") => {
                 game.select_option(0);
@@ -430,6 +433,11 @@ fn step_zero_to_one_live_start_full_ability() {
             }
         }
     }
+    assert!(
+        !game.has_pending_choice(),
+        "{}",
+        game.pending_choice_summary()
+    );
 
     assert_eq!(game.state.mods.get_score_modifier(live), 1, "score +1");
 }

@@ -892,6 +892,22 @@ impl super::TurnEngine {
                 .take()
                 .unwrap_or_else(|| "player1".to_string());
             let result = Self::build_choice_result(&choice, card_id, card_indices, None)?;
+            let filtered_indices = match &choice {
+                crate::ability::types::Choice::SelectCard {
+                    filtered_indices,
+                    ..
+                } => filtered_indices.as_ref(),
+                _ => None,
+            };
+            let physical_idx = match &result {
+                crate::ability::types::ChoiceResult::CardSelected { indices } => indices.first().map(|index| {
+                    filtered_indices
+                        .and_then(|filtered| filtered.get(*index))
+                        .copied()
+                        .unwrap_or(*index)
+                }),
+                _ => None,
+            };
             let player = if player_id == game_state.player1.id {
                 &mut game_state.player1
             } else {
@@ -903,7 +919,7 @@ impl super::TurnEngine {
                 {
                     // Player chose a card from discard  Emove it to success zone,
                     // and put the original card in waitroom.
-                    if let Some(&selected_idx) = indices.first() {
+                    if let Some(selected_idx) = physical_idx {
                         if selected_idx < player.waitroom.cards.len() {
                             let selected_card_id = player.waitroom.cards.remove(selected_idx);
                             // Remove the original card from live_card_zone if present

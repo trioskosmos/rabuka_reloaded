@@ -13,6 +13,19 @@ use alloc::{
     vec::Vec,
 };
 
+fn effect_uses_selected_cards(effect: &AbilityEffect) -> bool {
+    effect.source == Some(Zone::SelectedCards)
+        || effect
+            .compound
+            .actions
+            .as_ref()
+            .is_some_and(|actions| {
+                actions
+                    .iter()
+                    .any(|action| effect_uses_selected_cards(action))
+            })
+}
+
 impl AbilityResolver {
     /// Pay all deferred costs that were stored during sequential_cost handler.
     /// Clears the list after paying. Returns error if any cost cannot be paid.
@@ -1232,13 +1245,28 @@ let source = cost.source_str().unwrap_or("");
                     card_type
                 );
 
-                if has_explicit_count && card_ids.len() <= explicit_count {
+                if !cost.optional.unwrap_or(false)
+                    && has_explicit_count
+                    && card_ids.len() == explicit_count
+                {
                     let cost_source = gs.current_ability_source_card_id();
                     let cost_owner =
                         util::target_player_index(target, gs.ability_master_id().as_deref());
                     for &card_id in &card_ids {
                         gs.push_revealed_card(card_id, cost_source, false, cost_owner, "cost");
                         gs.push_revealed_cost_card(card_id, cost_source, false, cost_owner, "cost");
+                    }
+                    let effect_uses_selected = gs
+                        .entry_effect()
+                        .as_ref()
+                        .is_some_and(|effect| effect_uses_selected_cards(effect))
+                        || gs
+                            .ability_queue
+                            .current_entry()
+                            .and_then(|entry| entry.ability.effect.as_deref())
+                            .is_some_and(|effect| effect_uses_selected_cards(effect));
+                    if effect_uses_selected {
+                        self.selected_cards = card_ids.into();
                     }
                     Ok(())
                 } else {

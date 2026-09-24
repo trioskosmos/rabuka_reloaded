@@ -945,6 +945,14 @@ def parse_ability(triggerless_text: str) -> Dict[str, Any]:
         if isinstance(effect, dict) and "cost" in effect:
             ability["cost"] = effect.pop("cost")
         effect = _normalize_effect_tree(effect, triggerless_text)
+        if (
+            isinstance(effect, dict)
+            and effect.get("action") == "sequential"
+            and effect.get("conditional") is True
+            and ability.get("cost")
+            and "そうした場合、これにより公開したカード" in triggerless_text
+        ):
+            effect.pop("conditional", None)
         if not isinstance(effect, dict):
             effect = {}
 

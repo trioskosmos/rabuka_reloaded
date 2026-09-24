@@ -399,7 +399,7 @@ SOURCE_PATTERNS: List[Tuple[str, str]] = [
     ("デッキの一番上からカードを", "deck_top"),
     ("デッキの一番上のカードを", "deck_top"),
     ("これにより公開されたほかのすべてのカードを", "revealed_remaining"),
-    ("これにより公開したカードを", "revealed_cards"),
+    ("これにより公開したカードを", "selected_cards"),
     ("公開したカードをすべて", "revealed_cards"),
     ("公開したカードを", "revealed_cards"),
     ("それらのカードの中から", "those_cards"),

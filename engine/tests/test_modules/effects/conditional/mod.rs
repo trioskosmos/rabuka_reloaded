@@ -9,7 +9,7 @@ pub mod kanon_invalidate_test;
 pub mod keke_bp5_test;
 pub mod keke_pb2_013_debut_test;
 pub mod konata_bp4_test;
-pub mod live_phase_success_zone_replacement_q257_test;
+pub mod live_phase_success_zone_replacement_q256_test;
 pub mod ll_joint_test;
 pub mod pl_hs_bp6_004_test;
 pub mod pl_s_bp7_007_test;
