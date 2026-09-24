@@ -166,3 +166,22 @@ fn q248_hanayo_use_limit_blocks_second_activation() {
         err
     );
 }
+
+#[test]
+fn q248_hanayo_p_activate_no_other_members() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let hanayo = game.id("PL!-bp6-008-P");
+    let filler = game.id("PL!-sd1-010-SD");
+
+    for _ in 0..10 {
+        game.state.player1.main_deck.cards.push(filler);
+    }
+    game.add_to_hand(hanayo);
+    game.give_energy(8);
+    game.play_to_stage(hanayo, MemberArea::Center);
+    game.activate_ability(hanayo);
+
+    assert_eq!(game.state.mods.get_orientation_modifier(hanayo), Some("wait"));
+    assert!(!game.has_pending_choice());
+}

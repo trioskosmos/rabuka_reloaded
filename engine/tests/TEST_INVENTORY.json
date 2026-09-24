@@ -1,6 +1,6 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-09-24T21:22:06.981065+00:00",
+  "generated_at": "2026-09-24T21:23:56.973056+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
@@ -8,7 +8,7 @@
     "unique_abilities": 936
   },
   "n_files": 839,
-  "n_tests": 3492,
+  "n_tests": 3493,
   "total_cards": 771,
   "covered_cards": 771,
   "abilities_on_covered": 936,
@@ -678,7 +678,7 @@
       ]
     }
   },
-  "n_test_fns_parsed": 3492,
+  "n_test_fns_parsed": 3493,
   "abilities": [
     {
       "idx": 0,
@@ -24632,9 +24632,10 @@
         "q248_hanayo_activate_no_other_members",
         "q248_hanayo_activate_others_all_active",
         "q248_hanayo_activate_with_wait_member",
+        "q248_hanayo_p_activate_no_other_members",
         "q248_hanayo_use_limit_blocks_second_activation"
       ],
-      "covering_test_count": 4,
+      "covering_test_count": 5,
       "is_null": false,
       "use_limit": 1,
       "watches_abilities": false,
