@@ -76,6 +76,9 @@ impl AbilityResolver {
             }
             group_name = None;
         }
+        if effect.per_unit_any().unwrap_or(false) && count == 0 {
+            return Ok(());
+        }
         let max = effect.max.unwrap_or(false);
         let optional = effect.optional.unwrap_or(false);
         let self_cost = effect.self_cost_any().unwrap_or(false);

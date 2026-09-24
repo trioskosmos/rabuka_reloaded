@@ -50,14 +50,6 @@ fn pl_n_bp7_008_r_bottoms_only_non_blade_heart_members_and_activates_energy() {
             _ => break,
         }
     }
-    eprintln!(
-        "[EMMA_DBG] deck={:?} waitroom={:?} clean={} blade={} blade2={}",
-        game.state.player1.main_deck.cards,
-        game.state.player1.waitroom.cards,
-        clean,
-        bladefill,
-        bladefill2
-    );
     assert_eq!(
         *game
             .state
@@ -83,4 +75,22 @@ fn pl_n_bp7_008_r_bottoms_only_non_blade_heart_members_and_activates_energy() {
         2,
         "1 card placed → 1 wait energy activated (1+1)"
     );
+}
+
+#[test]
+fn pl_n_bp7_008_r_empty_waitroom_is_a_noop() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let emma = game.id("PL!N-bp7-008-R");
+    let stock = game.id(FILLER);
+    game.state.player1.stage.stage[1] = emma;
+    game.state.player1.main_deck.cards.extend([stock, stock]);
+    game.give_energy(4);
+    game.state.player1.energy_zone.set_active_count(1);
+
+    trigger_auto(&mut game, emma, AbilityTrigger::Debut, "登場");
+
+    assert!(!game.has_pending_choice());
+    assert_eq!(game.state.player1.main_deck.cards, [stock, stock].into());
+    assert_eq!(game.state.player1.energy_zone.active_count(), 1);
 }
