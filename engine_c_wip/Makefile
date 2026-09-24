@@ -2,10 +2,10 @@ CC      ?= gcc
 CFLAGS  ?= -std=c11 -O2 -Wall -Iinclude -Isrc -Isrc/core/generated
 # Layout mirrors engine/src: ability/ (vm, condition, choice, queue, effects/),
 # core/ (card, data, alloc, modifiers, stats_pipeline, generated/), turn/ (phase, live, triggers).
-SRC     := src/ability/enums.c src/ability/types.c src/ability/vm.c src/ability/condition.c src/ability/choice.c src/ability/ability_queue.c src/ability/dynamic_count.c src/ability/util.c src/ability/cost.c src/ability/compound.c src/ability/resolver.c src/ability/effects/executor.c src/ability/effects/ability_effects.c src/ability/effects/custom.c src/ability/effects/move.c src/ability/effects/move_missing.c src/ability/effects/look.c src/ability/effects/state.c src/ability/effects/ability.c src/ability/effects/misc.c src/ability/effects/draw.c src/ability/effects/score.c src/ability/log.c src/ability/debug.c src/ability/abilities_gen.c src/game/deck_parser.c src/core/card.c src/core/data.c src/core/alloc.c src/core/modifiers.c src/core/stats_pipeline.c src/core/game_state_abilities.c src/core/tracking.c src/core/zones.c src/bytecode_data.c src/core/generated/bytecode_blob.c src/core/generated/gen_data.c src/turn/phase.c src/turn/live.c src/turn/triggers.c src/engine.c src/main.c
+SRC     := src/ability/enums.c src/ability/types.c src/ability/vm.c src/ability/condition.c src/ability/choice.c src/ability/ability_queue.c src/ability/dynamic_count.c src/ability/util.c src/ability/cost.c src/ability/compound.c src/ability/resolver.c src/ability/effects/executor.c src/ability/effects/ability_effects.c src/ability/effects/custom.c src/ability/effects/move.c src/ability/effects/move_missing.c src/ability/effects/look.c src/ability/effects/state.c src/ability/effects/ability.c src/ability/effects/misc.c src/ability/effects/draw.c src/ability/effects/score.c src/ability/log.c src/ability/debug.c src/ability/abilities_gen.c src/game/deck_parser.c src/game/deck_builder.c src/core/card.c src/core/data.c src/core/alloc.c src/core/modifiers.c src/core/stats_pipeline.c src/core/game_state_abilities.c src/core/tracking.c src/core/zones.c src/bytecode_data.c src/core/generated/bytecode_blob.c src/core/generated/gen_data.c src/turn/phase.c src/turn/live.c src/turn/triggers.c src/engine.c src/main.c
 OBJ     := $(SRC:.c=.o)
 # library objects (everything except main, so tests can supply their own main)
-OBJ_LIB := src/ability/enums.o src/ability/types.o src/ability/vm.o src/ability/condition.o src/ability/choice.o src/ability/ability_queue.o src/ability/dynamic_count.o src/ability/util.o src/ability/cost.o src/ability/compound.o src/ability/resolver.o src/ability/effects/executor.o src/ability/effects/ability_effects.o src/ability/effects/custom.o src/ability/effects/move.o src/ability/effects/move_missing.o src/ability/effects/look.o src/ability/effects/state.o src/ability/effects/ability.o src/ability/effects/misc.o src/ability/effects/draw.o src/ability/effects/score.o src/ability/log.o src/ability/debug.o src/ability/abilities_gen.o src/game/deck_parser.o src/core/card.o src/core/data.o src/core/alloc.o src/core/modifiers.o src/core/stats_pipeline.o src/core/game_state_abilities.o src/core/tracking.o src/core/zones.o src/bytecode_data.o src/core/generated/bytecode_blob.o src/core/generated/gen_data.o src/turn/phase.o src/turn/live.o src/turn/triggers.o src/engine.o src/test_game.o
+OBJ_LIB := src/ability/enums.o src/ability/types.o src/ability/vm.o src/ability/condition.o src/ability/choice.o src/ability/ability_queue.o src/ability/dynamic_count.o src/ability/util.o src/ability/cost.o src/ability/compound.o src/ability/resolver.o src/ability/effects/executor.o src/ability/effects/ability_effects.o src/ability/effects/custom.o src/ability/effects/move.o src/ability/effects/move_missing.o src/ability/effects/look.o src/ability/effects/state.o src/ability/effects/ability.o src/ability/effects/misc.o src/ability/effects/draw.o src/ability/effects/score.o src/ability/log.o src/ability/debug.o src/ability/abilities_gen.o src/game/deck_parser.o src/game/deck_builder.o src/core/card.o src/core/data.o src/core/alloc.o src/core/modifiers.o src/core/stats_pipeline.o src/core/game_state_abilities.o src/core/tracking.o src/core/zones.o src/bytecode_data.o src/core/generated/bytecode_blob.o src/core/generated/gen_data.o src/turn/phase.o src/turn/live.o src/turn/triggers.o src/engine.o src/test_game.o
 TARGET  := rb_engine
 WEB_TARGET := rb_web_server
 GENERATED := tests/test_ported_generated.c
@@ -26,9 +26,13 @@ B8_LIVE_TIMING := tests/test_b8_live_timing.c
 CROSS_PLAYER := tests/test_cross_player_interaction.c
 DRAW_PHASE_FIX := tests/test_draw_phase_fix.c
 ZONE_FILTER_PARITY := tests/test_zone_filter_parity.c
+LIVE_ALLOCATOR := tests/test_live_allocator.c
+LOOK_SELECT := tests/test_look_select.c
+DECK_BUILDER := tests/test_deck_builder.c
+DECK_PARSER := tests/test_deck_parser.c
 AUDIT   := tools/audit_actions.c
 
-.PHONY: all web test audit regen clean mechanics live-rules phase-rules performance-rules surplus-heart opponent-live-flow live-movement restrictions condition-eval target-selection max-distinct-names baton-touch member-activation b8-live-timing cross-player draw-phase-fix zone-filter-parity
+.PHONY: all web test audit regen clean mechanics live-rules phase-rules performance-rules surplus-heart opponent-live-flow live-movement restrictions condition-eval target-selection max-distinct-names baton-touch member-activation b8-live-timing cross-player draw-phase-fix zone-filter-parity live-allocator look-select deck-builder deck-parser
 all: $(TARGET)
 
 web: $(WEB_TARGET)
@@ -46,15 +50,31 @@ $(TARGET): $(OBJ)
 src/%.o: src/%.c $(wildcard include/*.h)
 	$(CC) $(CFLAGS) -c -o $@ $<
 
-test: $(TARGET)_generated $(TARGET)_replay
+test: $(TARGET)_generated $(TARGET)_replay $(TARGET)_live_allocator $(TARGET)_look_select $(TARGET)_deck_builder $(TARGET)_deck_parser
 	./$(TARGET)_generated
 	./$(TARGET)_replay
+	./$(TARGET)_live_allocator
+	./$(TARGET)_look_select
+	./$(TARGET)_deck_builder
+	./$(TARGET)_deck_parser
 
 $(TARGET)_generated: $(OBJ_LIB) $(GENERATED)
 	$(CC) $(CFLAGS) -o $@ $(OBJ_LIB) $(GENERATED)
 
 $(TARGET)_replay: $(OBJ_LIB) tests/replay.c
 	$(CC) $(CFLAGS) -o $@ $(OBJ_LIB) tests/replay.c
+
+$(TARGET)_live_allocator: $(OBJ_LIB) $(LIVE_ALLOCATOR)
+	$(CC) $(CFLAGS) -o $@ $(OBJ_LIB) $(LIVE_ALLOCATOR)
+
+$(TARGET)_look_select: $(OBJ_LIB) $(LOOK_SELECT)
+	$(CC) $(CFLAGS) -o $@ $(OBJ_LIB) $(LOOK_SELECT)
+
+$(TARGET)_deck_builder: $(OBJ_LIB) $(DECK_BUILDER)
+	$(CC) $(CFLAGS) -o $@ $(OBJ_LIB) $(DECK_BUILDER)
+
+$(TARGET)_deck_parser: $(OBJ_LIB) $(DECK_PARSER)
+	$(CC) $(CFLAGS) -o $@ $(OBJ_LIB) $(DECK_PARSER)
 
 $(TARGET)_mechanics: $(OBJ_LIB) $(MECHANICS)
 	$(CC) $(CFLAGS) -o $@ $(OBJ_LIB) $(MECHANICS)
@@ -157,6 +177,18 @@ $(TARGET)_zone_filter_parity: $(OBJ_LIB) $(ZONE_FILTER_PARITY)
 
 zone-filter-parity: $(TARGET)_zone_filter_parity
 	./$(TARGET)_zone_filter_parity
+
+live-allocator: $(TARGET)_live_allocator
+	./$(TARGET)_live_allocator
+
+look-select: $(TARGET)_look_select
+	./$(TARGET)_look_select
+
+deck-builder: $(TARGET)_deck_builder
+	./$(TARGET)_deck_builder
+
+deck-parser: $(TARGET)_deck_parser
+	./$(TARGET)_deck_parser
 
  $(TARGET)_debug: $(OBJ_LIB) src/debug_umi.o
 	$(CC) $(CFLAGS) -o $@ $(OBJ_LIB) src/debug_umi.o

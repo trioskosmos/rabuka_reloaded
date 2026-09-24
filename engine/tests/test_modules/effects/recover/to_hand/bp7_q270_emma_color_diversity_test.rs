@@ -165,3 +165,18 @@ fn emma_members_without_blade_heart_no_heart04() {
         heart04(&game, emma)
     );
 }
+
+#[test]
+fn emma_all_and_green_blade_hearts_do_not_meet_member_color_condition() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let all_blade = game.id("PL!-sd1-020-SD");
+    let green_blade_member = game.id("PL!N-PR-024-PR");
+    let no_blade_member = game.id(NO_BLADE);
+    let emma = setup(&mut game, [all_blade, green_blade_member, no_blade_member]);
+
+    trigger_debut(&mut game, emma);
+
+    assert_eq!(heart04(&game, emma), 0);
+}

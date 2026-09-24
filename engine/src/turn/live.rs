@@ -1515,15 +1515,19 @@ impl super::TurnEngine {
         let p2_id = game_state.player2.id.clone();
         let p1_cards = game_state.player1.live_card_zone.cards.len();
         let p2_cards = game_state.player2.live_card_zone.cards.len();
-        let p1_must_skip = player1_won && player2_won && p1_cards >= 2;
-        let p2_must_skip = player1_won && player2_won && p2_cards >= 2;
+        let p1_successes = game_state.player1.success_live_card_zone.cards.len();
+        let p2_successes = game_state.player2.success_live_card_zone.cards.len();
+        let p1_must_skip = player1_won && player2_won && p1_successes >= 2;
+        let p2_must_skip = player1_won && player2_won && p2_successes >= 2;
 
         log::debug!(
-            "[MULTI_LIVE] p1_won={} p2_won={} p1_cards={} p2_cards={} p1_must={} p2_must={}",
+            "[MULTI_LIVE] p1_won={} p2_won={} p1_cards={} p2_cards={} p1_successes={} p2_successes={} p1_must={} p2_must={}",
             player1_won,
             player2_won,
             p1_cards,
             p2_cards,
+            p1_successes,
+            p2_successes,
             p1_must_skip,
             p2_must_skip
         );

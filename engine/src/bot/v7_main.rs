@@ -1,3 +1,5 @@
+use crate::bot::determinization::DeterminizationSampler;
+use crate::bot::observation::PublicObservation;
 use crate::bot::strategy_common::{acc_add, requirements_met, Acc};
 use crate::card::CardType;
 use crate::core::stats_pipeline;
@@ -302,10 +304,23 @@ fn simulation_state(gs: &GameState, me: u8) -> GameState {
     for i in (1..own.main_deck.cards.len()).rev() {
         own.main_deck.cards.swap(i, rng.range(i + 1));
     }
-    opp.hand.cards.fill(-1);
-    opp.main_deck.cards.fill(-1);
-    if matches!(gs.current_phase, Phase::Main | Phase::LiveCardSetFirstAttacker | Phase::LiveCardSetSecondAttacker) {
-        opp.live_card_zone.cards.fill(-1);
+    if std::env::var_os("V7_FAIR_DETERMINIZATION").is_some() {
+        let observation = PublicObservation::from_state(gs, me);
+        let sampler = DeterminizationSampler::new_fair(crate::Arc::clone(&gs.card_database), &[]);
+        let sampled = sampler.sample(&observation);
+        let (_, sampled_opp) = sampled.seated_pair(me);
+        opp.hand.cards = sampled_opp.hand.cards.clone();
+        opp.main_deck.cards = sampled_opp.main_deck.cards.clone();
+        opp.energy_deck.cards = sampled_opp.energy_deck.cards.clone();
+        if matches!(gs.current_phase, Phase::Main | Phase::LiveCardSetFirstAttacker | Phase::LiveCardSetSecondAttacker) {
+            opp.live_card_zone.cards = sampled_opp.live_card_zone.cards.clone();
+        }
+    } else {
+        opp.hand.cards.fill(-1);
+        opp.main_deck.cards.fill(-1);
+        if matches!(gs.current_phase, Phase::Main | Phase::LiveCardSetFirstAttacker | Phase::LiveCardSetSecondAttacker) {
+            opp.live_card_zone.cards.fill(-1);
+        }
     }
     sim
 }

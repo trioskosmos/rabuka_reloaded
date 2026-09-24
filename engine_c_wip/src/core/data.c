@@ -31,6 +31,7 @@ static uint32_t      g_num_card_strings = 0;  /* entries in g_card_strings */
 static uint32_t     *g_card_off = NULL;       /* (num_cards+1) offsets */
 static unsigned char *g_card_data = NULL;     /* base of card records */
 static uint32_t      g_card_alias_plus_one[RB_MAX_CARD_IDS];
+static uint32_t      g_next_copy_id;
 
 static unsigned char *g_abstr_blob = NULL;    /* abilities_strings.bin */
 static long           g_abstr_len = 0;
@@ -211,6 +212,7 @@ int rb_load(const char *data_dir) {
     if (load_cards(data_dir) != 0) { fprintf(stderr, "load_cards failed\n"); return -1; }
     if (load_strings(data_dir) != 0) { fprintf(stderr, "load_strings failed\n"); return -1; }
     if (load_bytecode() != 0) { fprintf(stderr, "load_bytecode failed\n"); return -1; }
+    rb_card_copy_pool_reset();
     return 0;
 }
 
@@ -263,6 +265,7 @@ void rb_unload(void) {
     /* g_bc points at the static RBKA_BYTECODE blob; do not free */
     g_bc = NULL;
     memset(g_card_alias_plus_one, 0, sizeof(g_card_alias_plus_one));
+    g_next_copy_id = 0;
 }
 
 /* expose internal card data accessors for cards.c / vm.c */
@@ -271,6 +274,25 @@ int rb_register_card_copy(int copy_id, int template_id) {
         (uint32_t)template_id >= g_num_cards) return 0;
     g_card_alias_plus_one[copy_id] = (uint32_t)template_id + 1;
     return 1;
+}
+
+void rb_card_copy_pool_reset(void)
+{
+    memset(g_card_alias_plus_one, 0, sizeof(g_card_alias_plus_one));
+    g_next_copy_id = g_num_cards;
+}
+
+int rb_create_card_copy(int template_id)
+{
+    if (template_id < 0 || (uint32_t)template_id >= g_num_cards) return -1;
+    if (g_next_copy_id == 0) g_next_copy_id = g_num_cards;
+    if (g_next_copy_id >= RB_MAX_CARD_IDS) return -1;
+    int copy_id = (int)g_next_copy_id++;
+    if (!rb_register_card_copy(copy_id, template_id)) {
+        g_next_copy_id--;
+        return -1;
+    }
+    return copy_id;
 }
 static uint32_t rb_card_template_id(uint32_t i) {
     if (i < g_num_cards) return i;

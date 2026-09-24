@@ -185,6 +185,8 @@ pub struct GameState {
     pub(crate) recently_moved_cards: Option<SmallVec<[i16; 4]>>,
     pub recently_appeared_cards: SmallVec<[i16; 4]>,
     pub recently_moved_from_zone: Option<String>,
+    #[cfg_attr(feature = "serde_support", serde(default))]
+    pub deck_emptied_by_effect: Option<String>,
     /// Explicit per-batch event log of stage-area-to-stage-area position changes.
     /// Each entry records the moved card, old/new position, and cause info.
     /// Replaces the fragile snapshot-based detection with direct event tracking.
@@ -534,12 +536,14 @@ impl GameState {
             play_time_cost_play: None,
             play_time_cost_reduction_accepted: None,
             looked_at_cards: SmallVec::new(),
-            ability_applications: SmallVec::new(),
-            recently_moved_cards: None,
-            recently_appeared_cards: SmallVec::new(),
-            recently_moved_from_zone: None,
-            position_change_events: SmallVec::new(),
-            batch_movements: SmallVec::new(),
+             ability_applications: SmallVec::new(),
+             recently_moved_cards: None,
+             recently_appeared_cards: SmallVec::new(),
+             recently_moved_from_zone: None,
+             deck_emptied_by_effect: None,
+             position_change_events: SmallVec::new(),
+             batch_movements: SmallVec::new(),
+
             turn_area_movements: SmallVec::new(),
             turn_movements: SmallVec::new(),
             movement_event_counter: 0,

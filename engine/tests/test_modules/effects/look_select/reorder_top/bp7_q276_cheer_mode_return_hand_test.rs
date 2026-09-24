@@ -201,3 +201,34 @@ fn q276_control_normal_live_does_go_to_success_zone() {
         game.state.player1.success_live_card_zone.cards
     );
 }
+
+#[test]
+fn q276_failed_live_does_not_return_cheer_to_hand() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let cheer = game.id(CHEER);
+    let filler = game.id("PL!-sd1-010-SD");
+
+    game.state.player1.hand.cards.push(cheer);
+    for _ in 0..50 {
+        game.state.player1.main_deck.cards.push(filler);
+    }
+    for _ in 0..20 {
+        game.state.player2.main_deck.cards.push(filler);
+    }
+
+    advance_to_live_card_set(&mut game);
+    game.set_live_card(cheer);
+    advance_to_live_start(&mut game);
+    while game.has_pending_choice() {
+        game.select_indices(&[]);
+    }
+    advance_to_live_victory(&mut game);
+    while game.has_pending_choice() {
+        game.select_indices(&[]);
+    }
+
+    assert!(!game.state.player1.success_live_card_zone.cards.contains(&cheer));
+    assert!(!game.state.player1.hand.cards.contains(&cheer));
+    assert!(game.state.player1.waitroom.cards.contains(&cheer));
+}

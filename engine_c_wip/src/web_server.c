@@ -1,5 +1,6 @@
 #include "web_server.h"
 #include "deck_parser.h"
+#include "deck_builder.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -48,8 +49,7 @@ typedef struct {
 
 typedef struct {
     GameState state;
-    uint32_t deck[2][RB_MAX_DECK];
-    int deck_count[2];
+    RbBuiltDeck built_deck[2];
     int version;
     int initialized;
     int deck_ready[2];
@@ -86,35 +86,29 @@ static void json_string(Buffer *b, const char *s) {
     }
     buffer_put(b, "\"");
 }
-static int find_card_for_deck(const char *raw) {
-    char normalized[128];
-    const char *card_no = raw;
-    int direct;
-    if (rb_normalize_card_no(raw, normalized, sizeof(normalized)) == 0) card_no = normalized;
-    direct = rb_find_card_by_no(card_no);
-    if (direct >= 0) return direct;
-    for (uint32_t i = 0; i < rb_num_cards(); i++) {
-        Card c;
-        memset(&c, 0, sizeof(c));
-        if (!rb_decode_card_by_index(i, &c)) continue;
-        const char *candidate = rb_card_string(c.card_no_idx);
-        const unsigned char *a = (const unsigned char *)card_no;
-        const unsigned char *b = (const unsigned char *)candidate;
-        size_t remaining = strlen(card_no);
-        int match = 1;
-        while (remaining > 0) {
-            if (*a == '+' && b[0] == 0xef && b[1] == 0xbc && b[2] == 0x9b) { a++; b += 3; remaining--; continue; }
-            if (*b == '+' && a[0] == 0xef && a[1] == 0xbc && a[2] == 0x9b) { b++; a += 3; remaining -= 3; continue; }
-            if (!*b || tolower(*a) != tolower(*b)) { match = 0; break; }
-            a++; b++; remaining--;
-        }
-        rb_free_card(&c);
-        if (match) return (int)i;
+static const char *phase_wire_name(const GameState *g)
+{
+    if (!g) return "Active";
+    switch (g->phase) {
+        case RB_PHASE_RPS: return "RockPaperScissors";
+        case RB_PHASE_OPENING: return "ChooseFirstAttacker";
+        case RB_PHASE_MULLIGAN_FIRST: return "MulliganFirstAttacker";
+        case RB_PHASE_MULLIGAN_SECOND: return "MulliganSecondAttacker";
+        case RB_PHASE_ACTIVE: return "Active";
+        case RB_PHASE_ENERGY: return "Energy";
+        case RB_PHASE_DRAW: return "Draw";
+        case RB_PHASE_MAIN: return "Main";
+        case RB_PHASE_LIVE_SET:
+        case RB_PHASE_LIVE_SET_SECOND:
+            return g->active == g->first_attacker ? "LiveCardSetFirstAttacker" : "LiveCardSetSecondAttacker";
+        case RB_PHASE_PERFORMANCE:
+        case RB_PHASE_PERFORMANCE_SECOND:
+            return g->active == g->first_attacker ? "FirstAttackerPerformance" : "SecondAttackerPerformance";
+        case RB_PHASE_VICTORY: return "LiveVictoryDetermination";
+        case RB_PHASE_DONE: return "Response";
+        default: return "Active";
     }
-    return -1;
 }
-
-static const char *phase_name(const GameState *g) { return rb_phase_name((int)g->phase); }
 
 static void append_card(Buffer *b, int cid, const char *orientation) {
     Card c; memset(&c, 0, sizeof(c));
@@ -131,11 +125,24 @@ static void append_bag(Buffer *b, const RbBag *bag, const char *orientation) {
     for (int i = 0; i < bag->n; i++) { if (i) buffer_put(b, ","); append_card(b, bag->cards[i], orientation); }
     buffer_put(b, "]}");
 }
+static void append_energy_bag(Buffer *b, const RbPlayer *p)
+{
+    buffer_put(b, "{\"count\":");
+    buffer_putf(b, "%d", p->energy.n);
+    buffer_put(b, ",\"cards\":[");
+    for (int i = 0; i < p->energy.n; i++) {
+        if (i) buffer_put(b, ",");
+        append_card(b, p->energy.cards[i], i < p->energy_active ? "Active" : "Wait");
+    }
+    buffer_put(b, "]}");
+}
+
 static void append_player(Buffer *b, const RbPlayer *p) {
     buffer_put(b, "{\"hand\":"); append_bag(b, &p->hand, NULL);
     buffer_put(b, ",\"main_deck_count\":"); buffer_putf(b, "%d", p->deck.n);
     buffer_put(b, ",\"energy_deck_count\":"); buffer_putf(b, "%d", p->energy_deck.n);
-    buffer_put(b, ",\"energy\":"); append_bag(b, &p->energy, "Active");
+    buffer_put(b, ",\"energy_active_count\":"); buffer_putf(b, "%d", p->energy_active);
+    buffer_put(b, ",\"energy\":"); append_energy_bag(b, p);
     buffer_put(b, ",\"live_zone\":"); append_bag(b, &p->live, NULL);
     buffer_put(b, ",\"success_live_card_zone\":"); append_bag(b, &p->success, NULL);
     buffer_put(b, ",\"discard\":"); append_bag(b, &p->discard, NULL);
@@ -143,10 +150,11 @@ static void append_player(Buffer *b, const RbPlayer *p) {
     buffer_put(b, ",\"center\":"); if (p->stage[1] >= 0) append_card(b, p->stage[1], p->stage_wait[1] ? "Wait" : "Active"); else buffer_put(b, "null");
     buffer_put(b, ",\"right_side\":"); if (p->stage[2] >= 0) append_card(b, p->stage[2], p->stage_wait[2] ? "Wait" : "Active"); else buffer_put(b, "null");
     buffer_put(b, ",\"left_under\":"); append_bag(b, &p->under_cards[0], NULL); buffer_put(b, ",\"center_under\":"); append_bag(b, &p->under_cards[1], NULL); buffer_put(b, ",\"right_under\":"); append_bag(b, &p->under_cards[2], NULL); buffer_put(b, "},\"score\":");
-    buffer_putf(b, "%d,\"life\":%d}", p->score, p->life);
+    buffer_putf(b, "%d,\"current_score\":%d,\"life\":%d}", p->score, p->score, p->life);
 }
 static void append_action(Buffer *b, const RbGeneratedAction *a, int index) {
-    const char *type = a->action_type == 1 ? "pass" : a->action_type == 2 ? "play_member_to_stage" : "use_ability";
+    const char *type = a->action_type == 1 ? "pass" :
+                      a->action_type == 14 ? "play_member_to_stage" : "use_ability";
     buffer_putf(b, "{\"index\":%d,\"action_type\":", index); json_string(b, type);
     buffer_put(b, ",\"description\":"); json_string(b, a->action_type == 1 ? "Pass" : "Action"); buffer_put(b, ",\"parameters\":{");
     if (a->has_parameters) { buffer_put(b, "\"card_id\":"); buffer_putf(b, "%d", a->parameters.card_id); buffer_put(b, ",\"available_areas\":[");
@@ -154,11 +162,48 @@ static void append_action(Buffer *b, const RbGeneratedAction *a, int index) {
         buffer_put(b, "]"); }
     buffer_put(b, "}}");
 }
+static const char *choice_kind_wire(RbChoiceKind kind)
+{
+    switch (kind) {
+        case RB_CHOICE_SELECT_CARD: return "select_card";
+        case RB_CHOICE_SELECT_TARGET: return "select_target";
+        case RB_CHOICE_SELECT_HEART_COLOR: return "select_heart_color";
+        case RB_CHOICE_SELECT_NUMBER: return "select_number";
+        case RB_CHOICE_SELECT_POSITION: return "select_position";
+        case RB_CHOICE_SELECT_AUTO_ABILITY: return "select_auto_ability";
+        default: return "choice";
+    }
+}
+
+static void append_pending_choice(Buffer *b, const GameState *state)
+{
+    const RbChoice *choice = rb_get_pending_choice(state);
+    if (!state || !rb_has_pending_choice(state) || !choice) {
+        buffer_put(b, "null");
+        return;
+    }
+    buffer_put(b, "{\"kind\":");
+    json_string(b, choice_kind_wire(choice->kind));
+    buffer_put(b, ",\"zone\":");
+    json_string(b, choice->zone);
+    buffer_put(b, ",\"target\":");
+    json_string(b, choice->target);
+    buffer_put(b, ",\"card_type\":");
+    json_string(b, choice->card_type);
+    buffer_putf(b, ",\"count\":%d,\"allow_skip\":%s,\"actor\":%d",
+                choice->count, choice->allow_skip ? "true" : "false", choice->actor);
+    buffer_put(b, "}");
+}
+
 static int serialize_state(Sandbox *s, Buffer *b) {
     RbGeneratedActionList actions = rb_generate_action_candidates(&s->state);
     buffer_put(b, "{\"state_id\":\"c-"); buffer_putf(b, "%d", s->version); buffer_put(b, "\",\"frame_counter\":"); buffer_putf(b, "%d", s->version);
-    buffer_put(b, ",\"phase\":"); json_string(b, phase_name(&s->state)); buffer_put(b, ",\"active_player\":"); buffer_putf(b, "%d", s->state.active + 1);
+    buffer_put(b, ",\"turn\":"); buffer_putf(b, "%d", s->state.turn);
+    buffer_put(b, ",\"phase\":"); json_string(b, phase_wire_name(&s->state));
+    buffer_put(b, ",\"mode\":\"sandbox\",\"game_over\":"); buffer_put(b, s->state.winner >= 0 ? "true" : "false");
+    buffer_put(b, ",\"active_player\":"); buffer_putf(b, "%d", s->state.active + 1);
     buffer_put(b, ",\"winner\":"); if (s->state.winner < 0) buffer_put(b, "null"); else buffer_putf(b, "%d", s->state.winner);
+    buffer_put(b, ",\"pending_choice\":"); append_pending_choice(b, &s->state);
     buffer_put(b, ",\"player1\":"); append_player(b, &s->state.p[0]); buffer_put(b, ",\"player2\":"); append_player(b, &s->state.p[1]);
     buffer_put(b, ",\"legal_actions\":["); for (int i = 0; i < actions.count; i++) { if (i) buffer_put(b, ","); append_action(b, &actions.actions[i], i); } buffer_put(b, "]");
     buffer_put(b, ",\"ui_config\":{\"perspective_player\":0,\"current_lang\":\"jp\"}}");
@@ -169,26 +214,163 @@ static void send_http(int fd, const char *status, const char *type, const char *
     send(fd, head, (size_t)n, 0); if (len) send(fd, body, len, 0);
 }
 static void send_json(int fd, int code, const char *json) { char st[32]; snprintf(st, sizeof(st), code == 200 ? "200 OK" : code == 404 ? "404 Not Found" : "400 Bad Request"); send_http(fd, st, "application/json; charset=utf-8", json, strlen(json)); }
-static const char *json_value(const char *body, const char *key) { char needle[80]; snprintf(needle, sizeof(needle), "\"%s\"", key); const char *p = strstr(body, needle); if (!p) return NULL; p = strchr(p, ':'); return p ? p + 1 : NULL; }
+static const char *json_value(const char *body, const char *key) { char needle[80]; if (!body || !key) return NULL; snprintf(needle, sizeof(needle), "\"%s\"", key); const char *p = strstr(body, needle); if (!p) return NULL; p = strchr(p, ':'); return p ? p + 1 : NULL; }
 static int json_int(const char *body, const char *key, int def) { const char *p = json_value(body, key); return p ? atoi(p) : def; }
-static void make_test_deck(Sandbox *s) {
-    memset(s->deck, 0, sizeof(s->deck)); s->deck_count[0] = s->deck_count[1] = 0;
-    for (uint32_t i = 0; i < rb_num_cards() && s->deck_count[0] < 40; i++) if (rb_card_ability_idx(i) != 0xFFFF) s->deck[0][s->deck_count[0]++] = i;
-    for (uint32_t i = 0; i < rb_num_cards() && s->deck_count[1] < 40; i++) if (rb_card_ability_idx(i) != 0xFFFF) s->deck[1][s->deck_count[1]++] = i;
-    rb_seed(0xCAFE); memset(&s->state, 0, sizeof(s->state)); rb_game_init(&s->state, s->deck[0], s->deck_count[0], s->deck[1], s->deck_count[1]); s->initialized = 1; s->deck_ready[0] = s->deck_ready[1] = 1; s->version++;
-}
-static void set_deck(Sandbox *s, const char *body, int player) {
-    if (player < 0 || player > 1) return;
-    s->deck_count[player] = 0;
-    const char *p = json_value(body, "deck"); if (!p) return; p = strchr(p, '['); if (!p) return;
-    fprintf(stderr, "[SET_DECK] player=%d body=%s\n", player, body);
-    p++; char card[128];
-    while (s->deck_count[player] < RB_MAX_DECK && *p && *p != ']') {
-        while (*p == ' ' || *p == ',' || *p == '\n' || *p == '\r' || *p == '\t') p++;
-        if (*p == '"') { p++; size_t n = 0; while (*p && *p != '"' && n + 1 < sizeof(card)) card[n++] = *p++; card[n] = 0; if (*p == '"') p++; int idx = find_card_for_deck(card); fprintf(stderr, "[SET_DECK] card=%s idx=%d\n", card, idx); if (idx >= 0) s->deck[player][s->deck_count[player]++] = (uint32_t)idx; }
+static int parse_json_card_array(const char *body, const char *key,
+                                 int *ids, int max_ids, int *count)
+{
+    if (!body || !key || !ids || !count) return 0;
+    *count = 0;
+    const char *p = json_value(body, key);
+    if (!p) return 0;
+    while (*p && isspace((unsigned char)*p)) p++;
+    if (*p != '[') return 0;
+    p++;
+    while (*p && *p != ']') {
+        while (*p && (isspace((unsigned char)*p) || *p == ',')) p++;
+        if (*p == ']') break;
+        int card_id = -1;
+        if (*p == '"') {
+            char card[128];
+            size_t n = 0;
+            p++;
+            while (*p && *p != '"' && n + 1 < sizeof(card)) {
+                if (*p == '\\' && p[1]) p++;
+                card[n++] = *p++;
+            }
+            card[n] = '\0';
+            if (*p != '"') return 0;
+            p++;
+            card_id = rb_card_get_card_id(card);
+        } else {
+            char *end = NULL;
+            long value = strtol(p, &end, 10);
+            if (end == p) return 0;
+            p = end;
+            card_id = (int)value;
+        }
+        if (card_id < 0 || rb_card_record((uint32_t)card_id) == NULL) return 0;
+        if (*count >= max_ids) return 0;
+        ids[(*count)++] = card_id;
         while (*p && *p != ',' && *p != ']') p++;
     }
-    s->deck_ready[player] = s->deck_count[player] > 0;
+    return *p == ']';
+}
+
+static int parse_json_string_value(const char *body, const char *key,
+                                   char *out, size_t out_size)
+{
+    if (!body || !key || !out || out_size == 0) return 0;
+    const char *p = json_value(body, key);
+    if (!p) return 0;
+    while (*p && isspace((unsigned char)*p)) p++;
+    if (*p != '"') return 0;
+    p++;
+    size_t n = 0;
+    while (*p && *p != '"' && n + 1 < out_size) {
+        if (*p == '\\' && p[1]) p++;
+        out[n++] = *p++;
+    }
+    if (*p != '"') return 0;
+    out[n] = '\0';
+    return 1;
+}
+
+static int parse_deck_content_ids(const char *body, int *ids, int max_ids, int *count)
+{
+    if (!body || !ids || !count) return 0;
+    char content[16384];
+    if (!parse_json_string_value(body, "content", content, sizeof(content))) return 0;
+    char **cards = NULL;
+    size_t card_count = 0;
+    if (rb_parse_deck_content(content, &cards, &card_count) != 0) return 0;
+    if (card_count > (size_t)max_ids) {
+        rb_deck_card_numbers_free(cards, card_count);
+        return 0;
+    }
+    for (size_t i = 0; i < card_count; i++) {
+        ids[i] = rb_card_get_card_id(cards[i]);
+        if (ids[i] < 0) {
+            rb_deck_card_numbers_free(cards, card_count);
+            return 0;
+        }
+    }
+    *count = (int)card_count;
+    rb_deck_card_numbers_free(cards, card_count);
+    return 1;
+}
+
+static void settle_web_initial_state(GameState *state)
+{
+    if (!state) return;
+    for (int guard = 0; guard < 16; guard++) {
+        if (state->phase != RB_PHASE_ACTIVE &&
+            state->phase != RB_PHASE_ENERGY &&
+            state->phase != RB_PHASE_DRAW)
+            break;
+        if (rb_has_pending_choice(state)) break;
+        rb_advance_phase(state);
+    }
+}
+
+static int make_test_deck(Sandbox *s)
+{
+    int main_ids[2][40];
+    int energy_ids[2][RB_MAX_ENERGY_CARDS];
+    int main_counts[2] = {0, 0};
+    int energy_counts[2] = {0, 0};
+    for (int pl = 0; pl < 2; pl++) {
+        for (uint32_t card_id = 0; card_id < rb_num_cards(); card_id++) {
+            if (rb_card_is_energy((int)card_id)) {
+                if (energy_counts[pl] < RB_MAX_ENERGY_CARDS)
+                    energy_ids[pl][energy_counts[pl]++] = (int)card_id;
+            } else if (rb_card_ability_idx(card_id) != 0xFFFF && main_counts[pl] < 40) {
+                main_ids[pl][main_counts[pl]++] = (int)card_id;
+            }
+        }
+    }
+    RbBuiltDeck built0;
+    RbBuiltDeck built1;
+    if (rb_build_deck_from_card_ids(main_ids[0], (size_t)main_counts[0],
+                                    energy_ids[0], (size_t)energy_counts[0], &built0) != 0 ||
+        rb_build_deck_from_card_ids(main_ids[1], (size_t)main_counts[1],
+                                    energy_ids[1], (size_t)energy_counts[1], &built1) != 0)
+        return 0;
+    s->built_deck[0] = built0;
+    s->built_deck[1] = built1;
+    rb_seed(0xCAFE);
+    if (rb_init_game_from_built_decks(&s->state, &built0, &built1) != 0) return 0;
+    settle_web_initial_state(&s->state);
+    s->initialized = 1;
+    s->deck_ready[0] = s->deck_ready[1] = 1;
+    s->version++;
+    return 1;
+}
+
+static int set_deck(Sandbox *s, const char *body, int player)
+{
+    if (!s || !body || player < 0 || player > 1) return 0;
+    int main_ids[RB_MAX_DECK + RB_MAX_ENERGY_CARDS];
+    int energy_ids[RB_MAX_ENERGY_CARDS];
+    int main_count = 0;
+    int energy_count = 0;
+    int parsed = parse_json_card_array(body, "deck", main_ids,
+                                       RB_MAX_DECK + RB_MAX_ENERGY_CARDS, &main_count);
+    if (!parsed) parsed = parse_deck_content_ids(body, main_ids,
+                                                 RB_MAX_DECK + RB_MAX_ENERGY_CARDS,
+                                                 &main_count);
+    if (!parsed || main_count == 0) return 0;
+    if (json_value(body, "energy_deck") &&
+        !parse_json_card_array(body, "energy_deck", energy_ids,
+                               RB_MAX_ENERGY_CARDS, &energy_count))
+        return 0;
+    RbBuiltDeck built;
+    if (rb_build_deck_from_card_ids(main_ids, (size_t)main_count,
+                                    energy_ids, (size_t)energy_count, &built) != 0)
+        return 0;
+    s->built_deck[player] = built;
+    s->deck_ready[player] = 1;
+    return 1;
 }
 static int read_text_file(const char *path, char **out, size_t *out_len) {
     FILE *f = fopen(path, "rb"); long size;
@@ -265,6 +447,8 @@ static void append_deck_presets(Buffer *b, const char *web_root) {
             char card_no[128];
             int qty;
             if (!preset_card(line, card_no, &qty)) continue;
+            int card_id = rb_card_get_card_id(card_no);
+            if (card_id < 0 || rb_card_is_energy(card_id)) continue;
             for (int i = 0; i < qty; i++) {
                 append_preset_card(b, &first_main, card_no);
                 count++;
@@ -285,7 +469,8 @@ static void append_deck_presets(Buffer *b, const char *web_root) {
             char card_no[128];
             int qty;
             if (!preset_card(line, card_no, &qty)) continue;
-            if (!strstr(card_no, "-PE") && !strstr(card_no, "-E")) continue;
+            int card_id = rb_card_get_card_id(card_no);
+            if (card_id < 0 || !rb_card_is_energy(card_id)) continue;
             for (int i = 0; i < qty; i++) append_preset_card(b, &first_energy, card_no);
         }
         buffer_put(b, "],\"card_count\":");
@@ -301,31 +486,170 @@ static void handle_request(Sandbox *s, int fd, HttpRequest *r, const char *web_r
     char method[16] = {0}, path[256] = {0}; const char *line = strstr(r->request, "\r\n");
     if (line) { size_t n = (size_t)(line - r->request); char *sp = memchr(r->request, ' ', n); if (sp) { sscanf(r->request, "%15s %255s", method, path); } }
     while (path[0] == '/') memmove(path, path + 1, strlen(path));
-    if (!strcmp(path, "api/status")) { char status[192]; snprintf(status, sizeof(status), "{\"status\":\"c_server\",\"cards\":%u,\"niji\":%d,\"instance_id\":\"c-web-single-room\"}", rb_num_cards(), rb_find_card_by_no("PL!N-bp1-026-L")); send_json(fd, 200, status); return; }
-    if (!strcmp(path, "api/rooms/create")) { s->deck_count[0] = s->deck_count[1] = 0; s->deck_ready[0] = s->deck_ready[1] = 0; send_json(fd, 200, "{\"success\":true,\"room_id\":\"SANDBX\",\"session\":{\"token\":\"sandbox\",\"player_id\":0}}"); return; }
+    if (!strcmp(path, "api/status")) { char status[224]; snprintf(status, sizeof(status), "{\"status\":\"rust_server\",\"backend\":\"c_server\",\"cards\":%u,\"niji\":%d,\"instance_id\":\"c-web-single-room\"}", rb_num_cards(), rb_find_card_by_no("PL!N-bp1-026-L")); send_json(fd, 200, status); return; }
+    if (!strcmp(path, "api/rooms/create")) {
+        rb_built_deck_clear(&s->built_deck[0]);
+        rb_built_deck_clear(&s->built_deck[1]);
+        s->deck_ready[0] = s->deck_ready[1] = 0;
+        s->initialized = 0;
+        send_json(fd, 200, "{\"success\":true,\"room_id\":\"SANDBX\",\"session\":{\"token\":\"sandbox\",\"player_id\":0}}");
+        return;
+    }
     if (!strcmp(path, "api/rooms/list")) { send_json(fd, 200, "{\"rooms\":[{\"room_id\":\"SANDBX\",\"mode\":\"sandbox\",\"players\":1}]}"); return; }
     if (!strcmp(path, "api/rooms/join") || !strcmp(path, "api/rooms/leave")) { send_json(fd, 200, "{\"success\":true,\"room_id\":\"SANDBX\"}"); return; }
     if (!strcmp(path, "api/get_decks")) { Buffer b = {0}; buffer_put(&b, "{\"success\":true,"); append_deck_presets(&b, web_root); buffer_put(&b, "}"); send_json(fd, 200, b.data ? b.data : "{}"); buffer_free(&b); return; }
     if (!strcmp(path, "api/get_test_deck")) { Buffer b = {0}; buffer_put(&b, "{\"success\":true,\"content\":["); append_deck_file_content(&b, web_root, "nijigaku_cup.txt"); buffer_put(&b, "]}"); send_json(fd, 200, b.data ? b.data : "{}"); buffer_free(&b); return; }
-    if (!strcmp(path, "api/set_deck") && !strcmp(method, "POST")) { int player = json_int(r->body, "player", 0); set_deck(s, r->body, player); int room_init = s->deck_ready[0] && s->deck_ready[1]; if (room_init) { rb_seed(0xCAFE); memset(&s->state, 0, sizeof(s->state)); rb_game_init(&s->state, s->deck[0], s->deck_count[0], s->deck[1], s->deck_count[1]); s->initialized = 1; s->version++; } char response[160]; snprintf(response, sizeof(response), "{\"success\":true,\"room_init\":%s,\"p0_count\":%d,\"p1_count\":%d,\"body_len\":%d}", room_init ? "true" : "false", s->deck_count[0], s->deck_count[1], (int)r->body_len); send_json(fd, 200, response); return; }
-    if (!strcmp(path, "api/init") && !strcmp(method, "POST")) { if (!s->initialized) make_test_deck(s); else { rb_seed(0xCAFE); memset(&s->state, 0, sizeof(s->state)); rb_game_init(&s->state, s->deck[0], s->deck_count[0], s->deck[1], s->deck_count[1]); s->version++; } Buffer b = {0}; serialize_state(s, &b); send_json(fd, 200, b.data ? b.data : "{}"); buffer_free(&b); return; }
+    if (!strcmp(path, "api/set_deck") && !strcmp(method, "POST")) {
+        int player = json_int(r->body, "player", 0);
+        if (!set_deck(s, r->body, player)) {
+            send_json(fd, 400, "{\"success\":false,\"error\":\"invalid deck\"}");
+            return;
+        }
+        int room_init = s->deck_ready[0] && s->deck_ready[1];
+        if (room_init) {
+            rb_seed(0xCAFE);
+            if (rb_init_game_from_built_decks(&s->state, &s->built_deck[0], &s->built_deck[1]) != 0) {
+                send_json(fd, 400, "{\"success\":false,\"error\":\"game initialization failed\"}");
+                return;
+            }
+            s->initialized = 1;
+            settle_web_initial_state(&s->state);
+            s->version++;
+        }
+        char response[220];
+        snprintf(response, sizeof(response),
+                 "{\"success\":true,\"room_init\":%s,\"p0_count\":%d,\"p1_count\":%d,\"p0_energy\":%d,\"p1_energy\":%d}",
+                 room_init ? "true" : "false",
+                 s->built_deck[0].main_count, s->built_deck[1].main_count,
+                 s->built_deck[0].energy_count, s->built_deck[1].energy_count);
+        send_json(fd, 200, response);
+        return;
+    }
+    if (!strcmp(path, "api/init") && !strcmp(method, "POST")) {
+        if (!s->initialized) {
+            if (!make_test_deck(s)) {
+                send_json(fd, 400, "{\"error\":\"test deck initialization failed\"}");
+                return;
+            }
+        } else {
+            rb_seed(0xCAFE);
+            if (rb_init_game_from_built_decks(&s->state, &s->built_deck[0], &s->built_deck[1]) != 0) {
+                send_json(fd, 400, "{\"error\":\"game initialization failed\"}");
+                return;
+            }
+            settle_web_initial_state(&s->state);
+            s->version++;
+        }
+        Buffer b = {0};
+        serialize_state(s, &b);
+        send_json(fd, 200, b.data ? b.data : "{}");
+        buffer_free(&b);
+        return;
+    }
     if (!strcmp(path, "api/game-state/version")) { char b[64]; snprintf(b, sizeof(b), "{\"version\":%d}", s->version); send_json(fd, 200, b); return; }
     if (!strcmp(path, "api/game-state")) { Buffer b = {0}; if (!s->initialized) make_test_deck(s); serialize_state(s, &b); send_json(fd, 200, b.data ? b.data : "{}"); buffer_free(&b); return; }
     if (!strcmp(path, "api/execute-action") && !strcmp(method, "POST")) {
-        if (!s->initialized) make_test_deck(s);
-        RbGeneratedActionList a = rb_generate_action_candidates(&s->state); int idx = json_int(r->body, "action_index", 0);
-        if (idx < 0 || idx >= a.count) { rb_free(a.actions); send_json(fd, 400, "{\"error\":\"invalid action index\"}"); return; }
-        RbGeneratedAction action = a.actions[idx]; int area = json_int(r->body, "stage_area", 0); if (area < 0) area = 0;
-        if (action.action_type == 1) rb_execute_main_phase_action(&s->state, 1, -1, 0, 0, 0);
-        else if (action.action_type == 2) { int hi = json_int(r->body, "card_index", -1); if (hi < 0) for (int i = 0; i < s->state.p[s->state.active].hand.n; i++) if (s->state.p[s->state.active].hand.cards[i] == action.parameters.card_id) { hi = i; break; } rb_play_member(&s->state, s->state.active, hi, area); }
-        else rb_execute_main_phase_action(&s->state, 0, action.parameters.card_id, area, 0, 0);
-        rb_free(a.actions); s->version++; Buffer b = {0}; serialize_state(s, &b); send_json(fd, 200, b.data ? b.data : "{}"); buffer_free(&b); return;
+        if (!s->initialized && !make_test_deck(s)) {
+            send_json(fd, 400, "{\"error\":\"game initialization failed\"}");
+            return;
+        }
+        RbGeneratedActionList actions = rb_generate_action_candidates(&s->state);
+        int index = json_int(r->body, "action_index", -1);
+        if (index < 0 || index >= actions.count) {
+            rb_free(actions.actions);
+            send_json(fd, 400, "{\"error\":\"invalid action index\"}");
+            return;
+        }
+        RbGeneratedAction action = actions.actions[index];
+        int requested_type = action.action_type;
+        char type_text[32];
+        if (parse_json_string_value(r->body, "action_type", type_text, sizeof(type_text))) {
+            if (!strcmp(type_text, "pass")) requested_type = 1;
+            else if (!strcmp(type_text, "play_member_to_stage")) requested_type = 14;
+            else if (!strcmp(type_text, "use_ability")) requested_type = 0;
+            else {
+                rb_free(actions.actions);
+                send_json(fd, 400, "{\"error\":\"unknown action_type\"}");
+                return;
+            }
+            if (requested_type != action.action_type &&
+                !(action.action_type == 2 && requested_type == 14)) {
+                rb_free(actions.actions);
+                send_json(fd, 400, "{\"error\":\"action_type does not match action index\"}");
+                return;
+            }
+        }
+        int actor = s->state.active;
+        int card_id = action.parameters.card_id;
+        int hand_index = -1;
+        if (requested_type != 1) {
+            hand_index = json_int(r->body, "card_index", -1);
+            if (hand_index >= s->state.p[actor].hand.n || hand_index < 0) {
+                hand_index = -1;
+                for (int i = 0; i < s->state.p[actor].hand.n; i++) {
+                    if (s->state.p[actor].hand.cards[i] == card_id) {
+                        hand_index = i;
+                        break;
+                    }
+                }
+            }
+            if (hand_index < 0 || s->state.p[actor].hand.cards[hand_index] != card_id) {
+                rb_free(actions.actions);
+                send_json(fd, 400, "{\"error\":\"card is not in actor hand\"}");
+                return;
+            }
+        }
+        int area = -1;
+        char area_text[32];
+        if (parse_json_string_value(r->body, "stage_area", area_text, sizeof(area_text)))
+            area = rb_member_area_to_index(area_text);
+        else if (json_value(r->body, "stage_area"))
+            area = json_int(r->body, "stage_area", -1);
+        if (requested_type == 14 && (area < 0 || area >= RB_STAGE_SIZE)) {
+            rb_free(actions.actions);
+            send_json(fd, 400, "{\"error\":\"invalid stage_area\"}");
+            return;
+        }
+        int result;
+        if (requested_type == 1) {
+            result = rb_execute_main_phase_action(&s->state, 1, -1, 0, 0, 0);
+        } else if (requested_type == 14) {
+            result = rb_play_member(&s->state, actor, hand_index, area);
+        } else if (requested_type == 0) {
+            result = rb_execute_main_phase_action(&s->state, 0, card_id, 0, 0, 0);
+        } else {
+            result = -1;
+        }
+        rb_free(actions.actions);
+        if (result != 0) {
+            send_json(fd, 400, "{\"error\":\"action execution failed\"}");
+            return;
+        }
+        s->version++;
+        Buffer b = {0};
+        serialize_state(s, &b);
+        send_json(fd, 200, b.data ? b.data : "{}");
+        buffer_free(&b);
+        return;
     }
     if (!strcmp(path, "api/ui/config") && !strcmp(method, "POST")) { send_json(fd, 200, "{\"success\":true,\"ui_config\":{}}"); return; }
+    if (!strcmp(path, "cards/cards.json")) {
+        char card_path[1024];
+        snprintf(card_path, sizeof(card_path), "%s/../cards/cards.json", web_root ? web_root : ".");
+        char *card_data = NULL;
+        size_t card_len = 0;
+        if (read_text_file(card_path, &card_data, &card_len)) {
+            send_http(fd, "200 OK", "application/json; charset=utf-8", card_data, card_len);
+            free(card_data);
+        } else {
+            send_json(fd, 404, "{\"error\":\"card database not found\"}");
+        }
+        return;
+    }
     if (strstr(path, "..") || !web_root) { send_json(fd, 404, "{\"error\":\"not found\"}"); return; }
     char file[1024]; snprintf(file, sizeof(file), "%s/%s", web_root, path); if (!strcmp(path, "")) snprintf(file, sizeof(file), "%s/index.html", web_root);
     FILE *fp = fopen(file, "rb"); if (!fp) { send_json(fd, 404, "{\"error\":\"not found\"}"); return; } fseek(fp, 0, SEEK_END); long n = ftell(fp); fseek(fp, 0, SEEK_SET); char *data = (char *)malloc((size_t)n); fread(data, 1, (size_t)n, fp); fclose(fp);
-    const char *type = strstr(file, ".js") ? "text/javascript" : strstr(file, ".css") ? "text/css" : strstr(file, ".wasm") ? "application/wasm" : "text/html"; send_http(fd, "200 OK", type, data, (size_t)n); free(data);
+    const char *type = strstr(file, ".js") ? "text/javascript" : strstr(file, ".css") ? "text/css" : strstr(file, ".wasm") ? "application/wasm" : strstr(file, ".json") ? "application/json; charset=utf-8" : "text/html"; send_http(fd, "200 OK", type, data, (size_t)n); free(data);
 }
 
 int rb_web_server_run(const char *host, int port, const char *web_root, const char *data_dir) {

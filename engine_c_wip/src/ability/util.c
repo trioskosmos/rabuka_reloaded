@@ -1369,6 +1369,14 @@ const AbilityEffect *rb_find_modify_cost(const AbilityEffect *effect,
         const AbilityEffect *found = rb_find_modify_cost(effect->alternative_effect, op, loc);
         if (found) return found;
     }
+    if (effect->look_action) {
+        const AbilityEffect *found = rb_find_modify_cost(effect->look_action, op, loc);
+        if (found) return found;
+    }
+    if (effect->select_action) {
+        const AbilityEffect *found = rb_find_modify_cost(effect->select_action, op, loc);
+        if (found) return found;
+    }
     if (effect->followup_action) {
         const AbilityEffect *found = rb_find_modify_cost(effect->followup_action, op, loc);
         if (found) return found;

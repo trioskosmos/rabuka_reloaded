@@ -345,11 +345,15 @@ int rb_backtrack_allocate(const int pool[8], const int card_needs[8], int n_card
 /* Greedy allocation + verdict (mirror compute_allocations / check_live_success).
    Returns 1 if all lives pass. Computes surplus (total - required) for no_excess
    checks. */
-static int allocate_and_verdict(const GameState *g, int pl, const int total_hearts[8], int *out_passed, int *out_score, int *out_surplus, int *out_per_live){
+static int allocate_and_verdict(const GameState *g, int pl, const int total_hearts[8],
+                                int score_bonus, int *out_passed, int *out_score,
+                                int *out_surplus, int *out_per_live){
     RbPlayer *P=(RbPlayer*)&g->p[pl];
     int total_score=0;
     int pool[8]; memcpy(pool,total_hearts,8*sizeof(int));
-    int needs[RB_MAX_LIVE_CARDS*8]; int filled[RB_MAX_LIVE_CARDS*8]; int future[RB_MAX_LIVE_CARDS*8];
+    int needs[RB_MAX_LIVE_CARDS*8] = {0};
+    int filled[RB_MAX_LIVE_CARDS*8] = {0};
+    int future[RB_MAX_LIVE_CARDS*8] = {0};
     int n=0;
     rb_build_card_needs(g, pl, needs, &n);
     rb_compute_future_demand(needs, n, future);
@@ -417,6 +421,7 @@ static int allocate_and_verdict(const GameState *g, int pl, const int total_hear
     int lt_bonus = (pl == 0) ? (int)g->mods.p1_constant_total_score_bonus
                              : (int)g->mods.p2_constant_total_score_bonus;
     if (all_pass && lt_bonus > 0) total_score += lt_bonus;
+    if (all_pass && score_bonus > 0) total_score += score_bonus;
     if (total_score < 0) total_score = 0;
     if (total_score > 255) total_score = 255;
     if(out_passed) *out_passed=all_pass;
@@ -452,7 +457,8 @@ int rb_perform_live(GameState *g, int pl){
     int live_passed[RB_MAX_LIVE_CARDS]={0};
     if (g->n_snapshots < RB_MAX_SNAPSHOTS)
         memset(&g->snapshots[g->n_snapshots], 0, sizeof(g->snapshots[g->n_snapshots]));
-    allocate_and_verdict(g, pl, total_hearts, &passed, &live_score, &surplus, live_passed);
+    allocate_and_verdict(g, pl, total_hearts, note_icons,
+                         &passed, &live_score, &surplus, live_passed);
     g->live_success[pl] = passed; /* record this turn's live result for opponent_live_success */
     /* push snapshot for parity diff (trace_game oracle) — surplus feeds
        NoExcessHeart condition (engine/src/turn/live.rs compute_surplus_and_flags) */
@@ -522,7 +528,8 @@ int rb_perform_live(GameState *g, int pl){
         for(int i=0;i<8;i++) total2[i]+=g->re_yell_blade_hearts[i];
         int passed2=0, score2=0, surplus2=-1;
         int live_passed2[RB_MAX_LIVE_CARDS]={0};
-        allocate_and_verdict(g, pl, total2, &passed2, &score2, &surplus2, live_passed2);
+        allocate_and_verdict(g, pl, total2, note_icons + g->re_yell_note_icons,
+                             &passed2, &score2, &surplus2, live_passed2);
         passed = passed2; live_score = score2; surplus = surplus2;
         g->live_success[pl] = passed;
         g->live_score[pl] = live_score;
@@ -658,27 +665,50 @@ void rb_finalize_snapshot_fields(GameState *g, int p1_won, int p2_won,
     snapshot (surplus_per_color), and the GameState surplus-count / no-excess
     flags used by NoExcessHeart conditions. */
 void rb_compute_surplus_and_flags(GameState *g, int p1_won, int p2_won){
-    int p1_surplus=0, p2_surplus=0;
-    for(int si=0;si<g->n_snapshots;si++){
-        RbLiveSnapshot *s=&g->snapshots[si];
-        int total_avail=0;
-        for(int c=0;c<8;c++) total_avail+=s->total_hearts[c];
-        int total_filled=0;
-        for(int i=0;i<s->n_lives && i<RB_MAX_LIVE_CARDS;i++)
-            for(int c=0;c<8;c++) total_filled+=s->live_filled[i][c];
-        int surplus=total_avail-total_filled; if(surplus<0) surplus=0;
-        for(int c=0;c<8;c++){
-            int filled_color=0;
-            for(int i=0;i<s->n_lives && i<RB_MAX_LIVE_CARDS;i++) filled_color+=s->live_filled[i][c];
-            int pc=s->total_hearts[c]-filled_color; if(pc<0) pc=0;
-            s->surplus_per_color[c]=pc;
+    if (!g) return;
+    int p1_surplus = 0, p2_surplus = 0;
+    int p1_recorded = 0, p2_recorded = 0;
+    for (int si = 0; si < g->n_snapshots; si++) {
+        RbLiveSnapshot *s = &g->snapshots[si];
+        int all_passed = s->n_lives > 0;
+        for (int i = 0; i < s->n_lives && i < RB_MAX_LIVE_CARDS; i++)
+            if (!s->live_passed[i]) all_passed = 0;
+        if (!all_passed || !s->success) {
+            s->surplus_hearts = 0;
+            memset(s->surplus_per_color, 0, sizeof(s->surplus_per_color));
+            continue;
         }
-        if(s->player==0){ p1_surplus=surplus; g->self_live_surplus_count=surplus; }
-        else            { p2_surplus=surplus; g->opponent_live_surplus_count=surplus; }
+        int total_avail = 0;
+        int total_filled = 0;
+        for (int c = 0; c < 8; c++) total_avail += s->total_hearts[c];
+        for (int i = 0; i < s->n_lives && i < RB_MAX_LIVE_CARDS; i++)
+            for (int c = 0; c < 8; c++) total_filled += s->live_filled[i][c];
+        int surplus = total_avail - total_filled;
+        if (surplus < 0) surplus = 0;
+        for (int c = 0; c < 8; c++) {
+            int filled_color = 0;
+            for (int i = 0; i < s->n_lives && i < RB_MAX_LIVE_CARDS; i++)
+                filled_color += s->live_filled[i][c];
+            int per_color = s->total_hearts[c] - filled_color;
+            if (per_color < 0) per_color = 0;
+            s->surplus_per_color[c] = per_color;
+        }
+        s->surplus_hearts = surplus;
+        if (s->player == 0) {
+            p1_surplus = surplus;
+            p1_recorded = 1;
+            g->self_live_surplus_count = surplus;
+        } else {
+            p2_surplus = surplus;
+            p2_recorded = 1;
+            g->opponent_live_surplus_count = surplus;
+        }
     }
-    g->live_surplus_ready_this_turn=1;
-    if(p2_won) g->p2_live_success_no_excess = (p2_surplus==0);
-    if(p1_won) g->p1_live_success_no_excess = (p1_surplus==0);
+    g->live_surplus_ready_this_turn = 1;
+    if (p1_recorded) g->p1_live_success_no_excess = (p1_surplus == 0);
+    if (p2_recorded) g->p2_live_success_no_excess = (p2_surplus == 0);
+    if (p1_won && !p1_recorded) g->p1_live_success_no_excess = 0;
+    if (p2_won && !p2_recorded) g->p2_live_success_no_excess = 0;
 }
 
 /* ── live.rs standalone helpers (ported) ── */
@@ -707,6 +737,15 @@ int rb_score_delta_since(const int *current, const int *prev, const int *zone_ca
     return total;
 }
 
+static int rb_latest_snapshot_note_icons(const GameState *g, int pl)
+{
+    if (!g || pl < 0 || pl > 1) return 0;
+    for (int i = g->n_snapshots - 1; i >= 0; i--)
+        if (g->snapshots[i].player == pl && g->snapshots[i].turn == g->turn)
+            return g->snapshots[i].note_icons;
+    return 0;
+}
+
 /* Mirror live.rs::TurnEngine::compute_pregame_scores: each player's live score from
     current stage hearts + granted hearts, plus the per-player extra (LiveSuccess
     delta). Reuses the shared allocation/verdict path so the score formula stays a
@@ -723,7 +762,8 @@ void rb_compute_pregame_scores(const GameState *g, int p1_extra, int p2_extra,
         int total[8];
         for (int i = 0; i < 8; i++) total[i] = stage[i] + g->p[pl].hearts[i];
         int passed = 0, score = 0, surplus = -1;
-        allocate_and_verdict(g, pl, total, &passed, &score, &surplus, NULL);
+        allocate_and_verdict(g, pl, total, rb_latest_snapshot_note_icons(g, pl),
+                             &passed, &score, &surplus, NULL);
         int extra = (pl == 0) ? p1_extra : p2_extra;
         int s = score + extra;
         if (s < 0) s = 0;
@@ -878,16 +918,20 @@ void rb_record_pretrigger_live_results(GameState *g) {
     if (!g) return;
     for (int i = 0; i < g->n_snapshots; i++) {
         RbLiveSnapshot *s = &g->snapshots[i];
-        if (s->turn != g->turn) continue;
-        int passed = s->n_lives > 0 && s->success;
-        int no_excess = passed && s->surplus_hearts == 0;
-        if (s->player == 0) {
-            g->live_success[0] = passed;
-            g->p1_live_success_no_excess = no_excess;
-        } else {
-            g->live_success[1] = passed;
-            g->p2_live_success_no_excess = no_excess;
+        if (s->turn != g->turn || s->player < 0 || s->player > 1) continue;
+        int passed = s->n_lives > 0;
+        for (int live = 0; live < s->n_lives && live < RB_MAX_LIVE_CARDS; live++)
+            if (!s->live_passed[live]) passed = 0;
+        int no_excess = passed;
+        for (int color = 0; color < 8 && no_excess; color++) {
+            int filled = 0;
+            for (int live = 0; live < s->n_lives && live < RB_MAX_LIVE_CARDS; live++)
+                filled += s->live_filled[live][color];
+            if (s->total_hearts[color] != filled) no_excess = 0;
         }
+        g->live_success[s->player] = passed;
+        if (s->player == 0) g->p1_live_success_no_excess = no_excess;
+        else g->p2_live_success_no_excess = no_excess;
         fprintf(stderr, "[EARLY_SEAT] pl=%d won=%d no_excess=%d surplus=%d\n",
                 s->player, passed, no_excess, s->surplus_hearts);
     }
@@ -977,18 +1021,27 @@ void rb_merge_late_score_apps(GameState *g) {
     int trace_n = rb_mods_trace_len(&g->mods);
     if (trace_n == 0) return;
     RbLiveSnapshot *s = &g->snapshots[g->n_snapshots - 1];
+    int write = 0;
     for (int i = 0; i < trace_n; i++) {
         const RbAbilityTraceEntry *entry = &g->mods.trace[i];
-        if (entry->effect_type != RB_EFFECT_SCORE_BONUS &&
-            entry->effect_type != RB_EFFECT_SCORE_SET) continue;
-        for (int live = 0; live < s->n_lives; live++) {
-            if (s->lives[live] != entry->target_card_id) continue;
-            s->live_score_detail[live] += entry->amount;
-            break;
+        int is_score = entry->effect_type == RB_EFFECT_SCORE_BONUS ||
+                       entry->effect_type == RB_EFFECT_SCORE_SET;
+        if (is_score) {
+            for (int live = 0; live < s->n_lives; live++) {
+                if (s->lives[live] != entry->target_card_id) continue;
+                s->live_score_detail[live] += entry->amount;
+                break;
+            }
+            continue;
         }
+        if (write != i) g->mods.trace[write] = *entry;
+        write++;
     }
-    int total = 0;
+    g->mods.n_trace = write;
+    int total = s->note_icons;
     for (int live = 0; live < s->n_lives; live++) total += s->live_score_detail[live];
+    if (total < 0) total = 0;
+    if (total > 255) total = 255;
     s->total_score = total;
 }
 

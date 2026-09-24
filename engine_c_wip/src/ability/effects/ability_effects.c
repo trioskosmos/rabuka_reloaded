@@ -91,6 +91,8 @@ int rb_translated_execute_gain_ability_effect(GameState *g, int actor,
         copy.n_child = 0;
         copy.primary_effect = NULL;
         copy.alternative_effect = NULL;
+        copy.look_action = NULL;
+        copy.select_action = NULL;
         copy.followup_action = NULL;
         copy.optional_action = NULL;
         copy.conditional_action = NULL;

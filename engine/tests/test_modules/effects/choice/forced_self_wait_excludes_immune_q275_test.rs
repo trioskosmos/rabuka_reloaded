@@ -202,3 +202,16 @@ fn forced_self_wait_q275_immunity_excludes_only_the_immune_member() {
     assert!(!is_waited(&game, kanan), "immune 果南 stays active");
     assert!(is_waited(&game, a), "the picked non-immune member is waited");
 }
+
+#[test]
+fn forced_self_wait_q275_with_only_immune_member_does_not_offer_or_wait() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db.clone());
+
+    let kanan = p1_establish_wait_immunity(&mut game);
+    let (offered, selected) = run_ceras_forced_wait(&mut game, 0);
+
+    assert!(offered.is_empty());
+    assert_eq!(selected, usize::MAX);
+    assert!(!is_waited(&game, kanan));
+}

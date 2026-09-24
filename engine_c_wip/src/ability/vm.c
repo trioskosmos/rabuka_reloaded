@@ -356,6 +356,8 @@ static void effect_free(AbilityEffect *e) {
     for (int i = 0; i < e->n_extra; i++) { free(e->extra_k[i]); free(e->extra_v[i]); }
     effect_free(e->primary_effect);
     effect_free(e->alternative_effect);
+    effect_free(e->look_action);
+    effect_free(e->select_action);
     effect_free(e->followup_action);
     effect_free(e->optional_action);
     effect_free(e->conditional_action);
@@ -372,7 +374,7 @@ static int effect_set_extra(AbilityEffect *e, const char *k, const char *v) {
     if (!e || !k) return 0;
     int i;
     for (i = 0; i < e->n_extra; i++)
-        if (!strcmp(e->extra_k[i], k)) break;
+        if (e->extra_k[i] && !strcmp(e->extra_k[i], k)) break;
     if (i == RB_MAX_EXTRA) return 0;
     char *value = v ? rb_strdup(v) : NULL;
     if (v && !value) return 0;
@@ -384,6 +386,27 @@ static int effect_set_extra(AbilityEffect *e, const char *k, const char *v) {
     } else free(e->extra_v[i]);
     e->extra_v[i] = value;
     return 1;
+}
+static void effect_decode_dynamic_count(AbilityEffect *e, Rdr *r)
+{
+    Condition *dynamic = read_condition(r);
+    if (!dynamic) return;
+    for (uint32_t i = 0; i < dynamic->n_fields; i++) {
+        const CondField *field = &dynamic->fields[i];
+        char number[32];
+        const char *value = NULL;
+        if (field->v.tag == RB_TAG_STR || field->v.tag == RB_TAG_F64)
+            value = field->v.s;
+        else if (field->v.tag == RB_TAG_I64) {
+            snprintf(number, sizeof(number), "%lld", (long long)field->v.i);
+            value = number;
+        } else if (field->v.tag == RB_TAG_TRUE)
+            value = "true";
+        else if (field->v.tag == RB_TAG_FALSE)
+            value = "false";
+        if (field->key && value) effect_set_extra(e, field->key, value);
+    }
+    rb_free_condition(dynamic);
 }
 
 static int effect_decode_extra(AbilityEffect *e, const char *key, Rdr *r, uint8_t tag) {
@@ -434,6 +457,10 @@ static AbilityEffect *decode_effect_body(Rdr *r) {
             e->has_condition = 1;
             if (tag == RB_TAG_OBJVAR) e->condition = read_condition(r);
             else skip_value(r, tag);
+            continue;
+        }
+        if (key && !strcmp(key, "dynamic_count") && tag == RB_TAG_OBJVAR) {
+            effect_decode_dynamic_count(e, r);
             continue;
         }
         if (key && (strcmp(key, "optional") == 0 || strcmp(key, "non_stackable") == 0 ||
@@ -491,7 +518,15 @@ static AbilityEffect *decode_effect_body(Rdr *r) {
         if (key && (strcmp(key, "look_action") == 0 || strcmp(key, "select_action") == 0)) {
             if (tag == RB_TAG_OBJVAR) {
                 AbilityEffect *c = decode_effect_body(r);
-                if (c) effect_add_child(e, c);
+                if (c) {
+                    if (!strcmp(key, "look_action")) {
+                        effect_free(e->look_action);
+                        e->look_action = c;
+                    } else {
+                        effect_free(e->select_action);
+                        e->select_action = c;
+                    }
+                }
             } else skip_value(r, tag);
             continue;
         }

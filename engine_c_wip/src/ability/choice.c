@@ -380,6 +380,8 @@ void rb_set_chosen_target(AbilityEffect *e, const char *target) {
     if (e->child[0]) { /* cover compound look_action / select_action / actions / steps via child */ }
     if (e->primary_effect) rb_set_chosen_target(e->primary_effect, target);
     if (e->alternative_effect) rb_set_chosen_target(e->alternative_effect, target);
+    if (e->look_action) rb_set_chosen_target(e->look_action, target);
+    if (e->select_action) rb_set_chosen_target(e->select_action, target);
     if (e->followup_action) rb_set_chosen_target(e->followup_action, target);
     if (e->optional_action) rb_set_chosen_target(e->optional_action, target);
     if (e->conditional_action) rb_set_chosen_target(e->conditional_action, target);
@@ -2333,8 +2335,10 @@ void rb_resolver_continue_siblings(GameState *g, int actor, int host,
 void rb_move_handle_select_cards_looked_at(GameState *g, int actor,
     const int *indices, int n_indices, const char *destination, int discard_remaining);
 
-int rb_resume_with_choice(GameState *g, int selected_idx) {
+static int rb_resume_with_choice_indices_internal(GameState *g, const int *selected_indices,
+                                                   int n_indices) {
     if (!g || !g->queue.has_pending) return 0;
+    int selected_idx = n_indices > 0 && selected_indices ? selected_indices[0] : -1;
     fprintf(stderr, "[RESUME_ANY] kind=%d zone=%s target=%s route=%d mode=%d idx=%d\n",
             g->queue.pending.kind, g->queue.pending.zone, g->queue.pending.target, g->queue.pending.route, g->queue.resume_mode, selected_idx);
     int actor = g->queue.actor;
@@ -2395,9 +2399,27 @@ int rb_resume_with_choice(GameState *g, int selected_idx) {
     g->queue.state = RB_QUEUE_RESOLVING;   /* resuming / draining an ability */
     if (mode == 6) {
         rb_resolver_continue_siblings(g, actor, host, cont, cont_from);
-    } else if (mode == 2) {                 /* select_cards → look.ts keep/drop */
+    } else if (mode == 2) {
         const char *dest = eff ? eff->destination : NULL;
-        rb_look_resume(g, actor, selected_idx, dest, is_select);
+        const char *remainder = eff ? choice_effect_extra(eff, "remainder_destination") : NULL;
+        const char *discard_text = eff ? choice_effect_extra(eff, "discard_remaining") : NULL;
+        int discard_remaining = discard_text
+                                    ? (!strcmp(discard_text, "true") || !strcmp(discard_text, "1"))
+                                    : -1;
+        int mapped[RB_MAX_ZONE];
+        int n_mapped = 0;
+        for (int i = 0; i < n_indices; i++) {
+            int mapped_index = map_choice_index(&saved_pending, selected_indices[i]);
+            if (mapped_index >= 0 && n_mapped < RB_MAX_ZONE) mapped[n_mapped++] = mapped_index;
+        }
+        int look_owner = g->queue.resume_look_owner;
+        if (look_owner < 0 || look_owner > 1) look_owner = actor;
+        rb_look_resume_indices(g, look_owner, mapped, n_mapped,
+                               dest, remainder, discard_remaining, is_select);
+        AbilityEffect *after_look = g->queue.resume_after_look;
+        g->queue.resume_after_look = NULL;
+        if (after_look && !rb_has_pending_choice(g))
+            rb_execute_effect_ex(g, actor, after_look, host);
     } else if (mode == 1) {          /* position_change destination selection */
         if (!was_skip && eff) {
             g->queue.resume_active = 1;
@@ -2596,6 +2618,20 @@ int rb_resume_with_choice(GameState *g, int selected_idx) {
     return 1;
 }
 
+int rb_resume_with_choice(GameState *g, int selected_idx)
+{
+    int index = selected_idx;
+    return rb_resume_with_choice_indices_internal(
+        g, &index, selected_idx < 0 ? 0 : 1);
+}
+
+int rb_resume_with_choice_indices(GameState *g, const int *indices, int n_indices)
+{
+    if (n_indices <= 0 || !indices)
+        return rb_resume_with_choice_indices_internal(g, NULL, 0);
+    return rb_resume_with_choice_indices_internal(g, indices, n_indices);
+}
+
 /* internal: emit a choice that pauses execution. Called from engine.c handle_action. */
 void rb_emit_choice(GameState *g, int actor, RbChoiceKind kind,
                     const char *zone, const char *card_type,
@@ -2610,6 +2646,8 @@ void rb_emit_choice(GameState *g, int actor, RbChoiceKind kind,
     g->queue.has_pending = 1;
     g->queue.actor = actor;
     g->queue.deferred = NULL;
+    g->queue.resume_look_owner = -1;
+    g->queue.resume_after_look = NULL;
     g->queue.state = RB_QUEUE_AWAITING_CHOICE;   /* QueueState FSM (ability_queue.rs) */
     /* Also pause the queue so the choice gets proper actor/player_id routing */
     RbChoice ch = g->queue.pending;

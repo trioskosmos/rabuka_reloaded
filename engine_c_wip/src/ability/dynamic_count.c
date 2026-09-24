@@ -230,14 +230,27 @@ static int dc_extra_int(const AbilityEffect *e, const char *key)
    and feed them to rb_resolve_dynamic_count. Falls back to 1 when no dynamic
    parameters are present (preserves prior default). */
 int rb_effect_count(const struct GameState *g, int actor, int host_cid, const AbilityEffect *e,
-                    int last_draw_count)
+                     int last_draw_count)
 {
     if (!e) return 0;
-
-    /* per_unit scaling (mirrors misc.rs calculate_gain_multiplier /
-       resolve_per_unit_count): the base count is multiplied by the number of
-       units at `location` (e.g. one heart per success-live-zone card). Checked
-       BEFORE the e->count early-return because the base count is 1-per-unit. */
+    const char *reference = dc_extra(e, "reference");
+    const char *base_reference = dc_extra(e, "base_reference");
+    const char *count_type = dc_extra(e, "count_type");
+    int has_dynamic = reference || base_reference || count_type;
+    int dynamic_count = -1;
+    if (has_dynamic) {
+        const char *calculation = dc_extra(e, "calculation");
+        int calc_value = dc_extra_int(e, "calculation_value");
+        const char *on_p1 = dc_extra(e, "owner_on_p1");
+        int owner_on_p1 = (on_p1 && !strcmp(on_p1, "true")) ? 1 : 0;
+        int moved = dc_extra_int(e, "moved");
+        int selected = dc_extra_int(e, "selected");
+        dynamic_count = rb_resolve_dynamic_count(
+            g, actor, host_cid, reference, base_reference, count_type,
+            calculation, calc_value, owner_on_p1,
+            &moved, moved > 0 ? 1 : 0, &selected, selected > 0 ? 1 : 0,
+            last_draw_count);
+    }
     const char *per_unit = dc_extra(e, "per_unit");
     if (per_unit && !strcmp(per_unit, "true")) {
         const char *loc = dc_extra(e, "location");
@@ -245,7 +258,6 @@ int rb_effect_count(const struct GameState *g, int actor, int host_cid, const Ab
         if (loc) {
             if (!strcmp(loc, "success_live_zone") || !strcmp(loc, "success") ||
                 !strcmp(loc, "live")) {
-                /* the player's live-card zone (the live being performed) */
                 int pl = (host_cid >= 0) ? rb_owner_of_card((GameState *)g, host_cid) : actor;
                 if (pl < 0) pl = actor;
                 units = g->p[pl].live.n;
@@ -263,31 +275,12 @@ int rb_effect_count(const struct GameState *g, int actor, int host_cid, const Ab
             }
         }
         if (units < 0) units = 0;
-        int base = (e->count >= 0) ? e->count : 1;
+        int base = dynamic_count >= 0 ? dynamic_count : (e->count >= 0 ? e->count : 1);
         if (base < 0) base = 1;
         return base * units;
     }
-
-    if (e->count >= 0) return e->count;
-
-    const char *reference      = dc_extra(e, "reference");
-    const char *base_reference = dc_extra(e, "base_reference");
-    const char *count_type     = dc_extra(e, "count_type");
-    if (!reference && !base_reference && !count_type) return 1;
-
-    const char *calculation    = dc_extra(e, "calculation");
-    int         calc_value     = dc_extra_int(e, "calculation_value");
-    const char *on_p1          = dc_extra(e, "owner_on_p1");
-    int         owner_on_p1    = (on_p1 && !strcmp(on_p1, "true")) ? 1 : 0;
-    int         moved          = dc_extra_int(e, "moved");
-    int         selected       = dc_extra_int(e, "selected");
-
-    return rb_resolve_dynamic_count(g, actor, host_cid,
-                                    reference, base_reference, count_type,
-                                    calculation, calc_value, owner_on_p1,
-                                    &moved, moved > 0 ? 1 : 0,
-                                    &selected, selected > 0 ? 1 : 0,
-                                    last_draw_count);
+    if (dynamic_count >= 0) return dynamic_count;
+    return e->count >= 0 ? e->count : 1;
 }
 
 /* ── revealed_count: mirror GameState::revealed_count ──

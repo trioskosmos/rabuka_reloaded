@@ -1,6 +1,6 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-09-24T13:57:18.125078+00:00",
+  "generated_at": "2026-09-24T16:31:32.867373+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
@@ -8,7 +8,7 @@
     "unique_abilities": 936
   },
   "n_files": 839,
-  "n_tests": 3457,
+  "n_tests": 3467,
   "total_cards": 771,
   "covered_cards": 771,
   "abilities_on_covered": 936,
@@ -678,7 +678,7 @@
       ]
     }
   },
-  "n_test_fns_parsed": 3457,
+  "n_test_fns_parsed": 3467,
   "abilities": [
     {
       "idx": 0,
@@ -1801,9 +1801,9 @@
         "live_start_no_group_members_adds_no_score",
         "live_start_one_group_member_adds_two_score",
         "live_start_three_distinct_group_members_add_six_score",
-        "q278_ayumu_plus_joint_is_two_blades"
+        "q278_ability_placed_card_and_joint_are_counted_at_live_start"
       ],
-      "covering_test_count": 48,
+      "covering_test_count": 51,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -8801,6 +8801,7 @@
         "forced_self_wait_q275_forced_wait_excludes_immune_and_waits_non_immune",
         "forced_self_wait_q275_immunity_excludes_only_the_immune_member",
         "forced_self_wait_q275_single_legal_target_auto_resolves_no_prompt",
+        "forced_self_wait_q275_with_only_immune_member_does_not_offer_or_wait",
         "forced_self_wait_q275_without_immunity_immune_member_is_offered_and_waited",
         "kanan_bp7_both_debut_abilities_in_queue_from_start",
         "mari_bottom_dia_added_to_hand",
@@ -8809,10 +8810,11 @@
         "mari_does_not_grab_other_discard_match",
         "mari_skip_optional_discard_moves_nothing",
         "q274_immune_target_still_offered_and_not_waited",
+        "q274_immunity_uses_printed_blade_not_current_blade",
         "q274_non_immune_pick_is_still_waited",
         "q274_without_immunity_the_member_is_waited"
       ],
-      "covering_test_count": 19,
+      "covering_test_count": 21,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -8859,6 +8861,7 @@
         "forced_self_wait_q275_forced_wait_excludes_immune_and_waits_non_immune",
         "forced_self_wait_q275_immunity_excludes_only_the_immune_member",
         "forced_self_wait_q275_single_legal_target_auto_resolves_no_prompt",
+        "forced_self_wait_q275_with_only_immune_member_does_not_offer_or_wait",
         "forced_self_wait_q275_without_immunity_immune_member_is_offered_and_waited",
         "kanan_bp7_both_debut_abilities_in_queue_from_start",
         "mari_bottom_dia_added_to_hand",
@@ -8867,10 +8870,11 @@
         "mari_does_not_grab_other_discard_match",
         "mari_skip_optional_discard_moves_nothing",
         "q274_immune_target_still_offered_and_not_waited",
+        "q274_immunity_uses_printed_blade_not_current_blade",
         "q274_non_immune_pick_is_still_waited",
         "q274_without_immunity_the_member_is_waited"
       ],
-      "covering_test_count": 19,
+      "covering_test_count": 21,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -9162,8 +9166,11 @@
         "miyamiya_baton_touch_blade_heart_newcomer_nothing",
         "miyamiya_baton_touch_cost13_newcomer_energy_only",
         "miyamiya_baton_touch_cost15_newcomer_full_payoff",
+        "q278_ability_placed_card_and_joint_are_counted_at_live_start",
         "q278_ayumu_plus_joint_is_two_blades",
         "q279_all_singles_plus_joint_is_three_blades",
+        "q279_duplicate_joint_cards_count_as_one_name",
+        "q279_single_plus_duplicate_joint_cards_count_each_name_once",
         "q279_three_singles_no_joint_is_three_blades",
         "qduplicates_dedupe",
         "qjoint_alone_is_one_blade",
@@ -9183,7 +9190,7 @@
         "shizuku_live_start_blade_per_distinct_under",
         "shizuku_live_start_blade_zero_under"
       ],
-      "covering_test_count": 27,
+      "covering_test_count": 30,
       "is_null": false,
       "use_limit": 1,
       "watches_abilities": false,
@@ -9227,8 +9234,11 @@
         "miyamiya_baton_touch_blade_heart_newcomer_nothing",
         "miyamiya_baton_touch_cost13_newcomer_energy_only",
         "miyamiya_baton_touch_cost15_newcomer_full_payoff",
+        "q278_ability_placed_card_and_joint_are_counted_at_live_start",
         "q278_ayumu_plus_joint_is_two_blades",
         "q279_all_singles_plus_joint_is_three_blades",
+        "q279_duplicate_joint_cards_count_as_one_name",
+        "q279_single_plus_duplicate_joint_cards_count_each_name_once",
         "q279_three_singles_no_joint_is_three_blades",
         "qduplicates_dedupe",
         "qjoint_alone_is_one_blade",
@@ -9248,7 +9258,7 @@
         "shizuku_live_start_blade_per_distinct_under",
         "shizuku_live_start_blade_zero_under"
       ],
-      "covering_test_count": 27,
+      "covering_test_count": 30,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -9598,6 +9608,7 @@
         "q269_yell_reveal_does_not_trigger_deck_to_discard_recovery",
         "q269_yell_reveal_mid_pool_does_not_trigger",
         "q277_control_no_refresh_recovers_milled_self",
+        "q277_real_mill_refreshes_before_mia_auto_resolves",
         "q277_refresh_before_auto_resolve_prevents_recover",
         "real_deck_top_mill_declined_discard_leaves_self_in_waitroom",
         "real_deck_top_mill_offers_discard_and_recovers_self",
@@ -9606,7 +9617,7 @@
         "shuffle_waitroom_members_play_discount_decline_pays_full_cost",
         "shuffle_waitroom_members_play_discount_no_waitroom_members_still_offers_choice"
       ],
-      "covering_test_count": 29,
+      "covering_test_count": 30,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -9668,6 +9679,7 @@
         "q269_yell_reveal_does_not_trigger_deck_to_discard_recovery",
         "q269_yell_reveal_mid_pool_does_not_trigger",
         "q277_control_no_refresh_recovers_milled_self",
+        "q277_real_mill_refreshes_before_mia_auto_resolves",
         "q277_refresh_before_auto_resolve_prevents_recover",
         "real_deck_top_mill_declined_discard_leaves_self_in_waitroom",
         "real_deck_top_mill_offers_discard_and_recovers_self",
@@ -9676,7 +9688,7 @@
         "shuffle_waitroom_members_play_discount_decline_pays_full_cost",
         "shuffle_waitroom_members_play_discount_no_waitroom_members_still_offers_choice"
       ],
-      "covering_test_count": 29,
+      "covering_test_count": 30,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -9735,6 +9747,7 @@
         "q269_yell_reveal_does_not_trigger_deck_to_discard_recovery",
         "q269_yell_reveal_mid_pool_does_not_trigger",
         "q277_control_no_refresh_recovers_milled_self",
+        "q277_real_mill_refreshes_before_mia_auto_resolves",
         "q277_refresh_before_auto_resolve_prevents_recover",
         "real_deck_top_mill_declined_discard_leaves_self_in_waitroom",
         "real_deck_top_mill_offers_discard_and_recovers_self",
@@ -9743,7 +9756,7 @@
         "shuffle_waitroom_members_play_discount_decline_pays_full_cost",
         "shuffle_waitroom_members_play_discount_no_waitroom_members_still_offers_choice"
       ],
-      "covering_test_count": 29,
+      "covering_test_count": 30,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -10148,10 +10161,13 @@
       ],
       "covering_tests": [
         "q280_active_phase_excludes_flagged_energy",
+        "q280_already_active_restricted_energy_is_not_deactivated",
         "q280_live_success_flags_placed_energy_not_member",
+        "q280_mei_activation_then_payment_keeps_next_phase_restriction",
+        "q280_mei_live_success_abilities_compose_before_payment",
         "q280_opponents_active_phase_does_not_clear_owner_flag"
       ],
-      "covering_test_count": 3,
+      "covering_test_count": 6,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -10185,10 +10201,13 @@
       ],
       "covering_tests": [
         "q280_active_phase_excludes_flagged_energy",
+        "q280_already_active_restricted_energy_is_not_deactivated",
         "q280_live_success_flags_placed_energy_not_member",
+        "q280_mei_activation_then_payment_keeps_next_phase_restriction",
+        "q280_mei_live_success_abilities_compose_before_payment",
         "q280_opponents_active_phase_does_not_clear_owner_flag"
       ],
-      "covering_test_count": 3,
+      "covering_test_count": 6,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -10222,10 +10241,13 @@
       ],
       "covering_tests": [
         "q280_active_phase_excludes_flagged_energy",
+        "q280_already_active_restricted_energy_is_not_deactivated",
         "q280_live_success_flags_placed_energy_not_member",
+        "q280_mei_activation_then_payment_keeps_next_phase_restriction",
+        "q280_mei_live_success_abilities_compose_before_payment",
         "q280_opponents_active_phase_does_not_clear_owner_flag"
       ],
-      "covering_test_count": 3,
+      "covering_test_count": 6,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -13817,9 +13839,17 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/effects/recover/to_hand/sunny_test.rs",
+        "engine/tests/test_modules/jidou/discard_watch/deck_to_discard_self_recovery_yell_refresh_q269_q277_test.rs",
         "engine/tests/test_modules/jidou/discard_watch/real_mill_optional_discard_recover_self_test.rs"
       ],
       "covering_tests": [
+        "q269_control_deck_to_discard_triggers",
+        "q269_yell_reveal_does_not_recover_existing_waitroom_copy",
+        "q269_yell_reveal_does_not_trigger_deck_to_discard_recovery",
+        "q269_yell_reveal_mid_pool_does_not_trigger",
+        "q277_control_no_refresh_recovers_milled_self",
+        "q277_real_mill_refreshes_before_mia_auto_resolves",
+        "q277_refresh_before_auto_resolve_prevents_recover",
         "real_deck_top_mill_declined_discard_leaves_self_in_waitroom",
         "real_deck_top_mill_offers_discard_and_recovers_self",
         "real_hand_discard_does_not_trigger_deck_to_discard_self_recovery",
@@ -13833,7 +13863,7 @@
         "sunny_q210_joint_card_counts_as_one_member",
         "sunny_q211_joint_card_targetable_for_mus_heart"
       ],
-      "covering_test_count": 12,
+      "covering_test_count": 19,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -14063,7 +14093,7 @@
         "b_heart07_yell_contributes_two_colorless_hearts_each",
         "bella_positive_surplus_heart04_ability_fires"
       ],
-      "covering_test_count": 713,
+      "covering_test_count": 714,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -14845,7 +14875,7 @@
         "joint_live_start_no_named_skips_gracefully",
         "joint_live_start_skip_optional_no_effect"
       ],
-      "covering_test_count": 81,
+      "covering_test_count": 84,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -15161,7 +15191,7 @@
         "joint_live_start_hand_copy_counts_as_named_card",
         "joint_live_start_no_named_skips_gracefully"
       ],
-      "covering_test_count": 62,
+      "covering_test_count": 65,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -16433,6 +16463,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
+        "engine/tests/test_modules/effects/compound/bp7_q274_immune_still_selectable_test.rs",
         "engine/tests/test_modules/effects/compound/center_wait_discard_other_group_cost_plus_two_same_area_deploy_test.rs"
       ],
       "covering_tests": [
@@ -16445,9 +16476,13 @@
         "center_wait_discard_cost_plus_two_deploy_no_other_aqours_on_stage",
         "center_wait_discard_cost_plus_two_deploy_no_valid_target_after_sacrifice",
         "center_wait_discard_cost_plus_two_deploy_selects_valid_target_among_wrong_group",
-        "center_wait_discard_cost_plus_two_deploy_use_limit"
+        "center_wait_discard_cost_plus_two_deploy_use_limit",
+        "q274_immune_target_still_offered_and_not_waited",
+        "q274_immunity_uses_printed_blade_not_current_blade",
+        "q274_non_immune_pick_is_still_waited",
+        "q274_without_immunity_the_member_is_waited"
       ],
-      "covering_test_count": 10,
+      "covering_test_count": 14,
       "is_null": false,
       "use_limit": 1,
       "watches_abilities": false,
@@ -25122,6 +25157,7 @@
         "forced_self_wait_q275_forced_wait_excludes_immune_and_waits_non_immune",
         "forced_self_wait_q275_immunity_excludes_only_the_immune_member",
         "forced_self_wait_q275_single_legal_target_auto_resolves_no_prompt",
+        "forced_self_wait_q275_with_only_immune_member_does_not_offer_or_wait",
         "forced_self_wait_q275_without_immunity_immune_member_is_offered_and_waited",
         "hanaho_baton_touch_low_cost_no_trigger",
         "hanaho_baton_touch_triggers_activates_energy",
@@ -25140,10 +25176,9 @@
         "serasu_edelnote_appear_no_opponent_member",
         "serasu_edelnote_appear_triggers_opponent_wait",
         "serasu_edelnote_appears_fires_once",
-        "serasu_edelnote_appears_with_non_edelnote_on_stage",
-        "serasu_on_stage_non_edelnote_appears_no_trigger"
+        "serasu_edelnote_appears_with_non_edelnote_on_stage"
       ],
-      "covering_test_count": 36,
+      "covering_test_count": 37,
       "is_null": false,
       "use_limit": 1,
       "watches_abilities": false,
@@ -27072,10 +27107,10 @@
         "karin_two_eligible_members_offers_selection_choice",
         "karin_waits_only_in_limit_when_both_present",
         "q274_immune_target_still_offered_and_not_waited",
-        "q274_non_immune_pick_is_still_waited",
-        "q274_without_immunity_the_member_is_waited"
+        "q274_immunity_uses_printed_blade_not_current_blade",
+        "q274_non_immune_pick_is_still_waited"
       ],
-      "covering_test_count": 30,
+      "covering_test_count": 31,
       "is_null": false,
       "use_limit": 1,
       "watches_abilities": false,
@@ -28265,7 +28300,7 @@
         "center_non_mus_no_reduction",
         "center_wait_discard_cost_plus_two_deploy_basic_success"
       ],
-      "covering_test_count": 416,
+      "covering_test_count": 417,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -28398,7 +28433,7 @@
         "center_non_mus_no_reduction",
         "center_wait_discard_cost_plus_two_deploy_basic_success"
       ],
-      "covering_test_count": 416,
+      "covering_test_count": 417,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -30009,7 +30044,7 @@
         "bella_q174_no_heart04_surplus_ability_does_not_fire",
         "bella_q174_no_member_on_stage_ability_does_not_fire"
       ],
-      "covering_test_count": 150,
+      "covering_test_count": 153,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -30081,7 +30116,7 @@
         "bella_q174_no_heart04_surplus_ability_does_not_fire",
         "bella_q174_no_member_on_stage_ability_does_not_fire"
       ],
-      "covering_test_count": 150,
+      "covering_test_count": 153,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -44588,9 +44623,10 @@
         "insufficient_colorless_hearts_fail_heart0_only_live",
         "q276_cheer_discarded_by_own_ability_goes_to_waitroom_not_success",
         "q276_cheer_mode_returns_to_hand_not_success_zone",
-        "q276_control_normal_live_does_go_to_success_zone"
+        "q276_control_normal_live_does_go_to_success_zone",
+        "q276_failed_live_does_not_return_cheer_to_hand"
       ],
-      "covering_test_count": 11,
+      "covering_test_count": 12,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,

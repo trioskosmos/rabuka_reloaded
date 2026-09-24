@@ -453,6 +453,8 @@ static int fx_blocks_baton(const AbilityEffect *e, int incoming) {
         if (fx_blocks_baton(e->child[i], incoming)) return 1;
     if (fx_blocks_baton(e->primary_effect, incoming)) return 1;
     if (fx_blocks_baton(e->alternative_effect, incoming)) return 1;
+    if (fx_blocks_baton(e->look_action, incoming)) return 1;
+    if (fx_blocks_baton(e->select_action, incoming)) return 1;
     if (fx_blocks_baton(e->followup_action, incoming)) return 1;
     if (fx_blocks_baton(e->optional_action, incoming)) return 1;
     if (fx_blocks_baton(e->conditional_action, incoming)) return 1;

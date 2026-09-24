@@ -252,12 +252,12 @@ static void scenario_move_looked_at(void){
 
 static void scenario_yell_draw_icons(void){
     static TestGame tg;
-    int sr=rb_find_card_by_no("PL!N-bp1-027-L");
-    int fill=rb_find_card_by_no("PL!-sd1-010-SD");
-    CHECK(sr>=0 && fill>=0,"yell draw regression card identities resolve");
-    if(sr<0 || fill<0) return;
+    int sr_template=rb_find_card_by_no("PL!N-bp1-027-L");
+    int fill_template=rb_find_card_by_no("PL!-sd1-010-SD");
+    CHECK(sr_template>=0 && fill_template>=0,"yell draw regression card identities resolve");
+    if(sr_template<0 || fill_template<0) return;
     Card card;
-    int decoded=rb_decode_card_by_index((uint32_t)sr,&card);
+    int decoded=rb_decode_card_by_index((uint32_t)sr_template,&card);
     CHECK(decoded,"Solitude Rain decodes");
     if(!decoded) return;
     CHECK(card.has_special && card.special_color==RB_HEART_DRAW && card.special_count==1,
@@ -265,39 +265,69 @@ static void scenario_yell_draw_icons(void){
     rb_free_card(&card);
     for(int success=0;success<2;success++){
         test_game_new(&tg);
-        test_add_to_live(&tg,sr);
-        test_add_to_deck(&tg,fill);
-        test_add_to_deck(&tg,sr);
+        int live=test_new_id(&tg,"PL!N-bp1-027-L");
+        int stage_member=test_new_id(&tg,"PL!-sd1-010-SD");
+        int draw_card=test_new_id(&tg,"PL!-sd1-010-SD");
+        int below_reveal=test_new_id(&tg,"PL!N-bp1-027-L");
+        CHECK(live>=0 && stage_member>=0 && draw_card>=0 && below_reveal>=0,
+              "single yell draw copies resolve");
+        if(live<0 || stage_member<0 || draw_card<0 || below_reveal<0) return;
+        test_add_to_live(&tg,live);
+        test_add_to_stage(&tg,0,stage_member);
+        test_add_to_deck(&tg,below_reveal);
+        test_add_to_deck(&tg,draw_card);
         if(success) for(int c=0;c<8;c++) tg.state.p[0].hearts[c]=30;
-        else rb_mods_add_need_heart(&tg.state.mods,sr,1,100);
+        else rb_mods_add_need_heart(&tg.state.mods,live,1,100);
         int passed=rb_perform_live(&tg.state,0);
         CHECK(passed==success,"yell draw tested with both live verdicts");
-        CHECK(tg.state.p[0].hand.n==1 && tg.state.p[0].hand.cards[0]==fill,
+        CHECK(tg.state.p[0].hand.n==1 && tg.state.p[0].hand.cards[0]==draw_card,
               "yell draw resolves independently of live success");
         CHECK(tg.state.p[0].deck.n==0,"yell draw consumes the card below the reveal");
         CHECK(tg.state.p[0].discard.n==(success?1:2),"yell cards discarded after drawing");
     }
     test_game_new(&tg);
-    test_add_to_live(&tg,sr);
-    rb_mods_add_need_heart(&tg.state.mods,sr,1,100);
-    test_add_to_deck(&tg,sr);
-    for(int i=0;i<3;i++) test_add_to_discard(&tg,fill);
+    int live=test_new_id(&tg,"PL!N-bp1-027-L");
+    int stage_member=test_new_id(&tg,"PL!-sd1-010-SD");
+    int reveal=test_new_id(&tg,"PL!N-bp1-027-L");
+    CHECK(live>=0 && stage_member>=0 && reveal>=0,"refresh yell draw copies resolve");
+    if(live<0 || stage_member<0 || reveal<0) return;
+    test_add_to_live(&tg,live);
+    test_add_to_stage(&tg,0,stage_member);
+    rb_mods_add_need_heart(&tg.state.mods,live,1,100);
+    test_add_to_deck(&tg,reveal);
+    int refresh_fill=-1;
+    for(int i=0;i<3;i++){
+        int fill=test_new_id(&tg,"PL!-sd1-010-SD");
+        if(fill<0) return;
+        if(i==0) refresh_fill=fill;
+        test_add_to_discard(&tg,fill);
+    }
     rb_perform_live(&tg.state,0);
-    CHECK(tg.state.p[0].hand.n==1 && tg.state.p[0].hand.cards[0]==fill,
+    CHECK(tg.state.p[0].hand.n==1 && tg.state.p[0].hand.cards[0]==refresh_fill,
           "yell draw refresh draws only from the previous waitroom");
     CHECK(tg.state.p[0].deck.n==2,"yell draw refresh leaves two cards in deck");
     CHECK(tg.state.p[0].discard.n==2,"current yell and failed live excluded from refresh");
     test_game_new(&tg);
-    test_add_to_live(&tg,sr);
-    test_add_to_deck(&tg,fill);
-    test_add_to_deck(&tg,fill);
-    test_add_to_deck(&tg,sr);
-    test_add_to_deck(&tg,sr);
+    live=test_new_id(&tg,"PL!N-bp1-027-L");
+    stage_member=test_new_id(&tg,"PL!-sd1-010-SD");
+    int reveal1=test_new_id(&tg,"PL!N-bp1-027-L");
+    int reveal2=test_new_id(&tg,"PL!N-bp1-027-L");
+    int draw1=test_new_id(&tg,"PL!-sd1-010-SD");
+    int draw2=test_new_id(&tg,"PL!-sd1-010-SD");
+    CHECK(live>=0 && stage_member>=0 && reveal1>=0 && reveal2>=0 && draw1>=0 && draw2>=0,
+          "multiple yell draw copies resolve");
+    if(live<0 || stage_member<0 || reveal1<0 || reveal2<0 || draw1<0 || draw2<0) return;
+    test_add_to_live(&tg,live);
+    test_add_to_stage(&tg,0,stage_member);
+    test_add_to_deck(&tg,reveal1);
+    test_add_to_deck(&tg,reveal2);
+    test_add_to_deck(&tg,draw1);
+    test_add_to_deck(&tg,draw2);
     tg.state.yell_count_mod[0]=1;
-    rb_mods_add_need_heart(&tg.state.mods,sr,1,100);
+    rb_mods_add_need_heart(&tg.state.mods,live,1,100);
     rb_perform_live(&tg.state,0);
-    CHECK(tg.state.p[0].hand.n==2 && tg.state.p[0].hand.cards[0]==fill &&
-          tg.state.p[0].hand.cards[1]==fill,"all yell cards reveal before either draw resolves");
+    CHECK(tg.state.p[0].hand.n==2 && tg.state.p[0].hand.cards[0]==draw1 &&
+          tg.state.p[0].hand.cards[1]==draw2,"all yell cards reveal before either draw resolves");
     CHECK(tg.state.p[0].deck.n==0 && tg.state.p[0].discard.n==3,
           "multiple yell draws preserve all cards");
 }

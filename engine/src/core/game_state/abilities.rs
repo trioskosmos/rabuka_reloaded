@@ -447,6 +447,7 @@ impl GameState {
         player_id: &str,
         event: &crate::ability::types::TriggerEvent,
     ) {
+        let queued_before = self.ability_queue.len();
         let player_id_clone = player_id.to_string();
         let mut abilities_to_trigger: Vec<(i16, usize, i16)> = Vec::new();
         let skip_this_card_auto_key = self.just_completed_ability_key.clone();
@@ -869,6 +870,24 @@ impl GameState {
         // trigger at most one batch of each_time abilities.  The snapshot
         // captured in trigger_auto_ability (above) preserves the flag value
         // for abilities that need it during execution (e.g. Sumire's "moves").
+        let queued_new = self.ability_queue.len() > queued_before;
+        let deck_emptied_for_player =
+            self.deck_emptied_by_effect.as_deref() == Some(player_id_clone.as_str());
+        if deck_emptied_for_player {
+            if queued_new {
+                if player_id_clone == self.player1.id {
+                    self.player1.refresh();
+                } else {
+                    self.player2.refresh();
+                }
+                log::debug!(
+                    "[AUTO_REFRESH] queued_new={} player={} deck_emptied_by_effect=true",
+                    self.ability_queue.len() - queued_before,
+                    player_id_clone
+                );
+            }
+            self.deck_emptied_by_effect = None;
+        }
     }
 
     /// §9.7.2.1: Count how many standby entries to create for a trigger event.

@@ -785,6 +785,47 @@ fn experiment_pass_probability(
     hits as f64 / EXPERIMENT_SAMPLES as f64
 }
 
+fn live_payoff(my_success: usize, opp_success: usize, my_place: bool, opp_place: bool) -> f64 {
+    let my_total = my_success + usize::from(my_place);
+    let opp_total = opp_success + usize::from(opp_place);
+    if my_total >= 3 && opp_total >= 3 {
+        0.0
+    } else if my_total >= 3 {
+        1.0
+    } else if opp_total >= 3 {
+        -1.0
+    } else {
+        0.1 * (my_total as f64 - opp_total as f64)
+    }
+}
+
+fn expected_live_value(
+    pass: f64,
+    score: i32,
+    set_size: usize,
+    my_success: usize,
+    opp_success: usize,
+    opp_pass: f64,
+    opp_score: i32,
+    opp_set_size: usize,
+) -> f64 {
+    let both_pass = pass * opp_pass;
+    let self_only = pass * (1.0 - opp_pass);
+    let opp_only = (1.0 - pass) * opp_pass;
+    let mut value = self_only * live_payoff(my_success, opp_success, true, false)
+        + opp_only * live_payoff(my_success, opp_success, false, true);
+    if score > opp_score {
+        value += both_pass * live_payoff(my_success, opp_success, true, false);
+    } else if score < opp_score {
+        value += both_pass * live_payoff(my_success, opp_success, false, true);
+    } else {
+        let my_place = set_size < 2;
+        let opp_place = opp_set_size < 2;
+        value += both_pass * live_payoff(my_success, opp_success, my_place, opp_place);
+    }
+    value
+}
+
 fn experiment_sample_pools(
     cats: &[([i32; 8], usize)],
     deck_len: usize,
@@ -843,6 +884,28 @@ fn experiment_board_pool(gs: &GameState, me: u8, db: &CardDatabase) -> [i32; 8] 
 
 fn experiment_score_of(db: &CardDatabase, cid: i16) -> i32 {
     db.get_card(cid).and_then(|c| c.score).unwrap_or(0) as i32
+}
+
+fn experiment_expected_yell_score(gs: &GameState, me: u8, db: &CardDatabase, blades: i32) -> i32 {
+    if blades <= 0 {
+        return 0;
+    }
+    let (my, _) = gs.seated_pair(me);
+    let deck_len = my.main_deck.cards.len();
+    if deck_len == 0 {
+        return 0;
+    }
+    let score_icons: usize = my
+        .main_deck
+        .cards
+        .iter()
+        .filter_map(|&cid| db.get_card(cid))
+        .filter_map(|card| card.special_heart.as_ref())
+        .filter_map(|hearts| hearts.hearts.get(&crate::card::HeartColor::Score).copied())
+        .map(|count| usize::from(count))
+        .sum();
+    let draws = usize::try_from(blades).unwrap_or(usize::MAX).min(deck_len);
+    (score_icons * draws / deck_len) as i32
 }
 
 fn experiment_lives(gs: &GameState, me: u8, db: &CardDatabase) -> Vec<(usize, i16, [i32; 11])> {
@@ -967,9 +1030,14 @@ fn experiment_portfolio_rank(
     let (cats, deck_len) = experiment_flip_categories(gs, me, db);
     let blades = experiment_blades(gs, me, db);
     let board = experiment_board_pool(gs, me, db);
-    let shared_pools = std::env::var_os("V7_SHARED_SAMPLES").is_some().then(|| {
+    let shared_pools = std::env::var_os("V7_NO_SHARED_SAMPLES").is_none().then(|| {
         experiment_sample_pools(&cats, deck_len, blades, &board)
     });
+    let yell_score = if std::env::var_os("V7_YELL_SCORE").is_some() {
+        experiment_expected_yell_score(gs, me, db, blades)
+    } else {
+        0
+    };
     let mut needs: Vec<[i32; 11]> = Vec::with_capacity(n);
     let mut scores: Vec<i32> = Vec::with_capacity(n);
     for &(_, cid, ref need) in lives.iter().take(n) {
@@ -986,7 +1054,7 @@ fn experiment_portfolio_rank(
             |pools| experiment_pass_probability_pools(pools, &needs[bit]),
         );
         if p > 0.0 {
-            singles.push((p, scores[bit], lives[bit].0, needs[bit]));
+            singles.push((p, scores[bit] + yell_score, lives[bit].0, needs[bit]));
         }
     }
     singles.sort_by(|a, b| {
@@ -1002,7 +1070,7 @@ fn experiment_portfolio_rank(
             continue;
         }
         let mut need_total = [0i32; 11];
-        let mut score = 0i32;
+        let mut score = yell_score;
         let mut idxs = Vec::with_capacity(cnt);
         let mut unpassable = false;
         for bit in 0..n {
@@ -1101,7 +1169,42 @@ pub(crate) fn choose_live_set_experiment(gs: &GameState, actions: &[Action], db:
         let ceiling_enabled = std::env::var_os("V7_PRE_D").is_none()
             && std::env::var_os("V7_NO_CEILING").is_none();
         let mut chose_single = false;
-        if ceiling_enabled {
+        if std::env::var_os("V7_PAYOFF_MODEL").is_some()
+            && (my_succ >= 2 || opp_succ >= 2)
+        {
+            let e_opp = public_opponent_ceiling(gs, me, db);
+            let opp_pass = if opp_committed { 0.86 } else { 0.0 };
+            let opp_set_size = opp.live_card_zone.cards.len();
+            let mut best: Option<(f64, Vec<usize>)> = None;
+            for (ev, score, idxs) in &ranked {
+                let pass = if *score > 0 { *ev / *score as f64 } else { 1.0 };
+                let value = expected_live_value(
+                    pass,
+                    *score,
+                    idxs.len(),
+                    my_succ,
+                    opp_succ,
+                    opp_pass,
+                    e_opp,
+                    opp_set_size,
+                );
+                if best.as_ref().is_none_or(|current| value > current.0) {
+                    best = Some((value, idxs.clone()));
+                }
+            }
+            if let Some((value, idxs)) = best {
+                log::debug!(
+                    "v7 payoff-model t{} me{} value={:.3} idxs={:?}",
+                    gs.turn_number,
+                    me,
+                    value,
+                    idxs
+                );
+                desired = idxs;
+                chose_single = true;
+            }
+        }
+        if !chose_single && ceiling_enabled {
             let e_opp = public_opponent_ceiling(gs, me, db);
             let best_score = ranked.iter().map(|(_, s, _)| *s).max();
             if let Some(best_score) = best_score {
@@ -1127,9 +1230,9 @@ pub(crate) fn choose_live_set_experiment(gs: &GameState, actions: &[Action], db:
         }
         if ceiling_enabled && std::env::var_os("V7_NO_MIN_WIN").is_none() {
             let e_opp = public_opponent_ceiling(gs, me, db);
-            let required = e_opp + i32::from(my_succ >= 2);
             let mut best: Option<(f64, i32, Vec<usize>)> = None;
             for (ev, score, idxs) in &ranked {
+                let required = e_opp + i32::from(idxs.len() >= 2);
                 if *score < required {
                     continue;
                 }
@@ -1138,12 +1241,22 @@ pub(crate) fn choose_live_set_experiment(gs: &GameState, actions: &[Action], db:
                 } else {
                     1.0
                 };
-                let replace = best.as_ref().is_none_or(|current| {
-                    probability > current.0 + f64::EPSILON
-                        || ((probability - current.0).abs() <= f64::EPSILON
-                            && (*score < current.1
-                                || (*score == current.1 && idxs.len() < current.2.len())))
-                });
+                let replace = if std::env::var_os("V7_NO_TRUE_MIN_WIN").is_none() {
+                    best.as_ref().is_none_or(|current| {
+                        *score < current.1
+                            || (*score == current.1
+                                && (probability > current.0 + f64::EPSILON
+                                    || ((probability - current.0).abs() <= f64::EPSILON
+                                        && idxs.len() < current.2.len())))
+                    })
+                } else {
+                    best.as_ref().is_none_or(|current| {
+                        probability > current.0 + f64::EPSILON
+                            || ((probability - current.0).abs() <= f64::EPSILON
+                                && (*score < current.1
+                                    || (*score == current.1 && idxs.len() < current.2.len())))
+                    })
+                };
                 if replace {
                     best = Some((probability, *score, idxs.clone()));
                 }
@@ -1152,11 +1265,10 @@ pub(crate) fn choose_live_set_experiment(gs: &GameState, actions: &[Action], db:
                 desired = idxs;
                 chose_single = true;
                 log::debug!(
-                    "v7 minimum-win t{} me{} e_opp={} required={} score={} p={:.2} idxs={:?}",
+                    "v7 minimum-win t{} me{} e_opp={} score={} p={:.2} idxs={:?}",
                     gs.turn_number,
                     me,
                     e_opp,
-                    required,
                     score,
                     probability,
                     desired
@@ -1170,7 +1282,7 @@ pub(crate) fn choose_live_set_experiment(gs: &GameState, actions: &[Action], db:
         {
             let e_opp = public_opponent_ceiling(gs, me, db);
             let best_score = ranked.first().map(|(_, score, _)| *score).unwrap_or(0);
-            if best_score <= e_opp {
+            if best_score < e_opp {
                 if let Some(&(_, _, first_hi, _)) = singles.first().filter(|s| s.0 >= floor) {
                     desired.push(first_hi);
                     chose_single = true;
@@ -1298,6 +1410,43 @@ fn emit(gs: &GameState, actions: &[Action], desired: &[usize]) -> Action {
     crate::bot::strategy_common::emit_live_set(gs, actions, desired)
 }
 
+fn reachable_curve_keep(costs: &[Option<u8>]) -> Vec<usize> {
+    let members: Vec<(usize, u8)> = costs
+        .iter()
+        .enumerate()
+        .filter_map(|(index, cost)| cost.map(|cost| (index, cost)))
+        .collect();
+    let mut best = Vec::new();
+    let mut best_rank = (0u32, 0u32, 0u32);
+    for mask in 1u32..(1u32 << members.len()) {
+        let line: Vec<(usize, u8)> = members
+            .iter()
+            .enumerate()
+            .filter_map(|(bit, &(index, cost))| (mask & (1 << bit) != 0).then_some((index, cost)))
+            .collect();
+        if line.is_empty() || line.len() > 4 || line[0].1 > 4 {
+            continue;
+        }
+        if line.len() >= 2 && line[0].1 + line[1].1 > 4 {
+            continue;
+        }
+        if line.windows(2).any(|pair| pair[1].1 < pair[0].1 || pair[1].1 > pair[0].1 + 6) {
+            continue;
+        }
+        let rank = (
+            line.len() as u32,
+            line.last().copied().map(|(_, cost)| u32::from(cost)).unwrap_or(0),
+            line.iter().map(|(_, cost)| u32::from(*cost)).sum(),
+        );
+        if rank > best_rank {
+            best_rank = rank;
+            best = line.into_iter().map(|(index, _)| index).collect();
+        }
+    }
+    best.sort_unstable();
+    best
+}
+
 fn opening_curve_keep(costs: &[Option<u8>]) -> Vec<usize> {
     let mut best = Vec::new();
     let mut best_rank = (0, 0, 0);
@@ -1347,7 +1496,11 @@ fn choose_mulligan_curve(gs: &GameState, actions: &[Action], db: &CardDatabase) 
             (card.card_type == CardType::Member).then_some(card.cost).flatten()
         })
     }).collect();
-    let keep = opening_curve_keep(&costs);
+    let keep = if std::env::var_os("V7_MULLIGAN_REACHABLE").is_some() {
+        reachable_curve_keep(&costs)
+    } else {
+        opening_curve_keep(&costs)
+    };
     if keep.is_empty() {
         return crate::bot::strategy_v4::choose_mulligan_v4(gs, actions, db);
     }
@@ -1385,7 +1538,9 @@ fn choose_mulligan_curve(gs: &GameState, actions: &[Action], db: &CardDatabase) 
 }
 
 pub fn choose_mulligan_v7(gs: &GameState, actions: &[Action], db: &CardDatabase) -> Action {
-    if std::env::var("V7_MULLIGAN_CURVE").is_ok() {
+    if std::env::var("V7_MULLIGAN_CURVE").is_ok()
+        || std::env::var("V7_MULLIGAN_REACHABLE").is_ok()
+    {
         return choose_mulligan_curve(gs, actions, db);
     }
     crate::bot::strategy_v4::choose_mulligan_v4(gs, actions, db)
@@ -1406,6 +1561,13 @@ mod mulligan_tests {
         assert_eq!(opening_curve_keep(&[Some(2), Some(2), Some(7), Some(11), None, None]), vec![0, 1, 2, 3]);
         assert!(opening_curve_keep(&[Some(2), Some(2), Some(11), Some(17), None, None]).is_empty());
         assert!(opening_curve_keep(&[Some(2), Some(4), Some(7), Some(11), None, None]).is_empty());
+    }
+
+    #[test]
+    fn reachable_curve_accepts_short_and_duplicate_cost_lines() {
+        assert_eq!(reachable_curve_keep(&[Some(2), Some(2), Some(7)]), vec![0, 1, 2]);
+        assert_eq!(reachable_curve_keep(&[Some(2), Some(2), Some(7), Some(13)]), vec![0, 1, 2, 3]);
+        assert!(reachable_curve_keep(&[Some(7), Some(11)]).is_empty());
     }
 
     #[test]

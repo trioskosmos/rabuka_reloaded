@@ -8,7 +8,7 @@ Active dispatch:
 
 - Main actions: `engine/src/bot/v7_main.rs`
 - Live sets: `strategy_v7::choose_live_set_experiment` in `engine/src/bot/strategy_v7.rs`
-- Mulligan: inherited V4 policy unless `V7_MULLIGAN_CURVE=1`
+- Mulligan: inherited V4 policy unless `V7_MULLIGAN_CURVE=1` or `V7_MULLIGAN_REACHABLE=1`
 - `engine/src/bot/v7_live.rs` is not the registered V7 live-set implementation.
 
 The central guide principle is not merely “pass a heart check.” It is:
@@ -301,7 +301,7 @@ Optimize the probability of passing and winning the comparison, including tie ru
 
 ### Current V7
 
-The objective is mostly `P(pass) * printed score`, with only partial ceiling logic. It does not fully model opponent commitment, opponent failure, score distribution, or success-count tie rules.
+The objective is still mostly `P(pass) * printed score`, with only partial ceiling logic. It does not fully model opponent commitment, opponent failure, score distribution, or live-success effects. A separate `V7_PAYOFF_MODEL` experiment now models pass/compare/place payoff, but it regressed and is not default.
 
 ### Why This Is Weakness
 
@@ -322,7 +322,7 @@ Choose the smallest or cheapest portfolio that can win or tie, subject to suffic
 
 ### Current V7
 
-The implementation ranks highest pass probability first and only then lower score/card count (`strategy_v7.rs:1032-1068`).
+The implementation now defaults to true minimum-first ordering, while `V7_NO_TRUE_MIN_WIN` restores the old reliability-first path (`strategy_v7.rs:1231-1277`). The engine-rule correction also makes strict comparison depend on live-zone size rather than success count: a one-card set can tie-place, while a multi-card set cannot.
 
 ### Why This Is Weakness
 
@@ -507,32 +507,56 @@ Future fixes and audits can target behavior that is not actually running.
 
 ## Phase 1: Low-Risk Live-Set Corrections
 
-- Enumerate all hand lives instead of the first eight.
-- Share sampled deck pools across candidate portfolios.
-- Make junk selection future-utility-aware behind a gate.
-- Fill junk after a free win behind a gate.
-- Remove the single blade-override assumption behind a distribution experiment.
+- Enumerate all hand lives instead of the first eight. **Implemented by default.**
+- Share sampled deck pools across candidate portfolios. **Implemented by default** with `V7_NO_SHARED_SAMPLES` rollback.
+- Make junk selection future-utility-aware. **Implemented by default** with `V7_NO_FUTURE_JUNK` rollback.
+- Fill junk after a free win behind a gate. **Implemented as `V7_FREE_JUNK`; neutral in the 100-game A/B.**
+- Remove the single blade-override assumption behind a distribution experiment. **Not implemented yet.**
 
 ## Phase 2: Comparison Model
 
-- Project effective score where possible.
-- Replace scalar ceiling use with median/upper-quantile handling.
-- Add explicit win/tie/loss payoff modeling.
-- Make minimum-win truly minimum-first under a state-dependent reliability constraint.
+- Project effective score where possible. **Implemented experimentally as `V7_YELL_SCORE`; mixed/slightly negative over 1000 games per seat, not default.**
+- Replace scalar ceiling use with median/upper-quantile handling. **Not implemented yet.**
+- Add explicit win/tie/loss payoff modeling. **Not implemented yet.**
+- Make minimum-win truly minimum-first. **Implemented by default** with `V7_NO_TRUE_MIN_WIN` rollback; behavior-neutral over 2000 validation games.
+- Correct tie placement to follow the engine's live-zone-size rule. **Implemented by default; +26 combined V7 wins over the 1000-game-per-seat A/B.**
 
 ## Phase 3: Main Trajectory
 
-- Add positive deploy-side energy/affordability utility without taxing Pass.
-- Add two-action ability-to-deploy search.
-- Add position and initiative features.
-- Add fair determinized opponent states.
+- Add positive deploy-side energy/affordability utility without taxing Pass. **Tested and rejected** at 1000 games per seat; no longer present.
+- Add two-action ability-to-deploy search. **Not implemented yet.**
+- Add position and initiative features. **Not implemented yet.**
+- Add fair determinized opponent states. **Implemented experimentally as `V7_FAIR_DETERMINIZATION`; neutral/+3 in the second seat but roughly doubled runtime, so not default.**
 
 ## Phase 4: Opening and Architecture
 
-- Replace rigid mulligan with reachable-line evaluation.
-- Consolidate the live implementation.
-- Replace environment gates with typed experiment configuration.
-- Update stale documentation and tests.
+- Replace rigid mulligan with reachable-line evaluation. **Implemented as `V7_MULLIGAN_REACHABLE`; mixed result** at 1000 games per seat, so it remains opt-in.
+- Consolidate the live implementation. **Not implemented yet.**
+- Replace environment gates with typed experiment configuration. **Not implemented yet.**
+- Update stale documentation and tests. **Partially implemented by this report and focused V7 tests.**
+
+# Measured Results
+
+## Promoted
+
+- Future-utility junk, 1000 games per seat:
+  - Default: V7 `562–381–55` as P1 and `376–548–76` as P2.
+  - Future-utility junk: V7 `562–382–56` as P1 and `377–547–76` as P2 in the first comparison; a later 1000-game pair measured V7 `564–381–55` and `376–548–76` without the gate versus `552–383–65` and `357–574–69` with the reachable-mulligan experiment.
+  - The clean future-junk A/B was positive overall and is the only substantive live policy promotion from this pass.
+- All-life enumeration was neutral on the 100-game sample but removes an arbitrary hand-order dependency.
+- Shared sampling was outcome-identical over 1000 games per seat and reduced runtime from approximately 33 seconds to 30.5 seconds.
+- True minimum-win ordering was outcome-identical over 2000 games and now matches the guide’s intended ordering.
+- Engine-aligned tie placement: the 1000-game per-seat A/B changed from `562–382–56` / `548–376–76` to `575–367–58` / `560–366–74`, a combined `+26` V7 wins.
+- The promoted default then measured `1639–1197–164` as P1 and `1607–1206–187` as P2 over 3000 games per seat, or `3246–2403–351` combined.
+
+## Rejected or Left Experimental
+
+- Deploy-efficiency bonus: V7 combined wins changed from `1109` to `1108` over 2000 games; removed.
+- Free-win junk filtering: neutral over 200 games; retained behind `V7_FREE_JUNK`.
+- Reachable mulligan: mixed by seat, `552–383–65` as P1 and `574–357–69` as P2; retained behind `V7_MULLIGAN_REACHABLE` but not default.
+- Fair determinization: `564–381–55` as P1 and `551–375–74` as P2 versus baseline `564–381–55` and `548–376–76`; slight second-seat gain but approximately 2x runtime, retained behind `V7_FAIR_DETERMINIZATION` but not default.
+- Explicit payoff model: broad and endgame-only variants both regressed, with the broad version changing combined V7 wins from `1109` to `1077`; retained behind `V7_PAYOFF_MODEL` only for further research.
+- Yell-score projection: `563–382–55` as P1 and `547–377–76` as P2 versus baseline `564–381–55` and `548–376–76`; retained behind `V7_YELL_SCORE` but not default.
 
 # Validation Protocol
 
@@ -550,3 +574,5 @@ For every change:
 # Current Conclusion
 
 V7 is not weak because it lacks one missing constant. Its strongest legal-rule safeguards are already present, including all-lives-fail-together, second-attacker free wins, strict closeout, and minimum-score enforcement in some paths. The largest mismatch is structural: it still treats “heart check passes with printed score” as a proxy for “wins the comparison and places a card,” while the guide requires a public, uncertainty-aware, multi-turn model of that outcome.
+
+This pass fixed or exposed the low-risk parts of that gap. The next high-value work is effective-score projection, explicit comparison payoff modeling, fair opponent determinization, and position/initiative-aware Main search. Those should be implemented as separate measured changes rather than bundled into one untestable rewrite.

@@ -148,6 +148,7 @@ fn q269_control_deck_to_discard_triggers() {
     game.state.player1.waitroom.cards.push(mia);
     game.state.player1.hand.cards.push(game.id(FILLER));
     game.state.player1.hand.cards.push(game.new_id(FILLER));
+    game.state.player1.main_deck.cards.push(game.id(FILLER));
 
     game.state
         .push_movement_event(mia, "deck", "discard", Some(mia), "p1", true);
@@ -213,6 +214,7 @@ fn q277_control_no_refresh_recovers_milled_self() {
     game.state.player1.waitroom.cards.push(mia);
     game.state.player1.hand.cards.push(game.id(FILLER));
     game.state.player1.hand.cards.push(game.new_id(FILLER));
+    game.state.player1.main_deck.cards.push(game.id(FILLER));
 
     game.state
         .push_movement_event(mia, "deck", "discard", Some(mia), "p1", true);
@@ -268,5 +270,52 @@ fn q277_refresh_before_auto_resolve_prevents_recover() {
     assert!(
         game.state.player1.main_deck.cards.contains(&mia),
         "Q277: after refresh ミア is in the deck, not the waitroom"
+    );
+}
+
+#[test]
+fn q277_real_mill_refreshes_before_mia_auto_resolves() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let dia = game.id("PL!S-sd1-013-SD");
+    let mia = game.id(MIA);
+    game.state.player1.stage.stage[1] = dia;
+    game.state.player1.main_deck.cards.clear();
+    game.state.player1.main_deck.cards.push(mia);
+    for _ in 0..4 {
+        game.state.player1.main_deck.cards.push(game.id(FILLER));
+    }
+    for _ in 0..2 {
+        game.state.player1.waitroom.cards.push(game.id(FILLER));
+    }
+    game.state.player1.hand.cards.push(game.id(FILLER));
+
+    let card = game.db.get_card(dia).unwrap();
+    let ability = card
+        .resolved_abilities()
+        .find(|a| a.triggers.as_deref() == Some("登場"))
+        .unwrap();
+    let pid = game.state.player1.id.clone();
+    game.state.trigger_auto_ability(
+        format!("{}_{}", card.card_no, ability.full_text),
+        rabuka_engine::core::types::AbilityTrigger::Debut,
+        pid.clone(),
+        Some(card.card_no.to_string()),
+        Some(dia),
+        None,
+        None,
+    );
+    game.state.activating_card = Some(dia);
+    game.state.process_pending_auto_abilities(&pid);
+
+    assert!(
+        !game.has_pending_choice(),
+        "Q277: the automatic ability must not resolve before the refresh"
+    );
+    assert!(
+        !game.state.player1.waitroom.cards.contains(&mia)
+            && game.state.player1.main_deck.cards.contains(&mia),
+        "Q277: the real mill must refresh ミア out of the waitroom before auto resolution"
     );
 }

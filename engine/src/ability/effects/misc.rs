@@ -3791,6 +3791,7 @@ impl AbilityResolver {
             let ct = effect.card_type_any().map(|c| c.as_card_str());
             let blade_limit = effect.blade_limit_any().unwrap_or(u8::MAX) as u8;
             let blade_op = effect.blade_limit_operator_any().map(|o| o.as_str());
+            let original_blade = effect.original_value_any().unwrap_or(false);
             let mut to_protect: Vec<i16> = Vec::new();
             for &cid in &owner_stage {
                 if cid == -1 {
@@ -3812,7 +3813,16 @@ impl AbilityResolver {
                 {
                     continue;
                 }
-                let blade = base_blade + gs.mods.get_blade_modifier(cid);
+                let current_blade = base_blade + gs.mods.get_blade_modifier(cid);
+                let blade = if original_blade { base_blade } else { current_blade };
+                log::debug!(
+                    "[WAIT_IMMUNITY_FILTER] member={} printed_blade={} current_blade={} limit={} original_value={}",
+                    cid,
+                    base_blade,
+                    current_blade,
+                    blade_limit,
+                    original_blade
+                );
                 if crate::ability::util::compare_counts(
                     blade_op,
                     crate::constants::saturate_u8(blade),

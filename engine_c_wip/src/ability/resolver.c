@@ -360,6 +360,8 @@ static const AbilityEffect *find_modify_cost_in_effect(const AbilityEffect *eff)
     }
     if (eff->primary_effect) { const AbilityEffect *f = find_modify_cost_in_effect(eff->primary_effect); if (f) return f; }
     if (eff->alternative_effect) { const AbilityEffect *f = find_modify_cost_in_effect(eff->alternative_effect); if (f) return f; }
+    if (eff->look_action) { const AbilityEffect *f = find_modify_cost_in_effect(eff->look_action); if (f) return f; }
+    if (eff->select_action) { const AbilityEffect *f = find_modify_cost_in_effect(eff->select_action); if (f) return f; }
     return NULL;
 }
 static AbilityEffect clone_cost(const AbilityEffect *c) {

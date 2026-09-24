@@ -170,3 +170,20 @@ fn q274_without_immunity_the_member_is_waited() {
         "with no immunity, selecting 果南 (blade 2 ≤ window 2) MUST wait her — the block in test #1 is due to immunity"
     );
 }
+
+#[test]
+fn q274_immunity_uses_printed_blade_not_current_blade() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let high_blade = game.id("PL!S-bp2-003-R");
+    game.state.player1.stage.stage[0] = high_blade;
+    game.state.mods.add_blade_modifier(high_blade, -1);
+
+    let kanan = p1_establish_wait_immunity(&mut game);
+
+    assert!(game.state.wait_immune_members.iter().any(|(member, _)| *member == kanan));
+    assert!(
+        !game.state.wait_immune_members.iter().any(|(member, _)| *member == high_blade),
+        "printed blade 4 remains ineligible even when a modifier reduces its current blade to 3"
+    );
+}

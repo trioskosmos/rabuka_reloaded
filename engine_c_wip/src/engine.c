@@ -778,6 +778,8 @@ static int effect_has_restriction(const AbilityEffect *e, const char *restrictio
         if (effect_has_restriction(e->child[i], restriction, incoming_cid)) return 1;
     if (effect_has_restriction(e->primary_effect, restriction, incoming_cid)) return 1;
     if (effect_has_restriction(e->alternative_effect, restriction, incoming_cid)) return 1;
+    if (effect_has_restriction(e->look_action, restriction, incoming_cid)) return 1;
+    if (effect_has_restriction(e->select_action, restriction, incoming_cid)) return 1;
     if (effect_has_restriction(e->followup_action, restriction, incoming_cid)) return 1;
     if (effect_has_restriction(e->optional_action, restriction, incoming_cid)) return 1;
     if (effect_has_restriction(e->conditional_action, restriction, incoming_cid)) return 1;
@@ -863,6 +865,8 @@ static int effect_is_double_baton(const AbilityEffect *e) {
         if (effect_is_double_baton(e->child[i])) return 1;
     if (effect_is_double_baton(e->primary_effect)) return 1;
     if (effect_is_double_baton(e->alternative_effect)) return 1;
+    if (effect_is_double_baton(e->look_action)) return 1;
+    if (effect_is_double_baton(e->select_action)) return 1;
     if (effect_is_double_baton(e->followup_action)) return 1;
     if (effect_is_double_baton(e->optional_action)) return 1;
     if (effect_is_double_baton(e->conditional_action)) return 1;
@@ -1393,6 +1397,7 @@ void rb_turn(GameState *g) {
 int rb_game_init(GameState *g, const uint32_t *deck0, int n0,
                  const uint32_t *deck1, int n1) {
      memset(g, 0, sizeof(*g));
+     rb_look_reset_all();
      rb_mods_init(&g->mods);
      g->winner = -1; g->turn = 1; g->phase = RB_PHASE_RPS;
      g->cheer_check_base = -1;

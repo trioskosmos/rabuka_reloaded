@@ -108,6 +108,8 @@ typedef struct AbilityEffect {
        the generic pre-order walk in rb_execute_effect_ex never double-executes them. */
     struct AbilityEffect *primary_effect;
     struct AbilityEffect *alternative_effect;
+    struct AbilityEffect *look_action;
+    struct AbilityEffect *select_action;
     struct AbilityEffect *followup_action;
     struct AbilityEffect *optional_action;
     struct AbilityEffect *conditional_action;
@@ -404,7 +406,10 @@ uint32_t rb_card_record_len(uint32_t i);
 const unsigned char *rb_bc_slice(uint32_t idx, uint32_t *out_len);
 const char *rb_card_string(uint16_t idx);
 int rb_find_card_by_no(const char *card_no); /* linear scan cards.bin card_no strings, -1 if not found */
+int rb_card_get_card_id(const char *card_no);
 int rb_register_card_copy(int copy_id, int template_id);
+int rb_create_card_copy(int template_id);
+void rb_card_copy_pool_reset(void);
 /* Multi-ability support  Ecards can have 1..N abilities (e.g. hanayo debut+constant).
    The pairs table RBKA_CARD_ABILITY_PAIRS maps card_no string idx ↁEability idx.
    Use these to iterate all abilities for a card (mirrors Rust Card.abilities:Vec). */
@@ -1126,6 +1131,8 @@ typedef struct {
         validate the kept card. Empty/negative = no filter. */
     char     resume_filter_group[32];
     int      resume_filter_heart;
+    int      resume_look_owner;
+    AbilityEffect *resume_after_look;
     /* optional-cost continuation: when an optional pay_energy/cost gate emits a
        choice, the executing effect's parent + the index of that gate are stashed
        here so the resume can run the ability's remaining sibling effects. */
@@ -1496,6 +1503,10 @@ RbGeneratedActionList rb_generate_action_candidates(const GameState *state);
 int rb_owner_of_card(const GameState *g, int cid);
 int rb_drain_ability_queue(GameState *g);
 void rb_look_resume(GameState *g, int actor, int selected_idx, const char *destination, int is_select);
+void rb_look_resume_indices(GameState *g, int owner, const int *indices, int n_indices,
+                            const char *destination, const char *remainder_destination,
+                            int discard_remaining, int is_select);
+void rb_look_reset_all(void);
 int rb_look_remove(int pl, int cid);
 void rb_look_add(int pl, int cid);
 void rb_look_clear(int pl);
@@ -1543,6 +1554,8 @@ size_t rb_lcg_range(RbLcg *rng, size_t n);
 /* ── Setup ── */
 int  rb_game_init(GameState *g, const uint32_t *deck0, int n0,
                   const uint32_t *deck1, int n1);
+void rb_setup_initial_energy(GameState *g);
+void rb_player_set_energy_deck(GameState *g, int pl, const int *cards, int n);
 void rb_turn(GameState *g);            /* advance one full turn */
 void rb_print_state(const GameState *g);
 
@@ -1629,6 +1642,8 @@ int  rb_resolve_gain_heart_color(GameState *g, int actor, AbilityEffect *e,
                                  const char **heart_colors, int n_colors, int heart_selection);
 void rb_shuffle(int *a, int n);
 int  rb_zone_of_str(const char *s, RbZone *out);    /* map zone wire name */
+int  rb_member_area_to_index(const char *area);
+const char *rb_member_area_to_str(int idx);
 
 /* Main phase action execution (mirrors TurnEngine::execute_main_phase_action).
    Dispatches UseAbility → activate ability, Pass → advance phase, etc. */
@@ -1762,6 +1777,9 @@ void rb_calc_stage_hearts(const GameState *g, int pl, int out[8]);
 void rb_stage_hearts_pipeline(const GameState *g, int pl, int out[8]);
 void rb_effective_need_heart(const GameState *g, int live_cid, int out[8]);
 int  rb_perform_live(GameState *g, int pl);
+int  rb_backtrack_allocate(const int pool[8], const int card_needs[8], int n_cards,
+                           int *out_allocs, int max_allocs);
+int  rb_card_ok_with_wildcard(const int filled[8], const int need[8]);
 void rb_execute_live_victory_determination(GameState *g);
 void rb_process_player_live_result(GameState *g, int pl, int won, int must_skip, int can_place);
 /* ── live.rs standalone helpers (ported) ── */
@@ -2158,6 +2176,7 @@ void rb_execute_effect_ex(GameState *g, int actor, AbilityEffect *e, int host_ci
 int       rb_has_pending_choice(const GameState *g);
 const RbChoice *rb_get_pending_choice(const GameState *g);
 int       rb_resume_with_choice(GameState *g, int selected_idx); /* 0..count-1, -1=skip */
+int       rb_resume_with_choice_indices(GameState *g, const int *indices, int n_indices);
 void rb_clear_pending_choice(GameState *g);
 void rb_queue_set_pending_choice(GameState *g, const RbChoice *choice);
 void rb_queue_pause_for_choice(GameState *g, const RbChoice *choice);

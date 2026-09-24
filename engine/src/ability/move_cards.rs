@@ -685,9 +685,19 @@ impl AbilityResolver {
         if self.gate_optional_source(gs, c, Zone::Deck) {
             return Ok(vec![]);
         }
-        let player = c.player_mut(gs);
         let count = c.count;
         let card_db = c.card_db;
+        let player_id = if c.use_p2 {
+            gs.player2.id.clone()
+        } else {
+            gs.player1.id.clone()
+        };
+        let track_depletion = matches!(
+            Zone::from_str(c.destination),
+            Some(Zone::Discard | Zone::Waitroom)
+        );
+        let mut deck_emptied = false;
+        let player = c.player_mut(gs);
         let mut drawn = Vec::new();
         let mut attempts = 0u8;
         let mut remaining = count;
@@ -716,11 +726,23 @@ impl AbilityResolver {
                     continue;
                 }
                 drawn.push(card);
+                if track_depletion && player.main_deck.cards.is_empty() {
+                    deck_emptied = true;
+                }
                 remaining = remaining.saturating_sub(1);
             } else {
                 // Both deck and waitroom are empty — cannot draw more
                 break;
             }
+        }
+        if deck_emptied {
+            gs.deck_emptied_by_effect = Some(player_id);
+            log::debug!(
+                "[DECK_EMPTIED_BY_EFFECT] player={} source={} destination={}",
+                gs.deck_emptied_by_effect.as_deref().unwrap_or_default(),
+                c.source_str,
+                c.destination
+            );
         }
         Ok(drawn)
     }
@@ -733,15 +755,37 @@ impl AbilityResolver {
         if self.gate_optional_source(gs, c, Zone::DeckBottom) {
             return Ok(vec![]);
         }
-        let player = c.player_mut(gs);
         let count = c.count;
+        let player_id = if c.use_p2 {
+            gs.player2.id.clone()
+        } else {
+            gs.player1.id.clone()
+        };
+        let track_depletion = matches!(
+            Zone::from_str(c.destination),
+            Some(Zone::Discard | Zone::Waitroom)
+        );
+        let mut deck_emptied = false;
+        let player = c.player_mut(gs);
         let mut drawn = Vec::new();
         for _i in 0..count {
             if let Some(card) = player.main_deck.draw_bottom() {
+                if track_depletion && player.main_deck.cards.is_empty() {
+                    deck_emptied = true;
+                }
                 drawn.push(card);
             } else {
                 break;
             }
+        }
+        if deck_emptied {
+            gs.deck_emptied_by_effect = Some(player_id);
+            log::debug!(
+                "[DECK_EMPTIED_BY_EFFECT] player={} source={} destination={}",
+                gs.deck_emptied_by_effect.as_deref().unwrap_or_default(),
+                c.source_str,
+                c.destination
+            );
         }
         Ok(drawn)
     }
