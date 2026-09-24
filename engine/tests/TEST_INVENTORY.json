@@ -1,6 +1,6 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-09-24T21:25:52.892353+00:00",
+  "generated_at": "2026-09-24T21:31:12.454136+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
@@ -8,7 +8,7 @@
     "unique_abilities": 936
   },
   "n_files": 839,
-  "n_tests": 3494,
+  "n_tests": 3495,
   "total_cards": 771,
   "covered_cards": 771,
   "abilities_on_covered": 936,
@@ -678,7 +678,7 @@
       ]
     }
   },
-  "n_test_fns_parsed": 3494,
+  "n_test_fns_parsed": 3495,
   "abilities": [
     {
       "idx": 0,
@@ -1903,10 +1903,10 @@
         "issue11_fanfare_few_cards_no_blade",
         "issue11_shizuku_score_floor_at_zero",
         "issue12_compass_activate_dollchestra_live_start",
-        "issue12_proof_look_and_select_cost_20plus",
-        "issue12_proof_look_and_select_cost_30plus"
+        "issue12_compass_can_activate_sayaka_live_start_again_q243",
+        "issue12_proof_look_and_select_cost_20plus"
       ],
-      "covering_test_count": 151,
+      "covering_test_count": 152,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -3059,6 +3059,7 @@
       "covering_tests": [
         "issue11_shizuku_score_floor_at_zero",
         "issue12_compass_activate_dollchestra_live_start",
+        "issue12_compass_can_activate_sayaka_live_start_again_q243",
         "issue13_mia_three_conditional_blade_checks",
         "issue4_izumi_no_other_member_no_heart",
         "issue4_izumi_self_gains_heart_with_other_member_on_stage",
@@ -3080,7 +3081,7 @@
         "sayaka_activation_charges_energy_and_terminates",
         "sayaka_unaffordable_not_offered_and_press_rejected"
       ],
-      "covering_test_count": 22,
+      "covering_test_count": 23,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -5172,6 +5173,7 @@
         "issue11_fanfare_few_cards_no_blade",
         "issue11_shizuku_score_floor_at_zero",
         "issue12_compass_activate_dollchestra_live_start",
+        "issue12_compass_can_activate_sayaka_live_start_again_q243",
         "issue13_kurage_card_exists",
         "issue13_mia_three_conditional_blade_checks",
         "issue14_koware_yasuki_card_exists",
@@ -5194,10 +5196,9 @@
         "issue6_natsumi_self_and_other_blade",
         "issue6_natsumi_self_only_blade",
         "issue6_you_timed_heart_zero_for_setup_members",
-        "issue7_hajimari_no_success_live_no_effect",
-        "issue7_hajimari_set_modifier_replaces_not_adds"
+        "issue7_hajimari_no_success_live_no_effect"
       ],
-      "covering_test_count": 54,
+      "covering_test_count": 55,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -5240,6 +5241,7 @@
         "issue11_fanfare_few_cards_no_blade",
         "issue11_shizuku_score_floor_at_zero",
         "issue12_compass_activate_dollchestra_live_start",
+        "issue12_compass_can_activate_sayaka_live_start_again_q243",
         "issue13_kurage_card_exists",
         "issue13_mia_three_conditional_blade_checks",
         "issue14_koware_yasuki_card_exists",
@@ -5262,10 +5264,9 @@
         "issue6_natsumi_self_and_other_blade",
         "issue6_natsumi_self_only_blade",
         "issue6_you_timed_heart_zero_for_setup_members",
-        "issue7_hajimari_no_success_live_no_effect",
-        "issue7_hajimari_set_modifier_replaces_not_adds"
+        "issue7_hajimari_no_success_live_no_effect"
       ],
-      "covering_test_count": 54,
+      "covering_test_count": 55,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -5511,6 +5512,7 @@
         "dream_believers_wrong_name_no_bonus",
         "issue11_shizuku_score_floor_at_zero",
         "issue12_compass_activate_dollchestra_live_start",
+        "issue12_compass_can_activate_sayaka_live_start_again_q243",
         "issue13_mia_three_conditional_blade_checks",
         "issue4_izumi_no_other_member_no_heart",
         "issue4_izumi_self_gains_heart_with_other_member_on_stage",
@@ -5532,10 +5534,9 @@
         "saikou_edge_no_cards",
         "saikou_edge_score1_only",
         "saikou_edge_score2_only",
-        "saikou_edge_score5_only",
-        "shioriko_bp4_basic_swap_one_niji_one_niji"
+        "saikou_edge_score5_only"
       ],
-      "covering_test_count": 37,
+      "covering_test_count": 38,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -5577,6 +5578,7 @@
         "dream_believers_wrong_name_no_bonus",
         "issue11_shizuku_score_floor_at_zero",
         "issue12_compass_activate_dollchestra_live_start",
+        "issue12_compass_can_activate_sayaka_live_start_again_q243",
         "issue13_mia_three_conditional_blade_checks",
         "issue4_izumi_no_other_member_no_heart",
         "issue4_izumi_self_gains_heart_with_other_member_on_stage",
@@ -5598,10 +5600,9 @@
         "saikou_edge_no_cards",
         "saikou_edge_score1_only",
         "saikou_edge_score2_only",
-        "saikou_edge_score5_only",
-        "shioriko_bp4_basic_swap_one_niji_one_niji"
+        "saikou_edge_score5_only"
       ],
-      "covering_test_count": 37,
+      "covering_test_count": 38,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -6492,6 +6493,7 @@
         "issue11_fanfare_few_cards_no_blade",
         "issue11_shizuku_score_floor_at_zero",
         "issue12_compass_activate_dollchestra_live_start",
+        "issue12_compass_can_activate_sayaka_live_start_again_q243",
         "issue13_kurage_card_exists",
         "issue13_mia_three_conditional_blade_checks",
         "issue14_koware_yasuki_card_exists",
@@ -6514,10 +6516,9 @@
         "issue6_natsumi_self_and_other_blade",
         "issue6_natsumi_self_only_blade",
         "issue6_you_timed_heart_zero_for_setup_members",
-        "issue7_hajimari_no_success_live_no_effect",
-        "issue7_hajimari_set_modifier_replaces_not_adds"
+        "issue7_hajimari_no_success_live_no_effect"
       ],
-      "covering_test_count": 47,
+      "covering_test_count": 48,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -13056,6 +13057,7 @@
       "covering_tests": [
         "issue11_shizuku_score_floor_at_zero",
         "issue12_compass_activate_dollchestra_live_start",
+        "issue12_compass_can_activate_sayaka_live_start_again_q243",
         "issue13_mia_three_conditional_blade_checks",
         "issue4_izumi_no_other_member_no_heart",
         "issue4_izumi_self_gains_heart_with_other_member_on_stage",
@@ -13084,7 +13086,7 @@
         "surplus_conditioned_score_sequential_both_conditions_present",
         "surplus_conditioned_score_with_base_live_bonus_not_below_minus_two"
       ],
-      "covering_test_count": 29,
+      "covering_test_count": 30,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -14113,7 +14115,7 @@
         "b_heart07_yell_contributes_two_colorless_hearts_each",
         "bella_positive_surplus_heart04_ability_fires"
       ],
-      "covering_test_count": 728,
+      "covering_test_count": 729,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -18888,6 +18890,7 @@
       "covering_tests": [
         "issue11_shizuku_score_floor_at_zero",
         "issue12_compass_activate_dollchestra_live_start",
+        "issue12_compass_can_activate_sayaka_live_start_again_q243",
         "issue13_mia_three_conditional_blade_checks",
         "issue4_izumi_no_other_member_no_heart",
         "issue4_izumi_self_gains_heart_with_other_member_on_stage",
@@ -18907,7 +18910,7 @@
         "saikou_edge_score2_only",
         "saikou_edge_score5_only"
       ],
-      "covering_test_count": 20,
+      "covering_test_count": 21,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -20253,6 +20256,7 @@
       "covering_tests": [
         "issue11_shizuku_score_floor_at_zero",
         "issue12_compass_activate_dollchestra_live_start",
+        "issue12_compass_can_activate_sayaka_live_start_again_q243",
         "issue13_mia_three_conditional_blade_checks",
         "issue2_kanan_discard_1_gain_1",
         "issue2_kanan_skip_cost_empty_live_gain",
@@ -20279,10 +20283,9 @@
         "niji_bp5_partner_low_cost_nothing_fires",
         "niji_bp5_partner_not_nijigasaki_nothing_fires",
         "niji_bp5_partner_with_blade_heart_nothing_fires",
-        "rina_copied_live_success_ability_does_nothing_without_energy_deficit",
-        "rina_copied_live_success_ability_places_energy_from_energy_deck"
+        "rina_copied_live_success_ability_does_nothing_without_energy_deficit"
       ],
-      "covering_test_count": 44,
+      "covering_test_count": 45,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -23372,6 +23375,7 @@
         "hana_009_q245_self_deploy_to_center_triggers_each_time",
         "issue11_shizuku_score_floor_at_zero",
         "issue12_compass_activate_dollchestra_live_start",
+        "issue12_compass_can_activate_sayaka_live_start_again_q243",
         "issue13_mia_three_conditional_blade_checks",
         "issue4_izumi_no_other_member_no_heart",
         "issue4_izumi_self_gains_heart_with_other_member_on_stage",
@@ -23391,7 +23395,7 @@
         "saikou_edge_score2_only",
         "saikou_edge_score5_only"
       ],
-      "covering_test_count": 29,
+      "covering_test_count": 30,
       "is_null": false,
       "use_limit": 2,
       "watches_abilities": false,
@@ -23436,6 +23440,7 @@
         "hana_009_q245_self_deploy_to_center_triggers_each_time",
         "issue11_shizuku_score_floor_at_zero",
         "issue12_compass_activate_dollchestra_live_start",
+        "issue12_compass_can_activate_sayaka_live_start_again_q243",
         "issue13_mia_three_conditional_blade_checks",
         "issue4_izumi_no_other_member_no_heart",
         "issue4_izumi_self_gains_heart_with_other_member_on_stage",
@@ -23455,7 +23460,7 @@
         "saikou_edge_score2_only",
         "saikou_edge_score5_only"
       ],
-      "covering_test_count": 29,
+      "covering_test_count": 30,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -23483,7 +23488,8 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/energy/under_member/energy_and_member_under_test.rs"
+        "engine/tests/test_modules/effects/energy/under_member/energy_and_member_under_test.rs",
+        "engine/tests/test_modules/integration/parser_issues_e2e_part3_test.rs"
       ],
       "covering_tests": [
         "activation_once_per_turn_blocks_second_under_energy_payment_and_live_recovery",
@@ -23498,24 +23504,26 @@
         "ayumu_bp3n_debit_place_one_under_draw_two",
         "ayumu_bp3n_debut_skip_no_draw",
         "ayumu_bp3n_q157_wait_energy_placed_under",
+        "issue11_shizuku_score_floor_at_zero",
+        "issue12_compass_activate_dollchestra_live_start",
+        "issue12_compass_can_activate_sayaka_live_start_again_q243",
+        "issue13_mia_three_conditional_blade_checks",
+        "issue4_izumi_no_other_member_no_heart",
+        "issue4_izumi_self_gains_heart_with_other_member_on_stage",
+        "issue6_you_timed_heart_zero_for_setup_members",
+        "issue7_mifune_live_start_select_and_check",
+        "issue9_karin_select_from_discard_place_on_deck",
+        "karin_edge_0_waited_members",
+        "karin_edge_1_waited_1_niji_in_discard",
+        "karin_edge_2_waited_2_niji_select_both",
+        "karin_edge_3_waited_1_niji_available",
+        "karin_edge_hand_unchanged",
+        "karin_edge_non_niji_not_selectable",
+        "karin_edge_not_opponent_waitroom",
         "kasumi_debut_place_two_energy_under",
-        "kasumi_debut_skip_optional_no_energy_moved",
-        "kasumi_q184_under_energy_not_counted_in_zone",
-        "kasumi_rule_1054_under_energy_recycles_to_energy_deck",
-        "kasumi_rule_4553_under_cards_follow_position_change",
-        "live_start_no_under_material_ignores_same_name_in_hand_and_grants_no_heart_or_cost",
-        "live_start_three_under_members_grant_three_heart05",
-        "live_start_with_under_energy_grants_one_heart01",
-        "reveal_same_name_under_then_live_start_grants_one_heart05_and_four_cost",
-        "rina_debit_triggers_with_target_in_discard",
-        "rina_rule_1053_under_member_goes_to_waitroom",
-        "rina_rule_4553_under_member_follows_position_change",
-        "sayaka_q243_max_three_per_activation_recounts",
-        "sayaka_rule_1053_under_members_go_to_waitroom",
-        "sayaka_rule_4553_under_members_follow_position_change",
-        "sayaka_use_limit_enforced"
+        "kasumi_debut_skip_optional_no_energy_moved"
       ],
-      "covering_test_count": 28,
+      "covering_test_count": 49,
       "is_null": false,
       "use_limit": 1,
       "watches_abilities": false,
@@ -23543,7 +23551,8 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/energy/under_member/energy_and_member_under_test.rs"
+        "engine/tests/test_modules/effects/energy/under_member/energy_and_member_under_test.rs",
+        "engine/tests/test_modules/integration/parser_issues_e2e_part3_test.rs"
       ],
       "covering_tests": [
         "activation_once_per_turn_blocks_second_under_energy_payment_and_live_recovery",
@@ -23558,24 +23567,26 @@
         "ayumu_bp3n_debit_place_one_under_draw_two",
         "ayumu_bp3n_debut_skip_no_draw",
         "ayumu_bp3n_q157_wait_energy_placed_under",
+        "issue11_shizuku_score_floor_at_zero",
+        "issue12_compass_activate_dollchestra_live_start",
+        "issue12_compass_can_activate_sayaka_live_start_again_q243",
+        "issue13_mia_three_conditional_blade_checks",
+        "issue4_izumi_no_other_member_no_heart",
+        "issue4_izumi_self_gains_heart_with_other_member_on_stage",
+        "issue6_you_timed_heart_zero_for_setup_members",
+        "issue7_mifune_live_start_select_and_check",
+        "issue9_karin_select_from_discard_place_on_deck",
+        "karin_edge_0_waited_members",
+        "karin_edge_1_waited_1_niji_in_discard",
+        "karin_edge_2_waited_2_niji_select_both",
+        "karin_edge_3_waited_1_niji_available",
+        "karin_edge_hand_unchanged",
+        "karin_edge_non_niji_not_selectable",
+        "karin_edge_not_opponent_waitroom",
         "kasumi_debut_place_two_energy_under",
-        "kasumi_debut_skip_optional_no_energy_moved",
-        "kasumi_q184_under_energy_not_counted_in_zone",
-        "kasumi_rule_1054_under_energy_recycles_to_energy_deck",
-        "kasumi_rule_4553_under_cards_follow_position_change",
-        "live_start_no_under_material_ignores_same_name_in_hand_and_grants_no_heart_or_cost",
-        "live_start_three_under_members_grant_three_heart05",
-        "live_start_with_under_energy_grants_one_heart01",
-        "reveal_same_name_under_then_live_start_grants_one_heart05_and_four_cost",
-        "rina_debit_triggers_with_target_in_discard",
-        "rina_rule_1053_under_member_goes_to_waitroom",
-        "rina_rule_4553_under_member_follows_position_change",
-        "sayaka_q243_max_three_per_activation_recounts",
-        "sayaka_rule_1053_under_members_go_to_waitroom",
-        "sayaka_rule_4553_under_members_follow_position_change",
-        "sayaka_use_limit_enforced"
+        "kasumi_debut_skip_optional_no_energy_moved"
       ],
-      "covering_test_count": 28,
+      "covering_test_count": 49,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -30856,6 +30867,7 @@
         "issue11_fanfare_few_cards_no_blade",
         "issue11_shizuku_score_floor_at_zero",
         "issue12_compass_activate_dollchestra_live_start",
+        "issue12_compass_can_activate_sayaka_live_start_again_q243",
         "issue13_kurage_card_exists",
         "issue13_mia_three_conditional_blade_checks",
         "issue14_koware_yasuki_card_exists",
@@ -30864,10 +30876,9 @@
         "issue16_hanamaru_opponent_higher_cost_no_blade",
         "issue17_suzu_cost_bonus_condition_met",
         "issue17_suzu_cost_bonus_condition_not_met",
-        "issue1_kanon_invalidate_and_recover",
-        "issue1_kanon_no_liella_on_stage_no_recovery"
+        "issue1_kanon_invalidate_and_recover"
       ],
-      "covering_test_count": 134,
+      "covering_test_count": 135,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -31019,7 +31030,7 @@
         "catchu_basic_two_distinct_activate_2",
         "catchu_duplicate_names_dedup_to_1"
       ],
-      "covering_test_count": 291,
+      "covering_test_count": 292,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -32846,6 +32857,7 @@
         "hasunosora_group_no_member_fails",
         "issue11_shizuku_score_floor_at_zero",
         "issue12_compass_activate_dollchestra_live_start",
+        "issue12_compass_can_activate_sayaka_live_start_again_q243",
         "issue13_mia_three_conditional_blade_checks",
         "issue4_izumi_no_other_member_no_heart",
         "issue4_izumi_self_gains_heart_with_other_member_on_stage",
@@ -32866,10 +32878,9 @@
         "q271_blade_hearts_mapping_to_colors_still_not_met",
         "q271_no_revealed_cards_no_score",
         "q271_one_card_with_three_base_hearts_scores",
-        "q271_three_distinct_base_hearts_scores",
-        "q271_two_base_hearts_no_score"
+        "q271_three_distinct_base_hearts_scores"
       ],
-      "covering_test_count": 42,
+      "covering_test_count": 43,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -33723,6 +33734,7 @@
       "covering_tests": [
         "issue11_shizuku_score_floor_at_zero",
         "issue12_compass_activate_dollchestra_live_start",
+        "issue12_compass_can_activate_sayaka_live_start_again_q243",
         "issue13_mia_three_conditional_blade_checks",
         "issue4_izumi_no_other_member_no_heart",
         "issue4_izumi_self_gains_heart_with_other_member_on_stage",
@@ -33742,7 +33754,7 @@
         "saikou_edge_score2_only",
         "saikou_edge_score5_only"
       ],
-      "covering_test_count": 20,
+      "covering_test_count": 21,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -39979,6 +39991,7 @@
       "covering_tests": [
         "issue11_shizuku_score_floor_at_zero",
         "issue12_compass_activate_dollchestra_live_start",
+        "issue12_compass_can_activate_sayaka_live_start_again_q243",
         "issue13_mia_three_conditional_blade_checks",
         "issue4_izumi_no_other_member_no_heart",
         "issue4_izumi_self_gains_heart_with_other_member_on_stage",
@@ -39998,7 +40011,7 @@
         "saikou_edge_score2_only",
         "saikou_edge_score5_only"
       ],
-      "covering_test_count": 20,
+      "covering_test_count": 21,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,

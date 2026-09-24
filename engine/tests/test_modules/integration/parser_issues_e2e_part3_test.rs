@@ -618,6 +618,55 @@ fn issue12_compass_activate_dollchestra_live_start() {
     );
 }
 
+#[test]
+fn issue12_compass_can_activate_sayaka_live_start_again_q243() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let compass = game.id("PL!HS-pb1-028-L");
+    let sayaka = game.id("PL!HS-pb1-002-R");
+
+    game.state.player1.stage.stage[1] = sayaka;
+    for _ in 0..3 {
+        let under = game.new_id("PL!HS-pb1-002-R");
+        game.state
+            .player1
+            .stage
+            .place_under_card(rabuka_engine::zones::MemberArea::Center, under);
+    }
+    game.state.player1.hand.cards.push(compass);
+    fill_decks(&mut game);
+
+    advance_to_live_card_set_p1(&mut game);
+    game.set_live_card(compass);
+    advance_to_live_start(&mut game);
+
+    let mut guard = 0;
+    while game.has_pending_choice() && guard < 20 {
+        guard += 1;
+        if game.pending_choice_type().as_deref() == Some("SelectAutoAbility") {
+            game.select_option(1);
+        } else {
+            game.select_indices(&[0]);
+        }
+    }
+
+    assert_eq!(
+        game.state
+            .mods
+            .get_heart_modifier(sayaka, rabuka_engine::card::HeartColor::Heart05),
+        3
+    );
+    assert_eq!(
+        game.state
+            .player1
+            .stage
+            .get_under_cards(rabuka_engine::zones::MemberArea::Center)
+            .len(),
+        3
+    );
+    assert_eq!(guard, 1, "COMPASS selected Sayaka and resolved her LiveStart");
+}
+
 // ====================================================================
 // Issue 13 (Manual Guide): PL!N-bp3-011-R (ミア・テイラー)
 // Multi-part IF-THEN: 3 independent checks for blade.
