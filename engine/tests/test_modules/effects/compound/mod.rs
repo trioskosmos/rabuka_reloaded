@@ -3,6 +3,7 @@
 pub mod ability_engine_fixes_test;
 pub mod activate_wait_other_group_draw_q163_test;
 pub mod boosted_miraku_draw_and_need_heart_reduction_test;
+pub mod bp2_006_kinako_baton_recovery_test;
 pub mod bp7_q274_immune_still_selectable_test;
 pub mod center_wait_discard_other_group_cost_plus_two_same_area_deploy_edges_test;
 pub mod center_wait_discard_other_group_cost_plus_two_same_area_deploy_test;

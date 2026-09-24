@@ -1010,6 +1010,7 @@ def parse_ability(triggerless_text: str) -> Dict[str, Any]:
         if extra_pos_from_cost and "activation_position" not in effect:
             effect["activation_position"] = extra_pos_from_cost
 
+        _fix_sequential_chain(effect)
         effect = _clean(effect)
         _validate_effect(effect, triggerless_text[:40])
         ability["effect"] = effect
@@ -9215,6 +9216,14 @@ def _try_baton_touch_effect(text):
     # Only override if the action text explicitly says "by this baton touch"
     # (e.g. "このバトンタッチで控え室に置かれた"), not a generic discard search.
     if (
+        action.get("action") == "move_cards"
+        and not action.get("source")
+        and "このカード" in action_text
+        and "そのバトンタッチで登場した" in action_text
+        and "下に置く" in action_text
+    ):
+        action["source"] = "discard"
+    if (
         cond.get("baton_touch_trigger")
         and action.get("source") == "discard"
         and (
@@ -11387,6 +11396,25 @@ def _stamp_mid_sentence_duration(node, root_text):
                     alt["duration"] = pd
 
 
+def _infer_baton_placement_source(effect):
+    if isinstance(effect, dict):
+        text = effect.get("text", "") or ""
+        if (
+            effect.get("action") == "move_cards"
+            and not effect.get("source")
+            and "このカード" in text
+            and "そのバトンタッチで登場した" in text
+            and "下に置く" in text
+        ):
+            effect["source"] = "discard"
+        for value in effect.values():
+            _infer_baton_placement_source(value)
+    elif isinstance(effect, list):
+        for item in effect:
+            _infer_baton_placement_source(item)
+    return effect
+
+
 def _normalize_effect_tree(effect, original_text=None):
     if not effect or not isinstance(effect, dict):
         return effect
@@ -11435,6 +11463,7 @@ def _normalize_effect_tree(effect, original_text=None):
     src = original_text or effect.get("text", "") or ""
     if "からバトンタッチして登場した場合" in src:
         _attach_baton_touch_from_group_condition(effect, src)
+    _infer_baton_placement_source(effect)
     return effect
 
 

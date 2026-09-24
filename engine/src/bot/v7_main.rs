@@ -238,7 +238,32 @@ impl Search<'_> {
     }
 
     fn complete(&mut self, gs: &GameState, depth: usize) -> (f64, usize, &'static str) {
-        if gs.game_result != GameResult::Ongoing || !gs.has_pending_choice() {
+        if gs.game_result != GameResult::Ongoing {
+            return (self.evaluate(gs), depth, "complete");
+        }
+        if !gs.has_pending_choice() {
+            let beam = std::env::var_os("V7_BEAM").is_some();
+            if beam
+                && depth < 1
+                && gs.current_phase == Phase::Main
+                && gs.can_player_act(self.me as i32)
+                && self.nodes < Self::node_budget()
+            {
+                let mut best = (f64::NEG_INFINITY, depth, "beam-empty");
+                for action in game_setup::generate_possible_actions(gs) {
+                    if self.nodes >= Self::node_budget() { break; }
+                    if action.parameters.as_ref().and_then(|p| p.disabled) == Some(true) { continue; }
+                    self.nodes += 1;
+                    crate::rng::seed(0x7637 + depth as u32);
+                    let mut next = gs.clone();
+                    if game_setup::execute_action(&mut next, &action).is_err() { continue; }
+                    let candidate = self.complete(&next, depth + 1);
+                    if candidate.0 > best.0 { best = candidate; }
+                }
+                if best.0.is_finite() {
+                    return best;
+                }
+            }
             return (self.evaluate(gs), depth, "complete");
         }
         if !gs.can_player_act(self.me as i32) {

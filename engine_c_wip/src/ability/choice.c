@@ -19,72 +19,6 @@ void rb_move_handle_select_cards_looked_at(GameState *g, int actor, const int *i
 /* === Assembled choice resolver (ports engine/src/ability/choice.rs) === */
 typedef RbSelectionContext SelectionContext;
 
-int rb_get_card(int id, Card *out) { return rb_decode_card_by_index((uint32_t)id, out); }
-int rb_card_db_unit(int id) { (void)id; return 0; }
-int rb_ability_master_id(const GameState *g) { return g->activating_card >= 0 ? g->activating_card : 0; }
-int rb_choice_destination(const GameState *g, int *out) {
-    /* Return 1 if the pending choice has a destination zone, else 0 */
-    const RbChoice *c = rb_get_pending_choice(g);
-    if (c && c->target[0]) {
-        if (out) *out = 1;
-        return 1;
-    }
-    if (out) *out = 0;
-    return 0;
-}
-int rb_compound_route_conditional_branch(const AbilityEffect *e) { (void)e; return 0; }
-int rb_effect_answers_any(const AbilityEffect *e) { (void)e; return 0; }
-int rb_effect_resource_on_select(const AbilityEffect *e) { (void)e; return 0; }
-int rb_effect_alternative_count_type_any(const AbilityEffect *e) { (void)e; return 0; }
-int rb_entry_conditional_choice_effect(const GameState *g) { (void)g; return 0; }
-int rb_resolver_build_choice_select_cards(RbAbilityResolver *self, GameState *g) {
-    (void)self; (void)g;
-    return 0;
-}
-int rb_resolver_card_name(GameState *g, int id, char *out, int outsz) {
-    Card c; if (rb_decode_card_by_index((uint32_t)id, &c)) { if(out&&outsz)snprintf(out,outsz,"%s",c.name?c.name:""); rb_free_card(&c); return 1;} return 0;
-}
-int rb_resolver_entry_effect(RbAbilityResolver *self) { (void)self; return 0; }
-int rb_resolver_look_select_finalize_dest(GameState *g, int idx) {
-    (void)g; (void)idx;
-    return 0;
-}
-int rb_resolver_spawn_target(RbAbilityResolver *self, GameState *g, int t) {
-    (void)self; (void)g; (void)t;
-    return 0;
-}
-
-/* ===== Port of engine/src/ability/choice.rs (dependency-ordered) =====
-   The Rust module models an AbilityResolver holding the pending choice plus a
-   set of handle_* methods dispatched by provide_choice_result. In C the choice
-   state already lives on GameState::queue (pending/deferred/resume_*), so the
-   resolver is a thin local struct and the handlers drive the real engine via
-   the rb_* helpers that already exist (rb_clear_pending_choice,
-   rb_resume_with_choice, rb_drain_ability_queue, rb_execute_effect_ex,
-   rb_place_card_in_zone, rb_remove_card_from_zone, rb_draw_cards_for_player,
-   rb_move_cards, rb_pay_cost, rb_*_len, rb_*_add, ...). */
-
-typedef struct RbSelectionContext {
-    int indices[RB_MAX_ZONE]; int n;
-    int filtered_indices[RB_MAX_ZONE]; int n_filtered;
-    int has_filtered;
-    char card_type[32];
-    int count;
-    int allow_skip;
-    int cost_limit; int has_cost_limit;
-    char cost_limit_op[8];
-    int cost_total; int has_cost_total;
-    char cost_total_op[8];
-    char group[32];
-    char characters[8][32]; int n_characters;
-    int is_select_action;
-    char target_player_id[16];
-    char destination[32];
-    int discard_remaining; int has_discard_remaining;
-    int blind;
-    int is_reveal;
-} RbSelectionContext;
-typedef struct RbExecutionContext { int kind; int step; char destination[32]; } RbExecutionContext;
 typedef struct RbAbilityResolver {
     GameState *gs;
     int actor;
@@ -118,6 +52,184 @@ typedef struct RbAbilityResolver {
 } RbAbilityResolver;
 typedef RbAbilityResolver RbResolver;
 typedef RbAbilityResolver AbilityResolver;
+
+int rb_get_card(int id, Card *out) { return rb_decode_card_by_index((uint32_t)id, out); }
+int rb_card_db_unit(int id)
+{
+    Card card;
+    if (id < 0 || !rb_decode_card_by_index((uint32_t)id, &card)) return -1;
+    int unit = card.unit_idx == UINT16_MAX ? -1 : (int)card.unit_idx;
+    rb_free_card(&card);
+    return unit;
+}
+int rb_ability_master_id(const GameState *g) { return g && g->activating_card >= 0 ? g->activating_card : -1; }
+int rb_choice_destination(const GameState *g, int *out)
+{
+    const RbChoice *choice = rb_get_pending_choice(g);
+    int found = 0;
+    if (choice) {
+        for (int i = 0; i < choice->n_characters; i++) {
+            if (strcmp(choice->characters[i], "destination") == 0) found = 1;
+        }
+        if (strstr(choice->target, "destination") || strstr(choice->target, "position"))
+            found = 1;
+    }
+    if (out) *out = found;
+    return found;
+}
+
+int rb_compound_route_conditional_branch(const AbilityEffect *effect)
+{
+    if (!effect) return -1;
+    if (effect->conditional_action) return 0;
+    if (effect->optional_action) return 1;
+    return -1;
+}
+
+static const char *choice_effect_extra(const AbilityEffect *effect, const char *key)
+{
+    if (!effect) return NULL;
+    for (int i = 0; i < effect->n_extra; i++)
+        if (effect->extra_k[i] && strcmp(effect->extra_k[i], key) == 0)
+            return effect->extra_v[i];
+    return NULL;
+}
+
+int rb_effect_answers_any(const AbilityEffect *effect)
+{
+    const char *value = choice_effect_extra(effect, "answers_any");
+    if (value) return strcmp(value, "false") != 0 && strcmp(value, "0") != 0;
+    return effect && effect->alternative_condition != NULL;
+}
+
+int rb_effect_resource_on_select(const AbilityEffect *effect)
+{
+    const char *resource = choice_effect_extra(effect, "resource");
+    return resource && *resource;
+}
+
+int rb_effect_alternative_count_type_any(const AbilityEffect *effect)
+{
+    const char *kind = choice_effect_extra(effect, "alternative_count_type");
+    return kind && strcmp(kind, "any_number") == 0;
+}
+
+int rb_entry_conditional_choice_effect(const GameState *g)
+{
+    if (!g || g->queue.cur < 0 || g->queue.cur >= g->queue.n_entries) return 0;
+    const RbQueueEntry *entry = &g->queue.entries[g->queue.cur];
+    return entry->choice_card_no == RB_ROUTE_CONDITIONAL_CHOICE ||
+           (g->queue.pending.route == RB_ROUTE_CONDITIONAL_CHOICE && g->queue.has_pending);
+}
+
+int rb_resolver_build_choice_select_cards(RbAbilityResolver *self, GameState *g)
+{
+    if (!self || !g) return -1;
+    const AbilityEffect *effect = self->current_effect ? self->current_effect : rb_entry_effect(g);
+    if (!effect) return -1;
+    RbChoice choice;
+    memset(&choice, 0, sizeof(choice));
+    choice.kind = RB_CHOICE_SELECT_CARD;
+    choice.count = effect->count > 0 ? effect->count : 1;
+    choice.allow_skip = effect->is_optional;
+    if (effect->source) strncpy(choice.zone, effect->source, sizeof(choice.zone) - 1);
+    if (effect->card_type_field[0]) strncpy(choice.card_type, effect->card_type_field, sizeof(choice.card_type) - 1);
+    if (effect->text) strncpy(choice.description, effect->text, sizeof(choice.description) - 1);
+    const char *group = choice_effect_extra(effect, "group_names");
+    if (group) strncpy(choice.filter_group, group, sizeof(choice.filter_group) - 1);
+    if (effect->target) strncpy(choice.target_player_id, effect->target, sizeof(choice.target_player_id) - 1);
+    choice.route = RB_ROUTE_SELECT_CARDS;
+    choice.actor = g->queue.actor;
+    g->queue.pending = choice;
+    g->queue.has_pending = 1;
+    g->queue.state = RB_QUEUE_AWAITING_CHOICE;
+    self->pending_choice = choice;
+    self->has_pending_choice = 1;
+    return 1;
+}
+
+int rb_resolver_card_name(GameState *g, int id, char *out, int outsz)
+{
+    (void)g;
+    Card card;
+    if (id < 0 || !rb_decode_card_by_index((uint32_t)id, &card)) return 0;
+    if (out && outsz > 0) {
+        snprintf(out, (size_t)outsz, "%s", card.name ? card.name : "");
+    }
+    rb_free_card(&card);
+    return 1;
+}
+
+int rb_resolver_entry_effect(RbAbilityResolver *self)
+{
+    if (!self || !self->gs) return 0;
+    const AbilityEffect *effect = rb_entry_effect(self->gs);
+    if (!effect) return 0;
+    self->current_effect = (AbilityEffect *)effect;
+    self->entry_effect = (AbilityEffect *)effect;
+    return 1;
+}
+
+int rb_resolver_look_select_finalize_dest(GameState *g, int idx)
+{
+    if (!g) return -1;
+    int actor = g->queue.actor >= 0 ? g->queue.actor : g->active;
+    int ids[RB_MAX_ZONE];
+    int n = rb_looked_at_pool(actor, ids, RB_MAX_ZONE);
+    if (idx < 0 || idx >= n) return -1;
+    int cid = ids[idx];
+    const char *destination = g->queue.resume_move_destination[0]
+                                ? g->queue.resume_move_destination : "hand";
+    rb_move_card(g, actor, cid, "looked_at", destination, -1);
+    return 1;
+}
+
+int rb_resolver_spawn_target(RbAbilityResolver *self, GameState *g, int target)
+{
+    if (!self || !g || target < 0 || target > 1) return -1;
+    self->spawn_target = target;
+    self->spawn_target_set = 1;
+    g->queue.actor = target;
+    g->queue.resume_actor = target;
+    if (g->queue.cur >= 0 && g->queue.cur < g->queue.n_entries) {
+        RbQueueEntry *entry = &g->queue.entries[g->queue.cur];
+        snprintf(entry->choice_player_id, sizeof(entry->choice_player_id),
+                 target == 0 ? "p1" : "p2");
+    }
+    return target;
+}
+
+/* ===== Port of engine/src/ability/choice.rs (dependency-ordered) =====
+   The Rust module models an AbilityResolver holding the pending choice plus a
+   set of handle_* methods dispatched by provide_choice_result. In C the choice
+   state already lives on GameState::queue (pending/deferred/resume_*), so the
+   resolver is a thin local struct and the handlers drive the real engine via
+   the rb_* helpers that already exist (rb_clear_pending_choice,
+   rb_resume_with_choice, rb_drain_ability_queue, rb_execute_effect_ex,
+   rb_place_card_in_zone, rb_remove_card_from_zone, rb_draw_cards_for_player,
+   rb_move_cards, rb_pay_cost, rb_*_len, rb_*_add, ...). */
+
+typedef struct RbSelectionContext {
+    int indices[RB_MAX_ZONE]; int n;
+    int filtered_indices[RB_MAX_ZONE]; int n_filtered;
+    int has_filtered;
+    char card_type[32];
+    int count;
+    int allow_skip;
+    int cost_limit; int has_cost_limit;
+    char cost_limit_op[8];
+    int cost_total; int has_cost_total;
+    char cost_total_op[8];
+    char group[32];
+    char characters[8][32]; int n_characters;
+    int is_select_action;
+    char target_player_id[16];
+    char destination[32];
+    int discard_remaining; int has_discard_remaining;
+    int blind;
+    int is_reveal;
+} RbSelectionContext;
+typedef struct RbExecutionContext { int kind; int step; char destination[32]; } RbExecutionContext;
 /* --- SelectionContext::mfi (choice.rs:49) --- */
 int rb_selection_context_mfi(const RbSelectionContext *ctx, const int *indices, int n_indices, int *out) {
     if (!ctx || !indices || !out) return 0;
@@ -449,6 +561,8 @@ int rb_resolver_provide_choice_result(GameState *g, int selected_idx) {
     int count = g->queue.pending.count;
     int allow_skip = g->queue.pending.allow_skip;
     int was_skip = selected_idx < 0;
+    if (was_skip && g->queue.pending.actor == 1)
+        g->opponent_choice_declined = 1;
     char selbuf[32]; const char *selstr = NULL;
     if (!was_skip) { snprintf(selbuf,sizeof(selbuf),"%d",selected_idx); selstr=selbuf; }
     /* Rust match: (Some(SelectCard), CardSelected) => handle_select_card */
@@ -602,10 +716,19 @@ static void choice_build_reprompt(GameState *g, int actor, const char *zone, int
     g->queue.state = RB_QUEUE_AWAITING_CHOICE;
 }
 
+static int map_choice_index(const RbChoice *choice, int index)
+{
+    if (!choice || index < 0) return index;
+    if (choice->n_filtered_indices > 0 && index < choice->n_filtered_indices)
+        return choice->filtered_indices[index];
+    return index;
+}
+
 int rb_resolver_handle_select_card(RbAbilityResolver *self, GameState *g, const char *selected) {
     if (!g || !g->queue.has_pending) return -1;
     int actor = g->queue.actor;
     int idx = selected ? atoi(selected) : -1;
+    idx = map_choice_index(&g->queue.pending, idx);
     int was_skip = (idx < 0);
     const char *zone = g->queue.pending.zone[0] ? g->queue.pending.zone : "hand";
     const char *target = g->queue.pending.target[0] ? g->queue.pending.target : NULL;
@@ -2208,6 +2331,8 @@ int rb_resume_with_choice(GameState *g, int selected_idx) {
     const AbilityEffect *cont = g->queue.resume_parent;
     int cont_from = g->queue.resume_child + 1;
     int was_skip = (selected_idx < 0);
+    if (was_skip && g->queue.pending.actor == 1)
+        g->opponent_choice_declined = 1;
     int kind = g->queue.pending.kind;   /* captured BEFORE rb_clear_pending_choice */
     RbChoice saved_pending = g->queue.pending;
     RbAbilityResolver self; memset(&self, 0, sizeof(self));
@@ -2399,7 +2524,7 @@ int rb_resume_with_choice(GameState *g, int selected_idx) {
             rb_resolver_continue_siblings(g, actor, host, cont, cont_from);
             break;
         case RB_CHOICE_SELECT_NUMBER:
-            rb_resolver_handle_draw_any_number(g, selected);
+            rb_resolver_handle_number_selection(g, was_skip ? -1 : selected_idx);
             break;
         case RB_CHOICE_SELECT_POSITION: {
             int host = g->queue.resume_host;
@@ -2486,7 +2611,7 @@ int rb_gained_ability_index(int ability_idx) {
 /* Choice::description_ja — returns the Japanese description for the choice. */
 const char *rb_choice_description_ja(const RbChoice *ch) {
     if (!ch) return NULL;
-    return NULL; /* C RbChoice has no description_ja field; placeholder for parity. */
+    return ch->description_ja[0] ? ch->description_ja : NULL;
 }
 
 /* Choice::allow_skip — returns whether this choice may be skipped. */
@@ -2504,11 +2629,16 @@ void rb_choice_set_description(RbChoice *ch, const char *desc) {
 
 /* Choice::set_bilingual_descriptions — replace both prompt fields. */
 void rb_choice_set_bilingual_descriptions(RbChoice *ch, const char *en, const char *ja) {
-    (void)ja;
     if (!ch) return;
     if (en) {
         strncpy(ch->description, en, sizeof(ch->description) - 1);
         ch->description[sizeof(ch->description) - 1] = '\0';
+        strncpy(ch->description_en, en, sizeof(ch->description_en) - 1);
+        ch->description_en[sizeof(ch->description_en) - 1] = '\0';
+    }
+    if (ja) {
+        strncpy(ch->description_ja, ja, sizeof(ch->description_ja) - 1);
+        ch->description_ja[sizeof(ch->description_ja) - 1] = '\0';
     }
 }
 
@@ -2619,13 +2749,44 @@ void rb_resolver_handle_select_position(GameState *g, int actor, const char *pos
     rb_move_fire_debut_side_effects(g, actor, card_id, target ? target : "self", source_zone ? source_zone : "");
 }
 
-/* ── handle_number_selection (choice.rs stub) ── */
-void rb_resolver_handle_number_selection(GameState *g, int selected) {
-    (void)g; (void)selected;
+void rb_resolver_handle_number_selection(GameState *g, int selected)
+{
+    if (!g) return;
+    AbilityEffect *parent = g->queue.resume_parent;
+    int child = g->queue.resume_child;
+    int actor = g->queue.resume_actor >= 0 ? g->queue.resume_actor : g->queue.actor;
+    int host = g->queue.resume_host;
+    g->queue.choice_result = selected;
+    rb_clear_pending_choice(g);
+    g->queue.resume_mode = 0;
+    g->queue.state = RB_QUEUE_RESOLVING;
+    rb_queue_resume_pending_actions(g);
+    if (!rb_has_pending_choice(g) && parent && child >= 0)
+        rb_resolver_continue_siblings(g, actor, host, parent, child + 1);
+    if (!rb_has_pending_choice(g)) {
+        g->queue.state = RB_QUEUE_IDLE;
+        rb_drain_ability_queue(g);
+    }
 }
 
-/* ── handle_auto_ability_selection (choice.rs stub) ── */
-void rb_resolver_handle_auto_ability_selection(GameState *g, int selected) {
-    (void)g; (void)selected;
+void rb_resolver_handle_auto_ability_selection(GameState *g, int selected)
+{
+    if (!g) return;
+    g->queue.choice_result = selected;
+    int cur = g->queue.cur;
+    if (selected >= 0 && cur >= 0 && cur < g->queue.n_entries) {
+        int target = cur + selected;
+        if (target >= g->queue.n_entries) target = selected;
+        if (target >= 0 && target < g->queue.n_entries && target != cur) {
+            RbQueueEntry tmp = g->queue.entries[cur];
+            g->queue.entries[cur] = g->queue.entries[target];
+            g->queue.entries[target] = tmp;
+        }
+    }
+    g->queue.auto_ability = 0;
+    rb_clear_pending_choice(g);
+    g->queue.state = RB_QUEUE_IDLE;
+    rb_process_pending_auto_abilities(g);
+    if (!rb_has_pending_choice(g)) rb_drain_ability_queue(g);
 }
 

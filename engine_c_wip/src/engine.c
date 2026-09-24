@@ -222,13 +222,10 @@ void rb_execute_effect_ex(GameState *g, int actor, AbilityEffect *e, int host_ci
     if (rb_has_pending_choice(g)) { s_exec_depth--; return; }
     if (e->has_condition && e->condition && !rb_eval_condition_for_host(g, actor, host_cid, e->condition)) { s_exec_depth--; return; }
     for (int i = 0; i < e->n_child; i++) {
-        /* repeat_procedure's children are executed cnt times by handle_action,
-           so skip the single pre-order pass here to avoid a double execution. */
-        if (!(e->action && (!strcmp(e->action, "repeat_procedure") ||
-                            !strcmp(e->action, "conditional_alternative") ||
-                            !strcmp(e->action, "sequential"))))
+        if (!(e->action && rb_executor_is_structural(e->action))) {
             rb_execute_effect_ex(g, actor, e->child[i], host_cid);
-            if (rb_has_pending_choice(g)) {
+        }
+        if (rb_has_pending_choice(g)) {
                 /* A child emitted a pending choice and stalled this effect chain.
                    Stash the parent + child index + host so the resume can run the
                    remaining sibling effects (e.g. the gain_resource that follows a
@@ -267,7 +264,10 @@ void rb_execute_effect_ex(GameState *g, int actor, AbilityEffect *e, int host_ci
             }
     }
     if (!e->action) { s_exec_depth--; return; }
-    handle_action(g, actor, e, host_cid);
+    if (rb_executor_has_executor(e->action))
+        rb_executor_execute(g, actor, e, host_cid);
+    else
+        handle_action(g, actor, e, host_cid);
     s_exec_depth--;
 }
 
@@ -518,18 +518,24 @@ static void handle_action(GameState *g, int actor, AbilityEffect *e, int host_ci
         rb_effect_move_cards(g, actor, e);
     } else if (!strcmp(act, "change_state")) {
          rb_effect_change_state(g, actor, e, host_cid);
-    } else if (!strcmp(act, "look_at") || !strcmp(act, "reveal") ||
-                !strcmp(act, "reveal_per_group")) {
+    } else if (!strcmp(act, "look_at")) {
         rb_effect_look_at(g, actor, e);
+    } else if (!strcmp(act, "reveal")) {
+        rb_effect_reveal(g, actor, e);
+    } else if (!strcmp(act, "reveal_per_group")) {
+        rb_effect_reveal_per_group(g, actor, e);
     } else if (!strcmp(act, "reveal_until_live_card")) {
         rb_effect_reveal_until_live_card(g, actor, e);
     } else if (!strcmp(act, "reveal_until_chosen_card")) {
         rb_effect_reveal_until_chosen_card(g, actor, e);
     } else if (!strcmp(act, "reveal_until_target")) {
         rb_effect_reveal_until_target(g, actor, e);
-    } else if (!strcmp(act, "select_cards") || !strcmp(act, "select") ||
-               !strcmp(act, "select_number") || !strcmp(act, "look_and_select")) {
+    } else if (!strcmp(act, "select_cards")) {
         rb_effect_select_cards(g, actor, e);
+    } else if (!strcmp(act, "select")) {
+        rb_effect_select(g, actor, e);
+    } else if (!strcmp(act, "look_and_select")) {
+        rb_effect_look_and_select(g, actor, e);
     } else if (!strcmp(act, "set_cost")) {
         rb_effect_set_cost(g, actor, e, host_cid);
     } else if (!strcmp(act, "modify_cost") || !strcmp(act, "set_cost_to_use") ||

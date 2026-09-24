@@ -108,7 +108,7 @@ void rb_effect_look_at(GameState *g, int actor, AbilityEffect *e){
     rb_emit_choice(g, actor, RB_CHOICE_SELECT_CARD, "looked_at", NULL, 1, e->is_optional?1:0, NULL);
     rb_queue_pause_for_choice(g, &g->queue.pending);
     g->queue.resume_mode = 2; g->queue.resume_eff = e; g->queue.resume_is_select = 0;
-    g->queue.resume_actor = actor; g->queue.resume_host = actor;
+    g->queue.resume_actor = actor; g->queue.resume_host = g->queue.resume_host >= 0 ? g->queue.resume_host : actor;
 }
 
 void rb_effect_select_cards(GameState *g, int actor, AbilityEffect *e){
@@ -171,10 +171,10 @@ void rb_effect_select_cards(GameState *g, int actor, AbilityEffect *e){
             }
         }
         g->queue.resume_mode = 0; g->queue.resume_is_select = 0;
-        g->queue.resume_eff = e; g->queue.resume_actor = actor; g->queue.resume_host = actor;
+        g->queue.resume_eff = e; g->queue.resume_actor = actor; g->queue.resume_host = g->queue.resume_host >= 0 ? g->queue.resume_host : actor;
     } else {
         g->queue.resume_mode = 2; g->queue.resume_eff = e; g->queue.resume_is_select = 1;
-        g->queue.resume_actor = actor; g->queue.resume_host = actor;
+        g->queue.resume_actor = actor; g->queue.resume_host = g->queue.resume_host >= 0 ? g->queue.resume_host : actor;
     }
 }
 
@@ -304,7 +304,7 @@ void rb_effect_reveal_until_live_card(GameState *g, int actor, AbilityEffect *e)
     rb_emit_choice(g, actor, RB_CHOICE_SELECT_CARD, "looked_at", NULL, 1, e->is_optional?1:0, NULL);
     rb_queue_pause_for_choice(g, &g->queue.pending);
     g->queue.resume_mode = 2; g->queue.resume_eff = e; g->queue.resume_is_select = 0;
-    g->queue.resume_actor = actor; g->queue.resume_host = actor;
+    g->queue.resume_actor = actor; g->queue.resume_host = g->queue.resume_host >= 0 ? g->queue.resume_host : actor;
 }
 
 void rb_effect_reveal_until_chosen_card(GameState *g, int actor, AbilityEffect *e){
@@ -317,7 +317,7 @@ void rb_effect_reveal_until_chosen_card(GameState *g, int actor, AbilityEffect *
     rb_emit_choice(g, actor, RB_CHOICE_SELECT_CARD, "looked_at", ctype, 1, e->is_optional?1:0, NULL);
     rb_queue_pause_for_choice(g, &g->queue.pending);
     g->queue.resume_mode = 2; g->queue.resume_eff = e; g->queue.resume_is_select = 0;
-    g->queue.resume_actor = actor; g->queue.resume_host = actor;
+    g->queue.resume_actor = actor; g->queue.resume_host = g->queue.resume_host >= 0 ? g->queue.resume_host : actor;
 }
 
 /* Mirror look.rs::execute_reveal_until_target — reveal from the deck until a card
@@ -350,7 +350,7 @@ void rb_effect_reveal_until_target(GameState *g, int actor, AbilityEffect *e){
     rb_emit_choice(g, actor, RB_CHOICE_SELECT_CARD, "looked_at", ctype, 1, e->is_optional?1:0, NULL);
     rb_queue_pause_for_choice(g, &g->queue.pending);
     g->queue.resume_mode = 2; g->queue.resume_eff = e; g->queue.resume_is_select = 0;
-    g->queue.resume_actor = actor; g->queue.resume_host = actor;
+    g->queue.resume_actor = actor; g->queue.resume_host = g->queue.resume_host >= 0 ? g->queue.resume_host : actor;
 }
 
 /* -- look_at_with_refresh -- */
@@ -433,7 +433,7 @@ void rb_effect_reveal(GameState *g, int actor, AbilityEffect *e) {
     rb_queue_pause_for_choice(g, &g->queue.pending);
             g->queue.resume_mode = 0; g->queue.resume_eff = e;
             g->queue.resume_is_select = 0;
-            g->queue.resume_actor = actor; g->queue.resume_host = actor;
+            g->queue.resume_actor = actor; g->queue.resume_host = g->queue.resume_host >= 0 ? g->queue.resume_host : actor;
             return;
         }
     }
@@ -499,7 +499,7 @@ void rb_effect_select(GameState *g, int actor, AbilityEffect *e) {
     rb_queue_pause_for_choice(g, &g->queue.pending);
     g->queue.resume_mode = 2; g->queue.resume_eff = e;
     g->queue.resume_is_select = 1;
-    g->queue.resume_actor = actor; g->queue.resume_host = actor;
+    g->queue.resume_actor = actor; g->queue.resume_host = g->queue.resume_host >= 0 ? g->queue.resume_host : actor;
 }
 
 /* -- execute_look_and_select -- */
@@ -524,5 +524,5 @@ void rb_effect_look_and_select(GameState *g, int actor, AbilityEffect *e) {
     rb_queue_pause_for_choice(g, &g->queue.pending);
     g->queue.resume_mode = 2; g->queue.resume_eff = e;
     g->queue.resume_is_select = 1;
-    g->queue.resume_actor = actor; g->queue.resume_host = actor;
+    g->queue.resume_actor = actor; g->queue.resume_host = g->queue.resume_host >= 0 ? g->queue.resume_host : actor;
 }

@@ -10,6 +10,7 @@ import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from parser import (
     parse_effect,
+    parse_ability,
     parse_cost,
     parse_condition,
     _merge_parenthetical,
@@ -261,6 +262,37 @@ def test_score_alternate_values_are_not_treated_as_one_threshold():
     condition = parse_condition("スコアが1か5の場合")
     assert condition.get("values") == [1, 5], condition
     assert "count" not in condition, condition
+
+
+def test_baton_touch_recovery_uses_recently_moved_source():
+    effect = parse_effect(
+        "バトンタッチして登場した場合、このバトンタッチで控え室に置かれた『Liella!』のメンバーカードを1枚手札に加える"
+    )
+    assert effect.get("action") == "move_cards", effect
+    assert effect.get("source") == "recently_moved", effect
+    assert effect.get("destination") == "hand", effect
+    condition = effect.get("condition", {})
+    assert condition.get("baton_touch_trigger") is True, condition
+
+
+def test_baton_touch_displaced_card_under_arriver_uses_discard_source():
+    text = "このメンバーがステージから控え室に置かれたとき、バトンタッチしていた場合、このカードをそのバトンタッチで登場したメンバーの下に置く"
+    effect = _normalize_effect_tree(parse_effect(text), text)
+    assert effect.get("action") == "move_cards", effect
+    assert effect.get("source") == "discard", effect
+    assert effect.get("destination") == "under_member", effect
+    assert effect.get("self_target") is True, effect
+    condition = effect.get("condition", {})
+    assert condition.get("trigger_event", {}).get("location") == "discard", condition
+
+
+def test_sequential_baton_placement_is_validated_after_source_inference():
+    ability = parse_ability(
+        "{{toujyou.png|登場}}バトンタッチして登場した場合、このバトンタッチで控え室に置かれた『Liella!』のメンバーカードを1枚、このメンバーの下に置く。"
+    )
+    effect = ability["effect"]
+    assert effect.get("action") == "sequential", effect
+    assert effect["actions"][1].get("source") == "those_cards", effect
 
 
 # ─── run all ──────────────────────────────────────────────────────────────────

@@ -217,6 +217,7 @@ static int zone_count_filtered(const struct GameState *g, int pl, const char *lo
 /* Forward */
 static int eval_condition_inner(const struct GameState *g, int actor, const Condition *c);
 static int eval_condition_inner_host(const struct GameState *g, int actor, int host_cid, const Condition *c);
+int rb_check_phase_gate(const struct GameState *g, int actor, const Condition *c, int skip_gate);
 static int stage_index_of_position(const char *pos);
 
 /* Mirror engine/src/ability/condition/card.rs:resolve_target_for_scope  E   target=="self" with scope=="both" widens the scope to both players. */
@@ -1541,17 +1542,17 @@ static int eval_complex(const struct GameState *g, int actor, int host_cid, cons
 
 
 static int eval_opponent_choice(const GameState *g, int actor, const Condition *c) {
-    (void)g;
     (void)actor;
-    int negation = 0;
-    get_bool(c, "negation", &negation);
-    return !negation;
+    (void)c;
+    return g && g->opponent_choice_declined;
 }
 
 static int eval_condition_inner_host(const struct GameState *g, int actor, int host_cid, const Condition *c) {
     if (!c) return 1;
     int negation=0; get_bool(c,"negation",&negation);
-    /* Mirrors the [cond] log::debug! in condition/card.rs  Egated on the shared
+    if (c->variant != RB_COND_COMPOUND && !rb_check_phase_gate(g, actor, c, 0))
+        return negation ? 1 : 0;
+    /* Mirrors the [cond] log::debug! in condition/card.rs  Egated on the shared
        ability-debug switch so a full suite run is not flooded. */
     if (rb_ability_debug_enabled()) {
         const char *dp=get_str(c,"position"), *dl=get_str(c,"location"), *dc=get_str(c,"comparison_type"),

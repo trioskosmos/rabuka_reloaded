@@ -945,7 +945,7 @@ fn count_lives(gs: &GameState, desired: &[usize], db: &CardDatabase) -> usize {
         .count()
 }
 
-fn choose_live_set_experiment(gs: &GameState, actions: &[Action], db: &CardDatabase) -> Action {
+pub(crate) fn choose_live_set_experiment(gs: &GameState, actions: &[Action], db: &CardDatabase) -> Action {
     let me = gs.active_player_index();
     let (my, opp) = gs.seated_pair(me);
     let my_succ = my.success_live_card_zone.cards.len();

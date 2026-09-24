@@ -1,14 +1,14 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-09-24T10:09:18.463630+00:00",
+  "generated_at": "2026-09-24T11:54:15.161872+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
     "total_abilities": 2011,
     "unique_abilities": 936
   },
-  "n_files": 838,
-  "n_tests": 3451,
+  "n_files": 839,
+  "n_tests": 3454,
   "total_cards": 771,
   "covered_cards": 771,
   "abilities_on_covered": 936,
@@ -732,7 +732,7 @@
       ]
     }
   },
-  "n_test_fns_parsed": 3451,
+  "n_test_fns_parsed": 3454,
   "abilities": [
     {
       "idx": 0,
@@ -3509,6 +3509,7 @@
       "covering_files": [
         "engine/tests/test_modules/effects/ability_mod/chisato_bp5_test.rs",
         "engine/tests/test_modules/effects/ability_mod/discard_low_cost_group_member_trigger_debut_q108_q240_test.rs",
+        "engine/tests/test_modules/effects/compound/bp2_006_kinako_baton_recovery_test.rs",
         "engine/tests/test_modules/effects/draw/flat/miyashita_ai_pb1_test.rs",
         "engine/tests/test_modules/effects/look_select/reveal_to_hand/center_wait_discard_reveal_until_chosen_type_q166_q167_test.rs",
         "engine/tests/test_modules/rules/conditions/condition_evaluation_test.rs"
@@ -3527,6 +3528,9 @@
         "discard_low_cost_group_member_trigger_debut_activate_high_cost_card_stays_in_hand",
         "discard_low_cost_group_member_trigger_debut_center_gate_fails_in_waitroom_q108_q240",
         "discard_low_cost_group_member_trigger_debut_non_center_cost_card_reaches_waitroom_q240",
+        "kinako_baton_touch_does_not_recover_a_non_liella_member",
+        "kinako_baton_touch_recovers_the_displaced_liella_member",
+        "kinako_normal_debut_does_not_recover_a_hand_card",
         "left_side_heart_below_ignores_center_high",
         "left_side_heart_meets_threshold_gains_blade",
         "miyashita_ai_cost10_appears_elsewhere_triggers_draw",
@@ -3540,10 +3544,9 @@
         "reveal_until_chosen_type_q166_target_first_card",
         "reveal_until_chosen_type_q166_target_last_card",
         "reveal_until_chosen_type_q166_two_matches_only_one_added",
-        "reveal_until_chosen_type_q167_deck_exhausted_during_reveal",
-        "reveal_until_chosen_type_use_limit_blocks_second_activation"
+        "reveal_until_chosen_type_q167_deck_exhausted_during_reveal"
       ],
-      "covering_test_count": 28,
+      "covering_test_count": 31,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -3575,6 +3578,7 @@
       "covering_files": [
         "engine/tests/test_modules/effects/ability_mod/chisato_bp5_test.rs",
         "engine/tests/test_modules/effects/ability_mod/discard_low_cost_group_member_trigger_debut_q108_q240_test.rs",
+        "engine/tests/test_modules/effects/compound/bp2_006_kinako_baton_recovery_test.rs",
         "engine/tests/test_modules/effects/draw/flat/miyashita_ai_pb1_test.rs",
         "engine/tests/test_modules/effects/look_select/reveal_to_hand/center_wait_discard_reveal_until_chosen_type_q166_q167_test.rs",
         "engine/tests/test_modules/rules/conditions/condition_evaluation_test.rs"
@@ -3593,6 +3597,9 @@
         "discard_low_cost_group_member_trigger_debut_activate_high_cost_card_stays_in_hand",
         "discard_low_cost_group_member_trigger_debut_center_gate_fails_in_waitroom_q108_q240",
         "discard_low_cost_group_member_trigger_debut_non_center_cost_card_reaches_waitroom_q240",
+        "kinako_baton_touch_does_not_recover_a_non_liella_member",
+        "kinako_baton_touch_recovers_the_displaced_liella_member",
+        "kinako_normal_debut_does_not_recover_a_hand_card",
         "left_side_heart_below_ignores_center_high",
         "left_side_heart_meets_threshold_gains_blade",
         "miyashita_ai_cost10_appears_elsewhere_triggers_draw",
@@ -3606,10 +3613,9 @@
         "reveal_until_chosen_type_q166_target_first_card",
         "reveal_until_chosen_type_q166_target_last_card",
         "reveal_until_chosen_type_q166_two_matches_only_one_added",
-        "reveal_until_chosen_type_q167_deck_exhausted_during_reveal",
-        "reveal_until_chosen_type_use_limit_blocks_second_activation"
+        "reveal_until_chosen_type_q167_deck_exhausted_during_reveal"
       ],
-      "covering_test_count": 28,
+      "covering_test_count": 31,
       "is_null": false,
       "use_limit": 1,
       "watches_abilities": false,
@@ -10844,6 +10850,7 @@
         "engine/tests/test_modules/characterization/zero_tested_action_types_test.rs",
         "engine/tests/test_modules/effects/ability_mod/invalid_suppress_comprehensive_edge_test.rs",
         "engine/tests/test_modules/effects/compound/ability_engine_fixes_test.rs",
+        "engine/tests/test_modules/effects/compound/bp2_006_kinako_baton_recovery_test.rs",
         "engine/tests/test_modules/effects/conditional/sp_bp2_004_comprehensive_edge_test.rs",
         "engine/tests/test_modules/effects/conditional/sp_bp2_004_highest_cost_edge_test.rs",
         "engine/tests/test_modules/effects/gain/hearts/center_highest_cost_constant_heart03_test.rs",
@@ -10889,7 +10896,7 @@
         "empty_center_with_lone_member_grants_no_heart",
         "empty_center_with_two_side_members_grants_no_heart"
       ],
-      "covering_test_count": 122,
+      "covering_test_count": 125,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -10921,6 +10928,7 @@
         "engine/tests/test_modules/characterization/zero_tested_action_types_test.rs",
         "engine/tests/test_modules/effects/ability_mod/invalid_suppress_comprehensive_edge_test.rs",
         "engine/tests/test_modules/effects/compound/ability_engine_fixes_test.rs",
+        "engine/tests/test_modules/effects/compound/bp2_006_kinako_baton_recovery_test.rs",
         "engine/tests/test_modules/effects/conditional/sp_bp2_004_comprehensive_edge_test.rs",
         "engine/tests/test_modules/effects/conditional/sp_bp2_004_highest_cost_edge_test.rs",
         "engine/tests/test_modules/effects/gain/hearts/center_highest_cost_constant_heart03_test.rs",
@@ -10966,7 +10974,7 @@
         "empty_center_with_lone_member_grants_no_heart",
         "empty_center_with_two_side_members_grants_no_heart"
       ],
-      "covering_test_count": 122,
+      "covering_test_count": 125,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,

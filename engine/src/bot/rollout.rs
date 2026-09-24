@@ -15,33 +15,128 @@
 //! the cheap heuristic path, which already plays them correctly.
 
 use crate::bot::strategy_v4::{alloc, flip_stats, hand_lives, heart_pool};
-use crate::card::CardDatabase;
+use crate::card::{CardDatabase, CardType};
 use crate::game_setup::{self, Action};
 use crate::game_state::{GameResult, GameState};
 
+use super::determinization::DeterminizationSampler;
+use super::observation::PublicObservation;
 use super::strategy_v5::{binom_ge, nearest_miss_life};
 
 /// Number of candidate portfolios priced per contested decision.
-const TOP_K: usize = 4;
+const TOP_K: usize = 5;
 /// Rollouts per candidate.
-const SIMS_PER_CANDIDATE: usize = 6;
-/// Play out until this many turns beyond the decision turn have STARTED.
-const HORIZON_TURNS: u8 = 2;
+const SIMS_PER_CANDIDATE: usize = 3;
+/// Play out only the current live check.
+const HORIZON_TURNS: u8 = 0;
 /// Hard iteration cap per rollout.
-const MAX_ITERS: usize = 500;
+const MAX_ITERS: usize = 100;
+
+struct RngGuard(u32);
+
+impl Drop for RngGuard {
+    fn drop(&mut self) {
+        crate::rng::restore(self.0);
+    }
+}
+
+fn own_visible_pool(gs: &GameState, me: u8) -> Vec<String> {
+    let p = gs.seat_player(me);
+    p.hand.cards.iter()
+        .chain(p.stage.stage.iter())
+        .chain(p.stage.under_cards.iter().flatten())
+        .chain(p.waitroom.cards.iter())
+        .chain(p.success_live_card_zone.cards.iter())
+        .chain(p.live_card_zone.cards.iter())
+        .chain(p.main_deck.cards.iter())
+        .filter_map(|&cid| gs.card_database.get_card(cid))
+        .map(|card| card.card_no.to_string())
+        .collect()
+}
+
+fn first_live_id(db: &CardDatabase) -> i16 {
+    db.cards.values()
+        .find(|card| card.card_type == CardType::Live)
+        .and_then(|card| db.get_card_id(card.card_no.as_ref()))
+        .unwrap_or(-1)
+}
+
+fn take_live_cards(
+    source: &mut Vec<i16>,
+    selected: &mut Vec<i16>,
+    limit: usize,
+    db: &CardDatabase,
+) {
+    let mut keep = Vec::with_capacity(source.len());
+    for &cid in source.iter() {
+        if selected.len() < limit
+            && db.get_card(cid).is_some_and(|card| card.card_type == CardType::Live)
+        {
+            selected.push(cid);
+        } else {
+            keep.push(cid);
+        }
+    }
+    *source = keep;
+}
+
+fn fair_rollout_state(gs: &GameState, me: u8, seed: u64) -> GameState {
+    let observation = PublicObservation::from_state(gs, me);
+    let own_pool = own_visible_pool(gs, me);
+    let sampler = DeterminizationSampler::new_fair(
+        crate::Arc::clone(&gs.card_database),
+        &own_pool,
+    );
+    let sampled = sampler.sample(&observation);
+    let sampled_opp = sampled.seat_player(1 - me);
+    let mut sim = gs.clone();
+    let (own, opp) = if me == 0 {
+        (&mut sim.player1, &mut sim.player2)
+    } else {
+        (&mut sim.player2, &mut sim.player1)
+    };
+
+    let mut deck_rng = crate::rng::Lcg::new(seed);
+    for i in (1..own.main_deck.cards.len()).rev() {
+        own.main_deck.cards.swap(i, deck_rng.range(i + 1));
+    }
+    opp.hand.cards = sampled_opp.hand.cards.clone();
+    opp.main_deck.cards = sampled_opp.main_deck.cards.clone();
+    opp.energy_deck.cards = sampled_opp.energy_deck.cards.clone();
+
+    let live_count = opp.live_card_zone.cards.len();
+    if live_count > 0 {
+        let mut live_cards = Vec::with_capacity(live_count);
+        let mut hand_cards = opp.hand.cards.to_vec();
+        let mut deck_cards = opp.main_deck.cards.to_vec();
+        take_live_cards(&mut hand_cards, &mut live_cards, live_count, &gs.card_database);
+        take_live_cards(&mut deck_cards, &mut live_cards, live_count, &gs.card_database);
+        opp.hand.cards = hand_cards.into();
+        opp.main_deck.cards = deck_cards.into();
+        let fallback = first_live_id(&gs.card_database);
+        while live_cards.len() < live_count {
+            live_cards.push(fallback);
+        }
+        opp.live_card_zone.cards = live_cards.into();
+    }
+    if !gs.opponent_has_performed(me as usize) {
+        opp.last_resolution_cards.clear();
+    }
+    sim
+}
 
 fn value_outcome(gs: &GameState, me: u8, start_succ: (i32, i32)) -> f64 {
     let (my, opp) = gs.seated_pair(me);
     match gs.game_result {
         GameResult::FirstAttackerWins => {
-            if me == 0 {
+            if gs.player1.is_first_attacker == (me == 0) {
                 10000.0
             } else {
                 -10000.0
             }
         }
         GameResult::SecondAttackerWins => {
-            if me == 0 {
+            if gs.player1.is_first_attacker == (me == 0) {
                 -10000.0
             } else {
                 10000.0
@@ -136,7 +231,7 @@ fn rollout_value(
             }
             crate::game_state::Phase::LiveCardSetFirstAttacker
             | crate::game_state::Phase::LiveCardSetSecondAttacker => {
-                super::strategy_v5::choose_live_set_v5(sim, &actions, &sim.card_database)
+                super::strategy_v7::choose_live_set_experiment(sim, &actions, &sim.card_database)
             }
             _ => {
                 if side_me == me {
@@ -171,10 +266,13 @@ pub fn price_portfolios(
         gs.player2.success_live_card_zone.cards.len() as i32,
     );
     let horizon_end = start_turn.saturating_add(HORIZON_TURNS);
+    let world_seed = plan_key(gs, me).2;
+    let _rng = RngGuard(crate::rng::checkpoint());
     let mut totals = vec![0.0f64; candidates.len()];
     for (ci, cand) in candidates.iter().enumerate() {
         for _ in 0..SIMS_PER_CANDIDATE {
-            let mut sim = gs.clone();
+            crate::rng::seed(world_seed as u32);
+            let mut sim = fair_rollout_state(gs, me, world_seed);
             if !apply_portfolio(&mut sim, cand) {
                 totals[ci] -= 500.0 / SIMS_PER_CANDIDATE as f64;
                 continue;
@@ -295,7 +393,7 @@ thread_local! {
 }
 
 fn plan_key(gs: &GameState, me: u8) -> (u8, u8, u64) {
-    let (my, _) = gs.seated_pair(me);
+    let (my, opp) = gs.seated_pair(me);
     let side = if matches!(
         gs.current_phase,
         crate::game_state::Phase::LiveCardSetFirstAttacker
@@ -305,10 +403,29 @@ fn plan_key(gs: &GameState, me: u8) -> (u8, u8, u64) {
         1u8
     };
     let mut h = std::collections::hash_map::DefaultHasher::new();
-    for &cid in &my.hand.cards {
-        cid.hash(&mut h);
+    my.hand.cards.hash(&mut h);
+    my.stage.stage.hash(&mut h);
+    for under in &my.stage.under_cards {
+        under.hash(&mut h);
     }
-    my.success_live_card_zone.cards.len().hash(&mut h);
+    my.energy_zone.cards.hash(&mut h);
+    my.energy_zone.active_count().hash(&mut h);
+    my.waitroom.cards.hash(&mut h);
+    my.success_live_card_zone.cards.hash(&mut h);
+    my.live_card_zone.cards.hash(&mut h);
+    let mut own_deck = my.main_deck.cards.clone();
+    own_deck.sort_unstable();
+    own_deck.hash(&mut h);
+    opp.stage.stage.hash(&mut h);
+    for under in &opp.stage.under_cards {
+        under.hash(&mut h);
+    }
+    opp.energy_zone.cards.hash(&mut h);
+    opp.energy_zone.active_count().hash(&mut h);
+    opp.waitroom.cards.hash(&mut h);
+    opp.success_live_card_zone.cards.hash(&mut h);
+    opp.live_card_zone.cards.len().hash(&mut h);
+    opp.hand.cards.len().hash(&mut h);
     gs.turn_number.hash(&mut h);
     (side, gs.turn_number, h.finish())
 }

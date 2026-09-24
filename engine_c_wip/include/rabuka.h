@@ -890,8 +890,12 @@ typedef struct {
     int  allow_skip;
     char target[64];
     char description[128];
+    char description_en[128];
+    char description_ja[128];
     RbChoiceRoute route;
     char filter_group[32];
+    int  filtered_indices[RB_MAX_ZONE];
+    int  n_filtered_indices;
     int  filter_heart;
     char heart_options[8][24];
     int  n_heart_options;
@@ -1380,6 +1384,7 @@ typedef struct GameState {
     int      position_change_occurred_this_turn;
     int      formation_change_occurred_this_turn;
     int      opponent_live_success_this_turn;
+    int      opponent_choice_declined;
     int      game_state_history[64]; int n_game_state_history;
     int      loop_detected;
     /* just_completed_ability_key — mirrors Rust's GameState.just_completed_ability_key.
@@ -1788,10 +1793,14 @@ void rb_effect_gain_surplus_heart(GameState *g, int actor, const AbilityEffect *
 /* Mirror cost.rs::handle_pay_cost_all_discard — "may discard your whole hand" cost. */
 int  rb_effect_pay_cost_all_discard(GameState *g, int actor, const AbilityEffect *e);
 void rb_effect_look_at(GameState *g, int actor, AbilityEffect *e);
+void rb_effect_reveal(GameState *g, int actor, AbilityEffect *e);
+void rb_effect_reveal_per_group(GameState *g, int actor, AbilityEffect *e);
 void rb_effect_reveal_until_live_card(GameState *g, int actor, AbilityEffect *e);
 void rb_effect_reveal_until_chosen_card(GameState *g, int actor, AbilityEffect *e);
 void rb_effect_reveal_until_target(GameState *g, int actor, AbilityEffect *e);
+void rb_effect_select(GameState *g, int actor, AbilityEffect *e);
 void rb_effect_select_cards(GameState *g, int actor, AbilityEffect *e);
+void rb_effect_look_and_select(GameState *g, int actor, AbilityEffect *e);
 int  rb_looked_at_pool(int pl, int *out_ids, int max);
 void rb_gain_ability(GameState *g, int actor, AbilityEffect *e);
 void rb_gain_ability_from_source(GameState *g, int actor, AbilityEffect *e, int host_cid);
@@ -2609,5 +2618,18 @@ int rb_las_kind_from_str(const char *s, RbLookAndSelectStepKind *out);
 RbLookAndSelectStep rb_look_and_select_step_look(int count, const char *source);
 RbLookAndSelectStep rb_look_and_select_step_select(int count, int max_per_group);
 RbLookAndSelectStep rb_look_and_select_step_finalize(const char *destination, const char *source_zone);
+
+int rb_executor_has_executor(const char *action);
+int rb_executor_is_structural(const char *action);
+int rb_executor_execute(GameState *g, int actor, AbilityEffect *effect, int host_cid);
+int rb_execute_effect_via_registry(GameState *g, int actor, AbilityEffect *effect, int host_cid);
+int rb_translated_execute_gain_ability_effect(GameState *g, int actor, AbilityEffect *effect, int host_cid);
+int rb_translated_execute_activate_ability(GameState *g, int actor, AbilityEffect *effect, int host_cid);
+int rb_translated_execute_invalidate_ability(GameState *g, int actor, AbilityEffect *effect);
+int rb_translated_execute_suppress_ability_trigger(GameState *g, int actor, AbilityEffect *effect);
+int rb_translated_execute_set_card_identity_effect(GameState *g, int actor, AbilityEffect *effect, int host_cid);
+int rb_translated_execute_gain_ability_from_source(GameState *g, int actor, AbilityEffect *effect, int host_cid);
+int rb_translated_execute_custom_effect(GameState *g, int actor, AbilityEffect *effect, const char *action_str);
+int rb_execute_custom_effect(GameState *g, int actor, AbilityEffect *effect, const char *action_str);
 
 #endif /* RABUKA_H */

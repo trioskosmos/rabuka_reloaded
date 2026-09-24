@@ -562,7 +562,7 @@ void rb_effect_select_effect(GameState *g, int actor, AbilityEffect *e, int host
     }
     g->queue.resume_eff = e;
     g->queue.resume_actor = actor;
-    g->queue.resume_host = actor;
+    g->queue.resume_host = g->queue.resume_host >= 0 ? g->queue.resume_host : actor;
 }
 
 /* ── C6 keep-N-shuffle-rest (draw.rs::execute_both_hand_keep_shuffle_under) ── */
@@ -588,7 +588,7 @@ void rb_effect_both_hand_keep_shuffle_under(GameState *g, int actor,
         g->queue.resume_mode = 5;
         g->queue.resume_eff = e;
         g->queue.resume_actor = actor;
-        g->queue.resume_host = actor;
+        g->queue.resume_host = g->queue.resume_host >= 0 ? g->queue.resume_host : actor;
         g->keep_shuffle_under_phase = 1;
         return;
     }
@@ -641,7 +641,7 @@ void rb_effect_both_hand_keep_shuffle_under(GameState *g, int actor,
         g->queue.resume_mode = 5;
         g->queue.resume_eff = e;
         g->queue.resume_actor = actor;
-        g->queue.resume_host = actor;
+        g->queue.resume_host = g->queue.resume_host >= 0 ? g->queue.resume_host : actor;
         g->keep_shuffle_under_phase = 2;
         g->n_selected_cards = 0;
         return;
@@ -775,6 +775,10 @@ void rb_effect_select_number(GameState *g, int actor, AbilityEffect *e) {
     rb_emit_choice(g, actor, RB_CHOICE_SELECT_NUMBER, NULL, NULL,
                    max_cost, allow, "choice_number");
     rb_queue_pause_for_choice(g, &g->queue.pending);
+    g->queue.resume_mode = 0;
+    g->queue.resume_eff = e;
+    g->queue.resume_actor = actor;
+    g->queue.resume_host = g->activating_card >= 0 ? g->activating_card : g->queue.resume_host;
     const char *hc = draw_extra(e, "heart_color");
     if (!hc) hc = draw_extra(e, "heart_colors");
     g->queue.selected_heart_color = (int)rb_parse_heart_color(hc ? hc : "pink");

@@ -507,8 +507,15 @@ void rb_full_choice_to_header(const RbFullChoice *src, RbChoice *dst) {
     dst->count = src->count > 0 ? src->count : 1;
     dst->allow_skip = src->allow_skip;
     strncpy(dst->description, src->description, sizeof(dst->description) - 1);
+    strncpy(dst->description_en, src->description_en[0] ? src->description_en : src->description,
+            sizeof(dst->description_en) - 1);
+    strncpy(dst->description_ja, src->description_ja, sizeof(dst->description_ja) - 1);
     strncpy(dst->target, src->target_player_id[0] ? src->target_player_id : src->target,
             sizeof(dst->target) - 1);
+    dst->n_filtered_indices = src->has_filtered ? src->n_filtered : 0;
+    if (dst->n_filtered_indices > RB_MAX_ZONE) dst->n_filtered_indices = RB_MAX_ZONE;
+    for (int i = 0; i < dst->n_filtered_indices; i++)
+        dst->filtered_indices[i] = src->filtered_indices[i];
 }
 
 const char *rb_full_choice_to_json(const RbFullChoice *ch, char *buf, size_t buf_sz) {

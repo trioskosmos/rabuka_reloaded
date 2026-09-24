@@ -1767,8 +1767,7 @@ gs.set_recently_moved_batch(moved.clone().into(), Some("under_member"));
         let is_all = effect.all_any().unwrap_or(false);
         let card_db = gs.card_database.clone();
         let activating_card_id = gs.activating_card;
-        let vacated_stage_area = gs.last_vacated_stage_area;
-        gs.last_vacated_stage_area = None;
+        let mut vacated_stage_area = gs.last_vacated_stage_area;
 
         // Character name filter from the effect
         let character_filter: Option<Vec<String>> = effect.characters_any().cloned();
@@ -1798,6 +1797,40 @@ gs.set_recently_moved_batch(moved.clone().into(), Some("under_member"));
             ),
             _ => false,
         };
+        let baton_arrival_area = if Zone::from_str(&destination) == Some(Zone::UnderMember)
+            && source == "discard"
+            && effect.is_self_target()
+            && effect
+                .condition
+                .as_ref()
+                .and_then(|condition| condition.get_baton_touch_trigger())
+                .unwrap_or(false)
+        {
+            let player = gs.resolve_target_player(&target);
+            gs.baton_touch_arriving_card_id
+                .and_then(|arriving| player.stage.stage.iter().position(|&id| id == arriving))
+                .map(|area| area as u8)
+        } else {
+            None
+        };
+        if vacated_stage_area.is_none() {
+            vacated_stage_area = baton_arrival_area;
+        }
+        log::debug!(
+            "[BATON_UNDER] destination={} source={} self_target={} baton_condition={} arriving={:?} arrival_area={:?} vacated={:?}",
+            destination,
+            source,
+            effect.is_self_target(),
+            effect
+                .condition
+                .as_ref()
+                .and_then(|condition| condition.get_baton_touch_trigger())
+                .unwrap_or(false),
+            gs.baton_touch_arriving_card_id,
+            baton_arrival_area,
+            vacated_stage_area,
+        );
+        gs.last_vacated_stage_area = None;
 
         // Store destination for execute_selected_cards_from_zone to read later
         // (needed when the resolve creates a card selection choice and the destination

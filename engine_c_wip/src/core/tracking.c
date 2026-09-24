@@ -34,6 +34,7 @@ void rb_reset_keyword_tracking(GameState *g){
     rb_reset_change_flags(g);
     g->live_success[0] = 0;
     g->live_success[1] = 0;
+    g->opponent_choice_declined = 0;
     g->cheer_check_completed = 0;
     rb_reset_loop_detection(g);
     g->baton_touch_count_p1 = 0;
