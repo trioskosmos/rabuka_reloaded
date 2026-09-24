@@ -1,6 +1,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #define MAX_CARDS 6
@@ -41,7 +42,13 @@ static DistinctNamesResult brute_force(const NameSet name_sets[], int name_set_c
         bool collided;
     } StackEntry;
 
-    StackEntry stack[4096];
+    StackEntry *stack = malloc(sizeof(StackEntry) * 4096);
+    if (!stack) {
+        fprintf(stderr, "FAIL: brute-force stack allocation failed\n");
+        result.distinct = -1;
+        result.collision = true;
+        return result;
+    }
     int top = 0;
     stack[top++] = (StackEntry){0, {0}, 0, false};
     bool found_no_collision = false;
@@ -64,6 +71,7 @@ static DistinctNamesResult brute_force(const NameSet name_sets[], int name_set_c
                 fprintf(stderr, "FAIL: brute-force stack overflow\n");
                 result.distinct = -1;
                 result.collision = true;
+                free(stack);
                 return result;
             }
             stack[top++] = next;
@@ -71,6 +79,7 @@ static DistinctNamesResult brute_force(const NameSet name_sets[], int name_set_c
     }
 
     result.collision = !found_no_collision;
+    free(stack);
     return result;
 }
 

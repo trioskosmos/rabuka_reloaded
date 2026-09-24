@@ -1223,6 +1223,10 @@ static int rb_process_current_ability(GameState *g) {
     if (!g || g->queue.cur < 0 || g->queue.cur >= g->queue.n_entries) return 0;
 
     RbQueueEntry *entry = &g->queue.entries[g->queue.cur];
+    if (entry->effect_started) {
+        g->queue.cur++;
+        return 0;
+    }
     int cid = entry->card_id;
     int aidx = entry->ability_idx;
 
@@ -1277,6 +1281,7 @@ static int rb_process_current_ability(GameState *g) {
 
 int rb_process_player_abilities(GameState *g, int pl) {
     if (!g) return 0;
+    if (g->queue.has_pending) return 0;
     int processed = 0;
     g->queue.actor = pl;
     g->queue.state = RB_QUEUE_RESOLVING;
@@ -1300,6 +1305,7 @@ int rb_process_player_abilities(GameState *g, int pl) {
 
 int rb_process_pending_auto_abilities(GameState *g) {
     if (!g) return 0;
+    if (g->queue.has_pending) return 0;
     int total = 0;
     for (int pl = 0; pl < 2; pl++)
         total += rb_process_player_abilities(g, pl);

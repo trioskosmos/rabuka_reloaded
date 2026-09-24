@@ -671,6 +671,9 @@ int rb_drain_ability_queue(GameState *g) {
         if (!rb_decode_card_ability((uint32_t)e->card_id, e->ability_idx, &ab)) continue;
         int actor = rb_owner_of_card(g, e->card_id);
         if (actor < 0) actor = g->active;
+        fprintf(stderr, "[QUEUE_EXEC] idx=%d n=%d cid=%d ab=%d actor=%d action=%s\n",
+                i, g->queue.n_entries, e->card_id, e->ability_idx, actor,
+                ab.effect && ab.effect->action ? ab.effect->action : "-");
         if (ab.effect) {
             rb_execute_effect_ex(g, actor, ab.effect, e->card_id);
             g->n_recently_moved = 0;

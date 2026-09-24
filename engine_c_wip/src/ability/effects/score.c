@@ -111,6 +111,10 @@ static int score_per_unit_count(const GameState *gs, int actor, const AbilityEff
 
 int rb_execute_modify_score(GameState *gs, int actor, AbilityEffect *e) {
     if (!gs || !e) return -1;
+    fprintf(stderr, "[SCORE_CALL] cur=%d state=%d pending=%d resume_action=%s text=%s\n",
+            gs->queue.cur, gs->queue.state, gs->queue.has_pending,
+            gs->queue.resume_eff && gs->queue.resume_eff->action ? gs->queue.resume_eff->action : "-",
+            e->text ? e->text : "-");
     const char *op = sc_extra(e, "operation"); if (!op) op = "add";
     int value = e->count >= 0 ? e->count : sc_extra_int(e, "value");
 
@@ -254,6 +258,8 @@ int rb_execute_modify_score(GameState *gs, int actor, AbilityEffect *e) {
                 rb_mods_add_score(&gs->mods, cid, (int16_t)delta);
             }
             int source = gs->queue.resume_host >= 0 ? gs->queue.resume_host : gs->activating_card;
+            fprintf(stderr, "[SCORE_APPLY] source=%d target=%d delta=%d action=%s\n",
+                    source, cid, delta, e->text ? e->text : "-");
             if (source >= 0) {
                 rb_mods_trace_push(&gs->mods, source, e->text,
                                    !strcmp(op, "set") ? RB_EFFECT_SCORE_SET : RB_EFFECT_SCORE_BONUS,

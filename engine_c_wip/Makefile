@@ -16,9 +16,12 @@ SURPLUS_HEART := tests/test_surplus_heart.c
 OPPONENT_LIVE_FLOW := tests/test_opponent_live_success_flow.c
 LIVE_MOVEMENT := tests/test_live_card_zone_movement.c
 RESTRICTIONS := tests/test_restriction_mechanics.c
+CONDITION_EVAL := tests/test_condition_evaluation.c
+TARGET_SELECTION := tests/test_target_selection.c
+MAX_DISTINCT_NAMES := tests/test_max_distinct_names.c
 AUDIT   := tools/audit_actions.c
 
-.PHONY: all test audit regen clean mechanics live-rules phase-rules performance-rules surplus-heart opponent-live-flow live-movement restrictions
+.PHONY: all test audit regen clean mechanics live-rules phase-rules performance-rules surplus-heart opponent-live-flow live-movement restrictions condition-eval target-selection max-distinct-names
 all: $(TARGET)
 
 regen:
@@ -88,6 +91,24 @@ live-movement: $(TARGET)_live_movement
 
 restrictions: $(TARGET)_restrictions
 	./$(TARGET)_restrictions
+
+$(TARGET)_condition_eval: $(OBJ_LIB) $(CONDITION_EVAL)
+	$(CC) $(CFLAGS) -o $@ $(OBJ_LIB) $(CONDITION_EVAL)
+
+$(TARGET)_target_selection: $(OBJ_LIB) $(TARGET_SELECTION)
+	$(CC) $(CFLAGS) -o $@ $(OBJ_LIB) $(TARGET_SELECTION)
+
+$(TARGET)_max_distinct_names: $(OBJ_LIB) $(MAX_DISTINCT_NAMES)
+	$(CC) $(CFLAGS) -o $@ $(OBJ_LIB) $(MAX_DISTINCT_NAMES)
+
+condition-eval: $(TARGET)_condition_eval
+	./$(TARGET)_condition_eval
+
+target-selection: $(TARGET)_target_selection
+	./$(TARGET)_target_selection
+
+max-distinct-names: $(TARGET)_max_distinct_names
+	./$(TARGET)_max_distinct_names
 
  $(TARGET)_debug: $(OBJ_LIB) src/debug_umi.o
 	$(CC) $(CFLAGS) -o $@ $(OBJ_LIB) src/debug_umi.o

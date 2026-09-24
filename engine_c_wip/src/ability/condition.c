@@ -456,6 +456,37 @@ static int eval_comparison_inner(const struct GameState *g, int actor, int host_
     const char *loc = get_str(c, "location");
     const char *agg = get_str(c, "aggregate");
     const char *ctype = get_str(c, "comparison_type");
+    const char *comparison_target = get_str(c, "comparison_target");
+    const char *position = get_str(c, "position");
+    if (ctype && !strcmp(ctype, "cost") && position &&
+        comparison_target && !strcmp(comparison_target, "opponent")) {
+        int self_player = target_player_idx(actor, c);
+        int self_id = rb_card_at_position(g, self_player, position);
+        int opponent_id = rb_card_at_position(g, self_player ^ 1, position);
+        const CondValue *groups = find_val(c, "group_names");
+        const char *group = groups && groups->tag == RB_TAG_ARRAY && groups->arr_n > 0 &&
+                            groups->arr[0].tag == RB_TAG_STR ? groups->arr[0].s : NULL;
+        const char *card_type = get_str(c, "card_type");
+        int self_cost = 0;
+        int opponent_cost = 0;
+        if (self_id != RB_EMPTY_SLOT && (!group || rb_card_matches_group_str(self_id, group)) &&
+            (!card_type || card_matches_card_type_filter(self_id, card_type))) {
+            Card cc;
+            if (rb_decode_card_by_index((uint32_t)self_id, &cc)) {
+                self_cost = cc.cost + rb_mods_get_cost((RbMods *)g, self_id);
+                rb_free_card(&cc);
+            }
+        }
+        if (opponent_id != RB_EMPTY_SLOT && (!group || rb_card_matches_group_str(opponent_id, group)) &&
+            (!card_type || card_matches_card_type_filter(opponent_id, card_type))) {
+            Card cc;
+            if (rb_decode_card_by_index((uint32_t)opponent_id, &cc)) {
+                opponent_cost = cc.cost + rb_mods_get_cost((RbMods *)g, opponent_id);
+                rb_free_card(&cc);
+            }
+        }
+        return eval_operator(self_cost, get_str(c, "operator"), opponent_cost);
+    }
     /* both_condition: values = required scores that must ALL be present among the
        player's success/live cards. It shares variant 2 with comparison_condition
        but carries NO comparison_type=="score", so route it here. Mirrors
