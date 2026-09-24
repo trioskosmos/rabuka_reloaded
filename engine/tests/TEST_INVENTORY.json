@@ -1,6 +1,6 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-09-24T20:52:33.146600+00:00",
+  "generated_at": "2026-09-24T21:08:26.754900+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
@@ -8,7 +8,7 @@
     "unique_abilities": 936
   },
   "n_files": 839,
-  "n_tests": 3486,
+  "n_tests": 3488,
   "total_cards": 771,
   "covered_cards": 771,
   "abilities_on_covered": 936,
@@ -678,7 +678,7 @@
       ]
     }
   },
-  "n_test_fns_parsed": 3486,
+  "n_test_fns_parsed": 3488,
   "abilities": [
     {
       "idx": 0,
@@ -6884,12 +6884,14 @@
         "engine/tests/test_modules/jidou/ability_watch/live_success_resolved_moved_own_center_group_gain_live_score_q255_test.rs"
       ],
       "covering_tests": [
+        "live_success_q255_turn_one_limit_resets_on_next_turn",
+        "live_success_q255_unrelated_member_movement_does_not_score",
         "live_success_resolution_score_non_mus_resolver_no_score_even_with_mus_staged_and_moved",
         "live_success_resolution_score_once_per_turn_single_score_for_two_resolvers",
         "live_success_resolution_score_q255_moved_before_resolution_scores",
         "live_success_resolution_score_unmoved_resolver_scores_nothing"
       ],
-      "covering_test_count": 4,
+      "covering_test_count": 6,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -7873,6 +7875,8 @@
         "live_start_resolution_reposition_opponent_member_resolution_does_not_arm_own_watcher",
         "live_start_resolution_reposition_q255_member_already_off_center_still_triggers",
         "live_start_resolution_reposition_resolving_center_group_member",
+        "live_success_q255_turn_one_limit_resets_on_next_turn",
+        "live_success_q255_unrelated_member_movement_does_not_score",
         "live_success_resolution_score_non_mus_resolver_no_score_even_with_mus_staged_and_moved",
         "live_success_resolution_score_once_per_turn_single_score_for_two_resolvers",
         "live_success_resolution_score_q255_moved_before_resolution_scores",
@@ -7881,7 +7885,7 @@
         "nonmatching_group_discard_recovers_live_to_hand",
         "resolved_live_success_after_center_position_change_adds_one_score_q255"
       ],
-      "covering_test_count": 21,
+      "covering_test_count": 23,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -7933,6 +7937,8 @@
         "live_start_resolution_reposition_opponent_member_resolution_does_not_arm_own_watcher",
         "live_start_resolution_reposition_q255_member_already_off_center_still_triggers",
         "live_start_resolution_reposition_resolving_center_group_member",
+        "live_success_q255_turn_one_limit_resets_on_next_turn",
+        "live_success_q255_unrelated_member_movement_does_not_score",
         "live_success_resolution_score_non_mus_resolver_no_score_even_with_mus_staged_and_moved",
         "live_success_resolution_score_once_per_turn_single_score_for_two_resolvers",
         "live_success_resolution_score_q255_moved_before_resolution_scores",
@@ -7941,7 +7947,7 @@
         "nonmatching_group_discard_recovers_live_to_hand",
         "resolved_live_success_after_center_position_change_adds_one_score_q255"
       ],
-      "covering_test_count": 21,
+      "covering_test_count": 23,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -7990,6 +7996,8 @@
         "kotori_q247_preexisting_under_does_not_double_heart",
         "kotori_q247_preexisting_under_skip_live_start_no_heart",
         "kotori_skip_optional_does_nothing",
+        "live_success_q255_turn_one_limit_resets_on_next_turn",
+        "live_success_q255_unrelated_member_movement_does_not_score",
         "live_success_resolution_score_non_mus_resolver_no_score_even_with_mus_staged_and_moved",
         "live_success_resolution_score_once_per_turn_single_score_for_two_resolvers",
         "live_success_resolution_score_q255_moved_before_resolution_scores",
@@ -7998,7 +8006,7 @@
         "q148_blade_total_below_threshold",
         "q148_blade_total_includes_waited_member"
       ],
-      "covering_test_count": 21,
+      "covering_test_count": 23,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -8047,6 +8055,8 @@
         "kotori_q247_preexisting_under_does_not_double_heart",
         "kotori_q247_preexisting_under_skip_live_start_no_heart",
         "kotori_skip_optional_does_nothing",
+        "live_success_q255_turn_one_limit_resets_on_next_turn",
+        "live_success_q255_unrelated_member_movement_does_not_score",
         "live_success_resolution_score_non_mus_resolver_no_score_even_with_mus_staged_and_moved",
         "live_success_resolution_score_once_per_turn_single_score_for_two_resolvers",
         "live_success_resolution_score_q255_moved_before_resolution_scores",
@@ -8055,7 +8065,7 @@
         "q148_blade_total_below_threshold",
         "q148_blade_total_includes_waited_member"
       ],
-      "covering_test_count": 21,
+      "covering_test_count": 23,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -40343,13 +40353,15 @@
         "live_start_resolution_reposition_opponent_member_resolution_does_not_arm_own_watcher",
         "live_start_resolution_reposition_q255_member_already_off_center_still_triggers",
         "live_start_resolution_reposition_resolving_center_group_member",
+        "live_success_q255_turn_one_limit_resets_on_next_turn",
+        "live_success_q255_unrelated_member_movement_does_not_score",
         "live_success_resolution_score_non_mus_resolver_no_score_even_with_mus_staged_and_moved",
         "live_success_resolution_score_once_per_turn_single_score_for_two_resolvers",
         "live_success_resolution_score_q255_moved_before_resolution_scores",
         "live_success_resolution_score_unmoved_resolver_scores_nothing",
         "resolved_live_success_after_center_position_change_adds_one_score_q255"
       ],
-      "covering_test_count": 15,
+      "covering_test_count": 17,
       "is_null": false,
       "use_limit": 1,
       "watches_abilities": true,
@@ -40394,13 +40406,15 @@
         "live_start_resolution_reposition_opponent_member_resolution_does_not_arm_own_watcher",
         "live_start_resolution_reposition_q255_member_already_off_center_still_triggers",
         "live_start_resolution_reposition_resolving_center_group_member",
+        "live_success_q255_turn_one_limit_resets_on_next_turn",
+        "live_success_q255_unrelated_member_movement_does_not_score",
         "live_success_resolution_score_non_mus_resolver_no_score_even_with_mus_staged_and_moved",
         "live_success_resolution_score_once_per_turn_single_score_for_two_resolvers",
         "live_success_resolution_score_q255_moved_before_resolution_scores",
         "live_success_resolution_score_unmoved_resolver_scores_nothing",
         "resolved_live_success_after_center_position_change_adds_one_score_q255"
       ],
-      "covering_test_count": 15,
+      "covering_test_count": 17,
       "is_null": false,
       "use_limit": 1,
       "watches_abilities": true,

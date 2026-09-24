@@ -132,3 +132,38 @@ fn live_success_resolution_score_once_per_turn_single_score_for_two_resolvers() 
         "ターン1回: second μ's LSS resolution same turn adds nothing"
     );
 }
+
+#[test]
+fn live_success_q255_unrelated_member_movement_does_not_score() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let ds = game.id("PL!-bp6-020-L");
+    let honoka = game.id("PL!-bp6-001-R＋");
+    let ally = game.id("PL!-bp6-003-R＋");
+    game.state.player1.live_card_zone.cards.push(ds);
+    game.state.player1.stage.stage[1] = honoka;
+    game.state.player1.stage.stage[2] = ally;
+    manually_move(&mut game, ally, 2, 0);
+
+    fire_trigger(&mut game, honoka, AbilityTrigger::LiveSuccess, LSS);
+
+    assert_eq!(score_of(&game, ds), 0);
+}
+
+#[test]
+fn live_success_q255_turn_one_limit_resets_on_next_turn() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let ds = game.id("PL!-bp6-020-L");
+    let honoka = game.id("PL!-bp6-001-R＋");
+    game.state.player1.live_card_zone.cards.push(ds);
+    game.state.player1.stage.stage[1] = honoka;
+    manually_move(&mut game, honoka, 1, 0);
+    fire_trigger(&mut game, honoka, AbilityTrigger::LiveSuccess, LSS);
+    assert_eq!(score_of(&game, ds), 1);
+
+    game.state.turn_number = 2;
+    manually_move(&mut game, honoka, 0, 1);
+    fire_trigger(&mut game, honoka, AbilityTrigger::LiveSuccess, LSS);
+    assert_eq!(score_of(&game, ds), 2);
+}

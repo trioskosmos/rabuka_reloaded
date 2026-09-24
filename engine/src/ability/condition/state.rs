@@ -92,19 +92,30 @@ impl<'a> ConditionContext<'a> {
                                 }
                             }
                             "has_moved" => {
-                                let check_card = condition.get_position().and_then(|pos| {
-                                    pos.get_position().and_then(|pos_str| {
-                                        let target = condition.get_target().unwrap_or("self");
-                                        let player = self.resolve_condition_player(target);
-                                        util::stage_position_index(pos_str).and_then(|idx| {
-                                            if idx < 3 && player.stage.stage[idx] != -1 {
-                                                Some(player.stage.stage[idx])
-                                            } else {
-                                                None
-                                            }
+                                let check_card = self
+                                    .game_state
+                                    .ability_queue
+                                    .current_entry()
+                                    .and_then(|entry| entry.triggering_member_id)
+                                    .or_else(|| {
+                                        condition.get_position().and_then(|pos| {
+                                            pos.get_position().and_then(|pos_str| {
+                                                let target =
+                                                    condition.get_target().unwrap_or("self");
+                                                let player =
+                                                    self.resolve_condition_player(target);
+                                                util::stage_position_index(pos_str)
+                                                    .and_then(|idx| {
+                                                        if idx < 3 && player.stage.stage[idx] != -1
+                                                        {
+                                                            Some(player.stage.stage[idx])
+                                                        } else {
+                                                            None
+                                                        }
+                                                    })
+                                            })
                                         })
-                                    })
-                                });
+                                    });
                                 if let Some(card_id) = check_card {
                                     // Positioned subject (「センターエリアにいる…メン
                                     // バー」): the member CURRENTLY at the named slot
@@ -1080,12 +1091,17 @@ impl<'a> ConditionContext<'a> {
     ///   登場か、エリアを移動したとき — "has_moved" with appearance OR
     fn evaluate_has_moved(&self, condition: &Condition, _player: &crate::player::Player) -> bool {
         let _ = condition;
-        self.activating_card_id.is_some_and(|cid| {
-            self.game_state
-                .position_change_events
-                .iter()
-                .any(|e| e.moved_card_id == cid)
-        })
+        self.game_state
+            .ability_queue
+            .current_entry()
+            .and_then(|entry| entry.triggering_member_id)
+            .or(self.activating_card_id)
+            .is_some_and(|cid| {
+                self.game_state
+                    .position_change_events
+                    .iter()
+                    .any(|event| event.moved_card_id == cid)
+            })
     }
 
     pub(crate) fn evaluate_score_threshold_condition(&self, condition: &Condition) -> bool {
