@@ -75,16 +75,10 @@ void rb_advance_phase(GameState *g) {
     if(g->phase==RB_PHASE_LIVE_SET){
         RbPlayer *P = &g->p[g->active];
         int placed = P->live.n;
-        for (int i = 0; i < placed; i++) {
-            for (int h = 0; h < P->hand.n; h++) {
-                if (P->hand.cards[h] == P->live.cards[i]) {
-                    for (int k = h; k < P->hand.n - 1; k++) P->hand.cards[k] = P->hand.cards[k + 1];
-                    P->hand.n--;
-                    break;
-                }
-            }
-        }
+        int hand_before_refill = P->hand.n;
         for (int i = 0; i < placed; i++) rb_draw(g, g->active);
+        fprintf(stderr, "[LIVE_ZONE_REFILL] pl=%d placed=%d hand_before=%d hand_after=%d\n",
+                g->active, placed, hand_before_refill, P->hand.n);
         if (g->active == g->first_attacker) {
             g->active = g->second_attacker;
             return;
@@ -112,10 +106,14 @@ void rb_advance_phase(GameState *g) {
     }
     if(g->phase==RB_PHASE_PERFORMANCE){
         rb_recalc_constants(g);
-        /* Perform the live calculation for both players */
         g->live_batch_mode = 1;
-        rb_perform_live(g, 0);
-        rb_perform_live(g, 1);
+        if (g->active == g->first_attacker) {
+            rb_perform_live(g, g->active);
+            g->active = g->second_attacker;
+            return;
+        }
+        rb_perform_live(g, g->active);
+        g->active = g->first_attacker;
         g->live_batch_mode = 0;
         rb_execute_live_victory_determination(g);
         g->live_victory_pending = rb_has_pending_choice(g);
@@ -699,4 +697,143 @@ const char *rb_rps_choice_name(int choice) {
 void rb_push_rps_log(GameState *g, int p1, int p2, const char *winner_str) {
     if (!g) return;
     (void)p1; (void)p2; (void)winner_str;
+}
+
+static RbGeneratedArea rb_action_areas[RB_MAX_HAND * RB_STAGE_SIZE][RB_STAGE_SIZE];
+
+static RbGeneratedAction *rb_actions_push(RbGeneratedAction *actions, int *count, int *capacity,
+                                 RbGeneratedAction action) {
+    if (*count >= *capacity) {
+        int next_capacity = *capacity > 0 ? *capacity * 2 : 16;
+        RbGeneratedAction *next = (RbGeneratedAction *)rb_malloc((size_t)next_capacity * sizeof(*next));
+        if (!next) return NULL;
+        if (*count > 0) memcpy(next, actions, (size_t)(*count) * sizeof(*next));
+        rb_free(actions);
+        actions = next;
+        *capacity = next_capacity;
+    }
+    actions[(*count)++] = action;
+    return actions;
+}
+
+RbGeneratedActionList rb_generate_action_candidates(const GameState *state) {
+    RbGeneratedActionList result = { NULL, 0 };
+    if (!state || state->phase != RB_PHASE_MAIN) return result;
+
+    int capacity = 1 + state->p[state->active].hand.n * RB_STAGE_SIZE;
+    RbGeneratedAction *actions = (RbGeneratedAction *)rb_malloc((size_t)capacity * sizeof(*actions));
+    if (!actions) return result;
+
+    RbGeneratedAction pass;
+    memset(&pass, 0, sizeof(pass));
+    actions[result.count++] = pass;
+    if (rb_is_action_prohibited(state, "play_member")) {
+        result.actions = actions;
+        return result;
+    }
+
+    int actor = state->active;
+    const RbPlayer *player = &state->p[actor];
+    int area_slot = 0;
+    for (int hand_index = 0; hand_index < player->hand.n; hand_index++) {
+        int card_id = player->hand.cards[hand_index];
+        if (!rb_card_is_member(card_id)) continue;
+
+        Card card;
+        if (!rb_decode_card_by_index((uint32_t)card_id, &card)) continue;
+        int cost_modifier = rb_mods_get_cost((RbMods *)&state->mods, card_id);
+        int reduction = rb_calculate_play_cost_reduction(state, actor,
+                                                        player->hand.n, card_id);
+        int effective_cost = card.cost + cost_modifier - reduction;
+        if (effective_cost < 0) effective_cost = 0;
+        int available_count = 0;
+
+        for (int area = 0; area < RB_STAGE_SIZE; area++) {
+            RbGeneratedArea *info = &rb_action_areas[area_slot][area];
+            info->available = 0;
+            info->is_baton_touch = 0;
+            int existing_id = player->stage[area];
+            if (existing_id == RB_EMPTY_SLOT) {
+                if (player->energy_active >= effective_cost) {
+                    info->available = 1;
+                    available_count++;
+                }
+            } else if (!rb_card_arrived_this_turn(state, actor, existing_id) &&
+                       !rb_card_has_restriction(state, card_id, existing_id,
+                                                "cannot_baton_touch")) {
+                Card existing;
+                if (rb_decode_card_by_index((uint32_t)existing_id, &existing)) {
+                    int existing_modifier = rb_mods_get_cost((RbMods *)&state->mods,
+                                                             existing_id);
+                    int existing_cost = existing.cost + existing_modifier;
+                    int baton_cost = effective_cost - existing_cost;
+                    if (baton_cost < 0) baton_cost = 0;
+                    if (player->energy_active >= baton_cost) {
+                        info->available = 1;
+                        info->is_baton_touch = 1;
+                        available_count++;
+                    }
+                    rb_free_card(&existing);
+                }
+            }
+        }
+
+        if (available_count > 0) {
+            for (int area = 0; area < RB_STAGE_SIZE; area++) {
+                if (!rb_action_areas[area_slot][area].available) continue;
+                RbGeneratedAction action;
+                memset(&action, 0, sizeof(action));
+                action.action_type = 14;
+                action.has_parameters = 1;
+                action.parameters.card_id = card_id;
+                action.parameters.available_areas = rb_action_areas[area_slot];
+                action.parameters.n_available_areas = RB_STAGE_SIZE;
+                RbGeneratedAction *next = rb_actions_push(actions, &result.count,
+                                                &capacity, action);
+                if (!next) {
+                    rb_free(actions);
+                    result.actions = NULL;
+                    result.count = 0;
+                    rb_free_card(&card);
+                    return result;
+                }
+                actions = next;
+            }
+        }
+        area_slot++;
+        rb_free_card(&card);
+    }
+
+    result.actions = actions;
+    return result;
+}
+
+typedef struct {
+    int available;
+    int is_baton_touch;
+} RbBatonAvailableArea;
+
+typedef struct {
+    int card_id;
+    const RbBatonAvailableArea *available_areas;
+    int n_available_areas;
+} RbBatonActionParameters;
+
+typedef struct {
+    int action_type;
+    RbBatonActionParameters parameters;
+    int has_parameters;
+} RbBatonAction;
+
+typedef struct {
+    RbBatonAction *actions;
+    int count;
+} RbBatonActionList;
+
+RbBatonActionList rb_generate_possible_actions(const GameState *state) {
+    RbGeneratedActionList generated = rb_generate_action_candidates(state);
+    RbBatonActionList result;
+    result.actions = (RbBatonAction *)generated.actions;
+    result.count = generated.count;
+    return result;
 }

@@ -889,8 +889,8 @@ int rb_complete_double_baton(GameState *g, int selected_pair) {
     P->stage_wait[dst] = 0;
     g->stage_arrived[actor][dst] = 1;
     g->baton_touch_used[actor] = 1;
-    g->baton_touch_count_p1 += actor == 0 ? 2 : 0;
-    g->baton_touch_count_p2 += actor == 1 ? 2 : 0;
+    rb_record_baton_touch(g, actor, card);
+    rb_record_baton_touch(g, actor, card);
     g->baton_touch_replaced_member_id = old2;
     g->baton_touch_arriving_card_id = card;
     g->recently_moved[0] = old1;
@@ -993,12 +993,24 @@ int rb_play_member(GameState *g, int pl, int hand_idx, int stage_pos) {
     if (is_baton) {
         /* Replace: old member (and its under-cards) → waitroom. */
         int old = P->stage[stage_pos];
+        Card old_card;
+        int old_cost = -1;
+        if (rb_decode_card_by_index((uint32_t)old, &old_card)) {
+            old_cost = old_card.cost + rb_mods_get_cost(&g->mods, old);
+            if (old_cost < 0) old_cost = 0;
+            rb_free_card(&old_card);
+        }
+        g->baton_touch_zero_cost = cost == 0;
+        g->baton_touch_replaced_member_cost = old_cost;
+        g->baton_touch_replaced_member_id = old;
         for (int u = 0; u < P->under_cards[stage_pos].n; u++)
             rb_send_to_waitroom(g, pl, P->under_cards[stage_pos].cards[u]);
         P->under_cards[stage_pos].n = 0;
         rb_send_to_waitroom(g, pl, old);
         P->stage[stage_pos] = -1;
         g->baton_touch_used[pl] = 1;
+        rb_record_baton_touch(g, pl, card);
+        g->baton_touch_arriving_card_id = card;
     }
     P->stage[stage_pos] = card;
     P->stage_wait[stage_pos] = 0;

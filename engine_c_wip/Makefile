@@ -19,9 +19,12 @@ RESTRICTIONS := tests/test_restriction_mechanics.c
 CONDITION_EVAL := tests/test_condition_evaluation.c
 TARGET_SELECTION := tests/test_target_selection.c
 MAX_DISTINCT_NAMES := tests/test_max_distinct_names.c
+BATON_TOUCH := tests/test_baton_touch.c
+MEMBER_ACTIVATION := tests/test_member_activation_debut_live_start.c
+B8_LIVE_TIMING := tests/test_b8_live_timing.c
 AUDIT   := tools/audit_actions.c
 
-.PHONY: all test audit regen clean mechanics live-rules phase-rules performance-rules surplus-heart opponent-live-flow live-movement restrictions condition-eval target-selection max-distinct-names
+.PHONY: all test audit regen clean mechanics live-rules phase-rules performance-rules surplus-heart opponent-live-flow live-movement restrictions condition-eval target-selection max-distinct-names baton-touch member-activation b8-live-timing
 all: $(TARGET)
 
 regen:
@@ -109,6 +112,24 @@ target-selection: $(TARGET)_target_selection
 
 max-distinct-names: $(TARGET)_max_distinct_names
 	./$(TARGET)_max_distinct_names
+
+$(TARGET)_baton_touch: $(OBJ_LIB) $(BATON_TOUCH)
+	$(CC) $(CFLAGS) -o $@ $(OBJ_LIB) $(BATON_TOUCH)
+
+$(TARGET)_member_activation: $(OBJ_LIB) $(MEMBER_ACTIVATION)
+	$(CC) $(CFLAGS) -o $@ $(OBJ_LIB) $(MEMBER_ACTIVATION)
+
+$(TARGET)_b8_live_timing: $(OBJ_LIB) $(B8_LIVE_TIMING)
+	$(CC) $(CFLAGS) -o $@ $(OBJ_LIB) $(B8_LIVE_TIMING)
+
+baton-touch: $(TARGET)_baton_touch
+	./$(TARGET)_baton_touch
+
+member-activation: $(TARGET)_member_activation
+	./$(TARGET)_member_activation
+
+b8-live-timing: $(TARGET)_b8_live_timing
+	./$(TARGET)_b8_live_timing
 
  $(TARGET)_debug: $(OBJ_LIB) src/debug_umi.o
 	$(CC) $(CFLAGS) -o $@ $(OBJ_LIB) src/debug_umi.o

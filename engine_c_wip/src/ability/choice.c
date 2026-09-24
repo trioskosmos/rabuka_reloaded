@@ -1273,7 +1273,8 @@ void rb_resolver_handle_stage_selection(RbAbilityResolver *self, GameState *g,
                 fprintf(stderr, "[STAGE_TARGET_RESULT] pick=%d eligible=%d cid=%d target=%s\n",
                         selected_idx, n, cid, g->queue.pending.target);
                 if (self->n_selected_cards < RB_MAX_RECENTLY_MOVED) self->selected_cards[self->n_selected_cards++] = cid;
-                if (!strcmp(g->queue.pending.target, "gain_resource_targets") &&
+                if ((!strcmp(g->queue.pending.target, "gain_resource_targets") ||
+                     !strcmp(g->queue.pending.target, "change_state")) &&
                     g->n_selected_cards < RB_MAX_RECENTLY_MOVED)
                     g->selected_cards[g->n_selected_cards++] = cid;
             }

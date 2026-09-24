@@ -335,10 +335,15 @@ void rb_clear_card_appearance_tracking(GameState *g) {
 }
 
 /* -- record_baton_touch -- */
-void rb_record_baton_touch(GameState *g, int pl) {
+void rb_record_baton_touch(GameState *g, int pl, int arriving_card_id) {
     if (!g || pl < 0 || pl >= 2) return;
     if (pl == 0) g->baton_touch_count_p1++;
     else g->baton_touch_count_p2++;
+    if (arriving_card_id >= 0 &&
+        g->n_baton_touch_arriving_card_ids < 16) {
+        g->baton_touch_arriving_card_ids[
+            g->n_baton_touch_arriving_card_ids++] = arriving_card_id;
+    }
 }
 
 /* -- get_baton_touch_count -- */

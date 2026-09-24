@@ -440,6 +440,7 @@ static AbilityEffect *decode_effect_body(Rdr *r) {
                     strcmp(key, "conditional") == 0 || strcmp(key, "is_further") == 0 ||
                     strcmp(key, "max") == 0)) {
             if (strcmp(key, "optional") == 0 && tag == RB_TAG_TRUE) e->is_optional = 1;
+            if (strcmp(key, "max") == 0 && tag == RB_TAG_TRUE) effect_set_extra(e, "max", "true");
             if (strcmp(key, "conditional") == 0 && tag == RB_TAG_TRUE) e->conditional_flag = 1;
             if (strcmp(key, "conditional_negation") == 0 && tag == RB_TAG_TRUE) e->conditional_negation = 1;
             if (strcmp(key, "is_further") == 0 && tag == RB_TAG_TRUE) e->is_further = 1;

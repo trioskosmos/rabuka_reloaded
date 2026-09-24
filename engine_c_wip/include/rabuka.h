@@ -1441,12 +1441,41 @@ typedef struct GameState {
 
 /* ── Tracking (engine/src/core/game_state/tracking.rs) ── */
 void rb_reset_keyword_tracking(GameState *g);
+void rb_record_baton_touch(GameState *g, int player, int arriving_card_id);
+int  rb_get_baton_touch_count(const GameState *g, int player);
+void rb_clear_baton_touch_tracking(GameState *g);
 void rb_add_yell_count_modifier(GameState *g, uint8_t player_slot, int32_t delta);
 void rb_refresh_yell_sources(GameState *g);
 uint8_t rb_effective_cheer_checks_required(const GameState *g, const char *player_id, uint8_t base);
 int rb_perform_cheer_check(GameState *g, const char *player_id, uint8_t blade_count);
 int rb_check_required_hearts(const GameState *g);
 int rb_is_action_prohibited(const GameState *g, const char *action);
+int rb_calculate_play_cost_reduction(const GameState *g, int pl, int hand_count,
+                                    int card_id);
+
+typedef struct {
+    int available;
+    int is_baton_touch;
+} RbGeneratedArea;
+
+typedef struct {
+    int card_id;
+    const RbGeneratedArea *available_areas;
+    int n_available_areas;
+} RbGeneratedActionParameters;
+
+typedef struct {
+    int action_type;
+    RbGeneratedActionParameters parameters;
+    int has_parameters;
+} RbGeneratedAction;
+
+typedef struct {
+    RbGeneratedAction *actions;
+    int count;
+} RbGeneratedActionList;
+
+RbGeneratedActionList rb_generate_action_candidates(const GameState *state);
 
 /* ── Ability queue drain + owner lookup (engine/src/ability_queue.rs) ── */
 int rb_owner_of_card(const GameState *g, int cid);

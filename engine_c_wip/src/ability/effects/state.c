@@ -342,8 +342,12 @@ candidates_ready:
         int pick = count > 0 ? count : 1;
         rb_emit_choice(g, who, RB_CHOICE_SELECT_CARD, "stage", NULL,
                        pick > 0 ? pick : 1, max, "change_state");
-    rb_queue_pause_for_choice(g, &g->queue.pending);
-        if(g->queue.cur >= 0) g->queue.entries[g->queue.cur].pending_actions_n = 1;
+        strncpy(g->queue.pending.card_type, card_type_filter ? card_type_filter : "member_card",
+                sizeof(g->queue.pending.card_type) - 1);
+        strncpy(g->queue.pending.target_player_id, target,
+                sizeof(g->queue.pending.target_player_id) - 1);
+        g->queue.deferred = rb_effect_deep_clone(e);
+        rb_queue_pause_for_choice(g, &g->queue.pending);
         return;
     }
 
@@ -502,17 +506,19 @@ void rb_effect_energy_state_change(GameState *g, int actor, AbilityEffect *e){
     } else {
         eff = e->count;
     }
+    int available = is_active ? total - active : active;
+    if(available < 0) available = 0;
+    if(eff > available) eff = available;
     if(max){
         fprintf(stderr, "DEBUG [ENERGY] max=true: count=%d available=%d effective=%d\n", e->count, is_active ? (total - (int)P->energy_active) : (int)P->energy_active, eff);
     } else if(e->count == 0){
         fprintf(stderr, "DEBUG [ENERGY] count=0 (all): effective=%d\n", eff);
     } else {
-        fprintf(stderr, "DEBUG [ENERGY] max=false: count=%d effective=%d\n", e->count, eff);
+        fprintf(stderr, "DEBUG [ENERGY] max=false: count=%d effective=%d available=%d\n", e->count, eff, available);
     }
     if(is_active){
         active += eff;
         if(active > total) active = total;
-        if(active > RB_ENERGY_CAP) active = RB_ENERGY_CAP;
         P->energy_active = active;
     } else {
         active -= eff;

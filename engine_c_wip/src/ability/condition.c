@@ -338,7 +338,32 @@ static int eval_location(const struct GameState *g, int actor, int host_cid, con
     int excl = 0; get_bool(c, "exclude_self", &excl);
     int exclude_cid = (excl && host_cid >= 0) ? host_cid : -1;
     int actual = 0;
-    if (ctype || group) actual = zone_count_filtered_ex(g, pl, loc, ctype, group, exclude_cid);
+    int baton_filter = 0; get_bool(c, "baton_touch_trigger", &baton_filter);
+    if (baton_filter && !strcmp(loc, "stage")) {
+        int min_baton = 0;
+        get_i(c, "min_baton_touch_count", &min_baton);
+        int baton_count = pl ? g->baton_touch_count_p2 : g->baton_touch_count_p1;
+        if (baton_count < min_baton) {
+            actual = 0;
+        } else {
+            for (int i = 0; i < RB_STAGE_SIZE; i++) {
+                int cid = g->p[pl].stage[i];
+                if (cid == RB_EMPTY_SLOT || cid == exclude_cid) continue;
+                int arrived = 0;
+                for (int j = 0; j < g->n_baton_touch_arriving_card_ids; j++) {
+                    if (g->baton_touch_arriving_card_ids[j] == cid) {
+                        arrived = 1;
+                        break;
+                    }
+                }
+                if (!arrived) continue;
+                if (ctype && !card_matches_card_type_filter(cid, ctype)) continue;
+                if (group && !rb_card_matches_group_str(cid, group)) continue;
+                actual++;
+            }
+        }
+    }
+    else if (ctype || group) actual = zone_count_filtered_ex(g, pl, loc, ctype, group, exclude_cid);
     else if (distinct) actual = count_distinct_in_zone(g, pl, loc);
     else if (exclude_cid >= 0) actual = zone_count_filtered_ex(g, pl, loc, NULL, NULL, exclude_cid);
     else actual = count_in_zone(g, pl, loc);
