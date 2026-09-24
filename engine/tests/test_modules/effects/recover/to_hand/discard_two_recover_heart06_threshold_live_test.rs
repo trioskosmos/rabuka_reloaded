@@ -146,6 +146,31 @@ fn heart06_too_low_not_recovered() {
 
 /// Empty-matching waitroom → pure cost payment, nothing recovered.
 #[test]
+fn recover_same_live_used_as_discard_cost_q209() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let nico = setup_nico(&mut game);
+    let eligible = game.id("PL!N-bp1-028-L");
+    let filler_a = game.new_id("PL!-sd1-010-SD");
+    let filler_b = game.new_id("PL!-sd1-010-SD");
+    let hand_filler = game.new_id("PL!-sd1-010-SD");
+
+    game.add_to_hand(eligible);
+    game.add_to_hand(filler_a);
+    game.add_to_hand(filler_b);
+    game.add_to_hand(hand_filler);
+
+    activate_nico(&mut game, nico);
+    pay_discard_cost(&mut game, &[eligible, filler_a]);
+    drain_to_completion(&mut game);
+
+    assert!(game.state.player1.hand.cards.contains(&eligible));
+    assert!(!game.state.player1.waitroom.cards.contains(&eligible));
+    assert!(game.state.player1.waitroom.cards.contains(&filler_a));
+    assert_eq!(game.state.player1.hand.cards.len(), 3);
+}
+
+#[test]
 fn no_eligible_card_skips() {
     let db = load_real_database();
     let mut game = TestGame::new(db);

@@ -1,6 +1,6 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-09-24T21:31:12.454136+00:00",
+  "generated_at": "2026-09-24T21:49:26.521417+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
@@ -8,7 +8,7 @@
     "unique_abilities": 936
   },
   "n_files": 839,
-  "n_tests": 3495,
+  "n_tests": 3496,
   "total_cards": 771,
   "covered_cards": 771,
   "abilities_on_covered": 936,
@@ -678,7 +678,7 @@
       ]
     }
   },
-  "n_test_fns_parsed": 3495,
+  "n_test_fns_parsed": 3496,
   "abilities": [
     {
       "idx": 0,
@@ -12403,9 +12403,10 @@
         "heart06_too_low_not_recovered",
         "no_eligible_card_skips",
         "one_card_recovered_even_if_multiple_eligible",
+        "recover_same_live_used_as_discard_cost_q209",
         "recover_with_heart06_ge3"
       ],
-      "covering_test_count": 4,
+      "covering_test_count": 5,
       "is_null": false,
       "use_limit": 1,
       "watches_abilities": false,
@@ -14115,7 +14116,7 @@
         "b_heart07_yell_contributes_two_colorless_hearts_each",
         "bella_positive_surplus_heart04_ability_fires"
       ],
-      "covering_test_count": 729,
+      "covering_test_count": 730,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -30384,7 +30385,7 @@
         "mebius_single_copy_blocks_both_when_tied",
         "mebius_tie_when_both_fail_still_restricts"
       ],
-      "covering_test_count": 46,
+      "covering_test_count": 47,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
