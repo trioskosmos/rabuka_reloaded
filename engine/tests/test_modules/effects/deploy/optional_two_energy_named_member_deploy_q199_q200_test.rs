@@ -6,6 +6,8 @@
 /// Q199: Can the card placed by this ability baton touch this turn? A: No.
 /// Q200: Can that card's own debut ability be used? A: Yes (it keeps its abilities).
 use crate::helpers::*;
+use rabuka_engine::game_setup::ActionType;
+use rabuka_engine::turn::TurnEngine;
 use rabuka_engine::zones::MemberArea;
 
 fn find_ayumu_sd(db: &std::sync::Arc<rabuka_engine::card::CardDatabase>) -> i16 {
@@ -88,6 +90,18 @@ fn optional_two_energy_named_member_deploy_tracks_deployed_this_turn_q199() {
             .contains(&target_ayumu),
         "Placed card should be tracked as deployed this turn"
     );
+
+    let replacement = game.new_id("PL!-sd1-010-SD");
+    game.state.player1.hand.cards.push(replacement);
+    let result = TurnEngine::execute_main_phase_action(
+        &mut game.state,
+        &ActionType::PlayMemberToStage,
+        Some(replacement),
+        None,
+        Some(_target_area),
+        Some(true),
+    );
+    assert!(result.is_err(), "Q199: deployed-this-turn card cannot baton touch");
 }
 
 /// Q200: Card placed by effect retains its own abilities.

@@ -75,9 +75,11 @@ fn cost11_debut_with_watcher_retains_nonempty_energy_zone_q198() {
     let ranju = game.id(RANJU);
     let cost11 = game.id(COST11_MEMBER);
     let filler = game.id("PL!-sd1-010-SD");
+    let energy = game.id("LL-E-001-SD");
 
     game.state.player1.hand.cards.push(ranju);
     game.state.player1.hand.cards.push(cost11);
+    game.state.player1.energy_deck.cards.push(energy);
     game.give_energy(25);
     for _ in 0..5 {
         game.state.player1.main_deck.cards.push(filler);
@@ -95,10 +97,10 @@ fn cost11_debut_with_watcher_retains_nonempty_energy_zone_q198() {
         game.select_indices(&[]);
     }
 
-    // Verify energy was placed (total zone count increased)
     assert!(
-        game.state.player1.energy_zone.cards.len() > 0,
-        "Energy should be placed from energy deck"
+        game.state.player1.energy_zone.cards.contains(&energy)
+            && !game.state.player1.energy_deck.cards.contains(&energy),
+        "Q198: watcher must move the exact energy from energy deck to energy zone"
     );
 }
 

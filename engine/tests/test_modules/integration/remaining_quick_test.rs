@@ -39,9 +39,10 @@ fn eternalize_q204_two_niko_hearts_reduced() {
 
     let live = game.id("PL!N-pb1-042-L");
     let filler = game.id("PL!-sd1-010-SD");
-    let niji = game.id("PL!N-pb1-012-R"); // 虹ヶ咲 member (series contains 虹ヶ咲)
+    let niji = game.id("PL!N-pb1-012-R");
+    let niji_copy = game.new_id("PL!N-pb1-012-R");
 
-    game.state.player1.stage.stage = [niji, niji, -1];
+    game.state.player1.stage.stage = [niji, niji_copy, -1];
     game.state.player1.hand.cards.push(live);
     game.state.player1.hand.cards.push(filler);
     for _ in 0..60 {
@@ -119,8 +120,9 @@ fn eternalize_same_name_two_niji_identical() {
     let mut game = TestGame::new(load_real_database());
     let (live, _) = setup_eternalize_base(&mut game);
     let ayumu = game.id("PL!N-pb1-001-R");
+    let ayumu_copy = game.new_id("PL!N-pb1-001-R");
     // Two of the same card → same name
-    game.state.player1.stage.stage = [ayumu, ayumu, -1];
+    game.state.player1.stage.stage = [ayumu, ayumu_copy, -1];
     run_live_with_eternalize(&mut game, live);
 
     let mods = game.state.mods.need_heart_modifiers.get(&live);
@@ -176,8 +178,9 @@ fn eternalize_two_same_one_different_triggers() {
     let (live, _) = setup_eternalize_base(&mut game);
     let kasumi = game.id("PL!N-pb1-002-R");
     let ayumu = game.id("PL!N-pb1-001-R");
+    let ayumu_copy = game.new_id("PL!N-pb1-001-R");
     // Two ayumu (same name) + one kasumi (different) → at least 2 share a name
-    game.state.player1.stage.stage = [ayumu, ayumu, kasumi];
+    game.state.player1.stage.stage = [ayumu, ayumu_copy, kasumi];
     run_live_with_eternalize(&mut game, live);
 
     let mods = game.state.mods.need_heart_modifiers.get(&live);
