@@ -107,7 +107,7 @@ fn love_u_q192_recolored_all_blade_does_not_score() {
     game.state.revealed_cards.push(b_all);
     game.state
         .mods
-        .set_blade_type_modifier(stage_member, BladeColor::Purple);
+        .set_blade_type_modifier(b_all, BladeColor::Purple);
     game.state.current_phase = Phase::LiveVictoryDetermination;
 
     TurnEngine::trigger_live_success_abilities(&mut game.state, "p1");

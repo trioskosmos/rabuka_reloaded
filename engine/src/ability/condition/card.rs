@@ -145,9 +145,16 @@ impl<'a> ConditionContext<'a> {
                 }
                 "has_score_icon" => c.is_some_and(|c| c.has_score_icon()),
                 "has_all_blade" => {
+                    let effective_override = self
+                        .game_state
+                        .mods
+                        .blade_type_modifiers
+                        .get(&id)
+                        .copied()
+                        .or(blade_type_override);
                     c.is_some_and(|c| c.has_all_blade())
                         && !matches!(
-                            blade_type_override,
+                            effective_override,
                             Some(
                                 BladeColor::Peach
                                     | BladeColor::Red
@@ -3307,11 +3314,18 @@ impl<'a> ConditionContext<'a> {
                 continue;
             }
             if card_property == Some(CardProperty::HasAllBlade) {
+                let effective_override = self
+                    .game_state
+                    .mods
+                    .blade_type_modifiers
+                    .get(&card_id)
+                    .copied()
+                    .or(blade_type_override);
                 let has_effective_all = card_db
                     .get_card(card_id)
                     .is_some_and(|card| card.has_all_blade())
                     && !matches!(
-                        blade_type_override,
+                        effective_override,
                         Some(
                             BladeColor::Peach
                                 | BladeColor::Red
