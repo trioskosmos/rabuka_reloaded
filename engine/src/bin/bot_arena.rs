@@ -6,7 +6,16 @@
 //! Moved out of tests/test_modules/strategy_bot_test.rs  Ethis is a
 //! benchmark/arena, not a unit test. Run it when you want numbers.
 
-use rabuka_engine::bot::{registry::BotKind, strategy_v2, strategy_v3, strategy_v6, strategy_v7};
+use rabuka_engine::bot::{
+    encoding::ActionEncoding,
+    neural::PolicyNet,
+    registry::BotKind,
+    strategy_v2,
+    strategy_v3,
+    strategy_v6,
+    strategy_v7,
+    PublicObservation,
+};
 use rabuka_engine::card::CardDatabase;
 use rabuka_engine::card_loader;
 use rabuka_engine::deck_parser;
@@ -399,11 +408,44 @@ fn choose_policy_action(
     kinds: [BotKind; 2],
     v2_policy: &strategy_v2::V2Policy,
     plans: [&strategy_v3::V3Plan; 2],
+    neural: Option<&PolicyNet>,
     rng: &mut Lcg,
 ) -> game_setup::Action {
     let me = u8::from(decision_player(gs).id != gs.player1.id);
     let kind = kinds[me as usize];
     let plan = plans[me as usize];
+    if kind == BotKind::Neural {
+        let Some(network) = neural else {
+            return actions.first().cloned().unwrap_or(game_setup::Action {
+                description: "pass".into(),
+                description_ja: None,
+                action_type: game_setup::ActionType::Pass,
+                parameters: None,
+                selected: None,
+            });
+        };
+        let observation = PublicObservation::from_state(gs, me);
+        let encoded = network.encode_state(&observation);
+        let action_encodings: Vec<ActionEncoding> = actions
+            .iter()
+            .map(|action| ActionEncoding::from_action(action, &observation))
+            .collect();
+        let (logits, _) = network.evaluate_actions(&encoded, &action_encodings);
+        let epsilon = std::env::var("NEURAL_EPSILON")
+            .ok()
+            .and_then(|value| value.parse::<usize>().ok())
+            .unwrap_or(0);
+        if epsilon > 0 && rng.range(10_000) < epsilon {
+            return actions[rng.range(actions.len())].clone();
+        }
+        let index = logits
+            .iter()
+            .enumerate()
+            .max_by(|(_, left), (_, right)| left.total_cmp(right))
+            .map(|(index, _)| index)
+            .unwrap_or(0);
+        return actions[index].clone();
+    }
     match policy_route(gs) {
         PolicyRoute::Mulligan => policy_call(|| kind.choose_mulligan(gs, actions, &gs.card_database)),
         _ if kind == BotKind::Random => actions[rng.range(actions.len())].clone(),
@@ -649,6 +691,18 @@ fn main() -> ArenaResult<()> {
     }
     let p1_kind = options.p1;
     let p2_kind = options.p2;
+    let neural = if p1_kind == BotKind::Neural || p2_kind == BotKind::Neural {
+        let path = std::env::var("NEURAL_WEIGHTS").map_err(|_| {
+            "NEURAL_WEIGHTS must point to a schema-v3 policy weights file".to_string()
+        })?;
+        let mut network = PolicyNet::new();
+        network
+            .load_weights(&path)
+            .map_err(|error| format!("load NEURAL_WEIGHTS {path}: {error}"))?;
+        Some(network)
+    } else {
+        None
+    };
     let trace = options.trace;
     let logs = options.logs;
     let deck_name = &options.deck;
@@ -880,7 +934,7 @@ fn main() -> ArenaResult<()> {
             }
 
             if gs.has_pending_choice() {
-                let action = choose_policy_action(&gs, &actions, [p1_kind, p2_kind], &v2_policy, [&plan_p1, &plan_p2], &mut rng);
+                let action = choose_policy_action(&gs, &actions, [p1_kind, p2_kind], &v2_policy, [&plan_p1, &plan_p2], neural.as_ref(), &mut rng);
                 decisions.execute(&mut audit, &mut gs, &actions, &action)?;
                 total_actions += 1;
                 continue;
@@ -916,7 +970,7 @@ fn main() -> ArenaResult<()> {
                 gs.current_phase,
                 Phase::MulliganFirstAttacker | Phase::MulliganSecondAttacker
             ) {
-                let a = choose_policy_action(&gs, &actions, [p1_kind, p2_kind], &v2_policy, [&plan_p1, &plan_p2], &mut rng);
+                let a = choose_policy_action(&gs, &actions, [p1_kind, p2_kind], &v2_policy, [&plan_p1, &plan_p2], neural.as_ref(), &mut rng);
                 decisions.execute(&mut audit, &mut gs, &actions, &a)?;
                 continue;
             }
@@ -927,7 +981,7 @@ fn main() -> ArenaResult<()> {
                 gs.current_phase,
                 Phase::LiveCardSetFirstAttacker | Phase::LiveCardSetSecondAttacker
             ) {
-                let a = choose_policy_action(&gs, &actions, [p1_kind, p2_kind], &v2_policy, [&plan_p1, &plan_p2], &mut rng);
+                let a = choose_policy_action(&gs, &actions, [p1_kind, p2_kind], &v2_policy, [&plan_p1, &plan_p2], neural.as_ref(), &mut rng);
                 if a.action_type == rabuka_engine::game_setup::ActionType::ConfirmLiveCardSet {
                     live_decisions += 1;
                     if gs.live_card_selected_indices.is_empty() {
@@ -989,7 +1043,7 @@ fn main() -> ArenaResult<()> {
                 }
             }
             // Main phase (and everything else policy-driven): registry dispatch.
-            let action = choose_policy_action(&gs, &actions, [p1_kind, p2_kind], &v2_policy, [&plan_p1, &plan_p2], &mut rng);
+            let action = choose_policy_action(&gs, &actions, [p1_kind, p2_kind], &v2_policy, [&plan_p1, &plan_p2], neural.as_ref(), &mut rng);
             _main_decisions += 1;
             if gs.current_phase == Phase::Main {
                 if !cur_is_main {
@@ -1316,7 +1370,7 @@ mod tests {
                 serde_json::to_value(&actions[index]).unwrap() != wrong_value
             }).unwrap();
             let expected = actions[Lcg(seed).range(actions.len())].clone();
-            let chosen = choose_policy_action(&gs, &actions, [BotKind::V1, BotKind::Random], &v2, [&plan_p1, &plan_p2], &mut Lcg(seed));
+            let chosen = choose_policy_action(&gs, &actions, [BotKind::V1, BotKind::Random], &v2, [&plan_p1, &plan_p2], None, &mut Lcg(seed));
             assert_eq!(serde_json::to_value(&chosen).unwrap(), serde_json::to_value(&expected).unwrap());
             assert_ne!(serde_json::to_value(&chosen).unwrap(), wrong_value);
             let mut audit = DecisionAudit { game: 4, decision: 73, ..Default::default() };

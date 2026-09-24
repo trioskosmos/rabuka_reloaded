@@ -11,7 +11,7 @@
 //! never names a versioned function directly.
 
 use crate::card::CardDatabase;
-use crate::game_setup::Action;
+use crate::game_setup::{Action, ActionType};
 use crate::game_state::GameState;
 
 use super::{conductor, strategy, strategy_v2, strategy_v3, strategy_v4, strategy_v5, strategy_v6, strategy_v7};
@@ -26,6 +26,7 @@ pub enum BotKind {
     V5,
     V6,
     V7,
+    Neural,
     Conductor,
     Random,
 }
@@ -40,6 +41,7 @@ impl BotKind {
         "v5",
         "v6",
         "v7",
+        "neural",
         "conductor",
         "random",
     ];
@@ -53,6 +55,7 @@ impl BotKind {
             "v5" => BotKind::V5,
             "v6" => BotKind::V6,
             "v7" => BotKind::V7,
+            "neural" => BotKind::Neural,
             "conductor" => BotKind::Conductor,
             _ => BotKind::Random,
         }
@@ -67,6 +70,7 @@ impl BotKind {
             BotKind::V5 => "v5",
             BotKind::V6 => "v6",
             BotKind::V7 => "v7",
+            BotKind::Neural => "neural",
             BotKind::Conductor => "conductor",
             BotKind::Random => "random",
         }
@@ -92,6 +96,13 @@ impl BotKind {
             BotKind::V5 => strategy_v5::choose_action(gs, actions, me),
             BotKind::V6 => strategy_v6::choose_action(gs, actions, me),
             BotKind::V7 => strategy_v7::choose_action(gs, actions, me),
+            BotKind::Neural => actions.first().cloned().unwrap_or(Action {
+                description: "pass".into(),
+                description_ja: None,
+                action_type: ActionType::Pass,
+                parameters: None,
+                selected: None,
+            }),
             BotKind::Conductor => conductor::choose_main_conductor(gs, actions, me),
             BotKind::Random => {
                 // Deterministic harness random is handled by the caller; fall
@@ -124,6 +135,13 @@ impl BotKind {
             BotKind::V5 => strategy_v5::choose_live_set(gs, actions, db),
             BotKind::V6 => strategy_v6::choose_live_set(gs, actions, db),
             BotKind::V7 => strategy_v7::choose_live_set(gs, actions, db),
+            BotKind::Neural => actions.first().cloned().unwrap_or(Action {
+                description: "pass".into(),
+                description_ja: None,
+                action_type: ActionType::Pass,
+                parameters: None,
+                selected: None,
+            }),
             BotKind::Conductor => conductor::choose_live_set_conductor(gs, actions, db),
             BotKind::Random => actions
                 .first()
@@ -159,6 +177,13 @@ impl BotKind {
             BotKind::V5 => strategy_v5::choose_mulligan(gs, actions, db),
             BotKind::V6 => strategy_v6::choose_mulligan(gs, actions, db),
             BotKind::V7 => strategy_v7::choose_mulligan(gs, actions, db),
+            BotKind::Neural => actions.first().cloned().unwrap_or(Action {
+                description: "skip".into(),
+                description_ja: None,
+                action_type: ActionType::SkipMulligan,
+                parameters: None,
+                selected: None,
+            }),
             BotKind::Conductor => strategy_v4::choose_mulligan(gs, actions, db),
         }
     }

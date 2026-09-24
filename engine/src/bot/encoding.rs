@@ -6,9 +6,15 @@ pub const ZONE_EMBED_DIM: usize = 16;
 pub const ACTION_TYPE_EMBED_DIM: usize = 16;
 pub const ACTION_TYPE_COUNT: usize = 25;
 pub const POSITION_FEATURES: usize = 4;
-pub const GLOBAL_FEATURES: usize = 29;
-pub const ACTION_ENC_DIM: usize =
-    ACTION_TYPE_EMBED_DIM + CARD_EMBED_DIM + ZONE_EMBED_DIM + POSITION_FEATURES;
+pub const STAGE_ABILITY_FEATURES: usize = 13;
+pub const ACTION_EXTRA_FEATURES: usize = 9;
+pub const GLOBAL_FEATURES: usize = 66;
+pub const SCHEMA_VERSION: f32 = 4.0;
+pub const ACTION_ENC_DIM: usize = ACTION_TYPE_EMBED_DIM
+    + CARD_EMBED_DIM
+    + ZONE_EMBED_DIM
+    + POSITION_FEATURES
+    + ACTION_EXTRA_FEATURES;
 
 pub const NUM_ZONES: usize = 15;
 
@@ -76,6 +82,7 @@ pub struct EncodedState {
     pub my_waitroom: Vec<f32>,
     pub my_live: Vec<f32>,
     pub my_success: Vec<f32>,
+    pub my_deck: Vec<f32>,
     pub opp_stage: [Vec<f32>; 3],
     pub opp_energy: Vec<f32>,
     pub opp_waitroom: Vec<f32>,
@@ -95,6 +102,7 @@ impl EncodedState {
         out.extend(&self.my_waitroom);
         out.extend(&self.my_live);
         out.extend(&self.my_success);
+        out.extend(&self.my_deck);
         for pos in &self.opp_stage {
             out.extend(pos);
         }
@@ -107,7 +115,9 @@ impl EncodedState {
     }
 
     pub fn state_dim() -> usize {
-        9 * CARD_EMBED_DIM + 6 * (CARD_EMBED_DIM + POSITION_FEATURES) + GLOBAL_FEATURES
+        10 * CARD_EMBED_DIM
+            + 6 * (CARD_EMBED_DIM + POSITION_FEATURES + STAGE_ABILITY_FEATURES)
+            + GLOBAL_FEATURES
     }
 
 }
@@ -117,9 +127,91 @@ pub struct ActionEncoding {
     pub target_card_id: i16,
     pub target_zone: u8,
     pub position: u8,
+    pub ability_index: u8,
+    pub choice_option: u16,
+    pub flags: u8,
+    pub final_cost: u8,
+    pub card_index: u16,
+    pub card_indices_count: u8,
+}
+
+fn card_visible_to_observer(obs: &PublicObservation, card_id: i16) -> bool {
+    if card_id < 0 {
+        return false;
+    }
+    let me = &obs.me;
+    let opp = &obs.opp;
+    me.hand.contains(&card_id)
+        || me.stage.contains(&card_id)
+        || me.under_cards.iter().any(|cards| cards.contains(&card_id))
+        || me.energy_zone.contains(&card_id)
+        || me.waitroom.contains(&card_id)
+        || me.live_zone.contains(&card_id)
+        || me.success_zone.contains(&card_id)
+        || opp.stage.contains(&card_id)
+        || opp.under_cards.iter().any(|cards| cards.contains(&card_id))
+        || opp.energy_zone.contains(&card_id)
+        || opp.waitroom.contains(&card_id)
+        || opp.live_zone.contains(&card_id)
+        || opp.success_zone.contains(&card_id)
 }
 
 impl ActionEncoding {
+    pub fn from_action(action: &Action, obs: &PublicObservation) -> Self {
+        let target = action_target_zone(action, obs);
+        let params = action.parameters.as_ref();
+        let position = params
+            .and_then(|p| p.stage_area_index)
+            .or_else(|| {
+                params
+                    .and_then(|p| p.stage_area.as_deref())
+                    .and_then(|area| match area {
+                        "center" => Some(1),
+                        "right" => Some(2),
+                        _ => Some(0),
+                    })
+            })
+            .unwrap_or(target.position);
+        let raw_card_id = params.and_then(|p| p.card_id);
+        let target_visible = raw_card_id.is_some_and(|card_id| card_visible_to_observer(obs, card_id));
+        let mut flags = 0u8;
+        if action.selected.unwrap_or(false) {
+            flags |= 1;
+        }
+        if params.and_then(|p| p.disabled).unwrap_or(false) {
+            flags |= 2;
+        }
+        if params.and_then(|p| p.use_baton_touch).unwrap_or(false) {
+            flags |= 4;
+        }
+        if raw_card_id.is_some() && !target_visible {
+            flags |= 8;
+        }
+        Self {
+            action_type: action_type_index(&action.action_type),
+            target_card_id: if target_visible { raw_card_id.unwrap_or(-1) } else { -1 },
+            target_zone: target.zone as u8,
+            position,
+            ability_index: params
+                .and_then(|p| p.ability_index)
+                .unwrap_or(0)
+                .min(u8::MAX as usize) as u8,
+            choice_option: params
+                .and_then(|p| p.card_index)
+                .unwrap_or(usize::MAX)
+                .min(u16::MAX as usize) as u16,
+            flags,
+            final_cost: params.and_then(|p| p.final_cost).unwrap_or(u8::MAX),
+            card_index: params
+                .and_then(|p| p.card_index)
+                .unwrap_or(usize::MAX)
+                .min(u16::MAX as usize) as u16,
+            card_indices_count: params
+                .and_then(|p| p.card_indices.as_ref())
+                .map_or(0, |indices| indices.len().min(u8::MAX as usize) as u8),
+        }
+    }
+
     pub fn encode(
         &self,
         card_embed: &[f32],
@@ -135,14 +227,18 @@ impl ActionEncoding {
         } else {
             v.extend_from_slice(&action_type_embed[..ACTION_TYPE_EMBED_DIM]);
         }
-        let cid = self.target_card_id.max(0) as usize;
-        let base = cid * CARD_EMBED_DIM;
-        let ce = if base + CARD_EMBED_DIM <= card_embed.len() {
-            &card_embed[base..base + CARD_EMBED_DIM]
+        if self.target_card_id < 0 {
+            v.extend(vec![0.0f32; CARD_EMBED_DIM]);
         } else {
-            &card_embed[..CARD_EMBED_DIM] // fallback to first card
-        };
-        v.extend_from_slice(ce);
+            let cid = self.target_card_id as usize;
+            let base = cid * CARD_EMBED_DIM;
+            let ce = if base + CARD_EMBED_DIM <= card_embed.len() {
+                &card_embed[base..base + CARD_EMBED_DIM]
+            } else {
+                &card_embed[..CARD_EMBED_DIM]
+            };
+            v.extend_from_slice(ce);
+        }
         let zid = (self.target_zone as usize).min(NUM_ZONES - 1);
         let zbase = zid * ZONE_EMBED_DIM;
         v.extend_from_slice(&zone_embed[zbase..zbase + ZONE_EMBED_DIM]);
@@ -150,6 +246,23 @@ impl ActionEncoding {
         v.push(0.0);
         v.push(0.0);
         v.push(0.0);
+        v.push(self.ability_index as f32 / 8.0);
+        v.push(self.choice_option as f32 / 16.0);
+        v.push(if self.card_index == u16::MAX {
+            0.0
+        } else {
+            self.card_index as f32 / 16.0
+        });
+        v.push(self.card_indices_count as f32 / 8.0);
+        v.push(if self.flags & 1 != 0 { 1.0 } else { 0.0 });
+        v.push(if self.flags & 2 != 0 { 1.0 } else { 0.0 });
+        v.push(if self.flags & 4 != 0 { 1.0 } else { 0.0 });
+        v.push(if self.flags & 8 != 0 { 1.0 } else { 0.0 });
+        v.push(if self.final_cost == u8::MAX {
+            0.0
+        } else {
+            self.final_cost as f32 / 12.0
+        });
         v
     }
 }
@@ -163,16 +276,57 @@ pub struct ActionTargetZone {
 /// Determine the target zone for an action.
 pub fn action_target_zone(action: &Action, obs: &PublicObservation) -> ActionTargetZone {
     use crate::game_setup::ActionType;
+    let card_zone = |card_id: i16| -> ActionTargetZone {
+        for (position, &stage_card) in obs.me.stage.iter().enumerate() {
+            if stage_card == card_id
+                || obs.me.under_cards[position].contains(&card_id)
+            {
+                return ActionTargetZone {
+                    zone: match position {
+                        1 => ZoneId::MyStagePos1,
+                        2 => ZoneId::MyStagePos2,
+                        _ => ZoneId::MyStagePos0,
+                    },
+                    position: position as u8,
+                };
+            }
+        }
+        if obs.me.hand.contains(&card_id) {
+            return ActionTargetZone { zone: ZoneId::MyHand, position: 0 };
+        }
+        if obs.me.energy_zone.contains(&card_id) {
+            return ActionTargetZone { zone: ZoneId::MyEnergy, position: 0 };
+        }
+        if obs.me.waitroom.contains(&card_id) {
+            return ActionTargetZone { zone: ZoneId::MyWaitroom, position: 0 };
+        }
+        if obs.me.live_zone.contains(&card_id) {
+            return ActionTargetZone { zone: ZoneId::MyLive, position: 0 };
+        }
+        if obs.me.success_zone.contains(&card_id) {
+            return ActionTargetZone { zone: ZoneId::MySuccess, position: 0 };
+        }
+        ActionTargetZone { zone: ZoneId::MyHand, position: 0 }
+    };
+    let position = |action: &Action| -> u8 {
+        action
+            .parameters
+            .as_ref()
+            .and_then(|p| {
+                p.stage_area_index.or_else(|| {
+                    p.stage_area.as_deref().and_then(|area| match area {
+                        "center" => Some(1),
+                        "right" => Some(2),
+                        "left" => Some(0),
+                        _ => None,
+                    })
+                })
+            })
+            .unwrap_or(0)
+    };
     match action.action_type {
         ActionType::PlayMemberToStage => {
-            let pos = action
-                .parameters
-                .as_ref()
-                .and_then(|p| {
-                    p.stage_area_index
-                        .or_else(|| p.stage_area.as_deref().and_then(|s| s.parse().ok()))
-                })
-                .unwrap_or(0);
+            let pos = position(action);
             let zone = match pos {
                 1 => ZoneId::MyStagePos1,
                 2 => ZoneId::MyStagePos2,
@@ -180,43 +334,37 @@ pub fn action_target_zone(action: &Action, obs: &PublicObservation) -> ActionTar
             };
             ActionTargetZone { zone, position: pos }
         }
-        ActionType::UseAbility => {
-            // Target is the card whose ability we're using
-            if let Some(cid) = action.parameters.as_ref().and_then(|p| p.card_id) {
-                // Check if it's on our stage
-                if obs.me.stage.contains(&cid) {
-                    let pos = obs.me.stage.iter().position(|&c| c == cid).unwrap_or(0) as u8;
-                    let zone = match pos {
-                        1 => ZoneId::MyStagePos1,
-                        2 => ZoneId::MyStagePos2,
-                        _ => ZoneId::MyStagePos0,
-                    };
-                    return ActionTargetZone { zone, position: pos };
-                }
-            }
-            ActionTargetZone {
-                zone: ZoneId::MyHand,
-                position: 0,
-            }
+        ActionType::UseAbility
+        | ActionType::ChoiceSelect
+        | ActionType::ChoiceOption
+        | ActionType::ChoiceDecision => action
+            .parameters
+            .as_ref()
+            .and_then(|p| p.card_id)
+            .map(card_zone)
+            .unwrap_or(ActionTargetZone { zone: ZoneId::MyHand, position: 0 }),
+        ActionType::SetLiveCard | ActionType::SelectLiveCard | ActionType::SelectMulligan => {
+            ActionTargetZone { zone: ZoneId::MyHand, position: 0 }
         }
-        ActionType::SetLiveCard => ActionTargetZone {
-            zone: ZoneId::MyLive,
-            position: 0,
-        },
-        ActionType::SelectLiveCard
-        | ActionType::ConfirmLiveCardSet
-        | ActionType::SkipLiveCardSet => ActionTargetZone {
-            zone: ZoneId::MyLive,
-            position: 0,
-        },
-        ActionType::Pass | ActionType::PassRemaining => ActionTargetZone {
-            zone: ZoneId::MyHand,
-            position: 0,
-        },
-        _ => ActionTargetZone {
-            zone: ZoneId::MyHand,
-            position: 0,
-        },
+        ActionType::ConfirmLiveCardSet
+        | ActionType::FinishLiveCardSet
+        | ActionType::SkipLiveCardSet => {
+            ActionTargetZone { zone: ZoneId::MyLive, position: 0 }
+        }
+        ActionType::ChoicePosition => {
+            let pos = position(action);
+            let zone = match pos {
+                1 => ZoneId::MyStagePos1,
+                2 => ZoneId::MyStagePos2,
+                _ => ZoneId::MyStagePos0,
+            };
+            ActionTargetZone { zone, position: pos }
+        }
+        ActionType::EnergyCharge => ActionTargetZone { zone: ZoneId::MyEnergy, position: 0 },
+        ActionType::Pass | ActionType::PassRemaining => {
+            ActionTargetZone { zone: ZoneId::MyHand, position: 0 }
+        }
+        _ => ActionTargetZone { zone: ZoneId::MyHand, position: 0 },
     }
 }
 
@@ -260,7 +408,7 @@ mod tests {
 
     #[test]
     fn state_dimension_matches_all_encoded_zones() {
-        assert_eq!(EncodedState::state_dim(), 1973);
+        assert_eq!(EncodedState::state_dim(), 2216);
     }
 
     #[test]
@@ -273,6 +421,12 @@ mod tests {
             target_card_id: 0,
             target_zone: 0,
             position: 0,
+            ability_index: 0,
+            choice_option: u16::MAX,
+            flags: 0,
+            final_cost: u8::MAX,
+            card_index: u16::MAX,
+            card_indices_count: 0,
         };
         let encoded = action.encode(
             &[0.0; CARD_EMBED_DIM],

@@ -62,3 +62,38 @@ fn s_pr_042_pr_constant_six_combined_staged_members_gains_heart02_and_heart04() 
     assert!(h02 > 0, "6 staged members -> heart02 granted");
     assert!(h04 > 0, "6 staged members -> heart04 granted");
 }
+
+#[test]
+fn karin_exact_six_members_grants_heart02_and_heart05() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let karin = game.id("PL!N-PR-027-PR");
+    assert_eq!(game.db.get_card(karin).unwrap().card_no, "PL!N-PR-027-PR");
+
+    let p1_left = game.new_id(FILLER);
+    let p1_right = game.new_id(FILLER);
+    let p2_left = game.new_id(FILLER);
+    let p2_center = game.new_id(FILLER);
+    game.state.player1.stage.stage = [karin, p1_left, p1_right];
+    game.state.player2.stage.stage = [p2_left, p2_center, -1];
+
+    const H01: rabuka_engine::card::HeartColor = rabuka_engine::card::HeartColor::Heart01;
+    const H02: rabuka_engine::card::HeartColor = rabuka_engine::card::HeartColor::Heart02;
+    const H05: rabuka_engine::card::HeartColor = rabuka_engine::card::HeartColor::Heart05;
+
+    game.state.recalculate_constants();
+    assert_eq!(game.state.mods.get_heart_modifier(karin, H02), 0);
+    assert_eq!(game.state.mods.get_heart_modifier(karin, H05), 0);
+
+    let p2_right = game.new_id(FILLER);
+    game.state.player2.stage.stage[2] = p2_right;
+    game.state.recalculate_constants();
+    assert_eq!(game.state.mods.get_heart_modifier(karin, H02), 1);
+    assert_eq!(game.state.mods.get_heart_modifier(karin, H05), 1);
+    assert_eq!(game.state.mods.get_heart_modifier(karin, H01), 0);
+
+    game.state.player2.stage.stage[2] = -1;
+    game.state.recalculate_constants();
+    assert_eq!(game.state.mods.get_heart_modifier(karin, H02), 0);
+    assert_eq!(game.state.mods.get_heart_modifier(karin, H05), 0);
+}

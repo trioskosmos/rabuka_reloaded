@@ -7,6 +7,7 @@ OBJ     := $(SRC:.c=.o)
 # library objects (everything except main, so tests can supply their own main)
 OBJ_LIB := src/ability/enums.o src/ability/types.o src/ability/vm.o src/ability/condition.o src/ability/choice.o src/ability/ability_queue.o src/ability/dynamic_count.o src/ability/util.o src/ability/cost.o src/ability/compound.o src/ability/resolver.o src/ability/effects/move.o src/ability/effects/move_missing.o src/ability/effects/look.o src/ability/effects/state.o src/ability/effects/ability.o src/ability/effects/misc.o src/ability/effects/draw.o src/ability/effects/score.o src/ability/log.o src/ability/debug.o src/ability/abilities_gen.o src/core/card.o src/core/data.o src/core/alloc.o src/core/modifiers.o src/core/stats_pipeline.o src/core/game_state_abilities.o src/core/tracking.o src/core/zones.o src/bytecode_data.o src/core/generated/bytecode_blob.o src/core/generated/gen_data.o src/turn/phase.o src/turn/live.o src/turn/triggers.o src/engine.o src/test_game.o
 TARGET  := rb_engine
+WEB_TARGET := rb_web_server
 GENERATED := tests/test_ported_generated.c
 MECHANICS := tests/test_mechanics.c
 LIVE_RULES := tests/test_live_success_rules.c
@@ -26,8 +27,13 @@ CROSS_PLAYER := tests/test_cross_player_interaction.c
 DRAW_PHASE_FIX := tests/test_draw_phase_fix.c
 AUDIT   := tools/audit_actions.c
 
-.PHONY: all test audit regen clean mechanics live-rules phase-rules performance-rules surplus-heart opponent-live-flow live-movement restrictions condition-eval target-selection max-distinct-names baton-touch member-activation b8-live-timing cross-player draw-phase-fix
+.PHONY: all web test audit regen clean mechanics live-rules phase-rules performance-rules surplus-heart opponent-live-flow live-movement restrictions condition-eval target-selection max-distinct-names baton-touch member-activation b8-live-timing cross-player draw-phase-fix
 all: $(TARGET)
+
+web: $(WEB_TARGET)
+
+$(WEB_TARGET): $(OBJ_LIB) src/web_server.o
+	$(CC) $(CFLAGS) -mwindows -Wl,--stack,16777216 -o $@ $(OBJ_LIB) src/web_server.o
 
 regen:
 	python3 tools/gen_from_rs.py ../cards/build/abilities_gen.rs

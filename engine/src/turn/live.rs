@@ -45,6 +45,19 @@ pub(crate) fn blade_color_to_heart(bc: BladeColor) -> HeartColor {
     }
 }
 
+pub(crate) fn blade_type_override_for_stage(
+    stage: &[i16],
+    blade_type_modifiers: &HashMap<i16, BladeColor>,
+) -> Option<BladeColor> {
+    stage.iter().find_map(|card_id| {
+        if *card_id == -1 {
+            None
+        } else {
+            blade_type_modifiers.get(card_id).copied()
+        }
+    })
+}
+
 /// Process the blade-heart and special-heart icons of ONE yell-revealed card.
 ///
 /// Single source of truth shared by the primary yell (`player_perform_live`)
@@ -74,9 +87,6 @@ pub(crate) fn process_yell_revealed_card_icons(
             // (colorless), and `b_heart07: N` means 2×N colorless hearts.
             // A colorless heart can ONLY be used to replace heart0
             // requirements — never a specific color (heart01-heart06).
-            // The ×2 is applied on the ORIGINAL color (before any
-            // set_blade_type recoloring), so a recolored b_heart07 still
-            // contributes 2 hearts of the new color.
             let amount = if *color == HeartColor::Heart00 {
                 count * 2
             } else {
@@ -84,11 +94,22 @@ pub(crate) fn process_yell_revealed_card_icons(
             };
             // Draw/Score special icons are never converted by
             // set_blade_type — they pass through unchanged.
-            let effective_color = if matches!(*color, HeartColor::Draw | HeartColor::Score) {
+            let effective_color = if matches!(
+                *color,
+                HeartColor::Heart00 | HeartColor::Draw | HeartColor::Score
+            ) {
                 *color
             } else {
                 override_color.unwrap_or(*color)
             };
+            if override_color.is_some() {
+                log::debug!(
+                    "[BLADE_RECOLOR] original={:?} override={:?} effective={:?}",
+                    color,
+                    override_color,
+                    effective_color
+                );
+            }
             // Q45: ALL-blade (BAll) can be treated as any color heart.
             // Mapped to HeartColor::All (icon_all, index 7) so the UI
             // displays icon_all.png for BAll yell hearts.
@@ -1984,16 +2005,9 @@ impl super::TurnEngine {
         );
 
         let blade_to_heart = blade_color_to_heart;
-        let override_color = (0..3)
-            .filter_map(|i| {
-                let cid = player.stage.stage[i];
-                if cid == -1 {
-                    None
-                } else {
-                    blade_type_modifiers.get(&cid).copied().map(blade_to_heart)
-                }
-            })
-            .next();
+        let override_color =
+            blade_type_override_for_stage(&player.stage.stage, blade_type_modifiers)
+                .map(blade_to_heart);
 
         // Process yell cards and build YellCardResult + track heart allocations
         let mut heart_sources: Vec<HeartSource> = Vec::new();

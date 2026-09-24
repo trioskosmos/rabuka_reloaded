@@ -7,6 +7,9 @@
 ///       as ALL blade? A: No — ALL heart ≠ ALL blade.
 /// Q36:  LiveSuccess timing definition.
 use crate::helpers::*;
+use rabuka_engine::core::card::{BaseHeart, BladeColor, HeartColor, HeartMap};
+use rabuka_engine::game_state::Phase;
+use rabuka_engine::turn::TurnEngine;
 
 fn advance_to_live_card_set_p1(game: &mut TestGame) {
     for _ in 0..5 {
@@ -75,4 +78,40 @@ fn love_u_q192_live_success_all_blade_score_up() {
     );
     let l = &game.state.performance_snapshots[0].lives[0];
     assert_eq!(l.score - l.base_score, 1, "bonus in final score");
+}
+
+#[test]
+fn love_u_q192_recolored_all_blade_does_not_score() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let love_u = game.new_id("PL!N-bp3-030-L");
+    let b_all = game.new_id("PL!-sd1-020-SD");
+    let stage_member = game.new_id("PL!HS-pb1-023-N");
+
+    game.state.player1.stage.stage = [stage_member, -1, -1];
+    let mut stage_hearts = BaseHeart {
+        hearts: HeartMap::new(),
+    };
+    for color in [
+        HeartColor::Heart01,
+        HeartColor::Heart02,
+        HeartColor::Heart03,
+        HeartColor::Heart04,
+        HeartColor::Heart05,
+        HeartColor::Heart06,
+    ] {
+        stage_hearts.hearts.insert(color, 1);
+    }
+    game.state.player1.stage_hearts = Some(stage_hearts);
+    game.state.player1.live_card_zone.cards.push(love_u);
+    game.state.revealed_cards.push(b_all);
+    game.state
+        .mods
+        .set_blade_type_modifier(stage_member, BladeColor::Purple);
+    game.state.current_phase = Phase::LiveVictoryDetermination;
+
+    TurnEngine::trigger_live_success_abilities(&mut game.state, "p1");
+    game.state.process_pending_auto_abilities("p1");
+
+    assert_eq!(game.state.mods.get_score_modifier(love_u), 0);
 }

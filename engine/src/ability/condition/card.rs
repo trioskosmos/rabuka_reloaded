@@ -6,7 +6,7 @@ use crate::ability::enums::Zone;
 use crate::ability::util;
 use crate::ability::util::compare_counts;
 use crate::card::{
-    AbilityFilter, CardProperty, ComparisonTarget, Condition, HeartColor,
+    AbilityFilter, BladeColor, CardProperty, ComparisonTarget, Condition, HeartColor,
 };
 use crate::{HashMap, HashSet};
 #[cfg(feature = "no_std")]
@@ -119,9 +119,18 @@ impl<'a> ConditionContext<'a> {
                 .collect(),
             _ => vec![],
         };
+        let neg = condition.get_negation().unwrap_or(false);
         if check_cards.is_empty() {
             return true;
         }
+        let blade_type_override = if location == "revealed_cards" {
+            crate::turn::live::blade_type_override_for_stage(
+                &player.stage.stage,
+                &self.game_state.mods.blade_type_modifiers,
+            )
+        } else {
+            None
+        };
         let has_prop = |id: i16| -> bool {
             let c = card_db.get_card(id);
             match prop {
@@ -135,13 +144,62 @@ impl<'a> ConditionContext<'a> {
                     }
                 }
                 "has_score_icon" => c.is_some_and(|c| c.has_score_icon()),
-                "has_all_blade" => c.is_some_and(|c| c.has_all_blade()),
+                "has_all_blade" => {
+                    c.is_some_and(|c| c.has_all_blade())
+                        && !matches!(
+                            blade_type_override,
+                            Some(
+                                BladeColor::Peach
+                                    | BladeColor::Red
+                                    | BladeColor::Yellow
+                                    | BladeColor::Green
+                                    | BladeColor::Blue
+                                    | BladeColor::Purple
+                            )
+                        )
+                }
                 _ => false,
             }
         };
-        let any = check_cards.iter().any(|&id| has_prop(id));
-        let neg = condition.get_negation().unwrap_or(false);
-        any != neg
+        if neg {
+            let property_cards: Vec<i16> = check_cards
+                .iter()
+                .copied()
+                .filter(|&id| has_prop(id))
+                .collect();
+            log::debug!(
+                "[CARD_PROPERTY_FILTER] zone={} property={} negated={} override={:?} candidates={:?} matches={:?}",
+                location,
+                prop,
+                neg,
+                blade_type_override,
+                check_cards,
+                property_cards
+            );
+            return property_cards.is_empty();
+        }
+        let mut matching = Vec::new();
+        for &id in &check_cards {
+            let mut filter = condition.filter_subset();
+            filter.heart_colors = condition.get_heart_colors().unwrap_or(&[]);
+            let other_filters_match = filter.matches(card_db, id, true)
+                && self.check_original_blade_filter(condition, id)
+                && self.check_original_heart_filter(condition, id)
+                && self.check_heart_type_all_per_card(condition, card_db, id);
+            if has_prop(id) && other_filters_match {
+                matching.push(id);
+            }
+        }
+        log::debug!(
+            "[CARD_PROPERTY_FILTER] zone={} property={} negated={} override={:?} candidates={:?} matches={:?}",
+            location,
+            prop,
+            neg,
+            blade_type_override,
+            check_cards,
+            matching
+        );
+        !matching.is_empty()
     }
 
     pub(crate) fn check_baton_touch(&self, condition: &Condition) -> bool {
@@ -3192,15 +3250,59 @@ impl<'a> ConditionContext<'a> {
         }
         // card_property + negation live on the Condition variant (not in the
         // flat EffectFilter that filter_subset reads), so re-apply them here.
-        if let Some(cp) = &condition.get_card_property() {
-            filter.card_property = Some(cp.as_str());
-            filter.negation = condition.get_negation().unwrap_or(false);
+        let card_property = condition.get_card_property();
+        if card_property != Some(CardProperty::HasAllBlade) {
+            if let Some(cp) = &card_property {
+                filter.card_property = Some(cp.as_str());
+                filter.negation = condition.get_negation().unwrap_or(false);
+            }
         }
         let card_db = &self.game_state.card_database;
+        let blade_type_override = if condition.get_location() == Some("revealed_cards") {
+            let target = condition.get_target().unwrap_or("self");
+            let player = self.resolve_condition_player(target);
+            crate::turn::live::blade_type_override_for_stage(
+                &player.stage.stage,
+                &self.game_state.mods.blade_type_modifiers,
+            )
+        } else {
+            None
+        };
         let mut count = 0u8;
         for &card_id in cards {
             if !filter.matches(card_db, card_id, true) {
                 continue;
+            }
+            if card_property == Some(CardProperty::HasAllBlade) {
+                let has_effective_all = card_db
+                    .get_card(card_id)
+                    .is_some_and(|card| card.has_all_blade())
+                    && !matches!(
+                        blade_type_override,
+                        Some(
+                            BladeColor::Peach
+                                | BladeColor::Red
+                                | BladeColor::Yellow
+                                | BladeColor::Green
+                                | BladeColor::Blue
+                                | BladeColor::Purple
+                        )
+                    );
+                let negated = condition.get_negation().unwrap_or(false);
+                let property_name = card_property
+                    .map(|property| property.as_str().to_owned())
+                    .unwrap_or_else(|| "<none>".into());
+                log::debug!(
+                    "[CARD_COUNT_PROPERTY] card={} property={} override={:?} effective_all={} negated={}",
+                    card_id,
+                    property_name,
+                    blade_type_override,
+                    has_effective_all,
+                    negated
+                );
+                if has_effective_all == negated {
+                    continue;
+                }
             }
             if !self.matches_original_value_filters(condition, card_id, respect_original_value) {
                 continue;

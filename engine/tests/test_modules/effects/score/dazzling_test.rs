@@ -9,6 +9,148 @@ fn advance_to_live_set(game: &mut TestGame) {
     }
 }
 
+fn run_dazzling_yell(game: &mut TestGame, deck: Vec<i16>) {
+    let live = game.new_id("PL!SP-bp4-023-L");
+    let host = game.new_id("PL!HS-pb1-023-N");
+    let extra_member = game.new_id("PL!-sd1-006-SD");
+    let filler = game.new_id("PL!-sd1-010-SD");
+
+    game.state.player1.hand.cards.clear();
+    game.state.player1.waitroom.cards.clear();
+    game.state.player1.main_deck.cards.clear();
+    game.state.player2.hand.cards.clear();
+    game.state.player2.main_deck.cards.clear();
+    game.state.player1.stage.stage = [host, extra_member, -1];
+    for _ in 0..40 {
+        game.state.player1.main_deck.cards.push(filler);
+        game.state.player2.main_deck.cards.push(filler);
+    }
+    game.add_to_hand(live);
+
+    advance_to_live_set(game);
+    game.set_live_card(live);
+    game.state.player1.main_deck.cards = deck.into();
+    game.pass();
+    game.pass();
+    game.drain_auto_ability_choices();
+    game.pass();
+
+    assert!(
+        !game.has_pending_choice(),
+        "unexpected choice: {:?}",
+        game.get_pending_choice()
+    );
+}
+
+fn last_p1_snap(game: &TestGame) -> &rabuka_engine::types::PerformanceSnapshot {
+    game.state
+        .performance_snapshots
+        .iter()
+        .rev()
+        .find(|snapshot| snapshot.player_id == "p1")
+        .expect("P1 should have a performance snapshot")
+}
+
+fn yell_card<'a>(
+    snapshot: &'a rabuka_engine::types::PerformanceSnapshot,
+    card_no: &str,
+) -> &'a rabuka_engine::types::YellCardResult {
+    snapshot
+        .yell_cards
+        .iter()
+        .find(|card| card.card_no.as_ref() == card_no)
+        .unwrap_or_else(|| {
+            panic!(
+                "missing yell card {card_no}: {:?}",
+                snapshot
+                    .yell_cards
+                    .iter()
+                    .map(|card| card.card_no.as_ref())
+                    .collect::<Vec<_>>()
+            )
+        })
+}
+
+#[test]
+fn dazzling_live_start_recolors_listed_blade_hearts_to_purple() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let h01 = game.new_id("PL!-sd1-013-SD");
+    let h02 = game.new_id("PL!S-PR-017-PR");
+    let h03 = game.new_id("PL!-sd1-010-SD");
+    let h04 = game.new_id("PL!S-PR-015-PR");
+    let h05 = game.new_id("PL!S-bp2-015-PR");
+    let h06 = game.new_id("PL!N-bp1-021-N");
+    let all = game.new_id("PL!-sd1-020-SD");
+    let score = game.new_id("PL!-sd1-019-SD");
+    let filler = game.new_id("PL!-sd1-010-SD");
+
+    run_dazzling_yell(
+        &mut game,
+        vec![filler, h01, h02, h03, h04, h05, h06, all, score],
+    );
+
+    let snapshot = last_p1_snap(&game);
+    for (card_no, original_index) in [
+        ("PL!-sd1-013-SD", 1),
+        ("PL!S-PR-017-PR", 2),
+        ("PL!-sd1-010-SD", 3),
+        ("PL!S-PR-015-PR", 4),
+        ("PL!S-bp2-015-PR", 5),
+    ] {
+        let result = yell_card(snapshot, card_no);
+        assert_eq!(result.blade_hearts[original_index], 0);
+        assert_eq!(result.blade_hearts[6], 1);
+        for index in 1..=6 {
+            if index != original_index && index != 6 {
+                assert_eq!(
+                    result.blade_hearts[index], 0,
+                    "{card_no} retained blade heart at index {index}"
+                );
+            }
+        }
+    }
+
+    let purple_result = yell_card(snapshot, "PL!N-bp1-021-N");
+    assert_eq!(purple_result.blade_hearts[6], 1);
+    for index in 1..=5 {
+        assert_eq!(purple_result.blade_hearts[index], 0);
+    }
+
+    let all_result = yell_card(snapshot, "PL!-sd1-020-SD");
+    assert_eq!(all_result.blade_hearts[7], 0);
+    assert_eq!(all_result.blade_hearts[6], 1);
+    let score_result = yell_card(snapshot, "PL!-sd1-019-SD");
+    assert_eq!(score_result.note_icons, 1);
+}
+
+#[test]
+fn dazzling_live_start_leaves_draw_and_colorless_icons_unchanged() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let draw = game.new_id("PL!N-bp1-027-L");
+    let colorless = game.new_id("PL!N-bp7-030-L");
+    let filler = game.new_id("PL!-sd1-010-SD");
+    let extra = game.new_id("PL!-sd1-010-SD");
+
+    run_dazzling_yell(
+        &mut game,
+        vec![
+            filler, draw, colorless, extra, extra, extra, extra, extra, extra,
+        ],
+    );
+
+    let snapshot = last_p1_snap(&game);
+    let draw_result = yell_card(snapshot, "PL!N-bp1-027-L");
+    assert_eq!(draw_result.draw_icons, 1);
+    assert_eq!(draw_result.blade_hearts[5], 0);
+    assert_eq!(draw_result.blade_hearts[6], 1);
+
+    let colorless_result = yell_card(snapshot, "PL!N-bp7-030-L");
+    assert_eq!(colorless_result.blade_hearts[0], 2);
+    assert_eq!(colorless_result.blade_hearts[6], 0);
+}
+
 /// Two eligible Liella! members on stage. First select picks かのん (one of the 3).
 /// Second select must pick a Liella! member OTHER than かのん.
 /// If exclude_selected works, only the other member is pickable → blade to both.

@@ -55,8 +55,13 @@ impl PolicyNet {
             f32::from_le_bytes(bytes)
         };
 
-        // Version header: skipped, but must be consumed to advance the cursor.
-        read_f32(&buf, &mut pos);
+        let version = read_f32(&buf, &mut pos);
+        if version != SCHEMA_VERSION {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!("unsupported policy schema version {version}"),
+            ));
+        }
 
         // card_embed [2400, 128]
         for i in 0..CARD_EMBED_TABLE_SIZE * CARD_EMBED_DIM {
@@ -127,31 +132,59 @@ impl PolicyNet {
             s
         };
 
-        let stage_enc = |cards: &[i16; 3], waited: &[bool; 3], under: &[Vec<i16>; 3]| -> [Vec<f32>; 3] {
+        let stage_enc = |cards: &[i16; 3],
+                         waited: &[bool; 3],
+                         under: &[Vec<i16>; 3],
+                         abilities: &[crate::bot::observation::AbilityFeatures; 3]|
+         -> [Vec<f32>; 3] {
             let mut out = [vec![], vec![], vec![]];
             for pos in 0..3 {
                 let cid = cards[pos];
                 if cid < 0 {
-                    out[pos] = vec![0.0f32; CARD_EMBED_DIM + POSITION_FEATURES];
+                    out[pos] = vec![
+                        0.0f32;
+                        CARD_EMBED_DIM + POSITION_FEATURES + STAGE_ABILITY_FEATURES
+                    ];
                     continue;
                 }
                 let mut v = embed_card(cid);
-                // orientation: 1 for active, 0 for waited
                 v.push(if waited[pos] { 0.0 } else { 1.0 });
-                // underlay count
-                let ucnt = under[pos].len() as f32;
-                v.push(ucnt / 5.0);
-                // position index
+                v.push(under[pos].len() as f32 / 5.0);
                 v.push(pos as f32 / 2.0);
-                // flag
                 v.push(1.0);
+                let a = &abilities[pos];
+                v.extend([
+                    a.printed as f32 / 8.0,
+                    a.gained as f32 / 4.0,
+                    a.activation as f32 / 4.0,
+                    a.debut as f32 / 4.0,
+                    a.live_start as f32 / 4.0,
+                    a.live_success as f32 / 4.0,
+                    a.constant as f32 / 4.0,
+                    a.auto as f32 / 4.0,
+                    a.invalidated as f32 / 4.0,
+                    a.usable_activation as f32 / 4.0,
+                    a.limited_total as f32 / 4.0,
+                    a.limited_used as f32 / 4.0,
+                    a.queued as f32 / 4.0,
+                ]);
                 out[pos] = v;
             }
             out
         };
 
-        let my_stage_enc = stage_enc(&obs.me.stage, &obs.me.stage_waited, &obs.me.under_cards);
-        let opp_stage_enc = stage_enc(&obs.opp.stage, &obs.opp.stage_waited, &obs.opp.under_cards);
+        let my_stage_enc = stage_enc(
+            &obs.me.stage,
+            &obs.me.stage_waited,
+            &obs.me.under_cards,
+            &obs.me.stage_abilities,
+        );
+        let opp_stage_enc = stage_enc(
+            &obs.opp.stage,
+            &obs.opp.stage_waited,
+            &obs.opp.under_cards,
+            &obs.opp.stage_abilities,
+        );
 
         let mut globals = vec![0.0f32; GLOBAL_FEATURES];
         let pi = phase_as_u8(&obs.current_phase) as usize;
@@ -174,6 +207,53 @@ impl PolicyNet {
         globals[26] = obs.opp.live_zone.len() as f32 / 3.0;
         globals[27] = obs.me.features.active_blades as f32 / 12.0;
         globals[28] = obs.opp.features.active_blades as f32 / 12.0;
+        globals[29] = if obs.pending_choice { 1.0 } else { 0.0 };
+        globals[30] = if obs.pending_choice_for_viewer { 1.0 } else { 0.0 };
+        globals[31] = obs.active_player as f32;
+        globals[32] = if obs.can_current_player_act { 1.0 } else { 0.0 };
+        let choice_index = match obs.pending_choice_kind.as_deref() {
+            Some("SelectCard") => 33,
+            Some("SelectTarget") => 34,
+            Some("SelectPosition") => 35,
+            Some("SelectHeartColor") => 36,
+            Some("SelectHeartType") => 37,
+            Some("SelectAutoAbility") => 38,
+            Some("SelectLiveSuccess") => 39,
+            _ => 40,
+        };
+        if obs.pending_choice_kind.is_some() {
+            globals[choice_index] = 1.0;
+        }
+        globals[40] = obs.live_card_selected_count as f32 / 3.0;
+        globals[41] = obs.pending_choice_option_count as f32 / 8.0;
+        globals[42] = if obs.pending_choice_allow_skip { 1.0 } else { 0.0 };
+        globals[43] = obs.me.features.abilities.printed as f32 / 8.0;
+        globals[44] = obs.me.features.abilities.gained as f32 / 4.0;
+        globals[45] = obs.me.features.abilities.activation as f32 / 4.0;
+        globals[46] = obs.me.features.abilities.live_start as f32 / 4.0;
+        globals[47] = obs.me.features.abilities.live_success as f32 / 4.0;
+        globals[48] = obs.me.features.abilities.constant as f32 / 4.0;
+        globals[49] = obs.me.features.abilities.auto as f32 / 4.0;
+        globals[50] = obs.me.features.abilities.usable_activation as f32 / 4.0;
+        globals[51] = obs.me.features.abilities.limited_used as f32 / 4.0;
+        globals[52] = obs.me.features.abilities.invalidated as f32 / 4.0;
+        globals[53] = obs.ability_queue_len as f32 / 8.0;
+        globals[54] = if obs.ability_queue_waiting { 1.0 } else { 0.0 };
+        globals[55] = obs.me.features.stage_cost as f32 / 30.0;
+        globals[56] = obs.opp.features.stage_cost as f32 / 30.0;
+        globals[57] = obs.me.features.stage_hearts as f32 / 20.0;
+        globals[58] = obs.opp.features.stage_hearts as f32 / 20.0;
+        globals[59] = obs.me.features.active_stage_slots as f32 / 3.0;
+        globals[60] = obs.opp.features.active_stage_slots as f32 / 3.0;
+        globals[61] = obs.me.live_zone.len() as f32 / 3.0;
+        globals[62] = obs.opp.live_zone.len() as f32 / 3.0;
+        globals[63] = obs.mulligan_selected_count as f32 / 6.0;
+        globals[64] = obs
+            .ability_queue_current_trigger
+            .map_or(0.0, |value| value as f32 / 5.0);
+        globals[65] = obs
+            .ability_queue_current_ability
+            .map_or(0.0, |value| value as f32 / 8.0);
 
         EncodedState {
             my_hand: sum_embeds(&obs.me.hand),
@@ -182,6 +262,7 @@ impl PolicyNet {
             my_waitroom: sum_embeds(&obs.me.waitroom),
             my_live: sum_embeds(&obs.me.live_zone),
             my_success: sum_embeds(&obs.me.success_zone),
+            my_deck: sum_embeds(&obs.me.main_deck_composition),
             opp_stage: opp_stage_enc,
             opp_energy: sum_embeds(&obs.opp.energy_zone),
             opp_waitroom: sum_embeds(&obs.opp.waitroom),
