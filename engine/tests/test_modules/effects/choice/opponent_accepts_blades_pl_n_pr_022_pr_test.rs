@@ -40,3 +40,21 @@ fn pl_n_pr_022_pr_opponent_accepts_choice_gains_blade_only_opponent() {
         "Player 1's Emma should NOT have gained a blade"
     );
 }
+
+#[test]
+fn pl_n_pr_022_pr_other_answer_does_not_gain_opponent_blade() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let emma = game.id("PL!N-PR-022-PR");
+    let filler = game.id("PL!-sd1-010-SD");
+    game.state
+        .player2
+        .stage
+        .set_area(MemberArea::Center, filler);
+    game.state.player1.hand.cards.push(emma);
+    game.give_energy(10);
+    game.play_to_stage(emma, MemberArea::LeftSide);
+    assert!(game.has_pending_choice());
+    game.select_option(1);
+    assert_eq!(game.state.mods.get_blade_modifier(filler), 0);
+}
