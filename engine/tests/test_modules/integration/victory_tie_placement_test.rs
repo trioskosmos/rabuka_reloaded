@@ -59,7 +59,8 @@ fn tie_with_two_card_live_zones_allows_selection() {
 
     // Run the live round to completion.
     let mut guard = 0;
-    while game.state.current_turn_phase == rabuka_engine::game_state::TurnPhase::Live && guard < 24 {
+    while game.state.current_turn_phase == rabuka_engine::game_state::TurnPhase::Live && guard < 24
+    {
         guard += 1;
         game.pass();
         while game.has_pending_choice() {
@@ -133,7 +134,8 @@ fn tie_at_two_successes_blocks_third_placement() {
     game.set_live_card(p2_live);
 
     let mut guard = 0;
-    while game.state.current_turn_phase == rabuka_engine::game_state::TurnPhase::Live && guard < 24 {
+    while game.state.current_turn_phase == rabuka_engine::game_state::TurnPhase::Live && guard < 24
+    {
         guard += 1;
         game.pass();
         while game.has_pending_choice() {
@@ -153,6 +155,74 @@ fn tie_at_two_successes_blocks_third_placement() {
     assert_eq!(game.state.player1.success_live_card_zone.cards.len(), 2);
     assert_eq!(game.state.player2.success_live_card_zone.cards.len(), 2);
     assert!(!game.state.game_ended);
+}
+
+#[test]
+fn solo_winner_third_success_ends_before_live_reentry() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let filler = game.id("PL!-sd1-010-SD");
+
+    let m1 = game.id(MEMBER);
+    let m2 = game.new_id(MEMBER);
+    let m3 = game.new_id(MEMBER);
+    game.state.player1.stage.stage = [m1, m2, m3];
+    let m4 = game.new_id(MEMBER);
+    let m5 = game.new_id(MEMBER);
+    let m6 = game.new_id(MEMBER);
+    game.state.player2.stage.stage = [m4, m5, m6];
+
+    let p1_success_a = game.new_id(LIVE);
+    let p1_success_b = game.new_id(LIVE);
+    let p2_success_a = game.new_id(LIVE);
+    let p2_success_b = game.new_id(LIVE);
+    for seat in [0usize, 1] {
+        let player = if seat == 0 {
+            &mut game.state.player1
+        } else {
+            &mut game.state.player2
+        };
+        player.main_deck.cards.clear();
+        player.hand.cards.clear();
+        player.waitroom.cards.clear();
+        for _ in 0..40 {
+            player.main_deck.cards.push(filler);
+        }
+    }
+    game.state.player1.success_live_card_zone.cards = vec![p1_success_a, p1_success_b].into();
+    game.state.player2.success_live_card_zone.cards = vec![p2_success_a, p2_success_b].into();
+
+    let p1_live = game.id(LIVE);
+    let p2_live_a = game.new_id(LIVE);
+    let p2_live_b = game.new_id(LIVE);
+    game.state.player1.hand.cards.push(p1_live);
+    game.state.player2.hand.cards.push(p2_live_a);
+    game.state.player2.hand.cards.push(p2_live_b);
+
+    for _ in 0..5 {
+        game.pass();
+    }
+    game.set_live_card(p1_live);
+    game.pass();
+    game.set_live_card(p2_live_a);
+    game.state.player2.live_card_zone.cards.push(p2_live_b);
+
+    let mut guard = 0;
+    while !game.state.game_ended && guard < 24 {
+        guard += 1;
+        game.pass();
+        while game.has_pending_choice() {
+            if game.pending_choice_type().as_deref() == Some("SelectLiveSuccess") {
+                game.select_indices(&[0]);
+            } else {
+                game.select_indices(&[]);
+            }
+        }
+    }
+
+    assert!(game.state.game_ended);
+    assert_eq!(game.state.player1.success_live_card_zone.cards.len(), 2);
+    assert_eq!(game.state.player2.success_live_card_zone.cards.len(), 3);
 }
 
 /// Rule 8.4.6.1 — NEITHER player sets a live card: no totals, no winner,

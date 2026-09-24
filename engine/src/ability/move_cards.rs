@@ -945,6 +945,32 @@ impl AbilityResolver {
         let src_zone = Zone::from_str(c.effective_source);
         let actual_zone = c.effective_source;
 
+        if c.is_self_cost && src_zone == Some(Zone::Hand) {
+            let card_id = c
+                .activating_card_id
+                .ok_or_else(|| "Self hand cost has no activating card".to_string())?;
+            let player = c.player_mut(gs);
+            if let Some(pos) = player.hand.cards.iter().position(|&id| id == card_id) {
+                player.hand.cards.remove(pos);
+                log::debug!(
+                    "[HAND_SELF_COST_RESOLVE] card={} from=hand position={}",
+                    card_id,
+                    pos
+                );
+                return Ok(vec![card_id]);
+            }
+            if let Some(pos) = player.waitroom.cards.iter().position(|&id| id == card_id) {
+                player.waitroom.cards.remove(pos);
+                log::debug!(
+                    "[HAND_SELF_COST_RESOLVE] card={} from=waitroom position={}",
+                    card_id,
+                    pos
+                );
+                return Ok(vec![card_id]);
+            }
+            return Err("Self hand cost card is not in hand or waitroom".to_string());
+        }
+
         let insufficient_behavior = match src_zone {
             Some(Zone::Energy) => {
                 // A move_cards EFFECT (e.g. "エネルギー1枚をエネルギーデッキに置く")

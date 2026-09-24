@@ -14,6 +14,7 @@ static int eval_card_count(const GameState *g, int actor, const Condition *c);
 static int eval_card_blade(const GameState *g, int actor, const Condition *c);
 static int resolve_moved_cards_source(const GameState *g, int actor, const Condition *c,
                                       int *out_ids, int max, int *out_n);
+static int check_card_property(const struct GameState *g, int actor, const Condition *c, const char *loc);
 
 static int s_heart_idx(const char *h){
     if(!h) return RB_HEART_ALL;
@@ -314,6 +315,17 @@ static int eval_location(const struct GameState *g, int actor, int host_cid, con
         if (lv && lv->tag == RB_TAG_ARRAY && lv->arr_n>0 && lv->arr[0].tag==RB_TAG_STR) loc = lv->arr[0].s;
     }
     if (!loc) loc = "stage";
+    int yell_trigger = 0;
+    get_bool(c, "yell_trigger", &yell_trigger);
+    int yell_negation = 0;
+    get_bool(c, "negation", &yell_negation);
+    if (yell_trigger)
+        fprintf(stderr, "[YELL_COND] host=%d loc=%s occurred=%d revealed=%d property=%s negation=%d\n",
+                host_cid, loc, g->yell_occurred, g->n_revealed,
+                get_str(c, "card_property") ? get_str(c, "card_property") : "-",
+                yell_negation);
+    if (yell_trigger && !g->yell_occurred) return 0;
+    if (get_str(c, "card_property")) return check_card_property(g, actor, c, loc);
     int pl = target_player_idx(actor, c);
     const char *ctype = get_str(c, "card_type");
     const char *temporal = get_str(c, "temporal");
@@ -1647,6 +1659,8 @@ static int eval_condition_inner_host(const struct GameState *g, int actor, int h
         }
         default: r = 1; break;
     }
+    int location_property = c->variant == RB_COND_LOCATION && get_str(c, "card_property") != NULL;
+    if (location_property) return r;
     return negation ? !r : r;
 }
 static int eval_condition_inner(const struct GameState *g, int actor, const Condition *c) {
@@ -1893,7 +1907,11 @@ static int check_card_property(const struct GameState *g, int actor, const Condi
     for (int i = 0; i < n; i++) {
         Card cc; if (!rb_decode_card_by_index((uint32_t)ids[i], &cc)) continue;
         int has = 0;
-        if (!strcmp(prop, "has_blade_heart")) has = rb_card_has_blade_heart(&cc);
+        if (!strcmp(prop, "has_blade_heart")) {
+            int yell_trigger = 0;
+            get_bool(c, "yell_trigger", &yell_trigger);
+            has = yell_trigger ? cc.num_blade > 0 : rb_card_has_blade_heart(&cc);
+        }
         else if (!strcmp(prop, "has_score_icon")) has = rb_card_has_score_icon(&cc);
         else if (!strcmp(prop, "has_all_blade")) has = rb_card_has_all_blade(&cc);
         rb_free_card(&cc);

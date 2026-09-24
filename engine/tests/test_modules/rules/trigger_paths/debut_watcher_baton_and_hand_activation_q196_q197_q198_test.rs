@@ -228,34 +228,22 @@ fn hand_activation_empty_stage_resolves_draw_after_discard_choices_q196() {
     )
     .expect("activate from hand");
 
-    // The engine auto-processes the self_cost (removes shizuku), then
-    // presents a SelectCard for the move_cards cost step.
-    // Observed: SelectCard zone=hand count=1 allow_skip=false.
     assert!(
-        game.has_pending_choice(),
-        "move_cards cost selection must be prompted"
+        !game.has_pending_choice(),
+        "self-discard cost must resolve without a card-choice prompt"
     );
-    assert_eq!(
-        game.pending_choice_type().as_deref(),
-        Some("SelectCard"),
-        "expected SelectCard cost prompt"
-    );
-    // Select 1 card to discard.
-    game.select_indices(&[0]);
 
-    // Effect resolves: draw 1, then blade grant (no targets → skip)
     while game.has_pending_choice() {
         game.select_indices(&[]);
     }
 
     // Hand: [shizuku, filler, filler] = 3
     // Self-cost removes shizuku: [filler, filler] = 2
-    // SelectCard cost discards 1: [filler] = 1
-    // Draw 1: [filler, drawn] = 2
+    // Draw 1: [filler, filler, drawn] = 3
     assert_eq!(
         game.state.player1.hand.cards.len(),
-        2,
-        "Hand should be 2 after activation (self+select discards, then draw)"
+        3,
+        "Hand should be 3 after the self-discard cost and draw"
     );
 }
 
@@ -289,18 +277,10 @@ fn hand_activation_draw_and_lone_nijigasaki_blade_resolve_q196() {
     )
     .expect("activate from hand");
 
-    // Self-cost removes shizuku, then SelectCard for remaining cost step.
-    // Observed: SelectCard zone=hand count=1 allow_skip=false.
     assert!(
-        game.has_pending_choice(),
-        "move_cards cost selection must be prompted"
+        !game.has_pending_choice(),
+        "self-discard cost must resolve without a card-choice prompt"
     );
-    assert_eq!(
-        game.pending_choice_type().as_deref(),
-        Some("SelectCard"),
-        "expected SelectCard cost prompt"
-    );
-    game.select_indices(&[0]);
 
     // Blade target selection: with 上原歩夢 as the only 虹ヶ咲 member on
     // stage the single candidate auto-resolves — no prompt (observed).
@@ -313,8 +293,8 @@ fn hand_activation_draw_and_lone_nijigasaki_blade_resolve_q196() {
         game.select_indices(&[]);
     }
 
-    // Hand: 3 → 2 (self-cost) → 1 (select discard) → 2 (draw)
-    assert_eq!(game.state.player1.hand.cards.len(), 2);
+    // Hand: 3 → 2 (self-cost) → 3 (draw)
+    assert_eq!(game.state.player1.hand.cards.len(), 3);
 
     // Blade should be granted to the 虹ヶ咲 member
     let blade = game.state.mods.get_blade_modifier(niji);

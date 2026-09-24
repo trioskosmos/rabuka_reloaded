@@ -425,6 +425,102 @@ static int rb_condition_is_event_based(const Condition *c) {
     }
 }
 
+static int rb_queue_key(int cid, int a);
+static void rb_build_ability_queue_entry(GameState *g, int card_id, int ability_idx,
+                                         const char *card_no, const char *player_id,
+                                         const char *trigger_type,
+                                         const int *trigger_moved_cards, int n_moved,
+                                         int triggering_member_id);
+static int rb_effect_is_ability_resolution_watcher(const AbilityEffect *e);
+
+static int rb_condition_requires_yell(const Condition *c) {
+    if (!c) return 0;
+    for (uint32_t i = 0; i < c->n_fields; i++) {
+        const CondField *f = &c->fields[i];
+        if (f->key && !strcmp(f->key, "yell_trigger") &&
+            f->v.tag == RB_TAG_TRUE) return 1;
+        if (f->v.tag == RB_TAG_OBJVAR && f->v.cond &&
+            rb_condition_requires_yell(f->v.cond)) return 1;
+        if (f->v.tag == RB_TAG_ARRAY) {
+            for (uint32_t j = 0; j < f->v.arr_n; j++)
+                if (f->v.arr[j].tag == RB_TAG_OBJVAR && f->v.arr[j].cond &&
+                    rb_condition_requires_yell(f->v.arr[j].cond)) return 1;
+        }
+    }
+    return 0;
+}
+
+static int rb_queue_yell_ability(GameState *g, int pl, int cid, int ability_idx) {
+    if (!g || pl < 0 || pl > 1 || cid < 0) return 0;
+    Ability ab;
+    if (!rb_decode_card_ability((uint32_t)cid, ability_idx, &ab)) return 0;
+    if (!rb_ability_matches_trigger(&ab, "自動") || !ab.effect || !ab.effect->condition ||
+        !rb_condition_requires_yell(ab.effect->condition) ||
+        rb_ability_is_invalidated(g, cid, "自動") ||
+        rb_effect_is_ability_resolution_watcher(ab.effect)) {
+        rb_free_ability(&ab);
+        return 0;
+    }
+    int saved = g->activating_card;
+    g->activating_card = cid;
+    int passes = rb_can_activate_effect(g, pl, ab.effect, cid);
+    g->activating_card = saved;
+    fprintf(stderr, "[YELL_QUEUE] cid=%d ability=%d passes=%d occurred=%d revealed=%d\n",
+            cid, ability_idx, passes, g->yell_occurred, g->n_revealed);
+    if (!passes) {
+        rb_free_ability(&ab);
+        return 0;
+    }
+    int key = rb_queue_key(cid, ability_idx);
+    int limit = ab.use_limit < 0 ? 99 : ab.use_limit;
+    if (key == g->just_completed_ability_key || rb_use_limit_reached(&g->queue, cid, ability_idx, limit, g->turn)) {
+        rb_free_ability(&ab);
+        return 0;
+    }
+    for (int i = 0; i < g->n_batch_triggered_keys; i++) {
+        if (g->batch_triggered_keys[i] == key) {
+            rb_free_ability(&ab);
+            return 0;
+        }
+    }
+    int cap = (int)(sizeof(g->batch_triggered_keys) / sizeof(g->batch_triggered_keys[0]));
+    if (g->n_batch_triggered_keys >= cap || g->queue.n_entries >= RB_QUEUE_DEPTH) {
+        rb_free_ability(&ab);
+        return 0;
+    }
+    g->batch_triggered_keys[g->n_batch_triggered_keys++] = key;
+    rb_build_ability_queue_entry(g, cid, ability_idx, "",
+                                  pl == 0 ? "p1" : "p2", "yell", NULL, 0, -1);
+    rb_record_use(&g->queue, cid, ability_idx, g->turn);
+    rb_free_ability(&ab);
+    return 1;
+}
+
+int rb_queue_yell_auto_abilities(GameState *g, int pl) {
+    if (!g || pl < 0 || pl > 1 || !g->yell_occurred) return 0;
+    g->n_batch_triggered_keys = 0;
+    const RbPlayer *P = &g->p[pl];
+    int queued = 0;
+    for (int i = 0; i < RB_STAGE_SIZE; i++) {
+        if (P->stage[i] < 0) continue;
+        for (int a = 0; a < rb_card_num_abilities((uint32_t)P->stage[i]); a++)
+            queued += rb_queue_yell_ability(g, pl, P->stage[i], a);
+    }
+    for (int i = 0; i < P->success.n; i++)
+        for (int a = 0; a < rb_card_num_abilities((uint32_t)P->success.cards[i]); a++)
+            queued += rb_queue_yell_ability(g, pl, P->success.cards[i], a);
+    for (int i = 0; i < P->live.n; i++)
+        for (int a = 0; a < rb_card_num_abilities((uint32_t)P->live.cards[i]); a++)
+            queued += rb_queue_yell_ability(g, pl, P->live.cards[i], a);
+    for (int i = 0; i < P->hand.n; i++)
+        for (int a = 0; a < rb_card_num_abilities((uint32_t)P->hand.cards[i]); a++)
+            queued += rb_queue_yell_ability(g, pl, P->hand.cards[i], a);
+    for (int i = 0; i < P->energy.n; i++)
+        for (int a = 0; a < rb_card_num_abilities((uint32_t)P->energy.cards[i]); a++)
+            queued += rb_queue_yell_ability(g, pl, P->energy.cards[i], a);
+    return queued;
+}
+
 /* Mirror abilities.rs::condition_tree_group_names — first non-empty group filter. */
 static const char *rb_condition_tree_group_names(const Condition *c) {
     if (!c) return NULL;
@@ -972,6 +1068,13 @@ static int queue_zone_abilities(GameState *g, int actor, const int *ids, int n,
             }
             if (ab.effect && rb_effect_is_ability_resolution_watcher(ab.effect))
                 { rb_free_ability(&ab); continue; }
+            if (ab.effect && ab.effect->condition) {
+                const char *loc = rb_cond_get_str(ab.effect->condition, "location");
+                if (loc && !strcmp(loc, "revealed_cards") && !g->yell_occurred) {
+                    rb_free_ability(&ab);
+                    continue;
+                }
+            }
             /* Discard-location guard for stage cards: skip discard-location abilities
                when the card is on stage (not in discard). */
             if (check_discard_guard && ab.effect && ab.effect->condition) {

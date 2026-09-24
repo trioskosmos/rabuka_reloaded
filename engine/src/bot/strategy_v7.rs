@@ -41,7 +41,6 @@ use crate::game_setup::{Action, ActionType};
 use crate::game_state::{GameState, Phase};
 use crate::player::Player;
 
-
 fn env_weight(name: &str, default: f64) -> f64 {
     std::env::var(name)
         .ok()
@@ -81,8 +80,7 @@ fn total_blades_of(p: &Player, gs: &GameState, db: &CardDatabase) -> i32 {
             if waiting {
                 0
             } else {
-                db.get_card(c).map(|x| x.blade as i32).unwrap_or(0)
-                    + gs.mods.get_blade_modifier(c)
+                db.get_card(c).map(|x| x.blade as i32).unwrap_or(0) + gs.mods.get_blade_modifier(c)
             }
         })
         .sum()
@@ -105,7 +103,11 @@ fn public_opponent_ceiling(gs: &GameState, me: u8, db: &CardDatabase) -> i32 {
         false,
     );
     let pool = hearts.hearts.values().copied().map(i32::from).sum::<i32>() + (blades as i32) / 2;
-    if pool < 3 { 0 } else { ((pool - 1) / 2).min(12) }
+    if pool < 3 {
+        0
+    } else {
+        ((pool - 1) / 2).min(12)
+    }
 }
 
 /// Passable lives under the buff-aware mean pool.
@@ -197,8 +199,12 @@ pub fn score_actions(gs: &GameState, actions: &[Action], me: u8) -> Vec<(f64, St
     let base_wait = wait_fingerprint(gs, me);
     let base_blade_mods = blade_mod_fingerprint(gs, me);
     let stage_cost = |p: &Player| -> i32 {
-        p.stage.stage.iter().filter_map(|&id| db.get_card(id))
-            .map(|card| i32::from(card.cost.unwrap_or(0))).sum()
+        p.stage
+            .stage
+            .iter()
+            .filter_map(|&id| db.get_card(id))
+            .map(|card| i32::from(card.cost.unwrap_or(0)))
+            .sum()
     };
     let base_cost = stage_cost(my_now);
     let development = std::env::var("V7_NO_DEVELOPMENT").is_err();
@@ -209,7 +215,10 @@ pub fn score_actions(gs: &GameState, actions: &[Action], me: u8) -> Vec<(f64, St
         .main_deck
         .cards
         .iter()
-        .filter(|&&c| db.get_card(c).map_or(false, |x| x.card_type == CardType::Live))
+        .filter(|&&c| {
+            db.get_card(c)
+                .map_or(false, |x| x.card_type == CardType::Live)
+        })
         .count();
     let deck_len = my_now.main_deck.cards.len().max(1);
     let p_life_draw = deck_lives as f64 / deck_len as f64;
@@ -217,7 +226,10 @@ pub fn score_actions(gs: &GameState, actions: &[Action], me: u8) -> Vec<(f64, St
         .waitroom
         .cards
         .iter()
-        .filter(|&&c| db.get_card(c).map_or(false, |x| x.card_type == CardType::Live))
+        .filter(|&&c| {
+            db.get_card(c)
+                .map_or(false, |x| x.card_type == CardType::Live)
+        })
         .count();
 
     let mut vals: Vec<f64> = vec![f64::NEG_INFINITY; actions.len()];
@@ -295,8 +307,7 @@ pub fn score_actions(gs: &GameState, actions: &[Action], me: u8) -> Vec<(f64, St
             parts.push(format!("development{:+}", 8 * cost_growth));
         }
         let baton_hit = a.parameters.as_ref().is_some_and(|p| {
-            p.use_baton_touch == Some(true)
-                || crate::bot::v7_main::baton_from_params(gs, me, p)
+            p.use_baton_touch == Some(true) || crate::bot::v7_main::baton_from_params(gs, me, p)
         });
         // D1: detect-only in the default path — `development` (8× cost growth)
         // already prices batons; a flat +45 double-counted and regressed ~18pp
@@ -323,7 +334,10 @@ pub fn score_actions(gs: &GameState, actions: &[Action], me: u8) -> Vec<(f64, St
                 .waitroom
                 .cards
                 .iter()
-                .filter(|&&c| db.get_card(c).map_or(false, |x| x.card_type == CardType::Live))
+                .filter(|&&c| {
+                    db.get_card(c)
+                        .map_or(false, |x| x.card_type == CardType::Live)
+                })
                 .count();
             if wr_now > waitroom_lives && p_life_draw > 0.0 {
                 val += 25.0;
@@ -357,8 +371,7 @@ pub fn score_actions(gs: &GameState, actions: &[Action], me: u8) -> Vec<(f64, St
                 .map(|c| c.card_no.clone())
                 .unwrap_or_default();
             let baton_mark = if a.parameters.as_ref().is_some_and(|p| {
-                p.use_baton_touch == Some(true)
-                    || crate::bot::v7_main::baton_from_params(gs, me, p)
+                p.use_baton_touch == Some(true) || crate::bot::v7_main::baton_from_params(gs, me, p)
             }) {
                 "[BATON]"
             } else {
@@ -366,7 +379,11 @@ pub fn score_actions(gs: &GameState, actions: &[Action], me: u8) -> Vec<(f64, St
             };
             dbg_lines.push(format!(
                 "    [{}] {:?} {} {} -> {}",
-                i, a.action_type, card_no, baton_mark, parts.join(" ")
+                i,
+                a.action_type,
+                card_no,
+                baton_mark,
+                parts.join(" ")
             ));
         }
 
@@ -501,7 +518,10 @@ pub fn choose_live_set_v7(gs: &GameState, actions: &[Action], db: &CardDatabase)
             .main_deck
             .cards
             .iter()
-            .filter(|&&cid| db.get_card(cid).map_or(false, |c| c.card_type == CardType::Live))
+            .filter(|&&cid| {
+                db.get_card(cid)
+                    .map_or(false, |c| c.card_type == CardType::Live)
+            })
             .count();
         let max_slots = (3i32 - i32::from(my.live_card_set_limit_reduction)).max(0) as usize;
         if desired.len() < max_slots && deck_lives > 0 {
@@ -512,7 +532,9 @@ pub fn choose_live_set_v7(gs: &GameState, actions: &[Action], db: &CardDatabase)
                 .enumerate()
                 .filter(|&(i, &cid)| {
                     !desired.contains(&i)
-                        && db.get_card(cid).map_or(false, |c| c.card_type != CardType::Live)
+                        && db
+                            .get_card(cid)
+                            .map_or(false, |c| c.card_type != CardType::Live)
                 })
                 .map(|(i, &cid)| (i, db.get_card(cid).and_then(|c| c.cost).unwrap_or(0)))
                 .collect();
@@ -684,12 +706,7 @@ fn cheapest_deterministic_life(gs: &GameState, me: u8, db: &CardDatabase) -> Opt
     hand_lives(my, db)
         .into_iter()
         .filter(|(_, _, need)| alloc(&pool, need).is_some())
-        .min_by_key(|(hi, cid, _)| {
-            (
-                db.get_card(*cid).and_then(|c| c.score).unwrap_or(0),
-                *hi,
-            )
-        })
+        .min_by_key(|(hi, cid, _)| (db.get_card(*cid).and_then(|c| c.score).unwrap_or(0), *hi))
         .map(|(hi, _, _)| hi)
 }
 
@@ -698,20 +715,33 @@ const EXPERIMENT_SAMPLES: usize = 256;
 type ExperimentPortfolio = (f64, i32, Vec<usize>);
 type ExperimentSingle = (f64, i32, usize, [i32; 11]);
 
-fn experiment_flip_categories(gs: &GameState, me: u8, db: &CardDatabase) -> (Vec<([i32; 8], usize)>, usize) {
+fn experiment_flip_categories(
+    gs: &GameState,
+    me: u8,
+    db: &CardDatabase,
+) -> (Vec<([i32; 8], usize)>, usize) {
     let (my, _) = gs.seated_pair(me);
     let override_color = my.stage.stage.iter().find_map(|cid| {
-        gs.mods.blade_type_modifiers.get(cid).copied()
+        gs.mods
+            .blade_type_modifiers
+            .get(cid)
+            .copied()
             .map(crate::turn::live::blade_color_to_heart)
     });
     let mut cats: Vec<([i32; 8], usize)> = Vec::new();
     for &cid in &my.main_deck.cards {
         let mut total = [0u8; 8];
         if let Some(card) = db.get_card(cid) {
-            let mut hearts = crate::card::BaseHeart { hearts: crate::card::HeartMap::new() };
+            let mut hearts = crate::card::BaseHeart {
+                hearts: crate::card::HeartMap::new(),
+            };
             let mut cheer = 0;
             crate::turn::live::process_yell_revealed_card_icons(
-                card, override_color, &mut hearts, &mut total, &mut cheer,
+                card,
+                override_color,
+                &mut hearts,
+                &mut total,
+                &mut cheer,
             );
         }
         let vector = total.map(i32::from);
@@ -753,7 +783,11 @@ fn experiment_pass_probability(
     need: &[i32; 11],
 ) -> f64 {
     if blades <= 0 || cats.is_empty() || deck_len == 0 {
-        return if experiment_feasible(board, need) { 1.0 } else { 0.0 };
+        return if experiment_feasible(board, need) {
+            1.0
+        } else {
+            0.0
+        };
     }
     let mut deck = Vec::with_capacity(deck_len);
     for &(vector, count) in cats {
@@ -867,14 +901,22 @@ fn experiment_pass_probability_pools(pools: &[[i32; 8]], need: &[i32; 11]) -> f6
     if pools.is_empty() {
         return 0.0;
     }
-    pools.iter().filter(|pool| experiment_feasible(pool, need)).count() as f64
+    pools
+        .iter()
+        .filter(|pool| experiment_feasible(pool, need))
+        .count() as f64
         / pools.len() as f64
 }
 
 fn experiment_board_pool(gs: &GameState, me: u8, db: &CardDatabase) -> [i32; 8] {
     let (my, _) = gs.seated_pair(me);
-    let hearts = my.stage.get_available_hearts(db, &gs.mods.heart_override,
-        &gs.mods.heart_modifiers, &gs.mods.heart_color_multiplier, &gs.mods.heart_copy);
+    let hearts = my.stage.get_available_hearts(
+        db,
+        &gs.mods.heart_override,
+        &gs.mods.heart_modifiers,
+        &gs.mods.heart_color_multiplier,
+        &gs.mods.heart_copy,
+    );
     let mut pool = [0i32; 8];
     for (color, count) in &hearts.hearts {
         pool[color.index()] += i32::from(*count);
@@ -910,24 +952,33 @@ fn experiment_expected_yell_score(gs: &GameState, me: u8, db: &CardDatabase, bla
 
 fn experiment_lives(gs: &GameState, me: u8, db: &CardDatabase) -> Vec<(usize, i16, [i32; 11])> {
     let (my, _) = gs.seated_pair(me);
-    hand_lives(my, db).into_iter().map(|(hi, cid, _)| {
-        let mut need = [0; 11];
-        let base = db.get_card(cid).and_then(|card| card.need_heart.as_ref());
-        if let Some(effective) = crate::core::stats_pipeline::effective_need_heart(
-            base, cid, &gs.mods.need_heart_modifiers,
-        ) {
-            for (color, count) in &effective.hearts {
-                need[color.index()] += i32::from(*count);
+    hand_lives(my, db)
+        .into_iter()
+        .map(|(hi, cid, _)| {
+            let mut need = [0; 11];
+            let base = db.get_card(cid).and_then(|card| card.need_heart.as_ref());
+            if let Some(effective) = crate::core::stats_pipeline::effective_need_heart(
+                base,
+                cid,
+                &gs.mods.need_heart_modifiers,
+            ) {
+                for (color, count) in &effective.hearts {
+                    need[color.index()] += i32::from(*count);
+                }
             }
-        }
-        (hi, cid, need)
-    }).collect()
+            (hi, cid, need)
+        })
+        .collect()
 }
 
 fn experiment_blades(gs: &GameState, me: u8, db: &CardDatabase) -> i32 {
     let (my, _) = gs.seated_pair(me);
-    i32::from(my.stage.total_blades(db, &gs.mods.blade_modifiers,
-        &gs.mods.orientation_modifiers, false))
+    i32::from(my.stage.total_blades(
+        db,
+        &gs.mods.blade_modifiers,
+        &gs.mods.orientation_modifiers,
+        false,
+    ))
 }
 
 fn experiment_junk_fill(gs: &GameState, me: u8, db: &CardDatabase, desired: &mut Vec<usize>) {
@@ -936,7 +987,10 @@ fn experiment_junk_fill(gs: &GameState, me: u8, db: &CardDatabase, desired: &mut
         .main_deck
         .cards
         .iter()
-        .filter(|&&cid| db.get_card(cid).is_some_and(|c| c.card_type == CardType::Live))
+        .filter(|&&cid| {
+            db.get_card(cid)
+                .is_some_and(|c| c.card_type == CardType::Live)
+        })
         .count();
     let max_slots = usize::from(3u8.saturating_sub(my.live_card_set_limit_reduction));
     if desired.len() >= max_slots || deck_lives == 0 {
@@ -959,7 +1013,9 @@ fn experiment_junk_fill(gs: &GameState, me: u8, db: &CardDatabase, desired: &mut
         .enumerate()
         .filter(|&(i, &cid)| {
             !desired.contains(&i)
-                && db.get_card(cid).is_some_and(|c| c.card_type != CardType::Live)
+                && db
+                    .get_card(cid)
+                    .is_some_and(|c| c.card_type != CardType::Live)
         })
         .map(|(i, &cid)| {
             let card = db.get_card(cid);
@@ -970,7 +1026,9 @@ fn experiment_junk_fill(gs: &GameState, me: u8, db: &CardDatabase, desired: &mut
                     .map(|h| h.hearts.values_sum() as i32)
                     .unwrap_or(0);
                 let delay = (i32::from(cost) - budget - max_stage_cost).max(0) as f64;
-                (2.0 * f64::from(cost) + 2.0 * f64::from(card.map(|c| c.blade).unwrap_or(0)) + f64::from(hearts))
+                (2.0 * f64::from(cost)
+                    + 2.0 * f64::from(card.map(|c| c.blade).unwrap_or(0))
+                    + f64::from(hearts))
                     / (1.0 + delay)
             } else {
                 0.0
@@ -1005,12 +1063,7 @@ fn experiment_free_win(gs: &GameState, me: u8, db: &CardDatabase) -> Option<usiz
     experiment_lives(gs, me, db)
         .into_iter()
         .filter(|(_, _, need)| experiment_feasible(&pool, need))
-        .min_by_key(|(hi, cid, _)| {
-            (
-                db.get_card(*cid).and_then(|c| c.score).unwrap_or(0),
-                *hi,
-            )
-        })
+        .min_by_key(|(hi, cid, _)| (db.get_card(*cid).and_then(|c| c.score).unwrap_or(0), *hi))
         .map(|(hi, _, _)| hi)
 }
 
@@ -1030,9 +1083,9 @@ fn experiment_portfolio_rank(
     let (cats, deck_len) = experiment_flip_categories(gs, me, db);
     let blades = experiment_blades(gs, me, db);
     let board = experiment_board_pool(gs, me, db);
-    let shared_pools = std::env::var_os("V7_NO_SHARED_SAMPLES").is_none().then(|| {
-        experiment_sample_pools(&cats, deck_len, blades, &board)
-    });
+    let shared_pools = std::env::var_os("V7_NO_SHARED_SAMPLES")
+        .is_none()
+        .then(|| experiment_sample_pools(&cats, deck_len, blades, &board));
     let yell_score = if std::env::var_os("V7_YELL_SCORE").is_some() {
         experiment_expected_yell_score(gs, me, db, blades)
     } else {
@@ -1120,13 +1173,18 @@ fn count_lives(gs: &GameState, desired: &[usize], db: &CardDatabase) -> usize {
         .iter()
         .filter(|&&hi| {
             my.hand.cards.get(hi).copied().map_or(false, |cid| {
-                db.get_card(cid).is_some_and(|c| c.card_type == CardType::Live)
+                db.get_card(cid)
+                    .is_some_and(|c| c.card_type == CardType::Live)
             })
         })
         .count()
 }
 
-pub(crate) fn choose_live_set_experiment(gs: &GameState, actions: &[Action], db: &CardDatabase) -> Action {
+pub(crate) fn choose_live_set_experiment(
+    gs: &GameState,
+    actions: &[Action],
+    db: &CardDatabase,
+) -> Action {
     let me = gs.active_player_index();
     let (my, opp) = gs.seated_pair(me);
     let my_succ = my.success_live_card_zone.cards.len();
@@ -1166,12 +1224,27 @@ pub(crate) fn choose_live_set_experiment(gs: &GameState, actions: &[Action], db:
         // failure). Fold only when the opponent zone is still empty (nothing
         // to gift) and no single clears the floor. Reverse-gate: V7_PRE_D=1
         // keeps pure score-max (old behavior).
-        let ceiling_enabled = std::env::var_os("V7_PRE_D").is_none()
-            && std::env::var_os("V7_NO_CEILING").is_none();
+        let ceiling_enabled =
+            std::env::var_os("V7_PRE_D").is_none() && std::env::var_os("V7_NO_CEILING").is_none();
         let mut chose_single = false;
-        if std::env::var_os("V7_PAYOFF_MODEL").is_some()
-            && (my_succ >= 2 || opp_succ >= 2)
+        if std::env::var_os("V7_CLOSE_RACE").is_some()
+            && opp_succ >= 2
+            && my_succ < 2
         {
+            if let Some(&(_, _, first_hi, _)) = singles.first() {
+                desired.push(first_hi);
+                chose_single = true;
+                log::debug!(
+                    "v7 close-race t{} me{} opp{} hi={} p={:.2}",
+                    gs.turn_number,
+                    me,
+                    opp_succ,
+                    first_hi,
+                    singles.first().map(|s| s.0).unwrap_or(0.0)
+                );
+            }
+        }
+        if !chose_single && std::env::var_os("V7_PAYOFF_MODEL").is_some() && (my_succ >= 2 || opp_succ >= 2) {
             let e_opp = public_opponent_ceiling(gs, me, db);
             let opp_pass = if opp_committed { 0.86 } else { 0.0 };
             let opp_set_size = opp.live_card_zone.cards.len();
@@ -1215,13 +1288,23 @@ pub(crate) fn choose_live_set_experiment(gs: &GameState, actions: &[Action], db:
                         chose_single = true;
                         log::debug!(
                             "v7 ceiling-single t{} me{} e_opp={} best={} gap={} hi={} p={:.2}",
-                            gs.turn_number, me, e_opp, best_score, gap, first_hi,
+                            gs.turn_number,
+                            me,
+                            e_opp,
+                            best_score,
+                            gap,
+                            first_hi,
                             singles.first().map(|s| s.0).unwrap_or(0.0)
                         );
                     } else if !opp_committed {
                         log::debug!(
                             "v7 ceiling-fold t{} me{} e_opp={} best={} gap={} floor={:.2}",
-                            gs.turn_number, me, e_opp, best_score, gap, floor
+                            gs.turn_number,
+                            me,
+                            e_opp,
+                            best_score,
+                            gap,
+                            floor
                         );
                         return emit(gs, actions, &desired);
                     }
@@ -1236,11 +1319,7 @@ pub(crate) fn choose_live_set_experiment(gs: &GameState, actions: &[Action], db:
                 if *score < required {
                     continue;
                 }
-                let probability = if *score > 0 {
-                    *ev / *score as f64
-                } else {
-                    1.0
-                };
+                let probability = if *score > 0 { *ev / *score as f64 } else { 1.0 };
                 let replace = if std::env::var_os("V7_NO_TRUE_MIN_WIN").is_none() {
                     best.as_ref().is_none_or(|current| {
                         *score < current.1
@@ -1362,7 +1441,11 @@ pub(crate) fn choose_live_set_experiment(gs: &GameState, actions: &[Action], db:
             desired.push(*hi);
             log::debug!(
                 "v7 desperation-life t{} me{} hi={} p={:.2} (below floor {:.2})",
-                gs.turn_number, me, hi, p, gamble_floor
+                gs.turn_number,
+                me,
+                hi,
+                p,
+                gamble_floor
             );
         }
     } else if desired.is_empty() {
@@ -1400,7 +1483,12 @@ pub(crate) fn choose_live_set_experiment(gs: &GameState, actions: &[Action], db:
             .sum();
         eprintln!(
             "V7LE t{} me{} n={} score={} my{} opp{}",
-            gs.turn_number, me, desired.len(), score, my_succ, opp_succ
+            gs.turn_number,
+            me,
+            desired.len(),
+            score,
+            my_succ,
+            opp_succ
         );
     }
     emit(gs, actions, &desired)
@@ -1430,12 +1518,18 @@ fn reachable_curve_keep(costs: &[Option<u8>]) -> Vec<usize> {
         if line.len() >= 2 && line[0].1 + line[1].1 > 4 {
             continue;
         }
-        if line.windows(2).any(|pair| pair[1].1 < pair[0].1 || pair[1].1 > pair[0].1 + 6) {
+        if line
+            .windows(2)
+            .any(|pair| pair[1].1 < pair[0].1 || pair[1].1 > pair[0].1 + 6)
+        {
             continue;
         }
         let rank = (
             line.len() as u32,
-            line.last().copied().map(|(_, cost)| u32::from(cost)).unwrap_or(0),
+            line.last()
+                .copied()
+                .map(|(_, cost)| u32::from(cost))
+                .unwrap_or(0),
             line.iter().map(|(_, cost)| u32::from(*cost)).sum(),
         );
         if rank > best_rank {
@@ -1459,12 +1553,18 @@ fn opening_curve_keep(costs: &[Option<u8>]) -> Vec<usize> {
             }
             for (c, bridge) in costs.iter().enumerate() {
                 let Some(bridge) = bridge else { continue };
-                if c == a || c == b || bridge <= first || u16::from(*bridge) > u16::from(*first) + 5 {
+                if c == a || c == b || bridge <= first || u16::from(*bridge) > u16::from(*first) + 5
+                {
                     continue;
                 }
                 for (d, finish) in costs.iter().enumerate() {
                     let Some(finish) = finish else { continue };
-                    if d == a || d == b || d == c || finish <= bridge || u16::from(*finish) > u16::from(*bridge) + 6 {
+                    if d == a
+                        || d == b
+                        || d == c
+                        || finish <= bridge
+                        || u16::from(*finish) > u16::from(*bridge) + 6
+                    {
                         continue;
                     }
                     let rank = (*first + *second, *bridge, *finish);
@@ -1491,11 +1591,19 @@ fn opening_curve_keep(costs: &[Option<u8>]) -> Vec<usize> {
 /// when it does fire it preserves members whose value the one-ply Main eval
 /// already captures from redraws. v4's expensive-first replacement stays.
 fn choose_mulligan_curve(gs: &GameState, actions: &[Action], db: &CardDatabase) -> Action {
-    let costs: Vec<Option<u8>> = gs.active_player().hand.cards.iter().map(|&id| {
-        db.get_card(id).and_then(|card| {
-            (card.card_type == CardType::Member).then_some(card.cost).flatten()
+    let costs: Vec<Option<u8>> = gs
+        .active_player()
+        .hand
+        .cards
+        .iter()
+        .map(|&id| {
+            db.get_card(id).and_then(|card| {
+                (card.card_type == CardType::Member)
+                    .then_some(card.cost)
+                    .flatten()
+            })
         })
-    }).collect();
+        .collect();
     let keep = if std::env::var_os("V7_MULLIGAN_REACHABLE").is_some() {
         reachable_curve_keep(&costs)
     } else {
@@ -1507,19 +1615,27 @@ fn choose_mulligan_curve(gs: &GameState, actions: &[Action], db: &CardDatabase) 
     let mut desired = Vec::new();
     let mut lives = 0;
     for (index, &id) in gs.active_player().hand.cards.iter().enumerate() {
-        if db.get_card(id).is_some_and(|card| card.card_type == CardType::Live) {
+        if db
+            .get_card(id)
+            .is_some_and(|card| card.card_type == CardType::Live)
+        {
             lives += 1;
             if lives > 3 {
                 desired.push(index);
             }
         }
     }
-    let mut members: Vec<(usize, u8)> = costs.iter().enumerate()
+    let mut members: Vec<(usize, u8)> = costs
+        .iter()
+        .enumerate()
         .filter_map(|(index, cost)| cost.map(|cost| (index, cost)))
-        .filter(|(index, _)| !keep.contains(index)).collect();
+        .filter(|(index, _)| !keep.contains(index))
+        .collect();
     members.sort_by_key(|&(_, cost)| std::cmp::Reverse(cost));
     for (index, _) in members {
-        if desired.len() >= 3 { break; }
+        if desired.len() >= 3 {
+            break;
+        }
         desired.push(index);
     }
     log::debug!("v7 mulligan curve keep={:?} replace={:?}", keep, desired);
@@ -1532,14 +1648,21 @@ fn choose_mulligan_curve(gs: &GameState, actions: &[Action], db: &CardDatabase) 
             }
         }
     }
-    actions.iter().find(|action| matches!(action.action_type,
-        ActionType::ConfirmMulligan | ActionType::SkipMulligan))
-        .or_else(|| actions.first()).cloned().expect("mulligan actions non-empty")
+    actions
+        .iter()
+        .find(|action| {
+            matches!(
+                action.action_type,
+                ActionType::ConfirmMulligan | ActionType::SkipMulligan
+            )
+        })
+        .or_else(|| actions.first())
+        .cloned()
+        .expect("mulligan actions non-empty")
 }
 
 pub fn choose_mulligan_v7(gs: &GameState, actions: &[Action], db: &CardDatabase) -> Action {
-    if std::env::var("V7_MULLIGAN_CURVE").is_ok()
-        || std::env::var("V7_MULLIGAN_REACHABLE").is_ok()
+    if std::env::var("V7_MULLIGAN_CURVE").is_ok() || std::env::var("V7_MULLIGAN_REACHABLE").is_ok()
     {
         return choose_mulligan_curve(gs, actions, db);
     }
@@ -1558,25 +1681,42 @@ mod mulligan_tests {
 
     #[test]
     fn opening_curve_keep_finds_connected_ladder_only() {
-        assert_eq!(opening_curve_keep(&[Some(2), Some(2), Some(7), Some(11), None, None]), vec![0, 1, 2, 3]);
+        assert_eq!(
+            opening_curve_keep(&[Some(2), Some(2), Some(7), Some(11), None, None]),
+            vec![0, 1, 2, 3]
+        );
         assert!(opening_curve_keep(&[Some(2), Some(2), Some(11), Some(17), None, None]).is_empty());
         assert!(opening_curve_keep(&[Some(2), Some(4), Some(7), Some(11), None, None]).is_empty());
     }
 
     #[test]
     fn reachable_curve_accepts_short_and_duplicate_cost_lines() {
-        assert_eq!(reachable_curve_keep(&[Some(2), Some(2), Some(7)]), vec![0, 1, 2]);
-        assert_eq!(reachable_curve_keep(&[Some(2), Some(2), Some(7), Some(13)]), vec![0, 1, 2, 3]);
+        assert_eq!(
+            reachable_curve_keep(&[Some(2), Some(2), Some(7)]),
+            vec![0, 1, 2]
+        );
+        assert_eq!(
+            reachable_curve_keep(&[Some(2), Some(2), Some(7), Some(13)]),
+            vec![0, 1, 2, 3]
+        );
         assert!(reachable_curve_keep(&[Some(7), Some(11)]).is_empty());
     }
 
     #[test]
     fn mulligan_default_matches_v4_and_curve_variant_recovers_selection() {
-        let cards = crate::card_loader::CardLoader::load_cards_from_file(
-            std::path::Path::new("../cards/cards.json")).unwrap();
+        let cards = crate::card_loader::CardLoader::load_cards_from_file(std::path::Path::new(
+            "../cards/cards.json",
+        ))
+        .unwrap();
         let db = crate::Arc::new(CardDatabase::load_or_create(cards));
-        let names = ["PL!SP-bp1-005-R", "PL!SP-sd1-019-SD", "PL!SP-bp4-011-R＋",
-            "PL!SP-bp5-006-R", "PL!SP-sd2-023-SD2", "PL!SP-bp4-025-L"];
+        let names = [
+            "PL!SP-bp1-005-R",
+            "PL!SP-sd1-019-SD",
+            "PL!SP-bp4-011-R＋",
+            "PL!SP-bp5-006-R",
+            "PL!SP-sd2-023-SD2",
+            "PL!SP-bp4-025-L",
+        ];
         let mut p1 = Player::new("p1".into(), "P1".into(), true);
         for name in names {
             let id = db.get_card_id(name).unwrap();
@@ -1591,8 +1731,13 @@ mod mulligan_tests {
         assert_eq!(v4.parameters.as_ref().and_then(|p| p.card_index), Some(3));
         let default_choice = choose_mulligan_v7(&gs, &actions, &db);
         assert_eq!(default_choice.action_type, v4.action_type);
-        assert_eq!(default_choice.parameters.as_ref().and_then(|p| p.card_index),
-            v4.parameters.as_ref().and_then(|p| p.card_index));
+        assert_eq!(
+            default_choice
+                .parameters
+                .as_ref()
+                .and_then(|p| p.card_index),
+            v4.parameters.as_ref().and_then(|p| p.card_index)
+        );
         gs.mulligan_selected_indices.extend([3, 2, 0]);
         for _ in 0..3 {
             let actions = crate::game_setup::generate_possible_actions(&gs);
@@ -1603,7 +1748,10 @@ mod mulligan_tests {
         }
         assert!(gs.mulligan_selected_indices.is_empty());
         let actions = crate::game_setup::generate_possible_actions(&gs);
-        assert_eq!(choose_mulligan_curve(&gs, &actions, &db).action_type, ActionType::ConfirmMulligan);
+        assert_eq!(
+            choose_mulligan_curve(&gs, &actions, &db).action_type,
+            ActionType::ConfirmMulligan
+        );
     }
 }
 
@@ -1612,9 +1760,9 @@ mod live_experiment_tests {
     use super::*;
 
     fn db_real() -> crate::Arc<CardDatabase> {
-        let cards = crate::card_loader::CardLoader::load_cards_from_file(
-            std::path::Path::new("../cards/cards.json"),
-        )
+        let cards = crate::card_loader::CardLoader::load_cards_from_file(std::path::Path::new(
+            "../cards/cards.json",
+        ))
         .unwrap();
         crate::Arc::new(CardDatabase::load_or_create(cards))
     }
@@ -1662,7 +1810,10 @@ mod live_experiment_tests {
         let surplus_need = [1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0];
         let mut pool3 = [0i32; 8];
         pool3[1] = 2;
-        assert!(experiment_feasible(&pool3, &surplus_need), "surplus feeds bucket");
+        assert!(
+            experiment_feasible(&pool3, &surplus_need),
+            "surplus feeds bucket"
+        );
         pool3[1] = 0;
         pool3[2] = 2;
         assert!(
@@ -1736,7 +1887,10 @@ mod live_experiment_tests {
         assert!(experiment_free_win(&gs, 1, &db).is_none());
         gs.mods.heart_modifiers.entry(member).or_default().insert(
             crate::card::HeartColor::Heart06,
-            crate::core::game_modifiers::ModifierEntry { additive: 1, ..Default::default() },
+            crate::core::game_modifiers::ModifierEntry {
+                additive: 1,
+                ..Default::default()
+            },
         );
         assert_eq!(experiment_free_win(&gs, 1, &db), Some(0));
         let mut guard = 0;

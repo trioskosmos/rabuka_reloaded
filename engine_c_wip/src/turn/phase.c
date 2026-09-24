@@ -109,10 +109,12 @@ void rb_advance_phase(GameState *g) {
         g->live_batch_mode = 1;
         if (g->active == g->first_attacker) {
             rb_perform_live(g, g->active);
+            if (g->performance_resume_pending || rb_has_pending_choice(g)) return;
             g->active = g->second_attacker;
             return;
         }
         rb_perform_live(g, g->active);
+        if (g->performance_resume_pending || rb_has_pending_choice(g)) return;
         g->active = g->first_attacker;
         g->live_batch_mode = 0;
         rb_execute_live_victory_determination(g);

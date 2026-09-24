@@ -209,6 +209,56 @@ fn one_player_live_auto_higher_score() {
     );
 }
 
+#[test]
+fn q259_live_success_remains_after_constant_heart_source_is_lost() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let live = game.id("PL!S-PR-024-PR");
+    let heart_source = game.id("PL!SP-pb2-023-N");
+    let energy_payer = game.id("PL!SP-bp5-020-N");
+    let color_support = game.id("PL!N-sd2-010-SD2");
+    let filler = game.id("PL!-sd1-010-SD");
+
+    game.state.player1.stage.stage = [heart_source, energy_payer, color_support];
+    game.state.player1.hand.cards.push(live);
+    for _ in 0..50 {
+        game.state.player1.main_deck.cards.push(filler);
+    }
+    for _ in 0..20 {
+        game.state.player2.main_deck.cards.push(filler);
+    }
+    game.give_energy(6);
+
+    advance_to_live_card_set_p1(&mut game);
+    game.set_live_card(live);
+    advance_to_live_start(&mut game);
+    game.drain_choices_strict(&["SelectCard", "SelectAutoAbility"], &[]);
+    advance_to_live_victory(&mut game);
+
+    let mut paid = false;
+    let mut guard = 0;
+    while game.has_pending_choice() && guard < 30 {
+        guard += 1;
+        match game.pending_choice_type().as_deref() {
+            Some("SelectAutoAbility") => game.select_option(0),
+            Some("SelectTarget") => {
+                game.select_option(1);
+                paid = true;
+            }
+            Some("SelectCard") => game.select_indices(&[0]),
+            _ => game.select_indices(&[]),
+        }
+    }
+
+    assert!(paid, "Q259: the Live Success energy payment must be offered");
+    assert_eq!(game.state.player1.energy_zone.active_count(), 5);
+    game.pass();
+    assert!(
+        game.state.player1.success_live_card_zone.cards.contains(&live),
+        "Q259: the live remains successful after its constant heart source disappears"
+    );
+}
+
 /// No live card set -> no yell, no LiveSuccess (Q32).
 #[test]
 fn no_live_card_no_yell_no_success() {

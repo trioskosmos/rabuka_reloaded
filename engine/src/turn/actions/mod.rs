@@ -1,4 +1,4 @@
-use crate::ability::enums::{ConditionType, Zone};
+use crate::ability::enums::{ActionType, ConditionType, Zone};
 use crate::ability::types::ChoiceRoute;
 use crate::card::CardDatabase;
 use crate::game_state::GameState;
@@ -359,6 +359,25 @@ impl super::TurnEngine {
             .unwrap_or(Zone::Stage)
     }
 
+    fn cost_has_hand_self_move(cost: &crate::card::AbilityEffect) -> bool {
+        match cost.action {
+            ActionType::MoveCards => {
+                cost.source_zone() == Some(Zone::Hand)
+                    && cost.self_cost_any().unwrap_or(false)
+            }
+            ActionType::SequentialCost => cost
+                .compound
+                .actions
+                .as_ref()
+                .is_some_and(|actions| {
+                    actions
+                        .iter()
+                        .any(|action| Self::cost_has_hand_self_move(action.as_ref()))
+                }),
+            _ => false,
+        }
+    }
+
     /// Can this card activate this ability from `loc` right now?
     fn can_activate_at_location(
         player: &crate::player::Player,
@@ -554,10 +573,19 @@ impl super::TurnEngine {
             )?;
         }
 
-        if loc == Zone::Hand {
+        let hand_self_cost = ability
+            .cost
+            .as_ref()
+            .is_some_and(|cost| Self::cost_has_hand_self_move(&cost.0));
+        if loc == Zone::Hand && !hand_self_cost {
             let player = game_state.active_player_mut();
             player.hand.cards.retain(|id| *id != card_id);
             player.waitroom.add_card(card_id);
+        } else if loc == Zone::Hand {
+            log::debug!(
+                "[HAND_ACTIVATION] card={} defer_self_cost=true",
+                card_id
+            );
         }
 
         // Gained abilities use the "card_no_gained_{idx}" format so

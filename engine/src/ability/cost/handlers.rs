@@ -421,6 +421,26 @@ let source = cost.source_str().unwrap_or("");
             let mut filter = cost.filter_subset();
             filter.card_type = card_type;
             filter.cost_limit = cost.cost_limit_any();
+            log::debug!(
+                "[HAND_COST_FILTER] target={} card_type={:?} group={:?} groups={:?} cost_limit={:?} exclude_self={:?} characters={:?} names={:?} hand={:?}",
+                target_str,
+                filter.card_type,
+                filter.group,
+                filter.groups,
+                filter.cost_limit,
+                filter.exclude_self,
+                filter.characters,
+                filter.name_fragments,
+                pl.hand.cards
+            );
+            for (i, &cid) in pl.hand.cards.iter().enumerate() {
+                log::debug!(
+                    "[HAND_COST_FILTER] index={} cid={} matches={}",
+                    i,
+                    cid,
+                    filter.matches(card_db, cid, false)
+                );
+            }
             pl.hand
                 .cards
                 .iter()
@@ -728,6 +748,10 @@ let source = cost.source_str().unwrap_or("");
 
         let same_unit = cost.same_unit_name_any().unwrap_or(false);
         let is_from_hand = Zone::from_str(source) == Some(Zone::Hand) && !same_unit;
+        let hand_self_cost = is_from_hand
+            && cost.self_cost_any().unwrap_or(false)
+            && !optional
+            && !is_any_number;
         let is_all = cost.all_any().unwrap_or(false);
 
         // 「〜してもよい」 stage-move costs (e.g. 『μ's』のメンバー1人をステージから
@@ -748,7 +772,7 @@ let source = cost.source_str().unwrap_or("");
             self.offer_all_hand_discard(gs, cost, optional, is_any_number, is_activation);
             return Ok(());
         }
-        if is_from_hand {
+        if is_from_hand && !hand_self_cost {
             if self.offer_hand_cost_choice(
                 gs,
                 cost,
@@ -761,6 +785,13 @@ let source = cost.source_str().unwrap_or("");
             )? {
                 return Ok(());
             }
+        } else if hand_self_cost {
+            log::debug!(
+                "[HAND_SELF_COST] source={} count={} card={:?}",
+                source,
+                count,
+                gs.current_ability_source_card_id()
+            );
         }
         if !source.is_empty() {
             let target = cost.target.as_deref().unwrap_or("self");

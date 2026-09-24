@@ -212,6 +212,10 @@ void rb_emit_choice(GameState *g, int actor, RbChoiceKind kind,
 static int s_exec_depth = 0;
 void rb_execute_effect_ex(GameState *g, int actor, AbilityEffect *e, int host_cid) {
     if (!e) return;
+    if (host_cid == 2016 || host_cid == 2022)
+        fprintf(stderr, "[YELL_EXEC_ENTER] host=%d action=%s has_cond=%d pending=%d occurred=%d revealed=%d\n",
+                host_cid, e->action ? e->action : "-", e->has_condition,
+                rb_has_pending_choice(g), g->yell_occurred, g->n_revealed);
     if (rb_ability_debug_enabled() || (e->action && !strcmp(e->action, "draw_until_count")))
         fprintf(stderr, "[EXEC_EFFECT_ENTER] action=%s host=%d pending=%d depth=%d ptr=%p\n",
                 e->action ? e->action : "-", host_cid, rb_has_pending_choice(g), s_exec_depth, (void *)e);
@@ -230,6 +234,9 @@ void rb_execute_effect_ex(GameState *g, int actor, AbilityEffect *e, int host_ci
     }
     if (e->has_condition && e->condition) {
         int condition_ok = rb_eval_condition_for_host(g, actor, host_cid, e->condition);
+        if (e->action && !strcmp(e->action, "gain_resource"))
+            fprintf(stderr, "[YELL_EXEC_COND] host=%d occurred=%d revealed=%d result=%d\n",
+                    host_cid, g->yell_occurred, g->n_revealed, condition_ok);
         if (e->action && !strcmp(e->action, "draw_until_count"))
             fprintf(stderr, "[EXEC_EFFECT_COND] action=%s ok=%d\n", e->action, condition_ok);
         if (!condition_ok) { s_exec_depth--; return; }

@@ -271,6 +271,11 @@ impl super::TurnEngine {
                     Self::execute_performance_phase(game_state, false);
                 }
                 Phase::LiveVictoryDetermination => {
+                    if game_state.game_result != crate::game_state::GameResult::Ongoing
+                        || game_state.game_ended
+                    {
+                        return;
+                    }
                     #[cfg(not(feature = "no_std"))]
                     let _t = crate::timer::Timer::start("advance_phase::live_victory");
                     Self::execute_live_victory_determination(game_state);

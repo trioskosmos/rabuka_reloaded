@@ -1332,8 +1332,16 @@ typedef struct GameState {
     int8_t   state_change_to[RB_MAX_CARD_IDS];
     int      last_wait_to_active_count; /* count of wait→active flips this turn */
     int      revealed_cards[RB_MAX_RECENTLY_MOVED]; /* cards revealed by yell/re_yell */
-    int      n_revealed;
-    int      last_draw_count;   /* mirror AbilityResolver.step_state.last_draw_count */
+     int      n_revealed;
+     int      yell_occurred;
+     int      performance_resume_pending;
+     int      performance_resume_player;
+     int      performance_resume_yell_cards[RB_MAX_ZONE];
+     int      performance_resume_n_yell_cards;
+     int      performance_resume_blade_hearts[8];
+     int      performance_resume_note_icons;
+     int      performance_resume_yell_flag;
+     int      last_draw_count;   /* mirror AbilityResolver.step_state.last_draw_count */
     int      last_surplus_loss_count[2]; /* gain_surplus_heart: surplus hearts gained/lost this live (misc.rs) */
     int      re_yell_occurred;  /* a re_yell effect fired this live */
     int      re_yell_blade_hearts[8]; /* hearts harvested by perform_yell, applied to live */
@@ -2351,6 +2359,7 @@ int  rb_trigger_auto_abilities(GameState *g, int actor, const char *trigger);
 int  rb_trigger_auto_abilities_for_movement(GameState *g, int pl);
 int  rb_trigger_auto_abilities_for_player_with_event(GameState *g, int pl, const int *moved_cards, int n_moved, int position_change, int energy_placed);
 int  rb_trigger_auto_abilities_for_player(GameState *g, int pl);
+int  rb_queue_yell_auto_abilities(GameState *g, int pl);
 void rb_trigger_each_time_for_member(GameState *g, int pl, const char *trigger_substring, int member_card_id);
 void rb_trigger_auto_abilities_for_movement_current(GameState *g);
 /* Mirror live.rs::determine_winners — who placed a live this turn (score-tie → both). */

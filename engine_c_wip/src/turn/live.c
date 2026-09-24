@@ -434,16 +434,60 @@ static int allocate_and_verdict(const GameState *g, int pl, const int total_hear
 }
 
 int rb_perform_live(GameState *g, int pl){
+    if (!g || pl < 0 || pl > 1) return 0;
     RbPlayer *P=&g->p[pl];
-    if(P->live.n==0) return 0;
-    /* Fresh re_yell state for this live. */
-    g->re_yell_occurred = 0;
-    g->re_yell_note_icons = 0;
-    memset(g->re_yell_blade_hearts, 0, sizeof(g->re_yell_blade_hearts));
-    g->n_revealed = 0;
     int yell_cards[RB_MAX_ZONE]; int n_yell=0;
     int blade_hearts[8]={0}; int note_icons=0;
-    do_yell(g, pl, yell_cards, &n_yell, blade_hearts, &note_icons);
+    if (g->performance_resume_pending) {
+        if (g->performance_resume_player != pl) return 0;
+        n_yell = g->performance_resume_n_yell_cards;
+        if (n_yell > RB_MAX_ZONE) n_yell = RB_MAX_ZONE;
+        for (int i = 0; i < n_yell; i++) yell_cards[i] = g->performance_resume_yell_cards[i];
+        memcpy(blade_hearts, g->performance_resume_blade_hearts, sizeof(blade_hearts));
+        note_icons = g->performance_resume_note_icons;
+        g->performance_resume_pending = 0;
+        g->yell_occurred = g->performance_resume_yell_flag;
+        if (g->queue.n_entries > 0 && !rb_has_pending_choice(g)) {
+            rb_queue_set_state(&g->queue, RB_QUEUE_IDLE);
+            rb_drain_ability_queue(g);
+        }
+        if (rb_has_pending_choice(g)) {
+            g->performance_resume_pending = 1;
+            return 0;
+        }
+        g->yell_occurred = 0;
+    } else {
+        if(P->live.n==0) return 0;
+        g->re_yell_occurred = 0;
+        g->re_yell_note_icons = 0;
+        memset(g->re_yell_blade_hearts, 0, sizeof(g->re_yell_blade_hearts));
+        g->n_revealed = 0;
+        do_yell(g, pl, yell_cards, &n_yell, blade_hearts, &note_icons);
+        for (int i = 0; i < n_yell && i < RB_MAX_RECENTLY_MOVED; i++)
+            g->revealed_cards[g->n_revealed++] = yell_cards[i];
+        g->yell_occurred = n_yell > 0;
+        int queued = rb_queue_yell_auto_abilities(g, pl);
+        fprintf(stderr, "[YELL_PERFORM] queued=%d entries=%d state=%d occurred=%d revealed=%d\n",
+                queued, g->queue.n_entries, g->queue.state, g->yell_occurred, g->n_revealed);
+        if (queued > 0) {
+            rb_queue_set_state(&g->queue, RB_QUEUE_IDLE);
+            rb_drain_ability_queue(g);
+        }
+        if (rb_has_pending_choice(g)) {
+            if (g->queue.pending.kind != RB_CHOICE_SELECT_AUTO_ABILITY)
+                g->yell_occurred = 0;
+            g->performance_resume_player = pl;
+            g->performance_resume_n_yell_cards = n_yell;
+            for (int i = 0; i < n_yell && i < RB_MAX_ZONE; i++)
+                g->performance_resume_yell_cards[i] = yell_cards[i];
+            memcpy(g->performance_resume_blade_hearts, blade_hearts, sizeof(blade_hearts));
+            g->performance_resume_note_icons = note_icons;
+            g->performance_resume_yell_flag = g->yell_occurred;
+            g->performance_resume_pending = 1;
+            return 0;
+        }
+        g->yell_occurred = 0;
+    }
 
     int stage_hearts[8]={0};
     rb_stage_hearts_pipeline(g, pl, stage_hearts);
@@ -1021,23 +1065,16 @@ void rb_merge_late_score_apps(GameState *g) {
     int trace_n = rb_mods_trace_len(&g->mods);
     if (trace_n == 0) return;
     RbLiveSnapshot *s = &g->snapshots[g->n_snapshots - 1];
-    int write = 0;
     for (int i = 0; i < trace_n; i++) {
         const RbAbilityTraceEntry *entry = &g->mods.trace[i];
-        int is_score = entry->effect_type == RB_EFFECT_SCORE_BONUS ||
-                       entry->effect_type == RB_EFFECT_SCORE_SET;
-        if (is_score) {
-            for (int live = 0; live < s->n_lives; live++) {
-                if (s->lives[live] != entry->target_card_id) continue;
-                s->live_score_detail[live] += entry->amount;
-                break;
-            }
-            continue;
+        if (entry->effect_type != RB_EFFECT_SCORE_BONUS &&
+            entry->effect_type != RB_EFFECT_SCORE_SET) continue;
+        for (int live = 0; live < s->n_lives; live++) {
+            if (s->lives[live] != entry->target_card_id) continue;
+            s->live_score_detail[live] += entry->amount;
+            break;
         }
-        if (write != i) g->mods.trace[write] = *entry;
-        write++;
     }
-    g->mods.n_trace = write;
     int total = s->note_icons;
     for (int live = 0; live < s->n_lives; live++) total += s->live_score_detail[live];
     if (total < 0) total = 0;

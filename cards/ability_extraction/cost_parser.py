@@ -89,10 +89,11 @@ def _fill_cost_destination(cost, text):
 
 def _mark_self_cost(cost, text):
     if (
-        "このメンバー" in text
+        ("このメンバー" in text or "このカード" in text)
         and "このメンバー以外" not in text
+        and "このカード以外" not in text
         and not bool(re.search(r"ほかの.*?メンバー", text))
-        and re.search(r"このメンバー[をが]", text)
+        and re.search(r"(?:このメンバー|このカード)[をが]", text)
     ):
         cost["self_cost"] = True
 

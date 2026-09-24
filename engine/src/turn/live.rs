@@ -1732,6 +1732,26 @@ impl super::TurnEngine {
         player.success_live_card_zone.cards.push(card_id);
         let remaining = core::mem::take(&mut player.live_card_zone.cards);
         player.waitroom.cards.extend(remaining);
+        log::debug!(
+            "[LIVE_SUCCESS_CHOICE] player={} card={} success_count={}",
+            player_id,
+            card_id,
+            player.success_live_card_zone.cards.len()
+        );
+        let success_count = player.success_live_card_zone.cards.len();
+        Self::check_victory_condition(game_state);
+        game_state.push_structured_log(crate::types::LogEntry {
+            text: format!(
+                "LIVE_SUCCESS_HANDLER player={} card={} success_count={} ended={} result={:?}",
+                player_id, card_id, success_count, game_state.game_ended, game_state.game_result
+            ),
+            turn: game_state.turn_number,
+            player_label: "SYSTEM".into(),
+            source_card_id: Some(card_id),
+            source_card_name: None,
+            category: "live_result".into(),
+            metadata: None,
+        });
         Ok(())
     }
 

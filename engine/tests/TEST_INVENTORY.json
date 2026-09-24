@@ -1,6 +1,6 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-09-24T16:31:32.867373+00:00",
+  "generated_at": "2026-09-24T17:50:50.473845+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
@@ -8,7 +8,7 @@
     "unique_abilities": 936
   },
   "n_files": 839,
-  "n_tests": 3467,
+  "n_tests": 3471,
   "total_cards": 771,
   "covered_cards": 771,
   "abilities_on_covered": 936,
@@ -309,10 +309,10 @@
     ]
   },
   "depth_counts": {
-    "L2+choice": 747,
+    "L2+choice": 749,
     "L1+choice": 85,
-    "L2": 72,
-    "L1": 32
+    "L2": 71,
+    "L1": 31
   },
   "qa_rulings": {
     "covered": 280,
@@ -678,7 +678,7 @@
       ]
     }
   },
-  "n_test_fns_parsed": 3467,
+  "n_test_fns_parsed": 3471,
   "abilities": [
     {
       "idx": 0,
@@ -953,7 +953,7 @@
         "baton_leaves_stage_offers_own_and_opponent_position_change_q238",
         "bella_positive_surplus_heart04_ability_fires"
       ],
-      "covering_test_count": 339,
+      "covering_test_count": 340,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -1072,7 +1072,7 @@
         "burn_one_under_moves_and_scores_when_total_10",
         "burn_skip_optional_no_score_even_with_10_total"
       ],
-      "covering_test_count": 300,
+      "covering_test_count": 301,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -1332,7 +1332,7 @@
         "ddd_decline_pay_does_nothing",
         "ddd_option_a_retrieves_any_member_from_waitroom"
       ],
-      "covering_test_count": 129,
+      "covering_test_count": 130,
       "is_null": true,
       "use_limit": null,
       "watches_abilities": false,
@@ -1590,9 +1590,15 @@
         "engine/tests/test_modules/effects/state/konata_bp1_test.rs",
         "engine/tests/test_modules/effects/state/konata_test.rs",
         "engine/tests/test_modules/effects/state/self_wait_and_nijigasaki_activation_test.rs",
-        "engine/tests/test_modules/rules/conditions/restriction_mechanics_test.rs"
+        "engine/tests/test_modules/rules/conditions/restriction_mechanics_test.rs",
+        "engine/tests/test_modules/rules/phases/live_success_rules_test.rs"
       ],
       "covering_tests": [
+        "any_card_fails_hearts_all_fail",
+        "both_players_have_live_cards",
+        "both_players_live_score_compared",
+        "daydream_mermaid_no_niji_in_success_pick_one",
+        "daydream_mermaid_q191_niji_in_success_pick_both",
         "debut_both_waitrooms_member_restore_shrinks_own_waitroom",
         "different_niji_member_on_turn2_activates",
         "exactly_twenty_restored_members_meet_recovery_and_blade_threshold_q242",
@@ -1610,21 +1616,16 @@
         "konata_q77_debuted_this_turn_activates_energy",
         "konata_q77_self_appearance_activates_energy",
         "konata_use_limit_blocks_second_activation",
+        "live_fails_with_insufficient_hearts",
         "ll_bp2001_cannot_be_baton_touched_out",
         "mijuku_dreamer_refresh_condition_scores",
         "nico_bp3_009_activation_self_wait_cost_grants_only_chosen_heart",
         "nijigasaki_bp1_006r_pay_two_draw_one",
         "niko_pb1009_suppresses_effect_activations_for_the_turn",
         "nineteen_restored_members_grant_neither_recovery_nor_blades_q242",
-        "no_appearance_condition_fails",
-        "non_niji_member_does_not_activate",
-        "one_energy_live_success_draw_member_in_live_zone_shrinks_deck",
-        "one_energy_live_success_draw_skip_leaves_no_pending_choice",
-        "one_energy_live_success_draw_without_granted_energy_does_not_increase_active_energy",
-        "q242_real_debut_moves_each_players_members_to_their_own_deck_bottom",
-        "q77_self_appearance_activates_energy"
+        "no_appearance_condition_fails"
       ],
-      "covering_test_count": 38,
+      "covering_test_count": 53,
       "is_null": false,
       "use_limit": 1,
       "watches_abilities": false,
@@ -11464,7 +11465,7 @@
         "butterfly_wing_to_butterfly_no_match",
         "candidate_pool_distinct_filter"
       ],
-      "covering_test_count": 220,
+      "covering_test_count": 221,
       "is_null": true,
       "use_limit": null,
       "watches_abilities": false,
@@ -11649,6 +11650,7 @@
         "engine/tests/test_modules/effects/recover/to_hand/bp7_q272_just_believe_test.rs"
       ],
       "covering_tests": [
+        "emma_all_and_green_blade_hearts_do_not_meet_member_color_condition",
         "emma_all_one_color_no_heart04",
         "emma_members_without_blade_heart_no_heart04",
         "emma_only_one_member_milled_no_heart04",
@@ -11676,7 +11678,7 @@
         "q272_skip_discard_no_blade",
         "q272_two_distinct_members_each_gain_blade"
       ],
-      "covering_test_count": 26,
+      "covering_test_count": 27,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -14093,7 +14095,7 @@
         "b_heart07_yell_contributes_two_colorless_hearts_each",
         "bella_positive_surplus_heart04_ability_fires"
       ],
-      "covering_test_count": 714,
+      "covering_test_count": 717,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -14425,22 +14427,29 @@
       ],
       "base": "PL!S-PR-039",
       "covered": true,
-      "depth": "L2",
+      "depth": "L2+choice",
       "has_assert": true,
-      "has_choice": false,
+      "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/gain/blades/combined_success_zone_constant_blade_test.rs"
+        "engine/tests/test_modules/effects/gain/blades/combined_success_zone_constant_blade_test.rs",
+        "engine/tests/test_modules/effects/recover/to_hand/bp7_q270_emma_color_diversity_test.rs"
       ],
       "covering_tests": [
         "combined_success_count_blades_apply_independently_to_two_copies_pl_s_pb1_009_r",
         "combined_success_count_includes_zero_score_and_removes_blades_dynamically_pl_s_pb1_009_r",
         "combined_success_count_opponent_only_grants_blades_pl_s_pb1_009_r",
         "combined_success_count_threshold_grants_blades_pl_s_pb1_009_r",
+        "emma_all_and_green_blade_hearts_do_not_meet_member_color_condition",
+        "emma_all_one_color_no_heart04",
+        "emma_members_without_blade_heart_no_heart04",
+        "emma_only_one_member_milled_no_heart04",
+        "emma_three_distinct_colors_gains_heart04",
+        "emma_two_distinct_colors_gains_heart04",
         "s_pr_039_pr_constant_four_combined_success_cards_gains_two_blades",
         "s_pr_039_pr_constant_two_combined_success_cards_gains_no_blades"
       ],
-      "covering_test_count": 6,
+      "covering_test_count": 12,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -28300,7 +28309,7 @@
         "center_non_mus_no_reduction",
         "center_wait_discard_cost_plus_two_deploy_basic_success"
       ],
-      "covering_test_count": 417,
+      "covering_test_count": 420,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -28433,7 +28442,7 @@
         "center_non_mus_no_reduction",
         "center_wait_discard_cost_plus_two_deploy_basic_success"
       ],
-      "covering_test_count": 417,
+      "covering_test_count": 420,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -28508,7 +28517,7 @@
         "mei_mirror_standoff_each_side_rests_own_opponent",
         "member_name_constants_selective_gain"
       ],
-      "covering_test_count": 116,
+      "covering_test_count": 117,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -28583,7 +28592,7 @@
         "mei_mirror_standoff_each_side_rests_own_opponent",
         "member_name_constants_selective_gain"
       ],
-      "covering_test_count": 116,
+      "covering_test_count": 117,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -35169,13 +35178,14 @@
         "no_live_card_no_yell_no_success",
         "one_player_live_auto_higher_score",
         "q147_empty_need_heart_live_succeeds",
+        "q259_live_success_remains_after_constant_heart_source_is_lost",
         "shared_pool_depletion_all_fail",
         "shared_pool_four_hearts_satisfy_one_live",
         "three_live_cards_any_fails_all_fail",
         "two_live_cards_choose_second",
         "winner_takes_one_to_success_zone"
       ],
-      "covering_test_count": 16,
+      "covering_test_count": 17,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -37031,15 +37041,31 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/draw/flat/optional_energy_live_success_draw_test.rs"
+        "engine/tests/test_modules/effects/draw/flat/optional_energy_live_success_draw_test.rs",
+        "engine/tests/test_modules/rules/phases/live_success_rules_test.rs"
       ],
       "covering_tests": [
+        "any_card_fails_hearts_all_fail",
+        "both_players_have_live_cards",
+        "both_players_live_score_compared",
+        "daydream_mermaid_no_niji_in_success_pick_one",
+        "daydream_mermaid_q191_niji_in_success_pick_both",
+        "live_fails_with_insufficient_hearts",
+        "no_live_card_no_yell_no_success",
         "one_energy_live_success_draw_member_in_live_zone_shrinks_deck",
         "one_energy_live_success_draw_skip_leaves_no_pending_choice",
         "one_energy_live_success_draw_without_granted_energy_does_not_increase_active_energy",
-        "three_energy_live_success_draw_member_in_live_zone_shrinks_deck"
+        "one_player_live_auto_higher_score",
+        "q147_empty_need_heart_live_succeeds",
+        "q259_live_success_remains_after_constant_heart_source_is_lost",
+        "shared_pool_depletion_all_fail",
+        "shared_pool_four_hearts_satisfy_one_live",
+        "three_energy_live_success_draw_member_in_live_zone_shrinks_deck",
+        "three_live_cards_any_fails_all_fail",
+        "two_live_cards_choose_second",
+        "winner_takes_one_to_success_zone"
       ],
-      "covering_test_count": 4,
+      "covering_test_count": 19,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -39147,7 +39173,7 @@
         "pl_s_sd1_009_sd_live_start_revealed_aqours_card_moves_from_hand_to_deck",
         "pl_s_sd1_009_sd_live_start_without_aqours_preserves_non_aqours_hand_card"
       ],
-      "covering_test_count": 77,
+      "covering_test_count": 78,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -42788,17 +42814,33 @@
       ],
       "base": "PL!SP-pb2-023",
       "covered": true,
-      "depth": "L1",
+      "depth": "L2+choice",
       "has_assert": true,
-      "has_choice": false,
-      "has_negative": false,
+      "has_choice": true,
+      "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/gain/hearts/energy_thresholds_pl_sp_pb2_023_n_test.rs"
+        "engine/tests/test_modules/effects/gain/hearts/energy_thresholds_pl_sp_pb2_023_n_test.rs",
+        "engine/tests/test_modules/rules/phases/live_success_rules_test.rs"
       ],
       "covering_tests": [
-        "pl_sp_pb2_023_n_energy_thresholds_stack_heart02_at_six_and_eight"
+        "any_card_fails_hearts_all_fail",
+        "both_players_have_live_cards",
+        "both_players_live_score_compared",
+        "daydream_mermaid_no_niji_in_success_pick_one",
+        "daydream_mermaid_q191_niji_in_success_pick_both",
+        "live_fails_with_insufficient_hearts",
+        "no_live_card_no_yell_no_success",
+        "one_player_live_auto_higher_score",
+        "pl_sp_pb2_023_n_energy_thresholds_stack_heart02_at_six_and_eight",
+        "q147_empty_need_heart_live_succeeds",
+        "q259_live_success_remains_after_constant_heart_source_is_lost",
+        "shared_pool_depletion_all_fail",
+        "shared_pool_four_hearts_satisfy_one_live",
+        "three_live_cards_any_fails_all_fail",
+        "two_live_cards_choose_second",
+        "winner_takes_one_to_success_zone"
       ],
-      "covering_test_count": 1,
+      "covering_test_count": 16,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -44351,6 +44393,7 @@
         "engine/tests/test_modules/effects/recover/to_hand/bp7_q270_emma_color_diversity_test.rs"
       ],
       "covering_tests": [
+        "emma_all_and_green_blade_hearts_do_not_meet_member_color_condition",
         "emma_all_one_color_no_heart04",
         "emma_members_without_blade_heart_no_heart04",
         "emma_only_one_member_milled_no_heart04",
@@ -44361,7 +44404,7 @@
         "kanata_skip_optional_cost_effect_does_not_fire",
         "kanata_takes_eligible_no_blade_member_to_hand"
       ],
-      "covering_test_count": 9,
+      "covering_test_count": 10,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -45696,23 +45739,39 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/state/bp7_sd2_gap_test.rs"
+        "engine/tests/test_modules/effects/state/bp7_sd2_gap_test.rs",
+        "engine/tests/test_modules/rules/phases/live_success_rules_test.rs"
       ],
       "covering_tests": [
         "ai_pay_activates_a_waited_member",
         "ai_skip_pay_keeps_waited",
+        "any_card_fails_hearts_all_fail",
         "ayumu_no_wait_with_non_nijigasaki_ally",
         "ayumu_waits_opp_low_blade_when_stage_only_nijigasaki",
+        "both_players_have_live_cards",
+        "both_players_live_score_compared",
+        "daydream_mermaid_no_niji_in_success_pick_one",
+        "daydream_mermaid_q191_niji_in_success_pick_both",
         "kanata_pays_wait_and_gains_two_blade",
         "kanata_skip_optional_wait_gains_nothing",
+        "live_fails_with_insufficient_hearts",
+        "no_live_card_no_yell_no_success",
+        "one_player_live_auto_higher_score",
+        "q147_empty_need_heart_live_succeeds",
+        "q259_live_success_remains_after_constant_heart_source_is_lost",
         "rinne_waits_opp_cost_four_member",
         "setsuna_debut_gains_heart05",
         "setsuna_live_start_waits_only_cost2_or_less",
+        "shared_pool_depletion_all_fail",
+        "shared_pool_four_hearts_satisfy_one_live",
         "shioriko_auto_activates_waited_ally",
         "shioriko_debut_draws_two",
-        "shizuku_kidou_draws_after_waiting_self"
+        "shizuku_kidou_draws_after_waiting_self",
+        "three_live_cards_any_fails_all_fail",
+        "two_live_cards_choose_second",
+        "winner_takes_one_to_success_zone"
       ],
-      "covering_test_count": 12,
+      "covering_test_count": 27,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -45739,23 +45798,39 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/state/bp7_sd2_gap_test.rs"
+        "engine/tests/test_modules/effects/state/bp7_sd2_gap_test.rs",
+        "engine/tests/test_modules/rules/phases/live_success_rules_test.rs"
       ],
       "covering_tests": [
         "ai_pay_activates_a_waited_member",
         "ai_skip_pay_keeps_waited",
+        "any_card_fails_hearts_all_fail",
         "ayumu_no_wait_with_non_nijigasaki_ally",
         "ayumu_waits_opp_low_blade_when_stage_only_nijigasaki",
+        "both_players_have_live_cards",
+        "both_players_live_score_compared",
+        "daydream_mermaid_no_niji_in_success_pick_one",
+        "daydream_mermaid_q191_niji_in_success_pick_both",
         "kanata_pays_wait_and_gains_two_blade",
         "kanata_skip_optional_wait_gains_nothing",
+        "live_fails_with_insufficient_hearts",
+        "no_live_card_no_yell_no_success",
+        "one_player_live_auto_higher_score",
+        "q147_empty_need_heart_live_succeeds",
+        "q259_live_success_remains_after_constant_heart_source_is_lost",
         "rinne_waits_opp_cost_four_member",
         "setsuna_debut_gains_heart05",
         "setsuna_live_start_waits_only_cost2_or_less",
+        "shared_pool_depletion_all_fail",
+        "shared_pool_four_hearts_satisfy_one_live",
         "shioriko_auto_activates_waited_ally",
         "shioriko_debut_draws_two",
-        "shizuku_kidou_draws_after_waiting_self"
+        "shizuku_kidou_draws_after_waiting_self",
+        "three_live_cards_any_fails_all_fail",
+        "two_live_cards_choose_second",
+        "winner_takes_one_to_success_zone"
       ],
-      "covering_test_count": 12,
+      "covering_test_count": 27,
       "is_null": false,
       "use_limit": 1,
       "watches_abilities": false,

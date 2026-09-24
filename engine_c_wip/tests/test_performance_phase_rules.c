@@ -73,6 +73,8 @@ static int run_full_turn(TestGame *tg) {
         const char *choice = test_pending_choice_type(tg);
         if (strcmp(choice, "SelectCard") == 0) {
             rb_resume_with_choice(&tg->state, -1);
+        } else if (strcmp(choice, "SelectAutoAbility") == 0) {
+            rb_resume_with_choice(&tg->state, 0);
         } else if (choice[0] == 0) {
             test_pass(tg);
         } else {
@@ -180,6 +182,92 @@ static void test_per_color_modifier_does_not_erase_base_requirements(void) {
     }
 }
 
+static void setup_yell_game(TestGame *tg, const char *const *yell_no, int n_yell) {
+    clear_bag(&tg->state.p[0].deck);
+    clear_bag(&tg->state.p[0].hand);
+    clear_bag(&tg->state.p[0].discard);
+    clear_bag(&tg->state.p[0].success);
+    clear_bag(&tg->state.p[0].energy_deck);
+    clear_bag(&tg->state.p[1].deck);
+    clear_bag(&tg->state.p[1].hand);
+    clear_bag(&tg->state.p[1].discard);
+    clear_bag(&tg->state.p[1].success);
+    clear_bag(&tg->state.p[1].energy_deck);
+
+    int filler = test_id(tg, "PL!-sd1-010-SD");
+    for (int i = 0; i < 40; i++) {
+        test_add_to_deck_pl(tg, 0, filler);
+        test_add_to_deck_pl(tg, 1, filler);
+    }
+    int top[5];
+    top[0] = test_new_id(tg, "PL!S-bp2-002-R");
+    top[1] = test_new_id(tg, "PL!S-bp2-002-R");
+    for (int i = 0; i < n_yell; i++) top[2 + i] = test_new_id(tg, yell_no[i]);
+    for (int i = 2 + n_yell - 1; i >= 0; i--) test_insert_deck_top(tg, 0, top[i]);
+
+    int sumire = test_id(tg, "PL!SP-bp2-015-N");
+    int wien = test_id(tg, "PL!SP-bp2-021-N");
+    int honoka = test_id(tg, "PL!-sd1-010-SD");
+    tg->state.p[0].stage[0] = sumire;
+    tg->state.p[0].stage[1] = wien;
+    tg->state.p[0].stage[2] = honoka;
+    tg->state.p[1].stage[0] = -1;
+    tg->state.p[1].stage[1] = filler;
+    tg->state.p[1].stage[2] = -1;
+    test_add_to_hand(tg, test_id(tg, "PL!-sd1-019-SD"));
+}
+
+static void run_yell_case(const char *const *yell_no, int n_yell, int expected) {
+    TestGame tg;
+    test_game_new(&tg);
+    setup_yell_game(&tg, yell_no, n_yell);
+    int sumire = test_id(&tg, "PL!SP-bp2-015-N");
+    int wien = test_id(&tg, "PL!SP-bp2-021-N");
+    int live = tg.state.p[0].hand.cards[0];
+
+    advance_to_live_card_set_p1(&tg);
+    CHECK(set_live_card(&tg, live), "yell fixture live enters the live card set");
+    test_pass(&tg);
+    test_pass(&tg);
+    CHECK_EQ(test_get_heart_modifier(&tg, sumire, RB_HEART_ORANGE), 0,
+             "yell condition does not fire before a yell");
+    CHECK_EQ(test_get_heart_modifier(&tg, wien, RB_HEART_GREEN), 0,
+             "yell condition does not fire before a yell for Wien");
+    run_full_turn(&tg);
+
+    CHECK_EQ(test_get_heart_modifier(&tg, sumire, RB_HEART_ORANGE), expected,
+             "Sumire heart06 matches the yell contents");
+    CHECK_EQ(test_get_heart_modifier(&tg, wien, RB_HEART_GREEN), expected,
+             "Wien heart03 matches the yell contents");
+}
+
+static void test_yell_auto_abilities_use_revealed_cards(void) {
+    const char *no_blade[] = {
+        "PL!S-bp2-002-R",
+        "PL!S-bp2-002-R",
+        "PL!S-bp2-002-R"
+    };
+    run_yell_case(no_blade, 3, 1);
+}
+
+static void test_yell_auto_abilities_block_on_blade(void) {
+    const char *with_blade[] = {
+        "PL!S-bp2-002-R",
+        "PL!S-bp2-002-R",
+        "PL!-pb1-014-R"
+    };
+    run_yell_case(with_blade, 3, 0);
+}
+
+static void test_yell_auto_abilities_block_on_all_blade(void) {
+    const char *with_all[] = {
+        "PL!S-bp2-002-R",
+        "PL!S-bp2-002-R",
+        "PL!HS-PR-010-PR"
+    };
+    run_yell_case(with_all, 3, 0);
+}
+
 int main(void) {
     if (rb_load("src") != 0) {
         fprintf(stderr, "FAIL: database load\n");
@@ -189,6 +277,9 @@ int main(void) {
     test_zero_cards_on_stage_fails_live();
     test_sufficient_hearts_passes_live();
     test_per_color_modifier_does_not_erase_base_requirements();
+    test_yell_auto_abilities_use_revealed_cards();
+    test_yell_auto_abilities_block_on_blade();
+    test_yell_auto_abilities_block_on_all_blade();
 
     rb_unload();
     if (failures) return 1;
