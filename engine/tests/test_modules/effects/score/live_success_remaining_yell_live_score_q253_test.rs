@@ -1,4 +1,5 @@
 use crate::helpers::*;
+use rabuka_engine::core::types::AbilityTrigger;
 use rabuka_engine::game_setup::ActionType;
 use rabuka_engine::zones::MemberArea;
 
@@ -174,4 +175,24 @@ fn live_success_recovery_leaves_revealed_live_for_one_score_modifier_q253() {
     answer_prompts(&mut game);
 
     assert_eq!(game.state.mods.get_score_modifier(galaxy), 1);
+}
+
+#[test]
+fn live_success_non_live_revealed_card_does_not_score_galaxy_q253() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let galaxy = game.id("PL!S-bp6-023-L");
+    let non_live = game.id("PL!-sd1-010-SD");
+
+    game.state.player1.live_card_zone.cards.push(galaxy);
+    game.state.revealed_cards.push(non_live);
+
+    fire_trigger(
+        &mut game,
+        galaxy,
+        AbilityTrigger::LiveSuccess,
+        "ライブ成功時",
+    );
+
+    assert_eq!(game.state.mods.get_score_modifier(galaxy), 0);
 }

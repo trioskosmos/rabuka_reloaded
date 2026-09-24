@@ -1,6 +1,6 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-09-24T21:13:45.607793+00:00",
+  "generated_at": "2026-09-24T21:16:30.634936+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
@@ -8,7 +8,7 @@
     "unique_abilities": 936
   },
   "n_files": 839,
-  "n_tests": 3489,
+  "n_tests": 3490,
   "total_cards": 771,
   "covered_cards": 771,
   "abilities_on_covered": 936,
@@ -678,7 +678,7 @@
       ]
     }
   },
-  "n_test_fns_parsed": 3489,
+  "n_test_fns_parsed": 3490,
   "abilities": [
     {
       "idx": 0,
@@ -17741,6 +17741,7 @@
         "kanan_live_success_timing",
         "kanan_livestart_converts_all_hearts_to_heart04",
         "kasumi_heart_transform_reflected_in_header_stats",
+        "live_success_non_live_revealed_card_does_not_score_galaxy_q253",
         "live_success_recovery_leaves_revealed_live_for_one_score_modifier_q253",
         "live_success_recovery_removes_only_revealed_live_leaving_zero_score_modifier_q253",
         "live_success_revealed_live_adds_one_to_final_score_q253",
@@ -17749,10 +17750,9 @@
         "multi_name_card_single_slot_one_group_not_three",
         "three_distinct_groups_center_gets_all_hearts",
         "tiny_stars_basic",
-        "tiny_stars_duplicate_kanon",
-        "tiny_stars_duplicate_kanon_select_second"
+        "tiny_stars_duplicate_kanon"
       ],
-      "covering_test_count": 37,
+      "covering_test_count": 38,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -17806,6 +17806,7 @@
         "kanan_live_success_timing",
         "kanan_livestart_converts_all_hearts_to_heart04",
         "kasumi_heart_transform_reflected_in_header_stats",
+        "live_success_non_live_revealed_card_does_not_score_galaxy_q253",
         "live_success_recovery_leaves_revealed_live_for_one_score_modifier_q253",
         "live_success_recovery_removes_only_revealed_live_leaving_zero_score_modifier_q253",
         "live_success_revealed_live_adds_one_to_final_score_q253",
@@ -17814,10 +17815,9 @@
         "multi_name_card_single_slot_one_group_not_three",
         "three_distinct_groups_center_gets_all_hearts",
         "tiny_stars_basic",
-        "tiny_stars_duplicate_kanon",
-        "tiny_stars_duplicate_kanon_select_second"
+        "tiny_stars_duplicate_kanon"
       ],
-      "covering_test_count": 37,
+      "covering_test_count": 38,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -40991,11 +40991,12 @@
         "engine/tests/test_modules/effects/score/live_success_remaining_yell_live_score_q253_test.rs"
       ],
       "covering_tests": [
+        "live_success_non_live_revealed_card_does_not_score_galaxy_q253",
         "live_success_recovery_leaves_revealed_live_for_one_score_modifier_q253",
         "live_success_recovery_removes_only_revealed_live_leaving_zero_score_modifier_q253",
         "live_success_revealed_live_adds_one_to_final_score_q253"
       ],
-      "covering_test_count": 3,
+      "covering_test_count": 4,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
