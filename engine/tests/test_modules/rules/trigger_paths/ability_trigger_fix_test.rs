@@ -22,7 +22,7 @@ use rabuka_engine::zones::MemberArea;
 //   相手は、自身のステージにいるアクティブ状態のメンバー1人をウェイトにする。
 // ====================================================================
 
-/// Q245: Serasu's own appearance DOES trigger the ability (no "ほかの" in text).
+/// Q250: Serasu's own appearance DOES trigger the ability (no "ほかの" in text).
 /// The opponent chooses which of their active members to wait.
 #[test]
 fn serasu_played_to_stage_triggers_self() {
