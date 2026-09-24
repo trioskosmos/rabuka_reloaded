@@ -275,8 +275,23 @@ void rb_resolver_clear_choice_state(RbAbilityResolver *self) {
     self->n_formation_plan = 0;
     rb_resolver_clear_choice_meta(self);
 }
+static void publish_selected_cards(RbAbilityResolver *self)
+{
+    if (!self || !self->gs || self->n_selected_cards <= 0) return;
+    GameState *g = self->gs;
+    for (int i = 0; i < self->n_selected_cards; i++) {
+        int cid = self->selected_cards[i];
+        int exists = 0;
+        for (int j = 0; j < g->n_selected_cards; j++)
+            if (g->selected_cards[j] == cid) { exists = 1; break; }
+        if (!exists && g->n_selected_cards < RB_MAX_RECENTLY_MOVED)
+            g->selected_cards[g->n_selected_cards++] = cid;
+    }
+}
+
 int rb_resolver_clear_choice_state_and_resume(RbAbilityResolver *self) {
     if (!self || !self->gs) return -1;
+    publish_selected_cards(self);
     rb_resolver_clear_choice_state(self);
     rb_drain_ability_queue(self->gs);
     return 0;
@@ -1399,6 +1414,8 @@ void rb_resolver_handle_stage_selection(RbAbilityResolver *self, GameState *g,
                         selected_idx, n, cid, g->queue.pending.target);
                 if (self->n_selected_cards < RB_MAX_RECENTLY_MOVED) self->selected_cards[self->n_selected_cards++] = cid;
                 if ((!strcmp(g->queue.pending.target, "gain_resource_targets") ||
+                     !strcmp(g->queue.pending.target, "gain_ability_targets") ||
+                     !strcmp(g->queue.pending.target, "invalidate_ability") ||
                      !strcmp(g->queue.pending.target, "change_state")) &&
                     g->n_selected_cards < RB_MAX_RECENTLY_MOVED)
                     g->selected_cards[g->n_selected_cards++] = cid;

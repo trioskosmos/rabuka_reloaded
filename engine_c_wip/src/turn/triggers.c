@@ -44,7 +44,8 @@ int rb_trigger_debut(GameState *g, int pl, int card_id) {
     int queued = 0;
     for(int i=0;i<n;i++){
         Ability ab; if(!rb_decode_card_ability((uint32_t)card_id,i,&ab)) continue;
-        if(ab.triggers && rb_trigger_is(ab.triggers, "登場")){
+        if(ab.triggers && rb_trigger_is(ab.triggers, "登場") &&
+           !rb_ability_is_invalidated(g, card_id, "登場")){
             if (!rb_use_limit_reached(&g->queue, card_id, i, ab.use_limit < 0 ? 99 : ab.use_limit, g->turn)) {
                 rb_queue_push(&g->queue, card_id, i);
                 rb_record_use(&g->queue, card_id, i, g->turn);
@@ -68,7 +69,8 @@ int rb_trigger_live_start(GameState *g, int pl) {
         int n = rb_card_num_abilities((uint32_t)cid);
         for (int ai = 0; ai < n; ai++) {
             Ability ab; if(!rb_decode_card_ability((uint32_t)cid, ai, &ab)) continue;
-            if (ab.triggers && rb_trigger_is(ab.triggers,"ライブ開始時")) {
+            if (ab.triggers && rb_trigger_is(ab.triggers,"ライブ開始時") &&
+                !rb_ability_is_invalidated(g, cid, "ライブ開始時")) {
                 if (!rb_use_limit_reached(&g->queue, cid, ai, ab.use_limit<0?99:ab.use_limit, g->turn)) {
                     fprintf(stderr, "[LIVE_START_SCAN] pl=%d zone=live cid=%d ab=%d queued=1\n", pl, cid, ai);
                     rb_queue_push(&g->queue, cid, ai);
@@ -88,7 +90,8 @@ int rb_trigger_live_start(GameState *g, int pl) {
         int n = rb_card_num_abilities((uint32_t)cid);
         for(int i=0;i<n;i++){
             Ability ab; if(!rb_decode_card_ability((uint32_t)cid,i,&ab)) continue;
-            if(ab.triggers && rb_trigger_is(ab.triggers,"ライブ開始時")){
+            if(ab.triggers && rb_trigger_is(ab.triggers,"ライブ開始時") &&
+               !rb_ability_is_invalidated(g, cid, "ライブ開始時")){
                 if(!rb_use_limit_reached(&g->queue, cid, i, ab.use_limit<0?99:ab.use_limit,g->turn)){
                     fprintf(stderr, "[LIVE_START_SCAN] pl=%d zone=stage cid=%d ab=%d queued=1\n", pl, cid, i);
                     rb_queue_push(&g->queue, cid, i);
@@ -128,7 +131,8 @@ static int queue_live_success_for_card(GameState *g, int pl, int cid, int occurr
     int n = rb_card_num_abilities((uint32_t)cid);
     for (int i = 0; i < n; i++) {
         Ability ab; if (!rb_decode_card_ability((uint32_t)cid, i, &ab)) continue;
-        if (ab.triggers && rb_trigger_is(ab.triggers, "ライブ成功時")) {
+        if (ab.triggers && rb_trigger_is(ab.triggers, "ライブ成功時") &&
+            !rb_ability_is_invalidated(g, cid, "ライブ成功時")) {
             fprintf(stderr, "[LIVE_SUCCESS_TRIGGER] cid=%d ab=%d occurrence=%d use_limit=%d effect=%s options=%d\n",
                     cid, i, occurrence, ab.use_limit,
                     ab.effect && ab.effect->action ? ab.effect->action : "none",
@@ -549,6 +553,19 @@ void rb_check_expired_effects(GameState *g, int which) {
         }
     }
     g->n_temp_effects = j;
+    int invalidation_write = 0;
+    for (int i = 0; i < g->n_ability_invalidations; i++) {
+        RbAbilityInvalidation *entry = &g->ability_invalidations[i];
+        int live_end = !strcmp(entry->duration, "live_end") ||
+                       !strcmp(entry->duration, "during_live");
+        int turn_end = !strcmp(entry->duration, "until_end_of_turn") ||
+                       !strcmp(entry->duration, "first_turn") ||
+                       !strcmp(entry->duration, "turn_end");
+        int expire = which == 0 || (which == 1 && live_end) ||
+                     (which == 2 && turn_end);
+        if (!expire) g->ability_invalidations[invalidation_write++] = *entry;
+    }
+    g->n_ability_invalidations = invalidation_write;
     if (gained_changed) rb_recalc_constants(g);
 }
 
@@ -597,7 +614,8 @@ void rb_recalc_constants(GameState *g) {
             for (int ai = 0; ai < n; ai++) {
                 Ability ab;
                 if (!rb_decode_card_ability((uint32_t)cid, ai, &ab)) continue;
-                if (ab.triggers && rb_trigger_is(ab.triggers, "常時") && ab.effect) {
+                if (ab.triggers && rb_trigger_is(ab.triggers, "常時") && ab.effect &&
+                    !rb_ability_is_invalidated(g, cid, "常時")) {
                     AbilityEffect *e = ab.effect;
                     int cond_ok = effect_position_matches(g, pl, cid, e) &&
                                   (!e->has_condition || !e->condition ||
@@ -624,7 +642,8 @@ void rb_recalc_constants(GameState *g) {
             int ng = rb_card_num_gained_abilities(g, cid);
             for (int gi = 0; gi < ng; gi++) {
                 const Ability *gab = rb_card_gained_ability(g, cid, gi);
-                if (!gab || !gab->effect || !rb_trigger_is(gab->triggers, "常時")) continue;
+                if (!gab || !gab->effect || !rb_trigger_is(gab->triggers, "常時") ||
+                    rb_ability_is_invalidated(g, cid, "常時")) continue;
                 int cond_ok = effect_position_matches(g, pl, cid, gab->effect) &&
                               (!gab->effect->has_condition || !gab->effect->condition ||
                                rb_eval_condition_for_host(g, pl, cid, gab->effect->condition));

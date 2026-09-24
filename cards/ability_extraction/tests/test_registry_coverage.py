@@ -15,10 +15,11 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from parser import (
+    ActionRule,
     parse_ability,
     _effect_registry,
     _condition_registry,
-    _ACTION_REGISTRY,
+    _ACTION_RULES,
 )
 
 CORPUS_PATH = os.path.join(
@@ -39,6 +40,11 @@ def load_ability_texts():
             if t:
                 texts.append(t)
     return texts
+
+
+def test_action_rules_are_normalized():
+    assert _ACTION_RULES
+    assert all(isinstance(rule, ActionRule) for rule in _ACTION_RULES)
 
 
 def _extract_effect_texts(texts):
@@ -123,6 +129,7 @@ def test_parse_ability_no_crash():
 
 if __name__ == "__main__":
     tests = [
+        test_action_rules_are_normalized,
         test_all_effect_rules_triggered,
         test_all_condition_rules_triggered,
         test_parse_ability_no_crash,

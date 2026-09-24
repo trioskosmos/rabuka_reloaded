@@ -9,7 +9,8 @@ Run: python -m pytest cards/ability_extraction/tests/test_parse_action.py -v
 """
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
-from parser import parse_action
+import parser as parser_module
+from parser import ActionRule, _ACTION_RULES, parse_action
 
 
 def check(text, expected_action, **expected_fields):
@@ -46,25 +47,25 @@ def test_select_from_hand_to_stage():
 def test_select_from_hand():
     check('手札からメンバーカードを選ぶ', 'select')
 
-def test_KNOWN_BUG_select_from_deck_add_to_hand():
-    """
-    BUG: "山札から2枚を選び手札に加える" → move_cards instead of select.
-    Same as test_KNOWN_BUG_select_shadowed_by_move_cards.
-    """
-    result = parse_action('山札から2枚を選び手札に加える')
-    if result.get('action') == 'select':
-        return
-    assert result.get('action') == 'move_cards', f"Unexpected state: {result}"
+def test_select_from_deck_add_to_hand():
+    check(
+        '山札から2枚を選び手札に加える',
+        'select',
+        source='deck',
+        destination='hand',
+        count=2,
+    )
 
-def test_KNOWN_BUG_deck_search_no_silent_move():
-    """
-    BUG: "山札から1枚のメンバーカードを選び、手札に加える" → move_cards instead of select.
-    Same root cause as test_KNOWN_BUG_select_shadowed_by_move_cards.
-    """
-    result = parse_action('山札から1枚のメンバーカードを選び、手札に加える')
-    if result.get('action') == 'select':
-        return
-    assert result.get('action') == 'move_cards', f"Unexpected state: {result}"
+
+def test_deck_search_no_silent_move():
+    check(
+        '山札から1枚のメンバーカードを選び、手札に加える',
+        'select',
+        source='deck',
+        destination='hand',
+        card_type='member_card',
+        count=1,
+    )
 
 def test_select_from_live_card_zone():
     check('ライブカード置き場から1枚を選ぶ', 'select', source='live_card_zone')
@@ -124,31 +125,22 @@ def test_gain_blade_per_unit():
 
 # ─── KNOWN BUGS (documented, not yet fixed) ───────────────────────────────────
 
-def test_KNOWN_BUG_select_shadowed_by_move_cards():
-    """
-    BUG: "山札から2枚を選び手札に加える" → move_cards instead of select.
-    The catch-all source+destination move_cards rule (Rule 44) fires before the select
-    rule (Rule 42) when both a source zone and destination zone are parseable.
-    Fix: add "選び" or "選ぶ" exclusion to the move_cards catch-all rule.
-    """
-    result = parse_action('自分の控え室からライブカードを1枚手札に加える')
-    if result.get('action') == 'select':
-        return  # Fixed! Great.
-    assert result.get('action') == 'move_cards', (
-        f"Unexpected state: {result}"
+def test_select_shadowed_by_move_cards():
+    check(
+        '自分の控え室からライブカードを1枚手札に加える',
+        'select',
+        source='discard',
+        destination='hand',
+        card_type='live_card',
+        count=1,
     )
 
-def test_KNOWN_BUG_choice_shadowed_by_select():
-    """
-    BUG: "以下から1つを選ぶ" → select instead of choice.
-    The select rule fires before the choice rule (Rule 52) because "選ぶ" appears in text.
-    Fix: add "以下から" exclusion to the select rule condition, or promote the choice rule.
-    """
-    result = parse_action('{{heart_01.png|heart01}}か{{heart_03.png|heart03}}か{{heart_06.png|heart06}}のうち、1つを選ぶ')
-    if result.get('action') == 'choice':
-        return  # Fixed! Great.
-    assert result.get('action') == 'select', (
-        f"Unexpected state: {result}"
+
+def test_choice_shadowed_by_select():
+    check(
+        '{{heart_01.png|heart01}}か{{heart_03.png|heart03}}か{{heart_06.png|heart06}}のうち、1つを選ぶ',
+        'choice',
+        count=1,
     )
 
 
@@ -286,6 +278,42 @@ def test_invalidate_ability_uses_nearest_trigger_icon():
     )
     assert result.get('action') == 'invalidate_ability'
     assert result.get('target_trigger') == 'ライブ成功時'
+
+
+def test_action_rules_are_normalized_dispatch_entries():
+    assert _ACTION_RULES
+    assert all(isinstance(rule, ActionRule) for rule in _ACTION_RULES)
+
+
+def test_parse_action_scans_source_and_destination_once():
+    original_source = parser_module.extract_source
+    original_destination = parser_module.extract_destination
+    source_calls = 0
+    destination_calls = 0
+
+    def counted_source(text):
+        nonlocal source_calls
+        source_calls += 1
+        return original_source(text)
+
+    def counted_destination(text):
+        nonlocal destination_calls
+        destination_calls += 1
+        return original_destination(text)
+
+    parser_module.extract_source = counted_source
+    parser_module.extract_destination = counted_destination
+    try:
+        result = parse_action('手札から1枚を控え室に置く')
+    finally:
+        parser_module.extract_source = original_source
+        parser_module.extract_destination = original_destination
+
+    assert result['action'] == 'move_cards'
+    assert result['source'] == 'hand'
+    assert result['destination'] == 'discard'
+    assert source_calls == 1
+    assert destination_calls == 1
 
 
 if __name__ == '__main__':

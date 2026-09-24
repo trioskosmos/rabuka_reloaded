@@ -1235,6 +1235,14 @@ typedef struct {
     int applied_this_event;
 } RbReplacementEffect;
 
+#define RB_MAX_ABILITY_INVALIDATIONS 64
+typedef struct {
+    int card_id;
+    char trigger[32];
+    char duration[32];
+    int created_turn;
+} RbAbilityInvalidation;
+
 #define RB_MAX_SNAPSHOTS 64
 #define RB_MAX_RECENTLY_MOVED 8
 
@@ -1442,6 +1450,8 @@ typedef struct GameState {
     Ability  gained_card_abilities[64][4]; /* up to 4 gained abilities per slot */
     int      gained_card_n[64];            /* count of gained abilities per slot */
     int      n_gained_cards;               /* number of distinct cards with gains */
+    RbAbilityInvalidation ability_invalidations[RB_MAX_ABILITY_INVALIDATIONS];
+    int      n_ability_invalidations;
 } GameState;
 
 /* ── Tracking (engine/src/core/game_state/tracking.rs) ── */
@@ -1494,7 +1504,10 @@ int rb_queue_is_idle(const GameState *g);
 int rb_queue_has_entry_with_id(const GameState *g, int card_id, int ability_idx);
 int rb_queue_start_next(GameState *g);
 void rb_queue_complete_current(GameState *g);
-int rb_queue_make_entry(GameState *g, int card_id, int ability_idx);
+int  rb_queue_make_entry(GameState *g, int card_id, int ability_idx);
+int  rb_queue_enqueue(GameState *g, int card_id, int ability_idx,
+                      int ability_index, const char *player_id,
+                      const char *card_no);
 int rb_queue_is_entry_available(const GameState *g, int idx);
 int rb_queue_current_entry(const GameState *g);
 void rb_queue_promote_entry(GameState *g, int from_index);
@@ -1651,6 +1664,10 @@ int  rb_process_pending_auto_abilities(GameState *g);
 void rb_recalc_constants(GameState *g);
 int  rb_register_gained_ability(GameState *g, int card_id, const Ability *ability);
 int  rb_remove_gained_ability(GameState *g, int card_id, int index);
+int  rb_card_has_ability_trigger_for(GameState *g, int card_id, const char *trigger);
+int  rb_ability_is_invalidated(const GameState *g, int card_id, const char *trigger);
+int  rb_try_add_ability_invalidation(GameState *g, int card_id, const char *trigger,
+                                     const char *duration);
 int  rb_card_num_gained_abilities(const GameState *g, int card_id);
 const Ability *rb_card_gained_ability(const GameState *g, int card_id, int index);
 void rb_check_expired_effects(GameState *g, int which);

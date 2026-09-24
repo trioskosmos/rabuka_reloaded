@@ -8,7 +8,7 @@ pub mod score;
 pub mod state;
 
 pub(crate) use draw::draw_cards_for_player;
-pub(crate) use executor::execute_effect_via_registry;
+pub(crate) use executor::execute_effect as execute_effect_dispatch;
 
 use super::debug::AbDebug;
 use super::enums::ActionType;
@@ -314,7 +314,6 @@ impl AbilityResolver {
             return self.execute_sequential_effect(gs, &normalized);
         }
 
-        // Delegate to registered executor (it pushes the verdict itself).
-        execute_effect_via_registry(self, gs, effect)
+        execute_effect_dispatch(self, gs, effect)
     }
 }

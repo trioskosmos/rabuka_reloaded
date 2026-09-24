@@ -207,6 +207,33 @@ static void test_bp3_001_live_start_can_skip_activation(void) {
           "declined activation: member must stay waited");
 }
 
+static int discard_has(TestGame *game, int card_id)
+{
+    for (int i = 0; i < game->state.p[0].discard.n; i++)
+        if (game->state.p[0].discard.cards[i] == card_id) return 1;
+    return 0;
+}
+
+static void test_kinako_baton_recovery(void)
+{
+    TestGame game;
+    test_game_new(&game);
+    int kinako = test_id(&game, "PL!SP-bp2-006-P");
+    int liela = test_id(&game, "PL!SP-pb1-001-R");
+    int filler = test_id(&game, "PL!-sd1-010-SD");
+    CHECK(kinako >= 0 && liela >= 0 && filler >= 0, "Kinako recovery fixtures resolve");
+    if (kinako < 0 || liela < 0 || filler < 0) return;
+    test_give_energy(&game, 25);
+    fill_decks(&game, filler);
+    test_add_to_stage(&game, 1, liela);
+    test_add_to_hand(&game, kinako);
+    test_play_to_stage(&game, kinako, 1);
+    drain_choices(&game);
+    CHECK(test_stage_has(&game, 1, kinako), "Kinako occupies the baton-touched area");
+    CHECK(test_hand_has(&game, liela), "Kinako recovers a displaced Liella! member");
+    CHECK(!discard_has(&game, liela), "recovered Liella! member is not left in waitroom");
+}
+
 int main(void) {
     if (rb_load("src") != 0) {
         fprintf(stderr, "FAIL: database load\n");
@@ -217,6 +244,7 @@ int main(void) {
     test_combo_bp3_005_mass_activate_readies_self_waited_ability_member();
     test_bp3_001_live_start_activates_one_chosen_member();
     test_bp3_001_live_start_can_skip_activation();
+    test_kinako_baton_recovery();
 
     rb_unload();
     if (failures) {

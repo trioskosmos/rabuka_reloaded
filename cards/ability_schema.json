@@ -88,7 +88,7 @@
       "kind": "enum",
       "values": [
         "this_turn",
-        "until_end_of_live",
+        "live_end",
         "permanent",
         "until_used",
         "next_turn"

@@ -1008,6 +1008,44 @@ pub(crate) fn choose_live_set_experiment(gs: &GameState, actions: &[Action], db:
                 }
             }
         }
+        if ceiling_enabled && std::env::var_os("V7_NO_MIN_WIN").is_none() {
+            let e_opp = crate::bot::strategy_v5::estimate_opp_score(gs, me, db);
+            let required = e_opp + i32::from(my_succ >= 2);
+            let mut best: Option<(f64, i32, Vec<usize>)> = None;
+            for (ev, score, idxs) in &ranked {
+                if *score < required {
+                    continue;
+                }
+                let probability = if *score > 0 {
+                    *ev / *score as f64
+                } else {
+                    1.0
+                };
+                let replace = best.as_ref().is_none_or(|current| {
+                    probability > current.0 + f64::EPSILON
+                        || ((probability - current.0).abs() <= f64::EPSILON
+                            && (*score < current.1
+                                || (*score == current.1 && idxs.len() < current.2.len())))
+                });
+                if replace {
+                    best = Some((probability, *score, idxs.clone()));
+                }
+            }
+            if let Some((probability, score, idxs)) = best {
+                desired = idxs;
+                chose_single = true;
+                log::debug!(
+                    "v7 minimum-win t{} me{} e_opp={} required={} score={} p={:.2} idxs={:?}",
+                    gs.turn_number,
+                    me,
+                    e_opp,
+                    required,
+                    score,
+                    probability,
+                    desired
+                );
+            }
+        }
         if !chose_single
             && my_succ >= 2
             && std::env::var_os("V7_NO_STRICT_CLOSE").is_none()
@@ -1063,6 +1101,14 @@ pub(crate) fn choose_live_set_experiment(gs: &GameState, actions: &[Action], db:
                 desired.push(hi);
                 covered = grown;
             }
+        }
+    }
+
+    if contested && std::env::var("V7_ROLLOUT_ASSIST").is_ok() {
+        let candidates = crate::bot::rollout::enumerate_candidates(gs, me, db);
+        if !candidates.is_empty() {
+            let index = crate::bot::rollout::price_portfolios(gs, me, &candidates, actions);
+            desired = candidates[index].clone();
         }
     }
 

@@ -946,6 +946,7 @@ int rb_play_member(GameState *g, int pl, int hand_idx, int stage_pos) {
     }
     rb_free_card(&c);
     int is_baton = (P->stage[stage_pos] >= 0); /* playing onto an occupied area */
+    int baton_replaced = RB_EMPTY_SLOT;
 
 
     /* Baton-touch legality gates (Rule 9.6.2.1.2.1): cannot replace a member that
@@ -999,6 +1000,7 @@ int rb_play_member(GameState *g, int pl, int hand_idx, int stage_pos) {
     if (is_baton) {
         /* Replace: old member (and its under-cards) → waitroom. */
         int old = P->stage[stage_pos];
+        baton_replaced = old;
         Card old_card;
         int old_cost = -1;
         if (rb_decode_card_by_index((uint32_t)old, &old_card)) {
@@ -1027,8 +1029,10 @@ int rb_play_member(GameState *g, int pl, int hand_idx, int stage_pos) {
     /* Mirror Rust set_recently_moved_batch: the played (or baton-replaced) member
         is now "recently moved" so movement-condition gates and auto-abilities-for-
         movement (trigger_auto_abilities_for_movement) see it during this resolution. */
-    g->recently_moved[0] = card;
+    g->recently_moved[0] = is_baton && baton_replaced >= 0 ? baton_replaced : card;
     g->n_recently_moved = 1;
+    if (is_baton && baton_replaced >= 0)
+        g->moved_this_turn[baton_replaced] = 1;
     if (is_baton) g->baton_last_vacated_area[pl] = stage_pos;
 
     /* Fire ALL debut / baton abilities on the played card. Mirrors Rust's

@@ -125,6 +125,11 @@ name = "performance"
 harness = false
 required-features = ["profiling"]
 
+[[example]]
+name = "gen_flamegraph"
+path = "examples/gen_flamegraph.rs"
+required-features = ["profiling"]
+
 [[bin]]
 name = "rabuka_engine"
 path = "src/main.rs"

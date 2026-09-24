@@ -36,7 +36,9 @@ pub(crate) fn baton_from_params(gs: &GameState, me: u8, p: &ActionParameters) ->
         .and_then(|index| crate::zones::MemberArea::from_index(index as usize))
         .or_else(|| p.stage_area.as_deref()?.parse().ok());
     let Some(stage) = stage else {
-        return false;
+        return p.available_areas.as_ref().is_some_and(|areas| {
+            areas.iter().any(|area| area.is_baton_touch)
+        });
     };
     if let Some(areas) = p.available_areas.as_ref() {
         if areas
@@ -315,6 +317,18 @@ fn simulation_state(gs: &GameState, me: u8) -> GameState {
 /// 0–0 tie → empty-main spiral (seed 42: t3/t4/t6, empty Main 7/20=35%).
 /// On an exact finite tie, prefer a baton `PlayMemberToStage` over Pass.
 /// Pass still wins ties against non-baton 0s (anti-clog for empty-slot bodies).
+fn is_free_baton(gs: &GameState, me: u8, action: &Action) -> bool {
+    if !is_baton_action(gs, me, action) {
+        return false;
+    }
+    action.parameters.as_ref().is_some_and(|params| {
+        params.final_cost == Some(0)
+            || params.available_areas.as_ref().is_some_and(|areas| {
+                areas.iter().any(|area| area.is_baton_touch && area.cost == 0)
+            })
+    })
+}
+
 fn pick_best(gs: &GameState, me: u8, actions: &[Action], scores: &[(f64, String)]) -> usize {
     let mut best = 0usize;
     for i in 1..scores.len() {
@@ -322,10 +336,12 @@ fn pick_best(gs: &GameState, me: u8, actions: &[Action], scores: &[(f64, String)
         let sb = scores[best].0;
         if si > sb {
             best = i;
-        } else if si == sb && si.is_finite()
+        } else if si.is_finite()
             && actions[best].action_type == ActionType::Pass
             && actions[i].action_type != ActionType::Pass
             && is_baton_action(gs, me, &actions[i])
+            && (si == sb || (std::env::var_os("V7_FREE_BATON").is_some()
+                && is_free_baton(gs, me, &actions[i])))
         {
             log::debug!(
                 "v7_main baton-tie-break t{} me{} idx{} {:?} score={:.2} beats Pass",

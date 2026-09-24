@@ -1461,21 +1461,14 @@ def _handle_required_hearts(t, a):
 # explicit to avoid silent mis-parse when inserting in wrong place.
 # ======================================================================
 
-_ACTION_REGISTRY = PriorityRegistry("action_rules")
-_ACTION_RULES: List[Any] = []  # populated from registry on first use
-_ACTION_RULE_NEXT_PRIORITY = 0
+_ACTION_RULES: List[Any] = []
 
-def _register_action(cond, act=None, setter=None, priority: Optional[int] = None):
-    global _ACTION_RULE_NEXT_PRIORITY
-    if priority is None:
-        priority = _ACTION_RULE_NEXT_PRIORITY
-        _ACTION_RULE_NEXT_PRIORITY += 10
+def _register_action(cond, act=None, setter=None):
     if not isinstance(cond, ActionRule):
         if isinstance(cond, str):
             cond = ActionRule(match=cond, action=act or "", setter=setter)
         else:
             cond = ActionRule(condition=cond, action=act or "", setter=setter)
-    _ACTION_REGISTRY.register(priority, f"action_{priority}", cond)
     _ACTION_RULES.append(cond)
 
 
@@ -1588,7 +1581,8 @@ _register_action(
     and "destination" in a
     and a.get("destination")
     and "選ぶ" not in t
-    and "選び" not in t,
+    and "選び" not in t
+    and not ("手札に加える" in t and extract_count(t) is not None),
     "move_cards",
     None,
 )
@@ -1748,6 +1742,19 @@ _register_action(
 )
 _register_action(
     ActionRule(
+        condition=lambda t, a: (
+            "加える" in t
+            and "選ぶ" not in t
+            and "選び" not in t
+            and a.get("source") is not None
+            and "手札に加える" in t
+            and extract_count(t) is not None
+        ),
+        action="select",
+    )
+)
+_register_action(
+    ActionRule(
         match_any=["加える", "加え"],
         exclude_any=["選ぶ", "選び"],
         action="move_cards",
@@ -1789,12 +1796,6 @@ _register_action(
     and "選ぶ" not in t
     and "選び" not in t,
     "move_cards",
-    # Only set destination when actually extracted — injecting None here would
-    # block every later default-fill guard (the key would exist with value None).
-    lambda t, a: a.update({"destination": dest})
-    if "destination" not in a
-    and (dest := extract_destination(t)) is not None
-    else None,
 )
 _register_action(
     lambda t: "ブレードを得る" in t or "選んだブレード" in t,
@@ -1908,7 +1909,13 @@ _register_action(
     ),
 )
 
-_register_action(ActionRule(match="以下から1つを選ぶ", action="choice"))
+_register_action(
+    ActionRule(
+        condition=lambda t: "1つを選ぶ" in t
+        and ("以下から" in t or "のうち" in t),
+        action="choice",
+    )
+)
 _register_action(
     ActionRule(
         condition=lambda t: bool(re.search(r"数\d*つを選ぶ", t)),
@@ -6001,7 +6008,7 @@ def _fill_defaults_move_cards(action, text, action_text, _cached_source, _cached
     if a != "move_cards":
         return a
     if "source" not in action:
-        s = _cached_source if _cached_source is not None else extract_source(text)
+        s = _cached_source
         if s:
             action["source"] = s
     if action.get("source") is None and "控え室から" in text:
@@ -6032,7 +6039,7 @@ def _fill_defaults_move_cards(action, text, action_text, _cached_source, _cached
             elif "エネルギー" not in text:
                 action["source"] = "hand"
     if "destination" not in action:
-        d = _cached_dest if _cached_dest is not None else extract_destination(text)
+        d = _cached_dest
         if d:
             action["destination"] = d
     if (
@@ -6190,17 +6197,13 @@ def _fill_draw_shuffle(action, text, _cached_source, _cached_dest):
     # Shuffle is always combined with a move action (shuffle then place).
     # If dispatch matched shuffle but text also has a destination pattern, emit move_cards with shuffle flag.
     if a == "shuffle":
-        dest = _cached_dest if _cached_dest is not None else extract_destination(text)
+        dest = _cached_dest
         if dest:
             action["action"] = "move_cards"
             action["shuffle"] = True
             action["destination"] = dest
             if "source" not in action:
-                s = (
-                    _cached_source
-                    if _cached_source is not None
-                    else extract_source(text)
-                )
+                s = _cached_source
                 if s:
                     action["source"] = s
             if "card_type" not in action:
@@ -6366,7 +6369,10 @@ def _fill_need_heart(action, text):
         action["need_heart_operator"] = ">="
 
 
-def _fill_defaults(action, text, _cached_source=None, _cached_dest=None):
+_UNSET = object()
+
+
+def _fill_defaults(action, text, _cached_source=_UNSET, _cached_dest=_UNSET):
     """Consolidated post-dispatch normalization. Fills defaults every action needs.
 
     Field ownership (C6): parse_action owns ALL field extraction (source,
@@ -6377,6 +6383,10 @@ def _fill_defaults(action, text, _cached_source=None, _cached_dest=None):
     sub-action dicts. No extraction should be added here — add it to
     parse_action instead.
     """
+    if _cached_source is _UNSET:
+        _cached_source = extract_source(text)
+    if _cached_dest is _UNSET:
+        _cached_dest = extract_destination(text)
     action_text = action.get("text", text) or text
     a = action.get("action")
     # Normalize "revealed_card" (singular) to "revealed_cards" (plural) for consistency

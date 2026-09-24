@@ -16,7 +16,7 @@ REPO = Path(__file__).parent.parent
 SCHEMA_PATH = REPO / "cards" / "ability_schema.json"
 COMPILE_PATH = REPO / "cards" / "compile_abilities.py"
 ENGINE_ENUMS = REPO / "engine" / "src" / "ability" / "enums.rs"
-ENGINE_EFFECTS = REPO / "engine" / "src" / "ability" / "effects" / "mod.rs"
+ENGINE_EFFECTS = REPO / "engine" / "src" / "ability" / "effects" / "executor.rs"
 
 ERRORS = []
 
@@ -55,9 +55,9 @@ def extract_action_type_variants():
 
 
 def extract_handler_actions():
-    """Extract which ActionType variants have match arms in effects/mod.rs."""
+    """Extract which ActionType variants have dispatch arms in executor.rs."""
     if not ENGINE_EFFECTS.exists():
-        err(f"effects/mod.rs not found at {ENGINE_EFFECTS}")
+        err(f"executor.rs not found at {ENGINE_EFFECTS}")
         return set()
     content = ENGINE_EFFECTS.read_text(encoding="utf-8")
     return set(re.findall(r"ActionType::(\w+)\s*=>", content))
@@ -75,11 +75,14 @@ def check_schema_vs_engine(schema):
             err(
                 f"Schema action '{action}' rust_variant '{rust_variant}' not in ActionType enum"
             )
-        handler = info.get("handler_fn", "")
-        if handler and handler not in ("(no-op)",):
-            if handler not in handlers:
-                # handler may be inline in the match arm
-                pass
+        handler = info.get("handler_fn", "") or info.get("handler", "")
+        if rust_variant and rust_variant not in handlers:
+            err(
+                f"Schema action '{action}' has no executor dispatch for "
+                f"ActionType::{rust_variant}"
+            )
+        if not handler:
+            err(f"Schema action '{action}' has no handler documented")
 
 
 def check_handler_coverage(schema):
@@ -88,7 +91,7 @@ def check_handler_coverage(schema):
     for action, info in sorted(schema.get("actions", {}).items()):
         handler = info.get("handler", "")
         if not handler:
-            warn(f"Action '{action}' has no handler documented in schema")
+            err(f"Action '{action}' has no handler documented in schema")
 
 
 def main():

@@ -163,6 +163,60 @@ const Ability *rb_card_gained_ability(const GameState *g, int card_id, int index
     return rb_card_gained_ability_internal(g, (uint32_t)card_id, index);
 }
 
+static int trigger_text_matches(const char *a, const char *b)
+{
+    if (!a || !b) return 0;
+    if (!strcmp(a, b)) return 1;
+    if (rb_trigger_is(a, b) || rb_trigger_is(b, a)) return 1;
+    return 0;
+}
+
+int rb_card_has_ability_trigger_for(GameState *g, int card_id, const char *trigger)
+{
+    if (!g || card_id < 0 || !trigger) return 0;
+    int count = rb_card_num_abilities((uint32_t)card_id);
+    for (int i = 0; i < count; i++) {
+        Ability ability;
+        if (!rb_decode_card_ability((uint32_t)card_id, i, &ability)) continue;
+        int match = trigger_text_matches(ability.triggers, trigger);
+        rb_free_ability(&ability);
+        if (match) return 1;
+    }
+    int gained_count = rb_card_num_gained_abilities(g, card_id);
+    for (int i = 0; i < gained_count; i++) {
+        const Ability *ability = rb_card_gained_ability(g, card_id, i);
+        if (ability && trigger_text_matches(ability->triggers, trigger)) return 1;
+    }
+    return 0;
+}
+
+int rb_ability_is_invalidated(const GameState *g, int card_id, const char *trigger)
+{
+    if (!g || card_id < 0 || !trigger) return 0;
+    for (int i = 0; i < g->n_ability_invalidations; i++) {
+        const RbAbilityInvalidation *entry = &g->ability_invalidations[i];
+        if (entry->card_id == card_id && trigger_text_matches(entry->trigger, trigger))
+            return 1;
+    }
+    return 0;
+}
+
+int rb_try_add_ability_invalidation(GameState *g, int card_id, const char *trigger,
+                                     const char *duration)
+{
+    if (!g || card_id < 0 || !trigger) return 0;
+    if (rb_ability_is_invalidated(g, card_id, trigger) ||
+        !rb_card_has_ability_trigger_for(g, card_id, trigger) ||
+        g->n_ability_invalidations >= RB_MAX_ABILITY_INVALIDATIONS)
+        return 0;
+    RbAbilityInvalidation *entry = &g->ability_invalidations[g->n_ability_invalidations++];
+    entry->card_id = card_id;
+    snprintf(entry->trigger, sizeof(entry->trigger), "%s", trigger);
+    snprintf(entry->duration, sizeof(entry->duration), "%s", duration ? duration : "permanent");
+    entry->created_turn = g->turn;
+    return 1;
+}
+
 /* ── collect_constant_ids_for ──────────────────────────────────────── */
 
 typedef struct { int card_id; int ability_idx; } RbConstantIdPair;
@@ -911,7 +965,11 @@ static int queue_zone_abilities(GameState *g, int actor, const int *ids, int n,
         for (int a = 0; a < nab; a++) {
             Ability ab;
             if (!rb_decode_card_ability((uint32_t)cid, a, &ab)) continue;
-            if (!rb_ability_matches_trigger(&ab, trigger)) { rb_free_ability(&ab); continue; }
+            if (!rb_ability_matches_trigger(&ab, trigger) ||
+                rb_ability_is_invalidated(g, cid, trigger)) {
+                rb_free_ability(&ab);
+                continue;
+            }
             if (ab.effect && rb_effect_is_ability_resolution_watcher(ab.effect))
                 { rb_free_ability(&ab); continue; }
             /* Discard-location guard for stage cards: skip discard-location abilities
@@ -1011,7 +1069,11 @@ static int queue_moved_cards_abilities(GameState *g, const int *moved_cards, int
         for (int a = 0; a < nab; a++) {
             Ability ab;
             if (!rb_decode_card_ability((uint32_t)moved_card_id, a, &ab)) continue;
-            if (!rb_ability_matches_trigger(&ab, trigger)) { rb_free_ability(&ab); continue; }
+            if (!rb_ability_matches_trigger(&ab, trigger) ||
+                rb_ability_is_invalidated(g, moved_card_id, trigger)) {
+                rb_free_ability(&ab);
+                continue;
+            }
             if (ab.effect && rb_effect_is_ability_resolution_watcher(ab.effect))
                 { rb_free_ability(&ab); continue; }
             if (ab.effect && ab.effect->has_condition && ab.effect->condition) {

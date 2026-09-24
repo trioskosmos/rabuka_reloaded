@@ -273,11 +273,16 @@ impl super::resolver::AbilityResolver {
     ) -> Result<(), String> {
         let choice = self.pending_choice.clone();
         let context = self.execution_context.clone();
-        let registry = crate::ability::choice::result_handlers::init_choice_result_registry();
         let Some(choice) = choice else {
             return Err("No pending choice".to_string());
         };
-        registry.handle(self, gs, &choice, &result, context)
+        crate::ability::choice::result_handlers::dispatch_choice_result(
+            self,
+            gs,
+            &choice,
+            &result,
+            context,
+        )
     }
 
     /// Consume the deferred そうした場合 gate (parent-conditional sequential
