@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-09-25T03:31:49.379256",
+  "generated_at": "2026-09-25T04:27:27.948842",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "a14d91a1",
+  "engine_commit": "f3008c9e",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -4814,6 +4814,8 @@
               "state_change": "active",
               "card_type": "member_card",
               "action": "change_state",
+              "target": "self",
+              "self_target": true,
               "count": 1,
               "activation_position": "left_side",
               "duration": "live_end"
@@ -6254,6 +6256,8 @@
             "state_change": "wait",
             "card_type": "member_card",
             "action": "change_state",
+            "target": "self",
+            "self_target": true,
             "count": 1
           },
           {
@@ -9303,6 +9307,8 @@
         "state_change": "wait",
         "card_type": "member_card",
         "action": "change_state",
+        "target": "self",
+        "self_target": true,
         "count": 1
       }
     },
@@ -9712,6 +9718,8 @@
               "state_change": "wait",
               "card_type": "member_card",
               "action": "change_state",
+              "target": "self",
+              "self_target": true,
               "count": 1,
               "duration": "live_end",
               "self_cost": true
@@ -14060,6 +14068,8 @@
         "state_change": "wait",
         "card_type": "member_card",
         "action": "change_state",
+        "target": "self",
+        "self_target": true,
         "count": 1,
         "parenthetical": [
           "ウェイト状態のメンバーが持つ{{icon_blade.png|ブレード}}は、エールで公開する枚数を増やさない。"
@@ -15690,8 +15700,9 @@
           "state_change": "wait",
           "card_type": "member_card",
           "action": "change_state",
-          "count": 1,
+          "target": "self",
           "self_target": true,
+          "count": 1,
           "self_cost": true
         },
         "group_names": [
@@ -20021,10 +20032,9 @@
             "state_change": "wait",
             "card_type": "member_card",
             "action": "change_state",
-            "count": 1,
-            "group_names": [
-              "蓮ノ空"
-            ]
+            "target": "self",
+            "self_target": true,
+            "count": 1
           },
           {
             "text": "自分の控え室からスコア4以下の『蓮ノ空』のライブカードを1枚手札に加える",
@@ -20062,13 +20072,20 @@
         "text": "自分のライブ中のカードにスコア2以下のライブカードがある場合、このメンバーをアクティブにする",
         "condition": {
           "text": "自分のライブ中のカードにスコア2以下のライブカードがある場合",
-          "type": "temporal_condition",
-          "temporal": "during_live",
+          "type": "card_count_condition",
+          "count": 1,
+          "operator": ">=",
+          "card_type": "live_card",
+          "location": "live_card_zone",
+          "cost_limit": 2,
+          "cost_limit_operator": "<=",
           "target": "self"
         },
         "state_change": "active",
         "card_type": "member_card",
         "action": "change_state",
+        "target": "self",
+        "self_target": true,
         "count": 1
       }
     },
@@ -22423,6 +22440,8 @@
         "state_change": "active",
         "card_type": "member_card",
         "action": "change_state",
+        "target": "self",
+        "self_target": true,
         "count": 1
       }
     },
@@ -36392,6 +36411,8 @@
             "state_change": "active",
             "card_type": "member_card",
             "action": "change_state",
+            "target": "self",
+            "self_target": true,
             "count": 1,
             "condition": {
               "text": "それらがすべて『Aqours』のメンバーカードの場合",
@@ -36404,9 +36425,6 @@
               "count": 2,
               "operator": "="
             },
-            "group_names": [
-              "Aqours"
-            ],
             "duration": "live_end"
           },
           {

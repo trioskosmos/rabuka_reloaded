@@ -1586,19 +1586,39 @@ _register_action(
     "move_cards",
     None,
 )
+
+
+def _set_state_change_action(text, action, state_change=None):
+    if state_change is not None:
+        action["state_change"] = state_change
+    target = extract_target(text)
+    if target:
+        action["target"] = target
+    if "このメンバー" in text:
+        action["card_type"] = "member_card"
+        if "このメンバー以外" not in text:
+            action.update(
+                {
+                    "target": "self",
+                    "self_target": True,
+                    "count": 1,
+                }
+            )
+    elif "エネルギー" in text and "メンバー" not in text:
+        action["card_type"] = "energy_card"
+    elif "メンバー" in text and any(
+        state in text for state in ("ウェイト", "レスト", "アクティブ")
+    ):
+        action["card_type"] = "member_card"
+    if "してもよい" in text:
+        action["optional"] = True
+    return action
+
+
 _register_action(
     lambda t, a: a.get("state_change") and a.get("state_change") != "",
     "change_state",
-    lambda t, a: (
-        a.update({"target": extract_target(t)}) if extract_target(t) else None,
-        a.update({"card_type": "energy_card"})
-        if "エネルギー" in t and "メンバー" not in t
-        else None,
-        a.update({"card_type": "member_card"})
-        if "このメンバー" in t
-        or ("メンバー" in t and ("ウェイト" in t or "レスト" in t or "アクティブ" in t))
-        else None,
-    )[-1],
+    _set_state_change_action,
 )
 _register_action(
     ActionRule(
@@ -1606,15 +1626,7 @@ _register_action(
         or "アクティブにする" in t
         or ("アクティブにし" in t and "しない" not in t),
         action="change_state",
-        setter=lambda t, a: (
-            a.update(
-                {
-                    "state_change": "active",
-                    "card_type": "energy_card" if "エネルギー" in t else "member_card",
-                }
-            ),
-            a.update({"optional": True}) if "してもよい" in t else None,
-        )[-1],
+        setter=lambda t, a: _set_state_change_action(t, a, "active"),
     )
 )
 _register_action(
@@ -4438,13 +4450,21 @@ def _try_live_mid(text):
     if "ライブ中" not in text:
         return None
     result = {"text": text}
-    count_match = re.search(r"(\d+)枚以上", text)
-    if count_match:
+    score_match = re.search(r"スコア([0-9０-９]+)以下のライブカード", text)
+    count_match = re.search(r"([0-9０-９]+)枚以上", text)
+    if score_match:
         result["type"] = "card_count_condition"
-        result["count"] = int(count_match.group(1))
+        result["count"] = 1
         result["operator"] = ">="
         result["card_type"] = "live_card"
-        result["target"] = "self"
+        result["location"] = "live_card_zone"
+        result["cost_limit"] = int(normalize_fullwidth_digits(score_match.group(1)))
+        result["cost_limit_operator"] = "<="
+    elif count_match:
+        result["type"] = "card_count_condition"
+        result["count"] = int(normalize_fullwidth_digits(count_match.group(1)))
+        result["operator"] = ">="
+        result["card_type"] = "live_card"
         result["temporal"] = "during_live"
         if "ライブ中の" in text:
             result["location"] = "live_card_zone"
@@ -10365,13 +10385,11 @@ def _propagation_allowed(f, sub, parent_effect):
         or sub_action in ("gain_resource", "set_heart_type", "heart_selection", "modify_score")
     ):
         return False
-    # group_names on energy change_state is meaningless.
-    if (
-        f == "group_names"
-        and sub_action == "change_state"
-        and sub.get("card_type") == "energy_card"
-    ):
-        return False
+    if f == "group_names" and sub_action == "change_state":
+        if sub.get("card_type") == "energy_card":
+            return False
+        sub_text = sub.get("text", "")
+        return any(g in sub_text for g in parent_effect[f])
     # group_names on gain_resource only if the text targets the group explicitly.
     if f == "group_names" and sub_action == "gain_resource":
         return False
@@ -10784,7 +10802,11 @@ def _walk_set_defaults(d, d_text, ct):
         # "1枚以上公開...2枚以下の場合" pick ≤2 (the real condition),
         # not ≥1 (the trigger clause).
         _text = d.get("text", "")
-        if d.get("count") is not None and not d.get("comparison_target"):
+        if (
+            d.get("count") is not None
+            and not d.get("comparison_target")
+            and not (ct == "card_count_condition" and "cost_limit" in d)
+        ):
             if "以下" in _text:
                 d["operator"] = "<="
             elif "以上" in _text:

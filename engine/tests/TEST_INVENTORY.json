@@ -1,6 +1,6 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-09-24T17:50:50.473845+00:00",
+  "generated_at": "2026-09-24T18:23:35.567276+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
@@ -8,7 +8,7 @@
     "unique_abilities": 936
   },
   "n_files": 839,
-  "n_tests": 3471,
+  "n_tests": 3477,
   "total_cards": 771,
   "covered_cards": 771,
   "abilities_on_covered": 936,
@@ -178,8 +178,8 @@
       545
     ],
     "temporal_condition": [
-      19,
-      19
+      18,
+      18
     ],
     "compound": [
       35,
@@ -194,8 +194,8 @@
       60
     ],
     "card_count_condition": [
-      88,
-      88
+      89,
+      89
     ],
     "location_condition": [
       73,
@@ -309,9 +309,9 @@
     ]
   },
   "depth_counts": {
-    "L2+choice": 749,
-    "L1+choice": 85,
-    "L2": 71,
+    "L2+choice": 751,
+    "L1+choice": 84,
+    "L2": 70,
     "L1": 31
   },
   "qa_rulings": {
@@ -678,7 +678,7 @@
       ]
     }
   },
-  "n_test_fns_parsed": 3471,
+  "n_test_fns_parsed": 3477,
   "abilities": [
     {
       "idx": 0,
@@ -1285,6 +1285,7 @@
         "engine/tests/test_modules/characterization/prohibition_layer_characterization_test.rs",
         "engine/tests/test_modules/characterization/strict_engine_bug_expected_fail_test.rs",
         "engine/tests/test_modules/effects/compound/discard_mill_live_recovery_pl_hs_pb1_004_r_test.rs",
+        "engine/tests/test_modules/effects/compound/izumi_bp6_test.rs",
         "engine/tests/test_modules/effects/compound/pb1_007_comprehensive_edge_test.rs",
         "engine/tests/test_modules/effects/conditional/remaining_comprehensive_edge_test.rs",
         "engine/tests/test_modules/effects/energy/place/score_condition_integration_test.rs",
@@ -1332,7 +1333,7 @@
         "ddd_decline_pay_does_nothing",
         "ddd_option_a_retrieves_any_member_from_waitroom"
       ],
-      "covering_test_count": 130,
+      "covering_test_count": 140,
       "is_null": true,
       "use_limit": null,
       "watches_abilities": false,
@@ -13968,6 +13969,7 @@
         "engine/tests/test_modules/effects/compound/fuyumari_debut_test.rs",
         "engine/tests/test_modules/effects/compound/heart_override_test.rs",
         "engine/tests/test_modules/effects/compound/hs_bp2_018_live_card_zone_test.rs",
+        "engine/tests/test_modules/effects/compound/izumi_bp6_test.rs",
         "engine/tests/test_modules/effects/compound/live_start_energy_under_member_draw_all_blades_q157_q158_q184_test.rs",
         "engine/tests/test_modules/effects/compound/live_start_optional_live_discard_chosen_heart_q190_test.rs",
         "engine/tests/test_modules/effects/compound/live_start_repeat_mill_blade_live_self_wait_q222_test.rs",
@@ -14095,7 +14097,7 @@
         "b_heart07_yell_contributes_two_colorless_hearts_each",
         "bella_positive_surplus_heart04_ability_fires"
       ],
-      "covering_test_count": 717,
+      "covering_test_count": 727,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -25218,12 +25220,18 @@
         "engine/tests/test_modules/effects/compound/izumi_bp6_test.rs"
       ],
       "covering_tests": [
-        "izumi_bp6_q257_multiple_matches_prompts_choice",
+        "izumi_bp6_live_start_activates_at_score_two_for_both_rarities",
+        "izumi_bp6_live_start_ignores_opponents_score_two",
+        "izumi_bp6_live_start_stays_waited_at_score_three",
+        "izumi_bp6_q257_debut_fires_after_baton_touch",
+        "izumi_bp6_q257_multiple_matches_use_filtered_waitroom_indices",
         "izumi_bp6_q257_non_matching_only_no_second_effect",
-        "izumi_bp6_q257_single_match_moves_to_hand",
-        "izumi_bp6_q257_waitroom_empty_becomes_wait"
+        "izumi_bp6_q257_p2_uses_only_p2_waitroom",
+        "izumi_bp6_q257_single_match_moves_to_hand_for_both_rarities",
+        "izumi_bp6_q257_waitroom_empty_becomes_wait",
+        "izumi_bp6_q257_waits_only_izumi_when_other_hasunosora_is_active"
       ],
-      "covering_test_count": 4,
+      "covering_test_count": 10,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -25238,7 +25246,7 @@
         "ライブ開始時"
       ],
       "action": "change_state",
-      "condition": "temporal_condition",
+      "condition": "card_count_condition",
       "set": "bp6",
       "cards": [
         "PL!HS-bp6-008-R",
@@ -25254,12 +25262,18 @@
         "engine/tests/test_modules/effects/compound/izumi_bp6_test.rs"
       ],
       "covering_tests": [
-        "izumi_bp6_q257_multiple_matches_prompts_choice",
+        "izumi_bp6_live_start_activates_at_score_two_for_both_rarities",
+        "izumi_bp6_live_start_ignores_opponents_score_two",
+        "izumi_bp6_live_start_stays_waited_at_score_three",
+        "izumi_bp6_q257_debut_fires_after_baton_touch",
+        "izumi_bp6_q257_multiple_matches_use_filtered_waitroom_indices",
         "izumi_bp6_q257_non_matching_only_no_second_effect",
-        "izumi_bp6_q257_single_match_moves_to_hand",
-        "izumi_bp6_q257_waitroom_empty_becomes_wait"
+        "izumi_bp6_q257_p2_uses_only_p2_waitroom",
+        "izumi_bp6_q257_single_match_moves_to_hand_for_both_rarities",
+        "izumi_bp6_q257_waitroom_empty_becomes_wait",
+        "izumi_bp6_q257_waits_only_izumi_when_other_hasunosora_is_active"
       ],
-      "covering_test_count": 4,
+      "covering_test_count": 10,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -30615,19 +30629,30 @@
       ],
       "base": "PL!HS-bp1-022",
       "covered": true,
-      "depth": "L2",
+      "depth": "L2+choice",
       "has_assert": true,
-      "has_choice": false,
+      "has_choice": true,
       "has_negative": true,
       "covering_files": [
+        "engine/tests/test_modules/effects/compound/izumi_bp6_test.rs",
         "engine/tests/test_modules/effects/score/awake_test.rs"
       ],
       "covering_tests": [
         "awake_q36_10_plus_hasetsu_cheers_score_plus_1",
         "awake_q36_low_cheers_no_score",
-        "awake_q36_non_hasetsu_cheered_no_score"
+        "awake_q36_non_hasetsu_cheered_no_score",
+        "izumi_bp6_live_start_activates_at_score_two_for_both_rarities",
+        "izumi_bp6_live_start_ignores_opponents_score_two",
+        "izumi_bp6_live_start_stays_waited_at_score_three",
+        "izumi_bp6_q257_debut_fires_after_baton_touch",
+        "izumi_bp6_q257_multiple_matches_use_filtered_waitroom_indices",
+        "izumi_bp6_q257_non_matching_only_no_second_effect",
+        "izumi_bp6_q257_p2_uses_only_p2_waitroom",
+        "izumi_bp6_q257_single_match_moves_to_hand_for_both_rarities",
+        "izumi_bp6_q257_waitroom_empty_becomes_wait",
+        "izumi_bp6_q257_waits_only_izumi_when_other_hasunosora_is_active"
       ],
-      "covering_test_count": 3,
+      "covering_test_count": 13,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -41011,18 +41036,29 @@
       ],
       "base": "PL!HS-bp6-009",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
+        "engine/tests/test_modules/effects/compound/izumi_bp6_test.rs",
         "engine/tests/test_modules/effects/compound/live_start_mill_all_group_blade_test.rs"
       ],
       "covering_tests": [
+        "izumi_bp6_live_start_activates_at_score_two_for_both_rarities",
+        "izumi_bp6_live_start_ignores_opponents_score_two",
+        "izumi_bp6_live_start_stays_waited_at_score_three",
+        "izumi_bp6_q257_debut_fires_after_baton_touch",
+        "izumi_bp6_q257_multiple_matches_use_filtered_waitroom_indices",
+        "izumi_bp6_q257_non_matching_only_no_second_effect",
+        "izumi_bp6_q257_p2_uses_only_p2_waitroom",
+        "izumi_bp6_q257_single_match_moves_to_hand_for_both_rarities",
+        "izumi_bp6_q257_waitroom_empty_becomes_wait",
+        "izumi_bp6_q257_waits_only_izumi_when_other_hasunosora_is_active",
         "mill_four_all_group_cards_grants_one_blade_until_live_end",
         "mill_four_any_wrong_group_card_prevents_blade_rider"
       ],
-      "covering_test_count": 2,
+      "covering_test_count": 12,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -41464,12 +41500,18 @@
         "engine/tests/test_modules/effects/compound/izumi_bp6_test.rs"
       ],
       "covering_tests": [
-        "izumi_bp6_q257_multiple_matches_prompts_choice",
+        "izumi_bp6_live_start_activates_at_score_two_for_both_rarities",
+        "izumi_bp6_live_start_ignores_opponents_score_two",
+        "izumi_bp6_live_start_stays_waited_at_score_three",
+        "izumi_bp6_q257_debut_fires_after_baton_touch",
+        "izumi_bp6_q257_multiple_matches_use_filtered_waitroom_indices",
         "izumi_bp6_q257_non_matching_only_no_second_effect",
-        "izumi_bp6_q257_single_match_moves_to_hand",
-        "izumi_bp6_q257_waitroom_empty_becomes_wait"
+        "izumi_bp6_q257_p2_uses_only_p2_waitroom",
+        "izumi_bp6_q257_single_match_moves_to_hand_for_both_rarities",
+        "izumi_bp6_q257_waitroom_empty_becomes_wait",
+        "izumi_bp6_q257_waits_only_izumi_when_other_hasunosora_is_active"
       ],
-      "covering_test_count": 4,
+      "covering_test_count": 10,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -41499,12 +41541,18 @@
         "engine/tests/test_modules/effects/compound/izumi_bp6_test.rs"
       ],
       "covering_tests": [
-        "izumi_bp6_q257_multiple_matches_prompts_choice",
+        "izumi_bp6_live_start_activates_at_score_two_for_both_rarities",
+        "izumi_bp6_live_start_ignores_opponents_score_two",
+        "izumi_bp6_live_start_stays_waited_at_score_three",
+        "izumi_bp6_q257_debut_fires_after_baton_touch",
+        "izumi_bp6_q257_multiple_matches_use_filtered_waitroom_indices",
         "izumi_bp6_q257_non_matching_only_no_second_effect",
-        "izumi_bp6_q257_single_match_moves_to_hand",
-        "izumi_bp6_q257_waitroom_empty_becomes_wait"
+        "izumi_bp6_q257_p2_uses_only_p2_waitroom",
+        "izumi_bp6_q257_single_match_moves_to_hand_for_both_rarities",
+        "izumi_bp6_q257_waitroom_empty_becomes_wait",
+        "izumi_bp6_q257_waits_only_izumi_when_other_hasunosora_is_active"
       ],
-      "covering_test_count": 4,
+      "covering_test_count": 10,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -41531,6 +41579,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
+        "engine/tests/test_modules/effects/compound/izumi_bp6_test.rs",
         "engine/tests/test_modules/integration/parser_issues_e2e_test.rs",
         "engine/tests/test_modules/jidou/yell/yell_revealed_no_blade_heart_discard_q251_test.rs"
       ],
@@ -41562,11 +41611,11 @@
         "issue7_hajimari_set_required_hearts",
         "issue9_izumi_debut_draw_2_discard_1",
         "issue9_izumi_debut_empty_hand",
-        "yell_revealed_blade_heart_member_offers_no_discard_q251",
-        "yell_revealed_mixed_pool_moves_member_but_keeps_score_heart_live_q251",
-        "yell_revealed_no_blade_heart_member_moves_to_waitroom_q251"
+        "izumi_bp6_live_start_activates_at_score_two_for_both_rarities",
+        "izumi_bp6_live_start_ignores_opponents_score_two",
+        "izumi_bp6_live_start_stays_waited_at_score_three"
       ],
-      "covering_test_count": 33,
+      "covering_test_count": 43,
       "is_null": false,
       "use_limit": 1,
       "watches_abilities": false,

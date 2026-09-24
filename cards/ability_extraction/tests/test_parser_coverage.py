@@ -380,6 +380,45 @@ def test_q279_distinct_under_member_blade_gain_is_parsed():
     assert effect.get("duration") == "live_end", effect
 
 
+def test_live_start_score_gate_filters_own_live_cards():
+    ability = parse_ability(
+        "{{live_start.png|ライブ開始時}}自分のライブ中のカードにスコア2以下のライブカードがある場合、このメンバーをアクティブにする"
+    )
+    condition = ability["effect"]["condition"]
+    assert condition.get("type") == "card_count_condition", condition
+    assert condition.get("location") == "live_card_zone", condition
+    assert condition.get("card_type") == "live_card", condition
+    assert condition.get("cost_limit") == 2, condition
+    assert condition.get("cost_limit_operator") == "<=", condition
+    assert condition.get("count") == 1, condition
+    assert condition.get("operator") == ">=", condition
+    assert condition.get("target") == "self", condition
+
+
+def test_excluded_this_member_state_change_is_not_self_targeted():
+    ability = parse_ability(
+        "{{live_start.png|ライブ開始時}}自分のステージにいるこのメンバー以外のウェイト状態のメンバー1人をアクティブにする"
+    )
+    effect = ability["effect"]
+    action = effect.get("actions", [effect])[0]
+    assert action.get("target") == "self", action
+    assert action.get("exclude_self") is True, action
+    assert "self_target" not in action, action
+
+
+def test_sequential_group_filter_stays_on_recovery_action():
+    ability = parse_ability(
+        "{{toujyou.png|登場}}このメンバーをウェイトにする。その後、自分の控え室からスコア4以下の『蓮ノ空』のライブカードを1枚手札に加える"
+    )
+    actions = ability["effect"]["actions"]
+    wait, recovery = actions
+    assert wait.get("target") == "self", wait
+    assert wait.get("self_target") is True, wait
+    assert wait.get("count") == 1, wait
+    assert "group_names" not in wait, wait
+    assert recovery.get("group_names") == ["蓮ノ空"], recovery
+
+
 # ─── run all ──────────────────────────────────────────────────────────────────
 
 tests = {

@@ -413,9 +413,9 @@ def extract_all_abilities(cards_file: Path) -> dict:
     # Compute repository-relative source path
     try:
         repo_root = Path(__file__).parent.parent.parent
-        rel_source = str(cards_file.relative_to(repo_root))
+        rel_source = cards_file.relative_to(repo_root).as_posix()
     except ValueError:
-        rel_source = str(cards_file)
+        rel_source = cards_file.as_posix()
 
     # Get git commit hash for reproducibility tracking
     git_hash = "unknown"
