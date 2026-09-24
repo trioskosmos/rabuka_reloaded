@@ -1,6 +1,6 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-09-24T21:49:26.521417+00:00",
+  "generated_at": "2026-09-24T22:02:41.713881+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
@@ -8,7 +8,7 @@
     "unique_abilities": 936
   },
   "n_files": 839,
-  "n_tests": 3496,
+  "n_tests": 3497,
   "total_cards": 771,
   "covered_cards": 771,
   "abilities_on_covered": 936,
@@ -678,7 +678,7 @@
       ]
     }
   },
-  "n_test_fns_parsed": 3496,
+  "n_test_fns_parsed": 3497,
   "abilities": [
     {
       "idx": 0,
@@ -814,7 +814,7 @@
         "center_mus_with_2_heart03_reduces_1",
         "center_mus_zero_heart03_no_reduction"
       ],
-      "covering_test_count": 382,
+      "covering_test_count": 383,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -13876,6 +13876,7 @@
         "real_deck_top_mill_offers_discard_and_recovers_self",
         "real_hand_discard_does_not_trigger_deck_to_discard_self_recovery",
         "sunny_branch1_1_member_triggers_draw",
+        "sunny_branch1_discard_is_not_restricted_to_mus_q210",
         "sunny_branch1_no_members_does_nothing",
         "sunny_branch2_one_member_skips_b2",
         "sunny_branch2_two_mus_grants_heart",
@@ -13885,7 +13886,7 @@
         "sunny_q210_joint_card_counts_as_one_member",
         "sunny_q211_joint_card_targetable_for_mus_heart"
       ],
-      "covering_test_count": 19,
+      "covering_test_count": 20,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -28773,7 +28774,7 @@
         "maki_q256_selects_exact_success_card",
         "maki_q256_uses_only_the_cost_revealed_card"
       ],
-      "covering_test_count": 74,
+      "covering_test_count": 75,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -33951,6 +33952,7 @@
         "ll_joint_creates_choice_with_6_cards",
         "ll_joint_requires_6_cards",
         "sunny_branch1_1_member_triggers_draw",
+        "sunny_branch1_discard_is_not_restricted_to_mus_q210",
         "sunny_branch1_no_members_does_nothing",
         "sunny_branch2_one_member_skips_b2",
         "sunny_branch2_two_mus_grants_heart",
@@ -33976,7 +33978,7 @@
         "test_joint_card_has_all_three_name_identities",
         "test_multi_name_card_matches_any_constituent_in_characters_filter"
       ],
-      "covering_test_count": 27,
+      "covering_test_count": 28,
       "is_null": false,
       "use_limit": 1,
       "watches_abilities": false,
@@ -34011,6 +34013,7 @@
         "ll_joint_creates_choice_with_6_cards",
         "ll_joint_requires_6_cards",
         "sunny_branch1_1_member_triggers_draw",
+        "sunny_branch1_discard_is_not_restricted_to_mus_q210",
         "sunny_branch1_no_members_does_nothing",
         "sunny_branch2_one_member_skips_b2",
         "sunny_branch2_two_mus_grants_heart",
@@ -34036,7 +34039,7 @@
         "test_joint_card_has_all_three_name_identities",
         "test_multi_name_card_matches_any_constituent_in_characters_filter"
       ],
-      "covering_test_count": 27,
+      "covering_test_count": 28,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -36000,6 +36003,7 @@
       ],
       "covering_tests": [
         "sunny_branch1_1_member_triggers_draw",
+        "sunny_branch1_discard_is_not_restricted_to_mus_q210",
         "sunny_branch1_no_members_does_nothing",
         "sunny_branch2_one_member_skips_b2",
         "sunny_branch2_two_mus_grants_heart",
@@ -36009,7 +36013,7 @@
         "sunny_q210_joint_card_counts_as_one_member",
         "sunny_q211_joint_card_targetable_for_mus_heart"
       ],
-      "covering_test_count": 9,
+      "covering_test_count": 10,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,

@@ -1,4 +1,5 @@
 use crate::helpers::*;
+use rabuka_engine::ability::types::Choice;
 use rabuka_engine::zones::MemberArea;
 
 /// SUNNY DAY SONG (PL!-bp5-021-L) — LiveStart ability with 3 conditional branches.
@@ -443,6 +444,59 @@ fn sunny_q211_joint_card_targetable_for_mus_heart() {
         "Joint card or other member should gain heart03 as a μ's target"
     );
 }
+
+#[test]
+fn sunny_branch1_discard_is_not_restricted_to_mus_q210() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let sunny = game.id("PL!-bp5-021-L");
+    let aqours = game.id("PL!S-sd1-013-SD");
+    let mus = game.id("PL!-sd1-005-SD");
+    let filler = game.id("PL!-sd1-010-SD");
+
+    game.add_to_hand(sunny);
+    game.add_to_hand(aqours);
+    game.add_to_hand(mus);
+    game.add_to_stage(MemberArea::Center, mus);
+    for _ in 0..5 {
+        game.state.player1.main_deck.cards.push(filler);
+    }
+    for _ in 0..5 {
+        game.state.player2.main_deck.cards.push(filler);
+    }
+
+    advance_to_live_card_set_p1(&mut game);
+    game.set_live_card(sunny);
+    advance_to_live_start(&mut game);
+
+    let hand_index = game
+        .state
+        .player1
+        .hand
+        .cards
+        .iter()
+        .position(|card_id| *card_id == aqours)
+        .expect("Aqours hand card");
+    let mus_index = game
+        .state
+        .player1
+        .hand
+        .cards
+        .iter()
+        .position(|card_id| *card_id == mus)
+        .expect("mu's hand card");
+    match game.get_pending_choice() {
+        Choice::SelectCard {
+            filtered_indices, ..
+        } => {
+            let indices = filtered_indices.as_ref().expect("discard filter");
+            assert!(indices.contains(&hand_index));
+            assert!(indices.contains(&mus_index));
+        }
+        choice => panic!("expected unfiltered hand discard, got {choice:?}"),
+    }
+}
+
 
 fn advance_to_live_card_set_p1(game: &mut TestGame) {
     assert_eq!(game.state.current_phase.to_string(), "Main");

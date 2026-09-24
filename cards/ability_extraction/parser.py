@@ -945,14 +945,6 @@ def parse_ability(triggerless_text: str) -> Dict[str, Any]:
         if isinstance(effect, dict) and "cost" in effect:
             ability["cost"] = effect.pop("cost")
         effect = _normalize_effect_tree(effect, triggerless_text)
-        if (
-            isinstance(effect, dict)
-            and effect.get("action") == "sequential"
-            and effect.get("conditional") is True
-            and ability.get("cost")
-            and "そうした場合、これにより公開したカード" in triggerless_text
-        ):
-            effect.pop("conditional", None)
         if not isinstance(effect, dict):
             effect = {}
 
@@ -1022,6 +1014,27 @@ def parse_ability(triggerless_text: str) -> Dict[str, Any]:
         effect = _clean(effect)
         _validate_effect(effect, triggerless_text[:40])
         ability["effect"] = effect
+
+    if (
+        isinstance(effect, dict)
+        and effect.get("action") == "sequential"
+        and effect.get("conditional") is True
+        and ability.get("cost")
+        and "そうした場合、これにより公開したカード" in triggerless_text
+    ):
+        effect.pop("conditional", None)
+        ability["effect"] = effect
+
+    if isinstance(effect, dict) and effect.get("action") == "sequential":
+        actions = effect.get("actions")
+        if isinstance(actions, list):
+            child_group_flags = [
+                isinstance(action, dict) and bool(action.get("group_names"))
+                for action in actions
+            ]
+            if any(child_group_flags) and not all(child_group_flags):
+                effect.pop("group_names", None)
+                ability["effect"] = effect
 
     # Merge phase gate into effect["condition"] (not ability["condition"])
     # so the Rust Ability struct picks it up via AbilityEffect.condition.
@@ -6976,8 +6989,18 @@ def _propagate(src, dst, skip_existing=False):
     If skip_existing is True, only copy fields not already present in dst.
     """
     for k in _PROPAGATE_FIELDS:
-        if k in src and (not skip_existing or k not in dst):
-            dst[k] = src[k]
+        if k not in src or (skip_existing and k in dst):
+            continue
+        if k in ("group_names", "exclude_group_names"):
+            own_text = str(dst.get("text", ""))
+            groups = src[k] or []
+            if (
+                not any(str(group) in own_text for group in groups)
+                and not dst.get("per_unit")
+                and not dst.get("per_unit_type")
+            ):
+                continue
+        dst[k] = src[k]
 
 
 def _try_yell_source_modifier(text):
@@ -10398,7 +10421,14 @@ def _propagation_allowed(f, sub, parent_effect):
             return False
         sub_text = sub.get("text", "")
         return any(g in sub_text for g in parent_effect[f])
-    # group_names on gain_resource only if the text targets the group explicitly.
+    if f == "group_names" and sub_action in (
+        "draw_card",
+        "move_cards",
+        "modify_score",
+        "sequential",
+    ):
+        sub_text = sub.get("text", "")
+        return any(g in sub_text for g in parent_effect[f])
     if f == "group_names" and sub_action == "gain_resource":
         return False
     # group_names on specify_heart_color / reveal: no group filtering.

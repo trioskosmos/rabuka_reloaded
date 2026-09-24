@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-09-25T05:21:56.152981",
+  "generated_at": "2026-09-25T08:01:24.045774",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "125bbf7f",
+  "engine_commit": "36db12bf",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -2334,10 +2334,7 @@
           "location": "success_live_card_zone",
           "card_type": "live_card",
           "type": "location_condition"
-        },
-        "group_names": [
-          "μ's"
-        ]
+        }
       }
     },
     {
@@ -3223,9 +3220,6 @@
             "source": "selected_cards",
             "card_type": "card"
           }
-        ],
-        "group_names": [
-          "虹ヶ咲"
         ]
       }
     },
@@ -3418,9 +3412,6 @@
             "duration": "live_end"
           }
         ],
-        "group_names": [
-          "虹ヶ咲"
-        ],
         "heart_colors": [
           "heart04"
         ]
@@ -3522,9 +3513,6 @@
             ],
             "action": "move_cards"
           }
-        ],
-        "group_names": [
-          "虹ヶ咲"
         ]
       }
     },
@@ -3593,9 +3581,6 @@
           }
         ],
         "activation_position": "center",
-        "group_names": [
-          "Liella!"
-        ],
         "position": "center"
       }
     },
@@ -4261,9 +4246,6 @@
             "all": true
           }
         ],
-        "group_names": [
-          "Aqours"
-        ],
         "all": true,
         "heart_colors": [
           "heart03",
@@ -4431,9 +4413,6 @@
               "虹ヶ咲"
             ]
           }
-        ],
-        "group_names": [
-          "虹ヶ咲"
         ],
         "condition": {
           "type": "card_count_condition",
@@ -5539,17 +5518,11 @@
               }
             ],
             "position": "center",
-            "activation_position": "center",
-            "group_names": [
-              "μ's"
-            ]
+            "activation_position": "center"
           }
         ],
         "conditional": true,
         "activation_position": "center",
-        "group_names": [
-          "μ's"
-        ],
         "position": "center"
       }
     },
@@ -5667,9 +5640,6 @@
             "all": true,
             "text": "公開した残りのカードを控え室に置く"
           }
-        ],
-        "group_names": [
-          "μ's"
         ]
       }
     },
@@ -5899,9 +5869,6 @@
           "location": "live_card_zone",
           "target": "self"
         },
-        "group_names": [
-          "Aqours"
-        ],
         "heart_colors": [
           "heart02",
           "heart04"
@@ -6133,9 +6100,6 @@
           }
         ],
         "duration": "live_end",
-        "group_names": [
-          "蓮ノ空"
-        ],
         "heart_colors": [
           "heart05"
         ]
@@ -6564,9 +6528,6 @@
             "per_unit_source": "previous_moved_cards",
             "duration": "live_end"
           }
-        ],
-        "group_names": [
-          "Aqours"
         ]
       }
     },
@@ -9081,10 +9042,7 @@
             "count": 2
           }
         ],
-        "conditional": true,
-        "group_names": [
-          "SaintSnow"
-        ]
+        "conditional": true
       }
     },
     {
@@ -11938,10 +11896,7 @@
             "action": "modify_score",
             "value": 1,
             "operation": "add",
-            "self_target": true,
-            "group_names": [
-              "CatChu!"
-            ]
+            "self_target": true
           }
         ],
         "distinct": "card_name",
@@ -12084,10 +12039,7 @@
           "self_target": true,
           "source": "stage",
           "destination": "discard"
-        },
-        "group_names": [
-          "Aqours"
-        ]
+        }
       }
     },
     {
@@ -13947,10 +13899,7 @@
             "resource": "heart"
           }
         ],
-        "exclude_self": true,
-        "group_names": [
-          "虹ヶ咲"
-        ]
+        "exclude_self": true
       }
     },
     {
@@ -14677,9 +14626,6 @@
             "source": "deck",
             "destination": "hand"
           }
-        ],
-        "group_names": [
-          "μ's"
         ]
       }
     },
@@ -16249,10 +16195,7 @@
             "duration": "live_end"
           }
         ],
-        "duration": "live_end",
-        "group_names": [
-          "Liella!"
-        ]
+        "duration": "live_end"
       }
     },
     {
@@ -16676,10 +16619,7 @@
           "operator": ">=",
           "target": "self",
           "type": "comparison_condition"
-        },
-        "group_names": [
-          "虹ヶ咲"
-        ]
+        }
       }
     },
     {
@@ -18379,9 +18319,6 @@
             "source": "deck",
             "destination": "hand"
           }
-        ],
-        "group_names": [
-          "みらくらぱーく！"
         ]
       }
     },
@@ -18498,9 +18435,6 @@
             ],
             "action": "move_cards"
           }
-        ],
-        "group_names": [
-          "スリーズブーケ"
         ]
       }
     },
@@ -18643,10 +18577,7 @@
               "heart01"
             ],
             "count": 2,
-            "exclude_self": true,
-            "group_names": [
-              "みらくらぱーく！"
-            ]
+            "exclude_self": true
           }
         ],
         "conditional": true,
@@ -18654,9 +18585,6 @@
           "このメンバーを今いるエリア以外のエリアに移動させる。そのエリアにメンバーがいる場合、そのメンバーはこのメンバーがいたエリアに移動させる。"
         ],
         "exclude_self": true,
-        "group_names": [
-          "みらくらぱーく！"
-        ],
         "heart_colors": [
           "heart01"
         ]
@@ -20042,9 +19970,6 @@
             ],
             "action": "move_cards"
           }
-        ],
-        "group_names": [
-          "蓮ノ空"
         ]
       }
     },
@@ -21674,9 +21599,6 @@
             "value": 1
           }
         ],
-        "group_names": [
-          "Aqours"
-        ],
         "heart_colors": [
           "heart00"
         ]
@@ -22174,9 +22096,6 @@
             "resource": "blade",
             "count": 1
           }
-        ],
-        "group_names": [
-          "虹ヶ咲"
         ]
       }
     },
@@ -23336,9 +23255,6 @@
             "action": "change_state",
             "card_type": "energy_card"
           }
-        ],
-        "group_names": [
-          "μ's"
         ]
       }
     },
@@ -26685,14 +26601,8 @@
             "action": "modify_score",
             "value": 1,
             "operation": "add",
-            "self_target": true,
-            "group_names": [
-              "Aqours"
-            ]
+            "self_target": true
           }
-        ],
-        "group_names": [
-          "Aqours"
         ]
       }
     },
@@ -28204,9 +28114,6 @@
             "value": 1,
             "operation": "add",
             "self_target": true,
-            "group_names": [
-              "虹ヶ咲"
-            ],
             "duration": "live_end"
           },
           {
@@ -28222,9 +28129,6 @@
             "action": "gain_resource",
             "resource": "blade"
           }
-        ],
-        "group_names": [
-          "虹ヶ咲"
         ],
         "condition": {
           "type": "temporal_condition",
@@ -28986,9 +28890,6 @@
             ],
             "action": "move_cards"
           }
-        ],
-        "group_names": [
-          "A-RISE"
         ]
       }
     },
@@ -29198,9 +29099,6 @@
                 "action": "move_cards",
                 "card_type": "card"
               }
-            ],
-            "group_names": [
-              "μ's"
             ]
           },
           {
@@ -29260,14 +29158,8 @@
             "operation": "add",
             "self_target": true,
             "multiple_targets": true,
-            "group_names": [
-              "μ's"
-            ],
             "duration": "live_end"
           }
-        ],
-        "group_names": [
-          "μ's"
         ],
         "heart_colors": [
           "heart03"
@@ -31675,9 +31567,6 @@
             ],
             "action": "move_cards"
           }
-        ],
-        "group_names": [
-          "蓮ノ空"
         ]
       }
     },
@@ -32430,11 +32319,7 @@
           "card_type": "live_card",
           "location": "discard",
           "target": "self"
-        },
-        "group_names": [
-          "スリーズブーケ",
-          "蓮ノ空"
-        ]
+        }
       }
     },
     {
@@ -33236,10 +33121,7 @@
             "action": "modify_score",
             "value": 1,
             "operation": "add",
-            "self_target": true,
-            "group_names": [
-              "μ's"
-            ]
+            "self_target": true
           },
           {
             "text": "自分の控え室から『μ's』のライブカード1枚を手札に加える",
@@ -33253,9 +33135,6 @@
             ],
             "action": "move_cards"
           }
-        ],
-        "group_names": [
-          "μ's"
         ]
       }
     },
@@ -33343,9 +33222,6 @@
               "μ's"
             ]
           }
-        ],
-        "group_names": [
-          "μ's"
         ]
       }
     },
@@ -33910,9 +33786,6 @@
             "operation": "add",
             "value": 5
           }
-        ],
-        "group_names": [
-          "DOLLCHESTRA"
         ]
       }
     },
@@ -35417,10 +35290,7 @@
           "target": "self",
           "location": "energy_zone"
         },
-        "exclude_self": true,
-        "group_names": [
-          "Liella!"
-        ]
+        "exclude_self": true
       }
     },
     {
@@ -36127,16 +35997,10 @@
             "action": "modify_score",
             "value": 1,
             "operation": "add",
-            "self_target": true,
-            "group_names": [
-              "CatChu!"
-            ]
+            "self_target": true
           }
         ],
         "distinct": "card_name",
-        "group_names": [
-          "CatChu!"
-        ],
         "heart_colors": [
           "heart00",
           "heart02"
@@ -37440,16 +37304,10 @@
             "value": 1,
             "operation": "add",
             "self_target": true,
-            "all": true,
-            "group_names": [
-              "虹ヶ咲"
-            ]
+            "all": true
           }
         ],
         "exclude_self": true,
-        "group_names": [
-          "虹ヶ咲"
-        ],
         "all": true
       }
     },
@@ -37719,10 +37577,7 @@
               "action": "modify_score",
               "value": 1,
               "operation": "add",
-              "self_target": true,
-              "group_names": [
-                "虹ヶ咲"
-              ]
+              "self_target": true
             }
           ],
           "text": "自分の{{live_success.png|ライブ成功時}}能力によって、カードが自分のデッキから自分の控え室に置かれるたび、それらのカードの中から『虹ヶ咲』のライブカードを1枚手札に加えてもよい。そうしたとき、このカードのスコアを+1する",

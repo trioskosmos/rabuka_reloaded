@@ -395,6 +395,18 @@ def test_live_start_score_gate_filters_own_live_cards():
     assert condition.get("target") == "self", condition
 
 
+def test_sunny_day_song_group_filter_stays_on_mus_branch():
+    ability = parse_ability(
+        "{{live_start.png|ライブ開始時}}自分のステージにメンバーが1人以上いる場合、自分と相手はカードを1枚引き、手札を1枚控え室に置く。2人以上いる場合、さらに自分のステージにいる『μ's』のメンバー1人は、ライブ終了時まで、{{heart_03.png|heart03}}を得る。3人以上おり、かつそれぞれ名前が異なる場合、さらにこのカードのスコアを＋１する。"
+    )
+    effect = ability["effect"]
+    branch1, branch2, branch3 = effect["actions"]
+    assert "group_names" not in effect, effect
+    assert "group_names" not in branch1, branch1
+    assert branch2.get("group_names") == ["μ's"], branch2
+    assert "group_names" not in branch3, branch3
+
+
 def test_maki_previous_reveal_source_is_resolution_scoped():
     ability = parse_ability(
         "{{toujyou.png|登場}}手札のライブカードを1枚公開してもよい：自分の成功ライブカード置き場にあるカードを1枚手札に加える。そうした場合、これにより公開したカードを自分の成功ライブカード置き場に置く。"
