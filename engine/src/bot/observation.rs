@@ -3,6 +3,8 @@ use std::hash::{Hash, Hasher};
 use crate::ability::types::Choice;
 use crate::game_state::{GameResult, GameState, Phase, TurnPhase};
 
+pub const MATH_FEATURES: usize = 32;
+
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde_support", derive(serde::Serialize, serde::Deserialize))]
 pub struct PublicObservation {
@@ -27,6 +29,7 @@ pub struct PublicObservation {
     pub ability_queue_current_card: Option<i16>,
     pub ability_queue_current_ability: Option<u8>,
     pub ability_queue_current_trigger: Option<u8>,
+    pub math_features: [f32; MATH_FEATURES],
     pub resolution_zone: Vec<i16>,
 }
 
@@ -289,6 +292,115 @@ fn player_features(
     }
     features.success_count = player.success_live_card_zone.cards.len().min(u8::MAX as usize) as u8;
     features
+}
+
+fn math_features(state: &GameState, perspective_player: u8) -> [f32; MATH_FEATURES] {
+    use crate::bot::strategy_common::{acc_add, requirements_met, Acc};
+    use crate::bot::strategy_v4;
+    use crate::bot::strategy_v5;
+    use crate::card::CardType;
+    use crate::core::stats_pipeline;
+
+    let me = if perspective_player == 0 { &state.player1 } else { &state.player2 };
+    let opp = if perspective_player == 0 { &state.player2 } else { &state.player1 };
+    let db = &state.card_database;
+    let (blades, density) = strategy_v4::flip_stats(state, perspective_player, db);
+    let expected = strategy_v4::expected_flip_units(state, perspective_player, db);
+    let pool_board = strategy_v4::heart_pool_inner(state, perspective_player, db, 0.0);
+    let mut out = [0.0f32; MATH_FEATURES];
+    let stage_cost: i32 = me
+        .stage
+        .stage
+        .iter()
+        .filter_map(|&id| db.get_card(id).and_then(|card| card.cost))
+        .map(i32::from)
+        .sum();
+    let active_slots = me
+        .stage
+        .stage
+        .iter()
+        .filter(|&&id| id >= 0)
+        .filter(|&&id| state.mods.get_orientation_modifier(id) != Some("wait"))
+        .count();
+    let waited_slots = me.stage.stage.iter().filter(|&&id| id >= 0).count() - active_slots;
+    out[0] = stage_cost as f32 / 30.0;
+    out[1] = blades as f32 / 12.0;
+    out[2] = me
+        .stage
+        .total_blades(db, &state.mods.blade_modifiers, &state.mods.orientation_modifiers, true) as f32
+        / 12.0;
+    out[3] = me.energy_zone.active_count() as f32 / 15.0;
+    out[4] = me.energy_zone.cards.len() as f32 / 20.0;
+    out[5] = me.hand.cards.len() as f32 / 10.0;
+    out[7] = me.success_live_card_zone.cards.len() as f32 / 3.0;
+    out[8] = opp.success_live_card_zone.cards.len() as f32 / 3.0;
+    out[9] = if me.is_first_attacker { 1.0 } else { 0.0 };
+    out[10] = density as f32;
+    out[13] = strategy_v5::estimate_opp_score(state, perspective_player, db) as f32 / 12.0;
+    out[14] = active_slots as f32 / 3.0;
+    out[15] = waited_slots as f32 / 3.0;
+    out[16] = (expected[0] + expected[1] + expected[2] + expected[3] + expected[4] + expected[5] + expected[6] + expected[10]) as f32 / 12.0;
+    for i in 0..6 {
+        out[17 + i] = expected[i + 1] as f32 / 8.0;
+        out[23 + i] = pool_board[i + 1] as f32 / 8.0;
+    }
+    let mut live_count = 0usize;
+    let mut passable_count = 0usize;
+    let mut best_live_prob = 0.0f32;
+    let mut max_live_score = 0u8;
+    for &card_id in &me.hand.cards {
+        let Some(card) = db.get_card(card_id) else { continue };
+        if card.card_type != CardType::Live {
+            continue;
+        }
+        live_count += 1;
+        max_live_score = max_live_score.max(card.get_score());
+        let need = stats_pipeline::effective_need_heart(
+            card.need_heart.as_ref(),
+            card_id,
+            &state.mods.need_heart_modifiers,
+        );
+        let mut required: Acc = [0; 11];
+        if let Some(need) = need {
+            acc_add(&mut required, &need.hearts);
+        }
+        let deterministic = requirements_met(&pool_board, &required);
+        if deterministic {
+            passable_count += 1;
+            best_live_prob = 1.0;
+            continue;
+        }
+        let mut shortfall = 0i32;
+        for color in 1..=6 {
+            shortfall += (required[color] - pool_board[color]).max(0);
+        }
+        if required[0] > 0 {
+            shortfall += required[0];
+        }
+        let probability = strategy_v5::binom_ge(blades, shortfall, density) as f32;
+        best_live_prob = best_live_prob.max(probability);
+    }
+    out[6] = live_count as f32 / 8.0;
+    out[11] = best_live_prob;
+    out[12] = max_live_score as f32 / 10.0;
+    out[29] = passable_count as f32 / 8.0;
+    let mut hand_reserve = 0i32;
+    for &card_id in &me.hand.cards {
+        if let Some(card) = db.get_card(card_id) {
+            if card.card_type == CardType::Member {
+                let hearts = card
+                    .base_heart
+                    .as_ref()
+                    .map(|heart| heart.hearts.values_sum())
+                    .unwrap_or(0);
+                hand_reserve += 2 * i32::from(card.cost.unwrap_or(0))
+                    + 2 * i32::from(card.blade)
+                    + i32::from(hearts);
+            }
+        }
+    }
+    out[30] = hand_reserve as f32 / 100.0;
+    out
 }
 
 fn pending_choice_features(state: &GameState) -> (Option<&'static str>, usize, bool) {
@@ -558,6 +670,8 @@ impl PublicObservation {
         } else {
             Vec::new()
         };
+        let mut public_math = math_features(state, perspective_player);
+        public_math[31] = if pending_choice_for_viewer { 1.0 } else { 0.0 };
 
         Self {
             me,
@@ -587,6 +701,7 @@ impl PublicObservation {
             ability_queue_current_card,
             ability_queue_current_ability,
             ability_queue_current_trigger,
+            math_features: public_math,
             resolution_zone,
         }
     }
@@ -613,6 +728,9 @@ impl Hash for PublicObservation {
         self.ability_queue_current_card.hash(state);
         self.ability_queue_current_ability.hash(state);
         self.ability_queue_current_trigger.hash(state);
+        for value in self.math_features {
+            value.to_bits().hash(state);
+        }
         self.resolution_zone.hash(state);
         hash_view(&self.me, state);
         hash_view(&self.opp, state);

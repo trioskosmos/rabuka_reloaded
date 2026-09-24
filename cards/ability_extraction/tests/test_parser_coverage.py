@@ -249,6 +249,20 @@ def test_stage_member_without_blade_heart_keeps_stage_subject():
     assert condition.get("negation") is True, condition
 
 
+def test_score_threshold_exact_preserves_value():
+    condition = parse_condition("このカードのスコアが３の場合")
+    assert condition.get("type") == "comparison_condition", condition
+    assert condition.get("comparison_type") == "score", condition
+    assert condition.get("operator") == "=", condition
+    assert condition.get("count") == 3, condition
+
+
+def test_score_alternate_values_are_not_treated_as_one_threshold():
+    condition = parse_condition("スコアが1か5の場合")
+    assert condition.get("values") == [1, 5], condition
+    assert "count" not in condition, condition
+
+
 # ─── run all ──────────────────────────────────────────────────────────────────
 
 tests = {

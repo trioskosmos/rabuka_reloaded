@@ -60,7 +60,7 @@ _has_pending_choice asserted without choice identity (pending_choice_type/summar
 | --- | --- | --- | --- |
 | `engine/tests/test_modules/effects/compound/discard_two_self_and_other_group_debut_retrigger_test.rs` | `discard_two_debut_retrigger_offers_count_two_selection` | 47 |  |
 
-## similar_cards (26)
+## similar_cards (27)
 
 _confusable card numbers (bp2 vs pb2) staged in one file — human review for wrong-card staging_
 
@@ -75,6 +75,7 @@ _confusable card numbers (bp2 vs pb2) staged in one file — human review for wr
 | `engine/tests/test_modules/effects/energy/under_member/energy_and_member_under_test.rs` | `<file>` | 1 | PL!N-bp3-013-N, PL!N-bp5-013-N |
 | `engine/tests/test_modules/effects/gain/blades/mymai_tonight_test.rs` | `<file>` | 1 | PL!S-bp2-023-L, PL!S-bp5-023-L |
 | `engine/tests/test_modules/effects/gain/hearts/live_zone_heart04_threshold_pl_s_bp5_013_n_test.rs` | `<file>` | 1 | PL!S-bp2-020-L, PL!S-bp3-020-L |
+| `engine/tests/test_modules/effects/live_start/dazzling_game_test.rs` | `<file>` | 1 | PL!S-PR-015-PR, PL!S-bp2-015-PR |
 | `engine/tests/test_modules/effects/look_select/niche_filters/all_or_any_three_heart_member_search_test.rs` | `<file>` | 1 | PL!S-PR-015-PR, PL!S-bp2-015-PR |
 | `engine/tests/test_modules/effects/look_select/reveal_to_hand/distortion_need_hearts_test.rs` | `<file>` | 1 | PL!SP-bp1-012-N, PL!SP-bp4-012-N |
 | `engine/tests/test_modules/effects/look_select/reveal_to_hand/eli_bp5_cost9_search_test.rs` | `<file>` | 1 | PL!-bp3-002-R, PL!-bp5-002-R |

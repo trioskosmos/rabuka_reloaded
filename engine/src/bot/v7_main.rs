@@ -92,6 +92,24 @@ fn member_reserve(gs: &GameState, me: u8, id: i16) -> f64 {
     (2.0 * cost as f64 + 2.0 * card.blade as f64 + hearts as f64) / (1.0 + delay)
 }
 
+fn future_development(gs: &GameState, me: u8) -> f64 {
+    let p = gs.seat_player(me);
+    let db = &gs.card_database;
+    let budget = usize::from(p.energy_zone.active_count()) + 1;
+    let stage_discount = p.stage.stage.iter()
+        .filter_map(|&cid| db.get_card(cid))
+        .filter_map(|card| card.cost)
+        .max()
+        .unwrap_or(0) as usize;
+    p.hand.cards.iter()
+        .filter_map(|&cid| db.get_card(cid))
+        .filter(|card| card.card_type == CardType::Member)
+        .filter_map(|card| card.cost)
+        .filter(|&cost| usize::from(cost) <= budget + stage_discount)
+        .map(|cost| cost as f64)
+        .fold(0.0, f64::max)
+}
+
 #[derive(Clone)]
 struct Features {
     hearts: i32,
@@ -102,6 +120,7 @@ struct Features {
     hand: usize,
     energy: usize,
     reserve: f64,
+    future: f64,
     success: usize,
 }
 
@@ -146,6 +165,7 @@ fn features(gs: &GameState, me: u8) -> Features {
         blades, cost, ammo, coverage, hand: p.hand.cards.len(),
         energy: usize::from(p.energy_zone.active_count()),
         reserve: reserves.iter().take(2).sum(),
+        future: future_development(gs, me),
         success: p.success_live_card_zone.cards.len(),
     }
 }
@@ -168,6 +188,16 @@ fn value(now: &Features, base: &Features, deploy: bool) -> f64 {
         score += 2.0 * (now.energy as f64 - base.energy as f64)
             + 3.0 * (now.hand as f64 - base.hand as f64)
             + 0.5 * (now.reserve - base.reserve);
+    }
+    let future_enabled = std::env::var_os("V7_FUTURE").is_none()
+        || std::env::var("V7_FUTURE").ok().as_deref() == Some("1");
+    let future_weight: f64 = std::env::var("V7_FUTURE_WEIGHT")
+        .ok()
+        .and_then(|value| value.parse().ok())
+        .filter(|value: &f64| value.is_finite() && *value >= 0.0)
+        .unwrap_or(2.0);
+    if future_enabled {
+        score += (now.future - base.future) * future_weight;
     }
     if now.ammo == 0 && base.ammo > 0 { score -= 120.0; }
     if now.hand <= 1 && base.hand > 1 { score -= 60.0; }

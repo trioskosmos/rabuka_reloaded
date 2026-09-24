@@ -333,29 +333,12 @@ Version history:
   7.6%→0.8%, median game length ~5.8 turns. v6 still uses ONLY fair
   information (own hand/deck + opponent public board via `estimate_opp_score`).
    Do-nothing root cause and the exact mechanism are documented in §8.5.
-- **v7** `strategy_v7.rs` — **v6 alias; does NOT improve on v6** (2026-08-27).
-  Two intuitive improvements were attempted and both regressed against v6 in
-  cross-deck arena:
-  1. *Aggressive match-point live set* (lower binomial floors + mandatory 1-life
-     attempt at match point) — on `fade deck` v7 fell to **70–100 vs v6**
-     (v6 was 142–39 vs v5), stalls rising 17→24. Every all-or-nothing failure
-     *wastes a life* without placing; lives are not infinitely recycled mid-game
-     (refresh only fires on deck-out, which these games never reach). Forcing
-     attempts just depleted ammo → more stalls. Re-confirms the V3_WHY_IT_SUCKS
-     correction: "folding is usually worse than swinging" is **false** when ammo
-     is effectively finite.
-  2. *Color-aware Main development* (bonus for playing members whose `base_heart`
-     colors match our own hand lives' `need_heart`) — v7 then lost to v6 on 6 of
-     8 decks (liella 58–84, fade 47–81, muse 59–78, aqours 60–68, 5CP3Z 64–79…)
-     and only won on hasunosora. Steering development toward *specific* life
-     colors trades board power for a false target — what the yell needs is total
-     hearts+blades, because flips supply the needed colors stochastically.
-  **Conclusion: v6 is at a heuristic plateau.** Marginal term surgery does not
-  move win rate, and aggressive variants actively hurt. v7 is therefore kept as a
-  v6 alias so it never regresses. The genuine path to >v6 is the *structural*
-  fix the doc prescribes: simulation/ISMCTS-backed live-set (and main) decisions
-  via the existing `ismcts.rs` + `DeterminizationSampler` + `PublicObservation`
-  infrastructure — not more scalar terms (see §8 / §10).
+- **v7** `strategy_v7.rs` — current strongest bot. The default path uses
+  `v7_main` for buff-aware, bounded Main-phase search and a sampled
+  per-color live-set model with public-ceiling handling. The v7 Main value
+  now also preserves the next reachable high-cost member after the current
+  action, addressing the guide's 4→9→13 development ladder without a flat
+  baton bonus.
 
 ## 8. POST-MORTEM 2026-08-22 — why it looked terrible and what was fixed
 
@@ -689,7 +672,26 @@ class A. Remaining hole in the same game: t5 generated **zero** member plays
 (hand=8, en=8) — likely live-set junk-discard of members (8.3.4), not scorer;
 re-check if empty mains stay ≥15% after this fix.
 
-### Process (measured, for reproduction)
+### D2c. Future development reachability (implemented 2026-09-24)
+`v7_main` now includes the highest-cost hand member reachable next turn after
+applying the current stage's baton discount. This is a trajectory feature, not
+a flat baton bonus, so it rewards preserving the next ladder step while avoiding
+the measured over-dump regression. The default weight is 2.0 after ablation;
+`V7_FUTURE=0` disables the feature and `V7_FUTURE_WEIGHT` controls its weight.
+Untraced `5CP3Z idou`, 3000 games per seed, v7 vs v6: weight 1.0 scored
+1555–1259 on seed 11 and 1554–1260 on seed 12; weight 2.0 scored 1567–1242
+on seed 11 and 1567–1242 on seed 12. The combined strict-close experiment
+below scored 1573–1252 on seed 11 and 1585–1235 on seed 12. Empty Main phases
+stayed near 10.7% and live-set folds stayed near 0.4%.
+
+### D3b. Strict two-success closeout (implemented 2026-09-24)
+When v7 already has two successes, a tied comparison cannot place another card.
+The default experiment now avoids a portfolio whose projected score is not
+strictly above the public opponent ceiling when a safer single passer exists.
+This is controlled by `V7_NO_STRICT_CLOSE=1`; `V7_PRE_D=1` disables it. It is
+not a general comparison-probability model yet, but it captures the highest-value
+rule that scalar pass floors previously missed.
+
 - Loss clusters: `python tools/analysis/analyze_losses.py <audit.jsonl> --examples N`
 - Decision tables: `$env:V7_DEBUG='1'` (stderr tables; UNTRACED runs only)
 - Baton visibility: `python tools/analysis/count_batons.py <audit.jsonl>`
@@ -704,13 +706,15 @@ re-check if empty mains stay ≥15% after this fix.
 - Ablation env gates (v7): `V7_PRE_D=1` (all old behavior), `V7_NO_BATON`,
   `V7_NO_CEILING`, `V7_PURE_JUNK`, `V7_BATON_FLAT=1` (repro old +45),
   `V7_D2B=1` (re-enable D2b), `V7_NODES` (search budget, default 64),
-  `V7_DEV_WEIGHT` (stage-cost weight, default 8.0).
+  `V7_DEV_WEIGHT` (stage-cost weight, default 8.0), `V7_FUTURE=0`,
+  `V7_FUTURE_WEIGHT` (trajectory weight, default 2.0), `V7_NO_STRICT_CLOSE=1`.
 
 ## 10. OPEN FIX ORDER (testable via bot_arena, untraced)
 
 1. Root-cause §8.4 allocation-layout sensitivity (poisons all measurement).
-2. Tie-value table in L3/L4: explicit tie scoring (win ≤1 success, loss at 2,
-   suicide at 2-2) instead of floor approximations.
+2. Tie-value table in L3/L4: expand the implemented two-success rule into a
+   full comparison model (win ≤1 success, loss at 2, suicide at 2-2) instead
+   of floor approximations.
 3. ~~M2: main-phase eval undervalues 起動 engines~~ — v6 now values any
    value>0 main action (including UseAbility/baton) above Pass, so activation
    engines are no longer pruned by acquisition deltas. (Do-nothing Main-phase

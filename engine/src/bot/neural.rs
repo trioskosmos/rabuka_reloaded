@@ -254,6 +254,10 @@ impl PolicyNet {
         globals[65] = obs
             .ability_queue_current_ability
             .map_or(0.0, |value| value as f32 / 8.0);
+        let math_base = GLOBAL_FEATURES - crate::bot::observation::MATH_FEATURES;
+        for (index, value) in obs.math_features.iter().enumerate() {
+            globals[math_base + index] = *value;
+        }
 
         EncodedState {
             my_hand: sum_embeds(&obs.me.hand),

@@ -994,7 +994,7 @@ static int eval_temporal(const struct GameState *g, int actor, int host_cid, con
     int tn=0;
     if (get_i(c,"turn_number",&tn)) {
         const char *op = get_str(c,"operator");
-        return eval_operator(g->turn, op, tn);
+        if (!eval_operator(g->turn, op, tn)) return 0;
     }
     /* phase gate */
     const char *phase = get_str(c,"phase");

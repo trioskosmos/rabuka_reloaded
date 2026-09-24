@@ -10,6 +10,9 @@
 /// Q232: +1 score modifies TOTAL, not the base card score.
 ///   Total scoring = base(2) + modifier(1) = 3, but card.score stays 2.
 use crate::helpers::*;
+use rabuka_engine::core::card::{BaseHeart, HeartColor, HeartMap};
+use rabuka_engine::game_state::Phase;
+use rabuka_engine::turn::TurnEngine;
 
 fn advance_to_live_card_set_p1(game: &mut TestGame) {
     for _ in 0..5 {
@@ -127,4 +130,46 @@ fn tokimeki_q232_modifier_separate_from_base_score() {
         1,
         "Q232: All 6 colors → Modifier +1 applied"
     );
+}
+
+fn setup_tokimeki_live_success(game: &mut TestGame, score_modifier: i16) -> (i16, i16) {
+    let live = game.new_id("PL!N-bp5-026-L");
+    let recoverable = game.new_id("PL!N-bp1-001-R");
+    let mut stage_hearts = BaseHeart {
+        hearts: HeartMap::new(),
+    };
+    stage_hearts.hearts.insert(HeartColor::Heart03, 2);
+    stage_hearts.hearts.insert(HeartColor::Heart00, 4);
+    game.state.player1.stage_hearts = Some(stage_hearts);
+    game.state.player1.live_card_zone.cards.push(live);
+    game.state.player1.waitroom.cards.push(recoverable);
+    game.state.mods.set_score_modifier(live, score_modifier);
+    game.state.current_phase = Phase::LiveVictoryDetermination;
+    (live, recoverable)
+}
+
+#[test]
+fn tokimeki_live_success_score_three_recovers_nijigasaki_card() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let (_, recoverable) = setup_tokimeki_live_success(&mut game, 1);
+
+    TurnEngine::trigger_live_success_abilities(&mut game.state, "p1");
+    game.state.process_pending_auto_abilities("p1");
+
+    assert!(game.state.player1.hand.cards.contains(&recoverable));
+    assert!(!game.state.player1.waitroom.cards.contains(&recoverable));
+}
+
+#[test]
+fn tokimeki_live_success_score_two_does_not_recover_card() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let (_, recoverable) = setup_tokimeki_live_success(&mut game, 0);
+
+    TurnEngine::trigger_live_success_abilities(&mut game.state, "p1");
+    game.state.process_pending_auto_abilities("p1");
+
+    assert!(!game.state.player1.hand.cards.contains(&recoverable));
+    assert!(game.state.player1.waitroom.cards.contains(&recoverable));
 }

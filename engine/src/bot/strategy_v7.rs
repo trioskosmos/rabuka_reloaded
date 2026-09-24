@@ -1008,6 +1008,29 @@ fn choose_live_set_experiment(gs: &GameState, actions: &[Action], db: &CardDatab
                 }
             }
         }
+        if !chose_single
+            && my_succ >= 2
+            && std::env::var_os("V7_NO_STRICT_CLOSE").is_none()
+            && std::env::var_os("V7_PRE_D").is_none()
+        {
+            let e_opp = crate::bot::strategy_v5::estimate_opp_score(gs, me, db);
+            let best_score = ranked.first().map(|(_, score, _)| *score).unwrap_or(0);
+            if best_score <= e_opp {
+                if let Some(&(_, _, first_hi, _)) = singles.first().filter(|s| s.0 >= floor) {
+                    desired.push(first_hi);
+                    chose_single = true;
+                    log::debug!(
+                        "v7 strict-close t{} me{} e_opp={} best={} hi={} p={:.2}",
+                        gs.turn_number,
+                        me,
+                        e_opp,
+                        best_score,
+                        first_hi,
+                        singles.first().map(|s| s.0).unwrap_or(0.0)
+                    );
+                }
+            }
+        }
         if !chose_single {
             if let Some((_, _, idxs)) = ranked.first() {
                 desired = idxs.clone();

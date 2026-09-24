@@ -414,7 +414,8 @@ fn choose_policy_action(
     let me = u8::from(decision_player(gs).id != gs.player1.id);
     let kind = kinds[me as usize];
     let plan = plans[me as usize];
-    if kind == BotKind::Neural {
+    let setup_kind = if kind == BotKind::Neural { BotKind::V7 } else { kind };
+    if kind == BotKind::Neural && policy_route(gs) == PolicyRoute::Action {
         let Some(network) = neural else {
             return actions.first().cloned().unwrap_or(game_setup::Action {
                 description: "pass".into(),
@@ -447,9 +448,9 @@ fn choose_policy_action(
         return actions[index].clone();
     }
     match policy_route(gs) {
-        PolicyRoute::Mulligan => policy_call(|| kind.choose_mulligan(gs, actions, &gs.card_database)),
+        PolicyRoute::Mulligan => policy_call(|| setup_kind.choose_mulligan(gs, actions, &gs.card_database)),
         _ if kind == BotKind::Random => actions[rng.range(actions.len())].clone(),
-        PolicyRoute::LiveSet => policy_call(|| kind.choose_live_set(gs, actions, &gs.card_database, v2_policy, plan)),
+        PolicyRoute::LiveSet => policy_call(|| setup_kind.choose_live_set(gs, actions, &gs.card_database, v2_policy, plan)),
         PolicyRoute::Action => policy_call(|| kind.choose_action(gs, actions, me, v2_policy, plan)),
     }
 }

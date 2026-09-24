@@ -1,9 +1,11 @@
 #include "web_server.h"
+#include "deck_parser.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
 #include <stdarg.h>
+#include <ctype.h>
 #include <errno.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -50,6 +52,7 @@ typedef struct {
     int deck_count[2];
     int version;
     int initialized;
+    int deck_ready[2];
 } Sandbox;
 
 static void buffer_free(Buffer *b) { free(b->data); b->data = NULL; b->len = b->cap = 0; }
@@ -83,6 +86,30 @@ static void json_string(Buffer *b, const char *s) {
     }
     buffer_put(b, "\"");
 }
+static int find_card_for_deck(const char *card_no) {
+    int direct = rb_find_card_by_no(card_no);
+    if (direct >= 0) return direct;
+    for (uint32_t i = 0; i < rb_num_cards(); i++) {
+        Card c;
+        memset(&c, 0, sizeof(c));
+        if (!rb_decode_card_by_index(i, &c)) continue;
+        const char *candidate = rb_card_string(c.card_no_idx);
+        const unsigned char *a = (const unsigned char *)card_no;
+        const unsigned char *b = (const unsigned char *)candidate;
+        size_t remaining = strlen(card_no);
+        int match = 1;
+        while (remaining > 0) {
+            if (*a == '+' && b[0] == 0xef && b[1] == 0xbc && b[2] == 0x9b) { a++; b += 3; remaining--; continue; }
+            if (*b == '+' && a[0] == 0xef && a[1] == 0xbc && a[2] == 0x9b) { b++; a += 3; remaining -= 3; continue; }
+            if (!*b || tolower(*a) != tolower(*b)) { match = 0; break; }
+            a++; b++; remaining--;
+        }
+        rb_free_card(&c);
+        if (match) return (int)i;
+    }
+    return -1;
+}
+
 static const char *phase_name(const GameState *g) { return rb_phase_name((int)g->phase); }
 
 static void append_card(Buffer *b, int cid, const char *orientation) {
@@ -144,30 +171,168 @@ static void make_test_deck(Sandbox *s) {
     memset(s->deck, 0, sizeof(s->deck)); s->deck_count[0] = s->deck_count[1] = 0;
     for (uint32_t i = 0; i < rb_num_cards() && s->deck_count[0] < 40; i++) if (rb_card_ability_idx(i) != 0xFFFF) s->deck[0][s->deck_count[0]++] = i;
     for (uint32_t i = 0; i < rb_num_cards() && s->deck_count[1] < 40; i++) if (rb_card_ability_idx(i) != 0xFFFF) s->deck[1][s->deck_count[1]++] = i;
-    rb_seed(0xCAFE); memset(&s->state, 0, sizeof(s->state)); rb_game_init(&s->state, s->deck[0], s->deck_count[0], s->deck[1], s->deck_count[1]); s->initialized = 1; s->version++;
+    rb_seed(0xCAFE); memset(&s->state, 0, sizeof(s->state)); rb_game_init(&s->state, s->deck[0], s->deck_count[0], s->deck[1], s->deck_count[1]); s->initialized = 1; s->deck_ready[0] = s->deck_ready[1] = 1; s->version++;
 }
 static void set_deck(Sandbox *s, const char *body, int player) {
     if (player < 0 || player > 1) return;
     s->deck_count[player] = 0;
     const char *p = json_value(body, "deck"); if (!p) return; p = strchr(p, '['); if (!p) return;
+    fprintf(stderr, "[SET_DECK] player=%d body=%s\n", player, body);
     p++; char card[128];
     while (s->deck_count[player] < RB_MAX_DECK && *p && *p != ']') {
         while (*p == ' ' || *p == ',' || *p == '\n' || *p == '\r' || *p == '\t') p++;
-        if (*p == '"') { p++; size_t n = 0; while (*p && *p != '"' && n + 1 < sizeof(card)) card[n++] = *p++; card[n] = 0; if (*p == '"') p++; int idx = rb_find_card_by_no(card); if (idx >= 0) s->deck[player][s->deck_count[player]++] = (uint32_t)idx; }
+        if (*p == '"') { p++; size_t n = 0; while (*p && *p != '"' && n + 1 < sizeof(card)) card[n++] = *p++; card[n] = 0; if (*p == '"') p++; int idx = find_card_for_deck(card); fprintf(stderr, "[SET_DECK] card=%s idx=%d\n", card, idx); if (idx >= 0) s->deck[player][s->deck_count[player]++] = (uint32_t)idx; }
         while (*p && *p != ',' && *p != ']') p++;
     }
+    s->deck_ready[player] = s->deck_count[player] > 0;
 }
+static int read_text_file(const char *path, char **out, size_t *out_len) {
+    FILE *f = fopen(path, "rb"); long size;
+    if (!f) return 0;
+    if (fseek(f, 0, SEEK_END) != 0) { fclose(f); return 0; }
+    size = ftell(f);
+    if (size < 0 || fseek(f, 0, SEEK_SET) != 0) { fclose(f); return 0; }
+    *out = (char *)malloc((size_t)size + 1u);
+    if (!*out) { fclose(f); return 0; }
+    *out_len = fread(*out, 1, (size_t)size, f);
+    (*out)[*out_len] = '\0';
+    fclose(f);
+    return 1;
+}
+
+static void append_preset_card(Buffer *b, int *first, const char *card_no) {
+    if (!*first) buffer_put(b, ",");
+    *first = 0;
+    json_string(b, card_no);
+}
+
+static int preset_card(const char *line, char *card_no, int *qty) {
+    const char *marker;
+    const char *start = line;
+    size_t n;
+    while (*start == ' ' || *start == '\t') start++;
+    if (!*start || *start == '#') return 0;
+    if (*start >= '0' && *start <= '9') {
+        char *end = NULL;
+        long count = strtol(start, &end, 10);
+        if (end && (*end == ' ' || *end == '\t') && end[1] == 'x' && (end[2] == ' ' || end[2] == '\t')) {
+            start = end + 3;
+            while (*start == ' ' || *start == '\t') start++;
+            if (count <= 0) return 0;
+            n = strlen(start);
+            if (n == 0 || n >= 128) return 0;
+            memcpy(card_no, start, n + 1);
+            *qty = (int)count;
+            return 1;
+        }
+    }
+    marker = strstr(start, " x ");
+    if (marker) {
+        n = (size_t)(marker - start);
+        if (n == 0 || n >= 128) return 0;
+        memcpy(card_no, start, n);
+        card_no[n] = '\0';
+        *qty = atoi(marker + 3);
+    } else {
+        n = strlen(start);
+        if (n == 0 || n >= 128) return 0;
+        memcpy(card_no, start, n + 1);
+        *qty = 1;
+    }
+    return *qty > 0;
+}
+
+static void append_deck_file_content(Buffer *b, const char *web_root, const char *filename) {
+    char path[1024];
+    RbDeckList deck;
+    int first = 1;
+    snprintf(path, sizeof(path), "%s/decks/%s", web_root, filename);
+    if (rb_parse_deck_file(path, &deck) != 0) return;
+    for (size_t i = 0; i < deck.count; i++) {
+        for (int copy = 0; copy < deck.entries[i].quantity; copy++) {
+            append_preset_card(b, &first, deck.entries[i].card_no);
+        }
+    }
+    rb_deck_list_free(&deck);
+}
+
+static void append_deck_presets(Buffer *b, const char *web_root) {
+    static const char *files[] = {
+        "nijigaku_cup.txt", "muse_cup.txt", "liella_cup.txt", "hasunosora_cup.txt",
+        "fade deck.txt", "bp7_unique_abilities.txt", "bp7_abilities_PL!SP.txt",
+        "bp7_abilities_PL!S.txt", "bp7_abilities_PL!N.txt", "aqours_cup.txt",
+        "aiscream 37PMZ.txt", "5ZNN5 sakkakubibi.txt", "5CP3Z idou.txt"
+    };
+    char path[1024];
+    int first_preset = 1;
+    buffer_put(b, "\"decks\":[");
+    for (size_t fi = 0; fi < sizeof(files) / sizeof(files[0]); fi++) {
+        char *content;
+        size_t content_len;
+        char *line;
+        char id[128];
+        int first_main = 1;
+        int first_energy = 1;
+        int count = 0;
+        snprintf(path, sizeof(path), "%s/decks/%s", web_root, files[fi]);
+        if (!read_text_file(path, &content, &content_len)) continue;
+        snprintf(id, sizeof(id), "%s", files[fi]);
+        size_t id_len = strlen(id);
+        if (id_len > 4 && strcmp(id + id_len - 4, ".txt") == 0) id[id_len - 4] = '\0';
+        if (!first_preset) buffer_put(b, ",");
+        first_preset = 0;
+        buffer_put(b, "{\"id\":");
+        json_string(b, id);
+        buffer_put(b, ",\"name\":");
+        json_string(b, id);
+        buffer_put(b, ",\"main\":[");
+        for (line = strtok(content, "\r\n"); line; line = strtok(NULL, "\r\n")) {
+            char card_no[128];
+            int qty;
+            if (!preset_card(line, card_no, &qty)) continue;
+            for (int i = 0; i < qty; i++) {
+                append_preset_card(b, &first_main, card_no);
+                count++;
+            }
+        }
+        buffer_put(b, "],\"energy\":[");
+        content[0] = '\0';
+        {
+            FILE *f = fopen(path, "rb");
+            if (f) {
+                size_t n = fread(content, 1, content_len, f);
+                content[n] = '\0';
+                fclose(f);
+            }
+        }
+        first_main = first_energy = 1;
+        for (line = strtok(content, "\r\n"); line; line = strtok(NULL, "\r\n")) {
+            char card_no[128];
+            int qty;
+            if (!preset_card(line, card_no, &qty)) continue;
+            if (!strstr(card_no, "-PE") && !strstr(card_no, "-E")) continue;
+            for (int i = 0; i < qty; i++) append_preset_card(b, &first_energy, card_no);
+        }
+        buffer_put(b, "],\"card_count\":");
+        char count_text[32];
+        snprintf(count_text, sizeof(count_text), "%d}", count);
+        buffer_put(b, count_text);
+        free(content);
+    }
+    buffer_put(b, "]");
+}
+
 static void handle_request(Sandbox *s, int fd, HttpRequest *r, const char *web_root) {
     char method[16] = {0}, path[256] = {0}; const char *line = strstr(r->request, "\r\n");
     if (line) { size_t n = (size_t)(line - r->request); char *sp = memchr(r->request, ' ', n); if (sp) { sscanf(r->request, "%15s %255s", method, path); } }
     while (path[0] == '/') memmove(path, path + 1, strlen(path));
-    if (!strcmp(path, "api/status")) { send_json(fd, 200, "{\"status\":\"rust_server\",\"members\":2000,\"lives\":0,\"instance_id\":\"c-web-single-room\"}"); return; }
-    if (!strcmp(path, "api/rooms/create")) { send_json(fd, 200, "{\"success\":true,\"room_id\":\"SANDBX\",\"session\":{\"token\":\"sandbox\",\"player_id\":0}}"); return; }
+    if (!strcmp(path, "api/status")) { char status[192]; snprintf(status, sizeof(status), "{\"status\":\"c_server\",\"cards\":%u,\"niji\":%d,\"instance_id\":\"c-web-single-room\"}", rb_num_cards(), rb_find_card_by_no("PL!N-bp1-026-L")); send_json(fd, 200, status); return; }
+    if (!strcmp(path, "api/rooms/create")) { s->deck_count[0] = s->deck_count[1] = 0; s->deck_ready[0] = s->deck_ready[1] = 0; send_json(fd, 200, "{\"success\":true,\"room_id\":\"SANDBX\",\"session\":{\"token\":\"sandbox\",\"player_id\":0}}"); return; }
     if (!strcmp(path, "api/rooms/list")) { send_json(fd, 200, "{\"rooms\":[{\"room_id\":\"SANDBX\",\"mode\":\"sandbox\",\"players\":1}]}"); return; }
     if (!strcmp(path, "api/rooms/join") || !strcmp(path, "api/rooms/leave")) { send_json(fd, 200, "{\"success\":true,\"room_id\":\"SANDBX\"}"); return; }
-    if (!strcmp(path, "api/get_decks")) { send_json(fd, 200, "{\"success\":true,\"decks\":[{\"id\":\"test\",\"name\":\"Test Deck\",\"card_count\":40}]}"); return; }
-    if (!strcmp(path, "api/get_test_deck")) { Buffer b = {0}; buffer_put(&b, "{\"success\":true,\"content\":["); for (int i = 0; i < s->deck_count[0]; i++) { Card c; memset(&c, 0, sizeof(c)); if (rb_decode_card_by_index(s->deck[0][i], &c)) { if (i) buffer_put(&b, ","); json_string(&b, rb_card_string(c.card_no_idx)); rb_free_card(&c); } } buffer_put(&b, "]}"); send_json(fd, 200, b.data ? b.data : "{}"); buffer_free(&b); return; }
-    if (!strcmp(path, "api/set_deck") && !strcmp(method, "POST")) { set_deck(s, r->body, json_int(r->body, "player", 0)); send_json(fd, 200, "{\"success\":true}"); return; }
+    if (!strcmp(path, "api/get_decks")) { Buffer b = {0}; buffer_put(&b, "{\"success\":true,"); append_deck_presets(&b, web_root); buffer_put(&b, "}"); send_json(fd, 200, b.data ? b.data : "{}"); buffer_free(&b); return; }
+    if (!strcmp(path, "api/get_test_deck")) { Buffer b = {0}; buffer_put(&b, "{\"success\":true,\"content\":["); append_deck_file_content(&b, web_root, "nijigaku_cup.txt"); buffer_put(&b, "]}"); send_json(fd, 200, b.data ? b.data : "{}"); buffer_free(&b); return; }
+    if (!strcmp(path, "api/set_deck") && !strcmp(method, "POST")) { int player = json_int(r->body, "player", 0); set_deck(s, r->body, player); int room_init = s->deck_ready[0] && s->deck_ready[1]; if (room_init) { rb_seed(0xCAFE); memset(&s->state, 0, sizeof(s->state)); rb_game_init(&s->state, s->deck[0], s->deck_count[0], s->deck[1], s->deck_count[1]); s->initialized = 1; s->version++; } char response[160]; snprintf(response, sizeof(response), "{\"success\":true,\"room_init\":%s,\"p0_count\":%d,\"p1_count\":%d,\"body_len\":%d}", room_init ? "true" : "false", s->deck_count[0], s->deck_count[1], (int)r->body_len); send_json(fd, 200, response); return; }
     if (!strcmp(path, "api/init") && !strcmp(method, "POST")) { if (!s->initialized) make_test_deck(s); else { rb_seed(0xCAFE); memset(&s->state, 0, sizeof(s->state)); rb_game_init(&s->state, s->deck[0], s->deck_count[0], s->deck[1], s->deck_count[1]); s->version++; } Buffer b = {0}; serialize_state(s, &b); send_json(fd, 200, b.data ? b.data : "{}"); buffer_free(&b); return; }
     if (!strcmp(path, "api/game-state/version")) { char b[64]; snprintf(b, sizeof(b), "{\"version\":%d}", s->version); send_json(fd, 200, b); return; }
     if (!strcmp(path, "api/game-state")) { Buffer b = {0}; if (!s->initialized) make_test_deck(s); serialize_state(s, &b); send_json(fd, 200, b.data ? b.data : "{}"); buffer_free(&b); return; }

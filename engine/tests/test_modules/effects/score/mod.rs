@@ -2,13 +2,13 @@
 // Regenerated from the directory listing at compile time.
 pub mod angelic_angel_test;
 pub mod aqours_heart04_threshold_score_pl_s_pb1_020_l_test;
+pub mod aquarium_live_success_test;
 pub mod aurora_flower_identity_test;
 pub mod aurora_flower_test;
 pub mod awake_test;
 pub mod bp7_we_will_energy_score_test;
 pub mod chika_bp3_001_wait_self_activation_live_total_score_test;
 pub mod chisato_live_success_test;
-pub mod dazzling_test;
 pub mod distinct_waitroom_lives_pl_n_bp4_028_l_test;
 pub mod dream_with_you_test;
 pub mod energy_state_condition_test;
@@ -45,7 +45,7 @@ pub mod stellar_phoenix_test;
 pub mod strawberry_test;
 pub mod success_count_revealed_score_live_pl_sp_bp5_023_l_test;
 pub mod takaramono_test;
-pub mod tokimeki_test;
+pub mod tokimeki_runners_test;
 pub mod twelve_energy_pl_sp_pb1_002_r_test;
 pub mod vitamin_test;
 pub mod waited_members_pl_n_sd2_027_p_test;

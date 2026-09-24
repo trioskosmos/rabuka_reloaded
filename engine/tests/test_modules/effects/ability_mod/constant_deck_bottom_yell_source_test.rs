@@ -256,4 +256,3 @@ fn bottom_yell_source_in_success_zone_applies() {
         revealed
     );
 }
-

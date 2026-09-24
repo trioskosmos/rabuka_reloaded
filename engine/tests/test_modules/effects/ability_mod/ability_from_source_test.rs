@@ -4,11 +4,12 @@
 /// 常時: このメンバーは、このメンバーの下に置かれているコスト9以下の『虹ヶ咲』の
 /// メンバーカードが持つライブ成功時能力をすべて得る。
 ///
-/// NOTE: gained_abilities stores the triggerless_text of copied abilities, but the
-/// engine's auto-ability trigger pipeline does not currently read gained_abilities
-/// at runtime. These tests verify the COPYING MECHANISM (filtering, storage) works.
-/// Dynamic ability execution is a separate pending feature.
+/// NOTE: gained_abilities stores the triggerless_text of copied abilities, and
+/// the runtime LiveSuccess path is exercised below after the copying setup.
 use crate::helpers::*;
+use rabuka_engine::core::card::{BaseHeart, HeartColor, HeartMap};
+use rabuka_engine::game_state::Phase;
+use rabuka_engine::turn::TurnEngine;
 
 fn fill_decks(game: &mut TestGame, filler: i16) {
     game.state.player1.main_deck.cards.clear();
@@ -188,4 +189,63 @@ fn rina_copies_from_multiple_under_cards() {
             list.len()
         );
     }
+}
+
+fn setup_rina_live_success(game: &mut TestGame, p1_energy: usize, p2_energy: usize) -> (i16, i16) {
+    let rina = game.new_id("PL!N-PR-026-PR");
+    let ayumu = game.new_id("PL!N-bp4-001-R");
+    let live = game.new_id("PL!HS-bp1-019-L");
+    let filler = game.new_id("PL!-sd1-010-SD");
+    let energy = game.new_id("LL-E-001-SD");
+    let deck_energy = game.new_id("LL-E-001-SD");
+
+    game.state.player1.stage.stage = [rina, filler, -1];
+    game.state.player1.stage.under_cards[0].push(ayumu);
+    game.state.player1.energy_zone.cards.clear();
+    game.state.player2.energy_zone.cards.clear();
+    for _ in 0..p1_energy {
+        game.state.player1.energy_zone.push_active(energy);
+    }
+    for _ in 0..p2_energy {
+        game.state.player2.energy_zone.push_active(energy);
+    }
+    game.state.player1.energy_deck.cards.push(deck_energy);
+    game.state.player1.live_card_zone.cards.push(live);
+    let mut stage_hearts = BaseHeart {
+        hearts: HeartMap::new(),
+    };
+    stage_hearts.hearts.insert(HeartColor::Heart00, 4);
+    game.state.player1.stage_hearts = Some(stage_hearts);
+    game.state.current_phase = Phase::LiveVictoryDetermination;
+    game.state.recalculate_constants();
+    (rina, deck_energy)
+}
+
+#[test]
+fn rina_copied_live_success_ability_places_energy_from_energy_deck() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let (rina, energy) = setup_rina_live_success(&mut game, 0, 1);
+
+    assert!(game.state.gained_card_abilities.get(&rina).is_some());
+    TurnEngine::trigger_live_success_abilities(&mut game.state, "p1");
+    game.state.process_pending_auto_abilities("p1");
+
+    assert!(game.state.player1.energy_zone.cards.contains(&energy));
+    assert_eq!(game.state.player1.energy_zone.active_count(), 0);
+    assert!(!game.state.player1.energy_deck.cards.contains(&energy));
+}
+
+#[test]
+fn rina_copied_live_success_ability_does_nothing_without_energy_deficit() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let (rina, energy) = setup_rina_live_success(&mut game, 1, 0);
+
+    assert!(game.state.gained_card_abilities.get(&rina).is_some());
+    TurnEngine::trigger_live_success_abilities(&mut game.state, "p1");
+    game.state.process_pending_auto_abilities("p1");
+
+    assert!(game.state.player1.energy_deck.cards.contains(&energy));
+    assert_eq!(game.state.player1.energy_zone.active_count(), 1);
 }

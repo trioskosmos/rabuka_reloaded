@@ -10,6 +10,7 @@ pub mod deploy;
 pub mod draw;
 pub mod energy;
 pub mod gain;
+pub mod live_start;
 pub mod look_select;
 pub mod mill;
 pub mod other;

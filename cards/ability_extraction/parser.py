@@ -5044,6 +5044,14 @@ def _extract_comparison_fields(condition, text):
         if kw in text:
             condition["comparison_type"] = ct
             break
+    if condition.get("comparison_type") == "score":
+        score_text = normalize_fullwidth_digits(text)
+        score_match = re.search(r"スコア(?:が|は)\s*(\d+)", score_text)
+        if score_match:
+            suffix = score_text[score_match.end() :]
+            if not re.match(r"\s*(?:か|または|や|のいずれか)", suffix):
+                condition["count"] = int(score_match.group(1))
+                condition.setdefault("operator", "=")
     if "合計" in text:
         condition["aggregate"] = "total"
     if "自分と相手の" in text and "合計" in text and "同じ" in text:

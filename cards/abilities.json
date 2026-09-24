@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-09-24T08:46:01.390016",
+  "generated_at": "2026-09-24T20:14:59.558299",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "d5044f28",
+  "engine_commit": "62d469aa",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -29786,6 +29786,8 @@
         "condition": {
           "text": "このカードのスコアが3の場合",
           "comparison_type": "score",
+          "count": 3,
+          "operator": "=",
           "type": "comparison_condition"
         },
         "source": "discard",

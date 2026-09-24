@@ -8,8 +8,8 @@ pub const ACTION_TYPE_COUNT: usize = 25;
 pub const POSITION_FEATURES: usize = 4;
 pub const STAGE_ABILITY_FEATURES: usize = 13;
 pub const ACTION_EXTRA_FEATURES: usize = 9;
-pub const GLOBAL_FEATURES: usize = 66;
-pub const SCHEMA_VERSION: f32 = 4.0;
+pub const GLOBAL_FEATURES: usize = 98;
+pub const SCHEMA_VERSION: f32 = 5.0;
 pub const ACTION_ENC_DIM: usize = ACTION_TYPE_EMBED_DIM
     + CARD_EMBED_DIM
     + ZONE_EMBED_DIM
@@ -408,7 +408,7 @@ mod tests {
 
     #[test]
     fn state_dimension_matches_all_encoded_zones() {
-        assert_eq!(EncodedState::state_dim(), 2216);
+        assert_eq!(EncodedState::state_dim(), 2248);
     }
 
     #[test]

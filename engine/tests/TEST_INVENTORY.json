@@ -1,14 +1,14 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-09-24T00:34:04.645713+00:00",
+  "generated_at": "2026-09-24T10:09:18.463630+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
     "total_abilities": 2011,
     "unique_abilities": 936
   },
-  "n_files": 836,
-  "n_tests": 3442,
+  "n_files": 838,
+  "n_tests": 3451,
   "total_cards": 771,
   "covered_cards": 771,
   "abilities_on_covered": 936,
@@ -565,7 +565,7 @@
       ]
     },
     "similar_cards": {
-      "count": 26,
+      "count": 27,
       "rows": [
         {
           "file": "engine/tests/test_modules/characterization/bp7_character_name_condition_test.rs",
@@ -620,6 +620,12 @@
           "test": "<file>",
           "line": 1,
           "detail": "PL!S-bp2-020-L, PL!S-bp3-020-L"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/live_start/dazzling_game_test.rs",
+          "test": "<file>",
+          "line": 1,
+          "detail": "PL!S-PR-015-PR, PL!S-bp2-015-PR"
         },
         {
           "file": "engine/tests/test_modules/effects/look_select/niche_filters/all_or_any_three_heart_member_search_test.rs",
@@ -726,7 +732,7 @@
       ]
     }
   },
-  "n_test_fns_parsed": 3442,
+  "n_test_fns_parsed": 3451,
   "abilities": [
     {
       "idx": 0,
@@ -1000,7 +1006,7 @@
         "baton_leaves_stage_offers_own_and_opponent_position_change_q238",
         "bella_positive_surplus_heart04_ability_fires"
       ],
-      "covering_test_count": 334,
+      "covering_test_count": 335,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -5333,6 +5339,8 @@
         "riko_aqours_live_leaving_live_zone_offers_deck_placement",
         "riko_ignores_non_aqours_live_leaving_live_zone",
         "riko_responds_only_to_own_side_live_zone",
+        "rina_copied_live_success_ability_does_nothing_without_energy_deficit",
+        "rina_copied_live_success_ability_places_energy_from_energy_deck",
         "rina_copies_from_multiple_under_cards",
         "rina_gains_ability_from_under_member",
         "rina_no_under_cards",
@@ -5342,7 +5350,7 @@
         "two_dive_copies_only_the_moved_one_places",
         "wrong_target_retrieval_does_not_arm_dive"
       ],
-      "covering_test_count": 26,
+      "covering_test_count": 28,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -5399,6 +5407,8 @@
         "riko_aqours_live_leaving_live_zone_offers_deck_placement",
         "riko_ignores_non_aqours_live_leaving_live_zone",
         "riko_responds_only_to_own_side_live_zone",
+        "rina_copied_live_success_ability_does_nothing_without_energy_deficit",
+        "rina_copied_live_success_ability_places_energy_from_energy_deck",
         "rina_copies_from_multiple_under_cards",
         "rina_gains_ability_from_under_member",
         "rina_no_under_cards",
@@ -5408,7 +5418,7 @@
         "two_dive_copies_only_the_moved_one_places",
         "wrong_target_retrieval_does_not_arm_dive"
       ],
-      "covering_test_count": 26,
+      "covering_test_count": 28,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -5465,6 +5475,8 @@
         "riko_aqours_live_leaving_live_zone_offers_deck_placement",
         "riko_ignores_non_aqours_live_leaving_live_zone",
         "riko_responds_only_to_own_side_live_zone",
+        "rina_copied_live_success_ability_does_nothing_without_energy_deficit",
+        "rina_copied_live_success_ability_places_energy_from_energy_deck",
         "rina_copies_from_multiple_under_cards",
         "rina_gains_ability_from_under_member",
         "rina_no_under_cards",
@@ -5474,7 +5486,7 @@
         "two_dive_copies_only_the_moved_one_places",
         "wrong_target_retrieval_does_not_arm_dive"
       ],
-      "covering_test_count": 26,
+      "covering_test_count": 28,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -10836,10 +10848,10 @@
         "engine/tests/test_modules/effects/conditional/sp_bp2_004_highest_cost_edge_test.rs",
         "engine/tests/test_modules/effects/gain/hearts/center_highest_cost_constant_heart03_test.rs",
         "engine/tests/test_modules/effects/gain/hearts/center_highest_cost_heart03_edges_test.rs",
+        "engine/tests/test_modules/effects/live_start/dazzling_game_test.rs",
         "engine/tests/test_modules/effects/look_select/reveal_to_hand/revealed_distinct_liella_live_retrieval_test.rs",
         "engine/tests/test_modules/effects/recover/to_hand/kanon_test.rs",
         "engine/tests/test_modules/effects/recover/to_hand/self_to_waitroom_liella_recovery_test.rs",
-        "engine/tests/test_modules/effects/score/dazzling_test.rs",
         "engine/tests/test_modules/effects/score/nonfiction_cost_comparison_test.rs",
         "engine/tests/test_modules/effects/score/revealed_distinct_liella_score_test.rs",
         "engine/tests/test_modules/effects/state/bp7_q266_natsumi_blade_wait_test.rs",
@@ -10871,13 +10883,13 @@
         "chisato_003_rotation_full_stage",
         "chisato_003_rotation_partial_stage",
         "chisato_003_rotation_single_member",
+        "dazzling_live_start_leaves_draw_and_colorless_icons_unchanged",
+        "dazzling_live_start_recolors_listed_blade_hearts_to_purple",
         "dazzling_q187_exclude_selected_liella_other_pickable",
         "empty_center_with_lone_member_grants_no_heart",
-        "empty_center_with_two_side_members_grants_no_heart",
-        "genki_5_heart02_not_invalidate",
-        "genki_exactly_6_invalidates"
+        "empty_center_with_two_side_members_grants_no_heart"
       ],
-      "covering_test_count": 120,
+      "covering_test_count": 122,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -10913,10 +10925,10 @@
         "engine/tests/test_modules/effects/conditional/sp_bp2_004_highest_cost_edge_test.rs",
         "engine/tests/test_modules/effects/gain/hearts/center_highest_cost_constant_heart03_test.rs",
         "engine/tests/test_modules/effects/gain/hearts/center_highest_cost_heart03_edges_test.rs",
+        "engine/tests/test_modules/effects/live_start/dazzling_game_test.rs",
         "engine/tests/test_modules/effects/look_select/reveal_to_hand/revealed_distinct_liella_live_retrieval_test.rs",
         "engine/tests/test_modules/effects/recover/to_hand/kanon_test.rs",
         "engine/tests/test_modules/effects/recover/to_hand/self_to_waitroom_liella_recovery_test.rs",
-        "engine/tests/test_modules/effects/score/dazzling_test.rs",
         "engine/tests/test_modules/effects/score/nonfiction_cost_comparison_test.rs",
         "engine/tests/test_modules/effects/score/revealed_distinct_liella_score_test.rs",
         "engine/tests/test_modules/effects/state/bp7_q266_natsumi_blade_wait_test.rs",
@@ -10948,13 +10960,13 @@
         "chisato_003_rotation_full_stage",
         "chisato_003_rotation_partial_stage",
         "chisato_003_rotation_single_member",
+        "dazzling_live_start_leaves_draw_and_colorless_icons_unchanged",
+        "dazzling_live_start_recolors_listed_blade_hearts_to_purple",
         "dazzling_q187_exclude_selected_liella_other_pickable",
         "empty_center_with_lone_member_grants_no_heart",
-        "empty_center_with_two_side_members_grants_no_heart",
-        "genki_5_heart02_not_invalidate",
-        "genki_exactly_6_invalidates"
+        "empty_center_with_two_side_members_grants_no_heart"
       ],
-      "covering_test_count": 120,
+      "covering_test_count": 122,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -11378,6 +11390,7 @@
         "engine/tests/test_modules/characterization/decode_audit_behavior_pins_test.rs",
         "engine/tests/test_modules/characterization/performance_snapshot_audit_test.rs",
         "engine/tests/test_modules/characterization/pipeline_characterization_test.rs",
+        "engine/tests/test_modules/effects/ability_mod/ability_from_source_test.rs",
         "engine/tests/test_modules/effects/ability_mod/full_distinct_group_stage_grants_yell_live_score_test.rs",
         "engine/tests/test_modules/effects/compound/shioriko_bp4_swap_test.rs",
         "engine/tests/test_modules/effects/conditional/debut_reveal_success_zone_replacement_q256_test.rs",
@@ -11446,7 +11459,7 @@
         "butterfly_wing_to_butterfly_no_match",
         "candidate_pool_distinct_filter"
       ],
-      "covering_test_count": 212,
+      "covering_test_count": 220,
       "is_null": true,
       "use_limit": null,
       "watches_abilities": false,
@@ -13982,6 +13995,7 @@
         "engine/tests/test_modules/effects/gain/hearts/live_start_equal_success_counts_heart02_test.rs",
         "engine/tests/test_modules/effects/gain/hearts/six_heart_types_constant_all_heart_matrix_test.rs",
         "engine/tests/test_modules/effects/gain/hearts/success_pile_chosen_heart_pl_bp5_011_n_test.rs",
+        "engine/tests/test_modules/effects/live_start/dazzling_game_test.rs",
         "engine/tests/test_modules/effects/look_select/niche_filters/no_blade_heart_group_look_test.rs",
         "engine/tests/test_modules/effects/look_select/reorder_top/bp7_q276_cheer_mode_return_hand_test.rs",
         "engine/tests/test_modules/effects/look_select/reorder_top/live_success_look_three_deck_size_q36_test.rs",
@@ -14066,7 +14080,7 @@
         "b_heart07_yell_contributes_two_colorless_hearts_each",
         "bella_positive_surplus_heart04_ability_fires"
       ],
-      "covering_test_count": 709,
+      "covering_test_count": 712,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -14813,6 +14827,7 @@
         "engine/tests/test_modules/effects/look_select/pin_top/per_group_member_look_pin_reveal_score_test.rs",
         "engine/tests/test_modules/effects/recover/to_hand/bp7_audrey_blade_max_test.rs",
         "engine/tests/test_modules/effects/score/ll_bp1_001_test.rs",
+        "engine/tests/test_modules/effects/score/tokimeki_runners_test.rs",
         "engine/tests/test_modules/effects/state/bp7_karin_wait_blade_limit_test.rs"
       ],
       "covering_tests": [
@@ -14847,7 +14862,7 @@
         "joint_live_start_no_named_skips_gracefully",
         "joint_live_start_skip_optional_no_effect"
       ],
-      "covering_test_count": 71,
+      "covering_test_count": 76,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -20189,10 +20204,10 @@
         "niji_bp5_partner_low_cost_nothing_fires",
         "niji_bp5_partner_not_nijigasaki_nothing_fires",
         "niji_bp5_partner_with_blade_heart_nothing_fires",
-        "rina_copies_from_multiple_under_cards",
-        "rina_gains_ability_from_under_member"
+        "rina_copied_live_success_ability_does_nothing_without_energy_deficit",
+        "rina_copied_live_success_ability_places_energy_from_energy_deck"
       ],
-      "covering_test_count": 42,
+      "covering_test_count": 44,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -20259,6 +20274,8 @@
         "engine/tests/test_modules/effects/score/shizuku_bp4_aggregate_test.rs"
       ],
       "covering_tests": [
+        "rina_copied_live_success_ability_does_nothing_without_energy_deficit",
+        "rina_copied_live_success_ability_places_energy_from_energy_deck",
         "rina_copies_from_multiple_under_cards",
         "rina_gains_ability_from_under_member",
         "rina_no_under_cards",
@@ -20270,7 +20287,7 @@
         "shizuku_p_rarity_same_as_r",
         "shizuku_tied_score_no_draw"
       ],
-      "covering_test_count": 10,
+      "covering_test_count": 12,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -20836,9 +20853,11 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/characterization/zero_tested_action_types_test.rs",
-        "engine/tests/test_modules/effects/score/dazzling_test.rs"
+        "engine/tests/test_modules/effects/live_start/dazzling_game_test.rs"
       ],
       "covering_tests": [
+        "dazzling_live_start_leaves_draw_and_colorless_icons_unchanged",
+        "dazzling_live_start_recolors_listed_blade_hearts_to_purple",
         "dazzling_q187_exclude_selected_liella_other_pickable",
         "kanon_invalidate_liella_live_start",
         "natsumi_sunshine_pay_any_energy_for_score",
@@ -20849,7 +20868,7 @@
         "vivid_world_live_phase_blade_and_success",
         "vivid_world_missing_heart_color"
       ],
-      "covering_test_count": 9,
+      "covering_test_count": 11,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -20878,9 +20897,11 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/characterization/zero_tested_action_types_test.rs",
-        "engine/tests/test_modules/effects/score/dazzling_test.rs"
+        "engine/tests/test_modules/effects/live_start/dazzling_game_test.rs"
       ],
       "covering_tests": [
+        "dazzling_live_start_leaves_draw_and_colorless_icons_unchanged",
+        "dazzling_live_start_recolors_listed_blade_hearts_to_purple",
         "dazzling_q187_exclude_selected_liella_other_pickable",
         "kanon_invalidate_liella_live_start",
         "natsumi_sunshine_pay_any_energy_for_score",
@@ -20891,7 +20912,7 @@
         "vivid_world_live_phase_blade_and_success",
         "vivid_world_missing_heart_color"
       ],
-      "covering_test_count": 9,
+      "covering_test_count": 11,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -26828,9 +26849,12 @@
       "has_choice": false,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/ability_mod/constant_deck_bottom_yell_source_test.rs"
+        "engine/tests/test_modules/effects/ability_mod/constant_deck_bottom_yell_source_test.rs",
+        "engine/tests/test_modules/effects/score/aquarium_live_success_test.rs"
       ],
       "covering_tests": [
+        "aquarium_live_success_aqours_hearts_score_plus_one",
+        "aquarium_live_success_non_aqours_hearts_do_not_score",
         "bottom_yell_source_in_success_zone_applies",
         "bottom_yell_source_leaves_zone_reverts_to_top",
         "bottom_yell_source_yell_from_bottom",
@@ -26839,7 +26863,7 @@
         "no_yell_source_modifier_reveals_from_top",
         "opponent_yell_source_modifier_does_not_change_own_yell"
       ],
-      "covering_test_count": 7,
+      "covering_test_count": 9,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -26867,9 +26891,12 @@
       "has_choice": false,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/ability_mod/constant_deck_bottom_yell_source_test.rs"
+        "engine/tests/test_modules/effects/ability_mod/constant_deck_bottom_yell_source_test.rs",
+        "engine/tests/test_modules/effects/score/aquarium_live_success_test.rs"
       ],
       "covering_tests": [
+        "aquarium_live_success_aqours_hearts_score_plus_one",
+        "aquarium_live_success_non_aqours_hearts_do_not_score",
         "bottom_yell_source_in_success_zone_applies",
         "bottom_yell_source_leaves_zone_reverts_to_top",
         "bottom_yell_source_yell_from_bottom",
@@ -26878,7 +26905,7 @@
         "no_yell_source_modifier_reveals_from_top",
         "opponent_yell_source_modifier_does_not_change_own_yell"
       ],
-      "covering_test_count": 7,
+      "covering_test_count": 9,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -28163,7 +28190,7 @@
         "engine/tests/test_modules/effects/recover/to_hand/wao_wao_test.rs",
         "engine/tests/test_modules/effects/score/shizuku_bp4_aggregate_test.rs",
         "engine/tests/test_modules/effects/score/takaramono_test.rs",
-        "engine/tests/test_modules/effects/score/tokimeki_test.rs",
+        "engine/tests/test_modules/effects/score/tokimeki_runners_test.rs",
         "engine/tests/test_modules/effects/state/bp7_q266_natsumi_blade_wait_test.rs",
         "engine/tests/test_modules/effects/state/bp7_sd2_gap_test.rs",
         "engine/tests/test_modules/effects/state/discard_activate_opponent_recover_live_test.rs",
@@ -28214,7 +28241,7 @@
         "center_non_mus_no_reduction",
         "center_wait_discard_cost_plus_two_deploy_basic_success"
       ],
-      "covering_test_count": 413,
+      "covering_test_count": 415,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -28296,7 +28323,7 @@
         "engine/tests/test_modules/effects/recover/to_hand/wao_wao_test.rs",
         "engine/tests/test_modules/effects/score/shizuku_bp4_aggregate_test.rs",
         "engine/tests/test_modules/effects/score/takaramono_test.rs",
-        "engine/tests/test_modules/effects/score/tokimeki_test.rs",
+        "engine/tests/test_modules/effects/score/tokimeki_runners_test.rs",
         "engine/tests/test_modules/effects/state/bp7_q266_natsumi_blade_wait_test.rs",
         "engine/tests/test_modules/effects/state/bp7_sd2_gap_test.rs",
         "engine/tests/test_modules/effects/state/discard_activate_opponent_recover_live_test.rs",
@@ -28347,7 +28374,7 @@
         "center_non_mus_no_reduction",
         "center_wait_discard_cost_plus_two_deploy_basic_success"
       ],
-      "covering_test_count": 413,
+      "covering_test_count": 415,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -28596,6 +28623,7 @@
         "engine/tests/test_modules/effects/conditional/live_phase_success_zone_replacement_q257_test.rs",
         "engine/tests/test_modules/effects/cost_mod/seven_energy_lead_stage_cost_two_bonus_test.rs",
         "engine/tests/test_modules/effects/draw/flat/live_success_compare_revealed_draw_test.rs",
+        "engine/tests/test_modules/effects/live_start/dazzling_game_test.rs",
         "engine/tests/test_modules/effects/recover/to_hand/cheaper_unit_baton_group_live_recovery_test.rs",
         "engine/tests/test_modules/effects/recover/to_hand/sunny_test.rs",
         "engine/tests/test_modules/effects/score/side_member_original_blade_gated_constant_score_test.rs",
@@ -28605,6 +28633,9 @@
       "covering_tests": [
         "baton_touch_cleared_between_actions",
         "cheaper_unit_baton_recovers_group_live_to_hand",
+        "dazzling_live_start_leaves_draw_and_colorless_icons_unchanged",
+        "dazzling_live_start_recolors_listed_blade_hearts_to_purple",
+        "dazzling_q187_exclude_selected_liella_other_pickable",
         "debut_reveal_success_zone_placement_replaces_with_waitroom_live_q256",
         "debut_reveal_success_zone_replacement_preserves_target_identity_pl_bp6_022_l",
         "empty_waitroom_resolves_cleanly",
@@ -28629,12 +28660,9 @@
         "non_hasu_live_not_added",
         "q266_cost_b0_waits_nothing_incl_blade0",
         "q266_cost_b1_waits_nothing",
-        "q266_cost_b2_waits_blade0_not_blade1",
-        "q266_cost_b4_waits_blade2_not_blade3",
-        "q266_skip_cost_waits_nothing",
-        "serasu_double_trigger_regression"
+        "q266_cost_b2_waits_blade0_not_blade1"
       ],
-      "covering_test_count": 62,
+      "covering_test_count": 65,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -29345,13 +29373,16 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/effects/ability_mod/ability_from_source_test.rs",
-        "engine/tests/test_modules/effects/energy/under_member/energy_and_member_under_test.rs"
+        "engine/tests/test_modules/effects/energy/under_member/energy_and_member_under_test.rs",
+        "engine/tests/test_modules/effects/score/aquarium_live_success_test.rs"
       ],
       "covering_tests": [
         "activation_once_per_turn_blocks_second_under_energy_payment_and_live_recovery",
         "activation_paid_under_energy_recovers_exact_nijigasaki_live",
         "activation_reveals_same_name_hand_member_and_moves_it_under_self",
         "activation_under_energy_cost_removes_one_energy_from_zone",
+        "aquarium_live_success_aqours_hearts_score_plus_one",
+        "aquarium_live_success_non_aqours_hearts_do_not_score",
         "awakening_move_1_of_2",
         "awakening_move_all_energy",
         "awakening_no_energy_nothing_happens",
@@ -29369,17 +29400,15 @@
         "live_start_three_under_members_grant_three_heart05",
         "live_start_with_under_energy_grants_one_heart01",
         "reveal_same_name_under_then_live_start_grants_one_heart05_and_four_cost",
+        "rina_copied_live_success_ability_does_nothing_without_energy_deficit",
+        "rina_copied_live_success_ability_places_energy_from_energy_deck",
         "rina_copies_from_multiple_under_cards",
         "rina_debit_triggers_with_target_in_discard",
         "rina_gains_ability_from_under_member",
         "rina_no_under_cards",
-        "rina_not_on_stage",
-        "rina_only_copies_live_success_not_constant",
-        "rina_respects_cost_limit",
-        "rina_rule_1053_under_member_goes_to_waitroom",
-        "rina_rule_4553_under_member_follows_position_change"
+        "rina_not_on_stage"
       ],
-      "covering_test_count": 34,
+      "covering_test_count": 38,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -29407,13 +29436,16 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/effects/ability_mod/ability_from_source_test.rs",
-        "engine/tests/test_modules/effects/energy/under_member/energy_and_member_under_test.rs"
+        "engine/tests/test_modules/effects/energy/under_member/energy_and_member_under_test.rs",
+        "engine/tests/test_modules/effects/score/aquarium_live_success_test.rs"
       ],
       "covering_tests": [
         "activation_once_per_turn_blocks_second_under_energy_payment_and_live_recovery",
         "activation_paid_under_energy_recovers_exact_nijigasaki_live",
         "activation_reveals_same_name_hand_member_and_moves_it_under_self",
         "activation_under_energy_cost_removes_one_energy_from_zone",
+        "aquarium_live_success_aqours_hearts_score_plus_one",
+        "aquarium_live_success_non_aqours_hearts_do_not_score",
         "awakening_move_1_of_2",
         "awakening_move_all_energy",
         "awakening_no_energy_nothing_happens",
@@ -29431,17 +29463,15 @@
         "live_start_three_under_members_grant_three_heart05",
         "live_start_with_under_energy_grants_one_heart01",
         "reveal_same_name_under_then_live_start_grants_one_heart05_and_four_cost",
+        "rina_copied_live_success_ability_does_nothing_without_energy_deficit",
+        "rina_copied_live_success_ability_places_energy_from_energy_deck",
         "rina_copies_from_multiple_under_cards",
         "rina_debit_triggers_with_target_in_discard",
         "rina_gains_ability_from_under_member",
         "rina_no_under_cards",
-        "rina_not_on_stage",
-        "rina_only_copies_live_success_not_constant",
-        "rina_respects_cost_limit",
-        "rina_rule_1053_under_member_goes_to_waitroom",
-        "rina_rule_4553_under_member_follows_position_change"
+        "rina_not_on_stage"
       ],
-      "covering_test_count": 34,
+      "covering_test_count": 38,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -29473,6 +29503,8 @@
       ],
       "covering_tests": [
         "karin_exact_six_members_grants_heart02_and_heart05",
+        "rina_copied_live_success_ability_does_nothing_without_energy_deficit",
+        "rina_copied_live_success_ability_places_energy_from_energy_deck",
         "rina_copies_from_multiple_under_cards",
         "rina_gains_ability_from_under_member",
         "rina_no_under_cards",
@@ -29482,7 +29514,7 @@
         "s_pr_042_pr_constant_six_combined_staged_members_gains_heart02_and_heart04",
         "sp_pr_022_pr_constant_hearts_at_six_combined_members"
       ],
-      "covering_test_count": 9,
+      "covering_test_count": 11,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -30123,6 +30155,7 @@
         "engine/tests/test_modules/effects/draw/chains/card_ability_test.rs",
         "engine/tests/test_modules/effects/gain/blades/bp4_014_ability_filter_edge_test.rs",
         "engine/tests/test_modules/effects/gain/blades/bp7_q271_colorful_dreams_test.rs",
+        "engine/tests/test_modules/effects/live_start/dazzling_game_test.rs",
         "engine/tests/test_modules/effects/score/distinct_waitroom_lives_pl_n_bp4_028_l_test.rs",
         "engine/tests/test_modules/effects/score/live_success_surplus_score_zero_floor_test.rs",
         "engine/tests/test_modules/effects/score/pl_n_bp1_027_test.rs",
@@ -30131,6 +30164,9 @@
         "engine/tests/test_modules/rules/scoring/special_blade_heart_rules_test.rs"
       ],
       "covering_tests": [
+        "dazzling_live_start_leaves_draw_and_colorless_icons_unchanged",
+        "dazzling_live_start_recolors_listed_blade_hearts_to_purple",
+        "dazzling_q187_exclude_selected_liella_other_pickable",
         "discarded_first_yell_hearts_are_lost",
         "failed_live_still_resolves_yell_draw_icons",
         "fu_pb1_debut_heart06_member_auto_gains_heart06",
@@ -30157,12 +30193,9 @@
         "issue3_karin_live_start_draw_card",
         "issue4_you_exclude_aqours_live_start",
         "issue5_solitude_rain_heart_color_scoring",
-        "issue6_natsumi_blade_expires_after_live_victory_determination",
-        "issue6_natsumi_low_energy_no_blade",
-        "issue6_natsumi_self_and_other_blade",
-        "issue6_natsumi_self_only_blade"
+        "issue6_natsumi_blade_expires_after_live_victory_determination"
       ],
-      "covering_test_count": 105,
+      "covering_test_count": 108,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -30882,11 +30915,11 @@
         "engine/tests/test_modules/effects/conditional/kanon_invalidate_test.rs",
         "engine/tests/test_modules/effects/deploy/pl_sp_sd1_002_test.rs",
         "engine/tests/test_modules/effects/draw/flat/b9_more_test.rs",
+        "engine/tests/test_modules/effects/live_start/dazzling_game_test.rs",
         "engine/tests/test_modules/effects/look_select/reveal_to_hand/energy_discard_look_pl_sp_bp1_010_r_test.rs",
         "engine/tests/test_modules/effects/look_select/reveal_to_hand/optional_energy_look_pl_sp_bp2_005_r_test.rs",
         "engine/tests/test_modules/effects/recover/to_hand/distinct_trio_reveals_pl_sp_bp2_025_l_test.rs",
         "engine/tests/test_modules/effects/recover/to_hand/optional_energy_member_recovery_pl_sp_sd1_007_sd_test.rs",
-        "engine/tests/test_modules/effects/score/dazzling_test.rs",
         "engine/tests/test_modules/effects/score/wakana_shiki_test.rs",
         "engine/tests/test_modules/effects/score/zettai_lover_test.rs",
         "engine/tests/test_modules/integration/hard_abilities_tier_test.rs",
@@ -30903,6 +30936,8 @@
         "chisato_movement_triggers_with_both_flags",
         "chisato_no_trigger_without_position_change_flag",
         "cutie_panther_live_start_reduce_hearts",
+        "dazzling_live_start_leaves_draw_and_colorless_icons_unchanged",
+        "dazzling_live_start_recolors_listed_blade_hearts_to_purple",
         "dazzling_q187_exclude_selected_liella_other_pickable",
         "ddd_decline_pay_does_nothing",
         "ddd_option_a_retrieves_any_member_from_waitroom",
@@ -30921,11 +30956,9 @@
         "issue10_dream_with_you_no_blade_no_score",
         "issue11_fanfare_15plus_cards_gives_blade",
         "issue11_fanfare_few_cards_no_blade",
-        "issue13_kurage_card_exists",
-        "issue14_koware_yasuki_card_exists",
-        "issue15_mirai_ticket_card_exists"
+        "issue13_kurage_card_exists"
       ],
-      "covering_test_count": 99,
+      "covering_test_count": 101,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -33700,7 +33733,7 @@
         "kanon_activation_choice_condition_wait_option",
         "kosuzu_choose_number_adds_to_hand"
       ],
-      "covering_test_count": 64,
+      "covering_test_count": 65,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -36353,17 +36386,19 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/effects/gain/hearts/six_heart_types_constant_all_heart_contribution_test.rs",
-        "engine/tests/test_modules/effects/score/tokimeki_test.rs"
+        "engine/tests/test_modules/effects/score/tokimeki_runners_test.rs"
       ],
       "covering_tests": [
         "setsuna_q205_all_heart_granted",
         "setsuna_q205_condition_not_met_no_bonus",
         "setsuna_q205_no_bonus_outside_live",
         "tokimeki_all_6_colors_collectively_score_plus_1",
+        "tokimeki_live_success_score_three_recovers_nijigasaki_card",
+        "tokimeki_live_success_score_two_does_not_recover_card",
         "tokimeki_q216_missing_hearts_no_score",
         "tokimeki_q232_modifier_separate_from_base_score"
       ],
-      "covering_test_count": 6,
+      "covering_test_count": 8,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -36391,17 +36426,19 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/effects/gain/hearts/six_heart_types_constant_all_heart_contribution_test.rs",
-        "engine/tests/test_modules/effects/score/tokimeki_test.rs"
+        "engine/tests/test_modules/effects/score/tokimeki_runners_test.rs"
       ],
       "covering_tests": [
         "setsuna_q205_all_heart_granted",
         "setsuna_q205_condition_not_met_no_bonus",
         "setsuna_q205_no_bonus_outside_live",
         "tokimeki_all_6_colors_collectively_score_plus_1",
+        "tokimeki_live_success_score_three_recovers_nijigasaki_card",
+        "tokimeki_live_success_score_two_does_not_recover_card",
         "tokimeki_q216_missing_hearts_no_score",
         "tokimeki_q232_modifier_separate_from_base_score"
       ],
-      "covering_test_count": 6,
+      "covering_test_count": 8,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -38860,10 +38897,11 @@
         "engine/tests/test_modules/effects/mill/bottom_member_tiers_pl_s_bp7_021_l_test.rs",
         "engine/tests/test_modules/effects/mill/discard_cost_mill_then_arise_recovery_test.rs",
         "engine/tests/test_modules/effects/recover/to_hand/location_condition_cost_test.rs",
+        "engine/tests/test_modules/effects/score/aquarium_live_success_test.rs",
         "engine/tests/test_modules/effects/score/opponent_surplus_constant_total_score_test.rs",
         "engine/tests/test_modules/effects/score/return_energy_deficit_score_pl_s_bp7_023_l_test.rs",
         "engine/tests/test_modules/effects/score/strawberry_test.rs",
-        "engine/tests/test_modules/effects/score/tokimeki_test.rs",
+        "engine/tests/test_modules/effects/score/tokimeki_runners_test.rs",
         "engine/tests/test_modules/jidou/leaves_stage/baton_replacement_auto_effects_test.rs",
         "engine/tests/test_modules/jidou/leaves_stage/stage_to_discard_ability_test.rs",
         "engine/tests/test_modules/jidou/movement/awaken_the_power_test.rs",
@@ -38875,6 +38913,8 @@
         "all_areas_aqours_diff_names_gains_ability",
         "all_three_heart_match_enters_hand_without_nonmatching_filler",
         "all_three_required_hearts_member_is_added_to_hand",
+        "aquarium_live_success_aqours_hearts_score_plus_one",
+        "aquarium_live_success_non_aqours_hearts_do_not_score",
         "baton_touch_cleared_between_actions",
         "both_empty_stages_skip_draw_and_topdeck_pl_n_bp4_009_r",
         "both_sides_cost13_still_only_two_blades",
@@ -38899,11 +38939,9 @@
         "debut_look_three_decline_discards_all_looked_cards",
         "debut_look_three_no_group_card_discards_all_without_pick",
         "debut_look_three_reveals_group_member_and_discards_other_cards",
-        "duplicate_names_fails_condition",
-        "empty_area_fails_condition",
-        "empty_own_stage_counts_as_zero_for_draw_and_topdeck_pl_n_bp4_009_r"
+        "duplicate_names_fails_condition"
       ],
-      "covering_test_count": 262,
+      "covering_test_count": 266,
       "is_null": false,
       "use_limit": 1,
       "watches_abilities": false,
@@ -39018,6 +39056,7 @@
         "kanan_live_success_timing",
         "live_fails_with_insufficient_hearts",
         "love_u_q192_live_success_all_blade_score_up",
+        "love_u_q192_recolored_all_blade_does_not_score",
         "mijuku_dreamer_no_refresh_no_bonus",
         "mijuku_dreamer_refresh_via_mill_gets_bonus",
         "nandodatte_yakusoku_pl_s_bp7_019_l_places_two_aqours_cards_under_deck",
@@ -39029,10 +39068,9 @@
         "pl_s_bp7_023_l_return_energy_opponent_two_ahead_grants_two_score",
         "pl_s_bp7_023_l_tied_energy_after_return_grants_no_score",
         "pl_s_sd1_009_sd_live_start_revealed_aqours_card_moves_from_hand_to_deck",
-        "pl_s_sd1_009_sd_live_start_without_aqours_preserves_non_aqours_hand_card",
-        "q147_empty_need_heart_live_succeeds"
+        "pl_s_sd1_009_sd_live_start_without_aqours_preserves_non_aqours_hand_card"
       ],
-      "covering_test_count": 76,
+      "covering_test_count": 77,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -44478,6 +44516,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
+        "engine/tests/test_modules/effects/live_start/dazzling_game_test.rs",
         "engine/tests/test_modules/effects/look_select/reorder_top/bp7_q276_cheer_mode_return_hand_test.rs",
         "engine/tests/test_modules/rules/scoring/blade_heart_colorless_test.rs"
       ],
@@ -44486,12 +44525,15 @@
         "b_heart07_yell_contributes_two_colorless_hearts_each",
         "colorless_hearts_cannot_fill_colored_requirement",
         "colorless_hearts_fill_heart0_when_colored_hearts_present",
+        "dazzling_live_start_leaves_draw_and_colorless_icons_unchanged",
+        "dazzling_live_start_recolors_listed_blade_hearts_to_purple",
+        "dazzling_q187_exclude_selected_liella_other_pickable",
         "insufficient_colorless_hearts_fail_heart0_only_live",
         "q276_cheer_discarded_by_own_ability_goes_to_waitroom_not_success",
         "q276_cheer_mode_returns_to_hand_not_success_zone",
         "q276_control_normal_live_does_go_to_success_zone"
       ],
-      "covering_test_count": 8,
+      "covering_test_count": 11,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
