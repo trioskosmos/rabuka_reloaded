@@ -11,8 +11,10 @@ if errorlevel 1 (
 if /I "%~1"=="tests" goto tests
 if /I "%~1"=="replay" goto replay
 if /I "%~1"=="smoke" goto smoke
+if /I "%~1"=="cli" goto interactive
 if /I "%~1"=="interactive" goto interactive
 if /I "%~1"=="web" goto web
+goto web
 
 :build
 make -j4
@@ -40,6 +42,7 @@ exit /b %errorlevel%
 make web
 if errorlevel 1 exit /b %errorlevel%
 echo [C] Starting web server at http://127.0.0.1:18080/
+start "" /b powershell -NoProfile -Command "Start-Sleep -Seconds 1; Start-Process 'http://127.0.0.1:18080/'"
 .\rb_web_server.exe
 exit /b %errorlevel%
 
