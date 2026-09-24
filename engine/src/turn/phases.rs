@@ -140,12 +140,23 @@ impl super::TurnEngine {
                     // Q280: capture per-card flags for THIS turn player's own cards and
                     // which energy cards must stay inactive, BEFORE the mutable phase work
                     // below so `turn_player`'s immutable borrow does not span them.
+                    let active_energy = turn_player.energy_zone.active_count() as usize;
                     let excluded_energy = turn_player
                         .energy_zone
                         .cards
                         .iter()
-                        .filter(|&&c| game_state.mods.is_delayed_cannot_active(c))
+                        .enumerate()
+                        .filter(|(index, &card_id)| {
+                            *index >= active_energy
+                                && game_state.mods.is_delayed_cannot_active(card_id)
+                        })
                         .count();
+                    log::debug!(
+                        "[ACTIVE_ENERGY] total={} active_before={} excluded_waited_restricted={}",
+                        turn_player.energy_zone.cards.len(),
+                        active_energy,
+                        excluded_energy
+                    );
                     let owned: crate::HashSet<i16> =
                         turn_player.all_card_ids().into_iter().collect();
                     for &cid in &to_activate {

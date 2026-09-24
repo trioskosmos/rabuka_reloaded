@@ -303,9 +303,10 @@ def test_distributed_baton_arrival_reaggregates_trigger_events():
     ], condition
     leg_events = [leg["trigger_event"] for leg in legs]
     assert all(leg_events), condition
+    assert leg_events[0] == leg_events[1], condition
     assert condition["trigger_event"] == {
         "type": "or",
-        "events": leg_events,
+        "events": [leg_events[0]],
     }, condition
     assert effect["action"] == "draw_card", effect
     assert effect["count"] == 1, effect
@@ -345,6 +346,23 @@ def test_duration_prefixes_use_canonical_codes():
         text, parsed = _strip_duration_prefix(prefix)
         assert text == ""
         assert parsed == code
+
+
+def test_q280_energy_placement_restriction_is_delayed_per_card():
+    text = (
+        "自分のエネルギーデッキから、エネルギーカードを2枚ウェイト状態で置く。"
+        "それらのエネルギーカードは、次のターンのアクティブフェイズにアクティブしない。"
+    )
+    effect = _normalize_effect_tree(parse_effect(text), text)
+    assert effect.get("action") == "sequential", effect
+    move, restriction = effect["actions"]
+    assert move.get("source") == "energy_deck", move
+    assert move.get("destination") == "energy_zone", move
+    assert move.get("state_change") == "wait", move
+    assert move.get("count") == 2, move
+    assert restriction.get("action") == "restriction", restriction
+    assert restriction.get("restriction_type") == "cannot_active", restriction
+    assert restriction.get("delayed") is True, restriction
 
 
 # ─── run all ──────────────────────────────────────────────────────────────────

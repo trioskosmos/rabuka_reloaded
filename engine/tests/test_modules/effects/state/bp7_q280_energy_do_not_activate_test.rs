@@ -60,6 +60,32 @@ fn trigger_mei_live_success(game: &mut TestGame, mei: i16) {
     }
 }
 
+fn trigger_mei_energy_activation(game: &mut TestGame, mei: i16) {
+    let card = game.db.get_card(mei).unwrap();
+    let ab = card
+        .resolved_abilities()
+        .find(|a| {
+            a.triggers.as_deref() == Some("ライブ成功時")
+                && a.full_text.contains("エネルギーを6枚")
+        })
+        .unwrap();
+    let pid = game.state.player1.id.clone();
+    game.state.trigger_auto_ability(
+        format!("{}_{}", card.card_no, ab.full_text),
+        AbilityTrigger::LiveSuccess,
+        pid.clone(),
+        Some(card.card_no.to_string()),
+        Some(mei),
+        None,
+        None,
+    );
+    game.state.activating_card = Some(mei);
+    game.state.process_pending_auto_abilities(&pid);
+    while game.has_pending_choice() {
+        game.select_indices(&[]);
+    }
+}
+
 // ====================================================================
 // Fix #1: the "does not activate next phase" flag is keyed to the placed
 // ENERGY cards, NOT to the member whose ability placed them.
@@ -188,4 +214,115 @@ fn q280_opponents_active_phase_does_not_clear_owner_flag() {
             "Q280: the owner's active phase consumes the do-not-activate flag"
         );
     }
+}
+
+#[test]
+fn q280_mei_activation_then_payment_keeps_next_phase_restriction() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let mei = game.id(MEI);
+    game.state.player1.stage.stage = [-1, mei, -1];
+    let ordinary = game.id(ENERGY);
+    let restricted = game.id(ENERGY);
+    game.state.player1.energy_zone.cards.push(ordinary);
+    game.state.player1.energy_zone.cards.push(restricted);
+    game.state.player1.energy_zone.set_active_count(0);
+    game.state
+        .mods
+        .add_delayed_cannot_active(restricted, 1);
+
+    trigger_mei_energy_activation(&mut game, mei);
+    assert_eq!(
+        game.state.player1.energy_zone.active_count(),
+        2,
+        "Q280: Mei's live-success ability must activate both waited energy cards"
+    );
+    assert!(game.state.mods.is_delayed_cannot_active(restricted));
+
+    game.state.player1.energy_zone.pay_energy(1).unwrap();
+    assert_eq!(
+        game.state.player1.energy_zone.active_count(),
+        1,
+        "paying the activated energy must return it to WAIT"
+    );
+    assert!(
+        game.state.mods.is_delayed_cannot_active(restricted),
+        "paying the energy must not clear its next-Active-Phase restriction"
+    );
+
+    advance_to_phase_active(&mut game);
+    assert_eq!(
+        game.state.player1.energy_zone.active_count(),
+        1,
+        "the paid restricted energy must remain inactive next turn"
+    );
+    assert!(
+        !game.state
+            .player1
+            .energy_zone
+            .cards
+            .get(0)
+            .is_some_and(|&cid| cid == restricted),
+        "the ordinary energy, not the restricted energy, should be active"
+    );
+    assert!(!game.state.mods.is_delayed_cannot_active(restricted));
+}
+
+#[test]
+fn q280_mei_live_success_abilities_compose_before_payment() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let mei = game.id(MEI);
+    game.state.player1.stage.stage = [-1, mei, -1];
+    seed_energy_deck(&mut game, 2);
+
+    trigger_mei_live_success(&mut game, mei);
+    let placed: Vec<i16> = game.state.player1.energy_zone.cards.clone();
+    assert_eq!(placed.len(), 2);
+    assert_eq!(game.state.player1.energy_zone.active_count(), 0);
+    assert!(placed
+        .iter()
+        .all(|&card_id| game.state.mods.is_delayed_cannot_active(card_id)));
+
+    trigger_mei_energy_activation(&mut game, mei);
+    assert_eq!(
+        game.state.player1.energy_zone.active_count(),
+        2,
+        "the second live-success ability must activate the energy placed by the first"
+    );
+    assert!(placed
+        .iter()
+        .all(|&card_id| game.state.mods.is_delayed_cannot_active(card_id)));
+
+    game.state.player1.energy_zone.pay_energy(1).unwrap();
+    advance_to_phase_active(&mut game);
+
+    assert_eq!(game.state.player1.energy_zone.active_count(), 1);
+    assert!(placed
+        .iter()
+        .all(|&card_id| !game.state.mods.is_delayed_cannot_active(card_id)));
+}
+
+#[test]
+fn q280_already_active_restricted_energy_is_not_deactivated() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let restricted = game.id(ENERGY);
+    game.state.player1.energy_zone.cards.push(restricted);
+    game.state.player1.energy_zone.set_active_count(1);
+    game.state
+        .mods
+        .add_delayed_cannot_active(restricted, 1);
+
+    advance_to_phase_active(&mut game);
+
+    assert_eq!(
+        game.state.player1.energy_zone.active_count(),
+        1,
+        "a restricted energy that is already active must not be deactivated"
+    );
+    assert!(!game.state.mods.is_delayed_cannot_active(restricted));
 }

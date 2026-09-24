@@ -15,21 +15,13 @@ _test never asserts (smoke at best — cannot pin behavior)_
 | `engine/tests/test_modules/effects/score/chika_bp3_001_wait_self_activation_live_total_score_test.rs` | `wait_member_total_score_expires_at_live_end_even_without_setting_live` | 110 |  |
 | `engine/tests/test_modules/effects/score/chika_bp3_001_wait_self_activation_live_total_score_test.rs` | `wait_member_total_score_persists_through_victory_and_expires_after_live` | 105 |  |
 
-## no_drive (24)
+## no_drive (15)
 
 _trigger-context test that mutates state and asserts but never drives the engine (no scan/activate/play/fire): vacuous negatives/positives_
 
 | file | test | line | detail |
 | --- | --- | --- | --- |
-| `engine/tests/test_modules/effects/deck_order/restore/both_waitrooms_member_restore_threshold_q242_test.rs` | `debut_both_waitrooms_member_restore_shrinks_own_waitroom` | 4 |  |
-| `engine/tests/test_modules/effects/deck_order/restore/both_waitrooms_member_restore_threshold_q242_test.rs` | `exactly_twenty_restored_members_meet_recovery_and_blade_threshold_q242` | 123 |  |
-| `engine/tests/test_modules/effects/deck_order/restore/both_waitrooms_member_restore_threshold_q242_test.rs` | `nineteen_restored_members_grant_neither_recovery_nor_blades_q242` | 155 |  |
-| `engine/tests/test_modules/effects/deck_order/restore/both_waitrooms_member_restore_threshold_q242_test.rs` | `twenty_members_restored_from_own_waitroom_alone_grant_blades_q242` | 188 |  |
-| `engine/tests/test_modules/effects/deck_order/restore/both_waitrooms_member_restore_threshold_q242_test.rs` | `twenty_restored_members_gain_two_blades_without_recoverable_live_q242` | 84 |  |
-| `engine/tests/test_modules/effects/deck_order/restore/both_waitrooms_member_restore_threshold_q242_test.rs` | `twenty_restored_members_recover_live_and_gain_two_blades_q242` | 35 |  |
 | `engine/tests/test_modules/effects/deck_order/restore/live_start_optional_two_member_bottomdeck_test.rs` | `live_start_optional_two_member_bottomdeck_shrinks_waitroom` | 4 |  |
-| `engine/tests/test_modules/effects/draw/chains/full_group_cost_twenty_draw_three_topdeck_three_test.rs` | `full_group_cost_at_least_twenty_draw_and_topdeck_preserves_hand_count` | 4 |  |
-| `engine/tests/test_modules/effects/draw/chains/full_group_cost_twenty_draw_three_topdeck_three_test.rs` | `full_group_cost_below_twenty_preserves_hand_count` | 30 |  |
 | `engine/tests/test_modules/effects/look_select/niche_filters/all_or_any_three_heart_member_search_test.rs` | `all_three_heart_match_enters_hand_without_nonmatching_filler` | 161 |  |
 | `engine/tests/test_modules/effects/look_select/niche_filters/all_or_any_three_heart_member_search_test.rs` | `all_three_required_hearts_member_is_added_to_hand` | 23 |  |
 | `engine/tests/test_modules/effects/look_select/niche_filters/all_or_any_three_heart_member_search_test.rs` | `no_all_three_heart_match_discards_both_looked_at_members` | 94 |  |
@@ -38,13 +30,12 @@ _trigger-context test that mutates state and asserts but never drives the engine
 | `engine/tests/test_modules/effects/look_select/pin_top/per_group_member_look_pin_reveal_score_test.rs` | `look_per_group_member_discards_remainder_without_score_for_member_reveal` | 4 |  |
 | `engine/tests/test_modules/jidou/debut_watch/baton_arrival_self_budget_gates_pl_n_pr_025_pr_test.rs` | `setsuna_self_baton_arrival_draws_one` | 45 |  |
 | `engine/tests/test_modules/jidou/debut_watch/other_baton_arrival_draw_test.rs` | `other_member_baton_arrival_draws_one_card` | 5 |  |
-| `engine/tests/test_modules/jidou/leaves_stage/baton_replacement_auto_effects_test.rs` | `group_baton_replacement_places_energy_under_arriving_member` | 138 |  |
-| `engine/tests/test_modules/jidou/leaves_stage/baton_replacement_auto_effects_test.rs` | `other_member_stage_to_waitroom_does_not_trigger_self_live_recovery` | 28 |  |
-| `engine/tests/test_modules/jidou/leaves_stage/baton_replacement_auto_effects_test.rs` | `self_stage_to_waitroom_draw_two_discard_one_leaves_one_card_in_hand` | 53 |  |
-| `engine/tests/test_modules/jidou/leaves_stage/baton_replacement_auto_effects_test.rs` | `self_stage_to_waitroom_draw_two_discard_two_leaves_empty_hand` | 72 |  |
-| `engine/tests/test_modules/jidou/leaves_stage/baton_replacement_auto_effects_test.rs` | `self_stage_to_waitroom_look_five_adds_live_to_hand` | 91 |  |
-| `engine/tests/test_modules/jidou/leaves_stage/baton_replacement_auto_effects_test.rs` | `self_stage_to_waitroom_optional_discard_grants_member_heart05_and_blade` | 114 |  |
-| `engine/tests/test_modules/jidou/leaves_stage/baton_replacement_auto_effects_test.rs` | `self_stage_to_waitroom_recovers_group_live` | 6 |  |
+| `engine/tests/test_modules/jidou/leaves_stage/baton_replacement_auto_effects_test.rs` | `group_baton_replacement_places_energy_under_arriving_member` | 175 |  |
+| `engine/tests/test_modules/jidou/leaves_stage/baton_replacement_auto_effects_test.rs` | `other_member_stage_to_waitroom_does_not_trigger_self_live_recovery` | 43 |  |
+| `engine/tests/test_modules/jidou/leaves_stage/baton_replacement_auto_effects_test.rs` | `self_stage_to_waitroom_draw_two_discard_one_leaves_one_card_in_hand` | 68 |  |
+| `engine/tests/test_modules/jidou/leaves_stage/baton_replacement_auto_effects_test.rs` | `self_stage_to_waitroom_look_five_adds_live_to_hand` | 128 |  |
+| `engine/tests/test_modules/jidou/leaves_stage/baton_replacement_auto_effects_test.rs` | `self_stage_to_waitroom_optional_discard_grants_member_heart05_and_blade` | 151 |  |
+| `engine/tests/test_modules/jidou/leaves_stage/baton_replacement_auto_effects_test.rs` | `self_stage_to_waitroom_recovers_group_live` | 21 |  |
 
 ## synthetic_only (0)
 

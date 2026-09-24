@@ -3630,11 +3630,11 @@ def _try_or(text):
             "text": text,
         }
         result = _fix_distributed_baton_arrival(result, text)
-        leg_events = [
-            leg.get("trigger_event")
-            for leg in result.get("conditions", [])
-            if leg.get("trigger_event")
-        ]
+        leg_events = []
+        for leg in result.get("conditions", []):
+            event = leg.get("trigger_event")
+            if event and event not in leg_events:
+                leg_events.append(event)
         if leg_events:
             result["trigger_event"] = {
                 "type": "or",

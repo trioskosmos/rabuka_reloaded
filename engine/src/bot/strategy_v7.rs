@@ -834,7 +834,17 @@ fn experiment_junk_fill(gs: &GameState, me: u8, db: &CardDatabase, desired: &mut
     if desired.len() >= max_slots || deck_lives == 0 {
         return;
     }
-    let mut junk: Vec<(usize, u8)> = my
+    let future_junk = std::env::var_os("V7_FUTURE_JUNK").is_some();
+    let max_stage_cost = my
+        .stage
+        .stage
+        .iter()
+        .filter_map(|&cid| db.get_card(cid))
+        .filter_map(|card| card.cost)
+        .max()
+        .unwrap_or(0) as i32;
+    let budget = i32::from(u16::from(my.energy_zone.active_count())) + 1;
+    let mut junk: Vec<(usize, u8, i32)> = my
         .hand
         .cards
         .iter()
@@ -843,10 +853,38 @@ fn experiment_junk_fill(gs: &GameState, me: u8, db: &CardDatabase, desired: &mut
             !desired.contains(&i)
                 && db.get_card(cid).is_some_and(|c| c.card_type != CardType::Live)
         })
-        .map(|(i, &cid)| (i, db.get_card(cid).and_then(|c| c.cost).unwrap_or(0)))
+        .map(|(i, &cid)| {
+            let card = db.get_card(cid);
+            let cost = card.and_then(|c| c.cost).unwrap_or(0);
+            let utility = if future_junk && card.is_some_and(|c| c.card_type == CardType::Member) {
+                let hearts = card
+                    .and_then(|c| c.base_heart.as_ref())
+                    .map(|h| h.hearts.values_sum() as i32)
+                    .unwrap_or(0);
+                let delay = (i32::from(cost) - budget - max_stage_cost).max(0) as f64;
+                (2.0 * f64::from(cost) + 2.0 * f64::from(card.map(|c| c.blade).unwrap_or(0)) + f64::from(hearts))
+                    / (1.0 + delay)
+            } else {
+                0.0
+            };
+            let class = if future_junk && card.is_some_and(|c| c.card_type == CardType::Energy) {
+                2
+            } else if future_junk {
+                1
+            } else {
+                0
+            };
+            (i, cost, class * 1_000_000 + utility as i32)
+        })
         .collect();
-    junk.sort_by_key(|&(_, cost)| std::cmp::Reverse(cost));
-    for &(hi, _) in &junk {
+    junk.sort_by_key(|&(_, cost, utility)| {
+        if future_junk {
+            (utility, std::cmp::Reverse(cost))
+        } else {
+            (0, std::cmp::Reverse(cost))
+        }
+    });
+    for &(hi, _, _) in &junk {
         if desired.len() >= max_slots {
             break;
         }
@@ -880,7 +918,7 @@ fn experiment_portfolio_rank(
         return (Vec::new(), Vec::new());
     }
     let lives = experiment_lives(gs, me, db);
-    let n = lives.len().min(8);
+    let n = lives.len();
     let (cats, deck_len) = experiment_flip_categories(gs, me, db);
     let blades = experiment_blades(gs, me, db);
     let board = experiment_board_pool(gs, me, db);
@@ -988,7 +1026,11 @@ pub(crate) fn choose_live_set_experiment(gs: &GameState, actions: &[Action], db:
     }
     if is_second && !opp_committed {
         if let Some(hi) = experiment_free_win(gs, me, db) {
-            return emit(gs, actions, &[hi]);
+            desired.push(hi);
+            if std::env::var_os("V7_FREE_JUNK").is_some() {
+                experiment_junk_fill(gs, me, db, &mut desired);
+            }
+            return emit(gs, actions, &desired);
         }
     }
 
