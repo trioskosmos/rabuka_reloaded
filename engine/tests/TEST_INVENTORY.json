@@ -1,6 +1,6 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-09-25T16:39:19.875583+00:00",
+  "generated_at": "2026-09-25T17:19:11.733052+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
@@ -401,8 +401,14 @@
       ]
     },
     "no_drive": {
-      "count": 15,
+      "count": 16,
       "rows": [
+        {
+          "file": "engine/tests/test_modules/effects/ability_mod/live_success_invalidation_and_live_start_suppression_test.rs",
+          "test": "butterfly_suppresses_only_the_owners_live_start_members",
+          "line": 213,
+          "detail": ""
+        },
         {
           "file": "engine/tests/test_modules/effects/deck_order/restore/live_start_optional_two_member_bottomdeck_test.rs",
           "test": "live_start_optional_two_member_bottomdeck_shrinks_waitroom",
@@ -761,7 +767,7 @@
         "engine/tests/test_modules/effects/conditional/joint_six_discard_mixed_name_cost_test.rs",
         "engine/tests/test_modules/effects/conditional/pl_hs_bp6_004_test.rs",
         "engine/tests/test_modules/effects/conditional/pl_s_bp7_007_test.rs",
-        "engine/tests/test_modules/effects/conditional/remaining_comprehensive_edge_test.rs",
+        "engine/tests/test_modules/effects/conditional/under_card_and_success_live_conditions_test.rs",
         "engine/tests/test_modules/effects/cost_mod/modify_required_hearts_exclude_heart_test.rs",
         "engine/tests/test_modules/effects/cost_mod/play_time_three_named_member_discard_cost_ten_test.rs",
         "engine/tests/test_modules/effects/cost_mod/wonder_zone_max_repeats_test.rs",
@@ -1136,7 +1142,8 @@
       "covering_files": [
         "engine/tests/test_modules/characterization/character_condition_fix_test.rs",
         "engine/tests/test_modules/characterization/logging_test.rs",
-        "engine/tests/test_modules/effects/ability_mod/genki_zenkai_test.rs",
+        "engine/tests/test_modules/effects/ability_mod/genki_zenkai_invalidates_own_live_success_test.rs",
+        "engine/tests/test_modules/effects/ability_mod/live_success_invalidation_and_live_start_suppression_test.rs",
         "engine/tests/test_modules/effects/choice/opponent_choice_test.rs",
         "engine/tests/test_modules/effects/compound/edelnote_test.rs",
         "engine/tests/test_modules/effects/compound/live_start_optional_unit_position_change_heart_blade_test.rs",
@@ -1167,6 +1174,8 @@
         "baton_touch_moves_replaced_member_to_waitroom",
         "both_effects_execute",
         "buffers_are_bounded",
+        "butterfly_suppresses_only_the_owners_live_start_members",
+        "butterfly_suppresses_own_live_start_but_still_scores_on_live_success",
         "card_count_condition_baton_touch_filter",
         "choice_metadata_preserves_offered_and_chosen",
         "choice_resolved_metadata_is_trimmed_and_captures_chosen",
@@ -1180,11 +1189,9 @@
         "edelnote_name_based_exclusion",
         "edelnote_no_members",
         "edelnote_single_member",
-        "edelnote_three_members_two_same_name",
-        "edelnote_two_members_different_names",
-        "edelnote_two_same_name"
+        "edelnote_three_members_two_same_name"
       ],
-      "covering_test_count": 146,
+      "covering_test_count": 150,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -1306,7 +1313,7 @@
         "engine/tests/test_modules/effects/compound/discard_mill_live_recovery_pl_hs_pb1_004_r_test.rs",
         "engine/tests/test_modules/effects/compound/izumi_bp6_test.rs",
         "engine/tests/test_modules/effects/compound/pb1_007_comprehensive_edge_test.rs",
-        "engine/tests/test_modules/effects/conditional/remaining_comprehensive_edge_test.rs",
+        "engine/tests/test_modules/effects/conditional/under_card_and_success_live_conditions_test.rs",
         "engine/tests/test_modules/effects/energy/place/score_condition_integration_test.rs",
         "engine/tests/test_modules/effects/energy/under_member/energy_and_member_under_test.rs",
         "engine/tests/test_modules/effects/gain/hearts/live_zone_heart05_threshold_pl_s_bp5_017_n_test.rs",
@@ -1862,7 +1869,7 @@
         "engine/tests/test_modules/effects/compound/mus_live_recovery_success_score_energy_pl_pr_017_pr_test.rs",
         "engine/tests/test_modules/effects/compound/pl_hs_sd1_008_test.rs",
         "engine/tests/test_modules/effects/compound/stage_heart02_score_requirement_pl_n_bp5_028_l_test.rs",
-        "engine/tests/test_modules/effects/conditional/remaining_comprehensive_edge_test.rs",
+        "engine/tests/test_modules/effects/conditional/under_card_and_success_live_conditions_test.rs",
         "engine/tests/test_modules/effects/deck_order/restore/revealed_liella_pl_sp_bp7_023_l_test.rs",
         "engine/tests/test_modules/effects/deploy/waitroom_low_cost_pl_hs_bp6_016_r_test.rs",
         "engine/tests/test_modules/effects/draw/chains/hand_debut_no_draw_pl_hs_bp6_015_r_test.rs",
@@ -1959,7 +1966,7 @@
       "covering_files": [
         "engine/tests/test_modules/characterization/prohibition_layer_characterization_test.rs",
         "engine/tests/test_modules/effects/compound/pb1_007_comprehensive_edge_test.rs",
-        "engine/tests/test_modules/effects/conditional/remaining_comprehensive_edge_test.rs",
+        "engine/tests/test_modules/effects/conditional/under_card_and_success_live_conditions_test.rs",
         "engine/tests/test_modules/effects/gain/blades/live_start_hand_pair_blade_snapshot_q109_test.rs",
         "engine/tests/test_modules/effects/gain/blades/live_start_hand_pair_blades_test.rs",
         "engine/tests/test_modules/effects/gain/blades/success_pile_difference_pl_s_bp6_009_r_plus_test.rs",
@@ -5333,7 +5340,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/ability_mod/ability_from_source_test.rs",
+        "engine/tests/test_modules/effects/ability_mod/rina_gain_live_success_from_under_member_test.rs",
         "engine/tests/test_modules/effects/gain/blades/live_start_optional_energy_other_group_blades_test.rs",
         "engine/tests/test_modules/effects/gain/hearts/combined_energy_fifteen_constant_heart_test.rs",
         "engine/tests/test_modules/effects/gain/hearts/combined_energy_fifteen_heart02_boundary_test.rs",
@@ -5402,7 +5409,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/ability_mod/ability_from_source_test.rs",
+        "engine/tests/test_modules/effects/ability_mod/rina_gain_live_success_from_under_member_test.rs",
         "engine/tests/test_modules/effects/gain/blades/live_start_optional_energy_other_group_blades_test.rs",
         "engine/tests/test_modules/effects/gain/hearts/combined_energy_fifteen_constant_heart_test.rs",
         "engine/tests/test_modules/effects/gain/hearts/combined_energy_fifteen_heart02_boundary_test.rs",
@@ -5471,7 +5478,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/ability_mod/ability_from_source_test.rs",
+        "engine/tests/test_modules/effects/ability_mod/rina_gain_live_success_from_under_member_test.rs",
         "engine/tests/test_modules/effects/gain/blades/live_start_optional_energy_other_group_blades_test.rs",
         "engine/tests/test_modules/effects/gain/hearts/combined_energy_fifteen_constant_heart_test.rs",
         "engine/tests/test_modules/effects/gain/hearts/combined_energy_fifteen_heart02_boundary_test.rs",
@@ -6819,7 +6826,7 @@
       "covering_files": [
         "engine/tests/test_modules/effects/compound/pl_bp5_012_test.rs",
         "engine/tests/test_modules/effects/compound/shodo_rin_energy_test.rs",
-        "engine/tests/test_modules/effects/conditional/remaining_comprehensive_edge_test.rs"
+        "engine/tests/test_modules/effects/conditional/under_card_and_success_live_conditions_test.rs"
       ],
       "covering_tests": [
         "genki_invalidate_isolated_to_self",
@@ -6876,7 +6883,7 @@
       "covering_files": [
         "engine/tests/test_modules/effects/compound/pl_bp5_012_test.rs",
         "engine/tests/test_modules/effects/compound/shodo_rin_energy_test.rs",
-        "engine/tests/test_modules/effects/conditional/remaining_comprehensive_edge_test.rs"
+        "engine/tests/test_modules/effects/conditional/under_card_and_success_live_conditions_test.rs"
       ],
       "covering_tests": [
         "genki_invalidate_isolated_to_self",
@@ -10921,7 +10928,6 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/characterization/zero_tested_action_types_test.rs",
-        "engine/tests/test_modules/effects/ability_mod/invalid_suppress_comprehensive_edge_test.rs",
         "engine/tests/test_modules/effects/compound/ability_engine_fixes_test.rs",
         "engine/tests/test_modules/effects/compound/bp2_006_kinako_baton_recovery_test.rs",
         "engine/tests/test_modules/effects/conditional/sp_bp2_004_comprehensive_edge_test.rs",
@@ -10942,8 +10948,6 @@
         "all_three_equal_cost_grants_no_heart",
         "blade_goes_to_stage_member_not_live_card",
         "both_players_get_own_live_start_effects",
-        "butterfly_opponent_not_suppressed",
-        "butterfly_suppress_blocks_livestart_not_livesuccess",
         "center_cost_below_left_grants_no_heart",
         "center_equal_cost_no_heart",
         "center_highest_among_three_different_costs",
@@ -10967,9 +10971,11 @@
         "dazzling_live_start_recolors_listed_blade_hearts_to_purple",
         "dazzling_q187_exclude_selected_liella_other_pickable",
         "empty_center_with_lone_member_grants_no_heart",
-        "empty_center_with_two_side_members_grants_no_heart"
+        "empty_center_with_two_side_members_grants_no_heart",
+        "kanon_ab1_live_success_fires_but_live_fails_no_hearts",
+        "kanon_ab1_live_success_pay_optional_cost"
       ],
-      "covering_test_count": 127,
+      "covering_test_count": 123,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -10999,7 +11005,6 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/characterization/zero_tested_action_types_test.rs",
-        "engine/tests/test_modules/effects/ability_mod/invalid_suppress_comprehensive_edge_test.rs",
         "engine/tests/test_modules/effects/compound/ability_engine_fixes_test.rs",
         "engine/tests/test_modules/effects/compound/bp2_006_kinako_baton_recovery_test.rs",
         "engine/tests/test_modules/effects/conditional/sp_bp2_004_comprehensive_edge_test.rs",
@@ -11020,8 +11025,6 @@
         "all_three_equal_cost_grants_no_heart",
         "blade_goes_to_stage_member_not_live_card",
         "both_players_get_own_live_start_effects",
-        "butterfly_opponent_not_suppressed",
-        "butterfly_suppress_blocks_livestart_not_livesuccess",
         "center_cost_below_left_grants_no_heart",
         "center_equal_cost_no_heart",
         "center_highest_among_three_different_costs",
@@ -11045,9 +11048,11 @@
         "dazzling_live_start_recolors_listed_blade_hearts_to_purple",
         "dazzling_q187_exclude_selected_liella_other_pickable",
         "empty_center_with_lone_member_grants_no_heart",
-        "empty_center_with_two_side_members_grants_no_heart"
+        "empty_center_with_two_side_members_grants_no_heart",
+        "kanon_ab1_live_success_fires_but_live_fails_no_hearts",
+        "kanon_ab1_live_success_pay_optional_cost"
       ],
-      "covering_test_count": 127,
+      "covering_test_count": 123,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -11475,8 +11480,8 @@
         "engine/tests/test_modules/characterization/decode_audit_behavior_pins_test.rs",
         "engine/tests/test_modules/characterization/performance_snapshot_audit_test.rs",
         "engine/tests/test_modules/characterization/pipeline_characterization_test.rs",
-        "engine/tests/test_modules/effects/ability_mod/ability_from_source_test.rs",
         "engine/tests/test_modules/effects/ability_mod/full_distinct_group_stage_grants_yell_live_score_test.rs",
+        "engine/tests/test_modules/effects/ability_mod/rina_gain_live_success_from_under_member_test.rs",
         "engine/tests/test_modules/effects/compound/shioriko_bp4_swap_test.rs",
         "engine/tests/test_modules/effects/conditional/debut_reveal_success_zone_replacement_q256_test.rs",
         "engine/tests/test_modules/effects/conditional/live_phase_success_zone_replacement_q256_test.rs",
@@ -16082,21 +16087,26 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
+        "engine/tests/test_modules/effects/ability_mod/live_success_invalidation_and_live_start_suppression_test.rs",
         "engine/tests/test_modules/effects/draw/flat/stage_member_identity_and_cost_gated_draw_test.rs",
         "engine/tests/test_modules/effects/state/butterfly_wing_suppress_test.rs"
       ],
       "covering_tests": [
+        "butterfly_suppresses_only_the_owners_live_start_members",
+        "butterfly_suppresses_own_live_start_but_still_scores_on_live_success",
         "butterfly_wing_live_success_scores_with_live_start_members",
         "butterfly_wing_no_live_start_member_no_score",
         "butterfly_wing_q260_control_live_start_resolves",
         "butterfly_wing_q260_suppressed_not_resolved",
+        "genki_5_heart02_keeps_live_success_and_it_resolves",
+        "genki_exactly_6_heart02_across_two_members_invalidates_live_success",
         "honoka_bp4_001_live_start_cheaper_stage_total_draws_one_otherwise_skips",
         "nico_bp3_009_debut_cost_thirteen_member_present_draws_one",
         "nico_bp3_009_debut_no_cost_thirteen_member_skips_draw",
         "shiki_sp_bp1_008_debut_with_mei_draws_two",
         "shiki_sp_bp1_008_debut_without_mei_draws_one"
       ],
-      "covering_test_count": 9,
+      "covering_test_count": 13,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -16505,7 +16515,7 @@
         "engine/tests/test_modules/effects/compound/center_wait_discard_other_group_cost_plus_two_same_area_deploy_edges_test.rs",
         "engine/tests/test_modules/effects/compound/center_wait_discard_other_group_cost_plus_two_same_area_deploy_test.rs",
         "engine/tests/test_modules/effects/compound/discard_wait_enables_hearts_pl_hs_bp5_016_n_test.rs",
-        "engine/tests/test_modules/effects/conditional/remaining_comprehensive_edge_test.rs",
+        "engine/tests/test_modules/effects/conditional/under_card_and_success_live_conditions_test.rs",
         "engine/tests/test_modules/effects/deploy/paid_energy_same_name_debut_chain_q200_q201_q202_test.rs",
         "engine/tests/test_modules/effects/deploy/s_bp3_006_cost_ref_test.rs",
         "engine/tests/test_modules/effects/gain/blades/live_start_distinct_under_member_blades_test.rs",
@@ -16779,7 +16789,7 @@
       "covering_files": [
         "engine/tests/test_modules/characterization/prohibition_layer_characterization_test.rs",
         "engine/tests/test_modules/effects/compound/pb1_007_comprehensive_edge_test.rs",
-        "engine/tests/test_modules/effects/conditional/remaining_comprehensive_edge_test.rs",
+        "engine/tests/test_modules/effects/conditional/under_card_and_success_live_conditions_test.rs",
         "engine/tests/test_modules/effects/gain/blades/success_pile_difference_pl_s_bp6_009_r_plus_test.rs",
         "engine/tests/test_modules/effects/restriction/kagayaiteru_test.rs",
         "engine/tests/test_modules/effects/restriction/live_success_sequential_test.rs",
@@ -19272,7 +19282,7 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/effects/conditional/conditional_alternative_test.rs",
-        "engine/tests/test_modules/effects/conditional/remaining_comprehensive_edge_test.rs"
+        "engine/tests/test_modules/effects/conditional/under_card_and_success_live_conditions_test.rs"
       ],
       "covering_tests": [
         "genki_invalidate_isolated_to_self",
@@ -19708,7 +19718,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/conditional/umi_pb1_013_test.rs"
+        "engine/tests/test_modules/effects/conditional/umi_reveal_live_card_gains_live_total_score_test.rs"
       ],
       "covering_tests": [
         "q176_activate_creates_blind_reveal_choice_opponent_controls_pick",
@@ -20350,7 +20360,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/ability_mod/ability_from_source_test.rs",
+        "engine/tests/test_modules/effects/ability_mod/rina_gain_live_success_from_under_member_test.rs",
         "engine/tests/test_modules/integration/parser_issues_e2e_part2_test.rs",
         "engine/tests/test_modules/integration/parser_issues_e2e_part3_test.rs",
         "engine/tests/test_modules/jidou/leaves_stage/miyashita_ai_bp5_test.rs"
@@ -20451,7 +20461,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/ability_mod/ability_from_source_test.rs",
+        "engine/tests/test_modules/effects/ability_mod/rina_gain_live_success_from_under_member_test.rs",
         "engine/tests/test_modules/effects/score/shizuku_bp4_aggregate_test.rs"
       ],
       "covering_tests": [
@@ -25068,7 +25078,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/ability_mod/genki_zenkai_test.rs",
+        "engine/tests/test_modules/effects/ability_mod/genki_zenkai_invalidates_own_live_success_test.rs",
         "engine/tests/test_modules/effects/state/s_bp6_015_wait_test.rs"
       ],
       "covering_tests": [
@@ -25900,7 +25910,7 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/characterization/strict_engine_bug_expected_fail_test.rs",
-        "engine/tests/test_modules/effects/conditional/remaining_comprehensive_edge_test.rs",
+        "engine/tests/test_modules/effects/conditional/under_card_and_success_live_conditions_test.rs",
         "engine/tests/test_modules/jidou/movement/ability_chain_combo_test.rs",
         "engine/tests/test_modules/jidou/movement/live_success_or_self_move_place_discard_group_member_under_self_test.rs",
         "engine/tests/test_modules/jidou/movement/pb2_under_member_test.rs"
@@ -25959,7 +25969,7 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/characterization/strict_engine_bug_expected_fail_test.rs",
-        "engine/tests/test_modules/effects/conditional/remaining_comprehensive_edge_test.rs",
+        "engine/tests/test_modules/effects/conditional/under_card_and_success_live_conditions_test.rs",
         "engine/tests/test_modules/jidou/movement/ability_chain_combo_test.rs",
         "engine/tests/test_modules/jidou/movement/live_success_or_self_move_place_discard_group_member_under_self_test.rs",
         "engine/tests/test_modules/jidou/movement/pb2_under_member_test.rs"
@@ -26311,7 +26321,7 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/effects/conditional/keke_pb2_013_debut_test.rs",
-        "engine/tests/test_modules/effects/conditional/remaining_comprehensive_edge_test.rs"
+        "engine/tests/test_modules/effects/conditional/under_card_and_success_live_conditions_test.rs"
       ],
       "covering_tests": [
         "genki_invalidate_isolated_to_self",
@@ -29624,7 +29634,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/ability_mod/ability_from_source_test.rs",
+        "engine/tests/test_modules/effects/ability_mod/rina_gain_live_success_from_under_member_test.rs",
         "engine/tests/test_modules/effects/energy/under_member/energy_and_member_under_test.rs",
         "engine/tests/test_modules/effects/score/aquarium_live_success_test.rs"
       ],
@@ -29687,7 +29697,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/ability_mod/ability_from_source_test.rs",
+        "engine/tests/test_modules/effects/ability_mod/rina_gain_live_success_from_under_member_test.rs",
         "engine/tests/test_modules/effects/energy/under_member/energy_and_member_under_test.rs",
         "engine/tests/test_modules/effects/score/aquarium_live_success_test.rs"
       ],
@@ -29750,7 +29760,7 @@
       "has_choice": false,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/ability_mod/ability_from_source_test.rs",
+        "engine/tests/test_modules/effects/ability_mod/rina_gain_live_success_from_under_member_test.rs",
         "engine/tests/test_modules/effects/gain/hearts/combined_stage_count_constant_heart_test.rs"
       ],
       "covering_tests": [
@@ -30953,7 +30963,7 @@
         "engine/tests/test_modules/effects/compound/live_start_discard_reactivate_other_member_both_heart04_test.rs",
         "engine/tests/test_modules/effects/compound/mus_live_recovery_success_score_energy_pl_pr_017_pr_test.rs",
         "engine/tests/test_modules/effects/compound/stage_heart02_score_requirement_pl_n_bp5_028_l_test.rs",
-        "engine/tests/test_modules/effects/conditional/remaining_comprehensive_edge_test.rs",
+        "engine/tests/test_modules/effects/conditional/under_card_and_success_live_conditions_test.rs",
         "engine/tests/test_modules/effects/deck_order/restore/revealed_liella_pl_sp_bp7_023_l_test.rs",
         "engine/tests/test_modules/effects/deploy/waitroom_low_cost_pl_hs_bp6_016_r_test.rs",
         "engine/tests/test_modules/effects/draw/chains/hand_debut_no_draw_pl_hs_bp6_015_r_test.rs",
@@ -32734,17 +32744,17 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/ability_mod/genki_zenkai_test.rs",
+        "engine/tests/test_modules/effects/ability_mod/genki_zenkai_invalidates_own_live_success_test.rs",
         "engine/tests/test_modules/effects/ability_mod/heart02_gated_live_success_invalidation_setup_test.rs",
-        "engine/tests/test_modules/effects/ability_mod/invalid_suppress_comprehensive_edge_test.rs",
-        "engine/tests/test_modules/effects/conditional/remaining_comprehensive_edge_test.rs",
+        "engine/tests/test_modules/effects/ability_mod/live_success_invalidation_and_live_start_suppression_test.rs",
+        "engine/tests/test_modules/effects/conditional/under_card_and_success_live_conditions_test.rs",
         "engine/tests/test_modules/effects/energy/place/live_success_opponent_waited_energy_resolution_test.rs"
       ],
       "covering_tests": [
-        "butterfly_opponent_not_suppressed",
-        "butterfly_suppress_blocks_livestart_not_livesuccess",
-        "genki_5_heart02_not_invalidate",
-        "genki_exactly_6_invalidates",
+        "butterfly_suppresses_only_the_owners_live_start_members",
+        "butterfly_suppresses_own_live_start_but_still_scores_on_live_success",
+        "genki_5_heart02_keeps_live_success_and_it_resolves",
+        "genki_exactly_6_heart02_across_two_members_invalidates_live_success",
         "genki_invalidate_isolated_to_self",
         "genki_zenkai_invalidates_own_live_success",
         "genki_zenkai_live_success_fires_when_condition_not_met",
@@ -32784,17 +32794,17 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/ability_mod/genki_zenkai_test.rs",
+        "engine/tests/test_modules/effects/ability_mod/genki_zenkai_invalidates_own_live_success_test.rs",
         "engine/tests/test_modules/effects/ability_mod/heart02_gated_live_success_invalidation_setup_test.rs",
-        "engine/tests/test_modules/effects/ability_mod/invalid_suppress_comprehensive_edge_test.rs",
-        "engine/tests/test_modules/effects/conditional/remaining_comprehensive_edge_test.rs",
+        "engine/tests/test_modules/effects/ability_mod/live_success_invalidation_and_live_start_suppression_test.rs",
+        "engine/tests/test_modules/effects/conditional/under_card_and_success_live_conditions_test.rs",
         "engine/tests/test_modules/effects/energy/place/live_success_opponent_waited_energy_resolution_test.rs"
       ],
       "covering_tests": [
-        "butterfly_opponent_not_suppressed",
-        "butterfly_suppress_blocks_livestart_not_livesuccess",
-        "genki_5_heart02_not_invalidate",
-        "genki_exactly_6_invalidates",
+        "butterfly_suppresses_only_the_owners_live_start_members",
+        "butterfly_suppresses_own_live_start_but_still_scores_on_live_success",
+        "genki_5_heart02_keeps_live_success_and_it_resolves",
+        "genki_exactly_6_heart02_across_two_members_invalidates_live_success",
         "genki_invalidate_isolated_to_self",
         "genki_zenkai_invalidates_own_live_success",
         "genki_zenkai_live_success_fires_when_condition_not_met",
@@ -39376,7 +39386,6 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/ability_mod/invalid_suppress_comprehensive_edge_test.rs",
         "engine/tests/test_modules/effects/choice/blade_option_exclude_self_pl_s_bp5_004_r_test.rs",
         "engine/tests/test_modules/effects/choice/daydream_mermaid_test.rs",
         "engine/tests/test_modules/effects/compound/deficit_mill_live_topdeck_pl_n_pr_032_pr_test.rs",
@@ -39400,16 +39409,12 @@
         "any_card_fails_hearts_all_fail",
         "both_players_have_live_cards",
         "both_players_live_score_compared",
-        "butterfly_opponent_not_suppressed",
-        "butterfly_suppress_blocks_livestart_not_livesuccess",
         "cutie_panther_live_start_reduce_hearts",
         "daydream_mermaid_choice_appears_and_selects_energy",
         "daydream_mermaid_choice_cannot_be_applied_twice_q191",
         "daydream_mermaid_choice_selects_recover",
         "daydream_mermaid_no_niji_in_success_pick_one",
         "daydream_mermaid_q191_niji_in_success_pick_both",
-        "genki_5_heart02_not_invalidate",
-        "genki_exactly_6_invalidates",
         "kaguya_live_success_cheer_recover",
         "kaguya_live_success_recover",
         "kanan_live_success_timing",
@@ -39426,9 +39431,13 @@
         "pl_s_bp5_004_r_blade_option_selects_one_other_aqours_member",
         "pl_s_bp7_023_l_return_energy_opponent_one_ahead_grants_one_score",
         "pl_s_bp7_023_l_return_energy_opponent_two_ahead_grants_two_score",
-        "pl_s_bp7_023_l_tied_energy_after_return_grants_no_score"
+        "pl_s_bp7_023_l_tied_energy_after_return_grants_no_score",
+        "pl_s_sd1_009_sd_live_start_revealed_aqours_card_moves_from_hand_to_deck",
+        "pl_s_sd1_009_sd_live_start_without_aqours_preserves_non_aqours_hand_card",
+        "q147_empty_need_heart_live_succeeds",
+        "q259_live_success_remains_after_constant_heart_source_is_lost"
       ],
-      "covering_test_count": 82,
+      "covering_test_count": 78,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -43795,13 +43804,13 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/ability_mod/invalid_suppress_comprehensive_edge_test.rs",
+        "engine/tests/test_modules/effects/ability_mod/live_success_invalidation_and_live_start_suppression_test.rs",
         "engine/tests/test_modules/effects/recover/to_hand/hinoshita_test.rs",
         "engine/tests/test_modules/effects/state/butterfly_wing_suppress_test.rs"
       ],
       "covering_tests": [
-        "butterfly_opponent_not_suppressed",
-        "butterfly_suppress_blocks_livestart_not_livesuccess",
+        "butterfly_suppresses_only_the_owners_live_start_members",
+        "butterfly_suppresses_own_live_start_but_still_scores_on_live_success",
         "butterfly_to_butterfly_wing_matches",
         "butterfly_wing_live_success_scores_with_live_start_members",
         "butterfly_wing_no_live_start_member_no_score",
@@ -43812,8 +43821,8 @@
         "dream_believers_105_to_104_no_match",
         "dream_believers_105_to_base_no_match",
         "dream_believers_to_105_matches",
-        "genki_5_heart02_not_invalidate",
-        "genki_exactly_6_invalidates",
+        "genki_5_heart02_keeps_live_success_and_it_resolves",
+        "genki_exactly_6_heart02_across_two_members_invalidates_live_success",
         "hinoshita_multiple_waitroom_matches_prompts_choice",
         "hinoshita_no_live_card_in_hand_fails",
         "hinoshita_no_matching_live_in_discard_fails",
@@ -43853,13 +43862,13 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/ability_mod/invalid_suppress_comprehensive_edge_test.rs",
+        "engine/tests/test_modules/effects/ability_mod/live_success_invalidation_and_live_start_suppression_test.rs",
         "engine/tests/test_modules/effects/recover/to_hand/hinoshita_test.rs",
         "engine/tests/test_modules/effects/state/butterfly_wing_suppress_test.rs"
       ],
       "covering_tests": [
-        "butterfly_opponent_not_suppressed",
-        "butterfly_suppress_blocks_livestart_not_livesuccess",
+        "butterfly_suppresses_only_the_owners_live_start_members",
+        "butterfly_suppresses_own_live_start_but_still_scores_on_live_success",
         "butterfly_to_butterfly_wing_matches",
         "butterfly_wing_live_success_scores_with_live_start_members",
         "butterfly_wing_no_live_start_member_no_score",
@@ -43870,8 +43879,8 @@
         "dream_believers_105_to_104_no_match",
         "dream_believers_105_to_base_no_match",
         "dream_believers_to_105_matches",
-        "genki_5_heart02_not_invalidate",
-        "genki_exactly_6_invalidates",
+        "genki_5_heart02_keeps_live_success_and_it_resolves",
+        "genki_exactly_6_heart02_across_two_members_invalidates_live_success",
         "hinoshita_multiple_waitroom_matches_prompts_choice",
         "hinoshita_no_live_card_in_hand_fails",
         "hinoshita_no_matching_live_in_discard_fails",

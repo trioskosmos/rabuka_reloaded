@@ -133,7 +133,7 @@ impl super::TurnEngine {
         }
     }
 
-    fn is_trigger_suppressed(game_state: &GameState, player_id: &str, trigger_name: &str) -> bool {
+    pub fn is_trigger_suppressed(game_state: &GameState, player_id: &str, trigger_name: &str) -> bool {
         let player = if player_id == game_state.player1.id {
             &game_state.player1
         } else {

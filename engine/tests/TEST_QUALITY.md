@@ -15,12 +15,13 @@ _test never asserts (smoke at best — cannot pin behavior)_
 | `engine/tests/test_modules/effects/score/chika_bp3_001_wait_self_activation_live_total_score_test.rs` | `wait_member_total_score_expires_at_live_end_even_without_setting_live` | 110 |  |
 | `engine/tests/test_modules/effects/score/chika_bp3_001_wait_self_activation_live_total_score_test.rs` | `wait_member_total_score_persists_through_victory_and_expires_after_live` | 105 |  |
 
-## no_drive (15)
+## no_drive (16)
 
 _trigger-context test that mutates state and asserts but never drives the engine (no scan/activate/play/fire): vacuous negatives/positives_
 
 | file | test | line | detail |
 | --- | --- | --- | --- |
+| `engine/tests/test_modules/effects/ability_mod/live_success_invalidation_and_live_start_suppression_test.rs` | `butterfly_suppresses_only_the_owners_live_start_members` | 213 |  |
 | `engine/tests/test_modules/effects/deck_order/restore/live_start_optional_two_member_bottomdeck_test.rs` | `live_start_optional_two_member_bottomdeck_shrinks_waitroom` | 4 |  |
 | `engine/tests/test_modules/effects/look_select/niche_filters/all_or_any_three_heart_member_search_test.rs` | `all_three_heart_match_enters_hand_without_nonmatching_filler` | 231 |  |
 | `engine/tests/test_modules/effects/look_select/niche_filters/all_or_any_three_heart_member_search_test.rs` | `all_three_required_hearts_member_is_added_to_hand` | 23 |  |
