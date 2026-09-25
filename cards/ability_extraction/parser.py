@@ -1775,21 +1775,32 @@ def _set_action_039(t, a):
  )
 
 def _set_action_040(t, a):
- return a.update(
-    {
-       'sign': 'negative',
-       'resource': (
-           'surplus_heart'
-           if (
-                '余剰ハート' in t or '余分ハート' in t or 'それら' in t
-               )
-           else 'heart'
-          ),
-       'all': (
-           'すべて' in t or None
-          )
-      },
- )
+    if "余剰ハート" in t or "余分ハート" in t or "それら" in t:
+        a["resource"] = "surplus_heart"
+    elif "ブレード" in t:
+        a["resource"] = "blade"
+    else:
+        a["resource"] = "heart"
+    blade_count = len(re.findall(r"\{\{icon_blade\.png\|ブレード\}\}", t))
+    heart_count = len(re.findall(r"\{\{heart_\d+\.png\|heart\d+\}\}", t))
+    if blade_count:
+        a["count"] = blade_count
+    elif heart_count:
+        a["count"] = heart_count
+        a["heart_colors"] = extract_heart_types(t)
+    elif "count" not in a:
+        count_match = re.search(r"(\d+)(?:つ|個|枚)", t)
+        if count_match:
+            a["count"] = int(count_match.group(1))
+    if "すべて" in t or "全て" in t:
+        a["all"] = True
+    if "ライブ終了時まで" in t:
+        a["duration"] = "live_end"
+    cost_limit = extract_cost_limit_with_operator(t)
+    if cost_limit:
+        a["cost_limit"], a["cost_limit_operator"] = cost_limit
+    a["sign"] = "negative"
+    return a
 
 def _set_action_041(t, a):
  return (
@@ -2083,7 +2094,7 @@ _ACTION_RULES: List[ActionRule] = [
     ActionRule(name='action_037_gain_resource', condition=lambda t: '{{icon_blade.png|ブレード}}' in t and '得る' in t and (not _blade_icon_is_target_filter(t)), action='gain_resource', setter=_set_action_037, priority=37, order=37),
     ActionRule(name='action_038_gain_resource', match='得る', condition=lambda t: '{{icon_all.png' in t, action='gain_resource', defaults={'resource': 'heart', 'heart_type': 'all'}, setter=_set_action_038, priority=38, order=38),
     ActionRule(name='action_039_gain_resource', condition=lambda t: '{{heart' in t and '得る' in t or bool(re.search('ハート.*得る', t)) or ('選んだハート' in t and 'になる' not in t), action='gain_resource', setter=_set_action_039, priority=39, order=39),
-    ActionRule(name='action_040_gain_resource', condition=lambda t: bool(re.search('を(すべて)?失[うい]', t)) and 'もう一度エール' not in t and ('もう1度エール' not in t), action='gain_resource', setter=_set_action_040, priority=40, order=40),
+    ActionRule(name='action_040_gain_resource', condition=lambda t: re.search(r'(ブレード|ハート|余剰ハート|それら).*?失[うい]', t) is not None and 'もう一度エール' not in t and 'もう1度エール' not in t, action='gain_resource', setter=_set_action_040, priority=40, order=40),
     ActionRule(name='action_041_re_yell', condition=lambda t: 'もう一度エール' in t or 'もう1度エール' in t, action='re_yell', setter=_set_action_041, priority=41, order=41),
     ActionRule(name='action_042_look_at', condition=lambda t: '見る' in t or '見て' in t or t.endswith('見'), action='look_at', setter=_set_action_042, priority=42, order=42),
     ActionRule(name='action_043_reveal', condition=lambda t: '公開する' in t or '公開して' in t, action='reveal', setter=_set_action_043, priority=43, order=43),
@@ -6832,25 +6843,22 @@ def _propagate(src, dst, skip_existing=False):
         dst[k] = src[k]
 
 
-def _try_yell_source_modifier(text):
-    """エールは、デッキの上から行う代わりにデッキの下から行う — modifies where the
-    player's yell draws from. Emits a first-class modify_yell_source action with a
-    `yell_source` field the engine decodes and applies during the cheer reveal."""
-    if "エール" not in text or "代わりに" not in text or "行う" not in text:
-        return None
-    if "デッキの上から" not in text and "デッキの下から" not in text:
-        return None
-    if not re.search(
-        r"エール.*?代わりに.*?(デッキの[上下]から|山札の[上下]から).*?行う", text
-    ):
-        return None
-    return {
-        "text": text,
-        "action": "modify_yell_source",
-        "yell_source": "deck_bottom"
-        if "デッキの下から" in text or "山札の下から" in text
-        else "deck_top",
-    }
+_try_yell_source_modifier = EffectPattern(
+    condition=lambda t: "エール" in t
+    and "代わりに" in t
+    and "行う" in t
+    and ("デッキの上から" in t or "デッキの下から" in t)
+    and re.search(r"エール.*?代わりに.*?(デッキの[上下]から|山札の[上下]から).*?行う", t)
+    is not None,
+    action="modify_yell_source",
+    setter=lambda t, r: r.update(
+        {
+            "yell_source": "deck_bottom"
+            if "デッキの下から" in t or "山札の下から" in t
+            else "deck_top"
+        }
+    ),
+)
 
 
 def _try_activation_history_tiers(text):
@@ -9391,80 +9399,20 @@ def _try_te_sequential(text):
     return None
 
 
-def _try_global_modifier(text):
-    """～は、～ — global required hearts modifier (必要ハートが多くなる/少なくなる)."""
-    m = re.search(r".+は、.+", text)
-    if not m or "ある場合" in text:
-        return None
-    if "必要ハート" in text and ("多くなる" in text or "少なくなる" in text):
-        result = {
-            "text": text,
-            "action": "modify_required_hearts_global",
-            "operation": "increase" if "多くなる" in text else "decrease",
-        }
-        tm = re.search(r"([^は]+)は", text)
-        if tm:
-            raw_target = tm.group(1).strip()
-            if "相手の" in raw_target:
-                result["target"] = "opponent"
-            else:
-                result["target"] = raw_target
-        if "すべて" in text:
-            result["all"] = True
-        # Extract heart_colors from the effect text (the heart icon being modified)
-        hm = re.search(r"\{\{heart_(\d+)\.png\|heart\d+\}\}", text)
-        if hm:
-            hc = f"heart{hm.group(1).zfill(2)}"
-            result["heart_colors"] = [hc]
-        # Extract value: "2つ多くなる" → value=2, bare "多くなる" → value=1
-        vm = re.search(r"(\d+)つ多", text)
-        if vm:
-            result["value"] = int(vm.group(1))
-        else:
-            result["value"] = 1
-        return result
-    return None
-
-
-def _set_lose_resource_fields(text, result):
-    """Setter for lose_resource EffectPattern: detect resource, count, duration."""
-    if "ブレード" in text:
-        result["resource"] = "blade"
-    elif "ハート" in text:
-        result["resource"] = "heart"
-    if "余剰ハート" in text:
-        result["resource"] = "surplus_heart"
-    blade_count = len(re.findall(r"\{\{icon_blade\.png\|ブレード\}\}", text))
-    if blade_count > 0:
-        result["count"] = blade_count
-    heart_count = len(re.findall(r"\{\{heart_\d+\.png\|heart\d+\}\}", text))
-    if heart_count > 0:
-        result["count"] = heart_count
-        result["heart_colors"] = extract_heart_types(text)
-    # No resource icons: pull the count from a counter particle (e.g. "ブレードを1つ失う")
-    if result.get("count") is None:
-        cm = re.search(r"(\d+)(?:つ|個|枚)", text)
-        if cm:
-            result["count"] = int(cm.group(1))
-    if "すべて" in text or "全て" in text:
+def _set_global_modifier_fields(text, result):
+    result["operation"] = "increase" if "多くなる" in text else "decrease"
+    target_match = re.search(r"([^は]+)は", text)
+    if target_match:
+        raw_target = target_match.group(1).strip()
+        result["target"] = "opponent" if "相手の" in raw_target else raw_target
+    if "すべて" in text:
         result["all"] = True
-    if "ライブ終了時まで" in text:
-        result["duration"] = "live_end"
-    cl_op = extract_cost_limit_with_operator(text)
-    if cl_op:
-        result["cost_limit"] = cl_op[0]
-        result["cost_limit_operator"] = cl_op[1]
+    heart_match = re.search(r"\{\{heart_(\d+)\.png\|heart\d+\}\}", text)
+    if heart_match:
+        result["heart_colors"] = [f"heart{heart_match.group(1).zfill(2)}"]
+    value_match = re.search(r"(\d+)つ多", text)
+    result["value"] = int(value_match.group(1)) if value_match else 1
 
-
-_try_lose_resource = EffectPattern(
-    # "を失う" is not enough: corpus also writes "を1つ失う" (count between verb and particle).
-    condition=lambda t: re.search(r"(ブレード|ハート|余剰ハート).*?失う", t) is not None
-    and "もう一度エールを行う" not in t
-    and "もう1度エールを行う" not in t,
-    action="gain_resource",
-    defaults={"sign": "negative"},
-    setter=_set_lose_resource_fields,
-)
 
 _try_play_baton_touch = EffectPattern(
     match_all=["プレイに際し", "バトンタッチ"],
@@ -9483,10 +9431,7 @@ def _try_duration_effect(text):
     ct = parts[0].strip() + DURATION_MARKER
     at = parts[1].strip().lstrip("、")
     cond = parse_condition(ct)
-    # Check for lose_resource in the action part before falling back to parse_action
-    action = _try_lose_resource(at)
-    if action is None:
-        action = parse_action(at)
+    action = parse_action(at)
 
     # Detect "unless pay N energy": negated condition with energy resource type
     if (
@@ -9519,26 +9464,56 @@ def _try_duration_effect(text):
     return result
 
 
-def _try_restriction_effect(text):
-    """アクティブにならない/にしない/ウェイトしない — restriction preventing activation or wait.
-    Matches both "効果によってはアクティブにならない" and plain "アクティブフェイズにアクティブにならない".
-    Also matches "アクティブにしない" (causative negative, e.g. 近江彼方) and
-    "ウェイトしない" (immune to wait, e.g. choice option on 恋になりたいAQUARIUM)."""
+def _set_blade_conversion(text, result):
+    match = re.search(r"すべて\[([^\]]+)\]", text)
+    if not match:
+        return
+    result["blade_type"] = match.group(1)
+    if "ライブ終了時まで" in text:
+        result["duration"] = "live_end"
+
+
+def _set_blade_equal_gain(text, result):
+    result["resource"] = "blade"
+    icon_count = text.count("{{icon_blade.png|ブレード}}")
+    if icon_count:
+        result["count"] = icon_count
+
+
+def _set_blade_same_thing_gain(text, result):
+    result["resource"] = "blade"
+    icon_count = text.count("{{icon_blade.png|ブレード}}")
+    result["count"] = icon_count or 1
+    if "ライブ終了時まで" in text:
+        result["duration"] = "live_end"
+
+
+def _set_blade_count_set(text, result):
+    normalized = re.sub(r"\s+", "", text)
+    pattern_text = re.sub(r"\{\{[^|]+\|([^}]+)\}\}", r"\1", normalized)
+    match = re.search(r"(\d+)つになる", pattern_text) or re.search(
+        r"(\d+)になる", pattern_text
+    )
+    if match:
+        result["count"] = int(match.group(1))
+    if "ライブ終了時まで" in pattern_text:
+        result["duration"] = "live_end"
+
+
+def _set_restriction_fields(text, result):
     has_wait = "ウェイトしない" in text
     has_active = "アクティブにならない" in text or "アクティブにしない" in text
-    if not has_wait and not has_active:
-        return None
-    result = {
-        "text": text,
-        "action": "restriction",
-        "restriction_type": "cannot_wait" if has_wait else "cannot_activate",
-    }
+    result["restriction_type"] = (
+        "cannot_wait_by_effect"
+        if has_wait and "効果によっては" in text
+        else "cannot_activate_by_effect"
+        if has_active and "効果によっては" in text
+        else "cannot_wait"
+        if has_wait
+        else "cannot_activate"
+    )
     if "アクティブフェイズ" in text:
         result["phase"] = "active_phase"
-    if "効果によっては" in text:
-        result["restriction_type"] = (
-            "cannot_wait_by_effect" if has_wait else "cannot_activate_by_effect"
-        )
     if "自分と相手の" in text:
         result["target"] = "both"
     elif "自分の" in text:
@@ -9553,60 +9528,15 @@ def _try_restriction_effect(text):
         result["card_type"] = "member_card"
     if "エネルギー" in text:
         result["card_type"] = "energy_card"
-    # Wait-immunity targets specific members (blade count / group / original-value filters)
     if has_wait:
-        bl = extract_blade_limit(text)
-        if bl:
-            result.update(bl)
-        gns = extract_all_groups(text)
-        if gns:
-            result["group_names"] = gns
+        blade_limit = extract_blade_limit(text)
+        if blade_limit:
+            result.update(blade_limit)
+        group_names = extract_all_groups(text)
+        if group_names:
+            result["group_names"] = group_names
         if "元々" in text:
             result["original_value"] = True
-    return result
-
-
-def _try_blade_actions(text):
-    """Blade-related actions: gain_equal, same_thing, set_blade_count, blade_conversion."""
-    # blade conversion: すべて[色]になる
-    if "すべて[" in text and "]になる" in text:
-        m = re.search(r"すべて\[([^\]]+)\]", text)
-        if m:
-            result = {
-                "text": text,
-                "action": "set_blade_type",
-                "blade_type": m.group(1),
-            }
-            if "ライブ終了時まで" in text:
-                result["duration"] = "live_end"
-            return result
-
-    # gain_resource with equality condition: コストが同じ + を得る
-    if "を得る" in text and "コストが同じ" in text:
-        result = {"text": text, "action": "gain_resource", "resource": "blade"}
-        ic = text.count("{{icon_blade.png|ブレード}}")
-        if ic > 0:
-            result["count"] = ic
-        return result
-
-    # same_thing: 同じことを行う
-    if "同じことを行う" in text:
-        result = {"text": text, "action": "gain_resource", "resource": "blade"}
-        ic = text.count("{{icon_blade.png|ブレード}}")
-        result["count"] = ic if ic > 0 else 1
-        if "ライブ終了時まで" in text:
-            result["duration"] = "live_end"
-        return result
-
-    # set_blade_count: ブレードの数はXつになる
-    if "ブレードの数は" in text and ("つになる" in text or "になる" in text):
-        result = {"text": text, "action": "set_blade_count"}
-        m = re.search(r"(\d+)つになる", text) or re.search(r"(\d+)になる", text)
-        if m:
-            result["count"] = int(m.group(1))
-        return result
-
-    return None
 
 
 def _try_both_discard_until(text):
@@ -9691,18 +9621,6 @@ def _try_re_yell(text):
     if promoted_condition:
         result["condition"] = promoted_condition
     return result
-
-
-_try_energy_under_member = EffectPattern(
-    match="下に置かれているエネルギーカード",
-    action="place_energy_under_member",
-    defaults={
-        "source": "under_member",
-        "card_type": "energy_card",
-        "energy_count": 1,
-        "target_member": "this_member",
-    },
-)
 
 
 def _try_heart_choice(text):
@@ -9935,13 +9853,8 @@ _EFFECT_HANDLERS = [
     _try_choice,  # 以下から1つを選ぶ (generic choice)
     _try_kore_niyori_cascade,  # により cascade
     _try_baton_touch_effect,  # バトンタッチ (baton touch)
-    _try_global_modifier,  # Global effect modifiers
     _try_play_baton_touch,  # Play + baton touch combo
-    _try_energy_under_member,  # Energy under member
-    _try_blade_actions,  # Blade-specific actions
     _try_both_discard_until,  # Both players discard until
-    _try_lose_resource,  # Lose resource
-    _try_restriction_effect,  # Restriction effects
 ]
 
 # ======================================================================
@@ -10087,34 +10000,70 @@ for _i, _h in enumerate(_EFFECT_HANDLERS):
     _effect_registry.register(100 + _i, _hn, _h)
 
 
-def _try_blade_count_set(text):
-    """「（元々持つ）ブレードの数はNつになる」 → set_blade_count(N).
-
-    Play-time/continuous blade-count setting. The icon template sits between
-    ブレード and の数 in raw text, so match on the icon-stripped form.
-    Registered at priority 10000 so it runs after every legacy handler but
-    before the parse_action fallback — replacing the former extra_checks
-    lambda block in parse_effect.
-    """
-    normalized = re.sub(r"\s+", "", text)
-    pattern_text = re.sub(r"\{\{[^|]+\|([^}]+)\}\}", r"\1", normalized)
-    m = re.search(r"ブレードの数は(\d+)つになる", pattern_text)
-    if not m:
-        return None
-    result = {
-        "text": text,
-        "action": "set_blade_count",
-        "count": int(m.group(1)),
-    }
-    if "ライブ終了時まで" in pattern_text:
-        result["duration"] = "live_end"
-    return result
-
-
-# Priority 10000: runs after every legacy handler (100+) but before the
-# parse_action fallback, so this phrase is claimed declaratively instead of
-# via a post-hoc override lambda.
-_effect_registry.register(10000, "blade_count_set", _try_blade_count_set)
+_effect_registry.register(
+    10000,
+    "blade_conversion",
+    EffectPattern(
+        condition=lambda t: "すべて[" in t and "]になる" in t,
+        action="set_blade_type",
+        setter=_set_blade_conversion,
+    ),
+)
+_effect_registry.register(
+    10001,
+    "blade_equal_gain",
+    EffectPattern(
+        condition=lambda t: "を得る" in t and "コストが同じ" in t,
+        action="gain_resource",
+        setter=_set_blade_equal_gain,
+    ),
+)
+_effect_registry.register(
+    10002,
+    "blade_same_thing_gain",
+    EffectPattern(
+        match="同じことを行う",
+        action="gain_resource",
+        setter=_set_blade_same_thing_gain,
+    ),
+)
+_effect_registry.register(
+    10003,
+    "blade_count_set",
+    EffectPattern(
+        condition=lambda t: re.search(
+            r"ブレードの数は(\d+)つになる",
+            re.sub(r"\{\{[^|]+\|([^}]+)\}\}", r"\1", re.sub(r"\s+", "", t)),
+        )
+        is not None,
+        action="set_blade_count",
+        setter=_set_blade_count_set,
+    ),
+)
+_effect_registry.register(
+    10004,
+    "restriction",
+    EffectPattern(
+        condition=lambda t: "ウェイトしない" in t
+        or "アクティブにならない" in t
+        or "アクティブにしない" in t,
+        action="restriction",
+        setter=_set_restriction_fields,
+    ),
+)
+_effect_registry.register(
+    10005,
+    "global_modifier",
+    EffectPattern(
+        condition=lambda t: re.search(r".+は、.+", t)
+        is not None
+        and "ある場合" not in t
+        and "必要ハート" in t
+        and ("多くなる" in t or "少なくなる" in t),
+        action="modify_required_hearts_global",
+        setter=_set_global_modifier_fields,
+    ),
+)
 
 
 def _try_play_time_cost_set(text):

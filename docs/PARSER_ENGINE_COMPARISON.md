@@ -2,7 +2,8 @@
 
 **Status:** investigation started — this file is updated continuously as review proceeds.
 **Created:** 2026-09-18. HEAD at creation: `d1993354` ("Fix gained-ability tracking and test choices; improve profiling, diagnostics, and CI").
-**Supersedes:** the old remediation-queue framing in `AUDIT.md` for this task only; `AUDIT.md` remains the historical audit.
+**Consolidation:** the old remediation-queue framing lived in the now-removed
+`AUDIT.md`; this comparison is the maintained parser representation audit.
 
 ## Scope & Evidence Standard
 

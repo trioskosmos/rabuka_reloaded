@@ -1364,5 +1364,4 @@ ability and resource signals visible to the policy head.
 This is a design direction, not a claim that the PPO collector, trainer, and
 Rust inference path already agree on dimensions or trajectory format. Define
 and version those interfaces before treating the model as operational. The
-original `nn_architecture.md` proposal is preserved as a compatibility stub;
-its detailed historical discussion remains in Git history.
+original architecture proposal is preserved in Git history.

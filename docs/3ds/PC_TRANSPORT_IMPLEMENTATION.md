@@ -1,5 +1,9 @@
 # PC Transport Implementation for 3DS Crossplay
 
+> **Status: implementation record (2026-09).** For current build and port
+> status, see `engine/3DS_CROSS_COMPILE_GUIDE.md`; for UI behavior, see
+> `docs/3ds/VISUAL_DESIGN.md`.
+
 ## Overview
 Added a transport-agnostic multiplayer architecture to enable 3DS ↔ PC crossplay over Direct LAN (same Wi-Fi network), alongside existing UDS (3DS↔3DS ad-hoc) multiplayer.
 

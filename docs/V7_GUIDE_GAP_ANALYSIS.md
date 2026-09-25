@@ -1,5 +1,9 @@
 # V7 vs. Loveca Strategy Guide: Complete Gap Analysis
 
+> **Status: dated audit snapshot (2026-09-23).** Current V7 policy behavior and
+> implementation status are maintained in `docs/BOT_STRATEGY.md`; this report
+> preserves the gap analysis and evidence that led to the current design.
+
 ## Scope
 
 This report compares the active V7 policy with the strategy doctrine recorded in `docs/BOT_STRATEGY.md` and the cited Loveca strategy guides.

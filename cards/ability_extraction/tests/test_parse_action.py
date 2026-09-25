@@ -10,7 +10,7 @@ Run: python -m pytest cards/ability_extraction/tests/test_parse_action.py -v
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 import parser as parser_module
-from parser import ActionRule, _ACTION_RULES, parse_action
+from parser import ActionRule, _ACTION_RULES, parse_ability, parse_action, parse_effect
 
 
 def check(text, expected_action, **expected_fields):
@@ -132,6 +132,52 @@ def test_discard_to_hand_move_uses_move_action():
         card_type='live_card',
         count=1,
     )
+
+
+def test_lose_resource_icon_count():
+    check(
+        '{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を失う',
+        'gain_resource',
+        resource='blade',
+        count=3,
+        sign='negative',
+    )
+
+
+def test_lose_resource_count_and_cost_filter():
+    check(
+        'コスト4以下のメンバーは、{{icon_blade.png|ブレード}}を1つ失う',
+        'gain_resource',
+        resource='blade',
+        count=1,
+        cost_limit=4,
+        cost_limit_operator='<=',
+        sign='negative',
+    )
+
+
+def test_duration_lose_resource_uses_action_grammar():
+    result = parse_ability(
+        '自分のステージに自分のメンバーがいないかぎり、{{icon_blade.png|ブレード}}を1つ失う'
+    )['effect']
+    assert result['action'] == 'gain_resource'
+    assert result['resource'] == 'blade'
+    assert result['count'] == 1
+    assert result['sign'] == 'negative'
+
+
+def test_blade_conversion_uses_declarative_effect_rule():
+    result = parse_effect('すべて[紫ブレード]になる')
+    assert result['action'] == 'set_blade_type'
+    assert result['blade_type'] == '紫ブレード'
+
+
+def test_restriction_uses_declarative_effect_rule():
+    result = parse_effect('自分のステージにいるメンバーは、アクティブフェイズにアクティブにしない')
+    assert result['action'] == 'restriction'
+    assert result['restriction_type'] == 'cannot_activate'
+    assert result['target'] == 'self'
+    assert result['phase'] == 'active_phase'
 
 
 def test_choice_shadowed_by_select():

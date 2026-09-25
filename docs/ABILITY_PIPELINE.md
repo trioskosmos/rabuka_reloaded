@@ -319,10 +319,7 @@ Do this before a broad refactor.
   `source_file` value can contain a machine-specific absolute path.
 - [x] Add one documented regeneration command and make it update all generated
   outputs atomically. (`python cards/ability_extraction/extract_card_abilities.py`)
-- [ ] Decide whether `cards/build/abilities.bin` is a retained artifact or a
-  temporary intermediate. The runtime currently embeds `BYTECODE` from the
-  generated Rust file, so the build should not imply that the loose `.bin`
-  file is the runtime source of truth.
+- [x] Treat `cards/build/abilities.bin` as a temporary intermediate. The runtime embeds `BYTECODE` from the generated Rust file; `abilities.bin.z` is the compressed host build artifact.
 - [x] Add parser validation that rejects unknown action/condition names, impossible
   field combinations, and effects that parse to an empty action list unless
   explicitly marked as null/custom.

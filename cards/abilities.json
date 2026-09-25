@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-09-25T17:35:49.777397",
+  "generated_at": "2026-09-25T18:11:08.447914",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "f8e85e05",
+  "engine_commit": "e94494a5",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -19085,9 +19085,9 @@
         "duration": "as_long_as",
         "conditional": true,
         "action": "gain_resource",
-        "sign": "negative",
         "resource": "blade",
-        "count": 3
+        "count": 3,
+        "sign": "negative"
       }
     },
     {
@@ -21509,13 +21509,14 @@
       "cost": null,
       "effect": {
         "text": "このメンバーの正面のエリアにいるコスト4以下のメンバーは、{{icon_blade.png|ブレード}}を1つ失う",
-        "action": "gain_resource",
-        "sign": "negative",
-        "resource": "blade",
-        "count": 1,
         "cost_limit": 4,
         "cost_limit_operator": "<=",
-        "position": "front"
+        "count": 1,
+        "card_type": "member_card",
+        "position": "front",
+        "action": "gain_resource",
+        "resource": "blade",
+        "sign": "negative"
       }
     },
     {
@@ -29506,9 +29507,9 @@
           {
             "text": "それらをすべて失い",
             "action": "gain_resource",
-            "sign": "negative",
             "resource": "surplus_heart",
-            "all": true
+            "all": true,
+            "sign": "negative"
           },
           {
             "text": "このカードのスコアを+1する",
@@ -33667,9 +33668,9 @@
           {
             "text": "相手は余剰ハートをすべて失う。",
             "action": "gain_resource",
-            "sign": "negative",
             "resource": "surplus_heart",
             "all": true,
+            "sign": "negative",
             "target": "opponent",
             "action_by": "opponent",
             "duration": "live_end"

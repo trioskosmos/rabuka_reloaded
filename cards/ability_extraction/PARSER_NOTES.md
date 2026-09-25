@@ -1,8 +1,10 @@
-# Parser Notes — debt, history, and status
+# Parser Notes — canonical debt, history, and status
 
 **File**: `cards/ability_extraction/parser.py` (~13.5K lines)
-Consolidates the former `PARSER_REFACTOR.md`, `PARSER_DEEP_REFACTOR.md`, and
-`PARSER_DEBT.md` (all completed sessions; kept in git history).
+This is the single maintained parser maintenance document. It consolidates
+the former `PARSER_REFACTOR.md`, `PARSER_DEEP_REFACTOR.md`,
+`PARSER_DEBT.md`, and `PARSER_UNTANGLE_PLAN.md` (all completed or rescoped;
+history remains in Git).
 
 ## Remaining debt (live)
 

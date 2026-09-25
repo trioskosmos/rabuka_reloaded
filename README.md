@@ -182,8 +182,6 @@ cargo bench                         # Criterion benchmarks
 
 ## Known Issues
 
-See [engine/ISSUES_FOUND.md](engine/ISSUES_FOUND.md) for the full list.
-
 - **DS ability activation** — Heap exhaustion on ability activation was fixed. Needs build test on actual DS hardware to confirm.
 - **Dreamcast port** — **SOLVED** via the wasm→C pipeline (was: no LLVM backend for SH-4). `platforms/dc/build_dc.bat` builds engine→wasm→C→SH-4 ELF→bootable .cdi. Same pipeline unlocks Saturn/Jaguar later.
 - **Exit code 1** — commands return exit code 1 even on success (breaks CI)
@@ -198,15 +196,11 @@ See [engine/ISSUES_FOUND.md](engine/ISSUES_FOUND.md) for the full list.
 | [platforms/gba/output/GBA_PORT_NOTES.md](platforms/gba/output/GBA_PORT_NOTES.md) | GBA port build/toolchain + object-text rendering + VRAM crash fix |
 | [engine/3DS_CROSS_COMPILE_GUIDE.md](engine/3DS_CROSS_COMPILE_GUIDE.md) | 3DS porting guide, plan, and progress |
 | [docs/memory_optimization_combined.md](docs/memory_optimization_combined.md) | Unified memory & bytecode optimization guide (supersedes the older memory docs) |
-| [engine/ISSUES_FOUND.md](engine/ISSUES_FOUND.md) | Known build issues, warnings, and clippy lints |
 | [engine/tests/WRITING_TESTS.md](engine/tests/WRITING_TESTS.md) | 530-line guide for writing card tests |
 | [cards/ABILITY_DOCUMENTATION.md](cards/ABILITY_DOCUMENTATION.md) | Ability system reference |
-| [ai_design/rabuka_bot_design.md](ai_design/rabuka_bot_design.md) | Current bot and neural-policy design |
-| [ai_design/nn_architecture.md](ai_design/nn_architecture.md) | Consolidated neural architecture pointer |
+| [ai_design/rabuka_bot_design.md](ai_design/rabuka_bot_design.md) | Consolidated neural architecture and bot design |
 | [docs/QR_DECK_SHARING.md](docs/QR_DECK_SHARING.md) | QR code deck sharing guide |
 | [docs/ABILITY_PIPELINE.md](docs/ABILITY_PIPELINE.md) | Card-text → bytecode pipeline documentation |
-| [AUDIT.md](AUDIT.md) | Current repository findings and maintenance hazards |
-| [docs/AUDITS.md](docs/AUDITS.md) | Historical audit and refactor archive |
 | [android/README_ANDROID.md](android/README_ANDROID.md) | **Android/Termux hosting guide — free multiplayer via cloudflared** |
 
 ## License

@@ -1,3 +1,5 @@
+use crate::bot::determinization::DeterminizationSampler;
+use crate::bot::observation::PublicObservation;
 use crate::bot::strategy_common::{acc_add, requirements_met, Acc};
 use crate::card::CardType;
 use crate::core::stats_pipeline;
@@ -440,7 +442,7 @@ fn rollout_suggestion(gs: &GameState, actions: &[Action], me: u8) -> Option<Acti
         .iter()
         .enumerate()
         .max_by(|(_, left), (_, right)| left.total_cmp(right))?;
-    Some(actions.get(*index).cloned()?)
+    Some(actions.get(index).cloned()?)
 }
 fn pick_best(gs: &GameState, me: u8, actions: &[Action], scores: &[(f64, String)]) -> usize {
     let mut best = 0usize;

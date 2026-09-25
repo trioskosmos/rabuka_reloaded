@@ -1,5 +1,10 @@
 # Test Audit Plan — behavior-first suite
 
+> **Status: living maintenance document.** The policy and naming rules are
+> canonical; dated campaign history and the live backlog are retained in the
+> marked sections below. Regenerate inventory reports with
+> `python cards/test_inventory.py`.
+
 How the suite is organized (`engine/tests/test_modules/`) and what remains
 to be audited. The re-sort (2026-09-17) moved ~510 files; this doc tracks
 the audit work that the sort enables.

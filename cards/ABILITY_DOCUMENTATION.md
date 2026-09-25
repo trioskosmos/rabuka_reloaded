@@ -1153,13 +1153,15 @@ reachable and is required for any `no_std` target without serde.
 ### Build-time pipeline
 
 ```
-abilities.json  ──►  compile_abilities.py  ──►  abilities.bin  (~7KB)
-                                                    abilities_gen.rs
+abilities.json  ──►  compile_abilities.py  ──►  abilities.bin  (~7KB intermediate)
+                                                    abilities.bin.z (compressed host artifact)
+                                                    abilities_gen.rs (embedded runtime source)
                                                     abilities_disassembly.txt
 ```
 
-- `abilities.bin` — raw bytecode, embedded via `include_bytes!`
-- `abilities_gen.rs` — auto-generated Rust source (offset table, debug names)
+- `abilities.bin` — temporary compiler intermediate; not the runtime source of truth
+- `abilities.bin.z` — compressed host build artifact
+- `abilities_gen.rs` — auto-generated Rust source with the embedded runtime bytecode
 - `abilities_disassembly.txt` — human-readable dump (debug builds only)
 
 ### How JSON fields map to bytecode

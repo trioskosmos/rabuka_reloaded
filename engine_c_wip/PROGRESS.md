@@ -73,7 +73,11 @@ just wrote is classified `REAL` (not `STUB_NOOP`/`STUB_MARKER`) and that it is n
 the bottom-up work-order table. Cross-check with `size_audit.py` (C should be a meaningful
 fraction of the Rust twin) and `audit_placeholders.py` (no TODO/STUB markers left).
 
-## Current gap snapshot (from latest audits — regenerate before trusting)
+## Historical gap snapshot (2026-09-14; regenerate before trusting)
+
+> The figures below are retained as a dated reproducibility record. Current
+> counts and work items come only from the generated `DEPENDENCY_AUDIT.md` and
+> `SIZE_AUDIT.md` reports.
 - C lines / Rust lines: 23,401 / 48,893 (~48%). [UPDATED 2026-09-14]
 - C functions: 1,231 / Rust port functions: 867 (C has MORE due to helpers). [UPDATED 2026-09-14]
 - Worst file gaps: `src/core/card.c` (2 missing, 7%), `src/ability/vm.c` (14, 48%), `src/ability/effects/state.c` (2, 27%). [UPDATED 2026-09-14]

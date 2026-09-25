@@ -1,11 +1,11 @@
 # Bot Strategy & Winning Tree — Loveca (Love Live! Series Official Card Game)
 
-Merged specification: play research (`BOT_STRATEGY.md`) + executable decision
-tree (`BOT_STRATEGY_TREE.md`), formerly separate files. Ground truth: official
-rules ver 1.02 (`engine/rules/rules.txt`), card database (`cards/cards.json`,
-2526 cards), and the guides cited below. Every claim carries its rule number
-or data source. A bot that executes §6 leaf-perfect plays near-optimally by
-construction; any behavior not reachable from the tree is a mistake.
+Merged specification: play research and the executable decision tree are
+maintained in this document. Ground truth: official rules ver 1.02
+(`engine/rules/rules.txt`), card database (`cards/cards.json`, 2526 cards), and
+the guides cited below. Every claim carries its rule number or data source. A
+bot that executes §6 leaf-perfect plays near-optimally by construction; any
+behavior not reachable from the tree is a mistake.
 
 Written 2026-08-21, merged + updated 2026-08-22 after the log-driven session
 that fixed the arena stall and rewrote the live-set portfolio doctrine (§8).
@@ -312,7 +312,8 @@ Version history:
 - **v2** `strategy_v2.rs` — MC-ladder live-set + hand-tuned scalar eval;
   still the strongest *heuristic* baseline.
 - **v3** `strategy_v3.rs` — archetype plans + clone-eval main phase;
-  parity with v2 head-to-head (see `V3_WHY_IT_SUCKS.md` for its autopsy).
+  parity with v2 head-to-head. The v3 post-mortem is retained in the dated
+  analysis sections below.
 - **v4** `strategy_v4.rs` — "success-zone fundamentalism": hearts-based
   development, deterministic-pass portfolios, junk filtering.
 - **v5** `strategy_v5.rs` — v4 execution + comparison awareness: binomial
@@ -410,8 +411,8 @@ allocation-layout-dependently. Until root-caused:
 
 - **Benchmark and tune bots UNTRACED only.**
 - Traced replays are qualitatively useful but quantitatively distorted.
-- This also retroactively taints any analysis session that read traced games
-  (including parts of `V3_WHY_IT_SUCKS.md`).
+- This also retroactively taints any analysis session that read traced games,
+  including the dated v3 post-mortem below.
 
 ## 8.5 Do-nothing turns — root cause & fix (2026-08-27)
 
@@ -655,9 +656,9 @@ D4 needs a *positive* deploy-side fix (see D2 residual), not a Pass penalty.
 Root-cause of empty-Main spirals when the stage is full: free equal-stat baton
 swaps score exactly `0.00` (Δcost=Δhearts=Δblades=0), Pass short-circuits to
 exactly `0.0`, and selection uses strict `>` with Pass always first in the
-list → Pass wins every 0–0 tie. One-game examination (fade deck, seed 42,
-`test_output/decks/game_s42_report.md`): t3/t4/t6 all took Pass over three
-free `[BATON]` deploys at 0.00; empty Main **7/20 = 35%**; hearts stuck at
+list → Pass wins every 0–0 tie. One-game examination (fade deck, seed 42;
+raw report not retained): t3/t4/t6 all took Pass over three free `[BATON]`
+deploys at 0.00; empty Main **7/20 = 35%**; hearts stuck at
 h=3 through t6 while v6 developed every turn; final 0–3. v6's gate only forces
 Pass to −∞ when `best_nonpass > 0`, so identical baton ties lose there too
 (v6 avoided the spiral this shuffle only because non-identical swaps print
@@ -743,9 +744,11 @@ not a trained model.
 
 ---
 
-## Why V3 Sucks (V3_WHY_IT_SUCKS.md)
+## Why v3 performed poorly — dated post-mortem
 
-# Why v3 still sucks — post-mortem after the log-driven iteration
+> **Historical analysis (2026-08-27).** The detailed evidence is retained here
+> for reproducibility; current policy status is maintained in the dated V7
+> sections above.
 
 > ## ⚠ CORRECTION (post-refresh-analysis)
 > An earlier version of this document claimed **"ammo exhaustion"** as a
