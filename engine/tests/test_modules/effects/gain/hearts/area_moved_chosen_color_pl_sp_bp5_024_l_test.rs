@@ -54,3 +54,27 @@ fn pl_sp_bp5_024_l_live_start_chosen_heart_granted_only_to_area_moved_member() {
         "member that did not move areas gains nothing"
     );
 }
+
+#[test]
+fn pl_sp_bp5_024_l_opponent_movement_does_not_qualify() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let filler = game.new_id(FILLER);
+    fill_decks(&mut game, filler);
+    let live = game.id("PL!SP-bp5-024-L");
+    let opponent_mover = game.new_id("PL!S-bp5-001-R＋");
+    game.add_to_hand(live);
+    game.set_live_card(live);
+    game.state.player2.stage.stage[0] = opponent_mover;
+    game.state
+        .push_movement_event(opponent_mover, "stage", "stage", None, "p2", true);
+
+    fire_trigger(&mut game, live, AbilityTrigger::LiveStart, "ライブ開始時");
+    answer_all(&mut game, 0);
+    game.state.recalculate_constants();
+
+    let total = game.state.mods.get_heart_modifier(opponent_mover, HeartColor::Heart01)
+        + game.state.mods.get_heart_modifier(opponent_mover, HeartColor::Heart02)
+        + game.state.mods.get_heart_modifier(opponent_mover, HeartColor::Heart06);
+    assert_eq!(total, 0);
+}
