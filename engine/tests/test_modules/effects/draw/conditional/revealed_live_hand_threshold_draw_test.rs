@@ -1,5 +1,5 @@
-/// Tests for 国木田花丸 (PL!S-bp2-007-R＋) — Q120: auto ability fires after cheer
-/// when live card in revealed_cards AND hand ≤ 7 → draw 1.
+/// Tests for 国木田花丸 (PL!S-bp2-007-R＋) — Q120: after a revealed live card
+/// resolves, the automatic draw only applies when the hand is still at most 7.
 ///
 /// Engine fixes applied:
 /// 1. trigger_auto_abilities_for_player added after player_perform_live (phases.rs)
@@ -13,11 +13,10 @@ fn advance_to_live_set(game: &mut TestGame) {
     }
 }
 
-/// Blade=13, all cheered cards are live. Cheer draws 13 to hand.
-/// Start with 7 hand → after blade draws arrives to 20.
-/// Auto condition: ≥1 live in revealed (true) AND hand ≤ 7 (false at 20) → no draw.
+/// Starting at seven cards, resolving a revealed live reaches eight before the
+/// automatic ability resolves, so the automatic draw must not fire.
 #[test]
-fn hanamaru_q120_hand7_auto_condition_checked_after_blade_draws() {
+fn revealed_live_above_hand_threshold_does_not_draw_again() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
@@ -25,11 +24,13 @@ fn hanamaru_q120_hand7_auto_condition_checked_after_blade_draws() {
     let filler = game.id("PL!-sd1-010-SD");
     let blader = game.id("PL!S-PR-014-PR");
     let live = game.id("LL-bp5-001-L");
+    let other_live = game.id("LL-bp5-002-L");
 
-    // Deck: enough cards for LiveStart (needs 2) + blade draws (13)
     game.state.player1.main_deck.cards.clear();
-    for _ in 0..100 {
-        game.state.player1.main_deck.cards.push(live);
+    game.state.player1.main_deck.cards.push(other_live);
+    game.state.player1.main_deck.cards.push(live);
+    for _ in 0..98 {
+        game.state.player1.main_deck.cards.push(filler);
     }
     game.state.player2.main_deck.cards.clear();
     for _ in 0..100 {
@@ -53,14 +54,25 @@ fn hanamaru_q120_hand7_auto_condition_checked_after_blade_draws() {
         game.select_indices(&[]);
     }
 
-    let hand = game.state.player1.hand.cards.len();
-    eprintln!("[HANAMARU] hand=7 start, after cheer: {}", hand);
-    assert!(hand >= 8, "Q120: blade draws increase hand; auto must not draw again");
+    let hand = game.state.player1.hand.cards.as_slice();
+    assert_eq!(hand.len(), 8, "only the selected live should enter hand");
+    assert_eq!(
+        hand.iter()
+            .filter(|&&id| id == live || id == other_live)
+            .count(),
+        1,
+        "exactly one distinct revealed live should enter hand"
+    );
+    assert_eq!(
+        game.state.player1.main_deck.cards.len(),
+        99,
+        "one of the two revealed cards should be removed from the deck"
+    );
 }
 
 /// No live cards in deck → condition fails → no draw.
 #[test]
-fn hanamaru_q120_no_live_in_revealed_no_draw() {
+fn revealed_filler_does_not_satisfy_live_condition() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 

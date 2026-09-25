@@ -32,15 +32,18 @@ QA-specific files use the ruling ID and behavior, never the card print ID as the
 | QA | Coverage | Remaining edge focus |
 |---|---|---|
 | Q180 | `nico_cannot_activate_test.rs` | restriction expiry and unrelated baton paths |
-| Q165 | `ll_joint_test.rs` | mixed-name combinations and duplicate instances |
-| Q163 | `activate_wait_other_group_draw_q163_test.rs` | empty own stage and multiple opponent targets |
+| Q165 | `joint_six_discard_mixed_name_cost_test.rs` | mixed-name combinations and duplicate instances |
+| Q163 | `activate_wait_other_group_draw_test.rs` | empty own stage and multiple opponent targets |
 | Q160 | `miyashita_ai_test.rs` | member leaves before/after the triggering debut |
 | Q141 | `energy_and_member_under_test.rs` | under-energy when owner leaves by effect |
 | Q140 | `energy_and_member_under_test.rs` | stage-to-hand and stage-to-discard parity |
 | Q134 | `baton_touch_test.rs` | already-deployed occupant restriction |
-| Q126 | `chisato_move_test.rs` | stage-to-waitroom and effect-caused movement |
+| Q126 | `position_change_only_places_energy_test.rs` | stage-to-waitroom and effect-caused movement |
 | Q122 | `debut_top3_reorder_and_discard_activation_test.rs` | refresh timing versus same-turn discard |
-| Q120 | `revealed_live_hand_le7_draw_q120_test.rs` | exact draw delta and duplicate live identity |
+| Q120 | `revealed_live_hand_threshold_draw_test.rs` | exact draw delta and duplicate live identity |
+| Q131 | `chosen_player_look_two_reorder_discard_test.rs` | P2-first suppresses P1 LiveStart when P1 has no live card |
+| Q145 | `q145_empty_waitroom_optional_self_wait_test.rs` | mandatory μ's member when a waitroom candidate exists |
+| Q135 | `phase_machine_rules_test.rs` | multiple waited members through the real Active→Energy transition |
 | Q111 | `wien_yell_count_test.rs` | blade changes after the LiveStart snapshot |
 | Q116 | `dream_with_you_test.rs` | reduced yell count below the blade threshold |
 | Q101 | `special_blade_heart_rules_test.rs` | refresh and exhausted-source termination |

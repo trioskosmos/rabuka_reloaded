@@ -31,6 +31,12 @@ static void test_phase_and_rps_strings(void)
     CHECK(strcmp(rb_rps_choice_name(1), "パー") == 0, "paper choice string");
     CHECK(strcmp(rb_rps_choice_name(2), "チョキ") == 0, "scissors choice string");
     CHECK(strcmp(rb_rps_choice_name(3), "?") == 0, "invalid RPS choice string");
+    GameState g;
+    memset(&g, 0, sizeof(g));
+    g.player1_rps_choice = 0;
+    g.player2_rps_choice = 2;
+    CHECK(rb_resolve_rps_if_both_chosen(&g) == 1, "RPS choices resolve");
+    CHECK(g.rps_winner == 1, "rock beats scissors");
 }
 
 static void test_zone_strings(void)
@@ -41,6 +47,10 @@ static void test_zone_strings(void)
     CHECK(strcmp(rb_ability_zone_to_str(RB_ABILITY_ZONE_SUCCESS_LIVE_ZONE), "success_live_zone") == 0, "success live zone string");
     CHECK(strcmp(rb_ability_zone_to_str(RB_ABILITY_ZONE_UNKNOWN), "unknown") == 0, "unknown zone string");
     CHECK(rb_ability_zone_to_str(-1) == NULL, "invalid zone string is null");
+    CHECK(strcmp(rb_trigger_zone_id(0), "live_card_zone") == 0, "live trigger zone id");
+    CHECK(strcmp(rb_trigger_zone_id(1), "stage") == 0, "stage trigger zone id");
+    CHECK(strcmp(rb_trigger_zone_label(0), "ライブ置場") == 0, "live trigger zone label");
+    CHECK(strcmp(rb_trigger_zone_label(1), "ステージ") == 0, "stage trigger zone label");
 }
 
 static void test_queue_helpers(void)
@@ -85,6 +95,61 @@ static void test_deployment_tracking(void)
     CHECK(rb_zone_track_deployment(&g, 0, 99) == 0, "non-stage card is not tracked");
 }
 
+static void test_backtracking(void)
+{
+    int pool[8] = {0, 1, 2, 0, 0, 0, 0, 1};
+    int needs[16] = {
+        0, 2, 0, 0, 0, 0, 0, 0,
+        0, 0, 2, 0, 0, 0, 0, 0
+    };
+    int allocs[16];
+    memset(allocs, 0, sizeof(allocs));
+    CHECK(rb_backtrack_allocate(pool, needs, 2, allocs, 16) == 1,
+          "backtracking reserves surplus for a later live");
+    int has_first_wildcard = 0;
+    int has_first_color02 = 0;
+    int has_second_color02 = 0;
+    for (int i = 0; i < 16; i++) {
+        if (allocs[i] == 1) has_first_wildcard = 1;
+        if (allocs[i] == 2) has_first_color02 = 1;
+        if (allocs[i] == 10) has_second_color02 = 1;
+    }
+    CHECK(has_first_wildcard, "first live uses icon-all for its red deficit");
+    CHECK(!has_first_color02, "first live preserves color02 for the second live");
+    CHECK(has_second_color02, "second live receives both color02 hearts");
+}
+
+static void test_deferred_reyell(void)
+{
+    GameState g;
+    memset(&g, 0, sizeof(g));
+    g.turn = 3;
+    g.re_yell_pending = 1;
+    g.re_yell_owner = 0;
+    g.re_yell_occurred = 1;
+    g.re_yell_blade_hearts[0] = 3;
+    g.re_yell_note_icons = 2;
+    g.revealed_cards[0] = 101;
+    g.revealed_cards[1] = 102;
+    g.n_revealed = 2;
+    g.snapshots[0].turn = 3;
+    g.snapshots[0].player = 0;
+    g.snapshots[0].n_lives = 1;
+    g.snapshots[0].yell_cards[0] = 999;
+    g.snapshots[0].n_yell_cards = 1;
+    g.n_snapshots = 1;
+    for (int i = 0; i < RB_STAGE_SIZE; i++) g.p[0].stage[i] = RB_EMPTY_SLOT;
+
+    rb_apply_deferred_reyell(&g);
+    CHECK(!g.re_yell_pending, "deferred re-yell is consumed");
+    CHECK(!g.re_yell_occurred, "deferred re-yell occurrence is cleared");
+    CHECK(g.snapshots[0].n_yell_cards == 2, "re-yell replaces snapshot yell cards");
+    CHECK(g.snapshots[0].yell_cards[0] == 101, "first re-yell card is retained");
+    CHECK(g.snapshots[0].yell_cards[1] == 102, "second re-yell card is retained");
+    CHECK(g.snapshots[0].note_icons == 2, "snapshot note icons are rebuilt");
+    CHECK(g.snapshots[0].total_hearts[0] == 3, "re-yell hearts rebuild snapshot total");
+}
+
 int main(void)
 {
     test_canonical_trigger();
@@ -92,6 +157,8 @@ int main(void)
     test_zone_strings();
     test_deployment_tracking();
     test_queue_helpers();
+    test_backtracking();
+    test_deferred_reyell();
     if (failures) return 1;
     puts("P1 helper tests passed");
     return 0;

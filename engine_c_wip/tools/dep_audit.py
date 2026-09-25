@@ -150,7 +150,8 @@ def classify(body, callees_defined, defined_set):
     # a call to something we did NOT define (libc / declared helper) = real delegation
     external_calls = called_names - defined_set
     has_call = bool(called_names)
-    marker = MARKER_RE.search(body)
+    marker_text = re.sub(r'"(?:\\.|[^"\\])*"|\'(?:\\.|[^\'\\])*\'', "", body)
+    marker = MARKER_RE.search(marker_text)
     if marker:
         return "STUB_MARKER"
     if not state_write and not has_call:

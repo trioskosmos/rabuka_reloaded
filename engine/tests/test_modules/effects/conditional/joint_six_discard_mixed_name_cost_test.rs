@@ -12,7 +12,7 @@ use crate::helpers::*;
 
 /// Without 6+ cards in discard, the ability creates no choice prompt
 #[test]
-fn ll_joint_requires_6_cards() {
+fn joint_cost_requires_six_cards() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let joint = game.id("LL-bp3-001-R\u{ff0b}");
@@ -46,7 +46,7 @@ fn ll_joint_requires_6_cards() {
 
 /// With 6+ cards in discard, cost creates a choice
 #[test]
-fn ll_joint_q165_accepts_mixed_three_name_cards() {
+fn joint_cost_accepts_mixed_six_card_names() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let joint = game.id("LL-bp3-001-R\u{ff0b}");
@@ -75,7 +75,7 @@ fn ll_joint_q165_accepts_mixed_three_name_cards() {
 }
 
 #[test]
-fn ll_joint_creates_choice_with_6_cards() {
+fn joint_cost_creates_choice_with_7_matching_cards() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let joint = game.id("LL-bp3-001-R\u{ff0b}");

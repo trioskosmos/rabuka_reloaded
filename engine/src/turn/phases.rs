@@ -242,15 +242,8 @@ impl super::TurnEngine {
                     game_state.current_phase = Phase::FirstAttackerPerformance;
                     let first_attacker_id = game_state.first_attacker().id.clone();
                     let second_attacker_id = game_state.second_attacker().id.clone();
-                    // Trigger ALL LiveStart abilities for BOTH players before processing,
-                    // so that if one player's processing creates a choice (e.g. SelectAutoAbility
-                    // from multiple abilities), the other player's abilities are already queued
-                    // and will be processed when the choice resolves.
                     Self::trigger_live_start_abilities(game_state, &first_attacker_id);
                     Self::trigger_live_start_abilities(game_state, &second_attacker_id);
-                    // each_time LIVE_START triggers fire post-resolution
-                    // in process_current_ability (abilities.rs)
-                    // Now process both players' abilities
                     game_state.process_pending_auto_abilities(&first_attacker_id);
                     if game_state.has_pending_choice() {
                         return;

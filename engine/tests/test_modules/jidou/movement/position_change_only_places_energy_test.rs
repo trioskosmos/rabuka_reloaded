@@ -16,7 +16,7 @@ fn setup_energy_deck(game: &mut TestGame) {
 }
 
 #[test]
-fn chisato_q126_area_move_triggers_energy_placement() {
+fn position_change_places_waited_energy() {
     let db = load_real_database();
     let mut game = TestGame::new(db.clone());
 
@@ -104,7 +104,7 @@ fn chisato_q126_area_move_triggers_energy_placement() {
 }
 
 #[test]
-fn chisato_q126_stage_to_waitroom_does_not_trigger_energy_placement() {
+fn leaving_stage_does_not_place_waited_energy() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let chisato = game.id("PL!SP-bp2-003-R");

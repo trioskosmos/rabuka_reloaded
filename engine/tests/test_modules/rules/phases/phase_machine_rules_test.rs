@@ -119,6 +119,30 @@ fn active_phase_stands_only_the_turn_players_cards() {
 /// 7.5.2 — the Energy phase moves the top card of the TURN PLAYER's energy
 /// deck; an EMPTY energy deck moves nothing and must not panic (silent skip).
 #[test]
+fn q135_real_active_phase_activates_all_waited_members() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let filler = game.id("PL!-sd1-010-SD");
+    let members = [filler, game.new_id("PL!-sd1-010-SD"), game.new_id("PL!-sd1-010-SD")];
+    game.state.player1.stage.stage = members;
+    for &member in &members {
+        wait(&mut game, member);
+    }
+    fill_decks(&mut game, filler);
+
+    pass_until(&mut game, Phase::Active, 0);
+    game.pass();
+    assert_eq!(game.state.current_phase, Phase::Energy);
+    for &member in &members {
+        assert_ne!(
+            orientation(&game, member),
+            Some(CardOrientation::Wait),
+            "Q135: real Active phase must activate every waited member"
+        );
+    }
+}
+
+#[test]
 fn energy_phase_draws_one_and_empty_deck_skips() {
     let db = load_real_database();
     let mut game = TestGame::new(db);

@@ -203,18 +203,6 @@ int rb_ability_ref_cache_size(void) {
     ~20 of the gain_ability abilities from no-ops to faithful.
     ════════════════════════════════════════════════════════════════════ */
 
-typedef struct {
-    int target; /* card_id */
-    int score;  /* bonus */
-    int blade;
-    int heart;
-    int need_heart;
-    int turns;  /* remaining */
-} Gained;
-
-#define MAX_GAINED 32
-static Gained g_gained[MAX_GAINED];
-static int g_n=0;
 
 static const char *gain_extra(const AbilityEffect *e, const char *key) {
     if (!e) return NULL;
@@ -234,10 +222,17 @@ static int gain_target(const GameState *g, int actor, const AbilityEffect *e) {
     const char *target_card = gain_extra(e, "target_card");
     if (target_card) return atoi(target_card);
     if (g->n_selected_cards > 0) return g->selected_cards[0];
-    if (g->activating_card >= 0) return g->activating_card;
-    if (g->queue.resume_host >= 0) return g->queue.resume_host;
+    const char *target = e ? e->target : NULL;
+    int target_actor = actor;
+    if (target && (!strcmp(target, "opponent") || !strcmp(target, "other_player")))
+        target_actor = actor ^ 1;
+    if (!target || !strcmp(target, "self") || !strcmp(target, "activating_card")) {
+        if (g->activating_card >= 0) return g->activating_card;
+    }
+    if (g->queue.resume_host >= 0 && target_actor == actor)
+        return g->queue.resume_host;
     for (int i = 0; i < RB_STAGE_SIZE; i++) {
-        if (g->p[actor].stage[i] != RB_EMPTY_SLOT) return g->p[actor].stage[i];
+        if (g->p[target_actor].stage[i] != RB_EMPTY_SLOT) return g->p[target_actor].stage[i];
     }
     return -1;
 }
@@ -309,34 +304,30 @@ void rb_gain_ability(GameState *g, int actor, AbilityEffect *e) {
     int blade = gain_extra(e, "blade") ? atoi(gain_extra(e, "blade")) : 0;
     int heart = gain_extra(e, "heart") ? atoi(gain_extra(e, "heart")) : 0;
     int need = gain_extra(e, "need_heart") ? atoi(gain_extra(e, "need_heart")) : 0;
-    if (g_n < MAX_GAINED) {
-        Gained *gg = &g_gained[g_n++];
-        gg->target = target; gg->score = score; gg->blade = blade; gg->heart = heart;
-        gg->need_heart = need; gg->turns = 2;
-        if (score) rb_mods_add_score(&g->mods, target, score);
-        if (blade) rb_mods_add_blade(&g->mods, target, blade);
-        if (heart) rb_mods_add_heart(&g->mods, target, 0, heart);
-        if (need)  rb_mods_add_need_heart(&g->mods, target, 0, need);
+    if (score) rb_mods_add_score(&g->mods, target, score);
+    if (blade) rb_mods_add_blade(&g->mods, target, blade);
+    if (heart) rb_mods_add_heart(&g->mods, target, 0, heart);
+    if (need)  rb_mods_add_need_heart(&g->mods, target, 0, need);
+    int dur = gain_duration(gain_extra(e, "duration"));
+    if (dur != RB_TEMP_PERM && g->n_temp_effects < RB_MAX_TEMP_EFFECTS) {
+        RbTempEffect te;
+        memset(&te, 0, sizeof(te));
+        te.card_id = target;
+        te.dur = dur;
+        te.score = score;
+        te.blade = blade;
+        te.heart[0] = heart;
+        te.need_heart[0] = need;
+        te.gained_card_id = -1;
+        te.gained_index = -1;
+        g->temp_effects[g->n_temp_effects++] = te;
     }
 }
 
 void rb_invalidate_ability(GameState *g, int actor, AbilityEffect *e){
-    /* Mirror ability_effects.rs::execute_invalidate_ability — revoke every gained
-        ability owned by the targeted player (revert its score/blade/heart/need
-        bonus, then drop). */
-    int who=actor;
-    if(e && e->target && !strcmp(e->target,"opponent")) who=actor^1;
-    for(int i=g_n-1;i>=0;i--){
-        int t=g_gained[i].target;
-        if(rb_owner_of_card(g, t) == who){
-            if(g_gained[i].score) rb_mods_add_score(&g->mods, t, -g_gained[i].score);
-            if(g_gained[i].blade) rb_mods_add_blade(&g->mods, t, -g_gained[i].blade);
-            if(g_gained[i].heart) rb_mods_add_heart(&g->mods, t, 0, -g_gained[i].heart);
-            if(g_gained[i].need_heart) rb_mods_add_need_heart(&g->mods, t, 0, -g_gained[i].need_heart);
-            for(int j=i;j<g_n-1;j++) g_gained[j]=g_gained[j+1];
-            g_n--;
-        }
-    }
+    if (!g) return;
+    int who = actor;
+    if (e && e->target && !strcmp(e->target, "opponent")) who = actor ^ 1;
     int synthetic_changed = 0;
     for (int slot = 0; slot < 64; slot++) {
         int card_id = g->gained_card_ids[slot];
@@ -346,24 +337,26 @@ void rb_invalidate_ability(GameState *g, int actor, AbilityEffect *e){
             synthetic_changed = 1;
         }
     }
+    int temp_write = 0;
+    for (int i = 0; i < g->n_temp_effects; i++) {
+        RbTempEffect *te = &g->temp_effects[i];
+        if (rb_owner_of_card(g, te->card_id) == who) {
+            rb_mods_add_blade(&g->mods, te->card_id, -te->blade);
+            rb_mods_add_score(&g->mods, te->card_id, -te->score);
+            for (int c = 0; c < 8; c++) {
+                rb_mods_add_heart(&g->mods, te->card_id, c, -te->heart[c]);
+                rb_mods_add_need_heart(&g->mods, te->card_id, c, -te->need_heart[c]);
+            }
+        } else {
+            g->temp_effects[temp_write++] = *te;
+        }
+    }
+    g->n_temp_effects = temp_write;
     if (synthetic_changed) rb_recalc_constants(g);
 }
 
 void rb_tick_gained(GameState *g){
-    if(!g) return;
-    for(int i=0;i<g_n;i++){
-        if(--g_gained[i].turns<=0){
-            /* Mirror TemporaryEffect expiry: revert the granted modifiers
-                on the target card so the bonus does not leak past its duration. */
-            int t=g_gained[i].target;
-            if(g_gained[i].score) rb_mods_add_score(&g->mods, t, -g_gained[i].score);
-            if(g_gained[i].blade) rb_mods_add_blade(&g->mods, t, -g_gained[i].blade);
-            if(g_gained[i].heart) rb_mods_add_heart(&g->mods, t, 0, -g_gained[i].heart);
-            if(g_gained[i].need_heart) rb_mods_add_need_heart(&g->mods, t, 0, -g_gained[i].need_heart);
-            for(int j=i;j<g_n-1;j++) g_gained[j]=g_gained[j+1];
-            g_n--; i--;
-        }
-    }
+    (void)g;
 }
 
 /* Mirror ability_effects.rs::execute_activate_ability. The common path is

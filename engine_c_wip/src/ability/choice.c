@@ -303,7 +303,11 @@ int rb_resolver_clear_choice_state_and_resume(RbAbilityResolver *self) {
     then resume pending actions. Kept as a separate symbol for callers that
     mirror the Rust `…_and_resume2` dispatch site. */
 int rb_resolver_clear_choice_state_and_resume2(RbAbilityResolver *self) {
-    return rb_resolver_clear_choice_state_and_resume(self);
+    if (!self || !self->gs) return -1;
+    publish_selected_cards(self);
+    rb_resolver_clear_choice_state(self);
+    rb_drain_ability_queue(self->gs);
+    return 0;
 }
 
 /* mirror choice.rs:reschedule_pending_choice — re-store the pending choice so

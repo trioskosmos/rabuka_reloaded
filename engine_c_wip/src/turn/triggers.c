@@ -12,6 +12,27 @@ int rb_trigger_is(const char *triggers, const char *needle) {
     return strstr(triggers, needle) != NULL;
 }
 
+static int queue_gained_trigger(GameState *g, int pl, int card_id, const char *trigger)
+{
+    if (!g || card_id < 0 || !trigger) return 0;
+    int queued = 0;
+    int count = rb_card_num_gained_abilities(g, card_id);
+    for (int i = 0; i < count; i++) {
+        const Ability *ability = rb_card_gained_ability(g, card_id, i);
+        if (!ability || !ability->triggers || !rb_trigger_is(ability->triggers, trigger)) continue;
+        if (rb_ability_is_invalidated(g, card_id, trigger)) continue;
+        int limit = ability->use_limit < 0 ? 99 : ability->use_limit;
+        int ability_idx = RB_GAINED_ABILITY_INDEX_BASE + i;
+        if (rb_use_limit_reached(&g->queue, card_id, ability_idx, limit, g->turn)) continue;
+        if (rb_queue_push_with_trigger(&g->queue, card_id, ability_idx, trigger, NULL, 0)) {
+            rb_record_use(&g->queue, card_id, ability_idx, g->turn);
+            queued++;
+        }
+    }
+    (void)pl;
+    return queued;
+}
+
 /* Mirror triggers.rs:TriggerKind::from_token (triggers.rs:54-75): trim the
     token, match against the wire constants; unknown → RB_TK_COUNT (no kind).
     Whitespace handling mirrors Rust str::trim on both ends. */
@@ -46,14 +67,15 @@ int rb_trigger_debut(GameState *g, int pl, int card_id) {
         Ability ab; if(!rb_decode_card_ability((uint32_t)card_id,i,&ab)) continue;
         if(ab.triggers && rb_trigger_is(ab.triggers, "登場") &&
            !rb_ability_is_invalidated(g, card_id, "登場")){
-            if (!rb_use_limit_reached(&g->queue, card_id, i, ab.use_limit < 0 ? 99 : ab.use_limit, g->turn)) {
-                rb_queue_push(&g->queue, card_id, i);
-                rb_record_use(&g->queue, card_id, i, g->turn);
-                queued = 1;
-            }
+             if (!rb_use_limit_reached(&g->queue, card_id, i, ab.use_limit < 0 ? 99 : ab.use_limit, g->turn)) {
+                 rb_queue_push_with_trigger(&g->queue, card_id, i, "登場", NULL, 0);
+                 rb_record_use(&g->queue, card_id, i, g->turn);
+                 queued = 1;
+             }
         }
         rb_free_ability(&ab);
     }
+    queued += queue_gained_trigger(g, pl, card_id, "登場");
     (void)pl;
     return queued;
 }
@@ -73,16 +95,21 @@ int rb_trigger_live_start(GameState *g, int pl) {
             if (ab.triggers && rb_trigger_is(ab.triggers,"ライブ開始時") &&
                 !rb_ability_is_invalidated(g, cid, "ライブ開始時")) {
                 if (!rb_use_limit_reached(&g->queue, cid, ai, ab.use_limit<0?99:ab.use_limit, g->turn)) {
-                    fprintf(stderr, "[LIVE_START_SCAN] pl=%d zone=live cid=%d ab=%d queued=1\n", pl, cid, ai);
-                    rb_queue_push(&g->queue, cid, ai);
+                    fprintf(stderr, "[LIVE_START_SCAN] pl=%d trigger=%s zone=%s label=%s cid=%d ab=%d queued=1\n",
+                            pl, rb_canonical_trigger(ab.triggers), rb_trigger_zone_id(0),
+                            rb_trigger_zone_label(0), cid, ai);
+                     rb_queue_push_with_trigger(&g->queue, cid, ai, "ライブ開始時", NULL, 0);
                     rb_record_use(&g->queue, cid, ai, g->turn);
                     queued++;
                 } else {
-                    fprintf(stderr, "[LIVE_START_SCAN] pl=%d zone=live cid=%d ab=%d queued=0 use_limit\n", pl, cid, ai);
+                    fprintf(stderr, "[LIVE_START_SCAN] pl=%d trigger=%s zone=%s label=%s cid=%d ab=%d queued=0 use_limit\n",
+                            pl, rb_canonical_trigger(ab.triggers), rb_trigger_zone_id(0),
+                            rb_trigger_zone_label(0), cid, ai);
                 }
             }
             rb_free_ability(&ab);
         }
+        queued += queue_gained_trigger(g, pl, cid, "ライブ開始時");
     }
     /* Stage members — mirrors Rust's scan of player.stage. */
     for(int s=0;s<RB_STAGE_SIZE;s++){
@@ -94,16 +121,24 @@ int rb_trigger_live_start(GameState *g, int pl) {
             if(ab.triggers && rb_trigger_is(ab.triggers,"ライブ開始時") &&
                !rb_ability_is_invalidated(g, cid, "ライブ開始時")){
                 if(!rb_use_limit_reached(&g->queue, cid, i, ab.use_limit<0?99:ab.use_limit,g->turn)){
-                    fprintf(stderr, "[LIVE_START_SCAN] pl=%d zone=stage cid=%d ab=%d queued=1\n", pl, cid, i);
-                    rb_queue_push(&g->queue, cid, i);
+                    fprintf(stderr, "[LIVE_START_SCAN] pl=%d trigger=%s zone=%s label=%s cid=%d ab=%d queued=1\n",
+                            pl, rb_canonical_trigger(ab.triggers), rb_trigger_zone_id(1),
+                            rb_trigger_zone_label(1), cid, i);
+                     rb_queue_push_with_trigger(&g->queue, cid, i, "ライブ開始時", NULL, 0);
                     rb_record_use(&g->queue, cid, i, g->turn);
                     queued++;
                 } else {
-                    fprintf(stderr, "[LIVE_START_SCAN] pl=%d zone=stage cid=%d ab=%d queued=0 use_limit\n", pl, cid, i);
+                    fprintf(stderr, "[LIVE_START_SCAN] pl=%d trigger=%s zone=%s label=%s cid=%d ab=%d queued=0 use_limit\n",
+                            pl, rb_canonical_trigger(ab.triggers), rb_trigger_zone_id(1),
+                            rb_trigger_zone_label(1), cid, i);
                 }
             }
             rb_free_ability(&ab);
         }
+    }
+    for (int s = 0; s < RB_STAGE_SIZE; s++) {
+        int cid = g->p[pl].stage[s];
+        if (cid != RB_EMPTY_SLOT) queued += queue_gained_trigger(g, pl, cid, "ライブ開始時");
     }
     /* Process the queued abilities so their effects resolve (e.g., position change) */
     if (queued > 0) {
@@ -144,13 +179,14 @@ static int queue_live_success_for_card(GameState *g, int pl, int cid, int occurr
             fprintf(stderr, "[LIVE_SUCCESS_QUEUE] cid=%d ab=%d occurrence=%d limit=%d reached=%d completed=%d\n",
                     cid, i, occurrence, limit + occurrence, reached, key == g->just_completed_ability_key);
             if (key != g->just_completed_ability_key && !reached) {
-                rb_queue_push(&g->queue, cid, i);
+                rb_queue_push_with_trigger(&g->queue, cid, i, "ライブ成功時", NULL, 0);
                 rb_record_use(&g->queue, cid, i, g->turn);
                 queued++;
             }
         }
         rb_free_ability(&ab);
     }
+    queued += queue_gained_trigger(g, pl, cid, "ライブ成功時");
     return queued;
 }
 
@@ -165,6 +201,7 @@ int rb_trigger_live_success(GameState *g, int pl) {
         fprintf(stderr, "[LIVE_SUCCESS_TRIGGER_ENTER] pl=%d state=%d pending=%d cur=%d n=%d\n",
                 pl, g->queue.state, g->queue.has_pending, g->queue.cur, g->queue.n_entries);
     if (!rb_should_trigger_live_success(g, pl)) return 0;
+    if (rb_is_trigger_suppressed(g, pl, "live_success")) return 0;
     int queued = 0;
     for (int i = 0; i < g->p[pl].live.n; i++) {
         int cid = g->p[pl].live.cards[i];
@@ -541,8 +578,15 @@ void rb_check_expired_effects(GameState *g, int which) {
                      (which==2 && te->dur==RB_TEMP_TURN_END);
         if(expire){
             if (te->gained_index >= 0) {
-                if (rb_remove_gained_ability(g, te->gained_card_id, te->gained_index)) {
+                int removed_index = te->gained_index;
+                if (rb_remove_gained_ability(g, te->gained_card_id, removed_index)) {
                     gained_changed = 1;
+                    for (int k = 0; k < g->n_temp_effects; k++) {
+                        RbTempEffect *other = &g->temp_effects[k];
+                        if (other->gained_card_id == te->gained_card_id &&
+                            other->gained_index > removed_index)
+                            other->gained_index--;
+                    }
                 }
             }
             rb_mods_add_blade(&g->mods, te->card_id, -te->blade);
@@ -774,6 +818,14 @@ const char *rb_canonical_trigger(const char *raw) {
     if (strstr(raw, RB_TSTR_AUTO))
         return "auto";
     return "unknown";
+}
+
+const char *rb_trigger_zone_id(int is_stage) {
+    return is_stage ? "stage" : "live_card_zone";
+}
+
+const char *rb_trigger_zone_label(int is_stage) {
+    return is_stage ? "ステージ" : "ライブ置場";
 }
 
 /* Map a trigger string to its texticon filename for card badge display.

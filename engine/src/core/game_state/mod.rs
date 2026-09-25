@@ -117,6 +117,7 @@ pub struct GameState {
     pub turn_limited_abilities_used: HashMap<(i16, usize, u8), u8>,
     pub mulligan_selected_indices: SmallVec<[u8; 6]>,
     pub live_card_selected_indices: SmallVec<[u8; 3]>,
+    pub live_start_players_triggered: SmallVec<[String; 2]>,
     /// Auto-ability trigger counts per ability — CardId for zero-allocation.
     pub auto_ability_trigger_counts: SmallVec<[(CardId, u8); 8]>,
     /// Turn-limit usage per ability — CardId for zero-allocation.
@@ -503,6 +504,7 @@ impl GameState {
             turn_limited_abilities_used: HashMap::default(),
             mulligan_selected_indices: SmallVec::new(),
             live_card_selected_indices: SmallVec::new(),
+            live_start_players_triggered: SmallVec::new(),
             auto_ability_trigger_counts: SmallVec::new(),
             turn_limit_usage: SmallVec::new(),
             card_instance_mapping: HashMap::default(),

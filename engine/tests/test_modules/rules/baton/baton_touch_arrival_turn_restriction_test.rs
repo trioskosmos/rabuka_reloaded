@@ -16,7 +16,7 @@ const FIRST: &str = "PL!-sd1-010-SD"; // cost 4, no abilities
 const SECOND: &str = "PL!N-PR-008-PR"; // cost 9
 
 #[test]
-fn q29_baton_touch_blocked_on_arrival_turn_allowed_next_turn() {
+fn baton_touch_blocked_on_arrival_turn_allowed_next_turn() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let first = game.id(FIRST);

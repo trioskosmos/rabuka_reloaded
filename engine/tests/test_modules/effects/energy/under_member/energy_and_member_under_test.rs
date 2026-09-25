@@ -918,7 +918,7 @@ fn sayaka_rule_1053_under_members_go_to_waitroom() {
 }
 
 #[test]
-fn q140_member_with_under_energy_to_hand_recycles_energy() {
+fn member_with_under_energy_moving_to_hand_recycles_energy() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let member = game.id("PL!-sd1-010-SD");
@@ -942,7 +942,7 @@ fn q140_member_with_under_energy_to_hand_recycles_energy() {
 }
 
 #[test]
-fn q141_baton_touch_recycles_under_energy() {
+fn baton_touch_recycles_owner_under_energy() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let target = game.id("PL!-sd1-010-SD");

@@ -119,6 +119,7 @@ static int enqueue_matching_ability(GameState *g, int actor, int card_id,
                 snprintf(g->queue.entries[index].player_id,
                          sizeof(g->queue.entries[index].player_id), "%s",
                          actor == 0 ? "p1" : "p2");
+                rb_queue_set_entry_trigger(g, index, trigger, NULL, 0);
                 queued++;
             }
         }
@@ -134,13 +135,22 @@ int rb_translated_execute_activate_ability(GameState *g, int actor,
     if (!g || !effect) return 0;
     const char *source_card = effect_extra(effect, "source_card");
     const char *target_trigger = effect_extra(effect, "target_trigger");
+    if (!target_trigger || !*target_trigger) {
+        int target = g->activating_card >= 0 ? g->activating_card : host_cid;
+        if (target >= 0) {
+            AbilityEffect copy = *effect;
+            copy.text = effect->text ? effect->text : (char *)"";
+            rb_gain_ability(g, actor, &copy);
+        }
+        return 1;
+    }
     int selected[RB_MAX_RECENTLY_MOVED];
     int selected_count = 0;
     if (source_card && !strcmp(source_card, "previous_selected")) {
         selected_count = g->n_selected_cards;
         if (selected_count > RB_MAX_RECENTLY_MOVED)
             selected_count = RB_MAX_RECENTLY_MOVED;
-        memcpy(selected, g->selected_cards, sizeof(selected));
+        memcpy(selected, g->selected_cards, sizeof(int) * (size_t)selected_count);
     } else if (source_card && !strcmp(source_card, "cost_card") &&
                g->n_recently_moved > 0) {
         selected[0] = g->recently_moved[g->n_recently_moved - 1];
@@ -155,15 +165,8 @@ int rb_translated_execute_activate_ability(GameState *g, int actor,
         queued += enqueue_matching_ability(g, actor, selected[i], target_trigger);
     if (queued) {
         translated_log(g, actor, "[[log_activated_ability]]");
-        return 1;
     }
-
-    if (g->activating_card >= 0 || host_cid >= 0) {
-        AbilityEffect copy = *effect;
-        copy.text = effect->text ? effect->text : (char *)"";
-        rb_gain_ability(g, actor, &copy);
-    }
-    return 1;
+    return queued > 0;
 }
 
 int rb_translated_execute_invalidate_ability(GameState *g, int actor,

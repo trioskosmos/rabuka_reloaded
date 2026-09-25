@@ -44,6 +44,7 @@ pub mod optional_energy_saint_snow_recovery_and_blades_test;
 pub mod pl_hs_bp1_003_test;
 pub mod pl_n_bp1_008_test;
 pub mod poppin_test;
+pub mod q145_empty_waitroom_optional_self_wait_test;
 pub mod self_to_waitroom_liella_recovery_test;
 pub mod self_to_waitroom_live_recovery_energy_activation_test;
 pub mod self_to_waitroom_recover_live_q79_q123_test;

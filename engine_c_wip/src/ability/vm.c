@@ -363,6 +363,8 @@ static void effect_free(AbilityEffect *e) {
     effect_free(e->optional_action);
     effect_free(e->conditional_action);
     effect_free(e->gained_effect);
+    effect_free(e->resource_on_select);
+    effect_free(e->opponent_action);
     rb_free_condition(e->result_condition);
     rb_free_condition(e->alternative_condition);
     free(e);
@@ -431,25 +433,26 @@ static AbilityEffect *decode_effect_body(Rdr *r) {
     AbilityEffect *e = effect_new();
     if (!e) return NULL;
     for (i = 0; i < count; i++) {
-        uint32_t kidx; if (!rd_idx(r, &kidx)) break;
+        uint32_t kidx; if (!rd_idx(r, &kidx)) goto fail;
         const char *key = rb_get_string(kidx);
-        uint8_t tag; if (!rd_u8(r, &tag)) break;
+        uint8_t tag; if (!rd_u8(r, &tag)) goto fail;
 
         if (key && strcmp(key, "text") == 0) {
             free(e->text); e->text = rd_string_val(r, tag); continue;
         }
-        if (key && strcmp(key, "action") == 0) {
+        if (key && (!strcmp(key, "action") || !strcmp(key, "type") ||
+                    !strcmp(key, "cost_type"))) {
             free(e->action); e->action = rd_string_val(r, tag); continue;
         }
-        if (key && (strcmp(key, "source") == 0 || strcmp(key, "destination") == 0 ||
-                    strcmp(key, "target") == 0)) {
+        if (key && (!strcmp(key, "source") || !strcmp(key, "destination") ||
+                    !strcmp(key, "target") || !strcmp(key, "zone"))) {
             char *s = rd_string_val(r, tag);
-            if (key && (strcmp(key, "source") == 0 || strcmp(key, "destination") == 0) &&
+            if (s && (strcmp(key, "target") != 0) &&
                 s && rb_zone_from_source_str(s) == RB_ZONEID_UNKNOWN) {
                 rb_note_decode_fallback(r->ability, key, s);
             }
-            if (strcmp(key, "source") == 0) { free(e->source); e->source = s; }
-            else if (strcmp(key, "destination") == 0) { free(e->destination); e->destination = s; }
+            if (!strcmp(key, "source") || !strcmp(key, "zone")) { free(e->source); e->source = s; }
+            else if (!strcmp(key, "destination")) { free(e->destination); e->destination = s; }
             else { free(e->target); e->target = s; }
             continue;
         }
@@ -468,9 +471,9 @@ static AbilityEffect *decode_effect_body(Rdr *r) {
             effect_decode_dynamic_count(e, r);
             continue;
         }
-        if (key && (strcmp(key, "optional") == 0 || strcmp(key, "non_stackable") == 0 ||
-                    strcmp(key, "conditional") == 0 || strcmp(key, "is_further") == 0 ||
-                    strcmp(key, "max") == 0)) {
+        if (key && (!strcmp(key, "optional") == 0 || !strcmp(key, "non_stackable") == 0 ||
+                    !strcmp(key, "conditional") == 0 || !strcmp(key, "conditional_negation") == 0 ||
+                    !strcmp(key, "is_further") == 0 || !strcmp(key, "max") == 0)) {
             if (strcmp(key, "optional") == 0 && tag == RB_TAG_TRUE) e->is_optional = 1;
             if (strcmp(key, "max") == 0 && tag == RB_TAG_TRUE) effect_set_extra(e, "max", "true");
             if (strcmp(key, "conditional") == 0 && tag == RB_TAG_TRUE) e->conditional_flag = 1;
@@ -492,14 +495,15 @@ static AbilityEffect *decode_effect_body(Rdr *r) {
             continue;
         }
         /* nested effect(s) */
-        if (key && (strcmp(key, "actions") == 0 || strcmp(key, "effect_steps") == 0)) {
+        if (key && (!strcmp(key, "actions") || !strcmp(key, "effect_steps") ||
+                    !strcmp(key, "costs"))) {
             if (tag == RB_TAG_ARRAY) {
                 uint32_t n; if (rd_len(r, &n)) {
                     for (uint32_t j = 0; j < n; j++) {
-                        uint8_t st; if (!rd_u8(r, &st)) break;
+                        uint8_t st; if (!rd_u8(r, &st)) goto fail;
                         if (st == RB_TAG_OBJVAR) {
                             AbilityEffect *c = decode_effect_body(r);
-                            if (c) effect_add_child(e, c);
+                            if (!c || !effect_add_child(e, c)) goto fail;
                         } else skip_value(r, st);
                     }
                 }
@@ -539,11 +543,13 @@ static AbilityEffect *decode_effect_body(Rdr *r) {
             followup/optional/conditional). Decoded into dedicated fields (NOT child[])
             so branch ordering is unambiguous and the pre-order walk in rb_execute_effect_ex
             does not double-execute them. */
-        if (key && (strcmp(key, "primary_effect") == 0 ||
-                    strcmp(key, "alternative_effect") == 0 ||
-                    strcmp(key, "followup_action") == 0 ||
-                    strcmp(key, "optional_action") == 0 ||
-                    strcmp(key, "conditional_action") == 0)) {
+        if (key && (!strcmp(key, "primary_effect") ||
+                    !strcmp(key, "alternative_effect") ||
+                    !strcmp(key, "followup_action") ||
+                    !strcmp(key, "optional_action") ||
+                    !strcmp(key, "conditional_action") ||
+                    !strcmp(key, "resource_on_select") ||
+                    !strcmp(key, "opponent_action"))) {
             if (tag == RB_TAG_OBJVAR) {
                 AbilityEffect *c = decode_effect_body(r);
                 if (c) {
@@ -551,7 +557,9 @@ static AbilityEffect *decode_effect_body(Rdr *r) {
                     else if (!strcmp(key, "alternative_effect")) { effect_free(e->alternative_effect); e->alternative_effect = c; }
                     else if (!strcmp(key, "followup_action")) { effect_free(e->followup_action); e->followup_action = c; }
                     else if (!strcmp(key, "optional_action")) { effect_free(e->optional_action); e->optional_action = c; }
-                    else { effect_free(e->conditional_action); e->conditional_action = c; }
+                    else if (!strcmp(key, "conditional_action")) { effect_free(e->conditional_action); e->conditional_action = c; }
+                    else if (!strcmp(key, "resource_on_select")) { effect_free(e->resource_on_select); e->resource_on_select = c; }
+                    else { effect_free(e->opponent_action); e->opponent_action = c; }
                 }
             } else skip_value(r, tag);
             continue;
@@ -600,22 +608,14 @@ static AbilityEffect *decode_effect_body(Rdr *r) {
         } else if (tag == RB_TAG_FALSE) {
             effect_set_extra(e, key, "false");
         } else if (tag == RB_TAG_ARRAY) {
-            // heart_colors: ["heart03"] etc. — capture first element as heart_color
-            uint32_t n; if (!rd_len(r, &n)) { skip_value(r, tag); continue; }
-            if (n==0) continue;
-            // peek first element
-            uint8_t etag; if (!rd_u8(r, &etag)) continue;
-            if (etag == RB_TAG_STR) {
-                uint32_t eidx; if (rd_idx(r, &eidx)) {
-                    const char *es = rb_get_string(eidx);
-                    if (key && (!strcmp(key,"heart_colors") || !strcmp(key,"heart_color"))) effect_set_extra(e, "heart_color", es);
-                    else effect_set_extra(e, key, es);
-                }
-            } else if (etag == RB_TAG_I64) {
-                int64_t ev; if (rd_int(r, &ev)) { char buf[24]; snprintf(buf,sizeof(buf),"%lld",(long long)ev); effect_set_extra(e, key, buf); }
+            char *value = decode_extra_value(r, tag);
+            if (!value) return NULL;
+            int ok = effect_set_extra(e, key, value);
+            if (ok && key && !strcmp(key, "heart_colors") && !strchr(value, ',')) {
+                ok = effect_set_extra(e, "heart_color", value);
             }
-            // skip remaining elements
-            for (uint32_t j=1;j<n;j++) skip_one(r);
+            free(value);
+            if (!ok) goto fail;
         } else {
             skip_value(r, tag);
         }
@@ -654,27 +654,44 @@ RbKeyword rb_keyword_from_str(const char *s) {
     return RB_KW_COUNT;
 }
 
-/* Decode a keyword array into a static buffer (max 8). Returns count written.
-   Mirrors vm.rs decode_keywords: TAG_NULL -> 0, TAG_ARRAY -> parse each TAG_STR. */
+static int decode_keywords_value(Rdr *r, uint8_t tag, unsigned char *out,
+                                 int cap, int *count, int *present) {
+    if (!count) return 0;
+    *count = 0;
+    if (present) *present = 0;
+    if (tag == RB_TAG_NULL) return 1;
+    if (tag != RB_TAG_ARRAY || !out || cap <= 0) return 0;
+    uint32_t n;
+    if (!rd_len(r, &n)) return 0;
+    if (present) *present = 1;
+    for (uint32_t i = 0; i < n; i++) {
+        uint8_t st;
+        if (!rd_u8(r, &st) || st != RB_TAG_STR) return 0;
+        uint32_t idx;
+        if (!rd_idx(r, &idx)) return 0;
+        const char *s = rb_get_string(idx);
+        if (!s) return 0;
+        RbKeyword kw = rb_keyword_from_str(s);
+        if (kw == RB_KW_COUNT) {
+            rb_note_decode_fallback(r->ability, "keyword", s);
+        } else if (*count < cap) {
+            out[(*count)++] = (unsigned char)kw;
+        }
+    }
+    return 1;
+}
+
 int rb_decode_keywords(const unsigned char *arr, uint32_t arr_len, RbKeyword *out, int max) {
     if (!arr || arr_len == 0 || !out || max <= 0) return 0;
     Rdr r = { arr, arr + arr_len, -1 };
     uint8_t tag;
-    if (!rd_u8(&r, &tag)) return 0;
-    if (tag == RB_TAG_NULL) return 0;
-    if (tag != RB_TAG_ARRAY) { skip_value(&r, tag); return 0; }
-    uint32_t n; if (!rd_len(&r, &n)) return 0;
-    int kwc = 0;
-    for (uint32_t j = 0; j < n && kwc < max; j++) {
-        uint8_t st; if (!rd_u8(&r, &st)) break;
-        if (st == RB_TAG_STR) {
-            uint32_t idx; if (rd_idx(&r, &idx)) {
-                const char *s = rb_get_string(idx);
-                if (s) {
-                    RbKeyword kw = rb_keyword_from_str(s);
-                    if (kw != RB_KW_COUNT) out[kwc++] = kw;
-                    else rb_note_decode_fallback(r.ability, "keyword", s);
-                }
+    int count, present;
+    if (!rd_u8(&r, &tag) ||
+        !decode_keywords_value(&r, tag, (unsigned char *)out, max, &count, &present)) {
+        return 0;
+    }
+    return present ? count : 0;
+}
             }
         } else skip_value(&r, st);
     }
@@ -703,7 +720,7 @@ int rb_decode_ability(uint32_t idx, Ability *out) {
     out->use_limit = -1;
     if (!slice || len == 0) return 1; /* empty slice -> default Ability (mirrors Rust) */
     Rdr r = { slice, slice + len, (int)idx };
-    uint8_t tag, b;
+    uint8_t tag;
     if (!rd_u8(&r, &tag) || tag != RB_TAG_OBJECT) return 0;
     uint32_t count;
     if (!rd_len(&r, &count)) return 0;
@@ -723,28 +740,16 @@ int rb_decode_ability(uint32_t idx, Ability *out) {
         else if (key && strcmp(key, "cost") == 0) { out->cost = decode_effect_value(&r, tag); }
         else if (key && strcmp(key, "effect") == 0) { out->effect = decode_effect_value(&r, tag); }
         else if (key && strcmp(key, "keywords") == 0) {
-            if (tag == RB_TAG_ARRAY) {
-                /* Decode keywords inline: store the raw array bytes as an extra so
-                   downstream callers can re-parse if needed. The C engine does not
-                   evaluate keywords, but the data is preserved for traceability. */
-                uint32_t n; if (rd_len(&r, &n)) {
-                    for (uint32_t j = 0; j < n; j++) {
-                        uint8_t st; if (!rd_u8(&r, &st)) break;
-                        if (st == RB_TAG_STR) {
-                            uint32_t idx; if (rd_idx(&r, &idx)) {
-                                const char *s = rb_get_string(idx);
-                                if (s && rb_keyword_from_str(s) == RB_KW_COUNT) {
-                                    rb_note_decode_fallback(r.ability, "keyword", s);
-                                }
-                            }
-                        } else skip_value(&r, st);
-                    }
-                }
-            } else skip_value(&r, tag);
+            if (!decode_keywords_value(&r, tag, out->keywords, RB_MAX_ABILITY_KEYWORDS,
+                                       &out->n_keywords, &out->has_keywords)) {
+                rb_free_ability(out);
+                memset(out, 0, sizeof(*out));
+                out->use_limit = -1;
+                return 0;
+            }
         }
         else { skip_value(&r, tag); }
     }
-    (void)b;
     return 1;
 }
 
@@ -753,10 +758,11 @@ int rb_decode_ability(uint32_t idx, Ability *out) {
    slice, returns 1 with a default Ability (matching Rust's Ok(Ability::default())).
    Only returns 0 when the bytecode is present but structurally invalid. */
 int rb_get_ability(uint32_t idx, Ability *out) {
+    if (!out) return 0;
     if (idx >= RBKA_NUM_ABILITIES) {
         memset(out, 0, sizeof(*out));
         out->use_limit = -1;
-        return 1;
+        return 0;
     }
     return rb_decode_ability(idx, out);
 }

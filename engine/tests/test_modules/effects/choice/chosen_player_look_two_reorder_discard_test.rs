@@ -121,6 +121,33 @@ fn chosen_player_look_two_empty_self_deck_and_waitroom_no_selection() {
 
 /// Deck has enough cards: choose self, look at own deck, select, reorder.
 #[test]
+fn chosen_player_q131_p2_first_live_does_not_trigger_p1_live_start() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let ability_card = game.id("PL!S-pb1-008-R");
+    let filler = game.id("PL!-sd1-010-SD");
+    let live = game.id("LL-bp5-001-L");
+
+    game.state.player1.stage.stage = [ability_card, filler, -1];
+    game.state.player1.hand.cards.clear();
+    game.state.player2.live_card_zone.cards.push(live);
+    for _ in 0..20 {
+        game.state.player1.main_deck.cards.push(filler);
+        game.state.player2.main_deck.cards.push(filler);
+    }
+    game.state.player1.is_first_attacker = false;
+    game.state.player2.is_first_attacker = true;
+    game.state.current_phase = rabuka_engine::game_state::Phase::LiveCardSetSecondAttacker;
+    game.state.current_turn_phase = rabuka_engine::game_state::TurnPhase::Live;
+    rabuka_engine::turn::TurnEngine::advance_phase(&mut game.state);
+
+    assert!(
+        !game.has_pending_choice(),
+        "Q131: P1 LiveStart ability must not fire when P2 is the first attacker"
+    );
+}
+
+#[test]
 fn chosen_player_look_two_live_start_sufficient_deck_fires() {
     let db = load_real_database();
     let mut game = TestGame::new(db);

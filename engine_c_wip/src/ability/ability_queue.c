@@ -158,6 +158,13 @@ int rb_queue_enqueue(GameState *g, int card_id, int ability_idx,
     e->use_limit_recorded = 0;
     e->n_cond_cache = 0;
     if (player_id) snprintf(e->player_id, sizeof(e->player_id), "%s", player_id);
+    if (card_id >= 0 && ability_idx >= 0) {
+        Ability ab;
+        if (rb_decode_card_ability((uint32_t)card_id, ability_idx, &ab)) {
+            snprintf(e->trigger, sizeof(e->trigger), "%s", ab.triggers ? ab.triggers : "");
+            rb_free_ability(&ab);
+        }
+    }
     if (card_no) {
         /* card_no is stored only in Rust; C port looks it up from the card db */
         (void)card_no;
@@ -181,7 +188,45 @@ int rb_queue_push(RbAbilityQueue *q, int card_id, int ability_idx) {
     e->pending_actions_n = 0;
     e->n_cond_cache = 0;
     e->player_id[0] = '\0';
+    if (card_id >= 0 && ability_idx >= 0) {
+        Ability ab;
+        if (rb_decode_card_ability((uint32_t)card_id, ability_idx, &ab)) {
+            snprintf(e->trigger, sizeof(e->trigger), "%s", ab.triggers ? ab.triggers : "");
+            rb_free_ability(&ab);
+        }
+    }
     q->n_entries++;
+    return 1;
+}
+
+static void queue_set_entry_trigger(RbAbilityQueue *q, int entry_index,
+                                    const char *trigger, const int *moved_cards, int n_moved)
+{
+    if (!q || entry_index < 0 || entry_index >= q->n_entries) return;
+    RbQueueEntry *e = &q->entries[entry_index];
+    snprintf(e->trigger, sizeof(e->trigger), "%s", trigger ? trigger : "");
+    if (n_moved < 0) n_moved = 0;
+    if (n_moved > (int)(sizeof(e->trigger_moved_cards) / sizeof(e->trigger_moved_cards[0])))
+        n_moved = (int)(sizeof(e->trigger_moved_cards) / sizeof(e->trigger_moved_cards[0]));
+    for (int i = 0; i < n_moved; i++)
+        e->trigger_moved_cards[i] = moved_cards ? moved_cards[i] : -1;
+    e->n_trigger_moved_cards = n_moved;
+}
+
+void rb_queue_set_entry_trigger(GameState *g, int entry_index, const char *trigger,
+                                const int *moved_cards, int n_moved)
+{
+    if (!g) return;
+    queue_set_entry_trigger(&g->queue, entry_index, trigger, moved_cards, n_moved);
+}
+
+int rb_queue_push_with_trigger(RbAbilityQueue *q, int card_id, int ability_idx,
+                               const char *trigger, const int *moved_cards, int n_moved)
+{
+    if (!q || q->n_entries >= RB_QUEUE_DEPTH) return 0;
+    int index = q->n_entries;
+    if (!rb_queue_push(q, card_id, ability_idx)) return 0;
+    queue_set_entry_trigger(q, index, trigger, moved_cards, n_moved);
     return 1;
 }
 

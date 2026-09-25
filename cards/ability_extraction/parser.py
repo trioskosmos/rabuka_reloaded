@@ -97,6 +97,8 @@ from parser_utils import (
     POSITION_KEYWORDS,
     _ALL_KW_RE,
     iter_dict_nodes,
+    transform_child_lists,
+    walk_dict_tree,
     PriorityRegistry,
     ActionRule,
     EffectPattern,
@@ -10815,54 +10817,57 @@ def _walk_cleanup_text(d, d_text):
         d["text"] = d_text.lstrip("、，").strip()
 
 
+_WALK_CHILD_KEYS = (
+    "actions",
+    "options",
+    "conditions",
+    "condition",
+    "primary_effect",
+    "alternative_effect",
+    "select_action",
+    "look_action",
+    "opponent_action",
+    "followup_action",
+    "optional_action",
+    "conditional_action",
+)
+
+
 def _walk(d, full_text, original_text, ctx_text=None):
     if not isinstance(d, dict):
         return d
-    d_ctx = d.get("text") or ctx_text or full_text
-    d_text = d.get("text") or ""
-    ct = d.get("condition_type") or d.get("type")
 
-    _walk_ensure_text(d, ctx_text, full_text)
-    _walk_propagate_activation_position(d, original_text, full_text)
-    _walk_propagate_text_context_fields(d, d_ctx, ctx_text)
-    _walk_extract_heart_colors(d, d_text, ctx_text)
-    _walk_propagate_all_and_targets(d, d_ctx)
-    _walk_propagate_sequential_links(d)
-    _walk_set_defaults(d, d_text, ct)
-    _walk_propagate_position(d, d_ctx, d_text)
-    _walk_propagate_flags(d, d_ctx)
-    _fix_unqualified_group_card_move(d)
-    _walk_cleanup_text(d, d_text)
+    def enter(node, parent_text):
+        d_ctx = node.get("text") or parent_text or full_text
+        d_text = node.get("text") or ""
+        ct = node.get("condition_type") or node.get("type")
+        _walk_ensure_text(node, parent_text, full_text)
+        _walk_propagate_activation_position(node, original_text, full_text)
+        _walk_propagate_text_context_fields(node, d_ctx, parent_text)
+        _walk_extract_heart_colors(node, d_text, parent_text)
+        _walk_propagate_all_and_targets(node, d_ctx)
+        _walk_propagate_sequential_links(node)
+        _walk_set_defaults(node, d_text, ct)
+        _walk_propagate_position(node, d_ctx, d_text)
+        _walk_propagate_flags(node, d_ctx)
+        _fix_unqualified_group_card_move(node)
+        _walk_cleanup_text(node, d_text)
+        if isinstance(node.get("actions"), list):
+            node["actions"] = _clean_action_list(node["actions"], node, d_ctx)
+        return d_ctx
 
-    # Recurse into sub-actions
-    for sub_key in (
-        "actions",
-        "options",
-        "conditions",
-        "condition",
-        "primary_effect",
-        "alternative_effect",
-        "select_action",
-        "look_action",
-        "opponent_action",
-        "followup_action",
-        "optional_action",
-        "conditional_action",
-    ):
-        sub = d.get(sub_key)
-        if isinstance(sub, list):
-            if sub_key == "actions":
-                d[sub_key] = _clean_action_list(sub, d, d_ctx)
-                sub = d[sub_key]
-            for item in sub:
-                _walk(item, full_text, original_text, d_ctx)
-        elif isinstance(sub, dict):
-            _walk(sub, full_text, original_text, d_ctx)
+    def leave(node, _parent_text):
+        if node.get("action") == "sequential" and not node.get("actions"):
+            node.pop("action", None)
 
-    # Clean up empty actions
-    if d.get("action") == "sequential" and not d.get("actions"):
-        d.pop("action", None)
-
+    walk_dict_tree(
+        d,
+        keys=_WALK_CHILD_KEYS,
+        context=ctx_text,
+        enter=enter,
+        leave=leave,
+        child_context=lambda node, node_context, _key, _child: node_context,
+    )
     return d
 
 
@@ -10927,45 +10932,29 @@ def _mark_live_total_score(node):
 
 
 def _mark_live_total_clamp(node, original_text: str = ""):
-    """「この効果ではライブの合計スコアは０未満にはならない」 is a per-effect floor.
-
-    The sentence has no verb, so the sequential splitter drops it. Detect it on
-    the parent text and stamp `effect_constraint: min:0` + `score_floor:0` on
-    the parent sequential and on each modify_score child so score.rs can enforce
-    the floor at application time (mirrors the global saturate but scoped to
-    this effect as printed).
-    """
-    if not isinstance(node, dict):
-        return
-    src = original_text or node.get("text", "") or ""
-    # Full-width digits normalized, but keep ０ for regex
-    has_clamp_phrase = ("この効果では" in src and "未満にはならない" in src) or (
-        "この効果では" in node.get("text", "") and "未満にはならない" in node.get("text", "")
+    """Stamp the printed per-effect live-total score floor on the whole tree."""
+    source = original_text or node.get("text", "") or ""
+    has_clamp_phrase = ("この効果では" in source and "未満にはならない" in source) or (
+        "この効果では" in node.get("text", "")
+        and "未満にはならない" in node.get("text", "")
     )
     if not has_clamp_phrase:
-        # Also check if any child text was stripped but parent still holds it
-        for v in node.values():
-            if isinstance(v, str) and "この効果では" in v and "未満にはならない" in v:
-                has_clamp_phrase = True
-                break
-    if has_clamp_phrase and "0未満" in src.replace("０", "0"):
-        # Stamp parent
-        if node.get("action") == "sequential":
-            node["effect_constraint"] = "min:0"
-            node["score_floor"] = 0
-        # Stamp children
-        for act in node.get("actions", []):
-            if isinstance(act, dict) and act.get("action") == "modify_score":
-                act["effect_constraint"] = "min:0"
-                act["score_floor"] = 0
-        # Recurse for nested
-        for v in node.values():
-            if isinstance(v, dict):
-                _mark_live_total_clamp(v, src)
-            elif isinstance(v, list):
-                for it in v:
-                    if isinstance(it, dict):
-                        _mark_live_total_clamp(it, src)
+        has_clamp_phrase = any(
+            isinstance(v, str)
+            and "この効果では" in v
+            and "未満にはならない" in v
+            for v in node.values()
+        )
+    if not has_clamp_phrase or "0未満" not in source.replace("０", "0"):
+        return
+
+    for current in iter_dict_nodes(node):
+        if current.get("action") == "sequential":
+            current["effect_constraint"] = "min:0"
+            current["score_floor"] = 0
+        elif current.get("action") == "modify_score":
+            current["effect_constraint"] = "min:0"
+            current["score_floor"] = 0
 
 
 def _state_energy_is_object(txt: str) -> bool:
@@ -11116,84 +11105,53 @@ def _split_mixed_state_change(node):
 
 
 def _walk_split_mixed(node):
-    if isinstance(node, dict):
-        for key in ("actions", "options"):
-            if isinstance(node.get(key), list):
-                node[key] = [_walk_split_mixed(a) for a in node[key]]
-        return _split_mixed_state_change(node)
-    elif isinstance(node, list):
-        return [_walk_split_mixed(a) for a in node]
-    return node
+    return transform_child_lists(node, _split_mixed_state_change)
 
 
 def _mark_success_pile_difference(node):
-    """「相手の成功ライブカード置き場にあるカードの枚数が自分より多いかぎり、
-    その差に等しい数の…を得る」 — the vague reference 「その差」 becomes an
-    explicit success-pile CARD-COUNT difference so the engine resolves the
-    printed semantics without guessing between counts and score sums."""
-    if isinstance(node, dict):
-        dc = node.get("dynamic_count")
-        if isinstance(dc, dict) and dc.get("reference") == "その差":
-            cond = node.get("condition") or {}
-            if cond.get("location") == "success_live_card_zone" or (
-                node.get("resource") == "blade"
-            ):
-                dc["reference"] = "success_pile_count_difference"
-        for v in node.values():
-            _mark_success_pile_difference(v)
-    elif isinstance(node, list):
-        for it in node:
-            _mark_success_pile_difference(it)
+    """Canonicalize success-pile card-count differences throughout the tree."""
+    for current in iter_dict_nodes(node):
+        dc = current.get("dynamic_count")
+        cond = current.get("condition") or {}
+        if (
+            isinstance(dc, dict)
+            and dc.get("reference") == "その差"
+            and (
+                cond.get("location") == "success_live_card_zone"
+                or current.get("resource") == "blade"
+            )
+        ):
+            dc["reference"] = "success_pile_count_difference"
 
 
 def _canonicalize_dynamic_counts(node):
-    """Replace raw sentence fragments used as dynamic_count references with
-    canonical tokens the engine can dispatch on exactly:
-      - opponent waited-member count   (相手のステージにいるウェイト状態のメンバー)
-      - waitroom shortfall vs base     ((デッキの上からカードを)その差 with
-                                        控え室…N枚未満 gating)
-      - cards placed to waitroom by this effect (これにより控え室に置いた…)
-      - plain / opponent stage member counts (ステージ…メンバー)
-    """
-    if isinstance(node, dict):
-        dc = node.get("dynamic_count")
-        if isinstance(dc, dict):
-            ref = str(dc.get("reference") or "")
-            if "ウェイト状態" in ref and "ステージ" in ref and "メンバー" in ref:
-                dc["reference"] = "opponent_waited_member_count"
-            elif (
-                ("その差" in ref and "デッキ" in ref)
-                or ref == "その差"
-                or "その差に等しい枚数" in ref
-            ):
-                cond = node.get("condition") or {}
-                if "控え室" in str(cond.get("text", "")):
-                    dc["reference"] = "waitroom_count_below_base"
-                    dc["base_reference"] = re.search(
-                        r"(\d+)枚未満", str(cond.get("text", ""))
-                    )
-                    dc["base_reference"] = (
-                        dc["base_reference"].group(1)
-                        if dc["base_reference"]
-                        else "8"
-                    )
-                    # The shortfall IS the move count — drop any static
-                    # default so executors resolve the dynamic branch
-                    # instead of moving a fixed 1 card.
-                    node.pop("count", None)
-            elif "これにより控え室に置いた" in ref:
-                dc["reference"] = "these_waitroom_placed_count"
-            elif "ステージ" in ref and "メンバー" in ref:
-                dc["reference"] = (
-                    "opponent_stage_member_count"
-                    if "相手" in ref
-                    else "stage_member_count"
-                )
-        for v in node.values():
-            _canonicalize_dynamic_counts(v)
-    elif isinstance(node, list):
-        for it in node:
-            _canonicalize_dynamic_counts(it)
+    """Replace raw dynamic_count references with engine-dispatchable tokens."""
+    for current in iter_dict_nodes(node):
+        dc = current.get("dynamic_count")
+        if not isinstance(dc, dict):
+            continue
+        ref = str(dc.get("reference") or "")
+        if "ウェイト状態" in ref and "ステージ" in ref and "メンバー" in ref:
+            dc["reference"] = "opponent_waited_member_count"
+        elif (
+            ("その差" in ref and "デッキ" in ref)
+            or ref == "その差"
+            or "その差に等しい枚数" in ref
+        ):
+            cond = current.get("condition") or {}
+            if "控え室" in str(cond.get("text", "")):
+                dc["reference"] = "waitroom_count_below_base"
+                match = re.search(r"(\d+)枚未満", str(cond.get("text", "")))
+                dc["base_reference"] = match.group(1) if match else "8"
+                current.pop("count", None)
+        elif "これにより控え室に置いた" in ref:
+            dc["reference"] = "these_waitroom_placed_count"
+        elif "ステージ" in ref and "メンバー" in ref:
+            dc["reference"] = (
+                "opponent_stage_member_count"
+                if "相手" in ref
+                else "stage_member_count"
+            )
 
 
 def _split_look_three_way(node):
@@ -11250,14 +11208,7 @@ def _split_look_three_way(node):
 
 
 def _walk_split_look(node):
-    if isinstance(node, dict):
-        for key in ("actions", "options"):
-            if isinstance(node.get(key), list):
-                node[key] = [_walk_split_look(a) for a in node[key]]
-        return _split_look_three_way(node)
-    elif isinstance(node, list):
-        return [_walk_split_look(a) for a in node]
-    return node
+    return transform_child_lists(node, _split_look_three_way)
 
 
 def _stamp_mid_sentence_duration(node, root_text):
@@ -11341,20 +11292,15 @@ def _normalize_effect_tree(effect, original_text=None):
     # stored as the tail AFTER「につき」, so the group can never appear in it —
     # yet the group legitimately defines WHICH discarded cards count.
     def _strip_leaked_draw_g(node):
-        if isinstance(node, dict):
+        for current in iter_dict_nodes(node):
             if (
-                node.get("action") == "draw_card"
-                and node.get("group_names")
-                and node.get("per_unit_type") != "discard"
+                current.get("action") == "draw_card"
+                and current.get("group_names")
+                and current.get("per_unit_type") != "discard"
             ):
-                txt = node.get("text") or ""
-                if not any(g in txt for g in node["group_names"]):
-                    node.pop("group_names", None)
-            for v in node.values():
-                _strip_leaked_draw_g(v)
-        elif isinstance(node, list):
-            for it in node:
-                _strip_leaked_draw_g(it)
+                txt = current.get("text") or ""
+                if not any(g in txt for g in current["group_names"]):
+                    current.pop("group_names", None)
     _strip_leaked_draw_g(effect)
     _enrich_gain_abilities(effect)
     _mark_live_total_score(effect)
@@ -11427,15 +11373,11 @@ def _collapse_position_changes(node):
 
 
 def _collect_gain(d, nodes):
-    if isinstance(d, dict):
-        if d.get("action") == "gain_ability" and d.get("ability_gain"):
-            nodes.append(d)
-        for v in d.values():
-            if isinstance(v, dict):
-                _collect_gain(v, nodes)
-            elif isinstance(v, list):
-                for item in v:
-                    _collect_gain(item, nodes)
+    nodes.extend(
+        current
+        for current in iter_dict_nodes(d)
+        if current.get("action") == "gain_ability" and current.get("ability_gain")
+    )
 
 
 def _enrich_gain_abilities(effect):
@@ -11450,44 +11392,35 @@ def _enrich_gain_abilities(effect):
 
 
 def _enrich_characters(d):
-    if isinstance(d, dict):
-        if d.get("action") in (
+    for current in iter_dict_nodes(d):
+        if current.get("action") in (
             "sequential",
             "conditional_on_optional",
             "conditional_on_result",
             "conditional_alternative",
             "look_and_select",
         ):
-            pass
-        elif "text" in d:
-            text = d["text"]
-            if not d.get("characters"):
-                # Cost-set modifiers on "このカード" (e.g. "このカードのコストは
-                # 10になる" after placing named members) target the card itself —
-                # any 「X」names describe the CONDITION, not the modify target.
-                is_self_cost_set = (
-                    d.get("action") == "modify_cost"
-                    and d.get("operation") == "set"
-                    and ("このカード" in text or "このメンバーカード" in text)
-                )
-                cm = re.search(
-                    r"((?:「[^」]+」[か、]? ?)+)の(?:メンバーカード|ライブカード)", text
-                )
-                if cm and not is_self_cost_set:
-                    names = _quoted_names(cm.group(1))
-                    if names:
-                        d["characters"] = names
-            if not d.get("card_names"):
-                cn = re.search(r"カード名(?:に|が)「([^」]+)」", text)
-                if cn:
-                    d["card_names"] = [cn.group(1)]
-        for v in d.values():
-            if isinstance(v, (dict, list)):
-                _enrich_characters(v)
-    elif isinstance(d, list):
-        for item in d:
-            if isinstance(item, (dict, list)):
-                _enrich_characters(item)
+            continue
+        if "text" not in current:
+            continue
+        text = current["text"]
+        if not current.get("characters"):
+            is_self_cost_set = (
+                current.get("action") == "modify_cost"
+                and current.get("operation") == "set"
+                and ("このカード" in text or "このメンバーカード" in text)
+            )
+            cm = re.search(
+                r"((?:「[^」]+」[か、]? ?)+)の(?:メンバーカード|ライブカード)", text
+            )
+            if cm and not is_self_cost_set:
+                names = _quoted_names(cm.group(1))
+                if names:
+                    current["characters"] = names
+        if not current.get("card_names"):
+            cn = re.search(r"カード名(?:に|が)「([^」]+)」", text)
+            if cn:
+                current["card_names"] = [cn.group(1)]
 
 
 # ====================================================================
@@ -11501,273 +11434,270 @@ def _enrich_characters(d):
 
 
 def _clean_gain_resource(node):
-    """Recursively remove inappropriate fields from gain_resource action nodes."""
-    if isinstance(node, dict):
-        if node.get("action") == "gain_resource":
-            res = node.get("resource")
-            if res in ("blade", "ブレード"):
-                node.pop("heart_colors", None)
-            elif res in ("heart", "ハート") and node.get("heart_type") == "all":
-                # icon_all already encodes every color; any heart_colors here is
-                # leakage from a condition clause (e.g. "heart02とheart04とheart05
-                # の合計が12以上の場合、ハートを得る").
-                node.pop("heart_colors", None)
-            node.pop("source", None)
-            node.pop("source", None)
-            # Remove position from gain_resource when the condition has the same
-            # position. Position on gain_resource tells the engine which card
-            # position must hold the ability card (pos_ok gate in recalculate_constants).
-            # That's wrong when position describes something else:
-            # - Trigger conditions: position = WHERE the event happened (not target)
-            # - Comparison with comparison_type: position = which member to compare
-            #   (e.g. "center has highest cost" — position is the subject, not target)
-            # Keep position when condition has resource_type (e.g. heart_02 >= 3 at
-            # left_side) because position IS the effect target.
-            cond = node.get("condition", {})
-            if node.get("position") and cond.get("position") == node.get("position"):
-                trigger_types = (
-                    "movement_condition",
-                    "appearance_condition",
-                    "baton_touch",
-                    "state_change_condition",
-                )
-                is_trigger = cond.get("type") in trigger_types
-                # comparison_type (e.g. "cost") means position is the comparison
-                # subject, not the effect target — strip it.
-                is_comparison_subject = cond.get("comparison_type") is not None
-                # highest_cost_on_stage: position describes WHICH member to check,
-                # not where the ability card must be.
-                is_highest_cost = cond.get("type") == "highest_cost_on_stage_condition"
-                if is_trigger or is_comparison_subject or is_highest_cost:
-                    node.pop("position", None)
-        for v in node.values():
-            _clean_gain_resource(v)
-    elif isinstance(node, list):
-        for item in node:
-            _clean_gain_resource(item)
+    """Remove inappropriate fields from every gain_resource action node."""
+    for current in iter_dict_nodes(node):
+        if current.get("action") != "gain_resource":
+            continue
+        res = current.get("resource")
+        if res in ("blade", "ブレード"):
+            current.pop("heart_colors", None)
+        elif res in ("heart", "ハート") and current.get("heart_type") == "all":
+            current.pop("heart_colors", None)
+        current.pop("source", None)
+        cond = current.get("condition", {})
+        if current.get("position") and cond.get("position") == current.get("position"):
+            trigger_types = (
+                "movement_condition",
+                "appearance_condition",
+                "baton_touch",
+                "state_change_condition",
+            )
+            is_trigger = cond.get("type") in trigger_types
+            is_comparison_subject = cond.get("comparison_type") is not None
+            is_highest_cost = cond.get("type") == "highest_cost_on_stage_condition"
+            if is_trigger or is_comparison_subject or is_highest_cost:
+                current.pop("position", None)
 
 
 def _clean_per_unit_source(d):
-    """Recursively remove redundant fields on perform_yell with per_unit_source.
-
-    When per_unit_source is 'previous_moved_cards', the engine sums costs from
-    self.moved_cards directly — per_unit_type and count are unused for yell.
-    """
-    if isinstance(d, dict):
+    """Remove redundant fields on perform_yell with per_unit_source."""
+    for current in iter_dict_nodes(d):
         if (
-            d.get("per_unit")
-            and d.get("action") == "perform_yell"
-            and d.get("per_unit_source") == "previous_moved_cards"
+            current.get("per_unit")
+            and current.get("action") == "perform_yell"
+            and current.get("per_unit_source") == "previous_moved_cards"
         ):
-            d.pop("per_unit_type", None)
-            d.pop("count", None)
-        for v in d.values():
-            _clean_per_unit_source(v)
-    elif isinstance(d, list):
-        for item in d:
-            _clean_per_unit_source(item)
+            current.pop("per_unit_type", None)
+            current.pop("count", None)
+
+
+_PROPAGATE_CHILD_KEYS = (
+    "condition",
+    "primary_effect",
+    "followup_action",
+    "optional_action",
+    "conditional_action",
+    "alternative_effect",
+    "actions",
+    "options",
+)
 
 
 def _propagate_context(node, ctx=None, *, t="", eff_root=None):
-    if not isinstance(node, dict):
-        return
-    if ctx is None:
-        ctx = {}
+    def enter(current, parent_ctx):
+        context = {} if parent_ctx is None else parent_ctx
+        action = current.get("action")
+        child_ctx = dict(context)
+        for field in (
+            "location",
+            "target",
+            "card_type",
+            "duration",
+            "timing_condition",
+            "all",
+        ):
+            if field in current:
+                child_ctx[field] = current[field]
 
-    action = node.get("action")
-    ct = node.get("condition_type") or node.get("type")
-
-    # Build context for children
-    new_ctx = dict(ctx)
-    for f in (
-        "location",
-        "target",
-        "card_type",
-        "duration",
-        "timing_condition",
-        "all",
-    ):
-        if f in node:
-            new_ctx[f] = node[f]
-
-    # Inherit location into compound sub-conditions (from compound's own context)
-    if node.get("type") == "compound" and "conditions" in node:
-        # Also inherit from first sub-condition to later ones (e.g. "ライブ中のカードが
-        # 3枚以上あり、その中に『虹ヶ咲』のライブカードを1枚以上" → both should use
-        # live_card_zone from the first sub-condition).
-        first_loc = None
-        for sub in node["conditions"]:
-            if isinstance(sub, dict) and sub.get("location"):
-                first_loc = sub["location"]
-                break
-        for sub in node["conditions"]:
-            if isinstance(sub, dict):
-                loc_source = new_ctx.get("location") or first_loc
-                if loc_source and not sub.get("location"):
-                    # Don't propagate location to score comparison conditions
-                    # — they need live_card_zone / success_live_zone, not stage
+        if current.get("type") == "compound" and "conditions" in current:
+            first_location = next(
+                (
+                    sub["location"]
+                    for sub in current["conditions"]
+                    if isinstance(sub, dict) and sub.get("location")
+                ),
+                None,
+            )
+            for sub in current["conditions"]:
+                if not isinstance(sub, dict):
+                    continue
+                location = child_ctx.get("location") or first_location
+                if location and not sub.get("location"):
                     if (
                         not sub.get("temporal")
                         and not sub.get("resource_type")
                         and sub.get("comparison_type") != "score"
                     ):
-                        sub["location"] = loc_source
-                _propagate_context(sub, new_ctx, t=t, eff_root=eff_root)
+                        sub["location"] = location
+            walk_dict_tree(
+                current["conditions"],
+                keys=_PROPAGATE_CHILD_KEYS,
+                list_keys=("actions", "options"),
+                context=child_ctx,
+                enter=enter,
+                leave=leave,
+                child_context=lambda _node, node_ctx, _key, _child: node_ctx,
+                after_child=lambda _node, _ctx, _key, _child: None,
+            )
 
-    # Restore duration for sequential sub-actions when the parser lost it
-    # during sequential creation (e.g., "と" split targets).
-    if action == "sequential" and not new_ctx.get("duration") and t:
-        if "ライブ終了時まで" in t:
-            for act in node.get("actions", []):
-                if isinstance(act, dict) and act.get("action") in (
-                    "gain_resource",
-                    "change_state",
-                    "move_cards",
-                ):
-                    if act.get("duration") is None and "得る" in (
-                        act.get("text", "") or ""
+        if action == "sequential" and not child_ctx.get("duration") and t:
+            if "ライブ終了時まで" in t:
+                for act in current.get("actions", []):
+                    if isinstance(act, dict) and act.get("action") in (
+                        "gain_resource",
+                        "change_state",
+                        "move_cards",
                     ):
-                        act["duration"] = "live_end"
+                        if act.get("duration") is None and "得る" in (
+                            act.get("text", "") or ""
+                        ):
+                            act["duration"] = "live_end"
+        return child_ctx
 
-    for ck in (
-        "condition",
-        "primary_effect",
-        "followup_action",
-        "optional_action",
-        "conditional_action",
-        "alternative_effect",
-    ):
-        ch = node.get(ck)
-        if isinstance(ch, dict):
-            _propagate_context(ch, new_ctx, t=t, eff_root=eff_root)
-            # Propagate location from condition back to the parent
-            # context so sibling actions in a sequential inherit it.
-            # Only propagate location — target and card_type are too
-            # context-dependent and would be incorrectly injected.
-            for f in ("location",):
-                if f in ch and f not in node and f not in ctx:
-                    ctx[f] = ch[f]
-            # Also inherit missing location from parent context into condition
-            for f in ("location",):
-                if f not in ch and f in ctx:
-                    ch[f] = ctx[f]
-        # For conditional_on_result: propagate card_type from the outer
-        # condition into the primary_effect's condition when missing.
+    def after_child(current, context, key, child):
+        if key not in ("actions", "options"):
+            if "location" in child and "location" not in current and "location" not in context:
+                context["location"] = child["location"]
+            if "location" not in child and "location" in context:
+                child["location"] = context["location"]
         if (
-            action == "conditional_on_result"
-            and ck == "primary_effect"
-            and isinstance(ch, dict)
+            current.get("action") == "conditional_on_result"
+            and key == "primary_effect"
             and eff_root
         ):
             outer_cond = eff_root.get("condition", {})
             if isinstance(outer_cond, dict) and outer_cond.get("card_type"):
-                nested_cond = ch.get("condition", {})
+                nested_cond = child.get("condition", {})
                 if isinstance(nested_cond, dict) and not nested_cond.get("card_type"):
                     nested_cond["card_type"] = outer_cond["card_type"]
 
-    for ak in ("actions", "options"):
-        arr = node.get(ak, [])
-        if isinstance(arr, list):
-            for item in arr:
-                _propagate_context(item, new_ctx, t=t, eff_root=eff_root)
+    def leave(current, _context):
+        _infer_baton_touch(current, current.get("text", "") or "")
 
-    # Baton touch trigger on action nodes (e.g. gain_resource with
-    # "このターンにバトンタッチして登場した" in a choice option)
-    node_text = node.get("text", "") or ""
-    _infer_baton_touch(node, node_text)
+        nested = current.get("condition")
+        if current.get("type") == "card_count_condition" and current is not nested:
+            text = current.get("text", "")
+            if "ブレードハートを持たない" in text or "ブレードハートがない" in text:
+                if not current.get("card_property"):
+                    current["card_property"] = "has_blade_heart"
+            if "{{icon_score.png|スコア}}を持つ" in text and not current.get("card_property"):
+                current["card_property"] = "has_score_icon"
+            _infer_heart_source(current, text)
+            _infer_baton_touch(current, text)
 
-    nc = node.get("condition")
-    # Also check if node itself IS a card_count_condition (sub-condition
-    # of a compound — no "condition" child, it IS the condition).
-    if node.get("type") == "card_count_condition" and node is not nc:
-        nct = node.get("text", "")
-        if "ブレードハートを持たない" in nct or "ブレードハートがない" in nct:
-            if not node.get("card_property"):
-                node["card_property"] = "has_blade_heart"
-        if "{{icon_score.png|スコア}}を持つ" in nct and not node.get("card_property"):
-            node["card_property"] = "has_score_icon"
-        _infer_heart_source(node, nct)
-        _infer_baton_touch(node, nct)
+        if current.get("type") == "compound" and "conditions" in current:
+            first_location = next(
+                (
+                    sub["location"]
+                    for sub in current["conditions"]
+                    if isinstance(sub, dict) and sub.get("location")
+                ),
+                None,
+            )
+            location = _context.get("location") or first_location
+            for sub in current["conditions"]:
+                if (
+                    isinstance(sub, dict)
+                    and not sub.get("location")
+                    and location
+                    and not sub.get("temporal")
+                    and not sub.get("resource_type")
+                    and sub.get("comparison_type") != "score"
+                ):
+                    sub["location"] = location
+            for sub in current["conditions"]:
+                if isinstance(sub, dict) and isinstance(sub.get("parenthetical"), list):
+                    sub.pop("parenthetical", None)
 
-    # Strip parenthetical from sub-conditions of compound conditions
-    if node.get("type") == "compound" and "conditions" in node:
-        for sub in node["conditions"]:
-            if isinstance(sub, dict) and isinstance(sub.get("parenthetical"), list):
-                sub.pop("parenthetical", None)
+        nested = current.get("condition")
+        if (
+            current.get("type") == "temporal_condition"
+            and isinstance(nested, dict)
+            and not nested.get("location")
+            and "location" in _context
+        ):
+            nested["location"] = _context["location"]
 
-    # movement_condition card_type
-    nc = node.get("condition")
-    if isinstance(nc, dict) and nc.get("type") == "movement_condition":
-        if nc.get("ability_filter") and not nc.get("card_type"):
-            nc["card_type"] = "member_card"
+        nested = current.get("condition")
+        if isinstance(nested, dict) and nested.get("type") == "movement_condition":
+            if nested.get("ability_filter") and not nested.get("card_type"):
+                nested["card_type"] = "member_card"
 
-    # temporal_condition location — for aggregate conditions about live card
-    # required hearts (all 6 heart colors, not per-color totals)
-    nc = node.get("condition")
-    if isinstance(nc, dict) and nc.get("type") == "temporal_condition":
-        ct = nc.get("text", "") or ""
-        if nc.get("aggregate") == "total" and "必要ハート" in ct:
-            if "成功" not in ct and not nc.get("location"):
-                hc = nc.get("heart_colors") or []
-                if len(hc) >= 6 or "{{icon_all.png" in ct:
-                    nc["location"] = "live_card_zone"
+        nested = current.get("condition")
+        if (
+            isinstance(nested, dict)
+            and nested.get("type") == "temporal_condition"
+            and nested.get("aggregate") == "total"
+            and "必要ハート" in (nested.get("text", "") or "")
+            and "成功" not in (nested.get("text", "") or "")
+            and not nested.get("location")
+        ):
+            colors = nested.get("heart_colors") or []
+            if len(colors) >= 6 or "{{icon_all.png" in (nested.get("text", "") or ""):
+                nested["location"] = "live_card_zone"
 
-    # Inherit target from condition into gain_resource effect (each_time
-    # abilities: the condition's target identifies the member that triggered
-    # the each_time, and the gain_resource effect needs it to know which card
-    # receives the modifier).
-    # NOTE: "both" is NOT inherited — a condition's "both" means checking
-    # both sides (e.g. "self and opponent's success zones"), NOT applying
-    # the effect to both players.
-    if isinstance(eff_root, dict) and eff_root.get("action") == "gain_resource":
-        if not eff_root.get("target") and eff_root.get("resource") == "heart":
-            nc = eff_root.get("condition")
-            if isinstance(nc, dict) and nc.get("target"):
-                ct = nc["target"]
-                if ct == "both":
-                    eff_root["target"] = "self"
-                else:
-                    eff_root["target"] = ct
+        if (
+            isinstance(eff_root, dict)
+            and eff_root.get("action") == "gain_resource"
+            and not eff_root.get("target")
+            and eff_root.get("resource") == "heart"
+        ):
+            root_condition = eff_root.get("condition")
+            if isinstance(root_condition, dict) and root_condition.get("target"):
+                target = root_condition["target"]
+                eff_root["target"] = "self" if target == "both" else target
+
+    walk_dict_tree(
+        node,
+        keys=_PROPAGATE_CHILD_KEYS,
+        list_keys=("actions", "options"),
+        context={} if ctx is None else ctx,
+        enter=enter,
+        leave=leave,
+        child_context=lambda current, child_ctx, _key, _child: child_ctx,
+        after_child=after_child,
+    )
 
 
 def _apply_recursive_fixes(d, fix_stats):
-    if isinstance(d, dict):
-        if d.get("type") == "appearance_condition" and "控え室から" in d.get(
+    for current in iter_dict_nodes(d):
+        if current.get("type") == "compound" and current.get("conditions"):
+            first_location = next(
+                (
+                    sub["location"]
+                    for sub in current["conditions"]
+                    if isinstance(sub, dict) and sub.get("location")
+                ),
+                None,
+            )
+            if first_location:
+                for sub in current["conditions"]:
+                    if (
+                        isinstance(sub, dict)
+                        and sub.get("type") == "temporal_condition"
+                        and not sub.get("location")
+                        and not sub.get("temporal")
+                        and not sub.get("resource_type")
+                        and sub.get("comparison_type") != "score"
+                    ):
+                        sub["location"] = first_location
+
+        if current.get("type") == "appearance_condition" and "控え室から" in current.get(
             "text", ""
         ):
-            if "appearance_source" not in d:
-                d["appearance_source"] = "discard"
-                fix_stats["appearance_source"] = (
-                    fix_stats.get("appearance_source", 0) + 1
-                )
+            if "appearance_source" not in current:
+                current["appearance_source"] = "discard"
+                fix_stats["appearance_source"] = fix_stats.get("appearance_source", 0) + 1
 
-        if d.get("action") == "move_cards":
-            t = d.get("text", "")
+        if current.get("action") == "move_cards":
+            t = current.get("text", "")
             if "これにより控え室に置いた" in t and "より" in t and "コストの低い" in t:
-                if "cost_reference" not in d:
-                    d["cost_reference"] = "previous_moved_card"
-                    d["cost_limit_operator"] = "<"
+                if "cost_reference" not in current:
+                    current["cost_reference"] = "previous_moved_card"
+                    current["cost_limit_operator"] = "<"
                     fix_stats["cost_reference"] = fix_stats.get("cost_reference", 0) + 1
 
         if (
-            d.get("action") == "modify_score"
-            and d.get("per_unit_type") == "member"
-            and d.get("heart_colors")
+            current.get("action") == "modify_score"
+            and current.get("per_unit_type") == "member"
+            and current.get("heart_colors")
         ):
-            t = d.get("text", "")
+            t = current.get("text", "")
             if "色につき" in t:
-                d["per_unit_type"] = "heart_colors"
-                fix_stats["heart_colors_per_unit"] = (
-                    fix_stats.get("heart_colors_per_unit", 0) + 1
-                )
-
-        for v in d.values():
-            if isinstance(v, (dict, list)):
-                _apply_recursive_fixes(v, fix_stats)
-    elif isinstance(d, list):
-        for item in d:
-            if isinstance(item, (dict, list)):
-                _apply_recursive_fixes(item, fix_stats)
+                current["per_unit_type"] = "heart_colors"
+                fix_stats["heart_colors_per_unit"] = fix_stats.get(
+                    "heart_colors_per_unit", 0
+                ) + 1
 
 
 def _fix_sequential_chain(eff):
@@ -12505,18 +12435,13 @@ _SELF_APPEARANCE_PATTERNS = ("このメンバーが登場", "このカードが�
 
 
 def _strip_self_appearance_card_type(node):
-    """Walk the parsed tree and remove `card_type` from any self-appearance
-    condition. Applied to every ability's effect as a final normalization pass."""
-    if isinstance(node, dict):
-        if node.get("type") == "appearance_condition":
-            text = node.get("text", "")
-            if any(p in text for p in _SELF_APPEARANCE_PATTERNS):
-                node.pop("card_type", None)
-        for value in node.values():
-            _strip_self_appearance_card_type(value)
-    elif isinstance(node, list):
-        for item in node:
-            _strip_self_appearance_card_type(item)
+    """Remove card_type from every self-appearance condition."""
+    for current in iter_dict_nodes(node):
+        if current.get("type") != "appearance_condition":
+            continue
+        text = current.get("text", "")
+        if any(pattern in text for pattern in _SELF_APPEARANCE_PATTERNS):
+            current.pop("card_type", None)
 
 
 def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:

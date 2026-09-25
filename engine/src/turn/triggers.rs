@@ -173,6 +173,17 @@ impl super::TurnEngine {
             );
             return;
         }
+        let player = if player_id == game_state.player1.id {
+            &game_state.player1
+        } else {
+            &game_state.player2
+        };
+        if game_state.current_phase == crate::game_state::Phase::FirstAttackerPerformance
+            && !player.is_first_attacker
+            && player.live_card_zone.cards.is_empty()
+        {
+            return;
+        }
 
         let player_id_clone = player_id.to_string();
         let mut abilities_to_trigger: Vec<(String, String, Option<i16>)> = Vec::new();
@@ -451,7 +462,7 @@ impl super::TurnEngine {
                             &mut game_state.structured_log,
                             LogEntry {
                                 text: format!(
-                                    "{} card#{card_id} [{zone_label}/獲得]: 能力確認 [ライブ成功時]",
+                                    "{} card#{card_id} [success/獲得]: 能力確認 [ライブ成功時]",
                                     player_id_clone
                                 ),
                                 turn: game_state.turn_number,
@@ -461,7 +472,7 @@ impl super::TurnEngine {
                                 category: "trigger_evaluation".to_string(),
                                 metadata: Some(crate::core::types::LogMetadata::TriggerEvaluation {
                                     trigger: "live_success".to_string(),
-                                    zone: format!("{zone}_gained"),
+                                    zone: "success_gained".to_string(),
                                     result: "pending".to_string(),
                                     ability_index,
                                     ability_text: ability.full_text.clone(),

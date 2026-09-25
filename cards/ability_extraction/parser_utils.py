@@ -234,6 +234,95 @@ def iter_dict_nodes(value: Any, keys: Optional[Tuple[str, ...]] = None):
             yield from iter_dict_nodes(item, keys)
 
 
+def walk_dict_tree(
+    value: Any,
+    *,
+    keys: Tuple[str, ...],
+    list_keys: Optional[Tuple[str, ...]] = None,
+    context: Any = None,
+    enter: Optional[Callable[[dict, Any], Any]] = None,
+    leave: Optional[Callable[[dict, Any], None]] = None,
+    child_context: Optional[Callable[[dict, Any, str, dict], Any]] = None,
+    prepare_child: Optional[Callable[[dict, Any, str, dict], dict]] = None,
+    after_child: Optional[Callable[[dict, Any, str, dict], None]] = None,
+    after_key: Optional[Callable[[dict, Any, str], None]] = None,
+) -> None:
+    """Walk parser dictionaries in child-key order with optional context hooks."""
+    if isinstance(value, list):
+        for item in value:
+            walk_dict_tree(
+                item,
+                keys=keys,
+                list_keys=list_keys,
+                context=context,
+                enter=enter,
+                leave=leave,
+                child_context=child_context,
+                prepare_child=prepare_child,
+                after_child=after_child,
+                after_key=after_key,
+            )
+        return
+    if not isinstance(value, dict):
+        return
+
+    node_context = enter(value, context) if enter else context
+    for key in keys:
+        child = value.get(key)
+        if isinstance(child, list):
+            if list_keys is not None and key not in list_keys:
+                continue
+            children = child
+        elif isinstance(child, dict):
+            children = [child]
+        else:
+            continue
+        item_context = (
+            child_context(value, node_context, key, child)
+            if child_context
+            else node_context
+        )
+        for item in children:
+            if not isinstance(item, dict):
+                continue
+            if prepare_child:
+                item = prepare_child(value, node_context, key, item)
+            walk_dict_tree(
+                item,
+                keys=keys,
+                context=item_context,
+                enter=enter,
+                leave=leave,
+                child_context=child_context,
+                prepare_child=prepare_child,
+                after_child=after_child,
+                after_key=after_key,
+            )
+            if after_child:
+                after_child(value, context, key, item)
+        if after_key:
+            after_key(value, node_context, key)
+    if leave:
+        leave(value, context)
+
+
+def transform_child_lists(
+    value: Any,
+    transform: Callable[[Any], Any],
+    keys: Tuple[str, ...] = ("actions", "options"),
+) -> Any:
+    """Transform selected child lists bottom-up, then transform their parent."""
+    if isinstance(value, dict):
+        for key in keys:
+            children = value.get(key)
+            if isinstance(children, list):
+                value[key] = [transform_child_lists(item, transform, keys) for item in children]
+        return transform(value)
+    if isinstance(value, list):
+        return [transform_child_lists(item, transform, keys) for item in value]
+    return value
+
+
 def text_matches(
     text: str,
     *,

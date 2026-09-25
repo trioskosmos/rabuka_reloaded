@@ -86,6 +86,9 @@ void rb_effect_change_state(GameState *g, int actor, AbilityEffect *e, int host_
             int filt_ids[RB_STAGE_SIZE]; int fn = 0;
             for(int i=0;i<zn;i++){
                 int cid = zone_ids[i];
+                if(group_filter && !rb_card_matches_group_str(cid, group_filter)) continue;
+                if(s_excluded_group(cid, e) || s_excluded_chars(cid, e)) continue;
+                if(!s_match_chars(cid, chars)) continue;
                 if(cost_limit >= 0){
                     Card cc; int ccost = 0;
                     if(rb_decode_card_by_index((uint32_t)cid, &cc)){ ccost = cc.cost; rb_free_card(&cc); }
@@ -182,6 +185,7 @@ void rb_effect_change_state(GameState *g, int actor, AbilityEffect *e, int host_
                 }
                 if(card_type_filter && !rb_card_matches_type(cid, card_type_filter)) continue;
                 if(group_filter && !rb_card_matches_group_str(cid, group_filter)) continue;
+                if(s_excluded_group(cid, e) || s_excluded_chars(cid, e)) continue;
                 if(!s_match_chars(cid, chars)) continue;
                 if(blade_limit >= 0){
                     Card cc; int bl = 0;
@@ -230,6 +234,7 @@ void rb_effect_change_state(GameState *g, int actor, AbilityEffect *e, int host_
                 else if(!strcmp(state_change,"wait")){ if(is_wait) continue; }
                 if(card_type_filter && !rb_card_matches_type(cid, card_type_filter)) continue;
                 if(group_filter && !rb_card_matches_group_str(cid, group_filter)) continue;
+                if(s_excluded_group(cid, e) || s_excluded_chars(cid, e)) continue;
                 if(!s_match_chars(cid, chars)) continue;
                 if(blade_limit >= 0){
                     Card cc; int bl = 0;
@@ -260,6 +265,7 @@ void rb_effect_change_state(GameState *g, int actor, AbilityEffect *e, int host_
         if(exclude_self_id >= 0 && cid == exclude_self_id) continue;
         if(card_type_filter && !rb_card_matches_type(cid, card_type_filter)) continue;
         if(group_filter && !rb_card_matches_group_str(cid, group_filter)) continue;
+        if(s_excluded_group(cid, e) || s_excluded_chars(cid, e)) continue;
         if(!s_match_chars(cid, chars)) continue;
         if(cost_limit >= 0){
             Card cc; int ccost = 0;
@@ -857,7 +863,8 @@ void rb_effect_set_heart_type(GameState *g, int actor, AbilityEffect *e, int hos
         const char *chars2 = NULL; s_has_chars(e, &chars2);
         int cand[RB_STAGE_SIZE]; int nc2 = 0;
         for(int i=0;i<sn;i++)
-            if(s_pass_filter(stage_ids[i], grp, chars2)) cand[nc2++] = stage_ids[i];
+            if(s_pass_filter(stage_ids[i], grp, chars2) &&
+               !s_excluded_group(stage_ids[i], e) && !s_excluded_chars(stage_ids[i], e)) cand[nc2++] = stage_ids[i];
         if(nc2 == 0) return;
         int tc = 1;
         const char *tcv = s_eff_extra(e, "target_count");

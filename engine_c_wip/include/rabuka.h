@@ -114,6 +114,8 @@ typedef struct AbilityEffect {
     struct AbilityEffect *optional_action;
     struct AbilityEffect *conditional_action;
     struct AbilityEffect *gained_effect;
+    struct AbilityEffect *resource_on_select;
+    struct AbilityEffect *opponent_action;
     Condition *result_condition;       /* a Condition, not an effect */
     Condition *alternative_condition;   /* a Condition, not an effect */
     int   repeat_limit;                /* repeat_procedure: max ADDITIONAL iterations */
@@ -128,6 +130,8 @@ typedef struct AbilityEffect {
     char  card_type_field[24];         /* member_card / live_card / energy_card */
 } AbilityEffect;
 
+#define RB_MAX_ABILITY_KEYWORDS 64
+
 typedef struct Ability {
     char *full_text;
     char *triggerless_text;
@@ -136,6 +140,9 @@ typedef struct Ability {
     int   is_null;
     AbilityEffect *cost;    /* nullable */
     AbilityEffect *effect;  /* nullable */
+    int   has_keywords;
+    int   n_keywords;
+    unsigned char keywords[RB_MAX_ABILITY_KEYWORDS];
 } Ability;
 
 /* ── Portable allocator ── */
@@ -387,6 +394,8 @@ typedef enum {
 RbTriggerKind rb_trigger_from_token(const char *s);
 int rb_parse_triggers(const char *triggers, RbTriggerKind *out, int max);
 const char *rb_canonical_trigger(const char *raw);
+const char *rb_trigger_zone_id(int is_stage);
+const char *rb_trigger_zone_label(int is_stage);
 const char *rb_trigger_to_texticon(const char *trigger);
 int rb_ability_has_trigger(const Ability *a, RbTriggerKind kind);
 const char *rb_ability_triggerless_text(const Ability *a);
@@ -754,6 +763,8 @@ typedef enum {
 } RbPhase;
 
 const char *rb_phase_name(int phase);
+const char *rb_rps_choice_name(int choice);
+void rb_push_rps_log(struct GameState *g, int p1, int p2, const char *winner_str);
 
 /* ── Turn-phase grouping (mirrors engine/src/core/types.rs::TurnPhase) ──
     Used to classify the broad phase of a turn: first-attacker normal play,
@@ -945,6 +956,9 @@ typedef struct {
     int  triggering_member_id;
     int  use_limit_recorded;
     int  optional_moves_all_moved; /* -1=None, 0=false, 1=true (mirrors Rust Option<bool>) */
+    char trigger[32];
+    int  trigger_moved_cards[16];
+    int  n_trigger_moved_cards;
 #define RB_COND_CACHE_CAP 8
     int  cond_cache_keys[RB_COND_CACHE_CAP];
     int  cond_cache_vals[RB_COND_CACHE_CAP];
@@ -1182,6 +1196,10 @@ typedef struct {
 } RbAbilityQueue;
 
 int  rb_queue_push(RbAbilityQueue *q, int card_id, int ability_idx);
+int  rb_queue_push_with_trigger(RbAbilityQueue *q, int card_id, int ability_idx,
+                                const char *trigger, const int *moved_cards, int n_moved);
+void rb_queue_set_entry_trigger(struct GameState *g, int entry_index, const char *trigger,
+                                const int *moved_cards, int n_moved);
 void rb_queue_clear(RbAbilityQueue *q);
 int  rb_queue_has_pending(const RbAbilityQueue *q);
 RbQueueState rb_queue_state(const RbAbilityQueue *q);
@@ -1351,9 +1369,11 @@ typedef struct GameState {
      int      performance_resume_yell_flag;
      int      last_draw_count;   /* mirror AbilityResolver.step_state.last_draw_count */
     int      last_surplus_loss_count[2]; /* gain_surplus_heart: surplus hearts gained/lost this live (misc.rs) */
-    int      re_yell_occurred;  /* a re_yell effect fired this live */
-    int      re_yell_blade_hearts[8]; /* hearts harvested by perform_yell, applied to live */
-    int      re_yell_note_icons;
+     int      re_yell_occurred;  /* a re_yell effect fired this live */
+     int      re_yell_blade_hearts[8]; /* hearts harvested by perform_yell, applied to live */
+     int      re_yell_note_icons;
+     int      re_yell_pending;
+     int      re_yell_owner;
     int      last_energy_placed_by_effect;
     int      last_energy_placed_by_player;
     int      last_area_move_card_id;
@@ -1812,6 +1832,7 @@ int  rb_perform_live(GameState *g, int pl);
 int  rb_backtrack_allocate(const int pool[8], const int card_needs[8], int n_cards,
                            int *out_allocs, int max_allocs);
 int  rb_card_ok_with_wildcard(const int filled[8], const int need[8]);
+void rb_apply_deferred_reyell(GameState *g);
 void rb_execute_live_victory_determination(GameState *g);
 void rb_move_live_to_success_and_handle_wins(GameState *g);
 void rb_handle_live_success_choice(GameState *g, int pl, int selected_index);

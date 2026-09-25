@@ -29,13 +29,15 @@ ZONE_FILTER_PARITY := tests/test_zone_filter_parity.c
 P1_HELPERS := tests/test_p1_helpers.c
 LIVE_ALLOCATOR := tests/test_live_allocator.c
 LOOK_SELECT := tests/test_look_select.c
+MOVE_CARDS := tests/test_move_cards.c
 DECK_BUILDER := tests/test_deck_builder.c
 DECK_PARSER := tests/test_deck_parser.c
 DECODE_FALLBACK := tests/test_decode_fallback.c
 STATE_EFFECTS := tests/test_state_effects.c
+ABILITY_EFFECTS := tests/test_ability_effects.c
 AUDIT   := tools/audit_actions.c
 
-.PHONY: all web test audit regen clean mechanics live-rules phase-rules performance-rules surplus-heart opponent-live-flow live-movement restrictions condition-eval target-selection max-distinct-names baton-touch member-activation b8-live-timing cross-player draw-phase-fix zone-filter-parity p1-helpers live-allocator look-select deck-builder deck-parser decode-fallback state-effects
+.PHONY: all web test audit regen clean mechanics live-rules phase-rules performance-rules surplus-heart opponent-live-flow live-movement restrictions condition-eval target-selection max-distinct-names baton-touch member-activation b8-live-timing cross-player draw-phase-fix zone-filter-parity p1-helpers live-allocator look-select move-cards deck-builder deck-parser decode-fallback state-effects ability-effects
 all: $(TARGET)
 
 web: $(WEB_TARGET)
@@ -53,7 +55,7 @@ $(TARGET): $(OBJ)
 src/%.o: src/%.c $(wildcard include/*.h)
 	$(CC) $(CFLAGS) -c -o $@ $<
 
-test: $(TARGET)_generated $(TARGET)_replay $(TARGET)_live_allocator $(TARGET)_look_select $(TARGET)_deck_builder $(TARGET)_deck_parser $(TARGET)_decode_fallback $(TARGET)_state_effects
+test: $(TARGET)_generated $(TARGET)_replay $(TARGET)_live_allocator $(TARGET)_look_select $(TARGET)_deck_builder $(TARGET)_deck_parser $(TARGET)_decode_fallback $(TARGET)_state_effects $(TARGET)_ability_effects
 	./$(TARGET)_generated
 	./$(TARGET)_replay
 	./$(TARGET)_live_allocator
@@ -62,6 +64,7 @@ test: $(TARGET)_generated $(TARGET)_replay $(TARGET)_live_allocator $(TARGET)_lo
 	./$(TARGET)_deck_parser
 	./$(TARGET)_decode_fallback
 	./$(TARGET)_state_effects
+	./$(TARGET)_ability_effects
 
 $(TARGET)_generated: $(OBJ_LIB) $(GENERATED)
 	$(CC) $(CFLAGS) -o $@ $(OBJ_LIB) $(GENERATED)
@@ -81,6 +84,9 @@ $(TARGET)_live_allocator: $(OBJ_LIB) $(LIVE_ALLOCATOR)
 $(TARGET)_look_select: $(OBJ_LIB) $(LOOK_SELECT)
 	$(CC) $(CFLAGS) -o $@ $(OBJ_LIB) $(LOOK_SELECT)
 
+$(TARGET)_move_cards: $(OBJ_LIB) $(MOVE_CARDS)
+	$(CC) $(CFLAGS) -o $@ $(OBJ_LIB) $(MOVE_CARDS)
+
 $(TARGET)_deck_builder: $(OBJ_LIB) $(DECK_BUILDER)
 	$(CC) $(CFLAGS) -o $@ $(OBJ_LIB) $(DECK_BUILDER)
 
@@ -98,6 +104,12 @@ $(TARGET)_state_effects: $(OBJ_LIB) $(STATE_EFFECTS)
 
 state-effects: $(TARGET)_state_effects
 	./$(TARGET)_state_effects
+
+$(TARGET)_ability_effects: $(OBJ_LIB) $(ABILITY_EFFECTS)
+	$(CC) $(CFLAGS) -o $@ $(OBJ_LIB) $(ABILITY_EFFECTS)
+
+ability-effects: $(TARGET)_ability_effects
+	./$(TARGET)_ability_effects
 
 $(TARGET)_mechanics: $(OBJ_LIB) $(MECHANICS)
 	$(CC) $(CFLAGS) -o $@ $(OBJ_LIB) $(MECHANICS)
@@ -206,6 +218,9 @@ live-allocator: $(TARGET)_live_allocator
 
 look-select: $(TARGET)_look_select
 	./$(TARGET)_look_select
+
+move-cards: $(TARGET)_move_cards
+	./$(TARGET)_move_cards
 
 deck-builder: $(TARGET)_deck_builder
 	./$(TARGET)_deck_builder

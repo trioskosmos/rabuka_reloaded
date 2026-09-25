@@ -1031,11 +1031,30 @@ void rb_enrich_from_applications(const GameState *g){
     s->total_score = total;
 }
 
-/* Stub helpers for execute_live_victory_determination — these will be fully
-   ported in subsequent batches. For now they are minimal implementations that
-   allow the orchestration function to compile and link. */
 void rb_apply_deferred_reyell(GameState *g) {
-    (void)g;
+     if (!g || !g->re_yell_pending) return;
+     int owner = g->re_yell_owner;
+     if (owner < 0 || owner > 1) {
+          g->re_yell_pending = 0;
+          return;
+     }
+     int stage[8];
+     rb_stage_hearts_pipeline(g, owner, stage);
+     for (int s = g->n_snapshots - 1; s >= 0; s--) {
+          RbLiveSnapshot *snapshot = &g->snapshots[s];
+          if (snapshot->player != owner || snapshot->turn != g->turn) continue;
+          snapshot->n_yell_cards = 0;
+          for (int i = 0; i < g->n_revealed && i < RB_MAX_LIVE_CARDS * 3; i++)
+               snapshot->yell_cards[snapshot->n_yell_cards++] = g->revealed_cards[i];
+          memcpy(snapshot->yell_blade_hearts, g->re_yell_blade_hearts,
+                 sizeof(snapshot->yell_blade_hearts));
+          snapshot->note_icons = g->re_yell_note_icons;
+          for (int color = 0; color < 8; color++)
+               snapshot->total_hearts[color] = stage[color] + g->re_yell_blade_hearts[color];
+          break;
+     }
+     g->re_yell_pending = 0;
+     g->re_yell_occurred = 0;
 }
 
 void rb_rebuild_stage_hearts_with_yell(GameState *g) {
@@ -1594,11 +1613,17 @@ static int bt_search(int *pool, const int *card_needs, int n_cards, int idx,
      for (int c = 1; c < 7; c++) if (pool[c] > 0) surplus_colors[n_surplus++] = c;
      int total_surplus = 0;
      for (int i = 0; i < n_surplus; i++) total_surplus += pool[surplus_colors[i]];
-     int h00_from_surplus = h00_deficit < total_surplus ? h00_deficit : total_surplus;
+      int max_surplus_take = h00_deficit < total_surplus ? h00_deficit : total_surplus;
+      for (int surplus_take = 0; surplus_take <= max_surplus_take; surplus_take++) {
+           int phase_pool[8]; memcpy(phase_pool, pool, sizeof(phase_pool));
+           int phase_n = *n_allocs;
+           if (bt_try_surplus(pool, card_needs, n_cards, idx, allocs, n_allocs, max_allocs,
+                              surplus_colors, n_surplus, surplus_take, 0, filled))
+                return 1;
+           memcpy(pool, phase_pool, sizeof(phase_pool));
+           *n_allocs = phase_n;
+      }
 
-     int found = bt_try_surplus(pool, card_needs, n_cards, idx, allocs, n_allocs, max_allocs,
-                                  surplus_colors, n_surplus, h00_from_surplus, 0, filled);
-     if (found) return 1;
 
      /* Undo */
      memcpy(pool, saved_pool, sizeof(saved_pool));

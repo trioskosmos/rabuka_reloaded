@@ -297,6 +297,7 @@ int rb_resolve_rps_if_both_chosen(GameState *g) {
     if ((p1 == 0 && p2 == 2) || (p1 == 1 && p2 == 0) || (p1 == 2 && p2 == 1)) winner = 1;
     else if (p1 != p2) winner = 2;
     g->rps_winner = winner;
+    rb_push_rps_log(g, p1, p2, winner == 0 ? "tie" : winner == 1 ? "p1" : "p2");
     return 1;
 }
 
@@ -693,7 +694,9 @@ const char *rb_rps_choice_name(int choice) {
 /* -- push_rps_log -- */
 void rb_push_rps_log(GameState *g, int p1, int p2, const char *winner_str) {
     if (!g) return;
-    (void)p1; (void)p2; (void)winner_str;
+    fprintf(stderr, "[RPS] p1=%s p2=%s winner=%s\n",
+            rb_rps_choice_name(p1), rb_rps_choice_name(p2),
+            winner_str ? winner_str : "none");
 }
 
 static RbGeneratedArea rb_action_areas[RB_MAX_HAND * RB_STAGE_SIZE][RB_STAGE_SIZE];

@@ -30,11 +30,151 @@ int rb_move_place_card_with_stage_choice(GameState *g, int actor, int host_cid,
 void rb_move_fire_debut_side_effects(GameState *g, int actor, int card_id,
                                      const char *target, const char *source);
 void rb_move_prompt_deck_top_or_bottom(GameState *g, int actor, int card_id,
-                                        const char *target, const char *source_zone,
-                                        int allow_skip);
+                                         const char *target, const char *source_zone,
+                                         int allow_skip);
+int rb_move_maybe_prompt_success_replacement(GameState *g, int actor, int card_id,
+                                               const char *dest, const char *target);
+void rb_move_finalize_card_movement(GameState *g, int actor,
+                                     const int *moved_cards, int n_moved,
+                                     const char *destination, const char *source,
+                                     const char *state_change, const char *target);
+
 int rb_move_optional_gate_source(const char *zone_str);
+int rb_move_resolve_cards_from_source(GameState *g, int actor, AbilityEffect *e,
+                                        int count, int *out_ids, int max);
+static const char *cmf_extra(const AbilityEffect *e, const char *k);
 
+static int move_port_remove_any(GameState *g, int pl, int cid) {
+    RbPlayer *P = &g->p[pl];
+    for (int i = 0; i < P->hand.n; i++) if (P->hand.cards[i] == cid) {
+        for (int k = i; k < P->hand.n - 1; k++) P->hand.cards[k] = P->hand.cards[k + 1];
+        P->hand.n--; return 1;
+    }
+    for (int i = 0; i < P->discard.n; i++) if (P->discard.cards[i] == cid) {
+        for (int k = i; k < P->discard.n - 1; k++) P->discard.cards[k] = P->discard.cards[k + 1];
+        P->discard.n--; return 1;
+    }
+    for (int i = 0; i < P->deck.n; i++) if (P->deck.cards[i] == cid) {
+        for (int k = i; k < P->deck.n - 1; k++) P->deck.cards[k] = P->deck.cards[k + 1];
+        P->deck.n--; return 1;
+    }
+    for (int i = 0; i < P->energy.n; i++) if (P->energy.cards[i] == cid) {
+        for (int k = i; k < P->energy.n - 1; k++) P->energy.cards[k] = P->energy.cards[k + 1];
+        P->energy.n--; return 1;
+    }
+    for (int i = 0; i < P->live.n; i++) if (P->live.cards[i] == cid) {
+        for (int k = i; k < P->live.n - 1; k++) P->live.cards[k] = P->live.cards[k + 1];
+        P->live.n--; return 1;
+    }
+    for (int i = 0; i < P->success.n; i++) if (P->success.cards[i] == cid) {
+        for (int k = i; k < P->success.n - 1; k++) P->success.cards[k] = P->success.cards[k + 1];
+        P->success.n--; return 1;
+    }
+    for (int i = 0; i < RB_STAGE_SIZE; i++) if (P->stage[i] == cid) {
+        P->stage[i] = RB_EMPTY_SLOT;
+        P->stage_wait[i] = 0;
+        return 1;
+    }
+    return 0;
+}
 
+static int move_port_place_deck(GameState *g, int pl, int cid, const char *destination, int vacated) {
+    RbBag *deck = &g->p[pl].deck;
+    if (!strcmp(destination, "deck_bottom")) {
+        if (deck->n >= RB_MAX_ZONE) return 0;
+        deck->cards[deck->n++] = cid;
+        return 1;
+    }
+    int idx = vacated >= 0 && vacated <= deck->n ? vacated : 0;
+    if (deck->n >= RB_MAX_ZONE) return 0;
+    for (int i = deck->n; i > idx; i--) deck->cards[i] = deck->cards[i - 1];
+    deck->cards[idx] = cid;
+    deck->n++;
+    return 1;
+}
+
+static int move_port_same_area(GameState *g, int pl, int cid, int area) {
+    RbPlayer *P = &g->p[pl];
+    if (area < 0) {
+        for (int i = 0; i < RB_STAGE_SIZE; i++)
+            if (P->stage[i] == RB_EMPTY_SLOT) { area = i; break; }
+    }
+    if (area < 0 || area >= RB_STAGE_SIZE) return 0;
+    if (P->stage[area] != RB_EMPTY_SLOT) rb_waitroom_add(P, P->stage[area]);
+    P->stage[area] = cid;
+    P->stage_wait[area] = 0;
+    if (area >= 0) g->stage_arrived[pl][area] = 1;
+    return 1;
+}
+
+void rb_move_execute_move_cards_ported(GameState *g, int actor, AbilityEffect *e) {
+    if (!g || !e) return;
+    const char *source = e->source ? e->source : "hand";
+    const char *destination = e->destination ? e->destination : "discard";
+    int count = e->count;
+    if (count < 0) count = RB_MAX_ZONE;
+    int pl = actor;
+    if (e->target && !strcmp(e->target, "opponent")) pl = actor ^ 1;
+    if (pl < 0 || pl > 1) pl = actor;
+    int ids[RB_MAX_ZONE];
+    int n = rb_move_resolve_cards_from_source(g, actor, e, count, ids, RB_MAX_ZONE);
+    if (n <= 0 || rb_has_pending_choice(g)) return;
+
+    int source_is_relay = !strcmp(source, "selected_cards") ||
+                          !strcmp(source, "those_cards") ||
+                          !strcmp(source, "recently_moved") ||
+                          !strcmp(source, "preceding_moved") ||
+                          !strcmp(source, "revealed_cards");
+    const char *state = cmf_extra(e, "state_change");
+    int is_max = cmf_extra(e, "max") && (!strcmp(cmf_extra(e, "max"), "true") || !strcmp(cmf_extra(e, "max"), "1"));
+    int allow_occupied = cmf_extra(e, "allow_occupied_stage") &&
+        (!strcmp(cmf_extra(e, "allow_occupied_stage"), "true") || !strcmp(cmf_extra(e, "allow_occupied_stage"), "1"));
+    int under_self = cmf_extra(e, "under_self") &&
+        (!strcmp(cmf_extra(e, "under_self"), "true") || !strcmp(cmf_extra(e, "under_self"), "1"));
+    int moved[RB_MAX_ZONE];
+    int nm = 0;
+    for (int i = 0; i < n; i++) {
+        int cid = ids[i];
+        if (source_is_relay) move_port_remove_any(g, pl, cid);
+        if (rb_move_maybe_prompt_success_replacement(g, pl, cid, destination, e->target)) return;
+        if (!strcmp(destination, "deck_top_or_bottom")) {
+            rb_move_prompt_deck_top_or_bottom(g, actor, cid, e->target, source, e->is_optional);
+            g->queue.resume_eff = e;
+            g->queue.resume_actor = actor;
+            return;
+        }
+        int vacated = g->baton_last_vacated_area[pl];
+        int placed = 0;
+        if (!strcmp(destination, "stage") || !strcmp(destination, "empty_area") ||
+            !strcmp(destination, "under_member")) {
+            placed = rb_move_place_card_with_stage_choice(g, actor, -1, e->target,
+                cid, destination, vacated, is_max, count, state, -1, source,
+                allow_occupied, under_self) == 0;
+        } else if (!strcmp(destination, "same_area")) {
+            placed = move_port_same_area(g, pl, cid, vacated);
+        } else if (!strcmp(destination, "deck") || !strcmp(destination, "deck_top") ||
+                   !strcmp(destination, "deck_bottom")) {
+            placed = move_port_place_deck(g, pl, cid, destination, vacated);
+        } else {
+            placed = rb_place_card_in_zone(g, pl, cid, destination, vacated);
+        }
+        if (!placed) {
+            rb_place_card_in_zone(g, pl, cid, source_is_relay ? "discard" : source, -1);
+            continue;
+        }
+        rb_mods_clear_card(&g->mods, cid);
+        moved[nm++] = cid;
+    }
+    if (nm > 0) {
+        rb_move_finalize_card_movement(g, actor, moved, nm, destination, source,
+                                       state, e->target);
+        if (!strcmp(destination, "stage") || !strcmp(destination, "empty_area") ||
+            !strcmp(destination, "same_area")) {
+            for (int i = 0; i < nm; i++)
+                rb_move_fire_debut_side_effects(g, actor, moved[i], e->target ? e->target : "self", NULL);
+        }
+    }
+}
 
 int rb_move_looked_at_matches(GameState *g, int cid, AbilityEffect *e);
 int rb_move_resolve_cost_limit_reference(const GameState *g, const AbilityEffect *e);

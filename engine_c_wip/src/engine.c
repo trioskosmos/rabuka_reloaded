@@ -680,6 +680,10 @@ static void handle_action(GameState *g, int actor, AbilityEffect *e, int host_ci
         }
         int count = total_blade > 0 ? total_blade : cnt;
         if (count <= 0) count = 1;
+        memset(g->re_yell_blade_hearts, 0, sizeof(g->re_yell_blade_hearts));
+        g->re_yell_note_icons = 0;
+        g->re_yell_pending = 1;
+        g->re_yell_owner = tgt;
         int draw_total = 0;
         for (int k = 0; k < count; k++) {
             if (TP->deck.n == 0) break;

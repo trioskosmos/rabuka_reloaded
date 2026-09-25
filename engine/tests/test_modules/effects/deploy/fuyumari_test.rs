@@ -186,6 +186,37 @@ fn fuyumari_q95_player_chooses_card_from_discard() {
 /// With zero candidates the engine Q167-skips silently — either way the
 /// filler must never be sacrificed or summoned.
 #[test]
+fn fuyumari_q95_same_name_decoy_is_not_the_sacrificed_instance() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let fuyumari = game.id("PL!SP-pb1-011-R");
+    let sacrificed = game.id("PL!SP-sd1-006-SD");
+    let decoy = game.new_id("PL!SP-sd1-006-SD");
+
+    game.state.player1.hand.cards.push(fuyumari);
+    game.state.player1.stage.stage[0] = sacrificed;
+    game.state.player1.waitroom.cards.push(decoy);
+    game.give_energy(13);
+    game.state.player1.stage.stage[1] = -1;
+    game.play_to_stage(fuyumari, MemberArea::Center);
+    answer_stage_cost_gate(&mut game, true);
+    assert!(game.has_pending_choice());
+    let filtered = game
+        .state
+        .get_pending_choice_json()
+        .and_then(|v| v.get("filtered_indices").cloned())
+        .expect("re-deploy must expose filtered indices");
+    assert!(
+        filtered.to_string().contains("1"),
+        "Q95: only the sacrificed instance should be selectable, not the same-name decoy"
+    );
+    game.select_indices(&[1]);
+    drain_auto_prompts_fuyumari(&mut game);
+    assert_eq!(game.state.player1.stage.stage[0], sacrificed);
+    assert!(game.state.player1.waitroom.cards.contains(&decoy));
+}
+
+#[test]
 fn fuyumari_edge_no_valid_cost_target() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
