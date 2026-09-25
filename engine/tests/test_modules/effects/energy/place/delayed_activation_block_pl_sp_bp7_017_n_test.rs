@@ -26,3 +26,16 @@ fn pl_sp_bp7_017_n_energy_placement_sets_delayed_activation_block() {
         "energy deck shrank by one"
     );
 }
+
+#[test]
+fn pl_sp_bp7_017_n_empty_energy_deck_is_a_noop() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let kinako = game.id("PL!SP-bp7-017-N");
+    game.add_to_stage(MemberArea::Center, kinako);
+
+    fire_trigger(&mut game, kinako, AbilityTrigger::Debut, "登場");
+
+    assert!(!game.has_pending_choice());
+    assert!(game.state.player1.energy_zone.cards.is_empty());
+}
