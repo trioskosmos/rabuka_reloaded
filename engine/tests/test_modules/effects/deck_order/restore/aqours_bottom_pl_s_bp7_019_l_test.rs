@@ -40,3 +40,21 @@ fn nandodatte_yakusoku_pl_s_bp7_019_l_places_two_aqours_cards_under_deck() {
         "the two Aqours cards sit at the deck BOTTOM (either order)"
     );
 }
+
+#[test]
+fn nandodatte_yakusoku_pl_s_bp7_019_l_no_aqours_is_a_noop() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let live = game.id("PL!S-bp7-019-L");
+    let non_aq = game.new_id("PL!-sd1-010-SD");
+    let filler = game.new_id("PL!-sd1-010-SD");
+    fill_decks(&mut game, filler);
+    game.state.player1.live_card_zone.cards.push(live);
+    game.state.player1.waitroom.cards.push(non_aq);
+
+    fire_trigger(&mut game, live, AbilityTrigger::LiveSuccess, "ライブ成功時");
+
+    assert!(!game.has_pending_choice());
+    assert!(game.state.player1.waitroom.cards.contains(&non_aq));
+    assert_eq!(game.state.player1.main_deck.cards.len(), 30);
+}
