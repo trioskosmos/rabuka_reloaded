@@ -8,13 +8,14 @@ Run: cd cards/ability_extraction && python tests/test_parser_coverage.py
 import sys, os
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 from parser import (
     parse_effect,
     parse_ability,
     parse_cost,
     parse_condition,
     _merge_parenthetical,
-    _normalize_effect_tree,
+    _normalize_parsed_effect,
     _try_sequential,
     _try_shi_sequential,
     _try_te_sequential,
@@ -24,6 +25,11 @@ from parser import (
     extract_operator,
     DURATION_PREFIX_MAP,
     _strip_duration_prefix,
+    _validate_condition_types,
+)
+from compile_abilities import (
+    COND_TO_VARIANT_TAG,
+    UNSUPPORTED_CONDITION_VARIANT,
 )
 
 passed = 0
@@ -46,7 +52,7 @@ def run_check(name, fn):
 def test_activation_condition_center_only():
     text = "カードを2枚引く。（この能力はセンターエリアに登場した場合のみ発動する。）"
     effect = parse_effect(text)
-    effect = _normalize_effect_tree(effect, text)
+    effect = _normalize_parsed_effect(effect, text)
     assert effect.get("activation_position") == "center", (
         f"Got {effect.get('activation_position')}"
     )
@@ -55,7 +61,7 @@ def test_activation_condition_center_only():
 def test_activation_condition_left_right():
     text = "カードを2枚引く。（この能力は左サイドエリアか右サイドエリアに登場した場合のみ発動する。）"
     effect = parse_effect(text)
-    effect = _normalize_effect_tree(effect, text)
+    effect = _normalize_parsed_effect(effect, text)
     assert effect.get("activation_position") == "left_side,right_side", (
         f"Got {effect.get('activation_position')}"
     )
@@ -68,7 +74,7 @@ def test_activation_condition_left_right_no_spurious_position():
         "（この能力は左サイドエリアか右サイドエリアに登場した場合のみ発動する。）"
     )
     effect = parse_effect(text)
-    effect = _normalize_effect_tree(effect, text)
+    effect = _normalize_parsed_effect(effect, text)
     assert "position" not in effect, f"Spurious position: {effect.get('position')}"
     assert effect.get("activation_position") == "left_side,right_side"
 
@@ -76,7 +82,7 @@ def test_activation_condition_left_right_no_spurious_position():
 def test_activation_condition_left_only():
     text = "{{leftside.png|左サイド}}カードを2枚引く。"
     effect = parse_effect(text)
-    effect = _normalize_effect_tree(effect, text)
+    effect = _normalize_parsed_effect(effect, text)
     assert effect.get("activation_position") == "left_side", (
         f"Got {effect.get('activation_position')}"
     )
@@ -228,7 +234,7 @@ def test_reveal_to_hand_score_keeps_moved_subject_after_normalization():
         "自分のデッキの一番上のカードを公開し、手札に加える。"
         "それがブレードハートを持たないメンバーカードの場合、ライブの合計スコアを＋１する。"
     )
-    effect = _normalize_effect_tree(parse_effect(text), text)
+    effect = _normalize_parsed_effect(parse_effect(text), text)
     assert effect.get("action") == "sequential", effect
     move, score = effect["actions"]
     assert move.get("source") == "deck_top", move
@@ -279,7 +285,7 @@ def test_baton_touch_recovery_uses_recently_moved_source():
 
 def test_baton_touch_displaced_card_under_arriver_uses_discard_source():
     text = "このメンバーがステージから控え室に置かれたとき、バトンタッチしていた場合、このカードをそのバトンタッチで登場したメンバーの下に置く"
-    effect = _normalize_effect_tree(parse_effect(text), text)
+    effect = _normalize_parsed_effect(parse_effect(text), text)
     assert effect.get("action") == "move_cards", effect
     assert effect.get("source") == "discard", effect
     assert effect.get("destination") == "under_member", effect
@@ -353,7 +359,7 @@ def test_q280_energy_placement_restriction_is_delayed_per_card():
         "自分のエネルギーデッキから、エネルギーカードを2枚ウェイト状態で置く。"
         "それらのエネルギーカードは、次のターンのアクティブフェイズにアクティブしない。"
     )
-    effect = _normalize_effect_tree(parse_effect(text), text)
+    effect = _normalize_parsed_effect(parse_effect(text), text)
     assert effect.get("action") == "sequential", effect
     move, restriction = effect["actions"]
     assert move.get("source") == "energy_deck", move
@@ -370,7 +376,7 @@ def test_q279_distinct_under_member_blade_gain_is_parsed():
         "ライブ終了時まで、このメンバーの下に置かれている名前の異なるメンバーカード1枚につき、"
         "{{icon_blade.png|ブレード}}を得る。"
     )
-    effect = _normalize_effect_tree(parse_effect(text), text)
+    effect = _normalize_parsed_effect(parse_effect(text), text)
     assert effect.get("action") == "gain_resource", effect
     assert effect.get("resource") == "blade", effect
     assert effect.get("per_unit") is True, effect
@@ -456,6 +462,34 @@ def test_sequential_group_filter_stays_on_recovery_action():
     assert wait.get("count") == 1, wait
     assert "group_names" not in wait, wait
     assert recovery.get("group_names") == ["蓮ノ空"], recovery
+
+
+def test_condition_validation_rejects_unsupported_types():
+    for condition in (
+        {"type": "custom"},
+        {"type": "future_runtime_condition"},
+        {
+            "type": "temporal_condition",
+            "condition": {"type": "custom"},
+        },
+    ):
+        try:
+            _validate_condition_types(condition)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError(condition)
+
+
+def test_condition_validation_preserves_unconditional_shapes():
+    _validate_condition_types(None)
+    _validate_condition_types({"type": "otherwise_condition"})
+
+
+def test_condition_bytecode_maps_custom_to_fail_closed_variant():
+    assert COND_TO_VARIANT_TAG["custom"] == UNSUPPORTED_CONDITION_VARIANT
+    assert COND_TO_VARIANT_TAG["otherwise_condition"] == 17
+    assert COND_TO_VARIANT_TAG.get("future_runtime_condition", UNSUPPORTED_CONDITION_VARIANT) == UNSUPPORTED_CONDITION_VARIANT
 
 
 # ─── run all ──────────────────────────────────────────────────────────────────

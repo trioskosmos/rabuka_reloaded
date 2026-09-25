@@ -44,7 +44,7 @@ After adding a rule, regenerate + validate:
   _extract_generic_fields, _infer_condition_type, _enrich_* helpers
   Action utility helpers, _fill_defaults
   Effect handler functions (_try_effect_*) + _EFFECT_RULES + _STRUCTURAL_EFFECT_RULES
-  _walk, _normalize_effect_tree, process_abilities (post-hoc fixes)
+  _walk, _normalize_parsed_effect, process_abilities (post-hoc fixes)
   _propagate_optional, _merge_parenthetical
   Validation helpers + semantic validation
   __main__ (--list-rules dumps every registered rule)
@@ -939,7 +939,7 @@ def parse_ability(triggerless_text: str) -> Dict[str, Any]:
         effect = parse_effect(effect_text)
         if isinstance(effect, dict) and "cost" in effect:
             ability["cost"] = effect.pop("cost")
-        effect = _normalize_effect_tree(effect, triggerless_text)
+        effect = _normalize_parsed_effect(effect, triggerless_text)
         if not isinstance(effect, dict):
             effect = {}
 
@@ -1399,7 +1399,7 @@ def _handle_cost_modification(text, action):
         action["self_target"] = True
     # 「（トリガー）能力を持たない」 restricts WHICH cards the cost change
     # applies to. Derived at parse time rather than as a post-parse backfill
-    # (dissolved FIX 7, formerly in _finalize_ability_stage).
+    # (dissolved FIX 7, formerly in the finalization pipeline).
     if "ability_filter" not in action and (
         "能力を持たない" in text or "能力も持たない" in text
     ):
@@ -1795,6 +1795,8 @@ def _set_action_040(t, a):
             a["count"] = int(count_match.group(1))
     if "すべて" in t or "全て" in t:
         a["all"] = True
+    if "メンバーカード" in t or "ステージのメンバー" in t:
+        a["card_type"] = "member_card"
     if "ライブ終了時まで" in t:
         a["duration"] = "live_end"
     cost_limit = extract_cost_limit_with_operator(t)
@@ -2579,7 +2581,7 @@ def parse_action(text: str) -> Dict[str, Any]:
 
     # 「（トリガー）能力を持たない」 on selection actions filters WHAT may be
     # selected. Derived at parse time rather than as a post-parse backfill
-    # (dissolved FIX 7b, formerly in _finalize_ability_stage).
+    # (dissolved FIX 7b, formerly in the finalization pipeline).
     if (
         "ability_filter" not in action
         and action.get("action") in ("select", "select_cards")
@@ -4399,163 +4401,46 @@ def _try_live_mid(text):
 # Handlers earlier in the list take precedence over later ones.
 # Annotations show representative Japanese text → JSON type produced.
 CONDITION_PATTERNS = [
-    # Tier 1: Complex/compound patterns (most specific)
-    (
-        "this_turn_opponent_live_success",
-        1,
-        _try_this_turn_opponent_live_success,
-    ),  # "このターン、相手もライブを成功している場合" → compound this_turn + opponent success
-    ("complex", 1, _try_complex),  # nested "AかつB、CかつD" → {type: "complex"}
-    (
-        "character_each",
-        1,
-        _try_character_each,
-    ),  # "「A」と「B」と「C」...をそれぞれ1枚ずつ" → compound AND per-character
-    (
-        "compound",
-        1,
-        _try_compound,
-    ),  # "AかつB" / "Aあり、B" → {type: "compound", operator: "and"}
-    (
-        "distinct",
-        1,
-        _try_distinct,
-    ),  # "名前が異なる" → {type: "location_condition", distinct: "card_name"}
-    (
-        "dual_distinct",
-        1,
-        _try_dual_distinct,
-    ),  # "名前とコストが両方ともそれぞれ異なる" → {type: "compound"}
-    # Tier 2: State changes & OR triggers
-    (
-        "state_change",
-        2,
-        _try_state_change,
-    ),  # "アクティブ状態→ウェイト状態" → {type: "state_change_condition"}
-    ("or", 2, _try_or),  # "Aか、B" → {type: "compound", operator: "or"}
-    (
-        "blade_count",
-        2,
-        _try_blade_count,
-    ),  # "ブレードがNつ以上" → {type: "card_blade_condition", count: N}
-    # Tier 3: Card counts & cost comparisons
-    (
-        "card_count",
-        3,
-        _try_card_count,
-    ),  # "N枚以上" / "N人以上" → {type: "card_count_condition", count: N}
-    (
-        "highest_cost_on_stage",
-        3,
-        _try_highest_cost_on_stage,
-    ),  # "位置にいるメンバーが最も大きいコスト" → {type: "highest_cost_on_stage_condition"}
-    (
-        "cost_override_condition",
-        3,
-        _try_cost_override_condition,
-    ),  # cost override comparison → {type: "comparison_condition"}
-    ("both", 3, _try_both),  # "それらが両方ある" → {type: "both_condition"}
-    # Tier 4: Temporal constraints
-    (
-        "temporal_this_turn",
-        4,
-        _try_temporal_this_turn,
-    ),  # "このターン" + sub-pattern → {type: "temporal_condition", temporal: "this_turn"}
-    (
-        "phase_gate",
-        4,
-        _try_phase_gate,
-    ),  # "メインフェイズの場合" → {type: "temporal_condition", phase: "main"}
-    (
-        "temporal_turn_phase",
-        4,
-        _try_temporal_turn_phase,
-    ),  # turn+phase combo → {type: "temporal_condition"}
-    (
-        "baton_touch",
-        4,
-        _try_baton_touch,
-    ),  # "バトンタッチして登場" → baton touch conditions
-    (
-        "temporal_count",
-        4,
-        _try_temporal_count,
-    ),  # "このターンN回登場" → {type: "temporal_condition", count: N}
-    # Tier 5: Target/location/zone patterns
-    ("either_target", 5, _try_either_target),  # "自分か相手" → target selection
-    (
-        "live_success_or_move",
-        5,
-        _try_live_success_or_move,
-    ),  # "ライブ成功時かエリアを移動" → compound OR
-    (
-        "appear_or_move",
-        5,
-        _try_appear_or_move,
-    ),  # "登場するかエリアを移動" → compound OR
-    ("movement", 5, _try_movement),  # "エリアを移動" → {type: "movement_condition"}
-    ("appearance", 5, _try_appearance),  # "登場した" → {type: "appearance"}
-    (
-        "zone_placement",
-        5,
-        _try_zone_placement,
-    ),  # "控え室に置かれた" → {type: "zone_placement_condition"}
-    # Tier 6: State/resource checks
-    (
-        "energy_state",
-        6,
-        _try_energy_state,
-    ),  # "エネルギーがN以下" → {type: "comparison_condition", resource_type: "energy"}
-    (
-        "state",
-        6,
-        _try_state,
-    ),  # "アクティブ状態" / "ウェイト状態" → {type: "member_state"}
-    ("revealed", 6, _try_revealed),  # "公開されたカード" → {type: "revealed_condition"}
-    (
-        "opponent_choice",
-        6,
-        _try_opponent_choice,
-    ),  # "相手は" → opponent choice condition
-    (
-        "unless_pay",
-        6,
-        _try_unless_pay,
-    ),  # "支払わないかぎり" → {type: "comparison_condition", negation: True}
-    # Tier 7: Position, ability, other filters
-    (
-        "position_change",
-        7,
-        _try_position_change,
-    ),  # "ポジションチェンジ" → {type: "position_change_condition"}
-    ("position", 7, _try_position),  # POSITION_KEYWORDS → {type: "position_condition"}
-    (
-        "ability_filter",
-        7,
-        _try_ability_filter,
-    ),  # "能力を持たない" → {type: "ability_filter_condition"}
-    (
-        "otherwise",
-        7,
-        _try_otherwise,
-    ),  # "それ以外の場合" → {type: "otherwise_condition"}
-    (
-        "heart_possession",
-        7,
-        _try_heart_possession,
-    ),  # "ハートを持つ/持たない" → {type: "location_condition"}
-    (
-        "live_mid",
-        7,
-        _try_live_mid,
-    ),  # "ライブ中" → {type: "card_count_condition"|"temporal_condition", temporal: "during_live"}
+    ConditionPattern("this_turn_opponent_live_success", 1, _try_this_turn_opponent_live_success),
+    ConditionPattern("complex", 1, _try_complex),
+    ConditionPattern("character_each", 1, _try_character_each),
+    ConditionPattern("compound", 1, _try_compound),
+    ConditionPattern("distinct", 1, _try_distinct),
+    ConditionPattern("dual_distinct", 1, _try_dual_distinct),
+    ConditionPattern("state_change", 2, _try_state_change),
+    ConditionPattern("or", 2, _try_or),
+    ConditionPattern("blade_count", 2, _try_blade_count),
+    ConditionPattern("card_count", 3, _try_card_count),
+    ConditionPattern("highest_cost_on_stage", 3, _try_highest_cost_on_stage),
+    ConditionPattern("cost_override_condition", 3, _try_cost_override_condition),
+    ConditionPattern("both", 3, _try_both),
+    ConditionPattern("temporal_this_turn", 4, _try_temporal_this_turn),
+    ConditionPattern("phase_gate", 4, _try_phase_gate),
+    ConditionPattern("temporal_turn_phase", 4, _try_temporal_turn_phase),
+    ConditionPattern("baton_touch", 4, _try_baton_touch),
+    ConditionPattern("temporal_count", 4, _try_temporal_count),
+    ConditionPattern("either_target", 5, _try_either_target),
+    ConditionPattern("live_success_or_move", 5, _try_live_success_or_move),
+    ConditionPattern("appear_or_move", 5, _try_appear_or_move),
+    ConditionPattern("movement", 5, _try_movement),
+    ConditionPattern("appearance", 5, _try_appearance),
+    ConditionPattern("zone_placement", 5, _try_zone_placement),
+    ConditionPattern("energy_state", 6, _try_energy_state),
+    ConditionPattern("state", 6, _try_state),
+    ConditionPattern("revealed", 6, _try_revealed),
+    ConditionPattern("opponent_choice", 6, _try_opponent_choice),
+    ConditionPattern("unless_pay", 6, _try_unless_pay),
+    ConditionPattern("position_change", 7, _try_position_change),
+    ConditionPattern("position", 7, _try_position),
+    ConditionPattern("ability_filter", 7, _try_ability_filter),
+    ConditionPattern("otherwise", 7, _try_otherwise),
+    ConditionPattern("heart_possession", 7, _try_heart_possession),
+    ConditionPattern("live_mid", 7, _try_live_mid),
 ]
 
-# PriorityRegistry wrapping canonical ConditionPattern rules.
 _condition_registry = PriorityRegistry("condition_rules")
-for _ci, (_cn, _ct, _ch) in enumerate(CONDITION_PATTERNS):
-    _rule = _ch if isinstance(_ch, ConditionPattern) else ConditionPattern(handler=_ch)
-    _condition_registry.register(_ct * 100 + _ci, _cn, _rule)
+for _ci, _rule in enumerate(CONDITION_PATTERNS):
+    _condition_registry.register(_rule.tier * 100 + _ci, _rule.name, _rule)
 
 
 def _try_placed_discard_live_or_member(text):
@@ -7504,7 +7389,7 @@ def _try_each_time(text):
     # "〜たび" bodies shaped [optional pay_energy, effect] are
     # conditional_on_optional: the player MAY pay, and paying gates the
     # effect. Reshaped here at the producer rather than as a post-parse FIX
-    # block (dissolved FIX 2, formerly in _finalize_ability_stage).
+    # block (dissolved FIX 2, formerly in the finalization pipeline).
     acts = sub.get("actions") or []
     if (
         sub.get("action") == "sequential"
@@ -9294,7 +9179,7 @@ def _try_kore_niyori_result(text):
         else:
             cond = None
     # Result-condition property enrichment, done at the producer rather than
-    # as a post-parse backfill (dissolved FIX 9, formerly in _finalize_ability_stage).
+    # as a post-parse backfill (dissolved FIX 9, formerly in the finalization pipeline).
     if isinstance(cond, dict) and not cond.get("card_property"):
         cond_text = cond.get("text", "")
         if "ブレードハート" in cond_text:
@@ -9322,7 +9207,7 @@ def _try_kore_niyori_result(text):
     followup = parse_effect(fp.strip())
     # "このメンバー" in a これにより followup acts on the activating card
     # itself. Derived at the producer rather than as a post-parse backfill
-    # (dissolved FIX 9b, formerly in _finalize_ability_stage).
+    # (dissolved FIX 9b, formerly in the finalization pipeline).
     if isinstance(followup, dict) and "このメンバー" in followup.get("text", ""):
         if not followup.get("target") and followup.get("self_target") is None:
             followup["self_target"] = True
@@ -9783,8 +9668,8 @@ def _try_heart_choice(text):
 # ====================================================================
 # EFFECT HANDLER DEFINITIONS & DISPATCH
 # ====================================================================
-# The _STRUCTURAL_EFFECT_RULES list defines the priority-ordered cascade.
-# Each function takes raw effect text and returns a parsed dict or None.
+# The _STRUCTURAL_EFFECT_RULES list defines the priority-ordered effect rules.
+# Each EffectPattern takes raw effect text and returns a parsed dict or None.
 # The first match wins — ordering is CRITICAL.
 #
 # Key constraints:
@@ -9880,69 +9765,62 @@ _try_place_under_heart_copy = EffectPattern(
 
 
 _STRUCTURAL_EFFECT_RULES = [
-    # Tier 1: Very specific patterns that must be checked first.
-    # These would be misparsed by any generic handler.
-    _try_timing_condition_gain,  # このターン中にエリアを移動した全てのX...
-    _try_self_and_other,  # XとYを得る (two different targets)
-    _try_per_unit,  # XにつきY (per-unit gain — restructures text)
-    _try_yell_source_modifier,  # エールはデッキの下から行う (yell-source modifier)
-    _try_activation_history_tiers,  # このターン…アクティブにしていた場合 tiers (Q203)
-    _try_cost_set_from_reference,  # コストは選んだメンバーが元々持つコストよりN低い/高い (bp5-005-R)
-    _try_energy_ahead_alternative,  # 相手のエネルギーが自分よりN枚多い場合 tiers (bp7-023-L)
-    _try_conditional_alternative,  # X場合Y、そうでない場合Z (if/else)
-    _try_character_specific,  # 「X」のキャラ specific effect
-    _try_activation_suffix,  # （この能力は...） activation conditions
-    _try_cost_modification,  # Cost modification patterns
-    _try_kore_niyori_case,  # これによりX場合、Y (conditional on prior result)
-    _try_heart_select_reveal,  # Heart selection + reveal combo
-    _try_choose_self_opponent,  # 自分か相手を選ぶ (choose self or opponent)
-    _try_look_and_select,  # Look at N cards, select some
-    _try_answer_choice,  # 回答がXの場合 (answer-based choice)
-    _try_each_time,  # Xたび (each-time trigger + effect)
-    # Tier 2: Conditional/optional effect shapes
-    _try_those_cards_add_hand_optional,  # G13: それらのカードの中から…手札に加えてもよい。そうしたとき…
-    _try_discard_shuffle_to_bottom_optional,  # G16: 控え室N枚選びシャッフル→デッキ一番下・そうしたとき…
-    _try_discard_hand_recover_self_optional,  # G7: 手札をN枚控え室に置いてもよい。そうしたとき、控え室からこのカードを手札に加える
-    _try_discard_hand_reactivate_optional,  # Shioriko bp7-022: 手札をN枚控え室に置いてもよい。そうしたとき、そのメンバーをアクティブにする
-    _try_discard_live_and_member_optional,  # B6: 控え室にライブカードとmember無ブレードがある場合→シャッフルデッキ下・そうしたときheart01
-    _try_unless_effect,  # しないかぎり (unless-pay)
-    _try_opponent_action,  # 相手は... (opponent action)
-    _try_opponent_after_conditional,  # 相手はX場合、Y (opponent conditional)
-    _try_reveal_until_chosen_card,  # Reveal until condition met
-    _try_reveal_until_live,  # Reveal until live card found
-    _try_furthermore,  # さらに (furthermore/additional effect)
-    _try_kore_niyori_result,  # これによりX場合 (result-based conditional)
-    _try_sequential_duration,  # Duration + sequential
-    _try_place_under_heart_copy,  # 下に置く。そうしたとき、ハート=置いたカード (C4)
-    _try_conditional_sequential,  # そうした場合X場合 (nested conditional-on-optional)
-    # Tier 3: Sequential and compound patterns
-    _try_sequential,  # その後、 (then)
-    _try_duration_effect,  # Duration-bounded effect
-    _try_sou_shinakatta,  # そうしなかった場合 (if you don't)
-    _try_period_conditional,  # 。場合 (period-separated conditional)
-    _try_compound_select,  # Compound select + action
-    _try_shi_sequential,  # Aし、B (te-form sequential)
-    _try_te_sequential,  # Xを得て、Yを得る (sequential gains)
-    _try_re_yell,  # Re-yell — must be before implicit sequential to prevent splitting
-    _try_implicit_sequential,  # Implicit sequential (two actions fused)
-    # Tier 4: Single-action patterns (most general)
-    _try_conditional,  # X場合、Y (generic conditional)
-    _try_ability_activation,  # 能力を発動させる (activate ability)
-    _try_heart_choice,  # ハートをXつ選ぶ (heart choice)
-    _try_choice,  # 以下から1つを選ぶ (generic choice)
-    _try_kore_niyori_cascade,  # により cascade
-    _try_baton_touch_effect,  # バトンタッチ (baton touch)
-    _try_play_baton_touch,  # Play + baton touch combo
-    _try_both_discard_until,  # Both players discard until
+    EffectPattern(action="custom", handler=_try_timing_condition_gain),
+    EffectPattern(action="custom", handler=_try_self_and_other),
+    EffectPattern(action="custom", handler=_try_per_unit),
+    EffectPattern(action="custom", handler=_try_yell_source_modifier),
+    EffectPattern(action="custom", handler=_try_activation_history_tiers),
+    EffectPattern(action="custom", handler=_try_cost_set_from_reference),
+    EffectPattern(action="custom", handler=_try_energy_ahead_alternative),
+    EffectPattern(action="custom", handler=_try_conditional_alternative),
+    EffectPattern(action="custom", handler=_try_character_specific),
+    EffectPattern(action="custom", handler=_try_activation_suffix),
+    EffectPattern(action="custom", handler=_try_cost_modification),
+    EffectPattern(action="custom", handler=_try_kore_niyori_case),
+    EffectPattern(action="custom", handler=_try_heart_select_reveal),
+    EffectPattern(action="custom", handler=_try_choose_self_opponent),
+    EffectPattern(action="custom", handler=_try_look_and_select),
+    EffectPattern(action="custom", handler=_try_answer_choice),
+    EffectPattern(action="custom", handler=_try_each_time),
+    EffectPattern(action="custom", handler=_try_those_cards_add_hand_optional),
+    EffectPattern(action="custom", handler=_try_discard_shuffle_to_bottom_optional),
+    EffectPattern(action="custom", handler=_try_discard_hand_recover_self_optional),
+    EffectPattern(action="custom", handler=_try_discard_hand_reactivate_optional),
+    EffectPattern(action="custom", handler=_try_discard_live_and_member_optional),
+    EffectPattern(action="custom", handler=_try_unless_effect),
+    EffectPattern(action="custom", handler=_try_opponent_action),
+    EffectPattern(action="custom", handler=_try_opponent_after_conditional),
+    EffectPattern(action="custom", handler=_try_reveal_until_chosen_card),
+    EffectPattern(action="custom", handler=_try_reveal_until_live),
+    EffectPattern(action="custom", handler=_try_furthermore),
+    EffectPattern(action="custom", handler=_try_kore_niyori_result),
+    EffectPattern(action="custom", handler=_try_sequential_duration),
+    _try_place_under_heart_copy,
+    EffectPattern(action="custom", handler=_try_conditional_sequential),
+    EffectPattern(action="custom", handler=_try_sequential),
+    EffectPattern(action="custom", handler=_try_duration_effect),
+    EffectPattern(action="custom", handler=_try_sou_shinakatta),
+    EffectPattern(action="custom", handler=_try_period_conditional),
+    EffectPattern(action="custom", handler=_try_compound_select),
+    EffectPattern(action="custom", handler=_try_shi_sequential),
+    EffectPattern(action="custom", handler=_try_te_sequential),
+    EffectPattern(action="custom", handler=_try_re_yell),
+    EffectPattern(action="custom", handler=_try_implicit_sequential),
+    EffectPattern(action="custom", handler=_try_conditional),
+    EffectPattern(action="custom", handler=_try_ability_activation),
+    EffectPattern(action="custom", handler=_try_heart_choice),
+    EffectPattern(action="custom", handler=_try_choice),
+    EffectPattern(action="custom", handler=_try_kore_niyori_cascade),
+    EffectPattern(action="custom", handler=_try_baton_touch_effect),
+    EffectPattern(action="custom", handler=_try_play_baton_touch),
+    EffectPattern(action="custom", handler=_try_both_discard_until),
 ]
 
 # ======================================================================
 # EFFECT RULE REGISTRY (ADD NEW EFFECT PHRASES HERE)
-# Each EffectPattern(...) row is dispatched BEFORE every legacy _try_*
-# handler, so a new phrase can be taught declaratively without touching the
-# cascade below. Row order = priority (first match wins). Keep rows narrow
-# (match/match_any + optional exclude) so they only fire on their phrase —
-# a row that overlaps a compound text will shadow the legacy cascade.
+# Each EffectPattern(...) row is dispatched before structural handlers. Rows use
+# the same contract as every other effect rule. Keep rows narrow so they only
+# fire on their phrase and do not shadow longer structural text.
 # ======================================================================
 _EFFECT_RULES: List[Any] = []
 
@@ -9954,9 +9832,9 @@ def _register_effect_rule(rule: EffectPattern) -> EffectPattern:
 
 # --- example rows: simple phrase → shape (proven identical to legacy output) ---
 # Each setter calls _fill_defaults so the row's output carries the same
-# source/destination enrichment the legacy cascade produces. The condition
-# matches the exact phrase (post-normalization) so a row never shadows a
-# longer/structural text the legacy cascade handles better.
+# source/destination enrichment as the structural effect rules. The condition
+# matches the exact phrase (post-normalization) so a row never shadows longer
+# structural text.
 def _exact_effect_phrase(phrase: str):
     return lambda t: t.strip().rstrip("。") == phrase
 
@@ -10074,11 +9952,8 @@ _effect_registry = PriorityRegistry("effect_rules")
 for _ri, _h in enumerate(_EFFECT_RULES):
     _hn = getattr(_h, "__name__", f"effect_rule_{_ri}")
     _effect_registry.register(_ri, _hn, _h)
-for _i, _h in enumerate(_STRUCTURAL_EFFECT_RULES):
-    _rule = _h if isinstance(_h, EffectPattern) else EffectPattern(
-        action="custom", handler=_h
-    )
-    _hn = getattr(_h, "__name__", f"structural_rule_{_i}")
+for _i, _rule in enumerate(_STRUCTURAL_EFFECT_RULES):
+    _hn = getattr(_rule, "__name__", f"structural_rule_{_i}")
     _effect_registry.register(100 + _i, _hn, _rule)
 
 
@@ -10205,7 +10080,11 @@ def _try_play_time_cost_set(text):
 
 # Negative priority: play-time costs are the most specific shape in effect
 # text and must win before generic handlers mis-parse them.
-_effect_registry.register(-10, "play_time_cost_set", _try_play_time_cost_set)
+_effect_registry.register(
+    -10,
+    "play_time_cost_set",
+    EffectPattern(action="custom", handler=_try_play_time_cost_set),
+)
 
 # ======================================================================
 # POST-PROCESSING NORMALIZERS & CHAINING
@@ -11312,7 +11191,7 @@ def _infer_baton_placement_source(effect):
     return effect
 
 
-def _normalize_effect_tree(effect, original_text=None):
+def _normalize_parsed_effect(effect, original_text=None):
     if not effect or not isinstance(effect, dict):
         return effect
     _full_text = effect.get("text") or original_text or ""
@@ -11681,7 +11560,7 @@ def _propagate_context(node, ctx=None, *, t="", eff_root=None):
     )
 
 
-def _apply_recursive_fixes(d, fix_stats):
+def _apply_recursive_fixes(d):
     for current in iter_dict_nodes(d):
         if current.get("type") == "compound" and current.get("conditions"):
             first_location = next(
@@ -11709,7 +11588,6 @@ def _apply_recursive_fixes(d, fix_stats):
         ):
             if "appearance_source" not in current:
                 current["appearance_source"] = "discard"
-                fix_stats["appearance_source"] = fix_stats.get("appearance_source", 0) + 1
 
         if current.get("action") == "move_cards":
             t = current.get("text", "")
@@ -11717,7 +11595,6 @@ def _apply_recursive_fixes(d, fix_stats):
                 if "cost_reference" not in current:
                     current["cost_reference"] = "previous_moved_card"
                     current["cost_limit_operator"] = "<"
-                    fix_stats["cost_reference"] = fix_stats.get("cost_reference", 0) + 1
 
         if (
             current.get("action") == "modify_score"
@@ -11727,9 +11604,6 @@ def _apply_recursive_fixes(d, fix_stats):
             t = current.get("text", "")
             if "色につき" in t:
                 current["per_unit_type"] = "heart_colors"
-                fix_stats["heart_colors_per_unit"] = fix_stats.get(
-                    "heart_colors_per_unit", 0
-                ) + 1
 
 
 def _fix_sequential_chain(eff):
@@ -11814,7 +11688,7 @@ def _fix_sequential_chain(eff):
             sub["source"] = prev_source
 
 
-def _fix_condition_enrichment(eff, t, fix_stats):
+def _fix_condition_enrichment(eff, t):
     """FIX 8/8e/8f: condition card_property, temporal aggregate, need_heart_total."""
     cond = eff.get("condition")
     if isinstance(cond, dict):
@@ -11824,12 +11698,10 @@ def _fix_condition_enrichment(eff, t, fix_stats):
                 cond["card_property"] = "has_blade_heart"
                 if "持たない" in ct or "ない" in ct:
                     cond["negation"] = True
-                fix_stats["card_property"] += 1
             if "{{icon_score.png|スコア}}を持つ" in ct and not cond.get(
                 "card_property"
             ):
                 cond["card_property"] = "has_score_icon"
-                fix_stats["card_property"] += 1
             _infer_heart_source(cond, ct)
             _infer_baton_touch(cond, ct)
         if cond.get("type") == "temporal_condition":
@@ -11853,18 +11725,14 @@ def _fix_condition_enrichment(eff, t, fix_stats):
                 if cm:
                     cond["count"] = int(cm.group(1))
                     changed = True
-            if changed:
-                fix_stats["temporal"] += 1
     if "{{icon_score.png|スコア}}を持つ" in t:
         if eff.get("action") in ("move_cards", "select") and not eff.get(
             "card_property"
         ):
             eff["card_property"] = "has_score_icon"
-            fix_stats["card_property"] += 1
         cond = eff.get("condition")
         if isinstance(cond, dict) and not cond.get("card_property"):
             cond["card_property"] = "has_score_icon"
-            fix_stats["card_property"] += 1
     if (
         eff.get("per_unit")
         and not eff.get("need_heart_total")
@@ -11874,7 +11742,6 @@ def _fix_condition_enrichment(eff, t, fix_stats):
         if nh:
             eff["need_heart_total"] = int(nh.group(1))
             eff["need_heart_operator"] = ">="
-            fix_stats["need_heart"] = fix_stats.get("need_heart", 0) + 1
 
 
 def _prefix_condition_reparse(ability, eff, cond):
@@ -11929,7 +11796,7 @@ def _infer_effect_action(eff):
                 return
 
 
-def _fix_primary_negation(eff, fix_stats):
+def _fix_primary_negation(eff):
     # FIX 10: Primary effect fixes — negation condition
     pe = eff.get("primary_effect")
     if not isinstance(pe, dict):
@@ -11962,7 +11829,6 @@ def _fix_primary_negation(eff, fix_stats):
         pe["condition"] = neg_cond
         pe["card_type"] = "card"
         pe.pop("target", None)
-        fix_stats["primary_neg"] += 1
     # all:false on single-target primary when parent has all:true
     if eff.get("all") and "all" not in pe and pe.get("count") == 1:
         pe["all"] = False
@@ -12045,7 +11911,7 @@ def _fix_spurious_sequential_change_state(eff):
         eff["actions"] = new_actions
 
 
-def _fix_auto_condition(ability, eff, t, fix_stats):
+def _fix_auto_condition(ability, eff, t):
     # FIX 13: Auto abilities with no condition — extract from text
     if (
         ability.get("triggers") == "自動"
@@ -12059,45 +11925,7 @@ def _fix_auto_condition(ability, eff, t, fix_stats):
                 tc = parse_condition(ct)
                 if tc and tc.get("type") not in (None, "custom"):
                     eff["condition"] = copy.deepcopy(tc)
-                    fix_stats["auto_trigger"] += 1
                     break
-
-
-def _finalize_ability_stage(ability: Dict[str, Any], fix_stats: Dict[str, int]) -> None:
-    """Pre-fix pass: condition re-parse, target fix, action inference, sequential chain fixes, targeted fixes."""
-    # ─── Pre-fix pass (merged from 3 separate loops) ───────────────────────────
-    # 1. Re-parse condition texts to pick up newer parser fields (cost_limit etc.)
-    # 2. Fix target=both when comparison_target is set → target should be self.
-    # 3. Infer action for effects with no action; apply sequential chain fixes.
-    # ─────────────────────────────────────────────────────────────────────────────
-    ability_text = ability.get("full_text") or ability.get("triggerless_text", "")
-    eff = ability.get("effect")
-    if not isinstance(eff, dict):
-        return
-    cond = eff.get("condition")
-
-    _prefix_condition_reparse(ability, eff, cond)
-
-    # --- 2. Fix target=both when comparison_target is set ---
-    # comparison_target handles the opponent side, so target should be self.
-    if isinstance(cond, dict):
-        if cond.get("target") == "both" and cond.get("comparison_target"):
-            cond["target"] = "self"
-
-    _infer_effect_action(eff)
-
-    # --- 2. Targeted fixes logic ---
-    t = ability.get("triggerless_text", "")
-
-    _fix_condition_enrichment(eff, t, fix_stats)
-
-    _fix_primary_negation(eff, fix_stats)
-
-    _fix_compound_gain_split(eff, cond, t)
-
-    _fix_spurious_sequential_change_state(eff)
-
-    _fix_auto_condition(ability, eff, t, fix_stats)
 
 
 def _fix_conditional_on_result(eff, t):
@@ -12283,9 +12111,9 @@ def _fix_conditional_on_result(eff, t):
         eff.pop("actions", None)
 
 
-def _finalize_corpus_stage(data: Dict[str, Any], fix_stats: Dict[str, int]) -> None:
+def _repair_corpus(data: Dict[str, Any]) -> None:
     """Post-processing: recursive fixes, action inference & engine compat fixes, post-hoc fixes."""
-    _apply_recursive_fixes(data["unique_abilities"], fix_stats)
+    _apply_recursive_fixes(data["unique_abilities"])
 
     # ====================================================================
     # POST-PROCESSING: action inference & engine compat fixes
@@ -12439,16 +12267,8 @@ def _finalize_corpus_stage(data: Dict[str, Any], fix_stats: Dict[str, int]) -> N
                         sub["action"] = "reduce_live_card_set_limit"
                         sub.pop("card_type", None)
 
-    # ====================================================================
-    # POST-HOC FIXES & MAIN
-    # ====================================================================
     # Card-specific post-hoc fixes (e.g. PL!S-bp2-008 gain_ability) live in
-    # card_overrides.py and are applied by process_abilities.
-
-    # FIX 17: Clean up redundant fields on perform_yell actions with per_unit_source
-    # When per_unit_source is "previous_moved_cards", the engine sums costs from
-    # self.moved_cards directly — per_unit_type and count are not used for yell.
-    _clean_per_unit_source(data["unique_abilities"])
+    # card_overrides.py and are applied by the pipeline.
 
 
 # Patterns whose appearance condition refers to the card's OWN debut. A
@@ -12470,35 +12290,43 @@ def _strip_self_appearance_card_type(node):
 
 
 class _FinalizationPipeline:
-    def __init__(self):
-        self.fix_stats = {
-            "card_property": 0,
-            "temporal": 0,
-            "primary_neg": 0,
-            "auto_trigger": 0,
-            "overrides": {},
-        }
-
-    def finish_ability(self, ability):
-        _finalize_ability_stage(ability, self.fix_stats)
-
-    def finish_corpus(self, data):
-        _finalize_corpus_stage(data, self.fix_stats)
+    def _apply_card_specific_overrides(self, data):
         from card_overrides import apply_card_overrides
 
-        apply_card_overrides(data, self.fix_stats)
-        for ability in data["unique_abilities"]:
+        apply_card_overrides(data)
+
+    def _validate_structured_output(self, data):
+        for ability in data.get("unique_abilities", []):
             effect = ability.get("effect")
             if isinstance(effect, dict):
+                _validate_effect(effect, ability.get("full_text", ""))
                 _strip_self_appearance_card_type(effect)
 
-    def run(self, data):
+    def _normalize_generated_metadata(self, data):
         data["_warning"] = (
             "DO NOT EDIT THIS MANUALLY. Run cards/ability_extraction/parser.py to regenerate."
         )
+        _clean_per_unit_source(data["unique_abilities"])
+
+    def run(self, data):
         for ability in data["unique_abilities"]:
-            self.finish_ability(ability)
-        self.finish_corpus(data)
+            effect = ability.get("effect")
+            if isinstance(effect, dict):
+                condition = effect.get("condition")
+                _prefix_condition_reparse(ability, effect, condition)
+                if isinstance(condition, dict) and condition.get("target") == "both" and condition.get("comparison_target"):
+                    condition["target"] = "self"
+                _infer_effect_action(effect)
+                triggerless_text = ability.get("triggerless_text", "")
+                _fix_condition_enrichment(effect, triggerless_text)
+                _fix_primary_negation(effect)
+                _fix_compound_gain_split(effect, condition, triggerless_text)
+                _fix_spurious_sequential_change_state(effect)
+                _fix_auto_condition(ability, effect, triggerless_text)
+        _repair_corpus(data)
+        self._apply_card_specific_overrides(data)
+        self._validate_structured_output(data)
+        self._normalize_generated_metadata(data)
         return data
 
 
@@ -12525,7 +12353,7 @@ def _strip_coo_child_optional(effect):
     player's may-I choice), not its sub-actions — handlers emit optional=True
     on inner nodes from 「〜してもよい」, and leaving it there makes the engine
     double-prompt. Runs after `_propagate_optional` at parse time, replacing
-    the post-parse FIX 3 sweep in _finalize_ability_stage."""
+    the post-parse FIX 3 sweep in the finalization pipeline."""
     if isinstance(effect, dict) and effect.get("action") == "conditional_on_optional":
         for sub_key in ("optional_action", "conditional_action"):
             sub = effect.get(sub_key)
@@ -12729,7 +12557,6 @@ _KNOWN_CONDITIONS = {
     "complex_condition",
     "otherwise_condition",
     "action_success_condition",
-    "custom",
     "revealed_condition",
     "member_state",
     "zone_placement_condition",
@@ -12743,19 +12570,24 @@ _KNOWN_CONDITIONS = {
 
 
 def _validate_condition_types(cond, context=""):
-    """Recursively validate condition types. Non-fatal warnings."""
-    import logging
-
-    _log = logging.getLogger("parser")
+    """Recursively validate condition types."""
     if not isinstance(cond, dict):
         return
     ctype = cond.get("type", "")
-    if ctype and ctype not in _KNOWN_CONDITIONS:
-        _log.warning("Unknown condition type '%s' in %s", ctype, context or "(root)")
-    # Recurse into compound conditions
-    if ctype in ("compound", "or_condition"):
-        for sub in cond.get("conditions", []):
-            _validate_condition_types(sub, context)
+    if not ctype or ctype not in _KNOWN_CONDITIONS:
+        raise ValueError(
+            f"Unsupported condition type {ctype!r} in {context or '(root)'}"
+        )
+    for key in ("cause", "condition"):
+        nested = cond.get(key)
+        if nested is not None:
+            if isinstance(nested, list):
+                for sub in nested:
+                    _validate_condition_types(sub, context)
+            else:
+                _validate_condition_types(nested, context)
+    for sub in cond.get("conditions", []):
+        _validate_condition_types(sub, context)
 
 
 def _validate_effect(eff, context=""):
@@ -12780,23 +12612,16 @@ def _validate_effect(eff, context=""):
                     context or "(root)",
                 )
 
-    # Validate condition types
     cond = eff.get("condition")
-    if isinstance(cond, dict):
-        ctype = cond.get("type", "")
-        if ctype and ctype not in _KNOWN_CONDITIONS:
-            _log.warning(
-                "Unknown condition type '%s' in %s (action=%s)",
-                ctype,
-                context or "(root)",
-                action,
-            )
-        # Recurse into compound conditions
-        if ctype in ("compound", "or_condition"):
-            for sub_cond in cond.get("conditions", []):
-                _validate_condition_types(sub_cond, context)
+    if cond is not None:
+        _validate_condition_types(cond, context)
     # Also check alternative_condition, choice_condition
-    for cond_key in ("alternative_condition", "choice_condition", "result_condition"):
+    for cond_key in (
+        "alternative_condition",
+        "choice_condition",
+        "result_condition",
+        "activation_condition_parsed",
+    ):
         sub_cond = eff.get(cond_key)
         if isinstance(sub_cond, dict):
             _validate_condition_types(sub_cond, context)

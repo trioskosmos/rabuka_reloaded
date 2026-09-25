@@ -21,7 +21,7 @@ from parser import (
     detect_icon_positions,
     set_cross_position_fields,
     parse_effect,
-    _normalize_effect_tree,
+    _normalize_parsed_effect,
 )
 
 
@@ -135,7 +135,7 @@ class TestParseEffectActivationPosition:
             "（この能力は左サイドエリアか右サイドエリアに登場した場合のみ発動する。）"
         )
         effect = parse_effect(text)
-        effect = _normalize_effect_tree(effect, text)
+        effect = _normalize_parsed_effect(effect, text)
         assert effect.get("activation_position") == "left_side,right_side"
 
     def test_left_right_no_spurious_position(self):
@@ -146,7 +146,7 @@ class TestParseEffectActivationPosition:
             "（この能力は左サイドエリアか右サイドエリアに登場した場合のみ発動する。）"
         )
         effect = parse_effect(text)
-        effect = _normalize_effect_tree(effect, text)
+        effect = _normalize_parsed_effect(effect, text)
         assert "position" not in effect, (
             f"effect should not have 'position' field for multi-position activation, "
             f"got position={effect.get('position')}"
@@ -155,13 +155,13 @@ class TestParseEffectActivationPosition:
     def test_center_only_activation(self):
         text = "{{center.png|センター}}{{icon_blade.png|ブレード}}を得る。"
         effect = parse_effect(text)
-        effect = _normalize_effect_tree(effect, text)
+        effect = _normalize_parsed_effect(effect, text)
         assert effect.get("activation_position") == "center"
 
     def test_left_only_activation(self):
         text = "{{leftside.png|左サイド}}カードを2枚引く。"
         effect = parse_effect(text)
-        effect = _normalize_effect_tree(effect, text)
+        effect = _normalize_parsed_effect(effect, text)
         assert effect.get("activation_position") == "left_side"
 
     def test_sub_action_activation_position(self):
@@ -172,7 +172,7 @@ class TestParseEffectActivationPosition:
             "（この能力は左サイドエリアか右サイドエリアに登場した場合のみ発動する。）"
         )
         effect = parse_effect(text)
-        effect = _normalize_effect_tree(effect, text)
+        effect = _normalize_parsed_effect(effect, text)
         for action in effect.get("actions", []):
             assert action.get("activation_position") == "left_side,right_side", (
                 f"Sub-action '{action.get('text')}' should have activation_position "

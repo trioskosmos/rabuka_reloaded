@@ -1227,6 +1227,8 @@ class EffectPattern:
 
 @dataclass
 class ConditionPattern:
+    name: str = ""
+    tier: int = 0
     handler: Optional[Callable] = None
     match: str = ""
     match_any: List[str] = field(default_factory=list)

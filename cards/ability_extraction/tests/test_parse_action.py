@@ -360,6 +360,55 @@ def test_parse_action_scans_source_and_destination_once():
     assert destination_calls == 1
 
 
+def test_canonical_condition_patterns_cover_nested_shapes():
+    for text in ('AかつB', 'このターン、相手もライブを成功している場合', '名前が異なるメンバーが2人以上いる'):
+        result = parser_module.parse_condition(text)
+        assert isinstance(result, dict)
+        assert result.get('type') not in (None, 'custom')
+
+
+def test_structural_effect_rules_are_effect_patterns():
+    assert all(isinstance(rule, parser_module.EffectPattern) for rule in parser_module._STRUCTURAL_EFFECT_RULES)
+    assert all(isinstance(handler, parser_module.EffectPattern) for _, _, handler in parser_module._effect_registry.sorted_handlers())
+
+
+def test_finalizer_phases_are_ordered():
+    calls = []
+    pipeline = parser_module._FinalizationPipeline()
+    pipeline._normalize_generated_metadata = lambda data: calls.append('metadata')
+    pipeline._apply_card_specific_overrides = lambda data: calls.append('overrides')
+    pipeline._validate_structured_output = lambda data: calls.append('validate')
+    original_corpus_normalizer = parser_module._repair_corpus
+    parser_module._repair_corpus = lambda data: calls.append('normalize')
+    data = {'unique_abilities': [{}]}
+    try:
+        pipeline.run(data)
+    finally:
+        parser_module._repair_corpus = original_corpus_normalizer
+    assert calls == ['normalize', 'overrides', 'validate', 'metadata']
+
+
+def test_card_overrides_do_not_require_fix_stats():
+    data = {'unique_abilities': [{'cards': [], 'triggerless_text': ''}]}
+    parser_module.card_overrides.apply_card_overrides(data) if hasattr(parser_module, 'card_overrides') else None
+    from card_overrides import apply_card_overrides
+    apply_card_overrides(data)
+
+
+def test_resource_loss_keeps_member_card_type():
+    result = parse_effect('自分のステージのメンバーカードの{{icon_blade.png|ブレード}}を1つ失う')
+    assert result.get('action') == 'gain_resource'
+    assert result.get('sign') == 'negative'
+    assert result.get('card_type') == 'member_card'
+
+
+def test_nested_sequential_normalization_preserves_links():
+    result = parse_effect('カードを1枚選ぶ。その後、選んだカードを手札に加え、控え室に置く')
+    assert result.get('action') in ('sequential', 'select')
+    if result.get('action') == 'sequential':
+        assert result.get('actions')
+
+
 if __name__ == '__main__':
     import traceback
     tests = [(k, v) for k, v in sorted(globals().items()) if k.startswith('test_')]

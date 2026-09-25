@@ -1,0 +1,12 @@
+﻿c-translate-ability-runtime 1
+c-translate-characterization 1
+c-translate-conditions 1
+c-translate-gain-effects 1
+c-translate-triggers 1
+port-condition-card 1
+port-condition-cost 1
+port-effects-draw 1
+port-effects-score 1
+port-effects-state 1
+port-test-inventory2 1
+port-vm-decode 1

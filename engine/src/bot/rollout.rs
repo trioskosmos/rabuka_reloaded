@@ -266,18 +266,57 @@ fn rollout_value(
     value_outcome(sim, me, start_succ)
 }
 
+pub fn price_main_actions_at_horizons(
+    gs: &GameState,
+    me: u8,
+    actions: &[Action],
+    simulations: usize,
+    horizons: &[u8],
+) -> Vec<Vec<f64>> {
+    let start_turn = gs.turn_number;
+    let start_succ = (
+        gs.player1.success_live_card_zone.cards.len() as i32,
+        gs.player2.success_live_card_zone.cards.len() as i32,
+    );
+    let _guard = RngGuard(crate::rng::checkpoint());
+    let mut values = vec![vec![0.0; actions.len()]; horizons.len()];
+    for (action_index, action) in actions.iter().enumerate() {
+        for horizon_index in 0..horizons.len() {
+            for simulation in 0..simulations.max(1) {
+                crate::rng::seed(0x51A7 + simulation as u32);
+                let mut sim = fair_rollout_state(gs, me, 0x51A7 + simulation as u64);
+                if game_setup::execute_action(&mut sim, action).is_err() {
+                    values[horizon_index][action_index] -= 500.0;
+                    continue;
+                }
+                game_setup::settle_single_player_state(&mut sim);
+                values[horizon_index][action_index] += rollout_value(
+                    &mut sim,
+                    me,
+                    start_turn,
+                    start_succ,
+                    start_turn.saturating_add(horizons[horizon_index]),
+                );
+            }
+            values[horizon_index][action_index] /= simulations.max(1) as f64;
+        }
+    }
+    values
+}
+
 pub fn price_main_actions(
     gs: &GameState,
     me: u8,
     actions: &[Action],
     simulations: usize,
+    horizon_turns: u8,
 ) -> Vec<f64> {
     let start_turn = gs.turn_number;
     let start_succ = (
         gs.player1.success_live_card_zone.cards.len() as i32,
         gs.player2.success_live_card_zone.cards.len() as i32,
     );
-    let horizon_end = start_turn.saturating_add(1);
+    let horizon_end = start_turn.saturating_add(horizon_turns);
     let _guard = RngGuard(crate::rng::checkpoint());
     let mut totals = vec![0.0; actions.len()];
     for (index, action) in actions.iter().enumerate() {
@@ -310,16 +349,26 @@ pub fn price_portfolios(
         gs.player1.success_live_card_zone.cards.len() as i32,
         gs.player2.success_live_card_zone.cards.len() as i32,
     );
-    let horizon_end = start_turn.saturating_add(HORIZON_TURNS);
+    let simulations = std::env::var("V7_LIVE_SIMS")
+        .ok()
+        .and_then(|value| value.parse().ok())
+        .filter(|value: &usize| *value > 0)
+        .unwrap_or(SIMS_PER_CANDIDATE);
+    let horizon_turns = std::env::var("V7_LIVE_HORIZON")
+        .ok()
+        .and_then(|value| value.parse().ok())
+        .filter(|value: &u8| *value <= 3)
+        .unwrap_or(HORIZON_TURNS);
+    let horizon_end = start_turn.saturating_add(horizon_turns);
     let world_seed = plan_key(gs, me).2;
     let _rng = RngGuard(crate::rng::checkpoint());
     let mut totals = vec![0.0f64; candidates.len()];
     for (ci, cand) in candidates.iter().enumerate() {
-        for _ in 0..SIMS_PER_CANDIDATE {
+        for _ in 0..simulations {
             crate::rng::seed(world_seed as u32);
             let mut sim = fair_rollout_state(gs, me, world_seed);
             if !apply_portfolio(&mut sim, cand) {
-                totals[ci] -= 500.0 / SIMS_PER_CANDIDATE as f64;
+                totals[ci] -= 500.0 / simulations as f64;
                 continue;
             }
             // Re-generate offers post-application; confirm may already have
@@ -337,7 +386,7 @@ pub fn price_portfolios(
             let v = rollout_value(&mut sim, me, start_turn, start_succ, horizon_end);
             totals[ci] += v;
         }
-        totals[ci] /= SIMS_PER_CANDIDATE as f64;
+        totals[ci] /= simulations as f64;
     }
     let mut best = 0usize;
     for (i, &t) in totals.iter().enumerate() {

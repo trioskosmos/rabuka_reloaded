@@ -35,6 +35,44 @@ class BC:
         return bytes(self.data)
 
 
+COND_TO_VARIANT_TAG = {
+    "compound": 0,
+    "or_condition": 0,
+    "card_count_condition": 1,
+    "location_condition": 1,
+    "comparison_condition": 2,
+    "both_condition": 2,
+    "all_cost_comparison_condition": 2,
+    "highest_cost_on_stage_condition": 2,
+    "movement_condition": 3,
+    "not_moved": 3,
+    "has_moved": 3,
+    "group_condition": 4,
+    "appearance_condition": 5,
+    "temporal_condition": 6,
+    "state_condition": 7,
+    "energy_state_condition": 7,
+    "state_change_condition": 7,
+    "resource_condition": 8,
+    "card_blade_condition": 8,
+    "ability_filter_condition": 9,
+    "score_threshold_condition": 10,
+    "choice_condition": 11,
+    "position_change_condition": 11,
+    "complex_condition": 12,
+    "position_condition": 13,
+    "opponent_choice_condition": 14,
+    "opponent_live_success": 15,
+    "no_excess_heart": 16,
+    "otherwise_condition": 17,
+    "action_success_condition": 17,
+    "any_of_condition": 18,
+    "all_revealed_match_heart_color": 19,
+    "custom": 20,
+}
+UNSUPPORTED_CONDITION_VARIANT = 20
+
+
 def compile_all(abilities):
     """Store each `unique_abilities[i]` entry as a compact *binary JSON* slice.
 
@@ -54,42 +92,6 @@ def compile_all(abilities):
         "activation_condition_parsed",
         "cause",
     )
-
-    COND_TO_VARIANT_TAG = {
-        "compound": 0,
-        "or_condition": 0,
-        "card_count_condition": 1,
-        "location_condition": 1,
-        "comparison_condition": 2,
-        "both_condition": 2,
-        "all_cost_comparison_condition": 2,
-        "highest_cost_on_stage_condition": 2,
-        "movement_condition": 3,
-        "not_moved": 3,
-        "has_moved": 3,
-        "group_condition": 4,
-        "appearance_condition": 5,
-        "temporal_condition": 6,
-        "state_condition": 7,
-        "energy_state_condition": 7,
-        "state_change_condition": 7,
-        "resource_condition": 8,
-        "card_blade_condition": 8,
-        "ability_filter_condition": 9,
-        "score_threshold_condition": 10,
-        "choice_condition": 11,
-        "position_change_condition": 11,
-        "complex_condition": 12,
-        "position_condition": 13,
-        "opponent_choice_condition": 14,
-        "opponent_live_success": 15,
-        "no_excess_heart": 16,
-        "otherwise_condition": 17,
-        "action_success_condition": 17,
-        "custom": 17,
-        "any_of_condition": 18,
-        "all_revealed_match_heart_color": 19,
-    }
 
     ACTION_TO_VARIANT_TAG = {
         "": 3,
@@ -205,7 +207,7 @@ def compile_all(abilities):
         elif isinstance(v, dict):
             if is_condition:
                 t = v.get("type") or ""
-                vtag = COND_TO_VARIANT_TAG.get(t)
+                vtag = COND_TO_VARIANT_TAG.get(t, UNSUPPORTED_CONDITION_VARIANT)
                 if t == "or_condition" and "operator" not in v:
                     v["operator"] = "or"
                 if t in ("has_moved", "not_moved") and "movement" not in v:

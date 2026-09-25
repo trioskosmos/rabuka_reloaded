@@ -228,6 +228,14 @@ fn features(gs: &GameState, me: u8) -> Features {
     }
 }
 
+fn terminal_win(gs: &GameState, me: u8) -> bool {
+    match gs.game_result {
+        GameResult::FirstAttackerWins => gs.player1.is_first_attacker == (me == 0),
+        GameResult::SecondAttackerWins => gs.player1.is_first_attacker != (me == 0),
+        _ => false,
+    }
+}
+
 fn value(now: &Features, base: &Features, deploy: bool) -> f64 {
     // Development weight: default 8.0 (historical). V7_DEV_WEIGHT for
     // ablation — losses still cluster on dev_gap (audit 2026-09-23).
@@ -305,7 +313,9 @@ impl Search<'_> {
             return (self.evaluate(gs), depth, "complete");
         }
         if !gs.has_pending_choice() {
-            let beam = std::env::var_os("V7_BEAM").is_some();
+            let beam = std::env::var("V7_BEAM")
+                .map(|value| value != "0")
+                .unwrap_or(false);
             if beam
                 && depth < 1
                 && gs.current_phase == Phase::Main
@@ -433,11 +443,37 @@ fn is_free_baton(gs: &GameState, me: u8, action: &Action) -> bool {
     })
 }
 
+fn action_card_label(gs: &GameState, action: &Action) -> String {
+    action
+        .parameters
+        .as_ref()
+        .and_then(|p| p.card_id)
+        .and_then(|id| gs.card_database.get_card(id))
+        .map(|card| format!("{}:{:?}", card.card_no, card.card_type))
+        .or_else(|| {
+            action
+                .parameters
+                .as_ref()
+                .and_then(|p| p.card_id.map(|id| id.to_string()))
+        })
+        .unwrap_or_else(|| "-".into())
+}
+
 fn rollout_suggestion(gs: &GameState, actions: &[Action], me: u8) -> Option<Action> {
     if gs.current_phase != Phase::Main {
         return None;
     }
-    let values = crate::bot::rollout::price_main_actions(gs, me, actions, 8);
+    let simulations = std::env::var("V7_ROLLOUT_SIMS")
+        .ok()
+        .and_then(|value| value.parse().ok())
+        .filter(|value: &usize| *value > 0)
+        .unwrap_or(8);
+    let horizon = std::env::var("V7_ROLLOUT_HORIZON")
+        .ok()
+        .and_then(|value| value.parse().ok())
+        .filter(|value: &u8| *value > 0)
+        .unwrap_or(1);
+    let values = crate::bot::rollout::price_main_actions(gs, me, actions, simulations, horizon);
     let (index, _) = values
         .iter()
         .enumerate()
@@ -505,6 +541,10 @@ pub fn score_actions(gs: &GameState, actions: &[Action], me: u8) -> Vec<(f64, St
             scores.push((f64::NEG_INFINITY, "execution-error".into()));
             continue;
         }
+        let immediate = {
+            crate::turn::TurnEngine::check_victory_condition(&mut sim);
+            terminal_win(&sim, me)
+        };
         let mut search = Search {
             base: base.clone(),
             opponent: opponent.clone(),
@@ -513,7 +553,11 @@ pub fn score_actions(gs: &GameState, actions: &[Action], me: u8) -> Vec<(f64, St
             deploy: action.action_type == ActionType::PlayMemberToStage,
             nodes: 0,
         };
-        let (mut score, depth, status) = search.complete(&sim, 0);
+        let (mut score, depth, status) = if immediate {
+            (10000.0, 0, "terminal-win")
+        } else {
+            search.complete(&sim, 0)
+        };
         // D1 baton vision: DETECT for logging/[BATON] marks, but do NOT add a
         // flat bonus. MEASURED 2026-09-23 (seed 11, 3000×2): +45 → 39.5% vs
         // v6 (folds 3.7%); +12 with ammo-guard → 50.5%; flat 0 → baseline.
@@ -531,15 +575,7 @@ pub fn score_actions(gs: &GameState, actions: &[Action], me: u8) -> Vec<(f64, St
         );
         if std::env::var_os("V7_DEBUG").is_some() {
             let (_, blades, cost) = board(&root, me);
-            let card = action
-                .parameters
-                .as_ref()
-                .and_then(|p| {
-                    p.card_id
-                        .map(|id| id.to_string())
-                        .or_else(|| p.card_no.clone())
-                })
-                .unwrap_or_else(|| "-".into());
+            let card = action_card_label(gs, action);
             let area = action
                 .parameters
                 .as_ref()
@@ -563,12 +599,7 @@ pub fn score_actions(gs: &GameState, actions: &[Action], me: u8) -> Vec<(f64, St
         let best = pick_best(gs, me, actions, &scores);
         let chosen = actions.get(best);
         let card = chosen
-            .and_then(|a| a.parameters.as_ref())
-            .and_then(|p| {
-                p.card_id
-                    .map(|id| id.to_string())
-                    .or_else(|| p.card_no.clone())
-            })
+            .map(|a| action_card_label(gs, a))
             .unwrap_or_else(|| "-".into());
         eprintln!(
             "V7CH t={} me={} act={} card={} score={:.2} note={}",
@@ -589,16 +620,54 @@ pub fn score_actions(gs: &GameState, actions: &[Action], me: u8) -> Vec<(f64, St
 pub fn choose_action(gs: &GameState, actions: &[Action], me: u8) -> Action {
     let scores = score_actions(gs, actions, me);
     let best = pick_best(gs, me, actions, &scores);
-    let mut chosen = actions.get(best).cloned().unwrap_or(Action {
+    let chosen = actions.get(best).cloned().unwrap_or(Action {
         action_type: ActionType::Pass,
         description: "pass".into(),
         description_ja: None,
         parameters: None,
         selected: None,
     });
-    if std::env::var_os("V7_ROLLOUT_POLICY").is_some() {
-        if let Some(suggested) = rollout_suggestion(gs, actions, me) {
-            chosen = suggested;
+    if std::env::var_os("V7_ROLLOUT_ANALYZE").is_some() {
+        let simulations = std::env::var("V7_ROLLOUT_SIMS")
+            .ok()
+            .and_then(|value| value.parse().ok())
+            .filter(|value: &usize| *value > 0)
+            .unwrap_or(100);
+        let horizons = [1u8, 2, 3, 5, 10];
+        let values = crate::bot::rollout::price_main_actions_at_horizons(
+            gs,
+            me,
+            actions,
+            simulations,
+            &horizons,
+        );
+        for (horizon_index, horizon) in horizons.iter().enumerate() {
+            let (best, _) = values[horizon_index]
+                .iter()
+                .enumerate()
+                .max_by(|(_, left), (_, right)| left.total_cmp(right))
+                .unwrap_or((0, &0.0));
+            let best_card = actions
+                .get(best)
+                .and_then(|a| a.parameters.as_ref())
+                .and_then(|p| {
+                    p.card_id
+                        .map(|id| id.to_string())
+                        .or_else(|| p.card_no.clone())
+                })
+                .unwrap_or_else(|| "-".into());
+            eprintln!(
+                "V7HORIZON t={} me{} horizon={} best={} card={} value={:.2}",
+                gs.turn_number,
+                me,
+                horizon,
+                actions
+                    .get(best)
+                    .map(|a| a.action_type)
+                    .unwrap_or(ActionType::Pass),
+                best_card,
+                values[horizon_index][best]
+            );
         }
     }
     if std::env::var_os("V7_ROLLOUT_COMPARE").is_some() {

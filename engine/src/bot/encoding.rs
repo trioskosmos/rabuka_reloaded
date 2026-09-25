@@ -399,6 +399,7 @@ pub fn action_type_index(t: &crate::game_setup::ActionType) -> u8 {
         ActionType::ChoicePosition => 22,
         ActionType::EnergyCharge => 23,
         ActionType::PassRemaining => 24,
+        ActionType::Concede | ActionType::DrawCard => 0,
     }
 }
 

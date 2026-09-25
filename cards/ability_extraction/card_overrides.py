@@ -9,9 +9,10 @@ parser.py. Each override is an entry in OVERRIDES with:
   ab_index   optional "(ab#N)" filter applied together with `cards`
   text_any   all of these substrings must appear in triggerless_text
   pred       optional extra predicate(ability) -> bool
-  apply      fn(ability, ctx) -> bool  (ctx has triggerless_text/fix_stats)
+   apply      fn(ability, ctx) -> bool  (ctx has triggerless_text)
 
-apply_card_overrides(data, fix_stats) runs every override over
+apply_card_overrides(data) runs every override over
+
 data["unique_abilities"] in one pass. Add new card-specific fixes here,
 never in parser.py.
 """
@@ -100,7 +101,6 @@ def _apply_mari_gain_ability(ability, ctx):
                     fixed["condition"] = tc
                     break
     ability["effect"] = fixed
-    ctx["fix_stats"]["leak"] = ctx["fix_stats"].get("leak", 0) + 1
     # Re-run enrichment: gained_effect from ability_gain text
     if "gained_effect" not in fixed and fixed.get("ability_gain"):
         clean_gain = re.sub(r"【[^】]+】", "", fixed["ability_gain"]).strip()
@@ -128,20 +128,15 @@ OVERRIDES: list = [
 ]
 
 
-def apply_card_overrides(data: Dict[str, Any], fix_stats: Dict[str, int]) -> None:
+def apply_card_overrides(data: Dict[str, Any]) -> None:
     """Run every card-specific override over all unique abilities."""
     for ability in data.get("unique_abilities", []):
         ctx = {
             "triggerless_text": ability.get("triggerless_text", ""),
-            "fix_stats": fix_stats,
         }
         for ov in OVERRIDES:
             if not _cards_match(ability, ov["cards"], ov.get("ab_index")):
                 continue
             if ov.get("text_any") and not _text_match(ability, ov["text_any"]):
                 continue
-            if ov.get("pred")(ability, ctx):
-                fix_stats.setdefault("overrides", {})
-                fix_stats["overrides"][ov["name"]] = (
-                    fix_stats["overrides"].get(ov["name"], 0) + 1
-                )
+            ov.get("pred")(ability, ctx)

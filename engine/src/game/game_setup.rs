@@ -546,7 +546,13 @@ pub fn execute_action(gs: &mut GameState, action: &Action) -> Result<(), String>
         use_baton_touch,
         ability_index,
     );
-    if result.is_ok() && !gs.has_pending_choice() {
+    if result.is_ok()
+        && !gs.has_pending_choice()
+        && !matches!(
+            action.action_type,
+            ActionType::RockChoice | ActionType::PaperChoice | ActionType::ScissorsChoice
+        )
+    {
         gs.record_action_boundary(action.action_type);
     }
     result

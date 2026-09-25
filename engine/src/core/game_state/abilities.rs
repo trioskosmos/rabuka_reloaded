@@ -3136,6 +3136,8 @@ impl GameState {
         self.mods.orientation_modifiers.len().hash(&mut hasher);
         self.prohibition_effects.len().hash(&mut hasher);
         self.temporary_effects.len().hash(&mut hasher);
+        self.mulligan_selected_indices.hash(&mut hasher);
+        self.live_card_selected_indices.hash(&mut hasher);
         self.rps_winner.hash(&mut hasher);
         hasher.finish()
     }
