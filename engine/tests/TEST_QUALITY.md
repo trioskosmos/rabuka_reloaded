@@ -12,8 +12,8 @@ _test never asserts (smoke at best — cannot pin behavior)_
 
 | file | test | line | detail |
 | --- | --- | --- | --- |
-| `engine/tests/test_modules/effects/score/chika_bp3_001_wait_self_activation_live_total_score_test.rs` | `wait_member_total_score_expires_at_live_end_even_without_setting_live` | 110 |  |
-| `engine/tests/test_modules/effects/score/chika_bp3_001_wait_self_activation_live_total_score_test.rs` | `wait_member_total_score_persists_through_victory_and_expires_after_live` | 105 |  |
+| `engine/tests/test_modules/effects/score/live_total/chika_bp3_001_wait_self_activation_live_total_score_test.rs` | `wait_member_total_score_expires_at_live_end_even_without_setting_live` | 110 |  |
+| `engine/tests/test_modules/effects/score/live_total/chika_bp3_001_wait_self_activation_live_total_score_test.rs` | `wait_member_total_score_persists_through_victory_and_expires_after_live` | 105 |  |
 
 ## no_drive (16)
 
@@ -29,14 +29,14 @@ _trigger-context test that mutates state and asserts but never drives the engine
 | `engine/tests/test_modules/effects/look_select/niche_filters/all_or_any_three_heart_member_search_test.rs` | `one_of_three_required_hearts_member_is_discarded` | 137 |  |
 | `engine/tests/test_modules/effects/look_select/niche_filters/all_or_any_three_heart_member_search_test.rs` | `two_of_three_required_hearts_member_is_discarded` | 109 |  |
 | `engine/tests/test_modules/effects/look_select/pin_top/per_group_member_look_pin_reveal_score_test.rs` | `look_per_group_member_discards_remainder_without_score_for_member_reveal` | 4 |  |
-| `engine/tests/test_modules/jidou/debut_watch/baton_arrival_self_budget_gates_pl_n_pr_025_pr_test.rs` | `setsuna_self_baton_arrival_draws_one` | 45 |  |
-| `engine/tests/test_modules/jidou/debut_watch/other_baton_arrival_draw_test.rs` | `other_member_baton_arrival_draws_one_card` | 5 |  |
-| `engine/tests/test_modules/jidou/leaves_stage/baton_replacement_auto_effects_test.rs` | `group_baton_replacement_places_energy_under_arriving_member` | 175 |  |
-| `engine/tests/test_modules/jidou/leaves_stage/baton_replacement_auto_effects_test.rs` | `other_member_stage_to_waitroom_does_not_trigger_self_live_recovery` | 43 |  |
-| `engine/tests/test_modules/jidou/leaves_stage/baton_replacement_auto_effects_test.rs` | `self_stage_to_waitroom_draw_two_discard_one_leaves_one_card_in_hand` | 68 |  |
-| `engine/tests/test_modules/jidou/leaves_stage/baton_replacement_auto_effects_test.rs` | `self_stage_to_waitroom_look_five_adds_live_to_hand` | 128 |  |
-| `engine/tests/test_modules/jidou/leaves_stage/baton_replacement_auto_effects_test.rs` | `self_stage_to_waitroom_optional_discard_grants_member_heart05_and_blade` | 151 |  |
-| `engine/tests/test_modules/jidou/leaves_stage/baton_replacement_auto_effects_test.rs` | `self_stage_to_waitroom_recovers_group_live` | 21 |  |
+| `engine/tests/test_modules/jidou/debut_watch/baton_touch_arrival_self_or_other_draws_one_twice_per_turn_test.rs` | `setsuna_self_baton_arrival_draws_one` | 45 |  |
+| `engine/tests/test_modules/jidou/debut_watch/other_member_baton_arrival_draws_one_test.rs` | `other_member_baton_arrival_draws_one_card` | 5 |  |
+| `engine/tests/test_modules/jidou/leaves_stage/self_stage_to_waitroom_recovery_and_group_baton_replacement_test.rs` | `group_baton_replacement_places_energy_under_arriving_member` | 175 |  |
+| `engine/tests/test_modules/jidou/leaves_stage/self_stage_to_waitroom_recovery_and_group_baton_replacement_test.rs` | `other_member_stage_to_waitroom_does_not_trigger_self_live_recovery` | 43 |  |
+| `engine/tests/test_modules/jidou/leaves_stage/self_stage_to_waitroom_recovery_and_group_baton_replacement_test.rs` | `self_stage_to_waitroom_draw_two_discard_one_leaves_one_card_in_hand` | 68 |  |
+| `engine/tests/test_modules/jidou/leaves_stage/self_stage_to_waitroom_recovery_and_group_baton_replacement_test.rs` | `self_stage_to_waitroom_look_five_adds_live_to_hand` | 128 |  |
+| `engine/tests/test_modules/jidou/leaves_stage/self_stage_to_waitroom_recovery_and_group_baton_replacement_test.rs` | `self_stage_to_waitroom_optional_discard_grants_member_heart05_and_blade` | 151 |  |
+| `engine/tests/test_modules/jidou/leaves_stage/self_stage_to_waitroom_recovery_and_group_baton_replacement_test.rs` | `self_stage_to_waitroom_recovers_group_live` | 21 |  |
 
 ## synthetic_only (0)
 
@@ -75,16 +75,16 @@ _confusable card numbers (bp2 vs pb2) staged in one file — human review for wr
 | `engine/tests/test_modules/effects/position/area_move/position_change_multi_test.rs` | `<file>` | 1 | PL!HS-bp2-006-R, PL!HS-pb1-006-R |
 | `engine/tests/test_modules/effects/position/area_move/position_change_non_optional_test.rs` | `<file>` | 1 | PL!HS-bp2-006-R, PL!HS-pb1-006-R |
 | `engine/tests/test_modules/effects/recover/to_hand/deep_resonance_bp3_test.rs` | `<file>` | 1 | PL!S-bp2-001-R, PL!S-pb1-001-R |
-| `engine/tests/test_modules/effects/score/aurora_flower_identity_test.rs` | `<file>` | 1 | PL!HS-bp1-021-L, PL!HS-bp2-021-L |
-| `engine/tests/test_modules/effects/score/note_mermaid_distinct_kaleidoscore_test.rs` | `<file>` | 1 | PL!SP-bp1-013-PR, PL!SP-pb1-013-PR |
-| `engine/tests/test_modules/effects/score/success_count_revealed_score_live_pl_sp_bp5_023_l_test.rs` | `<file>` | 1 | PL!SP-bp1-023-L, PL!SP-bp5-023-L |
+| `engine/tests/test_modules/effects/score/card_score/live_start_two_distinct_group_members_live_score_test.rs` | `<file>` | 1 | PL!SP-bp1-013-PR, PL!SP-pb1-013-PR |
+| `engine/tests/test_modules/effects/score/card_score/success_count_revealed_score_live_pl_sp_bp5_023_l_test.rs` | `<file>` | 1 | PL!SP-bp1-023-L, PL!SP-bp5-023-L |
+| `engine/tests/test_modules/effects/score/per_card/aurora_flower_set_card_identity_group_match_test.rs` | `<file>` | 1 | PL!HS-bp1-021-L, PL!HS-bp2-021-L |
 | `engine/tests/test_modules/effects/state/per_card/either_or_state_change_test.rs` | `<file>` | 1 | PL!N-bp4-008-R, PL!N-pb1-008-R |
-| `engine/tests/test_modules/integration/gameplay_test.rs` | `<file>` | 1 | PL!S-bp2-009-R, PL!S-bp5-009-R |
-| `engine/tests/test_modules/integration/integration_blindspot_test.rs` | `<file>` | 1 | PL!HS-bp5-004-R, PL!HS-bp6-004-R |
-| `engine/tests/test_modules/jidou/movement/ability_chain_combo_test.rs` | `<file>` | 1 | PL!SP-pb1-006-R, PL!SP-pb2-006-R |
-| `engine/tests/test_modules/jidou/movement/appearance_and_repeated_swaps_stack_blades_test.rs` | `<file>` | 1 | PL!SP-bp5-006-R, PL!SP-pb1-006-R |
-| `engine/tests/test_modules/jidou/movement/debut_or_self_area_move_gain_two_blades_q94_q171_test.rs` | `<file>` | 1 | PL!SP-bp5-006-R, PL!SP-pb1-006-R |
-| `engine/tests/test_modules/jidou/movement/live_success_or_self_move_place_discard_group_member_under_self_test.rs` | `<file>` | 1 | PL!SP-bp5-006-R, PL!SP-pb2-006-R |
-| `engine/tests/test_modules/jidou/movement/pb2_under_member_test.rs` | `<file>` | 1 | PL!SP-pb1-006-R, PL!SP-pb2-006-R |
+| `engine/tests/test_modules/integration/full_round/real_card_phase_walkthrough_and_ability_suite_test.rs` | `<file>` | 1 | PL!S-bp2-009-R, PL!S-bp5-009-R |
+| `engine/tests/test_modules/integration/per_card/live_end_expiry_rollover_and_dual_trigger_window_gates_test.rs` | `<file>` | 1 | PL!HS-bp5-004-R, PL!HS-bp6-004-R |
+| `engine/tests/test_modules/jidou/movement/ability_chain_combo/ability_chain_combo_test.rs` | `<file>` | 1 | PL!SP-pb1-006-R, PL!SP-pb2-006-R |
+| `engine/tests/test_modules/jidou/movement/self_area_move_watch/appearance_and_repeated_swaps_stack_blades_test.rs` | `<file>` | 1 | PL!SP-bp5-006-R, PL!SP-pb1-006-R |
+| `engine/tests/test_modules/jidou/movement/self_area_move_watch/debut_or_self_area_move_gain_two_blades_q94_q171_test.rs` | `<file>` | 1 | PL!SP-bp5-006-R, PL!SP-pb1-006-R |
+| `engine/tests/test_modules/jidou/movement/under_member_placement/live_success_or_self_move_place_discard_group_member_under_self_test.rs` | `<file>` | 1 | PL!SP-bp5-006-R, PL!SP-pb2-006-R |
+| `engine/tests/test_modules/jidou/movement/under_member_placement/under_member_counted_for_both_players_test.rs` | `<file>` | 1 | PL!SP-pb1-006-R, PL!SP-pb2-006-R |
 | `engine/tests/test_modules/rules/conditions/restriction_mechanics_test.rs` | `<file>` | 1 | PL!S-bp5-009-R, PL!S-bp7-009-R |
 | `engine/tests/test_modules/rules/trigger_paths/combined_ability_chain_test.rs` | `<file>` | 1 | PL!S-bp2-019-L, PL!S-bp3-019-L |

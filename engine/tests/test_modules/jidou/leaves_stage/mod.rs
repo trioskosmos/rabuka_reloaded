@@ -2,11 +2,11 @@
 // Regenerated from the directory listing at compile time.
 pub mod baton_displaced_self_placed_under_arriver_test;
 pub mod baton_displaced_under_arriver_grants_host_blade_test;
-pub mod baton_replacement_auto_effects_test;
-pub mod hanabiko_discard_test;
-pub mod hs_cl1_003_edge_test;
-pub mod miyashita_ai_bp5_test;
+pub mod baton_touch_nijigasaki_partner_cost_gate_energizes_and_draws_test;
+pub mod debut_heart02_threshold_five_grants_opponent_global_heart_test;
+pub mod live_success_heart05_threshold_and_no_surplus_score_plus2_test;
 pub mod optional_any_player_position_change_q238_test;
-pub mod s_bp5_010_global_heart_test;
-pub mod stage_to_discard_ability_test;
-pub mod strawberry_trapper_test;
+pub mod self_discard_optional_hand_discard_recovers_live_and_member_test;
+pub mod self_stage_to_waitroom_recovery_and_group_baton_replacement_test;
+pub mod self_wait_cost_then_choose_mirakura_member_gains_blade_test;
+pub mod stage_to_discard_watcher_requires_actual_stage_leaving_move_test;

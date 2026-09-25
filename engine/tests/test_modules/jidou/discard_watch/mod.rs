@@ -2,9 +2,9 @@
 // Regenerated from the directory listing at compile time.
 pub mod deck_to_discard_optional_hand_discard_recover_self_test;
 pub mod deck_to_discard_self_recovery_yell_refresh_q269_q277_test;
-pub mod hanamusubi_test;
 pub mod hand_discard_batch_heart_blade_q241_test;
 pub mod live_discard_optional_deck_top_bottom_q252_test;
-pub mod on_hand_to_discard_test;
+pub mod live_start_heart_requirement_reduction_counts_live_slot_cards_only_test;
+pub mod on_hand_to_discard_each_time_gain_heart01_and_blade_test;
 pub mod own_live_zone_discard_group_live_optional_deck_top_bottom_q252_test;
 pub mod real_mill_optional_discard_recover_self_test;
