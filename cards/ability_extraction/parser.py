@@ -7499,87 +7499,80 @@ def _try_opponent_action(text):
     return oa
 
 
-def _try_choose_self_opponent(text):
-    """自分か相手を選ぶ。— choose self or opponent, then execute effect on chosen player."""
-    if not text.startswith("自分か相手を選ぶ。"):
-        return None
-    rest = text[len("自分か相手を選ぶ。") :].strip()
-    inner = parse_effect(rest)
-    # The text says "自分は..." (I/active player does the selection), so action_by=self
-    # regardless of whether target is self or opponent
+def _set_choose_self_opponent(text, result):
+    inner = parse_effect(text[len("自分か相手を選ぶ。") :].strip())
     if isinstance(inner, dict):
         inner["action_by"] = "self"
-    return {
-        "text": text,
-        "action": "choose_target_player",
-        "choice_options": ["自分", "相手"],
-        "effect_steps": [inner],
-    }
+    result["choice_options"] = ["自分", "相手"]
+    result["effect_steps"] = [inner]
 
 
-def _try_opponent_after_conditional(text):
-    """、相手は、 — opponent action after conditional marker."""
+_try_choose_self_opponent = EffectPattern(
+    match="自分か相手を選ぶ。",
+    action="choose_target_player",
+    setter=_set_choose_self_opponent,
+)
+
+
+def _matches_opponent_after_conditional(text):
     if "、相手は" not in text:
-        return None
+        return False
     parts = text.split("、相手は、", SPLIT_LIMIT)
-    if len(parts) != 2:
-        return None
-    first = parts[0].strip()
-    opp = "相手は、" + parts[1]
-    om = re.match(r"相手は、(.+?)。", opp)
-    if not om:
-        return None
-    fa = parse_action(first.replace("そうした場合、", "").strip())
-    rest = opp[len(om.group(0)) :].strip()
-    oa = parse_action(om.group(1).strip())
-    # "相手は..." means opponent makes the choice
-    if isinstance(oa, dict):
-        oa["action_by"] = "opponent"
-    result = {
-        "text": text,
-        "action": "sequential",
-        "actions": [fa, oa],
-        "conditional": True,
-    }
+    return len(parts) == 2 and re.match(r"相手は、(.+?)。", "相手は、" + parts[1])
+
+
+def _set_opponent_after_conditional(text, result):
+    first, second = text.split("、相手は、", SPLIT_LIMIT)
+    opponent_text = "相手は、" + second
+    match = re.match(r"相手は、(.+?)。", opponent_text)
+    first_action = parse_action(first.replace("そうした場合、", "").strip())
+    opponent_action = parse_action(match.group(1).strip())
+    opponent_action["action_by"] = "opponent"
+    actions = [first_action, opponent_action]
+    rest = opponent_text[len(match.group(0)) :].strip()
     if rest:
-        result["actions"].append(parse_action(rest))
-    return result if result["actions"] else None
+        actions.append(parse_action(rest))
+    result["actions"] = actions
+    result["conditional"] = True
 
 
-def _try_kore_niyori_case(text):
-    """これにより～の場合、～。～以外の場合、～ — conditional alternative with card type.
-    MUST precede その中から since the regex for "これにより～の場合" would
-    be consumed by the "その中から" text split logic."""
-    if "これにより" not in text or "の場合" not in text or "以外の場合" not in text:
-        return None
-    parts = text.split("以外の場合", 1)
-    if len(parts) != 2:
-        return None
-    first, second = parts[0].strip(), parts[1].strip()
-    if "場合、" not in first:
-        return None
-    cp, ap = first.split("場合、", 1)
-    cond_text = "これにより" + cp.replace("これにより", "").strip() + "場合"
-    action_text = re.sub(r"『.+』のカード$", "", ap.strip()).strip()
-    fe = parse_effect(action_text)
-    se = parse_effect(second.lstrip("、。").strip())
-    condition = parse_condition(cond_text)
-    # The "これにより" refers to the card just moved by the preceding cost
-    # (discard from hand). Check it via preceding_moved, not the discard pile.
+_try_opponent_after_conditional = EffectPattern(
+    condition=_matches_opponent_after_conditional,
+    action="sequential",
+    setter=_set_opponent_after_conditional,
+)
+
+
+def _set_kore_niyori_case(text, result):
+    first, second = text.split("以外の場合", 1)
+    condition_part, action_part = first.strip().split("場合、", 1)
+    condition_text = "これにより" + condition_part.replace("これにより", "").strip() + "場合"
+    primary_text = re.sub(r"『.+』のカード$", "", action_part.strip()).strip()
+    condition = parse_condition(condition_text)
     if condition and condition.get("location") == "discard":
         condition["source"] = "preceding_moved"
         condition.pop("location", None)
-        # Branch logic: TRUE → alternative_effect, FALSE → primary_effect.
-        # The primary_effect is the named/gated case (μ's), so negate so
-        # that μ's → FALSE → primary, non-μ's → TRUE → alternative.
         condition["negation"] = True
-    return {
-        "text": text,
-        "action": "conditional_alternative",
-        "condition": condition,
-        "primary_effect": fe,
-        "alternative_effect": se,
-    }
+    result["condition"] = condition
+    result["primary_effect"] = parse_effect(primary_text)
+    result["alternative_effect"] = parse_effect(second.lstrip("、。").strip())
+
+
+def _matches_kore_niyori_case(text):
+    return (
+        "これにより" in text
+        and "の場合" in text
+        and "以外の場合" in text
+        and len(text.split("以外の場合", 1)) == 2
+        and "場合、" in text.split("以外の場合", 1)[0]
+    )
+
+
+_try_kore_niyori_case = EffectPattern(
+    condition=_matches_kore_niyori_case,
+    action="conditional_alternative",
+    setter=_set_kore_niyori_case,
+)
 
 
 def _apply_card_property_filter(d, text):
@@ -8221,55 +8214,49 @@ def _try_look_and_select(text):
     return result
 
 
-def _try_reveal_until_chosen_card(text):
-    """ライブカードか...メンバーカードのどちらか1つを選ぶ — type choice + reveal until match."""
-    # Pattern: "ライブカードか" + optional "コストN以上の" + "メンバーカードのどちらか1つを選ぶ"
-    if (
-        "ライブカードか" in text
-        and "メンバーカードのどちらか" in text
-        and "選んだカードが公開されるまで" in text
-    ):
-        cost_limit = None
-        m = re.search(r"コスト(\d+)以上", text)
-        if m:
-            cost_limit = int(m.group(1))
-        action = {
-            "text": text,
-            "action": "sequential",
-            "actions": [
-                {
-                    "action": "select",
-                    "or_card_types": ["live_card", "member_card"],
-                    "count": 1,
-                    "all": False,
-                },
-                {
-                    "action": "reveal",
-                    "source": "deck_top",
-                    "count": 1,
-                    "multiple_targets": True,
-                    "all": False,
-                },
-                {
-                    "action": "move_cards",
-                    "source": "looked_at",
-                    "destination": "hand",
-                    "count": 1,
-                    "all": False,
-                },
-                {
-                    "action": "move_cards",
-                    "source": "looked_at_remaining",
-                    "destination": "discard",
-                    "all": True,
-                },
-            ],
-        }
-        if cost_limit is not None:
-            action["actions"][0]["cost_limit"] = cost_limit
-            action["actions"][0]["cost_limit_operator"] = ">="
-        return action
-    return None
+def _set_reveal_until_chosen_card(text, result):
+    cost_match = re.search(r"コスト(\d+)以上", text)
+    first = {
+        "action": "select",
+        "or_card_types": ["live_card", "member_card"],
+        "count": 1,
+        "all": False,
+    }
+    if cost_match:
+        first["cost_limit"] = int(cost_match.group(1))
+        first["cost_limit_operator"] = ">="
+    result["actions"] = [
+        first,
+        {
+            "action": "reveal",
+            "source": "deck_top",
+            "count": 1,
+            "multiple_targets": True,
+            "all": False,
+        },
+        {
+            "action": "move_cards",
+            "source": "looked_at",
+            "destination": "hand",
+            "count": 1,
+            "all": False,
+        },
+        {
+            "action": "move_cards",
+            "source": "looked_at_remaining",
+            "destination": "discard",
+            "all": True,
+        },
+    ]
+
+
+_try_reveal_until_chosen_card = EffectPattern(
+    condition=lambda t: "ライブカードか" in t
+    and "メンバーカードのどちらか" in t
+    and "選んだカードが公開されるまで" in t,
+    action="sequential",
+    setter=_set_reveal_until_chosen_card,
+)
 
 
 def _try_self_and_other(text):
@@ -8339,77 +8326,87 @@ def _try_self_and_other(text):
     return result
 
 
-def _try_reveal_until_live(text):
-    """ライブカードが公開されるまで — reveal deck until live card found."""
-    if "ライブカードが公開されるまで" not in text:
-        return None
-    return {
-        "text": text,
-        "action": "sequential",
-        "actions": [
-            {
-                "action": "reveal_until_live_card",
-                "source": "deck_top",
-                "target": "self",
-            },
-            {
-                "action": "move_cards",
-                "source": "looked_at",
-                "destination": "hand",
-                "card_type": "live_card",
-                "count": 1,
-                "text": "そのライブカードを手札に加え",
-            },
-            {
-                "action": "move_cards",
-                "source": "looked_at_remaining",
-                "destination": "discard",
-                "all": True,
-                "text": "これにより公開されたほかのすべてのカードを控え室に置く",
-            },
-        ],
-    }
+def _set_reveal_until_live(text, result):
+    result["actions"] = [
+        {
+            "action": "reveal_until_live_card",
+            "source": "deck_top",
+            "target": "self",
+        },
+        {
+            "action": "move_cards",
+            "source": "looked_at",
+            "destination": "hand",
+            "card_type": "live_card",
+            "count": 1,
+            "text": "そのライブカードを手札に加え",
+        },
+        {
+            "action": "move_cards",
+            "source": "looked_at_remaining",
+            "destination": "discard",
+            "all": True,
+            "text": "これにより公開されたほかのすべてのカードを控え室に置く",
+        },
+    ]
 
 
-def _try_furthermore(text):
-    """さらに — sequential conditional effects with "furthermore"."""
-    if "さらに" not in text:
-        return None
-    parts = _split_sentences_nesting(text)
-    if len(parts) < 2:
-        return None
-    if not any("さらに" in p for p in parts[1:]):
-        return None
+_try_reveal_until_live = EffectPattern(
+    match="ライブカードが公開されるまで",
+    action="sequential",
+    setter=_set_reveal_until_live,
+)
+
+
+def _set_furthermore(text, result):
     actions = []
-    for p in parts:
-        pt = p.strip()
-        if not pt:
+    for part in _split_sentences_nesting(text):
+        part = part.strip()
+        if not part:
             continue
-        if "さらに" in pt:
-            pt = pt.replace("さらに", "", 1).strip()
-        actions.append(parse_effect(pt))
-    if actions and any(a.get("action") or a.get("actions") for a in actions):
-        return {"text": text, "action": "sequential", "actions": actions}
-    return None
+        if "さらに" in part:
+            part = part.replace("さらに", "", 1).strip()
+        actions.append(parse_effect(part))
+    result["actions"] = actions
 
 
-def _try_sequential_duration(text):
-    """その後、～かぎり、 — sequential with duration condition."""
-    if "その後、" not in text or "かぎり、" not in text:
-        return None
-    parts = text.split("その後、", SPLIT_LIMIT)
-    if len(parts) != 2:
-        return None
-    fa = parse_action(parts[0].strip())
-    second = parts[1].strip()
-    if "かぎり、" not in second:
-        return None
-    cp = second.split("かぎり、", 1)
-    cond = parse_condition(cp[0].strip())
-    sa = parse_action(cp[1].strip())
-    sa["condition"] = cond
-    sa["duration"] = "unless"
-    return {"text": text, "action": "sequential", "actions": [fa, sa]}
+def _matches_furthermore(text):
+    parts = _split_sentences_nesting(text)
+    return "さらに" in text and len(parts) >= 2 and any(
+        "さらに" in part for part in parts[1:]
+    )
+
+
+_try_furthermore = EffectPattern(
+    condition=_matches_furthermore,
+    action="sequential",
+    setter=_set_furthermore,
+)
+
+
+def _matches_sequential_duration(text):
+    return (
+        "その後、" in text
+        and "かぎり、" in text
+        and len(text.split("その後、", SPLIT_LIMIT)) == 2
+        and "かぎり、" in text.split("その後、", SPLIT_LIMIT)[1]
+    )
+
+
+def _set_sequential_duration(text, result):
+    first, second = text.split("その後、", SPLIT_LIMIT)
+    condition_text, action_text = second.strip().split("かぎり、", 1)
+    second_action = parse_action(action_text.strip())
+    second_action["condition"] = parse_condition(condition_text.strip())
+    second_action["duration"] = "unless"
+    result["actions"] = [parse_action(first.strip()), second_action]
+
+
+_try_sequential_duration = EffectPattern(
+    condition=_matches_sequential_duration,
+    action="sequential",
+    setter=_set_sequential_duration,
+)
 
 
 def _try_compound_select(text):
@@ -8828,25 +8825,34 @@ def _try_choice(text):
     return result
 
 
-def _try_kore_niyori_cascade(text):
-    """これにより cascading: [actions]。[actions]。これにより[cond]場合、[result]."""
-    m = re.search(r"^(.*?)。これにより(.+?)場合、(.+)$", text, re.DOTALL)
-    if not m:
-        return None
+def _set_kore_niyori_cascade(text, result):
+    match = re.search(r"^(.*?)。これにより(.+?)場合、(.+)$", text, re.DOTALL)
+    if not match:
+        return
     action_text, cond_text, result_text = (
-        m.group(1).strip(),
-        m.group(2).strip(),
-        m.group(3).strip(),
+        match.group(1).strip(),
+        match.group(2).strip(),
+        match.group(3).strip(),
     )
-    acts = [parse_action(p) for p in action_text.split("。") if p.strip()]
-    if not acts:
-        return None
-    cp = parse_condition(cond_text + "場合")
-    rp = parse_effect(result_text)
-    follow = {"condition": cp}
-    follow.update(rp)
-    acts.append(follow)
-    return {"text": text, "action": "sequential", "actions": acts}
+    actions = [parse_action(part) for part in action_text.split("。") if part.strip()]
+    if not actions:
+        return
+    follow = {"condition": parse_condition(cond_text + "場合")}
+    follow.update(parse_effect(result_text))
+    actions.append(follow)
+    result["actions"] = actions
+
+
+def _matches_kore_niyori_cascade(text):
+    match = re.search(r"^(.*?)。これにより(.+?)場合、(.+)$", text, re.DOTALL)
+    return bool(match and any(part.strip() for part in match.group(1).split("。")))
+
+
+_try_kore_niyori_cascade = EffectPattern(
+    condition=_matches_kore_niyori_cascade,
+    action="sequential",
+    setter=_set_kore_niyori_cascade,
+)
 
 
 def _try_period_conditional(text):
@@ -9279,22 +9285,29 @@ def _try_kore_niyori_result(text):
     }
 
 
-def _try_sou_shinakatta(text):
-    """そうしなかった場合 — conditional on optional action NOT taken."""
-    if "そうしなかった場合" not in text:
-        return None
+def _set_sou_shinakatta(text, result):
     parts = _split_marker_depth0(text, "そうしなかった場合")
     if parts is None:
-        return None
-    opt_text = parts[0].strip()
-    fa = parse_action(opt_text)
-    # If optional action starts with "相手は" (opponent does X), set target to opponent
-    if opt_text.startswith("相手は"):
-        fa["target"] = "opponent"
-    aa_text = parts[1].strip().lstrip("、")
-    # The alternative action text may include duration prefixes
-    aa = parse_effect(aa_text)
-    return make_conditional_on_optional(text, fa, aa, negation=True)
+        return
+    optional_text = parts[0].strip()
+    first = parse_action(optional_text)
+    if optional_text.startswith("相手は"):
+        first["target"] = "opponent"
+    alternative = parse_effect(parts[1].strip().lstrip("、"))
+    result.update(make_conditional_on_optional(text, first, alternative, negation=True))
+
+
+def _matches_sou_shinakatta(text):
+    return "そうしなかった場合" in text and _split_marker_depth0(
+        text, "そうしなかった場合"
+    ) is not None
+
+
+_try_sou_shinakatta = EffectPattern(
+    condition=_matches_sou_shinakatta,
+    action="conditional_on_optional",
+    setter=_set_sou_shinakatta,
+)
 
 
 def _try_unless_effect(text):
@@ -9355,48 +9368,59 @@ def _try_unless_effect(text):
     return None
 
 
-def _try_shi_sequential(text):
-    """Aし、B — multiple actions joined by te-form."""
-    if "し、" not in text:
-        return None
-    # If choice marker is present, let _try_choice handle the text
-    if CHOICE_MARKER in text:
-        return None
-    # If condition markers are present, let _try_conditional handle the text
-    if any(m in text for m in CONDITION_MARKERS):
-        return None
-    # Split only on "し、" (te-form action boundary), NOT on every comma.
-    # Commas within the second clause (e.g. topic-comment "は、" separators)
-    # should remain intact so parse_effect sees the complete action text.
-    idx = text.find("し、")
-    if idx < 0:
-        return None
-    first = text[: idx + 1]  # include the "し"
-    rest = text[idx + 2 :].strip().lstrip("、")  # everything after "し、"
-    first_a = parse_effect(first)
-    if first_a.get("action", "custom") in ("custom", "do_nothing"):
-        return None
-    second_a = parse_effect(rest)
-    if second_a.get("action", "custom") in ("custom", "do_nothing"):
-        return None
-    return {"text": text, "action": "sequential", "actions": [first_a, second_a]}
+def _matches_shi_sequential(text):
+    if "し、" not in text or CHOICE_MARKER in text:
+        return False
+    if any(marker in text for marker in CONDITION_MARKERS):
+        return False
+    index = text.find("し、")
+    if index < 0:
+        return False
+    first = parse_effect(text[: index + 1])
+    second = parse_effect(text[index + 2 :].strip().lstrip("、"))
+    return first.get("action", "custom") not in ("custom", "do_nothing") and second.get(
+        "action", "custom"
+    ) not in ("custom", "do_nothing")
 
 
-def _try_te_sequential(text):
-    """Xを得て、Yを得る — te-form sequential for resource gains (e.g. blade + heart on different targets).
-    Splits 'member A gets resource X, different member B gets resource Y' into sequential actions."""
+def _set_shi_sequential(text, result):
+    index = text.find("し、")
+    result["actions"] = [
+        parse_effect(text[: index + 1]),
+        parse_effect(text[index + 2 :].strip().lstrip("、")),
+    ]
+
+
+_try_shi_sequential = EffectPattern(
+    condition=_matches_shi_sequential,
+    action="sequential",
+    setter=_set_shi_sequential,
+)
+
+
+def _matches_te_sequential(text):
     if "を得て、" not in text or "を得る" not in text:
-        return None
-    parts = text.split("を得て、", 1)
-    if len(parts) != 2:
-        return None
-    left = parts[0].strip() + "を得る"
-    right = parts[1].strip()
-    fa = parse_action(left)
-    sa = parse_action(right)
-    if fa.get("action") != "custom" and sa.get("action") != "custom":
-        return {"text": text, "action": "sequential", "actions": [fa, sa]}
-    return None
+        return False
+    left, right = text.split("を得て、", 1)
+    return (
+        parse_action(left.strip() + "を得る").get("action") != "custom"
+        and parse_action(right.strip()).get("action") != "custom"
+    )
+
+
+def _set_te_sequential(text, result):
+    left, right = text.split("を得て、", 1)
+    result["actions"] = [
+        parse_action(left.strip() + "を得る"),
+        parse_action(right.strip()),
+    ]
+
+
+_try_te_sequential = EffectPattern(
+    condition=_matches_te_sequential,
+    action="sequential",
+    setter=_set_te_sequential,
+)
 
 
 def _set_global_modifier_fields(text, result):
@@ -9539,88 +9563,83 @@ def _set_restriction_fields(text, result):
             result["original_value"] = True
 
 
-def _try_both_discard_until(text):
-    """自分と相手はそれぞれ...枚になるまで手札を控え室に置き, その後..."
-    Both players each discard until condition, then both draw."""
-    if (
-        "自分と相手はそれぞれ" not in text
-        or "枚になるまで" not in text
-        or ("控え室に置き" not in text and "控え室に置く" not in text)
-    ):
-        return None
-    result = {
-        "text": text,
-        "action": "sequential",
+def _set_both_discard_until(text, result):
+    first_text, second_text = re.split(r"その後[、。]?", text, maxsplit=1)
+    first = {
+        "text": first_text.strip(),
+        "action": "discard_until_count",
         "target": "both",
         "multiple_targets": True,
     }
-    # Split on その後
-    parts = re.split(r"その後[、。]?", text, maxsplit=1)
-    if len(parts) == 2:
-        fa_text = parts[0].strip()
-        sa_text = parts[1].strip()
-        fa = {
-            "text": fa_text,
-            "action": "discard_until_count",
-            "target": "both",
-            "multiple_targets": True,
-        }
-        m = re.search(r"(\d+)枚になるまで", fa_text)
-        if m:
-            fa["target_count"] = int(m.group(1))
-        sa = parse_effect(sa_text)
-        result["actions"] = [fa, sa]
-    return result if result.get("actions") else None
+    count_match = re.search(r"(\d+)枚になるまで", first["text"])
+    if count_match:
+        first["target_count"] = int(count_match.group(1))
+    result["target"] = "both"
+    result["multiple_targets"] = True
+    result["actions"] = [first, parse_effect(second_text.strip())]
 
 
-def _try_re_yell(text):
-    """もう一度エールを行う + ブレードハートを失い — re-yell with perform_yell.
-    Handles preceding actions before the re-yell sentence (e.g. optional discard)
-    when the text has a 。 separator.
+def _matches_both_discard_until(text):
+    return (
+        "自分と相手はそれぞれ" in text
+        and "枚になるまで" in text
+        and ("控え室に置き" in text or "控え室に置く" in text)
+        and len(re.split(r"その後[、。]?", text, maxsplit=1)) == 2
+    )
 
-    The preceding action's condition (e.g. ≤2 blade_heart) gates the ENTIRE
-    sequential — not just the first action. It is promoted to the outer level."""
-    if "もう一度エールを行う" not in text or "ブレードハートを失い" not in text:
-        return None
-    promoted_condition = None
+
+_try_both_discard_until = EffectPattern(
+    condition=_matches_both_discard_until,
+    action="sequential",
+    setter=_set_both_discard_until,
+)
+
+
+def _set_re_yell(text, result):
     actions = []
-    # If there are preceding sentences before the re-yell instruction, parse them
+    source_text = text
     if "。" in text:
-        parts = text.rsplit("。", 1)
-        preceding = parts[0].strip()
+        preceding, source_text = text.rsplit("。", 1)
+        preceding = preceding.strip()
         if preceding:
             parsed = parse_effect(preceding)
             if isinstance(parsed, dict):
-                if parsed.get("action") == "sequential":
-                    actions.extend(parsed.get("actions", []))
-                else:
-                    actions.append(parsed)
-        text = parts[1].strip().lstrip("、")
-    # Promote condition from the first action so it gates the entire re-yell sequence
-    if actions:
-        first = actions[0]
-        if "condition" in first and isinstance(first.get("condition"), dict):
-            promoted_condition = first.pop("condition")
-    actions.append(
-        {
-            "text": "ブレードハートを失い",
-            "action": "re_yell",
-            "lose_blade_hearts": True,
-            "target": "self",
-        }
+                actions.extend(
+                    parsed.get("actions", [])
+                    if parsed.get("action") == "sequential"
+                    else [parsed]
+                )
+        source_text = source_text.strip().lstrip("、")
+    promoted_condition = None
+    if actions and isinstance(actions[0].get("condition"), dict):
+        promoted_condition = actions[0].pop("condition")
+    actions.extend(
+        [
+            {
+                "text": "ブレードハートを失い",
+                "action": "re_yell",
+                "lose_blade_hearts": True,
+                "target": "self",
+            },
+            {
+                "text": "もう一度エールを行う",
+                "action": "perform_yell",
+                "count": 1,
+                "target": "self",
+            },
+        ]
     )
-    actions.append(
-        {
-            "text": "もう一度エールを行う",
-            "action": "perform_yell",
-            "count": 1,
-            "target": "self",
-        }
-    )
-    result = {"text": text, "action": "sequential", "actions": actions}
+    result["text"] = source_text
+    result["actions"] = actions
     if promoted_condition:
         result["condition"] = promoted_condition
-    return result
+
+
+_try_re_yell = EffectPattern(
+    condition=lambda t: "もう一度エールを行う" in t and "ブレードハートを失い" in t,
+    action="sequential",
+    setter=_set_re_yell,
+)
 
 
 def _try_heart_choice(text):
@@ -9717,87 +9736,89 @@ def _try_heart_choice(text):
 # ====================================================================
 
 
-def _try_timing_condition_gain(text):
-    """このターン中にエリアを移動した(全ての)メンバーはYを得る — gain with timing_condition."""
-    m = re.search(
+def _set_timing_condition_gain(text, result):
+    match = re.search(
         r"このターン中にエリアを移動した(?:(?:全て|すべて)の)?(?:(.+?)の)?メンバー[は、]+(.+?)を得る",
         text,
     )
-    if not m:
-        return None
-    has_all = bool(re.search(r"このターン中にエリアを移動した(?:全て|すべて)の", text))
-    group_name = m.group(1)
-    resource_text = m.group(2)
+    if not match:
+        return
+    resource_text = match.group(2)
     blade_count = resource_text.count("{{icon_blade.png|ブレード}}")
-    full_resource_text = resource_text + "を得る"
-    if blade_count == 0:
-        return None
-    result = {
-        "text": full_resource_text,
-        "action": "gain_resource",
-        "resource": "blade",
-        "count": blade_count,
-        "card_type": "member_card",
-        "timing_condition": "moved_this_turn",
-        "target": "self",
-    }
-    if has_all:
+    result["text"] = resource_text + "を得る"
+    result["resource"] = "blade"
+    result["count"] = blade_count
+    result["card_type"] = "member_card"
+    result["timing_condition"] = "moved_this_turn"
+    result["target"] = "self"
+    if re.search(r"このターン中にエリアを移動した(?:全て|すべて)の", text):
         result["all"] = True
-    if group_name:
-        gn = group_name.strip("｢「『　 ").rstrip("｣」』　 ")
-        result["group_names"] = [gn]
-    return result
+    if match.group(1):
+        result["group_names"] = [
+            match.group(1).strip("｢「『　 ").rstrip("｣」』　 ")
+        ]
 
 
-def _try_place_under_heart_copy(text):
-    """Xをこのメンバーの下に置く。そうしたとき、...このメンバーが元々持つハートは、
-    これにより下に置いたメンバーカードが持つハートと同じになる。
+_try_timing_condition_gain = EffectPattern(
+    condition=lambda t: re.search(
+        r"このターン中にエリアを移動した(?:(?:全て|すべて)の)?(?:(.+?)の)?メンバー[は、]+(.+?)を得る",
+        t,
+    )
+    is not None
+    and t.count("{{icon_blade.png|ブレード}}") > 0,
+    action="gain_resource",
+    setter=_set_timing_condition_gain,
+)
 
-    Sequential: first move the member card from discard to under this member,
-    then (dependent on the placement succeeding) set this member's original heart
-    to match the placed card. The heart source is the card placed under by the
-    preceding move (NOT a fixed color), emitted as heart_source="placed_under".
-    """
+
+def _set_place_under_heart_copy(text, result):
+    separator = "そうしたとき、" if "そうしたとき、" in text else "そうしたとき"
+    place_text, _, heart_text = text.partition(separator)
+    place_text = place_text.strip()
+    heart_text = heart_text.strip().lstrip("、")
+    move = parse_action(place_text)
+    if not move or move.get("action") != "move_cards":
+        move = parse_effect(place_text)
+    move.setdefault("destination", "under_member")
+    move.setdefault("count", 1)
+    result["conditional"] = True
+    result["actions"] = [
+        move,
+        {
+            "text": heart_text,
+            "action": "set_heart_type",
+            "heart_type": None,
+            "ref_value": "placed_under",
+            "original_value": True,
+            "self_target": True,
+            "card_type": "member_card",
+            "duration": "live_end",
+        },
+    ]
+
+
+def _matches_place_under_heart_copy(text):
     if "同じになる" not in text or "そうしたとき" not in text:
-        return None
-    # Split at そうしたとき — before it is the placement, after is the heart copy.
-    if "そうしたとき、" in text:
-        place_text, _sep, heart_text = text.partition("そうしたとき、")
-    elif "そうしたとき" in text:
-        place_text, _sep, heart_text = text.partition("そうしたとき")
-    else:
-        return None
+        return False
+    separator = "そうしたとき、" if "そうしたとき、" in text else "そうしたとき"
+    place_text, _, heart_text = text.partition(separator)
     place_text = place_text.strip()
     heart_text = heart_text.strip().lstrip("、")
     if "このメンバーの下に置く" not in place_text:
-        return None
+        return False
     if "元々持つハート" not in heart_text or "と同じになる" not in heart_text:
-        return None
-    # Parse the placement as a move_cards action (discard -> under_member).
+        return False
     move = parse_action(place_text)
     if not move or move.get("action") != "move_cards":
-        # Fall back to generic parse_effect for the placement half.
         move = parse_effect(place_text)
-        if not isinstance(move, dict) or move.get("action") != "move_cards":
-            return None
-    move.setdefault("destination", "under_member")
-    move.setdefault("count", 1)
-    heart = {
-        "text": heart_text,
-        "action": "set_heart_type",
-        "heart_type": None,
-        "ref_value": "placed_under",
-        "original_value": True,
-        "self_target": True,
-        "card_type": "member_card",
-        "duration": "live_end",
-    }
-    return {
-        "text": text,
-        "action": "sequential",
-        "conditional": True,
-        "actions": [move, heart],
-    }
+    return isinstance(move, dict) and move.get("action") == "move_cards"
+
+
+_try_place_under_heart_copy = EffectPattern(
+    condition=_matches_place_under_heart_copy,
+    action="sequential",
+    setter=_set_place_under_heart_copy,
+)
 
 
 _EFFECT_HANDLERS = [
