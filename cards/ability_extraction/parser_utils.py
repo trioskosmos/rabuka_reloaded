@@ -2,16 +2,12 @@
 Parser utilities for ability extraction.
 This module contains pure utility functions for text processing, regex extraction,
 pattern lists, and normalization used across the parsing pipeline.
-Single owner for shared field/position helpers and the scalar-extractor
-memoization (lru_cache at the name level, so every call site in the pipeline
-computes each field once per unique text; list/dict-returning extractors stay
-unmemoized so callers can mutate results freely).
+Single owner for shared field/position helpers and the parser's field context.
 """
 
 import re
 import inspect
 from dataclasses import dataclass, field
-from functools import lru_cache
 from typing import Any, Dict, List, Optional, Tuple, Callable
 
 # Precompiled regex patterns for performance
@@ -213,6 +209,10 @@ def set_if_value(target: dict, field: str, value: Any) -> None:
     """Set a field only when an extractor produced a meaningful value."""
     if value is not None and value != "":
         target[field] = value
+
+
+def matches_predicate(predicate: Any, text: str) -> bool:
+    return predicate(text) if callable(predicate) else predicate in text
 
 
 def apply_extractors(target: dict, text: str, extractors: List[Tuple[str, Callable]]) -> None:
@@ -896,6 +896,116 @@ def extract_card_type(text: str) -> Optional[str]:
     """Extract card type from text."""
     return extract_by_pattern(text, _CARD_TYPE_LONGEST_FIRST)
 
+
+@dataclass(frozen=True)
+class FieldContext:
+    text: str
+    source: Optional[str]
+    destination: Optional[str]
+    target: Optional[str]
+    card_type: Optional[str]
+    count: Optional[int]
+    positions: Tuple[str, ...]
+
+    @property
+    def zone(self) -> Optional[str]:
+        return self.source
+
+    def value(self, field: str) -> Any:
+        if field == "position":
+            return self.positions[0] if self.positions else None
+        return getattr(self, field)
+
+    def apply(self, target: dict, policy: "FieldPolicy") -> None:
+        for field in policy.fields:
+            if field == "position":
+                if "position" in target and "position" not in policy.overwrite_fields:
+                    continue
+                position_fields = position_fields_from_matches(self.positions)
+                if position_fields:
+                    for key, value in position_fields.items():
+                        if key not in target or key in policy.overwrite_fields:
+                            target[key] = value
+                continue
+            hook = policy.hooks.get(field)
+            value = hook(self) if hook is not None else self.value(field)
+            if value is None or value == "":
+                continue
+            if field not in target or field in policy.overwrite_fields:
+                target[field] = value
+        if policy.after_apply is not None:
+            policy.after_apply(target, self)
+
+
+@dataclass(frozen=True)
+class FieldPolicy:
+    fields: Tuple[str, ...]
+    overwrite_fields: Tuple[str, ...] = ()
+    hooks: Dict[str, Callable[[FieldContext], Any]] = field(default_factory=dict)
+    after_apply: Optional[Callable[[dict, FieldContext], None]] = None
+
+
+def detect_position_matches(text: str) -> List[Tuple[str, str]]:
+    seen = set()
+    matches = []
+    for keyword, position in POSITION_KEYWORDS.items():
+        if position not in seen and keyword in text:
+            seen.add(position)
+            matches.append((keyword, position))
+    return matches
+
+
+def position_fields_from_matches(positions: Tuple[str, ...]) -> Dict[str, str]:
+    matched = set(positions)
+    if not matched:
+        return {}
+    if "left_side" in matched and "right_side" in matched:
+        return {"position": "left_side", "position_compare": "right_side"}
+    if len(matched) == 1:
+        return {"position": next(iter(matched))}
+    ordered = sorted(matched)
+    return {"position": ordered[0], "position_compare": ordered[1]}
+
+
+def extract_field_context(text: str, **extractors: Callable[[str], Any]) -> FieldContext:
+    defaults = {
+        "source": extract_source,
+        "destination": extract_destination,
+        "target": extract_target,
+        "card_type": extract_card_type,
+        "count": extract_count,
+    }
+    defaults.update(extractors)
+    position_matches = detect_position_matches(text)
+    return FieldContext(
+        text=text,
+        source=defaults["source"](text),
+        destination=defaults["destination"](text),
+        target=defaults["target"](text),
+        card_type=defaults["card_type"](text),
+        count=defaults["count"](text),
+        positions=tuple(position for _, position in position_matches),
+    )
+
+
+ACTION_SOURCE_POLICY = FieldPolicy(
+    fields=("source",),
+    overwrite_fields=("source",),
+)
+ACTION_DESTINATION_POLICY = FieldPolicy(
+    fields=("destination",),
+    overwrite_fields=("destination",),
+)
+ACTION_CARD_FIELDS_POLICY = FieldPolicy(
+    fields=("count", "card_type", "target"),
+    overwrite_fields=("count", "card_type", "target"),
+)
+ACTION_POSITION_POLICY = FieldPolicy(fields=("position",))
+COST_CARD_FIELDS_POLICY = ACTION_CARD_FIELDS_POLICY
+COST_REVEAL_FIELDS_POLICY = FieldPolicy(
+    fields=("card_type", "target"),
+    overwrite_fields=("card_type", "target"),
+)
 
 
 class PriorityRegistry:

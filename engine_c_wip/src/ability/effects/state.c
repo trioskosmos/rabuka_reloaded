@@ -18,6 +18,13 @@ static const char *s_eff_extra(const AbilityEffect *e, const char *k);
 static int s_eff_extra_true(const AbilityEffect *e, const char *k);
 static int s_eff_extra_int(const AbilityEffect *e, const char *k, int dflt);
 static const char *s_player_prefix(GameState *g, int card_id);
+static void s_push_revert(GameState *g, int card_id, const char *duration, int kind,
+                          int previous, int previous2, const char *text);
+static int s_state_filter_matches(GameState *g, const AbilityEffect *e, int card_id,
+                                  const char *card_type, const char *group_filter,
+                                  int cost_limit, const char *cost_op,
+                                  int blade_limit, const char *blade_op,
+                                  int exclude_self_id);
 
 /* Mirror engine/src/ability/effects/state.rs::AbilityResolver::execute_change_state.
    Changes member card orientation (wait/active) on the stage. */
@@ -71,6 +78,8 @@ void rb_effect_change_state(GameState *g, int actor, AbilityEffect *e, int host_
 
     /* ── Per-unit count derivation ── */
     int per_unit = e->per_unit || s_eff_extra_true(e, "per_unit");
+    int exclude_self_id = -1;
+    if(s_eff_extra_true(e, "exclude_self") && host_cid >= 0) exclude_self_id = host_cid;
     if(per_unit){
         int per_cnt = e->per_unit_count > 0 ? e->per_unit_count : 1;
         const char *puc = s_eff_extra(e, "per_unit_count");
@@ -79,29 +88,23 @@ void rb_effect_change_state(GameState *g, int actor, AbilityEffect *e, int host_
         if(per_src && strstr(per_src, "previous_moved")){
             count = (g->n_recently_moved / (per_cnt > 0 ? per_cnt : 1)) * (count > 0 ? count : 1);
         } else {
-            RbPlayer *Ptmp = &g->p[who];
-            int zone_ids[RB_STAGE_SIZE]; int zn = 0;
-            for(int q=0; q<RB_STAGE_SIZE; q++)
-                if(Ptmp->stage[q] != RB_EMPTY_SLOT) zone_ids[zn++] = Ptmp->stage[q];
-            int filt_ids[RB_STAGE_SIZE]; int fn = 0;
-            for(int i=0;i<zn;i++){
-                int cid = zone_ids[i];
-                if(group_filter && !rb_card_matches_group_str(cid, group_filter)) continue;
-                if(s_excluded_group(cid, e) || s_excluded_chars(cid, e)) continue;
-                if(!s_match_chars(cid, chars)) continue;
-                if(cost_limit >= 0){
-                    Card cc; int ccost = 0;
-                    if(rb_decode_card_by_index((uint32_t)cid, &cc)){ ccost = cc.cost; rb_free_card(&cc); }
-                    int ok = 1;
-                    if(cost_limit_op && !strcmp(cost_limit_op,"<=")) ok = ccost <= cost_limit;
-                    else if(cost_limit_op && !strcmp(cost_limit_op,"<")) ok = ccost < cost_limit;
-                    else if(!cost_limit_op) ok = ccost == cost_limit;
-                    if(!ok) continue;
-                }
-                filt_ids[fn++] = cid;
-            }
+            const char *location = s_eff_extra(e, "location");
+            int zone_ids[RB_MAX_ZONE];
+            int zn = 0;
+            if (location && *location)
+                zn = rb_zone_cards(g, who, location, zone_ids, RB_MAX_ZONE);
+            else
+                for (int q = 0; q < RB_STAGE_SIZE; q++)
+                    if (g->p[who].stage[q] != RB_EMPTY_SLOT) zone_ids[zn++] = g->p[who].stage[q];
+            int filt_ids[RB_MAX_ZONE]; int fn = 0;
+            for(int i=0;i<zn;i++)
+                if(s_state_filter_matches(g, e, zone_ids[i], NULL, group_filter,
+                                           cost_limit, cost_limit_op, -1, NULL,
+                                           exclude_self_id))
+                    filt_ids[fn++] = zone_ids[i];
             int matched = fn;
-            if(s_eff_extra_true(e, "distinct")){
+            const char *distinct = s_eff_extra(e, "distinct");
+            if(distinct && *distinct && strcmp(distinct, "false") && strcmp(distinct, "0")){
                 matched = rb_count_distinct_member_name_units(filt_ids, fn);
             }
             count = (matched / (per_cnt > 0 ? per_cnt : 1)) * (count > 0 ? count : 1);
@@ -159,8 +162,6 @@ void rb_effect_change_state(GameState *g, int actor, AbilityEffect *e, int host_
     int is_cannot_activate = 0;
     if(!strcmp(state_change, "active") && g->player_cannot_activate[who]) is_cannot_activate = 1;
 
-    int exclude_self_id = -1;
-    if(s_eff_extra_true(e, "exclude_self") && host_cid >= 0) exclude_self_id = host_cid;
     int is_self_target_flag = (e->self_target_field[0] && !strcmp(e->self_target_field, "true"));
 
     /* ── Optional gate: verify at least one valid target exists ── */
@@ -183,19 +184,9 @@ void rb_effect_change_state(GameState *g, int actor, AbilityEffect *e, int host_
                 } else if(!strcmp(state_change, "wait")){
                     if(is_wait) continue;
                 }
-                if(card_type_filter && !rb_card_matches_type(cid, card_type_filter)) continue;
-                if(group_filter && !rb_card_matches_group_str(cid, group_filter)) continue;
-                if(s_excluded_group(cid, e) || s_excluded_chars(cid, e)) continue;
-                if(!s_match_chars(cid, chars)) continue;
-                if(blade_limit >= 0){
-                    Card cc; int bl = 0;
-                    if(rb_decode_card_by_index((uint32_t)cid, &cc)){ bl = cc.blade; rb_free_card(&cc); }
-                    int ok = 1;
-                    if(blade_limit_op && !strcmp(blade_limit_op,"<")) ok = bl < blade_limit;
-                    else if(blade_limit_op && !strcmp(blade_limit_op,"<=")) ok = bl <= blade_limit;
-                    else ok = bl <= blade_limit;
-                    if(!ok) continue;
-                }
+                if(!s_state_filter_matches(g, e, cid, card_type_filter, group_filter,
+                                          cost_limit, cost_limit_op, blade_limit,
+                                          blade_limit_op, exclude_self_id)) continue;
                 can_target = 1; break;
             }
             if(!can_target){
@@ -232,19 +223,9 @@ void rb_effect_change_state(GameState *g, int actor, AbilityEffect *e, int host_
                 if(!strcmp(state_change,"active")){ if(!is_wait) continue; }
                 else if(state_filter && !strcmp(state_filter,"active")){ if(is_wait) continue; }
                 else if(!strcmp(state_change,"wait")){ if(is_wait) continue; }
-                if(card_type_filter && !rb_card_matches_type(cid, card_type_filter)) continue;
-                if(group_filter && !rb_card_matches_group_str(cid, group_filter)) continue;
-                if(s_excluded_group(cid, e) || s_excluded_chars(cid, e)) continue;
-                if(!s_match_chars(cid, chars)) continue;
-                if(blade_limit >= 0){
-                    Card cc; int bl = 0;
-                    if(rb_decode_card_by_index((uint32_t)cid, &cc)){ bl = cc.blade; rb_free_card(&cc); }
-                    int ok = 1;
-                    if(blade_limit_op && !strcmp(blade_limit_op,"<")) ok = bl < blade_limit;
-                    else if(blade_limit_op && !strcmp(blade_limit_op,"<=")) ok = bl <= blade_limit;
-                    else ok = bl <= blade_limit;
-                    if(!ok) continue;
-                }
+                if(!s_state_filter_matches(g, e, cid, card_type_filter, group_filter,
+                                          cost_limit, cost_limit_op, blade_limit,
+                                          blade_limit_op, exclude_self_id)) continue;
                 fcands[fnc++] = cid;
             }
             nc = fnc;
@@ -263,28 +244,9 @@ void rb_effect_change_state(GameState *g, int actor, AbilityEffect *e, int host_
         int cid = P->stage[q];
         if(cid == RB_EMPTY_SLOT) continue;
         if(exclude_self_id >= 0 && cid == exclude_self_id) continue;
-        if(card_type_filter && !rb_card_matches_type(cid, card_type_filter)) continue;
-        if(group_filter && !rb_card_matches_group_str(cid, group_filter)) continue;
-        if(s_excluded_group(cid, e) || s_excluded_chars(cid, e)) continue;
-        if(!s_match_chars(cid, chars)) continue;
-        if(cost_limit >= 0){
-            Card cc; int ccost = 0;
-            if(rb_decode_card_by_index((uint32_t)cid, &cc)){ ccost = cc.cost; rb_free_card(&cc); }
-            int ok = 1;
-            if(cost_limit_op && !strcmp(cost_limit_op,"<=")) ok = ccost <= cost_limit;
-            else if(cost_limit_op && !strcmp(cost_limit_op,"<")) ok = ccost < cost_limit;
-            else if(!cost_limit_op) ok = ccost == cost_limit;
-            if(!ok) continue;
-        }
-        if(blade_limit >= 0){
-            Card cc; int bl = 0;
-            if(rb_decode_card_by_index((uint32_t)cid, &cc)){ bl = cc.blade; rb_free_card(&cc); }
-            int ok = 1;
-            if(blade_limit_op && !strcmp(blade_limit_op,"<")) ok = bl < blade_limit;
-            else if(blade_limit_op && !strcmp(blade_limit_op,"<=")) ok = bl <= blade_limit;
-            else ok = bl <= blade_limit;
-            if(!ok) continue;
-        }
+        if(!s_state_filter_matches(g, e, cid, card_type_filter, group_filter,
+                                   cost_limit, cost_limit_op, blade_limit,
+                                   blade_limit_op, exclude_self_id)) continue;
         const char *ori = rb_mods_get_orientation((RbMods*)&g->mods, cid);
         int is_wait = (ori && !strcmp(ori, "wait"));
         int matches_state = 1;
@@ -352,9 +314,27 @@ candidates_ready:
                        pick > 0 ? pick : 1, max, "change_state");
         strncpy(g->queue.pending.card_type, card_type_filter ? card_type_filter : "member_card",
                 sizeof(g->queue.pending.card_type) - 1);
+        if(group_filter) strncpy(g->queue.pending.filter_group, group_filter,
+                                  sizeof(g->queue.pending.filter_group) - 1);
+        if(cost_limit >= 0) {
+            g->queue.pending.cost_limit = cost_limit;
+            if(cost_limit_op) strncpy(g->queue.pending.cost_limit_op, cost_limit_op,
+                                       sizeof(g->queue.pending.cost_limit_op) - 1);
+        }
+        g->queue.pending.n_filtered_indices = 0;
+        for(int i=0;i<nc && i<RB_STAGE_SIZE;i++)
+            for(int q=0;q<RB_STAGE_SIZE;q++)
+                if(P->stage[q] == cands[i]) {
+                    g->queue.pending.filtered_indices[g->queue.pending.n_filtered_indices++] = q;
+                    break;
+                }
         strncpy(g->queue.pending.target_player_id, target,
                 sizeof(g->queue.pending.target_player_id) - 1);
+        rb_choice_set_route(&g->queue.pending, RB_ROUTE_SELECT_CARDS);
         g->queue.deferred = rb_effect_deep_clone(e);
+        g->queue.resume_eff = g->queue.deferred;
+        g->queue.resume_actor = who;
+        g->queue.resume_host = host_cid;
         rb_queue_pause_for_choice(g, &g->queue.pending);
         return;
     }
@@ -547,12 +527,45 @@ void rb_effect_energy_state_change(GameState *g, int actor, AbilityEffect *e){
     if(max && requested > 0 && eff > requested) eff = requested;
     if(eff < 0) eff = 0;
     if(eff > nstate) eff = nstate;
+    int has_selected_energy = 0;
+    for(int s=0;s<g->n_selected_cards && !has_selected_energy;s++)
+        for(int i=0;i<nstate;i++)
+            if(P->energy.cards[state_idx[i]] == g->selected_cards[s]) {
+                has_selected_energy = 1;
+                break;
+            }
+    if(!max && !is_active && nstate > eff && eff > 0 && !has_selected_energy) {
+        rb_emit_choice(g, who, RB_CHOICE_SELECT_CARD, "energy", "energy_card",
+                       eff, 0, "energy_state_change");
+        g->queue.pending.n_filtered_indices = 0;
+        for(int i=0;i<nstate && i<RB_MAX_ZONE;i++)
+            g->queue.pending.filtered_indices[g->queue.pending.n_filtered_indices++] = state_idx[i];
+        strncpy(g->queue.pending.target_player_id, e->target ? e->target : "self",
+                sizeof(g->queue.pending.target_player_id)-1);
+        rb_choice_set_route(&g->queue.pending, RB_ROUTE_SELECT_CARDS);
+        g->queue.deferred = rb_effect_deep_clone(e);
+        g->queue.resume_eff = g->queue.deferred;
+        g->queue.resume_actor = who;
+        g->queue.resume_host = -1;
+        rb_queue_pause_for_choice(g, &g->queue.pending);
+        return;
+    }
 
     int chosen[RB_MAX_ZONE];
     int chosen_mask[RB_MAX_ZONE];
+    int selected_state[RB_MAX_ZONE];
+    int nselected = 0;
     memset(chosen_mask, 0, sizeof(chosen_mask));
-    for(int i=0; i<eff; i++){
-        int idx = state_idx[i];
+    for(int s=0;s<g->n_selected_cards && nselected<RB_MAX_ZONE;s++)
+        for(int i=0;i<nstate;i++)
+            if(P->energy.cards[state_idx[i]] == g->selected_cards[s]) {
+                int seen = 0;
+                for(int j=0;j<nselected;j++) if(selected_state[j] == state_idx[i]) seen = 1;
+                if(!seen) selected_state[nselected++] = state_idx[i];
+                break;
+            }
+    for(int i=0;i<eff;i++){
+        int idx = nselected > 0 ? (i < nselected ? selected_state[i] : -1) : state_idx[i];
         if(idx < 0 || idx >= total) continue;
         chosen_mask[idx] = 1;
         chosen[i] = P->energy.cards[idx];
@@ -573,7 +586,32 @@ void rb_effect_energy_state_change(GameState *g, int actor, AbilityEffect *e){
     P->energy_active = is_active ? active + eff : active - eff;
     if(P->energy_active < 0) P->energy_active = 0;
     if(P->energy_active > total) P->energy_active = total;
+    for(int i=0;i<eff;i++) {
+        int cid = chosen[i];
+        if(cid < 0) continue;
+        int w = 0;
+        for(int s=0;s<g->n_selected_cards;s++)
+            if(g->selected_cards[s] != cid) g->selected_cards[w++] = g->selected_cards[s];
+        g->n_selected_cards = w;
+        g->state_change_from[cid] = (int8_t)(is_active ? 1 : 0);
+        g->state_change_to[cid] = (int8_t)(is_active ? 0 : 1);
+        if(g->n_recently_state_changed < RB_MAX_RECENTLY_MOVED)
+            g->recently_state_changed[g->n_recently_state_changed++] = cid;
+        if(g->n_turn_state_changes < 64) {
+            int row = g->n_turn_state_changes++;
+            g->turn_state_changes[row][0] = g->activating_card;
+            g->turn_state_changes[row][1] = cid;
+            g->turn_state_changes[row][2] = is_active ? 'w' : 'a';
+            g->turn_state_changes[row][3] = is_active ? 'a' : 'w';
+        }
+    }
     rb_recalc_constants(g);
+        if(!g->state_change_triggering) {
+            g->state_change_triggering = 1;
+            rb_trigger_auto_abilities_for_player(g, 0);
+            rb_trigger_auto_abilities_for_player(g, 1);
+            g->state_change_triggering = 0;
+        }
 }
 
 /* Mirror engine/src/ability/effects/state.rs::execute_set_cost.
@@ -654,11 +692,11 @@ void rb_effect_set_blade_type(GameState *g, int actor, AbilityEffect *e, int hos
         if(cid == RB_EMPTY_SLOT) continue;
         if(!s_pass_filter(cid, grp, chars)) continue;
         if(s_excluded_group(cid, e) || s_excluded_chars(cid, e)) continue;
-        g->mods.blade_type[cid] = (int8_t)col;
-        if(duration && strcmp(duration, "permanent") != 0){
-            rb_util_push_temporary_effect(g, "set_blade_type", duration, "self",
-                bt ? bt : "");
-        }
+        int previous_blade_type = rb_mods_get_blade_type(&g->mods, cid);
+        rb_mods_set_blade_type(&g->mods, cid, col);
+        if(duration && strcmp(duration, "permanent") != 0)
+            s_push_revert(g, cid, duration, RB_REVERT_BLADE_TYPE,
+                          previous_blade_type, 0, NULL);
     }
     rb_recalc_constants(g);
 }
@@ -668,8 +706,9 @@ void rb_effect_set_blade_type(GameState *g, int actor, AbilityEffect *e, int hos
    Optionally registers a temporary effect for duration-based revert. */
 void rb_effect_set_blade_count(GameState *g, int actor, AbilityEffect *e, int host_cid){
     (void)host_cid;
-    int value = s_value(e, 0);
-    if(value == 0 && e->count >= 0) value = e->count;
+    int value = s_value(e, -1);
+    if(value < 0 && e->count >= 0) value = e->count;
+    if(value < 0) value = 0;
     int who = s_who(e->target, actor);
     RbPlayer *P = &g->p[who];
     int ids[RB_STAGE_SIZE]; int n = 0;
@@ -711,10 +750,10 @@ void rb_effect_set_blade_count(GameState *g, int actor, AbilityEffect *e, int ho
     rb_log_push_verdict(logbuf, "rule_log", 1);
     const char *duration = s_eff_extra(e, "duration");
     for(int i=0;i<n;i++){
+        int previous = g->mods.blade[ids[i]].set;
         rb_mods_set_blade(&g->mods, ids[i], value);
-        if(duration && strcmp(duration, "permanent") != 0){
-            rb_util_push_temporary_effect(g, "set_blade_count", duration, "self", "");
-        }
+        if(duration && strcmp(duration, "permanent") != 0)
+            s_push_revert(g, ids[i], duration, RB_REVERT_BLADE_SET, previous, 0, NULL);
     }
     rb_recalc_constants(g);
 }
@@ -722,7 +761,6 @@ void rb_effect_set_blade_count(GameState *g, int actor, AbilityEffect *e, int ho
 /* Mirror engine/src/ability/effects/state.rs::execute_set_heart_copy_from_under.
    Copies the hearts of the card just placed under this member onto the member. */
 void rb_effect_set_heart_copy_from_under(GameState *g, int actor, AbilityEffect *e, int host_cid){
-    (void)e;
     int member = -1;
     if(g->n_selected_cards > 0) member = g->selected_cards[0];
     else if(host_cid >= 0) member = host_cid;
@@ -744,7 +782,10 @@ void rb_effect_set_heart_copy_from_under(GameState *g, int actor, AbilityEffect 
         break;
     }
     if(src < 0) return;
-    g->mods.heart_copy[member] = (int16_t)src;
+    int previous = rb_mods_get_heart_copy(&g->mods, member);
+    rb_mods_set_heart_copy(&g->mods, member, src);
+    s_push_revert(g, member, s_eff_extra(e, "duration"), RB_REVERT_HEART_COPY,
+                  previous, 0, NULL);
     {
         const char *pp = s_player_prefix(g, member);
         char act_name[64]; act_name[0] = 0;
@@ -786,12 +827,12 @@ void rb_effect_set_heart_type_applied(GameState *g, int actor, const char *heart
     else if(host_cid >= 0) cid = host_cid;
     if(cid < 0){ fprintf(stderr,"DEBUG [SET_HEART_APPLIED] no target card\n"); return; }
     int col = s_heart_idx(ht);
-    g->mods.heart_multiplier[cid] = (int8_t)col;
-    g->mods.heart_multiplier_amt[cid] = (int8_t)1;
+    int previous_mult = rb_mods_get_heart_color_multiplier(&g->mods, cid);
+    int previous_amt = g->mods.heart_multiplier_amt[cid];
+    rb_mods_set_heart_color_multiplier(&g->mods, cid, col);
+    g->mods.heart_multiplier_amt[cid] = 2;
+    s_push_revert(g, cid, duration, RB_REVERT_HEART_MULT, previous_mult, previous_amt, NULL);
     fprintf(stderr, "DEBUG [SET_HEART_APPLIED] applied cid=%d col=%d ht=%s\n", cid, col, ht);
-    if(duration && strcmp(duration,"permanent")!=0){
-        rb_util_push_temporary_effect(g,"set_heart_type",duration,"self",ht);
-    }
 }
 
 /* Mirror engine/src/ability/effects/state.rs::execute_set_heart_type (+ applied).
@@ -811,11 +852,20 @@ void rb_effect_set_heart_type(GameState *g, int actor, AbilityEffect *e, int hos
 
     const char *ht = NULL;
     for(int i=0;i<e->n_extra;i++)
-        if(e->extra_k[i] && (!strcmp(e->extra_k[i],"heart_type")||!strcmp(e->extra_k[i],"heart_color")) && e->extra_v[i])
+        if(e->extra_k[i] && (!strcmp(e->extra_k[i],"heart_type")||!strcmp(e->extra_k[i],"heart_color")) && e->extra_v[i]) {
             ht = e->extra_v[i];
+            break;
+        }
     if(!ht)
         for(int i=0;i<e->n_extra;i++)
-            if(e->extra_k[i] && !strcmp(e->extra_k[i],"heart_colors") && e->extra_v[i]){ ht = e->extra_v[i]; break; }
+            if(e->extra_k[i] && !strcmp(e->extra_k[i],"heart_colors") && e->extra_v[i]) {
+                static char first_heart[64];
+                snprintf(first_heart, sizeof(first_heart), "%s", e->extra_v[i]);
+                char *comma = strpbrk(first_heart, ",、 [");
+                if(comma) *comma = '\0';
+                ht = first_heart;
+                break;
+            }
     if(ht && !strcmp(ht, "selected")){
         if(g->queue.selected_heart_color >= 0){
             static char buf[16];
@@ -826,7 +876,6 @@ void rb_effect_set_heart_type(GameState *g, int actor, AbilityEffect *e, int hos
     if(!ht) ht = "heart00";
 
     if(is_self || !needs_target){
-        int col = s_heart_idx(ht);
         int who = s_who(e->target, actor);
         int cid = -1;
         if(g->n_selected_cards > 0) cid = g->selected_cards[0];
@@ -834,22 +883,9 @@ void rb_effect_set_heart_type(GameState *g, int actor, AbilityEffect *e, int hos
         else for(int q=0;q<RB_STAGE_SIZE;q++)
             if(g->p[who].stage[q] != RB_EMPTY_SLOT){ cid = g->p[who].stage[q]; break; }
         if(cid < 0) return;
-        g->mods.heart_multiplier[cid] = (int8_t)col;
-        g->mods.heart_multiplier_amt[cid] = (int8_t)(e->count >= 1 ? e->count : 2);
-        {
-            const char *pp = s_player_prefix(g, cid);
-            char act_name[64]; act_name[0] = 0;
-            if(g->activating_card >= 0){
-                Card c;
-                if(rb_decode_card_by_index((uint32_t)g->activating_card, &c)){
-                    if(c.name){ strncpy(act_name, c.name, sizeof(act_name)-1); act_name[sizeof(act_name)-1]=0; }
-                    rb_free_card(&c);
-                }
-            }
-            char logbuf[128];
-            snprintf(logbuf, sizeof logbuf, "%s %s: [[log_set_heart_type:type=%s]]", pp, act_name, ht);
-            rb_log_push_verdict(logbuf, "rule_log", 1);
-        }
+        rb_effect_set_heart_type_applied(g, actor, ht, e->target,
+                                         e->count >= 0 ? e->count : 1,
+                                         s_eff_extra(e, "duration"), host_cid);
         return;
     }
 
@@ -860,11 +896,13 @@ void rb_effect_set_heart_type(GameState *g, int actor, AbilityEffect *e, int hos
         int stage_ids[RB_STAGE_SIZE]; int sn = 0;
         for(int q=0;q<RB_STAGE_SIZE;q++)
             if(P2->stage[q] != RB_EMPTY_SLOT) stage_ids[sn++] = P2->stage[q];
-        const char *chars2 = NULL; s_has_chars(e, &chars2);
         int cand[RB_STAGE_SIZE]; int nc2 = 0;
+        int cost_limit = s_eff_extra_int(e, "cost_limit", -1);
+        const char *cost_op = s_eff_extra(e, "cost_limit_operator");
         for(int i=0;i<sn;i++)
-            if(s_pass_filter(stage_ids[i], grp, chars2) &&
-               !s_excluded_group(stage_ids[i], e) && !s_excluded_chars(stage_ids[i], e)) cand[nc2++] = stage_ids[i];
+            if(s_state_filter_matches(g, e, stage_ids[i], e->card_type_field, grp,
+                                       cost_limit, cost_op, -1, NULL, -1))
+                cand[nc2++] = stage_ids[i];
         if(nc2 == 0) return;
         int tc = 1;
         const char *tcv = s_eff_extra(e, "target_count");
@@ -877,28 +915,36 @@ void rb_effect_set_heart_type(GameState *g, int actor, AbilityEffect *e, int hos
                 if(!already && g->n_selected_cards < RB_MAX_RECENTLY_MOVED)
                     g->selected_cards[g->n_selected_cards++] = cand[i];
             }
-            int col = s_heart_idx(ht);
-            int cid2 = g->selected_cards[0];
-            g->mods.heart_multiplier[cid2] = (int8_t)col;
-            g->mods.heart_multiplier_amt[cid2] = (int8_t)(e->count >= 1 ? e->count : 2);
+            rb_effect_set_heart_type_applied(g, actor, ht, e->target,
+                                             e->count >= 0 ? e->count : 1,
+                                             s_eff_extra(e, "duration"), host_cid);
         } else {
             rb_emit_choice(g, actor, RB_CHOICE_SELECT_CARD, "stage", NULL, tc, 0, "heart_type");
-    rb_queue_pause_for_choice(g, &g->queue.pending);
             if(grp) strncpy(g->queue.pending.filter_group, grp, sizeof(g->queue.pending.filter_group)-1);
-            g->queue.deferred = e;
+            if(cost_limit >= 0) {
+                g->queue.pending.cost_limit = cost_limit;
+                if(cost_op) strncpy(g->queue.pending.cost_limit_op, cost_op,
+                                    sizeof(g->queue.pending.cost_limit_op)-1);
+            }
+            g->queue.pending.n_filtered_indices = 0;
+            for(int i=0;i<nc2;i++)
+                for(int q=0;q<RB_STAGE_SIZE;q++)
+                    if(P2->stage[q] == cand[i]) {
+                        g->queue.pending.filtered_indices[g->queue.pending.n_filtered_indices++] = q;
+                        break;
+                    }
+            g->queue.deferred = rb_effect_deep_clone(e);
+            g->queue.resume_eff = g->queue.deferred;
             g->queue.resume_host = host_cid;
-            g->queue.resume_mode = 2; /* select_card */
+            g->queue.resume_mode = 0;
+            rb_queue_pause_for_choice(g, &g->queue.pending);
             return;
         }
         return;
     }
-    /* already have selected target */
-    {
-        int col = s_heart_idx(ht);
-        int cid2 = g->selected_cards[0];
-        g->mods.heart_multiplier[cid2] = (int8_t)col;
-        g->mods.heart_multiplier_amt[cid2] = (int8_t)(e->count >= 1 ? e->count : 2);
-    }
+    rb_effect_set_heart_type_applied(g, actor, ht, e->target,
+                                     e->count >= 0 ? e->count : 1,
+                                     s_eff_extra(e, "duration"), host_cid);
 }
 
 /* Mirror engine/src/ability/effects/state.rs::execute_activation_cost.
@@ -910,17 +956,16 @@ void rb_effect_activation_cost(GameState *g, int actor, AbilityEffect *e, int ho
         if(e->extra_k[i] && !strcmp(e->extra_k[i],"operation") && e->extra_v[i]) op = e->extra_v[i];
     int value = s_value(e, 0);
     const char *target = e->target ? e->target : "self";
+    char note[64];
+    note[0] = '\0';
     if(!strcmp(target,"self") || !strcmp(target,"opponent")){
-        char note[64];
         snprintf(note, sizeof note, "activation_cost_%s_%d", op, value);
-        if(g->n_prohibition < 64){
-            snprintf(g->prohibition[g->n_prohibition], sizeof(g->prohibition[0]), "%s", note);
-            g->n_prohibition++;
-        }
         if(g->n_prohibition_effects < 64){
             snprintf(g->prohibition_effects[g->n_prohibition_effects], sizeof(g->prohibition_effects[0]), "%s", note);
             g->n_prohibition_effects++;
         }
+        s_push_revert(g, g->activating_card >= 0 ? g->activating_card : host_cid,
+                      s_eff_extra(e, "duration"), RB_REVERT_TEXT, 0, 0, note);
     }
     {
         const char *pp = s_player_prefix(g, g->activating_card >= 0 ? g->activating_card : host_cid);
@@ -941,77 +986,63 @@ void rb_effect_activation_cost(GameState *g, int actor, AbilityEffect *e, int ho
 /* Mirror engine/src/ability/effects/state.rs::execute_set_card_identity.
    Rewrites this member's identity to the listed group/unit names. */
 void rb_effect_set_card_identity(GameState *g, int actor, AbilityEffect *e, int host_cid){
-    (void)actor;
-    int cid = host_cid >= 0 ? host_cid : -1;
-    if(cid < 0){
-        for(int q=0;q<RB_STAGE_SIZE;q++)
-            if(g->p[actor].stage[q] != RB_EMPTY_SLOT){ cid = g->p[actor].stage[q]; break; }
-    }
-    if(cid < 0) return;
+    (void)actor; (void)host_cid;
     const char *id = NULL;
     for(int i=0;i<e->n_extra;i++)
-        if(e->extra_k[i] && (!strcmp(e->extra_k[i],"identities")||!strcmp(e->extra_k[i],"identity")) && e->extra_v[i])
+        if(e->extra_k[i] && (!strcmp(e->extra_k[i],"identities")||!strcmp(e->extra_k[i],"identity")) && e->extra_v[i]) {
             id = e->extra_v[i];
-    if(!id) return;
-    char buf[256]; strncpy(buf, id, 255); buf[255] = 0;
-    char *tok = strtok(buf, ",、 ");
-    while(tok){ rb_set_card_identity(cid, tok); tok = strtok(NULL, ",、 "); }
-    {
-        const char *pp = s_player_prefix(g, cid);
-        char act_name[64]; act_name[0] = 0;
-        if(g->activating_card >= 0){
-            Card c;
-            if(rb_decode_card_by_index((uint32_t)g->activating_card, &c)){
-                if(c.name){ strncpy(act_name, c.name, sizeof(act_name)-1); act_name[sizeof(act_name)-1]=0; }
-                rb_free_card(&c);
-            }
+            break;
         }
-        char logbuf[128];
-        snprintf(logbuf, sizeof logbuf, "%s %s: カード同一性変更", pp, act_name);
-        rb_log_push_verdict(logbuf, "rule_log", 1);
+    if(id && *id && g->n_prohibition_effects < 64)
+        snprintf(g->prohibition_effects[g->n_prohibition_effects++],
+                 sizeof(g->prohibition_effects[0]), "card_identity:%s", id);
+    int cid = g->activating_card >= 0 ? g->activating_card : host_cid;
+    const char *pp = s_player_prefix(g, cid);
+    char act_name[64]; act_name[0] = 0;
+    if(g->activating_card >= 0){
+        Card c;
+        if(rb_decode_card_by_index((uint32_t)g->activating_card, &c)){
+            if(c.name) snprintf(act_name, sizeof act_name, "%s", c.name);
+            rb_free_card(&c);
+        }
     }
+    char logbuf[128];
+    snprintf(logbuf, sizeof logbuf, "%s %s: カード同一性変更", pp, act_name);
+    rb_log_push_verdict(logbuf, "rule_log", 1);
 }
 
 /* Mirror engine/src/ability/effects/state.rs::execute_set_card_identity_all_regions.
    Identity rewrite that also records a per-card prohibition note. */
 void rb_effect_set_card_identity_all_regions(GameState *g, int actor, AbilityEffect *e, int host_cid){
     (void)actor;
-    int cid = host_cid >= 0 ? host_cid : -1;
-    if(cid < 0){
-        for(int q=0;q<RB_STAGE_SIZE;q++)
-            if(g->p[actor].stage[q] != RB_EMPTY_SLOT){ cid = g->p[actor].stage[q]; break; }
-    }
-    if(cid < 0) return;
+    int cid = g->activating_card >= 0 ? g->activating_card : host_cid;
     const char *id = NULL;
     for(int i=0;i<e->n_extra;i++)
-        if(e->extra_k[i] && (!strcmp(e->extra_k[i],"identities")||!strcmp(e->extra_k[i],"identity")) && e->extra_v[i])
+        if(e->extra_k[i] && (!strcmp(e->extra_k[i],"identities")||!strcmp(e->extra_k[i],"identity")) && e->extra_v[i]) {
             id = e->extra_v[i];
-    if(!id) return;
-    char buf[256]; strncpy(buf, id, 255); buf[255] = 0;
-    char *tok = strtok(buf, ",、 ");
-    while(tok){
-        rb_set_card_identity(cid, tok);
-        if(g->n_prohibition < 64){
-            snprintf(g->prohibition[g->n_prohibition], sizeof(g->prohibition[0]),
-                     "card_identity:%d:%s", cid, tok);
-            g->n_prohibition++;
+            break;
         }
-        tok = strtok(NULL, ",、 ");
-    }
-    {
-        const char *pp = s_player_prefix(g, cid);
-        char act_name[64]; act_name[0] = 0;
-        if(g->activating_card >= 0){
-            Card c;
-            if(rb_decode_card_by_index((uint32_t)g->activating_card, &c)){
-                if(c.name){ strncpy(act_name, c.name, sizeof(act_name)-1); act_name[sizeof(act_name)-1]=0; }
-                rb_free_card(&c);
-            }
+    if(id && cid >= 0) {
+        char buf[256]; snprintf(buf, sizeof buf, "%s", id);
+        char *tok = strtok(buf, ",、 ");
+        while(tok && g->n_prohibition_effects < 64) {
+            snprintf(g->prohibition_effects[g->n_prohibition_effects++],
+                     sizeof(g->prohibition_effects[0]), "card_identity:%d:%s", cid, tok);
+            tok = strtok(NULL, ",、 ");
         }
-        char logbuf[128];
-        snprintf(logbuf, sizeof logbuf, "%s %s: 全領域カード同一性変更", pp, act_name);
-        rb_log_push_verdict(logbuf, "rule_log", 1);
     }
+    const char *pp = s_player_prefix(g, cid);
+    char act_name[64]; act_name[0] = 0;
+    if(g->activating_card >= 0){
+        Card c;
+        if(rb_decode_card_by_index((uint32_t)g->activating_card, &c)){
+            if(c.name) snprintf(act_name, sizeof act_name, "%s", c.name);
+            rb_free_card(&c);
+        }
+    }
+    char logbuf[128];
+    snprintf(logbuf, sizeof logbuf, "%s %s: 全領域カード同一性変更", pp, act_name);
+    rb_log_push_verdict(logbuf, "rule_log", 1);
 }
 
 /* Mirror engine/src/ability/effects/state.rs::execute_reduce_live_card_set_limit.
@@ -1019,10 +1050,9 @@ void rb_effect_set_card_identity_all_regions(GameState *g, int actor, AbilityEff
 void rb_effect_reduce_live_card_set_limit(GameState *g, int actor, AbilityEffect *e, int host_cid){
     (void)host_cid;
     int lim = e->count > 0 ? e->count : 1;
-    int who = s_who(e->target, actor);
-    g->live_set_limit_reduction[who] += lim;
-    if(g->live_set_limit_reduction[who] > RB_MAX_LIVE_CARDS)
-        g->live_set_limit_reduction[who] = RB_MAX_LIVE_CARDS;
+    g->live_set_limit_reduction[actor] += lim;
+    if(g->live_set_limit_reduction[actor] > RB_MAX_LIVE_CARDS)
+        g->live_set_limit_reduction[actor] = RB_MAX_LIVE_CARDS;
     {
         const char *pp = s_player_prefix(g, g->activating_card >= 0 ? g->activating_card : host_cid);
         char act_name[64]; act_name[0] = 0;
@@ -1082,8 +1112,7 @@ void rb_effect_specify_heart_color(GameState *g, int actor, AbilityEffect *e, in
    Sets the cost-to-use modifier for the activating/selected card. */
 void rb_effect_set_cost_to_use(GameState *g, int actor, AbilityEffect *e, int host_cid){
     int value = s_value(e, 0);
-    int cid = host_cid >= 0 ? host_cid : -1;
-    if(cid < 0 && g->n_selected_cards > 0) cid = g->selected_cards[0];
+    int cid = g->activating_card >= 0 ? g->activating_card : host_cid;
     if(cid < 0) return;
     rb_mods_set_cost(&g->mods, cid, value);
     {
@@ -1106,12 +1135,16 @@ void rb_effect_set_cost_to_use(GameState *g, int actor, AbilityEffect *e, int ho
    Sets the member's blade type to "all" so its blade satisfies any blade-timing
    condition. Records a prohibition note with timing/treat_as. */
 void rb_effect_all_blade_timing(GameState *g, int actor, AbilityEffect *e, int host_cid){
-    (void)e;
-    int cid = host_cid >= 0 ? host_cid : -1;
-    if(cid < 0 && g->n_selected_cards > 0) cid = g->selected_cards[0];
-    if(cid >= 0){
-        g->mods.blade_type[cid] = 7; /* "all" blade type */
-    }
+    (void)actor;
+    int cid = host_cid >= 0 ? host_cid : g->activating_card;
+    const char *timing = s_eff_extra(e, "timing");
+    if(!timing) timing = "check_required_hearts";
+    const char *treat_as = s_eff_extra(e, "treat_as");
+    if(!treat_as) treat_as = "any_heart_color";
+    if(cid >= 0 && g->n_prohibition_effects < 64)
+        snprintf(g->prohibition_effects[g->n_prohibition_effects++],
+                 sizeof(g->prohibition_effects[0]), "all_blade_timing:%d:%s:%s",
+                 cid, timing, treat_as);
     {
         const char *pp = s_player_prefix(g, g->activating_card >= 0 ? g->activating_card : host_cid);
         char act_name[64]; act_name[0] = 0;
@@ -1136,8 +1169,8 @@ void rb_effect_modify_cost(GameState *g, int actor, AbilityEffect *e, int host_c
     const char *op = "add";
     for(int i=0;i<e->n_extra;i++)
         if(e->extra_k[i] && !strcmp(e->extra_k[i],"operation") && e->extra_v[i]) op = e->extra_v[i];
-
     int value = s_value(e, 0);
+    const char *duration = s_eff_extra(e, "duration");
 
     /* per-unit scaling */
     int per_unit = e->per_unit || s_eff_extra_true(e, "per_unit");
@@ -1214,6 +1247,12 @@ void rb_effect_modify_cost(GameState *g, int actor, AbilityEffect *e, int host_c
             if(rb_decode_card_by_index((uint32_t)ids[i], &c)){ printed = c.cost; rb_free_card(&c); }
             int d = resolved - printed;
             rb_mods_add_cost(&g->mods, ids[i], d);
+            if(duration && strcmp(duration, "permanent") != 0) {
+                int before = g->n_temp_effects;
+                s_push_revert(g, ids[i], duration, RB_REVERT_NONE, 0, 0, NULL);
+                if(g->n_temp_effects > before)
+                    g->temp_effects[g->n_temp_effects - 1].cost = -d;
+            }
         }
         return;
     }
@@ -1225,8 +1264,20 @@ void rb_effect_modify_cost(GameState *g, int actor, AbilityEffect *e, int host_c
     else return;
 
     for(int i=0;i<n;i++){
-        if(!strcmp(op, "set")) rb_mods_set_cost(&g->mods, ids[i], delta);
-        else rb_mods_add_cost(&g->mods, ids[i], delta);
+        if(!strcmp(op, "set")) {
+            int previous = g->mods.cost[ids[i]].set;
+            rb_mods_set_cost(&g->mods, ids[i], delta);
+            if(duration && strcmp(duration, "permanent") != 0)
+                s_push_revert(g, ids[i], duration, RB_REVERT_COST_SET, previous, 0, NULL);
+        } else {
+            rb_mods_add_cost(&g->mods, ids[i], delta);
+            if(duration && strcmp(duration, "permanent") != 0) {
+                int before = g->n_temp_effects;
+                s_push_revert(g, ids[i], duration, RB_REVERT_NONE, 0, 0, NULL);
+                if(g->n_temp_effects > before)
+                    g->temp_effects[g->n_temp_effects - 1].cost = -delta;
+            }
+        }
     }
 
     {
@@ -1692,6 +1743,61 @@ static const char *s_player_prefix(GameState *g, int card_id){
         }
     }
     return g->active == 0 ? "P1" : "P2";
+}
+
+static void s_push_revert(GameState *g, int card_id, const char *duration, int kind,
+                          int previous, int previous2, const char *text) {
+    if (!g || card_id < 0 || !duration || !strcmp(duration, "permanent") ||
+        g->n_temp_effects >= RB_MAX_TEMP_EFFECTS) return;
+    RbTempEffect *te = &g->temp_effects[g->n_temp_effects++];
+    memset(te, 0, sizeof(*te));
+    te->card_id = card_id;
+    te->dur = rb_parse_duration(duration);
+    te->gained_card_id = -1;
+    te->gained_index = -1;
+    te->revert_kind = kind;
+    te->previous_value = previous;
+    te->previous_value2 = previous2;
+    if (text) snprintf(te->revert_text, sizeof(te->revert_text), "%s", text);
+}
+
+static int s_state_filter_matches(GameState *g, const AbilityEffect *e, int card_id,
+                                  const char *card_type, const char *group_filter,
+                                  int cost_limit, const char *cost_op,
+                                  int blade_limit, const char *blade_op,
+                                  int exclude_self_id) {
+    (void)g;
+    if (card_id < 0 || card_id == exclude_self_id) return 0;
+    RbCardFilter filter;
+    rb_effect_filter_subset(e, &filter);
+    filter.card_type[0] = 0;
+    filter.has_group = 0;
+    filter.has_cost_limit = 0;
+    filter.has_original_blade = 0;
+    if (card_type && *card_type) snprintf(filter.card_type, sizeof(filter.card_type), "%s", card_type);
+    if (group_filter && *group_filter) {
+        snprintf(filter.group, sizeof(filter.group), "%s", group_filter);
+        filter.has_group = 1;
+    }
+    if (cost_limit >= 0) {
+        filter.cost_limit = cost_limit;
+        filter.has_cost_limit = 1;
+        if (cost_op) snprintf(filter.cost_op, sizeof(filter.cost_op), "%s", cost_op);
+    }
+    if (blade_limit >= 0) {
+        filter.original_blade_limit = blade_limit;
+        filter.has_original_blade = 1;
+        if (blade_op) snprintf(filter.original_blade_op, sizeof(filter.original_blade_op), "%s", blade_op);
+    }
+    filter.has_filter = filter.card_type[0] || filter.has_group || filter.has_cost_limit ||
+                        filter.has_characters || filter.has_exclude_characters ||
+                        filter.n_heart_colors > 0 || filter.n_name_fragments > 0 ||
+                        filter.n_cost_values > 0 || filter.has_original_blade ||
+                        filter.has_cost_total || filter.has_blade_limit || filter.has_exclude_self;
+    int ids[1] = {card_id};
+    if (!rb_matching_ids(&filter, ids, 1, ids, 1)) return 0;
+    if (s_excluded_group(card_id, e) || s_excluded_chars(card_id, e)) return 0;
+    return 1;
 }
 
 /* ── Ported from engine/src/core/card.rs (Card impl block) ──────────────── */

@@ -59,6 +59,12 @@ typedef struct {
     int   cost_total;
     char  cost_total_op[8];
     int   has_cost_total;
+    int   cost_values[16];
+    int   n_cost_values;
+    int   distinct;
+    int   blade_limit;
+    char  blade_op[8];
+    int   has_blade_limit;
     int   has_filter;
 } LocalCardFilter;
 
@@ -494,9 +500,9 @@ const char *rb_target_player_label(const char *target, const char *master) {
 /* Mirror util.rs::parse_duration. */
 int rb_parse_duration(const char *s) {
     if (!s) return RB_TEMP_LIVE_END;
-    if (!strcmp(s, "this_turn"))    return RB_TEMP_TURN_END;
-    if (!strcmp(s, "live_end") || !strcmp(s, "this_live")) return RB_TEMP_LIVE_END;
-    if (!strcmp(s, "as_long_as") || !strcmp(s, "permanent")) return RB_TEMP_PERM;
+    if (!strcmp(s, "permanent") || !strcmp(s, "as_long_as")) return RB_TEMP_PERM;
+    if (!strcmp(s, "this_turn") || !strcmp(s, "turn_end") ||
+        !strcmp(s, "until_end_of_turn") || !strcmp(s, "first_turn")) return RB_TEMP_TURN_END;
     return RB_TEMP_LIVE_END;
 }
 
@@ -755,6 +761,29 @@ static int local_filter_matches(const LocalCardFilter *f, int card_id) {
     if (f->has_group && !rb_card_matches_group_str(card_id, f->group)) return 0;
     if (f->has_cost_limit && !rb_card_matches_cost_limit(card_id, f->cost_limit, f->cost_op[0] ? f->cost_op : NULL))
         return 0;
+    if (f->n_cost_values > 0) {
+        Card c;
+        if (!rb_decode_card_by_index((uint32_t)card_id, &c)) return 0;
+        int cost = c.cost;
+        rb_free_card(&c);
+        int found = 0;
+        for (int i = 0; i < f->n_cost_values; i++) if (f->cost_values[i] == cost) found = 1;
+        if (!found) return 0;
+    }
+    if (f->has_cost_total) {
+        Card c;
+        if (!rb_decode_card_by_index((uint32_t)card_id, &c)) return 0;
+        int total = c.cost;
+        rb_free_card(&c);
+        if (!rb_compare_counts(f->cost_total_op[0] ? f->cost_total_op : NULL, total, f->cost_total)) return 0;
+    }
+    if (f->has_blade_limit) {
+        Card c;
+        if (!rb_decode_card_by_index((uint32_t)card_id, &c)) return 0;
+        int blade = c.blade;
+        rb_free_card(&c);
+        if (!rb_compare_counts(f->blade_op[0] ? f->blade_op : NULL, blade, f->blade_limit)) return 0;
+    }
     if (f->has_characters) {
         if (!rb_card_matches_characters(card_id, (const char **)(intptr_t)(intptr_t)(const char **)f->characters, 1))
             return 0;
@@ -886,7 +915,7 @@ static int local_has_filter(const LocalCardFilter *f) {
     return f->card_type[0] || f->has_group || f->has_cost_limit || f->has_characters ||
            f->has_exclude_characters || f->n_heart_colors > 0 || f->has_need_heart_total ||
            f->n_name_fragments > 0 || f->has_original_blade || f->ability_filter[0] ||
-           f->has_exclude_self || f->has_cost_total;
+           f->has_exclude_self || f->has_cost_total || f->n_cost_values > 0 || f->has_blade_limit;
 }
 
 /* Mirror util.rs::CardFilter::matches — check all present filter fields. */
@@ -954,6 +983,11 @@ int rb_matching_ids(const RbCardFilter *rf, const int *cards, int n, int *out, i
     if (rf->has_cost_total) { f.cost_total = rf->cost_total;
                                if (rf->cost_total_op[0]) strncpy(f.cost_total_op, rf->cost_total_op, sizeof f.cost_total_op - 1);
                                f.has_cost_total = 1; }
+    for (int i = 0; i < rf->n_cost_values && i < 16; i++) f.cost_values[i] = rf->cost_values[i];
+    f.n_cost_values = rf->n_cost_values;
+    f.has_blade_limit = rf->has_blade_limit;
+    f.blade_limit = rf->blade_limit;
+    if (rf->blade_op[0]) strncpy(f.blade_op, rf->blade_op, sizeof f.blade_op - 1);
 
     int m = 0;
     for (int i = 0; i < n && m < max; i++) {
@@ -1805,6 +1839,10 @@ void rb_util_push_temporary_effect(
     te->cost = 0;
     te->gained_card_id = -1;
     te->gained_index = -1;
+    te->revert_kind = RB_REVERT_NONE;
+    te->previous_value = 0;
+    te->previous_value2 = 0;
+    te->revert_text[0] = '\0';
     for (int c = 0; c < 8; c++) { te->heart[c] = 0; te->need_heart[c] = 0; }
     (void)target_player_id;
     (void)description;
@@ -1823,6 +1861,10 @@ int rb_push_temporary_effect(GameState *g, int card_id, int dur, int blade,
     e->cost = cost;
     e->gained_card_id = -1;
     e->gained_index = -1;
+    e->revert_kind = RB_REVERT_NONE;
+    e->previous_value = 0;
+    e->previous_value2 = 0;
+    e->revert_text[0] = '\0';
     for (int i = 0; i < 8; i++) {
         e->heart[i] = heart ? heart[i] : 0;
         e->need_heart[i] = need_heart ? need_heart[i] : 0;

@@ -568,6 +568,24 @@ void rb_fire_debut(GameState *g, int pl, int card_id) {
      0 = all, 1 = live_end/during_live (called at live-phase end),
      2 = until_end_of_turn/first_turn (called at turn rollover).
    Reverted entries are compacted out of the array so other durations survive. */
+static void remove_prohibition_text(GameState *g, const char *text) {
+    if (!g || !text || !*text) return;
+    int w = 0;
+    for (int i = 0; i < g->n_prohibition; i++)
+        if (strcmp(g->prohibition[i], text) != 0) {
+            memcpy(g->prohibition[w], g->prohibition[i], sizeof(g->prohibition[w]));
+            w++;
+        }
+    g->n_prohibition = w;
+    w = 0;
+    for (int i = 0; i < g->n_prohibition_effects; i++)
+        if (strcmp(g->prohibition_effects[i], text) != 0) {
+            memcpy(g->prohibition_effects[w], g->prohibition_effects[i], sizeof(g->prohibition_effects[w]));
+            w++;
+        }
+    g->n_prohibition_effects = w;
+}
+
 void rb_check_expired_effects(GameState *g, int which) {
     int w = g->n_temp_effects;
     int j = 0;
@@ -589,6 +607,19 @@ void rb_check_expired_effects(GameState *g, int which) {
                     }
                 }
             }
+            if (te->revert_kind == RB_REVERT_BLADE_SET && te->card_id >= 0)
+                g->mods.blade[te->card_id].set = (int16_t)te->previous_value;
+            else if (te->revert_kind == RB_REVERT_BLADE_TYPE && te->card_id >= 0)
+                g->mods.blade_type[te->card_id] = (int8_t)te->previous_value;
+            else if (te->revert_kind == RB_REVERT_HEART_MULT && te->card_id >= 0) {
+                g->mods.heart_multiplier[te->card_id] = (int8_t)te->previous_value;
+                g->mods.heart_multiplier_amt[te->card_id] = (int8_t)te->previous_value2;
+            } else if (te->revert_kind == RB_REVERT_HEART_COPY && te->card_id >= 0)
+                g->mods.heart_copy[te->card_id] = (int16_t)te->previous_value;
+            else if (te->revert_kind == RB_REVERT_COST_SET && te->card_id >= 0)
+                g->mods.cost[te->card_id].set = (int16_t)te->previous_value;
+            else if (te->revert_kind == RB_REVERT_TEXT)
+                remove_prohibition_text(g, te->revert_text);
             rb_mods_add_blade(&g->mods, te->card_id, -te->blade);
             rb_mods_add_score(&g->mods, te->card_id, -te->score);
             rb_mods_add_cost(&g->mods, te->card_id, -te->cost);

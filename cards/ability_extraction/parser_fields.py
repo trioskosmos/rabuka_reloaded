@@ -1,56 +1,20 @@
 import re
-from functools import lru_cache
-from typing import List, Tuple
+from typing import List
 
 from parser_utils import (
-    POSITION_KEYWORDS,
     STATE_CHANGE_PATTERNS,
     _OPTIONAL_RE,
     _SHUFFLE_RE,
-    extract_by_pattern,
-    extract_count,
-    extract_source,
-    extract_destination,
-    extract_target,
-    extract_card_type,
-    extract_operator,
-    extract_cost_limit,
-    extract_cost_limit_with_operator,
-    extract_picker,
-    detect_require_all_hearts,
-    check_original_value,
     apply_extractors as apply_extracted_fields,
+    detect_position_matches,
+    extract_by_pattern,
+    position_fields_from_matches,
 )
-
-
-extract_count = lru_cache(maxsize=16384)(extract_count)
-extract_source = lru_cache(maxsize=16384)(extract_source)
-extract_destination = lru_cache(maxsize=16384)(extract_destination)
-extract_target = lru_cache(maxsize=16384)(extract_target)
-extract_card_type = lru_cache(maxsize=16384)(extract_card_type)
-extract_operator = lru_cache(maxsize=16384)(extract_operator)
-extract_cost_limit = lru_cache(maxsize=16384)(extract_cost_limit)
-extract_cost_limit_with_operator = lru_cache(maxsize=16384)(extract_cost_limit_with_operator)
-extract_picker = lru_cache(maxsize=16384)(extract_picker)
-detect_require_all_hearts = lru_cache(maxsize=16384)(detect_require_all_hearts)
-check_original_value = lru_cache(maxsize=16384)(check_original_value)
-
-
 ICON_POSITION_TEMPLATES = {
     "{{center.png|センター}}": "center",
     "{{leftside.png|左サイド}}": "left_side",
     "{{rightside.png|右サイド}}": "right_side",
 }
-
-
-def detect_position_matches(text: str) -> List[Tuple[str, str]]:
-    seen = set()
-    matches = []
-    for keyword, position in POSITION_KEYWORDS.items():
-        if position not in seen and keyword in text:
-            seen.add(position)
-            matches.append((keyword, position))
-    return matches
 
 
 def detect_positions(text: str) -> List[str]:
@@ -95,18 +59,12 @@ def format_positions(positions: List[str]) -> str:
 def set_cross_position_fields(target, text):
     if "position" in target:
         return False
-    matched = {position for _, position in detect_position_matches(text)}
-    if "left_side" in matched and "right_side" in matched:
-        target["position"] = "left_side"
-        target["position_compare"] = "right_side"
-    elif len(matched) == 1:
-        target["position"] = next(iter(matched))
-    elif len(matched) > 1:
-        positions = sorted(matched)
-        target["position"] = positions[0]
-        target["position_compare"] = positions[1]
-    else:
+    fields = position_fields_from_matches(
+        tuple(position for _, position in detect_position_matches(text))
+    )
+    if not fields:
         return False
+    target.update(fields)
     return True
 
 

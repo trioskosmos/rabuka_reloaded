@@ -1241,6 +1241,13 @@ typedef struct {
 #define RB_TEMP_PERM      0
 #define RB_TEMP_LIVE_END  1
 #define RB_TEMP_TURN_END  2
+#define RB_REVERT_NONE            0
+#define RB_REVERT_BLADE_SET       1
+#define RB_REVERT_BLADE_TYPE      2
+#define RB_REVERT_HEART_MULT      3
+#define RB_REVERT_HEART_COPY      4
+#define RB_REVERT_COST_SET        5
+#define RB_REVERT_TEXT            6
 #define RB_MAX_DELAYED_GAINED 16
 typedef struct {
     int card_id;
@@ -1256,6 +1263,10 @@ typedef struct {
     int need_heart[8];
     int gained_card_id;
     int gained_index;
+    int revert_kind;
+    int previous_value;
+    int previous_value2;
+    char revert_text[48];
 } RbTempEffect;
 
 /* Replacement effect (used by GameState at line 819). */
@@ -1356,6 +1367,7 @@ typedef struct GameState {
     int      n_turn_state_changes;
     int8_t   state_change_from[RB_MAX_CARD_IDS];
     int8_t   state_change_to[RB_MAX_CARD_IDS];
+    int      state_change_triggering;
     int      last_wait_to_active_count; /* count of wait→active flips this turn */
     int      revealed_cards[RB_MAX_REVEALED_CARDS]; /* cards revealed by yell/re_yell */
      int      n_revealed;

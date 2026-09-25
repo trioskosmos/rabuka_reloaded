@@ -869,7 +869,8 @@ int rb_resolver_handle_select_card(RbAbilityResolver *self, GameState *g, const 
     }
 
     /* Energy zone cost handling (choice.rs:746-800): pay_energy with reprompt */
-    if (!strcmp(zone,"energy") && !effect_started) {
+    if (!strcmp(zone,"energy") && !effect_started &&
+        !(target && !strcmp(target, "energy_state_change"))) {
         const char *dest = g->queue.pending.target[0] ? g->queue.pending.target : NULL;
         if (!dest || strcmp(dest,"under_member")!=0) {
             if (!was_skip) {
@@ -986,6 +987,34 @@ int rb_resolver_handle_select_card(RbAbilityResolver *self, GameState *g, const 
         return 0;
     }
     if (!strcmp(zone,"energy")) {
+        if (target && !strcmp(target, "energy_state_change")) {
+            if (was_skip) return 0;
+            int ids[RB_MAX_ZONE];
+            int n = rb_zone_cards(g, actor, "energy", ids, RB_MAX_ZONE);
+            if (idx < 0 || idx >= n) return 0;
+            int cid = ids[idx];
+            int already = 0;
+            for (int i = 0; i < g->n_selected_cards; i++)
+                if (g->selected_cards[i] == cid) already = 1;
+            if (!already && g->n_selected_cards < RB_MAX_RECENTLY_MOVED)
+                g->selected_cards[g->n_selected_cards++] = cid;
+            already = 0;
+            for (int i = 0; i < self->n_selected_cards; i++)
+                if (self->selected_cards[i] == cid) already = 1;
+            if (!already && self->n_selected_cards < RB_MAX_RECENTLY_MOVED)
+                self->selected_cards[self->n_selected_cards++] = cid;
+            if (g->queue.pending.count > 1) {
+                g->queue.pending.count--;
+                int w = 0;
+                for (int i = 0; i < g->queue.pending.n_filtered_indices; i++)
+                    if (g->queue.pending.filtered_indices[i] != idx)
+                        g->queue.pending.filtered_indices[w++] = g->queue.pending.filtered_indices[i];
+                g->queue.pending.n_filtered_indices = w;
+                return 0;
+            }
+            g->queue.has_pending = 0;
+            return 0;
+        }
         if (!was_skip) {
             int ids[RB_MAX_ZONE]; int n=rb_zone_cards(g, actor,"energy",ids,RB_MAX_ZONE);
             if(idx>=0 && idx<n){ int cid=ids[idx]; rb_choice_send_to_dst(g,actor,cid,"waitroom"); if(self->n_moved_cards<RB_MAX_RECENTLY_MOVED) self->moved_cards[self->n_moved_cards++]=cid; }

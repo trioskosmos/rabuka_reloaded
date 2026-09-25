@@ -92,6 +92,25 @@ from parser_utils import (
     extract_cost_values,
     extract_all_quoted_names,
     extract_all_groups,
+    extract_field_context,
+    detect_position_matches,
+    position_fields_from_matches,
+    FieldContext,
+    ACTION_CARD_FIELDS_POLICY,
+    ACTION_DESTINATION_POLICY,
+    ACTION_POSITION_POLICY,
+    ACTION_SOURCE_POLICY,
+    extract_count,
+    extract_source,
+    extract_destination,
+    extract_target,
+    extract_card_type,
+    extract_operator,
+    extract_cost_limit,
+    extract_cost_limit_with_operator,
+    extract_picker,
+    detect_require_all_hearts,
+    check_original_value,
     detect_card_property,
     LOCATION_PATTERNS,
     POSITION_KEYWORDS,
@@ -126,7 +145,6 @@ from cost_parser import (
 from parser_fields import (
     apply_group_exclusions,
     detect_note_positions,
-    detect_position_matches,
     detect_positions,
     detect_icon_positions,
     set_cross_position_fields,
@@ -136,24 +154,7 @@ from parser_fields import (
     _quoted_names,
     _has_shuffle,
     detect_exclude_self,
-    extract_count,
-    extract_source,
-    extract_destination,
-    extract_target,
-    extract_card_type,
-    extract_operator,
-    extract_cost_limit,
-    extract_cost_limit_with_operator,
-    extract_picker,
-    detect_require_all_hearts,
-    check_original_value,
 )
-
-# ======================================================================
-# EXTRACTION MEMOIZATION (Phase 3: single-pass field extraction)
-# ======================================================================
-# Scalar extractors are lru_cache-wrapped at the name level in parser_fields
-# (single owner); every call site in this module uses those cached versions.
 
 # ============== CONFIGURATION CONSTANTS ==============
 SPLIT_LIMIT = 1
@@ -2347,10 +2348,18 @@ def parse_action(text: str) -> Dict[str, Any]:
                 action["duration"] = _dur_code
                 break
 
-    # Extract count, card_type, target, state_change for dispatch rules
-    count = extract_count(text)
-    target = extract_target(text)
-    card_type = extract_card_type(text)
+    # Shared extraction context owns one scan for the common action fields.
+    field_context = extract_field_context(
+        text,
+        source=extract_source,
+        destination=extract_destination,
+        target=extract_target,
+        card_type=extract_card_type,
+        count=extract_count,
+    )
+    count = field_context.count
+    target = field_context.target
+    card_type = field_context.card_type
     state_change = extract_state_change(text)
 
     if per_unit_info is not None:
@@ -2386,8 +2395,7 @@ def parse_action(text: str) -> Dict[str, Any]:
         action["source"] = "under_member"
         action["card_type"] = "energy_card"
 
-    # Extract source
-    source = extract_source(text)
+    source = field_context.source
     if source:
         action["source"] = source
         # Special case: if source is deck_top and no count was extracted, default to 1
@@ -2409,8 +2417,7 @@ def parse_action(text: str) -> Dict[str, Any]:
         elif source in ("revealed_card", "revealed_cards") and "count" not in action:
             action["count"] = 1
 
-    # Extract destination
-    destination = extract_destination(text)
+    destination = field_context.destination
     if destination:
         action["destination"] = destination
     # Check for "好きな順番で" (in any order) placement
@@ -2461,30 +2468,24 @@ def parse_action(text: str) -> Dict[str, Any]:
         if state_change == "wait" and "アクティブ状態" in text:
             action["state"] = "active"
 
-    if count:
-        action["count"] = count
-    elif "これにより引いた枚数と同じ枚数を" in text:
+    # Apply the common fields at their original insertion points. These
+    # policies intentionally overwrite rule fields to preserve parse ordering.
+    if not count and "これにより引いた枚数と同じ枚数を" in text:
         action["dynamic_count"] = {"type": "drawn_cards", "reference": "previous_draw"}
     else:
-        dynamic_count = extract_dynamic_count(text)
+        dynamic_count = extract_dynamic_count(text) if not count else None
         if dynamic_count:
             action["dynamic_count"] = dynamic_count
-            # If dynamic_count set for place_energy_under_member, remove fixed energy_count
             if (
                 action.get("action") == "place_energy_under_member"
                 and "energy_count" in action
             ):
                 del action["energy_count"]
-
-    if card_type:
-        action["card_type"] = card_type
-
-    if target:
-        action["target"] = target
+    field_context.apply(action, ACTION_CARD_FIELDS_POLICY)
 
     # Extract position restrictions (e.g., "センター", "センターエリア")
     # Also detect cross-position patterns (e.g. "右サイドエリアと左サイドエリア")
-    set_cross_position_fields(action, text)
+    field_context.apply(action, ACTION_POSITION_POLICY)
 
     # Extract exclude_self for actions (e.g., "このメンバー以外の" or "「character name」以外")
     # Only for filtering actions, NOT for gain_resource/select (self-buffs)

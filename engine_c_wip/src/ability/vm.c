@@ -621,6 +621,10 @@ static AbilityEffect *decode_effect_body(Rdr *r) {
         }
     }
     return e;
+
+fail:
+    effect_free(e);
+    return NULL;
 }
 
 /* decode an optional effect value (TAG_NULL -> NULL) */
@@ -691,11 +695,6 @@ int rb_decode_keywords(const unsigned char *arr, uint32_t arr_len, RbKeyword *ou
         return 0;
     }
     return present ? count : 0;
-}
-            }
-        } else skip_value(&r, st);
-    }
-    return kwc;
 }
 
 /* ── Empty-bytecode audit (mirrors vm.rs count_empty_bytecode_abilities) ──

@@ -3,15 +3,15 @@ from typing import Any, Dict, List
 
 from parser_utils import (
     COUNT_PATTERN,
+    FieldContext,
+    COST_CARD_FIELDS_POLICY,
+    COST_REVEAL_FIELDS_POLICY,
     extract_all_groups,
-    extract_card_type,
     extract_cost_limit,
     extract_cost_values,
-    extract_count,
-    extract_destination,
+    extract_field_context,
     extract_operator,
-    extract_source,
-    extract_target,
+    matches_predicate,
 )
 from parser_fields import (
     _has_shuffle,
@@ -38,12 +38,6 @@ _COST_BATON_TOUCH_PATTERNS = [
     (r"「([^」]+)」からバトンタッチ", "baton_touch_source"),
     (r"『([^』]+)』からバトンタッチ", "baton_touch_group"),
 ]
-_COST_CARD_FIELDS = (
-    ("count", extract_count),
-    ("card_type", extract_card_type),
-    ("target", extract_target),
-    ("group_names", extract_all_groups),
-)
 
 
 def _mark_discard_all_hand(cost, text):
@@ -66,21 +60,19 @@ def _infer_destination_from_source(cost, text):
             cost["destination"] = "hand"
 
 
-def _fill_cost_source(cost, text):
+def _fill_cost_source(cost: dict, text: str, context: FieldContext):
     if "手札を" in text or "手札の" in text:
         cost["source"] = "hand"
         cost["zone"] = "hand"
-    src = extract_source(text)
-    if src and "source" not in cost:
-        cost["source"] = src
+    if context.source and "source" not in cost:
+        cost["source"] = context.source
         if "zone" not in cost:
-            cost["zone"] = src
+            cost["zone"] = context.source
 
 
-def _fill_cost_destination(cost, text):
-    dst = extract_destination(text)
-    if dst:
-        cost["destination"] = dst
+def _fill_cost_destination(cost: dict, text: str, context: FieldContext):
+    if context.destination:
+        cost["destination"] = context.destination
     if "エネルギーデッキに置く" in text:
         cost["destination"] = "energy_deck"
         if "source" not in cost and "エネルギー" in text:
@@ -98,17 +90,22 @@ def _mark_self_cost(cost, text):
         cost["self_cost"] = True
 
 
-def _extract_basic_cost_fields(cost, text):
-    _fill_cost_source(cost, text)
-    _fill_cost_destination(cost, text)
+def _extract_basic_cost_fields(cost, text, context=None):
+    if context is None:
+        context = extract_field_context(text)
+    _fill_cost_source(cost, text, context)
+    _fill_cost_destination(cost, text, context)
     _infer_destination_from_source(cost, text)
     _mark_discard_all_hand(cost, text)
-    apply_extracted_fields(cost, text, (
-        ("state_change", extract_state_change),
-        *_COST_CARD_FIELDS,
-    ))
+    state_change = extract_state_change(text)
+    if state_change:
+        cost["state_change"] = state_change
+    context.apply(cost, COST_CARD_FIELDS_POLICY)
+    group_names = extract_all_groups(text)
+    if group_names:
+        cost["group_names"] = group_names
     for test, field, value in _COST_FLAG_RULES:
-        if test(text) if callable(test) else test in text:
+        if matches_predicate(test, text):
             cost[field] = value
     if "バトンタッチ" in text:
         for pattern, field in _COST_BATON_TOUCH_PATTERNS:
@@ -219,7 +216,11 @@ def _cost_reveal(text, cost):
     match = re.search(COUNT_PATTERN, text)
     if match:
         cost["count"] = int(match.group(1))
-    apply_extracted_fields(cost, text, _COST_CARD_FIELDS[1:2] + _COST_CARD_FIELDS[3:])
+    context = extract_field_context(text)
+    context.apply(cost, COST_REVEAL_FIELDS_POLICY)
+    group_names = extract_all_groups(text)
+    if group_names:
+        cost["group_names"] = group_names
     return cost
 
 
@@ -239,7 +240,7 @@ def _apply_under_member_classification(cost, text):
     elif "このカード" in text or "メンバーカード" in text:
         cost["card_type"] = "member_card"
     if not cost.get("source"):
-        cost["source"] = extract_source(text) or "energy_zone"
+        cost["source"] = extract_field_context(text).source or "energy_zone"
     return "place_energy_under_member"
 
 
@@ -335,7 +336,8 @@ _TAIL_FLAG_PHRASES = (
 
 def parse_cost(text: str) -> Dict[str, Any]:
     cost: Dict[str, Any] = {"text": text}
-    _extract_basic_cost_fields(cost, text)
+    context = extract_field_context(text)
+    _extract_basic_cost_fields(cost, text, context)
     for handler in _COST_HANDLERS:
         result = handler(text, cost)
         if result is not None:
@@ -343,7 +345,8 @@ def parse_cost(text: str) -> Dict[str, Any]:
     if any(phrase in text for phrase in _DECK_BOTTOM_PHRASES):
         cost["destination"] = "deck_bottom"
         cost["type"] = "move_cards"
-        apply_extracted_fields(cost, text, (("source", extract_source),))
+        if context.source:
+            cost["source"] = context.source
     for phrases, field, value in _TAIL_FLAG_PHRASES:
         if any(phrase in text for phrase in phrases):
             cost[field] = value

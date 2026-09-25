@@ -42,7 +42,9 @@ impl Drop for RngGuard {
 
 fn own_visible_pool(gs: &GameState, me: u8) -> Vec<String> {
     let p = gs.seat_player(me);
-    p.hand.cards.iter()
+    p.hand
+        .cards
+        .iter()
         .chain(p.stage.stage.iter())
         .chain(p.stage.under_cards.iter().flatten())
         .chain(p.waitroom.cards.iter())
@@ -55,7 +57,8 @@ fn own_visible_pool(gs: &GameState, me: u8) -> Vec<String> {
 }
 
 fn first_live_id(db: &CardDatabase) -> i16 {
-    db.cards.values()
+    db.cards
+        .values()
         .find(|card| card.card_type == CardType::Live)
         .and_then(|card| db.get_card_id(card.card_no.as_ref()))
         .unwrap_or(-1)
@@ -70,7 +73,9 @@ fn take_live_cards(
     let mut keep = Vec::with_capacity(source.len());
     for &cid in source.iter() {
         if selected.len() < limit
-            && db.get_card(cid).is_some_and(|card| card.card_type == CardType::Live)
+            && db
+                .get_card(cid)
+                .is_some_and(|card| card.card_type == CardType::Live)
         {
             selected.push(cid);
         } else {
@@ -83,10 +88,7 @@ fn take_live_cards(
 fn fair_rollout_state(gs: &GameState, me: u8, seed: u64) -> GameState {
     let observation = PublicObservation::from_state(gs, me);
     let own_pool = own_visible_pool(gs, me);
-    let sampler = DeterminizationSampler::new_fair(
-        crate::Arc::clone(&gs.card_database),
-        &own_pool,
-    );
+    let sampler = DeterminizationSampler::new_fair(crate::Arc::clone(&gs.card_database), &own_pool);
     let sampled = sampler.sample(&observation);
     let sampled_opp = sampled.seat_player(1 - me);
     let mut sim = gs.clone();
@@ -109,8 +111,18 @@ fn fair_rollout_state(gs: &GameState, me: u8, seed: u64) -> GameState {
         let mut live_cards = Vec::with_capacity(live_count);
         let mut hand_cards = opp.hand.cards.to_vec();
         let mut deck_cards = opp.main_deck.cards.to_vec();
-        take_live_cards(&mut hand_cards, &mut live_cards, live_count, &gs.card_database);
-        take_live_cards(&mut deck_cards, &mut live_cards, live_count, &gs.card_database);
+        take_live_cards(
+            &mut hand_cards,
+            &mut live_cards,
+            live_count,
+            &gs.card_database,
+        );
+        take_live_cards(
+            &mut deck_cards,
+            &mut live_cards,
+            live_count,
+            &gs.card_database,
+        );
         opp.hand.cards = hand_cards.into();
         opp.main_deck.cards = deck_cards.into();
         let fallback = first_live_id(&gs.card_database);
@@ -185,7 +197,10 @@ fn apply_portfolio(sim: &mut GameState, desired: &[usize]) -> bool {
         game_setup::settle_single_player_state(sim);
     }
     let acts = game_setup::generate_possible_actions(sim);
-    match acts.iter().find(|a| a.action_type == game_setup::ActionType::ConfirmLiveCardSet) {
+    match acts
+        .iter()
+        .find(|a| a.action_type == game_setup::ActionType::ConfirmLiveCardSet)
+    {
         Some(a) => game_setup::execute_action(sim, a).is_ok(),
         None => false,
     }
@@ -205,7 +220,8 @@ fn rollout_value(
         if sim.game_result != GameResult::Ongoing {
             break;
         }
-        let turn_done = sim.turn_number > horizon_end || sim.turn_number.wrapping_sub(start_turn) > HORIZON_TURNS;
+        let turn_done = sim.turn_number > horizon_end
+            || sim.turn_number.wrapping_sub(start_turn) > HORIZON_TURNS;
         if turn_done {
             break;
         }
@@ -222,9 +238,7 @@ fn rollout_value(
 
         let action = match sim.current_phase {
             crate::game_state::Phase::RockPaperScissors
-            | crate::game_state::Phase::ChooseFirstAttacker => {
-                actions[0].clone()
-            }
+            | crate::game_state::Phase::ChooseFirstAttacker => actions[0].clone(),
             crate::game_state::Phase::MulliganFirstAttacker
             | crate::game_state::Phase::MulliganSecondAttacker => {
                 super::strategy_v4::choose_mulligan_v4(sim, &actions, &sim.card_database)
@@ -252,7 +266,38 @@ fn rollout_value(
     value_outcome(sim, me, start_succ)
 }
 
+pub fn price_main_actions(
+    gs: &GameState,
+    me: u8,
+    actions: &[Action],
+    simulations: usize,
+) -> Vec<f64> {
+    let start_turn = gs.turn_number;
+    let start_succ = (
+        gs.player1.success_live_card_zone.cards.len() as i32,
+        gs.player2.success_live_card_zone.cards.len() as i32,
+    );
+    let horizon_end = start_turn.saturating_add(1);
+    let _guard = RngGuard(crate::rng::checkpoint());
+    let mut totals = vec![0.0; actions.len()];
+    for (index, action) in actions.iter().enumerate() {
+        for simulation in 0..simulations.max(1) {
+            crate::rng::seed(0x51A7 + simulation as u32);
+            let mut sim = fair_rollout_state(gs, me, 0x51A7 + simulation as u64);
+            if game_setup::execute_action(&mut sim, action).is_err() {
+                totals[index] -= 500.0;
+                continue;
+            }
+            game_setup::settle_single_player_state(&mut sim);
+            totals[index] += rollout_value(&mut sim, me, start_turn, start_succ, horizon_end);
+        }
+        totals[index] /= simulations.max(1) as f64;
+    }
+    totals
+}
+
 /// Price candidate portfolios by rollout. Returns the index into
+
 /// `candidates` of the highest-average-value portfolio.
 pub fn price_portfolios(
     gs: &GameState,
@@ -312,8 +357,7 @@ pub fn enumerate_candidates(gs: &GameState, me: u8, db: &CardDatabase) -> Vec<Ve
     let (my, _) = gs.seated_pair(me);
     let pool = heart_pool(gs, me, db);
     let lives = hand_lives(my, db);
-    let max_slots =
-        (3i32 - i32::from(my.live_card_set_limit_reduction)).max(0) as usize;
+    let max_slots = (3i32 - i32::from(my.live_card_set_limit_reduction)).max(0) as usize;
     let (blades, density) = flip_stats(gs, me, db);
 
     let mut scored: Vec<(f64, Vec<usize>)> = Vec::new();
@@ -335,8 +379,7 @@ pub fn enumerate_candidates(gs: &GameState, me: u8, db: &CardDatabase) -> Vec<Ve
                     match alloc(&p, need) {
                         Some(next) => {
                             p = next;
-                            score +=
-                                db.get_card(cid).and_then(|c| c.score).unwrap_or(0) as i32;
+                            score += db.get_card(cid).and_then(|c| c.score).unwrap_or(0) as i32;
                             total_req += (0..=7)
                                 .chain(std::iter::once(10))
                                 .map(|i| need[i])
@@ -452,16 +495,14 @@ pub fn choose_live_set_v7(gs: &GameState, actions: &[Action], db: &CardDatabase)
         // Fill spare slots with junk draws exactly like the heuristic path,
         // so the priced comparison matches what will actually be set.
         let (my, _) = gs.seated_pair(me);
-        let max_slots =
-            (3i32 - i32::from(my.live_card_set_limit_reduction)).max(0) as usize;
+        let max_slots = (3i32 - i32::from(my.live_card_set_limit_reduction)).max(0) as usize;
         let deck_lives = my
             .main_deck
             .cards
             .iter()
             .filter(|&&cid| {
-                db.get_card(cid).map_or(false, |c| {
-                    c.card_type == crate::card::CardType::Live
-                })
+                db.get_card(cid)
+                    .map_or(false, |c| c.card_type == crate::card::CardType::Live)
             })
             .count();
         if !plan.is_empty() && plan.len() < max_slots && deck_lives > 0 {
@@ -472,9 +513,9 @@ pub fn choose_live_set_v7(gs: &GameState, actions: &[Action], db: &CardDatabase)
                 .enumerate()
                 .filter(|&(i, &cid)| {
                     !plan.contains(&i)
-                        && db.get_card(cid).map_or(false, |c| {
-                            c.card_type != crate::card::CardType::Live
-                        })
+                        && db
+                            .get_card(cid)
+                            .map_or(false, |c| c.card_type != crate::card::CardType::Live)
                 })
                 .map(|(i, _)| i)
                 .collect();
@@ -498,9 +539,8 @@ pub fn choose_live_set_v7(gs: &GameState, actions: &[Action], db: &CardDatabase)
                 .iter()
                 .enumerate()
                 .filter(|&(_, &cid)| {
-                    db.get_card(cid).map_or(false, |c| {
-                        c.card_type != crate::card::CardType::Live
-                    })
+                    db.get_card(cid)
+                        .map_or(false, |c| c.card_type != crate::card::CardType::Live)
                 })
                 .map(|(i, _)| i)
                 .collect();
@@ -533,5 +573,3 @@ pub fn choose_live_set_v7(gs: &GameState, actions: &[Action], db: &CardDatabase)
     };
     super::strategy_v5::emit(gs, actions, &desired)
 }
-
-

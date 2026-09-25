@@ -1,5 +1,3 @@
-use crate::bot::determinization::DeterminizationSampler;
-use crate::bot::observation::PublicObservation;
 use crate::bot::strategy_common::{acc_add, requirements_met, Acc};
 use crate::card::CardType;
 use crate::core::stats_pipeline;
@@ -433,6 +431,17 @@ fn is_free_baton(gs: &GameState, me: u8, action: &Action) -> bool {
     })
 }
 
+fn rollout_suggestion(gs: &GameState, actions: &[Action], me: u8) -> Option<Action> {
+    if gs.current_phase != Phase::Main {
+        return None;
+    }
+    let values = crate::bot::rollout::price_main_actions(gs, me, actions, 8);
+    let (index, _) = values
+        .iter()
+        .enumerate()
+        .max_by(|(_, left), (_, right)| left.total_cmp(right))?;
+    Some(actions.get(*index).cloned()?)
+}
 fn pick_best(gs: &GameState, me: u8, actions: &[Action], scores: &[(f64, String)]) -> usize {
     let mut best = 0usize;
     for i in 1..scores.len() {
@@ -457,32 +466,6 @@ fn pick_best(gs: &GameState, me: u8, actions: &[Action], scores: &[(f64, String)
                 si
             );
             best = i;
-        }
-    }
-    if std::env::var_os("V7_RACE_DEVELOP").is_some() {
-        let me = gs.active_player_index();
-        let (own, opp) = gs.seated_pair(me);
-        if opp.success_live_card_zone.cards.len() >= 2 && own.success_live_card_zone.cards.len() < 2
-        {
-            let mut race_best: Option<(usize, u8)> = None;
-            for (index, action) in actions.iter().enumerate() {
-                if action.action_type != ActionType::PlayMemberToStage
-                    || action.parameters.as_ref().and_then(|p| p.disabled) == Some(true)
-                {
-                    continue;
-                }
-                let cost = action
-                    .parameters
-                    .as_ref()
-                    .and_then(|p| p.final_cost)
-                    .unwrap_or(0);
-                if race_best.is_none_or(|(_, best_cost)| cost > best_cost) {
-                    race_best = Some((index, cost));
-                }
-            }
-            if let Some((index, _)) = race_best {
-                return index;
-            }
         }
     }
     best
@@ -549,7 +532,11 @@ pub fn score_actions(gs: &GameState, actions: &[Action], me: u8) -> Vec<(f64, St
             let card = action
                 .parameters
                 .as_ref()
-                .and_then(|p| p.card_no.clone())
+                .and_then(|p| {
+                    p.card_id
+                        .map(|id| id.to_string())
+                        .or_else(|| p.card_no.clone())
+                })
                 .unwrap_or_else(|| "-".into());
             let area = action
                 .parameters
@@ -575,7 +562,11 @@ pub fn score_actions(gs: &GameState, actions: &[Action], me: u8) -> Vec<(f64, St
         let chosen = actions.get(best);
         let card = chosen
             .and_then(|a| a.parameters.as_ref())
-            .and_then(|p| p.card_no.clone())
+            .and_then(|p| {
+                p.card_id
+                    .map(|id| id.to_string())
+                    .or_else(|| p.card_no.clone())
+            })
             .unwrap_or_else(|| "-".into());
         eprintln!(
             "V7CH t={} me={} act={} card={} score={:.2} note={}",
@@ -603,6 +594,37 @@ pub fn choose_action(gs: &GameState, actions: &[Action], me: u8) -> Action {
         parameters: None,
         selected: None,
     });
+    if std::env::var_os("V7_ROLLOUT_COMPARE").is_some() {
+        if let Some(suggested) = rollout_suggestion(gs, actions, me) {
+            let suggested_card = suggested
+                .parameters
+                .as_ref()
+                .and_then(|p| {
+                    p.card_id
+                        .map(|id| id.to_string())
+                        .or_else(|| p.card_no.clone())
+                })
+                .unwrap_or_else(|| "-".into());
+            let chosen_card = chosen
+                .parameters
+                .as_ref()
+                .and_then(|p| {
+                    p.card_id
+                        .map(|id| id.to_string())
+                        .or_else(|| p.card_no.clone())
+                })
+                .unwrap_or_else(|| "-".into());
+            eprintln!(
+                "V7ISM t={} me{} chosen={}:{} rollout={}:{}",
+                gs.turn_number,
+                me,
+                chosen.action_type,
+                chosen_card,
+                suggested.action_type,
+                suggested_card
+            );
+        }
+    }
     log::debug!(
         "v7_main chosen t{} me{} {:?} params={:?} score={:.2} note={}",
         gs.turn_number,
