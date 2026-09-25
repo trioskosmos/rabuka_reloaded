@@ -1,4 +1,5 @@
 use crate::helpers::*;
+use rabuka_engine::core::types::AbilityTrigger;
 
 fn assert_live_success_reveal_score(revealed_print: &str, expected_bonus: u32) {
     let db = load_real_database();
@@ -119,4 +120,45 @@ fn live_success_revealed_total_score_applies_once_with_two_set_lives() {
         snapshot.total_score as u32, 6,
         "score 2 + score 3 + printed single +1; per-live multiplication would show 7"
     );
+}
+
+#[test]
+fn p2_live_success_reveals_only_p2_top_member_and_scores_only_p2_live() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let source = game.id("PL!-bp6-007-R+");
+    let p1_revealed = game.id("PL!-sd1-001-SD");
+    let p2_revealed = game.new_id("PL!-sd1-001-SD");
+    let p2_live = game.new_id("PL!-sd1-020-SD");
+    let filler = game.id("PL!-sd1-010-SD");
+    game.state.player2.stage.stage = [-1, source, -1];
+    game.state.player2.live_card_zone.cards.push(p2_live);
+    game.state.player1.main_deck.cards.push(p1_revealed);
+    game.state.player1.main_deck.cards.extend([filler; 10]);
+    game.state.player2.main_deck.cards.push(p2_revealed);
+    game.state.player2.main_deck.cards.extend([filler; 10]);
+
+    let card = game.db.get_card(source).unwrap();
+    let ability = card
+        .resolved_abilities()
+        .find(|a| a.triggers.as_deref() == Some("ライブ成功時"))
+        .unwrap();
+    game.state.trigger_auto_ability(
+        format!("{}_{}", card.card_no, ability.full_text),
+        AbilityTrigger::LiveSuccess,
+        "p2".to_string(),
+        Some(card.card_no.to_string()),
+        Some(source),
+        None,
+        None,
+    );
+    game.state.activating_card = Some(source);
+    game.state.process_pending_auto_abilities("p2");
+
+    assert!(game.state.player2.hand.cards.contains(&p2_revealed));
+    assert!(!game.state.player1.hand.cards.contains(&p2_revealed));
+    assert!(!game.state.player1.hand.cards.contains(&p1_revealed));
+    assert!(!game.state.player2.main_deck.cards.contains(&p2_revealed));
+    assert_eq!(game.state.mods.p2_constant_total_score_bonus, 1);
+    assert_eq!(game.state.mods.p1_constant_total_score_bonus, 0);
 }

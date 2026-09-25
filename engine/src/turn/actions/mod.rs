@@ -56,10 +56,7 @@ impl ResumeSnapshot {
     /// Capture the snapshot and decide the outcome. Centralizes the flag
     /// computation previously smeared across the three branches, with the
     /// single CHOICE_RESUME_BRANCH debug line.
-    fn capture(
-        game_state: &mut GameState,
-        had_pending_sequential: bool,
-    ) -> (Self, ResumeOutcome) {
+    fn capture(game_state: &mut GameState, had_pending_sequential: bool) -> (Self, ResumeOutcome) {
         let entry = game_state.ability_queue.current_entry();
         let cost_was_paid = entry.is_some_and(|e| e.cost_paid);
         let effect_started = game_state
@@ -218,7 +215,9 @@ impl super::TurnEngine {
         } else {
             // Sandbox / no player context: sequential (P1 then P2)
             if game_state.player1_rps_choice.is_none() {
-                Self::handle_rps_choice_p1(game_state, choice_value)
+                let result = Self::handle_rps_choice_p1(game_state, choice_value);
+                game_state.pending_rps_player_id = Some(1);
+                result
             } else {
                 Self::handle_rps_choice_p2(game_state, choice_value)
             }
@@ -271,17 +270,17 @@ impl super::TurnEngine {
         }
 
         match action {
-                crate::game_setup::ActionType::Pass => match game_state.current_phase {
-                    Phase::LiveCardSetFirstAttacker => {
-                        Self::refill_live_zone_hand(game_state, "FA");
-                        game_state.current_phase = Phase::LiveCardSetSecondAttacker;
-                        Ok(())
-                    }
-                    Phase::LiveCardSetSecondAttacker => {
-                        Self::refill_live_zone_hand(game_state, "SA");
-                        Self::advance_phase(game_state);
-                        Ok(())
-                    }
+            crate::game_setup::ActionType::Pass => match game_state.current_phase {
+                Phase::LiveCardSetFirstAttacker => {
+                    Self::refill_live_zone_hand(game_state, "FA");
+                    game_state.current_phase = Phase::LiveCardSetSecondAttacker;
+                    Ok(())
+                }
+                Phase::LiveCardSetSecondAttacker => {
+                    Self::refill_live_zone_hand(game_state, "SA");
+                    Self::advance_phase(game_state);
+                    Ok(())
+                }
                 _ => {
                     Self::advance_phase(game_state);
                     Ok(())
@@ -362,18 +361,13 @@ impl super::TurnEngine {
     fn cost_has_hand_self_move(cost: &crate::card::AbilityEffect) -> bool {
         match cost.action {
             ActionType::MoveCards => {
-                cost.source_zone() == Some(Zone::Hand)
-                    && cost.self_cost_any().unwrap_or(false)
+                cost.source_zone() == Some(Zone::Hand) && cost.self_cost_any().unwrap_or(false)
             }
-            ActionType::SequentialCost => cost
-                .compound
-                .actions
-                .as_ref()
-                .is_some_and(|actions| {
-                    actions
-                        .iter()
-                        .any(|action| Self::cost_has_hand_self_move(action.as_ref()))
-                }),
+            ActionType::SequentialCost => cost.compound.actions.as_ref().is_some_and(|actions| {
+                actions
+                    .iter()
+                    .any(|action| Self::cost_has_hand_self_move(action.as_ref()))
+            }),
             _ => false,
         }
     }
@@ -389,20 +383,17 @@ impl super::TurnEngine {
             Zone::Hand => player.hand.cards.contains(&card_id),
             Zone::Discard => player.waitroom.cards.contains(&card_id),
             Zone::Stage => {
-                let stage_position =
-                    player.stage.stage.iter().position(|&id| id == card_id);
+                let stage_position = player.stage.stage.iter().position(|&id| id == card_id);
                 if let Some(pos) = stage_position {
                     let stage_area = crate::ability::util::pos_to_area(pos);
-                    crate::zones::check_trigger_position(
-                        ability.triggers.as_deref(),
-                        stage_area,
-                    ) && crate::zones::check_effect_position(
-                        ability
-                            .effect
-                            .as_ref()
-                            .and_then(|e| e.activation_position_any()),
-                        stage_area,
-                    )
+                    crate::zones::check_trigger_position(ability.triggers.as_deref(), stage_area)
+                        && crate::zones::check_effect_position(
+                            ability
+                                .effect
+                                .as_ref()
+                                .and_then(|e| e.activation_position_any()),
+                            stage_area,
+                        )
                 } else {
                     false
                 }
@@ -422,8 +413,7 @@ impl super::TurnEngine {
     ) -> Result<(), String> {
         if let Some(ref cost) = ability.cost {
             let groups = game_state.distinct_stage_groups(player_id);
-            let effective =
-                game_state.effective_activation_cost_for(cost, groups) as u32;
+            let effective = game_state.effective_activation_cost_for(cost, groups) as u32;
             if !cost.has_optional_payment() && effective > u32::from(active_energy) {
                 return Err(format!(
                     "Cannot activate: cost {} energy exceeds active {}",
@@ -441,15 +431,16 @@ impl super::TurnEngine {
         player: &crate::player::Player,
         card_id: i16,
     ) -> Option<AbilityActivation> {
-        let (gained_idx, gained) = game_state
-            .gained_card_abilities
-            .get(&card_id)
-            .and_then(|list| {
-                list.iter()
-                    .enumerate()
-                    .find(|(_, a)| a.has_trigger(crate::triggers::TriggerKind::Activation))
-                    .map(|(i, a)| (i, a.clone()))
-            })?;
+        let (gained_idx, gained) =
+            game_state
+                .gained_card_abilities
+                .get(&card_id)
+                .and_then(|list| {
+                    list.iter()
+                        .enumerate()
+                        .find(|(_, a)| a.has_trigger(crate::triggers::TriggerKind::Activation))
+                        .map(|(i, a)| (i, a.clone()))
+                })?;
         if !player.stage.stage.contains(&card_id) {
             return None;
         }
@@ -530,9 +521,7 @@ impl super::TurnEngine {
                     if let Some(use_limit) = ability.use_limit {
                         let key = (card_id, idx, game_state.turn_number);
                         if !crate::ability::util::ability_under_use_limit(
-                            game_state,
-                            &key,
-                            use_limit,
+                            game_state, &key, use_limit,
                         ) {
                             continue;
                         }
@@ -582,10 +571,7 @@ impl super::TurnEngine {
             player.hand.cards.retain(|id| *id != card_id);
             player.waitroom.add_card(card_id);
         } else if loc == Zone::Hand {
-            log::debug!(
-                "[HAND_ACTIVATION] card={} defer_self_cost=true",
-                card_id
-            );
+            log::debug!("[HAND_ACTIVATION] card={} defer_self_cost=true", card_id);
         }
 
         // Gained abilities use the "card_no_gained_{idx}" format so
@@ -624,7 +610,11 @@ impl super::TurnEngine {
             C::SelectCard { zone, .. } => {
                 let idxs = card_indices
                     .map(|v| v.to_vec())
-                    .or_else(|| card_id.and_then(|id| usize::try_from(id).ok()).map(|id| vec![id]))
+                    .or_else(|| {
+                        card_id
+                            .and_then(|id| usize::try_from(id).ok())
+                            .map(|id| vec![id])
+                    })
                     .unwrap_or_default();
                 if idxs.is_empty() {
                     vec!["(none)".to_string()]
@@ -638,9 +628,10 @@ impl super::TurnEngine {
             } => {
                 let chosen = match card_id {
                     Some(-1) => Some("skip".to_string()),
-                    Some(id) if target != "choice"
-                        && target != "choice_string"
-                        && target != "conditional_optional" =>
+                    Some(id)
+                        if target != "choice"
+                            && target != "choice_string"
+                            && target != "conditional_optional" =>
                     {
                         // Use the option text when it's a labelled option.
                         if let Some(ref o) = options {
@@ -751,9 +742,7 @@ impl super::TurnEngine {
                     || (card_indices.is_none() && card_id.is_none())
             }
             C::SelectTarget {
-                target,
-                allow_skip,
-                ..
+                target, allow_skip, ..
             } => {
                 if !allow_skip {
                     return false;
@@ -763,8 +752,7 @@ impl super::TurnEngine {
                     crate::ability::types::PAY_SKIP_TARGET => card_id == Some(2),
                     "pay_cost_all:discard_all" => card_id == Some(2),
                     "choice" | "choice_string" | "conditional_optional" => {
-                        card_id.is_none()
-                            && card_indices.is_none_or(|v| v.is_empty())
+                        card_id.is_none() && card_indices.is_none_or(|v| v.is_empty())
                     }
                     _ => card_id == Some(-1),
                 }
@@ -780,6 +768,29 @@ impl super::TurnEngine {
         card_id: Option<i16>,
         card_indices: Option<Vec<usize>>,
     ) -> Result<(), String> {
+        if game_state.pending_loop_protocol.is_some() {
+            let choice = game_state
+                .pending_loop_protocol
+                .as_ref()
+                .map(|protocol| protocol.choice.clone())
+                .ok_or("No pending choice to resume")?;
+            if let crate::ability::types::Choice::SelectTarget { options, .. } = &choice {
+                let selected = card_id
+                    .and_then(|id| usize::try_from(id).ok())
+                    .and_then(|idx| options.as_ref().and_then(|values| values.get(idx)));
+                match selected {
+                    Some(value) if value == "Continue" => {
+                        game_state.resolve_loop_protocol(true);
+                        return Ok(());
+                    }
+                    Some(value) if value == "Stop" => {
+                        game_state.resolve_loop_protocol(false);
+                        return Ok(());
+                    }
+                    _ => return Err("Invalid Rule 12.1 protocol choice".to_string()),
+                }
+            }
+        }
         let choice = game_state
             .ability_queue
             .take_waiting_choice()
@@ -790,14 +801,12 @@ impl super::TurnEngine {
         // that silently no-opped (e.g. position|destination resolving to
         // "Unknown source position"), dropping cards without any error.
         {
-            let empty_answer = card_id.is_none()
-                && card_indices.as_deref().is_none_or(|v| v.is_empty());
+            let empty_answer =
+                card_id.is_none() && card_indices.as_deref().is_none_or(|v| v.is_empty());
             let skippable = match &choice {
                 crate::ability::types::Choice::SelectCard { allow_skip, .. }
                 | crate::ability::types::Choice::SelectTarget { allow_skip, .. }
-                | crate::ability::types::Choice::SelectPosition { allow_skip, .. } => {
-                    *allow_skip
-                }
+                | crate::ability::types::Choice::SelectPosition { allow_skip, .. } => *allow_skip,
                 _ => true,
             };
             if empty_answer && !skippable {
@@ -807,12 +816,8 @@ impl super::TurnEngine {
                     crate::ability::types::Choice::SelectPosition { .. } => "SelectPosition",
                     crate::ability::types::Choice::SelectHeartColor { .. } => "SelectHeartColor",
                     crate::ability::types::Choice::SelectHeartType { .. } => "SelectHeartType",
-                    crate::ability::types::Choice::SelectAutoAbility { .. } => {
-                        "SelectAutoAbility"
-                    }
-                    crate::ability::types::Choice::SelectLiveSuccess { .. } => {
-                        "SelectLiveSuccess"
-                    }
+                    crate::ability::types::Choice::SelectAutoAbility { .. } => "SelectAutoAbility",
+                    crate::ability::types::Choice::SelectLiveSuccess { .. } => "SelectLiveSuccess",
                 };
                 if matches!(choice, crate::ability::types::Choice::SelectCard { .. }) {
                     game_state.ability_queue.restore_waiting_choice(choice);
@@ -820,8 +825,7 @@ impl super::TurnEngine {
                     let has_selectable = offered.iter().any(|a| {
                         a.action_type == crate::game_setup::ActionType::ChoiceSelect
                             && a.parameters.as_ref().and_then(|p| p.disabled) != Some(true)
-                            && a
-                                .parameters
+                            && a.parameters
                                 .as_ref()
                                 .and_then(|p| p.card_indices.as_deref())
                                 .is_some_and(|v| !v.is_empty())
@@ -894,18 +898,19 @@ impl super::TurnEngine {
             let result = Self::build_choice_result(&choice, card_id, card_indices, None)?;
             let filtered_indices = match &choice {
                 crate::ability::types::Choice::SelectCard {
-                    filtered_indices,
-                    ..
+                    filtered_indices, ..
                 } => filtered_indices.as_ref(),
                 _ => None,
             };
             let physical_idx = match &result {
-                crate::ability::types::ChoiceResult::CardSelected { indices } => indices.first().map(|index| {
-                    filtered_indices
-                        .and_then(|filtered| filtered.get(*index))
-                        .copied()
-                        .unwrap_or(*index)
-                }),
+                crate::ability::types::ChoiceResult::CardSelected { indices } => {
+                    indices.first().map(|index| {
+                        filtered_indices
+                            .and_then(|filtered| filtered.get(*index))
+                            .copied()
+                            .unwrap_or(*index)
+                    })
+                }
                 _ => None,
             };
             let player = if player_id == game_state.player1.id {
@@ -996,16 +1001,22 @@ impl super::TurnEngine {
                 "pay_optional_cost",
                 "skip_optional_cost",
             ),
-            ("pay_cost_all:discard_all", "pay_cost_all", "skip_optional_cost"),
+            (
+                "pay_cost_all:discard_all",
+                "pay_cost_all",
+                "skip_optional_cost",
+            ),
             ("primary|alternative", "alternative", "primary"),
         ];
-        ROWS.iter().find(|(t, _, _)| *t == target).map(|(_, one, other)| {
-            if card_id == Some(1) {
-                one.to_string()
-            } else {
-                other.to_string()
-            }
-        })
+        ROWS.iter()
+            .find(|(t, _, _)| *t == target)
+            .map(|(_, one, other)| {
+                if card_id == Some(1) {
+                    one.to_string()
+                } else {
+                    other.to_string()
+                }
+            })
     }
 
     /// Map an answer (indices channel first, then card id) through an option
@@ -1065,8 +1076,12 @@ impl super::TurnEngine {
     ) -> Result<crate::ability::types::ChoiceResult, String> {
         match choice {
             crate::ability::types::Choice::SelectCard { .. } => {
-                let indices = card_indices
-                    .unwrap_or_else(|| card_id.and_then(|id| usize::try_from(id).ok()).map(|id| vec![id]).unwrap_or_default());
+                let indices = card_indices.unwrap_or_else(|| {
+                    card_id
+                        .and_then(|id| usize::try_from(id).ok())
+                        .map(|id| vec![id])
+                        .unwrap_or_default()
+                });
                 Ok(crate::ability::types::ChoiceResult::CardSelected { indices })
             }
             crate::ability::types::Choice::SelectTarget {
@@ -1087,8 +1102,7 @@ impl super::TurnEngine {
                     }
                     "choice" | "choice_string" | "conditional_optional" => {
                         // card_id=None + card_indices absent/empty means skip
-                        if card_id.is_none()
-                            && card_indices.as_deref().is_none_or(|v| v.is_empty())
+                        if card_id.is_none() && card_indices.as_deref().is_none_or(|v| v.is_empty())
                         {
                             return Ok(crate::ability::types::ChoiceResult::Skip);
                         }
@@ -1107,11 +1121,9 @@ impl super::TurnEngine {
                             if let Some(found) =
                                 Self::lookup_option_target(options.as_ref(), card_id, &None)
                             {
-                                return Ok(
-                                    crate::ability::types::ChoiceResult::TargetSelected {
-                                        target: found,
-                                    },
-                                );
+                                return Ok(crate::ability::types::ChoiceResult::TargetSelected {
+                                    target: found,
+                                });
                             }
                         }
                         // For position|destination choices, look up the option text in the
@@ -1130,30 +1142,22 @@ impl super::TurnEngine {
                             // the raw number became the destination string ("0"),
                             // which matches no zone — the card was silently dropped
                             // (found by zone_change_gate_test riko_responds_only_to_own_side).
-                            if let Some(found) = Self::lookup_option_target(
-                                options.as_ref(),
-                                card_id,
-                                &card_indices,
-                            ) {
-                                return Ok(
-                                    crate::ability::types::ChoiceResult::TargetSelected {
-                                        target: found,
-                                    },
-                                );
+                            if let Some(found) =
+                                Self::lookup_option_target(options.as_ref(), card_id, &card_indices)
+                            {
+                                return Ok(crate::ability::types::ChoiceResult::TargetSelected {
+                                    target: found,
+                                });
                             }
                         }
                         // For self_or_opponent, look up option text by index from card_indices
                         if target == "self_or_opponent" {
-                            if let Some(found) = Self::lookup_option_target(
-                                options.as_ref(),
-                                card_id,
-                                &card_indices,
-                            ) {
-                                return Ok(
-                                    crate::ability::types::ChoiceResult::TargetSelected {
-                                        target: found,
-                                    },
-                                );
+                            if let Some(found) =
+                                Self::lookup_option_target(options.as_ref(), card_id, &card_indices)
+                            {
+                                return Ok(crate::ability::types::ChoiceResult::TargetSelected {
+                                    target: found,
+                                });
                             }
                         }
                         match card_id {
@@ -1174,16 +1178,12 @@ impl super::TurnEngine {
                 Ok(crate::ability::types::ChoiceResult::PositionSelected { position: pos })
             }
             crate::ability::types::Choice::SelectHeartColor {
-                count: _,
-                options,
-                ..
+                count: _, options, ..
             } => Ok(crate::ability::types::ChoiceResult::HeartColorSelected {
                 colors: vec![Self::pick_heart_option(options, card_id)],
             }),
             crate::ability::types::Choice::SelectHeartType {
-                count: _,
-                options,
-                ..
+                count: _, options, ..
             } => Ok(crate::ability::types::ChoiceResult::HeartTypeSelected {
                 types: vec![Self::pick_heart_option(options, card_id)],
             }),
@@ -1220,7 +1220,8 @@ impl super::TurnEngine {
         if let crate::ability_queue::QueueState::WaitingForAutoAbilityChoice { .. } =
             game_state.ability_queue.get_state()
         {
-            if let crate::ability::types::ChoiceResult::AutoAbilitySelected { queue_index } = result {
+            if let crate::ability::types::ChoiceResult::AutoAbilitySelected { queue_index } = result
+            {
                 let queue_index = *queue_index;
                 let player_id = if let crate::ability::types::Choice::SelectAutoAbility {
                     ref player_id,
@@ -1465,10 +1466,7 @@ impl super::TurnEngine {
             || !game_state.recently_appeared_cards.is_empty()
         {
             let event = crate::ability::types::TriggerEvent {
-                moved_cards: game_state
-                    .recently_moved_cards
-                    .clone()
-                    .unwrap_or_default(),
+                moved_cards: game_state.recently_moved_cards.clone().unwrap_or_default(),
                 moved_from_zone: game_state.recently_moved_from_zone.clone(),
                 position_change_occurred: game_state.position_change_occurred_this_turn,
                 energy_placed_by_effect: game_state.last_energy_placed_by_effect(),
@@ -1506,11 +1504,7 @@ impl super::TurnEngine {
             let pid = Self::entry_player_or_p1(&snap.entry_player_id);
             if let Some(crate::game_state::AbilityTrigger::LiveStart) = snap.cost_entry_trigger {
                 if let Some(cid) = snap.cost_entry_card_id {
-                    game_state.trigger_each_time_for_member(
-                        &pid,
-                        crate::triggers::LIVE_START,
-                        cid,
-                    );
+                    game_state.trigger_each_time_for_member(&pid, crate::triggers::LIVE_START, cid);
                 }
             } else if let Some(crate::game_state::AbilityTrigger::LiveSuccess) =
                 snap.cost_entry_trigger
@@ -1585,12 +1579,8 @@ impl super::TurnEngine {
             // No more choices — ability execution finished
             let (snap, outcome) = ResumeSnapshot::capture(game_state, had_pending_sequential);
             match outcome {
-                ResumeOutcome::CompleteSkipped => {
-                    Self::complete_skipped_ability(game_state, &snap)
-                }
-                ResumeOutcome::Reprocess => {
-                    Self::reprocess_ability(game_state, resolver, &snap)
-                }
+                ResumeOutcome::CompleteSkipped => Self::complete_skipped_ability(game_state, &snap),
+                ResumeOutcome::Reprocess => Self::reprocess_ability(game_state, resolver, &snap),
                 ResumeOutcome::FinishPaid => {
                     if Self::finish_paid_ability(game_state, &snap) {
                         return Ok(());
@@ -1602,24 +1592,28 @@ impl super::TurnEngine {
         Ok(())
     }
 
-    // Rule 9.5.1/10.1 cascade. NOTE (audit 2026-08): the duplicate-member rule
-    // process (Rule 10.4: multiple members in one area -> newest stays, others
-    // to owner's waitroom) is NOT implemented here. It is unreachable by
-    // construction today (baton-touch enforcement, swap-on-position-change,
-    // formation change forbidding stacking), so no defensive scan exists.
     pub fn check_timing(game_state: &mut GameState) {
         #[cfg(not(feature = "no_std"))]
         let _t = crate::timer::Timer::start("check_timing");
+        Self::check_duplicate_members(&mut game_state.player1, &game_state.card_database);
+        Self::check_duplicate_members(&mut game_state.player2, &game_state.card_database);
         tdbg!("CHECK_TIMING:0");
-        game_state.player1.refresh();
-        tdbg!("CHECK_TIMING:1 p1.refresh OK");
-        game_state.player2.refresh();
-        tdbg!("CHECK_TIMING:2 p2.refresh OK");
+        if game_state.player1.is_first_attacker {
+            game_state.player1.refresh();
+            game_state.player2.refresh();
+        } else {
+            game_state.player2.refresh();
+            game_state.player1.refresh();
+        }
+        tdbg!("CHECK_TIMING:1 refresh OK");
         tdbg!("CHECK_TIMING:3 refresh done");
         {
             #[cfg(not(feature = "no_std"))]
             let _t = crate::timer::Timer::start("check_timing::check_victory_condition");
             Self::check_victory_condition(game_state);
+        }
+        if game_state.game_ended {
+            return;
         }
         tdbg!("CHECK_TIMING:4 victory OK");
         {
@@ -1643,10 +1637,6 @@ impl super::TurnEngine {
         tdbg!("CHECK_TIMING:9 recalc_constants OK");
         Self::check_invalid_resolution_zone(game_state);
         tdbg!("CHECK_TIMING:10 invalid resolution OK");
-        if game_state.check_permanent_loop() {
-            game_state.game_result = crate::game_state::GameResult::Draw;
-            game_state.game_ended = true;
-        }
         tdbg!("CHECK_TIMING:11 perm_loop OK");
         // NOTE: check_victory_condition already ran above; the steps between
         // (invalid-card cleanup, recalculate_constants, resolution-zone check,
@@ -1710,6 +1700,9 @@ impl super::TurnEngine {
     /// path where a card actually moves (needed for the movement event).
     fn check_invalid_live_cards(game_state: &mut GameState, is_p1: bool) {
         let seat = if is_p1 { 0 } else { 1 };
+        if !game_state.seat_player(seat).live_card_zone.face_up {
+            return;
+        }
         let invalids: Vec<(usize, i16, bool)> = {
             let player = game_state.seat_player(seat);
             player
@@ -1756,6 +1749,38 @@ impl super::TurnEngine {
                 false,
             );
         }
+    }
+
+    fn check_duplicate_members(
+        player: &mut crate::player::Player,
+        card_db: &CardDatabase,
+    ) -> usize {
+        let mut moved = 0;
+        for area in crate::zones::MemberArea::ALL {
+            let pending = player.stage.take_pending_duplicate_members(area);
+            for (member_id, under_cards) in pending {
+                log::debug!(
+                    "[DUPLICATE_MEMBER] player={} area={} member={}",
+                    player.id,
+                    area,
+                    member_id
+                );
+                player.waitroom.add_card(member_id);
+                moved += 1;
+                for card_id in under_cards {
+                    if card_db
+                        .get_card(card_id)
+                        .is_some_and(|card| card.is_energy())
+                    {
+                        player.energy_deck.cards.push(card_id);
+                    } else {
+                        player.waitroom.add_card(card_id);
+                    }
+                    moved += 1;
+                }
+            }
+        }
+        moved
     }
 
     /// Rule 10.5.2: Non-energy cards in energy zone ↁEmoved to discard.
@@ -1807,13 +1832,33 @@ impl super::TurnEngine {
 
     fn check_invalid_resolution_zone(game_state: &mut GameState) {
         let cards = core::mem::take(&mut game_state.resolution_zone.cards);
+        let owners = core::mem::take(&mut game_state.resolution_zone.owners);
         if cards.is_empty() {
             return;
         }
-        let player = game_state.active_player_mut();
-        for card_id in cards {
-            player.waitroom.add_card(card_id);
+        let active_seat = game_state.seat_index_by_id(&game_state.active_player().id);
+        for (index, card_id) in cards.into_iter().enumerate() {
+            let owner = owners.get(index).copied().unwrap_or(active_seat);
+            let player = if owner == 0 {
+                &mut game_state.player1
+            } else {
+                &mut game_state.player2
+            };
+            let is_energy = game_state
+                .card_database
+                .get_card(card_id)
+                .is_some_and(|card| card.is_energy());
+            log::debug!(
+                "[RESOLUTION_CLEANUP] card={} owner={} energy={}",
+                card_id,
+                owner,
+                is_energy
+            );
+            if is_energy {
+                player.energy_deck.cards.push(card_id);
+            } else {
+                player.waitroom.add_card(card_id);
+            }
         }
     }
 }
-

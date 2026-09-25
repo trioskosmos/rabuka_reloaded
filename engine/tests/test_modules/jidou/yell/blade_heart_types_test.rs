@@ -167,7 +167,6 @@ fn six_blade_heart_types_grants_both() {
         "Should have heart01 ×1 with 6 blade heart types"
     );
     // The gain_ability grants 「常時：ライブの合計スコア＋１する」 — live-total.
-    game.state.recalculate_constants();
     assert_eq!(
         game.state.mods.p1_constant_total_score_bonus,
         1,
@@ -199,7 +198,6 @@ fn all_blade_heart_types_with_b_all_grants_both() {
         "Should have heart01 ×1 with all blade heart types + b_all"
     );
     // The gain_ability grants 「常時：ライブの合計スコア＋１する」 — live-total.
-    game.state.recalculate_constants();
     assert_eq!(
         game.state.mods.p1_constant_total_score_bonus,
         1,

@@ -28,7 +28,6 @@ fn pl_pr_020_pr_live_total_eight_grants_constant_score_ability() {
     heart_map.insert(HeartColor::Heart00, 20);
     game.state.player1.stage_hearts = Some(BaseHeart { hearts: heart_map });
     fire_trigger(&mut game, honoka, AbilityTrigger::LiveStart, "ライブ開始時");
-    game.state.recalculate_constants();
     assert_eq!(
         game.state.mods.p1_constant_total_score_bonus, 1,
         "score total ≥ 8 → gained 【常時】ライブの合計スコア+1"

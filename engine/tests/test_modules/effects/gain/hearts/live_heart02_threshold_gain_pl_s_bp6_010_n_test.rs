@@ -20,7 +20,6 @@ fn pl_s_bp6_010_n_live_requires_four_heart02_grants_one_heart02() {
     game.state.current_phase = rabuka_engine::game_state::Phase::FirstAttackerPerformance;
 
     fire_trigger(&mut game, me, AbilityTrigger::LiveStart, LIVE_START);
-    game.state.recalculate_constants();
 
     assert_eq!(
         game.state.mods.get_heart_modifier(me, HeartColor::Heart02),
@@ -44,7 +43,6 @@ fn pl_s_bp6_010_n_live_requires_no_heart02_grants_none() {
     game.state.current_phase = rabuka_engine::game_state::Phase::FirstAttackerPerformance;
 
     fire_trigger(&mut game, me, AbilityTrigger::LiveStart, LIVE_START);
-    game.state.recalculate_constants();
 
     assert_eq!(
         game.state.mods.get_heart_modifier(me, HeartColor::Heart02),

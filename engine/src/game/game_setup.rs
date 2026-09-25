@@ -112,6 +112,7 @@ pub enum ActionType {
     UseAbility,
     SetLiveCard,
     FinishLiveCardSet,
+    DrawCard,
     // Choice action types for ability cost/effect prompts
     ChoiceDecision,
     ChoiceSelect,
@@ -120,6 +121,7 @@ pub enum ActionType {
     ChoicePosition,
     EnergyCharge,
     PassRemaining,
+    Concede,
 }
 
 impl core::fmt::Display for ActionType {
@@ -143,6 +145,7 @@ impl core::fmt::Display for ActionType {
             ActionType::UseAbility => write!(f, "use_ability"),
             ActionType::SetLiveCard => write!(f, "set_live_card"),
             ActionType::FinishLiveCardSet => write!(f, "finish_live_card_set"),
+            ActionType::DrawCard => write!(f, "draw_card"),
             ActionType::ChoiceDecision => write!(f, "decision"),
             ActionType::ChoiceSelect => write!(f, "select_card"),
             ActionType::ChoiceSkip => write!(f, "select_skip"),
@@ -150,6 +153,7 @@ impl core::fmt::Display for ActionType {
             ActionType::ChoicePosition => write!(f, "select_position"),
             ActionType::EnergyCharge => write!(f, "energy_charge"),
             ActionType::PassRemaining => write!(f, "pass_remaining"),
+            ActionType::Concede => write!(f, "concede"),
         }
     }
 }
@@ -169,6 +173,7 @@ impl ActionType {
             ActionType::PlayMemberToStage => 6,
             ActionType::SetLiveCard => 7,
             ActionType::FinishLiveCardSet => 8,
+            ActionType::DrawCard => 24,
             ActionType::EnergyCharge => 9,
             ActionType::ChoiceDecision => 10,
             ActionType::ChoiceSelect => 11,
@@ -183,6 +188,7 @@ impl ActionType {
             ActionType::SkipLiveCardSet => 20,
             ActionType::PassRemaining => 21,
             ActionType::Pass => 22,
+            ActionType::Concede => 23,
             // Non-wire variants (menu headers) have no tag.
             ActionType::MulliganHeader | ActionType::LiveCardHeader => 0,
         }
@@ -214,6 +220,8 @@ impl ActionType {
             20 => ActionType::SkipLiveCardSet,
             21 => ActionType::PassRemaining,
             22 => ActionType::Pass,
+            23 => ActionType::Concede,
+            24 => ActionType::DrawCard,
             _ => ActionType::Pass,
         }
     }
@@ -242,6 +250,7 @@ impl core::str::FromStr for ActionType {
             "use_ability" => Ok(ActionType::UseAbility),
             "set_live_card" => Ok(ActionType::SetLiveCard),
             "finish_live_card_set" => Ok(ActionType::FinishLiveCardSet),
+            "draw_card" => Ok(ActionType::DrawCard),
             "decision" => Ok(ActionType::ChoiceDecision),
             "select_card" => Ok(ActionType::ChoiceSelect),
             "select_skip" => Ok(ActionType::ChoiceSkip),
@@ -249,6 +258,7 @@ impl core::str::FromStr for ActionType {
             "select_position" => Ok(ActionType::ChoicePosition),
             "energy_charge" => Ok(ActionType::EnergyCharge),
             "pass_remaining" => Ok(ActionType::PassRemaining),
+            "concede" => Ok(ActionType::Concede),
             _ => Err(format!("Unknown action type: {}", s)),
         }
     }
@@ -509,6 +519,11 @@ fn stage_area_from_parameters(params: &ActionParameters) -> Option<MemberArea> {
 /// Execute a game action extracted from the action parameters.
 /// Returns Ok(()) on success, Err(message) on failure. Always resets loop detection.
 pub fn execute_action(gs: &mut GameState, action: &Action) -> Result<(), String> {
+    if action.action_type == ActionType::Concede {
+        let result = gs.concede(gs.active_player_index());
+        gs.reset_loop_detection();
+        return result;
+    }
     let (card_id, card_indices, stage_area, use_baton_touch, ability_index) = action
         .parameters
         .as_ref()
@@ -531,8 +546,24 @@ pub fn execute_action(gs: &mut GameState, action: &Action) -> Result<(), String>
         use_baton_touch,
         ability_index,
     );
-    gs.reset_loop_detection();
+    if result.is_ok() && !gs.has_pending_choice() {
+        gs.record_action_boundary(action.action_type);
+    }
     result
+}
+
+pub fn execute_action_for_player(
+    gs: &mut GameState,
+    action: &Action,
+    player_id: u8,
+) -> Result<(), String> {
+    if action.action_type == ActionType::Concede {
+        let result = gs.concede(player_id);
+        gs.reset_loop_detection();
+        result
+    } else {
+        execute_action(gs, action)
+    }
 }
 
 /// Run a quick AI-vs-AI test game using the given cards and deck lists.
@@ -1032,6 +1063,27 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
                         })
                         .collect();
                 }
+            }
+            if target == "rule_12_1" {
+                return options
+                    .as_ref()
+                    .map(|opts| {
+                        opts.iter()
+                            .enumerate()
+                            .map(|(i, opt)| {
+                                make_action_params(
+                                    ActionType::ChoiceOption,
+                                    opt,
+                                    ActionParameters {
+                                        card_id: Some(i as i16),
+                                        card_no: Some(i.to_string()),
+                                        ..make_params()
+                                    },
+                                )
+                            })
+                            .collect()
+                    })
+                    .unwrap_or_default();
             }
             if target == "choice_string" || target == "conditional_optional" {
                 if let Some(ref opts) = options {

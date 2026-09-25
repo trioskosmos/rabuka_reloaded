@@ -55,6 +55,49 @@ fn mifune_same_name_in_success_zone_gains_heart04() {
     );
 }
 
+#[test]
+fn mifune_selects_one_repeated_live_instance_from_own_success_zone() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let mifune = game.id("PL!N-bp4-010-R\u{ff0b}");
+    let live_a = game.id("PL!N-sd1-025-SD");
+    let live_b = game.new_id("PL!N-sd1-025-SD");
+    let p1_success = game.new_id("PL!N-sd1-025-SD");
+    let p2_success = game.new_id("PL!N-sd1-025-SD");
+    assert_ne!(live_a, live_b);
+    assert_ne!(live_a, p1_success);
+    assert_ne!(live_b, p1_success);
+    assert_ne!(p1_success, p2_success);
+
+    game.state.player1.stage.stage[1] = mifune;
+    game.state.player1.live_card_zone.cards.push(live_a);
+    game.state.player1.live_card_zone.cards.push(live_b);
+    game.state.player1.success_live_card_zone.cards.push(p1_success);
+    game.state.player2.success_live_card_zone.cards.push(p2_success);
+
+    fire_trigger(&mut game, mifune, AbilityTrigger::LiveStart, "ライブ開始時");
+    assert_eq!(game.pending_choice_type().as_deref(), Some("SelectCard"));
+    game.select_indices(&[1]);
+
+    assert_eq!(
+        game.state.mods.get_heart_modifier(live_b, HeartColor::Heart04),
+        1,
+        "the selected physical instance gains heart04 from the owner's matching success card"
+    );
+    assert_eq!(
+        game.state.mods.get_heart_modifier(live_a, HeartColor::Heart04),
+        0,
+        "the unselected same-name instance does not gain heart04"
+    );
+    assert_eq!(
+        game.state.mods.get_heart_modifier(p2_success, HeartColor::Heart04),
+        0,
+        "the opponent's matching success card is not a target"
+    );
+    assert!(!game.has_pending_choice());
+}
+
 /// Different-name live card in the success zone → no heart04 gain anywhere.
 #[test]
 fn mifune_different_name_in_success_zone_no_heart04() {

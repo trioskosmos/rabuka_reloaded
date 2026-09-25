@@ -200,7 +200,6 @@ fn ab2_live_success_places_energy_under_member() {
     );
 
     // The newly placed energy now feeds ab#0: recalc → +1 heart02.
-    game.state.recalculate_constants();
     assert_eq!(heart02(&game, s), 1, "placed energy now grants 1 heart02 via ab#0");
 }
 

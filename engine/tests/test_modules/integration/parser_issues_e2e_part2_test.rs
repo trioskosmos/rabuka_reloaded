@@ -57,6 +57,59 @@ fn issue2_kanan_discard_1_gain_1() {
 }
 
 #[test]
+fn issue2_kanan_discard_2_gain_2_exact_aqours_lives() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let kanan = game.id("PL!S-bp5-003-R");
+    let no_blade_1 = game.id("PL!S-bp2-002-R");
+    let no_blade_2 = game.id("PL!-sd1-011-SD");
+    let aqours_live_1 = game.id("PL!S-bp3-019-L");
+    let aqours_live_2 = game.id("PL!S-PR-022-PR");
+
+    game.add_to_hand(kanan);
+    game.add_to_hand(no_blade_1);
+    game.add_to_hand(no_blade_2);
+    game.add_to_discard(aqours_live_1);
+    game.add_to_discard(aqours_live_2);
+    game.give_energy(13);
+
+    game.play_to_stage(kanan, MemberArea::Center);
+
+    let mut card_choice = 0;
+    while game.has_pending_choice() {
+        match game.pending_choice_type().as_deref() {
+            Some("SelectAutoAbility") => game.select_indices(&[]),
+            Some("SelectCard") => {
+                if card_choice == 0 {
+                    game.select_indices(&[0, 1]);
+                } else {
+                    game.select_indices(&[0]);
+                }
+                card_choice += 1;
+            }
+            other => panic!("unexpected Kanan choice: {other:?}"),
+        }
+    }
+
+    let hand = &game.state.player1.hand.cards;
+    let live_cards: Vec<_> = hand
+        .iter()
+        .filter_map(|&card_id| {
+            let card = game.db.get_card(card_id)?;
+            card.is_live().then_some(card_id)
+        })
+        .collect();
+    let waitroom = &game.state.player1.waitroom.cards;
+    assert!(!hand.contains(&no_blade_1));
+    assert!(!hand.contains(&no_blade_2));
+    assert!(waitroom.contains(&no_blade_1));
+    assert!(waitroom.contains(&no_blade_2));
+    assert_eq!(live_cards.len(), 2, "Kanan must recover exactly two live cards");
+    assert!(live_cards.contains(&aqours_live_1));
+    assert!(live_cards.contains(&aqours_live_2));
+}
+
+#[test]
 fn issue2_kanan_skip_cost_empty_live_gain() {
     let db = load_real_database();
     let mut game = TestGame::new(db);

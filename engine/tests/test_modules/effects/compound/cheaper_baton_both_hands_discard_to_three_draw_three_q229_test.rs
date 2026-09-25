@@ -175,3 +175,58 @@ fn cheaper_baton_hand_reset_edge_play_to_empty_no_trigger() {
         "4 hand - 1 played = 3, no draw from ability"
     );
 }
+
+#[test]
+fn cheaper_baton_hand_reset_q229_both_over_3_discard_in_order_then_draw() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let nozomi = game.id("PL!-bp5-007-R");
+    let cheap = game.id("PL!SP-sd1-019-SD");
+    let filler = game.id("PL!-sd1-010-SD");
+
+    assert_eq!(
+        game.db.get_card(nozomi).unwrap().card_no.as_ref(),
+        "PL!-bp5-007-R"
+    );
+
+    game.state.player1.hand.cards.push(nozomi);
+    for _ in 0..5 {
+        game.state.player1.hand.cards.push(filler);
+    }
+    give_p2_hand(&mut game, filler, 5);
+    for _ in 0..10 {
+        game.state.player1.main_deck.cards.push(filler);
+        game.state.player2.main_deck.cards.push(filler);
+    }
+
+    game.state.player1.stage.stage[1] = cheap;
+    game.give_energy(13);
+    game.play_to_stage(nozomi, rabuka_engine::zones::MemberArea::Center);
+
+    assert_eq!(game.state.player1.stage.stage[1], nozomi);
+    assert_eq!(
+        game.db.get_card(nozomi).unwrap().card_no.as_ref(),
+        "PL!-bp5-007-R"
+    );
+    game.assert_select_card("hand", 2, false);
+    assert_eq!(
+        game.state.get_pending_choice_player_id().as_deref(),
+        Some("p1")
+    );
+    game.try_select_indices(&[0, 1]).unwrap();
+
+    assert_eq!(game.state.player1.hand.cards.len(), 3);
+    assert_eq!(game.state.player2.hand.cards.len(), 5);
+
+    assert!(game.has_pending_choice());
+    game.assert_select_card("hand", 2, false);
+    assert_eq!(
+        game.state.get_pending_choice_player_id().as_deref(),
+        Some("p2")
+    );
+    game.try_select_indices(&[0, 1]).unwrap();
+
+    assert_eq!(game.state.player1.hand.cards.len(), 6);
+    assert_eq!(game.state.player2.hand.cards.len(), 6);
+}

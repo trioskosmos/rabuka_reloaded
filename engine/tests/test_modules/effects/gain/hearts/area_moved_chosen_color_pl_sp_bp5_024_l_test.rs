@@ -36,7 +36,6 @@ fn pl_sp_bp5_024_l_live_start_chosen_heart_granted_only_to_area_moved_member() {
 
     fire_trigger(&mut game, live, AbilityTrigger::LiveStart, "ライブ開始時");
     answer_all(&mut game, 0);
-    game.state.recalculate_constants();
 
     let hearts = |id: i16| {
         game.state.mods.get_heart_modifier(id, HeartColor::Heart01)
@@ -71,7 +70,6 @@ fn pl_sp_bp5_024_l_opponent_movement_does_not_qualify() {
 
     fire_trigger(&mut game, live, AbilityTrigger::LiveStart, "ライブ開始時");
     answer_all(&mut game, 0);
-    game.state.recalculate_constants();
 
     let total = game.state.mods.get_heart_modifier(opponent_mover, HeartColor::Heart01)
         + game.state.mods.get_heart_modifier(opponent_mover, HeartColor::Heart02)

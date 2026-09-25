@@ -318,7 +318,6 @@ impl super::TurnEngine {
     fn execute_performance_phase(game_state: &mut GameState, is_first: bool) {
         #[cfg(not(feature = "no_std"))]
         let _t = crate::timer::Timer::start("execute_performance_phase");
-        let mut resolution_zone = core::mem::take(&mut game_state.resolution_zone);
         let nhm_flat: Vec<(
             i16,
             crate::card::HeartColor,
@@ -338,7 +337,22 @@ impl super::TurnEngine {
         } else {
             game_state.second_attacker().id.clone()
         };
+        let performer = game_state
+            .player1
+            .id
+            .eq(&player_id)
+            .then_some(&mut game_state.player1)
+            .unwrap_or(&mut game_state.player2);
+        performer.live_card_zone.face_up = true;
+        log::debug!(
+            "[LIVE_REVEAL] performer={} cards={:?}",
+            player_id,
+            performer.live_card_zone.cards
+        );
+        Self::check_timing(game_state);
+        let mut resolution_zone = core::mem::take(&mut game_state.resolution_zone);
         let cannot_live = game_state.cannot_live_players.contains(&player_id);
+        let performer_seat = game_state.seat_index_by_id(&player_id);
         let performer_id = player_id.clone();
 
         // Phase A: yell + blade heart (rules 8.3.10-8.3.12).
@@ -369,6 +383,7 @@ impl super::TurnEngine {
                 player,
                 &mut resolution_zone,
                 &performer_id,
+                performer_seat,
                 card_db,
                 bm,
                 ho,
@@ -794,6 +809,7 @@ impl super::TurnEngine {
             .ok_or("Selected card not found in hand")?;
         if !player.hand.cards.is_empty() && idx < player.hand.cards.len() {
             let card = player.hand.cards.remove(idx);
+            player.live_card_zone.face_up = false;
             let live_cards = &mut player.live_card_zone.cards;
             if live_cards.len() >= MAX_LIVE_CARDS {
                 return Err("Live card zone is full".to_string());
@@ -848,6 +864,7 @@ impl super::TurnEngine {
             });
         // Sort descending so removals don't shift other targets
         let player = game_state.active_player_mut();
+        player.live_card_zone.face_up = false;
         let max_live = MAX_LIVE_CARDS - player.live_card_zone.cards.len();
         let mut placed = 0usize;
         for &idx in Self::deduped_desc(live_indices).iter() {

@@ -37,7 +37,6 @@ fn pl_sp_bp5_016_n_energy_at_least_ten_grants_heart06() {
         game.state.player1.energy_zone.active_count() >= 10,
         "Precondition: energy >= 10"
     );
-    game.state.recalculate_constants();
     let h06 = game
         .state
         .mods

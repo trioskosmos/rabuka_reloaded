@@ -70,6 +70,7 @@ impl GameState {
         }
         self.cheer_checks_required = self.effective_cheer_checks_required(player_id, blade_count);
 
+        let owner = if player_id == self.player1.id { 0 } else { 1 };
         let player = if player_id == self.player1.id {
             &mut self.player1
         } else {
@@ -89,7 +90,7 @@ impl GameState {
                 player.main_deck.draw()
             };
             if let Some(card_id) = card_id {
-                self.resolution_zone.cards.push(card_id);
+                self.resolution_zone.add_card_for_owner(card_id, owner);
                 self.cheer_checks_done += 1;
             }
         }

@@ -52,7 +52,6 @@ fn wien_high_energy_cost_modifier_applied() {
     );
 
     // Recalc SHOULD add +4 cost mod (10 >= 10)
-    game.state.recalculate_constants();
     assert_eq!(
         game.state.mods.get_cost_modifier(wien),
         4,

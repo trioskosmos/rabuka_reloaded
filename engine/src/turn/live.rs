@@ -1141,58 +1141,59 @@ impl super::TurnEngine {
         player2_id: &str,
         pre_score_flat: &HashMap<i16, i32>,
     ) -> Option<(u8, u8)> {
-        // Q48: A live can be won even with total score 0 or less
-        // (score comparison determines the winner regardless of absolute value).
-        if game_state.live_success_triggered_this_turn && game_state.live_success_p2_fired {
-            // Re-entry after BOTH players' triggers already resolved.
-            // Restore saved extras (e.g. if a later auto-ability creates a choice).
-            return Some((
-                game_state.live_success_p1_extra,
-                game_state.live_success_p2_extra,
-            ));
-        }
         if !game_state.live_success_triggered_this_turn {
-            // First entry: init state, process surplus, fire P1 triggers.
             game_state.live_success_triggered_this_turn = true;
+            game_state.live_success_p1_fired = false;
             game_state.live_success_p2_fired = false;
-
             Self::compute_snapshot_surplus(game_state, player2_id);
+        }
 
+        if !game_state.player1.is_first_attacker && !game_state.live_success_p2_fired {
+            game_state.live_success_p2_fired = true;
+            Self::trigger_live_success_abilities(game_state, player2_id);
+            Self::trigger_auto_abilities_for_player(game_state, player2_id);
+            game_state.process_pending_auto_abilities(player2_id);
+            if game_state.has_pending_choice() {
+                return None;
+            }
+            game_state.live_success_p2_extra = Self::side_score_extra(
+                game_state,
+                pre_score_flat,
+                &game_state.player2.live_card_zone.cards,
+            );
+        }
+
+        if !game_state.live_success_p1_fired {
+            game_state.live_success_p1_fired = true;
             Self::trigger_live_success_abilities(game_state, player1_id);
             Self::trigger_auto_abilities_for_player(game_state, player1_id);
             game_state.process_pending_auto_abilities(player1_id);
             if game_state.has_pending_choice() {
                 return None;
             }
-            // each_time LIVE_SUCCESS triggers fire post-resolution
-            // in process_current_ability (abilities.rs)
-            let p1_extra = Self::side_score_extra(
+            game_state.live_success_p1_extra = Self::side_score_extra(
                 game_state,
                 pre_score_flat,
                 &game_state.player1.live_card_zone.cards,
             );
-            game_state.live_success_p1_extra = p1_extra;
+        }
+
+        if !game_state.live_success_p2_fired {
             game_state.live_success_p2_fired = true;
+            Self::trigger_live_success_abilities(game_state, player2_id);
+            Self::trigger_auto_abilities_for_player(game_state, player2_id);
+            game_state.process_pending_auto_abilities(player2_id);
+            if game_state.has_pending_choice() {
+                return None;
+            }
+            game_state.live_success_p2_extra = Self::side_score_extra(
+                game_state,
+                pre_score_flat,
+                &game_state.player2.live_card_zone.cards,
+            );
         }
-        // P2 trigger block (shared between first entry and re-entry paths)
-        // Set flag BEFORE triggering so that if P2's ability creates a choice
-        // and the function returns early, P2 is not re-triggered on re-entry.
-        game_state.live_success_p2_fired = true;
-        Self::trigger_live_success_abilities(game_state, player2_id);
-        Self::trigger_auto_abilities_for_player(game_state, player2_id);
-        game_state.process_pending_auto_abilities(player2_id);
-        if game_state.has_pending_choice() {
-            return None;
-        }
-        // each_time LIVE_SUCCESS triggers fire post-resolution
-        // in process_current_ability (abilities.rs)
-        let p2_extra = Self::side_score_extra(
-            game_state,
-            pre_score_flat,
-            &game_state.player2.live_card_zone.cards,
-        );
-        game_state.live_success_p2_extra = p2_extra;
-        Some((game_state.live_success_p1_extra, p2_extra))
+
+        Some((game_state.live_success_p1_extra, game_state.live_success_p2_extra))
     }
 
     /// Debug-only per-snapshot performance lines for the rule log.
@@ -1886,6 +1887,7 @@ impl super::TurnEngine {
         player: &mut crate::player::Player,
         resolution_zone: &mut crate::zones::ResolutionZone,
         total_blade: u8,
+        owner: u8,
     ) {
         // Q40: Yell must complete ALL checks — even if hearts are already satisfied,
         // the full blade-count of yell cards is always revealed.
@@ -1900,7 +1902,7 @@ impl super::TurnEngine {
                 player.main_deck.draw()
             };
             if let Some(card_id) = card_id {
-                resolution_zone.cards.push(card_id);
+                resolution_zone.add_card_for_owner(card_id, owner);
             }
         }
     }
@@ -1962,6 +1964,7 @@ impl super::TurnEngine {
         player: &mut crate::player::Player,
         resolution_zone: &mut crate::zones::ResolutionZone,
         _player_id: &str,
+        owner: u8,
         card_db: &CardDatabase,
         blade_modifiers: &HashMap<i16, ModifierEntry>,
         heart_override: &HashMap<i16, (HeartColor, u8)>,
@@ -2017,7 +2020,7 @@ impl super::TurnEngine {
                 .stage
                 .total_blades(card_db, blade_modifiers, orientation_modifiers, false);
 
-        Self::reveal_yell_cards(player, resolution_zone, total_blade);
+        Self::reveal_yell_cards(player, resolution_zone, total_blade, owner);
 
         // Compute owned hearts from stage
         let mut owned_hearts = player.stage.get_available_hearts(

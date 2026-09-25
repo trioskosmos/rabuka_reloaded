@@ -1,4 +1,6 @@
 use crate::helpers::*;
+use rabuka_engine::ability::condition::ConditionContext;
+use rabuka_engine::card::{AbilityEffect, Condition, ConditionCommon};
 
 fn base_heart02(db: &rabuka_engine::card::CardDatabase, card_id: i16) -> u8 {
     db.get_card(card_id)
@@ -29,6 +31,32 @@ fn drain_auto_choices(game: &mut TestGame) {
             }
             _ => break,
         }
+    }
+}
+
+#[test]
+fn unsupported_condition_fails_closed_and_missing_condition_stays_unconditional() {
+    let game = TestGame::new(load_real_database());
+    let context = ConditionContext::new(&game.state);
+    let unsupported = Condition::Unsupported {
+        common: Box::new(ConditionCommon::default()),
+    };
+
+    assert!(!context.evaluate_condition(&unsupported));
+    let unconditional = AbilityEffect::default();
+    assert!(context.allows(&unconditional));
+
+    let guarded = AbilityEffect {
+        condition: Some(Box::new(unsupported)),
+        ..AbilityEffect::default()
+    };
+    assert!(!context.allows(&guarded));
+
+    #[cfg(feature = "serde_support")]
+    {
+        let unsupported: Condition =
+            serde_json::from_value(serde_json::json!({"type": "custom"})).unwrap();
+        assert!(!context.evaluate_condition(&unsupported));
     }
 }
 

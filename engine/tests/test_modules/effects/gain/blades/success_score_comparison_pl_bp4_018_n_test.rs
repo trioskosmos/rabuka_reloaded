@@ -93,7 +93,6 @@ fn pl_bp4_018_n_success_score_changes_update_blades_strictly_greater() {
     while game.has_pending_choice() {
         game.select_indices(&[0]);
     }
-    game.state.recalculate_constants();
     assert_eq!(
         game.state.mods.get_blade_modifier(card),
         0,

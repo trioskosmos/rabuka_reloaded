@@ -44,6 +44,26 @@ fn pl_s_bp6_009_r_plus_constant_blades_follow_opponent_success_pile_lead() {
     );
 }
 
+#[test]
+fn pl_s_bp6_009_r_plus_constant_blades_apply_to_each_instance() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let ruby_left = game.id("PL!S-bp6-009-R＋");
+    let ruby_center = game.new_id("PL!S-bp6-009-R＋");
+    let opponent_lives: [i16; 3] = std::array::from_fn(|_| game.new_id(LIVE_FILLER));
+    game.state.player1.stage.stage = [ruby_left, ruby_center, -1];
+    game.state
+        .player2
+        .success_live_card_zone
+        .cards
+        .extend(opponent_lives);
+
+    game.state.recalculate_constants();
+
+    assert_eq!(game.state.mods.get_blade_modifier(ruby_left), 3);
+    assert_eq!(game.state.mods.get_blade_modifier(ruby_center), 3);
+}
+
 fn fire_ruby_live_success(game: &mut TestGame, live_card: i16) {
     let mut heart_map = HeartMap::new();
     heart_map.insert(HeartColor::Heart00, 20);

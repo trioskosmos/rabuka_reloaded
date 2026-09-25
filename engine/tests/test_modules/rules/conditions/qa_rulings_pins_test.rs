@@ -126,7 +126,6 @@ fn q37_live_start_grant_does_not_stack_on_refire() {
     // protected by the just_completed/this_batch guards. Hardening ticket:
     // make gained-ability registration idempotent per (card, full_text).
     fire_trigger(&mut game, member, AbilityTrigger::LiveStart, "ライブ開始時");
-    game.state.recalculate_constants();
 
     assert_eq!(
         game.state.mods.p1_constant_total_score_bonus,

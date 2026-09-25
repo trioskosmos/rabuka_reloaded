@@ -97,3 +97,32 @@ fn karin_exact_six_members_grants_heart02_and_heart05() {
     assert_eq!(game.state.mods.get_heart_modifier(karin, H02), 0);
     assert_eq!(game.state.mods.get_heart_modifier(karin, H05), 0);
 }
+
+#[test]
+fn karin_counts_six_physical_instances_of_the_same_member() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let karin1 = game.id("PL!N-PR-027-PR");
+    let karin2 = game.new_id("PL!N-PR-027-PR");
+    let karin3 = game.new_id("PL!N-PR-027-PR");
+    let karin4 = game.new_id("PL!N-PR-027-PR");
+    let karin5 = game.new_id("PL!N-PR-027-PR");
+    let karin6 = game.new_id("PL!N-PR-027-PR");
+    let members = [karin1, karin2, karin3, karin4, karin5, karin6];
+    assert!(members.windows(2).all(|pair| pair[0] != pair[1]));
+
+    game.state.player1.stage.stage = [members[0], members[1], members[2]];
+    game.state.player2.stage.stage = [members[3], members[4], -1];
+
+    const H02: rabuka_engine::card::HeartColor = rabuka_engine::card::HeartColor::Heart02;
+    const H05: rabuka_engine::card::HeartColor = rabuka_engine::card::HeartColor::Heart05;
+
+    game.state.recalculate_constants();
+    assert_eq!(game.state.mods.get_heart_modifier(karin1, H02), 0);
+    assert_eq!(game.state.mods.get_heart_modifier(karin1, H05), 0);
+
+    game.state.player2.stage.stage[2] = members[5];
+    game.state.recalculate_constants();
+    assert_eq!(game.state.mods.get_heart_modifier(karin1, H02), 1);
+    assert_eq!(game.state.mods.get_heart_modifier(karin1, H05), 1);
+}

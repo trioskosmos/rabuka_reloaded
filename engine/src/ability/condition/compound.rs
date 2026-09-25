@@ -77,7 +77,10 @@ impl<'a> ConditionContext<'a> {
             log::debug!(
                 "[COMPOUND_EVAL] operator={} children={:?}",
                 op,
-                conditions.iter().map(|child| child.condition_type()).collect::<Vec<_>>()
+                conditions
+                    .iter()
+                    .map(|child| child.condition_type())
+                    .collect::<Vec<_>>()
             );
             #[cfg(not(feature = "no_std"))]
             let before = crate::ability::log::buffer_len();

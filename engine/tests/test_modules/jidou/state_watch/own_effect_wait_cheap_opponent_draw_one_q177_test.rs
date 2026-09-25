@@ -156,6 +156,32 @@ fn declined_unit_wait_cost_leaves_expensive_opponent_active_and_no_draw() {
     );
 }
 
+#[test]
+fn actual_cost_nine_wait_does_not_trigger_maki_draw() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let maki = game.id("PL!-pb1-015-R");
+    let expensive = game.id("PL!-sd1-014-SD");
+    let filler = game.id("PL!-sd1-010-SD");
+    game.state.player1.hand.cards.extend([maki, filler]);
+    game.state.player2.stage.stage[0] = expensive;
+    game.give_energy(11);
+    for _ in 0..10 {
+        game.state.player1.main_deck.cards.push(filler);
+    }
+
+    game.play_to_stage(maki, rabuka_engine::zones::MemberArea::Center);
+    assert_eq!(game.pending_choice_type().as_deref(), Some("SelectTarget"));
+    game.select_option(1);
+    game.drain_choices_strict(&["SelectCard"], &[0]);
+
+    assert_eq!(
+        game.state.mods.get_orientation_modifier(expensive),
+        Some("wait")
+    );
+    assert_eq!(game.state.player1.hand.cards.len(), 1);
+}
+
 /// Edge: No opponent member on stage → no one to wait → Ab#0 effect does nothing.
 #[test]
 fn declined_unit_wait_cost_with_empty_opponent_stage_draws_nothing() {

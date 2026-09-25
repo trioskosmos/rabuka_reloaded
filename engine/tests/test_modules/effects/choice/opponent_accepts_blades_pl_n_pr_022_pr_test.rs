@@ -42,6 +42,26 @@ fn pl_n_pr_022_pr_opponent_accepts_choice_gains_blade_only_opponent() {
 }
 
 #[test]
+fn pl_n_pr_022_pr_accepted_choice_blades_every_opponent_member() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let emma = game.id("PL!N-PR-022-PR");
+    let left = game.new_id("PL!-sd1-010-SD");
+    let center = game.new_id("PL!-sd1-010-SD");
+    let right = game.new_id("PL!-sd1-010-SD");
+    game.state.player2.stage.stage = [left, center, right];
+    game.state.player1.hand.cards.push(emma);
+    game.give_energy(10);
+    game.play_to_stage(emma, MemberArea::LeftSide);
+    game.select_option(0);
+
+    assert_eq!(game.state.mods.get_blade_modifier(left), 1);
+    assert_eq!(game.state.mods.get_blade_modifier(center), 1);
+    assert_eq!(game.state.mods.get_blade_modifier(right), 1);
+    assert_eq!(game.state.mods.get_blade_modifier(emma), 0);
+}
+
+#[test]
 fn pl_n_pr_022_pr_other_answer_does_not_gain_opponent_blade() {
     let db = load_real_database();
     let mut game = TestGame::new(db);

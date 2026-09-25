@@ -112,7 +112,6 @@ fn joint_live_start_discard_three_gains_score3() {
         hand_before - 3,
         "3 discarded"
     );
-    game.state.recalculate_constants();
     assert_eq!(
         game.state.mods.p1_constant_total_score_bonus,
         3,
@@ -146,7 +145,6 @@ fn joint_live_start_discard_two_gains_score3() {
         hand_before - 2,
         "2 discarded"
     );
-    game.state.recalculate_constants();
     assert_eq!(
         game.state.mods.p1_constant_total_score_bonus,
         3,
@@ -238,7 +236,6 @@ fn joint_live_start_discard_mixed_named_gains_score3() {
         hand_before - 2,
         "2 mixed discarded"
     );
-    game.state.recalculate_constants();
     assert_eq!(
         game.state.mods.p1_constant_total_score_bonus,
         3,
@@ -296,7 +293,6 @@ fn joint_live_start_hand_copy_counts_as_named_card() {
         game.state.player1.waitroom.cards.contains(&joint_in_hand),
         "the self-copy counts as a named card and is discarded"
     );
-    game.state.recalculate_constants();
     assert_eq!(
         game.state.mods.p1_constant_total_score_bonus,
         3,

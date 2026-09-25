@@ -140,6 +140,15 @@ impl AbilityResolver {
         } else {
             effect.count_or(1)
         };
+        log::debug!(
+            "[DRAW] source={:?} action={} count={} target={} source={} destination={}",
+            self.activating_card_id,
+            effect.action,
+            draw_count,
+            effect.target_name(),
+            effect.source_or(Zone::Deck.to_str()),
+            effect.destination.map(|z| z.as_str()).unwrap_or(Zone::Hand.to_str())
+        );
         self.execute_draw(
             gs,
             effect,

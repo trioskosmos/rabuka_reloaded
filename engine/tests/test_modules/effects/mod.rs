@@ -16,6 +16,7 @@ pub mod mill;
 pub mod other;
 pub mod position;
 pub mod recover;
+pub mod replacement_generic_rule_9_10_test;
 pub mod restriction;
 pub mod score;
 pub mod state;

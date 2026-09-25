@@ -91,6 +91,30 @@ fn riko_equal_cost_both_occupied_triggers() {
     );
 }
 
+#[test]
+fn riko_equal_cost_waits_all_repeated_opponent_instances() {
+    let mut game = TestGame::new(load_real_database());
+    setup_riko_at_center(&mut game);
+    game.state.player1.stage.stage[0] = aqours_cost4(&game);
+    game.state.player1.stage.stage[2] = aqours_cost4(&game);
+    let opponent_a = game.new_id("PL!S-bp2-002-R");
+    let opponent_b = game.new_id("PL!S-bp2-002-R");
+    game.state.player2.stage.stage[0] = opponent_a;
+    game.state.player2.stage.stage[1] = opponent_b;
+
+    run_live_start(&mut game);
+
+    assert_ne!(opponent_a, opponent_b);
+    assert_eq!(
+        game.state.mods.get_orientation_modifier(opponent_a),
+        Some("wait")
+    );
+    assert_eq!(
+        game.state.mods.get_orientation_modifier(opponent_b),
+        Some("wait")
+    );
+}
+
 // ===================================================================
 // Negative: different costs → no trigger
 // ===================================================================

@@ -1,5 +1,6 @@
 use crate::card::CardDatabase;
 use crate::Arc;
+use crate::HashMap;
 use crate::VecDeque;
 #[cfg(feature = "no_std")]
 use alloc::{
@@ -25,6 +26,61 @@ impl Deck {
         crate::rng::shuffle_slice(&mut cards);
         self.energy_deck = cards.into();
     }
+}
+
+pub fn validate_deck_construction(
+    card_db: &CardDatabase,
+    card_numbers: &[String],
+) -> Result<(), String> {
+    let mut member_count = 0;
+    let mut live_count = 0;
+    let mut energy_count = 0;
+    let mut copies_by_card_no: HashMap<&str, usize> = HashMap::new();
+
+    for requested_card_no in card_numbers {
+        let template_id = card_db
+            .get_card_id(requested_card_no)
+            .ok_or_else(|| format!("Card not found: {}", requested_card_no))?;
+        let card = card_db
+            .get_card(template_id)
+            .ok_or_else(|| format!("Card not found: {}", requested_card_no))?;
+        let canonical_card_no = card.card_no.as_ref();
+        let copies = copies_by_card_no.entry(canonical_card_no).or_insert(0);
+        *copies += 1;
+        if *copies > 4 {
+            return Err(format!(
+                "Card {} has {} copies (maximum 4)",
+                canonical_card_no, copies
+            ));
+        }
+
+        match card.card_type {
+            crate::card::CardType::Member => member_count += 1,
+            crate::card::CardType::Live => live_count += 1,
+            crate::card::CardType::Energy => energy_count += 1,
+        }
+    }
+
+    if member_count != 48 {
+        return Err(format!(
+            "Member deck must contain exactly 48 cards (found {})",
+            member_count
+        ));
+    }
+    if live_count != 12 {
+        return Err(format!(
+            "Deck must contain exactly 12 live cards (found {})",
+            live_count
+        ));
+    }
+    if energy_count != 12 {
+        return Err(format!(
+            "Energy deck must contain exactly 12 cards (found {})",
+            energy_count
+        ));
+    }
+
+    Ok(())
 }
 
 pub struct DeckBuilder;
@@ -80,12 +136,6 @@ impl DeckBuilder {
                 log::debug!("  - {}", card_no);
             }
         }
-
-        // Validate deck composition with priority on 12 live + 48 member.
-        // NOTE (audit 2026-08): this is warn-only (Rule 6.1.1). Exact counts are
-        // not enforced and the max-4-copies-per-card-number limit has no check
-        // anywhere. Deck-construction replacement abilities (Rule 6.1.2) are
-        // also unimplemented (no デッキ構築 text in card data yet).
 
         let total_main = member_count + live_count;
         if total_main < 60 {

@@ -354,7 +354,10 @@ pub struct Card {
 /// [`CardId::from_raw`] / [`CardId::raw`]. The sentinel [`CardId::EMPTY`]
 /// (-1) preserves existing "no card" conventions.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
-#[cfg_attr(feature = "serde_support", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "serde_support",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub struct CardId(i16);
 
 impl CardId {
@@ -484,7 +487,12 @@ impl CardDatabase {
         db.normalized_no_to_id = db
             .card_no_to_id
             .keys()
-            .map(|k| (Self::normalize_card_no(k), *db.card_no_to_id.get(k).unwrap()))
+            .map(|k| {
+                (
+                    Self::normalize_card_no(k),
+                    *db.card_no_to_id.get(k).unwrap(),
+                )
+            })
             .collect();
 
         db
@@ -1458,7 +1466,9 @@ impl AbilityEffect {
         }
         macro_rules! zone_field {
             ($key:expr) => {
-                obj.get($key).and_then(|v| v.as_str()).map(Zone::from_source_str)
+                obj.get($key)
+                    .and_then(|v| v.as_str())
+                    .map(Zone::from_source_str)
             };
         }
         macro_rules! bool_field {
@@ -1468,12 +1478,14 @@ impl AbilityEffect {
         }
         macro_rules! u8_field {
             ($key:expr) => {
-                obj.get($key).and_then(|v| v.as_u64().and_then(|n| u8::try_from(n).ok()))
+                obj.get($key)
+                    .and_then(|v| v.as_u64().and_then(|n| u8::try_from(n).ok()))
             };
         }
         macro_rules! i8_field {
             ($key:expr) => {
-                obj.get($key).and_then(|v| v.as_i64().and_then(|n| i8::try_from(n).ok()))
+                obj.get($key)
+                    .and_then(|v| v.as_i64().and_then(|n| i8::try_from(n).ok()))
             };
         }
         macro_rules! str_vec_field {
@@ -1509,214 +1521,214 @@ impl AbilityEffect {
 
         let filter = || {
             let f = EffectFilter {
-            card_type: None,
-            exclude_self: bool_field!("exclude_self"),
-            same_name: bool_field!("same_name"),
-            same_unit_name: bool_field!("same_unit_name"),
-            group_names: opt_str_vec_field!("group_names"),
-            self_target: bool_field!("self_target"),
-            under_self: bool_field!("under_self"),
-            location: str_field!("location"),
-            heart_colors: str_vec_field!("heart_colors").unwrap_or_default(),
-            source: zone_field!("source"),
-            target: str_field!("target"),
-            destination: zone_field!("destination"),
-            characters: opt_str_vec_field!("characters"),
-            exclude_characters: opt_str_vec_field!("exclude_characters"),
-            exclude_group_names: opt_str_vec_field!("exclude_group_names"),
-            activation_position: str_field!("activation_position"),
-            original_value: bool_field!("original_value"),
-            target_count: u8_field!("target_count"),
-            per_unit: bool_field!("per_unit"),
-            per_unit_count: u8_field!("per_unit_count"),
-            per_unit_type: str_field!("per_unit_type"),
-            per_unit_source: str_field!("per_unit_source"),
-            group_reference: str_field!("group_reference"),
-            state: obj
-                .get("state")
-                .and_then(|v| v.as_str())
-                .map(|s| Box::new(EffectState::from_str(s))),
-            distinct: None,
-            position: obj.get("position").and_then(|v| match v {
-                serde_json::Value::String(s) if !s.is_empty() => {
-                    Some(Box::new(PositionInfo::String(s.clone())))
-                }
-                serde_json::Value::Object(m) => {
-                    let pos = m.get("position").and_then(|p| p.as_str()).map(String::from);
-                    let tgt = m.get("target").and_then(|t| t.as_str()).map(ArcStr::from);
-                    Some(Box::new(PositionInfo::Struct {
-                        position: pos.map(ArcStr::from),
-                        target: tgt,
-                    }))
-                }
-                _ => None,
-            }),
-            negation: bool_field!("negation"),
-            per_unit_heart_colors: str_vec_field!("per_unit_heart_colors").unwrap_or_default(),
-            cost_limit: u8_field!("cost_limit"),
-            cost_limit_operator: obj
-                .get("cost_limit_operator")
-                .and_then(|v| v.as_str())
-                .and_then(parse_operator),
-            cost_values: obj
-                .get("cost_values")
-                .and_then(|v| v.as_array())
-                .map(|arr| {
-                    arr.iter()
-                        .filter_map(|x| x.as_u64())
-                        .map(|n| n as u8)
-                        .collect()
+                card_type: None,
+                exclude_self: bool_field!("exclude_self"),
+                same_name: bool_field!("same_name"),
+                same_unit_name: bool_field!("same_unit_name"),
+                group_names: opt_str_vec_field!("group_names"),
+                self_target: bool_field!("self_target"),
+                under_self: bool_field!("under_self"),
+                location: str_field!("location"),
+                heart_colors: str_vec_field!("heart_colors").unwrap_or_default(),
+                source: zone_field!("source"),
+                target: str_field!("target"),
+                destination: zone_field!("destination"),
+                characters: opt_str_vec_field!("characters"),
+                exclude_characters: opt_str_vec_field!("exclude_characters"),
+                exclude_group_names: opt_str_vec_field!("exclude_group_names"),
+                activation_position: str_field!("activation_position"),
+                original_value: bool_field!("original_value"),
+                target_count: u8_field!("target_count"),
+                per_unit: bool_field!("per_unit"),
+                per_unit_count: u8_field!("per_unit_count"),
+                per_unit_type: str_field!("per_unit_type"),
+                per_unit_source: str_field!("per_unit_source"),
+                group_reference: str_field!("group_reference"),
+                state: obj
+                    .get("state")
+                    .and_then(|v| v.as_str())
+                    .map(|s| Box::new(EffectState::from_str(s))),
+                distinct: None,
+                position: obj.get("position").and_then(|v| match v {
+                    serde_json::Value::String(s) if !s.is_empty() => {
+                        Some(Box::new(PositionInfo::String(s.clone())))
+                    }
+                    serde_json::Value::Object(m) => {
+                        let pos = m.get("position").and_then(|p| p.as_str()).map(String::from);
+                        let tgt = m.get("target").and_then(|t| t.as_str()).map(ArcStr::from);
+                        Some(Box::new(PositionInfo::Struct {
+                            position: pos.map(ArcStr::from),
+                            target: tgt,
+                        }))
+                    }
+                    _ => None,
                 }),
-            blade_limit: u8_field!("blade_limit"),
-            blade_limit_operator: obj
-                .get("blade_limit_operator")
-                .and_then(|v| v.as_str())
-                .and_then(parse_operator),
-            blade_limit_from_energy_under: bool_field!("blade_limit_from_energy_under"),
-            blade_limit_from_cost_member: bool_field!("blade_limit_from_cost_member"),
-            blade_limit_offset: u8_field!("blade_limit_offset"),
-            keep_shuffle_under: bool_field!("keep_shuffle_under"),
-            need_heart_color: str_field!("need_heart_color"),
-            need_heart_operator: obj
-                .get("need_heart_operator")
-                .and_then(|v| v.as_str())
-                .and_then(parse_operator),
-            need_heart_total: u8_field!("need_heart_total"),
-            cost_reference: str_field!("cost_reference"),
-            cost_offset: i8_field!("cost_offset"),
-            target_member: str_field!("target_member"),
-            target_from_selection: bool_field!("target_from_selection"),
-            source_position: str_field!("source_position"),
-            position_compare: str_field!("position_compare"),
-            source_location: str_field!("source_location"),
-            exclude_selected: bool_field!("exclude_selected"),
-            discard_remaining: bool_field!("discard_remaining"),
-            self_cost: bool_field!("self_cost"),
-            shuffle: bool_field!("shuffle"),
-            effect_constraint: str_field!("effect_constraint"),
-            score_floor: u8_field!("score_floor"),
-            sign: str_field!("sign"),
-            heart_type: str_field!("heart_type"),
-            picker: str_field!("picker"),
-            reveal: bool_field!("reveal"),
-            replaces_event: str_field!("replaces_event"),
-            use_limit: u8_field!("use_limit"),
-            triggers: str_field!("triggers"),
-            original_count: u8_field!("original_count"),
-            alternative_count_type: str_field!("alternative_count_type"),
-            blind: bool_field!("blind"),
-            allow_occupied_stage: bool_field!("allow_occupied_stage"),
-            state_change: obj
-                .get("state_change")
-                .and_then(|v| v.as_str())
-                .map(|s| Box::new(EffectState::from_str(s))),
-            exclude_position: str_field!("exclude_position"),
-            original_operator: obj
-                .get("original_operator")
-                .and_then(|v| v.as_str())
-                .and_then(parse_operator),
-            quoted_text: None,
-            duration: str_field!("duration"),
-            dynamic_count: obj
-                .get("dynamic_count")
-                .and_then(|v| serde_json::from_value(v.clone()).ok())
-                .map(Box::new),
-            filter_targets_by_heart_colors: bool_field!("filter_targets_by_heart_colors"),
-            card_property: str_field!("card_property"),
-            per_unit_location: str_field!("per_unit_location"),
-            card_names: str_vec_field!("card_names").unwrap_or_default(),
-            all: bool_field!("all"),
-            requires_under_card: bool_field!("requires_under_card"),
-            optional: bool_field!("optional"),
-            cost_total: u8_field!("cost_total"),
-            cost_total_operator: None,
-            activation_condition_parsed: None,
-            action_by: str_field!("action_by"),
-            trigger_type: str_field!("trigger_type"),
-            repeat_limit: u8_field!("repeat_limit"),
-            ability_filter: None,
-            multiple_targets: bool_field!("multiple_targets"),
-            operation: obj
-                .get("operation")
-                .and_then(|v| v.as_str())
-                .and_then(parse_operation),
-            options: None,
-            name_constraint: str_field!("name_constraint"),
-            name_constraint_source: str_field!("name_constraint_source"),
-            ability_filter_triggers: opt_str_vec_field!("ability_filter_triggers"),
-            or_ability_filters: None,
-            energy_count: u8_field!("energy_count").or_else(|| u8_field!("energy")),
-            any_number: bool_field!("any_number"),
-            custom_type: str_field!("custom_type"),
-            yell_source: str_field!("yell_source"),
-            require_all_heart_colors: bool_field!("require_all_heart_colors"),
-            heart_color_count: u8_field!("heart_color_count"),
-            value: u8_field!("value"),
-            per_group: bool_field!("per_group"),
-            per_group_count: u8_field!("per_group_count"),
-            per_character: bool_field!("per_character"),
-            placement_order: None,
-            remainder_destination: None,
-            remainder_placement_order: None,
-            or_card_types: opt_str_vec_field!("or_card_types"),
-            exclude_heart_colors: opt_str_vec_field!("exclude_heart_colors"),
-            cost_from_revealed: bool_field!("cost_from_revealed"),
-            timing_condition: str_field!("timing_condition"),
-            identities: opt_str_vec_field!("identities"),
-            all_regions: bool_field!("all_regions"),
-            trigger_filter: opt_str_vec_field!("trigger_filter"),
-            effect_type: str_field!("effect_type"),
-            timing: str_field!("timing"),
-            treat_as: str_field!("treat_as"),
-            question: str_field!("question"),
-            answers: opt_str_vec_field!("answers"),
-            choice_maker: str_field!("choice_maker"),
-            choice_based: bool_field!("choice_based"),
-            choice_options: opt_str_vec_field!("choice_options"),
-            choice_type: str_field!("choice_type"),
-            cost_limit_min: u8_field!("cost_limit_min"),
-            cost_limit_max: u8_field!("cost_limit_max"),
-            count: u8_field!("count"),
-            exclude_by_name_source: str_field!("exclude_by_name_source"),
-            baton_touch_trigger: bool_field!("baton_touch_trigger"),
-            is_reveal: bool_field!("is_reveal"),
-            resource_on_select: effect_field!("resource_on_select"),
-            replace_all: bool_field!("replace_all"),
-            resource: str_field!("resource"),
-            heart_colors_from_selected_card: bool_field!("heart_colors_from_selected_card"),
-            heart_color: str_field!("heart_color"),
-            ability_gain: str_field!("ability_gain"),
-            ability_gain_trigger: str_field!("ability_gain_trigger"),
-            anaphora: str_field!("anaphora"),
-            gained_effect: effect_field!("gained_effect"),
-            ability_text: str_field!("ability_text"),
-            target_trigger: str_field!("target_trigger"),
-            source_card: str_field!("source_card"),
-            suppressed_trigger: str_field!("suppressed_trigger"),
-            option: str_field!("option"),
-            alternative_effect: effect_field!("alternative_effect"),
-            choice_condition: obj
-                .get("choice_condition")
-                .and_then(|v| serde_json::from_value(v.clone()).ok()),
-            alternative_condition: obj
-                .get("alternative_condition")
-                .and_then(|v| serde_json::from_value(v.clone()).ok()),
-            restriction_type: str_field!("restriction_type"),
-            restricted_destination: str_field!("restricted_destination"),
-            delayed: bool_field!("delayed"),
-            phase: str_field!("phase"),
-            non_stackable: bool_field!("non_stackable"),
-            heart_selection: bool_field!("heart_selection"),
-            blade_type: str_field!("blade_type"),
-            choice: bool_field!("choice"),
-            lose_blade_hearts: bool_field!("lose_blade_hearts"),
-            original_cost: u8_field!("original_cost"),
-            parenthetical: opt_str_vec_field!("parenthetical"),
-            resource_icon_count: u8_field!("resource_icon_count"),
-            ref_value: str_field!("ref_value"),
-            ref_offset: i8_field!("ref_offset"),
-            id: str_field!("id"),
-            opponent_action: effect_field!("opponent_action"),
+                negation: bool_field!("negation"),
+                per_unit_heart_colors: str_vec_field!("per_unit_heart_colors").unwrap_or_default(),
+                cost_limit: u8_field!("cost_limit"),
+                cost_limit_operator: obj
+                    .get("cost_limit_operator")
+                    .and_then(|v| v.as_str())
+                    .and_then(parse_operator),
+                cost_values: obj
+                    .get("cost_values")
+                    .and_then(|v| v.as_array())
+                    .map(|arr| {
+                        arr.iter()
+                            .filter_map(|x| x.as_u64())
+                            .map(|n| n as u8)
+                            .collect()
+                    }),
+                blade_limit: u8_field!("blade_limit"),
+                blade_limit_operator: obj
+                    .get("blade_limit_operator")
+                    .and_then(|v| v.as_str())
+                    .and_then(parse_operator),
+                blade_limit_from_energy_under: bool_field!("blade_limit_from_energy_under"),
+                blade_limit_from_cost_member: bool_field!("blade_limit_from_cost_member"),
+                blade_limit_offset: u8_field!("blade_limit_offset"),
+                keep_shuffle_under: bool_field!("keep_shuffle_under"),
+                need_heart_color: str_field!("need_heart_color"),
+                need_heart_operator: obj
+                    .get("need_heart_operator")
+                    .and_then(|v| v.as_str())
+                    .and_then(parse_operator),
+                need_heart_total: u8_field!("need_heart_total"),
+                cost_reference: str_field!("cost_reference"),
+                cost_offset: i8_field!("cost_offset"),
+                target_member: str_field!("target_member"),
+                target_from_selection: bool_field!("target_from_selection"),
+                source_position: str_field!("source_position"),
+                position_compare: str_field!("position_compare"),
+                source_location: str_field!("source_location"),
+                exclude_selected: bool_field!("exclude_selected"),
+                discard_remaining: bool_field!("discard_remaining"),
+                self_cost: bool_field!("self_cost"),
+                shuffle: bool_field!("shuffle"),
+                effect_constraint: str_field!("effect_constraint"),
+                score_floor: u8_field!("score_floor"),
+                sign: str_field!("sign"),
+                heart_type: str_field!("heart_type"),
+                picker: str_field!("picker"),
+                reveal: bool_field!("reveal"),
+                replaces_event: str_field!("replaces_event"),
+                use_limit: u8_field!("use_limit"),
+                triggers: str_field!("triggers"),
+                original_count: u8_field!("original_count"),
+                alternative_count_type: str_field!("alternative_count_type"),
+                blind: bool_field!("blind"),
+                allow_occupied_stage: bool_field!("allow_occupied_stage"),
+                state_change: obj
+                    .get("state_change")
+                    .and_then(|v| v.as_str())
+                    .map(|s| Box::new(EffectState::from_str(s))),
+                exclude_position: str_field!("exclude_position"),
+                original_operator: obj
+                    .get("original_operator")
+                    .and_then(|v| v.as_str())
+                    .and_then(parse_operator),
+                quoted_text: None,
+                duration: str_field!("duration"),
+                dynamic_count: obj
+                    .get("dynamic_count")
+                    .and_then(|v| serde_json::from_value(v.clone()).ok())
+                    .map(Box::new),
+                filter_targets_by_heart_colors: bool_field!("filter_targets_by_heart_colors"),
+                card_property: str_field!("card_property"),
+                per_unit_location: str_field!("per_unit_location"),
+                card_names: str_vec_field!("card_names").unwrap_or_default(),
+                all: bool_field!("all"),
+                requires_under_card: bool_field!("requires_under_card"),
+                optional: bool_field!("optional"),
+                cost_total: u8_field!("cost_total"),
+                cost_total_operator: None,
+                activation_condition_parsed: None,
+                action_by: str_field!("action_by"),
+                trigger_type: str_field!("trigger_type"),
+                repeat_limit: u8_field!("repeat_limit"),
+                ability_filter: None,
+                multiple_targets: bool_field!("multiple_targets"),
+                operation: obj
+                    .get("operation")
+                    .and_then(|v| v.as_str())
+                    .and_then(parse_operation),
+                options: None,
+                name_constraint: str_field!("name_constraint"),
+                name_constraint_source: str_field!("name_constraint_source"),
+                ability_filter_triggers: opt_str_vec_field!("ability_filter_triggers"),
+                or_ability_filters: None,
+                energy_count: u8_field!("energy_count").or_else(|| u8_field!("energy")),
+                any_number: bool_field!("any_number"),
+                custom_type: str_field!("custom_type"),
+                yell_source: str_field!("yell_source"),
+                require_all_heart_colors: bool_field!("require_all_heart_colors"),
+                heart_color_count: u8_field!("heart_color_count"),
+                value: u8_field!("value"),
+                per_group: bool_field!("per_group"),
+                per_group_count: u8_field!("per_group_count"),
+                per_character: bool_field!("per_character"),
+                placement_order: None,
+                remainder_destination: None,
+                remainder_placement_order: None,
+                or_card_types: opt_str_vec_field!("or_card_types"),
+                exclude_heart_colors: opt_str_vec_field!("exclude_heart_colors"),
+                cost_from_revealed: bool_field!("cost_from_revealed"),
+                timing_condition: str_field!("timing_condition"),
+                identities: opt_str_vec_field!("identities"),
+                all_regions: bool_field!("all_regions"),
+                trigger_filter: opt_str_vec_field!("trigger_filter"),
+                effect_type: str_field!("effect_type"),
+                timing: str_field!("timing"),
+                treat_as: str_field!("treat_as"),
+                question: str_field!("question"),
+                answers: opt_str_vec_field!("answers"),
+                choice_maker: str_field!("choice_maker"),
+                choice_based: bool_field!("choice_based"),
+                choice_options: opt_str_vec_field!("choice_options"),
+                choice_type: str_field!("choice_type"),
+                cost_limit_min: u8_field!("cost_limit_min"),
+                cost_limit_max: u8_field!("cost_limit_max"),
+                count: u8_field!("count"),
+                exclude_by_name_source: str_field!("exclude_by_name_source"),
+                baton_touch_trigger: bool_field!("baton_touch_trigger"),
+                is_reveal: bool_field!("is_reveal"),
+                resource_on_select: effect_field!("resource_on_select"),
+                replace_all: bool_field!("replace_all"),
+                resource: str_field!("resource"),
+                heart_colors_from_selected_card: bool_field!("heart_colors_from_selected_card"),
+                heart_color: str_field!("heart_color"),
+                ability_gain: str_field!("ability_gain"),
+                ability_gain_trigger: str_field!("ability_gain_trigger"),
+                anaphora: str_field!("anaphora"),
+                gained_effect: effect_field!("gained_effect"),
+                ability_text: str_field!("ability_text"),
+                target_trigger: str_field!("target_trigger"),
+                source_card: str_field!("source_card"),
+                suppressed_trigger: str_field!("suppressed_trigger"),
+                option: str_field!("option"),
+                alternative_effect: effect_field!("alternative_effect"),
+                choice_condition: obj
+                    .get("choice_condition")
+                    .and_then(|v| serde_json::from_value(v.clone()).ok()),
+                alternative_condition: obj
+                    .get("alternative_condition")
+                    .and_then(|v| serde_json::from_value(v.clone()).ok()),
+                restriction_type: str_field!("restriction_type"),
+                restricted_destination: str_field!("restricted_destination"),
+                delayed: bool_field!("delayed"),
+                phase: str_field!("phase"),
+                non_stackable: bool_field!("non_stackable"),
+                heart_selection: bool_field!("heart_selection"),
+                blade_type: str_field!("blade_type"),
+                choice: bool_field!("choice"),
+                lose_blade_hearts: bool_field!("lose_blade_hearts"),
+                original_cost: u8_field!("original_cost"),
+                parenthetical: opt_str_vec_field!("parenthetical"),
+                resource_icon_count: u8_field!("resource_icon_count"),
+                ref_value: str_field!("ref_value"),
+                ref_offset: i8_field!("ref_offset"),
+                id: str_field!("id"),
+                opponent_action: effect_field!("opponent_action"),
             };
             if f == EffectFilter::default() {
                 None
@@ -1843,8 +1855,14 @@ impl AbilityEffect {
     filter_str_getter!(yell_source_any, yell_source);
 
     filter_u8_getter!(blade_limit_any, blade_limit);
-    filter_bool_getter!(blade_limit_from_energy_under_any, blade_limit_from_energy_under);
-    filter_bool_getter!(blade_limit_from_cost_member_any, blade_limit_from_cost_member);
+    filter_bool_getter!(
+        blade_limit_from_energy_under_any,
+        blade_limit_from_energy_under
+    );
+    filter_bool_getter!(
+        blade_limit_from_cost_member_any,
+        blade_limit_from_cost_member
+    );
     filter_u8_getter!(blade_limit_offset_any, blade_limit_offset);
     filter_bool_getter!(keep_shuffle_under_any, keep_shuffle_under);
 
@@ -1974,7 +1992,10 @@ impl AbilityEffect {
             .unwrap_or(&[])
     }
 
-    filter_bool_getter!(heart_colors_from_selected_card_any, heart_colors_from_selected_card);
+    filter_bool_getter!(
+        heart_colors_from_selected_card_any,
+        heart_colors_from_selected_card
+    );
 
     filter_str_getter!(heart_color_any, heart_color);
 
@@ -2065,7 +2086,11 @@ impl AbilityEffect {
 
     filter_copy_getter!(placement_order_any, PlacementOrder, placement_order);
     filter_str_getter!(remainder_destination_any, remainder_destination);
-    filter_copy_getter!(remainder_placement_order_any, PlacementOrder, remainder_placement_order);
+    filter_copy_getter!(
+        remainder_placement_order_any,
+        PlacementOrder,
+        remainder_placement_order
+    );
 
     pub fn position_any(&self) -> Option<&PositionInfo> {
         self.kind.as_deref()?.filter()?.position.as_deref()
@@ -2128,9 +2153,13 @@ impl AbilityEffect {
 
     /// String form of the filter-level destination zone.
     pub fn destination_any(&self) -> Option<&str> {
-        self.destination
-            .map(|z| z.as_str())
-            .or_else(|| self.kind.as_deref()?.filter()?.destination.map(|z| z.as_str()))
+        self.destination.map(|z| z.as_str()).or_else(|| {
+            self.kind
+                .as_deref()?
+                .filter()?
+                .destination
+                .map(|z| z.as_str())
+        })
     }
 
     pub fn count_any(&self) -> Option<u8> {
@@ -2143,13 +2172,9 @@ impl AbilityEffect {
     }
 
     pub fn target_any(&self) -> Option<&str> {
-        self.target.as_deref().or_else(|| {
-            self.kind
-                .as_deref()?
-                .filter()?
-                .target
-                .as_deref()
-        })
+        self.target
+            .as_deref()
+            .or_else(|| self.kind.as_deref()?.filter()?.target.as_deref())
     }
 
     /// Typed player-target subset of `target`. Returns `None` when the merged
@@ -2328,9 +2353,9 @@ impl AbilityEffect {
         crate::ability::util::CardFilter {
             card_type: self.card_type_any().map(|ct| ct.as_card_str()),
             group: self.group_name(),
-                cost_limit: self.cost_limit_any(),
-                cost_operator: self.cost_limit_operator_any().map(Operator::as_str),
-                cost_values: self.cost_values_any(),
+            cost_limit: self.cost_limit_any(),
+            cost_operator: self.cost_limit_operator_any().map(Operator::as_str),
+            cost_values: self.cost_values_any(),
             characters: self.characters_any(),
             exclude_characters: self.exclude_characters_any(),
             exclude_self: if self.exclude_self_any().unwrap_or(false) {
@@ -2614,7 +2639,6 @@ impl ComparisonTarget {
         }
     }
 }
-
 
 impl_deref_str!(ComparisonTarget);
 
@@ -2978,14 +3002,14 @@ pub struct ConditionCommon {
     pub all: Option<bool>,
     #[cfg_attr(feature = "serde_support", serde(default))]
     pub all_areas: Option<bool>,
-#[cfg_attr(feature = "serde_support", serde(default))]
-pub baton_touch_trigger: Option<bool>,
-#[cfg_attr(feature = "serde_support", serde(default))]
-pub blade_limit: Option<u8>,
-#[cfg_attr(feature = "serde_support", serde(default))]
-pub blade_limit_operator: Option<Operator>,
-#[cfg_attr(feature = "serde_support", serde(default))]
-pub blade_greater_than_all: Option<bool>,
+    #[cfg_attr(feature = "serde_support", serde(default))]
+    pub baton_touch_trigger: Option<bool>,
+    #[cfg_attr(feature = "serde_support", serde(default))]
+    pub blade_limit: Option<u8>,
+    #[cfg_attr(feature = "serde_support", serde(default))]
+    pub blade_limit_operator: Option<Operator>,
+    #[cfg_attr(feature = "serde_support", serde(default))]
+    pub blade_greater_than_all: Option<bool>,
     pub cache: Option<bool>,
     #[cfg_attr(feature = "serde_support", serde(default))]
     pub card_property: Option<CardProperty>,
@@ -3287,11 +3311,7 @@ pub enum Condition {
 
     #[cfg_attr(
         feature = "serde_support",
-        serde(
-            rename = "otherwise_condition",
-            alias = "action_success_condition",
-            alias = "custom"
-        )
+        serde(rename = "otherwise_condition", alias = "action_success_condition")
     )]
     AlwaysTrue {
         #[cfg_attr(feature = "serde_support", serde(flatten))]
@@ -3310,6 +3330,12 @@ pub enum Condition {
         serde(rename = "all_revealed_match_heart_color")
     )]
     AllRevealedMatchHeartColor {
+        #[cfg_attr(feature = "serde_support", serde(flatten))]
+        common: Box<ConditionCommon>,
+    },
+
+    #[cfg_attr(feature = "serde_support", serde(rename = "custom"))]
+    Unsupported {
         #[cfg_attr(feature = "serde_support", serde(flatten))]
         common: Box<ConditionCommon>,
     },
@@ -3375,6 +3401,7 @@ impl Condition {
             Condition::AlwaysTrue { common, .. } => Some(common.as_ref()),
             Condition::AnyOf { common, .. } => Some(common.as_ref()),
             Condition::AllRevealedMatchHeartColor { common, .. } => Some(common.as_ref()),
+            Condition::Unsupported { common, .. } => Some(common.as_ref()),
         }
     }
 
@@ -3401,6 +3428,7 @@ impl Condition {
             Condition::AlwaysTrue { common, .. } => Some(common.as_mut()),
             Condition::AnyOf { common, .. } => Some(common.as_mut()),
             Condition::AllRevealedMatchHeartColor { common, .. } => Some(common.as_mut()),
+            Condition::Unsupported { common, .. } => Some(common.as_mut()),
         }
     }
 
@@ -3448,7 +3476,9 @@ impl Condition {
     }
 
     pub fn get_locations(&self) -> Option<&[String]> {
-        self.common().and_then(|c| c.locations.as_deref()).map(|v| v.as_slice())
+        self.common()
+            .and_then(|c| c.locations.as_deref())
+            .map(|v| v.as_slice())
     }
 
     pub fn get_target(&self) -> Option<&str> {
@@ -3468,15 +3498,21 @@ impl Condition {
     }
 
     pub fn get_group_names(&self) -> Option<&[String]> {
-        self.common().and_then(|c| c.group_names.as_deref()).map(|v| v.as_slice())
+        self.common()
+            .and_then(|c| c.group_names.as_deref())
+            .map(|v| v.as_slice())
     }
 
     pub fn get_characters(&self) -> Option<&[String]> {
-        self.common().and_then(|c| c.characters.as_deref()).map(|v| v.as_slice())
+        self.common()
+            .and_then(|c| c.characters.as_deref())
+            .map(|v| v.as_slice())
     }
 
     pub fn get_exclude_characters(&self) -> Option<&[String]> {
-        self.common().and_then(|c| c.exclude_characters.as_deref()).map(|v| v.as_slice())
+        self.common()
+            .and_then(|c| c.exclude_characters.as_deref())
+            .map(|v| v.as_slice())
     }
 
     pub fn get_state(&self) -> Option<CardState> {
@@ -3550,7 +3586,9 @@ impl Condition {
     }
 
     pub fn get_heart_colors(&self) -> Option<&[String]> {
-        self.common().and_then(|c| c.heart_colors.as_deref()).map(|v| v.as_slice())
+        self.common()
+            .and_then(|c| c.heart_colors.as_deref())
+            .map(|v| v.as_slice())
     }
 
     pub fn get_exclude_self(&self) -> Option<bool> {
@@ -3698,9 +3736,7 @@ impl Condition {
         let card_names = c.and_then(|c| c.card_names.as_ref()).map(|b| b.as_ref());
         crate::ability::util::CardFilter {
             card_type: card_type.map(|ct| ct.as_str()),
-            group: group_names
-                .and_then(|v| v.first())
-                .map(|s| s.as_str()),
+            group: group_names.and_then(|v| v.first()).map(|s| s.as_str()),
             cost_limit,
             cost_operator,
             characters: characters.map(|b| b.as_ref()),
@@ -3746,6 +3782,7 @@ impl Condition {
             Condition::AllRevealedMatchHeartColor { .. } => {
                 Some(ConditionType::AllRevealedMatchHeartColor)
             }
+            Condition::Unsupported { .. } => Some(ConditionType::Custom),
         }
     }
 
@@ -4014,7 +4051,9 @@ impl Condition {
         match self {
             // Bare-key original_value lands in ConditionCommon; the legacy
             // LocationSubChecks nesting wins when both are present.
-            Condition::Location { common, sub_checks, .. } => sub_checks
+            Condition::Location {
+                common, sub_checks, ..
+            } => sub_checks
                 .as_ref()
                 .and_then(|sc| sc.original_value)
                 .or(common.original_value),

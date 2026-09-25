@@ -71,3 +71,31 @@ fn pl_pb1_003_r_paid_self_wait_activates_energy_per_printemps_member() {
         "per-Printemps count includes every stage member (3) → 2+3=5 active"
     );
 }
+
+#[test]
+fn pl_pb1_003_r_paid_self_wait_counts_two_physical_instances_of_same_card_no() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let kotori = game.id("PL!-pb1-003-R");
+    let kotori2 = game.id("PL!-pb1-003-R");
+    assert_ne!(kotori, kotori2);
+    assert_eq!(
+        game.db.get_card(kotori).unwrap().card_no,
+        game.db.get_card(kotori2).unwrap().card_no
+    );
+    game.state.player1.stage.stage = [kotori, kotori2, 0];
+    game.give_energy(5);
+    game.state.player1.energy_zone.set_active_count(2);
+    trigger_auto(&mut game, kotori, AbilityTrigger::Debut, "登場");
+    game.select_option(1);
+    assert_eq!(
+        game.state.mods.get_orientation_modifier(kotori),
+        Some("wait")
+    );
+    assert_eq!(
+        game.state.player1.energy_zone.active_count(),
+        4,
+        "two physical Printemps instances count independently → 2+2=4 active"
+    );
+    assert!(!game.has_pending_choice());
+}

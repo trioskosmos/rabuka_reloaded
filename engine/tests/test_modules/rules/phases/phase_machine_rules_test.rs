@@ -229,6 +229,40 @@ fn draw_phase_on_empty_main_deck_refreshes_then_draws() {
     );
 }
 
+#[test]
+fn simultaneous_refresh_uses_first_attacker_order() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let mut p1_cards = Vec::new();
+    let mut p2_cards = Vec::new();
+    for _ in 0..5 {
+        p1_cards.push(game.new_id("PL!-sd1-010-SD"));
+    }
+    for _ in 0..5 {
+        p2_cards.push(game.new_id("PL!-sd1-010-SD"));
+    }
+    game.state.player1.main_deck.cards.clear();
+    game.state.player2.main_deck.cards.clear();
+    game.state.player1.waitroom.cards.clear();
+    game.state.player2.waitroom.cards.clear();
+    game.state.player1.waitroom.cards.extend(p1_cards.iter().copied());
+    game.state.player2.waitroom.cards.extend(p2_cards.iter().copied());
+    game.state.player1.is_first_attacker = false;
+    game.state.player2.is_first_attacker = true;
+
+    let mut expected_p1 = p1_cards.clone();
+    let mut expected_p2 = p2_cards.clone();
+    rabuka_engine::rng::seed(0x51A7_106);
+    rabuka_engine::rng::shuffle_slice(&mut expected_p2);
+    rabuka_engine::rng::shuffle_slice(&mut expected_p1);
+    rabuka_engine::rng::seed(0x51A7_106);
+
+    rabuka_engine::turn::TurnEngine::check_timing(&mut game.state);
+
+    assert_eq!(game.state.player1.main_deck.cards.as_slice(), expected_p1);
+    assert_eq!(game.state.player2.main_deck.cards.as_slice(), expected_p2);
+}
+
 /// 8.2.2/8.2.4 — crossing out of a LiveCardSet phase refills the setter's
 /// hand by EXACTLY the number of live cards she placed (two placed ⇒ two
 /// drawn), drawing from the deck TOP in order; a player who placed nothing
@@ -257,6 +291,7 @@ fn live_card_set_refill_draws_placed_count() {
     }
 
     game.set_live_card(live1);
+    assert!(!game.state.player1.live_card_zone.face_up);
     // A second live arrives by effect (established direct-placement idiom).
     game.state.player1.live_card_zone.cards.push(live2);
 

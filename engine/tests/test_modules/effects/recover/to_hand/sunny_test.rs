@@ -206,6 +206,67 @@ fn sunny_branch2_two_mus_grants_heart() {
     );
 }
 
+#[test]
+fn sunny_branch2_targets_only_owners_mus_members() {
+    use rabuka_engine::card::HeartColor;
+
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let sunny = game.id("PL!-bp5-021-L");
+    let p1_mus = game.id("PL!-sd1-005-SD");
+    let p1_non_mus = game.id("PL!S-sd1-013-SD");
+    let p2_mus_a = game.new_id("PL!-sd1-005-SD");
+    let p2_mus_b = game.new_id("PL!-sd1-010-SD");
+    let filler = game.id("PL!-sd1-013-SD");
+    assert_ne!(p1_mus, p2_mus_a);
+    assert_ne!(p1_mus, p2_mus_b);
+    assert_ne!(p2_mus_a, p2_mus_b);
+
+    game.add_to_hand(sunny);
+    game.add_to_stage(MemberArea::Center, p1_mus);
+    game.add_to_stage(MemberArea::LeftSide, p1_non_mus);
+    game.state.player2.stage.stage[0] = p2_mus_a;
+    game.state.player2.stage.stage[1] = p2_mus_b;
+    game.state.player2.stage.stage[2] = -1;
+    for _ in 0..5 {
+        game.state.player1.main_deck.cards.push(filler);
+        game.state.player2.main_deck.cards.push(filler);
+    }
+
+    advance_to_live_card_set_p1(&mut game);
+    game.set_live_card(sunny);
+    advance_to_live_start(&mut game);
+
+    assert_eq!(game.pending_choice_type().as_deref(), Some("SelectCard"));
+    game.select_indices(&[0]);
+    assert!(!game.has_pending_choice());
+
+    assert_eq!(
+        game.state
+            .mods
+            .get_heart_modifier(p1_mus, HeartColor::Heart03),
+        1
+    );
+    assert_eq!(
+        game.state
+            .mods
+            .get_heart_modifier(p1_non_mus, HeartColor::Heart03),
+        0
+    );
+    assert_eq!(
+        game.state
+            .mods
+            .get_heart_modifier(p2_mus_a, HeartColor::Heart03),
+        0
+    );
+    assert_eq!(
+        game.state
+            .mods
+            .get_heart_modifier(p2_mus_b, HeartColor::Heart03),
+        0
+    );
+}
+
 /// 2 non-μ's members → Branch 2 condition met but no μ's target → no heart granted.
 #[test]
 fn sunny_branch2_two_non_mus_no_heart() {

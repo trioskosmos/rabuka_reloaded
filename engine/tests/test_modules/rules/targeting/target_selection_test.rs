@@ -65,6 +65,38 @@ fn target_count_1_gain_resource_chooses_one_of_many() {
 }
 
 #[test]
+fn target_selection_distinguishes_repeated_card_instances() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let target_a = game.id("PL!N-PR-003-PR");
+    let target_b = game.new_id("PL!N-PR-003-PR");
+    let stellar = game.id("PL!N-pb1-039-L");
+    game.state.player1.stage.stage = [target_a, -1, target_b];
+    game.state.player1.live_card_zone.cards.push(stellar);
+    setup_live_phase_with_hearts(&mut game);
+
+    let player_id = game.state.player1.id.clone();
+    rabuka_engine::turn::TurnEngine::trigger_live_start_abilities(&mut game.state, &player_id);
+    game.state.process_pending_auto_abilities(&player_id);
+    assert!(game.has_pending_choice());
+    game.select_indices(&[1]);
+    game.state.process_pending_auto_abilities(&player_id);
+
+    assert_eq!(
+        game.state
+            .mods
+            .get_heart_modifier(target_a, HeartColor::Heart06),
+        0
+    );
+    assert_eq!(
+        game.state
+            .mods
+            .get_heart_modifier(target_b, HeartColor::Heart06),
+        4
+    );
+}
+
+#[test]
 fn distinct_card_name_prevents_same_card_twice() {
     let db = load_real_database();
     let mut game = TestGame::new(db);

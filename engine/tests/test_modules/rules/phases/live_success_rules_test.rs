@@ -126,6 +126,21 @@ fn q147_empty_need_heart_live_succeeds() {
 
 /// Both players have lives -> both scores compared, each may have LiveSuccess.
 #[test]
+fn rule_victory_stops_the_rest_of_check_timing() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let live = game.id("PL!-sd1-019-SD");
+    let stale = game.new_id("PL!-sd1-010-SD");
+    game.state.player1.success_live_card_zone.cards = vec![live, live, live].into();
+    game.state.resolution_zone.add_card(stale);
+
+    rabuka_engine::turn::TurnEngine::check_timing(&mut game.state);
+
+    assert!(game.state.game_ended);
+    assert_eq!(game.state.resolution_zone.cards.as_slice(), &[stale]);
+}
+
+#[test]
 fn both_players_have_live_cards() {
     let db = load_real_database();
     let mut game = TestGame::new(db);

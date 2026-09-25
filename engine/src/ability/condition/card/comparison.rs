@@ -176,11 +176,7 @@ impl<'a> ConditionContext<'a> {
             threshold,
             op
         );
-        compare_counts(
-            Some(op),
-            effective,
-            threshold,
-        )
+        compare_counts(Some(op), effective, threshold)
     }
 
     fn evaluate_original_score(&self, condition: &Condition) -> bool {
@@ -394,8 +390,8 @@ impl<'a> ConditionContext<'a> {
         if front_card_id == -1 {
             return false;
         }
-        let master_cost = self.printed_cost(master_id);
-        let front_cost = self.printed_cost(front_card_id);
+        let master_cost = self.effective_condition_cost(master_id);
+        let front_cost = self.effective_condition_cost(front_card_id);
         compare_counts(condition.get_operator(), front_cost, master_cost)
     }
 

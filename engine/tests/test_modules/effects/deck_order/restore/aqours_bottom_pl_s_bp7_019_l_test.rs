@@ -36,8 +36,8 @@ fn nandodatte_yakusoku_pl_s_bp7_019_l_places_two_aqours_cards_under_deck() {
     let deck = &game.state.player1.main_deck.cards;
     assert_eq!(deck.len(), 32, "30 fillers + 2 returned cards");
     assert!(
-        deck.ends_with(&[aq1, aq2]) || deck.ends_with(&[aq2, aq1]),
-        "the two Aqours cards sit at the deck BOTTOM (either order)"
+        deck.ends_with(&[aq1, aq2]),
+        "the selected order must be preserved at the deck bottom"
     );
 }
 

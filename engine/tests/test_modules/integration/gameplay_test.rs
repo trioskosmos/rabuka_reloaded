@@ -11,6 +11,7 @@
 /// Each advance_phase() moves exactly one step.
 /// Turn 1 starts at Phase::Main, TurnPhase::FirstAttackerNormal.
 use crate::helpers::*;
+use rabuka_engine::core::types::AbilityTrigger;
 
 /// Smoke test: 20 pass() calls should cycle through 2+ turns without crashing.
 #[test]
@@ -195,6 +196,93 @@ fn ai_screeam_answer_both_discard() {
 }
 
 #[test]
+fn ai_screeam_p2_owned_live_routes_answer_and_discard_choices() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let fill = game.id("PL!-sd1-010-SD");
+    for _ in 0..10 {
+        game.state.player1.main_deck.cards.push(fill);
+        game.state.player2.main_deck.cards.push(fill);
+    }
+
+    let screeam = game.id("LL-PR-004-PR");
+    let p1_discard = game.new_id("PL!-sd1-013-SD");
+    let p2_discard = game.new_id("PL!-sd1-014-SD");
+    game.state.player1.hand.cards.push(p1_discard);
+    game.state.player2.hand.cards.push(screeam);
+    game.state.player2.hand.cards.push(p2_discard);
+
+    game.state.player1.is_first_attacker = false;
+    game.state.player2.is_first_attacker = true;
+    advance_to_live_card_set_p1(&mut game);
+    game.set_live_card(screeam);
+    advance_to_live_start(&mut game);
+
+    let entry = game
+        .state
+        .ability_queue
+        .current_entry()
+        .expect("Scream should create an answer choice");
+    assert_eq!(entry.choice_player_id.as_deref(), Some("p1"));
+    game.select_option(0);
+
+    let entry = game
+        .state
+        .ability_queue
+        .current_entry()
+        .expect("P2 should receive the self discard choice first");
+    assert_eq!(entry.choice_player_id.as_deref(), Some("p2"));
+    game.select_indices(&[0]);
+
+    let entry = game
+        .state
+        .ability_queue
+        .current_entry()
+        .expect("P1 should receive the opponent discard choice second");
+    assert_eq!(entry.choice_player_id.as_deref(), Some("p1"));
+    game.select_indices(&[0]);
+
+    assert!(!game.has_pending_choice());
+    assert!(!game.state.player1.hand.cards.contains(&p1_discard));
+    assert!(!game.state.player2.hand.cards.contains(&p2_discard));
+}
+
+#[test]
+fn ai_screeam_p2_owned_live_gives_blade_to_all_members() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let fill = game.id("PL!-sd1-010-SD");
+    for _ in 0..10 {
+        game.state.player1.main_deck.cards.push(fill);
+        game.state.player2.main_deck.cards.push(fill);
+    }
+
+    let screeam = game.id("LL-PR-004-PR");
+    let p1_left = game.id("PL!-sd1-013-SD");
+    let p1_center = game.new_id("PL!-sd1-013-SD");
+    let p2_left = game.id("PL!-sd1-014-SD");
+    let p2_center = game.new_id("PL!-sd1-014-SD");
+    game.state.player1.stage.stage = [p1_left, p1_center, -1];
+    game.state.player2.stage.stage = [p2_left, p2_center, -1];
+    game.state.player2.hand.cards.push(screeam);
+    game.state.player1.is_first_attacker = false;
+    game.state.player2.is_first_attacker = true;
+
+    advance_to_live_card_set_p1(&mut game);
+    game.set_live_card(screeam);
+    advance_to_live_start(&mut game);
+    game.select_option(2);
+
+    for member in [p1_left, p1_center, p2_left, p2_center] {
+        assert_eq!(
+            game.state.mods.get_blade_modifier(member),
+            1,
+            "all members on both stages should receive one blade"
+        );
+    }
+}
+
+#[test]
 fn ai_screeam_answer_both_draw() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
@@ -316,6 +404,43 @@ fn ai_screeam_answer_both_gain_blade() {
         game.state.mods.get_blade_modifier(p2_member) > 0,
         "P2 member should have gained blade modifier"
     );
+}
+
+#[test]
+fn shared_pr_debut_waits_only_low_cost_opposing_members_for_each_card_identity() {
+    for card_no in [
+        "PL!-PR-005-PR",
+        "PL!-PR-006-PR",
+        "PL!-PR-008-PR",
+    ] {
+        let db = load_real_database();
+        let mut game = TestGame::new(db);
+        let member = game.id(card_no);
+        let cheap_a = game.id("PL!HS-pb1-002-R");
+        let cheap_b = game.new_id("PL!HS-pb1-002-R");
+        let expensive = game.id("PL!S-bp5-009-R");
+        game.state.player2.stage.stage = [cheap_a, cheap_b, expensive];
+
+        assert_eq!(game.db.get_card(member).unwrap().card_no, card_no);
+        fire_trigger(&mut game, member, AbilityTrigger::Debut, "登場");
+        game.select_option(1);
+
+        assert_eq!(
+            game.state.mods.get_orientation_modifier(cheap_a),
+            Some("wait")
+        );
+        assert_eq!(
+            game.state.mods.get_orientation_modifier(cheap_b),
+            Some("wait")
+        );
+        assert_ne!(
+            game.state.mods.get_orientation_modifier(expensive),
+            Some("wait")
+        );
+        assert!(game.state.player2.stage.stage.contains(&cheap_a));
+        assert!(game.state.player2.stage.stage.contains(&cheap_b));
+        assert_eq!(game.state.player2.stage.stage[2], expensive);
+    }
 }
 
 // ====================================================================

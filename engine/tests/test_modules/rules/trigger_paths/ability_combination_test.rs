@@ -312,7 +312,6 @@ fn n_bp3_005_constant_grant_and_counting_auto_combo() {
 
     // Live start with 2+ own debuts this turn: 常時 score+1 until live end.
     fire_trigger(&mut game, member, AbilityTrigger::LiveStart, "ライブ開始時");
-    game.state.recalculate_constants();
     assert_eq!(
         game.state.mods.p1_constant_total_score_bonus,
         1,
@@ -357,7 +356,6 @@ fn n_bp3_005_two_debuts_auto_silent_but_constant_grants() {
     );
 
     fire_trigger(&mut game, member, AbilityTrigger::LiveStart, "ライブ開始時");
-    game.state.recalculate_constants();
     assert_eq!(
         game.state.mods.p1_constant_total_score_bonus,
         1,

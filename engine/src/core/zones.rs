@@ -1,5 +1,5 @@
-use crate::core::constants::U8Count;
 use crate::card::{BaseHeart, CardDatabase, HeartColor};
+use crate::core::constants::U8Count;
 use crate::core::game_modifiers::ModifierEntry;
 use crate::{HashMap, HashSet};
 #[cfg(feature = "serde_support")]
@@ -26,8 +26,11 @@ impl MemberArea {
     /// All stage areas in slot order. ONE definition for the
     /// `[LeftSide, Center, RightSide]` literal previously copy-pasted at
     /// every per-area loop (game_setup estimates, phases double-baton).
-    pub const ALL: [MemberArea; 3] =
-        [MemberArea::LeftSide, MemberArea::Center, MemberArea::RightSide];
+    pub const ALL: [MemberArea; 3] = [
+        MemberArea::LeftSide,
+        MemberArea::Center,
+        MemberArea::RightSide,
+    ];
 
     pub fn as_str(&self) -> &'static str {
         match self {
@@ -153,11 +156,13 @@ pub fn check_effect_position(effect_pos: Option<&str>, card_position: MemberArea
         ("center", MemberArea::Center) => true,
         ("left" | "left_side", MemberArea::LeftSide) => true,
         ("right" | "right_side", MemberArea::RightSide) => true,
-        _ => !(pos == "center"
-            || pos == "left"
-            || pos == "right"
-            || pos == "left_side"
-            || pos == "right_side"),
+        _ => {
+            !(pos == "center"
+                || pos == "left"
+                || pos == "right"
+                || pos == "left_side"
+                || pos == "right_side")
+        }
     }
 }
 
@@ -179,6 +184,8 @@ pub struct Stage {
     // Rule 4.5.5: Cards (member or energy) placed under a member card
     // Index 0 = left side, 1 = center, 2 = right side
     pub under_cards: [SmallVec<[i16; 4]>; STAGE_SIZE],
+    #[cfg_attr(feature = "serde_support", serde(default))]
+    pub pending_duplicate_members: [Vec<(i16, SmallVec<[i16; 4]>)>; STAGE_SIZE],
 }
 
 impl Default for Stage {
@@ -192,12 +199,15 @@ impl Stage {
         Stage {
             stage: [EMPTY_SLOT, EMPTY_SLOT, EMPTY_SLOT], // [left_side, center, right_side], EMPTY_SLOT indicates empty
             under_cards: [SmallVec::new(), SmallVec::new(), SmallVec::new()],
+            pending_duplicate_members: [Vec::new(), Vec::new(), Vec::new()],
         }
     }
 
     /// Invariant check: stage must always have exactly STAGE_SIZE positions
     pub fn invariant(&self) -> bool {
-        self.stage.len() == STAGE_SIZE && self.under_cards.len() == STAGE_SIZE
+        self.stage.len() == STAGE_SIZE
+            && self.under_cards.len() == STAGE_SIZE
+            && self.pending_duplicate_members.len() == STAGE_SIZE
     }
 
     pub fn get_area(&self, area: MemberArea) -> Option<i16> {
@@ -224,6 +234,29 @@ impl Stage {
         };
         self.stage[index] = card_id;
         debug_assert!(self.invariant(), "Stage invariant violated after set");
+    }
+
+    pub fn stage_member_for_check_timing(&mut self, area: MemberArea, card_id: i16) {
+        let index = area.to_index();
+        log::debug!(
+            "[DUPLICATE_STAGE] area={} older={} newest={}",
+            area,
+            self.stage[index],
+            card_id
+        );
+        if self.stage[index] != EMPTY_SLOT {
+            let older = self.stage[index];
+            let under_cards = core::mem::take(&mut self.under_cards[index]);
+            self.pending_duplicate_members[index].push((older, under_cards));
+        }
+        self.stage[index] = card_id;
+    }
+
+    pub fn take_pending_duplicate_members(
+        &mut self,
+        area: MemberArea,
+    ) -> Vec<(i16, SmallVec<[i16; 4]>)> {
+        core::mem::take(&mut self.pending_duplicate_members[area.to_index()])
     }
 
     pub fn place_under_card(&mut self, area: MemberArea, card_id: i16) {
@@ -417,7 +450,10 @@ impl Stage {
         &self,
         card_db: &CardDatabase,
         heart_override: &HashMap<i16, (HeartColor, u8)>,
-        heart_modifiers: &HashMap<i16, HashMap<HeartColor, crate::core::game_modifiers::ModifierEntry>>,
+        heart_modifiers: &HashMap<
+            i16,
+            HashMap<HeartColor, crate::core::game_modifiers::ModifierEntry>,
+        >,
         heart_color_multiplier: &HashMap<i16, HeartColor>,
         heart_copy: &HashMap<i16, i16>,
     ) -> BaseHeart {
@@ -443,19 +479,21 @@ impl Stage {
         heart_color_multiplier: &HashMap<i16, HeartColor>,
         heart_copy: &HashMap<i16, i16>,
     ) -> BaseHeart {
-        let converted: HashMap<i16, HashMap<HeartColor, crate::core::game_modifiers::ModifierEntry>> =
-            heart_modifiers_i32
-                .iter()
-                .map(|(&cid, colors)| {
-                    let mut m = HashMap::default();
-                    for (&col, &delta) in colors {
-                        let mut e = crate::core::game_modifiers::ModifierEntry::default();
-                        e.additive = delta as i16;
-                        m.insert(col, e);
-                    }
-                    (cid, m)
-                })
-                .collect();
+        let converted: HashMap<
+            i16,
+            HashMap<HeartColor, crate::core::game_modifiers::ModifierEntry>,
+        > = heart_modifiers_i32
+            .iter()
+            .map(|(&cid, colors)| {
+                let mut m = HashMap::default();
+                for (&col, &delta) in colors {
+                    let mut e = crate::core::game_modifiers::ModifierEntry::default();
+                    e.additive = delta as i16;
+                    m.insert(col, e);
+                }
+                (cid, m)
+            })
+            .collect();
         self.get_available_hearts(
             card_db,
             heart_override,
@@ -476,6 +514,7 @@ impl Stage {
 pub struct LiveCardZone {
     // Rule 5.2: Live Card Zone - Where member and live cards are placed during Live Card Set Phase
     pub cards: SmallVec<[i16; MAX_LIVE_CARDS]>, // Card IDs - stack-allocated for up to MAX_LIVE_CARDS cards
+    pub face_up: bool,
 }
 
 impl Default for LiveCardZone {
@@ -488,6 +527,7 @@ impl LiveCardZone {
     pub fn new() -> Self {
         LiveCardZone {
             cards: SmallVec::new(),
+            face_up: false,
         }
     }
 
@@ -538,8 +578,7 @@ impl LiveCardZone {
                     .and_then(|sm| sm.get(card_id))
                     .copied()
                     .unwrap_or(0);
-                let card_score =
-                    crate::constants::saturate_u8(base_score + modifier);
+                let card_score = crate::constants::saturate_u8(base_score + modifier);
 
                 // A4: use unified effective_need_heart + check_heart_requirement
                 let heart_needs_satisfied = if let Some(ref need_heart) = card.need_heart {
@@ -570,10 +609,10 @@ impl LiveCardZone {
             }
         }
 
-        total_score + cheer_blade_heart_count
+        total_score
+            + cheer_blade_heart_count
             + crate::constants::saturate_u8(constant_total_score_bonus as i32)
     }
-
 }
 
 use crate::constants::{MAX_ENERGY_CARDS, MAX_LIVE_CARDS};
@@ -1034,20 +1073,54 @@ impl ExclusionZone {
 pub struct ResolutionZone {
     // Rule 5.8: Resolution Zone - Temporary holding area for cards being resolved
     pub cards: SmallVec<[i16; 10]>, // Card IDs - stack-allocated for up to 10 cards
+    pub owners: SmallVec<[u8; 10]>,
 }
 
 impl ResolutionZone {
     pub fn new() -> Self {
         ResolutionZone {
             cards: SmallVec::new(),
+            owners: SmallVec::new(),
         }
     }
 
     pub fn add_card(&mut self, card_id: i16) {
+        self.add_card_for_owner(card_id, 0);
+    }
+
+    pub fn add_card_for_owner(&mut self, card_id: i16, owner: u8) {
         self.cards.push(card_id);
+        self.owners.push(owner);
+    }
+
+    pub fn owner_at(&self, index: usize) -> Option<u8> {
+        self.owners.get(index).copied()
+    }
+
+    pub fn swap_slots(&mut self, left_slot: usize, right_slot: usize) -> Result<(), String> {
+        if left_slot == right_slot {
+            return Err("Cannot swap the same Resolution Zone slot".to_string());
+        }
+        self.cards
+            .get(left_slot)
+            .ok_or_else(|| "Left Resolution Zone slot is out of bounds".to_string())?;
+        self.cards
+            .get(right_slot)
+            .ok_or_else(|| "Right Resolution Zone slot is out of bounds".to_string())?;
+        self.owners
+            .get(left_slot)
+            .ok_or_else(|| "Left Resolution Zone slot has no owner".to_string())?;
+        self.owners
+            .get(right_slot)
+            .ok_or_else(|| "Right Resolution Zone slot has no owner".to_string())?;
+
+        self.cards.swap(left_slot, right_slot);
+        self.owners.swap(left_slot, right_slot);
+        Ok(())
     }
 
     pub fn clear(&mut self) -> SmallVec<[i16; 10]> {
+        self.owners.clear();
         core::mem::take(&mut self.cards)
     }
 

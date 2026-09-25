@@ -29,7 +29,6 @@ fn pl_bp4_013_n_paid_discard_grants_other_member_heart01() {
         guard += 1;
         game.select_indices(&[0]);
     }
-    game.state.recalculate_constants();
 
     assert_eq!(
         game.state
@@ -60,7 +59,6 @@ fn pl_bp4_013_n_declined_discard_grants_no_heart01() {
 
     fire_trigger(&mut game, me, AbilityTrigger::LiveStart, LIVE_START);
     game.select_option(1);
-    game.state.recalculate_constants();
 
     assert_eq!(
         game.state

@@ -167,6 +167,44 @@ fn himeno_front_constant_evaluates() {
 
 /// No opponent in front → no heart01.
 #[test]
+fn himeno_front_constant_uses_modified_front_cost() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db.clone());
+    let himeno = game.id(HIMENO);
+    let opp = game.id("PL!HS-sd1-006-SD");
+
+    game.state.player1.stage.stage[1] = himeno;
+    game.state.player2.stage.stage[1] = opp;
+    game.state.mods.add_cost_modifier(opp, -7);
+    game.state.recalculate_constants();
+
+    let m = game
+        .state
+        .mods
+        .get_heart_modifier(himeno, rabuka_engine::card::parse_heart_color("heart01"));
+    assert_eq!(m, 0);
+}
+
+#[test]
+fn himeno_front_constant_uses_modified_own_cost() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db.clone());
+    let himeno = game.id(HIMENO);
+    let opp = game.id(FILLER);
+
+    game.state.player1.stage.stage[1] = himeno;
+    game.state.player2.stage.stage[1] = opp;
+    game.state.mods.add_cost_modifier(himeno, -6);
+    game.state.recalculate_constants();
+
+    let m = game
+        .state
+        .mods
+        .get_heart_modifier(himeno, rabuka_engine::card::parse_heart_color("heart01"));
+    assert_eq!(m, 1);
+}
+
+#[test]
 fn himeno_front_constant_no_opponent() {
     let db = load_real_database();
     let mut game = TestGame::new(db.clone());

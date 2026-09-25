@@ -881,8 +881,16 @@ impl AbilityResolver {
                         .iter()
                         .rev()
                         .filter_map(|&i| {
-                            let cid =
-                                player.remove_member_from_stage_with_recycling(i, card_db);
+                            let cid = player.stage.stage[i];
+                            if let Some(area) = crate::zones::MemberArea::from_index(i) {
+                                self.record_member_last_known(
+                                    cid,
+                                    card_db,
+                                    &gs.mods.blade_modifiers,
+                                    area,
+                                );
+                            }
+                            let cid = player.remove_member_from_stage_with_recycling(i, card_db);
                             if cid.is_some() {
                                 vacated = Some(i as u8);
                             }

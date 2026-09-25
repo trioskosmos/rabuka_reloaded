@@ -47,7 +47,6 @@ fn nagisa_one_card_gets_plus_one() {
     game.play_to_stage(nagisa, MemberArea::Center);
     game.drain_auto_ability_choices();
 
-    game.state.recalculate_constants();
     let score_mod = game.state.mods.p1_constant_total_score_bonus;
     assert_eq!(score_mod, 1, "1 card → gain +1 (live total)");
 }
@@ -68,7 +67,6 @@ fn nagisa_zero_cards_nothing_happens() {
     game.play_to_stage(nagisa, MemberArea::Center);
     game.drain_auto_ability_choices();
 
-    game.state.recalculate_constants();
     let score_mod = game.state.mods.p1_constant_total_score_bonus;
     assert_eq!(score_mod, 0, "0 cards → nothing");
 }
@@ -93,7 +91,6 @@ fn nagisa_two_cards_gets_plus_two() {
     game.play_to_stage(nagisa, MemberArea::Center);
     game.drain_auto_ability_choices();
 
-    game.state.recalculate_constants();
     let score_mod = game.state.mods.p1_constant_total_score_bonus;
     assert_eq!(score_mod, 2, "2 cards → gain +2 instead of +1 (live total)");
 }
@@ -116,7 +113,6 @@ fn nagisa_not_at_center_does_not_fire() {
     game.play_to_stage(nagisa, MemberArea::LeftSide);
     game.drain_auto_ability_choices();
 
-    game.state.recalculate_constants();
     let score_mod = game.state.mods.p1_constant_total_score_bonus;
     assert_eq!(score_mod, 0, "Left side → activation_condition blocks");
 }
@@ -140,7 +136,6 @@ fn nagisa_effect_expires_on_clear() {
     game.play_to_stage(nagisa, MemberArea::Center);
     game.drain_auto_ability_choices();
 
-    game.state.recalculate_constants();
     let before = game.state.mods.p1_constant_total_score_bonus;
     assert_eq!(before, 2, "Should have +2 before clear");
 

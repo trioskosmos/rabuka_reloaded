@@ -91,8 +91,6 @@ impl AbilityResolver {
             }
         }
 
-        gs.reset_replacement_effect_flags();
-
         // Empty action (default) with action_by means it was entirely handled by opponent
         if effect.action == ActionType::Custom && effect.action_by().is_some() {
             return Ok(true);
@@ -112,8 +110,16 @@ impl AbilityResolver {
     fn run_replacement_effects(
         &mut self,
         gs: &mut GameState,
-        action_str: &str,
+        effect: &AbilityEffect,
     ) -> Result<bool, String> {
+        let action_str = effect.action.to_str();
+        if self.resolving_replacement {
+            return Ok(false);
+        }
+        if !self.resolving_replacement {
+            gs.reset_replacement_effect_flags();
+            self.resolving_replacement = true;
+        }
         let replacement_indices: Vec<usize> = gs
             .replacement_effects
             .iter()
@@ -123,10 +129,21 @@ impl AbilityResolver {
             .collect();
 
         if replacement_indices.is_empty() {
+            self.resolving_replacement = false;
             return Ok(false);
         }
+        let mut mandatory_effects = Vec::new();
         for idx in replacement_indices {
+            if gs.replacement_effects[idx].applied_this_event {
+                continue;
+            }
             if gs.replacement_effects[idx].is_choice_based {
+                for effects in &mandatory_effects {
+                    for replacement_effect in effects {
+                        self.execute_effect(gs, replacement_effect)?;
+                    }
+                }
+                self.pending_replacement = Some((idx, effect.clone()));
                 let description =
                     format!("Apply replacement effect for action '{}'?", action_str);
                 self.pending_choice = Some(Choice::SelectTarget {
@@ -140,16 +157,33 @@ impl AbilityResolver {
                     allow_skip: false,
                     options: None,
                 });
+                log::debug!(
+                    "[REPLACEMENT] event={} registration={} pending=true",
+                    action_str,
+                    idx
+                );
                 return Err("Pending choice required: apply replacement effect".to_string());
             }
             let effects_to_execute =
                 gs.replacement_effects[idx].replacement_effects.clone();
-            let card_id = gs.replacement_effects[idx].card_id;
-            for replacement_effect in &effects_to_execute {
+            gs.mark_replacement_effect_applied(idx);
+            log::debug!(
+                "[REPLACEMENT] event={} registration={} applied=true choice=false count={:?}",
+                action_str,
+                idx,
+                effects_to_execute
+                    .iter()
+                    .map(|effect| effect.count_any())
+                    .collect::<Vec<_>>()
+            );
+            mandatory_effects.push(effects_to_execute);
+        }
+        for effects in &mandatory_effects {
+            for replacement_effect in effects {
                 self.execute_effect(gs, replacement_effect)?;
             }
-            gs.mark_replacement_effect_applied(card_id);
         }
+        self.resolving_replacement = false;
         Ok(true)
     }
 
@@ -269,9 +303,15 @@ impl AbilityResolver {
             return Ok(());
         }
 
-        let action_str = effect.action.to_str();
-
-        if self.run_replacement_effects(gs, action_str)? {
+        if self.run_replacement_effects(gs, effect)? {
+            return Ok(());
+        }
+        if self.replacement_original_suppressed {
+            self.replacement_original_suppressed = false;
+            log::debug!(
+                "[REPLACEMENT] action={} original_suppressed=true",
+                effect.action
+            );
             return Ok(());
         }
 

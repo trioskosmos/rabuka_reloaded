@@ -85,6 +85,29 @@ fn hazuki_energy_by_opponent_effect_triggers() {
 /// batch_movements is clear, even though the
 /// comparison_condition would pass (energy card in zone).
 #[test]
+fn two_hazuki_copies_gain_once_per_opponent_effect_energy_placement() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let left = game.id("PL!SP-bp4-016-N");
+    let right = game.new_id("PL!SP-bp4-016-N");
+    game.state.player1.stage.stage = [left, right, -1];
+
+    for _ in 0..2 {
+        let energy = game.id("LL-E-001-SD");
+        game.state.player1.energy_zone.cards.push(energy);
+        game.state
+            .push_movement_event(-1, "energy_deck", "energy", None, "p2", true);
+        trigger_auto(&mut game);
+        game.drain_choices_strict(&["SelectAutoAbility"], &[0]);
+    }
+
+    assert_eq!(heart06_mod(&game, left), 2);
+    assert_eq!(heart06_mod(&game, right), 2);
+    assert_ne!(left, right);
+    assert_eq!(game.state.player1.energy_zone.cards.len(), 2);
+}
+
+#[test]
 fn hazuki_energy_phase_no_effect_flag() {
     let db = load_real_database();
     let mut v = TestGame::new(db);

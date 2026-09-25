@@ -1194,6 +1194,17 @@ pub async fn execute_action(
     req: web::Json<ExecuteActionRequest>,
     http_req: actix_web::HttpRequest,
 ) -> impl Responder {
+    let action_type = match req.action_type.as_ref() {
+        None => ActionType::Pass,
+        Some(t) => match t.parse::<ActionType>() {
+            Ok(parsed) => parsed,
+            Err(_) => {
+                return HttpResponse::BadRequest()
+                    .json(serde_json::json!({ "error": format!("Unknown action_type: {}", t) }));
+            }
+        },
+    };
+
     // PVP: verify the requesting player is allowed to act
     // IMPORTANT: do NOT call resolve_game_state_arc while holding the rooms lock
     // (std::sync::Mutex is not reentrant — same thread would deadlock)
@@ -1211,7 +1222,7 @@ pub async fn execute_action(
     let gs_arc = resolve_game_state_arc(&data, &http_req);
     if let Some(pid) = pvp_player_pid {
         let gs = lock_state!(gs_arc, read);
-        if !pvp_player_can_act(&gs, pid) {
+        if action_type != ActionType::Concede && !pvp_player_can_act(&gs, pid) {
             return HttpResponse::Forbidden().json(serde_json::json!({
                 "error": "It's not your turn. Waiting for opponent."
             }));
@@ -1228,20 +1239,6 @@ pub async fn execute_action(
     };
     let mut game_state = lock_state!(gs_arc, write);
 
-    // An unrecognised action_type used to silently execute a Pass — a typo
-    // could pass the turn. Reject gibberish; only a missing field keeps the
-    // legacy Pass default.
-    let action_type = match req.action_type.as_ref() {
-        None => ActionType::Pass,
-        Some(t) => match t.parse::<ActionType>() {
-            Ok(parsed) => parsed,
-            Err(_) => {
-                return HttpResponse::BadRequest()
-                    .json(serde_json::json!({ "error": format!("Unknown action_type: {}", t) }));
-            }
-        },
-    };
-
     // PVP RPS: set transient player_id so the handler routes to the correct player
     if matches!(
         action_type,
@@ -1250,16 +1247,20 @@ pub async fn execute_action(
         game_state.pending_rps_player_id = pvp_player_pid.map(|p| p as u8);
     }
 
-    let result = crate::turn::TurnEngine::execute_main_phase_action(
-        &mut game_state,
-        &action_type,
-        req.card_id,
-        req.card_indices.as_ref().cloned(),
-        req.stage_area
-            .as_ref()
-            .and_then(|s| s.parse::<crate::zones::MemberArea>().ok()),
-        req.use_baton_touch,
-    );
+    let result = if action_type == ActionType::Concede {
+        game_state.concede(pvp_player_pid.unwrap_or(0) as u8)
+    } else {
+        crate::turn::TurnEngine::execute_main_phase_action(
+            &mut game_state,
+            &action_type,
+            req.card_id,
+            req.card_indices.as_ref().cloned(),
+            req.stage_area
+                .as_ref()
+                .and_then(|s| s.parse::<crate::zones::MemberArea>().ok()),
+            req.use_baton_touch,
+        )
+    };
 
     match result {
         Ok(_) => {

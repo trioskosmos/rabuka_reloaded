@@ -598,6 +598,15 @@ impl AbilityResolver {
                 );
             }
 
+            // Conditional constants read wait/active orientations, so they must be
+            // re-evaluated as soon as the orientation change is applied — otherwise
+            // a card whose own effect satisfies its 「~が2人以上いる」 常時 stays stale.
+            log::debug!(
+                "[EXEC_CHANGE_STATE] recalculating constants after state={}",
+                state_change
+            );
+            gs.recalculate_constants();
+
             // Push changed cards to selected_cards so subsequent sequential
             // actions (e.g. gain_resource with target_from_selection: true)
             // can target the affected member(s).

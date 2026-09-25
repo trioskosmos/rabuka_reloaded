@@ -661,6 +661,58 @@ fn live_start_three_under_members_grant_three_heart05() {
 }
 
 #[test]
+fn two_live_start_sayaka_instances_count_only_their_own_under_cards() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let sayaka_left = game.id("PL!HS-pb1-002-R");
+    let sayaka_center = game.new_id("PL!HS-pb1-002-R");
+    game.state.player1.stage.stage = [sayaka_left, sayaka_center, -1];
+    for _ in 0..3 {
+        let under = game.new_id("PL!HS-pb1-002-R");
+        game.state
+            .player1
+            .stage
+            .place_under_card(MemberArea::LeftSide, under);
+    }
+    for _ in 0..3 {
+        let under = game.new_id("PL!HS-pb1-002-R");
+        game.state
+            .player1
+            .stage
+            .place_under_card(MemberArea::Center, under);
+    }
+
+    trigger_sayaka_live_start(&mut game, sayaka_left);
+    trigger_sayaka_live_start(&mut game, sayaka_center);
+
+    for sayaka in [sayaka_left, sayaka_center] {
+        assert_eq!(
+            game.state
+                .mods
+                .get_heart_modifier(sayaka, rabuka_engine::card::HeartColor::Heart05),
+            3
+        );
+        assert_eq!(game.state.mods.get_cost_modifier(sayaka), 12);
+    }
+    assert_eq!(
+        game.state
+            .player1
+            .stage
+            .get_under_cards(MemberArea::LeftSide)
+            .len(),
+        3
+    );
+    assert_eq!(
+        game.state
+            .player1
+            .stage
+            .get_under_cards(MemberArea::Center)
+            .len(),
+        3
+    );
+}
+
+#[test]
 fn live_start_no_under_material_ignores_same_name_in_hand_and_grants_no_heart_or_cost() {
     let db = load_real_database();
     let mut game = TestGame::new(db);

@@ -45,7 +45,6 @@ fn pl_s_bp6_007_r_energy_cost_grants_aqours_constant_score_abilities() {
         hand_before,
         "energy payment leaves hand alone"
     );
-    game.state.recalculate_constants();
     assert_eq!(
         game.state.mods.p1_constant_total_score_bonus, 2,
         "up to TWO 『Aqours』 members each gain ライブの合計スコア+1 (μ's member excluded)"
@@ -77,7 +76,6 @@ fn hanamaru_q_constant_score_success_threshold_matrix() {
             guard += 1;
             game.select_indices(&[0, 1]);
         }
-        game.state.recalculate_constants();
         assert_eq!(
             game.state.mods.p1_constant_total_score_bonus,
             i16::from(u8::from(success_count >= 2)),

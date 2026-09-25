@@ -238,7 +238,8 @@ fn describe_condition_expectation(condition: &Condition) -> String {
         | Condition::Compound { .. }
         | Condition::AnyOf { .. }
         | Condition::AlwaysTrue { .. }
-        | Condition::AllRevealedMatchHeartColor { .. } => String::new(),
+        | Condition::AllRevealedMatchHeartColor { .. }
+        | Condition::Unsupported { .. } => String::new(),
     }
 }
 
@@ -304,6 +305,7 @@ pub fn push_cond_verdict(
         Condition::AnyOf { .. } => "any_of_condition",
         Condition::AlwaysTrue { .. } => "otherwise_condition",
         Condition::AllRevealedMatchHeartColor { .. } => "all_revealed_match_heart_color",
+        Condition::Unsupported { .. } => "custom",
     }
     .to_string();
 
@@ -422,8 +424,7 @@ impl<'a> ConditionContext<'a> {
             && condition.get_count().is_none()
             && condition.get_values().is_none()
             && (condition.get_comparison_target().is_none()
-                || condition.get_comparison_target()
-                    == Some(crate::card::ComparisonTarget::Self_))
+                || condition.get_comparison_target() == Some(crate::card::ComparisonTarget::Self_))
             && condition.get_all().unwrap_or(false)
     }
 
@@ -465,7 +466,11 @@ impl<'a> ConditionContext<'a> {
         }
     }
 
-    pub fn evaluate_condition(&self, condition: &Condition) -> bool {        // Handle aggregate total with heart_colors — runs before type dispatch.
+    pub fn evaluate_condition(&self, condition: &Condition) -> bool {
+        // Handle aggregate total with heart_colors — runs before type dispatch.
+        if matches!(condition, Condition::Unsupported { .. }) {
+            return false;
+        }
         // Skip early return for TemporalCondition so the phase gate is checked too.
         if !matches!(condition, Condition::Temporal { .. })
             && condition.get_aggregate() == Some("total")
@@ -527,6 +532,7 @@ impl<'a> ConditionContext<'a> {
             Condition::AllRevealedMatchHeartColor { .. } => {
                 self.evaluate_all_revealed_match_heart_color(condition)
             }
+            Condition::Unsupported { .. } => false,
             Condition::Compound { .. } => {
                 // The decoder CAN produce top-level Compound (variant 0 →
                 // build_compound). The pre-dispatch above normally handles it,
@@ -539,8 +545,8 @@ impl<'a> ConditionContext<'a> {
             }
         };
 
-        let is_plain_location = matches!(condition, Condition::Location { .. })
-            && condition.get_count().is_none();
+        let is_plain_location =
+            matches!(condition, Condition::Location { .. }) && condition.get_count().is_none();
 
         let final_result = if condition.get_negation().unwrap_or(false)
             && !(matches!(condition, Condition::Location { .. })
@@ -883,14 +889,14 @@ impl<'a> ConditionContext<'a> {
             position_str = format!("位置={}", pos.get_position().unwrap_or("?"));
         } else if let Some(ref act_pos) = condition.get_activation_position() {
             let card_id = self.activating_card_id;
-        let ok = act_pos.split(',').any(|p| {
-            let Some(idx) = crate::ability::util::activation_position_index(p) else {
-                return true;
-            };
-            idx < player.stage.stage.len()
-                && card_id.is_some()
-                && player.stage.stage[idx] == card_id.unwrap()
-        });
+            let ok = act_pos.split(',').any(|p| {
+                let Some(idx) = crate::ability::util::activation_position_index(p) else {
+                    return true;
+                };
+                idx < player.stage.stage.len()
+                    && card_id.is_some()
+                    && player.stage.stage[idx] == card_id.unwrap()
+            });
             if ok {
                 position_str = format!("位置=OK({})", act_pos);
             } else {

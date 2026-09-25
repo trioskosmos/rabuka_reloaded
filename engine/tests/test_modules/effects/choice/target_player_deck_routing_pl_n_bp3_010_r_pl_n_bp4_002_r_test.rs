@@ -164,3 +164,73 @@ fn pl_n_bp4_002_r_choose_self_discards_looked_top_card() {
         "choosing the discard option moves the looked-at top card to the waitroom"
     );
 }
+
+#[test]
+fn dia_then_azuna_share_opponent_waitroom_and_preserve_selection_order() {
+    use rabuka_engine::ability::types::Choice;
+    use rabuka_engine::core::types::AbilityTrigger;
+
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let azuna = game.id(AZUNA_TARGET);
+    let dia = game.id("PL!S-bp7-013-N");
+    let a = game.new_id("PL!S-sd1-001-SD");
+    let b = game.new_id("PL!S-sd1-001-SD");
+    let c = game.new_id("PL!S-sd1-001-SD");
+    let d = game.new_id("PL!S-sd1-001-SD");
+    let live1 = game.new_id(FILLER_LIVE);
+    let live2 = game.new_id(FILLER_LIVE);
+    let live3 = game.new_id(FILLER_LIVE);
+    game.state.player1.stage.stage[1] = azuna;
+    game.state.player2.waitroom.cards.extend([a, live1, b, live2, c, live3, d]);
+    fill_deck(&mut game, "p1", 10);
+    fill_deck(&mut game, "p2", 10);
+
+    fire_trigger(&mut game, dia, AbilityTrigger::Debut, "登場");
+    game.select_option(1);
+    match game.get_pending_choice() {
+        Choice::SelectCard {
+            zone,
+            filtered_indices,
+            target_player_id,
+            ..
+        } => {
+            assert_eq!(zone, "discard");
+            assert_eq!(filtered_indices.as_deref(), Some(&[0, 2, 4, 6][..]));
+            assert_eq!(target_player_id.as_deref(), Some("self"));
+        }
+        other => panic!("expected Dia member selection, got {other:?}"),
+    }
+    game.select_indices(&[1, 0]);
+
+    fire_trigger(&mut game, azuna, AbilityTrigger::LiveStart, "ライブ開始時");
+    game.select_option(1);
+    match game.get_pending_choice() {
+        Choice::SelectCard {
+            zone,
+            filtered_indices,
+            target_player_id,
+            ..
+        } => {
+            assert_eq!(zone, "discard");
+            assert_eq!(filtered_indices.as_deref(), Some(&[2, 4][..]));
+            assert_eq!(target_player_id.as_deref(), Some("self"));
+        }
+        other => panic!("expected Azuna member selection, got {other:?}"),
+    }
+    game.select_indices(&[1, 0]);
+
+    assert!(!game.has_pending_choice());
+    for card in [a, b, c, d] {
+        assert!(!game.state.player2.waitroom.cards.contains(&card));
+        assert!(game.state.player2.main_deck.cards.contains(&card));
+    }
+    let p2_deck = &game.state.player2.main_deck.cards;
+    assert_eq!(&p2_deck[p2_deck.len() - 4..], &[b, a, d, c]);
+    assert_eq!(p2_deck.len(), 14);
+    for live in [live1, live2, live3] {
+        assert!(game.state.player2.waitroom.cards.contains(&live));
+    }
+    assert_eq!(game.state.player2.waitroom.cards.len(), 3);
+    assert!(game.state.player1.waitroom.cards.is_empty());
+}

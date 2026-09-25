@@ -1455,7 +1455,6 @@ fn karin_position_change_removes_not_moved_blade() {
     game.play_to_stage(karin, MemberArea::Center);
 
     // Before LiveStart: Karin has not moved → gets blade 2.
-    game.state.recalculate_constants();
     let blade_before = game.state.mods.get_blade_modifier(karin);
     assert_eq!(blade_before, 2, "Karin should have +2 blade before moving");
 

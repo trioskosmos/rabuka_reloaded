@@ -37,6 +37,76 @@ fn all_three_required_hearts_member_is_added_to_hand() {
 }
 
 #[test]
+fn two_matching_copies_select_exact_physical_instance() {
+    use rabuka_engine::ability::types::Choice;
+    use rabuka_engine::core::types::AbilityTrigger;
+
+    let db = load_real_database();
+    let mut g = TestGame::new(db);
+    let source = g.id("PL!S-bp6-005-R");
+    let matching_a = g.id("PL!S-sd1-001-SD");
+    let matching_b = g.new_id("PL!S-sd1-001-SD");
+    let filler = g.id("PL!-sd1-010-SD");
+    assert_ne!(matching_a, matching_b);
+
+    g.state.player1.stage.stage = [-1, source, -1];
+    g.give_energy(5);
+    g.state.player1.main_deck.cards.clear();
+    g.state.player1.main_deck.cards.push(matching_a);
+    g.state.player1.main_deck.cards.push(matching_b);
+    while g.state.player1.main_deck.cards.len() < 40 {
+        g.state.player1.main_deck.cards.push(filler);
+    }
+
+    let card = g.db.get_card(source).unwrap();
+    let ability = card
+        .resolved_abilities()
+        .find(|ability| ability.triggers.as_deref() == Some("登場"))
+        .unwrap();
+    let pid = g.state.player1.id.clone();
+    g.state.trigger_auto_ability(
+        format!("{}_{}", card.card_no, ability.full_text),
+        AbilityTrigger::Debut,
+        pid.clone(),
+        Some(card.card_no.to_string()),
+        Some(source),
+        None,
+        None,
+    );
+    g.state.activating_card = Some(source);
+    g.state.process_pending_auto_abilities(&pid);
+
+    match g.get_pending_choice() {
+        Choice::SelectCard {
+            zone,
+            count,
+            allow_skip,
+            filtered_indices,
+            target_player_id,
+            ..
+        } => {
+            assert_eq!(zone, "looked_at");
+            assert_eq!(*count, 1);
+            assert!(*allow_skip);
+            assert_eq!(filtered_indices.as_deref(), Some(&[0, 1][..]));
+            assert_eq!(target_player_id, &None);
+        }
+        other => panic!("expected looked-at selection, got {other:?}"),
+    }
+
+    g.select_indices(&[1]);
+
+    assert!(!g.has_pending_choice());
+    assert!(g.state.player1.hand.cards.contains(&matching_b));
+    assert!(!g.state.player1.hand.cards.contains(&matching_a));
+    assert!(g.state.player1.waitroom.cards.contains(&matching_a));
+    assert!(!g.state.player1.waitroom.cards.contains(&matching_b));
+    assert!(!g.state.player2.hand.cards.contains(&matching_a));
+    assert!(!g.state.player2.hand.cards.contains(&matching_b));
+    assert_eq!(g.state.player1.main_deck.cards.len(), 38);
+}
+
+#[test]
 fn two_of_three_required_hearts_member_is_discarded() {
     // Cards with only 2 of the 3 required hearts should NOT be selectable.
     // Mix a qualifying card in so the prompt IS offered, then verify only the

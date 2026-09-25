@@ -1,5 +1,5 @@
 use crate::core::constants::U8Count;
-use super::GameState;
+use super::{GameResult, GameState, PermanentLoopProtocol};
 #[cfg(feature = "no_std")]
 use alloc::{
     string::{String, ToString},
@@ -2100,11 +2100,14 @@ impl GameState {
     }
 
     pub fn get_pending_choice(&self) -> Option<&crate::ability::types::Choice> {
-        self.ability_queue.is_waiting_for_choice()
+        self.pending_loop_protocol
+            .as_ref()
+            .map(|protocol| &protocol.choice)
+            .or_else(|| self.ability_queue.is_waiting_for_choice())
     }
 
     pub fn has_pending_choice(&self) -> bool {
-        self.ability_queue.is_waiting_for_choice().is_some()
+        self.pending_loop_protocol.is_some() || self.ability_queue.is_waiting_for_choice().is_some()
     }
 
     pub fn entry_effect(&self) -> Option<&crate::card::AbilityEffect> {
@@ -2214,6 +2217,14 @@ impl GameState {
 
     /// If the pending choice is routed to a specific player (PVP), return their player_id.
     pub fn get_pending_choice_player_id(&self) -> Option<String> {
+        if self.pending_loop_protocol.is_some() {
+            let active = if core::ptr::eq(self.active_player(), &self.player1) {
+                self.player2.id.clone()
+            } else {
+                self.player1.id.clone()
+            };
+            return Some(active);
+        }
         self.ability_queue
             .current_entry()
             .and_then(|e| e.choice_player_id.as_ref().cloned())
@@ -2224,7 +2235,7 @@ impl GameState {
     /// Get the serialized JSON for the frontend from the ability queue's waiting choice.
     #[cfg(feature = "serde_support")]
     pub fn get_pending_choice_json(&self) -> Option<serde_json::Value> {
-        let choice = self.ability_queue.is_waiting_for_choice()?;
+        let choice = self.get_pending_choice()?;
         let mut json = choice.to_frontend_json()?;
         self.inject_choice_ability_context(&mut json);
         Some(json)
@@ -2992,12 +3003,8 @@ impl GameState {
         }
     }
 
-    pub fn mark_replacement_effect_applied(&mut self, card_id: i16) {
-        if let Some(effect) = self
-            .replacement_effects
-            .iter_mut()
-            .find(|e| e.card_id == card_id)
-        {
+    pub fn mark_replacement_effect_applied(&mut self, index: usize) {
+        if let Some(effect) = self.replacement_effects.get_mut(index) {
             effect.applied_this_event = true;
         }
     }
@@ -3018,6 +3025,7 @@ impl GameState {
         self.p2_live_success_no_excess = false;
         self.live_success_triggered_this_turn = false;
         self.live_success_p2_fired = false;
+        self.live_success_p1_fired = false;
         self.live_success_p1_extra = 0;
         self.live_success_p2_extra = 0;
         self.last_state_change_wait_to_active_count = 0;
@@ -3031,15 +3039,59 @@ impl GameState {
 
     pub fn check_permanent_loop(&mut self) -> bool {
         let state_hash = self.generate_state_hash();
-
         if self.game_state_history.contains(&state_hash) {
             self.loop_detected = true;
             return true;
         }
-
         self.game_state_history.push(state_hash);
-
         false
+    }
+
+    pub fn record_action_boundary(&mut self, action: crate::game_setup::ActionType) {
+        if self.loop_last_action != Some(action) {
+            self.game_state_history.clear();
+            self.pending_loop_protocol = None;
+            self.loop_last_action = Some(action);
+        }
+        if self.pending_loop_protocol.is_some() {
+            return;
+        }
+        let hash = self.generate_state_hash();
+        self.game_state_history.push(hash);
+        let repetition_count = self
+            .game_state_history
+            .iter()
+            .filter(|&&seen| seen == hash)
+            .count() as u8;
+        if repetition_count < 3 {
+            return;
+        }
+        self.pending_loop_protocol = Some(PermanentLoopProtocol {
+            state_hash: hash,
+            repetition_count,
+            choice: crate::ability::types::Choice::SelectTarget {
+                target: "rule_12_1".to_string(),
+                description: "Stop the repeated action and draw the game?".to_string(),
+                description_en: Some("Stop the repeated action and draw the game?".to_string()),
+                description_ja: Some("繰り返しを停止して引き分けにしますか？".to_string()),
+                allow_skip: false,
+                options: Some(vec!["Stop".to_string(), "Continue".to_string()]),
+            },
+        });
+        self.loop_detected = true;
+    }
+
+    pub fn resolve_loop_protocol(&mut self, continue_loop: bool) {
+        if self.pending_loop_protocol.take().is_none() {
+            return;
+        }
+        if !continue_loop {
+            self.game_result = GameResult::Draw;
+            self.game_ended = true;
+            return;
+        }
+        self.game_state_history.clear();
+        self.loop_detected = false;
     }
 
     fn generate_state_hash(&self) -> u64 {
@@ -3059,26 +3111,28 @@ impl GameState {
         self.turn_number.hash(&mut hasher);
         self.current_phase.hash(&mut hasher);
         self.current_turn_phase.hash(&mut hasher);
-        self.player1.hand.cards.len().hash(&mut hasher);
-        self.player1.energy_zone.cards.len().hash(&mut hasher);
-        self.player1.waitroom.cards.len().hash(&mut hasher);
-        self.player1.live_card_zone.cards.len().hash(&mut hasher);
-        self.player1
-            .success_live_card_zone
-            .cards
-            .len()
-            .hash(&mut hasher);
+        self.player1.hand.cards.hash(&mut hasher);
+        self.player1.main_deck.cards.hash(&mut hasher);
+        self.player1.energy_deck.cards.hash(&mut hasher);
+        self.player1.energy_zone.cards.hash(&mut hasher);
+        self.player1.waitroom.cards.hash(&mut hasher);
+        self.player1.live_card_zone.cards.hash(&mut hasher);
+        self.player1.success_live_card_zone.cards.hash(&mut hasher);
         self.player1.stage.stage.hash(&mut hasher);
-        self.player2.hand.cards.len().hash(&mut hasher);
-        self.player2.energy_zone.cards.len().hash(&mut hasher);
-        self.player2.waitroom.cards.len().hash(&mut hasher);
-        self.player2.live_card_zone.cards.len().hash(&mut hasher);
-        self.player2
-            .success_live_card_zone
-            .cards
-            .len()
-            .hash(&mut hasher);
+        for under_cards in &self.player1.stage.under_cards {
+            under_cards.hash(&mut hasher);
+        }
+        self.player2.hand.cards.hash(&mut hasher);
+        self.player2.main_deck.cards.hash(&mut hasher);
+        self.player2.energy_deck.cards.hash(&mut hasher);
+        self.player2.energy_zone.cards.hash(&mut hasher);
+        self.player2.waitroom.cards.hash(&mut hasher);
+        self.player2.live_card_zone.cards.hash(&mut hasher);
+        self.player2.success_live_card_zone.cards.hash(&mut hasher);
         self.player2.stage.stage.hash(&mut hasher);
+        for under_cards in &self.player2.stage.under_cards {
+            under_cards.hash(&mut hasher);
+        }
         self.mods.orientation_modifiers.len().hash(&mut hasher);
         self.prohibition_effects.len().hash(&mut hasher);
         self.temporary_effects.len().hash(&mut hasher);
@@ -3089,6 +3143,8 @@ impl GameState {
     pub fn reset_loop_detection(&mut self) {
         self.game_state_history.clear();
         self.loop_detected = false;
+        self.pending_loop_protocol = None;
+        self.loop_last_action = None;
     }
 
     pub fn is_loop_detected(&self) -> bool {

@@ -63,7 +63,6 @@ fn baton_displaced_self_placed_under_liella_arriver_grants_host_blade() {
     );
 
     // ab#0: the Liella! arriver host now gains a blade.
-    game.state.recalculate_constants();
     let blade_mod = game.state.mods.get_blade_modifier(arriver);
     assert_eq!(
         blade_mod, 1,

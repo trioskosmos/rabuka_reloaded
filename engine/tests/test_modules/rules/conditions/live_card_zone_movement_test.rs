@@ -65,6 +65,40 @@ fn push_movement_p2(game: &mut TestGame, card_id: i16, from: &str, to: &str) {
         .push_movement_event(card_id, from, to, None, &pid, false);
 }
 
+#[test]
+fn face_down_non_live_card_survives_live_card_set_check() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let member = game.id("PL!-sd1-010-SD");
+    let filler = game.new_id("PL!-sd1-010-SD");
+
+    game.state.player1.live_card_zone.cards.push(member);
+    game.state.player1.stage.stage[0] = filler;
+    fill_decks(&mut game, filler);
+
+    rabuka_engine::turn::TurnEngine::check_timing(&mut game.state);
+
+    assert_eq!(game.state.player1.live_card_zone.cards.as_slice(), &[member]);
+    assert!(!game.state.player1.waitroom.cards.contains(&member));
+}
+
+#[test]
+fn invalid_resolution_card_returns_to_its_owner() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let member = game.new_id("PL!-sd1-010-SD");
+
+    game.state.player1.is_first_attacker = true;
+    game.state.player2.is_first_attacker = false;
+    game.state.resolution_zone.add_card_for_owner(member, 1);
+
+    rabuka_engine::turn::TurnEngine::check_timing(&mut game.state);
+
+    assert!(game.state.resolution_zone.cards.is_empty());
+    assert!(!game.state.player1.waitroom.cards.contains(&member));
+    assert!(game.state.player2.waitroom.cards.contains(&member));
+}
+
 /// Test: check_invalid_live_cards records turn_movements when discarding
 /// a member card from the live card zone.
 #[test]
@@ -76,6 +110,7 @@ fn invalid_live_card_discard_records_turn_movements() {
     let filler = member;
 
     game.state.player1.live_card_zone.cards.push(member);
+    game.state.player1.live_card_zone.face_up = true;
     game.state.player1.stage.stage = [filler, -1, -1];
     fill_decks(&mut game, filler);
 
@@ -193,6 +228,7 @@ fn invalid_energy_card_in_live_zone_goes_to_energy_deck() {
     let filler = game.id("PL!-sd1-010-SD");
 
     game.state.player1.live_card_zone.cards.push(energy);
+    game.state.player1.live_card_zone.face_up = true;
     game.state.player1.stage.stage = [filler, -1, -1];
     fill_decks(&mut game, filler);
 
@@ -257,6 +293,8 @@ fn check_invalid_live_cards_distinguishes_players() {
     // Put a non-live card in each player's live_card_zone
     game.state.player1.live_card_zone.cards.push(member1);
     game.state.player2.live_card_zone.cards.push(member2);
+    game.state.player1.live_card_zone.face_up = true;
+    game.state.player2.live_card_zone.face_up = true;
     game.state.player1.stage.stage = [filler, -1, -1];
     game.state.player2.stage.stage = [filler, -1, -1];
     fill_decks(&mut game, filler);

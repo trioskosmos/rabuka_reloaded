@@ -75,7 +75,6 @@ fn chisato_cost_hits_threshold_condition_passes() {
         "Revealed cost cards should be tracked for condition evaluation"
     );
     // Gained 「常時：ライブの合計スコア＋１する」 — live-total accumulator.
-    game.state.recalculate_constants();
     assert_eq!(
         game.state.mods.p1_constant_total_score_bonus,
         1,
@@ -191,7 +190,6 @@ fn chisato_q78_ability_lost_on_leave() {
     game.select_indices_sequential(&[0, 0, 0, 0, 0]);
 
     // Verify the gained live-total bonus was applied (threshold 20 was met)
-    game.state.recalculate_constants();
     assert_eq!(
         game.state.mods.p1_constant_total_score_bonus,
         1,

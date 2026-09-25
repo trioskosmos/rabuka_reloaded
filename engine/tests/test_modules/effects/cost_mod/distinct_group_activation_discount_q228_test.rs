@@ -159,3 +159,45 @@ fn distinct_group_activation_discount_q228_reduction_charges_effective_cost() {
         "resolution charges the reduced cost 2 (5 − 2 = 3), not printed 4"
     );
 }
+
+#[test]
+fn distinct_group_activation_selects_one_eligible_opponent_physical_instance() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let umi = game.id("PL!-bp5-004-R\u{ff0b}");
+    let ally = game.id("PL!-sd1-010-SD");
+    let target_a = game.id("PL!HS-pb1-002-R");
+    let target_b = game.new_id("PL!HS-pb1-002-R");
+    let too_expensive = game.id("PL!S-bp5-009-R");
+    assert_ne!(target_a, target_b);
+    assert_eq!(
+        game.db.get_card(target_a).unwrap().card_no,
+        game.db.get_card(target_b).unwrap().card_no
+    );
+
+    game.state.player1.stage.stage = [ally, umi, -1];
+    game.state.player2.stage.stage = [target_a, target_b, too_expensive];
+    game.give_energy(3);
+
+    game.activate_ability(umi);
+    assert!(game.has_pending_choice());
+    game.select_indices(&[1]);
+    while game.has_pending_choice() {
+        game.select_indices(&[]);
+    }
+
+    assert_eq!(
+        game.state.mods.get_orientation_modifier(target_b),
+        Some("wait")
+    );
+    assert_ne!(
+        game.state.mods.get_orientation_modifier(target_a),
+        Some("wait")
+    );
+    assert_ne!(
+        game.state.mods.get_orientation_modifier(too_expensive),
+        Some("wait")
+    );
+    assert!(game.state.player2.stage.stage.contains(&target_b));
+    assert_eq!(game.state.player1.energy_zone.active_count(), 0);
+}

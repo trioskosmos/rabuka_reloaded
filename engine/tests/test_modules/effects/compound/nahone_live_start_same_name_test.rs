@@ -317,6 +317,70 @@ fn q30_multiple_same_name_only_one_buffed() {
     );
 }
 
+#[test]
+fn same_name_target_excludes_different_name_and_opponent_instances() {
+    use rabuka_engine::ability::types::Choice;
+
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let nahone1 = game.id("PL!HS-bp2-007-R+");
+    let nahone2 = game.new_id("PL!HS-bp2-007-R+");
+    let different_name = game.id("PL!-sd1-010-SD");
+    let opponent_copy = game.new_id("PL!HS-bp2-007-R+");
+    let nahone_hand = game.new_id("PL!HS-PR-007-PR");
+    let live = game.id("PL!-sd1-020-SD");
+    let filler = game.id("PL!-sd1-010-SD");
+    assert_ne!(nahone1, nahone2);
+    assert_ne!(nahone1, opponent_copy);
+    assert_ne!(nahone2, opponent_copy);
+
+    game.state.player1.stage.stage = [nahone1, different_name, nahone2];
+    game.state.player2.stage.stage = [opponent_copy, -1, -1];
+    fill_decks(&mut game, filler);
+    game.give_energy(10);
+    advance_to_live_card_set_p1(&mut game);
+    game.state.player1.hand.cards.clear();
+    game.state.player1.hand.cards.push(nahone_hand);
+    game.state.player1.hand.cards.push(live);
+    game.set_live_card(live);
+    game.state.player1.main_deck.cards.clear();
+    finish_live_setup(&mut game);
+
+    game.select_indices(&[0]);
+    let mut choice_count = 0;
+    while game.has_pending_choice() {
+        choice_count += 1;
+        assert!(choice_count <= 8, "ability resolution did not terminate");
+        match game.get_pending_choice() {
+            Choice::SelectCard { zone, .. } if zone == "hand" => {
+                game.select_indices(&[0]);
+            }
+            Choice::SelectCard {
+                zone,
+                filtered_indices: Some(indices),
+                target_player_id,
+                ..
+            } => {
+                assert_eq!(zone, "stage");
+                assert_eq!(indices, &[0, 2]);
+                assert_eq!(target_player_id.as_deref(), Some("self"));
+                game.select_indices(&[1]);
+            }
+            other => panic!("expected a Nahone cost or filtered stage choice, got {other:?}"),
+        }
+    }
+
+    assert_eq!(get_heart04(&game, nahone1), 0);
+    assert_eq!(get_heart04(&game, nahone2), 1);
+    assert_eq!(get_heart04(&game, different_name), 0);
+    assert_eq!(get_heart04(&game, opponent_copy), 0);
+    assert_eq!(get_blade(&game, nahone1), 0);
+    assert_eq!(get_blade(&game, nahone2), 1);
+    assert_eq!(get_blade(&game, different_name), 0);
+    assert_eq!(get_blade(&game, opponent_copy), 0);
+    assert!(!game.has_pending_choice());
+}
+
 // =========================================================================
 // 8. Discarded card ends up in waitroom
 // =========================================================================

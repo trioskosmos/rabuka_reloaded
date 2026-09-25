@@ -22,11 +22,11 @@ _trigger-context test that mutates state and asserts but never drives the engine
 | file | test | line | detail |
 | --- | --- | --- | --- |
 | `engine/tests/test_modules/effects/deck_order/restore/live_start_optional_two_member_bottomdeck_test.rs` | `live_start_optional_two_member_bottomdeck_shrinks_waitroom` | 4 |  |
-| `engine/tests/test_modules/effects/look_select/niche_filters/all_or_any_three_heart_member_search_test.rs` | `all_three_heart_match_enters_hand_without_nonmatching_filler` | 161 |  |
+| `engine/tests/test_modules/effects/look_select/niche_filters/all_or_any_three_heart_member_search_test.rs` | `all_three_heart_match_enters_hand_without_nonmatching_filler` | 231 |  |
 | `engine/tests/test_modules/effects/look_select/niche_filters/all_or_any_three_heart_member_search_test.rs` | `all_three_required_hearts_member_is_added_to_hand` | 23 |  |
-| `engine/tests/test_modules/effects/look_select/niche_filters/all_or_any_three_heart_member_search_test.rs` | `no_all_three_heart_match_discards_both_looked_at_members` | 94 |  |
-| `engine/tests/test_modules/effects/look_select/niche_filters/all_or_any_three_heart_member_search_test.rs` | `one_of_three_required_hearts_member_is_discarded` | 67 |  |
-| `engine/tests/test_modules/effects/look_select/niche_filters/all_or_any_three_heart_member_search_test.rs` | `two_of_three_required_hearts_member_is_discarded` | 39 |  |
+| `engine/tests/test_modules/effects/look_select/niche_filters/all_or_any_three_heart_member_search_test.rs` | `no_all_three_heart_match_discards_both_looked_at_members` | 164 |  |
+| `engine/tests/test_modules/effects/look_select/niche_filters/all_or_any_three_heart_member_search_test.rs` | `one_of_three_required_hearts_member_is_discarded` | 137 |  |
+| `engine/tests/test_modules/effects/look_select/niche_filters/all_or_any_three_heart_member_search_test.rs` | `two_of_three_required_hearts_member_is_discarded` | 109 |  |
 | `engine/tests/test_modules/effects/look_select/pin_top/per_group_member_look_pin_reveal_score_test.rs` | `look_per_group_member_discards_remainder_without_score_for_member_reveal` | 4 |  |
 | `engine/tests/test_modules/jidou/debut_watch/baton_arrival_self_budget_gates_pl_n_pr_025_pr_test.rs` | `setsuna_self_baton_arrival_draws_one` | 45 |  |
 | `engine/tests/test_modules/jidou/debut_watch/other_baton_arrival_draw_test.rs` | `other_member_baton_arrival_draws_one_card` | 5 |  |
@@ -52,7 +52,7 @@ _has_pending_choice asserted without choice identity (pending_choice_type/summar
 | `engine/tests/test_modules/effects/compound/discard_two_self_and_other_group_debut_retrigger_test.rs` | `discard_two_debut_retrigger_offers_count_two_selection` | 47 |  |
 | `engine/tests/test_modules/jidou/leaves_stage/optional_any_player_position_change_q238_test.rs` | `leaves_stage_repositions_opponent_member_for_all_rarities_q238` | 84 |  |
 
-## similar_cards (27)
+## similar_cards (29)
 
 _confusable card numbers (bp2 vs pb2) staged in one file — human review for wrong-card staging_
 
@@ -78,6 +78,7 @@ _confusable card numbers (bp2 vs pb2) staged in one file — human review for wr
 | `engine/tests/test_modules/effects/score/note_mermaid_distinct_kaleidoscore_test.rs` | `<file>` | 1 | PL!SP-bp1-013-PR, PL!SP-pb1-013-PR |
 | `engine/tests/test_modules/effects/score/success_count_revealed_score_live_pl_sp_bp5_023_l_test.rs` | `<file>` | 1 | PL!SP-bp1-023-L, PL!SP-bp5-023-L |
 | `engine/tests/test_modules/effects/state/either_or_state_change_test.rs` | `<file>` | 1 | PL!N-bp4-008-R, PL!N-pb1-008-R |
+| `engine/tests/test_modules/integration/gameplay_test.rs` | `<file>` | 1 | PL!S-bp2-009-R, PL!S-bp5-009-R |
 | `engine/tests/test_modules/integration/integration_blindspot_test.rs` | `<file>` | 1 | PL!HS-bp5-004-R, PL!HS-bp6-004-R |
 | `engine/tests/test_modules/jidou/movement/ability_chain_combo_test.rs` | `<file>` | 1 | PL!SP-pb1-006-R, PL!SP-pb2-006-R |
 | `engine/tests/test_modules/jidou/movement/appearance_and_repeated_swaps_stack_blades_test.rs` | `<file>` | 1 | PL!SP-bp5-006-R, PL!SP-pb1-006-R |
@@ -85,3 +86,4 @@ _confusable card numbers (bp2 vs pb2) staged in one file — human review for wr
 | `engine/tests/test_modules/jidou/movement/live_success_or_self_move_place_discard_group_member_under_self_test.rs` | `<file>` | 1 | PL!SP-bp5-006-R, PL!SP-pb2-006-R |
 | `engine/tests/test_modules/jidou/movement/pb2_under_member_test.rs` | `<file>` | 1 | PL!SP-pb1-006-R, PL!SP-pb2-006-R |
 | `engine/tests/test_modules/rules/conditions/restriction_mechanics_test.rs` | `<file>` | 1 | PL!S-bp5-009-R, PL!S-bp7-009-R |
+| `engine/tests/test_modules/rules/trigger_paths/combined_ability_chain_test.rs` | `<file>` | 1 | PL!S-bp2-019-L, PL!S-bp3-019-L |

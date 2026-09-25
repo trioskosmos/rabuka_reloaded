@@ -99,6 +99,39 @@ fn wien_constant_applies_to_all_opponent_live_cards() {
     }
 }
 
+#[test]
+fn two_wien_instances_stack_required_hearts_on_all_opponent_live_cards() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let wien_left = game.id("PL!SP-bp2-010-P");
+    let wien_center = game.new_id("PL!SP-bp2-010-P");
+    let live_a = game.id("PL!-sd1-019-SD");
+    let live_b = game.id("PL!-sd1-020-SD");
+    game.state.player1.stage.stage = [wien_left, wien_center, -1];
+    game.state.player2.live_card_zone.cards = vec![live_a, live_b].into();
+
+    game.state.recalculate_constants();
+    for live in [live_a, live_b] {
+        assert_eq!(
+            game.state
+                .mods
+                .get_need_heart_modifier(live, HeartColor::Heart00),
+            2
+        );
+    }
+
+    game.state.player1.stage.stage[1] = -1;
+    game.state.recalculate_constants();
+    for live in [live_a, live_b] {
+        assert_eq!(
+            game.state
+                .mods
+                .get_need_heart_modifier(live, HeartColor::Heart00),
+            1
+        );
+    }
+}
+
 // ====================================================================
 // PL!S-bp5-011-N (桜内梨子) — 登場: conditional global heart increase
 // ====================================================================

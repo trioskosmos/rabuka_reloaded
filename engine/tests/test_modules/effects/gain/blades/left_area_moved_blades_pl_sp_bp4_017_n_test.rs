@@ -22,7 +22,6 @@ fn pl_sp_bp4_017_n_left_area_moved_this_turn_grants_two_blades() {
         guard += 1;
         game.select_indices(&[0]);
     }
-    game.state.recalculate_constants();
 
     assert_eq!(
         game.state.mods.get_blade_modifier(me),
@@ -42,7 +41,6 @@ fn pl_sp_bp4_017_n_left_area_unmoved_grants_no_blades() {
     game.state.player1.stage.stage[0] = me;
 
     fire_trigger(&mut game, me, AbilityTrigger::LiveStart, LIVE_START);
-    game.state.recalculate_constants();
 
     assert_eq!(
         game.state.mods.get_blade_modifier(me),
@@ -64,7 +62,6 @@ fn pl_sp_bp4_017_n_center_area_moved_grants_no_blades() {
     game.state.position_change_occurred_this_turn = true;
 
     fire_trigger(&mut game, me, AbilityTrigger::LiveStart, LIVE_START);
-    game.state.recalculate_constants();
 
     assert_eq!(
         game.state.mods.get_blade_modifier(me),

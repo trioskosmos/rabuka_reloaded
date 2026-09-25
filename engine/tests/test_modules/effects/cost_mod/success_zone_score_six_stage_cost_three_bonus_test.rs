@@ -190,7 +190,6 @@ fn success_zone_score_six_stage_cost_play_cost_unaffected() {
     );
 
     // After playing, on-stage modifier should be active
-    game.state.recalculate_constants();
     assert_eq!(
         game.state.mods.get_cost_modifier(hanayo),
         3,

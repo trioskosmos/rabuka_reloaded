@@ -75,6 +75,8 @@ fn p2_first_attacker_performance_finalizes_p2_snapshot() {
         game.pass();
     }
     assert!(saw_result, "never reached Live Result");
+    assert!(game.state.live_success_p2_fired);
+    assert!(game.state.live_success_p1_fired);
 
     let p2_snap = game
         .state

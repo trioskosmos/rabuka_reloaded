@@ -74,7 +74,6 @@ fn q176_reveal_live_card_gains_plus1_score() {
         game.select_indices(&[0]);
     }
 
-    game.state.recalculate_constants();
     assert_eq!(
         game.state.mods.p1_constant_total_score_bonus,
         1,
@@ -98,7 +97,6 @@ fn q176_reveal_non_live_card_no_score_modifier() {
         game.select_indices(&[0]);
     }
 
-    game.state.recalculate_constants();
     assert_eq!(
         game.state.mods.p1_constant_total_score_bonus,
         0,
@@ -199,7 +197,6 @@ fn q176_score_modifier_cleared_when_member_leaves_stage() {
     while game.has_pending_choice() {
         game.select_indices(&[0]);
     }
-    game.state.recalculate_constants();
     assert_eq!(game.state.mods.p1_constant_total_score_bonus, 1, "Should have +1");
 
     game.state.player1.stage.stage[1] = -1;
@@ -267,7 +264,6 @@ fn q176_choice_path_pick_live_from_mixed_hand() {
         game.select_indices(&[0]);
     }
 
-    game.state.recalculate_constants();
     assert_eq!(
         game.state.mods.p1_constant_total_score_bonus,
         1,
@@ -304,7 +300,6 @@ fn q176_choice_path_pick_non_live_from_mixed_hand() {
         game.select_indices(&[0]);
     }
 
-    game.state.recalculate_constants();
     assert_eq!(
         game.state.mods.p1_constant_total_score_bonus,
         0,

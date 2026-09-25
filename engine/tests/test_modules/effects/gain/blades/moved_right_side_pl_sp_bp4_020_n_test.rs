@@ -14,7 +14,6 @@ fn pl_sp_bp4_020_n_moved_right_side_member_gains_two_blades() {
     game.state.cards_moved_this_turn.push(me);
     game.state.position_change_occurred_this_turn = true;
     fire_trigger(&mut game, me, AbilityTrigger::LiveStart, "ライブ開始時");
-    game.state.recalculate_constants();
     assert_eq!(game.state.mods.get_blade_modifier(me), 2);
 }
 
@@ -29,7 +28,6 @@ fn pl_sp_bp4_020_n_moved_center_member_gains_no_blades() {
     game.state.cards_moved_this_turn.push(me);
     game.state.position_change_occurred_this_turn = true;
     fire_trigger(&mut game, me, AbilityTrigger::LiveStart, "ライブ開始時");
-    game.state.recalculate_constants();
     assert_eq!(
         game.state.mods.get_blade_modifier(me),
         0,

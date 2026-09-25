@@ -369,6 +369,7 @@ pub enum StageSelectIntent {
     /// Only collect the chosen members into selected_cards; a stored pending
     /// action re-applies using them.
     CollectTargets,
+    PlaceEnergyDeckUnder,
 }
 
 /// Ability-index offset addressing RUNTIME-GAINED abilities (「…を得る」 grants)

@@ -1,9 +1,9 @@
-use crate::core::constants::U8Count;
 use super::ConditionContext;
 use crate::ability::enums::Zone;
 use crate::ability::util;
 use crate::ability::util::compare_counts;
 use crate::card::{CardProperty, Condition};
+use crate::core::constants::U8Count;
 use crate::game_state::Phase;
 use crate::HashSet;
 #[cfg(feature = "no_std")]
@@ -79,10 +79,7 @@ impl<'a> ConditionContext<'a> {
                             }
                             _ => "",
                         };
-                        log::debug!(
-                            "[TEMPORAL_TURN] nested movement={:?}",
-                            nested_movement
-                        );
+                        log::debug!("[TEMPORAL_TURN] nested movement={:?}", nested_movement);
                         match nested_movement {
                             "not_moved" => {
                                 if let Some(activating_card_id) = self.activating_card_id {
@@ -102,17 +99,17 @@ impl<'a> ConditionContext<'a> {
                                             pos.get_position().and_then(|pos_str| {
                                                 let target =
                                                     condition.get_target().unwrap_or("self");
-                                                let player =
-                                                    self.resolve_condition_player(target);
-                                                util::stage_position_index(pos_str)
-                                                    .and_then(|idx| {
+                                                let player = self.resolve_condition_player(target);
+                                                util::stage_position_index(pos_str).and_then(
+                                                    |idx| {
                                                         if idx < 3 && player.stage.stage[idx] != -1
                                                         {
                                                             Some(player.stage.stage[idx])
                                                         } else {
                                                             None
                                                         }
-                                                    })
+                                                    },
+                                                )
                                             })
                                         })
                                     });
@@ -123,12 +120,16 @@ impl<'a> ConditionContext<'a> {
                                     let groups = nested_condition
                                         .get_group_names()
                                         .map(|g| g.to_vec())
-                                        .or_else(|| condition.get_group_names().map(|g| g.to_vec()));
+                                        .or_else(|| {
+                                            condition.get_group_names().map(|g| g.to_vec())
+                                        });
                                     let card_db = &self.game_state.card_database;
                                     let in_group = groups.as_ref().map_or(true, |g| {
                                         g.iter().any(|name| {
                                             crate::ability::util::card_matches_group_str(
-                                                card_db, card_id, Some(name),
+                                                card_db,
+                                                card_id,
+                                                Some(name),
                                             )
                                         })
                                     });
@@ -156,7 +157,9 @@ impl<'a> ConditionContext<'a> {
                                     let groups = nested_condition
                                         .get_group_names()
                                         .map(|g| g.to_vec())
-                                        .or_else(|| condition.get_group_names().map(|g| g.to_vec()));
+                                        .or_else(|| {
+                                            condition.get_group_names().map(|g| g.to_vec())
+                                        });
                                     let card_db = &self.game_state.card_database;
                                     player.stage.stage.iter().any(|&cid| {
                                         cid != -1
@@ -164,7 +167,9 @@ impl<'a> ConditionContext<'a> {
                                             && groups.as_ref().map_or(true, |g| {
                                                 g.iter().any(|name| {
                                                     crate::ability::util::card_matches_group_str(
-                                                        card_db, cid, Some(name),
+                                                        card_db,
+                                                        cid,
+                                                        Some(name),
                                                     )
                                                 })
                                             })
@@ -258,10 +263,12 @@ impl<'a> ConditionContext<'a> {
                         if crate::ability::debug::ABILITY_DEBUG
                             .load(core::sync::atomic::Ordering::Relaxed)
                         {
-                            log::debug!("[TEMP_DIAG] checking zone={} {} cards={:?}",
+                            log::debug!(
+                                "[TEMP_DIAG] checking zone={} {} cards={:?}",
                                 zone_name,
                                 cards.len(),
-                                cards);
+                                cards
+                            );
                         }
                         for &cid in &cards {
                             if let Some(card) = self.game_state.card_database.get_card(cid) {
@@ -277,8 +284,13 @@ impl<'a> ConditionContext<'a> {
                                 if crate::ability::debug::ABILITY_DEBUG
                                     .load(core::sync::atomic::Ordering::Relaxed)
                                 {
-                                    log::debug!("[TEMP_DIAG]   card={} name={} group_ok={} nh={:?}",
-                                        cid, card.name, group_ok, card.need_heart);
+                                    log::debug!(
+                                        "[TEMP_DIAG]   card={} name={} group_ok={} nh={:?}",
+                                        cid,
+                                        card.name,
+                                        group_ok,
+                                        card.need_heart
+                                    );
                                 }
                                 if !group_ok {
                                     continue;
@@ -294,8 +306,10 @@ impl<'a> ConditionContext<'a> {
                                         if crate::ability::debug::ABILITY_DEBUG
                                             .load(core::sync::atomic::Ordering::Relaxed)
                                         {
-                                            log::debug!("[TEMP_DIAG]   all_hearts_present={}",
-                                                all_hearts_present);
+                                            log::debug!(
+                                                "[TEMP_DIAG]   all_hearts_present={}",
+                                                all_hearts_present
+                                            );
                                         }
                                         if all_hearts_present {
                                             found_match = true;
@@ -419,7 +433,8 @@ impl<'a> ConditionContext<'a> {
                     if all_cards {
                         player.energy_zone.active_count() == 0
                     } else {
-                        player.energy_zone.active_count() < player.energy_zone.cards.len().u8_count()
+                        player.energy_zone.active_count()
+                            < player.energy_zone.cards.len().u8_count()
                     }
                 }
                 _ => true,
@@ -618,9 +633,7 @@ impl<'a> ConditionContext<'a> {
                     let in_current_batch = |cid: i16| {
                         cid == self.activating_card_id.unwrap_or(-1)
                             && (self.moved_cards.contains(&cid)
-                                || entry_snapshot
-                                    .as_ref()
-                                    .map_or(false, |v| v.contains(&cid))
+                                || entry_snapshot.as_ref().map_or(false, |v| v.contains(&cid))
                                 || self
                                     .game_state
                                     .recently_moved_cards
@@ -1199,9 +1212,7 @@ impl<'a> ConditionContext<'a> {
                     if !groups.is_empty() {
                         let card_db = &self.game_state.card_database;
                         let group_ok = groups.iter().any(|g| {
-                            crate::ability::util::card_matches_group_str(
-                                card_db, *cid, Some(g),
-                            )
+                            crate::ability::util::card_matches_group_str(card_db, *cid, Some(g))
                         });
                         if !group_ok {
                             continue;
@@ -1226,9 +1237,7 @@ impl<'a> ConditionContext<'a> {
             // and the TARGET kind (energy vs member).
             if condition.get_temporal().map(|t| t.as_ref()) == Some("this_turn") {
                 let card_db = &self.game_state.card_database;
-                let want_kind = condition
-                    .get_card_type()
-                    .map(|ct| ct.as_str().to_string());
+                let want_kind = condition.get_card_type().map(|ct| ct.as_str().to_string());
                 // The target card must belong to the conditioned player.
                 let mut owned: HashSet<i16> = target_player.stage.stage.iter().copied().collect();
                 owned.extend(target_player.energy_zone.cards.iter().copied());
@@ -1272,9 +1281,7 @@ impl<'a> ConditionContext<'a> {
                     );
                     return true;
                 }
-                log::debug!(
-                    "[STATE_CHANGE_COND] no matching transition in turn_state_changes"
-                );
+                log::debug!("[STATE_CHANGE_COND] no matching transition in turn_state_changes");
             }
             return false;
         }
@@ -1376,7 +1383,8 @@ impl<'a> ConditionContext<'a> {
                                     }
                                 })
                         })
-                        .count().u8_count();
+                        .count()
+                        .u8_count();
                     // Negation: passes only when NO matching cards exist
                     if count > 0 {
                         return false;

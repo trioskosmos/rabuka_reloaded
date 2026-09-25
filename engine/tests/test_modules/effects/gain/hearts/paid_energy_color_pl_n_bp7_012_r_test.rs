@@ -25,7 +25,6 @@ fn pl_n_bp7_012_r_paid_energy_and_first_color_choice_grant_one_heart01() {
             game.select_indices(&[0]);
         }
     }
-    game.state.recalculate_constants();
     assert_eq!(
         game.state.mods.get_heart_modifier(me, HeartColor::Heart01),
         1,

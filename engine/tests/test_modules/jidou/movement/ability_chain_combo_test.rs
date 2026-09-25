@@ -85,7 +85,6 @@ fn pb2006_jidou_placement_feeds_constant_cost_up() {
 
     // The chain payoff: her 常時 now counts 1 Liella! under → cost +1.
     // Constant cost bonuses land in constant_cost_bonuses (recalc output).
-    game.state.recalculate_constants();
     assert_eq!(
         *game.state.mods.constant_cost_bonuses.get(&kinako).unwrap_or(&0),
         1,

@@ -44,6 +44,43 @@ fn pl_s_bp5_019_l_two_own_success_cards_retrieve_two_revealed_members() {
 }
 
 #[test]
+fn p2_success_zone_gate_allows_partial_own_revealed_member_retrieval() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let filler = game.new_id(FILLER);
+    fill_decks(&mut game, filler);
+    let live = game.id("PL!S-bp5-019-L");
+    game.add_to_hand(live);
+    game.set_live_card(live);
+
+    game.state.player2.success_live_card_zone.cards.push(game.new_id("PL!-sd1-019-SD"));
+    game.state.player2.success_live_card_zone.cards.push(game.new_id("PL!HS-bp2-020-L"));
+    let member_a = game.new_id("PL!N-sd1-006-P");
+    let member_b = game.new_id("PL!N-bp1-009-R");
+    let non_member = game.new_id("PL!-sd1-019-SD");
+    game.state.revealed_cards.extend([member_a, non_member, member_b]);
+
+    fire_trigger(&mut game, live, AbilityTrigger::LiveSuccess, "ライブ成功時");
+    assert!(game.has_pending_choice());
+    assert_eq!(game.pending_choice_type().as_deref(), Some("SelectCard"));
+    let filtered = match game.state.get_pending_choice() {
+        Some(rabuka_engine::ability::types::Choice::SelectCard {
+            filtered_indices: Some(indices),
+            ..
+        }) => indices.clone(),
+        _ => panic!("expected filtered SelectCard choice"),
+    };
+    assert_eq!(filtered, vec![0, 2]);
+    game.select_indices(&[0]);
+
+    assert!(game.state.player1.hand.cards.contains(&member_a));
+    assert!(!game.state.player1.hand.cards.contains(&member_b));
+    assert!(game.state.revealed_cards.contains(&member_b));
+    assert!(game.state.revealed_cards.contains(&non_member));
+    assert_eq!(game.state.player2.success_live_card_zone.cards.len(), 2);
+}
+
+#[test]
 fn pl_s_bp5_019_l_zero_or_one_success_card_does_not_retrieve() {
     for success_count in 0..=1 {
         let db = load_real_database();

@@ -72,6 +72,12 @@ fn choice_offer_sig(offered: &[String], skip_allowed: bool) -> String {
 ///
 /// Cross-step communication rides on `GameState` (moved/selected cards,
 /// revealed pools, queue entries), never on globals.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct LastKnownMemberInfo {
+    pub blades: u8,
+    pub area: MemberArea,
+}
+
 #[derive(Clone, Debug)]
 pub struct AbilityResolver {
     pub pending_choice: Option<Choice>,
@@ -168,6 +174,10 @@ pub struct AbilityResolver {
     /// registration, forwarded to push_temporary_effect so expiry can revert
     /// by card id instead of text-searching the gained maps.
     pub last_gain_effect_data: Option<crate::core::types::EffectData>,
+    pub pending_replacement: Option<(usize, AbilityEffect)>,
+    pub resolving_replacement: bool,
+    pub replacement_original_suppressed: bool,
+    last_known_members: SmallVec<[(i16, LastKnownMemberInfo); 2]>,
 }
 
 impl AbilityResolver {
@@ -263,7 +273,52 @@ impl AbilityResolver {
             looked_at_deck_position: None,
             stage_select_intent: None,
             last_gain_effect_data: None,
+            pending_replacement: None,
+            resolving_replacement: false,
+            replacement_original_suppressed: false,
+            last_known_members: SmallVec::new(),
         }
+    }
+
+    pub(crate) fn record_member_last_known(
+        &mut self,
+        card_id: i16,
+        card_db: &CardDatabase,
+        blade_modifiers: &crate::HashMap<i16, crate::core::game_modifiers::ModifierEntry>,
+        area: MemberArea,
+    ) {
+        let entry = blade_modifiers.get(&card_id).copied().unwrap_or_default();
+        let blades = crate::core::stats_pipeline::effective_blade(card_db, card_id, entry);
+        self.last_known_members.retain(|entry| entry.0 != card_id);
+        self.last_known_members
+            .push((card_id, LastKnownMemberInfo { blades, area }));
+        log::debug!(
+            "[LKI] card={} blades={} area={:?} stored=true",
+            card_id,
+            blades,
+            area
+        );
+    }
+
+    pub fn last_known_member_info(
+        &self,
+        gs: &GameState,
+        card_id: i16,
+    ) -> Option<LastKnownMemberInfo> {
+        let current = [&gs.player1, &gs.player2]
+            .iter()
+            .any(|player| player.stage.stage.contains(&card_id));
+        let info = self
+            .last_known_members
+            .iter()
+            .find_map(|&(id, info)| (id == card_id).then_some(info));
+        log::debug!(
+            "[LKI] card={} current={} resolved={:?}",
+            card_id,
+            current,
+            info
+        );
+        (!current).then_some(info).flatten()
     }
 
     pub fn get_pending_choice(&self) -> Option<&Choice> {
@@ -1185,6 +1240,7 @@ impl AbilityResolver {
         gs.activating_card = None;
         self.current_ability = None;
         self.current_ability_index = None;
+        self.last_known_members.clear();
 
         if self.debug_trace {
             self.pipeline.trace.after = Some(ZoneSnapshot::from_game_state(gs));
@@ -1200,6 +1256,7 @@ impl AbilityResolver {
     ) -> Result<(), String> {
         let mut dbg = AbDebug::new();
         self.last_action_result = None;
+        self.last_known_members.clear();
         // Clear structured verdict buffer from any previous ability
         #[cfg(not(feature = "no_std"))]
         crate::ability::log::clear_verdicts();

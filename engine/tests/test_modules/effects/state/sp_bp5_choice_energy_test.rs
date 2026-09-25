@@ -162,3 +162,72 @@ fn sp_bp5_choice_energy_decline_cost_no_effect() {
         "Hand should only lose the played card (no draw)"
     );
 }
+
+#[test]
+fn sp_bp5_choice_energy_pay_and_choose_draw() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let card = game.id("PL!SP-bp5-001-R+");
+    let opponent = game.id("PL!-sd1-010-SD");
+    let deck_card = game.id("PL!-sd1-010-SD");
+
+    game.add_to_hand(card);
+    game.give_energy(15);
+    game.state.player2.stage.stage[1] = opponent;
+    game.state.player1.main_deck.cards.push(deck_card);
+
+    TurnEngine::execute_main_phase_action(
+        &mut game.state,
+        &ActionType::PlayMemberToStage,
+        Some(card),
+        None,
+        Some(MemberArea::Center),
+        Some(false),
+    )
+    .expect("play to stage");
+
+    game.select_option(1);
+    game.select_option(1);
+
+    assert!(game.player().hand.cards.contains(&deck_card));
+    assert!(!game.state.player1.main_deck.cards.contains(&deck_card));
+    assert_eq!(game.state.mods.get_orientation_modifier(opponent), None);
+}
+
+#[test]
+fn sp_bp5_choice_energy_decline_payment_has_no_follow_up_effect() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let card = game.id("PL!SP-bp5-001-R+");
+    let opponent = game.id("PL!-sd1-010-SD");
+    let deck_card = game.id("PL!-sd1-010-SD");
+
+    game.add_to_hand(card);
+    game.give_energy(15);
+    game.state.player2.stage.stage[1] = opponent;
+    game.state.player1.main_deck.cards.push(deck_card);
+    let hand_before = game.player().hand.cards.len();
+
+    TurnEngine::execute_main_phase_action(
+        &mut game.state,
+        &ActionType::PlayMemberToStage,
+        Some(card),
+        None,
+        Some(MemberArea::Center),
+        Some(false),
+    )
+    .expect("play to stage");
+    let energy_after_play = game.state.player1.energy_zone.active_count();
+
+    game.select_option(0);
+    while game.has_pending_choice() {
+        game.select_indices(&[0]);
+    }
+
+    assert_eq!(game.state.mods.get_orientation_modifier(opponent), None);
+    assert_eq!(game.player().hand.cards.len(), hand_before - 1);
+    assert_eq!(game.state.player1.energy_zone.active_count(), energy_after_play);
+    assert!(!game.player().hand.cards.contains(&deck_card));
+}

@@ -1039,6 +1039,42 @@ fn baad_cage_cost_limit_two_hasunosora_members_grants_score() {
     );
 }
 
+#[test]
+fn baad_cage_counts_two_physical_instances_of_same_hasunosora_member() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let baad_cage = game.id("PL!HS-bp5-020-L");
+    let sayaka1 = game.id("PL!HS-bp1-002-R");
+    let sayaka2 = game.new_id("PL!HS-bp1-002-R");
+    let filler = game.new_id("PL!-sd1-010-SD");
+    assert_ne!(sayaka1, sayaka2);
+
+    game.state.player1.main_deck.cards.clear();
+    game.state.player2.main_deck.cards.clear();
+    for _ in 0..30 {
+        game.state.player1.main_deck.cards.push(filler);
+        game.state.player2.main_deck.cards.push(filler);
+    }
+
+    game.state.player1.stage.stage[0] = sayaka1;
+    game.state.player1.stage.stage[1] = sayaka2;
+    game.state.player1.stage.stage[2] = -1;
+    game.state.player1.hand.cards.push(baad_cage);
+    game.state.player1.hand.cards.push(filler);
+
+    advance_to_live_start(&mut game);
+    game.set_live_card(baad_cage);
+    finish_live_setup(&mut game);
+    assert!(!game.has_pending_choice());
+
+    assert_eq!(
+        game.state.mods.get_score_modifier(baad_cage),
+        1,
+        "two physical copies of one cost-11 member satisfy the two-member threshold"
+    );
+}
+
 /// T21: バアドケージ — 1 蓮ノ空 member with cost >= 10 → score 0.
 ///
 /// Only 1 member meets the condition (count >= 2 required).

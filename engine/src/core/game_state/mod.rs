@@ -61,7 +61,13 @@ pub use crate::types::{
     ScoreLine, TemporaryEffect, TriggeredAbility, TurnPhase, YellCardResult,
 };
 
-/// State saved while a play action is paused for a play-time cost-reduction
+#[derive(Debug, Clone)]
+pub struct PermanentLoopProtocol {
+    pub state_hash: u64,
+    pub repetition_count: u8,
+    pub choice: crate::ability::types::Choice,
+}
+
 /// choice (常時「このカードをプレイする際…コストは減る」).
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde_support", derive(Serialize, Deserialize))]
@@ -330,8 +336,13 @@ pub struct GameState {
     pub game_ended: bool,
     pub draw_state: bool,
     pub loop_detected: bool,
+    #[cfg_attr(feature = "serde_support", serde(skip))]
+    pub pending_loop_protocol: Option<PermanentLoopProtocol>,
+    #[cfg_attr(feature = "serde_support", serde(skip))]
+    pub loop_last_action: Option<crate::game_setup::ActionType>,
     pub live_success_triggered_this_turn: bool,
     pub live_success_p2_fired: bool,
+    pub live_success_p1_fired: bool,
     pub live_success_p1_extra: u8,
     pub live_success_p2_extra: u8,
     pub live_surplus_ready_this_turn: bool,
@@ -348,6 +359,46 @@ pub struct GameState {
 }
 
 impl GameState {
+    pub fn concede(&mut self, player_id: u8) -> Result<(), String> {
+        if player_id > 1 {
+            return Err("Invalid player seat".to_string());
+        }
+        self.reject_if_ended()?;
+        let opponent_is_first = if player_id == 0 {
+            !self.player1.is_first_attacker
+        } else {
+            self.player1.is_first_attacker
+        };
+        self.game_result = if opponent_is_first {
+            GameResult::FirstAttackerWins
+        } else {
+            GameResult::SecondAttackerWins
+        };
+        self.game_ended = true;
+        self.ability_queue.clear();
+        self.pending_success_replacement_card_id = None;
+        self.pending_success_replacement_player_id = None;
+        Ok(())
+    }
+
+    pub fn concede_both(&mut self) -> Result<(), String> {
+        self.reject_if_ended()?;
+        self.game_result = GameResult::Draw;
+        self.game_ended = true;
+        self.ability_queue.clear();
+        self.pending_success_replacement_card_id = None;
+        self.pending_success_replacement_player_id = None;
+        Ok(())
+    }
+
+    fn reject_if_ended(&self) -> Result<(), String> {
+        if self.game_ended || self.game_result != GameResult::Ongoing {
+            Err("Game has already ended".to_string())
+        } else {
+            Ok(())
+        }
+    }
+
     /// Whether the opponent (the player at index `1 - my_player_idx`) has
     /// performed their live this turn. Used to decide when the opponent's live
     /// zone / need-hearts may be revealed to the local player.
@@ -611,8 +662,11 @@ impl GameState {
             game_ended: false,
             draw_state: false,
             loop_detected: false,
+            pending_loop_protocol: None,
+            loop_last_action: None,
             live_success_triggered_this_turn: false,
             live_success_p2_fired: false,
+            live_success_p1_fired: false,
             live_success_p1_extra: 0,
             live_success_p2_extra: 0,
             live_surplus_ready_this_turn: false,

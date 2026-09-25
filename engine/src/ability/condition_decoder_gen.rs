@@ -1519,6 +1519,70 @@ fn build_allrevealedmatchheartcolor(l: &ConditionLocals) -> Condition {
     }
 }
 
+fn build_unsupported(l: &ConditionLocals) -> Condition {
+    Condition::Unsupported {
+        common: Box::new(ConditionCommon {
+            ability_filter_triggers: l.ability_filter_triggers.clone(),
+            action_reference: l.action_reference.clone(),
+            activation_position: l.activation_position.clone(),
+            aggregate: l.aggregate.clone(),
+            all: l.all.clone(),
+            all_areas: l.all_areas.clone(),
+            baton_touch_trigger: l.baton_touch_trigger.clone(),
+            blade_greater_than_all: l.blade_greater_than_all.clone(),
+            blade_limit: l.blade_limit.clone(),
+            blade_limit_operator: l.blade_limit_operator.clone(),
+            cache: l.cache.clone(),
+            card_names: l.card_names.clone(),
+            card_property: l.card_property.as_deref().map(CardProperty::from_str),
+            card_type: l.card_type.as_deref().map(ConditionCardType::from_str),
+            characters: l.characters.clone(),
+            check_self: l.check_self.clone(),
+            comparison_target: l.comparison_target.as_deref().map(ComparisonTarget::from_str),
+            comparison_type: l.comparison_type.as_deref().map(ComparisonType::from_str),
+            cost_limit: l.cost_limit.clone(),
+            cost_limit_operator: l.cost_limit_operator.clone(),
+            count: l.count.clone(),
+            delta: l.delta.clone(),
+            destination: l.destination.clone(),
+            distinct: l.distinct.clone(),
+            exclude_characters: l.exclude_characters.clone(),
+            exclude_group_names: l.exclude_group_names.clone(),
+            exclude_self: l.exclude_self.clone(),
+            from_state: l.from_state.clone(),
+            group_names: l.group_names.clone(),
+            heart_colors: l.heart_colors.clone(),
+            heart_source: l.heart_source.clone(),
+            location: l.location.clone(),
+            locations: l.locations.clone(),
+            min_baton_touch_count: l.min_baton_touch_count.clone(),
+            movement: l.movement.clone(),
+            negation: l.negation.clone(),
+            no_excess_heart: l.no_excess_heart.clone(),
+            operator: l.operator.clone(),
+            original_value: l.original_value.clone(),
+            phase: l.phase.clone(),
+            phase_target: l.phase_target.clone(),
+            position: l.position.clone(),
+            position_compare: l.position_compare.clone(),
+            reference_card: l.reference_card.clone(),
+            require_position_cards: l.require_position_cards.clone(),
+            resource_type: l.resource_type.clone(),
+            same_name: l.same_name.clone(),
+            scope: l.scope.clone(),
+            self_target: l.self_target.clone(),
+            shuffle: l.shuffle.clone(),
+            source: l.source.clone(),
+            target: l.target.clone(),
+            temporal: l.temporal.clone(),
+            #[cfg(feature = "debug_conditions")] text: l.text.clone(),
+            to_state: l.to_state.clone(),
+            #[cfg(feature = "debug_conditions")] trigger_event: l.trigger_event.clone(),
+            yell_trigger: l.yell_trigger.clone(),
+        }),
+    }
+}
+
 /// Direct decoder for TAG_OBJECT_VARIANT conditions.
 fn decode_condition_direct(
     bc: &mut BcReader,
@@ -1551,6 +1615,7 @@ fn decode_condition_direct(
         17 => build_alwaystrue(&l),
         18 => build_anyof(&l),
         19 => build_allrevealedmatchheartcolor(&l),
+        20 => build_unsupported(&l),
         _ => { note_decode_fallback(bc.idx, "condition_variant", &variant.to_string()); return None; }
     })
 }

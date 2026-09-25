@@ -2,6 +2,10 @@
 //! Plus timestamp ordering and replacement choose-order.
 
 use crate::helpers::*;
+use rabuka_engine::ability::enums::{ActionType, Zone};
+use rabuka_engine::ability::resolver::AbilityResolver;
+use rabuka_engine::card::AbilityEffect;
+use rabuka_engine::zones::MemberArea;
 
 // 9.5 check timing cascade — a check at 8.3.13 that grants hearts must be visible at 8.3.14
 #[test]
@@ -47,17 +51,59 @@ fn s9_replacement_choose_order_smoke() {
 
 // 9.11 LKI — last known information: a member that leaves stage still has last known blade/heart for trigger
 #[test]
-fn s9_lki_member_leaves_stage_still_has_last_known() {
-    let db = load_real_database();
-    let mut game = TestGame::new(db.clone());
-    let m = game.id("PL!-sd1-008-SD");
-    game.state.player1.stage.stage = [m, -1, -1];
-    let blade_before = game.state.player1.stage.total_blades(&db, &game.state.mods.blade_modifiers, &game.state.mods.orientation_modifiers, true);
-    game.state.push_movement_event_typed(m, rabuka_engine::types::ZoneId::Stage, rabuka_engine::types::ZoneId::Waitroom, None, "p1", false);
+fn s9_lki_survives_sequential_stage_move_and_ignores_current_stage_card() {
+    let mut game = TestGame::new(load_real_database());
+    let member = game.id("PL!HS-bp1-005-P");
+    assert_eq!(game.db.get_card(member).unwrap().blade, 3);
+    game.state.player1.stage.stage = [member, -1, -1];
+    game.state.mods.add_blade_modifier(member, 2);
+
+    let move_stage_member = AbilityEffect {
+        action: ActionType::MoveCards,
+        source: Some(Zone::Stage),
+        destination: Some(Zone::Waitroom),
+        count: Some(1),
+        ..Default::default()
+    };
+    let mut sequential = AbilityEffect {
+        action: ActionType::Sequential,
+        ..Default::default()
+    };
+    sequential.compound.actions = Some(vec![Box::new(move_stage_member)]);
+    let mut resolver = AbilityResolver::new(game.state.card_database.clone(), None);
+    resolver
+        .execute_effect(&mut game.state, &sequential)
+        .unwrap();
+
+    assert_eq!(game.state.player1.stage.stage, [-1, -1, -1]);
+    assert_eq!(
+        resolver.last_known_member_info(&game.state, member),
+        Some(rabuka_engine::ability::resolver::LastKnownMemberInfo {
+            blades: 5,
+            area: MemberArea::LeftSide,
+        })
+    );
+
+    let waitroom = game
+        .state
+        .player1
+        .waitroom
+        .cards
+        .iter()
+        .position(|&id| id == member)
+        .unwrap();
+    game.state.player1.waitroom.cards.remove(waitroom);
+    game.state.player1.stage.stage = [-1, member, -1];
+    assert_eq!(resolver.last_known_member_info(&game.state, member), None);
+
     game.state.player1.stage.stage = [-1, -1, -1];
-    // After leaving, stage blades are 0, but the movement event retains timestamp + mover id for LKI consumers
-    assert_eq!(blade_before, 0); // PL!-sd1-008-SD has 0 blade, so this is a smoke that path exists
-    assert!(game.state.turn_movements.iter().any(|e| e.moved_card_id == m));
+    assert_eq!(
+        resolver.last_known_member_info(&game.state, member),
+        Some(rabuka_engine::ability::resolver::LastKnownMemberInfo {
+            blades: 5,
+            area: MemberArea::LeftSide,
+        })
+    );
 }
 
 // 9.12 source identification — the cause card is tracked

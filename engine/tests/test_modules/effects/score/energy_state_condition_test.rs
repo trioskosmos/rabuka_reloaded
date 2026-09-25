@@ -117,7 +117,6 @@ fn daisuki_score_not_added_when_no_active_energy() {
     assert!(!g.state.has_pending_choice());
     let score = g.state.mods.get_score_modifier(live);
     assert_eq!(score, 0, "wait energy should not satisfy active check, got {}", score);
-    g.state.recalculate_constants();
 }
 
 #[test]

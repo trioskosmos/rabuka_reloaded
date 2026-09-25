@@ -100,7 +100,6 @@ fn test_bp1_live_start_pay_cost_gains_score_three() {
     );
 
     // Effect: score+3 modifier applied to joint
-    game.state.recalculate_constants();
         let score_mod = game.state.mods.p1_constant_total_score_bonus;
     assert_eq!(
         score_mod, 3,

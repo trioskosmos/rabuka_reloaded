@@ -17,6 +17,7 @@
 //!   窶ｦwhile P2 exact-fills 譛ｪ譚･縺ｮ蜒輔ｉ縺ｯ遏･縺｣縺ｦ繧九ｈ 竊・per-seat flags diverge.
 
 use crate::helpers::*;
+use rabuka_engine::core::types::AbilityTrigger;
 use rabuka_engine::zones::MemberArea;
 
 const SETSUNA_BOTH: &str = "PL!N-bp4-007-R\u{ff0b}";
@@ -84,6 +85,73 @@ fn retrieval_then_dive_placement_then_blade_grant() {
         0,
         "P2's DIVE! stayed out of the live zone"
     );
+}
+
+fn trigger_specific_auto(
+    game: &mut TestGame,
+    cid: i16,
+    trigger: AbilityTrigger,
+    trigger_text: &str,
+    player_id: &str,
+) {
+    let card = game.db.get_card(cid).unwrap();
+    let ability = card
+        .resolved_abilities()
+        .find(|a| a.triggers.as_deref() == Some(trigger_text))
+        .expect("card should have the requested trigger ability");
+    game.state.trigger_auto_ability(
+        format!("{}_{}", card.card_no, ability.full_text),
+        trigger,
+        player_id.to_string(),
+        Some(card.card_no.to_string()),
+        Some(cid),
+        None,
+        None,
+    );
+    game.state.activating_card = Some(cid);
+    game.state.process_pending_auto_abilities(player_id);
+}
+
+#[test]
+fn p2_setsuna_retrieves_independent_live_instances_from_each_waitroom() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let setsuna = game.id(SETSUNA_BOTH);
+    let live_a = game.id("PL!S-bp2-019-L");
+    let live_b = game.new_id("PL!S-bp2-019-L");
+    let p2_live_a = game.new_id("PL!S-bp2-019-L");
+    let p2_live_b = game.new_id("PL!S-bp2-019-L");
+    game.state.player1.waitroom.cards.extend([live_a, live_b]);
+    game.state.player2.waitroom.cards.extend([p2_live_a, p2_live_b]);
+
+    trigger_specific_auto(&mut game, setsuna, AbilityTrigger::Debut, "登場", "p2");
+    let first = game
+        .state
+        .ability_queue
+        .current_entry()
+        .expect("first retrieval choice")
+        .choice_player_id
+        .clone();
+    assert_eq!(first.as_deref(), Some("p2"));
+    game.select_indices(&[1]);
+
+    let second = game
+        .state
+        .ability_queue
+        .current_entry()
+        .expect("second retrieval choice")
+        .choice_player_id
+        .clone();
+    assert_eq!(second.as_deref(), Some("p1"));
+    game.select_indices(&[0]);
+
+    assert!(!game.has_pending_choice());
+    assert!(game.state.player2.hand.cards.contains(&p2_live_b));
+    assert!(game.state.player2.waitroom.cards.contains(&p2_live_a));
+    assert!(game.state.player1.hand.cards.contains(&live_a));
+    assert!(game.state.player1.waitroom.cards.contains(&live_b));
+    assert!(!game.state.player2.hand.cards.contains(&live_a));
+    assert!(!game.state.player1.hand.cards.contains(&p2_live_a));
 }
 
 /// Chain 2: one determination, divergent seat outcomes.

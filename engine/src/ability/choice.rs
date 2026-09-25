@@ -2142,6 +2142,53 @@ gs.set_recently_moved_batch(moved.clone().into(), Some("under_member"));
                 Some(crate::ability::types::StageSelectIntent::CollectTargets) => {
                     return Ok(());
                 }
+                Some(crate::ability::types::StageSelectIntent::PlaceEnergyDeckUnder) => {
+                    if let Some(effect) = gs.entry_effect().cloned() {
+                        let target = effect
+                            .target
+                            .as_deref()
+                            .unwrap_or("self")
+                            .to_string();
+                        let count = effect.count.unwrap_or(1);
+                        let mut placed = Vec::new();
+                        {
+                            let player = gs.resolve_target_player_mut(&target);
+                            if let Some(&member) = cards.first() {
+                                if let Some(idx) =
+                                    player.stage.stage.iter().position(|&id| id == member)
+                                {
+                                    let area = crate::ability::util::pos_to_area(idx);
+                                    for _ in 0..count {
+                                        if let Some(energy) = player.energy_deck.draw() {
+                                            player.stage.place_under_card(area, energy);
+                                            placed.push(energy);
+                                        } else {
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        if !placed.is_empty() {
+                            let player_id = gs.resolve_target_player(&target).id.clone();
+                            for &energy in &placed {
+                                gs.push_movement_event(
+                                    energy,
+                                    "energy_deck",
+                                    "under_member",
+                                    cards.first().copied(),
+                                    &player_id,
+                                    false,
+                                );
+                            }
+                            self.moved_cards = placed.clone().into();
+                            gs.set_recently_moved_batch(placed.into(), Some("under_member"));
+                            gs.recalculate_constants();
+                        }
+                        self.clear_choice_state_and_resume(gs)?;
+                    }
+                    return Ok(());
+                }
                 None => {}
             }
         } else {
@@ -2659,8 +2706,7 @@ gs.set_recently_moved_batch(valid_ids.into(), Some("stage"));
                 return self.handle_primary_alternative(gs, selected);
             }
             Some(super::enums::SelectTargetKind::ApplyReplacement) => {
-                self.clear_choice_state(gs);
-                return Ok(());
+                return self.handle_apply_replacement(gs, selected);
             }
             Some(super::enums::SelectTargetKind::ChooseRequiredHearts) => {
                 gs.prohibition_effects
@@ -2747,6 +2793,41 @@ gs.set_recently_moved_batch(valid_ids.into(), Some("stage"));
 
         self.clear_choice_state(gs);
         Ok(())
+    }
+
+    pub(in crate::ability::choice) fn handle_apply_replacement(
+        &mut self,
+        gs: &mut GameState,
+        selected: &str,
+    ) -> Result<(), String> {
+        let Some((index, original)) = self.pending_replacement.take() else {
+            self.clear_choice_state(gs);
+            return Err("Pending replacement is missing".to_string());
+        };
+        self.clear_choice_state(gs);
+        let accepted = selected == "0";
+        let effects = gs
+            .replacement_effects
+            .get(index)
+            .map(|replacement| replacement.replacement_effects.clone())
+            .ok_or_else(|| "Pending replacement registration is missing".to_string())?;
+        gs.mark_replacement_effect_applied(index);
+        log::debug!(
+            "[REPLACEMENT] registration={} accepted={} deferred_original={}",
+            index,
+            accepted,
+            !accepted
+        );
+        if accepted {
+            for effect in &effects {
+                self.execute_effect(gs, effect)?;
+            }
+        }
+        self.replacement_original_suppressed = accepted;
+        self.resolving_replacement = true;
+        let result = self.execute_effect(gs, &original);
+        self.resolving_replacement = false;
+        result
     }
 
     pub(in crate::ability::choice) fn handle_draw_any_number(&mut self, gs: &mut GameState, selected: &str) -> Result<(), String> {

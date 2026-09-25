@@ -39,7 +39,6 @@ fn success_zone_score_at_most_one_condition_met_gains_score_boost() {
     // Natural debut: 登場 trigger fires during play_to_stage
     game.play_to_stage(nozomi, MemberArea::LeftSide);
 
-    game.state.recalculate_constants();
     let bonus_after = game.state.mods.p1_constant_total_score_bonus;
     assert!(
         bonus_after > bonus_before,
@@ -75,7 +74,6 @@ fn success_zone_score_at_most_one_score_too_high_condition_fails() {
 
     let bonus_before = game.state.mods.p1_constant_total_score_bonus;
     game.play_to_stage(nozomi, MemberArea::LeftSide);
-    game.state.recalculate_constants();
     let bonus_after = game.state.mods.p1_constant_total_score_bonus;
 
     assert_eq!(
@@ -105,7 +103,6 @@ fn success_zone_score_at_most_one_empty_zone_condition_fails() {
 
     let bonus_before = game.state.mods.p1_constant_total_score_bonus;
     game.play_to_stage(nozomi, MemberArea::LeftSide);
-    game.state.recalculate_constants();
     let bonus_after = game.state.mods.p1_constant_total_score_bonus;
 
     assert_eq!(
@@ -137,7 +134,6 @@ fn success_zone_score_at_most_one_p_rarity_same_behavior() {
 
     let bonus_before = game.state.mods.p1_constant_total_score_bonus;
     game.play_to_stage(nozomi, MemberArea::LeftSide);
-    game.state.recalculate_constants();
     let bonus_after = game.state.mods.p1_constant_total_score_bonus;
 
     assert!(

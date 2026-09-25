@@ -1370,6 +1370,33 @@ impl AbilityResolver {
                 });
             }
         }
+        if effect.same_name_any().unwrap_or(false) {
+            let ref_names: Vec<String> = self
+                .moved_cards
+                .iter()
+                .filter_map(|&cid| card_db.get_card(cid).map(|c| c.name.to_string()))
+                .collect();
+            log::debug!(
+                "[SAME_NAME_CHOICE] ref_names={:?} before={}",
+                ref_names,
+                candidates.len()
+            );
+            if ref_names.is_empty() {
+                candidates.clear();
+            } else {
+                candidates.retain(|cid| {
+                    card_db
+                        .get_card(*cid)
+                        .map(|card| ref_names.contains(&card.name.to_string()))
+                        .unwrap_or(false)
+                });
+            }
+            log::debug!(
+                "[SAME_NAME_CHOICE] after={} candidates={:?}",
+                candidates.len(),
+                candidates
+            );
+        }
         let tc = effect.target_count_any().unwrap_or(1) as usize;
         if candidates.len() <= tc {
             return Ok(false);
@@ -2103,7 +2130,6 @@ impl AbilityResolver {
             // effect's group filter (or there is no filter); otherwise fall back
             // to the first stage member that matches the filter.
             let card_db = gs.card_database.clone();
-            let activating = gs.activating_card;
             let matches_group = |id: i16| -> bool {
                 match effect.group_names_any() {
                     Some(groups) => groups
@@ -2116,15 +2142,32 @@ impl AbilityResolver {
             if player.energy_deck.cards.is_empty() {
                 return;
             }
-            let idx = activating
-                .and_then(|c| player.stage.stage.iter().position(|&id| id == c))
+            let eligible: Vec<usize> = (0..3)
                 .filter(|&i| player.stage.stage[i] != -1 && matches_group(player.stage.stage[i]))
-                .or_else(|| {
-                    (0..3).find(|&i| {
-                        player.stage.stage[i] != -1 && matches_group(player.stage.stage[i])
-                    })
-                })
-                .unwrap_or(1);
+                .collect();
+            if eligible.is_empty() {
+                return;
+            }
+            if eligible.len() > 1 {
+                let mut builder = Choice::select_cards(
+                    Zone::Stage.to_str(),
+                    1,
+                    "Select a member to place energy underneath",
+                    false,
+                )
+                .card_type(Some("member_card".to_string()))
+                .target_player_id(Some(target.clone()))
+                .is_select_action(true);
+                if let Some(group) = effect.group_names_any().and_then(|groups| groups.first()) {
+                    builder = builder.group(Some(group.clone()));
+                }
+                self.pending_choice = Some(builder.build());
+                self.stage_select_intent =
+                    Some(crate::ability::types::StageSelectIntent::PlaceEnergyDeckUnder);
+                self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
+                return;
+            }
+            let idx = eligible[0];
             let area = util::pos_to_area(idx);
             for _ in 0..count {
                 if let Some(energy) = player.energy_deck.draw() {

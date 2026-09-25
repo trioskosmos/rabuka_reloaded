@@ -19,6 +19,7 @@ use rabuka_engine::zones::MemberArea;
 
 const AI: &str = "PL!N-bp7-005-R"; // 宮下 愛 — DiverDiva + 虹ヶ咲
 const KARIN: &str = "PL!N-bp7-004-R"; // 朝香果林 — DiverDiva + 虹ヶ咲 (distinct name from Ai)
+const KASUMI: &str = "PL!N-bp7-014-N";
 const ENERGY: &str = "LL-E-001-SD";
 
 /// Fire the 登場 ability on a card directly (borrowed from pl_s_bp5_010_test).
@@ -127,11 +128,8 @@ fn ai_option_1_places_energy_under_nijigasaki_member() {
     assert!(game.has_pending_choice(), "choice should be offered");
     game.select_choice_option(1);
 
-    // place_energy_under_member auto-resolves: no member-under prompt follows.
-    assert!(
-        !game.has_pending_choice(),
-        "place_energy_under_member must not prompt for the under-member"
-    );
+    assert_eq!(game.pending_choice_type().as_deref(), Some("SelectCard"));
+    game.select_indices(&[0]);
 
     assert_eq!(
         game.state.player1.energy_deck.cards.len(),
@@ -147,6 +145,71 @@ fn ai_option_1_places_energy_under_nijigasaki_member() {
         "exactly 1 energy card should be under a stage member"
     );
     let _ = MemberArea::Center;
+}
+
+#[test]
+fn ai_option_1_selects_non_first_nijigasaki_target() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let ai = game.id(AI);
+    let karin = game.id(KARIN);
+    let kasumi = game.id(KASUMI);
+    game.state.player1.stage.stage = [ai, karin, kasumi];
+    give_energy_deck(&mut game, 3);
+    let selected_energy = game.state.player1.energy_deck.cards[0];
+    let energy_deck_before = game.state.player1.energy_deck.cards.clone();
+
+    trigger_debut(&mut game, ai);
+    game.select_choice_option(1);
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectCard"),
+        "option 1 must explicitly offer the eligible stage members"
+    );
+    game.select_indices(&[1]);
+
+    assert_eq!(
+        game.state.player1.energy_deck.cards.len(),
+        energy_deck_before.len() - 1,
+        "option 1 must move exactly one energy card out of the energy deck"
+    );
+    assert!(
+        !game.state.player1.energy_deck.cards.contains(&selected_energy),
+        "the selected energy card must leave the energy deck"
+    );
+    assert!(
+        game.state.player1.stage.under_cards[0].is_empty(),
+        "the first eligible member must not receive the card"
+    );
+    assert_eq!(
+        game.state.player1.stage.under_cards[1].to_vec(),
+        vec![selected_energy],
+        "the explicitly selected non-first member must receive the card underneath"
+    );
+    assert!(
+        game.state.player1.stage.under_cards[2].is_empty(),
+        "the third eligible member must not receive the card"
+    );
+    assert!(!game.has_pending_choice(), "member selection must resolve completely");
+}
+
+#[test]
+fn ai_option_1_with_no_energy_cards_offers_no_target_resolution() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let ai = game.id(AI);
+    let karin = game.id(KARIN);
+    game.state.player1.stage.stage = [ai, karin, -1];
+
+    trigger_debut(&mut game, ai);
+    assert!(game.has_pending_choice());
+    game.select_choice_option(1);
+
+    assert!(!game.has_pending_choice(), "no energy card means no target resolution follows");
+    assert!(game.state.player1.energy_deck.cards.is_empty());
+    assert!(game.state.player1.stage.under_cards.iter().all(|cards| cards.is_empty()));
 }
 
 /// Condition gate: only 1 DiverDiva member on stage → no choice.
