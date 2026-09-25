@@ -3,4 +3,4 @@
 pub mod empty_energy_deck_test;
 pub mod resolution_zone_rule_5_8_swap_test;
 pub mod rule_10_4_duplicate_member_cleanup_test;
-pub mod zone_conversion_test;
+pub mod zone_vocabulary_conversion_test;

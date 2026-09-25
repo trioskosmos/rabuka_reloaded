@@ -8,7 +8,7 @@
 
 use rabuka_engine::bot::{
     encoding::ActionEncoding, neural::PolicyNet, registry::BotKind, strategy_v2, strategy_v3,
-    strategy_v6, strategy_v7, PublicObservation,
+    strategy_v6, strategy_v7, strategy_v8, PublicObservation,
 };
 use rabuka_engine::card::CardDatabase;
 use rabuka_engine::card_loader;
@@ -267,6 +267,8 @@ fn behaviorally_equal(a: &GameState, b: &GameState) -> ArenaResult<bool> {
     for score in [
         strategy_v6::score_actions as ScoreFn,
         strategy_v7::score_actions as ScoreFn,
+            strategy_v8::score_actions_v8 as ScoreFn,
+
     ] {
         let x = policy_call(|| score(a, &actions_a, me));
         let y = policy_call(|| score(b, &actions_b, me));
@@ -601,6 +603,12 @@ fn compare_position(saved: &SavedPosition, templates: &CardDatabase) -> ArenaRes
             strategy_v7::score_actions as ScoreFn,
             strategy_v7::choose_action_v7
                 as fn(&GameState, &[game_setup::Action], u8) -> game_setup::Action,
+        ),
+        (
+            "v8",
+        strategy_v8::score_actions_v8 as ScoreFn,
+
+            strategy_v8::choose_action as fn(&GameState, &[game_setup::Action], u8) -> game_setup::Action,
         ),
     ] {
         rabuka_engine::rng::restore(saved.engine_rng);

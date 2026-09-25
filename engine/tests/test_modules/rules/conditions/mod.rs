@@ -2,10 +2,10 @@
 // Regenerated from the directory listing at compile time.
 pub mod ability_filter_comprehensive_edge_test;
 pub mod condition_evaluation_test;
+pub mod general_procedure_qa_rulings_test;
 pub mod live_card_zone_movement_test;
 pub mod multiname_metadata_and_stage_slots_q207_q208_test;
 pub mod q38_live_card_zone_test;
-pub mod qa_rulings_pins_test;
-pub mod restriction_mechanics_test;
+pub mod restriction_and_aura_mechanics_test;
 pub mod rule_9_9_layering_test;
 pub mod turn_number_condition_test;

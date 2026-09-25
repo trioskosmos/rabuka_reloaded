@@ -16,6 +16,10 @@ pub mod strategy_v5;
 pub mod strategy_v6;
 pub mod strategy_v7;
 mod v7_main;
+pub mod strategy_v8;
+mod v8_live;
+mod v8_main;
+mod v8_model;
 pub mod registry;
 pub mod weights;
 
@@ -36,6 +40,7 @@ pub use strategy_v4::{choose_action_v4, choose_live_set_v4, choose_mulligan_v4, 
 pub use strategy_v5::{choose_action_v5, choose_live_set_v5, choose_mulligan_v5, choose_action as choose_action_v5_alias, choose_live_set as choose_live_set_v5_alias, choose_mulligan as choose_mulligan_v5_alias};
 pub use strategy_v6::{choose_action_v6, choose_live_set_v6, choose_mulligan_v6, choose_action as choose_action_v6_alias, choose_live_set as choose_live_set_v6_alias, choose_mulligan as choose_mulligan_v6_alias};
 pub use strategy_v7::{choose_action_v7, choose_live_set_v7, choose_mulligan_v7, choose_action as choose_action_v7_alias, choose_live_set as choose_live_set_v7_alias, choose_mulligan as choose_mulligan_v7_alias};
+pub use strategy_v8::{choose_action as choose_action_v8, choose_live_set as choose_live_set_v8, choose_mulligan as choose_mulligan_v8, score_actions_v8};
 
 use crate::card::CardDatabase;
 use crate::game_setup::{Action, ActionType};

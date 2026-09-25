@@ -50,7 +50,7 @@ Usage: cargo run --release --bin sim_bench -- [options]
   --games N       games per deck per repeat (default 2000)
   --deck NAME     single deck name (file stem under ../web_ui/decks)
   --seed S        base engine seed (default 1)
-  --policy P      random (default) | v1..v7 | conductor
+  --policy P      random (default) | v1..v8 | conductor
   --repeat R      repeat the full deck sweep R times (default 1)
    --jobs N        worker threads per deck sweep (default 1 = baseline)
    --per-game      print per-game outcome, end reason, and action count

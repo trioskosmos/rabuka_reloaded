@@ -1201,13 +1201,17 @@ pub(crate) fn choose_live_set_experiment(
     let opp_succ = opp.success_live_card_zone.cards.len();
     let is_second = gs.current_phase == Phase::LiveCardSetSecondAttacker;
     let opp_committed = !opp.live_card_zone.cards.is_empty();
-    let floor = if opp_succ >= 2 {
-        0.35
-    } else if my_succ >= 2 {
-        0.60
-    } else {
-        0.45
-    };
+    let floor = std::env::var("V7_LIVE_FLOOR")
+        .ok()
+        .and_then(|value| value.parse::<f64>().ok())
+        .filter(|value: &f64| value.is_finite() && *value >= 0.0 && *value <= 1.0)
+        .unwrap_or(if opp_succ >= 2 {
+            0.35
+        } else if my_succ >= 2 {
+            0.60
+        } else {
+            0.45
+        });
 
     let mut desired: Vec<usize> = Vec::new();
 
