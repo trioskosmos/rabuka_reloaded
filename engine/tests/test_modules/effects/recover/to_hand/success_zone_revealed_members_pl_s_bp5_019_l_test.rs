@@ -42,3 +42,31 @@ fn pl_s_bp5_019_l_two_own_success_cards_retrieve_two_revealed_members() {
         "gate met -> up to 2 members retrieved to hand"
     );
 }
+
+#[test]
+fn pl_s_bp5_019_l_zero_or_one_success_card_does_not_retrieve() {
+    for success_count in 0..=1 {
+        let db = load_real_database();
+        let mut game = TestGame::new(db);
+        let filler = game.new_id(FILLER);
+        let live = game.id("PL!S-bp5-019-L");
+        let member = game.new_id("PL!N-sd1-006-P");
+        fill_decks(&mut game, filler);
+        game.add_to_hand(live);
+        game.set_live_card(live);
+        for _ in 0..success_count {
+            game.state
+                .player1
+                .success_live_card_zone
+                .cards
+                .push(game.new_id("PL!-sd1-019-SD"));
+        }
+        game.state.revealed_cards.push(member);
+
+        fire_trigger(&mut game, live, AbilityTrigger::LiveSuccess, "ライブ成功時");
+
+        assert!(!game.has_pending_choice(), "success_count={success_count}");
+        assert!(!game.state.player1.hand.cards.contains(&member));
+        assert!(game.state.revealed_cards.contains(&member));
+    }
+}
