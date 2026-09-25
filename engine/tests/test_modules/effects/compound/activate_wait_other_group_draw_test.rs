@@ -1,7 +1,7 @@
 use crate::helpers::*;
 
 #[test]
-fn wait_other_group_draw_q163_self_excluded_no_other_group_cost_fails() {
+fn wait_other_group_draw_self_excluded_no_other_group_cost_fails() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
@@ -48,7 +48,7 @@ fn wait_other_group_draw_q163_self_excluded_no_other_group_cost_fails() {
 }
 
 #[test]
-fn wait_other_group_draw_q163_opponent_nijigasaki_is_not_a_cost_target() {
+fn wait_other_group_draw_opponent_nijigasaki_is_not_a_cost_target() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let emma = game.id("PL!N-bp3-008-R\u{ff0b}");
@@ -75,7 +75,7 @@ fn wait_other_group_draw_q163_opponent_nijigasaki_is_not_a_cost_target() {
 }
 
 #[test]
-fn wait_other_group_draw_q163_other_group_member_pays_cost() {
+fn wait_other_group_draw_other_group_member_pays_cost() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 

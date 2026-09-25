@@ -9,7 +9,7 @@ fn advance_to_live_set(game: &mut TestGame) {
 }
 
 #[test]
-fn dream_with_you_q116_blade_10_score_plus_1() {
+fn dream_with_you_blade_10_score_plus_1() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
@@ -46,7 +46,7 @@ fn dream_with_you_q116_blade_10_score_plus_1() {
 }
 
 #[test]
-fn dream_with_you_q116_blade_6_no_score() {
+fn dream_with_you_blade_6_no_score() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
@@ -81,4 +81,36 @@ fn dream_with_you_q116_blade_6_no_score() {
     let mod_val = game.state.mods.get_score_modifier(dream);
     eprintln!("[DREAM] score_mod={}", mod_val);
     assert_eq!(mod_val, 0, "Blade <10 → no score");
+}
+
+#[test]
+fn dream_with_you_reduced_yell_count_does_not_block_score() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let dream = game.id("PL!N-sd1-028-SD");
+    let wien = game.id("PL!SP-bp2-010-R\u{ff0b}");
+    let blader = game.id("PL!S-PR-014-PR");
+    let filler = game.id("PL!-sd1-010-SD");
+
+    game.state.player1.stage.stage = [wien, blader, blader];
+    game.state.player1.hand.cards.push(dream);
+    for _ in 0..40 {
+        game.state.player1.main_deck.cards.push(filler);
+        game.state.player2.main_deck.cards.push(filler);
+    }
+
+    advance_to_live_set(&mut game);
+    game.set_live_card(dream);
+    game.pass();
+    game.pass();
+    while game.has_pending_choice() {
+        game.select_indices(&[]);
+    }
+
+    assert!(game.state.initial_yell_revealed_cards.len() <= 9);
+    assert_eq!(
+        game.state.mods.get_score_modifier(dream),
+        1,
+        "Q116: total blade threshold is independent of Wien's reduced yell count"
+    );
 }

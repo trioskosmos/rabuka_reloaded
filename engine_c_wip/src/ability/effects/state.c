@@ -10,6 +10,8 @@ static int s_has_group(const AbilityEffect *e, const char **out);
 static int s_has_chars(const AbilityEffect *e, const char **out);
 static int s_match_chars(int cid, const char *chars);
 static int s_pass_filter(int cid, const char *grp, const char *chars);
+static int s_excluded_group(int cid, const AbilityEffect *e);
+static int s_excluded_chars(int cid, const AbilityEffect *e);
 static int s_blade_color_idx(const char *bt);
 static int s_heart_idx(const char *h);
 static const char *s_eff_extra(const AbilityEffect *e, const char *k);
@@ -481,51 +483,91 @@ void rb_effect_energy_placement(GameState *g, int actor, AbilityEffect *e){
 /* Mirror engine/src/ability/effects/state.rs::execute_energy_state_change.
    Changes active/wait state of energy zone cards with max/count==0 resolution. */
 void rb_effect_energy_state_change(GameState *g, int actor, AbilityEffect *e){
-    fprintf(stderr, "DEBUG [ENERGY_STATE_CHANGE] actor=%d target=%s state=%s count=%d\n", actor, e->target ? e->target : "self", s_eff_extra(e,"state_change") ? s_eff_extra(e,"state_change") : s_eff_extra(e,"state") ? s_eff_extra(e,"state") : "active", e->count);
-    const char *st = NULL;
-    int max = 0;
-    for(int i=0;i<e->n_extra;i++){
-        if(e->extra_k[i] && !strcmp(e->extra_k[i],"state_change") && e->extra_v[i]) st = e->extra_v[i];
-        else if(e->extra_k[i] && !strcmp(e->extra_k[i],"state") && e->extra_v[i]) st = e->extra_v[i];
-        else if(e->extra_k[i] && !strcmp(e->extra_k[i],"max") && e->extra_v[i] && !strcmp(e->extra_v[i],"true")) max = 1;
-    }
+    const char *st = s_eff_extra(e, "state_change");
+    if(!st) st = s_eff_extra(e, "state");
     if(!st) st = "active";
-    int who = actor;
-    if(e->target && (!strcmp(e->target,"opponent")||!strcmp(e->target,"p2"))) who = actor ^ 1;
+    int is_active = !strcmp(st, "active") || !strcmp(st, "アクティブ");
+    int is_wait = !strcmp(st, "wait") || !strcmp(st, "ウェイト");
+    if(!is_active && !is_wait) return;
+
+    int max = s_eff_extra_true(e, "max");
+    int who = s_who(e->target, actor);
     RbPlayer *P = &g->p[who];
-    int total = P->energy.n, active = P->energy_active;
-    int is_active = (!strcmp(st,"active") || !strcmp(st,"アクティブ"));
-    int eff;
-    if(max){
-        int available = is_active ? (total - active) : active;
-        if(available < 0) available = 0;
-        int req = e->count > 0 ? e->count : 1;
-        eff = req < available ? req : available;
-    } else if(e->count == 0){
-        eff = is_active ? (total - active) : active;
-    } else {
-        eff = e->count;
+    int total = P->energy.n;
+    if(total <= 0) return;
+    int active = P->energy_active;
+    if(active < 0) active = 0;
+    if(active > total) active = total;
+
+    const char *ct = e->card_type_field[0] ? e->card_type_field : s_eff_extra(e, "card_type");
+    if(ct && *ct && strcmp(ct, "energy_card") != 0) return;
+    const char *grp = NULL, *chars = NULL;
+    s_has_group(e, &grp);
+    s_has_chars(e, &chars);
+    int cost_limit = s_eff_extra_int(e, "cost_limit", -1);
+    const char *cost_op = s_eff_extra(e, "cost_limit_operator");
+    int exclude_self = s_eff_extra_true(e, "exclude_self") ? g->activating_card : -1;
+
+    int state_idx[RB_MAX_ZONE];
+    int nstate = 0;
+    for(int i=0; i<total; i++){
+        int is_activate = i >= active;
+        if(is_activate != is_active) continue;
+        int cid = P->energy.cards[i];
+        if(cid == exclude_self) continue;
+        if(grp && !rb_card_matches_group_str(cid, grp)) continue;
+        if(s_excluded_group(cid, e)) continue;
+        if(!s_match_chars(cid, chars)) continue;
+        if(s_excluded_chars(cid, e)) continue;
+        if(cost_limit >= 0){
+            Card c;
+            int cost = 0;
+            if(rb_decode_card_by_index((uint32_t)cid, &c)){ cost = c.cost; rb_free_card(&c); }
+            int ok = 1;
+            if(cost_op && !strcmp(cost_op, "<=")) ok = cost <= cost_limit;
+            else if(cost_op && !strcmp(cost_op, "<")) ok = cost < cost_limit;
+            else if(cost_op && !strcmp(cost_op, ">=")) ok = cost >= cost_limit;
+            else if(cost_op && !strcmp(cost_op, ">")) ok = cost > cost_limit;
+            else ok = cost == cost_limit;
+            if(!ok) continue;
+        }
+        state_idx[nstate++] = i;
     }
-    int available = is_active ? total - active : active;
-    if(available < 0) available = 0;
-    if(eff > available) eff = available;
-    if(max){
-        fprintf(stderr, "DEBUG [ENERGY] max=true: count=%d available=%d effective=%d\n", e->count, is_active ? (total - (int)P->energy_active) : (int)P->energy_active, eff);
-    } else if(e->count == 0){
-        fprintf(stderr, "DEBUG [ENERGY] count=0 (all): effective=%d\n", eff);
-    } else {
-        fprintf(stderr, "DEBUG [ENERGY] max=false: count=%d effective=%d available=%d\n", e->count, eff, available);
+    if(nstate == 0) return;
+
+    int requested = e->count >= 0 ? e->count : 0;
+    int eff = max ? (requested > 0 ? requested : 0)
+                  : (requested == 0 ? nstate : requested);
+    if(max && requested > 0 && eff > requested) eff = requested;
+    if(eff < 0) eff = 0;
+    if(eff > nstate) eff = nstate;
+
+    int chosen[RB_MAX_ZONE];
+    int chosen_mask[RB_MAX_ZONE];
+    memset(chosen_mask, 0, sizeof(chosen_mask));
+    for(int i=0; i<eff; i++){
+        int idx = state_idx[i];
+        if(idx < 0 || idx >= total) continue;
+        chosen_mask[idx] = 1;
+        chosen[i] = P->energy.cards[idx];
+        rb_mods_set_orientation(&g->mods, chosen[i], is_active ? "active" : "wait");
     }
+    if(eff <= 0) return;
+
+    int rebuilt[RB_MAX_ZONE];
+    int nrebuilt = 0;
     if(is_active){
-        active += eff;
-        if(active > total) active = total;
-        P->energy_active = active;
+        for(int i=0; i<eff; i++) if(chosen[i] >= 0) rebuilt[nrebuilt++] = chosen[i];
+        for(int i=0; i<total; i++) if(!chosen_mask[i]) rebuilt[nrebuilt++] = P->energy.cards[i];
     } else {
-        active -= eff;
-        if(active < 0) active = 0;
-        P->energy_active = active;
+        for(int i=0; i<total; i++) if(!chosen_mask[i]) rebuilt[nrebuilt++] = P->energy.cards[i];
+        for(int i=0; i<eff; i++) if(chosen[i] >= 0) rebuilt[nrebuilt++] = chosen[i];
     }
-    fprintf(stderr, "DEBUG [ENERGY_STATE_CHANGE] done: total=%d active=%d eff=%d is_active=%d\n", total, P->energy_active, eff, is_active);
+    for(int i=0; i<nrebuilt; i++) P->energy.cards[i] = rebuilt[i];
+    P->energy_active = is_active ? active + eff : active - eff;
+    if(P->energy_active < 0) P->energy_active = 0;
+    if(P->energy_active > total) P->energy_active = total;
+    rb_recalc_constants(g);
 }
 
 /* Mirror engine/src/ability/effects/state.rs::execute_set_cost.
@@ -551,7 +593,8 @@ void rb_effect_set_cost(GameState *g, int actor, AbilityEffect *e, int host_cid)
     if(s_has_group(e, &grp) || s_has_chars(e, &chars)){
         int fids[RB_MAX_ZONE]; int fn = 0;
         for(int i=0;i<n;i++)
-            if(s_pass_filter(ids[i], grp, chars)) fids[fn++] = ids[i];
+            if(s_pass_filter(ids[i], grp, chars) &&
+               !s_excluded_group(ids[i], e) && !s_excluded_chars(ids[i], e)) fids[fn++] = ids[i];
         n = fn;
         for(int i=0;i<n;i++) ids[i] = fids[i];
     }
@@ -604,6 +647,7 @@ void rb_effect_set_blade_type(GameState *g, int actor, AbilityEffect *e, int hos
         int cid = P->stage[q];
         if(cid == RB_EMPTY_SLOT) continue;
         if(!s_pass_filter(cid, grp, chars)) continue;
+        if(s_excluded_group(cid, e) || s_excluded_chars(cid, e)) continue;
         g->mods.blade_type[cid] = (int8_t)col;
         if(duration && strcmp(duration, "permanent") != 0){
             rb_util_push_temporary_effect(g, "set_blade_type", duration, "self",
@@ -629,7 +673,8 @@ void rb_effect_set_blade_count(GameState *g, int actor, AbilityEffect *e, int ho
     if(s_has_group(e, &grp) || s_has_chars(e, &chars)){
         int f[RB_STAGE_SIZE]; int fn = 0;
         for(int i=0;i<n;i++)
-            if(s_pass_filter(ids[i], grp, chars)) f[fn++] = ids[i];
+            if(s_pass_filter(ids[i], grp, chars) &&
+               !s_excluded_group(ids[i], e) && !s_excluded_chars(ids[i], e)) f[fn++] = ids[i];
         n = fn;
         for(int i=0;i<n;i++) ids[i] = f[i];
     }
@@ -1131,7 +1176,8 @@ void rb_effect_modify_cost(GameState *g, int actor, AbilityEffect *e, int host_c
     if(s_has_group(e, &grp) || s_has_chars(e, &chars)){
         int fids[RB_MAX_ZONE]; int fn = 0;
         for(int i=0;i<n;i++)
-            if(s_pass_filter(ids[i], grp, chars)) fids[fn++] = ids[i];
+            if(s_pass_filter(ids[i], grp, chars) &&
+               !s_excluded_group(ids[i], e) && !s_excluded_chars(ids[i], e)) fids[fn++] = ids[i];
         n = fn;
         for(int i=0;i<n;i++) ids[i] = fids[i];
     }
@@ -1446,6 +1492,33 @@ static int s_match_chars(int cid, const char *chars){
     return rb_card_matches_characters(cid, arr, n);
 }
 
+static int s_matches_excluded_tokens(int cid, const AbilityEffect *e, const char *key, int characters) {
+    const char *value = s_eff_extra(e, key);
+    if (!value || !*value) return 0;
+    char buf[256];
+    strncpy(buf, value, sizeof(buf) - 1);
+    buf[sizeof(buf) - 1] = 0;
+    char *tok = strtok(buf, ",、 ");
+    while (tok) {
+        if (characters) {
+            const char *arr[1] = { tok };
+            if (rb_card_matches_characters(cid, arr, 1)) return 1;
+        } else if (rb_card_matches_group_str(cid, tok)) {
+            return 1;
+        }
+        tok = strtok(NULL, ",、 ");
+    }
+    return 0;
+}
+
+static int s_excluded_group(int cid, const AbilityEffect *e) {
+    return s_matches_excluded_tokens(cid, e, "exclude_group_names", 0);
+}
+
+static int s_excluded_chars(int cid, const AbilityEffect *e) {
+    return s_matches_excluded_tokens(cid, e, "exclude_characters", 1);
+}
+
 static int s_pass_filter(int cid, const char *grp, const char *chars){
     if(grp && !rb_card_matches_group_str(cid, grp)) return 0;
     if(!s_match_chars(cid, chars)) return 0;
@@ -1645,6 +1718,7 @@ int rb_card_need_heart_satisfied(const Card *c, const int *need, const int *prov
 
 /* Mirror check_heart_requirement (engine/src/core/card.rs). */
 int rb_check_heart_requirement(const int *need, const int *provided) {
+    if (!need || !provided) return 0;
     int total_need = 0, total_prov = 0;
     for (int c = 0; c < 8; c++) { total_need += need[c]; total_prov += provided[c]; }
     if (total_need == 0) return 1;

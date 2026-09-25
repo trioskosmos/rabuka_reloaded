@@ -168,14 +168,19 @@ int rb_cost_threshold_met(const Card *card, const AbilityEffect *e) {
 
 /* Mirror card.rs::has_blade_heart / has_score_icon / has_all_blade. */
 int rb_card_has_blade_heart(const Card *c) {
+    if (!c) return 0;
     if (c->num_blade > 0) return 1;
     if (c->has_special && c->special_count > 0) return 1;
     return 0;
 }
+int rb_card_has_blade_heart_strict(const Card *c) {
+    return c && c->num_blade > 0;
+}
 int rb_card_has_score_icon(const Card *c) {
-    return c->has_special && c->special_color == (uint8_t)RB_HEART_SCORE;
+    return c && c->has_special && c->special_color == (uint8_t)RB_HEART_SCORE;
 }
 int rb_card_has_all_blade(const Card *c) {
+    if (!c) return 0;
     int base = c->num_base;
     int end = base + c->num_blade;
     if (end > c->n_hearts) end = c->n_hearts;

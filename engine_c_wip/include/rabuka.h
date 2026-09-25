@@ -398,9 +398,14 @@ typedef enum {
 } RbKeyword;
 RbKeyword rb_keyword_from_str(const char *s);
 int rb_decode_keywords(const unsigned char *arr, uint32_t arr_len, RbKeyword *out, int max);
-int  rb_decode_card_by_index(uint32_t i, Card *out);    /* 0..num_cards-1 */
+int rb_decode_card_by_index(uint32_t i, Card *out);    /* 0..num_cards-1 */
 void rb_free_card(Card *c);
-uint16_t rb_card_ability_idx(uint32_t i);   /* 0xFFFF if none  Efirst ability only (legacy) */
+int rb_card_get_card_by_id(int card_id, Card *out);
+int rb_card_get_card_by_no(const char *card_no, Card *out);
+int rb_card_get_card(const char *card_no);
+int rb_card_get_card_names(int card_id, char *out, size_t out_sz);
+int rb_card_database_create_copy(int template_id);
+uint16_t rb_card_ability_idx(uint32_t i);   /* 0xFFFF if none  Efirst ability only (legacy) */
 const unsigned char *rb_card_record(uint32_t i);
 uint32_t rb_card_record_len(uint32_t i);
 const unsigned char *rb_bc_slice(uint32_t idx, uint32_t *out_len);
@@ -1729,9 +1734,21 @@ int  rb_card_equivalent_rarity(const char *rarity, char *out, size_t out_sz);
 /* ── Card impl methods (mirror engine/src/core/card.rs Card impl block) ── */
 int rb_card_total_hearts(const Card *c);
 int rb_card_has_blade_heart(const Card *c);
+int rb_card_has_blade_heart_strict(const Card *c);
 int rb_card_has_score_icon(const Card *c);
 int rb_card_has_all_blade(const Card *c);
 int rb_card_get_score(const Card *c);
+const char *rb_effect_exclude_heart_colors_any(const AbilityEffect *e);
+const char *rb_effect_heart_colors_any(const AbilityEffect *e);
+const char *rb_effect_per_unit_heart_colors_any(const AbilityEffect *e);
+int rb_effect_options_any(const AbilityEffect *e, const AbilityEffect **out, int max);
+int rb_effect_repeat_limit_any(const AbilityEffect *e);
+const char *rb_effect_destination_any(const AbilityEffect *e);
+int rb_effect_is_under_self(const AbilityEffect *e);
+const char *rb_effect_action_by_any(const AbilityEffect *e);
+const char *rb_effect_action_by(const AbilityEffect *e);
+const char *rb_effect_picker_any(const AbilityEffect *e);
+int rb_effect_non_stackable_any(const AbilityEffect *e, int *out);
 int rb_card_need_heart_satisfied(const Card *c, const int *need, const int *provided);
 int  rb_check_heart_requirement(const int *need, const int *provided);
 int  rb_live_calculate_score(const GameState *g, int pl, int cheer_blade_heart_count,

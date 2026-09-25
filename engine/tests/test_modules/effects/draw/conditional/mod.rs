@@ -2,5 +2,6 @@
 // Regenerated from the directory listing at compile time.
 pub mod area_moved_pl_sp_sd2_003_sd2_test;
 pub mod live_start_energy_return_ren_draw_pl_sp_bp7_026_l_test;
+pub mod revealed_live_hand_threshold_draw_test;
 pub mod score_or_revealed_live_pl_sp_pb2_004_r_test;
 pub mod success_zone_group_pl_bp6_023_l_test;

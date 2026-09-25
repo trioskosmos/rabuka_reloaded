@@ -937,8 +937,11 @@ class ActionRule:
     extract_optional: bool = False  # auto-detect optional from "もよい"
     priority: Optional[int] = None
     order: int = 0
+    name: str = ""
 
     def __post_init__(self):
+        if not self.name:
+            self.name = self.action
         self.condition = _as_two_arg(self.condition)
         self.setter = _as_two_arg(self.setter)
 

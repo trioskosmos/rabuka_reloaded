@@ -288,9 +288,13 @@ def main():
     unimpl_names={r["name"] for _,recs in per_file.items() for r in recs if r["cls"] in UNIMPL}
 
     depth_cache={}
+    visiting=set()
     def depth(name):
         if name in depth_cache: return depth_cache[name]
+        if name in visiting: return 1
+        visiting.add(name)
         if name not in unimpl_names:
+            visiting.remove(name)
             depth_cache[name]=0; return 0
         rec=None
         for _,recs in per_file.items():
@@ -299,6 +303,7 @@ def main():
             if rec: break
         uc=[c for c in rec["calls"] if c in unimpl_names]
         d=1 if not uc else 1+max(depth(c) for c in uc)
+        visiting.remove(name)
         depth_cache[name]=d; return d
     for _,recs in per_file.items():
         for r in recs: r["depth"]=depth(r["name"])

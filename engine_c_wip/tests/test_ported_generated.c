@@ -310,6 +310,117 @@ static void generated_card_helpers(void)
     CHECK(!strcmp(rb_effect_source_or(&effect, "hand"), "hand"), "effect source default");
 }
 
+static void generated_card_property_heart_helpers(void)
+{
+    Card card = {0};
+    card.num_base = 0;
+    card.num_blade = 1;
+    card.n_hearts = 1;
+    card.heart_color[0] = RB_HEART_ALL;
+    card.heart_count[0] = 1;
+    CHECK(rb_card_has_blade_heart(&card), "card property accepts blade hearts");
+    CHECK(rb_card_has_blade_heart_strict(&card), "strict blade-heart property accepts blade hearts");
+    CHECK(rb_card_has_all_blade(&card), "card property detects all-blade heart");
+    CHECK(!rb_card_has_score_icon(&card), "plain blade heart is not score icon");
+
+    card.num_blade = 0;
+    card.has_special = 1;
+    card.special_count = 1;
+    card.special_color = RB_HEART_SCORE;
+    CHECK(rb_card_has_blade_heart(&card), "legacy blade-heart property accepts special heart");
+    CHECK(!rb_card_has_blade_heart_strict(&card), "strict blade-heart property rejects special heart");
+    CHECK(rb_card_has_score_icon(&card), "card property detects score icon");
+
+    int need_empty[8] = {0};
+    int provided_empty[8] = {0};
+    int need_red[8] = {0, 1};
+    int provided_colorless[8] = {1};
+    int provided_all[8] = {0, 0, 0, 0, 0, 0, 0, 1};
+    int provided_red[8] = {0, 1};
+    CHECK(rb_check_heart_requirement(NULL, provided_empty) == 0, "heart check rejects missing requirement");
+    CHECK(rb_check_heart_requirement(need_empty, provided_empty), "empty heart requirement is satisfied");
+    CHECK(rb_check_heart_requirement(need_red, provided_red), "matching heart satisfies requirement");
+    CHECK(rb_check_heart_requirement(need_red, provided_colorless), "heartless wildcard follows Rust allocation rule");
+    CHECK(rb_check_heart_requirement(need_red, provided_all), "all-heart wildcard satisfies requirement");
+    CHECK(!rb_check_heart_requirement(need_red, need_empty), "unfulfilled heart requirement is rejected");
+}
+
+static void generated_effect_convenience_getters(void)
+{
+    AbilityEffect effect = {0};
+    AbilityEffect option = {0};
+    const AbilityEffect *options[1];
+    effect.destination = (char *)"stage";
+    effect.n_options = 1;
+    effect.options[0] = &option;
+    effect.repeat_limit = 3;
+    effect.n_extra = 7;
+    effect.extra_k[0] = (char *)"exclude_heart_colors";
+    effect.extra_v[0] = (char *)"heart01,heart02";
+    effect.extra_k[1] = (char *)"heart_colors";
+    effect.extra_v[1] = (char *)"heart03,heart04";
+    effect.extra_k[2] = (char *)"per_unit_heart_colors";
+    effect.extra_v[2] = (char *)"heart05";
+    effect.extra_k[3] = (char *)"under_self";
+    effect.extra_v[3] = (char *)"true";
+    effect.extra_k[4] = (char *)"action_by";
+    effect.extra_v[4] = (char *)"opponent";
+    effect.extra_k[5] = (char *)"picker";
+    effect.extra_v[5] = (char *)"self";
+    effect.extra_k[6] = (char *)"non_stackable";
+    effect.extra_v[6] = (char *)"true";
+
+    CHECK(!strcmp(rb_effect_exclude_heart_colors_any(&effect), "heart01,heart02"), "exclude-heart getter");
+    CHECK(!strcmp(rb_effect_heart_colors_any(&effect), "heart03,heart04"), "heart-color getter");
+    CHECK(!strcmp(rb_effect_per_unit_heart_colors_any(&effect), "heart05"), "per-unit heart-color getter");
+    CHECK_EQ(rb_effect_options_any(&effect, options, 1), 1, "options getter returns option count");
+    CHECK(options[0] == &option, "options getter returns option pointer");
+    CHECK_EQ(rb_effect_repeat_limit_any(&effect), 3, "repeat-limit getter");
+    CHECK(!strcmp(rb_effect_destination_any(&effect), "stage"), "destination getter");
+    CHECK(rb_effect_is_under_self(&effect), "under-self convenience getter");
+    CHECK(!strcmp(rb_effect_action_by_any(&effect), "opponent"), "action-by-any getter");
+    CHECK(!strcmp(rb_effect_action_by(&effect), "opponent"), "action-by getter");
+    CHECK(!strcmp(rb_effect_picker_any(&effect), "self"), "picker getter");
+    int non_stackable = 0;
+    CHECK(rb_effect_non_stackable_any(&effect, &non_stackable) && non_stackable, "non-stackable getter");
+    effect.n_extra = 0;
+    effect.destination = NULL;
+    CHECK(rb_effect_destination_any(&effect) == NULL, "destination getter reports missing field");
+    CHECK_EQ(rb_effect_repeat_limit_any(&effect), 3, "repeat-limit getter keeps decoded field");
+    CHECK_EQ(rb_effect_repeat_limit_any(NULL), -1, "repeat-limit getter reports missing effect");
+}
+
+static void generated_card_database_helpers(void)
+{
+    int template_id = rb_find_card_by_no("PL!N-bp1-027-L");
+    Card template = {0};
+    Card copy = {0};
+    int copy_id = rb_card_database_create_copy(template_id);
+    CHECK(template_id >= 0 && rb_card_get_card_by_id(template_id, &template), "database get-by-id");
+    CHECK(copy_id > template_id && rb_card_get_card_by_id(copy_id, &copy), "database create-copy");
+    CHECK(copy_id != template_id && !strcmp(template.name, copy.name), "database copy preserves card identity");
+    rb_free_card(&template);
+    rb_free_card(&copy);
+
+    Card by_no = {0};
+    CHECK(rb_card_get_card_by_no("pl!n-bp1-027-l", &by_no), "database get-by-number");
+    if (by_no.name) rb_free_card(&by_no);
+
+    int names_id = -1;
+    char names[256] = {0};
+    for (uint32_t i = 0; i < rb_num_cards() && names_id < 0; i++) {
+        Card candidate = {0};
+        if (!rb_decode_card_by_index(i, &candidate)) continue;
+        if (candidate.name && (strchr(candidate.name, '&') || strstr(candidate.name, "＆"))) {
+            names_id = (int)i;
+            int n = rb_card_get_card_names((int)i, names, sizeof(names));
+            CHECK(n >= 2, "database multi-name helper returns names");
+        }
+        rb_free_card(&candidate);
+    }
+    CHECK(names_id >= 0, "database contains a multi-name card");
+}
+
 int main(void)
 {
     if (rb_load("src") != 0) {
@@ -324,6 +435,9 @@ int main(void)
     generated_decode_all_cards();
     generated_card_number_normalization();
     generated_card_helpers();
+    generated_card_property_heart_helpers();
+    generated_effect_convenience_getters();
+    generated_card_database_helpers();
     rb_unload();
     if (failures)
         return 1;

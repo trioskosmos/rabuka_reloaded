@@ -86,16 +86,6 @@ fn total_blades_of(p: &Player, gs: &GameState, db: &CardDatabase) -> i32 {
         .sum()
 }
 
-fn opponent_live_score(gs: &GameState, me: u8, db: &CardDatabase) -> i32 {
-    let (_, opp) = gs.seated_pair(me);
-    opp.live_card_zone
-        .cards
-        .iter()
-        .filter_map(|&cid| db.get_card(cid).and_then(|card| card.score))
-        .map(i32::from)
-        .sum()
-}
-
 fn public_opponent_ceiling(gs: &GameState, me: u8, db: &CardDatabase) -> i32 {
     let (_, opp) = gs.seated_pair(me);
     let hearts = stats_pipeline::stage_hearts(
@@ -112,9 +102,7 @@ fn public_opponent_ceiling(gs: &GameState, me: u8, db: &CardDatabase) -> i32 {
         &gs.mods.orientation_modifiers,
         false,
     );
-    let pool = hearts.hearts.values().copied().map(i32::from).sum::<i32>()
-        + (blades as i32) / 2
-        + opponent_live_score(gs, me, db);
+    let pool = hearts.hearts.values().copied().map(i32::from).sum::<i32>() + (blades as i32) / 2;
     if pool < 3 {
         0
     } else {
@@ -1008,6 +996,16 @@ fn experiment_junk_fill(gs: &GameState, me: u8, db: &CardDatabase, desired: &mut
     if desired.len() >= max_slots || deck_lives == 0 {
         return;
     }
+    if !desired.is_empty()
+        && my.hand.cards.iter().enumerate().any(|(i, &cid)| {
+            !desired.contains(&i)
+                && db
+                    .get_card(cid)
+                    .is_some_and(|c| c.card_type == CardType::Live)
+        })
+    {
+        return;
+    }
     let future_junk = std::env::var_os("V7_NO_FUTURE_JUNK").is_none();
     let max_stage_cost = my
         .stage
@@ -1240,32 +1238,20 @@ pub(crate) fn choose_live_set_experiment(
             std::env::var_os("V7_PRE_D").is_none() && std::env::var_os("V7_NO_CEILING").is_none();
         let mut chose_single = false;
         if my_succ >= 2 && opp_succ >= 2 {
-            let committed_score = opponent_live_score(gs, me, db);
-            let highest_score = singles.iter().max_by_key(|(_, _, hi, _)| {
+            if let Some(&(_, _, first_hi, _)) = singles.iter().max_by_key(|(_, _, hi, _)| {
                 db.get_card(my.hand.cards.get(*hi).copied().unwrap_or(-1))
                     .and_then(|c| c.score)
                     .unwrap_or(0)
-            });
-            let score_choice = highest_score.and_then(|&(_, _, hi, _)| {
-                let score = db
-                    .get_card(my.hand.cards.get(hi).copied().unwrap_or(-1))
-                    .and_then(|c| c.score)
-                    .unwrap_or(0);
-                (i32::from(score) > committed_score).then_some(hi)
-            });
-            let choice = score_choice.or_else(|| singles.first().map(|&(_, _, hi, _)| hi));
-            if let Some(hi) = choice {
-                desired.push(hi);
+            }) {
+                desired.push(first_hi);
                 chose_single = true;
                 log::debug!(
-                    "v7 score-race t{} me{} my{} opp{} committed={} hi={} strict={}",
+                    "v7 score-race t{} me{} my{} opp{} hi={}",
                     gs.turn_number,
                     me,
                     my_succ,
                     opp_succ,
-                    committed_score,
-                    hi,
-                    score_choice.is_some()
+                    first_hi
                 );
             }
         }

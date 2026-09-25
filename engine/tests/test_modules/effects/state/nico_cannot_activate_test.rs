@@ -131,7 +131,7 @@ fn kotori_activate_works_without_restriction() {
 /// that change orientation to active (like Kotori's debut). The natural
 /// Active phase activation still works — it is a game rule, not an effect.
 #[test]
-fn nico_q180_active_phase_still_activates() {
+fn nico_active_phase_still_activates() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
@@ -168,7 +168,7 @@ fn nico_q180_active_phase_still_activates() {
 }
 
 #[test]
-fn nico_q180_p1_active_phase_still_activates() {
+fn nico_p1_active_phase_still_activates() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 

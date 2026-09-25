@@ -168,3 +168,35 @@ fn q117_second_wien_copy_counts_as_other_member() {
         game.state.cheer_checks_required
     );
 }
+
+#[test]
+fn blade_gained_after_live_start_does_not_reduce_yell_checks() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let wien = game.id(WIEN);
+    let partner = game.id(FILLER);
+    let live_card = game.id("PL!-sd1-020-SD");
+    game.state.player1.stage.stage = [-1, wien, partner];
+    game.state.mods.add_blade_modifier(partner, -3);
+    game.state.player1.hand.cards.push(live_card);
+    fill_decks(&mut game);
+
+    advance_to_live_card_set_p1(&mut game);
+    game.set_live_card(live_card);
+    advance_past_live_start(&mut game);
+
+    game.state.mods.add_blade_modifier(partner, 2);
+    let blade = game.state.player1.stage.total_blades(
+        &game.db,
+        &game.state.mods.blade_modifiers,
+        &game.state.mods.orientation_modifiers,
+        true,
+    );
+    let p1_id = game.state.player1.id.clone();
+    let _ = game.state.perform_cheer_check(&p1_id, blade);
+    assert_eq!(
+        game.state.cheer_checks_required,
+        blade.saturating_sub(8),
+        "Q111: Wien's -8 yell reduction is fixed at LiveStart and applies to the later blade total"
+    );
+}

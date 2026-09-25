@@ -25,7 +25,32 @@ on. Consequences:
   the ability it claims), but fix it by correcting the number or asserting
   identity — never by renaming the file to the card.
 
-## Layout (what goes where)
+## QA test naming and index
+
+QA-specific files use the ruling ID and behavior, never the card print ID as the headline: `q<NNN>_<behavior>_<kind>_test.rs`. Card IDs remain fixture data inside the test body. Use suffixes such as `_positive`, `_negative`, `_boundary`, `_ordering`, `_refresh`, `_same_instance`, and `_no_replay`.
+
+| QA | Coverage | Remaining edge focus |
+|---|---|---|
+| Q180 | `nico_cannot_activate_test.rs` | restriction expiry and unrelated baton paths |
+| Q165 | `ll_joint_test.rs` | mixed-name combinations and duplicate instances |
+| Q163 | `activate_wait_other_group_draw_q163_test.rs` | empty own stage and multiple opponent targets |
+| Q160 | `miyashita_ai_test.rs` | member leaves before/after the triggering debut |
+| Q141 | `energy_and_member_under_test.rs` | under-energy when owner leaves by effect |
+| Q140 | `energy_and_member_under_test.rs` | stage-to-hand and stage-to-discard parity |
+| Q134 | `baton_touch_test.rs` | already-deployed occupant restriction |
+| Q126 | `chisato_move_test.rs` | stage-to-waitroom and effect-caused movement |
+| Q122 | `debut_top3_reorder_and_discard_activation_test.rs` | refresh timing versus same-turn discard |
+| Q120 | `revealed_live_hand_le7_draw_q120_test.rs` | exact draw delta and duplicate live identity |
+| Q111 | `wien_yell_count_test.rs` | blade changes after the LiveStart snapshot |
+| Q116 | `dream_with_you_test.rs` | reduced yell count below the blade threshold |
+| Q101 | `special_blade_heart_rules_test.rs` | refresh and exhausted-source termination |
+| Q95 | `fuyumari_test.rs` | same-name decoy versus exact card instance |
+| Q90 | `ll_bp1_001_test.rs` | joint-card name in live-card selection |
+| Q88 | `action_coverage_test.rs` | illegal free actions outside abilities |
+| Q89 | `multiname_card_test.rs` | group metadata and unit-field invariants |
+
+When a QA test is added or moved, update this table in the same change. The full current queue and known gaps remain below.
+
 
 - `rules/` — game-wide mechanics, proven once, not per card:
   `trigger_paths`, `phases`, `zones`, `targeting`, `scoring`,

@@ -100,6 +100,21 @@ void rb_free_card(Card *c) {
     if (c->ability) { rb_free_ability(c->ability); rb_free(c->ability); c->ability = NULL; }
 }
 
+int rb_card_get_card_by_id(int card_id, Card *out) {
+    if (!out || card_id < 0) return 0;
+    return rb_decode_card_by_index((uint32_t)card_id, out);
+}
+
+int rb_card_get_card_by_no(const char *card_no, Card *out) {
+    if (!out || !card_no) return 0;
+    int id = rb_card_get_card_id(card_no);
+    return id >= 0 && rb_decode_card_by_index((uint32_t)id, out);
+}
+
+int rb_card_database_create_copy(int template_id) {
+    return rb_create_card_copy(template_id);
+}
+
 /* ── Ability slices (mirrors card_loader.rs::attach_abilities:
    CARD_ABILITY_PAIRS holds (ability-string-idx, ability-idx) pairs;
    a pair belongs to the card whose card_no equals get_string(str_idx). ── */
@@ -539,6 +554,59 @@ int rb_condition_get_distinct(const Condition *c) {
 }
 const char *rb_effect_position_any(const AbilityEffect *e) {
     return fx_extra(e, "position");
+}
+
+const char *rb_effect_exclude_heart_colors_any(const AbilityEffect *e) {
+    return fx_extra(e, "exclude_heart_colors");
+}
+const char *rb_effect_heart_colors_any(const AbilityEffect *e) {
+    const char *value = fx_extra(e, "heart_colors");
+    return value ? value : fx_extra(e, "heart_color");
+}
+const char *rb_effect_per_unit_heart_colors_any(const AbilityEffect *e) {
+    return fx_extra(e, "per_unit_heart_colors");
+}
+int rb_effect_options_any(const AbilityEffect *e, const AbilityEffect **out, int max) {
+    if (!e || e->n_options <= 0) return 0;
+    int n = e->n_options;
+    if (n > max) n = max;
+    if (out) {
+        for (int i = 0; i < n; i++) out[i] = e->options[i];
+    }
+    return n;
+}
+int rb_effect_repeat_limit_any(const AbilityEffect *e) {
+    if (!e) return -1;
+    if (e->repeat_limit > 0) return e->repeat_limit;
+    const char *value = fx_extra(e, "repeat_limit");
+    if (!value || !*value) return -1;
+    char *end = NULL;
+    long parsed = strtol(value, &end, 10);
+    if (end == value || *end || parsed < 0 || parsed > 255) return -1;
+    return (int)parsed;
+}
+const char *rb_effect_destination_any(const AbilityEffect *e) {
+    if (!e) return NULL;
+    if (e->destination && *e->destination) return e->destination;
+    return fx_extra(e, "destination");
+}
+int rb_effect_is_under_self(const AbilityEffect *e) {
+    const char *value = fx_extra(e, "under_self");
+    return value && (!strcmp(value, "true") || strtol(value, NULL, 10) != 0);
+}
+const char *rb_effect_action_by_any(const AbilityEffect *e) {
+    return fx_extra(e, "action_by");
+}
+const char *rb_effect_action_by(const AbilityEffect *e) {
+    return rb_effect_action_by_any(e);
+}
+const char *rb_effect_picker_any(const AbilityEffect *e) {
+    return fx_extra(e, "picker");
+}
+int rb_effect_non_stackable_any(const AbilityEffect *e, int *out) {
+    const char *value = fx_extra(e, "non_stackable");
+    if (out) *out = value && (!strcmp(value, "true") || strtol(value, NULL, 10) != 0);
+    return value != NULL;
 }
 
 /* ── (original CardDatabase-method ports follow) ── */

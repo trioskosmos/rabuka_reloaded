@@ -2,4 +2,3 @@
 // Regenerated from the directory listing at compile time.
 pub mod live_phase_group_wait_discard_reactivate_test;
 pub mod own_effect_wait_cheap_opponent_draw_one_q177_test;
-pub mod revealed_live_hand_le7_draw_q120_test;
