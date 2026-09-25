@@ -39,3 +39,21 @@ fn pl_n_bp5_028_l_live_start_heart02_member_grants_score_and_heart02_requirement
         "required hearts must include heart02 totalling >=5 (got {nh02})"
     );
 }
+
+#[test]
+fn pl_n_bp5_028_l_wrong_group_member_does_not_trigger() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let live = game.id("PL!N-bp5-028-L");
+    let wrong_group = game.id("PL!-sd1-013-SD");
+    game.add_to_hand(live);
+    game.set_live_card(live);
+    game.state.current_phase = rabuka_engine::game_state::Phase::FirstAttackerPerformance;
+    game.state.player1.stage.stage[0] = wrong_group;
+
+    fire_trigger(&mut game, live, AbilityTrigger::LiveStart, "ライブ開始時");
+    game.state.recalculate_constants();
+
+    assert_eq!(game.state.mods.get_score_modifier(live), 0);
+    assert!(!game.state.mods.need_heart_modifiers.contains_key(&live));
+}
