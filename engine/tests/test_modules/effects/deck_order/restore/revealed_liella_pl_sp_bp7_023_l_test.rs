@@ -32,3 +32,22 @@ fn pl_sp_bp7_023_l_selected_revealed_liella_card_increases_deck_count() {
         "revealed Liella! card placed onto the deck top"
     );
 }
+
+#[test]
+fn pl_sp_bp7_023_l_non_liella_reveal_is_a_noop() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let filler = game.new_id(FILLER);
+    fill_decks(&mut game, filler);
+    let live = game.id("PL!SP-bp7-023-L");
+    game.add_to_hand(live);
+    game.set_live_card(live);
+    game.state.revealed_cards.clear();
+    game.state.revealed_cards.push(game.new_id("PL!-sd1-010-SD"));
+    let deck_before = game.state.player1.main_deck.cards.len();
+
+    fire_trigger(&mut game, live, AbilityTrigger::LiveSuccess, "ライブ成功時");
+
+    assert!(!game.has_pending_choice());
+    assert_eq!(game.state.player1.main_deck.cards.len(), deck_before);
+}
