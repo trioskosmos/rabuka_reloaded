@@ -407,6 +407,22 @@ def test_sunny_day_song_group_filter_stays_on_mus_branch():
     assert "group_names" not in branch3, branch3
 
 
+def test_ai_screeam_answer_choices_preserve_exact_text_answers():
+    ability = parse_ability(
+        "{{live_start.png|ライブ開始時}}相手に何が好き？と聞く。回答がチョコミントかストロベリーフレイバーかクッキー＆クリームの場合、自分と相手は手札を1枚控え室に置く。回答があなたの場合、自分と相手はカードを1枚引く。回答がそれ以外の場合、ライブ終了時まで、自分と相手のステージにいるメンバーは{{icon_blade.png|ブレード}}を得る。"
+    )
+    effect = ability["effect"]
+    assert effect["action"] == "choice", effect
+    assert effect["choice_type"] == "answer_based", effect
+    assert effect["options"][0]["answers"] == [
+        "チョコミント",
+        "ストロベリーフレイバー",
+        "クッキー＆クリーム",
+    ], effect
+    assert effect["options"][1]["answers"] == ["あなた"], effect
+    assert effect["options"][2]["answers"] == ["それ以外"], effect
+
+
 def test_maki_previous_reveal_source_is_resolution_scoped():
     ability = parse_ability(
         "{{toujyou.png|登場}}手札のライブカードを1枚公開してもよい：自分の成功ライブカード置き場にあるカードを1枚手札に加える。そうした場合、これにより公開したカードを自分の成功ライブカード置き場に置く。"
