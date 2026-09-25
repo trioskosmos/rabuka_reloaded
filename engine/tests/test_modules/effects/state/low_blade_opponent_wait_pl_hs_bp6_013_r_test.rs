@@ -49,3 +49,37 @@ fn pl_hs_bp6_013_r_live_start_waits_low_blade_opponent_member() {
         "opponent low-blade member waited"
     );
 }
+
+#[test]
+fn pl_hs_bp6_013_r_empty_opponent_stage_is_a_noop() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let me = game.id("PL!HS-bp6-013-R");
+    let filler = game.new_id(FILLER);
+    fill_decks(&mut game, filler);
+    game.state.player1.stage.stage[1] = me;
+    let ability_id = {
+        let card = game.db.get_card(me).unwrap();
+        let ability = card
+            .resolved_abilities()
+            .find(|ability| ability.full_text.contains("DOLLCHESTRA"))
+            .unwrap();
+        format!("{}_{}", card.card_no, ability.full_text)
+    };
+    let pid = game.state.player1.id.clone();
+    game.state.trigger_auto_ability(
+        ability_id,
+        AbilityTrigger::LiveStart,
+        pid.clone(),
+        Some(game.db.get_card(me).unwrap().card_no.to_string()),
+        Some(me),
+        None,
+        None,
+    );
+    game.state.activating_card = Some(me);
+    game.state.process_pending_auto_abilities(&pid);
+
+    assert!(!game.has_pending_choice());
+    assert!(game.state.player2.stage.stage.iter().all(|card_id| *card_id == -1));
+}
+
