@@ -1,13 +1,13 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-09-25T17:28:43.425069+00:00",
+  "generated_at": "2026-09-25T17:40:10.375035+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
     "total_abilities": 2011,
     "unique_abilities": 936
   },
-  "n_files": 855,
+  "n_files": 868,
   "n_tests": 3607,
   "total_cards": 771,
   "covered_cards": 771,
@@ -550,13 +550,13 @@
           "detail": "PL!SP-bp2-011-R, PL!SP-pb2-011-R"
         },
         {
-          "file": "engine/tests/test_modules/effects/cost_mod/play_time_three_named_member_discard_cost_ten_test.rs",
+          "file": "engine/tests/test_modules/effects/cost_mod/activation_discount/play_time_three_named_member_discard_cost_ten_test.rs",
           "test": "<file>",
           "line": 1,
           "detail": "PL!S-bp2-016-N, PL!S-bp3-016-N, PL!S-bp7-016-N"
         },
         {
-          "file": "engine/tests/test_modules/effects/cost_mod/play_time_three_named_member_discard_cost_ten_test.rs",
+          "file": "engine/tests/test_modules/effects/cost_mod/activation_discount/play_time_three_named_member_discard_cost_ten_test.rs",
           "test": "<file>",
           "line": 1,
           "detail": "PL!SP-bp5-014-N, PL!SP-bp7-014-N"
@@ -604,13 +604,13 @@
           "detail": "PL!-bp3-002-R, PL!-bp5-002-R"
         },
         {
-          "file": "engine/tests/test_modules/effects/position/position_change_multi_test.rs",
+          "file": "engine/tests/test_modules/effects/position/area_move/position_change_multi_test.rs",
           "test": "<file>",
           "line": 1,
           "detail": "PL!HS-bp2-006-R, PL!HS-pb1-006-R"
         },
         {
-          "file": "engine/tests/test_modules/effects/position/position_change_non_optional_test.rs",
+          "file": "engine/tests/test_modules/effects/position/area_move/position_change_non_optional_test.rs",
           "test": "<file>",
           "line": 1,
           "detail": "PL!HS-bp2-006-R, PL!HS-pb1-006-R"
@@ -640,7 +640,7 @@
           "detail": "PL!SP-bp1-023-L, PL!SP-bp5-023-L"
         },
         {
-          "file": "engine/tests/test_modules/effects/state/either_or_state_change_test.rs",
+          "file": "engine/tests/test_modules/effects/state/per_card/either_or_state_change_test.rs",
           "test": "<file>",
           "line": 1,
           "detail": "PL!N-bp4-008-R, PL!N-pb1-008-R"
@@ -764,13 +764,13 @@
         "engine/tests/test_modules/effects/compound/pl_bp6_006_test.rs",
         "engine/tests/test_modules/effects/compound/pl_sp_pb2_005_test.rs",
         "engine/tests/test_modules/effects/compound/self_discard_same_name_same_area_deploy_energy_under_q157_q184_test.rs",
-        "engine/tests/test_modules/effects/conditional/joint_six_discard_mixed_name_cost_test.rs",
-        "engine/tests/test_modules/effects/conditional/pl_hs_bp6_004_test.rs",
-        "engine/tests/test_modules/effects/conditional/pl_s_bp7_007_test.rs",
-        "engine/tests/test_modules/effects/conditional/under_card_and_success_live_conditions_test.rs",
-        "engine/tests/test_modules/effects/cost_mod/modify_required_hearts_exclude_heart_test.rs",
-        "engine/tests/test_modules/effects/cost_mod/play_time_three_named_member_discard_cost_ten_test.rs",
-        "engine/tests/test_modules/effects/cost_mod/wonder_zone_max_repeats_test.rs",
+        "engine/tests/test_modules/effects/conditional/joint/joint_six_discard_mixed_name_cost_test.rs",
+        "engine/tests/test_modules/effects/conditional/per_card/ginako_live_start_discard_group_blade_count_test.rs",
+        "engine/tests/test_modules/effects/conditional/per_card/hanamaru_debut_result_character_deploy_test.rs",
+        "engine/tests/test_modules/effects/conditional/zone_source/under_card_and_success_live_conditions_test.rs",
+        "engine/tests/test_modules/effects/cost_mod/activation_discount/play_time_three_named_member_discard_cost_ten_test.rs",
+        "engine/tests/test_modules/effects/cost_mod/required_hearts/modify_required_hearts_exclude_heart_test.rs",
+        "engine/tests/test_modules/effects/cost_mod/required_hearts/wonder_zone_center_heart03_required_hearts_test.rs",
         "engine/tests/test_modules/effects/deploy/discard_self_same_area_group_deploy_q63_q80_test.rs",
         "engine/tests/test_modules/effects/deploy/fuyumari_test.rs",
         "engine/tests/test_modules/effects/deploy/optional_energy_deploy_two_total_cost_four_test.rs",
@@ -788,7 +788,7 @@
         "engine/tests/test_modules/effects/gain/blades/under_member/under_liella_member_constant_host_blade_test.rs",
         "engine/tests/test_modules/effects/gain/hearts/per_card/subunit_stage_count_gated_debut_heart_test.rs",
         "engine/tests/test_modules/effects/look_select/recruit_stage/proof_bp6_remainder_routing_test.rs",
-        "engine/tests/test_modules/effects/position/love_wing_bell_test.rs",
+        "engine/tests/test_modules/effects/position/area_gated/success_zone_center_area_mus_member_constant_blade_test.rs",
         "engine/tests/test_modules/effects/recover/to_hand/cost_two_members_pl_hs_bp2_002_r_plus_test.rs",
         "engine/tests/test_modules/effects/recover/to_hand/distinct_trio_reveals_pl_sp_bp2_025_l_test.rs",
         "engine/tests/test_modules/effects/recover/to_hand/duplicate_id_mulligan_test.rs",
@@ -799,8 +799,8 @@
         "engine/tests/test_modules/effects/recover/to_hand/self_to_waitroom_recover_live_q79_q123_test.rs",
         "engine/tests/test_modules/effects/recover/to_hand/sunny_test.rs",
         "engine/tests/test_modules/effects/score/waited_members_pl_n_sd2_027_p_test.rs",
-        "engine/tests/test_modules/effects/state/kanata_bp1_test.rs",
-        "engine/tests/test_modules/effects/state/konata_test.rs",
+        "engine/tests/test_modules/effects/state/per_card/kanata_nijigasaki_appeared_activate_two_energy_test.rs",
+        "engine/tests/test_modules/effects/state/per_card/konata_nijigasaki_debuted_this_turn_activates_energy_test.rs",
         "engine/tests/test_modules/integration/gameplay_test.rs",
         "engine/tests/test_modules/integration/hard_abilities_tier_test.rs",
         "engine/tests/test_modules/jidou/energy_watch/energy_placement_blade_excludes_area_move_and_under_member_test.rs",
@@ -895,10 +895,10 @@
       "covering_files": [
         "engine/tests/test_modules/characterization/zero_tested_action_types_test.rs",
         "engine/tests/test_modules/effects/compound/live_start_own_discard_two_member_bottomdeck_hearts_q164_test.rs",
-        "engine/tests/test_modules/effects/conditional/konata_bp4_test.rs",
-        "engine/tests/test_modules/effects/conditional/pl_s_bp7_007_test.rs",
-        "engine/tests/test_modules/effects/cost_mod/modify_required_hearts_exclude_heart_test.rs",
-        "engine/tests/test_modules/effects/cost_mod/play_time_three_named_member_discard_cost_ten_test.rs",
+        "engine/tests/test_modules/effects/conditional/per_card/hanamaru_debut_result_character_deploy_test.rs",
+        "engine/tests/test_modules/effects/conditional/state_gated/deployed_member_blade_heart_wait_test.rs",
+        "engine/tests/test_modules/effects/cost_mod/activation_discount/play_time_three_named_member_discard_cost_ten_test.rs",
+        "engine/tests/test_modules/effects/cost_mod/required_hearts/modify_required_hearts_exclude_heart_test.rs",
         "engine/tests/test_modules/effects/deck_order/restore/clean_members_energy_pl_n_bp7_008_r_test.rs",
         "engine/tests/test_modules/effects/deploy/optional_energy_deploy_two_total_cost_four_test.rs",
         "engine/tests/test_modules/effects/deploy/under_energy_cost_waited_empty_area_deploy_q268_test.rs",
@@ -928,8 +928,8 @@
         "engine/tests/test_modules/effects/score/dream_with_you_test.rs",
         "engine/tests/test_modules/effects/score/love_u_test.rs",
         "engine/tests/test_modules/effects/score/solitude_test.rs",
-        "engine/tests/test_modules/effects/state/live_start_wait_filters_pl_n_bp5_004_r_pl_sp_pr_021_pr_test.rs",
-        "engine/tests/test_modules/effects/state/riko_bp5_center_cost_equal_test.rs",
+        "engine/tests/test_modules/effects/state/wait_activation/live_start_wait_filters_pl_n_bp5_004_r_pl_sp_pr_021_pr_test.rs",
+        "engine/tests/test_modules/effects/state/wait_activation/riko_center_gated_live_start_low_blade_opponent_wait_test.rs",
         "engine/tests/test_modules/integration/gameplay_test.rs",
         "engine/tests/test_modules/integration/parser_issues_e2e_test.rs",
         "engine/tests/test_modules/jidou/debut_watch/baton_arrival_self_budget_gates_pl_n_pr_025_pr_test.rs",
@@ -1032,9 +1032,9 @@
         "engine/tests/test_modules/effects/compound/boosted_miraku_draw_and_need_heart_reduction_test.rs",
         "engine/tests/test_modules/effects/compound/center_wait_discard_other_group_cost_plus_two_same_area_deploy_test.rs",
         "engine/tests/test_modules/effects/compound/debut_opponent_optional_live_discard_or_total_score_edges_test.rs",
-        "engine/tests/test_modules/effects/conditional/chika_bp7_conditional_result_test.rs",
-        "engine/tests/test_modules/effects/conditional/sp_bp2_004_comprehensive_edge_test.rs",
-        "engine/tests/test_modules/effects/cost_mod/per_unit_member_cost_reduction_q249_test.rs",
+        "engine/tests/test_modules/effects/conditional/per_card/chika_debut_result_character_condition_test.rs",
+        "engine/tests/test_modules/effects/conditional/state_gated/center_highest_cost_constant_heart_edges_test.rs",
+        "engine/tests/test_modules/effects/cost_mod/activation_discount/per_unit_member_cost_reduction_q249_test.rs",
         "engine/tests/test_modules/effects/deck_order/restore/both_waitrooms_member_restore_threshold_q242_test.rs",
         "engine/tests/test_modules/effects/deploy/paid_energy_same_name_debut_chain_q200_q201_q202_test.rs",
         "engine/tests/test_modules/effects/draw/until_count/miyata_draw_until_test.rs",
@@ -1055,8 +1055,8 @@
         "engine/tests/test_modules/effects/mill/liella_milled_per_unit_blades_test.rs",
         "engine/tests/test_modules/effects/recover/to_hand/bp7_q270_emma_color_diversity_test.rs",
         "engine/tests/test_modules/effects/score/live_success_score_per_waited_member_test.rs",
-        "engine/tests/test_modules/effects/state/center_optional_unit_wait_opponent_wait_immunity_test.rs",
-        "engine/tests/test_modules/effects/state/optional_self_wait_target_pl_pr_007_pr_test.rs",
+        "engine/tests/test_modules/effects/state/wait_activation/center_optional_unit_wait_opponent_wait_immunity_test.rs",
+        "engine/tests/test_modules/effects/state/wait_activation/optional_self_wait_target_pl_pr_007_pr_test.rs",
         "engine/tests/test_modules/integration/gameplay_test.rs",
         "engine/tests/test_modules/integration/parser_issues_e2e_part2_test.rs",
         "engine/tests/test_modules/jidou/ability_watch/live_start_resolved_own_center_group_reposition_q255_test.rs",
@@ -1147,10 +1147,10 @@
         "engine/tests/test_modules/effects/choice/opponent_choice_test.rs",
         "engine/tests/test_modules/effects/compound/edelnote_test.rs",
         "engine/tests/test_modules/effects/compound/live_start_optional_unit_position_change_heart_blade_test.rs",
-        "engine/tests/test_modules/effects/cost_mod/distinct_stage_waitroom_members_required_hearts_test.rs",
+        "engine/tests/test_modules/effects/cost_mod/required_hearts/distinct_stage_waitroom_members_required_hearts_test.rs",
         "engine/tests/test_modules/effects/gain/blades/live_start/live_start_optional_energy_self_blades_test.rs",
-        "engine/tests/test_modules/effects/position/himeno_front_test.rs",
-        "engine/tests/test_modules/effects/position/position_change_multi_test.rs",
+        "engine/tests/test_modules/effects/position/area_move/himeno_debut_opponent_member_moved_to_own_front_area_test.rs",
+        "engine/tests/test_modules/effects/position/area_move/position_change_multi_test.rs",
         "engine/tests/test_modules/effects/recover/to_hand/debut_character_condition_energy_recover_live_test.rs",
         "engine/tests/test_modules/integration/parser_issues_e2e_test.rs",
         "engine/tests/test_modules/rules/baton/baton_touch_test.rs",
@@ -1313,7 +1313,7 @@
         "engine/tests/test_modules/effects/compound/discard_mill_live_recovery_pl_hs_pb1_004_r_test.rs",
         "engine/tests/test_modules/effects/compound/izumi_bp6_test.rs",
         "engine/tests/test_modules/effects/compound/pb1_007_comprehensive_edge_test.rs",
-        "engine/tests/test_modules/effects/conditional/under_card_and_success_live_conditions_test.rs",
+        "engine/tests/test_modules/effects/conditional/zone_source/under_card_and_success_live_conditions_test.rs",
         "engine/tests/test_modules/effects/energy/place/score_condition_integration_test.rs",
         "engine/tests/test_modules/effects/energy/under_member/energy_and_member_under_test.rs",
         "engine/tests/test_modules/effects/gain/hearts/live_start/live_start_live_zone_heart05_threshold_gain_test.rs",
@@ -1611,12 +1611,12 @@
         "engine/tests/test_modules/effects/deck_order/restore/both_waitrooms_member_restore_threshold_q242_test.rs",
         "engine/tests/test_modules/effects/draw/flat/optional_energy_live_success_draw_test.rs",
         "engine/tests/test_modules/effects/gain/hearts/color_choice/paid_heart_color_choice_test.rs",
-        "engine/tests/test_modules/effects/state/characterization_promoted_test.rs",
-        "engine/tests/test_modules/effects/state/kanata_bp1_test.rs",
-        "engine/tests/test_modules/effects/state/kanata_restrict_test.rs",
-        "engine/tests/test_modules/effects/state/konata_bp1_test.rs",
-        "engine/tests/test_modules/effects/state/konata_test.rs",
-        "engine/tests/test_modules/effects/state/self_wait_and_nijigasaki_activation_test.rs",
+        "engine/tests/test_modules/effects/state/per_card/kanata_nijigasaki_appeared_activate_two_energy_test.rs",
+        "engine/tests/test_modules/effects/state/per_card/konata_ability_order_draw_and_activate_energy_test.rs",
+        "engine/tests/test_modules/effects/state/per_card/konata_nijigasaki_debuted_this_turn_activates_energy_test.rs",
+        "engine/tests/test_modules/effects/state/per_card/nijigasaki_bp1_006_promoted_pay_two_draw_one_test.rs",
+        "engine/tests/test_modules/effects/state/wait_activation/kanata_active_phase_restriction_and_live_success_self_wait_test.rs",
+        "engine/tests/test_modules/effects/state/wait_activation/self_wait_and_nijigasaki_activation_test.rs",
         "engine/tests/test_modules/rules/conditions/restriction_mechanics_test.rs",
         "engine/tests/test_modules/rules/phases/live_success_rules_test.rs"
       ],
@@ -1686,7 +1686,7 @@
       "has_negative": false,
       "covering_files": [
         "engine/tests/test_modules/effects/look_select/reveal_to_hand/discard_subunit_look_pl_pb1_016_r_pl_sp_pb1_017_n_pl_hs_pb1_018_n_test.rs",
-        "engine/tests/test_modules/effects/state/optional_self_wait_target_pl_pr_007_pr_test.rs"
+        "engine/tests/test_modules/effects/state/wait_activation/optional_self_wait_target_pl_pr_007_pr_test.rs"
       ],
       "covering_tests": [
         "pl_hs_pb1_018_n_paid_discard_looks_five_fetches_dollchestra",
@@ -1728,7 +1728,7 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/effects/choice/tang_keke_test.rs",
-        "engine/tests/test_modules/effects/conditional/keke_pb2_013_debut_test.rs",
+        "engine/tests/test_modules/effects/conditional/zone_source/debut_discard_blade_heart_draw_test.rs",
         "engine/tests/test_modules/effects/draw/flat/optional_energy_catchu_trio_draw_sumire_bp7_015_n_test.rs",
         "engine/tests/test_modules/effects/energy/place/pr_energy_place_cost_test.rs",
         "engine/tests/test_modules/effects/look_select/reveal_to_hand/debut_look_liella_cost4_hand_or_debut_test.rs",
@@ -1789,7 +1789,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/cost_mod/ladybug_test.rs",
+        "engine/tests/test_modules/effects/cost_mod/required_hearts/ladybug_stage_cost_comparison_required_hearts_test.rs",
         "engine/tests/test_modules/effects/draw/flat/success_zone_group_live_success_draw_test.rs",
         "engine/tests/test_modules/effects/draw/flat/surplus_heart01_live_success_draw_test.rs",
         "engine/tests/test_modules/effects/gain/blades/under_member/q278_q279_joint_card_under_member_blade_test.rs",
@@ -1869,7 +1869,7 @@
         "engine/tests/test_modules/effects/compound/mus_live_recovery_success_score_energy_pl_pr_017_pr_test.rs",
         "engine/tests/test_modules/effects/compound/pl_hs_sd1_008_test.rs",
         "engine/tests/test_modules/effects/compound/stage_heart02_score_requirement_pl_n_bp5_028_l_test.rs",
-        "engine/tests/test_modules/effects/conditional/under_card_and_success_live_conditions_test.rs",
+        "engine/tests/test_modules/effects/conditional/zone_source/under_card_and_success_live_conditions_test.rs",
         "engine/tests/test_modules/effects/deck_order/restore/revealed_liella_pl_sp_bp7_023_l_test.rs",
         "engine/tests/test_modules/effects/deploy/waitroom_low_cost_pl_hs_bp6_016_r_test.rs",
         "engine/tests/test_modules/effects/draw/chains/hand_debut_no_draw_pl_hs_bp6_015_r_test.rs",
@@ -1890,7 +1890,7 @@
         "engine/tests/test_modules/effects/recover/to_hand/optional_energy_live_recovery_pl_sp_pb2_007_r_test.rs",
         "engine/tests/test_modules/effects/recover/to_hand/success_zone_revealed_members_pl_s_bp5_019_l_test.rs",
         "engine/tests/test_modules/effects/score/success_count_revealed_score_live_pl_sp_bp5_023_l_test.rs",
-        "engine/tests/test_modules/effects/state/low_blade_opponent_wait_pl_hs_bp6_013_r_test.rs",
+        "engine/tests/test_modules/effects/state/wait_activation/low_blade_opponent_wait_pl_hs_bp6_013_r_test.rs",
         "engine/tests/test_modules/integration/hard_abilities_tier_test.rs",
         "engine/tests/test_modules/integration/parser_issues_e2e_part3_test.rs",
         "engine/tests/test_modules/integration/parser_issues_e2e_test.rs",
@@ -1966,7 +1966,7 @@
       "covering_files": [
         "engine/tests/test_modules/characterization/prohibition_layer_characterization_test.rs",
         "engine/tests/test_modules/effects/compound/pb1_007_comprehensive_edge_test.rs",
-        "engine/tests/test_modules/effects/conditional/under_card_and_success_live_conditions_test.rs",
+        "engine/tests/test_modules/effects/conditional/zone_source/under_card_and_success_live_conditions_test.rs",
         "engine/tests/test_modules/effects/gain/blades/constants/success_pile_difference_pl_s_bp6_009_r_plus_test.rs",
         "engine/tests/test_modules/effects/gain/blades/live_start/live_start_hand_pair_blade_snapshot_q109_test.rs",
         "engine/tests/test_modules/effects/gain/blades/live_start/live_start_hand_pair_blades_test.rs",
@@ -2293,7 +2293,7 @@
       "covering_files": [
         "engine/tests/test_modules/characterization/zero_tested_action_types_test.rs",
         "engine/tests/test_modules/effects/compound/live_start_waited_opponent_count_group_member_topdeck_test.rs",
-        "engine/tests/test_modules/effects/conditional/discard_group_look_four_or_recover_live_test.rs",
+        "engine/tests/test_modules/effects/conditional/state_gated/discard_group_look_four_or_recover_live_test.rs",
         "engine/tests/test_modules/effects/draw/conditional/live_start_energy_return_ren_draw_pl_sp_bp7_026_l_test.rs",
         "engine/tests/test_modules/effects/gain/blades/per_card/q46_kanako_all_heart_timing_test.rs"
       ],
@@ -2360,8 +2360,8 @@
         "engine/tests/test_modules/effects/gain/blades/constants/per_waited_opponent_member_constant_blade_test.rs",
         "engine/tests/test_modules/effects/gain/blades/per_card/eri_debut_up_to_two_opponent_members_to_wait_test.rs",
         "engine/tests/test_modules/effects/look_select/reveal_to_hand/eli_bp5_cost9_search_test.rs",
-        "engine/tests/test_modules/effects/state/card_count_state_test.rs",
-        "engine/tests/test_modules/effects/state/state_condition_test.rs"
+        "engine/tests/test_modules/effects/state/orientation_gated/two_or_more_opponent_wait_members_constant_heart06_test.rs",
+        "engine/tests/test_modules/effects/state/orientation_gated/wait_state_condition_constants_test.rs"
       ],
       "covering_tests": [
         "center_grants_at_least_two_blades_pl_sp_bp4_003",
@@ -2605,12 +2605,12 @@
       "covering_files": [
         "engine/tests/test_modules/effects/deck_order/restore/both_waitrooms_member_restore_threshold_q242_test.rs",
         "engine/tests/test_modules/effects/gain/hearts/color_choice/paid_heart_color_choice_test.rs",
-        "engine/tests/test_modules/effects/state/characterization_promoted_test.rs",
-        "engine/tests/test_modules/effects/state/kanata_bp1_test.rs",
-        "engine/tests/test_modules/effects/state/kanata_restrict_test.rs",
-        "engine/tests/test_modules/effects/state/konata_bp1_test.rs",
-        "engine/tests/test_modules/effects/state/konata_test.rs",
-        "engine/tests/test_modules/effects/state/self_wait_and_nijigasaki_activation_test.rs",
+        "engine/tests/test_modules/effects/state/per_card/kanata_nijigasaki_appeared_activate_two_energy_test.rs",
+        "engine/tests/test_modules/effects/state/per_card/konata_ability_order_draw_and_activate_energy_test.rs",
+        "engine/tests/test_modules/effects/state/per_card/konata_nijigasaki_debuted_this_turn_activates_energy_test.rs",
+        "engine/tests/test_modules/effects/state/per_card/nijigasaki_bp1_006_promoted_pay_two_draw_one_test.rs",
+        "engine/tests/test_modules/effects/state/wait_activation/kanata_active_phase_restriction_and_live_success_self_wait_test.rs",
+        "engine/tests/test_modules/effects/state/wait_activation/self_wait_and_nijigasaki_activation_test.rs",
         "engine/tests/test_modules/rules/conditions/restriction_mechanics_test.rs"
       ],
       "covering_tests": [
@@ -2677,7 +2677,7 @@
       "covering_files": [
         "engine/tests/test_modules/characterization/zero_tested_action_types_test.rs",
         "engine/tests/test_modules/effects/compound/live_start_waited_opponent_count_group_member_topdeck_test.rs",
-        "engine/tests/test_modules/effects/conditional/discard_group_look_four_or_recover_live_test.rs",
+        "engine/tests/test_modules/effects/conditional/state_gated/discard_group_look_four_or_recover_live_test.rs",
         "engine/tests/test_modules/effects/gain/blades/per_card/q46_kanako_all_heart_timing_test.rs"
       ],
       "covering_tests": [
@@ -2817,7 +2817,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/cost_mod/distinct_group_activation_discount_q228_test.rs",
+        "engine/tests/test_modules/effects/cost_mod/activation_discount/distinct_group_activation_discount_q228_test.rs",
         "engine/tests/test_modules/effects/recover/to_hand/total_energy_gated_live_recovery_test.rs"
       ],
       "covering_tests": [
@@ -3196,7 +3196,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/cost_mod/play_time_three_named_member_discard_cost_ten_test.rs",
+        "engine/tests/test_modules/effects/cost_mod/activation_discount/play_time_three_named_member_discard_cost_ten_test.rs",
         "engine/tests/test_modules/effects/draw/conditional/revealed_live_hand_threshold_draw_test.rs",
         "engine/tests/test_modules/jidou/yell/live_reveal_hand_limit_draw_test.rs"
       ],
@@ -3258,7 +3258,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/cost_mod/play_time_three_named_member_discard_cost_ten_test.rs",
+        "engine/tests/test_modules/effects/cost_mod/activation_discount/play_time_three_named_member_discard_cost_ten_test.rs",
         "engine/tests/test_modules/effects/draw/conditional/revealed_live_hand_threshold_draw_test.rs",
         "engine/tests/test_modules/jidou/yell/live_reveal_hand_limit_draw_test.rs"
       ],
@@ -3319,9 +3319,9 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/effects/ability_mod/full_distinct_group_stage_grants_yell_live_score_test.rs",
-        "engine/tests/test_modules/effects/cost_mod/success_zone_high_cost_group_deploy_discount_test.rs",
+        "engine/tests/test_modules/effects/cost_mod/activation_discount/success_zone_high_cost_group_deploy_discount_test.rs",
         "engine/tests/test_modules/effects/deploy/s_bp3_006_cost_ref_test.rs",
-        "engine/tests/test_modules/effects/position/love_wing_bell_test.rs"
+        "engine/tests/test_modules/effects/position/area_gated/success_zone_center_area_mus_member_constant_blade_test.rs"
       ],
       "covering_tests": [
         "all_areas_aqours_diff_names_gains_ability",
@@ -3386,9 +3386,9 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/effects/ability_mod/full_distinct_group_stage_grants_yell_live_score_test.rs",
-        "engine/tests/test_modules/effects/cost_mod/success_zone_high_cost_group_deploy_discount_test.rs",
+        "engine/tests/test_modules/effects/cost_mod/activation_discount/success_zone_high_cost_group_deploy_discount_test.rs",
         "engine/tests/test_modules/effects/deploy/s_bp3_006_cost_ref_test.rs",
-        "engine/tests/test_modules/effects/position/love_wing_bell_test.rs"
+        "engine/tests/test_modules/effects/position/area_gated/success_zone_center_area_mus_member_constant_blade_test.rs"
       ],
       "covering_tests": [
         "all_areas_aqours_diff_names_gains_ability",
@@ -3455,7 +3455,7 @@
         "engine/tests/test_modules/characterization/bytecode_validation_test.rs",
         "engine/tests/test_modules/characterization/decode_audit_behavior_pins_test.rs",
         "engine/tests/test_modules/characterization/zero_tested_action_types_test.rs",
-        "engine/tests/test_modules/effects/conditional/kanon_invalidate_test.rs",
+        "engine/tests/test_modules/effects/conditional/per_card/kanon_debut_invalidate_recovers_discard_card_test.rs",
         "engine/tests/test_modules/integration/parser_issues_e2e_part2_test.rs",
         "engine/tests/test_modules/integration/parser_issues_e2e_test.rs"
       ],
@@ -3659,7 +3659,7 @@
       "has_choice": true,
       "has_negative": false,
       "covering_files": [
-        "engine/tests/test_modules/effects/state/either_or_state_change_test.rs"
+        "engine/tests/test_modules/effects/state/per_card/either_or_state_change_test.rs"
       ],
       "covering_tests": [
         "chisato_bp5003_live_start_activates_all_members_and_energy",
@@ -3765,8 +3765,8 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/cost_mod/modify_required_hearts_global_test.rs",
-        "engine/tests/test_modules/effects/cost_mod/wien_yell_count_test.rs",
+        "engine/tests/test_modules/effects/cost_mod/per_card/wien_yell_count_test.rs",
+        "engine/tests/test_modules/effects/cost_mod/required_hearts/modify_required_hearts_global_test.rs",
         "engine/tests/test_modules/effects/gain/hearts/per_card/q127_heart_set_plus_global_test.rs",
         "engine/tests/test_modules/effects/score/dream_with_you_test.rs",
         "engine/tests/test_modules/integration/gameplay_test.rs"
@@ -3833,8 +3833,8 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/cost_mod/modify_required_hearts_global_test.rs",
-        "engine/tests/test_modules/effects/cost_mod/wien_yell_count_test.rs",
+        "engine/tests/test_modules/effects/cost_mod/per_card/wien_yell_count_test.rs",
+        "engine/tests/test_modules/effects/cost_mod/required_hearts/modify_required_hearts_global_test.rs",
         "engine/tests/test_modules/effects/gain/hearts/per_card/q127_heart_set_plus_global_test.rs",
         "engine/tests/test_modules/effects/score/dream_with_you_test.rs",
         "engine/tests/test_modules/integration/gameplay_test.rs"
@@ -5075,7 +5075,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/position/position_change_non_optional_test.rs"
+        "engine/tests/test_modules/effects/position/area_move/position_change_non_optional_test.rs"
       ],
       "covering_tests": [
         "exclude_position_and_exclude_self_combine_correctly",
@@ -5118,7 +5118,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/position/position_change_non_optional_test.rs"
+        "engine/tests/test_modules/effects/position/area_move/position_change_non_optional_test.rs"
       ],
       "covering_tests": [
         "exclude_position_and_exclude_self_combine_correctly",
@@ -5161,7 +5161,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/position/position_change_non_optional_test.rs"
+        "engine/tests/test_modules/effects/position/area_move/position_change_non_optional_test.rs"
       ],
       "covering_tests": [
         "exclude_position_and_exclude_self_combine_correctly",
@@ -5904,7 +5904,7 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/effects/draw/chains/leftside_debut_draw_test.rs",
-        "engine/tests/test_modules/effects/state/rightside_debut_energy_test.rs",
+        "engine/tests/test_modules/effects/state/per_card/pl_sp_bp4_008_rightside_debut_energy_activation_test.rs",
         "engine/tests/test_modules/jidou/movement/chisato_jidou_move_analysis_test.rs"
       ],
       "covering_tests": [
@@ -5947,7 +5947,7 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/effects/draw/chains/leftside_debut_draw_test.rs",
-        "engine/tests/test_modules/effects/state/rightside_debut_energy_test.rs",
+        "engine/tests/test_modules/effects/state/per_card/pl_sp_bp4_008_rightside_debut_energy_activation_test.rs",
         "engine/tests/test_modules/jidou/movement/chisato_jidou_move_analysis_test.rs"
       ],
       "covering_tests": [
@@ -5990,7 +5990,7 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/effects/draw/chains/leftside_debut_draw_test.rs",
-        "engine/tests/test_modules/effects/state/rightside_debut_energy_test.rs",
+        "engine/tests/test_modules/effects/state/per_card/pl_sp_bp4_008_rightside_debut_energy_activation_test.rs",
         "engine/tests/test_modules/jidou/movement/chisato_jidou_move_analysis_test.rs"
       ],
       "covering_tests": [
@@ -6149,7 +6149,7 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/effects/choice/choice_bullet_test.rs",
-        "engine/tests/test_modules/effects/conditional/discard_group_look_four_or_recover_live_test.rs",
+        "engine/tests/test_modules/effects/conditional/state_gated/discard_group_look_four_or_recover_live_test.rs",
         "engine/tests/test_modules/effects/gain/hearts/constants/three_distinct_names_constant_heart03_test.rs",
         "engine/tests/test_modules/effects/gain/hearts/constants/three_distinct_stage_names_constant_heart03_test.rs",
         "engine/tests/test_modules/rules/conditions/multiname_metadata_and_stage_slots_q207_q208_test.rs"
@@ -6206,7 +6206,7 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/effects/choice/choice_bullet_test.rs",
-        "engine/tests/test_modules/effects/conditional/discard_group_look_four_or_recover_live_test.rs",
+        "engine/tests/test_modules/effects/conditional/state_gated/discard_group_look_four_or_recover_live_test.rs",
         "engine/tests/test_modules/effects/gain/hearts/constants/three_distinct_names_constant_heart03_test.rs",
         "engine/tests/test_modules/effects/gain/hearts/constants/three_distinct_stage_names_constant_heart03_test.rs",
         "engine/tests/test_modules/rules/conditions/multiname_metadata_and_stage_slots_q207_q208_test.rs"
@@ -6262,7 +6262,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/cost_mod/distinct_group_activation_discount_q228_test.rs",
+        "engine/tests/test_modules/effects/cost_mod/activation_discount/distinct_group_activation_discount_q228_test.rs",
         "engine/tests/test_modules/jidou/yell/blade_heartless_member_threshold_all_heart_test.rs",
         "engine/tests/test_modules/rules/trigger_paths/activation_offer_bounded_and_terminates_test.rs"
       ],
@@ -6308,7 +6308,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/cost_mod/distinct_group_activation_discount_q228_test.rs",
+        "engine/tests/test_modules/effects/cost_mod/activation_discount/distinct_group_activation_discount_q228_test.rs",
         "engine/tests/test_modules/jidou/yell/blade_heartless_member_threshold_all_heart_test.rs",
         "engine/tests/test_modules/rules/trigger_paths/activation_offer_bounded_and_terminates_test.rs"
       ],
@@ -6357,7 +6357,7 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/effects/compound/stage_heart02_score_requirement_pl_n_bp5_028_l_test.rs",
-        "engine/tests/test_modules/effects/cost_mod/abilityless_member_play_cost_reduction_test.rs",
+        "engine/tests/test_modules/effects/cost_mod/activation_discount/abilityless_member_play_cost_reduction_test.rs",
         "engine/tests/test_modules/effects/gain/hearts/live_start/live_start_chosen_heart_area_moved_member_test.rs",
         "engine/tests/test_modules/effects/look_select/reveal_to_hand/mirai_ticket_test.rs",
         "engine/tests/test_modules/integration/remaining_quick_test.rs",
@@ -6426,7 +6426,7 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/effects/compound/stage_heart02_score_requirement_pl_n_bp5_028_l_test.rs",
-        "engine/tests/test_modules/effects/cost_mod/abilityless_member_play_cost_reduction_test.rs",
+        "engine/tests/test_modules/effects/cost_mod/activation_discount/abilityless_member_play_cost_reduction_test.rs",
         "engine/tests/test_modules/effects/gain/hearts/live_start/live_start_chosen_heart_area_moved_member_test.rs",
         "engine/tests/test_modules/effects/look_select/reveal_to_hand/mirai_ticket_test.rs",
         "engine/tests/test_modules/integration/remaining_quick_test.rs",
@@ -6494,7 +6494,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/state/riko_bp5_center_cost_equal_test.rs"
+        "engine/tests/test_modules/effects/state/wait_activation/riko_center_gated_live_start_low_blade_opponent_wait_test.rs"
       ],
       "covering_tests": [
         "riko_both_empty_no_trigger",
@@ -6700,7 +6700,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/cost_mod/play_time_three_named_member_discard_cost_ten_test.rs",
+        "engine/tests/test_modules/effects/cost_mod/activation_discount/play_time_three_named_member_discard_cost_ten_test.rs",
         "engine/tests/test_modules/effects/gain/hearts/live_start/live_start_equal_success_counts_heart02_test.rs"
       ],
       "covering_tests": [
@@ -6762,7 +6762,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/cost_mod/play_time_three_named_member_discard_cost_ten_test.rs",
+        "engine/tests/test_modules/effects/cost_mod/activation_discount/play_time_three_named_member_discard_cost_ten_test.rs",
         "engine/tests/test_modules/effects/gain/hearts/live_start/live_start_equal_success_counts_heart02_test.rs"
       ],
       "covering_tests": [
@@ -6826,7 +6826,7 @@
       "covering_files": [
         "engine/tests/test_modules/effects/compound/pl_bp5_012_test.rs",
         "engine/tests/test_modules/effects/compound/shodo_rin_energy_test.rs",
-        "engine/tests/test_modules/effects/conditional/under_card_and_success_live_conditions_test.rs"
+        "engine/tests/test_modules/effects/conditional/zone_source/under_card_and_success_live_conditions_test.rs"
       ],
       "covering_tests": [
         "genki_invalidate_isolated_to_self",
@@ -6883,7 +6883,7 @@
       "covering_files": [
         "engine/tests/test_modules/effects/compound/pl_bp5_012_test.rs",
         "engine/tests/test_modules/effects/compound/shodo_rin_energy_test.rs",
-        "engine/tests/test_modules/effects/conditional/under_card_and_success_live_conditions_test.rs"
+        "engine/tests/test_modules/effects/conditional/zone_source/under_card_and_success_live_conditions_test.rs"
       ],
       "covering_tests": [
         "genki_invalidate_isolated_to_self",
@@ -6979,7 +6979,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/state/sp_bp5_choice_energy_test.rs",
+        "engine/tests/test_modules/effects/state/wait_activation/sp_bp5_choice_energy_test.rs",
         "engine/tests/test_modules/integration/gameplay_test.rs"
       ],
       "covering_tests": [
@@ -7044,7 +7044,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/state/sp_bp5_choice_energy_test.rs",
+        "engine/tests/test_modules/effects/state/wait_activation/sp_bp5_choice_energy_test.rs",
         "engine/tests/test_modules/integration/gameplay_test.rs"
       ],
       "covering_tests": [
@@ -7109,8 +7109,8 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/conditional/keke_bp5_test.rs",
-        "engine/tests/test_modules/effects/conditional/sp_bp5_leftside_cost_test.rs"
+        "engine/tests/test_modules/effects/conditional/per_card/position_gated_left_side_cost_reduction_test.rs",
+        "engine/tests/test_modules/effects/conditional/zone_source/activation_discard_blade_heart_count_condition_test.rs"
       ],
       "covering_tests": [
         "keke_discard_0_no_blade_heart_members",
@@ -7152,7 +7152,7 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/effects/ability_mod/chisato_bp5_test.rs",
-        "engine/tests/test_modules/effects/state/either_or_state_change_test.rs"
+        "engine/tests/test_modules/effects/state/per_card/either_or_state_change_test.rs"
       ],
       "covering_tests": [
         "chisato_bp5003_live_start_activates_all_members_and_energy",
@@ -7198,7 +7198,7 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/effects/ability_mod/chisato_bp5_test.rs",
-        "engine/tests/test_modules/effects/state/either_or_state_change_test.rs"
+        "engine/tests/test_modules/effects/state/per_card/either_or_state_change_test.rs"
       ],
       "covering_tests": [
         "chisato_bp5003_live_start_activates_all_members_and_energy",
@@ -7411,7 +7411,7 @@
       "covering_files": [
         "engine/tests/test_modules/characterization/decode_audit_behavior_pins_test.rs",
         "engine/tests/test_modules/effects/compound/deficit_mill_live_topdeck_pl_n_pr_032_pr_test.rs",
-        "engine/tests/test_modules/effects/cost_mod/baton_arrivals_pl_hs_bp2_023_l_and_pl_hs_bp2_025_l_test.rs",
+        "engine/tests/test_modules/effects/cost_mod/required_hearts/baton_arrivals_required_hearts_reduction_test.rs",
         "engine/tests/test_modules/effects/draw/chains/stage_group_pl_hs_sd1_017_sd_test.rs",
         "engine/tests/test_modules/effects/gain/hearts/live_start/live_start_chosen_heart_area_moved_member_test.rs",
         "engine/tests/test_modules/effects/look_select/reveal_to_hand/revealed_member_cost_gated_recovery_test.rs",
@@ -7482,7 +7482,7 @@
       "covering_files": [
         "engine/tests/test_modules/characterization/decode_audit_behavior_pins_test.rs",
         "engine/tests/test_modules/effects/compound/deficit_mill_live_topdeck_pl_n_pr_032_pr_test.rs",
-        "engine/tests/test_modules/effects/cost_mod/baton_arrivals_pl_hs_bp2_023_l_and_pl_hs_bp2_025_l_test.rs",
+        "engine/tests/test_modules/effects/cost_mod/required_hearts/baton_arrivals_required_hearts_reduction_test.rs",
         "engine/tests/test_modules/effects/draw/chains/stage_group_pl_hs_sd1_017_sd_test.rs",
         "engine/tests/test_modules/effects/gain/hearts/live_start/live_start_chosen_heart_area_moved_member_test.rs",
         "engine/tests/test_modules/effects/look_select/reveal_to_hand/revealed_member_cost_gated_recovery_test.rs",
@@ -7773,8 +7773,8 @@
       "covering_files": [
         "engine/tests/test_modules/characterization/logging_test.rs",
         "engine/tests/test_modules/effects/choice/choice_bullet_test.rs",
-        "engine/tests/test_modules/effects/position/group_only_debut_formation_move_subunit_gain_blades_test.rs",
-        "engine/tests/test_modules/effects/position/self_control_position_change_test.rs",
+        "engine/tests/test_modules/effects/position/area_move/group_only_debut_formation_move_subunit_gain_blades_test.rs",
+        "engine/tests/test_modules/effects/position/area_move/self_control_position_change_test.rs",
         "engine/tests/test_modules/jidou/movement/awaken_the_power_test.rs",
         "engine/tests/test_modules/rules/conditions/qa_rulings_pins_test.rs",
         "engine/tests/test_modules/rules/trigger_paths/ability_combination_test.rs",
@@ -7912,8 +7912,8 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/conditional/discard_group_look_four_or_recover_live_test.rs",
-        "engine/tests/test_modules/effects/conditional/keke_bp5_test.rs",
+        "engine/tests/test_modules/effects/conditional/state_gated/discard_group_look_four_or_recover_live_test.rs",
+        "engine/tests/test_modules/effects/conditional/zone_source/activation_discard_blade_heart_count_condition_test.rs",
         "engine/tests/test_modules/jidou/ability_watch/live_start_resolved_own_center_group_reposition_q255_test.rs",
         "engine/tests/test_modules/jidou/ability_watch/live_success_resolved_moved_own_center_group_gain_live_score_q255_test.rs",
         "engine/tests/test_modules/jidou/ability_watch/resolved_center_member_ability_movement_score_q255_test.rs",
@@ -7974,8 +7974,8 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/conditional/discard_group_look_four_or_recover_live_test.rs",
-        "engine/tests/test_modules/effects/conditional/keke_bp5_test.rs",
+        "engine/tests/test_modules/effects/conditional/state_gated/discard_group_look_four_or_recover_live_test.rs",
+        "engine/tests/test_modules/effects/conditional/zone_source/activation_discard_blade_heart_count_condition_test.rs",
         "engine/tests/test_modules/jidou/ability_watch/live_start_resolved_own_center_group_reposition_q255_test.rs",
         "engine/tests/test_modules/jidou/ability_watch/live_success_resolved_moved_own_center_group_gain_live_score_q255_test.rs",
         "engine/tests/test_modules/jidou/ability_watch/resolved_center_member_ability_movement_score_q255_test.rs",
@@ -8712,7 +8712,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/cost_mod/per_unit_member_cost_reduction_q249_test.rs",
+        "engine/tests/test_modules/effects/cost_mod/activation_discount/per_unit_member_cost_reduction_q249_test.rs",
         "engine/tests/test_modules/effects/restriction/delayed_cannot_active_owner_tick_test.rs",
         "engine/tests/test_modules/rules/conditions/restriction_mechanics_test.rs"
       ],
@@ -8762,7 +8762,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/cost_mod/per_unit_member_cost_reduction_q249_test.rs",
+        "engine/tests/test_modules/effects/cost_mod/activation_discount/per_unit_member_cost_reduction_q249_test.rs",
         "engine/tests/test_modules/effects/restriction/delayed_cannot_active_owner_tick_test.rs",
         "engine/tests/test_modules/rules/conditions/restriction_mechanics_test.rs"
       ],
@@ -8812,7 +8812,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/cost_mod/per_unit_member_cost_reduction_q249_test.rs",
+        "engine/tests/test_modules/effects/cost_mod/activation_discount/per_unit_member_cost_reduction_q249_test.rs",
         "engine/tests/test_modules/effects/restriction/delayed_cannot_active_owner_tick_test.rs",
         "engine/tests/test_modules/rules/conditions/restriction_mechanics_test.rs"
       ],
@@ -8984,7 +8984,7 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/effects/compound/discard_two_self_and_other_group_debut_retrigger_test.rs",
-        "engine/tests/test_modules/effects/conditional/chika_bp7_conditional_result_test.rs",
+        "engine/tests/test_modules/effects/conditional/per_card/chika_debut_result_character_condition_test.rs",
         "engine/tests/test_modules/effects/gain/blades/per_card/q273_fired_debut_ability_cost_paid_test.rs",
         "engine/tests/test_modules/effects/gain/blades/under_member/bp7_watanabe_under_card_blade_test.rs",
         "engine/tests/test_modules/effects/gain/blades/under_member/member_under_aqours_constant_blade_test.rs"
@@ -9038,7 +9038,7 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/effects/compound/discard_two_self_and_other_group_debut_retrigger_test.rs",
-        "engine/tests/test_modules/effects/conditional/chika_bp7_conditional_result_test.rs",
+        "engine/tests/test_modules/effects/conditional/per_card/chika_debut_result_character_condition_test.rs",
         "engine/tests/test_modules/effects/gain/blades/per_card/q273_fired_debut_ability_cost_paid_test.rs",
         "engine/tests/test_modules/effects/gain/blades/under_member/bp7_watanabe_under_card_blade_test.rs",
         "engine/tests/test_modules/effects/gain/blades/under_member/member_under_aqours_constant_blade_test.rs"
@@ -9092,7 +9092,7 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/effects/compound/discard_two_self_and_other_group_debut_retrigger_test.rs",
-        "engine/tests/test_modules/effects/conditional/chika_bp7_conditional_result_test.rs",
+        "engine/tests/test_modules/effects/conditional/per_card/chika_debut_result_character_condition_test.rs",
         "engine/tests/test_modules/effects/gain/blades/per_card/q273_fired_debut_ability_cost_paid_test.rs",
         "engine/tests/test_modules/effects/gain/blades/under_member/bp7_watanabe_under_card_blade_test.rs",
         "engine/tests/test_modules/effects/gain/blades/under_member/member_under_aqours_constant_blade_test.rs"
@@ -9146,7 +9146,7 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/effects/compound/discard_two_self_and_other_group_debut_retrigger_test.rs",
-        "engine/tests/test_modules/effects/conditional/pl_s_bp7_007_test.rs"
+        "engine/tests/test_modules/effects/conditional/per_card/hanamaru_debut_result_character_deploy_test.rs"
       ],
       "covering_tests": [
         "discard_two_debut_retrigger_offers_count_two_selection",
@@ -9189,7 +9189,7 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/effects/compound/discard_two_self_and_other_group_debut_retrigger_test.rs",
-        "engine/tests/test_modules/effects/conditional/pl_s_bp7_007_test.rs"
+        "engine/tests/test_modules/effects/conditional/per_card/hanamaru_debut_result_character_deploy_test.rs"
       ],
       "covering_tests": [
         "discard_two_debut_retrigger_offers_count_two_selection",
@@ -9369,8 +9369,8 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/conditional/bp7_kanata_choice_test.rs",
-        "engine/tests/test_modules/effects/state/ability_index_execution_test.rs"
+        "engine/tests/test_modules/effects/conditional/zone_source/discard_placed_group_live_or_blade_condition_test.rs",
+        "engine/tests/test_modules/effects/state/per_card/ability_index_execution_test.rs"
       ],
       "covering_tests": [
         "execute_action_honors_ability_index_for_dual_activation_member",
@@ -9414,8 +9414,8 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/conditional/bp7_kanata_choice_test.rs",
-        "engine/tests/test_modules/effects/state/ability_index_execution_test.rs"
+        "engine/tests/test_modules/effects/conditional/zone_source/discard_placed_group_live_or_blade_condition_test.rs",
+        "engine/tests/test_modules/effects/state/per_card/ability_index_execution_test.rs"
       ],
       "covering_tests": [
         "execute_action_honors_ability_index_for_dual_activation_member",
@@ -9459,7 +9459,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/conditional/bp7_kanata_choice_test.rs",
+        "engine/tests/test_modules/effects/conditional/zone_source/discard_placed_group_live_or_blade_condition_test.rs",
         "engine/tests/test_modules/effects/gain/hearts/constants/per_under_member_energy_constant_heart_test.rs",
         "engine/tests/test_modules/effects/gain/hearts/constants/setsuna_under_member_and_energy_over_six_constant_hearts_test.rs",
         "engine/tests/test_modules/effects/gain/hearts/live_start/live_start_discard_shuffle_group_members_heart01_test.rs"
@@ -9526,7 +9526,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/conditional/bp7_kanata_choice_test.rs",
+        "engine/tests/test_modules/effects/conditional/zone_source/discard_placed_group_live_or_blade_condition_test.rs",
         "engine/tests/test_modules/effects/gain/hearts/constants/per_under_member_energy_constant_heart_test.rs",
         "engine/tests/test_modules/effects/gain/hearts/constants/setsuna_under_member_and_energy_over_six_constant_hearts_test.rs",
         "engine/tests/test_modules/effects/gain/hearts/live_start/live_start_discard_shuffle_group_members_heart01_test.rs"
@@ -9593,7 +9593,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/conditional/bp7_kanata_choice_test.rs",
+        "engine/tests/test_modules/effects/conditional/zone_source/discard_placed_group_live_or_blade_condition_test.rs",
         "engine/tests/test_modules/effects/gain/hearts/constants/per_under_member_energy_constant_heart_test.rs",
         "engine/tests/test_modules/effects/gain/hearts/constants/setsuna_under_member_and_energy_over_six_constant_hearts_test.rs",
         "engine/tests/test_modules/effects/gain/hearts/live_start/live_start_discard_shuffle_group_members_heart01_test.rs"
@@ -9661,7 +9661,7 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/characterization/bytecode_validation_test.rs",
-        "engine/tests/test_modules/effects/cost_mod/shuffle_waitroom_members_optional_play_discount_test.rs",
+        "engine/tests/test_modules/effects/cost_mod/activation_discount/shuffle_waitroom_members_optional_play_discount_test.rs",
         "engine/tests/test_modules/jidou/discard_watch/deck_to_discard_optional_hand_discard_recover_self_test.rs",
         "engine/tests/test_modules/jidou/discard_watch/deck_to_discard_self_recovery_yell_refresh_q269_q277_test.rs",
         "engine/tests/test_modules/jidou/discard_watch/real_mill_optional_discard_recover_self_test.rs"
@@ -9732,7 +9732,7 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/characterization/bytecode_validation_test.rs",
-        "engine/tests/test_modules/effects/cost_mod/shuffle_waitroom_members_optional_play_discount_test.rs",
+        "engine/tests/test_modules/effects/cost_mod/activation_discount/shuffle_waitroom_members_optional_play_discount_test.rs",
         "engine/tests/test_modules/jidou/discard_watch/deck_to_discard_optional_hand_discard_recover_self_test.rs",
         "engine/tests/test_modules/jidou/discard_watch/deck_to_discard_self_recovery_yell_refresh_q269_q277_test.rs",
         "engine/tests/test_modules/jidou/discard_watch/real_mill_optional_discard_recover_self_test.rs"
@@ -9800,7 +9800,7 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/characterization/bytecode_validation_test.rs",
-        "engine/tests/test_modules/effects/cost_mod/shuffle_waitroom_members_optional_play_discount_test.rs",
+        "engine/tests/test_modules/effects/cost_mod/activation_discount/shuffle_waitroom_members_optional_play_discount_test.rs",
         "engine/tests/test_modules/jidou/discard_watch/deck_to_discard_optional_hand_discard_recover_self_test.rs",
         "engine/tests/test_modules/jidou/discard_watch/deck_to_discard_self_recovery_yell_refresh_q269_q277_test.rs",
         "engine/tests/test_modules/jidou/discard_watch/real_mill_optional_discard_recover_self_test.rs"
@@ -10238,7 +10238,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/state/bp7_q280_energy_do_not_activate_test.rs"
+        "engine/tests/test_modules/effects/state/per_card/bp7_q280_energy_do_not_activate_test.rs"
       ],
       "covering_tests": [
         "q280_active_phase_excludes_flagged_energy",
@@ -10278,7 +10278,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/state/bp7_q280_energy_do_not_activate_test.rs"
+        "engine/tests/test_modules/effects/state/per_card/bp7_q280_energy_do_not_activate_test.rs"
       ],
       "covering_tests": [
         "q280_active_phase_excludes_flagged_energy",
@@ -10318,7 +10318,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/state/bp7_q280_energy_do_not_activate_test.rs"
+        "engine/tests/test_modules/effects/state/per_card/bp7_q280_energy_do_not_activate_test.rs"
       ],
       "covering_tests": [
         "q280_active_phase_excludes_flagged_energy",
@@ -10425,7 +10425,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/conditional/sp_bp2_004_highest_cost_edge_test.rs",
+        "engine/tests/test_modules/effects/conditional/state_gated/center_highest_cost_constant_heart_tie_test.rs",
         "engine/tests/test_modules/effects/gain/hearts/constants/center_highest_cost_constant_heart03_edges_test.rs",
         "engine/tests/test_modules/effects/gain/hearts/constants/center_highest_cost_constant_heart03_test.rs",
         "engine/tests/test_modules/integration/gameplay_test.rs"
@@ -10862,7 +10862,7 @@
         "engine/tests/test_modules/effects/look_select/reveal_to_hand/revealed_distinct_liella_live_retrieval_test.rs",
         "engine/tests/test_modules/effects/recover/to_hand/optional_discard_subunit_recovery_test.rs",
         "engine/tests/test_modules/effects/score/revealed_distinct_liella_score_test.rs",
-        "engine/tests/test_modules/effects/state/bp7_q266_natsumi_blade_wait_test.rs",
+        "engine/tests/test_modules/effects/state/per_card/bp7_q266_natsumi_blade_wait_test.rs",
         "engine/tests/test_modules/rules/baton/chisato_natsumi_test.rs",
         "engine/tests/test_modules/rules/baton/double_baton_touch_draw_deploy_q193_q194_test.rs"
       ],
@@ -10930,8 +10930,8 @@
         "engine/tests/test_modules/characterization/zero_tested_action_types_test.rs",
         "engine/tests/test_modules/effects/compound/ability_engine_fixes_test.rs",
         "engine/tests/test_modules/effects/compound/bp2_006_kinako_baton_recovery_test.rs",
-        "engine/tests/test_modules/effects/conditional/sp_bp2_004_comprehensive_edge_test.rs",
-        "engine/tests/test_modules/effects/conditional/sp_bp2_004_highest_cost_edge_test.rs",
+        "engine/tests/test_modules/effects/conditional/state_gated/center_highest_cost_constant_heart_edges_test.rs",
+        "engine/tests/test_modules/effects/conditional/state_gated/center_highest_cost_constant_heart_tie_test.rs",
         "engine/tests/test_modules/effects/gain/hearts/constants/center_highest_cost_constant_heart03_edges_test.rs",
         "engine/tests/test_modules/effects/gain/hearts/constants/center_highest_cost_constant_heart03_test.rs",
         "engine/tests/test_modules/effects/live_start/dazzling_game_test.rs",
@@ -10940,7 +10940,7 @@
         "engine/tests/test_modules/effects/recover/to_hand/self_to_waitroom_liella_recovery_test.rs",
         "engine/tests/test_modules/effects/score/nonfiction_cost_comparison_test.rs",
         "engine/tests/test_modules/effects/score/revealed_distinct_liella_score_test.rs",
-        "engine/tests/test_modules/effects/state/bp7_q266_natsumi_blade_wait_test.rs",
+        "engine/tests/test_modules/effects/state/per_card/bp7_q266_natsumi_blade_wait_test.rs",
         "engine/tests/test_modules/rules/conditions/condition_evaluation_test.rs"
       ],
       "covering_tests": [
@@ -11007,8 +11007,8 @@
         "engine/tests/test_modules/characterization/zero_tested_action_types_test.rs",
         "engine/tests/test_modules/effects/compound/ability_engine_fixes_test.rs",
         "engine/tests/test_modules/effects/compound/bp2_006_kinako_baton_recovery_test.rs",
-        "engine/tests/test_modules/effects/conditional/sp_bp2_004_comprehensive_edge_test.rs",
-        "engine/tests/test_modules/effects/conditional/sp_bp2_004_highest_cost_edge_test.rs",
+        "engine/tests/test_modules/effects/conditional/state_gated/center_highest_cost_constant_heart_edges_test.rs",
+        "engine/tests/test_modules/effects/conditional/state_gated/center_highest_cost_constant_heart_tie_test.rs",
         "engine/tests/test_modules/effects/gain/hearts/constants/center_highest_cost_constant_heart03_edges_test.rs",
         "engine/tests/test_modules/effects/gain/hearts/constants/center_highest_cost_constant_heart03_test.rs",
         "engine/tests/test_modules/effects/live_start/dazzling_game_test.rs",
@@ -11017,7 +11017,7 @@
         "engine/tests/test_modules/effects/recover/to_hand/self_to_waitroom_liella_recovery_test.rs",
         "engine/tests/test_modules/effects/score/nonfiction_cost_comparison_test.rs",
         "engine/tests/test_modules/effects/score/revealed_distinct_liella_score_test.rs",
-        "engine/tests/test_modules/effects/state/bp7_q266_natsumi_blade_wait_test.rs",
+        "engine/tests/test_modules/effects/state/per_card/bp7_q266_natsumi_blade_wait_test.rs",
         "engine/tests/test_modules/rules/conditions/condition_evaluation_test.rs"
       ],
       "covering_tests": [
@@ -11083,16 +11083,16 @@
       "covering_files": [
         "engine/tests/test_modules/effects/choice/mill_or_wait_pl_hs_cl1_004_cl_test.rs",
         "engine/tests/test_modules/effects/choice/tang_keke_test.rs",
-        "engine/tests/test_modules/effects/cost_mod/abilityless_member_play_cost_reduction_test.rs",
-        "engine/tests/test_modules/effects/cost_mod/jellyfish_test.rs",
+        "engine/tests/test_modules/effects/cost_mod/activation_discount/abilityless_member_play_cost_reduction_test.rs",
+        "engine/tests/test_modules/effects/cost_mod/required_hearts/jellyfish_appeared_moved_member_required_hearts_test.rs",
         "engine/tests/test_modules/effects/draw/flat/higher_cost_member_live_success_draw_test.rs",
         "engine/tests/test_modules/effects/draw/flat/optional_energy_catchu_trio_draw_sumire_bp7_015_n_test.rs",
         "engine/tests/test_modules/effects/look_select/reveal_to_hand/debut_look_liella_cost4_hand_or_debut_test.rs",
         "engine/tests/test_modules/effects/recover/to_hand/distinct_trio_reveals_pl_sp_bp2_025_l_test.rs",
         "engine/tests/test_modules/effects/recover/to_hand/tied_score_reveals_pl_hs_cl1_012_cl_test.rs",
-        "engine/tests/test_modules/effects/state/all_liella_gated_opponent_wait_test.rs",
-        "engine/tests/test_modules/effects/state/bp7_q266_natsumi_blade_wait_test.rs",
-        "engine/tests/test_modules/effects/state/debut_low_cost_opponent_wait_test.rs",
+        "engine/tests/test_modules/effects/state/per_card/bp7_q266_natsumi_blade_wait_test.rs",
+        "engine/tests/test_modules/effects/state/wait_activation/all_liella_gated_opponent_wait_test.rs",
+        "engine/tests/test_modules/effects/state/wait_activation/debut_low_cost_opponent_wait_test.rs",
         "engine/tests/test_modules/integration/cross_player_round5_test.rs",
         "engine/tests/test_modules/rules/baton/chika_bp5_001_no_ability_baton_touch_draw_test.rs"
       ],
@@ -11208,8 +11208,8 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/effects/compound/boosted_miraku_draw_and_need_heart_reduction_test.rs",
-        "engine/tests/test_modules/effects/cost_mod/per_unit_member_cost_reduction_q249_test.rs",
-        "engine/tests/test_modules/effects/cost_mod/play_time_three_named_member_discard_cost_ten_test.rs",
+        "engine/tests/test_modules/effects/cost_mod/activation_discount/per_unit_member_cost_reduction_q249_test.rs",
+        "engine/tests/test_modules/effects/cost_mod/activation_discount/play_time_three_named_member_discard_cost_ten_test.rs",
         "engine/tests/test_modules/effects/draw/chains/card_ability_test.rs",
         "engine/tests/test_modules/effects/draw/flat/distinct_draw_regression_test.rs",
         "engine/tests/test_modules/effects/draw/flat/dream_believers_test.rs",
@@ -11287,8 +11287,8 @@
       "covering_files": [
         "engine/tests/test_modules/characterization/strict_engine_bug_expected_fail_test.rs",
         "engine/tests/test_modules/effects/compound/boosted_miraku_draw_and_need_heart_reduction_test.rs",
-        "engine/tests/test_modules/effects/conditional/sp_bp2_004_comprehensive_edge_test.rs",
-        "engine/tests/test_modules/effects/cost_mod/per_unit_member_cost_reduction_q249_test.rs",
+        "engine/tests/test_modules/effects/conditional/state_gated/center_highest_cost_constant_heart_edges_test.rs",
+        "engine/tests/test_modules/effects/cost_mod/activation_discount/per_unit_member_cost_reduction_q249_test.rs",
         "engine/tests/test_modules/effects/gain/hearts/constants/center_highest_cost_constant_heart03_edges_test.rs",
         "engine/tests/test_modules/effects/gain/hearts/constants/center_highest_cost_constant_heart03_test.rs",
         "engine/tests/test_modules/effects/gain/hearts/per_card/hasunosora_live_start_waitroom_ten_heart04_gain_test.rs",
@@ -11483,9 +11483,9 @@
         "engine/tests/test_modules/effects/ability_mod/full_distinct_group_stage_grants_yell_live_score_test.rs",
         "engine/tests/test_modules/effects/ability_mod/rina_gain_live_success_from_under_member_test.rs",
         "engine/tests/test_modules/effects/compound/shioriko_bp4_swap_test.rs",
-        "engine/tests/test_modules/effects/conditional/debut_reveal_success_zone_replacement_q256_test.rs",
-        "engine/tests/test_modules/effects/conditional/live_phase_success_zone_replacement_q256_test.rs",
-        "engine/tests/test_modules/effects/cost_mod/success_zone_group_pl_n_sd2_003_sd2_test.rs",
+        "engine/tests/test_modules/effects/conditional/zone_source/debut_reveal_success_zone_replacement_q256_test.rs",
+        "engine/tests/test_modules/effects/conditional/zone_source/live_phase_success_zone_replacement_q256_test.rs",
+        "engine/tests/test_modules/effects/cost_mod/activation_discount/success_zone_group_member_play_discount_test.rs",
         "engine/tests/test_modules/effects/deck_order/restore/optional_waitroom_to_deck_top_test.rs",
         "engine/tests/test_modules/effects/draw/conditional/success_zone_group_pl_bp6_023_l_test.rs",
         "engine/tests/test_modules/effects/draw/flat/success_zone_group_live_success_draw_test.rs",
@@ -11795,7 +11795,7 @@
         "engine/tests/test_modules/effects/compound/live_start_bottom_one_mill_live_heart_source_test.rs",
         "engine/tests/test_modules/effects/compound/live_start_bottom_three_mill_all_group_heart_test.rs",
         "engine/tests/test_modules/effects/compound/live_start_optional_bottom_mill_named_recovery_source_test.rs",
-        "engine/tests/test_modules/effects/conditional/kanon_invalidate_test.rs",
+        "engine/tests/test_modules/effects/conditional/per_card/kanon_debut_invalidate_recovers_discard_card_test.rs",
         "engine/tests/test_modules/effects/gain/blades/under_member/bp7_under_member_per_unit_blade_test.rs",
         "engine/tests/test_modules/integration/parser_issues_e2e_part2_test.rs",
         "engine/tests/test_modules/integration/parser_issues_e2e_test.rs"
@@ -11861,7 +11861,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/conditional/keke_bp5_test.rs"
+        "engine/tests/test_modules/effects/conditional/zone_source/activation_discard_blade_heart_count_condition_test.rs"
       ],
       "covering_tests": [
         "keke_discard_0_no_blade_heart_members",
@@ -11898,7 +11898,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/cost_mod/jellyfish_test.rs"
+        "engine/tests/test_modules/effects/cost_mod/required_hearts/jellyfish_appeared_moved_member_required_hearts_test.rs"
       ],
       "covering_tests": [
         "jellyfish_member_moved_by_position_change_without_appearing_this_turn_counts",
@@ -12023,7 +12023,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/cost_mod/hanamusubi_exclude_self_test.rs",
+        "engine/tests/test_modules/effects/cost_mod/required_hearts/hanamusubi_required_hearts_exclude_self_test.rs",
         "engine/tests/test_modules/effects/draw/flat/dollchestra_live_zone_gated_draw_test.rs",
         "engine/tests/test_modules/effects/gain/hearts/live_start/live_start_four_heart02_required_gain_heart02_test.rs",
         "engine/tests/test_modules/effects/look_select/reveal_to_hand/discard_filtered_look_pl_n_bp3_012_r_pl_hs_bp1_011_pr_test.rs",
@@ -12727,14 +12727,14 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/effects/compound/deficit_mill_live_topdeck_pl_n_pr_032_pr_test.rs",
-        "engine/tests/test_modules/effects/cost_mod/distinct_group_activation_discount_q228_test.rs",
+        "engine/tests/test_modules/effects/cost_mod/activation_discount/distinct_group_activation_discount_q228_test.rs",
         "engine/tests/test_modules/effects/draw/flat/stage_member_identity_and_cost_gated_draw_test.rs",
         "engine/tests/test_modules/effects/gain/blades/constants/energy_count_and_stage_cost_constant_blade_test.rs",
         "engine/tests/test_modules/effects/gain/blades/constants/higher_cost_member_pl_hs_bp2_002_r_plus_test.rs",
         "engine/tests/test_modules/effects/gain/hearts/color_choice/paid_heart_color_choice_test.rs",
         "engine/tests/test_modules/effects/recover/to_hand/cost_two_members_pl_hs_bp2_002_r_plus_test.rs",
         "engine/tests/test_modules/effects/recover/to_hand/optional_energy_saint_snow_recovery_and_blades_test.rs",
-        "engine/tests/test_modules/effects/state/cost_and_blade_filtered_opponent_wait_test.rs",
+        "engine/tests/test_modules/effects/state/wait_activation/cost_and_blade_filtered_opponent_wait_test.rs",
         "engine/tests/test_modules/integration/gameplay_test.rs",
         "engine/tests/test_modules/rules/conditions/restriction_mechanics_test.rs"
       ],
@@ -12932,7 +12932,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/state/live_start_wait_filters_pl_n_bp5_004_r_pl_sp_pr_021_pr_test.rs",
+        "engine/tests/test_modules/effects/state/wait_activation/live_start_wait_filters_pl_n_bp5_004_r_pl_sp_pr_021_pr_test.rs",
         "engine/tests/test_modules/integration/integration_blindspot_test.rs"
       ],
       "covering_tests": [
@@ -12971,7 +12971,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/state/kanata_restrict_test.rs"
+        "engine/tests/test_modules/effects/state/wait_activation/kanata_active_phase_restriction_and_live_success_self_wait_test.rs"
       ],
       "covering_tests": [
         "kanata_can_be_activated_by_effect",
@@ -13009,7 +13009,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/state/kanata_restrict_test.rs"
+        "engine/tests/test_modules/effects/state/wait_activation/kanata_active_phase_restriction_and_live_success_self_wait_test.rs"
       ],
       "covering_tests": [
         "kanata_can_be_activated_by_effect",
@@ -13047,7 +13047,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/state/emma_bp5_test.rs"
+        "engine/tests/test_modules/effects/state/per_card/emma_place_energy_under_self_then_activate_two_test.rs"
       ],
       "covering_tests": [
         "emma_bp5_q215_no_energy_cost_fails_gracefully",
@@ -13259,11 +13259,11 @@
         "engine/tests/test_modules/effects/compound/deficit_mill_live_topdeck_pl_n_pr_032_pr_test.rs",
         "engine/tests/test_modules/effects/draw/conditional/area_moved_pl_sp_sd2_003_sd2_test.rs",
         "engine/tests/test_modules/effects/gain/blades/live_start/live_start_center_liella_set_blade_three_test.rs",
-        "engine/tests/test_modules/effects/position/auto_system_stress_test.rs",
-        "engine/tests/test_modules/effects/position/mill_three_self_position_change_q104_q234_test.rs",
-        "engine/tests/test_modules/effects/position/position_change_condition_test.rs",
-        "engine/tests/test_modules/effects/position/position_change_non_optional_test.rs",
-        "engine/tests/test_modules/effects/position/position_change_triggers_jidou_move_test.rs",
+        "engine/tests/test_modules/effects/position/area_gated/center_area_syncrise_member_constant_blade_gain_test.rs",
+        "engine/tests/test_modules/effects/position/area_move/area_move_triggered_auto_ability_stress_test.rs",
+        "engine/tests/test_modules/effects/position/area_move/position_change_non_optional_test.rs",
+        "engine/tests/test_modules/effects/position/area_move/position_change_triggers_jidou_move_test.rs",
+        "engine/tests/test_modules/effects/position/per_card/mill_three_self_position_change_q104_q234_test.rs",
         "engine/tests/test_modules/jidou/energy_watch/own_effect_self_move_or_energy_placed_draw_heart02_test.rs",
         "engine/tests/test_modules/jidou/movement/appearance_and_repeated_swaps_stack_blades_test.rs",
         "engine/tests/test_modules/jidou/movement/chisato_jidou_move_analysis_test.rs",
@@ -13462,7 +13462,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/position/wien_bp5_test.rs"
+        "engine/tests/test_modules/effects/position/area_move/wien_bp5_test.rs"
       ],
       "covering_tests": [
         "wien_bp5_q223_both_centers_empty_no_moves",
@@ -13608,7 +13608,7 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/characterization/prohibition_layer_characterization_test.rs",
-        "engine/tests/test_modules/effects/cost_mod/baton_arrivals_pl_hs_bp2_023_l_and_pl_hs_bp2_025_l_test.rs",
+        "engine/tests/test_modules/effects/cost_mod/required_hearts/baton_arrivals_required_hearts_reduction_test.rs",
         "engine/tests/test_modules/effects/draw/flat/higher_cost_member_live_success_draw_test.rs",
         "engine/tests/test_modules/effects/gain/blades/live_start/debut_and_live_start_blade_grant_test.rs",
         "engine/tests/test_modules/effects/gain/blades/live_start/live_start_high_cost_hasunosora_member_blades_test.rs",
@@ -13725,7 +13725,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/cost_mod/baton_arrivals_pl_hs_bp2_023_l_and_pl_hs_bp2_025_l_test.rs",
+        "engine/tests/test_modules/effects/cost_mod/required_hearts/baton_arrivals_required_hearts_reduction_test.rs",
         "engine/tests/test_modules/effects/gain/hearts/live_start/live_start_discarded_group_member_heart01_test.rs",
         "engine/tests/test_modules/effects/gain/hearts/live_start/live_start_same_group_pair_cost_heart01_test.rs"
       ],
@@ -14078,13 +14078,13 @@
         "engine/tests/test_modules/effects/compound/reveal_live_opponent_discard_or_four_blades_test.rs",
         "engine/tests/test_modules/effects/compound/success_score_required_heart_and_score_pl_bp4_021_l_test.rs",
         "engine/tests/test_modules/effects/compound/toubatsu_test.rs",
-        "engine/tests/test_modules/effects/conditional/conditional_alternative_test.rs",
-        "engine/tests/test_modules/effects/conditional/discard_group_look_four_or_recover_live_test.rs",
-        "engine/tests/test_modules/effects/conditional/kanon_invalidate_test.rs",
-        "engine/tests/test_modules/effects/cost_mod/hanamusubi_exclude_self_test.rs",
-        "engine/tests/test_modules/effects/cost_mod/modify_required_hearts_global_test.rs",
-        "engine/tests/test_modules/effects/cost_mod/pl_s_bp5_010_test.rs",
-        "engine/tests/test_modules/effects/cost_mod/success_zone_stage_cost_deploy_energy_test.rs",
+        "engine/tests/test_modules/effects/conditional/per_card/kanon_debut_invalidate_recovers_discard_card_test.rs",
+        "engine/tests/test_modules/effects/conditional/state_gated/discard_group_look_four_or_recover_live_test.rs",
+        "engine/tests/test_modules/effects/conditional/zone_source/success_zone_live_card_count_alternative_test.rs",
+        "engine/tests/test_modules/effects/cost_mod/per_card/success_zone_stage_cost_deploy_energy_test.rs",
+        "engine/tests/test_modules/effects/cost_mod/required_hearts/hanamusubi_required_hearts_exclude_self_test.rs",
+        "engine/tests/test_modules/effects/cost_mod/required_hearts/modify_required_hearts_global_test.rs",
+        "engine/tests/test_modules/effects/cost_mod/required_hearts/rina_debut_opponent_live_card_heart_increase_test.rs",
         "engine/tests/test_modules/effects/deck_order/restore/both_waitrooms_member_restore_threshold_q242_test.rs",
         "engine/tests/test_modules/effects/deck_order/restore/optional_waitroom_to_deck_top_test.rs",
         "engine/tests/test_modules/effects/deck_order/restore/s_bp2_021_live_success_test.rs",
@@ -14140,10 +14140,10 @@
         "engine/tests/test_modules/effects/score/shizuku_bp4_aggregate_test.rs",
         "engine/tests/test_modules/effects/score/stellar_phoenix_test.rs",
         "engine/tests/test_modules/effects/score/success_count_revealed_score_live_pl_sp_bp5_023_l_test.rs",
-        "engine/tests/test_modules/effects/state/bp7_sd2_gap_test.rs",
-        "engine/tests/test_modules/effects/state/butterfly_wing_suppress_test.rs",
-        "engine/tests/test_modules/effects/state/kanata_restrict_test.rs",
-        "engine/tests/test_modules/effects/state/live_start_wait_filters_pl_n_bp5_004_r_pl_sp_pr_021_pr_test.rs",
+        "engine/tests/test_modules/effects/state/per_card/butterfly_wing_suppress_test.rs",
+        "engine/tests/test_modules/effects/state/per_card/sd2_nijigasaki_abilities_gap_test.rs",
+        "engine/tests/test_modules/effects/state/wait_activation/kanata_active_phase_restriction_and_live_success_self_wait_test.rs",
+        "engine/tests/test_modules/effects/state/wait_activation/live_start_wait_filters_pl_n_bp5_004_r_pl_sp_pr_021_pr_test.rs",
         "engine/tests/test_modules/integration/gameplay_test.rs",
         "engine/tests/test_modules/integration/parser_issues_e2e_part2_test.rs",
         "engine/tests/test_modules/integration/parser_issues_e2e_part3_test.rs",
@@ -14225,11 +14225,11 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/cost_mod/modify_required_hearts_exclude_heart_test.rs",
-        "engine/tests/test_modules/effects/cost_mod/success_zone_high_cost_group_deploy_discount_test.rs",
+        "engine/tests/test_modules/effects/cost_mod/activation_discount/success_zone_high_cost_group_deploy_discount_test.rs",
+        "engine/tests/test_modules/effects/cost_mod/required_hearts/modify_required_hearts_exclude_heart_test.rs",
         "engine/tests/test_modules/effects/gain/blades/per_card/q271_colorful_dreams_test.rs",
         "engine/tests/test_modules/effects/look_select/reveal_to_hand/heart05_or_heart06_member_pl_bp5_014_n_test.rs",
-        "engine/tests/test_modules/effects/position/love_wing_bell_test.rs",
+        "engine/tests/test_modules/effects/position/area_gated/success_zone_center_area_mus_member_constant_blade_test.rs",
         "engine/tests/test_modules/effects/recover/to_hand/poppin_test.rs",
         "engine/tests/test_modules/jidou/leaves_stage/stage_to_discard_ability_test.rs"
       ],
@@ -14295,7 +14295,7 @@
       "covering_files": [
         "engine/tests/test_modules/effects/choice/daydream_mermaid_test.rs",
         "engine/tests/test_modules/effects/compound/pl_s_bp6_comprehensive_edge_test.rs",
-        "engine/tests/test_modules/effects/cost_mod/success_zone_high_cost_group_deploy_discount_test.rs",
+        "engine/tests/test_modules/effects/cost_mod/activation_discount/success_zone_high_cost_group_deploy_discount_test.rs",
         "engine/tests/test_modules/effects/deploy/lower_cost_baton_optional_low_cost_hand_deploy_test.rs"
       ],
       "covering_tests": [
@@ -14944,7 +14944,7 @@
         "engine/tests/test_modules/effects/ability_mod/constant_deck_bottom_yell_source_test.rs",
         "engine/tests/test_modules/effects/compound/condition_negative_test.rs",
         "engine/tests/test_modules/effects/compound/tsunagaru_connect_test.rs",
-        "engine/tests/test_modules/effects/conditional/bp7_kanata_choice_test.rs",
+        "engine/tests/test_modules/effects/conditional/zone_source/discard_placed_group_live_or_blade_condition_test.rs",
         "engine/tests/test_modules/effects/deck_order/restore/both_waitrooms_member_restore_threshold_q242_test.rs",
         "engine/tests/test_modules/effects/gain/blades/live_start/live_start_optional_energy_self_blades_test.rs",
         "engine/tests/test_modules/effects/gain/blades/live_start/mirai_no_oto_live_start_optional_deck_bottom_blades_test.rs",
@@ -14954,7 +14954,7 @@
         "engine/tests/test_modules/effects/recover/to_hand/bp7_audrey_blade_max_test.rs",
         "engine/tests/test_modules/effects/score/ll_bp1_001_test.rs",
         "engine/tests/test_modules/effects/score/tokimeki_runners_test.rs",
-        "engine/tests/test_modules/effects/state/bp7_karin_wait_blade_limit_test.rs",
+        "engine/tests/test_modules/effects/state/wait_activation/bp7_karin_wait_blade_limit_test.rs",
         "engine/tests/test_modules/rules/permanent_loop_rule_12_1_test.rs"
       ],
       "covering_tests": [
@@ -15018,11 +15018,11 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/characterization/zero_tested_action_types_test.rs",
-        "engine/tests/test_modules/effects/conditional/konata_bp4_test.rs",
+        "engine/tests/test_modules/effects/conditional/state_gated/deployed_member_blade_heart_wait_test.rs",
         "engine/tests/test_modules/effects/deck_order/restore/both_waitrooms_member_restore_threshold_q242_test.rs",
         "engine/tests/test_modules/effects/look_select/reveal_to_hand/debut_group_look_three_reveal_test.rs",
         "engine/tests/test_modules/effects/look_select/reveal_to_hand/named_member_look_pl_n_pb1_016_r_018_r_021_r_024_r_test.rs",
-        "engine/tests/test_modules/effects/state/bp7_ai_energy_under_member_optional_test.rs"
+        "engine/tests/test_modules/effects/state/per_card/ai_debut_optional_energy_under_nijigasaki_member_test.rs"
       ],
       "covering_tests": [
         "ai_accept_places_energy_under_nijigasaki",
@@ -15810,7 +15810,7 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/effects/compound/ability_engine_fixes_test.rs",
-        "engine/tests/test_modules/effects/position/chisato_pb1_003_both_stages_rotation_test.rs"
+        "engine/tests/test_modules/effects/position/area_move/chisato_pb1_003_both_stages_rotation_test.rs"
       ],
       "covering_tests": [
         "chisato_003_rotation_condition_fails_with_non_5yncri5e",
@@ -16089,7 +16089,7 @@
       "covering_files": [
         "engine/tests/test_modules/effects/ability_mod/live_success_invalidation_and_live_start_suppression_test.rs",
         "engine/tests/test_modules/effects/draw/flat/stage_member_identity_and_cost_gated_draw_test.rs",
-        "engine/tests/test_modules/effects/state/butterfly_wing_suppress_test.rs"
+        "engine/tests/test_modules/effects/state/per_card/butterfly_wing_suppress_test.rs"
       ],
       "covering_tests": [
         "butterfly_suppresses_only_the_owners_live_start_members",
@@ -16135,7 +16135,7 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/effects/compound/ability_engine_fixes_test.rs",
-        "engine/tests/test_modules/effects/cost_mod/jellyfish_test.rs"
+        "engine/tests/test_modules/effects/cost_mod/required_hearts/jellyfish_appeared_moved_member_required_hearts_test.rs"
       ],
       "covering_tests": [
         "chisato_003_rotation_condition_fails_with_non_5yncri5e",
@@ -16198,7 +16198,7 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/effects/compound/ability_engine_fixes_test.rs",
-        "engine/tests/test_modules/effects/cost_mod/jellyfish_test.rs"
+        "engine/tests/test_modules/effects/cost_mod/required_hearts/jellyfish_appeared_moved_member_required_hearts_test.rs"
       ],
       "covering_tests": [
         "chisato_003_rotation_condition_fails_with_non_5yncri5e",
@@ -16260,7 +16260,7 @@
       "has_choice": false,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/cost_mod/wien_cost_mod_test.rs"
+        "engine/tests/test_modules/effects/cost_mod/per_card/wien_cost_mod_test.rs"
       ],
       "covering_tests": [
         "wien_cost_modifier_cleared_on_leave",
@@ -16515,13 +16515,13 @@
         "engine/tests/test_modules/effects/compound/center_wait_discard_other_group_cost_plus_two_same_area_deploy_edges_test.rs",
         "engine/tests/test_modules/effects/compound/center_wait_discard_other_group_cost_plus_two_same_area_deploy_test.rs",
         "engine/tests/test_modules/effects/compound/discard_wait_enables_hearts_pl_hs_bp5_016_n_test.rs",
-        "engine/tests/test_modules/effects/conditional/under_card_and_success_live_conditions_test.rs",
+        "engine/tests/test_modules/effects/conditional/zone_source/under_card_and_success_live_conditions_test.rs",
         "engine/tests/test_modules/effects/deploy/paid_energy_same_name_debut_chain_q200_q201_q202_test.rs",
         "engine/tests/test_modules/effects/deploy/s_bp3_006_cost_ref_test.rs",
         "engine/tests/test_modules/effects/gain/blades/under_member/live_start_distinct_under_member_blades_test.rs",
         "engine/tests/test_modules/effects/look_select/reveal_to_hand/mirai_ticket_test.rs",
         "engine/tests/test_modules/effects/score/chika_bp3_001_wait_self_activation_live_total_score_test.rs",
-        "engine/tests/test_modules/effects/state/riko_bp5_center_cost_equal_test.rs",
+        "engine/tests/test_modules/effects/state/wait_activation/riko_center_gated_live_start_low_blade_opponent_wait_test.rs",
         "engine/tests/test_modules/integration/parser_issues_e2e_part2_test.rs",
         "engine/tests/test_modules/integration/sp_bp2_015_proper_gameplay_test.rs",
         "engine/tests/test_modules/jidou/leaves_stage/s_bp5_010_global_heart_test.rs",
@@ -16789,7 +16789,7 @@
       "covering_files": [
         "engine/tests/test_modules/characterization/prohibition_layer_characterization_test.rs",
         "engine/tests/test_modules/effects/compound/pb1_007_comprehensive_edge_test.rs",
-        "engine/tests/test_modules/effects/conditional/under_card_and_success_live_conditions_test.rs",
+        "engine/tests/test_modules/effects/conditional/zone_source/under_card_and_success_live_conditions_test.rs",
         "engine/tests/test_modules/effects/gain/blades/constants/success_pile_difference_pl_s_bp6_009_r_plus_test.rs",
         "engine/tests/test_modules/effects/restriction/kagayaiteru_test.rs",
         "engine/tests/test_modules/effects/restriction/live_success_sequential_test.rs",
@@ -16920,7 +16920,7 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/effects/mill/liella_milled_per_unit_blades_test.rs",
-        "engine/tests/test_modules/effects/position/position_change_triggers_jidou_move_test.rs",
+        "engine/tests/test_modules/effects/position/area_move/position_change_triggers_jidou_move_test.rs",
         "engine/tests/test_modules/jidou/movement/chisato_jidou_move_analysis_test.rs",
         "engine/tests/test_modules/jidou/movement/movement_condition_test.rs",
         "engine/tests/test_modules/jidou/movement/position_change_only_places_energy_test.rs"
@@ -16986,8 +16986,8 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/characterization/strict_engine_bug_expected_fail_test.rs",
-        "engine/tests/test_modules/effects/conditional/sp_bp2_004_comprehensive_edge_test.rs",
-        "engine/tests/test_modules/effects/conditional/sp_bp2_004_highest_cost_edge_test.rs",
+        "engine/tests/test_modules/effects/conditional/state_gated/center_highest_cost_constant_heart_edges_test.rs",
+        "engine/tests/test_modules/effects/conditional/state_gated/center_highest_cost_constant_heart_tie_test.rs",
         "engine/tests/test_modules/effects/gain/hearts/constants/center_highest_cost_constant_heart03_edges_test.rs",
         "engine/tests/test_modules/effects/gain/hearts/constants/center_highest_cost_constant_heart03_test.rs",
         "engine/tests/test_modules/effects/gain/hearts/constants/center_highest_cost_constant_heart_empty_and_single_member_test.rs",
@@ -17089,7 +17089,7 @@
       "covering_files": [
         "engine/tests/test_modules/effects/compound/ability_engine_fixes_test.rs",
         "engine/tests/test_modules/effects/compound/toubatsu_test.rs",
-        "engine/tests/test_modules/effects/position/position_change_condition_test.rs",
+        "engine/tests/test_modules/effects/position/area_gated/center_area_syncrise_member_constant_blade_gain_test.rs",
         "engine/tests/test_modules/jidou/energy_watch/energy_placement_blade_excludes_area_move_and_under_member_test.rs",
         "engine/tests/test_modules/jidou/energy_watch/real_card_effect_self_move_or_energy_placed_draw_heart02_test.rs",
         "engine/tests/test_modules/jidou/state_watch/own_effect_wait_cheap_opponent_draw_one_q177_test.rs"
@@ -17359,9 +17359,9 @@
       "covering_files": [
         "engine/tests/test_modules/effects/gain/blades/constants/other_unit_member_constant_blades_test.rs",
         "engine/tests/test_modules/effects/gain/blades/constants/per_other_unit_member_constant_blades_test.rs",
-        "engine/tests/test_modules/effects/position/formation_change_test.rs",
-        "engine/tests/test_modules/effects/position/position_change_multi_test.rs",
-        "engine/tests/test_modules/effects/position/position_change_non_optional_test.rs",
+        "engine/tests/test_modules/effects/position/area_move/formation_change_test.rs",
+        "engine/tests/test_modules/effects/position/area_move/position_change_multi_test.rs",
+        "engine/tests/test_modules/effects/position/area_move/position_change_non_optional_test.rs",
         "engine/tests/test_modules/effects/score/chisato_live_success_test.rs",
         "engine/tests/test_modules/jidou/energy_watch/own_effect_self_move_or_energy_placed_draw_heart02_test.rs",
         "engine/tests/test_modules/rules/baton/optional_energy_group_cost_pl_hs_bp2_009_r_test.rs"
@@ -17428,9 +17428,9 @@
       "covering_files": [
         "engine/tests/test_modules/effects/gain/blades/constants/other_unit_member_constant_blades_test.rs",
         "engine/tests/test_modules/effects/gain/blades/constants/per_other_unit_member_constant_blades_test.rs",
-        "engine/tests/test_modules/effects/position/formation_change_test.rs",
-        "engine/tests/test_modules/effects/position/position_change_multi_test.rs",
-        "engine/tests/test_modules/effects/position/position_change_non_optional_test.rs",
+        "engine/tests/test_modules/effects/position/area_move/formation_change_test.rs",
+        "engine/tests/test_modules/effects/position/area_move/position_change_multi_test.rs",
+        "engine/tests/test_modules/effects/position/area_move/position_change_non_optional_test.rs",
         "engine/tests/test_modules/effects/score/chisato_live_success_test.rs",
         "engine/tests/test_modules/jidou/energy_watch/own_effect_self_move_or_energy_placed_draw_heart02_test.rs",
         "engine/tests/test_modules/rules/baton/optional_energy_group_cost_pl_hs_bp2_009_r_test.rs"
@@ -17659,7 +17659,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/cost_mod/ladybug_test.rs"
+        "engine/tests/test_modules/effects/cost_mod/required_hearts/ladybug_stage_cost_comparison_required_hearts_test.rs"
       ],
       "covering_tests": [
         "ladybug_q114_both_members_on_stage_reduces_hearts",
@@ -18195,7 +18195,7 @@
       "has_negative": false,
       "covering_files": [
         "engine/tests/test_modules/effects/draw/chains/self_wait_draw_then_discard_test.rs",
-        "engine/tests/test_modules/effects/state/member_activation_debut_and_live_start_test.rs"
+        "engine/tests/test_modules/effects/state/per_card/member_activation_debut_and_live_start_test.rs"
       ],
       "covering_tests": [
         "bp3_001_activation_waits_self_draw_then_discard",
@@ -18233,7 +18233,7 @@
       "has_negative": false,
       "covering_files": [
         "engine/tests/test_modules/effects/draw/chains/self_wait_draw_then_discard_test.rs",
-        "engine/tests/test_modules/effects/state/member_activation_debut_and_live_start_test.rs"
+        "engine/tests/test_modules/effects/state/per_card/member_activation_debut_and_live_start_test.rs"
       ],
       "covering_tests": [
         "bp3_001_activation_waits_self_draw_then_discard",
@@ -18274,7 +18274,7 @@
         "engine/tests/test_modules/effects/gain/blades/constants/per_waited_opponent_member_constant_blade_test.rs",
         "engine/tests/test_modules/effects/gain/blades/per_card/eri_debut_up_to_two_opponent_members_to_wait_test.rs",
         "engine/tests/test_modules/effects/look_select/reveal_to_hand/eli_bp5_cost9_search_test.rs",
-        "engine/tests/test_modules/effects/state/state_condition_test.rs"
+        "engine/tests/test_modules/effects/state/orientation_gated/wait_state_condition_constants_test.rs"
       ],
       "covering_tests": [
         "center_grants_at_least_two_blades_pl_sp_bp4_003",
@@ -18387,7 +18387,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/state/member_activation_debut_and_live_start_test.rs",
+        "engine/tests/test_modules/effects/state/per_card/member_activation_debut_and_live_start_test.rs",
         "engine/tests/test_modules/rules/conditions/restriction_mechanics_test.rs"
       ],
       "covering_tests": [
@@ -18501,7 +18501,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/conditional/chika_bp7_conditional_result_test.rs"
+        "engine/tests/test_modules/effects/conditional/per_card/chika_debut_result_character_condition_test.rs"
       ],
       "covering_tests": [
         "chika_adds_non_matching_member_gets_no_blades",
@@ -18726,7 +18726,7 @@
       "has_choice": true,
       "has_negative": false,
       "covering_files": [
-        "engine/tests/test_modules/effects/state/debut_optional_single_member_activation_test.rs"
+        "engine/tests/test_modules/effects/state/per_card/debut_optional_single_member_activation_test.rs"
       ],
       "covering_tests": [
         "debut_activates_only_selected_own_member_chika_bp3_010",
@@ -18888,8 +18888,8 @@
         "engine/tests/test_modules/effects/draw/chains/side_debut_draw_discard_pl_sp_pb2_036_n_pl_sp_pb2_037_n_test.rs",
         "engine/tests/test_modules/effects/mill/all_members_blades_pl_hs_bp5_013_n_test.rs",
         "engine/tests/test_modules/effects/mill/discard_cost_mill_then_arise_recovery_test.rs",
-        "engine/tests/test_modules/effects/state/either_or_state_change_test.rs",
-        "engine/tests/test_modules/effects/state/self_wait_and_nijigasaki_activation_test.rs",
+        "engine/tests/test_modules/effects/state/per_card/either_or_state_change_test.rs",
+        "engine/tests/test_modules/effects/state/wait_activation/self_wait_and_nijigasaki_activation_test.rs",
         "engine/tests/test_modules/integration/remaining_quick_test.rs",
         "engine/tests/test_modules/jidou/state_watch/own_effect_wait_cheap_opponent_draw_one_q177_test.rs"
       ],
@@ -19167,7 +19167,7 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/effects/gain/hearts/constants/per_waited_opponent_member_constant_heart_test.rs",
-        "engine/tests/test_modules/effects/state/maki_pb1_test.rs"
+        "engine/tests/test_modules/effects/state/wait_activation/maki_optional_self_wait_cost_opponent_own_wait_test.rs"
       ],
       "covering_tests": [
         "maki_ab0_plus_ab1_end_to_end",
@@ -19207,7 +19207,7 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/effects/gain/hearts/constants/per_waited_opponent_member_constant_heart_test.rs",
-        "engine/tests/test_modules/effects/state/maki_pb1_test.rs"
+        "engine/tests/test_modules/effects/state/wait_activation/maki_optional_self_wait_cost_opponent_own_wait_test.rs"
       ],
       "covering_tests": [
         "maki_ab0_plus_ab1_end_to_end",
@@ -19246,7 +19246,7 @@
       "has_choice": true,
       "has_negative": false,
       "covering_files": [
-        "engine/tests/test_modules/effects/state/self_wait_printemps_energy_pl_pb1_003_r_test.rs"
+        "engine/tests/test_modules/effects/state/wait_activation/self_wait_printemps_energy_pl_pb1_003_r_test.rs"
       ],
       "covering_tests": [
         "pl_pb1_003_r_declined_self_wait_preserves_active_energy_and_ends_choices",
@@ -19281,8 +19281,8 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/conditional/conditional_alternative_test.rs",
-        "engine/tests/test_modules/effects/conditional/under_card_and_success_live_conditions_test.rs"
+        "engine/tests/test_modules/effects/conditional/zone_source/success_zone_live_card_count_alternative_test.rs",
+        "engine/tests/test_modules/effects/conditional/zone_source/under_card_and_success_live_conditions_test.rs"
       ],
       "covering_tests": [
         "genki_invalidate_isolated_to_self",
@@ -19490,8 +19490,8 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/state/maki_pb1_test.rs",
-        "engine/tests/test_modules/effects/state/nico_cannot_activate_test.rs",
+        "engine/tests/test_modules/effects/state/orientation_gated/nico_cannot_activate_test.rs",
+        "engine/tests/test_modules/effects/state/wait_activation/maki_optional_self_wait_cost_opponent_own_wait_test.rs",
         "engine/tests/test_modules/rules/conditions/restriction_mechanics_test.rs"
       ],
       "covering_tests": [
@@ -19541,8 +19541,8 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/state/maki_pb1_test.rs",
-        "engine/tests/test_modules/effects/state/nico_cannot_activate_test.rs",
+        "engine/tests/test_modules/effects/state/orientation_gated/nico_cannot_activate_test.rs",
+        "engine/tests/test_modules/effects/state/wait_activation/maki_optional_self_wait_cost_opponent_own_wait_test.rs",
         "engine/tests/test_modules/rules/conditions/restriction_mechanics_test.rs"
       ],
       "covering_tests": [
@@ -19627,7 +19627,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/state/maki_pb1_test.rs",
+        "engine/tests/test_modules/effects/state/wait_activation/maki_optional_self_wait_cost_opponent_own_wait_test.rs",
         "engine/tests/test_modules/rules/trigger_paths/joint_card_live_start_test.rs"
       ],
       "covering_tests": [
@@ -19682,7 +19682,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/state/nico_cannot_activate_test.rs"
+        "engine/tests/test_modules/effects/state/orientation_gated/nico_cannot_activate_test.rs"
       ],
       "covering_tests": [
         "kotori_activate_works_without_restriction",
@@ -19718,7 +19718,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/conditional/umi_reveal_live_card_gains_live_total_score_test.rs"
+        "engine/tests/test_modules/effects/conditional/zone_source/umi_reveal_live_card_gains_live_total_score_test.rs"
       ],
       "covering_tests": [
         "q176_activate_creates_blind_reveal_choice_opponent_controls_pick",
@@ -19829,8 +19829,8 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/state/center_optional_unit_wait_opponent_wait_immunity_test.rs",
-        "engine/tests/test_modules/effects/state/maki_pb1_test.rs",
+        "engine/tests/test_modules/effects/state/wait_activation/center_optional_unit_wait_opponent_wait_immunity_test.rs",
+        "engine/tests/test_modules/effects/state/wait_activation/maki_optional_self_wait_cost_opponent_own_wait_test.rs",
         "engine/tests/test_modules/jidou/state_watch/own_effect_wait_cheap_opponent_draw_one_q177_test.rs"
       ],
       "covering_tests": [
@@ -19877,8 +19877,8 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/state/center_optional_unit_wait_opponent_wait_immunity_test.rs",
-        "engine/tests/test_modules/effects/state/maki_pb1_test.rs",
+        "engine/tests/test_modules/effects/state/wait_activation/center_optional_unit_wait_opponent_wait_immunity_test.rs",
+        "engine/tests/test_modules/effects/state/wait_activation/maki_optional_self_wait_cost_opponent_own_wait_test.rs",
         "engine/tests/test_modules/jidou/state_watch/own_effect_wait_cheap_opponent_draw_one_q177_test.rs"
       ],
       "covering_tests": [
@@ -19997,7 +19997,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/state/q137_already_waited_cost_test.rs",
+        "engine/tests/test_modules/effects/state/per_card/q137_already_waited_cost_test.rs",
         "engine/tests/test_modules/integration/gameplay_test.rs"
       ],
       "covering_tests": [
@@ -20097,7 +20097,7 @@
       "has_choice": false,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/state/success_score_energy_pl_bp4_004_r_test.rs"
+        "engine/tests/test_modules/effects/state/per_card/success_score_energy_pl_bp4_004_r_test.rs"
       ],
       "covering_tests": [
         "pl_bp4_004_r_success_score_five_activates_no_energy",
@@ -20201,7 +20201,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/cost_mod/success_zone_score_six_stage_cost_three_bonus_test.rs"
+        "engine/tests/test_modules/effects/cost_mod/per_card/success_zone_score_six_stage_cost_three_bonus_test.rs"
       ],
       "covering_tests": [
         "success_zone_score_six_stage_cost_above_threshold_has_cost_mod",
@@ -20245,7 +20245,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/state/debut_opponent_chooses_active_member_wait_q189_test.rs"
+        "engine/tests/test_modules/effects/state/wait_activation/debut_opponent_chooses_active_member_wait_q189_test.rs"
       ],
       "covering_tests": [
         "debut_opponent_chooses_which_active_member_to_wait",
@@ -20323,7 +20323,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/conditional/conditional_alternative_test.rs"
+        "engine/tests/test_modules/effects/conditional/zone_source/success_zone_live_card_count_alternative_test.rs"
       ],
       "covering_tests": [
         "nagisa_effect_expires_on_clear",
@@ -20506,7 +20506,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/conditional/konata_bp4_test.rs"
+        "engine/tests/test_modules/effects/conditional/state_gated/deployed_member_blade_heart_wait_test.rs"
       ],
       "covering_tests": [
         "konata_bp4_deploy_blade_heart_member_waits",
@@ -20542,7 +20542,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/state/either_or_state_change_test.rs",
+        "engine/tests/test_modules/effects/state/per_card/either_or_state_change_test.rs",
         "engine/tests/test_modules/integration/remaining_quick_test.rs"
       ],
       "covering_tests": [
@@ -20713,7 +20713,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/state/q137_already_waited_cost_test.rs"
+        "engine/tests/test_modules/effects/state/per_card/q137_already_waited_cost_test.rs"
       ],
       "covering_tests": [
         "q137_keke_active_cost_pay_applies_wait",
@@ -21309,7 +21309,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/position/position_change_multi_test.rs"
+        "engine/tests/test_modules/effects/position/area_move/position_change_multi_test.rs"
       ],
       "covering_tests": [
         "formation_change_destination_excludes_already_claimed_area",
@@ -21875,7 +21875,7 @@
       "has_negative": false,
       "covering_files": [
         "engine/tests/test_modules/effects/energy/wait_self_activate_pl_n_pb1_006_r_test.rs",
-        "engine/tests/test_modules/effects/state/member_activation_debut_and_live_start_test.rs"
+        "engine/tests/test_modules/effects/state/per_card/member_activation_debut_and_live_start_test.rs"
       ],
       "covering_tests": [
         "bp3_001_live_start_activates_one_chosen_member",
@@ -21960,7 +21960,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/state/either_or_state_change_test.rs",
+        "engine/tests/test_modules/effects/state/per_card/either_or_state_change_test.rs",
         "engine/tests/test_modules/integration/gameplay_test.rs",
         "engine/tests/test_modules/integration/parser_issues_e2e_part3_test.rs",
         "engine/tests/test_modules/integration/remaining_quick_test.rs",
@@ -22026,7 +22026,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/state/either_or_state_change_test.rs",
+        "engine/tests/test_modules/effects/state/per_card/either_or_state_change_test.rs",
         "engine/tests/test_modules/integration/gameplay_test.rs",
         "engine/tests/test_modules/integration/parser_issues_e2e_part3_test.rs",
         "engine/tests/test_modules/integration/remaining_quick_test.rs",
@@ -22921,7 +22921,7 @@
         "engine/tests/test_modules/effects/gain/hearts/live_start/live_start_discarded_group_member_heart01_test.rs",
         "engine/tests/test_modules/effects/gain/hearts/live_start/live_start_same_group_pair_cost_heart01_test.rs",
         "engine/tests/test_modules/effects/mill/discard_cost_mill_then_arise_recovery_test.rs",
-        "engine/tests/test_modules/effects/state/discard_activate_opponent_recover_live_test.rs"
+        "engine/tests/test_modules/effects/state/per_card/discard_activate_opponent_recover_live_test.rs"
       ],
       "covering_tests": [
         "discard_to_activate_opponent_recovers_live_from_waitroom",
@@ -22986,7 +22986,7 @@
         "engine/tests/test_modules/effects/gain/hearts/live_start/live_start_discarded_group_member_heart01_test.rs",
         "engine/tests/test_modules/effects/gain/hearts/live_start/live_start_same_group_pair_cost_heart01_test.rs",
         "engine/tests/test_modules/effects/mill/discard_cost_mill_then_arise_recovery_test.rs",
-        "engine/tests/test_modules/effects/state/discard_activate_opponent_recover_live_test.rs"
+        "engine/tests/test_modules/effects/state/per_card/discard_activate_opponent_recover_live_test.rs"
       ],
       "covering_tests": [
         "discard_to_activate_opponent_recovers_live_from_waitroom",
@@ -23085,8 +23085,8 @@
         "engine/tests/test_modules/effects/choice/arise_gated_activate_blade_or_wait_private_wars_test.rs",
         "engine/tests/test_modules/effects/gain/hearts/constants/per_other_group_member_constant_heart_test.rs",
         "engine/tests/test_modules/effects/gain/hearts/constants/waited_self_heart05_constant_test.rs",
-        "engine/tests/test_modules/effects/state/bp5_333_comprehensive_edge_test.rs",
-        "engine/tests/test_modules/effects/state/state_condition_test.rs"
+        "engine/tests/test_modules/effects/state/orientation_gated/erena_self_wait_constant_heart05_test.rs",
+        "engine/tests/test_modules/effects/state/orientation_gated/wait_state_condition_constants_test.rs"
       ],
       "covering_tests": [
         "bp5_333_leave_stage_clears_reenter_active_no_heart",
@@ -23140,8 +23140,8 @@
         "engine/tests/test_modules/effects/choice/arise_gated_activate_blade_or_wait_private_wars_test.rs",
         "engine/tests/test_modules/effects/gain/hearts/constants/per_other_group_member_constant_heart_test.rs",
         "engine/tests/test_modules/effects/gain/hearts/constants/waited_self_heart05_constant_test.rs",
-        "engine/tests/test_modules/effects/state/bp5_333_comprehensive_edge_test.rs",
-        "engine/tests/test_modules/effects/state/state_condition_test.rs"
+        "engine/tests/test_modules/effects/state/orientation_gated/erena_self_wait_constant_heart05_test.rs",
+        "engine/tests/test_modules/effects/state/orientation_gated/wait_state_condition_constants_test.rs"
       ],
       "covering_tests": [
         "bp5_333_leave_stage_clears_reenter_active_no_heart",
@@ -23192,8 +23192,8 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/position/group_only_debut_formation_move_subunit_gain_blades_test.rs",
-        "engine/tests/test_modules/effects/position/self_control_position_change_test.rs",
+        "engine/tests/test_modules/effects/position/area_move/group_only_debut_formation_move_subunit_gain_blades_test.rs",
+        "engine/tests/test_modules/effects/position/area_move/self_control_position_change_test.rs",
         "engine/tests/test_modules/jidou/movement/awaken_the_power_test.rs",
         "engine/tests/test_modules/rules/conditions/qa_rulings_pins_test.rs",
         "engine/tests/test_modules/rules/trigger_paths/ability_combination_test.rs",
@@ -23611,7 +23611,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/cost_mod/distinct_group_activation_discount_q228_test.rs",
+        "engine/tests/test_modules/effects/cost_mod/activation_discount/distinct_group_activation_discount_q228_test.rs",
         "engine/tests/test_modules/effects/energy/under_member/energy_and_member_under_test.rs",
         "engine/tests/test_modules/integration/gameplay_test.rs",
         "engine/tests/test_modules/integration/parser_issues_e2e_part3_test.rs"
@@ -23676,7 +23676,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/cost_mod/distinct_group_activation_discount_q228_test.rs",
+        "engine/tests/test_modules/effects/cost_mod/activation_discount/distinct_group_activation_discount_q228_test.rs",
         "engine/tests/test_modules/effects/energy/under_member/energy_and_member_under_test.rs",
         "engine/tests/test_modules/integration/gameplay_test.rs",
         "engine/tests/test_modules/integration/parser_issues_e2e_part3_test.rs"
@@ -23973,8 +23973,8 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/effects/compound/live_start_optional_unit_position_change_heart_blade_test.rs",
-        "engine/tests/test_modules/effects/position/position_change_multi_test.rs",
-        "engine/tests/test_modules/effects/position/position_change_non_optional_test.rs"
+        "engine/tests/test_modules/effects/position/area_move/position_change_multi_test.rs",
+        "engine/tests/test_modules/effects/position/area_move/position_change_non_optional_test.rs"
       ],
       "covering_tests": [
         "exclude_position_and_exclude_self_combine_correctly",
@@ -24118,7 +24118,7 @@
       "has_negative": false,
       "covering_files": [
         "engine/tests/test_modules/effects/restriction/opponent_active_phase_lock_targeting_test.rs",
-        "engine/tests/test_modules/effects/state/debut_low_blade_wait_immunity_test.rs"
+        "engine/tests/test_modules/effects/state/wait_activation/debut_low_blade_wait_immunity_test.rs"
       ],
       "covering_tests": [
         "active_phase_lock_excludes_owners_members_from_simulated_activation_block",
@@ -24155,7 +24155,7 @@
       "has_negative": false,
       "covering_files": [
         "engine/tests/test_modules/effects/restriction/opponent_active_phase_lock_targeting_test.rs",
-        "engine/tests/test_modules/effects/state/debut_low_blade_wait_immunity_test.rs"
+        "engine/tests/test_modules/effects/state/wait_activation/debut_low_blade_wait_immunity_test.rs"
       ],
       "covering_tests": [
         "active_phase_lock_excludes_owners_members_from_simulated_activation_block",
@@ -24278,7 +24278,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/state/cost_and_blade_filtered_opponent_wait_test.rs"
+        "engine/tests/test_modules/effects/state/wait_activation/cost_and_blade_filtered_opponent_wait_test.rs"
       ],
       "covering_tests": [
         "natsumi_sp_bp7_009_live_start_in_center_waits_only_low_original_blade_opponent_not_from_side",
@@ -24428,7 +24428,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/position/himeno_front_test.rs",
+        "engine/tests/test_modules/effects/position/area_move/himeno_debut_opponent_member_moved_to_own_front_area_test.rs",
         "engine/tests/test_modules/integration/cross_player_interaction_test.rs",
         "engine/tests/test_modules/rules/conditions/restriction_mechanics_test.rs",
         "engine/tests/test_modules/rules/trigger_paths/trigger_scope_test.rs"
@@ -24488,7 +24488,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/position/himeno_front_test.rs",
+        "engine/tests/test_modules/effects/position/area_move/himeno_debut_opponent_member_moved_to_own_front_area_test.rs",
         "engine/tests/test_modules/integration/cross_player_interaction_test.rs",
         "engine/tests/test_modules/rules/conditions/restriction_mechanics_test.rs",
         "engine/tests/test_modules/rules/trigger_paths/trigger_scope_test.rs"
@@ -24773,7 +24773,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/state/hanayo_bp6_test.rs"
+        "engine/tests/test_modules/effects/state/wait_activation/hanayo_self_wait_cost_activates_other_member_test.rs"
       ],
       "covering_tests": [
         "q248_hanayo_activate_no_other_members",
@@ -24843,7 +24843,7 @@
       "has_choice": false,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/state/hand_debut_no_wait_pl_s_bp6_001_r_test.rs"
+        "engine/tests/test_modules/effects/state/wait_activation/hand_debut_no_wait_pl_s_bp6_001_r_test.rs"
       ],
       "covering_tests": [
         "pl_s_bp6_001_r_hand_debut_leaves_low_cost_opponent_unwaited"
@@ -25079,7 +25079,7 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/effects/ability_mod/genki_zenkai_invalidates_own_live_success_test.rs",
-        "engine/tests/test_modules/effects/state/s_bp6_015_wait_test.rs"
+        "engine/tests/test_modules/effects/state/wait_activation/pl_s_bp6_015_n_debut_opponent_cost2_wait_test.rs"
       ],
       "covering_tests": [
         "genki_zenkai_invalidates_own_live_success",
@@ -25234,7 +25234,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/conditional/pl_hs_bp6_004_test.rs",
+        "engine/tests/test_modules/effects/conditional/per_card/ginako_live_start_discard_group_blade_count_test.rs",
         "engine/tests/test_modules/integration/integration_blindspot_test.rs"
       ],
       "covering_tests": [
@@ -25274,7 +25274,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/conditional/pl_hs_bp6_004_test.rs",
+        "engine/tests/test_modules/effects/conditional/per_card/ginako_live_start_discard_group_blade_count_test.rs",
         "engine/tests/test_modules/integration/integration_blindspot_test.rs"
       ],
       "covering_tests": [
@@ -25910,7 +25910,7 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/characterization/strict_engine_bug_expected_fail_test.rs",
-        "engine/tests/test_modules/effects/conditional/under_card_and_success_live_conditions_test.rs",
+        "engine/tests/test_modules/effects/conditional/zone_source/under_card_and_success_live_conditions_test.rs",
         "engine/tests/test_modules/jidou/movement/ability_chain_combo_test.rs",
         "engine/tests/test_modules/jidou/movement/live_success_or_self_move_place_discard_group_member_under_self_test.rs",
         "engine/tests/test_modules/jidou/movement/pb2_under_member_test.rs"
@@ -25969,7 +25969,7 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/characterization/strict_engine_bug_expected_fail_test.rs",
-        "engine/tests/test_modules/effects/conditional/under_card_and_success_live_conditions_test.rs",
+        "engine/tests/test_modules/effects/conditional/zone_source/under_card_and_success_live_conditions_test.rs",
         "engine/tests/test_modules/jidou/movement/ability_chain_combo_test.rs",
         "engine/tests/test_modules/jidou/movement/live_success_or_self_move_place_discard_group_member_under_self_test.rs",
         "engine/tests/test_modules/jidou/movement/pb2_under_member_test.rs"
@@ -26099,7 +26099,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/state/bp7_q266_natsumi_blade_wait_test.rs"
+        "engine/tests/test_modules/effects/state/per_card/bp7_q266_natsumi_blade_wait_test.rs"
       ],
       "covering_tests": [
         "q266_cost_b0_waits_nothing_incl_blade0",
@@ -26136,7 +26136,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/conditional/wien_pb2_test.rs"
+        "engine/tests/test_modules/effects/conditional/per_card/wien_live_start_empty_hand_energy_placement_test.rs"
       ],
       "covering_tests": [
         "wien_live_success_choice_draw_via_trigger",
@@ -26172,7 +26172,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/conditional/wien_pb2_test.rs"
+        "engine/tests/test_modules/effects/conditional/per_card/wien_live_start_empty_hand_energy_placement_test.rs"
       ],
       "covering_tests": [
         "wien_live_success_choice_draw_via_trigger",
@@ -26320,8 +26320,8 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/conditional/keke_pb2_013_debut_test.rs",
-        "engine/tests/test_modules/effects/conditional/under_card_and_success_live_conditions_test.rs"
+        "engine/tests/test_modules/effects/conditional/zone_source/debut_discard_blade_heart_draw_test.rs",
+        "engine/tests/test_modules/effects/conditional/zone_source/under_card_and_success_live_conditions_test.rs"
       ],
       "covering_tests": [
         "genki_invalidate_isolated_to_self",
@@ -26360,7 +26360,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/cost_mod/play_time_three_named_member_discard_cost_ten_test.rs"
+        "engine/tests/test_modules/effects/cost_mod/activation_discount/play_time_three_named_member_discard_cost_ten_test.rs"
       ],
       "covering_tests": [
         "play_time_named_discard_accept_with_ten_energy_pays_ten",
@@ -26446,7 +26446,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/state/catchu_energy_activation_test.rs"
+        "engine/tests/test_modules/effects/state/per_card/mei_per_distinct_catchu_member_energy_activation_test.rs"
       ],
       "covering_tests": [
         "catchu_basic_two_distinct_activate_2",
@@ -26593,7 +26593,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/position/position_change_condition_test.rs"
+        "engine/tests/test_modules/effects/position/area_gated/center_area_syncrise_member_constant_blade_gain_test.rs"
       ],
       "covering_tests": [
         "no_position_change_no_trigger",
@@ -26632,7 +26632,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/conditional/chika_bp7_conditional_result_test.rs",
+        "engine/tests/test_modules/effects/conditional/per_card/chika_debut_result_character_condition_test.rs",
         "engine/tests/test_modules/effects/draw/chains/full_group_cost_twenty_draw_three_topdeck_three_test.rs"
       ],
       "covering_tests": [
@@ -27008,8 +27008,8 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/cost_mod/all_active_stage_pl_s_bp7_020_l_test.rs",
-        "engine/tests/test_modules/effects/cost_mod/stacking_and_edges_pl_s_bp7_020_l_test.rs",
+        "engine/tests/test_modules/effects/cost_mod/required_hearts/all_active_stage_required_hearts_reduction_test.rs",
+        "engine/tests/test_modules/effects/cost_mod/required_hearts/required_hearts_stacking_and_hostile_edges_test.rs",
         "engine/tests/test_modules/effects/mill/bottom_aqours_required_heart_pl_s_bp7_020_l_test.rs"
       ],
       "covering_tests": [
@@ -27050,8 +27050,8 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/cost_mod/all_active_stage_pl_s_bp7_020_l_test.rs",
-        "engine/tests/test_modules/effects/cost_mod/stacking_and_edges_pl_s_bp7_020_l_test.rs",
+        "engine/tests/test_modules/effects/cost_mod/required_hearts/all_active_stage_required_hearts_reduction_test.rs",
+        "engine/tests/test_modules/effects/cost_mod/required_hearts/required_hearts_stacking_and_hostile_edges_test.rs",
         "engine/tests/test_modules/effects/mill/bottom_aqours_required_heart_pl_s_bp7_020_l_test.rs"
       ],
       "covering_tests": [
@@ -27264,8 +27264,8 @@
         "engine/tests/test_modules/effects/compound/bp7_q274_immune_still_selectable_test.rs",
         "engine/tests/test_modules/effects/compound/debut_choose_low_blade_group_wait_immunity_or_position_change_test.rs",
         "engine/tests/test_modules/effects/energy/under_member/energy_under_original_blade_limit_opponent_wait_test.rs",
-        "engine/tests/test_modules/effects/state/bp7_ai_choice_under_member_test.rs",
-        "engine/tests/test_modules/effects/state/bp7_karin_wait_blade_limit_test.rs"
+        "engine/tests/test_modules/effects/state/per_card/ai_debut_choice_activate_energy_or_under_member_test.rs",
+        "engine/tests/test_modules/effects/state/wait_activation/bp7_karin_wait_blade_limit_test.rs"
       ],
       "covering_tests": [
         "ai_condition_fails_with_duplicate_name",
@@ -27327,7 +27327,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/state/bp7_ai_choice_under_member_test.rs"
+        "engine/tests/test_modules/effects/state/per_card/ai_debut_choice_activate_energy_or_under_member_test.rs"
       ],
       "covering_tests": [
         "ai_condition_fails_with_duplicate_name",
@@ -27807,7 +27807,7 @@
       "has_choice": false,
       "has_negative": false,
       "covering_files": [
-        "engine/tests/test_modules/effects/cost_mod/seven_energy_lead_stage_cost_two_bonus_test.rs"
+        "engine/tests/test_modules/effects/cost_mod/per_card/seven_energy_lead_stage_cost_two_bonus_test.rs"
       ],
       "covering_tests": [
         "seven_energy_lead_stage_cost_baton_pass_fails_without_enough_energy",
@@ -27970,7 +27970,7 @@
       "covering_files": [
         "engine/tests/test_modules/effects/gain/hearts/constants/side_position_constant_heart02_positive_test.rs",
         "engine/tests/test_modules/effects/gain/hearts/constants/side_position_constant_heart_test.rs",
-        "engine/tests/test_modules/effects/state/cost_and_blade_filtered_opponent_wait_test.rs"
+        "engine/tests/test_modules/effects/state/wait_activation/cost_and_blade_filtered_opponent_wait_test.rs"
       ],
       "covering_tests": [
         "left_and_right_sides_each_grant_heart02",
@@ -28010,7 +28010,7 @@
       "covering_files": [
         "engine/tests/test_modules/effects/gain/hearts/constants/side_position_constant_heart02_positive_test.rs",
         "engine/tests/test_modules/effects/gain/hearts/constants/side_position_constant_heart_test.rs",
-        "engine/tests/test_modules/effects/state/cost_and_blade_filtered_opponent_wait_test.rs"
+        "engine/tests/test_modules/effects/state/wait_activation/cost_and_blade_filtered_opponent_wait_test.rs"
       ],
       "covering_tests": [
         "left_and_right_sides_each_grant_heart02",
@@ -28281,7 +28281,7 @@
       "has_choice": true,
       "has_negative": false,
       "covering_files": [
-        "engine/tests/test_modules/effects/state/self_wait_and_nijigasaki_activation_test.rs"
+        "engine/tests/test_modules/effects/state/wait_activation/self_wait_and_nijigasaki_activation_test.rs"
       ],
       "covering_tests": [
         "kanata_n_bp3_006_debut_active_self_becomes_waited",
@@ -28395,11 +28395,11 @@
         "engine/tests/test_modules/effects/compound/discard_two_self_and_other_group_debut_retrigger_test.rs",
         "engine/tests/test_modules/effects/compound/pl_bp5_012_test.rs",
         "engine/tests/test_modules/effects/compound/pr045_comprehensive_edge_test.rs",
-        "engine/tests/test_modules/effects/conditional/chika_bp7_conditional_result_test.rs",
-        "engine/tests/test_modules/effects/cost_mod/baton_arrivals_pl_hs_bp2_023_l_and_pl_hs_bp2_025_l_test.rs",
-        "engine/tests/test_modules/effects/cost_mod/modify_required_hearts_exclude_heart_test.rs",
-        "engine/tests/test_modules/effects/cost_mod/success_zone_score_six_stage_cost_three_bonus_test.rs",
-        "engine/tests/test_modules/effects/cost_mod/wonder_zone_max_repeats_test.rs",
+        "engine/tests/test_modules/effects/conditional/per_card/chika_debut_result_character_condition_test.rs",
+        "engine/tests/test_modules/effects/cost_mod/per_card/success_zone_score_six_stage_cost_three_bonus_test.rs",
+        "engine/tests/test_modules/effects/cost_mod/required_hearts/baton_arrivals_required_hearts_reduction_test.rs",
+        "engine/tests/test_modules/effects/cost_mod/required_hearts/modify_required_hearts_exclude_heart_test.rs",
+        "engine/tests/test_modules/effects/cost_mod/required_hearts/wonder_zone_center_heart03_required_hearts_test.rs",
         "engine/tests/test_modules/effects/deck_order/restore/both_waitrooms_member_restore_threshold_q242_test.rs",
         "engine/tests/test_modules/effects/deck_order/restore/live_start_optional_two_member_bottomdeck_test.rs",
         "engine/tests/test_modules/effects/deck_order/restore/recover_and_order_opponent_bottom_test.rs",
@@ -28442,10 +28442,10 @@
         "engine/tests/test_modules/effects/score/shizuku_bp4_aggregate_test.rs",
         "engine/tests/test_modules/effects/score/takaramono_test.rs",
         "engine/tests/test_modules/effects/score/tokimeki_runners_test.rs",
-        "engine/tests/test_modules/effects/state/bp7_q266_natsumi_blade_wait_test.rs",
-        "engine/tests/test_modules/effects/state/bp7_sd2_gap_test.rs",
-        "engine/tests/test_modules/effects/state/discard_activate_opponent_recover_live_test.rs",
-        "engine/tests/test_modules/effects/state/kanata_restrict_test.rs",
+        "engine/tests/test_modules/effects/state/per_card/bp7_q266_natsumi_blade_wait_test.rs",
+        "engine/tests/test_modules/effects/state/per_card/discard_activate_opponent_recover_live_test.rs",
+        "engine/tests/test_modules/effects/state/per_card/sd2_nijigasaki_abilities_gap_test.rs",
+        "engine/tests/test_modules/effects/state/wait_activation/kanata_active_phase_restriction_and_live_success_self_wait_test.rs",
         "engine/tests/test_modules/integration/cross_player_round5_test.rs",
         "engine/tests/test_modules/integration/victory_tie_placement_test.rs",
         "engine/tests/test_modules/jidou/movement/movement_condition_test.rs",
@@ -28527,11 +28527,11 @@
         "engine/tests/test_modules/effects/compound/discard_two_self_and_other_group_debut_retrigger_test.rs",
         "engine/tests/test_modules/effects/compound/pl_bp5_012_test.rs",
         "engine/tests/test_modules/effects/compound/pr045_comprehensive_edge_test.rs",
-        "engine/tests/test_modules/effects/conditional/chika_bp7_conditional_result_test.rs",
-        "engine/tests/test_modules/effects/cost_mod/baton_arrivals_pl_hs_bp2_023_l_and_pl_hs_bp2_025_l_test.rs",
-        "engine/tests/test_modules/effects/cost_mod/modify_required_hearts_exclude_heart_test.rs",
-        "engine/tests/test_modules/effects/cost_mod/success_zone_score_six_stage_cost_three_bonus_test.rs",
-        "engine/tests/test_modules/effects/cost_mod/wonder_zone_max_repeats_test.rs",
+        "engine/tests/test_modules/effects/conditional/per_card/chika_debut_result_character_condition_test.rs",
+        "engine/tests/test_modules/effects/cost_mod/per_card/success_zone_score_six_stage_cost_three_bonus_test.rs",
+        "engine/tests/test_modules/effects/cost_mod/required_hearts/baton_arrivals_required_hearts_reduction_test.rs",
+        "engine/tests/test_modules/effects/cost_mod/required_hearts/modify_required_hearts_exclude_heart_test.rs",
+        "engine/tests/test_modules/effects/cost_mod/required_hearts/wonder_zone_center_heart03_required_hearts_test.rs",
         "engine/tests/test_modules/effects/deck_order/restore/both_waitrooms_member_restore_threshold_q242_test.rs",
         "engine/tests/test_modules/effects/deck_order/restore/live_start_optional_two_member_bottomdeck_test.rs",
         "engine/tests/test_modules/effects/deck_order/restore/recover_and_order_opponent_bottom_test.rs",
@@ -28574,10 +28574,10 @@
         "engine/tests/test_modules/effects/score/shizuku_bp4_aggregate_test.rs",
         "engine/tests/test_modules/effects/score/takaramono_test.rs",
         "engine/tests/test_modules/effects/score/tokimeki_runners_test.rs",
-        "engine/tests/test_modules/effects/state/bp7_q266_natsumi_blade_wait_test.rs",
-        "engine/tests/test_modules/effects/state/bp7_sd2_gap_test.rs",
-        "engine/tests/test_modules/effects/state/discard_activate_opponent_recover_live_test.rs",
-        "engine/tests/test_modules/effects/state/kanata_restrict_test.rs",
+        "engine/tests/test_modules/effects/state/per_card/bp7_q266_natsumi_blade_wait_test.rs",
+        "engine/tests/test_modules/effects/state/per_card/discard_activate_opponent_recover_live_test.rs",
+        "engine/tests/test_modules/effects/state/per_card/sd2_nijigasaki_abilities_gap_test.rs",
+        "engine/tests/test_modules/effects/state/wait_activation/kanata_active_phase_restriction_and_live_success_self_wait_test.rs",
         "engine/tests/test_modules/integration/cross_player_round5_test.rs",
         "engine/tests/test_modules/integration/victory_tie_placement_test.rs",
         "engine/tests/test_modules/jidou/movement/movement_condition_test.rs",
@@ -28663,7 +28663,7 @@
         "engine/tests/test_modules/effects/recover/to_hand/location_condition_cost_test.rs",
         "engine/tests/test_modules/effects/recover/to_hand/self_to_waitroom_recover_member_q79_test.rs",
         "engine/tests/test_modules/effects/recover/to_hand/wao_wao_test.rs",
-        "engine/tests/test_modules/effects/state/s_bp6_015_wait_test.rs",
+        "engine/tests/test_modules/effects/state/wait_activation/pl_s_bp6_015_n_debut_opponent_cost2_wait_test.rs",
         "engine/tests/test_modules/integration/cross_player_round5_test.rs",
         "engine/tests/test_modules/rules/phases/live_success_rules_test.rs"
       ],
@@ -28738,7 +28738,7 @@
         "engine/tests/test_modules/effects/recover/to_hand/location_condition_cost_test.rs",
         "engine/tests/test_modules/effects/recover/to_hand/self_to_waitroom_recover_member_q79_test.rs",
         "engine/tests/test_modules/effects/recover/to_hand/wao_wao_test.rs",
-        "engine/tests/test_modules/effects/state/s_bp6_015_wait_test.rs",
+        "engine/tests/test_modules/effects/state/wait_activation/pl_s_bp6_015_n_debut_opponent_cost2_wait_test.rs",
         "engine/tests/test_modules/integration/cross_player_round5_test.rs",
         "engine/tests/test_modules/rules/phases/live_success_rules_test.rs"
       ],
@@ -28869,15 +28869,15 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/conditional/debut_reveal_success_zone_replacement_q256_test.rs",
-        "engine/tests/test_modules/effects/conditional/live_phase_success_zone_replacement_q256_test.rs",
-        "engine/tests/test_modules/effects/cost_mod/seven_energy_lead_stage_cost_two_bonus_test.rs",
+        "engine/tests/test_modules/effects/conditional/zone_source/debut_reveal_success_zone_replacement_q256_test.rs",
+        "engine/tests/test_modules/effects/conditional/zone_source/live_phase_success_zone_replacement_q256_test.rs",
+        "engine/tests/test_modules/effects/cost_mod/per_card/seven_energy_lead_stage_cost_two_bonus_test.rs",
         "engine/tests/test_modules/effects/draw/flat/live_success_compare_revealed_draw_test.rs",
         "engine/tests/test_modules/effects/live_start/dazzling_game_test.rs",
         "engine/tests/test_modules/effects/recover/to_hand/cheaper_unit_baton_group_live_recovery_test.rs",
         "engine/tests/test_modules/effects/recover/to_hand/sunny_test.rs",
         "engine/tests/test_modules/effects/score/side_member_original_blade_gated_constant_score_test.rs",
-        "engine/tests/test_modules/effects/state/bp7_q266_natsumi_blade_wait_test.rs",
+        "engine/tests/test_modules/effects/state/per_card/bp7_q266_natsumi_blade_wait_test.rs",
         "engine/tests/test_modules/rules/trigger_paths/ability_trigger_fix_test.rs"
       ],
       "covering_tests": [
@@ -28941,7 +28941,7 @@
       "covering_files": [
         "engine/tests/test_modules/effects/compound/deficit_mill_live_topdeck_pl_n_pr_032_pr_test.rs",
         "engine/tests/test_modules/effects/compound/pr045_comprehensive_edge_test.rs",
-        "engine/tests/test_modules/effects/cost_mod/baton_arrivals_pl_hs_bp2_023_l_and_pl_hs_bp2_025_l_test.rs",
+        "engine/tests/test_modules/effects/cost_mod/required_hearts/baton_arrivals_required_hearts_reduction_test.rs",
         "engine/tests/test_modules/effects/draw/chains/baton_source_cost_gated_draw_discard_test.rs",
         "engine/tests/test_modules/effects/draw/chains/self_wait_draw_discard_pl_n_bp7_023_n_test.rs",
         "engine/tests/test_modules/effects/draw/chains/side_debut_draw_discard_pl_sp_pb2_036_n_pl_sp_pb2_037_n_test.rs",
@@ -29023,7 +29023,7 @@
         "engine/tests/test_modules/effects/recover/to_hand/miracle_stay_tune_test.rs",
         "engine/tests/test_modules/effects/recover/to_hand/wao_wao_test.rs",
         "engine/tests/test_modules/effects/score/replacement_choose_order_test.rs",
-        "engine/tests/test_modules/effects/state/bp7_q266_natsumi_blade_wait_test.rs",
+        "engine/tests/test_modules/effects/state/per_card/bp7_q266_natsumi_blade_wait_test.rs",
         "engine/tests/test_modules/integration/parser_issues_e2e_test.rs",
         "engine/tests/test_modules/rules/phases/performance_pipeline_test.rs",
         "engine/tests/test_modules/rules/trigger_paths/zone_change_gate_test.rs"
@@ -29088,7 +29088,7 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/characterization/zero_tested_action_types_test.rs",
-        "engine/tests/test_modules/effects/conditional/sp_bp2_004_comprehensive_edge_test.rs",
+        "engine/tests/test_modules/effects/conditional/state_gated/center_highest_cost_constant_heart_edges_test.rs",
         "engine/tests/test_modules/effects/recover/to_hand/hasunosora_bp6_test.rs",
         "engine/tests/test_modules/effects/score/awake_test.rs",
         "engine/tests/test_modules/integration/parser_issues_e2e_test.rs",
@@ -29206,7 +29206,7 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/characterization/pipeline_characterization_test.rs",
-        "engine/tests/test_modules/effects/state/live_start_wait_filters_pl_n_bp5_004_r_pl_sp_pr_021_pr_test.rs",
+        "engine/tests/test_modules/effects/state/wait_activation/live_start_wait_filters_pl_n_bp5_004_r_pl_sp_pr_021_pr_test.rs",
         "engine/tests/test_modules/integration/gameplay_test.rs",
         "engine/tests/test_modules/rules/phases/performance_pipeline_test.rs"
       ],
@@ -29302,8 +29302,8 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/conditional/joint_six_discard_mixed_name_cost_test.rs",
-        "engine/tests/test_modules/effects/conditional/umi_pr014_test.rs",
+        "engine/tests/test_modules/effects/conditional/joint/joint_six_discard_mixed_name_cost_test.rs",
+        "engine/tests/test_modules/effects/conditional/zone_source/opponent_hand_blind_reveal_no_live_card_draw_test.rs",
         "engine/tests/test_modules/integration/gameplay_test.rs"
       ],
       "covering_tests": [
@@ -29837,7 +29837,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/state/live_start_wait_filters_pl_n_bp5_004_r_pl_sp_pr_021_pr_test.rs"
+        "engine/tests/test_modules/effects/state/wait_activation/live_start_wait_filters_pl_n_bp5_004_r_pl_sp_pr_021_pr_test.rs"
       ],
       "covering_tests": [
         "pl_n_bp5_004_r_wait_original_four_blades_excludes_modified_four",
@@ -30205,7 +30205,7 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/characterization/kinako_hs_test.rs",
-        "engine/tests/test_modules/effects/cost_mod/distinct_group_activation_discount_q228_test.rs",
+        "engine/tests/test_modules/effects/cost_mod/activation_discount/distinct_group_activation_discount_q228_test.rs",
         "engine/tests/test_modules/effects/gain/blades/under_member/q278_q279_joint_card_under_member_blade_test.rs",
         "engine/tests/test_modules/effects/look_select/niche_filters/mei_bp5_test.rs",
         "engine/tests/test_modules/effects/recover/to_hand/bring_love_test.rs",
@@ -30277,7 +30277,7 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/characterization/kinako_hs_test.rs",
-        "engine/tests/test_modules/effects/cost_mod/distinct_group_activation_discount_q228_test.rs",
+        "engine/tests/test_modules/effects/cost_mod/activation_discount/distinct_group_activation_discount_q228_test.rs",
         "engine/tests/test_modules/effects/gain/blades/under_member/q278_q279_joint_card_under_member_blade_test.rs",
         "engine/tests/test_modules/effects/look_select/niche_filters/mei_bp5_test.rs",
         "engine/tests/test_modules/effects/recover/to_hand/bring_love_test.rs",
@@ -30349,7 +30349,7 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/effects/choice/energy_or_recycle_live_pl_n_pb1_010_r_test.rs",
-        "engine/tests/test_modules/effects/conditional/bp7_kanata_choice_test.rs",
+        "engine/tests/test_modules/effects/conditional/zone_source/discard_placed_group_live_or_blade_condition_test.rs",
         "engine/tests/test_modules/effects/draw/chains/card_ability_test.rs",
         "engine/tests/test_modules/effects/draw/chains/full_group_cost_twenty_draw_three_topdeck_three_test.rs",
         "engine/tests/test_modules/effects/gain/hearts/live_start/live_start_discard_shuffle_group_members_heart01_test.rs",
@@ -30713,7 +30713,7 @@
         "engine/tests/test_modules/effects/gain/blades/constants/combined_success_zone_constant_blade_test.rs",
         "engine/tests/test_modules/effects/gain/hearts/constants/success_score_sum_constant_heart_test.rs",
         "engine/tests/test_modules/effects/score/opponent_success_score_six_constant_total_bonus_test.rs",
-        "engine/tests/test_modules/effects/state/success_score_energy_pl_bp4_004_r_test.rs"
+        "engine/tests/test_modules/effects/state/per_card/success_score_energy_pl_bp4_004_r_test.rs"
       ],
       "covering_tests": [
         "combined_success_count_blades_apply_independently_to_two_copies_pl_s_pb1_009_r",
@@ -30909,7 +30909,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/cost_mod/play_time_three_named_member_discard_cost_ten_test.rs"
+        "engine/tests/test_modules/effects/cost_mod/activation_discount/play_time_three_named_member_discard_cost_ten_test.rs"
       ],
       "covering_tests": [
         "play_time_named_discard_accept_with_ten_energy_pays_ten",
@@ -30963,7 +30963,7 @@
         "engine/tests/test_modules/effects/compound/live_start_discard_reactivate_other_member_both_heart04_test.rs",
         "engine/tests/test_modules/effects/compound/mus_live_recovery_success_score_energy_pl_pr_017_pr_test.rs",
         "engine/tests/test_modules/effects/compound/stage_heart02_score_requirement_pl_n_bp5_028_l_test.rs",
-        "engine/tests/test_modules/effects/conditional/under_card_and_success_live_conditions_test.rs",
+        "engine/tests/test_modules/effects/conditional/zone_source/under_card_and_success_live_conditions_test.rs",
         "engine/tests/test_modules/effects/deck_order/restore/revealed_liella_pl_sp_bp7_023_l_test.rs",
         "engine/tests/test_modules/effects/deploy/waitroom_low_cost_pl_hs_bp6_016_r_test.rs",
         "engine/tests/test_modules/effects/draw/chains/hand_debut_no_draw_pl_hs_bp6_015_r_test.rs",
@@ -30983,7 +30983,7 @@
         "engine/tests/test_modules/effects/recover/to_hand/optional_energy_live_recovery_pl_sp_pb2_007_r_test.rs",
         "engine/tests/test_modules/effects/recover/to_hand/success_zone_revealed_members_pl_s_bp5_019_l_test.rs",
         "engine/tests/test_modules/effects/score/success_count_revealed_score_live_pl_sp_bp5_023_l_test.rs",
-        "engine/tests/test_modules/effects/state/low_blade_opponent_wait_pl_hs_bp6_013_r_test.rs",
+        "engine/tests/test_modules/effects/state/wait_activation/low_blade_opponent_wait_pl_hs_bp6_013_r_test.rs",
         "engine/tests/test_modules/integration/hard_abilities_tier_test.rs",
         "engine/tests/test_modules/integration/parser_issues_e2e_part3_test.rs",
         "engine/tests/test_modules/integration/parser_issues_e2e_test.rs",
@@ -31120,9 +31120,9 @@
         "engine/tests/test_modules/effects/compound/live_start_bottom_three_mill_all_group_heart_test.rs",
         "engine/tests/test_modules/effects/compound/live_start_optional_bottom_mill_named_recovery_source_test.rs",
         "engine/tests/test_modules/effects/compound/pl_sp_pb2_005_test.rs",
-        "engine/tests/test_modules/effects/conditional/bp7_kanata_choice_test.rs",
-        "engine/tests/test_modules/effects/conditional/kanon_invalidate_test.rs",
-        "engine/tests/test_modules/effects/cost_mod/wonder_zone_max_repeats_test.rs",
+        "engine/tests/test_modules/effects/conditional/per_card/kanon_debut_invalidate_recovers_discard_card_test.rs",
+        "engine/tests/test_modules/effects/conditional/zone_source/discard_placed_group_live_or_blade_condition_test.rs",
+        "engine/tests/test_modules/effects/cost_mod/required_hearts/wonder_zone_center_heart03_required_hearts_test.rs",
         "engine/tests/test_modules/effects/draw/flat/b9_more_test.rs",
         "engine/tests/test_modules/effects/gain/blades/per_card/ren_baton_touch_group_check_test.rs",
         "engine/tests/test_modules/effects/gain/blades/under_member/bp7_under_member_per_unit_blade_test.rs",
@@ -31135,7 +31135,7 @@
         "engine/tests/test_modules/effects/mill/liella_milled_per_unit_blades_test.rs",
         "engine/tests/test_modules/effects/score/wakana_shiki_test.rs",
         "engine/tests/test_modules/effects/score/zettai_lover_test.rs",
-        "engine/tests/test_modules/effects/state/catchu_energy_activation_test.rs",
+        "engine/tests/test_modules/effects/state/per_card/mei_per_distinct_catchu_member_energy_activation_test.rs",
         "engine/tests/test_modules/integration/gameplay_test.rs",
         "engine/tests/test_modules/integration/parser_issues_e2e_part2_test.rs",
         "engine/tests/test_modules/integration/parser_issues_e2e_part3_test.rs",
@@ -31202,7 +31202,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/conditional/kanon_invalidate_test.rs",
+        "engine/tests/test_modules/effects/conditional/per_card/kanon_debut_invalidate_recovers_discard_card_test.rs",
         "engine/tests/test_modules/effects/deploy/pl_sp_sd1_002_test.rs",
         "engine/tests/test_modules/effects/draw/flat/b9_more_test.rs",
         "engine/tests/test_modules/effects/live_start/dazzling_game_test.rs",
@@ -31282,7 +31282,7 @@
         "engine/tests/test_modules/effects/gain/blades/under_member/bp7_under_member_per_unit_blade_test.rs",
         "engine/tests/test_modules/effects/gain/blades/under_member/under_liella_member_constant_host_blade_test.rs",
         "engine/tests/test_modules/effects/mill/liella_milled_per_unit_blades_test.rs",
-        "engine/tests/test_modules/effects/state/catchu_energy_activation_test.rs",
+        "engine/tests/test_modules/effects/state/per_card/mei_per_distinct_catchu_member_energy_activation_test.rs",
         "engine/tests/test_modules/integration/gameplay_test.rs",
         "engine/tests/test_modules/jidou/leaves_stage/baton_displaced_self_placed_under_arriver_test.rs",
         "engine/tests/test_modules/jidou/leaves_stage/baton_displaced_under_arriver_grants_host_blade_test.rs"
@@ -31569,7 +31569,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/position/auto_system_stress_test.rs",
+        "engine/tests/test_modules/effects/position/area_move/area_move_triggered_auto_ability_stress_test.rs",
         "engine/tests/test_modules/jidou/energy_watch/trigger_card_integration_test.rs",
         "engine/tests/test_modules/rules/trigger_paths/cross_player_jidou_comprehensive_edge_test.rs"
       ],
@@ -32313,7 +32313,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/cost_mod/baton_arrivals_pl_hs_bp2_023_l_and_pl_hs_bp2_025_l_test.rs",
+        "engine/tests/test_modules/effects/cost_mod/required_hearts/baton_arrivals_required_hearts_reduction_test.rs",
         "engine/tests/test_modules/effects/recover/to_hand/hasunosora_cost_gated_recovery_test.rs",
         "engine/tests/test_modules/rules/trigger_paths/ability_trigger_fix_test.rs"
       ],
@@ -32370,7 +32370,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/cost_mod/baton_arrivals_pl_hs_bp2_023_l_and_pl_hs_bp2_025_l_test.rs",
+        "engine/tests/test_modules/effects/cost_mod/required_hearts/baton_arrivals_required_hearts_reduction_test.rs",
         "engine/tests/test_modules/rules/trigger_paths/ability_trigger_fix_test.rs"
       ],
       "covering_tests": [
@@ -32420,8 +32420,8 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/effects/ability_mod/chisato_test.rs",
-        "engine/tests/test_modules/effects/cost_mod/hand_size_zero_floor_ll_bp2_001_r_plus_test.rs",
-        "engine/tests/test_modules/effects/cost_mod/ll_bp2_001_cost_reduction_test.rs",
+        "engine/tests/test_modules/effects/cost_mod/activation_discount/hand_card_count_play_cost_reduction_test.rs",
+        "engine/tests/test_modules/effects/cost_mod/activation_discount/hand_size_play_cost_reduction_zero_floor_test.rs",
         "engine/tests/test_modules/effects/draw/flat/dream_believers_test.rs",
         "engine/tests/test_modules/effects/gain/blades/live_start/live_start_blade_per_discard_test.rs",
         "engine/tests/test_modules/effects/look_select/reveal_to_hand/mirai_ticket_test.rs",
@@ -32493,8 +32493,8 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/effects/ability_mod/chisato_test.rs",
-        "engine/tests/test_modules/effects/cost_mod/hand_size_zero_floor_ll_bp2_001_r_plus_test.rs",
-        "engine/tests/test_modules/effects/cost_mod/ll_bp2_001_cost_reduction_test.rs",
+        "engine/tests/test_modules/effects/cost_mod/activation_discount/hand_card_count_play_cost_reduction_test.rs",
+        "engine/tests/test_modules/effects/cost_mod/activation_discount/hand_size_play_cost_reduction_zero_floor_test.rs",
         "engine/tests/test_modules/effects/draw/flat/dream_believers_test.rs",
         "engine/tests/test_modules/effects/gain/blades/live_start/live_start_blade_per_discard_test.rs",
         "engine/tests/test_modules/effects/look_select/reveal_to_hand/mirai_ticket_test.rs",
@@ -32566,8 +32566,8 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/effects/ability_mod/chisato_test.rs",
-        "engine/tests/test_modules/effects/cost_mod/hand_size_zero_floor_ll_bp2_001_r_plus_test.rs",
-        "engine/tests/test_modules/effects/cost_mod/ll_bp2_001_cost_reduction_test.rs",
+        "engine/tests/test_modules/effects/cost_mod/activation_discount/hand_card_count_play_cost_reduction_test.rs",
+        "engine/tests/test_modules/effects/cost_mod/activation_discount/hand_size_play_cost_reduction_zero_floor_test.rs",
         "engine/tests/test_modules/effects/draw/flat/dream_believers_test.rs",
         "engine/tests/test_modules/effects/gain/blades/live_start/live_start_blade_per_discard_test.rs",
         "engine/tests/test_modules/effects/look_select/reveal_to_hand/mirai_ticket_test.rs",
@@ -32747,7 +32747,7 @@
         "engine/tests/test_modules/effects/ability_mod/genki_zenkai_invalidates_own_live_success_test.rs",
         "engine/tests/test_modules/effects/ability_mod/heart02_gated_live_success_invalidation_setup_test.rs",
         "engine/tests/test_modules/effects/ability_mod/live_success_invalidation_and_live_start_suppression_test.rs",
-        "engine/tests/test_modules/effects/conditional/under_card_and_success_live_conditions_test.rs",
+        "engine/tests/test_modules/effects/conditional/zone_source/under_card_and_success_live_conditions_test.rs",
         "engine/tests/test_modules/effects/energy/place/live_success_opponent_waited_energy_resolution_test.rs"
       ],
       "covering_tests": [
@@ -32797,7 +32797,7 @@
         "engine/tests/test_modules/effects/ability_mod/genki_zenkai_invalidates_own_live_success_test.rs",
         "engine/tests/test_modules/effects/ability_mod/heart02_gated_live_success_invalidation_setup_test.rs",
         "engine/tests/test_modules/effects/ability_mod/live_success_invalidation_and_live_start_suppression_test.rs",
-        "engine/tests/test_modules/effects/conditional/under_card_and_success_live_conditions_test.rs",
+        "engine/tests/test_modules/effects/conditional/zone_source/under_card_and_success_live_conditions_test.rs",
         "engine/tests/test_modules/effects/energy/place/live_success_opponent_waited_energy_resolution_test.rs"
       ],
       "covering_tests": [
@@ -32925,8 +32925,8 @@
       "covering_files": [
         "engine/tests/test_modules/effects/compound/debut_group_live_topdeck_waited_opponent_draw_test.rs",
         "engine/tests/test_modules/effects/compound/tsunagaru_connect_test.rs",
-        "engine/tests/test_modules/effects/conditional/debut_reveal_success_zone_replacement_q256_test.rs",
-        "engine/tests/test_modules/effects/conditional/live_phase_success_zone_replacement_q256_test.rs",
+        "engine/tests/test_modules/effects/conditional/zone_source/debut_reveal_success_zone_replacement_q256_test.rs",
+        "engine/tests/test_modules/effects/conditional/zone_source/live_phase_success_zone_replacement_q256_test.rs",
         "engine/tests/test_modules/effects/gain/blades/constants/combined_success_zone_constant_blade_test.rs",
         "engine/tests/test_modules/effects/gain/hearts/constants/success_score_sum_constant_heart_test.rs",
         "engine/tests/test_modules/effects/recover/to_hand/pl_hs_bp1_003_test.rs",
@@ -33369,8 +33369,8 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/cost_mod/play_time_three_named_member_discard_cost_ten_test.rs",
-        "engine/tests/test_modules/effects/cost_mod/success_zone_stage_cost_deploy_energy_test.rs",
+        "engine/tests/test_modules/effects/cost_mod/activation_discount/play_time_three_named_member_discard_cost_ten_test.rs",
+        "engine/tests/test_modules/effects/cost_mod/per_card/success_zone_stage_cost_deploy_energy_test.rs",
         "engine/tests/test_modules/effects/draw/flat/live_success_compare_revealed_draw_test.rs"
       ],
       "covering_tests": [
@@ -34096,7 +34096,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/conditional/joint_six_discard_mixed_name_cost_test.rs",
+        "engine/tests/test_modules/effects/conditional/joint/joint_six_discard_mixed_name_cost_test.rs",
         "engine/tests/test_modules/effects/recover/to_hand/sunny_test.rs",
         "engine/tests/test_modules/rules/trigger_paths/joint_card_live_start_test.rs"
       ],
@@ -34159,7 +34159,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/conditional/joint_six_discard_mixed_name_cost_test.rs",
+        "engine/tests/test_modules/effects/conditional/joint/joint_six_discard_mixed_name_cost_test.rs",
         "engine/tests/test_modules/effects/recover/to_hand/sunny_test.rs",
         "engine/tests/test_modules/rules/trigger_paths/joint_card_live_start_test.rs"
       ],
@@ -34743,7 +34743,7 @@
       "has_choice": false,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/position/love_wing_bell_test.rs"
+        "engine/tests/test_modules/effects/position/area_gated/success_zone_center_area_mus_member_constant_blade_test.rs"
       ],
       "covering_tests": [
         "love_wing_bell_both_players_get_own_center_blade",
@@ -34785,7 +34785,7 @@
       "has_choice": false,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/position/love_wing_bell_test.rs"
+        "engine/tests/test_modules/effects/position/area_gated/success_zone_center_area_mus_member_constant_blade_test.rs"
       ],
       "covering_tests": [
         "love_wing_bell_both_players_get_own_center_blade",
@@ -34926,7 +34926,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/conditional/konata_bp4_test.rs"
+        "engine/tests/test_modules/effects/conditional/state_gated/deployed_member_blade_heart_wait_test.rs"
       ],
       "covering_tests": [
         "konata_bp4_deploy_blade_heart_member_waits",
@@ -36126,7 +36126,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/cost_mod/wonder_zone_max_repeats_test.rs"
+        "engine/tests/test_modules/effects/cost_mod/required_hearts/wonder_zone_center_heart03_required_hearts_test.rs"
       ],
       "covering_tests": [
         "center_mus_with_2_heart03_reduces_1",
@@ -36239,7 +36239,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/cost_mod/modify_required_hearts_exclude_heart_test.rs"
+        "engine/tests/test_modules/effects/cost_mod/required_hearts/modify_required_hearts_exclude_heart_test.rs"
       ],
       "covering_tests": [
         "all_members_excluded_no_reduction",
@@ -36274,7 +36274,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/cost_mod/pl_s_bp5_010_test.rs",
+        "engine/tests/test_modules/effects/cost_mod/required_hearts/rina_debut_opponent_live_card_heart_increase_test.rs",
         "engine/tests/test_modules/jidou/leaves_stage/s_bp5_010_global_heart_test.rs"
       ],
       "covering_tests": [
@@ -36312,7 +36312,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/cost_mod/modify_required_hearts_global_test.rs"
+        "engine/tests/test_modules/effects/cost_mod/required_hearts/modify_required_hearts_global_test.rs"
       ],
       "covering_tests": [
         "riko_bp5_condition_met_increases_opponent_hearts",
@@ -37104,7 +37104,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/cost_mod/play_time_three_named_member_discard_cost_ten_test.rs"
+        "engine/tests/test_modules/effects/cost_mod/activation_discount/play_time_three_named_member_discard_cost_ten_test.rs"
       ],
       "covering_tests": [
         "play_time_named_discard_accept_with_ten_energy_pays_ten",
@@ -37669,7 +37669,7 @@
       "covering_files": [
         "engine/tests/test_modules/effects/choice/optional_energy_edelnote_deploy_or_requirement_test.rs",
         "engine/tests/test_modules/effects/compound/discard_wait_enables_hearts_pl_hs_bp5_016_n_test.rs",
-        "engine/tests/test_modules/effects/state/card_count_state_test.rs"
+        "engine/tests/test_modules/effects/state/orientation_gated/two_or_more_opponent_wait_members_constant_heart06_test.rs"
       ],
       "covering_tests": [
         "declined_energy_preserves_energy_stage_and_requirement_743",
@@ -37718,7 +37718,7 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/characterization/decode_audit_behavior_pins_test.rs",
-        "engine/tests/test_modules/effects/cost_mod/hanamusubi_exclude_self_test.rs",
+        "engine/tests/test_modules/effects/cost_mod/required_hearts/hanamusubi_required_hearts_exclude_self_test.rs",
         "engine/tests/test_modules/effects/draw/flat/dream_believers_test.rs",
         "engine/tests/test_modules/effects/recover/to_hand/hinoshita_test.rs"
       ],
@@ -37781,7 +37781,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/cost_mod/hanamusubi_exclude_self_test.rs",
+        "engine/tests/test_modules/effects/cost_mod/required_hearts/hanamusubi_required_hearts_exclude_self_test.rs",
         "engine/tests/test_modules/effects/recover/to_hand/hs_bp2_001_recover_test.rs",
         "engine/tests/test_modules/effects/score/aurora_flower_identity_test.rs",
         "engine/tests/test_modules/effects/score/aurora_flower_test.rs"
@@ -37839,7 +37839,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/cost_mod/hanamusubi_exclude_self_test.rs",
+        "engine/tests/test_modules/effects/cost_mod/required_hearts/hanamusubi_required_hearts_exclude_self_test.rs",
         "engine/tests/test_modules/jidou/discard_watch/hanamusubi_test.rs"
       ],
       "covering_tests": [
@@ -38248,7 +38248,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/position/self_control_position_change_test.rs",
+        "engine/tests/test_modules/effects/position/area_move/self_control_position_change_test.rs",
         "engine/tests/test_modules/jidou/movement/awaken_the_power_test.rs"
       ],
       "covering_tests": [
@@ -38292,7 +38292,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/position/self_control_position_change_test.rs",
+        "engine/tests/test_modules/effects/position/area_move/self_control_position_change_test.rs",
         "engine/tests/test_modules/jidou/movement/awaken_the_power_test.rs"
       ],
       "covering_tests": [
@@ -38442,7 +38442,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/cost_mod/distinct_stage_waitroom_members_required_hearts_test.rs",
+        "engine/tests/test_modules/effects/cost_mod/required_hearts/distinct_stage_waitroom_members_required_hearts_test.rs",
         "engine/tests/test_modules/effects/gain/hearts/live_start/live_start_convert_selected_member_heart_color_test.rs",
         "engine/tests/test_modules/effects/look_select/reveal_to_hand/izumi_bp5_test.rs",
         "engine/tests/test_modules/effects/recover/to_hand/optional_discard_two_split_group_recovery_ginko_test.rs",
@@ -38513,8 +38513,8 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/cost_mod/distinct_stage_waitroom_members_required_hearts_test.rs",
-        "engine/tests/test_modules/effects/cost_mod/ladybug_test.rs",
+        "engine/tests/test_modules/effects/cost_mod/required_hearts/distinct_stage_waitroom_members_required_hearts_test.rs",
+        "engine/tests/test_modules/effects/cost_mod/required_hearts/ladybug_stage_cost_comparison_required_hearts_test.rs",
         "engine/tests/test_modules/effects/recover/to_hand/optional_discard_two_split_group_recovery_ginko_test.rs",
         "engine/tests/test_modules/effects/score/live_start_distinct_group_member_score_test.rs",
         "engine/tests/test_modules/rules/trigger_paths/ability_trigger_fix_test.rs"
@@ -38577,7 +38577,7 @@
       "covering_files": [
         "engine/tests/test_modules/characterization/character_condition_fix_test.rs",
         "engine/tests/test_modules/characterization/logging_test.rs",
-        "engine/tests/test_modules/effects/cost_mod/distinct_stage_waitroom_members_required_hearts_test.rs",
+        "engine/tests/test_modules/effects/cost_mod/required_hearts/distinct_stage_waitroom_members_required_hearts_test.rs",
         "engine/tests/test_modules/effects/gain/hearts/live_start/live_start_convert_selected_member_heart_color_test.rs",
         "engine/tests/test_modules/effects/recover/to_hand/debut_character_condition_energy_recover_live_test.rs",
         "engine/tests/test_modules/effects/score/live_start_distinct_group_member_score_test.rs",
@@ -38643,7 +38643,7 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/characterization/character_condition_fix_test.rs",
-        "engine/tests/test_modules/effects/cost_mod/distinct_stage_waitroom_members_required_hearts_test.rs",
+        "engine/tests/test_modules/effects/cost_mod/required_hearts/distinct_stage_waitroom_members_required_hearts_test.rs",
         "engine/tests/test_modules/effects/recover/to_hand/debut_character_condition_energy_recover_live_test.rs"
       ],
       "covering_tests": [
@@ -38702,7 +38702,7 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/characterization/character_condition_fix_test.rs",
-        "engine/tests/test_modules/effects/cost_mod/distinct_stage_waitroom_members_required_hearts_test.rs",
+        "engine/tests/test_modules/effects/cost_mod/required_hearts/distinct_stage_waitroom_members_required_hearts_test.rs",
         "engine/tests/test_modules/effects/recover/to_hand/debut_character_condition_energy_recover_live_test.rs"
       ],
       "covering_tests": [
@@ -38761,7 +38761,7 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/characterization/character_condition_fix_test.rs",
-        "engine/tests/test_modules/effects/cost_mod/distinct_stage_waitroom_members_required_hearts_test.rs",
+        "engine/tests/test_modules/effects/cost_mod/required_hearts/distinct_stage_waitroom_members_required_hearts_test.rs",
         "engine/tests/test_modules/effects/gain/blades/constants/other_unit_member_constant_blades_test.rs",
         "engine/tests/test_modules/effects/recover/to_hand/debut_character_condition_energy_recover_live_test.rs"
       ],
@@ -38822,7 +38822,7 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/characterization/character_condition_fix_test.rs",
-        "engine/tests/test_modules/effects/cost_mod/distinct_stage_waitroom_members_required_hearts_test.rs",
+        "engine/tests/test_modules/effects/cost_mod/required_hearts/distinct_stage_waitroom_members_required_hearts_test.rs",
         "engine/tests/test_modules/effects/gain/blades/constants/other_unit_member_constant_blades_test.rs",
         "engine/tests/test_modules/effects/recover/to_hand/debut_character_condition_energy_recover_live_test.rs"
       ],
@@ -38885,9 +38885,9 @@
         "engine/tests/test_modules/characterization/character_condition_fix_test.rs",
         "engine/tests/test_modules/characterization/logging_test.rs",
         "engine/tests/test_modules/effects/compound/live_start_optional_unit_position_change_heart_blade_test.rs",
-        "engine/tests/test_modules/effects/cost_mod/distinct_stage_waitroom_members_required_hearts_test.rs",
-        "engine/tests/test_modules/effects/position/himeno_front_test.rs",
-        "engine/tests/test_modules/effects/position/position_change_multi_test.rs",
+        "engine/tests/test_modules/effects/cost_mod/required_hearts/distinct_stage_waitroom_members_required_hearts_test.rs",
+        "engine/tests/test_modules/effects/position/area_move/himeno_debut_opponent_member_moved_to_own_front_area_test.rs",
+        "engine/tests/test_modules/effects/position/area_move/position_change_multi_test.rs",
         "engine/tests/test_modules/effects/recover/to_hand/debut_character_condition_energy_recover_live_test.rs",
         "engine/tests/test_modules/rules/baton/baton_touch_test.rs",
         "engine/tests/test_modules/rules/trigger_paths/ability_trigger_fix_test.rs"
@@ -39016,7 +39016,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/cost_mod/ladybug_test.rs",
+        "engine/tests/test_modules/effects/cost_mod/required_hearts/ladybug_stage_cost_comparison_required_hearts_test.rs",
         "engine/tests/test_modules/integration/gameplay_test.rs"
       ],
       "covering_tests": [
@@ -39079,7 +39079,7 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/effects/compound/live_start_optional_unit_position_change_heart_blade_test.rs",
-        "engine/tests/test_modules/effects/position/position_change_multi_test.rs"
+        "engine/tests/test_modules/effects/position/area_move/position_change_multi_test.rs"
       ],
       "covering_tests": [
         "formation_change_destination_excludes_already_claimed_area",
@@ -39126,7 +39126,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/cost_mod/distinct_stage_waitroom_members_required_hearts_test.rs",
+        "engine/tests/test_modules/effects/cost_mod/required_hearts/distinct_stage_waitroom_members_required_hearts_test.rs",
         "engine/tests/test_modules/effects/draw/chains/stage_group_pl_hs_sd1_017_sd_test.rs"
       ],
       "covering_tests": [
@@ -39229,10 +39229,10 @@
         "engine/tests/test_modules/effects/choice/target_player_recycle_pl_s_bp7_013_n_test.rs",
         "engine/tests/test_modules/effects/compound/deficit_mill_live_topdeck_pl_n_pr_032_pr_test.rs",
         "engine/tests/test_modules/effects/compound/optional_member_topdeck_blade_pl_s_bp3_021_l_test.rs",
-        "engine/tests/test_modules/effects/cost_mod/all_active_stage_pl_s_bp7_020_l_test.rs",
-        "engine/tests/test_modules/effects/cost_mod/baton_arrivals_pl_hs_bp2_023_l_and_pl_hs_bp2_025_l_test.rs",
-        "engine/tests/test_modules/effects/cost_mod/modify_required_hearts_global_test.rs",
-        "engine/tests/test_modules/effects/cost_mod/stacking_and_edges_pl_s_bp7_020_l_test.rs",
+        "engine/tests/test_modules/effects/cost_mod/required_hearts/all_active_stage_required_hearts_reduction_test.rs",
+        "engine/tests/test_modules/effects/cost_mod/required_hearts/baton_arrivals_required_hearts_reduction_test.rs",
+        "engine/tests/test_modules/effects/cost_mod/required_hearts/modify_required_hearts_global_test.rs",
+        "engine/tests/test_modules/effects/cost_mod/required_hearts/required_hearts_stacking_and_hostile_edges_test.rs",
         "engine/tests/test_modules/effects/deck_order/restore/s_bp2_021_live_success_test.rs",
         "engine/tests/test_modules/effects/draw/chains/card_ability_test.rs",
         "engine/tests/test_modules/effects/draw/chains/draw_discard_pl_hs_bp6_030_l_test.rs",
@@ -40115,7 +40115,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/cost_mod/distinct_stage_waitroom_members_required_hearts_test.rs",
+        "engine/tests/test_modules/effects/cost_mod/required_hearts/distinct_stage_waitroom_members_required_hearts_test.rs",
         "engine/tests/test_modules/effects/recover/to_hand/optional_discard_two_split_group_recovery_ginko_test.rs"
       ],
       "covering_tests": [
@@ -40324,7 +40324,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/state/self_discard_target_wait_pl_bp6_010_n_test.rs"
+        "engine/tests/test_modules/effects/state/wait_activation/self_discard_target_wait_pl_bp6_010_n_test.rs"
       ],
       "covering_tests": [
         "pl_bp6_010_n_cost_limit_wait_blocked_by_wait_immunity",
@@ -40535,7 +40535,7 @@
       "has_choice": false,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/cost_mod/success_zone_high_cost_group_deploy_discount_test.rs"
+        "engine/tests/test_modules/effects/cost_mod/activation_discount/success_zone_high_cost_group_deploy_discount_test.rs"
       ],
       "covering_tests": [
         "success_zone_discount_absent_after_source_removed_before_play",
@@ -40709,9 +40709,9 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/conditional/debut_reveal_success_zone_replacement_q256_test.rs",
-        "engine/tests/test_modules/effects/conditional/live_phase_success_zone_replacement_q256_test.rs",
-        "engine/tests/test_modules/effects/cost_mod/modify_required_hearts_13key_test.rs"
+        "engine/tests/test_modules/effects/conditional/zone_source/debut_reveal_success_zone_replacement_q256_test.rs",
+        "engine/tests/test_modules/effects/conditional/zone_source/live_phase_success_zone_replacement_q256_test.rs",
+        "engine/tests/test_modules/effects/cost_mod/required_hearts/modify_required_hearts_13key_test.rs"
       ],
       "covering_tests": [
         "activator_not_in_success_zone_does_nothing",
@@ -40805,8 +40805,8 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/conditional/debut_reveal_success_zone_replacement_q256_test.rs",
-        "engine/tests/test_modules/effects/conditional/live_phase_success_zone_replacement_q256_test.rs"
+        "engine/tests/test_modules/effects/conditional/zone_source/debut_reveal_success_zone_replacement_q256_test.rs",
+        "engine/tests/test_modules/effects/conditional/zone_source/live_phase_success_zone_replacement_q256_test.rs"
       ],
       "covering_tests": [
         "debut_reveal_success_zone_replacement_preserves_target_identity_pl_bp6_022_l",
@@ -41453,7 +41453,7 @@
       "has_choice": false,
       "has_negative": false,
       "covering_files": [
-        "engine/tests/test_modules/effects/state/cerise_bouquet_teammate_energy_activation_test.rs"
+        "engine/tests/test_modules/effects/state/per_card/cerise_bouquet_teammate_energy_activation_test.rs"
       ],
       "covering_tests": [
         "hs_bp6_012_debut_with_other_cerise_bouquet_member_activates_one_energy"
@@ -41486,7 +41486,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/state/low_blade_opponent_wait_pl_hs_bp6_013_r_test.rs"
+        "engine/tests/test_modules/effects/state/wait_activation/low_blade_opponent_wait_pl_hs_bp6_013_r_test.rs"
       ],
       "covering_tests": [
         "pl_hs_bp6_013_r_empty_opponent_stage_is_a_noop",
@@ -42768,7 +42768,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/position/position_change_condition_test.rs",
+        "engine/tests/test_modules/effects/position/area_gated/center_area_syncrise_member_constant_blade_gain_test.rs",
         "engine/tests/test_modules/jidou/movement/sd2_011_tomari_jidou_test.rs",
         "engine/tests/test_modules/rules/trigger_paths/cross_player_jidou_comprehensive_edge_test.rs"
       ],
@@ -43086,7 +43086,7 @@
         "engine/tests/test_modules/effects/gain/blades/constants/combined_success_zone_constant_blade_test.rs",
         "engine/tests/test_modules/effects/gain/hearts/constants/success_score_sum_constant_heart_test.rs",
         "engine/tests/test_modules/effects/score/opponent_success_score_six_constant_total_bonus_test.rs",
-        "engine/tests/test_modules/effects/state/success_score_energy_pl_bp4_004_r_test.rs"
+        "engine/tests/test_modules/effects/state/per_card/success_score_energy_pl_bp4_004_r_test.rs"
       ],
       "covering_tests": [
         "combined_success_count_blades_apply_independently_to_two_copies_pl_s_pb1_009_r",
@@ -43259,7 +43259,7 @@
       "has_choice": true,
       "has_negative": false,
       "covering_files": [
-        "engine/tests/test_modules/effects/position/auto_system_stress_test.rs"
+        "engine/tests/test_modules/effects/position/area_move/area_move_triggered_auto_ability_stress_test.rs"
       ],
       "covering_tests": [
         "step1_p1_single",
@@ -43296,7 +43296,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/state/debut_low_cost_opponent_wait_test.rs",
+        "engine/tests/test_modules/effects/state/wait_activation/debut_low_cost_opponent_wait_test.rs",
         "engine/tests/test_modules/integration/cross_player_round5_test.rs"
       ],
       "covering_tests": [
@@ -43450,7 +43450,7 @@
       "covering_files": [
         "engine/tests/test_modules/effects/draw/chains/side_debut_draw_discard_pl_sp_pb2_036_n_pl_sp_pb2_037_n_test.rs",
         "engine/tests/test_modules/effects/score/liella_heart_total_score_test.rs",
-        "engine/tests/test_modules/effects/state/all_liella_gated_opponent_wait_test.rs"
+        "engine/tests/test_modules/effects/state/wait_activation/all_liella_gated_opponent_wait_test.rs"
       ],
       "covering_tests": [
         "bp5026_total_above_threshold_scores_plus_one",
@@ -43489,7 +43489,7 @@
       "covering_files": [
         "engine/tests/test_modules/effects/draw/chains/side_debut_draw_discard_pl_sp_pb2_036_n_pl_sp_pb2_037_n_test.rs",
         "engine/tests/test_modules/effects/score/liella_heart_total_score_test.rs",
-        "engine/tests/test_modules/effects/state/all_liella_gated_opponent_wait_test.rs"
+        "engine/tests/test_modules/effects/state/wait_activation/all_liella_gated_opponent_wait_test.rs"
       ],
       "covering_tests": [
         "bp5026_total_above_threshold_scores_plus_one",
@@ -43594,7 +43594,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/state/all_liella_gated_opponent_wait_test.rs"
+        "engine/tests/test_modules/effects/state/wait_activation/all_liella_gated_opponent_wait_test.rs"
       ],
       "covering_tests": [
         "welcome_to_bokura_no_sekai_sp_pb2_047_live_start_with_all_liella_and_discard_waits_cost_two_enemy",
@@ -43737,7 +43737,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/position/live_start_subunit_threshold_formation_test.rs"
+        "engine/tests/test_modules/effects/position/area_move/live_start_subunit_threshold_formation_test.rs"
       ],
       "covering_tests": [
         "live_start_one_subunit_member_does_not_offer_formation",
@@ -43806,7 +43806,7 @@
       "covering_files": [
         "engine/tests/test_modules/effects/ability_mod/live_success_invalidation_and_live_start_suppression_test.rs",
         "engine/tests/test_modules/effects/recover/to_hand/hinoshita_test.rs",
-        "engine/tests/test_modules/effects/state/butterfly_wing_suppress_test.rs"
+        "engine/tests/test_modules/effects/state/per_card/butterfly_wing_suppress_test.rs"
       ],
       "covering_tests": [
         "butterfly_suppresses_only_the_owners_live_start_members",
@@ -43864,7 +43864,7 @@
       "covering_files": [
         "engine/tests/test_modules/effects/ability_mod/live_success_invalidation_and_live_start_suppression_test.rs",
         "engine/tests/test_modules/effects/recover/to_hand/hinoshita_test.rs",
-        "engine/tests/test_modules/effects/state/butterfly_wing_suppress_test.rs"
+        "engine/tests/test_modules/effects/state/per_card/butterfly_wing_suppress_test.rs"
       ],
       "covering_tests": [
         "butterfly_suppresses_only_the_owners_live_start_members",
@@ -43992,7 +43992,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/position/group_only_debut_formation_move_subunit_gain_blades_test.rs"
+        "engine/tests/test_modules/effects/position/area_move/group_only_debut_formation_move_subunit_gain_blades_test.rs"
       ],
       "covering_tests": [
         "group_gated_debut_non_group_member_no_formation",
@@ -44138,7 +44138,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/cost_mod/play_time_three_named_member_discard_cost_ten_test.rs"
+        "engine/tests/test_modules/effects/cost_mod/activation_discount/play_time_three_named_member_discard_cost_ten_test.rs"
       ],
       "covering_tests": [
         "play_time_named_discard_accept_with_ten_energy_pays_ten",
@@ -44227,7 +44227,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/position/debut_selected_member_fixed_center_test.rs"
+        "engine/tests/test_modules/effects/position/area_move/debut_selected_member_fixed_center_test.rs"
       ],
       "covering_tests": [
         "fixed_center_can_choose_self_when_not_already_center",
@@ -44438,7 +44438,7 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/effects/choice/energy_or_recycle_live_pl_n_pb1_010_r_test.rs",
-        "engine/tests/test_modules/effects/conditional/bp7_kanata_choice_test.rs",
+        "engine/tests/test_modules/effects/conditional/zone_source/discard_placed_group_live_or_blade_condition_test.rs",
         "engine/tests/test_modules/effects/draw/chains/card_ability_test.rs",
         "engine/tests/test_modules/effects/draw/chains/full_group_cost_twenty_draw_three_topdeck_three_test.rs",
         "engine/tests/test_modules/effects/gain/hearts/live_start/live_start_discard_shuffle_group_members_heart01_test.rs",
@@ -44545,7 +44545,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/state/bp7_ai_choice_under_member_test.rs",
+        "engine/tests/test_modules/effects/state/per_card/ai_debut_choice_activate_energy_or_under_member_test.rs",
         "engine/tests/test_modules/jidou/leaves_stage/baton_replacement_auto_effects_test.rs"
       ],
       "covering_tests": [
@@ -44591,8 +44591,8 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/state/bp7_ai_energy_under_member_optional_test.rs",
-        "engine/tests/test_modules/effects/state/s_bp6_015_wait_test.rs",
+        "engine/tests/test_modules/effects/state/per_card/ai_debut_optional_energy_under_nijigasaki_member_test.rs",
+        "engine/tests/test_modules/effects/state/wait_activation/pl_s_bp6_015_n_debut_opponent_cost2_wait_test.rs",
         "engine/tests/test_modules/rules/trigger_paths/q159_debut_from_discard_self_cost_test.rs"
       ],
       "covering_tests": [
@@ -44668,7 +44668,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/cost_mod/play_time_three_named_member_discard_cost_ten_test.rs",
+        "engine/tests/test_modules/effects/cost_mod/activation_discount/play_time_three_named_member_discard_cost_ten_test.rs",
         "engine/tests/test_modules/jidou/leaves_stage/baton_replacement_auto_effects_test.rs"
       ],
       "covering_tests": [
@@ -45202,7 +45202,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/cost_mod/play_time_three_named_member_discard_cost_ten_test.rs",
+        "engine/tests/test_modules/effects/cost_mod/activation_discount/play_time_three_named_member_discard_cost_ten_test.rs",
         "engine/tests/test_modules/jidou/movement/area_swap_auto_effects_test.rs"
       ],
       "covering_tests": [
@@ -45460,7 +45460,7 @@
       "has_choice": true,
       "has_negative": false,
       "covering_files": [
-        "engine/tests/test_modules/effects/position/energy_return_cost_position_change_test.rs"
+        "engine/tests/test_modules/effects/position/area_move/energy_return_cost_position_change_test.rs"
       ],
       "covering_tests": [
         "tomari_sp_bp7_022_activation_with_energy_returns_one_energy_and_leaves_center",
@@ -45706,7 +45706,7 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/characterization/pipeline_characterization_test.rs",
-        "engine/tests/test_modules/effects/cost_mod/play_time_three_named_member_discard_cost_ten_test.rs",
+        "engine/tests/test_modules/effects/cost_mod/activation_discount/play_time_three_named_member_discard_cost_ten_test.rs",
         "engine/tests/test_modules/effects/recover/to_hand/debut_live_recovery_test.rs",
         "engine/tests/test_modules/effects/recover/to_hand/live_success_member_recovery_test.rs"
       ],
@@ -45770,7 +45770,7 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/characterization/pipeline_characterization_test.rs",
-        "engine/tests/test_modules/effects/cost_mod/play_time_three_named_member_discard_cost_ten_test.rs",
+        "engine/tests/test_modules/effects/cost_mod/activation_discount/play_time_three_named_member_discard_cost_ten_test.rs",
         "engine/tests/test_modules/effects/recover/to_hand/debut_live_recovery_test.rs",
         "engine/tests/test_modules/effects/recover/to_hand/live_success_member_recovery_test.rs"
       ],
@@ -45834,7 +45834,7 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/characterization/pipeline_characterization_test.rs",
-        "engine/tests/test_modules/effects/cost_mod/play_time_three_named_member_discard_cost_ten_test.rs",
+        "engine/tests/test_modules/effects/cost_mod/activation_discount/play_time_three_named_member_discard_cost_ten_test.rs",
         "engine/tests/test_modules/effects/recover/to_hand/debut_live_recovery_test.rs",
         "engine/tests/test_modules/effects/recover/to_hand/live_success_member_recovery_test.rs"
       ],
@@ -45933,7 +45933,7 @@
       "has_choice": false,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/cost_mod/success_zone_group_pl_n_sd2_003_sd2_test.rs"
+        "engine/tests/test_modules/effects/cost_mod/activation_discount/success_zone_group_member_play_discount_test.rs"
       ],
       "covering_tests": [
         "shizuku_pl_n_sd2_003_sd2_hand_cost_full_without_success_zone_card",
@@ -45999,7 +45999,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/state/bp7_sd2_gap_test.rs"
+        "engine/tests/test_modules/effects/state/per_card/sd2_nijigasaki_abilities_gap_test.rs"
       ],
       "covering_tests": [
         "ai_pay_activates_a_waited_member",
@@ -46077,7 +46077,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/state/bp7_sd2_gap_test.rs",
+        "engine/tests/test_modules/effects/state/per_card/sd2_nijigasaki_abilities_gap_test.rs",
         "engine/tests/test_modules/rules/phases/live_success_rules_test.rs"
       ],
       "covering_tests": [
@@ -46137,7 +46137,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/state/bp7_sd2_gap_test.rs",
+        "engine/tests/test_modules/effects/state/per_card/sd2_nijigasaki_abilities_gap_test.rs",
         "engine/tests/test_modules/rules/phases/live_success_rules_test.rs"
       ],
       "covering_tests": [
@@ -46200,7 +46200,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/state/bp7_sd2_gap_test.rs"
+        "engine/tests/test_modules/effects/state/per_card/sd2_nijigasaki_abilities_gap_test.rs"
       ],
       "covering_tests": [
         "ai_pay_activates_a_waited_member",
@@ -46243,7 +46243,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/state/bp7_sd2_gap_test.rs"
+        "engine/tests/test_modules/effects/state/per_card/sd2_nijigasaki_abilities_gap_test.rs"
       ],
       "covering_tests": [
         "ai_pay_activates_a_waited_member",
@@ -46286,7 +46286,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/state/bp7_sd2_gap_test.rs",
+        "engine/tests/test_modules/effects/state/per_card/sd2_nijigasaki_abilities_gap_test.rs",
         "engine/tests/test_modules/integration/victory_road_test.rs"
       ],
       "covering_tests": [
@@ -46348,7 +46348,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/state/bp7_sd2_gap_test.rs"
+        "engine/tests/test_modules/effects/state/per_card/sd2_nijigasaki_abilities_gap_test.rs"
       ],
       "covering_tests": [
         "ai_pay_activates_a_waited_member",
@@ -46391,7 +46391,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/state/bp7_sd2_gap_test.rs"
+        "engine/tests/test_modules/effects/state/per_card/sd2_nijigasaki_abilities_gap_test.rs"
       ],
       "covering_tests": [
         "ai_pay_activates_a_waited_member",
@@ -46434,7 +46434,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/state/bp7_sd2_gap_test.rs"
+        "engine/tests/test_modules/effects/state/per_card/sd2_nijigasaki_abilities_gap_test.rs"
       ],
       "covering_tests": [
         "ai_pay_activates_a_waited_member",
