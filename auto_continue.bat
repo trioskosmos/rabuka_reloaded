@@ -9,7 +9,7 @@ exit /b
 param(
     [int]$IntervalMinutes = 8,
     [string]$WindowTitle = "",
-    [string]$Message = "continue what you are doing, if done continue renaming reorganising and writing tests to find parser and engine issues based on written japanese abilities and rules and qa."
+    [string]$Message = "continue what you are doing, if done continue renaming reorganising and writing tests to find parser and engine issues based on written japanese abilities and rules and qa. if all qa are done go through each ability individually looking for missing edge cases and considerations remember combining with other abilities and so on"
 )
 
 Add-Type -AssemblyName System.Windows.Forms

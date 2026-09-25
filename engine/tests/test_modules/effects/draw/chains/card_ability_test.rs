@@ -482,6 +482,31 @@ fn q244_mirakura_no_discard_draws_one() {
     );
 }
 
+#[test]
+fn q244_mirakura_p_plus_no_discard_draws_one() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let ability_card = game.new_id("PL!HS-pb1-003-P＋");
+    let other_card = game.new_id("PL!HS-pb1-003-P＋");
+    let filler = game.id("PL!-sd1-010-SD");
+
+    game.add_to_hand(ability_card);
+    game.add_to_hand(other_card);
+    game.give_energy(15);
+    game.state.player1.main_deck.cards.push(filler);
+
+    let deck_before = game.state.player1.main_deck.cards.len();
+    game.play_to_stage(ability_card, rabuka_engine::zones::MemberArea::Center);
+
+    assert_eq!(game.pending_choice_type(), Some("SelectCard".to_string()));
+    game.select_indices(&[]);
+
+    assert_eq!(game.state.player1.waitroom.cards.len(), 0);
+    assert_eq!(game.state.player1.hand.cards.len(), 2);
+    assert_eq!(game.state.player1.main_deck.cards.len(), deck_before - 1);
+}
+
 // ====================================================================
 //  大沢瑠璃乃 (PL!HS-bp1-005-R) — 登場:  discard up to 3 → draw equal to discarded
 // ====================================================================

@@ -123,6 +123,33 @@ fn twenty_restored_members_gain_two_blades_without_recoverable_live_q242() {
 }
 
 #[test]
+fn p_plus_twenty_restored_members_gain_two_blades_without_recoverable_live_q242() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let card = game.id("PL!HS-pb1-012-P＋");
+    let member = game.id("PL!-sd1-001-SD");
+    let filler = game.id("PL!-sd1-010-SD");
+    game.state.player1.stage.stage = [-1, -1, -1];
+
+    for _ in 0..10 {
+        game.state.player1.waitroom.cards.push(member);
+        game.state.player2.waitroom.cards.push(member);
+    }
+
+    let hand_before = game.state.player1.hand.cards.len();
+    fill_both_main_decks(&mut game, filler);
+    let blade_before = game.state.mods.get_blade_modifier(card);
+
+    trigger_member_restore_debut_and_check_blade_gain(&mut game, card);
+
+    assert_eq!(game.state.player1.hand.cards.len(), hand_before);
+    assert_eq!(
+        game.state.mods.get_blade_modifier(card),
+        blade_before + 2
+    );
+}
+
+#[test]
 fn exactly_twenty_restored_members_meet_recovery_and_blade_threshold_q242() {
     let db = load_real_database();
     let mut game = TestGame::new(db);

@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-09-25T08:04:33.908640",
+  "generated_at": "2026-09-25T12:06:04.246133",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "d5b9e3d5",
+  "engine_commit": "dba6cd0f",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -9708,7 +9708,6 @@
         "target": "both",
         "action": "position_change",
         "source_position": "center",
-        "exclude_self": true,
         "parenthetical": [
           "センターにいるメンバーを今いるエリア以外のエリアに移動させる。そのエリアにメンバーがいる場合、そのメンバーはセンターエリアに移動させる。"
         ]
@@ -31016,11 +31015,11 @@
         "text": "自分の控え室にある、自分のステージにいるすべてのメンバーと異なるグループ名を持つカード1枚を手札に加える",
         "source": "discard",
         "destination": "hand",
-        "card_type": "member_card",
+        "card_type": "card",
         "target": "self",
         "action": "move_cards",
-        "all": true,
-        "group_reference": "different_group_names"
+        "group_reference": "different_group_names",
+        "count": 1
       }
     },
     {

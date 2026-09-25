@@ -127,7 +127,7 @@ static void look_record_revealed(GameState *g, const int *cards, int n)
 {
     if (!g) return;
     for (int i = 0; i < n; i++)
-        if (g->n_revealed < RB_MAX_RECENTLY_MOVED)
+        if (g->n_revealed < RB_MAX_REVEALED_CARDS)
             g->revealed_cards[g->n_revealed++] = cards[i];
 }
 

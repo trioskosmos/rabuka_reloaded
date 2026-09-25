@@ -1227,24 +1227,28 @@ pub(crate) fn choose_live_set_experiment(
         let ceiling_enabled =
             std::env::var_os("V7_PRE_D").is_none() && std::env::var_os("V7_NO_CEILING").is_none();
         let mut chose_single = false;
-        if std::env::var_os("V7_CLOSE_RACE").is_some()
-            && opp_succ >= 2
-            && my_succ < 2
-        {
-            if let Some(&(_, _, first_hi, _)) = singles.first() {
+        if std::env::var_os("V7_SCORE_RACE").is_some() && my_succ >= 2 && opp_succ >= 2 {
+            if let Some(&(_, _, first_hi, _)) = singles.iter().max_by_key(|(_, _, hi, _)| {
+                db.get_card(my.hand.cards.get(*hi).copied().unwrap_or(-1))
+                    .and_then(|c| c.score)
+                    .unwrap_or(0)
+            }) {
                 desired.push(first_hi);
                 chose_single = true;
                 log::debug!(
-                    "v7 close-race t{} me{} opp{} hi={} p={:.2}",
+                    "v7 score-race t{} me{} my{} opp{} hi={}",
                     gs.turn_number,
                     me,
+                    my_succ,
                     opp_succ,
-                    first_hi,
-                    singles.first().map(|s| s.0).unwrap_or(0.0)
+                    first_hi
                 );
             }
         }
-        if !chose_single && std::env::var_os("V7_PAYOFF_MODEL").is_some() && (my_succ >= 2 || opp_succ >= 2) {
+        if !chose_single
+            && std::env::var_os("V7_PAYOFF_MODEL").is_some()
+            && (my_succ >= 2 || opp_succ >= 2)
+        {
             let e_opp = public_opponent_ceiling(gs, me, db);
             let opp_pass = if opp_committed { 0.86 } else { 0.0 };
             let opp_set_size = opp.live_card_zone.cards.len();

@@ -334,6 +334,44 @@ fn ranju_live_success_q239_zero_under_places_one() {
 }
 
 #[test]
+fn ranju_q239_zero_under_places_one_for_all_rarities() {
+    for suffix in ["AR", "P", "R＋", "SEC"] {
+        let db = load_real_database();
+        let mut game = TestGame::new(db);
+        let card_no = format!("PL!N-bp5-012-{suffix}");
+        let card = game.id(&card_no);
+        let live_card = game.id("PL!-sd1-019-SD");
+        let filler = game.id("PL!-sd1-010-SD");
+        let member = game.id("PL!-sd1-001-SD");
+
+        game.state.player1.stage.stage = [member, card, member];
+        let energy = game.id("LL-E-001-SD");
+        for _ in 0..10 {
+            game.state.player1.energy_deck.cards.push(energy);
+        }
+        game.state.player1.hand.cards.push(live_card);
+        fill_decks(&mut game, filler);
+        game.give_energy(5);
+
+        let energy_deck_before = game.state.player1.energy_deck.cards.len();
+        let energy_zone_before = game.state.player1.energy_zone.cards.len();
+
+        run_live_flow(&mut game, live_card);
+
+        assert_eq!(
+            game.state.player1.energy_deck.cards.len(),
+            energy_deck_before - 1,
+            "{card_no}: one energy should come from the energy deck"
+        );
+        assert_eq!(
+            game.state.player1.energy_zone.cards.len(),
+            energy_zone_before + 1,
+            "{card_no}: one energy should be added to the zone"
+        );
+    }
+}
+
+#[test]
 fn ranju_live_success_condition_not_met_no_move() {
     let db = load_real_database();
     let mut game = TestGame::new(db);

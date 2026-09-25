@@ -1911,11 +1911,19 @@ static int check_card_property(const struct GameState *g, int actor, const Condi
             int yell_trigger = 0;
             get_bool(c, "yell_trigger", &yell_trigger);
             has = yell_trigger ? cc.num_blade > 0 : rb_card_has_blade_heart(&cc);
+            if (yell_trigger)
+                fprintf(stderr, "[YELL_PROPERTY] id=%d no=%s num_blade=%d base=%d hearts=%d has=%d\n",
+                        ids[i], rb_card_string(cc.card_no_idx) ? rb_card_string(cc.card_no_idx) : "-",
+                        cc.num_blade, cc.num_base, cc.n_hearts, has);
         }
         else if (!strcmp(prop, "has_score_icon")) has = rb_card_has_score_icon(&cc);
         else if (!strcmp(prop, "has_all_blade")) has = rb_card_has_all_blade(&cc);
         rb_free_card(&cc);
-        if (neg) { if (!has) return 1; } else { if (has) return 1; }
+        if (neg) {
+            if (has) return 0;
+        } else if (has) {
+            return 1;
+        }
     }
     return neg ? 1 : 0;
 }

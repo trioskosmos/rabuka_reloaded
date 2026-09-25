@@ -34,8 +34,31 @@ fn distinct_group_activation_discount_q228_four_unique_groups_cost_zero() {
     }
 
     let active = game.state.player1.energy_zone.active_count();
-    eprintln!("[UMI] active energy consumed: {} (expected 0)", active);
     assert_eq!(active, 0, "Cost=0, no active energy consumed");
+}
+
+#[test]
+fn distinct_group_activation_discount_q228_zero_cost_all_rarities() {
+    for suffix in ["AR", "P", "R＋", "SEC"] {
+        let db = load_real_database();
+        let mut game = TestGame::new(db);
+        let card_no = format!("PL!-bp5-004-{suffix}");
+        let umi = game.id(&card_no);
+        let multi = game.id("LL-bp1-001-R＋");
+
+        game.state.player1.stage.stage = [umi, multi, -1];
+        assert_eq!(game.state.distinct_stage_groups("p1"), 4);
+        game.activate_ability(umi);
+        while game.has_pending_choice() {
+            game.select_indices(&[]);
+        }
+
+        assert_eq!(
+            game.state.player1.energy_zone.active_count(),
+            0,
+            "{card_no}: four groups should reduce the cost to zero"
+        );
+    }
 }
 
 /// umi + 2 fillers — all 3 are μ's (1 group) → printed 4E − 1 = 3.

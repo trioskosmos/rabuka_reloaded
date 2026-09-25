@@ -705,6 +705,71 @@ fn card_series_matches_group(series: &str, group: &str) -> bool {
     }
 }
 
+pub fn card_group_options(card_db: &CardDatabase, card_id: i16) -> Vec<String> {
+    let Some(card) = card_db.get_card(card_id) else {
+        return Vec::new();
+    };
+    let mut options = Vec::new();
+    for group in KNOWN_GROUPS {
+        if card_matches_group_str(card_db, card_id, Some(group)) {
+            options.push(group.to_string());
+        }
+    }
+    if !card.group.is_empty() && !options.iter().any(|g| g == card.group.as_ref()) {
+        options.push(card.group.to_string());
+    }
+    for ability_ref in &card.abilities {
+        let ability = ability_ref.resolve();
+        let Some(ref effect) = ability.effect else {
+            continue;
+        };
+        if effect.action != ActionType::SetCardIdentity {
+            continue;
+        }
+        let Some(identities) = effect.identities_any() else {
+            continue;
+        };
+        for identity in identities {
+            if !identity.is_empty() && !options.iter().any(|g| g == identity) {
+                options.push(identity.clone());
+            }
+        }
+    }
+    options
+}
+
+pub fn max_distinct_group_names(
+    card_db: &CardDatabase,
+    cards: &[i16],
+    allowed_groups: Option<&[String]>,
+) -> usize {
+    let group_sets: Vec<Vec<String>> = cards
+        .iter()
+        .filter_map(|&card_id| {
+            let options = card_group_options(card_db, card_id)
+                .into_iter()
+                .filter(|_group| {
+                    allowed_groups.is_none_or(|allowed| {
+                        allowed.iter().any(|candidate| {
+                            card_matches_group_str(card_db, card_id, Some(candidate.as_str()))
+                        })
+                    })
+                });
+            let options: Vec<String> = options.collect();
+            (!options.is_empty()).then_some(options)
+        })
+        .collect();
+    let distinct = max_distinct_names(&group_sets).distinct;
+    log::debug!(
+        "[DISTINCT_GROUPS] cards={:?} allowed={:?} options={:?} distinct={}",
+        cards,
+        allowed_groups,
+        group_sets,
+        distinct
+    );
+    distinct
+}
+
 pub fn card_matches_characters(
     card_db: &CardDatabase,
     card_id: i16,
@@ -1071,6 +1136,7 @@ impl<'a> CardFilter<'a> {
         self.card_type.is_some()
             || self.group.is_some()
             || self.groups.is_some()
+            || self.exclude_group_names.is_some()
             || self.cost_limit.is_some()
             || self.cost_limit_min.is_some()
             || self.cost_limit_max.is_some()

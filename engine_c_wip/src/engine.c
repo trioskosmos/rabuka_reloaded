@@ -212,7 +212,7 @@ void rb_emit_choice(GameState *g, int actor, RbChoiceKind kind,
 static int s_exec_depth = 0;
 void rb_execute_effect_ex(GameState *g, int actor, AbilityEffect *e, int host_cid) {
     if (!e) return;
-    if (host_cid == 2016 || host_cid == 2022)
+    if (g->yell_occurred)
         fprintf(stderr, "[YELL_EXEC_ENTER] host=%d action=%s has_cond=%d pending=%d occurred=%d revealed=%d\n",
                 host_cid, e->action ? e->action : "-", e->has_condition,
                 rb_has_pending_choice(g), g->yell_occurred, g->n_revealed);
@@ -234,7 +234,7 @@ void rb_execute_effect_ex(GameState *g, int actor, AbilityEffect *e, int host_ci
     }
     if (e->has_condition && e->condition) {
         int condition_ok = rb_eval_condition_for_host(g, actor, host_cid, e->condition);
-        if (e->action && !strcmp(e->action, "gain_resource"))
+        if (g->yell_occurred && e->action && !strcmp(e->action, "gain_resource"))
             fprintf(stderr, "[YELL_EXEC_COND] host=%d occurred=%d revealed=%d result=%d\n",
                     host_cid, g->yell_occurred, g->n_revealed, condition_ok);
         if (e->action && !strcmp(e->action, "draw_until_count"))
@@ -682,7 +682,7 @@ static void handle_action(GameState *g, int actor, AbilityEffect *e, int host_ci
         for (int k = 0; k < count; k++) {
             if (TP->deck.n == 0) break;
             int cid = TP->deck.cards[--TP->deck.n];
-            if (g->n_revealed < RB_MAX_RECENTLY_MOVED) g->revealed_cards[g->n_revealed++] = cid;
+            if (g->n_revealed < RB_MAX_REVEALED_CARDS) g->revealed_cards[g->n_revealed++] = cid;
             Card c; if (!rb_decode_card_by_index((uint32_t)cid, &c)) continue;
             int blade = (int)c.blade + rb_mods_get_blade(&g->mods, cid);
             if (blade > 0) g->re_yell_blade_hearts[RB_HEART_PINK] += blade;

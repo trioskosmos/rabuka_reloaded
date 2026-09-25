@@ -37,6 +37,26 @@ fn wien_bp5_q223_p1_center_empty_opponent_chooses() {
         game.has_pending_choice(),
         "Opponent should get choice for their center member (Q223)"
     );
+    assert_eq!(
+        game.state
+            .ability_queue
+            .current_entry()
+            .and_then(|entry| entry.choice_player_id.as_deref()),
+        Some("p2"),
+        "Q223: the opponent owns the destination choice"
+    );
+    assert!(game.state.can_player_act(1));
+    assert!(!game.state.can_player_act(0));
+    let options = match game.get_pending_choice() {
+        rabuka_engine::ability::types::Choice::SelectTarget { options, .. } => {
+            options.as_ref().unwrap()
+        }
+        other => panic!("expected SelectTarget, got {:?}", other),
+    };
+    assert_eq!(
+        options.iter().map(String::as_str).collect::<Vec<_>>(),
+        vec!["left", "right"]
+    );
     game.select_option(0); // choose Left
 
     // P2 center member moved to LeftSide
@@ -85,13 +105,31 @@ fn wien_bp5_q223_both_centers_occupied_both_choose() {
         "P2 center moved to LeftSide"
     );
     assert_eq!(game.state.player2.stage.stage[1], -1);
-
-    // Self's choice second (from pending_sequential_actions)
     assert!(
         game.has_pending_choice(),
         "Self's choice should come second"
     );
-    game.select_option(2); // self chooses Right
+    assert_eq!(
+        game.state
+            .ability_queue
+            .current_entry()
+            .and_then(|entry| entry.choice_player_id.as_deref()),
+        Some("p1"),
+        "The activating player owns the self-side destination choice"
+    );
+    assert!(game.state.can_player_act(0));
+    assert!(!game.state.can_player_act(1));
+    let options = match game.get_pending_choice() {
+        rabuka_engine::ability::types::Choice::SelectTarget { options, .. } => {
+            options.as_ref().unwrap()
+        }
+        other => panic!("expected SelectTarget, got {:?}", other),
+    };
+    assert_eq!(
+        options.iter().map(String::as_str).collect::<Vec<_>>(),
+        vec!["left", "right"]
+    );
+    game.select_option(1); // self chooses Right
 
     // P1 center moved to RightSide, p1_right swapped to Center
     assert_eq!(

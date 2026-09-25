@@ -26,6 +26,15 @@ fn fill_deck(game: &mut TestGame, filler: i16) {
     }
 }
 
+fn has_all_heart(game: &TestGame, card_id: i16) -> bool {
+    game.state
+        .mods
+        .heart_modifiers
+        .get(&card_id)
+        .and_then(|mods| mods.get(&HeartColor::All))
+        .map_or(false, |entry| entry.total() > 0)
+}
+
 /// Bypass the actual live resolution and directly trigger LiveSuccess
 /// abilities.  Injects enough hearts into stage_hearts so the engine's
 /// should_trigger_live_success check passes, then fires the abilities.
@@ -207,30 +216,58 @@ fn multi_name_card_single_slot_one_group_not_three() {
     );
 }
 
-/// Q225: Multi-name card counts as 1 member on stage.
 #[test]
-fn bring_love_q225_multiname_counts_as_one_member() {
+fn q225_joint_card_counts_as_one_member() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
-    let multi = game.id("LL-bp1-001-R\u{ff0b}");
+    let live = game.id("LL-bp5-002-L");
+    let joint = game.id("LL-bp1-001-R\u{ff0b}");
+    let filler = game.id("PL!-sd1-010-SD");
 
-    game.state.player1.stage.stage = [multi, -1, -1];
+    game.state.player1.stage.stage = [joint, -1, -1];
+    game.give_energy(15);
+    game.state.player1.hand.cards.push(live);
+    fill_deck(&mut game, filler);
 
-    let stage_ids: Vec<i16> = game
-        .state
-        .player1
-        .stage
-        .stage
-        .iter()
-        .filter(|&&id| id != -1)
-        .copied()
-        .collect();
-    assert_eq!(stage_ids.len(), 1, "One stage slot occupied");
-    assert_eq!(stage_ids[0], multi, "Multi-name card occupies the slot");
+    advance_to_live_card_set_p1(&mut game);
+    game.set_live_card(live);
+    advance_to_live_start(&mut game);
+    while game.has_pending_choice() {
+        game.select_indices(&[]);
+    }
 
-    let card = game.state.card_database.get_card(multi).unwrap();
-    let parts: Vec<&str> = card.name.split('&').collect();
-    assert!(parts.len() >= 3, "Multi-name card has 3+ individual names");
+    assert!(
+        !has_all_heart(&game, joint),
+        "Q225: one joint card is one member, not three"
+    );
+}
+
+#[test]
+fn q225_joint_cards_can_supply_distinct_groups() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let live = game.id("LL-bp5-002-L");
+    let joint1 = game.id("LL-bp1-001-R\u{ff0b}");
+    let joint2 = game.id("LL-bp2-001-R\u{ff0b}");
+    let muse = game.id("PL!-bp3-003-R");
+    let filler = game.id("PL!-sd1-010-SD");
+
+    game.state.player1.stage.stage = [muse, joint2, joint1];
+    game.give_energy(30);
+    game.state.player1.hand.cards.push(live);
+    fill_deck(&mut game, filler);
+
+    advance_to_live_card_set_p1(&mut game);
+    game.set_live_card(live);
+    advance_to_live_start(&mut game);
+    while game.has_pending_choice() {
+        game.select_indices(&[]);
+    }
+
+    assert!(
+        has_all_heart(&game, joint2),
+        "Q225: two joint cards can each represent one distinct group"
+    );
 }
 
 // ═══ ab#1: LiveSuccess — different_group_names discard filter ════════
@@ -266,6 +303,32 @@ fn ab1_different_group_moved_to_hand() {
     assert!(
         !game.state.player1.waitroom.cards.contains(&aqours_discard),
         "Aqours card should no longer be in discard"
+    );
+}
+
+#[test]
+fn ab1_group_bearing_live_card_can_move() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let live = game.id("LL-bp5-002-L");
+    let muse = game.id("PL!-bp3-003-R");
+    let aqours_live = game.id("PL!S-sd1-019-SD");
+
+    game.state.player1.stage.stage = [muse, -1, -1];
+    game.state.player1.waitroom.cards.push(aqours_live);
+    force_live_success(&mut game, live);
+
+    assert!(
+        !game.has_pending_choice(),
+        "A single eligible card should auto-resolve"
+    );
+    assert!(
+        game.state.player1.hand.cards.contains(&aqours_live),
+        "Aqours live card should move to hand"
+    );
+    assert!(
+        !game.state.player1.waitroom.cards.contains(&aqours_live),
+        "Aqours live card should leave the waitroom"
     );
 }
 
@@ -341,9 +404,8 @@ fn ab1_mixed_discard_only_different_group_moved() {
     );
 }
 
-/// No stage members → no groups to block → all discard cards pass.
 #[test]
-fn ab1_empty_stage_all_discard_moved() {
+fn ab1_empty_stage_moves_one_eligible_card() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let live = game.id("LL-bp5-002-L");
@@ -355,13 +417,26 @@ fn ab1_empty_stage_all_discard_moved() {
     game.state.player1.waitroom.cards.push(muse_card);
     force_live_success(&mut game, live);
 
-    assert!(
-        game.state.player1.hand.cards.contains(&aqours_card),
-        "Aqours should move (empty stage = no groups blocked)"
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectCard"),
+        "Bring the LOVE must select exactly one eligible card"
     );
-    assert!(
-        game.state.player1.hand.cards.contains(&muse_card),
-        "μ's should also move (empty stage)"
+    game.select_indices(&[0]);
+
+    let moved = game
+        .state
+        .player1
+        .hand
+        .cards
+        .iter()
+        .filter(|&&id| id == aqours_card || id == muse_card)
+        .count();
+    assert_eq!(moved, 1, "Only one eligible card moves");
+    assert_eq!(
+        game.state.player1.waitroom.cards.len(),
+        1,
+        "The other eligible card remains in the waitroom"
     );
 }
 
@@ -509,21 +584,26 @@ fn ab1_multiname_discard_blocked_by_one_matching_group() {
     );
 }
 
-/// Two copies of the same multi-name card in discard: both pass the
-/// group filter (when their groups differ from stage).
 #[test]
-fn ab1_two_multiname_discards_both_pass() {
+fn ab1_two_multiname_discards_moves_one() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let live = game.id("LL-bp5-002-L");
     let muse = game.id("PL!-bp3-003-R");
     let filler = game.id("PL!-sd1-010-SD");
-    let multi = game.id("LL-bp2-001-R\u{ff0b}"); // Aqours, Liella!, 蓮ノ空
+    let multi = game.id("LL-bp2-001-R\u{ff0b}");
 
     game.state.player1.stage.stage = [muse, filler, -1];
     game.state.player1.waitroom.cards.push(multi);
     game.state.player1.waitroom.cards.push(multi);
     force_live_success(&mut game, live);
+
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectCard"),
+        "Bring the LOVE must select one of two eligible cards"
+    );
+    game.select_indices(&[0]);
 
     let count_in_hand = game
         .state
@@ -533,8 +613,16 @@ fn ab1_two_multiname_discards_both_pass() {
         .iter()
         .filter(|&&c| c == multi)
         .count();
+    assert_eq!(count_in_hand, 1, "Exactly one multi-name card moves");
     assert_eq!(
-        count_in_hand, 2,
-        "Both multi-name cards should move (groups differ from μ's)"
+        game.state
+            .player1
+            .waitroom
+            .cards
+            .iter()
+            .filter(|&&c| c == multi)
+            .count(),
+        1,
+        "The second multi-name card remains in the waitroom"
     );
 }

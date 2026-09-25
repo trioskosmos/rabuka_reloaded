@@ -679,7 +679,7 @@ int rb_drain_ability_queue(GameState *g) {
                 i, g->queue.n_entries, e->card_id, e->ability_idx, actor,
                 ab.effect && ab.effect->action ? ab.effect->action : "-");
         if (ab.effect) {
-            if (e->card_id == 2016 || e->card_id == 2022)
+            if (g->yell_occurred)
                 fprintf(stderr, "[YELL_DRAIN] cid=%d action=%s has_cond=%d cond=%p pending=%d\n",
                         e->card_id, ab.effect->action ? ab.effect->action : "-",
                         ab.effect->has_condition, (void *)ab.effect->condition,

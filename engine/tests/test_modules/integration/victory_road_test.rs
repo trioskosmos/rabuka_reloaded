@@ -209,9 +209,6 @@ fn live_start_another_member() {
     );
 }
 
-/// T5: Q227: コスト支払いが必要な能力でコスト不払い → 不解決 → each_time発動しない
-/// Uses PL!-bp3-012-N (南ことり) which has LiveStart without cost → always resolves.
-/// (Engine currently has no way to test cost-decline via gameplay for this card.)
 #[test]
 fn live_start_cost_free_still_triggers() {
     let db = load_real_database();
@@ -242,6 +239,60 @@ fn live_start_cost_free_still_triggers() {
     assert!(
         has_all_heart(&game.state, member),
         "Cost-free LiveStart resolves → each_time fires"
+    );
+}
+
+#[test]
+fn q227_declined_live_start_cost_does_not_trigger_victory_road() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let victory = game.id("PL!N-bp5-030-L");
+    let payer = game.id("PL!N-sd2-017-SD2");
+    let ally = game.id("PL!-sd1-010-SD");
+    let live = game.id("PL!-sd1-019-SD");
+    let filler = game.new_id("PL!-sd1-010-SD");
+
+    game.state.player1.main_deck.cards.clear();
+    game.state.player2.main_deck.cards.clear();
+    for _ in 0..30 {
+        game.state.player1.main_deck.cards.push(filler);
+        game.state.player2.main_deck.cards.push(filler);
+    }
+    game.state.player1.live_card_zone.cards.push(victory);
+    game.state.player1.stage.stage = [ally, payer, -1];
+    game.state.mods.add_orientation_modifier(ally, "wait");
+    game.state.player1.hand.cards.push(live);
+    game.give_energy(8);
+
+    advance_to_live_start(&mut game);
+    game.set_live_card(live);
+    finish_live_setup(&mut game);
+
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectTarget"),
+        "Q227 should offer the optional LiveStart energy cost"
+    );
+    game.select_option(0);
+
+    assert!(
+        !game.has_pending_choice(),
+        "Declining the optional cost should skip the entire LiveStart ability"
+    );
+    assert_eq!(
+        game.state.mods.get_orientation_modifier(ally),
+        Some("wait"),
+        "Declining the cost must not activate the waited member"
+    );
+    assert!(
+        !has_all_heart(&game.state, payer),
+        "Declining the cost must not resolve the member ability for Victory Road"
+    );
+    assert_eq!(
+        game.state.player1.energy_zone.active_count(),
+        8,
+        "Declining the optional cost must not spend energy"
     );
 }
 

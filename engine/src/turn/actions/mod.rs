@@ -1342,6 +1342,12 @@ impl super::TurnEngine {
             {
                 true
             }
+            crate::ability::types::Choice::SelectTarget { target, .. }
+                if target == "position|destination"
+                    && resolver.spawn_context.target.as_deref() == Some("opponent") =>
+            {
+                true
+            }
             _ => false,
         };
         log::debug!(
@@ -1368,7 +1374,22 @@ impl super::TurnEngine {
         let Some(current) = current_pid else {
             return;
         };
-        let self_targeted = matches!(sub_choice, crate::ability::types::Choice::SelectCard { target_player_id: Some(tpid), .. } if tpid == "self");
+        let route = game_state
+            .ability_queue
+            .current_entry()
+            .and_then(|entry| entry.choice_card_no.as_ref())
+            .map(ToString::to_string);
+        let self_position_route = route
+            .as_deref()
+            .is_some_and(|raw| raw.starts_with("position_change:self"));
+        let self_targeted = matches!(sub_choice, crate::ability::types::Choice::SelectCard { target_player_id: Some(tpid), .. } if tpid == "self")
+            || self_position_route;
+        log::debug!(
+            "[RWC_G1_ROUTE] route={:?} self_targeted={} targets_opponent={}",
+            route,
+            self_targeted,
+            targets_opponent
+        );
         if targets_opponent {
             let opponent_id = game_state.opponent_id(&current);
             log::debug!("[RWC_G1] SET choice_player_id={}", opponent_id);

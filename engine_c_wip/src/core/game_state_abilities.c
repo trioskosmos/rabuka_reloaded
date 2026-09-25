@@ -71,7 +71,8 @@ static void apply_constant_node(RbMods *m, int cid, const AbilityEffect *e) {
 
 static int constant_pair_matches(const Ability *ab) {
     if (!ab) return 0;
-    return rb_ability_matches_trigger(ab, "constant")
+    return rb_ability_has_trigger(ab, RB_TK_CONSTANT)
+        || rb_ability_matches_trigger(ab, "constant")
         || rb_ability_matches_trigger(ab, "continuous")
         || (ab->triggers == NULL || ab->triggers[0] == '\0');
 }
@@ -330,20 +331,28 @@ int rb_can_place_card_in_zone(const GameState *g, int cid, const char *zone) {
     for (int a = 0; a < nab; a++) {
         Ability ab;
         if (!rb_decode_card_ability((uint32_t)cid, a, &ab)) continue;
-        if (constant_pair_matches(&ab) && ab.effect) {
+        int is_constant = constant_pair_matches(&ab);
+        if (zone && strstr(zone, "success"))
+            fprintf(stderr, "[CAN_PLACE_DECODE] cid=%d ability=%d constant=%d trigger=%s action=%s dest=%s\n",
+                    cid, a, is_constant, ab.triggers ? ab.triggers : "-",
+                    ab.effect && ab.effect->action ? ab.effect->action : "-",
+                    ab.effect && ab.effect->destination ? ab.effect->destination : "-");
+        if (is_constant && ab.effect) {
             const AbilityEffect *e = ab.effect;
             const char *act = e->action ? e->action : "";
             const char *rtype = NULL;
             for (int i = 0; i < e->n_extra; i++)
                 if (e->extra_k[i] && !strcmp(e->extra_k[i], "restriction_type"))
                     rtype = e->extra_v[i];
-            const char *dest = NULL;
-            for (int i = 0; i < e->n_extra; i++)
+            const char *dest = e->destination;
+            for (int i=0;i<e->n_extra && !dest;i++)
                 if (e->extra_k[i] && (!strcmp(e->extra_k[i], "destination") ||
                                       !strcmp(e->extra_k[i], "restricted_destination")))
                     dest = e->extra_v[i];
             if (!strcmp(act, "restriction") && rtype && !strcmp(rtype, "cannot_place") &&
                 dest && zone_eq(dest, zone)) {
+                fprintf(stderr, "[CAN_PLACE] cid=%d zone=%s result=0 reason=cannot_place\n",
+                        cid, zone ? zone : "-");
                 rb_free_ability(&ab);
                 return 0;
             }

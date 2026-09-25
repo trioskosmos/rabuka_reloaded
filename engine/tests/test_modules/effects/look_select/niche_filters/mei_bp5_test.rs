@@ -212,3 +212,33 @@ fn mei_bp5_q235_debut_look_and_select_with_multiname() {
         "Multi-name card should no longer be in the deck"
     );
 }
+
+#[test]
+fn mei_bp5_q235_multiname_for_all_rarities() {
+    for suffix in ["AR", "P", "R"] {
+        let db = load_real_database();
+        let mut game = TestGame::new(db);
+        let card_no = format!("PL!SP-bp5-007-{suffix}");
+        let mei = game.id(&card_no);
+        let filler = game.id("PL!-sd1-010-SD");
+        let multiname = game.id("LL-bp1-001-R＋");
+
+        game.state.player1.hand.cards.push(mei);
+        game.state.player1.hand.cards.push(filler);
+        game.state.player1.main_deck.cards.push(multiname);
+        for _ in 0..4 {
+            game.state.player1.main_deck.cards.push(filler);
+        }
+        game.give_energy(15);
+        game.play_to_stage(mei, rabuka_engine::zones::MemberArea::LeftSide);
+
+        discard_cost_if_pending(&mut game);
+        select_and_finish(&mut game, 2);
+
+        assert!(
+            game.state.player1.hand.cards.contains(&multiname),
+            "{card_no}: multi-name card should be added to hand"
+        );
+        assert!(!game.state.player1.main_deck.cards.contains(&multiname));
+    }
+}

@@ -558,7 +558,7 @@ void rb_resolver_reveal_selected_looked_at(GameState *g, const int *indices, int
             if (idx < n) cid = pool[idx];
         }
         if (cid < 0) continue;
-        if (g->n_revealed < RB_MAX_RECENTLY_MOVED) g->revealed_cards[g->n_revealed++] = cid;
+        if (g->n_revealed < RB_MAX_REVEALED_CARDS) g->revealed_cards[g->n_revealed++] = cid;
         /* In Rust push_revealed_card also records source, owner, cause "ability" — mirrored via g->revealed_cards */
         (void)source; (void)looked_owner;
     }
@@ -772,7 +772,7 @@ int rb_resolver_handle_select_card(RbAbilityResolver *self, GameState *g, const 
             int n = rb_zone_cards(g, actor, zone, ids, RB_MAX_ZONE);
             if (idx >= 0 && idx < n) {
                 int cid = ids[idx];
-                if (g->n_revealed < RB_MAX_RECENTLY_MOVED) g->revealed_cards[g->n_revealed++] = cid;
+                if (g->n_revealed < RB_MAX_REVEALED_CARDS) g->revealed_cards[g->n_revealed++] = cid;
                 if (self->n_selected_cards < RB_MAX_RECENTLY_MOVED) self->selected_cards[self->n_selected_cards++] = cid;
                 if (g->queue.resume_eff) rb_set_chosen_target(g->queue.resume_eff, target ? target : "reveal");
             }
@@ -995,8 +995,12 @@ int rb_resolver_handle_select_card(RbAbilityResolver *self, GameState *g, const 
     }
     if (!strcmp(zone,"live_card_zone")) {
         if (!was_skip) {
-            int ids[RB_MAX_ZONE]; int n=rb_zone_cards(g, actor,"live",ids,RB_MAX_ZONE);
-            if(idx>=0 && idx<n){ int cid=ids[idx]; if(self->n_selected_cards<RB_MAX_RECENTLY_MOVED) self->selected_cards[self->n_selected_cards++]=cid; /* remove from live zone */ for(int i=idx;i<g->p[actor].live.n-1;i++) g->p[actor].live.cards[i]=g->p[actor].live.cards[i+1]; if(g->p[actor].live.n>0) g->p[actor].live.n--; }
+            if (target && !strcmp(target, "select_live_success")) {
+                rb_handle_live_success_choice(g, actor, idx);
+            } else {
+                int ids[RB_MAX_ZONE]; int n=rb_zone_cards(g, actor,"live",ids,RB_MAX_ZONE);
+                if(idx>=0 && idx<n){ int cid=ids[idx]; if(self->n_selected_cards<RB_MAX_RECENTLY_MOVED) self->selected_cards[self->n_selected_cards++]=cid; /* remove from live zone */ for(int i=idx;i<g->p[actor].live.n-1;i++) g->p[actor].live.cards[i]=g->p[actor].live.cards[i+1]; if(g->p[actor].live.n>0) g->p[actor].live.n--; }
+            }
         }
         rb_resolver_handle_selection_epilogue(self,g); return 0;
     }
@@ -1224,7 +1228,7 @@ void rb_resolver_handle_reveal_selection(RbAbilityResolver *self, GameState *g,
         int n = rb_zone_cards(g, actor, g->queue.pending.zone[0] ? g->queue.pending.zone : "hand", ids, RB_MAX_ZONE);
         if (idx >=0 && idx < n) {
             int cid = ids[idx];
-            if (g->n_revealed < RB_MAX_RECENTLY_MOVED) g->revealed_cards[g->n_revealed++] = cid;
+            if (g->n_revealed < RB_MAX_REVEALED_CARDS) g->revealed_cards[g->n_revealed++] = cid;
             if (self->n_selected_cards < RB_MAX_RECENTLY_MOVED) self->selected_cards[self->n_selected_cards++] = cid;
             /* also push to revealed cost tracking if effect not started */
             int cur = g->queue.cur;
@@ -1311,7 +1315,7 @@ void rb_resolver_handle_entry_cost_reveal(RbAbilityResolver *self, GameState *g,
     int n = rb_zone_cards(g, actor, "hand", ids, RB_MAX_ZONE);
     if (idx >=0 && idx < n) {
         int cid = ids[idx];
-        if (g->n_revealed < RB_MAX_RECENTLY_MOVED) g->revealed_cards[g->n_revealed++] = cid;
+        if (g->n_revealed < RB_MAX_REVEALED_CARDS) g->revealed_cards[g->n_revealed++] = cid;
         if (self->n_selected_cards < RB_MAX_RECENTLY_MOVED) self->selected_cards[self->n_selected_cards++] = cid;
         /* cost reveal also counts toward cost tracking */
         if (cur>=0) g->queue.entries[cur].optional_cost_result=1;
@@ -1364,7 +1368,7 @@ void rb_resolver_handle_looked_at_selection(RbAbilityResolver *self, GameState *
                 ch.count=rem; ch.allow_skip=0; g->queue.pending=ch; g->queue.has_pending=1; return;
             }
             /* move looked_at cards to revealed for later handling */
-            for (int i=0;i<self->n_selected_cards;i++) if (g->n_revealed < RB_MAX_RECENTLY_MOVED) g->revealed_cards[g->n_revealed++]=self->selected_cards[i];
+            for (int i=0;i<self->n_selected_cards;i++) if (g->n_revealed < RB_MAX_REVEALED_CARDS) g->revealed_cards[g->n_revealed++]=self->selected_cards[i];
         } else {
             /* move directly to discard/energy etc. */
             const char *dst = g->queue.pending.target[0] ? g->queue.pending.target : "waitroom";
@@ -1373,7 +1377,7 @@ void rb_resolver_handle_looked_at_selection(RbAbilityResolver *self, GameState *
         }
     } else if (idx < 0 && g->queue.pending.allow_skip) {
         /* skip for any_number: finalize */
-        if (self->n_selected_cards>0) for(int i=0;i<self->n_selected_cards;i++) if(g->n_revealed<RB_MAX_RECENTLY_MOVED) g->revealed_cards[g->n_revealed++]=self->selected_cards[i];
+        if (self->n_selected_cards>0) for(int i=0;i<self->n_selected_cards;i++) if(g->n_revealed<RB_MAX_REVEALED_CARDS) g->revealed_cards[g->n_revealed++]=self->selected_cards[i];
     }
     rb_resolver_clear_choice_state_and_resume(self);
 }

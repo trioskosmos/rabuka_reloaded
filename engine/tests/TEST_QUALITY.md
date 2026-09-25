@@ -43,13 +43,14 @@ _trigger event hand-pushed with no real ability resolution in the same fn (weake
 
 None.
 
-## pendency_only (1)
+## pendency_only (2)
 
 _has_pending_choice asserted without choice identity (pending_choice_type/summary/answer) or outcome asserts_
 
 | file | test | line | detail |
 | --- | --- | --- | --- |
 | `engine/tests/test_modules/effects/compound/discard_two_self_and_other_group_debut_retrigger_test.rs` | `discard_two_debut_retrigger_offers_count_two_selection` | 47 |  |
+| `engine/tests/test_modules/jidou/leaves_stage/optional_any_player_position_change_q238_test.rs` | `leaves_stage_repositions_opponent_member_for_all_rarities_q238` | 84 |  |
 
 ## similar_cards (27)
 

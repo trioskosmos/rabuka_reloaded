@@ -1328,18 +1328,16 @@ impl<'a> ConditionContext<'a> {
                     compare_counts(operator, count, count_threshold)
                 }
                 "group_name" => {
-                    let mut distinct_groups: HashSet<String> = HashSet::default();
-                    for &cid in &combined {
-                        if !eligible(cid) {
-                            continue;
-                        }
-                        if let Some(card) = card_db.get_card(cid) {
-                            if !card.group.is_empty() {
-                                distinct_groups.insert(card.group.to_string());
-                            }
-                        }
-                    }
-                    let count = distinct_groups.len().u8_count();
+                    let eligible_cards: Vec<i16> = combined
+                        .iter()
+                        .copied()
+                        .filter(|&cid| eligible(cid))
+                        .collect();
+                    let count = util::max_distinct_group_names(
+                        card_db,
+                        &eligible_cards,
+                        group_names,
+                    ) as u8;
                     compare_counts(operator, count, count_threshold)
                 }
                 _ => {
@@ -2319,8 +2317,19 @@ impl<'a> ConditionContext<'a> {
         }
 
         // Early-out for aggregate total (sum heart colors, not count cards)
-        if let Some(res) = self.check_aggregate_total(condition, player, location) {
-            return res;
+        let stage_types = condition.get_unit().as_deref() == Some("types")
+            && Zone::from_str(location) == Some(Zone::Stage);
+        log::debug!(
+            "[AGGREGATE_DISPATCH] location={} unit={:?} stage_types={} aggregate={:?}",
+            location,
+            condition.get_unit(),
+            stage_types,
+            condition.get_aggregate()
+        );
+        if !stage_types {
+            if let Some(res) = self.check_aggregate_total(condition, player, location) {
+                return res;
+            }
         }
 
         let is_old_movement = condition.get_source() == Some("preceding_moved")
@@ -3388,15 +3397,7 @@ impl<'a> ConditionContext<'a> {
         };
         match distinct_type {
             "cost" => self.count_distinct_cost(&matching, None) as u8,
-            "group_name" => {
-                let mut seen: HashSet<String> = HashSet::default();
-                for &cid in &matching {
-                    if let Some(card) = card_db.get_card(cid) {
-                        seen.insert(card.group.to_string());
-                    }
-                }
-                seen.len().u8_count()
-            }
+            "group_name" => util::max_distinct_group_names(card_db, &matching, group_names) as u8,
             _ => {
                 let name_sets: Vec<Vec<String>> = matching
                     .iter()

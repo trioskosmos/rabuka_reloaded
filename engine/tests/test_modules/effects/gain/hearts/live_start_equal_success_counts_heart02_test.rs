@@ -53,6 +53,40 @@ fn setsuna_q230_both_zero_heart02_gained() {
     assert_eq!(mod_val, 2, "Q230: Both 0 success cards → heart02 x2 gained");
 }
 
+#[test]
+fn setsuna_q230_both_zero_heart02_gained_all_rarities() {
+    for suffix in ["AR", "P", "R＋", "SEC"] {
+        let db = load_real_database();
+        let mut game = TestGame::new(db);
+        let card_no = format!("PL!N-bp5-007-{suffix}");
+        let setsuna = game.id(&card_no);
+        let filler = game.id("PL!-sd1-010-SD");
+        let live = game.id("PL!-sd1-019-SD");
+
+        game.state.player1.stage.stage = [setsuna, filler, -1];
+        game.state.player1.hand.cards.push(live);
+        game.state.player1.hand.cards.push(filler);
+        for _ in 0..40 {
+            game.state.player1.main_deck.cards.push(filler);
+            game.state.player2.main_deck.cards.push(filler);
+        }
+        game.give_energy(15);
+
+        advance_to_live_set(&mut game);
+        game.set_live_card(live);
+        game.pass();
+        game.pass();
+
+        assert_eq!(
+            game.state
+                .mods
+                .get_heart_modifier(setsuna, rabuka_engine::card::HeartColor::Heart02),
+            2,
+            "{card_no}: equal zero counts should grant heart02 twice"
+        );
+    }
+}
+
 /// ab#0: P1 has 1 success card, P2 has 1 → equal → no pending choice (fixed heart color).
 #[test]
 fn setsuna_unequal_success_cards_no_heart() {

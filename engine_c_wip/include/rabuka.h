@@ -1252,6 +1252,7 @@ typedef struct {
 
 #define RB_MAX_SNAPSHOTS 64
 #define RB_MAX_RECENTLY_MOVED 8
+#define RB_MAX_REVEALED_CARDS RB_MAX_ZONE
 
 /* batch_movements / position_change_events entry types (must precede GameState) */
 typedef struct {
@@ -1331,7 +1332,7 @@ typedef struct GameState {
     int8_t   state_change_from[RB_MAX_CARD_IDS];
     int8_t   state_change_to[RB_MAX_CARD_IDS];
     int      last_wait_to_active_count; /* count of wait→active flips this turn */
-    int      revealed_cards[RB_MAX_RECENTLY_MOVED]; /* cards revealed by yell/re_yell */
+    int      revealed_cards[RB_MAX_REVEALED_CARDS]; /* cards revealed by yell/re_yell */
      int      n_revealed;
      int      yell_occurred;
      int      performance_resume_pending;
@@ -1789,6 +1790,8 @@ int  rb_backtrack_allocate(const int pool[8], const int card_needs[8], int n_car
                            int *out_allocs, int max_allocs);
 int  rb_card_ok_with_wildcard(const int filled[8], const int need[8]);
 void rb_execute_live_victory_determination(GameState *g);
+void rb_move_live_to_success_and_handle_wins(GameState *g);
+void rb_handle_live_success_choice(GameState *g, int pl, int selected_index);
 void rb_process_player_live_result(GameState *g, int pl, int won, int must_skip, int can_place);
 /* ── live.rs standalone helpers (ported) ── */
 /* Mirror live.rs::blade_color_to_heart: map a set_blade_type blade color to the

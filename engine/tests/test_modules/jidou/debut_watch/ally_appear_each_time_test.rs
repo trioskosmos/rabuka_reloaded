@@ -286,12 +286,36 @@ fn hana_009_q245_self_deploy_to_center_triggers_each_time() {
     let blade_after = blade_count(&v, hanaho);
     assert!(
         blade_after >= 2,
-        "Q245: Kaho deployed to center should trigger own each_time (blade 0 竊・{})",
+        "Q245: Kaho deployed to center should trigger own each_time (blade 0 → {})",
         blade_after
     );
 }
 
+#[test]
+fn hana_009_p_plus_q245_self_deploy_to_center_triggers_each_time() {
+    let db = load_real_database();
+    let mut v = TestGame::new(db);
+    let hanaho = v.id("PL!HS-pb1-009-P＋");
+    let filler = v.id("PL!-sd1-010-SD");
+
+    v.state.player1.stage.stage = [filler, -1, -1];
+    v.state.player1.hand.cards.clear();
+    v.state.player1.hand.cards.push(hanaho);
+    v.give_energy(15);
+    for _ in 0..40 {
+        v.state.player1.main_deck.cards.push(filler);
+    }
+
+    assert_eq!(blade_count(&v, hanaho), 0);
+
+    v.play_to_stage(hanaho, MemberArea::Center);
+    drain_auto(&mut v);
+
+    assert!(blade_count(&v, hanaho) >= 2);
+}
+
 /// Q245 edge: 009 played to NON-center 竊・her each_time requires center 竊・no trigger.
+
 #[test]
 fn hana_009_q245_self_deploy_non_center_no_trigger() {
     let db = load_real_database();

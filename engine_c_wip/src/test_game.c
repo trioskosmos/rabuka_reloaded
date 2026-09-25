@@ -94,7 +94,7 @@ void test_set_energy_active(TestGame *tg, int pl, int n){
     tg->state.p[pl].energy_active = n;
 }
 void test_add_to_revealed(TestGame *tg, int card_id){
-    if(tg->state.n_revealed < RB_MAX_RECENTLY_MOVED)
+    if(tg->state.n_revealed < RB_MAX_REVEALED_CARDS)
         tg->state.revealed_cards[tg->state.n_revealed++]=card_id;
 }
 void test_give_opp_energy(TestGame *tg, int count){

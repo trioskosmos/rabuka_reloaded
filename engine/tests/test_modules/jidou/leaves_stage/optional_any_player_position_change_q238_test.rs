@@ -81,6 +81,32 @@ fn leaves_stage_repositions_opponent_member_q238() {
     );
 }
 
+#[test]
+fn leaves_stage_repositions_opponent_member_for_all_rarities_q238() {
+    for suffix in ["P", "R＋", "SEC"] {
+        let db = load_real_database();
+        let mut game = TestGame::new(db);
+        let card_no = format!("PL!HS-bp5-003-{suffix}");
+        let rino = game.id(&card_no);
+        let opponent = game.new_id("PL!-sd1-010-SD");
+
+        game.state.player1.stage.stage = [-1, rino, -1];
+        game.state.player2.stage.stage = [-1, opponent, -1];
+        game.state.player1.stage.stage[1] = -1;
+        game.state.player1.waitroom.cards.push(rino);
+        trigger_stage_to_waitroom_auto(&mut game, rino);
+
+        assert!(game.has_pending_choice(), "{card_no}: auto should fire");
+        assert_eq!(count_position_actions(&game), 1);
+        game.select_generated(0);
+        assert!(game.has_pending_choice(), "{card_no}: destination prompt");
+        game.select_generated(0);
+
+        assert_eq!(game.state.player2.stage.stage[0], opponent);
+        assert_eq!(game.state.player2.stage.stage[1], -1);
+    }
+}
+
 /// Reposition own member (basic case).
 #[test]
 fn leaves_stage_own_member_position_choice_resolves_q238() {

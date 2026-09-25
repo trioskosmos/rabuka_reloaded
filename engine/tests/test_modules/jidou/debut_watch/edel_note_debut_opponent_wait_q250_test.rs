@@ -1,5 +1,6 @@
 use crate::helpers::*;
 use rabuka_engine::game_state::AbilityTrigger;
+use rabuka_engine::zones::MemberArea;
 
 const CERAS_AUTO: &str = "{{jidou.png|自動}}{{turn1.png|ターン1回}}自分のステージに『EdelNote』のメンバーが登場したとき、相手は、自身のステージにいるアクティブ状態のメンバー1人をウェイトにする。";
 
@@ -57,6 +58,26 @@ fn edel_note_self_debut_waits_lone_active_opponent_member_q250() {
     trigger_ceras_auto(&mut game);
     assert!(!game.has_pending_choice(), "1 target → auto-resolved");
     assert!(is_wait(&game, p2_member), "Opponent member put into wait");
+}
+
+#[test]
+fn edel_note_p_self_debut_waits_lone_active_opponent_member_q250() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let ceras = game.id("PL!HS-bp6-007-P");
+    let p2_member = game.id("PL!-sd1-010-SD");
+    let filler = game.id("PL!-sd1-013-SD");
+
+    game.state.player2.stage.stage[1] = p2_member;
+    game.add_to_hand(ceras);
+    game.add_to_hand(filler);
+    game.give_energy(15);
+
+    game.play_to_stage(ceras, MemberArea::Center);
+
+    assert!(is_wait(&game, p2_member));
+    assert!(!game.has_pending_choice());
+    assert!(game.state.ability_queue.is_idle());
 }
 
 /// No appearance (card on stage, no recently_moved) → no trigger.

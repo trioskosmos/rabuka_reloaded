@@ -79,6 +79,42 @@ fn hand_discard_batch_q241_two_discarded_auto_fires_once() {
     );
 }
 
+#[test]
+fn hand_discard_batch_q241_p_plus_two_discarded_auto_fires_once() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let rurino = game.id("PL!HS-pb1-003-P＋");
+    let miraku = game.id("PL!HS-sd1-011-SD");
+    let miraku2 = game.new_id("PL!HS-sd1-011-SD");
+    let filler = game.id("PL!-sd1-010-SD");
+
+    game.add_to_hand(rurino);
+    game.add_to_hand(miraku);
+    game.add_to_hand(miraku2);
+    for _ in 0..20 {
+        game.state.player1.main_deck.cards.push(filler);
+        game.state.player2.main_deck.cards.push(filler);
+    }
+    game.give_energy(20);
+
+    game.play_to_stage(rurino, rabuka_engine::zones::MemberArea::Center);
+
+    let mut step = 0;
+    while game.has_pending_choice() && step < 20 {
+        step += 1;
+        match game.pending_choice_type().as_deref() {
+            Some("SelectAutoAbility") => game.select_indices(&[0]),
+            Some("SelectCard") if step <= 2 => game.select_indices(&[0, 1]),
+            Some("SelectCard") => game.select_indices(&[]),
+            _ => game.select_indices(&[]),
+        }
+    }
+
+    assert_eq!(heart01_mod(&game, rurino), 1);
+    assert_eq!(blade_mod(&game, rurino), 1);
+}
+
 /// Q241 edge: 1 card discarded → fires once (control).
 #[test]
 fn hand_discard_batch_q241_one_discarded_fires_once() {

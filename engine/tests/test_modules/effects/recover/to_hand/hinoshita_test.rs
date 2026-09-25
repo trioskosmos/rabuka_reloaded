@@ -80,6 +80,44 @@ fn hinoshita_q236_name_contains_all_matches() {
     );
 }
 
+#[test]
+fn hinoshita_q236_name_contains_all_matches_for_all_rarities() {
+    for suffix in ["AR", "P", "R＋", "SEC"] {
+        let db = load_real_database();
+        let mut game = TestGame::new(db);
+        let card_no = format!("PL!HS-bp5-001-{suffix}");
+        let hino = game.id(&card_no);
+        let reveal = game.id("PL!HS-bp1-019-L");
+        let target = game.id("PL!HS-bp5-017-L");
+
+        assert_eq!(game.db.get_card(reveal).unwrap().name, "Dream Believers");
+        assert_eq!(
+            game.db.get_card(target).unwrap().name,
+            "Dream Believers（104期Ver.）"
+        );
+        game.state.player1.stage.stage[1] = hino;
+        game.state.player1.hand.cards.push(reveal);
+        game.state.player1.waitroom.cards.push(target);
+        game.give_energy(2);
+        let energy_before = game.state.player1.energy_zone.active_count();
+
+        game.activate_ability(hino);
+        while game.has_pending_choice() {
+            game.select_indices(&[0]);
+        }
+
+        assert!(
+            game.state.player1.hand.cards.contains(&target),
+            "{card_no}: 104th Ver. should be recoverable from the base name"
+        );
+        assert!(game.state.player1.hand.cards.contains(&reveal));
+        assert_eq!(
+            game.state.player1.energy_zone.active_count(),
+            energy_before - 2
+        );
+    }
+}
+
 /// Q237: Reveal "Dream Believers (104th Ver.)" (longer name) → CANNOT recover
 /// "Dream Believers" because the extra fragment "(104th Ver.)" from the
 /// revealed card is NOT contained in the target's name.
@@ -133,6 +171,44 @@ fn hinoshita_q237_name_contains_all_no_match() {
         energy_before - 2,
         "Q237: 2 energy should be consumed"
     );
+}
+
+#[test]
+fn hinoshita_q237_no_name_match_for_all_rarities() {
+    for suffix in ["AR", "P", "R＋", "SEC"] {
+        let db = load_real_database();
+        let mut game = TestGame::new(db);
+        let card_no = format!("PL!HS-bp5-001-{suffix}");
+        let hino = game.id(&card_no);
+        let reveal = game.id("PL!HS-bp5-017-L");
+        let target = game.id("PL!HS-bp1-019-L");
+
+        assert_eq!(
+            game.db.get_card(reveal).unwrap().name,
+            "Dream Believers（104期Ver.）"
+        );
+        game.state.player1.stage.stage[1] = hino;
+        game.state.player1.hand.cards.push(reveal);
+        game.state.player1.waitroom.cards.push(target);
+        game.give_energy(2);
+        let energy_before = game.state.player1.energy_zone.active_count();
+
+        game.activate_ability(hino);
+        while game.has_pending_choice() {
+            game.select_indices(&[0]);
+        }
+
+        assert!(
+            !game.state.player1.hand.cards.contains(&target),
+            "{card_no}: base name must not match the 104th Ver. name"
+        );
+        assert!(game.state.player1.waitroom.cards.contains(&target));
+        assert!(game.state.player1.hand.cards.contains(&reveal));
+        assert_eq!(
+            game.state.player1.energy_zone.active_count(),
+            energy_before - 2
+        );
+    }
 }
 
 /// No matching live card in waitroom → ability resolves but nothing is recovered.

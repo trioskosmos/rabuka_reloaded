@@ -133,8 +133,6 @@ fn discard_low_cost_group_member_trigger_debut_center_gate_fails_in_waitroom_q10
 
     // Drain any remaining choices (debut ability activation followup, etc.)
     while game.has_pending_choice() {
-        let t = game.pending_choice_type().unwrap_or_default();
-        eprintln!("[DRAIN] choice={:?}", t);
         game.select_indices(&[]);
     }
 
@@ -158,6 +156,54 @@ fn discard_low_cost_group_member_trigger_debut_center_gate_fails_in_waitroom_q10
         sumire_blade, 0,
         "Q240: Sumire should not get blade+2 from waitroom debut"
     );
+}
+
+#[test]
+fn discard_low_cost_group_member_trigger_debut_center_gate_fails_for_all_kinako_rarities_q240() {
+    for suffix in ["P", "P＋", "R＋", "SEC"] {
+        let db = load_real_database();
+        let mut game = TestGame::new(db);
+        let card_no = format!("PL!SP-bp2-006-{suffix}");
+        let kinako = game.id(&card_no);
+        let sumire = game.id("PL!SP-bp5-015-N");
+        let filler = game.id("PL!-sd1-010-SD");
+
+        game.give_energy(10);
+        game.state.player1.hand.cards.push(kinako);
+        game.state.player1.hand.cards.push(sumire);
+        for _ in 0..20 {
+            game.state.player1.main_deck.cards.push(filler);
+        }
+        game.play_to_stage(kinako, MemberArea::Center);
+
+        let blade_before = game.state.mods.get_blade_modifier(kinako);
+        TurnEngine::execute_main_phase_action(
+            &mut game.state,
+            &ActionType::UseAbility,
+            Some(kinako),
+            None,
+            None,
+            None,
+        )
+        .expect("activate_ability failed");
+
+        assert!(game.has_pending_choice(), "{card_no}: cost prompt");
+        game.select_indices(&[0]);
+        while game.has_pending_choice() {
+            game.select_indices(&[]);
+        }
+
+        assert!(
+            game.state.player1.waitroom.cards.contains(&sumire),
+            "{card_no}: Sumire should be discarded as cost"
+        );
+        assert_eq!(
+            game.state.mods.get_blade_modifier(kinako),
+            blade_before,
+            "{card_no}: waitroom debut must not grant blade"
+        );
+        assert_eq!(game.state.mods.get_blade_modifier(sumire), 0);
+    }
 }
 
 /// Control: Discard a Liella! card with non-center-gated debut → activates from waitroom.
@@ -203,7 +249,6 @@ fn discard_low_cost_group_member_trigger_debut_non_center_cost_card_reaches_wait
     game.select_indices(&[0]);
     // Drain followup: if the debut ability triggers additional choices
     while game.has_pending_choice() {
-        eprintln!("[CTRL DRAIN] choice={:?}", game.pending_choice_type());
         game.select_indices(&[]);
     }
 

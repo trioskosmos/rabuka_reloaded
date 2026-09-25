@@ -2822,6 +2822,17 @@ impl AbilityResolver {
                 }
             }
 
+            if !effect.multiple_targets_any().unwrap_or(false) {
+                if let Some(source_index) = effect
+                    .source_position_any()
+                    .and_then(util::stage_position_index)
+                {
+                    if i == source_index {
+                        continue;
+                    }
+                }
+            }
+
             // Exclude the activating card's own position when exclude_self is set.
             if exclude_self && Some(card_id) == activating_card_id {
                 continue;
@@ -2851,6 +2862,13 @@ impl AbilityResolver {
             valid.push(pos_name.to_string());
         }
 
+        log::debug!(
+            "[POSITION_DESTINATIONS] target={} source={:?} exclude_self={} valid={:?}",
+            target,
+            effect.source_position_any(),
+            exclude_self,
+            valid
+        );
         valid
     }
 

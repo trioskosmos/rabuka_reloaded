@@ -736,10 +736,22 @@ let source = cost.source_str().unwrap_or("");
         if matching_count < count && is_deck_top {
             let waitroom_matching =
                 util::count_in_zone(player, Zone::Waitroom.to_str(), &filter, card_db) as usize;
-            if matching_count + waitroom_matching == 0 {
+            log::debug!(
+                "[COST_AVAIL] source={} deck_matching={} waitroom_matching={} need={}",
+                source,
+                matching_count,
+                waitroom_matching,
+                count
+            );
+            if matching_count + waitroom_matching < count {
                 return Err(format!(
-                    "Cannot pay cost: {} and waitroom are both empty, need {}",
-                    source, count
+                    "Cannot pay cost: {} and waitroom have only {} cards matching cost limit {}, need {}",
+                    source,
+                    matching_count + waitroom_matching,
+                    cost_limit
+                        .map(|l| l.to_string())
+                        .unwrap_or("none".to_string()),
+                    count
                 ));
             }
         }

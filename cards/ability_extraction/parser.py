@@ -2755,6 +2755,7 @@ def parse_action(text: str) -> Dict[str, Any]:
     # rather than as a post-parse backfill (dissolved FIX 15).
     if (
         action.get("action") == "position_change"
+        and "source_position" not in action
         and not action.get("exclude_self")
         and "それぞれ" not in text
         and not ("メンバー" in text and ("1人" in text or "N人" in text))
@@ -4316,8 +4317,10 @@ def _handle_position_change_fields(text, action):
     # Exclude the member's current position for single-target moves.
     # NOT for "メンバー1人を" (where the player selects a target first)
     # and NOT for formation change ("それぞれ" / multiple_targets).
-    if "それぞれ" not in text and not (
-        "メンバー" in text and ("1人" in text or "N人" in text)
+    if (
+        "それぞれ" not in text
+        and "source_position" not in action
+        and not ("メンバー" in text and ("1人" in text or "N人" in text))
     ):
         action["exclude_self"] = True
 
@@ -10966,6 +10969,23 @@ def _walk_propagate_flags(d, d_ctx):
 
 
 
+def _fix_unqualified_group_card_move(d):
+    if d.get("action") != "move_cards":
+        return
+    if d.get("group_reference") != "different_group_names":
+        return
+    if d.get("source") != "discard" or d.get("destination") != "hand":
+        return
+    text = d.get("text") or ""
+    if not re.search(r"カード\d+枚", text):
+        return
+    if re.search(r"(?:ライブカード|メンバーカード|エネルギーカード)\d+枚", text):
+        return
+    d["card_type"] = "card"
+    d["all"] = False
+    d["count"] = 1
+
+
 def _walk_cleanup_text(d, d_text):
     # Strip leading comma from text artifacts (e.g. "、{{icon_energy.png|E}}支払ってもよい")
     if d_text and (d_text.startswith("、") or d_text.startswith("，")):
@@ -10988,6 +11008,7 @@ def _walk(d, full_text, original_text, ctx_text=None):
     _walk_set_defaults(d, d_text, ct)
     _walk_propagate_position(d, d_ctx, d_text)
     _walk_propagate_flags(d, d_ctx)
+    _fix_unqualified_group_card_move(d)
     _walk_cleanup_text(d, d_text)
 
     # Recurse into sub-actions

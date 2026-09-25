@@ -142,6 +142,83 @@ static void test_winner_placement_and_second_selection(void) {
     }
 }
 
+static void test_success_zone_legality_and_selection(void) {
+    TestGame tg;
+    test_game_new(&tg);
+    int restricted = test_id(&tg, "PL!S-bp2-024-L");
+    int legal = test_id(&tg, "PL!HS-bp1-019-L");
+    CHECK(rb_card_is_live(restricted), "restricted success fixture is a live card");
+    CHECK(rb_card_is_live(legal), "legal success fixture is a live card");
+    test_add_to_live(&tg, restricted);
+    test_add_to_live(&tg, legal);
+    tg.state.p1_live_won = 1;
+
+    rb_move_live_to_success_and_handle_wins(&tg.state);
+
+    const RbChoice *choice = rb_get_pending_choice(&tg.state);
+    CHECK(choice != NULL, "winner chooses among multiple live cards");
+    CHECK(choice && choice->n_filtered_indices == 1,
+          "success choice excludes the restricted live card");
+    CHECK(choice && choice->n_filtered_indices == 1 && choice->filtered_indices[0] == 1,
+          "success choice maps to the legal live card");
+    if (choice) test_resume_choice(&tg, 0);
+
+    CHECK_EQ(tg.state.p[0].success.n, 1, "legal live reaches the success zone");
+    CHECK(tg.state.p[0].success.n == 1 && tg.state.p[0].success.cards[0] == legal,
+          "selected legal live is the success-zone card");
+    CHECK(test_zone_has_id(&tg, 0, "discard", restricted),
+          "unselected restricted live goes to the waitroom");
+    CHECK_EQ(tg.state.p[0].live.n, 0, "live zone is empty after success choice");
+
+    TestGame single;
+    test_game_new(&single);
+    restricted = test_id(&single, "PL!S-bp2-024-L");
+    test_add_to_live(&single, restricted);
+    single.state.p1_live_won = 1;
+
+    rb_move_live_to_success_and_handle_wins(&single.state);
+
+    CHECK(!test_has_pending_choice(&single), "single restricted live needs no choice");
+    CHECK_EQ(single.state.p[0].success.n, 0,
+             "single restricted live cannot enter the success zone");
+    CHECK(test_zone_has_id(&single, 0, "discard", restricted),
+          "single restricted live goes to the waitroom");
+
+    TestGame both;
+    test_game_new(&both);
+    restricted = test_id(&both, "PL!S-bp2-024-L");
+    legal = test_id(&both, "PL!HS-bp1-019-L");
+    test_add_to_live(&both, restricted);
+    test_add_to_live(&both, legal);
+    test_add_to_opp_live(&both, restricted);
+    test_add_to_opp_live(&both, legal);
+    both.state.p1_live_won = 1;
+    both.state.p2_live_won = 1;
+
+    rb_move_live_to_success_and_handle_wins(&both.state);
+    choice = rb_get_pending_choice(&both.state);
+    CHECK(choice && choice->actor == 0, "first winner receives the success choice");
+    if (choice) test_resume_choice(&both, 0);
+
+    both.state.live_victory_stage = 3;
+    rb_execute_live_victory_determination(&both.state);
+    choice = rb_get_pending_choice(&both.state);
+    CHECK(choice && choice->actor == 1, "victory resume offers the second winner choice");
+    if (choice) test_resume_choice(&both, 0);
+    rb_execute_live_victory_determination(&both.state);
+
+    CHECK_EQ(both.state.p[0].success.n, 1, "first winner places one legal live");
+    CHECK_EQ(both.state.p[1].success.n, 1, "second winner places one legal live");
+    CHECK(both.state.p[0].success.n == 1 && both.state.p[0].success.cards[0] == legal,
+          "first winner stores the legal live");
+    CHECK(both.state.p[1].success.n == 1 && both.state.p[1].success.cards[0] == legal,
+          "second winner stores the legal live");
+    CHECK(test_zone_has_id(&both, 0, "discard", restricted) &&
+          test_zone_has_id(&both, 1, "discard", restricted),
+          "both restricted live cards go to the waitroom");
+    CHECK_EQ(both.state.live_victory_stage, 0, "victory placement resumes to completion");
+}
+
 static void test_daydream_mermaid_choices(void) {
     for (int with_niji = 0; with_niji <= 1; with_niji++) {
         TestGame tg; test_game_new(&tg);
@@ -212,6 +289,7 @@ int main(void) {
     test_no_live_no_success();
     test_multiple_live_all_fail();
     test_winner_placement_and_second_selection();
+    test_success_zone_legality_and_selection();
     test_daydream_mermaid_choices();
     test_shared_heart_pool();
     rb_unload();

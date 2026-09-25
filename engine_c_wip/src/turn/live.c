@@ -463,7 +463,7 @@ int rb_perform_live(GameState *g, int pl){
         memset(g->re_yell_blade_hearts, 0, sizeof(g->re_yell_blade_hearts));
         g->n_revealed = 0;
         do_yell(g, pl, yell_cards, &n_yell, blade_hearts, &note_icons);
-        for (int i = 0; i < n_yell && i < RB_MAX_RECENTLY_MOVED; i++)
+        for (int i = 0; i < n_yell && i < RB_MAX_REVEALED_CARDS; i++)
             g->revealed_cards[g->n_revealed++] = yell_cards[i];
         g->yell_occurred = n_yell > 0;
         int queued = rb_queue_yell_auto_abilities(g, pl);
@@ -834,15 +834,20 @@ void rb_fmt_player_id(const char *id, char *out, size_t sz){
 int rb_try_take_success_zone_choice(GameState *g, int won, int must_skip,
                                      int cards_count, const int *cards, int player_pl){
     if(!won || must_skip || cards_count <= 1) return 0;
-    int can_place = 0;
-    for(int i=0;i<cards_count;i++){
-        if(rb_can_place_card_in_zone(g, cards[i], "success_live_zone")){
-            can_place = 1; break;
-        }
+    int filtered[RB_MAX_ZONE];
+    int n_filtered = 0;
+    for(int i=0;i<cards_count && n_filtered<RB_MAX_ZONE;i++){
+        if(rb_can_place_card_in_zone(g, cards[i], "success_live_zone"))
+            filtered[n_filtered++] = i;
     }
-    if(!can_place) return 0;
+    if(n_filtered == 0) return 0;
     rb_emit_choice(g, player_pl, RB_CHOICE_SELECT_CARD, "live_card_zone", "live_card",
                    1, 0, "select_live_success");
+    g->queue.pending.actor = player_pl;
+    g->queue.pending.n_filtered_indices = n_filtered;
+    for(int i=0;i<n_filtered;i++) g->queue.pending.filtered_indices[i] = filtered[i];
+    fprintf(stderr, "[LIVE_SUCCESS_PROMPT] pl=%d live=%d legal=%d\n",
+            player_pl, cards_count, n_filtered);
     return 1;
 }
 
@@ -1014,10 +1019,10 @@ void rb_revert_live_success_score_modifiers(GameState *g) {
 
 void rb_process_delayed_gained_effects(GameState *g) {
     if (!g || g->n_delayed_gained_effects == 0) return;
-    int saved_revealed[RB_MAX_RECENTLY_MOVED];
+    int saved_revealed[RB_MAX_REVEALED_CARDS];
     int saved_revealed_n = g->n_revealed;
     int saved_activating = g->activating_card;
-    for (int i = 0; i < saved_revealed_n && i < RB_MAX_RECENTLY_MOVED; i++) {
+    for (int i = 0; i < saved_revealed_n && i < RB_MAX_REVEALED_CARDS; i++) {
         saved_revealed[i] = g->revealed_cards[i];
     }
 
@@ -1040,7 +1045,7 @@ void rb_process_delayed_gained_effects(GameState *g) {
         if (!passed) continue;
 
         g->n_revealed = 0;
-        for (int j = 0; j < snapshot->n_yell_cards && j < RB_MAX_RECENTLY_MOVED; j++) {
+        for (int j = 0; j < snapshot->n_yell_cards && j < RB_MAX_REVEALED_CARDS; j++) {
             g->revealed_cards[g->n_revealed++] = snapshot->yell_cards[j];
         }
         g->activating_card = delayed->card_id;
@@ -1049,7 +1054,7 @@ void rb_process_delayed_gained_effects(GameState *g) {
     }
 
     g->n_revealed = saved_revealed_n;
-    for (int i = 0; i < saved_revealed_n && i < RB_MAX_RECENTLY_MOVED; i++) {
+    for (int i = 0; i < saved_revealed_n && i < RB_MAX_REVEALED_CARDS; i++) {
         g->revealed_cards[i] = saved_revealed[i];
     }
     g->activating_card = saved_activating;
@@ -1084,22 +1089,22 @@ void rb_merge_late_score_apps(GameState *g) {
 
 void rb_move_live_to_success_and_handle_wins(GameState *g) {
     if (!g) return;
+    int p1_must_skip = g->p1_live_won && g->p2_live_won && g->p[0].success.n >= 2;
+    int p2_must_skip = g->p1_live_won && g->p2_live_won && g->p[1].success.n >= 2;
+    if (rb_try_take_success_zone_choice(g, g->p1_live_won, p1_must_skip,
+                                        g->p[0].live.n, g->p[0].live.cards, 0))
+        return;
+    if (rb_try_take_success_zone_choice(g, g->p2_live_won, p2_must_skip,
+                                        g->p[1].live.n, g->p[1].live.cards, 1))
+        return;
     for (int pl = 0; pl < 2; pl++) {
         int won = pl == 0 ? g->p1_live_won : g->p2_live_won;
-        int placed = 0;
-        while (g->p[pl].live.n > 0) {
-            int cid = g->p[pl].live.cards[0];
-            for (int i = 0; i < g->p[pl].live.n - 1; i++) {
-                g->p[pl].live.cards[i] = g->p[pl].live.cards[i + 1];
-            }
-            g->p[pl].live.n--;
-            if (won && !placed && rb_success_len(&g->p[pl]) < RB_MAX_ZONE) {
-                rb_success_add(&g->p[pl], cid);
-                placed = 1;
-            } else {
-                rb_waitroom_add(&g->p[pl], cid);
-            }
-        }
+        int must_skip = pl == 0 ? p1_must_skip : p2_must_skip;
+        int cid = g->p[pl].live.n > 0 ? g->p[pl].live.cards[g->p[pl].live.n - 1] : -1;
+        int can_place = cid >= 0 && rb_can_place_card_in_zone(g, cid, "success_live_zone");
+        fprintf(stderr, "[LIVE_SUCCESS_RESULT] pl=%d won=%d must_skip=%d card=%d can_place=%d live=%d\n",
+                pl, won, must_skip, cid, can_place, g->p[pl].live.n);
+        rb_process_player_live_result(g, pl, won, must_skip, can_place);
     }
 }
 
@@ -1145,20 +1150,28 @@ void rb_build_snapshot(GameState *g, int turn, int pl, const int *live_card_ids,
 
 /* Mirror live.rs::handle_live_success_choice — handle the result of a live
    success zone card selection. */
-void rb_handle_live_success_choice(GameState *g, int pl, int card_id) {
-    if (!g) return;
+void rb_handle_live_success_choice(GameState *g, int pl, int selected_index) {
+    if (!g || pl < 0 || pl > 1) return;
     RbPlayer *P = &g->p[pl];
-    for (int i = 0; i < P->live.n; i++) {
-        if (P->live.cards[i] == card_id) {
-            for (int j = i; j < P->live.n - 1; j++) P->live.cards[j] = P->live.cards[j + 1];
-            P->live.n--;
-            break;
-        }
+    if (selected_index < 0 || selected_index >= P->live.n) {
+        fprintf(stderr, "[LIVE_SUCCESS_CHOICE] pl=%d index=%d live=%d result=invalid_index\n",
+                pl, selected_index, P->live.n);
+        return;
     }
-    rb_success_add(P, card_id);
+    int card_id = P->live.cards[selected_index];
+    int can_place = rb_can_place_card_in_zone(g, card_id, "success_live_zone");
+    fprintf(stderr, "[LIVE_SUCCESS_CHOICE] pl=%d index=%d card=%d can_place=%d live=%d\n",
+            pl, selected_index, card_id, can_place, P->live.n);
+    if (!can_place) return;
+    for (int i = selected_index; i < P->live.n - 1; i++)
+        P->live.cards[i] = P->live.cards[i + 1];
+    P->live.n--;
+    if (P->success.n < RB_MAX_ZONE) rb_success_add(P, card_id);
+    else rb_waitroom_add(P, card_id);
     while (P->live.n > 0) {
         int cid = P->live.cards[0];
-        for (int j = 0; j < P->live.n - 1; j++) P->live.cards[j] = P->live.cards[j + 1];
+        for (int i = 0; i < P->live.n - 1; i++)
+            P->live.cards[i] = P->live.cards[i + 1];
         P->live.n--;
         rb_waitroom_add(P, cid);
     }
@@ -1168,6 +1181,14 @@ void rb_handle_live_success_choice(GameState *g, int pl, int card_id) {
    live victory determination. */
 void rb_execute_live_victory_determination(GameState *g) {
     if (!g) return;
+    if (g->live_victory_stage == 3) {
+        fprintf(stderr, "[LIVE_VICTORY_RESUME] stage=3 p1_live=%d p2_live=%d\n",
+                g->p[0].live.n, g->p[1].live.n);
+        rb_move_live_to_success_and_handle_wins(g);
+        if (rb_has_pending_choice(g)) return;
+        g->live_victory_stage = 0;
+        return;
+    }
     rb_apply_deferred_reyell(g);
     rb_rebuild_stage_hearts_with_yell(g);
     rb_record_pretrigger_live_results(g);
@@ -1215,7 +1236,9 @@ void rb_execute_live_victory_determination(GameState *g) {
     rb_revert_live_success_score_modifiers(g);
     rb_merge_late_score_apps(g);
     rb_compute_surplus_and_flags(g, p1_won, p2_won);
+    g->live_victory_stage = 3;
     rb_move_live_to_success_and_handle_wins(g);
+    if (rb_has_pending_choice(g)) return;
     g->live_victory_stage = 0;
 }
 
@@ -1226,10 +1249,11 @@ void rb_process_player_live_result(GameState *g, int pl, int won, int must_skip,
     RbPlayer *P = &g->p[pl];
     int card_count = rb_live_len(P);
     if (won && !must_skip && card_count > 0) {
-        int card_id = P->live.cards[0];
-        for (int k = 0; k < P->live.n - 1; k++) P->live.cards[k] = P->live.cards[k + 1];
+        int selected_index = card_count - 1;
+        int card_id = P->live.cards[selected_index];
+        for (int k = selected_index; k < P->live.n - 1; k++) P->live.cards[k] = P->live.cards[k + 1];
         P->live.n--;
-        if (can_place) {
+        if (can_place && P->success.n < RB_MAX_ZONE) {
             rb_success_add(P, card_id);
         } else {
             rb_waitroom_add(P, card_id);

@@ -3429,7 +3429,21 @@ modified.destination = Some(Zone::from_source_str(dest));
             .or_else(|| entry_eff);
         if let Some(effect) = effect {
             let is_negation = effect.compound.conditional_negation.unwrap_or(false);
-            // Record use_limit when the player chose to pay (but NOT when declined)
+            if chose_yes && !is_negation {
+                if let Some(optional) = effect.compound.optional_action.as_ref() {
+                    if optional.action == ActionType::PayEnergy {
+                        let mut payment = optional.clone();
+                        payment.set_optional(Some(false));
+                        log::debug!(
+                            "[CONDITIONAL_OPTIONAL] source={:?} action=pay_energy energy={:?} target={:?}",
+                            self.activating_card_id,
+                            payment.energy_count_any(),
+                            payment.target
+                        );
+                        self.execute_effect(gs, &payment)?;
+                    }
+                }
+            }
             if chose_yes {
                 if let Some(entry) = gs.ability_queue.current_entry() {
                     if let Some(cid) = entry.card_id {

@@ -168,3 +168,33 @@ fn mill_three_q104_both_deck_and_waitroom_empty_fails() {
         "Kinako should remain at original position"
     );
 }
+
+#[test]
+fn mill_three_q234_deck_2_without_waitroom_fails_for_all_rarities() {
+    for suffix in ["AR", "P", "R"] {
+        let db = load_real_database();
+        let mut game = TestGame::new(db);
+        let card_no = format!("PL!SP-bp5-006-{suffix}");
+        let kinako = game.id(&card_no);
+        let filler = game.id("PL!-sd1-010-SD");
+
+        game.state.player1.stage.stage = [kinako, -1, -1];
+        game.state.player1.main_deck.cards.push(filler);
+        game.state.player1.main_deck.cards.push(filler);
+        game.state.player1.waitroom.cards.clear();
+
+        TurnEngine::execute_main_phase_action(
+            &mut game.state,
+            &ActionType::UseAbility,
+            Some(kinako),
+            None,
+            None,
+            None,
+        )
+        .expect("activation request returns Ok even when cost fails");
+
+        assert!(!game.has_pending_choice(), "{card_no}: no position choice");
+        assert_eq!(game.state.player1.stage.stage[0], kinako);
+        assert_eq!(game.state.player1.main_deck.cards.len(), 2);
+    }
+}

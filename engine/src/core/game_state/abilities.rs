@@ -1921,6 +1921,13 @@ impl GameState {
             // G1/G3: if the resolver was executing for opponent (handle_both_targets,
             // execute_move_cards_both, or opponent_action wrapper), route the choice
             // to the opponent player.
+            let route_targets_opponent = self
+                .ability_queue
+                .current_entry()
+                .and_then(|entry| entry.choice_card_no.as_ref())
+                .is_some_and(|route| {
+                    matches!(route, crate::ability::types::ChoiceRoute::Raw(raw) if raw.starts_with("position_change:opponent:"))
+                });
             let targets_opponent = match c {
                 crate::ability::types::Choice::SelectCard {
                     target_player_id: Some(tpid),
@@ -1936,6 +1943,13 @@ impl GameState {
                         crate::ability::types::ExecutionContext::MoveCardsPosition { ref target, .. }
                         if target == "opponent"
                     ) =>
+                {
+                    true
+                }
+                crate::ability::types::Choice::SelectTarget { target, .. }
+                    if target == "position|destination"
+                        && (resolver.spawn_context.target.as_deref() == Some("opponent")
+                            || route_targets_opponent) =>
                 {
                     true
                 }

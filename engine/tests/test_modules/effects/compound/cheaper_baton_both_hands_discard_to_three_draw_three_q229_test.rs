@@ -89,6 +89,35 @@ fn cheaper_baton_hand_reset_q229_both_at_3_no_discard_draw_3() {
     assert_eq!(game.state.player2.hand.cards.len(), 6, "P2: 3+3 = 6");
 }
 
+#[test]
+fn cheaper_baton_hand_reset_q229_both_at_3_all_rarities() {
+    for suffix in ["AR", "P", "R"] {
+        let db = load_real_database();
+        let mut game = TestGame::new(db);
+        let card_no = format!("PL!-bp5-007-{suffix}");
+        let nozomi = game.id(&card_no);
+        let cheap = game.id("PL!SP-sd1-019-SD");
+        let filler = game.id("PL!-sd1-010-SD");
+
+        game.state.player1.hand.cards.push(nozomi);
+        for _ in 0..3 {
+            game.state.player1.hand.cards.push(filler);
+        }
+        give_p2_hand(&mut game, filler, 3);
+        for _ in 0..10 {
+            game.state.player1.main_deck.cards.push(filler);
+            game.state.player2.main_deck.cards.push(filler);
+        }
+
+        game.state.player1.stage.stage[1] = cheap;
+        game.give_energy(13);
+        game.play_to_stage(nozomi, rabuka_engine::zones::MemberArea::Center);
+
+        assert_eq!(game.state.player1.hand.cards.len(), 6, "{card_no}: P1 draw");
+        assert_eq!(game.state.player2.hand.cards.len(), 6, "{card_no}: P2 draw");
+    }
+}
+
 /// Equal-cost baton touch: replacing a card with the SAME cost.
 /// The condition has operator: "<" (replaced cost < new card cost).
 /// Equal cost should NOT satisfy "<" → ability does NOT fire.

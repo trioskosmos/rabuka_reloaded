@@ -850,7 +850,7 @@ static int h_reveal(GameState *g, int actor, const AbilityEffect *e){
     else if(!strcmp(src,"energy"))     src_bag=&P->energy;
     else if(!strcmp(src,"discard"))    src_bag=&P->discard;
     if(!src_bag) return 1;
-    for(int i=0;i<n && src_bag->n>0 && g->n_revealed<RB_MAX_RECENTLY_MOVED;i++){
+    for(int i=0;i<n && src_bag->n>0 && g->n_revealed<RB_MAX_REVEALED_CARDS;i++){
         int cid=src_bag->cards[--src_bag->n];
         g->revealed_cards[g->n_revealed++]=cid;
     }

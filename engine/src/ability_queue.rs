@@ -283,10 +283,16 @@ impl AbilityQueue {
                     if entry.choice_player_id.is_some() {
                         return None;
                     }
-                    let is_opponent_choice = matches!(&choice, crate::ability::types::Choice::SelectCard {
+                    let is_opponent_choice = match &choice {
+                        crate::ability::types::Choice::SelectCard {
                             target_player_id: Some(tpid),
                             ..
-                        } if tpid == "opponent");
+                        } => tpid == "opponent",
+                        crate::ability::types::Choice::SelectTarget { target, .. } => {
+                            target == "position|destination"
+                        }
+                        _ => false,
+                    };
                     if !is_opponent_choice {
                         return None;
                     }
@@ -295,7 +301,10 @@ impl AbilityQueue {
                         .as_ref()
                         .and_then(|r| r.spawn_context.target.as_deref())
                         == Some("opponent");
-                    if !is_spawn_opponent {
+                    let is_route_opponent = entry.choice_card_no.as_ref().is_some_and(|route| {
+                        matches!(route, crate::ability::types::ChoiceRoute::Raw(raw) if raw.starts_with("position_change:opponent:"))
+                    });
+                    if !is_spawn_opponent && !is_route_opponent {
                         return None;
                     }
                     let opp = if entry.player_id == "p1" { "p2" } else { "p1" };
