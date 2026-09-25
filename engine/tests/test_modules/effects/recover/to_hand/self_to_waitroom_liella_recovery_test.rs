@@ -38,3 +38,17 @@ fn sp_bp4_018_activation_self_to_waitroom_recovers_liella_card() {
         "Liella! card retrieved to hand"
     );
 }
+
+#[test]
+fn sp_bp4_018_self_only_liella_pool_returns_self_to_hand() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let me = game.id("PL!SP-bp4-018-N");
+    game.state.player1.stage.stage[0] = me;
+
+    game.activate_ability(me);
+
+    assert!(!game.has_pending_choice());
+    assert!(game.state.player1.hand.cards.contains(&me));
+    assert!(!game.state.player1.waitroom.cards.contains(&me));
+}
