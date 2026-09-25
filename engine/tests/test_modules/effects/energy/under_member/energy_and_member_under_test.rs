@@ -917,7 +917,49 @@ fn sayaka_rule_1053_under_members_go_to_waitroom() {
     );
 }
 
-// ====================================================================
+#[test]
+fn q140_member_with_under_energy_to_hand_recycles_energy() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let member = game.id("PL!-sd1-010-SD");
+    game.state.player1.stage.stage[1] = member;
+    place_energy_under(&mut game, MemberArea::Center, 2);
+    let energy_deck_before = game.state.player1.energy_deck.cards.len();
+    let removed = game
+        .state
+        .player1
+        .remove_member_from_stage_with_recycling(1, &game.db)
+        .expect("member should be removed");
+    game.state.player1.hand.add_card(removed);
+
+    assert!(game.state.player1.hand.cards.contains(&member));
+    assert_eq!(
+        game.state.player1.energy_deck.cards.len(),
+        energy_deck_before + 2,
+        "Q140: under-energy returns to the energy deck when the member moves to hand"
+    );
+    assert!(game.state.player1.stage.get_under_cards(MemberArea::Center).is_empty());
+}
+
+#[test]
+fn q141_baton_touch_recycles_under_energy() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let target = game.id("PL!-sd1-010-SD");
+    let arriver = game.id("PL!-sd1-010-SD");
+    game.state.player1.stage.stage[1] = target;
+    place_energy_under(&mut game, MemberArea::Center, 2);
+    game.state.player1.hand.cards.push(arriver);
+    game.give_energy(4);
+    let energy_deck_before = game.state.player1.energy_deck.cards.len();
+
+    game.play_to_stage(arriver, MemberArea::Center);
+
+    assert_eq!(game.state.player1.stage.stage[1], arriver);
+    assert!(game.state.player1.waitroom.cards.contains(&target));
+    assert_eq!(game.state.player1.energy_deck.cards.len(), energy_deck_before + 2);
+    assert!(game.state.player1.stage.get_under_cards(MemberArea::Center).is_empty());
+}
 // PL!N-bp3-025-L Awakening Promise — LiveStart: under_member → energy_deck → hearts
 // ====================================================================
 

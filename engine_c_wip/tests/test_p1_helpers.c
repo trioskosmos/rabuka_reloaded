@@ -22,8 +22,21 @@ static void test_canonical_trigger(void)
     CHECK(strcmp(rb_canonical_trigger("sometimes"), "unknown") == 0, "unknown trigger canonicalization");
 }
 
+static void test_phase_and_rps_strings(void)
+{
+    CHECK(strcmp(rb_phase_name(RB_PHASE_OPENING), "Opening") == 0, "opening phase string");
+    CHECK(strcmp(rb_phase_name(RB_PHASE_LIVE_SET), "LiveCardSet") == 0, "live set phase string");
+    CHECK(strcmp(rb_phase_name(999), "Unknown") == 0, "invalid phase string");
+    CHECK(strcmp(rb_rps_choice_name(0), "グー") == 0, "rock choice string");
+    CHECK(strcmp(rb_rps_choice_name(1), "パー") == 0, "paper choice string");
+    CHECK(strcmp(rb_rps_choice_name(2), "チョキ") == 0, "scissors choice string");
+    CHECK(strcmp(rb_rps_choice_name(3), "?") == 0, "invalid RPS choice string");
+}
+
 static void test_zone_strings(void)
 {
+    CHECK(strcmp(rb_zone_id_as_str(RB_ZONEID_DECK_TOP_OR_BOTTOM), "deck_top_or_bottom") == 0, "zone id string");
+    CHECK(strcmp(rb_zone_id_as_str(RB_ZONEID_UNKNOWN), "unknown") == 0, "unknown zone id string");
     CHECK(strcmp(rb_ability_zone_to_str(RB_ABILITY_ZONE_LIVE_TOTAL), "live_total") == 0, "live_total zone string");
     CHECK(strcmp(rb_ability_zone_to_str(RB_ABILITY_ZONE_SUCCESS_LIVE_ZONE), "success_live_zone") == 0, "success live zone string");
     CHECK(strcmp(rb_ability_zone_to_str(RB_ABILITY_ZONE_UNKNOWN), "unknown") == 0, "unknown zone string");
@@ -61,10 +74,23 @@ static void test_queue_helpers(void)
     CHECK(strcmp(g.queue.entries[0].choice_player_id, "p2") == 0, "opponent spawn routes choice to opponent");
 }
 
+static void test_deployment_tracking(void)
+{
+    GameState g;
+    memset(&g, 0, sizeof(g));
+    g.p[0].stage[1] = 42;
+    CHECK(rb_zone_track_deployment(&g, 0, 42) == 1, "deployed stage card is tracked");
+    CHECK(g.stage_arrived[0][1] == 1, "deployment marks its stage area");
+    CHECK(rb_zone_track_deployment(&g, 0, 42) == 1, "deployment tracking is idempotent");
+    CHECK(rb_zone_track_deployment(&g, 0, 99) == 0, "non-stage card is not tracked");
+}
+
 int main(void)
 {
     test_canonical_trigger();
+    test_phase_and_rps_strings();
     test_zone_strings();
+    test_deployment_tracking();
     test_queue_helpers();
     if (failures) return 1;
     puts("P1 helper tests passed");

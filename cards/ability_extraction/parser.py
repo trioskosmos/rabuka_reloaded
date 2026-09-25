@@ -1241,6 +1241,25 @@ def _enrich_condition_common(d: Dict[str, Any], text: str) -> None:
     _enrich_heart_content(d, text)
 
 
+def _enrich_condition_result(result: Dict[str, Any], text: str) -> Dict[str, Any]:
+    if "cost_limit" not in result and "cost_limit_operator" not in result:
+        cost_limit = extract_cost_limit_with_operator(text)
+        if cost_limit:
+            result["cost_limit"], result["cost_limit_operator"] = cost_limit
+    if "card_property" not in result:
+        card_property = detect_card_property(text)
+        if card_property:
+            result["card_property"] = card_property[0]
+            if card_property[1]:
+                result["negation"] = True
+    if "aggregate" not in result and "合計" in text:
+        result["aggregate"] = "total"
+    _enrich_condition_common(result, text)
+    if "より多くの" in text and "ブレード" in text and "持つ" in text:
+        result["blade_greater_than_all"] = True
+    return result
+
+
 def parse_condition(text: str) -> Dict[str, Any]:
     """Parse a condition text using priority-ordered handler cascade.
 
@@ -1269,33 +1288,12 @@ def parse_condition(text: str) -> Dict[str, Any]:
             _post = _condition_registry.get_post_normalize(name)
             if _post is not None:
                 result = _post(text, result)
-            # Extract cost_limit and card_property from text for handlers
-            # that don't set these fields themselves (e.g. _try_heart_possession).
-            # Only extract when the key is truly absent (not just None) to avoid
-            # interfering with handlers that intentionally omit these fields.
-            if "cost_limit" not in result and "cost_limit_operator" not in result:
-                cl_op = extract_cost_limit_with_operator(text)
-                if cl_op:
-                    result["cost_limit"] = cl_op[0]
-                    result["cost_limit_operator"] = cl_op[1]
-            if "card_property" not in result:
-                cp = detect_card_property(text)
-                if cp:
-                    result["card_property"] = cp[0]
-                    if cp[1]:
-                        result["negation"] = True
-            if "aggregate" not in result and "合計" in text:
-                result["aggregate"] = "total"
-            _enrich_condition_common(result, text)
-            # G11 blade-max comparison flag (handler path skips _extract_generic_fields)
-            if "より多くの" in text and "ブレード" in text and "持つ" in text:
-                result["blade_greater_than_all"] = True
-            return result
+            return _enrich_condition_result(result, text)
 
     # Fall-through: generic field extraction + type inference
     condition: Dict[str, Any] = {"text": text}
     _extract_generic_fields(condition, text)
-    _enrich_condition_common(condition, text)
+    _enrich_condition_result(condition, text)
     return _infer_condition_type(condition, text)
 
 
@@ -1465,13 +1463,22 @@ def _handle_required_hearts(t, a):
 
 _ACTION_RULES: List[Any] = []
 
-def _register_action(cond, act=None, setter=None):
+def _register_action(cond, act=None, setter=None, priority=None):
     if not isinstance(cond, ActionRule):
         if isinstance(cond, str):
             cond = ActionRule(match=cond, action=act or "", setter=setter)
         else:
             cond = ActionRule(condition=cond, action=act or "", setter=setter)
+    cond.order = len(_ACTION_RULES)
+    if priority is not None:
+        cond.priority = priority
+    elif cond.priority is None:
+        cond.priority = cond.order
     _ACTION_RULES.append(cond)
+
+
+def _ordered_action_rules():
+    return sorted(_ACTION_RULES, key=lambda rule: (rule.priority, rule.order))
 
 
 # C4: _register_action table dissolution — declarative ACTION_DATA rows replace
@@ -2715,7 +2722,7 @@ def parse_action(text: str) -> Dict[str, Any]:
 
     # DISPATCH TABLE
     action["action"] = "custom"
-    for entry in _ACTION_RULES:
+    for entry in _ordered_action_rules():
         if entry.matches(text, action):
             entry.apply(text, action)
             break
@@ -11058,45 +11065,30 @@ def _fix_energy_difference_dynamic_count(effect):
 
 
 def _fix_select_self_and_other(effect):
-    """CLEAN-G19: 'このメンバーと…ほかの『X』のメンバー1人を選ぶ' — the select AND the
-    follow-up 登場-ability activation must include THIS member (not exclude_self)."""
+    """CLEAN-G19:「このメンバーと…ほかの『X』のメンバー1人を選ぶ」 — select and follow-up activation include this member."""
     if not isinstance(effect, dict):
         return
     root_text = effect.get("text", "") or ""
     has_self_and = "このメンバーと" in root_text and "を選ぶ" in root_text
-
-    def walk(node):
-        if isinstance(node, dict):
-            if has_self_and and node.get("action") in ("select", "activate_ability"):
-                node.pop("exclude_self", None)
-                if node.get("action") == "select":
-                    node["count"] = 2
-            for v in node.values():
-                walk(v)
-        elif isinstance(node, list):
-            for item in node:
-                walk(item)
-
-    walk(effect)
+    if not has_self_and:
+        return
+    for node in iter_dict_nodes(effect):
+        if node.get("action") in ("select", "activate_ability"):
+            node.pop("exclude_self", None)
+            if node.get("action") == "select":
+                node["count"] = 2
 
 
 def _mark_live_total_score(node):
-    """「ライブの合計スコアを＋１する」 modifies the player's live TOTAL, not
-    any specific card. Emit target="live_total" so the engine routes the bonus
-    into the per-player total-score accumulator instead of keying it under a
-    card id that can never match a live card (which silently no-op'd)."""
-    if isinstance(node, dict):
-        if node.get("action") == "modify_score":
-            txt = node.get("text") or ""
-            if ("合計スコア" in txt or "ライブのスコア" in txt) and node.get(
-                "target"
-            ) not in ("opponent", "相手"):
-                node["target"] = "live_total"
-        for v in node.values():
-            _mark_live_total_score(v)
-    elif isinstance(node, list):
-        for it in node:
-            _mark_live_total_score(it)
+    """Mark score effects that modify the player's live total."""
+    for current in iter_dict_nodes(node):
+        if current.get("action") != "modify_score":
+            continue
+        text = current.get("text") or ""
+        if ("合計スコア" in text or "ライブのスコア" in text) and current.get(
+            "target"
+        ) not in ("opponent", "相手"):
+            current["target"] = "live_total"
 
 
 def _mark_live_total_clamp(node, original_text: str = ""):
@@ -13871,12 +13863,12 @@ def _list_rules() -> None:
     seeing the whole phrase → shape mapping at once."""
     sep = "=" * 80
     print(sep)
-    print("ACTION RULES  (_ACTION_RULES — order = priority)")
+    print("ACTION RULES  (_ACTION_RULES — explicit priority, registration order)")
     print(sep)
-    for i, entry in enumerate(_ACTION_RULES):
+    for i, entry in enumerate(_ordered_action_rules()):
         desc = (
-            f"match={entry.match!r} match_any={entry.match_any}"
-            f" action={entry.action!r}"
+            f"priority={entry.priority:3} match={entry.match!r} "
+            f"match_any={entry.match_any} action={entry.action!r}"
         )
         print(f"  {i:3}  {desc}")
     print(sep)

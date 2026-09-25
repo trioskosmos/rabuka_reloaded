@@ -384,10 +384,10 @@ int rb_find_distinct_assignment_k(GameState *g, int pl, int k) {
    already-used IDs, recursing on the next level. Writes the chosen IDs into
    g->assignment[] on success. Returns 1 on success, 0 on failure.
    Rust: nested fn inside find_distinct_assignment_k; C: exported for ABI parity. */
-static int bt_search(int **cands, int *cand_counts, int n_levels, int level,
-                     int *used, int *n_used,
-                     int *acc, int *n_acc,
-                     int *assignment, int *n_assignment) {
+static int rb_backtrack(int **cands, int *cand_counts, int n_levels, int level,
+                        int *used, int *n_used,
+                        int *acc, int *n_acc,
+                        int *assignment, int *n_assignment) {
      if (level >= n_levels) { *n_assignment = *n_acc; return 1; }
      for (int i = 0; i < cand_counts[level]; i++) {
          int cid = cands[level][i];
@@ -396,17 +396,12 @@ static int bt_search(int **cands, int *cand_counts, int n_levels, int level,
          if (is_used) continue;
          used[(*n_used)++] = cid;
          acc[(*n_acc)++] = cid;
-         if (bt_search(cands, cand_counts, n_levels, level + 1,
-                       used, n_used, acc, n_acc, assignment, n_assignment))
+         if (rb_backtrack(cands, cand_counts, n_levels, level + 1,
+                          used, n_used, acc, n_acc, assignment, n_assignment))
               return 1;
          (*n_acc)--;
          (*n_used)--;
      }
-     return 0;
-}
-
-int rb_backtrack(GameState *g, int pl) {
-     (void)g; (void)pl;
      return 0;
 }
 
@@ -688,10 +683,10 @@ void rb_shuffle_waitroom_members_to_deck_bottom(GameState *g, int pl) {
 /* -- rps_choice_name -- */
 const char *rb_rps_choice_name(int choice) {
     switch (choice) {
-        case 0: return "rock";
-        case 1: return "scissors";
-        case 2: return "paper";
-        default: return "unknown";
+        case 0: return "グー";
+        case 1: return "パー";
+        case 2: return "チョキ";
+        default: return "?";
     }
 }
 

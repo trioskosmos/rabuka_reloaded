@@ -31,9 +31,10 @@ LIVE_ALLOCATOR := tests/test_live_allocator.c
 LOOK_SELECT := tests/test_look_select.c
 DECK_BUILDER := tests/test_deck_builder.c
 DECK_PARSER := tests/test_deck_parser.c
+DECODE_FALLBACK := tests/test_decode_fallback.c
 AUDIT   := tools/audit_actions.c
 
-.PHONY: all web test audit regen clean mechanics live-rules phase-rules performance-rules surplus-heart opponent-live-flow live-movement restrictions condition-eval target-selection max-distinct-names baton-touch member-activation b8-live-timing cross-player draw-phase-fix zone-filter-parity p1-helpers live-allocator look-select deck-builder deck-parser
+.PHONY: all web test audit regen clean mechanics live-rules phase-rules performance-rules surplus-heart opponent-live-flow live-movement restrictions condition-eval target-selection max-distinct-names baton-touch member-activation b8-live-timing cross-player draw-phase-fix zone-filter-parity p1-helpers live-allocator look-select deck-builder deck-parser decode-fallback
 all: $(TARGET)
 
 web: $(WEB_TARGET)
@@ -51,13 +52,14 @@ $(TARGET): $(OBJ)
 src/%.o: src/%.c $(wildcard include/*.h)
 	$(CC) $(CFLAGS) -c -o $@ $<
 
-test: $(TARGET)_generated $(TARGET)_replay $(TARGET)_live_allocator $(TARGET)_look_select $(TARGET)_deck_builder $(TARGET)_deck_parser
+test: $(TARGET)_generated $(TARGET)_replay $(TARGET)_live_allocator $(TARGET)_look_select $(TARGET)_deck_builder $(TARGET)_deck_parser $(TARGET)_decode_fallback
 	./$(TARGET)_generated
 	./$(TARGET)_replay
 	./$(TARGET)_live_allocator
 	./$(TARGET)_look_select
 	./$(TARGET)_deck_builder
 	./$(TARGET)_deck_parser
+	./$(TARGET)_decode_fallback
 
 $(TARGET)_generated: $(OBJ_LIB) $(GENERATED)
 	$(CC) $(CFLAGS) -o $@ $(OBJ_LIB) $(GENERATED)
@@ -82,6 +84,12 @@ $(TARGET)_deck_builder: $(OBJ_LIB) $(DECK_BUILDER)
 
 $(TARGET)_deck_parser: $(OBJ_LIB) $(DECK_PARSER)
 	$(CC) $(CFLAGS) -o $@ $(OBJ_LIB) $(DECK_PARSER)
+
+$(TARGET)_decode_fallback: $(OBJ_LIB) $(DECODE_FALLBACK)
+	$(CC) $(CFLAGS) -o $@ $(OBJ_LIB) $(DECODE_FALLBACK)
+
+decode-fallback: $(TARGET)_decode_fallback
+	./$(TARGET)_decode_fallback
 
 $(TARGET)_mechanics: $(OBJ_LIB) $(MECHANICS)
 	$(CC) $(CFLAGS) -o $@ $(OBJ_LIB) $(MECHANICS)

@@ -10,6 +10,7 @@ extern uint16_t *g_offset_deltas;
 /* forward declarations */
 void rb_free_condition(Condition *c);
 void rb_free_ability(Ability *a);
+int rb_zone_from_source_str(const char *s);
 
 static char *rb_strdup(const char *s) {
     if (!s) return NULL;
@@ -20,7 +21,7 @@ static char *rb_strdup(const char *s) {
 }
 
 /* ── byte reader ── */
-typedef struct { const unsigned char *p; const unsigned char *end; } Rdr;
+typedef struct { const unsigned char *p; const unsigned char *end; int ability; } Rdr;
 
 static int rd_u8(Rdr *r, uint8_t *out) {
     if (r->p + 1 > r->end) return 0;
@@ -443,6 +444,10 @@ static AbilityEffect *decode_effect_body(Rdr *r) {
         if (key && (strcmp(key, "source") == 0 || strcmp(key, "destination") == 0 ||
                     strcmp(key, "target") == 0)) {
             char *s = rd_string_val(r, tag);
+            if (key && (strcmp(key, "source") == 0 || strcmp(key, "destination") == 0) &&
+                s && rb_zone_from_source_str(s) == RB_ZONEID_UNKNOWN) {
+                rb_note_decode_fallback(r->ability, key, s);
+            }
             if (strcmp(key, "source") == 0) { free(e->source); e->source = s; }
             else if (strcmp(key, "destination") == 0) { free(e->destination); e->destination = s; }
             else { free(e->target); e->target = s; }
@@ -653,7 +658,7 @@ RbKeyword rb_keyword_from_str(const char *s) {
    Mirrors vm.rs decode_keywords: TAG_NULL -> 0, TAG_ARRAY -> parse each TAG_STR. */
 int rb_decode_keywords(const unsigned char *arr, uint32_t arr_len, RbKeyword *out, int max) {
     if (!arr || arr_len == 0 || !out || max <= 0) return 0;
-    Rdr r = { arr, arr + arr_len };
+    Rdr r = { arr, arr + arr_len, -1 };
     uint8_t tag;
     if (!rd_u8(&r, &tag)) return 0;
     if (tag == RB_TAG_NULL) return 0;
@@ -665,7 +670,11 @@ int rb_decode_keywords(const unsigned char *arr, uint32_t arr_len, RbKeyword *ou
         if (st == RB_TAG_STR) {
             uint32_t idx; if (rd_idx(&r, &idx)) {
                 const char *s = rb_get_string(idx);
-                if (s) { RbKeyword kw = rb_keyword_from_str(s); if (kw != RB_KW_COUNT) out[kwc++] = kw; }
+                if (s) {
+                    RbKeyword kw = rb_keyword_from_str(s);
+                    if (kw != RB_KW_COUNT) out[kwc++] = kw;
+                    else rb_note_decode_fallback(r.ability, "keyword", s);
+                }
             }
         } else skip_value(&r, st);
     }
@@ -693,7 +702,7 @@ int rb_decode_ability(uint32_t idx, Ability *out) {
     memset(out, 0, sizeof(*out));
     out->use_limit = -1;
     if (!slice || len == 0) return 1; /* empty slice -> default Ability (mirrors Rust) */
-    Rdr r = { slice, slice + len };
+    Rdr r = { slice, slice + len, (int)idx };
     uint8_t tag, b;
     if (!rd_u8(&r, &tag) || tag != RB_TAG_OBJECT) return 0;
     uint32_t count;
@@ -702,18 +711,18 @@ int rb_decode_ability(uint32_t idx, Ability *out) {
         uint32_t kidx; if (!rd_idx(&r, &kidx)) return 0;
         const char *key = rb_get_string(kidx);
         if (!rd_u8(&r, &tag)) return 0;
-        if (strcmp(key, "full_text") == 0) { out->full_text = rd_string_val(&r, tag); }
-        else if (strcmp(key, "triggerless_text") == 0) { out->triggerless_text = rd_string_val(&r, tag); }
-        else if (strcmp(key, "triggers") == 0) { out->triggers = rd_string_val(&r, tag); }
-        else if (strcmp(key, "use_limit") == 0) {
+        if (key && strcmp(key, "full_text") == 0) { out->full_text = rd_string_val(&r, tag); }
+        else if (key && strcmp(key, "triggerless_text") == 0) { out->triggerless_text = rd_string_val(&r, tag); }
+        else if (key && strcmp(key, "triggers") == 0) { out->triggers = rd_string_val(&r, tag); }
+        else if (key && strcmp(key, "use_limit") == 0) {
             if (tag == RB_TAG_I64) { int64_t v; if (rd_int(&r, &v)) out->use_limit = (int)v; } else skip_value(&r, tag);
         }
-        else if (strcmp(key, "is_null") == 0) {
+        else if (key && strcmp(key, "is_null") == 0) {
             if (tag == RB_TAG_TRUE) out->is_null = 1; else if (tag == RB_TAG_FALSE) out->is_null = 0; else skip_value(&r, tag);
         }
-        else if (strcmp(key, "cost") == 0) { out->cost = decode_effect_value(&r, tag); }
-        else if (strcmp(key, "effect") == 0) { out->effect = decode_effect_value(&r, tag); }
-        else if (strcmp(key, "keywords") == 0) {
+        else if (key && strcmp(key, "cost") == 0) { out->cost = decode_effect_value(&r, tag); }
+        else if (key && strcmp(key, "effect") == 0) { out->effect = decode_effect_value(&r, tag); }
+        else if (key && strcmp(key, "keywords") == 0) {
             if (tag == RB_TAG_ARRAY) {
                 /* Decode keywords inline: store the raw array bytes as an extra so
                    downstream callers can re-parse if needed. The C engine does not
@@ -724,7 +733,9 @@ int rb_decode_ability(uint32_t idx, Ability *out) {
                         if (st == RB_TAG_STR) {
                             uint32_t idx; if (rd_idx(&r, &idx)) {
                                 const char *s = rb_get_string(idx);
-                                if (s) (void)rb_keyword_from_str(s); /* validate, discard */
+                                if (s && rb_keyword_from_str(s) == RB_KW_COUNT) {
+                                    rb_note_decode_fallback(r.ability, "keyword", s);
+                                }
                             }
                         } else skip_value(&r, st);
                     }
@@ -1931,7 +1942,7 @@ static int decode_condition_field(Rdr *r, const char *key, ConditionLocals *l) {
         skip_value(r, tag);
         return 1;
     }
-    /* Unknown field — skip */
+    rb_note_decode_fallback(r->ability, "condition_field", key ? key : "<invalid>");
     skip_value(r, tag);
     return 1;
 }
@@ -1959,18 +1970,23 @@ Condition *decode_condition_direct(Rdr *r, uint8_t variant) {
         case 6: return build_temporal(&l);
         case 7: return build_state(&l);
         case 8: return build_resource(&l);
-        case 9: return NULL; /* build_abilityfilter — not in the 23 unmatched list */
+        case 9: rb_note_decode_fallback(r->ability, "condition_variant", "9"); return NULL;
         case 10: return build_scorethreshold(&l);
         case 11: return build_choice(&l);
         case 12: return build_complex(&l);
-        case 13: return NULL; /* build_positioncond — not in the 23 unmatched list */
+        case 13: rb_note_decode_fallback(r->ability, "condition_variant", "13"); return NULL;
         case 14: return build_opponentchoice(&l);
         case 15: return build_opponentlivesuccess(&l);
         case 16: return build_noexcessheart(&l);
         case 17: return build_alwaystrue(&l);
         case 18: return build_anyof(&l);
         case 19: return build_allrevealedmatchheartcolor(&l);
-        default: return NULL;
+        default: {
+            char value[16];
+            snprintf(value, sizeof(value), "%u", variant);
+            rb_note_decode_fallback(r->ability, "condition_variant", value);
+            return NULL;
+        }
     }
 }
 

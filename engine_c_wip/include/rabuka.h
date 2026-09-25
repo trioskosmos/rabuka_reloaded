@@ -1576,8 +1576,8 @@ void rb_print_state(const GameState *g);
 int  rb_draw(GameState *g, int pl);                 /* draw 1 to hand */
 int  rb_draw_energy(GameState *g, int pl);          /* draw 1 to energy zone */
 /* Mirror Player::track_deployment (player.rs) — marks deployment so the
-   area cannot be targeted for baton touch this turn. */
-void rb_player_track_deployment(GameState *g, int pl, int card_id);
+   area cannot be targeted for baton touch this turn. Returns whether found. */
+int  rb_zone_track_deployment(GameState *g, int pl, int card_id);
 int  rb_draw_cards_for_player(RbPlayer *player, uint8_t count, const char *source,
                              const char *destination, const char *card_type_filter,
                              int is_any_number, void *distinct, void *card_db, int self_target_id);
@@ -2080,6 +2080,12 @@ typedef struct {
     int   cost_total;
     char  cost_total_op[8];
     int   has_cost_total;
+    int   cost_values[16];
+    int   n_cost_values;
+    int   distinct;
+    int   blade_limit;
+    char  blade_op[8];
+    int   has_blade_limit;
     int   has_filter;
 } RbCardFilter;
 

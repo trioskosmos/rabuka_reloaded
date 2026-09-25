@@ -86,8 +86,6 @@ int rb_zone_refresh(GameState *g, int pl) {
     P->deck_refreshed_this_turn = 1;
     return 1;
 }
-int rb_zone_track_deployment(const GameState *g) { (void)g; return 0; }
-
 /* Mirror MemberArea::to_tag (Rule 4.5.7 wire protocol: 1=left, 2=center, 3=right). */
 uint8_t rb_member_area_to_tag(int idx){
     if(idx==0) return 1;
@@ -801,13 +799,14 @@ int rb_player_contains_card(const GameState *g, int pl, int cid){
 /* Mirror Player::track_deployment — marks a card as deployed this turn so
  * its area cannot be targeted for baton touch. The C engine tracks this via
  * stage_arrived[pl][area]. */
-void rb_player_track_deployment(GameState *g, int pl, int card_id){
-    if(!g || pl<0 || pl>1) return;
+int rb_zone_track_deployment(GameState *g, int pl, int card_id){
+    if(!g || pl<0 || pl>1) return 0;
     RbPlayer *P = &g->p[pl];
     for(int s=0;s<RB_STAGE_SIZE;s++){
         if(P->stage[s]==card_id){
             g->stage_arrived[pl][s] = 1;
-            return;
+            return 1;
         }
     }
+    return 0;
 }

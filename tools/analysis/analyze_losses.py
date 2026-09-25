@@ -31,6 +31,7 @@ def main():
         "mull_discards": 0,
         "max_stage_cost": 0,
         "max_blades": 0,
+        "live_notes": [],
     })
     game_final = {}  # game -> (z1, z2)
     game_turns = {}
@@ -70,7 +71,9 @@ def main():
                     sum(c.get("base_cost") or 0 for c in stage))
                 f["max_blades"] = max(f["max_blades"],
                     sum(c.get("base_blades") or 0 for c in stage))
-            elif phase.startswith("LiveCardSet") and op == "confirm":
+            if rec.get("v7_live_note"):
+                f["live_notes"].append(rec["v7_live_note"])
+            if phase.startswith("LiveCardSet") and op == "confirm":
                 sel = rec.get("live_selected_hand_indices_before", [])
                 hand = own.get("hand", [])
                 n_live = sum(1 for i in sel if i < len(hand)
@@ -138,9 +141,11 @@ def main():
     def dump(f, w):
         sets = " ".join(f"t{t}:{s[0]}({s[3]}L+{s[4]}j){'S' if s[1] else 'F'}"
                         for t, s in sorted(f["sets"].items()))
+        notes = " || ".join(f["live_notes"][-3:])
         return (f"    mull={f['mull_discards']} mains={f['mains']} "
-                f"sets=[{sets}] maxCost={f['max_stage_cost']} maxBlades={f['max_blades']} | "
-                f"winner: mull={w['mull_discards']} mains={w['mains']} maxCost={w['max_stage_cost']}")
+                f"sets=[{sets}] maxCost={f['max_stage_cost']} maxBlades={f['max_blades']} "
+                f"notes=[{notes}] | winner: mull={w['mull_discards']} "
+                f"mains={w['mains']} maxCost={w['max_stage_cost']}")
 
     print("\nexample games per cluster:")
     for k, exs in examples.items():

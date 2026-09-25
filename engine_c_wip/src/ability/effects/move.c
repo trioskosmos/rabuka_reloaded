@@ -337,7 +337,7 @@ static const char *move_zone_label(const char *zone) {
     if (!strcmp(zone, "those_cards")) return "those cards";
     if (!strcmp(zone, "recently_moved")) return "recently moved";
     if (!strcmp(zone, "looked_at")) return "looked at";
-    if (!strcmp(zone, "selected_cards")) return "selected cards";
+    if (!strcmp(zone, "all_selected")) return "selected cards";
     return zone;
 }
 

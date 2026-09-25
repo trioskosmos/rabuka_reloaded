@@ -902,6 +902,15 @@ def _as_two_arg(f: Optional[Callable]) -> Optional[Callable]:
     return wrapped
 
 
+def _apply_rule_fields(rule, text: str, result: Dict[str, Any]) -> None:
+    result["action"] = rule.action
+    result.update(rule.defaults)
+    for field, pattern in rule.extract.items():
+        match = re.search(pattern, text)
+        if match:
+            result[field] = _coerce_capture(match.group(1))
+
+
 @dataclass
 class ActionRule:
     """Declarative action parsing rule: text pattern → action type + field defaults.
@@ -926,6 +935,8 @@ class ActionRule:
     condition: Optional[Callable] = None  # complex predicate (text, action) → bool
     setter: Optional[Callable] = None  # complex setter (text, action) → None
     extract_optional: bool = False  # auto-detect optional from "もよい"
+    priority: Optional[int] = None
+    order: int = 0
 
     def __post_init__(self):
         self.condition = _as_two_arg(self.condition)
@@ -949,12 +960,7 @@ class ActionRule:
         return True
 
     def apply(self, text: str, action: Dict) -> None:
-        action["action"] = self.action
-        action.update(self.defaults)
-        for field, pattern in self.extract.items():
-            match = re.search(pattern, text)
-            if match:
-                action[field] = _coerce_capture(match.group(1))
+        _apply_rule_fields(self, text, action)
         if self.setter:
             try:
                 self.setter(text, action)
@@ -1008,12 +1014,8 @@ class EffectPattern:
     def __call__(self, text: str, ctx: Optional[dict] = None) -> Optional[Dict]:
         if not self.matches(text):
             return None
-        result: Dict = {"text": text, "action": self.action}
-        result.update(self.defaults)
-        for field, pattern in self.extract.items():
-            match = re.search(pattern, text)
-            if match:
-                result[field] = _coerce_capture(match.group(1))
+        result: Dict = {"text": text}
+        _apply_rule_fields(self, text, result)
         if self.setter:
             try:
                 self.setter(text, result)

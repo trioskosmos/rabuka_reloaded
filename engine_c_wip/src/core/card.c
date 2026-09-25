@@ -734,6 +734,36 @@ static void card_filter_set_text(char *dst, size_t dst_sz, const char *src) {
     if (len < dst_sz) memcpy(dst, src, len + 1);
 }
 
+static void card_filter_list(const char *src, char dst[][64], int max, int *count) {
+    *count = 0;
+    if (!src || !*src) return;
+    while (*src && *count < max) {
+        while (*src == ',' || *src == ' ' || *src == '[' || *src == ']' || *src == '"') src++;
+        const char *start = src;
+        while (*src && *src != ',' && *src != ']' && *src != ' ') src++;
+        size_t len = (size_t)(src - start);
+        if (len && len < 64) {
+            memcpy(dst[*count], start, len);
+            dst[*count][len] = 0;
+            (*count)++;
+        }
+    }
+}
+
+static void card_filter_cost_values(const char *src, int dst[16], int *count) {
+    *count = 0;
+    if (!src || !*src) return;
+    while (*src && *count < 16) {
+        while (*src == ',' || *src == ' ' || *src == '[' || *src == ']' || *src == '"') src++;
+        if (!*src) break;
+        char *end;
+        long value = strtol(src, &end, 10);
+        if (end == src || value < 0 || value > 255) break;
+        dst[(*count)++] = (int)value;
+        src = end;
+    }
+}
+
 static void card_filter_from_effect(const AbilityEffect *e, RbCardFilter *out) {
     if (!e || !out) return;
     const char *card_type = e->card_type_field[0] ? e->card_type_field : fx_extra(e, "card_type");
@@ -794,9 +824,29 @@ static void card_filter_from_effect(const AbilityEffect *e, RbCardFilter *out) {
             card_filter_set_text(out->original_blade_op, sizeof(out->original_blade_op), fx_extra(e, "blade_limit_operator"));
         }
     }
+    if (card_extra_int(e, "cost_total", &out->cost_total)) {
+        out->has_cost_total = 1;
+        card_filter_set_text(out->cost_total_op, sizeof(out->cost_total_op), fx_extra(e, "cost_total_operator"));
+    }
+    const char *cost_values = fx_extra(e, "cost_values");
+    if (cost_values) card_filter_cost_values(cost_values, out->cost_values, &out->n_cost_values);
+    const char *card_names = fx_extra(e, "card_names");
+    if (card_names) card_filter_list(card_names, out->name_fragments, 8, &out->n_name_fragments);
+    const char *name_constraint = fx_extra(e, "name_constraint");
+    if (name_constraint && *name_constraint && !out->n_name_fragments) {
+        card_filter_set_text(out->name_fragments[0], sizeof(out->name_fragments[0]), name_constraint);
+        out->n_name_fragments = 1;
+    }
+    out->distinct = rb_distinct_info_is_distinct(fx_extra(e, "distinct"));
+    if (card_extra_int(e, "blade_limit", &out->blade_limit)) {
+        out->has_blade_limit = 1;
+        card_filter_set_text(out->blade_op, sizeof(out->blade_op), fx_extra(e, "blade_limit_operator"));
+    }
     out->has_filter = !!(out->card_type[0] || out->has_group || out->has_cost_limit ||
                          out->has_characters || out->has_exclude_characters || out->has_exclude_self ||
-                         out->ability_filter[0] || out->negation || out->n_heart_colors || out->has_original_blade);
+                         out->ability_filter[0] || out->negation || out->n_heart_colors || out->has_original_blade ||
+                         out->has_cost_total || out->n_cost_values || out->n_name_fragments ||
+                         out->distinct || out->has_blade_limit);
 }
 
 int rb_effect_filter_subset(const AbilityEffect *e, RbCardFilter *out) {
@@ -818,6 +868,9 @@ int rb_condition_filter_subset(const Condition *c, RbCardFilter *out) {
     if (!operator_value) operator_value = cond_find(c, "operator");
     const CondValue *characters = cond_find(c, "characters");
     const CondValue *exclude_characters = cond_find(c, "exclude_characters");
+    const CondValue *cost_values = cond_find(c, "cost_values");
+    const CondValue *card_names = cond_find(c, "card_names");
+    const CondValue *distinct = cond_find(c, "distinct");
     if (card_type && card_type->tag == RB_TAG_STR) card_filter_set_text(out->card_type, sizeof(out->card_type), card_type->s);
     if (group && group->tag == RB_TAG_ARRAY && group->arr_n && group->arr[0].tag == RB_TAG_STR) {
         card_filter_set_text(out->group, sizeof(out->group), group->arr[0].s);
@@ -856,7 +909,25 @@ int rb_condition_filter_subset(const Condition *c, RbCardFilter *out) {
         }
         out->has_exclude_characters = w != 0;
     }
-    out->has_filter = !!(out->card_type[0] || out->has_group || out->has_cost_limit || out->has_characters || out->has_exclude_characters);
+    if (cost_values && cost_values->tag == RB_TAG_ARRAY) {
+        for (uint32_t i = 0; i < cost_values->arr_n && out->n_cost_values < 16; i++)
+            if (cost_values->arr[i].tag == RB_TAG_I64 && cost_values->arr[i].i >= 0 && cost_values->arr[i].i <= 255)
+                out->cost_values[out->n_cost_values++] = (int)cost_values->arr[i].i;
+    }
+    if (card_names && card_names->tag == RB_TAG_ARRAY) {
+        for (uint32_t i = 0; i < card_names->arr_n && out->n_name_fragments < 8; i++) {
+            if (card_names->arr[i].tag != RB_TAG_STR || !card_names->arr[i].s) continue;
+            card_filter_set_text(out->name_fragments[out->n_name_fragments], sizeof(out->name_fragments[0]), card_names->arr[i].s);
+            out->n_name_fragments++;
+        }
+    }
+    if (distinct) {
+        if (distinct->tag == RB_TAG_STR) out->distinct = rb_distinct_info_is_distinct(distinct->s);
+        else if (distinct->tag == RB_TAG_TRUE) out->distinct = 1;
+        else if (distinct->tag == RB_TAG_I64) out->distinct = distinct->i != 0;
+    }
+    out->has_filter = !!(out->card_type[0] || out->has_group || out->has_cost_limit || out->has_characters ||
+                         out->has_exclude_characters || out->n_cost_values || out->n_name_fragments || out->distinct);
     return out->has_filter;
 }
 

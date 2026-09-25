@@ -106,7 +106,7 @@ static int draw_place_in_zone_g(GameState *g_of_player, RbPlayer *player, int ca
                         placed = 1;
                     }
                 if (placed && g_of_player)
-                    rb_player_track_deployment(g_of_player, player - g_of_player->p, card);
+                    rb_zone_track_deployment(g_of_player, player - g_of_player->p, card);
                 else if (!placed && player->discard.n < RB_MAX_ZONE)
                     player->discard.cards[player->discard.n++] = card;
             }
