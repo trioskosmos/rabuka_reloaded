@@ -936,6 +936,7 @@ typedef struct {
     int  has_pending_choice;
     RbChoice pending_choice;   /* per-entry parked choice (Rust entry.pending_choice) */
     char spawn_target[64];     /* resolver spawn_context.target for this entry */
+    int  has_resolver;         /* persistent resolver is attached to this entry */
     int  triggering_member_id;
     int  use_limit_recorded;
     int  optional_moves_all_moved; /* -1=None, 0=false, 1=true (mirrors Rust Option<bool>) */
@@ -1102,6 +1103,7 @@ typedef struct RbChoiceBuilder {
 typedef struct {
     RbChoice pending;
     int      has_pending;      /* 1 if choice is waiting for player input */
+    int      snapshot_requested;
     int      actor;            /* player who must answer (0/1) */
     AbilityEffect *deferred;   /* sequential remainder after pay_skip gate */
     RbQueueEntry entries[RB_QUEUE_DEPTH];
@@ -1365,6 +1367,7 @@ typedef struct GameState {
     int      mulligan_done[2];     /* per-player mulligan done flag */
     int      live_set_player;
     RbBag    resolution;             /* resolution zone (temp holding) */
+    RbBag    exclusion_zone;         /* cards excluded from the game */
      RbTempEffect temp_effects[RB_MAX_TEMP_EFFECTS];
      int      n_temp_effects;
      RbDelayedGainedEffect delayed_gained_effects[RB_MAX_DELAYED_GAINED];
@@ -1547,6 +1550,7 @@ void rb_resume_position_change(GameState *g, int actor, const AbilityEffect *e, 
    so take_resolver and has_resolver are no-ops. */
 void rb_queue_pop_constant_context(GameState *g);
 int  rb_queue_take_resolver(GameState *g);
+void rb_queue_set_resolver(GameState *g);
 int  rb_queue_has_resolver(const GameState *g);
 
 /* ── RNG (xorshift; deterministic given seed) ── */
@@ -1675,6 +1679,7 @@ int  rb_trigger_is(const char *triggers, const char *needle);
 int  rb_trigger_debut(GameState *g, int pl, int card_id);
 void rb_fire_debut(GameState *g, int pl, int card_id);
 int  rb_trigger_live_start(GameState *g, int pl);
+int  rb_is_trigger_suppressed(GameState *g, int pl, const char *trigger_name);
 int  rb_trigger_live_success(GameState *g, int pl);
 int  rb_should_trigger_live_success(const GameState *g, int pl);
 int  rb_drain_live_success_choices(GameState *g);
@@ -1719,6 +1724,7 @@ const char *rb_card_type_str(int t);         /* inverse of rb_card_type_from_str
 void rb_card_normalize_no(const char *src, char *out, size_t out_sz);   /* CardDatabase::normalize_card_no */
 void rb_card_normalize_name(const char *src, char *out, size_t out_sz); /* CardDatabase::normalize_name */
 void rb_map_series_to_group(const char *series, char *out, size_t out_sz); /* map_series_to_group */
+int  rb_card_equivalent_rarity(const char *rarity, char *out, size_t out_sz);
 
 /* ── Card impl methods (mirror engine/src/core/card.rs Card impl block) ── */
 int rb_card_total_hearts(const Card *c);
@@ -1851,6 +1857,7 @@ int  rb_looked_at_pool(int pl, int *out_ids, int max);
 void rb_gain_ability(GameState *g, int actor, AbilityEffect *e);
 void rb_gain_ability_from_source(GameState *g, int actor, AbilityEffect *e, int host_cid);
 void rb_invalidate_ability(GameState *g, int actor, AbilityEffect *e);
+void rb_suppress_ability_trigger(GameState *g, int actor, AbilityEffect *e, int host_cid);
 void rb_activate_ability_effect(GameState *g, int actor, AbilityEffect *e, int host_cid);
 void rb_tick_gained(GameState *g);
 int  card_matches_card_type_filter(int card_idx, const char *filter);
@@ -2075,6 +2082,14 @@ typedef struct {
     int   has_cost_total;
     int   has_filter;
 } RbCardFilter;
+
+int rb_effect_filter_subset(const AbilityEffect *e, RbCardFilter *out);
+int rb_condition_filter_subset(const Condition *c, RbCardFilter *out);
+#define rb_card_filter_subset(e, out) rb_effect_filter_subset((e), (out))
+const char *rb_effect_target_name(const AbilityEffect *e);
+const char *rb_effect_source_or(const AbilityEffect *e, const char *default_source);
+int rb_effect_count_or(const AbilityEffect *e, int default_count);
+int rb_effect_value_or_count(const AbilityEffect *e, int default_value);
 
 /* Heart-all wildcard key ("heart00"). */
 #define RB_HEART_ALL_KEY "heart00"
@@ -2409,6 +2424,15 @@ int rb_should_trigger_live_success(const GameState *g, int pl);
 /* ── Loop detection ── */
 void rb_reset_loop_detection(GameState *g);
 int rb_is_loop_detected(const GameState *g);
+
+void rb_exclusion_add(GameState *g, int card_id);
+int rb_try_create_success_replacement_choice(GameState *g, int card_id, int player_pl);
+int rb_move_maybe_prompt_success_replacement(GameState *g, int actor, int card_id,
+                                              const char *dest, const char *target);
+void rb_handle_success_replacement_choice(GameState *g, int player_pl,
+                                          int original_card_id,
+                                          int selected_discard_index,
+                                          int accepted);
 
 /* ── Replacement effects (stubs) ── */
 void rb_add_replacement_effect(GameState *g, int card_id, int player_id, const char *original_event, const AbilityEffect *replacement_effects, int n_replacement, int is_choice_based);

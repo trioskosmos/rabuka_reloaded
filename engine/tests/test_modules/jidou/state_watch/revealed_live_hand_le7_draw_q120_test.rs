@@ -55,7 +55,7 @@ fn hanamaru_q120_hand7_auto_condition_checked_after_blade_draws() {
 
     let hand = game.state.player1.hand.cards.len();
     eprintln!("[HANAMARU] hand=7 start, after cheer: {}", hand);
-    assert!(hand >= 8, "Blade draws increased hand");
+    assert!(hand >= 8, "Q120: blade draws increase hand; auto must not draw again");
 }
 
 /// No live cards in deck → condition fails → no draw.

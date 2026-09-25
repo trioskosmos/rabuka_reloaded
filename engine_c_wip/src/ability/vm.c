@@ -1984,8 +1984,14 @@ Condition *decode_condition_direct(Rdr *r, uint8_t variant) {
    Rust decoder; it is never called on the C execution path because the action
    string (e->action) is used directly instead of EffectKind::from_action(). */
 void *build_filter(const void *ek) {
-     (void)ek;
-     return NULL;
+    if (!ek) return NULL;
+    RbCardFilter *f = calloc(1, sizeof(*f));
+    if (!f) return NULL;
+    if (!rb_effect_filter_subset((const AbilityEffect *)ek, f)) {
+        free(f);
+        return NULL;
+    }
+    return f;
 }
 
 /* ── offset_of (stub) ──
@@ -1994,6 +2000,7 @@ void *build_filter(const void *ek) {
    which does the same via g_offset_deltas. This stub exists for ABI
    parity with the Rust decoder. */
 uint32_t offset_of(uint32_t idx) {
+    if (idx >= RBKA_NUM_ABILITIES) return 0;
     uint32_t off = 0;
     for (uint32_t i = 0; i < idx; i++)
         off += g_offset_deltas[i];

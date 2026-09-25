@@ -234,6 +234,27 @@ static void test_kinako_baton_recovery(void)
     CHECK(!discard_has(&game, liela), "recovered Liella! member is not left in waitroom");
 }
 
+static void test_suppress_ability_trigger_is_persistent(void) {
+    GameState state;
+    memset(&state, 0, sizeof(state));
+    state.p[0].stage[0] = 1;
+    AbilityEffect effect;
+    memset(&effect, 0, sizeof(effect));
+    effect.n_extra = 1;
+    effect.extra_k[0] = (char *)"suppressed_trigger";
+    effect.extra_v[0] = (char *)"live_start";
+
+    rb_suppress_ability_trigger(&state, 0, &effect, 1);
+    CHECK(rb_is_trigger_suppressed(&state, 0, "live_start"),
+          "executed suppression persists in game state");
+    rb_suppress_ability_trigger(&state, 0, &effect, 1);
+    CHECK(state.n_prohibition == 1, "repeated suppression registration is deduplicated");
+    CHECK(!rb_is_trigger_suppressed(&state, 1, "live_start"),
+          "suppression remains player-specific");
+    CHECK(!rb_is_trigger_suppressed(&state, 0, "live_success"),
+          "suppression does not affect unrelated triggers");
+}
+
 int main(void) {
     if (rb_load("src") != 0) {
         fprintf(stderr, "FAIL: database load\n");
@@ -245,6 +266,7 @@ int main(void) {
     test_bp3_001_live_start_activates_one_chosen_member();
     test_bp3_001_live_start_can_skip_activation();
     test_kinako_baton_recovery();
+    test_suppress_ability_trigger_is_persistent();
 
     rb_unload();
     if (failures) {

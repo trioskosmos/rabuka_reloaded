@@ -857,6 +857,9 @@ int rb_move_place_card_with_stage_choice(
         if (t >= 0) pl = t;
     }
     RbPlayer *P = &g->p[pl];
+    if (rb_move_maybe_prompt_success_replacement(g, pl, card_id, destination,
+                                                  player_target))
+        return 1;
     if (!strcmp(destination, "empty_area") || !strcmp(destination, "stage")) {
         int empty_slots[RB_STAGE_SIZE], n_empty = 0;
         for (int i = 0; i < RB_STAGE_SIZE; i++)
@@ -1017,11 +1020,12 @@ int rb_move_maybe_prompt_success_replacement(GameState *g, int actor, int card_i
                                               const char *dest, const char *target) {
     if (!g || !dest) return 0;
     if (strcmp(dest, "success_zone") != 0 && strcmp(dest, "success_live_zone") != 0) return 0;
-    /* success replacement check stub: in the portable core this is handled
-       by the generic replacement_effects array; the full group-name lookup
-       from turn::TurnEngine::get_success_replacement_info lands in a later
-       batch. Return 0 to proceed normally. */
-    return 0;
+    int pl = actor;
+    if (target && *target) {
+        int resolved = rb_resolve_target_player(g, target);
+        if (resolved >= 0) pl = resolved;
+    }
+    return rb_try_create_success_replacement_choice(g, card_id, pl);
 }
 
 /* ── prompt_deck_top_or_bottom ── */

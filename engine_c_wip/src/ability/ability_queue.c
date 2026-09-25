@@ -221,15 +221,8 @@ void rb_queue_complete_current(GameState *g) {
    ========================================================================== */
 
 static int rb_queue_spawn_targets_opponent(const GameState *g, int cur) {
-    /* The Rust queue checks entry.resolver.spawn_context.target == "opponent".
-       The C queue does not carry a per-entry resolver.  Callers that know the
-       spawn target must set entry.choice_player_id before calling
-       rb_queue_pause_for_choice.  This helper is a best-effort fallback that
-       inspects the global resume state; it returns 0 (conservative) when the
-       resolver is not directly reachable.  */
-    (void)g;
-    (void)cur;
-    return 0;
+    if (!g || cur < 0 || cur >= g->queue.n_entries) return 0;
+    return strcmp(g->queue.entries[cur].spawn_target, "opponent") == 0;
 }
 
 void rb_queue_pause_for_choice(GameState *g, const RbChoice *choice) {
@@ -247,8 +240,11 @@ void rb_queue_pause_for_choice(GameState *g, const RbChoice *choice) {
                Here we only apply the default if the caller did not set it.  */
             int is_opp = 0;
             if (choice->kind == RB_CHOICE_SELECT_CARD) {
-                /* target field may contain "target_player_id:opponent" or similar */
                 if (strstr(choice->target, "opponent") != NULL) {
+                    is_opp = rb_queue_spawn_targets_opponent(g, cur);
+                }
+            } else if (choice->kind == RB_CHOICE_SELECT_TARGET) {
+                if (strcmp(choice->target, "position|destination") == 0) {
                     is_opp = rb_queue_spawn_targets_opponent(g, cur);
                 }
             }
@@ -256,8 +252,10 @@ void rb_queue_pause_for_choice(GameState *g, const RbChoice *choice) {
                 snprintf(e->choice_player_id, sizeof(e->choice_player_id),
                          "%s", (e->player_id[0] == 'p' && e->player_id[1] == '1') ? "p2" : "p1");
             } else {
-                snprintf(e->choice_player_id, sizeof(e->choice_player_id),
-                         "%s", e->player_id);
+                size_t len = strlen(e->player_id);
+                if (len >= sizeof(e->choice_player_id)) len = sizeof(e->choice_player_id) - 1;
+                memcpy(e->choice_player_id, e->player_id, len);
+                e->choice_player_id[len] = '\0';
             }
         }
 
@@ -515,22 +513,28 @@ int rb_queue_resume_pending_actions(GameState *g) {
 }
 
 /* ==========================================================================
-   Resolver stubs
-   The C port keeps resolver transient state in GameState::queue resume_*
-   fields, so per-entry Box<AbilityResolver> is not needed.  */
+    Resolver ownership
+    ========================================================================== */
 
 int rb_queue_take_resolver(GameState *g) {
-    (void)g;
-    return 0;
+    RbQueueEntry *entry = rb_queue_current_entry_mut(g);
+    if (!entry || !entry->has_resolver) return 0;
+    entry->has_resolver = 0;
+    return 1;
 }
 
 void rb_queue_set_resolver(GameState *g) {
-    (void)g;
+    RbQueueEntry *entry = rb_queue_current_entry_mut(g);
+    if (entry) entry->has_resolver = 1;
 }
 
 int rb_queue_has_resolver(const GameState *g) {
-    (void)g;
-    return 0;
+    const RbQueueEntry *entry;
+    if (!g || g->queue.state == RB_QUEUE_IDLE) return 0;
+    if (g->queue.state == RB_QUEUE_AWAITING_CHOICE && g->queue.auto_ability) return 0;
+    if (g->queue.cur < 0 || g->queue.cur >= g->queue.n_entries) return 0;
+    entry = &g->queue.entries[g->queue.cur];
+    return entry->has_resolver;
 }
 
 /* ==========================================================================

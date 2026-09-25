@@ -195,6 +195,8 @@ int rb_resolver_spawn_target(RbAbilityResolver *self, GameState *g, int target)
         RbQueueEntry *entry = &g->queue.entries[g->queue.cur];
         snprintf(entry->choice_player_id, sizeof(entry->choice_player_id),
                  target == 0 ? "p1" : "p2");
+        snprintf(entry->spawn_target, sizeof(entry->spawn_target), "%s",
+                 target == 0 ? "self" : "opponent");
     }
     return target;
 }
@@ -2350,6 +2352,7 @@ static int rb_resume_with_choice_indices_internal(GameState *g, const int *selec
     int is_select = g->queue.resume_is_select;
     AbilityEffect *eff = g->queue.resume_eff;
     int host = g->queue.resume_host;
+    int replacement_actor = g->queue.resume_actor;
     /* Capture the deferred effect BEFORE clearing the queue (clearing nulls it). */
     AbilityEffect *def = g->queue.deferred;
     AbilityEffect *target_selection_eff = g->queue.target_selection_eff;
@@ -2401,6 +2404,21 @@ static int rb_resume_with_choice_indices_internal(GameState *g, const int *selec
     g->queue.resume_eff = NULL;
     g->queue.auto_ability = 0;
     g->queue.state = RB_QUEUE_RESOLVING;   /* resuming / draining an ability */
+    if (saved_pending.target[0] && !strcmp(saved_pending.target, "success_replacement")) {
+        int pl = (replacement_actor >= 0 && replacement_actor <= 1) ? replacement_actor : actor;
+        int physical_index = map_choice_index(&saved_pending, selected_idx);
+        rb_handle_success_replacement_choice(g, pl, host, physical_index, !was_skip);
+        if (g->queue.cur >= 0 && g->queue.cur < g->queue.n_entries)
+            rb_queue_complete_current(g);
+        g->queue.resume_mode = 0;
+        g->queue.resume_eff = NULL;
+        g->queue.resume_actor = -1;
+        g->queue.resume_host = -1;
+        g->queue.resume_move_destination[0] = 0;
+        rb_queue_set_state(&g->queue, RB_QUEUE_IDLE);
+        rb_drain_ability_queue(g);
+        return 1;
+    }
     if (mode == 6) {
         rb_resolver_continue_siblings(g, actor, host, cont, cont_from);
     } else if (mode == 2) {

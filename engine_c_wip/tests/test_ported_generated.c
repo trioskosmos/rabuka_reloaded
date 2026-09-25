@@ -247,6 +247,53 @@ static void generated_decode_all_cards(void)
     CHECK(ability_count > 0, "generated card database decodes abilities");
 }
 
+static void generated_card_number_normalization(void)
+{
+    int canonical = rb_find_card_by_no("PL!N-bp1-027-L");
+    int normalized = rb_find_card_by_no("pl!n-bp1-027-l");
+    char normalized_text[64];
+    char equivalent[16];
+    CHECK(canonical >= 0, "canonical card number resolves");
+    CHECK(normalized >= 0, "normalized card number resolves");
+    rb_card_normalize_no("ａｂ！－＊＃＋", normalized_text, sizeof(normalized_text));
+    CHECK(!strcmp(normalized_text, "AB!-*#+"), "fullwidth card number normalization");
+    CHECK(rb_card_equivalent_rarity("PR+", equivalent, sizeof(equivalent)), "promo rarity equivalence");
+    CHECK(!strcmp(equivalent, "PR＋"), "promo rarity canonical form");
+    CHECK(rb_card_get_card_id("pl!n-bp1-027-X") == canonical, "rarity fallback resolves base card");
+}
+
+static void generated_card_helpers(void)
+{
+    AbilityEffect effect = {0};
+    RbCardFilter filter;
+    effect.count = 3;
+    effect.target = NULL;
+    effect.source = NULL;
+    effect.card_type_field[0] = 0;
+    effect.extra_k[0] = (char *)"card_type";
+    effect.extra_v[0] = (char *)"member_card";
+    effect.extra_k[1] = (char *)"group_names";
+    effect.extra_v[1] = (char *)"Aqours";
+    effect.extra_k[2] = (char *)"cost_limit";
+    effect.extra_v[2] = (char *)"5";
+    effect.extra_k[3] = (char *)"cost_limit_operator";
+    effect.extra_v[3] = (char *)"<=";
+    effect.extra_k[4] = (char *)"exclude_self";
+    effect.extra_v[4] = (char *)"true";
+    effect.n_extra = 5;
+    CHECK(rb_card_filter_subset(&effect, &filter), "effect filter subset builds");
+    CHECK(!strcmp(filter.card_type, "member_card"), "filter subset keeps card type");
+    CHECK(filter.has_group && !strcmp(filter.group, "Aqours"), "filter subset keeps first group");
+    CHECK(filter.has_cost_limit && filter.cost_limit == 5 && !strcmp(filter.cost_op, "<="), "filter subset keeps cost comparison");
+    CHECK(filter.has_exclude_self && filter.exclude_self_id == -1, "filter subset keeps self exclusion");
+    CHECK_EQ(rb_effect_count_or(&effect, 9), 3, "effect count uses explicit count");
+    CHECK_EQ(rb_effect_count_or(NULL, 9), 9, "effect count uses default");
+    CHECK_EQ(rb_effect_value_or_count(&effect, 9), 3, "effect value falls back to count");
+    CHECK_EQ(rb_effect_value_or_count(NULL, 9), 9, "effect value uses default");
+    CHECK(!strcmp(rb_effect_target_name(&effect), "self"), "effect target default");
+    CHECK(!strcmp(rb_effect_source_or(&effect, "hand"), "hand"), "effect source default");
+}
+
 int main(void)
 {
     if (rb_load("src") != 0) {
@@ -259,10 +306,12 @@ int main(void)
     generated_target_selection();
     generated_deck_parser();
     generated_decode_all_cards();
+    generated_card_number_normalization();
+    generated_card_helpers();
     rb_unload();
     if (failures)
         return 1;
     printf("ALL GENERATED CHECKS PASSED\n");
-    printf("generated: 6 checks\n");
+    printf("generated: card helper checks\n");
     return 0;
 }

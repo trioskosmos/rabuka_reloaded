@@ -48,6 +48,33 @@ fn wait_other_group_draw_q163_self_excluded_no_other_group_cost_fails() {
 }
 
 #[test]
+fn wait_other_group_draw_q163_opponent_nijigasaki_is_not_a_cost_target() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let emma = game.id("PL!N-bp3-008-R\u{ff0b}");
+    let opponent_niji = game.id("PL!N-sd1-001-SD");
+    let filler = game.id("PL!-sd1-010-SD");
+
+    game.state.player1.stage.stage = [emma, filler, -1];
+    game.state.player2.stage.stage = [opponent_niji, -1, -1];
+    for _ in 0..10 {
+        game.state.player1.main_deck.cards.push(filler);
+    }
+
+    let result = game.try_activate_ability(emma);
+    assert!(result.is_err(), "Q163: opponent member cannot pay own-stage cost");
+    assert!(
+        !game.has_pending_choice(),
+        "Q163: no target prompt when only an opponent member qualifies"
+    );
+    assert_ne!(
+        game.state.mods.get_orientation_modifier(opponent_niji),
+        Some("wait"),
+        "Q163: opponent member must remain unchanged"
+    );
+}
+
+#[test]
 fn wait_other_group_draw_q163_other_group_member_pays_cost() {
     let db = load_real_database();
     let mut game = TestGame::new(db);

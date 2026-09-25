@@ -87,15 +87,18 @@ fn miyashita_ai_q160_displaced_debuts_still_count() {
     game.play_to_stage(filler, MemberArea::Center);
     assert_eq!(game.state.player1.debut_count_this_turn, 2);
 
-    // Debut #3: Ai to Center via baton touch (displaces the filler there)
-    // Center was locked by debut #2, so we unlock it by clearing areas_locked.
-    // This simulates Q169: the baton touch restriction (Rule 9.6.2.1.2.1) prevents
-    // baton-touching to an area that already had a card arrive this turn.
-    // For this test, we need Center occupied but NOT locked.
-    let center_occupied = game.state.player1.stage.stage[1] != -1;
-    assert!(center_occupied, "Center occupied by filler from debut #2");
-    // Play Ai to Right (empty area) instead of Center, since Center is locked.
-    // This tests that Ai's debut count increment still works.
+    // The second debuted member genuinely leaves the stage before the third debut.
+    let removed = game
+        .state
+        .player1
+        .remove_member_from_stage_with_recycling(1, &game.db)
+        .expect("second debuted member should leave stage");
+    game.state.player1.waitroom.cards.push(removed);
+    game.state
+        .push_movement_event(removed, "stage", "discard", None, "p1", false);
+    assert_eq!(game.state.player1.debut_count_this_turn, 2);
+
+    // Debut #3: Ai to the empty right area after the second member left.
     game.play_to_stage(ai, MemberArea::RightSide);
     assert_eq!(
         game.state.player1.debut_count_this_turn, 3,

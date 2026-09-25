@@ -102,3 +102,37 @@ fn chisato_q126_area_move_triggers_energy_placement() {
         energy_deck_after
     );
 }
+
+#[test]
+fn chisato_q126_stage_to_waitroom_does_not_trigger_energy_placement() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let chisato = game.id("PL!SP-bp2-003-R");
+    game.state.player1.stage.stage = [chisato, -1, -1];
+    setup_energy_deck(&mut game);
+    let energy_zone_before = game.state.player1.energy_zone.cards.len();
+    let energy_deck_before = game.state.player1.energy_deck.cards.len();
+
+    let removed = game
+        .state
+        .player1
+        .remove_member_from_stage_with_recycling(0, &game.db)
+        .expect("member should be removed from stage");
+    assert_eq!(removed, chisato);
+    game.state
+        .push_movement_event(chisato, "stage", "discard", None, "p1", false);
+    let player_id = game.state.player1.id.clone();
+    rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(&mut game.state, &player_id);
+    game.state.process_pending_auto_abilities(&player_id);
+
+    assert_eq!(
+        game.state.player1.energy_zone.cards.len(),
+        energy_zone_before,
+        "Q126: stage-to-waitroom must not place energy"
+    );
+    assert_eq!(
+        game.state.player1.energy_deck.cards.len(),
+        energy_deck_before,
+        "Q126: stage-to-waitroom must not consume energy"
+    );
+}

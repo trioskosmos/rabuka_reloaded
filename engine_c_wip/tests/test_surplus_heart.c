@@ -25,12 +25,24 @@ static int failures;
     } \
 } while (0)
 
-static int drain_auto_prompts(TestGame *tg) {
+static int drain_prompts(TestGame *tg) {
     int guard = 0;
     while (test_has_pending_choice(tg) && guard < 40) {
-        if (strcmp(test_pending_choice_type(tg), "SelectAutoAbility") != 0) return 0;
-        guard++;
-        test_select_indices(tg, NULL, 0);
+        const char *type = test_pending_choice_type(tg);
+        if (strcmp(type, "SelectAutoAbility") == 0) {
+            guard++;
+            test_select_indices(tg, NULL, 0);
+            continue;
+        }
+        const RbChoice *choice = rb_get_pending_choice(&tg->state);
+        if (strcmp(type, "SelectCard") == 0 && choice &&
+            !strcmp(choice->zone, "live_card_zone") &&
+            !strcmp(choice->target, "select_live_success")) {
+            guard++;
+            test_resume_choice(tg, 0);
+            continue;
+        }
+        return 0;
     }
     return !test_has_pending_choice(tg);
 }
@@ -70,10 +82,10 @@ static int drive_past_placement(TestGame *tg, int want) {
     for (int i = 0; i < 14; i++) {
         if (!test_has_pending_choice(tg)) {
             test_pass(tg);
-            if (!drain_auto_prompts(tg)) return 0;
+            if (!drain_prompts(tg)) return 0;
             if (tg->state.p[0].energy.n >= want &&
                 tg->state.phase == RB_PHASE_ACTIVE && tg->state.turn > 1) return 1;
-        } else if (!drain_auto_prompts(tg)) {
+        } else if (!drain_prompts(tg)) {
             return 0;
         }
     }

@@ -7,14 +7,8 @@
 //! benchmark/arena, not a unit test. Run it when you want numbers.
 
 use rabuka_engine::bot::{
-    encoding::ActionEncoding,
-    neural::PolicyNet,
-    registry::BotKind,
-    strategy_v2,
-    strategy_v3,
-    strategy_v6,
-    strategy_v7,
-    PublicObservation,
+    encoding::ActionEncoding, neural::PolicyNet, registry::BotKind, strategy_v2, strategy_v3,
+    strategy_v6, strategy_v7, PublicObservation,
 };
 use rabuka_engine::card::CardDatabase;
 use rabuka_engine::card_loader;
@@ -60,7 +54,9 @@ impl Options {
                 "--trace" => trace = true,
                 "--logs" => logs = true,
                 "--games" | "--seed" | "--audit" | "--snapshots" | "--compare" => {
-                    let value = args.next().filter(|v| !v.starts_with("--"))
+                    let value = args
+                        .next()
+                        .filter(|v| !v.starts_with("--"))
                         .ok_or_else(|| format!("missing value for {arg}"))?;
                     match arg.as_str() {
                         "--games" => games = Some(value.parse::<u32>()?),
@@ -86,22 +82,34 @@ impl Options {
         if (audit.is_some() || snapshots.is_some()) && games.is_none() {
             return Err("--audit and --snapshots require --games N or ARENA_GAMES=N".into());
         }
-        if compare.is_some() && (audit.is_some() || snapshots.is_some() || !positional.is_empty() || trace || logs) {
+        if compare.is_some()
+            && (audit.is_some() || snapshots.is_some() || !positional.is_empty() || trace || logs)
+        {
             return Err("--compare PATH is a standalone exact-state diagnostic mode".into());
         }
         let parse_kind = |name: &str| -> ArenaResult<BotKind> {
             if !BotKind::ALL.contains(&name) {
-                return Err(format!("unknown bot: {name}; expected {}", BotKind::ALL.join(", ")).into());
+                return Err(
+                    format!("unknown bot: {name}; expected {}", BotKind::ALL.join(", ")).into(),
+                );
             }
             Ok(BotKind::parse(name))
         };
         Ok(Self {
             p1: parse_kind(positional.first().copied().unwrap_or("v2"))?,
             p2: parse_kind(positional.get(1).copied().unwrap_or("random"))?,
-            budget: positional.get(2).map(|s| s.parse()).transpose()?.unwrap_or(10),
+            budget: positional
+                .get(2)
+                .map(|s| s.parse())
+                .transpose()?
+                .unwrap_or(10),
             games,
             seed,
-            deck: positional.get(3).copied().unwrap_or("5CP3Z idou").to_string(),
+            deck: positional
+                .get(3)
+                .copied()
+                .unwrap_or("5CP3Z idou")
+                .to_string(),
             audit,
             snapshots,
             compare,
@@ -149,16 +157,24 @@ fn audit_cards(db: &CardDatabase, ids: &[i16]) -> Vec<Value> {
 
 fn decision_player(gs: &GameState) -> &rabuka_engine::player::Player {
     if gs.has_pending_choice() {
-        if gs.can_player_act(0) { return &gs.player1; }
-        if gs.can_player_act(1) { return &gs.player2; }
+        if gs.can_player_act(0) {
+            return &gs.player1;
+        }
+        if gs.can_player_act(1) {
+            return &gs.player2;
+        }
     }
     gs.active_player()
 }
 
 fn audit_view(gs: &GameState) -> Value {
     let own = decision_player(gs);
-    let opponent = if own.id == gs.player1.id { &gs.player2 } else { &gs.player1 };
-        let db = &gs.card_database;
+    let opponent = if own.id == gs.player1.id {
+        &gs.player2
+    } else {
+        &gs.player1
+    };
+    let db = &gs.card_database;
     json!({
         "own": {
             "player": own.id,
@@ -180,26 +196,46 @@ fn audit_view(gs: &GameState) -> Value {
 fn audit_action(gs: &GameState, action: &game_setup::Action) -> ArenaResult<Value> {
     use game_setup::ActionType;
     let mut value = serde_json::to_value(action)?;
-    let references_card = matches!(action.action_type,
-        ActionType::SelectMulligan | ActionType::SelectLiveCard | ActionType::PlayMemberToStage
-        | ActionType::UseAbility | ActionType::SetLiveCard | ActionType::ChoiceSelect);
+    let references_card = matches!(
+        action.action_type,
+        ActionType::SelectMulligan
+            | ActionType::SelectLiveCard
+            | ActionType::PlayMemberToStage
+            | ActionType::UseAbility
+            | ActionType::SetLiveCard
+            | ActionType::ChoiceSelect
+    );
     if references_card {
         if let Some(id) = action.parameters.as_ref().and_then(|p| p.card_id) {
             let own = decision_player(gs);
-            let opponent = if own.id == gs.player1.id { &gs.player2 } else { &gs.player1 };
-            let visible = id >= 0 && (own.hand.cards.contains(&id)
-                || own.stage.stage.contains(&id)
-                || own.success_live_card_zone.cards.contains(&id)
-                || own.waitroom.cards.contains(&id)
-                || opponent.stage.stage.contains(&id)
-                || opponent.success_live_card_zone.cards.contains(&id));
+            let opponent = if own.id == gs.player1.id {
+                &gs.player2
+            } else {
+                &gs.player1
+            };
+            let visible = id >= 0
+                && (own.hand.cards.contains(&id)
+                    || own.stage.stage.contains(&id)
+                    || own.success_live_card_zone.cards.contains(&id)
+                    || own.waitroom.cards.contains(&id)
+                    || opponent.stage.stage.contains(&id)
+                    || opponent.success_live_card_zone.cards.contains(&id));
             if visible {
                 value["resolved_card"] = audit_card(&gs.card_database, id);
             } else {
                 value["identity_redacted"] = json!(true);
                 value["description"] = Value::Null;
                 value["description_ja"] = Value::Null;
-                for field in ["card_id", "card_name", "card_no", "source_ability", "base_cost", "final_cost", "available_areas", "double_baton_pairs"] {
+                for field in [
+                    "card_id",
+                    "card_name",
+                    "card_no",
+                    "source_ability",
+                    "base_cost",
+                    "final_cost",
+                    "available_areas",
+                    "double_baton_pairs",
+                ] {
                     value["parameters"][field] = Value::Null;
                 }
             }
@@ -220,13 +256,25 @@ fn behaviorally_equal(a: &GameState, b: &GameState) -> ArenaResult<bool> {
     if serde_json::to_value(&actions_a)? != serde_json::to_value(&actions_b)? {
         return Ok(false);
     }
-    let me = if decision_player(a).id == a.player1.id { 0u8 } else { 1u8 };
-    if decision_player(a).id != decision_player(b).id { return Ok(false); }
-    for score in [strategy_v6::score_actions as ScoreFn, strategy_v7::score_actions as ScoreFn] {
+    let me = if decision_player(a).id == a.player1.id {
+        0u8
+    } else {
+        1u8
+    };
+    if decision_player(a).id != decision_player(b).id {
+        return Ok(false);
+    }
+    for score in [
+        strategy_v6::score_actions as ScoreFn,
+        strategy_v7::score_actions as ScoreFn,
+    ] {
         let x = policy_call(|| score(a, &actions_a, me));
         let y = policy_call(|| score(b, &actions_b, me));
         if x.len() != y.len()
-            || x.iter().zip(&y).any(|((s1, c1), (s2, c2))| s1.to_bits() != s2.to_bits() || c1 != c2) {
+            || x.iter()
+                .zip(&y)
+                .any(|((s1, c1), (s2, c2))| s1.to_bits() != s2.to_bits() || c1 != c2)
+        {
             return Ok(false);
         }
     }
@@ -234,13 +282,19 @@ fn behaviorally_equal(a: &GameState, b: &GameState) -> ArenaResult<bool> {
 }
 
 fn corpus_fold(seed: u32) -> &'static str {
-    if seed % 5 == 0 { "holdout" } else { "train" }
+    if seed % 5 == 0 {
+        "holdout"
+    } else {
+        "train"
+    }
 }
 
 fn snapshot_eligible(gs: &GameState) -> bool {
-    gs.current_phase == Phase::Main && gs.game_result == GameResult::Ongoing
+    gs.current_phase == Phase::Main
+        && gs.game_result == GameResult::Ongoing
         && gs.get_pending_choice().is_none()
-        && gs.ability_queue.is_idle() && gs.ability_queue.is_empty()
+        && gs.ability_queue.is_idle()
+        && gs.ability_queue.is_empty()
 }
 
 #[derive(serde::Serialize, serde::Deserialize)]
@@ -292,21 +346,45 @@ impl SavedPosition {
             return Err("snapshot requires idle Main with no pending choices".into());
         }
         let db = &gs.card_database;
-        let mut cards = db.cards.iter().map(|(&id, card)| Ok(SavedCard {
-            id, card_no: card.card_no.to_string(), identity: card_identity(card)?,
-        })).collect::<ArenaResult<Vec<_>>>()?;
+        let mut cards = db
+            .cards
+            .iter()
+            .map(|(&id, card)| {
+                Ok(SavedCard {
+                    id,
+                    card_no: card.card_no.to_string(),
+                    identity: card_identity(card)?,
+                })
+            })
+            .collect::<ArenaResult<Vec<_>>>()?;
         cards.sort_by_key(|c| c.id);
         Ok(Self {
-            format: "rabuka-arena-exact-state".into(), schema: 1, metadata,
-            engine_rng: rabuka_engine::rng::checkpoint(), arena_rng: arena_rng.0,
+            format: "rabuka-arena-exact-state".into(),
+            schema: 1,
+            metadata,
+            engine_rng: rabuka_engine::rng::checkpoint(),
+            arena_rng: arena_rng.0,
             cards,
-            card_no_to_id: db.card_no_to_id.iter().map(|(k, &v)| (k.clone(), v)).collect(),
-            normalized_no_to_id: db.normalized_no_to_id.iter().map(|(k, &v)| (k.clone(), v)).collect(),
+            card_no_to_id: db
+                .card_no_to_id
+                .iter()
+                .map(|(k, &v)| (k.clone(), v))
+                .collect(),
+            normalized_no_to_id: db
+                .normalized_no_to_id
+                .iter()
+                .map(|(k, &v)| (k.clone(), v))
+                .collect(),
             next_id: db.next_id,
             state: rmp_serde::to_vec_named(gs)?,
             internal_state: rmp_serde::to_vec_named(&(
-                &gs.game_state_history, &gs.structured_log, &gs.debug_trace,
-                &gs.scratch_exp_blade, &gs.scratch_exp_score, &gs.scratch_exp_heart, &gs.scratch_entry_positions,
+                &gs.game_state_history,
+                &gs.structured_log,
+                &gs.debug_trace,
+                &gs.scratch_exp_blade,
+                &gs.scratch_exp_score,
+                &gs.scratch_exp_heart,
+                &gs.scratch_entry_positions,
             ))?,
             offers: serde_json::to_value(game_setup::generate_possible_actions(gs))?,
         })
@@ -321,13 +399,20 @@ impl SavedPosition {
         }
         let mut db = CardDatabase::new();
         for saved in &self.cards {
-            let card = templates.card_no_to_id.get(&saved.card_no)
+            let card = templates
+                .card_no_to_id
+                .get(&saved.card_no)
                 .and_then(|&id| templates.get_card(id))
                 .ok_or_else(|| format!("snapshot card unavailable: {}", saved.card_no))?;
             if card_identity(card)? != saved.identity {
-                return Err(format!("snapshot card/ability identity mismatch: {}", saved.card_no).into());
+                return Err(
+                    format!("snapshot card/ability identity mismatch: {}", saved.card_no).into(),
+                );
             }
-            if saved.id < 0 || saved.id >= self.next_id || db.cards.insert(saved.id, card.clone()).is_some() {
+            if saved.id < 0
+                || saved.id >= self.next_id
+                || db.cards.insert(saved.id, card.clone()).is_some()
+            {
                 return Err("invalid or duplicate physical card ID".into());
             }
         }
@@ -337,16 +422,32 @@ impl SavedPosition {
             }
         }
         for &id in self.normalized_no_to_id.values() {
-            if db.get_card(id).is_none() { return Err("invalid normalized card lookup in snapshot".into()); }
+            if db.get_card(id).is_none() {
+                return Err("invalid normalized card lookup in snapshot".into());
+            }
         }
-        db.card_no_to_id = self.card_no_to_id.iter().map(|(k, &v)| (k.clone(), v)).collect();
-        db.normalized_no_to_id = self.normalized_no_to_id.iter().map(|(k, &v)| (k.clone(), v)).collect();
+        db.card_no_to_id = self
+            .card_no_to_id
+            .iter()
+            .map(|(k, &v)| (k.clone(), v))
+            .collect();
+        db.normalized_no_to_id = self
+            .normalized_no_to_id
+            .iter()
+            .map(|(k, &v)| (k.clone(), v))
+            .collect();
         db.next_id = self.next_id;
         let mut gs: GameState = rmp_serde::from_slice(&self.state)?;
         gs.card_database = Arc::new(db);
-        (gs.game_state_history, gs.structured_log, gs.debug_trace,
-            gs.scratch_exp_blade, gs.scratch_exp_score, gs.scratch_exp_heart, gs.scratch_entry_positions)
-            = rmp_serde::from_slice(&self.internal_state)?;
+        (
+            gs.game_state_history,
+            gs.structured_log,
+            gs.debug_trace,
+            gs.scratch_exp_blade,
+            gs.scratch_exp_score,
+            gs.scratch_exp_heart,
+            gs.scratch_entry_positions,
+        ) = rmp_serde::from_slice(&self.internal_state)?;
         if !snapshot_eligible(&gs) {
             return Err("snapshot state is not an idle Main position".into());
         }
@@ -359,16 +460,23 @@ impl SavedPosition {
 
     /// Atomic-ish write: create-new temp file, fsync, rename; never overwrites.
     fn write(&self, path: &std::path::Path) -> ArenaResult<()> {
-        if path.exists() { return Err(format!("refusing to overwrite snapshot {}", path.display()).into()); }
+        if path.exists() {
+            return Err(format!("refusing to overwrite snapshot {}", path.display()).into());
+        }
         let temporary = path.with_extension(format!("{}.tmp", std::process::id()));
         let result = (|| -> ArenaResult<()> {
-            let mut file = std::fs::OpenOptions::new().write(true).create_new(true).open(&temporary)?;
+            let mut file = std::fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(&temporary)?;
             file.write_all(&rmp_serde::to_vec_named(self)?)?;
             file.sync_all()?;
             std::fs::rename(&temporary, path)?;
             Ok(())
         })();
-        if result.is_err() { let _ = std::fs::remove_file(&temporary); }
+        if result.is_err() {
+            let _ = std::fs::remove_file(&temporary);
+        }
         result
     }
 }
@@ -376,7 +484,9 @@ impl SavedPosition {
 /// Restores the global engine RNG state on drop, including panic paths.
 struct RngRestore(u32);
 impl Drop for RngRestore {
-    fn drop(&mut self) { rabuka_engine::rng::restore(self.0); }
+    fn drop(&mut self) {
+        rabuka_engine::rng::restore(self.0);
+    }
 }
 
 fn policy_call<T>(call: impl FnOnce() -> T) -> T {
@@ -394,7 +504,9 @@ enum PolicyRoute {
 }
 
 fn policy_route(gs: &GameState) -> PolicyRoute {
-    if gs.has_pending_choice() { return PolicyRoute::Action; }
+    if gs.has_pending_choice() {
+        return PolicyRoute::Action;
+    }
     match gs.current_phase {
         Phase::MulliganFirstAttacker | Phase::MulliganSecondAttacker => PolicyRoute::Mulligan,
         Phase::LiveCardSetFirstAttacker | Phase::LiveCardSetSecondAttacker => PolicyRoute::LiveSet,
@@ -414,7 +526,11 @@ fn choose_policy_action(
     let me = u8::from(decision_player(gs).id != gs.player1.id);
     let kind = kinds[me as usize];
     let plan = plans[me as usize];
-    let setup_kind = if kind == BotKind::Neural { BotKind::V7 } else { kind };
+    let setup_kind = if kind == BotKind::Neural {
+        BotKind::V7
+    } else {
+        kind
+    };
     if kind == BotKind::Neural && policy_route(gs) == PolicyRoute::Action {
         let Some(network) = neural else {
             return actions.first().cloned().unwrap_or(game_setup::Action {
@@ -448,9 +564,13 @@ fn choose_policy_action(
         return actions[index].clone();
     }
     match policy_route(gs) {
-        PolicyRoute::Mulligan => policy_call(|| setup_kind.choose_mulligan(gs, actions, &gs.card_database)),
+        PolicyRoute::Mulligan => {
+            policy_call(|| setup_kind.choose_mulligan(gs, actions, &gs.card_database))
+        }
         _ if kind == BotKind::Random => actions[rng.range(actions.len())].clone(),
-        PolicyRoute::LiveSet => policy_call(|| setup_kind.choose_live_set(gs, actions, &gs.card_database, v2_policy, plan)),
+        PolicyRoute::LiveSet => policy_call(|| {
+            setup_kind.choose_live_set(gs, actions, &gs.card_database, v2_policy, plan)
+        }),
         PolicyRoute::Action => policy_call(|| kind.choose_action(gs, actions, me, v2_policy, plan)),
     }
 }
@@ -464,35 +584,60 @@ fn compare_position(saved: &SavedPosition, templates: &CardDatabase) -> ArenaRes
     let _restore_rng = RngRestore(rabuka_engine::rng::checkpoint());
     let gs = saved.restore(templates)?;
     let actions = game_setup::generate_possible_actions(&gs);
-    if actions.is_empty() { return Err("snapshot has no actions".into()); }
+    if actions.is_empty() {
+        return Err("snapshot has no actions".into());
+    }
     let me = gs.active_player_index();
     let mut bots = serde_json::Map::new();
     for (name, score, choose) in [
-        ("v6", strategy_v6::score_actions as ScoreFn, strategy_v6::choose_action_v6 as fn(&GameState, &[game_setup::Action], u8) -> game_setup::Action),
-        ("v7", strategy_v7::score_actions as ScoreFn, strategy_v7::choose_action_v7 as fn(&GameState, &[game_setup::Action], u8) -> game_setup::Action),
+        (
+            "v6",
+            strategy_v6::score_actions as ScoreFn,
+            strategy_v6::choose_action_v6
+                as fn(&GameState, &[game_setup::Action], u8) -> game_setup::Action,
+        ),
+        (
+            "v7",
+            strategy_v7::score_actions as ScoreFn,
+            strategy_v7::choose_action_v7
+                as fn(&GameState, &[game_setup::Action], u8) -> game_setup::Action,
+        ),
     ] {
         rabuka_engine::rng::restore(saved.engine_rng);
         let scores = policy_call(|| score(&gs, &actions, me));
-        if scores.len() != actions.len() { return Err("score/action length mismatch".into()); }
+        if scores.len() != actions.len() {
+            return Err("score/action length mismatch".into());
+        }
         rabuka_engine::rng::restore(saved.engine_rng);
         let chosen = policy_call(|| choose(&gs, &actions, me));
         let chosen_value = serde_json::to_value(&chosen)?;
-        let chosen_index = actions.iter().position(|a| serde_json::to_value(a).ok().as_ref() == Some(&chosen_value))
+        let chosen_index = actions
+            .iter()
+            .position(|a| serde_json::to_value(a).ok().as_ref() == Some(&chosen_value))
             .ok_or("bot chose an action not offered")?;
-        bots.insert(name.into(), json!({
-            "chosen_index": chosen_index,
-            "scores": scores.iter().map(|(score, components)| json!({
-                "score": if score.is_finite() { Some(*score) } else { None },
-                "components": components,
-            })).collect::<Vec<_>>(),
-        }));
+        bots.insert(
+            name.into(),
+            json!({
+                "chosen_index": chosen_index,
+                "scores": scores.iter().map(|(score, components)| json!({
+                    "score": if score.is_finite() { Some(*score) } else { None },
+                    "components": components,
+                })).collect::<Vec<_>>(),
+            }),
+        );
     }
-    let available = actions.iter().enumerate().map(|(index, a)| Ok(json!({
-        "index": index,
-        "card_no": a.parameters.as_ref().and_then(|p| p.card_id)
-            .and_then(|id| gs.card_database.get_card(id)).map(|c| c.card_no.as_ref()),
-        "action": audit_action(&gs, a)?,
-    }))).collect::<ArenaResult<Vec<_>>>()?;
+    let available = actions
+        .iter()
+        .enumerate()
+        .map(|(index, a)| {
+            Ok(json!({
+                "index": index,
+                "card_no": a.parameters.as_ref().and_then(|p| p.card_id)
+                    .and_then(|id| gs.card_database.get_card(id)).map(|c| c.card_no.as_ref()),
+                "action": audit_action(&gs, a)?,
+            }))
+        })
+        .collect::<ArenaResult<Vec<_>>>()?;
     Ok(json!({
         "format": "rabuka-arena-comparison", "schema": 1, "metadata": saved.metadata,
         "evaluation": "exact-state debugging only; hidden-state one-ply scores are not fair counterfactual outcome evaluation; no win claims",
@@ -506,11 +651,19 @@ fn compare_position(saved: &SavedPosition, templates: &CardDatabase) -> ArenaRes
 
 fn compare_path(path: &std::path::Path) -> ArenaResult<()> {
     let mut files = if path.is_dir() {
-        std::fs::read_dir(path)?.map(|entry| entry.map(|e| e.path())).collect::<Result<Vec<_>, _>>()?
-            .into_iter().filter(|p| p.extension().is_some_and(|e| e == "rmp")).collect::<Vec<_>>()
-    } else { vec![path.to_path_buf()] };
+        std::fs::read_dir(path)?
+            .map(|entry| entry.map(|e| e.path()))
+            .collect::<Result<Vec<_>, _>>()?
+            .into_iter()
+            .filter(|p| p.extension().is_some_and(|e| e == "rmp"))
+            .collect::<Vec<_>>()
+    } else {
+        vec![path.to_path_buf()]
+    };
     files.sort();
-    if files.is_empty() { return Err("no .rmp snapshots found".into()); }
+    if files.is_empty() {
+        return Err("no .rmp snapshots found".into());
+    }
     let templates = fresh_database();
     let mut stdout = std::io::stdout().lock();
     for file in files {
@@ -546,7 +699,12 @@ fn emit(audit: &mut Option<std::fs::File>, value: &Value) -> ArenaResult<()> {
 }
 
 impl DecisionAudit {
-    fn record(&mut self, gs: &GameState, actions: &[game_setup::Action], chosen: &game_setup::Action) -> ArenaResult<Value> {
+    fn record(
+        &mut self,
+        gs: &GameState,
+        actions: &[game_setup::Action],
+        chosen: &game_setup::Action,
+    ) -> ArenaResult<Value> {
         let owner = decision_player(gs);
         let boundary = (gs.turn_number, gs.current_phase, owner.id.clone());
         if self.boundary.as_ref() != Some(&boundary) {
@@ -555,19 +713,35 @@ impl DecisionAudit {
             self.boundary_step = 0;
         }
         self.boundary_step += 1;
-        let available = actions.iter().map(|a| audit_action(gs, a)).collect::<ArenaResult<Vec<_>>>()?;
+        let available = actions
+            .iter()
+            .map(|a| audit_action(gs, a))
+            .collect::<ArenaResult<Vec<_>>>()?;
         let chosen_value = audit_action(gs, chosen)?;
         let snapshot = audit_view(gs);
         let selected = json!(gs.live_card_selected_indices);
         let signature = serde_json::to_string(&json!([
-            gs.turn_number, gs.current_phase, owner.id, gs.active_player().id, snapshot, available, chosen_value, selected, gs.mulligan_selected_indices
+            gs.turn_number,
+            gs.current_phase,
+            owner.id,
+            gs.active_player().id,
+            snapshot,
+            available,
+            chosen_value,
+            selected,
+            gs.mulligan_selected_indices
         ]))?;
         let repeated_from = self.seen.insert(signature, self.decision);
         let selection_operation = match chosen.action_type {
             game_setup::ActionType::SelectLiveCard | game_setup::ActionType::SelectMulligan => {
-                Some(if chosen.selected == Some(true) { "deselect" } else { "select" })
+                Some(if chosen.selected == Some(true) {
+                    "deselect"
+                } else {
+                    "select"
+                })
             }
-            game_setup::ActionType::ConfirmLiveCardSet | game_setup::ActionType::ConfirmMulligan => Some("confirm"),
+            game_setup::ActionType::ConfirmLiveCardSet
+            | game_setup::ActionType::ConfirmMulligan => Some("confirm"),
             _ => None,
         };
         Ok(json!({
@@ -582,12 +756,19 @@ impl DecisionAudit {
             "live_selected_hand_indices_before": selected,
             "mulligan_selected_hand_indices_before": gs.mulligan_selected_indices,
             "selection_operation": selection_operation,
+            "debug_note": gs.debug_trace.last().cloned(),
+            "v7_live_note": rabuka_engine::bot::strategy_v7::live_set_audit_note(gs),
             "view": snapshot, "chosen": chosen_value, "available_actions": available,
         }))
     }
 
-    fn execute(&mut self, audit: &mut Option<std::fs::File>, gs: &mut GameState,
-        actions: &[game_setup::Action], chosen: &game_setup::Action) -> ArenaResult<()> {
+    fn execute(
+        &mut self,
+        audit: &mut Option<std::fs::File>,
+        gs: &mut GameState,
+        actions: &[game_setup::Action],
+        chosen: &game_setup::Action,
+    ) -> ArenaResult<()> {
         self.decision += 1;
         if audit.is_some() {
             emit(audit, &self.record(gs, actions, chosen)?)?;
@@ -595,12 +776,18 @@ impl DecisionAudit {
         let result = game_setup::execute_action(gs, chosen);
         if let Err(error) = &result {
             self.errors += 1;
-            eprintln!("ARENA game={} decision={} action={} failed: {}", self.game, self.decision, chosen.action_type, error);
+            eprintln!(
+                "ARENA game={} decision={} action={} failed: {}",
+                self.game, self.decision, chosen.action_type, error
+            );
         }
-        emit(audit, &json!({
-            "event": "action_result", "game": self.game, "decision": self.decision,
-            "execution_ok": result.is_ok(),
-        }))?;
+        emit(
+            audit,
+            &json!({
+                "event": "action_result", "game": self.game, "decision": self.decision,
+                "execution_ok": result.is_ok(),
+            }),
+        )?;
         game_setup::settle_single_player_state(gs);
         Ok(())
     }
@@ -617,8 +804,7 @@ fn fresh_database() -> Arc<CardDatabase> {
 }
 
 fn load_test_deck(db: &Arc<CardDatabase>, name: &str) -> Vec<String> {
-    let deck_path =
-        std::path::Path::new("../web_ui/decks").join(format!("{name}.txt"));
+    let deck_path = std::path::Path::new("../web_ui/decks").join(format!("{name}.txt"));
     if deck_path.exists() {
         let deck = deck_parser::DeckParser::parse_deck_file(&deck_path).expect("parse deck");
         return deck_parser::DeckParser::deck_list_to_card_numbers(&deck);
@@ -637,7 +823,10 @@ fn build_templates(
     db: &mut Arc<CardDatabase>,
     n1: &[String],
     n2: &[String],
-) -> (rabuka_engine::deck_builder::Deck, rabuka_engine::deck_builder::Deck) {
+) -> (
+    rabuka_engine::deck_builder::Deck,
+    rabuka_engine::deck_builder::Deck,
+) {
     game_setup::build_two_decks(db, n1, n2).expect("build decks")
 }
 
@@ -669,9 +858,8 @@ fn my_hand_lives(gs: &GameState, is_p1: bool, db: &Arc<CardDatabase>) -> usize {
         .cards
         .iter()
         .filter(|&&c| {
-            db.get_card(c).is_some_and(|x| {
-                x.card_type == rabuka_engine::card::CardType::Live
-            })
+            db.get_card(c)
+                .is_some_and(|x| x.card_type == rabuka_engine::card::CardType::Live)
         })
         .count()
 }
@@ -684,8 +872,10 @@ fn main() -> ArenaResult<()> {
     let env_games = std::env::var("ARENA_GAMES").ok();
     let options = Options::parse(&args, env_games.as_deref())?;
     rabuka_engine::game_setup::set_action_display(false);
-    rabuka_engine::game_setup::set_logging_enabled(options.logs);
-    if let Some(path) = &options.compare { return compare_path(path); }
+    rabuka_engine::game_setup::set_logging_enabled(options.logs || options.audit.is_some());
+    if let Some(path) = &options.compare {
+        return compare_path(path);
+    }
     if let Some(path) = &options.snapshots {
         std::fs::create_dir_all(path)?;
         eprintln!("SNAPSHOTS: full hidden state, offline exact-state debugging only; seed % 5 == 0 is held out; cap 20/game");
@@ -707,23 +897,36 @@ fn main() -> ArenaResult<()> {
     let trace = options.trace;
     let logs = options.logs;
     let deck_name = &options.deck;
-    let mut audit = options.audit.as_ref().map(std::fs::File::create).transpose()?;
+    let mut audit = options
+        .audit
+        .as_ref()
+        .map(std::fs::File::create)
+        .transpose()?;
     if logs {
         std::fs::create_dir_all("../test_output/arena_logs")?;
     }
-    if (audit.is_some() || options.snapshots.is_some()) && !std::path::Path::new("../web_ui/decks").join(format!("{deck_name}.txt")).is_file() {
-        return Err(format!("audit/snapshots require an existing deck file: {deck_name}.txt").into());
+    if (audit.is_some() || options.snapshots.is_some())
+        && !std::path::Path::new("../web_ui/decks")
+            .join(format!("{deck_name}.txt"))
+            .is_file()
+    {
+        return Err(
+            format!("audit/snapshots require an existing deck file: {deck_name}.txt").into(),
+        );
     }
-    emit(&mut audit, &json!({
-        "event": "run_start", "schema_version": 1,
-        "bots": [p1_kind.name(), p2_kind.name()], "deck": deck_name,
-        "games": options.games, "base_seed": options.seed,
-        "iteration_cap_per_game": 600, "same_turn_iteration_cap": 200,
-        "card_stats": "printed/base, not effective modifiers",
-        "identity_note": "card_no is authoritative; card_id can differ across builds for same-number sibling prints (R+/P/P+/SEC)",
-        "visibility": "each row is private to policy_player; opponent snapshot contains stage and success only; non-visible action card identities are redacted",
-        "rng_limitations": "engine global RNG and arena LCG reseeded before each deal; engine RNG checkpoint restored immediately after every policy call; no cross-build replay determinism guarantee",
-    }))?;
+    emit(
+        &mut audit,
+        &json!({
+            "event": "run_start", "schema_version": 1,
+            "bots": [p1_kind.name(), p2_kind.name()], "deck": deck_name,
+            "games": options.games, "base_seed": options.seed,
+            "iteration_cap_per_game": 600, "same_turn_iteration_cap": 200,
+            "card_stats": "printed/base, not effective modifiers",
+            "identity_note": "card_no is authoritative; card_id can differ across builds for same-number sibling prints (R+/P/P+/SEC)",
+            "visibility": "each row is private to policy_player; opponent snapshot contains stage and success only; non-visible action card identities are redacted",
+            "rng_limitations": "engine global RNG and arena LCG reseeded before each deal; engine RNG checkpoint restored immediately after every policy call; no cross-build replay determinism guarantee",
+        }),
+    )?;
 
     let kind_name = |k: BotKind| k.name();
 
@@ -748,7 +951,8 @@ fn main() -> ArenaResult<()> {
     let mut real_draws = 0u32;
     let mut stall_draws = 0u32;
     let mut stuck_ends = 0u32;
-    let mut final_hist: std::collections::BTreeMap<(u8, u8), u32> = std::collections::BTreeMap::new();
+    let mut final_hist: std::collections::BTreeMap<(u8, u8), u32> =
+        std::collections::BTreeMap::new();
     let mut games = 0u32;
     let mut total_actions = 0u64;
     let mut total_turns = 0u64;
@@ -776,11 +980,17 @@ fn main() -> ArenaResult<()> {
         let (engine_seed, arena_seed) = game_seeds(options.seed, games);
         rabuka_engine::rng::seed(engine_seed);
         let mut rng = Lcg(arena_seed);
-        let mut decisions = DecisionAudit { game: games, ..Default::default() };
-        emit(&mut audit, &json!({
-            "event": "game_start", "game": games,
-            "engine_seed": engine_seed, "arena_seed": arena_seed.to_string(),
-        }))?;
+        let mut decisions = DecisionAudit {
+            game: games,
+            ..Default::default()
+        };
+        emit(
+            &mut audit,
+            &json!({
+                "event": "game_start", "game": games,
+                "engine_seed": engine_seed, "arena_seed": arena_seed.to_string(),
+            }),
+        )?;
         let mut gs = deal_from_templates(&db, &t1, &t2);
         let mut captured_turns = std::collections::HashSet::new();
         let mut end_reason = "iteration_cap";
@@ -803,9 +1013,8 @@ fn main() -> ArenaResult<()> {
                     .cards
                     .iter()
                     .filter(|&&c| {
-                        db.get_card(c).is_some_and(|x| {
-                            x.card_type == rabuka_engine::card::CardType::Live
-                        })
+                        db.get_card(c)
+                            .is_some_and(|x| x.card_type == rabuka_engine::card::CardType::Live)
                     })
                     .count()
             };
@@ -909,8 +1118,10 @@ fn main() -> ArenaResult<()> {
             // turn, hard-capped at 20 per game. RNG states captured as-is;
             // full hidden state is written offline only.
             if let Some(directory) = &options.snapshots {
-                if snapshot_eligible(&gs) && captured_turns.len() < 20
-                    && captured_turns.insert((gs.turn_number, me)) {
+                if snapshot_eligible(&gs)
+                    && captured_turns.len() < 20
+                    && captured_turns.insert((gs.turn_number, me))
+                {
                     let metadata = json!({
                         "game": games, "game_seed": engine_seed, "base_seed": options.seed,
                         "decision": decisions.decision + 1, "turn": gs.turn_number,
@@ -929,13 +1140,22 @@ fn main() -> ArenaResult<()> {
                     }
                     saved.write(&directory.join(format!(
                         "{}-seed-{engine_seed:010}-decision-{:04}.rmp",
-                        corpus_fold(engine_seed), decisions.decision + 1,
+                        corpus_fold(engine_seed),
+                        decisions.decision + 1,
                     )))?;
                 }
             }
 
             if gs.has_pending_choice() {
-                let action = choose_policy_action(&gs, &actions, [p1_kind, p2_kind], &v2_policy, [&plan_p1, &plan_p2], neural.as_ref(), &mut rng);
+                let action = choose_policy_action(
+                    &gs,
+                    &actions,
+                    [p1_kind, p2_kind],
+                    &v2_policy,
+                    [&plan_p1, &plan_p2],
+                    neural.as_ref(),
+                    &mut rng,
+                );
                 decisions.execute(&mut audit, &mut gs, &actions, &action)?;
                 total_actions += 1;
                 continue;
@@ -971,7 +1191,15 @@ fn main() -> ArenaResult<()> {
                 gs.current_phase,
                 Phase::MulliganFirstAttacker | Phase::MulliganSecondAttacker
             ) {
-                let a = choose_policy_action(&gs, &actions, [p1_kind, p2_kind], &v2_policy, [&plan_p1, &plan_p2], neural.as_ref(), &mut rng);
+                let a = choose_policy_action(
+                    &gs,
+                    &actions,
+                    [p1_kind, p2_kind],
+                    &v2_policy,
+                    [&plan_p1, &plan_p2],
+                    neural.as_ref(),
+                    &mut rng,
+                );
                 decisions.execute(&mut audit, &mut gs, &actions, &a)?;
                 continue;
             }
@@ -982,7 +1210,15 @@ fn main() -> ArenaResult<()> {
                 gs.current_phase,
                 Phase::LiveCardSetFirstAttacker | Phase::LiveCardSetSecondAttacker
             ) {
-                let a = choose_policy_action(&gs, &actions, [p1_kind, p2_kind], &v2_policy, [&plan_p1, &plan_p2], neural.as_ref(), &mut rng);
+                let a = choose_policy_action(
+                    &gs,
+                    &actions,
+                    [p1_kind, p2_kind],
+                    &v2_policy,
+                    [&plan_p1, &plan_p2],
+                    neural.as_ref(),
+                    &mut rng,
+                );
                 if a.action_type == rabuka_engine::game_setup::ActionType::ConfirmLiveCardSet {
                     live_decisions += 1;
                     if gs.live_card_selected_indices.is_empty() {
@@ -1034,17 +1270,20 @@ fn main() -> ArenaResult<()> {
                         .unwrap_or_default();
                     trace_rows.push(format!(
                         "{},{},{:?},P1,OPT{},{},{},,,,,",
-                        games,
-                        gs.turn_number,
-                        gs.current_phase,
-                        ai,
-                        aa.action_type,
-                        cn
+                        games, gs.turn_number, gs.current_phase, ai, aa.action_type, cn
                     ));
                 }
             }
             // Main phase (and everything else policy-driven): registry dispatch.
-            let action = choose_policy_action(&gs, &actions, [p1_kind, p2_kind], &v2_policy, [&plan_p1, &plan_p2], neural.as_ref(), &mut rng);
+            let action = choose_policy_action(
+                &gs,
+                &actions,
+                [p1_kind, p2_kind],
+                &v2_policy,
+                [&plan_p1, &plan_p2],
+                neural.as_ref(),
+                &mut rng,
+            );
             _main_decisions += 1;
             if gs.current_phase == Phase::Main {
                 if !cur_is_main {
@@ -1055,10 +1294,7 @@ fn main() -> ArenaResult<()> {
                 let is_deploy = action.action_type
                     == rabuka_engine::game_setup::ActionType::PlayMemberToStage
                     || (action.action_type == rabuka_engine::game_setup::ActionType::UseAbility
-                        && action
-                            .parameters
-                            .as_ref()
-                            .and_then(|p| p.use_baton_touch)
+                        && action.parameters.as_ref().and_then(|p| p.use_baton_touch)
                             == Some(true));
                 if is_deploy {
                     cur_main_plays += 1;
@@ -1108,12 +1344,15 @@ fn main() -> ArenaResult<()> {
         if gs.game_result != GameResult::Ongoing {
             end_reason = "game_result";
         }
-        emit(&mut audit, &json!({
-            "event": "game_end", "game": games, "turn": gs.turn_number,
-            "end_reason": end_reason, "game_result": gs.game_result,
-            "success_counts": [z1, z2], "decisions": decisions.decision,
-            "execution_errors": decisions.errors,
-        }))?;
+        emit(
+            &mut audit,
+            &json!({
+                "event": "game_end", "game": games, "turn": gs.turn_number,
+                "end_reason": end_reason, "game_result": gs.game_result,
+                "success_counts": [z1, z2], "decisions": decisions.decision,
+                "execution_errors": decisions.errors,
+            }),
+        )?;
         final_hist
             .entry((z1 as u8, z2 as u8))
             .and_modify(|c| *c += 1)
@@ -1181,10 +1420,7 @@ fn main() -> ArenaResult<()> {
                 replay.push_str("=== LIVE CHECKS (engine verdicts) ===\n");
                 for e in &gs.structured_log {
                     if e.category == "live_result" {
-                        replay.push_str(&format!(
-                            "t{}|{}\n",
-                            e.turn, e.text
-                        ));
+                        replay.push_str(&format!("t{}|{}\n", e.turn, e.text));
                     }
                 }
                 replay.push_str("=== EVENTS ===\n");
@@ -1192,10 +1428,7 @@ fn main() -> ArenaResult<()> {
                     replay.push_str(r);
                     replay.push('\n');
                 }
-                std::fs::write(
-                    dir.join(format!("replay_game_{games:03}.txt")),
-                    replay,
-                )?;
+                std::fs::write(dir.join(format!("replay_game_{games:03}.txt")), replay)?;
             }
         }
         game_start_idx = trace_rows.len();
@@ -1242,8 +1475,12 @@ fn main() -> ArenaResult<()> {
     };
     println!(
         "DO-NOTHING telemetry: empty Main phases {}/{} = {:.1}% | live-set fold {}/{} = {:.1}%",
-        empty_main_count, main_phase_count, empty_main_rate * 100.0,
-        live_folds, live_decisions, live_fold_rate * 100.0,
+        empty_main_count,
+        main_phase_count,
+        empty_main_rate * 100.0,
+        live_folds,
+        live_decisions,
+        live_fold_rate * 100.0,
     );
     if trace {
         let path = std::path::Path::new("../test_output/bot_arena_trace.csv");
@@ -1265,7 +1502,19 @@ mod tests {
 
     #[test]
     fn fixed_games_ignore_wall_time_and_parse_flags_without_a_deck() {
-        let options = Options::parse(&args(&["v7", "random", "0", "--games", "2", "--audit", "audit.jsonl"]), None).unwrap();
+        let options = Options::parse(
+            &args(&[
+                "v7",
+                "random",
+                "0",
+                "--games",
+                "2",
+                "--audit",
+                "audit.jsonl",
+            ]),
+            None,
+        )
+        .unwrap();
         assert_eq!(options.deck, "5CP3Z idou");
         assert!(options.should_start_game(1, std::time::Duration::from_secs(9999)));
         assert!(!options.should_start_game(2, std::time::Duration::ZERO));
@@ -1277,11 +1526,24 @@ mod tests {
 
     #[test]
     fn invalid_or_unbounded_audit_options_fail() {
-        for values in [vec!["--audit"], vec!["--audit", "out"], vec!["--games", "0"], vec!["--seed", "0"], vec!["--games", "bad"], vec!["unknown"], vec!["--unknown"]] {
+        for values in [
+            vec!["--audit"],
+            vec!["--audit", "out"],
+            vec!["--games", "0"],
+            vec!["--seed", "0"],
+            vec!["--games", "bad"],
+            vec!["unknown"],
+            vec!["--unknown"],
+        ] {
             assert!(Options::parse(&args(&values), None).is_err());
         }
         assert!(Options::parse(&[], Some("bad")).is_err());
-        assert_eq!(Options::parse(&args(&["--games", "2"]), Some("bad")).unwrap().games, Some(2));
+        assert_eq!(
+            Options::parse(&args(&["--games", "2"]), Some("bad"))
+                .unwrap()
+                .games,
+            Some(2)
+        );
     }
 
     #[test]
@@ -1307,12 +1569,28 @@ mod tests {
         let mut gs = GameState::new(own, opponent, db);
         gs.current_phase = Phase::LiveCardSetFirstAttacker;
         let actions = game_setup::generate_possible_actions(&gs);
-        let chosen = actions.iter().find(|a| a.action_type == game_setup::ActionType::SelectLiveCard).unwrap();
-        let mut audit = DecisionAudit { game: 1, decision: 1, ..Default::default() };
+        let chosen = actions
+            .iter()
+            .find(|a| a.action_type == game_setup::ActionType::SelectLiveCard)
+            .unwrap();
+        let mut audit = DecisionAudit {
+            game: 1,
+            decision: 1,
+            ..Default::default()
+        };
         let row = audit.record(&gs, &actions, chosen).unwrap();
-        assert_eq!(row["available_actions"].as_array().unwrap().len(), actions.len());
-        assert_eq!(row["chosen"]["parameters"], serde_json::to_value(chosen).unwrap()["parameters"]);
-        assert_eq!(row["view"]["own"]["hand"][0]["card_no"], gs.card_database.get_card(ids[0]).unwrap().card_no.as_ref());
+        assert_eq!(
+            row["available_actions"].as_array().unwrap().len(),
+            actions.len()
+        );
+        assert_eq!(
+            row["chosen"]["parameters"],
+            serde_json::to_value(chosen).unwrap()["parameters"]
+        );
+        assert_eq!(
+            row["view"]["own"]["hand"][0]["card_no"],
+            gs.card_database.get_card(ids[0]).unwrap().card_no.as_ref()
+        );
         assert_eq!(row["view"]["opponent_public"].as_object().unwrap().len(), 3);
         for id in &ids[2..5] {
             assert!(!row.to_string().contains(&format!("\"card_id\":{id},")));
@@ -1352,9 +1630,16 @@ mod tests {
             .picker(Some("p2".into()))
             .build();
         gs.ability_queue.pause_for_choice(choice);
-        gs.ability_queue.current_entry_mut().unwrap().choice_player_id = Some("p2".into());
+        gs.ability_queue
+            .current_entry_mut()
+            .unwrap()
+            .choice_player_id = Some("p2".into());
 
-        for phase in [Phase::Main, Phase::MulliganFirstAttacker, Phase::LiveCardSetFirstAttacker] {
+        for phase in [
+            Phase::Main,
+            Phase::MulliganFirstAttacker,
+            Phase::LiveCardSetFirstAttacker,
+        ] {
             gs.current_phase = phase;
             assert_eq!(gs.active_player().id, "p1");
             assert!(!gs.can_player_act(0));
@@ -1363,39 +1648,75 @@ mod tests {
             assert_eq!(policy_route(&gs), PolicyRoute::Action);
             let actions = game_setup::generate_possible_actions(&gs);
             assert_eq!(actions.len(), 2);
-            assert!(actions.iter().all(|a| a.action_type == game_setup::ActionType::ChoiceSelect));
-            let wrong_policy = policy_call(|| BotKind::V1.choose_action(&gs, &actions, 0, &v2, &plan_p1));
+            assert!(actions
+                .iter()
+                .all(|a| a.action_type == game_setup::ActionType::ChoiceSelect));
+            let wrong_policy =
+                policy_call(|| BotKind::V1.choose_action(&gs, &actions, 0, &v2, &plan_p1));
             let wrong_value = serde_json::to_value(&wrong_policy).unwrap();
-            let seed = (1..1000).find(|&seed| {
-                let index = Lcg(seed).range(actions.len());
-                serde_json::to_value(&actions[index]).unwrap() != wrong_value
-            }).unwrap();
+            let seed = (1..1000)
+                .find(|&seed| {
+                    let index = Lcg(seed).range(actions.len());
+                    serde_json::to_value(&actions[index]).unwrap() != wrong_value
+                })
+                .unwrap();
             let expected = actions[Lcg(seed).range(actions.len())].clone();
-            let chosen = choose_policy_action(&gs, &actions, [BotKind::V1, BotKind::Random], &v2, [&plan_p1, &plan_p2], None, &mut Lcg(seed));
-            assert_eq!(serde_json::to_value(&chosen).unwrap(), serde_json::to_value(&expected).unwrap());
+            let chosen = choose_policy_action(
+                &gs,
+                &actions,
+                [BotKind::V1, BotKind::Random],
+                &v2,
+                [&plan_p1, &plan_p2],
+                None,
+                &mut Lcg(seed),
+            );
+            assert_eq!(
+                serde_json::to_value(&chosen).unwrap(),
+                serde_json::to_value(&expected).unwrap()
+            );
             assert_ne!(serde_json::to_value(&chosen).unwrap(), wrong_value);
-            let mut audit = DecisionAudit { game: 4, decision: 73, ..Default::default() };
+            let mut audit = DecisionAudit {
+                game: 4,
+                decision: 73,
+                ..Default::default()
+            };
             let row = audit.record(&gs, &actions, &chosen).unwrap();
             assert_eq!(row["policy_player"], "p2");
             assert_eq!(row["active_player"], "p1");
             assert_eq!(row["pending_choice_player"], "p2");
             assert_eq!(row["view"]["own"]["player"], "p2");
             assert_eq!(row["view"]["own"]["hand"].as_array().unwrap().len(), 2);
-            assert_eq!(row["chosen"]["resolved_card"]["card_id"], chosen.parameters.as_ref().unwrap().card_id.unwrap());
+            assert_eq!(
+                row["chosen"]["resolved_card"]["card_id"],
+                chosen.parameters.as_ref().unwrap().card_id.unwrap()
+            );
             let mut hidden = chosen.clone();
             hidden.parameters.as_mut().unwrap().card_id = Some(ids[0]);
-            assert_eq!(audit_action(&gs, &hidden).unwrap()["identity_redacted"], true);
-            gs.ability_queue.current_entry_mut().unwrap().choice_player_id = Some("p1".into());
+            assert_eq!(
+                audit_action(&gs, &hidden).unwrap()["identity_redacted"],
+                true
+            );
+            gs.ability_queue
+                .current_entry_mut()
+                .unwrap()
+                .choice_player_id = Some("p1".into());
             let next = audit.record(&gs, &actions, &chosen).unwrap();
             assert_eq!(next["policy_player"], "p1");
             assert_eq!(next["boundary_id"], 2);
             assert_eq!(next["boundary_step"], 1);
-            gs.ability_queue.current_entry_mut().unwrap().choice_player_id = Some("p2".into());
+            gs.ability_queue
+                .current_entry_mut()
+                .unwrap()
+                .choice_player_id = Some("p2".into());
         }
-        gs.ability_queue.pause_for_auto_ability_choice(Choice::SelectAutoAbility {
-            player_id: "p2".into(), options: vec![], description: "Choose ability".into(),
-            description_en: None, description_ja: None,
-        });
+        gs.ability_queue
+            .pause_for_auto_ability_choice(Choice::SelectAutoAbility {
+                player_id: "p2".into(),
+                options: vec![],
+                description: "Choose ability".into(),
+                description_en: None,
+                description_ja: None,
+            });
         assert!(gs.get_pending_choice_player_id().is_none());
         assert_eq!(decision_player(&gs).id, "p2");
     }
@@ -1412,10 +1733,12 @@ mod tests {
             assert_eq!(sampled, expected);
             assert_eq!(rabuka_engine::rng::checkpoint(), before);
         }
-        let result = std::panic::catch_unwind(|| policy_call(|| {
-            rabuka_engine::rng::rand_range(1_000_000);
-            panic!("policy failed");
-        }));
+        let result = std::panic::catch_unwind(|| {
+            policy_call(|| {
+                rabuka_engine::rng::rand_range(1_000_000);
+                panic!("policy failed");
+            })
+        });
         assert!(result.is_err());
         assert_eq!(rabuka_engine::rng::checkpoint(), before);
         assert_eq!(rabuka_engine::rng::rand_range(1_000_000), expected);
@@ -1452,12 +1775,17 @@ mod tests {
     #[test]
     fn snapshot_options_are_bounded_and_split_is_grouped_by_seed() {
         assert!(Options::parse(&args(&["--snapshots", "positions"]), None).is_err());
-        let options = Options::parse(&args(&["--games", "2", "--snapshots", "positions"]), None).unwrap();
+        let options =
+            Options::parse(&args(&["--games", "2", "--snapshots", "positions"]), None).unwrap();
         assert_eq!(options.snapshots, Some(PathBuf::from("positions")));
         assert!(options.audit.is_none());
         let compare = Options::parse(&args(&["--compare", "positions"]), None).unwrap();
         assert_eq!(compare.compare, Some(PathBuf::from("positions")));
-        assert!(Options::parse(&args(&["--compare", "p", "--snapshots", "q", "--games", "1"]), None).is_err());
+        assert!(Options::parse(
+            &args(&["--compare", "p", "--snapshots", "q", "--games", "1"]),
+            None
+        )
+        .is_err());
         assert!(Options::parse(&args(&["--compare", "p", "--trace"]), None).is_err());
         assert!(Options::parse(&args(&["--compare", "p", "v6", "v7"]), None).is_err());
         for seed in 1..100 {
@@ -1476,10 +1804,17 @@ mod tests {
         let mut gs = deal_from_templates(&db, &t1, &t2);
         let mut setup_rng = Lcg(17321);
         for _ in 0..100 {
-            if snapshot_eligible(&gs) { break; }
-            if game_setup::auto_advance_one(&mut gs) { continue; }
+            if snapshot_eligible(&gs) {
+                break;
+            }
+            if game_setup::auto_advance_one(&mut gs) {
+                continue;
+            }
             let actions = game_setup::generate_possible_actions(&gs);
-            let action = actions.iter().find(|a| a.action_type == game_setup::ActionType::ConfirmMulligan).unwrap_or(&actions[setup_rng.range(actions.len())]);
+            let action = actions
+                .iter()
+                .find(|a| a.action_type == game_setup::ActionType::ConfirmMulligan)
+                .unwrap_or(&actions[setup_rng.range(actions.len())]);
             game_setup::execute_action(&mut gs, action).unwrap();
             game_setup::settle_single_player_state(&mut gs);
         }
@@ -1490,27 +1825,44 @@ mod tests {
         let db_before = gs.card_database.cards.len();
         let arena_rng = Lcg(9876);
         let rng_before = rabuka_engine::rng::checkpoint();
-        let saved = SavedPosition::capture(&gs, &arena_rng, json!({"game_seed": 17, "fold": corpus_fold(17)})).unwrap();
+        let saved = SavedPosition::capture(
+            &gs,
+            &arena_rng,
+            json!({"game_seed": 17, "fold": corpus_fold(17)}),
+        )
+        .unwrap();
         // Capture must not disturb either RNG.
         assert_eq!(rng_before, rabuka_engine::rng::checkpoint());
         assert_eq!(arena_rng.0, saved.arena_rng);
         // Restore replays the exact global engine RNG stream.
-        let expected_rng: Vec<_> = (0..8).map(|_| rabuka_engine::rng::rand_range(1_000_000)).collect();
+        let expected_rng: Vec<_> = (0..8)
+            .map(|_| rabuka_engine::rng::rand_range(1_000_000))
+            .collect();
         rabuka_engine::rng::restore(saved.engine_rng);
-        assert_eq!(expected_rng, (0..8).map(|_| rabuka_engine::rng::rand_range(1_000_000)).collect::<Vec<_>>());
+        assert_eq!(
+            expected_rng,
+            (0..8)
+                .map(|_| rabuka_engine::rng::rand_range(1_000_000))
+                .collect::<Vec<_>>()
+        );
         // Arena LCG state roundtrips.
         assert_eq!(Lcg(saved.arena_rng).next_u64(), Lcg(arena_rng.0).next_u64());
         // File write: atomic create, refuses overwrite, reload identical.
-        let directory = std::env::temp_dir().join(format!("rabuka-snapshot-test-{}", std::process::id()));
+        let directory =
+            std::env::temp_dir().join(format!("rabuka-snapshot-test-{}", std::process::id()));
         std::fs::create_dir_all(&directory).unwrap();
         let path = directory.join("position.rmp");
         saved.write(&path).unwrap();
         assert!(saved.write(&path).is_err());
-        let mut loaded: SavedPosition = rmp_serde::from_slice(&std::fs::read(&path).unwrap()).unwrap();
+        let mut loaded: SavedPosition =
+            rmp_serde::from_slice(&std::fs::read(&path).unwrap()).unwrap();
         // Physical duplicate-deck IDs: real decks need far more physical IDs
         // than template card_nos.
         let template_count = fresh_database().cards.len();
-        assert!(saved.cards.len() > template_count + 100, "real decks require unique physical duplicate-card IDs");
+        assert!(
+            saved.cards.len() > template_count + 100,
+            "real decks require unique physical duplicate-card IDs"
+        );
         let restored = loaded.restore(&fresh_database()).unwrap();
         // Offers and v6/v7 numeric behavior identical after restore.
         let equivalence_rng = rabuka_engine::rng::checkpoint();
@@ -1518,7 +1870,10 @@ mod tests {
         assert_eq!(rabuka_engine::rng::checkpoint(), equivalence_rng);
         assert_eq!(restored.card_database.cards.len(), db_before);
         for (&id, card) in &gs.card_database.cards {
-            assert_eq!(restored.card_database.get_card(id).unwrap().card_no, card.card_no);
+            assert_eq!(
+                restored.card_database.get_card(id).unwrap().card_no,
+                card.card_no
+            );
         }
         assert_eq!(restored.game_state_history, gs.game_state_history);
         assert_eq!(restored.debug_trace, gs.debug_trace);
@@ -1532,7 +1887,10 @@ mod tests {
         assert_eq!(first, second);
         assert_eq!(rabuka_engine::rng::checkpoint(), 998877);
         for name in ["v6", "v7"] {
-            assert_eq!(first["bots"][name]["scores"].as_array().unwrap().len(), saved.offers.as_array().unwrap().len());
+            assert_eq!(
+                first["bots"][name]["scores"].as_array().unwrap().len(),
+                saved.offers.as_array().unwrap().len()
+            );
             assert!(first["bots"][name]["chosen_index"].as_u64().is_some());
         }
         // Original card DB unmutated by capture/compare paths; capture-time
@@ -1556,7 +1914,11 @@ mod tests {
         struct Fail(bool);
         impl Write for Fail {
             fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-                if self.0 { Ok(buf.len()) } else { Err(std::io::Error::other("write failure")) }
+                if self.0 {
+                    Ok(buf.len())
+                } else {
+                    Err(std::io::Error::other("write failure"))
+                }
             }
             fn flush(&mut self) -> std::io::Result<()> {
                 Err(std::io::Error::other("flush failure"))
@@ -1567,7 +1929,9 @@ mod tests {
         let mut output = Vec::new();
         write_jsonl(&mut output, &json!({"event": "test"})).unwrap();
         assert_eq!(output.last(), Some(&b'\n'));
-        assert_eq!(serde_json::from_slice::<Value>(&output).unwrap()["event"], "test");
+        assert_eq!(
+            serde_json::from_slice::<Value>(&output).unwrap()["event"],
+            "test"
+        );
     }
 }
-

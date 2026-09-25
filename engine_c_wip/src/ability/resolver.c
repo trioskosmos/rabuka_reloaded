@@ -215,8 +215,8 @@ void rb_resolver_store_condition_verdict(GameState *g, int actor, const char *co
 void rb_resolver_store_pending_choice(GameState *g) {
     if (!g) return;
     g->queue.has_pending = 1;
+    g->queue.snapshot_requested = 1;
     g->queue.state = RB_QUEUE_AWAITING_CHOICE;
-    /* Rust sets gs.ability_queue.snapshot_requested = true; C queue has no snapshot_requested field; skip */
     /* Dedup last_offered_sig (mirrors Rust last_offered_sig) */
     char sig[512];
     choice_offer_sig(&g->queue.pending, sig, sizeof(sig));

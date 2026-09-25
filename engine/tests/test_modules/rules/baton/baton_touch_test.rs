@@ -60,6 +60,32 @@ fn baton_touch_moves_replaced_member_to_waitroom() {
 /// After replacing one occupied lane, the remaining occupied lanes should
 /// still offer baton-touch placement options.
 #[test]
+fn q134_baton_touch_waited_occupant_and_arriver_orientation() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let target = game.id("PL!-sd1-010-SD");
+    let arriver = game.id("PL!-sd1-010-SD");
+
+    game.state.player1.stage.stage[1] = target;
+    game.state.mods.add_orientation_modifier(target, "wait");
+    game.state.player1.hand.cards.push(arriver);
+    game.give_energy(4);
+
+    game.play_to_stage(arriver, MemberArea::Center);
+
+    assert!(
+        game.state.player1.waitroom.cards.contains(&target),
+        "Q134: waited occupant is replaced and moved to the waitroom"
+    );
+    assert_eq!(game.state.player1.stage.stage[1], arriver);
+    assert_ne!(
+        game.state.mods.get_orientation_modifier(arriver),
+        Some("wait"),
+        "Q134: baton-touch arrival is active, not waited"
+    );
+}
+
+#[test]
 fn baton_touch_does_not_lock_all_full_lanes() {
     let db = load_real_database();
     let mut game = TestGame::new(db.clone());

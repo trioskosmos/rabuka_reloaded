@@ -861,27 +861,54 @@ static const char* get_success_replacement_info(const GameState *g, int card_id)
     for(int a=0;a<nab;a++){
         Ability ab;
         if(!rb_decode_card_ability((uint32_t)card_id, a, &ab)) continue;
-        if(!rb_ability_has_trigger(&ab, RB_TK_CONSTANT)) continue;
+        if(!rb_ability_has_trigger(&ab, RB_TK_CONSTANT)) {
+            rb_free_ability(&ab);
+            continue;
+        }
         AbilityEffect *e = ab.effect;
-        if(!e || !e->action || strcmp(e->action,"conditional_alternative")) continue;
-        if(!e->alternative_effect) continue;
+        if(!e || !e->action || strcmp(e->action,"conditional_alternative")) {
+            rb_free_ability(&ab);
+            continue;
+        }
+        int success_condition = 0;
+        if(e->condition) {
+            for(int i=0;i<(int)e->condition->n_fields;i++) {
+                const CondField *field = &e->condition->fields[i];
+                if(field->key && !strcmp(field->key, "location") && field->v.s &&
+                   (!strcmp(field->v.s, "success_live_zone") ||
+                    !strcmp(field->v.s, "success_live_card_zone"))) {
+                    success_condition = 1;
+                    break;
+                }
+            }
+        }
+        if(!success_condition) {
+            rb_free_ability(&ab);
+            continue;
+        }
         AbilityEffect *alt = e->alternative_effect;
-        if(!alt->action || strcmp(alt->action,"move_cards")) continue;
-        if(!alt->source || strcmp(alt->source,"discard")) continue;
-        /* extract group_names from extra_kv */
+        if(!alt || !alt->action || strcmp(alt->action,"move_cards") ||
+           !alt->source || strcmp(alt->source,"discard")) {
+            rb_free_ability(&ab);
+            continue;
+        }
         for(int i=0;i<e->n_extra;i++){
-            if(e->extra_k[i] && !strcmp(e->extra_k[i],"group_names") && e->extra_v[i]){
-                strncpy(group_buf, e->extra_v[i], sizeof(group_buf)-1); group_buf[sizeof(group_buf)-1]=0;
+            if(e->extra_k[i] && !strcmp(e->extra_k[i],"group_names") && e->extra_v[i] && e->extra_v[i][0]){
+                strncpy(group_buf, e->extra_v[i], sizeof(group_buf)-1);
+                group_buf[sizeof(group_buf)-1]=0;
+                rb_free_ability(&ab);
                 return group_buf;
             }
         }
         for(int i=0;i<alt->n_extra;i++){
-            if(alt->extra_k[i] && !strcmp(alt->extra_k[i],"group_names") && alt->extra_v[i]){
-                strncpy(group_buf, alt->extra_v[i], sizeof(group_buf)-1); group_buf[sizeof(group_buf)-1]=0;
+            if(alt->extra_k[i] && !strcmp(alt->extra_k[i],"group_names") && alt->extra_v[i] && alt->extra_v[i][0]){
+                strncpy(group_buf, alt->extra_v[i], sizeof(group_buf)-1);
+                group_buf[sizeof(group_buf)-1]=0;
+                rb_free_ability(&ab);
                 return group_buf;
             }
         }
-        group_buf[0]=0; return group_buf;
+        rb_free_ability(&ab);
     }
     return NULL;
 }
@@ -892,19 +919,88 @@ static const char* get_success_replacement_info(const GameState *g, int card_id)
     choice was emitted. */
 int rb_try_create_success_replacement_choice(GameState *g, int card_id, int player_pl){
     const char *group_name = get_success_replacement_info(g, card_id);
-    if(!group_name) return 0;
+    if(!group_name || player_pl < 0 || player_pl > 1) return 0;
     const RbPlayer *P = &g->p[player_pl];
-    int has_target = 0;
-    for(int i=0;i<P->discard.n;i++){
+    int filtered[RB_MAX_ZONE];
+    int n_filtered = 0;
+    for(int i=0;i<P->discard.n && n_filtered<RB_MAX_ZONE;i++){
         int cid = P->discard.cards[i];
-        if(rb_card_is_live(cid) && rb_card_matches_group_str(cid, group_name)){
-            has_target = 1; break;
+        if(rb_card_is_live(cid) && rb_card_matches_group_str(cid, group_name) &&
+           rb_can_place_card_in_zone(g, cid, "success_live_zone"))
+            filtered[n_filtered++] = i;
+    }
+    if(n_filtered == 0) return 0;
+    rb_emit_choice(g, player_pl, RB_CHOICE_SELECT_CARD, "discard", "live_card",
+                   1, 1, "success_replacement");
+    g->queue.actor = player_pl;
+    g->queue.pending.actor = player_pl;
+    g->queue.resume_actor = player_pl;
+    g->queue.resume_host = card_id;
+    g->queue.resume_mode = 0;
+    g->queue.pending.n_filtered_indices = n_filtered;
+    for(int i=0;i<n_filtered;i++) g->queue.pending.filtered_indices[i] = filtered[i];
+    strncpy(g->queue.pending.filter_group, group_name,
+            sizeof(g->queue.pending.filter_group) - 1);
+    g->queue.pending.filter_group[sizeof(g->queue.pending.filter_group) - 1] = 0;
+    strncpy(g->queue.resume_move_destination, "success_live_zone",
+            sizeof(g->queue.resume_move_destination) - 1);
+    g->queue.resume_move_destination[sizeof(g->queue.resume_move_destination) - 1] = 0;
+    fprintf(stderr, "[SUCCESS_REPLACEMENT_PROMPT] pl=%d original=%d legal=%d group=%s\n",
+            player_pl, card_id, n_filtered, group_name);
+    return 1;
+}
+
+void rb_handle_success_replacement_choice(GameState *g, int player_pl,
+                                          int original_card_id,
+                                          int selected_discard_index,
+                                          int accepted) {
+    if (!g || player_pl < 0 || player_pl > 1) return;
+    RbPlayer *P = &g->p[player_pl];
+    int replacement_id = -1;
+    if (accepted && selected_discard_index >= 0 && selected_discard_index < P->discard.n) {
+        replacement_id = P->discard.cards[selected_discard_index];
+        for (int i = selected_discard_index; i < P->discard.n - 1; i++)
+            P->discard.cards[i] = P->discard.cards[i + 1];
+        P->discard.n--;
+        if (!rb_card_is_live(replacement_id) ||
+            !rb_can_place_card_in_zone(g, replacement_id, "success_live_zone")) {
+            rb_waitroom_add(P, replacement_id);
+            replacement_id = -1;
         }
     }
-    if(!has_target) return 0;
-    rb_emit_choice(g, player_pl, RB_CHOICE_SELECT_CARD, "discard", "live_card",
-                   1, 0, "success_replacement");
-    return 1;
+
+    int original_index = -1;
+    for (int i = 0; i < P->live.n; i++) {
+        if (P->live.cards[i] == original_card_id) {
+            original_index = i;
+            break;
+        }
+    }
+    if (original_index >= 0) {
+        for (int i = original_index; i < P->live.n - 1; i++)
+            P->live.cards[i] = P->live.cards[i + 1];
+        P->live.n--;
+    }
+
+    if (replacement_id >= 0) {
+        if (original_card_id >= 0) rb_waitroom_add(P, original_card_id);
+        if (P->success.n < RB_MAX_ZONE) rb_success_add(P, replacement_id);
+        else rb_waitroom_add(P, replacement_id);
+    } else if (original_card_id >= 0) {
+        if (P->success.n < RB_MAX_ZONE) rb_success_add(P, original_card_id);
+        else rb_waitroom_add(P, original_card_id);
+    }
+
+    while (P->live.n > 0) {
+        int cid = P->live.cards[0];
+        for (int i = 0; i < P->live.n - 1; i++)
+            P->live.cards[i] = P->live.cards[i + 1];
+        P->live.n--;
+        rb_waitroom_add(P, cid);
+    }
+    fprintf(stderr, "[SUCCESS_REPLACEMENT_RESULT] pl=%d original=%d replacement=%d accepted=%d success=%d waitroom=%d\n",
+            player_pl, original_card_id, replacement_id, accepted,
+            P->success.n, P->discard.n);
 }
 
 /* Mirror live.rs::enrich_from_applications — fold the ability applications
@@ -939,11 +1035,7 @@ void rb_enrich_from_applications(const GameState *g){
    ported in subsequent batches. For now they are minimal implementations that
    allow the orchestration function to compile and link. */
 void rb_apply_deferred_reyell(GameState *g) {
-    if (!g) return;
-    if (g->re_yell_occurred) {
-        /* Restore yell state from deferred rebuild buffer (simplified) */
-        g->re_yell_occurred = 0;
-    }
+    (void)g;
 }
 
 void rb_rebuild_stage_hearts_with_yell(GameState *g) {
@@ -1100,6 +1192,14 @@ void rb_move_live_to_success_and_handle_wins(GameState *g) {
     for (int pl = 0; pl < 2; pl++) {
         int won = pl == 0 ? g->p1_live_won : g->p2_live_won;
         int must_skip = pl == 0 ? p1_must_skip : p2_must_skip;
+        int card_id = g->p[pl].live.n == 1 ? g->p[pl].live.cards[0] : -1;
+        if (won && !must_skip && card_id >= 0 &&
+            rb_try_create_success_replacement_choice(g, card_id, pl))
+            return;
+    }
+    for (int pl = 0; pl < 2; pl++) {
+        int won = pl == 0 ? g->p1_live_won : g->p2_live_won;
+        int must_skip = pl == 0 ? p1_must_skip : p2_must_skip;
         int cid = g->p[pl].live.n > 0 ? g->p[pl].live.cards[g->p[pl].live.n - 1] : -1;
         int can_place = cid >= 0 && rb_can_place_card_in_zone(g, cid, "success_live_zone");
         fprintf(stderr, "[LIVE_SUCCESS_RESULT] pl=%d won=%d must_skip=%d card=%d can_place=%d live=%d\n",
@@ -1249,9 +1349,8 @@ void rb_process_player_live_result(GameState *g, int pl, int won, int must_skip,
     RbPlayer *P = &g->p[pl];
     int card_count = rb_live_len(P);
     if (won && !must_skip && card_count > 0) {
-        int selected_index = card_count - 1;
-        int card_id = P->live.cards[selected_index];
-        for (int k = selected_index; k < P->live.n - 1; k++) P->live.cards[k] = P->live.cards[k + 1];
+        int card_id = P->live.cards[0];
+        for (int k = 0; k < P->live.n - 1; k++) P->live.cards[k] = P->live.cards[k + 1];
         P->live.n--;
         if (can_place && P->success.n < RB_MAX_ZONE) {
             rb_success_add(P, card_id);

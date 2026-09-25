@@ -339,14 +339,47 @@ const unsigned char *rb_bc_slice(uint32_t idx, uint32_t *out_len) {
     return g_bc + start;
 }
 
+static void rb_normalize_card_no(const char *src, char *dst, size_t dst_size) {
+    size_t n = 0;
+    if (!dst_size) return;
+    for (; src[n] && n + 1 < dst_size; n++) {
+        unsigned char ch = (unsigned char)src[n];
+        if (ch >= 0xE0 && ch <= 0xEF && src[n + 1] && src[n + 2]) {
+            unsigned codepoint = ((ch & 0x0F) << 12) |
+                                 (((unsigned char)src[n + 1] & 0x3F) << 6) |
+                                 ((unsigned char)src[n + 2] & 0x3F);
+            if (codepoint >= 0xFF01 && codepoint <= 0xFF5E) {
+                ch = (unsigned char)(codepoint - 0xFEE0);
+                n += 2;
+            }
+        }
+        if (ch >= 'a' && ch <= 'z') {
+            ch = (unsigned char)(ch - 'a' + 'A');
+        }
+        dst[n] = (char)ch;
+    }
+    dst[n] = 0;
+}
+
 int rb_find_card_by_no(const char *card_no) {
+    char normalized[128];
     if (!card_no || !g_cards_blob) return -1;
     for (uint32_t i = 0; i < g_num_cards; i++) {
         const unsigned char *rec = rb_card_record(i);
         if (!rec) continue;
-        uint16_t no_idx = le16(rec + 0); /* card_no_idx at offset 0 per cards.c */
+        uint16_t no_idx = le16(rec + 0);
         const char *no = rb_card_string(no_idx);
         if (no && strcmp(no, card_no) == 0) return (int)i;
+    }
+    rb_normalize_card_no(card_no, normalized, sizeof(normalized));
+    for (uint32_t i = 0; i < g_num_cards; i++) {
+        const unsigned char *rec = rb_card_record(i);
+        if (!rec) continue;
+        const char *no = rb_card_string(le16(rec));
+        char candidate[128];
+        if (!no) continue;
+        rb_normalize_card_no(no, candidate, sizeof(candidate));
+        if (strcmp(candidate, normalized) == 0) return (int)i;
     }
     return -1;
 }

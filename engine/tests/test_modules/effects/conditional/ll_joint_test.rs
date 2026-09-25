@@ -46,6 +46,35 @@ fn ll_joint_requires_6_cards() {
 
 /// With 6+ cards in discard, cost creates a choice
 #[test]
+fn ll_joint_q165_accepts_mixed_three_name_cards() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let joint = game.id("LL-bp3-001-R\u{ff0b}");
+    let umi = game.id("PL!-PR-014-PR");
+    let yoshiko = game.id("PL!S-sd1-015-SD");
+    let rino = game.id("PL!N-bp7-021-N");
+
+    game.state.player1.stage.stage[1] = joint;
+    for _ in 0..2 {
+        game.state.player1.waitroom.cards.push(umi);
+        game.state.player1.waitroom.cards.push(yoshiko);
+        game.state.player1.waitroom.cards.push(rino);
+    }
+
+    game.activate_ability(joint);
+    assert!(
+        !game.has_pending_choice(),
+        "exactly six valid mixed-name cards resolve without a choice"
+    );
+
+    assert!(game.state.player1.waitroom.cards.is_empty());
+    assert_eq!(game.state.player1.main_deck.cards.len(), 6);
+    assert_eq!(game.state.player1.main_deck.cards.iter().filter(|&&id| id == umi).count(), 2);
+    assert_eq!(game.state.player1.main_deck.cards.iter().filter(|&&id| id == yoshiko).count(), 2);
+    assert_eq!(game.state.player1.main_deck.cards.iter().filter(|&&id| id == rino).count(), 2);
+}
+
+#[test]
 fn ll_joint_creates_choice_with_6_cards() {
     let db = load_real_database();
     let mut game = TestGame::new(db);

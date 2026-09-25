@@ -443,18 +443,24 @@ void rb_set_card_identity_effect(GameState *g, int actor, AbilityEffect *e, int 
     else            rb_effect_set_card_identity(g, actor, e, host_cid);
 }
 
-/* Mirror ability_effects.rs::execute_suppress_ability_trigger. Surface the
-   suppressed trigger name via the rule log (INFO-only: no per-card state is
-   mutated in the portable core). */
+/* Register a persistent trigger suppression in game state. The trigger scan
+   also detects suppressors directly on active cards, matching Rust. */
 void rb_suppress_ability_trigger(GameState *g, int actor, AbilityEffect *e, int host_cid){
     (void)host_cid;
-    const char *trigger="unknown";
+    if (!g || !e) return;
+    const char *trigger = NULL;
     for(int i=0;i<e->n_extra;i++)
-        if(e->extra_k[i] && !strcmp(e->extra_k[i],"suppressed_trigger") && e->extra_v[i])
+        if(e->extra_k[i] && !strcmp(e->extra_k[i],"suppressed_trigger") && e->extra_v[i]) {
             trigger=e->extra_v[i];
-    (void)trigger;
-    (void)g;
-    (void)actor;
+            break;
+        }
+    if (!trigger || !*trigger || g->n_prohibition >= 64) return;
+    char entry[48];
+    snprintf(entry, sizeof(entry), "suppress:%d:%s", actor, trigger);
+    for (int i = 0; i < g->n_prohibition; i++)
+        if (!strcmp(g->prohibition[i], entry)) return;
+    snprintf(g->prohibition[g->n_prohibition], sizeof(g->prohibition[0]), "%s", entry);
+    g->n_prohibition++;
 }
 
 /* -- execute_gain_ability_effect -- */

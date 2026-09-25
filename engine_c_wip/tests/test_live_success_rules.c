@@ -169,54 +169,98 @@ static void test_success_zone_legality_and_selection(void) {
     CHECK(test_zone_has_id(&tg, 0, "discard", restricted),
           "unselected restricted live goes to the waitroom");
     CHECK_EQ(tg.state.p[0].live.n, 0, "live zone is empty after success choice");
+}
 
-    TestGame single;
-    test_game_new(&single);
-    restricted = test_id(&single, "PL!S-bp2-024-L");
-    test_add_to_live(&single, restricted);
-    single.state.p1_live_won = 1;
+static void test_single_restricted_live_goes_to_waitroom(void) {
+    TestGame tg;
+    test_game_new(&tg);
+    int restricted = test_id(&tg, "PL!S-bp2-024-L");
+    test_add_to_live(&tg, restricted);
+    tg.state.p1_live_won = 1;
 
-    rb_move_live_to_success_and_handle_wins(&single.state);
+    rb_move_live_to_success_and_handle_wins(&tg.state);
 
-    CHECK(!test_has_pending_choice(&single), "single restricted live needs no choice");
-    CHECK_EQ(single.state.p[0].success.n, 0,
+    CHECK(!test_has_pending_choice(&tg), "single restricted live needs no choice");
+    CHECK_EQ(tg.state.p[0].success.n, 0,
              "single restricted live cannot enter the success zone");
-    CHECK(test_zone_has_id(&single, 0, "discard", restricted),
+    CHECK(test_zone_has_id(&tg, 0, "discard", restricted),
           "single restricted live goes to the waitroom");
+}
 
-    TestGame both;
-    test_game_new(&both);
-    restricted = test_id(&both, "PL!S-bp2-024-L");
-    legal = test_id(&both, "PL!HS-bp1-019-L");
-    test_add_to_live(&both, restricted);
-    test_add_to_live(&both, legal);
-    test_add_to_opp_live(&both, restricted);
-    test_add_to_opp_live(&both, legal);
-    both.state.p1_live_won = 1;
-    both.state.p2_live_won = 1;
+static void test_success_choice_resumes_second_winner(void) {
+    TestGame tg;
+    test_game_new(&tg);
+    int restricted = test_id(&tg, "PL!S-bp2-024-L");
+    int legal = test_id(&tg, "PL!HS-bp1-019-L");
+    test_add_to_live(&tg, restricted);
+    test_add_to_live(&tg, legal);
+    test_add_to_opp_live(&tg, restricted);
+    test_add_to_opp_live(&tg, legal);
+    tg.state.p1_live_won = 1;
+    tg.state.p2_live_won = 1;
 
-    rb_move_live_to_success_and_handle_wins(&both.state);
-    choice = rb_get_pending_choice(&both.state);
+    rb_move_live_to_success_and_handle_wins(&tg.state);
+    const RbChoice *choice = rb_get_pending_choice(&tg.state);
     CHECK(choice && choice->actor == 0, "first winner receives the success choice");
-    if (choice) test_resume_choice(&both, 0);
+    if (choice) test_resume_choice(&tg, 0);
 
-    both.state.live_victory_stage = 3;
-    rb_execute_live_victory_determination(&both.state);
-    choice = rb_get_pending_choice(&both.state);
+    tg.state.live_victory_stage = 3;
+    rb_execute_live_victory_determination(&tg.state);
+    choice = rb_get_pending_choice(&tg.state);
     CHECK(choice && choice->actor == 1, "victory resume offers the second winner choice");
-    if (choice) test_resume_choice(&both, 0);
-    rb_execute_live_victory_determination(&both.state);
+    if (choice) test_resume_choice(&tg, 0);
+    rb_execute_live_victory_determination(&tg.state);
 
-    CHECK_EQ(both.state.p[0].success.n, 1, "first winner places one legal live");
-    CHECK_EQ(both.state.p[1].success.n, 1, "second winner places one legal live");
-    CHECK(both.state.p[0].success.n == 1 && both.state.p[0].success.cards[0] == legal,
+    CHECK_EQ(tg.state.p[0].success.n, 1, "first winner places one legal live");
+    CHECK_EQ(tg.state.p[1].success.n, 1, "second winner places one legal live");
+    CHECK(tg.state.p[0].success.n == 1 && tg.state.p[0].success.cards[0] == legal,
           "first winner stores the legal live");
-    CHECK(both.state.p[1].success.n == 1 && both.state.p[1].success.cards[0] == legal,
+    CHECK(tg.state.p[1].success.n == 1 && tg.state.p[1].success.cards[0] == legal,
           "second winner stores the legal live");
-    CHECK(test_zone_has_id(&both, 0, "discard", restricted) &&
-          test_zone_has_id(&both, 1, "discard", restricted),
+    CHECK(test_zone_has_id(&tg, 0, "discard", restricted) &&
+          test_zone_has_id(&tg, 1, "discard", restricted),
           "both restricted live cards go to the waitroom");
-    CHECK_EQ(both.state.live_victory_stage, 0, "victory placement resumes to completion");
+    CHECK_EQ(tg.state.live_victory_stage, 0, "victory placement resumes to completion");
+}
+
+static void test_success_replacement_choice(int accept) {
+    TestGame tg;
+    test_game_new(&tg);
+    int original = test_id(&tg, "PL!-bp6-024-L");
+    int other = test_id(&tg, "PL!S-bp2-024-L");
+    int replacement = test_id(&tg, "PL!HS-bp1-019-L");
+    CHECK(rb_card_is_live(original), "replacement original is a live card");
+    CHECK(rb_card_is_live(replacement), "replacement candidate is a live card");
+    test_add_to_live(&tg, original);
+    test_add_to_discard(&tg, other);
+    test_add_to_discard(&tg, replacement);
+    tg.state.p1_live_won = 1;
+
+    rb_move_live_to_success_and_handle_wins(&tg.state);
+    const RbChoice *choice = rb_get_pending_choice(&tg.state);
+    CHECK(choice != NULL, "success replacement prompts for a waitroom live");
+    CHECK(choice && choice->kind == RB_CHOICE_SELECT_CARD &&
+          !strcmp(choice->zone, "discard") &&
+          !strcmp(choice->target, "success_replacement") && choice->allow_skip,
+          "success replacement exposes an optional waitroom choice");
+    CHECK(choice && choice->n_filtered_indices == 1 &&
+          choice->filtered_indices[0] == 1,
+          "success replacement filters and maps the physical waitroom index");
+    if (choice) test_resume_choice(&tg, accept ? 0 : -1);
+
+    CHECK(!test_has_pending_choice(&tg), "success replacement resolves its prompt");
+    CHECK_EQ(tg.state.p[0].live.n, 0, "success replacement empties the live zone");
+    if (accept) {
+        CHECK(test_zone_has_id(&tg, 0, "success", replacement),
+              "selected replacement enters the success zone");
+        CHECK(test_zone_has_id(&tg, 0, "discard", original),
+              "original live enters the waitroom after replacement");
+    } else {
+        CHECK(test_zone_has_id(&tg, 0, "success", original),
+              "skipping replacement places the original live");
+        CHECK(test_zone_has_id(&tg, 0, "discard", replacement),
+              "skipped replacement stays in the waitroom");
+    }
 }
 
 static void test_daydream_mermaid_choices(void) {
@@ -290,6 +334,10 @@ int main(void) {
     test_multiple_live_all_fail();
     test_winner_placement_and_second_selection();
     test_success_zone_legality_and_selection();
+    test_single_restricted_live_goes_to_waitroom();
+    test_success_choice_resumes_second_winner();
+    test_success_replacement_choice(1);
+    test_success_replacement_choice(0);
     test_daydream_mermaid_choices();
     test_shared_heart_pool();
     rb_unload();

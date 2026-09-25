@@ -36,6 +36,85 @@ static int base_heart02(const TestGame *game, int card_id) {
     return count;
 }
 
+static int value_lookup(const char *step_id, int *value, int *accepted, void *ctx) {
+    (void)ctx;
+    if (strcmp(step_id, "draw") != 0) return 0;
+    *value = 4;
+    *accepted = 1;
+    return 1;
+}
+
+static void value_ref_resolution(void) {
+    RbValueRef literal, value, accepted, offset;
+    rb_value_ref_init_literal(&literal, 7);
+    rb_value_ref_init_step(&value, "draw");
+    rb_value_ref_init_accepted(&accepted, "draw");
+    rb_value_ref_init_offset(&offset, "draw", -1);
+    CHECK_EQ(rb_value_ref_resolve(&literal, value_lookup, NULL, 99), 7,
+             "ValueRef literal resolves directly");
+    CHECK_EQ(rb_value_ref_resolve(&value, value_lookup, NULL, 99), 4,
+             "ValueRef step value resolves through lookup");
+    CHECK_EQ(rb_value_ref_resolve(&accepted, value_lookup, NULL, 99), 1,
+             "ValueRef accepted resolves to boolean");
+    CHECK_EQ(rb_value_ref_resolve(&offset, value_lookup, NULL, 99), 3,
+             "ValueRef offset applies to step value");
+    rb_value_ref_init_step(&value, "missing");
+    CHECK_EQ(rb_value_ref_resolve(&value, value_lookup, NULL, 99), 99,
+             "ValueRef lookup miss uses fallback");
+}
+
+static CondValue condition_string_value(char *value) {
+    CondValue v;
+    memset(&v, 0, sizeof(v));
+    v.tag = RB_TAG_STR;
+    v.s = value;
+    return v;
+}
+
+static void temporal_tracking_and_nested_conditions(void) {
+    TestGame game;
+    test_game_new(&game);
+    int host = test_id(&game, "PL!SP-pb1-001-R");
+
+    Condition debuted = {0};
+    debuted.variant = RB_COND_TEMPORAL;
+    debuted.fields[0] = (CondField){"temporal", condition_string_value((char *)"this_turn")};
+    debuted.fields[1] = (CondField){"count", {.tag = RB_TAG_I64, .i = 3}};
+    debuted.fields[2] = (CondField){"location", condition_string_value((char *)"stage")};
+    debuted.fields[3] = (CondField){"card_type", condition_string_value((char *)"member_card")};
+    debuted.n_fields = 4;
+    CHECK(!rb_eval_condition(&game.state, 0, &debuted),
+          "Temporal debut count below threshold is false");
+    game.state.debut_count_this_turn[0] = 3;
+    CHECK(rb_eval_condition(&game.state, 0, &debuted),
+          "Temporal debut count reaches threshold");
+
+    Condition moved = {0};
+    moved.variant = RB_COND_TEMPORAL;
+    moved.fields[0] = (CondField){"temporal", condition_string_value((char *)"this_turn")};
+    moved.n_fields = 1;
+    Condition not_moved = {0};
+    not_moved.variant = RB_COND_MOVEMENT;
+    not_moved.fields[0] = (CondField){"movement", condition_string_value((char *)"not_moved")};
+    not_moved.n_fields = 1;
+    moved.fields[1] = (CondField){"condition", {.tag = RB_TAG_OBJVAR, .cond = &not_moved}};
+    moved.n_fields = 2;
+    CHECK(rb_eval_condition_for_host(&game.state, 0, host, &moved),
+          "Nested not-moved condition passes before movement");
+    game.state.moved_this_turn[host] = 1;
+    CHECK(!rb_eval_condition_for_host(&game.state, 0, host, &moved),
+          "Nested not-moved condition fails after movement");
+}
+
+static void pending_choice_requests_snapshot(void) {
+    TestGame game;
+    test_game_new(&game);
+    game.state.queue.snapshot_requested = 0;
+    rb_resolver_store_pending_choice(&game.state);
+    CHECK_EQ(game.state.queue.snapshot_requested, 1,
+             "Pending choice requests a boundary snapshot");
+}
+
 static void fill_both_decks(TestGame *game, int filler) {
     game->state.p[0].deck.n = 0;
     game->state.p[1].deck.n = 0;
@@ -290,6 +369,9 @@ int main(void) {
         fprintf(stderr, "FAIL: database load\n");
         return 1;
     }
+    value_ref_resolution();
+    temporal_tracking_and_nested_conditions();
+    pending_choice_requests_snapshot();
     opponent_cost_self_higher_scores_in_snapshot();
     opponent_cost_self_lower_no_score_in_snapshot();
     left_side_heart_meets_threshold_gains_blade();

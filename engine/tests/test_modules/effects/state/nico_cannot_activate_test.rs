@@ -159,12 +159,37 @@ fn nico_q180_active_phase_still_activates() {
     game.pass();
     game.pass();
 
-    // Q180: P2's Active phase should activate P2's wait members naturally
-    // despite the cannot_activate_by_effect restriction.
     let ori = game.state.mods.get_orientation_modifier(filler2);
-    assert!(
-        ori.is_none() || ori != Some("wait"),
-        "Q180: Active phase activates wait members despite restriction. Got: {:?}",
-        ori
+    assert_ne!(
+        ori,
+        Some("wait"),
+        "Q180: Active phase activates wait members despite restriction"
     );
 }
+
+#[test]
+fn nico_q180_p1_active_phase_still_activates() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let nico = game.id("PL!-pb1-009-R");
+    let filler = game.id("PL!-sd1-010-SD");
+    game.give_energy(6);
+    game.add_to_hand(nico);
+    game.state.player1.stage.stage = [filler, -1, -1];
+    game.state.mods.add_orientation_modifier(filler, "wait");
+    game.play_to_stage(nico, MemberArea::Center);
+    game.drain_auto_ability_choices();
+    assert!(game.state.cannot_activate_members.contains(&"p1".to_string()));
+
+    game.state.current_phase = rabuka_engine::types::Phase::Active;
+    game.state.current_turn_phase = rabuka_engine::types::TurnPhase::FirstAttackerNormal;
+    rabuka_engine::turn::TurnEngine::advance_phase(&mut game.state);
+
+    assert_ne!(
+        game.state.mods.get_orientation_modifier(filler),
+        Some("wait"),
+        "Q180: P1 Active phase must activate its waited member despite the aura"
+    );
+}
+

@@ -568,18 +568,13 @@ void rb_stage_get_available_hearts_i32(const GameState *g, int pl, int out[8],
     }
 }
 
-/* Mirror ExclusionZone::add_card — adds a card to the exclusion zone.
- * The C engine tracks exclusion via a dedicated bag in GameState. */
+/* Mirror ExclusionZone::add_card — adds a card to the exclusion zone. */
 void rb_exclusion_add(GameState *g, int card_id){
-    if(!g) return;
-    /* exclusion zone is modeled as a separate bag; append if space */
-    if(g->resolution.n < RB_MAX_ZONE){
-        /* reuse resolution bag as exclusion store when not in active resolution */
-    }
-    /* The portable core does not maintain a separate exclusion bag; cards are
-     * excluded by moving them to a holding area. For now this is a no-op stub
-     * that records the exclusion via the resolution zone. */
-    (void)card_id;
+    if(!g || card_id < 0) return;
+    for(int i=0;i<g->exclusion_zone.n;i++)
+        if(g->exclusion_zone.cards[i] == card_id) return;
+    if(g->exclusion_zone.n < RB_MAX_ZONE)
+        g->exclusion_zone.cards[g->exclusion_zone.n++] = card_id;
 }
 
 /* ── Ported from player.rs (Player) ── */

@@ -190,6 +190,22 @@ void rb_card_normalize_no(const char *src, char *out, size_t out_sz) {
     out[w] = 0;
 }
 
+int rb_card_equivalent_rarity(const char *rarity, char *out, size_t out_sz) {
+    const char *canonical = NULL;
+    if (rarity) {
+        if (!strcmp(rarity, "P+") || !strcmp(rarity, "P2") || !strcmp(rarity, "P＋")) canonical = "P＋";
+        else if (!strcmp(rarity, "R+") || !strcmp(rarity, "R2") || !strcmp(rarity, "R＋")) canonical = "R＋";
+        else if (!strcmp(rarity, "L+") || !strcmp(rarity, "L2") || !strcmp(rarity, "L＋")) canonical = "L＋";
+        else if (!strcmp(rarity, "N+") || !strcmp(rarity, "N2") || !strcmp(rarity, "N＋")) canonical = "N＋";
+        else if (!strcmp(rarity, "PR+") || !strcmp(rarity, "PR＋")) canonical = "PR＋";
+    }
+    if (!canonical) return 0;
+    size_t len = strlen(canonical);
+    if (!out || len >= out_sz) return 0;
+    memcpy(out, canonical, len + 1);
+    return 1;
+}
+
 void rb_map_series_to_group(const char *series, char *out, size_t out_sz) {
     if (!out || !out_sz) return;
     const char *group = "";
@@ -560,10 +576,28 @@ int rb_card_get_card_id(const char *card_no) {
     id = card_no_lookup(normalized, 0);
     char *dash = strrchr(normalized, '-');
     if (id < 0 && dash) {
-        char saved = dash[1];
-        dash[1] = 0;
-        id = card_no_lookup(normalized, 1);
-        dash[1] = saved;
+        char requested[64];
+        size_t rarity_len = strlen(dash + 1);
+        if (rarity_len < sizeof(requested)) {
+            memcpy(requested, dash + 1, rarity_len + 1);
+            char equivalent[32];
+            if (rb_card_equivalent_rarity(requested, equivalent, sizeof(equivalent))) {
+                *dash = 0;
+                size_t base_len = strlen(normalized);
+                size_t eq_len = strlen(equivalent);
+                if (base_len + eq_len + 2 < len + 1) {
+                    normalized[base_len] = '-';
+                    memcpy(normalized + base_len + 1, equivalent, eq_len + 1);
+                    id = card_no_lookup(normalized, 0);
+                }
+                *dash = '-';
+            }
+        }
+        if (id < 0) {
+            *dash = 0;
+            id = card_no_lookup(normalized, 1);
+            *dash = '-';
+        }
         if (id < 0) {
             *dash = 0;
             id = card_no_lookup(normalized, 0);
@@ -667,7 +701,173 @@ int rb_card_triggerless_text(int card_id, char *out, size_t out_sz) {
     rb_free_ability(&ab);
     return 1;
 }
-int rb_card_filter_subset(int card_id) { (void)card_id; return 0; }
+const char *rb_effect_target_name(const AbilityEffect *e) {
+    return e && e->target ? e->target : "self";
+}
+
+const char *rb_effect_source_or(const AbilityEffect *e, const char *default_source) {
+    if (e && e->source && *e->source) return e->source;
+    if (e) {
+        const char *source = fx_extra(e, "source");
+        if (source && *source) return source;
+    }
+    return default_source;
+}
+
+int rb_effect_count_or(const AbilityEffect *e, int default_count) {
+    return e && e->count >= 0 ? e->count : default_count;
+}
+
+static int card_extra_int(const AbilityEffect *e, const char *key, int *out) {
+    const char *v = fx_extra(e, key);
+    if (!v || !*v) return 0;
+    char *end;
+    long parsed = strtol(v, &end, 10);
+    if (*end || parsed < 0 || parsed > 255) return 0;
+    *out = (int)parsed;
+    return 1;
+}
+
+static void card_filter_set_text(char *dst, size_t dst_sz, const char *src) {
+    if (!src || !*src) return;
+    size_t len = strlen(src);
+    if (len < dst_sz) memcpy(dst, src, len + 1);
+}
+
+static void card_filter_from_effect(const AbilityEffect *e, RbCardFilter *out) {
+    if (!e || !out) return;
+    const char *card_type = e->card_type_field[0] ? e->card_type_field : fx_extra(e, "card_type");
+    card_filter_set_text(out->card_type, sizeof(out->card_type), card_type);
+    const char *group = fx_extra(e, "group_names");
+    if (!group) group = fx_extra(e, "group");
+    if (group && *group) {
+        card_filter_set_text(out->group, sizeof(out->group), group);
+        out->has_group = 1;
+    }
+    if (card_extra_int(e, "cost_limit", &out->cost_limit)) {
+        out->has_cost_limit = 1;
+        card_filter_set_text(out->cost_op, sizeof(out->cost_op), fx_extra(e, "cost_limit_operator"));
+        if (!out->cost_op[0]) card_filter_set_text(out->cost_op, sizeof(out->cost_op), fx_extra(e, "operator"));
+    }
+    const char *characters = fx_extra(e, "characters");
+    if (characters && *characters) {
+        card_filter_set_text(out->characters, sizeof(out->characters), characters);
+        out->has_characters = 1;
+    }
+    const char *exclude_characters = fx_extra(e, "exclude_characters");
+    if (exclude_characters && *exclude_characters) {
+        card_filter_set_text(out->exclude_characters, sizeof(out->exclude_characters), exclude_characters);
+        out->has_exclude_characters = 1;
+    }
+    const char *exclude_self = fx_extra(e, "exclude_self");
+    if (exclude_self && (!strcmp(exclude_self, "true") || strtol(exclude_self, NULL, 10) != 0)) {
+        out->exclude_self_id = -1;
+        out->has_exclude_self = 1;
+    }
+    const char *ability_filter = fx_extra(e, "ability_filter");
+    if (ability_filter && *ability_filter) card_filter_set_text(out->ability_filter, sizeof(out->ability_filter), ability_filter);
+    const char *negation = fx_extra(e, "negation");
+    out->negation = negation && (!strcmp(negation, "true") || strtol(negation, NULL, 10) != 0);
+    const char *heart_gate = fx_extra(e, "filter_targets_by_heart_colors");
+    const char *heart_colors = fx_extra(e, "heart_colors");
+    if (heart_gate && (!strcmp(heart_gate, "true") || strtol(heart_gate, NULL, 10) != 0) && heart_colors && *heart_colors) {
+        const char *cursor = heart_colors;
+        while (*cursor && out->n_heart_colors < 8) {
+            while (*cursor == ',' || *cursor == ' ' || *cursor == '[' || *cursor == ']' || *cursor == '"') cursor++;
+            const char *start = cursor;
+            while (*cursor && *cursor != ',' && *cursor != ']' && *cursor != ' ') cursor++;
+            size_t len = (size_t)(cursor - start);
+            if (len && len < sizeof(out->heart_colors[0])) {
+                memcpy(out->heart_colors[out->n_heart_colors], start, len);
+                out->heart_colors[out->n_heart_colors][len] = 0;
+                out->n_heart_colors++;
+            }
+        }
+    }
+    if (card_extra_int(e, "original_blade_limit", &out->original_blade_limit)) {
+        out->has_original_blade = 1;
+        card_filter_set_text(out->original_blade_op, sizeof(out->original_blade_op), fx_extra(e, "original_blade_operator"));
+    } else if (card_extra_int(e, "blade_limit", &out->original_blade_limit)) {
+        const char *original = fx_extra(e, "original_value");
+        if (original && (!strcmp(original, "true") || strtol(original, NULL, 10) != 0)) {
+            out->has_original_blade = 1;
+            card_filter_set_text(out->original_blade_op, sizeof(out->original_blade_op), fx_extra(e, "blade_limit_operator"));
+        }
+    }
+    out->has_filter = !!(out->card_type[0] || out->has_group || out->has_cost_limit ||
+                         out->has_characters || out->has_exclude_characters || out->has_exclude_self ||
+                         out->ability_filter[0] || out->negation || out->n_heart_colors || out->has_original_blade);
+}
+
+int rb_effect_filter_subset(const AbilityEffect *e, RbCardFilter *out) {
+    if (!out) return 0;
+    memset(out, 0, sizeof(*out));
+    if (!e) return 0;
+    card_filter_from_effect(e, out);
+    return out->has_filter;
+}
+
+int rb_condition_filter_subset(const Condition *c, RbCardFilter *out) {
+    if (!out) return 0;
+    memset(out, 0, sizeof(*out));
+    if (!c) return 0;
+    const CondValue *card_type = cond_find(c, "card_type");
+    const CondValue *group = cond_find(c, "group_names");
+    const CondValue *cost_limit = cond_find(c, "cost_limit");
+    const CondValue *operator_value = cond_find(c, "cost_limit_operator");
+    if (!operator_value) operator_value = cond_find(c, "operator");
+    const CondValue *characters = cond_find(c, "characters");
+    const CondValue *exclude_characters = cond_find(c, "exclude_characters");
+    if (card_type && card_type->tag == RB_TAG_STR) card_filter_set_text(out->card_type, sizeof(out->card_type), card_type->s);
+    if (group && group->tag == RB_TAG_ARRAY && group->arr_n && group->arr[0].tag == RB_TAG_STR) {
+        card_filter_set_text(out->group, sizeof(out->group), group->arr[0].s);
+        out->has_group = 1;
+    }
+    if (cost_limit && cost_limit->tag == RB_TAG_I64 && cost_limit->i >= 0 && cost_limit->i <= 255) {
+        out->cost_limit = (int)cost_limit->i;
+        out->has_cost_limit = 1;
+        if (operator_value && operator_value->tag == RB_TAG_STR) card_filter_set_text(out->cost_op, sizeof(out->cost_op), operator_value->s);
+    }
+    if (characters && characters->tag == RB_TAG_ARRAY && characters->arr_n) {
+        size_t w = 0;
+        for (uint32_t i = 0; i < characters->arr_n && w < sizeof(out->characters); i++) {
+            if (characters->arr[i].tag != RB_TAG_STR || !characters->arr[i].s) continue;
+            size_t len = strlen(characters->arr[i].s);
+            if (w && w + 1 < sizeof(out->characters)) out->characters[w++] = ',';
+            size_t copy = len;
+            if (copy >= sizeof(out->characters) - w) copy = sizeof(out->characters) - w - 1;
+            memcpy(out->characters + w, characters->arr[i].s, copy);
+            w += copy;
+            out->characters[w] = 0;
+        }
+        out->has_characters = w != 0;
+    }
+    if (exclude_characters && exclude_characters->tag == RB_TAG_ARRAY && exclude_characters->arr_n) {
+        size_t w = 0;
+        for (uint32_t i = 0; i < exclude_characters->arr_n && w < sizeof(out->exclude_characters); i++) {
+            if (exclude_characters->arr[i].tag != RB_TAG_STR || !exclude_characters->arr[i].s) continue;
+            size_t len = strlen(exclude_characters->arr[i].s);
+            if (w && w + 1 < sizeof(out->exclude_characters)) out->exclude_characters[w++] = ',';
+            size_t copy = len;
+            if (copy >= sizeof(out->exclude_characters) - w) copy = sizeof(out->exclude_characters) - w - 1;
+            memcpy(out->exclude_characters + w, exclude_characters->arr[i].s, copy);
+            w += copy;
+            out->exclude_characters[w] = 0;
+        }
+        out->has_exclude_characters = w != 0;
+    }
+    out->has_filter = !!(out->card_type[0] || out->has_group || out->has_cost_limit || out->has_characters || out->has_exclude_characters);
+    return out->has_filter;
+}
+
+int rb_effect_value_or_count(const AbilityEffect *e, int default_value) {
+    if (e) {
+        int value;
+        if (card_extra_int(e, "value", &value)) return value;
+        if (e->count >= 0) return e->count;
+    }
+    return default_value;
+}
 int rb_card_fires_on_opponent_effects(int card_id) {
     int n = rb_card_num_abilities((uint32_t)card_id);
     for (int i = 0; i < n; i++) {

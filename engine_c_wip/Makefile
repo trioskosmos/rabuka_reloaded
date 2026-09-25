@@ -26,13 +26,14 @@ B8_LIVE_TIMING := tests/test_b8_live_timing.c
 CROSS_PLAYER := tests/test_cross_player_interaction.c
 DRAW_PHASE_FIX := tests/test_draw_phase_fix.c
 ZONE_FILTER_PARITY := tests/test_zone_filter_parity.c
+P1_HELPERS := tests/test_p1_helpers.c
 LIVE_ALLOCATOR := tests/test_live_allocator.c
 LOOK_SELECT := tests/test_look_select.c
 DECK_BUILDER := tests/test_deck_builder.c
 DECK_PARSER := tests/test_deck_parser.c
 AUDIT   := tools/audit_actions.c
 
-.PHONY: all web test audit regen clean mechanics live-rules phase-rules performance-rules surplus-heart opponent-live-flow live-movement restrictions condition-eval target-selection max-distinct-names baton-touch member-activation b8-live-timing cross-player draw-phase-fix zone-filter-parity live-allocator look-select deck-builder deck-parser
+.PHONY: all web test audit regen clean mechanics live-rules phase-rules performance-rules surplus-heart opponent-live-flow live-movement restrictions condition-eval target-selection max-distinct-names baton-touch member-activation b8-live-timing cross-player draw-phase-fix zone-filter-parity p1-helpers live-allocator look-select deck-builder deck-parser
 all: $(TARGET)
 
 web: $(WEB_TARGET)
@@ -63,6 +64,12 @@ $(TARGET)_generated: $(OBJ_LIB) $(GENERATED)
 
 $(TARGET)_replay: $(OBJ_LIB) tests/replay.c
 	$(CC) $(CFLAGS) -o $@ $(OBJ_LIB) tests/replay.c
+
+$(TARGET)_p1_helpers: $(OBJ_LIB) $(P1_HELPERS)
+	$(CC) $(CFLAGS) -o $@ $(OBJ_LIB) $(P1_HELPERS)
+
+p1-helpers: $(TARGET)_p1_helpers
+	./$(TARGET)_p1_helpers
 
 $(TARGET)_live_allocator: $(OBJ_LIB) $(LIVE_ALLOCATOR)
 	$(CC) $(CFLAGS) -o $@ $(OBJ_LIB) $(LIVE_ALLOCATOR)

@@ -35,7 +35,8 @@ pub struct DeckList {
 /// Load and merge two deck JSON files from DECK_CARD_FILES, deduplicating by card_no.
 /// JSON parsing requires the `serde_support` feature; on no-serde targets (DS/PS1/etc)
 /// this returns cards from the embedded compact blob when available, else empty.
-pub fn load_two_decks(deck1_idx: usize, deck2_idx: usize) -> Vec<crate::card::Card> {    #[cfg(feature = "serde_support")]
+pub fn load_two_decks(deck1_idx: usize, deck2_idx: usize) -> Vec<crate::card::Card> {
+    #[cfg(feature = "serde_support")]
     {
         let json1 = DECK_CARD_FILES[deck1_idx];
         let mut merged: Vec<crate::card::Card> = serde_json::from_str(json1).unwrap_or_default();
@@ -77,10 +78,7 @@ pub fn load_two_decks(deck1_idx: usize, deck2_idx: usize) -> Vec<crate::card::Ca
 /// Load two decks' cards with abilities attached — the one-liner every
 /// console port's boot flow inlines (load_two_decks + attach_abilities).
 /// `no_std`-safe.
-pub fn load_two_decks_with_abilities(
-    deck1_idx: usize,
-    deck2_idx: usize,
-) -> Vec<crate::card::Card> {
+pub fn load_two_decks_with_abilities(deck1_idx: usize, deck2_idx: usize) -> Vec<crate::card::Card> {
     let mut cards = load_two_decks(deck1_idx, deck2_idx);
     crate::card_loader::CardLoader::attach_abilities(&mut cards);
     cards
@@ -123,31 +121,8 @@ impl DeckParser {
         let mut entries = Vec::new();
 
         for line in content.lines() {
-            let line = line.trim();
-            if line.is_empty() || line.starts_with("//") {
-                continue;
-            }
-
-            // Parse format: "card_no x quantity", "quantity x card_no", or single card per line
-            let parts: Vec<&str> = line.split(" x ").collect();
-            if parts.len() == 2 {
-                // Try to parse first part as quantity (for "quantity x card_no" format)
-                let (card_no, quantity) = if let Ok(q) = parts[0].trim().parse::<u8>() {
-                    (Self::clean_card_no(parts[1].trim()), q)
-                } else {
-                    let q = parts[1]
-                        .trim()
-                        .parse::<u8>()
-                        .map_err(|e| format!("Invalid quantity: {}", e))?;
-                    (Self::clean_card_no(parts[0].trim()), q)
-                };
+            if let Some((card_no, quantity)) = Self::parse_line(line) {
                 entries.push(DeckEntry { card_no, quantity });
-            } else if line.contains('-') && !line.contains(' ') {
-                // Single card per line (quantity defaults to 1)
-                entries.push(DeckEntry {
-                    card_no: Self::clean_card_no(line),
-                    quantity: 1,
-                });
             }
         }
 
@@ -234,32 +209,31 @@ impl DeckParser {
         s
     }
 
-    fn clean_card_no(raw: &str) -> String {
-        Self::normalize_card_no(raw)
-    }
-
     /// Parses a single line and returns (card_no, quantity).
     /// Supports "card_no x quantity", "quantity x card_no", or bare card_no (qty=1).
     fn parse_line(line: &str) -> Option<(String, u8)> {
         let line = line.trim();
-        let parts: Vec<&str> = line.split(" x ").collect();
-        if parts.len() == 2 {
-            let (card_no, quantity) = if let Ok(q) = parts[0].trim().parse::<u8>() {
-                (parts[1].trim(), q)
-            } else if let Ok(q) = parts[1].trim().parse::<u8>() {
-                (parts[0].trim(), q)
-            } else {
-                return None;
-            };
-            if card_no.contains('-') {
-                return Some((Self::clean_card_no(card_no), quantity));
-            }
+        if line.is_empty() || line.starts_with("//") {
+            return None;
         }
-        // Single identifier per line (quantity defaults to 1)
-        if line.contains('-') && !line.contains(' ') {
-            return Some((Self::clean_card_no(line), 1));
+
+        if let Some((first, second)) = line.split_once(" x ") {
+            let (card_no, quantity) = first
+                .trim()
+                .parse::<u8>()
+                .ok()
+                .map(|quantity| (second.trim(), quantity))
+                .or_else(|| {
+                    second
+                        .trim()
+                        .parse::<u8>()
+                        .ok()
+                        .map(|quantity| (first.trim(), quantity))
+                })?;
+            return Some((Self::normalize_card_no(card_no), quantity));
         }
-        None
+
+        (line.contains('-') && !line.contains(' ')).then(|| (Self::normalize_card_no(line), 1))
     }
 
     pub fn deck_list_to_card_numbers(deck: &DeckList) -> Vec<String> {

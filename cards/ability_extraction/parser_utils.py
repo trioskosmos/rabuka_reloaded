@@ -55,11 +55,6 @@ def extract_quoted_name(text):
     return None
 
 
-def has_any(text, phrases):
-    """Check if text contains any of the given phrases."""
-    return any(phrase in text for phrase in phrases)
-
-
 def strip_suffix_period(text):
     """Remove trailing period from text."""
     return text.rstrip("。")
@@ -68,11 +63,6 @@ def strip_suffix_period(text):
 def strip_prefix_period(text):
     """Remove leading period from text."""
     return text.lstrip("。")
-
-
-def parse_optional_flag(text, phrases):
-    """Check if text contains optional phrases and return boolean."""
-    return any(phrase in text for phrase in phrases)
 
 
 def normalize_whitespace(text):
@@ -217,6 +207,55 @@ def extract_by_pattern(text: str, patterns: List[Tuple[str, str]]) -> Optional[s
         if pattern in text:
             return value
     return None
+
+
+def set_if_value(target: dict, field: str, value: Any) -> None:
+    """Set a field only when an extractor produced a meaningful value."""
+    if value is not None and value != "":
+        target[field] = value
+
+
+def apply_extractors(target: dict, text: str, extractors: List[Tuple[str, Callable]]) -> None:
+    """Apply named scalar extractors to a target using one shared contract."""
+    for field, extract in extractors:
+        set_if_value(target, field, extract(text))
+
+
+def iter_dict_nodes(value: Any, keys: Optional[Tuple[str, ...]] = None):
+    """Yield dictionaries in a parser tree, optionally following selected keys."""
+    if isinstance(value, dict):
+        yield value
+        child_keys = keys or tuple(value.keys())
+        for key in child_keys:
+            if key in value:
+                yield from iter_dict_nodes(value[key], keys)
+    elif isinstance(value, list):
+        for item in value:
+            yield from iter_dict_nodes(item, keys)
+
+
+def text_matches(
+    text: str,
+    *,
+    match: str = "",
+    match_any: Optional[List[str]] = None,
+    match_all: Optional[List[str]] = None,
+    exclude: str = "",
+    exclude_any: Optional[List[str]] = None,
+) -> bool:
+    """Evaluate the common declarative text-matcher contract."""
+    return (
+        (not match or match in text)
+        and (not match_any or any(item in text for item in match_any))
+        and (not match_all or all(item in text for item in match_all))
+        and (not exclude or exclude not in text)
+        and (not exclude_any or all(item not in text for item in exclude_any))
+    )
+
+
+def _coerce_capture(value: str) -> Any:
+    """Convert numeric regex captures while preserving textual captures."""
+    return int(value) if value.isdigit() else value
 
 
 def extract_operator(text: str) -> Optional[str]:
@@ -893,23 +932,18 @@ class ActionRule:
         self.setter = _as_two_arg(self.setter)
 
     def matches(self, text: str, action: Optional[Dict] = None) -> bool:
-        if self.match and self.match not in text:
-            return False
-        if self.match_any and not any(m in text for m in self.match_any):
-            return False
-        if self.match_all and not all(m in text for m in self.match_all):
-            return False
-        if self.exclude and self.exclude in text:
-            return False
-        if self.exclude_any and any(e in text for e in self.exclude_any):
+        if not text_matches(
+            text,
+            match=self.match,
+            match_any=self.match_any,
+            match_all=self.match_all,
+            exclude=self.exclude,
+            exclude_any=self.exclude_any,
+        ):
             return False
         if self.condition and action is not None:
-            # Arity normalized in __post_init__ — call directly. A raised
-            # exception is a real predicate bug; log loudly, treat as no-match
-            # (same outcome as the old silent swallow) so behavior is stable.
             try:
-                if not self.condition(text, action):
-                    return False
+                return bool(self.condition(text, action))
             except Exception:
                 return False
         return True
@@ -918,10 +952,9 @@ class ActionRule:
         action["action"] = self.action
         action.update(self.defaults)
         for field, pattern in self.extract.items():
-            m = re.search(pattern, text)
-            if m:
-                val = m.group(1)
-                action[field] = int(val) if val.isdigit() else val
+            match = re.search(pattern, text)
+            if match:
+                action[field] = _coerce_capture(match.group(1))
         if self.setter:
             try:
                 self.setter(text, action)
@@ -956,15 +989,14 @@ class EffectPattern:
     setter: Optional[Callable] = None
 
     def matches(self, text: str) -> bool:
-        if self.match and self.match not in text:
-            return False
-        if self.match_any and not any(m in text for m in self.match_any):
-            return False
-        if self.match_all and not all(m in text for m in self.match_all):
-            return False
-        if self.exclude and self.exclude in text:
-            return False
-        if self.exclude_any and any(e in text for e in self.exclude_any):
+        if not text_matches(
+            text,
+            match=self.match,
+            match_any=self.match_any,
+            match_all=self.match_all,
+            exclude=self.exclude,
+            exclude_any=self.exclude_any,
+        ):
             return False
         if self.condition:
             try:
@@ -979,10 +1011,9 @@ class EffectPattern:
         result: Dict = {"text": text, "action": self.action}
         result.update(self.defaults)
         for field, pattern in self.extract.items():
-            m = re.search(pattern, text)
-            if m:
-                val = m.group(1)
-                result[field] = int(val) if val.isdigit() else val
+            match = re.search(pattern, text)
+            if match:
+                result[field] = _coerce_capture(match.group(1))
         if self.setter:
             try:
                 self.setter(text, result)

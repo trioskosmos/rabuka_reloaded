@@ -1227,7 +1227,7 @@ pub(crate) fn choose_live_set_experiment(
         let ceiling_enabled =
             std::env::var_os("V7_PRE_D").is_none() && std::env::var_os("V7_NO_CEILING").is_none();
         let mut chose_single = false;
-        if std::env::var_os("V7_SCORE_RACE").is_some() && my_succ >= 2 && opp_succ >= 2 {
+        if my_succ >= 2 && opp_succ >= 2 {
             if let Some(&(_, _, first_hi, _)) = singles.iter().max_by_key(|(_, _, hi, _)| {
                 db.get_card(my.hand.cards.get(*hi).copied().unwrap_or(-1))
                     .and_then(|c| c.score)
@@ -1496,6 +1496,48 @@ pub(crate) fn choose_live_set_experiment(
         );
     }
     emit(gs, actions, &desired)
+}
+
+pub fn live_set_audit_note(gs: &GameState) -> Option<String> {
+    if !matches!(
+        gs.current_phase,
+        Phase::LiveCardSetFirstAttacker | Phase::LiveCardSetSecondAttacker
+    ) {
+        return None;
+    }
+    let me = gs.active_player_index();
+    let (my, opp) = gs.seated_pair(me);
+    let db = &gs.card_database;
+    let selected = gs
+        .live_card_selected_indices
+        .iter()
+        .filter_map(|&hi| my.hand.cards.get(hi as usize).copied())
+        .map(|cid| {
+            let card = db.get_card(cid);
+            format!(
+                "{}:{}:{}",
+                card.map(|c| c.card_no.to_string()).unwrap_or_default(),
+                card.map(|c| if c.card_type == CardType::Live {
+                    "L"
+                } else {
+                    "J"
+                })
+                .unwrap_or("?"),
+                card.and_then(|c| c.score).unwrap_or(0)
+            )
+        })
+        .collect::<Vec<_>>()
+        .join(",");
+    Some(format!(
+        "t{} me{} selected={} my{} opp{} opp_live={} second={}",
+        gs.turn_number,
+        me,
+        selected,
+        my.success_live_card_zone.cards.len(),
+        opp.success_live_card_zone.cards.len(),
+        opp.live_card_zone.cards.len(),
+        gs.current_phase == Phase::LiveCardSetSecondAttacker
+    ))
 }
 
 fn emit(gs: &GameState, actions: &[Action], desired: &[usize]) -> Action {

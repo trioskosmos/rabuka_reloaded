@@ -594,8 +594,10 @@ static void handle_action(GameState *g, int actor, AbilityEffect *e, int host_ci
         rb_gain_ability(g, actor, e);
     } else if (!strcmp(act, "gain_ability_from_source")) {
         rb_gain_ability_from_source(g, actor, e, host_cid);
-    } else if (!strcmp(act, "invalidate_ability") || !strcmp(act, "suppress_ability_trigger")) {
+    } else if (!strcmp(act, "invalidate_ability")) {
         rb_invalidate_ability(g, actor, e);
+    } else if (!strcmp(act, "suppress_ability_trigger")) {
+        rb_suppress_ability_trigger(g, actor, e, host_cid);
     } else if (!strcmp(act, "activate_ability")) {
         /* Mirror ability_effects.rs::execute_activate_ability — fire the matching
            ability of each selected card (or the activating card's own ability). */

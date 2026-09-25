@@ -19,6 +19,7 @@ from parser_utils import (
     extract_picker,
     detect_require_all_hearts,
     check_original_value,
+    apply_extractors as apply_extracted_fields,
 )
 
 
@@ -144,13 +145,6 @@ def _has_shuffle(text):
 
 def detect_exclude_self(text: str) -> bool:
     return "このメンバー以外" in text or re.search(r"ほかの.*?(?:メンバー|カード)", text) is not None
-
-
-def apply_extracted_fields(target, text, extractors):
-    for field, extract in extractors:
-        value = extract(text)
-        if value:
-            target[field] = value
 
 
 def apply_character_filters(target, text):

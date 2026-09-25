@@ -96,6 +96,7 @@ from parser_utils import (
     LOCATION_PATTERNS,
     POSITION_KEYWORDS,
     _ALL_KW_RE,
+    iter_dict_nodes,
     PriorityRegistry,
     ActionRule,
     EffectPattern,
@@ -855,30 +856,20 @@ def _attach_baton_touch_from_group_condition(effect, triggerless_text):
 
 def _find_modify_cost_nodes(obj):
     """Collect modify_cost sub-action nodes (self-cost reduction clauses)."""
-    found = []
-    if isinstance(obj, dict):
-        if obj.get("action") == "modify_cost":
-            found.append(obj)
-        for v in obj.values():
-            found.extend(_find_modify_cost_nodes(v))
-    elif isinstance(obj, list):
-        for item in obj:
-            found.extend(_find_modify_cost_nodes(item))
-    return found
+    return [
+        node
+        for node in iter_dict_nodes(obj)
+        if node.get("action") == "modify_cost"
+    ]
 
 
 def _find_pay_energy_steps(obj):
     """Collect pay_energy cost steps from a cost tree."""
-    found = []
-    if isinstance(obj, dict):
-        if obj.get("type") == "pay_energy" or obj.get("action") == "pay_energy":
-            found.append(obj)
-        for key in ("costs", "options", "actions"):
-            sub = obj.get(key)
-            if isinstance(sub, list):
-                for item in sub:
-                    found.extend(_find_pay_energy_steps(item))
-    return found
+    return [
+        node
+        for node in iter_dict_nodes(obj, ("costs", "options", "actions"))
+        if node.get("type") == "pay_energy" or node.get("action") == "pay_energy"
+    ]
 
 
 def _promote_self_cost_reduction(ability: Dict[str, Any]) -> None:
@@ -1067,6 +1058,60 @@ def parse_ability(triggerless_text: str) -> Dict[str, Any]:
 # set fields instead return None and fall through to the generic field
 # accumulation + type classification at the bottom of parse_cost.
 # ======================================================================
+_DURATION_PROPAGATED_ACTIONS = frozenset(
+    ("gain_resource", "modify_score", "change_state", "set_blade_count")
+)
+
+
+def _propagate_effect_duration(result: Dict[str, Any], duration: Optional[str]) -> None:
+    if not duration:
+        return
+    action = result.get("action")
+    if action in ("sequential", "conditional_alternative"):
+        for child in result.get("actions", []):
+            if "duration" not in child and child.get("action") in _DURATION_PROPAGATED_ACTIONS:
+                child["duration"] = duration
+        for key in ("primary_effect", "alternative_effect"):
+            child = result.get(key)
+            if (
+                child
+                and "duration" not in child
+                and child.get("action") in _DURATION_PROPAGATED_ACTIONS
+            ):
+                child["duration"] = duration
+    elif action == "choice":
+        for child in result.get("options", []):
+            if "duration" not in child and child.get("action") in _DURATION_PROPAGATED_ACTIONS:
+                child["duration"] = duration
+    elif action == "conditional_on_result":
+        for key in ("primary_effect", "followup_action"):
+            child = result.get(key)
+            if child and "duration" not in child:
+                child["duration"] = duration
+
+
+def _finalize_effect(
+    result: Dict[str, Any],
+    prefix_effect: Dict[str, Any],
+    parenthetical: List[str],
+    activation_condition: Optional[Dict[str, Any]],
+    activation_position: Optional[str],
+) -> Dict[str, Any]:
+    _merge_parenthetical(result, parenthetical)
+    if "duration" in prefix_effect and "duration" not in result:
+        result["duration"] = prefix_effect["duration"]
+    _propagate_effect_duration(result, result.get("duration"))
+
+    if result.get("action") not in ("choice", "conditional_on_result"):
+        if activation_condition and "activation_condition_parsed" not in result:
+            result["activation_condition_parsed"] = activation_condition
+        if activation_position and "activation_position" not in result:
+            result["activation_position"] = activation_position
+    _propagate_optional(result)
+    _strip_coo_child_optional(result)
+    return result
+
+
 def parse_effect(text: str) -> Dict[str, Any]:
     """Parse an effect text. Tries handlers in priority order, then falls back to single action."""
     text = normalize_fullwidth_digits(text).strip()
@@ -1124,73 +1169,9 @@ def parse_effect(text: str) -> Dict[str, Any]:
             _post = _effect_registry.get_post_normalize(hn)
             if _post is not None:
                 result = _post(text, result)
-            _merge_parenthetical(result, parenthetical)
-            # Apply duration prefix info
-            if "duration" in effect and "duration" not in result:
-                result["duration"] = effect["duration"]
-            # Propagate duration to sub-actions in sequential/choice/conditional_alternative effects
-            dur = result.get("duration")
-            if dur:
-                if result.get("action") in ("sequential", "conditional_alternative"):
-                    for sub in result.get("actions", []):
-                        if "duration" not in sub and sub.get("action") in (
-                            "gain_resource",
-                            "modify_score",
-                            "change_state",
-                            "set_blade_count",
-                        ):
-                            sub["duration"] = dur
-                    for key in ("primary_effect", "alternative_effect"):
-                        sub = result.get(key)
-                        if (
-                            sub
-                            and "duration" not in sub
-                            and sub.get("action")
-                            in (
-                                "gain_resource",
-                                "modify_score",
-                                "change_state",
-                                "set_blade_count",
-                            )
-                        ):
-                            sub["duration"] = dur
-            # Handle choice and conditional_on_result results with early return
-            dur = result.get("duration")
-            if result.get("action") == "choice":
-                for opt in result.get("options", []):
-                    if (
-                        dur
-                        and "duration" not in opt
-                        and opt.get("action")
-                        in (
-                            "gain_resource",
-                            "modify_score",
-                            "change_state",
-                            "set_blade_count",
-                        )
-                    ):
-                        opt["duration"] = dur
-                _propagate_optional(result)
-                _strip_coo_child_optional(result)
-                return result
-            if result.get("action") == "conditional_on_result":
-                for key in ("primary_effect", "followup_action"):
-                    sub = result.get(key)
-                    if sub and dur and "duration" not in sub:
-                        sub["duration"] = dur
-                _propagate_optional(result)
-                _strip_coo_child_optional(result)
-                return result
-            # For all other handlers, use the result as the effect directly
-            effect = result
-            _merge_parenthetical(effect, parenthetical)
-            if extra_activation_cond and "activation_condition_parsed" not in effect:
-                effect["activation_condition_parsed"] = extra_activation_cond
-            if extra_activation_pos and "activation_position" not in effect:
-                effect["activation_position"] = extra_activation_pos
-            _propagate_optional(effect)
-            _strip_coo_child_optional(effect)
-            return effect
+            return _finalize_effect(
+                result, effect, parenthetical, extra_activation_cond, extra_activation_pos
+            )
 
     # No handler matched: fallback to parse_action
     effect.pop("_rest", None)

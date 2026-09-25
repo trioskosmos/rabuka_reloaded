@@ -59,6 +59,7 @@ int rb_trigger_debut(GameState *g, int pl, int card_id) {
 }
 
 int rb_trigger_live_start(GameState *g, int pl) {
+    if (rb_is_trigger_suppressed(g, pl, "live_start")) return 0;
     int queued=0;
     /* Live cards in the live-card zone — mirrors Rust's scan of
        player.live_card_zone.cards before the stage scan. Many LiveStart
@@ -668,47 +669,39 @@ void rb_recalc_constants(GameState *g) {
     rb_refresh_yell_sources(g);
 }
 
-/* Mirror triggers.rs::is_trigger_suppressed -- check if a trigger is suppressed
-   by any card on stage or live card zone. */
-int rb_is_trigger_suppressed(GameState *g, int pl, const char *trigger_name) {
-    if (!g || !trigger_name) return 0;
-    const RbPlayer *P = &g->p[pl];
-    for (int s = 0; s < RB_STAGE_SIZE; s++) {
-        int cid = P->stage[s];
-        if (cid < 0) continue;
-        int nab = rb_card_num_abilities((uint32_t)cid);
-        for (int a = 0; a < nab; a++) {
-            Ability ab;
-            if (!rb_decode_card_ability((uint32_t)cid, a, &ab)) continue;
-            if (ab.effect && ab.effect->action && !strcmp(ab.effect->action, "suppress_trigger")) {
-                for (int k = 0; k < ab.effect->n_extra; k++) {
-                    if (ab.effect->extra_k[k] && !strcmp(ab.effect->extra_k[k], "suppressed_trigger")
-                        && ab.effect->extra_v[k] && !strcmp(ab.effect->extra_v[k], trigger_name)) {
-                        rb_free_ability(&ab);
-                        return 1;
-                    }
-                }
-            }
-            rb_free_ability(&ab);
+static int effect_suppresses_trigger(const AbilityEffect *effect, const char *trigger_name) {
+    if (!effect || !effect->action) return 0;
+    if (strcmp(effect->action, "suppress_ability_trigger") == 0) {
+        for (int k = 0; k < effect->n_extra; k++) {
+            if (effect->extra_k[k] && strcmp(effect->extra_k[k], "suppressed_trigger") == 0 &&
+                effect->extra_v[k] && strcmp(effect->extra_v[k], trigger_name) == 0) return 1;
         }
     }
-    for (int i = 0; i < P->live.n; i++) {
-        int cid = P->live.cards[i];
-        if (cid < 0) continue;
-        int nab = rb_card_num_abilities((uint32_t)cid);
-        for (int a = 0; a < nab; a++) {
-            Ability ab;
-            if (!rb_decode_card_ability((uint32_t)cid, a, &ab)) continue;
-            if (ab.effect && ab.effect->action && !strcmp(ab.effect->action, "suppress_trigger")) {
-                for (int k = 0; k < ab.effect->n_extra; k++) {
-                    if (ab.effect->extra_k[k] && !strcmp(ab.effect->extra_k[k], "suppressed_trigger")
-                        && ab.effect->extra_v[k] && !strcmp(ab.effect->extra_v[k], trigger_name)) {
-                        rb_free_ability(&ab);
-                        return 1;
-                    }
-                }
+    for (int k = 0; k < effect->n_child; k++)
+        if (effect_suppresses_trigger(effect->child[k], trigger_name)) return 1;
+    return 0;
+}
+
+int rb_is_trigger_suppressed(GameState *g, int pl, const char *trigger_name) {
+    if (!g || pl < 0 || pl > 1 || !trigger_name) return 0;
+    char entry[48];
+    snprintf(entry, sizeof(entry), "suppress:%d:%s", pl, trigger_name);
+    for (int i = 0; i < g->n_prohibition; i++)
+        if (strcmp(g->prohibition[i], entry) == 0) return 1;
+    const RbPlayer *P = &g->p[pl];
+    for (int zone = 0; zone < 2; zone++) {
+        int count = zone == 0 ? RB_STAGE_SIZE : P->live.n;
+        for (int i = 0; i < count; i++) {
+            int cid = zone == 0 ? P->stage[i] : P->live.cards[i];
+            if (cid < 0) continue;
+            int nab = rb_card_num_abilities((uint32_t)cid);
+            for (int a = 0; a < nab; a++) {
+                Ability ab;
+                if (!rb_decode_card_ability((uint32_t)cid, a, &ab)) continue;
+                int suppressed = effect_suppresses_trigger(ab.effect, trigger_name);
+                rb_free_ability(&ab);
+                if (suppressed) return 1;
             }
-            rb_free_ability(&ab);
         }
     }
     return 0;

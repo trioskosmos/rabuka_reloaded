@@ -244,6 +244,7 @@ int rb_translated_execute_suppress_ability_trigger(GameState *g, int actor,
 {
     if (!g || !effect) return 0;
     const char *trigger = effect_extra(effect, "suppressed_trigger");
+    rb_suppress_ability_trigger(g, actor, effect, g->activating_card);
     char text[128];
     snprintf(text, sizeof(text), "[[log_suppress_ability:trigger=%s]]",
              trigger ? trigger : "unknown");

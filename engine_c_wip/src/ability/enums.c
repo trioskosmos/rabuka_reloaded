@@ -487,6 +487,7 @@ const char *rb_ability_zone_to_str(int z) {
         case RB_ABILITY_ZONE_DECK_TOP_OR_BOTTOM:  return "deck_top_or_bottom";
         case RB_ABILITY_ZONE_FRONT:               return "front";
         case RB_ABILITY_ZONE_UNKNOWN:             return "unknown";
+        case RB_ABILITY_ZONE_LIVE_TOTAL:          return "live_total";
         default:                                   return NULL;
     }
 }
