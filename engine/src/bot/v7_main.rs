@@ -589,13 +589,18 @@ pub fn score_actions(gs: &GameState, actions: &[Action], me: u8) -> Vec<(f64, St
 pub fn choose_action(gs: &GameState, actions: &[Action], me: u8) -> Action {
     let scores = score_actions(gs, actions, me);
     let best = pick_best(gs, me, actions, &scores);
-    let chosen = actions.get(best).cloned().unwrap_or(Action {
+    let mut chosen = actions.get(best).cloned().unwrap_or(Action {
         action_type: ActionType::Pass,
         description: "pass".into(),
         description_ja: None,
         parameters: None,
         selected: None,
     });
+    if std::env::var_os("V7_ROLLOUT_POLICY").is_some() {
+        if let Some(suggested) = rollout_suggestion(gs, actions, me) {
+            chosen = suggested;
+        }
+    }
     if std::env::var_os("V7_ROLLOUT_COMPARE").is_some() {
         if let Some(suggested) = rollout_suggestion(gs, actions, me) {
             let suggested_card = suggested

@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-09-25T18:29:45.976455",
+  "generated_at": "2026-09-25T18:54:15.282938",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "018b619e",
+  "engine_commit": "1ac95fd4",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -11887,9 +11887,9 @@
           {
             "text": "自分のエネルギーがすべてアクティブ状態の場合、このカードのスコアを+1する",
             "condition": {
+              "text": "自分のエネルギーがすべてアクティブ状態の場合",
               "type": "state_condition",
               "state": "active",
-              "text": "自分のエネルギーがすべてアクティブ状態の場合",
               "resource_type": "energy",
               "all": true,
               "target": "self",
@@ -14614,9 +14614,9 @@
           {
             "text": "相手のステージにウェイト状態のメンバーがいる場合、カードを1枚引く",
             "condition": {
+              "text": "相手のステージにウェイト状態のメンバーがいる場合",
               "type": "state_condition",
               "state": "wait",
-              "text": "相手のステージにウェイト状態のメンバーがいる場合",
               "target": "opponent",
               "location": "stage",
               "card_type": "member_card",
@@ -16414,8 +16414,8 @@
       "effect": {
         "text": "アクティブ状態の自分のエネルギーがある場合、このカードのスコアを+1する",
         "condition": {
-          "type": "energy_state_condition",
           "text": "アクティブ状態の自分のエネルギーがある場合",
+          "type": "energy_state_condition",
           "energy_state": "active"
         },
         "action": "modify_score",
@@ -16854,9 +16854,9 @@
       "effect": {
         "text": "手札にあるこのメンバーカードの{{icon_energy.png|E}}は2減る",
         "condition": {
+          "text": "自分のステージにウェイト状態の『虹ヶ咲』のメンバーがいるかぎり",
           "type": "state_condition",
           "state": "wait",
-          "text": "自分のステージにウェイト状態の『虹ヶ咲』のメンバーがいるかぎり",
           "target": "self",
           "location": "stage",
           "card_type": "member_card",
@@ -17886,9 +17886,9 @@
       "effect": {
         "text": "{{heart_05.png|heart05}}を得る",
         "condition": {
+          "text": "このメンバーがウェイト状態であるかぎり",
           "type": "state_condition",
           "state": "wait",
-          "text": "このメンバーがウェイト状態であるかぎり",
           "card_type": "member_card",
           "self_target": true
         },
@@ -18803,10 +18803,10 @@
       "effect": {
         "text": "このメンバーが持つ{{icon_blade.png|ブレード}}の数が8つ以上の場合、カードを2枚引き、手札を1枚控え室に置く",
         "condition": {
+          "text": "このメンバーが持つ{{icon_blade.png|ブレード}}の数が8つ以上の場合",
           "type": "card_blade_condition",
           "count": 8,
           "operator": ">=",
-          "text": "このメンバーが持つ{{icon_blade.png|ブレード}}の数が8つ以上の場合",
           "source": "selected_cards"
         },
         "action": "sequential",
@@ -21534,9 +21534,9 @@
       "effect": {
         "text": "自分のステージにいるすべてのメンバーがアクティブ状態の場合、このカードの必要ハートを{{heart_00.png|heart0}}減らす",
         "condition": {
+          "text": "自分のステージにいるすべてのメンバーがアクティブ状態の場合",
           "type": "state_condition",
           "state": "active",
-          "text": "自分のステージにいるすべてのメンバーがアクティブ状態の場合",
           "all": true,
           "target": "self",
           "location": "stage",
@@ -26595,10 +26595,10 @@
           {
             "text": "そのメンバーが持つ{{icon_blade.png|ブレード}}が6つ以上の場合、このカードのスコアを+1する",
             "condition": {
+              "text": "そのメンバーが持つ{{icon_blade.png|ブレード}}が6つ以上の場合",
               "type": "card_blade_condition",
               "count": 6,
               "operator": ">=",
-              "text": "そのメンバーが持つ{{icon_blade.png|ブレード}}が6つ以上の場合",
               "source": "selected_cards"
             },
             "action": "modify_score",
@@ -27129,9 +27129,9 @@
       "effect": {
         "text": "相手のステージにウェイト状態のメンバーがいる場合、このカードを成功させるための必要ハートを{{heart_00.png|heart0}}{{heart_00.png|heart0}}減らす",
         "condition": {
+          "text": "相手のステージにウェイト状態のメンバーがいる場合",
           "type": "state_condition",
           "state": "wait",
-          "text": "相手のステージにウェイト状態のメンバーがいる場合",
           "target": "opponent",
           "location": "stage",
           "card_type": "member_card",
@@ -34679,8 +34679,7 @@
             "action": "move_cards",
             "source": "looked_at",
             "card_type": "card",
-            "count": 1,
-            "discard_remaining": false
+            "count": 1
           }
         ]
       }
@@ -35492,8 +35491,8 @@
       "effect": {
         "text": "{{heart_02.png|heart02}}{{heart_02.png|heart02}}を得る",
         "condition": {
-          "type": "energy_state_condition",
           "text": "自分のアクティブ状態のエネルギーがあるかぎり",
+          "type": "energy_state_condition",
           "energy_state": "active"
         },
         "duration": "as_long_as",

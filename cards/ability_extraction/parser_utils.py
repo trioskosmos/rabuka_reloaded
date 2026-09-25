@@ -1195,8 +1195,11 @@ class EffectPattern:
     extract: Dict[str, str] = field(default_factory=dict)
     condition: Optional[Callable] = None
     setter: Optional[Callable] = None
+    handler: Optional[Callable] = None
 
     def matches(self, text: str) -> bool:
+        if self.handler is not None:
+            return True
         if not text_matches(
             text,
             match=self.match,
@@ -1207,20 +1210,47 @@ class EffectPattern:
         ):
             return False
         if self.condition:
-            try:
-                return bool(self.condition(text))
-            except Exception:
-                return False
+            return bool(self.condition(text))
         return True
 
     def __call__(self, text: str, ctx: Optional[dict] = None) -> Optional[Dict]:
+        if self.handler is not None:
+            return self.handler(text)
         if not self.matches(text):
             return None
         result: Dict = {"text": text}
         _apply_rule_fields(self, text, result)
         if self.setter:
-            try:
-                self.setter(text, result)
-            except Exception:
-                pass
+            self.setter(text, result)
+        return result
+
+
+@dataclass
+class ConditionPattern:
+    handler: Optional[Callable] = None
+    match: str = ""
+    match_any: List[str] = field(default_factory=list)
+    match_all: List[str] = field(default_factory=list)
+    exclude: str = ""
+    exclude_any: List[str] = field(default_factory=list)
+    condition: Optional[Callable] = None
+    setter: Optional[Callable] = None
+
+    def __call__(self, text: str, ctx: Optional[dict] = None) -> Optional[Dict]:
+        if self.handler is not None:
+            return self.handler(text)
+        if not text_matches(
+            text,
+            match=self.match,
+            match_any=self.match_any,
+            match_all=self.match_all,
+            exclude=self.exclude,
+            exclude_any=self.exclude_any,
+        ):
+            return None
+        if self.condition and not self.condition(text):
+            return None
+        result: Dict = {"text": text}
+        if self.setter:
+            self.setter(text, result)
         return result

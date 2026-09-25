@@ -21,7 +21,7 @@ row in the right table, then validating (see below).
                       priority. The first match wins.
   Cost phrases    →  _COST_HANDLERS section (module-level, above parse_cost).
                      Append a @_register_cost handler (text, cost) -> dict|None.
-  Effect phrases  →  _EFFECT_RULES section (module-level, above _EFFECT_HANDLERS).
+  Effect phrases  →  _EFFECT_RULES section (module-level, above _STRUCTURAL_EFFECT_RULES).
                      Append an EffectPattern(...) row; these are dispatched
                      before every legacy _try_* handler.
   Condition phrases → CONDITION_PATTERNS list (each (name, tier, handler)).
@@ -36,14 +36,14 @@ After adding a rule, regenerate + validate:
   parse_complex_condition, _extract_basic_cost_fields, _try_duration_prefix
   parse_ability
   COST RULE REGISTRY (_COST_HANDLERS) + parse_cost
-  parse_effect (dispatches _EFFECT_RULES then _EFFECT_HANDLERS)
+  parse_effect (dispatches _EFFECT_RULES then _STRUCTURAL_EFFECT_RULES)
   parse_condition (dispatches _condition_registry)
   ACTION RULE REGISTRY (_ACTION_RULES) + parse_action
   Condition handler functions (_try_* for conditions)
   CONDITION_PATTERNS + _condition_registry
   _extract_generic_fields, _infer_condition_type, _enrich_* helpers
   Action utility helpers, _fill_defaults
-  Effect handler functions (_try_effect_*) + _EFFECT_RULES + _EFFECT_HANDLERS
+  Effect handler functions (_try_effect_*) + _EFFECT_RULES + _STRUCTURAL_EFFECT_RULES
   _walk, _normalize_effect_tree, process_abilities (post-hoc fixes)
   _propagate_optional, _merge_parenthetical
   Validation helpers + semantic validation
@@ -120,6 +120,7 @@ from parser_utils import (
     walk_dict_tree,
     PriorityRegistry,
     ActionRule,
+    ConditionPattern,
     EffectPattern,
 )
 
@@ -1398,7 +1399,7 @@ def _handle_cost_modification(text, action):
         action["self_target"] = True
     # 「（トリガー）能力を持たない」 restricts WHICH cards the cost change
     # applies to. Derived at parse time rather than as a post-parse backfill
-    # (dissolved FIX 7, formerly in _process_pre_fix).
+    # (dissolved FIX 7, formerly in _finalize_ability_stage).
     if "ability_filter" not in action and (
         "能力を持たない" in text or "能力も持たない" in text
     ):
@@ -2578,7 +2579,7 @@ def parse_action(text: str) -> Dict[str, Any]:
 
     # 「（トリガー）能力を持たない」 on selection actions filters WHAT may be
     # selected. Derived at parse time rather than as a post-parse backfill
-    # (dissolved FIX 7b, formerly in _process_pre_fix).
+    # (dissolved FIX 7b, formerly in _finalize_ability_stage).
     if (
         "ability_filter" not in action
         and action.get("action") in ("select", "select_cards")
@@ -2898,26 +2899,43 @@ def _try_distinct(text):
     return result
 
 
-def _try_blade_count(text):
-    # Strip template markers like {{icon_blade.png|ブレード}} → ブレード
+def _blade_count_match(text):
     clean = re.sub(r"\{\{.*?\|([^}]+)\}\}", r"\1", text)
-    for pat, op in [
+    for pattern, operator in (
         (r"ブレードが(\d+)つ以上", ">="),
         (r"ブレードの数が(\d+)以上", ">="),
         (r"ブレードが(\d+)より多い", ">"),
         (r"ブレードが(\d+)つ", ">="),
         (r"ブレードの数が(\d+)つ以上", ">="),
-    ]:
-        m = re.search(pat, clean)
-        if m:
-            return {
+    ):
+        match = re.search(pattern, clean)
+        if match:
+            return match, operator
+    return None, None
+
+
+def _set_blade_count_condition(text, result):
+    match, operator = _blade_count_match(text)
+    if match:
+        result.update(
+            {
                 "type": "card_blade_condition",
-                "count": int(m.group(1)),
-                "operator": op,
-                "text": text,
+                "count": int(match.group(1)),
+                "operator": operator,
                 "source": "selected_cards",
             }
-    return None
+        )
+
+
+def _matches_blade_count_condition(text):
+    match, _operator = _blade_count_match(text)
+    return match is not None
+
+
+_try_blade_count = ConditionPattern(
+    condition=_matches_blade_count_condition,
+    setter=_set_blade_count_condition,
+)
 
 
 def _infer_heart_source(cond, text):
@@ -3979,58 +3997,85 @@ def _try_appearance(text):
     return result
 
 
-def _try_energy_state(text):
-    has_positive = "エネルギーがある" in text
-    has_negative = "エネルギーがない" in text
-    if not has_positive and not has_negative:
-        return None
-    result = {"type": "energy_state_condition", "text": text}
-    if has_negative:
+def _set_energy_state_condition(text, result):
+    result["type"] = "energy_state_condition"
+    if "エネルギーがない" in text:
         result["negation"] = True
     if "アクティブ状態" in text:
         result["energy_state"] = "active"
-    return result
 
 
-def _try_state(text):
-    result = None
-    for patterns, state in [
+def _matches_energy_state_condition(text):
+    return "エネルギーがある" in text or "エネルギーがない" in text
+
+
+_try_energy_state = ConditionPattern(
+    condition=_matches_energy_state_condition,
+    setter=_set_energy_state_condition,
+)
+
+
+def _set_state_condition(text, result):
+    state = None
+    for patterns, candidate in (
         (["ウェイト状態である", "ウェイト状態にある", "ウェイト状態の"], "wait"),
         (
             ["アクティブ状態である", "アクティブ状態にある", "アクティブ状態の"],
             "active",
         ),
-    ]:
-        if any(p in text for p in patterns):
-            result = {"type": "state_condition", "state": state, "text": text}
-            if state == "active" and "エネルギー" in text:
-                result["resource_type"] = "energy"
-            if "すべて" in text:
-                result["all"] = True
-    if result is None:
-        return None
-    tgt = extract_target(text)
-    if tgt:
-        result["target"] = tgt
-    loc = extract_location(text)
-    if loc:
-        result["location"] = loc
+    ):
+        if any(pattern in text for pattern in patterns):
+            state = candidate
+            break
+    if state is None:
+        return
+    result["type"] = "state_condition"
+    result["state"] = state
+    if state == "active" and "エネルギー" in text:
+        result["resource_type"] = "energy"
+    if "すべて" in text:
+        result["all"] = True
+    target = extract_target(text)
+    if target:
+        result["target"] = target
+    location = extract_location(text)
+    if location:
+        result["location"] = location
     elif "ステージ" in text:
         result["location"] = "stage"
-    ct = extract_card_type(text)
-    if ct:
-        result["card_type"] = ct
+    card_type = extract_card_type(text)
+    if card_type:
+        result["card_type"] = card_type
     elif "メンバー" in text:
         result["card_type"] = "member_card"
     if "いる場合" in text or "いる" in text:
         result["count"] = 1
         result["operator"] = ">="
-    gns = extract_all_groups(text)
-    if gns:
-        result["group_names"] = gns
+    groups = extract_all_groups(text)
+    if groups:
+        result["group_names"] = groups
     if re.search(r"この(メンバー|カード)[がは]", text) and "以外" not in text:
         result["self_target"] = True
-    return result
+
+
+def _matches_state_condition(text):
+    return any(
+        pattern in text
+        for pattern in (
+            "ウェイト状態である",
+            "ウェイト状態にある",
+            "ウェイト状態の",
+            "アクティブ状態である",
+            "アクティブ状態にある",
+            "アクティブ状態の",
+        )
+    )
+
+
+_try_state = ConditionPattern(
+    condition=_matches_state_condition,
+    setter=_set_state_condition,
+)
 
 
 def _try_revealed(text):
@@ -4506,10 +4551,11 @@ CONDITION_PATTERNS = [
     ),  # "ライブ中" → {type: "card_count_condition"|"temporal_condition", temporal: "during_live"}
 ]
 
-# PriorityRegistry wrapping CONDITION_PATTERNS for named, sorted dispatch.
-_condition_registry = PriorityRegistry("condition_patterns")
+# PriorityRegistry wrapping canonical ConditionPattern rules.
+_condition_registry = PriorityRegistry("condition_rules")
 for _ci, (_cn, _ct, _ch) in enumerate(CONDITION_PATTERNS):
-    _condition_registry.register(_ct * 100 + _ci, _cn, _ch)
+    _rule = _ch if isinstance(_ch, ConditionPattern) else ConditionPattern(handler=_ch)
+    _condition_registry.register(_ct * 100 + _ci, _cn, _rule)
 
 
 def _try_placed_discard_live_or_member(text):
@@ -4559,7 +4605,11 @@ def _try_placed_discard_live_or_member(text):
     }
 
 
-_condition_registry.register(1, "placed_discard_live_or_member", _try_placed_discard_live_or_member)
+_condition_registry.register(
+    1,
+    "placed_discard_live_or_member",
+    ConditionPattern(handler=_try_placed_discard_live_or_member),
+)
 
 
 def _try_discard_live_and_member_optional(text):
@@ -6393,7 +6443,7 @@ def _fill_defaults(action, text, _cached_source=_UNSET, _cached_dest=_UNSET):
 # The first match wins. Priority ordering is CRITICAL — specific/compound
 # patterns must come before generic ones.
 #
-# See the _EFFECT_HANDLERS list at the end of this section for the
+# See the _STRUCTURAL_EFFECT_RULES list at the end of this section for the
 # full priority-ordered cascade with tier grouping.
 # ====================================================================
 #
@@ -7340,41 +7390,50 @@ def _try_cost_modification(text):
     return result
 
 
-def _try_answer_choice(text):
-    """回答が — answer-based choice effects.
-    Structure: 相手に何が好き？と聞く。回答がXかYの場合、action。回答がZの場合、action。回答がそれ以外の場合、action"""
-    if "回答が" not in text:
-        return None
-    result = {"text": text, "action": "choice", "choice_type": "answer_based"}
-    qm = re.search(r"(.+?)(?=回答が)", text, re.DOTALL)
-    if qm:
-        qt = re.sub(r"[\n。]+$", "", qm.group(1).strip())
-        if qt:
-            result["question"] = qt
+def _answer_choice_options(text):
     options = []
-    segments = re.split(r"(?=回答が)", text)
-    for seg in segments:
-        seg = seg.strip()
-        if not seg.startswith("回答が"):
+    for segment in re.split(r"(?=回答が)", text):
+        segment = segment.strip()
+        if not segment.startswith("回答が"):
             continue
-        idx = seg.find("場合、")
-        if idx == -1:
+        index = segment.find("場合、")
+        if index == -1:
             continue
-        answers_text = seg[len("回答が") : idx].strip()
-        action_text = seg[idx + len("場合、") :].strip().rstrip("。")
+        answers_text = segment[len("回答が") : index].strip()
+        action_text = segment[index + len("場合、") :].strip().rstrip("。")
         if not answers_text or not action_text:
             continue
         answers = [
-            a.strip().rstrip("の") for a in answers_text.split("か") if a.strip()
+            answer.strip().rstrip("の")
+            for answer in answers_text.split("か")
+            if answer.strip()
         ]
-        pa = parse_action(action_text)
-        pa["answers"] = answers
-        options.append(pa)
-    if options:
-        result["options"] = options
-        result["choice_maker"] = "opponent"
-        return result
-    return None
+        action = parse_action(action_text)
+        action["answers"] = answers
+        options.append(action)
+    return options
+
+
+def _set_answer_choice(text, result):
+    question_match = re.search(r"(.+?)(?=回答が)", text, re.DOTALL)
+    if question_match:
+        question = re.sub(r"[\n。]+$", "", question_match.group(1).strip())
+        if question:
+            result["question"] = question
+    result["options"] = _answer_choice_options(text)
+    result["choice_maker"] = "opponent"
+
+
+def _matches_answer_choice(text):
+    return "回答が" in text and bool(_answer_choice_options(text))
+
+
+_try_answer_choice = EffectPattern(
+    condition=_matches_answer_choice,
+    action="choice",
+    defaults={"choice_type": "answer_based"},
+    setter=_set_answer_choice,
+)
 
 
 def _finish_each_time(text, trigger_text, sub):
@@ -7445,7 +7504,7 @@ def _try_each_time(text):
     # "〜たび" bodies shaped [optional pay_energy, effect] are
     # conditional_on_optional: the player MAY pay, and paying gates the
     # effect. Reshaped here at the producer rather than as a post-parse FIX
-    # block (dissolved FIX 2, formerly in _process_pre_fix).
+    # block (dissolved FIX 2, formerly in _finalize_ability_stage).
     acts = sub.get("actions") or []
     if (
         sub.get("action") == "sequential"
@@ -7469,34 +7528,33 @@ def _try_each_time(text):
     return _finish_each_time(text, trigger_text, sub)
 
 
-def _try_opponent_action(text):
-    """相手は — opponent action patterns (with or without comma).
-
-    Flattens the opponent_action wrapper — the inner action gets target="opponent"
-    and action_by="opponent" so the engine handles it directly via ActionType
-    dispatch instead of the legacy inline handler in effects/mod.rs.
-
-    Also strips condition-related fields (condition, group_names) from the
-    flattened action because those are trigger-level metadata, not effect filters.
-    """
-    if not text.startswith("相手は"):
-        return None
-    om = re.match(r"相手は[、]?(.+?)(?:。|$)", text)
-    if not om:
-        return None
-    oa_text = om.group(0)
-    rest = text[len(oa_text) :].strip()
-    oa = parse_action(om.group(1).strip())
-    oa["text"] = oa_text
-    oa["target"] = "opponent"
-    oa["action_by"] = "opponent"
-    # Strip trigger-level fields that don't belong on the effect
-    oa.pop("condition", None)
-    oa.pop("group_names", None)
+def _set_opponent_action(text, result):
+    match = re.match(r"相手は[、]?(.+?)(?:。|$)", text)
+    opponent_text = match.group(0)
+    opponent = parse_action(match.group(1).strip())
+    opponent["text"] = opponent_text
+    opponent["target"] = "opponent"
+    opponent["action_by"] = "opponent"
+    opponent.pop("condition", None)
+    opponent.pop("group_names", None)
+    rest = text[len(opponent_text) :].strip()
     if rest:
-        re_eff = parse_effect(rest)
-        return {"text": text, "action": "sequential", "actions": [oa, re_eff]}
-    return oa
+        result["action"] = "sequential"
+        result["actions"] = [opponent, parse_effect(rest)]
+    else:
+        result.clear()
+        result.update(opponent)
+
+
+def _matches_opponent_action(text):
+    return text.startswith("相手は") and re.match(r"相手は[、]?(.+?)(?:。|$)", text)
+
+
+_try_opponent_action = EffectPattern(
+    condition=_matches_opponent_action,
+    action="custom",
+    setter=_set_opponent_action,
+)
 
 
 def _set_choose_self_opponent(text, result):
@@ -8683,7 +8741,7 @@ def _try_conditional_sequential(text):
 def _try_sequential(text):
     """此后、 — sequential marker. Must be checked BEFORE _try_conditional
     so that 条件→行動。此后、条件→行動 patterns are split correctly
-    (moved from position 17 to position 12 in _EFFECT_HANDLERS)."""
+    (moved from position 17 to position 12 in _STRUCTURAL_EFFECT_RULES)."""
     if SEQUENTIAL_MARKER not in text:
         return None
     parts = _split_marker_depth0(text, SEQUENTIAL_MARKER)
@@ -9236,7 +9294,7 @@ def _try_kore_niyori_result(text):
         else:
             cond = None
     # Result-condition property enrichment, done at the producer rather than
-    # as a post-parse backfill (dissolved FIX 9, formerly in _process_pre_fix).
+    # as a post-parse backfill (dissolved FIX 9, formerly in _finalize_ability_stage).
     if isinstance(cond, dict) and not cond.get("card_property"):
         cond_text = cond.get("text", "")
         if "ブレードハート" in cond_text:
@@ -9264,7 +9322,7 @@ def _try_kore_niyori_result(text):
     followup = parse_effect(fp.strip())
     # "このメンバー" in a これにより followup acts on the activating card
     # itself. Derived at the producer rather than as a post-parse backfill
-    # (dissolved FIX 9b, formerly in _process_pre_fix).
+    # (dissolved FIX 9b, formerly in _finalize_ability_stage).
     if isinstance(followup, dict) and "このメンバー" in followup.get("text", ""):
         if not followup.get("target") and followup.get("self_target") is None:
             followup["self_target"] = True
@@ -9725,7 +9783,7 @@ def _try_heart_choice(text):
 # ====================================================================
 # EFFECT HANDLER DEFINITIONS & DISPATCH
 # ====================================================================
-# The _EFFECT_HANDLERS list defines the priority-ordered cascade.
+# The _STRUCTURAL_EFFECT_RULES list defines the priority-ordered cascade.
 # Each function takes raw effect text and returns a parsed dict or None.
 # The first match wins — ordering is CRITICAL.
 #
@@ -9821,7 +9879,7 @@ _try_place_under_heart_copy = EffectPattern(
 )
 
 
-_EFFECT_HANDLERS = [
+_STRUCTURAL_EFFECT_RULES = [
     # Tier 1: Very specific patterns that must be checked first.
     # These would be misparsed by any generic handler.
     _try_timing_condition_gain,  # このターン中にエリアを移動した全てのX...
@@ -10011,14 +10069,17 @@ _register_effect_rule(
         setter=_set_both_hand_keep_shuffle_under,
     )
 )
-# _EFFECT_HANDLERS cascade (100+). Explicit priorities keep both additive.
-_effect_registry = PriorityRegistry("effect_handlers")
+# Structural effect rules share the canonical EffectPattern dispatch contract.
+_effect_registry = PriorityRegistry("effect_rules")
 for _ri, _h in enumerate(_EFFECT_RULES):
     _hn = getattr(_h, "__name__", f"effect_rule_{_ri}")
     _effect_registry.register(_ri, _hn, _h)
-for _i, _h in enumerate(_EFFECT_HANDLERS):
-    _hn = getattr(_h, "__name__", f"handler_{_i}")
-    _effect_registry.register(100 + _i, _hn, _h)
+for _i, _h in enumerate(_STRUCTURAL_EFFECT_RULES):
+    _rule = _h if isinstance(_h, EffectPattern) else EffectPattern(
+        action="custom", handler=_h
+    )
+    _hn = getattr(_h, "__name__", f"structural_rule_{_i}")
+    _effect_registry.register(100 + _i, _hn, _rule)
 
 
 _effect_registry.register(
@@ -12002,7 +12063,7 @@ def _fix_auto_condition(ability, eff, t, fix_stats):
                     break
 
 
-def _process_pre_fix(ability: Dict[str, Any], fix_stats: Dict[str, int]) -> None:
+def _finalize_ability_stage(ability: Dict[str, Any], fix_stats: Dict[str, int]) -> None:
     """Pre-fix pass: condition re-parse, target fix, action inference, sequential chain fixes, targeted fixes."""
     # ─── Pre-fix pass (merged from 3 separate loops) ───────────────────────────
     # 1. Re-parse condition texts to pick up newer parser fields (cost_limit etc.)
@@ -12025,8 +12086,6 @@ def _process_pre_fix(ability: Dict[str, Any], fix_stats: Dict[str, int]) -> None
 
     _infer_effect_action(eff)
 
-    _fix_sequential_chain(eff)
-
     # --- 2. Targeted fixes logic ---
     t = ability.get("triggerless_text", "")
 
@@ -12037,11 +12096,6 @@ def _process_pre_fix(ability: Dict[str, Any], fix_stats: Dict[str, int]) -> None
     _fix_compound_gain_split(eff, cond, t)
 
     _fix_spurious_sequential_change_state(eff)
-
-    # FIX 14: sequential chaining — infer select_cards → move_cards implied source
-    # NOTE (2026-08): the line below used to claim "infer select_cards →
-    # move_cards implied source" but has only ever been a stats counter.
-    fix_stats["compound_split"] += 1
 
     _fix_auto_condition(ability, eff, t, fix_stats)
 
@@ -12229,7 +12283,7 @@ def _fix_conditional_on_result(eff, t):
         eff.pop("actions", None)
 
 
-def _process_post_fixes(data: Dict[str, Any], fix_stats: Dict[str, int]) -> None:
+def _finalize_corpus_stage(data: Dict[str, Any], fix_stats: Dict[str, int]) -> None:
     """Post-processing: recursive fixes, action inference & engine compat fixes, post-hoc fixes."""
     _apply_recursive_fixes(data["unique_abilities"], fix_stats)
 
@@ -12415,43 +12469,41 @@ def _strip_self_appearance_card_type(node):
             current.pop("card_type", None)
 
 
+class _FinalizationPipeline:
+    def __init__(self):
+        self.fix_stats = {
+            "card_property": 0,
+            "temporal": 0,
+            "primary_neg": 0,
+            "auto_trigger": 0,
+            "overrides": {},
+        }
+
+    def finish_ability(self, ability):
+        _finalize_ability_stage(ability, self.fix_stats)
+
+    def finish_corpus(self, data):
+        _finalize_corpus_stage(data, self.fix_stats)
+        from card_overrides import apply_card_overrides
+
+        apply_card_overrides(data, self.fix_stats)
+        for ability in data["unique_abilities"]:
+            effect = ability.get("effect")
+            if isinstance(effect, dict):
+                _strip_self_appearance_card_type(effect)
+
+    def run(self, data):
+        data["_warning"] = (
+            "DO NOT EDIT THIS MANUALLY. Run cards/ability_extraction/parser.py to regenerate."
+        )
+        for ability in data["unique_abilities"]:
+            self.finish_ability(ability)
+        self.finish_corpus(data)
+        return data
+
+
 def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
-    """Post-process already-parsed abilities: infer actions, apply targeted fixes."""
-
-    # Add a DO NOT EDIT warning
-    data["_warning"] = (
-        "DO NOT EDIT THIS MANUALLY. Run cards/ability_extraction/parser.py to regenerate."
-    )
-
-    fix_stats = {
-        "movement": 0,
-        "each_time": 0,
-        "card_property": 0,
-        "ability_filter": 0,
-        "temporal": 0,
-        "local_cond": 0,
-        "group_cond": 0,
-        "result_cond": 0,
-        "primary_neg": 0,
-        "leak": 0,
-        "compound_split": 0,
-        "auto_trigger": 0,
-    }
-
-    for ability in data["unique_abilities"]:
-        _process_pre_fix(ability, fix_stats)
-    _process_post_fixes(data, fix_stats)
-    # Card-specific patches live in card_overrides.py (single place).
-    from card_overrides import apply_card_overrides
-
-    apply_card_overrides(data, fix_stats)
-    # Final invariant pass: strip card_type from self-appearance conditions
-    # across every ability (single source of truth for this rule).
-    for ability in data["unique_abilities"]:
-        eff = ability.get("effect")
-        if isinstance(eff, dict):
-            _strip_self_appearance_card_type(eff)
-    return data
+    return _FinalizationPipeline().run(data)
 
 
 def _clean(obj):
@@ -12473,7 +12525,7 @@ def _strip_coo_child_optional(effect):
     player's may-I choice), not its sub-actions — handlers emit optional=True
     on inner nodes from 「〜してもよい」, and leaving it there makes the engine
     double-prompt. Runs after `_propagate_optional` at parse time, replacing
-    the post-parse FIX 3 sweep in _process_pre_fix."""
+    the post-parse FIX 3 sweep in _finalize_ability_stage."""
     if isinstance(effect, dict) and effect.get("action") == "conditional_on_optional":
         for sub_key in ("optional_action", "conditional_action"):
             sub = effect.get(sub_key)
@@ -13608,16 +13660,16 @@ def _list_rules() -> None:
     for i, h in enumerate(_COST_HANDLERS):
         print(f"  {i:3}  {getattr(h, '__name__', h)}")
     print(sep)
-    print("EFFECT RULES  (_EFFECT_RULES — dispatched before legacy handlers)")
+    print("EFFECT RULES  (_EFFECT_RULES — canonical effect grammar)")
     print(sep)
     for i, r in enumerate(_EFFECT_RULES):
         print(
             f"  {i:3}  match={getattr(r, 'match', None)!r} match_any={getattr(r, 'match_any', None)} action={r.action!r}"
         )
     print(sep)
-    print("EFFECT HANDLERS  (_EFFECT_HANDLERS — legacy cascade, priority 100+)")
+    print("STRUCTURAL EFFECT RULES  (_STRUCTURAL_EFFECT_RULES — canonical rules, priority 100+)")
     print(sep)
-    for i, h in enumerate(_EFFECT_HANDLERS):
+    for i, h in enumerate(_STRUCTURAL_EFFECT_RULES):
         print(f"  {i:3}  {getattr(h, '__name__', h)}")
     print(sep)
     print("CONDITION PATTERNS  (name, tier — tier*100 = priority base)")
