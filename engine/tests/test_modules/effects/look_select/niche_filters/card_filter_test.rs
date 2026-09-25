@@ -24,6 +24,16 @@ fn has_filter_detects_all_fields() {
         "group should make has_filter true"
     );
 
+    let excluded_groups = vec!["DOLLCHESTRA".to_string()];
+    let filter_exclude = rabuka_engine::ability::util::CardFilter {
+        exclude_group_names: Some(excluded_groups.as_slice()),
+        ..Default::default()
+    };
+    assert!(
+        filter_exclude.has_filter(),
+        "exclude_group_names should make has_filter true"
+    );
+
     let empty = rabuka_engine::ability::util::CardFilter::new();
     assert!(
         !empty.has_filter(),
