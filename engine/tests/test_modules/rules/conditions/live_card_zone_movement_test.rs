@@ -131,6 +131,57 @@ fn invalid_live_card_discard_records_turn_movements() {
     assert_eq!(m.cause_player_id, game.state.player1.id);
 }
 
+/// Rule 10.5.2: a card in the energy zone that is not an energy card is moved
+/// to that player's waitroom. Owner-scoped: only the offending player's copy
+/// is touched.
+#[test]
+fn rule_10_5_2_non_energy_card_in_energy_zone_goes_to_owners_waitroom() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let member_p1 = game.id("PL!-sd1-010-SD");
+    let member_p2 = game.new_id("PL!-sd1-010-SD");
+    assert_ne!(member_p1, member_p2);
+    let energy = game.id("LL-E-001-SD");
+
+    // A legal energy card and an illegal member card share P1's energy zone.
+    game.state.player1.energy_zone.cards.push(energy);
+    game.state.player1.energy_zone.cards.push(member_p1);
+    game.state.player2.energy_zone.cards.push(member_p2);
+    fill_decks(&mut game, energy);
+
+    rabuka_engine::turn::TurnEngine::check_timing(&mut game.state);
+
+    assert!(
+        !game.state.player1.energy_zone.cards.contains(&member_p1),
+        "the non-energy card must leave the energy zone"
+    );
+    assert!(
+        game.state.player1.waitroom.cards.contains(&member_p1),
+        "it goes to the OWNER's waitroom"
+    );
+    assert!(
+        !game.state.player2.energy_zone.cards.contains(&member_p2),
+        "check timing runs the rule procedure for both players, so P2's copy is cleaned too"
+    );
+    assert!(
+        game.state.player2.waitroom.cards.contains(&member_p2),
+        "each player's own illegal card goes to that player's own waitroom"
+    );
+    assert!(
+        !game.state.player1.waitroom.cards.contains(&member_p2),
+        "P1's waitroom must not receive P2's card"
+    );
+    assert!(
+        !game.state.player2.waitroom.cards.contains(&member_p1),
+        "P2's waitroom must not receive P1's card"
+    );
+    assert!(
+        game.state.player1.energy_zone.cards.contains(&energy),
+        "a real energy card stays in the energy zone"
+    );
+}
+
 /// Test: source+destination condition passes when turn_movements has a
 /// matching movement event for the same player (target="self").
 #[test]

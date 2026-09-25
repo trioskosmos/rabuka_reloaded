@@ -1,14 +1,14 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-09-25T18:11:39.675329+00:00",
+  "generated_at": "2026-09-25T18:50:52.296889+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
     "total_abilities": 2011,
     "unique_abilities": 936
   },
-  "n_files": 896,
-  "n_tests": 3607,
+  "n_files": 897,
+  "n_tests": 3613,
   "total_cards": 771,
   "covered_cards": 771,
   "abilities_on_covered": 936,
@@ -702,7 +702,7 @@
       ]
     }
   },
-  "n_test_fns_parsed": 3607,
+  "n_test_fns_parsed": 3613,
   "abilities": [
     {
       "idx": 0,
@@ -14160,6 +14160,7 @@
         "engine/tests/test_modules/rules/phases/live_success_rules_test.rs",
         "engine/tests/test_modules/rules/phases/opponent_live_success_flow_test.rs",
         "engine/tests/test_modules/rules/phases/performance_phase_rules_test.rs",
+        "engine/tests/test_modules/rules/phases/victory_success_cards_result_test.rs",
         "engine/tests/test_modules/rules/scoring/blade_heart_colorless_test.rs",
         "engine/tests/test_modules/rules/scoring/special_blade_heart_rules_test.rs",
         "engine/tests/test_modules/rules/trigger_paths/q159_debut_from_discard_self_cost_test.rs",
@@ -14197,7 +14198,7 @@
         "ayumu_no_wait_with_non_nijigasaki_ally",
         "ayumu_q62_and_name_has_individual_names"
       ],
-      "covering_test_count": 775,
+      "covering_test_count": 780,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,

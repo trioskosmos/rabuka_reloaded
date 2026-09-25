@@ -9,3 +9,4 @@ pub mod opponent_live_success_flow_test;
 pub mod performance_phase_rules_test;
 pub mod performance_pipeline_test;
 pub mod phase_machine_rules_test;
+pub mod victory_success_cards_result_test;
