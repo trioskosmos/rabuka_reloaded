@@ -1,6 +1,6 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-09-26T23:11:01.547813+00:00",
+  "generated_at": "2026-09-26T23:42:04.645098+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
@@ -8,7 +8,7 @@
     "unique_abilities": 936
   },
   "n_files": 916,
-  "n_tests": 3705,
+  "n_tests": 3706,
   "total_cards": 771,
   "covered_cards": 771,
   "abilities_on_covered": 936,
@@ -647,7 +647,7 @@
       "rows": []
     }
   },
-  "n_test_fns_parsed": 3705,
+  "n_test_fns_parsed": 3706,
   "abilities": [
     {
       "idx": 0,
@@ -897,6 +897,7 @@
         "engine/tests/test_modules/effects/gain/blades/per_card/q148_waited_member_blade_total_test.rs",
         "engine/tests/test_modules/effects/gain/blades/per_card/q271_colorful_dreams_test.rs",
         "engine/tests/test_modules/effects/gain/hearts/constants/three_distinct_stage_names_constant_heart03_test.rs",
+        "engine/tests/test_modules/effects/look_select/optional_look_and_select_negative_branches_test.rs",
         "engine/tests/test_modules/effects/recover/per_card/cannot_baton_touch_restriction_blocks_baton_touch_action_test.rs",
         "engine/tests/test_modules/effects/recover/per_card/live_start_success_zone_plus_three_distinct_names_score_plus_one_test.rs",
         "engine/tests/test_modules/effects/recover/per_card/live_success_highest_blade_niji_member_scores_plus_one_test.rs",
@@ -933,6 +934,8 @@
         "engine/tests/test_modules/rules/trigger_paths/q159_debut_from_discard_self_cost_test.rs"
       ],
       "covering_tests": [
+        "a_group_filter_takes_exactly_the_matching_card",
+        "a_group_filter_that_matches_nothing_banks_every_looked_card",
         "ai_screeam_answer_both_discard",
         "ai_screeam_answer_both_draw",
         "ai_screeam_answer_both_gain_blade",
@@ -960,12 +963,11 @@
         "ayumu_energy_under_member_triggers_energy_deck_move",
         "ayumu_kanon_koko_debut_recover_from_discard",
         "ayumu_live_start_triggers",
-        "ayumu_q62_and_name_has_individual_names",
-        "b_heart07_parses_to_colorless_heart00",
-        "b_heart07_yell_contributes_two_colorless_hearts_each"
+        "ayumu_q62_and_name_has_individual_names"
       ],
-      "covering_test_count": 393,
+      "covering_test_count": 395,
       "direct_tests": [
+        "a_group_filter_that_matches_nothing_banks_every_looked_card",
         "all_members_excluded_no_reduction",
         "another_stage_member_prevents_cannot_live_restriction",
         "audrey_high_target_scores_plus_1",
@@ -994,10 +996,9 @@
         "emma_three_distinct_colors_gains_heart04",
         "emma_two_distinct_colors_gains_heart04",
         "energy_under_original_blade_limit_cost_moves_one_energy_from_zone_under_member",
-        "energy_under_original_blade_limit_multiple_candidates_selects_one",
-        "energy_under_original_blade_limit_single_candidate_auto_waited"
+        "energy_under_original_blade_limit_multiple_candidates_selects_one"
       ],
-      "direct_test_count": 131,
+      "direct_test_count": 132,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -24582,18 +24583,20 @@
       ],
       "covering_tests": [
         "a_group_filter_takes_exactly_the_matching_card",
+        "a_group_filter_that_matches_nothing_banks_every_looked_card",
         "pl_hs_pb1_018_n_paid_discard_looks_five_fetches_dollchestra",
         "pl_pb1_016_r_declined_discard_leaves_deck_count_unchanged",
         "pl_pb1_016_r_paid_discard_looks_four_fetches_lilywhite",
         "pl_sp_pb1_017_n_paid_discard_looks_five_fetches_5yncri5e"
       ],
-      "covering_test_count": 5,
+      "covering_test_count": 6,
       "direct_tests": [
         "a_group_filter_takes_exactly_the_matching_card",
+        "a_group_filter_that_matches_nothing_banks_every_looked_card",
         "pl_pb1_016_r_declined_discard_leaves_deck_count_unchanged",
         "pl_pb1_016_r_paid_discard_looks_four_fetches_lilywhite"
       ],
-      "direct_test_count": 3,
+      "direct_test_count": 4,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -28098,9 +28101,10 @@
       ],
       "covering_tests": [
         "a_group_filter_takes_exactly_the_matching_card",
+        "a_group_filter_that_matches_nothing_banks_every_looked_card",
         "pl_n_pb1_028_n_paid_discard_looks_two_adds_one_to_hand"
       ],
-      "covering_test_count": 2,
+      "covering_test_count": 3,
       "direct_tests": [
         "pl_n_pb1_028_n_paid_discard_looks_two_adds_one_to_hand"
       ],
@@ -34887,6 +34891,7 @@
         "engine/tests/test_modules/effects/gain/hearts/live_start/live_start_equal_success_counts_heart02_test.rs",
         "engine/tests/test_modules/effects/gain/hearts/per_card/izumi_debut_other_heart06_member_gain_test.rs",
         "engine/tests/test_modules/effects/look_select/bottom_inspect/inspect_bottom_and_select_test.rs",
+        "engine/tests/test_modules/effects/look_select/optional_look_and_select_negative_branches_test.rs",
         "engine/tests/test_modules/effects/look_select/reorder_top/cheer_mode_look_three_return_one_from_hand_test.rs",
         "engine/tests/test_modules/effects/look_select/reorder_top/live_success_look_three_deck_size_q36_test.rs",
         "engine/tests/test_modules/effects/look_select/reveal/live_success_reveal_top_member_without_blade_heart_total_score_test.rs",
@@ -34924,6 +34929,8 @@
         "engine/tests/test_modules/rules/trigger_paths/zone_change_gate_test.rs"
       ],
       "covering_tests": [
+        "a_group_filter_takes_exactly_the_matching_card",
+        "a_group_filter_that_matches_nothing_banks_every_looked_card",
         "ab1_different_group_moved_to_hand",
         "ab1_empty_discard_nothing_happens",
         "ab1_empty_stage_moves_one_eligible_card",
@@ -34951,12 +34958,11 @@
         "aspire_only_non_liella_moved_no_blade",
         "aspire_two_moved_liella_both_gain_blade",
         "audit_additive_modifier_can_cause_failure",
-        "audit_additive_modifier_stacks_on_base",
-        "audit_allocations_match_filled",
-        "audit_both_players_fail_no_winner"
+        "audit_additive_modifier_stacks_on_base"
       ],
-      "covering_test_count": 487,
+      "covering_test_count": 489,
       "direct_tests": [
+        "a_group_filter_that_matches_nothing_banks_every_looked_card",
         "all_same_group_no_effect",
         "audit_additive_modifier_can_cause_failure",
         "audit_additive_modifier_stacks_on_base",
@@ -34985,10 +34991,9 @@
         "deploy_over_cost_filtered",
         "deploy_single_cost4_ok",
         "deploy_stage_full_graceful",
-        "deploy_two_cost2_ok",
-        "dia_keeps_one_on_bottom_rest_to_waitroom"
+        "deploy_two_cost2_ok"
       ],
-      "direct_test_count": 176,
+      "direct_test_count": 177,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -35057,6 +35062,7 @@
         "engine/tests/test_modules/effects/gain/hearts/live_start/live_start_equal_success_counts_heart02_test.rs",
         "engine/tests/test_modules/effects/gain/hearts/per_card/izumi_debut_other_heart06_member_gain_test.rs",
         "engine/tests/test_modules/effects/look_select/bottom_inspect/inspect_bottom_and_select_test.rs",
+        "engine/tests/test_modules/effects/look_select/optional_look_and_select_negative_branches_test.rs",
         "engine/tests/test_modules/effects/look_select/reorder_top/cheer_mode_look_three_return_one_from_hand_test.rs",
         "engine/tests/test_modules/effects/look_select/reorder_top/live_success_look_three_deck_size_q36_test.rs",
         "engine/tests/test_modules/effects/look_select/reveal/live_success_reveal_top_member_without_blade_heart_total_score_test.rs",
@@ -35094,6 +35100,8 @@
         "engine/tests/test_modules/rules/trigger_paths/zone_change_gate_test.rs"
       ],
       "covering_tests": [
+        "a_group_filter_takes_exactly_the_matching_card",
+        "a_group_filter_that_matches_nothing_banks_every_looked_card",
         "ab1_different_group_moved_to_hand",
         "ab1_empty_discard_nothing_happens",
         "ab1_empty_stage_moves_one_eligible_card",
@@ -35121,12 +35129,11 @@
         "aspire_only_non_liella_moved_no_blade",
         "aspire_two_moved_liella_both_gain_blade",
         "audit_additive_modifier_can_cause_failure",
-        "audit_additive_modifier_stacks_on_base",
-        "audit_allocations_match_filled",
-        "audit_both_players_fail_no_winner"
+        "audit_additive_modifier_stacks_on_base"
       ],
-      "covering_test_count": 487,
+      "covering_test_count": 489,
       "direct_tests": [
+        "a_group_filter_that_matches_nothing_banks_every_looked_card",
         "all_same_group_no_effect",
         "audit_additive_modifier_can_cause_failure",
         "audit_additive_modifier_stacks_on_base",
@@ -35155,10 +35162,9 @@
         "deploy_over_cost_filtered",
         "deploy_single_cost4_ok",
         "deploy_stage_full_graceful",
-        "deploy_two_cost2_ok",
-        "dia_keeps_one_on_bottom_rest_to_waitroom"
+        "deploy_two_cost2_ok"
       ],
-      "direct_test_count": 176,
+      "direct_test_count": 177,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -35193,6 +35199,7 @@
         "engine/tests/test_modules/effects/gain/blades/per_card/q271_colorful_dreams_test.rs",
         "engine/tests/test_modules/effects/gain/blades/per_card/yell_same_group_members_multi_color_hearts_test.rs",
         "engine/tests/test_modules/effects/look_select/bottom_inspect/inspect_bottom_and_select_test.rs",
+        "engine/tests/test_modules/effects/look_select/optional_look_and_select_negative_branches_test.rs",
         "engine/tests/test_modules/effects/recover/per_card/constant_two_blade_gain_when_either_stage_has_cost13_plus_test.rs",
         "engine/tests/test_modules/effects/recover/per_card/live_start_activate_three_printemps_wait_members_q178_q179_test.rs",
         "engine/tests/test_modules/effects/recover/to_discard/live_start_discard_two_from_unit_with_two_or_more_cards_gain_heart04_and_blade_test.rs",
@@ -35204,6 +35211,8 @@
         "engine/tests/test_modules/rules/phases/live_success_rules_test.rs"
       ],
       "covering_tests": [
+        "a_group_filter_takes_exactly_the_matching_card",
+        "a_group_filter_that_matches_nothing_banks_every_looked_card",
         "ab1_different_group_moved_to_hand",
         "ab1_empty_discard_nothing_happens",
         "ab1_empty_stage_moves_one_eligible_card",
@@ -35231,12 +35240,11 @@
         "both_sides_cost13_still_only_two_blades",
         "center_empty_no_effect",
         "compound_condition_two_self_three_opp",
-        "cost12_below_threshold_no_trigger",
-        "cost13_exact_boundary_triggers",
-        "cost13_on_opponent_stage_meets_condition"
+        "cost12_below_threshold_no_trigger"
       ],
-      "covering_test_count": 160,
+      "covering_test_count": 162,
       "direct_tests": [
+        "a_group_filter_that_matches_nothing_banks_every_looked_card",
         "all_same_group_no_effect",
         "both_sides_cost13_still_only_two_blades",
         "compound_condition_two_self_three_opp",
@@ -35265,7 +35273,7 @@
         "wao_wao_q178_already_active_no_change",
         "wao_wao_q179_only_2_wait_to_active_no_score"
       ],
-      "direct_test_count": 27,
+      "direct_test_count": 28,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -35300,6 +35308,7 @@
         "engine/tests/test_modules/effects/gain/blades/per_card/q271_colorful_dreams_test.rs",
         "engine/tests/test_modules/effects/gain/blades/per_card/yell_same_group_members_multi_color_hearts_test.rs",
         "engine/tests/test_modules/effects/look_select/bottom_inspect/inspect_bottom_and_select_test.rs",
+        "engine/tests/test_modules/effects/look_select/optional_look_and_select_negative_branches_test.rs",
         "engine/tests/test_modules/effects/recover/per_card/constant_two_blade_gain_when_either_stage_has_cost13_plus_test.rs",
         "engine/tests/test_modules/effects/recover/per_card/live_start_activate_three_printemps_wait_members_q178_q179_test.rs",
         "engine/tests/test_modules/effects/recover/to_discard/live_start_discard_two_from_unit_with_two_or_more_cards_gain_heart04_and_blade_test.rs",
@@ -35311,6 +35320,8 @@
         "engine/tests/test_modules/rules/phases/live_success_rules_test.rs"
       ],
       "covering_tests": [
+        "a_group_filter_takes_exactly_the_matching_card",
+        "a_group_filter_that_matches_nothing_banks_every_looked_card",
         "ab1_different_group_moved_to_hand",
         "ab1_empty_discard_nothing_happens",
         "ab1_empty_stage_moves_one_eligible_card",
@@ -35338,12 +35349,11 @@
         "both_sides_cost13_still_only_two_blades",
         "center_empty_no_effect",
         "compound_condition_two_self_three_opp",
-        "cost12_below_threshold_no_trigger",
-        "cost13_exact_boundary_triggers",
-        "cost13_on_opponent_stage_meets_condition"
+        "cost12_below_threshold_no_trigger"
       ],
-      "covering_test_count": 160,
+      "covering_test_count": 162,
       "direct_tests": [
+        "a_group_filter_that_matches_nothing_banks_every_looked_card",
         "all_same_group_no_effect",
         "both_sides_cost13_still_only_two_blades",
         "compound_condition_two_self_three_opp",
@@ -35372,7 +35382,7 @@
         "wao_wao_q178_already_active_no_change",
         "wao_wao_q179_only_2_wait_to_active_no_score"
       ],
-      "direct_test_count": 27,
+      "direct_test_count": 28,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -35413,6 +35423,7 @@
       ],
       "covering_tests": [
         "a_group_filter_takes_exactly_the_matching_card",
+        "a_group_filter_that_matches_nothing_banks_every_looked_card",
         "ai_grant_expires_through_the_real_live_end_rollover",
         "ai_grant_is_a_flat_bonus_past_its_two_debut_threshold",
         "compound_condition_two_self_three_opp",
@@ -35440,10 +35451,9 @@
         "niko_alt_grants_score_only_while_both_side_slots_hold_two_blade_members",
         "niko_alt_no_score_when_a_side_slot_member_does_not_print_exactly_two_blades",
         "niko_grant_expires_through_the_real_live_end_rollover",
-        "niko_grant_latches_at_live_start_and_survives_its_condition_later_failing",
-        "niko_grant_stays_single_across_repeated_constant_scans"
+        "niko_grant_latches_at_live_start_and_survives_its_condition_later_failing"
       ],
-      "covering_test_count": 46,
+      "covering_test_count": 47,
       "direct_tests": [
         "a_group_filter_takes_exactly_the_matching_card",
         "compound_condition_two_self_three_opp",
