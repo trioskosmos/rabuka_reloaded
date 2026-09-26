@@ -181,27 +181,15 @@ _the same card INSTANCE in two stage slots (`stage.stage = [filler, y, filler]`)
 | `engine/tests/test_modules/effects/recover/to_hand/live_success_draws_four_and_picks_one_niji_reveal_q66_test.rs` | `poppin_lower_score_fails` | 116 | member in 2 slots |
 | … | 56 more |  |  |
 
-## count_inequality_only (15)
+## count_inequality_only (3)
 
 _every assertion is an INEQUALITY on a count and there is no assert_eq anywhere — a band, not a value, so 1 card and 9 both pass; pin the number the card prints_
 
 | file | test | line | detail |
 | --- | --- | --- | --- |
 | `engine/tests/test_modules/characterization/corpus_smoke_test.rs` | `every_card_executes_without_panicking` | 84 | 1 inequality assertion(s) on a count, vs threshold |
-| `engine/tests/test_modules/effects/choice/per_card/tang_keke_energy_or_heart06_choice_test.rs` | `tang_keke_discard_member_without_blade_heart_choose_any_number` | 68 | 1 inequality assertion(s) on a count, vs baseline |
 | `engine/tests/test_modules/effects/compound/per_card/debut_blade_lifecycle_and_cost17_aqours_placement_edges_test.rs` | `mari_cost_17_aqours_vs_muse` | 84 | 1 inequality assertion(s) on a count, vs threshold |
 | `engine/tests/test_modules/effects/gain/blades/per_card/bp7_parser_gap_cards_test.rs` | `kanon_selects_each_group_to_deck_bottom_and_draws` | 223 | 1 inequality assertion(s) on a count, vs baseline |
-| `engine/tests/test_modules/effects/gain/hearts/constants/ten_energy_constant_heart06_threshold_boundary_test.rs` | `pl_sp_bp5_016_n_energy_at_least_ten_grants_heart06` | 22 | 1 inequality assertion(s) on a count, vs threshold |
-| `engine/tests/test_modules/effects/look_select/per_card/live_success_under_member_count_score_test.rs` | `burn_wait_state_verification` | 141 | 1 inequality assertion(s) on a count, vs threshold |
-| `engine/tests/test_modules/effects/look_select/reveal/sequential_cost_look_five_take_cost9_member_test.rs` | `eli_bp5_look_select_optional_skip_keeps_hand` | 149 | 1 inequality assertion(s) on a count, vs threshold |
-| `engine/tests/test_modules/effects/look_select/reveal/sequential_cost_look_five_take_cost9_member_test.rs` | `eli_bp5_no_eligible_look_discards_all` | 122 | 2 inequality assertion(s) on a count, vs baseline+threshold |
-| `engine/tests/test_modules/effects/look_select/reveal/sequential_cost_look_five_take_group_member_test.rs` | `izumi_bp5_look_no_eligible_auto_discards` | 143 | 1 inequality assertion(s) on a count, vs baseline |
-| `engine/tests/test_modules/effects/position/area_move/formation_change_test.rs` | `all_three_move_counts` | 35 | 1 inequality assertion(s) on a count, vs baseline |
-| `engine/tests/test_modules/effects/position/area_move/formation_change_test.rs` | `one_moves_two_stay` | 89 | 1 inequality assertion(s) on a count, vs baseline |
-| `engine/tests/test_modules/effects/recover/to_hand/energy_discard_live_recovery_pl_sp_sd2_006_sd2_test.rs` | `pl_sp_sd2_006_sd2_no_liella_live_terminates_without_gain` | 126 | 1 inequality assertion(s) on a count, vs baseline |
-| `engine/tests/test_modules/effects/recover/to_hand/live_success_draws_four_and_picks_one_niji_reveal_q66_test.rs` | `poppin_no_niji_revealed_effect_fails` | 264 | 1 inequality assertion(s) on a count, vs baseline |
-| `engine/tests/test_modules/jidou/yell/discard_revealed_then_re_yell/blade_heart_two_or_fewer_discard_all_and_re_yell_test.rs` | `discard_accept_then_re_yells` | 122 | 1 inequality assertion(s) on a count, vs baseline |
-| `engine/tests/test_modules/rules/trigger_paths/jidou_paired_ability_combination_test.rs` | `jidou_paired_with_other_ability_both_fire` | 52 | 1 inequality assertion(s) on a count, vs baseline |
 
 ## unresolvable_card_id (0)
 

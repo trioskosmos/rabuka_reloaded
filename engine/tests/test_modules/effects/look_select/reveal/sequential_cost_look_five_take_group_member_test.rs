@@ -162,5 +162,10 @@ fn izumi_bp5_look_no_eligible_auto_discards() {
         game.select_indices(&[]);
     }
     assert!(!game.has_pending_choice(), "no eligible should auto end");
-    assert!(game.state.player1.waitroom.cards.len() >= wait_before + 6, "5 looked + 1 discard to waitroom");
+    assert_eq!(
+        game.state.player1.waitroom.cards.len() - wait_before,
+        6,
+        "Exactly the look's own discard plus all 5 looked-at cards; \
+         '>= 6' would pass if the engine discarded a looked card twice"
+    );
 }

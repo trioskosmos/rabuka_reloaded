@@ -146,5 +146,18 @@ fn burn_wait_state_verification() {
     g.state.player1.success_live_card_zone.cards.push(burn);
     trigger_burn_success(&mut g, burn);
     select_burn_move(&mut g);
-    assert!(g.state.player1.energy_zone.active_count() <= 8);
+    // The two under-cards moved into the energy ZONE, but into its wait state —
+    // that is the whole point of the test, and 'active <= 8' could not tell the
+    // difference between that and the cards not having moved at all.
+    assert_eq!(
+        g.state.player1.energy_zone.active_count(),
+        8,
+        "Burn's moved cards land in the wait state, so the active count is \
+         unchanged"
+    );
+    assert_eq!(
+        g.state.player1.energy_zone.cards.len(),
+        10,
+        "Both under-cards joined the energy zone"
+    );
 }

@@ -142,9 +142,17 @@ fn discard_accept_then_re_yells() {
         !game.state.re_yell_revealed_cards.is_empty(),
         "re-yell happened"
     );
-    assert!(
-        game.state.player1.main_deck.cards.len() < deck_before,
-        "re-yell consumed deck cards"
+    assert_eq!(
+        count, 2,
+        "「ブレードハートの数以下のカードなら」を満たす discarded"
+    );
+    assert_eq!(
+        deck_before - game.state.player1.main_deck.cards.len(),
+        5,
+        "Re-yell consumed 5 deck cards: the 2 discarded blade hearts plus 3 \
+         from the yell itself. Pinned as a number rather than derived — if the \
+         yell maths changes, this is the test that reports it. '< \
+         deck_before' would have passed if it consumed the whole deck."
     );
 }
 

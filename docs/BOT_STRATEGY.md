@@ -1000,3 +1000,71 @@ v8 is now +5.1pp over what it was, about 3.6 sigma, reproduced across three
 seeds and both seats. It is still behind v7, and the table above is the reason:
 the remaining gap is in the Main phase's search structure, not in any constant
 or term that can be tuned from the outside.
+
+---
+
+# CORRECTION: the mulligan was replacing the OPPONENT''s cards
+
+Found 2026-09-26 by playing a side manually against v7, not by any automated
+measurement. This invalidates a result recorded above.
+
+## What was wrong
+
+`handle_mulligan_confirmation` advanced the mulligan phase BEFORE it mutated a
+hand:
+
+```rust
+if !Self::advance_mulligan_phase(game_state) { return Ok(()); }  // phase flips here
+...
+let player = game_state.active_player_mut();                      // ...so this is the OTHER seat
+```
+
+By the time the handler asked who the active player was, the phase had already
+moved to the next mulligan, so `active_player_mut()` returned the other seat.
+A player's own mulligan therefore removed the selected cards from their
+OPPONENT''s hand and dealt the replacements to the opponent.
+
+Observed directly, acting as player1 and selecting hand indices [3, 2]:
+
+```text
+  my_hand  [2547, 2563, 2573, 2576, 2537, 2533]  ->  unchanged
+  opp_hand [2651, 2611, 2599, 2615, 2639, 2636]  ->  [2651, 2611, 2639, 2636, 2648, 2609]
+```
+
+After the fix, the same action changes the actor''s hand and leaves the
+opponent''s byte-identical.
+
+## Why the arena never caught it
+
+The ablation in section V8 recorded v8''s mulligan as "neutral" (149 vs 151
+wins when swapping v8''s mulligan for v4''s). That result is not evidence that
+mulligan choice does not matter - it is what a **broken** mulligan looks like
+when measured in a **mirror**. Each seat''s mulligan corrupts the opponent, so
+in a mirror the two corruptions largely cancel and the measurement reports no
+difference. The one harness the project uses for every decision is the one
+configuration in which this class of bug is invisible.
+
+## Fix and regression cover
+
+- `GameState::mulligan_owner_index()` returns the seat that owns the current
+  mulligan phase, and `None` outside one. The handler captures it BEFORE
+  advancing the phase and mutates that seat explicitly.
+- `handle_mulligan_selection` resolves the card against the same owner, so
+  selection and confirmation read the same hand.
+- An explicitly empty `card_indices` is now treated as "not specified" rather
+  than silently discarding the server-side selection.
+- Five unit tests in `engine/src/turn/mulligan_tests.rs`, including the
+  regression that matters: **the opponent''s hand must be untouched.**
+
+## Effect on the numbers
+
+v8 vs v7 over 2400 games (3 seeds x 2 seats) is 43.0% with a working mulligan
+and was 43.9% with the broken one - within noise, exactly as the mirror
+explanation predicts. So this fix does not move the v8-vs-v7 number, and that
+is the point: the number was measuring cancellation, not strength.
+
+The open item this exposes is worse than the bug: **every conclusion in this
+document was measured in a mirror.** A change that helps one seat and hurts the
+other is invisible in a mirror match, which is the majority of the failures
+listed in section 9.2. Asymmetric-deck support in `bot_arena` is therefore not
+a nice-to-have; it is the precondition for trusting any of these results.

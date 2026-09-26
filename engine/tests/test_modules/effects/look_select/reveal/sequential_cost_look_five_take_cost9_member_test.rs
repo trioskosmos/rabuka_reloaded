@@ -140,8 +140,18 @@ fn eli_bp5_no_eligible_look_discards_all() {
         safety += 1;
         game.select_indices(&[]);
     }
-    assert!(game.state.player1.hand.cards.len() <= 1, "hand should be 0 or 1");
-    assert!(game.state.player1.waitroom.cards.len() >= wait_before + 5, "at least 5 looked discarded");
+    assert_eq!(
+        game.state.player1.hand.cards.len(),
+        0,
+        "Eli played (1 filler left) then that filler discarded as the look \
+         cost: the hand ends empty, not '0 or 1'"
+    );
+    assert_eq!(
+        game.state.player1.waitroom.cards.len() - wait_before,
+        6,
+        "The look cost card plus all 5 looked-at cards, none of which was \
+         eligible; '>= 5' would pass if the engine kept any of them"
+    );
 }
 
 
@@ -170,5 +180,13 @@ fn eli_bp5_look_select_optional_skip_keeps_hand() {
         safety += 1;
         game.select_indices(&[]);
     }
-    assert!(game.state.player1.hand.cards.len() <= 1, "skip must not add beyond 1");
+    assert_eq!(
+        game.state.player1.hand.cards.len(),
+        0,
+        "Skipping the optional select takes nothing from the looked-at cards \
+         (which is the point), but the look's own discard cost still takes \
+         the filler — so the hand ends empty rather than holding the looked \
+         card. '<= 1' passed both of those, and a bug that put a looked card \
+         in hand."
+    );
 }

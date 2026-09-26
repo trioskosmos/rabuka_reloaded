@@ -51,14 +51,22 @@ fn jidou_effect_cause_both_sides() {
 
 #[test]
 fn jidou_paired_with_other_ability_both_fire() {
-    // PL!SP-bp7-005-R＋ already has two jidou; ensure both can coexist with other members
+    // PL!SP-bp7-005-R＋ carries TWO jidou: ab#0 is a sequential that places an
+    // energy card from the energy deck in the wait state, ab#1 grants a blade.
+    // They have to coexist, so this asserts each one's own effect — checking
+    // only blade_modifiers saw just ab#1 and passed when ab#0 did nothing.
     let db = load_real_database();
     let mut game = TestGame::new(db.clone());
     let card = game.id("PL!SP-bp7-005-R＋");
     let filler = game.new_id("PL!-sd1-010-SD");
     fill_decks(&mut game, filler);
     game.state.player1.stage.stage = [card, -1, -1];
-    let before = game.state.mods.blade_modifiers.len();
+    // ab#0 draws from the energy deck, and fill_decks only fills the MAIN deck —
+    // without this the sequential silently did nothing and the test proved
+    // nothing about it.
+    fill_energy_deck(&mut game, 0, 3);
+    let blades_before = game.state.mods.blade_modifiers.len();
+    let energy_deck_before = game.state.player1.energy_deck.cards.len();
     // Trigger first jidou via登場 gate: push movement that counts as appeared
     game.state.push_movement_event(card, "hand", "stage", Some(card), "p1", true);
     game.state.record_card_appearance(card, "hand");
@@ -68,9 +76,21 @@ fn jidou_paired_with_other_ability_both_fire() {
     game.state.push_movement_event(-1, "energy_deck", "energy", Some(card), "p1", true);
     game.state.trigger_auto_abilities_for_player("p1");
     game.state.process_pending_auto_abilities("p1");
-    // At least one of the two should have added state; we pin no panic and distinct paths
+
     assert!(game.state.player1.stage.stage.contains(&card));
-    assert!(game.state.mods.blade_modifiers.len() >= before);
+    // ab#1: exactly one blade granted. '>= before' passed when NEITHER jidou
+    // fired, which is the case this test exists to rule out.
+    assert_eq!(
+        game.state.mods.blade_modifiers.len() - blades_before,
+        1,
+        "ab#1 granted its blade"
+    );
+    // ab#0: the sequential placed one energy card out of the energy deck.
+    assert_eq!(
+        energy_deck_before - game.state.player1.energy_deck.cards.len(),
+        1,
+        "ab#0 placed one energy card from the energy deck"
+    );
 }
 
 #[test]
