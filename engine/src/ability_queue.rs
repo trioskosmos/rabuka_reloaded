@@ -658,6 +658,20 @@ mod tests {
         }
     }
 
+    /// A stand-in prompt. Tests here are about queue state, not about the
+    /// shape of a choice, so they share one fixture rather than each spelling
+    /// out the same eight fields.
+    fn test_choice() -> Choice {
+        Choice::SelectTarget {
+            target: "test".into(),
+            description: "test".into(),
+            description_en: None,
+            description_ja: None,
+            allow_skip: false,
+            options: None,
+        }
+    }
+
     #[test]
     fn queue_starts_idle() {
         let q = AbilityQueue::new();
@@ -710,14 +724,7 @@ mod tests {
         q.enqueue(make_entry("card_1", "p1"));
         q.start_next();
 
-        q.pause_for_choice(Choice::SelectTarget {
-            target: "test".into(),
-            description: "test".into(),
-            description_en: None,
-            description_ja: None,
-            allow_skip: false,
-            options: None,
-        });
+        q.pause_for_choice(test_choice());
         assert!(q.is_waiting_for_choice().is_some());
         assert!(matches!(q.state, QueueState::WaitingForChoice { .. }));
 
@@ -731,14 +738,7 @@ mod tests {
         q.enqueue(make_entry("card_1", "p1"));
         q.start_next();
 
-        q.pause_for_choice(Choice::SelectTarget {
-            target: "test".into(),
-            description: "test".into(),
-            description_en: None,
-            description_ja: None,
-            allow_skip: false,
-            options: None,
-        });
+        q.pause_for_choice(test_choice());
 
         let entry = q.get_entry(0).unwrap();
         assert_eq!(entry.choice_player_id.as_deref(), Some("p1"));
@@ -771,14 +771,7 @@ mod tests {
     #[test]
     fn auto_ability_choice_returns_to_idle() {
         let mut q = AbilityQueue::new();
-        q.pause_for_auto_ability_choice(Choice::SelectTarget {
-            target: "test".into(),
-            description: "test".into(),
-            description_en: None,
-            description_ja: None,
-            allow_skip: false,
-            options: None,
-        });
+        q.pause_for_auto_ability_choice(test_choice());
         assert!(q.is_waiting_for_choice().is_some());
         q.resume_with_choice();
         assert!(q.is_idle());

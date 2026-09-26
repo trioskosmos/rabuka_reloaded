@@ -553,6 +553,31 @@ impl ChoiceBuilder {
     }
 }
 
+/// Rename a serde-tagged choice to its bare name and lift the fields out of the
+/// inner object, so the frontend sees `{"title": .., "options": ..}` rather
+/// than `{"SelectHeartColor": {"title": ..}}`.
+///
+/// `extras` are the variant's own fields, added alongside `title`. The tag is
+/// dropped but the inner fields are kept, so anything a variant already
+/// serialised (ids, indices) survives the rename.
+#[cfg(feature = "serde_support")]
+fn flatten_choice(json: &mut Value, tag: &str, description: &str, extras: &[(&str, Value)]) {
+    let Some(obj) = json.as_object_mut() else {
+        return;
+    };
+    let Some(inner) = obj.remove(tag) else {
+        return;
+    };
+    let Some(mut fields) = inner.as_object().cloned() else {
+        return;
+    };
+    fields.insert("title".into(), Value::String(description.to_string()));
+    for (key, value) in extras {
+        fields.insert((*key).into(), value.clone());
+    }
+    *obj = fields;
+}
+
 impl Choice {
     pub fn select_cards(
         zone: impl Into<String>,
@@ -724,23 +749,16 @@ impl Choice {
                 options,
                 ..
             } => {
-                if let Some(obj) = json.as_object_mut() {
-                    if let Some(inner) = obj.remove("SelectTarget") {
-                        if let Some(mut fields) = inner.as_object().cloned() {
-                            fields.insert("title".into(), Value::String(description.clone()));
-                            fields.insert("allow_skip".into(), Value::Bool(*allow_skip));
-                            if let Some(opts) = options {
-                                fields.insert(
-                                    "options".into(),
-                                    Value::Array(
-                                        opts.iter().map(|o| Value::String(o.clone())).collect(),
-                                    ),
-                                );
-                            }
-                            *obj = fields;
-                        }
-                    }
+                let mut extras = vec![("allow_skip", Value::Bool(*allow_skip))];
+                if let Some(opts) = options {
+                    extras.push((
+                        "options",
+                        Value::Array(
+                            opts.iter().map(|o| Value::String(o.clone())).collect(),
+                        ),
+                    ));
                 }
+                flatten_choice(&mut json, "SelectTarget", description, &extras);
             }
             Choice::SelectPosition {
                 position: _,
@@ -748,87 +766,60 @@ impl Choice {
                 allow_skip,
                 ..
             } => {
-                if let Some(obj) = json.as_object_mut() {
-                    if let Some(inner) = obj.remove("SelectPosition") {
-                        if let Some(mut fields) = inner.as_object().cloned() {
-                            fields.insert("title".into(), Value::String(description.clone()));
-                            fields.insert("allow_skip".into(), Value::Bool(*allow_skip));
-                            *obj = fields;
-                        }
-                    }
-                }
+                flatten_choice(
+                    &mut json,
+                    "SelectPosition",
+                    description,
+                    &[("allow_skip", Value::Bool(*allow_skip))],
+                );
             }
             Choice::SelectHeartColor {
                 options,
                 description,
                 ..
             } => {
-                if let Some(obj) = json.as_object_mut() {
-                    if let Some(inner) = obj.remove("SelectHeartColor") {
-                        if let Some(mut fields) = inner.as_object().cloned() {
-                            fields.insert("title".into(), Value::String(description.clone()));
-                            fields.insert(
-                                "options".into(),
-                                serde_json::to_value(options).unwrap_or_default(),
-                            );
-                            *obj = fields;
-                        }
-                    }
-                }
+                flatten_choice(
+                    &mut json,
+                    "SelectHeartColor",
+                    description,
+                    &[("options", serde_json::to_value(options).unwrap_or_default())],
+                );
             }
             Choice::SelectHeartType {
                 options,
                 description,
                 ..
             } => {
-                if let Some(obj) = json.as_object_mut() {
-                    if let Some(inner) = obj.remove("SelectHeartType") {
-                        if let Some(mut fields) = inner.as_object().cloned() {
-                            fields.insert("title".into(), Value::String(description.clone()));
-                            fields.insert(
-                                "options".into(),
-                                serde_json::to_value(options).unwrap_or_default(),
-                            );
-                            *obj = fields;
-                        }
-                    }
-                }
+                flatten_choice(
+                    &mut json,
+                    "SelectHeartType",
+                    description,
+                    &[("options", serde_json::to_value(options).unwrap_or_default())],
+                );
             }
             Choice::SelectAutoAbility {
                 options,
                 description,
                 ..
             } => {
-                if let Some(obj) = json.as_object_mut() {
-                    if let Some(inner) = obj.remove("SelectAutoAbility") {
-                        if let Some(mut fields) = inner.as_object().cloned() {
-                            fields.insert("title".into(), Value::String(description.clone()));
-                            fields.insert(
-                                "options".into(),
-                                serde_json::to_value(options).unwrap_or_default(),
-                            );
-                            *obj = fields;
-                        }
-                    }
-                }
+                flatten_choice(
+                    &mut json,
+                    "SelectAutoAbility",
+                    description,
+                    &[("options", serde_json::to_value(options).unwrap_or_default())],
+                );
             }
             Choice::SelectLiveSuccess {
                 options,
                 description,
                 ..
             } => {
-                if let Some(obj) = json.as_object_mut() {
-                    if let Some(inner) = obj.remove("SelectLiveSuccess") {
-                        if let Some(mut fields) = inner.as_object().cloned() {
-                            fields.insert("title".into(), Value::String(description.clone()));
-                            fields.insert(
-                                "options".into(),
-                                serde_json::to_value(options).unwrap_or_default(),
-                            );
-                            *obj = fields;
-                        }
-                    }
-                }
+                flatten_choice(
+                    &mut json,
+                    "SelectLiveSuccess",
+                    description,
+                    &[("options", serde_json::to_value(options).unwrap_or_default())],
+                );
             }
         }
         // Inject bilingual prompts from Choice-level description_en/description_ja
