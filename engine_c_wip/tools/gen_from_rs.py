@@ -11,12 +11,15 @@ NOTE: src/core card.c uses functions defined in engine/src/core/card.rs
 Card::short_label, etc.). When card.rs is updated, the corresponding C
 implementations in card.c must be updated manually — this script only handles
 the bytecode/string tables from abilities_gen.rs, not card.rs logic.
+"""
 import re, sys, pathlib
 
+ROOT = pathlib.Path(__file__).resolve().parents[2]
 SRC = pathlib.Path(sys.argv[1]) if len(sys.argv) > 1 else \
-    pathlib.Path(__file__).resolve().parents[1] / "cards" / "build" / "abilities_gen.rs"
-OUT = pathlib.Path(__file__).resolve().parents[1] / "src" / "gen_data.c"
-HDR = pathlib.Path(__file__).resolve().parents[1] / "src" / "gen_data.h"
+    ROOT / "cards" / "build" / "abilities_gen.rs"
+GEN_DIR = pathlib.Path(__file__).resolve().parents[1] / "src" / "core" / "generated"
+OUT = GEN_DIR / "gen_data.c"
+HDR = GEN_DIR / "gen_data.h"
 
 
 def grab_array(text, name):

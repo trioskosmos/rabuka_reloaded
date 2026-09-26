@@ -7,8 +7,11 @@ This avoids sizeof() on unsized extern chunk arrays.
 """
 import re, pathlib
 
-SRC = pathlib.Path(__file__).resolve().parents[1] / "src" / "bytecode_data.c"
-OUT = pathlib.Path(__file__).resolve().parents[1] / "src" / "bytecode_blob.c"
+GEN_DIR = pathlib.Path(__file__).resolve().parents[1] / "src" / "core" / "generated"
+BUILD_SRC = pathlib.Path(__file__).resolve().parents[2] / "cards" / "build" / "bytecode_data.c"
+LOCAL_SRC = pathlib.Path(__file__).resolve().parents[1] / "src" / "bytecode_data.c"
+SRC = BUILD_SRC if BUILD_SRC.exists() else LOCAL_SRC
+OUT = GEN_DIR / "bytecode_blob.c"
 
 text = SRC.read_text(encoding="utf-8", errors="replace")
 # match: const unsigned char BYTECODE_C0[29942] = { 0x.., ... };
