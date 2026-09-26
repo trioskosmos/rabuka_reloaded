@@ -63,23 +63,27 @@ src/cards.bin: $(CARDS_BIN)
 src/abilities_strings.bin: $(STRINGS_BIN)
 	cp -f $(STRINGS_BIN) $@
 
-# Generic rule: any tests/test_<name>.c is runnable as `make t_<name>`.
-# This keeps new test files off the Makefile's critical path so parallel
-# contributors never have to share one file.
-$(TARGET)_t_%: $(OBJ_LIB) tests/test_%.c
-	$(CC) $(CFLAGS) -o $@ $(OBJ_LIB) tests/test_%.c
+# Build + run one test suite:  make t T=<stem>   (uses tests/test_<stem>.c)
+# This is an explicit target rather than a pattern rule so that adding a test
+# file never requires editing the Makefile and never depends on pattern-rule
+# matching (this toolchain's GNU Make 4.4.1 fails to match pattern rules that
+# carry prerequisites, which is exactly the shape a test rule needs).
+.PHONY: t
+t: $(OBJ_LIB)
+	@test -f tests/test_$(T).c || { echo "no such test: tests/test_$(T).c"; exit 2; }
+	$(CC) $(CFLAGS) -o $(TARGET)_t_$(T) $(OBJ_LIB) tests/test_$(T).c
+	./$(TARGET)_t_$(T)
 
-t_%: $(TARGET)_t_%
-	./$(TARGET)_t_$*
-
-# Build + run every tests/test_*.c that has a main().
-TEST_STEMS := $(patsubst tests/%.c,%,$(wildcard tests/test_*.c))
+# Build + run every tests/test_*.c that has a main(). Logs land in tests/*.log.
 .PHONY: run-all-tests
-run-all-tests: $(addprefix $(TARGET)_t_,$(TEST_STEMS))
+run-all-tests: $(OBJ_LIB)
 	@fail=0; \
-	for t in $(TEST_STEMS); do \
-	  echo "=== $$t ==="; \
-	  ./$(TARGET)_t_$$t >/dev/null 2>tests/$$t.log || { echo "  RED: see tests/$$t.log"; fail=1; }; \
+	for f in tests/test_*.c; do \
+	  stem=`basename $$f .c`; stem=$${stem#test_}; \
+	  $(CC) $(CFLAGS) -o $(TARGET)_t_$$stem $(OBJ_LIB) $$f 2>tests/$$stem.log \
+	    || { echo "BUILD RED: $$stem"; fail=1; continue; }; \
+	  ./$(TARGET)_t_$$stem >tests/$$stem.log 2>&1 \
+	    || { echo "RED: $$stem (tests/$$stem.log)"; fail=1; }; \
 	done; \
 	if [ $$fail -eq 0 ]; then echo "ALL SUITES GREEN"; else echo "SOME SUITES RED"; fi; \
 	exit $$fail
