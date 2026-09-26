@@ -34,6 +34,10 @@ struct Options {
     audit: Option<PathBuf>,
     snapshots: Option<PathBuf>,
     compare: Option<PathBuf>,
+    /// Per-game outcome log, so two runs on the same seed can be paired.
+    outcomes: Option<PathBuf>,
+    /// Paired significance test of this run against a baseline outcome log.
+    vs: Option<PathBuf>,
     trace: bool,
     logs: bool,
 }
@@ -46,6 +50,8 @@ impl Options {
         let mut audit = None;
         let mut snapshots = None;
         let mut compare = None;
+        let mut outcomes = None;
+        let mut vs = None;
         let mut trace = false;
         let mut logs = false;
         let mut args = args.iter();
@@ -53,7 +59,8 @@ impl Options {
             match arg.as_str() {
                 "--trace" => trace = true,
                 "--logs" => logs = true,
-                "--games" | "--seed" | "--audit" | "--snapshots" | "--compare" => {
+                "--games" | "--seed" | "--audit" | "--snapshots" | "--compare" | "--outcomes"
+                | "--vs" => {
                     let value = args
                         .next()
                         .filter(|v| !v.starts_with("--"))
@@ -63,6 +70,8 @@ impl Options {
                         "--seed" => seed = value.parse::<u32>()?,
                         "--snapshots" => snapshots = Some(PathBuf::from(value)),
                         "--compare" => compare = Some(PathBuf::from(value)),
+                        "--outcomes" => outcomes = Some(PathBuf::from(value)),
+                        "--vs" => vs = Some(PathBuf::from(value)),
                         _ => audit = Some(PathBuf::from(value)),
                     }
                 }
@@ -79,11 +88,25 @@ impl Options {
         if games == Some(0) || seed == 0 {
             return Err("game count and seed must be positive".into());
         }
-        if (audit.is_some() || snapshots.is_some()) && games.is_none() {
-            return Err("--audit and --snapshots require --games N or ARENA_GAMES=N".into());
+        if (audit.is_some() || snapshots.is_some() || outcomes.is_some()) && games.is_none() {
+            return Err(
+                "--audit, --snapshots and --outcomes require --games N or ARENA_GAMES=N".into(),
+            );
+        }
+        // A paired test is only meaningful on a fixed game count: in
+        // wall-clock mode `n` differs between runs, the per-game joins stop
+        // lining up, and every number produced is unreproducible.
+        if vs.is_some() && games.is_none() {
+            return Err("--vs requires a fixed --games N so the two runs pair game-for-game".into());
         }
         if compare.is_some()
-            && (audit.is_some() || snapshots.is_some() || !positional.is_empty() || trace || logs)
+            && (audit.is_some()
+                || snapshots.is_some()
+                || outcomes.is_some()
+                || vs.is_some()
+                || !positional.is_empty()
+                || trace
+                || logs)
         {
             return Err("--compare PATH is a standalone exact-state diagnostic mode".into());
         }
@@ -113,6 +136,8 @@ impl Options {
             audit,
             snapshots,
             compare,
+            outcomes,
+            vs,
             trace,
             logs,
         })
@@ -129,6 +154,225 @@ impl Options {
 fn game_seeds(base: u32, game: u32) -> (u32, u64) {
     let engine = ((u64::from(base) - 1 + u64::from(game) - 1) % u64::from(u32::MAX) + 1) as u32;
     (engine, 0x5EED_1234_ABCD_0001 ^ u64::from(engine))
+}
+
+// -- Paired A/B significance ------------------------------------------------
+//
+// The deal for game N is a pure function of (--seed, N), so two runs on the
+// same seed face IDENTICAL shuffles. That makes the comparison paired, and a
+// paired test is far more sensitive than two independent win-rate tallies:
+// it throws away the between-game variance and only looks at the games where
+// the two policies actually disagreed. Independent-tally noise is what made
+// +/-2pp results unfalsifiable for this project (docs/BOT_STRATEGY.md 9.2
+// shipped "+10" while discarding deltas of the same size).
+
+/// One game's outcome, from P1's perspective. This is the unit of pairing.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct GameOutcome {
+    engine_seed: u32,
+    z1: u8,
+    z2: u8,
+    /// +1 P1 reached 3 first, -1 P2 did, 0 neither reached 3 (draw/stall).
+    result: i8,
+    turns: u8,
+}
+
+fn classify(z1: usize, z2: usize) -> i8 {
+    if z1 >= 3 && z2 <= 2 {
+        1
+    } else if z2 >= 3 && z1 <= 2 {
+        -1
+    } else {
+        0
+    }
+}
+
+/// Log-factorials up to `n`, so the binomial tail can be summed in log space
+/// without ever materialising a huge integer.
+fn log_factorials(n: u64) -> Vec<f64> {
+    let mut lf = Vec::with_capacity(n as usize + 1);
+    lf.push(0.0);
+    let mut acc = 0.0f64;
+    for i in 1..=n {
+        acc += (i as f64).ln();
+        lf.push(acc);
+    }
+    lf
+}
+
+/// Exact two-sided McNemar p-value. Under H0 (the two policies are
+/// interchangeable) the discordant pairs split Binomial(b + c, 1/2).
+fn mcnemar_exact_p(b: u64, c: u64) -> f64 {
+    let n = b + c;
+    if n == 0 {
+        return 1.0;
+    }
+    let lf = log_factorials(n);
+    let m = b.min(c);
+    let mut tail = 0.0f64;
+    for k in 0..=m {
+        let k = k as usize;
+        let coeff = (lf[n as usize] - lf[k] - lf[n as usize - k]).exp();
+        tail += coeff / 2f64.powi(n as i32);
+    }
+    (2.0 * tail).min(1.0)
+}
+
+/// Wilson score interval on a proportion, which behaves near 0 and 1 where the
+/// normal approximation does not.
+fn wilson_interval(successes: u64, trials: u64) -> (f64, f64) {
+    if trials == 0 {
+        return (0.0, 0.0);
+    }
+    let n = trials as f64;
+    let p = successes as f64 / n;
+    let z = 1.959_963_984_540_054_f64; // 95%
+    let denom = 1.0 + z * z / n;
+    let centre = p + z * z / (2.0 * n);
+    let margin = z * ((p * (1.0 - p) / n) + z * z / (4.0 * n * n)).sqrt();
+    ((centre - margin) / denom, (centre + margin) / denom)
+}
+
+fn write_outcomes(path: &PathBuf, rows: &[GameOutcome]) -> ArenaResult<()> {
+    if let Some(parent) = path.parent() {
+        if !parent.as_os_str().is_empty() {
+            std::fs::create_dir_all(parent)?;
+        }
+    }
+    let mut out = String::from("game,engine_seed,success_p1,success_p2,result,turns\n");
+    for (i, r) in rows.iter().enumerate() {
+        out.push_str(&format!(
+            "{},{},{},{},{},{}\n",
+            i + 1,
+            r.engine_seed,
+            r.z1,
+            r.z2,
+            r.result,
+            r.turns
+        ));
+    }
+    std::fs::write(path, out)?;
+    Ok(())
+}
+
+fn read_outcomes(path: &PathBuf) -> ArenaResult<Vec<GameOutcome>> {
+    let text = std::fs::read_to_string(path)
+        .map_err(|e| format!("cannot read outcomes {}: {e}", path.display()))?;
+    let mut rows = Vec::new();
+    for (n, line) in text.lines().enumerate() {
+        if n == 0 || line.trim().is_empty() {
+            continue;
+        }
+        let f: Vec<&str> = line.split(',').collect();
+        if f.len() < 6 {
+            return Err(format!("malformed outcomes line {}: {line}", n + 1).into());
+        }
+        rows.push(GameOutcome {
+            engine_seed: f[1].parse()?,
+            z1: f[2].parse()?,
+            z2: f[3].parse()?,
+            result: f[4].parse()?,
+            turns: f[5].parse()?,
+        });
+    }
+    Ok(rows)
+}
+
+/// Paired comparison of this run against a baseline, joined on engine seed.
+/// Prints the discordant table, the exact test, and an interval on the
+/// decisive-rate difference. This is the number a change should be judged on.
+fn report_paired(baseline: &[GameOutcome], candidate: &[GameOutcome], base_label: &str) {
+    let by_seed: std::collections::HashMap<u32, &GameOutcome> =
+        baseline.iter().map(|r| (r.engine_seed, r)).collect();
+    let mut joined = 0u64;
+    let mut seed_mismatch = 0u64;
+    // Discordant: (baseline wins / candidate loses) and the reverse.
+    let mut b_only = 0u64;
+    let mut c_only = 0u64;
+    let mut both_win = 0u64;
+    let mut both_lose = 0u64;
+    let mut both_draw = 0u64;
+    let mut base_decisive = 0u64;
+    let mut cand_decisive = 0u64;
+
+    for c in candidate {
+        let Some(b) = by_seed.get(&c.engine_seed) else {
+            seed_mismatch += 1;
+            continue;
+        };
+        joined += 1;
+        if b.result != 0 {
+            base_decisive += 1;
+        }
+        if c.result != 0 {
+            cand_decisive += 1;
+        }
+        match (b.result, c.result) {
+            (0, 0) => both_draw += 1,
+            (x, y) if x == y => {
+                if x > 0 {
+                    both_win += 1;
+                } else {
+                    both_lose += 1;
+                }
+            }
+            (x, y) => {
+                // x is the baseline's sign, y the candidate's.
+                let baseline_won = x > 0;
+                let candidate_won = y > 0;
+                if baseline_won && !candidate_won {
+                    b_only += 1;
+                } else if !baseline_won && candidate_won {
+                    c_only += 1;
+                } else {
+                    // One side decided, the other drew.
+                    if baseline_won {
+                        b_only += 1;
+                    } else {
+                        c_only += 1;
+                    }
+                }
+            }
+        }
+    }
+
+    let p = mcnemar_exact_p(b_only, c_only);
+    let (blo, bhi) = wilson_interval(base_decisive, joined);
+    let (clo, chi) = wilson_interval(cand_decisive, joined);
+
+    println!("PAIRED A/B (joined on engine seed = identical deal)");
+    println!("  baseline : {base_label}");
+    println!(
+        "  joined games {joined} | unpaired (seed absent from baseline) {seed_mismatch}"
+    );
+    println!("  concordant: both win {both_win} | both lose {both_lose} | both draw {both_draw}");
+    println!("  DISCORDANT: baseline-only {b_only} | candidate-only {c_only}");
+    println!(
+        "  decisive rate  baseline {:.1}% [{:.1}, {:.1}]   candidate {:.1}% [{:.1}, {:.1}]",
+        100.0 * base_decisive as f64 / joined.max(1) as f64,
+        100.0 * blo,
+        100.0 * bhi,
+        100.0 * cand_decisive as f64 / joined.max(1) as f64,
+        100.0 * clo,
+        100.0 * chi
+    );
+    let swing = 100.0
+        * (cand_decisive as f64 - base_decisive as f64)
+        / joined.max(1) as f64;
+    println!("  decisive-rate swing: {:+.2} pp", swing);
+    println!("  exact McNemar two-sided p = {p:.5}");
+    println!(
+        "  VERDICT: {}",
+        if p < 0.05 {
+            if swing > 0.0 {
+                "SIGNIFICANT IMPROVEMENT"
+            } else {
+                "SIGNIFICANT REGRESSION"
+            }
+        } else {
+            "no significant difference (do not ship a change on this evidence)"
+        }
+    );
 }
 
 fn audit_card(db: &CardDatabase, id: i16) -> Value {
@@ -653,7 +897,9 @@ fn compare_position(saved: &SavedPosition, templates: &CardDatabase) -> ArenaRes
         "score_semantics": "final native policy score after Pass override, not win probability; nonfinite values are null",
         "view": audit_view(&gs), "available_actions": available, "bots": bots,
         "engine_rng": saved.engine_rng, "arena_rng": saved.arena_rng.to_string(),
-        "policy_environment": std::env::vars().filter(|(key, _)| key.starts_with("V6_") || key.starts_with("V7_")).collect::<std::collections::BTreeMap<_, _>>(),
+                        "policy_environment": std::env::vars().filter(|(key, _)| {
+                            key.starts_with("V6_") || key.starts_with("V7_") || key.starts_with("V8_")
+                        }).collect::<std::collections::BTreeMap<_, _>>(),
     }))
 }
 
@@ -817,14 +1063,17 @@ fn load_test_deck(db: &Arc<CardDatabase>, name: &str) -> Vec<String> {
         let deck = deck_parser::DeckParser::parse_deck_file(&deck_path).expect("parse deck");
         return deck_parser::DeckParser::deck_list_to_card_numbers(&deck);
     }
-    // Fallback: synthesize a legal-ish deck of distinct member/live cards.
-    let mut nums: Vec<String> = Vec::new();
-    for card in db.cards.values() {
-        if !matches!(card.card_type, rabuka_engine::card::CardType::Energy) && nums.len() < 60 {
-            nums.push(card.card_no.to_string());
-        }
-    }
-    nums
+    // Previously this fell back to a synthesized 60-card list. That was a
+    // measurement trap: a mistyped deck name produced a plausible-looking
+    // mirror match on a deck nobody asked for, and every number derived from
+    // it was silently about the wrong game. Fail instead.
+    let _ = db;
+    panic!(
+        "deck not found: {}\n\
+         A missing deck is a hard error, not a fallback: every win rate measured \
+         against a synthesized list describes a different game than the one you asked for.",
+        deck_path.display()
+    );
 }
 
 fn build_templates(
@@ -974,6 +1223,17 @@ fn main() -> ArenaResult<()> {
     let mut main_phase_count = 0u64;
     let mut empty_main_count = 0u64;
     let t0 = std::time::Instant::now();
+    // Fixed-n runs are reproducible and pairable; wall-clock runs are not.
+    // Say so loudly rather than letting a number escape without its caveat.
+    if options.games.is_none() {
+        eprintln!(
+            "ARENA WARNING: no --games given, so this run stops on a {}-second wall clock.\n\
+             \x20           Game count will differ between runs, results are NOT reproducible,\n\
+             \x20           and no paired significance test is possible. Pass --games N.",
+            options.budget
+        );
+    }
+    let mut outcome_rows: Vec<GameOutcome> = Vec::new();
     let mut trace_rows: Vec<String> = Vec::new();
     let mut game_start_idx = 0usize;
     if trace {
@@ -1139,7 +1399,9 @@ fn main() -> ArenaResult<()> {
                         "split_rule": "game_seed modulo 5 == 0: holdout; otherwise train",
                         "sampling": "first eligible Main decision per player turn; at most 20 per game",
                         "deck": deck_name, "bots": [p1_kind.name(), p2_kind.name()],
-                        "policy_environment": std::env::vars().filter(|(key, _)| key.starts_with("V6_") || key.starts_with("V7_")).collect::<std::collections::BTreeMap<_, _>>(),
+        "policy_environment": std::env::vars().filter(|(key, _)| {
+            key.starts_with("V6_") || key.starts_with("V7_") || key.starts_with("V8_")
+        }).collect::<std::collections::BTreeMap<_, _>>(),
                     });
                     let saved = SavedPosition::capture(&gs, &rng, metadata)?;
                     let restored = saved.restore(&db)?;
@@ -1380,6 +1642,13 @@ fn main() -> ArenaResult<()> {
         if matches!(gs.game_result, GameResult::Ongoing) {
             stuck_ends += 1;
         }
+        outcome_rows.push(GameOutcome {
+            engine_seed,
+            z1: z1.min(255) as u8,
+            z2: z2.min(255) as u8,
+            result: classify(z1, z2),
+            turns: gs.turn_number.min(255),
+        });
 
         if logs {
             let dir = std::path::Path::new("../test_output/arena_logs");
@@ -1490,6 +1759,19 @@ fn main() -> ArenaResult<()> {
         live_decisions,
         live_fold_rate * 100.0,
     );
+    if let Some(path) = &options.outcomes {
+        write_outcomes(path, &outcome_rows)?;
+        eprintln!("outcomes written to {}", path.display());
+    }
+    if let Some(path) = &options.vs {
+        let baseline = read_outcomes(path)?;
+        let label = path
+            .file_name()
+            .map(|s| s.to_string_lossy().to_string())
+            .unwrap_or_else(|| path.display().to_string());
+        println!();
+        report_paired(&baseline, &outcome_rows, &label);
+    }
     if trace {
         let path = std::path::Path::new("../test_output/bot_arena_trace.csv");
         std::fs::create_dir_all(path.parent().unwrap())?;
@@ -1503,6 +1785,100 @@ fn main() -> ArenaResult<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // -- Paired-statistics tests. These pin the machinery that every
+    // "v8 change is an improvement" claim will rest on, so they check against
+    // values that can be verified by hand.
+
+    /// With no discordant pairs there is nothing to test.
+    #[test]
+    fn mcnemar_is_one_when_nothing_discords() {
+        assert_eq!(mcnemar_exact_p(0, 0), 1.0);
+    }
+
+    /// All discordant pairs going one way is the strongest possible result:
+    /// P = 2 * (1/2)^n, doubled and clamped at 1.
+    #[test]
+    fn mcnemar_matches_hand_computed_values() {
+        // 1-0 split, n=1: 2 * 0.5 = 1.0
+        assert!((mcnemar_exact_p(1, 0) - 1.0).abs() < 1e-12);
+        // 2-0 split, n=2: 2 * (1/4) = 0.5
+        assert!((mcnemar_exact_p(2, 0) - 0.5).abs() < 1e-12);
+        // 3-0 split, n=3: 2 * (1/8) = 0.25
+        assert!((mcnemar_exact_p(3, 0) - 0.25).abs() < 1e-12);
+        // 5-0 split, n=5: 2 * (1/32) = 0.0625
+        assert!((mcnemar_exact_p(5, 0) - 0.0625).abs() < 1e-12);
+        // 6-3 split, n=9. P(X<=3) = (1+9+36+84)/512 = 130/512, doubled.
+        assert!((mcnemar_exact_p(6, 3) - 0.507_812_5).abs() < 1e-6);
+    }
+
+    /// The test is symmetric and peaks at an even split: no signal, p = 1.
+    #[test]
+    fn mcnemar_is_symmetric_and_peaks_at_an_even_split() {
+        assert!((mcnemar_exact_p(7, 3) - mcnemar_exact_p(3, 7)).abs() < 1e-12);
+        assert!((mcnemar_exact_p(4, 4) - 1.0).abs() < 1e-12);
+    }
+
+    /// Enough discordant pairs the same way should clear p < 0.05, which is
+    /// the bar a change has to pass to be shippable - and a near-even split
+    /// must not.
+    #[test]
+    fn mcnemar_reaches_significance_on_a_real_skew() {
+        // 70-30 of 100 discordant games: about p = 1e-4.
+        assert!(mcnemar_exact_p(70, 30) < 0.001);
+        // 55-45 of 100: about p = 0.37, not a finding.
+        assert!(mcnemar_exact_p(55, 45) > 0.05);
+        assert!(mcnemar_exact_p(100, 100) >= 0.05);
+    }
+
+    /// Wilson interval must stay inside [0,1] and must actually exclude 0.5
+    /// when the observed rate is far enough from it - the property a normal
+    /// approximation gets wrong at the extremes.
+    #[test]
+    fn wilson_interval_brackets_the_estimate_and_excludes_half() {
+        let (lo, hi) = wilson_interval(700, 1000);
+        assert!(lo < 0.7 && hi > 0.7);
+        assert!(lo > 0.5);
+        let (lo, hi) = wilson_interval(10, 1000);
+        assert!(lo >= 0.0 && hi < 0.05);
+        let (lo, hi) = wilson_interval(0, 0);
+        assert_eq!((lo, hi), (0.0, 0.0));
+    }
+
+    /// Scoring must follow the engine rule 1.2.1.1 / 1.2.1.2 exactly, so the
+    /// paired test classifies the same states the arena tallies.
+    #[test]
+    fn classify_follows_the_success_zone_rule() {
+        assert_eq!(classify(3, 2), 1);
+        assert_eq!(classify(3, 0), 1);
+        assert_eq!(classify(2, 3), -1);
+        assert_eq!(classify(3, 3), 0, "mutual 3-3 is a draw game");
+        assert_eq!(classify(2, 2), 0, "neither reached 3");
+        assert_eq!(classify(1, 0), 0);
+    }
+
+    /// The deal for game N must be a pure function of (seed, N), or pairing is
+    /// meaningless. This is the assumption the whole A/B design rests on.
+    #[test]
+    fn game_seeds_are_a_pure_function_of_seed_and_index() {
+        assert_eq!(game_seeds(11, 1), game_seeds(11, 1));
+        assert_ne!(game_seeds(11, 1).0, game_seeds(11, 2).0);
+        assert_ne!(game_seeds(11, 1).0, game_seeds(12, 1).0);
+    }
+
+    /// A paired test is only meaningful on a fixed game count.
+    #[test]
+    fn paired_mode_requires_a_fixed_game_count() {
+        let Err(err) = Options::parse(&args(&["v8", "v7", "10", "--vs", "base.csv"]), None) else {
+            panic!("--vs without --games must be rejected");
+        };
+        assert!(err.to_string().contains("--vs"), "got: {err}");
+        assert!(Options::parse(
+            &args(&["v8", "v7", "10", "--games", "100", "--vs", "base.csv"]),
+            None
+        )
+        .is_ok());
+    }
 
     fn args(values: &[&str]) -> Vec<String> {
         values.iter().map(|s| s.to_string()).collect()
