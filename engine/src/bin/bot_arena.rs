@@ -6,13 +6,12 @@
 //! Moved out of tests/test_modules/strategy_bot_test.rs  Ethis is a
 //! benchmark/arena, not a unit test. Run it when you want numbers.
 
+use rabuka_engine::bin_common::{fresh_database, load_deck};
 use rabuka_engine::bot::{
     encoding::ActionEncoding, neural::PolicyNet, registry::BotKind, strategy_v2, strategy_v3,
     strategy_v6, strategy_v7, strategy_v8, PublicObservation,
 };
 use rabuka_engine::card::CardDatabase;
-use rabuka_engine::card_loader;
-use rabuka_engine::deck_parser;
 use rabuka_engine::game_setup;
 use rabuka_engine::game_state::{GameResult, GameState, Phase};
 use rabuka_engine::turn::TurnEngine;
@@ -1260,31 +1259,6 @@ impl DecisionAudit {
 /// means a new variant + dispatch lines there, never renames here.
 use rabuka_engine::rng::Lcg;
 
-fn fresh_database() -> Arc<CardDatabase> {
-    let cards_path = std::path::Path::new("../cards/cards.json");
-    let cards = card_loader::CardLoader::load_cards_from_file(cards_path).expect("load cards");
-    Arc::new(CardDatabase::load_or_create(cards))
-}
-
-fn load_test_deck(db: &Arc<CardDatabase>, name: &str) -> Vec<String> {
-    let deck_path = std::path::Path::new("../web_ui/decks").join(format!("{name}.txt"));
-    if deck_path.exists() {
-        let deck = deck_parser::DeckParser::parse_deck_file(&deck_path).expect("parse deck");
-        return deck_parser::DeckParser::deck_list_to_card_numbers(&deck);
-    }
-    // Previously this fell back to a synthesized 60-card list. That was a
-    // measurement trap: a mistyped deck name produced a plausible-looking
-    // mirror match on a deck nobody asked for, and every number derived from
-    // it was silently about the wrong game. Fail instead.
-    let _ = db;
-    panic!(
-        "deck not found: {}\n\
-         A missing deck is a hard error, not a fallback: every win rate measured \
-         against a synthesized list describes a different game than the one you asked for.",
-        deck_path.display()
-    );
-}
-
 fn build_templates(
     db: &mut Arc<CardDatabase>,
     n1: &[String],
@@ -1397,7 +1371,7 @@ fn main() -> ArenaResult<()> {
     let kind_name = |k: BotKind| k.name();
 
     let mut db = fresh_database();
-    let nums = load_test_deck(&db, deck_name);
+    let nums = load_deck(deck_name);
     eprintln!(
         "ARENA deck={} entries={} distinct={}",
         deck_name,
@@ -2429,7 +2403,7 @@ mod tests {
     #[test]
     fn confusable_deck_line_resolves_consistently_and_audit_exposes_card_no() {
         let db = fresh_database();
-        let deck = load_test_deck(&db, "5CP3Z idou");
+        let deck = load_deck("5CP3Z idou");
         let requested: Vec<&String> = deck
             .iter()
             .filter(|n| n.to_uppercase().contains("BP4-011"))
@@ -2481,7 +2455,7 @@ mod tests {
         let _restore_rng = RngRestore(rabuka_engine::rng::checkpoint());
         rabuka_engine::rng::seed(17);
         let mut db = fresh_database();
-        let nums = load_test_deck(&db, "5CP3Z idou");
+        let nums = load_deck("5CP3Z idou");
         let (t1, t2) = build_templates(&mut db, &nums, &nums);
         let mut gs = deal_from_templates(&db, &t1, &t2);
         let mut setup_rng = Lcg(17321);

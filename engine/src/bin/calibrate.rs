@@ -7,50 +7,14 @@
 //!   - FULL-MEAN (1.0× flip credit)
 //! Reports confusion matrices vs empirical outcomes.
 
+use rabuka_engine::bin_common::{deal_default_game, fresh_database, load_deck};
 use rabuka_engine::bot::{strategy_v2, strategy_v3, strategy_v4};
 use rabuka_engine::card::{CardDatabase, HeartColor, HeartMap, CardType};
 use rabuka_engine::player::Player;
-use rabuka_engine::card_loader;
-use rabuka_engine::deck_parser;
 use rabuka_engine::game_setup;
 use rabuka_engine::game_state::{GameResult, GameState, Phase};
 use rabuka_engine::rng::Lcg;
 use rabuka_engine::turn::TurnEngine;
-use std::sync::Arc;
-
-fn fresh_database() -> Arc<CardDatabase> {
-    let cards_path = std::path::Path::new("../cards/cards.json");
-    let cards = card_loader::CardLoader::load_cards_from_file(cards_path).expect("load cards");
-    Arc::new(CardDatabase::load_or_create(cards))
-}
-
-fn load_deck(name: &str) -> Vec<String> {
-    let p = std::path::Path::new("../web_ui/decks").join(format!("{name}.txt"));
-    let deck = deck_parser::DeckParser::parse_deck_file(&p).expect("parse deck");
-    deck_parser::DeckParser::deck_list_to_card_numbers(&deck)
-}
-
-fn deal(
-    db: &Arc<CardDatabase>,
-    t1: &rabuka_engine::deck_builder::Deck,
-    t2: &rabuka_engine::deck_builder::Deck,
-) -> GameState {
-    let mut d1 = t1.clone();
-    let mut d2 = t2.clone();
-    d1.shuffle_main_deck();
-    d1.shuffle_energy_deck();
-    d2.shuffle_main_deck();
-    d2.shuffle_energy_deck();
-    let mut p1 = rabuka_engine::player::Player::new("p1".into(), "P1".into(), true);
-    let mut p2 = rabuka_engine::player::Player::new("p2".into(), "P2".into(), false);
-    p1.set_main_deck(d1.main_deck);
-    p1.set_energy_deck(d1.energy_deck);
-    p2.set_main_deck(d2.main_deck);
-    p2.set_energy_deck(d2.energy_deck);
-    let mut gs = GameState::new(p1, p2, Arc::clone(db));
-    game_setup::setup_game(&mut gs);
-    gs
-}
 
 type Acc = [i32; 11];
 
@@ -270,7 +234,7 @@ fn main() {
     'games: for game in 1..=5000u32 {
         // budget handled by start_time() anchor below
         // time budget check below instead
-        let mut gs = deal(&db, &t1, &t2);
+        let mut gs = deal_default_game(&db, &t1, &t2);
         let plan_p1 = strategy_v3::V3Plan::detect(&gs, 0, &db);
         let mut last_turn = 0u8;
         let mut stuck = 0u32;

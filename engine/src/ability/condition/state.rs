@@ -2,7 +2,7 @@ use super::ConditionContext;
 use crate::ability::enums::Zone;
 use crate::ability::util;
 use crate::ability::util::compare_counts;
-use crate::card::{CardProperty, Condition};
+use crate::card::{CardProperty, Condition, TriggerEvent};
 use crate::core::constants::U8Count;
 use crate::game_state::Phase;
 use crate::HashSet;
@@ -580,6 +580,251 @@ impl<'a> ConditionContext<'a> {
         })
     }
 
+    /// A cost-limited 「〜何人かのカードが動いた場合」 condition is satisfied
+    /// when at least one recently moved card's cost compares as the limit says.
+    /// A missing move log fails the condition rather than passing it: a
+    /// condition about movement cannot be true when nothing moved.
+    fn moved_cards_match_cost_limit(&self, condition: &Condition) -> bool {
+        let Some(cost_limit) = condition.get_cost_limit() else {
+            return true;
+        };
+        let op = condition
+            .get_cost_limit_operator()
+            .map(|o| o.as_str())
+            .unwrap_or(">=");
+        let Some(moved) = self.game_state.recently_moved_cards.as_ref() else {
+            return false;
+        };
+        moved.iter().any(|&cid| {
+            self.game_state
+                .card_database
+                .get_card(cid)
+                .is_some_and(|c| c.cost.is_some_and(|cost| compare_counts(Some(op), cost, cost_limit)))
+        })
+    }
+
+    /// A 「バトンタッチした」 condition.
+    ///
+    /// The condition is written from the point of view of ONE member — the
+    /// one whose own ability declares the trigger. Which card the group's
+    /// qualifier (group_names / cost_limit / card_property) applies to depends
+    /// on where that member ended up: replaced members sit in a waitroom, so a
+    /// waitroom `location` means the qualifier describes the ARRIVING member,
+    /// while a stage `location` means it describes the REPLACED one.
+    fn evaluate_baton_touch_condition(
+        &self,
+        condition: &Condition,
+        te: Option<&TriggerEvent>,
+        location: &str,
+        player: &crate::player::Player,
+    ) -> bool {
+            let triggered = condition.get_baton_touch_trigger().unwrap_or(false);
+            if !triggered {
+                return false;
+            }
+            // Check per-player baton touch count
+            let player_id = player.id.as_str();
+            let bt_count = self.game_state.get_baton_touch_count(player_id);
+            if bt_count == 0 {
+                return false;
+            }
+            if let Some(min_count) = condition
+                .get_min_baton_touch_count()
+                .or_else(|| te.and_then(|t| t.min_count))
+            {
+                if bt_count < min_count {
+                    return false;
+                }
+            }
+            let replaced_id = match self.game_state.baton_touch_replaced_member_id {
+                Some(id) => id,
+                None => return false,
+            };
+            // Verify the baton touch belongs to this player: the replaced
+            // card must be in this player's waitroom (baton touch always
+            // moves the replaced member to the owner's waitroom).
+            let own_waitroom = if player_id == self.game_state.player1.id {
+                &self.game_state.player1.waitroom.cards
+            } else {
+                &self.game_state.player2.waitroom.cards
+            };
+            if !own_waitroom.contains(&replaced_id) {
+                return false;
+            }
+            if !location.is_empty() {
+                if Zone::from_str(location) == Some(Zone::Discard)
+                    || Zone::from_str(location) == Some(Zone::Waitroom)
+                {
+                    let in_discard = self
+                        .game_state
+                        .player1
+                        .waitroom
+                        .cards
+                        .contains(&replaced_id)
+                        || self
+                            .game_state
+                            .player2
+                            .waitroom
+                            .cards
+                            .contains(&replaced_id);
+                    if !in_discard {
+                        return false;
+                    }
+                }
+            }
+            if condition.get_exclude_self().unwrap_or(false)
+                && self.game_state.activating_card == Some(replaced_id)
+            {
+                return false;
+            }
+            // group_names and cost_limit may describe the arriving member
+            // ("baton touch WITH a X member") or the replaced member
+            // ("baton touch FROM a X member"). The location field determines
+            // which: if self is in discard (location=discard), self is the
+            // replaced member, so group/cost describe the ARRIVING member.
+            // If self is on stage (location=stage), self is the arriving
+            // member, so group/cost describe the REPLACED member.
+            let arriving_id = self.game_state.baton_touch_arriving_card_id;
+            let loc_discard = matches!(
+                Zone::from_str(location),
+                Some(Zone::Discard | Zone::Waitroom)
+            );
+            let check_id_for_group = if loc_discard {
+                // Self is replaced: group/cost describe the arriving member
+                arriving_id
+            } else {
+                // Self is arriving: group/cost describe the replaced member
+                Some(replaced_id)
+            };
+            if let Some(groups) = condition.get_group_names() {
+                if !groups.is_empty() {
+                    if let Some(check_card) = check_id_for_group {
+                        let group_ok = groups.iter().any(|g| {
+                            crate::ability::util::card_matches_group_str(
+                                &self.game_state.card_database,
+                                check_card,
+                                Some(g),
+                            )
+                        });
+                        if !group_ok {
+                            return false;
+                        }
+                    } else {
+                        return false;
+                    }
+                }
+            }
+            // ability_filter + card_type: apply to the same check_id as
+            // group_names (arriving or replaced member depending on location).
+            if let Some(check_card) = check_id_for_group {
+                if let Some(card) = self.game_state.card_database.get_card(check_card) {
+                    if let Some(af) = condition.get_ability_filter() {
+                        match &**af {
+                            "no_ability" => {
+                                if !card.abilities.is_empty() {
+                                    return false;
+                                }
+                            }
+                            "has_ability" => {
+                                if card.abilities.is_empty() {
+                                    return false;
+                                }
+                            }
+                            _ => {}
+                        }
+                    }
+                    if let Some(ct) = condition.get_card_type() {
+                        let card_type_ok = match ct.as_str() {
+                            "member_card" | "member" => card.is_member(),
+                            "live_card" => {
+                                matches!(card.card_type, crate::card::CardType::Live)
+                            }
+                            _ => true,
+                        };
+                        if !card_type_ok {
+                            return false;
+                        }
+                    }
+                } else {
+                    return false;
+                }
+            }
+            let bt_source = condition
+                .get_baton_touch_source()
+                .or_else(|| te.and_then(|t| t.source_character.as_deref()));
+            if let Some(source_name) = bt_source {
+                if let Some(card) = self.game_state.card_database.get_card(replaced_id) {
+                    let norm_name = crate::card::CardDatabase::normalize_name(&card.name);
+                    let norm_source = crate::card::CardDatabase::normalize_name(source_name);
+                    if !norm_name.contains(&norm_source) {
+                        return false;
+                    }
+                } else {
+                    return false;
+                }
+            }
+            if let Some(cost_limit) = condition.get_cost_limit() {
+                if let Some(check_card) = check_id_for_group {
+                    if let Some(card) = self.game_state.card_database.get_card(check_card) {
+                        let op = condition
+                            .get_cost_limit_operator()
+                            .map(|o| o.as_str())
+                            .unwrap_or(">=");
+                        if !card
+                            .cost
+                            .is_some_and(|cost| compare_counts(Some(op), cost, cost_limit))
+                        {
+                            return false;
+                        }
+                    } else {
+                        return false;
+                    }
+                } else {
+                    return false;
+                }
+            }
+            if let Some(prop) = condition.get_card_property() {
+                if let Some(check_card) = check_id_for_group {
+                    let has_prop = match prop {
+                        CardProperty::HasBladeHeart => self
+                            .game_state
+                            .card_database
+                            .get_card(check_card)
+                            .is_some_and(|c| c.has_blade_heart()),
+                        _ => false,
+                    };
+                    if condition.get_negation().unwrap_or(false) == has_prop {
+                        return false;
+                    }
+                }
+            }
+            let has_cost_comparison = condition.get_comparison_type() == Some("cost")
+                || te.is_some_and(|t| t.cost_comparison.is_some());
+            if has_cost_comparison {
+                if let Some(replaced_cost) = self.game_state.baton_touch_replaced_member_cost {
+                    if let Some(activating_id) = self.game_state.activating_card {
+                        if let Some(card) =
+                            self.game_state.card_database.get_card(activating_id)
+                        {
+                            if let Some(current_cost) = card.cost {
+                                let op = condition.get_operator().or_else(|| {
+                                    te.and_then(|t| {
+                                        t.cost_comparison
+                                            .as_ref()
+                                            .and_then(|cc| cc.operator.map(|o| o.as_str()))
+                                    })
+                                });
+                                if !compare_counts(op, replaced_cost, current_cost) {
+                                    return false;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            true
+    }
+
     pub(crate) fn evaluate_movement_condition(&self, condition: &Condition) -> bool {
         let movement = condition.get_movement().unwrap_or("");
         let te = condition.get_trigger_event();
@@ -592,33 +837,8 @@ impl<'a> ConditionContext<'a> {
 
         match movement {
             "moved" => {
-                let base_check = self.evaluate_has_moved(condition, &player);
-                if !base_check {
-                    return false;
-                }
-                if let Some(cost_limit) = condition.get_cost_limit() {
-                    let op = condition
-                        .get_cost_limit_operator()
-                        .map(|o| o.as_str())
-                        .unwrap_or(">=");
-                    if let Some(ref moved) = self.game_state.recently_moved_cards {
-                        if !moved.iter().any(|&cid| {
-                            self.game_state
-                                .card_database
-                                .get_card(cid)
-                                .is_some_and(|c| {
-                                    c.cost.is_some_and(|cost| {
-                                        compare_counts(Some(op), cost, cost_limit)
-                                    })
-                                })
-                        }) {
-                            return false;
-                        }
-                    } else {
-                        return false;
-                    }
-                }
-                true
+                self.evaluate_has_moved(condition, &player)
+                    && self.moved_cards_match_cost_limit(condition)
             }
             "position_change" => {
                 let pce_match = self.position_event_matches_filters(
@@ -658,242 +878,16 @@ impl<'a> ConditionContext<'a> {
                 } else {
                     false
                 };
-                if !pce_match && !tm_match {
-                    return false;
-                }
-                if let Some(cost_limit) = condition.get_cost_limit() {
-                    let op = condition
-                        .get_cost_limit_operator()
-                        .map(|o| o.as_str())
-                        .unwrap_or(">=");
-                    if let Some(ref moved) = self.game_state.recently_moved_cards {
-                        if !moved.iter().any(|&cid| {
-                            self.game_state
-                                .card_database
-                                .get_card(cid)
-                                .is_some_and(|c| {
-                                    c.cost.is_some_and(|cost| {
-                                        compare_counts(Some(op), cost, cost_limit)
-                                    })
-                                })
-                        }) {
-                            return false;
-                        }
-                    } else {
-                        return false;
-                    }
-                }
-                true
+                (pce_match || tm_match) && self.moved_cards_match_cost_limit(condition)
             }
             "notmoved" => true,
             "live_success" => self.game_state.live_success_triggered_this_turn,
-            "baton_touch" => {
-                let triggered = condition.get_baton_touch_trigger().unwrap_or(false);
-                if !triggered {
-                    return false;
-                }
-                // Check per-player baton touch count
-                let player_id = player.id.as_str();
-                let bt_count = self.game_state.get_baton_touch_count(player_id);
-                if bt_count == 0 {
-                    return false;
-                }
-                if let Some(min_count) = condition
-                    .get_min_baton_touch_count()
-                    .or_else(|| te.and_then(|t| t.min_count))
-                {
-                    if bt_count < min_count {
-                        return false;
-                    }
-                }
-                let replaced_id = match self.game_state.baton_touch_replaced_member_id {
-                    Some(id) => id,
-                    None => return false,
-                };
-                // Verify the baton touch belongs to this player: the replaced
-                // card must be in this player's waitroom (baton touch always
-                // moves the replaced member to the owner's waitroom).
-                let own_waitroom = if player_id == self.game_state.player1.id {
-                    &self.game_state.player1.waitroom.cards
-                } else {
-                    &self.game_state.player2.waitroom.cards
-                };
-                if !own_waitroom.contains(&replaced_id) {
-                    return false;
-                }
-                if !location.is_empty() {
-                    if Zone::from_str(location) == Some(Zone::Discard)
-                        || Zone::from_str(location) == Some(Zone::Waitroom)
-                    {
-                        let in_discard = self
-                            .game_state
-                            .player1
-                            .waitroom
-                            .cards
-                            .contains(&replaced_id)
-                            || self
-                                .game_state
-                                .player2
-                                .waitroom
-                                .cards
-                                .contains(&replaced_id);
-                        if !in_discard {
-                            return false;
-                        }
-                    }
-                }
-                if condition.get_exclude_self().unwrap_or(false)
-                    && self.game_state.activating_card == Some(replaced_id)
-                {
-                    return false;
-                }
-                // group_names and cost_limit may describe the arriving member
-                // ("baton touch WITH a X member") or the replaced member
-                // ("baton touch FROM a X member"). The location field determines
-                // which: if self is in discard (location=discard), self is the
-                // replaced member, so group/cost describe the ARRIVING member.
-                // If self is on stage (location=stage), self is the arriving
-                // member, so group/cost describe the REPLACED member.
-                let arriving_id = self.game_state.baton_touch_arriving_card_id;
-                let loc_discard = matches!(
-                    Zone::from_str(location),
-                    Some(Zone::Discard | Zone::Waitroom)
-                );
-                let check_id_for_group = if loc_discard {
-                    // Self is replaced: group/cost describe the arriving member
-                    arriving_id
-                } else {
-                    // Self is arriving: group/cost describe the replaced member
-                    Some(replaced_id)
-                };
-                if let Some(groups) = condition.get_group_names() {
-                    if !groups.is_empty() {
-                        if let Some(check_card) = check_id_for_group {
-                            let group_ok = groups.iter().any(|g| {
-                                crate::ability::util::card_matches_group_str(
-                                    &self.game_state.card_database,
-                                    check_card,
-                                    Some(g),
-                                )
-                            });
-                            if !group_ok {
-                                return false;
-                            }
-                        } else {
-                            return false;
-                        }
-                    }
-                }
-                // ability_filter + card_type: apply to the same check_id as
-                // group_names (arriving or replaced member depending on location).
-                if let Some(check_card) = check_id_for_group {
-                    if let Some(card) = self.game_state.card_database.get_card(check_card) {
-                        if let Some(af) = condition.get_ability_filter() {
-                            match &**af {
-                                "no_ability" => {
-                                    if !card.abilities.is_empty() {
-                                        return false;
-                                    }
-                                }
-                                "has_ability" => {
-                                    if card.abilities.is_empty() {
-                                        return false;
-                                    }
-                                }
-                                _ => {}
-                            }
-                        }
-                        if let Some(ct) = condition.get_card_type() {
-                            let card_type_ok = match ct.as_str() {
-                                "member_card" | "member" => card.is_member(),
-                                "live_card" => {
-                                    matches!(card.card_type, crate::card::CardType::Live)
-                                }
-                                _ => true,
-                            };
-                            if !card_type_ok {
-                                return false;
-                            }
-                        }
-                    } else {
-                        return false;
-                    }
-                }
-                let bt_source = condition
-                    .get_baton_touch_source()
-                    .or_else(|| te.and_then(|t| t.source_character.as_deref()));
-                if let Some(source_name) = bt_source {
-                    if let Some(card) = self.game_state.card_database.get_card(replaced_id) {
-                        let norm_name = crate::card::CardDatabase::normalize_name(&card.name);
-                        let norm_source = crate::card::CardDatabase::normalize_name(source_name);
-                        if !norm_name.contains(&norm_source) {
-                            return false;
-                        }
-                    } else {
-                        return false;
-                    }
-                }
-                if let Some(cost_limit) = condition.get_cost_limit() {
-                    if let Some(check_card) = check_id_for_group {
-                        if let Some(card) = self.game_state.card_database.get_card(check_card) {
-                            let op = condition
-                                .get_cost_limit_operator()
-                                .map(|o| o.as_str())
-                                .unwrap_or(">=");
-                            if !card
-                                .cost
-                                .is_some_and(|cost| compare_counts(Some(op), cost, cost_limit))
-                            {
-                                return false;
-                            }
-                        } else {
-                            return false;
-                        }
-                    } else {
-                        return false;
-                    }
-                }
-                if let Some(prop) = condition.get_card_property() {
-                    if let Some(check_card) = check_id_for_group {
-                        let has_prop = match prop {
-                            CardProperty::HasBladeHeart => self
-                                .game_state
-                                .card_database
-                                .get_card(check_card)
-                                .is_some_and(|c| c.has_blade_heart()),
-                            _ => false,
-                        };
-                        if condition.get_negation().unwrap_or(false) == has_prop {
-                            return false;
-                        }
-                    }
-                }
-                let has_cost_comparison = condition.get_comparison_type() == Some("cost")
-                    || te.is_some_and(|t| t.cost_comparison.is_some());
-                if has_cost_comparison {
-                    if let Some(replaced_cost) = self.game_state.baton_touch_replaced_member_cost {
-                        if let Some(activating_id) = self.game_state.activating_card {
-                            if let Some(card) =
-                                self.game_state.card_database.get_card(activating_id)
-                            {
-                                if let Some(current_cost) = card.cost {
-                                    let op = condition.get_operator().or_else(|| {
-                                        te.and_then(|t| {
-                                            t.cost_comparison
-                                                .as_ref()
-                                                .and_then(|cc| cc.operator.map(|o| o.as_str()))
-                                        })
-                                    });
-                                    if !compare_counts(op, replaced_cost, current_cost) {
-                                        return false;
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-                true
-            }
+            "baton_touch" => self.evaluate_baton_touch_condition(
+                condition,
+                te,
+                location,
+                &player,
+            ),
             "moves" => {
                 let self_effect_only = condition
                     .get_self_effect_only()

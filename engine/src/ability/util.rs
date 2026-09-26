@@ -1,6 +1,8 @@
 use crate::core::constants::U8Count;
 use super::enums::{ActionType, Zone};
-use crate::card::{parse_heart_color, Ability, AbilityFilter, CardDatabase, DistinctType, Operator};
+use crate::card::{
+    parse_heart_color, Ability, AbilityFilter, Card, CardDatabase, DistinctType, Operator,
+};
 use crate::{HashMap, HashSet};
 #[cfg(feature = "no_std")]
 use alloc::{
@@ -23,6 +25,17 @@ pub use selection::{classify_selection, get_selection_indices, resolve_selection
 
 // Labels, heart gains and constant per_unit live in `util/{labels,hearts}`.
 // (Bodies moved out; re-exported at the top of this file.)
+
+// ============== ABILITY FILTER MATCHING ==============
+/// What an ability filter that names a kind of trigger but lists no triggers
+/// degrades to. See `card_passes_ability_filter`.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum Unconstrained {
+    /// The filter cannot reject anything in that state.
+    Pass,
+    /// The card must still have some ability.
+    RequireAbility,
+}
 
 // ============== ABILITY ACTIVATION GATES ==============
 // Shared predicates for "can this ability be offered/activated": used by
@@ -1304,100 +1317,74 @@ impl<'a> CardFilter<'a> {
         true
     }
 
+    /// Does `card` satisfy one ability-filter branch?
+    ///
+    /// `unconstrained` is what a branch that names a kind of trigger but lists
+    /// no triggers degrades to. A standalone filter cannot reject anything in
+    /// that state; a branch of an OR list still requires the card to have some
+    /// ability, because the OTHER branches are what make the disjunction
+    /// meaningful — otherwise 「能力を持たない、またはOO」 would accept any
+    /// ability-less card for the wrong reason.
+    fn card_passes_ability_filter(
+        card: &Card,
+        ability_filter: Option<&str>,
+        triggers: Option<&[String]>,
+        unconstrained: Unconstrained,
+    ) -> bool {
+        let has_ability = !card.abilities.is_empty();
+        let unconstrained = match unconstrained {
+            Unconstrained::Pass => true,
+            Unconstrained::RequireAbility => has_ability,
+        };
+        let any_trigger = |wanted: &[String]| {
+            card.abilities.iter().any(|ar| {
+                ar.resolve()
+                    .triggers
+                    .as_ref()
+                    .is_some_and(|t| wanted.iter().any(|w| t.starts_with(w.as_str())))
+            })
+        };
+        match ability_filter.unwrap_or("") {
+            "no_ability" => !has_ability,
+            "has_ability" => has_ability,
+            "no_ability_type" => match triggers {
+                Some(excluded) if !excluded.is_empty() => !any_trigger(excluded),
+                _ => unconstrained,
+            },
+            "has_ability_type" => match triggers {
+                Some(included) if !included.is_empty() => any_trigger(included),
+                _ => unconstrained,
+            },
+            // An unrecognised filter name constrains nothing in either form.
+            _ => true,
+        }
+    }
+
     fn check_ability_filter(&self, db: &CardDatabase, id: i16) -> bool {
         // ability_filter: filter by presence/absence of abilities or trigger types
-        if let Some(af) = self.ability_filter {
-            if let Some(card) = db.get_card(id) {
-                let has_ability = !card.abilities.is_empty();
-                match af {
-                    "no_ability" => {
-                        if has_ability {
-                            return false;
-                        }
-                    }
-                    "has_ability" => {
-                        if !has_ability {
-                            return false;
-                        }
-                    }
-                    "no_ability_type" => {
-                        if let Some(excluded) = self.ability_filter_triggers {
-                            if !excluded.is_empty() {
-                                // Card passes only if it has NO ability matching any excluded trigger
-                                if card.abilities.iter().any(|ar| {
-                                    ar.resolve().triggers.as_ref().is_some_and(|t| {
-                                        excluded.iter().any(|et| t.starts_with(et.as_str()))
-                                    })
-                                }) {
-                                    return false;
-                                }
-                            }
-                        }
-                    }
-                    "has_ability_type" => {
-                        if let Some(included) = self.ability_filter_triggers {
-                            if !included.is_empty() {
-                                // Card passes if it has ANY ability matching included triggers
-                                if !card.abilities.iter().any(|ar| {
-                                    ar.resolve().triggers.as_ref().is_some_and(|t| {
-                                        included.iter().any(|it| t.starts_with(it.as_str()))
-                                    })
-                                }) {
-                                    return false;
-                                }
-                            }
-                        }
-                    }
-                    _ => {}
-                }
+        if let (Some(af), Some(card)) = (self.ability_filter, db.get_card(id)) {
+            if !Self::card_passes_ability_filter(
+                card,
+                Some(af),
+                self.ability_filter_triggers,
+                Unconstrained::Pass,
+            ) {
+                return false;
             }
         }
-        // or_ability_filters: card passes if ANY branch matches.
-        // When present, the single ability_filter above (if any) is ignored
-        // — the OR branches define the complete filter.
+        // or_ability_filters: card passes if ANY branch matches. When present,
+        // the single ability_filter above (if any) is ignored — the OR branches
+        // define the complete filter.
         if let Some(branches) = self.or_ability_filters {
             if !branches.is_empty() {
                 if let Some(card) = db.get_card(id) {
                     let passes_or = branches.iter().any(|branch| {
-                        let af = branch.ability_filter.as_deref().unwrap_or("");
-                        let has_ability = !card.abilities.is_empty();
-                        match af {
-                            "no_ability" => !has_ability,
-                            "has_ability" => has_ability,
-                            "no_ability_type" => {
-                                if let Some(excluded) = &branch.ability_filter_triggers {
-                                    if !excluded.is_empty() {
-                                        // Card passes if it has NO ability matching excluded triggers
-                                        !card.abilities.iter().any(|ar| {
-                                            ar.resolve().triggers.as_ref().is_some_and(|t| {
-                                                excluded.iter().any(|et| t.starts_with(et))
-                                            })
-                                        })
-                                    } else {
-                                        has_ability
-                                    }
-                                } else {
-                                    has_ability
-                                }
-                            }
-                            "has_ability_type" => {
-                                if let Some(included) = &branch.ability_filter_triggers {
-                                    if !included.is_empty() {
-                                        // Card passes if it has ANY ability matching included triggers
-                                        card.abilities.iter().any(|ar| {
-                                            ar.resolve().triggers.as_ref().is_some_and(|t| {
-                                                included.iter().any(|it| t.starts_with(it))
-                                            })
-                                        })
-                                    } else {
-                                        has_ability
-                                    }
-                                } else {
-                                    has_ability
-                                }
-                            }
-                            _ => true,
-                        }
+                        Self::card_passes_ability_filter(
+                            card,
+                            branch.ability_filter.as_deref(),
+                            branch.ability_filter_triggers.as_deref(),
+                            Unconstrained::RequireAbility,
+                        )
                     });
                     if !passes_or {
                         return false;

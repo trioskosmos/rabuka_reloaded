@@ -3,6 +3,7 @@
 
 use crate::ability::enums::Zone;
 use crate::ability::types::Choice;
+use crate::card::Card;
 use crate::game_state::GameState;
 use crate::game_state::{GameResult, Phase};
 use crate::turn::TurnEngine;
@@ -1583,6 +1584,158 @@ fn generate_mulligan_actions(game_state: &GameState) -> Vec<Action> {
     actions
 }
 
+/// The cost of paying for `card_id` to be replaced, including the constant cost
+/// modifiers it carries (e.g. 唐 可可 +2). Parity with core/player.rs baton
+/// payment, so the two must not drift.
+fn stage_play_cost(game_state: &GameState, card_id: i16) -> u8 {
+    game_state
+        .card_database
+        .get_card(card_id)
+        .and_then(|c| c.cost)
+        .map(|base| {
+            crate::constants::floored_cost(base, game_state.mods.get_cost_modifier(card_id))
+        })
+        .unwrap_or(0)
+}
+
+/// A stage area this card may baton-touch: `card_id` currently occupies it and
+/// may legally be replaced this turn.
+fn is_baton_touchable(
+    active_player: &crate::player::Player,
+    card_id: i16,
+    protection: [bool; 3],
+    slot: usize,
+) -> bool {
+    card_id != -1
+        // Rule 9.6.2.1.2.1: the check follows the member, not the area — a
+        // member deployed this turn cannot be baton-touched again.
+        && !active_player.deployed_this_turn.contains(&card_id)
+        && !protection[slot]
+}
+
+/// Every ordered pair of baton-touchable areas, for a member that can replace
+/// two members at once. Each pair yields two options, one per placement area.
+/// Empty when the card cannot double-baton or no pair is affordable.
+fn double_baton_options(
+    game_state: &GameState,
+    active_player: &crate::player::Player,
+    stage_card_ids: [i16; 3],
+    baton_touch_protected: [bool; 3],
+    effective_cost: u8,
+    active_energy_count: u8,
+) -> Vec<DoubleBatonOption> {
+    let mut occupied: [(usize, MemberArea, i16); 3] = [(0, MemberArea::Center, -1); 3];
+    let mut occupied_count = 0;
+    for slot in 0..3 {
+        let card_id = stage_card_ids[slot];
+        if is_baton_touchable(active_player, card_id, baton_touch_protected, slot) {
+            occupied[occupied_count] = (slot, MemberArea::ALL[slot], card_id);
+            occupied_count += 1;
+        }
+    }
+
+    let mut pairs = Vec::new();
+    for i in 0..occupied_count {
+        for j in (i + 1)..occupied_count {
+            let (_, area1, card1) = occupied[i];
+            let (_, area2, card2) = occupied[j];
+            let cost = effective_cost.saturating_sub(
+                stage_play_cost(game_state, card1) + stage_play_cost(game_state, card2),
+            );
+            if active_energy_count >= cost {
+                pairs.push(DoubleBatonOption { areas: [area1, area2], placement: area1, cost });
+                pairs.push(DoubleBatonOption { areas: [area1, area2], placement: area2, cost });
+            }
+        }
+    }
+    pairs
+}
+
+/// Whether `card` has a play_baton_touch effect that can replace more than one
+/// member at a time.
+fn has_double_baton(card: &Card) -> bool {
+    card.resolved_abilities().any(|ability| {
+        ability.effect.as_ref().is_some_and(|ef| {
+            ef.action == crate::ability::enums::ActionType::PlayBatonTouch
+                && ef.count.unwrap_or(1) > 1
+        })
+    })
+}
+
+/// What the main phase found for one stage area while considering one hand
+/// member card: whether it can be placed there, at what price, and whether the
+/// placement is a baton touch.
+struct AreaCandidate<'a> {
+    index: usize,
+    name: &'static str,
+    available: bool,
+    cost: u8,
+    is_baton_touch: bool,
+    existing_member_name: Option<&'a str>,
+}
+
+const AREA_NAMES: [&str; 3] = ["left", "center", "right"];
+
+/// For each stage area, what placing `card` there would cost and whether it is
+/// legal. Returns the three candidates plus whether any area is available at
+/// all (an empty area costs the card's full reduced cost; an occupied one is a
+/// baton touch priced at the card's cost minus the member it replaces).
+fn area_candidates_for<'a>(
+    game_state: &'a GameState,
+    active_player: &crate::player::Player,
+    stage_card_ids: [i16; 3],
+    stage_cards: [Option<&'a Card>; 3],
+    baton_touch_protected: [bool; 3],
+    card_cost: u8,
+    effective_cost: u8,
+    active_energy_count: u8,
+    display: bool,
+) -> ([AreaCandidate<'a>; 3], bool) {
+    let mut candidates: [AreaCandidate; 3] = core::array::from_fn(|slot| AreaCandidate {
+        index: slot,
+        name: AREA_NAMES[slot],
+        available: false,
+        cost: card_cost,
+        is_baton_touch: false,
+        existing_member_name: None,
+    });
+    let mut any_available = false;
+
+    for slot in 0..3 {
+        let existing_member_id = stage_card_ids[slot];
+        let candidate = &mut candidates[slot];
+        if existing_member_id == -1 {
+            // Empty area: a normal debut, priced at the reduced cost.
+            if active_energy_count >= effective_cost {
+                candidate.available = true;
+                candidate.cost = effective_cost;
+                any_available = true;
+            }
+            continue;
+        }
+        if !is_baton_touchable(active_player, existing_member_id, baton_touch_protected, slot) {
+            continue;
+        }
+        let Some(existing_member) = stage_cards[slot] else {
+            continue;
+        };
+        let cost = effective_cost
+            .saturating_sub(stage_play_cost(game_state, existing_member_id));
+        if active_energy_count < cost {
+            continue;
+        }
+        candidate.available = true;
+        candidate.cost = cost;
+        candidate.is_baton_touch = true;
+        if display {
+            candidate.existing_member_name = Some(existing_member.name.as_ref());
+        }
+        any_available = true;
+    }
+
+    (candidates, any_available)
+}
+
 fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
     #[cfg(not(feature = "no_std"))]
     let _timer = crate::timer::Timer::start("generate_main_phase_actions");
@@ -1655,130 +1808,39 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                             })
                     });
 
-                    let area_names = ["left", "center", "right"];
-                    let mut area_candidates: [(usize, &'static str, bool, u8, bool, Option<&str>); 3] =
-                        [(0, "left", false, card_cost, false, None), (1, "center", false, card_cost, false, None), (2, "right", false, card_cost, false, None)];
                     let mut has_any_available = false;
-
-                    for (area_idx, area_name) in area_names.iter().enumerate() {
-                        let mut cost = card_cost;
-                        let mut available = false;
-                        let mut is_baton_touch = false;
-                        let mut existing_member_name = None;
-
-                        if stage_card_ids[area_idx] != -1 {
-                            let existing_member_id = stage_card_ids[area_idx];
-                            // Rule 9.6.2.1.2.1: Check if the card at this area was deployed this turn.
-                            // The check follows the member (R3/R4), not the area.
-                            if !active_player
-                                .deployed_this_turn
-                                .contains(&existing_member_id)
-                            {
-                                // Check if existing member has cannot_baton_touch restriction
-                                let has_baton_touch_protection = baton_touch_protected[area_idx];
-
-                                if !has_baton_touch_protection {
-                                    if let Some(existing_member_card) = stage_cards[area_idx] {
-                                        // Include constant cost modifiers (e.g. 唐 可可 +2):
-                                        // parity with core/player.rs baton payment.
-                                        let member_cost = crate::constants::floored_cost(
-                                            existing_member_card.cost.unwrap_or(0),
-                                            game_state.mods.get_cost_modifier(existing_member_id),
-                                        );
-                                        let cost_to_pay =
-                                            effective_cost.saturating_sub(member_cost);
-                                        if (active_energy_count as u8) >= cost_to_pay {
-                                            available = true;
-                                            cost = cost_to_pay;
-                                            is_baton_touch = true;
-                                            if display {
-                                                existing_member_name =
-                                                    Some(existing_member_card.name.as_ref());
-                                            }
-                                            has_any_available = true;
-                                        }
-                                    }
-                                }
-                            }
-                        } else if (active_energy_count as u8) >= effective_cost {
-                            available = true;
-                            cost = effective_cost;
-                            has_any_available = true;
-                        }
-                        area_candidates[area_idx] =
-                            (area_idx, area_name, available, cost, is_baton_touch, existing_member_name);
-                    }
+                    let (mut area_candidates, any_area_available) = area_candidates_for(
+                        game_state,
+                        active_player,
+                        stage_card_ids,
+                        stage_cards,
+                        baton_touch_protected,
+                        card_cost,
+                        effective_cost,
+                        active_energy_count,
+                        display,
+                    );
+                    has_any_available = any_area_available;
 
                     // Check if this card has play_baton_touch with count > 1 (double baton)
-                    let has_double_baton = card.resolved_abilities().any(|ability| {
-                        ability.effect.as_ref().is_some_and(|ef| {
-                            ef.action == crate::ability::enums::ActionType::PlayBatonTouch
-                                && ef.count.unwrap_or(1) > 1
-                        })
-                    });
-
-                    let (double_baton_pairs, any_double_baton_available) = if has_double_baton {
-                        let mut occupied = [None; 3];
-                        let mut occupied_count = 0;
-                        for idx in 0..3 {
-                            if stage_card_ids[idx] != -1
-                                && !active_player
-                                    .deployed_this_turn
-                                    .contains(&stage_card_ids[idx])
-                                && !baton_touch_protected[idx]
-                            {
-                                occupied[occupied_count] =
-                                    Some((idx, MemberArea::ALL[idx], stage_card_ids[idx]));
-                                occupied_count += 1;
-                            }
+                    let double_baton_pairs = if has_double_baton(card) {
+                        let pairs = double_baton_options(
+                            game_state,
+                            active_player,
+                            stage_card_ids,
+                            baton_touch_protected,
+                            effective_cost,
+                            active_energy_count,
+                        );
+                        if pairs.is_empty() {
+                            None
+                        } else {
+                            Some(pairs)
                         }
-                        let mut pairs = [None; 6];
-                        let mut pair_count = 0;
-                        for i in 0..occupied_count {
-                            for j in (i + 1)..occupied_count {
-                                let (_idx1, area1, cid1) = occupied[i].unwrap();
-                                let (_idx2, area2, cid2) = occupied[j].unwrap();
-                                let baton_cost_for = |cid: i16| {
-                                    game_state.card_database.get_card(cid)
-                                        .and_then(|c| c.cost)
-                                        .map(|base| {
-                                            crate::constants::floored_cost(
-                                                base,
-                                                game_state.mods.get_cost_modifier(cid),
-                                            )
-                                        })
-                                        .unwrap_or(0)
-                                };
-                                let pair_cost =
-                                    effective_cost.saturating_sub(baton_cost_for(cid1) + baton_cost_for(cid2));
-                                if (active_energy_count as u8) >= pair_cost {
-                                    pairs[pair_count] = Some(DoubleBatonOption {
-                                        areas: [area1, area2],
-                                        placement: area1,
-                                        cost: pair_cost,
-                                    });
-                                    pair_count += 1;
-                                    pairs[pair_count] = Some(DoubleBatonOption {
-                                        areas: [area1, area2],
-                                        placement: area2,
-                                        cost: pair_cost,
-                                    });
-                                    pair_count += 1;
-                                }
-                            }
-                        }
-                        let available = pair_count > 0;
-                        (
-                            if available {
-                                Some(pairs.into_iter().flatten().collect::<Vec<_>>())
-                            } else {
-                                None
-                            },
-                            available,
-                        )
                     } else {
-                        (None, false)
+                        None
                     };
+                    let any_double_baton_available = double_baton_pairs.is_some();
                     let display_pairs = if display && cfg!(not(feature = "profiling")) {
                         double_baton_pairs.as_ref().map(|pairs| {
                             Arc::new(
@@ -1803,15 +1865,14 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                         Some(Arc::new(
                             area_candidates
                                 .iter()
-                                .map(|(_, area_name, available, cost, is_baton_touch, existing_member_name)| {
-                                    AreaInfo {
-                                        area: ArcStr::from(*area_name),
-                                        available: *available,
-                                        cost: *cost,
-                                        is_baton_touch: *is_baton_touch,
-                                        existing_member_name: existing_member_name
-                                            .map(ArcStr::from),
-                                    }
+                                .map(|candidate| AreaInfo {
+                                    area: ArcStr::from(candidate.name),
+                                    available: candidate.available,
+                                    cost: candidate.cost,
+                                    is_baton_touch: candidate.is_baton_touch,
+                                    existing_member_name: candidate
+                                        .existing_member_name
+                                        .map(ArcStr::from),
                                 })
                                 .collect::<Vec<_>>(),
                         ))
