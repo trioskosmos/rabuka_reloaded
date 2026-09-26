@@ -1891,40 +1891,44 @@ def _set_action_021(t, a):
  )
 
 def _set_action_023(t, a):
- return a.update(
-    {
-       'restriction_type': (
-           'cannot_wait_by_effect'
-           if '効果によっては' in t
-           else 'cannot_wait'
-          ),
-       'target': (
-           'both'
-           if (
-                '自分と相手' in t or 'お互い' in t
-               )
-           else (
-                'opponent'
-                if '相手の' in t
-                else (
-                      'self'
-                      if '自分' in t
-                      else None
-                     )
-               )
-          ),
-       'card_type': (
-           'member_card'
-           if 'メンバー' in t
-           else None
-          ),
-       'duration': (
-           'live_end'
-           if 'ライブ終了時まで' in t
-           else None
-          )
-      },
- )
+    """Restriction: cannot be sent to the wait state.
+
+    Two clauses collapse into one restriction here, which is why this is not a
+    dictionary lookup:
+      - 「効果によっては」: conditional, `cannot_wait_by_effect`
+      - otherwise: unconditional `cannot_wait`
+
+    Target is read from the clause: both players, else the opponent, else self —
+    that order matters, because 「自分と相手の」 also contains 「自分」.
+    """
+    a["restriction_type"] = (
+        "cannot_wait_by_effect" if "効果によっては" in t else "cannot_wait"
+    )
+    if "自分と相手" in t or "お互い" in t:
+        a["target"] = "both"
+    elif "相手の" in t:
+        a["target"] = "opponent"
+    elif "自分" in t:
+        a["target"] = "self"
+    else:
+        a["target"] = None
+    a["card_type"] = "member_card" if "メンバー" in t else None
+    a["duration"] = "live_end" if "ライブ終了時まで" in t else None
+    return a
+
+
+def _set_action_025(t, a):
+    """Restriction: cannot be placed at the stated destination."""
+    a["restriction_type"] = "cannot_place"
+    a["destination"] = _extract_place_restriction_destination(t)
+    return a
+
+
+def _set_action_026(t, a):
+    """Restriction: cannot be placed at the stated destination."""
+    a["restriction_type"] = "cannot_place"
+    a["destination"] = _extract_place_restriction_destination(t)
+    return a
 
 def _set_action_025(t, a):
  return a.update(
@@ -1943,54 +1947,52 @@ def _set_action_026(t, a):
  )
 
 def _set_action_030(t, a):
- return (a.update({'target': extract_target(t)}), _handle_position_change_fields(t, a), a.update({'destination': 'front'}) if '正面' in t else None, a.update({'target_member': 'select'}) if 'メンバー' in t and ('1人' in t or 'N人' in t) else None)[-1]
+    """Position change: move the member to the front.
+
+    Reads the target from the clause, applies the position-change fields, and
+    marks a member-selection target when the clause names one. All four steps
+    write into `a` in place; the caller ignores the return.
+    """
+    a["target"] = extract_target(t)
+    _handle_position_change_fields(t, a)
+    if "正面" in t:
+        a["destination"] = "front"
+    if "メンバー" in t and ("1人" in t or "N人" in t):
+        a["target_member"] = "select"
+    return a
 
 def _set_action_033(t, a):
- return a.update(
-    {
-       'resource': 'blade',
-       'count': (
-           t.count(BLADE_ICON) or 1
-          ),
-       'timing_condition': 'moved_this_turn'
-      },
- )
+    """Blade gain counted per blade icon, defaulting to 1, this turn only."""
+    a["resource"] = "blade"
+    a["count"] = t.count(BLADE_ICON) or 1
+    a["timing_condition"] = "moved_this_turn"
+    return a
+
 
 def _set_action_036(t, a):
- return a.update(
-    {
-       'resource': 'blade',
-       'count': (
-           _ic(t, BLADE_ICON) or 1
-          )
-      },
- )
+    """Blade gain counted per blade icon, defaulting to 1."""
+    a["resource"] = "blade"
+    a["count"] = _ic(t, BLADE_ICON) or 1
+    return a
+
 
 def _set_action_037(t, a):
- return a.update(
-    {
-       'resource': 'blade',
-       'count': (
-           t.count(BLADE_ICON) or None
-          )
-      },
- )
+    """Blade gain counted per blade icon, unstated when there are none."""
+    a["resource"] = "blade"
+    a["count"] = t.count(BLADE_ICON) or None
+    return a
+
 
 def _set_action_038(t, a):
- return a.update(
-    {
-       'count': (
-           t.count('{{icon_all.png|ハート}}') or None
-          )
-      },
- )
+    """Heart gain counted per all-heart icon, unstated when there are none."""
+    a["count"] = t.count(ALL_HEART_ICON) or None
+    return a
+
 
 def _set_action_039(t, a):
- return a.update(
-    {
-       'resource': 'heart'
-      },
- )
+    """Plain heart gain, with no count of its own."""
+    a["resource"] = "heart"
+    return a
 
 def _set_action_040(t, a):
     if "余剰ハート" in t or "余分ハート" in t or "それら" in t:
@@ -2023,41 +2025,38 @@ def _set_action_040(t, a):
     return a
 
 def _set_action_041(t, a):
- return (
-   None
-   if 'できない' in t
-   else (
-      (
-          a.pop('lose_blade_hearts', None),
-          a.pop('location', None),
-          a.update(
-                {
-                      'action': 'sequential',
-                      'actions': [
-                             {
-                                     'text': 'ブレードハートを失い',
-                                     'action': 're_yell',
-                                     'lose_blade_hearts': True,
-                                     'target': 'self'
-                                    },
-                             {
-                                     'text': 'もう一度エールを行う',
-                                     'action': 'perform_yell',
-                                     'count': 1,
-                                     'target': 'self'
-                                    }
-                            ]
-                     },
-          )
-         )
-      if 'ブレードハートを失い' in t
-      else a.update(
-           {
-                'lose_blade_hearts': True
-               },
-      )
-     )
-  )
+    """「ブレードハートを失い」 — lose the blade heart, then re-yell once.
+
+    Three shapes of the same printed clause:
+      - 「…できない」: cannot, so this rule does not apply at all
+      - 「ブレードハートを失い」: the re-yell is one compound step, not two
+      - otherwise: the plain blade-heart loss
+    """
+    if "できない" in t:
+        return None
+    if "ブレードハートを失い" in t:
+        # The loss and the re-yell are one printed clause; the engine gets
+        # them as a sequential so the re-yell happens after the loss.
+        a.pop("lose_blade_hearts", None)
+        a.pop("location", None)
+        a["action"] = "sequential"
+        a["actions"] = [
+            {
+                "text": "ブレードハートを失い",
+                "action": "re_yell",
+                "lose_blade_hearts": True,
+                "target": "self",
+            },
+            {
+                "text": "もう一度エールを行う",
+                "action": "perform_yell",
+                "count": 1,
+                "target": "self",
+            },
+        ]
+        return a
+    a["lose_blade_hearts"] = True
+    return a
 
 def _set_action_042(t, a):
  return (
@@ -2132,65 +2131,47 @@ def _set_action_051(t, a):
       },
  )
 
+def _set_heart_type(t, a, allow_selected=False):
+    """The heart type a 「ハート○に変える」 clause names.
+
+    Shared by the two rules that read it. They differ only in whether
+    「選んだハート」 is a valid answer, so that is the one parameter — the other
+    three fields are the same clause and used to be written out twice.
+    """
+    m = re.search(HEART_ICON_ID, t)
+    if m:
+        a["heart_type"] = f"heart{m.group(1)}"
+    elif allow_selected and "選んだハート" in t:
+        a["heart_type"] = "selected"
+    else:
+        a["heart_type"] = None
+    a["original_value"] = "元々" in t
+    a["self_target"] = "このメンバー" in t or "このカード" in t
+    a["card_type"] = "member_card" if "メンバー" in t else None
+    return a
+
+
 def _set_action_057(t, a):
- return a.update(
-    {
-       'heart_type': (
-           f'heart{m.group(1)}'
-           if (m := re.search('{{heart_(\\d+)\\.png\\|heart\\d+}}', t))
-           else None
-          ),
-       'original_value': '元々' in t,
-       'self_target': (
-           'このメンバー' in t or 'このカード' in t
-          ),
-       'card_type': (
-           'member_card'
-           if 'メンバー' in t
-           else None
-          )
-      },
- )
+    """Set a named heart type, from a printed icon only."""
+    return _set_heart_type(t, a)
 
 def _set_action_058(t, a):
- return a.update(
-    {
-       'choice': True,
-       'target': 'self'
-      },
- )
+    """Offer a choice, aimed at self."""
+    a["choice"] = True
+    a["target"] = "self"
+    return a
+
 
 def _set_action_059(t, a):
- return a.update(
-    {
-       'resource': 'heart',
-       'heart_selection': True
-      },
- )
+    """Gain a heart of the chosen colour."""
+    a["resource"] = "heart"
+    a["heart_selection"] = True
+    return a
+
 
 def _set_action_060(t, a):
- return a.update(
-    {
-       'heart_type': (
-           f'heart{m.group(1)}'
-           if (m := re.search('{{heart_(\\d+)\\.png\\|heart\\d+}}', t))
-           else (
-                'selected'
-                if '選んだハート' in t
-                else None
-               )
-          ),
-       'original_value': '元々' in t,
-       'self_target': (
-           'このメンバー' in t or 'このカード' in t
-          ),
-       'card_type': (
-           'member_card'
-           if 'メンバー' in t
-           else None
-          )
-      },
- )
+    """Set a heart type: a printed icon, or the chosen heart."""
+    return _set_heart_type(t, a, allow_selected=True)
 
 def _set_action_062(t, a):
  return _handle_cost_modification(t, a)
