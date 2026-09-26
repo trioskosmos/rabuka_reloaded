@@ -1,14 +1,14 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-09-26T23:42:04.645098+00:00",
+  "generated_at": "2026-09-26T23:54:16.124688+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
     "total_abilities": 2011,
     "unique_abilities": 936
   },
-  "n_files": 916,
-  "n_tests": 3706,
+  "n_files": 917,
+  "n_tests": 3708,
   "total_cards": 771,
   "covered_cards": 771,
   "abilities_on_covered": 936,
@@ -309,8 +309,8 @@
     ]
   },
   "depth_counts": {
-    "L2+choice": 792,
-    "L1+choice": 68,
+    "L2+choice": 793,
+    "L1+choice": 67,
     "L2": 76
   },
   "qa_rulings": {
@@ -647,7 +647,7 @@
       "rows": []
     }
   },
-  "n_test_fns_parsed": 3706,
+  "n_test_fns_parsed": 3708,
   "abilities": [
     {
       "idx": 0,
@@ -17401,6 +17401,7 @@
         "engine/tests/test_modules/effects/look_select/reveal/live_success_reveal_top_member_without_blade_heart_total_score_test.rs",
         "engine/tests/test_modules/effects/look_select/reveal/optional_live_discard_look_five_take_one_test.rs",
         "engine/tests/test_modules/effects/look_select/search_deck/reveal_from_deck_until_chosen_type_found_test.rs",
+        "engine/tests/test_modules/effects/look_select/sequential_mill_then_group_recovery_test.rs",
         "engine/tests/test_modules/effects/mill/all_members_blades_pl_hs_bp5_013_n_test.rs",
         "engine/tests/test_modules/effects/mill/bottom_member_tiers_pl_s_bp7_021_l_test.rs",
         "engine/tests/test_modules/effects/mill/debut_mill_and_all_member_draw_test.rs",
@@ -17487,7 +17488,7 @@
         "ayumu_live_start_triggers",
         "ayumu_no_wait_with_non_nijigasaki_ally"
       ],
-      "covering_test_count": 837,
+      "covering_test_count": 839,
       "direct_tests": [
         "any_card_fails_hearts_all_fail",
         "aoku_haruka_live_start_fails_with_only_non_suzu_live_cards",
@@ -28331,22 +28332,26 @@
       "covering_files": [
         "engine/tests/test_modules/effects/gain/hearts/constants/other_subunit_member_heart05_constant_test.rs",
         "engine/tests/test_modules/effects/gain/hearts/constants/per_other_group_member_constant_heart_test.rs",
+        "engine/tests/test_modules/effects/look_select/sequential_mill_then_group_recovery_test.rs",
         "engine/tests/test_modules/jidou/debut_watch/three_way_choices_and_look_at_three_test.rs"
       ],
       "covering_tests": [
         "ericho_gains_nothing_with_an_empty_success_zone",
         "ericho_gains_only_the_chosen_heart_two_per_success_card",
+        "honoka_recovers_nothing_when_no_milled_card_is_arise",
+        "honoka_recovers_the_arise_member_she_just_milled",
         "other_subunit_member_grants_exactly_one_heart05_and_excludes_self",
         "two_copies_of_same_arise_member_grant_two_heart05",
         "two_other_arise_members_grant_two_heart05",
         "wakana_the_chosen_heart_replaces_her_printed_hearts"
       ],
-      "covering_test_count": 6,
+      "covering_test_count": 8,
       "direct_tests": [
+        "honoka_recovers_the_arise_member_she_just_milled",
         "other_subunit_member_grants_exactly_one_heart05_and_excludes_self",
         "two_other_arise_members_grant_two_heart05"
       ],
-      "direct_test_count": 2,
+      "direct_test_count": 3,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -34895,6 +34900,7 @@
         "engine/tests/test_modules/effects/look_select/reorder_top/cheer_mode_look_three_return_one_from_hand_test.rs",
         "engine/tests/test_modules/effects/look_select/reorder_top/live_success_look_three_deck_size_q36_test.rs",
         "engine/tests/test_modules/effects/look_select/reveal/live_success_reveal_top_member_without_blade_heart_total_score_test.rs",
+        "engine/tests/test_modules/effects/look_select/sequential_mill_then_group_recovery_test.rs",
         "engine/tests/test_modules/effects/recover/per_card/cannot_baton_touch_restriction_blocks_baton_touch_action_test.rs",
         "engine/tests/test_modules/effects/recover/per_card/live_start_activate_three_printemps_wait_members_q178_q179_test.rs",
         "engine/tests/test_modules/effects/recover/per_card/live_start_aqours_center_cost_nine_blade_gain_or_opponent_wait_test.rs",
@@ -34960,7 +34966,7 @@
         "audit_additive_modifier_can_cause_failure",
         "audit_additive_modifier_stacks_on_base"
       ],
-      "covering_test_count": 489,
+      "covering_test_count": 491,
       "direct_tests": [
         "a_group_filter_that_matches_nothing_banks_every_looked_card",
         "all_same_group_no_effect",
@@ -34993,7 +34999,7 @@
         "deploy_stage_full_graceful",
         "deploy_two_cost2_ok"
       ],
-      "direct_test_count": 177,
+      "direct_test_count": 179,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -35066,6 +35072,7 @@
         "engine/tests/test_modules/effects/look_select/reorder_top/cheer_mode_look_three_return_one_from_hand_test.rs",
         "engine/tests/test_modules/effects/look_select/reorder_top/live_success_look_three_deck_size_q36_test.rs",
         "engine/tests/test_modules/effects/look_select/reveal/live_success_reveal_top_member_without_blade_heart_total_score_test.rs",
+        "engine/tests/test_modules/effects/look_select/sequential_mill_then_group_recovery_test.rs",
         "engine/tests/test_modules/effects/recover/per_card/cannot_baton_touch_restriction_blocks_baton_touch_action_test.rs",
         "engine/tests/test_modules/effects/recover/per_card/live_start_activate_three_printemps_wait_members_q178_q179_test.rs",
         "engine/tests/test_modules/effects/recover/per_card/live_start_aqours_center_cost_nine_blade_gain_or_opponent_wait_test.rs",
@@ -35131,7 +35138,7 @@
         "audit_additive_modifier_can_cause_failure",
         "audit_additive_modifier_stacks_on_base"
       ],
-      "covering_test_count": 489,
+      "covering_test_count": 491,
       "direct_tests": [
         "a_group_filter_that_matches_nothing_banks_every_looked_card",
         "all_same_group_no_effect",
@@ -35164,7 +35171,7 @@
         "deploy_stage_full_graceful",
         "deploy_two_cost2_ok"
       ],
-      "direct_test_count": 177,
+      "direct_test_count": 179,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -44306,18 +44313,21 @@
       ],
       "base": "PL!-bp5-010",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
+        "engine/tests/test_modules/effects/look_select/sequential_mill_then_group_recovery_test.rs",
         "engine/tests/test_modules/effects/mill/discard_cost_mill_then_arise_recovery_test.rs"
       ],
       "covering_tests": [
         "honoka_bp5_010_live_start_with_discard_and_arise_mills_three_then_recovers_arise",
-        "honoka_bp5_010_live_start_with_discard_without_arise_still_mills_three"
+        "honoka_bp5_010_live_start_with_discard_without_arise_still_mills_three",
+        "honoka_recovers_nothing_when_no_milled_card_is_arise",
+        "honoka_recovers_the_arise_member_she_just_milled"
       ],
-      "covering_test_count": 2,
+      "covering_test_count": 4,
       "direct_tests": [
         "honoka_bp5_010_live_start_with_discard_and_arise_mills_three_then_recovers_arise",
         "honoka_bp5_010_live_start_with_discard_without_arise_still_mills_three"

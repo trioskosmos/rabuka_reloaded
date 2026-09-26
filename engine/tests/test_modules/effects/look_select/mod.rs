@@ -10,4 +10,5 @@ pub mod recruit_stage;
 pub mod reorder_top;
 pub mod reveal;
 pub mod search_deck;
+pub mod sequential_mill_then_group_recovery_test;
 pub mod split_top_bottom;
