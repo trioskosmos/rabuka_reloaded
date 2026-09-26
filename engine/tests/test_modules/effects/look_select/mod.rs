@@ -2,6 +2,7 @@
 // Regenerated from the directory listing at compile time.
 pub mod bottom_inspect;
 pub mod look_and_filter;
+pub mod optional_look_and_select_negative_branches_test;
 pub mod per_card;
 pub mod pin_top;
 pub mod recruit_stage;

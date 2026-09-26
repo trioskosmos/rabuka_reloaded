@@ -404,6 +404,39 @@ fn miyamiya_baton_touch_blade_heart_newcomer_nothing() {
     let newcomer = g.id(NEWCOMER_BLADE_HEART);
     let filler = g.id("PL!-sd1-010-SD");
 
+    // `PL!N-pb1-009-R` (REINA) and `PL!N-bp4-009-R` (this newcomer) are BOTH
+    // 天王寺璃奈 and share the `009`, differing only in the `pb1`/`bp4`
+    // transposition — the exact shape the lenient card-id fallback papers over.
+    // They are deliberately the same CHARACTER in opposite roles, and the single
+    // property separating them is the one this test turns on: REINA's print
+    // carries no blade heart, this print carries `b_heart06`. A swapped pair
+    // would therefore INVERT the test rather than fail it, so both ids are pinned
+    // and the blade-heart property is asserted directly.
+    g.assert_card_identity(newcomer, NEWCOMER_BLADE_HEART);
+    g.assert_card_identity(g.id(REINA), REINA);
+    assert!(
+        g.state
+            .card_database
+            .get_card(newcomer)
+            .unwrap()
+            .blade_heart
+            .is_some(),
+        "precondition: the newcomer must PRINT a blade heart — that is what \
+         negates 宮下愛's condition, and it is the property a transposed id \
+         would silently flip"
+    );
+    assert!(
+        g.state
+            .card_database
+            .get_card(g.id(REINA))
+            .unwrap()
+            .blade_heart
+            .is_none(),
+        "precondition: REINA must print NO blade heart, or the negative twin of \
+         this test is not its twin"
+    );
+
+
     g.state.player1.stage.stage[1] = ai;
     fill_decks(&mut g, filler);
     g.state.player1.hand.cards.push(newcomer);

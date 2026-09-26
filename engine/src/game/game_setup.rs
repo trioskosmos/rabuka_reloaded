@@ -2075,8 +2075,36 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
         }
         if let Some(card) = game_state.card_database.get_card(card_id) {
             let card_position: MemberArea = area_name.parse().unwrap_or(MemberArea::Center);
-            for (ability_index, ar) in card.abilities.iter().enumerate() {
-                let ability = ar.resolve();
+            // PRINTED abilities PLUS runtime-gained ones
+            // (「…が持つ起動能力をすべて得る」). A gained activation is a real
+            // activation — `handle_use_ability`'s `find_gained_activation`
+            // resolves it — so it has to be OFFERED on the same terms. Only
+            // `card.abilities` used to be walked here, which left a copied 起動
+            // executable but invisible: a player, and the bot, could never pick
+            // it. Gained slots carry the shared
+            // `GAINED_ABILITY_INDEX_BASE + gained_idx` encoding, which is what
+            // `handle_use_ability` decodes back to this exact entry.
+            let activatable: Vec<(usize, crate::Arc<crate::card::Ability>)> = card
+                .abilities
+                .iter()
+                .enumerate()
+                .map(|(printed_index, ar)| (printed_index, ar.resolve()))
+                .chain(
+                    game_state
+                        .gained_card_abilities
+                        .get(&card_id)
+                        .into_iter()
+                        .flatten()
+                        .enumerate()
+                        .map(|(gained_index, gained)| {
+                            (
+                                crate::ability::types::GAINED_ABILITY_INDEX_BASE + gained_index,
+                                crate::Arc::new(gained.clone()),
+                            )
+                        }),
+                )
+                .collect();
+            for (ability_index, ability) in activatable {
                 if !crate::ability::util::ability_trigger_can_activate(&ability) {
                     continue;
                 }

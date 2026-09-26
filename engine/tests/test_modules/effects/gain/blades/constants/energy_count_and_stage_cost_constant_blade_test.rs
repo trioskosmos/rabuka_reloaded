@@ -43,6 +43,15 @@ fn natsumi_sp_bp4_009_constant_cheaper_stage_total_grants_three_blades() {
     let big = game.id("PL!S-bp5-009-R"); // cost 15
     let small = game.id(CLEAN_KOTORI); // cost 5
 
+    // `PL!-PR-021-PR` (nico, staged as the host in the first test) and
+    // `PL!-pb1-021-PR` (this "clean kotori") share the `021` and differ only in
+    // the `PR`/`pb1` transposition. This test's whole claim is a comparison
+    // between the two SIDES' stage totals, so a transposed id would change the
+    // opponent's cost and silently invert the comparison rather than fail it.
+    game.assert_card_identity(small, CLEAN_KOTORI);
+    game.assert_card_identity(game.id("PL!-PR-021-PR"), "PL!-PR-021-PR");
+    game.assert_distinct_card_names(small, game.id("PL!-PR-021-PR"), "小鳥遊 and 小林実香");
+
     game.state.player1.stage.stage[1] = natsumi;
     game.state.player2.stage.stage[1] = big;
     game.state.recalculate_constants();

@@ -169,6 +169,147 @@ SPECIAL_CONDITION_TYPES = {
 WATCHES_ABILITIES_MARKER = "能力が解決"      # fires when another ability resolves
 EFFECT_CAUSE_MARKERS = ("効果によって", "効果でも発動する")  # effect-caused / also fires off opponent effects
 
+# ---------------------------------------------------------------------------
+# LIFECYCLE CONSTRAINT (the dimension `depth` cannot see)
+# ---------------------------------------------------------------------------
+# The depth ladder (L0 referenced / L1 asserts / L2 negative) answers "does a
+# test constrain WHAT this ability does". It cannot answer "does a test
+# constrain HOW LONG the grant survives", and that is a separate failure mode
+# with a separate cause.
+#
+# These four actions do not resolve into the game state and stop. They MUTATE
+# persistent ability state that outlives the resolution and is RE-DERIVED by a
+# later scan:
+#
+#   gain_ability             「…を持つ」
+#   gain_ability_from_source 「…の下にあるカードから能力を得る」  (a 常時 that
+#                            re-copies on EVERY recalculate_constants)
+#   invalidate_ability       「…の能力を、ライブ終了時まで、無効に」
+#   suppress_ability_trigger 「…の…能力の発動を、ライブ終了時まで、無効に」
+#
+# A single resolution test is blind to three ways such a grant goes wrong, and
+# all three shipped as real defects while the depth check read "fully covered":
+#
+#   IDEMPOTENCE  the re-derivation APPENDS instead of replacing, so N scans
+#                produce N copies. Each copy takes a distinct
+#                `GAINED_ABILITY_INDEX_BASE + gained_idx`, so
+#                `trigger_live_success_abilities`' `(card_id, ability_index)`
+#                dedup cannot collapse them and the trigger fires N times.
+#   REVOCATION   the grant is never withdrawn when its precondition is
+#                destroyed, leaving the host able to activate an ability whose
+#                printed source is gone.
+#   SURFACE      the grant never reaches the generated action list, so it is
+#                executable but un-offerable — dead to a player and to the bot.
+#
+# SURFACE only applies to the `gain_ability*` pair: a granted 起動 becomes an
+# offerable action, whereas an invalidation/suppression is a flag consumed by a
+# trigger dispatch and has no action-list representation to check.
+STATEFUL_REGISTRATION_ACTIONS = {
+    "gain_ability",
+    "gain_ability_from_source",
+    "invalidate_ability",
+    "suppress_ability_trigger",
+}
+
+
+def _grants_activation(node):
+    """True if this effect (at any nesting depth) grants a 起動.
+
+    SURFACE is only meaningful for a grant that produces something the player is
+    OFFERED as an activation. That is decided by the granted ability's trigger,
+    not by the granting action: a grant of 常時 or ライブ成功時 changes scoring or
+    a trigger dispatch and has no action-list representation, so demanding a
+    `generate_possible_actions` read for it would be demanding an assertion about
+    something that does not exist.
+
+    The deck settles this cleanly. `gain_ability` carries a machine-readable
+    `ability_gain_trigger`, and every instance in `abilities.json` names 常時 — so
+    the whole `gain_ability` family is surface-exempt. `gain_ability_from_source`
+    carries a `trigger_filter`, and only a 起動 filter (or an absent one) can
+    yield an activatable copy. Net effect: exactly one ability in the deck is
+    surface-constrained, and it is the one whose grant was executable but never
+    offered.
+    """
+    if isinstance(node, dict):
+        if node.get("ability_gain_trigger") == "起動":
+            return True
+        for f in node.get("trigger_filter") or []:
+            if isinstance(f, str) and "起動" in f:
+                return True
+        # An absent filter on a from-source grant copies whatever the source
+        # prints, 起動 included.
+        if (
+            node.get("action") == "gain_ability_from_source"
+            and not node.get("trigger_filter")
+        ):
+            return True
+        return any(_grants_activation(v) for v in node.values())
+    if isinstance(node, list):
+        return any(_grants_activation(v) for v in node)
+    return False
+
+# A driver that RE-DERIVES persistent ability state. Calling it once proves the
+# grant was made; calling it again is what proves it was not duplicated. This is
+# the CONSTANT-SCAN shape of idempotence.
+LIFECYCLE_DRIVER_RE = re.compile(
+    r"\brecalculate_constants\b"
+    r"|\btrigger_live_success_abilities\b"
+    r"|\btrigger_live_start_abilities\b"
+    r"|\btrigger_auto_abilities\b"
+    r"|\bexecute_live_victory_determination\b"
+)
+# The RESOLVE-TWICE shape of idempotence: an ability that grants a 常時 is reached
+# by resolving its printed ability again, and "a second resolution does not grow
+# the total" is just as much an idempotence proof as re-running a scan. A 起動
+# with ターン1回 is refused the second time, so the assertion that the total held
+# is a real one.
+LIFECYCLE_RESOLVE_RE = re.compile(
+    r"\bactivate_ability\b"
+    r"|\btry_activate_ability\b"
+    r"|\bfire_trigger\b"
+    r"|\btrigger_printed_ability_and_resolve_choices\b"
+    r"|\bplay_to_stage\b"
+)
+# REVOCATION is reachable three ways, and this family uses all three:
+#   (a) the host (or a qualifying source) changes zone — the engine's choke point;
+#   (b) an explicit runtime clear;
+#   (c) the printed DURATION expiring through a real phase walk, which is how
+#       ライブ終了时报 grants end and is by far the most common path here.
+LIFECYCLE_ZONEXIT_RE = re.compile(
+    r"\bon_cards_left_zones\b"
+    r"|\bclear_gained_abilities\b"
+    r"|\bclear_all_for_card\b"
+    r"|\bexecute_main_phase_action\b"
+)
+# Crossing a phase boundary at all is what lets a duration expire; a `pass()`
+# inside a loop, or any explicit target phase, is the token for it.
+LIFECYCLE_ROLLOVER_RE = re.compile(
+    r"\bcurrent_turn_phase\b"
+    r"|\bTurnPhase::Live\b"
+    r"|\bPhase::Active\b"
+    r"|\bLiveVictoryDetermination\b"
+    r"|\bcheck_expired_effects\b"
+    r"|\badvance_to_phase\b"
+    r"|\.pass\(\)"
+)
+# Asserting the registration is GONE is the direct statement of revocation, and it
+# catches the case the phase walk misses: a card swapped off the stage by another
+# card's effect, with no rollover involved.
+LIFECYCLE_ABSENCE_RE = re.compile(
+    r"!\s*\w*\.?state\.gained_abilities\.contains_key"
+    r"|gained_abilities[^;\n]*\.\s*is_none"
+    r"|gained_abilities[^;\n]*\.\s*is_empty"
+    r"|!gained_abilities\.contains_key"
+)
+# Reading what a player would actually be offered, rather than an internal table.
+LIFECYCLE_SURFACE_RE = re.compile(
+    r"\bgenerate_possible_actions\b"
+    r"|\.generated_actions\(\)"
+)
+# Loop header — a driver reached through a loop is a repeat even though it
+# appears lexically once.
+LIFECYCLE_LOOP_RE = re.compile(r"^\s*(?:for\b|while\b|loop\s*\{)", re.MULTILINE)
+
 FN_TEST_RE = re.compile(r"^\s*#\[test\]\s*\n\s*(?:pub\s+)?fn\s+(\w+)", re.MULTILINE)
 COVERS_RE = re.compile(r"@covers\s+([A-Z0-9!+\-]+\S*)", re.IGNORECASE)
 
@@ -978,6 +1119,19 @@ def support_profiles_by_module(files):
 # (no such rarity) silently became `PL!SP-bp2-006-P`, whose printed text lacks
 # the 常時 the test was checking — a "known engine gap" that was really a typo.
 Q_ID_LITERAL_RE = re.compile(r'\b(?:id|id_ref)\(\s*"([^"]+)"')
+# A card number bound to a NAME and passed by reference: `const KEKE: &str =
+# "PL!SP-bp4-006-R";` … `game.id(KEKE)`.
+#
+# `Q_ID_LITERAL_RE` alone cannot see these, because the literal is not inside the
+# call. That blind spot is not hypothetical: `PL!SP-bp1-014-PR` in
+# `live_success_three_distinct_revealed_retrieves_live_test.rs` does not exist, the
+# lenient `get_card_id` fallback substituted `PL!SP-bp1-014-N`, and the test passed
+# while the "three DISTINCT names" premise it is named for went unpinned. A const
+# binding is the dominant idiom for card numbers in this suite, so the detector has
+# to follow the name, not the call site.
+Q_BOUND_ID_RE = re.compile(
+    r'\b(?:const|let)\s+[A-Za-z_][A-Za-z0-9_]*\s*:\s*&?\s*(?:str|String)\s*=\s*"([^"]+)"'
+)
 
 
 def _card_numbers():
@@ -1006,22 +1160,43 @@ def unresolvable_card_literals(files, card_numbers):
     `card_numbers` is the set of normalised card_no keys. Mirrors the two
     normalisations `CardDatabase::normalize_card_no` performs (fullwidth→ASCII,
     lowercase→uppercase) so a ＋/＋ difference is not reported.
+
+    Scans BOTH an inline `id("…")` literal and a card number bound to a name
+    (`const X: &str = "…"`), because the binding form is the common idiom here and
+    the call-site form alone cannot see it. A literal found by both patterns is
+    reported once.
     """
     keys = {_normalise_card_no(k) for k in card_numbers}
     out = []
+    seen = set()
     for _p, rel, text, _fns in files:
-        for m in Q_ID_LITERAL_RE.finditer(text):
-            s = m.group(1)
-            if not re.match(r"^[A-Za-z0-9!#\-_+]{6,}$", s):
-                continue  # not a card-number shape (a zone name, an option id)
-            if s.startswith(("LL-", "BD-", "EN-")):
-                continue
-            if s in keys or _normalise_card_no(s) in keys:
-                continue
-            out.append(
-                (rel, text[: m.start()].count("\n") + 1, s)
-            )
-    return out
+        # Inline `id("…")` may legitimately hold a non-card argument, so it keeps
+        # the loose shape test. A NAME BINDING is different: the consts in this
+        # suite hold card numbers, and the loose test also matched plain strings
+        # like `live_card_zone`, so a binding must look like a real card number —
+        # every member/live print is `PL!…`, and the `LL-`/`BD-`/`EN-` families are
+        # skipped below as before.
+        for pattern, require_pl_prefix in (
+            (Q_ID_LITERAL_RE, False),
+            (Q_BOUND_ID_RE, True),
+        ):
+            for m in pattern.finditer(text):
+                s = m.group(1)
+                if require_pl_prefix and not s.startswith("PL!"):
+                    continue
+                if not re.match(r"^[A-Za-z0-9!#\-_+]{6,}$", s):
+                    continue  # not a card-number shape (a zone name, an option id)
+                if s.startswith(("LL-", "BD-", "EN-")):
+                    continue
+                if s in keys or _normalise_card_no(s) in keys:
+                    continue
+                line = text[: m.start()].count("\n") + 1
+                dedup = (rel, line, s)
+                if dedup in seen:
+                    continue
+                seen.add(dedup)
+                out.append((rel, line, s))
+    return sorted(out)
 
 
 def _normalise_card_no(s):
@@ -1105,7 +1280,32 @@ def audit_test_quality(files):
         HELPER_ASSERT_CALLS.clear()
         for hname, hbody in local_bodies.items():
             HELPER_ASSERT_CALLS[hname] = _assert_calls(hbody)
+        # Helpers that pin a SPECIFIC value. `assert_only_negative` and
+        # `assert_only_counts` already reach into helper bodies (see
+        # `_only_asserts_of_kind`), but the `count_inequality_only` test below is
+        # an inline body-only string test, so a test that delegates its
+        # `assert_eq!` to a fixture helper was reported as inequality-only however
+        # precisely the helper asserts. Naming those helpers closes that.
+        helper_pins_value = {
+            hname
+            for hname, hbody in local_bodies.items()
+            if "assert_eq!" in hbody or "assert_ne!" in hbody
+        }
+        helper_pins_value_re = (
+            re.compile(r"\b(" + "|".join(sorted(helper_pins_value)) + r")\s*\(")
+            if helper_pins_value
+            else None
+        )
         file_groups = {}
+        # Const/let-bound card numbers count toward the confusable-number check
+        # too. The per-fn scan below only sees numbers written inside a test body,
+        # and `const CARD: &str = "PL!…"` at file level is the dominant idiom here
+        # — so a file that transposes `bp2`/`pb2` through its consts got no
+        # similar_cards row at all, which is the same blind spot that let
+        # `PL!SP-bp1-014-PR` (a number that does not exist) go unreported.
+        for bound in Q_BOUND_ID_RE.findall(text):
+            if bound.startswith("PL!"):
+                file_groups.setdefault(card_group_key(bound), set()).add(bound)
         for name, body, line in fns:
             has_assert = any(
                 not Q_TRIVIAL_ASSERT_RE.search(call) for call in _assert_calls(body)
@@ -1183,7 +1383,12 @@ def audit_test_quality(files):
             # whole band of values: the draw could be 1 card or 9, or the deck
             # could be shrinking for an unrelated reason (the yell discards, the
             # next turn draws). A threshold against a literal is weaker still.
-            if has_assert and "assert_eq!" not in body and "assert_ne!" not in body:
+            if (
+                has_assert
+                and "assert_eq!" not in body
+                and "assert_ne!" not in body
+                and not (helper_pins_value_re and helper_pins_value_re.search(body))
+            ):
                 band = _count_inequality_only(body)
                 if band:
                     smells["count_inequality_only"].append((rel, name, line, band))
@@ -1234,7 +1439,7 @@ SMELL_DOCS = {
     "unpinned_similar_cards": "confusable card numbers (bp2 vs pb2) staged in one file with NO card-identity pin — a transposed print would pass silently; add assert_card_identity to close it",
     "duplicate_stage_id": "the same card INSTANCE in two stage slots (`stage.stage = [filler, y, filler]`) — not a legal board; anything that counts members or dedupes by name measures a board that cannot occur, so use a second `new_id`",
     "count_inequality_only": "every assertion is an INEQUALITY on a count and there is no assert_eq anywhere — a band, not a value, so 1 card and 9 both pass; pin the number the card prints",
-    "unresolvable_card_id": "a game.id(\"…\") literal that is not a card number in the database — get_card_id's lenient fallback silently substitutes a DIFFERENT PRINT of the same card, so the test stages the wrong card and passes",
+    "unresolvable_card_id": "a card-number literal that is not in the database — either written inline in a `game.id(\"…\")` or bound to a name (`const X: &str = \"…\"` / `let x: &str = \"…\"`), because const-bound card numbers are the dominant idiom here and the call-site form alone cannot see them. get_card_id's lenient fallback silently substitutes a DIFFERENT PRINT of the same card, so the test stages the wrong card and passes: `PL!SP-bp1-014-PR` resolved to `PL!SP-bp1-014-N` and left a \"three DISTINCT names\" premise unpinned",
     "prompt_ordinal_drain": "prompts answered by ORDINAL position (if step <= 2 { select 2 cards }) instead of by the prompt's own identity — adding or removing one prompt upstream silently changes which prompt gets the answer",
     "blind_phase_stepping": "a fixed `for _ in 0..N { pass() }` walk through the turn — a phase gaining or losing a step silently shifts the window the test thinks it is standing in; step to the phase by name instead",
 }
@@ -1291,6 +1496,84 @@ def infer_ability_depth(covering_texts, covering_rels, covering_fns):
     if has_choice and depth in ("L1", "L2"):
         depth = depth + "+choice"
     return depth, {"has_assert": has_assert, "has_choice": has_choice, "has_negative": has_negative}
+
+
+def lifecycle_signals_in(body):
+    """Return {property: [signal, ...]} for the lifecycle properties in one fn body.
+
+    Deliberately syntactic, and deliberately returns WHICH signal matched rather
+    than a bare True — so the coverage table can show its evidence and a reader
+    can disagree with a specific call instead of the whole verdict.
+
+    This is a heuristic over test SOURCE, not a proof that a property holds. An
+    earlier single-token-per-property version of this check produced three
+    separate rounds of false positives (it did not see a resolve-twice idempotence
+    test, a duration rollover, or an absence assertion), which is why each
+    property now accepts several honest signals and names them.
+
+      idempotence — a re-deriving driver twice or in a loop (constant-scan shape),
+                    or a resolution entry point called at least twice (resolve-twice
+                    shape: "a second resolution does not grow the total").
+      revocation   — a zone exit / explicit clear, OR a phase walk that can cross
+                    a duration boundary, OR an assertion that the registration is
+                    gone.
+      surface      — the generated action list is read, so the offer path is
+                    validated rather than only the internal state tables.
+    """
+    driver_hits = len(LIFECYCLE_DRIVER_RE.findall(body))
+    in_loop = any(
+        LIFECYCLE_DRIVER_RE.search(seg)
+        for seg in LIFECYCLE_LOOP_RE.split(body)[1:]
+    )
+    resolve_hits = len(LIFECYCLE_RESOLVE_RE.findall(body))
+    signals = {"idempotence": [], "revocation": [], "surface": []}
+    if driver_hits >= 2:
+        signals["idempotence"].append("driver x%d" % driver_hits)
+    elif in_loop:
+        signals["idempotence"].append("driver in loop")
+    if resolve_hits >= 2:
+        signals["idempotence"].append("resolve x%d" % resolve_hits)
+    if LIFECYCLE_ZONEXIT_RE.search(body):
+        signals["revocation"].append("zone exit / clear")
+    if LIFECYCLE_ROLLOVER_RE.search(body):
+        signals["revocation"].append("duration rollover")
+    if LIFECYCLE_ABSENCE_RE.search(body):
+        signals["revocation"].append("registration absence assert")
+    if LIFECYCLE_SURFACE_RE.search(body):
+        signals["surface"].append("action list read")
+    return signals
+
+
+def required_lifecycle_properties(effect):
+    """The lifecycle properties that APPLY to this effect.
+
+    SURFACE is scoped by what the effect GRANTS, not by which action it uses —
+    see `_grants_activation`. A 常時 or ライブ成功時 grant is consumed by a
+    constant scan or a trigger dispatch and has no action-list representation, so
+    holding it to the offer surface would be a fabricated requirement.
+    """
+    props = ["idempotence", "revocation"]
+    if _grants_activation(effect):
+        props.append("surface")
+    return props
+
+
+def missing_lifecycle_properties(effect, bodies):
+    """Return (missing_properties, {property: [signals that matched]}) for an ability.
+
+    Evidence is unioned across the ability's direct test fns, not required of a
+    single one: the property is a claim about the ability, and demanding one fn
+    carry all of it would reward a long test over a correct split. The matched
+    signals are returned alongside so the report can show its evidence.
+    """
+    have = {"idempotence": [], "revocation": [], "surface": []}
+    for body in bodies:
+        for prop, found in lifecycle_signals_in(body).items():
+            for signal in found:
+                if signal not in have[prop]:
+                    have[prop].append(signal)
+    missing = [p for p in required_lifecycle_properties(effect) if not have[p]]
+    return missing, have
 
 
 def build_qa_coverage(all_src):
@@ -1485,6 +1768,7 @@ def build_inventory():
         covering_texts = []
         covering_fns = []
         direct_fns = []
+        direct_bodies = []
         covers_override = None
         for p, rel, text, fns in files:
             # check @covers override first
@@ -1521,17 +1805,44 @@ def build_inventory():
                     if any(c in hb for c in cards) or base in hb
                 }
                 for name, body in fn_bodies.get(rel, {}).items():
-                    if any(c in body for c in cards) or base in body:
+                    if (
+                        any(c in body for c in cards)
+                        or base in body
+                        or any(
+                            re.search(r"\b" + re.escape(a) + r"\b", body)
+                            for a in aliases
+                        )
+                        or any(
+                            re.search(r"\b" + re.escape(h) + r"\b", body)
+                            for h in helpers
+                        )
+                    ):
                         direct_fns.append(name)
-                        continue
-                    if any(re.search(r"\b" + re.escape(a) + r"\b", body) for a in aliases):
-                        direct_fns.append(name)
-                        continue
-                    if any(re.search(r"\b" + re.escape(h) + r"\b", body) for h in helpers):
-                        direct_fns.append(name)
+                        # The test's own body, PLUS the bodies of the local
+                        # helpers it calls. This suite is written with
+                        # well-factored fixture helpers, so the transition a test
+                        # exercises is very often inside one of them — a test that
+                        # proves a live-end revocation via a `roll_over_live_end()`
+                        # helper says nothing about revocation in its own text, and
+                        # crediting only the body would report it as untested.
+                        # One level deep is enough: helpers in this suite do not
+                        # call other helpers to reach a trigger.
+                        direct_bodies.append(body)
+                        for helper_name, helper_body in helper_bodies.get(rel, {}).items():
+                            if re.search(r"\b" + re.escape(helper_name) + r"\b", body):
+                                direct_bodies.append(helper_body)
 
         covered = bool(covered_rels) or covers_override is not None
         depth, flags = infer_ability_depth(covering_texts, covered_rels, covering_fns)
+        # Lifecycle dimension: only meaningful for the actions that MUTATE
+        # persistent ability state, and only judgeable once the card is driven
+        # at all — a card with no direct test is already reported as untested.
+        lifecycle_missing = []
+        lifecycle_evidence = {}
+        if act in STATEFUL_REGISTRATION_ACTIONS and direct_fns:
+            lifecycle_missing, lifecycle_evidence = missing_lifecycle_properties(
+                eff, direct_bodies
+            )
         if not covered:
             depth = "none"
 
@@ -1598,6 +1909,8 @@ def build_inventory():
             "covering_test_count": len(covering_fns),
             "direct_tests": direct_fns[:30],
             "direct_test_count": len(direct_fns),
+            "lifecycle_missing": lifecycle_missing,
+            "lifecycle_evidence": lifecycle_evidence,
             "cost": u.get("cost"),
             "effect": eff,
         })
@@ -1659,6 +1972,16 @@ def build_inventory():
             if r["condition"] in SPECIAL_CONDITION_TYPES or r["use_limit"] or r["watches_abilities"]
         ),
         "specific_requirements_thin": specific_thin,
+        "lifecycle_gaps": {
+            r["idx"]: r["lifecycle_missing"]
+            for r in rows
+            if r["lifecycle_missing"]
+        },
+        "lifecycle_total": sum(
+            1
+            for r in rows
+            if r["action"] in STATEFUL_REGISTRATION_ACTIONS and r["direct_test_count"]
+        ),
         "qa": qa,
         "all_src_len": len(all_src),
     }
@@ -1884,6 +2207,78 @@ def render_coverage(inv):
             )
     else:
         w("_None — all specific-requirement abilities have choice-level coverage from ≥2 test fns._")
+    w("")
+    w(
+        "That result is about *what* an ability does, not *how long* a grant it creates survives — "
+        "see the lifecycle table below, which is a separate axis and was not satisfied by any of it."
+    )
+    w("")
+
+    # ------------------------------------------------------------------
+    # Lifecycle-constrained abilities — the axis `depth` cannot see.
+    # ------------------------------------------------------------------
+    lifecycle_rows = [r for r in rows if r["lifecycle_missing"]]
+    lifecycle_ok = inv["lifecycle_total"] - len(lifecycle_rows)
+    w("## Lifecycle-constrained abilities — grant survival untested")
+    w("")
+    w(
+        f"The `gain_ability` / `gain_ability_from_source` / `invalidate_ability` / "
+        f"`suppress_ability_trigger` actions ({inv['lifecycle_total']} abilities with ≥1 direct test) "
+        "do not resolve into the game state and stop. They MUTATE persistent ability state that "
+        "outlives the resolution and is re-derived by a later scan, so a test that drives them once "
+        "cannot see how the grant behaves the second time."
+    )
+    w("")
+    w("Three transitions, each of which shipped as a real defect while the depth ladder above read `L2+choice`:")
+    w("")
+    w("- **idempotence** — the re-derivation must REPLACE, not append. `gain_ability_from_source` is a 常時, so it re-copies on every `recalculate_constants`; appending gives the host N copies after N scans, and each copy takes a distinct `GAINED_ABILITY_INDEX_BASE + gained_idx`, so the `(card_id, ability_index)` dedup in `trigger_live_success_abilities` cannot collapse them and the copied ライブ成功時 fires N times.")
+    w("- **revocation** — the grant must be WITHDRAWN when its precondition is destroyed. Otherwise the host keeps an ability whose printed source is gone, and the text table and the `Ability` table disagree about what the card has.")
+    w("- **surface** — a granted 起動 must reach the generated action list. It is executable via `find_gained_activation` regardless, so a grant missing from the action list is dead to a player and to the bot while every state-table assertion still passes. Scoped to grants that actually produce an activation: a granted 常時 or ライブ成功時 is consumed by a constant scan or a trigger dispatch and has no action-list representation, so it is exempt. In the current card set that leaves exactly one ability constrained here — and it is the one whose grant was executable but never offered.")
+    w("")
+    w(
+        "Evidence is unioned across an ability's direct test fns and reaches one level "
+        "into the local helpers a test calls — this suite is written with well-factored "
+        "fixture helpers, so a transition a test exercises is often inside one of them."
+    )
+    w("")
+    w(
+        "This is a heuristic over test SOURCE, not a proof that a property holds. "
+        "It credits a property when some direct test carries a signal for it, and "
+        "shows that signal, so a specific call can be disagreed with. Each property "
+        "accepts several honest shapes because one does not cover the family: a "
+        "constant scan repeated, a resolution repeated (\"a second resolution does not "
+        "grow the total\"), a zone exit or duration rollover, an assertion that the "
+        "registration is gone. It will still miss a property proven some other way."
+    )
+    w("")
+    if lifecycle_rows:
+        w("| Card | Action | Depth | Tests | Missing | Evidence for the rest |")
+        w("|---|---|---|---|---|---|")
+        for r in sorted(
+            lifecycle_rows,
+            key=lambda r: (len(r["lifecycle_missing"]), r["direct_test_count"], r["idx"]),
+            reverse=True,
+        ):
+            evidence = "; ".join(
+                f"{prop}: {', '.join(sigs)}"
+                for prop, sigs in sorted(r["lifecycle_evidence"].items())
+                if sigs
+            ) or "_none_"
+            w(
+                f"| `{r['base']}` | {r['action']} | {r['depth']} | "
+                f"{r['direct_test_count']}/{r['covering_test_count']} | "
+                f"{', '.join(r['lifecycle_missing'])} | {evidence} |"
+            )
+        w("")
+        w(
+            f"**{len(lifecycle_rows)} of {inv['lifecycle_total']}** lifecycle-constrained abilities have "
+            f"at least one transition with no test reaching it; {lifecycle_ok} are fully covered."
+        )
+    else:
+        w(
+            f"_None — all {inv['lifecycle_total']} lifecycle-constrained abilities have a test "
+            "reaching idempotence, revocation, and (for the `gain_ability*` pair) the offer surface._"
+        )
     w("")
 
     w("## Official QA rulings (cards/qa_data.json)")
@@ -2162,6 +2557,10 @@ def main():
             "total": inv["specific_requirements_total"],
             "thin_idxs": inv["specific_requirements_thin"],
         },
+        "lifecycle": {
+            "total": inv["lifecycle_total"],
+            "gap_idxs": inv["lifecycle_gaps"],
+        },
         "quality": json_quality,
         "n_test_fns_parsed": inv["n_test_fns_parsed"],
         "abilities": json_rows,
@@ -2221,6 +2620,7 @@ def main():
     print(f"abilities={len(inv['abilities'])} cards={inv['total_cards']} covered_cards={inv['covered_cards']} ({inv['covered_cards']}/{inv['total_cards']}) n_tests~{inv['n_tests']}")
     print(f"depth: {dict(inv['depth_counts'])}")
     print(f"jidou interaction: watchers+cause+multi = {sum(1 for r in inv['abilities'] if r['watches_abilities'])}+{sum(1 for r in inv['abilities'] if r['effect_cause'])}+{sum(1 for r in inv['abilities'] if '自動' in r['trigger_list'] and r['jidou_partners'])}; specific-requirement thin: {len(inv['specific_requirements_thin'])}/{inv['specific_requirements_total']}")
+    print(f"lifecycle gaps: {len(inv['lifecycle_gaps'])}/{inv['lifecycle_total']} stateful-registration abilities missing a transition")
     return 0
 
 

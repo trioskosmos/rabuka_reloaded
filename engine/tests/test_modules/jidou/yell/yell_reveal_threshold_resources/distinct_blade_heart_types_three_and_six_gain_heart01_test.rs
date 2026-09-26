@@ -23,6 +23,53 @@ const BASE_HEART_ONLY: &str = "PL!-sd1-014-SD";
 
 fn setup(game: &mut TestGame, revealed_card_ids: &[i16]) -> i16 {
     let ability_card = game.id(ABILITY_CARD);
+    // The reference cards are ONE PRINT PER BLADE-HEART COLOUR, and every test in
+    // this file counts DISTINCT types against a threshold. `PL!S-PR-015-PR`
+    // (松浦果南, b_heart04) and `PL!S-bp2-015-PR` (津島善子, b_heart05) share the
+    // `015` and differ only in the `PR`/`bp2` transposition — so a swapped pair
+    // would put two copies of one colour in the revealed set, drop the DISTINCT
+    // count by one, and move a threshold result without any test failing on a
+    // value. Pinned here, once, because `setup` is the single door every test in
+    // this file comes through.
+    for (const_name, card_no) in [
+        (B_HEART01, B_HEART01),
+        (B_HEART02, B_HEART02),
+        (B_HEART03, B_HEART03),
+        (B_HEART04, B_HEART04),
+        (B_HEART05, B_HEART05),
+        (B_HEART06, B_HEART06),
+    ] {
+        let id = game.id(card_no);
+        game.assert_card_identity(id, const_name);
+    }
+    // And the property the whole file turns on: the six references carry six
+    // DIFFERENT blade-heart colours.
+    let colours: std::collections::HashSet<String> = [
+        B_HEART01, B_HEART02, B_HEART03, B_HEART04, B_HEART05, B_HEART06,
+    ]
+    .iter()
+    .flat_map(|card_no| {
+        game.state
+            .card_database
+            .get_card(game.id(card_no))
+            .and_then(|c| c.blade_heart.clone())
+            .map(|bh| {
+                bh.hearts
+                    .iter()
+                    .map(|(k, _v)| k.to_string())
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default()
+    })
+    .collect();
+    assert_eq!(
+        colours.len(),
+        6,
+        "precondition: the six reference cards must carry six DISTINCT blade-heart \
+         colours (got {colours:?}) — a transposed print silently lowers the \
+         distinct-type count these thresholds are measured against"
+    );
+
     game.state.player1.stage.stage = [-1, ability_card, -1];
     for &id in revealed_card_ids {
         game.state.revealed_cards.push(id);

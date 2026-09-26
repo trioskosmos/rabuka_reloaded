@@ -6,6 +6,7 @@ pub mod live_success_distortion_heart_requirement_test;
 pub mod live_success_revealed_cards_extra_yells_test;
 pub mod live_success_three_distinct_revealed_retrieves_live_test;
 pub mod live_success_under_member_count_score_test;
+pub mod livesuccess_revealed_distinct_name_threshold_test;
 pub mod move_five_to_discard_draws_if_live_card_test;
 pub mod optional_discard_all_hand_cost_draws_six_test;
 pub mod turn_limited_yell_second_activation_blocked_test;

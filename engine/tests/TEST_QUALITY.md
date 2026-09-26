@@ -24,11 +24,13 @@ _trigger event hand-pushed with no real ability resolution in the same fn (weake
 
 None.
 
-## pendency_only (0)
+## pendency_only (1)
 
 _has_pending_choice asserted without choice identity (pending_choice_type/summary/answer) or outcome asserts_
 
-None.
+| file | test | line | detail |
+| --- | --- | --- | --- |
+| `engine/tests/test_modules/jidou/debut_watch/three_way_choices_and_look_at_three_test.rs` | `wakana_the_chosen_heart_replaces_her_printed_hearts` | 159 |  |
 
 ## assert_only_negative (0)
 
@@ -60,17 +62,19 @@ _a fixed `for _ in 0..N { pass() }` walk through the turn — a phase gaining or
 
 None.
 
-## similar_cards (20)
+## similar_cards (25)
 
 _confusable card numbers (bp2 vs pb2) staged in one file AND the file pins card identity (assert_card_identity / compares card_no), so a transposition would fail loudly_
 
 | file | test | line | detail |
 | --- | --- | --- | --- |
+| `engine/tests/test_modules/effects/compound/condition_and_effect/live_start_boosted_miraku_draws_and_reduces_need_heart_pl_hs_pb1_029_l_test.rs` | `<file>` | 1 | PL!HS-PR-005-PR, PL!HS-bp1-005-PR |
 | `engine/tests/test_modules/effects/compound/per_card/position_change_draw_and_rotation_multi_card_fixes_test.rs` | `<file>` | 1 | PL!SP-bp2-008-R, PL!SP-pb1-008-R |
 | `engine/tests/test_modules/effects/compound/sequential_effects/debut_two_distinct_live_cards_opponent_picks_one_q118_test.rs` | `<file>` | 1 | PL!SP-bp2-011-R, PL!SP-pb2-011-R |
 | `engine/tests/test_modules/effects/cost_mod/activation_discount/play_time_three_named_member_discard_cost_ten_test.rs` | `<file>` | 1 | PL!S-bp2-016-N, PL!S-bp3-016-N, PL!S-bp7-016-N |
 | `engine/tests/test_modules/effects/cost_mod/activation_discount/play_time_three_named_member_discard_cost_ten_test.rs` | `<file>` | 1 | PL!SP-bp5-014-N, PL!SP-bp7-014-N |
 | `engine/tests/test_modules/effects/energy/under_member/energy_and_member_under_test.rs` | `<file>` | 1 | PL!N-bp3-013-N, PL!N-bp5-013-N |
+| `engine/tests/test_modules/effects/gain/blades/constants/energy_count_and_stage_cost_constant_blade_test.rs` | `<file>` | 1 | PL!-PR-021-PR, PL!-pb1-021-PR |
 | `engine/tests/test_modules/effects/gain/blades/live_start/mymai_tonight_test.rs` | `<file>` | 1 | PL!S-bp2-023-L, PL!S-bp5-023-L |
 | `engine/tests/test_modules/effects/gain/hearts/live_start/live_start_live_zone_heart04_threshold_gain_test.rs` | `<file>` | 1 | PL!S-bp2-020-L, PL!S-bp3-020-L |
 | `engine/tests/test_modules/effects/live_start/dazzling_game_test.rs` | `<file>` | 1 | PL!S-PR-015-PR, PL!S-bp2-015-PR |
@@ -82,10 +86,13 @@ _confusable card numbers (bp2 vs pb2) staged in one file AND the file pins card 
 | `engine/tests/test_modules/effects/state/per_card/either_or_state_change_test.rs` | `<file>` | 1 | PL!N-bp4-008-R, PL!N-pb1-008-R |
 | `engine/tests/test_modules/integration/full_round/real_card_phase_walkthrough_and_ability_suite_test.rs` | `<file>` | 1 | PL!S-bp2-009-R, PL!S-bp5-009-R |
 | `engine/tests/test_modules/integration/per_card/live_end_expiry_rollover_and_dual_trigger_window_gates_test.rs` | `<file>` | 1 | PL!HS-bp5-004-R, PL!HS-bp6-004-R |
+| `engine/tests/test_modules/jidou/ability_watch/copied_ability_registration_lifecycle_test.rs` | `<file>` | 1 | PL!N-bp4-007-R＋, PL!N-bp5-007-R＋ |
 | `engine/tests/test_modules/jidou/movement/self_area_move_watch/appearance_and_repeated_swaps_stack_blades_test.rs` | `<file>` | 1 | PL!SP-bp5-006-R, PL!SP-pb1-006-R |
 | `engine/tests/test_modules/jidou/movement/under_member_placement/live_success_or_self_move_place_discard_group_member_under_self_test.rs` | `<file>` | 1 | PL!SP-bp5-006-R, PL!SP-pb2-006-R |
+| `engine/tests/test_modules/jidou/yell/yell_reveal_threshold_resources/distinct_blade_heart_types_three_and_six_gain_heart01_test.rs` | `<file>` | 1 | PL!S-PR-015-PR, PL!S-bp2-015-PR |
 | `engine/tests/test_modules/rules/conditions/restriction_and_aura_mechanics_test.rs` | `<file>` | 1 | PL!S-bp5-009-R, PL!S-bp7-009-R |
 | `engine/tests/test_modules/rules/trigger_paths/retrieval_placement_blade_ability_chain_test.rs` | `<file>` | 1 | PL!S-bp2-019-L, PL!S-bp3-019-L |
+| `engine/tests/test_modules/rules/trigger_paths/zone_change_gate_test.rs` | `<file>` | 1 | PL!N-bp4-009-R, PL!N-pb1-009-R |
 
 ## unpinned_similar_cards (0)
 
@@ -93,11 +100,20 @@ _confusable card numbers (bp2 vs pb2) staged in one file with NO card-identity p
 
 None.
 
-## duplicate_stage_id (0)
+## duplicate_stage_id (8)
 
 _the same card INSTANCE in two stage slots (`stage.stage = [filler, y, filler]`) — not a legal board; anything that counts members or dedupes by name measures a board that cannot occur, so use a second `new_id`_
 
-None.
+| file | test | line | detail |
+| --- | --- | --- | --- |
+| `engine/tests/test_modules/jidou/ability_watch/constant_conditions_exact_counts_and_names_test.rs` | `komari_grants_only_when_both_stages_together_hold_six_members` | 161 | FILLER in 3 slots |
+| `engine/tests/test_modules/jidou/ability_watch/constant_conditions_exact_counts_and_names_test.rs` | `komari_grants_only_when_both_stages_together_hold_six_members` | 161 | new_id in 3 slots |
+| `engine/tests/test_modules/jidou/ability_watch/constant_conditions_exact_counts_and_names_test.rs` | `wakana_grants_heart02_and_heart03_on_the_same_six_member_condition` | 269 | FILLER in 2 slots |
+| `engine/tests/test_modules/jidou/ability_watch/constant_conditions_exact_counts_and_names_test.rs` | `wakana_grants_heart02_and_heart03_on_the_same_six_member_condition` | 269 | FILLER in 3 slots |
+| `engine/tests/test_modules/jidou/ability_watch/constant_conditions_exact_counts_and_names_test.rs` | `wakana_grants_heart02_and_heart03_on_the_same_six_member_condition` | 269 | new_id in 2 slots |
+| `engine/tests/test_modules/jidou/ability_watch/constant_conditions_exact_counts_and_names_test.rs` | `wakana_grants_heart02_and_heart03_on_the_same_six_member_condition` | 269 | new_id in 3 slots |
+| `engine/tests/test_modules/jidou/ability_watch/constant_energy_and_slot_conditions_test.rs` | `natsumi_three_blades_while_own_stage_cost_total_is_below_the_opponents` | 139 | FILLER in 3 slots |
+| `engine/tests/test_modules/jidou/ability_watch/constant_energy_and_slot_conditions_test.rs` | `natsumi_three_blades_while_own_stage_cost_total_is_below_the_opponents` | 139 | new_id in 3 slots |
 
 ## count_inequality_only (0)
 
@@ -107,6 +123,6 @@ None.
 
 ## unresolvable_card_id (0)
 
-_a game.id("…") literal that is not a card number in the database — get_card_id's lenient fallback silently substitutes a DIFFERENT PRINT of the same card, so the test stages the wrong card and passes_
+_a card-number literal that is not in the database — either written inline in a `game.id("…")` or bound to a name (`const X: &str = "…"` / `let x: &str = "…"`), because const-bound card numbers are the dominant idiom here and the call-site form alone cannot see them. get_card_id's lenient fallback silently substitutes a DIFFERENT PRINT of the same card, so the test stages the wrong card and passes: `PL!SP-bp1-014-PR` resolved to `PL!SP-bp1-014-N` and left a "three DISTINCT names" premise unpinned_
 
 None.

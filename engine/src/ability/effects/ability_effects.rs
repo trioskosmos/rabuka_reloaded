@@ -543,7 +543,28 @@ impl AbilityResolver {
             None => return Ok(()),
         };
 
+        // This 常時 RE-DERIVES the whole copy set every time it runs, so the
+        // registration is replaced rather than appended to. All three tables
+        // are the same grant seen from three sides (display texts, the
+        // resolved `Ability` structs the trigger pipeline scans, and the
+        // source card ids) and all three are owned by THIS constant, so all
+        // three are cleared together before the rebuild.
+        //
+        // Clearing only the text table (the previous behaviour) had two
+        // reachable defects, both pinned by
+        // `jidou/ability_watch/copied_ability_registration_lifecycle_test`:
+        //
+        //  * `gained_card_abilities` GREW once per recalculation. A single
+        //    eligible under-card produced N copies after N scans, and each
+        //    copy got its own `GAINED_ABILITY_INDEX_BASE + gained_idx`, so
+        //    `trigger_live_success_abilities`' `(card_id, ability_index)` dedup
+        //    could not collapse them and the copied ライブ成功時 fired N times.
+        //  * The struct table was never pruned, so when the last source left
+        //    the under-area the text table emptied while the `Ability` stayed —
+        //    a stale copy the host could still activate.
         gs.gained_abilities.remove(&activating_card);
+        gs.gained_card_abilities.remove(&activating_card);
+        gs.gained_ability_sources.remove(&activating_card);
 
         let player = if gs.player1.stage.stage.contains(&activating_card) {
             &gs.player1
