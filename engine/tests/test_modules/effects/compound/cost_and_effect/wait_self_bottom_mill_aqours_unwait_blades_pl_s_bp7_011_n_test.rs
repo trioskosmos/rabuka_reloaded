@@ -171,9 +171,21 @@ fn riko_blade_expires_at_live_end() {
         "all Aqours: exactly 2 blades"
     );
 
-    // Advance past LiveVictoryDetermination so duration=live_end expires.
-    for _ in 0..20 {
-        game.pass();
+    // The blade is 「ライブ終了時まで」 — it clears as the live CLOSES, on the
+    // LiveVictoryDetermination → Active transition (probed: it is still 2 all
+    // the way through both performances and is 0 on the next Active). Step to
+    // that transition by name: `advance_to_phase(Active)` alone stops at
+    // turn 1's own Active, BEFORE any live, and "20 passes later" was standing
+    // in the turn after that — neither is the moment the card names.
+    game.advance_to_phase(rabuka_engine::game_state::Phase::LiveVictoryDetermination);
+    assert_eq!(
+        game.state.current_phase,
+        rabuka_engine::game_state::Phase::LiveVictoryDetermination,
+        "the expiry is checked at the live close, not at an arbitrary later pass"
+    );
+    game.advance_to_phase(rabuka_engine::game_state::Phase::Active);
+    while game.has_pending_choice() {
+        game.select_indices(&[]);
     }
 
     assert_eq!(

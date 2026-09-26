@@ -297,13 +297,13 @@ fn real_choice_flow_emits_offered_and_resolved() {
     g.play_to_stage(ss, MemberArea::Center);
     g.add_to_discard(aq_live);
     g.add_to_hand(awaken);
-    // Live phase setup, mirroring awaken_the_power_test's known-good sequence:
-    for _ in 0..5 {
-        g.pass();
-    }
+    // Live phase setup, mirroring awaken_the_power_test's known-good sequence.
+    // Stepped by NAME, not by pass count: a pass-count walk silently changes
+    // which window the test is standing in the moment a phase gains or loses a
+    // step, and the first thing that breaks is the test's own setup.
+    g.advance_to_phase(rabuka_engine::game_state::Phase::LiveCardSetFirstAttacker);
     g.set_live_card(awaken);
-    g.pass();
-    g.pass();
+    g.advance_to_phase(rabuka_engine::game_state::Phase::FirstAttackerPerformance);
     g.drain_auto_ability_choices();
 
     assert!(

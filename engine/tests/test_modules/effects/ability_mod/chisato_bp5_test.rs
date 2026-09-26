@@ -265,15 +265,16 @@ fn chisato_promo_ab1_live_start() {
         game.state.player2.main_deck.cards.push(filler);
     }
 
-    // Pass turns to enter live card set phase
-    for _ in 0..5 {
-        game.pass();
-    }
+    // Step to the live setup BY NAME — a pass-count walk means "roughly here"
+    // and moves silently when a phase gains or loses a step.
+    game.advance_to_phase(rabuka_engine::game_state::Phase::LiveCardSetFirstAttacker);
     game.set_live_card(live_card);
 
-    // Pass to run LiveStart phase and trigger abilities
-    game.pass();
-    game.pass();
+    // Step into the first attacker performance, where ライブ開始時 resolves.
+    game.advance_to_phase(rabuka_engine::game_state::Phase::FirstAttackerPerformance);
+    while game.has_pending_choice() {
+        game.select_indices(&[]);
+    }
 
     // Since Chisato's ab#1 triggers automatically and is not optional,
     // the members and energy should be activated.

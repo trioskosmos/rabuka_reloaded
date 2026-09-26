@@ -250,10 +250,20 @@ fn maki_bp6_blade_expires_at_live_end() {
         "Blade+3 during live"
     );
 
-    // Advance past live end so live_end effects expire
-    // Keep passing until we're past the Live turn phase
-    for _ in 0..20 {
-        game.pass();
+    // Advance past live end so live_end effects expire. The expiry is pinned to
+    // the live CLOSING — the LiveVictoryDetermination → Active transition — so
+    // step to that transition by name. `advance_to_phase(Active)` on its own
+    // stops at the CURRENT turn's Active, before any live, and a 20-pass walk
+    // lands in the turn after the one the card names.
+    game.advance_to_phase(rabuka_engine::game_state::Phase::LiveVictoryDetermination);
+    assert_eq!(
+        game.state.current_phase,
+        rabuka_engine::game_state::Phase::LiveVictoryDetermination,
+        "the expiry is checked at the live close, not at an arbitrary later pass"
+    );
+    game.advance_to_phase(rabuka_engine::game_state::Phase::Active);
+    while game.has_pending_choice() {
+        game.select_indices(&[]);
     }
 
     // After live end, blade should be 0

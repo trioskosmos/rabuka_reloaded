@@ -225,12 +225,15 @@ fn s9_check_timing_cascade_smoke() {
     for _ in 0..20 { game.state.player2.main_deck.cards.push(filler); }
     game.state.player1.stage.stage = [m, m, -1];
     game.state.player1.hand.cards.push(live);
-    // Advance roughly to live card set
-    for _ in 0..5 { game.pass(); }
+    // Advance to live card set BY NAME — a 5-pass walk silently means
+    // "somewhere near the live" and shifts the moment a phase changes length.
+    game.advance_to_phase(rabuka_engine::game_state::Phase::LiveCardSetFirstAttacker);
     if game.state.player1.hand.cards.contains(&live) {
         game.set_live_card(live);
-        game.pass(); game.pass();
-        while game.has_pending_choice() { game.select_indices(&[]); }
+        game.advance_to_phase(rabuka_engine::game_state::Phase::FirstAttackerPerformance);
+        while game.has_pending_choice() {
+            game.select_indices(&[]);
+        }
         // Even if we don't go through full phases, the pipeline helpers should be callable
         let hearts = game.state.player1.stage.get_available_hearts(&db, &game.state.mods.heart_override, &game.state.mods.heart_modifiers, &game.state.mods.heart_color_multiplier, &game.state.mods.heart_copy);
         assert!(hearts.hearts.values_sum() >= 2);

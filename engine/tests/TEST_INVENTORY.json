@@ -1,6 +1,6 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-09-26T10:51:17.687567+00:00",
+  "generated_at": "2026-09-26T11:02:40.387724+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
@@ -413,56 +413,8 @@
       "rows": []
     },
     "blind_phase_stepping": {
-      "count": 31,
+      "count": 23,
       "rows": [
-        {
-          "file": "engine/tests/test_modules/characterization/logging_test.rs",
-          "test": "real_choice_flow_emits_offered_and_resolved",
-          "line": 271,
-          "detail": ""
-        },
-        {
-          "file": "engine/tests/test_modules/characterization/performance_snapshot_audit_test.rs",
-          "test": "audit_both_players_fail_no_winner",
-          "line": 488,
-          "detail": ""
-        },
-        {
-          "file": "engine/tests/test_modules/characterization/performance_snapshot_audit_test.rs",
-          "test": "audit_p1_passes_p2_fails_p1_wins",
-          "line": 690,
-          "detail": ""
-        },
-        {
-          "file": "engine/tests/test_modules/characterization/pipeline_characterization_test.rs",
-          "test": "s9_check_timing_cascade_smoke",
-          "line": 214,
-          "detail": ""
-        },
-        {
-          "file": "engine/tests/test_modules/effects/ability_mod/chisato_bp5_test.rs",
-          "test": "chisato_promo_ab1_live_start",
-          "line": 234,
-          "detail": ""
-        },
-        {
-          "file": "engine/tests/test_modules/effects/compound/cost_and_effect/discard_cost_reveal_five_conditional_mus_search_pl_bp6_006_test.rs",
-          "test": "maki_bp6_blade_expires_at_live_end",
-          "line": 222,
-          "detail": ""
-        },
-        {
-          "file": "engine/tests/test_modules/effects/compound/cost_and_effect/live_start_optional_unit_discard_draw_unit_cost_gain_test.rs",
-          "test": "optional_unit_discard_draw_cost_gain_skip_cost_no_cost_modifier",
-          "line": 68,
-          "detail": ""
-        },
-        {
-          "file": "engine/tests/test_modules/effects/compound/cost_and_effect/wait_self_bottom_mill_aqours_unwait_blades_pl_s_bp7_011_n_test.rs",
-          "test": "riko_blade_expires_at_live_end",
-          "line": 158,
-          "detail": ""
-        },
         {
           "file": "engine/tests/test_modules/effects/compound/sequential_effects/debut_draws_one_and_cannot_live_this_turn_q68_test.rs",
           "test": "tote_mari_q68_can_still_set_live_card",

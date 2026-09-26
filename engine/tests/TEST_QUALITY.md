@@ -54,20 +54,12 @@ _prompts answered by ORDINAL position (if step <= 2 { select 2 cards }) instead 
 
 None.
 
-## blind_phase_stepping (31)
+## blind_phase_stepping (23)
 
 _a fixed `for _ in 0..N { pass() }` walk through the turn — a phase gaining or losing a step silently shifts the window the test thinks it is standing in; step to the phase by name instead_
 
 | file | test | line | detail |
 | --- | --- | --- | --- |
-| `engine/tests/test_modules/characterization/logging_test.rs` | `real_choice_flow_emits_offered_and_resolved` | 271 |  |
-| `engine/tests/test_modules/characterization/performance_snapshot_audit_test.rs` | `audit_both_players_fail_no_winner` | 488 |  |
-| `engine/tests/test_modules/characterization/performance_snapshot_audit_test.rs` | `audit_p1_passes_p2_fails_p1_wins` | 690 |  |
-| `engine/tests/test_modules/characterization/pipeline_characterization_test.rs` | `s9_check_timing_cascade_smoke` | 214 |  |
-| `engine/tests/test_modules/effects/ability_mod/chisato_bp5_test.rs` | `chisato_promo_ab1_live_start` | 234 |  |
-| `engine/tests/test_modules/effects/compound/cost_and_effect/discard_cost_reveal_five_conditional_mus_search_pl_bp6_006_test.rs` | `maki_bp6_blade_expires_at_live_end` | 222 |  |
-| `engine/tests/test_modules/effects/compound/cost_and_effect/live_start_optional_unit_discard_draw_unit_cost_gain_test.rs` | `optional_unit_discard_draw_cost_gain_skip_cost_no_cost_modifier` | 68 |  |
-| `engine/tests/test_modules/effects/compound/cost_and_effect/wait_self_bottom_mill_aqours_unwait_blades_pl_s_bp7_011_n_test.rs` | `riko_blade_expires_at_live_end` | 158 |  |
 | `engine/tests/test_modules/effects/compound/sequential_effects/debut_draws_one_and_cannot_live_this_turn_q68_test.rs` | `tote_mari_q68_can_still_set_live_card` | 47 |  |
 | `engine/tests/test_modules/effects/compound/sequential_effects/live_success_mill_five_distinct_live_recovery_setup_test.rs` | `live_success_mill_distinct_live_recovery_three_same_name_copies_resolves` | 3 |  |
 | `engine/tests/test_modules/effects/compound/sequential_effects/live_success_mill_five_distinct_live_recovery_setup_test.rs` | `live_success_mill_distinct_live_recovery_two_same_name_copies_resolves` | 33 |  |

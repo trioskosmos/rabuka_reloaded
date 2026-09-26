@@ -875,3 +875,79 @@ they are the architecture.
    info samples).
 
 Between them, neither requires a single new hand-tuned scalar.
+
+---
+
+# V8: measured status (added 2026-09-26)
+
+v8 was previously undocumented here and had **never been benchmarked**. It is
+now, and it is no longer hypothetical.
+
+## Measuring before changing
+
+`bot_arena` now emits per-game outcomes (`--outcomes`) and runs a paired test
+against a baseline run (`--vs`). The deal for game N is a pure function of
+(`--seed`, N), so two runs on one seed face identical shuffles; the comparison
+is paired, and only the discordant games carry information. It reports an exact
+McNemar p-value and a Wilson interval. `--vs` refuses to run without a fixed
+`--games`, because a wall-clock run's `n` differs every time and cannot pair.
+A missing deck file is now a hard error instead of a silent synthesized list.
+
+Every number below is 400 games x 3 seeds x both seats = 2400 games,
+untraced, deck `5CP3Z idou`, v8 vs v7.
+
+| config | v8 win rate |
+|---|---|
+| v8 as shipped (one-check leaf) | 38.8% (930/2400) |
+| v8 + continuous band term | **44.2% (1060/2400)** |
+| v7 Main + v8 live (reference) | 49.3% (1184/2400) |
+
+The +5.4pp is about 3.8 sigma at this sample size, and removing the term
+costs 27 wins over 700 games plus a significant -0.018 placements-per-live-phase.
+Both seats and three independent seeds agree.
+
+## The defect was composition, not cost
+
+The first hypothesis was a saturating one-check leaf, and the fix for it was a
+two-horizon leaf. **That was wrong, and the measurement said so.** The
+development curve (now reported by the arena) shows v8's Main and v7's Main
+reaching an *identical* stage-cost profile - entering T4 11.7 vs 12.2, T7 24.5
+vs 25.9, both close to the guide's T1=4 / T2=9 / T3=13. The leaf was never
+short of horizon. The two-horizon term is retained but defaults to 0, because
+it did not pay.
+
+What differed is that a check reads **hearts and blades** (3.2), and cost is
+only a proxy for them - on a real decklist a high-cost low-heart member scores
+the same as a high-cost high-heart one. So the Main leaf now carries
+`hearts + Binomial(active blades, own density)`, which is section 4's "the real
+scoreboard", expressed in score-band units by interpolating the guide's own
+band medians (`band_progress`). No conversion constant between hearts and
+probability is invented, and the weight is flat from 2 to 16, so the term being
+present is what matters, not its exact value.
+
+## The real remaining gap
+
+Both bots place about **0.39-0.46 successes per live phase against the guide's
+~1.0 target from T2** (section 1 calls <=0.33 a defect). That is a factor of
+two on the metric the guide itself calls the bottleneck, and it is now visible
+in every run. Game length is healthy (median T6, target T5-T8), so games are
+not dragging - checks are simply not converting.
+
+v8's Main is still 5.1pp behind v7's Main, and after the fix it matches v7's
+development curve through T6 while still winning less. So the remaining gap is
+in check conversion and the live set, not in board construction. v8's live set
+also folds 6.3% of live phases against v7's 0.3%, which is the D2b junk-set
+defect reproducing.
+
+## Open, and worth more than any further tuning
+
+- Pace is 0.4 against a 1.0 target. That is the biggest single gap in the
+  project and it is not a tuning problem.
+- v8's live set burns 6.3% of live phases folding.
+- Abilities are not valued, by design: the engine already resolves all of them
+  by construction and v8's Main already executes every offered action, so a
+  value table would be strictly worse. What abilities need is depth to show
+  their effect, plus a fix for `has_unpassable_icon`, which currently makes a
+  live with a Draw/Score requirement neither settable nor discardable.
+- All of the above is measured on one deck in a mirror. A claim about being
+  better needs a second deck and a non-mirror opponent before it is believed.

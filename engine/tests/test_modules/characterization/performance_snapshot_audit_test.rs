@@ -515,11 +515,9 @@ fn audit_both_players_fail_no_winner() {
     game.state.player2.hand.cards.push(live2);
 
     // Advance to live card set
-    for _ in 0..5 {
-        game.pass();
-    }
+    game.advance_to_phase(rabuka_engine::game_state::Phase::LiveCardSetFirstAttacker);
     game.set_live_card(live);
-    game.pass(); // → p2 set
+    game.advance_to_phase(rabuka_engine::game_state::Phase::LiveCardSetSecondAttacker);
     game.state.player2.hand.cards.push(live2);
     game.set_live_card(live2);
 
@@ -720,12 +718,10 @@ fn audit_p1_passes_p2_fails_p1_wins() {
     game.state.player2.hand.cards.push(live2);
 
     // Advance to live card set
-    for _ in 0..5 {
-        game.pass();
-    }
+    game.advance_to_phase(rabuka_engine::game_state::Phase::LiveCardSetFirstAttacker);
 
     game.set_live_card(live);
-    game.pass(); // → p2 set
+    game.advance_to_phase(rabuka_engine::game_state::Phase::LiveCardSetSecondAttacker);
     game.state.player2.hand.cards.push(live2);
     game.set_live_card(live2);
 

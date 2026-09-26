@@ -83,9 +83,11 @@ fn optional_unit_discard_draw_cost_gain_skip_cost_no_cost_modifier() {
     }
     game.state.player2.hand.cards.push(filler);
     game.give_energy(10);
-    for _ in 0..5 { game.pass(); }
+    game.advance_to_phase(rabuka_engine::game_state::Phase::LiveCardSetFirstAttacker);
     game.set_live_card(live);
-    for _ in 0..2 { game.pass(); }
+    // Arrive at the ライブ開始時 window BY NAME and leave its prompt standing,
+    // so the optional cost prompt below is the one the phase raised.
+    game.advance_to_phase(rabuka_engine::game_state::Phase::FirstAttackerPerformance);
     assert!(game.has_pending_choice(), "optional cost prompt expected");
     // Skip the cost (empty selection)
     game.select_indices(&[]);
