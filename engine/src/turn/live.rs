@@ -23,6 +23,37 @@ struct CardNeed {
     need: [u8; 8],
 }
 
+/// One allocation of stage hearts onto a live card's requirement.
+///
+/// Every phase in `greedy_allocate` pushes the same eleven-field record, and
+/// ten of those fields are the same every time: what varies is which source the
+/// hearts came from, whether that source is a wildcard, which colour bucket
+/// they land in, how many, and which phase it was. Spelling the constant ten
+/// out five times made any change to them a five-site edit, and the phase field
+/// — the one thing a reader most wants to see — was buried in the middle.
+fn stage_alloc(
+    live_idx: usize,
+    card_name: &crate::types::ArcStr,
+    source_name: crate::types::SourceName,
+    wildcard: bool,
+    color: u8,
+    amount: u8,
+    phase: crate::types::AllocPhase,
+) -> crate::types::Allocation {
+    crate::types::Allocation {
+        target_idx: u8::try_from(live_idx).unwrap(),
+        target_name: card_name.clone(),
+        source_type: crate::types::SourceType::Stage,
+        source_name,
+        source_slot: None,
+        wildcard,
+        color,
+        amount,
+        is_bonus: false,
+        phase,
+    }
+}
+
 /// Icon tallies contributed by one yell-revealed card (rule 8.3.12).
 pub(crate) struct YellIconOutcome {
     pub blade_hearts: [u8; 8],
@@ -2247,18 +2278,15 @@ impl super::TurnEngine {
             for c in 1..7 {
                 if need[c] > 0 && pool[c] > 0 {
                     let take = pool[c].min(need[c]);
-                    allocs.push(Allocation {
-                        target_idx: u8::try_from(live_idx).unwrap(),
-                        target_name: card_name.clone(),
-                        source_type: SourceType::Stage,
-                        source_name: SourceName::StageHearts,
-                        source_slot: None,
-                        wildcard: false,
-                        color: u8::try_from(c).unwrap(),
-                        amount: take,
-                        is_bonus: false,
-                        phase: AllocPhase::Colored,
-                    });
+                    allocs.push(stage_alloc(
+                        live_idx,
+                        card_name,
+                        SourceName::StageHearts,
+                        false,
+                        u8::try_from(c).unwrap(),
+                        take,
+                        AllocPhase::Colored,
+                    ));
                     pool[c] -= take;
                     filled[c] += take;
                 }
@@ -2290,18 +2318,15 @@ impl super::TurnEngine {
                     }
                     if pool[c] > 0 {
                         let take = pool[c].min(h00_deficit - filled_h00);
-                        allocs.push(Allocation {
-                            target_idx: u8::try_from(live_idx).unwrap(),
-                            target_name: card_name.clone(),
-                            source_type: SourceType::Stage,
-                            source_name: SourceName::StageHearts,
-                            source_slot: None,
-                            wildcard: false,
-                            color: u8::try_from(c).unwrap(),
-                            amount: take,
-                            is_bonus: false,
-                            phase: AllocPhase::ColoredSurplus,
-                        });
+                        allocs.push(stage_alloc(
+                            live_idx,
+                            card_name,
+                            SourceName::StageHearts,
+                            false,
+                            u8::try_from(c).unwrap(),
+                            take,
+                            AllocPhase::ColoredSurplus,
+                        ));
                         pool[c] -= take;
                         filled_h00 += take;
                         filled[c] += take;
@@ -2313,18 +2338,15 @@ impl super::TurnEngine {
                 // bucket — never a specific color.
                 if filled_h00 < h00_deficit && pool[0] > 0 {
                     let take = pool[0].min(h00_deficit - filled_h00);
-                    allocs.push(Allocation {
-                        target_idx: u8::try_from(live_idx).unwrap(),
-                        target_name: card_name.clone(),
-                        source_type: SourceType::Stage,
-                        source_name: SourceName::StageHearts,
-                        source_slot: None,
-                        wildcard: false,
-                        color: 0,
-                        amount: take,
-                        is_bonus: false,
-                        phase: AllocPhase::H00,
-                    });
+                    allocs.push(stage_alloc(
+                        live_idx,
+                        card_name,
+                        SourceName::StageHearts,
+                        false,
+                        0,
+                        take,
+                        AllocPhase::H00,
+                    ));
                     pool[0] -= take;
                     filled_h00 += take;
                     let _ = filled_h00;
@@ -2338,18 +2360,15 @@ impl super::TurnEngine {
                     if need[c] > filled[c] && pool[7] > 0 {
                         let deficit = need[c] - filled[c];
                         let take = pool[7].min(deficit);
-                        allocs.push(Allocation {
-                            target_idx: u8::try_from(live_idx).unwrap(),
-                            target_name: card_name.clone(),
-                            source_type: SourceType::Stage,
-                            source_name: SourceName::AllHeartIconAll,
-                            source_slot: None,
-                            wildcard: true,
-                            color: u8::try_from(c).unwrap(),
-                            amount: take,
-                            is_bonus: false,
-                            phase: AllocPhase::AllCleanup,
-                        });
+                        allocs.push(stage_alloc(
+                            live_idx,
+                            card_name,
+                            SourceName::AllHeartIconAll,
+                            true,
+                            u8::try_from(c).unwrap(),
+                            take,
+                            AllocPhase::AllCleanup,
+                        ));
                         pool[7] -= take;
                         filled[c] += take;
                     }
@@ -2363,18 +2382,15 @@ impl super::TurnEngine {
                     let h00_still_needed = h00_remaining.saturating_sub(already_filled_h00);
                     if h00_still_needed > 0 && pool[7] > 0 {
                         let take = pool[7].min(h00_still_needed);
-                        allocs.push(Allocation {
-                            target_idx: u8::try_from(live_idx).unwrap(),
-                            target_name: card_name.clone(),
-                            source_type: SourceType::Stage,
-                            source_name: SourceName::AllHeartIconAll,
-                            source_slot: None,
-                            wildcard: false,
-                            color: 7,
-                            amount: take,
-                            is_bonus: false,
-                            phase: AllocPhase::AllCleanup,
-                        });
+                        allocs.push(stage_alloc(
+                            live_idx,
+                            card_name,
+                            SourceName::AllHeartIconAll,
+                            false,
+                            7,
+                            take,
+                            AllocPhase::AllCleanup,
+                        ));
                         pool[7] -= take;
                         filled[0] += take;
                         let _ = filled;
