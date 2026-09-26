@@ -63,7 +63,8 @@ fn deep_resonance_aqours_center_cost9_fires() {
     let filler = game.id("PL!-sd1-010-SD");
 
     game.state.player1.live_card_zone.cards.push(dr);
-    game.state.player1.stage.stage = [filler, aq_center, filler];
+    let filler_copy2 = game.new_id("PL!-sd1-010-SD");
+    game.state.player1.stage.stage = [filler, aq_center, filler_copy2];
     fill_decks(&mut game, filler);
 
     trigger_ability(&mut game, dr, "ライブ開始時");
@@ -106,7 +107,8 @@ fn deep_resonance_empty_center_no_fire() {
     let filler = game.id("PL!-sd1-010-SD");
 
     game.state.player1.live_card_zone.cards.push(dr);
-    game.state.player1.stage.stage = [filler, -1, filler];
+    let filler_copy2 = game.new_id("PL!-sd1-010-SD");
+    game.state.player1.stage.stage = [filler, -1, filler_copy2];
     fill_decks(&mut game, filler);
 
     trigger_ability(&mut game, dr, "ライブ開始時");
@@ -122,7 +124,8 @@ fn deep_resonance_aqours_cost4_below_threshold_no_fire() {
     let filler = game.id("PL!-sd1-010-SD");
 
     game.state.player1.live_card_zone.cards.push(dr);
-    game.state.player1.stage.stage = [filler, aq_low, filler];
+    let filler_copy2 = game.new_id("PL!-sd1-010-SD");
+    game.state.player1.stage.stage = [filler, aq_low, filler_copy2];
     fill_decks(&mut game, filler);
 
     trigger_ability(&mut game, dr, "ライブ開始時");
@@ -142,7 +145,8 @@ fn deep_resonance_wrong_group_at_center_no_fire() {
     let filler = game.id("PL!-sd1-010-SD");
 
     game.state.player1.live_card_zone.cards.push(dr);
-    game.state.player1.stage.stage = [filler, non_aq, filler];
+    let filler_copy2 = game.new_id("PL!-sd1-010-SD");
+    game.state.player1.stage.stage = [filler, non_aq, filler_copy2];
     fill_decks(&mut game, filler);
 
     trigger_ability(&mut game, dr, "ライブ開始時");
@@ -162,7 +166,8 @@ fn deep_resonance_aqours_cost13_at_left_no_fire() {
     let filler = game.id("PL!-sd1-010-SD");
 
     game.state.player1.live_card_zone.cards.push(dr);
-    game.state.player1.stage.stage = [aq_left, filler, filler];
+    let filler_copy2 = game.new_id("PL!-sd1-010-SD");
+    game.state.player1.stage.stage = [aq_left, filler, filler_copy2];
     fill_decks(&mut game, filler);
 
     trigger_ability(&mut game, dr, "ライブ開始時");
@@ -184,7 +189,8 @@ fn deep_resonance_option_0_blade_gain_exact_modifier() {
     let filler = game.id("PL!-sd1-010-SD");
 
     game.state.player1.live_card_zone.cards.push(dr);
-    game.state.player1.stage.stage = [filler, aq_center, filler];
+    let filler_copy2 = game.new_id("PL!-sd1-010-SD");
+    game.state.player1.stage.stage = [filler, aq_center, filler_copy2];
     fill_decks(&mut game, filler);
 
     let blade_before = game.state.mods.get_blade_modifier(aq_center);
@@ -236,7 +242,8 @@ fn deep_resonance_option_1_opponent_wait_exact_state() {
     let filler = game.id("PL!-sd1-010-SD");
 
     game.state.player1.live_card_zone.cards.push(dr);
-    game.state.player1.stage.stage = [filler, aq_center, filler];
+    let filler_copy2 = game.new_id("PL!-sd1-010-SD");
+    game.state.player1.stage.stage = [filler, aq_center, filler_copy2];
     game.state.player2.stage.stage = [filler, -1, -1];
     fill_decks(&mut game, filler);
 

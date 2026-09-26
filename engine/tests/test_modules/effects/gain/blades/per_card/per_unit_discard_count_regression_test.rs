@@ -9,7 +9,8 @@ fn test_per_unit_discard_bug_fix() {
     let mut game = TestGame::new(db);
 
     let filler = game.id("PL!-sd1-010-SD");
-    game.state.player1.stage.stage = [filler, filler, -1];
+    let filler_copy2 = game.new_id("PL!-sd1-010-SD");
+    game.state.player1.stage.stage = [filler, filler_copy2, -1];
     game.state.player1.hand.cards.clear();
     for _ in 0..30 {
         game.state.player1.main_deck.cards.push(filler);

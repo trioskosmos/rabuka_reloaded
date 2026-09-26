@@ -32,7 +32,8 @@ fn discard_then_live_recovery_pays_score_energy_or_declines_q214() {
         let hand_cost_filler = game.id("PL!-sd1-010-SD");
         let filler = game.id("PL!-sd1-010-SD");
 
-        game.state.player1.stage.stage = [filler, shizuku, filler];
+        let filler_copy2 = game.new_id("PL!-sd1-010-SD");
+        game.state.player1.stage.stage = [filler, shizuku, filler_copy2];
         game.state.player1.hand.cards.push(hand_cost_filler);
         game.state.player1.waitroom.cards.push(discard_live);
         game.give_energy(5);
@@ -90,7 +91,8 @@ fn discard_then_live_recovery_pays_score_energy_or_declines_q214() {
         let hand_cost_filler = game.id("PL!-sd1-010-SD");
         let filler = game.id("PL!-sd1-010-SD");
 
-        game.state.player1.stage.stage = [filler, shizuku, filler];
+        let filler_copy3 = game.new_id("PL!-sd1-010-SD");
+        game.state.player1.stage.stage = [filler, shizuku, filler_copy3];
         game.state.player1.hand.cards.push(hand_cost_filler);
         game.state.player1.waitroom.cards.push(discard_live);
         game.give_energy(1); // Player has 1 energy
@@ -139,7 +141,8 @@ fn discard_then_live_recovery_pays_score_energy_or_declines_q214() {
         let hand_cost_filler = game.id("PL!-sd1-010-SD");
         let filler = game.id("PL!-sd1-010-SD");
 
-        game.state.player1.stage.stage = [filler, shizuku, filler];
+        let filler_copy4 = game.new_id("PL!-sd1-010-SD");
+        game.state.player1.stage.stage = [filler, shizuku, filler_copy4];
         game.state.player1.hand.cards.push(hand_cost_filler);
         game.state.player1.waitroom.cards.push(discard_live);
         game.give_energy(1); // Player only has 1 energy, needs 2
@@ -191,7 +194,8 @@ fn discard_then_live_recovery_pays_score_energy_or_declines_q214() {
         let hand_cost_filler = game.id("PL!-sd1-010-SD");
         let filler = game.id("PL!-sd1-010-SD");
 
-        game.state.player1.stage.stage = [filler, shizuku, filler];
+        let filler_copy5 = game.new_id("PL!-sd1-010-SD");
+        game.state.player1.stage.stage = [filler, shizuku, filler_copy5];
         game.state.player1.hand.cards.push(hand_cost_filler);
         game.state.player1.waitroom.cards.push(discard_live);
         game.give_energy(5);

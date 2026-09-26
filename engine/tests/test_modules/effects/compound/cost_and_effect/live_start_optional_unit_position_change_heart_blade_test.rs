@@ -319,7 +319,8 @@ fn live_start_unit_swap_no_valid_destinations_skips() {
     let himeno = game.id("PL!HS-pb1-006-R");
     let filler = game.id("PL!-sd1-010-SD");
 
-    game.state.player1.stage.stage = [himeno, filler, filler];
+    let filler_copy2 = game.new_id("PL!-sd1-010-SD");
+    game.state.player1.stage.stage = [himeno, filler, filler_copy2];
     fill_decks(&mut game, filler);
     game.give_energy(11);
 

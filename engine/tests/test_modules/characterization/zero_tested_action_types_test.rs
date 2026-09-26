@@ -106,7 +106,9 @@ fn vivid_world_live_phase_blade_and_success() {
         game.state.player2.main_deck.cards.push(filler);
     }
 
-    game.state.player1.stage.stage = [stage_card, stage_card, stage_card];
+    let stage_card_copy2 = game.new_id("PL!HS-pb1-023-N");
+    let stage_card_copy3 = game.new_id("PL!HS-pb1-023-N");
+    game.state.player1.stage.stage = [stage_card, stage_card_copy2, stage_card_copy3];
     game.state.player2.stage.stage = [-1, -1, -1];
     game.state.player1.energy_zone.cards.clear();
     for _ in 0..30 {
@@ -350,7 +352,8 @@ fn vitamin_summer_live_success_hand_condition() {
     // PL!SP-sd1-020-SD: heart02=1
     let nico = game.id("PL!-sd1-009-SD");
     let h02 = game.id("PL!SP-sd1-020-SD");
-    game.state.player1.stage.stage = [nico, nico, h02];
+    let nico_copy2 = game.new_id("PL!-sd1-009-SD");
+    game.state.player1.stage.stage = [nico, nico_copy2, h02];
     game.state.player1.hand.cards.push(live);
     for _ in 0..5 {
         game.state.player1.hand.cards.push(filler);

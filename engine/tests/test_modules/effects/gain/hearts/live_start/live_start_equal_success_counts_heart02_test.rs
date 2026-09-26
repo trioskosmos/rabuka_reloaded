@@ -285,7 +285,9 @@ fn landing_action_yeah_surplus_heart_ge_3_true() {
     let provider = game.id("PL!S-sd1-001-SD");
     let condition = landing_action_yeah_surplus_heart_condition();
 
-    game.state.player1.stage.stage = [provider, provider, provider];
+    let provider_copy2 = game.new_id("PL!S-sd1-001-SD");
+    let provider_copy3 = game.new_id("PL!S-sd1-001-SD");
+    game.state.player1.stage.stage = [provider, provider_copy2, provider_copy3];
     game.state.player1.live_card_zone.cards.push(live);
 
     let ctx = ConditionContext::new(&game.state);
@@ -323,7 +325,9 @@ fn landing_action_yeah_surplus_heart_applies_score_bonus() {
     let provider = game.id("PL!S-sd1-001-SD");
     let effect = landing_action_yeah_surplus_heart_effect();
 
-    game.state.player1.stage.stage = [provider, provider, provider];
+    let provider_copy2 = game.new_id("PL!S-sd1-001-SD");
+    let provider_copy3 = game.new_id("PL!S-sd1-001-SD");
+    game.state.player1.stage.stage = [provider, provider_copy2, provider_copy3];
     game.state.player1.live_card_zone.cards.push(live);
     game.state.activating_card = Some(live);
 

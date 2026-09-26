@@ -49,7 +49,8 @@ fn rina_bp5n_heart02_ge5_increases_opponent_need_heart00() {
     let filler = game.id("PL!-sd1-010-SD");
 
     // Stage: [h02(2), Rina(1), h02(2)] = 5 total heart02
-    game.state.player1.stage.stage = [h02_member, rina, h02_member];
+    let h02_member_copy2 = game.new_id("PL!S-sd1-010-SD");
+    game.state.player1.stage.stage = [h02_member, rina, h02_member_copy2];
     game.state.player2.live_card_zone.cards.push(opp_live);
     for _ in 0..30 {
         game.state.player1.main_deck.cards.push(filler);

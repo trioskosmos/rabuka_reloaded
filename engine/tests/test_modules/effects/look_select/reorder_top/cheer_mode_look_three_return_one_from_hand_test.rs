@@ -173,7 +173,9 @@ fn q276_control_normal_live_does_go_to_success_zone() {
     let member = game.id("PL!-sd1-001-SD"); // heart01:1 heart03:2 heart06:1
     let filler = game.id("PL!-sd1-010-SD");
 
-    game.state.player1.stage.stage = [member, member, member];
+    let member_copy2 = game.new_id("PL!-sd1-001-SD");
+    let member_copy3 = game.new_id("PL!-sd1-001-SD");
+    game.state.player1.stage.stage = [member, member_copy2, member_copy3];
     game.state.player1.hand.cards.push(live);
     for _ in 0..50 {
         game.state.player1.main_deck.cards.push(filler);

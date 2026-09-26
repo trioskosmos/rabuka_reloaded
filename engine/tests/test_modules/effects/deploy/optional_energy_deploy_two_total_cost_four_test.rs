@@ -465,7 +465,9 @@ fn deploy_stage_full_graceful() {
     let filler_m = game.id("PL!-sd1-001-SD");
     let filler = game.id("PL!-sd1-010-SD");
 
-    game.state.player1.stage.stage = [filler_m, filler_m, filler_m]; // full
+    let filler_m_copy2 = game.new_id("PL!-sd1-001-SD");
+    let filler_m_copy3 = game.new_id("PL!-sd1-001-SD");
+    game.state.player1.stage.stage = [filler_m, filler_m_copy2, filler_m_copy3]; // full
     game.state.player1.waitroom.cards.push(cost_2a);
     game.state.player1.waitroom.cards.push(cost_2b);
     game.state.player1.hand.cards.push(yoshiko);

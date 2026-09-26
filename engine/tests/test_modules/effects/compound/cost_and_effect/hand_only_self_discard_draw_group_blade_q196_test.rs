@@ -16,7 +16,8 @@ fn hand_only_self_discard_draw_q196_draw_after_discard_cost() {
     let shizuku = game.id("PL!N-pb1-003-R");
     let filler = game.id("PL!-sd1-010-SD");
 
-    game.state.player1.stage.stage = [filler, filler, -1];
+    let filler_copy2 = game.new_id("PL!-sd1-010-SD");
+    game.state.player1.stage.stage = [filler, filler_copy2, -1];
     game.state.player1.hand.cards.push(shizuku);
     game.state.player1.hand.cards.push(filler);
     game.state.player1.main_deck.cards.clear();

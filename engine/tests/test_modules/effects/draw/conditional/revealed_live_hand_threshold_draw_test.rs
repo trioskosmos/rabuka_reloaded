@@ -42,7 +42,8 @@ fn revealed_live_above_hand_threshold_does_not_draw_again() {
     }
     game.state.player1.hand.cards.push(live);
 
-    game.state.player1.stage.stage = [hanamaru, blader, blader];
+    let blader_copy2 = game.new_id("PL!S-PR-014-PR");
+    game.state.player1.stage.stage = [hanamaru, blader, blader_copy2];
 
     advance_to_live_set(&mut game);
     game.set_live_card(live);
@@ -95,7 +96,8 @@ fn revealed_filler_does_not_satisfy_live_condition() {
     }
     game.state.player1.hand.cards.push(live);
 
-    game.state.player1.stage.stage = [hanamaru, blader, blader];
+    let blader_copy2 = game.new_id("PL!S-PR-014-PR");
+    game.state.player1.stage.stage = [hanamaru, blader, blader_copy2];
 
     advance_to_live_set(&mut game);
     game.set_live_card(live);

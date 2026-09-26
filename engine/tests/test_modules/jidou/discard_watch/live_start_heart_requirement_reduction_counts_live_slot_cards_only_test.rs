@@ -30,7 +30,8 @@ fn hanamusubi_q213_member_card_moved_before_live_start() {
     }
 
     // Stage: hanamusubi (live card), filler
-    game.state.player1.stage.stage = [hanamusubi, filler, filler];
+    let filler_copy2 = game.new_id("PL!-sd1-010-SD");
+    game.state.player1.stage.stage = [hanamusubi, filler, filler_copy2];
     game.state.player1.hand.cards.push(hasetsu);
     // Need a real live card too
     let live = game.id("LL-bp5-001-L");

@@ -380,7 +380,8 @@ fn sumire_no_liella_on_stage_plays_normally() {
     }
     game.state.player1.hand.cards.push(sumire);
     game.state.player1.hand.cards.push(filler);
-    game.state.player1.stage.stage = [filler, filler, -1];
+    let filler_copy2 = game.new_id("PL!-sd1-010-SD");
+    game.state.player1.stage.stage = [filler, filler_copy2, -1];
     game.give_energy(20);
 
     advance_to_turn2(&mut game);

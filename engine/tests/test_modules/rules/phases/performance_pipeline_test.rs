@@ -250,7 +250,8 @@ fn heart00_passes_check_fails_when_insufficient() {
 
     // Stage: 2 members providing 4 total specific hearts
     // Pool: heart01=2, heart03=2 (4 specific hearts, no yell since blade=0)
-    game.state.player1.stage.stage = [member, member, -1];
+    let member_copy2 = game.new_id("PL!-sd1-008-SD");
+    game.state.player1.stage.stage = [member, member_copy2, -1];
 
     // Put 2 live cards in hand
     game.state.player1.hand.cards.push(live_a);
@@ -320,7 +321,8 @@ fn heart00_passes_check_succeeds_when_sufficient() {
     }
 
     // Stage: 2 members providing 4 hearts → meets Heart00=4
-    game.state.player1.stage.stage = [member, member, -1];
+    let member_copy2 = game.new_id("PL!-sd1-008-SD");
+    game.state.player1.stage.stage = [member, member_copy2, -1];
 
     game.state.player1.hand.cards.push(live);
     advance_to_live_card_set_p1(&mut game);
@@ -377,7 +379,8 @@ fn live_card_base_score_stored_correctly() {
         game.state.player2.main_deck.cards.push(member);
     }
 
-    game.state.player1.stage.stage = [member, member, -1];
+    let member_copy2 = game.new_id("PL!-sd1-008-SD");
+    game.state.player1.stage.stage = [member, member_copy2, -1];
     game.state.player1.hand.cards.push(live);
     advance_to_live_card_set_p1(&mut game);
     game.set_live_card(live);

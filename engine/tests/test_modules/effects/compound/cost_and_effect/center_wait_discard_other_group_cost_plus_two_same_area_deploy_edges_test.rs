@@ -97,7 +97,8 @@ fn center_other_member_cost_plus_two_deploy_only_non_aqours_on_stage() {
     let yoshiko = game.id("PL!S-bp3-006-R\u{ff0b}");
     let filler = game.id("PL!-sd1-010-SD");
 
-    game.state.player1.stage.stage = [filler, yoshiko, filler];
+    let filler_copy2 = game.new_id("PL!-sd1-010-SD");
+    game.state.player1.stage.stage = [filler, yoshiko, filler_copy2];
     game.state.player1.hand.cards.push(filler);
     game.give_energy(15);
 
@@ -108,7 +109,7 @@ fn center_other_member_cost_plus_two_deploy_only_non_aqours_on_stage() {
 
     assert_eq!(
         game.player().stage.stage,
-        [filler, yoshiko, filler],
+        [filler, yoshiko, filler_copy2],
         "stage unchanged — fillers are not Aqours"
     );
 }

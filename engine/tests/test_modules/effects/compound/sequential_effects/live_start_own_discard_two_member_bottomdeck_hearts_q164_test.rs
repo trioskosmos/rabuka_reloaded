@@ -30,7 +30,8 @@ fn live_start_bottomdeck_two_members_q164_uses_own_discard_only() {
     let opp_copy = game.new_id("PL!-sd1-002-SD");
     game.state.player2.waitroom.cards.push(opp_copy);
 
-    game.state.player1.stage.stage = [rina, filler, filler];
+    let filler_copy2 = game.new_id("PL!-sd1-010-SD");
+    game.state.player1.stage.stage = [rina, filler, filler_copy2];
     game.state.player1.hand.cards.push(live);
     game.state.player1.hand.cards.push(filler);
 

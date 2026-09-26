@@ -28,7 +28,9 @@ fn setup_live(live_no: &str, energy: usize) -> (TestGame, i16, usize) {
         game.state.player2.main_deck.cards.push(filler);
     }
     let stage_member = game.new_id("PL!-sd1-001-SD");
-    game.state.player1.stage.stage = [stage_member, stage_member, stage_member];
+    let stage_member_copy2 = game.new_id("PL!-sd1-001-SD");
+    let stage_member_copy3 = game.new_id("PL!-sd1-001-SD");
+    game.state.player1.stage.stage = [stage_member, stage_member_copy2, stage_member_copy3];
     let live = game.id(live_no);
     game.assert_card_identity(live, live_no);
     game.state.player1.hand.cards.push(live);

@@ -75,8 +75,10 @@ fn opponent_cost_self_higher_scores_in_snapshot() {
     let filler = game.id("PL!-sd1-010-SD");
 
     game.state.player1.hand.cards.push(nonfiction);
-    game.state.player1.stage.stage = [filler, self_center, filler];
-    game.state.player2.stage.stage = [filler, game.id("PL!-sd1-010-SD"), filler];
+    let filler_copy2 = game.new_id("PL!-sd1-010-SD");
+    game.state.player1.stage.stage = [filler, self_center, filler_copy2];
+    let filler_copy3 = game.new_id("PL!-sd1-010-SD");
+    game.state.player2.stage.stage = [filler, game.id("PL!-sd1-010-SD"), filler_copy3];
     fill_both_decks(&mut game, filler);
 
     // Step to the live window BY NAME. The five blind passes plus the four bare
@@ -109,8 +111,11 @@ fn opponent_cost_self_lower_no_score_in_snapshot() {
     let opp_center = game.id("PL!SP-pb1-001-R"); // cost=11
 
     game.state.player1.hand.cards.push(nonfiction);
-    game.state.player1.stage.stage = [filler, filler, filler];
-    game.state.player2.stage.stage = [filler, opp_center, filler];
+    let filler_copy2 = game.new_id("PL!-sd1-010-SD");
+    let filler_copy3 = game.new_id("PL!-sd1-010-SD");
+    game.state.player1.stage.stage = [filler, filler_copy2, filler_copy3];
+    let filler_copy4 = game.new_id("PL!-sd1-010-SD");
+    game.state.player2.stage.stage = [filler, opp_center, filler_copy4];
     fill_both_decks(&mut game, filler);
 
     // Step to the live window BY NAME. The five blind passes plus the four bare
@@ -240,7 +245,8 @@ fn blade_goes_to_stage_member_not_live_card() {
     assert_eq!(base_heart02(&game.db, left_high), 4);
 
     game.state.player1.hand.cards.push(nonfiction);
-    game.state.player1.stage.stage = [left_high, filler, filler];
+    let filler_copy2 = game.new_id("PL!-sd1-010-SD");
+    game.state.player1.stage.stage = [left_high, filler, filler_copy2];
     fill_both_decks(&mut game, filler);
 
     let live_blade_before = game.state.mods.get_blade_modifier(nonfiction);

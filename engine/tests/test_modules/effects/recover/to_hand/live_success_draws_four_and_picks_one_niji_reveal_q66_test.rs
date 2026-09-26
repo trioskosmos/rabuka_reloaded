@@ -29,8 +29,10 @@ fn poppin_q66_has_cards_beats_no_cards() {
     let mut game = TestGame::new(db);
 
     let member = game.id("PL!-PR-012-PR");
-    game.state.player1.stage.stage = [member, member, -1];
-    game.state.player2.stage.stage = [member, member, -1];
+    let member_copy2 = game.new_id("PL!-PR-012-PR");
+    game.state.player1.stage.stage = [member, member_copy2, -1];
+    let member_copy3 = game.new_id("PL!-PR-012-PR");
+    game.state.player2.stage.stage = [member, member_copy3, -1];
 
     let poppin = game.id("PL!N-bp1-026-L");
     let niji = game.id("PL!N-pb1-005-R");
@@ -74,8 +76,10 @@ fn poppin_equal_score_fails() {
     let mut game = TestGame::new(db);
 
     let member = game.id("PL!-PR-012-PR");
-    game.state.player1.stage.stage = [member, member, -1];
-    game.state.player2.stage.stage = [member, member, -1];
+    let member_copy2 = game.new_id("PL!-PR-012-PR");
+    game.state.player1.stage.stage = [member, member_copy2, -1];
+    let member_copy3 = game.new_id("PL!-PR-012-PR");
+    game.state.player2.stage.stage = [member, member_copy3, -1];
 
     let poppin = game.id("PL!N-bp1-026-L");
     let niji = game.id("PL!N-pb1-005-R");
@@ -119,8 +123,10 @@ fn poppin_lower_score_fails() {
     let mut game = TestGame::new(db);
 
     let member = game.id("PL!-PR-012-PR");
-    game.state.player1.stage.stage = [member, member, -1];
-    game.state.player2.stage.stage = [member, member, -1];
+    let member_copy2 = game.new_id("PL!-PR-012-PR");
+    game.state.player1.stage.stage = [member, member_copy2, -1];
+    let member_copy3 = game.new_id("PL!-PR-012-PR");
+    game.state.player2.stage.stage = [member, member_copy3, -1];
 
     let poppin = game.id("PL!N-bp1-026-L");
     let niji = game.id("PL!N-pb1-005-R");
@@ -162,8 +168,10 @@ fn poppin_multiple_cards_lower_total_fails() {
     let mut game = TestGame::new(db);
 
     let member = game.id("PL!-PR-012-PR");
-    game.state.player1.stage.stage = [member, member, -1];
-    game.state.player2.stage.stage = [member, member, -1];
+    let member_copy2 = game.new_id("PL!-PR-012-PR");
+    game.state.player1.stage.stage = [member, member_copy2, -1];
+    let member_copy3 = game.new_id("PL!-PR-012-PR");
+    game.state.player2.stage.stage = [member, member_copy3, -1];
 
     let poppin = game.id("PL!N-bp1-026-L");
     let niji = game.id("PL!N-pb1-005-R");
@@ -214,8 +222,10 @@ fn poppin_multiple_niji_revealed_picks_one() {
     let mut game = TestGame::new(db);
 
     let member = game.id("PL!-PR-012-PR");
-    game.state.player1.stage.stage = [member, member, -1];
-    game.state.player2.stage.stage = [member, member, -1];
+    let member_copy2 = game.new_id("PL!-PR-012-PR");
+    game.state.player1.stage.stage = [member, member_copy2, -1];
+    let member_copy3 = game.new_id("PL!-PR-012-PR");
+    game.state.player2.stage.stage = [member, member_copy3, -1];
 
     let poppin = game.id("PL!N-bp1-026-L");
     let niji_a = game.id("PL!N-pb1-005-R");
@@ -267,8 +277,10 @@ fn poppin_no_niji_revealed_effect_fails() {
     let mut game = TestGame::new(db);
 
     let member = game.id("PL!-PR-012-PR");
-    game.state.player1.stage.stage = [member, member, -1];
-    game.state.player2.stage.stage = [member, member, -1];
+    let member_copy2 = game.new_id("PL!-PR-012-PR");
+    game.state.player1.stage.stage = [member, member_copy2, -1];
+    let member_copy3 = game.new_id("PL!-PR-012-PR");
+    game.state.player2.stage.stage = [member, member_copy3, -1];
 
     let poppin = game.id("PL!N-bp1-026-L");
     let ball = game.id("PL!-sd1-020-SD");
@@ -319,8 +331,10 @@ fn poppin_mixed_revealed_picks_niji_only() {
     let mut game = TestGame::new(db);
 
     let member = game.id("PL!-PR-012-PR");
-    game.state.player1.stage.stage = [member, member, -1];
-    game.state.player2.stage.stage = [member, member, -1];
+    let member_copy2 = game.new_id("PL!-PR-012-PR");
+    game.state.player1.stage.stage = [member, member_copy2, -1];
+    let member_copy3 = game.new_id("PL!-PR-012-PR");
+    game.state.player2.stage.stage = [member, member_copy3, -1];
 
     let poppin = game.id("PL!N-bp1-026-L");
     let niji = game.id("PL!N-pb1-005-R");

@@ -127,7 +127,8 @@ fn proof_cost_below_20_no_effect() {
     let hs_low = game.id("PL!HS-bp1-005-PR"); // cost=9
     let filler = game.id("PL!-sd1-010-SD");
 
-    game.state.player1.stage.stage = [hs_low, filler, filler];
+    let filler_copy2 = game.new_id("PL!-sd1-010-SD");
+    game.state.player1.stage.stage = [hs_low, filler, filler_copy2];
     game.state.player1.main_deck.cards.clear();
     game.state.player1.main_deck.cards.push(filler);
     game.state.player1.main_deck.cards.push(filler);

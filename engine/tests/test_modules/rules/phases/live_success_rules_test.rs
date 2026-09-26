@@ -70,8 +70,12 @@ fn both_players_live_score_compared() {
     let p2_live = game.id("PL!-sd1-019-SD");
     let filler = game.id("PL!-sd1-010-SD");
     let member = game.id("PL!-sd1-001-SD");
-    game.state.player1.stage.stage = [member, member, member];
-    game.state.player2.stage.stage = [member, member, member];
+    let member_copy2 = game.new_id("PL!-sd1-001-SD");
+    let member_copy3 = game.new_id("PL!-sd1-001-SD");
+    game.state.player1.stage.stage = [member, member_copy2, member_copy3];
+    let member_copy4 = game.new_id("PL!-sd1-001-SD");
+    let member_copy5 = game.new_id("PL!-sd1-001-SD");
+    game.state.player2.stage.stage = [member, member_copy4, member_copy5];
     game.state.player1.hand.cards.push(p1_live);
     game.state.player2.hand.cards.push(p2_live);
     for _ in 0..50 {
@@ -107,7 +111,9 @@ fn q147_empty_need_heart_live_succeeds() {
     let live = game.id("PL!-sd1-019-SD");
     let filler = game.id("PL!-sd1-010-SD");
     let member = game.id("PL!-sd1-001-SD");
-    game.state.player1.stage.stage = [member, member, member];
+    let member_copy2 = game.new_id("PL!-sd1-001-SD");
+    let member_copy3 = game.new_id("PL!-sd1-001-SD");
+    game.state.player1.stage.stage = [member, member_copy2, member_copy3];
     game.state.player1.hand.cards.push(live);
     for _ in 0..50 {
         game.state.player1.main_deck.cards.push(filler);
@@ -155,8 +161,12 @@ fn both_players_have_live_cards() {
     let p2_live = game.id("PL!-sd1-019-SD");
     let filler = game.id("PL!-sd1-010-SD");
     let member = game.id("PL!-sd1-001-SD");
-    game.state.player1.stage.stage = [member, member, member];
-    game.state.player2.stage.stage = [member, member, member];
+    let member_copy2 = game.new_id("PL!-sd1-001-SD");
+    let member_copy3 = game.new_id("PL!-sd1-001-SD");
+    game.state.player1.stage.stage = [member, member_copy2, member_copy3];
+    let member_copy4 = game.new_id("PL!-sd1-001-SD");
+    let member_copy5 = game.new_id("PL!-sd1-001-SD");
+    game.state.player2.stage.stage = [member, member_copy4, member_copy5];
     game.state.player1.hand.cards.push(p1_live);
     game.state.player2.hand.cards.push(p2_live);
     for _ in 0..50 {
@@ -197,7 +207,9 @@ fn one_player_live_auto_higher_score() {
     let live = game.id("PL!-sd1-019-SD");
     let filler = game.id("PL!-sd1-010-SD");
     let member = game.id("PL!-sd1-001-SD");
-    game.state.player1.stage.stage = [member, member, member];
+    let member_copy2 = game.new_id("PL!-sd1-001-SD");
+    let member_copy3 = game.new_id("PL!-sd1-001-SD");
+    game.state.player1.stage.stage = [member, member_copy2, member_copy3];
     game.state.player1.hand.cards.push(live);
     for _ in 0..50 {
         game.state.player1.main_deck.cards.push(filler);

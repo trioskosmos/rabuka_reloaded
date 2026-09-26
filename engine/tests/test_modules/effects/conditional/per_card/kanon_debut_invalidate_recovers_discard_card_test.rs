@@ -125,7 +125,8 @@ fn kanon_live_start_invalidation_expires_at_live_end() {
     game.state.player1.main_deck.cards.clear();
     game.state.player1.hand.cards.clear();
     game.state.player1.waitroom.cards.clear();
-    game.state.player1.stage.stage = [target, filler, filler];
+    let filler_copy2 = game.new_id("PL!-sd1-010-SD");
+    game.state.player1.stage.stage = [target, filler, filler_copy2];
     game.state.player2.stage.stage = [-1, -1, -1];
     for _ in 0..20 {
         game.state.player1.main_deck.cards.push(filler);

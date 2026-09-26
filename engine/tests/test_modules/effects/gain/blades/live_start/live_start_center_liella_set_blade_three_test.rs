@@ -97,7 +97,8 @@ fn liella_at_right_side_excluded_by_position() {
     let liella = game.id("PL!SP-bp1-001-R");
     let filler = game.id("PL!-sd1-010-SD");
 
-    game.state.player1.stage.stage = [filler, filler, liella];
+    let filler_copy2 = game.new_id("PL!-sd1-010-SD");
+    game.state.player1.stage.stage = [filler, filler_copy2, liella];
     game.state.player1.hand.cards.push(special);
     game.state.player1.hand.cards.push(filler);
     fill_decks(&mut game);

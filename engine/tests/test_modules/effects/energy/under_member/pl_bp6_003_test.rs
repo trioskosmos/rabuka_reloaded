@@ -582,7 +582,8 @@ fn kotori_no_empty_slot_keeps_under() {
     let muse = game.id("PL!-sd1-005-SD");
     let filler = game.id("PL!-sd1-010-SD");
 
-    game.state.player1.stage.stage = [filler, kotori, filler];
+    let filler_copy2 = game.new_id("PL!-sd1-010-SD");
+    game.state.player1.stage.stage = [filler, kotori, filler_copy2];
     place_under(&mut game, MemberArea::Center, muse);
     game.give_energy(3);
 

@@ -1450,7 +1450,8 @@ fn nico_requires_empty_area() {
     game.state.player2.waitroom.cards.push(cheap);
 
     // Stage [filler, -, filler] → play Nico to center → [filler, nico, filler]
-    game.state.player1.stage.stage = [filler, -1, filler];
+    let filler_copy2 = game.new_id("PL!-sd1-010-SD");
+    game.state.player1.stage.stage = [filler, -1, filler_copy2];
     game.give_energy(7);
     game.play_to_stage(nico, rabuka_engine::zones::MemberArea::Center);
 
@@ -1471,10 +1472,11 @@ fn nico_requires_empty_area() {
 
     assert!(!game.has_pending_choice(), "No more prompts");
 
-    // P1 stage unchanged [filler, nico, filler]
+    // P1 stage unchanged [filler, nico, filler_copy2] — two distinct filler
+    // instances, so the board is one that can actually occur.
     assert_eq!(
         game.state.player1.stage.stage,
-        [filler, nico, filler],
+        [filler, nico, filler_copy2],
         "P1 stage full, no extra card appeared"
     );
     // P1's card returned to discard
@@ -1906,7 +1908,8 @@ fn nico_prompt_path_direct_placement_wait_state() {
     game.give_energy(7);
     // P1 stage: [nico, filler, -] → only 1 empty slot (right) → direct placement
     // First play Nico to center
-    game.state.player1.stage.stage = [filler, -1, filler];
+    let filler_copy2 = game.new_id("PL!-sd1-010-SD");
+    game.state.player1.stage.stage = [filler, -1, filler_copy2];
     game.play_to_stage(nico, rabuka_engine::zones::MemberArea::Center);
     // Now [filler, nico, filler] — full — then play_to_stage makes [filler, nico, -]
     // Actually, let's set up properly before playing Nico:
@@ -1924,7 +1927,8 @@ fn nico_prompt_path_direct_placement_wait_state() {
     game2.give_energy(7);
     // Stage: [filler, filler, -] → 1 empty slot (right) for P1's own card
     let filler2 = game2.id("PL!-sd1-010-SD");
-    game2.state.player1.stage.stage = [filler2, filler2, -1];
+    let filler2_copy2 = game2.new_id("PL!-sd1-010-SD");
+    game2.state.player1.stage.stage = [filler2, filler2_copy2, -1];
     game2.play_to_stage(nico2, rabuka_engine::zones::MemberArea::Center);
     // After playing Nico: [filler2, nico2, -] → 1 empty slot for the effect
 
@@ -2013,7 +2017,8 @@ fn nico_full_stage_then_prompt_path() {
     game.state.player2.waitroom.cards.push(cheap_a);
 
     // 1 empty slot for Nico, then full after
-    game.state.player1.stage.stage = [filler, -1, filler];
+    let filler_copy2 = game.new_id("PL!-sd1-010-SD");
+    game.state.player1.stage.stage = [filler, -1, filler_copy2];
     game.give_energy(7);
     game.play_to_stage(nico, rabuka_engine::zones::MemberArea::Center);
     // [filler, nico, filler] — full
@@ -2036,7 +2041,9 @@ fn nico_full_stage_then_prompt_path() {
     game.select_option(0); // P2: left
 
     assert!(!game.has_pending_choice(), "No more prompts");
-    assert_eq!(game.state.player1.stage.stage, [filler, nico, filler]);
+    // Both fillers are distinct instances: the stage started as
+    // [filler, -1, filler_copy2] and Niko filled the middle.
+    assert_eq!(game.state.player1.stage.stage, [filler, nico, filler_copy2]);
     // P1's discard untouched (no selection was shown)
     assert!(
         game.state.player1.waitroom.cards.contains(&cheap_a),

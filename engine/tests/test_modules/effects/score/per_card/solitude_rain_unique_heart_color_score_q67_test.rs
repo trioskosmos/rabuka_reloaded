@@ -32,7 +32,8 @@ fn solitude_q67_hasetsu_member_with_heart01_score_plus_1() {
     }
 
     // 虹ヶ咲 member on stage
-    game.state.player1.stage.stage = [hasetsu, filler, filler];
+    let filler_copy2 = game.new_id("PL!-sd1-010-SD");
+    game.state.player1.stage.stage = [hasetsu, filler, filler_copy2];
     game.state.player1.hand.cards.push(solitude);
 
     advance_to_live_set(&mut game);
@@ -75,7 +76,8 @@ fn solitude_q67_non_hasetsu_member_no_score() {
         game.state.player2.main_deck.cards.push(filler);
     }
 
-    game.state.player1.stage.stage = [non_hasetsu, filler, filler];
+    let filler_copy2 = game.new_id("PL!-sd1-010-SD");
+    game.state.player1.stage.stage = [non_hasetsu, filler, filler_copy2];
     game.state.player1.hand.cards.push(solitude);
 
     advance_to_live_set(&mut game);

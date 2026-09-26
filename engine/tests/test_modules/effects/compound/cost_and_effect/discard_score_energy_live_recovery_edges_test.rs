@@ -18,7 +18,8 @@ fn discard_score_energy_live_recovery_no_live_in_discard_no_selection() {
     let shizuku = game.id("PL!N-bp5-003-R");
     let filler = game.id("PL!-sd1-010-SD");
     let hand_cost = game.id("PL!-sd1-010-SD");
-    game.state.player1.stage.stage = [filler, shizuku, filler];
+    let filler_copy2 = game.new_id("PL!-sd1-010-SD");
+    game.state.player1.stage.stage = [filler, shizuku, filler_copy2];
     game.state.player1.hand.cards.push(hand_cost);
     // waitroom empty
     game.give_energy(5);
@@ -48,7 +49,8 @@ fn discard_score_energy_live_recovery_turn_limit_blocks_second_activation() {
     let live_no = live_score_2_no(&db);
     let live = game.id(&live_no);
     let filler = game.id("PL!-sd1-010-SD");
-    game.state.player1.stage.stage = [filler, shizuku, filler];
+    let filler_copy2 = game.new_id("PL!-sd1-010-SD");
+    game.state.player1.stage.stage = [filler, shizuku, filler_copy2];
     game.state.player1.hand.cards.push(game.id("PL!-sd1-010-SD"));
     game.state.player1.hand.cards.push(game.id("PL!-sd1-010-SD"));
     game.state.player1.waitroom.cards.push(live);
@@ -93,7 +95,8 @@ fn discard_score_energy_live_recovery_p_and_ar_variants_work() {
         let live = game.id(&live_no);
         let filler = game.id("PL!-sd1-010-SD");
         // Need to put variant on stage (even though P/AR are maybe not stageable 3-cost? but test harness allows)
-        game.state.player1.stage.stage = [filler, shizuku, filler];
+        let filler_copy2 = game.new_id("PL!-sd1-010-SD");
+        game.state.player1.stage.stage = [filler, shizuku, filler_copy2];
         game.state.player1.hand.cards.push(game.id("PL!-sd1-010-SD"));
         game.state.player1.waitroom.cards.push(live);
         game.give_energy(5);

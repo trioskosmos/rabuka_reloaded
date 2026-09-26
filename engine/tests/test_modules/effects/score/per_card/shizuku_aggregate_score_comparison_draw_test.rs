@@ -64,7 +64,8 @@ fn shizuku_higher_score_draws_card() {
     let member = game.id("PL!-sd1-001-SD");
     let live = game.id("PL!-sd1-019-SD"); // score 1
 
-    game.state.player1.stage.stage = [member, shizuku, member];
+    let member_copy2 = game.new_id("PL!-sd1-001-SD");
+    game.state.player1.stage.stage = [member, shizuku, member_copy2];
     game.state.player1.hand.cards.push(live);
     fill_decks(&mut game, filler);
     game.give_energy(5);
@@ -88,8 +89,11 @@ fn shizuku_tied_score_no_draw() {
     let member = game.id("PL!-sd1-001-SD");
     let live = game.id("PL!-sd1-019-SD"); // score 1
 
-    game.state.player1.stage.stage = [member, shizuku, member];
-    game.state.player2.stage.stage = [member, member, member];
+    let member_copy2 = game.new_id("PL!-sd1-001-SD");
+    game.state.player1.stage.stage = [member, shizuku, member_copy2];
+    let member_copy3 = game.new_id("PL!-sd1-001-SD");
+    let member_copy4 = game.new_id("PL!-sd1-001-SD");
+    game.state.player2.stage.stage = [member, member_copy3, member_copy4];
     game.state.player1.hand.cards.push(live);
     game.state.player2.hand.cards.push(live);
     fill_decks(&mut game, filler);
@@ -114,7 +118,8 @@ fn shizuku_p2_no_live_card_p1_wins_and_draws() {
     let member = game.id("PL!-sd1-001-SD");
     let live = game.id("PL!-sd1-019-SD");
 
-    game.state.player1.stage.stage = [member, shizuku, member];
+    let member_copy2 = game.new_id("PL!-sd1-001-SD");
+    game.state.player1.stage.stage = [member, shizuku, member_copy2];
     game.state.player1.hand.cards.push(live);
     game.state.player2.hand.cards.clear(); // no live card for P2
     fill_decks(&mut game, filler);
@@ -138,7 +143,8 @@ fn shizuku_p_rarity_same_as_r() {
     let member = game.id("PL!-sd1-001-SD");
     let live = game.id("PL!-sd1-019-SD");
 
-    game.state.player1.stage.stage = [member, shizuku, member];
+    let member_copy2 = game.new_id("PL!-sd1-001-SD");
+    game.state.player1.stage.stage = [member, shizuku, member_copy2];
     game.state.player1.hand.cards.push(live);
     game.state.player2.hand.cards.clear();
     fill_decks(&mut game, filler);

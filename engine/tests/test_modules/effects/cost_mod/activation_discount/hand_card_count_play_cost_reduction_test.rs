@@ -101,7 +101,8 @@ fn on_stage_card_does_not_reduce_other_cards_cost() {
     let filler = game.id("PL!-sd1-010-SD");
 
     // Card on stage, another card in hand (to attempt to play)
-    game.state.player1.stage.stage = [filler, card, filler];
+    let filler_copy2 = game.new_id("PL!-sd1-010-SD");
+    game.state.player1.stage.stage = [filler, card, filler_copy2];
     game.state.player1.hand.cards.push(other);
     fill_decks(&mut game, filler);
 
@@ -134,7 +135,8 @@ fn on_stage_card_ignores_hand_for_other_card_cost() {
     let other = game.id("PL!-sd1-010-SD");
     let filler = game.id("PL!-sd1-010-SD");
 
-    game.state.player1.stage.stage = [filler, card, filler];
+    let filler_copy2 = game.new_id("PL!-sd1-010-SD");
+    game.state.player1.stage.stage = [filler, card, filler_copy2];
     game.state.player1.hand.cards.push(other);
     game.state.player1.hand.cards.push(filler);
     game.state.player1.hand.cards.push(filler);

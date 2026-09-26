@@ -26,7 +26,8 @@ fn eutopia_q38_score_condition_checks_live_card_count() {
     game.state.player1.hand.cards.push(filler);
     game.state.player1.hand.cards.push(filler);
     game.state.player1.hand.cards.push(filler);
-    game.state.player1.stage.stage = [filler, filler, -1];
+    let filler_copy2 = game.new_id("PL!-sd1-010-SD");
+    game.state.player1.stage.stage = [filler, filler_copy2, -1];
 
     game.state.player1.main_deck.cards.clear();
     for _ in 0..40 {
@@ -66,7 +67,8 @@ fn eutopia_q38_three_live_cards_score_plus_2() {
     game.state.player1.hand.cards.push(live2);
     game.state.player1.hand.cards.push(live3);
     game.state.player1.hand.cards.push(filler);
-    game.state.player1.stage.stage = [filler, filler, -1];
+    let filler_copy2 = game.new_id("PL!-sd1-010-SD");
+    game.state.player1.stage.stage = [filler, filler_copy2, -1];
 
     game.state.player1.main_deck.cards.clear();
     for _ in 0..60 {

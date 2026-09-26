@@ -217,13 +217,17 @@ fn s9_check_timing_cascade_smoke() {
     let mut game = TestGame::new(db.clone());
     let live = game.id("PL!N-sd1-025-SD"); // need heart0=4
     let m = game.id("PL!-sd1-008-SD"); // h01=1 h03=1
+    // A second INSTANCE of the same card, not the same id twice: two slots
+    // holding one id is not a board that can occur, and anything that counts
+    // members or dedupes by name would be measuring that impossible state.
+    let m2 = game.new_id("PL!-sd1-008-SD");
     let filler = game.id("PL!-sd1-010-SD");
     game.state.player1.main_deck.cards.clear();
     game.state.player1.hand.cards.clear();
     for _ in 0..20 { game.state.player1.main_deck.cards.push(filler); }
     game.state.player2.main_deck.cards.clear();
     for _ in 0..20 { game.state.player2.main_deck.cards.push(filler); }
-    game.state.player1.stage.stage = [m, m, -1];
+    game.state.player1.stage.stage = [m, m2, -1];
     game.state.player1.hand.cards.push(live);
     // Advance to live card set BY NAME — a 5-pass walk silently means
     // "somewhere near the live" and shifts the moment a phase changes length.

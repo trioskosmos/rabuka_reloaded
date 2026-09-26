@@ -44,7 +44,8 @@ fn eternalize_love_two_same_name_reduces_by_3_not_6() {
     let filler = game.id("PL!-sd1-010-SD");
 
     // Two cards with the same name on stage
-    game.state.player1.stage.stage = [member, member, -1];
+    let member_copy2 = game.new_id("PL!N-pb1-015-R");
+    game.state.player1.stage.stage = [member, member_copy2, -1];
     game.state.player1.live_card_zone.cards.push(live);
     fill_decks(&mut game, filler);
 
@@ -97,7 +98,8 @@ fn eternalize_love_full_live_flow_heart00_reduction() {
     let filler = game.id("PL!-sd1-010-SD");
 
     // Two same-named 虹ヶ咲 on stage
-    game.state.player1.stage.stage = [member, member, -1];
+    let member_copy2 = game.new_id("PL!N-pb1-015-R");
+    game.state.player1.stage.stage = [member, member_copy2, -1];
     // Put live card in hand for set_live_card
     game.state.player1.hand.cards.push(live);
 

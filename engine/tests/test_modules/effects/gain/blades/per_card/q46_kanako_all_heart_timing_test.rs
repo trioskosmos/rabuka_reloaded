@@ -21,7 +21,8 @@ fn q46_kanako_constant_grants_blades_when_condition_met() {
     let other_live = game.id("PL!-sd1-019-SD"); // non-虹ヶ咲 live card
     let filler = game.id("PL!-sd1-010-SD");
 
-    game.state.player1.stage.stage = [filler, kanako, filler];
+    let filler_copy2 = game.new_id("PL!-sd1-010-SD");
+    game.state.player1.stage.stage = [filler, kanako, filler_copy2];
 
     // 3 live cards in zone: 1 虹ヶ咲 + 2 others → condition met
     game.state.player1.live_card_zone.cards.push(niji_live);
@@ -52,7 +53,8 @@ fn q46_kanako_condition_less_than_3_live_cards_no_gain() {
     let niji_live = game.id("PL!N-sd1-025-SD");
     let filler = game.id("PL!-sd1-010-SD");
 
-    game.state.player1.stage.stage = [filler, kanako, filler];
+    let filler_copy2 = game.new_id("PL!-sd1-010-SD");
+    game.state.player1.stage.stage = [filler, kanako, filler_copy2];
 
     // Only 2 live cards → condition fails
     game.state.player1.live_card_zone.cards.push(niji_live);
@@ -77,7 +79,8 @@ fn q46_kanako_no_nijigasaki_live_card_no_gain() {
     let kanako = game.id("PL!N-bp1-012-R\u{ff0b}");
     let filler = game.id("PL!-sd1-010-SD");
 
-    game.state.player1.stage.stage = [filler, kanako, filler];
+    let filler_copy2 = game.new_id("PL!-sd1-010-SD");
+    game.state.player1.stage.stage = [filler, kanako, filler_copy2];
 
     // 3 live cards, none are 虹ヶ咲
     game.state
@@ -113,7 +116,8 @@ fn q46_kanako_not_on_stage_no_constant() {
     let filler = game.id("PL!-sd1-010-SD");
 
     // Kanako in hand, not on stage
-    game.state.player1.stage.stage = [filler, -1, filler];
+    let filler_copy2 = game.new_id("PL!-sd1-010-SD");
+    game.state.player1.stage.stage = [filler, -1, filler_copy2];
 
     game.state.player1.live_card_zone.cards.push(niji_live);
     game.state
@@ -146,7 +150,8 @@ fn q46_kanako_leaves_stage_blade_removed() {
     let niji_live = game.id("PL!N-sd1-025-SD");
     let filler = game.id("PL!-sd1-010-SD");
 
-    game.state.player1.stage.stage = [filler, kanako, filler];
+    let filler_copy2 = game.new_id("PL!-sd1-010-SD");
+    game.state.player1.stage.stage = [filler, kanako, filler_copy2];
 
     game.state.player1.live_card_zone.cards.push(niji_live);
     game.state
@@ -166,7 +171,8 @@ fn q46_kanako_leaves_stage_blade_removed() {
     assert_eq!(blade_before, 2, "Condition met → +2 blades");
 
     // Remove Kanako from stage
-    game.state.player1.stage.stage = [filler, -1, filler];
+    let filler_copy3 = game.new_id("PL!-sd1-010-SD");
+    game.state.player1.stage.stage = [filler, -1, filler_copy3];
     game.state.recalculate_constants();
 
     let blade_after = game.state.mods.get_blade_modifier(kanako);
@@ -186,7 +192,8 @@ fn q46_live_card_removed_condition_fails_blade_removed() {
     let niji_live = game.id("PL!N-sd1-025-SD");
     let filler = game.id("PL!-sd1-010-SD");
 
-    game.state.player1.stage.stage = [filler, kanako, filler];
+    let filler_copy2 = game.new_id("PL!-sd1-010-SD");
+    game.state.player1.stage.stage = [filler, kanako, filler_copy2];
 
     game.state.player1.live_card_zone.cards.push(niji_live);
     game.state

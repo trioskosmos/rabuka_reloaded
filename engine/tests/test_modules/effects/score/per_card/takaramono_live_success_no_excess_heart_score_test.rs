@@ -34,7 +34,9 @@ fn takaramono_no_excess_heart_score_plus_1() {
     let member = game.id("PL!-sd1-001-SD"); // heart01:1,03:2,06:1
 
     // 3 members on stage to satisfy heart requirements (2× heart01, 2× heart06)
-    game.state.player1.stage.stage = [member, member, member];
+    let member_copy2 = game.new_id("PL!-sd1-001-SD");
+    let member_copy3 = game.new_id("PL!-sd1-001-SD");
+    game.state.player1.stage.stage = [member, member_copy2, member_copy3];
     game.state.player1.hand.cards.push(takaramono);
 
     // Seed decks

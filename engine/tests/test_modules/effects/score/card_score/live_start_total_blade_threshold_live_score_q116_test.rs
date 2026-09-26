@@ -28,7 +28,8 @@ fn dream_with_you_blade_10_score_plus_1() {
     }
 
     // 2 bladers = 12 blade ≥ 10
-    game.state.player1.stage.stage = [blader, blader, filler];
+    let blader_copy2 = game.new_id("PL!S-PR-014-PR");
+    game.state.player1.stage.stage = [blader, blader_copy2, filler];
     game.state.player1.hand.cards.push(dream);
     game.state.player1.hand.cards.push(filler);
 
@@ -92,7 +93,8 @@ fn dream_with_you_reduced_yell_count_does_not_block_score() {
     let blader = game.id("PL!S-PR-014-PR");
     let filler = game.id("PL!-sd1-010-SD");
 
-    game.state.player1.stage.stage = [wien, blader, blader];
+    let blader_copy2 = game.new_id("PL!S-PR-014-PR");
+    game.state.player1.stage.stage = [wien, blader, blader_copy2];
     game.state.player1.hand.cards.push(dream);
     for _ in 0..40 {
         game.state.player1.main_deck.cards.push(filler);

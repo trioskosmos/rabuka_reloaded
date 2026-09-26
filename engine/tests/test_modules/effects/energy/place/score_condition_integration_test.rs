@@ -393,7 +393,8 @@ fn hasunosora_group_mixed_stage_passes() {
 
     let hasunosora = game.id("PL!HS-pb1-023-N");
     let filler = game.id("PL!-sd1-010-SD");
-    game.state.player1.stage.stage = [filler, hasunosora, filler];
+    let filler_copy2 = game.new_id("PL!-sd1-010-SD");
+    game.state.player1.stage.stage = [filler, hasunosora, filler_copy2];
 
     let ctx = ConditionContext::new(&game.state);
     assert!(

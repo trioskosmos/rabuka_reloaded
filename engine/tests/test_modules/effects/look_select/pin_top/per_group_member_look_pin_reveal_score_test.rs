@@ -8,7 +8,9 @@ fn look_per_group_member_discards_remainder_without_score_for_member_reveal() {
     let l = g.id("PL!N-bp3-028-L");
     let n = g.id("PL!N-bp1-001-R");
     let f = g.id("PL!-sd1-010-SD");
-    g.state.player1.stage.stage = [n, n, n];
+    let n_copy2 = g.new_id("PL!N-bp1-001-R");
+    let n_copy3 = g.new_id("PL!N-bp1-001-R");
+    g.state.player1.stage.stage = [n, n_copy2, n_copy3];
     g.state.player1.hand.cards.push(l);
     fill_both_main_decks(&mut g, f);
     g.give_energy(5);

@@ -51,7 +51,9 @@ fn hanamusubi_alone_no_reduction() {
     let hanamusubi = game.id("PL!HS-bp5-019-L");
     let filler = game.id("PL!-sd1-010-SD"); // non-Renosora filler
 
-    game.state.player1.stage.stage = [filler, filler, filler];
+    let filler_copy2 = game.new_id("PL!-sd1-010-SD");
+    let filler_copy3 = game.new_id("PL!-sd1-010-SD");
+    game.state.player1.stage.stage = [filler, filler_copy2, filler_copy3];
     game.state.player1.hand.cards.push(hanamusubi);
     for _ in 0..20 {
         game.state.player1.main_deck.cards.push(filler);
@@ -88,7 +90,9 @@ fn hanamusubi_with_one_other_renosora_reduces_2() {
     let other_renosora = game.id("PL!HS-bp5-017-L"); // 蓮ノ空 live card
     let filler = game.id("PL!-sd1-010-SD");
 
-    game.state.player1.stage.stage = [filler, filler, filler];
+    let filler_copy2 = game.new_id("PL!-sd1-010-SD");
+    let filler_copy3 = game.new_id("PL!-sd1-010-SD");
+    game.state.player1.stage.stage = [filler, filler_copy2, filler_copy3];
     game.state.player1.hand.cards.push(hanamusubi);
     game.state.player1.hand.cards.push(other_renosora);
     for _ in 0..20 {
@@ -139,7 +143,9 @@ fn hanamusubi_with_two_other_renosora_reduces_4() {
     let other_b = game.id("PL!HS-bp5-018-L"); // 蓮ノ空 live card
     let filler = game.id("PL!-sd1-010-SD");
 
-    game.state.player1.stage.stage = [filler, filler, filler];
+    let filler_copy2 = game.new_id("PL!-sd1-010-SD");
+    let filler_copy3 = game.new_id("PL!-sd1-010-SD");
+    game.state.player1.stage.stage = [filler, filler_copy2, filler_copy3];
     game.state.player1.hand.cards.push(hanamusubi);
     game.state.player1.hand.cards.push(other_a);
     game.state.player1.hand.cards.push(other_b);
@@ -180,7 +186,9 @@ fn hanamusubi_with_non_renosora_no_reduction() {
     let non_renosora = game.id("PL!-sd1-019-SD"); // μ's live card (non-Renosora)
     let filler = game.id("PL!-sd1-010-SD");
 
-    game.state.player1.stage.stage = [filler, filler, filler];
+    let filler_copy2 = game.new_id("PL!-sd1-010-SD");
+    let filler_copy3 = game.new_id("PL!-sd1-010-SD");
+    game.state.player1.stage.stage = [filler, filler_copy2, filler_copy3];
     game.state.player1.hand.cards.push(hanamusubi);
     game.state.player1.hand.cards.push(non_renosora);
     for _ in 0..20 {
@@ -218,7 +226,9 @@ fn hanamusubi_reduces_only_heart04_not_heart0() {
     let other_renosora = game.id("PL!HS-bp5-017-L");
     let filler = game.id("PL!-sd1-010-SD");
 
-    game.state.player1.stage.stage = [filler, filler, filler];
+    let filler_copy2 = game.new_id("PL!-sd1-010-SD");
+    let filler_copy3 = game.new_id("PL!-sd1-010-SD");
+    game.state.player1.stage.stage = [filler, filler_copy2, filler_copy3];
     game.state.player1.hand.cards.push(hanamusubi);
     game.state.player1.hand.cards.push(other_renosora);
     for _ in 0..20 {
@@ -264,7 +274,9 @@ fn two_hanamusubi_each_reduces_2() {
     let b = game.id("PL!HS-bp5-019-L");
     let filler = game.id("PL!-sd1-010-SD");
 
-    game.state.player1.stage.stage = [filler, filler, filler];
+    let filler_copy2 = game.new_id("PL!-sd1-010-SD");
+    let filler_copy3 = game.new_id("PL!-sd1-010-SD");
+    game.state.player1.stage.stage = [filler, filler_copy2, filler_copy3];
     game.state.player1.hand.cards.push(a);
     game.state.player1.hand.cards.push(b);
     for _ in 0..20 {
@@ -306,7 +318,9 @@ fn three_hanamusubi_each_reduces_4() {
     let c = game.id("PL!HS-bp5-019-L");
     let filler = game.id("PL!-sd1-010-SD");
 
-    game.state.player1.stage.stage = [filler, filler, filler];
+    let filler_copy2 = game.new_id("PL!-sd1-010-SD");
+    let filler_copy3 = game.new_id("PL!-sd1-010-SD");
+    game.state.player1.stage.stage = [filler, filler_copy2, filler_copy3];
     game.state.player1.hand.cards.push(a);
     game.state.player1.hand.cards.push(b);
     game.state.player1.hand.cards.push(c);
@@ -345,7 +359,9 @@ fn two_hanamusubi_one_filler_each_reduces_2() {
     let filler_live = game.id("PL!-sd1-019-SD"); // μ's live (non-Renosora)
     let filler = game.id("PL!-sd1-010-SD");
 
-    game.state.player1.stage.stage = [filler, filler, filler];
+    let filler_copy2 = game.new_id("PL!-sd1-010-SD");
+    let filler_copy3 = game.new_id("PL!-sd1-010-SD");
+    game.state.player1.stage.stage = [filler, filler_copy2, filler_copy3];
     game.state.player1.hand.cards.push(a);
     game.state.player1.hand.cards.push(b);
     game.state.player1.hand.cards.push(filler_live);
@@ -383,7 +399,9 @@ fn one_hanamusubi_one_filler_no_reduction() {
     let filler_live = game.id("PL!-sd1-019-SD"); // μ's live (non-Renosora)
     let filler = game.id("PL!-sd1-010-SD");
 
-    game.state.player1.stage.stage = [filler, filler, filler];
+    let filler_copy2 = game.new_id("PL!-sd1-010-SD");
+    let filler_copy3 = game.new_id("PL!-sd1-010-SD");
+    game.state.player1.stage.stage = [filler, filler_copy2, filler_copy3];
     game.state.player1.hand.cards.push(hanamusubi);
     game.state.player1.hand.cards.push(filler_live);
     for _ in 0..20 {
@@ -418,7 +436,9 @@ fn one_hanamusubi_two_fillers_no_reduction() {
     let f2 = game.id("PL!-sd1-020-SD"); // μ's live (different)
     let filler = game.id("PL!-sd1-010-SD");
 
-    game.state.player1.stage.stage = [filler, filler, filler];
+    let filler_copy2 = game.new_id("PL!-sd1-010-SD");
+    let filler_copy3 = game.new_id("PL!-sd1-010-SD");
+    game.state.player1.stage.stage = [filler, filler_copy2, filler_copy3];
     game.state.player1.hand.cards.push(hanamusubi);
     game.state.player1.hand.cards.push(f1);
     game.state.player1.hand.cards.push(f2);

@@ -72,7 +72,8 @@ fn distinct_group_activation_discount_q228_one_group_cost_three_not_offered_at_t
     let umi = game.id("PL!-bp5-004-R\u{ff0b}");
     let filler = game.id("PL!-sd1-010-SD");
 
-    game.state.player1.stage.stage = [umi, filler, filler];
+    let filler_copy2 = game.new_id("PL!-sd1-010-SD");
+    game.state.player1.stage.stage = [umi, filler, filler_copy2];
     game.state.player1.hand.cards.push(filler);
     game.give_energy(2);
 

@@ -802,7 +802,9 @@ fn hanayo_no_mus_member_skips_cost_prompt() {
     // Let's use a different approach: put NO μ's members on stage.
 
     // Reset: only non-μ's members
-    game.state.player1.stage.stage = [non_mus, non_mus, non_mus];
+    let non_mus_copy2 = game.new_id("PL!-sd1-010-SD");
+    let non_mus_copy3 = game.new_id("PL!-sd1-010-SD");
+    game.state.player1.stage.stage = [non_mus, non_mus_copy2, non_mus_copy3];
 
     h_advance_to_live_card_set_p1(&mut game);
     game.state

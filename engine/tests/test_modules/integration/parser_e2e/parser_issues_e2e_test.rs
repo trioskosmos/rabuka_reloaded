@@ -344,7 +344,8 @@ fn issue5_solitude_rain_heart_color_scoring() {
     let niji_member = game.id("PL!N-sd1-010-SD");
     let filler = game.id("PL!-sd1-010-SD");
 
-    game.state.player1.stage.stage = [niji_member, filler, filler];
+    let filler_copy2 = game.new_id("PL!-sd1-010-SD");
+    game.state.player1.stage.stage = [niji_member, filler, filler_copy2];
     game.state.player1.hand.cards.push(solitude);
     fill_decks(&mut game);
 
@@ -942,7 +943,8 @@ fn issue11_fanfare_15plus_cards_gives_blade() {
     push_miracluck(&mut game, 15);
     game.state.player1.waitroom.cards.push(filler); // non-miracluck too
 
-    game.state.player1.stage.stage = [himeno, filler, filler];
+    let filler_copy2 = game.new_id("PL!-sd1-010-SD");
+    game.state.player1.stage.stage = [himeno, filler, filler_copy2];
     game.state.player1.hand.cards.push(live);
     fill_decks(&mut game);
 
@@ -975,7 +977,8 @@ fn issue11_fanfare_few_cards_no_blade() {
     let filler = game.id("PL!-sd1-010-SD");
 
     push_miracluck(&mut game, 3);
-    game.state.player1.stage.stage = [himeno, filler, filler];
+    let filler_copy2 = game.new_id("PL!-sd1-010-SD");
+    game.state.player1.stage.stage = [himeno, filler, filler_copy2];
     game.state.player1.hand.cards.push(live);
     fill_decks(&mut game);
 

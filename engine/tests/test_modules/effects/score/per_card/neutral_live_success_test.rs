@@ -300,7 +300,9 @@ fn q261_live_fails_no_trigger() {
     let neutral = game.id("PL!SP-pb2-049-L");
 
     let filler = game.id("PL!-sd1-010-SD");
-    game.state.player1.stage.stage = [filler, filler, filler];
+    let filler_copy2 = game.new_id("PL!-sd1-010-SD");
+    let filler_copy3 = game.new_id("PL!-sd1-010-SD");
+    game.state.player1.stage.stage = [filler, filler_copy2, filler_copy3];
     game.state.player1.hand.cards.push(neutral);
     fill_decks(&mut game, filler);
     game.give_energy(1);

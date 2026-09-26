@@ -257,7 +257,8 @@ fn ranju_live_success_places_under_plus_one_from_energy_deck() {
     let filler = game.id("PL!-sd1-010-SD");
     let member = game.id("PL!-sd1-001-SD");
 
-    game.state.player1.stage.stage = [member, card, member];
+    let member_copy2 = game.new_id("PL!-sd1-001-SD");
+    game.state.player1.stage.stage = [member, card, member_copy2];
     place_under_energy(&mut game, MemberArea::Center, 3);
 
     // Seed energy deck BEFORE give_energy
@@ -306,7 +307,8 @@ fn ranju_live_success_q239_zero_under_places_one() {
     let filler = game.id("PL!-sd1-010-SD");
     let member = game.id("PL!-sd1-001-SD");
 
-    game.state.player1.stage.stage = [member, card, member];
+    let member_copy2 = game.new_id("PL!-sd1-001-SD");
+    game.state.player1.stage.stage = [member, card, member_copy2];
     // 0 energy under (Q239)
 
     let energy = game.id("LL-E-001-SD");
@@ -344,7 +346,8 @@ fn ranju_q239_zero_under_places_one_for_all_rarities() {
         let filler = game.id("PL!-sd1-010-SD");
         let member = game.id("PL!-sd1-001-SD");
 
-        game.state.player1.stage.stage = [member, card, member];
+        let member_copy2 = game.new_id("PL!-sd1-001-SD");
+        game.state.player1.stage.stage = [member, card, member_copy2];
         let energy = game.id("LL-E-001-SD");
         for _ in 0..10 {
             game.state.player1.energy_deck.cards.push(energy);
@@ -380,7 +383,8 @@ fn ranju_live_success_condition_not_met_no_move() {
     let filler = game.id("PL!-sd1-010-SD");
     let member = game.id("PL!-sd1-001-SD");
 
-    game.state.player1.stage.stage = [member, card, member];
+    let member_copy2 = game.new_id("PL!-sd1-001-SD");
+    game.state.player1.stage.stage = [member, card, member_copy2];
     place_under_energy(&mut game, MemberArea::Center, 2);
     // Give P2 higher score — they'll have the same live setup so score ties
     // P1 as first attacker gets score priority, so condition SHOULD be met
@@ -426,8 +430,11 @@ fn ranju_live_success_condition_not_met_when_scores_tied() {
     // P1 stage: [member, card, member] — card has 2 under
     // P2 stage: [member, member, member]
     // Both set same-score live cards → scores tied → 1 > 1 is false
-    game.state.player1.stage.stage = [member, card, member];
-    game.state.player2.stage.stage = [member, member, member];
+    let member_copy2 = game.new_id("PL!-sd1-001-SD");
+    game.state.player1.stage.stage = [member, card, member_copy2];
+    let member_copy3 = game.new_id("PL!-sd1-001-SD");
+    let member_copy4 = game.new_id("PL!-sd1-001-SD");
+    game.state.player2.stage.stage = [member, member_copy3, member_copy4];
     game.state.player1.hand.cards.push(live_card);
     game.state.player2.hand.cards.push(live_card);
     place_under_energy(&mut game, MemberArea::Center, 2);
@@ -460,7 +467,8 @@ fn ranju_live_success_scales_with_more_under() {
     let filler = game.id("PL!-sd1-010-SD");
     let member = game.id("PL!-sd1-001-SD");
 
-    game.state.player1.stage.stage = [member, card, member];
+    let member_copy2 = game.new_id("PL!-sd1-001-SD");
+    game.state.player1.stage.stage = [member, card, member_copy2];
     place_under_energy(&mut game, MemberArea::Center, 5);
 
     let energy = game.id("LL-E-001-SD");
@@ -492,7 +500,8 @@ fn ranju_live_success_energy_deck_empty_does_nothing() {
     let filler = game.id("PL!-sd1-010-SD");
     let member = game.id("PL!-sd1-001-SD");
 
-    game.state.player1.stage.stage = [member, card, member];
+    let member_copy2 = game.new_id("PL!-sd1-001-SD");
+    game.state.player1.stage.stage = [member, card, member_copy2];
     place_under_energy(&mut game, MemberArea::Center, 2);
     // Empty energy deck
     game.state.player1.energy_deck.cards.clear();
@@ -520,7 +529,8 @@ fn ranju_activate_then_live_success_uses_accumulated_under() {
     let filler = game.id("PL!-sd1-010-SD");
     let member = game.id("PL!-sd1-001-SD");
 
-    game.state.player1.stage.stage = [member, card, member];
+    let member_copy2 = game.new_id("PL!-sd1-001-SD");
+    game.state.player1.stage.stage = [member, card, member_copy2];
     game.give_energy(10);
     fill_decks(&mut game, filler);
 

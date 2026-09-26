@@ -145,7 +145,9 @@ fn three_members_keep_one() {
     let tsunagaru = game.id("PL!N-bp3-028-L");
     let niji_member = game.id("PL!N-bp1-001-R");
 
-    game.state.player1.stage.stage = [niji_member, niji_member, niji_member];
+    let niji_member_copy2 = game.new_id("PL!N-bp1-001-R");
+    let niji_member_copy3 = game.new_id("PL!N-bp1-001-R");
+    game.state.player1.stage.stage = [niji_member, niji_member_copy2, niji_member_copy3];
     game.add_to_hand(tsunagaru);
     let deck_filler = game.new_id("PL!-sd1-010-SD");
     fill_deck(&mut game, deck_filler);
@@ -185,7 +187,9 @@ fn three_members_skip_all() {
     let tsunagaru = game.id("PL!N-bp3-028-L");
     let niji_member = game.id("PL!N-bp1-001-R");
 
-    game.state.player1.stage.stage = [niji_member, niji_member, niji_member];
+    let niji_member_copy2 = game.new_id("PL!N-bp1-001-R");
+    let niji_member_copy3 = game.new_id("PL!N-bp1-001-R");
+    game.state.player1.stage.stage = [niji_member, niji_member_copy2, niji_member_copy3];
     game.add_to_hand(tsunagaru);
     let deck_filler = game.new_id("PL!-sd1-010-SD");
     fill_deck(&mut game, deck_filler);
@@ -347,7 +351,9 @@ fn three_members_skip_reveal_live_gets_boost() {
     let niji_member = game.id("PL!N-bp1-001-R");
     let live_card = game.id("PL!-bp3-019-L");
 
-    game.state.player1.stage.stage = [niji_member, niji_member, niji_member];
+    let niji_member_copy2 = game.new_id("PL!N-bp1-001-R");
+    let niji_member_copy3 = game.new_id("PL!N-bp1-001-R");
+    game.state.player1.stage.stage = [niji_member, niji_member_copy2, niji_member_copy3];
     game.add_to_hand(tsunagaru);
 
     // Deck: 3 look_at cards + live_card on top (position 3 after look_at)

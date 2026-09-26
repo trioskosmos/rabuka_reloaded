@@ -21,7 +21,8 @@ fn play_himeno(game: &mut TestGame) {
     let himeno = game.id("PL!HS-sd1-006-SD");
     let filler = game.id("PL!-sd1-013-SD");
     let osawa = game.id("PL!HS-sd1-003-SD");
-    game.state.player1.stage.stage = [filler, filler, osawa];
+    let filler_copy2 = game.new_id("PL!-sd1-013-SD");
+    game.state.player1.stage.stage = [filler, filler_copy2, osawa];
     game.add_to_hand(himeno);
     game.add_to_hand(filler);
     game.give_energy(15);

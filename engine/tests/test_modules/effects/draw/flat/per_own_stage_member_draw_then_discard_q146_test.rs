@@ -175,7 +175,9 @@ fn per_own_member_draw_discard_q146_opponent_members_not_counted() {
 
     game.state.player1.hand.cards.push(kumi);
     game.state.player1.hand.cards.push(live);
-    game.state.player2.stage.stage = [opp_m, opp_m, opp_m];
+    let opp_m_copy2 = game.new_id("PL!-sd1-002-SD");
+    let opp_m_copy3 = game.new_id("PL!-sd1-002-SD");
+    game.state.player2.stage.stage = [opp_m, opp_m_copy2, opp_m_copy3];
 
     for _ in 0..20 {
         game.state

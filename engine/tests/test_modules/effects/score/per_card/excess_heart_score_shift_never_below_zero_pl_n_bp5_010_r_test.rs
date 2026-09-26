@@ -27,7 +27,9 @@ fn mifune_q231_excess_heart_2_score_cancels_to_0() {
     }
 
     // Stage: 虹ヶ咲 members with hearts → excess hearts will exist
-    game.state.player1.stage.stage = [filler_n, filler_n, filler_n];
+    let filler_n_copy2 = game.new_id("PL!N-sd1-001-SD");
+    let filler_n_copy3 = game.new_id("PL!N-sd1-001-SD");
+    game.state.player1.stage.stage = [filler_n, filler_n_copy2, filler_n_copy3];
     game.state.player1.hand.cards.push(mifune);
     game.state.player1.hand.cards.push(filler);
 
@@ -72,7 +74,9 @@ fn mifune_q231_excess_heart_2_score_cancels_to_0_all_rarities() {
         for _ in 0..40 {
             game.state.player2.main_deck.cards.push(filler);
         }
-        game.state.player1.stage.stage = [filler_n, filler_n, filler_n];
+        let filler_n_copy2 = game.new_id("PL!N-sd1-001-SD");
+        let filler_n_copy3 = game.new_id("PL!N-sd1-001-SD");
+        game.state.player1.stage.stage = [filler_n, filler_n_copy2, filler_n_copy3];
         game.state.player1.hand.cards.push(mifune);
         game.state.player1.hand.cards.push(filler);
 
