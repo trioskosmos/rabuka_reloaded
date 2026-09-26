@@ -201,8 +201,11 @@ fn cooking_condition_checks_discard_not_stage() {
     // Qualifying cards sit on STAGE, not in discard.
     let member = game.id(NIJI_MEMBER_NO_BLADE);
     let filler = game.id(NON_NIJI);
+    // Two distinct instances: the same id in both slots is not a board that can
+    // occur, and "count the qualifying members" would collapse to one.
+    let filler2 = game.new_id(NON_NIJI);
     let _live = game.id(NIJI_LIVE);
-    game.state.player1.stage.stage = [member, filler, filler];
+    game.state.player1.stage.stage = [member, filler, filler2];
 
     trigger_cooking(&mut game);
 

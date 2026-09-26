@@ -31,7 +31,14 @@ fn miracle_wave_q182_excess_heart_score_4() {
     let wave = game.id("PL!S-bp3-019-L");
     let filler = game.id("PL!-sd1-010-SD");
 
-    game.state.player1.stage.stage = [game.id("PL!S-sd1-001-SD"), game.id("PL!S-sd1-001-SD"), -1];
+    // Two distinct instances of the same cheer card: the same id in both slots
+    // is not a board that can occur, and anything counting members would be
+    // measuring that impossible state.
+    game.state.player1.stage.stage = [
+        game.id("PL!S-sd1-001-SD"),
+        game.new_id("PL!S-sd1-001-SD"),
+        -1,
+    ];
     game.state.player1.hand.cards.push(wave);
 
     for _ in 0..20 {
