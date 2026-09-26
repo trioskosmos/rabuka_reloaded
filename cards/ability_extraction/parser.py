@@ -7515,6 +7515,28 @@ def _try_conditional_alternative(text):
     return result
 
 
+def _character_gain(eff, resource, count, heart_color=None):
+    """A 「「X」N人は…を得る」 clause resolved to a gain_resource action.
+
+    `heart_color` goes directly after `resource` because that is where the
+    emitted JSON has always put it; appending it at the end would reorder keys
+    in the generated file.
+    """
+    action = {"action": "gain_resource", "resource": resource}
+    if heart_color:
+        action["heart_color"] = heart_color
+    action.update(
+        {
+            "count": count,
+            "characters": [eff["character"]],
+            "card_type": "member_card",
+            "target": "self",
+            "target_count": eff["count"],
+        }
+    )
+    return action
+
+
 def _try_character_specific(text):
     """「X」N人はYを、「Z」N人はWを得る — character-specific effects."""
     m = re.search(r"「([^」]+)」\d+人は(.+?)を、「([^」]+)」\d+人は(.+?)を得る", text)
@@ -7544,28 +7566,11 @@ def _try_character_specific(text):
             heart_color = f"heart{heart_m.group(1)}" if heart_m else None
             if blade_count > 0:
                 char_acts.append(
-                    {
-                        "action": "gain_resource",
-                        "resource": "blade",
-                        "count": blade_count,
-                        "characters": [eff["character"]],
-                        "card_type": "member_card",
-                        "target": "self",
-                        "target_count": eff["count"],
-                    }
+                    _character_gain(eff, "blade", blade_count)
                 )
             if heart_color:
                 char_acts.append(
-                    {
-                        "action": "gain_resource",
-                        "resource": "heart",
-                        "heart_color": heart_color,
-                        "count": 1,
-                        "characters": [eff["character"]],
-                        "card_type": "member_card",
-                        "target": "self",
-                        "target_count": eff["count"],
-                    }
+                    _character_gain(eff, "heart", 1, heart_color=heart_color)
                 )
             if len(char_acts) == 1:
                 per_char_actions.append(char_acts[0])
@@ -11363,6 +11368,18 @@ def _fw_int(txt: str, pattern: str) -> int:
     return int(m.group(1)) if m else 1
 
 
+def _energy_state_option(state, count, text):
+    """The 「エネルギーN枚を<state>にする」 half of a …か… choice."""
+    return {
+        "action": "change_state",
+        "state_change": state,
+        "card_type": "energy_card",
+        "count": count,
+        "target": "self",
+        "text": text,
+    }
+
+
 def _split_mixed_state_change(node):
     """Split change_state steps whose OBJECT spans two card kinds.
 
@@ -11436,17 +11453,13 @@ def _split_mixed_state_change(node):
     m = re.search(r"エネルギー[0-9]+枚か(.+)", txt)
     if m:
         # energy-first ordering
+        energy_text = (
+            f"エネルギー{energy_n}枚をアクティブにする"
+            if sc == "active"
+            else f"エネルギー{energy_n}枚を{sc}にする"
+        )
         options = [
-            {
-                "action": "change_state",
-                "state_change": sc,
-                "card_type": "energy_card",
-                "count": energy_n,
-                "target": "self",
-                "text": f"エネルギー{energy_n}枚をアクティブにする"
-                if sc == "active"
-                else f"エネルギー{energy_n}枚を{sc}にする",
-            },
+            _energy_state_option(sc, energy_n, energy_text),
             member_option(m.group(1)),
         ]
     else:
@@ -11462,14 +11475,11 @@ def _split_mixed_state_change(node):
             energy_n = int(m2b.group(2))
             options = [
                 member_option(m2b.group(1)),
-                {
-                    "action": "change_state",
-                    "state_change": sc,
-                    "card_type": "energy_card",
-                    "count": energy_n,
-                    "target": "self",
-                    "text": f"エネルギーを{energy_n}枚{m2b.group(3)}にする",
-                },
+                _energy_state_option(
+                    sc,
+                    energy_n,
+                    f"エネルギーを{energy_n}枚{m2b.group(3)}にする",
+                ),
             ]
         else:
             energy_n = int(m2.group(2)) if m2.group(2) else 1
@@ -13412,7 +13422,11 @@ def _check_sequential_patterns(eff, cards, i, trigger, all_issues, seen_by_rule)
 
 
 def _check_structural_semantics(eff, t, cards, i, trigger, all_issues, seen_by_rule):
-    """Non-regex structural checks for one ability entry."""
+    """Non-regex structural checks for one ability entry.
+
+    The dispatcher for every structural check, so adding one is a line here
+    rather than a fourth argument list to remember at the call site.
+    """
     _check_change_state_energy_type(eff, t, cards, i, trigger, all_issues, seen_by_rule)
     _check_move_cards_cost_limit(eff, t, cards, i, trigger, all_issues, seen_by_rule)
     _check_look_select_reveal_hearts(eff, t, cards, i, trigger, all_issues, seen_by_rule)
@@ -13881,10 +13895,7 @@ def _validate_semantic(abilities):
                     _report_semantic_issue(all_issues, seen_by_rule, rule_name, cards, i, trigger, snippet, desc)
 
         # ─── Structural checks (not regex-based) ─────────────────────────
-        _check_change_state_energy_type(eff, t, cards, i, trigger, all_issues, seen_by_rule)
-        _check_move_cards_cost_limit(eff, t, cards, i, trigger, all_issues, seen_by_rule)
-        _check_look_select_reveal_hearts(eff, t, cards, i, trigger, all_issues, seen_by_rule)
-        _check_sequential_patterns(eff, cards, i, trigger, all_issues, seen_by_rule)
+        _check_structural_semantics(eff, t, cards, i, trigger, all_issues, seen_by_rule)
 
     _print_semantic_report(all_issues, len(abilities))
     return all_issues

@@ -17,7 +17,6 @@ COUNTER_PATTERN = re.compile(r"(\d+)つ")  # Generic counter (e.g., "3つ")
 ITEM_PATTERN = re.compile(r"(\d+)個")  # Item counter (e.g., "4個")
 GROUP_PATTERN = re.compile(r"『(.+?)』")
 QUOTED_NAME_PATTERN = re.compile(r"「(.+?)」")
-BLADE_PATTERN = re.compile(r"{{icon_blade\.png\|ブレード}}")
 
 # ======================================================================
 # HEART ICON VOCABULARY (one definition, used by every heart scan)
@@ -74,11 +73,6 @@ def count_icons(text, icons):
 def strip_suffix_period(text):
     """Remove trailing period from text."""
     return text.rstrip("。")
-
-
-def normalize_whitespace(text):
-    """Normalize whitespace in text - collapse multiple spaces to single space."""
-    return re.sub(r"\s+", " ", text).strip()
 
 
 def normalize_fullwidth_digits(text):
@@ -359,53 +353,13 @@ def extract_operator(text: str) -> Optional[str]:
     return extract_by_pattern(text, OPERATOR_PATTERNS)
 
 
-# Main groups (large idol groups) - from rules v1.06 Appendix A
-MAIN_GROUPS = {
-    "μ's",
-    "Aqours",
-    "Saint Snow",
-    "虹ヶ咲",
-    "Liella!",
-    "Nijigaku",
-    "Liella",
-    "SaintSnow",
-    "Muse",
-    "蓮ノ空",  # Hasunosora
-    "A-RISE",
-    "Sunny Passion",
-}
-
-# Subunits (smaller groups within main groups) - from rules v1.06 Appendix A
-SUBUNITS = {
-    "CYaRon!",
-    "AZALEA",
-    "Guilty Kiss",
-    "Dance",
-    "Qu4rtz",
-    "R3BIRTH",
-    "CatChu!",
-    "5yncri5e!",
-    "BiBi",
-    "Printemps",
-    "lily white",
-    "DOLLCHESTRA",
-    "スリーズブーケ",
-    "みらくらぱーく！",
-    "MIRAPARK",
-    "EdelNote",
-    "Edel Note",
-    "KALEIDOSCORE",
-    "A・ZU・NA",
-    "DiverDiva",
-    "AiScReam",
-}
-
-# Combined known units (both main groups and subunits)
-KNOWN_UNITS = MAIN_GROUPS | SUBUNITS
-
-
 def extract_all_groups(text):
-    """Extract all group names from text (『...』 and mixed 『...」 patterns)."""
+    """Extract all group names from text (『...』 and mixed 『...」 patterns).
+
+    Group names are read straight out of the quoted text, so nothing needs a
+    hand-maintained list of the known units — that is why there is no such list
+    here, and why adding one would only add a place for it to go stale.
+    """
     matches = GROUP_PATTERN.findall(text)
     # Also handle mixed brackets: 『name」 (opening 『 but closing 」)
     matches += re.findall(r"『([^』」]+)」", text)
