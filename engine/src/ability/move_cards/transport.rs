@@ -67,6 +67,32 @@ pub(super) fn matching_waitroom_indices(player: &Player, cards: &[i16]) -> Vec<u
     indices
 }
 
+/// Take `cards` out of whichever physical zone still holds them.
+///
+/// A revealed card is only a *record* of visibility — the card itself is
+/// still somewhere: a yell card in a waitroom, a deck-peeked card in a deck.
+/// The caller is about to place them, so they must not also be sitting in their
+/// old zone.
+///
+/// Note the hand is NOT searched, despite what the old comment here claimed: a
+/// cost reveal leaves its card in hand and `place_card_in_zone` moves it from
+/// there. Searching the hand as well would remove the card before that call
+/// could find it. The order below is p1 before p2 for the same reason — first
+/// match wins, so a card present on both sides is taken from one, not both.
+fn remove_from_physical_zones(gs: &mut GameState, cards: &[i16]) {
+    for &cid in cards {
+        if let Some(pos) = gs.player1.waitroom.cards.iter().position(|&c| c == cid) {
+            gs.player1.waitroom.cards.remove(pos);
+        } else if let Some(pos) = gs.player2.waitroom.cards.iter().position(|&c| c == cid) {
+            gs.player2.waitroom.cards.remove(pos);
+        } else if let Some(pos) = gs.player1.main_deck.cards.iter().position(|&c| c == cid) {
+            gs.player1.main_deck.cards.remove(pos);
+        } else if let Some(pos) = gs.player2.main_deck.cards.iter().position(|&c| c == cid) {
+            gs.player2.main_deck.cards.remove(pos);
+        }
+    }
+}
+
 impl AbilityResolver {
     pub fn move_from_revealed(
         &mut self,
@@ -90,30 +116,7 @@ impl AbilityResolver {
             }
             result
         };
-        for &cid in &cards {
-            if let Some(pos) = gs.player1.waitroom.cards.iter().position(|&c| c == cid) {
-                gs.player1.waitroom.cards.remove(pos);
-            } else if let Some(pos) = gs.player2.waitroom.cards.iter().position(|&c| c == cid) {
-                gs.player2.waitroom.cards.remove(pos);
-            } else if let Some(pos) = gs.player1.main_deck.cards.iter().position(|&c| c == cid) {
-                gs.player1.main_deck.cards.remove(pos);
-            } else if let Some(pos) = gs.player2.main_deck.cards.iter().position(|&c| c == cid) {
-                gs.player2.main_deck.cards.remove(pos);
-            }
-        }
-        // Remove from physical zone (waitroom for yell cards,
-        // hand for cost reveals, deck for deck-peek reveals).
-        for &cid in &cards {
-            if let Some(pos) = gs.player1.waitroom.cards.iter().position(|&c| c == cid) {
-                gs.player1.waitroom.cards.remove(pos);
-            } else if let Some(pos) = gs.player2.waitroom.cards.iter().position(|&c| c == cid) {
-                gs.player2.waitroom.cards.remove(pos);
-            } else if let Some(pos) = gs.player1.main_deck.cards.iter().position(|&c| c == cid) {
-                gs.player1.main_deck.cards.remove(pos);
-            } else if let Some(pos) = gs.player2.main_deck.cards.iter().position(|&c| c == cid) {
-                gs.player2.main_deck.cards.remove(pos);
-            }
-        }
+        remove_from_physical_zones(gs, &cards);
         // Don't set self.selected_cards here — cards moved from
         // revealed_cards are effect-internal (not user-targeted
         // selections), and would bleed into downstream gain_resource

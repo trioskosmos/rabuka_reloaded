@@ -1161,14 +1161,7 @@ impl AbilityResolver {
                 );
             }
         } else if is_self_target
-            || (effect.target_name_player() == Some(TargetPlayer::Self_)
-                && activating_card_id.is_some()
-                && effect.source_any().is_none()
-                && effect.card_type_any().is_none()
-                && !effect.target_from_selection_any().unwrap_or(false)
-                && !effect.multiple_targets_any().unwrap_or(false)
-                && effect.group_names_any().map_or(true, |g| g.is_empty())
-                && !effect.all_any().unwrap_or(false))
+            || Self::is_broadly_self(effect, is_self_target, activating_card_id)
         {
             if let Some(card_id) = activating_card_id {
                 self.apply_heart_to_card(
@@ -1248,6 +1241,28 @@ impl AbilityResolver {
         effect_data
     }
 
+    /// Is this an explicit self target with nothing in it to widen the meaning?
+    ///
+    /// An explicit `self_target` with no source, card type, group, selection or
+    /// all-selections qualifier: there is nothing in the effect to widen it
+    /// beyond the card that triggered it, so "self" can only mean the
+    /// activating card.
+    fn is_broadly_self(
+        effect: &AbilityEffect,
+        is_self_target: bool,
+        activating_card_id: Option<i16>,
+    ) -> bool {
+        is_self_target
+            && effect.target_name_player() == Some(TargetPlayer::Self_)
+            && activating_card_id.is_some()
+            && effect.source_any().is_none()
+            && effect.card_type_any().is_none()
+            && !effect.target_from_selection_any().unwrap_or(false)
+            && !effect.multiple_targets_any().unwrap_or(false)
+            && effect.group_names_any().map_or(true, |g| g.is_empty())
+            && !effect.all_any().unwrap_or(false)
+    }
+
     /// The single card a heart gain applies to when the effect resolved to no
     /// explicit target list.
     ///
@@ -1255,8 +1270,7 @@ impl AbilityResolver {
     /// empty, the effect applies to nothing rather than quietly falling back to
     /// the activating card. Otherwise an unqualified self target means the
     /// activating card: either a no-count effect that does not exclude self, or
-    /// an explicit `self_target` with no source, card type, group or
-    /// all-selections qualifier to widen it.
+    /// an explicit `self_target` with nothing to widen it.
     fn implicit_heart_target(
         gs: &mut GameState,
         effect: &AbilityEffect,
@@ -1276,18 +1290,10 @@ impl AbilityResolver {
         let unqualified_self = effect.target_count_any().is_none()
             && (effect.exclude_self_any().is_none()
                 || effect.target_player() == Some(TargetPlayer::Self_));
-        let broadly_self = is_self_target
-            && effect.target_name_player() == Some(TargetPlayer::Self_)
-            && activating_card_id.is_some()
-            && effect.source_any().is_none()
-            && effect.card_type_any().is_none()
-            && !effect.target_from_selection_any().unwrap_or(false)
-            && !effect.multiple_targets_any().unwrap_or(false)
-            && effect.group_names_any().map_or(true, |g| g.is_empty())
-            && !effect.all_any().unwrap_or(false);
-        (unqualified_self || broadly_self)
-            .then_some(activating_card_id)
-            .flatten()
+        (unqualified_self
+            || Self::is_broadly_self(effect, is_self_target, activating_card_id))
+        .then_some(activating_card_id)
+        .flatten()
     }
 
     /// When target_count is set and there are more eligible stage members

@@ -1132,26 +1132,20 @@ impl super::TurnEngine {
                         // expects, not raw numeric indices.
                         // double_baton_touch likewise: its handler parses the option
                         // text as an "area1,area2" pair and cannot read numeric ids.
-                        if target == "position|destination"
-                            || target == "area_select"
-                            || target == "double_baton_touch"
-                        {
-                            // Indices channel (select_indices / web UI): map the
-                            // first index through the option list. Before this arm
-                            // existed, an indices-channel answer fell through and
-                            // the raw number became the destination string ("0"),
-                            // which matches no zone — the card was silently dropped
-                            // (found by zone_change_gate_test riko_responds_only_to_own_side).
-                            if let Some(found) =
-                                Self::lookup_option_target(options.as_ref(), card_id, &card_indices)
-                            {
-                                return Ok(crate::ability::types::ChoiceResult::TargetSelected {
-                                    target: found,
-                                });
-                            }
-                        }
-                        // For self_or_opponent, look up option text by index from card_indices
-                        if target == "self_or_opponent" {
+                        // self_or_opponent likewise: its options are the two player
+                        // names, not a zone.
+                        //
+                        // Indices channel (select_indices / web UI): map the
+                        // first index through the option list. Before this arm
+                        // existed, an indices-channel answer fell through and
+                        // the raw number became the destination string ("0"),
+                        // which matches no zone — the card was silently dropped
+                        // (found by zone_change_gate_test riko_responds_only_to_own_side).
+                        let target_needs_option_text = matches!(
+                            target.as_str(),
+                            "position|destination" | "area_select" | "double_baton_touch" | "self_or_opponent"
+                        );
+                        if target_needs_option_text {
                             if let Some(found) =
                                 Self::lookup_option_target(options.as_ref(), card_id, &card_indices)
                             {
