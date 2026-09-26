@@ -17,6 +17,97 @@ use alloc::{
 };
 
 impl AbilityResolver {
+    /// How many times a 「〜1枚につき」 state change fires.
+    ///
+    /// A `previous_moved` source counts the cards the PRECEDING sequential step
+    /// moved rather than a zone. Anything else counts the zone's cards through
+    /// the effect's own filter, with the card type dropped — a state change
+    /// applies to whatever is there — and the cost limit kept.
+    fn per_unit_state_count(
+        &self,
+        gs: &GameState,
+        effect: &AbilityEffect,
+        target: &str,
+        cost_limit: Option<u8>,
+        count: u8,
+    ) -> u8 {
+        let per_unit_cnt = effect.per_unit_count_any().unwrap_or(1) as u8;
+        if effect
+            .per_unit_source_any()
+            .is_some_and(|s| s.contains("previous_moved"))
+        {
+            return (self.moved_cards.len().u8_count() / per_unit_cnt) * count.max(1);
+        }
+        let player = gs.resolve_target_player(target);
+        let location = effect
+            .location_any()
+            .unwrap_or(Zone::Stage.to_str());
+        let cards: Vec<i16> = util::zone_cards(player, location).to_vec();
+        let mut per_unit_filter = util::CardFilter::from_effect(effect);
+        per_unit_filter.card_type = None;
+        per_unit_filter.cost_limit = cost_limit;
+        let matching: Vec<i16> = cards
+            .iter()
+            .filter(|&&cid| per_unit_filter.matches(&gs.card_database, cid, false))
+            .copied()
+            .collect();
+        let matched_count = if matches!(
+            effect.distinct_any(),
+            Some(crate::card::DistinctType::CardName)
+        ) {
+            // Joint-aware distinct-name count (Q278/Q279): ordinary cards dedupe by
+            // name; a joint (multi-name) card adds one unit if it introduces a name
+            // not already present as a single-name card.
+            util::count_distinct_member_name_units(&matching, &gs.card_database) as u8
+        } else {
+            util::apply_distinct_filter(&matching, effect.distinct_any(), &gs.card_database)
+                .len()
+                .u8_count()
+        };
+        (matched_count / per_unit_cnt) * count.max(1)
+    }
+
+    /// The blade limit, and whether it can match nothing.
+    ///
+    /// Two limits are computed rather than read. Q266 derives one from the
+    /// member paid as the wait cost; C5 from the energy under the activating
+    /// member. Q266 can come out negative, which no card can satisfy — and
+    /// clamping it to zero would let every member qualify, so that case is
+    /// reported for the caller to require "< 0", which nothing meets.
+    fn resolve_blade_limit(gs: &GameState, effect: &AbilityEffect) -> (Option<u8>, bool) {
+        if effect.blade_limit_from_cost_member_any().unwrap_or(false) {
+            // Q266: dynamic limit = (original blade of the member paid as the
+            // wait cost) − offset. 「元々持つブレードの数が…より2つ以上少ない」
+            // → limit = costed_blade − 2.
+            let base = effect.blade_limit_offset_any().unwrap_or(0) as i32;
+            let cost_member_blade = gs
+                .last_cost_wait_member()
+                .and_then(|cid| gs.card_database.get_card(cid).map(|c| c.blade))
+                .unwrap_or(0) as i32;
+            let signed = cost_member_blade - base;
+            return if signed < 0 {
+                (Some(0), true)
+            } else {
+                (Some(signed as u8), false)
+            };
+        }
+        if effect.blade_limit_from_energy_under_any().unwrap_or(false) {
+            // C5: dynamic limit = (energy cards under the activating member) + offset.
+            let base = effect.blade_limit_offset_any().unwrap_or(0) as i32;
+            let under_count = gs.activating_card.map_or(0, |aid| {
+                let p = gs.resolve_target_player("self");
+                p.stage
+                    .stage
+                    .iter()
+                    .position(|&id| id == aid)
+                    .map(|idx| p.stage.under_cards[idx].len() as i32)
+                    .unwrap_or(0)
+            });
+            return (Some(crate::constants::saturate_u8(under_count + base)), false);
+        }
+        (effect.blade_limit_any().map(|v| v as u8), false)
+    }
+
     pub(crate) fn execute_change_state(
         &mut self,
         gs: &mut GameState,
@@ -38,42 +129,7 @@ impl AbilityResolver {
         let mut count: u8 = effect.count_or(0) as u8;
         let mut group_name = effect.group_name();
         if effect.per_unit_any().unwrap_or(false) {
-            // "これによりデッキに置いたカード1枚につき" — count against the
-            // cards the PRECEDING sequential step moved, not a zone.
-            if effect
-                .per_unit_source_any()
-                .is_some_and(|s| s.contains("previous_moved"))
-            {
-                let per_unit_cnt = effect.per_unit_count_any().unwrap_or(1) as u8;
-                count = (self.moved_cards.len().u8_count() / per_unit_cnt) * count.max(1);
-            } else {
-                let player = gs.resolve_target_player(&target);
-                let loc_binding = effect.location_any();
-                let location = loc_binding.unwrap_or(Zone::Stage.to_str());
-                let cards: Vec<i16> = util::zone_cards(player, location).to_vec();
-                let mut per_unit_filter = util::CardFilter::from_effect(effect);
-                per_unit_filter.card_type = None;
-                per_unit_filter.cost_limit = cost_limit;
-                let matching: Vec<i16> = cards
-                    .iter()
-                    .filter(|&&cid| per_unit_filter.matches(&gs.card_database, cid, false))
-                    .copied()
-                    .collect();
-                let matched_count = if matches!(
-                    effect.distinct_any(),
-                    Some(crate::card::DistinctType::CardName)
-                ) {
-                    // Joint-aware distinct-name count (Q278/Q279): ordinary cards dedupe by
-                    // name; a joint (multi-name) card adds one unit if it introduces a name
-                    // not already present as a single-name card.
-                    util::count_distinct_member_name_units(&matching, &gs.card_database) as u8
-                } else {
-                    util::apply_distinct_filter(&matching, effect.distinct_any(), &gs.card_database)
-                        .len().u8_count()
-                };
-                let per_unit_cnt = effect.per_unit_count_any().unwrap_or(1) as u8;
-                count = (matched_count / per_unit_cnt) * count.max(1);
-            }
+            count = self.per_unit_state_count(gs, effect, &target, cost_limit, count);
             group_name = None;
         }
         if effect.per_unit_any().unwrap_or(false) && count == 0 {
@@ -86,43 +142,10 @@ impl AbilityResolver {
         let destination = effect.destination.map(|z| z.as_str());
         let cost_limit_operator = effect.cost_limit_operator_any().map(|s| s.to_string());
         let characters = effect.characters_any();
-        let mut q266_no_target = false;
-        let blade_limit: Option<u8> = if effect.blade_limit_from_cost_member_any().unwrap_or(false) {
-            // Q266: dynamic limit = (original blade of the member paid as the wait cost) − offset.
-            // "元々持つブレードの数が…より2つ以上少ない" → limit = costed_blade − 2.
-            let base = effect.blade_limit_offset_any().unwrap_or(0) as i32;
-            let cost_member_blade = gs
-                .last_cost_wait_member()
-                .and_then(|cid| gs.card_database.get_card(cid).map(|c| c.blade))
-                .unwrap_or(0) as i32;
-            let signed = cost_member_blade - base;
-            if signed < 0 {
-                // No member can have negative blades → no legal target. Encode as
-                // "< 0" (matches nothing), since blades are >= 0.
-                q266_no_target = true;
-                Some(0)
-            } else {
-                Some(signed as u8)
-            }
-        } else if effect.blade_limit_from_energy_under_any().unwrap_or(false) {
-            // C5: dynamic limit = (energy cards under the activating member) + offset.
-            let base = effect.blade_limit_offset_any().unwrap_or(0) as i32;
-            let under_count = gs.activating_card.map_or(0, |aid| {
-                let p = gs.resolve_target_player("self");
-                p.stage
-                    .stage
-                    .iter()
-                    .position(|&id| id == aid)
-                    .map(|idx| p.stage.under_cards[idx].len() as i32)
-                    .unwrap_or(0)
-            });
-            Some(crate::constants::saturate_u8(under_count + base))
-        } else {
-            effect.blade_limit_any().map(|v| v as u8)
-        };
+        let (blade_limit, blade_limit_unreachable) = Self::resolve_blade_limit(gs, effect);
         let blade_limit_operator_binding = effect.blade_limit_operator_any();
         let mut blade_limit_operator = blade_limit_operator_binding.as_deref();
-        if q266_no_target {
+        if blade_limit_unreachable {
             blade_limit_operator = Some("<");
         }
         // When targeting opponent, group_names is trigger-level metadata

@@ -44,6 +44,17 @@ fn ui_kind(s: &str) -> String {
     ui_text(s)
 }
 
+/// Does `requirement` name `slot`? This is only the comparison — the
+/// position vocabulary itself lives in
+/// `ability::util::activation_position_index`, which is its single source of
+/// truth. "front", an unstated position and a card that is not on stage all
+/// read as "does not name this slot"; callers decide whether that means pass.
+fn slot_named(requirement: &str, slot: Option<u8>) -> bool {
+    slot.is_some_and(|s| {
+        crate::ability::util::activation_position_index(requirement) == Some(s as usize)
+    })
+}
+
 impl GameState {
     /// Compute the opponent-front targets for a constant "正面のエリア" (front area)
     /// ability. Given the activating card's stage slot, mirrors to the opponent's
@@ -379,7 +390,6 @@ impl GameState {
             }
         }
         tdbg!("RC:4 ENTRY_POSITIONS_DONE count={}", entry_positions.len());
-
         for &(card_id, ability_idx) in &entries {
             tdbg!("RC:5_LOOP card_id={}", card_id);
             // Re-lookup effect through the local Arc clone — avoids 152B clone.
@@ -413,10 +423,6 @@ impl GameState {
                 // evaluation time, not during constant registration.
                 ctx.skip_phase_gate = true;
 
-                // Check effect-level position requirement.
-                // "front" is a targeting rule (正面のエリア) not an activation gate,
-                // so it does not restrict where the activating card must sit.
-                //
                 // activation_position ("左サイド,右サイド" etc.) is the AUTHORITATIVE
                 // gate when present — cards like 鬼塚夏美 SP-bp7-009 print
                 // 「（この能力は左サイド/右サイドエリアにいる場合のみ発動する）」 and the
@@ -424,33 +430,19 @@ impl GameState {
                 // may name a single slot) broke the second listed side: moving her
                 // right never re-granted heart02.
                 let card_pos = entry_positions.get(&card_id).copied().flatten();
-                let pos_matches = |ps: &str, cp: Option<u8>| {
-                    matches!(
-                        (ps, cp),
-                        ("center", Some(1))
-                            | ("left" | "left_side", Some(0))
-                            | ("right" | "right_side", Some(2))
-                    )
-                };
                 let pos_ok = if let Some(act) = effect.activation_position_any() {
+                    // The authoritative gate, and the parser can list several
+                    // sides in it — any one of them satisfies the condition.
                     act.split(',')
                         .map(|p| p.trim())
-                        .any(|p| pos_matches(p, card_pos))
-                } else if let Some(ref pos) = effect.position_any() {
-                    let pos_str = pos.get_position();
-                    if pos_str == Some("front") {
-                        true
-                    } else {
-                        matches!(
-                            (pos_str, card_pos),
-                            (Some("center"), Some(1))
-                                | (Some("left") | Some("left_side"), Some(0))
-                                | (Some("right") | Some("right_side"), Some(2))
-                                | (None, _)
-                        )
-                    }
+                        .any(|p| slot_named(p, card_pos))
                 } else {
-                    true
+                    // Otherwise the targeting rule, which names at most one slot.
+                    // "front" and an unstated position are not slot constraints.
+                    match effect.position_any().and_then(|p| p.get_position()) {
+                        Some(pos) if pos != "front" => slot_named(pos, card_pos),
+                        _ => true,
+                    }
                 };
 
                 if pos_ok {
