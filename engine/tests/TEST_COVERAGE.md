@@ -137,7 +137,9 @@ _None — every ability's card is referenced by at least one test._
 
 自動 abilities rarely act alone — they chain off other abilities, off effect *causes*, or share a card with other abilities. These lists group every 自動 by interaction shape; `Depth`/`Tests` say how well the **interaction** is exercised.
 
-`Tests` is `direct/in file`: how many test functions name this card in their own body, out of how many sit in a file that mentions it. A card is only as covered as the tests that actually drive it — the second number is co-location, which is navigation, not evidence.
+`Tests` is `direct/in file`: how many test functions reach this card in their own body, out of how many sit in a file that mentions it. A card is only as covered as the tests that actually drive it — the second number is co-location, which is navigation, not evidence.
+
+**What this column is not.** It counts a card, not an ability. 151 card identities carry more than one ability (the jidou plus its partner), and those abilities share one set of direct tests, so this number cannot say "ability A has 3 tests, ability B has 5". Splitting them was measured and rejected: 128 of those 151 differ by trigger, but only 59 of those can be separated by the explicit `AbilityTrigger::X` a test fires (自動 is driven through `trigger_auto_abilities_for_player`, which names no constant, and 常時 has none). A metric right for 46% of cases would read as complete, which is how this report's earlier 100% misled the test-improvement plan. Treat these rows as per-card, not per-ability.
 
 ### A. Jidou watching other abilities resolve (`能力が解決`)  (4)
 
