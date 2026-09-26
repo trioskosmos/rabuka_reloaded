@@ -49,6 +49,11 @@ TRIGGER_PATTERN = re.compile(r"\{\{([^|]+)\|([^}]+)\}\}")
 SLASH_TRIGGER_PATTERN = re.compile(r"/\{\{([^|]+)\|([^}]+)\}\}")
 
 
+def icon_markup(icon_file: str, icon_text: str) -> str:
+    """The icon as it appears in card text: `{{icon_file|icon_text}}`."""
+    return f"{{{{{icon_file}|{icon_text}}}}}"
+
+
 def extract_trigger(text: str) -> tuple[list, int | None, str]:
     """Extract triggers and use limits from ability text and return (triggers, use_limit, effect)."""
     # Cost icon patterns to exclude from triggers.
@@ -98,28 +103,31 @@ def extract_trigger(text: str) -> tuple[list, int | None, str]:
     # First, remove / prefix trigger patterns
     slash_matches = SLASH_TRIGGER_PATTERN.findall(text)
     for match in slash_matches:
-        icon_file = match[0]
-        icon_text = match[1]
-        slash_pattern = f"/{{{{{icon_file}|{icon_text}}}}}"
-        effect = effect.replace(slash_pattern, "", 1)
+        icon_file, icon_text = match[0], match[1]
+        effect = effect.replace(f"/{icon_markup(icon_file, icon_text)}", "", 1)
         triggers.append(icon_text)
 
     # Find all trigger patterns
     trigger_matches = TRIGGER_PATTERN.findall(text)
 
-    # Only consider triggers at the very start (before any non-trigger, non-whitespace text)
+    # Only consider triggers at the very start (before any non-trigger,
+    # non-whitespace text).
     pos = 0
     for match in trigger_matches:
-        icon_file = match[0]
-        icon_text = match[1]
-        match_start = text.find(f"{{{{{icon_file}|{icon_text}}}}}", pos)
+        icon_file, icon_text = match[0], match[1]
+        # The icon markup as it appears in the text, e.g. `{{turn1.png|ターン1回}}`.
+        # Built once per iteration: every branch below needs it, and rebuilding
+        # the same nested f-string eight times is both noise and somewhere for
+        # one copy to drift from the others.
+        markup = icon_markup(icon_file, icon_text)
+        match_start = text.find(markup, pos)
 
         # Check if there's any non-trigger text before this match
         before = text[pos:match_start]
         if before.strip() and before.strip() != "：":
             # If the only non-trigger text is a slash prefix (from /{{trigger}}), skip it
             if before.strip() == "/":
-                pos = match_start + len(f"{{{{{icon_file}|{icon_text}}}}}")
+                pos = match_start + len(markup)
                 continue
             # Found non-trigger text, stop here
             break
@@ -129,14 +137,14 @@ def extract_trigger(text: str) -> tuple[list, int | None, str]:
         # like {{center.png|センター}} -- they are activation position requirements,
         # not costs. Only skip actual cost resources (energy, heart, blade, score).
         if any(cost_pattern in icon_file for cost_pattern in cost_icon_patterns):
-            pos = match_start + len(f"{{{{{icon_file}|{icon_text}}}}}")
+            pos = match_start + len(markup)
             continue
 
         # Position icons (center, left, right) at the start should be skipped
         # only if no trigger has been found yet AND no other trigger icon precedes.
         # If they appear after a trigger icon, they're position requirements, not costs.
         if triggers and any(p in icon_file for p in position_icon_patterns):
-            pos = match_start + len(f"{{{{{icon_file}|{icon_text}}}}}")
+            pos = match_start + len(markup)
             continue
 
         # Check if this is a use limit (turn restriction)
@@ -156,9 +164,8 @@ def extract_trigger(text: str) -> tuple[list, int | None, str]:
                 num_match = re.match(r"ターン(\d+)回", use_limit_text)
                 use_limit = int(num_match.group(1)) if num_match else use_limit_text
             # Remove use limit from effect
-            trigger_pattern = f"{{{{{icon_file}|{icon_text}}}}}"
-            effect = effect.replace(trigger_pattern, "", 1)
-            pos = match_start + len(trigger_pattern)
+            effect = effect.replace(markup, "", 1)
+            pos = match_start + len(markup)
             continue
 
         # Check if we're inside quoted text
@@ -166,18 +173,17 @@ def extract_trigger(text: str) -> tuple[list, int | None, str]:
         quote_count = text[:match_start].count("「") - text[:match_start].count("」")
         if quote_count > 0:
             # We're inside quoted text, skip
-            pos = match_start + len(f"{{{{{icon_file}|{icon_text}}}}}")
+            pos = match_start + len(markup)
             continue
 
         # Skip if this trigger was already extracted (e.g. via slash prefix)
         if icon_text in triggers:
-            pos = match_start + len(f"{{{{{icon_file}|{icon_text}}}}}")
+            pos = match_start + len(markup)
             continue
         triggers.append(icon_text)
         # Remove this trigger icon from effect
-        trigger_pattern = f"{{{{{icon_file}|{icon_text}}}}}"
-        effect = effect.replace(trigger_pattern, "", 1)
-        pos = match_start + len(trigger_pattern)
+        effect = effect.replace(markup, "", 1)
+        pos = match_start + len(markup)
 
     effect = effect.strip()
 
