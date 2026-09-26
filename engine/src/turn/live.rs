@@ -3008,15 +3008,7 @@ pub fn enrich_from_applications(
             match app.effect_type {
                 crate::types::EffectType::HeartBonus => {
                     mc.ability_heart_bonuses.push(crate::types::AbilityBonus {
-                        source: if ABILITY_DEBUG.load(Ordering::Relaxed) {
-                            let source_name = card_db
-                                .get_card(app.source_card_id)
-                                .map(|c| c.name.to_string())
-                                .unwrap_or_else(|| format!("#{}", app.source_card_id));
-                            format!("Ability: {}", source_name).into()
-                        } else {
-                            crate::types::ArcStr::default()
-                        },
+                        source: bonus_source(card_db, app.source_card_id),
                         amount: u8::try_from(app.amount.unsigned_abs()).unwrap(),
                         color: app.heart_color,
                         ability_text: app.ability_text.clone(),
@@ -3024,15 +3016,7 @@ pub fn enrich_from_applications(
                 }
                 crate::types::EffectType::BladeBonus => {
                     mc.ability_blade_bonuses.push(crate::types::AbilityBonus {
-                        source: if ABILITY_DEBUG.load(Ordering::Relaxed) {
-                            let source_name = card_db
-                                .get_card(app.source_card_id)
-                                .map(|c| c.name.to_string())
-                                .unwrap_or_else(|| format!("#{}", app.source_card_id));
-                            format!("Ability: {}", source_name).into()
-                        } else {
-                            crate::types::ArcStr::default()
-                        },
+                        source: bonus_source(card_db, app.source_card_id),
                         amount: u8::try_from(app.amount.unsigned_abs()).unwrap(),
                         color: app.heart_color,
                         ability_text: app.ability_text.clone(),
@@ -3044,26 +3028,16 @@ pub fn enrich_from_applications(
         match app.effect_type {
             crate::types::EffectType::ScoreBonus | crate::types::EffectType::ScoreSet => {
                 breakdown.scores.push(crate::types::ScoreLine {
-                    source: if ABILITY_DEBUG.load(Ordering::Relaxed) {
-                        app.ability_text.to_string()
-                    } else {
-                        String::new()
-                    },
+                    source: debug_label(|| app.ability_text.to_string()),
                     value: u8::try_from(app.amount.unsigned_abs()).unwrap(),
                 });
             }
             crate::types::EffectType::Transform => {
                 breakdown.transforms.push(crate::types::EffectEntry {
-                    source: if ABILITY_DEBUG.load(Ordering::Relaxed) {
-                        app.ability_text.to_string()
-                    } else {
-                        String::new()
-                    },
-                    desc: if ABILITY_DEBUG.load(Ordering::Relaxed) {
+                    source: debug_label(|| app.ability_text.to_string()),
+                    desc: debug_label(|| {
                         format!("All hearts become type {}", app.heart_color.unwrap_or(0))
-                    } else {
-                        String::new()
-                    },
+                    }),
                     value: String::new(),
                 });
             }
@@ -3074,11 +3048,7 @@ pub fn enrich_from_applications(
             let card = card_db.get_card(app.source_card_id);
             triggered_abilities.push(crate::types::TriggeredAbility {
                 source_card_id: app.source_card_id,
-                name: if ABILITY_DEBUG.load(Ordering::Relaxed) {
-                    format!("Ability #{}", triggered_abilities.len() + 1)
-                } else {
-                    String::new()
-                },
+                name: debug_label(|| format!("Ability #{}", triggered_abilities.len() + 1)),
                 card_name: card
                     .map(|c| crate::types::ArcStr::from(c.name.as_ref()))
                     .unwrap_or_default(),
@@ -3088,6 +3058,33 @@ pub fn enrich_from_applications(
             });
         }
     }
+}
+
+/// Compute a debug-only label, or the empty default when ABILITY_DEBUG is off.
+///
+/// These labels exist for the live breakdown log and nothing else. They are
+/// built from `make` lazily so the formatting cost is not paid on the normal
+/// path, and so every call site spells the flag check the same way rather than
+/// each one re-deriving "is the debug build on?".
+fn debug_label(make: impl FnOnce() -> String) -> String {
+    if ABILITY_DEBUG.load(Ordering::Relaxed) {
+        make()
+    } else {
+        String::new()
+    }
+}
+
+/// The `Ability: <name>` source label for a recorded bonus, or empty when
+/// ABILITY_DEBUG is off.
+fn bonus_source(card_db: &CardDatabase, source_card_id: i16) -> crate::types::ArcStr {
+    if !ABILITY_DEBUG.load(Ordering::Relaxed) {
+        return crate::types::ArcStr::default();
+    }
+    let name = card_db
+        .get_card(source_card_id)
+        .map(|c| c.name.to_string())
+        .unwrap_or_else(|| format!("#{}", source_card_id));
+    format!("Ability: {}", name).into()
 }
 
 pub fn build_snapshot(

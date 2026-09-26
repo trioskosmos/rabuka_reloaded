@@ -984,16 +984,14 @@ if count <= 1 {
             };
             true
         }
+        // A heart colour and a heart type are answered the same way: pick an
+        // index into the offered list.
         Choice::SelectHeartColor {
             options,
             description: _description,
             ..
-        } => {
-            let sel = menu_select(ui, &options, prompt, false).unwrap_or(0);
-            TurnEngine::resume_with_choice(gs, Some(sel as i16), None).ok();
-            true
         }
-        Choice::SelectHeartType {
+        | Choice::SelectHeartType {
             options,
             description: _description,
             ..
