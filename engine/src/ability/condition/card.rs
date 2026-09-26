@@ -1038,31 +1038,22 @@ impl<'a> ConditionContext<'a> {
         include_opponent: bool,
     ) -> Vec<i16> {
         let card_db = &self.game_state.card_database;
-        let mut ids: Vec<i16> = self
-            .resolve_condition_player("self")
-            .stage
-            .stage
-            .iter()
-            .filter(|&&cid| {
-                cid != -1
-                    && Some(cid) != exclude_id
-                    && util::card_matches_type(card_db, cid, card_type)
-            })
-            .copied()
-            .collect();
+        let eligible = |player: &crate::player::Player| {
+            player
+                .stage
+                .stage
+                .iter()
+                .filter(|&&cid| {
+                    cid != -1
+                        && Some(cid) != exclude_id
+                        && util::card_matches_type(card_db, cid, card_type)
+                })
+                .copied()
+                .collect::<Vec<i16>>()
+        };
+        let mut ids = eligible(self.resolve_condition_player("self"));
         if include_opponent {
-            ids.extend(
-                self.resolve_condition_player("opponent")
-                    .stage
-                    .stage
-                    .iter()
-                    .filter(|&&cid| {
-                        cid != -1
-                            && Some(cid) != exclude_id
-                            && util::card_matches_type(card_db, cid, card_type)
-                    })
-                    .copied(),
-            );
+            ids.extend(eligible(self.resolve_condition_player("opponent")));
         }
         ids
     }
@@ -2490,6 +2481,38 @@ impl<'a> ConditionContext<'a> {
         util::compare_counts(operator, crate::constants::saturate_u8(total_blades), count)
     }
 
+    /// Does this condition narrow WHICH cards count, as opposed to merely
+    /// asking whether a card appeared at all?
+    ///
+    /// With no card-targeting filter the condition can only be 「このメンバーが
+    /// 登場」, so the activating card must genuinely have appeared. With one, the
+    /// condition describes a set and any appearance among them counts.
+    fn has_card_targeting_filters(condition: &Condition) -> bool {
+        condition.get_group_names().is_some_and(|g| !g.is_empty())
+            || condition.get_cost_limit().is_some()
+            || condition.get_card_type().is_some()
+            || condition.get_characters().is_some_and(|c| !c.is_empty())
+    }
+
+    /// Did `cid` appear in the CURRENT movement batch?
+    ///
+    /// Batch-scoped rather than turn-scoped: a stale turn-level record must not
+    /// re-trigger a rescan on an unrelated event. `recently_appeared_cards`
+    /// counts too — during a baton touch the arriving card's movement event is
+    /// not pushed (only the replaced member's is), but the card DID appear in
+    /// this batch via record_card_appearance.
+    fn appeared_in_current_batch(&self, cid: i16) -> bool {
+        (self.moved_cards.is_empty()
+            || self.moved_cards.contains(&cid)
+            || self
+                .game_state
+                .recently_moved_cards
+                .as_ref()
+                .is_some_and(|v| v.contains(&cid))
+            || self.game_state.recently_appeared_cards.contains(&cid))
+            && self.game_state.has_card_appeared_this_turn(cid)
+    }
+
     #[allow(clippy::too_many_arguments)]
     fn evaluate_appearance_stage(
         &self,
@@ -2502,42 +2525,16 @@ impl<'a> ConditionContext<'a> {
             push_rich("ステージ空", false);
             return false;
         }
-        // Self-trigger guard: when the condition has NO card-
-        // targeting filters (group_names, cost_limit, card_type,
-        // characters), it can only be "このメンバーが登場" (this
-        // member appears). For those conditions, the scanned card
-        // must have actually appeared this turn.
-        let has_card_filters = condition.get_group_names().map_or(false, |g| !g.is_empty())
-            || condition.get_cost_limit().is_some()
-            || condition.get_card_type().is_some()
-            || condition.get_characters().map_or(false, |c| !c.is_empty());
+        let has_card_filters = Self::has_card_targeting_filters(condition);
         let baton_touch_trigger = condition.get_baton_touch_trigger().unwrap_or(false);
         if !baton_touch_trigger && !has_card_filters {
             if self.game_state.cards_appeared_this_turn.is_empty() {
                 push_rich("今ターン未登場", false);
                 return false;
             }
-            let self_appeared = self.activating_card_id.is_some_and(|cid| {
-                // Batch-scoped guard: when moved_cards is non-empty,
-                // the card must have appeared in the current batch,
-                // not the entire turn. Prevents stale turn-level data
-                // from triggering re-scans on unrelated events.
-                // Also accept cards in recently_appeared_cards — during
-                // baton touch the arriving card's movement event is not
-                // pushed (only the replaced member's is), but the card
-                // DID appear in this batch via record_card_appearance.
-                let batch_ok = self.moved_cards.is_empty()
-                    || self.moved_cards.contains(&cid)
-                    || self
-                        .game_state
-                        .recently_moved_cards
-                        .as_ref()
-                        .map_or(false, |v| v.contains(&cid))
-                    || self.game_state.recently_appeared_cards.contains(&cid);
-                batch_ok
-                    && self.game_state.has_card_appeared_this_turn(cid)
-                    && stage_ids.contains(&cid)
-            });
+            let self_appeared = self
+                .activating_card_id
+                .is_some_and(|cid| self.appeared_in_current_batch(cid) && stage_ids.contains(&cid));
             if !self_appeared {
                 push_rich("自カード未登場", false);
                 return false;
@@ -2621,24 +2618,6 @@ impl<'a> ConditionContext<'a> {
                 // when a card THAT actually appeared this turn matches the group.
                 // If appearance tracking is cleared (resolution time), accept
                 // — the ability was already queued by the trigger event.
-                if !baton_touch_trigger {
-                    if self.game_state.cards_appeared_this_turn.is_empty() {
-                        // Resolution: appearance happened (ability was queued)
-                    } else {
-                        let has_appeared_matching = stage_ids.iter().any(|&cid| {
-                            match_fn(cid) && self.game_state.has_card_appeared_this_turn(cid)
-                        });
-                        if !has_appeared_matching {
-                            push_rich("該当グループ未登場", false);
-                            return false;
-                        }
-                    }
-                }
-                // Verify that an appeared card matches the group filter.
-                // The group check above ensures SOME card on stage belongs
-                // to the group, but the appearance trigger should only fire
-                // when a card THAT actually appeared this turn matches the group.
-                // Skip during constant evaluation (no cards "appeared").
                 if !baton_touch_trigger && !self.game_state.cards_appeared_this_turn.is_empty() {
                     let has_appeared_matching = stage_ids.iter().any(|&cid| {
                         match_fn(cid) && self.game_state.has_card_appeared_this_turn(cid)

@@ -1105,6 +1105,20 @@ pub struct CardFilter<'a> {
     pub negation: bool,
 }
 
+/// How many hearts of `color` a card carries, for a threshold test such as
+/// 「heart05を2個以上」. Whichever of the printed base heart and the need heart
+/// is larger counts, because either one satisfies the phrase.
+fn heart_count_for_threshold(db: &CardDatabase, id: i16, color: &str) -> u8 {
+    let hc = crate::card::parse_heart_color(color);
+    let of = |hearts: Option<&crate::card::BaseHeart>| {
+        hearts.map(|h| *h.hearts.get(&hc).unwrap_or(&0)).unwrap_or(0)
+    };
+    let card = db.get_card(id);
+    let base = of(card.and_then(|c| c.base_heart.as_ref()));
+    let need = of(card.and_then(|c| c.need_heart.as_ref()));
+    base.max(need)
+}
+
 impl<'a> CardFilter<'a> {
     pub fn new() -> Self {
         Self::default()
@@ -1242,36 +1256,14 @@ impl<'a> CardFilter<'a> {
         }
         // Heart color count threshold check (e.g. "heart05を2個以上").
         if let Some(min_count) = self.heart_color_count {
+            let threshold = min_count as u8;
+            let meets = |color: &String| heart_count_for_threshold(db, id, color) >= threshold;
+            // 「require_all」 means EVERY named colour must meet the count;
+            // otherwise any one of them does.
             let passes = if self.require_all_heart_colors {
-                self.heart_colors.iter().all(|color| {
-                    let hc = crate::card::parse_heart_color(color);
-                    let base_amount = db
-                        .get_card(id)
-                        .and_then(|c| c.base_heart.as_ref())
-                        .map(|bh| *bh.hearts.get(&hc).unwrap_or(&0))
-                        .unwrap_or(0);
-                    let need_amount = db
-                        .get_card(id)
-                        .and_then(|c| c.need_heart.as_ref())
-                        .map(|nh| *nh.hearts.get(&hc).unwrap_or(&0))
-                        .unwrap_or(0);
-                    base_amount.max(need_amount) >= min_count as u8
-                })
+                self.heart_colors.iter().all(meets)
             } else {
-                self.heart_colors.iter().any(|color| {
-                    let hc = crate::card::parse_heart_color(color);
-                    let base_amount = db
-                        .get_card(id)
-                        .and_then(|c| c.base_heart.as_ref())
-                        .map(|bh| *bh.hearts.get(&hc).unwrap_or(&0))
-                        .unwrap_or(0);
-                    let need_amount = db
-                        .get_card(id)
-                        .and_then(|c| c.need_heart.as_ref())
-                        .map(|nh| *nh.hearts.get(&hc).unwrap_or(&0))
-                        .unwrap_or(0);
-                    base_amount.max(need_amount) >= min_count as u8
-                })
+                self.heart_colors.iter().any(meets)
             };
             if !passes {
                 return false;
