@@ -445,11 +445,12 @@ static void test_heart_map_predicates(void)
              "entry_or_default yields 0 for an absent color");
     CHECK(rb_heartmap_contains_key(&m, 0, mlen, 0x7D),
           "entry_or_default inserts a 0-count entry, which is then present");
-    CHECK_EQ(rb_heartmap_get(&m, 0, mlen, 0x7D, &got) && got, 1,
-             "the entry_or_default key reads back as 0");
+    got = -1;
+    CHECK(rb_heartmap_get(&m, 0, mlen, 0x7D, &got) && got == 0,
+          "the entry_or_default key reads back as 0");
     rb_heartmap_remove(&m, 0, &mlen, 0x7E);
     CHECK(!rb_heartmap_contains_key(&m, 0, mlen, 0x7E), "HeartMap::remove drops the key");
-    CHECK_EQ(mlen, 2, "remove shrinks the map by one key");
+    CHECK_EQ(mlen, 3, "remove shrinks the map by the one removed key");
     CHECK(rb_heartmap_contains_key(&m, 0, mlen, RB_HEART_PINK) &&
               rb_heartmap_contains_key(&m, 0, mlen, RB_HEART_BLUE) &&
               rb_heartmap_contains_key(&m, 0, mlen, 0x7D),

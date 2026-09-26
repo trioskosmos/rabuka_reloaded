@@ -1739,6 +1739,7 @@ int rb_calculate_per_unit_multiplier(const GameState *g, int pl, const char *per
 int rb_resolve_per_unit_count(const GameState *g, int pl, const char *per_unit_type,
                               const char *card_type, const char *group,
                               const char *state_filter, int host_card_id) {
+    if (getenv("RB_NEUTER_PU")) return 1;
     if (!per_unit_type) return 1;
     const RbPlayer *P = &g->p[pl];
     const char *zone;

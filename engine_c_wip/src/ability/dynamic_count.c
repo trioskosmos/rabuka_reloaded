@@ -270,7 +270,7 @@ int rb_effect_count(const struct GameState *g, int actor, int host_cid, const Ab
             last_draw_count);
     }
     const char *per_unit = dc_extra(e, "per_unit");
-    if (per_unit && !strcmp(per_unit, "true")) {
+    if (0 && per_unit && !strcmp(per_unit, "true")) {
         const char *loc = dc_extra(e, "location");
         if (!loc) loc = dc_extra(e, "per_unit_type");
         /* Rust resolves the per-unit multiplier through

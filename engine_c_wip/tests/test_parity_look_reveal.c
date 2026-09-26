@@ -309,7 +309,7 @@ static void test_reveal_looked_at_filters_candidates(void)
     e.source = "looked_at";
     e.count = 3;
     strcpy(e.card_type_field, "live_card");
-    fx_set(&e, 0, "heart_colors", "blue");
+    fx_set(&e, 0, "heart_colors", "heart04");
     rb_execute_effect_ex(&tg.state, 0, &e, -1);
     CHECK_EQ(tg.state.n_revealed, 1, "looked_at reveal keeps only the cards passing the filter");
     CHECK(revealed_has(&tg.state, blue_live), "the blue live is the revealed card");
@@ -364,9 +364,12 @@ static void test_reveal_per_group_sources(void)
 
     /* waitroom arm reveals the whole waitroom */
     tg.state.n_revealed = 0;
+    tg.state.p[0].discard.n = 0;
+    test_add_to_discard(&tg, a);
+    test_add_to_discard(&tg, b);
     e.source = "waitroom";
     rb_execute_effect_ex(&tg.state, 0, &e, -1);
-    CHECK_EQ(tg.state.n_revealed, 3, "reveal_per_group from the waitroom reveals it all");
+    CHECK_EQ(tg.state.n_revealed, 2, "reveal_per_group from the waitroom reveals it all");
 
     /* an unsupported source yields nothing (look.rs:1162 `_ => vec![]`) */
     tg.state.n_revealed = 0;
@@ -756,7 +759,7 @@ static void test_look_and_select_heart_color_filter(void)
     select.destination = "hand";
     select.count = 1;
     strcpy(select.card_type_field, "member_card");
-    fx_set(&select, 0, "heart_colors", "blue");
+    fx_set(&select, 0, "heart_colors", "heart04");
     fx_set(&select, 1, "discard_remaining", "true");
     AbilityEffect parent = {0};
     parent.action = "look_and_select";
@@ -848,6 +851,7 @@ static void test_look_and_select_any_number_and_max(void)
 
     /* `max` with a count larger than the pool clamps to the pool */
     rb_look_clear(0);
+    tg.state.p[0].discard.n = 0;
     test_add_to_deck(&tg, a);
     test_add_to_deck(&tg, b);
     select.n_extra = 0;
@@ -926,12 +930,15 @@ static void test_look_and_select_nested_look_action(void)
     parent.action = "look_and_select";
     parent.look_action = &look;
     parent.select_action = &select;
-    /* no live card anywhere: the nested reveal empties the pool */
+    /* No live card anywhere: the nested reveal drains the deck and the whole
+       revealed run becomes the looked-at set (look.rs:1313-1324), so the
+       select step still offers a pick. */
     rb_execute_effect_ex(&tg.state, 0, &parent, -1);
-    CHECK(!rb_has_pending_choice(&tg.state),
-          "an empty pool after the nested look_action offers no prompt");
     int pool[8];
-    CHECK_EQ(pool_get(0, pool, 8), 0, "the unmatched pool is empty");
+    CHECK_EQ(pool_get(0, pool, 8), 3, "the nested reveal_until fills the looked-at set");
+    CHECK(rb_has_pending_choice(&tg.state), "the select step runs over the nested pool");
+    CHECK_EQ(tg.state.p[0].deck.n, 0, "the nested reveal_until drained the deck");
+    rb_resume_with_choice_indices(&tg.state, NULL, 0);
 }
 
 /* Remainder routing — keep_shuffle_under finalisation. */
