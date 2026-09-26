@@ -42,7 +42,33 @@ HEART_ICON_ID = r"\{\{heart_?(\d+)\.png\|heart\d+\}\}"
 HEART_ICON_PAIR = r"\{\{heart_(\d+)\.png\|heart(\d+)\}\}"
 HEART_REF = r"heart_(\d+)"
 HEART_HAS_REF = r"heart_\d+"
+# The label half of a rendered icon: the `|heart03}` that names the colour.
 HEART_LABEL = r"\|(heart\d+)\}"
+
+
+# ======================================================================
+# RESOURCE ICON VOCABULARY (one definition, used by every icon scan)
+# ======================================================================
+# The icons card text writes a cost or a resource with. Whether a phrase names
+# or counts a resource is a vocabulary question, so the templates live here
+# once rather than being spelled out at every call site.
+BLADE_ICON = "{{icon_blade.png|ブレード}}"
+ENERGY_ICON = "{{icon_energy.png|E}}"
+ALL_HEART_ICON = "{{icon_all.png|ハート}}"
+SCORE_ICON = "{{icon_score.png|スコア}}"
+
+# The same icons as match patterns, for the few scans that need a regex rather
+# than a substring test.
+BLADE_ICON_RE = r"\{\{icon_blade\.png\|ブレード\}\}"
+BLADE_ICON_HELD_RE = re.compile(r"{{icon_blade\.png\|ブレード}}[^得]*持つ")
+
+# 「{{icon_score.png|スコア}}を持つ」 — the one fragment these sites test for.
+HAS_SCORE_ICON = f"{SCORE_ICON}を持つ"
+
+
+def count_icons(text, icons):
+    """How many times any of `icons` appears in `text`."""
+    return sum(text.count(icon) for icon in icons)
 
 
 def strip_suffix_period(text):

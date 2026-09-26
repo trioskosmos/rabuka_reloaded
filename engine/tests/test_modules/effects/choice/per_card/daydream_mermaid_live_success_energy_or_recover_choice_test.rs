@@ -67,9 +67,11 @@ fn daydream_mermaid_choice_appears_and_selects_energy() {
 
     let energy_before = game.state.player1.energy_zone.cards.len();
     game.select_option(0);
-    assert!(
-        game.state.player1.energy_zone.cards.len() > energy_before,
-        "Energy should be placed from energy deck"
+    assert_eq!(
+        game.state.player1.energy_zone.cards.len(),
+        energy_before + 1,
+        "「自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く」: \
+         exactly one energy card was placed"
     );
 }
 
@@ -113,8 +115,12 @@ fn daydream_mermaid_choice_selects_recover() {
     assert!(game.has_pending_choice(), "Card selection should appear");
     game.select_indices(&[0]);
 
-    assert!(
-        game.state.player1.hand.cards.len() > hand_before,
-        "Member should be recovered to hand"
+    // The prompt filters to 8 members but the ability's count is 1, so exactly
+    // one card comes back — "hand grew" would also pass if every filtered member
+    // had been recovered.
+    assert_eq!(
+        game.state.player1.hand.cards.len(),
+        hand_before + 1,
+        "「自分の控え室から、メンバーカードを1枚手札に加える」: exactly one member"
     );
 }

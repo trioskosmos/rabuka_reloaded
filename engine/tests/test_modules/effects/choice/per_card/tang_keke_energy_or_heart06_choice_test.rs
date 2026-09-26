@@ -53,9 +53,11 @@ fn tang_keke_discard_member_with_blade_heart_choose_one() {
     pay_discard_cost(&mut game);
     let energy_before = select_energy_option(&mut game);
 
-    assert!(
-        game.state.player1.energy_zone.cards.len() > energy_before,
-        "Energy should be placed from energy deck"
+    assert_eq!(
+        game.state.player1.energy_zone.cards.len(),
+        energy_before + 1,
+        "「colspan1.png|colspan1.png|自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く」: \
+         exactly one energy card was placed"
     );
     assert!(
         game.state.player1.waitroom.cards.contains(&liella_with_bh),
@@ -125,9 +127,11 @@ fn tang_keke_discard_non_member_liella_card_choose_one() {
     pay_discard_cost(&mut game);
     let energy_before = select_energy_option(&mut game);
 
-    assert!(
-        game.state.player1.energy_zone.cards.len() > energy_before,
-        "Energy should be placed from energy deck"
+    assert_eq!(
+        game.state.player1.energy_zone.cards.len(),
+        energy_before + 1,
+        "「colspan1.png|colspan1.png|自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く」: \
+         exactly one energy card was placed"
     );
     assert!(
         game.state.player1.waitroom.cards.contains(&liella_live),

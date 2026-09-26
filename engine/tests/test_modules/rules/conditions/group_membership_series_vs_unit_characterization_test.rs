@@ -43,7 +43,7 @@ use rabuka_engine::ability::util::card_matches_group_str;
 
 /// The same card, asked the same question two ways.
 #[test]
-fn group_membership_KNOWN_GAP_aqours_card_matches_its_unit_but_not_its_group() {
+fn group_membership_known_gap_aqours_card_matches_its_unit_but_not_its_group() {
     let db = load_real_database();
     let game = TestGame::new(db);
 
@@ -73,7 +73,7 @@ fn group_membership_KNOWN_GAP_aqours_card_matches_its_unit_but_not_its_group() {
 }
 
 #[test]
-fn group_membership_KNOWN_GAP_muren_card_is_invisible_to_mus_filter() {
+fn group_membership_known_gap_muren_card_is_invisible_to_mus_filter() {
     let db = load_real_database();
     let game = TestGame::new(db);
 
@@ -114,7 +114,7 @@ fn group_membership_KNOWN_GAP_muren_card_is_invisible_to_mus_filter() {
 }
 
 #[test]
-fn group_membership_KNOWN_GAP_sunny_passion_filter_is_unsatisfiable() {
+fn group_membership_known_gap_sunny_passion_filter_is_unsatisfiable() {
     let db = load_real_database();
     let game = TestGame::new(db);
 

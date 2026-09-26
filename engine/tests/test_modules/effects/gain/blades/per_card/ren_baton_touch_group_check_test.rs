@@ -62,10 +62,13 @@ fn ren_baton_touch_from_liella_places_energy() {
         game.select_indices(&[0]);
     }
 
-    // ab#0: 2 energy cards placed in wait state from energy deck
-    assert!(
-        game.state.player1.energy_zone.cards.len() >= energy_before + 2,
-        "2 energy cards added when baton-touched from Liella! with ≥7 energy"
+    // ab#0: 2 energy cards placed in wait state from energy deck. Exact, and the
+    // comment above already says 2 — ">= +2" would also clear a bar if the
+    // effect placed 5, or placed 2 and then drew a third from somewhere else.
+    assert_eq!(
+        game.state.player1.energy_zone.cards.len(),
+        energy_before + 2,
+        "exactly 2 energy cards added when baton-touched from Liella! with >=7 energy"
     );
     assert!(
         game.state.player1.stage.stage.contains(&ren),

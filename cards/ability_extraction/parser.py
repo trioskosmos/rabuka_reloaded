@@ -106,6 +106,13 @@ from parser_utils import (
     HEART_REF,
     HEART_HAS_REF,
     HEART_LABEL,
+    ALL_HEART_ICON,
+    BLADE_ICON,
+    BLADE_ICON_HELD_RE,
+    BLADE_ICON_RE,
+    ENERGY_ICON,
+    HAS_SCORE_ICON,
+    count_icons,
     extract_count,
     extract_source,
     extract_destination,
@@ -444,7 +451,7 @@ _BLADE_LIMIT_OPERATORS = {"以下": "<=", "以上": ">=", "未満": "<", "超": 
 
 def extract_blade_limit(text: str) -> Optional[Dict[str, Any]]:
     """Extract blade count limit from text like 'ブレードの数が3つ以下' (<=3 blades)."""
-    normalized = re.sub(r"\{\{icon_blade\.png\|ブレード\}\}", "ブレード", text)
+    normalized = re.sub(BLADE_ICON_RE, "ブレード", text)
     for pattern, op_kind in _BLADE_LIMIT_PATTERNS:
         m = re.search(pattern, normalized)
         if not m:
@@ -507,9 +514,8 @@ def extract_deck_position_constraint(text: str) -> Optional[Dict[str, Any]]:
 
 
 def extract_heart_types(text: str) -> List[str]:
-    """Extract heart type identifiers (e.g. heart02, heart01) from icon markup."""
-    return re.findall(r"heart_(\d+)\.png\|heart(\d+)", text)  # type: ignore[return-value]
-
+    """The heart colours `text` names, as `heartNN` ids in first-appearance order."""
+    return _heart_ids_in_order(text)
 
 
 
@@ -1342,7 +1348,7 @@ def parse_effect(text: str) -> Dict[str, Any]:
         if "ブレードを得る" in fallback_text or "選んだブレード" in fallback_text:
             effect["action"] = "gain_resource"
             effect["resource"] = "blade"
-            ic = fallback_text.count("{{icon_blade.png|ブレード}}")
+            ic = fallback_text.count(BLADE_ICON)
             if ic > 0:
                 effect["count"] = ic
         elif "ハートを得る" in fallback_text or "選んだハート" in fallback_text:
@@ -1467,53 +1473,78 @@ def _apply_no_ability_filter(d, text):
         d["ability_filter"] = "no_ability"
 
 
-def _handle_cost_modification(text, action):
-    """Handle cost modification patterns."""
+# 「コストはNになる」 — the cost is SET rather than added to or subtracted from.
+_COST_SET_RE = re.compile(r"コスト[はがを](\d+)になる")
+
+# 「コストをN減る/増やす」 and 「コストを+N」 — the amount a cost change is worth.
+_COST_DELTA_RE = re.compile(r"コスト[はがを](\d+)(減る|減らす|増える|増やす)")
+_COST_SIGNED_RE = re.compile(r"コスト[をがは][+＋](\d+)")
+
+# The operator a stated cost limit is qualified with. Ordered: an unqualified
+# 「コスト10の」 means exactly that cost, so it is the fallback rather than a row.
+_COST_LIMIT_OPERATORS = (
+    ("以下", "<="),
+    ("以上", ">="),
+    ("未満", "<"),
+    ("超", ">"),
+)
+
+
+def _apply_cost_operation(action, text):
+    """Name what the cost change does: subtract, add, or set."""
     if "減る" in text or "減らす" in text or "マイナス" in text:
         action["operation"] = "subtract"
-    elif (
-        "増える" in text or "増やす" in text or "プラス" in text or "コストを+" in text
-    ):
+        return
+    if "増える" in text or "増やす" in text or "プラス" in text or "コストを+" in text:
         action["operation"] = "add"
-    elif re.search(r"コスト[はがを]\d+になる", text) or "コストは10になる" in text:
-        # "このカードのコストは10になる" — cost SET to a value (not add/subtract).
-        action["operation"] = "set"
-        set_match = re.search(r"コスト[はがを](\d+)になる", text)
-        if set_match:
-            action["value"] = int(set_match.group(1))
-        # This is a hand-cost modifier on the card being played: the card is in
-        # hand, so the engine must look in the hand (not stage) to set its cost.
-        if "このカード" in text or "このメンバーカード" in text:
-            action["source"] = "hand"
-            action["location"] = "hand"
-            action["card_type"] = "member_card"
+        return
+    if not (_COST_SET_RE.search(text) or "コストは10になる" in text):
+        return
+    action["operation"] = "set"
+    set_match = _COST_SET_RE.search(text)
+    if set_match:
+        action["value"] = int(set_match.group(1))
+    # A hand-cost modifier is about the card being played, so the engine has to
+    # read the card in hand rather than on the stage.
+    if "このカード" in text or "このメンバーカード" in text:
+        action["source"] = "hand"
+        action["location"] = "hand"
+        action["card_type"] = "member_card"
+
+
+def _apply_cost_limit(action, text):
+    """The cost range a modification applies to (e.g. 「コスト10の」)."""
+    limit = extract_cost_limit(text)
+    if limit is None:
+        return
+    action["cost_limit"] = limit
+    for phrase, operator in _COST_LIMIT_OPERATORS:
+        if phrase in text:
+            action["cost_limit_operator"] = operator
+            return
+    action["cost_limit_operator"] = "="
+
+
+def _apply_cost_value(action, text):
+    """The numeric amount the cost change is worth."""
+    delta = _COST_DELTA_RE.search(text)
+    if delta:
+        action["value"] = int(delta.group(1))
+        return
+    signed = _COST_SIGNED_RE.search(text)
+    if signed:
+        action["value"] = int(signed.group(1))
+
+
+def _handle_cost_modification(text, action):
+    """Handle cost modification patterns."""
+    _apply_cost_operation(action, text)
     # Set location for hand-based cost reductions (手札にある/手札から)
     if "手札" in text:
         action["location"] = "hand"
-    # Extract cost limit (e.g. "コスト10の" → limit to cards with cost 10)
-    cl = extract_cost_limit(text)
-    if cl is not None:
-        action["cost_limit"] = cl
-        if "以下" in text:
-            action["cost_limit_operator"] = "<="
-        elif "以上" in text:
-            action["cost_limit_operator"] = ">="
-        elif "未満" in text:
-            action["cost_limit_operator"] = "<"
-        elif "超" in text:
-            action["cost_limit_operator"] = ">"
-        else:
-            action["cost_limit_operator"] = "="
-    # Extract numeric value from patterns like "コストは2減る" or "コストを+1する"
-    value_match = re.search(r"コスト[はがを](\d+)(減る|減らす|増える|増やす)", text)
-    if value_match:
-        action["value"] = int(value_match.group(1))
-    else:
-        vm2 = re.search(r"コスト[をがは][+＋](\d+)", text)
-        if vm2:
-            action["value"] = int(vm2.group(1))
-    # Extract energy icon count
-    icon_count = text.count("{{icon_energy.png|E}}")
+    _apply_cost_limit(action, text)
+    _apply_cost_value(action, text)
+    icon_count = text.count(ENERGY_ICON)
     if icon_count > 0:
         action["count"] = icon_count
     # Replace コスト with energy texticon in the action text so the
@@ -1525,7 +1556,7 @@ def _handle_cost_modification(text, action):
         if "count" not in action and action.get("operation") != "set":
             action["count"] = action["value"]
         action["text"] = action.get("text", text).replace(
-            "コスト", "{{icon_energy.png|E}}", 1
+            "コスト", ENERGY_ICON, 1
         )
     # "このメンバーのコストを+Nする" → self_target (modifies only the activating card)
     if "このメンバー" in text:
@@ -1860,7 +1891,7 @@ def _set_action_033(t, a):
     {
        'resource': 'blade',
        'count': (
-           t.count('{{icon_blade.png|ブレード}}') or 1
+           t.count(BLADE_ICON) or 1
           ),
        'timing_condition': 'moved_this_turn'
       },
@@ -1871,7 +1902,7 @@ def _set_action_036(t, a):
     {
        'resource': 'blade',
        'count': (
-           _ic(t, '{{icon_blade.png|ブレード}}') or 1
+           _ic(t, BLADE_ICON) or 1
           )
       },
  )
@@ -1881,7 +1912,7 @@ def _set_action_037(t, a):
     {
        'resource': 'blade',
        'count': (
-           t.count('{{icon_blade.png|ブレード}}') or None
+           t.count(BLADE_ICON) or None
           )
       },
  )
@@ -1909,7 +1940,7 @@ def _set_action_040(t, a):
         a["resource"] = "blade"
     else:
         a["resource"] = "heart"
-    blade_count = len(re.findall(r"\{\{icon_blade\.png\|ブレード\}\}", t))
+    blade_count = len(re.findall(BLADE_ICON_RE, t))
     heart_count = _heart_count(t)
     if blade_count:
         a["count"] = blade_count
@@ -2221,7 +2252,7 @@ _ACTION_RULES: List[ActionRule] = [
     ActionRule(name='action_034_position_change', match_any=['移動する', '移動し'], action='position_change', priority=34, order=34),
     ActionRule(name='action_035_move_cards', condition=lambda t: (('置く' in t or '置いて' in t) or ('置き' in t and '置き場' not in t)) and '選ぶ' not in t and ('選び' not in t), action='move_cards', priority=35, order=35),
     ActionRule(name='action_036_gain_resource', condition=lambda t: 'ブレードを得る' in t or '選んだブレード' in t, action='gain_resource', setter=_set_action_036, priority=36, order=36),
-    ActionRule(name='action_037_gain_resource', condition=lambda t: '{{icon_blade.png|ブレード}}' in t and '得る' in t and (not _blade_icon_is_target_filter(t)), action='gain_resource', setter=_set_action_037, priority=37, order=37),
+    ActionRule(name='action_037_gain_resource', condition=lambda t: BLADE_ICON in t and '得る' in t and (not _blade_icon_is_target_filter(t)), action='gain_resource', setter=_set_action_037, priority=37, order=37),
     ActionRule(name='action_038_gain_resource', match='得る', condition=lambda t: '{{icon_all.png' in t, action='gain_resource', defaults={'resource': 'heart', 'heart_type': 'all'}, setter=_set_action_038, priority=38, order=38),
     ActionRule(name='action_039_gain_resource', condition=lambda t: '{{heart' in t and '得る' in t or bool(re.search('ハート.*得る', t)) or ('選んだハート' in t and 'になる' not in t), action='gain_resource', setter=_set_action_039, priority=39, order=39),
     ActionRule(name='action_040_gain_resource', condition=lambda t: re.search(r'(ブレード|ハート|余剰ハート|それら).*?失[うい]', t) is not None and 'もう一度エール' not in t and 'もう1度エール' not in t, action='gain_resource', setter=_set_action_040, priority=40, order=40),
@@ -2327,7 +2358,7 @@ def _extract_per_unit_info_from_text(text):
     if "ブレードを得る" in text or "選んだブレード" in text:
         info["action"] = "gain_resource"
         info["resource"] = "blade"
-        icon_count = text.count("{{icon_blade.png|ブレード}}")
+        icon_count = text.count(BLADE_ICON)
         if icon_count > 0:
             info["count"] = icon_count
             info["resource_icon_count"] = icon_count
@@ -2382,16 +2413,16 @@ def _check_ability_gain_from_text(text, action):
 
 def _check_heart_blade_split_from_text(text, action):
     """Check for heart+blade concurrent grant → sequential. Returns result dict or None."""
-    all_heart_count = text.count("{{icon_all.png|ハート}}")
+    all_heart_count = text.count(ALL_HEART_ICON)
     if (
-        "{{icon_blade.png|ブレード}}" not in text
+        BLADE_ICON not in text
         or ("{{heart" not in text and all_heart_count == 0)
         or "得る" not in text
         or "N人が" in text
         or _blade_icon_is_target_filter(text)
     ):
         return None
-    blade_count = text.count("{{icon_blade.png|ブレード}}")
+    blade_count = text.count(BLADE_ICON)
     heart_colors = _heart_ids_gained(text)
     actions = []
     if blade_count:
@@ -3172,21 +3203,10 @@ def _enrich_card_count_condition(result, text):
     tgt = extract_target(text)
     if tgt:
         result["target"] = tgt
-    # Comparison targets
-    for cmp_text, cmp_tgt in COMPARISON_TARGETS.items():
-        if cmp_text in text:
-            result["comparison_target"] = cmp_tgt
-            break
-    if "comparison_target" not in result:
-        for cmp_text, cmp_tgt in COMPARISON_TARGETS.items():
-            if cmp_text.endswith("より") and len(cmp_text) >= 4:
-                noun = cmp_text[:-2]
-                if noun in text and "より" in text:
-                    noun_pos = text.find(noun)
-                    marker_pos = text.find("より", noun_pos + len(noun))
-                    if noun_pos >= 0 and marker_pos > noun_pos:
-                        result["comparison_target"] = cmp_tgt
-                        break
+    # Comparison targets: a literal phrase first, else a 「<noun>より」 phrasing.
+    cmp_target = _contiguous_comparison_target(text) or _noun_comparison_target(text)
+    if cmp_target:
+        result["comparison_target"] = cmp_target
     # Fix: when target=both AND comparison_target is set, the comparison_target
     # already handles the opponent side, so target should be self
     if result.get("target") == "both" and result.get("comparison_target"):
@@ -4211,7 +4231,7 @@ def _try_revealed(text):
         result["negation"] = True
     if "ブレードハートを持つ" in text or "ブレードハートを持たない" in text:
         result["card_property"] = "has_blade_heart"
-    if "{{icon_score.png|スコア}}を持つ" in text:
+    if HAS_SCORE_ICON in text:
         result["card_property"] = "has_score_icon"
     # "持たないカードが0枚" = cards WITHOUT property = 0.
     # This means NOT(at least 1 card has the property).
@@ -4249,7 +4269,7 @@ def _try_unless_pay(text):
     if "支払わないかぎり" not in text:
         return None
     result = {"type": "comparison_condition", "negation": True, "text": text}
-    ec = text.count("{{icon_energy.png|E}}")
+    ec = text.count(ENERGY_ICON)
     if ec > 0:
         result["resource_type"] = "energy"
         result["count"] = ec
@@ -4985,25 +5005,48 @@ def _try_discard_hand_reactivate_optional(text):
     }
 
 
+# 「N枚より」 — a plain numeric threshold, not a comparison against a noun.
+_NUMERIC_MORE_RE = re.compile(r"\d+[枚人個種類つ]?より")
+
+
+def _contiguous_comparison_target(text):
+    """The comparison target named literally in `text`, or None."""
+    for phrase, target in COMPARISON_TARGETS.items():
+        if phrase in text:
+            return target
+    return None
+
+
+def _noun_comparison_target(text, reject_numeric=False):
+    """The comparison target from a 「<noun>より」 phrasing, or None.
+
+    `reject_numeric` skips 「N枚より」-style thresholds, which are a number
+    rather than another thing being compared against.
+    """
+    for phrase, target in COMPARISON_TARGETS.items():
+        if not (phrase.endswith("より") and len(phrase) >= 4):
+            continue
+        noun = phrase[:-2]
+        if noun not in text or "より" not in text:
+            continue
+        noun_pos = text.find(noun)
+        if text.find("より", noun_pos + len(noun)) <= noun_pos:
+            continue
+        if reject_numeric and _NUMERIC_MORE_RE.search(text):
+            continue
+        return target
+    return None
+
+
 def _extract_comparison_fields(condition, text):
     """Extract comparison_target, comparison_type, aggregate, operator from text."""
-    contiguous_found = False
-    for tgt_text, tgt in COMPARISON_TARGETS.items():
-        if tgt_text in text:
-            condition["comparison_target"] = tgt
-            contiguous_found = True
-            break
-    if not contiguous_found:
-        for tgt_text, tgt in COMPARISON_TARGETS.items():
-            if tgt_text.endswith("より") and len(tgt_text) >= 4:
-                noun = tgt_text[:-2]
-                if noun in text and "より" in text:
-                    noun_pos = text.find(noun)
-                    marker_pos = text.find("より", noun_pos + len(noun))
-                    if noun_pos >= 0 and marker_pos > noun_pos:
-                        if not re.search(r"\d+[枚人個種類つ]?より", text):
-                            condition["comparison_target"] = tgt
-                            break
+    target = _contiguous_comparison_target(text) or _noun_comparison_target(
+        text, reject_numeric=True
+    )
+    if target:
+        condition["comparison_target"] = target
+    # The comparison already covers the opponent side, so a "both" target would
+    # double-count it.
     if condition.get("target") == "both" and condition.get("comparison_target"):
         condition["target"] = "self"
     for op_text, op in COMPARISON_OPERATORS.items():
@@ -5015,13 +5058,7 @@ def _extract_comparison_fields(condition, text):
             condition["comparison_type"] = ct
             break
     if condition.get("comparison_type") == "score":
-        score_text = normalize_fullwidth_digits(text)
-        score_match = re.search(r"スコア(?:が|は)\s*(\d+)", score_text)
-        if score_match:
-            suffix = score_text[score_match.end() :]
-            if not re.match(r"\s*(?:か|または|や|のいずれか)", suffix):
-                condition["count"] = int(score_match.group(1))
-                condition.setdefault("operator", "=")
+        _extract_score_threshold(condition, text)
     if "合計" in text:
         condition["aggregate"] = "total"
     if "自分と相手の" in text and "合計" in text and "同じ" in text:
@@ -5041,6 +5078,22 @@ def _extract_comparison_fields(condition, text):
         if "同じ" in text and condition.get("comparison_type") != "score":
             condition["comparison_type"] = "equality"
             condition["type"] = "comparison_condition"
+
+
+def _extract_score_threshold(condition, text):
+    """Read 「スコアがN」 as the compared count, unless it is only an option.
+
+    「スコアが3か5の場合」 lists alternatives rather than setting the threshold,
+    so the digits there are not the count to compare against.
+    """
+    score_text = normalize_fullwidth_digits(text)
+    match = re.search(r"スコア(?:が|は)\s*(\d+)", score_text)
+    if not match:
+        return
+    if re.match(r"\s*(?:か|または|や|のいずれか)", score_text[match.end() :]):
+        return
+    condition["count"] = int(match.group(1))
+    condition.setdefault("operator", "=")
 
 
 def _extract_heart_resource(condition, text):
@@ -5752,9 +5805,9 @@ def _infer_card_type(text, action=None):
 def _count_resource_icons(text):
     """Count resource icons in text (heart_XX, blade, energy)."""
     heart_count = _heart_count(text)
-    blade_count = text.count("{{icon_blade.png|ブレード}}")
-    energy_count = text.count("{{icon_energy.png|E}}")
-    all_heart_count = text.count("{{icon_all.png|ハート}}")
+    blade_count = text.count(BLADE_ICON)
+    energy_count = text.count(ENERGY_ICON)
+    all_heart_count = text.count(ALL_HEART_ICON)
     total = heart_count + blade_count + energy_count + all_heart_count
     return total
 
@@ -5763,8 +5816,8 @@ def _count_resource_icons(text):
 # word forms so 「{{icon_blade.png|ブレード}}」 reads as a blade gain, and a
 # named heart icon beats a bare 「ハート」.
 _RESOURCE_BY_PHRASE = (
-    ("{{icon_blade.png|ブレード}}", "blade"),
-    ("{{icon_energy.png|E}}", "energy"),
+    (BLADE_ICON, "blade"),
+    (ENERGY_ICON, "energy"),
     ("{{heart_03.png|heart03}}", "heart03"),
     ("{{heart_02.png|heart02}}", "heart02"),
     ("{{heart_01.png|heart01}}", "heart01"),
@@ -5859,11 +5912,11 @@ def infer_count_from_icons(d, text):
         if count_match:
             d["count"] = int(count_match.group(1))
             return
-    blade_count = effect_text.count("{{icon_blade.png|ブレード}}")
+    blade_count = effect_text.count(BLADE_ICON)
     if blade_count > 0:
         d["count"] = blade_count
         return
-    all_heart_count = effect_text.count("{{icon_all.png|ハート}}")
+    all_heart_count = effect_text.count(ALL_HEART_ICON)
     if all_heart_count > 0:
         d["count"] = all_heart_count
         return
@@ -6042,7 +6095,7 @@ _PRONOUN_SOURCE_PHRASES = (
 _CARD_PROPERTY_PHRASES = (
     (("ブレードハートを持たない",), "has_blade_heart", True),
     (("ブレードハートを持つ",), "has_blade_heart", False),
-    (("{{icon_score.png|スコア}}を持つ",), "has_score_icon", False),
+    ((HAS_SCORE_ICON,), "has_score_icon", False),
 )
 
 # 「メンバーのいないエリアに登場」 — a stage slot with no member in it.
@@ -6713,20 +6766,9 @@ def _per_unit_filters(result, text, per_text):
         result["group_names"] = [gm.group(1)]
     # Extract heart colors from per_text for per-unit counting (e.g. heart03 from "そのメンバーが持つ{{heart_03.png|heart03}}2つ")
     # Exclude heart colors in exclusion patterns (e.g. "heart01とheart06以外の色" — those are excluded colors, not counted)
-    per_heart_matches = re.findall(r"\{\{heart_(\d+)\.png\|heart(\d+)\}\}", per_text)
-    if per_heart_matches:
-        colors = sorted(set(f"heart{m.zfill(2)}" for _, m in per_heart_matches))
-        # Remove colors that appear in "以外" exclusion context
-        igai_before = per_text.split("以外")[0] if "以外" in per_text else ""
-        excluded_colors = set()
-        if igai_before:
-            exc_matches = re.findall(
-                r"\{\{heart_(\d+)\.png\|heart(\d+)\}\}", igai_before
-            )
-            excluded_colors = set(f"heart{m.zfill(2)}" for _, m in exc_matches)
-        counted_colors = [c for c in colors if c not in excluded_colors]
-        if counted_colors:
-            result["per_unit_heart_colors"] = counted_colors
+    counted_colors = _counted_per_unit_colors(per_text)
+    if counted_colors:
+        result["per_unit_heart_colors"] = counted_colors
 
     if "名前の異なる" in per_text or "カード名の異なる" in per_text:
         result["distinct"] = "card_name"
@@ -6905,8 +6947,30 @@ def _try_per_unit(text):
     return action
 
 
-# 「N[枚/回/つ]までしか」 — a cap on how many times an effect may repeat.
+# 「N(枚|回|つ)までしか」 — a cap on how many times an effect may repeat.
 _MAX_REPEATS_RE = re.compile(r"(\d+)(?:枚|回|つ)?までしか")
+
+
+def _icon_pair_colors(text):
+    """The heart colours `text` names, from the two-capture icon form."""
+    return sorted({f"heart{m.zfill(2)}" for _, m in re.findall(HEART_ICON_PAIR, text)})
+
+
+def _counted_per_unit_colors(per_text):
+    """The heart colours a 「〜につき」 clause counts, excluding 「以外」 ones.
+
+    「heart01とheart06以外の色」 names two colours it does NOT count, so the
+    colours before 以外 are dropped rather than counted.
+    """
+    colors = _icon_pair_colors(per_text)
+    if not colors:
+        return []
+    excluded = (
+        set(_icon_pair_colors(per_text.split("以外")[0]))
+        if "以外" in per_text
+        else set()
+    )
+    return [colour for colour in colors if colour not in excluded]
 
 
 def _per_unit_comma_chain(result, action_text):
@@ -7462,7 +7526,7 @@ def _make_cost_mod_action(text_part, operation="decrease"):
     a = parse_action(text_part)
     a["action"] = "modify_cost"
     a["operation"] = operation
-    ic = text_part.count("{{icon_energy.png|E}}")
+    ic = text_part.count(ENERGY_ICON)
     if ic > 0:
         a["count"] = ic
     if "グループ名" in text_part and "につき" in text_part:
@@ -7478,7 +7542,7 @@ def _try_cost_modification(text):
     """コストは～につき～減る — cost modification with per-unit scaling.
     Handles: "action。コストは～につき～減る" (sequential) and
     "この能力を起動するためのコストは～につき～減る" (flat modify_cost)."""
-    energy_count = text.count("{{icon_energy.png|E}}")
+    energy_count = text.count(ENERGY_ICON)
     cost_prefixes = ("コストは", "この能力を起動するためのコストは")
     if not any(p in text for p in cost_prefixes):
         return None
@@ -7799,7 +7863,7 @@ def _apply_card_property_filter(d, text):
         d["negation"] = True
     elif "ブレードハートを持つ" in text:
         d["card_property"] = "has_blade_heart"
-    elif "{{icon_score.png|スコア}}を持つ" in text:
+    elif HAS_SCORE_ICON in text:
         d["card_property"] = "has_score_icon"
 
 
@@ -7817,11 +7881,7 @@ def _build_reveal_add_discard(fp, sa_text, select_text):
     ct = extract_card_type(select_text)
     if ct:
         result["card_type"] = ct
-    hc = list(
-        dict.fromkeys(
-            f"heart{m.zfill(2)}" for m in re.findall(r"heart_(\d+)", select_text)
-        )
-    )
+    hc = _heart_ref_ids(select_text, unique=True)
     if hc:
         result["heart_colors"] = hc
         if detect_require_all_hearts(select_text):
@@ -7882,9 +7942,7 @@ def _enrich_from_text(d, text):
     ct = extract_card_type(text)
     if ct and "or_card_types" not in d:
         d["card_type"] = ct
-    hc = list(
-        dict.fromkeys(f"heart{m.zfill(2)}" for m in re.findall(r"heart_(\d+)", text))
-    )
+    hc = _heart_ref_ids(text, unique=True)
     if hc:
         d["heart_colors"] = hc
         _add_heart_color_threshold(d, text)
@@ -8043,6 +8101,74 @@ def _build_look_select_with_followup(select_text, effect_result):
         effect_result["followup_action"] = sa.pop("followup_action")
 
 
+# 「好きな枚数を好きな順番で…」 — take any number, in any order, onto the deck.
+# Each row is the pair of phrases that identify the shape, the destination the
+# selected cards go to, and any extra fields the shape needs (non-empty only
+# for the one that routes the rest somewhere other than the discard). Tested in
+# order, first match wins.
+_ANY_NUMBER_DECK_MODES = (
+    (
+        ("好きな枚数を好きな順番でデッキの上に置き", "残りを控え室に置く"),
+        "deck_top",
+        {},
+    ),
+    (
+        # C7 黒澤ダイヤ ab#1
+        ("好きな枚数を好きな順番でデッキの下に置き", "残りを控え室に置く"),
+        "deck_bottom",
+        {},
+    ),
+    (
+        # C8: to the top, the rest to the bottom (小原鞠莉 ab#0)
+        (
+            "好きな枚数を好きな順番でデッキの上に置き",
+            "残りを好きな順番でデッキの下に置く",
+        ),
+        "deck_top",
+        {
+            "remainder_destination": "deck_bottom",
+            "remainder_placement_order": "any_order",
+        },
+    ),
+)
+
+# Where a selected card goes when the text does not spell it out. deck_top is
+# tested first because a select clause usually names BOTH 「デッキの上に置く」 (the
+# selected card) and 「残りを控え室に置く」 (the rest), and the first is the one
+# that describes the selection.
+_SELECT_DESTINATION_PHRASES = (
+    (("デッキの上に置く", "デッキの上に", "デッキの一番上に"), "deck_top"),
+    (("手札に加える", "手札に加え"), "hand"),
+    (("控え室に置く",), "discard"),
+)
+
+
+def _try_any_number_to_deck(result, select_text):
+    """Fill in the 「好きな枚数を好きな…」 shape. True when it matched."""
+    for phrases, destination, extra in _ANY_NUMBER_DECK_MODES:
+        if not all(phrase in select_text for phrase in phrases):
+            continue
+        result["destination"] = destination
+        result["placement_order"] = "any_order"
+        result["any_number"] = True
+        result["reveal"] = False
+        if extra:
+            result.pop("discard_remaining", None)
+            result.update(extra)
+        return True
+    return False
+
+
+def _fill_select_count_and_type(result, text):
+    """The card count and card type a select clause states."""
+    count = extract_count(text)
+    if count:
+        result["count"] = count
+    card_type = extract_card_type(text)
+    if card_type:
+        result["card_type"] = card_type
+
+
 def _build_look_select_actions_inner(select_text):
     """Build the select_action for その中から patterns."""
     result = {"action": "select_cards", "discard_remaining": True}
@@ -8052,114 +8178,58 @@ def _build_look_select_actions_inner(select_text):
     if "手札に加え" in select_text and "残りを控え室に置く" in select_text:
         parts = re.split(r"[、。]", select_text)
         if len(parts) >= 2:
-            fp = parts[0].strip()
-            if "公開し" in fp:
-                act = _build_reveal_add_discard(fp, parts[1].strip(), select_text)
-                if act:
-                    return act
-            if "公開し" not in fp:
-                result["destination"] = "hand"
-                cnt = extract_count(select_text)
-                if cnt:
-                    result["count"] = cnt
-                hc = list(
-                    dict.fromkeys(
-                        f"heart{m.zfill(2)}"
-                        for m in re.findall(r"heart_(\d+)", select_text)
-                    )
+            first_part = parts[0].strip()
+            if "公開し" in first_part:
+                revealed = _build_reveal_add_discard(
+                    first_part, parts[1].strip(), select_text
                 )
-                if hc:
-                    result["heart_colors"] = hc
+                if revealed:
+                    return revealed
+            if "公開し" not in first_part:
+                result["destination"] = "hand"
+                _fill_select_count_and_type(result, select_text)
+                heart_colors = _heart_ref_ids(select_text, unique=True)
+                if heart_colors:
+                    result["heart_colors"] = heart_colors
                 _add_heart_color_threshold(result, select_text)
-                ct = extract_card_type(select_text)
-                if ct:
-                    result["card_type"] = ct
                 _add_or_card_types_if_needed(result, select_text)
                 _enrich_from_text(result, select_text)
                 _apply_card_property_filter(result, select_text)
                 if extract_optional(select_text):
                     result["optional"] = True
-                # Check for "か" (OR) between 'debut to stage' and 'add to hand'
-                # e.g. "カードを...エリアに登場させるか、手札に加える"
-                if "登場させる" in select_text and "手札に加え" in select_text:
+                # 「カードを…エリアに登場させるか、手札に加える」 — an either-or
+                # between appearing and adding.
+                if "登場させる" in select_text:
                     followup = _build_or_destination_followup(select_text)
                     if followup:
                         result["followup_action"] = followup
                 return result
 
-    # Pattern: any number → deck_top → discard remaining
-    if (
-        "好きな枚数を好きな順番でデッキの上に置き" in select_text
-        and "残りを控え室に置く" in select_text
-    ):
-        result["destination"] = "deck_top"
-        result["placement_order"] = "any_order"
-        result["any_number"] = True
-        result["reveal"] = False
+    if _try_any_number_to_deck(result, select_text):
         return result
 
-    # Pattern: any number → deck_BOTTOM → discard remaining (C7 黒澤ダイヤ ab#1)
-    if (
-        "好きな枚数を好きな順番でデッキの下に置き" in select_text
-        and "残りを控え室に置く" in select_text
-    ):
-        result["destination"] = "deck_bottom"
-        result["placement_order"] = "any_order"
-        result["any_number"] = True
-        result["reveal"] = False
-        return result
-
-    # C8: any number → deck_top (any order), rest → deck_BOTTOM (any order).
-    # e.g. 小原鞠莉 ab#0 "…デッキの上に置き、残りを好きな順番でデッキの下に置く".
-    if (
-        "好きな枚数を好きな順番でデッキの上に置き" in select_text
-        and "残りを好きな順番でデッキの下に置く" in select_text
-    ):
-        result["destination"] = "deck_top"
-        result["placement_order"] = "any_order"
-        result["any_number"] = True
-        result["reveal"] = False
-        result.pop("discard_remaining", None)
-        result["remainder_destination"] = "deck_bottom"
-        result["remainder_placement_order"] = "any_order"
-        return result
-
-    # Issue 12: Pattern: hand + deck_top remainder (e.g. "1枚を手札に加え、残りをデッキの上に戻す")
+    # Issue 12: hand + deck_top remainder ("1枚を手札に加え、残りをデッキの上に戻す")
     if "手札に加え" in select_text and "残りをデッキの上" in select_text:
         result["destination"] = "hand"
         result["reveal"] = False
         result.pop("discard_remaining", None)
         result["remainder_destination"] = "deck_top"
-        cnt = extract_count(select_text)
-        if cnt:
-            result["count"] = cnt
-        ct = extract_card_type(select_text)
-        if ct:
-            result["card_type"] = ct
+        _fill_select_count_and_type(result, select_text)
         _enrich_from_text(result, select_text)
         _add_or_card_types_if_needed(result, select_text)
         return result
 
     # Default: detect destination from text
-    # NOTE: Check deck_top BEFORE discard, since select_text often contains
-    # both "デッキの上に置く" (selected card goes to deck top) AND
-    # "残りを控え室に置く" (remaining cards go to discard).
     result["reveal"] = False
-    if (
-        "デッキの上に置く" in select_text
-        or "デッキの上に" in select_text
-        or "デッキの一番上に" in select_text
-    ):
-        result["destination"] = "deck_top"
-    elif "手札に加える" in select_text or "手札に加え" in select_text:
-        result["destination"] = "hand"
-    elif "控え室に置く" in select_text:
-        result["destination"] = "discard"
+    for phrases, destination in _SELECT_DESTINATION_PHRASES:
+        if any(phrase in select_text for phrase in phrases):
+            result["destination"] = destination
+            break
 
     # Propagate selection criteria
     _enrich_from_text(result, select_text)
 
-    # Handle heart-color filter in default case
+    # A heart-coloured clause with no stated destination is a hand gain.
     if result.get("destination") is None and (
         "{{heart_" in select_text or "ハートに" in select_text
     ):
@@ -8215,8 +8285,8 @@ def _try_heart_select_reveal(text):
     # after = "『μ's』のカードを1枚手札に加え、...公開した残りのカードを控え室に置く"
     select_actions = _build_look_select_actions(after) or {}
     # Check if gain_resource is already nested in select_actions or needs standalone handling
-    has_blade = "{{icon_blade.png|ブレード}}" in after or "ブレード" in after
-    blade_count = after.count("{{icon_blade.png|ブレード}}")
+    has_blade = BLADE_ICON in after or "ブレード" in after
+    blade_count = after.count(BLADE_ICON)
     if blade_count == 0 and has_blade:
         m = re.search(r"ブレード", after)
         blade_count = len(re.findall(r"ブレード", after))
@@ -8294,6 +8364,120 @@ def _try_heart_select_reveal(text):
     return {"text": text, "action": "sequential", "actions": seq}
 
 
+# Zones a look_action reads from. The stage and the hand are never named as a
+# look source, so a condition mentioning them does not say where to look.
+_LOOK_SOURCE_EXCLUDED_ZONES = ("stage", "hand")
+
+# 「その後」 — the clause after it runs once the look_and_select has resolved.
+_SONOGO_SPLIT_RE = re.compile(r"[。、]?\s*その後[、。]?\s*")
+
+# A trailing 「。N以上の場合、…」 / 「。そうした場合、…」 is a followup action,
+# not part of the select filter.
+_COND_FOLLOWUP_RE = re.compile(r"[。]\s*(?:(\d+以上の場合、)|(そうした場合、))")
+
+# A shorthand followup condition ("30以上の場合") names no comparison type,
+# group, location, card type or aggregate, so it borrows them from the parent.
+_FOLLOWUP_INHERITED_FIELDS = (
+    "comparison_type",
+    "group_names",
+    "location",
+    "card_type",
+    "aggregate",
+)
+
+
+def _look_action_for(result, text):
+    """Build the look half of a 「…その中から…」 effect.
+
+    A condition naming a zone becomes the look source, so the engine looks
+    where the condition was about rather than at a default (「ライブカード置き場に
+    カードが2枚以上ある場合、その从中から…」 looks at the live-card zone). A
+    condition with no zone, or an unparseable look clause, falls back to
+    whatever the look text parses to on its own.
+    """
+    prefix = re.search(r"(.+?)その中から", text)
+    if not prefix:
+        return
+    cond_text, action_text = split_condition_action(prefix.group(1).strip())
+    cond = parse_condition(cond_text) if cond_text else None
+    if cond and cond.get("type") != "custom":
+        result["condition"] = cond
+        zone = cond.get("location")
+        if zone and zone not in _LOOK_SOURCE_EXCLUDED_ZONES:
+            if action_text:
+                parsed = parse_action(action_text)
+                if parsed.get("action") != "custom":
+                    parsed.setdefault("source", zone)
+                    result["look_action"] = parsed
+            else:
+                look = {"action": "look_at", "source": zone, "target": "self"}
+                if zone == "live_card_zone":
+                    look["all"] = True
+                result["look_action"] = look
+    if "look_action" not in result and action_text:
+        parsed = parse_action(action_text)
+        if parsed.get("action") != "custom":
+            result["look_action"] = parsed
+
+
+def _split_cond_followup(select_text):
+    """Peel a trailing conditional clause off the select text.
+
+    Returns (select_text, followup_text_or_None).
+    """
+    split = _COND_FOLLOWUP_RE.search(select_text)
+    if not split:
+        return select_text, None
+    followup = select_text[split.start() + 1 :].strip()  # skip the period
+    if followup.startswith("そうした場合、"):
+        followup = followup[len("そうした場合、") :].strip()
+    return select_text[: split.start()].strip(), followup
+
+
+def _build_select_with_followup(result, select_text):
+    """Build the select half, plus any 「その後」 followup it names."""
+    parts = _SONOGO_SPLIT_RE.split(select_text, maxsplit=1)
+    if len(parts) == 1:
+        _build_look_select_with_followup(select_text, result)
+        return
+    _build_look_select_with_followup(parts[0].strip(), result)
+    followup_text = parts[1].strip()
+    if not followup_text:
+        return
+    parsed = parse_effect(followup_text)
+    if parsed:
+        result["followup_action"] = parsed
+
+
+def _apply_conditional_followup(result, cond_followup):
+    """Attach a trailing 「…の場合、…」 clause as the followup action."""
+    if not cond_followup:
+        return
+    parsed = parse_effect(cond_followup)
+    if not parsed or parsed.get("action") == "custom":
+        return
+    parent_cond = result.get("condition")
+    if isinstance(parent_cond, dict):
+        follow_cond = parsed.get("condition") or {}
+        if follow_cond.get("type") == "comparison_condition":
+            for field in _FOLLOWUP_INHERITED_FIELDS:
+                if field in parent_cond and field not in follow_cond:
+                    follow_cond[field] = parent_cond[field]
+            # cost_total is special: it comes from the followup's own count (the
+            # threshold in "N以上"), not from the parent's.
+            if "cost_total" in parent_cond and "cost_total" not in follow_cond:
+                follow_cond["cost_total"] = follow_cond.get(
+                    "count", parent_cond["cost_total"]
+                )
+    # A その後 followup may already be there, so the conditional runs after it.
+    existing = result.get("followup_action")
+    result["followup_action"] = (
+        {"action": "sequential", "actions": [existing, parsed]}
+        if existing
+        else parsed
+    )
+
+
 def _try_look_and_select(text):
     """その中から — look_at + select + action."""
     if "その中から" not in text:
@@ -8306,110 +8490,17 @@ def _try_look_and_select(text):
     if re.search(r"にカードが\d+枚以上ある場合", text.split("その中から")[0]):
         return None
     result = {"text": text, "action": "look_and_select"}
-    lm = re.search(r"(.+?)その中から", text)
-    if lm:
-        look_text = lm.group(1).strip()
-        # Extract condition prefix from look action text
-        ct, at = split_condition_action(look_text)
-        if ct:
-            cond = parse_condition(ct)
-            if cond and cond.get("type") != "custom":
-                result["condition"] = cond
-                # When condition mentions a specific zone, propagate as look_action source
-                # so the engine knows where to look (e.g. "ライブカード置き場にカードが2枚以上
-                # ある場合、その中から..." → look at live_card_zone, not deck_top)
-                cond_location = cond.get("location")
-                if cond_location and cond_location not in ("stage", "hand"):
-                    if at:
-                        la = parse_action(at)
-                        if la.get("action") != "custom":
-                            la.setdefault("source", cond_location)
-                            result["look_action"] = la
-                    else:
-                        result["look_action"] = {
-                            "action": "look_at",
-                            "source": cond_location,
-                            "target": "self",
-                        }
-                        if cond_location == "live_card_zone":
-                            result["look_action"]["all"] = True
-        if "look_action" not in result and at:
-            look_text = at
-            la = parse_action(look_text)
-            if la.get("action") != "custom":
-                result["look_action"] = la
-    am = re.search(r"その中から(.+)", text)
-    if am:
-        select_text = am.group(1).strip()
-        # Issue 12: Split on trailing period-separated conditionals like
-        # "...戻す。N以上の場合、さらに..."  — the conditional after the period
-        # becomes a separate followup action (not part of the select filter).
-        cond_followup = None
-        cond_split = re.search(
-            r"[。](?:\s*)(?:(\d+以上の場合、)|(そうした場合、))", select_text
+    _look_action_for(result, text)
+    select_clause = re.search(r"その中から(.+)", text)
+    if select_clause:
+        # Issue 12: split off a trailing period-separated conditional
+        # ("...戻す。N以上の場合、さらに...") so it becomes a separate followup
+        # action rather than part of the select filter.
+        select_text, cond_followup = _split_cond_followup(
+            select_clause.group(1).strip()
         )
-        if cond_split:
-            cond_start = cond_split.start()
-            cond_followup = select_text[cond_start + 1 :].strip()  # skip period
-            select_text = select_text[:cond_start].strip()
-            if cond_followup.startswith("そうした場合、"):
-                cond_followup = cond_followup[len("そうした場合、") :].strip()
-        # Split on その後 — the clause after その後 becomes a followup action
-        # executed after the look_and_select completes.
-        sonogo_parts = re.split(r"[。、]?\s*その後[、。]?\s*", select_text, maxsplit=1)
-        if len(sonogo_parts) > 1:
-            _build_look_select_with_followup(sonogo_parts[0].strip(), result)
-            followup_text = sonogo_parts[1].strip()
-            if followup_text:
-                parsed = parse_effect(followup_text)
-                if parsed:
-                    result["followup_action"] = parsed
-        else:
-            _build_look_select_with_followup(select_text, result)
-        if cond_followup:
-            parsed_cond = parse_effect(cond_followup)
-            if parsed_cond and parsed_cond.get("action") != "custom":
-                # Inherit context from parent condition for shorthand followup
-                # conditions like "30以上の場合" (which lack comparison_type,
-                # group_names, location, card_type, aggregate).
-                parent_cond = result.get("condition")
-                if parent_cond and isinstance(parent_cond, dict):
-                    follow_cond = parsed_cond.get("condition") or {}
-                    if (
-                        follow_cond
-                        and follow_cond.get("type") == "comparison_condition"
-                    ):
-                        for inherit_key in (
-                            "comparison_type",
-                            "group_names",
-                            "location",
-                            "card_type",
-                            "aggregate",
-                        ):
-                            if (
-                                inherit_key in parent_cond
-                                and inherit_key not in follow_cond
-                            ):
-                                follow_cond[inherit_key] = parent_cond[inherit_key]
-                        # cost_total is special: inherit from the followup's own
-                        # count value (the threshold in "N以上"), NOT from the
-                        # parent condition's cost_total.
-                        if (
-                            "cost_total" in parent_cond
-                            and "cost_total" not in follow_cond
-                        ):
-                            follow_cond["cost_total"] = follow_cond.get(
-                                "count", parent_cond["cost_total"]
-                            )
-                # If there's already a followup from その後, nest as sequential
-                if result.get("followup_action"):
-                    existing = result["followup_action"]
-                    result["followup_action"] = {
-                        "action": "sequential",
-                        "actions": [existing, parsed_cond],
-                    }
-                else:
-                    result["followup_action"] = parsed_cond
+        _build_select_with_followup(result, select_text)
+        _apply_conditional_followup(result, cond_followup)
     return result
 
 
@@ -8774,7 +8865,7 @@ def _try_conditional_sequential(text):
     middle_pay = None
     if (
         fa.get("action") == "select"
-        and "{{icon_energy.png|E}}" in fp
+        and ENERGY_ICON in fp
         and ("支払う" in fp or "支払って" in fp)
     ):
         # Split the first part on "、" to separate select from energy payment
@@ -8782,7 +8873,7 @@ def _try_conditional_sequential(text):
         if (
             len(fp_segments) >= 2
             and "選び" in fp_segments[0]
-            and "{{icon_energy.png|E}}" in fp_segments[1]
+            and ENERGY_ICON in fp_segments[1]
         ):
             select_text = fp_segments[0] + "、"
             pay_text = fp_segments[1]
@@ -9442,7 +9533,7 @@ def _try_kore_niyori_result(text):
             cond["card_property"] = "has_blade_heart"
             if "持たない" in cond_text or "ない" in cond_text:
                 cond["negation"] = True
-        if "{{icon_score.png|スコア}}を持つ" in cond_text:
+        if HAS_SCORE_ICON in cond_text:
             cond["card_property"] = "has_score_icon"
         _infer_heart_source(cond, cond_text)
         _infer_baton_touch(cond, cond_text)
@@ -9531,8 +9622,8 @@ def _try_unless_effect(text):
     eff_text = parts[1].strip()
 
     # Energy-based unless (existing): pay energy to avoid effect
-    if "{{icon_energy.png|E}}" in unless_text:
-        ec = unless_text.count("{{icon_energy.png|E}}")
+    if ENERGY_ICON in unless_text:
+        ec = unless_text.count(ENERGY_ICON)
         fa = {"action": "pay_energy", "energy": ec, "count": ec, "target": "self"}
         aa = parse_effect(eff_text)
         return make_conditional_on_optional(
@@ -9723,14 +9814,14 @@ def _set_blade_conversion(text, result):
 
 def _set_blade_equal_gain(text, result):
     result["resource"] = "blade"
-    icon_count = text.count("{{icon_blade.png|ブレード}}")
+    icon_count = text.count(BLADE_ICON)
     if icon_count:
         result["count"] = icon_count
 
 
 def _set_blade_same_thing_gain(text, result):
     result["resource"] = "blade"
-    icon_count = text.count("{{icon_blade.png|ブレード}}")
+    icon_count = text.count(BLADE_ICON)
     result["count"] = icon_count or 1
     if "ライブ終了時まで" in text:
         result["duration"] = "live_end"
@@ -9968,7 +10059,7 @@ def _set_timing_condition_gain(text, result):
     if not match:
         return
     resource_text = match.group(2)
-    blade_count = resource_text.count("{{icon_blade.png|ブレード}}")
+    blade_count = resource_text.count(BLADE_ICON)
     result["text"] = resource_text + "を得る"
     result["resource"] = "blade"
     result["count"] = blade_count
@@ -9989,7 +10080,7 @@ _try_timing_condition_gain = EffectPattern(
         t,
     )
     is not None
-    and t.count("{{icon_blade.png|ブレード}}") > 0,
+    and t.count(BLADE_ICON) > 0,
     action="gain_resource",
     setter=_set_timing_condition_gain,
 )
@@ -11817,7 +11908,7 @@ def _propagate_context(node, ctx=None, *, t="", eff_root=None):
             if "ブレードハートを持たない" in text or "ブレードハートがない" in text:
                 if not current.get("card_property"):
                     current["card_property"] = "has_blade_heart"
-            if "{{icon_score.png|スコア}}を持つ" in text and not current.get("card_property"):
+            if HAS_SCORE_ICON in text and not current.get("card_property"):
                 current["card_property"] = "has_score_icon"
             _infer_heart_source(current, text)
             _infer_baton_touch(current, text)
@@ -12062,7 +12153,7 @@ def _fix_condition_enrichment(eff, t):
                 cond["card_property"] = "has_blade_heart"
                 if "持たない" in ct or "ない" in ct:
                     cond["negation"] = True
-            if "{{icon_score.png|スコア}}を持つ" in ct and not cond.get(
+            if HAS_SCORE_ICON in ct and not cond.get(
                 "card_property"
             ):
                 cond["card_property"] = "has_score_icon"
@@ -12087,7 +12178,7 @@ def _fix_condition_enrichment(eff, t):
                 if cm:
                     cond["count"] = int(cm.group(1))
                     changed = True
-    if "{{icon_score.png|スコア}}を持つ" in t:
+    if HAS_SCORE_ICON in t:
         if eff.get("action") in ("move_cards", "select") and not eff.get(
             "card_property"
         ):
@@ -12203,9 +12294,9 @@ def _fix_compound_gain_split(eff, cond, t):
     if eff.get("action") != "gain_resource":
         return
     et = eff.get("text", "") or t
-    if "{{icon_all.png|ハート}}" in et and "{{icon_blade.png|ブレード}}" in et:
-        blade_count = et.count("{{icon_blade.png|ブレード}}")
-        heart_count = et.count("{{icon_all.png|ハート}}")
+    if ALL_HEART_ICON in et and BLADE_ICON in et:
+        blade_count = et.count(BLADE_ICON)
+        heart_count = et.count(ALL_HEART_ICON)
         actions = [
             {
                 "action": "gain_resource",

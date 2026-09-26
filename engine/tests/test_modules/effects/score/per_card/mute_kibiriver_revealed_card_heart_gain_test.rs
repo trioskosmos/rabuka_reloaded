@@ -145,8 +145,16 @@ fn mute_kibiriver_no_kasumi_in_revealed_no_selection() {
         if !acts.is_empty() { game.select_generated(0); } else { game.select_indices(&[]); }
         game.drain_auto_ability_choices();
     }
-    assert!(!game.has_pending_choice());
-    assert!(game.state.player1.waitroom.cards.len() >= 4, "revealed filler should be discarded");
+    assert!(
+        !game.has_pending_choice()
+    );
+    // The ability looks at 4 and discards them; the waitroom is empty before
+    // this, so "exactly 4" is checkable and ">= 4" is not worth asserting.
+    assert_eq!(
+        game.state.player1.waitroom.cards.len(),
+        4,
+        "the 4 revealed filler cards were discarded"
+    );
     // No heart should be gained because no Kasumi selected
     assert_eq!(game.state.mods.get_heart_modifier(kasumi, rabuka_engine::card::HeartColor::Heart03), 0);
 }
@@ -160,10 +168,25 @@ fn mute_kibiriver_multiple_kasumi_in_revealed_select_one() {
     game.state.player1.stage.stage = [kasumi, -1, -1];
     game.state.player1.live_card_zone.cards.push(kibiriver);
     game.give_energy(10);
-    // Deck top 4: 2 Kasumi + 2 filler
-    for _ in 0..2 { game.state.player1.main_deck.cards.push(game.new_id("PL!N-bp5-002-R")); }
-    for _ in 0..2 { let f=game.id("PL!-sd1-010-SD"); game.state.player1.main_deck.cards.push(f); }
-    for _ in 0..10 { let f=game.id("PL!-sd1-010-SD"); game.state.player1.main_deck.cards.push(f); }
+    // Deck top 4: 2 Kasumi + 2 filler.
+    //
+    // Built with put_on_deck_top, NOT push. `push` appends to the TOP of the
+    // deck, so the original fixture pushed the two Kasumi first and then ten
+    // filler on top of them: the engine revealed four filler, never saw a
+    // Kasumi, and the "select a Kasumi" prompt this test drives had nothing to
+    // select. The test passed because the discarded count was ">=".
+    let filler = game.id("PL!-sd1-010-SD");
+    for _ in 0..10 {
+        game.state.player1.main_deck.cards.push(filler);
+    }
+    // Two DISTINCT instances: `put_on_deck_top` with one id twice would stage
+    // the same card in two slots, and then the revealed set is not four cards.
+    let kasumi_a = game.new_id("PL!N-bp5-002-R");
+    let kasumi_b = game.new_id("PL!N-bp5-002-R");
+    put_on_deck_top(&mut game, 0, filler);
+    put_on_deck_top(&mut game, 0, filler);
+    put_on_deck_top(&mut game, 0, kasumi_b);
+    put_on_deck_top(&mut game, 0, kasumi_a);
     let pid = game.state.player1.id.clone();
     rabuka_engine::turn::TurnEngine::trigger_live_start_abilities(&mut game.state, &pid);
     game.state.process_pending_auto_abilities(&pid);
@@ -171,5 +194,50 @@ fn mute_kibiriver_multiple_kasumi_in_revealed_select_one() {
     game.select_indices(&[0]);
     while game.has_pending_choice() { game.select_indices(&[]); game.drain_auto_ability_choices(); }
     assert!(!game.has_pending_choice());
-    assert!(game.state.player1.waitroom.cards.len() >= 4);
+    // 「公開したカードをすべて控え室に置く」 — ALL revealed cards, so both
+    // Kasumi (selected and not) and both fillers land there. Identity first,
+    // then the count.
+    let wait = &game.state.player1.waitroom.cards;
+    assert!(
+        wait.contains(&filler),
+        "the revealed filler cards are discarded"
+    );
+    assert!(
+        wait.contains(&kasumi_a) && wait.contains(&kasumi_b),
+        "「公開したカードをすべて控え室に置く」 includes the selected card, not \
+         just the ones left behind; waitroom holds {} cards",
+        wait.len()
+    );
+    assert_eq!(
+        wait.len(),
+        4,
+        "all four revealed cards are discarded, the selected one included"
+    );
+
+    // The ability's actual effect, which no assertion in this file covered:
+    // 「これにより選んだカードが持つ色のハートを1つずつ得る」 — the STAGED Kasumi
+    // gains one heart of every colour the selected card prints. Derived from the
+    // card data rather than hard-coded, so both instances agree on it.
+    let selected = game.db.get_card(kasumi_a).expect("card in db");
+    let printed = selected
+        .base_heart
+        .as_ref()
+        .expect("a member prints hearts")
+        .hearts
+        .iter()
+        .filter(|(color, count)| *count > 0 && (1..=6).contains(&color.index()))
+        .count() as i16;
+    let gained: i32 = (1..=6)
+        .map(|i| {
+            game.state
+                .mods
+                .get_heart_modifier(kasumi, rabuka_engine::card::HeartColor::from_index(i))
+        })
+        .sum();
+    assert_eq!(
+        gained, printed as i32,
+        "the staged Kasumi gains one heart per colour the SELECTED card prints \
+         ({} colours on PL!N-bp5-002-R)",
+        printed
+    );
 }

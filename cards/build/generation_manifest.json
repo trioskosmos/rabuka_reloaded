@@ -1,10 +1,10 @@
 {
   "schema": "compiled_abilities.v1",
   "compiler": "cards/compile_abilities.py",
-  "engine_commit": "8ac8bce4",
+  "engine_commit": "d71ef459",
   "input": {
     "source": "cards/abilities.json",
-    "sha256": "7c416e664400d356",
+    "sha256": "5162e7175906016c",
     "count": 936
   },
   "output": {

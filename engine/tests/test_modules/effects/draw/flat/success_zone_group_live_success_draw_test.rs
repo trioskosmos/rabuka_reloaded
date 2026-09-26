@@ -70,7 +70,7 @@ const MU_MUREN: &str = "PL!HS-bp1-023-L";
 const HASUNOSORA: &str = "PL!HS-bp1-001-R";
 
 #[test]
-fn success_zone_group_draw_live_KNOWN_GAP_mu_printemps_card_in_zone_draws_nothing() {
+fn success_zone_group_draw_live_known_gap_mu_printemps_card_in_zone_draws_nothing() {
     let (mut game, live, _filler) = setup();
     let mu = game.id(MU_PRINTEMPS);
     game.state
@@ -130,7 +130,7 @@ fn success_zone_group_draw_live_KNOWN_GAP_mu_printemps_card_in_zone_draws_nothin
 }
 
 #[test]
-fn success_zone_group_draw_live_KNOWN_GAP_mu_muren_card_in_zone_draws_nothing() {
+fn success_zone_group_draw_live_known_gap_mu_muren_card_in_zone_draws_nothing() {
     let (mut game, live, _filler) = setup();
     // The same group under μ's later unit name, みらくらぱーく！. This is the
     // half of μ's the series rule cannot see at all, because these cards print

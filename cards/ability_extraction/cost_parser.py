@@ -3,6 +3,7 @@ from typing import Any, Dict, List
 
 from parser_utils import (
     COUNT_PATTERN,
+    ENERGY_ICON,
     FieldContext,
     COST_CARD_FIELDS_POLICY,
     COST_REVEAL_FIELDS_POLICY,
@@ -158,9 +159,9 @@ def _cost_verb_choice(text, cost):
 
 @_register_cost
 def _cost_energy(text, cost):
-    if not text.strip().startswith("{{icon_energy.png|E}}"):
+    if not text.strip().startswith(ENERGY_ICON):
         return None
-    energy_end = text.find("}}", text.rfind("{{icon_energy.png|E}}")) + 2
+    energy_end = text.find("}}", text.rfind(ENERGY_ICON)) + 2
     energy_text = text[:energy_end].strip()
     other_text = text[energy_end:].strip()
     if energy_text and other_text:
@@ -174,7 +175,7 @@ def _cost_energy(text, cost):
             if extract_optional(text):
                 _set_optional_cost(result)
             return result
-    energy_count = text.count("{{icon_energy.png|E}}")
+    energy_count = text.count(ENERGY_ICON)
     cost["type"] = "pay_energy"
     cost["energy"] = energy_count
     cost["zone"] = "energy_zone"
@@ -245,7 +246,7 @@ def _apply_under_member_classification(cost, text):
 
 
 def _apply_pay_energy_classification(cost, text):
-    cost["energy"] = text.count("{{icon_energy.png|E}}")
+    cost["energy"] = text.count(ENERGY_ICON)
     if extract_optional(text):
         cost["optional"] = True
     return "pay_energy"
@@ -291,7 +292,7 @@ _CLASSIFY_COST_RULES = [
         lambda cost, text: "change_state",
     ),
     (
-        lambda cost, text: "{{icon_energy.png|E}}" in text
+        lambda cost, text: ENERGY_ICON in text
         and ("支払う" in text or "支払って" in text),
         _apply_pay_energy_classification,
     ),

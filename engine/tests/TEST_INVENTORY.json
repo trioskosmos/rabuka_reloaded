@@ -1,6 +1,6 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-09-26T12:33:32.767057+00:00",
+  "generated_at": "2026-09-26T12:46:37.111238+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
@@ -1367,7 +1367,7 @@
       ]
     },
     "count_inequality_only": {
-      "count": 24,
+      "count": 18,
       "rows": [
         {
           "file": "engine/tests/test_modules/characterization/corpus_smoke_test.rs",
@@ -1376,33 +1376,9 @@
           "detail": "1 inequality assertion(s) on a count, vs threshold"
         },
         {
-          "file": "engine/tests/test_modules/effects/choice/per_card/daydream_mermaid_live_success_energy_or_recover_choice_test.rs",
-          "test": "daydream_mermaid_choice_appears_and_selects_energy",
-          "line": 41,
-          "detail": "1 inequality assertion(s) on a count, vs baseline"
-        },
-        {
-          "file": "engine/tests/test_modules/effects/choice/per_card/daydream_mermaid_live_success_energy_or_recover_choice_test.rs",
-          "test": "daydream_mermaid_choice_selects_recover",
-          "line": 86,
-          "detail": "1 inequality assertion(s) on a count, vs baseline"
-        },
-        {
-          "file": "engine/tests/test_modules/effects/choice/per_card/tang_keke_energy_or_heart06_choice_test.rs",
-          "test": "tang_keke_discard_member_with_blade_heart_choose_one",
-          "line": 42,
-          "detail": "1 inequality assertion(s) on a count, vs baseline"
-        },
-        {
           "file": "engine/tests/test_modules/effects/choice/per_card/tang_keke_energy_or_heart06_choice_test.rs",
           "test": "tang_keke_discard_member_without_blade_heart_choose_any_number",
-          "line": 66,
-          "detail": "1 inequality assertion(s) on a count, vs baseline"
-        },
-        {
-          "file": "engine/tests/test_modules/effects/choice/per_card/tang_keke_energy_or_heart06_choice_test.rs",
-          "test": "tang_keke_discard_non_member_liella_card_choose_one",
-          "line": 112,
+          "line": 68,
           "detail": "1 inequality assertion(s) on a count, vs baseline"
         },
         {
@@ -1433,12 +1409,6 @@
           "file": "engine/tests/test_modules/effects/gain/blades/per_card/q273_fired_debut_ability_cost_paid_test.rs",
           "test": "q273_fired_debut_ability_cost_is_paid",
           "line": 85,
-          "detail": "1 inequality assertion(s) on a count, vs baseline"
-        },
-        {
-          "file": "engine/tests/test_modules/effects/gain/blades/per_card/ren_baton_touch_group_check_test.rs",
-          "test": "ren_baton_touch_from_liella_places_energy",
-          "line": 21,
           "detail": "1 inequality assertion(s) on a count, vs baseline"
         },
         {
@@ -1494,12 +1464,6 @@
           "test": "poppin_no_niji_revealed_effect_fails",
           "line": 264,
           "detail": "1 inequality assertion(s) on a count, vs baseline"
-        },
-        {
-          "file": "engine/tests/test_modules/effects/score/per_card/mute_kibiriver_revealed_card_heart_gain_test.rs",
-          "test": "mute_kibiriver_multiple_kasumi_in_revealed_select_one",
-          "line": 154,
-          "detail": "1 inequality assertion(s) on a count, vs threshold"
         },
         {
           "file": "engine/tests/test_modules/jidou/yell/discard_revealed_then_re_yell/blade_heart_two_or_fewer_discard_all_and_re_yell_test.rs",
@@ -2640,9 +2604,9 @@
         "eternalize_same_name_two_niji_identical",
         "eternalize_three_all_different_no_trigger",
         "eternalize_two_same_one_different_triggers",
-        "group_membership_KNOWN_GAP_aqours_card_matches_its_unit_but_not_its_group",
-        "group_membership_KNOWN_GAP_muren_card_is_invisible_to_mus_filter",
-        "group_membership_KNOWN_GAP_sunny_passion_filter_is_unsatisfiable",
+        "group_membership_known_gap_aqours_card_matches_its_unit_but_not_its_group",
+        "group_membership_known_gap_muren_card_is_invisible_to_mus_filter",
+        "group_membership_known_gap_sunny_passion_filter_is_unsatisfiable",
         "group_membership_works_for_the_three_covered_groups",
         "joint_live_start_discard_mixed_named_gains_score3",
         "joint_live_start_discard_three_gains_score3",
@@ -12451,9 +12415,9 @@
         "cost11_baton_replacement_moves_debut_watcher_to_waitroom_q198",
         "cost11_debut_with_watcher_retains_nonempty_energy_zone_q198",
         "full_chain_setsuna_debut_retrieval",
-        "group_membership_KNOWN_GAP_aqours_card_matches_its_unit_but_not_its_group",
-        "group_membership_KNOWN_GAP_muren_card_is_invisible_to_mus_filter",
-        "group_membership_KNOWN_GAP_sunny_passion_filter_is_unsatisfiable",
+        "group_membership_known_gap_aqours_card_matches_its_unit_but_not_its_group",
+        "group_membership_known_gap_muren_card_is_invisible_to_mus_filter",
+        "group_membership_known_gap_sunny_passion_filter_is_unsatisfiable",
         "group_membership_works_for_the_three_covered_groups",
         "hand_activation_draw_and_lone_nijigasaki_blade_resolve_q196",
         "hand_activation_empty_stage_resolves_draw_after_discard_choices_q196",
@@ -12527,9 +12491,9 @@
         "cost11_baton_replacement_moves_debut_watcher_to_waitroom_q198",
         "cost11_debut_with_watcher_retains_nonempty_energy_zone_q198",
         "full_chain_setsuna_debut_retrieval",
-        "group_membership_KNOWN_GAP_aqours_card_matches_its_unit_but_not_its_group",
-        "group_membership_KNOWN_GAP_muren_card_is_invisible_to_mus_filter",
-        "group_membership_KNOWN_GAP_sunny_passion_filter_is_unsatisfiable",
+        "group_membership_known_gap_aqours_card_matches_its_unit_but_not_its_group",
+        "group_membership_known_gap_muren_card_is_invisible_to_mus_filter",
+        "group_membership_known_gap_sunny_passion_filter_is_unsatisfiable",
         "group_membership_works_for_the_three_covered_groups",
         "hand_activation_draw_and_lone_nijigasaki_blade_resolve_q196",
         "hand_activation_empty_stage_resolves_draw_after_discard_choices_q196",
@@ -31070,9 +31034,9 @@
         "distortion_same_name_catchu_condition_not_met",
         "distortion_two_same_one_diff_catchu_condition_met",
         "energy_zone_capacity_handled",
-        "group_membership_KNOWN_GAP_aqours_card_matches_its_unit_but_not_its_group",
-        "group_membership_KNOWN_GAP_muren_card_is_invisible_to_mus_filter",
-        "group_membership_KNOWN_GAP_sunny_passion_filter_is_unsatisfiable",
+        "group_membership_known_gap_aqours_card_matches_its_unit_but_not_its_group",
+        "group_membership_known_gap_muren_card_is_invisible_to_mus_filter",
+        "group_membership_known_gap_sunny_passion_filter_is_unsatisfiable",
         "group_membership_works_for_the_three_covered_groups"
       ],
       "covering_test_count": 67,
@@ -31768,9 +31732,9 @@
         "compound_dododo_hasunosora_on_stage_passes",
         "compound_dododo_no_hasunosora_fails",
         "compound_dododo_tied_score_with_hasunosora_fails",
-        "group_membership_KNOWN_GAP_aqours_card_matches_its_unit_but_not_its_group",
-        "group_membership_KNOWN_GAP_muren_card_is_invisible_to_mus_filter",
-        "group_membership_KNOWN_GAP_sunny_passion_filter_is_unsatisfiable",
+        "group_membership_known_gap_aqours_card_matches_its_unit_but_not_its_group",
+        "group_membership_known_gap_muren_card_is_invisible_to_mus_filter",
+        "group_membership_known_gap_sunny_passion_filter_is_unsatisfiable",
         "group_membership_works_for_the_three_covered_groups",
         "hasunosora_group_member_present_passes",
         "hasunosora_group_mixed_stage_passes",
@@ -31785,10 +31749,10 @@
         "score_gt_opponent_equal_fails",
         "score_gt_opponent_p1_higher_passes",
         "score_gt_opponent_p1_lower_fails",
-        "success_zone_group_draw_live_KNOWN_GAP_mu_muren_card_in_zone_draws_nothing",
-        "success_zone_group_draw_live_KNOWN_GAP_mu_printemps_card_in_zone_draws_nothing",
         "success_zone_group_draw_live_draws_nothing_with_empty_success_zone",
-        "success_zone_group_draw_live_draws_nothing_with_non_mu_card_in_success_zone"
+        "success_zone_group_draw_live_draws_nothing_with_non_mu_card_in_success_zone",
+        "success_zone_group_draw_live_known_gap_mu_muren_card_in_zone_draws_nothing",
+        "success_zone_group_draw_live_known_gap_mu_printemps_card_in_zone_draws_nothing"
       ],
       "covering_test_count": 24,
       "is_null": false,
@@ -35354,10 +35318,10 @@
         "engine/tests/test_modules/effects/draw/flat/success_zone_group_live_success_draw_test.rs"
       ],
       "covering_tests": [
-        "success_zone_group_draw_live_KNOWN_GAP_mu_muren_card_in_zone_draws_nothing",
-        "success_zone_group_draw_live_KNOWN_GAP_mu_printemps_card_in_zone_draws_nothing",
         "success_zone_group_draw_live_draws_nothing_with_empty_success_zone",
-        "success_zone_group_draw_live_draws_nothing_with_non_mu_card_in_success_zone"
+        "success_zone_group_draw_live_draws_nothing_with_non_mu_card_in_success_zone",
+        "success_zone_group_draw_live_known_gap_mu_muren_card_in_zone_draws_nothing",
+        "success_zone_group_draw_live_known_gap_mu_printemps_card_in_zone_draws_nothing"
       ],
       "covering_test_count": 4,
       "is_null": false,
